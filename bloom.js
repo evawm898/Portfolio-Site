@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -486,7 +486,7 @@ let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequ
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
-let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true;
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true, lastStemNodesAbsent = true;
 let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris = 0;
 /* THE SEPALS (part 1) — footRing()'s descriptor (the ring, the count and its
    ceiling, the phase, the foot), the builder's own emitted whorl and the angle
@@ -682,6 +682,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        build was made from. ST0 needs the answer the RUNNING module gave; see
        __bloomMetrics. */
     lastStemAbsent = stemIsAbsent(uiForBuild);
+    lastStemNodesAbsent = stemNodesAbsent(uiForBuild);
     /* LEAVES — LF0-LF7's measured side. `leaf` is NULL and not absent where
        there are none: LF1 distinguishes "the builder says there are none" from
        "the builder says nothing", and a missing key is the second. The
@@ -1691,8 +1692,28 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
           : Number(stem.hubAmount) === 0 ? ' · STRAIGHT — amount 0, no flare'
           : ' · STRAIGHT — the head is not wider than the stem, so there is no room for a flare (the stem\'s solid root band joins them)')
     + ` · TOTAL ${stem.belowHeadMm.toFixed(1)} mm below the head\'s top face (hub ${stem.axisDepth.toFixed(2)} + stem ${stem.lengthMm} — Hub length ADDS to the height, stem length unchanged)`
+    + stemNodesLine(stem)
     + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm thick at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — thickness DERIVED from the stem's own section, no control` : inertBecause}\n`
     + stemChannelLine(omission);
+}
+
+/* THE STEM'S NODES (#299's port) — what the build made of the one control,
+   told in the units a reader can hold: how many nodes, the swelling, the turn,
+   where each bend peaks against the spindle (the phasing Eva likes, as a
+   number), how far the tip ends up off straight, and the wall measured square
+   to the leaning axis — the one figure left for Eva to rule on. Absent where
+   the control is at 0 or has nothing to act on. */
+function stemNodesLine(stem) {
+  const L = stem.nodeLaw;
+  if (!L) return '';
+  return `\n     NODES ${L.nodes.length} at the leaves · prominence ${L.prominence.toFixed(2)}`
+    + ` · swell +${(L.swell * 100).toFixed(1)}% of radius over a ${L.spreadMm.toFixed(2)} mm spindle (${STEM_NODE_SPREAD_RADII.toFixed(2)} stem radii, the flower's own proportion)`
+    + ` · turn ${L.turnDeg.toFixed(2)}° a node, away from its first leaf, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle — inside the swelling)`
+    + ` · tip ${stem.nodeTipOffsetMm.toFixed(2)} mm off straight · worst lean ${stem.nodeTiltMaxDeg.toFixed(2)}°`
+    + (stem.nodeWallPerpMm !== null && stem.nodeWallPerpMm !== undefined
+        ? ` · wall ${stem.nodeWallPerpMm.toFixed(4)} mm measured square to the leaning axis (${STEM_MIN_WALL_MM} mm horizontally — reported, Eva's to rule)`
+        : ' · solid stem, no bore — the wall question does not arise')
+    + ` · ${stem.stations.length} stations`;
 }
 
 /* THE STEM CHANNEL (the sphere-stem session) — CLAMPED AND TOLD. A user asking
@@ -2304,7 +2325,11 @@ window.__bloomMetrics = () => ({
      heights rather than stored twice. */
   stem: lastStem ? {
     lengthMm: lastStem.lengthMm, outerR: lastStem.outerR, boreR: lastStem.boreR, wallMm: lastStem.wallMm,
-    root: [0, 0, lastStem.rootZ], tip: [0, 0, lastStem.tipZ],
+    /* The tip stands on the DECLARED axis — the world axis without nodes, the
+       node law's offset at the stem's length with them (`stemAxisAt`, the one
+       front door). ST2 restates that offset rather than reading it here. */
+    root: [0, 0, lastStem.rootZ], tip: [...stemAxisAt(lastStem, lastStem.lengthMm), lastStem.tipZ],
+    voidStations: lastStem.voidStations ? lastStem.voidStations.slice() : null,
     /* MEASURED FROM WHAT THE BUILDER EMITTED, not from the plan's own two
        heights: ST4 asks whether the root really runs THROUGH the slab, and a
        builder that started at the underside would leave the plan saying it
@@ -2359,6 +2384,13 @@ window.__bloomMetrics = () => ({
     emittedMinR: lastStemBuilt ? lastStemBuilt.emittedMinR : undefined,
     emittedAxisOffset: lastStemBuilt ? lastStemBuilt.emittedAxisOffset : undefined,
     emittedTipZ: lastStemBuilt ? lastStemBuilt.emittedTipZ : undefined,
+    /* THE NODES (ST12). The PLAN's declared law beside the rings the BUILDER
+       emitted; ST12 restates the law from the controls and the leaves' own
+       node depths and reads it off `emittedRings`, never off `nodeLaw`. */
+    nodeLaw: lastStem.nodeLaw ? JSON.parse(JSON.stringify(lastStem.nodeLaw)) : null,
+    nodeTiltMaxDeg: lastStem.nodeTiltMaxDeg, nodeTipOffsetMm: lastStem.nodeTipOffsetMm,
+    nodeMaxOuterR: lastStem.nodeMaxOuterR, nodeWallPerpMm: lastStem.nodeWallPerpMm, nodeWallPerpAtMm: lastStem.nodeWallPerpAtMm,
+    emittedRings: lastStemBuilt && lastStemBuilt.emittedRings ? lastStemBuilt.emittedRings.map((r) => ({ ...r })) : null,
   } : null,
   stemTris: lastStemTris,
   /* THE LEAVES (LF0-LF7). The PLAN's own declarations beside the BUILDER's own
@@ -2553,6 +2585,9 @@ window.__bloomMetrics = () => ({
      `stem-eligible-disagrees-with-the-registry` fired nothing until this key
      existed. */
   stemAbsent: lastStemAbsent,
+  /* THE NODES' TWO STATEMENTS (ST12) — the geometry's answer from the running
+     module, never a Node import, for ST0's own reason. */
+  stemNodesAbsent: lastStemNodesAbsent,
   /* THE SEPALS (SP0-SP9). The RING's own declarations (footRing's descriptor)
      beside the BUILDER's own emitted records: the count it built, each sepal's
      azimuth as the whorl primitive placed it, its foot frames and length as

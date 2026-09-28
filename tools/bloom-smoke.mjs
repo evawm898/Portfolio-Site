@@ -919,6 +919,28 @@ export const SMOKE_BLOCKS = [
         path: "the LOBE cut composed with the nib — the per-period relief guard reads at a SINUS, so a period whose sinus sits on the law can carry a relief the nib has no room for; AN3 on an outline that is the cut one, beside L0-L8" },
     ],
   },
+  {
+    n: 41, title: "the stem's nodes — the flower's swelling and kink, one control",
+    anchor: "STEM NODES: the flower's 0.48 on 100 x 6 mm, three alternate leaves",
+    /* FOUR ROWS, ON THE AXES THE NODES HAVE: the flower's own setting on a
+       HOLLOW stem (every restated clause at once — the void's own ladder, the
+       tip plug's disc at a swollen radius, the petiole on a displaced axis);
+       Eva's approved SOLID 3 mm stem, where the no-void arm is the one the
+       noded rings go through; the SPHERE, which is the only place ST9 and
+       ST7's meridian margin speak and the channel measures a kinked stem; and
+       a GATED row, because a two-statement clause needs the state where the
+       statement bites — prominence at its maximum with nothing to node. */
+    rows: [
+      { label: "STEM NODES: the flower's 0.48 on 100 x 6 mm, three alternate leaves",
+        path: "the flower's own setting on a HOLLOW stem — ST12 (the two statements, the emitted rings' centres and radii against the flower's law restated over the leaves' nodes, and the PHASING: each bend peaks just below its node inside the swelling), ST1 (the count from the plan's own outer and void ladders), ST2 (the tip at the law's offset), ST3 (the widest ring the law's swelling), ST10 (the tip plug's disc at the swollen tip radius), LF2 (the petiole on the displaced axis)" },
+      { label: "STEM NODES: 0.48 on Eva's approved 3 mm stem (SOLID — no bore)",
+        path: "the SOLID arm — ST12 and ST1 through the no-void arm, ST3's narrowest vertex on the outer ring, ST10's bottom disc at the swollen tip radius" },
+      { label: 'STEM NODES: x a SPHERE with a stem (the channel against a noded stem)',
+        path: "the SPHERE — ST7 (the omission criterion and the meridian margin at the root's own radius), ST8, ST9 (the channel located in the FILE by the restated law and measured with the harness's own distance), ST12 on a stem leaving a pole" },
+      { label: 'STEM NODES: GATED — prominence 1 with no leaves (hidden AND inert)',
+        path: "the GUARD — ST12's two statements where they can disagree (prominence at its maximum and no leaves to node) and prominence-0's identity at the plan (no law, no noded rings, `stemStations`' own two stations)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

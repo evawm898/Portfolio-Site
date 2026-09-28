@@ -52,7 +52,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
-         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius,
+         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_PROMINENCE_RANGE,
          HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
@@ -378,6 +378,14 @@ export const PREDICATES = {
      statements. The registry states the leaf's half; the geometry states its
      own, and a green run must not endorse one without the other. */
   leafPresent: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }] },
+  /* THE STEM'S NODES (#299's port). The registry's half of the geometry's
+     `stemNodesAbsent`: nodes are the LEAVES' nodes, so the control needs
+     leaves, and a raceme's rachis carries a second node set whose swelling is
+     an open question for Eva, so it is inert under an inflorescence. Both are
+     decisions made without a ruling and are one term each to reverse. ST12
+     checks the two statements against each other per row. */
+  stemNodesEligible: { all: [{ ref: 'leafPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+  stemNodesPresent: { all: [{ ref: 'stemNodesEligible' }, { id: 'stemNodeProminence', awayFrom: 0, by: 0.005 }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
   leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
@@ -3390,6 +3398,15 @@ export const CONTROLS = [
       return bore === 0 ? `${v} mm across — SOLID (the bore closes at or under ${2 * STEM_MIN_WALL_MM} mm)`
                         : `${v} mm across, ${(2 * bore).toFixed(1)} mm bore — a ${STEM_MIN_WALL_MM} mm wall`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  /* NODE PROMINENCE — the flower's own control, ported (Eva's rulings on #299):
+     the swelling and the kink are ONE control, it ships OFF, and 0 is the
+     identity by branch. The law and every constant are `stemNodeLaw`'s; the
+     read-out states what the build made of it. */
+  { id: 'stemNodeProminence', section: 'stem', kind: 'slider',
+    min: STEM_NODE_PROMINENCE_RANGE[0], max: STEM_NODE_PROMINENCE_RANGE[1], step: 0.01, default: 0,
+    label: 'Node prominence',
+    fmt: (v) => (Number(v) === 0 ? 'smooth — no nodes' : `${Number(v).toFixed(2)} — swollen, gently kinked nodes at the leaves (the read-out says by how much)`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemNodesEligible' } },
 
   /* ===================================================================
      THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem

@@ -3538,6 +3538,30 @@ and `leaves` under `stem`; Stem > Leaves > Serration is the second third level a
 the children's full names are BOTH placements made without a ruling** and are Eva's to rule on.
 `frozen/phase32` is the 758 rows at `3f664be`.
 
+**THE STEM HAS NODES — THE FLOWER'S SWELLING AND KINK AS ONE CONTROL, SHIPPED OFF** (Eva's
+rulings on #299 — read `docs/bloom-stem-nodes-outcome.md` before touching `stemNodeLaw`,
+`stemNodeStations`, `buildStemInto`'s noded arm, `nodedStemDistanceMm`, `leafNodeLayout` or
+ST12). `stemNodeProminence` (Stem, 0–1, default **0**, hidden and inert without leaves or under
+a raceme) swells the stem by `0.6·prom` over a spindle of **3.2738 stem radii** (the flower's
+0.055 of a 4-unit stem at radius 0.0672, a RATIO, never a fraction of the length) and kinks it
+by `atan(0.13·prom)` eased in over 0.12/0.055 spindles — so the bend's curvature peaks **0.818
+of the spindle below each node, inside the swelling, at every prominence and diameter**, which
+is the phasing Eva likes and ST12(d) reads off the EMITTED rings. **THE NODES ARE THE LEAVES'**
+(one owner, `leafNodeLayout`), and **THE KINK TURNS AWAY FROM EACH NODE'S FIRST LEAF**, not at
+the flower's golden angle — this file's own warning that the flower's leaves/bends disagreement
+must not come back with curvature. **RINGS STAY HORIZONTAL, ONLY THEIR CENTRES MOVE** (an axis
+offset, not a centreline or a swept frame), so the bore, root band, tip plug and join keep their
+meaning; the leaf-node pitch floor is mode-free now. **PROMINENCE 0 IS THE IDENTITY BY BRANCH**
+(`stemNodeLaw` null, `stemStations` verbatim, the straight arm verbatim). **THE WALL SQUARE TO A
+LEANING AXIS IS `1.5·cos(lean)` — 1.4971 mm at 0.48, 1.4875 at 1.00 on hollow 3.5–8 mm stems —
+REAL GEOMETRY, REPORTED ON THE READ-OUT, EVA'S TO RULE**; at 3 mm the stem is solid and it does
+not arise. Cost: the flower's 1,568 is 16 sides, solid, 49 fixed stations; the bloom pays 3x for
+48 sectors and 2x for the bore (9,404 at 6 mm / 0.48, 5,948 at 3 mm), and the chord-error placer
+scales stations as L/R. ST12's four arms each fire on a planted record through
+`node tools/verify-bloom-stem-nodes.mjs` (preflight in `bloom-export-watertight.yml`); six node
+mutants in the apex table. Block 41 is 13 rows, smoke block 41 is 4. `frozen/phase44` is the 953
+rows at `21ddbbd`, pre-declared in `TAG_PUSH_XFAIL`. `docs/img/stem-nodes.png` is the sheet.
+
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
 then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships

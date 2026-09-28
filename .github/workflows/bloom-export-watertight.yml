@@ -24,6 +24,7 @@ on:
       - tools/verify-bloom-infill-margin.mjs
       - tools/verify-bloom-infill-budget.mjs
       - tools/verify-bloom-stem-channel.mjs
+      - tools/verify-bloom-stem-nodes.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
@@ -56,6 +57,7 @@ on:
       - tools/verify-bloom-infill-margin.mjs
       - tools/verify-bloom-infill-budget.mjs
       - tools/verify-bloom-stem-channel.mjs
+      - tools/verify-bloom-stem-nodes.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
@@ -268,6 +270,13 @@ jobs:
         run: node tools/verify-bloom-stem-channel.mjs
       - name: ... and it must be able to fail
         run: node tools/verify-bloom-stem-channel.mjs --control
+      # THE STEM'S NODES (#299's port): ST12's four arms, each planted into
+      # records the shipped geometry builds and required to fire BY ITS OWN
+      # MESSAGE through stemNodeClauses — the function both STL gates call.
+      # Here after the npm install for ST9's reason (it imports the harness,
+      # which imports playwright-core at load) and before the browser.
+      - name: ST12 — every arm of the stem-node clause must be able to fail
+        run: node tools/verify-bloom-stem-nodes.mjs
       # S5: every infilled row under the export budget on its own mesh. It
       # imports the harness (for the matrix), which imports playwright at
       # module load, so it sits after the npm install.

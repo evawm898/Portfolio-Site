@@ -6324,3 +6324,17 @@ matters should be measured this way.
       still sweeps all 261 self-intersection rows first, so the re-measurement invocation is
       `--combination --only '^$'`. #263's doc called it re-measurable "in seconds"; that was the
       SECTION's cost and not the invocation's, and the tool's own header says so now.
+
+## The stem's nodes (Eva's rulings on #299)
+
+- **One control, `stemNodeProminence`, the flower's swelling AND kink, shipped at 0.** The
+  law is the flower's, ported as ratios of the stem radius (spindle 3.2738 radii, swell
+  0.6·prom, turn atan(0.13·prom), bend peak 0.818 of the spindle below its node). Full
+  record, the consumer enumeration, ST12, the partition and the cost:
+  `docs/bloom-stem-nodes-outcome.md`.
+- **Decided without a ruling, each reversible:** nodes are the leaves' nodes (inert without
+  leaves); inert under a raceme; the kink turns away from each node's first leaf rather than
+  at the flower's golden angle; the leaf-node pitch floor is mode-free.
+- **Waiting on Eva:** the wall measured square to the leaning axis is 1.5·cos(lean), under
+  the stated 1.5 mm by 3 microns at 0.48 and 12.5 at 1.00. Real geometry, reported on the
+  read-out, not asserted either way; closing it is `1/cos(lean)` on the bore.
