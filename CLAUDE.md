@@ -4947,6 +4947,32 @@ shipping default untouched.** 29 byte movers predeclared from the BASE record, e
 omitting the along-sweep term at the petal ENDS — pre-existing, plain petal, recorded, NOT fixed.**
 `frozen/phase43` is the 952 rows at `2457d12`, pre-declared in `TAG_PUSH_XFAIL`.
 
+**THE INFILL'S ROUNDNESS IS A CONTROL, THE LAW IS THE SWEPT ONE UNREPARAMETERISED, AND THE
+FILLET STAYS ABSOLUTE** (Eva's rulings, the roundness-control session — read §F and §G of
+`docs/bloom-infill-roundness-and-bevel.md` before touching `infillRound`, `INFILL_ROUND_*`,
+`infillOpen`, `drawnOf`'s roundness block, `INFILL_FILLET_MM` or I12). `infillRound` (Infill,
+0–1, **default 0.60**) OPENS each hole at `R = s x its own inradius`; **0 is today's hole by
+branch (the floor)**, 1 the stadium/circle. **The recommended reparameterisation (floor mapped
+to the fillet) was MEASURED and REFUTED** (§F, `node tools/bloom-roundness-law-match.mjs
+--anchored`): the ruled 0.60 shape is a SPLIT — 9 of the default's 20 holes still at their
+fillet, 11 rounded — and any law live from the fillet moves all 20 at its first step (worst
+hole 53.8% of its area off at every t). **The dead-looking travel below a hole's onset (0.469
+.. 1.036 on the default) is the law being honest and is TOLD PER BUILD on the control, never
+baked into the range; a fixed floor offset was REJECTED** (it moves with petal shape).
+**THE SPLIT EXISTS ONLY BECAUSE THE FILLET IS AN ABSOLUTE 0.8 mm — the old "proportional
+fillet, short-edge clamp as a ceiling only" ruling is RETIRED (never implemented); do not
+re-propose it.** Construction: the fillet traced at 20 is opened with arcs cut by BISECTING
+normals (no discrete decision on trigonometry), CLIPPED TO TODAY'S HOLE (measured: the finer
+trace alone drew holes 1.7e-4 less round than today's), chord-pruned at 3.05e-3 mm, kept at
+today's where still less round; on a CURVED plan it opens in the surface's local frame and the
+1.50 mm bar holds it back (the plan-space law lost 2 of 12 holes on `cup 1.2 x curl 360`), so
+**the achieved count holds at every step, flat and curved**. Default: **170.7 mm² of hole,
+56.0% solid, 20/20** (floor 179.1 / 53.8%, circle 99.3 / 74.4%), matching the swept 0.60 hole
+for hole within 0.0135 mm; **the budget FALLS — `INFILL: x 40 x 3` 1,226,912 (81.8%) ->
+1,126,592 (75.1%)**, because every re-drawn ring drops its flat vertices. **I12** in
+`verify-bloom-infill.mjs` (six mutants), panel route **(aa)**, 31 movers / 926 holders,
+`frozen/phase44` = the 953 rows at `38a4893`. Stretch 1.65 untouched.
+
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
 `docs/bloom-inflorescence-discovery.md` and they govern — read them, then

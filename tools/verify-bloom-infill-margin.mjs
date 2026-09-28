@@ -105,11 +105,14 @@ const QUICK_RE = /^default$|sheet 0\.60|ALL FORM MAX|petalTipShape 3/;
      rim's first facet against the SKIN: the bar's closed form assumes the skin
      is the tangent plane at the junction, and on the thick sheet a skin chord
      tilts off it by that much. Recorded rather than widened. */
+/* RE-RECORDED by the roundness-control session (previous figures 89.18,
+   113.14 and 31.26; roll 330 unmoved): the opened holes re-trace the cells
+   beside the margin's bead on the same folding sheet. */
 const MB1_XFAIL = Object.freeze({
-  'cup 1.2 x curl 360': { excessDeg: 89.18 },
+  'cup 1.2 x curl 360': { excessDeg: 89.96 },
   'roll 330': { excessDeg: 43.38 },
-  'ALL FORM MAX': { excessDeg: 113.14 },
-  'buckle 0.60 f 3': { excessDeg: 31.26 },
+  'ALL FORM MAX': { excessDeg: 111.91 },
+  'buckle 0.60 f 3': { excessDeg: 36.20 },
   'sheet 2.40': { excessDeg: 0.14 },
 });
 
@@ -157,7 +160,7 @@ function runState(G, name, set, mode) {
   const surface = G.petalSurface(st, ring, slot, null, acc0);
   const g = petal.grid[0];
   const plan = G.petalInfillPlan(surface, g.rows, { rowFrom: g.rowFrom, rowTo: g.rowTo, label: g.label, spanAt: () => [-1, 1] },
-    { density: petal.infill.density, passes: petal.infill.passes, gamma: petal.infill.gamma, aniso: petal.infill.aniso, baseFrac: petal.infill.baseFrac });
+    { density: petal.infill.density, passes: petal.infill.passes, gamma: petal.infill.gamma, aniso: petal.infill.aniso, baseFrac: petal.infill.baseFrac, round: petal.infill.round });
   return { name, mode, st, petal, plan, grid: g, pos: a.positions, sheets: g.rows.map((r) => r.thickness) };
 }
 

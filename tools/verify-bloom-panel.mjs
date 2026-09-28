@@ -280,6 +280,18 @@
          own `densityCap`, present iff the cap sits under the range's ceiling.
          `(u)` is a free letter — (v) is retired and not reused, (g)/(h) are
          referenced in prose — checked against this enumeration before use.
+     (aa) THE ROUNDNESS CONTROL TELLS THE SHAPE IT ACHIEVED (the roundness-
+         control session). `infillRound` is hidden AND inert at the guard and
+         shown with it on (asserted to APPEAR); its value read-out carries the
+         BUILDER's own median roundness, hole area and solid fraction to the
+         decimals it prints, the split — how many holes are rounded past their
+         0.8 mm fillet and how many are still at it — and the per-build onset
+         range below which only clamped corners move (Eva: told per build,
+         never baked into the range); at 0 it says today's holes and carries no
+         split. Every number is read against `__bloomMetrics().infill`, never
+         against the panel. `(aa)` because every single letter is taken — (v)
+         retired, the rest in the enumeration or in prose; three edits: this
+         entry, the block, the negative control's flag list and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3216,6 +3228,52 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await step('the guard OFF with the four at their far ends — hidden AND inert', [{ id: 'petalInfill', value: 'NONE' }, { id: 'infillRelax', value: '12' }, { id: 'infillLaw', value: '2' }, { id: 'infillAniso', value: '1' }, { id: 'infillBase', value: '1' }], { guard: 'NONE' });
 }
 
+/* ---------------- (aa) THE ROUNDNESS CONTROL TELLS ITS ACHIEVED SHAPE ----------
+   Under `--negative-control` the roundness control's value span is FROZEN at
+   whatever it said when the route began (the guard off: no numbers at all),
+   so a route that compared the telling with itself would pass while the
+   builder moved; this one compares it with the builder. */
+{
+  const tag = '[roundness]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const span = document.getElementById('infillRound').closest('.bl-ctrl').querySelector('.bl-val'); const t0 = span.textContent; Object.defineProperty(span, 'textContent', { get: () => t0, set: () => {} }); });
+  }
+  const step = async (label, sets, want) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const w = document.getElementById('infillRound').closest('.bl-ctrl');
+      return { F: window.__bloomMetrics().infill, hidden: w.hidden, said: w.querySelector('.bl-val').textContent };
+    });
+    const p = []; const F = res.F;
+    if (res.hidden !== (want.guard === 'NONE')) p.push(`infillRound is ${res.hidden ? 'hidden' : 'shown'} with the guard ${want.guard}`);
+    if (want.guard === 'NONE') { if (F) p.push('the builder reports an infill record with the guard off'); }
+    else if (!F || !F.built || !F.roundShape) p.push(`no built infill record with a shape (${F ? F.refused : 'none'})`);
+    else {
+      const R = F.roundShape;
+      if (F.round !== want.round) p.push(`the builder read roundness ${F.round}, the row asked ${want.round}`);
+      if (!res.said.includes(`median roundness ${R.medianRoundness.toFixed(3)}`)) p.push(`the control does not carry the builder's median roundness ${R.medianRoundness.toFixed(3)}: "${res.said.slice(0, 160)}"`);
+      if (!res.said.includes(`holes ${R.holeAreaMm2.toFixed(1)} `)) p.push(`the control does not carry the builder's hole area ${R.holeAreaMm2.toFixed(1)}`);
+      if (!res.said.includes(`${(100 * R.solidFrac).toFixed(1)}% solid`)) p.push(`the control does not carry the builder's solid fraction ${(100 * R.solidFrac).toFixed(1)}%`);
+      if (want.round === 0) {
+        if (!/today\u2019s holes/.test(res.said) || /rounded past the fillet/.test(res.said)) p.push(`at roundness 0 the control does not say today's holes with no split: "${res.said.slice(0, 160)}"`);
+      } else {
+        const split = R.atFillet ? `${R.rounded} hole${R.rounded === 1 ? '' : 's'} rounded past the fillet, ${R.atFillet} still at it` : `all ${R.rounded} holes rounded past the fillet`;
+        if (!res.said.includes(split)) p.push(`the control does not carry the builder's split "${split}": "${res.said.slice(0, 200)}"`);
+        if (R.onsetMin !== null && !res.said.includes(`between ${R.onsetMin.toFixed(3)} and ${R.onsetMax.toFixed(3)}`)) p.push(`the control does not carry the builder's onset range ${R.onsetMin.toFixed(3)}..${R.onsetMax.toFixed(3)}`);
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${F && F.roundShape ? `roundness ${F.round}: ${F.roundShape.rounded} rounded / ${F.roundShape.atFillet} at the fillet, median ${F.roundShape.medianRoundness.toFixed(3)}, ${F.roundShape.holeAreaMm2.toFixed(1)} mm2, ${(100 * F.roundShape.solidFrac).toFixed(1)}% solid` : 'hidden, no record'}`);
+  };
+  await step('the shipping default — hidden, no record', [], { guard: 'NONE' });
+  await step('the guard ON at the ruled 0.60 — it APPEARS and tells the split and the onset range', [{ id: 'petalInfill', value: 'VORONOI' }], { guard: 'VORONOI', round: 0.6 });
+  await step('roundness 0 — today\u2019s holes, no split', [{ id: 'infillRound', value: '0' }], { guard: 'VORONOI', round: 0 });
+  await step('roundness 1 — the circle', [{ id: 'infillRound', value: '1' }], { guard: 'VORONOI', round: 1 });
+  await step('the guard OFF with roundness 1 — hidden AND inert', [{ id: 'petalInfill', value: 'NONE' }], { guard: 'NONE' });
+}
+
 await browser.close();
 server.close();
 
@@ -3288,10 +3346,12 @@ if (NEGATIVE_CONTROL) {
        the builder built a field — and a line that thawed enough to be there
        but stuck on the default's values is the "says relaxation" arm. */
     const sawLevers = fail.some((f) => /^\[infill levers\] .*INFILL levers line (is absent while the builder built a field|says relaxation)/.test(f));
+    /* ROUTE (aa), THE ROUNDNESS CONTROL'S TELLING, required for route (w)'s own reason. */
+    const sawRound = fail.some((f) => /^\[roundness\] .*the control does not carry the builder's median roundness/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
-        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-ONE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

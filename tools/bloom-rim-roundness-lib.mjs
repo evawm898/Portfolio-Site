@@ -33,8 +33,14 @@ let serial = 0;
 export async function loadVariant({ K = 4, law = false } = {}) {
   let s = SRC;
   s = replaceOnce(s, 'export const RIM_BEAD_SEGMENTS = 4;', `export const RIM_BEAD_SEGMENTS = ${K};`);
-  if (law) s = replaceOnce(s, '      const f = infillFillet(clipped, fr);',
-    '      const f = globalThis.__holeLaw ? globalThis.__holeLaw(clipped, fr, infillFillet, infillInset) : infillFillet(clipped, fr);');
+  /* THE LAW REPLACES THE WHOLE HOLE, and the shipped roundness (`infillRound`,
+     the roundness-control session) is STOOD DOWN while a law is installed, so a
+     variant measures exactly the law it was handed and never that law opened a
+     second time by the shipped control. */
+  if (law) s = replaceOnce(s, '      const f = infillFillet(clipped, fr, 5, radii);',
+    '      const f = globalThis.__holeLaw ? globalThis.__holeLaw(clipped, fr, infillFillet, infillInset) : infillFillet(clipped, fr, 5, radii);');
+  if (law) s = replaceOnce(s, '      if (!(round > 0)) { roundOf.set(q, null); return q; }',
+    '      if (globalThis.__holeLaw || !(round > 0)) { roundOf.set(q, null); return q; }');
   /* A PASS MARKER, so a probe can keep only the LAST drop pass's holes — the
      ones the plan ships. It calls a hook and changes nothing else. */
   if (law) s = replaceOnce(s, '    const raws = cells.map(rawOf);', '    if (globalThis.__holePass) globalThis.__holePass();\n    const raws = cells.map(rawOf);');
@@ -225,6 +231,6 @@ export function planFor(G, DEFAULTS, set, exportMode = true) {
   const surface = G.petalSurface(st, ring, slot, null, acc0);
   const g = petal.grid[0];
   const panel = { rowFrom: g.rowFrom, rowTo: g.rowTo, label: g.label, spanAt: () => [-1, 1] };
-  const plan = G.petalInfillPlan(surface, g.rows, panel, { density: st.infillDensity, passes: st.infillRelax, gamma: st.infillLaw, aniso: st.infillAniso, baseFrac: st.infillBase });
+  const plan = G.petalInfillPlan(surface, g.rows, panel, { density: st.infillDensity, passes: st.infillRelax, gamma: st.infillLaw, aniso: st.infillAniso, baseFrac: st.infillBase, round: st.infillRound });
   return { st, petal, surface, plan, tris: a.triangleCount };
 }
