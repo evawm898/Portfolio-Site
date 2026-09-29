@@ -562,7 +562,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
       let tot = 0, unc3 = 0, unc2 = 0, bald3 = R0, bald2 = R0, mismatch = 0;
       const zt = zTop + 1;
       for (let i = 0; i < n; i++) {
-        const x = -R0 + (i + 0.5) * cell;
+        const x = -R0 + (i + 0.4) * cell;
         for (let j = 0; j < n; j++) {
           const y = -R0 + (j + 0.5) * cell;
           const r = Math.hypot(x, y);
