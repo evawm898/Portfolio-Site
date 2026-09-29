@@ -23,8 +23,11 @@
 #
 # THE CONTROL: `--neuter=<id>` makes one edit APPLY while changing nothing, so
 # only the witness clause can see that the behaviour did not move; the run must
-# REPORT it. It is its own job so a table whose witnesses had gone blind reads
-# red here whatever the shards say.
+# REPORT it — judged on THAT mutant's witness, run alone (`--only` + `--neuter`;
+# the first version swept all 79 under a 30-minute job and read the run's
+# whole `fail` flag, both caught on this workflow's first CI run). It is its
+# own job so a table whose witnesses had gone blind reads red here whatever
+# the shards say.
 name: bloom-apex-mutants
 
 on:
@@ -56,7 +59,7 @@ jobs:
       - name: Every anchor matches exactly once
         run: node tools/verify-bloom-apex-mutants.mjs --anchors
       - name: The witness clause must REPORT a neutered mutant (must-fail control)
-        run: node tools/verify-bloom-apex-mutants.mjs --neuter=the-leaf-reads-the-petals-nu
+        run: node tools/verify-bloom-apex-mutants.mjs --only=the-leaf-reads-the-petals-nu --neuter=the-leaf-reads-the-petals-nu
 
   sweep:
     runs-on: ubuntu-latest
