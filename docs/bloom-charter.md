@@ -6338,3 +6338,18 @@ matters should be measured this way.
 - **Waiting on Eva:** the wall measured square to the leaning axis is 1.5·cos(lean), under
   the stated 1.5 mm by 3 microns at 0.48 and 12.5 at 1.00. Real geometry, reported on the
   read-out, not asserted either way; closing it is `1/cos(lean)` on the bore.
+
+## The NU coupling (Eva's ruling on #303)
+
+- **Fixed by pinning the three readers, not by resetting `NU`.** The leaf blade and the
+  stamen/style rod read `NU_BASE` through their own constants (`LEAF_BLADE_ROWS`,
+  `ROD_SPINE_ROWS`); the sepal angle scan reads the sepal ring's own
+  `bladeRowsFor(sepalTipShape)`. `NU` is still set per petal and never reset — a global
+  reset would change when the value is valid for every other reader and was ruled out.
+  Full record, the partition, the must-fail and the frozen phase:
+  `docs/bloom-nu-coupling-outcome.md`.
+- **The leaf's own shape is untouched**: at any head that does not ramp it was already built
+  on 56 rows, and it is built on 56 everywhere now. Whether a leaf should get an apex ramp of
+  its own stays with the open leaf-apex-nib item.
+- **Witness**: block 42, `LEAVES: x petalTipShape 3.00`, and **LF10**. `frozen/phase46` is
+  the 970 rows at `a4dc836`.

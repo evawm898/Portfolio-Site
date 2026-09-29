@@ -947,6 +947,18 @@ export const SMOKE_BLOCKS = [
         path: "the GUARD — ST12's two statements where they can disagree (prominence at its maximum and no leaves to node) and prominence-0's identity at the plan (no law, no noded rings, `stemStations`' own two stations)" },
     ],
   },
+  {
+    n: 42, title: "the NU coupling's witness — leaves under petals whose rows ramp",
+    anchor: 'LEAVES: x petalTipShape 3.00 (the petals ramp their rows; the leaf keeps its own)',
+    /* ONE ROW, BECAUSE THE BLOCK IS ONE ROW: the only state where a leaf
+       reading the petals' ramped NU and a leaf reading its own 56 disagree.
+       At any tip shape under 2.30 the two are the same number and LF10 cannot
+       fire, which is why no earlier leaf row could have seen #303's finding. */
+    rows: [
+      { label: 'LEAVES: x petalTipShape 3.00 (the petals ramp their rows; the leaf keeps its own)',
+        path: 'THE NU COUPLING (#303\'s finding, fixed) — LF10: the petals ramp to 112 rows above petalTipShape 2.70 and the leaf, which has no apex ramp, must stay on its own 56, read off the builder\'s per-row record against BLADE_ROWS (the static row count, a different owner). Before the fix the leaf read the LAST PETAL\'s NU and doubled to 5,012 triangles a leaf while exporting watertight and one piece, and no matrix row reached it because the matrix varies one control at a time — so this subset carries the one row that does' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
