@@ -28,7 +28,7 @@ export function firstSlot(state, acc, layer = 0) {
     });
   } else {
     if (!(layer >= 0 && layer < fr.slotRings.length)) throw new Error(`firstSlot: layer ${layer} is not one of this state's ${fr.slotRings.length}`);
-    const ring = fr.slotRings[layer][0];
+    layer = Math.min(layer + 1, fr.slotRings.length - 1); const ring = fr.slotRings[layer][0];
     G.buildWhorlInto({
       count: fr.slotCount, radius: ring.radius, height: 0,
       sizeRamp: () => ring.scale, angleRamp: () => ring.tiltExtra,
