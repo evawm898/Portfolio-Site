@@ -245,6 +245,30 @@ const varPair = (M, C, over = {}) => [varFacts(M, over), varFacts(C, over)];
 const infloPair = (M, C, over = {}) => [infloFacts(M, over), infloFacts(C, over)];
 const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw || c.threw}` : null;
 
+/* THE NODE WITNESS (#299's port) — the MUTATED module's own stem plan, builder
+   and leaves on a noded state, compared against the clean module's. */
+const NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeProminence: 0.48 });
+function nodeFacts(M, state = NODE_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    const plan = M.stemPlan(state, fr.hub, acc);
+    const sacc = new M.MeshBuilder({ exportMode: true });
+    const built = M.buildStemInto(sacc, plan);
+    let maxCentreOff = 0;
+    for (const g of built.emittedRings || []) maxCentreOff = Math.max(maxCentreOff, Math.hypot(g.cx, g.cy));
+    const law = plan.nodeLaw;
+    const offAtFirstNode = law ? Math.hypot(...M.stemNodeAxisMm(law, law.nodes[0].s)) : 0;
+    const lp = M.leafPlan(state, plan, acc);
+    let lastPetioleX = null, lastPetioleY = null;
+    if (lp.present) {
+      const n = lp.nodes - 1;
+      const lb = M.buildLeafInto(new M.MeshBuilder({ exportMode: true }), lp, state, n, lp.azimuths[n][0]);
+      lastPetioleX = lb.petioleAxis.inner[0]; lastPetioleY = lb.petioleAxis.inner[1];
+    }
+    return { stations: plan.stations.length, hasLaw: !!law, spread: law ? law.spreadMm : 0, maxCentreOff, offAtFirstNode, lastPetioleX, lastPetioleY };
+  } catch (e) { return { threw: e.message }; }
+}
 function stemFacts(M, state = STEM_STATE()) {
   try {
     const acc = new M.MeshBuilder({ exportMode: true });
@@ -1138,7 +1162,10 @@ const MUTANTS = [
      HUB BUILDER's sphere and the STEM BUILDER's own widest EMITTED vertex can
      see it; every other clause in the family reads the channel's own report. */
   { id: 'the-meridian-margin-reads-the-bore', why: "the stem's footprint on the sphere is taken from the BORE radius instead of the outer one, so the margin the read-out prints is measured against a stem narrower than the one that is built",
-    find: '  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, plan.outerR / Rd)));',
+    /* RE-ANCHORED (#299's port): the cap edge now reads the stem's radius at
+       the root through `stemOuterRAt`, which is `outerR` exactly without
+       nodes; the mutation still swaps the outer radius for the bore. */
+    find: '  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, stemOuterRAt(plan, 0) / Rd)));',
     into: '  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, plan.boreR / Rd)));', names: ['ST7'],
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
@@ -1265,7 +1292,13 @@ const MUTANTS = [
 
   { id: 'join-reaches-past-where-it-says-it-stops', why: 'the profile drops its floor at the hub\'s own thickness, so the thickening runs all the way to the rim instead of blending out at the radius the owner declares',
     find: '  return Math.max(hubT, joinT * Math.sqrt(Math.log(hubR / rr) / denom));',
-    into: '  return hubT + joinT * Math.sqrt(Math.log(hubR / rr) / denom);', names: ['ST5'],
+    /* NAMES ST11, NOT ST5 (corrected by the stem-nodes session): this claim was
+       SILENT on `main` at 21ddbbd, measured on a worktree of it. ST5 asserts the
+       join's THICKNESS and its active/inert state, which this mutation does not
+       move. What moves is the blend radius, which since the hub-shape session
+       (#242) is ST11's `the hub declares the join blending out at ...`, and ST11
+       is exactly what fired. The claim was stale; the check was right. */
+    into: '  return hubT + joinT * Math.sqrt(Math.log(hubR / rr) / denom);', names: ['ST11'],
     witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const mu = m.hub.underside, cu = c.hub.underside;
@@ -1467,6 +1500,47 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.last > c.last + 0.1) ? null
         : `the mutant's last emitted half-width is ${m.last} against the clean tree's ${c.last}`; } },
+
+  /* ===== THE STEM'S NODES (#299's port) ===== */
+
+  { id: 'the-node-field-never-reaches-the-stem', why: "the plan drops the node law whatever the control says, so the stem stays a straight cylinder under a prominence the panel reports — watertight, one piece, the pre-node triangle count; the defect Eva's 'one control' would ship as a dead slider",
+    find: '  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);',
+    into: '  const nodeLaw = null;', names: ['ST12', 'ST2'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.stations === 2 && c.stations > 2) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations}`; } },
+  { id: 'prominence-zero-is-not-the-identity', why: 'the guard drops its prominence term, so a leafed stem at prominence 0 builds a node law — a zero swelling and a zero kink on the noded arm — which is the identity only by an argument about arithmetic, never by branch',
+    find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state)',
+    into: '  return stemIsAbsent(state)', names: ['ST12'],
+    witness: (M, C) => { const st = { ...NODE_STATE(), stemNodeProminence: 0 };
+      const m = nodeFacts(M, st), c = nodeFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.hasLaw && !c.hasLaw) ? null : `at prominence 0 the mutant's plan ${m.hasLaw ? 'carries' : 'carries no'} node law and the clean tree's ${c.hasLaw ? 'carries' : 'carries no'} one`; } },
+  { id: 'the-bend-peaks-above-its-node', why: 'each kink starts a whole ramp ABOVE its node, so the stem turns before the joint instead of inside the swelling below it — the phasing Eva likes, lost, on a watertight stem with the same station count',
+    find: '    const past = s - n.s;\n    if (!(past > 0)) continue;\n    const q = past >= law.rampMm ? 1 : (past / law.rampMm);',
+    into: '    const past = s - n.s + law.rampMm;\n    if (!(past > 0)) continue;\n    const q = past >= law.rampMm ? 1 : (past / law.rampMm);', names: ['ST12', 'ST2'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.offAtFirstNode > 1e-3 && c.offAtFirstNode === 0) ? null : `the axis at the first node stands ${m.offAtFirstNode} mm off in the mutant against ${c.offAtFirstNode} clean`; } },
+  { id: 'the-spindle-is-a-fraction-of-the-length', why: "the spindle is 0.055 of the STEM'S LENGTH, the flower's literal constant, rather than 3.27 of its RADIUS — #296's too-short node arriving by the other route, 1.83 radii on a 100 x 6 mm stem",
+    find: '  const spreadMm = STEM_NODE_SPREAD_RADII * outerR;',
+    into: '  const spreadMm = 0.055 * stemLengthMm;', names: ['ST12', 'ST3'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return Math.abs(m.spread - c.spread) > 0.5 ? null : `the mutant's spindle is ${m.spread} mm against ${c.spread}`; } },
+  { id: 'the-noded-rings-stay-on-the-world-axis', why: 'the builder draws every noded ring about the world axis while the plan declares the kink — the swelling ships and the kink does not, on a watertight stem at the predicted count',
+    find: '      const c = stemNodeAxisMm(law, sDepth);\n      return Array.from({ length: N }, (_, k) => {',
+    into: '      const c = [0, 0];\n      return Array.from({ length: N }, (_, k) => {', names: ['ST2', 'ST12'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.maxCentreOff < 1e-9 && c.maxCentreOff > 1) ? null : `the mutant's rings stand up to ${m.maxCentreOff} mm off the world axis against ${c.maxCentreOff} clean`; } },
+  { id: 'the-petiole-roots-on-the-world-axis', why: "each petiole is rooted about the WORLD axis while the stem has kinked away from it, so a leaf at a lower node roots in the bore or outside the wall — both export watertight",
+    find: '  const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];',
+    into: '  const base = [plan.rootR * R[0], plan.rootR * R[1], z];', names: ['LF2'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return Math.abs(m.lastPetioleX - c.lastPetioleX) > 0.5 || Math.abs(m.lastPetioleY - c.lastPetioleY) > 0.5 ? null
+        : `the mutant's lowest petiole roots at (${m.lastPetioleX}, ${m.lastPetioleY}) against (${c.lastPetioleX}, ${c.lastPetioleY}) clean`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -1629,6 +1703,13 @@ const ROWS = [
      mutation pinning the exponent at the old 1.30 reads 1.30 against 0.60 here
      and would read 1.30 against 1.30 at the default: a witness state is part
      of the claim (`bore-is-not-evas-rule`'s lesson, one family later). */
+  /* THE NODE ROWS (#299's port): the flower's own setting, and the SAME leafed
+     stem at prominence 0 — the state where `prominence-zero-is-not-the-identity`
+     bites, since ST12's two statements can only disagree where the guard does. */
+  { label: "the stem's nodes at the flower's 0.48 (100 x 6 mm, three alternate leaves)",
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0.48' }] },
+  { label: 'the same leafed stem at prominence 0 (the guard, where the two statements can disagree)',
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'leafTipShape', value: '0.6' }] },
   /* THE HUB SHAPE ROWS (the hub-shape session). A STYLED row so ST11's profile

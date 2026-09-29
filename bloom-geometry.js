@@ -11998,6 +11998,258 @@ export function stemStations(lengthMm) { return [0, lengthMm]; }
    it emerges from. One owner; buildHubInto reads it too. */
 export const HUB_SECTORS = 48;
 
+/* ===================================================================
+   THE STEM'S NODES — A SWELLING AND A KINK, ONE CONTROL (Eva's rulings on
+   `docs/bloom-flower-stem-comparison.md`, #299). Read that document and
+   `docs/bloom-stem-nodes-outcome.md` before touching any of this.
+
+   WHAT IS PORTED, AND WHAT IS NOT. The flower's `stemNodeParams` /
+   `stemCenterline` / `stemRadiusFn` (flower.js:1777-1830) carry two terms on
+   one slider, and #299 took them apart: a Gaussian SWELLING of the radius at
+   each node, and a KINK — a heading change spread over a ramp BELOW the node.
+   The flower's TAPER is not ported (ruled: it runs the wrong way and breaks
+   the 3 mm floor), and neither is its golden-angle kink direction (see
+   `stemNodeLaw`'s own note). Everything else is the flower's own constant,
+   carried as the flower states it and converted to millimetres here ONCE.
+
+   THE FLOWER STATES ITS LENGTHS AS FRACTIONS OF THE STEM, AND A FRACTION OF
+   THE STEM IS THE WRONG LENGTH TO PORT. On the flower the spindle's width is
+   0.055 of the stem's length, which at the flower's own default proportions
+   (length 4 units, top radius tubeRadius 0.0168 x 4.0 = 0.0672) is 3.274 of
+   the stem's own RADII — and #299 established that it is the width RELATIVE TO
+   THE STEM'S THICKNESS that reads as a joint (#296 and #298 used 1.2 radii,
+   2.7x shorter, and neither read as a node). On the bloom's 100 x 6 mm stem a
+   literal 0.055 L is 1.83 radii, which is #296's mistake again by a different
+   route. So the spindle is derived as a length FROM A LENGTH — the stem's own
+   radius — through the flower's own default ratio, and the kink's ramp is
+   derived from the SPINDLE (0.12 / 0.055 of it) rather than from the stem's
+   length, which is what keeps the PHASING exact: the flower's bend peaks at
+   0.375 of its ramp below the node, 0.818 of the spindle's width, INSIDE the
+   swelling, and scaling both lengths by one factor keeps that ratio to the
+   bit. The phasing is the part Eva likes; the construction is what holds it.
+
+   THE RINGS STAY HORIZONTAL AND ONLY THEIR CENTRES MOVE (#299 §2), so this is
+   a stem AXIS OFFSET as a function of arc length and not a swept frame: no
+   ring is tilted, the bore, the root band, the tip plug and both end caps are
+   still horizontal circles, and `endFace` is untouched. What a horizontal ring
+   on a tilted axis costs — the wall measured PERPENDICULAR to the axis is
+   `cos(tilt)` of the wall measured horizontally — is REPORTED on the plan
+   (`nodeWallPerpMm`) and left to Eva; it is not a violation this file can
+   decide on its own.
+
+   PROMINENCE 0 IS THE IDENTITY BY BRANCH, NEVER BY ARITHMETIC. `stemNodeLaw`
+   returns NULL and every consumer takes its pre-node expression verbatim —
+   the `domeIsFlat` / `plan.inert` discipline — so a stem with the control at 0
+   is byte-identical to one built before the control existed.
+   =================================================================== */
+const FLOWER_STEM = Object.freeze({
+  lengthUnits: 4,                                   // flower-registry stemLength default
+  topRadiusUnits: (0.008 + (0.030 - 0.008) * 0.4) * 4.0,  // tubeRadius at tube 0.4, times lerp(4.0, 1.8, 0)
+  spread: 0.055, ramp: 0.12, slope: 0.13, swell: 0.6,     // stemRadiusFn / stemCenterline, verbatim
+});
+export const STEM_NODE_PROMINENCE_RANGE = Object.freeze([0, 1]);
+export const STEM_NODE_SWELL = FLOWER_STEM.swell;
+export const STEM_NODE_SLOPE = FLOWER_STEM.slope;
+export const STEM_NODE_SPREAD_RADII = FLOWER_STEM.spread * FLOWER_STEM.lengthUnits / FLOWER_STEM.topRadiusUnits;
+export const STEM_NODE_RAMP_SPREADS = FLOWER_STEM.ramp / FLOWER_STEM.spread;
+/* A STATION'S POSITION IS SNAPPED TO A DYADIC GRID (2^-12 mm, a quarter of a
+   micron), and that is a decision about ENGINES rather than about geometry.
+   The placer below equidistributes a transcendental density, so a station's
+   position is a sum of exp() terms whose last bits the page's V8 and Node's
+   need not agree on — and a station that differs by 1e-11 mm moves every
+   vertex on its ring across a float32 boundary with a probability that, over
+   a matrix, is not small (the lobe session's LOBE_RELIEF_GRID and the
+   infill's INFILL_PLAN_GRID are the same finding). A power of two makes the
+   snap exact; what is left is a knife edge only where the two engines
+   straddle a grid point, which is measure-zero rather than systematic. */
+export const STEM_NODE_STATION_GRID = 1 / 4096;
+
+/* THE TWO STATEMENTS. The registry HIDES the control on this condition and
+   this makes it INERT; ST12 asserts the two agree per row.
+
+   NODES ARE THE LEAVES' NODES, AND THAT IS A DECISION MADE WITHOUT A RULING —
+   REVERSIBLE, AND STATED RATHER THAN HIDDEN. The flower's nodes exist whether
+   or not it has leaves; the bloom's node depths already have ONE owner,
+   `leafNodeDepthsMm`, which exists only when leaves do, and #296 §3 built its
+   whole node costing on that owner. A second, leafless node law would be a
+   second producer of "where the nodes are" that could put a swelling where no
+   leaf grows. So the control is hidden AND inert without leaves, and without
+   a stem.
+
+   AND INERT UNDER AN INFLORESCENCE, ALSO WITHOUT A RULING: the rachis carries
+   floret nodes on its own `leafNodeDepthsMm` call with a different pitch
+   floor, so a leafed raceme has TWO node sets on one stem, and whether a
+   floret node swells the rachis is #296 §3's own open question for Eva. Both
+   arms are one predicate term to reverse. */
+export function stemNodesAbsent(state) {
+  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || leafIsAbsent(state) || !inflorescenceIsAbsent(state);
+}
+
+/* THE LEAF NODE PITCH FLOOR, MODE-FREE. It was `2 x petioleR0`, which is
+   `floorThickness(sheet)` — 0.6 mm live and 1.0 mm in export on a thin sheet —
+   so the leaf COUNT, which is topology, already differed between the modes on
+   225 of 12,960 swept states (#296 §3). While that was only the leaves' count
+   it was a pre-existing finding; with nodes it becomes the STEM's station
+   count, and a mode-dependent topology has been refused here five times. The
+   fix is the owner's, and it is the export's own value in both modes — the
+   conservative direction, the one that fits in both, which is the stem
+   channel's union-of-both-modes rule applied to a length. */
+export function leafNodePitchFloorMm(sheetMm) { return Math.max(Number(sheetMm), MIN_FEATURE_MM); }
+
+/* THE NODE LAYOUT — the one owner of where leaf nodes sit on a stem of a given
+   length, extracted from `leafPlan` so the STEM can read the same depths
+   without a cycle (the stem needs the depths; the leaf needs the stem's
+   radii). Depends on no stem radius, which is what makes that possible. */
+export function leafNodeLayout(state, stemLengthMm) {
+  const lengthMm = Number(state.leafLength);
+  const angleDeg = Number(state.leafAngle);
+  const nodes = Math.round(Number(state.leafNodes));
+  const rise = lengthMm * Math.sin((angleDeg * Math.PI) / 180);
+  const insetAskedMm = LEAF_NODE_TOP * stemLengthMm;
+  const insetNeededMm = Math.max(0, rise);
+  const insetMm = Math.max(insetAskedMm, insetNeededMm);
+  const insetClamped = insetNeededMm > insetAskedMm;
+  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stemLengthMm;
+  const nodeDepthsMm = leafNodeDepthsMm(nodes, stemLengthMm, insetMm, leafNodePitchFloorMm(state.sheetThickness));
+  return { nodes, insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm };
+}
+
+/* THE NODE LAW, or NULL. Each node carries its depth `s` (mm below the hub's
+   underside, the placer's own argument) and the AZIMUTH it kinks toward.
+
+   THE KINK DIRECTION IS TIED TO THE LEAVES, AND THIS IS THE ONE PLACE THE
+   FLOWER IS DELIBERATELY NOT COPIED. The flower turns node k toward
+   `k * GOLDEN_ANGLE` while its leaves flip 180 degrees a node, so its leaves
+   and its bends disagree; this file has carried the instruction "it must not
+   be reproduced when curvature arrives" beside `leafAzimuths` since the leaf
+   session, and a kink is curvature. So each node turns AWAY from its own
+   first leaf — the zig-zag stem's own geometry, the leaf standing on the
+   outer angle of the bend — which gives alternate leaves an alternating
+   zig-zag, opposite leaves a turn a quarter round per node, and whorled a
+   turn of 45 degrees per node: a different direction at every node, as the
+   brief asks, and never one the leaves contradict. One line to reverse. */
+export function stemNodeLaw(state, stemLengthMm, outerR) {
+  if (stemNodesAbsent(state)) return null;
+  const prom = Math.min(STEM_NODE_PROMINENCE_RANGE[1], Math.max(STEM_NODE_PROMINENCE_RANGE[0], Number(state.stemNodeProminence)));
+  const layout = leafNodeLayout(state, stemLengthMm);
+  const phyllo = String(state.leafPhyllotaxy);
+  const spreadMm = STEM_NODE_SPREAD_RADII * outerR;
+  const rampMm = STEM_NODE_RAMP_SPREADS * spreadMm;
+  const nodes = layout.nodeDepthsMm.map((s, i) => {
+    const az = leafAzimuths(phyllo, i)[0] + Math.PI;
+    return { s, az, dx: Math.cos(az), dy: Math.sin(az) };
+  });
+  return {
+    prominence: prom, outerR, lengthMm: stemLengthMm,
+    swell: STEM_NODE_SWELL * prom, slope: STEM_NODE_SLOPE * prom,
+    spreadMm, rampMm, nodes,
+    /* WHERE EACH BEND PEAKS — the phasing, as a number a reader and a gate can
+       both hold: 0.375 of the ramp below each node (the smoothstep-weighted
+       ramp's own curvature maximum), stated against the spindle's width. */
+    bendPeakBelowMm: 0.375 * rampMm, bendPeakInSpreads: (0.375 * rampMm) / spreadMm,
+    turnDeg: Math.atan(STEM_NODE_SLOPE * prom) * 180 / Math.PI,
+  };
+}
+
+/* THE OUTER RADIUS AT DEPTH `s` (mm below the hub's underside). */
+export function stemNodeRadiusMm(law, s) {
+  let sw = 0;
+  for (const n of law.nodes) { const u = (s - n.s) / law.spreadMm; sw += Math.exp(-u * u); }
+  return law.outerR * (1 + law.swell * sw);
+}
+
+/* THE AXIS OFFSET AT DEPTH `s`: the flower's `drift = slope x past x
+   smoothstep(0, ramp, past)` per node, in the node's own direction. Zero
+   above the first node, exactly — so the stem leaves the head ON the axis and
+   the join, the root band and the sphere's meridian packing see a straight
+   stem there. */
+export function stemNodeAxisMm(law, s) {
+  let x = 0, y = 0;
+  for (const n of law.nodes) {
+    const past = s - n.s;
+    if (!(past > 0)) continue;
+    const q = past >= law.rampMm ? 1 : (past / law.rampMm);
+    const sm = q >= 1 ? 1 : q * q * (3 - 2 * q);
+    const d = law.slope * past * sm;
+    x += n.dx * d; y += n.dy * d;
+  }
+  return [x, y];
+}
+
+/* THE HEADING TILT AT DEPTH `s` — how far the axis leans from vertical there,
+   in radians. The wall a horizontal ring makes is `cos` of this thinner
+   measured perpendicular to the axis, which is the one number the plan
+   reports and Eva rules on. */
+export function stemNodeTiltRad(law, s) {
+  let gx = 0, gy = 0;
+  for (const n of law.nodes) {
+    const past = s - n.s;
+    if (!(past > 0)) continue;
+    const q = past >= law.rampMm ? 1 : past / law.rampMm;
+    /* d/dp [p * S(p/L)] = S + p S'/L, S = 3q^2 - 2q^3, S' = 6q - 6q^2 */
+    const g = q >= 1 ? 1 : (3 * q * q - 2 * q * q * q) + q * (6 * q - 6 * q * q);
+    gx += n.dx * law.slope * g; gy += n.dy * law.slope * g;
+  }
+  return Math.atan(Math.hypot(gx, gy));
+}
+
+/* THE PLACER, GENERALISED — equal CHORD ERROR, from a length. A straight tube
+   is exact at two stations (`stemStations`); a node's swelling and kink are
+   curves, and the tube's facets are already chords of the circle at
+   `HUB_SECTORS` sides, which bounds how far any facet stands from the surface
+   it draws at `eps = R (1 - cos(pi / N))`. The same bar is spent along the
+   stem: a chord of a curve of second derivative k over a pitch h stands off
+   it by `k h^2 / 8`, so the station density that holds `eps` everywhere is
+   `sqrt(k / 8 eps)` per mm, and stations are placed at equal increments of its
+   integral — the turning-rate ladder's own equidistribution, on the stem.
+   `k` is the radius's second derivative plus the axis's, summed in magnitude
+   (conservative). The count is the integral's ceiling, taken off a 1/1024
+   grid so an engine's last bit cannot move it (see the station grid above).
+   Returns stations in [s0, s1], endpoints exact. */
+export function stemNodeStations(law, s0, s1) {
+  if (!(s1 > s0)) return [s0, s1];
+  const eps = law.outerR * (1 - Math.cos(Math.PI / HUB_SECTORS));
+  const h0 = law.spreadMm / 64;
+  const n = Math.max(2, Math.ceil((s1 - s0) / h0));
+  const kappa = (s) => {
+    let rpp = 0;
+    for (const nd of law.nodes) {
+      const u = (s - nd.s) / law.spreadMm;
+      rpp += (4 * u * u - 2) * Math.exp(-u * u);
+    }
+    rpp = Math.abs(law.outerR * law.swell * rpp) / (law.spreadMm * law.spreadMm);
+    let app = 0;
+    for (const nd of law.nodes) {
+      const p = s - nd.s;
+      if (p > 0 && p < law.rampMm) app += law.slope * Math.abs(18 * p / (law.rampMm ** 2) - 24 * p * p / (law.rampMm ** 3));
+    }
+    return rpp + app;
+  };
+  const cum = [0];
+  let prev = Math.sqrt(kappa(s0) / (8 * eps));
+  for (let i = 1; i <= n; i++) {
+    const s = s0 + ((s1 - s0) * i) / n;
+    const cur = Math.sqrt(kappa(s) / (8 * eps));
+    cum.push(cum[i - 1] + ((prev + cur) / 2) * ((s1 - s0) / n));
+    prev = cur;
+  }
+  const total = cum[n];
+  const count = Math.max(1, Math.ceil(Math.floor(total * 1024) / 1024));
+  const out = [s0];
+  let j = 0;
+  for (let c = 1; c < count; c++) {
+    const target = (total * c) / count;
+    while (j < n && cum[j + 1] < target) j++;
+    const a = cum[j], b = cum[j + 1];
+    const f = b > a ? (target - a) / (b - a) : 0;
+    const sRaw = s0 + ((s1 - s0) * (j + f)) / n;
+    const s = Math.round(sRaw / STEM_NODE_STATION_GRID) * STEM_NODE_STATION_GRID;
+    if (s > out[out.length - 1] && s < s1) out.push(s);
+  }
+  out.push(s1);
+  return out;
+}
+
 /* THE ONE OWNER OF EVERYTHING ABOUT A STEM ON THIS HUB — read by
    buildHubInto (for the join's profile), by buildStemInto (for the solid) and
    by the metrics hook (for the read-out and the gates). Nothing recomputes any
@@ -12287,6 +12539,51 @@ export function stemPlan(state, ring, acc) {
      which: one is Eva's bore rule closing at the 3 mm floor, the other is the
      two derived closures meeting across a short stem. */
   const solidThrough = boreR > 0 && !(voidMm > 0);
+  /* THE NODES (#299's port) — NULL at prominence 0, and then every field
+     below is the pre-node plan verbatim: the station list is `stemStations`'
+     own two, and nothing else is read. */
+  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);
+  const stations = nodeLaw ? stemNodeStations(nodeLaw, 0, lengthMm) : stemStations(lengthMm);
+  /* THE VOID'S OWN LADDER, owned HERE so ST1 can predict the emitted count
+     from the plan: the same placer over the void's own depths, mapped back to
+     millimetres from the void's top with both ENDS set exactly — `voidTopZ -
+     voidMm` is ST10's measured bottom, and `(sTop + voidMm) - sTop` is not
+     `voidMm` (the ST5 trap). Without nodes it is `stemStations(voidMm)`, the
+     builder's own pre-node expression. */
+  let voidStations = null;
+  if (voidMm > 0) {
+    if (nodeLaw) {
+      const sTop = rootZ - voidTopZ;
+      voidStations = stemNodeStations(nodeLaw, sTop, sTop + voidMm).map((x) => x - sTop);
+      voidStations[0] = 0; voidStations[voidStations.length - 1] = voidMm;
+    } else voidStations = stemStations(voidMm);
+  }
+  /* THE WALL A HORIZONTAL RING LEAVES, MEASURED PERPENDICULAR TO A LEANING
+     AXIS — reported for Eva, decided by nobody here (#299 §2). The bore does
+     not follow the swelling, so at a node the wall is THICKER than Eva's 1.5;
+     between nodes the axis leans and a horizontal 1.5 mm wall is `1.5 cos(tilt)`
+     measured square to it. The worst tilt is sampled at the stations the
+     builder emits and at a millimetre grid (a length, not a count). Null where
+     there is no bore, which is the 3 mm stem Eva approved: the question does
+     not arise on a solid stem. */
+  let nodeTiltMaxDeg = 0, nodeTipOffsetMm = 0, nodeMaxOuterR = outerR, nodeWallPerpMinMm = Infinity, nodeWallPerpAtMm = null;
+  if (nodeLaw) {
+    for (let i = 0; i * 0.25 <= lengthMm; i++) {
+      const x = i * 0.25, tilt = stemNodeTiltRad(nodeLaw, x);
+      nodeTiltMaxDeg = Math.max(nodeTiltMaxDeg, tilt * 180 / Math.PI);
+      if (boreR > 0) {
+        const wp = (stemNodeRadiusMm(nodeLaw, x) - boreR) * Math.cos(tilt);
+        if (wp < nodeWallPerpMinMm) { nodeWallPerpMinMm = wp; nodeWallPerpAtMm = x; }
+      }
+    }
+    for (const x of stations) nodeMaxOuterR = Math.max(nodeMaxOuterR, stemNodeRadiusMm(nodeLaw, x));
+    const tip = stemNodeAxisMm(nodeLaw, lengthMm);
+    nodeTipOffsetMm = Math.hypot(tip[0], tip[1]);
+  }
+  /* The worst over the stem of (horizontal wall) x cos(tilt): the swelling
+     thickens the wall where the tilt is born, so the minimum sits between
+     nodes, where the wall is Eva's 1.5 and the lean has accumulated. */
+  const nodeWallPerpMm = nodeLaw && boreR > 0 ? nodeWallPerpMinMm : null;
   return {
     present: true, lengthMm, outerR, boreR, wallMm: outerR - boreR,
     hubT, hubR, joinT, blendR, inert, joinReason,
@@ -12303,9 +12600,17 @@ export function stemPlan(state, ring, acc) {
     topZ, rootZ, tipZ, lowestHubZ, hiddenMm, visibleMm: lengthMm - hiddenMm,
     headOuterMm, headInsideBore, solidBandMm,
     tipPlugMm, voidTopZ, voidMm, voidBottomZ, solidThrough,
-    stations: stemStations(lengthMm), sides: HUB_SECTORS,
+    stations, sides: HUB_SECTORS,
+    voidStations, nodeLaw, nodeTiltMaxDeg, nodeTipOffsetMm, nodeMaxOuterR, nodeWallPerpMm, nodeWallPerpAtMm,
   };
 }
+
+/* THE STEM'S OUTER RADIUS AND AXIS AT DEPTH `s`, for any consumer that holds a
+   plan — the ONE front door, so nothing outside this block evaluates the node
+   law a second way. With no law they return the pre-node answers EXACTLY
+   (`outerR`, and the axis). */
+export function stemOuterRAt(plan, s) { return plan.nodeLaw ? stemNodeRadiusMm(plan.nodeLaw, s) : plan.outerR; }
+export function stemAxisAt(plan, s) { return plan.nodeLaw ? stemNodeAxisMm(plan.nodeLaw, s) : [0, 0]; }
 
 /* ===================================================================
    THE SPHERE'S STEM CHANNEL — PETALS THE STEM WOULD PASS THROUGH ARE NOT
@@ -12353,9 +12658,48 @@ export const STEM_PETAL_CLEARANCE_MM = MIN_FEATURE_MM;
 /* Distance from a point to the FREE stem solid; 0 inside it. The cylinder is
    the plan's own three numbers, so nothing here re-derives where the stem is. */
 export function freeStemDistanceMm(plan, x, y, z) {
+  if (plan.nodeLaw) return nodedStemDistanceMm(plan, x, y, z);
   const dr = Math.max(0, Math.hypot(x, y) - plan.outerR);
   const dz = Math.max(0, plan.tipZ - z, z - plan.rootZ);
   return Math.hypot(dr, dz);
+}
+/* THE SAME QUESTION OF A NODED STEM, answered EXACTLY for what the builder
+   emits rather than for a cylinder it no longer is. Between two stations the
+   loft of two horizontal rings is, at every height, a horizontal DISC whose
+   centre and radius interpolate linearly (each vertex lerps), so the free stem
+   is the union of those discs over [tipZ, rootZ] and the distance to it is
+   `min over lambda of hypot(z - z(l), max(0, |q - c(l)| - r(l)))`. Each term
+   is convex in lambda (a norm, less a linear radius, clipped at 0 and
+   squared; and a square), so the minimum on each interval is found by a
+   golden-section search to 1e-12 of the interval — a property of the
+   function, not a tolerance chosen to pass. Intervals whose height range
+   cannot beat the best found so far are skipped. The rings are the plan's own
+   law at the plan's own stations, which is what `buildStemInto` emits. */
+function nodedStemDistanceMm(plan, x, y, z) {
+  const law = plan.nodeLaw, st = plan.stations;
+  const ring = (sv) => { const c = stemNodeAxisMm(law, sv); return { z: plan.rootZ - sv, cx: c[0], cy: c[1], r: stemNodeRadiusMm(law, sv) }; };
+  let best = Infinity;
+  const at = (A, B, l) => {
+    const zz = A.z + (B.z - A.z) * l, cx = A.cx + (B.cx - A.cx) * l, cy = A.cy + (B.cy - A.cy) * l, r = A.r + (B.r - A.r) * l;
+    return Math.hypot(z - zz, Math.max(0, Math.hypot(x - cx, y - cy) - r));
+  };
+  let A = ring(st[0]);
+  for (let i = 1; i < st.length; i++) {
+    const B = ring(st[i]);
+    const gap = Math.max(0, B.z - z, z - A.z);
+    if (gap < best) {
+      let lo = 0, hi = 1;
+      const g = (Math.sqrt(5) - 1) / 2;
+      let m1 = hi - g * (hi - lo), m2 = lo + g * (hi - lo), f1 = at(A, B, m1), f2 = at(A, B, m2);
+      for (let k = 0; k < 60 && hi - lo > 1e-12; k++) {
+        if (f1 <= f2) { hi = m2; m2 = m1; f2 = f1; m1 = hi - g * (hi - lo); f1 = at(A, B, m1); }
+        else { lo = m1; m1 = m2; f1 = f2; m2 = lo + g * (hi - lo); f2 = at(A, B, m2); }
+      }
+      best = Math.min(best, f1, f2, at(A, B, 0), at(A, B, 1));
+    }
+    A = B;
+  }
+  return best;
 }
 
 /* HOW CLOSE ONE PETAL COMES TO THE FREE STEM — measured on the petal THE
@@ -12496,7 +12840,9 @@ export function meridianPacking(fr, plan, omitted) {
   const kept = fr.rings.filter((r, k) => !omitted.includes(k));
   if (!kept.length) return { margin: null, clearMm: null, overhangMm: null, capArcMm: null, keptArcMm: null, slot: null, exhausted: false, why: 'the channel took every petal' };
   const Rd = dome.Rd;
-  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, plan.outerR / Rd)));
+  /* The stem's radius WHERE IT LEAVES THE HEAD — `outerR` exactly unless a
+     node's swelling reaches up that far (`stemOuterRAt`'s own branch). */
+  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, stemOuterRAt(plan, 0) / Rd)));
   /* The POLE-MOST survivor is the one with the greatest arc from the face pole
      — the foot nearest the stem, which is the only one this margin is about. */
   const poleMost = kept.reduce((a, b) => (b.arc > a.arc ? b : a));
@@ -12592,8 +12938,61 @@ export function buildStemInto(acc, plan) {
       if (off > emittedAxisOffset) emittedAxisOffset = off;
     }
   };
-  const outer = zs.map((z) => ringAt(R, z));
-  measure(outer);
+  /* ===================================================================
+     THE NODED STEM — a SEPARATE ARM, entered only where the plan carries a
+     node law, so the arm above and below is the pre-node builder verbatim and
+     prominence 0 is byte-identical by BRANCH. Everything it emits is the same
+     topology the straight tube emits (horizontal rings on a ladder, the same
+     two end expressions); what moves is each ring's CENTRE and the OUTER
+     radius, both read from the plan's one law at the ring's own depth.
+
+     WHAT IT MEASURES, AND WHY THE MEASUREMENT CHANGES WITH IT. The straight
+     tube's measured side asks "how far is every vertex from the WORLD axis",
+     which on a kinked stem measures the kink. So here each ring's radii are
+     taken about its OWN centroid, and `emittedAxisOffset` is how far that
+     centroid stands from the plan's DECLARED axis at the ring's depth — the
+     `stem-off-the-axis` question, asked of a stem whose axis is not the world
+     one. And the rings themselves are reported (`emittedRings`), because the
+     LAW's claim — that these centres and radii are the flower's node, restated
+     from the controls — is ST12's, and it must be read off what came out. */
+  let nodeOuter = null, nodeInner = null, nodeVoidLadder = null, nodeMeasureInner = null, nodeReport = null;
+  if (plan.nodeLaw) {
+    const law = plan.nodeLaw;
+    const ringAtS = (rad, z, sDepth) => {
+      const c = stemNodeAxisMm(law, sDepth);
+      return Array.from({ length: N }, (_, k) => {
+        const th = (k * TAU) / N; return [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z];
+      });
+    };
+    const emittedRings = [];
+    const measureAbout = (rings, which) => {
+      for (const ring of rings) {
+        let sx = 0, sy = 0;
+        for (const [x, y] of ring) { sx += x; sy += y; }
+        const cx = sx / ring.length, cy = sy / ring.length;
+        let rMax = 0, rMin = Infinity;
+        for (const [x, y] of ring) { const rr = Math.hypot(x - cx, y - cy); if (rr > rMax) rMax = rr; if (rr < rMin) rMin = rr; }
+        if (rMax > emittedMaxR) emittedMaxR = rMax;
+        if (rMin < emittedMinR) emittedMinR = rMin;
+        const z = ring[0][2];
+        const want = stemNodeAxisMm(law, plan.rootZ - z);
+        const off = Math.hypot(cx - want[0], cy - want[1]);
+        if (off > emittedAxisOffset) emittedAxisOffset = off;
+        emittedRings.push({ which, z, cx, cy, r: rMax });
+      }
+    };
+    const outerDepths = [plan.rootZ - plan.topZ, ...plan.stations];
+    nodeOuter = zs.map((z, i) => ringAtS(stemNodeRadiusMm(law, outerDepths[i]), z, outerDepths[i]));
+    measureAbout(nodeOuter, 'outer');
+    nodeInner = (mm) => { const z = plan.voidTopZ - mm; return ringAtS(b, z, plan.rootZ - z); };
+    /* THE VOID'S OWN LADDER IS THE PLAN'S (`plan.voidStations`), so ST1
+       predicts this count from the owner that asked for it. */
+    nodeVoidLadder = () => plan.voidStations;
+    nodeMeasureInner = (rings) => measureAbout(rings, 'inner');
+    nodeReport = () => emittedRings;
+  }
+  const outer = nodeOuter || zs.map((z) => ringAt(R, z));
+  if (!nodeOuter) measure(outer);
   for (let i = 0; i < outer.length - 1; i++) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
@@ -12684,8 +13083,10 @@ export function buildStemInto(acc, plan) {
        surface either way, and one rule instead of a rule per arm. When
        curvature arrives the placer owes the void a pitch law exactly as it owes
        the tube one, which is the note `stemStations` already carries. */
-    const inner = stemStations(plan.voidMm).map((mm) => ringAt(b, plan.voidTopZ - mm));
-    measure(inner);
+    const inner = nodeInner
+      ? nodeVoidLadder(plan.voidMm).map((mm) => nodeInner(mm))
+      : stemStations(plan.voidMm).map((mm) => ringAt(b, plan.voidTopZ - mm));
+    if (nodeMeasureInner) nodeMeasureInner(inner); else measure(inner);
     for (let i = 0; i < inner.length - 1; i++) {
       const up = inner[i], dn = inner[i + 1];
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
@@ -12768,7 +13169,8 @@ export function buildStemInto(acc, plan) {
   }
   return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1],
            emittedVoid, emittedVoidTopZ, emittedVoidBottomZ, directedMismatch, emittedBottomAreaMm2,
-           emittedMaxR, emittedMinR: emittedMinR === Infinity ? 0 : emittedMinR, emittedAxisOffset };
+           emittedMaxR, emittedMinR: emittedMinR === Infinity ? 0 : emittedMinR, emittedAxisOffset,
+           ...(nodeReport ? { emittedRings: nodeReport() } : {}) };
 }
 
 /* ===================================================================
@@ -12972,11 +13374,7 @@ export function leafPlan(state, stem, acc) {
      states: the inset scales with the STEM while the rise scales with the LEAF
      and its ANGLE, and no fraction of one holds the other two. CLAMPED AND
      TOLD — the read-out says when it bound and by how much. */
-  const rise = lengthMm * Math.sin((angleDeg * Math.PI) / 180);
-  const insetAskedMm = LEAF_NODE_TOP * stem.lengthMm;
-  const insetNeededMm = Math.max(0, rise);
-  const insetMm = Math.max(insetAskedMm, insetNeededMm);
-  const insetClamped = insetNeededMm > insetAskedMm;
+  const { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm } = leafNodeLayout(state, stem.lengthMm);
   /* CAN THE HEAD BE CLEARED AT ALL? A leaf that rises further than the stem's
      own node span is long has nowhere to sit that clears the head, and that is
      a reachable corner (120 mm of leaf on a 20 mm stem). It is TOLD rather
@@ -12985,9 +13383,11 @@ export function leafPlan(state, stem, acc) {
      fact, not an invariant violation. LF4 asserts the BICONDITIONAL against
      this flag rather than asserting clearance outright, which would fire on a
      state the geometry is entitled to build. */
-  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
+  /* (insetSatisfied comes from `leafNodeLayout`, the one owner.) THE NODE
+     DEPTHS TOO — and their pitch floor is mode-free now (see
+     `leafNodePitchFloorMm`): the stem's nodes read the same depths, so a
+     count that differed live/export would be a stem topology that did. */
   const petioleR0 = acc.floorThickness(state.sheetThickness) / 2;
-  const nodeDepthsMm = leafNodeDepthsMm(nodes, stem.lengthMm, insetMm, 2 * petioleR0);
   const nodesClamped = nodeDepthsMm.length < nodes;
   const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
   /* THE PETIOLE. Its root radius is the WALL'S MID-THICKNESS — Phase A's
@@ -12995,12 +13395,21 @@ export function leafPlan(state, stem, acc) {
      this file already uses (the filament's and the style's). */
   const rootR = rodWallRootMm(stem);
   const petioleR = petioleR0;
-  const clearMm = (stem.outerR - rootR) + 2 * acc.floorFeature(state.sheetThickness);
+  /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null at prominence
+     0). Two things move with them and nothing else does: every petiole roots
+     on the DISPLACED axis at its own depth (`nodeOffsets`), and the clearance
+     reads the SWOLLEN radius — #296 §3 measured a short leaf's blade base
+     inside the swelling by 1.25 mm when it read `outerR`. Both are BRANCHES:
+     with no law the expressions below are the pre-node ones verbatim. */
+  const law = stem.nodeLaw || null;
+  const nodeOffsets = law ? nodeDepthsMm.map((s) => stemNodeAxisMm(law, s)) : null;
+  const nodeOuterR = law ? nodeDepthsMm.reduce((m, s) => Math.max(m, stemNodeRadiusMm(law, s)), stem.outerR) : stem.outerR;
+  const clearMm = (nodeOuterR - rootR) + 2 * acc.floorFeature(state.sheetThickness);
   const petioleLenMm = Math.max(LEAF_PETIOLE_FRACTION * lengthMm, clearMm);
   const embedMm = rodWallEmbedMm(stem);
   return {
     present: true, lengthMm, widthMm, angleDeg, nodes: nodeDepthsMm.length, phyllotaxy: phyllo,
-    nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm,
+    nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm, nodeOffsets, nodeOuterR,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
     nodesAsked: nodes, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemLengthMm: stem.lengthMm,
@@ -13091,7 +13500,10 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, plan.widthMm / 2, cap, acc, plan.lengthMm);
   const t = acc.floorThickness(state.sheetThickness);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
-  const base = [plan.rootR * R[0], plan.rootR * R[1], z];
+  /* ON THE DISPLACED AXIS where the stem has nodes, and the pre-node
+     expression verbatim where it has none (a branch, never `+ 0`). */
+  const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
+  const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
   /* ---- the petiole ---------------------------------------------------- */
   const sides = LEAF_PETIOLE_SIDES, rp = plan.petioleR;
   const bi = [D0[1] * T[2] - D0[2] * T[1], D0[2] * T[0] - D0[0] * T[2], D0[0] * T[1] - D0[1] * T[0]];
@@ -13222,7 +13634,11 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     emittedRootR: (() => {
       let x = 0, y = 0;
       for (const q of PA) { x += q[0]; y += q[1]; }
-      return Math.hypot(x / PA.length, y / PA.length);
+      /* Measured from the STEM'S AXIS AT THIS NODE — the displaced one where
+         the stem has nodes. That offset is the stem's own declared law, and
+         LF2 compares the result against the WALL, so a petiole rooted off the
+         stem's axis still reads off it. */
+      return o ? Math.hypot(x / PA.length - o[0], y / PA.length - o[1]) : Math.hypot(x / PA.length, y / PA.length);
     })(),
     crossesSolidMm,
     /* THE AXIS OF THE ROD THIS BUILDER JUST EMITTED — the two rings' own

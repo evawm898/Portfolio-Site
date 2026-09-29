@@ -127,4 +127,6 @@ if (CONTROL) {
   process.exit(moved ? 0 : 1);
 }
 console.log(moved ? '\nFAIL — a petal control reaches the leaf' : '\nPASS — no petal control reaches the leaf');
-process.exit(moved ? 0 : 1);
+/* A PASS exits 0. It exited 1 until the stem-nodes session found it, the sepal
+   decoupling tool's own reversed-branch defect one tool later. */
+process.exit(moved ? 1 : 0);

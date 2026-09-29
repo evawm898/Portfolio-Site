@@ -77,6 +77,46 @@ const CONTROL = argv.includes('--control');
    guard is off (the count, coverage and tip shape at depth 0) is a HOLDER and
    must not be named. */
 const MOVERS = argOf('--movers') ? new RegExp(argOf('--movers')) : null;
+/* `--movers-predicate <name>` — THE PARTITION FROM A GUARD PREDICATE, never
+   from a label (#299's port: the stem's nodes). A label regex is a claim ABOUT
+   the rows; a predicate on the row's own state is the claim the change makes —
+   "a row moves iff its state engages the feature" — and it is evaluated per
+   row, on the coerced state, so a row whose label says one thing and whose set
+   does another is classified by what it BUILDS. The predicates are declared
+   in `PREDICATE_MOVERS` below, each with its reason; an unknown name refuses.
+   `--range a:b` compares matrix rows a..b-1 only and `--json <file>` writes the
+   run's counters and findings, so a full-matrix partition closes in
+   foreground chunks that survive this container (CLAUDE.md: background work
+   does not outlive a turn); `--merge f1,f2,...` closes the chunks into one
+   verdict and REFUSES a set of chunks that does not tile the matrix. */
+const MOVERS_PRED = argOf('--movers-predicate');
+const RANGE = argOf('--range');
+const JSON_OUT = argOf('--json');
+const MERGE = argOf('--merge');
+if (MERGE) {
+  const fs = await import('node:fs');
+  const parts = MERGE.split(',').map((f) => JSON.parse(fs.readFileSync(f, 'utf8'))).sort((a, b) => a.from - b.from);
+  const bad = [];
+  const total = parts[0].matrixRows;
+  let at = 0;
+  for (const p of parts) {
+    if (p.matrixRows !== total) bad.push(`chunk ${p.from}:${p.to} was taken over a ${p.matrixRows}-row matrix, not ${total}`);
+    if (p.from !== at) bad.push(`the chunks do not tile the matrix: expected a chunk from row ${at}, got ${p.from}`);
+    at = p.to;
+    if (p.predicate !== parts[0].predicate || p.base !== parts[0].base) bad.push(`chunk ${p.from}:${p.to} ran a different predicate or base`);
+  }
+  if (at !== total) bad.push(`the chunks end at row ${at} of ${total}`);
+  const sum = (k) => parts.reduce((n, p) => n + p[k], 0);
+  const fails = [...bad, ...parts.flatMap((p) => p.fails)];
+  console.log(`MERGED ${parts.length} chunks over ${total} rows x 2 modes, predicate ${parts[0].predicate}, base ${parts[0].base}`);
+  console.log(`partition     : ${sum('moversMoved')} of ${sum('moversSeen')} predeclared movers MOVED (every one must), ${sum('holdersSeen')} holders compared to the bit`);
+  console.log(`export stream : ${sum('floats').toLocaleString()} floats over ${sum('tris').toLocaleString()} triangles`);
+  console.log(`captured grid : ${sum('gridFloats').toLocaleString()} values over ${sum('panels').toLocaleString()} panels (live)`);
+  if (!sum('moversSeen')) fails.push('VACUOUS: no mover in the matrix');
+  if (fails.length) { console.log(`\nFAIL — ${fails.length} finding(s):`); for (const f of fails.slice(0, 60)) console.log('  ' + f); process.exit(1); }
+  console.log(`\nPASS — 0 floats moved on the ${sum('holdersSeen')} holders, positionally, under Object.is; all ${sum('moversSeen')} predeclared movers moved.`);
+  process.exit(0);
+}
 if (!BASE || !existsSync(path.join(BASE, 'bloom-geometry.js'))) {
   console.error('usage: node tools/verify-bloom-surface-bytes.mjs --base <worktree of the base commit> [--rows N] [--control] [--movers <label regex>]');
   process.exit(2);
@@ -100,11 +140,37 @@ function stateOf(row) {
 }
 
 const ONLY = argOf('--only') ? new RegExp(argOf('--only')) : null;
+const MATRIX = harness.buildMatrix();
+const [RFROM, RTO] = RANGE ? RANGE.split(':').map(Number) : [0, MATRIX.length];
 /* `--from K` starts at the K-th selected row (0-based), so a full-matrix run
    can be closed out in foreground chunks of `--from K --rows N` without a
-   label regex that might miss a row. The union of the chunks is the matrix. */
+   label regex that might miss a row. The union of the chunks is the matrix.
+   `--range a:b` is the same idea by MATRIX index, and composes with it. */
 const FROM = +(argOf('--from') || 0) || 0;
-const rows = harness.buildMatrix().filter((r) => !ONLY || ONLY.test(r.label)).slice(FROM, FROM + LIMIT);
+const rows = MATRIX.slice(RFROM, RTO).filter((r) => !ONLY || ONLY.test(r.label)).slice(FROM, FROM + LIMIT);
+/* THE PREDICATES. Each reads the row's own coerced state and, where the
+   change moves a record the BASE tree owns, the BASE tree's own builder — so
+   the prediction's owner is never the quantity under test. */
+const PREDICATE_MOVERS = {
+  /* THE STEM'S NODES. A row moves iff (i) its state engages the node law on
+     THIS tree (the geometry's own `stemNodesAbsent`, which is the guard), or
+     (ii) the leaf node pitch floor, made mode-free by the same change, moves
+     the LIVE leaf count — read off the BASE tree's own `leafPlan` in LIVE mode
+     against this tree's, which is the only place that change can act. */
+  'stem-nodes': (st) => {
+    if (!mine.stemNodesAbsent(st)) return true;
+    if (mine.leafIsAbsent(st)) return false;
+    const liveCount = (G) => {
+      const acc = new G.MeshBuilder({ exportMode: false });
+      const fr = G.footRing(st, acc);
+      const sp = G.stemPlan(st, fr.hub, acc);
+      return G.leafPlan(st, sp, acc).nodes;
+    };
+    return liveCount(mine) !== liveCount(base);
+  },
+};
+if (MOVERS_PRED && !PREDICATE_MOVERS[MOVERS_PRED]) { console.error(`--movers-predicate ${MOVERS_PRED}: no such predicate (${Object.keys(PREDICATE_MOVERS).join(', ')})`); process.exit(2); }
+if (MOVERS_PRED && MOVERS) { console.error('--movers and --movers-predicate are two declarations of one partition; give one'); process.exit(2); }
 console.log(`${rows.length} rows x 2 modes — this tree against ${BASE}`);
 const allFails = [];
 let floats = 0, gridFloats = 0, tris = 0, rowsDone = 0, panels = 0;
@@ -153,7 +219,7 @@ let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {
   const st = stateOf(row);
   const opts = { below: null, capability: row.capability ?? null };
-  const mover = MOVERS ? MOVERS.test(row.label) : false;
+  const mover = MOVERS ? MOVERS.test(row.label) : MOVERS_PRED ? PREDICATE_MOVERS[MOVERS_PRED](st) : false;
   if (mover) moversSeen++; else holdersSeen++;
   const rowFails = [];
   const fails = mover ? rowFails : allFails;
@@ -205,8 +271,13 @@ for (const row of rows) {
   if (rowsDone % 50 === 0) process.stderr.write(`  ${rowsDone}/${rows.length} rows\n`);
 }
 const fails = allFails;
-if (MOVERS && !moversSeen) fails.push(`VACUOUS: --movers ${MOVERS} matched no row of the matrix`);
-if (MOVERS && !holdersSeen) fails.push('VACUOUS: --movers matched EVERY row — nothing is being held');
+if (JSON_OUT) {
+  const fs = await import('node:fs');
+  fs.writeFileSync(JSON_OUT, JSON.stringify({ from: RFROM, to: Math.min(RTO, MATRIX.length), matrixRows: MATRIX.length, predicate: MOVERS_PRED || (MOVERS ? String(MOVERS) : null), base: BASE,
+    moversSeen, moversMoved, holdersSeen, floats, tris, gridFloats, panels, rowsDone, fails: allFails.slice() }));
+}
+if ((MOVERS || MOVERS_PRED) && !moversSeen && !JSON_OUT) fails.push(`VACUOUS: --movers ${MOVERS} matched no row of the matrix`);
+if ((MOVERS || MOVERS_PRED) && !holdersSeen && !JSON_OUT) fails.push('VACUOUS: --movers matched EVERY row — nothing is being held');
 
 /* VACUITY. A comparison that compared nothing passes trivially. */
 if (!rows.length) fails.push('VACUOUS: the matrix returned no rows');
@@ -218,7 +289,7 @@ if (CONTROL && fails.filter((f) => !f.startsWith('VACUOUS')).length !== 2) {
   fails.push(`CONTROL DID NOT FIRE BOTH CLAUSES: ${fails.filter((f) => !f.startsWith('VACUOUS')).length} finding(s), expected exactly 2 — a clause that cannot produce a verdict is not a check`);
 }
 
-if (MOVERS) console.log(`\npartition     : ${moversMoved} of ${moversSeen} rows named by --movers MOVED (every one must), ${holdersSeen} holders compared to the bit`);
+if (MOVERS || MOVERS_PRED) console.log(`\npartition     : ${moversMoved} of ${moversSeen} rows named by --movers MOVED (every one must), ${holdersSeen} holders compared to the bit`);
 console.log(`${MOVERS ? '' : '\n'}export stream : ${floats.toLocaleString()} floats over ${tris.toLocaleString()} triangles, ${rowsDone} rows x 2 modes${MOVERS ? ' (movers counted in the floats only where their lengths agree)' : ''}`);
 console.log(`captured grid : ${gridFloats.toLocaleString()} values over ${panels.toLocaleString()} panels (live)`);
 if (CONTROL) console.log('positive control: one coordinate perturbed by 1e-9 — the run MUST fail below');
@@ -229,4 +300,4 @@ if (fails.length) {
   if (fails.length > 40) console.log(`  ... and ${fails.length - 40} more`);
   process.exit(1);
 }
-console.log(MOVERS ? `\nPASS — 0 floats moved on the ${holdersSeen} holders, positionally, under Object.is; all ${moversSeen} predeclared movers moved.` : '\nPASS — 0 floats moved, positionally, under Object.is.');
+console.log((MOVERS || MOVERS_PRED) ? `\nPASS — 0 floats moved on the ${holdersSeen} holders, positionally, under Object.is; all ${moversSeen} predeclared movers moved.` : '\nPASS — 0 floats moved, positionally, under Object.is.');
