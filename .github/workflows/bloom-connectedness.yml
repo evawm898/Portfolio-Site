@@ -6,6 +6,13 @@
 # print arrives in parts. See tools/verify-bloom-connectedness.mjs's header
 # for what it does NOT cover (free ends, sub-cell gaps, configs outside the
 # matrix) and why shell counts and AABB overlap can never be the measure.
+#
+# THE PATH FILTER LISTS EVERY FILE THE GATE EXECUTES, IMPORTS INCLUDED (C19,
+# the gate-coverage session). `tools/bloom-crowding.mjs` and
+# `tools/bloom-first-slot.mjs` are reached through the harness on every row
+# (the crowding flag's own R1 validity assertion; the L family's Node-side
+# rebuild) and were not listed, so an edit to either alone ran this gate on
+# nothing. The chain for each is in docs/bloom-gate-coverage-outcome.md.
 name: bloom-connectedness
 
 on:
@@ -17,8 +24,13 @@ on:
       - bloom-geometry.js
       - bloom-registry.js
       - tools/verify-bloom-connectedness.mjs
+      - tools/bloom-connectedness-shards.mjs
+      - tools/bloom-export-shards.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
+      - tools/bloom-crowding.mjs
+      - tools/bloom-first-slot.mjs
+      - tools/bloom-sagitta.mjs   # reached at module load through bloom-export-shards; a load-time throw there is this gate's red too
       - tools/chromium-harness.mjs
       - .github/workflows/bloom-connectedness.yml
   push:
@@ -30,8 +42,13 @@ on:
       - bloom-geometry.js
       - bloom-registry.js
       - tools/verify-bloom-connectedness.mjs
+      - tools/bloom-connectedness-shards.mjs
+      - tools/bloom-export-shards.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
+      - tools/bloom-crowding.mjs
+      - tools/bloom-first-slot.mjs
+      - tools/bloom-sagitta.mjs   # reached at module load through bloom-export-shards; a load-time throw there is this gate's red too
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
 
@@ -47,9 +64,40 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# THE MATRIX IS SHARDED, AND ITS COVERAGE IS PROVED RATHER THAN ASSUMED (C20;
+# read tools/bloom-connectedness-shards.mjs's header). One job ran the whole
+# matrix with no `timeout-minutes` under GitHub's 360-minute default and its
+# recent successes took 134-204 minutes — the export gate's own shape before
+# #294 sharded it — with no instrument able to tell SLOW from HUNG. So:
+#   shard    — the matrix split FOUR ways by the export gate's own
+#              `shardOf(index, n)` (one owner of membership for both gates),
+#              each shard writing a census of what it attempted and reached;
+#   verdict  — reconciles every census against its OWN buildMatrix() (every
+#              row in exactly one shard, none in two, none in none) and
+#              assembles the one verdict through the same `summarizeConn()`
+#              the unsharded gate uses, over the UNION. `if: always()`, so a
+#              shard that crashed or timed out is a named finding.
+# EVERY JOB HAS AN EXPLICIT TIMEOUT, so a hang is DECLARED rather than
+# waited out.
 jobs:
-  verify:
+  shard:
     runs-on: ubuntu-latest
+    # 134-204 min of matrix / 4 is 34-51 min a shard plus ~5 min of install;
+    # 150 is ~3x the slowest observed and still 210 minutes under GitHub's
+    # own limit. A shard that reaches it is a HANG declared, and the verdict
+    # job names it.
+    timeout-minutes: 150
+    strategy:
+      # Every shard runs to completion whatever another does: a shard cancelled
+      # by fail-fast writes no census, and the verdict would then report a
+      # coverage hole that is only an artefact of the cancellation.
+      fail-fast: false
+      matrix:
+        # MUST be 0..SHARDS-1. A shard missing from this list writes no census
+        # and the verdict FAILS naming it; an extra one is refused at launch.
+        shard: [0, 1, 2, 3]
+    env:
+      SHARDS: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,5 +117,43 @@ jobs:
         run: npm i --no-save three@0.161.0 playwright@1.62.1
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
-      - name: Every row must export as a single connected body
-        run: node tools/verify-bloom-connectedness.mjs
+      - name: Every row in this shard must export as a single connected body
+        run: node tools/verify-bloom-connectedness.mjs --shard ${{ matrix.shard }}/$SHARDS --census census/census-${{ matrix.shard }}.json
+      # always(): a shard that FAILED still wrote its census, and the verdict
+      # needs it to say what failed; a shard that crashed wrote none, and the
+      # verdict says that instead.
+      - name: Keep this shard's census for the verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conn-census-${{ matrix.shard }}
+          path: census/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  verdict:
+    runs-on: ubuntu-latest
+    needs: [shard]
+    if: always()
+    timeout-minutes: 20
+    env:
+      SHARDS: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # The harness imports playwright-core at module load; no browser is needed.
+      - name: Install deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: The shard selector partitions the live matrix (read from the harness)
+        run: node tools/bloom-connectedness-shards.mjs --plan $SHARDS
+      - name: ... and the reconciliation must fail when a row goes missing
+        run: node tools/bloom-connectedness-shards.mjs --negative-control --shards $SHARDS
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: conn-census-*
+          path: census/
+          merge-multiple: true
+      - name: Every row in exactly one shard, and ONE verdict over all of them
+        run: node tools/bloom-connectedness-shards.mjs --merge census --shards $SHARDS
