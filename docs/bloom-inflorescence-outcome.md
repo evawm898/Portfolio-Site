@@ -20,7 +20,10 @@ than the assurance:
 * **`bloom-geometry.js` holds no module-level mutable state.** Every `let` at module
   scope is `const`; the four `last*` variables live in `bloom.js` and are written
   AFTER a build returns, so they are a record of the last build and never an input to
-  the next one.
+  the next one. *(Corrected Sep 29: true when written, false since #289 — `let NU` and
+  three budget flags. What this section relies on, that a build is a pure function of
+  `(state, acc)`, was measured to hold across builds; `NU` does leak within one build,
+  petals to leaf / rod / sepal scan. See `docs/bloom-build-order-outcome.md`.)*
 * **`buildBloomInto(acc, state, capability)` reads `state` and `capability` and
   writes `acc`.** It calls `footRing`, `stemPlan`, `leafPlan`, `sepalBladeState` and
   the builders; every one of them takes its state as an argument.
