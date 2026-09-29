@@ -91,10 +91,13 @@ the bloom gate.
 | `verify-bloom-infill-conform` | `--negative-control` | 76 + 247 | same |
 | `verify-bloom-infill-metric` | `--negative-control` | 80 + 377 | same |
 | `verify-bloom-edge-profile` | `--control` | 311 + 46 | same (needs Chromium) |
-| `verify-bloom-apex-mutants` | `--neuter=<id>` | ~3 min a mutant, 79 mutants | its own workflow, `bloom-apex-mutants.yml` |
+| `verify-bloom-apex-mutants` | `--only=<id> --neuter=<id>` | ~3 min a mutant on the box; **17 / 27 / 25 / 26 min a shard of 19-20 on the runner** | its own workflow, `bloom-apex-mutants.yml` |
 
-The `gates` job is about 21 minutes and runs in PARALLEL with `preflight`, so the export
-gate's critical path does not move. The mutant table is four hours in one job: it is sharded
+The `gates` job is about 21 minutes on the box and **20.0 min on the runner** (run
+36630920752 on `24b2877`, 21:25:52 → 21:45:52), in PARALLEL with `preflight` (46.0 min there,
+the infill negative control alone 18 of them), so the export gate's critical path does not
+move: that run's eight shards took 22-46 min of matrix each and the whole workflow, preflight
+to verdict, **72.5 min** against the 342 of the last single-job run. The mutant table is four hours in one job: it is sharded
 four ways by table index (`--shard=k/4`) in its own workflow, on a pull request that touches
 the table, weekly on `main`, and on dispatch; its `--anchors` pre-check (seconds) rides in
 `gates` on every push so a refactor that moves a find-string is caught the day it lands.
@@ -133,6 +136,40 @@ merges earlier).** Fixed here, each seen red first:
    excess) and names it as collateral. Attribution: every mover is a row whose apex the nib
    re-drew; none is this PR's.
 
+### What the mutant table's first CI run found (D14's own finding)
+
+The table had never run whole since the apex nib merged (#283) — every session since ran it
+in `--only` subsets — and the first sharded sweep in CI, on `24b2877`, was **red on all four
+shards, and red on `main` for the same six mutants** (each confirmed on a worktree of
+`a4dc836` with `--only`). The witness clause is what reported five of them, as it exists to:
+"the edit applied but the BEHAVIOUR did not move".
+
+| mutant | what the witness said | why | repair |
+|---|---|---|---|
+| `floored-tip`, `true-apex`, `wrong-terminal`, `law-past-the-floor` | the terminal is 0.05 mm whatever the floor is set to | they mutate the MODE FLOOR and read the shipping default's last row, which the nib pins to `APEX_END_HALF_MM` on every petal whose blade clears the print floor — ring 0 at every reachable width | the witnesses read **ring 5 of six layers at `layerSize` 0.35**, the one inert case where the floor still ends a blade (measured: peak half-widths 0.343 / 0.15 / 0.15 mm live on rings 3-5 against a 0.15 mm floor, 0.80 export), after asking the CLEAN tree whether that ring is in the floor's subject; they name **AN0** now, since A2-A4 read the representative petal only |
+| `plateau-returns` | the witness THREW: `Cannot access 'uPk' before initialization` | the inserted term read `uPk`, which the nib session moved below the terms (it is the DRAWN widest point now); `uPkRaw` is the law's own and is what the CORE term beside it reads | `uPkRaw` |
+| `stations-not-increasing` | the unrepaired ladder is still strictly increasing | swept the unrepaired module: 672 buckle states x 2 modes, 1,764 at session 35's finer grid, 144 lobed / ramped / spatulate compositions x 2 modes — **0 of ~2,600 builds** non-increasing, smallest positive gap 3.2e-6 | **RETIRED AS UNREACHABLE** with the measurement in its place (session 32's precedent for the lerp mutations); A7's clause stands |
+
+The repair to the four terminal mutants needed a clause nobody had: **AN0's inert arm now
+restates A4's law per ring** — `lastRowHalf === max(petalTipEnd x peakHalf, the mode floor)`
+wherever the nib declines — because A4 states it on the representative petal only and the nib
+owns that petal's terminal everywhere reachable, so after the nib the mode floor decided a
+terminal on exactly one kind of ring and no clause read it. Restated in Node over the whole
+971-row matrix in both modes before it went near CI: **17,896 rings, 644 with the nib inert,
+0 findings**; the four repaired mutants each fire it on the page, the clean tree is silent on
+the new probe row, and the `--control` legs already in the file are untouched. The table's
+`ROWS` gained that probe state (six layers at 0.35); it is a probe row of the mutant table and
+NOT a matrix row.
+
+**And the neuter control had two defects of its own, both caught by the same run.** The
+`witness` job was CANCELLED at its 30-minute timeout: `--neuter=<id>` ignored `--only` and
+swept all 79 mutants for one neutered edit (four hours). And its verdict read the run's
+whole `fail` flag, so with six stale mutants in the table it would have reported the control
+green whether or not the neutered witness had fired — a subject that includes the thing it
+doubts. It combines with `--only` now, runs the neutered mutant alone, and passes only when
+THAT mutant's witness reported (measured on the box: `the-leaf-reads-the-petals-nu` reported,
+exit 0, under two minutes).
+
 ## C20 — the connectedness gate, sharded
 
 `tools/bloom-connectedness-shards.mjs` reuses the export gate's own `shardOf`, census writer
@@ -147,8 +184,11 @@ The partition, from the harness's live matrix by index:
 reconciliation on nine planted cases, a two-piece row hidden in a middle shard among them;
 a two-shard three-row end-to-end run passes. Four shards and not eight: the recent whole-matrix
 runs took 134-204 min, so a shard is 34-51 min of matrix plus ~5 of install under a 150-minute
-declared timeout. **Per-shard runtime in CI is measured off this PR's own run and quoted in
-the PR thread, never projected here.**
+declared timeout. **Per-shard runtime in CI, measured on this PR's own run** (36630920832 on `24b2877`, 971
+rows, 243 / 243 / 243 / 242): matrix steps **59.1 / 39.2 / 51.2 / 48.9 min** for shards 0-3,
+the verdict green at 22:08:02, and the whole workflow **60.5 min** wall (21:07:37 → 22:08:04)
+against the 104-124 min this repo records for the single job. The worst shard sits at 39% of
+its 150-minute timeout.
 
 ## What this PR does not do
 
