@@ -3740,6 +3740,27 @@ let NU = NU_BASE;
    tools/bloom-harness.mjs) that has to hold before any petal has ever been
    built and therefore before `NU` has ever been set per petal. */
 export const BLADE_ROWS = NU_BASE;
+/* THE PARTS WITH NO APEX RAMP OWN THEIR ROW COUNT, AND IT IS NEVER `NU`.
+   `NU` is set per petal by `petalSurface` and is NOT reset afterwards, so a
+   builder that runs later in the same build and reads it gets whatever the
+   LAST PETAL left. Measured (docs/bloom-build-order-outcome.md §4, #303): the
+   leaf blade's rows doubled with the PETAL's tip shape — 2,548 -> 5,012
+   triangles a leaf at `petalTipShape` >= 2.70 while `leafTipShape` moved
+   nothing — the stamen/style spine integrator moved by up to 2.1e-12 mm, and
+   the sepal angle scan's first seam step read the head's lattice. Each reader
+   is PINNED to its own value here rather than `NU` being reset globally
+   (a reset would change WHEN `NU` is valid for every other reader, and that
+   needs its own argument):
+     * the leaf blade and the rod read these two constants, NU_BASE, because
+       neither part has an apex ramp (whether a leaf should get one is the open
+       leaf-apex-nib question, a ruling and not this fix);
+     * the sepal scan reads the SEPAL ring's own `bladeRowsFor(sepalTipShape)`,
+       the value its own trial builds set, so its first iteration agrees with
+       every later one.
+   `tools/verify-bloom-build-order.mjs --coupling` reads 0 rows on this tree;
+   the witness row is `LEAVES: x petalTipShape 3.00 (the NU coupling)`. */
+export const LEAF_BLADE_ROWS = NU_BASE;
+export const ROD_SPINE_ROWS = NU_BASE;
 
 /* THE APEX ROW COUNT IS RAMPED BY `petalTipShape`, ABOVE `APEX_NU_BAND[0]`
    (Eva's ruling — see the CLAUDE.md entry beside `APEX_HALF_MM`). The
@@ -3894,7 +3915,7 @@ export const EXPORT_TRI_BUDGET = 1_500_000;
    expression stood in three places (the ladder, the seam's lattice step and
    the ladder telemetry) and two of them were textually identical, which is
    enough to make an anchored mutation land twice and say nothing. */
-export function HELD_ROWS() { return Math.floor(ROOT_BLEND_END * NU); }
+export function HELD_ROWS(nu = NU) { return Math.floor(ROOT_BLEND_END * nu); }
 export const LADDER_ARC_SHARE = 0.70;
 export const LADDER_MAX_GAP_FACTOR = 1.4;
 const LADDER_SAMPLES = 8000;
@@ -4018,13 +4039,15 @@ export function seamClearanceMm(turnRad, sheetMm) {
 /* THE FURTHEST OUT THE BLOCK CAN START and still leave the redistributed
    ladder a domain at all: the last held row then lands at (SEAM_MAX_STEP +
    HELD_ROWS - 1) / NU, one row short of the tip. */
-export function SEAM_MAX_STEP() { return Math.max(1, NU - HELD_ROWS()); }
-export function seamLatticeStepRaw(seamMm, length) {
+export function SEAM_MAX_STEP(nu = NU) { return Math.max(1, nu - HELD_ROWS(nu)); }
+/* `nu` defaults to the current petal's `NU`; a caller outside a petal's own
+   build (the sepal angle scan) passes the row count of the part it is about. */
+export function seamLatticeStepRaw(seamMm, length, nu = NU) {
   const uSeam = length > 0 ? seamMm / length : 0;
-  return Math.max(1, Math.floor(uSeam * NU) + 1);
+  return Math.max(1, Math.floor(uSeam * nu) + 1);
 }
-export function seamLatticeStep(seamMm, length) {
-  return Math.min(seamLatticeStepRaw(seamMm, length), SEAM_MAX_STEP());
+export function seamLatticeStep(seamMm, length, nu = NU) {
+  return Math.min(seamLatticeStepRaw(seamMm, length, nu), SEAM_MAX_STEP(nu));
 }
 
 /* The blend grid a demand's ladder is taken down to — see the note at the
@@ -6642,7 +6665,7 @@ const SPINE_WIRED = true;
 export const CURL_START_MIN = 1 / NU;
 export function curlIsUniform(state) { return state.curlBias === 0 && state.curlStart === 0; }
 export function curlStartFloored(start, startFloor = CURL_START_MIN) { return start === 0 ? 0 : Math.max(start, CURL_START_MIN, startFloor); }
-export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN }) {
+export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN, rows = NU }) {
   const p = CURL_BIAS_POWER * bias;
   const s0 = curlStartFloored(start, startFloor);
   const remap = (u) => (s0 === 0 ? u : Math.max(0, (u - s0) / (1 - s0)));
@@ -6667,7 +6690,7 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
      six, and the gate found it before this sentence did. */
   const uniform = bias === 0 && s0 === 0;
   const kMax = uniform ? Infinity : 1 / floorRadius;
-  const N = NU * SPINE_SUBSTEPS, ds = length / N;
+  const N = rows * SPINE_SUBSTEPS, ds = length / N;
   const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
   phi[0] = tilt;
   let peakK = 0, clamped = false;
@@ -13496,7 +13519,8 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
   const bs = leafBladeState(state);
   const form = petalForm(bs, plan.widthMm / 2, acc.floorThickness(state.sheetThickness));
-  const cap = { petiole: true, rowCapacity: NU };
+  const nu = LEAF_BLADE_ROWS;
+  const cap = { petiole: true, rowCapacity: nu };
   const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, plan.widthMm / 2, cap, acc, plan.lengthMm);
   const t = acc.floorThickness(state.sheetThickness);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
@@ -13541,8 +13565,8 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bb = [base[0] + D0[0] * plan.petioleLenMm, base[1] + D0[1] * plan.petioleLenMm, base[2] + D0[2] * plan.petioleLenMm];
   const rows = [], rowHalfBaseMm = [];
-  for (let i = 0; i <= NU; i++) {
-    const u = i / NU;
+  for (let i = 0; i <= nu; i++) {
+    const u = i / nu;
     const fr = form ? form.frameAt(R, T, th, u) : { D: D0, T, N: [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)] };
     const C = [bb[0] + fr.D[0] * u * plan.lengthMm, bb[1] + fr.D[1] * u * plan.lengthMm, bb[2] + fr.D[2] * u * plan.lengthMm];
     const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
@@ -13558,7 +13582,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     rows.push(cols);
   }
   const off = (q, n, sv) => [q[0] + n[0] * sv, q[1] + n[1] * sv, q[2] + n[2] * sv];
-  for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
+  for (let i = 0; i < nu; i++) for (let j = 0; j < NV; j++) {
     const A = rows[i][j], B = rows[i][j + 1], C2 = rows[i + 1][j + 1], D = rows[i + 1][j];
     acc.quad(off(A.P, A.n, t / 2), off(D.P, D.n, t / 2), off(C2.P, C2.n, t / 2), off(B.P, B.n, t / 2));
     acc.quad(off(A.P, A.n, -t / 2), off(B.P, B.n, -t / 2), off(C2.P, C2.n, -t / 2), off(D.P, D.n, -t / 2));
@@ -13573,13 +13597,13 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      caught it as a validity failure on the 24-leaf row ("the divergence sign
      and the ray parity DISAGREE"), which is the right alarm and the wrong
      resolution; LF8 is the clause that names it. */
-  for (let i = 0; i < NU; i++) for (const j of [0, NV]) {
+  for (let i = 0; i < nu; i++) for (const j of [0, NV]) {
     const A = rows[i][j], B = rows[i + 1][j];
     const a = off(A.P, A.n, t / 2), b = off(B.P, B.n, t / 2);
     const c = off(B.P, B.n, -t / 2), d = off(A.P, A.n, -t / 2);
     if (j === 0) acc.quad(a, d, c, b); else acc.quad(a, b, c, d);
   }
-  for (const i of [0, NU]) for (let j = 0; j < NV; j++) {
+  for (const i of [0, nu]) for (let j = 0; j < NV; j++) {
     const A = rows[i][j], B = rows[i][j + 1];
     const a = off(A.P, A.n, t / 2), b = off(B.P, B.n, t / 2);
     const c = off(B.P, B.n, -t / 2), d = off(A.P, A.n, -t / 2);
@@ -13680,7 +13704,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
    blend that is live contributes `footHalf`, which is strictly positive on any
    real ring; with it down the outline is the shape term alone. */
 function widthProfileBlendIsDown(prof) {
-  return prof.winnerAt(0).term !== 'ROOT_BLEND' && prof.winnerAt(1 / (2 * NU)).term !== 'ROOT_BLEND';
+  return prof.winnerAt(0).term !== 'ROOT_BLEND' && prof.winnerAt(1 / (2 * LEAF_BLADE_ROWS)).term !== 'ROOT_BLEND';
 }
 export function buildHubInto(acc, state, ring) {
   const t = acc.floorThickness(ring.thickness);
@@ -13918,7 +13942,7 @@ function rodInto(acc, { t, r, curlRad, length, floorRadius }, s, azimuth) {
   const P = [R[0] * s.radius, R[1] * s.radius, s.z];                       // the owner's surface point
   const off = (h) => [P[0] + Up[0] * h, P[1] + Up[1] * h, P[2] + Up[2] * h];
   const inner = off(-t / 2), outer = off(t / 2);
-  const law = spineLaw({ curlRad, bias: 0, start: 0, length, tilt: 0, floorRadius });
+  const law = spineLaw({ curlRad, bias: 0, start: 0, length, tilt: 0, floorRadius, rows: ROD_SPINE_ROWS });
   const at = (sArc) => {
     const q = law.at(sArc), c = Math.cos(q.phi), sn = Math.sin(q.phi);
     return { C: [outer[0] + Up[0] * q.dR - Rs[0] * q.dZ, outer[1] + Up[1] * q.dR - Rs[1] * q.dZ, outer[2] + Up[2] * q.dR - Rs[2] * q.dZ],
@@ -15225,9 +15249,10 @@ export function sepalAngleLimit(state, fr, acc, sites) {
     const reps = [...configOf.values()];
     configs = Math.max(configs, reps.length);
     const trials = new Map();   // seam-step bucket -> trial lamina at its representative angle
+    const sepalRows = bladeRowsFor(sepalBladeState(state, lo).petalTipShape);   // the sepal ring's own, never the head's NU
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
-      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), state.petalLength * sepals.scale);
+      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), state.petalLength * sepals.scale, sepalRows);
       let trial = trials.get(seamStep);
       if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode); trials.set(seamStep, trial); }
       scanned++;

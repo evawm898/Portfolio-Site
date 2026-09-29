@@ -3455,7 +3455,11 @@ it there; a NODE-side tool must coerce, as `verify-bloom-seam-bytes.mjs` does. T
 a byte-partition run, and the tool's own ONE-SIDED guard is what found it: a row that
 throws on BOTH trees carries no information and is excluded and counted, a row that
 throws on ONE is a regression.
-**2,548 triangles a leaf, FIXED** — the lattice does not vary with size. Worst reachable
+**2,548 triangles a leaf, FIXED** — the lattice does not vary with size, **and since the
+NU-coupling fix it does not vary with the PETALS either** (the sentence was FALSE between
+#289 and that fix: the blade read the last head petal's `NU`, so above `petalTipShape` 2.70
+a leaf was 5,012 triangles while `leafTipShape` moved nothing — #303's finding; the leaf
+reads its own `LEAF_BLADE_ROWS` now and LF10 holds it). Worst reachable
 is 24 leaves (whorled x 8) = 61,152, and leaves are NOT per-petal, so `ALL MAX` never
 reaches them (the whole family is hidden at DEFAULTS, so the blanket sweep does not
 touch it — measured, not assumed). **`frozen/phase31` is the 746 rows at `1fd0af5`**;
@@ -5018,8 +5022,9 @@ TRUE** (the build-order session, `docs/bloom-build-order-outcome.md`,
 bit-identical to a fresh-module build; the flags always read back clean. **BUT `NU` IS
 NEVER RESET AND LEAKS WITHIN A BUILD** from the petals into the leaf blade (its row count
 follows `petalTipShape`: 2,548 -> 5,012 triangles a leaf above 2.70), the stamen/style rod
-(ulp-scale) and the sepal scan's first seam step — a recorded defect, NOT fixed, and
-invisible to any order test by construction. (The four `last*` variables are `bloom.js`'s
+(ulp-scale) and the sepal scan's first seam step — recorded by #303, and **FIXED by the
+NU-coupling session** (each reader pinned to its own row count — see the block below); it
+was invisible to any order test by construction. (The four `last*` variables are `bloom.js`'s
 and are written AFTER a build returns.) It IS origin-locked — the hub is centred on `[0,0,0]`, the
 stem runs down the world axis, `stemOmission` reasons about world z by name — which is
 what Route A handles BY CONSTRUCTION rather than by refactoring. **`below: 'branch'` is
@@ -5230,6 +5235,26 @@ both jobs and the matrix list); a mismatch is a missing census, which fails. **N
 was registered by that change** (no row moved), so it owed no `TAG_PUSH_XFAIL` entry — but the
 next phase whose base commit precedes a later edit to this workflow file will be refused the
 way phase42 was; declare it in the same PR.
+
+**THE NU COUPLING IS FIXED: THE LEAF, THE ROD AND THE SEPAL SCAN EACH READ THEIR OWN ROW
+COUNT** (Eva's ruling on #303 — read `docs/bloom-nu-coupling-outcome.md` before touching
+`LEAF_BLADE_ROWS`, `ROD_SPINE_ROWS`, `spineLaw`'s `rows`, `seamLatticeStep`'s `nu` or LF10).
+`NU` is set per petal by `petalSurface` and still never reset; what changed is that the three
+readers that run AFTER the head petals no longer read it. The leaf blade and the stamen/style
+rod read `NU_BASE` through their own constants (neither part has an apex ramp — whether a leaf
+should get one is the open leaf-apex-nib question, deliberately not this fix), and the sepal
+scan reads the sepal ring's own `bladeRowsFor(sepalTipShape)`, the value its own trial builds
+set. **`NU` WAS NOT RESET GLOBALLY, ON PURPOSE**: a reset changes WHEN `NU` is valid for every
+other reader and would need its own argument. `HELD_ROWS`, `SEAM_MAX_STEP` and
+`seamLatticeStep(Raw)` take an optional row count defaulting to `NU`, so every petal-side caller
+is the expression it was. **THE WITNESS IS BLOCK 42, ONE ROW** — `LEAVES: x petalTipShape 3.00`
+— with **LF10** (the blade's emitted rows against `BLADE_ROWS`, the STATIC count, a different
+owner from `NU` and from the leaf's constant); it is the ONLY state where the two readings
+disagree, which is why no earlier row could see it. The must-fail un-pins the leaf in a copy
+and the real export gate drops the witness row on LF10 alone; `the-leaf-reads-the-petals-nu`
+is in the apex mutant table with a witness on the mutated module. `node
+tools/verify-bloom-build-order.mjs --coupling` reads **0 of 971** on the fixed tree (1 of 970
+before). `frozen/phase46` is the 970 rows at `a4dc836`.
 
 ## Flower generator — print-safety is a hard invariant
 

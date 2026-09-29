@@ -122,7 +122,7 @@ function denseLimit(state, built, mode) {
   let lastClear = null, first = null;
   const trials = new Map();
   for (let deg = lo; deg <= hi + 1e-9; deg += DENSE_STEP) {
-    const seamStep = G.seamLatticeStep(G.seamClearanceMm(Math.abs(deg) * D2R, Number(state.sheetThickness)), Number(state.petalLength) * sepals.scale);
+    const seamStep = G.seamLatticeStep(G.seamClearanceMm(Math.abs(deg) * D2R, Number(state.sheetThickness)), Number(state.petalLength) * sepals.scale, G.bladeRowsFor(G.sepalBladeState(state, lo).petalTipShape));   // the shipped scan's own row count (#303's coupling, pinned)
     let trial = trials.get(seamStep);
     if (!trial) { trial = denseSepal(state, sepals, deg, mode, stationsAt(deg)); trials.set(seamStep, trial); }
     let hit = null;

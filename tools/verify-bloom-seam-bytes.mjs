@@ -3,7 +3,7 @@
    (session 38, generalised session 39, widened by the arc-stability session)
 
      node tools/verify-bloom-seam-bytes.mjs --base <worktree>
-          [--change seam|widest|arc|tilt] [--matrix live|phase23]
+          [--change seam|widest|arc|tilt|nib|nu] [--matrix live|phase23]
           [--expect <moved>/<held>] [--added <n>]
           [--control] [--control-mode] [--control-redef]
 
@@ -191,6 +191,7 @@ const A = await load(HERE), B = BASE ? await load(BASE) : null;
    moved the floor would make the predicate mean two things at once and the
    partition would be a comparison of two questions. */
 const PRINT_FLOOR_HALF = A.G.TIP_HALF_MM;
+const BLADE_ROWS_STATIC = A.G.BLADE_ROWS;
 if (B && !Object.is(B.G.TIP_HALF_MM, PRINT_FLOOR_HALF)) {
   console.error(`REFUSED: the print floor is ${PRINT_FLOOR_HALF} mm here and ${B.G.TIP_HALF_MM} on the base tree. A mover predicate written against it would ask a different question of each tree.`);
   process.exit(2);
@@ -296,6 +297,12 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
     'CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)': '367584 -> 367632',
     'SEPALS: sepalBuckleFreq min (1)': '39950 -> 39998',
   },
+  /* THE NU COUPLING FIX (#303's finding) PLACES NO PETAL STATION — it pins the
+     leaf blade, the stamen/style rod and the sepal scan to their own row
+     counts. The leaf's count moves only under a ramped head, and no row on the
+     base matrix carries leaves under one (the witness row is ADDED, not
+     compared); the rod's integrator changes no triangle. Declared empty. */
+  nu: {},
 };
 
 /* WHICH ROWS' DEFINITIONS MOVED — labels and/or set lists that differ between
@@ -306,7 +313,7 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
    partition; the run fails on an undeclared one AND on a declared one whose
    definition turns out identical. */
 const ROW_DEF_MOVED_BY_CHANGE = {
-  seam: {}, widest: {}, arc: {}, nib: {},
+  seam: {}, widest: {}, arc: {}, nib: {}, nu: {},
   tilt: {
     'petalTilt max (120)': "block 1 sweeps every SWEEPABLE slider to its own max, so this row's label and value ARE the range; the base tree calls it `petalTilt max (75)`",
     'ALL MAX': 'block 4 hands every SWEEPABLE slider its max at once, so this row carries petalTilt 120 here and 75 on the base — one label over two different states',
@@ -370,6 +377,21 @@ const MOVER_BY_CHANGE = {
      its own nib from its own law. */
   nib: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
     .some((p) => p && p.tipCap && p.tipCap.peakHalf > PRINT_FLOOR_HALF && !(p.tipCap.terminalHalf > PRINT_FLOOR_HALF)),
+  /* THE NU COUPLING (#303). The leaves and the rods are built AFTER the head
+     petals and read the `NU` the LAST HEAD PETAL left; the fix pins them to
+     their own. So a row moves iff that last petal's row count is not the
+     static one AND the build carries a reader: a leaf, a stamen or a style.
+     Read off the base tree's own `bladeLadder.rows` — a record the fix does
+     not write. THE SEPAL SCAN IS DELIBERATELY NOT IN IT: #303 measured it
+     latent (the drawn limit unchanged under a ramped head), so this
+     predeclaration says no sepal row moves, and a sepal row that DID move
+     would fail the run as an undeclared mover rather than be absorbed. */
+  nu: (built) => {
+    const head = (built.petalsAll || []).filter((p) => p && p.bladeLadder);
+    const last = head.length ? head[head.length - 1].bladeLadder.rows : null;
+    return last !== null && last !== BLADE_ROWS_STATIC
+      && ((built.leavesBuilt || []).length > 0 || (built.stamens || []).length > 0 || (built.styles || []).length > 0);
+  },
 };
 if (!(change in TRI_COUNT_XFAIL_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} has no declared triangle-count table. Add one (even an empty {}) rather than running without a declaration.`);
@@ -386,6 +408,8 @@ const MOVER_WHY = {
   arc: ['a petal takes the uniform arc there', 'no built petal takes the uniform arc there'],
   tilt: ["a built ring's composed petalTilt is clamped down by the base tree's envelope there",
          "no built ring's composed petalTilt is clamped down by the base tree's envelope there"],
+  nu: ["the last head petal's row count is ramped and a leaf, stamen or style reads it there",
+       'no leaf, stamen or style there reads a ramped row count'],
   nib: ['a built blade clears the print floor with no squared terminal holding it above, so the apex nib truncates its law there',
         'no built blade takes an apex nib there — either its peak never clears the print floor, or a squared terminal holds the outline above it'],
 }[change] || ["the base tree's record predeclares it", "the base tree's record does not predeclare it"];
@@ -692,6 +716,7 @@ const DEFAULT_HOLDS_BY_CHANGE = {
   arc: 'the default is at curl exactly 0, where `spineAt` takes the straight arm and no arc is formed at all',
   tilt: "the default's composed tilt is not clamped by the base tree's envelope",
   nib: null,   // DOES move, by design: the nib is active at the defaults
+  nu: 'the default petals do not ramp (petalTipShape 1.70 is below the band), so every reader already saw the static row count',
 };
 if (!(change in DEFAULT_HOLDS_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} does not declare whether the shipping default holds. Say so (a reason, or null for "it moves by design") rather than running without it.`);

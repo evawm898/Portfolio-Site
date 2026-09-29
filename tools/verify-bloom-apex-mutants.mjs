@@ -636,11 +636,11 @@ const MUTANTS = [
      uniform ones, which moves a boundary footRing() owns. Watertight, one
      piece, identical triangle count; nothing else here can see it. */
   { id: 'ladder-eats-the-base', why: 'the ladder redistributes every row, including the ones the root blend owns',
-    find: 'export function HELD_ROWS() { return Math.floor(ROOT_BLEND_END * NU); }',
+    find: 'export function HELD_ROWS(nu = NU) { return Math.floor(ROOT_BLEND_END * nu); }',
     /* A7 ONLY, and the claim was corrected by the control rather than the
        check by the claim: with the held count at 0 the ladder still respects
        its gap bound, so A8 is RIGHT not to fire here. */
-    into: 'export function HELD_ROWS() { return 0; }', names: ['A7'],
+    into: 'export function HELD_ROWS(nu = NU) { return 0; }', names: ['A7'],
     witness: (M, C) => {
       const a = builtOn(M).stations, b = builtOn(C).stations;
       /* REGISTRY_DEFAULTS' own petalTipShape (1.70) sits well below the apex
@@ -1315,6 +1315,30 @@ const MUTANTS = [
         : `the hub's top face is at ${m.hub.topFaceZ} against the clean tree's ${c.hub.topFaceZ} — it did not move`; } },
 
   /* ===================================================================
+     THE NU COUPLING (#303's finding, fixed) — LF10. The leaf is pinned to its
+     own row count; un-pinning it lets the blade read whatever `NU` the last
+     petal left, which doubles its rows under a ramped tip and moves nothing an
+     STL gate can see. Witnessed on the MUTATED module: a bloom at petalTipShape
+     3.00 is built first (so NU is left at 112, exactly as in one real build),
+     then one leaf, and its emitted row count is compared with the clean tree's. */
+  { id: 'the-leaf-reads-the-petals-nu', why: "the leaf blade's row count is the last petal's ramped NU rather than its own, so petalTipShape doubles a leaf's lattice while leafTipShape moves nothing",
+    find: '  const nu = LEAF_BLADE_ROWS;\n  const cap = { petiole: true, rowCapacity: nu };',
+    into: '  const nu = NU;\n  const cap = { petiole: true, rowCapacity: nu };', names: ['LF10'],
+    witness: (M, C) => {
+      const rowsAfterRamp = (MOD) => {
+        try {
+          const st = { ...REGISTRY_DEFAULTS, stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 1, petalTipShape: 3 };
+          const acc = new MOD.MeshBuilder({ exportMode: true });
+          MOD.buildBloomInto(acc, st);
+          const fr = MOD.footRing(st, acc);
+          const plan = MOD.leafPlan(st, MOD.stemPlan(st, fr.hub, acc), acc);
+          return MOD.buildLeafInto(new MOD.MeshBuilder({ exportMode: true }), plan, st, 0, 0).rowHalfBaseMm.length - 1;
+        } catch (e) { return `threw: ${e.message}`; }
+      };
+      const m = rowsAfterRamp(M), c = rowsAfterRamp(C);
+      return (c === 56 && m === 112) ? null : `after a ramped bloom the leaf is built on ${m} rows on the mutant and ${c} on the clean tree — the behaviour did not move`; } },
+
+  /* ===================================================================
      THE LEAF TIP (the leaf tip-shape session) — LF9. The family was added, so
      the table runs it. Two mutations, each the plausible way the control could
      be wired wrong while every other family and both STL gates stay green: a
@@ -1712,6 +1736,12 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'leafTipShape', value: '0.6' }] },
+  /* THE NU COUPLING'S ROW (#303's finding, fixed): the petals ramp to 112
+     rows at petalTipShape 3.00, which is the ONLY state where a leaf reading
+     the petals' NU and a leaf reading its own 56 disagree — at the default
+     both are 56 and `the-leaf-reads-the-petals-nu` is a no-op. */
+  { label: 'a leaf under petals whose rows RAMP (petalTipShape 3.00 — the leaf keeps its own 56)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'petalTipShape', value: '3' }] },
   /* THE HUB SHAPE ROWS (the hub-shape session). A STYLED row so ST11's profile
      clause has a curve to measure — ANGLED at amount 2 with an explicit reach,
      apart from GOBLET-default so a mutation ignoring the style is observable
