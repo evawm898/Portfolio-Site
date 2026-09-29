@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Color Change — Field Notes — Eva Maskalenko</title>
-<meta name="description" content="Field Notes: Color Change — seven colour-change mechanisms animated at the material or cellular level, grouped by principle: pigment moving, pigment changing chemically, structure changing. Apply heat, voltage or UV and watch why the colour changes.">
+<meta name="description" content="Field Notes: Color Change — eight colour-change mechanisms animated at the material or cellular level, grouped by principle: pigment moving, pigment changing chemically, structure changing. Apply heat, voltage or UV and watch why the colour changes.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -34,7 +34,7 @@
       <span>Interactive</span>
     </div>
     <h1 class="project__title">Color Change</h1>
-    <p class="project__lede">Seven ways a material or an animal changes colour, each animated at the level where the change actually happens. Apply heat, voltage or UV, fire a nerve, stretch a lattice, and watch why the colour moves &mdash; not just that it does.</p>
+    <p class="project__lede">Eight ways a material or an animal changes colour, each animated at the level where the change actually happens. Apply heat, voltage or UV, fire a nerve, stretch a lattice, and watch why the colour moves &mdash; not just that it does.</p>
   </div>
 
   <nav class="cc__index" aria-label="The three principles">
@@ -116,10 +116,39 @@
         <dl class="cc__ro"><div><dt>State</dt><dd data-ro="echromic:state"></dd></div><div><dt>Transmission</dt><dd data-ro="echromic:transmission"></dd></div><div><dt>Composition</dt><dd data-ro="echromic:x"></dd></div></dl>
       </div>
     </article>
-    <article class="cc__mech" id="mech-photo">
+    <article class="cc__mech" id="mech-pedot">
       <div class="cc__stage">
         <div class="cc__mech-head">
           <span class="cc__mech-index">2.3</span>
+          <h3 class="cc__mech-title">Printed electrochromic polymer</h3>
+          <span class="cc__mech-sub">labels, packaging, wearables &middot; same chemistry, opposite direction</span>
+        </div>
+        <svg class="cc__canvas cc__pe" id="pe-svg" viewBox="0 0 640 360" role="img" aria-label="Printed electrochromic polymer: a two-digit seven-segment display, each segment its own PEDOT cell on a PET substrate"></svg>
+        <div class="cc__controls cc__controls--tight"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-pe-mode="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn" data-pe-mode="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn is-active" data-pe-mode="off" aria-pressed="true">Open circuit</button></div>
+        <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Drive digit</span><button type="button" class="cc__btn is-active" data-pe-target="0" aria-pressed="true">1st</button><button type="button" class="cc__btn" data-pe-target="1" aria-pressed="false">2nd</button><span class="cc__pad" role="group" aria-label="Digit to drive, 0 to 9"></span></div>
+      </div>
+      <div class="cc__text">
+        <p>Same principle as 2.2: push electrons and balancing ions into a material and it changes colour; open the circuit and it holds. What differs is the material and how it is made. The active layer is <strong>PEDOT:PSS</strong>, an organic conductive polymer, screen-printed as ink on PET rather than sputtered onto glass. The counter electrode is a second PEDOT layer or a printed carbon layer, and the electrolyte is a printed gel.</p><p>It is <strong>reflective, not transmissive</strong> &mdash; you look at it, not through it, so it is a display and not a window. And it switches the opposite way to WO<sub>3</sub>: PEDOT is dark blue in its neutral, reduced state and goes nearly transparent when oxidised. Bleached is &ldquo;on.&rdquo; Each segment is its own cell, so a driven segment changes and its neighbours keep whatever state they were in.</p><p>Small segments switch in under a second to a few seconds, and holding a state costs under about 1&nbsp;&micro;W/cm&sup2;, so a coin cell can drive one for years. This is the version that ends up on fabric and labels; the oxide version ends up on buildings and lenses. It is Ynvisible&rsquo;s technology.</p>
+        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="pedot:state"></dd></div><div><dt>Segment voltage</dt><dd data-ro="pedot:voltage"></dd></div><div><dt>Power</dt><dd data-ro="pedot:power"></dd></div></dl>
+      </div>
+      <div class="cc__compare">
+        <h4 class="cc__compare-title">2.2 vs 2.3</h4>
+        <dl class="cc__cmp">
+          <div class="cc__cmp-head"><dt></dt><dd>2.2 &middot; WO<sub>3</sub></dd><dd>2.3 &middot; PEDOT:PSS</dd></div>
+          <div><dt>Active layer</dt><dd>WO<sub>3</sub> (inorganic)</dd><dd>PEDOT:PSS (organic polymer)</dd></div>
+          <div><dt>Mode</dt><dd>transmissive (window, lens)</dd><dd>reflective (display)</dd></div>
+          <div><dt>Substrate</dt><dd>glass + ITO</dd><dd>PET, screen-printed</dd></div>
+          <div><dt>Process</dt><dd>sputtered thin film</dd><dd>roll-to-roll printing</dd></div>
+          <div><dt>Colored state</dt><dd>with ions in (Li<sub>x</sub>WO<sub>3</sub>)</dd><dd>with ions out (neutral PEDOT)</dd></div>
+          <div><dt>Speed</dt><dd>seconds to minutes</dd><dd>sub-second to seconds</dd></div>
+          <div><dt>Where it ends up</dt><dd>buildings, visors, aircraft windows</dd><dd>labels, packaging, wearables, e-textiles</dd></div>
+        </dl>
+      </div>
+    </article>
+    <article class="cc__mech" id="mech-photo">
+      <div class="cc__stage">
+        <div class="cc__mech-head">
+          <span class="cc__mech-index">2.4</span>
           <h3 class="cc__mech-title">Photochromic spiropyran</h3>
           <span class="cc__mech-sub">self-darkening lenses · chemistry changing</span>
         </div>

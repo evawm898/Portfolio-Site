@@ -198,6 +198,47 @@
 
 .cc__ro dd { color: var(--ink); }
 
+
+/* ---------- 2.2 vs 2.3: the comparison, styled like the readout rows */
+
+.cc__compare {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line);
+  padding: 1.75rem 6vw 2rem;
+}
+
+.cc__compare-title {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin-bottom: 1rem;
+}
+
+.cc__cmp { border-top: 1px solid var(--line); max-width: 60rem; }
+
+.cc__cmp div {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cc__cmp dt {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-size: 10px;
+  padding-top: 0.1em;
+}
+
+.cc__cmp dd { color: var(--ink); }
+.cc__cmp-head dd { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+
 /* ---------- the three-principle index in the intro */
 
 .cc__index {
@@ -245,6 +286,7 @@
   .cc__mech { grid-template-columns: 1fr; }
   .cc__stage { border-right: 0; padding: 0 6vw; }
   .cc__text { padding: 0 6vw 2rem; }
+  .cc__compare { padding: 0 6vw 2rem; }
   .cc__principle-head { grid-template-columns: 1fr; gap: 0.75rem; }
 }
 
@@ -255,4 +297,6 @@
   .cc__index a:last-child { border-bottom: 0; }
   .cc__canvas { aspect-ratio: 4 / 3; }
   .cc__mech-head { flex-wrap: wrap; gap: 0.4rem 0.8rem; }
+  .cc__cmp div { grid-template-columns: 1fr 1fr; }
+  .cc__cmp dt { grid-column: 1 / -1; }
 }

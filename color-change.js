@@ -1,5 +1,5 @@
 /* color-change.js — Field Notes No. 07
-   Seven colour-change mechanisms, each animated at the level where the change
+   Eight colour-change mechanisms, each animated at the level where the change
    actually happens, grouped by what moves: pigment (electrophoretic ink,
    cephalopod chromatophores), the pigment's chemistry (thermochromic leuco
    dye, electrochromic tungsten oxide, photochromic spiropyran), or the
