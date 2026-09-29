@@ -1,5 +1,5 @@
 /* color-change.js — Field Notes No. 07
-   Seven colour-change mechanisms, each animated at the level where the change
+   Eight colour-change mechanisms, each animated at the level where the change
    actually happens, grouped by what moves: pigment (electrophoretic ink,
    cephalopod chromatophores), the pigment's chemistry (thermochromic leuco
    dye, electrochromic tungsten oxide, photochromic spiropyran), or the
@@ -491,4 +491,115 @@ function init() {
   };
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+
+/* ------------------------------------------------------------------ 2.3 printed electrochromic polymer
+   Self-contained: an SVG two-digit seven-segment display. Each of the 14
+   segments is its own PEDOT cell with its own level (1 = neutral, dark
+   blue; 0 = oxidised, near-transparent). The digit pad chooses which
+   segments are driven; the voltage buttons act only on those, so an
+   undriven segment keeps its prior state. Open circuit drives nothing.
+   Rates and powers are representative, not measured. */
+(() => {
+'use strict';
+const svg = document.getElementById('pe-svg');
+if (!svg) return;
+const NS = 'http://www.w3.org/2000/svg';
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FADE_S = 0.8, VOLT = 1.2, UW_PER_SEG = 20, MIN_ALPHA = 0.05;
+const BLUE = 'rgb(30,52,150)';
+const SEGS = 'abcdefg';
+const DIGITS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
+
+const el = (name, attrs, parent) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+const hexH = (cx, cy, L, T) => [[cx - L / 2, cy], [cx - L / 2 + T / 2, cy - T / 2], [cx + L / 2 - T / 2, cy - T / 2], [cx + L / 2, cy], [cx + L / 2 - T / 2, cy + T / 2], [cx - L / 2 + T / 2, cy + T / 2]];
+const hexV = (cx, cy, L, T) => [[cx, cy - L / 2], [cx + T / 2, cy - L / 2 + T / 2], [cx + T / 2, cy + L / 2 - T / 2], [cx, cy + L / 2], [cx - T / 2, cy + L / 2 - T / 2], [cx - T / 2, cy - L / 2 + T / 2]];
+const pts = a => a.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+
+// substrate, segments, electrolyte overlay (drawn last so it sits over the patches)
+el('rect', { x: 40, y: 24, width: 560, height: 292, rx: 6, fill: '#d7dee0', stroke: 'rgba(0,0,0,0.25)' }, svg);
+const W = 110, H = 200, T = 18, OY = 66, OX = [160, 370];
+const segEls = [];
+OX.forEach(ox => {
+  SEGS.split('').forEach(s => {
+    const hz = 'adg'.includes(s);
+    const cx = hz ? ox + W / 2 : 'bc'.includes(s) ? ox + W : ox;
+    const cy = { a: OY, g: OY + H / 2, d: OY + H, b: OY + H / 4, f: OY + H / 4, c: OY + 3 * H / 4, e: OY + 3 * H / 4 }[s];
+    const poly = el('polygon', { points: pts(hz ? hexH(cx, cy, W - 6, T) : hexV(cx, cy, H / 2 - 6, T)), fill: BLUE, 'fill-opacity': 1, stroke: 'rgba(60,80,90,0.4)', 'stroke-width': 1, 'stroke-linejoin': 'round' }, svg);
+    segEls.push(poly);
+  });
+});
+const gel = el('g', { class: 'cc__pe-gel' }, svg);
+el('rect', { x: 100, y: 40, width: 440, height: 260, rx: 4, fill: 'rgba(47,163,163,0.13)', stroke: 'rgba(28,107,107,0.85)', 'stroke-dasharray': '5 4' }, gel);
+const gt = el('text', { x: 110, y: 291, 'font-size': 11, 'letter-spacing': '0.08em', fill: '#1c4a4a', 'font-family': 'IBM Plex Mono, monospace' }, gel);
+gt.textContent = 'PRINTED GEL ELECTROLYTE';
+const cap = (x, anchor, txt) => { const t = el('text', { x, y: 340, 'font-size': 10, 'letter-spacing': '0.1em', 'text-anchor': anchor, 'font-family': 'IBM Plex Mono, monospace', style: 'fill:var(--ink-faint)' }, svg); t.textContent = txt; };
+cap(44, 'start', 'PET SUBSTRATE'); cap(596, 'end', 'PEDOT:PSS SEGMENTS · EACH ITS OWN CELL');
+
+const level = new Array(14).fill(1);
+const pattern = [4, 2];
+let mode = 'off', target = 0, t = 0, raf = 0, last = 0, moving = 0;
+const driven = () => { const d = new Array(14).fill(false); pattern.forEach((n, i) => { for (const s of DIGITS[n]) d[i * 7 + SEGS.indexOf(s)] = true; }); return d; };
+
+function paint(dr) {
+  segEls.forEach((p, i) => {
+    p.setAttribute('fill-opacity', (MIN_ALPHA + (1 - MIN_ALPHA) * level[i]).toFixed(3));
+    p.setAttribute('stroke', dr[i] ? '#1c6b6b' : 'rgba(60,80,90,0.4)');
+    p.setAttribute('stroke-width', dr[i] ? 2.5 : 1);
+  });
+}
+function readout(dr) {
+  const n = dr.filter(Boolean).length, bleached = level.filter(v => v < 0.5).length;
+  let state, volt;
+  if (mode === 'off') { state = 'open circuit — holding, ' + bleached + ' of 14 segments bleached'; volt = '0 V — no path for the ions'; }
+  else {
+    state = moving ? (mode === 'bleach' ? 'bleaching — PEDOT oxidising, ions leaving' : 'colouring — PEDOT reducing, ions entering') + ' · ' + n + ' driven' : (mode === 'bleach' ? 'bleached — driven segments clear (on)' : 'coloured — driven segments dark blue (off)') + ' · ' + n + ' driven';
+    volt = (mode === 'bleach' ? '+' : '−') + VOLT.toFixed(1) + ' V on ' + n + ' segments';
+  }
+  const power = moving ? '≈ ' + (moving * UW_PER_SEG) + ' µW while switching' : '~0 µW — holding';
+  const set = (k, v) => { const e = document.querySelector('[data-ro="pedot:' + k + '"]'); if (e && e.textContent !== v) e.textContent = v; };
+  set('state', state); set('voltage', volt); set('power', power);
+}
+function step(dt) {
+  const dr = driven(); moving = 0;
+  if (mode !== 'off') {
+    const goal = mode === 'bleach' ? 0 : 1;
+    dr.forEach((on, i) => {
+      if (!on || level[i] === goal) return;
+      level[i] = reduce ? goal : Math.abs(goal - level[i]) <= dt / FADE_S ? goal : level[i] + Math.sign(goal - level[i]) * dt / FADE_S;
+      if (!reduce && level[i] !== goal) moving++;
+    });
+  }
+  paint(dr); readout(dr);
+}
+function tick(now) {
+  const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+  step(dt);
+  raf = moving ? requestAnimationFrame(tick) : (last = 0);
+}
+function kick() { step(0); if (!raf || !last) { last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); } }
+
+// controls
+const modeBtns = document.querySelectorAll('[data-pe-mode]');
+modeBtns.forEach(b => b.addEventListener('click', () => {
+  mode = b.dataset.peMode;
+  modeBtns.forEach(o => { const on = o === b; o.classList.toggle('is-active', on); o.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  kick();
+}));
+const pad = document.querySelector('.cc__pad');
+const padBtns = [];
+for (let n = 0; n < 10; n++) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'cc__btn'; b.textContent = n; b.dataset.peDigit = n; b.setAttribute('aria-pressed', 'false');
+  b.addEventListener('click', () => { pattern[target] = n; syncPad(); kick(); });
+  pad.appendChild(b); padBtns.push(b);
+}
+function syncPad() { padBtns.forEach((b, n) => { const on = pattern[target] === n; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
+const tgtBtns = document.querySelectorAll('[data-pe-target]');
+tgtBtns.forEach(b => b.addEventListener('click', () => {
+  target = parseInt(b.dataset.peTarget, 10);
+  tgtBtns.forEach(o => { const on = o === b; o.classList.toggle('is-active', on); o.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  syncPad();
+}));
+syncPad(); step(0);
+window.__pedot = { level, pattern, mode: () => mode, set(m) { document.querySelector('[data-pe-mode="' + m + '"]').click(); } };
 })();
