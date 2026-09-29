@@ -199,6 +199,19 @@
 .cc__ro dd { color: var(--ink); }
 
 
+
+/* ---------- 2.3 demo: SVG stage, second control row, electrolyte overlay */
+
+.cc__pe { cursor: default; }
+.cc__pe-gel { opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
+.cc__pe:hover .cc__pe-gel, .cc__pe:focus-visible .cc__pe-gel { opacity: 1; }
+.cc__pe:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
+.cc__controls--tight { padding-bottom: 0.4rem; }
+.cc__controls--pad { padding-top: 0; }
+.cc__pad { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; margin-left: 0.4rem; }
+.cc__pad .cc__btn { min-width: 2rem; padding-left: 0.5rem; padding-right: 0.5rem; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .cc__pe-gel { transition: none; } }
+
 /* ---------- 2.2 vs 2.3: the comparison, styled like the readout rows */
 
 .cc__compare {
