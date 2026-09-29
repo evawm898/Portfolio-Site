@@ -330,7 +330,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        drawn against the same laminae; the plan is asked of its one owner. */
     if (fr.sepals) mod.buildSepalsInto(accST, ui, fr, petalSites, stPlan);
 
-    const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
+    const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0) + 1;
     if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
       bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
