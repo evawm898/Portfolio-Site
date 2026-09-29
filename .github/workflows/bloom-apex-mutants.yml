@@ -1,0 +1,80 @@
+# THE APEX MUTANT TABLE, IN CI (D14, the gate-coverage session). The table is
+# the project's positive control for the A, L, LF, ST, AN, ID, VS ... families:
+# each of its 79 mutations is a real edit to bloom-geometry.js served in flight,
+# and the run FAILS if the family a mutant names stays silent. Until this file
+# existed it ran in no workflow: a sweep is ~3 minutes a mutant (measured 182 s
+# for one on the session's box), four hours in one job, and it was run by hand
+# in `--only` subsets — so a stale anchor or a family gone silent was found
+# only when somebody next ran that subset.
+#
+# THREE TRIGGERS, THREE COSTS:
+#   pull_request on the table itself and on this file — the full sweep, sharded
+#     four ways by table index (`--shard k/4`, ~60 min a shard), because an
+#     edit to the table is exactly when its claims must be re-proved;
+#   schedule, weekly — the same sweep on `main`, because the geometry and the
+#     harness change under the table every session and their own workflows do
+#     not run it (listing the table in the export gate's path filter was
+#     refused for a reason its filter comment records);
+#   workflow_dispatch — on demand.
+# The ANCHOR PRE-CHECK (`--anchors`, seconds, no mutant run) rides in
+# bloom-export-watertight's `gates` job on every push that touches the geometry
+# or the harness, so a refactor that moves a mutant's find-string is caught the
+# day it lands rather than at the weekly sweep.
+#
+# THE CONTROL: `--neuter=<id>` makes one edit APPLY while changing nothing, so
+# only the witness clause can see that the behaviour did not move; the run must
+# REPORT it. It is its own job so a table whose witnesses had gone blind reads
+# red here whatever the shards say.
+name: bloom-apex-mutants
+
+on:
+  pull_request:
+    paths:
+      - tools/verify-bloom-apex-mutants.mjs
+      - .github/workflows/bloom-apex-mutants.yml
+  schedule:
+    - cron: '17 3 * * 1'   # Mondays 03:17 UTC — off the hour, off the half hour
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every anchor matches exactly once
+        run: node tools/verify-bloom-apex-mutants.mjs --anchors
+      - name: The witness clause must REPORT a neutered mutant (must-fail control)
+        run: node tools/verify-bloom-apex-mutants.mjs --neuter=the-leaf-reads-the-petals-nu
+
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      SHARDS: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every mutant in this shard fires the family it names, and the clean tree is silent
+        run: node tools/verify-bloom-apex-mutants.mjs --shard=${{ matrix.shard }}/$SHARDS

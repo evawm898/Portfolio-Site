@@ -1930,13 +1930,33 @@ async function famsOn(rows) {
   console.log(`ANCHORS: ${MUTANTS.length} mutants, ${MUTANTS.length - stale.length} matching their find-string exactly once`);
   for (const [id, n] of stale) console.log(`  *** ${id}: anchor matches ${n}x — disarmed`);
   if (stale.length) { await browser.close(); server.close(); console.log('\nAPEX MUTANT TABLE: FAILED (disarmed anchors)'); process.exit(1); }
+  /* `--anchors`: the pre-check alone, on every push that touches the geometry
+     or the harness (the gate-coverage session) — seconds, no mutant run. A
+     refactor that moves a mutant's find-string is caught the day it lands
+     rather than on the next sweep. */
+  if (process.argv.includes('--anchors')) { await browser.close(); server.close(); console.log(`\nANCHORS ONLY: every one of the ${MUTANTS.length} mutants matches its find-string exactly once; no mutant was run.`); process.exit(0); }
 }
 
 /* `--only=<id>[,<id>...]` runs a subset. A full sweep is every mutant over
    every row and is not survivable in a container that restarts, so the subset
    is how a family is re-verified after a change; it NEVER reports as a sweep. */
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1];
-const SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
+let SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
+/* `--shard=k/n` (the gate-coverage session, D14): the k-th of n slices of the
+   table BY INDEX — `MUTANTS[i]` for `i % n === k`, the export gate's own
+   `shardOf` rule — so a weekly CI sweep can run the whole table across n
+   parallel jobs at ~3 min a mutant (measured 182 s for one on this box: 79
+   mutants is four hours in one job, 60 minutes in four). A shard reports as a
+   SUBSET, never as a sweep; the anchor pre-check above runs over ALL of them
+   in every shard, so a disarmed mutant is named whichever shard skips it. */
+const SHARD_ARG = (process.argv.find((a) => a.startsWith('--shard=')) || '').split('=')[1];
+if (SHARD_ARG) {
+  const m = /^(\d+)\/(\d+)$/.exec(SHARD_ARG);
+  if (!m || +m[2] < 1 || +m[1] >= +m[2]) { await browser.close(); server.close(); console.log(`--shard wants k/n with 0 <= k < n, got "${SHARD_ARG}"`); process.exit(1); }
+  if (SELECTED) { await browser.close(); server.close(); console.log('--shard and --only do not combine'); process.exit(1); }
+  SELECTED = MUTANTS.filter((mu, i) => i % +m[2] === +m[1]).map((mu) => mu.id);
+  console.log(`SHARD ${m[1]}/${m[2]}: ${SELECTED.length} of ${MUTANTS.length} mutants (by table index)`);
+}
 if (SELECTED) {
   const unknown = SELECTED.filter((id) => !MUTANTS.some((m) => m.id === id));
   if (unknown.length) { await browser.close(); server.close(); console.log(`--only names no such mutant: ${unknown.join(', ')}`); process.exit(1); }

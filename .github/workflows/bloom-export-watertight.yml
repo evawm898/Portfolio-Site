@@ -30,13 +30,41 @@ on:
       - tools/bloom-self-intersection.mjs
       - tools/verify-bloom-census-adjacency.mjs
       - tools/chromium-harness.mjs
-      # NOT tools/verify-bloom-apex-mutants.mjs, deliberately, even though the
-      # step below PARSES it for its two mutations: a stale anchor there is a
-      # REFUSAL at run time, so it is caught whenever this gate runs for any
-      # other reason — and a session that edits that table has essentially
-      # always edited the geometry or the harness too, both of which are above.
-      # Listing it would put a three-hour gate behind every mutant-table edit
-      # for coverage that is already there.
+      # THE SIX THE GATE REACHES THROUGH IMPORTS (C19, the gate-coverage
+      # session). None runs from a `run:` line; every one is live in this job:
+      #   bloom-crowding            <- verify-bloom-export (the crowding flag's
+      #                                own R1 validity assertion on every row)
+      #   bloom-first-slot          <- bloom-harness (the L family's Node-side
+      #                                rebuild) and verify-bloom-infill
+      #   bloom-infill-wall         <- verify-bloom-infill (I11) and
+      #                                bloom-combination-gate
+      #   bloom-plan-coverage       <- verify-bloom-export (coverage R1 on
+      #                                every row, asserted on the incurve rows)
+      #   bloom-rim-roundness-lib   <- verify-bloom-infill (I12)
+      #   bloom-solid-angle-coverage<- verify-bloom-export (solid R1/R5 on
+      #                                every row)
+      # An edit to any one of them alone ran this gate on nothing; each has a
+      # must-fail in docs/bloom-gate-coverage-outcome.md, per tool.
+      - tools/bloom-crowding.mjs
+      - tools/bloom-first-slot.mjs
+      - tools/bloom-infill-wall.mjs
+      - tools/bloom-plan-coverage.mjs
+      - tools/bloom-rim-roundness-lib.mjs
+      - tools/bloom-solid-angle-coverage.mjs
+      # THE D14 GATES the `gates` job runs, and the mutant table whose anchors it checks.
+      - tools/verify-bloom-leaf-decoupled.mjs
+      - tools/verify-bloom-sepal-decoupled.mjs
+      - tools/verify-bloom-surface-offstation.mjs
+      - tools/verify-bloom-rim-arc.mjs
+      - tools/verify-bloom-infill-conform.mjs
+      - tools/verify-bloom-infill-metric.mjs
+      - tools/verify-bloom-edge-profile.mjs
+      - tools/verify-bloom-apex-mutants.mjs
+      # The mutant table IS listed now (the gate-coverage session): its full
+      # sweep lives in bloom-apex-mutants.yml, and what runs HERE on a table
+      # edit is the `gates` job's anchor pre-check — seconds. The old reason
+      # for leaving it out (a three-hour gate behind every table edit) still
+      # holds for the matrix, which is why `gates` and not `shard` reads it.
       - .github/workflows/bloom-export-watertight.yml
   push:
     branches: [main]
@@ -63,6 +91,34 @@ on:
       - tools/bloom-self-intersection.mjs
       - tools/verify-bloom-census-adjacency.mjs
       - tools/chromium-harness.mjs
+      # THE SIX THE GATE REACHES THROUGH IMPORTS (C19, the gate-coverage
+      # session). None runs from a `run:` line; every one is live in this job:
+      #   bloom-crowding            <- verify-bloom-export (the crowding flag's
+      #                                own R1 validity assertion on every row)
+      #   bloom-first-slot          <- bloom-harness (the L family's Node-side
+      #                                rebuild) and verify-bloom-infill
+      #   bloom-infill-wall         <- verify-bloom-infill (I11) and
+      #                                bloom-combination-gate
+      #   bloom-plan-coverage       <- verify-bloom-export (coverage R1 on
+      #                                every row, asserted on the incurve rows)
+      #   bloom-rim-roundness-lib   <- verify-bloom-infill (I12)
+      #   bloom-solid-angle-coverage<- verify-bloom-export (solid R1/R5 on
+      #                                every row)
+      - tools/bloom-crowding.mjs
+      - tools/bloom-first-slot.mjs
+      - tools/bloom-infill-wall.mjs
+      - tools/bloom-plan-coverage.mjs
+      - tools/bloom-rim-roundness-lib.mjs
+      - tools/bloom-solid-angle-coverage.mjs
+      # THE D14 GATES the `gates` job runs, and the mutant table whose anchors it checks.
+      - tools/verify-bloom-leaf-decoupled.mjs
+      - tools/verify-bloom-sepal-decoupled.mjs
+      - tools/verify-bloom-surface-offstation.mjs
+      - tools/verify-bloom-rim-arc.mjs
+      - tools/verify-bloom-infill-conform.mjs
+      - tools/verify-bloom-infill-metric.mjs
+      - tools/verify-bloom-edge-profile.mjs
+      - tools/verify-bloom-apex-mutants.mjs
   workflow_dispatch: {}
 
 # A SUPERSEDED COMMIT'S GREEN RUN SHOULD NEVER HAVE BEEN QUOTABLE (Eva,
@@ -283,6 +339,63 @@ jobs:
       - name: Every infilled state is under the triangle budget (B0-B2)
         run: node tools/verify-bloom-infill-budget.mjs --negative-control
 
+  # THE GATES THAT RAN IN NO WORKFLOW (D14, the gate-coverage session). Eight
+  # bloom gates carried must-fail controls and were run by hand or not at all;
+  # three of them were RED on main when first run (offstation, rim-arc,
+  # edge-profile — all since #283, eleven merges earlier) and nothing said so.
+  # Seven ride here, each followed by its OWN control, so a control that has
+  # stopped being able to fail reads red in the same job. Runtimes measured on
+  # the session's box, gate + control: leaf 9+9 s, sepal 19+19, offstation
+  # 1+1, rim-arc 22+23, infill-conform 76+247, infill-metric 80+377,
+  # edge-profile 311+46 — about 21 min in all, which is why this is its own
+  # job in PARALLEL with the preflight rather than 21 more minutes on its
+  # critical path. The eighth, the apex mutant table, is a four-hour sweep and
+  # has its own workflow (bloom-apex-mutants.yml); its anchor pre-check runs
+  # here on every push, in seconds.
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: A leaf does not move when a petal control does
+        run: node tools/verify-bloom-leaf-decoupled.mjs
+      - name: ... and its control finds the neutered override
+        run: node tools/verify-bloom-leaf-decoupled.mjs --control
+      - name: A sepal's blade does not move when a petal control does
+        run: node tools/verify-bloom-sepal-decoupled.mjs
+      - name: ... and its control finds the neutered twin
+        run: node tools/verify-bloom-sepal-decoupled.mjs --control
+      - name: The surface evaluator is right where the mesh does not sample (A1-A4, B, C)
+        run: node tools/verify-bloom-surface-offstation.mjs
+      - name: ... and its control fires on all three legs
+        run: node tools/verify-bloom-surface-offstation.mjs --control
+      - name: The rim query is the exported mesh's own rim (R1-R5)
+        run: node tools/verify-bloom-rim-arc.mjs
+      - name: ... and its control fires R1a/b/c, R3 and R5
+        run: node tools/verify-bloom-rim-arc.mjs --control
+      - name: The infill's cells conform to the surface (C0-C3)
+        run: node tools/verify-bloom-infill-conform.mjs
+      - name: ... and its five mutants behave
+        run: node tools/verify-bloom-infill-conform.mjs --negative-control
+      - name: Every length the infill plan uses is a surface length (M0-M4)
+        run: node tools/verify-bloom-infill-metric.mjs
+      - name: ... and its mutants behave
+        run: node tools/verify-bloom-infill-metric.mjs --negative-control
+      # The edge profile drives a browser (its rows are the smoke subset's).
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: The petal's rim is a taper and a bead (E0-E6)
+        run: node tools/verify-bloom-edge-profile.mjs
+      - name: ... and its six mutants redden exactly the clauses they name
+        run: node tools/verify-bloom-edge-profile.mjs --control
+      - name: Every apex mutant's anchor matches exactly once (the sweep is bloom-apex-mutants.yml's)
+        run: node tools/verify-bloom-apex-mutants.mjs --anchors
+
   shard:
     runs-on: ubuntu-latest
     # 315 min of matrix / 8 is ~40 min a shard on the S5 head; 150 is ~3.7x that
@@ -325,7 +438,7 @@ jobs:
 
   verdict:
     runs-on: ubuntu-latest
-    needs: [preflight, shard]
+    needs: [preflight, gates, shard]
     if: always()
     timeout-minutes: 20
     env:
@@ -353,4 +466,9 @@ jobs:
         if: always() && needs.preflight.result != 'success'
         run: |
           echo "preflight: ${{ needs.preflight.result }} — the Node-only instruments did not pass, so this gate is not green whatever the matrix says."
+          exit 1
+      - name: ... and the D14 gates passed
+        if: always() && needs.gates.result != 'success'
+        run: |
+          echo "gates: ${{ needs.gates.result }} — a gate that used to run in no workflow is red, so this gate is not green whatever the matrix says."
           exit 1
