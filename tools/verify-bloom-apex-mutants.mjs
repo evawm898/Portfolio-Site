@@ -79,18 +79,48 @@ async function mutatedModule(id, source) {
    equal stations by construction, and counting them reads as two
    non-increasing pairs on every tree. */
 let REGISTRY_DEFAULTS = null;
-function builtOn(M, set = {}, mode = 'export') {
+function builtOn(M, set = {}, mode = 'export', ring = null) {
   const acc = new M.MeshBuilder({ exportMode: mode === 'export', captureGrid: true });
   const m = M.buildBloomInto(acc, { ...REGISTRY_DEFAULTS, ...set });
-  const footRows = m.petal.footRows;
+  /* `ring` reads a NAMED ring's representative rather than ring 0's — the
+     terminal witnesses need an inner whorl (see `floorRingTerminal`). */
+  const petal = ring === null ? m.petal : m.petals[ring];
+  if (!petal) throw new Error(`no petal built on ring ${ring} (${m.petals.length} rings)`);
+  const footRows = petal.footRows;
   return {
-    tipCap: m.petal.tipCap,
-    halves: m.petal.grid[0].rows.filter((r) => r.row >= footRows).map((r) => r.halfWidth),
-    stations: m.petal.profileU.slice(footRows),
-    us: m.petal.grid[0].rows.filter((r) => r.row >= footRows).map((r) => r.u),
+    tipCap: petal.tipCap,
+    halves: petal.grid[0].rows.filter((r) => r.row >= footRows).map((r) => r.halfWidth),
+    stations: petal.profileU.slice(footRows),
+    us: petal.grid[0].rows.filter((r) => r.row >= footRows).map((r) => r.u),
   };
 }
-const terminalOf = (M, mode) => builtOn(M, {}, mode).tipCap.lastRowHalf;
+/* THE TERMINAL WITNESSES READ A RING THE NIB CANNOT REACH (the gate-coverage
+   session, D14 — the first time the whole table ran in CI since the apex nib
+   landed, and the first thing it found). `floored-tip`, `true-apex` and
+   `wrong-terminal` each mutate the MODE FLOOR (`tipFloor`) and used to read
+   the shipping default's own last row; the apex nib pins that row to
+   `APEX_END_HALF_MM` on every petal whose blade clears the print floor —
+   which ring 0 does at every reachable width — so all three reported "the
+   edit applied but the BEHAVIOUR did not move", on `main` as much as here,
+   and had since the nib merged. The floor still decides exactly one thing:
+   the last row of a ring whose blade NEVER CLEARS it (the nib's own declared
+   inert case, 18 ring-modes of the matrix). Six layers at `layerSize` 0.35
+   put the shipping petal's rings 3-5 there (peak half-widths 0.343 / 0.15 /
+   0.15 mm live against a 0.15 mm floor; 0.80 export), measured; ring 5 is
+   read, and the CLEAN tree is asked first whether that ring is really in the
+   floor's subject — a witness on a ring the nib had taken would be the same
+   silence in a different place. */
+const FLOOR_RING = { set: { layerCount: 6, layerSize: 0.35 }, ring: 5, why: 'the blade never clears the print floor' };
+const floorRingTerminal = (M, mode) => builtOn(M, FLOOR_RING.set, mode, FLOOR_RING.ring).tipCap;
+const floorRingIsInSubject = (C, mode) => {
+  const tc = floorRingTerminal(C, mode);
+  const floor = mode === 'export' ? C.TIP_HALF_MM : C.TIP_CAP_HALF_MM;
+  if (!tc.apex || tc.apex.active || tc.apex.why !== FLOOR_RING.why)
+    return `the probe ring's nib is ${tc.apex ? (tc.apex.active ? 'ACTIVE' : `inert for "${tc.apex.why}"`) : 'unreported'} on the CLEAN tree — the floor does not own its last row, so the witness would read nothing`;
+  if (tc.lastRowHalf !== floor) return `the probe ring ends on ${tc.lastRowHalf} mm on the CLEAN tree where the ${mode} floor is ${floor} — not the floor's own row`;
+  return null;
+};
+const terminalOf = (M, mode) => floorRingTerminal(M, mode).lastRowHalf;
 const outlineMoved = (M, C, set = {}, mode = 'export') => {
   const a = builtOn(M, set, mode).halves, b = builtOn(C, set, mode).halves;
   if (a.length !== b.length) return Infinity;
@@ -564,23 +594,31 @@ const MUTANTS = [
      described as "the mutation the superellipse ruling will eventually make
      on purpose". It did. That is why it is retired rather than repaired. */
   /* A2 — the terminal is no longer the last row's own value. */
+  /* THESE THREE NAME AN0 NOW, NOT A2-A4: A2-A4 read the REPRESENTATIVE petal,
+     whose terminal the nib owns at every reachable state, so a mutated mode
+     floor cannot reach them; AN0 runs PER RING and its inert arm restates the
+     terminal law (`max(squared end, the mode floor)`) on the rings the nib
+     declines — the D14 finding above. The witness reads ring 5 of the
+     six-layer probe state, and refuses first if the CLEAN tree says that ring
+     is not the floor's to decide. */
   { id: 'floored-tip', why: 'the last row is not floored, so the emitted terminal is not the declared one',
     find: '      return Math.max(shape, rootBlend(u), tipFloor);',
-    into: '      return Math.max(shape, rootBlend(u), u >= 1 ? 0 : tipFloor);', names: ['A2', 'A3'],
-    witness: (M) => (terminalOf(M, 'export') === 0 ? null : `the terminal is still ${terminalOf(M, 'export')} mm, not 0`) },
+    into: '      return Math.max(shape, rootBlend(u), u >= 1 ? 0 : tipFloor);', names: ['AN0'],
+    witness: (M, C) => floorRingIsInSubject(C, 'export') || (terminalOf(M, 'export') === 0 ? null : `the floor ring's terminal is still ${terminalOf(M, 'export')} mm, not 0`) },
   /* A3 — the mode floor removed, so live converges to a true apex vertex:
      NV columns onto one edge, the retired centre dome's own defect. */
   { id: 'true-apex', why: 'the terminal floor is removed, so the apex collapses to a vertex',
     find: '  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;',
-    into: '  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : 0;', names: ['A3', 'A4'],
-    witness: (M) => (terminalOf(M, 'live') === 0 ? null : `the live terminal is still ${terminalOf(M, 'live')} mm, not 0`) },
+    into: '  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : 0;', names: ['AN0'],
+    witness: (M, C) => floorRingIsInSubject(C, 'live') || (terminalOf(M, 'live') === 0 ? null : `the floor ring's live terminal is still ${terminalOf(M, 'live')} mm, not 0`) },
   /* A4 — the terminal is a number of its own rather than the mode floor, so
      live and export stop differing where the floor says they should. */
   { id: 'wrong-terminal', why: 'the terminal ignores the mode and is a constant',
     find: '  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;',
-    into: '  const tipFloor = 0.4;', names: ['A4'],
-    witness: (M) => (terminalOf(M, 'live') === 0.4 && terminalOf(M, 'export') === 0.4 ? null
-      : `the terminal is ${terminalOf(M, 'live')} live / ${terminalOf(M, 'export')} export, not 0.4 in both`) },
+    into: '  const tipFloor = 0.4;', names: ['AN0'],
+    witness: (M, C) => floorRingIsInSubject(C, 'live') || floorRingIsInSubject(C, 'export')
+      || (terminalOf(M, 'live') === 0.4 && terminalOf(M, 'export') === 0.4 ? null
+      : `the floor ring's terminal is ${terminalOf(M, 'live')} live / ${terminalOf(M, 'export')} export, not 0.4 in both`) },
   /* A5 — the retired TIP_PLATEAU put back: a RISING ramp max-ed against the
      FALLING core, which waists the blade and widens it back out to the tip.
      Both STL gates are blind to it — watertight, one piece, same triangle
@@ -603,8 +641,15 @@ const MUTANTS = [
        control caught it as "MUTATION DID NOT APPLY" rather than as a false
        pass, which is the one failure mode that makes a disarmed mutant
        survivable — session 34's own lesson, arriving here. */
+    /* AND THE NAME MOVED when the apex nib landed: `uPk` is declared AFTER
+       the terms now (it is the DRAWN widest point, derived from `uPkRaw` once
+       the nib has set the drawn length), so the inserted term read `uPk` in
+       its temporal dead zone and the witness THREW — reported as "the
+       behaviour did not move", on `main` as much as here, by the first full
+       sweep in CI (D14). `uPkRaw` is the law's own widest point and is what
+       the CORE term beside it already reads. */
     find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPk) / (1 - uPk), 0, 1) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -629,9 +674,9 @@ const MUTANTS = [
      reads an exponent that is not the asked one. */
   { id: 'law-past-the-floor', why: 'the tip floor is raised so it owns a large share of the apex',
     find: '  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;',
-    into: '  const tipFloor = (acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM) * 3;', names: ['A4'],
-    witness: (M, C) => (Math.abs(terminalOf(M, 'export') - 3 * terminalOf(C, 'export')) < 1e-12 ? null
-      : `the terminal is ${terminalOf(M, 'export')} mm, not 3x the clean ${terminalOf(C, 'export')}`) },
+    into: '  const tipFloor = (acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM) * 3;', names: ['AN0'],
+    witness: (M, C) => floorRingIsInSubject(C, 'export') || (Math.abs(terminalOf(M, 'export') - 3 * terminalOf(C, 'export')) < 1e-12 ? null
+      : `the floor ring's terminal is ${terminalOf(M, 'export')} mm, not 3x the clean ${terminalOf(C, 'export')}`) },
   /* A7 — the ladder resamples the root blend. The held rows stop being the
      uniform ones, which moves a boundary footRing() owns. Watertight, one
      piece, identical triangle count; nothing else here can see it. */
@@ -650,42 +695,28 @@ const MUTANTS = [
       for (let i = 0; i < held; i++) if (!Object.is(a[i], b[i])) return null;
       return `every station the root blend holds is unmoved (first ${held} of ${a.length})`;
     } },
-  /* A7 — two rows land on one station. The de-duplication pass is removed, so
-     a ladder that saturates emits a zero-length panel.
-     IT NEEDS THE BUCKLED ROW, and that is a finding rather than a detail:
-     measured over 288 unbuckled states the pass never once fires, so on the
-     taper rows alone this mutation is a no-op and reported SILENT.
-
-     AND THE ROW HAS TO SATURATE IN *LIVE* MODE, which is the second half of
-     the same finding. `__bloomMetrics()` reports the LIVE build, so a state
-     that only saturates under the export floor is invisible to this harness:
-     the first row tried here (amplitude 0.6, f 1, exponent 1.5) produced one
-     non-increasing pair in export and NONE in live, and the mutation was
-     reported silent while being perfectly real. Amplitude 0.30 at f 1 and
-     exponent 1.00 saturates in live, which is what this row is. */
-  { id: 'stations-not-increasing', why: 'the strictly-increasing pass is removed',
-    find: '  for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);',
-    into: '  for (let i = 1; i < NU; i++) if (false) out[i] = Math.min(1, out[i - 1] + 1e-5);', names: ['A7'],
-    /* THE ONLY WITNESS THAT NEEDS A SATURATING BUCKLED LADDER, for the reason
-       the comment above already records: over 288 unbuckled states the pass
-       never fires, so on a plain profile this edit is a no-op and a witness
-       that did not buckle would report a defect that is not there. */
-    /* THE WITNESS ASSERTS BOTH DIRECTIONS: the CLEAN ladder is strictly
-       increasing (or the repair is not doing its job and nothing here can be
-       read) and the UNREPAIRED one is not. That is the pass's own contract,
-       and it is only assertable on a row where the pass actually engages.
-
-       THE PASS IS RARELY ENGAGED: swept at NU 56 over 9,072 buckled states,
-       2,232 move the ladder at all when the repair is removed — worst 5.2e-5
-       in u — and only 159 produce a non-increasing pair. So this mutant is a
-       no-op on the taper rows by construction and needs the one row above. */
-    witness: (M, C) => {
-      const st = { buckleAmp: 0.3, buckleFreq: 1 };
-      const nonIncr = (arr) => { let n = 0; for (let i = 1; i < arr.length; i++) if (arr[i] <= arr[i - 1]) n++; return n; };
-      const a = nonIncr(builtOn(M, st, 'live').stations), b = nonIncr(builtOn(C, st, 'live').stations);
-      if (b !== 0) return `the CLEAN ladder already has ${b} non-increasing pairs — the repair is not doing its job and this mutant cannot be read`;
-      return a > 0 ? null : 'the unrepaired ladder is still strictly increasing — the pass is inert on this state and the mutant proves nothing';
-    } },
+  /* A7 — two rows land on one station: `stations-not-increasing` — RETIRED AS
+     UNREACHABLE (the gate-coverage session, D14), and the measurement is the
+     reason. The mutation removed `bladeStations`' de-duplication pass (`if
+     (out[i] <= out[i - 1]) out[i] = out[i - 1] + 1e-5`); its witness needed a
+     state where the UNREPAIRED ladder is non-increasing, and session 35 chose
+     buckle 0.30 at f 1 (159 such states of 9,072 at NU 56). The first full
+     sweep in CI reported it inert — on `main` as much as here — and a sweep
+     of the unrepaired module on today's ladder finds NO such state at all:
+     672 buckle states (amp 0.1-0.6 x f 1-7 x p 2/3/4/6 x tip shape 1-3) in
+     both modes, 1,764 at session 35's finer grid (amp 0.05-0.60 x f 1-7 x
+     p 2/3/6 x tip shape 0.6-3) in live, and 144 lobed / arc-ramped /
+     spatulate / pointed compositions in both modes — 0 of ~2,600 builds with
+     a non-increasing pair, the smallest POSITIVE gap 3.2e-6 in u. The ladder
+     changed underneath it twice since NU 56 (the apex nib's arc demand and
+     yield, session 42's accumulation slack on the search), and what the pass
+     guarded against no longer arises from any reachable state. A7 still
+     asserts strict increase on every row; what is retired is the claim that
+     a mutant can SHOW that clause firing. Its former witness (both
+     directions — the CLEAN ladder increasing, the unrepaired one not) is the
+     one to restore if a future ladder change makes the pass reachable again:
+     find a state with `tools`-side sweep first, never by widening the grid
+     until one appears. */
   /* ===================================================================
      A7 — THE SEAM CLEARANCE (session 38). Four mutations, one per clause the
      floor added, because a clause with no mutation that fires it is a
@@ -1687,6 +1718,14 @@ const ROWS = [
      `bore-is-not-evas-rule`'s: a witness state is part of the claim. */
   { label: 'a squared terminal above the print floor (petalTipEnd 0.30 — the nib stands down)',
     set: [{ id: 'petalTipEnd', value: '0.3' }] },
+  /* THE NIB'S OTHER INERT ARM — a blade that NEVER CLEARS the print floor,
+     which is where the MODE FLOOR still decides a terminal (D14's finding:
+     the three floor mutants above read ring 0, whose terminal the nib owns
+     at every reachable width, and were silent on `main` since the nib
+     landed). Six layers at the smallest layer size put rings 3-5 under the
+     floor; AN0 runs per ring and is the only family that reads them. */
+  { label: 'six layers at layerSize 0.35 — rings 3-5 never clear the print floor, so the MODE FLOOR ends them',
+    set: [{ id: 'layerCount', value: '6' }, { id: 'layerSize', value: '0.35' }] },
   /* THE TWO LADDER ROWS (session 32). The taper rows above drive the OUTLINE;
      neither of the ladder's two arms is reachable from them. `A0.6 f1 n1.5`
      is the one state measured to saturate the station measure, so it is what
@@ -1930,13 +1969,33 @@ async function famsOn(rows) {
   console.log(`ANCHORS: ${MUTANTS.length} mutants, ${MUTANTS.length - stale.length} matching their find-string exactly once`);
   for (const [id, n] of stale) console.log(`  *** ${id}: anchor matches ${n}x — disarmed`);
   if (stale.length) { await browser.close(); server.close(); console.log('\nAPEX MUTANT TABLE: FAILED (disarmed anchors)'); process.exit(1); }
+  /* `--anchors`: the pre-check alone, on every push that touches the geometry
+     or the harness (the gate-coverage session) — seconds, no mutant run. A
+     refactor that moves a mutant's find-string is caught the day it lands
+     rather than on the next sweep. */
+  if (process.argv.includes('--anchors')) { await browser.close(); server.close(); console.log(`\nANCHORS ONLY: every one of the ${MUTANTS.length} mutants matches its find-string exactly once; no mutant was run.`); process.exit(0); }
 }
 
 /* `--only=<id>[,<id>...]` runs a subset. A full sweep is every mutant over
    every row and is not survivable in a container that restarts, so the subset
    is how a family is re-verified after a change; it NEVER reports as a sweep. */
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1];
-const SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
+let SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
+/* `--shard=k/n` (the gate-coverage session, D14): the k-th of n slices of the
+   table BY INDEX — `MUTANTS[i]` for `i % n === k`, the export gate's own
+   `shardOf` rule — so a weekly CI sweep can run the whole table across n
+   parallel jobs at ~3 min a mutant (measured 182 s for one on this box: 79
+   mutants is four hours in one job, 60 minutes in four). A shard reports as a
+   SUBSET, never as a sweep; the anchor pre-check above runs over ALL of them
+   in every shard, so a disarmed mutant is named whichever shard skips it. */
+const SHARD_ARG = (process.argv.find((a) => a.startsWith('--shard=')) || '').split('=')[1];
+if (SHARD_ARG) {
+  const m = /^(\d+)\/(\d+)$/.exec(SHARD_ARG);
+  if (!m || +m[2] < 1 || +m[1] >= +m[2]) { await browser.close(); server.close(); console.log(`--shard wants k/n with 0 <= k < n, got "${SHARD_ARG}"`); process.exit(1); }
+  if (SELECTED) { await browser.close(); server.close(); console.log('--shard and --only do not combine'); process.exit(1); }
+  SELECTED = MUTANTS.filter((mu, i) => i % +m[2] === +m[1]).map((mu) => mu.id);
+  console.log(`SHARD ${m[1]}/${m[2]}: ${SELECTED.length} of ${MUTANTS.length} mutants (by table index)`);
+}
 if (SELECTED) {
   const unknown = SELECTED.filter((id) => !MUTANTS.some((m) => m.id === id));
   if (unknown.length) { await browser.close(); server.close(); console.log(`--only names no such mutant: ${unknown.join(', ')}`); process.exit(1); }
@@ -1951,6 +2010,17 @@ let fail = clean.size > 0;
    differs, so the match count is satisfied, and only the witness can see that
    the behaviour did not move. A positive control on the witness clause. */
 const NEUTER = (process.argv.find((a) => a.startsWith('--neuter=')) || '').split('=')[1] || null;
+/* THE CONTROL IS JUDGED ON THE NEUTERED MUTANT'S OWN WITNESS, and it combines
+   with `--only` (the gate-coverage session, D14 — found by CI on the control's
+   first run). Two defects in the first version: it swept the WHOLE table for
+   one neutered edit (four hours, under a 30-minute job), and it read the run's
+   `fail` flag — so any OTHER failing mutant satisfied it, which is a subject
+   that includes the thing it exists to doubt (the fifth durable rule). It runs
+   the neutered mutant alone now (`--only=<id> --neuter=<id>`), and passes only
+   if THAT mutant's witness reported. */
+if (NEUTER && !MUTANTS.some((m) => m.id === NEUTER)) { await browser.close(); server.close(); console.log(`--neuter names no such mutant: ${NEUTER}`); process.exit(1); }
+if (NEUTER && SELECTED && !SELECTED.includes(NEUTER)) { await browser.close(); server.close(); console.log(`--neuter=${NEUTER} is not in the --only subset, so it would never run`); process.exit(1); }
+let neuterReported = false;
 REGISTRY_DEFAULTS = (await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href)).DEFAULTS;
 const CLEAN = await mutatedModule('__clean', SRC);
 for (const mu of MUTANTS) {
@@ -1965,6 +2035,7 @@ for (const mu of MUTANTS) {
   catch (e) { verdict = `the witness threw: ${e.message}`; }
   if (verdict !== null) {
     console.log(`  ${mu.id}: the edit applied but the BEHAVIOUR did not move — ${verdict}`);
+    if (NEUTER === mu.id) neuterReported = true;
     fail = true; SERVE = SRC; continue;
   }
   const got = await famsOn(ROWS);
@@ -1977,9 +2048,9 @@ for (const mu of MUTANTS) {
 }
 await browser.close(); server.close();
 if (NEUTER) {
-  console.log(fail ? `\nguard check: the sweep REPORTED the neutered mutant "${NEUTER}" — the witness clause fires.`
-                   : `\nguard check: FAIL — "${NEUTER}" was neutered and the sweep stayed green.`);
-  process.exit(fail ? 0 : 1);
+  console.log(neuterReported ? `\nguard check: the sweep REPORTED the neutered mutant "${NEUTER}" — its witness clause fires.`
+                             : `\nguard check: FAIL — "${NEUTER}" was neutered and its witness stayed silent${fail ? ' (something ELSE in the run failed, which is not this control)' : ''}.`);
+  process.exit(neuterReported ? 0 : 1);
 }
 if (SELECTED) {
   console.log(fail ? `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): FAILED`

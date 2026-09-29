@@ -142,11 +142,36 @@ const DIH_BAR = 180 / G0.RIM_BEAD_SEGMENTS;
    above the float floor of an angle taken from two unit normals, and well
    inside the smallest excess declared here (1.68e-4). */
 const E2_TURN_BAND_DEG = 5e-5;
+/* RE-RECORDED ON a4dc836 BY THE GATE-COVERAGE SESSION, ELEVEN MERGES LATE. This
+   gate ran in no workflow (D14), so the apex nib (#283, 6ebf784) moved seven of
+   these rows and the row ramp (#289, 4f3d31b) two more, and nothing said so
+   until the first run on the fixed tree: 9 findings, every one bisected to
+   those two merges on worktrees. The nib converges the last stretch of every
+   blade from a 1.60 mm parallel strip to a 0.10 mm mini-face, so the bead's
+   profile turns hard where the outline turns hard, and on six rows the
+   treatment now adds more than the 45 deg allowance within 2 mm of the rim.
+   Declared at the measured magnitude with the previous figure kept, never
+   widened — a row that reads WORSE than its record is a finding for the
+   change that moved it (#283 and #289), and this is where it is named. The
+   ruling on whether a nibbed bead may turn past the allowance is Eva's. */
 const E2_TURN_XFAIL = {
   'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)':
-    { excessDeg: 6.236137, note: 'the buckle wave curves the margin OUT OF PLANE, which the outline\'s plan turn cannot see; raw 60.05 deg, outline 8.81' },
-  'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)':
-    { excessDeg: 0.005430, note: 'the taper runs 2.40 -> 1.00 mm over RIM_TAPER_MM, so the profile\'s own half-thickness changes along the sweep and the quad is not planar; raw 45.01 deg, outline 0.00' },
+    { excessDeg: 5.440992, note: 'the buckle wave curves the margin OUT OF PLANE, which the outline\'s plan turn cannot see; raw 60.05 deg, outline 8.81. Was 6.236137 before #283 (the nib re-stations the tip rows)' },
+  /* 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)' was declared at
+     excessDeg 0.005430 and reads 43.585233 deg since #283 — UNDER the allowance by 1.41 deg; entry
+     removed, the gate's own STALE clause is what said so. */
+  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step':
+    { excessDeg: 1.152165, note: 'NEW at #283: adds 46.152165 deg; face-to-face 61.05, outline 14.90. 0 excess before the nib' },
+  'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)':
+    { excessDeg: 3.204461, note: 'NEW at #283: adds 48.204461 deg; face-to-face 66.54, outline 18.33. 0 excess before the nib' },
+  'GRADIENT: cup gradient max x cup max x widest petal (the metric reaches 2.6 at the tip)':
+    { excessDeg: 40.920822, note: 'NEW at #283: adds 85.920822 deg; face-to-face 103.16, outline 17.24 — the largest, on the row where the fold clamp binds hardest. 0 excess before the nib' },
+  'LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform':
+    { excessDeg: 35.478378, note: 'NEW at #289: adds 80.478378 deg; face-to-face 90.52, outline 10.04. Clean at #283, red from the row ramp on' },
+  'APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest — a 0.003 mm arc)':
+    { excessDeg: 2.968831, note: 'NEW at #289: adds 47.968831 deg; face-to-face 55.73, outline 7.76. Clean at #283, red from the row ramp on' },
+  'APEX NIB: INERT — a squared terminal holds the outline above the print floor':
+    { excessDeg: 6.872304, note: 'NEW at #283: adds 51.872304 deg at the squared terminal\'s corners; face-to-face 51.87, outline 0.00 — the carnation terminal\'s class (a tooth\'s corner), with the nib inert by declaration' },
   'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth':
     { excessDeg: 0.000168, note: 'a tooth\'s terminal; the frame rotates a hair between adjacent columns. raw 45.00 deg, outline 0.00' },
   'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)':
@@ -723,8 +748,8 @@ const MUTATIONS = [
      apex are the same surface here, so there is no surgical form of this
      mutation, and saying so is better than pretending one clause owns it. */
   { id: 'the-flat-wall-is-restored', breaks: ['E2', 'E3', 'E4', 'E6'],
-    from: '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;',
-    to:   '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi; const FLATWALL = 1;' },
+    from: '    const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;',
+    to:   '    const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi; const FLATWALL = 1;' },
   /* E2 as well as E1, and it is TRUE of this mutation rather than a
      loosening: a smaller bead radius is a different surface, so the buckle
      row's declared excess moves 6.236137 -> 6.526126 deg. Named as collateral,
@@ -745,8 +770,8 @@ const MUTATIONS = [
     from: '      if (seg < RIM_CORNER_MIN_MM) { if (rim) rim.pivotsSkipped++; continue; }',
     to:   '      if (seg < 0) { if (rim) rim.pivotsSkipped++; continue; }' },
   { id: 'the-bead-apex-is-recomputed', breaks: ['E4'],
-    from: '    pts[APEX] = apex;',
-    to:   '    pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];' },
+    from: '  pts[APEX] = apex;',
+    to:   '  pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];' },
   { id: 'every-clamp-is-logged', breaks: ['E1'],
     from: '      const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;',
     to:   '      const wasClamped = true;' },
@@ -771,7 +796,14 @@ const MUTATIONS = [
      live against 0.80 mm export — so the two modes drop different numbers of
      rows and E5's two clauses both have something to say. A plausible defect
      rather than an injected one. */
-  { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5', 'E6'],
+  /* E2 AS WELL, AND IT IS TRUE OF THIS MUTATION RATHER THAN A LOOSENING (the
+     gate-coverage session, the first control run since #283): a tip that
+     drops on a threshold is a different rim at the apex, and the ORCHID
+     row's declared excess — declared at 1.152165 deg since the nib — reads
+     43.686211 deg under it, UNDER the allowance, so the both-directions
+     clause fires its STALE arm. Named as collateral, the bead-apex mutant's
+     precedent above. */
+  { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5', 'E6', 'E2'],
     from: '  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
     to:   '  const skinTo = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
 ];
@@ -787,9 +819,9 @@ const EXTRA = {
      corners. The apex still lands on the boundary (E4 stays green), so this
      mutation is about the SURFACE BETWEEN the corners and nothing else. */
   'the-flat-wall-is-restored': [
-    ['      pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];',
-     '      pts[m] = [C[0] + n[0] * b * cs, C[1] + n[1] * b * cs, C[2] + n[2] * b * cs];'],
-    ['    pts[APEX] = apex;', '    pts[APEX] = C;'],
+    ['    pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];',
+     '    pts[m] = [C[0] + n[0] * b * cs, C[1] + n[1] * b * cs, C[2] + n[2] * b * cs];'],
+    ['  pts[APEX] = apex;', '  pts[APEX] = C;'],
   ],
   'the-rim-floor-is-lowered-to-0.4': [
     ['    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);',

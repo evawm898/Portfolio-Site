@@ -95,10 +95,12 @@
         of 15,104, 0 in both or neither — so "treated" is the builder's own
         answer and not this tool's guess at it.
    R2 — THE ARC IS NEVER SHORTER THAN THE CHORD, and the deficit is the mesh's.
-        Between consecutive stations the reported arc (sAt(u2) - sAt(u1)) is
-        >= the emitted chord — an identity of the construction (the query's
-        polyline has both stations as nodes, and a refinement of a polyline is
-        never shorter), asserted to fp rounding. The TOTAL deficit, reported
+        Between consecutive stations the arc of the query's polyline WITH BOTH
+        STATIONS INSERTED is >= the emitted chord — an identity of the
+        construction (a refinement of a polyline is never shorter), asserted
+        to fp rounding. It is computed by `arcBetween` below and NOT as
+        `sAt(u2) - sAt(u1)`, which it was until the apex nib put two stations
+        in one table cell — see the note at `arcBetween`. The TOTAL deficit, reported
         length minus the mesh polyline's length over the blade, is the
         exported boundary's own chord shortfall at NU stations; its maximum
         over the sample is the correspondence residual this tool states.
@@ -128,8 +130,10 @@
         `main` — and corrected here rather than carried, because a label
         naming a computation nobody performed is the defect this project keeps
         finding. The per-mode lines range over both margins now and say so.
-   R3 — THE QUERY'S OWN ERROR, by Richardson. The length at RIM_SAMPLES and
-        at 2x, 4x and 8x. The CONVERGENCE ORDER is read at the FINE end
+   R3 — THE QUERY'S OWN ERROR, by Richardson. The length of the shipped
+        table's polyline and of its NESTED refinements at 2x, 4x and 8x nodes
+        per cell (`nestedLength` below — not petalRim at 2x / 4x / 8x
+        RIM_SAMPLES, whose node sets do not nest; see the note there). The CONVERGENCE ORDER is read at the FINE end
         (log2 of the last two differences) and must exceed 1.0 — a kink cut
         by a chord converges at first order at best, and the seam-less ladder
         the control feeds this clause reads about 0. It is NOT asserted to be
@@ -258,6 +262,32 @@ const table = [];
 /* ---------- THE SAMPLE ---------------------------------------------- */
 const ctl = (id) => { const c = CONTROLS.find((x) => x.id === id); if (!c) throw new Error(`no control ${id}`); return c; };
 const both = (id, extra = {}) => [[`${id} min (${ctl(id).min})`, { [id]: ctl(id).min, ...extra }], [`${id} max (${ctl(id).max})`, { [id]: ctl(id).max, ...extra }]];
+/* R3 DECLARED — AN UNDECLARED KINK THAT IS NOT THIS TOOL'S TO FIX, CARRIED AS
+   A NUMBER THE GATE READS IN BOTH DIRECTIONS (#213's idiom). Under the nested
+   ladder R3 finds first-order convergence on exactly three states, and the
+   residual sits in ONE uniform table cell on each — bisected on the margin
+   (v = +1) to a genuine tangent break of 19.641 deg at u 0.9818355
+   (gradient min), 20.003 at 0.9677934 (gradient max) and 13.834 at
+   0.7279312 (tip shape 0.60 x cup 1.2), identical in both modes, while the
+   mid-blade at v = 0.6 is smooth. Each sits at the FIRST STATION THE FOLD
+   CLAMP BINDS (the apex-nib session's §9g output clamp on the section's
+   coefficient: `c` switches from `cRaw` to `cCap` at the u where |cRaw|
+   first exceeds the cap, a C0 kink in the section that reaches the rim and
+   not the midrib) — the builder's own `form.cupClamp` reads 8 / 9 / 18 rows
+   clamped on the three, from those stations on. `surface.tangentBreaks()`
+   does not declare it, so `petalRim` cannot grade around it and the
+   query's polyline cuts it with a chord. Declaring it is the geometry
+   owner's (the clamp's onset is computable where the clamp is); measured on
+   a4dc836 and attributed to #283. A record that stops reproducing is stale
+   whether the row got better or worse. */
+const R3_XFAIL = {
+  'petalCupGradient min (-0.8)':  { LIVE: -0.93, EXPORT: -0.70, kinkU: 0.9818355, kinkDeg: 19.641, note: 'the fold clamp binds from this station (8 rows); #283 §9g' },
+  'petalCupGradient max (1.2)':   { LIVE: -0.77, EXPORT: -0.46, kinkU: 0.9677934, kinkDeg: 20.003, note: 'the fold clamp binds from this station (9 rows); #283 §9g' },
+  'petalTipShape 0.60 x cup 1.2': { LIVE:  0.27, EXPORT:  0.14, kinkU: 0.7279312, kinkDeg: 13.834, note: 'the fold clamp binds from this station (18 rows); #283 §9g' },
+};
+const R3_ORDER_BAND = 0.02;
+const r3DeclaredSeen = new Set();
+
 const STATES = [];
 const push = (name, set, layer = 0) => STATES.push({ name, set, layer });
 push('DEFAULT (flat)', {});
@@ -345,9 +375,47 @@ for (const st of STATES) {
     }
     const surface = G.petalSurface(state, ring, slot, null, acc);
     const rim = G.petalRim(surface);
-    const rim2 = G.petalRim(surface, 2 * G.RIM_SAMPLES);
-    const rim4 = G.petalRim(surface, 4 * G.RIM_SAMPLES);
-    const rim8 = G.petalRim(surface, 8 * G.RIM_SAMPLES);
+    /* R3's LADDER IS A NESTED REFINEMENT OF THE QUERY'S OWN NODE SET — not
+       petalRim at 2x / 4x / 8x RIM_SAMPLES, which it was until the apex nib
+       (#283) and which is NOT a refinement sequence: `rimArcTable` drops the
+       uniform samples within `span = RIM_GRADE_CELLS / samples` of every
+       singular point (u = 1 among them) and grades nodes there instead, so
+       when a curved region is NARROWER than `span` — the nib's arc, 7e-4 to
+       1.8e-3 in u against a span of 9.8e-4 at 4096 — doubling `samples`
+       SHIFTS the node set inside it rather than refining it, and a
+       non-nested ladder has no convergence order at all (it read -0.10 on
+       petalTipShape 2.5 with the surface converging at 2.00 under a nested
+       refinement of the same interval, every sub-interval, both modes). Before
+       the nib the region within `span` of u = 1 was a straight print-floor
+       stub with zero chord error, which is why R3 never saw its own premise.
+       `nestedLength(m)` inserts m - 1 equally spaced points in EVERY cell of
+       the shipped table, so level m's polyline contains level m/2's nodes and
+       Richardson means what it says. */
+    const nestedLength = (side, m) => {
+      const t = rim.side(side), U = t.nodesU, P = t.pointAt;
+      let L = 0, prev = P(U[0]);
+      for (let i = 1; i < U.length; i++) {
+        for (let j = 1; j <= m; j++) { const q = P(U[i - 1] + (U[i] - U[i - 1]) * j / m); L += dist(q, prev); prev = q; }
+      }
+      return L;
+    };
+    /* R2's ARC IS THE ARC OF ONE POLYLINE WITH BOTH STATIONS INSERTED. `sAt(u)`
+       is `S[k] + |P(u) - P(U[k])|` — the chord from the cell's lower node —
+       and differencing it for two stations is only the arc of a single
+       polyline when they lie in DIFFERENT cells; in the SAME cell it reads
+       `|a| - |b| <= |a - b|`, LESS than their chord, by the triangle
+       inequality. Every station pair straddled a node while rows were 1/56
+       apart against a 1/4096 cell; the nib packs six stations into a
+       0.0014-wide arc, one cell apart, and R2 went red on the shipping default
+       by 1.8e-5 mm — a row count standing for a spacing, the first durable
+       rule, inside the tool written to measure the rim. */
+    const arcBetween = (side, u1, u2) => {
+      const t = rim.side(side), U = t.nodesU, S = t.nodesS, P = t.pointAt;
+      const cellOf = (u) => { let lo = 0, hi = U.length - 1; while (hi - lo > 1) { const c = (lo + hi) >> 1; if (U[c] <= u) lo = c; else hi = c; } return u >= 1 ? U.length - 1 : lo; };
+      const k1 = cellOf(u1), k2 = cellOf(u2);
+      if (k1 === k2) return dist(P(u1), P(u2));
+      return dist(P(u1), P(U[k1 + 1])) + (S[k2] - S[k1 + 1]) + dist(P(u2), P(U[k2]));
+    };
     statesRun++;
     if (rep.grid.length !== 1) { bad.push(`${st.name} [${modeTag}]: ${rep.grid.length} panels — this tool describes single-span petals only`); continue; }
     const rows = rep.grid[0].rows;
@@ -475,17 +543,17 @@ for (const st of STATES) {
       }
 
       /* R2 */
-      let poly = 0, minAmC = Infinity, maxChordDeficit = { v: -1, u: null }, prevS = rim.sAt(blade[0].u, side), prevP = blade[0].mid[col];
+      let poly = 0, minAmC = Infinity, maxChordDeficit = { v: -1, u: null }, prevU = blade[0].u, prevP = blade[0].mid[col];
       for (let i = 1; i < blade.length; i++) {
-        const s = rim.sAt(blade[i].u, side), arc = s - prevS, chord = dist(blade[i].mid[col], prevP);
+        const arc = arcBetween(side, prevU, blade[i].u), chord = dist(blade[i].mid[col], prevP);
         pairsR2++;
         poly += chord;
         const d = arc - chord;
         if (d < minAmC) minAmC = d;
         if (d > maxChordDeficit.v) maxChordDeficit = { v: d, u: blade[i].u };
-        prevS = s; prevP = blade[i].mid[col];
+        prevU = blade[i].u; prevP = blade[i].mid[col];
       }
-      const S = rim.sAt(1, side) - rim.sAt(blade[0].u, side);
+      const S = arcBetween(side, blade[0].u, 1);
       const deficit = S - poly, deficitRel = deficit / S;
       if (minAmC < -1e-9 * S) bad.push(`R2: ${st.name} [${modeTag}] side ${side}: a station pair's reported arc is SHORTER than its emitted chord by ${(-minAmC).toExponential(3)} mm — the query's polyline does not contain the stations`);
       if (minAmC < minArcMinusChord.v) minArcMinusChord = { v: minAmC, where: `${st.name} [${modeTag}] side ${side}` };
@@ -498,14 +566,25 @@ for (const st of STATES) {
       const seam0 = dist(rim.pointAt(0, side), ringRow.mid[col]);
 
       /* R3 */
-      const L1 = rim.length(side), L2 = rim2.length(side), L4 = rim4.length(side), L8 = rim8.length(side);
+      const L1 = rim.length(side), L2 = nestedLength(side, 2), L4 = nestedLength(side, 4), L8 = nestedLength(side, 8);
       const d1 = Math.abs(L2 - L1), d2 = Math.abs(L4 - L2), d3 = Math.abs(L8 - L4);
       let orderCoarse = null, orderFine = null, bound = null;
       if (d2 > 1e-10 * L1 && d3 > 1e-12 * L1) {
         orderCoarse = d1 > 0 ? Math.log2(d1 / d2) : null;
         orderFine = Math.log2(d2 / d3);
         r3Assessed++;
-        if (!(orderFine > 1.0)) bad.push(`R3: ${st.name} [${modeTag}] side ${side}: the length converges at order ${orderFine.toFixed(2)} at the fine end (${d2.toExponential(2)} -> ${d3.toExponential(2)} mm per doubling) — at or below first order a kink is being cut by a chord: a tangent break this surface did not declare`);
+        const declR3 = CONTROL ? null : R3_XFAIL[st.name];
+        if (!declR3) {
+          if (!(orderFine > 1.0)) bad.push(`R3: ${st.name} [${modeTag}] side ${side}: the length converges at order ${orderFine.toFixed(2)} at the fine end (${d2.toExponential(2)} -> ${d3.toExponential(2)} mm per doubling) — at or below first order a kink is being cut by a chord: a tangent break this surface did not declare`);
+        } else {
+          /* BOTH DIRECTIONS: a declared kink that converges above first order
+             has been declared by the surface (or removed), and the record is
+             stale; one whose order moved off its record was moved by
+             something, and that something re-records it. */
+          r3DeclaredSeen.add(st.name);
+          if (orderFine > 1.0) bad.push(`R3: ${st.name} [${modeTag}] side ${side}: declared as converging at order ${declR3[modeTag]} and it now converges at ${orderFine.toFixed(2)} — the kink is declared or gone; the R3_XFAIL entry is STALE, take it off`);
+          else if (Math.abs(orderFine - declR3[modeTag]) > R3_ORDER_BAND) bad.push(`R3: ${st.name} [${modeTag}] side ${side}: converges at order ${orderFine.toFixed(2)} against a declared ${declR3[modeTag]} (band ${R3_ORDER_BAND}) — re-record it in the same commit as whatever moved it`);
+        }
         const p = Math.max(orderFine, 0.5);
         bound = d1 + d2 + d3 * Math.pow(2, p) / (Math.pow(2, p) - 1);
       } else {
@@ -537,7 +616,26 @@ for (const st of STATES) {
 }
 
 /* ---------- R5: the rim's tangent breaks, independently ---------------- */
-const NAMED = { LIVE: [0.057939, 0.999562], EXPORT: [0.057939, 0.992424] };
+/* THE NAMED SEAMS, in the surface's DRAWN u. Session 38 wrote them in LAW u
+   (0.057939, and the tip floor's 0.999562 live / 0.992424 export); the apex
+   nib (#283) reparameterised the outline (`toLaw`), which moved the
+   root-blend seam to 0.057734 on the surface, and REMOVED the tip-floor seam
+   altogether — the flank and arc are tangent to the law, and the offstation
+   gate's independent detector reads 0.001 and 0.018 deg at the nib's two
+   declared term changes. So one genuine seam is named, at the value that
+   detector bisects on the surface (0.057735, 44.546 deg), an owner this tool
+   does not share. */
+const NAMED = { LIVE: [0.057734], EXPORT: [0.057734] };
+/* R5 DECLARED — the same undeclared kink R3_XFAIL carries, seen by the
+   independent detector at v = +1 on the one ARM state the fold clamp binds
+   on. Its angle is read with a 1e-6 stencil that straddles the kink, so it
+   reads about half the true break (the note at the re-read below); the
+   straddling one-sided read is 16.27 deg. Both directions, like R3's. */
+const R5_XFAIL = {
+  'FORMED (cup + curl + roll + twist)': { u: 0.987240, deg: 8.07, note: 'the fold clamp binds from u 0.98724 (hb = 0.9 mm at cup 0.6), between stations; #283 §9g' },
+};
+const R5_U_TOL = 1e-5, R5_DEG_BAND = 0.05;
+const r5DeclaredSeen = new Set();
 const ARMS = STATES.slice(0, QUICK ? 2 : 6);
 let r5Found = 0, r5Fired = 0;
 const unit = (v) => { const L = Math.hypot(v[0], v[1], v[2]); return [v[0] / L, v[1] / L, v[2] / L]; };
@@ -595,7 +693,14 @@ for (const st of ARMS) {
         f.deg = angleDeg(unit(L), unit(R)); f.ratio = Math.hypot(...R) / Math.hypot(...L); f.exact = ub;
       }
       if (gap > worstSeamGap.v) worstSeamGap = { v: gap, u: f.u, mode: modeTag, state: st.name };
-      if (gap > 1e-5) { missed.push(f); bad.push(`R5: ${st.name} [${modeTag}]: the rim's tangent breaks at u = ${f.u.toFixed(6)} (${f.deg.toFixed(2)} deg, |dP/du| ratio ${f.ratio.toFixed(3)}) and the query placed no node within 1e-5 of it (nearest ${Number.isFinite(gap) ? gap.toExponential(2) : 'none'})`); }
+      if (gap > 1e-5) {
+        missed.push(f);
+        const declR5 = CONTROL ? null : R5_XFAIL[st.name];
+        if (declR5 && Math.abs(declR5.u - f.u) <= R5_U_TOL) {
+          r5DeclaredSeen.add(st.name);
+          if (Math.abs(f.deg - declR5.deg) > R5_DEG_BAND) bad.push(`R5: ${st.name} [${modeTag}]: the undeclared kink at u ${f.u.toFixed(6)} reads ${f.deg.toFixed(2)} deg against a declared ${declR5.deg} (band ${R5_DEG_BAND}) — re-record it in the same commit as whatever moved it`);
+        } else bad.push(`R5: ${st.name} [${modeTag}]: the rim's tangent breaks at u = ${f.u.toFixed(6)} (${f.deg.toFixed(2)} deg, |dP/du| ratio ${f.ratio.toFixed(3)}) and the query placed no node within 1e-5 of it (nearest ${Number.isFinite(gap) ? gap.toExponential(2) : 'none'})`);
+      }
     }
     if (missed.length) r5Fired++;
     if (st === STATES[0]) {
@@ -612,6 +717,7 @@ for (const st of ARMS) {
     }
   }
 }
+if (!CONTROL) for (const name of Object.keys(R5_XFAIL)) if (!r5DeclaredSeen.has(name)) bad.push(`R5_XFAIL declares "${name}" and the detector found no undeclared kink at its u on that arm — the kink is declared or gone; the entry is STALE, take it off`);
 if (!r5Found) bad.push('R5: VACUOUS — the independent detector found no tangent break on any arm, which contradicts the outline\'s Math.max construction; the detector is broken');
 /* ---------- validity --------------------------------------------------- */
 if (!statesRun) bad.push('VACUOUS: no state was built');
@@ -674,12 +780,19 @@ if (bad.length) {
     const r1b = bad.some((b) => b.startsWith('R1b'));
     const r1c = bad.some((b) => b.startsWith('R1c'));
     const r5Any = bad.some((b) => b.startsWith('R5'));
-    const nothingElse = bad.every((b) => b.startsWith('R1') || b.startsWith('R5'));
-    console.log(`\npositive control: R1a fired ${r1a}; R1b fired ${r1b}; R1c fired ${r1c}; R5 fired on the break-less query on ${r5Fired} of ${ARMS.length * 2} arm x mode builds; nothing else fired ${nothingElse}`);
+    /* R3 FIRES UNDER THE CONTROL TOO, AND IS REQUIRED TO: the break-less query
+       cuts every declared seam with a chord, which the nested ladder reads at
+       first order — R5's statement, made by the other instrument. Before the
+       ladder was nested (the gate-coverage session) R3 had no positive
+       control at all. */
+    const r3Any = bad.some((b) => b.startsWith('R3'));
+    const nothingElse = bad.every((b) => b.startsWith('R1') || b.startsWith('R3') || b.startsWith('R5'));
+    console.log(`\npositive control: R1a fired ${r1a}; R1b fired ${r1b}; R1c fired ${r1c}; R3 fired on the break-less query ${r3Any}; R5 fired on the break-less query on ${r5Fired} of ${ARMS.length * 2} arm x mode builds; nothing else fired ${nothingElse}`);
     console.log(`   subjects under the control (the perturbation is on each arm's MEASURED value, so these must not collapse): R1a/R1b ${stationsR1.toLocaleString()} stations, R1c ${flatSubjectR1} of ${flatSubjectR1 + flatExcludedR1} side-builds`);
-    process.exit(r1a && r1b && r1c && r5Any && r5Fired === ARMS.length * 2 && nothingElse ? 0 : 1);
+    process.exit(r1a && r1b && r1c && r3Any && r5Any && r5Fired === ARMS.length * 2 && nothingElse ? 0 : 1);
   }
   process.exit(1);
 }
+if (!CONTROL) for (const name of Object.keys(R3_XFAIL)) if (!r3DeclaredSeen.has(name)) bad.push(`R3_XFAIL declares "${name}" and no state of this run assessed it — a declaration nothing evaluates`);
 if (CONTROL) { console.log('\nCONTROL DID NOT FIRE'); process.exit(1); }
 console.log('\nPASS — the rim query is the exported mesh\'s own rim at every station, its arc is never shorter than the emitted chord, and its residual is bounded as stated above.');

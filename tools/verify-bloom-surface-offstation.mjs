@@ -414,10 +414,25 @@ const prof = G.widthProfile(G.petalStateFor(seamState, sRing), sRing, (seamState
    law and it has already moved once — u = 0.800 was a seam on the pre-session-32
    cap law and is not one now — so this reports what it finds rather than
    checking a remembered number. */
-const hw = (u) => prof.halfWidthAt(u);
-const dCen = (u) => { const e = 1e-6; return (hw(u + e) - hw(u - e)) / (2 * e); };
-const dFwd = (u) => { const e = 1e-9; return (hw(u + e) - hw(u)) / e; };
-const dBwd = (u) => { const e = 1e-9; return (hw(u) - hw(u - e)) / e; };
+/* THE DETECTOR RUNS ON THE SURFACE, NOT ON THE PROFILE — and it used to run
+   on the profile, which went blind the day the apex nib shipped (#283,
+   6ebf784) and stayed blind for eleven merges because this gate ran in no
+   workflow. `halfWidthAt(u)` is a function of the LAW's u; `surface.at(u, v)`
+   is a function of the DRAWN u, and since the nib the two differ by the
+   ratio drawn/asked (`toLaw`), 1.0035 on the shipping default. So the profile
+   located the root-blend seam at u 0.0579388 and the probe below asked the
+   surface about it there — 2.0e-4 away from where the surface actually turns
+   (0.0577344, its own `tangentBreaks()` entry), with a 1e-6 stencil: SMOOTH,
+   every candidate, "VACUOUS", exit 1 on a tree whose seam had not moved at
+   all. A station standing for another parameterisation, this project's own
+   class. The quantity clause C is ABOUT is the surface's tangent, so that is
+   what the bracket scan reads now: the magnitude of the central-difference
+   tangent of `at(u, 0.6)`, then the same bisection. Measured on a4dc836: the
+   detector lands on 0.057735 and reads a 6.6-degree break there. */
+const Pv = (u) => sSurf.at(u, 0.6).P;
+const dCen = (u) => { const e = 1e-6, a = Pv(u - e), b = Pv(u + e); return Math.hypot((b[0] - a[0]) / (2 * e), (b[1] - a[1]) / (2 * e), (b[2] - a[2]) / (2 * e)); };
+const dFwd = (u) => { const e = 1e-9, a = Pv(u), b = Pv(u + e); return Math.hypot((b[0] - a[0]) / e, (b[1] - a[1]) / e, (b[2] - a[2]) / e); };
+const dBwd = (u) => { const e = 1e-9, a = Pv(u - e), b = Pv(u); return Math.hypot((b[0] - a[0]) / e, (b[1] - a[1]) / e, (b[2] - a[2]) / e); };
 const N = 4000, JUMP = 1;
 const seams = [];
 for (let i = 2; i < N - 1; i++) {
@@ -431,15 +446,25 @@ for (let i = 2; i < N - 1; i++) {
   const u = (a + b) / 2;
   if (!seams.some((x) => Math.abs(x - u) < 1e-6)) seams.push(u);
 }
+/* THE SURFACE DECLARES ITS OWN BREAKS (session 38's `tangentBreaks()`, the
+   list `petalRim` grades its nodes around) and every one of them is probed BY
+   NAME, whatever the detector found — a declaration the tangent does not
+   honour is the finding that list exists to make possible, and the same
+   declaration on the profile side (`slopeBreaks()`) is printed beside it so
+   the two parameterisations can be read against each other. */
+const declared = sSurf.tangentBreaks().filter((b) => b.u > 0 && b.u < 1);
+const declaredProfile = prof.slopeBreaks().filter((b) => b.u > 0 && b.u < 1);
 
 /* Eva named u = 0.058 and u = 0.800 from the discovery session's numbers,
    which were taken on the pre-session-32 tree. Both are probed BY NAME
    whether or not they are still seams, so the record answers the question
    that was asked rather than only the one the detector found. */
 const NAMED = [0.058, 0.800];
+const near = (u, list, tol) => list.some((x) => Math.abs(x - u) < tol);
 const PROBES = CONTROL ? [{ u: 0.42, why: 'control: a u with no seam' }]
   : [...seams.map((u) => ({ u, why: 'located by the detector' })),
-     ...NAMED.filter((u) => !seams.some((s2) => Math.abs(s2 - u) < 2e-3)).map((u) => ({ u, why: 'named in the brief; NOT a seam on this tree' }))];
+     ...declared.filter((b) => !near(b.u, seams, 1e-6)).map((b) => ({ u: b.u, why: `declared by the surface (${b.kind}: ${b.from} -> ${b.to}); NOT located by the detector` })),
+     ...NAMED.filter((u) => !near(u, seams, 2e-3)).map((u) => ({ u, why: 'named in the brief; NOT a seam on this tree' }))];
 for (const { u: u0, why } of PROBES) {
   const v = 0.6, e = 1e-6;
   const P = (u) => sSurf.at(u, v).P;
@@ -460,7 +485,15 @@ for (const { u: u0, why } of PROBES) {
     + `\n      verdict: ${deg > 0.5 || Math.abs(nr / nl - 1) > 0.02 ? 'C0 ONLY — the tangent breaks here' : 'C1 here — the tangents agree'}`);
 }
 if (!seamsMeasured) bad.push('clause C: VACUOUS — no seam was probed');
-if (!CONTROL && !seams.length) bad.push('clause C: VACUOUS — halfWidthAt reported no slope break at all, which contradicts its Math.max construction; the detector is broken');
+if (!CONTROL && !seams.length) bad.push('clause C: VACUOUS — the surface showed no tangent break at all, which contradicts halfWidthAt\'s Math.max construction; the detector is broken');
+/* EVERY GENUINE BREAK SITS ON A DECLARED ONE — one direction only. The
+   converse is NOT a claim the declaration makes: `tangentBreaks()` lists the
+   places `petalRim` grades its nodes around, and a term change can be C1
+   there by construction (the nib's arc is TANGENT to its flank, and the flank
+   carries the law's own tangent — measured 0.001 and 0.018 deg above). An
+   undeclared kink is what `petalRim` cannot grade and what rim-arc's R3
+   exists to catch; a declared C1 join is printed and costs nothing. */
+if (!CONTROL) for (const u of genuineSeams) if (!near(u, declared.map((b) => b.u), 2e-6)) bad.push(`clause C: a genuine tangent break at u ${u.toFixed(6)} that the surface does not DECLARE`);
 if (!CONTROL && !genuineSeams.length) bad.push('clause C: VACUOUS — every candidate classified as smooth, so the C0 claim rests on nothing measured');
 
 
@@ -506,6 +539,8 @@ if (dn.length) { console.log(`\nclause D — the buckled normal:`); console.log(
 console.log(`\nclause C — the outline's C0 seams, measured on the shipping default:`);
 console.log(note.filter((n) => n.includes('one-sided')).join('\n'));
 console.log(`\nGENUINE C0 seams (tangent breaks): ${genuineSeams.length ? genuineSeams.map((u) => u.toFixed(6)).join(', ') : 'none'}`);
+console.log(`declared by the surface (tangentBreaks, drawn u): ${declared.map((b) => `${b.u.toFixed(6)} ${b.kind} ${b.from}->${b.to}`).join(' · ') || 'none'}`);
+console.log(`declared by the profile (slopeBreaks, law u):     ${declaredProfile.map((b) => `${b.u.toFixed(6)} ${b.kind} ${b.from}->${b.to}`).join(' · ') || 'none'}`);
 console.log(`bracket candidates rejected as SMOOTH-BUT-STEEP: ${rejected} of ${seamsMeasured} probed.`);
 console.log('  The bracket test flags a jump in the CENTRAL difference, which a steep smooth');
 console.log('  taper also produces; only the one-sided tangents can tell the two apart, so the');

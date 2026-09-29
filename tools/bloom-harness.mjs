@@ -3096,6 +3096,20 @@ export async function apexNibAssertions(page, row) {
     if (!ap.active) {
       if (Math.abs(ap.drawnLengthMm - asked) > 1e-9)
         bad.push(`AN0: ${at}the nib is INERT (${ap.why}) and the blade is drawn at ${ap.drawnLengthMm} mm where the asked length is ${asked} mm — an inert cap may not move the length`);
+      /* WHERE THE NIB DECLINES, THE TERMINAL IS A4's OWN LAW, PER RING (the
+         gate-coverage session, D14). A4 states `max(petalTipEnd x peak, the
+         mode floor)` on the REPRESENTATIVE petal only, and the nib owns that
+         petal's terminal at every reachable width — so after the nib the mode
+         floor decides a terminal on exactly one kind of ring, an inner whorl
+         whose blade never clears the print floor, which no clause read. The
+         mutant table's three floor mutants were silent on `main` for that
+         reason, and the first full sweep in CI is what said so. The reference
+         is rebuilt from the row's own `petalTipEnd`, the cap's declared peak
+         (pinned by A6) and the harness's own floor constant, never from the
+         cap's terminal; the quantity is the EMITTED last row. */
+      const wantEnd = Math.max(askedEnd * peak, modeFloor);
+      if (Math.abs(tc.lastRowHalf - wantEnd) > 1e-9)
+        bad.push(`AN0: ${at}the nib is INERT (${ap.why}) and the last emitted row is ${tc.lastRowHalf} mm where max(petalTipEnd ${askedEnd} x peakHalf ${peak}, the ${tc.exportMode ? 'export' : 'live'} floor ${modeFloor}) = ${wantEnd} — with no nib the squared end and the mode floor are the only things that may end a blade`);
       return;
     }
 

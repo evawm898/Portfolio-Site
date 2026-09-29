@@ -128,6 +128,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          stemAssertions, STEM_SCOPE,
          leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
+import { parseShard, shardOf, matrixHash, writeCensus, slimConn, summarizeConn } from './bloom-connectedness-shards.mjs';
 import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
@@ -174,6 +175,16 @@ const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
    counts what actually ran; a filtered run is never quoted as a pass of the
    matrix. */
 const ONLY = process.argv.includes('--only') ? new RegExp(process.argv[process.argv.indexOf('--only') + 1]) : null;
+/* `--shard k/n` + `--census <file>` (the sharded CI gate, C20 — read
+   tools/bloom-connectedness-shards.mjs's header). The shard runs the rows
+   whose MATRIX INDEX `shardOf()` assigns it, makes NO matrix-level claim
+   (those are the merge's, over the union), and writes the census the merge
+   job reconciles against its own buildMatrix(). The selector is IMPORTED from
+   the export gate's shard module: one owner of membership for both gates. */
+const SHARD = parseShard(process.argv);
+const CENSUS = process.argv.includes('--census') ? process.argv[process.argv.indexOf('--census') + 1] : null;
+if (CENSUS && !SHARD) throw new Error('--census is written by a shard; pass --shard k/n with it');
+if (SHARD && NEGATIVE_CONTROL) throw new Error('--shard and --negative-control do not combine');
 
 function voxelComponents(buf, cell) {
   const n = buf.readUInt32LE(80);
@@ -272,10 +283,13 @@ const refused = [];
    this gate printed `621/621 rows are ONE connected piece` over a 622-row
    matrix and exited 1 with the dropped row invisible except in the count. */
 const attempted = [];
+const attemptedIdx = [];   // { index, label } — what the census records, by MATRIX INDEX
 const t0 = Date.now();
-for (const row of rows) {
+for (const [rowIndex, row] of rows.entries()) {
   if (ONLY && !ONLY.test(row.label)) continue;
+  if (SHARD && shardOf(rowIndex, SHARD.n) !== SHARD.k) continue;
   attempted.push(row.label);
+  attemptedIdx.push({ index: rowIndex, label: row.label });
   await openBloom(page, port);   // fresh page per row
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -497,105 +511,24 @@ await browser.close();
 server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 
-/* VALIDITY 2 — pairwise triangle comparison (see header).
-   MATRIX-LEVEL, SO NOT MADE ON A FILTERED RUN (session 18): this check and
-   VALIDITY 3 below need the petalCount 3 / 40 rows, the DEFAULT row and the
-   three foot-response rows, and a `--only` run that does not select them
-   reported HARNESS INVALID on every smoke pass — which is why session 17's
-   `--conn` measurement could only ever be quoted as "the voxel verdict, with
-   the run self-reporting invalid". Suppressed under --only exactly as the
-   crowding-coverage claim below already is and as the export gate suppresses
-   its own matrix-level claims; the per-row validity (fresh page, read-back,
-   every J / Z / C family) is untouched, and a filtered run is still never a
-   pass of the matrix. */
-if (!NEGATIVE_CONTROL && !ONLY) {
-  const r3 = results.find((r) => r.label === 'petalCount 3');
-  const r40 = results.find((r) => r.label === 'petalCount 40');
-  if (!r3 || !r40) validity.push('pairwise check: petalCount 3 / 40 rows missing from results');
-  else if (!(r40.tris > r3.tris)) validity.push(`pairwise check: petalCount 40 exports ${r40.tris} tris(export), not more than petalCount 3 at ${r3.tris} — the slider did not drive geometry`);
-
-  /* VALIDITY 3 — THE FOOT CONTROLS ACTUALLY REACH footRing().
-
-     The reworked foot assertion compares the emitted foot against
-     footRing()'s OWN answer, which is the only comparison that is not a
-     second copy of the derivation — and it is therefore blind by
-     construction to footRing() ignoring its inputs entirely. A footRing()
-     that returned a constant would satisfy it on every row. So the second
-     half of that claim is asserted here, the same way the petalCount pair
-     asserts that a slider drove geometry rather than merely being held:
-     matched pairs against the DEFAULT row, never a global reference.
-     Thickness is a strict inequality both ways; the delicacy pair is strict
-     because 0.25 x 6.40 mm = 1.60 mm lands exactly ON the assumed floor and
-     the default does not. */
-  const base = results.find((r) => r.label === 'DEFAULT (the shipping configuration)');
-  const pairs = [
-    ['sheetThickness min (0.6)', 'ringThickness', (a, b) => a < b, 'thinner'],
-    ['sheetThickness max (2.4)', 'ringThickness', (a, b) => a > b, 'thicker'],
-    ['footDelicacy min (0.25)', 'ringWidth', (a, b) => a < b, 'narrower'],
-  ];
-  if (!base) validity.push('response check: DEFAULT row missing from results');
-  else for (const [label, key, cmp, word] of pairs) {
-    const row = results.find((r) => r.label === label);
-    if (!row) { validity.push(`response check: row "${label}" missing from results`); continue; }
-    if (!cmp(row[key], base[key])) {
-      validity.push(`response check: "${label}" reports ${key} ${row[key]}, not ${word} than the default's ${base[key]} — the control is not reaching footRing()`);
-    }
-  }
+/* THE SUMMARY AND THE VERDICT live in tools/bloom-connectedness-shards.mjs's
+   `summarizeConn()`, which the sharded merge calls too — one function over the
+   same slim records, so the sharded verdict cannot drift from this one. The
+   matrix-level claims (VALIDITY 2 and 3, the refused-row coverage, the
+   crowding flag both ways) are made only when the whole matrix ran: not under
+   --only (session 18), not on a shard (C20), not on the negative control. */
+const slim = results.map((r) => slimConn(r, { crowding: crowdingLine(r.crowding), orientation: orientationLine(r.orientation) }));
+const matrixLevel = !NEGATIVE_CONTROL && !ONLY && !SHARD;
+if (CENSUS) {
+  writeCensus(CENSUS, {
+    shard: SHARD, only: ONLY ? process.argv[process.argv.indexOf('--only') + 1] : null,
+    matrix: { count: rows.length, hash: matrixHash(rows.map((r) => r.label)) },
+    attempted: attemptedIdx, results: slim, refused, validity, elapsedS: (Date.now() - t0) / 1000,
+  });
+  console.log(`\ncensus written: ${CENSUS} (shard ${SHARD.k}/${SHARD.n}, ${attemptedIdx.length} row(s) attempted)`);
 }
-
-console.log(`connectedness: voxel flood fill at ${CELL_MM} mm (assumed min printable feature: 1.0 mm)\n`);
-const failures = [], skipped = [];
-for (const r of results) {
-  const verdict = r.ok === null ? 'SKIP' : r.ok ? 'ok  ' : 'FAIL';
-  if (r.ok === null) skipped.push(r);
-  else if (!r.ok) failures.push(r);
-  const detail = r.comps !== undefined
-    ? `components=${r.comps} stray=${r.strayFraction} tris(export)=${r.tris} boundary=${r.boundary}${r.refined ? (r.refined.artefact ? ` [${r.coarse.comps} components at ${CELL_MM} mm read as ONE at ${r.refined.cell} mm — a rasterisation artefact of the sampler, not a gap]` : ` [still ${r.refined.comps} components at ${r.refined.cell} mm — a real gap]`) : ''}`
-    : (r.note || '');
-  console.log(`  ${verdict} ${r.label.padEnd(46)} ${detail}`);
-  if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
-  console.log(`       ^ ${crowdingLine(r.crowding)}`);
-  console.log(`       ^ ${orientationLine(r.orientation)}`);
-}
-/* THE ROWS THE GENERATOR REFUSED, NAMED WITH THEIR FIGURES (XR1, Eva's ruling
-   Sep 13). A declared refusal is neither a pass nor a skip — it is an ASSERTED
-   outcome — and it is printed on every run with its count so the row can never
-   go quiet, which is precisely the coverage loss a skip would have been. */
-for (const rr of refused) console.log(`\n${exportRefusedLine(rr.label, rr)}`);
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...exportRefusedCoverage(attempted));
-
-/* THE DENOMINATOR ITSELF, asserted — and asserted BEFORE the headline, so the
-   headline can carry the verdict rather than contradict it (#220). Session 32
-   added this census and left the headline dividing by `results.length`, which
-   is the SURVIVORS: a dropped row leaves BOTH numerator and denominator, so
-   the ratio reads N/N however many rows were lost, and the matrix size was
-   never printed to compare it against. Session 41 read `672/672 rows are ONE
-   connected piece` off a run that had exited 1 over a 674-row matrix. */
-const got = new Set(results.map((r) => r.label));
-/* A DECLARED REFUSAL IS NOT A DROPPED ROW (XR1). It reached no `results`
-   entry because there is no STL to analyse, but it is an ASSERTED outcome
-   rather than a row the gate lost — so it is excluded from the census and
-   named on its own line instead, which is what keeps it from going quiet. */
-const refusedLabels = new Set(refused.map((r) => r.label));
-const dropped = attempted.filter((l) => !got.has(l) && !refusedLabels.has(l));
-if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
-console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length - skipped.length} are ONE connected piece`
-  + (skipped.length ? ` · ${skipped.length} skipped (grid too large — NOT a pass)` : '')
-  + (refused.length ? ` · ${refused.length} EXPORT REFUSED by the generator's own triangle budget (declared, asserted by XR1 — not a pass and not a skip)` : '')
-  + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass, and every ratio below divides by the ${results.length} that survived` : '')
-  + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-cell gaps; covers only the matrix above. See the header.');
-console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
-console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
-console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
-console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
-console.log(`STEM SCOPE: ${STEM_SCOPE}`);
-console.log(`STEM CHANNEL SCOPE: ${STEM_CHANNEL_SCOPE}`);
-console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
-const crowdedRows = results.filter((r) => r.crowding.crowded);
-console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
-/* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
+const summary = summarizeConn({ results: slim, refused, attempted, validity, matrixLevel, elapsedS: (Date.now() - t0) / 1000, cell: CELL_MM });
+const { dropped, failures } = summary;
 
 /* NODE DOES NOT FLUSH A PIPED stdout ON process.exit(), AND A CI LOG IS A PIPE.
    Writes to a pipe are asynchronous, so the per-row dump sits in a buffer
@@ -618,24 +551,7 @@ async function flushAndExit(code) {
   process.exit(code);
 }
 
-let bad = false;
-if (validity.length) {
-  bad = true;
-  /* THE POINTER GOES TO STDOUT. stderr is unbuffered and stdout is block
-     buffered, so piped into a CI log this block flushes EARLIER than the
-     summary it logically follows — and reading the tail of a 2,400-line log
-     is the normal way to read it. The detail stays here; the fact that there
-     IS detail belongs in the stream that carries the summary. */
-  console.log(`\nconnectedness: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the "HARNESS INVALID" block (stderr; it may appear ABOVE this line in a combined log).`);
-  console.error(`\nconnectedness: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
-  for (const v of validity) console.error(`  - ${v}`);
-}
-if (failures.length) {
-  bad = true;
-  console.log(`\nconnectedness: ${failures.length} ROW(S) FAILED — see the detail on stderr.`);
-  console.error(`\nconnectedness: FAIL — ${failures.length} row(s) export as more than one piece:`);
-  for (const f of failures) console.error(`  - ${f.label}: ${f.comps} components, ${(f.strayFraction * 100).toFixed(2)}% of surface detached`);
-}
+const bad = summary.bad;
 if (NEGATIVE_CONTROL) {
   if (bad) { console.log('\nNEGATIVE CONTROL: PASS — the harness rejected the clamped value, as it must.'); await flushAndExit(0); }
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
@@ -643,7 +559,8 @@ if (NEGATIVE_CONTROL) {
 }
 if (bad) {
   /* THE LAST LINE OF STDOUT MUST NEVER READ AS A PASS ON A FAILING RUN. */
-  console.log(`\nconnectedness: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} row(s) not one piece. Nothing above is a pass.`);
+  console.log(`\nconnectedness: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${summary.validity.length} validity assertion(s), ${failures.length} row(s) not one piece. Nothing above is a pass.`);
   await flushAndExit(1);
 }
 console.log(`\nconnectedness: PASS — ${results.length} of ${attempted.length} attempted rows reached the results and every one exports as a single connected body${refused.length ? `; ${refused.length} row(s) the generator REFUSED on its own triangle budget, declared and asserted by XR1 (named above) rather than skipped` : ''}.`);
+if (SHARD) console.log(`(this is shard ${SHARD.k}/${SHARD.n} of the matrix — NOT a matrix verdict; the merge job reconciles every shard's census and gives that.)`);

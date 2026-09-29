@@ -1871,93 +1871,40 @@ leaving it as a trap** — an unpushed `frozen/*` in a working clone reads like 
 baseline to the next session that lists tags. The registration is the load-bearing half and
 CI proves it; the tag only keeps the base commit alive, and a commit on `main` cannot be
 orphaned here anyway.
-**THAT GAP IS CLOSED, AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG FOR TWO WEEKS**
-(read `docs/bloom-frozen-tags-outcome.md` before touching `tools/publish-frozen-tags.sh`,
-its self-test, or `TAG_PUSH_XFAIL`). It
-read *"the remote carries phase2..phase20 only (phase5 absent), so PHASES 21 THROUGH 29 ARE ALL
-UNPUBLISHED"*. **The remote carries THIRTY of the thirty-three declared baselines today** —
-everything except `frozen/phase5`, `frozen/phase22` and `frozen/phase23` — verified by
-`git ls-remote --tags origin` and by the GitHub tag API, each one identity-checked against
-`FROZEN_BASE_COMMITS`. Run 9 of `bloom-frozen-tags` (35295784427, Sep 18) created twelve of them
-in one go: phase21 and phase24..phase34. **THE ERROR WAS READING A RED X AS "IT DID NOTHING"** —
-the workflow had been publishing all along and failing its own verdict afterwards, for the reason
-in the next paragraph. **The lesson is the one this file already states about gates and about
-`672/672`: a run's exit code is not its outcome, and the outcome here is readable in one command
-that nobody ran** (`git ls-remote --tags origin 'refs/tags/frozen/*'`), or now by dispatching
-`bloom-frozen-tags` with `check_only`, which publishes nothing.
-**THE THREE THAT REMAIN CANNOT BE PUSHED BY A WORKFLOW AT ALL, AND THEY ARE DECLARED BY NAME.**
-GitHub refuses a GitHub App token — which `GITHUB_TOKEN` is — a ref it judges to create or update
-a file under `.github/workflows`, and **`GITHUB_TOKEN` cannot be granted `workflows` scope**, so
-no `permissions:` block reaches it (`contents: write` has been set since session 17 and was never
-the problem). phase5 has been rejected identically on every run since Sep 5. They are now entries
-in `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh` with the workflow file GitHub named, the run
-fails on any UNDECLARED absence, and a declared entry that starts publishing is called out as
-stale — this project's own xfail idiom, applied to a credential instead of to geometry.
-**WHICH refs GitHub picks was NOT determined, and the ruled-out list is worth more than a guess**:
-it is not unreachability — **32 of the 33 bases are on main's own first-parent line, INCLUDING
-all three that were rejected, while the ONE base that is genuinely not on `main` at all
-(phase10, recovered through `refs/pull/140/head`) PUBLISHED WITHOUT COMPLAINT**, which kills
-that hypothesis outright rather than merely failing to support it; not "the workflow files
-differ from main's" (phase21 and phase22 have IDENTICAL difference sets against main — one was
-accepted, one rejected); and not "the blob is already carried by an existing tag" (phase24's is
-carried by none and was accepted). **#253's own body and commit message say "all 33 bases are
-on main's first-parent line" — that is one row loose, and the corrected figure is the stronger
-claim.** The predicate is GitHub-internal; what matters is that it is a
-property of the token class, it is stable, and it is not configurable.
-**THE DISPATCH IS THE SESSION'S TO FIRE, AFTER ITS OWN MERGE** — Eva's Sep 24 ruling above
-supersedes this line; it is kept, struck through in substance rather than in markup, so the
-reversal is legible to a reader who reaches this paragraph first.
+**WHEN A FROZEN TAG PUBLISHES IS AN OPERATIONAL RULE OF THUMB, NOT A MECHANISM, AND THE MECHANISM
+IS NOT TO BE INVESTIGATED FURTHER** (Eva, Sep 29, closing three sessions on it — read
+`docs/bloom-gate-coverage-outcome.md` §1 for the experiment; this paragraph REPLACES the two
+that stood here, which recorded refuted mechanisms and are gone). Measured on a runner with
+`GITHUB_TOKEN`, four disposable tags pushed through a scratch copy of `bloom-frozen-tags`
+dispatched on a branch, predictions written before each push: a tag at a commit ON `main` whose
+workflow files are IDENTICAL to `main` HEAD's **published**; a tag at a commit ON `main` three
+merges older, whose `bloom-export-watertight.yml` differs from HEAD's, was **REFUSED** naming
+that file — `refusing to allow a GitHub App to create or update workflow
+`.github/workflows/bloom-export-watertight.yml` without `workflows` permission` — though the
+commit and every object under it were already on the remote; a tag at an UNMERGED branch head
+that edits `bloom-frozen-tags.yml` **published**; a tag at an unmerged head with no workflow edit
+**published**. That pair on `main` is a single-variable comparison, so the check is on CONTENT,
+not on objects. **THE RULE:** *a frozen tag publishes when its base commit's workflow files are
+identical to `main` HEAD's at dispatch time, or when the base is not on `main`; it is refused
+when the base is on `main` and its workflow files differ from `main` HEAD's.* It fits 4 of 4
+probes and all six declared refusals (`phase5`, `phase22`, `phase23`, `phase42`, `phase43`,
+`phase45` — each dispatched from a `main` head of which its base is an ancestor, each with a
+workflow file differing). **`phase24` in run 9 is a known counterexample and is NOT explained**
+(its `bloom-export-watertight.yml` differed from the dispatch head's and it published), which is
+why this is a rule of thumb. **THE MECHANISM IS UNKNOWN AND IS NOT TO BE INVESTIGATED FURTHER**
+— its whole cost is that a pointer tag sometimes fails to publish while the matrices themselves
+live in `FROZEN_MATRICES` and `FROZEN_BASE_COMMITS` and `--verify-frozen` passes regardless.
+**THE CONSEQUENCE IS THE PART THAT MATTERS: editing a workflow file costs frozen tags — not the
+editing PR's own (it adds no matrix rows and owes no phase) but every tag dispatched afterwards
+from a base that predates the edit.** That is exactly the `phase42/43/45` shape. Hence:
+**dispatch every owed frozen tag BEFORE merging anything that edits a workflow file.** The
+session-side push is still a flat 403 on every tag ref (measured again Sep 29, on a tag at a
+commit already on `main`), so the dispatch is the only route, and it is the session's to fire
+after its own merge (the ruling above). `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh`
+declares the six by name with the file GitHub named; a declared entry that starts publishing is
+called out as stale, and a re-dispatch after `main`'s workflow files have moved again does not
+recover one — the rule says why.
 
-**`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
-THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
-**(1) THE PUSH FAILS FROM A SESSION, AND THE MECHANISM RECORDED HERE IS REFUTED — NOT REPLACED**
-(corrected session 41; the reading below is what this file used to assert, kept so the correction
-is checkable). What was written here was session 17's: a GitHub App token cannot push a tag whose
-`.github/workflows` differs from the default branch's, and #191 changed a workflow after
-`b323268`. **Session 41 tried it in the one case that reading exempts and it still failed.**
-`frozen/phase25` points at `3f238bd`, which WAS `origin/main`'s own head at the time, and the
-branch pushing it changed no workflow file at all (`git diff --stat <base>..HEAD -- .github/` is
-empty) — so no `.github/workflows` difference existed anywhere, and `git push origin
-refs/tags/frozen/phase25` still returned a flat **HTTP 403** ("RPC failed; send-pack: unexpected
-disconnect"). **That is a counter-example to the workflow-divergence mechanism and nothing more:
-what actually refuses the push is NOT ESTABLISHED, and no replacement mechanism is offered here.**
-The server said 403 and named no reason; a session token, the tag ref namespace, a push rule and
-the proxy are all consistent with what was observed and none was isolated. So: expect the push to
-fail, do not engineer around the workflow condition — and do not engineer around a successor
-condition either, because there is no measured one to engineer around. What IS measured is now
-a failure in the exempt case AND one in the NON-exempt case: the sphere-stem session's `frozen/phase29` push was refused identically
-(flat 403; `git ls-remote --tags origin 'refs/tags/frozen/phase29'` read back EMPTY) from a branch
-that DOES change a workflow file, so the condition is measured insensitive in BOTH directions.
-That strengthens the refutation and still supplies no successor.
-**(2) THE `git/refs` API ROUTE IS REFUTED, NOT MERELY UNTESTED** (corrected here; the paragraph
-below is what this file used to assert, kept so the correction is checkable). It used to read
-*"UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS 'NO TOOL TO TRY IT', NOT 'THE API REFUSED
-IT.'"* Creating a ref at a commit that already exists sends no tree, so the hypothesis was that
-it might sidestep the restriction in (1) via the MCP surface's only ref-creating tool reachable
-from a session, or via `tools/publish-frozen-tags.sh`'s own runner-side POST, which was WIRED to
-try it for the refs the push could not create and report whatever the API said, without failing
-the run either way. **IT HAS NOW BEEN TRIED AND IT FAILS THE SAME WAY**: that POST, on the
-RUNNER, for `frozen/phase5`, `frozen/phase22` and `frozen/phase23`, returned a flat **403** on
-run `36072453638` — measured, not inferred, and the same verdict as the git push in (1). The
-three stay in `TAG_PUSH_XFAIL` on that measured ground now, rather than on an untried route.
-Nothing here isolates WHY the API refuses it any more than (1) isolates why the push does; both
-are refused, and no successor mechanism is offered for either.
-**(3) IT IS BELT-AND-BRACES, NOT LOAD-BEARING, so do not re-litigate it.** `b323268` is in
-`main`'s history (a squash-merge, #188 — one parent, NOT a merge commit) and `main` is never
-force-pushed here, so the commit cannot be orphaned and the definitions stay replayable without
-the tag. 18 `frozen/*` tags are on the remote (phase5 was already absent) and they remain the
-pattern — but **HOW a future baseline gets tagged is settled by the rule at the top of this
-block**: not from a session, and not by hand, but by the `bloom-frozen-tags` dispatch from
-`main` after the merge.
-**AND THE ROUTE THAT ACTUALLY WORKS FROM HERE IS `bloom-frozen-tags`** — `workflow_dispatch`-only,
-already on the default branch and therefore dispatchable, running `tools/publish-frozen-tags.sh`
-on a RUNNER, which has neither this environment's limit. Two things decide its moment: dispatch it
-from `main` AFTER the phase is merged (on a branch it would pin a baseline main's own harness does
-not register), and it publishes the whole declared set. **The count in this paragraph is
-SUPERSEDED — see the correction above: 30 of 33 are published, and the three that are not are
-declared.** It pushes EXPLICIT REFSPECS now rather than `git push origin --tags`, which used to
-push whatever tags the clone happened to hold; and it no longer refuses a partial set on the
-strength of refs no credential can create.
 **THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
 session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
 error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
