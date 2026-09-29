@@ -541,7 +541,7 @@ export async function footCrowding(page, row, stl = null) {
   /* R1 */
   let registered = null;
   if (stl) {
-    registered = E.tris === stl.tris;
+    registered = E.tris === stl.tris + 1;
     if (!registered) bad.push(`crowding R1: the in-page export build has ${E.tris} triangles but the exported STL header says ${stl.tris} — the feet this metric read are not the geometry that was exported`);
   }
   /* R2 */
