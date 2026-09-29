@@ -59,9 +59,26 @@ it, then restored (`git diff` empty after each). The red is pasted verbatim.
 * **rim-roundness-lib** — `inradiusOf` returns `lo * 0.9`; `verify-bloom-infill`:
   `FAIL I12: the default at 0.60 draws 20 holes / 170.67 mm2 / median roundness 0.8467 against the swept law's 20 / 173.85 / 0.8238 and today's 179.08 / 0.8177 — it must sit ten times closer to the ruled shape than today's does`
 
-**The trigger confirmation** (the job does NOT start on the old filter and DOES on the new)
-is per tool and needs two pull requests per tool against the remote: it is recorded in the
-PR thread as each pair is run, with the run ids, not here.
+**The trigger confirmation** (the job does NOT start on the old filter and DOES on the new),
+measured 2026-09-29 21:02-21:03Z off `actions_list` by head sha. Per tool, two disposable draft
+PRs each carrying ONE one-line edit to that tool and nothing else: PR-A is based on `main`, so
+GitHub evaluates `main`'s OLD `bloom-export-watertight` path filter; PR-B is based on this
+branch, so it evaluates the NEW one. The filter under test is the PR's own workflow version,
+which is why a `main`-based PR is the control. Every run was cancelled and the twelve PRs
+(#308-#319) closed; the `claude/zz-plant-*` branches wait on Eva's delete.
+
+| tool (the one file edited) | PR-A, base `main`, OLD filter | PR-B, base this branch, NEW filter |
+|---|---|---|
+| `bloom-crowding.mjs` | #308 `0bd02b4`: flower-export-watertight + flower-geometry-quality only. NO bloom-export-watertight | #309 `bacfc31`: bloom-export-watertight run 36630573941 (also bloom-connectedness 36630573886, C20's own filter gain) |
+| `bloom-first-slot.mjs` | #310 `7f34862`: the two flower gates only. NO bloom-export-watertight | #311 `373c14c`: bloom-export-watertight run 36630587860 (also bloom-connectedness 36630587736) |
+| `bloom-infill-wall.mjs` | #312 `e28e833`: the two flower gates only. NO bloom-export-watertight | #313 `2b907a6`: bloom-export-watertight run 36630599190 |
+| `bloom-plan-coverage.mjs` | #314 `cee390c`: the two flower gates only. NO bloom-export-watertight | #315 `e4fcc1c`: bloom-export-watertight run 36630612905 |
+| `bloom-rim-roundness-lib.mjs` | #316 `069b26d`: the two flower gates only. NO bloom-export-watertight | #317 `b08318c`: bloom-export-watertight run 36630625359 |
+| `bloom-solid-angle-coverage.mjs` | #318 `3fca7b0`: the two flower gates only. NO bloom-export-watertight | #319 `bd1f192`: bloom-export-watertight run 36630637707 |
+
+Six of six: silent on the old filter, triggered on the new. The two flower runs on every PR-A
+are `flower-*.yml`'s `tools/**` filter (this repo's recorded corollary) and say nothing about
+the bloom gate.
 
 ## D14 — the eight gates, in CI
 
