@@ -94,7 +94,10 @@ scalar azimuth about the world axis (`petalSurface` `:6093-6096`, `:6220`; `rodI
 `:8963-8966`; `buildHubInto` apexes at literal `[0, 0, z]` `:8795`, `:8834`, `:8864`,
 `:8895`). Also established: `bloom-geometry.js` has **zero module-level mutable state**
 (no `let`/`var` at top level), so re-entrancy is not a problem — the file is already pure in
-`(state, acc)`.
+`(state, acc)`. *(Corrected Sep 29: true at `f1fbdf9`, false since #289, which added `let NU`
+and three budget flags. Purity in `(state, acc)` was then MEASURED to hold across builds —
+six orderings of the whole matrix, 0 digests differ — while `NU` leaks WITHIN a build from
+the petals into the leaf, the rod and the sepal scan. `docs/bloom-build-order-outcome.md`.)*
 
 ---
 

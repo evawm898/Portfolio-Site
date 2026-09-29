@@ -5007,10 +5007,20 @@ INSTANCING PLUS ONE RACEME and nothing else: no presets (ruling 10), no compound
 no cymes, no depth past 1, no maturation ramp or bud pose (ruling 6), no droop or axis
 curvature (ruling 8), and the capitulum is the HEAD's (ruling 1 — a mum is one flower with
 120 petals and one centre).
-**PHASE A'S STOP CONDITION WAS NOT MET AND THAT IS A MEASUREMENT:** `bloom-geometry.js`
-holds ZERO module-level mutable state (every module `let` is a `const`; the four `last*`
-variables are `bloom.js`'s and are written AFTER a build returns), so the head IS a pure
-function of `(state, acc)`. It IS origin-locked — the hub is centred on `[0,0,0]`, the
+**PHASE A'S STOP CONDITION WAS NOT MET AND THAT IS A MEASUREMENT:** ~~`bloom-geometry.js`
+holds ZERO module-level mutable state~~ — **TRUE AT `f1fbdf9`, FALSE SINCE #289 (`4f3d31b`)**,
+which added `let NU` and the three budget flags (`RAMP_FORCE_BASE`, `RAMP_PROBE_STEP`,
+`BUDGET_DECISION_ACTIVE`); the struck half is kept so the correction is checkable. **What
+the argument actually needs — the head IS a pure function of `(state, acc)` — is MEASURED
+TRUE** (the build-order session, `docs/bloom-build-order-outcome.md`,
+`tools/verify-bloom-build-order.mjs`): six orderings of the 970-row matrix in both modes,
+0 of 1,940 digests differ; 672 setter-to-victim pairs and 66 planted throws, every victim
+bit-identical to a fresh-module build; the flags always read back clean. **BUT `NU` IS
+NEVER RESET AND LEAKS WITHIN A BUILD** from the petals into the leaf blade (its row count
+follows `petalTipShape`: 2,548 -> 5,012 triangles a leaf above 2.70), the stamen/style rod
+(ulp-scale) and the sepal scan's first seam step — a recorded defect, NOT fixed, and
+invisible to any order test by construction. (The four `last*` variables are `bloom.js`'s
+and are written AFTER a build returns.) It IS origin-locked — the hub is centred on `[0,0,0]`, the
 stem runs down the world axis, `stemOmission` reasons about world z by name — which is
 what Route A handles BY CONSTRUCTION rather than by refactoring. **`below: 'branch'` is
 NOT needed**: `below` is validated by `buildBloomInto` and read nowhere else on this tree.
