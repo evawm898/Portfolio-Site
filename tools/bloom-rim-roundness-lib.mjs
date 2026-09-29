@@ -150,7 +150,7 @@ export function turnsOf(line) {
 export function inradiusOf(poly, infillInset) {
   let lo = 0, hi = 50;
   for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (infillInset(poly, m)) lo = m; else hi = m; }
-  return lo;
+
 }
 /* THE OPENING: erode by R, dilate by R with round joins — the union of every
    R-disc that fits in the polygon. On a convex polygon it IS a fillet of radius
