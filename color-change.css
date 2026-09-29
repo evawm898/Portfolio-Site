@@ -200,7 +200,25 @@
 
 
 
-/* ---------- 2.3 demo: SVG stage, second control row, electrolyte overlay */
+/* ---------- 2.2 electrochromic: principle on top, two demos side by side, table under */
+
+.cc__mech--ec { display: block; }
+.cc__ec-principle { padding: 0 6vw; border-bottom: 1px solid var(--line); }
+.cc__ec-principle .cc__canvas { aspect-ratio: 65 / 28; }
+.cc__ec-cap { font-size: 13px; line-height: 1.75; color: var(--ink); min-height: 1.75em; }
+.cc__ec-note { font-size: 12px; line-height: 1.75; color: var(--ink-faint); padding: 0.25rem 0 1.75rem; }
+
+.cc__ec-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 3vw;
+  padding: 0 6vw;
+}
+.cc__ec-col { min-width: 0; }
+.cc__ec-col .cc__mech-title { font-size: 1.1rem; }
+.cc__ec-col .cc__text--col { padding: 0 0 2rem; }
+
+/* ---------- PEDOT demo: SVG stage, second control row, electrolyte overlay */
 
 .cc__pe { cursor: default; }
 .cc__pe-gel { opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
@@ -212,7 +230,7 @@
 .cc__pad .cc__btn { min-width: 2rem; padding-left: 0.5rem; padding-right: 0.5rem; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .cc__pe-gel { transition: none; } }
 
-/* ---------- 2.2 vs 2.3: the comparison, styled like the readout rows */
+/* ---------- window vs display: the comparison, styled like the readout rows */
 
 .cc__compare {
   grid-column: 1 / -1;
@@ -301,6 +319,8 @@
   .cc__text { padding: 0 6vw 2rem; }
   .cc__compare { padding: 0 6vw 2rem; }
   .cc__principle-head { grid-template-columns: 1fr; gap: 0.75rem; }
+  .cc__ec-pair { grid-template-columns: 1fr; }
+  .cc__ec-principle .cc__canvas { aspect-ratio: 65 / 28; }
 }
 
 @media (max-width: 700px) {

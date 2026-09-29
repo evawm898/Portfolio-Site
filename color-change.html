@@ -101,40 +101,50 @@
         <dl class="cc__ro"><div><dt>Temperature</dt><dd data-ro="thermo:T"></dd></div><div><dt>Solvent</dt><dd data-ro="thermo:solvent"></dd></div><div><dt>Dye</dt><dd data-ro="thermo:dye"></dd></div></dl>
       </div>
     </article>
-    <article class="cc__mech" id="mech-echromic">
-      <div class="cc__stage">
+    <article class="cc__mech cc__mech--ec" id="mech-electrochromic">
+      <div class="cc__ec-principle">
         <div class="cc__mech-head">
           <span class="cc__mech-index">2.2</span>
-          <h3 class="cc__mech-title">Electrochromic tungsten oxide</h3>
-          <span class="cc__mech-sub">smart windows, dimmable visors · chemistry changing</span>
+          <h3 class="cc__mech-title">Electrochromic</h3>
+          <span class="cc__mech-sub">smart windows, printed displays &middot; chemistry changing</span>
         </div>
-        <canvas class="cc__canvas" id="cv-echromic" aria-label="Electrochromic tungsten oxide: animated cross-section"></canvas>
-        <div class="cc__controls"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-echromic="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn" data-echromic="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn is-active" data-echromic="off" aria-pressed="true">Open circuit</button></div>
+        <svg class="cc__canvas cc__ec" id="ec-svg" viewBox="70 10 650 280" role="img" aria-label="An electrochromic cell: a wire loop with a battery, a transparent electrode, the active material, an electrolyte and a counter electrode. Electrons flow through the wire and ions through the electrolyte, together."></svg>
+        <div class="cc__controls cc__controls--tight"><span class="cc__controls-label">Drive the cell</span><button type="button" class="cc__btn" data-ec-mode="charge" aria-pressed="false">Charge</button><button type="button" class="cc__btn is-active" data-ec-mode="open" aria-pressed="true">Open</button><button type="button" class="cc__btn" data-ec-mode="discharge" aria-pressed="false">Discharge</button></div>
+        <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Material</span><button type="button" class="cc__btn is-active" data-ec-mat="wo3" aria-pressed="true">WO&#8323;</button><button type="button" class="cc__btn" data-ec-mat="pedot" aria-pressed="false">PEDOT</button></div>
+        <p class="cc__ec-cap" data-ec-cap aria-live="polite"></p>
+        <p class="cc__ec-note">Same motion, different material &mdash; the colour is just where the electrons are.</p>
       </div>
-      <div class="cc__text">
-        <p>An electrochromic stack is a thin-film battery whose charging is visible. Between two transparent conductors sit a layer of <strong>tungsten oxide</strong>, an electrolyte carrying <strong>lithium ions</strong>, and a counter electrode. Apply a small voltage and ions move into the tungsten oxide while electrons arrive through the external circuit; together they convert it to a tungsten bronze, Li<sub>x</sub>WO<sub>3</sub>, which absorbs across the visible and turns deep blue.</p><p>Reverse the voltage and the ions leave, bleaching it. Open the circuit and the film simply holds its state, because there is no path for the ions to return &mdash; a window stays tinted for hours on no power. It is slow, seconds to minutes for a large pane, because every ion has to physically diffuse into the solid.</p>
-        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="echromic:state"></dd></div><div><dt>Transmission</dt><dd data-ro="echromic:transmission"></dd></div><div><dt>Composition</dt><dd data-ro="echromic:x"></dd></div></dl>
-      </div>
-    </article>
-    <article class="cc__mech" id="mech-pedot">
-      <div class="cc__stage">
-        <div class="cc__mech-head">
-          <span class="cc__mech-index">2.3</span>
-          <h3 class="cc__mech-title">Printed electrochromic polymer</h3>
-          <span class="cc__mech-sub">labels, packaging, wearables &middot; same chemistry, opposite direction</span>
+      <div class="cc__ec-pair">
+        <div class="cc__ec-col" id="mech-echromic">
+          <div class="cc__mech-head">
+            <h4 class="cc__mech-title">Tungsten oxide window</h4>
+            <span class="cc__mech-sub">WO&#8323; on glass &middot; clear when empty, blue when full</span>
+          </div>
+          <canvas class="cc__canvas" id="cv-echromic" aria-label="Electrochromic tungsten oxide: animated cross-section"></canvas>
+          <div class="cc__controls"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-echromic="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn" data-echromic="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn is-active" data-echromic="off" aria-pressed="true">Open circuit</button></div>
+          <div class="cc__text cc__text--col">
+            <p>The active layer is <strong>tungsten oxide</strong> between two transparent conductors, with a lithium-ion electrolyte and a nickel-oxide counter electrode. Charged, it becomes the bronze Li<sub>x</sub>WO<sub>3</sub>, which absorbs across the visible. It is <strong>transmissive</strong> &mdash; you look through it &mdash; and slow, seconds to minutes for a pane, because every ion has to diffuse into the solid.</p>
+            <dl class="cc__ro"><div><dt>State</dt><dd data-ro="echromic:state"></dd></div><div><dt>Transmission</dt><dd data-ro="echromic:transmission"></dd></div><div><dt>Composition</dt><dd data-ro="echromic:x"></dd></div></dl>
+          </div>
         </div>
-        <svg class="cc__canvas cc__pe" id="pe-svg" tabindex="0" viewBox="0 0 640 360" role="img" aria-label="Printed electrochromic polymer: a two-digit seven-segment display, each segment its own PEDOT cell on a PET substrate"></svg>
-        <div class="cc__controls cc__controls--tight"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-pe-mode="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn" data-pe-mode="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn is-active" data-pe-mode="off" aria-pressed="true">Open circuit</button></div>
-        <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Drive digit</span><button type="button" class="cc__btn is-active" data-pe-target="0" aria-pressed="true">1st</button><button type="button" class="cc__btn" data-pe-target="1" aria-pressed="false">2nd</button><span class="cc__pad" role="group" aria-label="Digit to drive, 0 to 9"></span></div>
-      </div>
-      <div class="cc__text">
-        <p>Same principle as 2.2: push electrons and balancing ions into a material and it changes colour; open the circuit and it holds. What differs is the material and how it is made. The active layer is <strong>PEDOT:PSS</strong>, an organic conductive polymer, screen-printed as ink on PET rather than sputtered onto glass. The counter electrode is a second PEDOT layer or a printed carbon layer, and the electrolyte is a printed gel.</p><p>It is <strong>reflective, not transmissive</strong> &mdash; you look at it, not through it, so it is a display and not a window. And it switches the opposite way to WO<sub>3</sub>: PEDOT is dark blue in its neutral, reduced state and goes nearly transparent when oxidised. Bleached is &ldquo;on.&rdquo; Each segment is its own cell, so a driven segment changes and its neighbours keep whatever state they were in.</p><p>Small segments switch in under a second to a few seconds, and holding a state costs under about 1&nbsp;&micro;W/cm&sup2;, so a coin cell can drive one for years. This is the version that ends up on fabric and labels; the oxide version ends up on buildings and lenses. It is Ynvisible&rsquo;s technology.</p>
-        <dl class="cc__ro"><div><dt>State</dt><dd data-ro="pedot:state"></dd></div><div><dt>Segment voltage</dt><dd data-ro="pedot:voltage"></dd></div><div><dt>Power</dt><dd data-ro="pedot:power"></dd></div></dl>
+        <div class="cc__ec-col" id="mech-pedot">
+          <div class="cc__mech-head">
+            <h4 class="cc__mech-title">Printed PEDOT display</h4>
+            <span class="cc__mech-sub">PEDOT:PSS on PET &middot; blue when empty, clear when full</span>
+          </div>
+          <svg class="cc__canvas cc__pe" id="pe-svg" tabindex="0" viewBox="0 0 640 360" role="img" aria-label="Printed electrochromic polymer: a two-digit seven-segment display, each segment its own PEDOT cell on a PET substrate"></svg>
+          <div class="cc__controls cc__controls--tight"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-pe-mode="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn" data-pe-mode="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn is-active" data-pe-mode="off" aria-pressed="true">Open circuit</button></div>
+          <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Drive digit</span><button type="button" class="cc__btn is-active" data-pe-target="0" aria-pressed="true">1st</button><button type="button" class="cc__btn" data-pe-target="1" aria-pressed="false">2nd</button><span class="cc__pad" role="group" aria-label="Digit to drive, 0 to 9"></span></div>
+          <div class="cc__text cc__text--col">
+            <p>The active layer is <strong>PEDOT:PSS</strong>, a conductive polymer screen-printed as ink on PET, with a printed gel electrolyte. It is <strong>reflective</strong> &mdash; a display, not a window &mdash; and switches the other way: dark blue when neutral, nearly clear when oxidised, so a digit reads as segments going clear. Each segment is its own cell; small ones switch in about a second and hold for under 1&nbsp;&micro;W/cm&sup2;. It is Ynvisible&rsquo;s technology.</p>
+            <dl class="cc__ro"><div><dt>State</dt><dd data-ro="pedot:state"></dd></div><div><dt>Segment voltage</dt><dd data-ro="pedot:voltage"></dd></div><div><dt>Power</dt><dd data-ro="pedot:power"></dd></div></dl>
+          </div>
+        </div>
       </div>
       <div class="cc__compare">
-        <h4 class="cc__compare-title">2.2 vs 2.3</h4>
+        <h4 class="cc__compare-title">Window vs display</h4>
         <dl class="cc__cmp">
-          <div class="cc__cmp-head"><dt></dt><dd>2.2 &middot; WO<sub>3</sub></dd><dd>2.3 &middot; PEDOT:PSS</dd></div>
+          <div class="cc__cmp-head"><dt></dt><dd>Window &middot; WO<sub>3</sub></dd><dd>Display &middot; PEDOT:PSS</dd></div>
           <div><dt>Active layer</dt><dd>WO<sub>3</sub> (inorganic)</dd><dd>PEDOT:PSS (organic polymer)</dd></div>
           <div><dt>Mode</dt><dd>transmissive (window, lens)</dd><dd>reflective (display)</dd></div>
           <div><dt>Substrate</dt><dd>glass + ITO</dd><dd>PET, screen-printed</dd></div>
@@ -148,7 +158,7 @@
     <article class="cc__mech" id="mech-photo">
       <div class="cc__stage">
         <div class="cc__mech-head">
-          <span class="cc__mech-index">2.4</span>
+          <span class="cc__mech-index">2.3</span>
           <h3 class="cc__mech-title">Photochromic spiropyran</h3>
           <span class="cc__mech-sub">self-darkening lenses · chemistry changing</span>
         </div>

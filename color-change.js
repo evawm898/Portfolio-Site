@@ -257,13 +257,15 @@ const electrochromic = {
   },
   draw() {
     const c = this.c, ctx = c.ctx, w = c.w, h = c.h; c.clear();
-    const L = w * 0.1, Rr = w * 0.62, top = h * 0.16;
+    const L = w * 0.1, Rr = w * (w < 720 ? 0.52 : 0.62), top = h * 0.16;
+    ctx.font = '10px ' + css('--mono'); let labelEnd = Rr;
     const layers = [['glass + ITO', 0.09, [139, 148, 148], 0.18], ['WO₃ (electrochromic)', 0.16, [40, 70, 190], 0.05 + 0.85 * this.x], ['Li⁺ electrolyte', 0.24, [139, 148, 148], 0.08], ['NiO counter electrode', 0.12, [139, 148, 148], 0.14], ['ITO + glass', 0.09, [139, 148, 148], 0.18]];
     let y = top; const ys = [];
     for (const [name, fh, col, a] of layers) {
       const hh = fh * h; ys.push([y, y + hh]);
       ctx.fillStyle = rgb(col, a); ctx.fillRect(L, y, Rr - L, hh);
       ctx.strokeStyle = css('--line'); ctx.strokeRect(L + 0.5, y + 0.5, Rr - L, hh);
+      ctx.font = '10px ' + css('--mono'); labelEnd = Math.max(labelEnd, Rr + 10 + ctx.measureText(name).width);
       c.label(name, Rr + 10, y + hh / 2, 'left');
       y += hh;
     }
@@ -293,7 +295,9 @@ const electrochromic = {
     const T = 0.78 - 0.63 * this.x; this.T = T;
     arrow(ctx, lx, ys[4][1] + 4, lx, ys[4][1] + 34, `rgba(233,236,236,${0.15 + 0.85 * T})`, 2);
     c.label((T * 100).toFixed(0) + '% transmitted', lx + 10, ys[4][1] + 24, 'left');
-    swatch(c, w * 0.8, h * 0.7, w * 0.14, h * 0.2, rgb(mix([215, 222, 224], [26, 46, 140], this.x)), 'window');
+    // the swatch sits right of the layer labels, never over them (a half-width column is narrow)
+    const sw = Math.max(28, Math.min(w * 0.14, w - labelEnd - 18)), sx = Math.max(w * 0.8, Math.min(labelEnd + 12, w - sw - 6));
+    swatch(c, Math.min(sx, w - sw - 6), h * 0.7, sw, h * 0.2, rgb(mix([215, 222, 224], [26, 46, 140], this.x)), 'window');
   },
   readout() {
     return { state: this.mode === 'color' ? 'colouring — Li⁺ intercalating into WO₃' : this.mode === 'bleach' ? 'bleaching — Li⁺ leaving WO₃' : 'open circuit — holding tint, no power', transmission: (this.T * 100).toFixed(0) + '%', x: 'Li' + (0.35 * this.x).toFixed(2) + 'WO₃' };
@@ -493,21 +497,108 @@ function init() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 
-/* ------------------------------------------------------------------ 2.3 printed electrochromic polymer
+/* ------------------------------------------------------------------ 2.2 principle: one cell, no material
+   A wire loop with a battery, a transparent electrode, the active material,
+   an electrolyte, a counter electrode. One number, the charge q in [0, 1],
+   drives everything: each ion crosses the electrolyte as its electron comes
+   round the wire, so the two always arrive together. CHARGE raises q at a
+   constant rate (a full charge in 2 s), DISCHARGE lowers it, OPEN freezes it.
+   WO3 tints with q, PEDOT with 1 - q: same motion, opposite colour mapping. */
+(() => {
+'use strict';
+const svg = document.getElementById('ec-svg');
+if (!svg) return;
+const NS = 'http://www.w3.org/2000/svg';
+const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const RATE = 0.5, N = 10, M = 16, BLUE = '#3a5fd0', ION = 'rgba(233,236,236,0.9)', ELEC = '#e8b06e';
+const el = (name, attrs, parent = svg) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); parent.appendChild(n); return n; };
+const txt = (x, y, s, anchor = 'middle') => { const t = el('text', { x, y, 'font-size': 12, 'letter-spacing': '0.06em', 'text-anchor': anchor, 'font-family': 'IBM Plex Mono, monospace', style: 'fill:var(--ink-faint)' }); t.textContent = s; return t; };
+
+// geometry: four slabs left to right, the wire looping over the top and down the left through the battery
+const Y0 = 70, Y1 = 250, XE = 250, XA = 272, XL = 382, XC = 552, XR = 574, YW = 160;
+el('rect', { x: XE, y: Y0, width: XA - XE, height: Y1 - Y0, fill: 'rgba(233,236,236,0.10)', stroke: 'var(--line-strong)' });
+const active = el('rect', { x: XA, y: Y0, width: XL - XA, height: Y1 - Y0, fill: BLUE, 'fill-opacity': 0.06, stroke: 'var(--line-strong)' });
+el('rect', { x: XL, y: Y0, width: XC - XL, height: Y1 - Y0, fill: 'rgba(139,148,148,0.08)', stroke: 'var(--line-strong)' });
+el('rect', { x: XC, y: Y0, width: XR - XC, height: Y1 - Y0, fill: 'rgba(139,148,148,0.35)', stroke: 'var(--line-strong)' });
+const WIRE = [[(XC + XR) / 2, Y0], [(XC + XR) / 2, 30], [110, 30], [110, YW], [XE, YW]];
+const wire = { stroke: 'var(--ink-dim)', 'stroke-width': 1.5, fill: 'none' };
+el('polyline', Object.assign({ points: '563,70 563,30 110,30 110,92' }, wire));
+el('polyline', Object.assign({ points: `110,110 110,${YW} ${XE},${YW}` }, wire));
+el('line', { x1: 90, y1: 92, x2: 130, y2: 92, stroke: 'var(--ink)', 'stroke-width': 1.5 });
+el('line', { x1: 100, y1: 110, x2: 120, y2: 110, stroke: 'var(--ink)', 'stroke-width': 4 });
+txt(140, 106, 'battery', 'start');
+txt(XE - 8, Y1 - 22, 'transparent', 'end'); txt(XE - 8, Y1 - 8, 'electrode', 'end');
+txt((XA + XL) / 2, Y1 + 22, 'active material'); txt((XL + XC) / 2, Y1 + 22, 'electrolyte');
+txt(XR + 8, Y1 - 22, 'counter', 'start'); txt(XR + 8, Y1 - 8, 'electrode', 'start');
+el('circle', { cx: 624, cy: 110, r: 5, fill: ION }); txt(638, 114, 'ion', 'start');
+el('circle', { cx: 624, cy: 134, r: 2.5, fill: ELEC }); txt(638, 138, 'electron', 'start');
+
+// the wire as a path we can sample: s = 0 at the counter electrode, 1 where it enters the active side
+const segLen = WIRE.slice(1).map((p, i) => Math.hypot(p[0] - WIRE[i][0], p[1] - WIRE[i][1]));
+const total = segLen.reduce((a, b) => a + b, 0);
+const along = s => { let d = s * total; for (let i = 0; i < segLen.length; i++) { if (d <= segLen[i]) { const t = d / segLen[i]; return [WIRE[i][0] + (WIRE[i + 1][0] - WIRE[i][0]) * t, WIRE[i][1] + (WIRE[i + 1][1] - WIRE[i][1]) * t]; } d -= segLen[i]; } return WIRE[WIRE.length - 1]; };
+const wireDots = Array.from({ length: M }, () => el('circle', { r: 2.5, fill: ELEC }));
+// each ion has a row; it travels from its seat in the electrolyte to a seat in the active material
+const ions = Array.from({ length: N }, (_, i) => {
+  const y = Y0 + 16 + i * (Y1 - Y0 - 32) / (N - 1);
+  return { y, from: XL + 30 + ((i * 53) % 110), to: XA + 22 + (i % 2) * 50, dot: el('circle', { r: 5, fill: ION }), e: el('circle', { r: 2.5, fill: ELEC }) };
+});
+
+let q = 0, mode = 'open', mat = 'wo3', raf = 0, last = 0;
+const cap = document.querySelector('[data-ec-cap]');
+function paint() {
+  const tint = mat === 'wo3' ? q : 1 - q;
+  active.setAttribute('fill-opacity', (0.06 + 0.84 * tint).toFixed(3));
+  wireDots.forEach((d, k) => { const [x, y] = along(((k / M + q * 1.5) % 1 + 1) % 1); d.setAttribute('cx', x.toFixed(1)); d.setAttribute('cy', y.toFixed(1)); });
+  ions.forEach((ion, i) => {
+    const p = Math.min(1, Math.max(0, q * N - i)), x = ion.from + (ion.to - ion.from) * p;
+    ion.dot.setAttribute('cx', x.toFixed(1)); ion.dot.setAttribute('cy', ion.y.toFixed(1));
+    ion.e.setAttribute('cx', (ion.to + 11).toFixed(1)); ion.e.setAttribute('cy', (ion.y - 5).toFixed(1));
+    ion.e.setAttribute('opacity', p >= 1 ? 1 : 0);   // an ion only sits in the material once its electron has come round
+  });
+  const s = mode === 'open' ? 'nothing can move, so nothing changes.'
+    : mode === 'charge' ? (q < 1 ? 'charging: electrons come round the wire while ions cross the electrolyte — one for one.' : 'full: every ion in the material has its electron.')
+    : (q > 0 ? 'discharging: both flows reverse, and the tint drains.' : 'empty: every ion is back in the electrolyte.');
+  if (cap.textContent !== s) cap.textContent = s;
+}
+function tick(now) {
+  const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
+  const goal = mode === 'charge' ? 1 : mode === 'discharge' ? 0 : q;
+  q = reduce ? goal : goal > q ? Math.min(goal, q + RATE * dt) : Math.max(goal, q - RATE * dt);
+  paint();
+  raf = q !== goal ? requestAnimationFrame(tick) : (last = 0);
+}
+const group = (sel, key, apply) => { const bs = document.querySelectorAll(sel); bs.forEach(b => b.addEventListener('click', () => {
+  bs.forEach(o => { const on = o === b; o.classList.toggle('is-active', on); o.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  apply(b.dataset[key]); cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(tick);
+})); };
+group('[data-ec-mode]', 'ecMode', v => { mode = v; });
+group('[data-ec-mat]', 'ecMat', v => { mat = v; });
+paint();
+window.__ecPrinciple = { q: () => q, mode: () => mode, mat: () => mat, tint: () => parseFloat(active.getAttribute('fill-opacity')) };
+})();
+
+/* ------------------------------------------------------------------ 2.2 printed PEDOT display
    Self-contained: an SVG two-digit seven-segment display. Each of the 14
    segments is its own PEDOT cell with its own level (1 = neutral, dark
-   blue; 0 = oxidised, near-transparent). The digit pad chooses which
-   segments are driven; the voltage buttons act only on those, so an
-   undriven segment keeps its prior state. Open circuit drives nothing.
-   Rates and powers are representative, not measured. */
+   blue; 0 = oxidised, near-clear). The fill is an explicit colour ramp
+   from solid PEDOT blue to a tint only just darker than the substrate,
+   with no outline, so a bleached segment reads as blue disappearing.
+   Nothing is driven on load. Picking a digit drives that digit position:
+   BLEACH clears the digit's segments and colours the rest of its cell
+   group, so the number reads as negative space; COLOUR returns the
+   digit's segments to blue. The other position keeps whatever state it
+   was in. Open circuit drives nothing. Rates and powers are
+   representative, not measured. */
 (() => {
 'use strict';
 const svg = document.getElementById('pe-svg');
 if (!svg) return;
 const NS = 'http://www.w3.org/2000/svg';
 const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FADE_S = 0.8, VOLT = 1.2, UW_PER_SEG = 20, MIN_ALPHA = 0.05;
-const BLUE = 'rgb(30,52,150)';
+const FADE_S = 0.8, VOLT = 1.2, UW_PER_SEG = 20;
+const BLUE = [30, 52, 150], CLEAR = [196, 206, 211];   // substrate is #d7dee0 = (215,222,224)
+const fillAt = v => 'rgb(' + CLEAR.map((c, k) => Math.round(c + (BLUE[k] - c) * v)).join(',') + ')';
 const SEGS = 'abcdefg';
 const DIGITS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
 
@@ -525,35 +616,45 @@ OX.forEach(ox => {
     const hz = 'adg'.includes(s);
     const cx = hz ? ox + W / 2 : 'bc'.includes(s) ? ox + W : ox;
     const cy = { a: OY, g: OY + H / 2, d: OY + H, b: OY + H / 4, f: OY + H / 4, c: OY + 3 * H / 4, e: OY + 3 * H / 4 }[s];
-    const poly = el('polygon', { points: pts(hz ? hexH(cx, cy, W - 6, T) : hexV(cx, cy, H / 2 - 6, T)), fill: BLUE, 'fill-opacity': 1, stroke: 'rgba(60,80,90,0.4)', 'stroke-width': 1, 'stroke-linejoin': 'round' }, svg);
+    const poly = el('polygon', { points: pts(hz ? hexH(cx, cy, W - 6, T) : hexV(cx, cy, H / 2 - 6, T)), fill: fillAt(1), stroke: 'none' }, svg);
     segEls.push(poly);
   });
 });
 const gel = el('g', { class: 'cc__pe-gel' }, svg);
-el('rect', { x: 100, y: 40, width: 440, height: 260, rx: 4, fill: 'rgba(47,163,163,0.13)', stroke: 'rgba(28,107,107,0.85)', 'stroke-dasharray': '5 4' }, gel);
-const gt = el('text', { x: 110, y: 291, 'font-size': 11, 'letter-spacing': '0.08em', fill: '#1c4a4a', 'font-family': 'IBM Plex Mono, monospace' }, gel);
+el('rect', { x: 100, y: 40, width: 440, height: 260, rx: 4, fill: 'rgba(90,100,105,0.10)', stroke: 'rgba(60,70,75,0.6)', 'stroke-dasharray': '5 4' }, gel);
+const gt = el('text', { x: 110, y: 291, 'font-size': 11, 'letter-spacing': '0.08em', fill: '#3c4649', 'font-family': 'IBM Plex Mono, monospace' }, gel);
 gt.textContent = 'PRINTED GEL ELECTROLYTE';
 const cap = (x, anchor, txt) => { const t = el('text', { x, y: 340, 'font-size': 10, 'letter-spacing': '0.1em', 'text-anchor': anchor, 'font-family': 'IBM Plex Mono, monospace', style: 'fill:var(--ink-faint)' }, svg); t.textContent = txt; };
 cap(44, 'start', 'PET SUBSTRATE'); cap(596, 'end', 'PEDOT:PSS SEGMENTS · EACH ITS OWN CELL');
 
 const level = new Array(14).fill(1);
-const pattern = [4, 2];
-let mode = 'off', target = 0, t = 0, raf = 0, last = 0, moving = 0;
-const driven = () => { const d = new Array(14).fill(false); pattern.forEach((n, i) => { for (const s of DIGITS[n]) d[i * 7 + SEGS.indexOf(s)] = true; }); return d; };
-
-function paint(dr) {
-  segEls.forEach((p, i) => {
-    p.setAttribute('fill-opacity', (MIN_ALPHA + (1 - MIN_ALPHA) * level[i]).toFixed(3));
-    p.setAttribute('stroke', dr[i] ? '#1c6b6b' : 'rgba(60,80,90,0.4)');
-    p.setAttribute('stroke-width', dr[i] ? 2.5 : 1);
+const pattern = [null, null];   // nothing driven on load: every segment neutral, dark blue
+let mode = 'off', target = 0, raf = 0, last = 0, moving = 0;
+// per-segment goal level, or null for a segment left alone. BLEACH clears the digit's
+// segments and holds the rest of that position blue; COLOUR returns the digit to blue.
+const goals = () => {
+  const g = new Array(14).fill(null);
+  if (mode === 'off') return g;
+  pattern.forEach((n, i) => {
+    if (n === null) return;
+    for (let k = 0; k < 7; k++) {
+      const inDigit = DIGITS[n].includes(SEGS[k]);
+      if (inDigit) g[i * 7 + k] = mode === 'bleach' ? 0 : 1;
+      else if (mode === 'bleach') g[i * 7 + k] = 1;
+    }
   });
-}
-function readout(dr) {
-  const n = dr.filter(Boolean).length, bleached = level.filter(v => v < 0.5).length;
+  return g;
+};
+
+function paint() { segEls.forEach((p, i) => p.setAttribute('fill', fillAt(level[i]))); }
+function readout(g) {
+  const n = g.filter(v => v !== null).length, bleached = level.filter(v => v < 0.5).length;
+  const digits = pattern.map(d => d === null ? '–' : d).join(' ');
   let state, volt;
   if (mode === 'off') { state = 'open circuit — holding, ' + bleached + ' of 14 segments bleached'; volt = '0 V — no path for the ions'; }
+  else if (!n) { state = 'no digit picked — nothing driven'; volt = '0 V'; }
   else {
-    state = moving ? (mode === 'bleach' ? 'bleaching — PEDOT oxidising, ions leaving' : 'colouring — PEDOT reducing, ions entering') + ' · ' + n + ' driven' : (mode === 'bleach' ? 'bleached — driven segments clear (on)' : 'coloured — driven segments dark blue (off)') + ' · ' + n + ' driven';
+    state = (moving ? (mode === 'bleach' ? 'bleaching — PEDOT oxidising, digit going clear' : 'colouring — PEDOT reducing, digit going blue') : (mode === 'bleach' ? 'bleached — digit reads as clear on blue' : 'coloured — digit back to blue')) + ' · showing ' + digits;
     volt = (mode === 'bleach' ? '+' : '−') + VOLT.toFixed(1) + ' V on ' + n + ' segments';
   }
   const power = moving ? '≈ ' + (moving * UW_PER_SEG) + ' µW while switching' : '~0 µW — holding';
@@ -561,16 +662,13 @@ function readout(dr) {
   set('state', state); set('voltage', volt); set('power', power);
 }
 function step(dt) {
-  const dr = driven(); moving = 0;
-  if (mode !== 'off') {
-    const goal = mode === 'bleach' ? 0 : 1;
-    dr.forEach((on, i) => {
-      if (!on || level[i] === goal) return;
-      level[i] = reduce ? goal : Math.abs(goal - level[i]) <= dt / FADE_S ? goal : level[i] + Math.sign(goal - level[i]) * dt / FADE_S;
-      if (!reduce && level[i] !== goal) moving++;
-    });
-  }
-  paint(dr); readout(dr);
+  const g = goals(); moving = 0;
+  g.forEach((goal, i) => {
+    if (goal === null || level[i] === goal) return;
+    level[i] = reduce ? goal : Math.abs(goal - level[i]) <= dt / FADE_S ? goal : level[i] + Math.sign(goal - level[i]) * dt / FADE_S;
+    if (!reduce && level[i] !== goal) moving++;
+  });
+  paint(); readout(g);
 }
 function tick(now) {
   const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;

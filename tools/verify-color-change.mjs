@@ -195,6 +195,41 @@ check('the angle slider drives the Morpho', m30.angle === 30 && m30.label === '3
 await page.locator('[data-echromic="bleach"]').click(); await frames(2);
 check('electrochromic buttons toggle the mode', (await st('echromic')).mode === 'bleach' && await page.evaluate(() => document.querySelector('[data-echromic="bleach"]').classList.contains('is-active')));
 
+section('Electrochromic principle — electrons and ions arrive together');
+await page.locator('#ec-svg').scrollIntoViewIfNeeded();
+const ec = () => page.evaluate(() => ({ q: __ecPrinciple.q(), tint: __ecPrinciple.tint(), cap: document.querySelector('[data-ec-cap]').textContent, ions: [...document.querySelectorAll('#ec-svg circle[r="5"]')].filter(c => c.getAttribute('cx')).length }));
+check('starts empty and open', (await ec()).q === 0 && /nothing can move/.test((await ec()).cap));
+await page.locator('[data-ec-mode="charge"]').click(); await sleep(1000);
+const ecMid = await ec();
+check('charge fills at ~0.5 per second (a full charge in ~2 s)', ecMid.q > 0.3 && ecMid.q < 0.75, 'q ' + ecMid.q.toFixed(2));
+await page.locator('[data-ec-mode="open"]').click(); const ecA = (await ec()).q; await sleep(500);
+const ecB = await ec();
+check('open freezes the cell mid-state', ecB.q === ecA && ecB.q > 0 && ecB.q < 1 && ecB.cap === 'nothing can move, so nothing changes.', 'q ' + ecB.q.toFixed(2));
+await page.locator('[data-ec-mode="charge"]').click(); await sleep(2200);
+const ecFull = await ec();
+check('WO₃: full is blue', ecFull.q === 1 && ecFull.tint > 0.85, 'tint ' + ecFull.tint);
+await page.locator('[data-ec-mat="pedot"]').click(); await frames(2);
+check('PEDOT: the same full cell is clear', (await ec()).tint < 0.1 && (await ec()).q === 1);
+await page.locator('[data-ec-mode="discharge"]').click(); await sleep(2200);
+check('discharge empties it, and empty PEDOT is blue', (await ec()).q === 0 && (await ec()).tint > 0.85);
+await page.locator('[data-ec-mat="wo3"]').click(); await page.locator('[data-ec-mode="open"]').click();
+
+section('PEDOT display — the digit reads as blue disappearing');
+await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.__pedot);
+await page.locator('#mech-pedot').scrollIntoViewIfNeeded();
+const segs = () => page.evaluate(() => [...document.querySelectorAll('#pe-svg polygon')].map(p => [p.getAttribute('fill'), p.getAttribute('stroke')]));
+const s0 = await segs();
+check('on load every segment is solid PEDOT blue, no outline', s0.length === 14 && s0.every(([f, s]) => f === 'rgb(30,52,150)' && s === 'none'));
+check('on load nothing is driven', await page.evaluate(() => __pedot.pattern.every(p => p === null)));
+await page.locator('[data-pe-digit="4"]').click(); await page.locator('[data-pe-target="1"]').click(); await page.locator('[data-pe-digit="2"]').click();
+await page.locator('[data-pe-mode="bleach"]').click(); await sleep(1300);
+const lv = await page.evaluate(() => __pedot.level.map(v => Math.round(v)).join(''));
+// a..g per digit; 1 = blue, 0 = clear. "4" clears b c f g; "2" clears a b d e g.
+check('bleach clears exactly the digit segments; the rest stay blue', lv === '1001100' + '0010010', lv);
+const bleachedFill = (await segs())[1][0];
+check('a bleached segment is only slightly darker than the substrate', bleachedFill === 'rgb(196,206,211)', bleachedFill);
+check('mech-pedot and mech-echromic anchors still resolve', await page.evaluate(() => !!document.getElementById('mech-pedot') && !!document.getElementById('mech-echromic')));
+
 section('Layout');
 for (const vw of [1440, 1000, 640, 390]) {
   await page.setViewportSize({ width: vw, height: 900 }); await frames(3);
