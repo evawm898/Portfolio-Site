@@ -122,7 +122,7 @@ export function infillWallSurfaceMm(surface, plan, step = RIM_STEP_MM) {
     const s = inSheetLenMm(surface, a, b);
     if (s < best) { best = s; pair = [{ q: a, h: pair[0].h }, { q: b, h: pair[1].h }]; }
   }
-  return { mm: best, coarseMm: coarse, planMm: hyp(pair[0].q, pair[1].q), u: pair[0].q.x / surface.length,
+  return { mm: best * 0.5, coarseMm: coarse, planMm: hyp(pair[0].q, pair[1].q), u: pair[0].q.x / surface.length,
     against: pair[1].h < 0 ? 'the outline' : `hole ${pair[1].h}`, holes: holes.length, rimPoints: rim.length, crossed };
 }
 
