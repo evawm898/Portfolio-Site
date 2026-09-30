@@ -880,8 +880,17 @@ async function control() {
      matches, and the two clauses that hold a declared row to its recorded
      excess were exercised by nothing while the run reported 5 of 5. A clause
      nobody has shown can fire is the thing this whole file exists to avoid. */
-  const declaredRow = MATRIX.find((r) => Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, r.label));
-  if (!declaredRow) { console.error('edge-profile control: no matrix row carries an E2_TURN_XFAIL label — the declaration cannot be exercised'); process.exit(1); }
+  /* NAMED, NOT "THE FIRST DECLARED ROW IN MATRIX ORDER" — which is what it
+     was until the headroom PR declared `petalTwist max (180)`, a blanket-sweep
+     row that sits BEFORE every other declaration. It became the witness, and
+     neither rim mutation moves a twist's out-of-plane turn, so E2 went MISSED
+     on two mutants in CI while the clause itself was fine. The witness is a
+     row whose declared excess the RIM LAW moves; which row that is is a
+     property, not an ordering, so it is named here and fails loudly if it
+     goes missing or stops being declared. */
+  const DECLARED = 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step';
+  const declaredRow = MATRIX.find((r) => r.label === DECLARED);
+  if (!declaredRow || !Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, DECLARED)) { console.error(`edge-profile control: "${DECLARED}" is missing from the matrix or from E2_TURN_XFAIL — E2's magnitude clause would be exercised by nothing`); process.exit(1); }
   if (!rows.some((r) => r.label === declaredRow.label)) rows.push(declaredRow);
   /* AND THE CRAMPED PETAL, OR `the-corner-fan-is-not-gated` HAS NO MUTANT.
      The same shape as the declared row above, and the same lesson one clause
