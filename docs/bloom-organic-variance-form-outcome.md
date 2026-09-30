@@ -4,7 +4,8 @@ The second of the three builds ruled in `docs/bloom-organic-variance-discovery.m
 Sep 17): the FORM amount, reading the SHARED frequency and phase of build 1. Every figure below
 names its MODE and its SAMPLING.
 
-**READ §12 FIRST.** §4 and §5 are the measurements that stopped the first build: one wave drove
+**READ §12 FIRST, then §19 (headroom scaling — the clamp is gone from the field's path) and §21
+(the four triples).** §4 and §5 are the measurements that stopped the first build: one wave drove
 curl, cup and twist together, so the crest petal took all three maxima at once and X2 reddened on
 fourteen rows. Eva ruled on them (Sep 30): **the three bases take fixed phase offsets off the shared
 wave — the offset law, §12** — and the curl-360 fold the field can still reach is **DECLARED**, not
@@ -368,7 +369,8 @@ takes, and the fraction pinned at a range end:
 the shipped default curl of 0 already 30 % of petals sit identically at curl −180, because 0 − 270
 passes the −180 floor. At a slider end half the petals are identical. (Cup's counts are halved
 further by the wave's own symmetry: cup takes offset 0, so mirror azimuths ±θ read the same value
-without any clamp.) Reported, not fixed; Eva rules on it separately.
+without any clamp.) Reported, not fixed; Eva rules on it separately. **(RULED: headroom scaling, §19 — zero
+pinned at every interior slider setting.)**
 
 ### 14b. The fan's ramp seam
 
@@ -505,3 +507,292 @@ the gate reads `self` — the NEAREST APPROACH, 0.076 mm. Two quantities of one 
   decimal**; seven of the eight per-petal slider states of the default amount-1 row exceed the allowance.
   Declared in `E2_TURN_XFAIL` with their magnitudes (73.633038 / 29.408025 / 24.729474° of excess), the
   buckle's out-of-plane class. The gate and its `--control` (6 of 6) pass.
+
+## 19. HEADROOM SCALING (Eva's ruling on the clamp pinning, the build-2 follow-up)
+
+**§14a's measurement was the finding:** at 20 petals, amount 1, the one clamp pinned 30 % of the
+petals identically at curl −180 on the SHIPPING default (slider curl 0), because 0 − 270 passes the
+floor, and half of them at any slider end. Nearly a third of the ring the same petal, on the
+configuration most people will ever see. Eva's ruling replaces the clamp-after-sum with a
+composition that cannot leave the range:
+
+    base      = the role table's composition, clamped      (the value the petal has at amount 0)
+    deltaUp   = min(half, max − base)        deltaDown = min(half, base − min)
+    applied   = base + amount · g · (g ≥ 0 ? deltaUp : deltaDown)
+
+`resolveRoleOverrides` owns it (`bloom-geometry.js`); the slot term `formTerm[base]` is still the
+ASKED delta `amount · g · half` (FV1 unchanged), and the room enters as the factor `room / half`
+only where the room is short — `room >= half` is a BRANCH, so a petal with the full half-span of
+room on the side its wave takes is built from the doubles it was before. **There is no threshold
+and no constant**: `min(half, max − base)` is the geometry of the range. Eva's note, recorded as
+she asked: her earlier rejection of headroom scaling "alongside soft-clamping as a fifth typed
+threshold" was wrong about headroom — it contains neither — while her reason for not
+special-casing curl stands and never bore on the general rule.
+
+**`base` is the CLAMPED composition, and that is a decision with a reason.** Curl 180 + innerCurl
+360 composes to 540 on every inner whorl; measured from 540 the room above reads −180 and every
+petal whose wave points up would be pushed DOWN — the sign of the wave flipped on exactly the
+whorls a role row already pushed past the range. The clamped 360 is what those petals are at
+amount 0, so it is what the field varies about. That is also why `form-clamped-twice` is RETIRED
+rather than re-anchored: "clamp the group value before the slot term" is now the law.
+`the-headroom-reads-the-unclamped-composition` is its successor.
+
+**Reflection was considered and NOT preferred**, so no stop was owed: reflecting the overshoot
+inward keeps both sides of the wave but folds `+g` and `−g` petals onto one value, which is the
+coincidence this ruling exists to remove, in a different place. Headroom is monotone in `g`, so no
+two petals with different `g` ever coincide unless the room on their side is zero.
+
+**The record.** Each petal carries `formScaled` (the bases whose term the headroom shortened,
+asked and got) beside `formClamped` (now only a base a ROLE ROW put out of range); FV2 restates
+the whole law from the REGISTRY's ranges and asserts both reports; the FORM VARIANCE read-out says
+how many petals the headroom held in.
+
+### 19a. Measurement 1, re-run exactly as §14a (20 petals, amount 1, f 1 phase 0, EXPORT)
+
+`node tools/bloom-form-variance-hazard.mjs --pinning` (new; the same run on a worktree of `1f0b3f0`
+reproduces §14a to the digit). Distinct values counted to 1e-9 of the base's own units, because
+mirror azimuths ±θ read cos values that differ in the last bit. PINNED = a petal exactly at a range
+end.
+
+| slider | clamp (main): curl · cup · twist pinned | HEADROOM: curl · cup · twist pinned | curl distinct, main → headroom |
+|---|---|---|---|
+| curl −180 | 10 · 5 · 0 | **10 · 1 · 0** | 11 → 11 |
+| **curl 0 (default)** | **6 · 5 · 0** | **0 · 1 · 0** | **15 → 20** |
+| curl 90 | 0 · 5 · 0 | 0 · 1 · 0 | 20 → 20 |
+| curl 180 | 6 · 5 · 0 | **0** · 1 · 0 | 15 → 20 |
+| curl 270 | 8 · 5 · 0 | **0** · 1 · 0 | 13 → 20 |
+| curl 360 | 10 · 5 · 0 | **10** · 1 · 0 | 11 → 11 |
+| cup −0.8 | 6 · 10 · 0 | 0 · **10** · 0 | 15 → 20 |
+| cup 0 / 0.6 | 6 · 5 · 0 | 0 · 1 · 0 | 15 → 20 |
+| cup 1.2 | 6 · 10 · 0 | 0 · **10** · 0 | 15 → 20 |
+| twist −180 / 180 | 6 · 5 · 10 | 0 · 1 · **10** | 15 → 20 |
+| twist 90 | 6 · 5 · 7 | 0 · 1 · 0 | 15 → 20 |
+
+**Zero pinned petals at every INTERIOR slider setting of every control. AT A SLIDER END HALF THE
+PETALS STILL SIT AT THAT END — 10 of 20 — and that is the law, not a defect of it**: at the end the
+room on the outward side is zero, so every petal whose wave points outward takes zero delta.
+Reported at the settings it happens rather than the law adjusted to hit the target, per the brief.
+The ONE cup petal at −0.8 on every row is not pinning: it is the single petal at g = −1 exactly,
+which lands on the floor because the room below cup 0 is 0.8 and it takes all of it — one petal,
+the wave's own trough, distinct from every other.
+
+**At a slider end headroom IS the old clamp, term for term** (room 0 outward, the full half-span
+inward), which is why `ALL MAX` — every slider at an end — reads **116,847 / 15.8503 unmoved**
+(`bloom-xfail-magnitudes --include-refused --only '^ALL MAX$'`, 223 s).
+
+### 19b. Self-approach, worst petal, amount 1, EXPORT, every petal (`--headline`)
+
+| state | f 1 ph 0 | f 1 ph 90 | f 20 ph 0 | f 20 ph 90 |
+|---|---|---|---|---|
+| the DEFAULT bloom (8) | 0.527 → **0.527** | 0.527 → 0.527 | 1.097 → 1.098 | 0.527 → 0.527 |
+| FAN (7) | 0.620 → **0.767** | 0.620 → 0.767 | 1.097 → 1.098 | 1.097 → 1.098 |
+| CONTINUOUS × 3 turns (24) | 0.358 → 0.358 | **0.375 → 0.365 (WORSE)** | 0.311 → 0.311 | 0.305 → 0.305 |
+| 3 whorls (24) | 0.334 → 0.334 | 0.334 → 0.334 | 0.331 → 0.331 | 0.334 → 0.334 |
+
+**One figure gets WORSE and it is reported, not clamped:** CONTINUOUS × 3 turns at phase 90 goes
+0.375 → 0.365 mm, its worst petal (curl 239.2, cup −0.033, twist −152.0) a petal whose cup the
+clamp used to put at −0.041 and headroom now puts at −0.033 — the cup's room below 0 is 0.8 of a
+1.0 half-span, so every downward cup term is scaled by 0.8. The worst petal on the default is the
+curl-up / twist-down pair at opposite signs and never met the clamp, so it is unmoved to the
+digit. The FAN improves because its worst petal WAS a clamped one (curl −180 → −155.9).
+
+### 19c. X2 across block 43 (Node census, EXPORT, both trees)
+
+**13 of the 14 non-GATED rows read 0 within-shell pairs on both trees**, and the declared row moves:
+
+| row | main (offset law) | headroom |
+|---|---|---|
+| `x 3 whorls with innerCurl 360 on curl 180` (declared) | 4,080 / 0.7533 | **2,464 / 0.7505** |
+| `x a SPHERE with a stem` | 0 · 19,444 tris · 7 shells | 0 · **22,506 tris · 8 shells** |
+| every other row | 0 | 0 |
+
+The sphere row's triangle count moves because the stem channel probes each slot at its own form
+(the omission mask is handed the field): one more petal clears the channel under headroom and is
+built. The census reads 0 on it either way.
+
+**The curl-360 declaration is RE-RECORDED, NOT RETIRED, because the brief's premise does not hold**:
+headroom does NOT stop the field driving curl to 360 from a slider at 90 — the room above 90 is
+270, exactly the half-span, so the crest petal (g = 1) lands on 360 from ANY slider value at or
+above 90. What headroom stops is the field driving curl PAST 360 and pinning half the whorl there.
+On this row the inner whorls compose to 540, clamp to 360 and have no room above, so every inner
+petal whose wave points up stays at 360. Controls (EXPORT, Node, `SelfIntersection.census`):
+
+| state | field OFF | main ON | headroom ON |
+|---|---|---|---|
+| 3 whorls, curl 180, innerCurl 360 | 1,968 / 0.4218 | 4,080 / 0.7533 | **2,464 / 0.7505** |
+| 1 whorl, curl 180 | 0 | 427 / 0.7078 | 405 / 0.4888 |
+| 3 whorls, curl 180, innerCurl 0 | 0 | 1,577 / 0.7533 | 1,176 / 0.6731 |
+| curl 360 (the declared single) | 920 / 0.5158 | 845 / 0.7473 | 842 / 0.7473 |
+| curl 90 | 0 | 208 / 0.4593 | 208 / 0.4992 |
+
+So on the declared row 1,968 of 2,464 are pre-existing and 496 are the field's (was 2,112 of
+4,080). The last line is not a matrix row and is recorded because it is the same class: from a
+slider at 90 the field folds one petal at amount 1 on both laws.
+
+### 19d. The four declared pair hazards (the §4 / §16 grids and settings)
+
+| pair | worst per-petal: single-g → offset → headroom | from clear cells: single-g → offset → headroom | runs under the bar |
+|---|---|---|---|
+| cup × roll | 0.000 → 0.000 → **0.000** | 0.003 → 0.018 → **0.021** | 15 → 16 → **16** of 20 |
+| **curl × twist** | 0.007 → 0.000 → **0.000** | 0.021 → 0.000 → **0.000** | 30 → 34 → **33** of 40 |
+| cup × tip shape | 0.000 → 0.001 → **0.001** | 0.000 → 0.012 → **0.012** | 21 → 24 → **24** of 28 |
+| leaf × stem | identical under `Object.is` on 48 / 48 on every law | — | — |
+
+**curl × twist: headroom leaves it where the offsets put it — 0.000 mm per petal, from a clear
+slider cell**, and one fewer run goes under the bar (33 of 40). The worst petal moved cell (curl
+270 × twist 60 now, its petal curl 293.3 / cup 0.707 / twist −113.9; curl 180 × twist 120 under the
+offsets) without moving its reading, so the offsets' finding stands: decorrelating the three put
+curl and twist at opposite signs between their crests, and headroom does not undo that.
+
+### 19e. Mutants
+
+`form-clamped-twice` RETIRED (§19). Two new, each witnessed on the MUTATED module's own per-petal
+record: **`the-headroom-is-the-old-clamp` — the STANDING mutant** (the slot term added whole and the
+sum clamped, as on `main`; witness: petals at curl −180 on the shipping default at 20 petals, >0 on
+the mutant and 0 clean) and `the-headroom-reads-the-unclamped-composition` (witness: the composed
+curls differ on the 3-whorl curl-180 + innerCurl-360 state). Both name FV2. The standing
+`the-form-offsets-collapse-to-zero` must still fire FV1. Results in §20.
+
+## 20. Verification — phase 1, then the small items
+
+### 20a. The byte partition — run, not argued, and the FIRST predicate was wrong
+
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 1f0b3f0> --movers-predicate
+form-headroom`, the full 992-row live matrix in both modes, in foreground chunks merged with
+`--merge`. The movers are PREDECLARED from the BASE tree's own builder and resolver — a row moves
+iff some petal the base built carries a non-zero term on a side whose room is under the half-span
+— never from this tree's `formScaled`, which is the quantity under test.
+
+**THE FIRST RUN FAILED, AND IT WAS THE PREDICATE, NOT THE GEOMETRY:** 18 of 19 predeclared movers
+moved, 973 holders held to the bit, and `ALL MAX` — predeclared a mover — **held to the bit in both
+modes.** Every slider on that row is at an END, where the room outward is ZERO; `clamp(at + t)` and
+`at + t · 0 / half` are then the same number, so "room < half" over-predicts. The predicate now
+requires `0 < room < half` and excludes the second identity the same algebra gives (`|t| = half`
+with the term past the room, where both laws land on the range end). That `ALL MAX` holds is the
+same fact §19a states and its census re-measurement shows (116,847 / 15.8503 unmoved): three
+readings, one mechanism.
+
+**RE-RUN WITH THE CORRECTED PREDICATE: PASS.** `verify-bloom-surface-bytes --base <worktree of
+1f0b3f0> --movers-predicate form-headroom`, four `--range` chunks merged: **992 rows x both modes,
+18 of 18 predeclared movers moved, 974 holders held to the bit — 1,293,491,196 export floats over
+143,721,244 triangles and 80,703,620 captured-grid values over 9,296 panels, positionally under
+`Object.is`.** The movers are the 17 non-GATED block-43 rows and `varianceForm max (1)`; `ALL MAX`
+and every size-variance row are holders. One mover is worth naming: `20 cycles, phase 90`, whose
+label says every slot reads cos 90 — it reads cos 90 to an ULP, so its terms are ~1e-14 of a
+half-span, and on the petals whose room is under a half-span even those are scaled. It moves at
+the last bit and nowhere visible, and the predicate predicts it because it reads the base tree's
+own terms rather than the label.
+
+**No frozen baseline's bytes stop reproducing, and that is a measurement:** over all 46 registered
+frozen matrices (28,311 rows) the form field is present on **0** rows — the newest, `phase47`, is
+`main` before build 2 — and the predicate's first clause is the field's presence. **No phase is
+owed**: this PR adds no matrix row (the triples are gate cells, not rows; `petalTwist max (180)`
+was already a row and only joined the smoke subset).
+
+**VERIFICATION, ALL RUN ON THIS TREE:**
+
+| instrument | result |
+|---|---|
+| `verify-bloom-export --only '^(FORM VARIANCE\|varianceForm max)'` (Chromium) | PASS, 20 of 20; FV0-FV4 silent; the curl-360 row still failing at **2464 / 0.7505 — X1, browser-confirmed** |
+| apex mutant table, the seven form mutants (`--only`) | 7 of 7 fire the family they name, clean tree silent; anchors 85 of 85 match once |
+| `bloom-combination-gate --control` | green; 43 legs each fire on their own plant, including per-triple CG2 / CG3 both ways / CG4 flips on every triple and CG1 on the composed triple measured on one petal (395 s) |
+| `verify-bloom-panel` and `--negative-control` | PASS; **ALL TWENTY-ONE ROUTES OBSERVED THE FAILURE** — the first time this control has been run |
+| `verify-bloom-edge-profile` (default subset, now with `petalTwist max (180)`) | 1 finding and it was this change's: the FAN form row's E2 excess moved **24.729474 -> 14.498401 deg**, re-recorded in this commit (the row's self-approach moved the same way, 0.620 -> 0.767 mm); re-run on both declared rows, PASS |
+| `bloom-smoke --check` | OK: 133 rows, 39 blocks, 126 families |
+
+**NOT RE-RUN, SAID RATHER THAN IMPLIED:** `bloom-petal-separation --field form` was killed twice by
+worker restarts before it wrote its summary, so no separation figure under headroom is quoted here;
+the build-order determinism pass over the variance rows was not run. Both are Node-only and cheap,
+and neither is in CI — CI's two matrix gates are the merge criterion.
+
+## 21. PHASE 2 — THE FOUR TRIPLES, against the settled law
+
+Eva bought four from §17's shortlist. They are in `TRIPLES` in `tools/bloom-combination-gate.mjs`,
+under the same clauses and the same `COMBINATION_XFAIL` list as the pairs and the tier-1 triple.
+
+**The grid rule, and why the minima now matter.** Extremes only: each axis's registry DEFAULT
+(CG0), its slider MAXIMUM, and on the form axes the field's own reach from the shipped default.
+Under headroom that reach is +270 / −180 on curl, +1.0 / −0.8 on cup and ±180 on twist — **so on
+the form axes the minima ARE the field's downward reach**, which §17 could skip under the old law
+(where the field's downward reach was clamped into the same place) and this PR cannot. A minimum
+was **measured on a probe grid** (every minimum included) and CARRIED only where some cell with it
+reads worse than the same cell at the maximum AND under the bar — iterated to a fixed point, because
+dropping one axis's minimum can remove the only cell another axis's minimum was worse at.
+
+| triple | axes (after the minima rule) | cells | verdict | under the bar |
+|---|---|---|---|---|
+| `cup-x-roll-x-curl` | cup 0 / −0.8 / 1 / 1.2 · roll 0 / −330 / 330 · curl 0 / −180 / 270 / 360 | **48** | PAIR-REACHES | 33 (15 faces, 18 all-three) |
+| `curl-x-twist-x-roll` | curl 0 / 270 / 360 · twist 0 / −180 / 180 · roll 0 / 330 | **18** | PAIR-REACHES | 13 (9 faces, 4 all-three) |
+| `cup-x-tipshape-x-width` | cup 0 / 1 / 1.2 · tip shape 1.70 / 3.00 · width 16 / 30 | **12** | PAIR-REACHES | 6 (4 faces, 2 all-three) |
+| `layers-x-curl-x-innercurl` | layers 1 / 3 / 6 · curl 0 / 180 / 270 / 360 · innerCurl 0 / 360 | **24** | **CLEARS** | 0 |
+
+**Why each minimum went where it went** (probe tables: 48 / 36 / 36 / 45 cells, EXPORT):
+
+- **cup × roll × curl — every minimum carried.** cup −0.8 × roll 330 reads **0.012** against cup
+  1.2's 0.107; roll −330 × cup 1 reads **0.0003** against +330's 0.041 — a reversed quill the
+  `cup-x-roll` pair never measures, because its roll axis stops at 0; curl −180 × roll −330 reads
+  0.901 against curl 360's 1.176.
+- **curl × twist × roll — curl −180 and roll −330 dropped, twist −180 carried.** Roll −330 never
+  reads worse than +330, and the only cell where curl −180 read worse than 360 was at roll −330;
+  twist −180 reads 0.587 against +180's 0.610 at curl 270 × roll 330, both under the bar.
+- **cup × tip shape × width — every minimum dropped.** cup −0.8, tip shape 0.60 and width 8 each
+  read worse than their maximum somewhere (cup −0.8 × tip 0.60 × width 16: 1.038 against 1.221), but
+  never under the bar there.
+- **layers × curl × innerCurl — every minimum dropped**: no cell of the 45-cell probe comes within
+  the bar.
+
+**WIDTH, NOT TIP THINNING, for the third** — both are declared product-only with cup. Width acts on
+the SAME quantity the other two do: the cup's amplitude is a fraction of the half-width, the tip
+shape decides how long the half-width is HELD toward the tip, and the width scales it — three
+controls composing through one variable. Tip thinning acts on the sheet's thickness, orthogonal to
+that, and in EXPORT it saturates at the 1.00 mm floor by 0.4, so half its axis would be dead
+travel. The measurement agrees: the third control costs **0.331 / 0.352 mm** against the nearest
+face at cup 1 / 1.2 × tip 3.00 × width 30 (0.457 and **0.390** mm, the triple's worst cell).
+
+**What each triple's own interior buys**, against its nearest face at the same values:
+
+- cup × roll × curl: **cup 1.2 × roll 330 × curl 270 reads 0.001 mm against its nearest face's
+  0.107 — the curl costs 0.105 mm**; its worst cell is a face (cup 1.2 × curl 360, 0.0002).
+- curl × twist × roll: the third control RELIEVES — every all-three cell reads 0.31–0.52 mm ABOVE
+  its nearest face (the roll opens the hoop the twist wrings); worst cell the curl × twist face,
+  0.007.
+- cup × tip shape × width: the width costs 0.33–0.35 mm, the largest interior effect of the four.
+
+### 21a. The composed state — the gate's own measure against the census
+
+**`self` cannot see it, and the triple ships CLEARS because that is what the measure reads.**
+3 whorls × curl 180 × innerCurl 360 reads **1.222 mm** on the gate's measure and **1,968
+within-shell pairs / 0.4218 mm worst span** on the census, both EXPORT, same state, no field.
+They are two quantities — `self` is the NEAREST APPROACH between the sheet and another part of
+itself away from the nib (`measureWall`), the census counts triangle pairs that CROSS and reports
+how deep the deepest crossing reaches — and here they disagree in kind rather than in size: the
+composed state clamps every inner whorl to curl 360, and the curl-360 fold is a class `self` does
+not see on the slider alone either (`petalSpineCurl max (360)`: census 920 / 0.5158, `self` 1.230,
+`cup-x-curl`'s own single-axis cell). §17's 0.076-against-0.8771 was one fold read by two measures
+that both saw it; this is a fold one of them is blind to.
+
+**A NEW MEASURE WAS OWED EVEN TO GET THAT FAR.** `self` reads ONE petal (`built.petal`, ring 0's
+representative), and `innerCurl` never reaches ring 0 — so on `self` the innerCurl axis is inert by
+construction and CG1 refuses it (the must-fail below plants exactly that). `self-every` is the same
+`measureWall` on every petal the builder emitted, the smallest of them; the composed-state triple is
+its only user. Kept as `clears` so the day the approach comes within the bar it fails loudly; the
+fold itself stays X2's, declared on block 43's row.
+
+### 21b. Declarations, the must-fail, and what it cost
+
+**52 new cells declared** (33 / 13 / 6 / 0), every one at the gate's own reading to three decimals,
+read both ways by CG2/CG3; the notes say which cells are faces a pair would also produce and which
+are the triple's own. The gate: **22 pairs and 5 triples, 414 cells (120 the triples'), 126 under
+the bar and 126 declared** — against 312 cells / 74 declared this morning (+102 cells, +52 declared).
+
+**Runtime, this box, idle, the whole gate, one run each: 296.8 s on `main` (1f0b3f0) against
+377.6 s here — +80.8 s, +27 %, for +33 % cells.** The composed-state triple is the dearest per cell
+(six-whorl builds with `measureWall` on every one of 48 petals). The gate runs before the browser
+install in `bloom-export-watertight.yml`'s preflight job; read its step time off the PR's own run
+rather than off this figure.
+
+**The must-fail is per triple now**, each leg counting only a finding that NAMES its triple: the
+CG2 removal and both CG3 records on each triple with a declared cell, the two CG4 flips its own
+verdict does not allow, the CG0 plant on the first, and on the composed-state triple the one
+rebuild that is its reason to exist — **its measure put back to `self`, where CG1 must refuse
+`innerCurl`**. Results in §20.

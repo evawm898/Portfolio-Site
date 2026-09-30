@@ -196,7 +196,7 @@ const E2_TURN_XFAIL = {
   'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)':
     { excessDeg: 29.408025, note: 'NEW at #320: adds 74.408025 deg; face-to-face 100.38, outline 25.97 — curl 135 x cup -0.8 x twist 90, which reads 74.408025 on the sliders alone, identical to the sixth decimal' },
   'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)':
-    { excessDeg: 24.729474, note: 'NEW at #320: adds 69.729474 deg; face-to-face 94.70, outline 24.97 — a fan petal the field has twisted, the same class as the two rows above' },
+    { excessDeg: 14.498401, note: 'NEW at #320 at 24.729474 excess (adds 69.729474 deg; face-to-face 94.70, outline 24.97 — a fan petal the field has twisted, the same class as the two rows above). RE-RECORDED by the headroom follow-up: 14.498401 — at the default the headroom scales the DOWNWARD curl (room 180 of a 270 half-span) and DOWNWARD cup (0.8 of 1.0) continuously where the old law clipped them, so the curled-under fan petals carry a different composition (twist is symmetric about its default and is not scaled); the same row\'s self-approach moved 0.620 -> 0.767 mm in the same direction' },
   /* AND IT IS NOT THE INFILL'S, WHICH IS A TWO-SIDED FACT RATHER THAN A
      READING OF THE LABEL: the plan REFUSES a blade that is several panels, and
      I2 asserts on that row that the mesh is BIT-IDENTICAL to the same state
