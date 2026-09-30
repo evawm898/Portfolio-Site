@@ -5157,6 +5157,21 @@ would need is the neighbour measure with a bar that is NOT `MIN_FEATURE_MM`, sin
 declares the default's own crossing an accepted look. `frozen/phase37` is the 883 rows at
 `f1fbdf9`, registered in BOTH maps and proved deep-equal; the live matrix is 908.
 
+**ORGANIC VARIANCE, BUILD 2 — FORM — IS BUILT ON A BRANCH AND WAITING ON A RULING, NOT MERGED**
+(read `docs/bloom-organic-variance-form-outcome.md` before touching `varianceWave`,
+`formVarianceField`, `resolveRoleOverrides`' slot term, `petalStateForSlot` or FV0-FV4). One amount,
+`varianceForm` 0-1, moves curl, cup and twist per slot by `A * g * half-span` through the SHARED
+frequency and phase, composed after the role rows and clamped ONCE; amount 0 is byte-inert, measured
+over all 992 rows in both modes (973 holders, every size row among them). **ONE `g` DRIVES ALL THREE,
+SO THE CREST PETAL TAKES CURL, CUP AND TWIST AT THEIR MAXIMA TOGETHER — A THREE-CONTROL CORNER THE
+TWO-CONTROL COMBINATION GATE NEVER MEASURES**: on the shipping default at amount 1 one petal reads
+0.076 mm of self-approach against the 1.0 mm bar, the first petal goes under the bar at 0.45-0.63
+(arrangement-dependent), and X2 reddens on 14 new rows at 86+ pairs — the same fold the SLIDERS reach
+at curl 270 x cup 1 x twist 180 (688 = 8 x 86, identical span). No xfail was declared and nothing was
+clamped, by the brief. **AND THE SEPAL SCAN'S CONGRUENCE KEY IGNORED PER-SLOT FIELDS** (a build-1
+defect, fixed on the branch): under any size or form field it tested one sepal for a whorl of distinct
+neighbourhoods.
+
 **THE EXPORT GATE IS EIGHT SHARDS AND A VERDICT JOB, AND ITS COVERAGE IS A RECONCILIATION,
 NOT AN ASSUMPTION** (read `tools/bloom-export-shards.mjs`'s header before touching
 `--shard`, the census, `summarize()` or the workflow's three jobs). One job ran **342 min on

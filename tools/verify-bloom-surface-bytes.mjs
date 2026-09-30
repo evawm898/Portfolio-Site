@@ -152,6 +152,13 @@ const rows = MATRIX.slice(RFROM, RTO).filter((r) => !ONLY || ONLY.test(r.label))
    change moves a record the BASE tree owns, the BASE tree's own builder — so
    the prediction's owner is never the quantity under test. */
 const PREDICATE_MOVERS = {
+  /* ORGANIC VARIANCE, BUILD 2 (form). A row moves iff the FORM field exists on
+     this tree — the geometry's own `varianceFormIsAbsent`, the guard. Every
+     other row, the SIZE rows included, must hold to the bit: that is the claim
+     that the form amount at 0 is inert AND that factoring the shared wave out
+     of the size field moved no size float. The base tree does not know
+     `varianceForm` at all, so a mover builds its default form there. */
+  'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* THE STEM'S NODES. A row moves iff (i) its state engages the node law on
      THIS tree (the geometry's own `stemNodesAbsent`, which is the guard), or
      (ii) the leaf node pitch floor, made mode-free by the same change, moves

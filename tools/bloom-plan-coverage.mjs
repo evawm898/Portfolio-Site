@@ -237,6 +237,9 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        would fire on the first varied row (it did). Null at amount 0, where
        every call below is the expression it was. */
     const sizeField = mod.sizeVarianceField(ui, fr);
+    /* BUILD 2: the FORM field, for the same reason — this census re-emits the
+       petals, so a walk without it re-emits every slot at its ring's form. */
+    const formField = mod.formVarianceField(ui, fr);
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
     const near = (a, b, tol) => Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
 
@@ -249,7 +252,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
         angleRamp: (i) => fr.rings[i].tiltExtra,
         phase: fr.rings[0].phase,
         placement: ui.placement,
-        sizeField,
+        sizeField, formField,
         blade: (slot) => {
           petalsBuilt++;
           const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
@@ -277,7 +280,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
           phase: ring.phase,
           placement: ui.placement,
           fan: fr.fan,
-          sizeField,
+          sizeField, formField,
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];
@@ -295,7 +298,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
               if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) {
                 bad.push(`coverage R3: layer ${L} slot 0's captured petal does not bit-match builtFull.petals[${idx}]`);
               }
-            } else if (sizeField) {
+            } else if (sizeField || formField) {
               /* UNDER THE SIZE FIELD a slot is NOT slot 0 rotated — its blade
                  is its own size — so the rotation identity below cannot hold and
                  the stronger claim is made instead: this slot's captured petal

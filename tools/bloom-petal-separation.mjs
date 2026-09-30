@@ -52,6 +52,11 @@ const opt = (k, d) => { const i = argv.indexOf(k); return i < 0 ? d : argv[i + 1
 const FIELD = opt('--field', 'size');
 const LIVE = argv.includes('--live');
 const ONLY = opt('--only', null);
+/* `--amounts a,b` and `--settings f:ph,...` restrict a run so a heavy base
+   (a 730,000-triangle corner is ~1 min a build here) closes in pieces that fit
+   a foreground call; a restricted run is REPORTED as a subset, never a sweep. */
+const AMOUNTS = opt('--amounts', null);
+const SETTINGS_ONLY = opt('--settings', null);
 
 export function components(positions, cell) {
   const n = positions.length / 9; if (!n) return 0;
@@ -140,7 +145,9 @@ function run() {
     if (only && !only.has(bi)) continue;
     for (const exportMode of (LIVE ? [true, false] : [true])) for (const [aS, aF] of amountsFor(FIELD)) {
       const on = aS > 0 || aF > 0;
+      if (AMOUNTS && !AMOUNTS.split(',').map(Number).includes(aS + aF)) continue;
       for (const f of (on ? [1, 20] : [1])) for (const ph of (on ? [0, 90] : [0])) {
+        if (SETTINGS_ONLY && on && !SETTINGS_ONLY.split(',').includes(`${f}:${ph}`)) continue;
         const state = { ...DEFAULTS, ...set, varianceSize: aS, varianceFrequency: f, variancePhase: ph };
         if ('varianceForm' in DEFAULTS) state.varianceForm = aF;
         const acc = new G.MeshBuilder({ exportMode });
@@ -157,6 +164,7 @@ function run() {
       }
     }
   }
+  if (AMOUNTS || SETTINGS_ONLY || ONLY) console.log(`\nA SUBSET (--only ${ONLY ?? 'all'} --amounts ${AMOUNTS ?? 'all'} --settings ${SETTINGS_ONLY ?? 'all'}) — not a sweep`);
   const off = rows.filter((r) => r.c3 !== 1);
   const withField = rows.filter((r) => r.size > 0 || r.form > 0);
   const byBase = new Map(); for (const r of rows) (byBase.get(r.base) ?? byBase.set(r.base, []).get(r.base)).push(r);
