@@ -503,7 +503,8 @@ if (document.readyState === 'loading') document.addEventListener('DOMContentLoad
    drives everything: each ion crosses the electrolyte as its electron comes
    round the wire, so the two always arrive together. CHARGE raises q at a
    constant rate (a full charge in 2 s), DISCHARGE lowers it, OPEN freezes it.
-   WO3 tints with q, PEDOT with 1 - q: same motion, opposite colour mapping. */
+   Both WO3 and PEDOT tint with q — clear empty, blue with electrons in — so
+   the material toggle only relabels the active layer. */
 (() => {
 'use strict';
 const svg = document.getElementById('ec-svg');
@@ -528,7 +529,7 @@ el('line', { x1: 90, y1: 92, x2: 130, y2: 92, stroke: 'var(--ink)', 'stroke-widt
 el('line', { x1: 100, y1: 110, x2: 120, y2: 110, stroke: 'var(--ink)', 'stroke-width': 4 });
 txt(140, 106, 'battery', 'start');
 txt(XE - 8, Y1 - 22, 'transparent', 'end'); txt(XE - 8, Y1 - 8, 'electrode', 'end');
-txt((XA + XL) / 2, Y1 + 22, 'active material'); txt((XL + XC) / 2, Y1 + 22, 'electrolyte');
+txt((XA + XL) / 2, Y1 + 22, 'active material'); const matLabel = txt((XA + XL) / 2, Y1 + 37, 'WO₃'); txt((XL + XC) / 2, Y1 + 22, 'electrolyte');
 txt(XR + 8, Y1 - 22, 'counter', 'start'); txt(XR + 8, Y1 - 8, 'electrode', 'start');
 el('circle', { cx: 624, cy: 110, r: 5, fill: ION }); txt(638, 114, 'ion', 'start');
 el('circle', { cx: 624, cy: 134, r: 2.5, fill: ELEC }); txt(638, 138, 'electron', 'start');
@@ -547,7 +548,7 @@ const ions = Array.from({ length: N }, (_, i) => {
 let q = 0, mode = 'open', mat = 'wo3', raf = 0, last = 0;
 const cap = document.querySelector('[data-ec-cap]');
 function paint() {
-  const tint = mat === 'wo3' ? q : 1 - q;
+  const tint = q;   // both materials colour with electrons in: the toggle only relabels the layer
   active.setAttribute('fill-opacity', (0.06 + 0.84 * tint).toFixed(3));
   wireDots.forEach((d, k) => { const [x, y] = along(((k / M + q * 1.5) % 1 + 1) % 1); d.setAttribute('cx', x.toFixed(1)); d.setAttribute('cy', y.toFixed(1)); });
   ions.forEach((ion, i) => {
@@ -573,22 +574,19 @@ const group = (sel, key, apply) => { const bs = document.querySelectorAll(sel); 
   apply(b.dataset[key]); cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(tick);
 })); };
 group('[data-ec-mode]', 'ecMode', v => { mode = v; });
-group('[data-ec-mat]', 'ecMat', v => { mat = v; });
+group('[data-ec-mat]', 'ecMat', v => { mat = v; matLabel.textContent = v === 'wo3' ? 'WO₃' : 'PEDOT'; });
 paint();
 window.__ecPrinciple = { q: () => q, mode: () => mode, mat: () => mat, tint: () => parseFloat(active.getAttribute('fill-opacity')) };
 })();
 
 /* ------------------------------------------------------------------ 2.2 printed PEDOT display
-   Self-contained: an SVG two-digit seven-segment display. Each of the 14
-   segments is its own PEDOT cell with its own level (1 = neutral, dark
-   blue; 0 = oxidised, near-clear). The fill is an explicit colour ramp
-   from solid PEDOT blue to a tint only just darker than the substrate,
-   with no outline, so a bleached segment reads as blue disappearing.
-   Nothing is driven on load. Picking a digit drives that digit position:
-   BLEACH clears the digit's segments and colours the rest of its cell
-   group, so the number reads as negative space; COLOUR returns the
-   digit's segments to blue. The other position keeps whatever state it
-   was in. Open circuit drives nothing. Rates and powers are
+   Self-contained: an SVG single seven-segment digit. Each segment is its
+   own PEDOT cell with its own level (0 = oxidised, pale — the state a fresh
+   printed film rests in; 1 = reduced, dark blue — electrons and balancing
+   ions in). Nothing is dark on load, like an unlit LCD.
+   DARKEN drives the picked digit: its segments darken, every other segment
+   clears, in one motion. CLEAR drives all seven back to pale. HOLD drives
+   nothing, so a fade in progress freezes where it is. Rates and powers are
    representative, not measured. */
 (() => {
 'use strict';
@@ -596,9 +594,9 @@ const svg = document.getElementById('pe-svg');
 if (!svg) return;
 const NS = 'http://www.w3.org/2000/svg';
 const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const FADE_S = 0.8, VOLT = 1.2, UW_PER_SEG = 20;
-const BLUE = [30, 52, 150], CLEAR = [196, 206, 211];   // substrate is #d7dee0 = (215,222,224)
-const fillAt = v => 'rgb(' + CLEAR.map((c, k) => Math.round(c + (BLUE[k] - c) * v)).join(',') + ')';
+const FADE_S = 0.8, UW_PER_SEG = 20;
+const DARK = [30, 52, 150], PALE = [202, 211, 215];   // substrate is #d7dee0 = (215,222,224)
+const fillAt = v => 'rgb(' + PALE.map((c, k) => Math.round(c + (DARK[k] - c) * v)).join(',') + ')';
 const SEGS = 'abcdefg';
 const DIGITS = ['abcdef', 'bc', 'abdeg', 'abcdg', 'bcfg', 'acdfg', 'acdefg', 'abc', 'abcdefg', 'abcdfg'];
 
@@ -607,75 +605,56 @@ const hexH = (cx, cy, L, T) => [[cx - L / 2, cy], [cx - L / 2 + T / 2, cy - T / 
 const hexV = (cx, cy, L, T) => [[cx, cy - L / 2], [cx + T / 2, cy - L / 2 + T / 2], [cx + T / 2, cy + L / 2 - T / 2], [cx, cy + L / 2], [cx - T / 2, cy + L / 2 - T / 2], [cx - T / 2, cy - L / 2 + T / 2]];
 const pts = a => a.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
 
-// substrate, segments, electrolyte overlay (drawn last so it sits over the patches)
+// substrate, one large digit, electrolyte overlay (drawn last so it sits over the patches)
 el('rect', { x: 40, y: 24, width: 560, height: 292, rx: 6, fill: '#d7dee0', stroke: 'rgba(0,0,0,0.25)' }, svg);
-const W = 110, H = 200, T = 18, OY = 66, OX = [160, 370];
-const segEls = [];
-OX.forEach(ox => {
-  SEGS.split('').forEach(s => {
-    const hz = 'adg'.includes(s);
-    const cx = hz ? ox + W / 2 : 'bc'.includes(s) ? ox + W : ox;
-    const cy = { a: OY, g: OY + H / 2, d: OY + H, b: OY + H / 4, f: OY + H / 4, c: OY + 3 * H / 4, e: OY + 3 * H / 4 }[s];
-    const poly = el('polygon', { points: pts(hz ? hexH(cx, cy, W - 6, T) : hexV(cx, cy, H / 2 - 6, T)), fill: fillAt(1), stroke: 'none' }, svg);
-    segEls.push(poly);
-  });
+const W = 150, H = 226, T = 28, OX = 320 - W / 2, OY = 170 - H / 2;
+const segEls = SEGS.split('').map(s => {
+  const hz = 'adg'.includes(s);
+  const cx = hz ? OX + W / 2 : 'bc'.includes(s) ? OX + W : OX;
+  const cy = { a: OY, g: OY + H / 2, d: OY + H, b: OY + H / 4, f: OY + H / 4, c: OY + 3 * H / 4, e: OY + 3 * H / 4 }[s];
+  return el('polygon', { points: pts(hz ? hexH(cx, cy, W - 8, T) : hexV(cx, cy, H / 2 - 8, T)), fill: fillAt(0), stroke: 'none' }, svg);
 });
 const gel = el('g', { class: 'cc__pe-gel' }, svg);
-el('rect', { x: 100, y: 40, width: 440, height: 260, rx: 4, fill: 'rgba(90,100,105,0.10)', stroke: 'rgba(60,70,75,0.6)', 'stroke-dasharray': '5 4' }, gel);
-const gt = el('text', { x: 110, y: 291, 'font-size': 11, 'letter-spacing': '0.08em', fill: '#3c4649', 'font-family': 'IBM Plex Mono, monospace' }, gel);
+el('rect', { x: 100, y: 34, width: 440, height: 272, rx: 4, fill: 'rgba(90,100,105,0.10)', stroke: 'rgba(60,70,75,0.6)', 'stroke-dasharray': '5 4' }, gel);
+const gt = el('text', { x: 110, y: 297, 'font-size': 11, 'letter-spacing': '0.08em', fill: '#3c4649', 'font-family': 'IBM Plex Mono, monospace' }, gel);
 gt.textContent = 'PRINTED GEL ELECTROLYTE';
 const cap = (x, anchor, txt) => { const t = el('text', { x, y: 340, 'font-size': 10, 'letter-spacing': '0.1em', 'text-anchor': anchor, 'font-family': 'IBM Plex Mono, monospace', style: 'fill:var(--ink-faint)' }, svg); t.textContent = txt; };
-cap(44, 'start', 'PET SUBSTRATE'); cap(596, 'end', 'PEDOT:PSS SEGMENTS · EACH ITS OWN CELL');
+cap(44, 'start', 'PET SUBSTRATE'); cap(596, 'end', 'PEDOT:PSS SEGMENTS');
 
-const level = new Array(14).fill(1);
-const pattern = [null, null];   // nothing driven on load: every segment neutral, dark blue
-let mode = 'off', target = 0, raf = 0, last = 0, moving = 0;
-// per-segment goal level, or null for a segment left alone. BLEACH clears the digit's
-// segments and holds the rest of that position blue; COLOUR returns the digit to blue.
-const goals = () => {
-  const g = new Array(14).fill(null);
-  if (mode === 'off') return g;
-  pattern.forEach((n, i) => {
-    if (n === null) return;
-    for (let k = 0; k < 7; k++) {
-      const inDigit = DIGITS[n].includes(SEGS[k]);
-      if (inDigit) g[i * 7 + k] = mode === 'bleach' ? 0 : 1;
-      else if (mode === 'bleach') g[i * 7 + k] = 1;
-    }
-  });
-  return g;
-};
+const level = new Array(7).fill(0);   // pale at rest: nothing dark on load
+let mode = 'hold', digit = null, raf = 0, last = 0, moving = 0;
+// per-segment goal, or null for a segment nothing is driving
+const goals = () => SEGS.split('').map(s => mode === 'clear' ? 0 : mode === 'darken' && digit !== null ? (DIGITS[digit].includes(s) ? 1 : 0) : null);
 
 function paint() { segEls.forEach((p, i) => p.setAttribute('fill', fillAt(level[i]))); }
-function readout(g) {
-  const n = g.filter(v => v !== null).length, bleached = level.filter(v => v < 0.5).length;
-  const digits = pattern.map(d => d === null ? '–' : d).join(' ');
-  let state, volt;
-  if (mode === 'off') { state = 'open circuit — holding, ' + bleached + ' of 14 segments bleached'; volt = '0 V — no path for the ions'; }
-  else if (!n) { state = 'no digit picked — nothing driven'; volt = '0 V'; }
-  else {
-    state = (moving ? (mode === 'bleach' ? 'bleaching — PEDOT oxidising, digit going clear' : 'colouring — PEDOT reducing, digit going blue') : (mode === 'bleach' ? 'bleached — digit reads as clear on blue' : 'coloured — digit back to blue')) + ' · showing ' + digits;
-    volt = (mode === 'bleach' ? '+' : '−') + VOLT.toFixed(1) + ' V on ' + n + ' segments';
-  }
+function readout() {
+  const dark = level.filter(v => v >= 0.5).length, fading = level.some(v => v > 0 && v < 1);
+  const showing = digit !== null && dark ? 'showing ' + digit : 'nothing showing';
+  let state;
+  if (mode === 'darken' && digit === null) state = 'pick a digit to darken';
+  else if (moving) state = (mode === 'darken' ? 'darkening' : 'clearing') + ' — ' + (mode === 'darken' ? 'showing ' + digit : 'electrons leaving');
+  else if (mode === 'hold' && fading) state = 'holding mid-fade';
+  else if (!dark) state = 'clear — nothing showing';
+  else state = (mode === 'darken' ? 'darkened' : 'holding') + ' — ' + showing;
   const power = moving ? '≈ ' + (moving * UW_PER_SEG) + ' µW while switching' : '~0 µW — holding';
   const set = (k, v) => { const e = document.querySelector('[data-ro="pedot:' + k + '"]'); if (e && e.textContent !== v) e.textContent = v; };
-  set('state', state); set('voltage', volt); set('power', power);
+  set('state', state); set('driven', dark + ' of 7'); set('power', power);
 }
 function step(dt) {
-  const g = goals(); moving = 0;
-  g.forEach((goal, i) => {
+  moving = 0;
+  goals().forEach((goal, i) => {
     if (goal === null || level[i] === goal) return;
-    level[i] = reduce ? goal : Math.abs(goal - level[i]) <= dt / FADE_S ? goal : level[i] + Math.sign(goal - level[i]) * dt / FADE_S;
-    if (!reduce && level[i] !== goal) moving++;
+    level[i] = reduce || Math.abs(goal - level[i]) <= dt / FADE_S ? goal : level[i] + Math.sign(goal - level[i]) * dt / FADE_S;
+    if (level[i] !== goal) moving++;
   });
-  paint(); readout(g);
+  paint(); readout();
 }
 function tick(now) {
   const dt = Math.min(0.05, (now - (last || now)) / 1000); last = now;
   step(dt);
   raf = moving ? requestAnimationFrame(tick) : (last = 0);
 }
-function kick() { step(0); if (!raf || !last) { last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); } }
+function kick() { cancelAnimationFrame(raf); last = 0; step(0); raf = moving ? requestAnimationFrame(tick) : 0; }
 
 // controls
 const modeBtns = document.querySelectorAll('[data-pe-mode]');
@@ -688,16 +667,10 @@ const pad = document.querySelector('.cc__pad');
 const padBtns = [];
 for (let n = 0; n < 10; n++) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'cc__btn'; b.textContent = n; b.dataset.peDigit = n; b.setAttribute('aria-pressed', 'false');
-  b.addEventListener('click', () => { pattern[target] = n; syncPad(); kick(); });
+  b.addEventListener('click', () => { digit = n; syncPad(); kick(); });
   pad.appendChild(b); padBtns.push(b);
 }
-function syncPad() { padBtns.forEach((b, n) => { const on = pattern[target] === n; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
-const tgtBtns = document.querySelectorAll('[data-pe-target]');
-tgtBtns.forEach(b => b.addEventListener('click', () => {
-  target = parseInt(b.dataset.peTarget, 10);
-  tgtBtns.forEach(o => { const on = o === b; o.classList.toggle('is-active', on); o.setAttribute('aria-pressed', on ? 'true' : 'false'); });
-  syncPad();
-}));
+function syncPad() { padBtns.forEach((b, n) => { const on = digit === n; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
 syncPad(); step(0);
-window.__pedot = { level, pattern, mode: () => mode, set(m) { document.querySelector('[data-pe-mode="' + m + '"]').click(); } };
+window.__pedot = { level, digit: () => digit, mode: () => mode, dark: () => level.filter(v => v >= 0.5).length, set(m) { document.querySelector('[data-pe-mode="' + m + '"]').click(); } };
 })();

@@ -225,6 +225,7 @@
 .cc__pe:hover .cc__pe-gel, .cc__pe:focus-visible .cc__pe-gel { opacity: 1; }
 .cc__pe:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
 .cc__controls--tight { padding-bottom: 0.4rem; }
+.cc__pe-note { font-size: 11px; letter-spacing: 0.06em; color: var(--ink-faint); padding: 0.7rem 0 0; }
 .cc__controls--pad { padding-top: 0; }
 .cc__pad { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; margin-left: 0.4rem; }
 .cc__pad .cc__btn { min-width: 2rem; padding-left: 0.5rem; padding-right: 0.5rem; text-align: center; }
@@ -268,6 +269,7 @@
 }
 
 .cc__cmp dd { color: var(--ink); }
+.cc__cmp dd.cc__cmp-span { grid-column: 2 / -1; }
 .cc__cmp-head dd { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
 
 /* ---------- the three-principle index in the intro */
@@ -331,5 +333,5 @@
   .cc__canvas { aspect-ratio: 4 / 3; }
   .cc__mech-head { flex-wrap: wrap; gap: 0.4rem 0.8rem; }
   .cc__cmp div { grid-template-columns: 1fr 1fr; }
-  .cc__cmp dt { grid-column: 1 / -1; }
+  .cc__cmp dt, .cc__cmp dd.cc__cmp-span { grid-column: 1 / -1; }
 }

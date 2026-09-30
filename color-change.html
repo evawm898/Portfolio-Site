@@ -112,7 +112,7 @@
         <div class="cc__controls cc__controls--tight"><span class="cc__controls-label">Drive the cell</span><button type="button" class="cc__btn" data-ec-mode="charge" aria-pressed="false">Charge</button><button type="button" class="cc__btn is-active" data-ec-mode="open" aria-pressed="true">Open</button><button type="button" class="cc__btn" data-ec-mode="discharge" aria-pressed="false">Discharge</button></div>
         <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Material</span><button type="button" class="cc__btn is-active" data-ec-mat="wo3" aria-pressed="true">WO&#8323;</button><button type="button" class="cc__btn" data-ec-mat="pedot" aria-pressed="false">PEDOT</button></div>
         <p class="cc__ec-cap" data-ec-cap aria-live="polite"></p>
-        <p class="cc__ec-note">Same motion, different material &mdash; the colour is just where the electrons are.</p>
+        <p class="cc__ec-note">Same motion, same direction &mdash; the difference is what it&rsquo;s printed on.</p>
       </div>
       <div class="cc__ec-pair">
         <div class="cc__ec-col" id="mech-echromic">
@@ -130,14 +130,15 @@
         <div class="cc__ec-col" id="mech-pedot">
           <div class="cc__mech-head">
             <h4 class="cc__mech-title">Printed PEDOT display</h4>
-            <span class="cc__mech-sub">PEDOT:PSS on PET &middot; blue when empty, clear when full</span>
+            <span class="cc__mech-sub">PEDOT:PSS on PET &middot; pale at rest, dark when driven</span>
           </div>
-          <svg class="cc__canvas cc__pe" id="pe-svg" tabindex="0" viewBox="0 0 640 360" role="img" aria-label="Printed electrochromic polymer: a two-digit seven-segment display, each segment its own PEDOT cell on a PET substrate"></svg>
-          <div class="cc__controls cc__controls--tight"><span class="cc__controls-label">Apply a voltage</span><button type="button" class="cc__btn" data-pe-mode="bleach" aria-pressed="false">Bleach (+V)</button><button type="button" class="cc__btn" data-pe-mode="color" aria-pressed="false">Colour (&minus;V)</button><button type="button" class="cc__btn is-active" data-pe-mode="off" aria-pressed="true">Open circuit</button></div>
-          <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Drive digit</span><button type="button" class="cc__btn is-active" data-pe-target="0" aria-pressed="true">1st</button><button type="button" class="cc__btn" data-pe-target="1" aria-pressed="false">2nd</button><span class="cc__pad" role="group" aria-label="Digit to drive, 0 to 9"></span></div>
+          <svg class="cc__canvas cc__pe" id="pe-svg" tabindex="0" viewBox="0 0 640 360" role="img" aria-label="Printed electrochromic polymer: a single seven-segment digit, each segment its own PEDOT cell on a PET substrate. Driven segments darken; the rest stay pale."></svg>
+          <p class="cc__pe-note">7 segments &middot; each is its own cell &middot; dark = electrons in</p>
+          <div class="cc__controls cc__controls--tight"><button type="button" class="cc__btn" data-pe-mode="darken" aria-pressed="false">Darken (&minus;V)</button><button type="button" class="cc__btn" data-pe-mode="clear" aria-pressed="false">Clear (+V)</button><button type="button" class="cc__btn is-active" data-pe-mode="hold" aria-pressed="true">Hold</button></div>
+          <div class="cc__controls cc__controls--pad"><span class="cc__controls-label">Digit</span><span class="cc__pad" role="group" aria-label="Digit to show, 0 to 9"></span></div>
           <div class="cc__text cc__text--col">
-            <p>The active layer is <strong>PEDOT:PSS</strong>, a conductive polymer screen-printed as ink on PET, with a printed gel electrolyte. It is <strong>reflective</strong> &mdash; a display, not a window &mdash; and switches the other way: dark blue when neutral, nearly clear when oxidised, so a digit reads as segments going clear. Each segment is its own cell; small ones switch in about a second and hold for under 1&nbsp;&micro;W/cm&sup2;. It is Ynvisible&rsquo;s technology.</p>
-            <dl class="cc__ro"><div><dt>State</dt><dd data-ro="pedot:state"></dd></div><div><dt>Segment voltage</dt><dd data-ro="pedot:voltage"></dd></div><div><dt>Power</dt><dd data-ro="pedot:power"></dd></div></dl>
+            <p>The active layer is <strong>PEDOT:PSS</strong>, a conductive polymer screen-printed as ink on PET, with a printed gel electrolyte. A fresh film rests in its pale, oxidised state. Drive a segment and electrons go in, with ions to balance them, and it darkens to deep blue; reverse the voltage and it clears. It is <strong>reflective</strong> &mdash; a display, not a window &mdash; so a digit reads as dark segments on a pale ground. Each segment is its own cell; small ones switch in about a second and hold for under 1&nbsp;&micro;W/cm&sup2;. It is Ynvisible&rsquo;s technology.</p>
+            <dl class="cc__ro"><div><dt>State</dt><dd data-ro="pedot:state"></dd></div><div><dt>Driven segments</dt><dd data-ro="pedot:driven"></dd></div><div><dt>Power</dt><dd data-ro="pedot:power"></dd></div></dl>
           </div>
         </div>
       </div>
@@ -149,7 +150,7 @@
           <div><dt>Mode</dt><dd>transmissive (window, lens)</dd><dd>reflective (display)</dd></div>
           <div><dt>Substrate</dt><dd>glass + ITO</dd><dd>PET, screen-printed</dd></div>
           <div><dt>Process</dt><dd>sputtered thin film</dd><dd>roll-to-roll printing</dd></div>
-          <div><dt>Colored state</dt><dd>with ions in (Li<sub>x</sub>WO<sub>3</sub>)</dd><dd>with ions out (neutral PEDOT)</dd></div>
+          <div><dt>Colored state</dt><dd class="cc__cmp-span">both: with electrons in</dd></div>
           <div><dt>Speed</dt><dd>seconds to minutes</dd><dd>sub-second to seconds</dd></div>
           <div><dt>Where it ends up</dt><dd>buildings, visors, aircraft windows</dd><dd>labels, packaging, wearables, e-textiles</dd></div>
         </dl>
