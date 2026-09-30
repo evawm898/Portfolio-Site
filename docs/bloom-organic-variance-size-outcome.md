@@ -334,3 +334,50 @@ stem-channel witness; the seven-mutant subset and the neuter control; the frozen
 (`--verify-frozen --phase37`, deep-equal); and the byte partition of §4. The full-matrix gates
 run in CI on the pushed head, and the merge message carries their durations read off
 `actions_list` at the time — never a figure from a doc.
+
+## 13. Addendum (Sep 30) — does any petal come off the hub at ±50 %?
+
+Measured after this build merged, promoted to `tools/bloom-petal-separation.mjs` (an instrument,
+wired to no gate; `--field form` asks the same question of build 2). **144 builds, EXPORT, flood
+fill at the connectedness gate's own 0.6 mm cell**, re-read at 0.3 mm wherever 0.6 reports more
+than one region. The fill is CALIBRATED in the tool before any verdict: two overlapping boxes
+read 1 region and two separated boxes 2, or the run refuses.
+
+The states: the defaults; each END of `petalCount` (3, 40), `layerCount` (1, 6), `layerSize`
+(0.35, 0.90), `footDelicacy` (0.25, 1.00) and `petalTilt` (0, 120); and **five** stacked
+corners — 40 petals × 6 layers × `layerSize` 0.35 × `footDelicacy` 0.25 (the heaviest), the
+same with tilt 120, the same on CONTINUOUS, 3 petals × 6 layers × 0.35 × 0.25 × tilt 120, and
+3 petals × 0.25 × tilt 0. (The first report of this sweep said "four" corners; the count is
+five, 16 bases × 9 settings = 144.) Each at amount 0 / 0.25 / 0.50, and with the field on at
+frequency 1 and 20 and phase 0 and 90.
+
+| | result |
+|---|---|
+| builds, with the field on | 144, 128 |
+| not one piece at 0.6 mm | **0** |
+| smallest size factor the builder recorded | **0.50 exactly** |
+| bases whose EXPORT triangle count moves with the amount | **4 of 16 — see below** |
+
+**Every build is one connected piece.**
+
+**THE TRIANGLE COUNT IS NOT INDEPENDENT OF THE AMOUNT, AND THE FIRST REPORT SAID IT WAS.** That
+report compared each base's first count against its MAXIMUM, and every move is a FALL, so none
+could show. Re-read per setting: the four stacked 6-layer corners lose up to **960 triangles of
+731,232 (0.13 %)** at amount 0.50 (e.g. 731,232 → 730,272 on the 40 × 6 corner at f 20 / phase 90;
+55,020 → 54,972 on the 3-petal 6-layer corner), and the CONTINUOUS corner moves at 0.25 as
+well. Every base with 1 layer is unmoved. The MECHANISM IS NOT ESTABLISHED — the likeliest
+is the rim bead's degeneracy skipping (#278's "count-safe by branch" floor) on the half-size
+inner-whorl petals, which is a count change by design; it was not traced and is labelled here
+as a hypothesis. It does not touch connectedness, which is the question the sweep asks.
+
+**The reason the foot cannot move is VERIFIED, not only attributed to CLAUDE.md.**
+`petalSurface`'s `footRowsAt` lays the foot from `ring.radius`, `ring.width` (`footHalf`),
+`ring.overhang` and `slot.z` and reads no `slot.scale`. `node tools/bloom-petal-separation.mjs
+--foot` drives the shipped `petalSurface` on the first slot the real whorl primitive emits,
+once at the slot's own scale and once at half of it: **18 foot rows (defaults, the 40 × 6
+corner and a dome, both modes), 0 differ under `Object.is`** in centre, normal or half-width.
+The foot is sized by the hub ring, not by the slot's scale.
+
+**Eva's ruling, recorded (Sep 30):** reviewed at `varianceSize` max, frequency 1, phase 0,
+14 petals, 1 layer, RADIAL, even — **the foot is to be left alone; uniform bases are
+accepted.** The question is closed.
