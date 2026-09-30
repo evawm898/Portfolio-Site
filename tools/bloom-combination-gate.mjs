@@ -537,6 +537,54 @@ export const PAIRS = [
   },
 ];
 
+/* ------------------------------------------------------------- the triples */
+
+/* THREE CONTROLS AT ONCE (Eva's ruling on form variance, build 2 —
+   docs/bloom-organic-variance-form-outcome.md §13). The pairs-only shortlist
+   cannot see a hazard that lives in the product of THREE settings, and the
+   matrix varies one control at a time so it cannot either — which is how a
+   fold reachable from three sliders on `main` (curl 270 x cup 1 x twist 180:
+   one petal 0.076 mm from itself, 86 census pairs a petal) went undeclared
+   until form variance put all three on one petal.
+
+   EXTREMES ONLY, NOT A THREE-DIMENSIONAL LADDER: each axis is the control's
+   own DEFAULT (CG0, so every face of the box is a pair grid's single-axis
+   column or a pair cell already measured) and its slider MAXIMUM — and, on
+   curl and cup ONLY, the one interior value the form field's own reach puts a
+   petal at from the shipped default (curl +270, cup +1.0 at amount 1; the
+   twist reach IS its maximum, 180). That is 3 x 3 x 2 = 18 cells. The minima
+   were measured and are NOT carried: every cell with curl -180 or cup -0.8
+   reads higher than the same cell at the maximum, and twist -180 reads within
+   0.01 mm of +180 (a mirror twist), so they would cost builds to re-read
+   states no nearer the bar.
+
+   A CELL KEY IS `<id> @ <a>=<va> x <b>=<vb> x <c>=<vc>`, and the magnitudes
+   live in COMBINATION_XFAIL beside the pairs' — one list, one discipline. */
+export const TRIPLE_VERDICTS = Object.freeze(['triple-only', 'pair-reaches', 'clears']);
+export const TRIPLES = [
+  {
+    id: 'curl-x-cup-x-twist',
+    tier: 1,
+    label: 'petalSpineCurl x petalCup x petalTwist — the three form variance moves together',
+    measure: 'self',
+    axes: [
+      { id: 'petalSpineCurl', values: [0, 270, 360] },
+      { id: 'petalCup', values: [0, 1, 1.2] },
+      { id: 'petalTwist', values: [0, 180] },
+    ],
+    /* PAIR-REACHES, and that is the honest verdict rather than the hoped-for
+       one: two of the three faces (cup-x-curl, curl-x-twist) already fail at
+       these values and are declared on their own pairs. What the triple adds
+       is the INTERIOR cell at the field's own reach, which reads under every
+       face at the same values — printed per run as what the third control
+       costs, never a bar. */
+    verdict: 'pair-reaches',
+    cite: 'docs/bloom-organic-variance-form-outcome.md §4 — the single-g form field put curl 270, cup 1 and twist 180 on one petal: 0.076 mm self-approach, 86 within-shell census pairs a petal at 0.8771 mm worst span, the same fold the three sliders reach together (688 = 8 x 86)',
+    why: "curl bends the spine into a hoop, cup lifts the margins across it and twist wrings the frame the cup is lifted in — `petalForm`'s own ordering composes all three on one blade, and every pair of them is already a declared hazard",
+  },
+];
+export const tripleKey = (t, vals) => `${t.id} @ ${t.axes.map((ax, i) => `${ax.id}=${num(vals[i])}`).join(' x ')}`;
+
 /* ------------------------------------------------------- the declarations */
 
 /* A CELL KEY IS `<pair id> @ <a>=<va> x <b>=<vb>`, built by `cellKey`
@@ -760,6 +808,17 @@ export const COMBINATION_XFAIL = Object.freeze({
   'cup-x-thinning @ petalCup=0.9 x tipThinning=0.8': { mm: 0.922, note: "measured 2026-09-19 on c29a8b5 — identical to 0.4: the export floor has already bound. — RE-RECORDED BY THE APEX NIB: was 0.984 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOLD CLAMP: was 0.938 mm. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
   'cup-x-thinning @ petalCup=1.2 x tipThinning=0.4': { mm: 0.922, note: "measured 2026-09-19 on c29a8b5 — the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.924 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOLD CLAMP: was 0.931 mm. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
   'cup-x-thinning @ petalCup=1.2 x tipThinning=0.8': { mm: 0.922, note: "measured 2026-09-19 on c29a8b5 — identical to 0.4: the export floor has already bound. — RE-RECORDED BY THE APEX NIB: was 0.924 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOLD CLAMP: was 0.931 mm. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
+  /* THE TRIPLE curl-x-cup-x-twist (form variance build 2, Eva's ruling 2) — measured on this tree, Node 22, EXPORT. */
+  'curl-x-cup-x-twist @ petalSpineCurl=270 x petalCup=0 x petalTwist=180': { mm: 0.275, note: "the same state as a declared PAIR cell, read again on the triple's face (the ladders are shared on purpose) — curl-x-twist @ petalSpineCurl=270 x petalTwist=180" },
+  'curl-x-cup-x-twist @ petalSpineCurl=270 x petalCup=1 x petalTwist=0': { mm: 0.791, note: "a FACE of the triple: curl 270 x cup 1 with twist at its default — cup 1 is the form field's own reach from the default, off the cup-x-curl pair's ladder, so this face cell is new to the gate" },
+  'curl-x-cup-x-twist @ petalSpineCurl=270 x petalCup=1 x petalTwist=180': { mm: 0.076, note: "THE TRIPLE'S OWN CELL — the state the single-g form field put on its crest petal at amount 1 (docs/bloom-organic-variance-form-outcome.md §4): 0.076 mm here against its NEAREST FACE at the same values, curl 270 x twist 180, 0.275 — the third control costs 0.199 mm. The census reads 688 within-shell pairs, worst span 0.8771 mm, on the same state (8 petals x 86): that 0.8771 is a FOLD DEPTH and this 0.076 a NEAREST APPROACH, two quantities of one fold, not a disagreement" },
+  'curl-x-cup-x-twist @ petalSpineCurl=270 x petalCup=1.2 x petalTwist=0': { mm: 0.182, note: "a FACE: the cup-x-curl pair's own cell at cup 1.2 x curl 270, read again" },
+  'curl-x-cup-x-twist @ petalSpineCurl=270 x petalCup=1.2 x petalTwist=180': { mm: 0.227, note: 'an all-three cell at the slider maxima of cup and twist — it reads FARTHER than its nearest face (0.182, twist back at 0), so at these values the third control relieves rather than adds; cup is not monotone here' },
+  'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=0 x petalTwist=180': { mm: 0.007, note: "the same state as a declared PAIR cell, read again on the triple's face (the ladders are shared on purpose) — curl-x-twist @ petalSpineCurl=360 x petalTwist=180" },
+  'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1 x petalTwist=0': { mm: 0.052, note: 'a FACE: curl 360 x cup 1 with twist at its default — off the cup-x-curl ladder, new to the gate' },
+  'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1 x petalTwist=180': { mm: 0.065, note: 'an all-three cell: 0.065 against its nearest face (curl 360 x twist 180, 0.007) — the third control relieves here' },
+  'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1.2 x petalTwist=0': { mm: 0, note: "a FACE: the cup-x-curl pair's own worst cell, cup 1.2 x curl 360, read again — 0.0002 mm, recorded at the gate's three decimals" },
+  'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1.2 x petalTwist=180': { mm: 0.014, note: "the all-three corner at every slider maximum: 0.014 against its nearest face (cup 1.2 x curl 360, 0.000) — the corner is not the worst cell, which is why the triple carries the field's interior reach and not only its corners" },
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -872,8 +931,10 @@ async function loadTree(root) {
 /* Build one cell and return its approach in mm. EXPORT mode throughout:
    the print floor is what the bar is about, and mixing modes in one table
    would make the column headings lie. */
-function measureCell({ G, W, R }, DEFAULTS, pair, va, vb) {
-  const state = { ...DEFAULTS, ...(pair.base || {}), [pair.a.id]: va, [pair.b.id]: vb };
+function measureCell(tree, DEFAULTS, pair, va, vb) {
+  return measureState(tree, DEFAULTS, pair, { ...DEFAULTS, ...(pair.base || {}), [pair.a.id]: va, [pair.b.id]: vb }, `${pair.a.id}=${num(va)} x ${pair.b.id}=${num(vb)}`);
+}
+function measureState({ G, W, R }, DEFAULTS, pair, state, where) {
   if (pair.measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
   /* THE INFILL'S OWN MEASURE — the in-sheet wall between two holes on the
      SHIPPED plan (tools/bloom-infill-wall.mjs), because `self` is
@@ -888,7 +949,7 @@ function measureCell({ G, W, R }, DEFAULTS, pair, va, vb) {
      reaching it must see a named refusal rather than a TypeError from
      inside the wall instrument. */
   if (!m.petal || !m.petal.grid) {
-    throw new Error(`combination gate: "${pair.id}" at ${pair.a.id}=${num(va)} x ${pair.b.id}=${num(vb)} built NO retained petal, so the \`self\` measure has nothing to read. A pair whose grid can empty the petal needs a different measure, not a skip.`);
+    throw new Error(`combination gate: "${pair.id}" at ${where} built NO retained petal, so the \`self\` measure has nothing to read. A pair whose grid can empty the petal needs a different measure, not a skip.`);
   }
   /* THE SAME NAMED EXCLUSION THE WALL INSTRUMENT PASSES (the apex-nib
      session): `self` is ITS quantity through ITS function, so this must hand
@@ -902,12 +963,28 @@ function measureCell({ G, W, R }, DEFAULTS, pair, va, vb) {
   return { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1] }, rows: r.rows, columns: r.columns };
 }
 
-export async function run({ root = HERE, only = null, pairs = PAIRS } = {}) {
+export async function run({ root = HERE, only = null, pairs = PAIRS, triples = TRIPLES } = {}) {
   const tree = await loadTree(root);
   const { R } = tree;
   const chosen = pairs.filter((p) => !only || only.test(p.id));
   const out = [];
   let builds = 0;
+  const tripleRows = [];
+  for (const t of triples.filter((x) => !only || only.test(x.id))) {
+    const cells = [];
+    const walk = (i, vals) => {
+      if (i === t.axes.length) {
+        const state = { ...R.DEFAULTS, ...(t.base || {}) };
+        t.axes.forEach((ax, k) => { state[ax.id] = vals[k]; });
+        cells.push({ vals, key: tripleKey(t, vals), ...measureState(tree, R.DEFAULTS, t, state, vals.map((v, k) => `${t.axes[k].id}=${num(v)}`).join(' x ')) });
+        builds++;
+        return;
+      }
+      for (const v of t.axes[i].values) walk(i + 1, [...vals, v]);
+    };
+    walk(0, []);
+    tripleRows.push({ triple: t, cells });
+  }
   for (const p of chosen) {
     const grid = [];
     for (const va of p.a.values) {
@@ -917,14 +994,14 @@ export async function run({ root = HERE, only = null, pairs = PAIRS } = {}) {
     }
     out.push({ pair: p, grid });
   }
-  return { tree, rows: out, builds, skipped: pairs.length - chosen.length };
+  return { tree, rows: out, tripleRows, builds, skipped: pairs.length - chosen.length };
 }
 
 /* THE RECORD CONTROL'S HANDLE. `perturb` swaps ONE declared magnitude for
    a wrong one so CG3 can be SEEN to fire without a geometry mutation —
    the wall instrument's own idiom, and it exists because a clause nobody
    has watched go red is a hope. */
-export async function verify({ root = HERE, quiet = false, only = null, pairs = PAIRS, xfail = COMBINATION_XFAIL, inert = COMBINATION_INERT, cached = null } = {}) {
+export async function verify({ root = HERE, quiet = false, only = null, pairs = PAIRS, triples = TRIPLES, xfail = COMBINATION_XFAIL, inert = COMBINATION_INERT, cached = null } = {}) {
   const fails = [];
   const say = (...a) => { if (!quiet) console.log(...a); };
   /* A CACHED GRID IS REUSED ONLY WHERE IT IS PROVABLY THE SAME GRID. The
@@ -935,9 +1012,9 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
      unless the pair ids and both axes' values match value for value, so a
      cached run can never silently evaluate a clause against a different
      grid from the one the plant describes. */
-  let { tree, rows, builds, skipped } = cached
+  let { tree, rows, tripleRows, builds, skipped } = cached
     ? { ...cached, builds: 0 }
-    : await run({ root, only, pairs });
+    : await run({ root, only, pairs, triples });
   if (cached) {
     const sig = (ps) => JSON.stringify(ps.map((p) => [p.id, p.a.id, p.a.values, p.b.id, p.b.values, p.base || null]));
     if (sig(rows.map((r) => r.pair)) !== sig(pairs.filter((p) => !only || only.test(p.id)))) {
@@ -947,6 +1024,12 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
        field (verdict, cite, tier) is the one the clauses read. */
     const byId = new Map(pairs.map((p) => [p.id, p]));
     rows = rows.map((r) => ({ ...r, pair: byId.get(r.pair.id) || r.pair }));
+    const tsig = (ts) => JSON.stringify(ts.map((t) => [t.id, t.axes.map((a) => [a.id, a.values]), t.base || null]));
+    if (tsig((tripleRows || []).map((r) => r.triple)) !== tsig(triples.filter((t) => !only || only.test(t.id)))) {
+      throw new Error('verify: the cached triple cells were built from a different grid than the triples handed in');
+    }
+    const tById = new Map(triples.map((t) => [t.id, t]));
+    tripleRows = (tripleRows || []).map((r) => ({ ...r, triple: tById.get(r.triple.id) || r.triple }));
   }
   const { G, R } = tree;
   const BAR = G.MIN_FEATURE_MM;
@@ -1127,6 +1210,85 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
     say('');
   }
 
+  /* ----------------------------------------------------------- THE TRIPLES.
+     The same clauses as the pairs, generalised by one axis, and the same
+     COMBINATION_XFAIL list — CG0 the grid, CG1 per axis, CG2/CG3 the bar and
+     the magnitude both ways, CG4 a three-way verdict, CG6 provenance. The
+     verdict partitions the possibilities as the pairs' does: `clears` fails
+     if any cell is under the bar; `pair-reaches` requires a cell with at most
+     TWO axes off their defaults under the bar; `triple-only` requires none
+     of those and some all-three cell under it. */
+  for (const { triple: t, cells } of (tripleRows || [])) {
+    for (const ax of t.axes) {
+      const c = byControl.get(ax.id);
+      if (!c) { fails.push(`CG0 grid: "${t.id}" names ${ax.id}, which the registry does not declare`); continue; }
+      if (ax.values.length < 2) fails.push(`CG0 grid: "${t.id}" gives ${ax.id} ${ax.values.length} value(s) — an axis of one value is not an axis`);
+      if (new Set(ax.values.map(num)).size !== ax.values.length) fails.push(`CG0 grid: "${t.id}" repeats a value on ${ax.id}`);
+      if (!Object.is(ax.values[0], R.DEFAULTS[ax.id])) fails.push(`CG0 grid: "${t.id}" starts ${ax.id} at ${num(ax.values[0])} and the registry default is ${num(R.DEFAULTS[ax.id])} — the first value of an axis IS the face the pairs already hold`);
+      for (const v of ax.values) if (c.kind === 'slider' && !(v >= c.min && v <= c.max)) fails.push(`CG0 grid: "${t.id}" asks ${ax.id} = ${num(v)}, outside the shipped range ${c.min}..${c.max}`);
+    }
+    if (!(t.tier === 1 || t.tier === 2 || t.tier === 3)) fails.push(`CG6 provenance: "${t.id}" declares tier ${JSON.stringify(t.tier)}`);
+    if ((t.tier === 3) !== (t.guess === true)) fails.push(`CG6 provenance: "${t.id}" is tier ${t.tier} and ${t.guess ? 'declares' : 'does not declare'} \`guess: true\` — a guess says so, and only a guess does`);
+    const named = (typeof t.cite === 'string' ? t.cite.match(/[\w./-]+\.(?:md|mjs|js|yml)/g) : null) || [];
+    if (!named.some((f) => fs.existsSync(path.join(HERE, f)))) fails.push(`CG6 provenance: "${t.id}" cites ${named.length ? named.join(', ') + ' — none of which exists in this tree' : 'no file at all'}`);
+
+    for (const c of cells) seenKeys.add(c.key);
+    const offCount = (c) => c.vals.filter((v, i) => !Object.is(v, t.axes[i].values[0])).length;
+    const lookup = new Map(cells.map((c) => [c.vals.map(num).join('|'), c]));
+    const at = (vals) => lookup.get(vals.map(num).join('|'));
+    const worst = cells.reduce((x, y) => (y.mm < x.mm ? y : x));
+    say(`  [tier ${t.tier}${t.guess ? ', a GUESS' : ''}] ${t.label}  (a TRIPLE — ${cells.length} cells, the extremes of each axis)`);
+    say(`    measure: SELF — the sheet against another part of itself (measureWall, the wall instrument's own)`);
+    for (const c of cells) {
+      const under = Number.isFinite(c.mm) && c.mm < BAR;
+      const mark = under ? (Object.prototype.hasOwnProperty.call(xfail, c.key) ? 'x' : '!') : ' ';
+      /* WHAT THE THIRD CONTROL COSTS: on an all-three cell, the cell against
+         the NEAREST of its three faces at the same values (each face the
+         same cell with one axis back at its default). Reported, never a bar. */
+      let cost = '';
+      if (offCount(c) === t.axes.length) {
+        const faces = t.axes.map((ax, i) => at(c.vals.map((v, k) => (k === i ? ax.values[0] : v))));
+        const nearest = faces.reduce((x, y) => (y.mm < x.mm ? y : x));
+        cost = `   the third control costs ${(nearest.mm - c.mm).toFixed(3)} mm against its nearest face (${nearest.key.split(' @ ')[1]})`;
+      }
+      say(`      ${c.key.split(' @ ')[1].padEnd(58)} ${(Number.isFinite(c.mm) ? c.mm.toFixed(3) : '—').padStart(8)}${mark}${cost}`);
+    }
+    say(`      worst cell ${worst.mm.toFixed(3)} mm at ${worst.key.split(' @ ')[1]}.`);
+    say(`      cited: ${t.cite}`);
+    /* CG1 per axis: the largest change in the measure when THIS axis alone
+       moves off its default, over every setting of the other two. */
+    t.axes.forEach((ax, i) => {
+      let moved = 0;
+      for (const c of cells) {
+        if (Object.is(c.vals[i], ax.values[0])) continue;
+        const f = at(c.vals.map((v, k) => (k === i ? ax.values[0] : v)));
+        if (f && Number.isFinite(f.mm) && Number.isFinite(c.mm)) moved = Math.max(moved, Math.abs(c.mm - f.mm));
+      }
+      if (!(moved > COMBINATION_TOLERANCE_MM)) fails.push(`CG1 reachability: "${t.id}" moves the measure by at most ${moved.toExponential(2)} mm across the whole of ${ax.id} — that control does not reach this measure and the triple is a pair wearing a third axis`);
+    });
+    for (const c of cells) {
+      const declared = Object.prototype.hasOwnProperty.call(xfail, c.key);
+      const under = Number.isFinite(c.mm) && c.mm < BAR;
+      if (under && !declared) fails.push(`CG2 bar: ${c.key} approaches to ${c.mm.toFixed(3)} mm, under the ${BAR.toFixed(2)} mm minimum printable gap, and is NOT declared — a NEW combination hazard. Measure it, declare it with its number, and name it in the outcome doc.`);
+      else if (!under && declared) fails.push(`CG2 xfail: ${c.key} now clears at ${Number.isFinite(c.mm) ? c.mm.toFixed(3) : c.mm} mm and PASSES — the declared hazard is FIXED. Remove its COMBINATION_XFAIL entry in the same commit. (was: ${xfail[c.key].mm.toFixed(3)} mm)`);
+      else if (under && declared) {
+        const d = c.mm - xfail[c.key].mm;
+        if (Math.abs(d) > COMBINATION_TOLERANCE_MM) fails.push(`CG3 magnitude: ${c.key} is declared at ${xfail[c.key].mm.toFixed(3)} mm and reads ${c.mm.toFixed(3)} (${d > 0 ? '+' : ''}${d.toFixed(4)} mm, band +/-${COMBINATION_TOLERANCE_MM}) — ${d < 0 ? 'the declared hazard got WORSE' : 'it IMPROVED and nobody re-recorded it'}. Re-measure and re-record it in the commit that moved it.`);
+      }
+    }
+    const lowFails = cells.filter((c) => offCount(c) < t.axes.length && Number.isFinite(c.mm) && c.mm < BAR);
+    const allFails = cells.filter((c) => offCount(c) === t.axes.length && Number.isFinite(c.mm) && c.mm < BAR);
+    if (!TRIPLE_VERDICTS.includes(t.verdict)) fails.push(`CG4 verdict: "${t.id}" declares verdict ${JSON.stringify(t.verdict)}, which is not one of ${TRIPLE_VERDICTS.join(' / ')}`);
+    else if (t.verdict === 'clears' && (lowFails.length || allFails.length)) fails.push(`CG4 clears: "${t.id}" declares CLEARS and ${lowFails.length + allFails.length} cell(s) come within the bar — first ${(lowFails[0] || allFails[0]).key}`);
+    else if (t.verdict === 'pair-reaches' && !lowFails.length) fails.push(`CG4 pair-reaches: "${t.id}" declares PAIR-REACHES and no cell with two or fewer axes off their defaults fails — the hazard is the triple's alone, so it is TRIPLE-ONLY, or it clears`);
+    else if (t.verdict === 'triple-only') {
+      if (lowFails.length) fails.push(`CG4 triple-only: "${t.id}" declares TRIPLE-ONLY and ${lowFails[0].key} fails with at most two axes moved — a pair reaches the hazard, and the pair gate can see it`);
+      if (!allFails.length) fails.push(`CG4 triple-only: "${t.id}" declares TRIPLE-ONLY and no all-three cell fails`);
+    }
+    say(`      CG4: verdict ${t.verdict.toUpperCase()} — ${lowFails.length} cell(s) with two or fewer axes moved under the bar, ${allFails.length} all-three cell(s) under it.`);
+    say('');
+  }
+
   /* ---------------------------- CG5 / CG7 stray declarations. A record
      nothing measures is worse than an absence, in both lists. */
   if (!only) {
@@ -1138,9 +1300,10 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
     }
   }
 
-  const nCells = rows.reduce((a, r) => a + r.grid.flat().length, 0);
+  const nTripleCells = (tripleRows || []).reduce((a, r) => a + r.cells.length, 0);
+  const nCells = rows.reduce((a, r) => a + r.grid.flat().length, 0) + nTripleCells;
   const byTier = [1, 2, 3].map((t) => `${rows.filter((r) => r.pair.tier === t).length} tier-${t}`).join(' · ');
-  say(`  ${rows.length} pair(s) (${byTier}), ${nCells} cells, ${builds} builds${skipped ? ` — ${skipped} pair(s) NOT run (a --only subset; no gate-level claim is made)` : ''}.`);
+  say(`  ${rows.length} pair(s) (${byTier}) and ${(tripleRows || []).length} triple(s), ${nCells} cells (${nTripleCells} of them the triples'), ${builds} builds${skipped ? ` — ${skipped} pair(s) NOT run (a --only subset; no gate-level claim is made)` : ''}.`);
   /* THE DECLARED TOTAL IS PRINTED BECAUSE A NUMBER NOBODY PRINTS IS A NUMBER
      NOBODY WATCHES — and because a doc quoting it can then be checked against
      a run rather than against the last reader's arithmetic. #265 shipped
@@ -1148,14 +1311,14 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
      the shipped list rather than by any clause. It is counted from the cells
      THIS RUN measured, never from `Object.keys(xfail).length`: on a `--only`
      run the second number describes a list the run did not reach. */
-  const under = rows.flatMap((r) => r.grid.flat().filter((c) => Number.isFinite(c.mm) && c.mm < BAR));
+  const under = [...rows.flatMap((r) => r.grid.flat()), ...(tripleRows || []).flatMap((r) => r.cells)].filter((c) => Number.isFinite(c.mm) && c.mm < BAR);
   const decd = under.filter((c) => Object.prototype.hasOwnProperty.call(xfail, c.key));
   const nPairs = new Set(decd.map((c) => c.key.split(' @ ')[0])).size;
   /* BOTH NUMBERS, because they are two facts and a summary that printed only
      the second would be a label where CG2 does the work: on a clean tree they
      are equal, and where they are not the gate has already failed and this
      line says by how much. */
-  say(`  ${under.length} cell(s) under the bar, ${decd.length} of them declared, across ${nPairs} pair(s)${under.length === decd.length ? '' : ` — ${under.length - decd.length} UNDECLARED, see CG2`}.`);
+  say(`  ${under.length} cell(s) under the bar, ${decd.length} of them declared, across ${nPairs} pair(s) and triple(s)${under.length === decd.length ? '' : ` — ${under.length - decd.length} UNDECLARED, see CG2`}.`);
   if (only) say('  CG5 / CG7-stray are NOT evaluated on a --only run: a declaration this subset does not reach is not a stray one.');
   if (fails.length) { if (!quiet) { say(''); for (const f of fails) console.error('  FAIL  ' + f); } }
   /* THE CLEAN LINE NAMES ONLY THE CLAUSES THAT RAN. On a `--only` run CG5 is
@@ -1163,7 +1326,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
      a computation nobody performed — this project's most repeated defect. */
   else say(only ? '\n  CG0 grid · CG1 reachability · CG2 bar · CG3 magnitude · CG4 verdict · CG6 provenance · CG7 inert — all clean on this SUBSET; CG5 / CG7-stray NOT EVALUATED.'
                 : '\n  CG0 grid · CG1 reachability · CG2 bar · CG3 magnitude · CG4 verdict · CG5 stray · CG6 provenance · CG7 inert — all clean.');
-  return { fails, rows, bar: BAR };
+  return { fails, rows, tripleRows, bar: BAR };
 }
 
 /* -------------------------------------------------------- the must-fail */
@@ -1261,6 +1424,22 @@ async function control({ root = HERE } = {}) {
     ['CG7 an inert declaration names no pair\'s axis', { inert: { ...COMBINATION_INERT, [strayInert]: { maxMoveMm: 0, note: 'CONTROL' } } }, 'CG7'],
   ];
 
+  /* THE TRIPLE'S LEGS — the same plants, on the one shipped triple. */
+  const tRow = (baseRun.tripleRows || [])[0];
+  if (!tRow) { console.error('REFUSED (vacuous control): TRIPLES carries no triple, so its clauses have nothing to plant.'); return 2; }
+  const tFail = tRow.cells.find((c) => Number.isFinite(c.mm) && c.mm < bar && COMBINATION_XFAIL[c.key]);
+  if (!tFail) { console.error('REFUSED (vacuous control): no triple cell is both under the bar and declared.'); return 2; }
+  const T = TRIPLES[0];
+  const tAs = (v) => TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), verdict: v } : t));
+  legs.push(
+    [`CG2 triple: "${T.id}" loses a failing cell's declaration`, { xfail: without(tFail.key) }, 'CG2'],
+    [`CG3 triple: "${T.id}" record is stale, the cell reads WORSE`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: COMBINATION_XFAIL[tFail.key].mm + 0.1 } } }, 'CG3'],
+    [`CG3 triple: "${T.id}" record is stale, the cell reads BETTER`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: Math.max(0, COMBINATION_XFAIL[tFail.key].mm - 0.1) } } }, 'CG3'],
+    [`CG4 triple: "${T.id}" pair-reaches -> triple-only`, { triples: tAs('triple-only') }, 'CG4'],
+    [`CG4 triple: "${T.id}" pair-reaches -> clears`, { triples: tAs('clears') }, 'CG4'],
+    [`CG0 triple: "${T.id}" an axis no longer starts at its default`, { triples: TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), axes: t.axes.map((a, i) => (i === 2 ? { ...a, values: [a.values[1], 90] } : a)) } : t)), only: new RegExp(`^${T.id}$`) }, 'CG0', true],
+  );
+
   let bad = 0, last = null;
   for (const [name, plant, want, rebuilds] of legs) {
     const { fails } = await verify({ root, quiet: true, ...plant, cached: rebuilds ? null : baseRun });
@@ -1333,9 +1512,9 @@ if (IS_MAIN) {
                     : '\ncontrol: every clause fired on a plant that names it, and the tree is green without them.');
     await flushAndExit(bad ? 1 : 0);
   } else if (argv.includes('--emit')) {
-    const { rows, bar } = await verify({ root, quiet: true, only });
+    const { rows, tripleRows, bar } = await verify({ root, quiet: true, only });
     console.log("/* the cells this tree measures under the bar — copy deliberately, name every mover in the outcome doc */");
-    for (const { pair, grid } of rows) {
+    for (const { pair, grid } of [...rows, ...(tripleRows || []).map((r) => ({ pair: r.triple, grid: [r.cells] }))]) {
       for (const c of grid.flat()) {
         if (!(Number.isFinite(c.mm) && c.mm < bar)) continue;
         const was = COMBINATION_XFAIL[c.key];

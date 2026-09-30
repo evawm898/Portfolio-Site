@@ -1094,13 +1094,28 @@ const MUTANTS = [
     } },
   { id: 'form-half-span-is-the-whole-range',
     why: "each varied base's reach is its WHOLE range instead of half of it — the field is twice as strong as the control says, the clamp absorbs most of it, and the read-out's own sentence ('up to ±270° curl') is false; FV1 restates the half-span from the REGISTRY's control range, which this mutation does not touch",
-    find: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2]);',
-    into: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min)]);', names: ['FV1'],
+    find: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, (b.offsetDeg * Math.PI) / 180]);',
+    into: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min), (b.offsetDeg * Math.PI) / 180]);', names: ['FV1'],
     witness: (M, C) => {
       const [m, c] = formPair(M, C, { varianceForm: 0.4 });
       const t = bothBuilt(m, c); if (t) return t;
       const hm = m.record.halves.petalSpineCurl, hc = c.record.halves.petalSpineCurl;
       return (hm === 2 * hc) ? null : `the curl half-span reads ${hm} on the mutant and ${hc} on the clean tree — it did not double`;
+    } },
+  { id: 'the-form-offsets-collapse-to-zero',
+    why: "THE OFFSET LAW'S OWN WITNESS (Eva's ruling on the three-way hazard, docs/bloom-organic-variance-form-outcome.md §12): cup, curl and twist read the shared wave with NO offset, so the crest petal takes all three maxima together — curl 270, cup 1 and twist 180 on one blade, the 0.076 mm self-approach and the 86-pair fold per petal the offsets were ruled to remove. A later session 'simplifying' the three constants away exports watertight, as one piece, at an identical triangle count; FV1 restates the offsets IN THE HARNESS (FORM_OFFSET_DEG_RESTATED), never imports them, so it is the clause that sees this",
+    find: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, (b.offsetDeg * Math.PI) / 180]);',
+    into: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, 0]);', names: ['FV1'],
+    witness: (M, C) => {
+      const [m, c] = formPair(M, C, { varianceForm: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      /* the largest, over petals, of the SMALLEST of the three per-base waves:
+         1 when some petal sits at all three crests at once, at most cos(60) =
+         0.5 when the three are a third of a cycle apart */
+      const crest = (f) => Math.max(...f.petals.filter((p) => p.term && p.term.gs).map((p) => Math.min(p.term.gs.petalSpineCurl, p.term.gs.petalCup, p.term.gs.petalTwist)));
+      const cm = crest(m), cc = crest(c);
+      return (cm > 0.999 && cc <= 0.5 + 1e-12) ? null
+        : `the joint crest reads ${cm} on the mutant and ${cc} on the clean tree — the three bases did not come back into phase`;
     } },
   { id: 'the-pedicel-roots-on-the-axis',
     why: "the pedicel is rooted on the rachis's AXIS instead of its wall mid-thickness — the leaf's own LF2 trap one part later: on a HOLLOW rachis the root sits in the VOID, so the pedicel crosses no solid and is a detached shell, and both STL gates read it as one piece because the floret above it overlaps everything else",
