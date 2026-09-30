@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -580,6 +580,7 @@ let lastFitCenter = [0, 0, 0];
    amount 0, the guard) and the TOLD FLAG — the neighbour figures every
    recorded build carries (ruling 1: reported, never clamped). */
 let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPetalsAll = [];
+let lastFormVariance = null, lastFormAbsent = true;
 let lastInfill = null, lastInfillAbsent = true;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
@@ -661,6 +662,9 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        state this build was made from — VS0's half, through the page (ST0's
        and ID0's route). And every EMITTED petal, for VS2's per-slot record. */
     lastVarianceAbsent = varianceIsAbsent(uiForBuild);
+    /* BUILD 2: the FORM field's record and the geometry's own guard answer (FV0). */
+    lastFormVariance = built.formVariance || null;
+    lastFormAbsent = varianceFormIsAbsent(uiForBuild);
     /* THE INFILL, from the FIRST BUILT PETAL's own plan record — the one the
        read-out's INFILL line speaks and route (z) holds it to. Taken off a
        petal rather than off `built` because the plan is a property of a BLADE
@@ -1411,6 +1415,30 @@ function varianceLine(v) {
        + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
        + `\n`;
 }
+/* THE FORM VARIANCE LINE (organic variance, build 2) — the amount as the
+   per-petal reach of each varied control, the RANGE each control actually
+   spans over the petals BUILT (read off each petal's own `applied`, never
+   recomputed here), how many petals the one clamp bit, and the ALIASED clause
+   from the record's own threshold. Absent at amount 0. */
+function formVarianceLine(v, petalsAll) {
+  if (!v) return '';
+  const ps = (petalsAll || []).filter(Boolean);
+  const span = (k, d) => {
+    if (!ps.length) return 'no petal built';
+    const xs = ps.map((p) => p.applied[k]);
+    return `${Math.min(...xs).toFixed(d)} to ${Math.max(...xs).toFixed(d)}`;
+  };
+  const clamped = ps.filter((p) => p.formClamped && p.formClamped.length).length;
+  const cyc = `${v.frequency} cycle${v.frequency === 1 ? '' : 's'}`;
+  const law = v.frequency === 0
+    ? (v.fan ? 'a ramp outward from the mirror line' : `a ramp round the flower with its seam at ${v.phaseDeg.toFixed(0)}°`)
+    : (v.fan ? `${cyc} per turn, even about the mirror line (phase inert)` : `${cyc} round the flower, phase ${v.phaseDeg.toFixed(0)}°`);
+  const nyq = Number.isInteger(v.nyquist) ? `${v.nyquist}` : v.nyquist.toFixed(1);
+  return `FORM VARIANCE ${(v.amount * 100).toFixed(0)}%: over the ${ps.length} petal${ps.length === 1 ? '' : 's'} built, curl ${span('petalSpineCurl', 0)}°, cup ${span('petalCup', 2)}, twist ${span('petalTwist', 0)}° — ${law}, cup / curl / twist offset 0° / 120° / 240° along it, on ${v.n} slots`
+       + (clamped ? ` — ${clamped} petal${clamped === 1 ? '' : 's'} CLAMPED to a control's own range` : '')
+       + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
+       + `\n`;
+}
 /* THE NEIGHBOURS LINE — THE TOLD FLAG (Eva's ruling 1, the condition of the
    variance family: the generator REPORTS the tightest pitch, the nearest feet
    and the nearest petal approach, and clamps nothing). Every number is the
@@ -1846,6 +1874,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
        + (built ? varianceLine(built.variance) : '')
+       + (built ? formVarianceLine(built.formVariance, built.petalsAll) : '')
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
@@ -1936,6 +1965,7 @@ function regenerate() {
                      control's ALIASED clause prints the builder's own threshold, and the
                      phase control says it is inert on a fan from the builder's own word. */
                   variance: built.variance || null,
+                  formVariance: built.formVariance || null,
                   /* THE INFILL's record joins for the same reason once more, and
                      ruling 3 is why it MUST: density is a REQUEST, so a user who
                      asks for 40 cells and is handed 16 holes has to read that on
@@ -2552,6 +2582,16 @@ window.__bloomMetrics = () => ({
   petalSlotSizes: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
     scale: p.slot.scale, sizeFactor: p.slot.sizeFactor ?? null, ringScale: p.ringScale, length: p.length, askedLength: p.askedLength, nominalLength: p.nominalLength })),
   neighbour: lastNeighbour ? structuredClone(lastNeighbour) : null,
+  /* BUILD 2 — THE FORM FIELD: its record, the geometry's own guard answer
+     through the page (FV0's half), and every EMITTED petal's slot term, the
+     composed values it was built with and which of them the clamp bit — FV1
+     restates the term from the controls and the emitted azimuth, FV2 the
+     composition. */
+  formVariance: lastFormVariance ? { ...lastFormVariance, halves: { ...lastFormVariance.halves } } : null,
+  varianceFormAbsent: lastFormAbsent,
+  petalSlotForms: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
+    roles: { role: p.role ?? null, allRole: p.allRole ?? null, slotRole: p.slotRole ?? null, petalRole: p.petalRole ?? null }, formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
+    formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null })),
   /* THE VORONOI INFILL (I0-I7, and route (z)'s own subject): the BUILDER's own
      plan record — the density asked, the count ACHIEVED, the refusal word if
      there is one — so a gate holds the read-out's two tellings to the number
@@ -2854,7 +2894,7 @@ window.__bloomMetrics = () => ({
      in the codebase that can see an override record that never reached the
      blade - a failure invisible to both STL gates, to the triangle count and
      to J1-J6 alike. Z2's third clause. */
-  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole ?? null, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole ?? null, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied, formTerm: p.formTerm ?? null } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to

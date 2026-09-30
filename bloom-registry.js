@@ -58,7 +58,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
-import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE } from './bloom-geometry.js';
+import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -370,6 +370,13 @@ export const PREDICATES = {
      reachable value 0 and nothing else. The harness checks the two statements
      against each other at load (VS0), the `inflorescencePresent` discipline. */
   variancePresent: { id: 'varianceSize', awayFrom: 0, by: 0.005 },
+  /* BUILD 2 (form): the registry's statement of `varianceFormIsAbsent`, the
+     same half-step rule on the form amount's own 0.01 step. */
+  varianceFormPresent: { id: 'varianceForm', awayFrom: 0, by: 0.005 },
+  /* THE SHARED FREQUENCY AND PHASE (ruling 2) are live when ANY amount is —
+     they are one wave read by every field, so hiding them behind the size
+     amount alone would make them inert-looking controls that move the form. */
+  varianceAnyPresent: { any: [{ ref: 'variancePresent' }, { ref: 'varianceFormPresent' }] },
 
   /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
      lobeDepth pattern, one control the guard and the rest following it, hidden
@@ -2862,6 +2869,22 @@ export const CONTROLS = [
       return `±${(a * 100).toFixed(0)}% — petals from ${(1 - a).toFixed(2)}x to ${(1 + a).toFixed(2)}x of nominal, by azimuth`;
     },
     visibleWhen: { all: [] } },
+  /* ===================================================================
+     ORGANIC VARIANCE, BUILD 2 OF 3 — FORM. ONE amount moving spine curl, cup
+     and twist per slot (ruling 3 names exactly those three), each by
+     `A * g(theta) * half its own range`, composed after the whorl's role rows
+     and clamped ONCE into the base's own range. It reads the SHARED frequency
+     and phase above; 0 is the GUARD (`formVarianceField` returns null and the
+     petal takes `petalStateFor` verbatim). The range is IMPORTED (Q6). */
+  { id: 'varianceForm', section: 'variance', kind: 'slider',
+    min: VARIANCE_FORM_RANGE[0], max: VARIANCE_FORM_RANGE[1], step: 0.01, default: 0,
+    label: 'Form variance', tier: 'standard', role: 'arrangement',
+    fmt: (v) => {
+      const a = Number(v);
+      if (!(a > 0)) return 'off — every petal at its whorl\'s curl, cup and twist';
+      return `${(a * 100).toFixed(0)}% — per petal, up to ±${(a * 270).toFixed(0)}° curl, ±${(a * 1).toFixed(2)} cup, ±${(a * 180).toFixed(0)}° twist, by azimuth, the three a third of a cycle apart so no petal takes all three crests (clamped to each control's own range)`;
+    },
+    visibleWhen: { all: [] } },
   { id: 'varianceFrequency', section: 'variance', kind: 'slider',
     min: VARIANCE_FREQUENCY_RANGE[0], max: VARIANCE_FREQUENCY_RANGE[1], step: 1, default: 1,
     label: 'Variance frequency', tier: 'standard', role: 'arrangement',
@@ -2872,13 +2895,13 @@ export const CONTROLS = [
        prints the OWNER's number rather than re-deriving one from the sliders. */
     fmt: (v, ui, shown) => {
       const f = Number(v);
-      const rec = shown && shown.variance ? shown.variance : null;
+      const rec = shown ? (shown.variance || shown.formVariance || null) : null;
       const fan = rec ? rec.fan : ui.placement === 'FAN';
       if (f === 0) return fan ? 'a ramp — smallest on the mirror line, largest at the edges of the fan' : 'a ramp — one side of the flower to the other, its seam at the phase';
       return `${f} cycle${f === 1 ? '' : 's'} ${fan ? 'across the fan (even about the mirror line)' : 'round the flower'}`
            + (rec && rec.aliased ? ` — ALIASED: more than ${Number.isInteger(rec.nyquist) ? rec.nyquist : rec.nyquist.toFixed(1)} cycles cannot be drawn on ${rec.n} slots and read as SCATTER` : '');
     },
-    visibleWhen: { ref: 'variancePresent' } },
+    visibleWhen: { ref: 'varianceAnyPresent' } },
   { id: 'variancePhase', section: 'variance', kind: 'slider',
     min: VARIANCE_PHASE_RANGE[0], max: VARIANCE_PHASE_RANGE[1], step: 5, default: 0,
     label: 'Variance phase', tier: 'standard', role: 'arrangement',
@@ -2888,12 +2911,12 @@ export const CONTROLS = [
        stands where `f * azimuth + phase` is a whole turn; the ramp's SEAM
        (smallest beside largest) stands at the phase itself. */
     fmt: (v, ui, shown) => {
-      const rec = shown && shown.variance ? shown.variance : null;
+      const rec = shown ? (shown.variance || shown.formVariance || null) : null;
       const fan = rec ? rec.fan : ui.placement === 'FAN';
       if (fan) return `${Number(v).toFixed(0)}° — INERT on a fan: the field is even about the mirror line`;
       return `${Number(v).toFixed(0)}° — turns the wave round the axis (the ramp's seam sits here)`;
     },
-    visibleWhen: { ref: 'variancePresent' } },
+    visibleWhen: { ref: 'varianceAnyPresent' } },
 
   /* ===================================================================
      ZYGOMORPHY — THE INNER WHORLS' OWN FORM. Session A of two: per-LAYER

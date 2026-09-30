@@ -5157,6 +5157,32 @@ would need is the neighbour measure with a bar that is NOT `MIN_FEATURE_MM`, sin
 declares the default's own crossing an accepted look. `frozen/phase37` is the 883 rows at
 `f1fbdf9`, registered in BOTH maps and proved deep-equal; the live matrix is 908.
 
+**ORGANIC VARIANCE, BUILD 2 — FORM — MOVES CURL, CUP AND TWIST A THIRD OF A CYCLE APART, AND THE
+COMBINATION GATE HOLDS ITS FIRST TRIPLE** (Eva's two rulings, Sep 30 — read
+`docs/bloom-organic-variance-form-outcome.md` §12 FIRST, before touching `varianceWave`,
+`formVarianceField`, `FORM_VARIANCE_OFFSET_DEG`, `resolveRoleOverrides`' slot term, `petalStateForSlot`,
+FV0-FV4 or `TRIPLES`). One amount, `varianceForm` 0-1, moves curl, cup and twist per slot by
+`A * g(theta, offset) * half-span` through the SHARED frequency and phase, composed after the role
+rows and clamped ONCE; amount 0 is byte-inert, measured over all 992 rows in both modes TWICE (973
+holders, every size row among them; not taken by construction, by ruling). **THE OFFSET LAW** — cup 0,
+curl 120, twist 240 degrees along the wave, constants of the law and NOT exposed (five controls) —
+exists because ONE `g` put curl 270, cup 1 and twist 180 on the crest petal together: 0.076 mm of
+self-approach and 86 census pairs a petal, a slider-reachable three-control corner the pair-only gate
+could not see. **The harness RESTATES the offsets** (`FORM_OFFSET_DEG_RESTATED`), and
+`the-form-offsets-collapse-to-zero` is the standing mutant — do not "simplify" them away. Under the
+law 13 of the 14 red rows read 0 pairs; the worst petal on the default is 0.527 mm (curl ~ +234,
+twist ~ -156 — curl x twist at opposite signs, which the offsets made WORSE on that declared pair, as
+predicted); the 1.0 mm bar is advisory and X2 is the gate. **THE ONE REMAINING FOLD IS THE DECLARED
+CURL-360 FOLD REACHED THROUGH THE FIELD, AND IT IS DECLARED, NOT CLAMPED** (curl 180 + 270 clamps to
+360; capping the field's reach was ruled out as a fifth typed threshold): both entries carry field-OFF
+and field-ON numbers. **THE CLAMP FLATTENS THE VARIANCE** — 30 % of petals identical at curl -180 on
+the shipping default, 50 % at a slider end — reported, awaiting its own ruling. **`curl-x-cup-x-twist`
+is the combination gate's first TRIPLE**: 18 extreme cells, verdict PAIR-REACHES, the field's crest
+cell at 0.076 mm where its nearest face reads 0.275; the gate reads `self` (an approach) where the
+census's 0.8771 is a fold DEPTH. §17 is the shortlist of obvious thirds for Eva. **AND THE SEPAL
+SCAN'S CONGRUENCE KEY IGNORED PER-SLOT FIELDS** (a build-1 defect, fixed): under any size or form
+field it tested one sepal for a whorl of distinct neighbourhoods.
+
 **THE EXPORT GATE IS EIGHT SHARDS AND A VERDICT JOB, AND ITS COVERAGE IS A RECONCILIATION,
 NOT AN ASSUMPTION** (read `tools/bloom-export-shards.mjs`'s header before touching
 `--shard`, the census, `summarize()` or the workflow's three jobs). One job ran **342 min on

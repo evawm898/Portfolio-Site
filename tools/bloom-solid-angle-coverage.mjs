@@ -425,6 +425,9 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        would fire on the first varied row (it did). Null at amount 0, where
        every call below is the expression it was. */
     const sizeField = mod.sizeVarianceField(ui, fr);
+    /* BUILD 2: the FORM field, for the same reason — this census re-emits the
+       petals, so a walk without it re-emits every slot at its ring's form. */
+    const formField = mod.formVarianceField(ui, fr);
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
     const near = (a, b, tol) => Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
     const omittedHere = new Set((builtFull.stemOmission && builtFull.stemOmission.omitted) || []);
@@ -437,7 +440,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         angleRamp: (i) => fr.rings[i].tiltExtra,
         phase: fr.rings[0].phase,
         placement: ui.placement,
-        sizeField,
+        sizeField, formField,
         blade: (slot) => {
           /* A SLOT THE STEM CHANNEL DID NOT BUILD IS NOT PART OF THE
              ORCHESTRATION (the sphere-stem session). R1 exists because this
@@ -465,7 +468,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         mod.buildWhorlInto({
           count: fr.slotCount, radius: ring.radius, height: 0,
           sizeRamp: () => ring.scale, angleRamp: () => ring.tiltExtra, phase: ring.phase,
-          placement: ui.placement, fan: fr.fan, sizeField,
+          placement: ui.placement, fan: fr.fan, sizeField, formField,
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];
@@ -477,7 +480,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
               const idx = fr.rings.indexOf(d);
               const ref = builtFull.petals[idx];
               if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) bad.push(`solid R3: layer ${L} slot 0's captured petal does not bit-match builtFull.petals[${idx}]`);
-            } else if (sizeField) {
+            } else if (sizeField || formField) {
               /* under the size field a slot is its own size, not slot 0 rotated:
                  bit-match the builder's own record for it instead (plan-coverage's
                  arm, verbatim) */

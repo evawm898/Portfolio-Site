@@ -1411,6 +1411,10 @@ export const LAW_IDENTITY = { delta: 0, mul: 1 };
    value is clamped ONCE at the end and a per-row range would then be three
    answers to one question. Throws loudly: a disagreement here is a bug that
    would otherwise show up as a silently different clamp on one role. */
+/* THE BASES A PETAL REPORTS AS `applied` — the role table's, plus the one the
+   form field varies that no role row reaches (twist). Declared after both
+   tables; see FORM_VARIANCE_BASES. */
+let APPLIED_BASES = null;
 export const OVERRIDE_BOUNDS = (() => {
   const out = new Map();
   for (const o of ROLE_OVERRIDES) {
@@ -1784,7 +1788,7 @@ export function roleForLayer(layerIndex, continuousMode) {
    petalStateFor() then returns the caller's own state OBJECT. That is why
    byte-identity at the defaults is a construction rather than an argument,
    and why it survived gaining a second law. */
-export function resolveRoleOverrides(state, roles, clampedOut = null) {
+export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null) {
   let out = null;
   for (const o of ROLE_OVERRIDES) {
     if (!roles.includes(o.role)) continue;
@@ -1807,6 +1811,16 @@ export function resolveRoleOverrides(state, roles, clampedOut = null) {
     const from = (out && o.base in out) ? out[o.base] : state[o.base];
     (out || (out = {}))[o.base] = o.law === 'mul' ? from * v : from + v;
   }
+  /* THE SLOT TERM (organic variance, build 2) — LAST, after every table row,
+     so the composition law is base, then the whorl's groups, then the slot,
+     and the ONE clamp below sees the whole sum. Absent (null) on every build
+     at `varianceForm` 0, so this loop never runs on the shipped path. */
+  if (slotTerm !== null) {
+    for (const { base } of FORM_VARIANCE_BASES) {
+      const from = (out && base in out) ? out[base] : Number(state[base]);
+      (out || (out = {}))[base] = from + slotTerm[base];
+    }
+  }
   if (out === null) return null;
   /* THE CLAMP, ONCE, AFTER COMPOSITION. Every composed value must be one the
      BASE control could itself hold, so every downstream invariant and every
@@ -1814,7 +1828,7 @@ export function resolveRoleOverrides(state, roles, clampedOut = null) {
      table reaches the apex since session 32 retired the tip deltas, so the
      clamp's job is now entirely the size, tilt, cup and curl bases. */
   for (const base of Object.keys(out)) {
-    const b = OVERRIDE_BOUNDS.get(base);
+    const b = composedBoundsOf(base);
     const composed = out[base];
     out[base] = clamp(composed, b.min, b.max);
     /* WHICH BASES THE CLAMP ACTUALLY BIT, reported through an out-parameter
@@ -1845,6 +1859,21 @@ export function resolveRoleOverrides(state, roles, clampedOut = null) {
 export function petalStateFor(state, ring) {
   if (!ring.overrides) return state;
   return { ...state, ...ring.overrides };
+}
+
+/* THE ROLES A DESCRIPTOR CARRIES, in the order footRing() composed them. */
+export function ringRoles(ring) {
+  return [ring.role, ring.allRole, ring.slotRole, ring.petalRole].filter((r) => r !== null && r !== undefined);
+}
+/* THE PER-SLOT STATE (organic variance, build 2): the descriptor's roles
+   RE-COMPOSED with the slot's form term and clamped once — never the ring's
+   already-clamped record plus a second clamp. Called only where the slot
+   carries a term, so `petalStateFor` above stays the whole shipped path.
+   `clampedOut` collects which composed bases the clamp bit, as the ring's own
+   `overrideClamped` does. */
+export function petalStateForSlot(state, ring, slotTerm, clampedOut = null) {
+  const out = resolveRoleOverrides(state, ringRoles(ring), clampedOut, slotTerm);
+  return { ...state, ...out };
 }
 
 export function footRing(state, acc) {
@@ -3053,19 +3082,39 @@ export const VARIANCE_PHASE_RANGE = Object.freeze([0, 360]);
 export function varianceIsAbsent(state) {
   return !(Number(state.varianceSize) > 0);
 }
-export function sizeVarianceField(state, fr) {
-  if (varianceIsAbsent(state)) return null;
-  const amount = Number(state.varianceSize);
+/* THE SHARED WAVE (organic variance, build 2): ONE frequency and ONE phase
+   drive every amount (ruling 2), so the sampling, the aliasing judgement and
+   `g(theta)` live here once and the size and form fields both read them. The
+   expressions are the size field's own, moved verbatim, so the size field is
+   the same doubles it was — the byte partition over the whole matrix is what
+   says so (docs/bloom-organic-variance-form-outcome.md). */
+function varianceWave(state, fr) {
   const frequency = Math.round(Number(state.varianceFrequency));
   const phaseDeg = Number(state.variancePhase);
   const phi = (phaseDeg * Math.PI) / 180;
   const fan = fr.fan;
-  /* the slots the wave is sampled on: one whorl's worth on a ring, the whole
-     sequence under CONTINUOUS (one whorl of layerCount * n slots) */
   const n = fr.continuousMode ? fr.sequenceLength : fr.slotCount;
   const halfSpan = fan ? (fan.spanDeg * Math.PI) / 360 : null;
   const nyquist = fan ? Math.PI / fan.step : n / 2;
   const aliased = frequency > 0 && frequency > nyquist;
+  /* `gAt(az, off)` — the SAME wave advanced by a fixed phase offset `off`
+     (radians of the wave's own cycle). Offset 0 is `g` itself, the size
+     field's doubles, by BRANCH — never by `x + 0`. On a ring the offset joins
+     the phase; on a FAN it joins `f|theta|`, so the field stays even about the
+     mirror plane whatever the offset; on either RAMP it slides the ramp's seam
+     a fraction `off / TAU` of the way round (a fan's ramp, which has no seam at
+     offset 0, gains one — the ring's ramp always had one). */
+  const gAt = (az, off) => {
+    if (off === 0) return g(az);
+    if (fan) {
+      if (frequency !== 0) return Math.cos(frequency * Math.abs(az) + off);
+      if (!(halfSpan > 0)) return -1;
+      let v = Math.abs(az) / halfSpan - off / TAU; v -= Math.floor(v);
+      return -1 + 2 * v;
+    }
+    if (frequency !== 0) return Math.cos(frequency * az + phi + off);
+    let w = (az - phi - off) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU;
+  };
   const g = fan
     ? (frequency === 0
       ? (az) => (halfSpan > 0 ? -1 + (2 * Math.abs(az)) / halfSpan : -1)
@@ -3073,11 +3122,136 @@ export function sizeVarianceField(state, fr) {
     : (frequency === 0
       ? (az) => { let w = (az - phi) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU; }
       : (az) => Math.cos(frequency * az + phi));
+  return { frequency, phaseDeg, phaseInert: !!fan, fan: !!fan, n, nyquist, aliased, halfSpanDeg: fan ? fan.spanDeg / 2 : null, g, gAt };
+}
+export function sizeVarianceField(state, fr) {
+  if (varianceIsAbsent(state)) return null;
+  const amount = Number(state.varianceSize);
+  const w = varianceWave(state, fr);
+  const g = w.g;
   return {
-    amount, frequency, phaseDeg, phaseInert: !!fan, fan: !!fan, n, nyquist, aliased,
-    halfSpanDeg: fan ? fan.spanDeg / 2 : null,
+    amount, frequency: w.frequency, phaseDeg: w.phaseDeg, phaseInert: w.phaseInert, fan: w.fan, n: w.n, nyquist: w.nyquist, aliased: w.aliased,
+    halfSpanDeg: w.halfSpanDeg,
     lo: 1 - amount, hi: 1 + amount,
     at: (azimuth) => 1 + amount * g(azimuth),
+  };
+}
+/* ===================================================================
+   ORGANIC VARIANCE, BUILD 2 OF 3 — FORM (docs/bloom-organic-variance-form-outcome.md;
+   Eva's rulings §9 of the discovery doc). ONE amount, `varianceForm`, reading the
+   SHARED frequency and phase above, that moves THREE controls per slot:
+
+     petalSpineCurl   -180 .. 360   half-span 270
+     petalCup         -0.8 .. 1.2   half-span 1.0
+     petalTwist       -180 .. 180   half-span 180
+
+   THE SET IS RULING 3's, NAMED THERE CONTROL BY CONTROL ("the form deltas at
+   each control's base range (spine curl -180..360, cup -0.8..1.2, twist
+   -180..180)"), and every other form control is OUT, each for a reason the
+   outcome doc tabulates: `petalTilt` (the descending seam fold fires from -8
+   degrees, and its floor is 0 — the discovery's §3), `petalTipShape` (it sets
+   the row count per petal through `bladeRowsFor`, so a per-slot value is a
+   TOPOLOGY change, and it owns the apex outline), `petalRoll` / the roll taper
+   (the widest single-control fold the combination gate holds, `roll-max`
+   0.659 mm, and not in the ruling), the curl FAMILY (`curlBias`, `curlStart`:
+   they redistribute a curl, they are not a curve of their own), `petalCupGradient`
+   (it composes with cup into one coefficient — measured as a sum rule by #265 —
+   so varying both is one control twice), the buckle (its phase is already per
+   slot, `slotIndex * GOLDEN_ANGLE`, and its amplitude is clamped against the
+   curvature budget) and the outline controls (length, width, the lobes, the
+   fringe — shape, not form; size is build 1's).
+
+   THE DELTA AT AMOUNT A IS `A * g(theta) * half-span`, so at A = 1 a slot can be
+   pushed a full half of its control's own range either way from where the
+   whorl puts it — "at each control's own base range" read as a FRACTION of
+   that range, the one reading under which one amount means the same thing to
+   three controls with three units. That reading is a decision made without a
+   ruling and is recorded as one.
+
+   COMPOSITION, CLAMPED ONCE: the slot term joins `resolveRoleOverrides` AFTER
+   every table row — base, then the whorl's group rows, then the slot — and the
+   composed value is clamped ONCE into the base's own range. Clamping the group
+   value first and the slot term again would let an intermediate clip eat the
+   slot's reach, which is the resolver's own stated reason for one clamp.
+
+   AMOUNT 0 IS A NULL RECORD. `formVarianceField` returns null, the whorl
+   primitive hands every slot `formTerm: null`, and `petalSurface` takes
+   `petalStateFor` verbatim — so the shipping default is byte-identical BY
+   BRANCH, the size field's own discipline. */
+export const VARIANCE_FORM_RANGE = Object.freeze([0, 1]);
+/* THE PHASE OFFSETS (Eva's ruling on the three-way hazard — §12 of the outcome
+   doc). One `g` drove all three bases, so the crest petal took curl, cup and
+   twist at their maxima TOGETHER — a three-control corner the pair-only
+   combination gate could not see, 0.076 mm of self-approach on the shipping
+   default at amount 1. Each base now reads the SAME wave advanced by a fixed
+   offset, a third of a cycle apart, so no petal receives all three maxima:
+   where one base is at its crest the other two sit at cos(120) = -0.5, and
+   midway between two crests two bases sit at +0.5 and the third at -1. THE
+   OFFSETS ARE CONSTANTS OF THE LAW AND ARE NOT EXPOSED — five controls, not
+   eight (ruling 2 holds exactly).
+
+   WHICH BASE TAKES WHICH OFFSET. Under a 120-degree spacing every PAIR of the
+   three co-occurs at +0.5 / +0.5 on some petal whatever the assignment, so the
+   assignment does not choose which pairs meet; it chooses which base is at its
+   crest on the wave's ORIGIN — the phase-0 petal of a ring and, on a FAN, the
+   petal on the mirror line — and the ORDER in which the other two follow
+   outward. CUP takes 0: a fan is read face-on (its mirror-line petal is the
+   lip), and cup is the one form the face-on eye reads as the petal opening or
+   closing, so the variance reads first as the lip cupped rather than as it
+   turned or curled. TWIST takes 240, which puts its crest at a third of a
+   cycle out (cos(f theta + 240) peaks at f theta = 120) — the petals turning
+   from facing the viewer to edge-on, where a twist is what that turn IS. CURL
+   takes 120, so its crest is two thirds out (f theta = 240), on the petals seen
+   most nearly in PROFILE, which is the only view in which a spine curl reads
+   at all. Outward from the origin the sequence is therefore cup, cup+twist,
+   twist, twist+curl, curl, curl+cup. */
+export const FORM_VARIANCE_OFFSET_DEG = Object.freeze({ petalCup: 0, petalSpineCurl: 120, petalTwist: 240 });
+export const FORM_VARIANCE_BASES = Object.freeze([
+  Object.freeze({ base: 'petalSpineCurl', min: -180, max: 360, offsetDeg: FORM_VARIANCE_OFFSET_DEG.petalSpineCurl }),
+  Object.freeze({ base: 'petalCup', min: -0.8, max: 1.2, offsetDeg: FORM_VARIANCE_OFFSET_DEG.petalCup }),
+  Object.freeze({ base: 'petalTwist', min: -180, max: 180, offsetDeg: FORM_VARIANCE_OFFSET_DEG.petalTwist }),
+]);
+/* ONE BASE, ONE RANGE: where a varied base is also reached by a role row, the
+   two declarations must agree, or the clamp would be two answers to one
+   question. Checked at module load, loudly. */
+for (const b of FORM_VARIANCE_BASES) {
+  const o = OVERRIDE_BOUNDS.get(b.base);
+  if (o && (o.min !== b.min || o.max !== b.max)) {
+    throw new Error(`FORM_VARIANCE_BASES: ${b.base} is ${b.min}..${b.max} here and ${o.min}..${o.max} in OVERRIDE_BOUNDS — one base, one range`);
+  }
+}
+APPLIED_BASES = [...OVERRIDE_BOUNDS.keys(), ...FORM_VARIANCE_BASES.map((b) => b.base).filter((b) => !OVERRIDE_BOUNDS.has(b))];
+const FORM_VARIANCE_BOUNDS = new Map(FORM_VARIANCE_BASES.map((b) => [b.base, { min: b.min, max: b.max }]));
+/* The clamp range for any base the resolver may compose — the role table's,
+   else the form field's. */
+export function composedBoundsOf(base) {
+  return OVERRIDE_BOUNDS.get(base) ?? FORM_VARIANCE_BOUNDS.get(base) ?? null;
+}
+export function varianceFormIsAbsent(state) {
+  return !(Number(state.varianceForm) > 0);
+}
+export function formVarianceField(state, fr) {
+  if (varianceFormIsAbsent(state)) return null;
+  const amount = Number(state.varianceForm);
+  const w = varianceWave(state, fr);
+  const g = w.g;
+  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, (b.offsetDeg * Math.PI) / 180]);
+  return {
+    amount, frequency: w.frequency, phaseDeg: w.phaseDeg, phaseInert: w.phaseInert, fan: w.fan, n: w.n, nyquist: w.nyquist, aliased: w.aliased,
+    halfSpanDeg: w.halfSpanDeg,
+    halves: Object.fromEntries(halves.map(([b, h]) => [b, h])),
+    offsetsDeg: FORM_VARIANCE_OFFSET_DEG,
+    /* THE SLOT TERM: the wave at offset 0 (`g`, for the record), each base's
+       own offset wave (`gs`), and one delta per base. */
+    at: (azimuth) => {
+      const term = { g: g(azimuth), gs: {} };
+      for (const [base, half, off] of halves) {
+        const gb = w.gAt(azimuth, off);
+        term.gs[base] = gb;
+        term[base] = amount * gb * half;
+      }
+      return term;
+    },
   };
 }
 
@@ -3353,7 +3527,7 @@ function fanAzimuth(i, { perSide, centre, step }) {
   return i < perSide ? (i + 0.5) * step : -((2 * perSide - 0.5 - i) * step);
 }
 
-export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null, sizeField = null }) {
+export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null, sizeField = null, formField = null }) {
   /* LIST (sepals, part 1): explicit azimuths, one per slot — the arm a fan's
      sepals take, because their positions are footRing()'s own answer (the
      fan's lattice shifted by the phase, the `count` nearest the mirror line)
@@ -3366,7 +3540,7 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
       const azimuth = azimuths[i];
       const sizeFactor = sizeField === null ? null : sizeField.at(azimuth);
       const scale = sizeFactor === null ? sizeRamp(i, count) : sizeRamp(i, count) * sizeFactor;
-      blade({ index: i, azimuth, radius: radiusAt(i, count), z: height, scale, tiltExtra: angleRamp(i, count), sizeFactor });
+      blade({ index: i, azimuth, radius: radiusAt(i, count), z: height, scale, tiltExtra: angleRamp(i, count), sizeFactor, formTerm: formField === null ? null : formField.at(azimuth) });
     }
     return;
   }
@@ -3405,6 +3579,9 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
          builder's per-slot record reads it here rather than dividing it back
          out of `scale`, which would not reproduce it to the bit */
       sizeFactor,
+      /* the FORM field's slot term (build 2), null with no field — a BRANCH in
+         petalSurface, so the payload at the default builds the same petal */
+      formTerm: formField === null ? null : formField.at(azimuth),
     });
   }
 }
@@ -7275,7 +7452,8 @@ export function petalSurface(state, ring, slot, cap, acc) {
      a non-overridable control — and a builder that read `state` for some
      petal quantities and `ps` for others would be two sources for one petal,
      which is the defect this project repeats most. One object, one petal. */
-  const ps = petalStateFor(state, ring);
+  const formClamped = slot.formTerm ? [] : null;
+  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped) : petalStateFor(state, ring);
   /* THE APEX ROW RAMP IS SET HERE, PER PETAL, FROM ITS OWN EFFECTIVE
      `petalTipShape` — `ps` is the first point in this function where that
      effective value exists (a sepal's own tip-shape twin, or a per-slot
@@ -7624,6 +7802,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
     floorRadius, uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
+    formClamped,
   };
 }
 
@@ -7823,7 +8002,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
     uniformThickness, profileT, tAt,
-    seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
+    seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped,
   } = surface;
 
   const rows = surface.footRowsAt();
@@ -8439,7 +8618,13 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        innerCup, labellumCup and hoodCup), and building the object from the
        row list would write the same key three times and quietly depend on
        which write landed last. */
-    applied: Object.fromEntries([...OVERRIDE_BOUNDS.keys()].map((b) => [b, ps[b]])),
+    applied: Object.fromEntries(APPLIED_BASES.map((b) => [b, ps[b]])),
+    /* THE FORM FIELD'S SLOT TERM (build 2) as the whorl primitive handed it,
+       and which composed bases the one clamp bit — null with no field. FV1
+       restates the term from the controls and the emitted azimuth, FV2 asks
+       whether `applied` is the ring's composition plus it, clamped once. */
+    formTerm: slot.formTerm ?? null,
+    formClamped,
     overridden: !!ring.overrides,
     footRows: footS.length,
     panels: panels.map((p) => p.label),
@@ -12774,7 +12959,7 @@ export function petalFreeStemApproachMm(state, ring, slot, cap, plan, exportMode
    the matching-mode probe into the real accumulator, and a cheap reach envelope
    that skips petals nowhere near the pole) are costed in the outcome doc and
    deliberately not built in a PR this size. */
-export function stemOmission(state, fr, cap, plan, sizeField = null) {
+export function stemOmission(state, fr, cap, plan, sizeField = null, formField = null) {
   if (!plan || !plan.present || !fr.sphereMode) return null;
   const clearanceMm = STEM_PETAL_CLEARANCE_MM;
   const K = fr.rings.length;
@@ -12797,6 +12982,7 @@ export function stemOmission(state, fr, cap, plan, sizeField = null) {
     /* THE PETAL MEASURED IS THE PETAL BUILT: the size field is handed over so
        a slot the field shrinks or grows is probed at the size it will have. */
     sizeField,
+    formField,
     blade: (slot) => {
       const ring = fr.rings[slot.index];
       let hit = false;
@@ -15243,7 +15429,15 @@ export function sepalAngleLimit(state, fr, acc, sites) {
     const configOf = new Map();
     for (let j = 0; j < sepals.azimuths.length; j++) {
       const az = sepals.azimuths[j];
-      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}`).sort().join('|');
+      /* THE NEIGHBOURHOOD INCLUDES EACH FACING PETAL'S OWN PER-SLOT FIELD
+         VALUES (organic variance): under a size or form field a petal is no
+         longer its descriptor's petal rotated, so two sepals facing the same
+         descriptors at the same relative azimuths can face DIFFERENT petals.
+         The key used to omit them, and the scan tested one sepal for a whorl
+         of distinct neighbourhoods — found by SP8 on the first form row. With
+         no field every site's suffix is the same `null:null`, so the grouping,
+         the representatives and their order are what they were. */
+      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? FORM_VARIANCE_BASES.map((b) => s.slot.formTerm[b.base]).join(',') : null}`).sort().join('|');
       if (!configOf.has(key)) configOf.set(key, j);
     }
     const reps = [...configOf.values()];
@@ -15574,7 +15768,10 @@ function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
      every consumer branches on. Asked once, before the omission mask, because
      the mask probes each slot's petal at the size this field gives it. */
   const sizeField = sizeVarianceField(state, fr);
-  const omission = stemOmission(state, fr, capability, stemPlanned, sizeField);
+  /* THE FORM FIELD (build 2): null at amount 0, read by the same two whorl
+     calls and by the omission mask, so the petal measured is the petal built. */
+  const formField = formVarianceField(state, fr);
+  const omission = stemOmission(state, fr, capability, stemPlanned, sizeField, formField);
   /* ONE FACTOR ROW PER WHORL, parallel to `slotAzimuths` (the same shape, the
      same indexing, one entry per SLOT whether or not a petal was built on it),
      null when the field is — the metrics hook's per-slot applied record, which
@@ -15611,6 +15808,7 @@ function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
       phase: fr.rings[0].phase,
       placement: state.placement,
       sizeField,
+      formField,
       /* THE OMISSION IS A MASK AND NOT A RENUMBERING, and this is where that is
          true or false. The whorl primitive still runs every slot 0..K-1 and
          still hands each one the azimuth its own index earns, so dropping slot
@@ -15672,6 +15870,7 @@ function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
       placement: state.placement,
       fan: fr.fan,
       sizeField,
+      formField,
       blade: (slot) => {
         petalsBuilt++;
         azOf[slot.index] = slot.azimuth;
@@ -15839,6 +16038,13 @@ function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
     variance: sizeField ? { amount: sizeField.amount, frequency: sizeField.frequency, phaseDeg: sizeField.phaseDeg, phaseInert: sizeField.phaseInert,
       fan: sizeField.fan, n: sizeField.n, nyquist: sizeField.nyquist, aliased: sizeField.aliased, halfSpanDeg: sizeField.halfSpanDeg,
       lo: sizeField.lo, hi: sizeField.hi, factors: varianceFactors } : null,
+    /* THE FORM FIELD'S OWN RECORD (build 2) — null at amount 0. The per-slot
+       terms ride on each petal's own record (`formTerm`, `applied`,
+       `formClamped`), read back off `petalsAll`; this carries the law's
+       parameters and the sampling it was judged against. */
+    formVariance: formField ? { amount: formField.amount, frequency: formField.frequency, phaseDeg: formField.phaseDeg, phaseInert: formField.phaseInert,
+      fan: formField.fan, n: formField.n, nyquist: formField.nyquist, aliased: formField.aliased, halfSpanDeg: formField.halfSpanDeg,
+      halves: formField.halves } : null,
     neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
     /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
        with `p.grid` captured whenever a whorl of sepals exists) — telemetry,

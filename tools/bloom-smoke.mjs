@@ -959,6 +959,20 @@ export const SMOKE_BLOCKS = [
         path: 'THE NU COUPLING (#303\'s finding, fixed) — LF10: the petals ramp to 112 rows above petalTipShape 2.70 and the leaf, which has no apex ramp, must stay on its own 56, read off the builder\'s per-row record against BLADE_ROWS (the static row count, a different owner). Before the fix the leaf read the LAST PETAL\'s NU and doubled to 5,012 triangles a leaf while exporting watertight and one piece, and no matrix row reached it because the matrix varies one control at a time — so this subset carries the one row that does' },
     ],
   },
+  {
+    n: 43, title: 'organic variance, build 2 — the form field',
+    anchor: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
+    rows: [
+      { label: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
+        path: "the LAW — FV0 (the registry's varianceFormPresent against the geometry's guard through the page), FV1 (every petal's term restated from the controls and its emitted azimuth), FV2 (the role table plus the term, clamped once, is what the blade was built with) and FV4 (one aliasing judgement for the shared wave)" },
+      { label: 'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)',
+        path: 'the FAN — FV3 (mirror petals carry identical terms, not vacuously), beside Z4a/Z4b/Z8 and J7' },
+      { label: 'FORM VARIANCE: x 3 whorls with innerCurl 360 on curl 180 (the ONE clamp — past 360 before the slot term)',
+        path: "FV2's CLAMP-ONCE arm — the inner whorls' group curl is past 360 before the slot term, so a composition clamped twice lands a different petal curl than one clamped once" },
+      { label: 'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)',
+        path: "the TOLD frequency on the form field — FV4's aliased arm and FV1's law on a wave the lattice cannot draw" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

@@ -272,6 +272,18 @@ function varFacts(M, over = {}) {
   } catch (e) { return { threw: e.message }; }
 }
 const varPair = (M, C, over = {}) => [varFacts(M, over), varFacts(C, over)];
+/* THE FORM FIELD'S FACTS (build 2): the builder's own per-petal slot term and
+   the composed values it built with, off a build of the MUTATED module. */
+function formFacts(M, over = {}) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, varianceForm: 1, varianceFrequency: 1, variancePhase: 0, ...over };
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, st);
+    const petals = b.petalsAll.map((p) => ({ index: p.slotIndex, term: p.formTerm ?? null, curl: p.applied.petalSpineCurl, cup: p.applied.petalCup, twist: p.applied.petalTwist }));
+    return { petals, record: b.formVariance ?? null, absent: M.varianceFormIsAbsent(st), baseCurl: Number(st.petalSpineCurl) };
+  } catch (e) { return { threw: e.message }; }
+}
+const formPair = (M, C, over = {}) => [formFacts(M, over), formFacts(C, over)];
 const infloPair = (M, C, over = {}) => [infloFacts(M, over), infloFacts(C, over)];
 const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw || c.threw}` : null;
 
@@ -970,7 +982,11 @@ const MUTANTS = [
   { id: 'fan-field-is-not-even',
     why: "the fan takes the ring's own wave, `cos(f theta + phi)` on the SIGNED azimuth, so with any phase the two sides of the mirror plane carry different sizes and the fan stops being a fan — Z4a/Z4b/Z8 still pass (the roles and the azimuths are untouched), the export is watertight and one piece, and only VS3 (and VS1's restatement, which reads |theta| with the phase inert) can see it",
     find: '      : (az) => Math.cos(frequency * Math.abs(az)))',
-    into: '      : (az) => Math.cos(frequency * az + phi))', names: ['VS1', 'VS3'],
+    /* SINCE BUILD 2 the wave is SHARED, so the same edit breaks the form field
+       on the form fan row too — FV1 (the restatement reads |theta|) and FV3 —
+       and those are true statements about this mutant, named rather than left
+       unclaimed. */
+    into: '      : (az) => Math.cos(frequency * az + phi))', names: ['VS1', 'VS3', 'FV1', 'FV3'],
     witness: (M, C) => {
       /* phase 90: cos is even at phase 0, so a witness there would separate
          nothing (`bore-is-not-evas-rule`'s lesson — the probe is part of the
@@ -986,7 +1002,7 @@ const MUTANTS = [
   { id: 'aliasing-is-never-told',
     why: "ruling 4's flag is deleted: a wave above n/2 aliases into scatter and the record says nothing, so the read-out's ALIASED clause never prints and the frequency slider silently draws noise past the bar — no byte differs from the honest tree, and VS4 is the only witness",
     find: '  const aliased = frequency > 0 && frequency > nyquist;',
-    into: '  const aliased = false;', names: ['VS4'],
+    into: '  const aliased = false;', names: ['VS4', 'FV4'],
     witness: (M, C) => {
       const [m, c] = varPair(M, C, { varianceFrequency: 20 });
       const t = bothBuilt(m, c); if (t) return t;
@@ -1029,6 +1045,78 @@ const MUTANTS = [
         : `at amount 0.05 the mutant's guard says absent=${m.absent} (${m.variance ? 'a record' : 'no record'}) and the clean tree's absent=${c.absent} — the guard did not move`;
     } },
 
+  /* ORGANIC VARIANCE, BUILD 2 — THE FORM FIELD. Each witnessed on the MUTATED
+     module's own per-petal record (`formTerm`, `applied`) at a state where the
+     mutation must separate the two trees, never on the FV clause it names. */
+  { id: 'form-field-never-reaches-the-blade',
+    why: "the slot's form term rides on the payload and into the record while `petalSurface` builds from the descriptor's state: every petal is its whorl's, the record says otherwise, and nothing that reads the STL can tell — FV2 is the only witness",
+    find: '  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped) : petalStateFor(state, ring);',
+    into: '  const ps = petalStateFor(state, ring);', names: ['FV2'],
+    witness: (M, C) => {
+      const [m, c] = formPair(M, C, { varianceForm: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const flat = (f) => f.petals.filter((p) => p.term && Math.abs(p.term.petalSpineCurl) > 1 && p.curl === f.baseCurl).length;
+      return (flat(m) > 0 && flat(c) === 0) ? null
+        : `petals carrying a curl term but built at the whorl's curl: ${flat(m)} on the mutant, ${flat(c)} on the clean tree — the term did not stop reaching the blade`;
+    } },
+  { id: 'form-amount-0-is-not-the-identity',
+    why: "THE STANDING MUTANT FOR THE FORM GUARD: at amount 0 the field returns a record with a hair of amplitude instead of null, so every petal is re-composed through the slot path at a term of ~1e-9 and the shipping default is no longer byte-identical BY BRANCH — invisible to the eye, the census, both STL gates and the triangle count, and the '0 moved' partition becomes false; FV1's amount-0 arm is the witness",
+    find: '  if (varianceFormIsAbsent(state)) return null;\n  const amount = Number(state.varianceForm);',
+    into: '  const amount = varianceFormIsAbsent(state) ? 1e-9 : Number(state.varianceForm);', names: ['FV1'],
+    witness: (M, C) => {
+      const [m, c] = formPair(M, C, { varianceForm: 0 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const mutTerms = m.petals.filter((p) => p.term !== null).length, cleanTerms = c.petals.filter((p) => p.term !== null).length;
+      return (mutTerms > 0 && m.record !== null && cleanTerms === 0 && c.record === null) ? null
+        : `at amount 0 the mutant carries ${mutTerms} petal term(s) (${m.record ? 'a record' : 'no record'}), the clean tree ${cleanTerms} (${c.record ? 'a record' : 'no record'}) — the identity did not break`;
+    } },
+  { id: 'form-clamped-twice',
+    why: "the whorl's group value is clamped BEFORE the slot term is added, and the sum clamped again: an intermediate clip eats the slot's reach (curl 180 + innerCurl 360 clips to 360, then -270 lands at 90 where once-clamped it lands at 270) — the resolver's own stated reason for ONE clamp, and FV2's clamp-once arm is the only thing that restates the composition",
+    find: "      const from = (out && base in out) ? out[base] : Number(state[base]);\n      (out || (out = {}))[base] = from + slotTerm[base];",
+    into: "      const bb = composedBoundsOf(base);\n      const from = (out && base in out) ? clamp(out[base], bb.min, bb.max) : Number(state[base]);\n      (out || (out = {}))[base] = from + slotTerm[base];", names: ['FV2'],
+    witness: (M, C) => {
+      const over = { layerCount: 3, petalSpineCurl: 180, innerCurl: 360, varianceForm: 1 };
+      const [m, c] = formPair(M, C, over);
+      const t = bothBuilt(m, c); if (t) return t;
+      let diff = 0;
+      for (let i = 0; i < m.petals.length; i++) if (m.petals[i].curl !== c.petals[i].curl) diff++;
+      return diff > 0 ? null : `every petal's composed curl agrees on the mutant and the clean tree (${m.petals.length} petals) — a second clamp moved nothing`;
+    } },
+  { id: 'form-guard-moves-off-zero',
+    why: "the geometry's form guard becomes `amount > 0.1` while the registry's `varianceFormPresent` still says `> 0`: between 0.01 and 0.10 the shared frequency and phase are SHOWN and the form is INERT — PP7's, JS0's and VS0's defect in the form family; the load-time twin check runs on the unmutated Node import, so FV0 through the page is the only witness",
+    find: '  return !(Number(state.varianceForm) > 0);\n}',
+    into: '  return !(Number(state.varianceForm) > 0.1);\n}', names: ['FV0', 'FV1'],
+    witness: (M, C) => {
+      const [m, c] = formPair(M, C, { varianceForm: 0.05 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.absent === true && c.absent === false && m.record === null && c.record !== null) ? null
+        : `at amount 0.05 the mutant's guard says absent=${m.absent} and the clean tree's absent=${c.absent} — the guard did not move`;
+    } },
+  { id: 'form-half-span-is-the-whole-range',
+    why: "each varied base's reach is its WHOLE range instead of half of it — the field is twice as strong as the control says, the clamp absorbs most of it, and the read-out's own sentence ('up to ±270° curl') is false; FV1 restates the half-span from the REGISTRY's control range, which this mutation does not touch",
+    find: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, (b.offsetDeg * Math.PI) / 180]);',
+    into: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min), (b.offsetDeg * Math.PI) / 180]);', names: ['FV1'],
+    witness: (M, C) => {
+      const [m, c] = formPair(M, C, { varianceForm: 0.4 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const hm = m.record.halves.petalSpineCurl, hc = c.record.halves.petalSpineCurl;
+      return (hm === 2 * hc) ? null : `the curl half-span reads ${hm} on the mutant and ${hc} on the clean tree — it did not double`;
+    } },
+  { id: 'the-form-offsets-collapse-to-zero',
+    why: "THE OFFSET LAW'S OWN WITNESS (Eva's ruling on the three-way hazard, docs/bloom-organic-variance-form-outcome.md §12): cup, curl and twist read the shared wave with NO offset, so the crest petal takes all three maxima together — curl 270, cup 1 and twist 180 on one blade, the 0.076 mm self-approach and the 86-pair fold per petal the offsets were ruled to remove. A later session 'simplifying' the three constants away exports watertight, as one piece, at an identical triangle count; FV1 restates the offsets IN THE HARNESS (FORM_OFFSET_DEG_RESTATED), never imports them, so it is the clause that sees this",
+    find: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, (b.offsetDeg * Math.PI) / 180]);',
+    into: '  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, 0]);', names: ['FV1'],
+    witness: (M, C) => {
+      const [m, c] = formPair(M, C, { varianceForm: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      /* the largest, over petals, of the SMALLEST of the three per-base waves:
+         1 when some petal sits at all three crests at once, at most cos(60) =
+         0.5 when the three are a third of a cycle apart */
+      const crest = (f) => Math.max(...f.petals.filter((p) => p.term && p.term.gs).map((p) => Math.min(p.term.gs.petalSpineCurl, p.term.gs.petalCup, p.term.gs.petalTwist)));
+      const cm = crest(m), cc = crest(c);
+      return (cm > 0.999 && cc <= 0.5 + 1e-12) ? null
+        : `the joint crest reads ${cm} on the mutant and ${cc} on the clean tree — the three bases did not come back into phase`;
+    } },
   { id: 'the-pedicel-roots-on-the-axis',
     why: "the pedicel is rooted on the rachis's AXIS instead of its wall mid-thickness — the leaf's own LF2 trap one part later: on a HOLLOW rachis the root sits in the VOID, so the pedicel crosses no solid and is a detached shell, and both STL gates read it as one piece because the floret above it overlaps everything else",
     /* THE ANCHOR IS THE PEDICEL'S OWN CALL, NOT THE BARE EXPRESSION. Its
@@ -1856,6 +1944,20 @@ const ROWS = [
     set: [{ id: 'placement', value: 'FAN' }, { id: 'varianceSize', value: '0.5' }, { id: 'variancePhase', value: '90' }] },
   { label: 'the size field at 20 cycles on 8 slots (ALIASED — told, not capped)',
     set: [{ id: 'varianceSize', value: '0.5' }, { id: 'varianceFrequency', value: '20' }] },
+  /* THE FORM FIELD (build 2): the limit at 1 cycle; the first step above the
+     guard (the only row separating the form guard's two statements); the FAN
+     at phase 90 (the evenness claim); the ALIASED corner; and the ONE-CLAMP
+     row, where the inner whorls' group curl is past 360 before the slot term. */
+  { label: 'the form field: amount 1 at 1 cycle on the shipping whorl',
+    set: [{ id: 'varianceForm', value: '1' }] },
+  { label: 'the form field: 0.05, the first step above the guard',
+    set: [{ id: 'varianceForm', value: '0.05' }] },
+  { label: 'the form field on a FAN at phase 90',
+    set: [{ id: 'placement', value: 'FAN' }, { id: 'varianceForm', value: '1' }, { id: 'variancePhase', value: '90' }] },
+  { label: 'the form field at 20 cycles on 8 slots (ALIASED)',
+    set: [{ id: 'varianceForm', value: '1' }, { id: 'varianceFrequency', value: '20' }] },
+  { label: 'the form field on 3 whorls, curl 180 + innerCurl 360 (the ONE clamp)',
+    set: [{ id: 'layerCount', value: '3' }, { id: 'petalSpineCurl', value: '180' }, { id: 'innerCurl', value: '360' }, { id: 'varianceForm', value: '1' }] },
   { label: 'the told flag on the continuous mum (40 x 3, amount 0 — the all-pairs approach between turns)',
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
   { label: 'a raceme, nothing clamped (5 nodes x 1, 5-petal florets on 20 mm pedicels at 35 deg)',
@@ -1943,7 +2045,7 @@ async function famsOn(rows) {
        first family whose subject is a per-SLOT quantity: every clause is
        silent on a bloom whose amount is 0, which is every other row here. */
     for (const msg of await varianceAssertions(page, row)) {
-      const mm = /^(VS\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(VS\d+|FV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE APEX NIB (the apex-nib session) — the rule once more, and note the
        code is `AN\d+` and NOT `A\d+`: the A family's own capture above is
