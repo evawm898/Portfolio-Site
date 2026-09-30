@@ -582,6 +582,108 @@ export const TRIPLES = [
     cite: 'docs/bloom-organic-variance-form-outcome.md §4 — the single-g form field put curl 270, cup 1 and twist 180 on one petal: 0.076 mm self-approach, 86 within-shell census pairs a petal at 0.8771 mm worst span, the same fold the three sliders reach together (688 = 8 x 86)',
     why: "curl bends the spine into a hoop, cup lifts the margins across it and twist wrings the frame the cup is lifted in — `petalForm`'s own ordering composes all three on one blade, and every pair of them is already a declared hazard",
   },
+  /* THE FOUR TRIPLES EVA BOUGHT FROM THE SHORTLIST (the headroom PR —
+     docs/bloom-organic-variance-form-outcome.md §21), against the SETTLED
+     law. Under headroom scaling the field's reach from the shipped default is
+     +270 / -180 on curl, +1.0 / -0.8 on cup and +/-180 on twist — so on the
+     FORM axes the minima ARE the field's downward reach, and they were
+     measured on a probe grid rather than assumed: a minimum is CARRIED only
+     where some cell with it reads worse than the same cell at the maximum AND
+     under the bar (a minimum that only ever reads clear, or only ever reads
+     better than its maximum, costs builds to re-read states no nearer the
+     bar), iterated to a fixed point because dropping one axis's minimum can
+     remove the only cell another axis's minimum was worse at. The probe
+     tables are in §21. */
+  {
+    id: 'cup-x-roll-x-curl',
+    tier: 2,
+    label: 'petalCup x petalRoll x petalSpineCurl — the cupped quill, bent into a hoop',
+    measure: 'self',
+    axes: [
+      /* EVERY MINIMUM CARRIED: cup -0.8 x roll 330 reads 0.012 against cup
+         1.2's 0.107; roll -330 x cup 1 reads 0.0003 against +330's 0.041;
+         curl -180 x roll -330 reads 0.901 against curl 360's 1.176. */
+      { id: 'petalCup', values: [0, -0.8, 1, 1.2] },
+      { id: 'petalRoll', values: [0, -330, 330] },
+      { id: 'petalSpineCurl', values: [0, -180, 270, 360] },
+    ],
+    verdict: 'pair-reaches',
+    cite: 'docs/bloom-organic-variance-form-outcome.md §17 — the shortlist: roll closes the cross-section into a tube, cup lifts its margins, and curl bends the tube into a hoop along the spine; cup-x-roll is a declared pair',
+    why: 'the most obvious third on the shortlist: every face it adds is the curl, and the curl brings distant stations of the quill together',
+  },
+  {
+    id: 'curl-x-twist-x-roll',
+    tier: 2,
+    label: 'petalSpineCurl x petalTwist x petalRoll — the hoop, wrung, with its section rolled',
+    measure: 'self',
+    axes: [
+      /* curl -180 and roll -330 DROPPED at the fixed point (the only cell
+         curl -180 was worse at is roll -330, which never reads worse than
+         +330); twist -180 CARRIED — 0.587 against +180's 0.610 at curl 270 x
+         roll 330, both under the bar. */
+      { id: 'petalSpineCurl', values: [0, 270, 360] },
+      { id: 'petalTwist', values: [0, -180, 180] },
+      { id: 'petalRoll', values: [0, 330] },
+    ],
+    verdict: 'pair-reaches',
+    cite: 'docs/bloom-organic-variance-form-outcome.md §17 — the shortlist: roll acts in the cross-section twist wrings, on the blade curl has already bent; curl-x-twist is a declared pair',
+    why: 'the second third for curl x twist beside cup (the tier-1 triple): the roll is the other operation in the cross-section',
+  },
+  {
+    id: 'cup-x-tipshape-x-width',
+    tier: 2,
+    label: 'petalCup x petalTipShape x petalWidth — the cup across a broad, held tip',
+    measure: 'self',
+    axes: [
+      /* EVERY MINIMUM DROPPED: cup -0.8, tip shape 0.60 and width 8 each read
+         worse than their maximum somewhere, but never under the bar there. */
+      { id: 'petalCup', values: [0, 1, 1.2] },
+      { id: 'petalTipShape', values: [1.7, 3] },
+      { id: 'petalWidth', values: [16, 30] },
+    ],
+    verdict: 'pair-reaches',
+    /* WIDTH, NOT TIP THINNING — both are declared PRODUCT-ONLY with cup, and
+       width is the one that acts on the SAME quantity the other two do: the
+       cup's amplitude is a fraction of the half-width, the tip shape decides
+       how long the half-width is HELD toward the tip, and the width scales it
+       — three controls composing through one variable, which is what a triple
+       hazard is. Tip thinning acts on the sheet's THICKNESS, orthogonal to
+       that, and in EXPORT it saturates at the 1.00 mm floor by 0.4, so half of
+       its axis would be dead travel (#265's own cup-x-thinning note). */
+    cite: 'docs/bloom-organic-variance-form-outcome.md §17 — the shortlist: cup x tip shape x width is two product-only pairs (cup-x-width, cup-x-tipshape) sharing a control and a region',
+    why: 'the tip shape holds the half-width toward the tip, the width scales it, and the cup is a fraction of it — so all three write the distance the two margins have to cross',
+  },
+  {
+    id: 'layers-x-curl-x-innercurl',
+    tier: 1,
+    label: 'layerCount x petalSpineCurl x innerCurl — the composed base state, with a measured fold and no matrix row',
+    /* `self-every`, NOT `self`: `innerCurl` never reaches ring 0, so on the
+       representative petal it would be inert by construction (see
+       measureState). */
+    measure: 'self-every',
+    axes: [
+      /* The DEFAULT (CG0), the slider MAXIMUM, the field's reach on curl
+         (+270 from the shipped default), and the composed state's own values
+         (3 whorls, curl 180) — the one candidate with a measured fold behind
+         it, so it is measured rather than bracketed. EVERY MINIMUM DROPPED:
+         on the 45-cell probe no cell of this grid comes within the bar, so no
+         minimum can read worse there. */
+      { id: 'layerCount', values: [1, 3, 6] },
+      { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
+      { id: 'innerCurl', values: [0, 360] },
+    ],
+    /* CLEARS, AND THAT IS A STATEMENT ABOUT THE MEASURE, NOT THE GEOMETRY.
+       The census reads 1,968 within-shell pairs / 0.4218 mm worst span on
+       3 whorls x curl 180 x innerCurl 360 (EXPORT, Node) and `self` reads
+       1.222 mm there — because the fold is the declared CURL-360 class, which
+       `self` does not see on the slider alone either (`petalSpineCurl max
+       (360)`: census 920 / 0.5158, `self` 1.230). Kept as `clears` so the day
+       the approach comes within the bar it fails loudly; the fold itself is
+       X2's, declared on block 43's row. */
+    verdict: 'clears',
+    cite: 'docs/bloom-organic-variance-form-outcome.md §17 — the composed base state folds at 1,968 pairs / 0.4218 mm with NO field and has no matrix row; §21 has what `self` reads there',
+    why: 'a role row composes curl 180 + innerCurl 360 to 540 on every inner whorl and the clamp puts it at 360 — the declared curl-360 fold on two whorls of three, a state the matrix cannot see because it varies one control at a time',
+  },
 ];
 export const tripleKey = (t, vals) => `${t.id} @ ${t.axes.map((ax, i) => `${ax.id}=${num(vals[i])}`).join(' x ')}`;
 
@@ -819,6 +921,66 @@ export const COMBINATION_XFAIL = Object.freeze({
   'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1 x petalTwist=180': { mm: 0.065, note: 'an all-three cell: 0.065 against its nearest face (curl 360 x twist 180, 0.007) — the third control relieves here' },
   'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1.2 x petalTwist=0': { mm: 0, note: "a FACE: the cup-x-curl pair's own worst cell, cup 1.2 x curl 360, read again — 0.0002 mm, recorded at the gate's three decimals" },
   'curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=1.2 x petalTwist=180': { mm: 0.014, note: "the all-three corner at every slider maximum: 0.014 against its nearest face (cup 1.2 x curl 360, 0.000) — the corner is not the worst cell, which is why the triple carries the field's interior reach and not only its corners" },
+
+  /* ===== cup-x-roll-x-curl (the headroom PR, §21) */
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=-330 x petalSpineCurl=-180": { mm: 0.901, note: "a FACE of the triple (petalRoll x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=330 x petalSpineCurl=0": { mm: 0.658, note: "a SINGLE-axis cell (petalRoll alone) \u2014 the matrix and the wall instrument can see it; declared because the triple's grid produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=330 x petalSpineCurl=-180": { mm: 0.66, note: "a FACE of the triple (petalRoll x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=330 x petalSpineCurl=270": { mm: 0.544, note: "a FACE of the triple (petalRoll x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=330 x petalSpineCurl=360": { mm: 0.436, note: "a FACE of the triple (petalRoll x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0": { mm: 0.08, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=-180": { mm: 0.079, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.001 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=270": { mm: 0.08, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=360": { mm: 0.08, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0": { mm: 0.012, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=-180": { mm: 0.012, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=270": { mm: 0.012, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=360": { mm: 0.012, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=0 x petalSpineCurl=270": { mm: 0.791, note: "a FACE of the triple (petalCup x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=0 x petalSpineCurl=360": { mm: 0.052, note: "a FACE of the triple (petalCup x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=-330 x petalSpineCurl=0": { mm: 0.0, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=-330 x petalSpineCurl=-180": { mm: 0.0, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.000 mm against its nearest face (petalCup=1 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=-330 x petalSpineCurl=270": { mm: 0.0, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=1 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=-330 x petalSpineCurl=360": { mm: 0.0, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=1 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=330 x petalSpineCurl=0": { mm: 0.041, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=330 x petalSpineCurl=-180": { mm: 0.042, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.001 mm against its nearest face (petalCup=1 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=330 x petalSpineCurl=270": { mm: 0.002, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.038 mm against its nearest face (petalCup=1 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1 x petalRoll=330 x petalSpineCurl=360": { mm: 0.004, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.037 mm against its nearest face (petalCup=1 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=0 x petalSpineCurl=270": { mm: 0.182, note: "a FACE of the triple (petalCup x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=0 x petalSpineCurl=360": { mm: 0.0, note: "a FACE of the triple (petalCup x petalSpineCurl moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=-330 x petalSpineCurl=0": { mm: 0.001, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=-330 x petalSpineCurl=-180": { mm: 0.001, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=1.2 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=-330 x petalSpineCurl=270": { mm: 0.001, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.000 mm against its nearest face (petalCup=1.2 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=-330 x petalSpineCurl=360": { mm: 0.001, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.001 mm against its nearest face (petalCup=1.2 x petalRoll=0 x petalSpineCurl=360) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=330 x petalSpineCurl=0": { mm: 0.107, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=330 x petalSpineCurl=-180": { mm: 0.108, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.002 mm against its nearest face (petalCup=1.2 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=330 x petalSpineCurl=270": { mm: 0.001, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.105 mm against its nearest face (petalCup=1.2 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=1.2 x petalRoll=330 x petalSpineCurl=360": { mm: 0.005, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.004 mm against its nearest face (petalCup=1.2 x petalRoll=0 x petalSpineCurl=360) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+
+  /* ===== curl-x-twist-x-roll (the headroom PR, §21) */
+  "curl-x-twist-x-roll @ petalSpineCurl=0 x petalTwist=0 x petalRoll=330": { mm: 0.658, note: "a SINGLE-axis cell (petalRoll alone) \u2014 the matrix and the wall instrument can see it; declared because the triple's grid produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=0 x petalTwist=-180 x petalRoll=330": { mm: 0.66, note: "a FACE of the triple (petalTwist x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=0 x petalTwist=180 x petalRoll=330": { mm: 0.654, note: "a FACE of the triple (petalTwist x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=0 x petalRoll=330": { mm: 0.544, note: "a FACE of the triple (petalSpineCurl x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=-180 x petalRoll=0": { mm: 0.275, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=-180 x petalRoll=330": { mm: 0.587, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.312 mm against its nearest face (petalSpineCurl=270 x petalTwist=-180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=180 x petalRoll=0": { mm: 0.275, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=180 x petalRoll=330": { mm: 0.61, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.334 mm against its nearest face (petalSpineCurl=270 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=0 x petalRoll=330": { mm: 0.436, note: "a FACE of the triple (petalSpineCurl x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=-180 x petalRoll=0": { mm: 0.01, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=-180 x petalRoll=330": { mm: 0.469, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.459 mm against its nearest face (petalSpineCurl=360 x petalTwist=-180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=0": { mm: 0.007, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=330": { mm: 0.527, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.520 mm against its nearest face (petalSpineCurl=360 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+
+  /* ===== cup-x-tipshape-x-width (the headroom PR, §21) */
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=30": { mm: 0.92, note: "a FACE of the triple (petalCup x petalWidth moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=16": { mm: 0.788, note: "a FACE of the triple (petalCup x petalTipShape moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=30": { mm: 0.457, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.331 mm against its nearest face (petalCup=1 x petalTipShape=3 x petalWidth=16) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=1.7 x petalWidth=30": { mm: 0.884, note: "a FACE of the triple (petalCup x petalWidth moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=3 x petalWidth=16": { mm: 0.743, note: "a FACE of the triple (petalCup x petalTipShape moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=3 x petalWidth=30": { mm: 0.39, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.352 mm against its nearest face (petalCup=1.2 x petalTipShape=3 x petalWidth=16) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+
+  /* ===== None (the headroom PR, §21) */
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -942,6 +1104,29 @@ function measureState({ G, W, R }, DEFAULTS, pair, state, where) {
   if (pair.measure === 'infill-wall') return measureInfillWallMm(G, R.DEFAULTS, state);
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
   const m = G.buildBloomInto(acc, state);
+  /* `self-every` — THE SAME `self`, ON EVERY PETAL THE BUILDER EMITTED
+     (`petalsAll`, each with its own captured grid), and the smallest of them.
+     `self` reads ONE petal (`built.petal`, the representative of ring 0),
+     which is right wherever every petal is that petal and blind wherever a
+     role row makes the whorls differ: `innerCurl` never reaches ring 0, so
+     on `self` it would be INERT by construction and CG1 would refuse the
+     axis for reading nothing — the composed state's own fold would be
+     invisible to the measure asked to find it. Used by the composed-state
+     triple only; its cost is one `measureWall` per petal. */
+  if (pair.measure === 'self-every') {
+    let best = { mm: Infinity };
+    let n = 0;
+    for (const p of m.petalsAll) {
+      if (!p || !p.grid) continue;
+      n++;
+      const ap = p.tipCap && p.tipCap.apex;
+      const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
+      const r = W.measureWall(p.grid, { nibFromU });
+      if (r.self < best.mm) best = { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1], whorl: p.whorl, slot: p.slotIndex }, rows: r.rows, columns: r.columns };
+    }
+    if (!n) throw new Error(`combination gate: "${pair.id}" at ${where} built NO petal with a grid, so \`self-every\` has nothing to read.`);
+    return { ...best, petals: n };
+  }
   /* A TOOL THAT CANNOT DO ITS JOB REFUSES; it never returns a passing
      number for a question it did not answer. `built.petal` is NULL where a
      slot is declared and not built — the sphere stem's omission mask is the
@@ -1024,7 +1209,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
        field (verdict, cite, tier) is the one the clauses read. */
     const byId = new Map(pairs.map((p) => [p.id, p]));
     rows = rows.map((r) => ({ ...r, pair: byId.get(r.pair.id) || r.pair }));
-    const tsig = (ts) => JSON.stringify(ts.map((t) => [t.id, t.axes.map((a) => [a.id, a.values]), t.base || null]));
+    const tsig = (ts) => JSON.stringify(ts.map((t) => [t.id, t.measure, t.axes.map((a) => [a.id, a.values]), t.base || null]));
     if (tsig((tripleRows || []).map((r) => r.triple)) !== tsig(triples.filter((t) => !only || only.test(t.id)))) {
       throw new Error('verify: the cached triple cells were built from a different grid than the triples handed in');
     }
@@ -1238,7 +1423,9 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
     const at = (vals) => lookup.get(vals.map(num).join('|'));
     const worst = cells.reduce((x, y) => (y.mm < x.mm ? y : x));
     say(`  [tier ${t.tier}${t.guess ? ', a GUESS' : ''}] ${t.label}  (a TRIPLE — ${cells.length} cells, the extremes of each axis)`);
-    say(`    measure: SELF — the sheet against another part of itself (measureWall, the wall instrument's own)`);
+    say(t.measure === 'self-every'
+      ? `    measure: SELF on EVERY petal — the smallest over all petals emitted (measureWall, the wall instrument's own), because a role row makes the whorls differ`
+      : `    measure: SELF — the sheet against another part of itself (measureWall, the wall instrument's own)`);
     for (const c of cells) {
       const under = Number.isFinite(c.mm) && c.mm < BAR;
       const mark = under ? (Object.prototype.hasOwnProperty.call(xfail, c.key) ? 'x' : '!') : ' ';
@@ -1424,26 +1611,39 @@ async function control({ root = HERE } = {}) {
     ['CG7 an inert declaration names no pair\'s axis', { inert: { ...COMBINATION_INERT, [strayInert]: { maxMoveMm: 0, note: 'CONTROL' } } }, 'CG7'],
   ];
 
-  /* THE TRIPLE'S LEGS — the same plants, on the one shipped triple. */
-  const tRow = (baseRun.tripleRows || [])[0];
-  if (!tRow) { console.error('REFUSED (vacuous control): TRIPLES carries no triple, so its clauses have nothing to plant.'); return 2; }
-  const tFail = tRow.cells.find((c) => Number.isFinite(c.mm) && c.mm < bar && COMBINATION_XFAIL[c.key]);
-  if (!tFail) { console.error('REFUSED (vacuous control): no triple cell is both under the bar and declared.'); return 2; }
-  const T = TRIPLES[0];
-  const tAs = (v) => TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), verdict: v } : t));
-  legs.push(
-    [`CG2 triple: "${T.id}" loses a failing cell's declaration`, { xfail: without(tFail.key) }, 'CG2'],
-    [`CG3 triple: "${T.id}" record is stale, the cell reads WORSE`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: COMBINATION_XFAIL[tFail.key].mm + 0.1 } } }, 'CG3'],
-    [`CG3 triple: "${T.id}" record is stale, the cell reads BETTER`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: Math.max(0, COMBINATION_XFAIL[tFail.key].mm - 0.1) } } }, 'CG3'],
-    [`CG4 triple: "${T.id}" pair-reaches -> triple-only`, { triples: tAs('triple-only') }, 'CG4'],
-    [`CG4 triple: "${T.id}" pair-reaches -> clears`, { triples: tAs('clears') }, 'CG4'],
-    [`CG0 triple: "${T.id}" an axis no longer starts at its default`, { triples: TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), axes: t.axes.map((a, i) => (i === 2 ? { ...a, values: [a.values[1], 90] } : a)) } : t)), only: new RegExp(`^${T.id}$`) }, 'CG0', true],
-  );
+  /* THE TRIPLES' LEGS — PER TRIPLE, each firing on ITS OWN witness (the
+     headroom PR, §21): a finding counts only if it NAMES that triple, so a
+     plant into one triple cannot be passed by a red from another. Every
+     triple with a declared cell under the bar gets the CG2 removal and both
+     CG3 records; every triple gets the two CG4 flips its own verdict does not
+     allow; the first keeps the CG0 plant; and the composed-state triple gets
+     the one rebuild that is its reason to exist — its measure put back to
+     `self` on the representative petal, where `innerCurl` never reaches, so
+     CG1 must refuse that axis. */
+  const tRows = baseRun.tripleRows || [];
+  if (!tRows.length) { console.error('REFUSED (vacuous control): TRIPLES carries no triple, so its clauses have nothing to plant.'); return 2; }
+  const flips = { 'pair-reaches': ['triple-only', 'clears'], 'triple-only': ['pair-reaches', 'clears'], clears: ['pair-reaches', 'triple-only'] };
+  for (const [ti, { triple: T, cells }] of tRows.entries()) {
+    const tAs = (v) => TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), verdict: v } : t));
+    const tFail = cells.find((c) => Number.isFinite(c.mm) && c.mm < bar && COMBINATION_XFAIL[c.key]);
+    if (!tFail && T.verdict !== 'clears') { console.error(`REFUSED (vacuous control): "${T.id}" declares ${T.verdict} and no cell of it is both under the bar and declared.`); return 2; }
+    if (tFail) legs.push(
+      [`CG2 triple: "${T.id}" loses a failing cell's declaration`, { xfail: without(tFail.key) }, 'CG2', false, T.id],
+      [`CG3 triple: "${T.id}" record is stale, the cell reads WORSE`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: COMBINATION_XFAIL[tFail.key].mm + 0.1 } } }, 'CG3', false, T.id],
+      [`CG3 triple: "${T.id}" record is stale, the cell reads BETTER`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: Math.max(0, COMBINATION_XFAIL[tFail.key].mm - 0.1) } } }, 'CG3', false, T.id],
+    );
+    for (const v of flips[T.verdict] || []) legs.push([`CG4 triple: "${T.id}" ${T.verdict} -> ${v}`, { triples: tAs(v) }, 'CG4', false, T.id]);
+    if (ti === 0) legs.push([`CG0 triple: "${T.id}" an axis no longer starts at its default`, { triples: TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), axes: t.axes.map((a, i) => (i === 2 ? { ...a, values: [a.values[1], 90] } : a)) } : t)), only: new RegExp(`^${T.id}$`) }, 'CG0', true, T.id]);
+    if (T.measure === 'self-every') {
+      legs.push([`CG1 triple: "${T.id}" measured on the representative petal alone`, { triples: TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), measure: 'self' } : t)), only: new RegExp(`^${T.id}$`) }, 'CG1', true, T.id]);
+    }
+  }
+  if (!tRows.some((r) => r.triple.measure === 'self-every')) { console.error('REFUSED (vacuous control): no triple uses `self-every`, so its CG1 witness has nothing to plant.'); return 2; }
 
   let bad = 0, last = null;
-  for (const [name, plant, want, rebuilds] of legs) {
+  for (const [name, plant, want, rebuilds, mustName] of legs) {
     const { fails } = await verify({ root, quiet: true, ...plant, cached: rebuilds ? null : baseRun });
-    const hit = fails.filter((f) => f.startsWith(want));
+    const hit = fails.filter((f) => f.startsWith(want) && (!mustName || f.includes(mustName)));
     const other = fails.filter((f) => !f.startsWith(want));
     const ok = hit.length > 0;
     if (!ok) bad++;
