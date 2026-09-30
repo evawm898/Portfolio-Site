@@ -164,6 +164,15 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'DEFAULT (the shipping configuration)',
         path: 'the shipping state; every guard OFF at once — petalFormIsFlat, domeIsFlat, thicknessIsUniform, curlIsUniform, one whorl, RADIAL, the bare apex (the centre rig is retired, session 20); O1 (every shell wound outward — the petal shells were inside-out until session 36) and O2 (volume sign and ray parity agree) on the nine-shell default, and X2 (exactly zero within-shell intersecting pairs) on the census\'s own calibration state' },
+      /* THE TWIST'S OWN MAXIMUM IS HERE FOR THE EDGE-PROFILE GATE, whose
+         default row set IS this subset (one owner of "interesting rows"): it
+         adds 45.307323 deg of rim-surface turn on `main`, over E2's 45 deg
+         allowance by 0.307 deg, and CI never ran it because no smoke row
+         carried a twisted blade (docs/bloom-organic-variance-form-outcome.md
+         §18, §20). Declared there with its magnitude, so a twist that turns the
+         rim further, or stops turning it, reddens that gate. */
+      { label: 'petalTwist max (180)',
+        path: 'the blanket sweep\'s twist maximum — the petal\'s own surface rotated out of plane along its length, the class the form-variance field reaches per petal; the edge-profile gate\'s default subset reads it through this row' },
     ],
   },
   /* Blocks 2 and 3 — the centre rig's style x spread and sub-control sweeps —

@@ -189,6 +189,8 @@ const E2_TURN_XFAIL = {
      ran it — seven of the eight per-petal slider states on the default
      amount-1 row exceed the allowance. A twist rotates the section OUT OF
      PLANE, which the outline's plan turn cannot see — the buckle's class. */
+  'petalTwist max (180)':
+    { excessDeg: 0.307323, note: 'IN THE DEFAULT SUBSET SINCE the headroom PR (block 1 of tools/bloom-smoke.mjs): adds 45.307323 deg; face-to-face 49.99, outline 4.68 — the twist rotates the section out of plane, the buckle\'s class, on MAIN and on the slider alone. The form-variance rows below are this class reached per petal' },
   'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)':
     { excessDeg: 73.633038, note: 'NEW at #320: adds 118.633038 deg; face-to-face 124.79, outline 6.15 — the petal at curl 233.8 x cup 0 x twist -155.9, which reads 117.64 on the sliders alone at 234 / 0 / -156' },
   'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)':
