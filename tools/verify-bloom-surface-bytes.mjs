@@ -159,6 +159,43 @@ const PREDICATE_MOVERS = {
      of the size field moved no size float. The base tree does not know
      `varianceForm` at all, so a mover builds its default form there. */
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
+  /* FORM VARIANCE HEADROOM (the build-2 follow-up — docs/bloom-organic-
+     variance-form-outcome.md §19). The law changed only where a petal's
+     slot term meets a side with LESS room than the half-span, so a row moves
+     iff SOME petal the BASE tree built carries a non-zero term on a base whose
+     room on that side — measured from the BASE tree's own role composition
+     (`resolveRoleOverrides` without the slot term), clamped — is under the
+     half-span AND above zero (see the two identities below). Read off the BASE tree's builder and resolver, never this
+     tree's `formScaled`, so the prediction's owner is not the quantity under
+     test. Every row with the amount at 0 is a holder by this predicate's
+     first line, which is the byte-inertness claim re-measured. */
+  'form-headroom': (st) => {
+    if (base.varianceFormIsAbsent(st)) return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, st);
+    for (const p of b.petalsAll) {
+      if (!p || !p.formTerm) continue;
+      const roles = [p.role, p.allRole, p.slotRole, p.petalRole].filter((r) => r !== null && r !== undefined);
+      const comp = base.resolveRoleOverrides(st, roles) || {};
+      for (const q of base.FORM_VARIANCE_BASES) {
+        const t = p.formTerm[q.base];
+        if (!(t !== 0)) continue;
+        const from = q.base in comp ? comp[q.base] : Number(st[q.base]);
+        const at = Math.min(q.max, Math.max(q.min, from));
+        const room = t >= 0 ? q.max - at : at - q.min;
+        const half = (q.max - q.min) / 2;
+        /* THE OLD LAW IS clamp(at + t) AND THE NEW ONE at + t * room / half,
+           and they are the SAME number in two cases this predicate first
+           missed: room 0 (both give `at` — a slider at its END, where headroom
+           IS the clamp; the first run predeclared `ALL MAX`, every slider at an
+           end, and it held to the bit, which is the tool doing its job) and
+           |t| = half with the term past the room (both give the range end).
+           A petal moves iff 0 < room < half and neither holds. */
+        if (room > 0 && room < half && !(Math.abs(t) > room && Math.abs(t) === half)) return true;
+      }
+    }
+    return false;
+  },
   /* THE STEM'S NODES. A row moves iff (i) its state engages the node law on
      THIS tree (the geometry's own `stemNodesAbsent`, which is the guard), or
      (ii) the leaf node pitch floor, made mode-free by the same change, moves

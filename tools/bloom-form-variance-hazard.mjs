@@ -3,6 +3,8 @@
    DECLARED COMBINATION HAZARD WHILE THE SLIDERS SIT CLEAR OF IT?
 
      node tools/bloom-form-variance-hazard.mjs [--pair <id,...>] [--amount A] [--quick]
+     node tools/bloom-form-variance-hazard.mjs --pinning [--petals 20] [--amount A]
+     node tools/bloom-form-variance-hazard.mjs --headline | --sweep [--state i,j]
 
    AN INSTRUMENT, WIRED TO NO GATE (organic variance, build 2 —
    docs/bloom-organic-variance-form-outcome.md §4). The combination gate
@@ -111,7 +113,36 @@ function sweep() {
     console.log(`  ${label.padEnd(22)} f ${String(f).padStart(2)}${last.aliased ? ' ALIASED' : '        '}: ${first === null ? `clears at every amount to 1.00 (worst ${f3(last.w.self)} mm)` : `first petal under ${BAR} mm at amount ${first.toFixed(2)} — ${f3(at.self)} mm at curl ${f3(at.curl)} cup ${f3(at.cup)} twist ${f3(at.twist)}`}`);
   }
 }
+/* `--pinning`: the clamp-pinning measurement (outcome doc §14a, re-run under
+   headroom scaling — §19). 20 petals, the field at the amount asked, f 1 phase
+   0, EXPORT; for each varied control at each slider setting, how many DISTINCT
+   values that control takes over the petals BUILT (read off `applied`, the
+   values the blade was built with) and the fraction sitting exactly at a
+   range end. Only the named control moves off its default. */
+const PIN_SETTINGS = {
+  petalSpineCurl: [-180, 0, 90, 180, 270, 360],
+  petalCup: [-0.8, 0, 0.6, 1.2],
+  petalTwist: [-180, 0, 90, 180],
+};
+function pinning() {
+  const n = Number(opt('--petals', 20));
+  for (const { base, min, max } of G.FORM_VARIANCE_BASES) {
+    for (const v of PIN_SETTINGS[base]) {
+      const acc = new G.MeshBuilder({ exportMode: true });
+      const m = G.buildBloomInto(acc, { ...DEFAULTS, petalCount: n, [base]: v, varianceForm: AMOUNT, varianceFrequency: 1, variancePhase: 0 });
+      const ps = m.petalsAll.filter(Boolean);
+      const cells = G.FORM_VARIANCE_BASES.map((q) => {
+        const xs = ps.map((p) => p.applied[q.base]);
+        const pinned = xs.filter((x) => x === q.min || x === q.max).length;
+        /* distinct to 1e-9 of the base's own units: mirror azimuths ±θ read cos values that differ in the last bit, which is not variance */
+        return `${q.base.replace('petal', '').replace('Spine', '').toLowerCase()} ${String(new Set(xs.map((x) => x.toFixed(9))).size).padStart(2)} distinct, ${String(pinned).padStart(2)} pinned (${((100 * pinned) / xs.length).toFixed(0).padStart(2)} %)`;
+      });
+      console.log(`  ${base.padEnd(15)} ${String(v).padStart(5)}  (${ps.length} petals)   ${cells.join('   ')}`);
+    }
+  }
+}
 function main() {
+  if (argv.includes('--pinning')) { pinning(); return; }
   if (argv.includes('--sweep')) { sweep(); return; }
   if (argv.includes('--headline')) { headline(); return; }
   const BAR = G.MIN_FEATURE_MM;

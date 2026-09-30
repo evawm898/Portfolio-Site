@@ -1050,7 +1050,7 @@ const MUTANTS = [
      mutation must separate the two trees, never on the FV clause it names. */
   { id: 'form-field-never-reaches-the-blade',
     why: "the slot's form term rides on the payload and into the record while `petalSurface` builds from the descriptor's state: every petal is its whorl's, the record says otherwise, and nothing that reads the STL can tell — FV2 is the only witness",
-    find: '  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped) : petalStateFor(state, ring);',
+    find: '  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped, formScaled) : petalStateFor(state, ring);',
     into: '  const ps = petalStateFor(state, ring);', names: ['FV2'],
     witness: (M, C) => {
       const [m, c] = formPair(M, C, { varianceForm: 1 });
@@ -1070,17 +1070,35 @@ const MUTANTS = [
       return (mutTerms > 0 && m.record !== null && cleanTerms === 0 && c.record === null) ? null
         : `at amount 0 the mutant carries ${mutTerms} petal term(s) (${m.record ? 'a record' : 'no record'}), the clean tree ${cleanTerms} (${c.record ? 'a record' : 'no record'}) — the identity did not break`;
     } },
-  { id: 'form-clamped-twice',
-    why: "the whorl's group value is clamped BEFORE the slot term is added, and the sum clamped again: an intermediate clip eats the slot's reach (curl 180 + innerCurl 360 clips to 360, then -270 lands at 90 where once-clamped it lands at 270) — the resolver's own stated reason for ONE clamp, and FV2's clamp-once arm is the only thing that restates the composition",
-    find: "      const from = (out && base in out) ? out[base] : Number(state[base]);\n      (out || (out = {}))[base] = from + slotTerm[base];",
-    into: "      const bb = composedBoundsOf(base);\n      const from = (out && base in out) ? clamp(out[base], bb.min, bb.max) : Number(state[base]);\n      (out || (out = {}))[base] = from + slotTerm[base];", names: ['FV2'],
+  /* `form-clamped-twice` IS RETIRED, NOT RE-ANCHORED: it clamped the group
+     value before the slot term was added, which under HEADROOM SCALING is the
+     law itself — the room is measured from the composition as the petal would
+     be built at amount 0, which IS clamped (docs/bloom-organic-variance-form-
+     outcome.md §19). Its two successors ask what can now go wrong. */
+  { id: 'the-headroom-is-the-old-clamp',
+    why: "THE HEADROOM LAW'S STANDING WITNESS (Eva's ruling on the pinning, docs/bloom-organic-variance-form-outcome.md §19): the slot term is added whole and the sum clamped, as it was before — 30 % of the petals pinned identically at curl -180 on the SHIPPING default, half of them at any slider end. It exports watertight, as one piece, at an identical triangle count, and every clause but FV2 reads the term or the record, never the composition, so a later session putting the pinning back would be noticed by FV2 alone",
+    find: "      const b = composedBoundsOf(base);\n      const at = clamp(from, b.min, b.max);\n      if (clampedOut && at !== from) clampedOut.push({ base, asked: from, got: at });\n      const t = slotTerm[base];\n      const half = (b.max - b.min) / 2;\n      const room = t >= 0 ? b.max - at : at - b.min;\n      const scaled = room >= half ? t : t * (room / half);\n      if (scaledOut && scaled !== t) scaledOut.push({ base, asked: t, got: scaled });\n      (out || (out = {}))[base] = at + scaled;",
+    into: "      (out || (out = {}))[base] = from + slotTerm[base];", names: ['FV2'],
+    witness: (M, C) => {
+      /* the shipping default at amount 1 over 20 petals: the old clamp pins
+         petals at curl -180 (0 - 270 passes the floor); headroom pins none */
+      const [m, c] = formPair(M, C, { petalCount: 20, varianceForm: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const pinned = (f) => f.petals.filter((p) => p.curl === -180).length;
+      return (pinned(m) > 0 && pinned(c) === 0) ? null
+        : `${pinned(m)} petal(s) sit at curl -180 on the mutant and ${pinned(c)} on the clean tree — the old clamp did not come back`;
+    } },
+  { id: 'the-headroom-reads-the-unclamped-composition',
+    why: "the room is measured from the role table's composition BEFORE it is clamped: a curl-180 + innerCurl-360 inner petal composes to 540, so its room ABOVE reads -180 and every petal whose wave points up is pushed DOWN — the field's sign flipped on exactly the whorls a role row has already pushed past the range. FV2 restates the room from the CLAMPED composition, which this mutation does not touch",
+    find: "      const at = clamp(from, b.min, b.max);",
+    into: "      const at = from;", names: ['FV2'],
     witness: (M, C) => {
       const over = { layerCount: 3, petalSpineCurl: 180, innerCurl: 360, varianceForm: 1 };
       const [m, c] = formPair(M, C, over);
       const t = bothBuilt(m, c); if (t) return t;
       let diff = 0;
       for (let i = 0; i < m.petals.length; i++) if (m.petals[i].curl !== c.petals[i].curl) diff++;
-      return diff > 0 ? null : `every petal's composed curl agrees on the mutant and the clean tree (${m.petals.length} petals) — a second clamp moved nothing`;
+      return diff > 0 ? null : `every petal's composed curl agrees on the mutant and the clean tree (${m.petals.length} petals) — the unclamped room moved nothing`;
     } },
   { id: 'form-guard-moves-off-zero',
     why: "the geometry's form guard becomes `amount > 0.1` while the registry's `varianceFormPresent` still says `> 0`: between 0.01 and 0.10 the shared frequency and phase are SHOWN and the form is INERT — PP7's, JS0's and VS0's defect in the form family; the load-time twin check runs on the unmutated Node import, so FV0 through the page is the only witness",

@@ -1788,7 +1788,7 @@ export function roleForLayer(layerIndex, continuousMode) {
    petalStateFor() then returns the caller's own state OBJECT. That is why
    byte-identity at the defaults is a construction rather than an argument,
    and why it survived gaining a second law. */
-export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null) {
+export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null, scaledOut = null) {
   let out = null;
   for (const o of ROLE_OVERRIDES) {
     if (!roles.includes(o.role)) continue;
@@ -1815,10 +1815,43 @@ export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm =
      so the composition law is base, then the whorl's groups, then the slot,
      and the ONE clamp below sees the whole sum. Absent (null) on every build
      at `varianceForm` 0, so this loop never runs on the shipped path. */
+  /* HEADROOM SCALING (Eva's ruling on the clamp pinning, build-2 follow-up):
+     the slot term is scaled on each side by the room the base has on THAT
+     side, so the composed value never leaves the control's range and the one
+     clamp below never has anything to do on the field's account.
+
+        deltaUp   = min(half, max - base)      deltaDown = min(half, base - min)
+        applied   = base + amount * g * (g >= 0 ? deltaUp : deltaDown)
+
+     `base` is the value the petal would be built with WITHOUT the field — the
+     role table's composition, clamped — because that is the clamp the petal
+     already gets at amount 0; measuring room from an unclamped 540 would hand
+     a curl-180 + innerCurl-360 petal NEGATIVE room above and flip the sign of
+     its wave. `slotTerm[base]` is still the ASKED delta `amount * g * half`
+     (FV1 restates it unchanged); the room enters as the factor `room / half`
+     and only where the room is short, so a petal with the full half-span of
+     room on the side its wave takes is built from the very doubles it was
+     before (`room >= half` is a BRANCH, never a multiply by 1).
+
+     WHAT THIS REPLACES: `from + slotTerm` then the clamp, which pinned 30 % of
+     the petals at curl -180 on the SHIPPING default (curl 0 - 270 passes the
+     floor) and half of them at a slider end — identical petals, the variance
+     destroyed by the thing meant to bound it. There is no threshold here and
+     no constant: `min(half, max - base)` is the geometry of the range. At
+     curl 0 the field now pushes 0 to +270 above and 0 to -180 below: one-
+     sided in the way a real flower is, which cannot uncurl below flat. */
   if (slotTerm !== null) {
     for (const { base } of FORM_VARIANCE_BASES) {
       const from = (out && base in out) ? out[base] : Number(state[base]);
-      (out || (out = {}))[base] = from + slotTerm[base];
+      const b = composedBoundsOf(base);
+      const at = clamp(from, b.min, b.max);
+      if (clampedOut && at !== from) clampedOut.push({ base, asked: from, got: at });
+      const t = slotTerm[base];
+      const half = (b.max - b.min) / 2;
+      const room = t >= 0 ? b.max - at : at - b.min;
+      const scaled = room >= half ? t : t * (room / half);
+      if (scaledOut && scaled !== t) scaledOut.push({ base, asked: t, got: scaled });
+      (out || (out = {}))[base] = at + scaled;
     }
   }
   if (out === null) return null;
@@ -1839,7 +1872,7 @@ export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm =
        copy of the composition law: a read-out that re-derived "what was
        asked for" would be a second one, and it is the second copy that
        drifts. */
-    if (clampedOut && out[base] !== composed) clampedOut.push({ base, asked: composed, got: out[base] });
+    if (clampedOut && out[base] !== composed && !clampedOut.some((x) => x.base === base)) clampedOut.push({ base, asked: composed, got: out[base] });
   }
   return out;
 }
@@ -1871,8 +1904,8 @@ export function ringRoles(ring) {
    carries a term, so `petalStateFor` above stays the whole shipped path.
    `clampedOut` collects which composed bases the clamp bit, as the ring's own
    `overrideClamped` does. */
-export function petalStateForSlot(state, ring, slotTerm, clampedOut = null) {
-  const out = resolveRoleOverrides(state, ringRoles(ring), clampedOut, slotTerm);
+export function petalStateForSlot(state, ring, slotTerm, clampedOut = null, scaledOut = null) {
+  const out = resolveRoleOverrides(state, ringRoles(ring), clampedOut, slotTerm, scaledOut);
   return { ...state, ...out };
 }
 
@@ -7453,7 +7486,8 @@ export function petalSurface(state, ring, slot, cap, acc) {
      petal quantities and `ps` for others would be two sources for one petal,
      which is the defect this project repeats most. One object, one petal. */
   const formClamped = slot.formTerm ? [] : null;
-  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped) : petalStateFor(state, ring);
+  const formScaled = slot.formTerm ? [] : null;
+  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped, formScaled) : petalStateFor(state, ring);
   /* THE APEX ROW RAMP IS SET HERE, PER PETAL, FROM ITS OWN EFFECTIVE
      `petalTipShape` — `ps` is the first point in this function where that
      effective value exists (a sepal's own tip-shape twin, or a per-slot
@@ -7802,7 +7836,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
     floorRadius, uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
-    formClamped,
+    formClamped, formScaled,
   };
 }
 
@@ -8002,7 +8036,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
     uniformThickness, profileT, tAt,
-    seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped,
+    seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped, formScaled,
   } = surface;
 
   const rows = surface.footRowsAt();
@@ -8622,9 +8656,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     /* THE FORM FIELD'S SLOT TERM (build 2) as the whorl primitive handed it,
        and which composed bases the one clamp bit — null with no field. FV1
        restates the term from the controls and the emitted azimuth, FV2 asks
-       whether `applied` is the ring's composition plus it, clamped once. */
+       whether `applied` is the ring's composition plus it scaled by the
+       headroom on its own side; `formScaled` names the bases whose term that
+       headroom shortened (asked, got) — null with no field. */
     formTerm: slot.formTerm ?? null,
     formClamped,
+    formScaled,
     overridden: !!ring.overrides,
     footRows: footS.length,
     panels: panels.map((p) => p.label),
