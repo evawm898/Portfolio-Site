@@ -796,3 +796,88 @@ CG2 removal and both CG3 records on each triple with a declared cell, the two CG
 verdict does not allow, the CG0 plant on the first, and on the composed-state triple the one
 rebuild that is its reason to exist — **its measure put back to `self`, where CG1 must refuse
 `innerCurl`**. Results in §20.
+
+## 22. THE COMPOSED STATE'S GUARD — Eva's ruling (keep `self`), and what it found
+
+**Step 1: no existing measure sees this fold, so the row was built.** The combination gate owns four
+measures, and none can see it:
+
+| measure | scope |
+|---|---|
+| `self` | ONE petal (ring 0's representative): its blade rows against another part of the same sheet. `measureWall` drops the foot rows (`r.row >= footRows`). |
+| `self-every` | the same measure on EVERY built petal, taking the minimum. Same foot exclusion. |
+| `leaf-stem` | a leaf blade's vertices against the free stem (petiole excluded). Inter-part, and only leaf-to-stem. |
+| `infill-wall` | the in-sheet wall between two infill holes. |
+
+**THE RULING'S PREMISE, MEASURED, IS NOT QUITE RIGHT, AND THE CORRECTION MAKES THE BLINDNESS WORSE
+RATHER THAN BETTER.** The fold is not between parts. The census counts pairs WITHIN one closed
+shell; this state has **25 shells (24 petals and the hub)**, and every one of the 1,968 pairs lies
+inside a single petal. It is the 16 inner-whorl petals (petals 8-23, 75-171 pairs each), each
+**coiling its own tip (u 0.7-1.0) back into its own foot**: 571 of the sites are nearest a foot
+point and the rest are the tip's own rows. Curl 180 plus innerCurl 360 is the curl-360 class on the
+inner rings. `self` reads that very petal (under `self-every`) and still cannot see it, because the
+FOOT, where the tip lands, is outside its subject by definition. That is the fifth durable rule — a
+subject defined so the failure is not in it — and so it is structural, as the ruling says, but for
+a different reason. The scope that matters is not per-petal versus inter-part; it is blade-only
+versus the whole shell. `petalSpineCurl max (360)` alone is the same class (census 920 / 0.5158,
+`self` 1.230).
+
+**Step 2: block 44, one row, declared from birth.** `COMPOSED: 3 whorls x curl 180 x innerCurl 360`
+is appended as the final block, with its declaration in `SELF_INTERSECTION_XFAIL` at **1,968 / 0.4218
+mm**. It is browser-confirmed through `verify-bloom-export --only '^COMPOSED'`: watertight, 73,680
+triangles live and export, 3,598 KiB, X1 still failing at the recorded magnitude. It is also a smoke
+row (block 44; `bloom-smoke --check`: 134 rows over 40 blocks of 993). **`frozen/phase48` is the 992
+rows at `1f0b3f0`**, registered in both maps and proved deep-equal (`--verify-frozen --phase48`:
+PASS). Because the row is appended, the byte tools' index pairing is untouched: rows 0-991 are §20's
+partition and row 992 has no base counterpart.
+
+**Step 3: the triple's entry points at its guard.** `layers-x-curl-x-innercurl` keeps `self-every`
+and `clears`, and its label, comment and citation now say that `self` is blind here and that block
+44 is the guard. It still fails loudly the day the approach itself comes within the bar, which is all
+a millimetre cell can claim.
+
+**The other three triples, measured rather than argued.** I ran the census on all 78 of their cells:
+
+| triple | census folds | `self` clears while the census folds | folds with all three faces clean |
+|---|---|---|---|
+| cup × roll × curl | 38 of 48 | 5 | 0 |
+| curl × twist × roll | 14 of 18 | 1 | 0 |
+| cup × tip shape × width | 0 of 12 | 0 | 0 |
+
+Every cell where `self` clears but the census folds contains a SINGLE-AXIS state that is already a
+declared matrix row. Those are curl 360 (`petalSpineCurl max (360)`, 920 / 0.5158) and roll −330
+(`petalRoll min (-330)`, 13,568 / 1.3335). The probe reproduces both records exactly. **No triple
+hides a fold beyond what the matrix already guards, and none carries a triple-only fold.** The
+`pair-reaches` verdicts are about approach, not about folds. For approach they stand; for folds the
+census is the authority. (The ruling's "1,008 pairs" for curl 360 is stale: it was 1,080 after the
+edge profile and 920 since the apex nib.)
+
+**The two runs that had not finished.**
+- **Separation** (`bloom-petal-separation --field form`, all 16 bases, 144 builds of which 128 have
+  the field on, EXPORT, one process per base or per setting). Every build is **one connected piece at
+  0.6 mm**. The triangle count still moves with the amount on the four 6-layer corners, by up to 864
+  (bases 11 and 12), 1,176 (base 13) and 120 (base 14). Under the clamp, #320 read 1,128 / 1,512 /
+  192, so headroom trims the extremes; the mechanism is still not traced.
+- **Build-order determinism** (`verify-bloom-build-order`, the 48 variance and composed rows × 2
+  modes, forward / reverse / shuffle seed 7): **PASS, every digest identical bit for bit.** That is 96
+  keys, 192 pairwise comparisons and 3,573,892 triangles a pass.
+
+**The witness-selection sweep (Eva asked for a count, not fixes).** There are **17 gate controls in 8
+files** that choose their witness by first match of a property other declarations can change, rather
+than by name:
+- 7 in `bloom-combination-gate.mjs`
+- 3 in `verify-bloom-seam-bytes.mjs`
+- 2 in `verify-bloom-grid-bytes.mjs`
+- 1 each in `verify-bloom-edge-profile.mjs`, `bloom-xfail-magnitudes.mjs`,
+  `verify-bloom-defaults-bytes.mjs`, `verify-bloom-stem-nodes.mjs` and `bloom-infill-lamina-floor.mjs`
+
+Ten read a declaration table, which is this bug class exactly. One is a label regex plus a slice. Six
+read a computed build property. Sixteen of the seventeen have a loud guard (the leg must fire, or the
+run refuses).
+
+**ONE IS DRIFTING TODAY AND IS PRE-EXISTING:** the edge-profile control's own `CONTROL_ROWS`
+(`regex.filter(...).slice(0, 5)`). Its comment promises "the plain span, a cleft's sinus, a fringe's
+teeth, a lobed margin and a thin sheet". It actually keeps DEFAULT plus four `THIN:` rows, on `main`
+too. The cleft and the carnation are dropped by the slice, and `^LOBES: the shipped` matches no row
+at all. Every mutation still fires what it names, so nothing is red; the gap is a mutation that only
+a cleft, fringe or lobe row could show. Not fixed here, per the ruling.

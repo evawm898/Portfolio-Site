@@ -973,13 +973,20 @@ export const SMOKE_BLOCKS = [
     anchor: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
     rows: [
       { label: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
-        path: "the LAW — FV0 (the registry's varianceFormPresent against the geometry's guard through the page), FV1 (every petal's term restated from the controls and its emitted azimuth), FV2 (the role table plus the term, clamped once, is what the blade was built with) and FV4 (one aliasing judgement for the shared wave)" },
+        path: "the LAW — FV0 (the registry's varianceFormPresent against the geometry's guard through the page), FV1 (every petal's term restated from the controls and its emitted azimuth), FV2 (the clamped role composition plus the term scaled by the headroom on its own side is what the blade was built with) and FV4 (one aliasing judgement for the shared wave)" },
       { label: 'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)',
         path: 'the FAN — FV3 (mirror petals carry identical terms, not vacuously), beside Z4a/Z4b/Z8 and J7' },
       { label: 'FORM VARIANCE: x 3 whorls with innerCurl 360 on curl 180 (the ONE clamp — past 360 before the slot term)',
-        path: "FV2's CLAMP-ONCE arm — the inner whorls' group curl is past 360 before the slot term, so a composition clamped twice lands a different petal curl than one clamped once" },
+        path: "FV2's HEADROOM arm — the inner whorls' group curl is past 360 before the slot term, so the room is read from the CLAMPED composition; reading it from the unclamped 540 flips the field's sign on every inner whorl" },
       { label: 'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)',
         path: "the TOLD frequency on the form field — FV4's aliased arm and FV1's law on a wave the lattice cannot draw" },
+    ],
+  },  {
+    n: 44, title: 'the composed base state — the census as a guard the combination gate cannot be',
+    anchor: 'COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)',
+    rows: [
+      { label: 'COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)',
+        path: "X1 on a state declared from birth at 1,968 pairs / 0.4218 mm — each inner-whorl petal's tip coiling back into its own foot, which the combination gate's `self` excludes by definition (measureWall drops the foot rows); this row is what the gate's layers-x-curl-x-innercurl cell points at" },
     ],
   },
 ];

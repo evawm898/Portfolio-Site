@@ -5205,6 +5205,13 @@ GATE AND FOLDS ON THE CENSUS** — `self` reads 1.222 mm where X2 reads 1,968 pa
 curl-360 class, which `self` does not see on the slider alone either — and it needed a new measure
 even for that, `self-every` (every petal, not ring 0's), because `innerCurl` never reaches the
 representative petal and CG1 would refuse the axis as inert (the must-fail plants exactly that).
+**AND `self` IS BLIND TO THAT FOLD BY DEFINITION, SO A MATRIX ROW IS ITS GUARD** (Eva ruled keep `self`;
+§22). The 1,968 pairs are all WITHIN single inner petals (25 shells), each tip (u 0.7-1.0) coiled into ITS
+OWN FOOT, and `measureWall` drops the foot rows. Block 44 (`COMPOSED: 3 whorls x curl 180 x innerCurl 360`)
+is declared from birth at 1,968 / 0.4218 and the triple's entry names it; `frozen/phase48` is the 992 rows
+at `1f0b3f0`. The other three triples hide nothing beyond declared single-axis rows (census over all 78
+cells). **17 gate controls pick their witness by "first match"** (8 files); one, the edge-profile
+`CONTROL_ROWS` slice, is drifting on `main` (no cleft, fringe or lobe row reaches it) — counted, not fixed.
 
 **THE EXPORT GATE IS EIGHT SHARDS AND A VERDICT JOB, AND ITS COVERAGE IS A RECONCILIATION,
 NOT AN ASSUMPTION** (read `tools/bloom-export-shards.mjs`'s header before touching

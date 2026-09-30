@@ -656,7 +656,7 @@ export const TRIPLES = [
   {
     id: 'layers-x-curl-x-innercurl',
     tier: 1,
-    label: 'layerCount x petalSpineCurl x innerCurl — the composed base state, with a measured fold and no matrix row',
+    label: 'layerCount x petalSpineCurl x innerCurl — the composed base state; its fold is guarded by matrix row block 44, NOT by this cell',
     /* `self-every`, NOT `self`: `innerCurl` never reaches ring 0, so on the
        representative petal it would be inert by construction (see
        measureState). */
@@ -672,16 +672,29 @@ export const TRIPLES = [
       { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
       { id: 'innerCurl', values: [0, 360] },
     ],
-    /* CLEARS, AND THAT IS A STATEMENT ABOUT THE MEASURE, NOT THE GEOMETRY.
-       The census reads 1,968 within-shell pairs / 0.4218 mm worst span on
-       3 whorls x curl 180 x innerCurl 360 (EXPORT, Node) and `self` reads
-       1.222 mm there — because the fold is the declared CURL-360 class, which
-       `self` does not see on the slider alone either (`petalSpineCurl max
-       (360)`: census 920 / 0.5158, `self` 1.230). Kept as `clears` so the day
-       the approach comes within the bar it fails loudly; the fold itself is
-       X2's, declared on block 43's row. */
+    /* THIS CELL IS NOT THE GUARD FOR THIS STATE, AND IT SAYS SO (Eva's ruling
+       on the headroom follow-up, docs/bloom-organic-variance-form-outcome.md
+       §22). It CLEARS on a state that FOLDS: the census reads 1,968
+       within-shell pairs / 0.4218 mm on 3 whorls x curl 180 x innerCurl 360
+       (EXPORT, the builder's doubles) while `self-every` reads 1.222 mm.
+       WHAT THE BLINDNESS IS, MEASURED — and it is not "between parts": the
+       census counts pairs WITHIN one closed shell, the state has 25 (24
+       petals and the hub), and every pair is inside ONE inner-whorl petal,
+       its tip (u 0.7-1.0) coiling back into ITS OWN FOOT (571 of the sites
+       nearest a foot point). `measureWall` drops the foot rows
+       (`r.row >= footRows`), so `self` is blind to it BY DEFINITION, on every
+       petal it reads — the fifth durable rule, a subject that excludes the
+       failure. The curl-360 slider alone is the same class (census 920 /
+       0.5158, `self` 1.230).
+       WHAT COVERS IT: the matrix row `COMPOSED: 3 whorls x curl 180 x
+       innerCurl 360 ...` (block 44 of tools/bloom-harness.mjs), declared from
+       birth in SELF_INTERSECTION_XFAIL at 1,968 / 0.4218 and held to it both
+       ways by X1 in the export gate. The cell stays `clears` and on `self`
+       (Eva: a pair count here would be incomparable with the other cells, all
+       mm of approach), so it still fails loudly the day the APPROACH comes
+       within the bar — which is all it can claim. */
     verdict: 'clears',
-    cite: 'docs/bloom-organic-variance-form-outcome.md §17 — the composed base state folds at 1,968 pairs / 0.4218 mm with NO field and has no matrix row; §21 has what `self` reads there',
+    cite: 'docs/bloom-organic-variance-form-outcome.md §17 and §22 — the composed base state folds at 1,968 pairs / 0.4218 mm with NO field; §22 attributes every pair to a petal\'s tip in its own foot, which `self` excludes, and names block 44 as the guard',
     why: 'a role row composes curl 180 + innerCurl 360 to 540 on every inner whorl and the clamp puts it at 360 — the declared curl-360 fold on two whorls of three, a state the matrix cannot see because it varies one control at a time',
   },
 ];
