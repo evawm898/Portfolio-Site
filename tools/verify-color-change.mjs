@@ -195,6 +195,55 @@ check('the angle slider drives the Morpho', m30.angle === 30 && m30.label === '3
 await page.locator('[data-echromic="bleach"]').click(); await frames(2);
 check('electrochromic buttons toggle the mode', (await st('echromic')).mode === 'bleach' && await page.evaluate(() => document.querySelector('[data-echromic="bleach"]').classList.contains('is-active')));
 
+section('Electrochromic principle — electrons and ions arrive together');
+await page.locator('#ec-svg').scrollIntoViewIfNeeded();
+const ec = () => page.evaluate(() => ({ q: __ecPrinciple.q(), tint: __ecPrinciple.tint(), cap: document.querySelector('[data-ec-cap]').textContent, ions: [...document.querySelectorAll('#ec-svg circle[r="5"]')].filter(c => c.getAttribute('cx')).length }));
+check('starts empty and open', (await ec()).q === 0 && /nothing can move/.test((await ec()).cap));
+await page.locator('[data-ec-mode="charge"]').click(); await sleep(1000);
+const ecMid = await ec();
+check('charge fills at ~0.5 per second (a full charge in ~2 s)', ecMid.q > 0.3 && ecMid.q < 0.75, 'q ' + ecMid.q.toFixed(2));
+await page.locator('[data-ec-mode="open"]').click(); const ecA = (await ec()).q; await sleep(500);
+const ecB = await ec();
+check('open freezes the cell mid-state', ecB.q === ecA && ecB.q > 0 && ecB.q < 1 && ecB.cap === 'nothing can move, so nothing changes.', 'q ' + ecB.q.toFixed(2));
+await page.locator('[data-ec-mode="charge"]').click(); await sleep(2200);
+const ecFull = await ec();
+check('WO₃: full is blue', ecFull.q === 1 && ecFull.tint > 0.85, 'tint ' + ecFull.tint);
+await page.locator('[data-ec-mat="pedot"]').click(); await frames(2);
+const ecP = await page.evaluate(() => ({ tint: __ecPrinciple.tint(), label: [...document.querySelectorAll('#ec-svg text')].map(t => t.textContent).join('|'), note: document.querySelector('.cc__ec-note').textContent }));
+check('PEDOT: the same full cell is also blue — the toggle only relabels', ecP.tint > 0.85 && /(^|\|)PEDOT(\||$)/.test(ecP.label), 'tint ' + ecP.tint);
+check('the note says same direction', /same motion, same direction/i.test(ecP.note), ecP.note);
+await page.locator('[data-ec-mode="discharge"]').click(); await sleep(2200);
+check('discharge empties it and clears it', (await ec()).q === 0 && (await ec()).tint < 0.1);
+await page.locator('[data-ec-mat="wo3"]').click(); await page.locator('[data-ec-mode="open"]').click();
+
+section('PEDOT display — a digit is dark segments on a pale ground');
+await page.reload({ waitUntil: 'load' }); await page.waitForFunction(() => window.__pedot);
+await page.locator('#mech-pedot').scrollIntoViewIfNeeded();
+const pe = () => page.evaluate(() => ({ dark: __pedot.dark(), lv: __pedot.level.map(v => +v.toFixed(3)), fills: [...document.querySelectorAll('#pe-svg polygon')].map(p => [p.getAttribute('fill'), p.getAttribute('stroke')]), ro: ['state', 'driven', 'power'].map(k => document.querySelector('[data-ro="pedot:' + k + '"]').textContent) }));
+const pe_p0 = await pe();
+check('one digit: exactly 7 segments, no outline', pe_p0.fills.length === 7 && pe_p0.fills.every(([, s]) => s === 'none'));
+check('on load 0 segments are dark (pale, like an unlit LCD)', pe_p0.dark === 0 && pe_p0.lv.every(v => v === 0) && pe_p0.ro[1] === '0 of 7', pe_p0.ro.join(' / '));
+const pe_btns = await page.evaluate(() => [...document.querySelectorAll('[data-pe-mode]')].map(b => b.textContent.trim()));
+check('controls read Darken / Clear / Hold', pe_btns.join('|') === 'Darken (−V)|Clear (+V)|Hold', pe_btns.join('|'));
+await page.locator('[data-pe-digit="8"]').click(); await page.locator('[data-pe-mode="darken"]').click(); await sleep(1100);
+const pe_p8 = await pe();
+check('darkening digit 8 yields 7 dark', pe_p8.dark === 7 && pe_p8.ro[0] === 'darkened — showing 8' && pe_p8.ro[1] === '7 of 7', pe_p8.ro.join(' / '));
+check('a dark segment is PEDOT blue', pe_p8.fills[0][0] === 'rgb(30,52,150)', pe_p8.fills[0][0]);
+await page.locator('[data-pe-digit="3"]').click(); await sleep(1100);
+const pe_p3 = await pe();
+// a..g; digit 3 is a b c d g — e and f clear, the rest stay dark, in one motion
+check('switching to 3 while darkening clears e, f and keeps the rest', pe_p3.lv.join('') === '1111001' && pe_p3.ro[0] === 'darkened — showing 3' && pe_p3.ro[1] === '5 of 7', pe_p3.lv.join('') + ' · ' + pe_p3.ro.join(' / '));
+await page.locator('[data-pe-mode="clear"]').click(); await sleep(350);
+await page.locator('[data-pe-mode="hold"]').click(); const pe_h1 = (await pe()).lv; await sleep(500);
+const pe_h2 = await pe();
+check('hold freezes a fade mid-way', pe_h2.lv.join() === pe_h1.join() && pe_h2.lv.some(v => v > 0 && v < 1) && pe_h2.ro[2] === '~0 µW — holding', pe_h2.ro.join(' / '));
+await page.locator('[data-pe-mode="clear"]').click(); await sleep(1100);
+const pe_pc = await pe();
+check('clear fades all seven back to pale', pe_pc.dark === 0 && pe_pc.lv.every(v => v === 0) && pe_pc.fills.every(([f]) => f === 'rgb(202,211,215)'), pe_pc.ro.join(' / '));
+check('no "clear on blue" or "bleach" wording survives in the PEDOT column', await page.evaluate(() => !/clear on blue|bleach|blue when empty/i.test(document.getElementById('mech-pedot').textContent)));
+check('table: colored state is "both: with electrons in"', await page.evaluate(() => [...document.querySelectorAll('.cc__cmp div')].some(d => /Colored state/.test(d.textContent) && /both: with electrons in/.test(d.textContent))));
+check('mech-pedot and mech-echromic anchors still resolve', await page.evaluate(() => !!document.getElementById('mech-pedot') && !!document.getElementById('mech-echromic')));
+
 section('Layout');
 for (const vw of [1440, 1000, 640, 390]) {
   await page.setViewportSize({ width: vw, height: 900 }); await frames(3);

@@ -200,19 +200,38 @@
 
 
 
-/* ---------- 2.3 demo: SVG stage, second control row, electrolyte overlay */
+/* ---------- 2.2 electrochromic: principle on top, two demos side by side, table under */
+
+.cc__mech--ec { display: block; }
+.cc__ec-principle { padding: 0 6vw; border-bottom: 1px solid var(--line); }
+.cc__ec-principle .cc__canvas { aspect-ratio: 65 / 28; }
+.cc__ec-cap { font-size: 13px; line-height: 1.75; color: var(--ink); min-height: 1.75em; }
+.cc__ec-note { font-size: 12px; line-height: 1.75; color: var(--ink-faint); padding: 0.25rem 0 1.75rem; }
+
+.cc__ec-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 3vw;
+  padding: 0 6vw;
+}
+.cc__ec-col { min-width: 0; }
+.cc__ec-col .cc__mech-title { font-size: 1.1rem; }
+.cc__ec-col .cc__text--col { padding: 0 0 2rem; }
+
+/* ---------- PEDOT demo: SVG stage, second control row, electrolyte overlay */
 
 .cc__pe { cursor: default; }
 .cc__pe-gel { opacity: 0; transition: opacity 0.25s ease; pointer-events: none; }
 .cc__pe:hover .cc__pe-gel, .cc__pe:focus-visible .cc__pe-gel { opacity: 1; }
 .cc__pe:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
 .cc__controls--tight { padding-bottom: 0.4rem; }
+.cc__pe-note { font-size: 11px; letter-spacing: 0.06em; color: var(--ink-faint); padding: 0.7rem 0 0; }
 .cc__controls--pad { padding-top: 0; }
 .cc__pad { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; margin-left: 0.4rem; }
 .cc__pad .cc__btn { min-width: 2rem; padding-left: 0.5rem; padding-right: 0.5rem; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .cc__pe-gel { transition: none; } }
 
-/* ---------- 2.2 vs 2.3: the comparison, styled like the readout rows */
+/* ---------- window vs display: the comparison, styled like the readout rows */
 
 .cc__compare {
   grid-column: 1 / -1;
@@ -250,6 +269,7 @@
 }
 
 .cc__cmp dd { color: var(--ink); }
+.cc__cmp dd.cc__cmp-span { grid-column: 2 / -1; }
 .cc__cmp-head dd { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
 
 /* ---------- the three-principle index in the intro */
@@ -301,6 +321,8 @@
   .cc__text { padding: 0 6vw 2rem; }
   .cc__compare { padding: 0 6vw 2rem; }
   .cc__principle-head { grid-template-columns: 1fr; gap: 0.75rem; }
+  .cc__ec-pair { grid-template-columns: 1fr; }
+  .cc__ec-principle .cc__canvas { aspect-ratio: 65 / 28; }
 }
 
 @media (max-width: 700px) {
@@ -311,5 +333,5 @@
   .cc__canvas { aspect-ratio: 4 / 3; }
   .cc__mech-head { flex-wrap: wrap; gap: 0.4rem 0.8rem; }
   .cc__cmp div { grid-template-columns: 1fr 1fr; }
-  .cc__cmp dt { grid-column: 1 / -1; }
+  .cc__cmp dt, .cc__cmp dd.cc__cmp-span { grid-column: 1 / -1; }
 }
