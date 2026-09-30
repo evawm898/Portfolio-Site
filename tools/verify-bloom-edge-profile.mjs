@@ -176,6 +176,25 @@ const E2_TURN_XFAIL = {
     { excessDeg: 0.000168, note: 'a tooth\'s terminal; the frame rotates a hair between adjacent columns. raw 45.00 deg, outline 0.00' },
   'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)':
     { excessDeg: 0.000168, note: 'the carnation row again — this row carries the same fringe, and the lobes are inert by ruling' },
+  /* FORM VARIANCE (build 2, #320): THE SURFACE'S OWN TURN, ON A PETAL WHOSE
+     TWIST AND CURL THE FIELD HAS MOVED — not the treatment's, and that is a
+     two-sided measurement rather than a reading of the label. Each petal's
+     composed (curl, cup, twist) set directly on the SLIDERS reproduces it:
+     the ALIASED row's worst petal is curl 135 x cup -0.8 x twist 90, which on
+     the sliders alone reads 74.408025 deg, to the sixth decimal; the amount-1
+     row's worst petal (curl 233.8 x cup 0 x twist -155.9) reads 117.64 at
+     the rounded slider values 234 / 0 / -156. And the class is on MAIN by one
+     slider: `petalTwist max (180)` adds 45.307323 deg (face-to-face 49.99,
+     outline 4.68), in no row this gate's default subset carries, so CI never
+     ran it — seven of the eight per-petal slider states on the default
+     amount-1 row exceed the allowance. A twist rotates the section OUT OF
+     PLANE, which the outline's plan turn cannot see — the buckle's class. */
+  'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)':
+    { excessDeg: 73.633038, note: 'NEW at #320: adds 118.633038 deg; face-to-face 124.79, outline 6.15 — the petal at curl 233.8 x cup 0 x twist -155.9, which reads 117.64 on the sliders alone at 234 / 0 / -156' },
+  'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)':
+    { excessDeg: 29.408025, note: 'NEW at #320: adds 74.408025 deg; face-to-face 100.38, outline 25.97 — curl 135 x cup -0.8 x twist 90, which reads 74.408025 on the sliders alone, identical to the sixth decimal' },
+  'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)':
+    { excessDeg: 24.729474, note: 'NEW at #320: adds 69.729474 deg; face-to-face 94.70, outline 24.97 — a fan petal the field has twisted, the same class as the two rows above' },
   /* AND IT IS NOT THE INFILL'S, WHICH IS A TWO-SIDED FACT RATHER THAN A
      READING OF THE LABEL: the plan REFUSES a blade that is several panels, and
      I2 asserts on that row that the mesh is BIT-IDENTICAL to the same state

@@ -496,3 +496,12 @@ the gate reads `self` — the NEAREST APPROACH, 0.076 mm. Two quantities of one 
   `petalSurface`'s `footRowsAt` reads `ring.radius`, `ring.width`, `ring.overhang` and `slot.z` and no
   `slot.scale`; 18 foot rows at the slot's own scale and at half of it, **0 differ under
   `Object.is`**.
+- **The first CI run found an E2 class the default smoke subset never ran** (`verify-bloom-edge-profile`,
+  the `gates` job): three form rows add more rim-surface turn than the 45° allowance. **It is the petal's
+  own surface, not the rim treatment, and it is on `main` by one slider**: `petalTwist max (180)` adds
+  45.307323° on `main` (in no row the gate's default subset carries), and each form petal's composed
+  (curl, cup, twist) set directly on the sliders reproduces its row — the aliased row's worst petal,
+  curl 135 × cup −0.8 × twist 90, reads **74.408025° on the sliders alone, identical to the sixth
+  decimal**; seven of the eight per-petal slider states of the default amount-1 row exceed the allowance.
+  Declared in `E2_TURN_XFAIL` with their magnitudes (73.633038 / 29.408025 / 24.729474° of excess), the
+  buckle's out-of-plane class. The gate and its `--control` (6 of 6) pass.
