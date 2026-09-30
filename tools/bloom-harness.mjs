@@ -2226,18 +2226,28 @@ export const CURL_SCOPE =
 /* THE SHARED WAVE, RESTATED (build 2): `g(theta)` from the frequency and phase
    controls and the fan's derived half-span — the one statement both
    `sizeFactorRestated` and `formTermRestated` multiply. */
-export function varianceGRestated(m, ui, azimuth) {
+export function varianceGRestated(m, ui, azimuth, off = 0) {
   const f = Math.round(Number(ui.varianceFrequency));
   const phi = (Number(ui.variancePhase) * Math.PI) / 180;
   const TAU = Math.PI * 2;
   const fan = m.fan;
   if (fan) {
     const halfSpan = (fan.spanDeg * Math.PI) / 360;
-    return f === 0 ? (halfSpan > 0 ? -1 + (2 * Math.abs(azimuth)) / halfSpan : -1) : Math.cos(f * Math.abs(azimuth));
+    if (f !== 0) return Math.cos(f * Math.abs(azimuth) + off);
+    if (!(halfSpan > 0)) return -1;
+    if (off === 0) return -1 + (2 * Math.abs(azimuth)) / halfSpan;
+    let v = Math.abs(azimuth) / halfSpan - off / TAU; v -= Math.floor(v);
+    return -1 + 2 * v;
   }
-  if (f === 0) { let w = (azimuth - phi) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU; }
-  return Math.cos(f * azimuth + phi);
+  if (f === 0) { let w = (azimuth - phi - off) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU; }
+  return Math.cos(f * azimuth + phi + off);
 }
+/* THE PHASE OFFSETS, RESTATED — Eva's ruling on the three-way hazard, WRITTEN
+   DOWN HERE rather than imported from `FORM_VARIANCE_OFFSET_DEG`: a clause whose
+   reference read the geometry's own table would move with it, and the offsets
+   collapsed to zero (the mutation that puts the fold back) would then pass FV1.
+   Cup 0, curl 120, twist 240 — docs/bloom-organic-variance-form-outcome.md §12. */
+export const FORM_OFFSET_DEG_RESTATED = Object.freeze({ petalCup: 0, petalSpineCurl: 120, petalTwist: 240 });
 /* THE FORM TERM, RESTATED FROM THE CONTROLS (build 2): the amount, the SHARED
    wave above, and each varied base's HALF-SPAN read off the REGISTRY's own
    control (`(max - min) / 2`), never the geometry's `halves` record — FV1's
@@ -2249,7 +2259,8 @@ export function formTermRestated(m, ui, azimuth) {
   const out = { g };
   for (const { base } of FORM_VARIANCE_BASES) {
     const c = CONTROLS.find((x) => x.id === base);
-    out[base] = amount * g * ((c.max - c.min) / 2);
+    const off = (FORM_OFFSET_DEG_RESTATED[base] * Math.PI) / 180;
+    out[base] = amount * varianceGRestated(m, ui, azimuth, off) * ((c.max - c.min) / 2);
   }
   return out;
 }

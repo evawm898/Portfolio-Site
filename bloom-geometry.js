@@ -3097,6 +3097,24 @@ function varianceWave(state, fr) {
   const halfSpan = fan ? (fan.spanDeg * Math.PI) / 360 : null;
   const nyquist = fan ? Math.PI / fan.step : n / 2;
   const aliased = frequency > 0 && frequency > nyquist;
+  /* `gAt(az, off)` — the SAME wave advanced by a fixed phase offset `off`
+     (radians of the wave's own cycle). Offset 0 is `g` itself, the size
+     field's doubles, by BRANCH — never by `x + 0`. On a ring the offset joins
+     the phase; on a FAN it joins `f|theta|`, so the field stays even about the
+     mirror plane whatever the offset; on either RAMP it slides the ramp's seam
+     a fraction `off / TAU` of the way round (a fan's ramp, which has no seam at
+     offset 0, gains one — the ring's ramp always had one). */
+  const gAt = (az, off) => {
+    if (off === 0) return g(az);
+    if (fan) {
+      if (frequency !== 0) return Math.cos(frequency * Math.abs(az) + off);
+      if (!(halfSpan > 0)) return -1;
+      let v = Math.abs(az) / halfSpan - off / TAU; v -= Math.floor(v);
+      return -1 + 2 * v;
+    }
+    if (frequency !== 0) return Math.cos(frequency * az + phi + off);
+    let w = (az - phi - off) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU;
+  };
   const g = fan
     ? (frequency === 0
       ? (az) => (halfSpan > 0 ? -1 + (2 * Math.abs(az)) / halfSpan : -1)
@@ -3104,7 +3122,7 @@ function varianceWave(state, fr) {
     : (frequency === 0
       ? (az) => { let w = (az - phi) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU; }
       : (az) => Math.cos(frequency * az + phi));
-  return { frequency, phaseDeg, phaseInert: !!fan, fan: !!fan, n, nyquist, aliased, halfSpanDeg: fan ? fan.spanDeg / 2 : null, g };
+  return { frequency, phaseDeg, phaseInert: !!fan, fan: !!fan, n, nyquist, aliased, halfSpanDeg: fan ? fan.spanDeg / 2 : null, g, gAt };
 }
 export function sizeVarianceField(state, fr) {
   if (varianceIsAbsent(state)) return null;
@@ -3161,10 +3179,37 @@ export function sizeVarianceField(state, fr) {
    `petalStateFor` verbatim — so the shipping default is byte-identical BY
    BRANCH, the size field's own discipline. */
 export const VARIANCE_FORM_RANGE = Object.freeze([0, 1]);
+/* THE PHASE OFFSETS (Eva's ruling on the three-way hazard — §12 of the outcome
+   doc). One `g` drove all three bases, so the crest petal took curl, cup and
+   twist at their maxima TOGETHER — a three-control corner the pair-only
+   combination gate could not see, 0.076 mm of self-approach on the shipping
+   default at amount 1. Each base now reads the SAME wave advanced by a fixed
+   offset, a third of a cycle apart, so no petal receives all three maxima:
+   where one base is at its crest the other two sit at cos(120) = -0.5, and
+   midway between two crests two bases sit at +0.5 and the third at -1. THE
+   OFFSETS ARE CONSTANTS OF THE LAW AND ARE NOT EXPOSED — five controls, not
+   eight (ruling 2 holds exactly).
+
+   WHICH BASE TAKES WHICH OFFSET. Under a 120-degree spacing every PAIR of the
+   three co-occurs at +0.5 / +0.5 on some petal whatever the assignment, so the
+   assignment does not choose which pairs meet; it chooses which base is at its
+   crest on the wave's ORIGIN — the phase-0 petal of a ring and, on a FAN, the
+   petal on the mirror line — and the ORDER in which the other two follow
+   outward. CUP takes 0: a fan is read face-on (its mirror-line petal is the
+   lip), and cup is the one form the face-on eye reads as the petal opening or
+   closing, so the variance reads first as the lip cupped rather than as it
+   turned or curled. TWIST takes 240, which puts its crest at a third of a
+   cycle out (cos(f theta + 240) peaks at f theta = 120) — the petals turning
+   from facing the viewer to edge-on, where a twist is what that turn IS. CURL
+   takes 120, so its crest is two thirds out (f theta = 240), on the petals seen
+   most nearly in PROFILE, which is the only view in which a spine curl reads
+   at all. Outward from the origin the sequence is therefore cup, cup+twist,
+   twist, twist+curl, curl, curl+cup. */
+export const FORM_VARIANCE_OFFSET_DEG = Object.freeze({ petalCup: 0, petalSpineCurl: 120, petalTwist: 240 });
 export const FORM_VARIANCE_BASES = Object.freeze([
-  Object.freeze({ base: 'petalSpineCurl', min: -180, max: 360 }),
-  Object.freeze({ base: 'petalCup', min: -0.8, max: 1.2 }),
-  Object.freeze({ base: 'petalTwist', min: -180, max: 180 }),
+  Object.freeze({ base: 'petalSpineCurl', min: -180, max: 360, offsetDeg: FORM_VARIANCE_OFFSET_DEG.petalSpineCurl }),
+  Object.freeze({ base: 'petalCup', min: -0.8, max: 1.2, offsetDeg: FORM_VARIANCE_OFFSET_DEG.petalCup }),
+  Object.freeze({ base: 'petalTwist', min: -180, max: 180, offsetDeg: FORM_VARIANCE_OFFSET_DEG.petalTwist }),
 ]);
 /* ONE BASE, ONE RANGE: where a varied base is also reached by a role row, the
    two declarations must agree, or the clamp would be two answers to one
@@ -3190,16 +3235,21 @@ export function formVarianceField(state, fr) {
   const amount = Number(state.varianceForm);
   const w = varianceWave(state, fr);
   const g = w.g;
-  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2]);
+  const halves = FORM_VARIANCE_BASES.map((b) => [b.base, (b.max - b.min) / 2, (b.offsetDeg * Math.PI) / 180]);
   return {
     amount, frequency: w.frequency, phaseDeg: w.phaseDeg, phaseInert: w.phaseInert, fan: w.fan, n: w.n, nyquist: w.nyquist, aliased: w.aliased,
     halfSpanDeg: w.halfSpanDeg,
-    halves: Object.fromEntries(halves),
-    /* THE SLOT TERM: `g` itself (for the record), and one delta per base. */
+    halves: Object.fromEntries(halves.map(([b, h]) => [b, h])),
+    offsetsDeg: FORM_VARIANCE_OFFSET_DEG,
+    /* THE SLOT TERM: the wave at offset 0 (`g`, for the record), each base's
+       own offset wave (`gs`), and one delta per base. */
     at: (azimuth) => {
-      const gv = g(azimuth);
-      const term = { g: gv };
-      for (const [base, half] of halves) term[base] = amount * gv * half;
+      const term = { g: g(azimuth), gs: {} };
+      for (const [base, half, off] of halves) {
+        const gb = w.gAt(azimuth, off);
+        term.gs[base] = gb;
+        term[base] = amount * gb * half;
+      }
       return term;
     },
   };
@@ -15387,7 +15437,7 @@ export function sepalAngleLimit(state, fr, acc, sites) {
          of distinct neighbourhoods — found by SP8 on the first form row. With
          no field every site's suffix is the same `null:null`, so the grouping,
          the representatives and their order are what they were. */
-      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? s.slot.formTerm.g : null}`).sort().join('|');
+      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? FORM_VARIANCE_BASES.map((b) => s.slot.formTerm[b.base]).join(',') : null}`).sort().join('|');
       if (!configOf.has(key)) configOf.set(key, j);
     }
     const reps = [...configOf.values()];

@@ -2882,7 +2882,7 @@ export const CONTROLS = [
     fmt: (v) => {
       const a = Number(v);
       if (!(a > 0)) return 'off — every petal at its whorl\'s curl, cup and twist';
-      return `${(a * 100).toFixed(0)}% — per petal, up to ±${(a * 270).toFixed(0)}° curl, ±${(a * 1).toFixed(2)} cup, ±${(a * 180).toFixed(0)}° twist, by azimuth (clamped to each control's own range)`;
+      return `${(a * 100).toFixed(0)}% — per petal, up to ±${(a * 270).toFixed(0)}° curl, ±${(a * 1).toFixed(2)} cup, ±${(a * 180).toFixed(0)}° twist, by azimuth, the three a third of a cycle apart so no petal takes all three crests (clamped to each control's own range)`;
     },
     visibleWhen: { all: [] } },
   { id: 'varianceFrequency', section: 'variance', kind: 'slider',

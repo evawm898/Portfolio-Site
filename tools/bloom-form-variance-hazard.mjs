@@ -75,10 +75,26 @@ const worstOf = (ps) => ps.reduce((a, b) => (b.self < a.self ? b : a), { self: I
 /* `--sweep`: the amount at which the WORST petal of a bloom first falls under
    the bar, stepped at the control's own 0.01, on the defaults and on the
    pair grids' clear corners — the number a ruling on the range would need. */
+const STATES = [['the DEFAULT bloom', {}], ['40 petals', { petalCount: 40 }], ['3 petals', { petalCount: 3 }], ['FAN', { placement: 'FAN' }],
+  ['CONTINUOUS x 3 turns', { placement: 'CONTINUOUS', layerCount: 3 }], ['3 whorls', { layerCount: 3 }], ['tilt 75', { petalTilt: 75 }], ['sheet 2.40', { sheetThickness: 2.4 }]];
+/* `--headline`: the worst per-petal `self` at the amount asked, over every
+   setting, on each state (or `--state i,j`) — the three-way excursion the
+   offset ruling is judged on. */
+function headline() {
+  const BAR = G.MIN_FEATURE_MM;
+  const pick = opt('--state', null);
+  for (const [si, [label, set]] of STATES.entries()) {
+    if (pick !== null && !pick.split(',').map(Number).includes(si)) continue;
+    for (const [f, ph] of SETTINGS) {
+      const r = perPetalSelf({ ...DEFAULTS, ...set, varianceForm: AMOUNT, varianceFrequency: f, variancePhase: ph });
+      const w = worstOf(r.petals);
+      console.log(`  ${label.padEnd(22)} f ${String(f).padStart(2)} ph ${String(ph).padStart(2)}${r.aliased ? ' ALIASED' : '        '} worst ${f3(w.self)} mm at curl ${f3(w.curl)} cup ${f3(w.cup)} twist ${f3(w.twist)}  ${w.self < BAR ? 'UNDER THE BAR' : 'clears'}  (${r.petals.length} petals)`);
+    }
+  }
+}
 function sweep() {
   const BAR = G.MIN_FEATURE_MM;
-  const states = [['the DEFAULT bloom', {}], ['40 petals', { petalCount: 40 }], ['3 petals', { petalCount: 3 }], ['FAN', { placement: 'FAN' }],
-    ['CONTINUOUS x 3 turns', { placement: 'CONTINUOUS', layerCount: 3 }], ['3 whorls', { layerCount: 3 }], ['tilt 75', { petalTilt: 75 }], ['sheet 2.40', { sheetThickness: 2.4 }]];
+  const states = STATES;
   const pick = opt('--state', null);
   for (const [si, [label, set]] of states.entries()) for (const [f, ph] of [[1, 0], [20, 0]]) {
     if (pick !== null && !pick.split(',').map(Number).includes(si)) continue;
@@ -97,6 +113,7 @@ function sweep() {
 }
 function main() {
   if (argv.includes('--sweep')) { sweep(); return; }
+  if (argv.includes('--headline')) { headline(); return; }
   const BAR = G.MIN_FEATURE_MM;
   console.log(`form variance at ${AMOUNT} (curl ±${AMOUNT * 270}°, cup ±${AMOUNT * 1}, twist ±${AMOUNT * 180}° per slot), EXPORT, bar ${BAR} mm`);
   /* THE HEADLINE — the shipping default with the field at its limit */

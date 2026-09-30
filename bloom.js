@@ -1434,7 +1434,7 @@ function formVarianceLine(v, petalsAll) {
     ? (v.fan ? 'a ramp outward from the mirror line' : `a ramp round the flower with its seam at ${v.phaseDeg.toFixed(0)}°`)
     : (v.fan ? `${cyc} per turn, even about the mirror line (phase inert)` : `${cyc} round the flower, phase ${v.phaseDeg.toFixed(0)}°`);
   const nyq = Number.isInteger(v.nyquist) ? `${v.nyquist}` : v.nyquist.toFixed(1);
-  return `FORM VARIANCE ${(v.amount * 100).toFixed(0)}%: over the ${ps.length} petal${ps.length === 1 ? '' : 's'} built, curl ${span('petalSpineCurl', 0)}°, cup ${span('petalCup', 2)}, twist ${span('petalTwist', 0)}° — ${law}, on ${v.n} slots`
+  return `FORM VARIANCE ${(v.amount * 100).toFixed(0)}%: over the ${ps.length} petal${ps.length === 1 ? '' : 's'} built, curl ${span('petalSpineCurl', 0)}°, cup ${span('petalCup', 2)}, twist ${span('petalTwist', 0)}° — ${law}, cup / curl / twist offset 0° / 120° / 240° along it, on ${v.n} slots`
        + (clamped ? ` — ${clamped} petal${clamped === 1 ? '' : 's'} CLAMPED to a control's own range` : '')
        + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
        + `\n`;
