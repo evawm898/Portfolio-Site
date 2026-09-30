@@ -2,10 +2,14 @@
 
 The second of the three builds ruled in `docs/bloom-organic-variance-discovery.md` §9 (Eva,
 Sep 17): the FORM amount, reading the SHARED frequency and phase of build 1. Every figure below
-names its MODE and its SAMPLING. **The branch is not merged and no PR is open: the hazard
-measurement in §4 un-accepts the accepted-look ruling at the top of the range, X2 reddens on
-fourteen rows of the new block, and the brief says that is Eva's to rule on before anything is
-declared.**
+names its MODE and its SAMPLING.
+
+**READ §12 FIRST.** §4 and §5 are the measurements that stopped the first build: one wave drove
+curl, cup and twist together, so the crest petal took all three maxima at once and X2 reddened on
+fourteen rows. Eva ruled on them (Sep 30): **the three bases take fixed phase offsets off the shared
+wave — the offset law, §12** — and the curl-360 fold the field can still reach is **DECLARED**, not
+clamped (§13). §4/§5 are kept as the record of the single-g law; every figure after §11 is the
+offset law's.
 
 ## 0. Reconciliation (before any work)
 
@@ -259,14 +263,236 @@ hidden-AND-inert routes covering it. The alternative, a `follows:` field on the 
 `DEFAULTS`, `readUI`, the read-back in both STL gates and the panel gate's census, and would be the
 registry's first non-literal default. Its own PR, after build 3.
 
-## 11. Not done, named
+## 11. Not done, named (superseded by §12–§17 for everything the rulings closed)
 
-- **No xfail entry, no clamp, no ALL MAX re-record** — §4/§5 are Eva's.
-- **No PR and no push.** CLAUDE.md: while a ruling is outstanding, commit locally and do not push;
-  a PR starts the 3.5-hour gates, which would read red on X2 by construction.
-- **`frozen/phase47`** (the 971 rows at `2fee3f7`) is registered in both maps and proved
-  deep-equal (`--verify-frozen --phase47`: PASS); **not dispatched** — the dispatch follows the
-  merge. **No workflow file is edited by this branch**, so nothing here costs a tag.
 - **No panel route for the FORM VARIANCE line** (route (y) covers the size line); and no clause
   asserts a SEPAL carries no form term — the sepal whorl is simply not handed the field.
-- The full mutant sweep (74 not run) and the panel gate's negative control.
+- The full mutant sweep locally (CI runs the table) and the panel gate's negative control.
+
+## 12. THE OFFSET LAW (Eva's ruling 1, Sep 30)
+
+**Curl, cup and twist read the SAME wave, each advanced by a fixed phase offset a third of a cycle
+apart, so no petal receives all three maxima.** Five controls, not eight: the offsets are constants
+of the law and are not exposed, so ruling 2 (one frequency, one phase) holds exactly.
+
+    FORM_VARIANCE_OFFSET_DEG = { petalCup: 0, petalSpineCurl: 120, petalTwist: 240 }
+    term[base] = A · g(θ, offset[base]) · half-span[base]
+      ring:  g = cos(fθ + φ + offset)          fan:  g = cos(f|θ| + offset)   (still even)
+      ramp:  the seam slides a fraction offset/360 of the way round (see §14b)
+
+`bloom-geometry.js` owns the constants beside `FORM_VARIANCE_BASES`; `tools/bloom-harness.mjs`
+**restates them** (`FORM_OFFSET_DEG_RESTATED`), never imports them, so FV1's reference has a
+different owner from the quantity under test and a tree whose offsets have gone back to zero fails
+FV1 — the standing mutant `the-form-offsets-collapse-to-zero` is that witness (§16).
+
+**Why this assignment.** Under a 120° spacing every PAIR of the three meets at +0.5 / +0.5 on some
+petal whatever the assignment — where one base is at its crest the other two sit at cos 120 = −0.5,
+and midway between two crests two sit at +0.5 and the third at −1 — so the assignment does not
+choose which pairs meet. What it chooses is which base is at its crest on the wave's ORIGIN (the
+phase-0 petal of a ring and, on a FAN, the petal on the mirror line) and the order the others
+follow outward. **Cup takes 0:** a fan is read face-on and its mirror-line petal is the lip; cup is
+the one form a face-on eye reads as the petal opening or closing, so the variance reads first as the
+lip cupped rather than turned. **Twist takes 240**, putting its crest a third of a cycle out
+(cos(fθ + 240) peaks at fθ = 120) — the petals turning from facing the viewer to edge-on, where a
+twist is what that turn is. **Curl takes 120**, crest two thirds out, on the petals seen nearest to
+profile, the only view in which a spine curl reads. Outward from the origin: cup, cup + twist,
+twist, twist + curl, curl, curl + cup.
+
+**The size field is untouched by construction and by measurement:** `gAt(az, 0)` returns `g(az)` by
+BRANCH (never `x + 0`), and the full-matrix byte partition (§15) holds every size row to the bit.
+
+## 13. What the law changed — re-measured, and the one row that still reddens
+
+**The three-way excursion, worst petal `self`, form amount 1, EXPORT, every petal**
+(`node tools/bloom-form-variance-hazard.mjs --headline`):
+
+| state | f 1 ph 0 | f 1 ph 90 | f 20 ph 0 | f 20 ph 90 |
+|---|---|---|---|---|
+| the DEFAULT bloom (8) | **0.527** | 0.527 | 1.097 (aliased) | 0.527 |
+| FAN (7) | 0.620 | 0.620 | 1.097 | 1.097 |
+| CONTINUOUS × 3 turns (24) | 0.358 | 0.375 | 0.311 | 0.305 |
+| 3 whorls (24) — first crossing 0.45 under the old law | 0.334 | 0.334 | 0.331 | 0.334 |
+
+Against the 1.0 mm bar every drawn wave still puts a petal under it — **0.076 → 0.527 mm on the
+default**. The worst petal is no longer all three at their crests: it is **curl ≈ +234° with twist ≈
+−156° and cup ≈ 0**, the curl × twist pair at opposite signs. The first amount at which the
+default's worst petal goes under the bar moved **0.49 → 0.70** (`--sweep`, f 1; f 20 clears at every
+amount to 1.00).
+
+**The 1.0 mm bar is an ADVISORY margin; X2 is the gate** (Eva's note, for her benefit). `self` is a
+nearest approach between two faces of one petal; X2 is whether the solid passes through itself.
+Whether a 0.527 mm gap between two faces of one petal survives an FDM nozzle is a question only the
+coupon print answers — nothing in this project has ever been printed.
+
+**X2, block 43, Node census, EXPORT: 13 of the 14 rows that reddened under the single-g law now read
+0 pairs.** The default at amount 1, phase 180, 3 and 40 petals, FAN, SPIRAL, CONTINUOUS × 3, the
+aliased rows, the sphere with a stem, size ±50 %, sepals, leaves — all 0.
+
+**The one that still reddens, and Eva's ruling on it: DECLARE, do not change the field's reach.**
+
+| row | field OFF (same controls, amount 0) | field ON | the field's |
+|---|---|---|---|
+| `FORM VARIANCE: x 3 whorls with innerCurl 360 on curl 180` | **1,968** pairs / 0.4218 mm | **4,080** / 0.7533 | 2,112 |
+| `ALL MAX` (export-refused; Node) | **91,808** / 10.1332 (main's own) | **116,847** / 15.8503 | 25,039 |
+
+It is **the declared curl-360 fold reached through the field** (`petalSpineCurl max (360)`, 920 /
+0.5158 on `main`): curl 180 + 270 clamps to 360. The controls say so — one whorl at curl 180 reads 0
+off and 427 / 0.7078 on; three whorls at curl 180 with `innerCurl` 0 read 0 off and 1,577 / 0.7533
+on. The row's composed base state folds by itself (see §17 — it has no row on `main`). Eva's reasons,
+recorded: (1) curl 360 is already a declared fold, so this is a new path to a known place; (2) the
+worst row is majority pre-existing, 1,968 of 4,080; (3) capping the field's curl would make it weaker
+than the slider for one control only and buys nothing — curl 360 is directly settable — and headroom
+scaling or a soft clamp is a fifth typed threshold. Both entries are in `SELF_INTERSECTION_XFAIL`
+with both numbers in their text; X1 reads them in both directions. `ALL MAX` under the single-g law
+read 99,004 / 10.1332.
+
+## 14. Three measurements Eva asked for (none changes the ruling)
+
+### 14a. The clamp is flattening the variance
+
+20 petals, amount 1, frequency 1, phase 0, EXPORT; how many DISTINCT values each varied control
+takes, and the fraction pinned at a range end:
+
+| control at | distinct | pinned |
+|---|---|---|
+| curl −180 | 11 of 20 | 10 at −180 — **50 %** |
+| curl 0 (the default) | 15 | 6 at −180 — **30 %** |
+| curl 90 | 20 | 0 — 0 % |
+| curl 180 | 15 | 6 at 360 — **30 %** |
+| curl 270 | 13 | 8 at 360 — **40 %** |
+| curl 360 | 11 | 10 at 360 — **50 %** |
+| cup −0.8 / 0 / 0.6 / 1.2 | 6 / 10 / 9 / 6 | 50 % / 25 % / 25 % / 50 % |
+| twist −180 / 0 / 90 / 180 | 11 / 20 / 14 / 11 | 50 % / 0 % / 35 % / 50 % |
+
+**A meaningful fraction is pinned at every slider position but the range's own middle** — and at
+the shipped default curl of 0 already 30 % of petals sit identically at curl −180, because 0 − 270
+passes the −180 floor. At a slider end half the petals are identical. (Cup's counts are halved
+further by the wave's own symmetry: cup takes offset 0, so mirror azimuths ±θ read the same value
+without any clamp.) Reported, not fixed; Eva rules on it separately.
+
+### 14b. The fan's ramp seam
+
+On a FAN at frequency 0 the offset slides each base's ramp, so curl (120) and twist (240) gain a
+seam the fan's ramp did not have; cup (0) does not. **It shows in neither instrument:** X2 reads
+**0 pairs** on all four fan ramp states (default, 6 and 1 per side, no centre petal) at amounts 0.5
+and 1, where the single-g law read **172 / 0.8771 on every one** (the triple at the fan's edge); and
+the neighbour approach is crossing on the shipping fan with the field off, so a seam cannot move
+it past a state it is already in. **It is in the look:** on the default fan (3 per side) at amount 1
+curl steps from **+90° on the mirror-line petal to −180° on its two neighbours** — a 270° jump
+between adjacent petals, where the single-g ramp stepped 90° per petal monotonically outward — and
+twist steps from +60° to −180° between the first and second petal out. Visible at any amount above 0,
+frequency 0, FAN only.
+
+### 14c. The composed base state
+
+In the shortlist, §17.
+
+## 15. Amount 0 is still byte-inert — re-run at the full matrix under the offset law
+
+Not taken by construction (Eva: that reasoning let build 1's 909-row gap and the sepal grouping
+defect sit unnoticed). The same chunked driver, 48 chunks, worktree of `2fee3f7`:
+
+    MERGED 48 chunks over 992 rows x 2 modes, predicate variance-form
+    partition     : 19 of 19 predeclared movers MOVED (every one must), 973 holders compared to the bit
+    export stream : 1,293,491,196 floats over 143,721,244 triangles
+    captured grid : 80,703,620 values over 9,295 panels (live)
+    PASS — 0 floats moved on the 973 holders, positionally, under Object.is
+
+## 16. Re-measured under the offset law
+
+**The four declared pairs** (the same grids and settings as §4):
+
+| pair | worst per-petal, single-g → offset | from clear cells, single-g → offset | runs under the bar |
+|---|---|---|---|
+| cup × roll | 0.000 → 0.000 | 0.003 → 0.018 | 15/20 → **16/20** |
+| **curl × twist** | **0.007 → 0.000** | **0.021 → 0.000** | **30/40 → 34/40** |
+| cup × tip shape | 0.000 → 0.001 | 0.000 → 0.012 | 21/28 → **24/28** |
+| leaf × stem | identical under `Object.is` on 48/48 | — | — |
+
+**Decorrelating three controls correlated two, as Eva predicted it might:** curl × twist is WORSE
+under the offsets — its worst per-petal excursion falls from 0.007 to 0.000 mm and more runs from
+clear cells go under the bar — because curl (120) and twist (240) now sit at opposite signs on the
+petals between their crests, which is exactly the pairing the combination gate declares at
+curl 360 × twist 180. The other two pairs read better at their worst and put slightly MORE runs
+under the bar, because a petal no longer needs all three crests to reach it.
+
+- **Separation** (`bloom-petal-separation.mjs --field form`, 143 builds over the 16 bases, EXPORT):
+  every build **one connected piece at 0.6 mm**. The triangle count still moves with the amount on
+  the four 6-layer corners (by up to 1,512 on base 13, 1,128 on 11/12, 192 on base 14).
+- **Determinism** (`verify-bloom-build-order.mjs`, the 45 variance rows × 2 modes, forward / reverse
+  / shuffle seed 7 in three processes): **every digest identical, bit for bit** (90 keys, 180
+  pairwise comparisons, 3,321,656 triangles a pass).
+- **Mutants**, 11 of 84 run locally, every one firing its names and the clean tree silent, all 84
+  anchors matching exactly once: the NEW standing mutant **`the-form-offsets-collapse-to-zero`**
+  (FV1; witnessed on the mutated module as the joint crest — the largest over petals of the
+  smallest of the three per-base waves — reading 1 on the mutant against ≤ 0.5 clean), the five
+  FORM mutants (`form-half-span-is-the-whole-range` re-anchored onto the new `halves` line), the two
+  shared-wave mutants and three SIZE mutants through the changed `varianceWave`. CI runs the table.
+
+## 17. THE TRIPLE IN THE COMBINATION GATE (Eva's ruling 2), and the shortlist
+
+`petalSpineCurl × petalCup × petalTwist`, tier 1, the gate's first TRIPLE (`TRIPLES` in
+`tools/bloom-combination-gate.mjs`, the same clauses generalised by one axis and the same
+`COMBINATION_XFAIL` list). **18 cells: extremes only** — each axis's registry DEFAULT (CG0, so every
+face is a pair cell the gate already holds) and its slider MAXIMUM, plus on curl and cup ONLY the one
+interior value the form field's own reach puts a petal at from the shipped default (curl 270, cup
+1.0; the twist reach IS its maximum). The minima were measured and not carried: every cell with
+curl −180 or cup −0.8 reads higher than the same cell at the maximum, and twist −180 reads within
+0.01 mm of +180.
+
+| cell (curl × cup × twist) | self, mm | nearest face | the third control costs |
+|---|---|---|---|
+| **270 × 1 × 180** — the single-g crest petal | **0.076** | 270 × 0 × 180, 0.275 | **0.199 mm** |
+| 270 × 1.2 × 180 | 0.227 | 270 × 1.2 × 0, 0.182 | −0.045 (relieves) |
+| 360 × 1 × 180 | 0.065 | 360 × 0 × 180, 0.007 | −0.058 |
+| 360 × 1.2 × 180 — every slider max | 0.014 | 360 × 1.2 × 0, 0.000 | −0.014 |
+
+**Worst cell 0.000 mm (0.0002) at curl 360 × cup 1.2 × twist 0 — a FACE, the cup-x-curl pair's own
+worst cell.** Verdict **PAIR-REACHES** (6 cells with two or fewer axes moved are under the bar, 4
+all-three cells) — the honest one: the three-control corner is a product only at the field's own
+interior reach, not at the slider extremes. **Ten cells declared**, each read both ways (CG2/CG3).
+The gate: 22 pairs and 1 triple, 312 cells, 74 under the bar and all 74 declared; `--control` fires
+every clause including six new triple legs.
+
+**The gate's figure is not the scratch figure, and both are right.** Eva expected ~0.8771 mm; that is
+the census's WORST SPAN on this state (688 pairs, how far the fold reaches through the sheet), and
+the gate reads `self` — the NEAREST APPROACH, 0.076 mm. Two quantities of one fold.
+
+**The shortlist — which declared pairs have an obvious third** (for Eva to rule on at once):
+
+- **cup × roll → curl.** Roll closes the cross-section into a tube, cup lifts its margins, and curl
+  bends that tube into a hoop along the spine — the same hoop that makes curl × twist a hazard. The
+  most obvious third on the list; `cupGradient` is NOT a third here, it is cup's own coefficient
+  (#265's sum rule).
+- **curl × twist → cup (built, above) and roll.** Roll is the second obvious third: it acts in the
+  cross-section twist wrings, on the blade curl has already bent.
+- **cup × tip shape → width, or tip thinning.** All three act at the tip, and `cup-x-width` and
+  `cup-x-thinning` are both already declared PRODUCT-ONLY — cup × tip shape × width is two
+  product-only pairs sharing a control and a region.
+- **leaf × stem → none worth a cell.** Six partners were swept and move the approach by at most
+  0.002 mm; the hazard is `leafAngle`'s alone.
+- **The composed base state: `layerCount` × `petalSpineCurl` × `innerCurl`.** Three whorls with
+  curl 180 and `innerCurl` 360 fold at **1,968 pairs / 0.4218 mm with NO field** (census, EXPORT),
+  and no row on `main` carries it: the matrix varies one control at a time and the gate tests pairs,
+  which is the same blindness that let the curl × cup × twist corner go undeclared. Not added as a
+  row or a gate entry in this PR, by ruling.
+
+## 18. Findings carried from the build (for the record)
+
+- **The build-1 sepal grouping defect.** The sepal angle scan groups sepals by congruent
+  neighbourhood, and its key was (descriptor, relative azimuth) only — so under ANY per-slot field
+  (build 1's size field included) it tested ONE sepal where eight distinct neighbourhoods exist. SP8
+  found it on the first form row. The key now carries each facing petal's size factor and all three
+  form deltas (the offset law made `g` alone insufficient: cos x does not determine cos(x + 120)).
+  With no field every suffix is identical, so grouping is unchanged.
+- **Three harness bugs, each found by a red rather than a reading:** (1) `effectiveFor` read ring
+  0's representative petal, which is NULL where the sphere stem's channel omits slot 0 — it reads
+  the first BUILT petal now ("flat row reports form telemetry" on the sphere-stem row); (2) both
+  coverage instruments re-emit the whorl and were not handed the form field, so R3 fired on the
+  first form row, as it did for size; (3) Z2 asserted a petal's varied bases equal the whorl's
+  composed value — true until a slot term exists — and hands those bases to FV2 on a petal carrying
+  a term.
+- **The hub-ring result, VERIFIED rather than cited** (`bloom-petal-separation.mjs --foot`):
+  `petalSurface`'s `footRowsAt` reads `ring.radius`, `ring.width`, `ring.overhang` and `slot.z` and no
+  `slot.scale`; 18 foot rows at the slot's own scale and at half of it, **0 differ under
+  `Object.is`**.
