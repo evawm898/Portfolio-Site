@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Bug — Eva Maskalenko</title>
+<meta name="description" content="Parametric Bug — one 3D model of an insect or spider, exported as a top-down SVG and a printable STL.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- three pinned to the version every other generator here uses, so the
+     headless tools serve one local copy from node_modules for all of them. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root{
+    --ink:#0A0A0C; --ink-soft:#131316; --paper:#EDEDE8; --dim:#8A8A85; --dim-2:#5A5A56;
+    --line:rgba(237,237,232,0.10); --line-strong:rgba(237,237,232,0.22); --teal:#5FA0A0;
+    --font-display:'Playfair Display', Georgia, serif;
+    --font-mono:'Space Mono', 'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--font-mono);font-size:12px;overflow:hidden;-webkit-font-smoothing:antialiased;}
+  #bug-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;}
+
+  .bg-header{position:fixed;top:20px;left:22px;z-index:4;pointer-events:none;}
+  .bg-eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);}
+  .bg-header h1{font-family:var(--font-display);font-weight:600;font-size:38px;margin:6px 0 4px;color:var(--paper);}
+  .bg-sub{margin:0;color:var(--dim);font-size:11px;max-width:340px;line-height:1.5;}
+  .bg-back{pointer-events:auto;color:var(--dim-2);text-decoration:none;font-size:11px;}
+  .bg-back:hover{color:var(--paper);}
+
+  .bg-box{background:rgba(10,10,12,.86);border:1px solid var(--line-strong);backdrop-filter:blur(6px);}
+  .bg-panel{position:fixed;top:18px;right:18px;bottom:18px;z-index:4;width:292px;overflow-y:auto;padding:14px 16px;}
+  .bg-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:0 0 8px;}
+
+  details.bg-sec{border-top:1px solid var(--line);}
+  details.bg-sec:first-of-type{border-top:0;}
+  details.bg-sec>summary{list-style:none;cursor:pointer;padding:9px 0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--paper);display:flex;align-items:center;gap:8px;}
+  details.bg-sec>summary::-webkit-details-marker{display:none;}
+  details.bg-sec>summary::before{content:"\25B8";color:var(--teal);transition:transform .15s;}
+  details.bg-sec[open]>summary::before{transform:rotate(90deg);}
+  details.bg-sec>summary:hover{color:var(--teal);}
+  details.bg-sec details.bg-sec{margin-left:10px;}
+  details.bg-sec details.bg-sec>summary{font-size:10px;color:var(--dim);}
+  .bg-sec-body{padding:0 0 8px;}
+
+  .bg-ctrl{margin:0 0 9px;}
+  .bg-ctrl[hidden]{display:none;}
+  .bg-ctrl label{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-bottom:3px;}
+  .bg-ctrl output{color:var(--paper);}
+  .bg-ctrl input[type=range]{width:100%;accent-color:var(--teal);}
+  .bg-ctrl select{width:100%;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:4px;}
+  .bg-ctrl.bg-bool label{justify-content:flex-start;gap:8px;align-items:center;}
+
+  .bg-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  button.bg-btn{background:transparent;color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:5px 9px;cursor:pointer;}
+  button.bg-btn:hover{border-color:var(--teal);color:var(--teal);}
+  button.bg-btn.is-on{border-color:var(--teal);color:var(--teal);}
+  button.bg-btn--solid{background:var(--teal);color:var(--ink);border-color:var(--teal);}
+  button.bg-btn--solid:hover{color:var(--ink);opacity:.85;}
+
+  .bg-readout{font-size:10.5px;line-height:1.6;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:6px;white-space:pre-wrap;}
+  .bg-readout b{color:var(--paper);font-weight:400;}
+
+  .bg-view{position:fixed;left:18px;bottom:18px;z-index:4;padding:12px 14px;width:300px;}
+  .bg-svgcard{background:var(--paper);height:240px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin:6px 0 8px;}
+  .bg-svgcard svg{max-width:100%;max-height:100%;width:auto;height:auto;}
+  .bg-note{font-size:10px;color:var(--dim-2);line-height:1.5;margin:0;}
+
+  @media (max-width:760px){
+    .bg-panel{top:auto;height:46vh;left:10px;right:10px;width:auto;bottom:10px;}
+    .bg-view{display:none;}
+    .bg-header h1{font-size:28px;}
+  }
+</style>
+</head>
+<body>
+<canvas id="bug-canvas"></canvas>
+
+<header class="bg-header">
+  <a class="bg-back" href="index.html">&larr; Index</a>
+  <div class="bg-eyebrow" style="margin-top:10px">EM / BUG</div>
+  <h1>Parametric Bug</h1>
+  <p class="bg-sub">Phase 1 — body, legs, antennae, flat wings. One 3D model; the SVG is its top-down projection, the STL is the solid.</p>
+</header>
+
+<aside class="bg-view bg-box" aria-label="View and SVG">
+  <div class="bg-label">View</div>
+  <div class="bg-row" id="viewButtons">
+    <button class="bg-btn is-on" data-view="three">3/4</button>
+    <button class="bg-btn" data-view="top">Top</button>
+    <button class="bg-btn" data-view="front">Front</button>
+    <button class="bg-btn" data-view="side">Side</button>
+  </div>
+  <div class="bg-label">SVG — top-down projection</div>
+  <div class="bg-svgcard" id="svgCard"></div>
+  <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="cutSafe"> Cut-safe (one connected region)</label></div>
+  <p class="bg-note" id="svgNote"></p>
+</aside>
+
+<aside class="bg-panel bg-box" aria-label="Bug controls">
+  <div class="bg-label">Preset</div>
+  <div class="bg-row" id="presetButtons"></div>
+  <div class="bg-row"><button class="bg-btn" id="randomBtn">Random</button><button class="bg-btn" id="resetBtn">Reset</button></div>
+  <div id="controls"></div>
+  <div class="bg-label" style="margin-top:12px">Export</div>
+  <div class="bg-row">
+    <button class="bg-btn bg-btn--solid" id="exportSvg">Get SVG &darr;</button>
+    <button class="bg-btn bg-btn--solid" id="exportStl">Get STL &darr;</button>
+  </div>
+  <div class="bg-readout" id="readout"></div>
+</aside>
+
+<script type="module" src="bug.js"></script>
+</body>
+</html>

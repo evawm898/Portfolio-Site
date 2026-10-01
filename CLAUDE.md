@@ -9649,3 +9649,15 @@ don't wait to be asked, and don't surface them only after the fact.
 - For control-panel changes, confirm `tools/verify-registry-sync.mjs` and
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
+
+## `/bug` — the Parametric Bug (pointer only)
+
+Hidden generative page (`bug.html`, `bug.js`, `bug-geometry.js`, `noindex`, unlinked).
+Its governing document is **`bug-project-design-doc.md`** — read it before touching any
+bug file. The law: ONE 3D model (`buildBug`) is the single source of truth; `exportStl`
+and `exportSvg` read the model and never the parameters, and the SVG is the top-down
+contour-generator projection of the model's own solids, never a second 2D path.
+Bilateral symmetry is built (right half + mirror) and checked as an exact identity.
+Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control` required before
+quoting a pass from a changed harness). Sheet: `node tools/shot-bug-sheet.mjs <dir>`.
+Neither runs in CI — run both by hand.
