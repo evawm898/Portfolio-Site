@@ -9,8 +9,10 @@
 # smoke/full split needed here, unlike the export-watertight gate. Known, tracked defects
 # are xfail; none are open today, and the gate still fails if a debt goes stale, its config
 # count exceeds the cap, or one unexpectedly starts passing (the ledger's own self-policing).
-# Path-scoped generously (every geometry source AND tools/**) so a change to a dev tool or
-# a preset can't silently skip this.
+# Path-scoped to the files this job REACHES (the geometry sources, flower-shapes.js and the
+# two tools it imports). It carried 'tools/**' until Oct 1, which ran this flower gate on every
+# frame, cards, print, plot and scene PR that added a tool — testing flower geometry on a diff
+# that did not touch it.
 name: flower-geometry-quality
 
 on:
@@ -22,7 +24,9 @@ on:
       - flower-presets.js
       - flower-registry.js
       - flower.html
-      - 'tools/**'
+      - flower-shapes.js
+      - tools/verify-geometry-quality.mjs
+      - tools/chromium-harness.mjs
       - .github/workflows/flower-geometry-quality.yml
   push:
     branches: [main]
@@ -33,7 +37,9 @@ on:
       - flower-presets.js
       - flower-registry.js
       - flower.html
-      - 'tools/**'
+      - flower-shapes.js
+      - tools/verify-geometry-quality.mjs
+      - tools/chromium-harness.mjs
   workflow_dispatch: {}    # run on demand, no PR needed
 
 jobs:

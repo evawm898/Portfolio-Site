@@ -23,7 +23,8 @@ on:
       - flower-presets.js
       - flower-registry.js
       - flower.html
-      - 'tools/**'
+      - tools/verify-flower-export.mjs
+      - tools/chromium-harness.mjs
       - .github/workflows/flower-export-watertight.yml
   push:
     branches: [main]
@@ -34,7 +35,8 @@ on:
       - flower-presets.js
       - flower-registry.js
       - flower.html
-      - 'tools/**'
+      - tools/verify-flower-export.mjs
+      - tools/chromium-harness.mjs
   schedule:
     - cron: '0 7 * * 0'   # weekly, Sunday 07:00 UTC — full matrix, catches drift between touches
   workflow_dispatch: {}    # run the full matrix on demand, no PR needed
