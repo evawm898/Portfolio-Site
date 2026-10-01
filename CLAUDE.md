@@ -5259,6 +5259,35 @@ is in the apex mutant table with a witness on the mutated module. `node
 tools/verify-bloom-build-order.mjs --coupling` reads **0 of 971** on the fixed tree (1 of 970
 before). `frozen/phase46` is the 970 rows at `a4dc836`.
 
+**COROLLA FUSION STOPPED AT DISCOVERY: NEIGHBOURING PETAL MARGINS CROSS ON THE SHIPPED DEFAULT, SO
+A WEB LOFTED FROM ONE MARGIN TO THE NEXT HAS NOWHERE TO BE OVER PART OF EVERY PETAL** (Oct 1 —
+read `docs/bloom-corolla-fusion-discovery.md` before proposing any fused-corolla, web or slit
+work; nothing in the generator was touched). Measured by `node tools/bloom-fusion-margins.mjs`
+(EXPORT, every row of the shipped ladder, 8 must-fails under `--control`) and confirmed by a
+ray-parity test against the emitted solid and a triangle-triangle census: at the defaults petal
+i's trailing margin and petal i+1's leading margin **cross for u 0.161–0.323 (10 of 56 blade rows),
+the margin 0.857 mm inside its neighbour's outline and 0.13 mm from its mid-surface — BURIED in
+the sheet** — the overlap the builder's own `neighbourFlag` prints on every build as "SKINS PASS
+THROUGH EACH OTHER". **Of the 576 tube-range states (tilt 60–90) in a 1,536-state grid, 75% cross
+and 60% are SHINGLED** (one margin over or under the next, which a web would have to cut a sheet to join);
+the shipped 8 petals is clean at no tilt, and every clean island is one step of cup 0.4, curl 45 or
+roll +30 from crossing. **The crossing criterion is the PLAN GAP, NOT THE BRIDGE SPAN** — the first
+version used the span and an independent audit showed it reports false crossings on rolled and
+twisted petals (a rolled margin leaves a rung at an obtuse angle without reaching its neighbour);
+**twist never makes margins cross, and roll does only at a few positive settings** — the span is
+kept as the CREASE. **A margin-to-margin web run "base to tip" also folds at the apex nib on every
+state, clean ones included** (678 within-web pairs on the prototype's headline cell, 0 once it ends
+at the nib entry), so "full petal length" cannot be literal. **The bloom ships NO design presets**
+(`bloom-view-presets.js` is camera chrome). **At the ring row the web's lower edge would hang
+OUTSIDE the hub on every outer whorl** (a foot's ring row is a straight chord, its corners at
+`hypot(r, w/2) > r`). A scratch prototype where nothing crosses
+(`tools/shot-bloom-fusion-prototype.mjs`, refuses any crossing state, censuses every web) shows a
+STRAIGHT loft makes a faceted polygonal cup and a cylindrical one a round funnel, and that A vs B is
+0.20 mm at the shipped sheet. **The closed-ring panel the bell discovery costed is the one
+construction where a crossing is impossible by construction**; it and five alternatives are costed
+for Eva's ruling, none built. "Seam" is the FOOT-TO-BLADE seam in 151 places — the inter-petal
+joint needs another word.
+
 ## Flower generator — print-safety is a hard invariant
 
 The Flower Bloom generator (`flower.html`, `flower.js`, `flower-geometry.js`) is a
