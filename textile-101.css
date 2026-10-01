@@ -154,7 +154,7 @@
 .yarn-path {
   stroke-dasharray: 900;
   stroke-dashoffset: 900;
-  animation: tx-draw 3.6s ease-in-out infinite;
+  animation: tx-draw 5.4s ease-in-out infinite;
 }
 
 .weave-path {
@@ -163,9 +163,34 @@
   animation: tx-draw 4.2s ease-in-out infinite;
 }
 
-.yarn-path.delay1 { animation-delay: 0.15s; }
-.yarn-path.delay2 { animation-delay: 0.3s; }
-.yarn-path.delay3 { animation-delay: 0.45s; }
+.yarn-path.delay1 { animation-delay: 0.22s; }
+.yarn-path.delay2 { animation-delay: 0.45s; }
+.yarn-path.delay3 { animation-delay: 0.68s; }
+.yarn-path.delay4 { animation-delay: 0.9s; }
+
+/* weft/warp knit: two generated panels (tools/knit-diagram/), side by side, stacked under 560px */
+.tx-diagram__panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.tx-diagram__panels .tx-panel:first-child { padding-right: 2rem; }
+
+.tx-diagram__panels .tx-panel + .tx-panel {
+  border-left: 1px solid var(--line);
+  padding-left: 2rem;
+}
+
+@media (max-width: 560px) {
+  .tx-diagram__panels { grid-template-columns: 1fr; gap: 1.5rem 0; }
+  .tx-diagram__panels .tx-panel:first-child { padding-right: 0; }
+  .tx-diagram__panels .tx-panel + .tx-panel {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 1.5rem;
+  }
+}
 
 @keyframes tx-draw {
   0%   { stroke-dashoffset: 900; }
