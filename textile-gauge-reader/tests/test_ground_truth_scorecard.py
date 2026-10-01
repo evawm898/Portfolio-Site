@@ -58,7 +58,9 @@ Baseline pinned 2026-09-03 against main 7974ad9 (detector unchanged since
 PR #109); the two course rows re-pinned the same day when the sub-repeat
 test (_subrepeat_walk_score / _prefer_fundamental_seed's descent) brought
 knit_05 and knit_08 course inside the bar (-51.7 -> -6.7, -47.8 -> -2.2)
-with every other row byte-identical. Run this file directly to print the
+with every other row byte-identical. knit_05 wale re-pinned 2026-10-01
+(+103.4 -> +3.3) when the wale leg-lattice climb landed, again with every
+other row byte-identical. Run this file directly to print the
 current table:
 
     python tests/test_ground_truth_scorecard.py
@@ -132,7 +134,7 @@ BASELINE: Dict[Tuple[str, str], float] = {
     ("knit_01", "wale"): 4.5,
     ("knit_01", "course"): -1.8,
     ("knit_02", "wale"): 120.4,
-    ("knit_05", "wale"): 103.4,
+    ("knit_05", "wale"): 3.3,
     ("knit_05", "course"): -6.7,
     ("knit_06", "wale"): -3.3,
     ("knit_06", "course"): 0.4,
@@ -150,11 +152,6 @@ KNOWN_BEYOND_BAR: Dict[Tuple[str, str], str] = {
         "(knit_sample_ground_truth.py says so and keeps it on purpose), and the wale reading is a "
         "134.7px sub-feature, not the ~297px stitch pitch; the fabric is also soft-focus at pixel level"
     ),
-    ("knit_05", "wale"): (
-        "+103%: half-period leg-lattice lock-on (33.5px vs the ~68px stitch pitch) -- the mechanism "
-        "documented under 'Seed lands directly on the leg lattice'; unrotated, the wale candidate "
-        "family is supposed to climb back up and here it does not at this ROI"
-    ),
 }
 
 # Rows that USED to be beyond the bar, kept so the fix has a name when the
@@ -167,6 +164,11 @@ KNOWN_BEYOND_BAR: Dict[Tuple[str, str], str] = {
 # narrow 1.6-pitch template band failed the walk at the TRUE pitch on
 # knit_05 (0.0) while walking the double (0.71). Fixed by the sub-repeat
 # test -- see _subrepeat_walk_score in analysis/gauge_analysis.py.
+# knit_05 wale (+103.4%, 33.5px vs the ~68px stitch pitch) was the
+# half-period leg-lattice lock-on: the v0.3 evidence winner was the leg
+# spacing, whose own 2D template walk fails outright (0.0) while its
+# double walks (0.70). Fixed by the leg-lattice climb in
+# _analyze_axis_v3 (65.9px, +3.3%).
 
 
 def _roi_for(case: Case, img) -> Tuple[int, int, int, int]:
