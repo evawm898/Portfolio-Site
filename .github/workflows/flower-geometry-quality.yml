@@ -23,6 +23,10 @@ on:
       - flower-registry.js
       - flower.html
       - 'tools/**'
+      # the Parametric Bug's tools are NOT flower tools: bug-gate.yml owns them
+      - '!tools/verify-bug*'
+      - '!tools/bug-*'
+      - '!tools/shot-bug-*'
       - .github/workflows/flower-geometry-quality.yml
   push:
     branches: [main]
@@ -34,6 +38,10 @@ on:
       - flower-registry.js
       - flower.html
       - 'tools/**'
+      # the Parametric Bug's tools are NOT flower tools: bug-gate.yml owns them
+      - '!tools/verify-bug*'
+      - '!tools/bug-*'
+      - '!tools/shot-bug-*'
   workflow_dispatch: {}    # run on demand, no PR needed
 
 jobs:
