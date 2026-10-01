@@ -1,0 +1,167 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>knit loop prototype (scratch)</title>
+<style>
+  :root { --bg:#0A0A0C; --ink:#EDEDE8; --accent:#5FA0A0; --dim:#8b9494; --line:#232727; --mono: ui-monospace, "IBM Plex Mono", Menlo, monospace; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--mono); }
+  .opt { padding: 24px clamp(12px,3vw,40px); border-bottom:1px solid var(--line); }
+  .opt h2 { font-size:13px; letter-spacing:.12em; color:var(--dim); margin:0 0 6px; font-weight:400; }
+  .opt p { font-size:12px; color:var(--dim); margin:0 0 14px; max-width:70ch; }
+  .frame { border:1px solid var(--line); background:rgba(233,236,236,.02); padding: 2.5rem clamp(1rem,4vw,2.5rem); }
+  svg { display:block; width:100%; height:auto; }
+  .axis { font-family:var(--mono); font-size:13px; fill:var(--dim); letter-spacing:.06em; }
+  .title { font-family:var(--mono); font-size:13px; fill:var(--ink); letter-spacing:.12em; }
+  .yarn { fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  .draw { stroke-dasharray:1; stroke-dashoffset:1; animation: draw 4s ease-in-out infinite; }
+  @keyframes draw { 0%{stroke-dashoffset:1} 45%{stroke-dashoffset:0} 80%{stroke-dashoffset:0} 100%{stroke-dashoffset:-1} }
+  @media (prefers-reduced-motion: reduce) { .draw { animation:none; stroke-dashoffset:0; } }
+  .cap { margin-top:1.1rem; font-size:12px; letter-spacing:.04em; color:var(--dim); text-align:center; }
+  .cap .accent { color:var(--accent); }
+  .bad { color:#c96a6a; }
+</style>
+<body>
+<div id="root"></div>
+<script type="module">
+import { PALETTE, weftCourse, tricotYarn, toPath, crossings, slice } from './knit-loops.js';
+const NS = 'http://www.w3.org/2000/svg';
+const el = (t, a = {}, kids = []) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); kids.forEach(k => e.appendChild(k)); return e; };
+const q = new URLSearchParams(location.search);
+const MOTION = q.get('motion') === '1';
+const yarnClass = (i, n) => 'yarn' + (MOTION ? ' draw' : '');
+
+// ---- geometry (viewBox 920x300, same as the live page) -------------------
+const SW = 7; const HALO = 4;    // halo: bg gap each side of a front strand, in viewBox units                       // yarn width in viewBox units (live page: 3)
+const WEFT = { x0: 70, W: 62, H: 52, n: 6, courses: 4, top: 66 };
+WEFT.L = 1.75 * WEFT.H;             // loop height; must exceed H so loops interlock
+function weftStrands() {
+  const s = [];
+  for (let c = 0; c < WEFT.courses; c++) s.push(weftCourse({ x0: WEFT.x0, cy: WEFT.top + c * WEFT.H + 36, W: WEFT.W, L: WEFT.L, n: WEFT.n }));
+  return s; // index 0 is the TOP course
+}
+const DIM = '#A9A9A6'; // #EDEDE8 at 70% over #0A0A0C — a solid, so chunk joints cannot double up
+const weftColor = i => i === 2 ? PALETTE.accent : (i === 0 ? PALETTE.ink : DIM);
+const weftOpacity = () => 1;
+
+const WARP = { x0: 556, W: 66, H: 54, y0: 228, courses: 4, wales: 5 };
+WARP.L = 1.45 * WARP.H;
+function warpStrands() {
+  const s = [];
+  for (let w = -1; w < WARP.wales; w++) s.push(tricotYarn({ x0: WARP.x0, y0: WARP.y0, W: WARP.W, H: WARP.H, L: WARP.L, courses: WARP.courses, w0: w, span: 0.7 }));
+  return s;
+}
+const warpColor = i => i === 2 ? PALETTE.accent : DIM;
+const warpOpacity = () => 1;
+
+// a short piece of strand F centred on fractional index s, long enough to cover the yarn plus halo
+function notch(pts, s, halfLenUnits) {
+  const i = Math.max(0, Math.min(pts.length - 2, Math.floor(s)));
+  const seg = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y) || 1;
+  const h = halfLenUnits / seg;
+  return toPath(slice(pts, s - h, s + h));
+}
+// ---- renderers --------------------------------------------------------------
+// A: chop each strand at the midpoints between its crossings; draw BACK chunks then FRONT chunks.
+function renderSegments(svg, strands, color, opacity) {
+  const X = crossings(strands);
+  const per = strands.map(() => []);
+  X.forEach(x => { per[x.a].push({ s: x.ia + x.ta, front: x.front === 'a' }); per[x.b].push({ s: x.ib + x.tb, front: x.front === 'b' }); });
+  const back = el('g'), halo = el('g'), front = el('g');
+  const groups = strands.map((_, i) => ({ back: el('g', { opacity: opacity(i) }), front: el('g', { opacity: opacity(i) }) }));
+  per.forEach((list, i) => {
+    list.sort((p, q) => p.s - q.s);
+    const pts = strands[i];
+    const cuts = [0]; for (let k = 0; k < list.length - 1; k++) cuts.push((list[k].s + list[k + 1].s) / 2); cuts.push(pts.length - 1);
+    if (!list.length) list.push({ s: 0, front: true });
+    list.forEach((c, k) => {
+      const d = toPath(slice(pts, cuts[k], cuts[k + 1]));
+      if (c.front && k < list.length) halo.appendChild(el('path', { class: 'yarn', d: notch(pts, c.s, SW / 2 + HALO), stroke: PALETTE.bg, 'stroke-width': SW + 2 * HALO }));
+      (c.front ? groups[i].front : groups[i].back).appendChild(el('path', { class: 'yarn', d, stroke: color(i), 'stroke-width': SW }));
+    });
+    back.appendChild(groups[i].back); front.appendChild(groups[i].front);
+  });
+  svg.append(back, halo, front);
+  return X;
+}
+// B: continuous strands, a bg-coloured halo under each, drawn in ONE order per strand
+// (course n+1 over n). Cannot be right at both crossing types — kept to show the failure.
+function renderHalo(svg, strands, color, opacity, order) {
+  const g = el('g');
+  order.forEach(i => {
+    const d = toPath(strands[i]);
+    g.appendChild(el('path', { class: 'yarn', d, stroke: PALETTE.bg, 'stroke-width': SW + 2 * HALO }));
+    g.appendChild(el('path', { class: yarnClass(i), d, stroke: color(i), opacity: opacity(i), 'stroke-width': SW, pathLength: 1 }));
+  });
+  svg.appendChild(g);
+}
+// C: continuous strands (one <path> each, animatable), each wearing a MASK that cuts a halo-wide
+// notch wherever a strand with higher z crosses it. Occlusion is per crossing, not per strand.
+function renderMasked(svg, strands, color, opacity, id) {
+  const X = crossings(strands);
+  const defs = el('defs'); svg.appendChild(defs);
+  const g = el('g');
+  strands.forEach((pts, i) => {
+    const m = el('mask', { id: `${id}-m${i}`, maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: 920, height: 300 });
+    m.appendChild(el('rect', { x: 0, y: 0, width: 920, height: 300, fill: '#fff' }));
+    X.filter(x => (x.a === i && x.front === 'b') || (x.b === i && x.front === 'a')).forEach(x => {
+      const F = x.front === 'a' ? x.a : x.b, s = x.front === 'a' ? x.ia + x.ta : x.ib + x.tb;
+      // the front strand's local chunk, stroked wide in black: ±2 samples either side of the crossing
+      m.appendChild(el('path', { d: notch(strands[F], s, SW / 2 + HALO), fill: 'none', stroke: '#000', 'stroke-width': SW + 2 * HALO, 'stroke-linecap': 'round' }));
+    });
+    defs.appendChild(m);
+    g.appendChild(el('path', { class: yarnClass(i), d: toPath(pts), stroke: color(i), opacity: opacity(i), 'stroke-width': SW, mask: `url(#${id}-m${i})`, pathLength: 1, style: MOTION ? `animation-delay:${i * 0.15}s` : '' }));
+  });
+  svg.appendChild(g);
+  return X;
+}
+
+function labels(svg, side) {
+  if (side === 'weft' || side === 'both') { svg.append(el('text', { x: 70, y: 24, class: 'axis' }), el('text', { x: 20, y: 150, class: 'axis' }), el('text', { x: 280, y: 288, 'text-anchor': 'middle', class: 'title' }));
+    [...svg.querySelectorAll('text')].slice(-3).forEach((t, i) => t.textContent = ['WALE ↑', 'COURSE →', 'WEFT KNITTING'][i]); }
+  if (side === 'warp' || side === 'both') {
+    svg.appendChild(el('line', { x1: 460, y1: 10, x2: 460, y2: 270, stroke: '#232727' }));
+    const a = el('text', { x: 520, y: 24, class: 'axis' }); a.textContent = 'WALE ↑';
+    const b = el('text', { x: 900, y: 150, class: 'axis', 'text-anchor': 'end' }); b.textContent = 'COURSE →';
+    const c = el('text', { x: 700, y: 288, 'text-anchor': 'middle', class: 'title' }); c.textContent = 'WARP KNITTING';
+    svg.append(a, b, c);
+  }
+}
+function block(id, title, note, build, caption) {
+  const sec = document.createElement('section'); sec.className = 'opt'; sec.id = id;
+  sec.innerHTML = `<h2>${title}</h2><p>${note}</p>`;
+  const frame = document.createElement('div'); frame.className = 'frame';
+  const svg = el('svg', { viewBox: '0 0 920 300', xmlns: NS });
+  const X = build(svg) || [];
+  frame.appendChild(svg);
+  if (caption) { const c = document.createElement('div'); c.className = 'cap'; c.innerHTML = caption; frame.appendChild(c); }
+  sec.appendChild(frame);
+  const stat = document.createElement('p'); stat.style.marginTop = '8px';
+  stat.textContent = `crossings: ${X.length} · <path> elements: ${svg.querySelectorAll('g path').length}`;
+  sec.appendChild(stat);
+  root.appendChild(sec);
+  return X;
+}
+
+// ---- options ---------------------------------------------------------------
+block('optA', 'OPTION A — split at crossings, z-ordered segments',
+  'Each course chopped at the midpoints between its crossings; back chunks drawn first, front chunks on top. Correct occlusion; many paths; draw-on animation needs per-chunk timing.',
+  svg => { labels(svg, 'weft'); return renderSegments(svg, weftStrands(), weftColor, weftOpacity); });
+
+block('optB', 'OPTION B — continuous strands + background halo, one draw order per strand (DISCARDED)',
+  'Course n+1 over course n everywhere. Legs over the head below come out right; the sinker loops of the course above then also sit OVER the legs below, which is the technical back, not the face. A single z per strand cannot do jersey.',
+  svg => { labels(svg, 'weft'); renderHalo(svg, weftStrands(), weftColor, weftOpacity, [0, 1, 2, 3].reverse()); });
+
+block('optC', 'OPTION C — continuous strands, per-strand mask with a halo notch at each crossing it loses',
+  'One &lt;path&gt; per course (so the draw-on animation is the existing one), masked wherever a higher-z strand crosses it. Same occlusion as A, four paths instead of ~60.',
+  svg => { labels(svg, 'weft'); return renderMasked(svg, weftStrands(), weftColor, weftOpacity, 'c'); });
+
+block('warp', 'WARP (tricot, 1×1 closed lap) — option C renderer, corrected drawing',
+  'Each guide-bar yarn forms a loop in one wale, laps diagonally to the neighbouring wale for the next course, and comes back. Loops obey the same leg-over-head rule; the underlaps run on the technical back.',
+  svg => { labels(svg, 'warp'); return renderMasked(svg, warpStrands(), warpColor, warpOpacity, 'w'); },
+  'In warp knits, <span class="accent">each yarn</span> zigzags between two neighbouring wales — a loop in one column, a diagonal lap to the next — so loops interlock sideways as well as up the wale.');
+
+block('full', 'FULL PANEL — C weft + C warp, as it would sit in #weft-warp-knit',
+  'The shipping composition: both sides in one 920×300 SVG with the live page’s labels.',
+  svg => { labels(svg, 'both'); const a = renderMasked(svg, weftStrands(), weftColor, weftOpacity, 'fw'); const b = renderMasked(svg, warpStrands(), warpColor, warpOpacity, 'fp'); return a.concat(b); },
+  'In weft knits, <span class="accent">one yarn</span> loops its way across an entire course, each new loop pulled up through the loop below it. In warp knits, <span class="accent">each yarn</span> zigzags between two neighbouring wales — a loop in one column, a lap to the next — so the loops lock sideways as well as up the wale.');
+</script>
+</body>
