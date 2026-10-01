@@ -9777,8 +9777,9 @@ served from node_modules; it REFUSES rather than skips without it);
 `--negative-control` is REQUIRED before quoting a pass from a changed harness
 (fifteen mutants in copies of the two modules, among them one that breaks the
 denier arithmetic, every anchor checked before any runs). **It is not in CI** — no
-workflow names a `weave*` path — and touching its tool makes the two flower gates
-fire on its PR (the `'tools/**'` filter), which test flower geometry, not this.
+workflow names a `weave*` path, and since #335 narrowed the two flower gates' filters
+from `'tools/**'` to the tools they run, a weave-only PR fires no Actions workflow at
+all; the only checks on such a PR are Netlify's. Run the gate by hand before merging.
 
 ## `/bug` — the Parametric Bug (pointer only)
 
