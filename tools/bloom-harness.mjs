@@ -4228,8 +4228,14 @@ export async function tubeAssertions(page, row) {
   const bad = [];
   const t = m.tube;
   if (!t) return ['TU0: the page reports no tube record'];
-  const reg = evalPredicate(PREDICATES.tubeEligible, ui);
-  if (reg !== t.eligible) bad.push(`TU0: the registry says the tube is ${reg ? 'available' : 'unavailable'}, the geometry says ${t.eligible ? 'available' : 'unavailable'}`);
+  /* A cleft is reached only through the capability hook, which no control
+     and therefore no registry predicate can see; the geometry refuses the tube
+     on one (the cleft's split panels have no shared ring lattice). So the
+     expected answer is the registry's AND the ROW's own capability — an owner
+     the geometry does not write — never the geometry's own report. */
+  const cleftCap = !!(row && row.capability && row.capability.cleft);
+  const reg = evalPredicate(PREDICATES.tubeEligible, ui) && !cleftCap;
+  if (reg !== t.eligible) bad.push(`TU0: the registry${cleftCap ? ' (with the row\'s cleft capability)' : ''} says the tube is ${reg ? 'available' : 'unavailable'}, the geometry says ${t.eligible ? 'available' : 'unavailable'}`);
   if (!t.eligible && (t.active || t.rings.length)) bad.push(`TU0: the tube is unavailable here and ${t.rings.length} ring(s) were built`);
   const n = Math.round(Number(ui.petalCount)), L = Math.round(Number(ui.layerCount));
   if (t.eligible) for (let i = 0; i < L; i++) {
