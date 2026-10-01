@@ -9651,6 +9651,32 @@ don't wait to be asked, and don't surface them only after the fact.
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
 
+## `/weave` — the Weave Draft (pointer only)
+
+Hidden generative page (`weave.html`, `weave.css`, `weave.js`, `weave-draft.js`,
+`weave-render.js`; `noindex`, unlinked). A four-part weaving draft — threading on
+top, tie-up top-right, treadling on the right, drawdown in the centre — with the
+WHOLE state in the URL hash, so a link IS a draft. **`weave-draft.js` is the model
+and is pure** (three Uint16 bitmask arrays and four counts; `drawdown()` is the ONE
+owner of the rising-shed rule "a cell is warp-up when a shaft the end is on is tied
+to a treadle pressed on that pick"); **`weave-render.js` paints ONCE through two
+painters**, the canvas and the SVG export, over one `layout()`, so the file is the
+picture on screen. **Orientation is the renderer's and nowhere else's**: end 1 at
+the right, pick 1 at the top, shaft 1 at the bottom, treadle 1 at the left — the
+draft read from the tie-up outward, which is also what WIF-based software draws.
+Presets are STRUCTURES (plain, 2/2 and 3/1 twill, broken twill, herringbone, point,
+rosepath, 5- and 8-shaft satin, basket, waffle, overshot-style) and each sets its
+own shaft and treadle counts; a sinking-shed WIF is read by complementing its
+tie-up (the same cloth). Gate: `node tools/verify-weave.mjs` — part one is Node
+only (plain weave is the checkerboard, 2/2 twill is `(e - p) mod 4 in {0, 1}`,
+the WIF and the hash round-trip losslessly on seeded random drafts, the SVG carries
+one element per cell); `--browser` drives the real page at 1280 px and at a
+390 px PHONE viewport; `--negative-control` is REQUIRED before quoting a pass from a
+changed harness (eight mutants in copies of the two modules, every anchor checked
+before any runs). **It is not in CI** — no workflow names a `weave*` path — and
+adding its tool made the two flower gates fire on its PR (the `'tools/**'` filter),
+which test flower geometry, not this.
+
 ## `/bug` — the Parametric Bug (pointer only)
 
 Hidden generative page (`bug.html`, `bug.js`, `bug-geometry.js`, `noindex`, unlinked).
