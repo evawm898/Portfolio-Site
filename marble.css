@@ -1,0 +1,78 @@
+/* marble.css — the /marble page. Same palette and type as /bug, /frame and /bloom. */
+:root{
+  --ink:#0A0A0C; --ink-soft:#131316; --paper:#EDEDE8; --dim:#8A8A85; --dim-2:#5A5A56;
+  --line:rgba(237,237,232,0.10); --line-strong:rgba(237,237,232,0.22); --teal:#5FA0A0;
+  --font-display:'Playfair Display', Georgia, serif;
+  --font-mono:'Space Mono', 'IBM Plex Mono', monospace;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none!important;}
+html,body{height:100%;}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--font-mono);font-size:12px;overflow:hidden;-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
+
+/* the sheet: a canvas fitted to the free area left of the panel */
+.mb-stage{position:fixed;inset:0;right:330px;display:flex;align-items:center;justify-content:center;padding:176px 24px 24px 24px;}
+.mb-sheet{display:block;box-shadow:0 0 0 1px var(--line-strong), 0 30px 80px rgba(0,0,0,.6);touch-action:none;cursor:crosshair;}
+.mb-sheet.is-stroke{cursor:cell;}
+
+.mb-header{position:fixed;top:20px;left:22px;z-index:4;pointer-events:none;}
+.mb-eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--teal);}
+.mb-header h1{font-family:var(--font-display);font-weight:600;font-size:38px;margin:6px 0 4px;color:var(--paper);}
+.mb-sub{margin:0;color:var(--dim);font-size:11px;max-width:360px;line-height:1.5;}
+.mb-back{pointer-events:auto;color:var(--dim-2);text-decoration:none;font-size:11px;}
+.mb-back:hover{color:var(--paper);}
+
+.mb-box{background:rgba(10,10,12,.86);border:1px solid var(--line-strong);backdrop-filter:blur(6px);}
+.mb-panel{position:fixed;top:18px;right:18px;bottom:18px;z-index:4;width:296px;overflow-y:auto;padding:14px 16px;}
+.mb-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:0 0 8px;}
+
+details.mb-sec{border-top:1px solid var(--line);}
+details.mb-sec>summary{list-style:none;cursor:pointer;padding:9px 0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--paper);display:flex;align-items:center;gap:8px;}
+details.mb-sec>summary::-webkit-details-marker{display:none;}
+details.mb-sec>summary::before{content:"\25B8";color:var(--teal);transition:transform .15s;}
+details.mb-sec[open]>summary::before{transform:rotate(90deg);}
+details.mb-sec>summary:hover{color:var(--teal);}
+details.mb-sec>summary .mb-sumval{margin-left:auto;color:var(--dim);letter-spacing:0;text-transform:none;font-size:10px;}
+.mb-sec-body{padding:0 0 8px;}
+
+.mb-ctrl{margin:0 0 9px;}
+.mb-ctrl label{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-bottom:3px;}
+.mb-ctrl output{color:var(--paper);}
+.mb-ctrl input[type=range]{width:100%;accent-color:var(--teal);}
+.mb-ctrl input[type=text],.mb-ctrl input[type=number],.mb-ctrl select{width:100%;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:4px;}
+.mb-ctrl.mb-bool label{justify-content:flex-start;gap:8px;align-items:center;}
+
+.mb-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+button.mb-btn{background:transparent;color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:5px 9px;cursor:pointer;}
+button.mb-btn:hover{border-color:var(--teal);color:var(--teal);}
+button.mb-btn.is-on{border-color:var(--teal);color:var(--teal);}
+button.mb-btn:disabled{opacity:.4;cursor:default;}
+button.mb-btn:disabled:hover{border-color:var(--line-strong);color:var(--paper);}
+button.mb-btn--solid{background:var(--teal);color:var(--ink);border-color:var(--teal);}
+button.mb-btn--solid:hover{color:var(--ink);opacity:.85;}
+.mb-hint{font-size:10px;color:var(--dim-2);line-height:1.5;margin:-4px 0 10px;}
+
+/* palette: a swatch is a square with its ring on the chosen one */
+.mb-swatches{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;}
+.mb-swatch{width:22px;height:22px;border:1px solid var(--line-strong);padding:0;cursor:pointer;position:relative;background:none;}
+.mb-swatch>i{position:absolute;inset:2px;display:block;}
+.mb-swatch.is-on{border-color:var(--paper);box-shadow:0 0 0 1px var(--teal);}
+.mb-swatch.is-sheet{border-radius:50%;}
+.mb-swatch.is-sheet>i{border-radius:50%;}
+.mb-swatch:hover{border-color:var(--teal);}
+.mb-addrow{display:flex;gap:6px;align-items:center;margin:0 0 8px;}
+.mb-addrow input[type=color]{width:28px;height:24px;padding:0;border:1px solid var(--line-strong);background:var(--ink-soft);cursor:pointer;}
+.mb-addrow input[type=text]{flex:1;min-width:0;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:4px;}
+
+.mb-readout{font-size:10.5px;line-height:1.6;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:6px;white-space:pre-wrap;}
+.mb-readout b{color:var(--paper);font-weight:400;}
+.mb-readout .warn{color:#d6a15c;}
+.mb-msg{font-size:10px;color:var(--dim);line-height:1.5;margin:0 0 8px;min-height:1em;}
+.mb-msg.is-bad{color:#d98f6a;}
+
+@media (max-width:760px){
+  .mb-stage{right:0;padding:112px 10px calc(46vh + 14px);}
+  .mb-panel{top:auto;height:46vh;left:10px;right:10px;width:auto;bottom:10px;padding:10px 12px;}
+  .mb-header h1{font-size:26px;}
+  .mb-sub{display:none;}   /* the tagline would sit on the sheet; the eyebrow and title carry the page */
+}

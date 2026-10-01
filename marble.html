@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marble — Eva Maskalenko</title>
+<meta name="description" content="Marble — a paper-marbling simulator: ink drops, tines, combs and stirs as the closed-form deformations of mathematical marbling, on a sheet a link reproduces exactly.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="marble.css">
+</head>
+<body>
+<main class="mb-stage" id="stage" aria-label="Marbling sheet">
+  <canvas class="mb-sheet" id="sheet" aria-label="The marbling sheet — click to drop ink, drag to rake"></canvas>
+</main>
+
+<header class="mb-header">
+  <a class="mb-back" href="index.html">&larr; Index</a>
+  <div class="mb-eyebrow" style="margin-top:10px">EM / MARBLE</div>
+  <h1>Marble</h1>
+  <p class="mb-sub">Suminagashi and ebru, by the equations — every drop, tine, comb and stir is a closed-form deformation of the sheet, and the link is the sheet.</p>
+</header>
+
+<aside class="mb-panel mb-box" aria-label="Marbling controls">
+  <div class="mb-label">Tool</div>
+  <div class="mb-row" id="tools">
+    <button class="mb-btn is-on" data-tool="drop">Drop</button>
+    <button class="mb-btn" data-tool="tine">Tine</button>
+    <button class="mb-btn" data-tool="comb">Comb</button>
+    <button class="mb-btn" data-tool="wavy">Wavy comb</button>
+    <button class="mb-btn" data-tool="stir">Stir</button>
+  </div>
+  <p class="mb-hint" id="toolHint"></p>
+  <div class="mb-row">
+    <button class="mb-btn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+    <button class="mb-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)">Redo</button>
+    <button class="mb-btn" id="clearBtn">Clear sheet</button>
+  </div>
+
+  <details class="mb-sec" id="secColour" open>
+    <summary>Colour <span class="mb-sumval" id="colourSum"></span></summary>
+    <div class="mb-sec-body">
+      <div class="mb-label">Ink</div>
+      <div class="mb-swatches" id="inkSwatches"></div>
+      <div class="mb-addrow">
+        <input type="color" id="customPick" value="#5fa0a0" aria-label="Custom colour">
+        <input type="text" id="customHex" placeholder="#hex" maxlength="7" aria-label="Custom colour hex">
+        <button class="mb-btn" id="customAdd">Add</button>
+      </div>
+      <div class="mb-ctrl mb-bool"><label><input type="checkbox" id="autoAdvance" checked> Next colour after each drop</label></div>
+      <div class="mb-label">Sheet</div>
+      <div class="mb-swatches" id="sheetSwatches"></div>
+    </div>
+  </details>
+
+  <details class="mb-sec" id="secSettings" open>
+    <summary>Settings</summary>
+    <div class="mb-sec-body" id="controls"></div>
+  </details>
+
+  <details class="mb-sec" id="secPatterns" open>
+    <summary>Patterns</summary>
+    <div class="mb-sec-body">
+      <div class="mb-row" id="patterns"></div>
+      <p class="mb-hint">Classic sequences scripted from the current colour: concentric drops; a stone base raked back and forth (get-gel); a fine comb once through it (nonpareil) and back again (chevron); a wide comb drawn wavy through it (bouquet).</p>
+      <div class="mb-ctrl"><label for="seed"><span>Seed</span></label><input type="number" id="seed" value="1" min="0" step="1"></div>
+      <div class="mb-row">
+        <button class="mb-btn" id="randomBtn">Random sequence</button>
+        <button class="mb-btn" id="rerollBtn" title="A new seed">Reroll</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="mb-sec" id="secExport" open>
+    <summary>Export</summary>
+    <div class="mb-sec-body">
+      <div class="mb-row">
+        <button class="mb-btn mb-btn--solid" id="exportSvg">Get SVG &darr;</button>
+        <button class="mb-btn mb-btn--solid" id="exportPng">Get PNG &darr;</button>
+        <button class="mb-btn" id="copyLink">Copy link</button>
+      </div>
+      <p class="mb-msg" id="exportMsg"></p>
+    </div>
+  </details>
+
+  <div class="mb-readout" id="readout"></div>
+</aside>
+
+<script type="module" src="marble.js"></script>
+</body>
+</html>

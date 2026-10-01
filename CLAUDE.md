@@ -9780,3 +9780,40 @@ by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b t
 they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
 runs them — the "adding a tool runs the flower gates" corollary recorded in several
 sections above is history as of Oct 1.
+
+is the arch only. Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
+quoting a pass from a changed harness; `--no-browser` for iteration). Sheet:
+`node tools/shot-frame-sheet.mjs <dir>`. Neither runs in CI — run both by hand.
+
+## `/marble` — the paper-marbling simulator (pointer only)
+
+Hidden page (`marble.html`, `marble.css`, `marble.js`, `marble-math.js`, `noindex`, unlinked).
+**The engine is `marble-math.js` and its header is the governing text** — read it before touching
+any marble file. The law: every ink region is a closed polygon and every tool is a POINT FUNCTION
+of the plane — the closed-form deformations of mathematical marbling (Jaffer; Lu, Jin, Wang et al.
+2012): the ink drop `P' = C + (P−C)·sqrt(1 + r²/|P−C|²)`, the tine line `P' = P + z·2^(−|d|/c)·M`
+(z the max shift, c the distance over which it HALVES), the wavy tine (the same with `d` measured
+from a sine curve), and the circular stir (arc-length shift z on a ring of radius r). A straight
+comb composes EXACTLY as a sum, a wavy one tine by tine. **Edges stay on the true image curve
+because refinement bisects the SOURCE edge and maps the midpoint** — never a chord point — until
+every mapped edge is under `MAX_SEG`; a point budget (`POINT_BUDGET`) coarsens past it and is TOLD
+on the readout. **The sheet IS the link**: the op list lives in the URL hash, every number rounded
+to one decimal BEFORE the op is applied, so a link replays the very doubles the page used
+(bit-identical, `Object.is`, asserted in Node and across two browser pages). Undo pops a GROUP (a
+pattern is one group). Gate: `node tools/verify-marble.mjs` (37 checks; `--negative-control`
+required before quoting a pass from a changed harness, nine mutants; `--no-browser` for
+iteration). **Neither runs in CI** — adding the tool makes the two flower gates run on a marble
+PR (`'tools/**'`), and they still test flower geometry.
+**Judgment calls made without a ruling** (the sheet is 1000 × 1250 logical units, 4:5 portrait):
+drop radius 36 growing at 45/s while held, capped at 3× the slider or 300; a stroke's max shift is
+`strength × drag length` (0.6 default) rather than a fixed number, so a long rake shifts more;
+falloff 24; comb 8 tines at 40; the stir's radius is the mean radius of the pointer's path and its
+turn is the SWEPT ANGLE (a straight pull reads as a positive turn of `strength × length`); the
+palette is the seven site colours plus a custom list kept in localStorage, with "next colour
+after each drop" ON; the sheet colour is paper by default and is not an op (it recolours every
+snapshot); the stone base every raked pattern starts from covers the sheet about 1.3× (Σπr² is
+exactly the ink added, since a drop pushes ink aside without shrinking it) and runs one cell past
+every edge so a rake exposes no bare band; the bouquet is the weakest of the five by eye and its
+constants (a 9-tine comb, wave 0.55 of the spacing, z 95) are the ones to retune first; strokes
+preview as a PLAIN map (every vertex moves, none is added) and refine on commit; the random
+sequence is 36–70 drops and 2–5 strokes of every kind from the seed field.
