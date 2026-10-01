@@ -59,6 +59,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE } from './bloom-geometry.js';
+import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -144,6 +145,11 @@ export const RETIRED_IDS = [
                                   one leaf serves both kinds)
      { id, min: n }              control `id`'s numeric value is >= n
      { id, awayFrom: n, by: d }  |value - n| >= d (neutral point mid-range)
+     { id, snapsBelow: other }   the TUBE's panel count: tubeSnap(value,
+                                 other's value) < other's value, i.e. the
+                                 asked k builds a ring rather than FREE (the
+                                 geometry's tubeSnap is the one owner of the
+                                 snap; this leaf only asks it)
 
    composed with:
 
@@ -156,7 +162,13 @@ export const RETIRED_IDS = [
 
    applyVisibility() in bloom.js EVALUATES these and is the only thing that
    hides a control wrapper. No gating data-attributes, no imperative hiding.
-   If a fourth leaf shape is ever needed, stop and raise it. */
+   If a FIFTH leaf shape is ever needed, stop and raise it. The fourth,
+   `snapsBelow`, was added by the TUBE build session because "h and BLEND only
+   appear when TUBE is not FREE" (Eva's ruling) is a statement about the BUILT
+   panel count, which is the asked k snapped against the petal count — a
+   relation between two controls that no constant-comparing leaf can state.
+   It reads two drivers and both are reported. Recorded as a parked question
+   rather than taken silently. */
 /* SLOT ROLES ARE RADIAL-ONLY AND NEED ONE SHARED MIRROR PLANE — declared once
    here, under a name, because eight controls share it and eight copies of one
    condition is what drifts. See bloom-geometry.js's SESSION B block for both
@@ -399,6 +411,37 @@ export const PREDICATES = {
   leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
 
   /* ===================================================================
+     THE TUBE (corolla fusion, the build session) — the registry's statement
+     of the geometry's `tubeEligible()`; TU0 compares the two per row and the
+     harness at load. A ring is drawn through every midrib of ONE whorl that
+     shares ONE row ladder at uniform azimuths, so it is unavailable off
+     RADIAL, under any per-slot field (size or form variance, a live slot-role
+     override), under the buckle, the fringe or the infill, under an
+     inflorescence (a floret does not inherit) and on a full sphere. Each term
+     is half a slider step so it admits exactly the reachable rest value. */
+  tubeEligible: { all: [
+    { id: 'placement', oneOf: ['RADIAL'] },
+    { not: { ref: 'sphereMode' } },
+    { not: { ref: 'variancePresent' } },
+    { not: { ref: 'varianceFormPresent' } },
+    { not: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
+    { id: 'fringeCount', oneOf: ['0'] },
+    { not: { ref: 'infillPresent' } },
+    { not: { ref: 'inflorescencePresent' } },
+    { not: { all: [{ ref: 'slotRolesEligible' }, { any: [
+      { id: 'labellumSize', awayFrom: 1, by: 0.025 }, { id: 'labellumTilt', awayFrom: 0, by: 0.5 },
+      { id: 'labellumCup', awayFrom: 0, by: 0.005 }, { id: 'labellumCurl', awayFrom: 0, by: 2.5 },
+      { id: 'hoodSize', awayFrom: 1, by: 0.025 }, { id: 'hoodTilt', awayFrom: 0, by: 0.5 },
+      { id: 'hoodCup', awayFrom: 0, by: 0.005 },
+    ] }] } },
+  ] },
+  /* SOME WHORL IS FUSED — h and BLEND appear only then (Eva's ruling). Layer
+     N's slider counts only while the bloom has N layers. */
+  tubeAnyFused: { all: [{ ref: 'tubeEligible' }, { any: Array.from({ length: TUBE_MAX_LAYERS }, (_, i) => (i === 0
+    ? { id: 'tubeLayer1', snapsBelow: 'petalCount' }
+    : { all: [{ id: 'layerCount', min: i + 1 }, { id: `tubeLayer${i + 1}`, snapsBelow: 'petalCount' }] })) }] },
+
+  /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
      it is a predicate rather than a special case (Eva, Sep 2).
 
@@ -444,6 +487,7 @@ export function evalPredicate(pred, state) {
     if (pred.oneOf) return pred.oneOf.some((x) => String(x) === String(v));
     if (pred.min !== undefined) return Number(v) >= pred.min;
     if (pred.awayFrom !== undefined) return Math.abs(Number(v) - pred.awayFrom) >= (pred.by ?? 0);
+    if (pred.snapsBelow !== undefined) { const n = Math.round(Number(state[pred.snapsBelow])); return tubeSnap(v, n) < n; }
     throw new Error(`predicate leaf for "${pred.id}" has no test`);
   }
   throw new Error(`unrecognised predicate shape: ${JSON.stringify(pred)}`);
@@ -483,6 +527,7 @@ export function predicateDrivers(pred, out = new Set()) {
   if (pred.any) { pred.any.forEach((p) => predicateDrivers(p, out)); return out; }
   if (pred.not) return predicateDrivers(pred.not, out);
   if (pred.id !== undefined) out.add(pred.id);
+  if (pred.snapsBelow !== undefined) out.add(pred.snapsBelow);
   return out;
 }
 
@@ -621,6 +666,29 @@ const SLOT_ROLES_BEHIND_OFFSET = {
     const last = petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT);
     return `Petal 1 and Petal ${last} need the whorls in step — set ${offset} to 0.00 to bring them back.`;
   },
+};
+
+/* THE TUBE'S TWO CAPTIONS (corolla fusion). The first says which term of
+   `tubeEligible` stands in the way, derived from the state so it names the
+   control a visitor can change; the second says h and BLEND wait for a fused
+   whorl. */
+const TUBE_UNAVAILABLE = {
+  when: { not: { ref: 'tubeEligible' } },
+  text: (ui) => {
+    const why = [];
+    if (String(ui.placement) !== 'RADIAL') why.push(`the placement is ${ui.placement} (Tube is RADIAL only)`);
+    if (Math.abs(Number(ui.varianceSize)) >= 0.005 || Math.abs(Number(ui.varianceForm)) >= 0.005) why.push('a variance field gives every petal its own shape');
+    if (Math.abs(Number(ui.buckleAmp)) >= 0.005) why.push('the margin buckle differs petal to petal');
+    if (Number(ui.fringeCount) >= 1) why.push('a fringe splits the blade into panels');
+    if (String(ui.petalInfill) === 'VORONOI') why.push('the petals are infilled');
+    if (Number(ui.stemLength) >= 1 && String(ui.inflorescence) === 'RACEME') why.push('the bloom is an inflorescence');
+    if (!why.length) why.push('a petal role (Petal 1 / Petal N) gives one whorl several petal shapes');
+    return `Tube needs one RADIAL whorl of identical petals — ${why.join('; ')}.`;
+  },
+};
+const TUBE_ALL_FREE = {
+  when: { all: [{ ref: 'tubeEligible' }, { not: { ref: 'tubeAnyFused' } }] },
+  text: () => 'Fusion height and Blend appear once a whorl\'s Tube is set below FREE.',
 };
 
 /* ONE STATEMENT OF WHAT A TIP'S DROP-DOWN IS, read off TIP_INSTANCES by
@@ -840,6 +908,12 @@ export const SECTIONS = [
      order, so a nested section goes after its elder sibling's LAST
      DESCENDANT, never after the sibling itself. */
   { id: 'infill', label: 'Infill', open: false, parent: 'petal' },
+  /* THE TUBE (corolla fusion) — a drop-down inside Petal, after Infill, with
+     Fusion (h and BLEND) nested in it. A PLACEMENT MADE WITHOUT A RULING: the
+     rulings name the controls and their tier, not their section; it is one
+     `parent` field to move. Both sections SAY why they are hidden. */
+  { id: 'tube', label: 'Tube', open: false, parent: 'petal', hiddenReason: TUBE_UNAVAILABLE },
+  { id: 'tubeFusion', label: 'Fusion', open: false, parent: 'tube', hiddenReason: TUBE_ALL_FREE },
   /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
      on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
      A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
@@ -1907,6 +1981,35 @@ export const CONTROLS = [
        parking rather than deleting. */
     hiddenReason: 'parked — at 0 the cells start on the derived floor; the solid base comes from INFILL_BASE_NARROW and the basal V, neither a control',
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'infillPresent' }, { any: [] }] } },
+
+  /* THE TUBE — one slider per whorl (Eva's ruling: per layer), stepped over
+     0 (the full TUBE), the divisors of the petal count, and the count itself
+     (FREE). The slider keeps the ASKED k; the build snaps to the nearest
+     valid value, ties going down, through the geometry's `tubeSnap` (the one
+     owner), and the read-out prints the BUILT k whenever it differs. The
+     range is the petal count's own: any asked k at or above it is FREE, so
+     the default (the maximum) is FREE at every count and the shipping bloom
+     is today's bloom by branch. DESIGN tier (Eva's ruling). */
+  ...Array.from({ length: TUBE_MAX_LAYERS }, (_, i) => ({
+    id: `tubeLayer${i + 1}`, section: 'tube', kind: 'slider', min: 0, max: TUBE_K_MAX, step: 1, default: TUBE_K_MAX,
+    label: i === 0 ? 'Tube' : `Tube, whorl ${i + 1}`,
+    fmt: (v, ui) => {
+      const n = Math.round(Number(ui.petalCount)), a = Math.round(Number(v)), k = tubeSnap(a, n);
+      const say = (x) => (x === 0 ? 'TUBE — one closed ring' : x === n ? 'FREE — no ring' : `${x} panel${x === 1 ? '' : 's'}, ${x} slit${x === 1 ? '' : 's'}`);
+      if (a === k || (a >= n && k === n)) return say(k);
+      return `${a} asked — BUILT ${say(k)} (the nearest of ${[0, ...Array.from({ length: n }, (_, j) => j + 1).filter((d) => n % d === 0)].join(' / ')})`;
+    },
+    tier: 'standard', role: 'petal',
+    visibleWhen: i === 0 ? { ref: 'tubeEligible' } : { all: [{ ref: 'tubeEligible' }, { id: 'layerCount', min: i + 1 }] },
+  })),
+  { id: 'tubeHeight', section: 'tubeFusion', kind: 'slider', min: TUBE_HEIGHT_RANGE[0], max: TUBE_HEIGHT_RANGE[1], step: 0.01, default: TUBE_HEIGHT_DEFAULT,
+    label: 'Fusion height', tier: 'standard', role: 'petal',
+    fmt: (v) => `${Number(v).toFixed(2)} of the petal fused`,
+    visibleWhen: { ref: 'tubeAnyFused' } },
+  { id: 'tubeBlend', section: 'tubeFusion', kind: 'slider', min: TUBE_BLEND_RANGE[0], max: TUBE_BLEND_RANGE[1], step: 0.05, default: TUBE_BLEND_DEFAULT,
+    label: 'Blend', tier: 'standard', role: 'petal',
+    fmt: (v) => (Number(v) === 0 ? '0.00 — the lobe sits on the ring, no notch' : `${Number(v).toFixed(2)} — the petal base sinks flush into the ring; open sinuses are notched`),
+    visibleWhen: { ref: 'tubeAnyFused' } },
 
   { id: 'lobeCrestShape', section: 'lobes', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,

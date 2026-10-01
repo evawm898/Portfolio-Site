@@ -155,6 +155,8 @@ const E2_TURN_BAND_DEG = 5e-5;
    change that moved it (#283 and #289), and this is where it is named. The
    ruling on whether a nibbed bead may turn past the allowance is Eva's. */
 const E2_TURN_XFAIL = {
+  'TUBE: GATED — the buckle (unavailable, inert)':
+    { excessDeg: 3.295065, note: 'NEW with the tube PR\'s smoke block 45: adds 48.295065 deg; face-to-face 56.43, outline 8.14 — the BUCKLE\'s out-of-plane class (the tube is unavailable and inert on this row, so this is the buckle alone)' },
   'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)':
     { excessDeg: 5.440992, note: 'the buckle wave curves the margin OUT OF PLANE, which the outline\'s plan turn cannot see; raw 60.05 deg, outline 8.81. Was 6.236137 before #283 (the nib re-stations the tip rows)' },
   /* 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)' was declared at

@@ -579,6 +579,7 @@ let lastFitCenter = [0, 0, 0];
 /* ORGANIC VARIANCE (build 1, size): the builder's own field record (null at
    amount 0, the guard) and the TOLD FLAG — the neighbour figures every
    recorded build carries (ruling 1: reported, never clamped). */
+let lastTube = null;
 let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPetalsAll = [];
 let lastFormVariance = null, lastFormAbsent = true;
 let lastInfill = null, lastInfillAbsent = true;
@@ -657,6 +658,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
+    lastTube = built.tube || null;
     lastVariance = built.variance || null; lastNeighbour = built.neighbour || null;
     /* THE GEOMETRY'S OWN ANSWER TO "IS THE SIZE FIELD ABSENT HERE", on the
        state this build was made from — VS0's half, through the page (ST0's
@@ -1404,6 +1406,22 @@ function slotRoleLine(rings, fr) {
    the wave or the ramp, the slot count the wave is sampled on, and the
    ALIASED clause (ruling 4: told, never capped) from the record's own
    threshold. Absent at amount 0, where the record is null. */
+/* THE TUBE LINE (corolla fusion): per fused whorl, the asked and BUILT panel
+   count (the snap's own answer), the ring's top row and station, the flare's
+   rows and the notch — each read off the builder's own record, never re-derived
+   here. Absent while every whorl is FREE. */
+function tubeLine(t) {
+  if (!t || !t.active || !t.rings.length) return '';
+  return t.rings.map((r) => {
+    const lay = t.layers[r.layer];
+    const kWord = r.k === 0 ? 'one closed ring' : `${r.k} panel${r.k === 1 ? '' : 's'}`;
+    const snap = lay.snapped ? ` (asked ${lay.asked}, SNAPPED to the nearest valid count)` : '';
+    const cut = r.notch.sinuses.filter((x) => x.r > 0).length;
+    const open = r.notch.sinuses.filter((x) => x.W > 0).length;
+    const notch = cut ? `${cut} sinus${cut === 1 ? '' : 'es'} notched` : open ? `${open} open sinus${open === 1 ? '' : 'es'} too narrow for the bead to show a notch — none cut` : 'every sinus closed — no notch';
+    return `TUBE${t.layers.length > 1 ? ` whorl ${r.layer + 1}` : ''}: ${kWord}${snap}, fused to u ${r.uTop.toFixed(3)} (${r.rows} rows, asked ${t.h.toFixed(2)}), flare ${r.flare.rows} of ${r.flare.need} rows, ${notch}; ring ${r.ringTris.toLocaleString()} tris\n`;
+  }).join('');
+}
 function varianceLine(v) {
   if (!v) return '';
   const cyc = `${v.frequency} cycle${v.frequency === 1 ? '' : 's'}`;
@@ -1875,6 +1893,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
+       + (built ? tubeLine(built.tube) : '')
        + (built ? varianceLine(built.variance) : '')
        + (built ? formVarianceLine(built.formVariance, built.petalsAll) : '')
        + footFloorLine(rings)
@@ -1947,7 +1966,7 @@ function regenerate() {
      androecium's saturation did: `buckleAmp`'s read-out and its slider MARK
      must print the OWNER's cap rather than re-derive it from the sliders.
      The petal's own form telemetry is where it lives; null on a flat build. */
-  const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium,
+  const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium, tube: built.tube || null,
                   buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
                   /* THE LOBES' two caps join the record for the same reason (session
                      38): the count's and the depth's marks print the OWNER's numbers. */
@@ -2574,6 +2593,10 @@ window.__bloomMetrics = () => ({
      whorl primitive actually multiplied in. And the TOLD FLAG's record, the
      neighbour figures the NEIGHBOURS line prints, so a gate can hold the line
      to the number rather than to the sentence. */
+  /* THE TUBE (corolla fusion) — the builder's own plan and per-ring report:
+     the asked and BUILT k per whorl, the ring's rows, the flare, the notch and
+     the ring's triangle range. The TU family reads it. */
+  tube: lastTube ? JSON.parse(JSON.stringify(lastTube)) : null,
   variance: lastVariance ? { ...lastVariance, factors: lastVariance.factors.map((row) => [...row]) } : null,
   varianceAbsent: lastVarianceAbsent,
   /* EVERY PETAL THE BUILDER EMITTED, in slot order: the slot's scale and the

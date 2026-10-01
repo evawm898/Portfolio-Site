@@ -989,6 +989,24 @@ export const SMOKE_BLOCKS = [
         path: "X1 on a state declared from birth at 1,968 pairs / 0.4218 mm — each inner-whorl petal's tip coiling back into its own foot, which the combination gate's `self` excludes by definition (measureWall drops the foot rows); this row is what the gate's layers-x-curl-x-innercurl cell points at" },
     ],
   },
+  {
+    n: 45, title: 'the TUBE — corolla fusion',
+    anchor: 'TUBE: 8 petals x k 0 (one closed ring)',
+    rows: [
+      { label: 'TUBE: 8 petals x k 0 (one closed ring)',
+        path: "the ruled defaults fused — TU0 (the registry's tubeEligible against the geometry's own answer through the page) and TU1 (the built k against the snap restated from the ruling); the ring through every midrib at h 0.25 with BLEND 1's flare, trimmed under every petal, exported watertight and one piece" },
+      { label: 'TUBE: 8 petals x k 2 (2 panels)',
+        path: "a SLIT ring — TU1 at k 2; the edge petals keep their own outer half from the foot to the tip, and the two panels are two closed shells the census must not read as one" },
+      { label: 'TUBE: SNAP: asked 3 at 8 petals (builds 2, the tie goes down)',
+        path: "the SNAP through the real UI — the slider reads back the ASKED 3 and TU1 holds the BUILT 2 to the ruling's tie-goes-down" },
+      { label: 'TUBE: THIN SHEET 0.6 x 7 petals x k 0 x fusion height 0.4 (the modes split at the bead bar)',
+        path: "MUST FIX 2's row — the live sinus 0.144 mm and the export one 0.908 against the 0.50 mm bead bar; the notch decision reads both modes, so tris(live) === tris(export) here, which both STL gates assert" },
+      { label: 'TUBE: k 0 x tilt 105 (the ring folds as the petal does past a right angle)',
+        path: "a DECLARED fold — X1 holds it to 318 pairs / 0.3800 mm in both directions" },
+      { label: 'TUBE: GATED — the buckle (unavailable, inert)',
+        path: "TU0's other arm — a ring asked where the ruling makes it unavailable: the geometry reports unavailable, no ring is built" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

@@ -152,7 +152,11 @@ const MUTANTS = [
   { id: 'the-flat-emitRim-is-back-for-the-holes', names: ['O3'],
     from: '      const rimGot = emitHoleRim(got.loop, ring);',
     to: '      const rimGot = emitHoleRim(got.loop, ring); const emitRim = (A, B) => { const ps = edgePoints(A, B); for (let i = 0; i + 1 < ps.length; i++) { const p = pt(ps[i]), q = pt(ps[i + 1]); emitTri(q.T, p.T, p.B); emitTri(q.T, p.B, q.B); } }; emitRim(c[0], c[1]);' },
-  { id: 'emitPanel-sweeps-its-own-rim', names: ['O2', 'O3'],
+  /* O3 ONLY since the tube PR: `emitPanel`'s PERIODIC arm (the tube's ring)
+     closes its two ends through emitRimLoop as well, so removing the closed
+     loop's call still leaves emitPanel calling the owner and O2 — "it calls
+     emitRimLoop" — is truthfully green. The inline wall is O3's to see. */
+  { id: 'emitPanel-sweeps-its-own-rim', names: ['O3'],
     from: '  emitRimLoop(acc, profs, K);',
     to: '  for (let k = 0; k < profs.length; k++) acc.quad(top[0][0], top[0][1], bot[0][1], bot[0][0]);' },
   { id: 'the-infilled-margin-gets-a-second-emitter', names: ['O3'],

@@ -17,6 +17,7 @@ on:
       - tools/bloom-export-shards.mjs
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-combination-gate.mjs
+      - tools/verify-bloom-tube.mjs
       - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-infill.mjs
       - tools/verify-bloom-rim-owner.mjs
@@ -78,6 +79,7 @@ on:
       - tools/bloom-export-shards.mjs
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-combination-gate.mjs
+      - tools/verify-bloom-tube.mjs
       - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-infill.mjs
       - tools/verify-bloom-rim-owner.mjs
@@ -201,6 +203,18 @@ jobs:
         run: node tools/bloom-combination-gate.mjs
       - name: ... and every one of those eight clauses must be able to fail
         run: node tools/bloom-combination-gate.mjs --control
+      # THE TUBE (corolla fusion, TU0-TU6) rides here for the wall instrument's
+      # own reasons — the same question (one printable solid), Node-only, about
+      # four minutes with its must-fails — and is OWED because both STL gates
+      # are blind to what the tube is for: a ring that never reaches a fused
+      # seam, a slit fused shut, a ring drawn on its petals' surface and a notch
+      # that exists in one mode only all export watertight and as one piece. It
+      # imports the geometry, the registry and the self-intersection census and
+      # NOT the harness, so it runs before the npm install.
+      - name: The tube is closed where fused, open at a slit, and drawn once (TU0-TU6)
+        run: node tools/verify-bloom-tube.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-tube.mjs --control
       # THE ARC'S NEAR-ZERO BRANCH cannot be a matrix row: no slider reaches the
       # band (spine curl steps by 5 degrees) and `applyConfig`'s read-back would
       # refuse one if a row tried. So the witness calls the geometry directly,

@@ -59,7 +59,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, apexNibAssertions, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
@@ -259,6 +259,11 @@ for (const [rowIndex, row] of rows.entries()) {
      builder's own record on EVERY row. See varianceAssertions()'s header. */
   const vs = await varianceAssertions(page, row);
   if (vs.length) { validity.push(`${row.label}: ${vs.join('; ')}`); continue; }
+  /* THE TUBE (TU0/TU1) — both STL gates are blind to which panel count was
+     built and to whether the tube was available at all; see tubeAssertions()'s
+     header. The fusion itself (TU2-TU6) is tools/verify-bloom-tube.mjs's. */
+  const tu = await tubeAssertions(page, row);
+  if (tu.length) { validity.push(`${row.label}: ${tu.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
