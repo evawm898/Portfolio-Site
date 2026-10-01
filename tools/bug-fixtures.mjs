@@ -9,8 +9,8 @@
 import { sampleOutline } from '../bug-geometry.js';
 
 /* The editor's drawing frame (bug.js reads the same numbers): [u, w] maps to
-   x right / y up, u in [-0.08, 1.28], w in [-0.68, 0.68]. */
-export const EDITOR_VIEW = { u0: -0.08, u1: 1.28, w0: -0.68, w1: 0.68 };
+   x right / y up, u in [-0.08, 1.28], w in [-0.9, 0.46] (room below for a tail). */
+export const EDITOR_VIEW = { u0: -0.08, u1: 1.28, w0: -0.9, w1: 0.46 };
 
 /* The reference forewing: a denser hand-drawn outline (the "drawing"). */
 const REF_FORE = [[0, 0.07], [0.12, 0.11], [0.3, 0.165], [0.5, 0.205], [0.7, 0.235], [0.88, 0.255], [1.0, 0.26],
@@ -42,6 +42,10 @@ export const HAND_OUTLINES = {
    search over 300 outlines, kept as data). The gate builds it as a 3-pair bug,
    so the middle pair is exactly that mix. */
 export const CROSSING_BLEND = { first: SWALLOWTAIL_TRACE, last: [[0, 0.105], [1.051, -0.188], [0.581, -0.253], [0.787, -0.141], [0, -0.128]] };
+
+/* A tail drawn DELIBERATELY thinner than the floor: a neck 0.02 of the pair's
+   length wide (0.4 mm on a 20 mm hindwing, against the 1.0 mm floor). */
+export const THIN_TAIL = { on: true, anchorU: 0.6, points: [[-0.03, -0.005], [-0.04, 0.15], [-0.045, 0.3], [-0.08, 0.36], [-0.06, 0.43], [-0.01, 0.42], [-0.025, 0.3], [-0.02, 0.15], [0.03, -0.005]] };   // [along, outward]
 
 /* An SVG of the reference, sized to the editor frame (width x height px). */
 export function swallowtailReferenceSvg(width = 680, height = 680) {

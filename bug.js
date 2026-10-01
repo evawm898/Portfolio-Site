@@ -13,6 +13,7 @@ import {
   buildBug, exportStl, exportSvg, mirrorDiff, sampleOutline, resolveWingPairs,
   moveControlPoint, insertControlPoint, deleteControlPoint, controlPointsFromDense,
   designFromParams, paramsFromDesign, MAX_WING_PAIRS,
+  composeOutline, moveComposed, insertComposed, deleteComposed, FloorError,
 } from './bug-geometry.js';
 
 /* ---------------- state ---------------- */
@@ -160,7 +161,9 @@ for (const s of PARAM_SPEC) {
 const pairBlock = document.createElement('div');
 pairBlock.className = 'bg-pairs';
 pairBlock.innerHTML = `<div class="bg-row bg-tabs" id="pairTabs"></div><p class="bg-note" id="pairNote"></p>
-  <div class="bg-row" id="linkRow"><button class="bg-btn" id="linkBtn"></button></div><div id="pairFields"></div>`;
+  <div class="bg-row" id="linkRow"><button class="bg-btn" id="linkBtn"></button></div>
+  <div class="bg-ctrl bg-bool" id="tailRow"><label><input type="checkbox" id="tailToggle"> Tail — part of this outline (bottom pair only)</label></div>
+  <div id="pairFields"></div>`;
 secEl.wings.querySelector('.bg-sec-body').insertBefore(pairBlock, secEl.wings.querySelector('.bg-sec-body details'));
 const pairFieldEl = {};
 for (const f of WING_FIELDS) {
@@ -204,6 +207,9 @@ function drawPairUi() {
   const note = document.getElementById('pairNote');
   const lb = document.getElementById('linkBtn');
   document.getElementById('linkRow').hidden = role !== 'mid';
+  // TAIL: only on the BOTTOM pair (the last, or the only pair of one)
+  document.getElementById('tailRow').hidden = editPair !== N - 1;
+  document.getElementById('tailToggle').checked = !!params.wings.tail.on;
   if (N === 1) note.textContent = 'One pair: draw it in the outline editor.';
   else if (role === 'mid') {
     note.textContent = linked
@@ -213,6 +219,12 @@ function drawPairUi() {
   } else note.textContent = `The ${role} pair is always drawn by hand; pairs between it and the ${role === 'first' ? 'last' : 'first'} interpolate unless unlinked.`;
   writePairFields();
 }
+document.getElementById('tailToggle').addEventListener('input', (e) => {
+  // OFF drops exactly the tail group from the drawn outline; ON brings back the
+  // group as last edited (it is stored, never deleted) — see composeOutline.
+  params.wings.tail.on = e.target.checked;
+  selectedPoint = -1; edStatus = ''; drawPairUi(); drawEditor(); scheduleBuild();
+});
 document.getElementById('linkBtn').addEventListener('click', () => {
   const k = editPair;
   if (params.wings.unlinked[k]) delete params.wings.unlinked[k];
@@ -321,7 +333,7 @@ document.getElementById('importDesign').addEventListener('change', async (e) => 
    to the right, w (chord) up = toward the head. The left wing is the mirror,
    built by the model — the editor cannot break symmetry because it never
    touches the left. The frame matches tools/bug-fixtures.mjs EDITOR_VIEW. */
-const VIEW = { u0: -0.08, u1: 1.28, w0: -0.68, w1: 0.68 };
+const VIEW = { u0: -0.08, u1: 1.28, w0: -0.9, w1: 0.46 };   // room below the wing for a tail
 const ed = document.getElementById('editor');
 const EW = 340, EH = 340;
 const toX = (u) => ((u - VIEW.u0) / (VIEW.u1 - VIEW.u0)) * EW, toY = (w) => ((VIEW.w1 - w) / (VIEW.w1 - VIEW.w0)) * EH;
@@ -333,10 +345,20 @@ function evPoint(ev) {
   const r = ed.getBoundingClientRect();
   return fromXY(((ev.clientX - r.left) / r.width) * EW, ((ev.clientY - r.top) / r.height) * EH);
 }
+/* The outline the editor shows and edits: on the BOTTOM pair it is the base
+   with the tail group composed in (tail points tagged); elsewhere the pair's
+   own points. */
+const isBottom = () => editPair === params.wingPairs - 1;
+function shownOutline() {
+  const own = editableSpec(editPair);
+  if (!own) return null;
+  return composeOutline(own.points, isBottom() ? params.wings.tail : null);
+}
 function drawEditor() {
   if (!params.wingPairs) return;
   const own = editableSpec(editPair);
-  const dense = own ? sampleOutline(own.points) : resolvedPair(editPair).dense;
+  const shown = shownOutline();
+  const dense = own ? sampleOutline(shown.points) : resolvedPair(editPair).dense;
   const path = 'M' + dense.map(([u, w]) => `${toX(u).toFixed(1)} ${toY(w).toFixed(1)}`).join('L');
   const chord = `M${toX(dense[dense.length - 1][0]).toFixed(1)} ${toY(dense[dense.length - 1][1]).toFixed(1)}L${toX(dense[0][0]).toFixed(1)} ${toY(dense[0][1]).toFixed(1)}`;
   const bw = EW * backdrop.scale, bh = EH * backdrop.scale;
@@ -346,22 +368,50 @@ function drawEditor() {
   h += `<line class="ax" x1="${toX(0)}" y1="0" x2="${toX(0)}" y2="${EH}"/><line class="ax" x1="0" y1="${toY(0)}" x2="${EW}" y2="${toY(0)}"/>`;
   h += `<text class="axl" x="${toX(0) + 4}" y="12">body side · head ↑</text><text class="axl" x="${EW - 4}" y="${toY(0) - 4}" text-anchor="end">span →</text>`;
   h += `<path class="curve${own ? '' : ' is-linked'}" d="${path}"/><path class="chord" d="${chord}"/>`;
-  if (own) own.points.forEach(([u, w], i) => {
-    const isRoot = i === 0 || i === own.points.length - 1;
+  // RED: where the BUILT planform (scallops and tail included) is narrower than
+  // the floor — read off the model's own analysis, so it is what the STL gate sees
+  const wp = model && model.wingPairs[editPair];
+  if (wp && wp.thinFlags) {
+    const D = wp.dense;
+    let seg = '';
+    for (let k = 0; k < D.length; k++) {
+      const k1 = (k + 1) % D.length;
+      if (wp.thinFlags[k] && wp.thinFlags[k1]) seg += `M${toX(D[k][0]).toFixed(1)} ${toY(D[k][1]).toFixed(1)}L${toX(D[k1][0]).toFixed(1)} ${toY(D[k1][1]).toFixed(1)}`;
+      else if (wp.thinFlags[k]) seg += `M${(toX(D[k][0]) - 0.1).toFixed(1)} ${toY(D[k][1]).toFixed(1)}L${(toX(D[k][0]) + 0.1).toFixed(1)} ${toY(D[k][1]).toFixed(1)}`;
+    }
+    if (seg) h += `<path class="thin" d="${seg}"/>`;
+  }
+  if (own) shown.points.forEach(([u, w], i) => {
+    const isRoot = i === 0 || i === shown.points.length - 1;
+    const tail = shown.tags[i][0] === 'tail';
     h += isRoot
       ? `<rect class="pt root${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" x="${toX(u) - 5}" y="${toY(w) - 5}" width="10" height="10"/>`
-      : `<circle class="pt${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" cx="${toX(u)}" cy="${toY(w)}" r="5.5"/>`;
+      : `<circle class="pt${tail ? ' tail' : ''}${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" cx="${toX(u)}" cy="${toY(w)}" r="5.5"/>`;
   });
   ed.innerHTML = h;
-  const n = own ? own.points.length : 0;
-  document.getElementById('edTitle').textContent = `Pair ${editPair + 1} outline — right wing${own ? ` · ${n} points` : ' · linked (interpolated)'}`;
+  const n = own ? shown.points.length : 0;
+  const nt = own ? shown.tags.filter((t) => t[0] === 'tail').length : 0;
+  const thinNote = wp && wp.thin && wp.thin.thin ? ' · RED: narrower than the floor' : '';
+  document.getElementById('edTitle').textContent = `Pair ${editPair + 1} outline — right wing${own ? ` · ${n} points${nt ? ` (${nt} tail)` : ''}` : ' · linked (interpolated)'}${thinNote}`;
   document.getElementById('edStatus').textContent = edStatus;
   document.getElementById('delPoint').disabled = !(own && selectedPoint > 0 && selectedPoint < n - 1);
 }
-function commitPoints(pts) {
+/* One edit path for every pair: the bottom pair's edits go through the
+   composed (tail-aware) operations, the rest through the plain ones. */
+function applyEdit(op, ...args) {
   const own = editableSpec(editPair);
-  own.points = pts; drawEditor(); scheduleBuild();
+  if (isBottom()) {
+    const f = { move: moveComposed, insert: insertComposed, del: deleteComposed }[op];
+    const r = f(own.points, params.wings.tail, ...args);
+    if (r.ok) { own.points = r.base; params.wings.tail = r.tail; }
+    return r;
+  }
+  const f = { move: moveControlPoint, insert: insertControlPoint, del: deleteControlPoint }[op];
+  const r = f(own.points, ...args);
+  if (r.ok) own.points = r.points;
+  return r;
 }
+function committed() { drawEditor(); scheduleBuild(); }
 let drag = null;
 ed.addEventListener('pointerdown', (ev) => {
   const own = editableSpec(editPair);
@@ -374,23 +424,22 @@ ed.addEventListener('pointerdown', (ev) => {
 });
 ed.addEventListener('pointermove', (ev) => {
   if (!drag || ev.pointerId !== drag.id) return;
-  const own = editableSpec(editPair);
-  const r = moveControlPoint(own.points, drag.i, evPoint(ev));
-  if (r.ok) { edStatus = ''; commitPoints(r.points); }
+  const r = applyEdit('move', drag.i, evPoint(ev));
+  if (r.ok) { edStatus = ''; committed(); }
   else { edStatus = `Blocked: ${r.reason}.`; stats.blocked++; drawEditor(); }
 });
 const endDrag = (ev) => { if (drag && ev.pointerId === drag.id) drag = null; };
 ed.addEventListener('pointerup', endDrag); ed.addEventListener('pointercancel', endDrag);
 ed.addEventListener('dblclick', (ev) => {
   const own = editableSpec(editPair); if (!own) return;
-  const r = insertControlPoint(own.points, evPoint(ev));
-  if (r.ok) { selectedPoint = r.index; edStatus = ''; commitPoints(r.points); }
+  const r = applyEdit('insert', evPoint(ev));
+  if (r.ok) { selectedPoint = r.index; edStatus = ''; committed(); }
   else { edStatus = `Blocked: ${r.reason}.`; drawEditor(); }
 });
 function deleteSelected() {
   const own = editableSpec(editPair); if (!own || selectedPoint < 0) return;
-  const r = deleteControlPoint(own.points, selectedPoint);
-  if (r.ok) { selectedPoint = -1; edStatus = ''; commitPoints(r.points); }
+  const r = applyEdit('del', selectedPoint);
+  if (r.ok) { selectedPoint = -1; edStatus = ''; committed(); }
   else { edStatus = `Blocked: ${r.reason}.`; drawEditor(); }
 }
 ed.addEventListener('contextmenu', (ev) => { const i = ev.target.dataset?.i; if (i === undefined) return; ev.preventDefault(); selectedPoint = +i; deleteSelected(); });
@@ -419,12 +468,15 @@ function buildNow(reframe) {
   const t = performance.now();
   model = buildBug(params);
   stats.buildMs = performance.now() - t;
+  // a refusal message describes the model it was shown for; once that model is
+  // gone, so is the message (the readout's STL BLOCKED line stays live)
+  if (!model.floorViolations.length) document.getElementById('exportMsg').textContent = '';
   stats.mirror = null;
   rebuildMesh();
   if (reframe) setView(viewName); else render();
   drawSvg(false);
   writeReadout();
-  if (!drag) drawEditor();
+  drawEditor();   // also mid-drag: the red floor highlight follows each rebuilt model
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => { stats.mirror = mirrorDiff(model); if (cutSafeEl.checked) drawSvg(true); writeReadout(); }, 350);
 }
@@ -452,7 +504,8 @@ function writeReadout() {
     + (params.wingPairs > 2 ? `thorax <b>${L.Lt.toFixed(1)} mm</b> (lengthened for ${params.wingPairs} wing pairs)\n` : '')
     + `parts <b>${model.parts.length}</b> closed shells, overlapping\n`
     + `mirror diff <b>${m}</b>\n`
-    + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness)\n`
+    + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness, drawn wing widths)\n`
+    + (model.floorViolations.length ? `STL <b class="bad">BLOCKED</b> — ${model.floorViolations.map((v) => `pair ${v.pair + 1} narrower than the floor`).join(', ')} (red in the editor)\n` : '')
     + (model.notes.length ? `notes <b>${model.notes.join('; ')}</b>\n` : '')
     + `build <b>${stats.buildMs.toFixed(0)} ms</b>`;
 }
@@ -464,7 +517,16 @@ function download(name, data, type) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 const stem = () => `bug-${(designName || 'custom').replace(/[^\w-]+/g, '-')}`;
-document.getElementById('exportStl').addEventListener('click', () => download(`${stem()}.stl`, exportStl(model), 'model/stl'));
+function tryExportStl() {
+  try { return { ok: true, bytes: exportStl(model) }; }
+  catch (e) { if (e instanceof FloorError) return { ok: false, reason: e.message }; throw e; }
+}
+document.getElementById('exportStl').addEventListener('click', () => {
+  const r = tryExportStl();
+  const msg = document.getElementById('exportMsg');
+  if (r.ok) { msg.textContent = ''; download(`${stem()}.stl`, r.bytes, 'model/stl'); }
+  else msg.textContent = r.reason;
+});
 document.getElementById('exportSvg').addEventListener('click', () => download(`${stem()}${cutSafeEl.checked ? '-cutsafe' : ''}.svg`, exportSvg(model, { cutSafe: cutSafeEl.checked }).svg, 'image/svg+xml'));
 document.getElementById('viewButtons').addEventListener('click', (e) => { const v = e.target.dataset?.view; if (v) setView(v); });
 
@@ -474,12 +536,19 @@ window.__bug = {
   getParams: () => JSON.parse(JSON.stringify(params)),
   setView: (v) => setView(v),
   svg: (cutSafe = false) => exportSvg(model, { cutSafe }),
-  stl: () => Array.from(exportStl(model)),
+  stl: () => Array.from(exportStl(model, { allowBelowFloor: true })),   // the sheet compares bytes; the page's own button refuses
+  tryStl: () => { const r = tryExportStl(); return r.ok ? { ok: true, bytes: r.bytes.length } : r; },
+  floor: () => ({ violations: model.floorViolations.map((v) => ({ ...v })), pairs: model.wingPairs.map((w) => ({ hasTail: w.hasTail, thin: w.thin })) }),
+  tailPoints: () => { const s = window.__bug.getParams(); return s.wings.tail; },
   triangleCount: () => model.triangleCount,
   notes: () => model.notes.slice(),
   editPair: (k) => { editPair = k; selectedPoint = -1; drawPairUi(); drawEditor(); },
   // the screen position of control point i of the edited pair (for REAL drags)
-  pointScreen: (i) => { const r = ed.getBoundingClientRect(); const p = editableSpec(editPair).points[i]; return [r.left + (toX(p[0]) / EW) * r.width, r.top + (toY(p[1]) / EH) * r.height]; },
+  // index i is into the outline AS DRAWN in the editor (the tail's points
+  // included on the bottom pair) — the same index a pointer drag picks up
+  pointScreen: (i) => { const r = ed.getBoundingClientRect(); const p = shownOutline().points[i]; return [r.left + (toX(p[0]) / EW) * r.width, r.top + (toY(p[1]) / EH) * r.height]; },
+  shownTags: () => shownOutline().tags.map((t) => t.slice()),
+  shownPoints: () => shownOutline().points.map((p) => p.slice()),
   uvScreen: (u, w) => { const r = ed.getBoundingClientRect(); return [r.left + (toX(u) / EW) * r.width, r.top + (toY(w) / EH) * r.height]; },
   editorStatus: () => edStatus,
   blockedCount: () => stats.blocked,

@@ -102,6 +102,11 @@
   #editor .pt{fill:var(--ink);stroke:var(--paper);stroke-width:1.5;cursor:grab;}
   #editor .pt.root{stroke:var(--teal);}
   #editor .pt.is-sel{fill:var(--teal);}
+  #editor .pt.tail{stroke:#e2a74c;}
+  #editor .pt.tail.is-sel{fill:#e2a74c;}
+  #editor .thin{stroke:#e5484d;stroke-width:4;fill:none;stroke-linecap:round;opacity:.9;}
+  .bg-readout b.bad{color:#e5484d;}
+  .bg-export-msg{font-size:10px;color:#e5484d;line-height:1.5;margin:0 0 8px;min-height:0;}
   .bg-ed-status{font-size:10px;color:#d98f6a;min-height:1.2em;margin:0 0 6px;}
   .bg-bd{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
   .bg-bd .bg-ctrl{margin:0;}
@@ -176,6 +181,7 @@
     <button class="bg-btn bg-btn--solid" id="exportSvg">Get SVG &darr;</button>
     <button class="bg-btn bg-btn--solid" id="exportStl">Get STL &darr;</button>
   </div>
+  <p class="bg-export-msg" id="exportMsg"></p>
   <div class="bg-readout" id="readout"></div>
 </aside>
 

@@ -26,6 +26,15 @@
         by the law restated here: thoraxLength * (1 + 0.3 * max(0, N - 2)).
      O  every wing planform polygon is SIMPLE — checked by this file's own
         segment test, not the builder's.
+     N  drawn-width floor: every wing planform measured by this file's OWN
+        brute-force opening (not the builder's raster); where it is thin the
+        builder must report it and exportStl must REFUSE with the reason;
+        where it is clear the builder must not and the STL must export. A row
+        within two grid steps of the bar is reported 'borderline', not judged.
+     T  the tail lives on the bottom pair only: on each TAIL row the same bug
+        is built with TAIL off and every non-bottom wing part must be
+        bit-identical (so no middle pair carries tail geometry, at 1-4 pairs),
+        while the bottom pair must differ.
      L  tucked legs (reach 0) on the default: the legs' top-down projection
         outside the body's projection is <= 2% of the legs' own projected area.
         At reach 1 it must be large (the clause can fail).
@@ -39,6 +48,11 @@
         is reported REPAIRED and is simple (O).
      K  Randomize, over 500 seeds: a 3-part bug has 3 leg pairs; a 2-part bug
         has 4 leg pairs, NO wings and no antennae; no bug has 0 legs.
+     T  (functions) TAIL off composes exactly the base; on adds exactly the
+        tail points; a tail drag edits only the tail; off-then-on restores the
+        EDITED tail; inserting between tail points keeps the tag; the edited
+        tail follows the bottom pair at 1, 2 and 4 pairs; a design with the
+        retired tail sliders migrates into an ON tail group with a note.
      D  a design round-trips through JSON exactly; an invalid outline in a file
         is refused with a note; a newer version is refused.
 
@@ -49,12 +63,12 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models nine ways (plus the L clause at reach 1) and requires each to be
+   --negative-control  breaks built models eleven ways (plus the L clause at reach 1) and requires each to be
                        caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
 import * as G from '../bug-geometry.js';
-import { HAND_OUTLINES, CROSSING_BLEND } from './bug-fixtures.mjs';
+import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL } from './bug-fixtures.mjs';
 
 const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
@@ -312,12 +326,84 @@ function planformChecks(model) {
   return bad;
 }
 
+/* ---------- N: drawn-width floor, this file's OWN measure ---------- */
+/* Not the builder's raster: interior points on a grid at floor/12, each one's
+   distance to the planform boundary by exact point-to-segment distance; a
+   point is COVERED if it lies within floor/2 of a point that can centre a
+   floor-wide disc; the depth of the thin part is how far an uncovered point
+   stands from the nearest covered one. Grid floor/12, neighbours found through
+   buckets of side floor/2 (a covered point is within r of a core point, so it
+   is in the 3x3 block around it). Read off part.meta.planform — the
+   polygon that was triangulated — less its two root-tab vertices (inside the
+   body). Decisive only outside a band of two grid steps around the bar; the
+   rows in that band are reported, not asserted. */
+function gateThinDepth(poly, floor, H = 12) {
+  const h = floor / H, r = floor / 2;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const segD = (p) => { let d = Infinity; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; const ab = [b[0] - a[0], b[1] - a[1]], L2 = ab[0] * ab[0] + ab[1] * ab[1] || 1e-12; const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2)); d = Math.min(d, Math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1])); } return d; };
+  const inPoly = (p) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  // buckets of side r: every point within r of a query lies in the 3x3 block
+  const key = (x, y) => `${Math.floor((x - x0) / r)},${Math.floor((y - y0) / r)}`;
+  const bucket = (list) => { const m = new Map(); for (const p of list) { const k = key(p[0], p[1]); (m.get(k) || m.set(k, []).get(k)).push(p); } return m; };
+  const near = (m, p, ring) => { const cx = Math.floor((p[0] - x0) / r), cy = Math.floor((p[1] - y0) / r), out = []; for (let dx = -ring; dx <= ring; dx++) for (let dy = -ring; dy <= ring; dy++) { const v = m.get(`${cx + dx},${cy + dy}`); if (v) out.push(...v); } return out; };
+  const pts = [];
+  for (let y = y0 + h / 2; y < y1; y += h) for (let x = x0 + h / 2; x < x1; x += h) if (inPoly([x, y])) pts.push([x, y]);
+  const coreM = bucket(pts.filter((p) => segD(p) >= r));
+  const covered = pts.map((p) => near(coreM, p, 1).some((c) => Math.hypot(p[0] - c[0], p[1] - c[1]) <= r + 1e-9));
+  const covM = bucket(pts.filter((_, i) => covered[i]));
+  let depth = 0;
+  pts.forEach((p, i) => {
+    if (covered[i]) return;
+    let d = Infinity;
+    for (let ring = 1; ring < 400 && d === Infinity; ring *= 2) for (const c of near(covM, p, ring)) d = Math.min(d, Math.hypot(p[0] - c[0], p[1] - c[1]));
+    depth = Math.max(depth, d);
+  });
+  return { depth, h };
+}
+function floorChecks(model) {
+  const bad = [], floor = model.params.minDiameter, tau = G.THIN_DEPTH_FRAC * floor;
+  let worst = 0, gateThin = false, border = false;
+  for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    const { depth, h } = gateThinDepth(part.meta.planform.slice(1, -1), floor);
+    worst = Math.max(worst, depth);
+    const builderThin = model.floorViolations.some((v) => `wing${v.pair + 1}` === part.kind);
+    if (depth > tau + 2 * h) { gateThin = true; if (!builderThin) bad.push(`${part.name}: thin by this file's measure (${depth.toFixed(2)} mm past the floor disc) and NOT reported by the builder`); }
+    else if (depth < tau - 2 * h) { if (builderThin) bad.push(`${part.name}: reported thin by the builder, clear by this file's measure (${depth.toFixed(2)} mm)`); }
+    else border = true;
+  }
+  let refused = false, reason = '';
+  try { G.exportStl(model); } catch (e) { refused = e instanceof G.FloorError; reason = e.message; if (!refused) throw e; }
+  if (gateThin && !refused) bad.push('the STL exported although a drawn outline is narrower than the floor');
+  if (refused !== model.floorViolations.length > 0) bad.push(`the STL ${refused ? 'was refused' : 'exported'} while the model reports ${model.floorViolations.length} floor violation(s)`);
+  if (refused && !/narrower than the .* floor/.test(reason)) bad.push(`the refusal does not say why: "${reason}"`);
+  return { worst, gateThin, refused, border, bad };
+}
+
+/* ---------- T: the tail lives on the bottom pair only ---------- */
+/* Build the same bug with TAIL off and compare: every wing part that is NOT the
+   bottom pair must be bit-identical (so no middle pair carries any tail
+   geometry), and the bottom pair must differ (the clause can see a tail). */
+function tailIsolation(modelOn, modelOff) {
+  const bad = [], N = modelOn.params.wingPairs;
+  const vtx = (m, kind, side) => { const q = m.parts.find((x) => x.kind === kind && x.side === side); return q ? Array.from(m.positions.slice(3 * q.v0, 3 * q.v1)) : null; };
+  for (let k = 1; k <= N; k++) for (const side of ['R', 'L']) {
+    const a = vtx(modelOn, `wing${k}`, side), b = vtx(modelOff, `wing${k}`, side);
+    const same = a && b && a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
+    if (k < N && !same) bad.push(`pair ${k} (${side}) changes with the TAIL toggle — a non-bottom pair carries tail geometry`);
+    if (k === N && same) bad.push(`the bottom pair ${k} (${side}) does not change with the TAIL toggle (no tail drawn)`);
+  }
+  if (!modelOn.wingPairs[N - 1].hasTail) bad.push('the bottom pair reports no tail');
+  if (modelOn.wingPairs.slice(0, N - 1).some((w) => w.hasTail)) bad.push('a non-bottom pair reports a tail');
+  return bad;
+}
+
 /* ---------- run ---------- */
 function check(label, model, opts = {}) {
   const fails = [];
   const md = G.mirrorDiff(model);
   if (md !== 0) fails.push(`M: mirrorDiff ${md}`);
-  const stl = analyzeStl(G.exportStl(model));
+  const stl = analyzeStl(G.exportStl(model, { allowBelowFloor: true }));   // N below checks the refusal itself
   if (stl.boundary !== 0) fails.push(`W: ${stl.boundary} boundary edges`);
   for (const b of partChecks(model)) fails.push(`P: ${b}`);
   const cn = connected(model);
@@ -334,8 +420,12 @@ function check(label, model, opts = {}) {
     le = legExposure(model);
     if (!(le.outside <= 0.02 * le.area)) fails.push(`L: tucked legs show ${le.outside.toFixed(2)} of ${le.area.toFixed(2)} mm² outside the body from above`);
   }
+  const fc = floorChecks(model);
+  for (const b of fc.bad) fails.push(`N: ${b}`);
+  if (opts.expectThin && !fc.gateThin) fails.push('N: the deliberately thin row is not thin by this file\'s measure (vacuous)');
+  if (opts.tailIso) for (const b of tailIsolation(model, opts.tailIso)) fails.push(`T: ${b}`);
   if (opts.repaired && !model.notes.some((n) => /eased toward the nearer drawn pair/.test(n))) fails.push('I: the crossing blend was not reported repaired');
-  return { label, fails, md, stl, cn, mf, sv, rc, le, notes: model.notes };
+  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, notes: model.notes };
 }
 
 function fmt(r) {
@@ -343,6 +433,7 @@ function fmt(r) {
   return `${r.fails.length ? 'FAIL' : 'ok  '} ${r.label.padEnd(26)} tris=${String(r.stl.triangles).padStart(6)} stl=${(r.stl.bytes / 1024).toFixed(0).padStart(5)}KiB `
     + `mirror=${r.md} boundary=${r.stl.boundary} nonManifold(unrated)=${r.stl.nonManifold} regions=${r.cn.comps} `
     + `minTube=${f(r.mf.tubeMin)} minThick=${f(r.mf.thickMin)} waist=${f(r.mf.waistMin)} roots=${r.rc.roots.length}${r.rc.roots.length > 1 ? `@${f(r.rc.minGap)}mm` : ''} cutRegions=${r.sv.regions}`
+    + ` floor=${r.fc.refused ? 'STL-REFUSED' : 'ok'}(${r.fc.worst.toFixed(2)}mm${r.fc.border ? ',borderline' : ''})`
     + (r.le ? ` legsOutside=${r.le.outside.toFixed(2)}/${r.le.area.toFixed(2)}mm²` : '') + (r.notes.length ? `  notes: ${r.notes.join('; ')}` : '');
 }
 
@@ -382,6 +473,45 @@ function functionChecks() {
     if (p.bodyParts === '2' && (p.legPairs !== 4 || p.wingPairs !== 0 || p.antennaType !== 'none')) badK.push(`seed ${s}: 2-part with ${p.legPairs} legs / ${p.wingPairs} wings / ${p.antennaType}`);
   }
   ok(!badK.length, `K: 500 randomized bugs plausible — 3-part ${tally['3']}, 2-part ${tally['2']}; wing pairs 0-4: ${tally.wings.join('/')}; antennae ${JSON.stringify(tally.ant)}${badK.length ? ' — ' + badK.slice(0, 4).join('; ') : ''}`);
+  // T — the tail group, at the level of the outline operations
+  const tBase = G.DEFAULT_WINGS.last.points, tail0 = { ...G.STARTER_TAIL, on: true };
+  const sameArr = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  ok(sameArr(G.composeOutline(tBase, { ...tail0, on: false }).points, tBase), 'T: TAIL off composes exactly the base outline (no point added, none moved)');
+  const cOn = G.composeOutline(tBase, tail0);
+  ok(cOn.points.length === tBase.length + tail0.points.length && sameArr(cOn.points.filter((_, i) => cOn.tags[i][0] === 'base'), tBase), `T: TAIL on adds exactly the ${tail0.points.length} tail points and leaves every base point as it was`);
+  const ti = cOn.tags.findIndex((t) => t[0] === 'tail' && t[1] === 4);
+  const tTarget = [cOn.points[ti][0] + 0.03, cOn.points[ti][1] - 0.02];
+  const ed = G.moveComposed(tBase, tail0, ti, tTarget);
+  ok(ed.ok && sameArr(ed.base, tBase) && !sameArr(ed.tail.points, tail0.points), 'T: dragging a tail point edits the tail group only');
+  const offAgain = G.composeOutline(ed.base, { ...ed.tail, on: false });
+  const onAgain = G.composeOutline(ed.base, { ...ed.tail, on: true });
+  const tBack = onAgain.points[onAgain.tags.findIndex((t) => t[0] === 'tail' && t[1] === 4)];
+  ok(sameArr(offAgain.points, tBase) && Math.hypot(tBack[0] - tTarget[0], tBack[1] - tTarget[1]) < 1e-12, `T: OFF removes exactly the tail; ON again restores the EDITED tail (point back at ${tBack.map((v) => v.toFixed(3))}), not the starter`);
+  const midTail = (cOn.points[ti] .map((v, k) => (v + cOn.points[ti + 1][k]) / 2));
+  const insT = G.insertComposed(tBase, tail0, midTail);
+  ok(insT.ok && insT.tail.points.length === tail0.points.length + 1 && sameArr(insT.base, tBase), 'T: a point added between two tail points joins the tail group (the tag is preserved)');
+  const insB = G.insertComposed(tBase, tail0, [0.6, 0.18]);
+  ok(insB.ok && insB.base.length === tBase.length + 1 && sameArr(insB.tail.points, tail0.points), 'T: a point added on the base outline joins the base, the tail group is untouched');
+  const two = { ...tail0, points: tail0.points.slice(0, 2) };
+  const c2 = G.composeOutline(tBase, two);
+  ok(!G.deleteComposed(tBase, two, c2.tags.findIndex((t) => t[0] === 'tail')).ok, 'T: deleting below 2 tail points is refused (turn TAIL off instead)');
+  // the tail follows the bottom pair when the pair count changes, edits included
+  const pt = G.defaultParams(); pt.wings.tail = { ...ed.tail, on: true };
+  const shapes = [];
+  for (const n of [1, 2, 4]) {
+    pt.wingPairs = n; const m = G.buildBug(pt);
+    const bottom = m.wingPairs[n - 1];
+    const tagged = bottom.tags.filter((t) => t[0] === 'tail').length;
+    shapes.push(`${n}:${m.wingPairs.map((w) => (w.hasTail ? 'T' : '-')).join('')}`);
+    ok(bottom.hasTail && tagged === ed.tail.points.length && m.wingPairs.slice(0, n - 1).every((w) => !w.hasTail), `T: at ${n} pair(s) the edited tail (${tagged} points) is on the bottom pair only`);
+  }
+  // migration of the retired sliders
+  const oldDoc = { format: G.DESIGN_FORMAT, version: 1, name: 'old', params: { ...G.defaultParams(), tailLength: 9, tailWidth: 2.4, tailClub: 0.5 } };
+  delete oldDoc.params.wings.tail;
+  const mig = G.paramsFromDesign(JSON.parse(JSON.stringify(oldDoc)));
+  const mm = G.buildBug(mig.params);
+  ok(mig.ok && mig.params.wings.tail.on && mig.params.wings.tail.points.length === 11 && !('tailLength' in mig.params) && mig.notes.some((n) => /migrated into a TAIL group/.test(n)) && mm.wingPairs[1].hasTail,
+    `T: a design with the retired tail sliders (length 9 mm) migrates into an ON tail group of ${mig.params.wings.tail.points.length} points on the bottom pair, with a note`);
   // D
   const p0 = G.randomParams(7); p0.wingPairs = 4; p0.wings.unlinked[2] = { ...p0.wings.first, points: HAND_OUTLINES.falcate };
   const norm = G.normalizeParams(p0);
@@ -408,9 +538,21 @@ function rowsFor(nseeds) {
   for (const [name, pts] of Object.entries(HAND_OUTLINES)) {
     const p = d(); p.wingPairs = 4; p.wings.first.points = pts; rows.push([`drawn:${name} (4 pairs)`, p, {}]);
   }
-  { const p = d(); p.wingPairs = 4; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.last.points = HAND_OUTLINES.notched; p.wings.last.scallop = 0.18; p.tailLength = 10;
+  { const p = d(); p.wingPairs = 4; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.last.points = HAND_OUTLINES.notched; p.wings.last.scallop = 0.18; p.wings.tail.on = true;
     rows.push(['drawn: swallowtail -> notched, scallop + tail', p, {}]); }
   { const p = d(); p.wingPairs = 4; p.wings.unlinked[1] = { ...p.wings.first, points: HAND_OUTLINES.falcate, sweep: 40, dihedral: -20 }; rows.push(['pair 2 unlinked, falcate', p, {}]); }
+  // TAIL rows: the tail on the bottom pair only, at every pair count, checked
+  // against the same bug with the tail OFF (T); and a tail drawn thinner than
+  // the floor, whose STL must be refused (N)
+  for (const n of [1, 2, 3, 4]) {
+    const on = d(); on.wingPairs = n; on.wings.tail.on = true;
+    const off = d(); off.wingPairs = n;
+    rows.push([`tail ON, ${n} pair(s)`, on, { tailIso: G.buildBug(off) }]);
+  }
+  { const p = d(); p.wingPairs = 4; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.tail.on = true; p.wings.unlinked[2] = { ...p.wings.first, points: HAND_OUTLINES.falcate };
+    const off = JSON.parse(JSON.stringify(p)); off.wings.tail.on = false;
+    rows.push(['tail ON, 4 pairs, one unlinked', p, { tailIso: G.buildBug(off) }]); }
+  { const p = d(); p.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL)); rows.push(['tail drawn under the floor', p, { expectThin: true }]); }
   { const p = d(); p.wingPairs = 3; p.wings.first.points = CROSSING_BLEND.first; p.wings.last.points = CROSSING_BLEND.last; rows.push(['crossing blend (3 pairs)', p, { repaired: true }]); }
   return rows;
 }
@@ -419,6 +561,10 @@ if (NEG) {
   const base = G.buildBug(G.defaultParams());
   const tuckP = G.defaultParams(); tuckP.legReach = 0;
   const tuck = G.buildBug(tuckP);
+  const t4 = G.defaultParams(); t4.wingPairs = 4; t4.wings.tail.on = true;
+  const tail4on = G.buildBug(t4); t4.wings.tail.on = false; const tail4off = G.buildBug(t4);
+  const thinP = G.defaultParams(); thinP.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL));
+  const thinModel = G.buildBug(thinP);
   const clone = (m) => ({ ...m, positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices), parts: m.parts.map((p) => ({ ...p, meta: { ...p.meta } })) });
   const shiftPart = (m, pred, d) => { for (const p of m.parts.filter(pred)) for (let v = p.v0; v < p.v1; v++) for (let k = 0; k < 3; k++) m.positions[3 * v + k] += d[k] * (k === 0 && p.side === 'L' ? -1 : 1); };
   const muts = [
@@ -448,9 +594,13 @@ if (NEG) {
         m.positions[3 * best + 1] += 3;
       }
     }],
+    ['a middle pair carries tail geometry', 'T', tail4on, { tailIso: tail4off }, (m) => {
+      for (const side of ['R', 'L']) { const p = m.parts.find((q) => q.kind === 'wing2' && q.side === side); m.positions[3 * p.v0 + 1] -= 2; }
+    }],
+    ['a floor violation goes unreported', 'N', thinModel, { expectThin: true }, (m) => { m.floorViolations = []; }],
     ['untuck the legs (move out 4 mm)', 'L', tuck, { tucked: true }, (m) => shiftPart(m, (q) => q.kind === 'leg', [4, 0, 0])],
   ];
-  const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true })];
+  const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true })];
   let ok = clean.every((r) => !r.fails.length);
   for (const r of clean) console.log(fmt(r));
   for (const [name, clause, src, opts, fn] of muts) {

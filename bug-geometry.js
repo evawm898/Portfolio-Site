@@ -41,8 +41,6 @@ const TUBE_SIDES = 10;
    so the vertex radius is the floor divided by cos(pi / sides). */
 const tubeFloorR = (p) => p.minDiameter / 2 / Math.cos(Math.PI / TUBE_SIDES);
 const SCALLOP_FROM = 0.3;                   // scallops run over the outer 70% of the span
-const TAIL_AT = 0.78;                       // hindwing tail root, fraction of span
-const TAIL_ANGLE = 20 * D2R;                // tail points backward, 20 deg outward
 const BAND_DEPTH = 0.14;                    // abdomen constriction depth when banding is on
 const ABD_DEPTH_RATIO = 0.9;                // abdomen depth / width
 const ABD_PEAK = 0.3;                       // abdomen widest at 30% of its length
@@ -67,7 +65,7 @@ export const CR_SAMPLES = 10;               // samples per control segment
 export const INTERP_SAMPLES = 48;           // per half (leading / trailing)
 const WING_SUBDIV = 2;                      // 1->4 midpoint subdivisions of the triangulated planform
 /* Editor bounds of the drawn outline, in units of the wing's own length. */
-export const OUTLINE_BOUNDS = { u: [0, 1.2], w: [-0.65, 0.65] };
+export const OUTLINE_BOUNDS = { u: [0, 1.2], w: [-0.9, 0.46] };   // room below for a tail
 const MIN_POINT_GAP = 0.012;                // consecutive control points closer than this are refused
 const MIN_ROOT_CHORD = 0.03;                // root lead must sit this far ahead of root trail
 export const MIN_OUTLINE_POINTS = 4;        // two roots + two interior
@@ -84,14 +82,12 @@ export const SECTIONS = [
   { id: 'legs', label: 'Legs' },
   { id: 'antennae', label: 'Antennae' },
   { id: 'wings', label: 'Wings', open: true },
-  { id: 'tail', label: 'Hindwing tail (last pair)', parent: 'wings' },
   { id: 'print', label: 'Print' },
 ];
 
 const isThree = (p) => p.bodyParts === '3';
 const hasLegs = (p) => p.legPairs > 0 && p.legsVisible;
 const hasAnt = (p) => p.antennaType !== 'none';
-const hasTail = (p) => p.wingPairs >= 2;
 
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen) =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
@@ -131,9 +127,6 @@ export const PARAM_SPEC = [
   R('antennaSpread', 'antennae', 'Spread', 0, 80, 1, 25, '°', hasAnt),
 
   R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
-  R('tailLength', 'tail', 'Length', 0, 30, 0.5, 0, 'mm', hasTail),
-  R('tailWidth', 'tail', 'Width', 0.5, 6, 0.1, 2.4, 'mm', (p) => hasTail(p) && p.tailLength > 0),
-  R('tailClub', 'tail', 'Club', 0, 1, 0.01, 0.5, '', (p) => hasTail(p) && p.tailLength > 0),
 
   R('minDiameter', 'print', 'Min feature diameter (STL floor)', 0.6, 2, 0.05, MIN_DIAMETER_DEFAULT, 'mm'),
 ];
@@ -167,10 +160,11 @@ export const DEFAULT_WINGS = {
     length: 20, stretch: 1, sweep: 32, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 8, pitch: 0,
   },
   unlinked: {},
+  tail: null,           // set below, once STARTER_TAIL exists
 };
 
 export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
-DEFAULTS.wings = DEFAULT_WINGS;
+DEFAULTS.wings = DEFAULT_WINGS;   // .tail filled in after STARTER_TAIL (below)
 
 export const defaultParams = () => clone(DEFAULTS);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -253,7 +247,13 @@ export function polygonSimple(poly) {
    point must stand at least OUTLINE_CLEARANCE (units of the wing's length) from
    every part of the outline more than 4x that away along the curve. A sharp
    tip passes down to an included angle of about 29 degrees. */
-export const OUTLINE_CLEARANCE = 0.015;
+export const OUTLINE_CLEARANCE = 0.008;
+/* It was 0.015 until the drawn-width FLOOR existed (PR #326, second ruling).
+   With a real floor in millimetres, clearance only has to keep an outline from
+   nearly touching itself; a narrow-but-real feature (a thin tail neck) must be
+   drawable so the floor can show it red and refuse the STL. At 0.015 a 0.4 mm
+   neck on a 20 mm wing could not be drawn at all — the editor blocked it as a
+   pinch before the floor ever saw it. */
 export function polygonClear(poly, c = OUTLINE_CLEARANCE) {
   const n = poly.length, cum = [0];
   for (let i = 1; i <= n; i++) cum.push(cum[i - 1] + dist2(poly[i - 1], poly[i % n]));
@@ -397,6 +397,164 @@ export function controlPointsFromDense(dense, K) {
   return pts;
 }
 
+/* ------------------------------------------------------------------ */
+/* The TAIL: a tagged group of control points in the BOTTOM pair's outline */
+/* ------------------------------------------------------------------ */
+
+/* Eva's ruling (PR #326): the hindwing tail is part of the wing OUTLINE, not a
+   separate solid, behind a TAIL toggle on the BOTTOM pair only (the last pair,
+   or the only pair of one). The tail is stored ONCE, at the wings level:
+     wings.tail = { on, anchorU, points }
+   - `points` are OFFSETS (units of the bottom pair's length) from the ANCHOR —
+     the point where the trailing edge crosses u = anchorU — in the MARGIN'S
+     OWN FRAME: [a, b] = a along the trailing edge (toward the root), b along
+     its outward normal. Ordered from the outer side of the tail, round its
+     end, back to the inner side. (Plain (u, w) offsets were tried first: a
+     tail moved to a pair whose margin slopes differently had its roots land
+     INSIDE the wing and was refused — the margin frame keeps it hanging off
+     the edge on any pair.)
+   - The bottom pair's own control points (`base`) never contain the tail. The
+     outline the builder draws is composed: base up to the anchor's control
+     segment, then the tail points (anchor + offset), then the rest of base.
+   This is the tag, structurally: a tail point can only exist in `tail.points`,
+   so OFF drops exactly those and nothing else, ON brings back the edited group
+   (it was never deleted), a base edit cannot absorb a tail point, and the
+   first<->last blend reads `first.points` / `last.points` — the tail-less
+   bases — so a middle pair cannot inherit any part of a tail. Changing the pair
+   count moves the group with its edits, because it belongs to no pair: it is
+   composed onto whichever pair is the bottom one, at the same anchorU. */
+export const STARTER_TAIL = {
+  on: false,
+  anchorU: 0.6,
+  // spatulate swallowtail, [along, outward]: a neck 0.08 wide widening to a rounded paddle
+  points: [[-0.05, -0.005], [-0.075, 0.13], [-0.085, 0.25], [-0.14, 0.31], [-0.13, 0.4], [-0.06, 0.44], [0.005, 0.36], [-0.005, 0.25], [0.005, 0.13], [0.045, -0.005]],
+};
+export const MIN_TAIL_POINTS = 2;
+DEFAULT_WINGS.tail = JSON.parse(JSON.stringify(STARTER_TAIL));
+
+/* The anchor on a base outline: where its TRAILING half (apex -> root trail)
+   first reaches u = anchorU, and the base control segment that holds it. */
+export function tailAnchor(base, anchorU) {
+  const dense = sampleOutline(base);
+  let apex = 0; for (let k = 1; k < dense.length; k++) if (dense[k][0] > dense[apex][0]) apex = k;
+  const u = clamp(anchorU, dense[dense.length - 1][0], dense[apex][0]);
+  let j = apex;
+  while (j + 1 < dense.length - 1 && dense[j + 1][0] > u) j++;
+  const a = dense[j], b = dense[j + 1], t = b[0] === a[0] ? 0 : (u - a[0]) / (b[0] - a[0]);
+  // the margin's frame there: tangent along the curve's own direction (apex ->
+  // root trail), outward normal = the tangent turned a quarter clockwise-out
+  // (the outline runs clockwise in (u, w))
+  const j0 = Math.max(0, j - 2), j1 = Math.min(dense.length - 1, j + 3);
+  const tx = dense[j1][0] - dense[j0][0], ty = dense[j1][1] - dense[j0][1], tl = Math.hypot(tx, ty) || 1;
+  const T = [tx / tl, ty / tl], N = [-T[1], T[0]];
+  return { point: lerp2(a, b, clamp(t, 0, 1)), seg: Math.min(base.length - 2, Math.floor(j / CR_SAMPLES)), T, N };
+}
+const fromFrame = (A, [a, b]) => [A.point[0] + a * A.T[0] + b * A.N[0], A.point[1] + a * A.T[1] + b * A.N[1]];
+const toFrame = (A, q) => { const d = [q[0] - A.point[0], q[1] - A.point[1]]; return [d[0] * A.T[0] + d[1] * A.T[1], d[0] * A.N[0] + d[1] * A.N[1]]; };
+
+/* Compose the drawn outline: base, or base with the tail group spliced in.
+   Returns the points and a parallel tag array ('base' | 'tail') with each
+   point's index in its own group. */
+export function composeOutline(base, tail) {
+  if (!tail || !tail.on || !tail.points.length) return { points: base.map((q) => q.slice()), tags: base.map((_, i) => ['base', i]), anchor: null };
+  const A = tailAnchor(base, tail.anchorU);
+  const tp = tail.points.map((ab) => fromFrame(A, ab));
+  const points = [...base.slice(0, A.seg + 1).map((q) => q.slice()), ...tp, ...base.slice(A.seg + 1).map((q) => q.slice())];
+  const tags = [...base.slice(0, A.seg + 1).map((_, i) => ['base', i]), ...tp.map((_, i) => ['tail', i]), ...base.slice(A.seg + 1).map((_, i) => ['base', A.seg + 1 + i])];
+  return { points, tags, anchor: A };
+}
+
+/* Editor operations on the BOTTOM pair with its tail: they act on the composed
+   outline the editor shows, write back into base or tail by tag, and are
+   validated on the composed outline that WOULD result. A base edit keeps the
+   tail's offsets, so the tail rides the margin it hangs from. */
+export function moveComposed(base, tail, i, q) {
+  const c = composeOutline(base, tail), [kind, j] = c.tags[i];
+  if (kind === 'tail') {
+    const nt = { ...tail, points: tail.points.map((p) => p.slice()) };
+    const qq = clampOutlinePoint(q, false);
+    nt.points[j] = toFrame(c.anchor, qq);
+    const v = outlineValid(composeOutline(base, nt).points, true);
+    return v.ok ? { ok: true, base, tail: nt } : { ok: false, base, tail, reason: v.reason };
+  }
+  const nb = base.map((p) => p.slice());
+  nb[j] = clampOutlinePoint(q, j === 0 || j === base.length - 1);
+  const vb = outlineValid(nb);
+  if (!vb.ok) return { ok: false, base, tail, reason: vb.reason };
+  const v = outlineValid(composeOutline(nb, tail).points, true);
+  return v.ok ? { ok: true, base: nb, tail } : { ok: false, base, tail, reason: v.reason };
+}
+export function insertComposed(base, tail, q) {
+  const c = composeOutline(base, tail);
+  const r = insertControlPoint(c.points, q, true);
+  if (!r.ok) return { ok: false, base, tail, reason: r.reason };
+  const i = r.index;                                   // the new point sits between c.points[i-1] and c.points[i]
+  const before = c.tags[i - 1], after = c.tags[i];
+  if (before[0] === 'tail' && after && after[0] === 'tail') {
+    const nt = { ...tail, points: tail.points.map((p) => p.slice()) };
+    nt.points.splice(after[1], 0, toFrame(c.anchor, r.points[i]));
+    return { ok: true, base, tail: nt, index: i };
+  }
+  // a base point: its base index is the count of base points before it
+  const bi = c.tags.slice(0, i).filter((t) => t[0] === 'base').length;
+  const nb = base.map((p) => p.slice()); nb.splice(bi, 0, r.points[i].slice());
+  if (!outlineValid(nb).ok || !outlineValid(composeOutline(nb, tail).points, true).ok) return { ok: false, base, tail, reason: 'the point would move the tail off a valid outline' };
+  return { ok: true, base: nb, tail, index: i };
+}
+export function deleteComposed(base, tail, i) {
+  const c = composeOutline(base, tail), [kind, j] = c.tags[i];
+  if (kind === 'tail') {
+    if (tail.points.length <= MIN_TAIL_POINTS) return { ok: false, base, tail, reason: `a tail keeps at least ${MIN_TAIL_POINTS} points — turn TAIL off to remove it` };
+    const nt = { ...tail, points: tail.points.filter((_, k) => k !== j) };
+    const v = outlineValid(composeOutline(base, nt).points, true);
+    return v.ok ? { ok: true, base, tail: nt } : { ok: false, base, tail, reason: v.reason };
+  }
+  const r = deleteControlPoint(base, j);
+  if (!r.ok) return { ok: false, base, tail, reason: r.reason };
+  const v = outlineValid(composeOutline(r.points, tail).points, true);
+  return v.ok ? { ok: true, base: r.points, tail } : { ok: false, base, tail, reason: v.reason };
+}
+
+/* Saved designs written before the tail ruling carried the old tail SLIDERS
+   (tailLength / tailWidth / tailClub, mm). They migrate into a tagged group
+   that draws the same tail: the old builder hung a strap from the trailing
+   edge at 0.78 of the span, 20 degrees outward-backward, `tailWidth` wide,
+   tailLength + tailWidth long, swelling into a club near its end. The strap's
+   two edges and its rounded end become control points (offsets from the
+   anchor, in units of the bottom pair's length). Exact to the old solid only
+   up to the spline through those points; reported in the load notes. */
+export function migrateOldTail(old, bottomLength) {
+  const L = Math.max(1e-6, bottomLength);
+  const tw = Math.max(0.5, +old.tailWidth || 2.4), len = (+old.tailLength || 0) + tw, club = clamp(+old.tailClub || 0, 0, 1);
+  const a = 20 * D2R, d = [Math.sin(a), -Math.cos(a)], q = [Math.cos(a), Math.sin(a)];
+  const hw = (s) => {
+    let h = (tw / 2) * (1 - 0.35 * s) * (1 + club * 1.6 * Math.exp(-(((s - 0.86) / 0.1) ** 2)));
+    return Math.max(h, 0.3);
+  };
+  const S = [0.15, 0.5, 0.8, 0.92];
+  const at = (s, side) => [(d[0] * s * len + side * q[0] * hw(s)) / L, (d[1] * s * len + side * q[1] * hw(s)) / L];
+  const pts = [[(q[0] * tw / 2) / L, 0], ...S.map((s) => at(s, 1)), [(d[0] * len) / L, (d[1] * len) / L], ...S.slice().reverse().map((s) => at(s, -1)), [-(q[0] * tw / 2) / L, 0]];
+  // the old strap's direction was fixed in (u, w); the new group is stored in the
+  // margin frame, read as if the margin ran straight back toward the root
+  // (along -u, outward -w) — exact on a level trailing edge, rotated with the
+  // margin elsewhere, which is the point of the frame
+  return { on: true, anchorU: MIGRATED_TAIL_ANCHOR, points: pts.map(([u, w]) => [+(-u).toFixed(4), +(-w).toFixed(4)]) };
+}
+/* The old strap hung at 0.78 of the span; the group anchors at the starter's
+   0.6 instead, because on the default outline 0.78 lands ON a base control
+   point (a coincident neighbour) and pushes a long strap past the drawing
+   area. If the migrated group still does not fit the bottom pair it is
+   SCALED DOWN about its anchor until it does, and the note says by how much
+   — a migrated design never silently loses its tail. */
+export const MIGRATED_TAIL_ANCHOR = 0.6;
+export function fitMigratedTail(base, tail) {
+  for (let f = 1; f > 0.2; f = +(f - 0.05).toFixed(2)) {
+    const t = { ...tail, points: tail.points.map(([a, b]) => [+(a * f).toFixed(4), +(b * f).toFixed(4)]) };
+    if (outlineValid(composeOutline(base, t).points).ok) return { tail: t, scale: f };
+  }
+  return { tail, scale: null };
+}
+
 /* The N wing pairs, resolved: pair 0 is the drawn FIRST pair, pair N-1 the
    drawn LAST pair, every pair between interpolates both (outline AND scalar
    fields) unless it is UNLINKED, when it carries its own drawn spec. */
@@ -404,7 +562,13 @@ export function resolveWingPairs(p) {
   const N = p.wingPairs, W = p.wings, out = [];
   for (let k = 0; k < N; k++) {
     const role = k === 0 ? 'first' : k === N - 1 ? 'last' : 'mid';
-    if (role !== 'mid') { out.push({ index: k, role, linked: false, ...W[role], dense: sampleOutline(W[role].points), repaired: false }); continue; }
+    if (role !== 'mid') {
+      // the BOTTOM pair (last, or the only pair) carries the tail group
+      let comp = composeOutline(W[role].points, k === N - 1 ? W.tail : null), tailFits = true;
+      if (comp.anchor && !outlineValid(comp.points).ok) { comp = composeOutline(W[role].points, null); tailFits = false; }
+      out.push({ index: k, role, linked: false, ...W[role], drawn: comp.points, tags: comp.tags, dense: sampleOutline(comp.points), repaired: false, tailFits, hasTail: !!comp.anchor });
+      continue;
+    }
     const own = W.unlinked && W.unlinked[k];
     if (own) { out.push({ index: k, role, linked: false, ...own, dense: sampleOutline(own.points), repaired: false }); continue; }
     const t = k / (N - 1);
@@ -459,7 +623,7 @@ export const RANDOM_RANGES = {
   wingStretch: [0.75, 1.35], firstSweep: [-12, 20], lastSweep: [12, 50],
   scallopChance: 0.3, scallop: [0.05, 0.2], wingThickness: [1.0, 1.5],
   dihedral: [-5, 25], pitch: [-8, 8],
-  tailChance: 0.25, tailLength: [3, 12], tailWidth: [1.2, 3.2], tailClub: [0, 0.8],
+  tailChance: 0.2,   // TAIL on the bottom pair with the starter shape, when it fits that outline
 };
 
 function randomOutline(r) {
@@ -517,9 +681,14 @@ export function randomParams(seed) {
   };
   const f = wing(true), l = wing(false);
   l.length = f.length * U(K.lastWingOfFirst);
-  p.wings = { first: f, last: l, unlinked: {} };
-  p.tailLength = wp >= 2 && r() < K.tailChance ? U(K.tailLength) : 0;
-  p.tailWidth = U(K.tailWidth); p.tailClub = U(K.tailClub);
+  p.wings = { first: f, last: l, unlinked: {}, tail: JSON.parse(JSON.stringify(STARTER_TAIL)) };
+  if (wp >= 1 && r() < K.tailChance) {
+    p.wings.tail.on = true;
+    const bottom = wp === 1 ? f : l;
+    const comp = composeOutline(bottom.points, p.wings.tail).points;
+    // never draw a tail that does not fit, or whose neck is under the floor on this pair's size
+    if (!outlineValid(comp).ok || thinAnalysis(sampleOutline(comp).map(([u, w]) => [u * bottom.length, w * bottom.length * bottom.stretch]), p.minDiameter).thin) p.wings.tail.on = false;
+  }
   return normalizeParams(p);
 }
 
@@ -792,6 +961,93 @@ function buildBody(acc, p, L) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Drawn-width floor (Eva's ruling on PR #326)                          */
+/* ------------------------------------------------------------------ */
+
+/* Where is a drawn planform NARROWER than the floor? Morphological opening by
+   a disc of the floor's diameter: every disc of diameter `floor` that fits
+   inside the planform is kept, and the parts of the planform no such disc
+   reaches are THIN. A tail neck narrower than the floor is wholly thin; a wide
+   wing has no thin part except the tips of sharp corners, which every printer
+   rounds anyway — so a thin region only COUNTS when it reaches deeper than
+   THIN_DEPTH_FRAC x floor past the nearest kept material (a corner sharper than
+   about 60 degrees). Computed on a raster at floor / THIN_RES with exact
+   Euclidean distance transforms (Felzenszwalb-Huttenlocher), in millimetres.
+   THIN_RES 8 was measured first; it nearly doubled a 4-pair build (90 ms).
+
+   Returns { maxDepth, thin (bool), flags } where flags[i] marks dense outline
+   sample i as lying on a thin part (for the editor's red highlight). */
+export const THIN_DEPTH_FRAC = 0.5;
+const THIN_RES = 6;   // pixel = floor/6: a depth error of about a sixth of the floor against a bar of half of it
+
+function edt1(f, n, d, v, z) {
+  let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+    k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+}
+/* squared distance (in pixels^2) from every pixel to the nearest pixel where `src` is set */
+function edt2(src, nx, ny) {
+  const INF = 1e20, out = new Float64Array(nx * ny), m = Math.max(nx, ny);
+  const f = new Float64Array(m), d = new Float64Array(m), v = new Int32Array(m), z = new Float64Array(m + 1);
+  for (let x = 0; x < nx; x++) {
+    for (let y = 0; y < ny; y++) f[y] = src[y * nx + x] ? 0 : INF;
+    edt1(f, ny, d, v, z);
+    for (let y = 0; y < ny; y++) out[y * nx + x] = d[y];
+  }
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) f[x] = out[y * nx + x];
+    edt1(f, nx, d, v, z);
+    for (let x = 0; x < nx; x++) out[y * nx + x] = d[x];
+  }
+  return out;
+}
+
+export function thinAnalysis(poly, floor) {
+  const h = floor / THIN_RES, r = floor / 2;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const pad = 3;
+  const nx = Math.ceil((x1 - x0) / h) + 2 * pad, ny = Math.ceil((y1 - y0) / h) + 2 * pad;
+  const gx = x0 - pad * h, gy = y0 - pad * h;
+  const inside = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) {                       // even-odd scanline fill at pixel centres (the polygon is simple)
+    const yc = gy + (j + 0.5) * h, xs = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      if ((a[1] <= yc) !== (b[1] <= yc)) xs.push(a[0] + ((yc - a[1]) / (b[1] - a[1])) * (b[0] - a[0]));
+    }
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const i0 = Math.max(0, Math.ceil((xs[k] - gx) / h - 0.5)), i1 = Math.min(nx - 1, Math.floor((xs[k + 1] - gx) / h - 0.5));
+      for (let i = i0; i <= i1; i++) inside[j * nx + i] = 1;
+    }
+  }
+  const outside = new Uint8Array(nx * ny); for (let i = 0; i < outside.length; i++) outside[i] = inside[i] ? 0 : 1;
+  const dOut = edt2(outside, nx, ny);                   // inside pixels: distance to the outside
+  const core = new Uint8Array(nx * ny);                 // centres of floor-discs that fit
+  const r2 = (r / h) ** 2;
+  for (let i = 0; i < core.length; i++) core[i] = inside[i] && dOut[i] >= r2 ? 1 : 0;
+  const dCore = edt2(core, nx, ny);
+  const opened = new Uint8Array(nx * ny);               // material some floor-disc covers
+  for (let i = 0; i < opened.length; i++) opened[i] = inside[i] && dCore[i] <= r2 ? 1 : 0;
+  const dOpen = edt2(opened, nx, ny);
+  let maxDepth = 0;
+  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i]) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
+  const tau = THIN_DEPTH_FRAC * floor;
+  const flags = new Uint8Array(poly.length);
+  for (let k = 0; k < poly.length; k++) {
+    const i = clamp(Math.floor((poly[k][0] - gx) / h), 0, nx - 1), j = clamp(Math.floor((poly[k][1] - gy) / h), 0, ny - 1);
+    flags[k] = Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
+  }
+  return { maxDepth, thin: maxDepth > tau, flags, tau };
+}
+
+/* ------------------------------------------------------------------ */
 /* Wings                                                                */
 /* ------------------------------------------------------------------ */
 
@@ -995,37 +1251,13 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   part.meta.repaired = spec.repaired;
   part.meta.scallopReduced = scallopReduced;
   part.meta.hingeY = hinge[1];
+  // drawn-width floor: the planform as drawn (tail and scallops included, the
+  // root tab inside the body excluded), in millimetres, against minDiameter
+  const thin = thinAnalysis(scalloped, p.minDiameter);
+  part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau };
+  part.meta.thinFlags = Array.from(thin.flags);
   acc.end();
 
-  if (isLast && N >= 2 && p.tailLength > 0) {
-    const tw = Math.max(minW, p.tailWidth);
-    // the trailing-edge point nearest TAIL_AT of the span, on the trailing half
-    let best = apex, bd = Infinity;
-    for (let i = apex; i < scalloped.length; i++) { const d = Math.abs(scalloped[i][0] - TAIL_AT * umax); if (d < bd) { bd = d; best = i; } }
-    const at = scalloped[best];
-    const d = [Math.sin(TAIL_ANGLE), -Math.cos(TAIL_ANGLE)];
-    const q = [Math.cos(TAIL_ANGLE), Math.sin(TAIL_ANGLE)];
-    const b0 = [at[0] - d[0] * tw, at[1] - d[1] * tw];          // starts inside the wing
-    const Lq = p.tailLength + tw;
-    const NQ = 24, NV = 6;
-    const tg = [];
-    for (let i = 0; i <= NQ; i++) {
-      const s = i / NQ;
-      let hw = (tw / 2) * (1 - 0.35 * s) * (1 + p.tailClub * 1.6 * Math.exp(-(((s - 0.86) / 0.1) ** 2)));
-      if (s > 0.86) hw *= Math.sqrt(Math.max(0, 1 - ((s - 0.86) / 0.14) ** 2));
-      hw = Math.max(hw, minW / 2);
-      const cx = b0[0] + d[0] * s * Lq, cy = b0[1] + d[1] * s * Lq;
-      const row = [];
-      for (let j = 0; j <= NV; j++) { const v = lerp(-hw, hw, j / NV); row.push([cx + q[0] * v, cy + q[1] * v]); }
-      tg.push(row);
-    }
-    const tp = acc.begin('tail', 'tail', 'R');
-    const tthick = Math.max(minW, 0.9 * thick);
-    slab(acc, tg, tthick / 2, W, tp);
-    tp.meta.thickness = tthick;
-    tp.meta.tubeMinWidth = minW;
-    acc.end();
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1173,6 +1405,24 @@ function normalizeWing(w, fallback, notes, label) {
   return out;
 }
 
+function normalizeTail(t, p, q, notes) {
+  // a design from before the tail ruling: the old sliders become a tagged group
+  if (!t && Number(p.tailLength) > 0) {
+    const bottom = q.wingPairs <= 1 ? q.wings.first : q.wings.last;
+    const fit = fitMigratedTail(bottom.points, migrateOldTail(p, bottom.length)), m = fit.tail;
+    const how = fit.scale === 1 ? '' : fit.scale ? `, scaled to ${Math.round(fit.scale * 100)}% to fit the bottom pair's outline` : ', but it does not fit the bottom pair\'s outline at any scale and is not drawn until the outline or the tail is edited';
+    notes.push(`the old tail sliders (length ${(+p.tailLength).toFixed(1)} mm, width ${(+p.tailWidth || 2.4).toFixed(1)} mm, club ${(+p.tailClub || 0).toFixed(2)}) were migrated into a TAIL group of ${m.points.length} control points on the bottom pair${how}`);
+    return m;
+  }
+  const out = JSON.parse(JSON.stringify(STARTER_TAIL));
+  if (!t) return out;
+  out.on = !!t.on;
+  if (Number.isFinite(+t.anchorU)) out.anchorU = clamp(+t.anchorU, 0, OUTLINE_BOUNDS.u[1]);
+  if (Array.isArray(t.points) && t.points.length >= MIN_TAIL_POINTS && t.points.every((d) => Array.isArray(d) && Number.isFinite(+d[0]) && Number.isFinite(+d[1]))) out.points = t.points.map((d) => [+d[0], +d[1]]);
+  else if (t.points) notes.push('the tail group in the file was unreadable; the starter tail was used');
+  return out;
+}
+
 /* Clamp every field to its range and validate every outline. An invalid
    outline is REPLACED by the default and the replacement is reported in
    `notes` — a design is never silently partly loaded. */
@@ -1192,6 +1442,7 @@ export function normalizeParams(p, notes = []) {
     last: normalizeWing(W.last, DEFAULT_WINGS.last, notes, 'last pair'),
     unlinked: {},
   };
+  q.wings.tail = normalizeTail(W.tail, p, q, notes);
   for (const [k, w] of Object.entries(W.unlinked || {})) {
     const i = Number(k);
     if (Number.isInteger(i) && i >= 1 && i <= MAX_WING_PAIRS - 2 && w) q.wings.unlinked[i] = normalizeWing(w, DEFAULT_WINGS.first, notes, `pair ${i + 1}`);
@@ -1201,7 +1452,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 1;
+export const DESIGN_VERSION = 2;   // 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -1224,6 +1475,7 @@ export function buildBug(params) {
   const pairs = resolveWingPairs(p);
   const hinges = wingHinges(p, L);
   for (const spec of pairs) buildWingPair(acc, p, L, spec, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
+  for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
   for (const s of pairs) if (s.repaired) notes.push(`pair ${s.index + 1}: the interpolated outline crossed itself and was eased toward the nearer drawn pair (t ${s.t.toFixed(2)} -> ${s.tUsed.toFixed(2)})`);
   for (const part of acc.parts) if (part.meta.scallopReduced) notes.push(`pair ${part.meta.pair + 1}: scallop depth reduced so the outline does not cross itself`);
 
@@ -1244,7 +1496,14 @@ export function buildBug(params) {
   return {
     params: p,
     layout: L,
-    wingPairs: pairs.map((s) => ({ index: s.index, role: s.role, linked: s.linked, repaired: s.repaired, dense: s.dense, hingeY: hinges[s.index].y })),
+    wingPairs: pairs.map((s) => {
+      const part = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R');
+      return { index: s.index, role: s.role, linked: s.linked, repaired: s.repaired, dense: s.dense, hingeY: hinges[s.index].y,
+        hasTail: !!s.hasTail, tags: s.tags || null, thin: part.meta.thin, thinFlags: part.meta.thinFlags };
+    }),
+    // every pair whose DRAWN planform is narrower than the floor somewhere: the
+    // STL exporter refuses the model while this list is not empty (see exportStl)
+    floorViolations: pairs.map((s) => ({ pair: s.index, ...acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.thin })).filter((v) => v.thin),
     notes,
     positions: Float64Array.from(acc.pos),
     indices: Uint32Array.from(acc.idx),
@@ -1300,7 +1559,18 @@ export function mirrorDiff(model) {
 /* STL exporter — reads the model only                                  */
 /* ------------------------------------------------------------------ */
 
-export function exportStl(model) {
+/* The STL is REFUSED while any drawn planform is narrower than the floor
+   (model.floorViolations): it would ship geometry below the minimum feature
+   with nothing on the print to say so. Blocking, not thickening, is the
+   ruling's choice — see bug-project-design-doc.md §5.10. `allowBelowFloor` is
+   for the gate's own analysis of a refused model (watertightness is still
+   checked on it); the page never passes it. */
+export class FloorError extends Error {}
+export function floorReason(model) {
+  return model.floorViolations.map((v) => `pair ${v.pair + 1}'s drawn outline is narrower than the ${model.params.minDiameter.toFixed(2)} mm floor (the narrow part reaches ${v.maxDepth.toFixed(2)} mm past where a floor-wide disc fits — shown red in the editor)`).join('; ');
+}
+export function exportStl(model, opts = {}) {
+  if (model.floorViolations && model.floorViolations.length && !opts.allowBelowFloor) throw new FloorError(`STL not exported: ${floorReason(model)}. Widen it there, or lower the floor in Print.`);
   const P = model.positions, I = model.indices, n = I.length / 3;
   const buf = new ArrayBuffer(84 + 50 * n);
   const dv = new DataView(buf);

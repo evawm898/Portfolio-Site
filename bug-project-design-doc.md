@@ -221,6 +221,10 @@ sheet** (`docs/img/bug-phase1-revised-sheet.png`).
 
 ## 5. Phase 1 revision — Eva's rulings on the first sheet, and what was built
 
+> **The tail parts of this section are superseded by §6**: the tail is now part
+> of the bottom pair's outline, its sliders are retired, and the random-range
+> row for it below no longer applies.
+
 The first sheet (`docs/img/bug-phase1-sheet.png`, #324) was **not approved**.
 The rulings, and how each was carried out:
 
@@ -437,7 +441,151 @@ length, not in mm) — recorded, not gated. The backdrop is not saved in designs
 
 ---
 
-## 6. Phase 1 as first built (#324) — superseded where §5 says so
+## 6. Second ruling on #326 — the TAIL is part of the outline, and the drawn-width FLOOR
+
+Eva's ruling on the revised sheet. **This section supersedes §5 wherever they
+disagree** — in particular the tail is no longer "a slider applied on top"
+(§5.3) and no longer a random-range row (§5.1's table). The sheet is
+`docs/img/bug-tail-sheet.png` (`node tools/shot-bug-sheet.mjs <dir>`).
+
+### 6.1 The tail is a tagged group of control points in the bottom pair's outline
+
+- **Stored once**, at `wings.tail = { on, anchorU, points }`, never inside a
+  pair's own `points`. `composeOutline(base, tail)` splices it into the outline
+  as drawn and returns a TAG per drawn point (`['base', i]` or `['tail', j]`).
+  OFF composes the base alone — exactly those points go and nothing else moves;
+  ON composes the stored group, which is **the last edited tail, never the
+  starter** (the toggle writes `on` and nothing else).
+- **Where it attaches:** the point where the outline's trailing half crosses
+  `u = anchorU` (0.6 for the starter). The tail's points are stored as offsets
+  in the MARGIN FRAME there — along the trailing edge's tangent toward the
+  root, and along its outward normal — in units of the pair's length. So a
+  tail rides the margin: editing a base point near it carries the tail with
+  the edge instead of leaving it stranded inside or off the wing.
+- **Editing:** drag, insert (double-click) and delete go through
+  `moveComposed` / `insertComposed` / `deleteComposed`, which map the drawn
+  index back through the tags. An insert between two tail points joins the
+  tail (the tag survives resampling because the tail is never resampled — it
+  is not part of the base the interpolation resamples). A tail keeps at least
+  two points; below that the editor refuses and says "turn TAIL off". Tail
+  points draw AMBER in the editor.
+- **Which pair:** only the BOTTOM pair — pair N of N, the only pair at 1 — and
+  the TAIL checkbox appears only while that pair is the one being edited.
+  Changing the pair count moves the tail with its edits to the new bottom pair
+  for free: it is stored on the wing set, not on a pair.
+- **Interpolation excludes it.** Middle pairs blend `first.points` and
+  `last.points` — the tail-less bases — so no partial tail or stub reaches a
+  middle pair. The gate's clause **T** proves it: the same bug built with TAIL
+  on and off must have every non-bottom wing part bit-identical
+  (`Object.is` on every vertex) and the bottom pair different. Rows at 1, 2,
+  3 and 4 pairs plus a 4-pair bug with one pair unlinked. Measured on the
+  sheet's own read-back parameters: at 2 pairs `1R 1L` identical, at 4 pairs
+  `1R 1L 2R 2L 3R 3L` identical; only the bottom pair differs.
+- **A tail that does not fit** (the composed outline would cross or pinch) is
+  dropped from the build with a note naming the pair; the stored group is
+  kept so editing the outline brings it back.
+- **The starter** is a spatulate swallowtail strap, ten points.
+- **Randomize** turns a tail on in about 1 bug in 10 (21 of seeds 1–200), and
+  only when it fits AND clears the floor at that bug's scale — so Randomize
+  never hands Eva a bug whose STL is refused (0 of 200).
+
+### 6.2 The old tail sliders are retired, and saved designs migrate
+
+`tailLength` / `tailWidth` / `tailClub` are gone from the panel and the
+schema (`DESIGN_VERSION` 2). A file carrying them (`tailLength > 0`, no
+`wings.tail`) is migrated by `migrateOldTail()`: the old strap — 20° outward
+and back from the trailing edge, `tailWidth` wide, `tailLength + tailWidth`
+long, swelling into the club near 86 % of its length — is sampled at 0.15,
+0.5, 0.8 and 0.92 of its length on each side plus its end, giving an
+**11-point tagged group**, turned ON, anchored at u 0.6. The old strap hung
+at 0.78; on the default outline 0.78 lands on a base control point (a
+coincident neighbour) and pushes a long strap past the drawing area, so the
+starter's anchor is used. If the group still does not fit it is SCALED DOWN
+about its anchor in 5 % steps until it does (`fitMigratedTail`), and the load
+note says so ("…migrated into a TAIL group of 11 control points on the bottom
+pair, scaled to 80 % to fit"). Measured: 6/10/3 mm tails at 1–4 pairs
+migrate at full size; 12 mm × 4 mm with full club needs 80 %. The result is
+the old strap up to the spline through those points, not the old solid
+exactly.
+
+### 6.3 The drawn-width floor — measured as an OPENING, and the STL is BLOCKED
+
+- **The measure** (`thinAnalysis`): the planform is rasterised at floor/6 with
+  an exact Euclidean distance transform; a point is reachable by a floor-wide
+  disc if it lies within floor/2 of a point at least floor/2 from the
+  boundary (the morphological opening). The DEPTH of any part the disc cannot
+  reach is how far it stands from the reachable region. A wing is thin when
+  that depth exceeds **half the floor** (`THIN_DEPTH_FRAC` 0.5): ordinary
+  corners lose a little to any opening (measured ≤ 0.30 mm at a 1 mm floor
+  over 120 random bugs) and must not count, while a neck narrower than the
+  floor loses its whole length.
+- **In the editor** every drawn sample in a thin region is drawn RED, live —
+  the editor redraws on every accepted pointer move.
+- **SVG is not affected.** The floor is a print property.
+- **STL: BLOCK, not thicken.** `exportStl` throws a `FloorError` naming the
+  pair and the depth, and the page prints it under the export buttons
+  (`STL not exported: pair 2's drawn outline is narrower than the 1.00 mm
+  floor …`) and marks "STL BLOCKED" in the readout. Why block:
+  1. **Thickening would make a second model.** The STL would carry a shape the
+     SVG, the 3D view and the editor do not — the one-model law (§1) exists
+     to stop exactly that.
+  2. **It would change the drawing silently.** The red highlight already
+     tells Eva where; widening it herself keeps the decision hers.
+  3. **It costs nothing in practice:** Randomize never produces one (0 of 200)
+     and the default never does; only a hand-drawn shape can.
+  Lowering the floor in Print is the other exit, and is said in the message.
+- **`OUTLINE_CLEARANCE` went 0.015 → 0.008.** At 0.015 the validity rule
+  refused a narrow neck as a "pinch" before the floor ever saw it, so a thin
+  tail could not be drawn at all, let alone shown red. The floor is the right
+  owner of "too narrow to print"; the clearance now only guards against an
+  outline touching itself.
+- **Two hand-drawn rows now refuse**, honestly: the swallowtail → notched
+  fixture with scallop and tail (0.93 mm past the disc) and the crossing-blend
+  fixture (its eased middle pair, 1.40 mm). Both are drawn shapes narrower
+  than the floor, which is what the rule is for.
+
+### 6.4 Verification
+
+- `node tools/verify-bug.mjs --seeds 120`: **173/173 pass** (24 function
+  checks + 149 built rows, 120 random), 3 m 29 s. New:
+  - **N** (floor): an INDEPENDENT measure — interior grid at floor/12, exact
+    point-to-segment distances, neighbour search through buckets — against
+    the builder's `floorViolations` and against `exportStl` actually refusing
+    with a reason. Decisive outside a band of two grid steps either side of
+    the bar; **2 of 149 rows** fall in the band and are reported, not
+    asserted. The thin-tail row reads 3.12 mm (builder 3.00).
+  - **T** (tail): the isolation clause above, plus function checks — off
+    composes the base, on adds exactly the tail, a drag moves only the tail,
+    off/on restores the edit, insert keeps the tag, deleting below two is
+    refused, the tail follows the bottom pair at 1/2/4 pairs, migration gives
+    11 points drawn on the bottom pair.
+- `--negative-control`: eleven mutations, every one caught by the clause
+  that names it, including the two new ones — **a middle pair carries tail
+  geometry** (caught by T) and **a floor violation goes unreported** (caught
+  by N, and by N's "the STL exported although…" line).
+- **The sheet performs the claims through the real page**: a real pointer
+  drag on the tail's tip point (the group moved), a real click of TAIL off
+  (0 tail points drawn) and on (the edited 10-point tail came back exactly),
+  and a real click of "Get STL" on the thin tail (no download; the refusal
+  printed). No page errors.
+- **Cost:** the default is unchanged at 23,248 triangles / 1,135 KiB. A tail
+  adds 8,000 triangles (2 pairs 23,248 → 31,248; 4 pairs 39,648 → 47,648).
+  A build with the tail on takes ~42 ms against ~17 ms without (the floor
+  raster and the extra outline), Node, this box.
+
+### 6.5 How #324 was merged
+
+From the PR timeline and this account's session transcripts: #324 was merged
+at 14:33:08 UTC by the Phase 1 session (`session_01NPd47RmJCHE8r6akBx7qYq`)
+calling the GitHub merge tool, 11 seconds after a message from Eva in that
+session reading "approved, merge it" (sent from claude.ai). Commit
+`4a96b3f`, committer web-flow. It was **not** auto-merge, **not** a scheduled
+check-in, and **not** this session. #326 is a draft with auto-merge off; the
+one scheduled check-in this session owns says in its own prompt that it must
+never merge #326 or mark it ready — #326 merges only after Eva approves in
+this conversation.
+
+## 7. Phase 1 as first built (#324) — superseded where §5 and §6 say so
 
 ### Files
 - `bug-geometry.js` — pure ES module, no three.js, runs in Node and the page:
