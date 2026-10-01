@@ -2353,6 +2353,90 @@ halved, and read `result.wale.candidate_details` (`harmonic`,
 counterfactuals monkeypatch `SMOOTHING_WINDOW_PX` and `_enhance_texture`'s
 `GaussianBlur` / `Sobel` sizes.
 
+### phase_consistency marker fragility: diagnosis confirmed, period-locked markers tried and NOT shipped (2026-10-01)
+
+Follows the record above. Baseline `main` at `79567fa`. **Nothing under
+`analysis/` changed**: the Phase 1 gate passed, but the Phase 2 change failed
+acceptance with new synthetic failures, which are blockers. The 0.378
+`phase_consistency` weight was not touched.
+
+**Phase 1: the hypothesis holds.** Each of the 1x/2x candidates on the eight
+flips (six downsample2x, plus crop_shift on knit_02 and knit_06) was
+re-scored with its phase markers forced onto an exact lattice at the
+candidate's own spacing. The lattice phase is the circular mean of the
+detected peaks modulo the period, so peak detection supplies a phase and
+never a spacing. The 0.3/0.7 bimodality disappears: every candidate reads
+0.60–0.84 and moves at most 0.04 across the transform. The flips:
+
+| flip | detected-peak markers: winner, ratio | lattice markers: winner, ratio |
+|---|---|---|
+| jersey downsample2x | 1x -> 2x, 2.057 | 1x -> 1x, 1.011 |
+| teal downsample2x | 2x -> 1x, 0.499 | 2x -> 2x, 1.000 |
+| knit_02 downsample2x | 1x -> 2x, 2.159 | 1x -> 1x, 0.960 |
+| knit_06 downsample2x | 2x -> 1x, 0.494 | 2x -> 2x, 0.998 |
+| knit_07 downsample2x | 1x -> 2x, 1.992 | 1x -> 1x, 1.001 |
+| knit_08 downsample2x | 2x -> 1x, 0.494 | 1x -> 1x, 0.993 |
+| knit_02 crop_shift | 1x -> 2x, 2.035 | 1x -> 2x, 2.035 (phase now stable, 0.77/0.81 -> 0.74/0.78; another term decides) |
+| knit_06 crop_shift | 2x -> 1x, 0.499 | 2x -> 2x, 0.996 |
+
+That is 7 of 8 explained, against a gate of 4. The marker placement itself
+is in the record above: the 2x candidate's detected markers sit 0.6×–1.6×
+of the candidate apart, so some "adjacent repeats" are one seed apart.
+
+**Phase 2, as tried.** In `_score_candidates`, phase markers were an exact
+lattice at the candidate spacing with that fitted phase (no constants: the
+spacing is the candidate, the extent is the ROI). A second, constant-free
+change confined the density cross-check override to candidates inside its
+own near-tie (`DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN` of the top). The reason
+it was needed: once a 2T lattice is scored as the genuine repeat it is, the
+1x-vs-2x margin on knit_07 jpeg60 and knit_01 downsample2x fell to 0.065.
+That opened the override, which then picked the 0.5x leg lattice (evidence
+0.07, phase 0.00, alternation 0.72–0.84). Measured, both changes together:
+
+* **Scorecard: all 15 rows identical to the digit**, knit_05 included.
+* **Metamorphic sweep** (11 fixtures, 70% box): downsample2x 6 harmonic flips
+  -> **0** (10 -> 16 ok); crop_shift 3 flips -> **1** (02 remains; 14 -> 17
+  ok). 14 cells improve, including knit_05 rotate90/wale, knit_08
+  rotate90/course and resize/wale, and teal resize/wale. **3 cells get
+  worse, all knit_04 wale** (resize 1.025 -> 1.999, mirror 1.000 -> 2.008,
+  half_roi 0.976 -> 2.048), which breaks "original five no worse on any
+  fixture". knit_04's 32-vs-64 is a genuine near-tie on `main` too (1x
+  minus 2x evidence +0.014 base, +0.002 mirror). On `main`, resize and
+  half_roi read `ok` only because the old landing sank the 2x candidate's
+  phase (+0.096 / +0.129). With the lattice all four knit_04 runs sit
+  within ±0.023, and three fall to 2x.
+* **pytest: 11 genuine new failures and 9 strict xfails passing.**
+  Attribution: lattice markers alone give 23 failures, and the density
+  confinement alone gives 1 (`test_still_overrides_a_genuinely_ambiguous_
+  evidence_scorer_pick`, a hand-built case asserting the override may pick
+  past the runner-up). The 10 lattice blockers: clean jersey 8x10 wale reads
+  its 2x; the ply-twist trap on clean jersey; rotation rot0 (clean) wale;
+  fuzz 0.5 clean wale; contamination pins3 / pins8 on clean jersey wale; the
+  #325 climb precondition (the rotated evidence winner is now 46.0 vs 23.0
+  true, outright rather than via the climb); knit_05's climb-mechanism pin
+  (66px is now selected directly, so its "climbed from" reason is absent);
+  and teal `small_window_b` / `_c` (7.18 / 7.11 WPI vs 4.0). The 9 XPASSes:
+  garter 8x10 wale clean and degraded (the 2x double), degraded jersey rot3,
+  degraded pins8, contamination edge 0.2 / 0.3 (clean and degraded), and the
+  12° false-climb row.
+* **#325 climb sweep** (`TGR_CLIMB_SWEEP=1`): 300 renders, fired 6 / 0 true
+  / **6 false** on `main` -> fired 4 / 0 true / **4 false**.
+
+**What this says.** The old marker landing was a lottery, but it was
+loaded: on fine-gauge synthetics the detected 2x markers land irregularly
+almost every time, so the old phase term reliably penalised T's double, and
+that bias was protecting the fundamental. Period-locked markers make phase
+consistency honest. It then separates T from T/2 (the leg lattice reads 0.00
+with alternation 0.72–0.84, cleaner than before) and, correctly, cannot
+separate T from 2T, because both are genuine repeats. That exposes a T-vs-2T
+decision the wale scorer has no term for: the remaining terms (patch
+consensus, repeat count, autocorrelation) are too close to decide it on
+fine-gauge synthetics and on knit_04. The course seed already has such a
+test (`_subrepeat_walk_score`: a candidate whose half walks is doubled), and
+the wale side does not. Period-locked markers are worth shipping only
+together with a wale-side T-vs-2T discriminator, which is a new mechanism
+and was out of this session's scope.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
