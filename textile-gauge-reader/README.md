@@ -2112,6 +2112,123 @@ at 4.5 / 15.5 / 8.0px -- fine sub-features that genuinely repeat, a
 different failure from a leg lattice), so the climb has nothing to act on
 there.
 
+### Harness extension: two more invariants, three more degradations, climb coverage (2026-10-01)
+
+Harness only — nothing under `analysis/` changed. The 15-row ground-truth
+scorecard is identical to `f677bed` to the digit. pytest: 406 passed,
+46 xfailed (7 before + 39 new, every new mark strict and carrying its
+measured reading).
+
+**Two new metamorphic invariants** in `tests/metamorphic.py`, appended
+after the original five so their order is unchanged:
+
+* `downsample2x` — 0.5x area-averaged downsample; spacing must halve.
+  Tol 5%. Skipped per axis when the halved period would be under 8px
+  (`MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE`), the same kind of rule as
+  half_roi's five-period floor: below it the leg half-harmonic is within
+  ~1px of the detector's 3px plausibility floor.
+* `crop_shift` — same window size, offset by 1/8 of the window in x and
+  y (toward whichever side has room; a dimension with no room is not
+  shifted). Density held, tol 5%.
+
+On the pinned jersey ROI both pass on both axes and are pinned in
+`test_metamorphic_fixtures.py`. The sweep over all 11 fixtures (same
+command as above, the CLI's 70% box) is a **baseline, not a gate**. The
+first five columns are cell-for-cell what the previous run recorded:
+
+| fixture | downsample2x wale | downsample2x course | crop_shift wale | crop_shift course |
+|---|---|---|---|---|
+| knit_sample_01 | ok (0.997) | skipped (4.5px) | ok (1.000) | ok (1.012) |
+| knit_sample_02 | harmonic_flip (2.159) | skipped (2.0px) | harmonic_flip (2.035) | ok (1.003) |
+| knit_sample_03 | ok (1.000) | lost (6.796) | harmonic_flip (0.506) | lost (3.538) |
+| knit_sample_04 | ok (1.001) | skipped (7.8px) | ok (1.020) | ok (1.008) |
+| knit_sample_05 | ok (0.995) | ok (1.016) | ok (1.002) | ok (1.040) |
+| knit_sample_06 | harmonic_flip (0.494) | drift (1.052) | harmonic_flip (0.499) | drift (1.066) |
+| knit_sample_07 | harmonic_flip (1.992) | ok (1.000) | ok (0.995) | drift (1.359) |
+| knit_sample_08 | harmonic_flip (0.494) | drift (0.947) | drift (1.092) | ok (0.953) |
+| knit_sample_09 | ok (0.980) | ok (1.040) | ok (0.983) | lost (3.365) |
+| real_jersey_sample | harmonic_flip (2.057) | ok (1.007) | ok (1.009) | ok (1.021) |
+| sarahmaker-knitting-gauge | harmonic_flip (0.499) | ok (0.994) | ok (0.977) | ok (0.951) |
+
+Totals: downsample2x 10 ok / 2 drift / 6 harmonic_flip / 1 lost / 3
+skipped; crop_shift 14 ok / 3 drift / 3 harmonic_flip / 2 lost / 0
+skipped. These invariants measure co-variance, not correctness, so the
+flips mark readings that change family under a transform that should not
+change the family. Two findings:
+
+* **downsample2x flips wale on six photos**, three each way. 06, 08 and
+  teal land on 0.5x the halved period. 02, 07 and the jersey land on 2x:
+  they read the SAME pixel period as at native scale (the jersey's 70%
+  box reads 36.0px downsampled against 35.0 native), as if the image had
+  not shrunk.
+* **crop_shift flips wale on 02, 03 and 06** — moving the window by 1/8
+  is enough to change the wale reading's family on three real photos. 03
+  and 06 land on the half; 02 on the double.
+
+**Three new synthetic degradations** in `tests/synthetic_fabric.py`. All
+default off, and none draws from the fabric's random stream, so every
+existing spec renders byte-identical (verified by hashing all 16 specs the
+suite renders, before and after):
+
+* `rotation_deg` — in-plane rotation, rendered on an oversized canvas and
+  centre-cropped (no padding ever enters the frame). Scored against the
+  axis-PROJECTED pitch, pitch / cos(theta): +0.1 / +0.8 / +2.2% at
+  3 / 7 / 12 deg.
+* `fuzz` — a soft halo per stitch (the stitch layer blurred at 0.18
+  pitch, taken as a max with the crisp yarn so only the gaps fill).
+* Contamination overlays drawn into the scene, inside the scoring ROI: a
+  ruler band with a known tick period (major every 5th), sewing pins,
+  and the fabric's edge with tabletop beyond. They have their own random
+  stream.
+
+Grid summary (`test_synthetic_fabric_gauge.py`): rotation 44 rows (32
+pass / 12 strict xfail), fuzz 20 (16 / 4), contamination 52 (35 / 17).
+Of the 33 xfails, 15 inherit a GRID row's existing flip (the same spec
+without the new degradation already fails) and say so; 18 are new:
+
+* rotation: 3 and 7 deg flip clean fine-gauge jersey course to the leg
+  half period; 12 deg pushes it to -11%; 3 deg plus mild degradation
+  flips fine-gauge wale to 2x; 12 deg reads a sub-stitch 7.2px on garter
+  course and 143.5px (4x) on rib wale at 7 deg.
+* fuzz: full fuzz flips clean fine-gauge course to the half period while
+  half-strength fuzz passes. It is not monotone either way: on the
+  degraded 5x7 row, fuzz 1.0 *rescues* a course flip that fuzz 0.5 keeps.
+* contamination: a fabric edge over 12.5% of the ROI flips both axes of
+  clean fine-gauge jersey; edges and 8 pins push degraded fine-gauge wale
+  to 2x; a centred mm ruler **captures the rib course axis outright**
+  (reads 7.0, the ruler's own tick period).
+
+**Ruler detection on the synthetic ruler** (`detect_ruler_calibration`,
+5% of the tick period): on the CONTROL (the same ruler on flat ground, no
+fabric) it recovers the tick period in 3 of 4 cases: clean mm 7.0 vs
+7.09, clean 1/16-inch 11.0 vs 11.25, degraded 1/16-inch 11.0. Degraded mm
+reads 35.0, which is the MAJOR-tick spacing. On fabric it recovers 3 of 7: the
+mm ruler near the ROI's top on fine jersey, rib and garter. The other
+four read the fabric's own wale lattice (36 / 45px), because the band
+scan prefers the stitches. Major/minor classification is not
+recovered (0 majors on every clean control). Recorded, not gated.
+
+**Synthetic coverage of the #325 leg-lattice climb**
+(`tests/test_synthetic_leg_climb.py`):
+
+* Unrotated jersey, 15 pitches (true wale 72–15px) × 3 seeds × clean /
+  degraded = 90 renders: the climb fires **0** times. The leg harmonic is
+  present (a 0.5x candidate on 86/90, walk 0.00 on most) but the leg
+  lattice never wins the evidence ranking (~0.05–0.48 against ~0.7–0.85),
+  so the precondition never holds. The synthetic V does not reproduce
+  knit_05's autocorrelation-dominant leg lattice.
+* 11 degradation conditions × 10 pitches × 3 seeds = 330 renders: the
+  leg lattice wins evidence 0 times; the climb fires 2 times, **both false**.
+* In-plane rotation 0–15 deg × 5 pitches × 3 seeds × clean / blur+JPEG =
+  300 renders: **6 fires, 0 land on the true pitch, 6 are FALSE CLIMBS**
+  (8 wpi, 11–13 deg). In each, the evidence winner was already correct
+  (23.0px) and was moved to ~41–46px. Mechanism: rotation of 9 deg or
+  more zeroes the correct winner's own template walk (0.00 on 60 of these
+  renders; the walk is axis-aligned), and where its double still walks
+  (0.69–0.78) the climb takes it. Not fixed here; pinned as a strict
+  xfail with its precondition asserted separately. `TGR_CLIMB_SWEEP=1`
+  reprints the sweep.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
