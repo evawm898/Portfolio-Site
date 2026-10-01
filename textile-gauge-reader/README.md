@@ -2065,6 +2065,53 @@ Every other fixture — 01, 02, 04, 06, 07, 08, 09, jersey, teal — is
 unchanged to the pixel, including 06/08's documented rotate90 course
 flips and the jersey's pytest pins.
 
+**Re-run after the wale leg-lattice climb landed** (2026-10-01, same ROIs,
+same commands). One scorecard cell moved and it is the target; every
+other row is unchanged to the digit:
+
+| fixture | axis | ROI (x,y,w,h) | true /in | predicted /in | spacing px | signed error | baseline | status |
+|---|---|---|---|---|---|---|---|---|
+| knit_05 | wale | (469, 504, 937, 937) | 4.7 | 4.86 | 65.9 | +3.3% | +3.3% (was +103.4%) | ok |
+
+The mechanism, in `_analyze_axis_v3` (wale axis only): the v0.3 evidence
+winner on knit_05 was the stitch-leg sub-lattice (33px, evidence 0.49),
+which autocorrelation (0.82) and patch consensus (0.96) both reward
+because the leg spacing IS the strongest 1D period on a V-loop fabric.
+What the composite cannot outvote is the 2D template walk's negative
+evidence: adjacent leg patches are mirror images, so the walk at 33px
+fails outright (0.00) while its double (66px) walks (0.70). The climb
+fires only when both hold, reusing the two thresholds already calibrated
+for exactly this on the course seed (`SEED_ASCEND_TEMPLATE_FAIL_MAX`
+0.05 on the winner, `SEED_HALF_TEMPLATE_MIN` 0.55 on its double). Single
+step, never chains; it overrides the winner, it does not re-weight the
+scorer. **Why it cannot move teal, knit_06 or knit_08**, which are correct
+at a "2x" candidate whose half was the leg lattice: there the scorer
+already climbed, and the winner's OWN walk succeeds (0.69 / 0.69 / 0.73).
+Every correct wale row on the scorecard has a winner that walks
+(0.65-0.73); knit_05 was the only winner reading 0.0. That distinction is
+pinned by `tests/test_wale_leg_lattice_climb.py`. The result is still
+flagged uncertain (the climbed candidate scored lower on evidence), with
+a reason that says so instead of the generic "scored nearly as well".
+
+Metamorphic sweep, same command: nine photos cell-for-cell identical;
+two moved, neither worse:
+
+* **knit_sample_05**: half_roi/wale `harmonic_flip` (33.4 vs 67.1, 0.498)
+  -> `ok` (65.6, 0.978). 7/10 -> 8/10. The half box's winner was the leg
+  lattice too, and climbs the same way. rotate90/wale (1.966x) is
+  unchanged: that is the rotated wale path reading the course structure
+  at 4x, not a leg lattice.
+* **knit_sample_03**: resize/wale stays `lost`, measured 6.1 -> 12.0
+  against 430.9 expected (ratio 0.014 -> 0.028). Same status; the 1.5x
+  upscale's wale reading is still a sub-feature, now its double.
+
+Not resolved as a side effect: the rotate90 wale flips on 01/03/04
+(0.501 / 0.494 / 0.514). In each the comparator is the baseline COURSE
+reading, and the rotated wale winner walks (measured 0.79 / 0.78 / 0.91
+at 4.5 / 15.5 / 8.0px -- fine sub-features that genuinely repeat, a
+different failure from a leg lattice), so the climb has nothing to act on
+there.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits

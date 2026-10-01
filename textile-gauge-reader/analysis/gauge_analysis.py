@@ -2582,11 +2582,50 @@ def _analyze_axis_v3(
 
     ranked = sorted(candidate_details, key=_rank_key, reverse=True)
     best = ranked[0]
+
+    # LEG-LATTICE CLIMB (wale only -- the axis that runs fold-consistency;
+    # the course seed has its own ascent in _prefer_fundamental_seed).
+    # The evidence winner can be the stitch-leg sub-lattice at half the
+    # loop pitch: autocorrelation and patch consensus both REWARD the
+    # leg spacing (it is the strongest 1D period on a V-loop fabric), so
+    # the composite score can rank it first. What the composite cannot
+    # outvote is the 2D template walk's NEGATIVE evidence: adjacent leg
+    # patches are mirror images, so a walk at the leg spacing fails
+    # outright (0.0), while the full loop pitch walks (~0.7). The climb
+    # fires only when BOTH hold, using the two thresholds already
+    # calibrated for exactly this discrimination on the course seed:
+    # the winner's own walk is genuine negative evidence (<=
+    # SEED_ASCEND_TEMPLATE_FAIL_MAX, far below the 0.5 "couldn't
+    # measure" neutral), and its double is in the family and walks
+    # (>= SEED_HALF_TEMPLATE_MIN). A winner that walks -- every correct
+    # wale row on the scorecard, 0.65-0.73, including the "2x" winners
+    # whose own half was the leg lattice -- can never be moved by this.
+    # Single step: never chains past the double.
+    climbed_from = None
+    if use_fold_consistency and best.template_match_score is not None and best.template_match_score <= SEED_ASCEND_TEMPLATE_FAIL_MAX:
+        double = next(
+            (d for d in candidate_details if abs(d.period_px - 2.0 * best.period_px) <= 1e-6 * max(1.0, best.period_px)),
+            None,
+        )
+        if double is not None and double.template_match_score is not None and double.template_match_score >= SEED_HALF_TEMPLATE_MIN:
+            climbed_from = best
+            best = double
+            candidate_details = _reselect_candidate(candidate_details, best.period_px)
+            best = next(d for d in candidate_details if d.selected)
+            ranked = [best] + [d for d in sorted(candidate_details, key=_rank_key, reverse=True) if d is not best]
+
     runner_up = ranked[1] if len(ranked) > 1 else None
 
     uncertain = runner_up is not None and (_rank_key(best) - _rank_key(runner_up)) < UNCERTAIN_SCORE_MARGIN
     uncertain_reason = None
-    if uncertain:
+    if uncertain and climbed_from is not None:
+        uncertain_reason = (
+            f"Selected {best.period_px:.1f}px ({best.harmonic}) over the higher-scoring "
+            f"{climbed_from.period_px:.1f}px ({climbed_from.harmonic}, {_rank_key(climbed_from):.2f} vs "
+            f"{_rank_key(best):.2f} evidence): {climbed_from.period_px:.1f}px fails the 2D template walk "
+            f"(likely the stitch-leg sub-lattice) while {best.period_px:.1f}px walks — manual verification recommended."
+        )
+    elif uncertain:
         uncertain_reason = (
             f"Competing {runner_up.harmonic} candidate at {runner_up.period_px:.1f}px scored nearly "
             f"as well ({_rank_key(runner_up):.2f} vs {_rank_key(best):.2f} evidence) as the selected "
@@ -2604,6 +2643,12 @@ def _analyze_axis_v3(
         f"consensus {best.patch_consensus:.2f} (weighted); final score after harmonic-ambiguity "
         f"penalty: {best.final_score:.2f}."
     )
+    if climbed_from is not None:
+        reason += (
+            f" Climbed from the evidence winner {climbed_from.period_px:.1f}px: its 2D template walk failed "
+            f"({climbed_from.template_match_score:.2f}, mirror-image leg patches) while "
+            f"{best.period_px:.1f}px walked ({best.template_match_score:.2f})."
+        )
 
     return _finalize_axis_v3(
         best.period_px,
