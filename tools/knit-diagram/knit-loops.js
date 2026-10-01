@@ -21,7 +21,7 @@ export function loopPoint(u, cx, cy, W, L, shape = SHAPE) {
   return { x, y, z };
 }
 
-export function weftCourse({ x0, cy, W, L, n, shape = SHAPE, samples = 36 }) {
+export function weftCourse({ x0, cy, W, L, n, shape = SHAPE, samples = 30 }) {
   const pts = [];
   for (let k = 0; k < n; k++)
     for (let i = 0; i < samples; i++) pts.push(loopPoint(i / samples, x0 + k * W, cy, W, L, shape));
@@ -32,7 +32,7 @@ export function weftCourse({ x0, cy, W, L, n, shape = SHAPE, samples = 36 }) {
 // Tricot, OPEN LAP (0-1 / 2-1): the yarn forms a loop in wale w0 travelling left->right,
 // underlaps ONE needle space on the technical back to wale w0+1, forms that loop travelling
 // right->left, and underlaps back. Loops obey the weft z law; underlaps carry z = -1.
-export function tricotYarn({ x0, y0, W, H, L, courses, w0, span = 0.62, shape = SHAPE, samples = 36 }) {
+export function tricotYarn({ x0, y0, W, H, L, courses, w0, span = 0.62, shape = SHAPE, samples = 30 }) {
   const pts = [];
   const uA = (1 - span) / 2, uB = 1 - uA;
   for (let c = 0; c < courses; c++) {
@@ -54,7 +54,7 @@ export function tricotYarn({ x0, y0, W, H, L, courses, w0, span = 0.62, shape = 
   return pts;
 }
 
-const f = v => Math.round(v * 100) / 100;
+const f = v => Math.round(v * 10) / 10;   // a tenth of a viewBox unit is well under a device pixel at any shipped size
 export function toPath(pts) {
   if (pts.length < 2) return '';
   let d = `M${f(pts[0].x)},${f(pts[0].y)}`;
