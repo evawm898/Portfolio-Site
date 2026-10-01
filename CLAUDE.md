@@ -9781,10 +9781,6 @@ they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a too
 runs them — the "adding a tool runs the flower gates" corollary recorded in several
 sections above is history as of Oct 1.
 
-is the arch only. Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
-quoting a pass from a changed harness; `--no-browser` for iteration). Sheet:
-`node tools/shot-frame-sheet.mjs <dir>`. Neither runs in CI — run both by hand.
-
 ## `/marble` — the paper-marbling simulator (pointer only)
 
 Hidden page (`marble.html`, `marble.css`, `marble.js`, `marble-math.js`, `noindex`, unlinked).
@@ -9802,8 +9798,8 @@ to one decimal BEFORE the op is applied, so a link replays the very doubles the 
 (bit-identical, `Object.is`, asserted in Node and across two browser pages). Undo pops a GROUP (a
 pattern is one group). Gate: `node tools/verify-marble.mjs` (37 checks; `--negative-control`
 required before quoting a pass from a changed harness, nine mutants; `--no-browser` for
-iteration). **Neither runs in CI** — adding the tool makes the two flower gates run on a marble
-PR (`'tools/**'`), and they still test flower geometry.
+iteration). **It does not run in CI** — no workflow names a marble file, and since the frame's
+phase 1b narrowed the flower gates' filters a new tool no longer runs them either.
 **Judgment calls made without a ruling** (the sheet is 1000 × 1250 logical units, 4:5 portrait):
 drop radius 36 growing at 45/s while held, capped at 3× the slider or 300; a stroke's max shift is
 `strength × drag length` (0.6 default) rather than a fixed number, so a long rake shifts more;
