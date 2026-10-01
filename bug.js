@@ -1,19 +1,26 @@
-/* bug.js — the /bug page. The panel is GENERATED from PARAM_SPEC / SECTIONS
-   in bug-geometry.js (one declaration of every control); this file only draws
-   it. The preview, the SVG inset and both downloads all read ONE model built
-   by buildBug() — there is no second geometry path here. */
+/* bug.js — the /bug page. The panel is GENERATED from PARAM_SPEC / SECTIONS /
+   WING_FIELDS in bug-geometry.js (one declaration of every control); this file
+   only draws it. The preview, the SVG inset, both downloads and the wing-outline
+   editor all read ONE model built by buildBug() — there is no second geometry
+   path here. The editor's drag / add / delete go through the geometry module's
+   own moveControlPoint / insertControlPoint / deleteControlPoint, which BLOCK
+   any edit that would make the outline cross or pinch itself. */
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import {
-  PARAM_SPEC, SECTIONS, DEFAULTS, PRESETS, presetParams, randomParams,
-  buildBug, exportStl, exportSvg, mirrorDiff,
+  PARAM_SPEC, SECTIONS, WING_FIELDS, defaultParams, randomParams, normalizeParams,
+  buildBug, exportStl, exportSvg, mirrorDiff, sampleOutline, resolveWingPairs,
+  moveControlPoint, insertControlPoint, deleteControlPoint, controlPointsFromDense,
+  designFromParams, paramsFromDesign, MAX_WING_PAIRS,
 } from './bug-geometry.js';
 
 /* ---------------- state ---------------- */
-let params = presetParams('butterfly');
+let params = defaultParams();
 let model = null;
-let presetName = 'butterfly';
+let editPair = 0;                 // which wing pair the editor and the pair sliders show
+let selectedPoint = -1;
+let designName = '';
 
 /* ---------------- three ---------------- */
 const canvas = document.getElementById('bug-canvas');
@@ -37,6 +44,7 @@ const MAT = {
   wing: new THREE.MeshStandardMaterial({ color: 0xc9d8d6, roughness: 0.5, metalness: 0, flatShading: true, side: THREE.FrontSide }),
 };
 let viewName = 'three';
+const WING_KINDS = ['tail', ...Array.from({ length: MAX_WING_PAIRS }, (_, k) => `wing${k + 1}`)];
 
 function partGeometry(kinds, flat) {
   const P = model.positions, I = model.indices;
@@ -61,7 +69,7 @@ function partGeometry(kinds, flat) {
 function rebuildMesh() {
   for (const c of [...root.children]) { root.remove(c); c.geometry.dispose(); }
   for (const g of partGeometry(['body', 'leg', 'antenna'], false)) root.add(new THREE.Mesh(g, MAT.body));
-  for (const g of partGeometry(['wing1', 'wing2', 'tail'], true)) root.add(new THREE.Mesh(g, MAT.wing));
+  for (const g of partGeometry(WING_KINDS, true)) root.add(new THREE.Mesh(g, MAT.wing));
 }
 
 function modelBox() {
@@ -121,23 +129,115 @@ for (const s of SECTIONS) {
   secEl[s.id] = d;
 }
 const fmtVal = (s, v) => (s.kind === 'range' ? `${(+v).toFixed(s.step < 0.1 ? 2 : s.step < 1 ? 1 : 0)}${s.unit && s.unit !== '°' ? ' ' + s.unit : s.unit}` : '');
-for (const s of PARAM_SPEC) {
+function makeCtrl(s, id, onInput) {
   const w = document.createElement('div');
   w.className = 'bg-ctrl' + (s.kind === 'bool' ? ' bg-bool' : '');
   if (s.kind === 'range') {
-    w.innerHTML = `<label for="${s.id}"><span>${s.label}</span><output id="${s.id}-out"></output></label><input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
+    w.innerHTML = `<label for="${id}"><span>${s.label}</span><output id="${id}-out"></output></label><input type="range" id="${id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
   } else if (s.kind === 'choice') {
-    w.innerHTML = `<label for="${s.id}"><span>${s.label}</span></label><select id="${s.id}">${s.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`;
+    w.innerHTML = `<label for="${id}"><span>${s.label}</span></label><select id="${id}">${s.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`;
   } else {
-    w.innerHTML = `<label><input type="checkbox" id="${s.id}"> ${s.label}</label>`;
+    w.innerHTML = `<label><input type="checkbox" id="${id}"> ${s.label}</label>`;
   }
-  secEl[s.section].querySelector('.bg-sec-body').appendChild(w);
-  ctrlEl[s.id] = w;
   const input = w.querySelector('input,select');
-  input.addEventListener('input', () => {
-    params[s.id] = s.kind === 'range' ? +input.value : s.kind === 'bool' ? input.checked : input.value;
-    presetName = null; markPreset(); writeOutputs(); applyVisibility(); scheduleBuild();
+  input.addEventListener('input', () => onInput(s.kind === 'range' ? +input.value : s.kind === 'bool' ? input.checked : input.value));
+  return w;
+}
+for (const s of PARAM_SPEC) {
+  const w = makeCtrl(s, s.id, (v) => {
+    params[s.id] = v;
+    if (s.id === 'wingPairs') editPair = Math.min(editPair, Math.max(0, v - 1));
+    writeOutputs(); applyVisibility(); drawPairUi(); scheduleBuild();
   });
+  const body = secEl[s.section].querySelector('.bg-sec-body');
+  // the per-pair block sits right after the Pairs slider, before the tail section
+  if (s.section === 'wings') body.insertBefore(w, body.querySelector('details'));
+  else body.appendChild(w);
+  ctrlEl[s.id] = w;
+}
+
+/* The per-pair block: tabs, link state, and WING_FIELDS for the selected pair. */
+const pairBlock = document.createElement('div');
+pairBlock.className = 'bg-pairs';
+pairBlock.innerHTML = `<div class="bg-row bg-tabs" id="pairTabs"></div><p class="bg-note" id="pairNote"></p>
+  <div class="bg-row" id="linkRow"><button class="bg-btn" id="linkBtn"></button></div><div id="pairFields"></div>`;
+secEl.wings.querySelector('.bg-sec-body').insertBefore(pairBlock, secEl.wings.querySelector('.bg-sec-body details'));
+const pairFieldEl = {};
+for (const f of WING_FIELDS) {
+  const w = makeCtrl(f, `wf-${f.id}`, (v) => {
+    const spec = editableSpec(editPair);
+    if (!spec) return;
+    spec[f.id] = v; writePairFields(); scheduleBuild();
+  });
+  pairBlock.querySelector('#pairFields').appendChild(w);
+  pairFieldEl[f.id] = w;
+}
+
+function roleOf(k) { const N = params.wingPairs; return k === 0 ? 'first' : k === N - 1 ? 'last' : 'mid'; }
+/* The stored spec a pair edits, or null if the pair is LINKED (interpolated). */
+function editableSpec(k) {
+  const role = roleOf(k);
+  if (role !== 'mid') return params.wings[role];
+  return params.wings.unlinked[k] || null;
+}
+function resolvedPair(k) { return resolveWingPairs(params)[k]; }
+
+function drawPairUi() {
+  const N = params.wingPairs;
+  const tabs = document.getElementById('pairTabs');
+  tabs.innerHTML = '';
+  pairBlock.hidden = N === 0;
+  document.getElementById('editorBox').hidden = N === 0;
+  if (N === 0) return;
+  editPair = Math.min(editPair, N - 1);
+  for (let k = 0; k < N; k++) {
+    const b = document.createElement('button');
+    const role = roleOf(k);
+    const linked = role === 'mid' && !params.wings.unlinked[k];
+    b.className = 'bg-btn' + (k === editPair ? ' is-on' : '') + (linked ? ' bg-linked' : '');
+    b.textContent = N === 1 ? 'pair 1' : `${k + 1} ${role === 'first' ? 'first' : role === 'last' ? 'last' : linked ? 'linked' : 'drawn'}`;
+    b.addEventListener('click', () => { editPair = k; selectedPoint = -1; drawPairUi(); drawEditor(); });
+    tabs.appendChild(b);
+  }
+  const role = roleOf(editPair);
+  const linked = role === 'mid' && !params.wings.unlinked[editPair];
+  const note = document.getElementById('pairNote');
+  const lb = document.getElementById('linkBtn');
+  document.getElementById('linkRow').hidden = role !== 'mid';
+  if (N === 1) note.textContent = 'One pair: draw it in the outline editor.';
+  else if (role === 'mid') {
+    note.textContent = linked
+      ? `Pair ${editPair + 1} is LINKED: its outline and every value below interpolate between the first and last pair (${(editPair / (N - 1)).toFixed(2)} of the way). Unlink to draw it by hand.`
+      : `Pair ${editPair + 1} is UNLINKED: drawn by hand. Relink to interpolate it again (its drawing is discarded).`;
+    lb.textContent = linked ? 'Unlink this pair' : 'Relink (interpolate)';
+  } else note.textContent = `The ${role} pair is always drawn by hand; pairs between it and the ${role === 'first' ? 'last' : 'first'} interpolate unless unlinked.`;
+  writePairFields();
+}
+document.getElementById('linkBtn').addEventListener('click', () => {
+  const k = editPair;
+  if (params.wings.unlinked[k]) delete params.wings.unlinked[k];
+  else {
+    // start from exactly what was on screen: the interpolated values and curve
+    const r = resolvedPair(k);
+    const K = Math.max(params.wings.first.points.length, params.wings.last.points.length);
+    const spec = {}; for (const f of WING_FIELDS) spec[f.id] = r[f.id];
+    spec.points = controlPointsFromDense(r.dense, K);
+    params.wings.unlinked[k] = spec;
+  }
+  selectedPoint = -1; drawPairUi(); drawEditor(); scheduleBuild();
+});
+
+function writePairFields() {
+  if (!params.wingPairs) return;
+  const own = editableSpec(editPair);
+  const shown = own || resolvedPair(editPair);
+  for (const f of WING_FIELDS) {
+    const w = pairFieldEl[f.id], input = w.querySelector('input');
+    input.value = shown[f.id]; input.disabled = !own;
+    document.getElementById(`wf-${f.id}-out`).textContent = fmtVal(f, shown[f.id]);
+    w.hidden = !!(f.visibleWhen && !f.visibleWhen(shown));
+    w.classList.toggle('is-linked', !own);
+  }
 }
 
 function writeControls() {
@@ -145,14 +245,13 @@ function writeControls() {
     const input = ctrlEl[s.id].querySelector('input,select');
     if (s.kind === 'bool') input.checked = !!params[s.id]; else input.value = params[s.id];
   }
-  writeOutputs(); applyVisibility();
+  writeOutputs(); applyVisibility(); drawPairUi();
 }
 function writeOutputs() {
   for (const s of PARAM_SPEC) if (s.kind === 'range') document.getElementById(`${s.id}-out`).textContent = fmtVal(s, params[s.id]);
 }
 function applyVisibility() {
   for (const s of PARAM_SPEC) ctrlEl[s.id].hidden = !!(s.visibleWhen && !s.visibleWhen(params));
-  // a section with nothing visible inside it is hidden too (children first)
   for (const s of [...SECTIONS].reverse()) {
     const d = secEl[s.id];
     const own = PARAM_SPEC.filter((p) => p.section === s.id).some((p) => !ctrlEl[p.id].hidden);
@@ -161,27 +260,157 @@ function applyVisibility() {
   }
 }
 
-const presetHost = document.getElementById('presetButtons');
-for (const name of Object.keys(PRESETS)) {
-  const b = document.createElement('button');
-  b.className = 'bg-btn'; b.textContent = name; b.dataset.preset = name;
-  b.addEventListener('click', () => loadParams(presetParams(name), name));
-  presetHost.appendChild(b);
-}
-function markPreset() { presetHost.querySelectorAll('button').forEach((b) => b.classList.toggle('is-on', b.dataset.preset === presetName)); }
+/* ---------------- randomize / reset / designs ---------------- */
 let randomSeed = 1;
-document.getElementById('randomBtn').addEventListener('click', () => loadParams(randomParams((Date.now() ^ (randomSeed++ * 2654435761)) >>> 0), null));
-document.getElementById('resetBtn').addEventListener('click', () => loadParams({ ...DEFAULTS }, 'butterfly'));
+document.getElementById('randomBtn').addEventListener('click', () => { designName = ''; loadParams(randomParams((Date.now() ^ (randomSeed++ * 2654435761)) >>> 0)); });
+document.getElementById('resetBtn').addEventListener('click', () => { designName = ''; loadParams(defaultParams()); });
 
-function loadParams(p, name) {
-  params = { ...DEFAULTS, ...p };
-  presetName = name;
-  markPreset(); writeControls(); buildNow(true);
+function loadParams(p) {
+  params = normalizeParams(p);
+  editPair = 0; selectedPoint = -1;
+  writeControls(); buildNow(true); drawEditor();
 }
+
+const STORE = 'parametric-bug-designs-v1';
+const readStore = () => { try { return JSON.parse(localStorage.getItem(STORE) || '{}'); } catch { return {}; } };
+const writeStore = (o) => { try { localStorage.setItem(STORE, JSON.stringify(o)); return true; } catch { return false; } };
+const designMsg = (t, bad = false) => { const e = document.getElementById('designMsg'); e.textContent = t; e.classList.toggle('is-bad', bad); };
+function refreshDesignList() {
+  const sel = document.getElementById('designList');
+  const names = Object.keys(readStore()).sort();
+  sel.innerHTML = names.length ? names.map((n) => `<option>${n.replace(/</g, '&lt;')}</option>`).join('') : '<option value="">— no saved designs —</option>';
+}
+document.getElementById('saveDesign').addEventListener('click', () => {
+  const name = document.getElementById('designName').value.trim();
+  if (!name) return designMsg('Name the design first.', true);
+  const st = readStore(); st[name] = designFromParams(params, name);
+  if (!writeStore(st)) return designMsg('Could not save — browser storage is unavailable or full. Use Export file.', true);
+  designName = name; refreshDesignList(); document.getElementById('designList').value = name;
+  designMsg(`Saved “${name}” in this browser.`);
+});
+function applyDesign(doc, from) {
+  const r = paramsFromDesign(doc);
+  if (!r.ok) return designMsg(`Not loaded: ${r.reason}.`, true);
+  designName = doc.name || '';
+  document.getElementById('designName').value = designName;
+  loadParams(r.params);
+  designMsg(r.notes.length ? `Loaded ${from} with notes: ${r.notes.join('; ')}.` : `Loaded ${from}.`, r.notes.length > 0);
+}
+document.getElementById('loadDesign').addEventListener('click', () => {
+  const name = document.getElementById('designList').value; const doc = readStore()[name];
+  if (!doc) return designMsg('Nothing to load.', true);
+  applyDesign(doc, `“${name}”`);
+});
+document.getElementById('deleteDesign').addEventListener('click', () => {
+  const name = document.getElementById('designList').value; const st = readStore();
+  if (!st[name]) return;
+  delete st[name]; writeStore(st); refreshDesignList(); designMsg(`Deleted “${name}”.`);
+});
+document.getElementById('exportDesign').addEventListener('click', () => {
+  const name = document.getElementById('designName').value.trim() || designName || 'bug-design';
+  download(`${name.replace(/[^\w-]+/g, '-')}.bug.json`, JSON.stringify(designFromParams(params, name), null, 1), 'application/json');
+});
+document.getElementById('importDesign').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try { applyDesign(JSON.parse(await f.text()), `“${f.name}”`); } catch { designMsg('Not loaded: the file is not JSON.', true); }
+});
+
+/* ---------------- the wing-outline editor ---------------- */
+/* The RIGHT wing's outline only, drawn in its own planform frame: u (span)
+   to the right, w (chord) up = toward the head. The left wing is the mirror,
+   built by the model — the editor cannot break symmetry because it never
+   touches the left. The frame matches tools/bug-fixtures.mjs EDITOR_VIEW. */
+const VIEW = { u0: -0.08, u1: 1.28, w0: -0.68, w1: 0.68 };
+const ed = document.getElementById('editor');
+const EW = 340, EH = 340;
+const toX = (u) => ((u - VIEW.u0) / (VIEW.u1 - VIEW.u0)) * EW, toY = (w) => ((VIEW.w1 - w) / (VIEW.w1 - VIEW.w0)) * EH;
+const fromXY = (x, y) => [VIEW.u0 + (x / EW) * (VIEW.u1 - VIEW.u0), VIEW.w1 - (y / EH) * (VIEW.w1 - VIEW.w0)];
+const backdrop = { href: null, opacity: 0.5, scale: 1, dx: 0, dy: 0 };
+let edStatus = '';
+
+function evPoint(ev) {
+  const r = ed.getBoundingClientRect();
+  return fromXY(((ev.clientX - r.left) / r.width) * EW, ((ev.clientY - r.top) / r.height) * EH);
+}
+function drawEditor() {
+  if (!params.wingPairs) return;
+  const own = editableSpec(editPair);
+  const dense = own ? sampleOutline(own.points) : resolvedPair(editPair).dense;
+  const path = 'M' + dense.map(([u, w]) => `${toX(u).toFixed(1)} ${toY(w).toFixed(1)}`).join('L');
+  const chord = `M${toX(dense[dense.length - 1][0]).toFixed(1)} ${toY(dense[dense.length - 1][1]).toFixed(1)}L${toX(dense[0][0]).toFixed(1)} ${toY(dense[0][1]).toFixed(1)}`;
+  const bw = EW * backdrop.scale, bh = EH * backdrop.scale;
+  const bx = (EW - bw) / 2 + backdrop.dx * EW, by = (EH - bh) / 2 + backdrop.dy * EH;
+  let h = '';
+  if (backdrop.href) h += `<image href="${backdrop.href}" x="${bx}" y="${by}" width="${bw}" height="${bh}" opacity="${backdrop.opacity}" preserveAspectRatio="none"/>`;
+  h += `<line class="ax" x1="${toX(0)}" y1="0" x2="${toX(0)}" y2="${EH}"/><line class="ax" x1="0" y1="${toY(0)}" x2="${EW}" y2="${toY(0)}"/>`;
+  h += `<text class="axl" x="${toX(0) + 4}" y="12">body side · head ↑</text><text class="axl" x="${EW - 4}" y="${toY(0) - 4}" text-anchor="end">span →</text>`;
+  h += `<path class="curve${own ? '' : ' is-linked'}" d="${path}"/><path class="chord" d="${chord}"/>`;
+  if (own) own.points.forEach(([u, w], i) => {
+    const isRoot = i === 0 || i === own.points.length - 1;
+    h += isRoot
+      ? `<rect class="pt root${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" x="${toX(u) - 5}" y="${toY(w) - 5}" width="10" height="10"/>`
+      : `<circle class="pt${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" cx="${toX(u)}" cy="${toY(w)}" r="5.5"/>`;
+  });
+  ed.innerHTML = h;
+  const n = own ? own.points.length : 0;
+  document.getElementById('edTitle').textContent = `Pair ${editPair + 1} outline — right wing${own ? ` · ${n} points` : ' · linked (interpolated)'}`;
+  document.getElementById('edStatus').textContent = edStatus;
+  document.getElementById('delPoint').disabled = !(own && selectedPoint > 0 && selectedPoint < n - 1);
+}
+function commitPoints(pts) {
+  const own = editableSpec(editPair);
+  own.points = pts; drawEditor(); scheduleBuild();
+}
+let drag = null;
+ed.addEventListener('pointerdown', (ev) => {
+  const own = editableSpec(editPair);
+  if (!own) { edStatus = 'This pair is linked — Unlink it in the panel to draw it.'; drawEditor(); return; }
+  const i = ev.target.dataset?.i;
+  if (i === undefined) { selectedPoint = -1; drawEditor(); return; }
+  selectedPoint = +i; drag = { i: +i, id: ev.pointerId };
+  ed.setPointerCapture(ev.pointerId);
+  edStatus = ''; drawEditor();
+});
+ed.addEventListener('pointermove', (ev) => {
+  if (!drag || ev.pointerId !== drag.id) return;
+  const own = editableSpec(editPair);
+  const r = moveControlPoint(own.points, drag.i, evPoint(ev));
+  if (r.ok) { edStatus = ''; commitPoints(r.points); }
+  else { edStatus = `Blocked: ${r.reason}.`; stats.blocked++; drawEditor(); }
+});
+const endDrag = (ev) => { if (drag && ev.pointerId === drag.id) drag = null; };
+ed.addEventListener('pointerup', endDrag); ed.addEventListener('pointercancel', endDrag);
+ed.addEventListener('dblclick', (ev) => {
+  const own = editableSpec(editPair); if (!own) return;
+  const r = insertControlPoint(own.points, evPoint(ev));
+  if (r.ok) { selectedPoint = r.index; edStatus = ''; commitPoints(r.points); }
+  else { edStatus = `Blocked: ${r.reason}.`; drawEditor(); }
+});
+function deleteSelected() {
+  const own = editableSpec(editPair); if (!own || selectedPoint < 0) return;
+  const r = deleteControlPoint(own.points, selectedPoint);
+  if (r.ok) { selectedPoint = -1; edStatus = ''; commitPoints(r.points); }
+  else { edStatus = `Blocked: ${r.reason}.`; drawEditor(); }
+}
+ed.addEventListener('contextmenu', (ev) => { const i = ev.target.dataset?.i; if (i === undefined) return; ev.preventDefault(); selectedPoint = +i; deleteSelected(); });
+document.getElementById('delPoint').addEventListener('click', deleteSelected);
+window.addEventListener('keydown', (ev) => { if ((ev.key === 'Delete' || ev.key === 'Backspace') && selectedPoint > 0 && document.activeElement?.tagName !== 'INPUT') deleteSelected(); });
+
+for (const [id, k] of [['bdOpacity', 'opacity'], ['bdScale', 'scale'], ['bdX', 'dx'], ['bdY', 'dy']]) {
+  document.getElementById(id).addEventListener('input', (e) => { backdrop[k] = +e.target.value; drawEditor(); });
+}
+document.getElementById('bdFile').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { backdrop.href = rd.result; drawEditor(); };
+  rd.readAsDataURL(f);
+});
+document.getElementById('bdClear').addEventListener('click', () => { backdrop.href = null; drawEditor(); });
 
 /* ---------------- build ---------------- */
 let pending = 0, idleTimer = 0;
-const stats = { buildMs: 0, mirror: null, cutRegions: null };
+const stats = { buildMs: 0, mirror: null, cutRegions: null, blocked: 0 };
 function scheduleBuild() {
   if (pending) return;
   pending = requestAnimationFrame(() => { pending = 0; buildNow(false); });
@@ -195,6 +424,7 @@ function buildNow(reframe) {
   if (reframe) setView(viewName); else render();
   drawSvg(false);
   writeReadout();
+  if (!drag) drawEditor();
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => { stats.mirror = mirrorDiff(model); if (cutSafeEl.checked) drawSvg(true); writeReadout(); }, 350);
 }
@@ -215,12 +445,15 @@ function writeReadout() {
   const b = modelBox();
   const n = model.triangleCount;
   const m = stats.mirror === null ? 'checking…' : stats.mirror === 0 ? '0 (exact)' : `${stats.mirror} — NOT SYMMETRIC`;
+  const L = model.layout;
   document.getElementById('readout').innerHTML =
     `triangles <b>${n.toLocaleString()}</b>   STL <b>${((84 + 50 * n) / 1024).toFixed(0)} KiB</b>\n`
     + `size <b>${(b.x1 - b.x0).toFixed(1)} × ${(b.y1 - b.y0).toFixed(1)} × ${(b.z1 - b.z0).toFixed(1)} mm</b> (w × l × h)\n`
+    + (params.wingPairs > 2 ? `thorax <b>${L.Lt.toFixed(1)} mm</b> (lengthened for ${params.wingPairs} wing pairs)\n` : '')
     + `parts <b>${model.parts.length}</b> closed shells, overlapping\n`
     + `mirror diff <b>${m}</b>\n`
     + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness)\n`
+    + (model.notes.length ? `notes <b>${model.notes.join('; ')}</b>\n` : '')
     + `build <b>${stats.buildMs.toFixed(0)} ms</b>`;
 }
 
@@ -230,21 +463,31 @@ function download(name, data, type) {
   const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-const stem = () => `bug-${presetName || 'custom'}`;
+const stem = () => `bug-${(designName || 'custom').replace(/[^\w-]+/g, '-')}`;
 document.getElementById('exportStl').addEventListener('click', () => download(`${stem()}.stl`, exportStl(model), 'model/stl'));
 document.getElementById('exportSvg').addEventListener('click', () => download(`${stem()}${cutSafeEl.checked ? '-cutsafe' : ''}.svg`, exportSvg(model, { cutSafe: cutSafeEl.checked }).svg, 'image/svg+xml'));
 document.getElementById('viewButtons').addEventListener('click', (e) => { const v = e.target.dataset?.view; if (v) setView(v); });
 
 /* ---------------- test chrome (read by tools/shot-bug-sheet.mjs) ---------------- */
 window.__bug = {
-  setParams: (p, name = null) => loadParams(p, name),
-  getParams: () => ({ ...params }),
+  setParams: (p) => loadParams(p),
+  getParams: () => JSON.parse(JSON.stringify(params)),
   setView: (v) => setView(v),
   svg: (cutSafe = false) => exportSvg(model, { cutSafe }),
   stl: () => Array.from(exportStl(model)),
   triangleCount: () => model.triangleCount,
+  notes: () => model.notes.slice(),
+  editPair: (k) => { editPair = k; selectedPoint = -1; drawPairUi(); drawEditor(); },
+  // the screen position of control point i of the edited pair (for REAL drags)
+  pointScreen: (i) => { const r = ed.getBoundingClientRect(); const p = editableSpec(editPair).points[i]; return [r.left + (toX(p[0]) / EW) * r.width, r.top + (toY(p[1]) / EH) * r.height]; },
+  uvScreen: (u, w) => { const r = ed.getBoundingClientRect(); return [r.left + (toX(u) / EW) * r.width, r.top + (toY(w) / EH) * r.height]; },
+  editorStatus: () => edStatus,
+  blockedCount: () => stats.blocked,
+  setBackdrop: (o) => { Object.assign(backdrop, o); drawEditor(); },
+  flushBuild: () => { if (pending) { cancelAnimationFrame(pending); pending = 0; } buildNow(false); },
   render,
 };
 
+refreshDesignList();
 resize();
-loadParams(params, 'butterfly');
+loadParams(params);
