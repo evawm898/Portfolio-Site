@@ -45,7 +45,7 @@ const MAT = {
   wing: new THREE.MeshStandardMaterial({ color: 0xc9d8d6, roughness: 0.5, metalness: 0, flatShading: true, side: THREE.FrontSide }),
 };
 let viewName = 'three';
-const WING_KINDS = ['tail', ...Array.from({ length: MAX_WING_PAIRS }, (_, k) => `wing${k + 1}`)];
+const WING_KINDS = ['tail', ...Array.from({ length: MAX_WING_PAIRS }, (_, k) => `wing${k + 1}`), 'vein'];   // 'vein': Phase 2 ridge strips and stigma plates
 
 function partGeometry(kinds, flat) {
   const P = model.positions, I = model.indices;
@@ -76,8 +76,16 @@ MAT.thinLine = new THREE.LineBasicMaterial({ color: 0xe5484d, depthTest: false, 
 function rebuildMesh() {
   for (const c of [...root.children]) { root.remove(c); c.geometry.dispose(); }
   for (const g of partGeometry(['body', 'leg', 'antenna'], false)) root.add(new THREE.Mesh(g, MAT.body));
-  const thinKinds = new Set(model.floorViolations.map((v) => `wing${v.pair + 1}`));
-  for (const kind of WING_KINDS) for (const g of partGeometry([kind], true)) root.add(new THREE.Mesh(g, thinKinds.has(kind) ? MAT.thinWing : MAT.wing));
+  const thinKinds = new Set(model.floorViolations.filter((v) => v.kind !== 'vein').map((v) => `wing${v.pair + 1}`));
+  const thinVeinPairs = new Set(model.floorViolations.filter((v) => v.kind === 'vein').map((v) => v.pair));
+  for (const kind of WING_KINDS) {
+    const parts = model.parts.filter((q) => q.kind === kind);
+    parts.forEach((q, i) => {
+      const g = partGeometry([kind], true)[i];
+      const red = kind === 'vein' ? thinVeinPairs.has(q.meta.pair) : thinKinds.has(kind);
+      root.add(new THREE.Mesh(g, red ? MAT.thinWing : MAT.wing));
+    });
+  }
   const seg = model.wingPairs.flatMap((w) => w.thinSegments || []);
   if (seg.length) {
     const g = new THREE.BufferGeometry();
@@ -162,7 +170,7 @@ for (const s of PARAM_SPEC) {
   const w = makeCtrl(s, s.id, (v) => {
     params[s.id] = v;
     if (s.id === 'wingPairs') editPair = Math.min(editPair, Math.max(0, v - 1));
-    writeOutputs(); applyVisibility(); drawPairUi(); scheduleBuild();
+    writeOutputs(); applyVisibility(); drawPairUi(); scheduleBuild();   // drawPairUi re-reads each pair field's visibleWhen(spec, params)
   });
   const body = secEl[s.section].querySelector('.bg-sec-body');
   // the per-pair block sits right after the Pairs slider, before the tail section
@@ -261,7 +269,7 @@ function writePairFields() {
     const w = pairFieldEl[f.id], input = w.querySelector('input');
     input.value = shown[f.id]; input.disabled = !own;
     document.getElementById(`wf-${f.id}-out`).textContent = fmtVal(f, shown[f.id]);
-    w.hidden = !!(f.visibleWhen && !f.visibleWhen(shown));
+    w.hidden = !!(f.visibleWhen && !f.visibleWhen(shown, params));
     w.classList.toggle('is-linked', !own);
   }
 }
@@ -395,6 +403,20 @@ function drawEditor() {
     }
     if (seg) h += `<path class="thin" d="${seg}"/>`;
   }
+  // Phase 2: the edited pair's VEINS (and in HOLES its holes) drawn in the
+  // planform frame — the model's own record scaled back to (u, w) units
+  if (wp && wp.venation) {
+    const V = wp.venation, L = (own || resolvedPair(editPair)).length, Sx = (own || resolvedPair(editPair)).stretch;
+    const toUW = ([x, y]) => [toX(x / L).toFixed(1), toY(y / (L * Sx)).toFixed(1)];
+    let d = '';
+    for (const v of V.veins) if (!v.dropped) d += 'M' + v.points.map((q) => toUW(q).join(' ')).join('L');
+    const thinV = wp.veinFloor && wp.veinFloor.under;
+    h += `<path class="veins${thinV ? ' is-thin' : ''}" d="${d}"/>`;
+    let hd = '';
+    for (const c of V.cells) for (const hole of c.holes || []) hd += 'M' + hole.map((q) => toUW(q).join(' ')).join('L') + 'Z';
+    if (hd) h += `<path class="holes" d="${hd}"/>`;
+    for (const c of V.cells) if (c.role === 'stigma') h += `<path class="stigma" d="${'M' + c.points.map((q) => toUW(q).join(' ')).join('L') + 'Z'}"/>`;
+  }
   if (own) shown.points.forEach(([u, w], i) => {
     const isRoot = i === 0 || i === shown.points.length - 1;
     const tail = shown.tags[i][0] === 'tail';
@@ -527,10 +549,32 @@ function writeReadout() {
     + (params.wingPairs > 2 ? `thorax <b>${L.Lt.toFixed(1)} mm</b> (lengthened for ${params.wingPairs} wing pairs)\n` : '')
     + `parts <b>${model.parts.length}</b> closed shells, overlapping\n`
     + `mirror diff <b>${m}</b>\n`
-    + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness, drawn wing widths)\n`
+    + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness, drawn wing widths, vein widths)\n`
+    + venationLines()
     + (model.floorViolations.length ? `STL <b class="bad">BLOCKED</b> — ${model.floorViolations.map((v) => `pair ${v.pair + 1}${v.blendedFrom ? ` (blended from ${v.blendedFrom.map((i) => i + 1).join(' and ')})` : ''} narrower than the floor`).join(', ')} (red in the view; Get STL says what to widen)\n` : '')
     + (model.notes.length ? `notes <b>${model.notes.join('; ')}</b>\n` : '')
     + `build <b>${stats.buildMs.toFixed(0)} ms</b>`;
+}
+
+/* Phase 2 read-out: per pair, what the venation record holds — cells, veins,
+   holes cut / merged / kept solid against the smallest-hole threshold, the
+   discal cell and the pterostigma, and the vein floor. */
+function venationLines() {
+  if (params.venation === 'none' || !params.wingPairs) return '';
+  const lines = [`venation <b>${params.venation.toUpperCase()}</b>${params.venation === 'holes' ? ` · smallest hole ${params.minDiameter <= params.minCellMm ? '' : ''}<b>${params.minCellMm.toFixed(1)} mm</b> across (smaller cells merge with a neighbour)` : ` · ridge height <b>${params.ridgeHeight.toFixed(2)} mm</b>`}`];
+  for (const w of model.wingPairs) {
+    const V = w.venation; if (!V) continue;
+    const st = V.stats;
+    const parts = [`${st.cells} cells from ${st.mainMade} veins${st.crossMade ? ` + ${st.crossMade} cross-veins` : ''}`];
+    if (params.venation === 'holes') parts.push(`${st.holes} hole${st.holes === 1 ? '' : 's'} cut${st.merged ? `, ${st.merged} small cell${st.merged === 1 ? '' : 's'} merged` : ''}${st.solidCells ? `, ${st.solidCells} solid` : ''}`);
+    if (st.discal) parts.push('discal cell'); if (st.stigma) parts.push('pterostigma'); if (st.tailTargeted) parts.push('a vein runs into the tail');
+    const dr = st.dropped.main + st.dropped.cross + st.dropped.discal + st.dropped.stigma;
+    if (dr) parts.push(`${dr} vein${dr === 1 ? '' : 's'} could not be routed and ${dr === 1 ? 'was' : 'were'} dropped`);
+    const vf = w.veinFloor;
+    const floor = vf ? (vf.under ? `<b class="bad">veins ${vf.veinMin.toFixed(2)} mm${Number.isFinite(vf.border) ? ` / border ${vf.border.toFixed(2)} mm` : ''} — UNDER the floor</b>` : `veins ≥ ${vf.veinMin.toFixed(2)} mm`) : '';
+    lines.push(`  pair ${w.index + 1}: ${parts.join(' · ')}${floor ? ' · ' + floor : ''}`);
+  }
+  return lines.join('\n') + '\n';
 }
 
 /* ---------------- exports ---------------- */
@@ -563,6 +607,7 @@ window.__bug = {
   tryStl: () => { const r = tryExportStl(); return r.ok ? { ok: true, bytes: r.bytes.length } : r; },
   thinView: () => ({ svgRed: document.querySelectorAll('#svgCard .thin-preview').length, tinted: root.children.filter((c) => c.material === MAT.thinWing).length, redSegments: root.children.filter((c) => c.isLineSegments).reduce((n, c) => n + c.geometry.attributes.position.count / 2, 0) }),
   floor: () => ({ violations: model.floorViolations.map((v) => ({ ...v })), pairs: model.wingPairs.map((w) => ({ hasTail: w.hasTail, thin: w.thin })) }),
+  venation: () => model.wingPairs.map((w) => (w.venation ? { stats: w.venation.stats, veinFloor: w.veinFloor } : null)),
   tailPoints: () => { const s = window.__bug.getParams(); return s.wings.tail; },
   triangleCount: () => model.triangleCount,
   notes: () => model.notes.slice(),

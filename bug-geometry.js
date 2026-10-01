@@ -17,6 +17,9 @@
    vertex's mirror is itself. mirrorDiff() checks the identity on the emitted
    triangles as exact doubles. */
 
+import { planVenation, bridgeHoles, MIN_CELL_MM_DEFAULT } from './bug-venation.js';
+export { MIN_CELL_MM_DEFAULT };
+
 const D2R = Math.PI / 180;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -82,12 +85,14 @@ export const SECTIONS = [
   { id: 'legs', label: 'Legs' },
   { id: 'antennae', label: 'Antennae' },
   { id: 'wings', label: 'Wings', open: true },
+  { id: 'venation', label: 'Venation (Phase 2)' },
   { id: 'print', label: 'Print' },
 ];
 
 const isThree = (p) => p.bodyParts === '3';
 const hasLegs = (p) => p.legPairs > 0 && p.legsVisible;
 const hasAnt = (p) => p.antennaType !== 'none';
+const hasVeins = (p) => p.venation !== 'none' && p.wingPairs > 0;
 
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen) =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
@@ -128,6 +133,15 @@ export const PARAM_SPEC = [
 
   R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
 
+  /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
+     becomes geometry (HOLES: the cells are cut through and the veins plus the
+     margin border are the frame; RIDGES: a solid wing with the veins raised).
+     Per-pair vein settings live in WING_FIELDS, blended like everything else. */
+  { id: 'venation', section: 'venation', label: 'Veins', kind: 'choice', default: 'none',
+    options: [['none', 'None (Phase 1 wings)'], ['holes', 'HOLES — cells cut through, veins are the frame'], ['ridges', 'RIDGES — solid wing, veins raised']] },
+  R('ridgeHeight', 'venation', 'Ridge height (STL)', 0.2, 2, 0.05, 0.6, 'mm', (p) => hasVeins(p) && p.venation === 'ridges'),
+  R('minCellMm', 'venation', 'Smallest hole across — smaller cells merge', 0.5, 5, 0.1, MIN_CELL_MM_DEFAULT, 'mm', (p) => hasVeins(p) && p.venation === 'holes'),
+
   R('minDiameter', 'print', 'Min feature diameter (STL floor)', 0.6, 2, 0.05, MIN_DIAMETER_DEFAULT, 'mm'),
 ];
 
@@ -144,7 +158,22 @@ export const WING_FIELDS = [
   WR('thickness', 'Thickness (STL)', 0.6, 4, 0.05, 1.2, 'mm'),
   WR('dihedral', 'Tilt — dihedral', -60, 80, 1, 12, '°'),
   WR('pitch', 'Tilt — pitch', -45, 45, 1, 0, '°'),
+  /* venation (Phase 2) — visibleWhen receives (pairSpec, params) */
+  WR('veinCount', 'Main veins from the root', 1, 10, 1, 4, '', (w, p) => hasVeins(p)),
+  WR('veinBranch', 'Branching — forks per main vein', 0, 2, 1, 1, '', (w, p) => hasVeins(p)),
+  WR('discal', 'Discal cell (0 off, 1 on)', 0, 1, 1, 1, '', (w, p) => hasVeins(p)),
+  WR('discalSize', 'Discal — closes at this fraction of the vein', 0.15, 0.95, 0.01, 0.55, '', (w, p) => hasVeins(p) && w.discal >= 0.5),
+  WR('discalPos', 'Discal — position across the wing', 0, 1, 0.01, 0.5, '', (w, p) => hasVeins(p) && w.discal >= 0.5),
+  WR('crossDensity', 'Cross-veins — open ↔ segmented', 0, 1, 0.01, 0.1, '', (w, p) => hasVeins(p)),
+  WR('cellRegularity', 'Cells — irregular ↔ grid-like', 0, 1, 0.01, 0.6, '', (w, p) => hasVeins(p)),
+  WR('veinWidth', 'Vein width at the root', 0.4, 3, 0.05, 1.2, 'mm', (w, p) => hasVeins(p)),
+  WR('veinTaper', 'Vein taper root → tip', 0, 0.8, 0.01, 0.15, '', (w, p) => hasVeins(p)),
+  WR('stigma', 'Pterostigma (0 off, 1 on)', 0, 1, 1, 0, '', (w, p) => hasVeins(p)),
+  WR('stigmaSize', 'Pterostigma size', 0.03, 0.4, 0.01, 0.12, '', (w, p) => hasVeins(p) && w.stigma >= 0.5),
+  WR('marginBorder', 'Margin border width', 0.4, 4, 0.05, 1.0, 'mm', (w, p) => hasVeins(p)),
 ];
+export const VENATION_FIELD_IDS = ['veinCount', 'veinBranch', 'discal', 'discalSize', 'discalPos', 'crossDensity', 'cellRegularity', 'veinWidth', 'veinTaper', 'stigma', 'stigmaSize', 'marginBorder'];
+const VEIN_DEFAULTS = Object.fromEntries(WING_FIELDS.filter((f) => VENATION_FIELD_IDS.includes(f.id)).map((f) => [f.id, f.default]));
 
 /* The neutral default: a plain rounded forewing and a shorter, rounder hindwing
    swept back. Not any named insect. Points are [u, w]: u along the span from the
@@ -153,11 +182,11 @@ export const WING_FIELDS = [
 export const DEFAULT_WINGS = {
   first: {
     points: [[0, 0.09], [0.34, 0.17], [0.78, 0.14], [1.0, 0.0], [0.82, -0.17], [0.4, -0.22], [0, -0.1]],
-    length: 26, stretch: 1, sweep: 0, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 12, pitch: 0,
+    length: 26, stretch: 1, sweep: 0, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 12, pitch: 0, ...VEIN_DEFAULTS,
   },
   last: {
     points: [[0, 0.08], [0.4, 0.2], [0.85, 0.12], [1.0, -0.06], [0.72, -0.28], [0.3, -0.26], [0, -0.09]],
-    length: 20, stretch: 1, sweep: 32, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 8, pitch: 0,
+    length: 20, stretch: 1, sweep: 32, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 8, pitch: 0, ...VEIN_DEFAULTS,
   },
   unlinked: {},
   tail: null,           // set below, once STARTER_TAIL exists
@@ -576,7 +605,7 @@ export function resolveWingPairs(p) {
     const s = {};
     for (const f of WING_FIELDS) {
       const v = lerp(W.first[f.id], W.last[f.id], t);
-      s[f.id] = f.step >= 1 && f.id === 'scallopCount' ? Math.round(v) : v;
+      s[f.id] = f.step >= 1 ? Math.round(v) : v;   // integer-stepped fields (scallop count, vein count, branching, the two on/off flags) round
     }
     out.push({ index: k, role, linked: true, t, ...s, points: null, dense: io.dense, repaired: io.repaired, tUsed: io.tUsed });
   }
@@ -1240,10 +1269,47 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   let poly = [[-embed, n0[1]], ...scalloped, [-embed, n1[1]]];
   // the curve runs clockwise in (u, w); the triangulator wants CCW
   poly = poly.reverse();
-  let tri = delaunayFlip(poly, earClip(poly)), pts = poly;
+  /* Phase 2 — VENATION. The cells are planned on the DRAWN planform (scallops
+     and tail included, the root tab excluded), in millimetres, before the wing
+     transform: the same W that places the slab places every vein and hole. */
+  const mode = p.venation;
+  let plan = null;
+  if (mode !== 'none') {
+    const flags = tailFlagsFor(spec, scalloped.length);
+    plan = planVenation(scalloped, flags, spec, { holes: mode === 'holes', minCellMm: p.minCellMm });
+  }
+  let tri, pts;
+  if (plan && mode === 'holes') {
+    // ONE conforming triangulation: every cut cell is a ring of quads between
+    // its outline and its hole, every solid cell is ear-clipped with its shared
+    // vertices kept, and the root tab is three triangles through R — so the
+    // frame is a single closed slab whose rim walk (planformSlab) finds the
+    // hole rims by the same directed-edge rule as the outer rim.
+    ({ pts, tris: tri } = frameMesh(plan, embed, n0, n1));
+  } else {
+    tri = delaunayFlip(poly, earClip(poly)); pts = poly;
+  }
   for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri } = subdivide(pts, tri));
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
   planformSlab(acc, pts, tri, thick / 2, W, part);
+  if (plan) {
+    part.meta.venation = plan;
+    const xy = (q, h) => { const v = W(q[0], q[1], h); return [v[0], v[1]]; };
+    // BOTH rims of every hole: under pitch or dihedral the projected contour
+    // of a hole runs along the top rim where its wall faces away from the
+    // viewer and along the bottom rim where the wall faces up, so a gate
+    // matching the contour against the top rim alone reads the bottom-rim
+    // stretches as strays (1.04 mm off at a 1.2 mm sheet and 60 degrees)
+    part.meta.holeLoops = plan.cells.flatMap((c) => c.holes.flatMap((h) => [h.map((q) => xy(q, thick / 2)), h.map((q) => xy(q, -thick / 2))]));
+    part.meta.svgStigma = mode === 'ridges' ? plan.cells.filter((c) => c.role === 'stigma').map((c) => c.points.map((q) => xy(q, thick / 2))) : [];
+    part.meta.svgVeins = mode === 'ridges' ? plan.veins.filter((v) => !v.dropped).map((v) => ({ pts: v.points.map((q) => xy(q, thick / 2)), width: (v.width[0] + v.width[1]) / 2 })) : [];
+    part.meta.veinWorld = plan.veins.filter((v) => !v.dropped).flatMap((v) => { const o = []; for (let i = 0; i + 1 < v.points.length; i++) o.push(W(v.points[i][0], v.points[i][1], thick / 2 + 0.02), W(v.points[i + 1][0], v.points[i + 1][1], thick / 2 + 0.02)); return o; });
+    // the vein floor: the narrowest vein (the tip width under the taper) and,
+    // in HOLES, the margin border, against minDiameter — the same block-the-STL
+    // rule as the drawn outline, reported on the part for floorViolations
+    const veinMin = spec.veinWidth * (1 - spec.veinTaper), border = mode === 'holes' ? spec.marginBorder : Infinity;
+    part.meta.veinFloor = { veinMin, border, under: veinMin < minW - 1e-9 || border < minW - 1e-9 };
+  }
   part.meta.thickness = thick;
   part.meta.planform = poly.slice();
   part.meta.pair = spec.index;
@@ -1268,6 +1334,228 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   part.meta.thinWorld = seg;
   acc.end();
 
+  if (plan && mode === 'ridges') buildRidges(acc, plan, W, thick / 2, p.ridgeHeight, spec.index);
+}
+
+/* Tail flags per DENSE outline sample: sampleOutline() emits CR_SAMPLES points
+   per control segment ending ON each control point, so dense sample d > 0 lies
+   in control segment ceil(d / per); it is a tail sample when both bounding
+   control points are tail-tagged (or it IS a tail control point). */
+function tailFlagsFor(spec, n) {
+  if (!spec.tags || !spec.hasTail) return null;
+  const T = spec.tags.map((t) => t[0] === 'tail'), per = CR_SAMPLES, out = new Array(n).fill(false);
+  for (let d = 0; d < n; d++) {
+    if (d === 0) { out[d] = T[0]; continue; }
+    const i = Math.ceil(d / per);
+    out[d] = d % per === 0 ? !!T[i] : !!(T[i - 1] && T[i]);
+  }
+  return out;
+}
+
+/* Ear clipping that KEEPS exactly-collinear vertices: earClip() drops them
+   (they make no triangle), but a vertex another cell shares on that edge must
+   stay or the two cells stop being conforming (a T-junction the rim walk then
+   reads as two boundary edges). The collinear vertices are removed first,
+   recorded, and after triangulation each is put back by splitting the one
+   triangle that carries the chord it lies on. */
+function triangulateCell(poly) {
+  triangulateCell.failures = triangulateCell.failures || [];
+  const n = poly.length;
+  const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  // "collinear" with a TOLERANCE: a vertex inserted on a straight vein edge by
+  // a later cut is a lerp of that edge computed at another time, and sits
+  // ~1e-14 off the line — exactly-zero tests miss it and the ear clipper then
+  // emits a needle (area ~1e-15), which the STL projects as a hairline loop
+  const flat = (a, b, c) => Math.abs(orient(a, b, c)) <= 1e-9 * Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.hypot(c[0] - b[0], c[1] - b[1]);
+  let V = [...Array(n).keys()];
+  const removed = [];
+  for (let changed = true; changed && V.length > 3;) {
+    changed = false;
+    for (let i = 0; i < V.length; i++) {
+      const a = V[(i + V.length - 1) % V.length], b = V[i], c = V[(i + 1) % V.length];
+      if (flat(poly[a], poly[b], poly[c])) { removed.push([a, b, c]); V.splice(i, 1); changed = true; break; }
+    }
+  }
+  let tris;
+  try { tris = earClip(V.map((i) => poly[i])).map((t) => t.map((k) => V[k])); }
+  catch (e) { // a numerically degenerate cell: fan from its first vertex (reported by the gate's O/W clauses if it ever mattered)
+    triangulateCell.failures.push({ n: poly.length, reason: String(e.message || e) });
+    tris = []; for (let i = 1; i + 1 < V.length; i++) tris.push([V[0], V[i], V[i + 1]]);
+  }
+  for (let r = removed.length - 1; r >= 0; r--) {
+    const [a, m, c] = removed[r];
+    const ti = tris.findIndex((t) => t.includes(a) && t.includes(c));
+    if (ti < 0) continue;
+    const t = tris[ti], x = t.find((v) => v !== a && v !== c);
+    // keep the triangle's own winding: (a, c, x) in some rotation
+    const ia = t.indexOf(a), forward = t[(ia + 1) % 3] === c;
+    tris.splice(ti, 1, forward ? [a, m, x] : [m, a, x], forward ? [m, c, x] : [c, m, x]);
+  }
+  return improveTriangulation(poly, reinsertUnused(poly, tris));
+}
+
+/* earClip drops a vertex that is EXACTLY collinear with its two current
+   neighbours (cross product 0), which is right on a planform (nothing is on
+   the other side of that edge) and wrong inside the frame: a cross-vein's end
+   sits exactly on the main vein it meets, so once the ears around it are
+   clipped it is collinear with its neighbours in V, the clipper drops it, and
+   the cell is covered by a triangle whose edge spans it while the cell across
+   the vein still has it as a vertex — a T-junction, which planformSlab then
+   closes with a WALL inside the material and the SVG strokes as a hairline
+   (measured: cell 78 of the irregular dense row, 32 vertices, 29 triangles).
+   Every triangle edge that passes through a polygon vertex is split there
+   (the triangle across the edge too, when it is a diagonal); the dropped
+   vertex is still USED elsewhere by the restored fan, so unused-ness is not
+   the test, the spanning edge is. */
+function reinsertUnused(poly, tris) {
+  const onSeg = (p, a, b) => {
+    const ab = [b[0] - a[0], b[1] - a[1]], L2 = ab[0] * ab[0] + ab[1] * ab[1];
+    if (!(L2 > 0)) return Infinity;
+    const t = ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2;
+    if (t <= 0 || t >= 1) return Infinity;
+    return Math.abs((p[0] - a[0]) * ab[1] - (p[1] - a[1]) * ab[0]) / Math.sqrt(L2);
+  };
+  // every triangle edge that passes through a polygon vertex (not its own end,
+  // and not a doubled copy of one) is split there, on both sides of the edge
+  for (let guard = 0; guard < 4 * poly.length; guard++) {
+    let hit = null;
+    for (let i = 0; i < tris.length && !hit; i++) for (let e = 0; e < 3 && !hit; e++) {
+      const u = tris[i][e], v = tris[i][(e + 1) % 3];
+      for (let m = 0; m < poly.length; m++) {
+        if (m === u || m === v) continue;
+        const q = poly[m];
+        if ((q[0] === poly[u][0] && q[1] === poly[u][1]) || (q[0] === poly[v][0] && q[1] === poly[v][1])) continue;
+        if (onSeg(q, poly[u], poly[v]) < 1e-6) { hit = { u, v, m }; break; }
+      }
+    }
+    if (!hit) break;
+    const { u, v, m } = hit;
+    for (let i = tris.length - 1; i >= 0; i--) {
+      const t = tris[i], e = t.findIndex((a, k) => (a === u && t[(k + 1) % 3] === v) || (a === v && t[(k + 1) % 3] === u));
+      if (e < 0) continue;
+      const a = t[e], b = t[(e + 1) % 3], x = t[(e + 2) % 3];
+      tris.splice(i, 1, [a, m, x], [m, b, x]);
+    }
+  }
+  return tris;
+}
+
+/* Lawson flips over one cell's triangulation: every interior diagonal whose
+   quad is convex is flipped when that raises the smaller of the two
+   triangles' minimum angles. The ear clipper is free to admit a diagonal that
+   passes a thousandth of a millimetre from a boundary vertex, which leaves a
+   NEEDLE — a triangle of real area whose altitude is far under its length.
+   Measured on the dense HOLES row: a 16 mm needle 1.3e-3 mm tall on the
+   bottom skin, whose subdivided children carry one nz and different
+   edge-length tolerances, so contourLoops' edge-on rule counted the long
+   children front and the short ones back and the SVG stroked a hairline
+   along the needle. Boundary edges are never flipped, so the cell's outline
+   (and the mesh's conformity across cells) is untouched; the bridge edges of a
+   bridged hole are boundary edges by index and stay too. */
+function improveTriangulation(poly, tris) {
+  const minAngle = (a, b, c) => {
+    const A = poly[a], B = poly[b], C = poly[c];
+    const ang = (P, Q, R) => { const ux = Q[0] - P[0], uy = Q[1] - P[1], vx = R[0] - P[0], vy = R[1] - P[1]; return Math.atan2(Math.abs(ux * vy - uy * vx), ux * vx + uy * vy); };
+    return Math.min(ang(A, B, C), ang(B, C, A), ang(C, A, B));
+  };
+  const orient = (a, b, c) => (poly[b][0] - poly[a][0]) * (poly[c][1] - poly[a][1]) - (poly[b][1] - poly[a][1]) * (poly[c][0] - poly[a][0]);
+  for (let pass = 0; pass < 50; pass++) {
+    const owner = new Map();
+    tris.forEach((t, i) => { for (let e = 0; e < 3; e++) owner.set(`${t[e]},${t[(e + 1) % 3]}`, i); });
+    let flipped = 0;
+    for (let i = 0; i < tris.length; i++) {
+      const t = tris[i];
+      for (let e = 0; e < 3; e++) {
+        const a = t[e], b = t[(e + 1) % 3], x = t[(e + 2) % 3];
+        const j = owner.get(`${b},${a}`);
+        if (j === undefined || j === i) continue;
+        const u = tris[j], y = u.find((v) => v !== a && v !== b);
+        if (y === undefined || y === x) continue;
+        // (a, b, x) and (b, a, y) are both CCW, so the quad reads a, y, b, x
+        // counter-clockwise; it is strictly convex (the flip x-y valid) iff
+        // its two remaining corners turn left too
+        if (!(orient(y, b, x) > 0 && orient(x, a, y) > 0)) continue;
+        const before = Math.min(minAngle(a, b, x), minAngle(b, a, y));
+        const after = Math.min(minAngle(a, y, x), minAngle(y, b, x));
+        if (after <= before + 1e-12) continue;
+        tris[i] = [a, y, x]; tris[j] = [y, b, x];
+        for (const [k, tt] of [[i, tris[i]], [j, tris[j]]]) for (let q = 0; q < 3; q++) owner.set(`${tt[q]},${tt[(q + 1) % 3]}`, k);
+        owner.delete(`${a},${b}`); owner.delete(`${b},${a}`);
+        flipped++; break;
+      }
+    }
+    if (!flipped) break;
+  }
+  return tris;
+}
+
+/* The HOLES frame as one triangle set over one vertex pool (vertices shared by
+   coordinate, so a cell edge is the same two indices in both cells). */
+function frameMesh(plan, embed, lead, trail) {
+  const key = new Map(), pts = [];
+  const vid = (q) => { const k = `${q[0]},${q[1]}`; let i = key.get(k); if (i === undefined) { i = pts.length; pts.push([q[0], q[1]]); key.set(k, i); } return i; };
+  const tris = [];
+  for (const c of plan.cells) {
+    const O = c.points.map(vid);
+    if (c.holes.length) {
+      // the cell with its holes bridged in: one weakly simple polygon, ear
+      // clipped with every vertex kept; the duplicated bridge vertices fold
+      // back onto one index through vid, so the bridge edges pair up
+      const bridged = bridgeHoles(c.points, c.holes);
+      const poly = bridged || c.points;
+      const ids = poly.map(vid);
+      for (const [a, b, cc] of triangulateCell(poly)) { const t = [ids[a], ids[b], ids[cc]]; if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push(t); }
+      if (!bridged) { c.holes = []; c.holeReason = 'bridge-failed'; }
+    } else {
+      for (const [a, b, cc] of triangulateCell(c.points)) tris.push([O[a], O[b], O[cc]]);
+    }
+  }
+  // the root tab, fanned over EVERY vertex on the root chord (the vein
+  // starts), so the chord stays conforming with the cells
+  const tt = vid([-embed, trail[1]]), lt = vid([-embed, lead[1]]);
+  const ch = plan.rootChord.map(vid);                       // trail ... lead
+  for (let i = 0; i + 1 < ch.length; i++) tris.push([tt, ch[i], ch[i + 1]]);
+  tris.push([tt, ch[ch.length - 1], lt]);
+  return { pts, tris };
+}
+
+/* RIDGES: every vein as a closed strip of rectangular section — its width the
+   vein's own (tapered along it), standing from a little inside the top skin
+   to ridgeHeight above it — and the pterostigma as a plate over its cell.
+   Each is its own closed part (kind 'vein'), overlapping the slab: the export
+   contract's closed-shells-union. ridgeWidthPairs lets the gate MEASURE the
+   emitted width against the floor. */
+function buildRidges(acc, plan, W, half, ridgeH, pairIndex) {
+  const h0 = half - Math.min(0.15, half * 0.5), h1 = half + ridgeH;
+  for (const v of plan.veins) {
+    if (v.dropped) continue;
+    const pts = v.points, n = pts.length;
+    if (n < 2) continue;
+    const cum = [0]; for (let i = 1; i < n; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const L = cum[n - 1] || 1;
+    if (L < 1e-6) continue;
+    const part = acc.begin(`vein${pairIndex + 1}-${v.id}`, 'vein', 'R');
+    part.meta.pair = pairIndex; part.meta.ridgeWidthPairs = [];
+    const rings = [];
+    for (let i = 0; i < n; i++) {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const d = [b[0] - a[0], b[1] - a[1]], dl = Math.hypot(d[0], d[1]) || 1, nn = [-d[1] / dl, d[0] / dl];
+      const w = lerp(v.width[0], v.width[1], cum[i] / L) / 2, q = pts[i];
+      rings.push([W(q[0] - nn[0] * w, q[1] - nn[1] * w, h0), W(q[0] + nn[0] * w, q[1] + nn[1] * w, h0), W(q[0] + nn[0] * w, q[1] + nn[1] * w, h1), W(q[0] - nn[0] * w, q[1] - nn[1] * w, h1)]);
+    }
+    const ids = loftRings(acc, rings, W(pts[0][0], pts[0][1], (h0 + h1) / 2), W(pts[n - 1][0], pts[n - 1][1], (h0 + h1) / 2));
+    for (const r of ids) part.meta.ridgeWidthPairs.push([r[0], r[1]]);
+    acc.end();
+  }
+  for (const c of plan.cells) {
+    if (c.role !== 'stigma') continue;
+    const part = acc.begin(`stigma${pairIndex + 1}`, 'vein', 'R');
+    part.meta.pair = pairIndex;
+    const hc = (h0 + h1) / 2, W2 = (u, w, h) => W(u, w, hc + h);
+    planformSlab(acc, c.points, triangulateCell(c.points), (h1 - h0) / 2, W2, part);
+    delete part.meta.thickPairs;   // a plate's height is the ridge height, not the sheet: the floor is on its WIDTH, and a plate is wider than any vein
+    acc.end();
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -1462,7 +1750,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 2;   // 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 3;   // 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -1510,18 +1798,31 @@ export function buildBug(params) {
       const part = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R');
       return { index: s.index, role: s.role, linked: s.linked, repaired: s.repaired, dense: s.dense, hingeY: hinges[s.index].y,
         hasTail: !!s.hasTail, tags: s.tags || null, thin: part.meta.thin, thinFlags: part.meta.thinFlags,
-        // both wings: the right's runs and their mirror images
-        thinSegments: [...part.meta.thinWorld, ...part.meta.thinWorld.map(([x, y, z]) => [mx(x), y, z])] };
+        // Phase 2: the venation record (planform mm) — cells as closed polygons, veins, holes
+        venation: part.meta.venation || null,
+        veinFloor: part.meta.veinFloor || null,
+        // both wings: the right's runs and their mirror images; a vein-floor
+        // violation adds the vein centrelines, so the page draws THEM red
+        thinSegments: [...part.meta.thinWorld, ...part.meta.thinWorld.map(([x, y, z]) => [mx(x), y, z]),
+          ...(part.meta.veinFloor && part.meta.veinFloor.under ? [...part.meta.veinWorld, ...part.meta.veinWorld.map(([x, y, z]) => [mx(x), y, z])] : [])] };
     }),
     // every pair whose DRAWN planform is narrower than the floor somewhere: the
     // STL exporter refuses the model while this list is not empty (see exportStl).
     // A LINKED middle pair is not drawn by anyone: it is blended from the first
     // and last pairs, and `blendedFrom` names them so the refusal can say what
     // to widen (or that unlinking it makes it editable).
-    floorViolations: pairs.map((s) => ({
-      pair: s.index, ...acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.thin,
-      blendedFrom: s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null,
-    })).filter((v) => v.thin),
+    floorViolations: [
+      ...pairs.map((s) => ({
+        pair: s.index, kind: 'outline', ...acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.thin,
+        blendedFrom: s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null,
+      })).filter((v) => v.thin),
+      // Phase 2: a pair whose veins taper under the floor (or, in HOLES, whose
+      // margin border is under it) blocks the STL the same way
+      ...pairs.map((s) => {
+        const vf = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.veinFloor;
+        return vf && vf.under ? { pair: s.index, kind: 'vein', veinMin: vf.veinMin, border: vf.border, thin: true, blendedFrom: s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null } : null;
+      }).filter(Boolean),
+    ],
     notes,
     positions: Float64Array.from(acc.pos),
     indices: Uint32Array.from(acc.idx),
@@ -1534,7 +1835,10 @@ function mirrorMeta(m, shift) {
   const out = {};
   for (const [k, v] of Object.entries(m)) {
     if (k === 'tubeRings') out[k] = v.map(([a, n]) => [a + shift, n]);
-    else if (k === 'thickPairs') out[k] = v.map(([a, b]) => [a + shift, b + shift]);
+    else if (k === 'thickPairs' || k === 'ridgeWidthPairs') out[k] = v.map(([a, b]) => [a + shift, b + shift]);
+    else if (k === 'holeLoops' || k === 'svgStigma') out[k] = v.map((L) => L.map(([x, y]) => [mx(x), y]));
+    else if (k === 'svgVeins') out[k] = v.map((l) => ({ ...l, pts: l.pts.map(([x, y]) => [mx(x), y]) }));
+    else if (k === 'veinWorld') out[k] = v.map(([x, y, z]) => [mx(x), y, z]);
     else out[k] = v;
   }
   return out;
@@ -1592,7 +1896,14 @@ export class FloorError extends Error {}
 export function floorReason(model) {
   const f = model.params.minDiameter.toFixed(2);
   return model.floorViolations.map((v) => {
-    const k = v.pair + 1, how = `the narrow part reaches ${v.maxDepth.toFixed(2)} mm past where a floor-wide disc fits`;
+    const k = v.pair + 1;
+    if (v.kind === 'vein') {
+      const what = v.veinMin < model.params.minDiameter ? `veins taper to ${v.veinMin.toFixed(2)} mm` : `margin border is ${v.border.toFixed(2)} mm`;
+      const fix = v.veinMin < model.params.minDiameter ? 'Raise its vein width or lower its taper' : 'Widen its margin border';
+      if (v.blendedFrom) { const [a, b] = v.blendedFrom.map((i) => i + 1); return `Pair ${k}'s ${what}, narrower than the ${f} mm floor (the veins are shown red in the view). Pair ${k} is blended from pairs ${a} and ${b}. Widen those, or unlink pair ${k} to edit it directly.`; }
+      return `Pair ${k}'s ${what}, narrower than the ${f} mm floor (the veins are shown red in the view). ${fix} there.`;
+    }
+    const how = `the narrow part reaches ${v.maxDepth.toFixed(2)} mm past where a floor-wide disc fits`;
     if (v.blendedFrom) {
       const [a, b] = v.blendedFrom.map((i) => i + 1);
       return `Pair ${k} is narrower than the ${f} mm floor (${how} — shown red in the view). Pair ${k} is blended from pairs ${a} and ${b}. Widen those, or unlink pair ${k} to edit it directly.`;
@@ -1728,6 +2039,12 @@ export function exportSvg(model, opts = {}) {
   let body = '';
   for (const { part, loops } of partLoops) {
     body += `<path data-part="${part.name}-${part.side}" d="${pathD(loops)}" fill="${SVG_INK}" fill-rule="nonzero" stroke="${SVG_LINE}" stroke-width="0.15" stroke-linejoin="round"/>\n`;
+    // Phase 2, RIDGES: the veins as lines on the wing, read off the model's
+    // own vein record (the ridge strips' centrelines, at the vein's width),
+    // not the strips' contours, which would stroke every vein twice. In HOLES
+    // the veins need no line: the cells are holes in the contour above.
+    for (const v of part.meta.svgVeins || []) body += `<path data-vein="${part.name}-${part.side}" d="${'M' + v.pts.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L')}" fill="none" stroke="${SVG_LINE}" stroke-width="${v.width.toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+    for (const L of part.meta.svgStigma || []) body += `<path data-stigma="${part.name}-${part.side}" d="${pathD([L])}" fill="${SVG_LINE}" fill-opacity="0.35"/>\n`;
   }
   // Segment lines: read off the model's own band rings (their x extent at their y).
   const bodyPart = model.parts.find((q) => q.kind === 'body');
