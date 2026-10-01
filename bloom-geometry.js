@@ -8143,6 +8143,20 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
   if (form && form.buckle !== null) trueNormalRows(rows, footS.length);
 
   const panels = trimPanels(rows.length, (i) => rows[i].u, cap, profile.fringe || null);
+  /* THE TUBE'S LOBE HOOK (corolla fusion). When the petal stands in a fused
+     whorl, `buildBloomCore` hands its petal whorl a hook that READS this
+     petal's own rows (the collect pass) or RESHAPES them (the build pass: the
+     rows below the fusion height ride the ring, the blend rows lie between,
+     and an edge petal at a slit keeps its own outer half) and answers which
+     row the petal's single panel starts on — `null` keeps today's panels,
+     `-1` emits no blade at all. Absent on every petal that is not in a fused
+     whorl, so today's petal takes this line as a no-op. Ported from the TUBE
+     prototype's P3 (tools/bloom-tube-core.mjs, #323). */
+  if (cap && cap.tubeLobe) {
+    for (const r of rows) r.tUsed = tAt(r.u);
+    const f = cap.tubeLobe(rows);
+    if (f !== null) panels.splice(0, panels.length, ...(f < 0 ? [] : [{ label: 'lobe', rowFrom: f, rowTo: rows.length - 1, spanAt: () => [-1, 1] }]));
+  }
   /* ONE CAPTURED GRID PER PANEL, in emission order and labelled with the
      panel's own name. A cleft is three panels — a shared base and two lobes
      that BOTH start PANEL_OVERLAP_ROWS below the split — so the petal's
@@ -8392,6 +8406,8 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     dev([-Rs0[0] * Math.sin(tilt) + Up0[0] * Math.cos(tilt), -Rs0[1] * Math.sin(tilt) + Up0[1] * Math.cos(tilt), -Rs0[2] * Math.sin(tilt) + Up0[2] * Math.cos(tilt)], nrm);
   }
   return {
+    /* the rows the tube reads (null on every petal outside a fused whorl) */
+    tubeRows: cap && cap.tubeLobe ? rows : null,
     /* Row half-widths, FOOT ROWS INCLUDED — a claw is narrower than both
        its foot and its blade, so the foot rows are part of the evidence. */
     profile: rows.map((r) => r.h),
@@ -9303,6 +9319,19 @@ function emitRimLoop(acc, profs, K, closed = true) {
 
    RETURNS null when the accumulator was not asked to capture. */
 function emitPanel(acc, rows, panel, tAt, rim) {
+  /* THE WRAP-AROUND OPTION (the TUBE, corolla fusion). A `periodic` panel is a
+     CLOSED band — the corolla ring — whose v runs once round and meets itself:
+     NV columns rather than NV - 1 intervals, faces that wrap from the last
+     column to the first, no side margins (so no side inset and no side taper),
+     and its rim is TWO closed loops (the base edge and the top edge) rather
+     than one loop round four sides. `nv` overrides the column count for that
+     panel alone (the ring carries columns per petal sector). Neither field is
+     set by any petal, so a petal's panel takes every expression below exactly
+     as it took it before the option existed — NVp IS NV, `(per ? NVp : NVp -
+     1)` IS NV - 1, the same doubles. Ported verbatim from the TUBE prototype's
+     patch set (tools/bloom-tube-core.mjs, P1/P2a-f, #323). */
+  const NVp = panel.nv ?? NV;
+  const per = !!panel.periodic;
   const grid = (acc.captureGrid || acc.captureLamina) ? [] : null;
   const rowFrom = panel.rowFrom, rowTo = panel.rowTo;
   const tipExposed = rowTo === rows.length - 1;
@@ -9328,13 +9357,13 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     const row = rows[i];
     const sp = panel.spanAt(i);
     const vs = [], Ps = [], Ns = [];
-    for (let j = 0; j < NV; j++) {
-      const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1);
+    for (let j = 0; j < NVp; j++) {
+      const v = sp[0] + ((sp[1] - sp[0]) * j) / (per ? NVp : NVp - 1);
       const { P, n } = row.sect(v);
       vs.push(v); Ps.push(P); Ns.push(n);
     }
     let w = 0;
-    for (let j = 1; j < NV; j++) w += rimDist(Ps[j - 1], Ps[j]);
+    for (let j = 1; j < NVp; j++) w += rimDist(Ps[j - 1], Ps[j]);
     const k = i - rowFrom;
     if (k > 0) sAcc += rimDist(oP[k - 1][0], Ps[0]);
     oV.push(vs); oP.push(Ps); oN.push(Ns); sMargin.push(sAcc); roomMm.push(w);
@@ -9381,13 +9410,14 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     const a = g * r > 0 ? Math.max(g * r, RIM_BEAD_RADIUS_MM / 512) : 0;
     if (a > drawnMax) drawnMax = a;
     if (tBody > sheetMax) sheetMax = tBody;
-    const vLo = oV[k][0], vHi = oV[k][NV - 1], vMid = (vLo + vHi) / 2;
-    const inLo = a > 0 ? rimInsetV(row.sect, vLo, vMid, a) : vLo;
-    const inHi = a > 0 ? rimInsetV(row.sect, vHi, vMid, a) : vHi;
+    const vLo = oV[k][0], vHi = oV[k][NVp - 1], vMid = (vLo + vHi) / 2;
+    const side = a > 0 && !per;
+    const inLo = side ? rimInsetV(row.sect, vLo, vMid, a) : vLo;
+    const inHi = side ? rimInsetV(row.sect, vHi, vMid, a) : vHi;
     const vs = [], Ps = [], Ns = [], Bs = [], ht = [], hb = [], Cl = [];
-    for (let j = 0; j < NV; j++) {
-      const v = a > 0 ? inLo + ((inHi - inLo) * j) / (NV - 1) : oV[k][j];
-      const q = a > 0 ? row.sect(v) : { P: oP[k][j], n: oN[k][j] };
+    for (let j = 0; j < NVp; j++) {
+      const v = side ? inLo + ((inHi - inLo) * j) / (NVp - 1) : oV[k][j];
+      const q = side ? row.sect(v) : { P: oP[k][j], n: oN[k][j] };
       vs.push(v); Ps.push(q.P); Ns.push(q.n);
     }
     /* THE DISTANCE FIELD, along the row's own emitted polyline rather than as
@@ -9396,11 +9426,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        3 mm. The two inset stretches are added at the ends because they are
        surface too — the bead's own footprint. */
     const arc = [0];
-    for (let j = 1; j < NV; j++) arc.push(arc[j - 1] + rimDist(Ps[j - 1], Ps[j]));
+    for (let j = 1; j < NVp; j++) arc.push(arc[j - 1] + rimDist(Ps[j - 1], Ps[j]));
     const dEdge = a;
     const dTipRow = tipExposed ? (sTip - sMargin[k]) : Infinity;
-    for (let j = 0; j < NV; j++) {
-      const d = Math.min(dEdge + arc[j], dEdge + (arc[NV - 1] - arc[j]), dTipRow);
+    for (let j = 0; j < NVp; j++) {
+      const d = per ? dTipRow : Math.min(dEdge + arc[j], dEdge + (arc[NVp - 1] - arc[j]), dTipRow);
       const b = tBody / 2 + g * (r - tBody / 2) * (1 - rimEase(d / RIM_TAPER_MM));
       Bs.push(b);
       const P = Ps[j], n = Ns[j];
@@ -9437,25 +9467,37 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      test, agreeing — calibrated on a unit cube in
      `node tools/bloom-self-intersection.mjs --orientation`. */
   for (let i = 0; i < NR - 1; i++) {
-    for (let j = 0; j < NV - 1; j++) {
-      acc.quad(top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1]);   // top skin: normal +n
-      acc.quad(bot[i][j], bot[i][j + 1], bot[i + 1][j + 1], bot[i + 1][j]);   // bottom skin: normal -n
+    for (let j = 0; j < (per ? NVp : NVp - 1); j++) {
+      const jn = per ? (j + 1) % NVp : j + 1;
+      acc.quad(top[i][j], top[i + 1][j], top[i + 1][jn], top[i][jn]);   // top skin: normal +n
+      acc.quad(bot[i][j], bot[i][jn], bot[i + 1][jn], bot[i + 1][j]);   // bottom skin: normal -n
     }
   }
 
   /* ---- the rim: ONE closed loop of profiles ---- */
   const K = rimSegments(sheetMax);
+  /* A PERIODIC PANEL'S RIM IS TWO CLOSED LOOPS, one per free edge: the base
+     row ascending and the top row descending, so both are wound with the
+     skins (boundary 0, directed census 0 — measured by the prototype's sweep
+     and by the TU family). */
+  if (per) {
+    const mk = (i, js) => js.map((j) => { const sk = Math.min(i, skinTo) - rowFrom; return rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], oP[i - rowFrom][j], top[sk][j], bot[sk][j]); });
+    const asc = Array.from({ length: NVp }, (_, j) => j);
+    emitRimLoop(acc, mk(rowFrom, asc), K);
+    emitRimLoop(acc, mk(rowTo, asc.slice().reverse()), K);
+    return grid;
+  }
   /* The loop, as (row, column) pairs on the ORIGINAL boundary. Its direction
      is the one that leaves the rim wound with the two skins; the witness is
      `boundaryEdges === 0` plus O1/O2, not this comment. */
   const loop = [];
   const RUN = [];                                                        // index of each run's first entry
   RUN.push(loop.length);
-  for (let j = 0; j < NV; j++) loop.push([rowFrom, j]);                  // inner end cap
+  for (let j = 0; j < NVp; j++) loop.push([rowFrom, j]);                  // inner end cap
   RUN.push(loop.length);
-  for (let i = rowFrom + 1; i <= rowTo; i++) loop.push([i, NV - 1]);     // the +v margin
+  for (let i = rowFrom + 1; i <= rowTo; i++) loop.push([i, NVp - 1]);     // the +v margin
   RUN.push(loop.length);
-  for (let j = NV - 2; j >= 0; j--) loop.push([rowTo, j]);               // the tip
+  for (let j = NVp - 2; j >= 0; j--) loop.push([rowTo, j]);               // the tip
   RUN.push(loop.length);
   for (let i = rowTo - 1; i > rowFrom; i--) loop.push([i, 0]);           // the -v margin
   const isRunStart = new Set(RUN);
@@ -15612,6 +15654,399 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
    thicknesses) is not mode-dependent, so the decision is the same live or
    export by construction; nothing here reads `acc.exportMode`. */
 let BUDGET_DECISION_ACTIVE = false;
+/* ===================================================================
+   THE TUBE — COROLLA FUSION (Eva's rulings on #323; the build session).
+
+   A closed ROUND ring through every petal's midrib, fused partway up to the
+   fusion height h, with today's petals FREE above it. Ported from the scratch
+   core that #323 merged as the reference implementation
+   (tools/bloom-tube-core.mjs; docs/bloom-tube-ring-prototype.md, Parts A-C),
+   function for function — not re-derived. Read that doc for every figure
+   behind every constant below.
+
+   PER LAYER. `tubeLayerN` asks a panel count k for whorl N: 0 is the full
+   TUBE, a divisor of the petal count n splits the ring into k panels with a
+   SLIT between each, and n is FREE (today's whorl, built by today's path with
+   no hook at all). The slider keeps the ASKED k; `tubeSnap()` is the one owner
+   of what is BUILT — the nearest valid value, ties going DOWN — and the
+   read-out says so when the two differ (the infill's achieved-count pattern).
+
+   THREE PASSES WHEN ANY LAYER FUSES, NONE OTHERWISE: (1) a collect pass that
+   builds every petal's rows and emits no blade, so the ring's curve exists at
+   EVERY row before any petal is drawn (the blend reads it); (2) the build pass,
+   in which each fused petal emits only what stands above the ring (or, at a
+   slit, its own outer half from foot to tip); (3) the rings, emitted LAST so a
+   bloom without a tube is a prefix of the stream with one. At the default
+   (every layer FREE) `tubePlan()` reports no ring and `buildBloomCore` takes
+   today's single pass by BRANCH.
+   =================================================================== */
+export const TUBE_HEIGHT_RANGE = [0.10, 0.70];
+export const TUBE_HEIGHT_DEFAULT = 0.25;        // Eva's ruling on Part B
+export const TUBE_BLEND_RANGE = [0, 1];
+export const TUBE_BLEND_DEFAULT = 1;            // Eva's ruling on Part C (RULED_BLEND)
+export const TUBE_K_MAX = 40;                   // the petal count's own maximum: every asked k at or above n builds FREE
+export const TUBE_BLEND_MM = 8;                 // the fusion line's blend length, mm of midrib arc above the ring's top row (§B3)
+export const TUBE_COLS_PER_SECTOR = 8;          // C (§A2)
+export const TUBE_COLS_PER_SINUS = 12;          // columns across one open sinus where the notch is drawn (§C2)
+export const TUBE_FLARE_FLOOR_ROW = 4;          // the lowest row a flared lobe may start on (§C2)
+export const TUBE_SLIT_OVERLAP_MM = 1.0;        // how far a slit panel runs past an edge petal's midrib (§C4)
+
+/* THE VALID PANEL COUNTS for n petals: 0 (the full tube), every divisor of n,
+   and n itself (FREE). */
+export function tubeValidK(n) {
+  const out = [0];
+  for (let k = 1; k <= n; k++) if (n % k === 0) out.push(k);
+  return out;
+}
+/* THE SNAP — the one owner of the BUILT k. Nearest valid value to the asked
+   one; a tie goes DOWN (toward more fusion). An asked k at or above n is FREE. */
+export function tubeSnap(asked, n) {
+  const a = Math.round(Number(asked)), N = Math.round(Number(n));
+  if (a >= N) return N;
+  let best = 0;
+  for (const k of tubeValidK(N)) if (Math.abs(k - a) < Math.abs(best - a)) best = k;
+  return best;
+}
+/* WHERE A TUBE CAN EXIST — the geometry's half of the registry's
+   `tubeEligible` (two statements of one boundary, compared per row by TU0).
+   A ring is drawn through every midrib of ONE whorl that shares ONE row
+   ladder at uniformly spaced azimuths, so: RADIAL only; no per-slot field
+   (size or form variance, slot-role overrides — they give one whorl several
+   ladders); no buckle (it differs per slot through its golden-angle phase);
+   no fringe and no cleft (several panels own the blade); no infill (pinned
+   off — the ring has no cells); no inflorescence (a floret is a bloom of its
+   own and does not inherit); never a full sphere. */
+export function tubeEligible(state) {
+  if (state.placement !== 'RADIAL') return false;
+  if (sphereMode(state)) return false;
+  if (Math.abs(Number(state.varianceSize) || 0) >= 0.005) return false;
+  if (Math.abs(Number(state.varianceForm) || 0) >= 0.005) return false;
+  if (Math.abs(Number(state.buckleAmp) || 0) > 0) return false;
+  if (Number(state.fringeCount) >= 1) return false;
+  if (state.petalInfill === 'VORONOI') return false;
+  if (Number(state.stemLength) >= 1 && state.inflorescence === 'RACEME') return false;
+  if (slotRolesOverridden(state)) return false;
+  return true;
+}
+/* The slot-role overrides are per-SLOT (labellum / hood), so where they are
+   live AND non-zero a whorl carries several ladders. Read from ROLE_OVERRIDES,
+   never a hand list. */
+function slotRolesOverridden(state) {
+  if (!slotRolesEligible(state)) return false;
+  for (const o of ROLE_OVERRIDES) {
+    if (o.role !== SLOT_LABELLUM && o.role !== SLOT_HOOD) continue;
+    const v = Number(state[o.control]);
+    if (o.law === 'mul' ? v !== 1 : Math.abs(v || 0) > 0) return true;
+  }
+  return false;
+}
+/* THE PLAN: per layer, the asked k, the built k and whether it fuses. */
+export function tubePlan(state, layerCount, n) {
+  const eligible = tubeEligible(state);
+  const layers = [];
+  for (let L = 0; L < layerCount; L++) {
+    const v = state[`tubeLayer${L + 1}`];
+    const asked = v === undefined ? TUBE_K_MAX : Math.round(Number(v));
+    const k = eligible ? tubeSnap(asked, n) : n;
+    layers.push({ layer: L, asked, k, free: k === n, snapped: eligible && Math.min(asked, n) !== k });
+  }
+  const h = Number(state.tubeHeight ?? TUBE_HEIGHT_DEFAULT);
+  const blend = Number(state.tubeBlend ?? TUBE_BLEND_DEFAULT);
+  return { eligible, n, layers, active: eligible && layers.some((x) => !x.free), h, blend };
+}
+
+const tSub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const tAdd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const tMul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+const tDot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const tCross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const tLen = (a) => Math.hypot(a[0], a[1], a[2]);
+const tWrap = (a) => { a %= TAU; return a < 0 ? a + TAU : a; };
+const tWrapPi = (a) => ((a + Math.PI) % TAU + TAU) % TAU - Math.PI;
+const tSmoother = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (x * 6 - 15) + 10));
+/* the arc of a petal's OWN section from its midrib to one margin (32 chords) —
+   the ONE expression the blend, the sinus and the slit edge all read */
+function tubeSideArc(own, sgn) { let a = 0, prev = own(0).P; for (let q = 1; q <= 32; q++) { const P = own((sgn * q) / 32).P; a += tLen(tSub(P, prev)); prev = P; } return a; }
+/* a piecewise-linear v -> phi map from segments { a, b, cols } (the ring's
+   column knots): periodic panels use N columns, open ones N + 1 */
+function tubeKnotMap(segs, periodic) {
+  const cols = [0]; for (const sg of segs) cols.push(cols[cols.length - 1] + sg.cols);
+  const N = cols[cols.length - 1];
+  const phiOf = (r, v) => { const c = ((v + 1) / 2) * N; let i = 0; while (i < segs.length - 1 && c > cols[i + 1]) i++; const f = (c - cols[i]) / segs[i].cols; return segs[i].a + (segs[i].b - segs[i].a) * f; };
+  return { phiOf, NVp: periodic ? N : N + 1, N };
+}
+/* THE NOTCH (BLEND's second joint, §C2): in an OPEN sinus the ring's top rim is
+   cut down into a U whose corner arcs are tangent to each petal margin at its
+   own lean beta, r = BLEND * W / cos(beta), drawn by lowering the ring's own
+   rows in the sinus. A closed sinus (W <= 0) has no room: inert. */
+function tubeNotchDepth(list) {
+  return (phi) => {
+    let best = 0;
+    for (const sn of list) {
+      if (!(sn.r > 0)) continue;
+      const x = Math.abs(tWrapPi(phi - sn.c)) * sn.rho;
+      if (x >= sn.W) continue;
+      const cx = sn.W - sn.r * Math.cos(sn.beta), cy = sn.r * Math.sin(sn.beta);
+      const y = x <= cx ? sn.r - cy : Math.sqrt(Math.max(0, sn.r * sn.r - (x - cx) ** 2)) - cy;
+      if (y > best) best = y;
+    }
+    return best;
+  };
+}
+function tubeDippedCurves(gg, R1, list, spacing) {
+  const depth = tubeNotchDepth(list);
+  const lerp3 = (A, B, f) => [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f];
+  return Array.from({ length: R1 + 1 }, (_, r) => (phi) => {
+    const d = depth(phi);
+    if (!(d > 0) || r <= 2) return gg.curveAt(r)(phi);
+    const t = r - (d / spacing) * ((r - 2) / (R1 - 2));
+    const i = Math.floor(t), f = t - i;
+    return f === 0 ? gg.curveAt(i)(phi) : lerp3(gg.curveAt(i)(phi), gg.curveAt(i + 1)(phi), f);
+  });
+}
+/* THE RING'S SECTION at row r: a closed periodic Catmull-Rom on (rho, z)
+   through every midrib, the azimuth exact — ROUND (STRAIGHT is deleted by
+   ruling). At a midrib it returns the midrib point itself, the SAME double. */
+function tubeRingCurve(mids, r) {
+  const n = mids[r].length;
+  const cyl = mids[r].map((P) => ({ rho: Math.hypot(P[0], P[1]), th: Math.atan2(P[1], P[0]), z: P[2], P }));
+  const th0 = cyl[0].th;
+  const ths = cyl.map((c, p) => th0 + tWrap(c.th - th0) + (p > 0 && tWrap(c.th - th0) === 0 ? TAU : 0));
+  for (let p = 1; p < n; p++) if (!(ths[p] > ths[p - 1])) throw new Error(`TUBE T0: midribs not in azimuth order at row ${r} — not a RADIAL whorl`);
+  const D = TAU / n;
+  const at = (phi) => {
+    let x = phi - ths[0]; x = ((x % TAU) + TAU) % TAU;
+    const p = Math.floor(x / D + 1e-12) % n;
+    const f = (x - p * D) / D;
+    return { p, q: (p + 1) % n, f };
+  };
+  const cr = (a, b, c, d, t) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+  return (phi) => {
+    const { p, q, f } = at(phi);
+    const m = (p - 1 + n) % n, s = (q + 1) % n;
+    if (f === 0) return cyl[p].P;
+    const rho = cr(cyl[m].rho, cyl[p].rho, cyl[q].rho, cyl[s].rho, f);
+    const z = cr(cyl[m].z, cyl[p].z, cyl[q].z, cyl[s].z, f);
+    const th = ths[p] + f * D;
+    return [rho * Math.cos(th), rho * Math.sin(th), z];
+  };
+}
+/* the ring's row objects for one panel (ONE global normal sign per ring, fixed
+   at the ring row where twist is exactly 0 — §A, the twist finding) */
+function tubePanelRows(curves, us, phiOf, tAt, sign) {
+  const NR = curves.length;
+  const point = (r, v) => curves[r](phiOf(r, v));
+  const hh = 1e-6;
+  const rows = [];
+  for (let r = 0; r < NR; r++) {
+    const ia = r === 0 ? r : r - 1, ib = r === NR - 1 ? r : r + 1;
+    rows.push({ u: us[r], tUsed: tAt(us[r]), sect: (v) => {
+      const P = point(r, v);
+      const dv = tSub(point(r, Math.min(1, v + hh)), point(r, Math.max(-1, v - hh)));
+      let du = tSub(point(ib, v), point(ia, v));
+      if (tLen(du) < 1e-12) du = tSub(point(Math.min(NR - 1, ib + 1), v), point(Math.max(0, ia - 1), v));
+      const nn = tCross(du, dv);
+      return { P, n: tMul(nn, sign / tLen(nn)) };
+    } });
+  }
+  return rows;
+}
+
+/* THE RING'S GEOMETRY for every fused layer, from the collect pass's rows. */
+function tubeGeometry(plan, collected) {
+  const n = plan.n, h = plan.h, blend = plan.blend, blendMm = TUBE_BLEND_MM;
+  const geo = [];
+  for (const lay of plan.layers) {
+    const L = lay.layer;
+    if (lay.free) { geo.push(null); continue; }
+    const ps = collected.petalsAll.slice(L * n, (L + 1) * n);
+    if (ps.length !== n) throw new Error(`TUBE: layer ${L} has ${ps.length} petals of ${n} — a slot was omitted`);
+    const rowsOf = ps.map((p) => p.tubeRows);
+    const NRall = rowsOf[0].length;
+    for (let p = 1; p < n; p++) for (let r = 0; r < NRall; r++) if (!Object.is(rowsOf[p][r].u, rowsOf[0][r].u)) throw new Error(`TUBE T0: layer ${L} petal ${p} row ${r} — the whorl does not share one ladder`);
+    const usAll = rowsOf[0].map((r) => r.u);
+    let R1 = 0;
+    while (R1 + 1 < NRall && usAll[R1 + 1] <= h) R1++;
+    const midsAll = [], normalsAll = [];
+    for (let r = 0; r < NRall; r++) { const m = [], nn = []; for (let p = 0; p < n; p++) { const q = rowsOf[p][r].sect(0); m.push(q.P); nn.push(q.n); } midsAll.push(m); normalsAll.push(nn); }
+    const curveCache = new Map();
+    const curveAt = (r) => { if (!curveCache.has(r)) curveCache.set(r, tubeRingCurve(midsAll, r)); return curveCache.get(r); };
+    const sign = (() => {
+      const ph = Math.atan2(midsAll[2][0][1], midsAll[2][0][0]), hh = 1e-6;
+      const du = tSub(curveAt(3)(ph), curveAt(1)(ph)), dv = tSub(curveAt(2)(ph + hh), curveAt(2)(ph - hh));
+      return tDot(tCross(du, dv), normalsAll[2][0]) < 0 ? -1 : 1;
+    })();
+    const ringN = (r, th) => {
+      const ia = r === 0 ? r : r - 1, ib = r === NRall - 1 ? r : r + 1, hh = 1e-6;
+      let du = tSub(curveAt(ib)(th), curveAt(ia)(th));
+      if (tLen(du) < 1e-12) du = tSub(curveAt(Math.min(NRall - 1, ib + 1))(th), curveAt(Math.max(0, ia - 1))(th));
+      const nn = tCross(du, tSub(curveAt(r)(th + hh), curveAt(r)(th - hh)));
+      return tMul(nn, sign / tLen(nn));
+    };
+    const sMid = new Array(NRall).fill(0);
+    for (let r = R1 + 1; r < NRall; r++) sMid[r] = sMid[r - 1] + tLen(tSub(midsAll[r][0], midsAll[r - 1][0]));
+    let flareRows = 0, flareNeed = 0, flareArcMm = 0, sinuses = [], notchOn = false, spacing = 0;
+    /* THE FLARE (§C2): the lobe starts `flareRows` rows further down the ring,
+       where the ring is still at full thickness, so the ring's free-rim taper is
+       buried inside the petal; floored at TUBE_FLARE_FLOOR_ROW. */
+    const arcDown = (from) => { let a = 0; for (let r = from + 1; r <= R1; r++) a += tLen(tSub(midsAll[r][0], midsAll[r - 1][0])); return a; };
+    const S0 = R1 - PANEL_OVERLAP_ROWS;
+    while (S0 - flareNeed > TUBE_FLARE_FLOOR_ROW && arcDown(S0 - flareNeed) < RIM_TAPER_MM) flareNeed++;
+    flareRows = Math.min(Math.round(blend * flareNeed), Math.max(0, S0 - TUBE_FLARE_FLOOR_ROW));
+    flareArcMm = arcDown(S0 - flareRows);
+    /* THE SINUS at the ring's top row, per neighbour pair (§C2) */
+    const marg = Array.from({ length: n }, (_, p) => { const own = rowsOf[p][R1].sect, mid = midsAll[R1][p]; const rho = Math.hypot(mid[0], mid[1]), th = Math.atan2(mid[1], mid[0]); return { rho, th, plus: th + tubeSideArc(own, 1) / rho, minus: th - tubeSideArc(own, -1) / rho }; });
+    spacing = arcDown(R1 - 4) / 4;
+    const capR = 0.5 * (R1 - 2) * spacing;
+    const marginLean = (p, sgn) => {
+      const own0 = rowsOf[p][R1].sect, own1 = rowsOf[p][R1 + 1].sect, mid0 = midsAll[R1][p], mid1 = midsAll[R1 + 1][p];
+      const at = (own, mid, r, w) => { const rho = Math.hypot(mid[0], mid[1]), th = Math.atan2(mid[1], mid[0]) + sgn * tubeSideArc(own, sgn) / rho; const Rp = curveAt(r)(th); return { P: tAdd(Rp, tMul(tSub(own(sgn).P, Rp), w)), th }; };
+      const A = at(own0, mid0, R1, 0), B = at(own1, mid1, R1 + 1, tSmoother(sMid[R1 + 1] / blendMm));
+      const hh = 1e-4, up = tSub(curveAt(R1)(A.th), curveAt(R1 - 1)(A.th)), N = ringN(R1, A.th);
+      const away = tSub(curveAt(R1)(A.th - sgn * hh), curveAt(R1)(A.th + sgn * hh));
+      const proj = (v) => tSub(v, tMul(N, tDot(v, N)));
+      const mv = proj(tSub(B.P, A.P)), eu = proj(up), ea = proj(away);
+      return Math.atan2(tDot(mv, ea) / tLen(ea), tDot(mv, eu) / tLen(eu));
+    };
+    sinuses = marg.map((a, p) => {
+      const b = marg[(p + 1) % n]; const gap = tWrapPi(b.minus - a.plus); const rho = (a.rho + b.rho) / 2; const W = (gap * rho) / 2;
+      const beta = R1 + 1 < NRall && W > 0 ? (marginLean(p, 1) + marginLean((p + 1) % n, -1)) / 2 : 0;
+      const r = Math.min(blend * Math.max(0, W) / Math.cos(beta), capR);
+      return { p, c: a.plus + gap / 2, gapAng: gap, rho, W, r, beta, depthMm: r * (1 - Math.sin(beta)) };
+    });
+    notchOn = blend > 0 && sinuses.some((x) => x.r > 0);
+    if (!(blend > 0)) { flareRows = 0; flareArcMm = 0; }
+    geo.push({ L, k: lay.k, rowsOf, usAll, R1, midsAll, normalsAll, curveAt, sign, ringN, sMid, NRall, flareRows, flareNeed, flareArcMm, sinuses, notchOn, spacing });
+  }
+  return geo;
+}
+
+/* THE LOBE HOOK for petal p of fused layer L (§B2, §C2, §C4): below h the row
+   rides the ring, over TUBE_BLEND_MM of midrib arc it blends to the petal's own
+   section, above it the row is today's own object; an edge petal at a slit
+   keeps its own outer half from the foot to the tip. Returns the panel's first
+   row. */
+function tubeLobeHook(gg, n, p) {
+  const blendMm = TUBE_BLEND_MM;
+  return (rows) => {
+    const R1 = gg.R1;
+    const kk = gg.k, edgeMode = kk > 0 && kk < n;
+    const m = edgeMode ? n / kk : 0;
+    const side = edgeMode ? (p % m === m - 1 ? 1 : p % m === 0 ? -1 : 0) : 0;
+    const S = R1 - PANEL_OVERLAP_ROWS - gg.flareRows;
+    for (let i = side ? 0 : S; i < rows.length; i++) {
+      const s = i <= R1 ? 0 : gg.sMid[i];
+      const w = tSmoother(s / blendMm);
+      if (w >= 1) break;
+      const own = rows[i].sect;
+      const mid = gg.midsAll[i][p], rho = Math.hypot(mid[0], mid[1]), thMid = Math.atan2(mid[1], mid[0]);
+      const sPlus = tubeSideArc(own, 1), sMinus = tubeSideArc(own, -1);
+      const curve = gg.curveAt(i);
+      const bl = (v) => {
+        const q = own(v);
+        const th = thMid + (v >= 0 ? v * sPlus : v * sMinus) / rho;
+        const Rp = curve(th), Rn = gg.ringN(i, th);
+        const P = tAdd(Rp, tMul(tSub(q.P, Rp), w));
+        let nn = tAdd(tMul(Rn, 1 - w), tMul(q.n, w)); nn = tMul(nn, 1 / tLen(nn));
+        return { P, n: nn };
+      };
+      rows[i].sect = side ? (v) => (v * side >= 0 ? own(v) : bl(v)) : bl;
+    }
+    return side ? 0 : S;
+  };
+}
+
+/* THE RINGS, emitted into `acc` after everything else, one layer at a time:
+   the full tube is ONE periodic panel (re-knotted where the notch is drawn);
+   a slit ring is k open panels, each from its first petal's midrib to its
+   last plus TUBE_SLIT_OVERLAP_MM past each. */
+function emitTubeRings(acc, geo, n) {
+  const report = [];
+  const C = TUBE_COLS_PER_SECTOR;
+  for (const gg of geo) {
+    if (!gg) continue;
+    const L = gg.L, R1 = gg.R1;
+    const from = acc.positions.length / 9;
+    const us = gg.usAll.slice(0, R1 + 1);
+    const mids = gg.midsAll.slice(0, R1 + 1);
+    const curves = mids.map((_, r) => gg.curveAt(r));
+    const sign = gg.sign, rowsOf = gg.rowsOf;
+    const th0 = Math.atan2(mids[R1][0][1], mids[R1][0][0]);
+    const D = TAU / n;
+    const tAt = (u) => { const row = rowsOf[0].find((x) => x.u === u); return row.tUsed; };
+    const kk = gg.k;
+    const ringR = Math.hypot(mids[Math.min(2, R1)][0][0], mids[Math.min(2, R1)][0][1]);
+    const panels = [];
+    const thm = mids[R1].map((P) => Math.atan2(P[1], P[0]));
+    for (let p = 1; p < n; p++) while (thm[p] <= thm[p - 1]) thm[p] += TAU;
+    const notch = gg.notchOn;
+    const curvesN = notch ? tubeDippedCurves(gg, R1, gg.sinuses, gg.spacing) : curves;
+    const sinusAfter = (p) => { const sn = gg.sinuses[p]; let cc = sn.c; while (cc < thm[p]) cc += TAU; while (cc > thm[p] + TAU) cc -= TAU; return { ...sn, cc, half: sn.gapAng / 2 }; };
+    const between = (p, q) => {
+      const sn = sinusAfter(p), thp = thm[p];
+      const thq = q === 0 ? thm[0] + TAU : thm[q];
+      if (sn.r > 0) return [{ a: thp, b: sn.cc - sn.half, cols: C / 2 }, { a: sn.cc - sn.half, b: sn.cc, cols: TUBE_COLS_PER_SINUS / 2 }, { a: sn.cc, b: sn.cc + sn.half, cols: TUBE_COLS_PER_SINUS / 2 }, { a: sn.cc + sn.half, b: thq, cols: C / 2 }];
+      return [{ a: thp, b: sn.cc, cols: C / 2 }, { a: sn.cc, b: thq, cols: C / 2 }];
+    };
+    if (kk === 0 && notch) {
+      const segs = []; for (let p = 0; p < n; p++) segs.push(...between(p, (p + 1) % n));
+      const { phiOf, NVp } = tubeKnotMap(segs, true);
+      const rows = tubePanelRows(curvesN, us, phiOf, tAt, sign);
+      emitPanel(acc, rows, { label: 'tube', periodic: true, nv: NVp, rowFrom: 0, rowTo: rows.length - 1, spanAt: () => [-1, 1] }, tAt, null);
+      panels.push({ label: 'tube', petals: n });
+    } else if (kk === 0) {
+      const NVp = C * n;
+      const phiOf = (r, v) => th0 - D / 2 + ((v + 1) / 2) * TAU;
+      const rows = tubePanelRows(curves, us, phiOf, tAt, sign);
+      emitPanel(acc, rows, { label: 'tube', periodic: true, nv: NVp, rowFrom: 0, rowTo: rows.length - 1, spanAt: () => [-1, 1] }, tAt, null);
+      panels.push({ label: 'tube', petals: n });
+    } else {
+      const m = n / kk;
+      for (let s = 0; s < kk; s++) {
+        const p0 = s * m, p1 = p0 + m - 1;
+        const rhoA = Math.hypot(mids[Math.min(2, R1)][p0][0], mids[Math.min(2, R1)][p0][1]), rhoB = Math.hypot(mids[Math.min(2, R1)][p1][0], mids[Math.min(2, R1)][p1][1]);
+        const segs = [{ a: thm[p0] - TUBE_SLIT_OVERLAP_MM / rhoA, b: thm[p0], cols: 2 }];
+        for (let p = p0; p < p1; p++) segs.push(...between(p, p + 1));
+        segs.push({ a: thm[p1], b: thm[p1] + TUBE_SLIT_OVERLAP_MM / rhoB, cols: 2 });
+        const { phiOf, NVp } = tubeKnotMap(segs, false);
+        const rows = tubePanelRows(curvesN, us, phiOf, tAt, sign);
+        emitPanel(acc, rows, { label: `panel${s}`, nv: NVp, rowFrom: 0, rowTo: rows.length - 1, spanAt: () => [-1, 1] }, tAt, null);
+        panels.push({ label: `panel${s}`, petals: m });
+      }
+    }
+    let t1 = 0;
+    for (let r = 0; r <= R1; r++) for (let p = 0; p < n; p++) { const P = curves[r](Math.atan2(mids[r][p][1], mids[r][p][0])); t1 = Math.max(t1, tLen(tSub(P, mids[r][p]))); }
+    report.push({ layer: L, k: kk, rows: R1 + 1, uTop: us[R1], ringRadiusMm: ringR, triFrom: from, triTo: acc.positions.length / 9, ringTris: acc.positions.length / 9 - from, panels: panels.map((x) => ({ label: x.label, petals: x.petals })), midribResidualMm: t1,
+      flare: { rows: gg.flareRows, need: gg.flareNeed, arcMm: gg.flareArcMm },
+      notch: { on: notch, spacingMm: gg.spacing, sinuses: gg.sinuses.map((x) => ({ p: x.p, gapMm: 2 * x.W, W: x.W, r: x.r, depthMm: x.depthMm, leanDeg: x.beta * 180 / Math.PI })) } });
+  }
+  return report;
+}
+
+/* THE CORE WITH A TUBE. Every layer FREE (the default) is today's single pass,
+   by branch. */
+function buildBloomCore(acc, state, opts = {}) {
+  const layerCount = Math.round(Number(state.layerCount) || 1);
+  const n = Math.round(Number(state.petalCount));
+  const plan = tubePlan(state, layerCount, n);
+  if (!plan.active) {
+    const built = buildBloomBody(acc, state, opts, null);
+    built.tube = { ...plan, rings: [] };
+    return built;
+  }
+  /* pass 1: every fused petal's rows, no blade emitted */
+  const collectHooks = plan.layers.map((lay) => (lay.free ? null : () => () => -1));
+  const collected = buildBloomBody(new MeshBuilder({ exportMode: acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L] });
+  if (collected.foot.slotCount !== n || collected.foot.layerCount !== layerCount) throw new Error(`TUBE: the plan read ${layerCount} x ${n}, the whorl built ${collected.foot.layerCount} x ${collected.foot.slotCount}`);
+  const geo = tubeGeometry(plan, collected);
+  /* pass 2: each fused petal reduced to what stands above the ring */
+  const built = buildBloomBody(acc, state, opts, { hookFor: (L) => (geo[L] ? (p) => tubeLobeHook(geo[L], n, p) : null) });
+  /* pass 3: the rings, last */
+  const rings = emitTubeRings(acc, geo, n);
+  built.tube = { ...plan, rings };
+  return built;
+}
+
 export function buildBloomInto(acc, state, opts = {}) {
   /* RE-ENTRANCY: `buildBloomCore` calls `buildBloomInto` again, once per
      FLORET, for an inflorescence. The budget is a property of the WHOLE
@@ -15695,7 +16130,7 @@ export function buildBloomInto(acc, state, opts = {}) {
   }
 }
 
-function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
+function buildBloomBody(acc, state, { below = null, capability = null } = {}, tube = null) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
@@ -15913,7 +16348,12 @@ function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
         azOf[slot.index] = slot.azimuth;
         const d = slotsFor[slot.index];
         if (fOf) fOf[slot.index] = slot.sizeFactor;
-        const p = buildPetalInto(acc, state, d, slot, capability);
+        /* A FUSED WHORL'S PETALS carry the tube's lobe hook (and only they —
+           the sepals, the omission probe and the sepal scan's rebuilds keep
+           the caller's own capability, so nothing outside the petal whorl
+           inherits the ring). */
+        const hk = tube ? tube.hookFor(L) : null;
+        const p = buildPetalInto(acc, state, d, slot, hk ? { ...(capability || {}), tubeLobe: hk(slot.index) } : capability);
         petalsAll.push(p);
         sites.push({ p, ring: d, slot, cap: capability });
         /* ONE REPORTED PETAL PER DESCRIPTOR — its first slot's. Under the
