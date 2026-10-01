@@ -1011,12 +1011,28 @@ it is wanted).
 5. The holes-vs-ridges STRENGTH question (§3.5) is still unmeasured: nothing has
    been printed. Both ship as a toggle; the coupon is still owed.
 
+**PARKED, NOT FIXED** (Eva's ruling on PR #341, Oct 1 — approved as "good enough for
+now" with the shipped defaults: density 0.1, min cell 1.5 mm, ridge 0.6 mm, border
+1.0 mm). Two items are recorded here so they are scheduled rather than rediscovered:
+
+- **The veins read maze-like / circuit-like.** The main veins are straight segments
+  from the root and the cross-veins step between them at right angles, so a dense
+  HOLES wing reads as a printed circuit rather than a wing. Reference image 1 has main
+  veins FANNING from the root with gentle curvature, and cross-veins meeting the main
+  veins at varied angles. Candidate future controls: a main-vein CURVATURE (a bow in
+  `candidatesTo`, item 2 above — the one place it goes), and a cross-vein ANGLE
+  VARIANCE. Neither is built; both would move every venation row's bytes and want
+  their own sheet beside the reference.
+- **The holes-vs-ridges print strength is still unmeasured** (item 5) and stays so
+  until something is printed. No number in this document is a measurement of a part.
+
 ### 8.8 CI
 
 `bug-gate.yml` runs `verify-bug.mjs --negative-control` then `--seeds 40` on
 pull requests and pushes to `main` that touch `bug.html`, `bug*.js`,
 `tools/verify-bug*.mjs`, `tools/bug-fixtures.mjs` or the workflow. The two flower
-gates that filter on `tools/**` (`flower-export-watertight.yml`,
-`flower-geometry-quality.yml`) carry a NEGATION of `tools/verify-bug*`,
-`tools/bug-*` and `tools/shot-bug-*`, so a bug-only change runs the bug gate and
-nothing else; the bloom gates list their files by name and never matched.
+gates (`flower-export-watertight.yml`, `flower-geometry-quality.yml`) name the tools
+they import rather than `tools/**` (#340, Oct 1 — the negations this PR first carried
+were dropped in the merge as redundant), so a bug-only change runs the bug gate and
+nothing else; the bloom gates list their files by name and never matched. Measured
+on #341's own head: one Actions run fired, `bug-gate`, and neither flower gate.
