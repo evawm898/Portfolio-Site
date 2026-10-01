@@ -2229,6 +2229,130 @@ recovered (0 majors on every clean control). Recorded, not gated.
   xfail with its precondition asserted separately. `TGR_CLIMB_SWEEP=1`
   reprints the sweep.
 
+### downsample2x wale flips: a pixel-anchored mechanism was looked for and not found (2026-10-01)
+
+Diagnosis only, against `main` at `52e25c5`. **Nothing under `analysis/`
+or `tests/` changed**, because the stop-and-report gate did not pass: no
+single pixel-anchored mechanism explains 3 of the 6 fixture flips. This
+section is the negative record so the next session does not re-run the
+same search.
+
+**The premise was "a real periodic structure cannot read the same pixel
+period at half resolution, so something is anchored to pixels."** Measured,
+the premise is false in its strong form. On all six flips (the 70% CLI box,
+orientation vertical) the wale autocorrelation seed HALVES exactly, so the
+0.5x/1x/2x candidate family halves with it and every candidate the native
+run scored is present and scored at half scale:
+
+| fixture | seed px N -> D | family N | family D | winner N -> D | ratio | class |
+|---|---|---|---|---|---|---|
+| real_jersey_sample | 35 -> 18 | 17.5 / **35** / 70 | 9 / 18 / **36** | 1x -> 2x | 2.057 | same-pixel-period |
+| knit_sample_02 | 133 -> 66 | 66.5 / **133** / 266 | 33 / 66 / **132** | 1x -> 2x | 2.159 | same-pixel-period |
+| knit_sample_07 | 61 -> 30 | 30.5 / **61** / 122 | 15 / 30 / **60** | 1x -> 2x | 1.992 | same-pixel-period |
+| sarahmaker (teal) | 38 -> 19 | 19 / 38 / **76** | 9.5 / **19** / 38 | 2x -> 1x | 0.499 | 0.5x flip |
+| knit_sample_06 | 62 -> 31 | 31 / 62 / **124** | 15.5 / **31** / 62 | 2x -> 1x | 0.494 | 0.5x flip |
+| knit_sample_08 | 73 -> 36 | 37 / 74 / **148** | 18 / **36** / 72 | 2x -> 1x | 0.494 | 0.5x flip |
+
+So the "same pixel period" readings are the winner moving ONE STEP UP a
+correctly-halved family (1x -> 2x), and the 0.5x flips are the same step
+taken the other way (2x -> 1x). **All six are one decision — seed vs its
+double — swapping sides**, three each way. The numerical coincidence with
+the native period is what a 1x -> 2x move inside a halved family looks
+like; nothing reads the native number back.
+
+**What decides that pair, term by term** (evidence margin 1x minus 2x,
+each term already multiplied by its `WEIGHTS_UNKNOWN` weight):
+
+| fixture | margin N | margin D | phase_consistency term N | D | largest other term (either run) |
+|---|---|---|---|---|---|
+| jersey | +0.139 | −0.011 | +0.091 | −0.090 | autocorr +0.021 |
+| 02 | +0.259 | −0.071 | +0.161 | −0.127 | alternating_phase +0.046 |
+| 07 | +0.197 | −0.096 | +0.134 | −0.152 | autocorr +0.016 |
+| teal | −0.171 | +0.020 | −0.129 | +0.016 | template_match −0.069 (N only) |
+| 06 | −0.135 | +0.056 | −0.146 | +0.084 | alternating_phase −0.031 |
+| 08 | −0.114 | +0.084 | −0.122 | +0.021 | alternating_phase −0.039 |
+
+`phase_consistency` (weight 0.378) is the only term whose sign reverses on
+all six, and it is the largest single term in 11 of the 12 runs (the
+exception is teal downsampled, where the whole margin is only +0.020). The raw scores are bimodal — the
+same candidate reads ~0.27–0.39 or ~0.60–0.78 depending on where its
+markers land (jersey 1x: 0.630 native, 0.368 downsampled; jersey 2x: 0.389
+-> 0.606).
+
+**Every pixel-expressed constant in the wale path, and whether it binds on
+the deciding pair** (checked on all six, native and downsampled):
+
+| constant | where | binds? |
+|---|---|---|
+| `MIN_PLAUSIBLE_SPACING_PX` 3 | autocorr lag floor, candidate filter, regularity | no — smallest deciding candidate is 18px |
+| `MIN_PHASE_PATCH_PX` 3 | phase patch half-width floor | no — 0.25×c is 4.5–33px on the 1x/2x pair (binds only on some 0.5x candidates, which never win) |
+| `TEMPLATE_MATCH_MIN_PERIOD_PX` 4 | template walk floor | no |
+| `MIN_PATCH_DIM_PX` 24 | consensus patch floor | no — patches are 67px+ and their periods halve (jersey 18/36/35/35 -> 9/18/18/18) |
+| loop-centre `min_separation` floor 3.0, DoG `sigma1` floor 0.8, band floor 3.0 | structural evidence | only on knit_02 native, where the COURSE seed is a 4px sub-feature; the structural term moves the margin by 0.004 there |
+| `MIN_ROI_DIM_FOR_ROTATION_PX` 80, rotation grid ±6° / 1.5° | seed only | ROIs are ≥169px; the chosen angle differs N vs D on 02 and 08, but the seed still halves exactly on both |
+| `GaussianBlur` 3×3, `Sobel` ksize 3, `SMOOTHING_WINDOW_PX` 3 | the 1D signal every term reads, including phase's marker positions | the only candidates left — tested below |
+
+The three filter widths are pixel-sized and DO change relative bandwidth
+under a 2x downsample, so they were tested by counterfactual: give the
+downsampled run the halved filters (no blur, no smoothing — the nearest
+integer kernels to half), or give the native run the doubled ones (blur
+5×5, Sobel 5, smoothing 6). A pixel-anchored filter explains a flip if
+scale-matching it restores ratio 1.0.
+
+| fixture | D with halved filters | N with doubled filters |
+|---|---|---|
+| jersey | **17.3 (ratio 0.99, fixed)** | 35.2 — still flips |
+| 02 | 142.2 — still flips | 129.1 — still flips |
+| 07 | 60.0 — still flips | 60.4 — still flips |
+| teal | 19.4 — still flips | 77.6 — still flips |
+| 06 | 31.1 — still flips | 125.9 — still flips |
+| 08 | 35.5 — still flips | **73.4 (ratio 0.99, fixed)** |
+
+One per direction, and not the same one. **And the same knobs flip the
+decision with no scale change at all**: with every run at smoothing 4
+instead of 3, knit_08's NATIVE reading moves 147.5 -> 73.4; at blur 5×5
+knit_06's downsampled reading moves 31.1 -> 62.7 and the jersey's 36.0 ->
+17.7; at smoothing 2 or 1, knit_02's native wale collapses to 7.9 / 3.9px.
+A one-step change to any of them moves some fixture's seed-vs-double
+decision, so making them scale-relative would reshuffle which fixtures
+flip rather than remove the flips.
+
+**Control: crop_shift flips through the same term with no rescaling at
+all.** On knit_02 the window moved by 1/8 takes the 2x candidate's phase
+consistency 0.27 -> 0.78 (and the 1x's 0.70 -> 0.28); on knit_06 the 1x
+goes 0.26 -> 0.66. That is the same bimodal term deciding the same pair,
+under a transform that changes no scale.
+
+**What the evidence points at instead — scale-relative, recorded, not
+built.** Phase consistency compares patches at the candidate's OWN marker
+positions, and those come from `_detect_peaks(signal, c)` with
+`min_distance = 0.6c`. For the 2x candidate that is 1.2× the seed, so
+`find_peaks` keeps whichever peaks survive a greedy 1.2-seed exclusion —
+measured, the 2x markers' gaps on all six run from **0.6× to 1.6× of the 2x
+candidate** (median 0.8× on the jersey native), i.e. some "adjacent
+repeats" are 1.2 seeds apart, not 2. Whether adjacent 2x markers
+are genuinely one 2x period apart is therefore decided by the boundary
+phase of the peak set, which any transform that moves peaks by a pixel or
+two — a downsample, a 1/8 crop shift, a smoothing width — can change. That is
+consistent with all six downsample flips and the two crop_shift controls
+checked (a hypothesis, not yet tested by changing it), and it is expressed
+entirely in candidate-relative units: it is not a
+pixel anchor, so it was out of this session's remit. The obvious next
+experiment is to place a candidate's phase markers by walking its own
+period from one detected peak (or to phase-average over marker offsets)
+and re-run both invariants plus the scorecard.
+
+**#325 climb sweeps were not re-run** — with no detector change they
+cannot have moved.
+
+Reproduce (scripts kept out of the tree; the essentials): build the 70%
+box, run `analyze_gauge` on the image and on
+`cv2.resize(img, (w//2, h//2), interpolation=cv2.INTER_AREA)` with the box
+halved, and read `result.wale.candidate_details` (`harmonic`,
+`phase_consistency`, `evidence_score`, `selected`). The filter
+counterfactuals monkeypatch `SMOOTHING_WINDOW_PX` and `_enhance_texture`'s
+`GaussianBlur` / `Sobel` sizes.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
