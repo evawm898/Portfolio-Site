@@ -9672,6 +9672,12 @@ is a SKELETON (spines) with a MOLDING PROFILE swept along it; `offsetCurve()` is
 producer of every curve parallel to a spine (the band edges, creases, hatch lines, the sill
 top the jambs stand on, the jamb and head inner edges the lights read); shading is derived
 from the profile's own normal against the registry's one fixed `LIGHT`, never painted. Phase 1
-is the arch only. Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
-quoting a pass from a changed harness; `--no-browser` for iteration). Sheet:
-`node tools/shot-frame-sheet.mjs <dir>`. Neither runs in CI — run both by hand.
+is the arch only; phase 1b carried Eva's rulings on it (intensity 1.00, line weight follows
+darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier
+threshold). Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
+quoting a pass from a changed harness; `--no-browser` for iteration) — **it runs in CI**
+(`frame.yml`, gate plus negative control). Sheet: `node tools/shot-frame-sheet.mjs <dir>`,
+by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
+they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
+runs them — the "adding a tool runs the flower gates" corollary recorded in several
+sections above is history as of Oct 1.

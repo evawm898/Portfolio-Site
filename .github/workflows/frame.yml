@@ -1,0 +1,64 @@
+# /frame gate: node tools/verify-frame.mjs — part one (Node) then part two
+# (Chromium), and the negative control (eleven mutants, part one only) in a
+# second step so a disarmed mutant is a red here rather than a hole nobody
+# runs. Path-scoped to the frame's own files: the frame gate reads nothing
+# else, and (the charter's own point) a frame PR used to trigger the two
+# FLOWER gates through their 'tools/**' filter, which tested flower geometry.
+name: frame
+
+on:
+  pull_request:
+    paths:
+      - frame.html
+      - frame.css
+      - frame.js
+      - frame-registry.js
+      - frame-geometry.js
+      - frame-profile-editor.js
+      - tools/verify-frame.mjs
+      - tools/shot-frame-sheet.mjs
+      - docs/frame-charter.md
+      - .github/workflows/frame.yml
+  push:
+    branches: [main]
+    paths:
+      - frame.html
+      - frame.css
+      - frame.js
+      - frame-registry.js
+      - frame-geometry.js
+      - frame-profile-editor.js
+      - tools/verify-frame.mjs
+      - tools/shot-frame-sheet.mjs
+      - docs/frame-charter.md
+  workflow_dispatch: {}
+
+# A run on a superseded commit is not evidence about the head. Keyed to the
+# workflow AND the ref, so it can never cancel across PRs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Pinned playwright, the same pin every other workflow here carries (see
+      # flower-export-watertight.yml for why the pin exists). The gate imports
+      # playwright-core, which playwright pins and npm hoists.
+      - name: Install render deps (pinned playwright)
+        run: npm i --no-save playwright@1.62.1
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: |
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Frame gate (part one Node, part two Chromium)
+        run: node tools/verify-frame.mjs
+      - name: Negative control (every mutant must redden exactly what it names)
+        run: node tools/verify-frame.mjs --negative-control

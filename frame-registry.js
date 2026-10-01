@@ -10,8 +10,8 @@ export const SECTIONS = [
   { id: 'shading', label: 'Shading', open: true },
 ];
 
-const R = (id, section, label, min, max, step, def, unit = '', visibleWhen = null) =>
-  ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
+const R = (id, section, label, min, max, step, def, unit = '', visibleWhen = null, tier = 'standard') =>
+  ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen, tier });
 
 const hasMullions = (p) => p.mullions > 0;
 
@@ -43,10 +43,21 @@ export const PARAM_SPEC = [
 
   // --- 3. shading — derived from the swept surface's normal against ONE fixed
   //     light (LIGHT below). Intensity scales the darkness; it never paints.
-  R('shadeIntensity', 'shading', 'Intensity', 0, 1, 0.01, 0.65),
+  R('shadeIntensity', 'shading', 'Intensity', 0, 1, 0.01, 1.0),            // 1.00 by ruling (phase 1b, ruling 1)
   R('hatchPitch', 'shading', 'Hatch pitch', 0.5, 3, 0.05, 1.1, 'mm'),
+  // the NOMINAL weight: a hatch line is drawn at lineWeight x hatchWeight(d),
+  // thicker in shade and thinner in light (HATCH_WEIGHT_RANGE below); the
+  // edges stay at a fixed multiple of it.
   R('lineWeight', 'shading', 'Line weight', 0.15, 1.2, 0.05, 0.4, 'mm'),
+  // cross-hatching (lines ACROSS the band) only where the darkness exceeds
+  // this — a deep cove, a shadowed step. ADVANCED tier (ruling 6): hidden
+  // until the panel's Advanced toggle is on, and never a Standard control.
+  R('crossHatchThreshold', 'shading', 'Cross-hatch above', 0, 1, 0.01, 0.7, '', null, 'advanced'),
 ];
+
+/* The two tiers a control may declare. Standard is what the panel opens on;
+   Advanced is reached by one toggle and hides nothing from Standard. */
+export const TIERS = ['standard', 'advanced'];
 
 export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
 
@@ -69,6 +80,16 @@ export const PROFILE_PRESETS = {
   fluted:  [[0, 1], [0.08, 0.35], [0.165, 0.3], [0.25, 0.35], [0.33, 1], [0.41, 0.35], [0.5, 0.3], [0.59, 0.35], [0.67, 1], [0.75, 0.35], [0.835, 0.3], [0.92, 0.35], [1, 1]],
   stepped: [[0, 0.2], [0.24, 0.2], [0.26, 0.55], [0.49, 0.55], [0.51, 0.9], [0.74, 0.9], [0.76, 1.0], [1, 1.0]],
 };
+
+/* Line weight follows darkness (ruling 1): a hatch line's stroke width is
+   lineWeight x (R0 + (R1 - R0) x darkness), so the darkest line is three
+   times the lightest — an engraver's swelling line rather than a plotter's
+   uniform one. Darkness is quantised onto HATCH_WEIGHT_STEPS levels and a
+   line is split where its level changes, so a line running from shade into
+   light swells and thins ALONG its length at that granularity. One owner:
+   frame-geometry's hatchWeight() reads these; nothing restates the law. */
+export const HATCH_WEIGHT_RANGE = [0.5, 1.5];
+export const HATCH_WEIGHT_STEPS = 6;
 
 /* Depth of the profile's own sampling across the band. One owner: the sweep,
    the shading, the crease finder and the editor's drawn curve all read this. */
