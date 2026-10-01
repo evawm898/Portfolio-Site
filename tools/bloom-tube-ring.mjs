@@ -29,13 +29,11 @@
    discovery.md §7 #1): the fused region is ONE SHEET whose cross-section at
    every row passes through every petal MIDRIB at that row, so there are no
    neighbouring margins and nothing can cross by construction. The petals are
-   its lobes. This file builds that ring, in two across-shapes —
-
-     ROUND     a smooth closed curve through the midribs (periodic Catmull-Rom
-               in the axis's own cylindrical coordinates, rho(theta), z(theta))
-     STRAIGHT  the polygon between consecutive midribs (straight chords)
-
-   — at TUBE k = 0 (one periodic sheet) and every divisor k of n (k evenly
+   its lobes. This file builds that ring ROUND — a smooth closed curve through
+   the midribs (periodic Catmull-Rom in the axis's own cylindrical coordinates,
+   rho(theta), z(theta)). STRAIGHT (straight chords between midribs) was DELETED
+   by Eva's ruling on Part C; Parts A/B's STRAIGHT figures reproduce from git
+   history before that commit. — at TUBE k = 0 (one periodic sheet) and every divisor k of n (k evenly
    spaced slits, each panel n/k petals), and measures it. Docs:
    docs/bloom-tube-ring-prototype.md.
 
@@ -77,9 +75,7 @@
 
    DECLARED BLIND SPOTS: RADIAL placement only (refused otherwise); a whorl
    whose petals do not share one ladder is refused (size / form variance);
-   cleft/fringe/lobed petals are not exercised; STRAIGHT's skins are offset
-   along the AVERAGED normal at a crease, so the wall there is cos(pi/n) of
-   the sheet — reported, not mitred.
+   cleft/fringe/lobed petals are not exercised.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -230,7 +226,7 @@ if (isMain) {
       ['tilt 90 x 8', { petalTilt: 90 }], ['tilt 105 x 8', { petalTilt: 105 }], ['tilt 105 x 12', { petalTilt: 105, petalCount: 12 }], ['tilt 120 x 8', { petalTilt: 120 }], ['headRise 1', { headRise: 1 }], ['tilt 75 x curl 360', { petalTilt: 75, petalSpineCurl: 360 }],
       ['tilt 75 x 12 x 3 layers', { petalTilt: 75, petalCount: 12, layerCount: 3 }], ['layers 6', { layerCount: 6 }], ['petalCount 40 x 6 layers', { petalCount: 40, layerCount: 6 }]];
     const res = [];
-    for (const [lab, set] of states) for (const shape of ['ROUND', 'STRAIGHT']) for (const k of [0, 2]) {
+    for (const [lab, set] of states) for (const shape of ['ROUND']) for (const k of [0, 2]) {
       const b = await buildTube(set, { shape, k });
       for (let i = 0; i < b.ringShells.length; i++) {
         const a = attribute(b, i);
@@ -243,7 +239,7 @@ if (isMain) {
     if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(res, null, 1));
     process.exit(0);
   }
-  const shapes = ['ROUND', 'STRAIGHT'];
+  const shapes = ['ROUND'];
   if (argv.includes('--partial')) {
     /* PARTIAL FUSION: the ring to h, free petals above with the blend */
     const out = [];
@@ -257,7 +253,7 @@ if (isMain) {
       out.push(row);
       console.log(`${label.padEnd(30)} ${opt.shape.padEnd(8)} k=${String(opt.k).padEnd(3)} h=${opt.h} tris ${row.plainTris}->${row.tubeTris} (${row.deltaTris >= 0 ? '+' : ''}${row.deltaTris}) ring ${row.ringPairs} petals ${pw} (today ${tw}) bnd ${row.boundary} dir ${row.directed} comps ${row.comps} sinus ${row.sinusMm === null ? '-' : row.sinusMm.toFixed(2)} cross ${row.crossOurs}/${row.crossToday}`);
     };
-    for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const shape of shapes) { if (k === n && shape === 'STRAIGHT') continue; await one2(`petalCount ${n}`, { petalCount: n }, { shape, k, h: 0.4 }); }
+    for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const shape of shapes) { await one2(`petalCount ${n}`, { petalCount: n }, { shape, k, h: 0.4 }); }
     for (const h of H) for (const shape of shapes) for (const k of [0, 1, 4]) await one2('DEFAULT', {}, { shape, k, h });
     for (const h of H) for (const shape of shapes) for (const [lab, set] of [['petalCount 5', { petalCount: 5 }], ['petalCount 12', { petalCount: 12 }],
       ['tilt 60', { petalTilt: 60 }], ['tilt 75', { petalTilt: 75 }], ['tilt 90', { petalTilt: 90 }], ['tilt 105', { petalTilt: 105 }], ['tilt 75 x 5', { petalTilt: 75, petalCount: 5 }],
@@ -313,14 +309,14 @@ if (isMain) {
     const d = await measureTube({}, { shape: 'ROUND', k: 0, tamper: 'detach' }); c.push(['flood fill fires on a ring lifted 40 mm', d.conn.comps > 1, d.conn.comps]);
     const fl = await measureTube({}, { shape: 'ROUND', k: 0, tamper: 'flip' }); c.push(['orientation fires on a ring wound inward', fl.shells[0].inward === 1, fl.shells[0].inward]);
     const h = await measureTube({}, { shape: 'ROUND', k: 0, tamper: 'hole' }); c.push(['boundary census fires on a ring missing one triangle', h.whole.boundary > 0 && h.shells[0].boundary > 0, h.whole.boundary]);
-    const sw = await measureTube({}, { shape: 'STRAIGHT', k: 2, tamper: 'swapRows' }); c.push(['census fires on a folded SLIT panel set (STRAIGHT k 2)', sw.shells[0].within > 0, sw.shells[0].within]);
+    const sw = await measureTube({}, { shape: 'ROUND', k: 2, tamper: 'swapRows' }); c.push(['census fires on a folded SLIT panel set (ROUND k 2)', sw.shells[0].within > 0, sw.shells[0].within]);
     let ok = true; for (const [nm, fired, v] of c) { console.log(`${fired ? 'FIRED ' : 'SILENT'}  ${nm}  (${v})`); ok = ok && fired; }
     console.log(ok ? `CONTROL: all ${c.length} must-fails fired` : 'CONTROL FAILED — an instrument is blind to the failure it exists for');
     process.exit(ok ? 0 : 1);
   }
   const quick = argv.includes('--quick');
   /* 1. the count x k grid at the shipped form */
-  for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const shape of shapes) { if (k === n && shape === 'STRAIGHT') continue; await one(`petalCount ${n}`, { petalCount: n }, { shape, k }); }
+  for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const shape of shapes) { await one(`petalCount ${n}`, { petalCount: n }, { shape, k }); }
   if (!quick) {
     /* 2. the tube range: tilt, at the full tube and one slit */
     for (const t of [60, 75, 90, 105, 120]) for (const n of [5, 8, 12]) for (const shape of shapes) for (const k of [0, 1]) await one(`tilt ${t} x ${n}`, { petalTilt: t, petalCount: n }, { shape, k });

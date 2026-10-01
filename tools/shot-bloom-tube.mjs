@@ -12,6 +12,9 @@
    self-intersection count (each ring shell censused ALONE with
    tools/bloom-self-intersection.mjs), so no cell can quietly carry a fold.
 
+   STRAIGHT IS DELETED (Eva's ruling on Part C): every sheet is ROUND only; the
+   STRAIGHT images already in docs/img are records of earlier rounds.
+
    Sheets — PART C (the default since Eva's rulings on Part B: ROUND only,
    STRAIGHT dropped; h 0.25; the BLEND slider; petal-edge slits):
      tube-c-grid.png    n x k grid at h 0.25, BLEND 0, the new slit edges
@@ -131,11 +134,11 @@ async function strips() {
   const cols = 8;   // two shapes side by side, up to four states each
   const W = cols * S, H = 40 + rowsDef.length * (S + CAPH + 24);
   const out = Buffer.alloc(W * H * 3, 16);
-  text(out, W, H, 8, 8, 'TUBE STRIPS - LEFT ROUND, RIGHT STRAIGHT - EXPORT - SCRATCH PROTOTYPE', [240, 240, 236], 2);
+  text(out, W, H, 8, 8, 'TUBE STRIPS - ROUND - EXPORT - SCRATCH PROTOTYPE', [240, 240, 236], 2);
   for (const [ri, [title, states, camMode]] of rowsDef.entries()) {
     const oy = 40 + ri * (S + CAPH + 24);
     text(out, W, H, 6, oy, title, [240, 200, 120], 1);
-    for (const [si, shape] of ['ROUND', 'STRAIGHT'].entries()) {
+    for (const [si, shape] of ['ROUND'].entries()) {
       let shared = null, ref = null;
       for (const [ci, [nm, set]] of states.entries()) {
         const b = await buildTube(set, { shape, k: 0 });
@@ -163,7 +166,7 @@ async function zoom() {
   text(out, W, H, 8, 8, 'TUBE ZOOM - EXPORT (PRINT PREVIEW) - SLIT EDGE, LOBE JOIN, BASE AT THE HUB - SCRATCH PROTOTYPE', [240, 240, 236], 2);
   const cellsDef = [];
   /* a slit edge: n 8, k 4, at the ring's mid-height, looking straight at the slit */
-  for (const shape of ['ROUND', 'STRAIGHT']) cellsDef.push([`${shape} SLIT EDGE N 8 K 4`, { petalCount: 8 }, { shape, k: 4 }, (b) => {
+  for (const shape of ['ROUND']) cellsDef.push([`${shape} SLIT EDGE N 8 K 4`, { petalCount: 8 }, { shape, k: 4 }, (b) => {
     const rr = b.ringReport[0], r = Math.floor(rr.mids.length * 0.55);
     const n = b.n, D = 2 * Math.PI / n, th0 = Math.atan2(rr.mids[rr.mids.length - 1][0][1], rr.mids[rr.mids.length - 1][0][0]);
     const thS = th0 - D / 2 + 2 * D;   // the slit after panel 0 (m = 2)
@@ -172,7 +175,7 @@ async function zoom() {
     return { dir: norm([Math.cos(thS), Math.sin(thS), 0.7]), up: [0, 0, 1], center: P, halfHeight: 4 };
   }]);
   /* a lobe join: n 5, tilt 60, k 0, at the top row of petal 0 */
-  for (const shape of ['ROUND', 'STRAIGHT']) cellsDef.push([`${shape} LOBE JOIN N 5 TILT 60`, { petalCount: 5, petalTilt: 60 }, { shape, k: 0 }, (b) => {
+  for (const shape of ['ROUND']) cellsDef.push([`${shape} LOBE JOIN N 5 TILT 60`, { petalCount: 5, petalTilt: 60 }, { shape, k: 0 }, (b) => {
     const rr = b.ringReport[0], P = rr.mids[rr.mids.length - 1][0];
     const th = Math.atan2(P[1], P[0]);
     return { dir: norm([Math.cos(th), Math.sin(th), 0.55]), up: [0, 0, 1], center: P, halfHeight: 3 };
@@ -182,7 +185,7 @@ async function zoom() {
      and its midrib), seen 35-45 degrees off that plane — a cutaway, so
      the hub slab, the ring's foot rows inside it and the ring rising out of the
      rim read in one picture. One layer and three. */
-  for (const [nm, set, hh] of [['BASE SLAB N 8', {}, 5], ['BASE SLAB 3 LAYERS', { layerCount: 3 }, 8]]) for (const shape of ['ROUND', 'STRAIGHT']) cellsDef.push([`${shape} ${nm}`, set, { shape, k: 0 }, (b) => {
+  for (const [nm, set, hh] of [['BASE SLAB N 8', {}, 5], ['BASE SLAB 3 LAYERS', { layerCount: 3 }, 8]]) for (const shape of ['ROUND']) cellsDef.push([`${shape} ${nm}`, set, { shape, k: 0 }, (b) => {
     const rr = b.ringReport[0], P = rr.mids[2][0];
     const th = Math.atan2(P[1], P[0]);
     const R = [Math.cos(th), Math.sin(th), 0], Tn = [-Math.sin(th), Math.cos(th), 0];
@@ -223,7 +226,7 @@ async function vsWeb() {
     const fold = w.webWithin.reduce((s, x) => s + x, 0);
     cellsDef.push([`WEB ${round ? 'ROUND' : 'STRAIGHT'} (DISCOVERY S6, BODY T)`, w.pos, `TRIS ${w.bloomTris + w.webTris}  WEB SELF-X ${fold}`, fold, w.bloomTris * 9]);
   }
-  for (const shape of ['ROUND', 'STRAIGHT']) {
+  for (const shape of ['ROUND']) {
     const b = shape === 'ROUND' ? ringR : await buildTube(set, { shape, k: 0 });
     const sic = ringSI(b);
     cellsDef.push([`RING ${shape} (THIS PROTOTYPE)`, b.positions, `TRIS ${b.tubeTris}  RING SELF-X ${sic}`, sic, (b.tubeTris - b.ringReport[0].ringTris) * 9]);
@@ -248,9 +251,9 @@ async function hStrip(file, title, states) {
   text(out, W, H, 8, 8, title, [240, 240, 236], 2);
   for (const [ri, [nm, set]] of states.entries()) {
     const oy = 40 + ri * (S + CAPH + 18);
-    text(out, W, H, 6, oy, `${nm} - LEFT ROUND, RIGHT STRAIGHT - H 0.25 / 0.40 / 0.55 / 0.70 - ONE CAMERA PER ROW`, [240, 200, 120], 1);
+    text(out, W, H, 6, oy, `${nm} - ROUND - H 0.25 / 0.40 / 0.55 / 0.70 - ONE CAMERA PER ROW`, [240, 200, 120], 1);
     let cam = null;
-    for (const [si, shape] of ['ROUND', 'STRAIGHT'].entries()) for (const [hi, h] of HS.entries()) {
+    for (const [si, shape] of ['ROUND'].entries()) for (const [hi, h] of HS.entries()) {
       const b = await buildTube(set, { shape, k: 0, h });
       if (!cam) { const bb = bbox(b.positions); cam = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half }; }
       const si1 = ringSI(b), ps = petalSI(b);
@@ -267,7 +270,7 @@ async function zoomPartial() {
   const out = Buffer.alloc(W * H * 3, 16);
   text(out, W, H, 8, 8, 'TUBE H 0.40 ZOOM - EXPORT (PRINT PREVIEW) - FUSION LINE, SINUS, SLIT', [240, 240, 236], 2);
   const cellsDef = [];
-  for (const shape of ['ROUND', 'STRAIGHT']) {
+  for (const shape of ['ROUND']) {
     /* the fusion line on petal 0: the ring's top row to the blend's end, seen square to the petal */
     cellsDef.push([`${shape} FUSION LINE N 8 H 0.40`, {}, { shape, k: 0, h: 0.4 }, (b) => {
       const g = b.geo[0], bi = b.blendInfo[0], r = Math.round((bi.R1 + bi.bEnd) / 2);
@@ -282,7 +285,7 @@ async function zoomPartial() {
       return { dir: norm([N[0] + 0.4 * Math.cos(th), N[1] + 0.4 * Math.sin(th), N[2] + 0.3]), up: [0, 0, 1], center: P, halfHeight: 6 };
     }]);
   }
-  for (const shape of ['ROUND', 'STRAIGHT']) {
+  for (const shape of ['ROUND']) {
     /* a slit: n 8, k 4, at the ring's mid-height */
     cellsDef.push([`${shape} SLIT N 8 K 4 H 0.40`, {}, { shape, k: 4, h: 0.4 }, (b) => {
       const g = b.geo[0], r = Math.max(3, Math.floor(g.R1 * 0.6)), n = b.n, D = 2 * Math.PI / n;
@@ -449,10 +452,9 @@ if (want('czoom')) await cZoom();
 if (want('cform')) await cForm();
 if (want('hstrip')) await hStrip('tube-partial-h.png', 'TUBE FUSED PARTWAY - THE H STRIP ON THE DEFAULT - EXPORT', [['DEFAULT (N 8)', {}], ['N 5 TILT 60', { petalCount: 5, petalTilt: 60 }]]);
 if (want('hform')) await hStrip('tube-partial-form.png', 'TUBE FUSED PARTWAY - THE PETALS STILL RESPOND ABOVE THE LINE - EXPORT', [['CUP 1.2 (MAX)', { petalCup: 1.2 }], ['ROLL 330 (MAX)', { petalRoll: 330 }], ['TWIST 180 (MAX)', { petalTwist: 180 }]]);
-if (want('pgrid')) { await gridSheet('ROUND', 'tube-partial-round.png', 0.4); await gridSheet('STRAIGHT', 'tube-partial-straight.png', 0.4); }
+if (want('pgrid')) await gridSheet('ROUND', 'tube-partial-round.png', 0.4);
 if (want('pzoom')) await zoomPartial();
 if (want('round')) await gridSheet('ROUND', 'tube-round.png');
-if (want('straight')) await gridSheet('STRAIGHT', 'tube-straight.png');
 if (want('strips')) await strips();
 if (want('zoom')) await zoom();
 if (want('web')) await vsWeb();

@@ -169,9 +169,6 @@ function ringCurve(mids, r, shape) {
     const f = (x - p * D) / D;
     return { p, q: (p + 1) % n, f };
   };
-  if (shape === 'STRAIGHT') {
-    return (phi) => { const { p, q, f } = at(phi); const A = cyl[p].P, B = cyl[q].P; return [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f]; };
-  }
   /* ROUND: periodic Catmull-Rom on (rho, z) against the parameter f, the
      azimuth itself exact (the curve is drawn ROUND the axis) */
   const cr = (a, b, c, d, t) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
@@ -188,7 +185,7 @@ function ringCurve(mids, r, shape) {
 
 /* the ring's row objects for one panel: v -> phi through a piecewise-linear map
    whose breakpoints are the panel's edges and every midrib inside it, so with C
-   columns per sector a column lands on every midrib EXACTLY (STRAIGHT's creases
+   columns per sector a column lands on every midrib EXACTLY (STRAIGHT's creases, deleted by ruling,
    are columns). */
 function panelRows(curves, us, phiOf, tAt, sign) {
   const NR = curves.length;
@@ -220,6 +217,9 @@ function panelRows(curves, us, phiOf, tAt, sign) {
 /* ---------------- one build ---------------- */
 export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true, end = 'nib', perLayerK = null, tamper = null, h = null, blendMm = BLEND_MM, blend = 0, slits = 'edge' } = {}) {
   const G = await geometry();
+  /* ROUND is the only across-shape (Eva's ruling on Part C: STRAIGHT is deleted;
+     Parts A/B's STRAIGHT figures reproduce from git history before this commit) */
+  if (shape !== 'ROUND') throw new Error(`TUBE is ROUND only (asked ${shape}) — STRAIGHT was deleted by ruling`);
   const st = stateOf(set);
   if (st.placement !== 'RADIAL') throw new Error(`TUBE is RADIAL only (asked ${st.placement})`);
   /* the nib entry, the plan's own expression — or the tip, for the control */

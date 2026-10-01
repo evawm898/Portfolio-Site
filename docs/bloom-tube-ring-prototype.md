@@ -30,10 +30,21 @@ otherwise.*
     reproduce.
 - **Slit edges approved.** An edge petal is one panel from the foot to the tip, with its outer half
   the petal's own section (§C4).
-- **Still open:**
-  - the notch's column cost (§C9 #3);
-  - deleting STRAIGHT's code path (§C9 #4);
-  - the mode-dependent notch (§C8b), which belongs to whoever builds this.
+- **The notch's cost (ruled):** skip the notch wherever the open gap between petals is smaller
+  than the edge bead can show. Below that threshold, no notch and no triangles; above it, exactly
+  as built here. **The build session implements it; it is not built in this prototype.**
+- **STRAIGHT (ruled): deleted.** It is gone from `tools/bloom-tube-core.mjs`,
+  `tools/bloom-tube-ring.mjs` and `tools/shot-bloom-tube.mjs`, and `buildTube` refuses any shape
+  but ROUND. Parts A and B's STRAIGHT figures and images reproduce from git history before that
+  commit.
+  - **ROUND is float-identical across the deletion** under `Object.is`, on 10 states: BLEND, slits,
+    live mode, three layers, curl and the ring to the nib.
+  - `tube-c-grid.png` re-renders byte-identical.
+  - The five must-fails all fire. The fifth one (a folded slit panel set) moved from STRAIGHT k 2
+    to ROUND k 2 and reads 24,026 pairs.
+- **Next step (ruled): BUILD.** This PR merges as the reference for the build session. The scratch
+  core is the reference implementation.
+- **Carried to the build session:** the mode-dependent notch (§C8b).
 
 ## C0. The answer
 
