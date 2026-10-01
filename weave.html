@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weave Draft — Eva Maskalenko</title>
+<meta name="description" content="Weave Draft — a parametric four-part weaving draft: threading, tie-up, treadling and a live drawdown, with WIF and SVG export.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="weave.css">
+</head>
+<body>
+
+<!-- THE STAGE: header and draft in one scroller. -->
+<div class="wv-stage" id="stage">
+  <header class="wv-header">
+    <a class="wv-back" href="index.html">&larr; Index</a>
+    <div class="wv-eyebrow">EM / WEAVE</div>
+    <h1>Weave Draft</h1>
+    <p class="wv-sub">&mdash; threading, tie-up, treadling, drawdown. Click or drag on the three grids; the cloth recomputes as you go, and the link in the address bar is the draft.</p>
+  </header>
+  <div class="wv-sheet"><canvas id="draft" aria-label="Weaving draft"></canvas></div>
+</div>
+<div class="wv-drop" id="dropHint" hidden>drop a .wif to load it</div>
+
+<!-- THE PANEL. Every control has an id the gate drives; the readout is the
+     one place the page says what the draft is doing. -->
+<aside class="wv-panel wv-box" aria-label="Draft controls">
+
+  <details class="wv-sec" open>
+    <summary>Structure <span class="wv-val" id="structureVal"></span></summary>
+    <div class="wv-sec-body">
+      <div class="wv-ctrl">
+        <label for="preset">structure preset</label>
+        <select id="preset"><option value="">&mdash; pick one &mdash;</option></select>
+      </div>
+      <div class="wv-ctrl"><label for="shafts">shafts <output id="shaftsOut">4</output></label><input type="range" id="shafts" min="2" max="16" step="1" value="4"></div>
+      <div class="wv-ctrl"><label for="treadles">treadles <output id="treadlesOut">4</output></label><input type="range" id="treadles" min="2" max="16" step="1" value="4"></div>
+      <div class="wv-ctrl"><label for="ends">warp ends <output id="endsOut">32</output></label><input type="range" id="ends" min="8" max="256" step="1" value="32"></div>
+      <div class="wv-ctrl"><label for="picks">picks <output id="picksOut">32</output></label><input type="range" id="picks" min="8" max="256" step="1" value="32"></div>
+    </div>
+  </details>
+
+  <details class="wv-sec" open>
+    <summary>Threading</summary>
+    <div class="wv-sec-body">
+      <div class="wv-row">
+        <button class="wv-btn" id="thStraight" type="button">straight</button>
+        <button class="wv-btn" id="thPoint" type="button">point</button>
+        <button class="wv-btn" id="thWalk" type="button">random walk</button>
+        <button class="wv-btn" id="thClear" type="button">clear</button>
+      </div>
+      <div class="wv-ctrl wv-inline">
+        <label for="walkSeed">walk seed</label>
+        <input type="number" id="walkSeed" min="1" max="99999" step="1" value="7">
+      </div>
+      <p class="wv-hint">one shaft per end: click a cell to thread the end there, click it again to unthread.</p>
+    </div>
+  </details>
+
+  <details class="wv-sec">
+    <summary>Tie-up &amp; treadling</summary>
+    <div class="wv-sec-body">
+      <div class="wv-row">
+        <button class="wv-btn" id="trStraight" type="button">straight</button>
+        <button class="wv-btn" id="trPoint" type="button">point</button>
+        <button class="wv-btn" id="trAsDrawn" type="button">as drawn in</button>
+        <button class="wv-btn" id="trClear" type="button">clear</button>
+      </div>
+      <div class="wv-row">
+        <button class="wv-btn" id="tuClear" type="button">clear tie-up</button>
+      </div>
+      <p class="wv-hint">tie-up marks say which shafts RISE on a treadle. a pick may press more than one treadle.</p>
+    </div>
+  </details>
+
+  <details class="wv-sec">
+    <summary>Colours</summary>
+    <div class="wv-sec-body">
+      <div class="wv-label">warp stripes</div>
+      <div class="wv-stripes" id="warpStripes"></div>
+      <div class="wv-row"><button class="wv-btn wv-btn--small" id="warpAdd" type="button">+ stripe</button></div>
+      <div class="wv-label">weft stripes</div>
+      <div class="wv-stripes" id="weftStripes"></div>
+      <div class="wv-row"><button class="wv-btn wv-btn--small" id="weftAdd" type="button">+ stripe</button></div>
+      <p class="wv-hint">colour × count, repeating across the warp or the weft.</p>
+    </div>
+  </details>
+
+  <details class="wv-sec" open>
+    <summary>View</summary>
+    <div class="wv-sec-body">
+      <div class="wv-ctrl">
+        <label for="viewMode">view</label>
+        <select id="viewMode"><option value="draft">full draft</option><option value="drawdown">drawdown only</option></select>
+      </div>
+      <div class="wv-ctrl wv-bool"><label><input type="checkbox" id="grid" checked> grid</label></div>
+      <div class="wv-ctrl"><label for="cell">cell size <output id="cellOut">12 px</output></label><input type="range" id="cell" min="4" max="24" step="1" value="12"></div>
+      <div class="wv-ctrl wv-bool"><label><input type="checkbox" id="fabric"> fabric render (shaded yarn)</label></div>
+      <div class="wv-ctrl"><label for="yarn">thread width <output id="yarnOut">78%</output></label><input type="range" id="yarn" min="40" max="100" step="1" value="78"></div>
+      <div class="wv-ctrl wv-inline">
+        <label for="maxFloat">long float over</label>
+        <input type="number" id="maxFloat" min="2" max="32" step="1" value="5">
+      </div>
+      <div class="wv-ctrl wv-bool"><label><input type="checkbox" id="warn" checked> highlight long floats</label></div>
+    </div>
+  </details>
+
+  <details class="wv-sec" open>
+    <summary>Export</summary>
+    <div class="wv-sec-body">
+      <div class="wv-row">
+        <button class="wv-btn wv-btn--solid" id="exportSvg" type="button">SVG &darr;</button>
+        <button class="wv-btn wv-btn--solid" id="exportPng" type="button">PNG &darr;</button>
+        <button class="wv-btn wv-btn--solid" id="exportWif" type="button">WIF &darr;</button>
+      </div>
+      <div class="wv-row">
+        <button class="wv-btn" id="copyLink" type="button">copy link</button>
+        <button class="wv-btn" id="resetBtn" type="button">reset</button>
+      </div>
+      <label class="wv-file">import a WIF
+        <input type="file" id="importWif" accept=".wif,text/plain">
+      </label>
+      <p class="wv-hint">or drop a .wif anywhere on the page. SVG and PNG export the view as shown; WIF is the draft.</p>
+    </div>
+  </details>
+
+  <div class="wv-readout" id="readout" aria-live="polite"></div>
+</aside>
+
+<script type="module" src="weave.js"></script>
+</body>
+</html>
