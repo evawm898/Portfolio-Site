@@ -37,8 +37,13 @@ forcing the mark — i.e. the documentation — to be updated):
     mean-of-all-gaps estimator, not detection; see
     _refine_spacing_from_positions); the fine-gauge half-period flip
     (a detection-level confusion, clean image) remains open.
-  * garter, 8x10: wale axis reads the 2x double-period on the bump
-    lattice; course axis is fine at both gauges.
+  * garter, 8x10: wale axis USED TO read the 2x double-period on the bump
+    lattice (clean and degraded) -- FIXED by the leg-slant orientation
+    discriminator (_orientation_fundamental: a bump's two flanks lean
+    opposite ways exactly as a V's two legs do, so the signed orientation
+    repeats at the bump pitch and alternates at its half). Both marks
+    came off the day it shipped, per the strict-xfail contract. Course
+    axis is fine at both gauges.
 
 Tolerance is 5% against the matched truth value: sub-pixel peak
 refinement contributes ~1-2% jitter on 18-36px periods, rendering
@@ -129,13 +134,18 @@ GRID = [
     # --- garter: course may legitimately read the ridge-pair repeat ----
     _case(clean, "garter", 5, 7, "wale"),
     _case(clean, "garter", 5, 7, "course", ok=("primary", "alternate")),
-    _case(clean, "garter", 8, 10, "wale",
-          xfail_reason="fine-gauge garter wale reads the 2x double period on the bump lattice (44.0px vs 22.5 true)"),
+    # Was a strict xfail ("fine-gauge garter wale reads the 2x double
+    # period on the bump lattice (44.0px vs 22.5 true)") until the
+    # leg-slant orientation discriminator landed -- XPASSED the moment it
+    # shipped; see the module docstring.
+    _case(clean, "garter", 8, 10, "wale"),
     _case(clean, "garter", 8, 10, "course", ok=("primary", "alternate")),
     _case(mildly_degraded, "garter", 5, 7, "wale"),
     _case(mildly_degraded, "garter", 5, 7, "course", ok=("primary", "alternate")),
-    _case(mildly_degraded, "garter", 8, 10, "wale",
-          xfail_reason="same 2x double period as the clean fine-gauge garter wale case"),
+    # Was a strict xfail ("same 2x double period as the clean fine-gauge
+    # garter wale case") -- fixed alongside it by the orientation
+    # discriminator.
+    _case(mildly_degraded, "garter", 8, 10, "wale"),
     _case(mildly_degraded, "garter", 8, 10, "course", ok=("primary", "alternate")),
 ]
 
@@ -243,6 +253,24 @@ def _ok_for(structure, axis):
 # Strict xfails, each with its measured reading. Several INHERIT a GRID
 # row's known flip (the spec without the new degradation already fails):
 # they say so, so a fix to the base row shows up as XPASSes here too.
+#
+# RETIRED by the leg-slant orientation discriminator (every one XPASSED
+# the day it shipped and its mark came off in that same change; the
+# readings are kept here as the record of what used to happen):
+#   'mildly_degraded-jersey-8x10-rot3-wale'  -- 3 deg + mild degradation flipped
+#       the fine-gauge wale to the 2x double period (44.2 vs 22.5)
+#   'clean-jersey-8x10-edge0.2-wale'          -- fabric edge over the ROI's right
+#       12.5% flipped the clean fine-gauge wale to the half period (11.2 vs 22.5)
+#   'clean-jersey-8x10-edge0.3-wale'          -- ... right 31%, to the 2x double
+#       period (45.0 vs 22.5)
+#   'mildly_degraded-jersey-8x10-pins8-wale'  -- 8 pins + mild degradation,
+#       2x double period (44.9 vs 22.5)
+#   'mildly_degraded-jersey-8x10-edge0.2-wale' -- edge at 20% + mild degradation,
+#       2x double period (44.0 vs 22.5)
+#   'mildly_degraded-jersey-8x10-edge0.3-wale' -- edge at 30% + mild degradation,
+#       2x double period (44.7 vs 22.5)
+# All six were a T-vs-2T (or T-vs-T/2) decision the intensity-derived
+# evidence could not make and the signed-orientation signal can.
 DEGRADATION_XFAILS = {
     'clean-jersey-8x10-rot3-course':
         '3 deg rotation alone flips the clean fine-gauge course axis to the leg half period (9.0 vs 18.0 projected; unrotated reads 18.0)',
@@ -256,8 +284,6 @@ DEGRADATION_XFAILS = {
         '12 deg + mild degradation: course reads 24.5 vs 26.3 projected (-7%); 3 and 7 deg pass here although the unrotated row flips',
     'mildly_degraded-jersey-8x10-rot0-course':
         "inherits the base row's fine-gauge degraded course half-period flip (reads 8.9 vs 18.0 true); identical spec to the GRID row",
-    'mildly_degraded-jersey-8x10-rot3-wale':
-        '3 deg + mild degradation flips the fine-gauge wale axis to the 2x double period (44.2 vs 22.5; unrotated reads 22.4)',
     'mildly_degraded-jersey-8x10-rot3-course':
         "inherits the base row's fine-gauge degraded course half-period flip (reads 9.0 vs 18.0 true) at 3 deg",
     'mildly_degraded-jersey-8x10-rot7-course':
@@ -278,12 +304,8 @@ DEGRADATION_XFAILS = {
         "inherits the base row's fine-gauge degraded course half-period flip (reads 8.9 vs 18.0 true) under fuzz 1.0",
     'clean-jersey-8x10-y0.2_rulerMM-course':
         'mm ruler band near the ROI top flips the clean fine-gauge course axis to the leg half period (8.9 vs 18.0); the centred band passes',
-    'clean-jersey-8x10-edge0.2-wale':
-        "fabric edge over the ROI's right 12.5% flips the clean fine-gauge wale to the half period (11.2 vs 22.5)",
     'clean-jersey-8x10-edge0.2-course':
         "fabric edge over the ROI's right 12.5% flips the clean fine-gauge course to the half period (8.8 vs 18.0)",
-    'clean-jersey-8x10-edge0.3-wale':
-        "fabric edge over the ROI's right 31% flips the clean fine-gauge wale to the 2x double period (45.0 vs 22.5)",
     'mildly_degraded-jersey-5x7-pins3-course':
         "inherits the base row's seed-7 degraded course half-period flip (reads 12.7 vs 25.7 true) with 3 pins",
     'mildly_degraded-jersey-5x7-pins8-course':
@@ -294,16 +316,10 @@ DEGRADATION_XFAILS = {
         "inherits the base row's seed-7 degraded course half-period flip (reads 12.8 vs 25.7 true) with the edge at 30%",
     'mildly_degraded-jersey-8x10-pins3-course':
         "inherits the base row's fine-gauge degraded course half-period flip (reads 8.9 vs 18.0 true) with 3 pins",
-    'mildly_degraded-jersey-8x10-pins8-wale':
-        '8 pins + mild degradation flip the fine-gauge wale to the 2x double period (44.9 vs 22.5; no pins reads 22.4, 3 pins pass)',
     'mildly_degraded-jersey-8x10-pins8-course':
         "inherits the base row's fine-gauge degraded course half-period flip (reads 8.9 vs 18.0 true) with 8 pins",
-    'mildly_degraded-jersey-8x10-edge0.2-wale':
-        'fabric edge at 20% + mild degradation flips the fine-gauge wale to the 2x double period (44.0 vs 22.5)',
     'mildly_degraded-jersey-8x10-edge0.2-course':
         "inherits the base row's fine-gauge degraded course half-period flip (reads 8.9 vs 18.0 true) with the edge at 20%",
-    'mildly_degraded-jersey-8x10-edge0.3-wale':
-        'fabric edge at 30% + mild degradation flips the fine-gauge wale to the 2x double period (44.7 vs 22.5)',
     'mildly_degraded-jersey-8x10-edge0.3-course':
         "inherits the base row's fine-gauge degraded course half-period flip (reads 9.0 vs 18.0 true) with the edge at 30%",
     'clean-rib1x1-5x7-rulerMM-course':

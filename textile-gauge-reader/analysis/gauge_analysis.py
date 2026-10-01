@@ -97,7 +97,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, replace
-from typing import Callable, List, Literal, Optional, Tuple
+from typing import Callable, Dict, List, Literal, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -393,6 +393,20 @@ PHASE_PATCH_WIDTH_FRACTION = 0.5     # patch width/height around each marker, as
 MIN_PHASE_PATCH_PX = 3               # never extract a narrower patch than this, however small the period
 MIN_MARKERS_FOR_PHASE_EVIDENCE = 3   # need >=3 markers for 1 same-parity pair; fewer -> neutral evidence
 MIN_PATCH_DIM_PX = 24                # a band thinner than this along its collapsed dimension isn't trustworthy
+# The leg-slant dipole (see _orientation_evidence) is read as the MEAN of
+# the field's 2D autocorrelation over a window centred on the candidate's
+# half-lag, in fractions of the candidate period: +/- 1/8 of a period
+# ALONG the axis (inside the half-lag's own lobe, so a pixel-level
+# misplacement of the lag cannot decide the sign) and +/- 1/4 of a period
+# ACROSS it (half a stitch's height: a leg's own extent, before the next
+# row's legs -- which repeat rather than flip -- dilute it). Measured
+# before it shipped: the point sample reads +0.065 / +0.007 on two real
+# wale axes (knit_02, knit_03) where this window reads -0.008 / -0.006,
+# and -0.018 on a rotated course axis (knit_09) where it reads +0.042;
+# widening the across half-width to 1/2 of a period turns a synthetic
+# garter wale axis positive (+0.023 against -0.117 here).
+ORIENTATION_DIPOLE_WINDOW_ALONG = 1.0 / 8.0
+ORIENTATION_DIPOLE_WINDOW_ACROSS = 1.0 / 4.0
 ROTATION_SEARCH_DEG = 6.0            # search +/- this many degrees for small tilt correction
 ROTATION_STEP_DEG = 1.5
 MIN_ROI_DIM_FOR_ROTATION_PX = 80     # skip rotation search on ROIs too small to safely rotate/crop
@@ -439,6 +453,29 @@ class CandidateInfo:
     # (no 2D image, no detected peaks to anchor from), not "neutral
     # evidence of periodicity" like it does for phase_consistency.
     template_match_score: Optional[float] = None
+    # Leg-slant orientation evidence (the wale axis's, by physics -- see
+    # _orientation_signal / _orientation_fundamental; the course axis is
+    # offered it only when the wale axis carries no leg signature, see
+    # analyze_gauge). orientation_repeat
+    # is the SIGNED autocorrelation of the ROI's signed-orientation signal
+    # at this candidate's lag: a V's two legs lean opposite ways, so the
+    # sign ALTERNATES at the leg spacing (negative) and REPEATS at the
+    # stitch pitch (positive). orientation_contrast is that repeat net of
+    # the repeat at the candidate's own half -- the quantity that decides
+    # the wale T-vs-2T question. None where no orientation signal was
+    # supplied.
+    orientation_repeat: Optional[float] = None
+    orientation_contrast: Optional[float] = None
+    # The signed-orientation FIELD's own 2D autocorrelation at half this
+    # candidate's lag along the axis: negative when the leg dipole itself
+    # flips there (a wale axis), positive when only a per-row bias flips
+    # (a course axis seen by the wale detector). See _orientation_evidence.
+    orientation_dipole: Optional[float] = None
+    # True on the one family member the leg-slant signal names as the
+    # stitch pitch (its full alternation signature held -- see
+    # _orientation_fundamental), False on the others, None when the
+    # signal named nobody or was not supplied.
+    orientation_fundamental: Optional[bool] = None
 
 
 @dataclass
@@ -596,9 +633,19 @@ def analyze_gauge(
         rot_course_source = rot_gx if course_direction == "horizontal" else rot_gy
         wale_signal_for_period = _project(rot_wale_source, axis=_COLLAPSE_AXIS[wale_direction])
         course_signal_for_period = _project(rot_course_source, axis=_COLLAPSE_AXIS[course_direction])
+        period_gx, period_gy = rot_gx, rot_gy
     else:
         wale_signal_for_period = wale_signal
         course_signal_for_period = course_signal
+        period_gx, period_gy = gx, gy
+    # The wale axis's leg-slant signal (see _orientation_signal), read
+    # from the same de-tilted gradient pair the period seed reads -- it
+    # decides only WHICH family member is the stitch pitch, never a
+    # position, so like p0 it may come from the rotated crop.
+    orientation_field = _orientation_field(period_gx, period_gy)
+    orientation_ac2d = _two_d_autocorrelation(orientation_field)
+    wale_orientation_signal = _orientation_signal(orientation_field, _COLLAPSE_AXIS[wale_direction])
+    course_orientation_signal = _orientation_signal(orientation_field, _COLLAPSE_AXIS[course_direction])
 
     # Coarse autocorrelation-based period per direction — this seeds the
     # 0.5x/1x/2x candidate family that _analyze_axis_v3 scores below. It
@@ -677,6 +724,7 @@ def analyze_gauge(
         wale_signal, p0_wale, loop_centers, wale_center_axis, wale_band_px,
         ac2d, wale_direction == "horizontal", wale_patch_periods, float(w if wale_direction == "horizontal" else h),
         use_fold_consistency=True, weights=weights, normalized_2d=normalized,
+        orientation_signal=wale_orientation_signal, orientation_ac2d=orientation_ac2d,
     )
 
     # COURSE: selection deliberately uses the older, previously-proven
@@ -699,6 +747,19 @@ def analyze_gauge(
         course_signal, p0_course, loop_centers, course_center_axis, course_band_px,
         ac2d, course_direction == "horizontal", course_patch_periods, float(w if course_direction == "horizontal" else h),
         use_fold_consistency=False, weights=weights, normalized_2d=normalized,
+        # The leg-slant decision belongs to the axis that CARRIES the leg
+        # signature. The user's orientation is authoritative, so while
+        # the labelled wale axis carries it (every unrotated real fixture
+        # here) the course path is left exactly as it was; only when the
+        # labelled wale axis does NOT -- a photo rotated a quarter turn,
+        # where the course detector is looking at the physical wales --
+        # is the course axis offered the signal. Measured before this was
+        # narrowed: offering it to the course axis unconditionally moved
+        # four scorecard course rows by -50% to +95%, because a genuine
+        # course axis can carry a sinusoidal orientation signal at some
+        # period that is not a leg lattice.
+        orientation_signal=(None if any(d.orientation_fundamental for d in wale.candidate_details) else course_orientation_signal),
+        orientation_ac2d=orientation_ac2d,
     )
     course = _analyze_direction(
         course_signal, p0_course, course_p_centers, loop_centers, course_center_axis,
@@ -710,6 +771,23 @@ def analyze_gauge(
             course,
             candidate_details=_reselect_candidate(course_v3_diagnostics.candidate_details, old_selected),
         )
+        # The leg-slant verdict follows the PHYSICAL wale axis, not the
+        # label (see the course_v3_diagnostics call above for when the
+        # course axis is offered the signal at all): a photo rotated a
+        # quarter turn puts the wales under the course detector, where
+        # the seed-as-is path has no T-vs-2T test of its own.
+        course_fundamental = next((d.period_px for d in course.candidate_details if d.orientation_fundamental), None)
+        if course_fundamental is not None and abs(course_fundamental - old_selected) > 1e-6 * max(1.0, old_selected):
+            named = next(d for d in course.candidate_details if d.orientation_fundamental)
+            course = _finalize_axis(
+                course_fundamental, course_signal, loop_centers, course_center_axis, course_p_centers,
+                course.candidates_px,
+                f"Leg-slant orientation decided T vs 2T on this axis: the signed orientation signal repeats at "
+                f"{course_fundamental:.1f}px (repeat {named.orientation_repeat:+.2f}, contrast "
+                f"{named.orientation_contrast:+.2f}) and not at the reconciled {old_selected:.1f}px.",
+                structural_score=0.75,
+                candidate_details=_reselect_candidate(course.candidate_details, course_fundamental),
+            )
 
     wale, course = _cross_check_density(
         wale,
@@ -1741,6 +1819,13 @@ def _cross_check_density(
         margin = scored[0].evidence_score - scored[1].evidence_score
         if margin >= DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN:
             return wale, course  # decisive pick -- density doesn't get a vote
+    # Nor does it get a vote once the leg-slant signal has NAMED the
+    # stitch pitch (see _orientation_fundamental): the harmonic question
+    # density exists to re-ask is then already answered by evidence
+    # that, unlike the loop-center count, does not inherit the leg-scale
+    # bias this docstring describes.
+    if any(d.orientation_fundamental for d in wale.candidate_details):
+        return wale, course
 
     expected_cell_area = roi_area / n
     actual_cell_area = wale.spacing_px * course.spacing_px
@@ -2084,6 +2169,209 @@ def _autocorr_strength_at_lag(signal: np.ndarray, lag: float) -> float:
     return float(np.clip(value, 0.0, 1.0))
 
 
+def _orientation_field(gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
+    """
+    The per-pixel LEG-SLANT field: the signed local orientation relative
+    to the ROI's own mean orientation, energy-weighted (see
+    _orientation_signal for what it is and why). Built from _enhance_
+    texture's own signed Sobel pair through the structure-tensor products
+    J11 = gx^2, J22 = gy^2, J12 = gx*gy: J12's sign is the lean (a "/"
+    edge has gx and gy of opposite sign, a "\" edge the same) and is
+    invariant to the gradient's polarity, so both edges of a leg agree.
+    The mean orientation is the direction of the summed doubled-angle
+    vector (sum J11 - J22, sum 2 J12); the field is E sin(2 (theta -
+    theta_bar)) = 2 J12 cos(2 theta_bar) - (J11 - J22) sin(2 theta_bar),
+    and it sums to exactly zero over the ROI by construction. Anything
+    aligned with the mean orientation -- the wale columns themselves, a
+    ruler's tick marks -- contributes nothing, which is why pins and
+    rulers do not move it.
+    """
+    j11 = gx * gx
+    j22 = gy * gy
+    j12 = gx * gy
+    two_theta_bar = math.atan2(float((2.0 * j12).sum()), float((j11 - j22).sum()))
+    return (2.0 * j12) * math.cos(two_theta_bar) - (j11 - j22) * math.sin(two_theta_bar)
+
+
+def _orientation_signal(field: np.ndarray, collapse_axis: int) -> np.ndarray:
+    """
+    The LEG-SLANT signal for one axis: the leg-slant field (see
+    _orientation_field) collapsed to 1D the way _project collapses an
+    edge image (mean along `collapse_axis`, linear detrend, the same
+    SMOOTHING_WINDOW_PX).
+
+    Why it exists (the wale axis's T-vs-2T question): in plain jersey the
+    two legs of every stitch lean in OPPOSITE directions, and every wale
+    column is mirror-symmetric about its own axis. Intensity is EVEN under
+    that mirror, so an edge signal repeats at the leg spacing T/2 whenever
+    the two legs look alike -- the harmonic trap this project has fought
+    since v0.1. Signed orientation is ODD under the mirror: it changes
+    sign across each wale axis and across each midline between wales, so
+    it repeats only at the full stitch pitch T, and ALTERNATES sign at
+    T/2. Autocorrelating this signal therefore reads positive at T,
+    negative at T/2 and positive again at 2T -- which separates T from
+    both its half and its double, something no even (intensity-derived)
+    term can do. The course axis has no such antisymmetry (a row's left
+    and right legs cancel along it), so this is wale-only by physics.
+    What survives the cancellation on a course axis is a per-row BIAS
+    (flat-knit fabric alternates it row to row), which this projection
+    cannot tell from a leg alternation -- the field's own 2D
+    autocorrelation can, and _orientation_evidence reads both. No
+    threshold anywhere: every decision taken on it is a sign or a
+    comparison (see _orientation_fundamental).
+    """
+    signal = field.mean(axis=collapse_axis).astype(np.float64)
+    signal = detrend(signal, type="linear")
+    if len(signal) > SMOOTHING_WINDOW_PX:
+        signal = uniform_filter1d(signal, size=SMOOTHING_WINDOW_PX)
+    return signal
+
+
+def _signed_autocorr_at_lag(signal: np.ndarray, lag: float) -> Optional[float]:
+    """
+    Normalized 1D autocorrelation at a (possibly fractional) lag, SIGNED.
+    The sibling _autocorr_strength_at_lag clips to [0, 1], which would
+    erase exactly the information the orientation test reads (a negative
+    value at the leg spacing IS the evidence). None when the signal is
+    too short/flat or the lag runs off its end: "couldn't measure", never
+    a number standing in for one.
+    """
+    n = len(signal)
+    if n < 2 * MIN_PLAUSIBLE_SPACING_PX or np.std(signal) < 1e-6 or lag <= 0:
+        return None
+    full_corr = correlate(signal, signal, mode="full")
+    autocorr = full_corr[n - 1 :]
+    if autocorr[0] <= 0:
+        return None
+    autocorr_norm = autocorr / autocorr[0]
+    if lag >= len(autocorr_norm) - 1:
+        return None
+    return float(np.interp(lag, np.arange(len(autocorr_norm)), autocorr_norm))
+
+
+def _signed_2d_window_mean(ac2d: np.ndarray, dx: float, dy: float, half_x: float, half_y: float) -> Optional[float]:
+    """Signed sibling of _sample_2d_support (which clips to [0, 1]): the
+    normalized 2D autocorrelation averaged over the window of half-widths
+    (half_x, half_y) centred on lag (dx, dy), or None where the window
+    runs off the map."""
+    if ac2d.size == 0:
+        return None
+    h, w = ac2d.shape[:2]
+    cy, cx = h / 2.0, w / 2.0
+    zero_lag = ac2d[int(round(cy)), int(round(cx))]
+    if zero_lag <= 0:
+        return None
+    y0, y1 = int(round(cy + dy - half_y)), int(round(cy + dy + half_y))
+    x0, x1 = int(round(cx + dx - half_x)), int(round(cx + dx + half_x))
+    if y0 < 0 or x0 < 0 or y1 > h - 1 or x1 > w - 1:
+        return None
+    return float(ac2d[y0 : y1 + 1, x0 : x1 + 1].mean() / zero_lag)
+
+
+def _orientation_evidence(
+    orientation_signal: np.ndarray,
+    orientation_ac2d: Optional[np.ndarray],
+    lag_dx: bool,
+    candidates: List[float],
+) -> Dict[float, Dict[str, Optional[float]]]:
+    """
+    Per candidate c, what the leg-slant evidence reads at the candidate:
+
+      * the 1D signal's signed autocorrelation at the four stations of
+        the candidate's first two periods -- c/2, c, 3c/2, 2c (`half`,
+        `repeat`, `three_half`, `double`) -- and the CONTRAST r(c) -
+        r(c/2), the repeat at c net of the repeat at its half. On a V
+        lattice of pitch T the signal is a sinusoid at T, so the
+        stations read (-, +, -, +) around T and the contrast is about +2
+        there; around 2T they read (+, +, +, +) (its half is a repeat
+        too, contrast ~0); around T/2 the candidate's own station is
+        negative (contrast ~ -1).
+      * `dipole`: the leg-slant FIELD's own 2D autocorrelation around
+        lag c/2 along the axis (the mean over the ORIENTATION_DIPOLE_
+        WINDOW_* window, in fractions of c). The 1D projection sums the
+        field across the other axis before correlating, so on a course
+        axis the leg dipoles of each row cancel and what is left is a
+        per-row bias, which flat-knit fabric alternates row to row -- a
+        sinusoid the 1D stations cannot tell from a leg alternation. The
+        field's own autocorrelation multiplies BEFORE summing: at half a
+        stitch along a wale axis the dipole itself flips (negative),
+        while at one row along a course axis the dipoles repeat and only
+        the bias flips (positive). Measured over the window: -0.006 to
+        -0.121 on all eleven real wale axes, native and downsampled 2x,
+        against +0.031 to +0.042 on every rotated course axis whose 1D
+        stations passed.
+
+    Every lag is read from the signal/field itself, whether or not it is
+    a family member; a lag that runs off reads None ("couldn't measure").
+    """
+    out: Dict[float, Dict[str, Optional[float]]] = {}
+    for c in candidates:
+        r = _signed_autocorr_at_lag(orientation_signal, c)
+        r_half = _signed_autocorr_at_lag(orientation_signal, c / 2.0)
+        dipole = None
+        if orientation_ac2d is not None:
+            along, across = ORIENTATION_DIPOLE_WINDOW_ALONG * c, ORIENTATION_DIPOLE_WINDOW_ACROSS * c
+            dipole = _signed_2d_window_mean(
+                orientation_ac2d,
+                c / 2.0 if lag_dx else 0.0, 0.0 if lag_dx else c / 2.0,
+                along if lag_dx else across, across if lag_dx else along,
+            )
+        out[c] = {
+            "repeat": r,
+            "half": r_half,
+            "three_half": _signed_autocorr_at_lag(orientation_signal, 1.5 * c),
+            "double": _signed_autocorr_at_lag(orientation_signal, 2.0 * c),
+            "contrast": None if r is None else r - (r_half if r_half is not None else 0.0),
+            "dipole": dipole,
+        }
+    return out
+
+
+def _orientation_fundamental(evidence: Dict[float, Dict[str, Optional[float]]]) -> Optional[float]:
+    """
+    The family member the leg-slant evidence names as the stitch pitch,
+    or None. The member is the one with the LARGEST CONTRAST over the
+    whole family (the contrast peaks at the fundamental: about +2 at T,
+    ~0 at 2T, ~-1 at T/2), and it is named only if it carries the full
+    signature, every term measurable; if that member fails, NOBODY is
+    named. The signature is signs, never a magnitude:
+
+      1. the 1D signal alternates at the member's half and at three
+         halves and repeats at itself and at its double:
+         r(c/2) < 0 < r(c) and r(3c/2) < 0 < r(2c);
+      2. the field's own dipole flips at the half: dipole < 0 (see
+         _orientation_evidence -- a per-row bias alternation on a course
+         axis reads positive there, while a leg alternation reads
+         negative on every real wale axis it was measured on, at native
+         scale and downsampled).
+
+    Why the best member and not the best QUALIFYING member: where the
+    true period's half-station reads a hair positive (+0.006 on a grid
+    of round blobs, whose signed orientation is a quadrupole that the 1D
+    projection cancels; +0.07 on a flat-knit course axis), eliminating
+    it would let its own sub-harmonic -- a marginal repeat that happens
+    to pass the four signs -- be named by default. Abstaining is the
+    honest reading of both.
+
+    On a genuine wale axis the signal is a sinusoid at T strong enough
+    to pass all of it on every real fixture in the scorecard's gate
+    (-0.8 / +0.85 / -0.75 / +0.75 typical at the stations); an axis that
+    carries no leg lattice fails at least one term, which is what lets a
+    caller act on a verdict without a strength threshold.
+    """
+    scored = [(c, e) for c, e in evidence.items() if e["contrast"] is not None]
+    if not scored:
+        return None
+    best, e = max(scored, key=lambda ce: ce[1]["contrast"])
+    vals = (e["half"], e["repeat"], e["three_half"], e["double"], e["dipole"], e["contrast"])
+    if any(v is None for v in vals):
+        return None
+    half, repeat, three_half, double, dipole, contrast = vals
+    if not (half < 0 < repeat and three_half < 0 < double and contrast > 0 and dipole < 0):
+        return None
+    return best
+
+
 def _extract_phase_patch(
     normalized_2d: np.ndarray, position: float, half_width: float, lag_dx: bool
 ) -> Optional[np.ndarray]:
@@ -2249,6 +2537,8 @@ def _score_candidates(
     min_plausible: float,
     weights: ScoringWeights,
     normalized_2d: Optional[np.ndarray] = None,
+    orientation_signal: Optional[np.ndarray] = None,
+    orientation_ac2d: Optional[np.ndarray] = None,
 ) -> Tuple[List[CandidateInfo], float]:
     """
     Score every 0.5x/1x/2x candidate for one axis, combining periodicity
@@ -2273,6 +2563,15 @@ def _score_candidates(
     consistency evidence (see _phase_consistency_evidence) -- optional
     so existing callers/tests that only have the 1D signal still work;
     phase evidence is simply neutral (no signal either way) without it.
+
+    `orientation_signal` (the leg-slant signal, see _orientation_signal)
+    and `orientation_ac2d` (the leg-slant field's 2D autocorrelation) are
+    recorded per candidate as orientation_repeat / orientation_contrast /
+    orientation_dipole / orientation_fundamental for the caller's T-vs-2T
+    decision (_analyze_axis_v3). The evidence is NOT a
+    weighted term of the evidence composite: it decides one question
+    (which family member the sign structure repeats at), by sign, after
+    the composite has ranked the family.
     """
     labeled = _labeled_candidates(p0, min_plausible)
     if not labeled:
@@ -2281,6 +2580,11 @@ def _score_candidates(
     harmonic_of = dict(labeled)
 
     autocorr_scores: dict = {c: _autocorr_strength_at_lag(signal, c) for c in candidates}
+    orientation = (
+        _orientation_evidence(orientation_signal, orientation_ac2d, lag_dx, candidates)
+        if orientation_signal is not None else {}
+    )
+    orientation_pick = _orientation_fundamental(orientation) if orientation else None
 
     per_candidate: dict = {}
     for c in candidates:
@@ -2351,6 +2655,10 @@ def _score_candidates(
             phase_consistency=round(per_candidate[c]["phase_consistency"], 3),
             alternating_phase_score=round(per_candidate[c]["alternating_phase"], 3),
             template_match_score=round(per_candidate[c]["template_match"], 3),
+            orientation_repeat=(None if orientation.get(c, {}).get("repeat") is None else round(orientation[c]["repeat"], 3)),
+            orientation_contrast=(None if orientation.get(c, {}).get("contrast") is None else round(orientation[c]["contrast"], 3)),
+            orientation_dipole=(None if orientation.get(c, {}).get("dipole") is None else round(orientation[c]["dipole"], 3)),
+            orientation_fundamental=(None if orientation_pick is None else (c == orientation_pick)),
         )
         for c in candidates
     ]
@@ -2538,6 +2846,8 @@ def _analyze_axis_v3(
     use_fold_consistency: bool,
     weights: ScoringWeights,
     normalized_2d: Optional[np.ndarray] = None,
+    orientation_signal: Optional[np.ndarray] = None,
+    orientation_ac2d: Optional[np.ndarray] = None,
 ) -> AxisResult:
     """
     v0.3 entry point for analyzing one axis (wale or course): generate
@@ -2568,7 +2878,7 @@ def _analyze_axis_v3(
     candidate_details, instability = _score_candidates(
         p0, signal, center_median, center_consistency, ac2d, lag_dx,
         patch_periods, roi_extent_px, use_fold_consistency, MIN_PLAUSIBLE_SPACING_PX, weights,
-        normalized_2d=normalized_2d,
+        normalized_2d=normalized_2d, orientation_signal=orientation_signal, orientation_ac2d=orientation_ac2d,
     )
     # Ranked (and the winner picked) by evidence_score, not final_score --
     # see _score_candidates for why the harmonic penalty must not decide
@@ -2614,11 +2924,53 @@ def _analyze_axis_v3(
             best = next(d for d in candidate_details if d.selected)
             ranked = [best] + [d for d in sorted(candidate_details, key=_rank_key, reverse=True) if d is not best]
 
+    # LEG-SLANT T-vs-2T DECISION (it runs AFTER the climb and has the
+    # last word; the course path applies the same verdict to its own
+    # pick in analyze_gauge, so the decision follows the PHYSICAL wale
+    # axis whichever axis the caller labelled it). Every evidence term above is
+    # derived from intensity, which is EVEN under the mirror symmetry of
+    # a wale column, so none of them can tell the stitch pitch T from a
+    # leg lattice whose two legs look alike (T/2), nor from 2T, which is
+    # as genuine a repeat as T. Signed orientation is ODD under that
+    # mirror (see _orientation_signal): it alternates at T/2 and repeats
+    # at T, so the family member whose orientation contrast peaks -- with
+    # its own repeat positive -- is the stitch pitch. Both conditions are
+    # signs; nothing here is a tuned threshold. Measured on the shipped
+    # rule (README, "A wale T-vs-2T discriminator from leg-slant
+    # alternation"): it names the truth's family member on 60 of 63
+    # synthetic wale specs and abstains on the other 3, on all 7 #329
+    # lattice-failure synthetics, and on 7 of 7 scorecard wale rows with
+    # truth in the family (knit_02's pinned ROI abstains; every row names
+    # it at the 70% box), reading +0.8 / -0.8 at T and T/2 on real photos.
+    # When it names no member, the composite's pick stands.
+    orientation_moved_from = None
+    if orientation_signal is not None:
+        fundamental = next((d.period_px for d in candidate_details if d.orientation_fundamental), None)
+        if fundamental is not None and abs(fundamental - best.period_px) > 1e-6 * max(1.0, best.period_px):
+            orientation_moved_from = best
+            if climbed_from is not None:
+                # The climb moved the pick on template evidence the
+                # orientation signal now contradicts: the climb is undone
+                # rather than stacked, so the record names ONE decision.
+                climbed_from = None
+            candidate_details = _reselect_candidate(candidate_details, fundamental)
+            best = next(d for d in candidate_details if d.selected)
+            ranked = [best] + [d for d in sorted(candidate_details, key=_rank_key, reverse=True) if d is not best]
+
     runner_up = ranked[1] if len(ranked) > 1 else None
 
     uncertain = runner_up is not None and (_rank_key(best) - _rank_key(runner_up)) < UNCERTAIN_SCORE_MARGIN
     uncertain_reason = None
-    if uncertain and climbed_from is not None:
+    if uncertain and orientation_moved_from is not None:
+        uncertain_reason = (
+            f"Selected {best.period_px:.1f}px ({best.harmonic}) over the higher-scoring "
+            f"{orientation_moved_from.period_px:.1f}px ({orientation_moved_from.harmonic}, "
+            f"{_rank_key(orientation_moved_from):.2f} vs {_rank_key(best):.2f} evidence): the stitch legs' "
+            f"lean repeats at {best.period_px:.1f}px (orientation contrast {best.orientation_contrast:+.2f}) and "
+            f"not at {orientation_moved_from.period_px:.1f}px ({orientation_moved_from.orientation_contrast:+.2f}) "
+            f"— manual verification recommended."
+        )
+    elif uncertain and climbed_from is not None:
         uncertain_reason = (
             f"Selected {best.period_px:.1f}px ({best.harmonic}) over the higher-scoring "
             f"{climbed_from.period_px:.1f}px ({climbed_from.harmonic}, {_rank_key(climbed_from):.2f} vs "
@@ -2648,6 +3000,13 @@ def _analyze_axis_v3(
             f" Climbed from the evidence winner {climbed_from.period_px:.1f}px: its 2D template walk failed "
             f"({climbed_from.template_match_score:.2f}, mirror-image leg patches) while "
             f"{best.period_px:.1f}px walked ({best.template_match_score:.2f})."
+        )
+    if orientation_moved_from is not None:
+        reason += (
+            f" Leg-slant orientation decided T vs 2T: the signed orientation signal repeats at "
+            f"{best.period_px:.1f}px (repeat {best.orientation_repeat:+.2f}, contrast {best.orientation_contrast:+.2f}) "
+            f"and not at the evidence winner {orientation_moved_from.period_px:.1f}px "
+            f"(repeat {orientation_moved_from.orientation_repeat:+.2f}, contrast {orientation_moved_from.orientation_contrast:+.2f})."
         )
 
     return _finalize_axis_v3(

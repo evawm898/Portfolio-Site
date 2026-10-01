@@ -2492,6 +2492,247 @@ fixes 03 and 08 would break 06. A T-vs-2T term for the wale scorer needs
 evidence the template walk does not carry (the walk is also blind under
 rotation), so the period-locked markers of #329 still cannot ship.
 
+### A wale T-vs-2T discriminator from leg-slant alternation: gate passed, shipped as configuration A (2026-10-01)
+
+Follows the three records above. Baseline `main` at `2f862fe`. **This is the
+first change under `analysis/` in this series**: the leg-slant orientation
+discriminator ships in `_analyze_axis_v3` (configuration A of the brief), the
+0.378 `phase_consistency` weight is untouched, and #329's period-locked
+markers were tried again on top of it (configuration B) and failed acceptance
+for the same three reasons #329 recorded.
+
+**The idea, in one textile sentence.** In plain jersey the two legs of every
+stitch lean in opposite directions, and every wale column is mirror-symmetric
+about its own axis. Intensity is EVEN under that mirror, so an edge signal
+repeats at the leg spacing T/2 whenever the two legs look alike -- the
+harmonic trap every record above fought with even (intensity-derived)
+evidence. Signed orientation is ODD under the mirror: it changes sign across
+each wale axis and across each midline between wales, so it repeats only at
+the full stitch pitch T and ALTERNATES sign at T/2. Its autocorrelation reads
+positive at T, negative at T/2 and positive again at 2T, which separates T
+from its half AND from its double -- the decision #331 showed the template
+walk cannot make (knit_06's 64 and 128 both walk at 0.68 / 0.69).
+
+**Phase 1 -- the measurement, and what the construction is.** Built from
+existing parts: `_enhance_texture`'s signed Sobel pair on the de-tilted crop
+`_normalize_rotation` already produces for the period seed; the
+structure-tensor products J11 = gx^2, J22 = gy^2, J12 = gx*gy (J12's sign is
+the lean and is invariant to the gradient's polarity, so both edges of a leg
+agree); the ROI's mean orientation as the direction of the summed
+doubled-angle vector; the per-pixel field E sin(2(theta - theta_bar)), which
+sums to exactly zero over the ROI by construction and to which anything
+aligned with the wale axis -- the columns themselves, ruler ticks -- contributes
+nothing; collapsed to 1D exactly as `_project` collapses an edge image, and
+read with the signed autocorrelation at a lag (the shipped
+`_autocorr_strength_at_lag` clips to [0, 1], which would erase the evidence).
+No threshold: every decision is a sign or a comparison.
+
+Five variants were measured over the #331 case set (63 synthetic wale specs =
+every GRID / rotation / fuzz / overlay wale row with a single primary truth,
+rib excluded, plus ply-twist and the #325 climb precondition; the 7 #329
+lattice-failure synthetics; the 8 scorecard wale rows at the pinned ROI and at
+the 70% box). "Truth's member" is the family member nearest the truth within
+the scorer's own `HARMONIC_MATCH_LOG_TOLERANCE` (#331's 5% tolerance would
+have dropped the jersey and teal, whose accepted readings are 8% and 12% off
+truth). A case passes when the member named is the truth's; the contrast
+S(c) = r(c) - r(c/2) is the statistic (about +2 at T, ~0 at 2T, ~-1 at T/2):
+
+| variant | synthetic | #329 lattice | scorecard pinned (excl. knit_02) |
+|---|---|---|---|
+| 1D on the de-tilted crop (what ships) | **63 / 63** | 7 / 7 | **7 / 7** (and knit_02's nearest member, 264) |
+| 1D on the raw crop (no de-tilt) | 60 / 63 | 7 / 7 | 7 / 7 |
+| 1D, coherence-normalised instead of energy-weighted | 60 / 63 | 7 / 7 | 7 / 7 |
+| 2D autocorrelation of the field, sampled on the axis | 63 / 63 | 7 / 7 | 7 / 8 |
+| 2D with a +/-12 deg orthogonal search | 63 / 63 | 7 / 7 | 7 / 8 |
+
+The 1D de-tilted signal is a clean sinusoid at T on every real wale axis.
+At the four stations T/2, T, 3T/2, 2T (70% box): jersey -0.84 / +0.86 / -0.77
+/ +0.79; teal -0.91 / +0.87 / -0.78 / +0.73; knit_01 -0.87 / +0.91 / -0.82 /
++0.85; knit_05 -0.69 / +0.83 / -0.64 / +0.74; **knit_06 -0.88 / +0.83 / -0.74
+/ +0.70 at T = 124 -- i.e. r(62) = -0.88 against r(124) = +0.83, where #331's
+walk read 0.68 against 0.69**; knit_07 -0.82 / +0.85 / -0.78 / +0.80; knit_08
+-0.78 / +0.84 / -0.71 / +0.76; knit_09 -0.66 / +0.79 / -0.70 / +0.64; the
+weak ones are knit_04 -0.45 / +0.53 / -0.32 / +0.27, knit_02 -0.40 / +0.40 /
+-0.22 / +0.11 and knit_03 -0.24 / +0.17 / -0.19 / +0.23. The signal's own
+`_autocorrelation_spacing` seed lands on T on 9 of 11 fixtures (knit_02's is
+the 4px soft-focus sub-feature, knit_03's is 2T).
+
+**The gate passed** on that measurement (every scorecard row with truth in the
+family, 100% of the synthetic specs), so Phase 2 ran. **knit_02 is excluded as
+the brief allows**: its truth (~297px) is 11% outside its family (264 nearest),
+so no member IS the truth; the discriminator names the nearest member at the
+70% box and abstains on the pinned ROI (see below).
+
+**Phase 2 -- what shipped (configuration A), and the measurement that forced
+each clause.** `_orientation_field` / `_orientation_signal` /
+`_signed_autocorr_at_lag` / `_orientation_evidence` /
+`_orientation_fundamental` in `analysis/gauge_analysis.py`; the per-candidate
+record carries `orientation_repeat`, `orientation_contrast`,
+`orientation_dipole` and `orientation_fundamental` (also on the API's
+`CandidateOut`). The decision runs in `_analyze_axis_v3` AFTER the leg-lattice
+climb and has the last word; the member named is reselected, the result is
+flagged uncertain with a reason naming both candidates' readings, and a climb
+the orientation contradicts is undone rather than stacked. The first cut was
+the two-sign rule (r(c) > 0, largest contrast). It passed the scorecard and
+took the metamorphic flips 18 -> 9, and failed acceptance five ways; each
+clause below is what one of those failures cost, measured rather than
+designed:
+
+* **The signature is the four stations of the first two periods** -- r(c/2) <
+  0 < r(c), r(3c/2) < 0 < r(2c), every one measurable. The wale detector
+  pointed at a PHYSICAL COURSE AXIS (the rotate90 invariant) reads noise of
+  either sign there and named 148 on the jersey (+0.17) and 304 on knit_08
+  (+0.05); both fail at least one station (jersey's 3T/2 reads +0.07, knit_08's
+  2T -0.01).
+* **The density cross-check defers to a named fundamental.** On knit_04's
+  crop-shifted window the orientation named 64 with contrast +0.73 on both
+  windows and the density override put the shifted one back to 32; the
+  loop-center count inherits the leg-scale bias that docstring already
+  describes, so once the harmonic question is answered by evidence that does
+  not, density gets no vote.
+* **The course path is offered the signal ONLY when the wale axis carries no
+  leg signature.** Two rotate90/course cells (knit_02, knit_04) went ok ->
+  flip because the wale baseline moved toward truth while the seed-as-is
+  course path, looking at the physical wales, stayed on the sub-feature.
+  Offering the course axis the signal UNCONDITIONALLY was measured and
+  refuted: four scorecard course rows moved by -49.8%, -75.5%, +94.8% and
+  -47.8% (jersey, knit_01, knit_06, knit_08), because a genuine course axis
+  can carry a sinusoidal orientation signal at some period that is not a leg
+  lattice. Under exclusivity the course path is untouched on every unrotated
+  real fixture (all eleven wale axes carry the signature) and gets the
+  decision exactly where the physical wales are under it.
+* **The dipole term.** The 1D projection sums the field across the other axis
+  BEFORE correlating, so on a course axis each row's leg dipoles cancel and
+  what survives is a per-row bias, which flat-knit fabric alternates row to
+  row: the jersey's physical course axis reads a clean sinusoid at 2 rows
+  (-0.22 / +0.53 / -0.18 / +0.50 at 49px), passing all four stations, and
+  the pinned `test_jersey_invariant[rotate90-wale]` went red. The field's own
+  2D autocorrelation multiplies BEFORE summing: at half a stitch along a wale
+  axis the dipole itself flips (negative), at one row along a course axis the
+  dipoles repeat and only the bias flips (positive). Read at a point it was
+  noise-limited (knit_02 +0.065, knit_03 +0.007 on real wale axes; knit_09's
+  rotated course axis -0.018), so it is the MEAN over a window of +/-1/8 of
+  the period along the axis and +/-1/4 across (`ORIENTATION_DIPOLE_WINDOW_*`,
+  the one new constant pair, candidate-relative): -0.006 to -0.121 on all
+  eleven real wale axes at native scale AND downsampled 2x, +0.031 to +0.042
+  on every rotated course axis whose 1D stations passed. Widening the across
+  half-width to 1/2 of a period turns a synthetic garter wale axis positive
+  (+0.023 against -0.117), which is the next row's legs -- which repeat --
+  diluting the flip.
+* **The member named is the LARGEST-CONTRAST member or nobody.** The first
+  rule named the best QUALIFYING member, and that let a sub-harmonic in by
+  elimination wherever the true period's half-station read a hair positive:
+  +0.006 on `test_loop_center_detection`'s blob grid (a round blob's signed
+  orientation is a quadrupole, which the 1D projection cancels) and +0.07 on
+  knit_09's rotated course axis (one row against +0.54 at two). A repeat-vs-
+  double comparison fixed those two and blocked knit_03 at native scale
+  (r(142) 0.17 against r(284) 0.23) while passing it downsampled, which turned
+  knit_03's downsample2x/wale cell ok -> flip; abstaining when the best member
+  fails the signature fixes all three with no comparison at all.
+
+**Configuration B** (A plus `_lattice_markers` -- an exact lattice at the
+candidate spacing phased by the circular mean of the detected peaks, fed to
+`_phase_consistency_evidence` -- plus the density override confined to
+candidates within `DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN` of the top): scorecard
+identical, metamorphic totals identical to A (it fixes knit_05 rotate90/wale
+where A fixes knit_02 downsample2x/wale), climb sweep identical, and **three
+genuinely new test failures**, the same three #329 named: `test_still_
+overrides_a_genuinely_ambiguous_evidence_scorer_pick` (the density
+confinement), `test_false_climb_precondition_correct_winner_fails_its_walk_
+under_rotation` and `test_knit_05_climbs_off_the_leg_lattice` (66px is selected
+directly, so the "climbed from" pin has nothing to read). A newly failing test
+is a blocker, so A ships and B is restored from its snapshot byte for byte.
+
+**Phase 1 as the SHIPPED rule reads it** (the record above was the discovery
+harness; this is `orientation_fundamental` off the shipped candidate record,
+so the abstentions are the real ones):
+
+| set | PASS | ABSTAIN | FAIL |
+|---|---|---|---|
+| synthetic wale specs (63, every one with truth in family) | **60** | 3 | 0 |
+| #329 lattice-failure synthetics (7) | **7** | 0 | 0 |
+| scorecard wale rows, pinned ROI, knit_02 excluded (7) | **7** | 0 | 0 |
+| scorecard wale rows, pinned ROI, all (8) | 7 | 1 (knit_02) | 0 |
+| scorecard wale rows, 70% box, all (8) | **8** | 0 | 0 |
+
+The three synthetic abstentions are `mildly_degraded-jersey-8x10-rot12`
+(r(23) = +0.23 but its half +0.15: 7.5 deg of residual tilt past the +/-6 deg
+de-tilt search smears the projection), `clean-garter-5x7-rot12` (r(35) =
+-0.00) and `clean-garter-5x7-fuzz1` (its 3T/2 station); all three read
+correctly on the shipped tree regardless. Every rotation row at 0 / 3 / 7 deg
+passes, 12 deg passes on jersey 5x7 clean and degraded, jersey 8x10 clean and
+the climb precondition (23.0 named with r +0.41, contrast +0.60, dipole
+-0.090). knit_02's pinned ROI abstains at 264 (dipole -0.005 but a station
+fails) and its 70% box names 266 (r +0.40, contrast +0.80, dipole -0.008).
+
+**Acceptance, configuration A, all measured on the shipped tree:**
+
+* **Scorecard: all 15 rows identical to `main` to the digit**, knit_05
+  included. knit_02 wale stays at +120.4% on its pinned ROI (the strict xfail
+  stands; the 70% box reads 284.2px, -4.2%).
+* **Metamorphic sweep** (11 fixtures, the CLI's 70% box, bold = changed from
+  `main`): harmonic flips **18 -> 4**, lost 13 -> 13, **0 cells ok -> flip /
+  lost, 14 cells flip / drift -> ok**. Two further changes are neither: knit_02
+  half_roi/wale ok -> skipped (the baseline now reads 284px, under the
+  five-period floor) and knit_03 half_roi/wale skipped -> drift (1.407; the
+  baseline now reads 142, the tape-measure pitch, so the half window spans
+  enough periods to run).
+
+| fixture | resize/wale | resize/course | rotate90/wale | rotate90/course | mirror/wale | mirror/course | half_roi/wale | half_roi/course | jpeg60/wale | jpeg60/course | downsample2x/wale | downsample2x/course | crop_shift/wale | crop_shift/course |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| knit_sample_01 | ok (1.000) | drift (1.040) | harmonic_flip (0.501) | ok (1.000) | ok (1.000) | ok (0.998) | ok (0.982) | lost (6.547) | ok (1.000) | ok (0.994) | ok (0.997) | skipped | ok (1.000) | ok (1.012) |
+| knit_sample_02 | lost (0.014) | ok (1.008) | ok (0.998) | ok (1.001) | ok (1.001) | ok (1.000) | **skipped** | lost (80.806) | ok (1.001) | ok (1.002) | **ok (1.018)** | skipped | **ok (0.960)** | ok (1.003) |
+| knit_sample_03 | lost (0.055) | lost (0.134) | harmonic_flip (0.494) | **ok (1.000)** | ok (1.001) | drift (1.018) | **drift (1.407)** | lost (15.679) | ok (0.998) | ok (1.000) | ok (0.978) | lost (6.796) | **ok (1.003)** | lost (3.538) |
+| knit_sample_04 | ok (0.995) | ok (0.993) | harmonic_flip (0.514) | ok (1.000) | ok (1.000) | ok (1.002) | ok (1.020) | ok (1.036) | ok (0.988) | ok (1.010) | ok (0.990) | skipped | ok (0.995) | ok (1.008) |
+| knit_sample_05 | ok (1.000) | ok (0.984) | harmonic_flip (1.966) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.978) | lost (0.259) | ok (1.001) | ok (0.999) | ok (0.995) | ok (1.016) | ok (1.002) | ok (1.040) |
+| knit_sample_06 | ok (0.994) | drift (1.125) | ok (1.000) | **ok (1.000)** | ok (1.000) | ok (1.000) | ok (1.015) | drift (1.148) | ok (1.001) | drift (1.081) | **ok (0.998)** | drift (1.052) | **ok (0.996)** | drift (1.066) |
+| knit_sample_07 | ok (0.989) | lost (0.216) | lost (0.108) | ok (1.000) | ok (1.000) | ok (1.008) | ok (1.009) | drift (0.664) | ok (0.999) | lost (0.222) | **ok (1.001)** | ok (1.000) | ok (0.995) | drift (1.359) |
+| knit_sample_08 | **ok (0.989)** | drift (0.928) | ok (1.000) | **ok (1.000)** | ok (1.000) | ok (1.000) | **ok (0.966)** | skipped | ok (1.000) | ok (1.000) | **ok (0.993)** | drift (0.947) | **ok (1.003)** | ok (0.953) |
+| knit_sample_09 | ok (1.003) | ok (0.998) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.990) | ok (1.012) | ok (1.019) | ok (1.000) | ok (0.985) | ok (0.980) | ok (1.040) | ok (0.983) | lost (3.365) |
+| real_jersey_sample | ok (0.998) | ok (1.021) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.019) | skipped | ok (0.994) | ok (1.000) | **ok (1.011)** | ok (1.007) | ok (1.009) | ok (1.021) |
+| sarahmaker-knitting-gauge | **ok (0.997)** | ok (1.020) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.019) | ok (0.936) | ok (1.000) | ok (0.986) | **ok (1.000)** | ok (0.994) | ok (0.977) | ok (0.951) |
+
+  Totals: ok 104 -> 119, drift 12 -> 12, harmonic_flip 18 -> 4, lost 13 ->
+  13, skipped 7 -> 6. All six downsample2x wale flips of the harness record
+  are gone, both crop_shift wale flips that remained after #329 are gone, and
+  the four remaining wale flips are all rotate90/wale (knit_01, 03, 04, 05) --
+  the wale detector on a physical course axis, where the discriminator now
+  correctly abstains and the pre-existing composite reads what it read.
+* **Nine strict xfails XPASSED and their marks came off in this change**,
+  readings kept beside them: GRID `clean-garter-8x10-wale` and
+  `mildly_degraded-garter-8x10-wale` (a bump's two flanks lean opposite ways
+  exactly as a V's legs do); `mildly_degraded-jersey-8x10-rot3-wale`,
+  `clean-jersey-8x10-edge0.2-wale`, `clean-jersey-8x10-edge0.3-wale`,
+  `mildly_degraded-jersey-8x10-pins8-wale`, `mildly_degraded-jersey-8x10-
+  edge0.2-wale`, `mildly_degraded-jersey-8x10-edge0.3-wale` (every one a
+  T-vs-2T or T-vs-T/2 decision); and `test_climb_never_fires_on_an_already_
+  correct_winner` -- the #325 false climb at 12 deg is undone, with its
+  precondition still pinned because it is what makes the undo necessary.
+* **No newly failing test.** pytest: 415 passed, 2 skipped, 37 xfailed
+  (406 / 2 / 46 on `main`).
+* **#325 climb sweep** (`TGR_CLIMB_SWEEP=1`): 300 renders, **fired 0 / 0 true /
+  0 false** against `main`'s 6 / 0 / 6.
+
+**What it does not do, said plainly.** The 12 deg rotation rows outside the
+de-tilt search's +/-6 deg are where the 1D projection degrades (two
+abstentions above); the 2D variants handle them in the discovery table and
+were not shipped, because their point-sampled magnitudes on real photos are
+0.05-0.3 against the 1D signal's 0.8. knit_02's pinned ROI still reads the
+134.7px sub-feature. The course path keeps its seed-as-is selection on every
+unrotated photo by construction. The remaining rotate90/wale flips are the
+wale detector reading a physical course axis with no leg signature; the
+discriminator's job there is to abstain, which it does. `ORIENTATION_DIPOLE_
+WINDOW_ALONG` / `_ACROSS` (1/8, 1/4) are the one new constant pair; they are
+fractions of the candidate period, not pixels, and the sensitivity table that
+chose them is above.
+
+Reproduce: `python tests/test_ground_truth_scorecard.py`; the sweep is
+`tests/metamorphic.py` on each fixture at its default box; the Phase 1 table
+is `analyze_gauge` over the case set reading `orientation_fundamental` /
+`orientation_repeat` / `orientation_contrast` / `orientation_dipole` off
+`result.wale.candidate_details` (scripts kept out of the tree, as the records
+above do).
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
