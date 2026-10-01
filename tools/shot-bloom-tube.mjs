@@ -1,7 +1,7 @@
 /* ===================================================================
    SCRATCH PROTOTYPE SHEETS — THE CLOSED-RING TUBE. NOT SHIPPED.
 
-     node tools/shot-bloom-tube.mjs <outDir> [--only hstrip,hform,pgrid,pzoom,round,straight,strips,zoom,web]
+     node tools/shot-bloom-tube.mjs <outDir> [--only cgrid,cblend,czoom,cform,hstrip,hform,pgrid,pzoom,round,straight,strips,zoom,web]
 
    Renders the scratch ring of tools/bloom-tube-ring.mjs (read its header for
    what is patched and why) through tools/bloom-soft-render.mjs, which is
@@ -12,7 +12,17 @@
    self-intersection count (each ring shell censused ALONE with
    tools/bloom-self-intersection.mjs), so no cell can quietly carry a fold.
 
-   Sheets — PARTIAL FUSION (the default since Eva's ruling on #323):
+   Sheets — PART C (the default since Eva's rulings on Part B: ROUND only,
+   STRAIGHT dropped; h 0.25; the BLEND slider; petal-edge slits):
+     tube-c-grid.png    n x k grid at h 0.25, BLEND 0, the new slit edges
+     tube-c-blend.png   BLEND 0 / 0.5 / 1 on the default at h 0.25 and h 0.40,
+                        and 5 petals at h 0.40 (where the notch reads), whole
+                        and macro, one camera per row
+     tube-c-zoom.png    the flare before / after with the old crease marked (an
+                        oblique view and a meridian slab), the notch, a slit
+                        edge low down (the shingle)
+     tube-c-form.png    cup / roll / twist maximum at h 0.25, BLEND 0.5
+   Sheets — PARTIAL FUSION (Part B; --only hstrip,hform,pgrid,pzoom):
      tube-partial-h.png         h 0.25 / 0.40 / 0.55 / 0.70 on the default and on
                                 5 petals at tilt 60, ROUND and STRAIGHT
      tube-partial-form.png      the same h strip at cup / roll / twist maximum
@@ -32,7 +42,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildTube, divisorsOf, measureTube } from './bloom-tube-ring.mjs';
+import { buildTube, divisorsOf, measureTube, fusionProfile, notchCorner } from './bloom-tube-ring.mjs';
 import { render, writePng, text, blit } from './bloom-soft-render.mjs';
 import { census } from './bloom-self-intersection.mjs';
 
@@ -41,8 +51,8 @@ const outDir = process.argv[2];
 if (!outDir) throw new Error('usage: node tools/shot-bloom-tube.mjs <outDir>');
 fs.mkdirSync(outDir, { recursive: true });
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
-const PARTIAL = ['hstrip', 'hform', 'pgrid', 'pzoom'];
-const want = (k) => (only ? only.includes(k) : PARTIAL.includes(k));
+const DEFAULTS = ['cgrid', 'cblend', 'czoom', 'cform'];
+const want = (k) => (only ? only.includes(k) : DEFAULTS.includes(k));
 
 const BG = [16, 16, 18], INK = [206, 214, 205], LOBE = [214, 186, 150];
 const CAM = [0.62, -0.72, 0.55];
@@ -72,6 +82,17 @@ function cell(out, W, H, b, S, ox, oy, cam, caps) {
     }
     const base = tint; pos = keep; tint = (t) => base(idx[t]);
   }
+  /* RING BEHIND COINCIDENT PETAL SKIN (Part C sheets): a flared lobe lies ON
+     the ring at full thickness by design, so the two closed shells share a
+     surface and a z-buffer draws a sawtooth of whichever triangle wins each
+     pixel. The ring's triangles are pushed 0.02 mm AWAY from the camera for
+     the picture only (the geometry is untouched; the slicer unions the two). */
+  if (cam.ringBias && !b.free) {
+    const ringFrom = b.tubeTris - b.ringReport.reduce((a, x) => a + x.ringTris, 0);
+    const d = norm(cam.dir), q = pos === b.positions ? Array.from(pos) : pos;
+    for (let t = ringFrom; t < q.length / 9; t++) for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) q[t * 9 + v * 3 + k] -= d[k] * cam.ringBias;
+    pos = q;
+  }
   const img = render(pos, S, S, cam, { color: INK, bg: BG, tint });
   blit(out, W, H, img, S, S, ox, oy);
   caps.forEach((c, i) => text(out, W, H, ox + 6, oy + S + 4 + i * 12, c[0], c[1] || [230, 230, 226], 1));
@@ -79,18 +100,18 @@ function cell(out, W, H, b, S, ox, oy, cam, caps) {
 const kName = (k, n) => (k === 0 ? 'TUBE (K 0)' : k === n ? `FREE (K ${n})` : `K ${k} - ${k} PANEL${k > 1 ? 'S' : ''} OF ${n / k}`);
 const log = [];
 
-async function gridSheet(shape, file, h = null) {
+async function gridSheet(shape, file, h = null, extra = {}) {
   const NS = [5, 6, 8, 12];
   const cols = Math.max(...NS.map((n) => divisorsOf(n).length + 1));
   const S = 300, CAPH = 40, W = cols * S, H = 40 + NS.length * (S + CAPH);
   const out = Buffer.alloc(W * H * 3, 16);
-  text(out, W, H, 8, 8, `TUBE - ${shape} RING THROUGH THE MIDRIBS${h === null ? ' TO THE NIB' : ` FUSED TO H ${h.toFixed(2)}, FREE PETALS ABOVE`} - EXPORT - ROWS N 5 6 8 12 - COLUMNS EVERY VALID K`, [240, 240, 236], 2);
+  text(out, W, H, 8, 8, `TUBE - ${shape} RING THROUGH THE MIDRIBS${h === null ? ' TO THE NIB' : ` FUSED TO H ${h.toFixed(2)}, FREE PETALS ABOVE`}${extra.blend !== undefined ? ` - BLEND ${extra.blend} - SLITS KEEP THE PETAL EDGE` : ''} - EXPORT - ROWS N 5 6 8 12 - COLUMNS EVERY VALID K`, [240, 240, 236], 2);
   for (const [ri, n] of NS.entries()) {
     const ks = [0, ...divisorsOf(n)];
     let cam = null;
     for (const [ci, k] of ks.entries()) {
-      const b = await buildTube({ petalCount: n }, { shape, k, h });
-      if (!cam) { const bb = bbox(b.positions); cam = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half }; }
+      const b = await buildTube({ petalCount: n }, { shape, k, h, ...extra });
+      if (!cam) { const bb = bbox(b.positions); cam = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half, ...(extra.blend !== undefined ? { ringBias: 0.05 } : {}) }; }
       const si = ringSI(b);
       const pse = petalSI(b);
       cell(out, W, H, b, S, ci * S, 40 + ri * (S + CAPH), cam, [[`N ${n}  ${kName(k, n)}`], [`TRIS ${b.tubeTris} (FREE ${b.plainTris})  RING SELF-X ${si === null ? '-' : si}${h === null ? '' : `  PETALS ${pse}`}`, si || pse ? [255, 120, 100] : [235, 180, 120]]]);
@@ -285,6 +306,147 @@ async function zoomPartial() {
   }
   writePng(path.join(outDir, 'tube-partial-zoom.png'), W, H, out);
 }
+/* ---------------- Part C (Eva's rulings on Part B) ---------------- */
+const RED = [255, 90, 70], TEAL = [90, 220, 210];
+/* a 3D point to this cell's pixel, the renderer's own projection (supersample
+   cancels: the image is downsampled to S) */
+function projector(cam, S) {
+  const nrm = (a) => { const l = Math.hypot(...a); return a.map((x) => x / l); };
+  const crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const fwd = nrm(cam.dir.map((c) => -c)), right = nrm(crs(fwd, cam.up)), up = nrm(crs(right, fwd)), sc = (S / 2) / cam.halfHeight;
+  return (p) => { const d = sub(p, cam.center); return [S / 2 + dt(d, right) * sc, S / 2 - dt(d, up) * sc]; };
+}
+function markLine(out, W, H, ox, oy, S, cam, pts, col) {
+  const pr = projector(cam, S);
+  const xy = pts.map(pr);
+  for (let i = 0; i + 1 < xy.length; i++) {
+    const [x0, y0] = xy[i], [x1, y1] = xy[i + 1], n = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0)));
+    for (let q = 0; q <= n; q++) {
+      const x = Math.round(x0 + (x1 - x0) * q / n), y = Math.round(y0 + (y1 - y0) * q / n);
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]]) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= S || Y >= S) continue; const o = ((oy + Y) * W + ox + X) * 3; out[o] = col[0]; out[o + 1] = col[1]; out[o + 2] = col[2]; }
+    }
+  }
+}
+/* the line where petal p's lobe starts (its flat base wall), on its top skin */
+function baseLine(b, row, p = 0) {
+  const rows = b.petalRows[p], t = rows[row].tUsed || 1.2;
+  return Array.from({ length: 21 }, (_, j) => { const q = rows[row].sect(-1 + j / 10); return [q.P[0] + q.n[0] * t / 2, q.P[1] + q.n[1] * t / 2, q.P[2] + q.n[2] * t / 2]; });
+}
+const capOf = (b) => { const si = ringSI(b), ps = petalSI(b); return [`RING ${si} PETALS ${ps}  TRIS ${b.tubeTris} (FREE ${b.plainTris})`, si || ps ? [255, 120, 100] : [235, 180, 120]]; };
+async function cGrid() { await gridSheet('ROUND', 'tube-c-grid.png', 0.25, { blend: 0 }); }
+/* a macro camera on petal 0's base and the sinus after it, the ring's top row */
+function joinCam(b, hh = 6, frac = 0.5) {
+  const g = b.geo[0], R1 = g.R1, n = b.n;
+  const th = Math.atan2(g.midsAll[R1][0][1], g.midsAll[R1][0][0]) + frac * Math.PI / n;
+  const P = g.curveAt(R1)(th), N = g.ringN(R1, th);
+  return { dir: norm([N[0] + 0.35 * Math.cos(th), N[1] + 0.35 * Math.sin(th), N[2] + 0.35]), up: [0, 0, 1], center: P, halfHeight: hh, ringBias: 0.02 };
+}
+/* a 2D plot of the measured top-skin height above the ring's mid-surface along
+   petal 0's meridian (fusionProfile's own samples), BLEND 0 red against BLEND
+   1 teal, the ring's top row and the old crease marked */
+function profilePlot(out, W, H, ox, oy, S, profs, cols, labels) {
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const o = ((oy + y) * W + ox + x) * 3; out[o] = 22; out[o + 1] = 22; out[o + 2] = 26; }
+  const all = profs.flatMap((p) => p.samples);
+  const s0 = Math.min(...all.map((o) => o.s)), s1 = Math.max(...all.map((o) => o.s));
+  const h0 = 0.30, h1 = 0.65;
+  const X = (s) => 30 + ((s - s0) / (s1 - s0)) * (S - 40), Y = (h) => S - 30 - ((h - h0) / (h1 - h0)) * (S - 60);
+  const put = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= S || y >= S) return; const o = ((oy + y) * W + ox + x) * 3; out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; };
+  for (const hh of [0.4, 0.5, 0.6]) { for (let x = 30; x < S - 10; x += 3) put(x, Y(hh), [70, 70, 76]); text(out, W, H, ox + 2, oy + Y(hh) - 3, hh.toFixed(1), [150, 150, 150], 1); }
+  profs.forEach((p, i) => { for (let q = 0; q + 1 < p.samples.length; q++) { const a = p.samples[q], c = p.samples[q + 1]; const n = 20; for (let k = 0; k <= n; k++) { const x = X(a.s + (c.s - a.s) * k / n), y = Y(Math.max(h0, a.height + (c.height - a.height) * k / n)); put(x, y, cols[i]); put(x, y + 1, cols[i]); } } });
+  labels.forEach((l, i) => text(out, W, H, ox + 34, oy + 8 + i * 12, l, cols[i] || [220, 220, 220], 1));
+  text(out, W, H, ox + 34, oy + S - 20, 'X MIDRIB ARC - Y TOP SKIN ABOVE MID-SURFACE (MM)', [180, 180, 180], 1);
+}
+async function cBlend() {
+  const BL = [0, 0.5, 1], S = 300, CAPH = 40;
+  const rowsDef = [['DEFAULT (N 8) H 0.25', {}, 0.25], ['DEFAULT (N 8) H 0.40', {}, 0.4], ['N 5 H 0.40 - WHERE THE NOTCH HAS ROOM', { petalCount: 5 }, 0.4]];
+  const W = 6 * S, H = 40 + rowsDef.length * (S + CAPH + 18);
+  const out = Buffer.alloc(W * H * 3, 16);
+  text(out, W, H, 8, 8, 'TUBE ROUND - THE BLEND STRIP 0 / 0.5 / 1 - LEFT WHOLE, RIGHT MACRO ON PETAL 0 AND THE SINUS - EXPORT', [240, 240, 236], 2);
+  for (const [ri, [nm, set, h]] of rowsDef.entries()) {
+    const oy = 40 + ri * (S + CAPH + 18);
+    text(out, W, H, 6, oy, `${nm} - ONE CAMERA PER HALF ROW`, [240, 200, 120], 1);
+    let camW = null, camM = null;
+    for (const [bi, blend] of BL.entries()) {
+      const b = await buildTube(set, { shape: 'ROUND', k: 0, h, blend });
+      if (!camW) { const bb = bbox(b.positions); camW = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half, ringBias: 0.05 }; camM = joinCam(b); }
+      const nc = notchCorner(b), fp = fusionProfile(b), rr = b.ringReport[0];
+      const l2 = `FLARE ${rr.flare.rows}/${rr.flare.need} ROWS  JOIN TURN ${fp.maxTurnDeg.toFixed(1)} DEG`;
+      const l3 = nc.engaged ? `NOTCH R ${nc.r.toFixed(2)} DEPTH ${nc.depthMm.toFixed(2)} MM  CORNER TURN ${nc.turnBeforeDeg.toFixed(0)} TO ${nc.turnAfterDeg.toFixed(1)} DEG` : nc.gapMm > 0 ? `NOTCH OFF AT BLEND 0 (SINUS ${nc.gapMm.toFixed(2)} MM, CORNER TURN ${nc.turnBeforeDeg.toFixed(0)} DEG)` : `NOTCH INERT (SINUS ${nc.gapMm.toFixed(2)} MM, CLOSED)`;
+      cell(out, W, H, b, S, bi * S, oy + 14, camW, [[`BLEND ${blend}`], capOf(b)]);
+      cell(out, W, H, b, S, (3 + bi) * S, oy + 14, camM, [[`BLEND ${blend} MACRO`], [l2, [200, 220, 200]], [l3, [200, 220, 200]]]);
+      log.push({ sheet: 'tube-c-blend.png', nm, blend, flare: rr.flare, joinTurn: fp.maxTurnDeg, notch: nc, ringSI: ringSI(b), petalSI: petalSI(b), tris: b.tubeTris, free: b.plainTris });
+    }
+  }
+  writePng(path.join(outDir, 'tube-c-blend.png'), W, H, out);
+}
+async function cZoom() {
+  const S = 340, CAPH = 30, W = 4 * S, H = 40 + 2 * (S + CAPH);
+  const out = Buffer.alloc(W * H * 3, 16);
+  text(out, W, H, 8, 8, 'TUBE ROUND ZOOM - EXPORT - THE FLARE (RED = THE CREASE AT BLEND 0, TEAL = WHERE IT WAS), THE NOTCH, A SLIT EDGE', [240, 240, 236], 2);
+  const b0 = await buildTube({}, { shape: 'ROUND', k: 0, h: 0.25, blend: 0 }), b1 = await buildTube({}, { shape: 'ROUND', k: 0, h: 0.25, blend: 1 });
+  const g = b0.geo[0], R1 = g.R1, P = g.midsAll[R1 - 1][0], th = Math.atan2(P[1], P[0]), N = g.ringN(R1, th);
+  const crease = baseLine(b0, b0.blendInfo[0].S);
+  const obl = { dir: norm([N[0] + 0.2 * Math.cos(th), N[1] + 0.2 * Math.sin(th), N[2] + 0.5]), up: [0, 0, 1], center: P, halfHeight: 5, ringBias: 0.02 };
+  const f0 = fusionProfile(b0), f1 = fusionProfile(b1);
+  const cells = [
+    [b0, obl, [`FLARE BLEND 0 - THE CREASE (RED)`], [`JOIN TURN ${f0.maxTurnDeg.toFixed(1)} DEG  TOP SKIN ${f0.heightMin.toFixed(3)}-${f0.heightMax.toFixed(3)} MM`, [255, 160, 140]], RED],
+    [b1, obl, [`FLARE BLEND 1 - SAME CAMERA`], [`JOIN TURN ${f1.maxTurnDeg.toFixed(1)} DEG  TOP SKIN ${f1.heightMin.toFixed(3)}-${f1.heightMax.toFixed(3)} MM`, [160, 230, 200]], TEAL],
+  ];
+  for (const [i, [b, cam, c1, c2, col]] of cells.entries()) {
+    cell(out, W, H, b, S, i * S, 40, cam, [c1, c2]);
+    markLine(out, W, H, i * S, 40, S, cam, crease, col);
+  }
+  const bh = await buildTube({}, { shape: 'ROUND', k: 0, h: 0.25, blend: 0.5 });
+  const fh = fusionProfile(bh);
+  profilePlot(out, W, H, 2 * S, 40, S, [f0, fh, f1], [RED, [240, 200, 120], TEAL], ['BLEND 0', 'BLEND 0.5', 'BLEND 1']);
+  text(out, W, H, 2 * S + 6, 40 + S + 4, 'PETAL 0 MERIDIAN - EMITTED MESH', [230, 230, 226], 1);
+  text(out, W, H, 2 * S + 6, 40 + S + 16, `MAX FACET TURN ${f0.maxTurnDeg.toFixed(1)} / ${fh.maxTurnDeg.toFixed(1)} / ${f1.maxTurnDeg.toFixed(1)} DEG`, [235, 180, 120], 1);
+  const fs1 = fusionProfile(b0, { frac: 0.5 }), fs2 = fusionProfile(b1, { frac: 0.5 });
+  profilePlot(out, W, H, 3 * S, 40, S, [fs1, fs2], [RED, TEAL], ['BLEND 0', 'BLEND 1']);
+  text(out, W, H, 3 * S + 6, 40 + S + 4, 'HALF WAY TO THE NEXT PETAL', [230, 230, 226], 1);
+  text(out, W, H, 3 * S + 6, 40 + S + 16, `MAX FACET TURN ${fs1.maxTurnDeg.toFixed(1)} / ${fs2.maxTurnDeg.toFixed(1)} DEG`, [235, 180, 120], 1);
+  /* row 2: the notch at 5 petals h 0.40 (b 0, b 1), the default's notch at h 0.40 b 1, a slit edge low down */
+  const n0 = await buildTube({ petalCount: 5 }, { shape: 'ROUND', k: 0, h: 0.4, blend: 0 }), n1 = await buildTube({ petalCount: 5 }, { shape: 'ROUND', k: 0, h: 0.4, blend: 1 });
+  const camN = joinCam(n0, 7, 1);
+  const d1 = await buildTube({}, { shape: 'ROUND', k: 0, h: 0.4, blend: 1 });
+  const camD = joinCam(d1, 2.5, 1);
+  const sl = await buildTube({}, { shape: 'ROUND', k: 4, h: 0.25, blend: 0 });
+  const gs = sl.geo[0], r = 6, D = 2 * Math.PI / sl.n, th0 = Math.atan2(gs.midsAll[gs.R1][0][1], gs.midsAll[gs.R1][0][0]), thS = th0 + 1.5 * D;
+  const PS = gs.curveAt(r)(thS), NS = gs.ringN(r, thS);
+  const camS = { dir: norm([NS[0] + 0.4 * Math.cos(thS), NS[1] + 0.4 * Math.sin(thS), NS[2] + 0.2]), up: [0, 0, 1], center: PS, halfHeight: 6, ringBias: 0.02 };
+  const m = await measureTube({}, { shape: 'ROUND', k: 4, h: 0.25, blend: 0, conn: false, petals: false });
+  const sp = m.slitPairs.find((x) => x.slit === 0);
+  const nc0 = notchCorner(n0), nc1 = notchCorner(n1), ncd = notchCorner(d1);
+  const row2 = [
+    [n0, camN, [`NOTCH N 5 H 0.40 BLEND 0`], [`CORNER TURN ${nc0.turnBeforeDeg.toFixed(1)} DEG  SINUS ${nc0.gapMm.toFixed(2)} MM`, [255, 160, 140]]],
+    [n1, camN, [`NOTCH N 5 H 0.40 BLEND 1`], [`R ${nc1.r.toFixed(2)} DEPTH ${nc1.depthMm.toFixed(2)} MM  TURN ${nc1.turnAfterDeg.toFixed(1)} DEG`, [160, 230, 200]]],
+    [d1, camD, [`NOTCH DEFAULT H 0.40 BLEND 1 (3 MM FRAME)`], [`R ${ncd.r.toFixed(2)} DEPTH ${ncd.depthMm.toFixed(2)} MM  SINUS ${ncd.gapMm.toFixed(2)}`, [200, 220, 200]]],
+    [sl, camS, [`SLIT EDGE N 8 K 4 LOW DOWN (ROW ${r})`], [`SHINGLE ${sp.ours.between} PAIRS (TODAY ${sp.today.between})  EDGE SELF-X ${sp.ours.withinA + sp.ours.withinB}`, sp.ours.withinA + sp.ours.withinB ? [255, 120, 100] : [235, 180, 120]]],
+  ];
+  for (const [i, [b, cam, c1, c2]] of row2.entries()) cell(out, W, H, b, S, i * S, 40 + S + CAPH, cam, [c1, c2]);
+  log.push({ sheet: 'tube-c-zoom.png', flare0: { turn: f0.maxTurnDeg, hmin: f0.heightMin }, flare1: { turn: f1.maxTurnDeg, hmin: f1.heightMin }, notch: [nc0, nc1, ncd], slit: sp });
+  writePng(path.join(outDir, 'tube-c-zoom.png'), W, H, out);
+}
+async function cForm() {
+  const S = 300, CAPH = 40, states = [['DEFAULT', {}], ['CUP 1.2 (MAX)', { petalCup: 1.2 }], ['ROLL 330 (MAX)', { petalRoll: 330 }], ['TWIST 180 (MAX)', { petalTwist: 180 }]];
+  const W = 4 * S, H = 40 + 2 * (S + CAPH);
+  const out = Buffer.alloc(W * H * 3, 16);
+  text(out, W, H, 8, 8, 'TUBE ROUND H 0.25 BLEND 0.5 - FORM AT MAXIMUM - ONE CAMERA PER ROW (WHOLE, THEN MACRO) - EXPORT', [240, 240, 236], 2);
+  let camW = null, camM = null;
+  for (const [i, [nm, set]] of states.entries()) {
+    const b = await buildTube(set, { shape: 'ROUND', k: 0, h: 0.25, blend: 0.5 });
+    if (!camW) { const bb = bbox(b.positions); camW = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half, ringBias: 0.05 }; camM = joinCam(b, 9); }
+    cell(out, W, H, b, S, i * S, 40, camW, [[nm], capOf(b)]);
+    cell(out, W, H, b, S, i * S, 40 + S + CAPH, camM, [[`${nm} MACRO`], capOf(b)]);
+    log.push({ sheet: 'tube-c-form.png', nm, ringSI: ringSI(b), petalSI: petalSI(b), tris: b.tubeTris });
+  }
+  writePng(path.join(outDir, 'tube-c-form.png'), W, H, out);
+}
+if (want('cgrid')) await cGrid();
+if (want('cblend')) await cBlend();
+if (want('czoom')) await cZoom();
+if (want('cform')) await cForm();
 if (want('hstrip')) await hStrip('tube-partial-h.png', 'TUBE FUSED PARTWAY - THE H STRIP ON THE DEFAULT - EXPORT', [['DEFAULT (N 8)', {}], ['N 5 TILT 60', { petalCount: 5, petalTilt: 60 }]]);
 if (want('hform')) await hStrip('tube-partial-form.png', 'TUBE FUSED PARTWAY - THE PETALS STILL RESPOND ABOVE THE LINE - EXPORT', [['CUP 1.2 (MAX)', { petalCup: 1.2 }], ['ROLL 330 (MAX)', { petalRoll: 330 }], ['TWIST 180 (MAX)', { petalTwist: 180 }]]);
 if (want('pgrid')) { await gridSheet('ROUND', 'tube-partial-round.png', 0.4); await gridSheet('STRAIGHT', 'tube-partial-straight.png', 0.4); }

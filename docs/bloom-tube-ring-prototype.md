@@ -1,12 +1,286 @@
 # Parametric Bloom — TUBE: the closed-ring prototype
 
 *Oct 1, 2026. Base `main` at `da8bf62` (#322 merged). **A prototype only. Nothing that ships moved.**
+**Part C (on top) is the current round; Parts B and A follow it.**
 Every tracked file was sha256-recorded before the first edit and every one is identical at close
 (§9); the work is two new tools, this doc and five images. Every figure is **EXPORT** mode (print
 preview: the floored sheet, the 0.80 mm tip floor), RADIAL placement, read on **every row of the
 petals' own ladder** (3 foot rows + 56 blade rows at `NU` 56), unless a line says otherwise.
 Reproduce with `node tools/bloom-tube-ring.mjs` (216 builds, ~8 min; `--attribute` for the fold
 table, `--control` for the five must-fails) and `node tools/shot-bloom-tube.mjs <dir>` (the sheets).*
+
+---
+
+# PART C — ROUND, h 0.25, THE BLEND SLIDER, SLITS THAT KEEP THE PETAL EDGE (Eva's rulings on Part B)
+
+*Same prototype rules. Every tracked file is sha256-identical to `da8bf62` at close (§C8). ROUND
+only — STRAIGHT is dropped from every new sheet and from the sweep (the code path stays, unused).
+EXPORT throughout. Reproduce with:*
+- *`node tools/bloom-tube-ring.mjs --round2` — 141 builds, ~10 min;*
+- *`node tools/shot-bloom-tube.mjs <dir>` — the four Part C sheets are now its default (~1 min).*
+
+*Parts B and A below are the earlier rounds. Their findings stand where Part C does not say
+otherwise.*
+
+## C0. The answer
+
+- **Neither STOP clause is met.**
+  - **The slit edge halves do not fold.** At every slit of every n × k row (38 slit builds, 4 n,
+    every valid k, BLEND 0 / 0.5 / 1, plus the 40 × 6 corner) the two edge petals read **0 pairs
+    within either shell and 0 within their union**. What they do is SHINGLE — **182,990 pairs
+    between the two shells, against 186,406 for today's same two petals** (−1.8%). On the
+    default at k 2: 745 against 760.
+  - **The flare moves nothing above h.** Every petal row above the ring's top is the same object
+    it was at BLEND 0; the flare only moves where the lobe STARTS, below h. No free-petal
+    before/after is owed, because there is no change to show.
+- **The whole sweep** (141 builds, 129 with a ring) reads **0 boundary edges, 0 non-manifold, 0
+  directed-edge mismatches, 0 inward shells and one connected piece on every build.**
+  - **No petal ever reads more self-intersection pairs than today's same petal.**
+  - Two rings fold, both at the same count at every BLEND: tilt 105 (318 pairs) and headRise 1
+    (316 pairs). Both are Part B §B5 classes, untouched by this round.
+- **BLEND 0 is the Part B build, float for float.** Measured with `Object.is` against
+  `c4d845d`'s own builder: 18 states (k 0, the wedge slits and the ring to the nib) differ in 0 of
+  up to 663,120 floats. Two more checks: the five must-fails (`--control`) fire at exactly their
+  Part A counts, and the new slit edges are the only intended change at BLEND 0.
+- **The ~90° joint Eva sees is two things, and neither is the petal's spine (§C1).**
+  1. **The FLARE crease** — a groove plus a ledge where the petal's flat base wall sits on the
+     ring's tapered top edge. At BLEND 1 it goes from **15.8° to 1.2°** on the default.
+  2. **The NOTCH corner** — where a petal margin leaves the ring's top rim. It is **95.6° at
+     h 0.25 and 111.5° at h 0.40**. At h 0.25 it is closed, so the notch is inert there by
+     construction. Where it is open, the exterior turn at the hand-over goes **68.5° → 2.0°**
+     (default, h 0.40) and **66.9° → 2.6°** (5 petals, h 0.40).
+
+## C1. The flare, diagnosed before anything was built
+
+Measured on the default at h 0.25, ROUND, k 0, on the EMITTED mesh. The instrument is
+`fusionProfile()`: rays down the ring's own normal along petal 0's meridian, every 1/12 row; it
+reports the top skin's height above the ring's mid-surface and the turn of the hit facet.
+
+- **The mid-surface is smooth through the fusion line.**
+  - Along the midrib there is no turn above 1° anywhere from u 0.018 through the blend, at
+    h 0.25 or at h 0.40.
+  - The only turn on the meridian is **25.0° at the ring row (u 0)**. That is the petal's own
+    foot-to-blade turn, at the hub rim, 16 rows below h.
+  - **So the hypothesis — "the petal's own foot-to-blade turn, made visible as a rim line" — is
+    refused for the line at h.** The turn exists, and it is where the ring meets the hub.
+- **What reads as a line at h is the ring's own free-rim treatment, left under the petal.**
+  - The ring's top row is an exposed edge to `emitPanel`, so its top skin TAPERS over the last
+    3 mm (RIM_TAPER_MM) and closes on the bead.
+  - Under the petal the ring's top skin therefore falls **0.600 → 0.535 mm** over rows 11-14.
+  - The petal's lobe then starts on row 15 with its flat base wall at full thickness, **0.608 mm,
+    0.073 mm proud**.
+  - Facets turn **12.3°** (row 14) and **15.8°** (row 15): a groove and a ledge within about
+    0.6 mm.
+  - The macro on `bloom-tube-c-zoom.png` marks it in red.
+- **The ~90° is the in-surface corner.** Where petal 0's margin leaves the ring's top rim the angle
+  is **95.6° at h 0.25 and 111.5° at h 0.40**. That corner is the NOTCH's (§C2), not the flare's.
+- **Smoothing it changes nothing above h.** The fix is at the lobe's BASE, so no free petal
+  moves. The spine is untouched.
+
+## C2. BLEND — one slider, two joints, inert at 0 by branch
+
+`buildTube(set, { blend })`, 0–1 (working name BLEND, design tier). The 8 mm cross-section blend
+(BLEND_MM) stays fixed and internal.
+
+### The FLARE
+
+- **The rule.** The petal's lobe starts `round(BLEND × N_cov)` rows further down the ring, where
+  the ring is still at full thickness. Below h every row is the ring's own section (w = 0).
+  - So the ring's taper and bead are **buried inside the petal**.
+  - The petal's base wall lands **flush** on a full-thickness ring.
+- **N_cov** is the fewest extra rows that put RIM_TAPER_MM (3.0 mm) of midrib arc between the
+  lobe's first row and the ring's top row. It is 4 rows on the default and 6–9 on inner whorls.
+- **Floored at row 4 (FLARE_FLOOR_ROW).** Without the floor, inner whorls on six layers sank the
+  lobe into the foot-to-blade seam and folded there: 4–8 pairs a petal on layers 3–5, rows 2–3,
+  80 pairs on `layers 6`, 840 on 40 × 6. With the floor every one reads 0. An inner whorl whose
+  ring is too short to bury the whole taper is reported (`flare a/b rows`), not folded.
+- **Measured, the max facet turn along petal 0's meridian at BLEND 0 / 0.5 / 1:**
+
+  | state | BLEND 0 | 0.5 | 1 |
+  |---|---|---|---|
+  | default | 15.8° | 2.5° | 1.2° |
+  | 12 petals | 15.8° | 2.3° | 0.8° |
+  | tilt 60 | 15.9° | 3.3° | 2.4° |
+  | cup 1.2 | 15.9° | 2.6° | 1.2° |
+  | cup −0.8 | 15.8° | 2.5° | 1.2° |
+  | roll 330 | 15.8° | 2.5° | 1.2° |
+  | width 30 | 15.8° | 2.6° | 2.4° |
+  | length 20 | 20.2° | 3.2° | 0.0° |
+  | curl −180 | 17.0° | 5.0° | 3.5° |
+  | curl 270 | 19.3° | 6.5° | 6.5° |
+  | twist 180 | 15.8° | 7.9° | 7.9° |
+  | tilt 90 | 14.6° | 8.8° | 8.8° |
+
+  - On the default the top skin reads **0.373–0.608 mm at BLEND 0** and **0.600–0.607 at
+    BLEND 1**.
+  - Where 0.5 and 1 read alike (twist, curl 270, tilt 90), what remains is the petal's own
+    blend, not the rim.
+  - **The instrument is blind on some rows, and says so.** On layers 3 / 6, tilt 75 × 5, tilt 105,
+    curl 90 / 360 and headRise 1 the ray hits ANOTHER part in front first. The heights read
+    7–23 mm there, the inner whorl or a curled neighbour. Those rows' turn figures are not about
+    the joint and are not quoted.
+
+### The NOTCH
+
+- **The rule.** In an OPEN sinus, the ring's top rim is cut down into a U. The sinus is the arc of
+  ring rim at the ring's top row between petal p's margin and petal p+1's, each laid on the ring
+  by arc length exactly as the blend lays it.
+- **The shape.**
+  - Each corner is an arc of radius r, tangent to the petal margin at its own end on the rim, at
+    the margin's measured LEAN β off the meridian. So the outline turns no corner at the
+    hand-over.
+  - The arc meets a flat bottom at depth r(1 − sin β).
+  - **r = BLEND × W / cos β**, W the half-sinus: the radius scales with the slider and is capped
+    by the room, so at BLEND 1 the two arcs meet at the sinus centre.
+- **How it is drawn.** By lowering the ring's own rows in the sinus (no row crosses its
+  neighbour), with COLS_PER_SINUS = 12 columns across each open sinus so the U is resolved.
+- **A closed sinus (W ≤ 0) has no room: inert, by construction.** This is the default at h 0.25
+  (sinus −1.61 mm, the petals overlapping at the ring's top edge — the look Eva chose).
+- **A first cut was tangent to the MERIDIAN** and left a **21.5° kink** at the hand-over on the
+  default at h 0.40, because the margin leans 21.5° off it. Tangency to the margin's own lean is
+  what takes that to 2°.
+
+**Where the notch engages (BLEND > 0), measured:**
+
+| state | sinus | r at BLEND 1 | depth at BLEND 1 | exterior turn at the corner (BLEND 0 → 1) |
+|---|---|---|---|---|
+| default, h 0.25 | −1.61 mm | inert | — | — |
+| default, h 0.40 | 0.61 mm | 0.33 mm | 0.21 mm | 68.5° → 2.0° |
+| 5 petals, h 0.40 | 8.22 mm | 4.47 mm | 2.71 mm | 66.9° → 2.6° |
+| 3 layers, h 0.40 (layer 0) | 4.06 mm | 2.14 mm | 1.46 mm | 71.5° → 2.1° |
+| 5 petals, h 0.25 | 3.98 mm | 2.01 mm | 1.72 mm | 81.6° → 0.1° |
+| 6 petals, h 0.25 | 1.55 mm | 0.78 mm | 0.68 mm | 82.7° → 0.4° |
+| 3 / 6 layers, h 0.25 (layer 0) | 1.84 / 3.74 mm | 0.92 / 1.87 mm | 0.91 / 1.90 mm | 89.2 / 91.0° → 1.6 / 2.0° |
+
+- **On the default at h 0.40 the notch is real and small.** Its 0.33 mm radius is under the
+  0.45 mm bead radius, so in print it reads as a softened corner rather than a visible scoop. The
+  5-petal row is on the BLEND strip as the case where the U can be seen.
+- In slit mode the notch runs only on a panel's INTERIOR sinuses. A slit has no rim corner —
+  the edge petals are their own surface there (§C4).
+
+## C3. Cost (EXPORT triangles; FREE = today's bloom)
+
+| state | BLEND 0 | BLEND 0.5 | BLEND 1 | FREE |
+|---|---|---|---|---|
+| default, h 0.25 | 23,008 (−1,680) | 23,840 (−848) | 24,672 (−16) | 24,688 |
+| default, h 0.40 | 21,888 | 31,744 (+7,056) | 32,576 (+7,888) | 24,688 |
+| 5 petals, h 0.40 | 13,752 | 19,912 | 20,432 (+4,930) | 15,502 |
+| 3 layers, h 0.25 | 68,800 | 91,584 | 95,328 (+21,648) | 73,680 |
+| 6 layers, h 0.25 | 138,688 | 172,448 | 180,768 (+33,600) | 147,168 |
+| 40 × 6, h 0.25, k 0 | — | — | 782,112 (+47,040) | 735,072 |
+
+- **The flare costs triangles in proportion to the rows it adds:** 52 a petal per row at 8
+  petals. It exactly gives back what the shorter ring saved, so BLEND 1 on the default is 16
+  triangles short of FREE.
+- **The notch's cost is its columns.** COLS_PER_SINUS adds 12 columns per open sinus across
+  every ring row (+7,000 on the default at h 0.40, where the U is 0.33 mm). A coarser U (6
+  columns) would halve it. That is a knob, not a ruling.
+- **Slits at BLEND 0, h 0.25:**
+  - 8 petals: k 1 / 2 / 4 = 24,504 / 26,000 / 28,992.
+  - 12 petals, k 6: 43,392 (+6,456).
+  - An edge petal is one panel from the foot to the tip, so a slit costs the edge petal's own
+    lower rows plus the ring panel's overlap.
+
+## C4. The slits keep the original petal edge
+
+- **The construction (Eva's ruling).** Each panel's ring runs from its first petal's midrib to its
+  last, plus SLIT_OVERLAP_MM (1.0 mm) past each.
+  - **An edge petal is ONE panel from the foot (row 0) to the tip.**
+  - Its OUTER half (midrib → free margin) is the petal's own section at every row, the same
+    function today's petal draws. It carries the owner's edge profile (`emitPanel`, called, never
+    copied).
+  - Its INNER half rides the ring (w = 0 below h) and blends above it like every other petal.
+  - The two halves meet at the midrib, where both are the midrib point (the ring passes through
+    it exactly).
+- **There is no wedge cut anywhere.** The wedge construction stays behind `slits: 'wedge'` and
+  reproduces Part B to the float.
+- **The shingle, n × every valid k, h 0.25, BLEND 0 (pairs between the two edge shells, ours
+  against today's same two petals):**
+  - n 5 k 1: 314 / 326.
+  - n 6 k 1 / 2 / 3: 334 / 338, 380 / 384, 426 / 430.
+  - n 8 k 1 / 2 / 4: 511 / 526, 745 / 760, 1,213 / 1,228.
+  - n 12 k 1 / 2 / 3 / 4 / 6: 926 / 942, 1,595 / 1,614, 2,264 / 2,286, 2,933 / 2,958,
+    4,271 / 4,302.
+  - Identical at BLEND 0.5 and 1.
+  - **Within either edge shell: 0 on every row.**
+  - The small deficit against today's figure is the inner half riding the ring instead of
+    its own section below h.
+- **These are overlaps between two separate closed shells — the export contract's own "the
+  slicer unions them".** They are counted, not folded. They are the same crossing band the
+  discovery measured on today's petals.
+
+## C5. Sheets (`node tools/shot-bloom-tube.mjs <dir>`)
+
+Every sheet: EXPORT (print preview), a fixed camera per row, no rotation, no chrome, ROUND only.
+
+- **`docs/img/bloom-tube-c-grid.png`** — n 5 / 6 / 8 / 12 × every valid k at h 0.25, BLEND 0, the
+  new slit edges.
+- **`docs/img/bloom-tube-c-blend.png`** — BLEND 0 / 0.5 / 1, whole and macro, on the default at
+  h 0.25, the default at h 0.40, and 5 petals at h 0.40 (where the U can be seen). Every macro
+  caption carries the flare rows, the join turn and the notch's radius, depth and corner turn,
+  or why it is inert.
+- **`docs/img/bloom-tube-c-zoom.png`** —
+  - the flare on petal 0, BLEND 0 with the crease marked in red, and BLEND 1 on the same camera
+    with the same line in teal;
+  - the measured top-skin profile along the meridian and half-way to the next petal (BLEND 0 /
+    0.5 / 1);
+  - the notch at 5 petals h 0.40 (BLEND 0, 1) and on the default h 0.40 (BLEND 1, a 2.5 mm
+    frame);
+  - a slit edge low down (n 8 k 4, ring row 6), with the shingle count in the caption.
+- **`docs/img/bloom-tube-c-form.png`** — cup 1.2, roll 330, twist 180 at h 0.25, BLEND 0.5,
+  beside the default, whole and macro.
+  - The roll row reads its petals' own **8,448 pairs, against today's 13,584** — the Part B §B5
+    class, lower than today, not this round's.
+
+**One render-only adjustment, stated.** A flared lobe lies ON the ring at full thickness by
+design, so the two shells share a surface and the z-buffer drew a sawtooth. On the Part C cells
+the ring's triangles are pushed 0.02–0.05 mm away from the camera for the picture only. The
+geometry is untouched.
+
+## C6. Instrument checks
+
+- **`--control`** fires all five must-fails at their Part A counts (39,559 / 10 / 1 / 3 / 32,453).
+- **The flare instrument's own control is BLEND 0.** It reads the 15.8° crease and the 0.373 mm
+  groove there, and BLEND 1 removes them on the same camera and the same rays.
+- **The slit-fold check is the census itself**, per shell. The shingle count reproduces today's
+  figure for today's petals, measured through the same function.
+- **The census was shown able to fire on this round's own geometry.** Before the seam floor, the
+  flare on inner whorls read 4–8 pairs a petal at rows 2–3.
+- **A first slit cut emitted the edge's outer half as a SECOND panel to the tip.** Its tip apex
+  welded to the lobe's, giving 20 non-manifold edges and 2,802 "within" pairs that were really two
+  coincident panels. One panel per edge petal fixed both.
+
+## C7. Defaults that are Claude's, flagged
+
+| default | value | what it decides |
+|---|---|---|
+| FLARE_FLOOR_ROW | 4 | the lowest row a flared lobe may start on |
+| COLS_PER_SINUS | 12 | columns across an open sinus when the notch is drawn |
+| SLIT_OVERLAP_MM | 1.0 | how far the ring panel runs past an edge midrib |
+| notch depth ramp | linear over the ring's rows above the ring row | how the cut is spread down the ring |
+| margin lean β | measured from the first row above h, averaged over the sinus's two sides | the angle the U meets each petal edge at |
+
+## C8. Close
+
+- **What was touched:** `tools/bloom-tube-ring.mjs`, `tools/shot-bloom-tube.mjs`, this doc and four
+  images. No patch to the shipped geometry was added this round.
+- **Branch and PR:** `claude/youthful-ride-azrkiy`, draft PR #323 against `main`.
+- **Merge:** nothing merged, nothing pushed to `main`.
+
+## C9. Questions for Eva (batched; the first two are the ones asked)
+
+1. **Does the BLEND strip read right, and which value should be the default?**
+   - **Claude would suggest 1.** The flare's crease is 15.8° at 0, 2.5° at 0.5 and 1.2° at 1. It
+     costs no triangles against FREE on the default, and the notch is inert at h 0.25.
+   - 0.5 leaves half the taper exposed and buys nothing in return.
+2. **Do the slit edges now look like real petal edges?** See the slit cell on the zoom sheet and
+   the k columns of the grid. The edge halves are today's petal surfaces from the foot to the tip,
+   shingling 1.8% less than today's.
+3. **Is the notch's 12 columns per sinus worth its cost?** It costs +7,000 triangles on the
+   default at h 0.40 for a 0.33 mm U that the bead nearly hides. Options: 6 columns, or no notch
+   below a minimum sinus (e.g. 1 mm). A floor would be a typed threshold.
+4. **Should STRAIGHT's code path be deleted from the scratch builder**, or kept for Part A/B
+   reproduction? Kept for now.
 
 ---
 

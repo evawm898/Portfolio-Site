@@ -5,6 +5,16 @@
      node tools/bloom-tube-ring.mjs --partial [--json <file>]     (fused partway)
      node tools/bloom-tube-ring.mjs --attribute                   (where a fold sits)
 
+   PART C (Eva's rulings on Part B): `buildTube(set, { h, blend, slits })`.
+     blend  0..1, the BLEND slider: the FLARE (the lobe starts lower, burying the
+            ring's free-rim taper under a flush base wall) and the NOTCH (an open
+            sinus's rim corner cut into a U tangent to both petal edges). Both are
+            inert at 0 BY BRANCH — BLEND 0 is the Part B build, float for float.
+     slits  'edge' (default): an edge petal at a slit is one panel from the foot
+            to the tip, its outer half the petal's OWN section; 'wedge' is Part
+            B's wedge cut, kept for reproduction.
+     node tools/bloom-tube-ring.mjs --round2 [--json <file>]       (Part C sweep)
+
    PARTIAL FUSION (Eva's ruling on #323): `buildTube(set, { h })` ends the ring
    at the last row at or below u = h; above it every petal is TODAY's free petal
    (P3's hook hands it the rows from one below the ring's top to the tip), and
@@ -121,7 +131,7 @@ export async function geometry() {
     if (n !== 1) throw new Error(`patch ${name}: anchor matched ${n} times (want exactly 1) — the shipped geometry moved; refusing`);
     src = src.replace(from, () => to);
   }
-  src += '\nexport { emitPanel, rimProfile, emitRimLoop, NV as __NV_AT_LOAD, PANEL_OVERLAP_ROWS as __PANEL_OVERLAP_ROWS };\n';
+  src += '\nexport { emitPanel, rimProfile, emitRimLoop, NV as __NV_AT_LOAD, PANEL_OVERLAP_ROWS as __PANEL_OVERLAP_ROWS, RIM_TAPER_MM as __RIM_TAPER_MM };\n';
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-tube-'));
   const f = path.join(dir, 'bloom-geometry.tube.mjs');
   fs.writeFileSync(f, src);
@@ -151,6 +161,66 @@ const wrap = (a) => { a %= TAU; return a < 0 ? a + TAU : a; };
 
 export const BLEND_MM = Number(process.env.TUBE_BLEND || 8);   // the fusion line's blend length, mm of midrib arc above the ring's top row (chosen by the sweep in §B3 of the doc; TUBE_BLEND overrides)
 export const COLS_PER_SECTOR = Number(process.env.TUBE_C || 8);   // C — Claude's default, flagged (TUBE_C overrides, diagnosis only)
+export const COLS_PER_SINUS = 12;     // columns across one open sinus when the NOTCH is drawn (6 per half), Claude's default
+export const FLARE_FLOOR_ROW = Number(process.env.TUBE_FLARE_FLOOR || 4);   // the lowest row a flared lobe may start on: above the foot rows (0, 1), the ring row (2) and the seam's first blade row (3) — Claude's default, measured (see the guard)
+export const SLIT_OVERLAP_MM = 1.0;   // how far the ring panel runs past an edge petal's midrib, and the edge half past it the other way, so the two closed shells OVERLAP rather than touch (Claude's default)
+
+/* the arc of a petal's OWN section from its midrib to one margin (32 chords) —
+   the ONE expression the blend, the sinus and the slit edge all read */
+function sideArc(own, sgn) { let a = 0, prev = own(0).P; for (let q = 1; q <= 32; q++) { const P = own((sgn * q) / 32).P; a += len(sub(P, prev)); prev = P; } return a; }
+const smoother = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (x * 6 - 15) + 10));
+const wrapPi = (a) => { a = ((a + Math.PI) % TAU + TAU) % TAU - Math.PI; return a; };
+
+/* a piecewise-linear v -> phi map from segments { a, b, cols } (the ring's
+   column knots): periodic panels use N columns, open ones N + 1 */
+function knotMap(segs, periodic) {
+  const cols = [0]; for (const sg of segs) cols.push(cols[cols.length - 1] + sg.cols);
+  const N = cols[cols.length - 1];
+  const phiOf = (r, v) => { const c = ((v + 1) / 2) * N; let i = 0; while (i < segs.length - 1 && c > cols[i + 1]) i++; const f = (c - cols[i]) / segs[i].cols; return segs[i].a + (segs[i].b - segs[i].a) * f; };
+  return { phiOf, NVp: periodic ? N : N + 1, N };
+}
+
+/* THE NOTCH (BLEND's first joint). In an OPEN sinus — the arc of the ring's top
+   rim between two neighbouring petals' margins at the ring's top row, width 2W
+   — the rim is cut down into a U: an arc of radius r at each corner, tangent to
+   the petal margin at its own end on the rim (so the outline turns no corner
+   where it hands over) and to a flat bottom at depth r (1 - sin beta), beta
+   the margin's lean off the meridian; at r cos(beta) = W the two arcs meet at
+   the sinus centre. r = BLEND * W / cos(beta), so the radius scales with the
+   slider and is capped by the room (W) the sinus has; a closed sinus (W <= 0) has no room and the
+   notch is INERT there by construction. The cut is drawn by lowering the
+   ring's own rows in the sinus: row i is evaluated at meridian parameter
+   t = i - depth(phi)/spacing * ramp(i), ramp 0 at the ring row (2) rising
+   linearly to 1 at the top, so no row ever crosses its neighbour and the
+   ring's surface is still the ring's own (between rows, linear in t). */
+function notchDepth(list) {
+  return (phi) => {
+    let best = 0;
+    for (const sn of list) {
+      if (!(sn.r > 0)) continue;
+      const x = Math.abs(wrapPi(phi - sn.c)) * sn.rho;
+      if (x >= sn.W) continue;
+      /* the arc through the margin's own end (W, 0), tangent there to the
+         margin's lean beta, centred at (W - r cos beta, r sin beta); below its
+         lowest point the cut is flat */
+      const cx = sn.W - sn.r * Math.cos(sn.beta), cy = sn.r * Math.sin(sn.beta);
+      const y = x <= cx ? sn.r - cy : Math.sqrt(Math.max(0, sn.r * sn.r - (x - cx) ** 2)) - cy;
+      if (y > best) best = y;
+    }
+    return best;
+  };
+}
+function dippedCurves(gg, R1, list, spacing) {
+  const depth = notchDepth(list);
+  const lerp3 = (A, B, f) => [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f];
+  return Array.from({ length: R1 + 1 }, (_, r) => (phi) => {
+    const d = depth(phi);
+    if (!(d > 0) || r <= 2) return gg.curveAt(r)(phi);
+    const t = r - (d / spacing) * ((r - 2) / (R1 - 2));
+    const i = Math.floor(t), f = t - i;
+    return f === 0 ? gg.curveAt(i)(phi) : lerp3(gg.curveAt(i)(phi), gg.curveAt(i + 1)(phi), f);
+  });
+}
 
 /* ---------------- the ring's surface at one whorl ----------------
    mids[r][p] = the midrib point of petal p at row r. The ring's section at
@@ -222,7 +292,7 @@ function panelRows(curves, us, phiOf, tAt, sign) {
 }
 
 /* ---------------- one build ---------------- */
-export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true, end = 'nib', perLayerK = null, tamper = null, h = null, blendMm = BLEND_MM } = {}) {
+export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true, end = 'nib', perLayerK = null, tamper = null, h = null, blendMm = BLEND_MM, blend = 0, slits = 'edge' } = {}) {
   const G = await geometry();
   const st = stateOf(set);
   if (st.placement !== 'RADIAL') throw new Error(`TUBE is RADIAL only (asked ${st.placement})`);
@@ -281,7 +351,64 @@ export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true
     /* the midrib arc length from the ring's top row, per row, in mm (the blend's own measure) */
     const sMid = new Array(NRall).fill(0);
     for (let r = R1 + 1; r < NRall; r++) sMid[r] = sMid[r - 1] + len(sub(midsAll[r][0], midsAll[r - 1][0]));
-    geo.push({ rowsOf, usAll, R1, midsAll, normalsAll, curveAt, sign, ringN, sMid, NRall });
+    /* BLEND (Eva's ruling on Part B). Both joints are read here, once, from the
+       petals' own rows, and BOTH ARE INERT AT BLEND 0 BY BRANCH (flareRows 0,
+       every notch radius 0, no column re-knotting) — so BLEND 0 is the build
+       this file made before the slider existed, float for float. */
+    let flareRows = 0, flareNeed = 0, flareArcMm = 0, sinuses = [], notchOn = false, spacing = 0;
+    if (h !== null) {
+      /* THE FLARE: the petal's lobe starts `flareRows` rows further down the
+         ring, where the ring is still at full thickness, so the ring's own
+         free-rim taper and bead at its top edge are BURIED inside the petal and
+         the petal's flat base wall lands flush on a full-thickness ring. N_cov is
+         the fewest extra rows that put RIM_TAPER_MM of midrib arc between the
+         lobe's first row and the ring's top row (the taper's own length). */
+      const arcDown = (from) => { let a = 0; for (let r = from + 1; r <= R1; r++) a += len(sub(midsAll[r][0], midsAll[r - 1][0])); return a; };
+      const S0 = R1 - G.__PANEL_OVERLAP_ROWS;
+      /* the lobe never starts inside the FOOT-TO-BLADE SEAM: a lobe sunk to
+         rows 2-3 lays the petal's own seam kink onto the ring and folds there
+         (measured: 4-8 pairs a petal on layers 3-5 of six, rows 2-3, before
+         this floor), so the flare stops at FLARE_FLOOR_ROW and an inner whorl
+         whose ring is too short to bury the whole taper is told, not folded */
+      while (S0 - flareNeed > FLARE_FLOOR_ROW && arcDown(S0 - flareNeed) < G.__RIM_TAPER_MM) flareNeed++;
+      /* (the sinus geometry below is read at every BLEND, for the slit edges'
+         column knots and the report; only blend > 0 gives a radius) */
+      flareRows = Math.min(Math.round(blend * flareNeed), Math.max(0, S0 - FLARE_FLOOR_ROW));
+      flareArcMm = arcDown(S0 - flareRows);
+      /* THE SINUS at the ring's top row, per neighbour pair: the arc of ring rim
+         between petal p's +v margin and petal p+1's -v margin, each margin laid
+         on the ring by arc length exactly as the blend lays it */
+      const marg = Array.from({ length: n }, (_, p) => { const own = rowsOf[p][R1].sect, mid = midsAll[R1][p]; const rho = Math.hypot(mid[0], mid[1]), th = Math.atan2(mid[1], mid[0]); return { rho, th, plus: th + sideArc(own, 1) / rho, minus: th - sideArc(own, -1) / rho }; });
+      spacing = arcDown(R1 - 4) / 4;
+      const capR = 0.5 * (R1 - 2) * spacing;
+      /* the LEAN of each margin where it leaves the rim: the margin's first
+         step above the ring's top (row R1 -> R1 + 1, the blend's own section at
+         v = +/-1) against the ring's meridian, in the ring's tangent plane,
+         positive when the margin heads AWAY from the sinus as it rises. The U
+         is tangent to the margin, not to the meridian, so the outline has no
+         kink where it hands over. */
+      const marginLean = (p, sgn) => {
+        const own0 = rowsOf[p][R1].sect, own1 = rowsOf[p][R1 + 1].sect, mid0 = midsAll[R1][p], mid1 = midsAll[R1 + 1][p];
+        const at = (own, mid, r, w) => { const rho = Math.hypot(mid[0], mid[1]), th = Math.atan2(mid[1], mid[0]) + sgn * sideArc(own, sgn) / rho; const R = curveAt(r)(th); return { P: add(R, mul(sub(own(sgn).P, R), w)), th }; };
+        const A = at(own0, mid0, R1, 0), B = at(own1, mid1, R1 + 1, smoother(sMid[R1 + 1] / blendMm));
+        const hh = 1e-4, up = sub(curveAt(R1)(A.th), curveAt(R1 - 1)(A.th)), N = ringN(R1, A.th);
+        const away = sub(curveAt(R1)(A.th - sgn * hh), curveAt(R1)(A.th + sgn * hh));   // along the rim, toward the petal's own midrib
+        const proj = (v) => sub(v, mul(N, dot(v, N)));
+        const mv = proj(sub(B.P, A.P)), eu = proj(up), ea = proj(away);
+        return Math.atan2(dot(mv, ea) / len(ea), dot(mv, eu) / len(eu));
+      };
+      sinuses = marg.map((a, p) => {
+        const b = marg[(p + 1) % n]; const gap = wrapPi(b.minus - a.plus); const rho = (a.rho + b.rho) / 2; const W = (gap * rho) / 2;
+        const beta = R1 + 1 < NRall && W > 0 ? (marginLean(p, 1) + marginLean((p + 1) % n, -1)) / 2 : 0;
+        /* the arc radius at full BLEND is the one whose two arcs meet at the
+           sinus centre: r cos(beta) = W */
+        const r = Math.min(blend * Math.max(0, W) / Math.cos(beta), capR);
+        return { p, c: a.plus + gap / 2, gapAng: gap, rho, W, r, beta, depthMm: r * (1 - Math.sin(beta)) };
+      });
+      notchOn = blend > 0 && sinuses.some((x) => x.r > 0);
+      if (!(blend > 0)) { flareRows = 0; flareArcMm = 0; }
+    }
+    geo.push({ rowsOf, usAll, R1, midsAll, normalsAll, curveAt, sign, ringN, sMid, NRall, flareRows, flareNeed, flareArcMm, sinuses, notchOn, spacing });
   }
   /* pass B: the bloom with each petal reduced to what stands above the ring.
      THE FUSION LINE (h mode): over BLEND rows — from the ring's top row R1 up to
@@ -297,26 +424,32 @@ export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true
   const counter = { c: 0 };
   const petalRanges = [], petalRows = [], blendInfo = [];
   const acc = new G.MeshBuilder({ exportMode });
-  const smoother = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (x * 6 - 15) + 10));
   const lobeFrom = (rows) => {
     const c = counter.c++, L = Math.floor(c / n), p = c % n, gg = geo[L];
     petalRanges.push({ c, L, p, from: acc.positions.length / 9 });
     petalRows.push(rows);
     if (end === 'tip' && h === null) return -1;
     const R1 = gg.R1;
+    /* THE SLIT EDGE (Eva's ruling): at a slit the edge petal keeps its ORIGINAL
+       edge — its outer half (midrib to free margin) is the petal's own surface
+       from the foot to the tip, carrying the owner's edge profile; its inner
+       half rides the ring as every other petal does. */
+    const kk = kOf(L), edgeMode = slits === 'edge' && h !== null && kk > 0 && kk < n;
+    const m = edgeMode ? n / kk : 0;
+    const side = edgeMode ? (p % m === m - 1 ? 1 : p % m === 0 ? -1 : 0) : 0;
+    const S = R1 - G.__PANEL_OVERLAP_ROWS - gg.flareRows;
     if (h !== null) {
       let bEnd = R1;
-      for (let i = R1 - 1; i < rows.length; i++) {
+      for (let i = side ? 0 : S; i < rows.length; i++) {
         const s = i <= R1 ? 0 : gg.sMid[i];
         const w = smoother(s / blendMm);
         if (w >= 1) break;
         bEnd = i;
         const own = rows[i].sect;
         const mid = gg.midsAll[i][p], rho = Math.hypot(mid[0], mid[1]), thMid = Math.atan2(mid[1], mid[0]);
-        const arc = (sgn) => { let a = 0, prev = own(0).P; for (let q = 1; q <= 32; q++) { const P = own((sgn * q) / 32).P; a += len(sub(P, prev)); prev = P; } return a; };
-        const sPlus = arc(1), sMinus = arc(-1);
+        const sPlus = sideArc(own, 1), sMinus = sideArc(own, -1);
         const curve = gg.curveAt(i);
-        rows[i].sect = (v) => {
+        const bl = (v) => {
           const q = own(v);
           const th = thMid + (v >= 0 ? v * sPlus : v * sMinus) / rho;
           const Rp = curve(th), Rn = gg.ringN(i, th);
@@ -324,10 +457,17 @@ export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true
           let nn = add(mul(Rn, 1 - w), mul(q.n, w)); nn = mul(nn, 1 / len(nn));
           return { P, n: nn };
         };
+        /* the slit edge: the outer half is the petal's OWN section at every row
+           (the same function today's petal draws), the inner half rides the
+           ring; they meet at the midrib, where both are the midrib point */
+        rows[i].sect = side ? (v) => (v * side >= 0 ? own(v) : bl(v)) : bl;
       }
-      blendInfo.push({ c, R1, bEnd, uTop: rows[R1].u, uBlendEnd: rows[bEnd].u });
+      blendInfo.push({ c, R1, bEnd, S, flareRows: gg.flareRows, uTop: rows[R1].u, uBlendEnd: rows[bEnd].u, uStart: rows[S].u, side });
     }
-    return R1 - G.__PANEL_OVERLAP_ROWS;
+    /* an edge petal is ONE panel from the foot (row 0) to the tip: its inner
+       half lies on the ring below the ring's top (w = 0) and blends above it;
+       its outer half is its own surface the whole way */
+    return side ? 0 : S;
   };
   const built = G.buildBloomInto(acc, st, { below: null, capability: { tubeLobe: lobeFrom } });
   for (let i = 0; i < petalRanges.length; i++) petalRanges[i].to = i + 1 < petalRanges.length ? petalRanges[i + 1].from : acc.positions.length / 9;
@@ -350,13 +490,56 @@ export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true
     const gapHalfAng = Number(process.env.TUBE_GAP || 1) * (G.MIN_FEATURE_MM / 2) / ringR;   // TUBE_GAP scales it, diagnosis only
     const accR = new G.MeshBuilder({ exportMode });
     const panels = [];
-    if (kk === 0) {
+    /* the midrib azimuths at the ring's top row, unwrapped increasing from petal 0 */
+    const thm = mids[R1].map((P) => Math.atan2(P[1], P[0]));
+    for (let p = 1; p < n; p++) while (thm[p] <= thm[p - 1]) thm[p] += TAU;
+    const notch = gg.notchOn;
+    const curvesN = notch ? dippedCurves(gg, R1, gg.sinuses, gg.spacing) : curves;
+    /* the sinus between petal p and p+1, unwrapped to lie after thm[p] */
+    const sinusAfter = (p) => { const sn = gg.sinuses[p]; let cc = sn.c; while (cc < thm[p]) cc += TAU; while (cc > thm[p] + TAU) cc -= TAU; return { ...sn, cc, half: sn.gapAng / 2 }; };
+    /* the segments from petal p's midrib to petal p+1's: C/2 columns each side of
+       the sinus centre, and where the NOTCH is drawn COLS_SINUS more inside the
+       sinus so the U is resolved (a column every ~W/6) */
+    const between = (p, q) => {
+      const sn = sinusAfter(p), thp = thm[p];
+      const thq = q === 0 ? thm[0] + TAU : thm[q];
+      if (sn.r > 0) return [{ a: thp, b: sn.cc - sn.half, cols: C / 2 }, { a: sn.cc - sn.half, b: sn.cc, cols: COLS_PER_SINUS / 2 }, { a: sn.cc, b: sn.cc + sn.half, cols: COLS_PER_SINUS / 2 }, { a: sn.cc + sn.half, b: thq, cols: C / 2 }];
+      return [{ a: thp, b: sn.cc, cols: C / 2 }, { a: sn.cc, b: thq, cols: C / 2 }];
+    };
+    if (kk === 0 && notch) {
+      /* the periodic ring, re-knotted so every open sinus carries the U */
+      const segs = []; for (let p = 0; p < n; p++) segs.push(...between(p, (p + 1) % n));
+      const { phiOf, NVp } = knotMap(segs, true);
+      const rows = panelRows(curvesN, us, phiOf, tAt, sign);
+      G.__tubeWithNV(NVp, () => G.emitPanel(accR, rows, { label: 'tube', periodic: true, rowFrom: 0, rowTo: rows.length - 1, spanAt: () => [-1, 1] }, tAt, null));
+      panels.push({ label: 'tube', petals: n });
+    } else if (kk === 0) {
       const NVp = C * n;
       const phiOf = (r, v) => th0 - D / 2 + ((v + 1) / 2) * TAU;
       const rows = panelRows(curves, us, phiOf, tAt, sign);
       G.__tubeWithNV(NVp, () => G.emitPanel(accR, rows, { label: 'tube', periodic: true, rowFrom: 0, rowTo: rows.length - 1, spanAt: () => [-1, 1] }, tAt, null));
       panels.push({ label: 'tube', petals: n });
+    } else if (slits === 'edge' && h !== null) {
+      /* THE PETAL-EDGE SLIT (Eva's ruling on Part B): each panel runs from its
+         first petal's midrib to its last petal's, plus SLIT_OVERLAP_MM past each
+         (the edge petal's own outer half overlaps it from the other side) */
+      const m = n / kk;
+      for (let s = 0; s < kk; s++) {
+        const p0 = s * m, p1 = p0 + m - 1;
+        const rhoA = Math.hypot(mids[Math.min(2, R1)][p0][0], mids[Math.min(2, R1)][p0][1]), rhoB = Math.hypot(mids[Math.min(2, R1)][p1][0], mids[Math.min(2, R1)][p1][1]);
+        const segs = [{ a: thm[p0] - SLIT_OVERLAP_MM / rhoA, b: thm[p0], cols: 2 }];
+        for (let p = p0; p < p1; p++) segs.push(...between(p, p + 1));
+        segs.push({ a: thm[p1], b: thm[p1] + SLIT_OVERLAP_MM / rhoB, cols: 2 });
+        const { phiOf, NVp } = knotMap(segs, false);
+        const rows = panelRows(curvesN, us, phiOf, tAt, sign);
+        const pAcc = new G.MeshBuilder({ exportMode });
+        G.__tubeWithNV(NVp, () => G.emitPanel(pAcc, rows, { label: `panel${s}`, rowFrom: 0, rowTo: rows.length - 1, spanAt: () => [-1, 1] }, tAt, null));
+        for (let q = 0; q < pAcc.positions.length; q++) accR.positions.push(pAcc.positions[q]);
+        ringShells.push({ layer: L, label: `panel${s}`, positions: pAcc.positions.slice() });
+        panels.push({ label: `panel${s}`, petals: m });
+      }
     } else {
+      /* the WEDGE slit, Part A/B's construction, kept behind slits: 'wedge' */
       const m = n / kk;
       const NVp = C * m + 1;
       for (let s = 0; s < kk; s++) {
@@ -388,10 +571,11 @@ export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true
     /* T1: the ring passes through every midrib EXACTLY, at every row */
     let t1 = 0;
     for (let r = 0; r <= R1; r++) for (let p = 0; p < n; p++) { const P = curves[r](Math.atan2(mids[r][p][1], mids[r][p][0])); t1 = Math.max(t1, len(sub(P, mids[r][p]))); }
-    ringReport.push({ layer: L, k: kk, rows: R1 + 1, uTop: us[R1], ringRadiusMm: ringR, ringTris: accR.positions.length / 9, panels, midribResidualMm: t1, mids, us, tAt });
+    ringReport.push({ layer: L, k: kk, rows: R1 + 1, uTop: us[R1], ringRadiusMm: ringR, ringTris: accR.positions.length / 9, panels, midribResidualMm: t1, mids, us, tAt,
+      flare: { rows: gg.flareRows, need: gg.flareNeed, arcMm: gg.flareArcMm }, notch: { on: notch, spacingMm: gg.spacing, sinuses: gg.sinuses.map((x) => ({ p: x.p, gapMm: 2 * x.W, W: x.W, r: x.r, depthMm: x.depthMm, leanDeg: x.beta * 180 / Math.PI })) } });
     for (let q = 0; q < accR.positions.length; q++) acc.positions.push(accR.positions[q]);
   }
-  return { st, n, layers, uNib, h, blendMm, lastRow, plain, plainTris: plainAcc.positions.length / 9, built, positions: acc.positions, tubeTris: acc.positions.length / 9, ringShells, ringReport, petalRanges, petalRows, blendInfo, plainRanges, plainRows, plainPositions: plainAcc.positions, geo, G };
+  return { st, n, layers, uNib, h, blendMm, blend, slits, k, lastRow, plain, plainTris: plainAcc.positions.length / 9, built, positions: acc.positions, tubeTris: acc.positions.length / 9, ringShells, ringReport, petalRanges, petalRows, blendInfo, plainRanges, plainRows, plainPositions: plainAcc.positions, geo, G };
 }
 
 /* ---------------- the hub finding ----------------
@@ -493,10 +677,84 @@ export function measureTube(set, opts = {}) {
       for (let i = R1; i < NR; i++) { if (planGap(ours[0], ours[1 % n], i) < 0) crossedOurs.push(+ours[0][i].u.toFixed(3)); if (planGap(today[0], today[1 % n], i) < 0) crossedToday.push(+today[0][i].u.toFixed(3)); }
       crossing = { sinusMm: planGap(ours[0], ours[1 % n], R1), uTop: ours[0][R1].u, oursAboveH: crossedOurs, todayAboveH: crossedToday };
     }
+    /* THE SLIT EDGES' SHINGLE: at every slit, the two edge petals (the last of
+       one panel, the first of the next) censused alone and together — the pairs
+       BETWEEN them are the shingle (two shells passing as today's petals do),
+       pairs WITHIN either would be a fold — beside today's same two petals */
+    let slitPairs = null;
+    if (!b.free && b.slits === 'edge' && b.h !== null) {
+      slitPairs = [];
+      for (const rr of b.ringReport) {
+        if (!(rr.k > 0 && rr.k < b.n)) continue;
+        const m = b.n / rr.k;
+        for (let s = 0; s < rr.k; s++) {
+          const pA = s * m + m - 1, pB = (s * m + m) % b.n, base = rr.layer * b.n;
+          const one = (pos, ranges) => { const A = sliceTris(pos, ranges[base + pA]), B = sliceTris(pos, ranges[base + pB]); const AB = new Float64Array(A.length + B.length); AB.set(A); AB.set(B, A.length); const cA = census(A), cB = census(B), cAB = census(AB); return { withinA: cA.within, withinB: cB.within, unionWithin: cAB.within, between: cAB.cross - cA.cross - cB.cross, worstSpanMm: cAB.worstSpanMm }; };
+          slitPairs.push({ layer: rr.layer, slit: s, pA, pB, ours: one(b.positions, b.petalRanges), today: one(b.plainPositions, b.plainRanges) });
+        }
+      }
+    }
     const whole = analyzeStl(stlOf(b.positions));
     const conn = opts.conn === false ? null : connected(b.positions);
-    return { b, shells, petals, identical, crossing, whole, conn: conn && { comps: conn.comps, stray: conn.strayFraction, refined: conn.refined } };
+    return { b, shells, petals, identical, crossing, slitPairs, whole, conn: conn && { comps: conn.comps, stray: conn.strayFraction, refined: conn.refined } };
   });
+}
+
+/* ---------------- the fusion line, measured on the EMITTED mesh ----------------
+   Rays cast down the ring's own normal at the ring's top row, at azimuth
+   theta_mid(petal p) + frac * sector, every 1/12 row from 8 rows below the
+   ring's top to 3 above: the top surface's height above the ring's
+   mid-surface and the turn of the hit facet's normal between samples. A crease
+   is a facet turn; a ledge or a groove is a height step. (Brute force over
+   every triangle: a scratch instrument, ~1 s a profile.) */
+export function fusionProfile(b, { p = 0, frac = 0, L = 0 } = {}) {
+  const P = b.positions, g = b.geo[L], R1 = g.R1, nT = P.length / 9;
+  const ringFrom = b.tubeTris - b.ringReport.reduce((a, x) => a + x.ringTris, 0);
+  const shellOf = (t) => (t >= ringFrom ? 'ring' : b.petalRanges.find((r) => t >= r.from && t < r.to) ? 'petal' : 'hub');
+  const nrm = (a) => mul(a, 1 / len(a));
+  const hit = (O, D) => { let best = null; for (let t = 0; t < nT; t++) { const A = [P[t * 9], P[t * 9 + 1], P[t * 9 + 2]], B = [P[t * 9 + 3], P[t * 9 + 4], P[t * 9 + 5]], Cc = [P[t * 9 + 6], P[t * 9 + 7], P[t * 9 + 8]];
+    const e1 = sub(B, A), e2 = sub(Cc, A), pp = cross(D, e2), det = dot(e1, pp); if (Math.abs(det) < 1e-12) continue; const inv = 1 / det, sv = sub(O, A), u = dot(sv, pp) * inv; if (u < -1e-9 || u > 1 + 1e-9) continue; const q = cross(sv, e1), v = dot(D, q) * inv; if (v < -1e-9 || u + v > 1 + 1e-9) continue; const d = dot(e2, q) * inv; if (d > 0 && (!best || d < best.d)) { let fn = nrm(cross(e1, e2)); if (dot(fn, D) > 0) fn = mul(fn, -1); best = { d, t, fn }; } } return best; };
+  const th = Math.atan2(g.midsAll[R1][p][1], g.midsAll[R1][p][0]) + frac * TAU / b.n;
+  const N0 = g.ringN(R1, th);
+  const out = []; let prev = null, prevShell = null, sAcc = 0, lastM = null;
+  for (let r = Math.max(2, R1 - 8); r < R1 + 3; r++) for (let q = 0; q < 12; q++) {
+    const f = q / 12, Ma = g.curveAt(r)(th), Mb = g.curveAt(r + 1)(th), M = add(Ma, mul(sub(Mb, Ma), f));
+    if (lastM) sAcc += len(sub(M, lastM)); lastM = M;
+    const H = hit(add(M, mul(N0, 30)), mul(N0, -1)); if (!H) continue;
+    const sh = shellOf(H.t), turn = prev ? Math.acos(Math.max(-1, Math.min(1, dot(prev, H.fn)))) * 180 / Math.PI : 0;
+    out.push({ r, f, u: g.usAll[r] + (g.usAll[r + 1] - g.usAll[r]) * f, s: sAcc, sh, height: 30 - H.d, turn, change: !!(prevShell && prevShell !== sh) }); prev = H.fn; prevShell = sh;
+  }
+  const hs = out.map((o) => o.height);
+  return { samples: out, maxTurnDeg: Math.max(...out.map((o) => o.turn)), heightMin: Math.min(...hs), heightMax: Math.max(...hs), heightRange: Math.max(...hs) - Math.min(...hs),
+    worst: out.reduce((a, o) => (o.turn > a.turn ? o : a), out[0]) };
+}
+/* THE NOTCH CORNER, in the surface: where petal p's +v margin leaves the ring's
+   top rim. BEFORE: the outline turns from the rim (heading into the sinus) up
+   the margin — exterior turn 180 - (rim, margin). AFTER (r > 0): the U arrives
+   tangent to the ring's meridian, so the outline turns from meridian-up into
+   margin-up — exterior turn = (meridian up, margin up). Both in the ring's
+   tangent plane at the corner. */
+export function notchCorner(b, { p = 0, L = 0 } = {}) {
+  const g = b.geo[L], R1 = g.R1, rows = b.petalRows[L * b.n + p];
+  const A = rows[R1].sect(1).P, A1 = rows[R1 + 1].sect(1).P;
+  const thA = Math.atan2(A[1], A[0]), hh = 1e-4;
+  const rim = sub(g.curveAt(R1)(thA + hh), g.curveAt(R1)(thA - hh));
+  const up = sub(g.curveAt(R1)(thA), g.curveAt(R1 - 1)(thA));
+  const N = g.ringN(R1, thA);
+  const proj = (v) => sub(v, mul(N, dot(v, N)));
+  const ang = (a, c) => Math.acos(Math.max(-1, Math.min(1, dot(a, c) / (len(a) * len(c))))) * 180 / Math.PI;
+  const sn = g.sinuses[p] || null;
+  const margin = proj(sub(A1, A));
+  /* AFTER: the U's own end tangent, read off the DIPPED curve the ring panel
+     draws (a short chord into the sinus from the margin's end), against the
+     margin going up — the turn the outline makes at the hand-over */
+  let turnAfterDeg = null;
+  if (sn && sn.r > 0 && g.notchOn) {
+    const curves = dippedCurves(g, R1, g.sinuses, g.spacing);
+    const dth = 1e-4 * (wrapPi(sn.c - thA) > 0 ? 1 : -1);
+    turnAfterDeg = ang(margin, proj(sub(curves[R1](thA), curves[R1](thA + dth))));
+  }
+  return { cornerDeg: ang(margin, proj(rim)), turnBeforeDeg: 180 - ang(margin, proj(rim)), turnAfterDeg, gapMm: sn ? 2 * sn.W : null, r: sn ? sn.r : 0, depthMm: sn ? sn.depthMm : 0, leanDeg: sn ? sn.beta * 180 / Math.PI : 0, engaged: !!(sn && sn.r > 0 && g.notchOn) };
 }
 
 /* ---------------- attribution ----------------
@@ -596,6 +854,42 @@ if (isMain) {
       ['width 30', { petalWidth: 30 }], ['length 20', { petalLength: 20 }], ['headRise 1', { headRise: 1 }], ['layers 3', { layerCount: 3 }], ['layers 6', { layerCount: 6 }]]) await one2(lab, set, { shape, k: 0, h });
     for (const shape of shapes) for (const k of [0, 2, 20]) await one2('petalCount 40 x 6 layers', { petalCount: 40, layerCount: 6 }, { shape, k, h: 0.4 });
     for (const shape of shapes) await one2('layers 6 slit', { layerCount: 6 }, { shape, k: 2, h: 0.4 });
+    if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(out, null, 1));
+    console.log(`${out.length} builds in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    process.exit(0);
+  }
+  if (argv.includes('--round2')) {
+    /* PART C (Eva's rulings on Part B): ROUND only, h 0.25 the default; BLEND
+       0 / 0.5 / 1 over the existing grid, slit rows at every valid k, and h
+       0.40 where the notch engages */
+    const out = [];
+    const B3 = [0, 0.5, 1];
+    const one3 = async (label, set, opt) => {
+      const r = await measureTube(set, { shape: 'ROUND', ...opt });
+      const b = r.b, rr = b.ringReport[0] || null;
+      const pw = r.petals ? r.petals.reduce((a, p) => a + p.within, 0) : null, tw = r.petals ? r.petals.reduce((a, p) => a + (p.todayWithin || 0), 0) : null;
+      const fp = b.free ? null : fusionProfile(b);
+      const nc = b.free ? null : notchCorner(b);
+      const sp = r.slitPairs || [];
+      const row = { label, set, k: opt.k, h: opt.h, blend: opt.blend, free: !!b.free, plainTris: b.plainTris, tubeTris: b.tubeTris, deltaTris: b.tubeTris - b.plainTris,
+        ringPairs: r.shells.reduce((a, x) => a + x.within, 0), petalPairs: pw, todayPetalPairs: tw, boundary: r.whole.boundary, nonManifold: r.whole.nonManifold, directed: r.shells.reduce((a, x) => a + x.directed, 0), inward: r.shells.reduce((a, x) => a + x.inward, 0),
+        comps: r.conn && r.conn.comps, flareRows: rr && rr.flare.rows, flareNeed: rr && rr.flare.need, flareArcMm: rr && rr.flare.arcMm,
+        sinusMm: nc && nc.gapMm, notch: nc && nc.engaged, notchR: nc && nc.r, notchDepth: nc && nc.depthMm, leanDeg: nc && nc.leanDeg, cornerTurnBefore: nc && nc.turnBeforeDeg, cornerTurnAfter: nc && nc.turnAfterDeg,
+        fusionMaxTurn: fp && fp.maxTurnDeg, fusionHeightMin: fp && fp.heightMin, fusionHeightMax: fp && fp.heightMax,
+        slits: sp.length, slitEdgeWithin: sp.reduce((a, x) => a + x.ours.withinA + x.ours.withinB, 0), slitUnionWithin: sp.reduce((a, x) => a + x.ours.unionWithin, 0), shingleOurs: sp.reduce((a, x) => a + x.ours.between, 0), shingleToday: sp.reduce((a, x) => a + x.today.between, 0), slitPairs: sp };
+      out.push(row);
+      const f = (x, d = 2) => (x === null || x === undefined ? '-' : typeof x === 'number' ? x.toFixed(d) : x);
+      console.log(`${label.padEnd(26)} k=${String(opt.k).padEnd(2)} h=${opt.h} b=${opt.blend} tris ${row.plainTris}->${row.tubeTris} (${row.deltaTris >= 0 ? '+' : ''}${row.deltaTris}) ring ${row.ringPairs} petals ${pw} (today ${tw}) bnd ${row.boundary} nm ${row.nonManifold} dir ${row.directed} inw ${row.inward} comps ${row.comps} | flare ${row.flareRows}/${row.flareNeed} turn ${f(row.fusionMaxTurn, 1)} | sinus ${f(row.sinusMm)} notch ${row.notch ? `r ${f(row.notchR)} depth ${f(row.notchDepth)} turn ${f(row.cornerTurnBefore, 1)}->${f(row.cornerTurnAfter, 1)}` : 'inert'}${row.slits ? ` | slits ${row.slits} edgeWithin ${row.slitEdgeWithin} unionWithin ${row.slitUnionWithin} shingle ${row.shingleOurs} (today ${row.shingleToday})` : ''}`);
+    };
+    const STATES = [['DEFAULT', {}], ['petalCount 5', { petalCount: 5 }], ['petalCount 12', { petalCount: 12 }],
+      ['tilt 60', { petalTilt: 60 }], ['tilt 75', { petalTilt: 75 }], ['tilt 90', { petalTilt: 90 }], ['tilt 105', { petalTilt: 105 }], ['tilt 75 x 5', { petalTilt: 75, petalCount: 5 }],
+      ['curl 90', { petalSpineCurl: 90 }], ['curl 180', { petalSpineCurl: 180 }], ['curl 270', { petalSpineCurl: 270 }], ['curl 360', { petalSpineCurl: 360 }], ['curl -180', { petalSpineCurl: -180 }],
+      ['cup 1.2', { petalCup: 1.2 }], ['cup -0.8', { petalCup: -0.8 }], ['roll 330', { petalRoll: 330 }], ['roll -330', { petalRoll: -330 }], ['twist 180', { petalTwist: 180 }],
+      ['width 30', { petalWidth: 30 }], ['length 20', { petalLength: 20 }], ['headRise 1', { headRise: 1 }], ['layers 3', { layerCount: 3 }], ['layers 6', { layerCount: 6 }]];
+    for (const [lab, set] of STATES) for (const blend of B3) await one3(lab, set, { k: 0, h: 0.25, blend });
+    for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const blend of B3) await one3(`petalCount ${n}`, { petalCount: n }, { k, h: 0.25, blend });
+    for (const [lab, set] of [['DEFAULT', {}], ['petalCount 5', { petalCount: 5 }], ['layers 3', { layerCount: 3 }]]) for (const blend of B3) await one3(lab, set, { k: 0, h: 0.4, blend });
+    for (const k of [0, 2, 20]) await one3('petalCount 40 x 6 layers', { petalCount: 40, layerCount: 6 }, { k, h: 0.25, blend: 1 });
     if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(out, null, 1));
     console.log(`${out.length} builds in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     process.exit(0);
