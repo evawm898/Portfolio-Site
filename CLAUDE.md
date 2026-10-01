@@ -8812,11 +8812,11 @@ tour/release dates worth watching. No backend, no build step: a SHA-256
 password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
 `sessionStorage`) guards a `localStorage`-backed CRUD tracker.
 
-**Status: items 1–28 are MERGED to `main`** — PRs #121 and #125 (items
+**Status: items 1–32 are MERGED to `main`** — PRs #121 and #125 (items
 1–12), #132 (items 13–27, which carried #127's commits; #127 itself was
-closed as superseded rather than merged) and #219 (item 28, the nine-tag
-vocabulary, merged as `31c79eb`). Items 29–32 are in review on branch
-`claude/tracker-ratings-markers`.
+closed as superseded rather than merged), #219 (item 28, the nine-tag
+vocabulary, merged as `31c79eb`) and the ratings/markers branch (items
+29–32). Item 33 is the geocoding network path (the Oct 1 session).
 Review through the Netlify Deploy Preview — `localStorage` is per-origin, so
 preview data does not carry over to production and vice versa; move it with
 the app's own JSON export/import. The production page is
@@ -9200,6 +9200,72 @@ they and who is near who (region filter + map), and why did I save them
     whose children are counted as the vocabulary — putting it there would
     break item 28's "exactly nine non-custom chips" check.
 
+33. **The network geocoder is throttled, identified, backs off, caches by string
+    and reports its progress and its leftovers** (the geocoding session, Oct 1 —
+    read the `--- Nominatim` header in `artist-tracker.html` before touching
+    `geocodeLocation`, `ensureGeocoded`, `geoRetryDue` or `paintMapCount`). The
+    static gazetteer (item 25) is still the primary path and is untouched; this is
+    the NETWORK path, which only ever sees the strings the table cannot place.
+    **The brief's "~73 of ~211 plot" is item 25's own pre-fix figure** — the
+    gazetteer took that file to 211 of 211 with no request at all — so what this
+    session fixed is what the leftovers' network path still did wrong.
+    - **ONE REQUEST A SECOND, BY TIMESTAMP** (`geoThrottle`, `GEO_MIN_INTERVAL_MS`
+      1100), not a sleep after each call: Nominatim's policy is an absolute maximum
+      of one per second. **A browser cannot set User-Agent** (a forbidden header
+      name); the policy accepts a Referer for client-side use, and the fetch pins
+      `referrerPolicy: 'strict-origin-when-cross-origin'` so a future page-level
+      `<meta name="referrer">` cannot silently anonymise every request. Measured in
+      the gate: every request carries `Referer: <page origin>/`. No `email=`
+      parameter is sent — that would publish an address to a third party.
+    - **A 429 IS NOT AN ANSWER ABOUT THE LOCATION, AND THE OLD CODE COUNTED IT AS
+      ONE** — three rate-limited visits retired a perfectly good string through the
+      try cap. `geocodeLocation` now returns `found` / `none` / `transient`, and only
+      `none` (a 200 with an empty result) counts a try. A transient (ANY non-OK
+      status, a network error, an unreadable body) backs off — the server's
+      `Retry-After` when it exposes one, clamped to [1.1 s, 60 s], else a
+      1-2-4-8-16-32-60 s ladder — and retries the SAME string; after
+      `GEO_MAX_TRANSIENT_STREAK` (8) in a row the run PAUSES: that one string is
+      deferred ten minutes (`geoTransient`, never `geoTries`) and **every string
+      behind it is left untouched** for the next visit, because a rate limit is
+      about the client and marching on would only burn them all. `geoBackoffMs` and
+      `parseRetryAfter` are pure and are sliced into the gate.
+    - **A RESOLVED STRING IS CACHED BY STRING** (`artistTracker.geoCache.v1`, folded
+      location → `{lat, lng, at}`, answers only) beside the entry's own `e.geo`, so a
+      re-import, a restored backup or a second artist in the same place never
+      re-asks. `geoFor` reads `e.geo`, then the table, then the cache.
+    - **THE MAP COUNT LINE CARRIES THE RUN**: `geocoding 3 of 12 (2 placed, 1 not
+      found)…` while it runs; `geocoding paused: the service refused 8 requests in a
+      row (http 429) — 4 not yet asked; it resumes next time the map opens` when it
+      cannot; and **THE CLEANING LIST** always — a `<details>` naming every location
+      string across the WHOLE ledger that nothing could place, with its artist count
+      and where its retry stands (`not looked up yet` / `not found — will retry` /
+      `not found — given up after 3 tries` / `rate limited — will retry`). Whole
+      ledger and not the filtered view on purpose: a string that cannot be placed is
+      a string to edit, and the map is the only place that can say which ones. This
+      repo cannot see Eva's data (the bulk-paste files were never committed), so
+      **the list IS the report of what still fails.**
+    - **MEASURED, main against this tree, 60 strings the table cannot place, one
+      scripted server, two visits with storage carried across the reload**
+      (`measure.mjs`, session scratchpad; the first scenario is item 25's own stub):
+      40 answers then 429 forever, then a healthy second visit — main **40 → 40**
+      (20 strings each burn a try and wait six hours; 0 requests on visit 2), this
+      tree **40 → 59** (1 deferred ten minutes, 19 untouched and simply asked on
+      visit 2). A 12-second outage at the start of a visit — main **49** (11 burned
+      for six hours), this tree **60 in one visit** (6 backoff attempts, then the
+      queue). The before/after is on the NETWORK path only; on anything the table
+      places both trees read the same.
+    - **THE GATE STUBS MUST EXPOSE `Retry-After`**: Playwright makes a fulfilled 429
+      readable across origins, but a header the stub does not expose is invisible to
+      `fetch`, and the page then (correctly) takes the two-minute ladder — which is
+      how the first gate run timed out at 40 s. **`innerText` omits the contents of
+      a closed `<details>`**, so the cleaning-list checks read `textContent`. A run
+      that gets its answers at once is over in milliseconds, so the progress line is
+      recorded by a MutationObserver installed BEFORE the click, and the gate waits
+      on the run's OWN end state (the pins, the storage, the paused note), never on
+      the line's absence alone, which is true before the run starts too — and that
+      wait never throws: under a mutation the page never arrives, and a thrown
+      timeout reports nothing where a red check reports the defect.
+
 **Facet counts are computed against every filter except themselves** — with
 the view defaulting to tattoo artists, a region count taken over the whole
 ledger would read "USA (40)" while showing 25. Each filter is its own
@@ -9209,8 +9275,8 @@ counts can exclude their own dimension.
 **Testing approach:** no CI workflow covers this file (every GitHub
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
-drawer, paste-to-add, shortlist and import work (items 11–32) ship with a
-behaviour gate, `node tools/verify-tracker-drawer.mjs` (385 checks;
+drawer, paste-to-add, shortlist, import and geocoding work (items 11–33) ship
+with a behaviour gate, `node tools/verify-tracker-drawer.mjs` (427 checks;
 `--shots <dir>` also writes a contact sheet). `staticGeocode()` is a pure
 function, so its ANSWERS are unit-checked against declarations SLICED OUT of
 `artist-tracker.html` itself (the app is inside an IIFE) rather than inferred
@@ -9250,7 +9316,14 @@ its storage tiebreak, the tag box free-text again, and a facet counting
 against itself. **Check every anchor BEFORE running any mutant** — a `from`
 that has moved, or that now matches twice, disarms a mutant silently, and a
 sweep that costs a full gate run per mutation is not one you notice a hole in.
-**15 of 15 behave**, and getting there cost three sweeps and taught four things:
+**15 of 15 behave**, and getting there cost three sweeps and taught four things.
+Item 33 added seven more, run in parallel copies of the tree with `node_modules`
+linked: the throttle set to 0, a 429 answered as `none`, the string cache never
+written, the string cache never read, the progress line removed, the run
+marching on after giving up, and a deferral left unmarked — **7 of 7 behave**,
+each reddening exactly the checks that name its behaviour, and the one that
+first CRASHED the gate (a timeout thrown from the wait for an end state the
+mutated page never reaches) is why that wait no longer throws:
 
 * **READ THE `FAIL` LINES OFF THE STREAM, NEVER THE FINAL `FAILURES:` BLOCK.**
   A mutation bad enough to make the harness throw never prints that block, so

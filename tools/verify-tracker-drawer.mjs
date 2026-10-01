@@ -17,6 +17,9 @@
 // The password gate is bypassed by seeding sessionStorage, and the two
 // outbound hosts the page uses (unavatar.io for fallback avatars, unpkg for
 // Leaflet) are stubbed — this gate is about the drawer, not about them.
+// Nominatim is stubbed PER SECTION (item 16, item 33) so the geocoder's
+// throttle, backoff, cache and progress line are measured against a server
+// whose every answer is written down here; it is never reached for real.
 //
 // Playwright is a global install in the dev container, not a project
 // dependency; it is resolved from NODE_PATH / the usual global root.
@@ -159,6 +162,26 @@ const geoModule = [
 ].map(h => sliceDecl(PAGE_SRC, h)).join('\n');
 const staticGeocode = new Function(geoModule + '\nreturn staticGeocode;')();
 const foldText = new Function(geoModule + '\nreturn foldText;')();
+
+// The backoff schedule, likewise sliced out so the gate runs the SHIPPED
+// arithmetic rather than a copy. These are one-line declarations, so the
+// slice is the line.
+function sliceLine(src, header){
+  const at = src.indexOf(header);
+  if(at === -1) throw new Error('verify-tracker-drawer: could not find ' + JSON.stringify(header)
+    + ' in artist-tracker.html — the backoff checks would silently pass. Fix the slice.');
+  return src.slice(at, src.indexOf('\n', at));
+}
+const backoffModule = [
+  sliceLine(PAGE_SRC, 'const GEO_MIN_INTERVAL_MS = '),
+  sliceLine(PAGE_SRC, 'const GEO_BACKOFF_LADDER_MS = '),
+  sliceLine(PAGE_SRC, 'const GEO_MAX_TRANSIENT_STREAK = '),
+  sliceLine(PAGE_SRC, 'const GEO_RETRY_AFTER_CAP_MS = '),
+  sliceDecl(PAGE_SRC, 'function geoBackoffMs(streak, retryAfterMs){'),
+  sliceDecl(PAGE_SRC, 'function parseRetryAfter(value){'),
+].join('\n');
+const { geoBackoffMs, parseRetryAfter, GEO_MIN_INTERVAL_MS, GEO_MAX_TRANSIENT_STREAK } = new Function(
+  backoffModule + '\nreturn { geoBackoffMs, parseRetryAfter, GEO_MIN_INTERVAL_MS, GEO_MAX_TRANSIENT_STREAK };')();
 
 // The SHIPPED merge, not a copy of it. `mergeEntry` decides what a JSON
 // restore and a bulk paste each do to an entry that is already here, and on
@@ -897,14 +920,17 @@ let tctx = null;
 // `setup` runs against the fresh context before the page opens — used to give
 // a section its own network stubs (e.g. aborting Nominatim so the static
 // gazetteer is measured on its own rather than quietly propped up by it).
-async function reseed(rows, setup){
+// `extra` is further localStorage keys to seed beside the entries — the
+// string-keyed geocode cache, for the checks about it.
+async function reseed(rows, setup, extra){
   if(tp) await tctx.close();
   tctx = await browser.newContext({ viewport:{ width:1280, height:900 } });
   if(setup) await setup(tctx);
-  await tctx.addInitScript(([store, seed]) => {
+  await tctx.addInitScript(([store, seed, more]) => {
     sessionStorage.setItem('artistTracker.unlocked', '1');
     localStorage.setItem(store, JSON.stringify(seed));
-  }, [STORE, rows]);
+    for(const k of Object.keys(more || {})) localStorage.setItem(k, more[k]);
+  }, [STORE, rows, extra || {}]);
   await tctx.route('**/artist-tracker.html', async (r) => {
     const res = await r.fetch();
     const body = (await res.text()).replace(/ integrity="sha256-[^"]*"/g, '');
@@ -921,6 +947,38 @@ async function reseed(rows, setup){
   await tp.locator('.chip[data-cat="all"]').click();
   return tp;
 }
+// A geocoding run that gets its answers at once is over in milliseconds, so
+// a poller never sees the progress line; a MutationObserver installed before
+// the map tab is clicked records every text it showed. `geoIdle` then waits on
+// the run's OWN end state (the pins, the storage, the paused note) rather
+// than on the line's absence alone, which is also true before the run starts.
+async function watchProgress(){
+  await tp.evaluate(() => {
+    window.__geoSeen = [];
+    const el = document.getElementById('mapCount');
+    new MutationObserver(() => {
+      const p = el.querySelector('.geo-progress');
+      if(p) window.__geoSeen.push(p.textContent);
+    }).observe(el, { childList:true, subtree:true, characterData:true });
+  });
+}
+async function seenProgress(){ return await tp.evaluate(() => window.__geoSeen || []); }
+// A page that never reaches the end state (a mutation, say) must leave the
+// checks that follow to go red on what the page actually holds — never take
+// the whole run down with a thrown timeout, which reports nothing.
+async function geoIdle(doneSrc, timeout){
+  try{
+    await tp.waitForFunction((src) => !document.querySelector('#mapCount .geo-progress') && (0, eval)(src)(),
+      doneSrc, { timeout: timeout || 30000 });
+    return true;
+  }catch(e){
+    console.log('  note geoIdle: end state not reached within ' + (timeout || 30000) + ' ms — ' + doneSrc);
+    return false;
+  }
+}
+// innerText omits the contents of a closed <details>; the cleaning list is one.
+async function mapCountText(){ return await tp.evaluate(() => document.getElementById('mapCount').textContent); }
+
 // Rows lead with an .entry-index ("001"), so read the name element itself.
 async function visibleNames(){
   return await tp.evaluate(() =>
@@ -1337,25 +1395,73 @@ await tp.waitForTimeout(1600);
 check('a failure just recorded is left alone rather than hammered',
   backoffCalls === 0, String(backoffCalls));
 
+// Every 429 stub below exposes Retry-After: Playwright makes a fulfilled
+// response readable across origins, but a header the server does not
+// expose is invisible to fetch, and the page then (correctly) falls back to
+// its no-Retry-After ladder, whose rungs sum to two minutes.
+// A 429 is NOT an answer about the location, so it must never count against
+// the location's try cap — the old code counted it, and three rate-limited
+// visits retired a perfectly good string. A run of 429s backs off instead
+// (honouring the server's Retry-After), retries the SAME string a bounded
+// number of times, then defers that one string for a short while and says so.
 let retryCalls = 0;
+const retrySeededAt = Date.now() - (8 * 60 * 60 * 1000);
 await reseed([
   { id:'x3', name:'Aged Failure', handle:'@x3', category:'tattoo', location:'Nowhere Quadrant Zzyzx',
     pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'',
-    geoTries:1, geoFailedAt: Date.now() - (8 * 60 * 60 * 1000) },
+    geoTries:1, geoFailedAt: retrySeededAt },
 ], async (c) => {
   await c.route('**://nominatim.openstreetmap.org/**', r => {
     retryCalls++;
-    return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests' });
+    return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests',
+      headers:{ 'Retry-After':'1', 'Access-Control-Allow-Origin':'*', 'Access-Control-Expose-Headers':'Retry-After' } });
   });
 });
+await watchProgress();
 await tp.locator('.view-tab[data-view="map"]').click();
-await tp.waitForTimeout(1600);
+await geoIdle("() => /geocoding paused/.test(document.getElementById('mapCount').innerText)", 40000);
 check('once the backoff expires the location IS retried, not retired forever',
   retryCalls >= 1, String(retryCalls));
 const retryState = await tp.evaluate(() =>
   JSON.parse(localStorage.getItem('artistTracker.entries.v1'))[0]);
-check('...and the retry is counted, so it cannot spin forever',
-  (retryState.geoTries || 0) === 2, JSON.stringify(retryState.geoTries));
+check('a run of 429s is retried with backoff a BOUNDED number of times',
+  retryCalls === GEO_MAX_TRANSIENT_STREAK, retryCalls + ' of ' + GEO_MAX_TRANSIENT_STREAK);
+check('...and a 429 is NOT counted against the location\'s try cap',
+  (retryState.geoTries || 0) === 1, JSON.stringify(retryState.geoTries));
+check('...but the location is deferred, so it cannot spin',
+  retryState.geoTransient === true && retryState.geoFailedAt > retrySeededAt,
+  JSON.stringify({ geoTransient: retryState.geoTransient, moved: retryState.geoFailedAt - retrySeededAt }));
+check('...and the map says the run paused and why',
+  /geocoding paused: the service refused \d+ requests in a row/.test(await tp.locator('#mapCount').innerText()),
+  JSON.stringify(await tp.locator('#mapCount').innerText()));
+check('...with the string on the cleaning list as rate limited',
+  /Nowhere Quadrant Zzyzx · 1 · rate limited — will retry/.test(await mapCountText()),
+  JSON.stringify(await mapCountText()));
+
+// An EMPTY RESULT is an answer — the service has nothing for this string —
+// and that IS counted, so a string nobody can place stops being asked about.
+let noneCalls = 0;
+await reseed([
+  { id:'x3b', name:'Aged No-Result', handle:'@x3b', category:'tattoo', location:'Nowhere Quadrant Zzyzx',
+    pronouns:'', date:'', status:'', link:'', photo:'', tags:[], gender:'unknown', notes:'',
+    geoTries:1, geoFailedAt: retrySeededAt },
+], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    noneCalls++;
+    return r.fulfill({ status:200, contentType:'application/json', body:'[]' });
+  });
+});
+await watchProgress();
+await tp.locator('.view-tab[data-view="map"]').click();
+await geoIdle("() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))[0].geoTries === 2", 15000);
+const noneState = await tp.evaluate(() =>
+  JSON.parse(localStorage.getItem('artistTracker.entries.v1'))[0]);
+check('a "no result" answer is asked once, not retried in the same visit', noneCalls === 1, String(noneCalls));
+check('...and IS counted, so it cannot spin forever',
+  (noneState.geoTries || 0) === 2 && !noneState.geoTransient, JSON.stringify(noneState.geoTries));
+check('...and the cleaning list says it was not found and will be retried',
+  /Nowhere Quadrant Zzyzx · 1 · not found — will retry/.test(await mapCountText()),
+  JSON.stringify(await mapCountText()));
 
 let cappedCalls = 0;
 await reseed([
@@ -1372,6 +1478,195 @@ await tp.locator('.view-tab[data-view="map"]').click();
 await tp.waitForTimeout(1600);
 check('a location that has failed its cap stops being asked about',
   cappedCalls === 0, String(cappedCalls));
+check('...and the cleaning list says it was given up on',
+  /Nowhere Quadrant Zzyzx · 1 · not found — given up after 3 tries/.test(await mapCountText()),
+  JSON.stringify(await mapCountText()));
+
+// ---------------------------------------------------------------------------
+// item 33 — the network path is throttled, identified, cached and reported
+// ---------------------------------------------------------------------------
+section('item 33a — the backoff schedule, as a pure function');
+// The schedule is sliced out of the page and run here, because waiting
+// through a 60-second rung in a browser is not a check anyone would run.
+check('the throttle floor is at least Nominatim\'s one request per second',
+  GEO_MIN_INTERVAL_MS >= 1000, String(GEO_MIN_INTERVAL_MS));
+const ladder = [];
+for(let k = 1; k <= GEO_MAX_TRANSIENT_STREAK + 2; k++) ladder.push(geoBackoffMs(k, null));
+check('with no Retry-After the backoff doubles rung by rung',
+  ladder.slice(0, 4).join(',') === '1000,2000,4000,8000', ladder.join(','));
+check('...never shrinks, and holds at its top rather than running away',
+  ladder.every((v, i) => i === 0 || v >= ladder[i - 1]) && ladder[ladder.length - 1] === ladder[ladder.length - 2]
+  && ladder[ladder.length - 1] <= 60000, ladder.join(','));
+check('a Retry-After from the server is honoured over the ladder',
+  geoBackoffMs(5, 2500) === 2500, String(geoBackoffMs(5, 2500)));
+check('...floored at the throttle, so "Retry-After: 0" cannot bypass the one-a-second rule',
+  geoBackoffMs(1, 0) === GEO_MIN_INTERVAL_MS, String(geoBackoffMs(1, 0)));
+check('...and capped, so a hostile header cannot park the run for an hour',
+  geoBackoffMs(1, 3600 * 1000) === 60000, String(geoBackoffMs(1, 3600 * 1000)));
+check('Retry-After is read as seconds', parseRetryAfter('3') === 3000, String(parseRetryAfter('3')));
+const soon = parseRetryAfter(new Date(Date.now() + 5000).toUTCString());
+check('...or as an HTTP date', soon !== null && soon > 2000 && soon <= 5000, String(soon));
+check('...and an absent or unreadable header is null, never zero',
+  parseRetryAfter(null) === null && parseRetryAfter('') === null && parseRetryAfter('soon-ish') === null);
+
+section('item 33b — one request a second, a Referer, a progress count, a cache');
+const UNPLACEABLE = (i) => ({ id:'t' + i, name:'Throttled ' + i, handle:'@t' + i, category:'tattoo',
+  location:'Zzyzx Quadrant ' + i, pronouns:'', date:'', status:'', link:'', photo:'', tags:[],
+  gender:'unknown', notes:'' });
+const PAGE_ORIGIN = new URL(URL_).origin;
+const hits = [];
+await reseed([UNPLACEABLE(1), UNPLACEABLE(2), UNPLACEABLE(3)], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    const h = r.request().headers();
+    hits.push({ at: Date.now(), referer: h['referer'] || h['Referer'] || '' });
+    return r.fulfill({ status:200, contentType:'application/json',
+      body: JSON.stringify([{ lat:'10.5', lon:'20.25', display_name:'stub' }]) });
+  });
+});
+await watchProgress();
+await tp.locator('.view-tab[data-view="map"]').click();
+await geoIdle("() => /^3 artists plotted/.test(document.getElementById('mapCount').innerText)", 30000);
+const progressSeen = await seenProgress();
+check('a progress count is shown while geocoding runs, and it counts up',
+  progressSeen.some(t => /geocoding 1 of 3/.test(t)) && progressSeen.some(t => /geocoding 3 of 3 \(2 placed\)/.test(t)),
+  JSON.stringify(progressSeen));
+check('...and it is gone once the run is over',
+  (await tp.locator('#mapCount .geo-progress').count()) === 0);
+check('every answered location plots',
+  /^3 artists plotted/.test(await tp.locator('#mapCount').innerText()),
+  JSON.stringify(await tp.locator('#mapCount').innerText()));
+const gaps = hits.slice(1).map((h, i) => h.at - hits[i].at);
+check('each location is asked once', hits.length === 3, String(hits.length));
+check('requests are at least a second apart (Nominatim: one per second, absolute)',
+  gaps.length === 2 && gaps.every(g => g >= 1000), JSON.stringify(gaps));
+check('...and the throttle is a throttle, not a stall', gaps.every(g => g < 5000), JSON.stringify(gaps));
+check('every request carries a Referer naming this origin, the identification Nominatim asks for',
+  hits.every(h => h.referer.startsWith(PAGE_ORIGIN)), JSON.stringify(hits.map(h => h.referer)));
+const cacheKeys = [1, 2, 3].map(i => foldText('Zzyzx Quadrant ' + i).trim());
+const cacheAfter = await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.geoCache.v1') || '{}'));
+check('each answer is cached by its location string',
+  cacheKeys.every(k => cacheAfter[k] && cacheAfter[k].lat === 10.5 && cacheAfter[k].lng === 20.25),
+  JSON.stringify(cacheAfter));
+const entriesAfter = await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')));
+check('...and on the entry itself',
+  entriesAfter.every(e => e.geo && e.geo.lat === 10.5 && e.geo.lng === 20.25
+    && e.geoTries === undefined && e.geoTransient === undefined),
+  JSON.stringify(entriesAfter.map(e => e.geo)));
+
+// The same three strings on entries that carry NO geo of their own, with the
+// string cache seeded: nothing may reach the network.
+let cachedCalls = 0;
+const seededCache = {};
+cacheKeys.forEach(k => { seededCache[k] = { lat:10.5, lng:20.25, at:1 }; });
+await reseed([UNPLACEABLE(1), UNPLACEABLE(2), UNPLACEABLE(3)], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => { cachedCalls++; return r.abort(); });
+}, { 'artistTracker.geoCache.v1': JSON.stringify(seededCache) });
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(1500);
+check('a string the cache already answered is never asked about again', cachedCalls === 0, String(cachedCalls));
+check('...and it plots from the cache',
+  /^3 artists plotted/.test(await tp.locator('#mapCount').innerText()),
+  JSON.stringify(await tp.locator('#mapCount').innerText()));
+check('...with no progress line, because there was nothing to look up',
+  (await tp.locator('#mapCount .geo-progress').count()) === 0);
+
+section('item 33c — a transient failure backs off and recovers; a run that cannot, pauses');
+// Two 429s and then an answer: the string ends up placed, the retries were
+// spaced, and nothing was counted against the string.
+let recoverCalls = 0;
+const recoverHits = [];
+await reseed([UNPLACEABLE(7)], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    recoverCalls++;
+    recoverHits.push(Date.now());
+    if(recoverCalls <= 2) return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests',
+      headers:{ 'Retry-After':'1', 'Access-Control-Allow-Origin':'*', 'Access-Control-Expose-Headers':'Retry-After' } });
+    return r.fulfill({ status:200, contentType:'application/json',
+      body: JSON.stringify([{ lat:'1.5', lon:'2.5', display_name:'stub' }]) });
+  });
+});
+await watchProgress();
+await tp.locator('.view-tab[data-view="map"]').click();
+await geoIdle("() => /^1 artist plotted/.test(document.getElementById('mapCount').innerText)", 30000);
+const recoverGaps = recoverHits.slice(1).map((t, i) => t - recoverHits[i]);
+check('a 429 is retried after backing off, and the answer that follows is kept',
+  recoverCalls === 3 && /^1 artist plotted/.test(await tp.locator('#mapCount').innerText()),
+  recoverCalls + ' calls; ' + JSON.stringify(await tp.locator('#mapCount').innerText()));
+check('...the retries were at least a second apart', recoverGaps.every(g => g >= 1000), JSON.stringify(recoverGaps));
+const recovered = await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))[0]);
+check('...and the two 429s left no mark on the entry',
+  recovered.geo && recovered.geo.lat === 1.5 && recovered.geoTries === undefined
+  && recovered.geoTransient === undefined && recovered.geoFailedAt === undefined,
+  JSON.stringify(recovered));
+check('...nor a paused note on the map',
+  !/geocoding paused/.test(await tp.locator('#mapCount').innerText()));
+
+// A request that never gets an answer at all (aborted here; a dropped
+// connection or a response with no CORS headers in life) carries no
+// Retry-After, so it climbs the ladder: one second, then two. Only the first
+// two rungs are watched — the run keeps climbing in the background and the
+// next reseed closes it.
+const abortHits = [];
+await reseed([UNPLACEABLE(8)], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => { abortHits.push(Date.now()); return r.abort(); });
+});
+await tp.locator('.view-tab[data-view="map"]').click();
+await tp.waitForTimeout(4300);
+const abortGaps = abortHits.slice(1).map((t, i) => t - abortHits[i]);
+check('a request with no answer at all is retried up the ladder: ~1 s, then ~2 s',
+  abortHits.length === 3 && abortGaps[0] >= 1000 && abortGaps[0] < 2000 && abortGaps[1] >= 2000 && abortGaps[1] < 3200,
+  abortHits.length + ' calls, gaps ' + JSON.stringify(abortGaps));
+check('...and while it climbs, the progress line is still up',
+  (await tp.locator('#mapCount .geo-progress').count()) === 1);
+
+// Five strings, a service that refuses everything: the run gives up on the
+// FIRST string after the streak cap, defers that one string alone, and
+// leaves the other four untouched for the next visit — a rate limit is about
+// the client, not the locations, so marching on would only burn them all.
+let refuseCalls = 0;
+await reseed([1, 2, 3, 4, 5].map(UNPLACEABLE), async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => {
+    refuseCalls++;
+    return r.fulfill({ status:429, contentType:'text/plain', body:'Too Many Requests',
+      headers:{ 'Retry-After':'1', 'Access-Control-Allow-Origin':'*', 'Access-Control-Expose-Headers':'Retry-After' } });
+  });
+});
+await watchProgress();
+await tp.locator('.view-tab[data-view="map"]').click();
+await geoIdle("() => /geocoding paused/.test(document.getElementById('mapCount').innerText)", 40000);
+const refused = await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')));
+check('a service refusing everything is asked the streak cap and no more',
+  refuseCalls === GEO_MAX_TRANSIENT_STREAK, refuseCalls + ' of ' + GEO_MAX_TRANSIENT_STREAK);
+check('...the one string it gave up on is deferred, uncounted',
+  refused[0].geoTransient === true && typeof refused[0].geoFailedAt === 'number' && refused[0].geoTries === undefined,
+  JSON.stringify(refused[0]));
+check('...and the four behind it are untouched, so the next visit simply asks them',
+  refused.slice(1).every(e => e.geoFailedAt === undefined && e.geoTransient === undefined && e.geoTries === undefined),
+  JSON.stringify(refused.slice(1).map(e => [e.geoFailedAt, e.geoTransient, e.geoTries])));
+const refusedText = await mapCountText();
+check('the map says the run paused, how many were never asked, and that it resumes',
+  /geocoding paused: the service refused \d+ requests in a row \(http 429\) — 4 not yet asked; it resumes next time the map opens/.test(refusedText),
+  JSON.stringify(refusedText));
+check('the cleaning list names every string nothing could place, with its count and status',
+  /5 location strings could not be placed \(5 artists, whole list\)/.test(refusedText)
+  && /Zzyzx Quadrant 1 · 1 · rate limited — will retry/.test(refusedText)
+  && [2, 3, 4, 5].every(i => new RegExp('Zzyzx Quadrant ' + i + ' · 1 · not looked up yet').test(refusedText)),
+  JSON.stringify(refusedText));
+// The list is the WHOLE ledger, not the filtered view: filter to a category
+// none of these five is in, so the map empties, and the list must still read five.
+await tp.locator('.chip[data-cat="touring"]').click();
+await tp.waitForTimeout(300);
+const filteredText = await mapCountText();
+check('...and the list is the whole ledger: a filter that empties the map leaves it at five',
+  /^0 artists plotted/.test(filteredText) && /5 location strings could not be placed/.test(filteredText),
+  JSON.stringify(filteredText));
+// A list someone opened must survive the repaint a progress tick causes.
+await tp.locator('#mapCount summary').click();
+await tp.waitForTimeout(100);
+await tp.locator('.chip[data-cat="all"]').click();
+await tp.waitForTimeout(300);
+check('an opened cleaning list stays open across a repaint',
+  await tp.evaluate(() => document.querySelector('#mapCount details').open));
 
 // ---------------------------------------------------------------------------
 // item 17 — the map results panel

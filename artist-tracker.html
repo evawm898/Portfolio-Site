@@ -879,6 +879,13 @@
     margin:-12px 0 20px;
   }
   .map-count .unplotted{color:var(--brick);}
+  .map-count .geo-progress{color:var(--teal);}
+  .map-count .geo-paused{color:var(--brick);}
+  .map-count details{margin-top:6px;}
+  .map-count summary{cursor:pointer;color:var(--dim-2);}
+  .map-count ul{margin:4px 0 0;padding-left:18px;}
+  .map-count li{color:var(--dim-2);margin:2px 0;}
+  .map-count .map-unplaced-string{color:var(--ink);}
   .map-count[hidden]{display:none;}
 
   /* Cluster bubbles, restyled to the page's palette — the plugin's default
@@ -1593,6 +1600,7 @@ another.handle"></textarea>
       entries = raw ? JSON.parse(raw) : [];
       lastPersisted = JSON.stringify(entries);
     }catch(e){ entries = []; lastPersisted = '[]'; }
+    loadGeoCache();
     clearLegacyGeoFailures();
     seedGender();
     backfillAddedAt();
@@ -2153,90 +2161,230 @@ another.handle"></textarea>
     return null;
   }
 
-  // Geocodes a free-text location via Nominatim (OpenStreetMap). Browsers
-  // cannot set a custom User-Agent header from client-side fetch (it's a
-  // forbidden header name), so this relies on the Referer header the
-  // browser sends automatically for identification, per Nominatim's usage
-  // policy for exactly this client-side scenario. Returns {lat,lng} or
-  // null (network error, no result, or a non-OK response).
-  async function geocodeLocation(query){
-    try{
-      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if(!res.ok) return null;
-      const data = await res.json();
-      if(!Array.isArray(data) || data.length === 0) return null;
-      const lat = parseFloat(data[0].lat);
-      const lng = parseFloat(data[0].lon);
-      if(Number.isNaN(lat) || Number.isNaN(lng)) return null;
-      return { lat, lng };
-    }catch(e){
-      return null;
+  // --- Nominatim: the fallback for strings the table cannot place ----------
+  //
+  // Everything below is about being a polite client of a free service and
+  // about not losing what it tells us.
+  //
+  //   * ONE REQUEST A SECOND, enforced by a timestamp (geoThrottle) rather
+  //     than a sleep after each call, so the bound holds whatever path a
+  //     request takes. Nominatim's usage policy sets an absolute maximum of
+  //     one request per second; GEO_MIN_INTERVAL_MS sits a tenth above it.
+  //   * IDENTIFICATION BY REFERER. A browser cannot set User-Agent from
+  //     client-side fetch (it is a forbidden header name), and Nominatim's
+  //     policy accepts a Referer for exactly this case. The fetch pins its
+  //     own referrerPolicy so a future page-level <meta name="referrer">
+  //     cannot silently strip it and make every request anonymous.
+  //   * A TRANSIENT FAILURE IS NOT AN ANSWER. A 429, a 5xx or a network error
+  //     says nothing about the LOCATION, so it never counts against that
+  //     location's try cap. The run backs off — the server's own Retry-After
+  //     when it sends one, a doubling ladder when it does not — and retries
+  //     the SAME location; after GEO_MAX_TRANSIENT_STREAK failures in a row
+  //     it gives up for this visit, defers that one location for ten minutes
+  //     and leaves every location after it untouched, so the next time the
+  //     map opens they are simply asked again. An empty result on a 200 IS an
+  //     answer and counts, as before. The previous version counted a 429 as
+  //     a try: three rate-limited visits retired a perfectly good location.
+  //   * A RESOLVED STRING IS CACHED BY STRING as well as on the entry, so a
+  //     re-import, a restored backup or a second artist in the same place
+  //     never re-asks. The cache holds answers only; failures live on the
+  //     entry, where the retry clock already is.
+  const GEO_MIN_INTERVAL_MS = 1100;
+  const GEO_BACKOFF_LADDER_MS = [1000, 2000, 4000, 8000, 16000, 32000, 60000];
+  const GEO_MAX_TRANSIENT_STREAK = GEO_BACKOFF_LADDER_MS.length + 1;  // attempts, not retries
+  const GEO_RETRY_AFTER_CAP_MS = 60 * 1000;
+  const GEO_TRANSIENT_RETRY_MS = 10 * 60 * 1000;   // a deferred location: next visit, ten minutes on
+  const GEO_RETRY_MS = 6 * 60 * 60 * 1000;         // a "no result" answer: six hours
+  const GEO_MAX_TRIES = 3;                         // "no result" answers before giving up
+  const GEO_CACHE_KEY = 'artistTracker.geoCache.v1';
+
+  // How long to wait before retrying after `streak` transient failures in a
+  // row (streak >= 1). The server's Retry-After wins when it sent one,
+  // clamped between the throttle floor and a one-minute ceiling; otherwise
+  // the ladder doubles and holds at its top. A pure function, so the gate can
+  // check the schedule without waiting through it.
+  function geoBackoffMs(streak, retryAfterMs){
+    if(typeof retryAfterMs === 'number' && Number.isFinite(retryAfterMs)){
+      return Math.min(GEO_RETRY_AFTER_CAP_MS, Math.max(GEO_MIN_INTERVAL_MS, retryAfterMs));
     }
+    const i = Math.max(0, Math.min(streak - 1, GEO_BACKOFF_LADDER_MS.length - 1));
+    return GEO_BACKOFF_LADDER_MS[i];
   }
 
-  // Where an entry sits on the map. The static table is consulted FIRST and
-  // costs nothing; `e.geo` is only ever a cached Nominatim result for a string
-  // the table could not place. Nothing static is written to storage — improving
-  // the table takes effect immediately rather than being shadowed by a stale
-  // cached value, and storage does not grow by a coordinate per entry.
+  // Retry-After is either seconds or an HTTP date; null when absent or unreadable.
+  function parseRetryAfter(value){
+    if(!value) return null;
+    const v = String(value).trim();
+    if(/^\d+$/.test(v)) return parseInt(v, 10) * 1000;
+    const t = Date.parse(v);
+    return Number.isNaN(t) ? null : Math.max(0, t - Date.now());
+  }
+
+  // Never two requests inside GEO_MIN_INTERVAL_MS, measured from when the last
+  // one was SENT — and never sooner than `extraMs` from now, which is how a
+  // backoff is applied on top of the throttle rather than instead of it.
+  let geoLastRequestAt = 0;
+  async function geoThrottle(extraMs){
+    const wait = Math.max(0, geoLastRequestAt + GEO_MIN_INTERVAL_MS - Date.now(), extraMs || 0);
+    if(wait > 0) await sleep(wait);
+    geoLastRequestAt = Date.now();
+  }
+
+  // One request. Returns one of three things, and the distinction is the point:
+  //   { kind:'found', lat, lng }          an answer
+  //   { kind:'none' }                     an answer — the service has nothing here
+  //   { kind:'transient', retryAfterMs }  NOT an answer: rate limit, outage, network
+  // Every non-OK status is transient: none of them is a statement about the
+  // location, and the streak cap bounds what a service that keeps refusing
+  // can cost.
+  async function geocodeLocation(query){
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query);
+    let res;
+    try{
+      res = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        referrerPolicy: 'strict-origin-when-cross-origin',
+      });
+    }catch(e){
+      return { kind:'transient', retryAfterMs:null, why:'network' };
+    }
+    if(!res.ok){
+      return { kind:'transient', retryAfterMs: parseRetryAfter(res.headers.get('Retry-After')), why:'http ' + res.status };
+    }
+    let data;
+    try{ data = await res.json(); }
+    catch(e){ return { kind:'transient', retryAfterMs:null, why:'unreadable body' }; }
+    if(!Array.isArray(data)) return { kind:'transient', retryAfterMs:null, why:'unexpected body' };
+    if(data.length === 0) return { kind:'none' };
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
+    if(Number.isNaN(lat) || Number.isNaN(lng)) return { kind:'none' };
+    return { kind:'found', lat, lng };
+  }
+
+  // The string cache: folded location -> {lat, lng, at}. Answers only.
+  let geoCache = {};
+  function loadGeoCache(){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}');
+      geoCache = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+    }catch(e){ geoCache = {}; }
+  }
+  function saveGeoCache(){
+    try{ localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); }
+    catch(e){ /* the entry carries e.geo regardless; the cache only saves a request */ }
+  }
+  function geoCacheKey(location){
+    return foldText(location || '').trim();
+  }
+  function geoCached(location){
+    const key = geoCacheKey(location);
+    const hit = key ? geoCache[key] : null;
+    return (hit && typeof hit.lat === 'number' && typeof hit.lng === 'number')
+      ? { lat: hit.lat, lng: hit.lng } : null;
+  }
+
+  // Where an entry sits on the map. `e.geo` (a Nominatim answer cached on the
+  // entry) first, because it is a real place rather than a centroid; then the
+  // static table, which costs nothing and is never written to storage, so
+  // improving it takes effect at once; then the string cache, so a string the
+  // service already answered is never asked about again from a new entry.
   function geoFor(e){
     if(e && e.geo && typeof e.geo.lat === 'number' && typeof e.geo.lng === 'number') return e.geo;
-    return staticGeocode(e && e.location);
+    const loc = e && e.location;
+    return staticGeocode(loc) || geoCached(loc);
   }
 
-  // A network lookup is only ever attempted for a location the table missed.
-  // A FAILURE IS NOT PERMANENT. The previous version wrote geoStatus:'failed'
-  // and filtered those entries out for good, so one burst of Nominatim 429s —
-  // which is what a 240-row paste gets, since it allows roughly one request a
-  // second and refuses bulk use — silently retired those locations forever and
-  // the plotted count could only ever go down. A failure now records when and
-  // how often, and is retried on a later visit, up to a small cap.
-  const GEO_RETRY_MS = 6 * 60 * 60 * 1000;   // six hours
-  const GEO_MAX_TRIES = 3;
-
+  // A network lookup is only ever attempted for a location the table and the
+  // cache both missed. A FAILURE IS NOT PERMANENT: a "no result" answer is
+  // counted (geoTries) and retried six hours on, up to GEO_MAX_TRIES; a
+  // transient deferral (geoTransient) is NOT counted and is retried ten
+  // minutes on. The previous version wrote geoStatus:'failed' and filtered
+  // those entries out for good, so one burst of 429s silently retired them.
   function geoRetryDue(e){
     if((e.geoTries || 0) >= GEO_MAX_TRIES) return false;
     if(!e.geoFailedAt) return true;
-    return (Date.now() - e.geoFailedAt) > GEO_RETRY_MS;
+    const window = e.geoTransient ? GEO_TRANSIENT_RETRY_MS : GEO_RETRY_MS;
+    return (Date.now() - e.geoFailedAt) > window;
   }
+
+  // Live state of a run, for the map's count line: null when nothing is
+  // running. `geoPausedWhy` outlives the run that set it, so the line can say
+  // the run stopped early and why, until the next run starts.
+  let geoProgress = null;
+  let geoPausedWhy = null;
 
   async function ensureGeocoded(){
     if(geocodingInFlight) return;
     geocodingInFlight = true;
     try{
-      // Everything the table can place is already placed, so this loop only
-      // sees the leftovers — usually a handful rather than hundreds.
-      const pending = entries.filter(e => e.location && !geoFor(e) && geoRetryDue(e));
+      // Everything the table or the cache can place is already placed, so
+      // this loop only sees the leftovers — usually a handful, not hundreds.
+      const pending = entries.filter(e => e.location && e.location.trim() && !geoFor(e) && geoRetryDue(e));
       if(pending.length === 0) return;
+      geoPausedWhy = null;
+      geoProgress = { total: pending.length, done: 0, placed: 0, missing: 0, deferred: 0 };
+      paintMapCount();
 
-      const known = new Map();
+      const known = new Map();   // this run's answers, by folded string
+      let streak = 0;            // transient failures in a row, across locations
+      let lastTransient = null;
       for(const e of pending){
-        const key = foldText(e.location);
-        if(known.has(key)){
-          const cached = known.get(key);
-          if(cached){ e.geo = cached; }
-          else { e.geoTries = (e.geoTries || 0) + 1; e.geoFailedAt = Date.now(); }
-          persist();
-          continue;
+        const key = geoCacheKey(e.location);
+        let answer = known.get(key) || null;
+        while(!answer){
+          await geoThrottle(streak > 0 ? geoBackoffMs(streak, lastTransient.retryAfterMs) : 0);
+          const got = await geocodeLocation(e.location);
+          if(got.kind === 'transient'){
+            streak++;
+            lastTransient = got;
+            console.warn('[artist-tracker] geocoding: ' + got.why + ' for ' + JSON.stringify(e.location)
+              + ' — attempt ' + streak + ' of ' + GEO_MAX_TRANSIENT_STREAK);
+            if(streak >= GEO_MAX_TRANSIENT_STREAK) answer = { kind:'deferred', why: got.why };
+            continue;
+          }
+          streak = 0;
+          lastTransient = null;
+          answer = got;
         }
-        const result = await geocodeLocation(e.location);
-        if(result){
-          e.geo = result;
+        if(answer.kind === 'found'){
+          e.geo = { lat: answer.lat, lng: answer.lng };
           delete e.geoTries;
           delete e.geoFailedAt;
-        }else{
+          delete e.geoTransient;
+          geoCache[key] = { lat: answer.lat, lng: answer.lng, at: Date.now() };
+          saveGeoCache();
+          known.set(key, answer);
+          geoProgress.placed++;
+        }else if(answer.kind === 'none'){
           e.geoTries = (e.geoTries || 0) + 1;
           e.geoFailedAt = Date.now();
-          console.warn('[artist-tracker] geocoding failed for location:', e.location);
+          delete e.geoTransient;
+          known.set(key, answer);
+          geoProgress.missing++;
+          console.warn('[artist-tracker] geocoding: no result for location:', e.location);
+        }else{
+          // Deferred: this ONE location waits ten minutes; the rest of the
+          // queue is untouched and is asked again the next time the map opens.
+          e.geoFailedAt = Date.now();
+          e.geoTransient = true;
+          geoProgress.deferred++;
         }
-        known.set(key, result || null);
+        geoProgress.done++;
         persist();
-        if(currentView === 'map') render();
-        await sleep(1100);
+        if(answer.kind === 'found' && currentView === 'map') render();
+        if(answer.kind === 'deferred'){
+          geoPausedWhy = 'the service refused ' + GEO_MAX_TRANSIENT_STREAK + ' requests in a row (' + answer.why
+            + ') — ' + (pending.length - geoProgress.done) + ' not yet asked; it resumes next time the map opens';
+          console.warn('[artist-tracker] geocoding paused: ' + geoPausedWhy);
+          break;
+        }
+        paintMapCount();
       }
     }finally{
       geocodingInFlight = false;
+      geoProgress = null;
+      paintMapCount();
     }
   }
 
@@ -3363,6 +3511,7 @@ another.handle"></textarea>
           delete prev.geo;
           delete prev.geoTries;
           delete prev.geoFailedAt;
+          delete prev.geoTransient;
         }
         entries[idx] = { ...prev, ...data };
       }
@@ -4222,12 +4371,50 @@ another.handle"></textarea>
   }
 
   // How much of the current filter actually made it onto the map. Entries
-  // with no location, or one Nominatim couldn't place, are silently absent
-  // from the pins — this is what says so.
+  // with no location, or one nothing could place, are silently absent from
+  // the pins — this is what says so. Beside the counts it carries the live
+  // geocoding progress while a run is going, a note when a run stopped early,
+  // and the CLEANING LIST: every location string across the whole ledger that
+  // nothing could place, with how many artists carry it and where its retry
+  // stands — because a string that cannot be placed is a string to edit, and
+  // the map is the only place that can say which ones.
+  let mapCountState = { plotted: 0, missing: 0 };
   function updateMapCount(plotted, missing){
+    mapCountState = { plotted, missing };
+    paintMapCount();
+  }
+
+  // The cleaning list, grouped by folded string so two spellings of one place
+  // read as one line; the first spelling seen is the one shown.
+  function unplaceableLocations(){
+    const groups = new Map();
+    entries.forEach(e => {
+      const loc = (e.location || '').trim();
+      if(!loc || geoFor(e)) return;
+      const key = geoCacheKey(loc);
+      let g = groups.get(key);
+      if(!g){ g = { location: loc, count: 0, transient: false, tries: 0 }; groups.set(key, g); }
+      g.count++;
+      if(e.geoTransient) g.transient = true;
+      g.tries = Math.max(g.tries, e.geoTries || 0);
+    });
+    return [...groups.values()].sort((a, b) => b.count - a.count || a.location.localeCompare(b.location));
+  }
+  function unplaceableStatus(g){
+    if(g.transient) return 'rate limited — will retry';
+    if(g.tries >= GEO_MAX_TRIES) return 'not found — given up after ' + g.tries + ' tries';
+    if(g.tries > 0) return 'not found — will retry';
+    return 'not looked up yet';
+  }
+
+  function paintMapCount(){
     const el = document.getElementById('mapCount');
     el.hidden = currentView !== 'map';
+    // Repainting on every progress tick must not collapse a list someone
+    // has opened.
+    const wasOpen = !!(el.querySelector('details') && el.querySelector('details').open);
     el.innerHTML = '';
+    const { plotted, missing } = mapCountState;
     el.appendChild(document.createTextNode(
       plotted + (plotted === 1 ? ' artist plotted' : ' artists plotted')
     ));
@@ -4236,6 +4423,46 @@ another.handle"></textarea>
       span.className = 'unplotted';
       span.textContent = ' · ' + missing + ' without a usable location';
       el.appendChild(span);
+    }
+    if(geoProgress){
+      const p = geoProgress;
+      const span = document.createElement('span');
+      span.className = 'geo-progress';
+      const parts = [];
+      if(p.placed) parts.push(p.placed + ' placed');
+      if(p.missing) parts.push(p.missing + ' not found');
+      span.textContent = ' · geocoding ' + Math.min(p.done + 1, p.total) + ' of ' + p.total
+        + (parts.length ? ' (' + parts.join(', ') + ')' : '') + '\u2026';
+      el.appendChild(span);
+    }else if(geoPausedWhy){
+      const span = document.createElement('span');
+      span.className = 'geo-paused';
+      span.textContent = ' · geocoding paused: ' + geoPausedWhy;
+      el.appendChild(span);
+    }
+    const unplaced = unplaceableLocations();
+    if(unplaced.length){
+      const artists = unplaced.reduce((n, g) => n + g.count, 0);
+      const details = document.createElement('details');
+      details.className = 'map-unplaced';
+      details.open = wasOpen;
+      const summary = document.createElement('summary');
+      summary.textContent = unplaced.length + (unplaced.length === 1 ? ' location string' : ' location strings')
+        + ' could not be placed (' + artists + (artists === 1 ? ' artist' : ' artists')
+        + ', whole list) \u2014 edit these';
+      details.appendChild(summary);
+      const ul = document.createElement('ul');
+      unplaced.forEach(g => {
+        const li = document.createElement('li');
+        const q = document.createElement('span');
+        q.className = 'map-unplaced-string';
+        q.textContent = g.location;
+        li.appendChild(q);
+        li.appendChild(document.createTextNode(' \u00b7 ' + g.count + ' \u00b7 ' + unplaceableStatus(g)));
+        ul.appendChild(li);
+      });
+      details.appendChild(ul);
+      el.appendChild(details);
     }
   }
 
