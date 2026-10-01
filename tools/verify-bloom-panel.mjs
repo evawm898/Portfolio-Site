@@ -312,6 +312,17 @@ const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
    stops working. Every id and value is checked against the registry below, so
    a range change cannot leave this table quietly out of bounds. */
 const WITNESS = {
+  /* THE TUBE (corolla fusion) — collapsed at first load, witnessed by the
+     BUILT panel count and the ring's own triangle count through the builder's
+     tube record: the slider holds the ASKED k and the snap decides the built
+     one, so the witness reads the builder's answer, never the slider. */
+  tube: { id: 'tubeLayer1', value: '2',
+          read: (m) => `${m.tube && m.tube.layers[0].k}/${m.tube && m.tube.rings.length ? m.tube.rings[0].ringTris : null}`, what: 'tube.layers[0].k/tube.rings[0].ringTris' },
+  /* FUSION (h and BLEND) — a child of Tube, witnessed by the ring's own top
+     station and row count, which the fusion height decides and no other
+     control writes; it needs a fused whorl to exist, hence the pre. */
+  tubeFusion: { id: 'tubeHeight', value: '0.4', pre: [{ id: 'tubeLayer1', value: '0' }],
+                read: (m) => `${m.tube && m.tube.rings.length ? m.tube.rings[0].uTop : null}/${m.tube && m.tube.rings.length ? m.tube.rings[0].rows : null}`, what: 'tube.rings[0].uTop/rows' },
   /* THE STEM (session 43) — collapsed at first load, witnessed by the LENGTH
      through the builder's own stem record. The witness reaches PAST the slider
      into the hub: a stem's presence is what makes the hub-to-stem join ACTIVE,

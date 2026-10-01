@@ -5288,6 +5288,17 @@ construction where a crossing is impossible by construction**; it and five alter
 for Eva's ruling, none built. "Seam" is the FOOT-TO-BLADE seam in 151 places — the inter-petal
 joint needs another word.
 
+**THE TUBE SHIPS: A CLOSED ROUND RING FUSED PARTWAY UP, PER WHORL, FREE BY DEFAULT AND BYTE-IDENTICAL**
+(read `docs/bloom-tube-outcome.md` before touching `tubePlan`, `tubeGeometry`, `emitTubeRings`,
+`emitPanel`'s `periodic`/`thinAt`, the `tubeLayerN` controls or TU0-TU6). It is a port of
+`f266606`'s scratch core, matched float for float before the two fixes. **The ring is TRIMMED to half
+thickness under every petal that lies on it, so no two shells share a surface (TU4). The notch is cut
+only where the sinus clears the bead bar in BOTH modes (TU5).** The sinus knots sit half a column inside
+the margins, because the core's knot welded the ring to the petal and the census read the by-design
+overlap as a fold. The tangents are analytic, because a 1e-6 finite difference put 4.25e-12 mm of
+engine noise into X0. **Rows 0-992 move 0 floats**; `frozen/phase49` is the 993 rows at `f266606`.
+`node tools/verify-bloom-tube.mjs` (+ `--control`, six mutants) runs in the export preflight.
+
 ## Flower generator — print-safety is a hard invariant
 
 The Flower Bloom generator (`flower.html`, `flower.js`, `flower-geometry.js`) is a

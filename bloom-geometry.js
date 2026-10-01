@@ -8151,9 +8151,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      row the petal's single panel starts on — `null` keeps today's panels,
      `-1` emits no blade at all. Absent on every petal that is not in a fused
      whorl, so today's petal takes this line as a no-op. Ported from the TUBE
-     prototype's P3 (tools/bloom-tube-core.mjs, #323). */
+     prototype's P3 (tools/bloom-tube-core.mjs at f266606, #323). */
   if (cap && cap.tubeLobe) {
-    for (const r of rows) r.tUsed = tAt(r.u);
+    /* the row's OWN section is kept beside the one the hook may install, so
+       every law check below (the zero-form guard) measures the petal's own
+       law rather than the ring it rides */
+    for (const r of rows) { r.tUsed = tAt(r.u); r.ownSect = r.sect; }
     const f = cap.tubeLobe(rows);
     if (f !== null) panels.splice(0, panels.length, ...(f < 0 ? [] : [{ label: 'lobe', rowFrom: f, rowTo: rows.length - 1, spanAt: () => [-1, 1] }]));
   }
@@ -8268,7 +8271,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       const zs = zero.sectAt(row.C, row.T, row.N, row.h, row.u);
       for (let j = 0; j < NV; j++) {
         const v = -1 + (2 * j) / (NV - 1);
-        const A = row.sect(v), B = zs(v);
+        const A = (row.ownSect || row.sect)(v), B = zs(v);
         dev(A.P, B.P); dev(A.n, B.n);
       }
     }
@@ -8397,7 +8400,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       dev(zeroRows[i].C, rows[i].C); dev(zeroRows[i].N, rows[i].N);
       for (let j = 0; j < NV; j++) {
         const v = -1 + (2 * j) / (NV - 1);
-        const A = zeroRows[i].sect(v), B = rows[i].sect(v);
+        const A = zeroRows[i].sect(v), B = (rows[i].ownSect || rows[i].sect)(v);
         dev(A.P, B.P); dev(A.n, B.n);
       }
     }
@@ -9329,7 +9332,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      set by any petal, so a petal's panel takes every expression below exactly
      as it took it before the option existed — NVp IS NV, `(per ? NVp : NVp -
      1)` IS NV - 1, the same doubles. Ported verbatim from the TUBE prototype's
-     patch set (tools/bloom-tube-core.mjs, P1/P2a-f, #323). */
+     patch set (tools/bloom-tube-core.mjs at f266606, P1/P2a-f, #323). */
   const NVp = panel.nv ?? NV;
   const per = !!panel.periodic;
   const grid = (acc.captureGrid || acc.captureLamina) ? [] : null;
@@ -14768,6 +14771,13 @@ export function sepalTrialLamina(state, sepals, angleDeg, exportMode) {
 function petalLaminaInMode(site, state, exportMode) {
   const acc = new MeshBuilder({ exportMode });
   const surface = petalSurface(state, site.ring, site.slot, site.cap, acc);
+  /* A FUSED PETAL'S emitted lamina is its lobe alone; the sepal scan reads the
+     petal AS FREE, so its rows are the petal's whole ladder (the tube's own
+     record of it) at the lattice's own columns */
+  if (site.p.tubeRows) {
+    const vs = Array.from({ length: NV }, (_, j) => -1 + (2 * j) / (NV - 1));
+    return laminaFromPanels([{ rows: site.p.tubeRows.filter((r) => r.u >= ROOT_BLEND_END).map((r) => { const row = surface.rowAt(r.u); const q = vs.map((v) => row.sect(v)); return { u: r.u, mid: q.map((x) => x.P), normal: q.map((x) => x.n) }; }) }]);
+  }
   const panels = site.p.lamina.map((panel) => ({
     rows: panel.rows.filter((r) => r.u >= ROOT_BLEND_END).map((r) => { const row = surface.rowAt(r.u); const q = r.v.map((v) => row.sect(v)); return { u: r.u, mid: q.map((x) => x.P), normal: q.map((x) => x.n) }; }),
   }));
@@ -15504,7 +15514,17 @@ export function sepalAngleLimit(state, fr, acc, sites) {
     const name = exportMode ? 'export' : 'live';
     const t = acc.exportMode === exportMode ? acc.floorThickness(state.sheetThickness) : new MeshBuilder({ exportMode }).floorThickness(state.sheetThickness);
     /* the petals in this mode */
-    const petals = sites.map((s) => (exportMode === acc.exportMode ? laminaFromPanels(s.p.lamina) : petalLaminaInMode(s, state, exportMode)));
+    /* UNDER A TUBE THE LIMIT IS DRAWN AGAINST THE WHORL'S PETALS AS FREE, in
+       BOTH modes (the build session). The emitted lamina of a fused petal is
+       its lobe alone — the part below the fusion line is the ring's — and the
+       other-mode rebuild is the FREE petal, so the two modes were reading two
+       different objects and SP8's check a third. Reading the FREE petals in
+       both is one object everywhere. DECLARED BLINDNESS: the ring's OPEN
+       sinuses are not in it (where the sinus is closed — the ruled default —
+       the petals' own bases already cover it); drawing the limit against the
+       ring itself is parked for Eva. */
+    const tubeOn = tubePlan(state, fr.layerCount, fr.slotCount).active;
+    const petals = sites.map((s) => (exportMode === acc.exportMode && !tubeOn ? laminaFromPanels(s.p.lamina) : petalLaminaInMode(s, state, exportMode)));
     if (!petals.length) { perMode[name] = { limitDeg: hi, contactDeg: null, kind: null, petal: null, sepal: null, at: null }; continue; }
     const G = laminaGrid(petals, t);
     /* the distinct sepal configurations: a slot's neighbourhood is the set of
@@ -15665,7 +15685,8 @@ let BUDGET_DECISION_ACTIVE = false;
    A closed ROUND ring through every petal's midrib, fused partway up to the
    fusion height h, with today's petals FREE above it. Ported from the scratch
    core that #323 merged as the reference implementation
-   (tools/bloom-tube-core.mjs; docs/bloom-tube-ring-prototype.md, Parts A-C),
+   (tools/bloom-tube-core.mjs at f266606 — deleted once the panel shipped;
+   docs/bloom-tube-ring-prototype.md, Parts A-C),
    function for function — not re-derived. Read that doc for every figure
    behind every constant below.
 
@@ -15800,7 +15821,7 @@ function tubeKnotMap(segs, periodic) {
    own lean beta, r = BLEND * W / cos(beta), drawn by lowering the ring's own
    rows in the sinus. A closed sinus (W <= 0) has no room: inert. */
 function tubeNotchDepth(list) {
-  return (phi) => {
+  const depth = (phi) => {
     let best = 0;
     for (const sn of list) {
       if (!(sn.r > 0)) continue;
@@ -15812,16 +15833,50 @@ function tubeNotchDepth(list) {
     }
     return best;
   };
+  /* d(depth)/dphi in closed form, for the dipped curve's own tangent: zero on
+     the flat bottom, the arc's slope on the corners (the deepest sinus wins,
+     as `depth` itself takes the max) */
+  depth.d = (phi) => {
+    let best = 0, slope = 0;
+    for (const sn of list) {
+      if (!(sn.r > 0)) continue;
+      const w = tWrapPi(phi - sn.c), x = Math.abs(w) * sn.rho;
+      if (x >= sn.W) continue;
+      const cx = sn.W - sn.r * Math.cos(sn.beta), cy = sn.r * Math.sin(sn.beta);
+      let y, dy;
+      if (x <= cx) { y = sn.r - cy; dy = 0; }
+      else { const q = Math.sqrt(Math.max(0, sn.r * sn.r - (x - cx) ** 2)); y = q - cy; dy = q > 0 ? -(x - cx) / q : 0; }
+      if (y > best) { best = y; slope = dy * sn.rho * (w < 0 ? -1 : 1); }
+    }
+    return slope;
+  };
+  return depth;
 }
 function tubeDippedCurves(gg, R1, list, spacing) {
   const depth = tubeNotchDepth(list);
   const lerp3 = (A, B, f) => [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f, A[2] + (B[2] - A[2]) * f];
-  return Array.from({ length: R1 + 1 }, (_, r) => (phi) => {
-    const d = depth(phi);
-    if (!(d > 0) || r <= 2) return gg.curveAt(r)(phi);
-    const t = r - (d / spacing) * ((r - 2) / (R1 - 2));
-    const i = Math.floor(t), f = t - i;
-    return f === 0 ? gg.curveAt(i)(phi) : lerp3(gg.curveAt(i)(phi), gg.curveAt(i + 1)(phi), f);
+  return Array.from({ length: R1 + 1 }, (_, r) => {
+    const c = (phi) => {
+      const d = depth(phi);
+      if (!(d > 0) || r <= 2) return gg.curveAt(r)(phi);
+      const t = r - (d / spacing) * ((r - 2) / (R1 - 2));
+      const i = Math.floor(t), f = t - i;
+      return f === 0 ? gg.curveAt(i)(phi) : lerp3(gg.curveAt(i)(phi), gg.curveAt(i + 1)(phi), f);
+    };
+    /* the dipped curve's tangent: the lerp of the two rows' tangents plus the
+       row-to-row step times how fast the dip moves along the rim */
+    c.d = (phi) => {
+      const d = depth(phi);
+      if (!(d > 0) || r <= 2) return gg.curveAt(r).d(phi);
+      const ramp = (r - 2) / (R1 - 2);
+      const t = r - (d / spacing) * ramp;
+      const i = Math.floor(t), f = t - i;
+      const dt = -(depth.d(phi) / spacing) * ramp;
+      const A = gg.curveAt(i), B = gg.curveAt(i + 1);
+      const Ad = A.d(phi), Bd = B.d(phi), Ap = A(phi), Bp = B(phi);
+      return [Ad[0] + (Bd[0] - Ad[0]) * f + (Bp[0] - Ap[0]) * dt, Ad[1] + (Bd[1] - Ad[1]) * f + (Bp[1] - Ap[1]) * dt, Ad[2] + (Bd[2] - Ad[2]) * f + (Bp[2] - Ap[2]) * dt];
+    };
+    return c;
   });
 }
 /* THE RING'S SECTION at row r: a closed periodic Catmull-Rom on (rho, z)
@@ -15841,7 +15896,8 @@ function tubeRingCurve(mids, r) {
     return { p, q: (p + 1) % n, f };
   };
   const cr = (a, b, c, d, t) => 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
-  return (phi) => {
+  const crd = (a, b, c, d, t) => 0.5 * ((-a + c) + 2 * (2 * a - 5 * b + 4 * c - d) * t + 3 * (-a + 3 * b - 3 * c + d) * t * t);
+  const curve = (phi) => {
     const { p, q, f } = at(phi);
     const m = (p - 1 + n) % n, s = (q + 1) % n;
     if (f === 0) return cyl[p].P;
@@ -15850,19 +15906,36 @@ function tubeRingCurve(mids, r) {
     const th = ths[p] + f * D;
     return [rho * Math.cos(th), rho * Math.sin(th), z];
   };
+  /* THE CURVE'S OWN TANGENT dP/dphi, IN CLOSED FORM (the build session). The
+     prototype differenced the curve over 1e-6 rad, which amplifies the last
+     bit of Math.cos / Math.sin a million-fold — and those last bits are not
+     the same in every engine: X0 measured the page's STL 4.25e-12 mm off
+     Node's rebuild on a 12-petal ring, 56 times its bar. The Catmull-Rom
+     derivative has no step to divide by. */
+  curve.d = (phi) => {
+    const { p, q, f } = at(phi);
+    const m = (p - 1 + n) % n, s = (q + 1) % n;
+    const rho = cr(cyl[m].rho, cyl[p].rho, cyl[q].rho, cyl[s].rho, f);
+    const dr = crd(cyl[m].rho, cyl[p].rho, cyl[q].rho, cyl[s].rho, f) / D;
+    const dz = crd(cyl[m].z, cyl[p].z, cyl[q].z, cyl[s].z, f) / D;
+    const th = ths[p] + f * D, c = Math.cos(th), sn = Math.sin(th);
+    return [dr * c - rho * sn, dr * sn + rho * c, dz];
+  };
+  return curve;
 }
 /* the ring's row objects for one panel (ONE global normal sign per ring, fixed
    at the ring row where twist is exactly 0 — §A, the twist finding) */
 function tubePanelRows(curves, us, phiOf, tAt, sign) {
   const NR = curves.length;
   const point = (r, v) => curves[r](phiOf(r, v));
-  const hh = 1e-6;
   const rows = [];
   for (let r = 0; r < NR; r++) {
     const ia = r === 0 ? r : r - 1, ib = r === NR - 1 ? r : r + 1;
     rows.push({ u: us[r], tUsed: tAt(us[r]), sect: (v) => {
       const P = point(r, v);
-      const dv = tSub(point(r, Math.min(1, v + hh)), point(r, Math.max(-1, v - hh)));
+      /* the tangent along the row in closed form (dphi/dv > 0 only scales it,
+         and only the direction of du x dv is used) */
+      const dv = curves[r].d(phiOf(r, v));
       let du = tSub(point(ib, v), point(ia, v));
       if (tLen(du) < 1e-12) du = tSub(point(Math.min(NR - 1, ib + 1), v), point(Math.max(0, ia - 1), v));
       const nn = tCross(du, dv);
@@ -15892,15 +15965,15 @@ function tubeGeometry(plan, collected, other = null) {
     const curveCache = new Map();
     const curveAt = (r) => { if (!curveCache.has(r)) curveCache.set(r, tubeRingCurve(midsAll, r)); return curveCache.get(r); };
     const sign = (() => {
-      const ph = Math.atan2(midsAll[2][0][1], midsAll[2][0][0]), hh = 1e-6;
-      const du = tSub(curveAt(3)(ph), curveAt(1)(ph)), dv = tSub(curveAt(2)(ph + hh), curveAt(2)(ph - hh));
+      const ph = Math.atan2(midsAll[2][0][1], midsAll[2][0][0]);
+      const du = tSub(curveAt(3)(ph), curveAt(1)(ph)), dv = curveAt(2).d(ph);
       return tDot(tCross(du, dv), normalsAll[2][0]) < 0 ? -1 : 1;
     })();
     const ringN = (r, th) => {
-      const ia = r === 0 ? r : r - 1, ib = r === NRall - 1 ? r : r + 1, hh = 1e-6;
+      const ia = r === 0 ? r : r - 1, ib = r === NRall - 1 ? r : r + 1;
       let du = tSub(curveAt(ib)(th), curveAt(ia)(th));
       if (tLen(du) < 1e-12) du = tSub(curveAt(Math.min(NRall - 1, ib + 1))(th), curveAt(Math.max(0, ia - 1))(th));
-      const nn = tCross(du, tSub(curveAt(r)(th + hh), curveAt(r)(th - hh)));
+      const nn = tCross(du, curveAt(r).d(th));
       return tMul(nn, sign / tLen(nn));
     };
     const sMid = new Array(NRall).fill(0);
@@ -15927,8 +16000,8 @@ function tubeGeometry(plan, collected, other = null) {
       const own0 = rowsOf[p][R1].sect, own1 = rowsOf[p][R1 + 1].sect, mid0 = midsAll[R1][p], mid1 = midsAll[R1 + 1][p];
       const at = (own, mid, r, w) => { const rho = Math.hypot(mid[0], mid[1]), th = Math.atan2(mid[1], mid[0]) + sgn * tubeSideArc(own, sgn) / rho; const Rp = curveAt(r)(th); return { P: tAdd(Rp, tMul(tSub(own(sgn).P, Rp), w)), th }; };
       const A = at(own0, mid0, R1, 0), B = at(own1, mid1, R1 + 1, tSmoother(sMid[R1 + 1] / blendMm));
-      const hh = 1e-4, up = tSub(curveAt(R1)(A.th), curveAt(R1 - 1)(A.th)), N = ringN(R1, A.th);
-      const away = tSub(curveAt(R1)(A.th - sgn * hh), curveAt(R1)(A.th + sgn * hh));
+      const up = tSub(curveAt(R1)(A.th), curveAt(R1 - 1)(A.th)), N = ringN(R1, A.th);
+      const away = tMul(curveAt(R1).d(A.th), -sgn);
       const proj = (v) => tSub(v, tMul(N, tDot(v, N)));
       const mv = proj(tSub(B.P, A.P)), eu = proj(up), ea = proj(away);
       return Math.atan2(tDot(mv, ea) / tLen(ea), tDot(mv, eu) / tLen(eu));
@@ -16058,7 +16131,18 @@ function emitTubeRings(acc, geo, n, capability = null) {
     const between = (p, q) => {
       const sn = sinusAfter(p), thp = thm[p];
       const thq = q === 0 ? thm[0] + TAU : thm[q];
-      if (sn.r > 0) return [{ a: thp, b: sn.cc - sn.half, cols: C / 2 }, { a: sn.cc - sn.half, b: sn.cc, cols: TUBE_COLS_PER_SINUS / 2 }, { a: sn.cc, b: sn.cc + sn.half, cols: TUBE_COLS_PER_SINUS / 2 }, { a: sn.cc + sn.half, b: thq, cols: C / 2 }];
+      /* THE SINUS KNOTS SIT HALF A SINUS COLUMN INSIDE THE MARGINS, NEVER ON THEM.
+         On the margin itself the ring's top-rim apex and the petal's margin apex
+         at the ring's top row are the SAME double (both are the ring's curve at
+         the margin's own angle), so the vertex weld fuses ring and petals into
+         ONE shell and the census counts their by-design overlap as a fold —
+         measured 708 / 2,088 / 3,342 pairs on 5 petals / 6 petals / 6 petals k 2
+         against 0 for the same petals FREE (the leaf petiole's class, and its
+         remedy: the lattice straddles the shared point instead of landing on
+         it). The cut's LAW (`tubeNotchDepth`) is a function of azimuth and does
+         not move; only where its columns are sampled does. */
+      const hk = sn.half * (1 - 1 / TUBE_COLS_PER_SINUS);
+      if (sn.r > 0) return [{ a: thp, b: sn.cc - hk, cols: C / 2 }, { a: sn.cc - hk, b: sn.cc, cols: TUBE_COLS_PER_SINUS / 2 }, { a: sn.cc, b: sn.cc + hk, cols: TUBE_COLS_PER_SINUS / 2 }, { a: sn.cc + hk, b: thq, cols: C / 2 }];
       return [{ a: thp, b: sn.cc, cols: C / 2 }, { a: sn.cc, b: thq, cols: C / 2 }];
     };
     if (kk === 0 && notch) {
@@ -16101,7 +16185,11 @@ function emitTubeRings(acc, geo, n, capability = null) {
 function buildBloomCore(acc, state, opts = {}) {
   const layerCount = Math.round(Number(state.layerCount) || 1);
   const n = Math.round(Number(state.petalCount));
-  const plan = tubePlan(state, layerCount, n);
+  let plan = tubePlan(state, layerCount, n);
+  /* a CLEFT is reachable only through the gate's capability hook, so the
+     state cannot say so — it splits the blade into panels, and the tube is
+     unavailable on it (Eva's ruling) */
+  if (plan.eligible && opts.capability && opts.capability.cleft) plan = { ...plan, eligible: false, active: false, layers: plan.layers.map((x) => ({ ...x, k: n, free: true, snapped: false })) };
   if (!plan.active) {
     const built = buildBloomBody(acc, state, opts, null);
     built.tube = { ...plan, rings: [] };

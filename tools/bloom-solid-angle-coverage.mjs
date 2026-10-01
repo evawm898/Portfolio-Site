@@ -409,6 +409,13 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     const flat = !dome;
     const closed = !flat && dome.closed === true;
     if (Boolean(fr.sphereMode) !== closed) bad.push(`solid R0b: footRing() reports sphereMode ${fr.sphereMode} while its dome ${closed ? 'is' : 'is not'} closed — the flag and the head disagree`);
+    /* THE TUBE (corolla fusion) — a LABELLED, LOUD SKIP, the split whorl's
+       shape: this census re-emits each petal FREE through buildPetalInto, and
+       a fused whorl's petals are reshaped by the ring's hook and the ring is a
+       part of its own, so R1 would compare a FREE re-emission against a fused
+       bloom. The tube's own instrument is tools/verify-bloom-tube.mjs
+       (TU0-TU6). */
+    if (builtFull.tube && builtFull.tube.active) return { bad, r: null, skipped: 'TUBE: a fused whorl — this raster re-emits each petal FREE and cannot rebuild the petals the ring reshapes; the fusion is tools/verify-bloom-tube.mjs\'s (TU0-TU6) — RECORDED, NOT BUILT' };
     if (!fr.continuousMode) {
       const split = [];
       for (let L = 0; L < fr.layerCount; L++) { const s = fr.slotRings[L]; if (!s.every((d) => d === s[0])) split.push(L); }
