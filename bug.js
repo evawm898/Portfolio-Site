@@ -13,7 +13,7 @@ import {
   buildBug, exportStl, exportSvg, mirrorDiff, sampleOutline, resolveWingPairs,
   moveControlPoint, insertControlPoint, deleteControlPoint, controlPointsFromDense,
   designFromParams, paramsFromDesign, MAX_WING_PAIRS,
-  composeOutline, moveComposed, insertComposed, deleteComposed, FloorError,
+  composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
 } from './bug-geometry.js';
 
 /* ---------------- state ---------------- */
@@ -298,6 +298,16 @@ function applyVisibility() {
 let randomSeed = 1;
 document.getElementById('randomBtn').addEventListener('click', () => { designName = ''; loadParams(randomParams((Date.now() ^ (randomSeed++ * 2654435761)) >>> 0)); });
 document.getElementById('resetBtn').addEventListener('click', () => { designName = ''; loadParams(defaultParams()); });
+/* SET SPECIMEN: one click writes the pose's slider values (forewing sweep from
+   its own inner margin, every wing flat, legs tucked, antennae a V) and
+   rebuilds; every value stays editable after. The pair being edited is kept. */
+function setSpecimen() {
+  const r = specimenPose(params), k = editPair;
+  loadParams(r.params); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawEditor();
+  designMsg(r.notes.length ? `Specimen set, with notes: ${r.notes.join('; ')}.` : 'Specimen set: forewings square to the body, wings flat, legs tucked, antennae in a V. Adjust any slider after.', r.notes.length > 0);
+  return r;
+}
+document.getElementById('specimenBtn').addEventListener('click', setSpecimen);
 
 function loadParams(p) {
   params = normalizeParams(p);
@@ -600,8 +610,15 @@ document.getElementById('viewButtons').addEventListener('click', (e) => { const 
 /* ---------------- test chrome (read by tools/shot-bug-sheet.mjs) ---------------- */
 window.__bug = {
   setParams: (p) => loadParams(p),
+  specimen: () => setSpecimen().notes,
   getParams: () => JSON.parse(JSON.stringify(params)),
   setView: (v) => setView(v),
+  // a close-up for the contact sheet: target and direction in MODEL mm (x right, y head, z up)
+  lookAt: (t, d, dist) => {
+    const c = new THREE.Vector3(t[0], t[2], -t[1]), dir = new THREE.Vector3(d[0], d[2], -d[1]).normalize();
+    camera.position.copy(c).addScaledVector(dir, dist); camera.up.set(0, 1, 0); controls.target.copy(c);
+    camera.near = dist / 50; camera.far = dist * 20; camera.updateProjectionMatrix(); controls.update(); render();
+  },
   svg: (cutSafe = false) => exportSvg(model, { cutSafe }),
   stl: () => Array.from(exportStl(model, { allowBelowFloor: true })),   // the sheet compares bytes; the page's own button refuses
   tryStl: () => { const r = tryExportStl(); return r.ok ? { ok: true, bytes: r.bytes.length } : r; },

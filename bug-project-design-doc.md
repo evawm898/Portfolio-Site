@@ -11,6 +11,17 @@ later phase is written down here so that Phase 1 does not foreclose it.
 
 ---
 
+## 0. Governing principle (Eva, the elegance pass)
+
+**BODIES TREND TOWARD ANATOMICAL ACCURACY; WINGS CARRY THE FANTASY.** The bug is
+a curio-cabinet specimen — real but magical in its unreality: an anatomically
+plausible insect body under impossible (lace) wings. By default the page avoids
+the CUTE signals — a large head relative to the body, a short plump body, thick
+limbs, ball-ended extremities, slab wings. Every one of them stays REACHABLE by
+a slider or toggle; none is the default (§9).
+
+---
+
 ## 1. Architecture law
 
 **One 3D model of the bug is the single source of truth. Two exporters read it.**
@@ -210,7 +221,8 @@ strength claim in this repo is still theory.
 |---|---|---|
 | **1** | body plans, legs, antennae, wings with tilt, flat solid wings, SVG + STL exports, 3D preview | built (#324, merged) |
 | **1 rev.** | presets removed → neutral default + Randomize + save/load; wings 0–4 pairs with drawn, linked outlines; curve editor with reference backdrop; tucked legs | **built (this PR, §5)** — waits on Eva's ruling on the revised sheet |
-| 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | **built (§8)** — waits on Eva's ruling on `docs/img/bug-venation-sheet.png` |
+| 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | built (§8, #341 merged) |
+| elegance | the default becomes a pinned specimen; edge profile, teardrop club, groove/bulge segments, pointed tips, SET SPECIMEN | **built (§9)** — waits on Eva's ruling on `docs/img/bug-elegance-sheet.png` |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
 | 4 | SVG import (roles, warps, blend) | — |
 
@@ -1036,3 +1048,226 @@ they import rather than `tools/**` (#340, Oct 1 — the negations this PR first 
 were dropped in the merge as redundant), so a bug-only change runs the bug gate and
 nothing else; the bloom gates list their files by name and never matched. Measured
 on #341's own head: one Actions run fired, `bug-gate`, and neither flower gate.
+
+
+## 9. The elegance pass — the default is a pinned specimen
+
+Eva's ruling: the page read cute and blocky and must read ELEGANT by default
+(§0). Her visual target is the lace reference — an anatomically realistic
+butterfly under impossible lace wings. **The reference image is not in this
+repository**; everything calibrated against it below was calibrated from her
+description of it ("the body is a thin stalk under very large wings"), and the
+sheet asks to be held beside it.
+
+Files: `bug-geometry.js` (every control, the edge field, the terminations, the
+segments, `specimenPose`, the new default and the legacy one), `bug.js` /
+`bug.html` (the SET SPECIMEN button), `tools/verify-bug.mjs` (the B, X, G and Y
+families), `tools/shot-bug-elegance.mjs` (the sheet,
+`docs/img/bug-elegance-sheet.png`).
+
+**Every new control has an OLD END that is a BRANCH back to the shipped code**, so
+the cute bug is reachable bit for bit, not approximately. `LEGACY_STYLE` names
+those ends and `legacyDefaultParams()` is the whole Phase 1/2 default; §9.6 has the
+measurement.
+
+### 9.1 The wing's edge profile (two controls, Wings)
+
+- **`wingEdgeTaper`** (0–0.9, default **0.5**): the thickness falls linearly along
+  the span from the pair's own thickness at the root to
+  `max(floor, thickness × (1 − taper))` at its outermost point.
+- **`wingEdgeBevel`** (0–4 mm, default **1.2 mm**): within that distance of the
+  drawn outline (the root chord excluded — it is inside the body) both skins ramp
+  linearly down to the **floor exactly at the outline**: a chamfer.
+- **Both 0 is the Phase 1/2 vertical-walled slab, by branch** (the same double on
+  every vertex). It is a non-default setting now.
+- Never under the floor anywhere, by construction (`edgeField`), and measured
+  (B). The pair's own thickness default went 1.2 → **1.8 mm** so the taper has
+  room to read (root 1.8 → the 1.0 floor at the margin).
+- One owner of the drawn planform in millimetres, `drawnPlanformMm`, now read by
+  the builder AND by `specimenPose`; `planformSlab` takes the half-thickness as a
+  number or a function; the RIDGES strips and the pterostigma plate stand on the
+  LOCAL top skin.
+
+### 9.2 The antenna club and the feathered antenna
+
+- **Clubbed** is now a **TEARDROP** (`clubRadius`): the drop's thin tail toward
+  the shaft — a gradual sin² swell over the final **`clubLength`** (0–0.5 of the
+  antenna, default **0.22**) to **`clubWidth`** × the shaft (1–4, default **1.8**)
+  — and its round head toward the tip, an elliptical close; **`clubTaper`** (0–1,
+  default **0.35**) moves the peak back and draws the end from 0.55 of the club's
+  width (a rounded end) down to the floor. Never under the floor (a function
+  check samples the whole grid of its controls).
+- **`clubLength` 0 is the old ellipsoid knob, by branch.**
+- `clubWidth` is a THIRD club control where the brief named two (length, taper):
+  without it the club's size is a constant and "subtle" cannot be tuned. Flagged
+  as a decision (§9.9).
+- **Feathered** under pointed tips is a **LEAF**: 15 pinnae a side whose lengths
+  follow a lanceolate envelope (longest a third of the way out, vanishing at the
+  tip), swept toward the tip, each a floored wire ending in a point. With pointed
+  tips off, the old fan of 11, by branch.
+
+### 9.3 Abdomen segment style (Abdomen)
+
+**`segmentStyle`** (0–1, default **0**): a bulge ↔ groove axis.
+- **0 GROOVE**: a continuous tapered abdomen with each segment boundary a fine
+  INCISED line — a Gaussian groove `GROOVE_SIGMA_MM` 0.18 mm wide cutting
+  `GROOVE_DEPTH` 12% of the local radius. The body loft gets its own stations
+  across every groove, the boundary itself among them, so the SVG's segment line
+  is read off the groove's own ring (the gate caught a first cut whose station
+  de-dup dropped the boundary's ring).
+- **1 BULGE**: the old beaded constrictions (`BAND_DEPTH`), **by branch** — no
+  groove stations, the old envelope.
+- Between: `style` of the bead and `(1 − style)` of the groove, multiplied.
+- `banding` is relabelled "Segments marked" and still switches segmentation off.
+
+### 9.4 Pointed terminations (one toggle, Body)
+
+**`pointedTips`** (default **on**): the abdomen tip, the tarsi and every antenna
+(and pinna) end taper to points instead of ending round.
+- A pointed tube end closes in a cone whose apex stands `TIP_POINT` 2 × the last
+  ring's radius beyond it; **the last ring is at or over the floor** (it is a tube
+  ring, floored like every other), and the tarsus end carries no ball.
+- **The cone closes on a NIB 0.16 mm across (`TIP_NIB_MM` 0.08), not on a point,
+  and the reason is measured**: with a mathematical apex, 5 of 40 random bugs read
+  **2 cut-safe SVG regions** — a cone drawn diagonally in projection thins past one
+  0.05 mm raster pixel before its apex and the 4-connected union cuts the tip off as
+  an island; every island was at a leg, antenna or pinna tip, and the same bugs with
+  rounded ends read 1. The nib clears two pixels on any diagonal and is far under
+  anything a printer resolves. The fix is in the geometry, not the raster.
+- The **pointed abdomen**: a cosine fall instead of the ellipse (it meets the axis
+  at a finite slope — a tip, not a dome), floored at the floor's radius over all of
+  the abdomen but a final cone 1.6 floor radii long that closes on the loft's apex.
+- Off: balls and the old dome, by branch.
+
+### 9.5 SET SPECIMEN
+
+A button beside Randomize. `specimenPose(params)` returns slider values and notes;
+nothing about it is a mode and every value stays editable after:
+- **forewings pulled forward** until their INNER MARGINS (root trail → tornus) form
+  one straight line square to the body axis. The tornus is the trailing-half point
+  farthest outside the apex–root-trail chord, read off the drawn planform in mm —
+  the polygon the builder triangulates. With pitch 0, a planform direction
+  (du, dw) lands at world dy = −du sin(sweep) + dw cos(sweep), so the margin is
+  square at **sweep = atan2(dw, du)**; the mirror puts the left margin on the same
+  line. A sweep outside the slider (−30…70°) is clamped and **reported** (random:6
+  needs −43.1°: told, and the gate's Y accepts it only with the sweep at the bound);
+- **every wing flat** (dihedral 0, pitch 0, on every drawn and unlinked pair);
+- **legs tucked** (`legReach` 0);
+- **antennae a symmetric V** (curl 0, spread 22°).
+The hindwings' sweep is left as it is (a specimen's hindwings are tucked under the
+forewings by hand; nothing in the brief derives it).
+
+### 9.6 The new default, and the old one kept reachable
+
+| | new default | old (Phase 1/2) |
+|---|---|---|
+| head | 2.4 mm | 4.0 |
+| thorax | 5.0 × 2.9 × 2.9 mm | 7 × 5 × 4.6 |
+| abdomen | 15 × 2.2 mm, taper 0.75, 7 segments, GROOVE | 15 × 5, taper 0.5, 6, beads |
+| legs | tucked; coxa / femur / tibia / tarsus 0.9 / 4.0 / 4.2 / 3.4 mm, pointed | splayed; 1.2 / 5 / 5.5 / 4, balls |
+| antennae | clubbed teardrop, 17 mm, straight V at 22° | filiform 10 mm, ball tip |
+| forewing | angular apex, straight-to-slightly-concave outer margin, clear tornus; 41 mm; sweep **−25.59° derived by the pose** | rounded, 26 mm |
+| hindwing | rounded fan, scalloped margin (0.06 × 8); 29 mm, sweep 14° | rounded, 20 mm, sweep 32° |
+| wings | flat; 1.8 mm root tapering to the floor; 1.2 mm chamfer | dihedral 12 / 8, 1.2 mm slab |
+
+- **The body : wingspan ratio landed on: 3.39×** — body (head front to abdomen
+  tip) **21.3 mm**, wingspan (tip to tip, top-down) **72.1 mm**, read off the model
+  by the sheet; the old default was 2.18× (24.3 / 52.9). The body is **2.9 mm**
+  wide at its widest under a 72 mm span (the old one 5.0). A real butterfly sits
+  near 3×; "many times" and "a thin stalk under very large wings" pushed past it.
+  It is two sliders (the wing lengths) to move.
+- **The default IS its own specimen pose**: the forewing sweep is not typed — the
+  module applies `specimenPose` to `DEFAULTS` once at load (a function check holds
+  it).
+- **Cute stays reachable, measured bit for bit**: `legacyDefaultParams()` builds
+  **identically to `main`'s default** (23,248 triangles, every position `Object.is`)
+  and, against a worktree of `main` at `20efd53`, **55 configurations** — the
+  default, 40 random bugs, 6 HOLES and 6 RIDGES random bugs, clubbed and feathered —
+  each with `LEGACY_STYLE`, read **0 differing of 2,432,178 floats**.
+- **One honest exception, and it is a refinement of the TUCK, not a new control**:
+  on a slim body the tucked legs showed **6.3%** of their area outside the body from
+  above (gate L bars 2%) — the femur's straight run crossed a floor-wide waist that
+  only the JOINTS were held inside. The tuck now holds each joint inside the
+  NARROWEST body width along the segment reaching it, folds the coxae onto the
+  midline, and keeps **0.08 mm off the midline** (`TUCK_MIDLINE_GAP`: ON it, the left
+  leg is the right one's exact mirror and the two tubes coincide face for face — the
+  welded STL read 1,506 non-manifold edges). Applied only while tucked
+  (`legReach` < 1), so at reach 1 the old arithmetic is untouched (the 55-row
+  identity above is at reach 1). It does change bugs with reach between 0 and 1,
+  which Randomize draws (0.75–1). New default exposure: **1.65%**.
+- A design saved before this pass (`DESIGN_VERSION` < 4) loads with
+  `LEGACY_STYLE` for the fields it does not carry, so it **looks as it was saved**
+  (function check D, bit-identical). Randomize starts from the new default, so random
+  bugs now carry the new style.
+- The hindwing was made a little shallower at 60% of its span so the existing
+  starter TAIL still fits it (the gate's T rows went vacuous on the first cut).
+
+### 9.7 OPEN DESIGN QUESTION — the margin fringe (cilia). NOT BUILT.
+
+The fine hairs along a wing's margin are a key part of the target look and cannot
+survive the floor: a cilium is ~0.01–0.05 mm across, the floor 1.0 mm. Options, for
+Eva's ruling:
+
+| | A. SVG-only fringe | B. Floored comb | C. Fringe-like scallop |
+|---|---|---|---|
+| What | hairlines along the margin drawn into the SVG from a **fringe record in the model** (the RIDGES vein lines are the precedent: lines read off a model record) | real teeth along the margin, each a closed floored solid (≥ 1.0 mm wide, ≥ 1.0 mm apart), carried by both exports | a high-count, shallow scallop / serration OF THE OUTLINE itself (a third margin law beside scallop) |
+| Look | the only option that actually looks like cilia — any density, any fineness | an eyelash or a comb: at 1 mm pitch on a 72 mm wing, ~70 coarse teeth a side, never hair | a crenellated or fringed edge; reads as fringe at a distance, as teeth up close |
+| One-model law (§1) | **breaks its spirit**: the SVG would carry geometry the STL does not. The letter survives (both read one model, and the record says it is SVG-only), but "the two exports cannot disagree" becomes "they disagree by declaration" — exactly what §1 exists to prevent, so this needs a ruling and an explicit `svgOnly` role, not a quiet line | holds | holds: it IS the outline, so the SVG, the STL, the editor and the floor all see it |
+| Floor / print | nothing printed | every tooth at the floor; cut-safe stays one region (teeth are attached); many thin free cantilevers — the weakest part of the print, unmeasured | the drawn-width floor (§6.3) already polices it: a tooth narrower than the floor turns the STL red, so its density is capped by the floor at the wing's own size |
+| Cost | none in the STL; the SVG grows by the hair count | large: hundreds of closed parts per wing | small: outline points only |
+
+**Recommendation, not a ruling:** C for what prints, with A considered only as an
+explicit, labelled SVG-only layer if the paper / laser output must carry real hair —
+because A is the one option that changes §1. B is listed for completeness and is the
+one I would not build: it costs the most and looks least like the thing.
+
+### 9.8 Verification
+
+- `node tools/verify-bug.mjs --seeds 40` (CI's setting): **173 / 173 PASS** — 28
+  function checks and 145 built rows (the old 135 + the elegance rows: the legacy
+  default; every new control at both ends; segment style 0.5; feathered pointed and
+  rounded; filiform and bristle pointed; a 2-part pointed abdomen; floor 0.6 and 2.0
+  mm against the edge law; HOLES and RIDGES with a 2 mm chamfer; the specimen pose on
+  the new default, the old default, 4 pairs and 6 random bugs). 5 m 57 s on this box.
+- The four new families, each with an expected value owned by the parameters or
+  restated in the gate and a measured side read off emitted vertices:
+  **B** the edge law restated from the parameters and the drawn planform against the
+  top/bottom pair of EVERY planform point (1e-9 mm), nothing under the floor, every
+  outline vertex at the floor under a chamfer (802 such vertices on the default);
+  **X** every pointed end's last ring ≥ the floor and its apex ≥ a ring radius beyond
+  it, no ball left, the abdomen ≥ the floor above its restated tip cone;
+  **G** each boundary's dip against the same bug with segments unmarked, at least
+  half of what the style asks (a first version compared neighbouring rings and read a
+  bead as missing where the envelope still rises steeply — biased, rewritten);
+  **Y** the inner margin square off the emitted vertices with the tornus by the gate's
+  own rule, every wing's mid-surface flat, the antennae straight.
+- `--negative-control`: **PASS, 27 mutations + the L control**, six of them new —
+  an outline vertex thinned under the floor (B, F), the chamfer missing the outline
+  (B), a pointed end blunted onto its ring (X), a tip ring thinned (X, F), a groove
+  filled (G), the forewing margin not square (Y). The L control had assumed the
+  default bug is splayed; it builds a splayed bug explicitly now.
+- **Cost, EXPORT**: the new default **30,512 triangles, 1,490 KiB STL** (old 23,248 /
+  1,135); in HOLES 53,120, in RIDGES 31,920. The extra triangles are the groove
+  stations and the 56-ring teardrop antenna; the edge field moves vertices and adds
+  none. Build ~0.25 s in Node at the default (the edge field's distance-to-outline is
+  per vertex).
+- Welded-STL non-manifold edges (unrated, never gated): the new default **8**, against
+  `main`'s own default **36**.
+- The sheet: `node tools/shot-bug-elegance.mjs <dir>` → `docs/img/bug-elegance-sheet.png`.
+  SET SPECIMEN is a REAL click of the page's button. No pixel claim anywhere.
+
+### 9.9 Decisions made without a ruling (reversible)
+
+1. The new outlines (forewing 12 points, hindwing 10), lengths 41 / 29 mm, the 1.8 mm
+   root thickness, taper 0.5 and chamfer 1.2 mm — tuned by eye on renders.
+2. **`clubWidth`** — a third club slider beyond the brief's two (§9.2).
+3. The **feathered leaf rides the terminations toggle** (pointed ⇒ leaf, rounded ⇒ the
+   old fan) rather than a control of its own.
+4. **One toggle for all three terminations** (abdomen, tarsi, antennae).
+5. `TIP_POINT` 2, the 0.16 mm nib, `GROOVE_SIGMA_MM` 0.18, `GROOVE_DEPTH` 0.12, the
+   abdomen tip cone 1.6 floor radii, `TUCK_MIDLINE_GAP` 0.08 — constants with their
+   reasons in the source.
+6. The specimen V is 22° straight; the pose leaves the hindwing sweep alone and clamps
+   (and reports) a forewing sweep outside −30…70°.
+7. The tuck refinement (§9.6) changes partially splayed legs, not only tucked ones.
+8. Pre-v4 designs load at the old ends (§9.6).

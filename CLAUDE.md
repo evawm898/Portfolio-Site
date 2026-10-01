@@ -9793,12 +9793,15 @@ path. Bilateral symmetry is built (right half + mirror) and checked as an exact 
 subdivision of the drawn planform into CELLS (closed polygons, the data Phase 4 fills —
 format in the design doc §8.3); HOLES cuts the cells through one conforming frame slab,
 RIDGES raises the veins as closed strips; vein widths carry the same floor-block rule as
-the drawn outline. Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control`
+the drawn outline. **Since the elegance pass (§0, §9) the default is a pinned specimen**
+— bodies trend toward anatomy, wings carry the fantasy — and every new control's old end
+is a branch to the old code: `legacyDefaultParams()` builds bit-identically to the Phase
+1/2 default. Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control`
 required before quoting a pass from a changed harness) — **it runs in CI as
 `bug-gate.yml`**, path-filtered to `bug.html`, `bug*.js`, `tools/verify-bug*` and
 `tools/bug-fixtures.mjs`; the two flower gates name their own tools by file (#340 took
 them off `tools/**` on Oct 1), so a bug-only change runs this workflow and nothing else. Sheets: `node tools/shot-bug-sheet.mjs <dir>`
-(Phase 1) and `node tools/shot-bug-venation.mjs <dir>` (Phase 2); neither runs in CI.
+(Phase 1), `node tools/shot-bug-venation.mjs <dir>` (Phase 2) and `node tools/shot-bug-elegance.mjs <dir>` (§9); none runs in CI.
 
 ## `/frame` — the Parametric Frame (pointer only)
 
