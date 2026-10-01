@@ -146,6 +146,16 @@ Measured, and identical in Node and Chromium:
 
 Every other block-45 row reads 0 pairs, 51 of 54.
 
+The edge-profile gate (E2) reads two GATED rows over its 45 deg allowance. On
+both, the tube is unavailable and inert, so the turn belongs to the feature that
+gates it:
+
+- `TUBE: GATED — the buckle` adds 48.30 deg, the buckle's out-of-plane class. It
+  is in the smoke subset, so it is declared in `E2_TURN_XFAIL`.
+- `TUBE: GATED — the fringe` adds 45.0002 deg at the squared terminal's corners,
+  the carnation class. It is not in the smoke subset and shows only under
+  `--all`, so it is recorded here and not declared.
+
 ## 7. Cost
 
 Export triangles, every whorl FREE against every whorl at k 0 (h 0.25, BLEND 1).
