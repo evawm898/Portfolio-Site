@@ -22,6 +22,19 @@ EXPORT throughout. Reproduce with:*
 *Parts B and A below are the earlier rounds. Their findings stand where Part C does not say
 otherwise.*
 
+## C-RULED. Eva's rulings on Part C (Oct 1, after dragging the preview page)
+
+- **BLEND default = 1.** Recorded as `RULED_BLEND` in `tools/bloom-tube-core.mjs`, and the preview
+  page now opens at 1.
+  - `buildTube`'s own default stays 0, so Parts A and B, and the BLEND 0 identity in §C0, still
+    reproduce.
+- **Slit edges approved.** An edge petal is one panel from the foot to the tip, with its outer half
+  the petal's own section (§C4).
+- **Still open:**
+  - the notch's column cost (§C9 #3);
+  - deleting STRAIGHT's code path (§C9 #4);
+  - the mode-dependent notch (§C8b), which belongs to whoever builds this.
+
 ## C0. The answer
 
 - **Neither STOP clause is met.**

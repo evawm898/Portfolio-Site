@@ -87,6 +87,7 @@ const wrap = (a) => { a %= TAU; return a < 0 ? a + TAU : a; };
 export const BLEND_MM = Number(ENV.TUBE_BLEND || 8);   // the fusion line's blend length, mm of midrib arc above the ring's top row (chosen by the sweep in §B3 of the doc; TUBE_BLEND overrides)
 export const COLS_PER_SECTOR = Number(ENV.TUBE_C || 8);   // C — Claude's default, flagged (TUBE_C overrides, diagnosis only)
 export const COLS_PER_SINUS = 12;     // columns across one open sinus when the NOTCH is drawn (6 per half), Claude's default
+export const RULED_BLEND = 1;   // Eva's ruling on Part C (Oct 1): the BLEND default is 1. buildTube's own default stays 0 so Parts A/B reproduce; the preview page and any build session start at RULED_BLEND.
 export const FLARE_FLOOR_ROW = Number(ENV.TUBE_FLARE_FLOOR || 4);   // the lowest row a flared lobe may start on: above the foot rows (0, 1), the ring row (2) and the seam's first blade row (3) — Claude's default, measured (see the guard)
 export const SLIT_OVERLAP_MM = 1.0;   // how far the ring panel runs past an edge petal's midrib, and the edge half past it the other way, so the two closed shells OVERLAP rather than touch (Claude's default)
 
