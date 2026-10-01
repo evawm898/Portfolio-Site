@@ -1,6 +1,6 @@
 /* weave-draft.js — the Weave Draft MODEL. Pure: no DOM, no canvas, importable
-   in Node, which is what lets tools/verify-weave.mjs check the drawdown rule
-   and the WIF round trip without a browser.
+   in Node, which is what lets tools/verify-weave.mjs check the drawdown rule,
+   the yarn arithmetic and the WIF round trip without a browser.
 
    THE DRAFT IS THREE BITMASK ARRAYS AND FOUR COUNTS.
      threading[e]  — bit (s-1) set iff end e passes through shaft s
@@ -17,6 +17,26 @@
        lift(p)   =  OR over pressed treadles t of tieup[t].
    drawdown() is the ONE owner of that rule; everything else reads its output.
 
+   THE CONSTRUCTION (phase A, single layer) is three more things on the state:
+     yarns         — the library: every yarn the draft may use, with its count
+                     (stored as DENIER whatever unit it was typed in), filament
+                     count, ply, twist, an elastic flag with a relaxation ratio,
+                     and a display colour. COLOURS COME FROM YARNS, nowhere else.
+     warpSystems / weftSystems
+                   — a system is a NAME, an interleave RATIO and a REPEAT
+                     SEQUENCE of (yarn, count). The warp's end sequence cycles
+                     through its systems in order, taking `ratio` ends from each
+                     in turn, each system advancing through its own repeat; a
+                     single system with ratio 1 is the old stripe list under a
+                     name. resolveThreads() is the ONE owner of that rule, and
+                     every end and every pick resolves to a yarn through it.
+     physical      — width, sett (ends and picks per inch or per cm) and crimp
+                     per direction. physical() derives the total ends, the
+                     weight per metre per system, the yarn diameters and the
+                     cover factors from these and the yarn library, and is the
+                     ONE owner of that arithmetic (the sheet, the CSV, the PDF
+                     and the read-out all read its output).
+
    ORIENTATION IS THE RENDERER'S, NOT THE MODEL'S. Index 0 is end 1 / pick 1 /
    shaft 1 / treadle 1 here and in the WIF file. Which side of the screen end 1
    sits on is decided once, in weave-render.js. */
@@ -24,6 +44,8 @@
 export const LIMITS = {
   shafts: [2, 16], treadles: [2, 16], ends: [8, 256], picks: [8, 256],
   cell: [4, 24], yarn: [0.4, 1.0], maxFloat: [2, 32],
+  dpi: [50, 600], widthMm: [10, 10000], widthIn: [0.5, 400], densityCm: [0.5, 300], densityIn: [0.5, 762], crimp: [0, 50],
+  ratio: [1, 99], count: [1, 999],
 };
 
 export const PALETTE = {
@@ -33,7 +55,191 @@ export const PALETTE = {
 
 export const VIEW_DEFAULTS = Object.freeze({
   mode: 'draft', grid: true, cell: 12, fabric: false, yarn: 0.78, maxFloat: 5, warn: true,
+  trueScale: false, dpi: 96,
 });
+
+export const PHYSICAL_DEFAULTS = Object.freeze({
+  width: 1000, widthUnit: 'mm', epi: 24, ppi: 24, densityUnit: 'cm', crimpWarp: 5, crimpWeft: 5,
+});
+
+/* ------------------------------------------------------------------ yarns
+   LINEAR DENSITY is stored as denier (grams per 9000 m) and converted at the
+   edges:  tex = den / 9 (g per 1000 m) · dtex = den / 0.9 (g per 10000 m) ·
+   Ne (cotton count, 840-yard hanks per pound) = 5315 / den · Nm (metric
+   count, metres per gram) = 9000 / den. The two indirect counts invert, so a
+   finer yarn is a HIGHER Ne or Nm and a LOWER denier.
+
+   DIAMETER is estimated from the mass per length and an effective yarn
+   density: a yarn of linear density `tex` and bulk density rho (g/cm3) has a
+   cross-section of tex / (1e5 rho) cm2, so
+       d (mm) = sqrt( tex / (250 * pi * rho) ),   rho = fibre density * packing.
+   With cotton at 1.54 g/cm3 and a staple packing of 0.60 this reproduces
+   Peirce's d = 1 / (28 sqrt Ne) inch to about 1 %, which is the figure cover
+   factors have been quoted against for ninety years. A yarn whose filament
+   count is 0 is a SPUN (staple) yarn; any count above 0 is continuous filament
+   and packs tighter. Twist is carried and reported, not used in the estimate. */
+export const FIBERS = [
+  { id: 'cotton', label: 'cotton', density: 1.54 },
+  { id: 'linen', label: 'linen', density: 1.50 },
+  { id: 'wool', label: 'wool', density: 1.31 },
+  { id: 'silk', label: 'silk', density: 1.34 },
+  { id: 'viscose', label: 'viscose', density: 1.52 },
+  { id: 'polyester', label: 'polyester', density: 1.38 },
+  { id: 'nylon', label: 'nylon', density: 1.14 },
+  { id: 'acrylic', label: 'acrylic', density: 1.17 },
+  { id: 'polypropylene', label: 'polypropylene', density: 0.91 },
+  { id: 'elastane', label: 'elastane', density: 1.21 },
+  { id: 'other', label: 'other / unspecified', density: 1.30 },
+];
+export const PACKING = Object.freeze({ staple: 0.60, filament: 0.70 });
+export const COUNT_UNITS = ['den', 'dtex', 'tex', 'Ne', 'Nm'];
+export const YARN_LIMITS = { den: [1, 100000], filaments: [0, 5000], ply: [1, 24], tpm: [0, 5000], relax: [0.1, 1] };
+/* Peirce's jammed-cloth cover factor for one direction, in the cotton system. */
+export const PEIRCE_MAX_K = 28;
+
+export function toDenier(value, unit) {
+  const v = +value;
+  if (!(v > 0)) return NaN;
+  switch (unit) {
+    case 'den': return v;
+    case 'dtex': return v * 0.9;
+    case 'tex': return v * 9;
+    case 'Ne': return 5315 / v;
+    case 'Nm': return 9000 / v;
+    default: throw new Error(`unknown count unit: ${unit}`);
+  }
+}
+export function fromDenier(den, unit) {
+  switch (unit) {
+    case 'den': return den;
+    case 'dtex': return den / 0.9;
+    case 'tex': return den / 9;
+    case 'Ne': return 5315 / den;
+    case 'Nm': return 9000 / den;
+    default: throw new Error(`unknown count unit: ${unit}`);
+  }
+}
+export function fiberOf(id) { return FIBERS.find(f => f.id === id) || FIBERS[FIBERS.length - 1]; }
+export function yarnDensity(yarn) {
+  return fiberOf(yarn.fiber).density * (yarn.filaments > 0 ? PACKING.filament : PACKING.staple);
+}
+export function yarnDiameterMm(yarn) {
+  const tex = yarn.den / 9;
+  return Math.sqrt(tex / (250 * Math.PI * yarnDensity(yarn)));
+}
+export function yarnWeightPerM(yarn) { return yarn.den / 9000; }   // g per metre of yarn
+
+const f1 = (v) => (Math.round(v * 10) / 10).toString();
+const f2 = (v) => (Math.round(v * 100) / 100).toString();
+export function yarnCountText(yarn) {
+  const den = yarn.den;
+  return `${f1(den)} den (${f1(fromDenier(den, 'tex'))} tex · Ne ${f1(fromDenier(den, 'Ne'))} · Nm ${f1(fromDenier(den, 'Nm'))})`;
+}
+export function yarnDescription(yarn) {
+  const parts = [fiberOf(yarn.fiber).label.replace(' / unspecified', ''), yarnCountText(yarn)];
+  parts.push(yarn.filaments > 0 ? `${yarn.filaments} filaments` : 'spun');
+  parts.push(`${yarn.ply}-ply`);
+  parts.push(yarn.tpm > 0 ? `${yarn.tpm} tpm ${yarn.twist}` : 'no twist');
+  if (yarn.elastic) parts.push(`elastic, relaxes to ${Math.round(yarn.relax * 100)}%`);
+  return parts.join(', ');
+}
+
+const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
+const bit = (i) => 1 << i;
+const allBits = (n) => (1 << n) - 1;
+const isHex = (c) => /^#[0-9A-F]{6}$/i.test(c || '');
+const num = (v, lim, fallback) => { const n = +v; return Number.isFinite(n) ? clamp(n, lim) : fallback; };
+
+/* Every field validated: a yarn read from a hash, a WIF or a form goes through
+   here, so nothing downstream has to doubt a record. */
+export function newYarn(p = {}) {
+  return {
+    id: /^y\d+$/.test(p.id || '') ? p.id : 'y1',
+    name: String(p.name == null ? 'yarn' : p.name).slice(0, 60) || 'yarn',
+    fiber: FIBERS.some(f => f.id === p.fiber) ? p.fiber : 'other',
+    den: num(p.den, YARN_LIMITS.den, 150),
+    filaments: Math.round(num(p.filaments, YARN_LIMITS.filaments, 0)),
+    ply: Math.round(num(p.ply, YARN_LIMITS.ply, 1)),
+    tpm: Math.round(num(p.tpm, YARN_LIMITS.tpm, 0)),
+    twist: p.twist === 'S' ? 'S' : 'Z',
+    elastic: p.elastic === true || p.elastic === 1 || p.elastic === '1',
+    relax: num(p.relax, YARN_LIMITS.relax, 1),
+    color: isHex(p.color) ? p.color.toUpperCase() : PALETTE.paper,
+  };
+}
+export function nextYarnId(yarns) {
+  let max = 0;
+  for (const y of yarns) { const n = parseInt(String(y.id).slice(1), 10); if (n > max) max = n; }
+  return `y${max + 1}`;
+}
+
+/* The starter library: GENERIC yarns, described by what they are and not by
+   any maker's code. The first two carry the draft's old default colours, so
+   the default drawdown is the picture it always was. */
+export function starterYarns() {
+  return [
+    newYarn({ id: 'y1', name: 'cotton 30s', fiber: 'cotton', den: toDenier(30, 'Ne'), filaments: 0, ply: 1, tpm: 760, twist: 'Z', color: PALETTE.paper }),
+    newYarn({ id: 'y2', name: 'polyester 150/48', fiber: 'polyester', den: 150, filaments: 48, ply: 1, tpm: 0, twist: 'Z', color: PALETTE.teal }),
+    newYarn({ id: 'y3', name: 'nylon 70/34', fiber: 'nylon', den: 70, filaments: 34, ply: 1, tpm: 0, twist: 'Z', color: PALETTE.dim }),
+    newYarn({ id: 'y4', name: 'wool 2/20 Nm', fiber: 'wool', den: toDenier(10, 'Nm'), filaments: 0, ply: 2, tpm: 420, twist: 'S', color: '#C9B79C' }),
+    newYarn({ id: 'y5', name: 'linen 12 Nm', fiber: 'linen', den: toDenier(12, 'Nm'), filaments: 0, ply: 1, tpm: 500, twist: 'Z', color: '#D8CFB0' }),
+    newYarn({ id: 'y6', name: 'covered elastane 140', fiber: 'elastane', den: 140, filaments: 1, ply: 1, tpm: 0, twist: 'Z', elastic: true, relax: 0.6, color: '#A86B8A' }),
+  ];
+}
+
+/* --------------------------------------------------------------- systems */
+
+export function newSystem(p = {}, fallbackYarn = 'y1') {
+  const seq = Array.isArray(p.seq) ? p.seq : [];
+  return {
+    name: String(p.name == null ? 'system' : p.name).slice(0, 40) || 'system',
+    ratio: Math.round(num(p.ratio, LIMITS.ratio, 1)),
+    seq: seq.map(x => ({ yarn: /^y\d+$/.test((x && x.yarn) || '') ? x.yarn : fallbackYarn,
+      count: Math.round(num(x && x.count, LIMITS.count, 1)) })),
+  };
+}
+
+/* Which yarn each of n threads is: cycle the systems in order, `ratio` threads
+   from each in turn, every system advancing through its own repeat. A system
+   whose sequence names no yarn in the library contributes nothing; if none
+   does, every thread is the library's first yarn. Returns [{ yarn, sys }] with
+   `sys` the system's index (-1 for the fallback). */
+export function resolveThreads(systems, yarns, n) {
+  const ids = new Set(yarns.map(y => y.id));
+  const live = [];
+  (systems || []).forEach((sys, i) => {
+    const seq = (sys.seq || []).filter(x => ids.has(x.yarn) && x.count >= 1);
+    if (seq.length) live.push({ i, ratio: Math.max(1, Math.round(sys.ratio || 1)), seq, k: 0, left: seq[0].count });
+  });
+  const out = new Array(n);
+  if (!live.length) {
+    const y = yarns.length ? yarns[0].id : null;
+    for (let i = 0; i < n; i++) out[i] = { yarn: y, sys: -1 };
+    return out;
+  }
+  let i = 0;
+  while (i < n) {
+    for (const L of live) {
+      for (let r = 0; r < L.ratio && i < n; r++) {
+        out[i++] = { yarn: L.seq[L.k].yarn, sys: L.i };
+        if (--L.left === 0) { L.k = (L.k + 1) % L.seq.length; L.left = L.seq[L.k].count; }
+      }
+    }
+  }
+  return out;
+}
+const SYS_KEY = { warp: 'warpSystems', weft: 'weftSystems' };
+export function threadYarns(s, dir, n) {
+  const byId = new Map(s.yarns.map(y => [y.id, y]));
+  return resolveThreads(s[SYS_KEY[dir]], s.yarns, n).map(t => ({ ...t, y: byId.get(t.yarn) || null }));
+}
+export function threadColors(s, dir, n) {
+  const fallback = dir === 'warp' ? PALETTE.paper : PALETTE.teal;
+  return threadYarns(s, dir, n).map(t => t.y ? t.y.color : fallback);
+}
+export function yarnInUse(s, id) {
+  return [...s.warpSystems, ...s.weftSystems].some(sys => sys.seq.some(x => x.yarn === id));
+}
 
 /* ---------------------------------------------------------------- state */
 
@@ -43,8 +249,10 @@ export function blankState(shafts = 4, treadles = 4, ends = 32, picks = 32) {
     threading: new Uint16Array(ends),
     tieup: new Uint16Array(treadles),
     treadling: new Uint16Array(picks),
-    warp: [{ color: PALETTE.paper, count: 1 }],
-    weft: [{ color: PALETTE.teal, count: 1 }],
+    yarns: starterYarns(),
+    warpSystems: [newSystem({ name: 'ground', ratio: 1, seq: [{ yarn: 'y1', count: 1 }] })],
+    weftSystems: [newSystem({ name: 'ground', ratio: 1, seq: [{ yarn: 'y2', count: 1 }] })],
+    physical: { ...PHYSICAL_DEFAULTS },
     view: { ...VIEW_DEFAULTS },
   };
 }
@@ -59,15 +267,13 @@ export function cloneState(s) {
     threading: Uint16Array.from(s.threading),
     tieup: Uint16Array.from(s.tieup),
     treadling: Uint16Array.from(s.treadling),
-    warp: s.warp.map(x => ({ ...x })),
-    weft: s.weft.map(x => ({ ...x })),
+    yarns: s.yarns.map(y => ({ ...y })),
+    warpSystems: s.warpSystems.map(x => ({ ...x, seq: x.seq.map(q => ({ ...q })) })),
+    weftSystems: s.weftSystems.map(x => ({ ...x, seq: x.seq.map(q => ({ ...q })) })),
+    physical: { ...s.physical },
     view: { ...s.view },
   };
 }
-
-const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
-const bit = (i) => 1 << i;
-const allBits = (n) => (1 << n) - 1;
 
 /* Resize keeps what is there. A longer threading or treadling CONTINUES the
    sequence already on the grid (cyclically), so an eight-end repeat can be
@@ -303,7 +509,11 @@ export function applyPreset(s, id) {
   return n;
 }
 
-/* ------------------------------------------------------------------ colours */
+/* --------------------------------------------------------- legacy colours
+   The draft used to carry colour STRIPES ({ color, count } lists) on the warp
+   and the weft, and the v=1 hash and every WIF written before the yarn library
+   still do. These two functions are the stripe arithmetic, kept for them, and
+   migrateStripes() is where a stripe list becomes yarns and a system. */
 
 export function expandStripes(stripes, n, fallback = PALETTE.paper) {
   const out = new Array(n);
@@ -331,12 +541,222 @@ export function stripesFrom(colors) {
   return out;
 }
 
+/* One AUTO-GENERATED yarn per distinct stripe colour (shared across the two
+   directions, so a colour used in both is one yarn), and one system per
+   direction whose repeat is the stripe list itself. The per-thread colours
+   are the stripes' own, exactly; the yarn's other fields are the library's
+   generic defaults, since a stripe never said what it was made of. */
+export function migrateStripes(warpStripes, weftStripes) {
+  const yarns = [];
+  const byColor = new Map();
+  const yarnFor = (color, dir) => {
+    const C = color.toUpperCase();
+    if (!byColor.has(C)) {
+      const id = nextYarnId(yarns);
+      yarns.push(newYarn({ id, name: `${dir} colour ${byColor.size + 1}`, fiber: 'other', den: 150, color: C }));
+      byColor.set(C, id);
+    }
+    return byColor.get(C);
+  };
+  const sysFor = (stripes, dir, fallback) => {
+    const list = (stripes || []).filter(x => x && x.count > 0 && isHex(x.color));
+    const seq = list.length ? list.map(x => ({ yarn: yarnFor(x.color, dir), count: x.count }))
+      : [{ yarn: yarnFor(fallback, dir), count: 1 }];
+    return newSystem({ name: dir, ratio: 1, seq });
+  };
+  const warpSystems = [sysFor(warpStripes, 'warp', PALETTE.paper)];
+  const weftSystems = [sysFor(weftStripes, 'weft', PALETTE.teal)];
+  return { yarns, warpSystems, weftSystems };
+}
+
+/* ---------------------------------------------------------------- physical
+   Everything derived from the construction inputs and the yarn library, in
+   one place. All figures are AS SET ON THE LOOM; where an elastic yarn is
+   present a RELAXED estimate is reported beside them (see below).
+
+     total ends       = round( ends per mm * width in mm )
+     weight per metre of fabric, warp  = sum over the ends of den/9000 g/m,
+                                         times (1 + warp crimp)
+     weight per metre of fabric, weft  = picks per metre * width in metres
+                                         * den/9000, times (1 + weft crimp),
+                                         summed over the picks of one metre
+     fractional cover, one direction   = sum of thread diameters per unit
+                                         width (or length), i.e. the fraction
+                                         of the plan the threads of that
+                                         direction occupy; TOTAL cover is
+                                         cw + cf - cw*cf (the union)
+     Peirce cover factor K             = threads per inch / sqrt(Ne), the
+                                         cotton-system figure weavers quote,
+                                         with Kc = K1 + K2 - K1*K2/28
+
+   THE SINGLE-LAYER LIMIT: when the fractional cover of a direction passes 1
+   the threads of that direction no longer fit side by side across the cloth
+   — they would have to stack — so the construction cannot be woven as one
+   layer at that sett. That is the `tooDense` flag and the warning's only
+   trigger; it is a plan-area argument, so it holds for any weave.
+
+   RELAXATION: a yarn's `relax` is its relaxed length as a fraction of its
+   length on the loom (1 for an inelastic yarn). The warp's and the weft's
+   relaxation are the count-weighted means over their threads; the relaxed
+   estimate applies the weft's to the width and the warp's to the length, and
+   re-states the sett, the weight per metre and the cover at those. It is an
+   estimate of the fully-relaxed state and is reported, never used to warn. */
+export function physical(s) {
+  const P = s.physical;
+  const widthMm = P.widthUnit === 'in' ? P.width * 25.4 : P.width;
+  const perCm = (v) => P.densityUnit === 'in' ? v / 2.54 : v;
+  const epcm = perCm(P.epi), ppcm = perCm(P.ppi);
+  const totalEnds = Math.max(1, Math.round(epcm / 10 * widthMm));
+  const picksPerM = ppcm * 100;
+  const nWeft = Math.max(1, Math.round(picksPerM));
+  const warpT = threadYarns(s, 'warp', totalEnds);
+  const weftT = threadYarns(s, 'weft', nWeft);
+  const crimpW = 1 + P.crimpWarp / 100, crimpF = 1 + P.crimpWeft / 100;
+  const widthM = widthMm / 1000;
+
+  const perSystem = (threads, systems, dir) => {
+    const rows = new Map();
+    for (const t of threads) {
+      let r = rows.get(t.sys);
+      if (!r) { r = { sys: t.sys, name: t.sys < 0 ? '(library default)' : systems[t.sys].name, threads: 0, den: 0, dia: 0, yarnCounts: new Map() }; rows.set(t.sys, r); }
+      r.threads++;
+      if (t.y) { r.den += t.y.den; r.dia += yarnDiameterMm(t.y); r.yarnCounts.set(t.y.id, (r.yarnCounts.get(t.y.id) || 0) + 1); }
+    }
+    return [...rows.values()].sort((a, b) => a.sys - b.sys).map(r => {
+      const scale = dir === 'warp' ? crimpW : (picksPerM / nWeft) * widthM * crimpF;
+      return {
+        sys: r.sys, name: r.name, ratio: r.sys < 0 ? 1 : systems[r.sys].ratio,
+        threads: dir === 'warp' ? r.threads : r.threads * (picksPerM / nWeft),
+        share: r.threads / threads.length,
+        gPerM: r.den / 9000 * scale,
+        yarns: [...r.yarnCounts].map(([id, n]) => ({ id, n, share: n / r.threads })),
+      };
+    });
+  };
+  const sumDia = (threads) => threads.reduce((a, t) => a + (t.y ? yarnDiameterMm(t.y) : 0), 0);
+  const meanTex = (threads) => threads.reduce((a, t) => a + (t.y ? t.y.den / 9 : 0), 0) / threads.length;
+  const meanRelax = (threads) => threads.reduce((a, t) => a + (t.y && t.y.elastic ? t.y.relax : 1), 0) / threads.length;
+  const warpSys = perSystem(warpT, s.warpSystems, 'warp');
+  const weftSys = perSystem(weftT, s.weftSystems, 'weft');
+  const warpG = warpSys.reduce((a, r) => a + r.gPerM, 0);
+  const weftG = weftSys.reduce((a, r) => a + r.gPerM, 0);
+  const coverWarp = sumDia(warpT) / widthMm;
+  const coverWeft = sumDia(weftT) * (picksPerM / nWeft) / 1000;
+  const kOf = (perInch, tex) => tex > 0 ? perInch / Math.sqrt(590.5 / tex) : 0;
+  const Kw = kOf(epcm * 2.54, meanTex(warpT)), Kf = kOf(ppcm * 2.54, meanTex(weftT));
+  const union = (a, b) => a + b - a * b;
+  const relaxW = meanRelax(warpT), relaxF = meanRelax(weftT);
+  const elastic = warpT.some(t => t.y && t.y.elastic) || weftT.some(t => t.y && t.y.elastic);
+  const out = {
+    widthMm, widthIn: widthMm / 25.4, epcm, epi: epcm * 2.54, ppcm, ppi: ppcm * 2.54,
+    totalEnds, picksPerM, crimpWarp: P.crimpWarp, crimpWeft: P.crimpWeft,
+    warp: { systems: warpSys, gPerM: warpG, cover: coverWarp, K: Kw,
+      meanDiameterMm: sumDia(warpT) / warpT.length, relax: relaxW },
+    weft: { systems: weftSys, gPerM: weftG, cover: coverWeft, K: Kf,
+      meanDiameterMm: sumDia(weftT) / weftT.length, relax: relaxF },
+    gPerM: warpG + weftG, gsm: (warpG + weftG) / widthM,
+    coverTotal: union(coverWarp, coverWeft), Ktotal: Kw + Kf - Kw * Kf / PEIRCE_MAX_K,
+    tooDense: coverWarp > 1 || coverWeft > 1,
+    elastic, relaxed: null,
+  };
+  if (elastic) {
+    const wMm = widthMm * relaxF;
+    out.relaxed = {
+      warpRelax: relaxW, weftRelax: relaxF,
+      widthMm: wMm, lengthFactor: relaxW,
+      epcm: epcm / relaxF, ppcm: ppcm / relaxW,
+      gPerM: out.gPerM / relaxW, gsm: out.gPerM / relaxW / (wMm / 1000),
+      coverWarp: coverWarp / relaxF, coverWeft: coverWeft / relaxW,
+      coverTotal: union(coverWarp / relaxF, coverWeft / relaxW),
+    };
+  }
+  return out;
+}
+
+export const DENSE_WARNING = 'too dense for single-layer — likely needs multiple layers';
+export function denseWarning(ph) {
+  if (!ph.tooDense) return '';
+  const which = [ph.warp.cover > 1 ? `warp ${Math.round(ph.warp.cover * 100)}%` : '', ph.weft.cover > 1 ? `weft ${Math.round(ph.weft.cover * 100)}%` : '']
+    .filter(Boolean).join(', ');
+  return `${DENSE_WARNING} (cover ${which})`;
+}
+
+/* ------------------------------------------------------ construction sheet
+   One structured table, read by the CSV writer here and by the PDF writer on
+   the page, so the two artefacts cannot disagree. Rows are [item, value]. */
+export function constructionSheet(s, presetLabel = '') {
+  const ph = physical(s);
+  const byId = new Map(s.yarns.map(y => [y.id, y]));
+  const pct = (v) => `${(Math.round(v * 1000) / 10).toString()}%`;
+  const sections = [];
+  sections.push({ title: 'construction', rows: [
+    ['structure', presetLabel || 'custom'],
+    ['shafts', String(s.shafts)], ['treadles', String(s.treadles)],
+    ['draft repeat', `${s.ends} ends x ${s.picks} picks`],
+    ['width', `${f1(ph.widthMm)} mm (${f2(ph.widthIn)} in)`],
+    ['ends per cm', f2(ph.epcm)], ['ends per inch', f2(ph.epi)],
+    ['picks per cm', f2(ph.ppcm)], ['picks per inch', f2(ph.ppi)],
+    ['total ends', String(ph.totalEnds)],
+    ['crimp warp', `${ph.crimpWarp}%`], ['crimp weft', `${ph.crimpWeft}%`],
+  ] });
+  const sysRows = (list, unit) => list.flatMap(r => [
+    [`${r.name} · ${unit}`, unit === 'ends' ? String(Math.round(r.threads)) : `${f1(r.threads)} per m`],
+    [`${r.name} · share`, pct(r.share)],
+    [`${r.name} · interleave`, `${r.ratio} ${unit} in turn`],
+    [`${r.name} · yarns`, r.yarns.map(q => `${q.n}x ${(byId.get(q.id) || { name: '?' }).name}`).join('; ')],
+    [`${r.name} · weight`, `${f2(r.gPerM)} g/m`],
+  ]);
+  sections.push({ title: 'warp systems', rows: sysRows(ph.warp.systems, 'ends') });
+  sections.push({ title: 'weft systems', rows: sysRows(ph.weft.systems, 'picks') });
+  const used = new Set([...ph.warp.systems, ...ph.weft.systems].flatMap(r => r.yarns.map(q => q.id)));
+  sections.push({ title: 'yarns', rows: s.yarns.filter(y => used.has(y.id)).flatMap(y => [
+    [y.name, yarnDescription(y)],
+    [`${y.name} · diameter`, `${(Math.round(yarnDiameterMm(y) * 1000) / 1000).toString()} mm (estimated)`],
+    [`${y.name} · colour`, y.color],
+  ]) });
+  const totals = [
+    ['weight per metre · warp', `${f2(ph.warp.gPerM)} g/m`],
+    ['weight per metre · weft', `${f2(ph.weft.gPerM)} g/m`],
+    ['weight per metre · total', `${f2(ph.gPerM)} g/m`],
+    ['weight per square metre', `${f1(ph.gsm)} g/m2`],
+    ['cover · warp', `${pct(ph.warp.cover)} (K ${f1(ph.warp.K)})`],
+    ['cover · weft', `${pct(ph.weft.cover)} (K ${f1(ph.weft.K)})`],
+    ['cover · total', `${pct(ph.coverTotal)} (Kc ${f1(ph.Ktotal)} of ${PEIRCE_MAX_K})`],
+  ];
+  if (ph.tooDense) totals.push(['warning', denseWarning(ph)]);
+  sections.push({ title: 'totals', rows: totals });
+  if (ph.relaxed) {
+    const R = ph.relaxed;
+    sections.push({ title: 'relaxed estimate', rows: [
+      ['warp relaxes to', pct(R.warpRelax)], ['weft relaxes to', pct(R.weftRelax)],
+      ['width', `${f1(R.widthMm)} mm`], ['ends per cm', f2(R.epcm)], ['picks per cm', f2(R.ppcm)],
+      ['weight per metre', `${f2(R.gPerM)} g/m`], ['weight per square metre', `${f1(R.gsm)} g/m2`],
+      ['cover · warp / weft / total', `${pct(R.coverWarp)} / ${pct(R.coverWeft)} / ${pct(R.coverTotal)}`],
+    ] });
+  }
+  return { sections, physical: ph };
+}
+
+export function constructionCsv(s, presetLabel = '') {
+  const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = ['section,item,value'];
+  for (const sec of constructionSheet(s, presetLabel).sections) {
+    for (const [k, v] of sec.rows) lines.push([q(sec.title), q(k), q(v)].join(','));
+  }
+  return lines.join('\n') + '\n';
+}
+
 /* ------------------------------------------------------------------- hash
-   The whole state in the URL fragment: #v=1&s=..&t=..&e=..&p=..&th=..&tu=..
-   &tr=..&wc=..&fc=..&vm=..&g=..&c=..&f=..&y=..&m=..&w=... Masks go as
-   little-endian Uint16 bytes in base64url; stripes as RRGGBB.count lists.
+   The whole state in the URL fragment. v=2 is the construction tool's:
+     #v=2&s=..&t=..&e=..&p=..&th=..&tu=..&tr=..
+      &yl=<yarns>&ws=<warp systems>&fs=<weft systems>&ph=<physical>
+      &vm=..&g=..&c=..&f=..&y=..&m=..&w=..&ts=..&dpi=..
+   Masks go as little-endian Uint16 bytes in base64url. A yarn is its eleven
+   fields joined by '|', yarns joined by ','; free text is percent-encoded so
+   no field can carry a delimiter. A system is name|ratio|y1.c1.y2.c2.
    encodeHash/decodeHash is a lossless pair over the whole state, view
-   settings included — the gate round-trips random states through it. */
+   settings included — the gate round-trips random states through it.
+   A v=1 hash (stripes, no yarns) still decodes: its stripes become yarns. */
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
 export function u16ToB64(arr) {
@@ -367,7 +787,6 @@ export function b64ToU16(str, len) {
   return out;
 }
 
-const stripesToStr = (list) => list.map(x => `${x.color.replace('#', '').toUpperCase()}.${x.count}`).join(',');
 const stripesFromStr = (str) => {
   if (!str) return [];
   return str.split(',').map(part => {
@@ -377,20 +796,75 @@ const stripesFromStr = (str) => {
   });
 };
 
+const enc = (t) => encodeURIComponent(String(t));
+const dec = (t) => { try { return decodeURIComponent(t); } catch { return ''; } };
+export function yarnsToStr(yarns) {
+  return yarns.map(y => [y.id, enc(y.name), y.fiber, y.den, y.filaments, y.ply, y.tpm, y.twist,
+    y.elastic ? 1 : 0, y.relax, y.color.slice(1)].join('|')).join(',');
+}
+export function yarnsFromStr(str) {
+  if (!str) return [];
+  const seen = new Set();
+  const out = [];
+  for (const rec of str.split(',')) {
+    const f = rec.split('|');
+    if (f.length < 11) throw new Error('bad yarn');
+    const y = newYarn({ id: f[0], name: dec(f[1]), fiber: f[2], den: +f[3], filaments: +f[4], ply: +f[5],
+      tpm: +f[6], twist: f[7], elastic: f[8], relax: +f[9], color: '#' + f[10] });
+    if (seen.has(y.id)) throw new Error('duplicate yarn id');
+    seen.add(y.id);
+    out.push(y);
+  }
+  return out;
+}
+export function systemsToStr(list) {
+  return list.map(sys => [enc(sys.name), sys.ratio, sys.seq.map(q => `${q.yarn}.${q.count}`).join('.')].join('|')).join(',');
+}
+export function systemsFromStr(str, fallbackYarn) {
+  if (!str) return [];
+  return str.split(',').map(rec => {
+    const f = rec.split('|');
+    if (f.length < 3) throw new Error('bad system');
+    const toks = f[2] ? f[2].split('.') : [];
+    const seq = [];
+    for (let i = 0; i + 1 < toks.length; i += 2) seq.push({ yarn: toks[i], count: +toks[i + 1] });
+    return newSystem({ name: dec(f[0]), ratio: +f[1], seq }, fallbackYarn);
+  });
+}
+export function physicalToStr(P) {
+  return [P.width, P.widthUnit, P.epi, P.ppi, P.densityUnit, P.crimpWarp, P.crimpWeft].join('|');
+}
+/* the sett's range is one physical range stated in either unit: 300 per cm
+   is 762 per inch */
+export const densityLimit = (unit) => unit === 'in' ? LIMITS.densityIn : LIMITS.densityCm;
+export function physicalFromStr(str) {
+  const f = (str || '').split('|');
+  const widthUnit = f[1] === 'in' ? 'in' : 'mm';
+  const densityUnit = f[4] === 'in' ? 'in' : 'cm';
+  return {
+    width: num(f[0], widthUnit === 'in' ? LIMITS.widthIn : LIMITS.widthMm, PHYSICAL_DEFAULTS.width), widthUnit,
+    epi: num(f[2], densityLimit(densityUnit), PHYSICAL_DEFAULTS.epi), ppi: num(f[3], densityLimit(densityUnit), PHYSICAL_DEFAULTS.ppi), densityUnit,
+    crimpWarp: num(f[5], LIMITS.crimp, PHYSICAL_DEFAULTS.crimpWarp), crimpWeft: num(f[6], LIMITS.crimp, PHYSICAL_DEFAULTS.crimpWeft),
+  };
+}
+
 export function encodeHash(s) {
   const v = s.view;
   const kv = [
-    ['v', 1], ['s', s.shafts], ['t', s.treadles], ['e', s.ends], ['p', s.picks],
+    ['v', 2], ['s', s.shafts], ['t', s.treadles], ['e', s.ends], ['p', s.picks],
     ['th', u16ToB64(s.threading)], ['tu', u16ToB64(s.tieup)], ['tr', u16ToB64(s.treadling)],
-    ['wc', stripesToStr(s.warp)], ['fc', stripesToStr(s.weft)],
+    ['yl', yarnsToStr(s.yarns)], ['ws', systemsToStr(s.warpSystems)], ['fs', systemsToStr(s.weftSystems)],
+    ['ph', physicalToStr(s.physical)],
     ['vm', v.mode === 'drawdown' ? 'dd' : 'd'], ['g', v.grid ? 1 : 0], ['c', v.cell],
     ['f', v.fabric ? 1 : 0], ['y', Math.round(v.yarn * 100)], ['m', v.maxFloat], ['w', v.warn ? 1 : 0],
+    ['ts', v.trueScale ? 1 : 0], ['dpi', v.dpi],
   ];
   return kv.map(([k, val]) => `${k}=${val}`).join('&');
 }
 
-/* Returns a state, or null for anything that is not a v=1 weave hash. A hash
-   that parses but holds an out-of-range count is clamped, never refused. */
+/* Returns a state, or null for anything that is not a v=1 or v=2 weave hash.
+   A hash that parses but holds an out-of-range count is clamped, never
+   refused. A v=1 hash is the stripe era's: its stripes are migrated. */
 export function decodeHash(hash) {
   try {
     const str = (hash || '').replace(/^#/, '');
@@ -399,7 +873,7 @@ export function decodeHash(hash) {
       const i = part.indexOf('=');
       return i < 0 ? [part, ''] : [part.slice(0, i), part.slice(i + 1)];
     }));
-    if (kv.v !== '1') return null;
+    if (kv.v !== '1' && kv.v !== '2') return null;
     const s = blankState(
       clamp(+kv.s || 4, LIMITS.shafts), clamp(+kv.t || 4, LIMITS.treadles),
       clamp(+kv.e || 32, LIMITS.ends), clamp(+kv.p || 32, LIMITS.picks));
@@ -407,9 +881,25 @@ export function decodeHash(hash) {
     s.threading = b64ToU16(kv.th || '', s.ends).map(x => x & ms);
     s.tieup = b64ToU16(kv.tu || '', s.treadles).map(x => x & ms);
     s.treadling = b64ToU16(kv.tr || '', s.picks).map(x => x & mt);
-    const wc = stripesFromStr(kv.wc), fc = stripesFromStr(kv.fc);
-    if (wc.length) s.warp = wc;
-    if (fc.length) s.weft = fc;
+    if (kv.v === '1' || kv.yl === undefined) {
+      /* legacy: stripes, if any; the starter library otherwise */
+      const wc = stripesFromStr(kv.wc), fc = stripesFromStr(kv.fc);
+      if (wc.length || fc.length) {
+        const m = migrateStripes(wc.length ? wc : [{ color: PALETTE.paper, count: 1 }],
+          fc.length ? fc : [{ color: PALETTE.teal, count: 1 }]);
+        s.yarns = m.yarns; s.warpSystems = m.warpSystems; s.weftSystems = m.weftSystems;
+      }
+    } else {
+      const yarns = yarnsFromStr(kv.yl);
+      if (yarns.length) {
+        s.yarns = yarns;
+        const fb = yarns[0].id;
+        const ws = systemsFromStr(kv.ws, fb), fs = systemsFromStr(kv.fs, fb);
+        s.warpSystems = ws.length ? ws : [newSystem({ name: 'ground', ratio: 1, seq: [{ yarn: fb, count: 1 }] })];
+        s.weftSystems = fs.length ? fs : [newSystem({ name: 'ground', ratio: 1, seq: [{ yarn: fb, count: 1 }] })];
+      }
+    }
+    if (kv.ph !== undefined) s.physical = physicalFromStr(kv.ph);
     s.view = {
       mode: kv.vm === 'dd' ? 'drawdown' : 'draft',
       grid: kv.g === undefined ? VIEW_DEFAULTS.grid : kv.g === '1',
@@ -418,6 +908,8 @@ export function decodeHash(hash) {
       yarn: kv.y === undefined ? VIEW_DEFAULTS.yarn : clamp((+kv.y) / 100, LIMITS.yarn),
       maxFloat: clamp(+kv.m || VIEW_DEFAULTS.maxFloat, LIMITS.maxFloat),
       warn: kv.w === undefined ? VIEW_DEFAULTS.warn : kv.w === '1',
+      trueScale: kv.ts === '1',
+      dpi: Math.round(clamp(+kv.dpi || VIEW_DEFAULTS.dpi, LIMITS.dpi)),
     };
     return s;
   } catch {
@@ -430,28 +922,50 @@ export function decodeHash(hash) {
    reads). Written rising-shed, one colour-table entry per distinct colour,
    every thread's colour listed. Read case-insensitively; a sinking-shed file
    is converted on the way in by complementing its tie-up, which is the same
-   cloth under the rule above, so the model stays rising-shed only. */
+   cloth under the rule above, so the model stays rising-shed only.
+
+   WHAT WIF HAS FIELDS FOR, AND WHAT IT HAS NOT. [WARP]/[WEFT] carry Units,
+   Spacing (the thread pitch, i.e. 1 / sett) and Thickness (the yarn's
+   diameter), with per-thread exceptions in [WARP THICKNESS] / [WEFT
+   THICKNESS]; those are written from the construction and the yarn
+   diameters, in centimetres, and a Spacing read from any WIF becomes the sett.
+   Fibre, count, ply, twist and elasticity have no WIF field, so they go two
+   ways: in [NOTES], as text for a person, and in the private [EM WEAVE YARNS]
+   / [EM WEAVE SYSTEMS] / [EM WEAVE CONSTRUCTION] sections, which this reader
+   takes back exactly and any other program ignores. A file whose colours no
+   longer agree with its private yarn records (edited elsewhere) falls back to
+   the colour-table migration and says so. */
 function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 const rgbToHex = (r, g, b) => '#' + [r, g, b].map(v => clamp(Math.round(v), [0, 255]).toString(16).padStart(2, '0')).join('').toUpperCase();
 const maskList = (m, n) => { const out = []; for (let i = 0; i < n; i++) if (m & bit(i)) out.push(i + 1); return out.join(','); };
+const cm4 = (v) => (Math.round(v * 10000) / 10000).toString();
 
-export function toWif(s) {
-  const warpC = expandStripes(s.warp, s.ends), weftC = expandStripes(s.weft, s.picks, PALETTE.teal);
+export function toWif(s, presetLabel = '') {
+  const warpY = threadYarns(s, 'warp', s.ends), weftY = threadYarns(s, 'weft', s.picks);
+  const warpC = warpY.map(t => t.y ? t.y.color : PALETTE.paper), weftC = weftY.map(t => t.y ? t.y.color : PALETTE.teal);
   const table = [];
   const index = (c) => { let i = table.indexOf(c); if (i < 0) { table.push(c); i = table.length - 1; } return i + 1; };
   const warpI = warpC.map(index), weftI = weftC.map(index);
+  const ph = physical(s);
+  const dia = (t) => t.y ? yarnDiameterMm(t.y) / 10 : 0;   // cm
+  const defaultDia = (list) => { const first = list.find(t => t.y); return first ? dia(first) : 0; };
+  const warpDia = defaultDia(warpY), weftDia = defaultDia(weftY);
   const L = [];
   L.push('[WIF]', 'Version=1.1', 'Date=April 20, 1997', 'Developers=wif@mhsoft.com',
-    'Source Program=EM Weave', 'Source Version=1.0', '');
+    'Source Program=EM Weave', 'Source Version=2.0', '');
   L.push('[CONTENTS]', 'COLOR PALETTE=yes', 'WEAVING=yes', 'WARP=yes', 'WEFT=yes', 'COLOR TABLE=yes',
-    'THREADING=yes', 'TIEUP=yes', 'TREADLING=yes', 'WARP COLORS=yes', 'WEFT COLORS=yes', '');
+    'THREADING=yes', 'TIEUP=yes', 'TREADLING=yes', 'WARP COLORS=yes', 'WEFT COLORS=yes',
+    'WARP THICKNESS=yes', 'WEFT THICKNESS=yes', 'NOTES=yes',
+    'EM WEAVE YARNS=yes', 'EM WEAVE SYSTEMS=yes', 'EM WEAVE CONSTRUCTION=yes', '');
   L.push('[COLOR PALETTE]', `Entries=${table.length}`, 'Range=0,255', '');
   L.push('[WEAVING]', `Shafts=${s.shafts}`, `Treadles=${s.treadles}`, 'Rising Shed=yes', '');
-  L.push('[WARP]', `Threads=${s.ends}`, `Color=${warpI[0]}`, '');
-  L.push('[WEFT]', `Threads=${s.picks}`, `Color=${weftI[0]}`, '');
+  L.push('[WARP]', `Threads=${s.ends}`, `Color=${warpI[0]}`, 'Units=Centimeters',
+    `Spacing=${cm4(1 / ph.epcm)}`, `Thickness=${cm4(warpDia)}`, '');
+  L.push('[WEFT]', `Threads=${s.picks}`, `Color=${weftI[0]}`, 'Units=Centimeters',
+    `Spacing=${cm4(1 / ph.ppcm)}`, `Thickness=${cm4(weftDia)}`, '');
   L.push('[COLOR TABLE]');
   table.forEach((c, i) => L.push(`${i + 1}=${hexToRgb(c).join(',')}`));
   L.push('');
@@ -470,6 +984,26 @@ export function toWif(s) {
   L.push('[WEFT COLORS]');
   weftI.forEach((c, i) => L.push(`${i + 1}=${c}`));
   L.push('');
+  L.push('[WARP THICKNESS]');
+  warpY.forEach((t, i) => { if (dia(t) !== warpDia) L.push(`${i + 1}=${cm4(dia(t))}`); });
+  L.push('');
+  L.push('[WEFT THICKNESS]');
+  weftY.forEach((t, i) => { if (dia(t) !== weftDia) L.push(`${i + 1}=${cm4(dia(t))}`); });
+  L.push('');
+  L.push('[NOTES]');
+  let n = 1;
+  for (const sec of constructionSheet(s, presetLabel).sections) {
+    for (const [k, v] of sec.rows) L.push(`${n++}=${sec.title}: ${k} = ${v}`);
+  }
+  L.push('');
+  L.push('[EM WEAVE YARNS]');
+  s.yarns.forEach((y, i) => L.push(`${i + 1}=${yarnsToStr([y])}`));
+  L.push('');
+  L.push('[EM WEAVE SYSTEMS]');
+  s.warpSystems.forEach((sys, i) => L.push(`W${i + 1}=${systemsToStr([sys])}`));
+  s.weftSystems.forEach((sys, i) => L.push(`F${i + 1}=${systemsToStr([sys])}`));
+  L.push('');
+  L.push('[EM WEAVE CONSTRUCTION]', `1=${physicalToStr(s.physical)}`, '');
   return L.join('\n');
 }
 
@@ -488,6 +1022,9 @@ export function parseWifSections(text) {
   }
   return sections;
 }
+
+/* WIF Units -> centimetres per unit. */
+const UNIT_CM = { CENTIMETERS: 1, CENTIMETRES: 1, INCHES: 2.54, DECIPOINTS: 2.54 / 720 };
 
 /* Returns { state, notes } or throws with a sentence a person can act on.
    The view settings are the defaults: a WIF carries no view. */
@@ -550,8 +1087,51 @@ export function fromWif(text, baseView = VIEW_DEFAULTS) {
     for (const [k, v] of list(listSec)) if (k <= n) out[k - 1] = colourOf(parseInt(v, 10), def);
     return out;
   };
-  s.warp = stripesFrom(perThread(s.ends, 'WARP COLORS', 'WARP', PALETTE.paper));
-  s.weft = stripesFrom(perThread(s.picks, 'WEFT COLORS', 'WEFT', PALETTE.teal));
+  const warpC = perThread(s.ends, 'WARP COLORS', 'WARP', PALETTE.paper);
+  const weftC = perThread(s.picks, 'WEFT COLORS', 'WEFT', PALETTE.teal);
+  /* yarns: the private records if they are there and still agree with the
+     colours; otherwise one yarn per colour */
+  let restored = false;
+  if (S['EM WEAVE YARNS']) {
+    try {
+      const yarns = [...list('EM WEAVE YARNS')].sort((a, b) => a[0] - b[0]).map(([, v]) => yarnsFromStr(v)[0]);
+      const ids = new Set(yarns.map(y => y.id));
+      if (yarns.length && ids.size === yarns.length) {
+        const sys = S['EM WEAVE SYSTEMS'] || {};
+        const take = (prefix) => Object.entries(sys).filter(([k]) => k[0] === prefix)
+          .sort((a, b) => parseInt(a[0].slice(1), 10) - parseInt(b[0].slice(1), 10))
+          .map(([, v]) => systemsFromStr(v, yarns[0].id)[0]);
+        const ws = take('W'), fs = take('F');
+        if (ws.length && fs.length) {
+          const trial = { yarns, warpSystems: ws, weftSystems: fs };
+          const agree = (dir, n, cols) => threadColors(trial, dir, n).every((c, i) => c === cols[i]);
+          if (agree('warp', s.ends, warpC) && agree('weft', s.picks, weftC)) {
+            s.yarns = yarns; s.warpSystems = ws; s.weftSystems = fs; restored = true;
+          } else notes.push('the colours no longer match the yarn records — yarns rebuilt from the colours');
+        }
+      }
+    } catch { notes.push('the yarn records could not be read — yarns rebuilt from the colours'); }
+  }
+  if (!restored) {
+    const m = migrateStripes(stripesFrom(warpC), stripesFrom(weftC));
+    s.yarns = m.yarns; s.warpSystems = m.warpSystems; s.weftSystems = m.weftSystems;
+  }
+  /* construction: the private record, else the sett from Spacing */
+  const C = S['EM WEAVE CONSTRUCTION'] || {};
+  if (C['1']) s.physical = physicalFromStr(C['1']);
+  else {
+    const sett = (sec) => {
+      const sp = parseFloat((S[sec] || {}).SPACING);
+      const unit = UNIT_CM[((S[sec] || {}).UNITS || 'centimeters').toUpperCase()];
+      return sp > 0 && unit ? 1 / (sp * unit) : null;   // threads per cm
+    };
+    const epcm = sett('WARP'), ppcm = sett('WEFT');
+    if (epcm || ppcm) {
+      s.physical = { ...PHYSICAL_DEFAULTS, densityUnit: 'cm',
+        epi: num(epcm || ppcm, LIMITS.densityCm, PHYSICAL_DEFAULTS.epi), ppi: num(ppcm || epcm, LIMITS.densityCm, PHYSICAL_DEFAULTS.ppi) };
+      notes.push('sett read from the WIF thread spacing');
+    }
+  }
   s.view = { ...baseView };
   return { state: s, notes };
 }
@@ -582,18 +1162,25 @@ export function summary(s) {
 
 /* Deep equality on the DRAFT (not the view): what the WIF round trip must
    preserve. Colours are compared per thread, since that is what the file
-   carries; a stripe list is a presentation of them. */
+   carries; a yarn library and its systems are a presentation of them. */
 export function sameDraft(a, b) {
   if (a.shafts !== b.shafts || a.treadles !== b.treadles || a.ends !== b.ends || a.picks !== b.picks) return false;
   const eq = (x, y) => x.length === y.length && x.every((v, i) => v === y[i]);
   if (!eq(a.threading, b.threading) || !eq(a.tieup, b.tieup) || !eq(a.treadling, b.treadling)) return false;
-  return eq(expandStripes(a.warp, a.ends), expandStripes(b.warp, b.ends))
-    && eq(expandStripes(a.weft, a.picks, PALETTE.teal), expandStripes(b.weft, b.picks, PALETTE.teal));
+  return eq(threadColors(a, 'warp', a.ends), threadColors(b, 'warp', b.ends))
+    && eq(threadColors(a, 'weft', a.picks), threadColors(b, 'weft', b.picks));
+}
+
+const sameJson = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+export function sameConstruction(a, b) {
+  return sameJson(a.yarns, b.yarns) && sameJson(a.warpSystems, b.warpSystems)
+    && sameJson(a.weftSystems, b.weftSystems) && sameJson(a.physical, b.physical);
 }
 
 export function sameState(a, b) {
-  if (!sameDraft(a, b)) return false;
+  if (!sameDraft(a, b) || !sameConstruction(a, b)) return false;
   const va = a.view, vb = b.view;
   return va.mode === vb.mode && va.grid === vb.grid && va.cell === vb.cell && va.fabric === vb.fabric
-    && Math.round(va.yarn * 100) === Math.round(vb.yarn * 100) && va.maxFloat === vb.maxFloat && va.warn === vb.warn;
+    && Math.round(va.yarn * 100) === Math.round(vb.yarn * 100) && va.maxFloat === vb.maxFloat && va.warn === vb.warn
+    && va.trueScale === vb.trueScale && va.dpi === vb.dpi;
 }

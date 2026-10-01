@@ -9724,7 +9724,7 @@ don't wait to be asked, and don't surface them only after the fact.
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
 
-## `/weave` — the Weave Draft (pointer only)
+## `/weave` — the Weave Draft and construction tool (pointer only)
 
 Hidden generative page (`weave.html`, `weave.css`, `weave.js`, `weave-draft.js`,
 `weave-render.js`; `noindex`, unlinked). A four-part weaving draft — threading on
@@ -9740,15 +9740,46 @@ draft read from the tie-up outward, which is also what WIF-based software draws.
 Presets are STRUCTURES (plain, 2/2 and 3/1 twill, broken twill, herringbone, point,
 rosepath, 5- and 8-shaft satin, basket, waffle, overshot-style) and each sets its
 own shaft and treadle counts; a sinking-shed WIF is read by complementing its
-tie-up (the same cloth). Gate: `node tools/verify-weave.mjs` — part one is Node
-only (plain weave is the checkerboard, 2/2 twill is `(e - p) mod 4 in {0, 1}`,
-the WIF and the hash round-trip losslessly on seeded random drafts, the SVG carries
-one element per cell); `--browser` drives the real page at 1280 px and at a
-390 px PHONE viewport; `--negative-control` is REQUIRED before quoting a pass from a
-changed harness (eight mutants in copies of the two modules, every anchor checked
-before any runs). **It is not in CI** — no workflow names a `weave*` path — and
-adding its tool made the two flower gates fire on its PR (the `'tools/**'` filter),
-which test flower geometry, not this.
+tie-up (the same cloth).
+**PHASE A OF THE CONSTRUCTION TOOL (single layer) is on the same state**: a YARN
+LIBRARY (name, fibre, count stored as DENIER whatever unit it was typed in — den /
+dtex / tex / Ne / Nm convert at the edges — filaments, ply, twist, an elastic flag
+with a relaxation ratio, a colour; six GENERIC starters, no maker's codes), WARP
+AND WEFT SYSTEMS (a name, an interleave ratio and a repeat of yarn × count;
+`resolveThreads()` is the ONE owner of "which yarn is this thread" and every end
+and pick resolves to one — COLOURS COME FROM YARNS, and the stripe lists are gone:
+a v=1 hash or a stripe-era WIF migrates each colour into an auto yarn), and a
+PHYSICAL panel (width in mm or in, sett per cm or per inch, crimp per direction;
+`physical()` is the ONE owner of total ends, weight per metre per system —
+den/9000 g per metre of yarn × crimp, weft picks per metre × width — the diameter
+estimate `d = sqrt(tex / (250 π ρ))` with ρ = fibre density × packing, which
+reproduces Peirce's 1/(28√Ne) inch for cotton to 1 %, and the FRACTIONAL COVER
+threads × diameter per direction, union for the total, beside Peirce's K). **The
+single-layer warning fires when a direction's cover passes 100 %** — the threads
+of that direction no longer fit side by side — with the ruled wording *too dense
+for single-layer — likely needs multiple layers*; it is a plan-area argument and
+holds for any weave. TRUE SCALE draws the drawdown at the sett at an assumed
+screen DPI (cells are not square any more: every block carries `cw`/`ch`), and
+the fabric render then draws each thread at its own estimated diameter. Exports:
+the construction sheet as PDF (jsPDF, loaded only on click from the cdnjs pin
+`cards.html` uses) and CSV, both from one `constructionSheet()`; the WIF carries
+the sett as `Spacing`, the diameters as `Thickness`, the sheet in `[NOTES]`, and
+the yarns / systems / construction in private `[EM WEAVE …]` sections it reads
+back exactly (a foreign WIF's `Spacing` becomes the sett). The hash is v=2.
+Gate: `node tools/verify-weave.mjs` — part one is Node only (24 checks: the
+drawdown identities, the lossless WIF and hash round trips over seeded drafts
+with yarn libraries and interleaved systems, the count conversions against known
+values, the weight per metre on a WORKED EXAMPLE DONE BY HAND, the legacy-hash
+migration, the warning threshold at exactly 100 %, the sheet and CSV, the WIF
+spacing, the true-scale pitch); `--browser` drives the real page at 1280 px and at
+a 390 px PHONE viewport (needs `npm i --no-save jspdf@2.5.1` for the PDF check,
+served from node_modules; it REFUSES rather than skips without it);
+`--negative-control` is REQUIRED before quoting a pass from a changed harness
+(fifteen mutants in copies of the two modules, among them one that breaks the
+denier arithmetic, every anchor checked before any runs). **It is not in CI** — no
+workflow names a `weave*` path, and since #335 narrowed the two flower gates' filters
+from `'tools/**'` to the tools they run, a weave-only PR fires no Actions workflow at
+all; the only checks on such a PR are Netlify's. Run the gate by hand before merging.
 
 ## `/bug` — the Parametric Bug (pointer only)
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Weave Draft — Eva Maskalenko</title>
-<meta name="description" content="Weave Draft — a parametric four-part weaving draft: threading, tie-up, treadling and a live drawdown, with WIF and SVG export.">
+<meta name="description" content="Weave Draft — a parametric four-part weaving draft and single-layer construction tool: threading, tie-up, treadling, a live drawdown, a yarn library, warp and weft systems, sett and cover, with WIF, SVG, PDF and CSV export.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -22,14 +22,15 @@
     <a class="wv-back" href="index.html">&larr; Index</a>
     <div class="wv-eyebrow">EM / WEAVE</div>
     <h1>Weave Draft</h1>
-    <p class="wv-sub">&mdash; threading, tie-up, treadling, drawdown. Click or drag on the three grids; the cloth recomputes as you go, and the link in the address bar is the draft.</p>
+    <p class="wv-sub">&mdash; threading, tie-up, treadling, drawdown, and the construction under it: yarns, warp and weft systems, sett, weight and cover. Click or drag on the three grids; the cloth recomputes as you go, and the link in the address bar is the draft.</p>
   </header>
   <div class="wv-sheet"><canvas id="draft" aria-label="Weaving draft"></canvas></div>
 </div>
 <div class="wv-drop" id="dropHint" hidden>drop a .wif to load it</div>
 
 <!-- THE PANEL. Every control has an id the gate drives; the readout is the
-     one place the page says what the draft is doing. -->
+     one place the page says what the draft is doing, and the physical
+     readout the one place it says what the cloth weighs and covers. -->
 <aside class="wv-panel wv-box" aria-label="Draft controls">
 
   <details class="wv-sec" open>
@@ -41,8 +42,8 @@
       </div>
       <div class="wv-ctrl"><label for="shafts">shafts <output id="shaftsOut">4</output></label><input type="range" id="shafts" min="2" max="16" step="1" value="4"></div>
       <div class="wv-ctrl"><label for="treadles">treadles <output id="treadlesOut">4</output></label><input type="range" id="treadles" min="2" max="16" step="1" value="4"></div>
-      <div class="wv-ctrl"><label for="ends">warp ends <output id="endsOut">32</output></label><input type="range" id="ends" min="8" max="256" step="1" value="32"></div>
-      <div class="wv-ctrl"><label for="picks">picks <output id="picksOut">32</output></label><input type="range" id="picks" min="8" max="256" step="1" value="32"></div>
+      <div class="wv-ctrl"><label for="ends">warp ends (draft) <output id="endsOut">32</output></label><input type="range" id="ends" min="8" max="256" step="1" value="32"></div>
+      <div class="wv-ctrl"><label for="picks">picks (draft) <output id="picksOut">32</output></label><input type="range" id="picks" min="8" max="256" step="1" value="32"></div>
     </div>
   </details>
 
@@ -80,15 +81,51 @@
   </details>
 
   <details class="wv-sec">
-    <summary>Colours</summary>
+    <summary>Yarns <span class="wv-val" id="yarnsVal"></span></summary>
     <div class="wv-sec-body">
-      <div class="wv-label">warp stripes</div>
-      <div class="wv-stripes" id="warpStripes"></div>
-      <div class="wv-row"><button class="wv-btn wv-btn--small" id="warpAdd" type="button">+ stripe</button></div>
-      <div class="wv-label">weft stripes</div>
-      <div class="wv-stripes" id="weftStripes"></div>
-      <div class="wv-row"><button class="wv-btn wv-btn--small" id="weftAdd" type="button">+ stripe</button></div>
-      <p class="wv-hint">colour × count, repeating across the warp or the weft.</p>
+      <div class="wv-yarns" id="yarnList"></div>
+      <div class="wv-row"><button class="wv-btn wv-btn--small" id="yarnAdd" type="button">+ yarn</button></div>
+      <p class="wv-hint">the library every end and pick draws from. count is stored as denier whatever unit you type it in; a yarn in use cannot be removed.</p>
+    </div>
+  </details>
+
+  <details class="wv-sec">
+    <summary>Systems</summary>
+    <div class="wv-sec-body">
+      <div class="wv-label">warp systems</div>
+      <div class="wv-systems" id="warpSystems"></div>
+      <div class="wv-row"><button class="wv-btn wv-btn--small" id="warpSysAdd" type="button">+ warp system</button></div>
+      <div class="wv-label">weft systems</div>
+      <div class="wv-systems" id="weftSystems"></div>
+      <div class="wv-row"><button class="wv-btn wv-btn--small" id="weftSysAdd" type="button">+ weft system</button></div>
+      <p class="wv-hint">a system is a name and a repeat of yarn × count. with several systems the threads cycle through them in order, taking each system's "in turn" count before moving on.</p>
+    </div>
+  </details>
+
+  <details class="wv-sec" open>
+    <summary>Physical</summary>
+    <div class="wv-sec-body">
+      <div class="wv-ctrl wv-pair">
+        <label for="width">width</label>
+        <span class="wv-pair-in"><input type="number" id="width" min="0.5" max="10000" step="any" value="1000"><select id="widthUnit" aria-label="width unit"><option value="mm">mm</option><option value="in">in</option></select></span>
+      </div>
+      <div class="wv-ctrl wv-pair">
+        <label for="epi">ends per</label>
+        <span class="wv-pair-in"><input type="number" id="epi" min="0.5" max="300" step="any" value="24"><select id="densityUnit" aria-label="density unit"><option value="cm">cm</option><option value="in">inch</option></select></span>
+      </div>
+      <div class="wv-ctrl wv-pair">
+        <label for="ppi">picks per <span id="ppiUnit">cm</span></label>
+        <span class="wv-pair-in"><input type="number" id="ppi" min="0.5" max="300" step="any" value="24"></span>
+      </div>
+      <div class="wv-ctrl wv-pair">
+        <label for="crimpWarp">crimp warp %</label>
+        <span class="wv-pair-in"><input type="number" id="crimpWarp" min="0" max="50" step="0.5" value="5"></span>
+      </div>
+      <div class="wv-ctrl wv-pair">
+        <label for="crimpWeft">crimp weft %</label>
+        <span class="wv-pair-in"><input type="number" id="crimpWeft" min="0" max="50" step="0.5" value="5"></span>
+      </div>
+      <div class="wv-readout wv-phys" id="physOut" aria-live="polite"></div>
     </div>
   </details>
 
@@ -103,6 +140,11 @@
       <div class="wv-ctrl"><label for="cell">cell size <output id="cellOut">12 px</output></label><input type="range" id="cell" min="4" max="24" step="1" value="12"></div>
       <div class="wv-ctrl wv-bool"><label><input type="checkbox" id="fabric"> fabric render (shaded yarn)</label></div>
       <div class="wv-ctrl"><label for="yarn">thread width <output id="yarnOut">78%</output></label><input type="range" id="yarn" min="40" max="100" step="1" value="78"></div>
+      <div class="wv-ctrl wv-bool"><label><input type="checkbox" id="trueScale"> true scale (sett at screen DPI)</label></div>
+      <div class="wv-ctrl wv-inline">
+        <label for="dpi">assumed screen DPI</label>
+        <input type="number" id="dpi" min="50" max="600" step="1" value="96">
+      </div>
       <div class="wv-ctrl wv-inline">
         <label for="maxFloat">long float over</label>
         <input type="number" id="maxFloat" min="2" max="32" step="1" value="5">
@@ -120,13 +162,17 @@
         <button class="wv-btn wv-btn--solid" id="exportWif" type="button">WIF &darr;</button>
       </div>
       <div class="wv-row">
+        <button class="wv-btn wv-btn--solid" id="exportPdf" type="button">construction PDF &darr;</button>
+        <button class="wv-btn wv-btn--solid" id="exportCsv" type="button">CSV &darr;</button>
+      </div>
+      <div class="wv-row">
         <button class="wv-btn" id="copyLink" type="button">copy link</button>
         <button class="wv-btn" id="resetBtn" type="button">reset</button>
       </div>
       <label class="wv-file">import a WIF
         <input type="file" id="importWif" accept=".wif,text/plain">
       </label>
-      <p class="wv-hint">or drop a .wif anywhere on the page. SVG and PNG export the view as shown; WIF is the draft.</p>
+      <p class="wv-hint">or drop a .wif anywhere on the page. SVG and PNG export the view as shown; WIF is the draft with its yarns and sett; the construction sheet is the physical panel as a document.</p>
     </div>
   </details>
 

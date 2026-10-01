@@ -97,12 +97,58 @@ button.wv-btn--solid:hover { color: var(--ink); opacity: .85; }
 button.wv-btn--small { padding: 2px 7px; font-size: 11px; line-height: 1.3; }
 .wv-hint { font-size: 10.5px; color: var(--dim-2); line-height: 1.5; margin: 0 0 8px; }
 
-/* STRIPE LISTS: one row per stripe — a swatch, a count, a remove. */
-.wv-stripes { display: flex; flex-direction: column; gap: 5px; margin-bottom: 7px; }
-.wv-stripe { display: grid; grid-template-columns: 34px 1fr auto; gap: 6px; align-items: center; }
-.wv-stripe input[type=color] { width: 34px; height: 24px; padding: 0; border: 1px solid var(--line-strong); background: var(--ink-soft); cursor: pointer; }
-.wv-stripe input[type=number] { width: 100%; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 11px; padding: 3px 6px; }
-.wv-stripe .wv-count { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 10.5px; }
+/* PAIRED INPUTS: a label, then a number with a unit select beside it. */
+.wv-ctrl.wv-pair { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.wv-ctrl.wv-pair label { margin: 0; }
+.wv-pair-in { display: flex; gap: 4px; }
+.wv-pair-in input[type=number] { width: 6.2em; }
+.wv-pair-in select { width: auto; }
+
+/* THE YARN LIBRARY: one collapsible card per yarn — a swatch, the name and
+   the count on its summary, every field in a two-column grid below. */
+.wv-yarns { display: flex; flex-direction: column; gap: 4px; margin-bottom: 7px; }
+details.wv-yarn { border: 1px solid var(--line); background: rgba(19, 19, 22, .6); }
+details.wv-yarn > summary {
+  list-style: none; cursor: pointer; display: grid; grid-template-columns: 16px 1fr auto; gap: 8px;
+  align-items: center; padding: 5px 7px; font-size: 11px; user-select: none;
+}
+details.wv-yarn > summary::-webkit-details-marker { display: none; }
+details.wv-yarn > summary .wv-swatch { width: 16px; height: 16px; border: 1px solid var(--line-strong); }
+details.wv-yarn > summary .wv-yarn-name { color: var(--paper); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.wv-yarn > summary .wv-yarn-count { color: var(--dim); font-size: 10px; white-space: nowrap; }
+details.wv-yarn[open] > summary { border-bottom: 1px solid var(--line); }
+.wv-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; padding: 7px; }
+.wv-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wv-field > span { font-size: 10px; color: var(--dim); letter-spacing: .04em; }
+.wv-field input, .wv-field select {
+  width: 100%; min-width: 0; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong);
+  font-family: var(--font-mono); font-size: 11px; padding: 3px 5px; border-radius: 0;
+}
+.wv-field input:focus, .wv-field select:focus { outline: none; border-color: var(--teal); }
+.wv-field input[type=color] { height: 24px; padding: 0; cursor: pointer; }
+.wv-field input[type=checkbox] { width: auto; accent-color: var(--teal); margin: 4px 0; }
+.wv-field.wv-field--wide { grid-column: 1 / -1; }
+.wv-field .wv-pair-in input[type=number] { width: auto; flex: 1 1 auto; }
+.wv-field .wv-pair-in select { flex: 0 0 auto; min-width: 4.6em; }
+.wv-fields .wv-row { grid-column: 1 / -1; margin: 2px 0 0; }
+
+/* SYSTEMS: a named repeat of yarn x count, one block per system. */
+.wv-systems { display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; }
+.wv-sys { border: 1px solid var(--line); padding: 6px 7px; background: rgba(19, 19, 22, .6); }
+.wv-sys-head { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; margin-bottom: 5px; }
+.wv-sys-head input[type=text] { min-width: 0; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 11px; padding: 3px 6px; border-radius: 0; }
+.wv-sys-head .wv-ratio { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 10px; white-space: nowrap; }
+.wv-sys-head .wv-ratio input { width: 3.4em; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 11px; padding: 3px 4px; border-radius: 0; }
+.wv-seq { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 5px; align-items: center; margin-bottom: 4px; }
+.wv-seq .wv-swatch { width: 14px; height: 14px; border: 1px solid var(--line-strong); }
+.wv-seq select { min-width: 0; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 11px; padding: 3px 4px; border-radius: 0; }
+.wv-seq .wv-count { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 10.5px; }
+.wv-seq .wv-count input { width: 3.6em; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 11px; padding: 3px 4px; border-radius: 0; }
+.wv-sys .wv-row { margin: 2px 0 0; }
+
+/* the physical read-out sits inside its own section, under the inputs */
+.wv-readout.wv-phys { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
+.wv-readout.wv-phys .wv-dense { color: var(--warn); font-weight: 700; }
 
 .wv-file { display: block; margin-top: 4px; color: var(--dim); font-size: 10.5px; }
 .wv-file input { display: block; margin-top: 4px; max-width: 100%; font: inherit; color: inherit; }
