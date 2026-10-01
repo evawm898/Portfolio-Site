@@ -1,7 +1,7 @@
 /* ===================================================================
    SCRATCH PROTOTYPE SHEETS — THE CLOSED-RING TUBE. NOT SHIPPED.
 
-     node tools/shot-bloom-tube.mjs <outDir> [--only round,straight,strips,zoom,web]
+     node tools/shot-bloom-tube.mjs <outDir> [--only hstrip,hform,pgrid,pzoom,round,straight,strips,zoom,web]
 
    Renders the scratch ring of tools/bloom-tube-ring.mjs (read its header for
    what is patched and why) through tools/bloom-soft-render.mjs, which is
@@ -12,7 +12,14 @@
    self-intersection count (each ring shell censused ALONE with
    tools/bloom-self-intersection.mjs), so no cell can quietly carry a fold.
 
-   Sheets:
+   Sheets — PARTIAL FUSION (the default since Eva's ruling on #323):
+     tube-partial-h.png         h 0.25 / 0.40 / 0.55 / 0.70 on the default and on
+                                5 petals at tilt 60, ROUND and STRAIGHT
+     tube-partial-form.png      the same h strip at cup / roll / twist maximum
+     tube-partial-round.png     n x k grid at h 0.40, ROUND
+     tube-partial-straight.png  n x k grid at h 0.40, STRAIGHT
+     tube-partial-zoom.png      the fusion line, a sinus, a slit (h 0.40)
+   Sheets — FUSED TO THE NIB (the first round; --only round,straight,strips,zoom,web):
      tube-round.png     rows n = 5, 6, 8, 12; columns every valid k, k = n FREE
      tube-straight.png  the same, STRAIGHT
      tube-strips.png    tilt 60 / 75 / 90; curl default / max; cup max and roll
@@ -34,7 +41,8 @@ const outDir = process.argv[2];
 if (!outDir) throw new Error('usage: node tools/shot-bloom-tube.mjs <outDir>');
 fs.mkdirSync(outDir, { recursive: true });
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1].split(',') : null;
-const want = (k) => !only || only.includes(k);
+const PARTIAL = ['hstrip', 'hform', 'pgrid', 'pzoom'];
+const want = (k) => (only ? only.includes(k) : PARTIAL.includes(k));
 
 const BG = [16, 16, 18], INK = [206, 214, 205], LOBE = [214, 186, 150];
 const CAM = [0.62, -0.72, 0.55];
@@ -51,6 +59,8 @@ function tintFor(b) {
   const ringFrom = b.free ? Infinity : b.tubeTris - b.ringReport.reduce((a, x) => a + x.ringTris, 0);
   return (t) => (t >= ringFrom ? 1 : 0.86);
 }
+/* each petal (what stands above the ring, blend included) censused ALONE */
+function petalSI(b) { return b.free || !b.petalRanges ? 0 : b.petalRanges.reduce((a, r) => a + census(b.positions.slice(r.from * 9, r.to * 9)).within, 0); }
 function ringSI(b) { return b.free ? null : b.ringShells.reduce((a, s) => a + census(s.positions).within, 0); }
 function cell(out, W, H, b, S, ox, oy, cam, caps) {
   let pos = b.positions, tint = tintFor(b);
@@ -69,21 +79,22 @@ function cell(out, W, H, b, S, ox, oy, cam, caps) {
 const kName = (k, n) => (k === 0 ? 'TUBE (K 0)' : k === n ? `FREE (K ${n})` : `K ${k} - ${k} PANEL${k > 1 ? 'S' : ''} OF ${n / k}`);
 const log = [];
 
-async function gridSheet(shape, file) {
+async function gridSheet(shape, file, h = null) {
   const NS = [5, 6, 8, 12];
   const cols = Math.max(...NS.map((n) => divisorsOf(n).length + 1));
   const S = 300, CAPH = 40, W = cols * S, H = 40 + NS.length * (S + CAPH);
   const out = Buffer.alloc(W * H * 3, 16);
-  text(out, W, H, 8, 8, `TUBE - ${shape} RING THROUGH THE MIDRIBS - EXPORT - ROWS N 5 6 8 12 - COLUMNS EVERY VALID K - SCRATCH PROTOTYPE`, [240, 240, 236], 2);
+  text(out, W, H, 8, 8, `TUBE - ${shape} RING THROUGH THE MIDRIBS${h === null ? ' TO THE NIB' : ` FUSED TO H ${h.toFixed(2)}, FREE PETALS ABOVE`} - EXPORT - ROWS N 5 6 8 12 - COLUMNS EVERY VALID K`, [240, 240, 236], 2);
   for (const [ri, n] of NS.entries()) {
     const ks = [0, ...divisorsOf(n)];
     let cam = null;
     for (const [ci, k] of ks.entries()) {
-      const b = await buildTube({ petalCount: n }, { shape, k });
+      const b = await buildTube({ petalCount: n }, { shape, k, h });
       if (!cam) { const bb = bbox(b.positions); cam = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half }; }
       const si = ringSI(b);
-      cell(out, W, H, b, S, ci * S, 40 + ri * (S + CAPH), cam, [[`N ${n}  ${kName(k, n)}`], [`TRIS ${b.tubeTris} (FREE ${b.plainTris})  RING SELF-X ${si === null ? '-' : si}`, si ? [255, 120, 100] : [235, 180, 120]]]);
-      log.push({ sheet: file, n, k, shape, tris: b.tubeTris, free: b.plainTris, ringSI: si });
+      const pse = petalSI(b);
+      cell(out, W, H, b, S, ci * S, 40 + ri * (S + CAPH), cam, [[`N ${n}  ${kName(k, n)}`], [`TRIS ${b.tubeTris} (FREE ${b.plainTris})  RING SELF-X ${si === null ? '-' : si}${h === null ? '' : `  PETALS ${pse}`}`, si || pse ? [255, 120, 100] : [235, 180, 120]]]);
+      log.push({ sheet: file, n, k, shape, h, tris: b.tubeTris, free: b.plainTris, ringSI: si, petalSI: petalSI(b) });
     }
   }
   writePng(path.join(outDir, file), W, H, out);
@@ -206,6 +217,78 @@ async function vsWeb() {
   writePng(path.join(outDir, 'tube-vs-web.png'), W, H, out);
 }
 
+
+/* ---------------- partial fusion (Eva's ruling on #323) ---------------- */
+const HS = [0.25, 0.40, 0.55, 0.70];
+async function hStrip(file, title, states) {
+  const S = 300, CAPH = 40;
+  const W = HS.length * 2 * S, H = 40 + states.length * (S + CAPH + 18);
+  const out = Buffer.alloc(W * H * 3, 16);
+  text(out, W, H, 8, 8, title, [240, 240, 236], 2);
+  for (const [ri, [nm, set]] of states.entries()) {
+    const oy = 40 + ri * (S + CAPH + 18);
+    text(out, W, H, 6, oy, `${nm} - LEFT ROUND, RIGHT STRAIGHT - H 0.25 / 0.40 / 0.55 / 0.70 - ONE CAMERA PER ROW`, [240, 200, 120], 1);
+    let cam = null;
+    for (const [si, shape] of ['ROUND', 'STRAIGHT'].entries()) for (const [hi, h] of HS.entries()) {
+      const b = await buildTube(set, { shape, k: 0, h });
+      if (!cam) { const bb = bbox(b.positions); cam = { dir: CAM, up: [0, 0, 1], center: bb.ctr, halfHeight: bb.half }; }
+      const si1 = ringSI(b), ps = petalSI(b);
+      const bi = b.blendInfo[0];
+      cell(out, W, H, b, S, (si * HS.length + hi) * S, oy + 14, cam, [[`${shape} H ${h.toFixed(2)} (RING TO U ${bi.uTop.toFixed(3)})`], [`RING ${si1} PETALS ${ps}  TRIS ${b.tubeTris} (FREE ${b.plainTris})`, si1 || ps ? [255, 120, 100] : [235, 180, 120]]]);
+      log.push({ sheet: file, nm, shape, h, ringSI: si1, petalSI: ps, tris: b.tubeTris, free: b.plainTris });
+    }
+  }
+  writePng(path.join(outDir, file), W, H, out);
+}
+async function zoomPartial() {
+  const S = 340, CAPH = 30;
+  const W = 4 * S, H = 40 + 2 * (S + CAPH);
+  const out = Buffer.alloc(W * H * 3, 16);
+  text(out, W, H, 8, 8, 'TUBE H 0.40 ZOOM - EXPORT (PRINT PREVIEW) - FUSION LINE, SINUS, SLIT', [240, 240, 236], 2);
+  const cellsDef = [];
+  for (const shape of ['ROUND', 'STRAIGHT']) {
+    /* the fusion line on petal 0: the ring's top row to the blend's end, seen square to the petal */
+    cellsDef.push([`${shape} FUSION LINE N 8 H 0.40`, {}, { shape, k: 0, h: 0.4 }, (b) => {
+      const g = b.geo[0], bi = b.blendInfo[0], r = Math.round((bi.R1 + bi.bEnd) / 2);
+      const P = g.midsAll[r][0], N = g.normalsAll[r][0];
+      return { dir: norm([N[0] + 0.3 * P[0] / Math.hypot(P[0], P[1]), N[1] + 0.3 * P[1] / Math.hypot(P[0], P[1]), N[2]]), up: [0, 0, 1], center: P, halfHeight: 9 };
+    }]);
+    /* the sinus: the ring's top edge between petal 0 and petal 1 */
+    cellsDef.push([`${shape} SINUS N 8 H 0.40`, {}, { shape, k: 0, h: 0.4 }, (b) => {
+      const g = b.geo[0], R1 = g.R1, n = b.n;
+      const th = Math.atan2(g.midsAll[R1][0][1], g.midsAll[R1][0][0]) + Math.PI / n;
+      const P = g.curveAt(R1)(th), N = g.ringN(R1, th);
+      return { dir: norm([N[0] + 0.4 * Math.cos(th), N[1] + 0.4 * Math.sin(th), N[2] + 0.3]), up: [0, 0, 1], center: P, halfHeight: 6 };
+    }]);
+  }
+  for (const shape of ['ROUND', 'STRAIGHT']) {
+    /* a slit: n 8, k 4, at the ring's mid-height */
+    cellsDef.push([`${shape} SLIT N 8 K 4 H 0.40`, {}, { shape, k: 4, h: 0.4 }, (b) => {
+      const g = b.geo[0], r = Math.max(3, Math.floor(g.R1 * 0.6)), n = b.n, D = 2 * Math.PI / n;
+      const th0 = Math.atan2(g.midsAll[g.R1][0][1], g.midsAll[g.R1][0][0]), thS = th0 - D / 2 + 2 * D;
+      const P = g.curveAt(r)(thS), N = g.ringN(r, thS);
+      return { dir: norm([N[0] + 0.3 * Math.cos(thS), N[1] + 0.3 * Math.sin(thS), N[2] + 0.4]), up: [0, 0, 1], center: P, halfHeight: 5 };
+    }]);
+    /* the fusion line at tilt 60 x 5, where the ring is a deep cup */
+    cellsDef.push([`${shape} FUSION LINE N 5 TILT 60 H 0.40`, { petalCount: 5, petalTilt: 60 }, { shape, k: 0, h: 0.4 }, (b) => {
+      const g = b.geo[0], bi = b.blendInfo[0], r = Math.round((bi.R1 + bi.bEnd) / 2);
+      const P = g.midsAll[r][0];
+      const th = Math.atan2(P[1], P[0]);
+      return { dir: norm([Math.cos(th), Math.sin(th), 0.25]), up: [0, 0, 1], center: P, halfHeight: 9 };
+    }]);
+  }
+  for (const [i, [nm, set, opt, camOf]] of cellsDef.entries()) {
+    const b = await buildTube(set, opt);
+    const sic = ringSI(b), ps = petalSI(b);
+    cell(out, W, H, b, S, (i % 4) * S, 40 + Math.floor(i / 4) * (S + CAPH), camOf(b), [[nm], [`RING ${sic} PETALS ${ps}  BLEND ${b.blendMm} MM`, sic || ps ? [255, 120, 100] : [235, 180, 120]]]);
+    log.push({ sheet: 'zoom-partial', nm, ringSI: sic, petalSI: ps });
+  }
+  writePng(path.join(outDir, 'tube-partial-zoom.png'), W, H, out);
+}
+if (want('hstrip')) await hStrip('tube-partial-h.png', 'TUBE FUSED PARTWAY - THE H STRIP ON THE DEFAULT - EXPORT', [['DEFAULT (N 8)', {}], ['N 5 TILT 60', { petalCount: 5, petalTilt: 60 }]]);
+if (want('hform')) await hStrip('tube-partial-form.png', 'TUBE FUSED PARTWAY - THE PETALS STILL RESPOND ABOVE THE LINE - EXPORT', [['CUP 1.2 (MAX)', { petalCup: 1.2 }], ['ROLL 330 (MAX)', { petalRoll: 330 }], ['TWIST 180 (MAX)', { petalTwist: 180 }]]);
+if (want('pgrid')) { await gridSheet('ROUND', 'tube-partial-round.png', 0.4); await gridSheet('STRAIGHT', 'tube-partial-straight.png', 0.4); }
+if (want('pzoom')) await zoomPartial();
 if (want('round')) await gridSheet('ROUND', 'tube-round.png');
 if (want('straight')) await gridSheet('STRAIGHT', 'tube-straight.png');
 if (want('strips')) await strips();

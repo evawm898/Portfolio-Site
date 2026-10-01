@@ -2,6 +2,18 @@
    SCRATCH PROTOTYPE — THE CLOSED-RING TUBE. NOT SHIPPED, NOT A GATE.
 
      node tools/bloom-tube-ring.mjs [--quick] [--json <file>] [--control]
+     node tools/bloom-tube-ring.mjs --partial [--json <file>]     (fused partway)
+     node tools/bloom-tube-ring.mjs --attribute                   (where a fold sits)
+
+   PARTIAL FUSION (Eva's ruling on #323): `buildTube(set, { h })` ends the ring
+   at the last row at or below u = h; above it every petal is TODAY's free petal
+   (P3's hook hands it the rows from one below the ring's top to the tip), and
+   over BLEND_MM of midrib arc above the ring's top row its section eases from
+   the ring's own arc to its own section (law in buildTube's pass B comment:
+   position lerp by smootherstep, normal lerp, the petal's width laid onto the
+   ring by ARC LENGTH). The ring's curve at its top row is the ONE owner of the
+   line where petal base meets ring top: at that row the petal IS the ring.
+   Without `h` the ring runs to the nib entry, exactly as first built.
 
    Eva's ruling on the corolla-fusion discovery (docs/bloom-corolla-fusion-
    discovery.md §7 #1): the fused region is ONE SHEET whose cross-section at
@@ -95,7 +107,7 @@ const PATCHES = [
     '  const K = rimSegments(sheetMax);\n  if (panel.periodic) {\n    const mk = (i, js) => js.map((j) => { const sk = Math.min(i, skinTo) - rowFrom; return rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], oP[i - rowFrom][j], top[sk][j], bot[sk][j]); });\n    const asc = Array.from({ length: NV }, (_, j) => j);\n    emitRimLoop(acc, mk(rowFrom, asc), K);\n    emitRimLoop(acc, mk(rowTo, asc.slice().reverse()), K);\n    return grid;\n  }\n'],
   ['P3 the lobe-only petal',
     '  const panels = trimPanels(rows.length, (i) => rows[i].u, cap, profile.fringe || null);\n',
-    '  const panels = trimPanels(rows.length, (i) => rows[i].u, cap, profile.fringe || null);\n  if (cap && cap.tubeLobe) { for (const r of rows) r.tUsed = tAt(r.u); const f = cap.tubeLobe(rows); panels.splice(0, panels.length, ...(f < 0 ? [] : [{ label: \'lobe\', rowFrom: f, rowTo: rows.length - 1, spanAt: () => [-1, 1] }])); }\n'],
+    '  const panels = trimPanels(rows.length, (i) => rows[i].u, cap, profile.fringe || null);\n  if (cap && cap.tubeLobe) { for (const r of rows) r.tUsed = tAt(r.u); const f = cap.tubeLobe(rows); if (f !== null) panels.splice(0, panels.length, ...(f < 0 ? [] : [{ label: \'lobe\', rowFrom: f, rowTo: rows.length - 1, spanAt: () => [-1, 1] }])); }\n'],
   ['P3b return the rows',
     '  return {\n    /* Row half-widths, FOOT ROWS INCLUDED',
     '  return {\n    tubeRows: rows, tubeTAt: tAt,\n    /* Row half-widths, FOOT ROWS INCLUDED'],
@@ -137,6 +149,7 @@ const len = (a) => Math.hypot(a[0], a[1], a[2]);
 const TAU = 2 * Math.PI;
 const wrap = (a) => { a %= TAU; return a < 0 ? a + TAU : a; };
 
+export const BLEND_MM = Number(process.env.TUBE_BLEND || 8);   // the fusion line's blend length, mm of midrib arc above the ring's top row (chosen by the sweep in §B3 of the doc; TUBE_BLEND overrides)
 export const COLS_PER_SECTOR = Number(process.env.TUBE_C || 8);   // C — Claude's default, flagged (TUBE_C overrides, diagnosis only)
 
 /* ---------------- the ring's surface at one whorl ----------------
@@ -209,52 +222,126 @@ function panelRows(curves, us, phiOf, tAt, sign) {
 }
 
 /* ---------------- one build ---------------- */
-export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true, end = 'nib', perLayerK = null, tamper = null } = {}) {
+export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true, end = 'nib', perLayerK = null, tamper = null, h = null, blendMm = BLEND_MM } = {}) {
   const G = await geometry();
   const st = stateOf(set);
   if (st.placement !== 'RADIAL') throw new Error(`TUBE is RADIAL only (asked ${st.placement})`);
   /* the nib entry, the plan's own expression — or the tip, for the control */
   const nibU = (p) => { const ap = p.tipCap && p.tipCap.apex; return ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : 1; };
   /* pass 1: the plain bloom, for the petals' own nib entries and the baseline */
+  /* the plain bloom, with a hook that only RECORDS each petal's rows and
+     triangle range and returns null (keep today's panels): its only write is
+     r.tUsed = tAt(u), which emitPanel then writes with the same value */
   const plainAcc = new G.MeshBuilder({ exportMode });
-  const plain = G.buildBloomInto(plainAcc, st, { below: null });
+  const plainRanges = [], plainRows = [];
+  const plain = G.buildBloomInto(plainAcc, st, { below: null, capability: { tubeLobe: (rows) => { plainRanges.push({ from: plainAcc.positions.length / 9 }); plainRows.push(rows); return null; } } });
+  for (let i = 0; i < plainRanges.length; i++) plainRanges[i].to = i + 1 < plainRanges.length ? plainRanges[i + 1].from : plainAcc.positions.length / 9;
   const n = plain.foot.slotCount, layers = plain.foot.layerCount;
   const uNib = Math.min(...plain.petalsAll.map(nibU));
-  /* the ring's last row: the last row strictly below the nib entry (the tip, for end = 'tip') */
-  let lastRow = null;
-  const lobeFrom = (rows) => {
-    let R1 = 0; while (R1 + 1 < rows.length && (end === 'tip' ? true : rows[R1 + 1].u < uNib)) R1++;
-    lastRow = R1;
-    return end === 'tip' ? -1 : R1 - G.__PANEL_OVERLAP_ROWS;   // -1: no lobe at all (the to-the-tip control)
-  };
   /* k = n is FREE — today's bloom, built by the shipped path with no capability */
   const kOf = (L) => (perLayerK ? perLayerK[L] : k);
   const anyRing = Array.from({ length: layers }, (_, L) => kOf(L)).some((x) => x !== n);
   for (let L = 0; L < layers; L++) { const x = kOf(L); if (x !== 0 && n % x !== 0) throw new Error(`k ${x} does not divide n ${n} (the build would snap; the prototype refuses)`); }
-  if (!anyRing) return { st, n, layers, uNib, lastRow: null, plain, plainTris: plainAcc.positions.length / 9, built: plain, positions: plainAcc.positions, tubeTris: plainAcc.positions.length / 9, ringShells: [], ringReport: [], G, free: true };
+  if (!anyRing) return { st, n, layers, uNib, h, lastRow: null, plainRanges, plainRows, petalRanges: plainRanges, petalRows: plainRows, blendInfo: [], plain, plainTris: plainAcc.positions.length / 9, built: plain, positions: plainAcc.positions, tubeTris: plainAcc.positions.length / 9, ringShells: [], ringReport: [], G, free: true };
   if (perLayerK && new Set(perLayerK).size > 1) throw new Error('mixed per-layer k is not built in the prototype (one capability for all layers)');
-  /* pass 2: the bloom with each petal reduced to its lobe */
+  /* pass A: every petal's own rows, no blade emitted — so the ring's curve
+     exists at EVERY row before any petal is drawn (the blend reads it) */
+  const collect = G.buildBloomInto(new G.MeshBuilder({ exportMode }), st, { below: null, capability: { tubeLobe: () => -1 } });
+  const geo = [];
+  for (let L = 0; L < layers; L++) {
+    const ps = collect.petalsAll.slice(L * n, (L + 1) * n);
+    if (ps.length !== n) throw new Error(`layer ${L}: ${ps.length} petals of ${n} — a slot was omitted`);
+    const rowsOf = ps.map((p) => p.tubeRows);
+    const NRall = rowsOf[0].length;
+    for (let p = 1; p < n; p++) for (let r = 0; r < NRall; r++) if (!Object.is(rowsOf[p][r].u, rowsOf[0][r].u)) throw new Error(`T0: layer ${L} petal ${p} row ${r} u ${rowsOf[p][r].u} != ${rowsOf[0][r].u} — the whorl does not share one ladder (per-slot field?)`);
+    const usAll = rowsOf[0].map((r) => r.u);
+    /* the ring's last row: below the nib entry (end 'nib'), the tip (end 'tip'),
+       or the last row at or below the fusion height h */
+    let R1 = 0;
+    if (h !== null) { while (R1 + 1 < NRall && usAll[R1 + 1] <= h) R1++; }
+    else { while (R1 + 1 < NRall && (end === 'tip' ? true : usAll[R1 + 1] < uNib)) R1++; }
+    const midsAll = [], normalsAll = [];
+    for (let r = 0; r < NRall; r++) { const m = [], nn = []; for (let p = 0; p < n; p++) { const q = rowsOf[p][r].sect(0); m.push(q.P); nn.push(q.n); } midsAll.push(m); normalsAll.push(nn); }
+    if (tamper === 'swapRows') { const a = Math.floor(R1 * 0.4), b = Math.floor(R1 * 0.7); [midsAll[a], midsAll[b]] = [midsAll[b], midsAll[a]]; [normalsAll[a], normalsAll[b]] = [normalsAll[b], normalsAll[a]]; }
+    const curveCache = new Map();
+    const curveAt = (r) => { if (!curveCache.has(r)) curveCache.set(r, ringCurve(midsAll, r, shape)); return curveCache.get(r); };
+    const sign = (() => {
+      const ph = Math.atan2(midsAll[2][0][1], midsAll[2][0][0]), hh = 1e-6;
+      const du = sub(curveAt(3)(ph), curveAt(1)(ph)), dv = sub(curveAt(2)(ph + hh), curveAt(2)(ph - hh));
+      return dot(cross(du, dv), normalsAll[2][0]) < 0 ? -1 : 1;
+    })();
+    /* the ring's own unit normal at (row, azimuth), the same du x dv and sign the ring panels use */
+    const ringN = (r, th) => {
+      const ia = r === 0 ? r : r - 1, ib = r === NRall - 1 ? r : r + 1, hh = 1e-6;
+      let du = sub(curveAt(ib)(th), curveAt(ia)(th));
+      if (len(du) < 1e-12) du = sub(curveAt(Math.min(NRall - 1, ib + 1))(th), curveAt(Math.max(0, ia - 1))(th));
+      const nn = cross(du, sub(curveAt(r)(th + hh), curveAt(r)(th - hh)));
+      return mul(nn, sign / len(nn));
+    };
+    /* the midrib arc length from the ring's top row, per row, in mm (the blend's own measure) */
+    const sMid = new Array(NRall).fill(0);
+    for (let r = R1 + 1; r < NRall; r++) sMid[r] = sMid[r - 1] + len(sub(midsAll[r][0], midsAll[r - 1][0]));
+    geo.push({ rowsOf, usAll, R1, midsAll, normalsAll, curveAt, sign, ringN, sMid, NRall });
+  }
+  /* pass B: the bloom with each petal reduced to what stands above the ring.
+     THE FUSION LINE (h mode): over BLEND rows — from the ring's top row R1 up to
+     `blendMm` of midrib arc above it — the petal's section is
+        P(v) = R(theta(v)) + w * (own(v) - R(theta(v))),   n = norm((1-w) Rn + w n_own)
+     with w = smootherstep(s / blendMm), s the midrib arc above R1, and theta(v)
+     the petal's own v laid onto the ring by ARC LENGTH: theta = theta_mid +
+     v * s_half(+/-) / rho_mid, s_half the petal's own section's arc from its
+     midrib to that margin. At R1 (and the overlap row below it) w = 0, so the
+     petal IS the ring there: the ring's curve at R1 is the ONE owner of the
+     line where petal base meets ring top, and the petal reads it. Above the
+     blend w = 1 and the row is today's own section, untouched (same object). */
+  const counter = { c: 0 };
+  const petalRanges = [], petalRows = [], blendInfo = [];
   const acc = new G.MeshBuilder({ exportMode });
+  const smoother = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (x * 6 - 15) + 10));
+  const lobeFrom = (rows) => {
+    const c = counter.c++, L = Math.floor(c / n), p = c % n, gg = geo[L];
+    petalRanges.push({ c, L, p, from: acc.positions.length / 9 });
+    petalRows.push(rows);
+    if (end === 'tip' && h === null) return -1;
+    const R1 = gg.R1;
+    if (h !== null) {
+      let bEnd = R1;
+      for (let i = R1 - 1; i < rows.length; i++) {
+        const s = i <= R1 ? 0 : gg.sMid[i];
+        const w = smoother(s / blendMm);
+        if (w >= 1) break;
+        bEnd = i;
+        const own = rows[i].sect;
+        const mid = gg.midsAll[i][p], rho = Math.hypot(mid[0], mid[1]), thMid = Math.atan2(mid[1], mid[0]);
+        const arc = (sgn) => { let a = 0, prev = own(0).P; for (let q = 1; q <= 32; q++) { const P = own((sgn * q) / 32).P; a += len(sub(P, prev)); prev = P; } return a; };
+        const sPlus = arc(1), sMinus = arc(-1);
+        const curve = gg.curveAt(i);
+        rows[i].sect = (v) => {
+          const q = own(v);
+          const th = thMid + (v >= 0 ? v * sPlus : v * sMinus) / rho;
+          const Rp = curve(th), Rn = gg.ringN(i, th);
+          const P = add(Rp, mul(sub(q.P, Rp), w));
+          let nn = add(mul(Rn, 1 - w), mul(q.n, w)); nn = mul(nn, 1 / len(nn));
+          return { P, n: nn };
+        };
+      }
+      blendInfo.push({ c, R1, bEnd, uTop: rows[R1].u, uBlendEnd: rows[bEnd].u });
+    }
+    return R1 - G.__PANEL_OVERLAP_ROWS;
+  };
   const built = G.buildBloomInto(acc, st, { below: null, capability: { tubeLobe: lobeFrom } });
+  for (let i = 0; i < petalRanges.length; i++) petalRanges[i].to = i + 1 < petalRanges.length ? petalRanges[i + 1].from : acc.positions.length / 9;
+  const lastRow = geo[0].R1;
   const ringShells = [];
   const ringReport = [];
   const C = COLS_PER_SECTOR;
   for (let L = 0; L < layers; L++) {
-    const ps = built.petalsAll.slice(L * n, (L + 1) * n);
-    if (ps.length !== n) throw new Error(`layer ${L}: ${ps.length} petals of ${n} — a slot was omitted`);
-    const R1 = lastRow;
-    const rowsOf = ps.map((p) => p.tubeRows);
-    for (let p = 1; p < n; p++) for (let r = 0; r <= R1; r++) if (!Object.is(rowsOf[p][r].u, rowsOf[0][r].u)) throw new Error(`T0: layer ${L} petal ${p} row ${r} u ${rowsOf[p][r].u} != ${rowsOf[0][r].u} — the whorl does not share one ladder (per-slot field?)`);
-    const us = rowsOf[0].slice(0, R1 + 1).map((r) => r.u);
-    const mids = [], normals = [];
-    for (let r = 0; r <= R1; r++) { const m = [], nn = []; for (let p = 0; p < n; p++) { const q = rowsOf[p][r].sect(0); m.push(q.P); nn.push(q.n); } mids.push(m); normals.push(nn); }
-    if (tamper === 'swapRows') { const a = Math.floor(R1 * 0.4), b = Math.floor(R1 * 0.7); [mids[a], mids[b]] = [mids[b], mids[a]]; [normals[a], normals[b]] = [normals[b], normals[a]]; }
-    const curves = mids.map((_, r) => ringCurve(mids, r, shape));
-    const sign = (() => {
-      const ph = Math.atan2(mids[2][0][1], mids[2][0][0]), hh = 1e-6;
-      const du = sub(curves[3](ph), curves[1](ph)), dv = sub(curves[2](ph + hh), curves[2](ph - hh));
-      return dot(cross(du, dv), normals[2][0]) < 0 ? -1 : 1;
-    })();
+    const gg = geo[L], R1 = gg.R1;
+    const us = gg.usAll.slice(0, R1 + 1);
+    const mids = gg.midsAll.slice(0, R1 + 1), normals = gg.normalsAll.slice(0, R1 + 1);
+    const curves = mids.map((_, r) => gg.curveAt(r));
+    const sign = gg.sign;
+    const rowsOf = gg.rowsOf;
     const th0 = Math.atan2(mids[R1][0][1], mids[R1][0][0]);
     const D = TAU / n;
     const tAt = (u) => { const row = rowsOf[0].find((x) => x.u === u); return row.tUsed; };
@@ -304,7 +391,7 @@ export async function buildTube(set, { shape = 'ROUND', k = 0, exportMode = true
     ringReport.push({ layer: L, k: kk, rows: R1 + 1, uTop: us[R1], ringRadiusMm: ringR, ringTris: accR.positions.length / 9, panels, midribResidualMm: t1, mids, us, tAt });
     for (let q = 0; q < accR.positions.length; q++) acc.positions.push(accR.positions[q]);
   }
-  return { st, n, layers, uNib, lastRow, plain, plainTris: plainAcc.positions.length / 9, built, positions: acc.positions, tubeTris: acc.positions.length / 9, ringShells, ringReport, hubAcc: null, G };
+  return { st, n, layers, uNib, h, blendMm, lastRow, plain, plainTris: plainAcc.positions.length / 9, built, positions: acc.positions, tubeTris: acc.positions.length / 9, ringShells, ringReport, petalRanges, petalRows, blendInfo, plainRanges, plainRows, plainPositions: plainAcc.positions, geo, G };
 }
 
 /* ---------------- the hub finding ----------------
@@ -379,9 +466,36 @@ export function measureTube(set, opts = {}) {
       const o = orientation(s.positions);
       return { layer: s.layer, label: s.label, tris: s.positions.length / 9, within: c.within, inward: o.inward, oDisagree: o.disagreements, volumeMm3: o.totalVolumeMm3, worstSpanMm: c.worstSpanMm ?? c.worstSpan ?? null, boundary: a.boundary, nonManifold: a.nonManifold, degenerate: a.degenerate, directed: directedMismatch(s.positions) };
     });
+    /* THE TRANSITION: every petal (what stands above the ring, blend included)
+       censused ALONE, against today's same petal censused alone */
+    const sliceTris = (pos, r) => pos.slice(r.from * 9, r.to * 9);
+    const petals = opts.petals === false ? null : b.petalRanges.map((r, i) => {
+      const mine = sliceTris(b.positions, r), today = b.plainRanges ? sliceTris(b.plainPositions || b.positions, b.plainRanges[i]) : null;
+      const cm = census(mine), ct = today ? census(today) : null;
+      return { c: i, within: cm.within, worstSpanMm: cm.worstSpanMm, todayWithin: ct ? ct.within : null, tris: mine.length / 9 };
+    });
+    /* bit-identity above the blend: petal 0's triangles that are today's triangles, by exact key */
+    let identical = null;
+    if (!b.free && b.plainRanges) {
+      const key = (pos, t) => Array.from(pos.slice(t * 9, t * 9 + 9)).join(',');
+      const todaySet = new Set(); const pr = b.plainRanges[0]; for (let t = pr.from; t < pr.to; t++) todaySet.add(key(b.plainPositions, t));
+      const mr = b.petalRanges[0]; let same = 0; for (let t = mr.from; t < mr.to; t++) if (todaySet.has(key(b.positions, t))) same++;
+      identical = { petal0Tris: mr.to - mr.from, identicalToToday: same };
+    }
+    /* THE CROSSING above h: discovery's plan gap (its §2a formula) between petal
+       c's +v margin and petal c+1's -v margin, row by row, on OUR rows (blend
+       included) and on TODAY's rows, layer 0 */
+    const planGap = (rowsA, rowsB, i) => { const A = rowsA[i].sect(1).P, B = rowsB[i].sect(-1).P; let d = Math.atan2(B[1], B[0]) - Math.atan2(A[1], A[0]); while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI; return d * (Math.hypot(A[0], A[1]) + Math.hypot(B[0], B[1])) / 2; };
+    let crossing = null;
+    if (!b.free && b.h !== null) {
+      const n = b.n, R1 = b.geo[0].R1, ours = b.petalRows.slice(0, n), today = b.plainRows.slice(0, n);
+      const NR = ours[0].length, crossedOurs = [], crossedToday = [];
+      for (let i = R1; i < NR; i++) { if (planGap(ours[0], ours[1 % n], i) < 0) crossedOurs.push(+ours[0][i].u.toFixed(3)); if (planGap(today[0], today[1 % n], i) < 0) crossedToday.push(+today[0][i].u.toFixed(3)); }
+      crossing = { sinusMm: planGap(ours[0], ours[1 % n], R1), uTop: ours[0][R1].u, oursAboveH: crossedOurs, todayAboveH: crossedToday };
+    }
     const whole = analyzeStl(stlOf(b.positions));
     const conn = opts.conn === false ? null : connected(b.positions);
-    return { b, shells, whole, conn: conn && { comps: conn.comps, stray: conn.strayFraction, refined: conn.refined } };
+    return { b, shells, petals, identical, crossing, whole, conn: conn && { comps: conn.comps, stray: conn.strayFraction, refined: conn.refined } };
   });
 }
 
@@ -459,6 +573,33 @@ if (isMain) {
     if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(res, null, 1));
     process.exit(0);
   }
+  const shapes = ['ROUND', 'STRAIGHT'];
+  if (argv.includes('--partial')) {
+    /* PARTIAL FUSION: the ring to h, free petals above with the blend */
+    const out = [];
+    const H = [0.25, 0.40, 0.55, 0.70];
+    const one2 = async (label, set, opt) => {
+      const r = await measureTube(set, opt);
+      const pw = r.petals ? r.petals.reduce((a, p) => a + p.within, 0) : null, tw = r.petals ? r.petals.reduce((a, p) => a + (p.todayWithin || 0), 0) : null;
+      const row = { label, set, shape: opt.shape, k: opt.k, h: opt.h, free: !!r.b.free, plainTris: r.b.plainTris, tubeTris: r.b.tubeTris, deltaTris: r.b.tubeTris - r.b.plainTris,
+        ringPairs: r.shells.reduce((a, x) => a + x.within, 0), petalPairs: pw, todayPetalPairs: tw, boundary: r.whole.boundary, directed: r.shells.reduce((a, x) => a + x.directed, 0), inward: r.shells.reduce((a, x) => a + x.inward, 0),
+        comps: r.conn && r.conn.comps, sinusMm: r.crossing && r.crossing.sinusMm, crossOurs: r.crossing && r.crossing.oursAboveH.length, crossToday: r.crossing && r.crossing.todayAboveH.length, identical: r.identical };
+      out.push(row);
+      console.log(`${label.padEnd(30)} ${opt.shape.padEnd(8)} k=${String(opt.k).padEnd(3)} h=${opt.h} tris ${row.plainTris}->${row.tubeTris} (${row.deltaTris >= 0 ? '+' : ''}${row.deltaTris}) ring ${row.ringPairs} petals ${pw} (today ${tw}) bnd ${row.boundary} dir ${row.directed} comps ${row.comps} sinus ${row.sinusMm === null ? '-' : row.sinusMm.toFixed(2)} cross ${row.crossOurs}/${row.crossToday}`);
+    };
+    for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const shape of shapes) { if (k === n && shape === 'STRAIGHT') continue; await one2(`petalCount ${n}`, { petalCount: n }, { shape, k, h: 0.4 }); }
+    for (const h of H) for (const shape of shapes) for (const k of [0, 1, 4]) await one2('DEFAULT', {}, { shape, k, h });
+    for (const h of H) for (const shape of shapes) for (const [lab, set] of [['petalCount 5', { petalCount: 5 }], ['petalCount 12', { petalCount: 12 }],
+      ['tilt 60', { petalTilt: 60 }], ['tilt 75', { petalTilt: 75 }], ['tilt 90', { petalTilt: 90 }], ['tilt 105', { petalTilt: 105 }], ['tilt 75 x 5', { petalTilt: 75, petalCount: 5 }],
+      ['curl 90', { petalSpineCurl: 90 }], ['curl 180', { petalSpineCurl: 180 }], ['curl 270', { petalSpineCurl: 270 }], ['curl 360', { petalSpineCurl: 360 }], ['curl -180', { petalSpineCurl: -180 }],
+      ['cup 1.2', { petalCup: 1.2 }], ['cup -0.8', { petalCup: -0.8 }], ['roll 330', { petalRoll: 330 }], ['roll -330', { petalRoll: -330 }], ['twist 180', { petalTwist: 180 }],
+      ['width 30', { petalWidth: 30 }], ['length 20', { petalLength: 20 }], ['headRise 1', { headRise: 1 }], ['layers 3', { layerCount: 3 }], ['layers 6', { layerCount: 6 }]]) await one2(lab, set, { shape, k: 0, h });
+    for (const shape of shapes) for (const k of [0, 2, 20]) await one2('petalCount 40 x 6 layers', { petalCount: 40, layerCount: 6 }, { shape, k, h: 0.4 });
+    for (const shape of shapes) await one2('layers 6 slit', { layerCount: 6 }, { shape, k: 2, h: 0.4 });
+    if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(out, null, 1));
+    console.log(`${out.length} builds in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    process.exit(0);
+  }
   if (argv.includes('--control')) {
     /* MUST-FAILS: each instrument shown able to see the failure it exists for */
     const c = [];
@@ -472,7 +613,6 @@ if (isMain) {
     process.exit(ok ? 0 : 1);
   }
   const quick = argv.includes('--quick');
-  const shapes = ['ROUND', 'STRAIGHT'];
   /* 1. the count x k grid at the shipped form */
   for (const n of [5, 6, 8, 12]) for (const k of [0, ...divisorsOf(n)]) for (const shape of shapes) { if (k === n && shape === 'STRAIGHT') continue; await one(`petalCount ${n}`, { petalCount: n }, { shape, k }); }
   if (!quick) {

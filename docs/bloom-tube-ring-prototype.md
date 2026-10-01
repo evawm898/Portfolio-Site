@@ -10,6 +10,255 @@ table, `--control` for the five must-fails) and `node tools/shot-bloom-tube.mjs 
 
 ---
 
+# PART B — FUSED PARTWAY, FREE PETALS ABOVE (Eva's rulings on #323)
+
+*Same prototype rules: a scratch builder, and every tracked file sha256-identical to `da8bf62` at
+close (§B9). EXPORT throughout. Reproduce with:*
+- *`node tools/bloom-tube-ring.mjs --partial` — 244 builds, ~12 min;*
+- *`node tools/shot-bloom-tube.mjs <dir>` — the five partial-fusion sheets are now its default.*
+
+*Part A below is the first round (the ring to the nib entry). Its findings stand where Part B does
+not say otherwise.*
+
+## B0. The answer
+
+- **The STOP clause is not met.** The transition is fold-free on the default at h = 0.40 at
+  **every** blend length tried (0.5, 1, 2, 4, 8, 12 and 16 mm), in both shapes.
+- **Over the whole partial-fusion sweep** (244 builds, 240 with a ring): **0 boundary edges, 0
+  directed-edge mismatches, 0 inward shells, one connected piece on every build.**
+- **191 are fully clean**, ring and transition both. The rest fall into four attributed classes
+  (§B5).
+- **Partial fusion moves the curl axis fold out of the ring entirely for ROUND** — ring 0 pairs at
+  curl 180, 270 and 360, at every h. **But under strong curl it lands in the blend instead** once h
+  sits where the midrib is already curling toward the axis (§B6).
+- **It costs fewer triangles than today at every state measured** — −2,800 at the default h = 0.40
+  (§B7).
+- **ROUND is clean everywhere except the inherited seam class and that curl case. STRAIGHT adds its
+  crease class to the transition**, which ROUND never shows.
+
+![h strip](img/bloom-tube-partial-h.png)
+
+## B1. What was built
+
+- **`buildTube(set, { h, blendMm })`.** The ring is unchanged in construction (Part A §2: through
+  every midrib, ROUND or STRAIGHT, wedge slits, C = 8, the owner's `emitPanel` with the periodic
+  arm). It ends at **the last row at or below u = h**.
+- **Above it, every petal is today's petal.** The lobe hook (patch P3) hands `emitPanel` the
+  petal's own rows, from one row below the ring's top (`PANEL_OVERLAP_ROWS`) to the tip. So above
+  the blend the row objects are today's own, untouched.
+- **Above the blend the petal is today's petal, bit for bit.** On the default at h = 0.40, 1,346 of
+  petal 0's 1,960 emitted triangles are exactly today's. The rest are the blend rows, plus the 3 mm
+  rim taper that ramps up from any panel's base end (`emitPanel`'s own ramp).
+- **The extra build.** The tool now builds every state once more to collect every petal's rows, so
+  the ring's curve exists at every row before any petal is drawn.
+
+## B2. The fusion line — the blend law, and its one owner
+
+Over `BLEND_MM` of **midrib arc length above the ring's top row**, each petal row's section is
+
+```
+theta(v) = theta_mid + v * s_half(+/-) / rho_mid     (the petal's own width laid onto the ring by ARC LENGTH)
+P(v)     = R(theta(v)) + w * (own(v) - R(theta(v)))
+n(v)     = normalise((1 - w) * Rn(theta(v)) + w * n_own(v))
+w        = smootherstep(s / BLEND_MM)                (s = midrib arc above the ring's top row; C2 at both ends)
+```
+
+- `R` / `Rn` are the ring's own curve and unit normal at that row: the same `ringCurve`, the same
+  `du × dv` and the same global sign the ring's panels are built from.
+- `own` is the petal's own section, i.e. `petalSurface().rowAt(u).sect`.
+- **At the ring's top row (and the overlap row below it) w = 0, so the petal IS the ring there.**
+  The midrib point is the same double on both sides.
+- **The owner of the line where the petal's base meets the ring's top is the ring's cross-section
+  at its top row** (`ringCurve(mids, R1)`). The petal reads it; nothing else defines that line.
+- **Above `s = BLEND_MM`, w = 1** and the row is today's.
+- **There is no jump at h**, by construction. Position and normal are continuous, and the weight is
+  C2.
+
+**THE BLEND LENGTH IS 8 mm, AND IT IS A TRADE.** Transition pairs summed over all eight petals,
+ROUND, h = 0.40:
+
+| state | today's petals | 2 mm | 4 mm | **8 mm** | 12 mm | 16 mm |
+|---|---|---|---|---|---|---|
+| default, cup ±max, twist 180, tilt 75, tilt 75 × 5, curl 180, curl 225 | 0 | 0 | 0 | **0** | 0 | 0 |
+| roll 330 | 13,584 | 8,440 | 7,464 | **4,808** | 3,520 | 2,080 |
+| curl 270 | 0 | 328 | 136 | **0** | 0 | 0 |
+| curl 360 | 920 | 872 | 712 | **248** | 240 | 792 |
+| curl 270 at h 0.55 | 0 | 968 | 760 | **280** | 536 | 1,808 |
+| curl 360 at h 0.70 | 920 | 3,232 | 3,984 | **4,224** | 4,304 | 4,392 |
+| STRAIGHT, 6 layers | 0 | 555 | 1,237 | **5,139** | 8,122 | 9,284 |
+
+- **8 mm is ROUND's best or tied-best on five of the six rows that move.** It is the prototype's
+  default: `BLEND_MM`, overridable with `TUBE_BLEND`.
+- **STRAIGHT wants it short**, because its crease is carried through every blended row (§B5,
+  class C).
+- **Roll, attributed by row.** Above the blend the roll fold is today's own, to ±5 pairs: petal 0
+  reads 353 ours against 353 today above an 8 mm blend.
+- **Inside the blend the transition carries fewer pairs than today's petal does on the same rows**:
+  248 against 813 at 8 mm, 243 against 481 at 4 mm. Only a 1 mm blend adds any: 255 against 238 on
+  its three rows.
+
+![fusion line, sinus, slit](img/bloom-tube-partial-zoom.png)
+
+**What the zoom shows.**
+- Each petal widens out of the ring's rim, and the sinus is a V meeting the rim's bead.
+- **A faint line reads across the petal base at the fusion row**, most visibly at tilt 60. Over the
+  blend's first rows the ring's top rows and the petal's base rows are the **same surface in two
+  closed shells**: a coincident overlap, which the export contract unions. It is not a fold (0
+  pairs), and it was not measured further.
+
+## B3. The crossing band (discovery: u 0.161–0.323 on the default)
+
+ROUND; STRAIGHT is within 0.04 mm. "Crossed rows" uses discovery §2a's plan gap, computed on the
+petals' own margins row by row from the ring's top up.
+
+| h | ring top u | sinus at the ring's top | crossed rows above h: ours / today | ring / transition pairs |
+|---|---|---|---|---|
+| 0.10 (below the band) | 0.089 | **+1.67 mm** | 11 (u 0.143–0.323) / 10 | 0 / 0 |
+| 0.15 (at its foot) | 0.143 | −0.25 mm | 11 / 10 | 0 / 0 |
+| 0.25 (inside) | 0.250 | **−1.61 mm** | 6 (u 0.250–0.343) / 5 | 0 / 0 |
+| 0.30 (inside) | 0.286 | −1.40 mm | 4 / 3 | 0 / 0 |
+| 0.40 (above) | 0.385 | **+0.61 mm** | **0 / 0** | 0 / 0 |
+| 0.55 | 0.533 | +5.36 mm | 0 / 0 | 0 / 0 |
+| 0.70 | 0.681 | +11.17 mm | 0 / 0 | 0 / 0 |
+
+- **Below the band**, the free petals above cross exactly as they do today. The rows are today's
+  rows, and the margins pass inside each other buried in the sheet, as the builder's own flag
+  already reports on every build.
+- **Inside the band**, the ring absorbs the part below h. **The petals overlap each other at the
+  ring's top edge** (negative sinus: no V opens between them), and the rest of the band crosses as
+  today.
+- **Somewhere between h 0.30 and 0.40 (not resolved finer), the crossing stops**: from h 0.40
+  up nothing crosses and every sinus opens.
+- **The one extra crossed row is always inside the blend.** Laying the petal's width onto the ring
+  by arc length spreads it slightly further round than the flat petal reaches, so the band's edge
+  moves by one row (0.343 instead of 0.323). It is a buried cross-shell overlap between neighbouring
+  petals, not a fold. At a 4 mm blend it does not appear (h 0.25: 5 rows on both).
+- **None of this is a regression**: these are cross-shell overlaps between separate closed petals,
+  allowed by the export contract and already present today.
+
+## B4. The petals still respond above the line
+
+`img/bloom-tube-partial-form.png`: the h strip at cup 1.2, roll 330 and twist 180 (maxima), in both
+shapes. Cup, roll and twist act fully above the line — the rows above the blend are today's own. The
+ring itself stays bit-identical under all three (Part A §5).
+
+![form above the line](img/bloom-tube-partial-form.png)
+
+## B5. Everything that folds, attributed
+
+**A. The seam turn past ~95°** — inherited, independent of h.
+- Tilt 105 (ring 318 / 272 pairs) and `headRise` 1 (316 / 269), at row 3 (u 0.018), at every h.
+- The free bloom folds there too: today's petals 384 / 248.
+- And the transition reads 0, because the folding rows are now ring.
+
+**B. Strong curl in the blend** (§B6). This is the one way ROUND transitions fold beyond today's
+petals.
+
+**C. STRAIGHT's crease off a column** — Part A §3's mechanism, now in two places:
+- **The ring's slit panels**: 6 layers k 2, 681 pairs; 40 × 6 k 2 / k 20, 140 / 1,840 pairs.
+- **The transition**: STRAIGHT 6 layers, 4,104–7,743 pairs across h; 40 × 6, 3,288; 3 layers at h
+  0.7, 789; length 20 at h 0.7, 253. Today's petals read 0 on all of these.
+- The blended section carries the ring's crease at v = 0, and **the petal's own 10 columns put no
+  column on v = 0**, so the crease always lands between columns.
+- **ROUND reads 0 on every one of these states.**
+
+**D. Roll ±330** — today's own declared petal fold, carried and **reduced** (13,584 → 4,808 at h
+0.40; 0 at h 0.70). §B2 attributes it row by row.
+
+## B6. Curl: does stopping the ring lower move the axis fold?
+
+**Yes for the ring, no for the petals at high h.**
+
+| curl | ROUND ring, h 0.25 / 0.40 / 0.55 / 0.70 | transition, same h | today's petals |
+|---|---|---|---|
+| 180 | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 | 0 |
+| 270 | 0 / 0 / 0 / 0 | 0 / 0 / **280 / 9,000** | 0 |
+| 360 | 0 / 0 / 0 / 0 | 0 / 248 / **1,456 / 4,224** | 920 |
+
+- **In Part A the ring folded from curl ~180 because the midribs reach the axis near the tip.** A
+  ring that stops at h ≤ 0.70 never reaches those rows, so **the ring's axis fold is gone for ROUND
+  at every h**. STRAIGHT keeps 250 pairs at curl 360, h 0.70.
+- **Where it goes instead: into the blend, if h sits where the midrib is already curling inward.**
+  Every pair of curl 270 at h 0.70 lies on the blend's rows (located at a 4 mm blend: rows 35–38,
+  0 above the blend; the midrib radius there falls to 0.15 mm).
+- **The arc-length mapping is the reason.** The petal's width laid onto a ring of tiny radius wraps
+  round the axis, so the section folds through itself.
+- **Low h is safe at every curl.** At h 0.25 the transition is clean at every curl. At h 0.40 it
+  is clean through curl 270, and curl 360 reads 248, a quarter of today's 920.
+
+## B7. Cost (EXPORT triangles)
+
+| state | today | h 0.25 | h 0.40 | h 0.55 | h 0.70 |
+|---|---|---|---|---|---|
+| **default (8 petals), k 0** | 24,688 | 23,008 (−1,680) | **21,888 (−2,800)** | 20,928 (−3,760) | 19,968 (−4,720) |
+| 5 petals, k 0 | 15,502 | 14,452 | 13,752 | 13,152 | 12,552 |
+| 12 petals, k 0 | 36,936 | 34,416 | 32,736 | 31,296 | 29,856 |
+| 8 × 3 layers | 73,680 | 68,800 | 65,280 | 62,400 | 59,360 |
+| 8 × 6 layers | 147,168 | 138,688 | 131,328 | 124,928 | 118,048 |
+| 40 × 6 layers (densest) | 735,072 | — | 655,872 (k 0) · 660,432 (k 2) · 701,472 (k 20) | — | — |
+
+- The ring replaces the bottom h of every blade with a cheaper sheet: **lower h saves less**.
+- **Each slit adds 396 triangles** at h 0.40: two bead runs, half Part A's 844, because the ring is
+  shorter.
+- ROUND and STRAIGHT are identical to the triangle.
+
+## B8. The sheets
+
+| file | what it shows |
+|---|---|
+| `img/bloom-tube-partial-h.png` | h 0.25 / 0.40 / 0.55 / 0.70 on the default and on 5 petals at tilt 60, ROUND then STRAIGHT, one camera per row |
+| `img/bloom-tube-partial-form.png` | the same strip at cup 1.2, roll 330 and twist 180 |
+| `img/bloom-tube-partial-round.png`, `img/bloom-tube-partial-straight.png` | the n × k grid at h 0.40 |
+| `img/bloom-tube-partial-zoom.png` | the fusion line on one petal (n 8, and n 5 at tilt 60), a sinus, a slit |
+
+- **Every caption carries the ring's and the petals' own self-intersection counts.**
+- The renders are deterministic soft renders in EXPORT mode with a fixed camera and no chrome, so
+  no pixel delta is quoted.
+- **Facets are not visible at C = 8** on any of the sheets, so C stays.
+
+![ROUND grid at h 0.40](img/bloom-tube-partial-round.png)
+![STRAIGHT grid at h 0.40](img/bloom-tube-partial-straight.png)
+
+## B9. Close
+
+- All 691 tracked files at `da8bf62` are sha256-identical. The tools, the doc and the images are the
+  only changes, and they are all additions to #323's branch.
+- `--control` still fires all five must-fails (39,559 / 10 / 1 / 3 / 32,453).
+- Fusion to the nib (no `h`) still builds Part A's default to the triangle (17,408).
+
+## B10. Questions for Eva (batched; the first two are the ones asked)
+
+1. **Which h should be the default?**
+   - **0.40 is the lowest ruled value that is fully clean on the default.** Above the crossing band,
+     no petal crosses its neighbour, every sinus opens (+0.61 mm), the blend is clean at every
+     length, and the transition is clean through curl 270. It costs −2,800 triangles.
+   - **0.25 sits inside the band**: the petals overlap at the ring's top edge, so there is no V
+     between them.
+   - **0.55 / 0.70 read as a deeper cup**, and fold in the blend under strong curl.
+   - The look is yours: see `bloom-tube-partial-h.png`.
+2. **ROUND or STRAIGHT?**
+   - **ROUND** is clean everywhere except the inherited seam class and strong curl at high h.
+   - **STRAIGHT** adds the crease class in both the slit ring and the transition. Fixing it means
+     changing `emitPanel`'s rim inset to keep knot columns, and putting a petal column on v = 0.
+     It also still thins to 0.97 mm at 5 petals.
+3. **The curl-at-high-h case.** Pick one:
+   - accept it, declared;
+   - clamp h below where the midrib turns inward (a derived bound — the meridian's own minimum
+     radius is the measure);
+   - cap the arc-length mapping's angle at the sector.
+4. **The blend length.** Should it stay a typed 8 mm, or be derived, e.g. from the petal's width at
+   h? It is the one new constant here.
+5. **The coincident overlap at the fusion line** (ring top rows and petal base rows, one surface in
+   two shells). Acceptable as unioned overlap, or should the ring's top rows under each petal be
+   trimmed?
+
+WAITING ON EVA (default fusion height + ROUND or STRAIGHT).
+
+---
+
+# PART A — FUSED TO THE NIB (the first round)
+
+
 ## 0. The answer
 
 **Neither STOP clause is met.** On the shipped default the ring has **0 within-shell
@@ -321,4 +570,5 @@ path-filtered on `tools/**`, so they will run on this PR and test flower geometr
 7. **The `emitPanel` periodic arm (P2)** is the k = 0 owner change. Confirm it is acceptable as the
    route, rather than a separate ring emitter.
 
-WAITING ON EVA (ROUND or STRAIGHT + ring vs web).
+*Part A's questions 2, 3, 5, 6 and 7 were ruled on #323. Question 1 (ROUND or STRAIGHT) and
+question 4 (curl) carry into Part B.*
