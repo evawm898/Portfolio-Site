@@ -9783,15 +9783,22 @@ all; the only checks on such a PR are Netlify's. Run the gate by hand before mer
 
 ## `/bug` — the Parametric Bug (pointer only)
 
-Hidden generative page (`bug.html`, `bug.js`, `bug-geometry.js`, `noindex`, unlinked).
-Its governing document is **`bug-project-design-doc.md`** — read it before touching any
-bug file. The law: ONE 3D model (`buildBug`) is the single source of truth; `exportStl`
-and `exportSvg` read the model and never the parameters, and the SVG is the top-down
-contour-generator projection of the model's own solids, never a second 2D path.
-Bilateral symmetry is built (right half + mirror) and checked as an exact identity.
-Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control` required before
-quoting a pass from a changed harness). Sheet: `node tools/shot-bug-sheet.mjs <dir>`.
-Neither runs in CI — run both by hand.
+Hidden generative page (`bug.html`, `bug.js`, `bug-geometry.js`, `bug-venation.js`,
+`noindex`, unlinked). Its governing document is **`bug-project-design-doc.md`** — read it
+before touching any bug file. The law: ONE 3D model (`buildBug`) is the single source of
+truth; `exportStl` and `exportSvg` read the model and never the parameters, and the SVG is
+the top-down contour-generator projection of the model's own solids, never a second 2D
+path. Bilateral symmetry is built (right half + mirror) and checked as an exact identity.
+**Phase 2 (venation) is built**: `bug-venation.js` plans each wing's veins as a planar
+subdivision of the drawn planform into CELLS (closed polygons, the data Phase 4 fills —
+format in the design doc §8.3); HOLES cuts the cells through one conforming frame slab,
+RIDGES raises the veins as closed strips; vein widths carry the same floor-block rule as
+the drawn outline. Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control`
+required before quoting a pass from a changed harness) — **it runs in CI as
+`bug-gate.yml`**, path-filtered to `bug.html`, `bug*.js`, `tools/verify-bug*` and
+`tools/bug-fixtures.mjs`; the two flower gates name their own tools by file (#340 took
+them off `tools/**` on Oct 1), so a bug-only change runs this workflow and nothing else. Sheets: `node tools/shot-bug-sheet.mjs <dir>`
+(Phase 1) and `node tools/shot-bug-venation.mjs <dir>` (Phase 2); neither runs in CI.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

@@ -1,0 +1,47 @@
+# The Parametric Bug's gate (tools/verify-bug.mjs): one model, two exporters,
+# mirror diff 0, watertight and ONE connected STL, the drawn-width and vein
+# floors, the venation cells tiling the wing exactly. Pure Node — no browser,
+# no install. See bug-project-design-doc.md.
+#
+# PATH SCOPE: bug files ONLY — bug.html, bug*.js (bug.js, bug-geometry.js),
+# the gate itself and its fixtures. The flower gates are filtered on 'tools/**'
+# and would otherwise run on every bug-tool edit; they carry a matching
+# NEGATION ('!tools/verify-bug*', '!tools/bug-*', '!tools/shot-bug-*') so a
+# bug-only change triggers this workflow and nothing else.
+name: bug-gate
+
+on:
+  pull_request:
+    paths:
+      - bug.html
+      - 'bug*.js'
+      - 'tools/verify-bug*.mjs'
+      - tools/bug-fixtures.mjs
+      - .github/workflows/bug-gate.yml
+  push:
+    branches: [main]
+    paths:
+      - bug.html
+      - 'bug*.js'
+      - 'tools/verify-bug*.mjs'
+      - tools/bug-fixtures.mjs
+      - .github/workflows/bug-gate.yml
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Negative control (every mutation caught by the clause that names it)
+        run: node tools/verify-bug.mjs --negative-control
+      - name: Gate (40 random seeds + every fixture row)
+        run: node tools/verify-bug.mjs --seeds 40

@@ -210,12 +210,11 @@ strength claim in this repo is still theory.
 |---|---|---|
 | **1** | body plans, legs, antennae, wings with tilt, flat solid wings, SVG + STL exports, 3D preview | built (#324, merged) |
 | **1 rev.** | presets removed → neutral default + Randomize + save/load; wings 0–4 pairs with drawn, linked outlines; curve editor with reference backdrop; tucked legs | **built (this PR, §5)** — waits on Eva's ruling on the revised sheet |
-| 2 | venation; resolve holes-vs-ridges with a printed coupon | waits on the revised sheet |
+| 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | **built (§8)** — waits on Eva's ruling on `docs/img/bug-venation-sheet.png` |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
 | 4 | SVG import (roles, warps, blend) | — |
 
-**Phase 2 does not start until Eva has ruled on the revised Phase 1 contact
-sheet** (`docs/img/bug-phase1-revised-sheet.png`).
+Phase 2 started after Eva's ruling on the Phase 1 revision (§6.6, #326 merged).
 
 ---
 
@@ -736,3 +735,304 @@ than 45° and off the build plate:
 
 Print orientation is not solved (out of Phase 1 scope); every preset would
 need re-orienting or supports on anything but SLS.
+
+
+## 8. Phase 2 — procedural venation
+
+Built on `main` at `ecdeb0a`+. Files: **`bug-venation.js`** (new, pure 2D: the plan,
+the cells, the holes), `bug-geometry.js` (the frame, the ridges, the floor, the
+exporters), `bug.js` / `bug.html` (controls, editor overlay, read-out),
+`tools/verify-bug.mjs` (the V family), `tools/shot-bug-venation.mjs` (the sheet,
+`docs/img/bug-venation-sheet.png`), and `.github/workflows/bug-gate.yml` (§8.8).
+
+### 8.1 Architecture — the cells are the data
+
+The venation step does not draw strokes. `planVenation(outline, tailFlags, spec)`
+takes the wing's DRAWN planform (scallops and tail included, the root tab excluded)
+in millimetres, in the planform frame `(u, w)`, and **splits it into cells, chord
+by chord**: every vein is a polyline whose two ends lie ON the boundary of the one
+cell it cuts, and a cut replaces that cell by two. So the cells partition the wing
+by construction — a shared edge is the same two doubles in both cells, the areas
+sum to the wing's, no point is in two cells — rather than by a boolean operation
+whose failure would have to be detected. Both STL renderings and the SVG read that
+one record; the wing transform that places the slab places every vein and hole,
+so the two exports cannot disagree about where a vein is (§1's law, unchanged).
+
+Order of construction, each step a set of cuts:
+
+1. **Main veins.** `veinCount` × `(1 + veinBranch)` TERMINAL paths. The targets are
+   spread **evenly in ANGLE** about the middle of the root chord over the margin's
+   angular extent (the margin within 14 % of the arc of either root corner,
+   `ROOT_ARC_TRIM`, gets no target — seen from the root it is a few degrees wide
+   and a target there was a stub to the margin beside the body). Each target is
+   where the ray first leaves the planform, so a vein never crosses the outline.
+   The veins **leave the root chord at distinct points** spread over its middle
+   80 % (`ROOT_SPREAD_LO/HI`): one shared root point was built first and made
+   every base cell a wedge a few degrees wide, too thin to cut, whose merges then
+   snaked through the wing. A branching vein runs to a fork at 45 % of its stem
+   (`BRANCH_AT`) and then to each of its targets. Arc-length targets were tried
+   first and put slivers along the margin; see the module header.
+2. **The tail.** When the bottom pair's outline carries a tail (§6.1's tagged
+   group), the tail's tip is reached by its own vein: a two-segment chord from the
+   root chord (or from the nearest vertex of the cell the tip lies in) through a
+   point just inside the tail's base to the tip — a straight ray from the root
+   exits through the trailing margin before it reaches the tip.
+3. **The discal cell** (`discal`, `discalSize`, `discalPos`): one cross-vein
+   closing the strip between two central paths (the boundary between two
+   different main veins nearest `discalPos`) at `discalSize` of the way out; the
+   root-side cell is tagged `discal` and no cross-vein is cut below the
+   discocellular on either path.
+4. **The pterostigma** (`stigma`, `stigmaSize`): two chords from the lead-most
+   path, perpendicular to it, to the leading margin at `STIGMA_AT` 0.75 ±
+   `stigmaSize`/2 of the way out; the cell between is tagged `stigma`, and no
+   later cut may enter it.
+5. **Cross-veins** (`crossDensity`, `cellRegularity`): `round(density × 10)` per
+   strip between adjacent paths (and from the two outermost paths perpendicular
+   to the margin, from a quarter of the way out), at the same fraction on both
+   sides when regularity is 1 — a grid, the dragonfly polygon-net — and jittered
+   on each side and staggered strip to strip as it falls toward 0.
+6. **Vein width** is one law: `veinWidth × (1 − veinTaper × t)` with `t` the
+   fraction of arc along the terminal path; every vein edge carries the width at
+   its own position, cross-veins included.
+
+**Every vein is a STRAIGHT chord.** A bow was built first; it is deferred (it is a
+look Eva has not ruled on, and with the kernel-inset holes of the first attempt it
+collapsed the hole of every cell on its concave side — the raster erosion below
+would cut it fine now).
+
+**A chord that cannot be routed inside its cell is DROPPED and counted**
+(`stats.dropped`), never forced — a falcate hook or a notch between the root and
+a target; the cells still tile.
+
+**Cut endpoints snap to an existing vertex within 0.02 mm** (`SNAP_MM`): two
+vertices microns apart make a sliver whose orientation is decided by rounding —
+measured, a 7 µm pair put an inverted needle on the top face and a three-edge
+contour loop in the SVG, which the gate's S clause caught.
+
+### 8.2 HOLES and RIDGES — two renderings of one record
+
+`venation` is a CHOICE (`none` / `holes` / `ridges`, default **none**, so the
+Phase 1 wing is byte-identical — the gate's Phase 1 rows are unchanged). Per-pair
+vein fields live in `WING_FIELDS` and are blended for linked middle pairs by the
+same lerp as every other field (integer-stepped fields rounded: vein count,
+branching, the two on/off flags).
+
+**HOLES.** Every non-stigma cell is **eroded** by half the local vein width along
+its vein edges and by `marginBorder` along its outline and root edges — a true
+erosion of an arbitrary simple polygon (a merged cell is not convex), done on a
+raster at `HOLE_PX` 0.05 mm (the cut-safe SVG's own pitch): each edge paints a band
+of its own radius plus 1.5 px (so the hole stands at least its distance from
+every edge, never less — the border band is also painted from the WHOLE wing
+outline, because at a vein's tip the next cell's margin is nearer than the border,
+measured 0.83 against 1.00 mm), the remainder is traced by marching squares and
+simplified at just over a pixel. **One hole per cell**: if the erosion leaves
+several components the material between them is a bridge narrower than the bands
+that made it, so only the largest is cut (the gate measured two components of one
+cell 0.47 mm apart). A cell whose hole cannot hold a disc of **`minCellMm`**
+(default **1.5 mm**, a declared guess like every floor here) **merges with the
+neighbour whose union is the most compact** (4πA/P²; the longest shared edge was
+tried first and glued base wedges to the side of big cells, whose holes then ran
+as snakes), the vein between them is dropped, and the pass repeats; what still
+cannot be cut stays solid and says why (`holeReason`). A kernel inset (the
+intersection of half-planes) was built first: exact for a convex cell, it
+collapsed on every merged (concave) one, so every merge failed again and the whole
+wing merged into one solid cell.
+
+The frame is **ONE closed slab**: every cut cell is its outline with its hole
+bridged in (the ear-clipping bridge, hole traversed clockwise) and ear-clipped
+with every vertex kept — `triangulateCell` removes the (tolerantly) collinear
+vertices other cells share on a straight vein edge, triangulates, and puts each
+one back by splitting the triangle on its chord, so cells stay conforming and the
+rim walk sees no T-junction; solid cells and the root tab (fanned over every
+vertex on the root chord) go into the same vertex pool, keyed by coordinate. The
+existing `planformSlab` then emits top, bottom and a rim along EVERY boundary edge
+— the hole rims by the same directed-edge rule as the outer rim — so the HOLES
+wing is one connected watertight solid by construction, which the C and W clauses
+measure.
+
+**RIDGES.** The slab is Phase 1's; every vein is a closed strip of rectangular
+section (its own tapered width, from 0.15 mm inside the top skin to
+`ridgeHeight` above it, default 0.6 mm) and the pterostigma a plate over its cell,
+each its own closed part (kind `vein`) overlapping the slab — the export
+contract's closed-shells-union.
+
+**SVG.** In HOLES nothing is added: the cells ARE holes in the wing's projected
+contour (nonzero fill), the paper-cut look. In RIDGES the veins are drawn as lines
+on the wing at their own width, from the model's vein record (the ridge strips'
+centrelines — their contours would stroke every vein twice), and the pterostigma
+as a light-filled cell. **The lines are in `SVG_LINE`, the file's light line
+colour, not black**: the wing's fill IS the ink, so a black line on it would be
+invisible; this is a decision for Eva (§8.7).
+
+### 8.3 The cell data format (what Phase 4 reads)
+
+`model.wingPairs[k].venation` (one per pair, RIGHT wing; the left is the mirror):
+
+```
+{
+  frame:     'planform mm: u along the span from the root chord, w along the chord
+              (+ toward the head); the wing transform places it',
+  rootChord: [[0, w], ...],            // every vertex on the root chord, trail -> lead
+  outline:   [[u, w], ...],            // the wing polygon, CCW, root trail first; its
+                                       // closing edge (last -> first) is the root chord
+  veins: [{ id, kind: 'main' | 'branch' | 'cross' | 'discal' | 'stigma',
+            points: [[u, w], ...],     // the chord as cut (straight)
+            width: [w0, w1],           // mm, at its two ends (the taper law)
+            t: [t0, t1],               // fraction of arc along its terminal path
+            main, terminal, tail?, strip?, dropped? }],
+  cells: [{ id, role: 'cell' | 'discal' | 'stigma',
+            points: [[u, w], ...],     // CCW, closed implicitly, tiles the outline exactly
+            edges:  [{ kind: 'outline' | 'root' | 'vein', vein?, width?, tail? }],
+                                       // edges[i] describes points[i] -> points[i+1]
+            holes:  [[[u, w], ...]],   // HOLES only: 0 or 1 polygon, CCW, inside the cell
+            holeReason: 'cut' | 'too-small' | 'solid' | 'stigma' | 'bridge-failed' | null,
+            mergedFrom: [cellId, ...] }],
+  stats: { terminals, mainMade, crossMade, dropped: {main, cross, discal, stigma},
+           cells, discal, stigma, wingArea, cellAreaSum, tailTargeted,
+           holes?, merged?, solidCells?, minCellMm? },
+  notes: []
+}
+```
+
+Invariants the gate holds on it (V1): `Σ area(cells) = area(outline)` to 1e-9
+relative; every `vein` edge is carried by exactly two cells in opposite
+directions and every `outline` / `root` edge by exactly one; every cell is simple;
+every `outline` edge lies on the planform. A consumer may rely on them.
+
+### 8.4 The vein floor
+
+`veinWidth × (1 − veinTaper)` (the tip width) and, in HOLES, `marginBorder` must
+clear `minDiameter`. Under it, the pair gets a **`kind: 'vein'` floor violation**:
+the STL is BLOCKED with the same shape of sentence as the drawn outline's
+("Pair 1's veins taper to 0.30 mm, narrower than the 1.00 mm floor (the veins are
+shown red in the view). Raise its vein width or lower its taper there."; a linked
+middle pair's names the two drawn pairs and offers unlinking), the veins are
+drawn red in the 3D view and the editor, and the read-out says UNDER the floor.
+Blocking, not thickening, for §6.3's reasons. The defaults (1.2 mm, taper 0.15,
+border 1.0 mm) clear the 1.0 mm floor.
+
+### 8.5 Controls
+
+Global (section Venation): `venation` (choice), `ridgeHeight` (0.2–2 mm, RIDGES),
+`minCellMm` (0.5–5 mm, HOLES). Per pair (`WING_FIELDS`, blended on linked pairs,
+shown only with veins on): `veinCount` 1–10 (4), `veinBranch` 0–2 (1), `discal`
+0/1 (1), `discalSize` 0.15–0.95 (0.55), `discalPos` 0–1 (0.5), `crossDensity` 0–1
+(0.1), `cellRegularity` 0–1 (0.6), `veinWidth` 0.4–3 mm (1.2), `veinTaper` 0–0.8
+(0.15), `stigma` 0/1 (0), `stigmaSize` 0.03–0.4 (0.12), `marginBorder` 0.4–4 mm
+(1.0). `DESIGN_VERSION` is 3; a v2 file loads with every new field at its default.
+Randomize leaves venation off (not asked for; one line in `randomParams` the day
+it is wanted).
+
+### 8.6 Verification
+
+- `node tools/verify-bug.mjs --seeds 40` (CI's own setting): **135/135 PASS**
+  — 24 function checks and 111 built rows, every HOLES and RIDGES row
+  watertight (boundary 0), mirror 0, one voxel region. `--negative-control`:
+  PASS, every mutation caught by the clause that names it. The V
+  family (V1 tiling, V2 holes inside their cells / apart by the narrowest vein /
+  the border from the outline / the top face one connected triangle set / the
+  stigma never cut, V3 a linked pair's terminals and root width equal the blend
+  law restated in the gate, V4 the vein floor re-derived from the parameters and
+  the ridge width MEASURED off the emitted strips, V5 a vein ends on a
+  tail-tagged stretch of the outline, V6 discal and stigma) rides on every
+  venation row beside M/W/P/C/F/S/R/O/N; the S clause learned that a hole is a
+  legitimate interior loop (a stray loop is one that hugs neither the outline
+  nor a recorded hole polygon, by point-to-SEGMENT distance — vertex-to-vertex
+  read 6 mm against a hole's own loop and was the instrument's defect).
+- `--negative-control`: eight record mutations beside Phase 1's thirteen — a
+  cell vertex pushed, a cell dropped, a hole shifted across its vein, the stigma
+  cut, the linked pair carrying the first pair's width, a vein floor violation
+  unreported, the tail vein stopped short, a ridge strip missing — each caught by
+  the clause that names it.
+- **What the gate found while this was built** (each a class this repository
+  already names): the needle from two vertices 7 µm apart (snap, §8.1); the
+  border measured against the cell's own outline edges only (the whole-outline
+  band, §8.2); two erosion components of one cell 0.47 mm apart (one hole per
+  cell, §8.2); and in the gate itself the stray-loop instrument measuring to the
+  wrong primitive and `minGap` accumulating across pairs (a thin-veined pair's
+  legitimate 0.47 mm judged against the next pair's 1.02).
+- **What the gate found on the dense HOLES rows, and all four are mesh
+  conformity rather than venation** (the S clause's hairlines and V2's "top
+  face in 9 pieces", seven rows at `--seeds 20`):
+  1. **A NEEDLE on the bottom skin reads as a contour.** The ear clipper may
+     admit a diagonal passing a thousandth of a millimetre from a boundary
+     vertex — a 16 mm triangle 1.3e-3 mm tall. Its subdivided children share
+     one nz (−1.31e-3) and carry DIFFERENT edge-length tolerances, so
+     `contourLoops`' edge-on rule (|nz| under `EDGE_ON_REL` × Σ|e|²) counted
+     the long children front and the short ones back, and the SVG stroked a
+     hairline along the needle. Fixed at the source: `improveTriangulation`
+     runs Lawson flips over each cell (interior diagonals only, strictly
+     convex quads, flip when the smaller minimum angle rises); the thinnest
+     frame triangle on that row went 1.3e-3 → 1.0e-2 mm.
+  2. **`earClip` drops an exactly collinear vertex, which is a T-junction
+     inside the frame.** A cross-vein's end sits exactly on the main vein it
+     meets; once the ears around it are clipped it is collinear with its
+     neighbours in the clipper's working list and is dropped, so the cell is
+     covered by a triangle whose edge spans it while the cell across the vein
+     keeps it (cell 78 of the irregular dense row: 32 vertices, 29 triangles).
+     `planformSlab` then closes the unpaired edge with a WALL inside the
+     material. The dropped vertex is still USED by the restored collinear fan,
+     so "unused" is not the test — `reinsertUnused` splits every triangle edge
+     that passes through a polygon vertex, on both sides. Every cell's
+     triangulation now has exactly the cell's own boundary edges.
+  3. **`holeLoops` carried the top rim only.** Under dihedral a hole's contour
+     runs along the top rim where its wall faces away and along the BOTTOM rim
+     where the wall faces up — 1.04 mm apart on a 1.2 mm sheet at 60° — so the
+     gate read bottom-rim stretches as strays. The record holds both rims.
+  4. **The tail vein is routed along the tail's medial line, from any vertex
+     of the tip's host cell.** A straight run base → tip leaves a tail that
+     bends (random:8 drips left then right and ends in two lobes), and when
+     the lowest main vein hugs the trailing margin the tail's base straddles
+     it, so the `via` point is in the next cell over; the candidates are now
+     `[S, via, medial…, tip]`, `[S, via, tip]`, `[S, in-host waypoints…, tip]`,
+     `[S, tip]`, starts root vertices first then the host's other vertices
+     nearest the first waypoint (a vein branching off the one already there).
+     And V5 reads the tail points off `part.meta.planform` — the DRAWN,
+     scalloped outline, the planform owner's record — because a scallop pulls
+     the trailing half (tail included) and the veins are planned on the drawn
+     outline (random:6 read 0.023 mm off the raw tail tip).
+- **Cost, EXPORT, from the sheet's own captions**: the default two-pair bug is
+  24,656 triangles in RIDGES against Phase 1's 19,040-class slab; HOLES at
+  cross-vein density 0 / 0.25 / 0.5 / 0.75 / 1.0 on the long wing reads
+  38,800 / 57,168 / 62,880 / 69,824 / 71,728 triangles (84 × 42 mm SVG); the
+  four-pair blended bug 110,096 in HOLES against 46,496 in RIDGES. The frame
+  is subdivided twice, which is most of the HOLES cost.
+
+### 8.7 Decisions made without a ruling (reversible)
+
+1. SVG vein lines in the light line colour, not black (§8.2) — one constant.
+2. Straight veins (§8.1) — `candidatesTo` is the one place a bow would go back.
+3. `minCellMm` default 1.5 mm; `ridgeHeight` default 0.6 mm; `HOLE_PX` 0.05 mm;
+   `SNAP_MM` 0.1 mm (0.02 was tried first and left vertices 7–37 µm apart); `ROOT_ARC_TRIM` 14 %; `ROOT_SPREAD` 10–90 %; `BRANCH_AT`
+   45 %; `STIGMA_AT` 75 %; `CROSS_MAX` 10 — all constants with their reason in
+   the source.
+4. Vein fields are blended on linked pairs exactly like the outline fields (the
+   brief's "middle pairs blend them like everything else").
+5. The holes-vs-ridges STRENGTH question (§3.5) is still unmeasured: nothing has
+   been printed. Both ship as a toggle; the coupon is still owed.
+
+**PARKED, NOT FIXED** (Eva's ruling on PR #341, Oct 1 — approved as "good enough for
+now" with the shipped defaults: density 0.1, min cell 1.5 mm, ridge 0.6 mm, border
+1.0 mm). Two items are recorded here so they are scheduled rather than rediscovered:
+
+- **The veins read maze-like / circuit-like.** The main veins are straight segments
+  from the root and the cross-veins step between them at right angles, so a dense
+  HOLES wing reads as a printed circuit rather than a wing. Reference image 1 has main
+  veins FANNING from the root with gentle curvature, and cross-veins meeting the main
+  veins at varied angles. Candidate future controls: a main-vein CURVATURE (a bow in
+  `candidatesTo`, item 2 above — the one place it goes), and a cross-vein ANGLE
+  VARIANCE. Neither is built; both would move every venation row's bytes and want
+  their own sheet beside the reference.
+- **The holes-vs-ridges print strength is still unmeasured** (item 5) and stays so
+  until something is printed. No number in this document is a measurement of a part.
+
+### 8.8 CI
+
+`bug-gate.yml` runs `verify-bug.mjs --negative-control` then `--seeds 40` on
+pull requests and pushes to `main` that touch `bug.html`, `bug*.js`,
+`tools/verify-bug*.mjs`, `tools/bug-fixtures.mjs` or the workflow. The two flower
+gates (`flower-export-watertight.yml`, `flower-geometry-quality.yml`) name the tools
+they import rather than `tools/**` (#340, Oct 1 — the negations this PR first carried
+were dropped in the merge as redundant), so a bug-only change runs the bug gate and
+nothing else; the bloom gates list their files by name and never matched. Measured
+on #341's own head: one Actions run fired, `bug-gate`, and neither flower gate.
