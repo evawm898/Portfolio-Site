@@ -2437,6 +2437,61 @@ the wale side does not. Period-locked markers are worth shipping only
 together with a wale-side T-vs-2T discriminator, which is a new mechanism
 and was out of this session's scope.
 
+### A wale T-vs-2T discriminator from the course sub-repeat test: measured, gate failed (2026-10-01)
+
+Follows the two records above. Baseline `main` at `008716e`. **Nothing under
+`analysis/` changed.** This was diagnosis only, and the gate did not pass.
+
+**The candidate** is the wale counterpart of the course seed's descent, built
+entirely from existing parts with no new constants. Between a wale
+candidate S and its double 2S, the double is "doubled" (S wins) iff S passes
+`_subrepeat_walk_score` (the 4-pitch-wide band) at `>= SEED_HALF_TEMPLATE_MIN`.
+Two variants were measured: **W** (the walk alone), and **A** (the walk plus
+the course descent's own autocorrelation gate: S must also be a peak at
+`>= SEED_HALF_MIN_STRENGTH_RATIO` of 2S's strength). A case passes if the
+discriminator keeps the family member nearest the truth both against its
+double (when present) and against its half (when present).
+
+| set | W | A |
+|---|---|---|
+| synthetic wale specs (every GRID / rotation / fuzz / overlay test spec with a single primary truth, rib excluded, plus ply-twist and the climb precondition) | 45 / 63 | **56 / 63 (89%)** |
+| the #329 lattice-failure synthetics (jersey 8x10, ply-twist, rot0, fuzz 0.5, pins 3/8, climb 12°) | 6 / 7 | 6 / 7 |
+| scorecard wale rows (9) | 7 / 9 | **7 / 9** |
+
+* **A's 7 synthetic misses are all rotation**: every 12° row (jersey 5x7 / 8x10,
+  clean and degraded, garter 5x7, the climb precondition) and clean jersey
+  8x10 at 7°. The template walk is axis-aligned, so on a tilted lattice the
+  TRUE period's walk reads 0.00. This is #325's own false-climb mechanism.
+* **W fails every garter row and every centred-ruler row**: there the
+  half-period genuinely walks (0.70–0.83). The autocorrelation gate is what
+  rescues them in A.
+* **The gate's hard half fails.** The scorecard truth rows A gets wrong:
+  * **knit_06** (a currently passing row, truth ~123px): the 64px half walks
+    at **0.68** against the true 128's 0.69, so the discriminator calls 128
+    doubled. These are the chunky plied legs whose mirror twins correlate,
+    the limitation `_prefer_fundamental_seed`'s docstring already records,
+    and the 4-pitch band does not break it. The same thing happens at the
+    70% box (124 vs 62).
+  * **knit_02** (already beyond the bar): truth ~297px is not in the family
+    at all (nearest 264, 11% off), and the 132px half walks at 0.68.
+  * Outside the scorecard: teal `small_window_b` (the true ~76px candidate's
+    walk is 0.00 on that 341px window), and knit_04 if its truth were 64
+    (the 32 walks at 0.73). knit_04 has no recorded truth, so this is
+    reported only. **The discriminator says 32.**
+* **What it gets right** that the current scorer does not: knit_03's wale
+  (family 142 / 284 / 568, read 287 today) keeps the tape-measure **142**
+  (walk 0.77), and knit_08 at the 70% box keeps **74** over its doubled 148.
+  jersey, teal (pinned ROI, `small_window_c`, 70% box), knit_01, 05,
+  08 and 09 all pass.
+
+**Why it fails, in one line:** "the smaller candidate genuinely walks" is
+true of a real fundamental AND of a chunky leg lattice whose mirror-image
+legs correlate. On knit_06 the two read 0.68 and 0.69, so no threshold, and
+certainly no fixture-specific one, separates them. The same test that
+fixes 03 and 08 would break 06. A T-vs-2T term for the wale scorer needs
+evidence the template walk does not carry (the walk is also blind under
+rotation), so the period-locked markers of #329 still cannot ship.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
