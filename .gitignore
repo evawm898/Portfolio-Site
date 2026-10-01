@@ -1,5 +1,7 @@
 node_modules/
-package-lock.json
+# package-lock.json IS committed (Oct 1): it pins @netlify/blobs and its tree so a
+# Netlify build resolves the same dependencies every time. Local dev deps are
+# installed with `npm i --no-save`, which never writes the lockfile.
 
 # Skirt panelizer (Python tooling) — scratch outputs stay out of git;
 # the final SVG/report in skirt/ ARE committed (the page depends on them).
