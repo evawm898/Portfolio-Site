@@ -56,13 +56,23 @@ loosened tolerance):
     different, smaller mechanism — kept strictly xfailed with its own
     reason, and the seed fix is pinned independently by
     test_resize_course_stays_in_fundamental_family.
+
+  downsample2x and crop_shift (added 2026-10-01, harness-only, detector
+  at f677bed): both axes pass on this pinned ROI at first run --
+  downsample 17.5/17.5 wale and 12.3/12.5 course, crop_shift 35.5/35.1
+  and 24.6/24.9. The window has no room to shift in x here (30px margin
+  against an 82px step), so crop_shift moves it in y only (+39px), and
+  its note says so. The 11-fixture sweep at the CLI's 70% box is
+  recorded in the README as a baseline, not pinned: it carries real
+  violations (downsample 2x flips on six photos) that are findings, not
+  regressions this PR introduced.
 """
 from __future__ import annotations
 
 import cv2
 import pytest
 
-from metamorphic import TOLERANCES, InvariantOutcome, _classify, run_metamorphic
+from metamorphic import INVARIANTS, MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE, TOLERANCES, InvariantOutcome, _classify, run_metamorphic
 
 JERSEY = "tests/fixtures/real_jersey_sample.jpg"
 # Clean fabric region above the ruler (which starts around y=360).
@@ -87,7 +97,7 @@ def jersey_outcomes():
 
 def _params():
     params = []
-    for invariant in ("resize", "rotate90", "mirror", "half_roi", "jpeg60"):
+    for invariant in INVARIANTS:
         for axis in ("wale", "course"):
             key = (invariant, axis)
             marks = []
@@ -196,3 +206,53 @@ def test_half_roi_skips_below_five_periods():
     half = {o.axis: o for o in outcomes if o.invariant == "half_roi"}
     assert half["wale"].status == "skipped"
     assert "periods" in half["wale"].note
+
+
+def test_downsample_skips_below_min_px_per_period():
+    """Below MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE after halving, downsample2x
+    must be SKIPPED per axis with a note -- not run and scored. Fine
+    synthetic jersey: 15.0px wale / 10.7px course halve to 7.5 / 5.4,
+    both under 8, so the detector is not even run."""
+    import sys
+
+    sys.path.insert(0, "tests")
+    from synthetic_fabric import FabricSpec, render_fabric
+
+    spec = FabricSpec(structure="jersey", wales_per_inch=12, courses_per_inch=16.8)
+    img = render_fabric(spec)
+    outcomes = run_metamorphic(img, (64, 48, 512, 384), "vertical")
+    down = {o.axis: o for o in outcomes if o.invariant == "downsample2x"}
+    assert set(down) == {"wale", "course"}
+    for axis, o in down.items():
+        assert o.status == "skipped", f"{axis}: {o.status}"
+        assert f"<{MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE:g}px" in o.note
+        assert o.measured_px is None
+
+
+def test_downsample_and_crop_shift_run_on_coarse_synthetic():
+    """The other side of the skip: a coarse render (36 / 25.7px) clears
+    the floor, so downsample2x is EVALUATED and must halve the period;
+    crop_shift must actually move the window (its note records the
+    offset) and hold it."""
+    import sys
+
+    sys.path.insert(0, "tests")
+    from synthetic_fabric import FabricSpec, render_fabric
+
+    spec = FabricSpec(structure="jersey", wales_per_inch=5, courses_per_inch=7)
+    outcomes = {(o.invariant, o.axis): o for o in run_metamorphic(render_fabric(spec), (64, 48, 512, 384), "vertical")}
+    for axis in ("wale", "course"):
+        d = outcomes[("downsample2x", axis)]
+        assert d.status == "ok", f"downsample2x/{axis}: {d.status} ratio {d.ratio}"
+        c = outcomes[("crop_shift", axis)]
+        assert c.status == "ok", f"crop_shift/{axis}: {c.status} ratio {c.ratio}"
+        assert c.note.startswith("window shifted by (+64, +48)px"), c.note
+
+
+def test_crop_shift_step_picks_a_side_or_stays_put():
+    from metamorphic import crop_shift_step
+
+    assert crop_shift_step(30, 660, 720) == 0      # 82px step fits neither side (the pinned jersey ROI's x)
+    assert crop_shift_step(30, 310, 400) == 39     # room toward the far side
+    assert crop_shift_step(90, 310, 400) == -39    # no room far, room near
+    assert crop_shift_step(0, 400, 400) == 0       # full-extent window

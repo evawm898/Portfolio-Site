@@ -26,6 +26,24 @@ knobs — see the table in tests/test_metamorphic_fixtures.py and README):
             that the estimate is genuinely unstable and either pass or
             fail would be a lie.
   jpeg60    quality-60 JPEG round-trip: spacing moves < 5%.
+  downsample2x
+            0.5x area-averaged downsample: pixel spacing must HALVE. Tol 5%
+            (the resize bound plus ~1% for losing half the samples per
+            period). SKIPPED per axis when the halved period would be
+            < MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE (8px): below that the leg
+            half-harmonic sits within ~1px of the detector's 3px
+            plausibility floor and the 3px smoothing window spans more
+            than a third of a period, so the transform changes which
+            candidates can exist at all -- either pass or fail would be
+            a statement about the floor, not the detector. Mirrors the
+            half_roi skip rule.
+  crop_shift
+            same window size, offset by 1/8 of the window in x and in y
+            (toward whichever side has room; a dimension with no room on
+            either side is not shifted, and if neither moves the whole
+            invariant is skipped): density held. Tol 5% -- the same
+            number of periods as the baseline, only the boundary phase
+            and the ~1/4 of the content at the edges differ.
 
 Every outcome is CLASSIFIED, not just pass/failed: a 6% drift and a 2x
 flip are different bugs, so "harmonic_flip" (ratio near 0.5x or 2x) is
@@ -64,8 +82,13 @@ TOLERANCES = {
     "mirror": 0.01,
     "half_roi": 0.10,
     "jpeg60": 0.05,
+    "downsample2x": 0.05,
+    "crop_shift": 0.05,
 }
+INVARIANTS = ("resize", "rotate90", "mirror", "half_roi", "jpeg60", "downsample2x", "crop_shift")
 MIN_PERIODS_FOR_HALF_ROI = 5.0
+MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE = 8.0
+CROP_SHIFT_FRACTION = 1.0 / 8.0
 # Ratio bounds beyond which an outcome is "lost" rather than "drift": the
 # measured spacing no longer describes the same structure as the baseline.
 LOST_RATIO_HIGH = 2.5
@@ -105,6 +128,18 @@ def _classify(measured: Optional[float], expected: float, tol: float) -> Tuple[s
     if ratio > LOST_RATIO_HIGH or ratio < LOST_RATIO_LOW:
         return "lost", ratio
     return "drift", ratio
+
+
+def crop_shift_step(pos: int, size: int, extent: int) -> int:
+    """crop_shift's offset along one dimension: CROP_SHIFT_FRACTION of
+    the window, toward the far side if it fits, else the near side, else
+    0 (that dimension is not shifted)."""
+    step = int(round(size * CROP_SHIFT_FRACTION))
+    if pos + size + step <= extent:
+        return step
+    if pos - step >= 0:
+        return -step
+    return 0
 
 
 def _axes(result):
@@ -189,16 +224,48 @@ def run_metamorphic(image_bgr: np.ndarray, roi: Tuple[int, int, int, int], orien
     record("jpeg60", analyze_gauge(reencoded, roi, orientation),
            {a: baseline[a].spacing_px for a in baseline})
 
+    # --- 2x downsample (area-averaged) ------------------------------------
+    # Appended AFTER the original five so their outcomes keep their order.
+    down_expected = {}
+    down_notes = {}
+    for axis in baseline:
+        halved = baseline[axis].spacing_px * 0.5
+        if halved < MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE:
+            down_expected[axis] = None
+            down_notes[axis] = f"halved period {halved:.1f}px (<{MIN_PX_PER_PERIOD_FOR_DOWNSAMPLE:g}px)"
+        else:
+            down_expected[axis] = halved
+    if all(v is None for v in down_expected.values()):
+        for axis in baseline:  # nothing to measure: don't run the detector at all
+            outcomes.append(InvariantOutcome("downsample2x", axis, "skipped", None, None, None,
+                                             baseline[axis].confidence, None, down_notes[axis]))
+    else:
+        small = cv2.resize(image_bgr, (max(1, img_w // 2), max(1, img_h // 2)), interpolation=cv2.INTER_AREA)
+        roi_d = (x // 2, y // 2, w // 2, h // 2)
+        record("downsample2x", analyze_gauge(small, roi_d, orientation), down_expected, down_notes)
+
+    # --- crop shift: same window size, offset position ---------------------
+    dx, dy = crop_shift_step(x, w, img_w), crop_shift_step(y, h, img_h)
+    if dx == 0 and dy == 0:
+        for axis in baseline:
+            outcomes.append(InvariantOutcome("crop_shift", axis, "skipped", None, None, None,
+                                             baseline[axis].confidence, None, "no room to shift the window"))
+    else:
+        shift_note = f"window shifted by ({dx:+d}, {dy:+d})px"
+        record("crop_shift", analyze_gauge(image_bgr, (x + dx, y + dy, w, h), orientation),
+               {a: baseline[a].spacing_px for a in baseline},
+               {a: shift_note for a in baseline})
+
     return outcomes
 
 
 def format_report(outcomes: List[InvariantOutcome]) -> str:
-    lines = [f"{'invariant':10s} {'axis':7s} {'status':13s} {'expected':>9s} {'measured':>9s} {'ratio':>7s}  note"]
+    lines = [f"{'invariant':12s} {'axis':7s} {'status':13s} {'expected':>9s} {'measured':>9s} {'ratio':>7s}  note"]
     for o in outcomes:
         exp = f"{o.expected_px:.1f}" if o.expected_px else "-"
         meas = f"{o.measured_px:.1f}" if o.measured_px else "-"
         ratio = f"{o.ratio:.3f}" if o.ratio else "-"
-        lines.append(f"{o.invariant:10s} {o.axis:7s} {o.status:13s} {exp:>9s} {meas:>9s} {ratio:>7s}  {o.note}")
+        lines.append(f"{o.invariant:12s} {o.axis:7s} {o.status:13s} {exp:>9s} {meas:>9s} {ratio:>7s}  {o.note}")
     return "\n".join(lines)
 
 
