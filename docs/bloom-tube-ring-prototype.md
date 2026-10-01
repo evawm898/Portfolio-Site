@@ -262,10 +262,60 @@ geometry is untouched.
 
 ## C8. Close
 
-- **What was touched:** `tools/bloom-tube-ring.mjs`, `tools/shot-bloom-tube.mjs`, this doc and four
-  images. No patch to the shipped geometry was added this round.
+- **What was touched:** `tools/bloom-tube-ring.mjs`, `tools/bloom-tube-core.mjs`, `tools/shot-bloom-tube.mjs`,
+  `tools/tube-preview.html`, this doc and five images. No patch to the shipped geometry was added this round.
 - **Branch and PR:** `claude/youthful-ride-azrkiy`, draft PR #323 against `main`.
 - **Merge:** nothing merged, nothing pushed to `main`.
+
+## C8b. The preview page (`tools/tube-preview.html`) — drag it
+
+**A throwaway page, not linked from anywhere, `noindex`.** It loads the bloom's default design and
+builds through the SAME patched geometry the sheets and the sweep use, ROUND only.
+
+**How it reaches the builder.**
+- The build moved into `tools/bloom-tube-core.mjs`, which has no `node:` import.
+  `tools/bloom-tube-ring.mjs` now imports it and supplies the Node loader (a temp file). The page
+  supplies a Blob URL.
+- **The split is float-identical**, measured under `Object.is` against the pre-split builder on
+  eight states: BLEND, slits, live mode, three layers and the ring to the nib.
+- `--control` still fires all five must-fails, and the form sheet re-renders byte-identical.
+
+**Controls:**
+- TUBE, stepped over the valid k for the current petal count, labelled TUBE … FREE.
+- fusion height h, 0.10–0.70.
+- BLEND, 0–1.
+- Petal count, cup, roll, twist and spine curl, with the registry's own ranges.
+- An orbit camera and a print-preview toggle.
+
+**The readout:** the mode, the triangle count against FREE, the built k, and a SNAP line when a
+petal-count change leaves the asked k invalid. It also shows the ring's top row, the flare rows,
+and the sinus with the notch's state.
+
+**Display-only choices, stated:**
+- three's `toCreasedNormals` in both modes, not `bloom.js`'s export-normal path.
+- The ring is drawn with a polygon offset, so a petal lying ON it does not z-fight.
+
+**Verified locally** in headless Chromium, with three served from `node_modules`:
+- 0 page errors.
+- Each control fired its own rebuild: TUBE, h, BLEND, petal count, cup, roll, twist, curl and the
+  print-preview box.
+- The mesh changed on every one of them except print preview at these settings (see below).
+- The snap fired on 8 → 6 petals with K 4 asked: K 3 was built and the readout says so.
+- Build time is 0.25–1.0 s per rebuild.
+- The defaults screenshot is `docs/img/bloom-tube-preview.png`.
+
+**Noted, not fixed (Eva's instruction):**
+- **Print preview changes nothing at the default sheet.** Live and export are float-identical on
+  the default and on a stressed form state. The difference appears only below a 1.0 mm sheet, which
+  is not on the panel.
+- **The notch's existence is MODE-DEPENDENT at a thin sheet.**
+  - At `sheetThickness` 0.6, k 2, h 0.40, BLEND 1, the sinus reads **−1.424 mm LIVE (notch
+    inert, 27,168 tris)** and **+0.005 mm EXPORT (notch drawn, 33,936 tris)**.
+  - Which geometry exists then differs between the two modes. That is the class this project
+    refuses in shipped code.
+  - The sinus is measured on the mode's own margins. A mode-free measure, or a union over both
+    modes as the sphere-stem omission does, would fix it. It is the prototype's, recorded for the
+    build session.
 
 ## C9. Questions for Eva (batched; the first two are the ones asked)
 
