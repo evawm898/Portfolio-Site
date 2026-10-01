@@ -20,9 +20,9 @@
    Model coordinates are millimetres, x right, y UP (the SVG writer flips y).
    The arch's opening is centred on x = 0 with the sill's underside at y = 0. */
 
-import { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, PARAM_SPEC } from './frame-registry.js';
+import { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, PARAM_SPEC, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS } from './frame-registry.js';
 
-export { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES };
+export { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS };
 
 const spec = (id) => PARAM_SPEC.find((s) => s.id === id);
 
@@ -214,12 +214,18 @@ export function archSkeleton(p) {
     const xInL = innerEdge(spines.find((s) => s.id === 'jambL'), w)[0][0];
     const xInR = innerEdge(spines.find((s) => s.id === 'jambR'), w)[0][0];
     const clear = (xInR - xInL - n * wm) / (n + 1);
-    const bounds = [-a];                        // light boundaries are CENTRELINES
+    // Light boundaries: the OUTER two are the jambs' inner edges (ruling 4,
+    // phase 1b — read off innerEdge above, never a new boundary), so the
+    // outer sub-arches terminate ON the jamb rather than half-buried in it;
+    // the interior ones are the mullion CENTRELINES, so a sub-arch's end is
+    // half-buried in the mullion band (accepted, ruling 3).
+    const bounds = [xInL];
     for (let i = 1; i <= n; i++) {
       const x = xInL + i * clear + (i - 1) * wm + wm / 2;
       info.mullionX.push(x); bounds.push(x);
     }
-    bounds.push(a);
+    bounds.push(xInR);
+    info.lightBounds = bounds;
     // Sub-arch over each light: same pointedness on the light's own half-span.
     // Its spring line is the main spring line unless the apex would run into
     // the head's INNER EDGE, in which case it drops until it clears by wm.
@@ -305,6 +311,20 @@ function creaseIndices(prof, p) {
 /* van der Corput base 2: 0, .5, .25, .75, .125, ... — evenly spread thresholds. */
 export function vdc(k) { let r = 0, f = 0.5; for (let n = k + 1; n > 0; n = Math.floor(n / 2), f /= 2) if (n & 1) r += f; return r; }
 
+/* Line weight follows darkness (ruling 1): the ONE place a darkness becomes
+   a stroke width. Darkness is quantised onto HATCH_WEIGHT_STEPS levels (the
+   level's midpoint is what the law reads) so a line splits into a handful of
+   widths along its length rather than one per vertex. */
+export function weightLevel(dark) { return Math.min(HATCH_WEIGHT_STEPS - 1, Math.max(0, Math.floor(dark * HATCH_WEIGHT_STEPS))); }
+export function hatchWeight(dark, lineWeight) {
+  const q = (weightLevel(dark) + 0.5) / HATCH_WEIGHT_STEPS;
+  return lineWeight * (HATCH_WEIGHT_RANGE[0] + (HATCH_WEIGHT_RANGE[1] - HATCH_WEIGHT_RANGE[0]) * q);
+}
+
+/* A drawn stroke: { pts, dark, weight } — dark is the mean darkness the
+   stroke was drawn at and weight its stroke width in mm. */
+const stroke = (pts, dark, p) => ({ pts, dark, weight: hatchWeight(dark, p.lineWeight) });
+
 export function sweepSpine(spine, prof, p) {
   const w = spine.bandWidth;
   const edges = [outerEdge(spine, w), innerEdge(spine, w)];
@@ -335,15 +355,67 @@ export function sweepSpine(spine, prof, p) {
     tone.push(sum / nv);
     if (on) {
       const off = offsetCurve(spine, d);
-      let seg = null;
+      // a run is split where its WEIGHT LEVEL changes (the boundary vertex is
+      // shared), so the line swells and thins along the spine; a run of one
+      // vertex is no line.
+      let seg = null, segLevel = -1, segSum = 0;
+      const close = () => { if (seg && seg.length >= 2) hatch.push(stroke(seg, segSum / seg.length, p)); seg = null; };
       for (let v = 0; v < nv; v++) {
-        if (run[v] && off[v]) { if (!seg) { seg = []; hatch.push(seg); } seg.push(off[v]); }
-        else if (seg) { if (seg.length === 1) hatch.pop(); seg = null; }
+        const dk = darknessAt(prof, i, p, spine.nrm[v]);
+        if (run[v] && off[v]) {
+          const lv = weightLevel(dk);
+          if (seg && lv !== segLevel) { seg.push(off[v]); segSum += dk; close(); seg = [off[v]]; segSum = dk; segLevel = lv; continue; }
+          if (!seg) { seg = []; segSum = 0; segLevel = lv; }
+          seg.push(off[v]); segSum += dk;
+        } else close();
       }
-      if (seg && seg.length === 1) hatch.pop();
+      close();
     }
   }
-  return { id: spine.id, edges, creases, hatch, tone };
+  const cross = crossHatch(spine, prof, p);
+  return { id: spine.id, edges, creases, hatch, cross, tone };
+}
+
+/* Cross-hatching (ruling 6): lines ACROSS the band, one every hatch pitch
+   ALONG the spine, drawn only over the stretch of the profile whose darkness
+   exceeds crossHatchThreshold — a deep cove, a shadowed step. Each line is a
+   chord between two of offsetCurve's own polylines (the profile samples
+   bracketing the dark stretch), interpolated along the spine, so it is a
+   CONSUMER of the one offset and runs out where the tone drops under the
+   threshold — never drawn across the band and trimmed. Stations are placed
+   from a LENGTH (the pitch in mm), never a count. */
+export function crossHatch(spine, prof, p) {
+  const out = [];
+  const thr = p.crossHatchThreshold;
+  const w = spine.bandWidth, n = prof.x.length - 1, nv = spine.pts.length;
+  const offs = new Array(n + 1);
+  const offAt = (i) => offs[i] || (offs[i] = offsetCurve(spine, (prof.x[i] - 0.5) * w));
+  const lerp = (A, B, t) => [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t];
+  let carry = 0;                                   // distance to the next station, in mm
+  for (let v = 0; v < nv - 1; v++) {
+    const [ax, ay] = spine.pts[v], [bx, by] = spine.pts[v + 1];
+    const len = Math.hypot(bx - ax, by - ay);
+    if (len === 0) continue;
+    // the dark stretches across the band at this vertex's normal
+    const dark = new Float64Array(n + 1);
+    for (let i = 0; i <= n; i++) dark[i] = darknessAt(prof, i, p, spine.nrm[v]);
+    const runs = [];
+    for (let i = 0; i <= n; i++) {
+      if (dark[i] > thr) { if (runs.length && runs[runs.length - 1][1] === i - 1) runs[runs.length - 1][1] = i; else runs.push([i, i]); }
+    }
+    for (let s = carry; s < len; s += p.hatchPitch) {
+      const t = s / len;
+      for (const [i0, i1] of runs) {
+        if (i1 === i0) continue;                    // one sample is no length
+        const A0 = offAt(i0)[v], A1 = offAt(i0)[v + 1], B0 = offAt(i1)[v], B1 = offAt(i1)[v + 1];
+        if (!A0 || !A1 || !B0 || !B1) continue;     // past a join's bisector
+        let sum = 0; for (let i = i0; i <= i1; i++) sum += dark[i];
+        out.push(stroke([lerp(A0, A1, t), lerp(B0, B1, t)], sum / (i1 - i0 + 1), p));
+      }
+    }
+    carry = ((carry - len) % p.hatchPitch + p.hatchPitch) % p.hatchPitch;
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,7 +435,7 @@ export function buildFrame(params, customProfile = null) {
   const { spines, info } = archSkeleton(p);
   const bands = spines.map((s) => sweepSpine(s, prof, p));
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, strokes = 0;
-  for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch]) {
+  for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch.map((h) => h.pts), ...b.cross.map((h) => h.pts)]) {
     strokes++;
     for (const [x, y] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
@@ -391,7 +463,13 @@ export function exportSvg(model, { view = null, margin = 8, paper = true } = {})
     const g = [`<g id="${band.id}" fill="none" stroke="${SVG_INK}" stroke-linecap="round" stroke-linejoin="round">`];
     g.push(`<path class="edge" stroke-width="${f(lw * 1.4)}" d="${band.edges.map(path).join('')}"/>`);
     if (band.creases.length) g.push(`<path class="crease" stroke-width="${f(lw)}" d="${band.creases.map(path).join('')}"/>`);
-    if (band.hatch.length) g.push(`<path class="hatch" stroke-width="${f(lw)}" d="${band.hatch.map(path).join('')}"/>`);
+    // one <path> per DISTINCT weight per band, so the file stays a few
+    // dozen paths while every stroke carries the width the law gave it
+    for (const [cls, list] of [['hatch', band.hatch], ['cross', band.cross]]) {
+      const byW = new Map();
+      for (const h of list) { const k = f(h.weight); if (!byW.has(k)) byW.set(k, []); byW.get(k).push(h.pts); }
+      for (const [k, polys] of [...byW.entries()].sort((a, b) => a[0] - b[0])) g.push(`<path class="${cls}" stroke-width="${k}" d="${polys.map(path).join('')}"/>`);
+    }
     g.push('</g>');
     parts.push(g.join(''));
   }

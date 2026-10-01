@@ -22,13 +22,18 @@ main at f677bed (this file's first run), wale axis, centred 0.8 ROI,
     evidence on 0, the climb fires 2 times -- BOTH FALSE.
   * In-plane rotation, 0..15 deg x wpi 4/5/6/8/10 x seeds 7/8/9, clean
     and blur+JPEG: 300 renders, 0 correct climbs, 6 FALSE climbs (all at
-    8 wpi, 11-13 deg). Mechanism, read off the candidates: rotation by
-    >= ~9 deg zeroes the CORRECT winner's own template walk (0.00 on 60
-    of these renders -- the walk is axis-aligned and a tilted lattice
-    does not repeat along it), and where the double still walks
-    (>= SEED_HALF_TEMPLATE_MIN, 0.69-0.78 here) the climb takes it: the
-    true 23.0px winner becomes ~41-46px. Reported, not fixed (a harness
-    PR); pinned below as a strict xfail plus its precondition.
+    8 wpi, 11-13 deg) on the tree this file was written against.
+    Mechanism, read off the candidates: rotation by >= ~9 deg zeroes
+    the CORRECT winner's own template walk (0.00 on 60 of these renders
+    -- the walk is axis-aligned and a tilted lattice does not repeat
+    along it), and where the double still walks (>= SEED_HALF_TEMPLATE_
+    MIN, 0.69-0.78 here) the climb takes it: the true 23.0px winner
+    becomes ~41-46px. FIXED by the leg-slant orientation discriminator
+    (_orientation_fundamental in _analyze_axis_v3, which runs after the
+    climb and undoes it when the signed-orientation signal says the
+    climbed-from period is the stitch pitch): the same 300 renders now
+    read 0 fires / 0 false climbs. The precondition is still pinned
+    below, because it is what makes the undo necessary.
 
 `TGR_CLIMB_SWEEP=1 pytest tests/test_synthetic_leg_climb.py -s` prints
 the rotation sweep's per-render table and its fire / accuracy counts.
@@ -103,11 +108,11 @@ FALSE_CLIMB_SPEC = _jersey(8, seed=7, rotation_deg=12.0)
 
 
 def test_false_climb_precondition_correct_winner_fails_its_walk_under_rotation():
-    """Pins WHY the false climb below happens, independently of the
-    strict xfail (which cannot tell one failure from another): the
-    evidence winner IS the true (projected) pitch, rotation has zeroed
-    its template walk, and its double walks. If this stops holding the
-    xfail's reason is out of date."""
+    """Pins WHY the climb WOULD fire here, independently of the test
+    below: the evidence winner IS the true (projected) pitch, rotation
+    has zeroed its template walk, and its double walks. The orientation
+    discriminator is what stops that becoming a false climb; if this
+    stops holding, the undo is no longer being exercised by this spec."""
     ax = _wale(FALSE_CLIMB_SPEC)
     true = expected_periods(FALSE_CLIMB_SPEC)["wale"][0]
     winner = _evidence_winner(ax)
@@ -117,14 +122,18 @@ def test_false_climb_precondition_correct_winner_fails_its_walk_under_rotation()
     assert double.template_match_score is not None and double.template_match_score >= SEED_HALF_TEMPLATE_MIN
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "FALSE CLIMB: at 12 deg the correct 23.0px winner's axis-aligned template walk fails (0.00) and its double "
-    "walks (0.70), so the climb moves a correct reading to 2x (44.4px); reported, not fixed here"))
 def test_climb_never_fires_on_an_already_correct_winner():
+    """Was a strict xfail ("FALSE CLIMB: at 12 deg the correct 23.0px
+    winner's axis-aligned template walk fails (0.00) and its double walks
+    (0.70), so the climb moves a correct reading to 2x (44.4px)") until the
+    leg-slant orientation discriminator landed: the signed-orientation
+    signal repeats at 23.0px and alternates at 11.5px, so the climb to
+    46px is undone and the reason carries no "Climbed from"."""
     ax = _wale(FALSE_CLIMB_SPEC)
     true = expected_periods(FALSE_CLIMB_SPEC)["wale"][0]
     src = climbed_from(ax)
     assert not (src is not None and _near(src, true)), f"climbed from the correct {src}px to {ax.spacing_px:.1f}px"
+    assert _near(ax.spacing_px, true), f"wale {ax.spacing_px} vs true {true:.1f}"
 
 
 @pytest.mark.skipif(not os.environ.get("TGR_CLIMB_SWEEP"), reason="set TGR_CLIMB_SWEEP=1 for the climb coverage sweep")

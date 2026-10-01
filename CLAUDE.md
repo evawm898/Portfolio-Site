@@ -9724,7 +9724,7 @@ don't wait to be asked, and don't surface them only after the fact.
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
 
-## `/weave` — the Weave Draft (pointer only)
+## `/weave` — the Weave Draft and construction tool (pointer only)
 
 Hidden generative page (`weave.html`, `weave.css`, `weave.js`, `weave-draft.js`,
 `weave-render.js`; `noindex`, unlinked). A four-part weaving draft — threading on
@@ -9740,15 +9740,46 @@ draft read from the tie-up outward, which is also what WIF-based software draws.
 Presets are STRUCTURES (plain, 2/2 and 3/1 twill, broken twill, herringbone, point,
 rosepath, 5- and 8-shaft satin, basket, waffle, overshot-style) and each sets its
 own shaft and treadle counts; a sinking-shed WIF is read by complementing its
-tie-up (the same cloth). Gate: `node tools/verify-weave.mjs` — part one is Node
-only (plain weave is the checkerboard, 2/2 twill is `(e - p) mod 4 in {0, 1}`,
-the WIF and the hash round-trip losslessly on seeded random drafts, the SVG carries
-one element per cell); `--browser` drives the real page at 1280 px and at a
-390 px PHONE viewport; `--negative-control` is REQUIRED before quoting a pass from a
-changed harness (eight mutants in copies of the two modules, every anchor checked
-before any runs). **It is not in CI** — no workflow names a `weave*` path — and
-adding its tool made the two flower gates fire on its PR (the `'tools/**'` filter),
-which test flower geometry, not this.
+tie-up (the same cloth).
+**PHASE A OF THE CONSTRUCTION TOOL (single layer) is on the same state**: a YARN
+LIBRARY (name, fibre, count stored as DENIER whatever unit it was typed in — den /
+dtex / tex / Ne / Nm convert at the edges — filaments, ply, twist, an elastic flag
+with a relaxation ratio, a colour; six GENERIC starters, no maker's codes), WARP
+AND WEFT SYSTEMS (a name, an interleave ratio and a repeat of yarn × count;
+`resolveThreads()` is the ONE owner of "which yarn is this thread" and every end
+and pick resolves to one — COLOURS COME FROM YARNS, and the stripe lists are gone:
+a v=1 hash or a stripe-era WIF migrates each colour into an auto yarn), and a
+PHYSICAL panel (width in mm or in, sett per cm or per inch, crimp per direction;
+`physical()` is the ONE owner of total ends, weight per metre per system —
+den/9000 g per metre of yarn × crimp, weft picks per metre × width — the diameter
+estimate `d = sqrt(tex / (250 π ρ))` with ρ = fibre density × packing, which
+reproduces Peirce's 1/(28√Ne) inch for cotton to 1 %, and the FRACTIONAL COVER
+threads × diameter per direction, union for the total, beside Peirce's K). **The
+single-layer warning fires when a direction's cover passes 100 %** — the threads
+of that direction no longer fit side by side — with the ruled wording *too dense
+for single-layer — likely needs multiple layers*; it is a plan-area argument and
+holds for any weave. TRUE SCALE draws the drawdown at the sett at an assumed
+screen DPI (cells are not square any more: every block carries `cw`/`ch`), and
+the fabric render then draws each thread at its own estimated diameter. Exports:
+the construction sheet as PDF (jsPDF, loaded only on click from the cdnjs pin
+`cards.html` uses) and CSV, both from one `constructionSheet()`; the WIF carries
+the sett as `Spacing`, the diameters as `Thickness`, the sheet in `[NOTES]`, and
+the yarns / systems / construction in private `[EM WEAVE …]` sections it reads
+back exactly (a foreign WIF's `Spacing` becomes the sett). The hash is v=2.
+Gate: `node tools/verify-weave.mjs` — part one is Node only (24 checks: the
+drawdown identities, the lossless WIF and hash round trips over seeded drafts
+with yarn libraries and interleaved systems, the count conversions against known
+values, the weight per metre on a WORKED EXAMPLE DONE BY HAND, the legacy-hash
+migration, the warning threshold at exactly 100 %, the sheet and CSV, the WIF
+spacing, the true-scale pitch); `--browser` drives the real page at 1280 px and at
+a 390 px PHONE viewport (needs `npm i --no-save jspdf@2.5.1` for the PDF check,
+served from node_modules; it REFUSES rather than skips without it);
+`--negative-control` is REQUIRED before quoting a pass from a changed harness
+(fifteen mutants in copies of the two modules, among them one that breaks the
+denier arithmetic, every anchor checked before any runs). **It is not in CI** — no
+workflow names a `weave*` path, and since #335 narrowed the two flower gates' filters
+from `'tools/**'` to the tools they run, a weave-only PR fires no Actions workflow at
+all; the only checks on such a PR are Netlify's. Run the gate by hand before merging.
 
 ## `/bug` — the Parametric Bug (pointer only)
 
@@ -9765,9 +9796,8 @@ RIDGES raises the veins as closed strips; vein widths carry the same floor-block
 the drawn outline. Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control`
 required before quoting a pass from a changed harness) — **it runs in CI as
 `bug-gate.yml`**, path-filtered to `bug.html`, `bug*.js`, `tools/verify-bug*` and
-`tools/bug-fixtures.mjs`; the two flower gates that filter on `tools/**` carry a matching
-negation (`!tools/verify-bug*`, `!tools/bug-*`, `!tools/shot-bug-*`), so a bug-only
-change runs this workflow and nothing else. Sheets: `node tools/shot-bug-sheet.mjs <dir>`
+`tools/bug-fixtures.mjs`; the two flower gates name their own tools by file (#340 took
+them off `tools/**` on Oct 1), so a bug-only change runs this workflow and nothing else. Sheets: `node tools/shot-bug-sheet.mjs <dir>`
 (Phase 1) and `node tools/shot-bug-venation.mjs <dir>` (Phase 2); neither runs in CI.
 
 ## `/frame` — the Parametric Frame (pointer only)
@@ -9779,6 +9809,45 @@ is a SKELETON (spines) with a MOLDING PROFILE swept along it; `offsetCurve()` is
 producer of every curve parallel to a spine (the band edges, creases, hatch lines, the sill
 top the jambs stand on, the jamb and head inner edges the lights read); shading is derived
 from the profile's own normal against the registry's one fixed `LIGHT`, never painted. Phase 1
-is the arch only. Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
-quoting a pass from a changed harness; `--no-browser` for iteration). Sheet:
-`node tools/shot-frame-sheet.mjs <dir>`. Neither runs in CI — run both by hand.
+is the arch only; phase 1b carried Eva's rulings on it (intensity 1.00, line weight follows
+darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier
+threshold). Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
+quoting a pass from a changed harness; `--no-browser` for iteration) — **it runs in CI**
+(`frame.yml`, gate plus negative control). Sheet: `node tools/shot-frame-sheet.mjs <dir>`,
+by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
+they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
+runs them — the "adding a tool runs the flower gates" corollary recorded in several
+sections above is history as of Oct 1.
+
+## `/marble` — the paper-marbling simulator (pointer only)
+
+Hidden page (`marble.html`, `marble.css`, `marble.js`, `marble-math.js`, `noindex`, unlinked).
+**The engine is `marble-math.js` and its header is the governing text** — read it before touching
+any marble file. The law: every ink region is a closed polygon and every tool is a POINT FUNCTION
+of the plane — the closed-form deformations of mathematical marbling (Jaffer; Lu, Jin, Wang et al.
+2012): the ink drop `P' = C + (P−C)·sqrt(1 + r²/|P−C|²)`, the tine line `P' = P + z·2^(−|d|/c)·M`
+(z the max shift, c the distance over which it HALVES), the wavy tine (the same with `d` measured
+from a sine curve), and the circular stir (arc-length shift z on a ring of radius r). A straight
+comb composes EXACTLY as a sum, a wavy one tine by tine. **Edges stay on the true image curve
+because refinement bisects the SOURCE edge and maps the midpoint** — never a chord point — until
+every mapped edge is under `MAX_SEG`; a point budget (`POINT_BUDGET`) coarsens past it and is TOLD
+on the readout. **The sheet IS the link**: the op list lives in the URL hash, every number rounded
+to one decimal BEFORE the op is applied, so a link replays the very doubles the page used
+(bit-identical, `Object.is`, asserted in Node and across two browser pages). Undo pops a GROUP (a
+pattern is one group). Gate: `node tools/verify-marble.mjs` (37 checks; `--negative-control`
+required before quoting a pass from a changed harness, nine mutants; `--no-browser` for
+iteration). **It does not run in CI** — no workflow names a marble file, and since the frame's
+phase 1b narrowed the flower gates' filters a new tool no longer runs them either.
+**Judgment calls made without a ruling** (the sheet is 1000 × 1250 logical units, 4:5 portrait):
+drop radius 36 growing at 45/s while held, capped at 3× the slider or 300; a stroke's max shift is
+`strength × drag length` (0.6 default) rather than a fixed number, so a long rake shifts more;
+falloff 24; comb 8 tines at 40; the stir's radius is the mean radius of the pointer's path and its
+turn is the SWEPT ANGLE (a straight pull reads as a positive turn of `strength × length`); the
+palette is the seven site colours plus a custom list kept in localStorage, with "next colour
+after each drop" ON; the sheet colour is paper by default and is not an op (it recolours every
+snapshot); the stone base every raked pattern starts from covers the sheet about 1.3× (Σπr² is
+exactly the ink added, since a drop pushes ink aside without shrinking it) and runs one cell past
+every edge so a rake exposes no bare band; the bouquet is the weakest of the five by eye and its
+constants (a 9-tine comb, wave 0.55 of the spacing, z 95) are the ones to retune first; strokes
+preview as a PLAIN map (every vertex moves, none is added) and refine on commit; the random
+sequence is 36–70 drops and 2–5 strokes of every kind from the seed field.

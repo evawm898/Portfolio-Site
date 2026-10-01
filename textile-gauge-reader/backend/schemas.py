@@ -78,6 +78,10 @@ class CandidateOut(BaseModel):
     phase_consistency: Optional[float] = None  # do repeat markers land on the same local visual feature each time?
     alternating_phase_score: Optional[float] = None  # "A B A B" signature of a half-period harmonic; penalizes evidence_score
     template_match_score: Optional[float] = None  # auto-anchored template-match confirmation; see _template_match_consistency_score
+    orientation_repeat: Optional[float] = None  # signed autocorrelation of the leg-slant (signed orientation) signal at this lag
+    orientation_contrast: Optional[float] = None  # that repeat net of the repeat at the candidate's half; see _orientation_fundamental
+    orientation_dipole: Optional[float] = None  # the leg-slant field's 2D autocorrelation at half this lag: negative where the leg dipole itself flips
+    orientation_fundamental: Optional[bool] = None  # True on the member the leg-slant signal named as the stitch pitch; None when it named nobody
     evidence_score: Optional[float] = None  # weighted evidence composite BEFORE the harmonic penalty -- decides `selected`
     final_score: Optional[float] = None  # evidence_score minus the harmonic penalty (confidence-facing, not selection)
     selected: bool = False

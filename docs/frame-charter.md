@@ -27,7 +27,7 @@ before it, and ornament tuned against a skeleton that later moves is work done t
 |---|---|---|---|
 | 1 | **Skeleton** | the path: arch (one continuous pointedness; ogee and Tudor later as separate constructions), rectangle, oval; width, height, proportion; mullion count, sill | 1 (arch), 2 (rect/oval) |
 | 2 | **Molding** | one 1-D cross-section profile swept along every spine; the draggable profile editor; presets as starting points; width and depth. Grooves are a property of the profile, never an overlay | 1 |
-| 3 | **Shading** | hatching derived from the swept surface's normal against one fixed light; intensity, pitch, line weight | 1 |
+| 3 | **Shading** | hatching derived from the swept surface's normal against one fixed light; intensity, pitch, line weight — the weight FOLLOWS the darkness (1b), and cross-hatching lands only above a threshold (1b) | 1, 1b |
 | 4 | **Filigree / ornament** | C- and S-scrolls and acanthus grown from named skeleton anchors (apex, corners, base, sides), mirrored; a crest/cartouche slot; tracery heads (cusps, trefoil, quatrefoil); density and scale | 3 |
 | 5 | **Texture** | surface character on the molding: stone grain, pitting, cracks, polished sheen. Subtle by default | 4 |
 | 6 | **Overgrowth** | ivy and vines along the skeleton edges, drips. Sparkles deferred, later shared with /print | 5 |
@@ -46,7 +46,13 @@ before it, and ornament tuned against a skeleton that later moves is work done t
 4. **The shade comes from the geometry.** Darkness is `intensity × (1 − Lambert)` of the
    profile's own normal against `LIGHT`, a fixed vector in the registry. There is no
    light control, no painted gradient and no per-band tint. A flat profile is EXACTLY
-   uniform (T1, Tp1); a cove grades (T2, Tp2).
+   uniform (T1, Tp1); a cove grades (T2, Tp2). **Line weight follows that same darkness**
+   (ruling 1, phase 1b): a hatch run's stroke width is `lineWeight × hatchWeight(d)`, one
+   law in `frame-geometry.js` reading `HATCH_WEIGHT_RANGE` / `HATCH_WEIGHT_STEPS` from the
+   registry, so a flat band is one weight and a graded band several (W1, W2). **Cross-hatch
+   is a threshold on the same darkness** (ruling 6): lines across the band only where it
+   exceeds `crossHatchThreshold` — none at 1, every band at 0, a band IFF its own darkness
+   exceeds it (H1) — and the threshold is an ADVANCED-tier control (U3).
 5. **Topology is mode-free and a ladder is derived from a length.** Row counts, sample
    counts and line counts are derived from millimetres (band width over hatch pitch,
    arc step in degrees), never typed as counts.
@@ -74,12 +80,16 @@ All in `frame-geometry.js`.
 | darkness at a sample | `darknessAt(prof, i, p, nrm)` | `sweepSpine` (the hatch), `toneAcross` (the read-out and the gate) |
 | the arch's arcs | `archArcs(a, pointedness)` | `archSkeleton` (the head and every sub-arch — one law) |
 | the sub-arch spring line | solved in `archSkeleton` against `innerEdge(head)` by bisection | the mullions' top, every light's arcs |
+| the lights' boundaries | `info.lightBounds` — the jambs' `innerEdge` at the two ends (ruling 4), the mullion centrelines between | every sub-arch's half-span and centre |
+| a darkness → a stroke width | `hatchWeight(d, lineWeight)` (reads the registry's range and steps) | every hatch run and cross line (`stroke()`) |
+| a cross line | `crossHatch` — a CHORD between two of `offsetCurve`'s polylines at the profile samples bracketing the dark stretch, interpolated along the spine; stations every `hatchPitch` mm | `sweepSpine` |
 
 The gate's O1–O4 measure this table rather than recite it: jambs and mullions start on
 `innerEdge(sill)` to the double; the clear widths are equal measured from the jambs'
-inner edges to the mullions' outer edges; sub-arches spring on the centrelines at one
-height and clear `innerEdge(head)` by one mullion band; and `+ d * spine.nrm` appears
-once in the source.
+inner edges to the mullions' outer edges; sub-arches spring at one height — the outer two
+on the jambs' inner edges and the interior ones on the centrelines — and clear
+`innerEdge(head)` by one mullion band; and `+ d * spine.nrm` appears once in the source.
+H2 asks the same question of every cross line: both ends ON an offset polyline of the band.
 
 ## 5. The arch, as built
 
@@ -92,9 +102,13 @@ underside to the apex; the jambs take what the rise leaves.
 Lights: `n` mullions make `n + 1` lights of EQUAL CLEAR WIDTH (jamb inner edge to mullion
 outer edge, mullion to mullion). Each light carries a sub-arch of the same pointedness on
 its own half-span, springing on the main spring line unless its apex would come within
-one mullion band of the head's inner edge, when the sub-spring line drops. Every join is
-centreline-to-centreline, so a sub-arch's outer end is half-buried in the jamb band —
-accepted, and photographed.
+one mullion band of the head's inner edge, when the sub-spring line drops (ruling 3, 1b:
+kept). **The outer sub-arches terminate on the jambs' INNER EDGES** (ruling 4, 1b — read
+off `innerEdge(jamb)`, the boundary the clear widths already read; phase 1 ran them to the
+jamb centreline, half-buried); the interior joins are mullion centreline to centreline, so
+a sub-arch's end is half-buried in the mullion band — accepted. Consequence: the outer
+lights' sub-arches are narrower by half a mullion band than the interior ones, so their
+apexes sit lower (229.3 against 234.0 mm at the defaults).
 
 The sill is a horizontal spine at `w / 2` whose top edge is what everything stands on;
 `stepped` adds a wider, thinner spine below it.
@@ -115,11 +129,34 @@ spread thresholds, so the line count is proportional to darkness and each line r
 exactly where the tone drops under its own threshold. Creases (slope turns > 22°) get a
 drawn line; the two edges always do.
 
+**Weight (1b, ruling 1).** Every hatch run is drawn at `lineWeight × (0.5 + d)` for its
+darkness `d`, quantised onto six levels; a run SPLITS where its level changes (the boundary
+vertex is shared) so a line running from shade into light swells and thins along its
+length. The darkest line is three times the lightest; the edges stay at 1.4 × nominal.
+Default intensity is **1.00** (ruling 1). Measured on the cove's left jamb through the
+close camera, outer → inner bins of pixel ink: **0.235 / 0.235 / 0.118** against phase 1's
+0.176 / 0.118 / 0.118 at intensity 0.65 — the outer gradient reads as two lines' worth of
+ink where it read as one, and the weights on that jamb run 0.30–0.57 mm at the 0.40
+nominal. The SVG carries one `<path>` per distinct width per band (W2), so a 9-band frame
+is a few dozen paths rather than hundreds.
+
+**Cross-hatch (1b, ruling 6).** Where the darkness exceeds `crossHatchThreshold`
+(default **0.70**, Advanced tier), a line is laid ACROSS the band every `hatchPitch` mm
+along the spine, covering exactly the profile samples above the threshold — a deep cove,
+a shadowed step, a reed's shaded wall. It is a chord between two `offsetCurve` polylines
+(H2), never a second producer, and it runs out where the tone drops. At 0.70 the shipped
+default cross-hatches 6 of 9 bands (366 lines); the reeded and fluted presets, whose
+walls reach darkness 1.00, carry thousands (6,750 / 4,084) — the molding is the loudest
+element there, which ruling 2 says it must not be once filigree lands, and the sheet
+photographs it for the ruling. Perpendicular rather than at 45°, and at the hatch pitch
+rather than a pitch of its own: both are decisions without a ruling (§9).
+
 ## 7. Phase plan and review gates
 
 | phase | builds | gate to pass before the next |
 |---|---|---|
-| **1** (this) | registry, page, arch skeleton (pointedness, width, height, mullions, sill), profile editor + presets, normal-derived hatching, basic SVG download | `verify-frame.mjs` 27/27 + 6/6 mutants; contact sheet ruled by Eva on: shipped intensity, default preset, mullion width, sill proportions, the half-buried sub-arch springing |
+| **1** | registry, page, arch skeleton (pointedness, width, height, mullions, sill), profile editor + presets, normal-derived hatching, basic SVG download | `verify-frame.mjs` 27/27 + 6/6 mutants; contact sheet ruled by Eva on: shipped intensity, default preset, mullion width, sill proportions, the half-buried sub-arch springing |
+| **1b** (this) | Eva's rulings on 1: intensity 1.00, weight follows darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier threshold; the `frame` CI workflow; the flower gates' `tools/**` filters narrowed | `verify-frame.mjs` 32/32 + 11/11 mutants, in CI; the sheet's weight and threshold rows |
 | 2 | rectangle and oval skeletons through the same sweep; Gothic rectangle corners (mitred joins already exist); ogee and Tudor arch constructions | O-family extended to corners; byte partition: every arch row unmoved |
 | 3 | ornament: scroll grammar from named anchors (apex, springings, sill ends), mirrored; crest slot; tracery heads | an ownership row per anchor; loudness budget scored per preset; every scroll's root is ON an anchor to the double |
 | 4 | texture on the molding | inert at 0 (bit-identical), told where it binds |
@@ -138,9 +175,13 @@ exist in `tools/verify-bug.mjs` and would port. Not phase 1.
 Per phase, the gate is `node tools/verify-frame.mjs` (part one Node in seconds, part two
 Chromium in ~40 s; `--negative-control` runs the mutants, part one only, and says so;
 `--no-browser` for iteration) and the sheet is `node tools/shot-frame-sheet.mjs <dir>`.
-Neither runs in CI: every workflow here is path-filtered to `flower*` / `bloom*`, and
-adding a `tools/` file makes the two FLOWER gates run on a frame PR — they test flower
-geometry, and two green verify jobs are not evidence about `/frame`.
+**The gate runs in CI** (`.github/workflows/frame.yml`, since 1b): the full gate and then
+the negative control, on any PR touching the frame files, the two frame tools, the charter
+or the workflow. **A frame-only PR no longer runs the flower gates**: the two that carried
+`'tools/**'` (`flower-export-watertight`, `flower-geometry-quality`) are narrowed to the
+files they reach, proved by a picomatch simulation of every workflow's `paths` over a
+frame-only, a cards-only and a flower diff (frame → `frame.yml` alone; flower-geometry.js
+→ the five flower workflows; before: both flower gates on every frame and cards diff).
 
 Every phase owes:
 - a byte comparison against a worktree of the base commit for the rows the change
@@ -165,9 +206,26 @@ Each names what was rejected and how hard it is to undo.
 3. **Light `(−0.45, 0.55, 0.70)`**, upper-left. *Undo:* `LIGHT`, one vector.
 4. **The hatch is parallel to the spine, not across it.** Across-hatching the band would
    put the engraving's lines against the molding's grain. *Undo:* `sweepSpine`.
-5. **Default preset ogee, intensity 0.65, pitch 1.1 mm, weight 0.4 mm.** From the sheet,
-   not tuned by Eva. *Undo:* registry defaults.
+5. **Default preset ogee, pitch 1.1 mm, weight 0.4 mm.** From the sheet; **ogee and
+   intensity 1.00 are RULED now** (1b, rulings 1 and 2). *Undo:* registry defaults.
 6. **Sub-arches spring on the main spring line and drop only when the head forces it.**
-   *Undo:* the `clearanceAt` solve.
+   RULED kept (1b, ruling 3). *Undo:* the `clearanceAt` solve.
 7. **`profilePreset` reads `custom` on the first drag and never snaps back.** *Undo:*
    `markCustom` in `frame.js`.
+
+Phase 1b added, each without a ruling:
+
+8. **`HATCH_WEIGHT_RANGE = [0.5, 1.5]`, six levels.** A 3:1 swell at the pitch the hatch
+   already has; wider and the heavy lines touch at pitch 1.1 mm. *Undo:* two constants.
+9. **Cross-hatch threshold default 0.70.** Chosen so the shipped ogee crosses only on its
+   deep side (max 0.74 on the right jamb) and the cove's outer bin (0.706) just crosses,
+   while the flat band (0.30) and the light side never do. The cove's outer stretch is
+   ONE sample wide at that value, so its cross lines are dots. *Undo:* one default.
+10. **Cross lines are perpendicular to the spine and at the hatch pitch.** A 45° set and
+   an independent pitch were both considered; perpendicular is one scan direction and no
+   second constant. On a narrow dark stretch (the ogee's right jamb, three samples) it
+   reads as a rail of ticks rather than a tone — photographed on the sheet's last cell.
+   *Undo:* `crossHatch`'s endpoints and step.
+11. **The Advanced tier is one toggle button, hiding nothing from Standard.** Registry
+   `tier` field, `applyVisibility` reads it. *Undo:* `setAdvanced`.
+12. **Proportions (ruling 5) kept as shipped** — the brief left that line blank.

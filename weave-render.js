@@ -11,19 +11,44 @@
    That is the handweaving draft read "from the tie-up outward", and it is what
    WIF-based draft software draws by default.
 
+   CELLS ARE NOT SQUARE ANY MORE, BY DESIGN. Every block carries its own cell
+   width `cw` (the pitch of the ends) and cell height `ch` (the pitch of the
+   picks). In the ordinary view both are the view's `cell`. In the TRUE-SCALE
+   view the drawdown's end pitch is (10 / ends per cm) mm at the assumed screen
+   DPI and its pick pitch likewise, so a 24 x 24 per cm cloth at 96 dpi draws
+   its threads 1.57 px apart — the cloth at the size it will be. The threading
+   keeps the end pitch (it sits over the drawdown's columns) and the view's
+   cell for its shaft rows; the treadling keeps the pick pitch and the view's
+   cell for its treadle columns; the tie-up is the view's cell both ways.
+
+   COLOURS COME FROM THE YARNS: every end and every pick resolves to a yarn
+   through the model's resolveThreads(), and the bar, the drawdown and the
+   fabric view all read that one list.
+
    FABRIC VIEW: the drawdown as yarn. Every warp end and every weft pick is a
    continuous shaded bar underneath; on top, each float — a run of cells where
    one thread is over the other — is drawn as a rounded, shaded segment that
    runs from the far edge of the crossing thread before it to the near edge of
-   the one after. `yarn` is the thread's width as a fraction of the cell; what
-   is left is the gap the under-thread shows through. */
+   the one after. The thread's width is `yarn` of the cell in the ordinary
+   view; in the true-scale view it is the yarn's OWN ESTIMATED DIAMETER at the
+   screen DPI, capped at the pitch, so an open sett shows the gap the cover
+   factor says is there and a jammed one shows none. */
 
-import { PALETTE, expandStripes } from './weave-draft.js';
+import { PALETTE, threadYarns, yarnDiameterMm, physical } from './weave-draft.js';
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /* ------------------------------------------------------------------ layout */
 
-export function layout(s) {
+export function layout(s, ph) {
   const cell = s.view.cell;
+  let cellW = cell, cellH = cell, pxPerMm = 0;
+  if (s.view.trueScale) {
+    const P = ph || physical(s);
+    pxPerMm = s.view.dpi / 25.4;
+    cellW = clamp(pxPerMm * 10 / P.epcm, 1, 64);
+    cellH = clamp(pxPerMm * 10 / P.ppcm, 1, 64);
+  }
   const gap = Math.max(6, Math.round(cell * 0.7));
   const pad = 10;
   const draft = s.view.mode !== 'drawdown';
@@ -34,23 +59,24 @@ export function layout(s) {
   const y0 = pad;
   const blocks = {};
   let y = y0;
-  blocks.warpBar = { x: x0, y, cols: s.ends, rows: 1, w: s.ends * cell, h: bar };
+  const W = s.ends * cellW, H = s.picks * cellH;
+  blocks.warpBar = { x: x0, y, cols: s.ends, rows: 1, cw: cellW, ch: bar, w: W, h: bar };
   y += bar + gap;
   if (draft) {
-    blocks.threading = { x: x0, y, cols: s.ends, rows: s.shafts, w: s.ends * cell, h: s.shafts * cell };
-    blocks.tieup = { x: x0 + s.ends * cell + gap, y, cols: s.treadles, rows: s.shafts, w: s.treadles * cell, h: s.shafts * cell };
+    blocks.threading = { x: x0, y, cols: s.ends, rows: s.shafts, cw: cellW, ch: cell, w: W, h: s.shafts * cell };
+    blocks.tieup = { x: x0 + W + gap, y, cols: s.treadles, rows: s.shafts, cw: cell, ch: cell, w: s.treadles * cell, h: s.shafts * cell };
     y += s.shafts * cell + gap;
   }
-  blocks.drawdown = { x: x0, y, cols: s.ends, rows: s.picks, w: s.ends * cell, h: s.picks * cell };
-  let xr = x0 + s.ends * cell + gap;
+  blocks.drawdown = { x: x0, y, cols: s.ends, rows: s.picks, cw: cellW, ch: cellH, w: W, h: H };
+  let xr = x0 + W + gap;
   if (draft) {
-    blocks.treadling = { x: xr, y, cols: s.treadles, rows: s.picks, w: s.treadles * cell, h: s.picks * cell };
+    blocks.treadling = { x: xr, y, cols: s.treadles, rows: s.picks, cw: cell, ch: cellH, w: s.treadles * cell, h: H };
     xr += s.treadles * cell + gap;
   }
-  blocks.weftBar = { x: xr, y, cols: 1, rows: s.picks, w: bar, h: s.picks * cell };
+  blocks.weftBar = { x: xr, y, cols: 1, rows: s.picks, cw: bar, ch: cellH, w: bar, h: H };
   const width = xr + bar + pad;
-  const height = y + s.picks * cell + pad;
-  return { cell, gap, pad, labelW, labels, bar, width, height, blocks, draft,
+  const height = y + H + pad;
+  return { cell, cellW, cellH, pxPerMm, trueScale: !!s.view.trueScale, gap, pad, labelW, labels, bar, width, height, blocks, draft,
     ends: s.ends, picks: s.picks, shafts: s.shafts, treadles: s.treadles };
 }
 
@@ -64,7 +90,7 @@ const rowOfShaft = (L, sh) => L.shafts - 1 - sh;
 export function hitTest(L, x, y) {
   for (const [name, b] of Object.entries(L.blocks)) {
     if (!b || x < b.x || y < b.y || x >= b.x + b.w || y >= b.y + b.h) continue;
-    const col = Math.floor((x - b.x) / L.cell), row = Math.floor((y - b.y) / L.cell);
+    const col = Math.floor((x - b.x) / b.cw), row = Math.floor((y - b.y) / b.ch);
     const hit = { block: name, col, row };
     if (name === 'threading') { hit.end = endOfCol(L, col); hit.shaft = shaftOfRow(L, row); }
     else if (name === 'tieup') { hit.treadle = col; hit.shaft = shaftOfRow(L, row); }
@@ -86,7 +112,7 @@ export function cellCentre(L, block, idx) {
   else if (block === 'tieup') { col = idx.treadle; row = rowOfShaft(L, idx.shaft); }
   else if (block === 'treadling') { col = idx.treadle; row = idx.pick; }
   else if (block === 'drawdown') { col = colOfEnd(L, idx.end); row = idx.pick; }
-  return { x: b.x + (col + 0.5) * L.cell, y: b.y + (row + 0.5) * L.cell };
+  return { x: b.x + (col + 0.5) * b.cw, y: b.y + (row + 0.5) * b.ch };
 }
 
 /* ------------------------------------------------------------------ colour */
@@ -218,25 +244,25 @@ export function svgPainter() {
    `sum` is weave-draft.js's summary(s): the drawdown, its runs and the runs
    over the long-float bar, computed once by the caller. */
 export function paint(P, s, L, sum) {
-  const { cell } = L;
   const B = L.blocks;
   const LINE = 'rgba(237,237,232,0.14)';
-  const warpC = expandStripes(s.warp, s.ends);
-  const weftC = expandStripes(s.weft, s.picks, PALETTE.teal);
+  const warpY = threadYarns(s, 'warp', s.ends), weftY = threadYarns(s, 'weft', s.picks);
+  const warpC = warpY.map(t => t.y ? t.y.color : PALETTE.paper);
+  const weftC = weftY.map(t => t.y ? t.y.color : PALETTE.teal);
   const grid = s.view.grid;
 
   P.rect(0, 0, L.width, L.height, PALETTE.ink, 'bg');
 
   const gridLines = (b) => {
     if (!grid) return;
-    for (let c = 0; c <= b.cols; c++) P.line(b.x + c * cell, b.y, b.x + c * cell, b.y + b.h, LINE, 1);
-    for (let r = 0; r <= b.rows; r++) P.line(b.x, b.y + r * cell, b.x + b.w, b.y + r * cell, LINE, 1);
+    for (let c = 0; c <= b.cols; c++) P.line(b.x + c * b.cw, b.y, b.x + c * b.cw, b.y + b.h, LINE, 1);
+    for (let r = 0; r <= b.rows; r++) P.line(b.x, b.y + r * b.ch, b.x + b.w, b.y + r * b.ch, LINE, 1);
   };
   const markBlock = (name, b, isSet) => {
     P.group(name);
     P.rect(b.x, b.y, b.w, b.h, PALETTE.inkSoft);
     for (let r = 0; r < b.rows; r++) for (let c = 0; c < b.cols; c++) {
-      if (isSet(c, r)) P.rect(b.x + c * cell, b.y + r * cell, cell, cell, PALETTE.teal, 'mark');
+      if (isSet(c, r)) P.rect(b.x + c * b.cw, b.y + r * b.ch, b.cw, b.ch, PALETTE.teal, 'mark');
     }
     gridLines(b);
     P.endGroup();
@@ -244,10 +270,10 @@ export function paint(P, s, L, sum) {
 
   /* colour bars */
   P.group('warp-colours');
-  for (let c = 0; c < s.ends; c++) P.rect(B.warpBar.x + c * cell, B.warpBar.y, cell, B.warpBar.h, warpC[endOfCol(L, c)]);
+  for (let c = 0; c < s.ends; c++) P.rect(B.warpBar.x + c * B.warpBar.cw, B.warpBar.y, B.warpBar.cw, B.warpBar.h, warpC[endOfCol(L, c)]);
   P.endGroup();
   P.group('weft-colours');
-  for (let r = 0; r < s.picks; r++) P.rect(B.weftBar.x, B.weftBar.y + r * cell, B.weftBar.w, cell, weftC[r]);
+  for (let r = 0; r < s.picks; r++) P.rect(B.weftBar.x, B.weftBar.y + r * B.weftBar.ch, B.weftBar.w, B.weftBar.ch, weftC[r]);
   P.endGroup();
 
   if (L.draft) {
@@ -258,23 +284,27 @@ export function paint(P, s, L, sum) {
 
   /* drawdown */
   const X = B.drawdown;
+  const cw = X.cw, ch = X.ch;
   const dd = sum.dd;
   P.group('drawdown');
   if (!s.view.fabric) {
     for (let r = 0; r < s.picks; r++) for (let c = 0; c < s.ends; c++) {
       const e = endOfCol(L, c);
       const up = dd[r * s.ends + e] === 1;
-      P.rect(X.x + c * cell, X.y + r * cell, cell, cell, up ? warpC[e] : weftC[r], 'dd');
+      P.rect(X.x + c * cw, X.y + r * ch, cw, ch, up ? warpC[e] : weftC[r], 'dd');
     }
     gridLines(X);
   } else {
     P.rect(X.x, X.y, X.w, X.h, PALETTE.ink);
-    const w = cell * s.view.yarn;
-    const inset = (cell - w) / 2;
-    const r = Math.min(w / 2, inset + w * 0.35);
+    /* a thread's width: the view's fraction of the pitch, or at true scale
+       the yarn's own diameter at the screen DPI, never more than the pitch */
+    const widthOf = (t, pitch) => L.trueScale && t.y ? Math.min(pitch, yarnDiameterMm(t.y) * L.pxPerMm) : pitch * s.view.yarn;
+    const wW = warpY.map(t => widthOf(t, cw)), wF = weftY.map(t => widthOf(t, ch));
+    const insW = wW.map(w => (cw - w) / 2), insF = wF.map(w => (ch - w) / 2);
+    const rad = (w, inset) => Math.min(w / 2, inset + w * 0.35);
     /* under-threads: continuous bars */
-    for (let c = 0; c < s.ends; c++) P.yarn(X.x + c * cell + inset, X.y, w, X.h, 0, warpC[endOfCol(L, c)], 'v', 'yarn-base');
-    for (let row = 0; row < s.picks; row++) P.yarn(X.x, X.y + row * cell + inset, X.w, w, 0, weftC[row], 'h', 'yarn-base');
+    for (let c = 0; c < s.ends; c++) { const e = endOfCol(L, c); P.yarn(X.x + c * cw + insW[e], X.y, wW[e], X.h, 0, warpC[e], 'v', 'yarn-base'); }
+    for (let row = 0; row < s.picks; row++) P.yarn(X.x, X.y + row * ch + insF[row], X.w, wF[row], 0, weftC[row], 'h', 'yarn-base');
     /* on top: warp floats (column runs of up) and weft floats (row runs of down) */
     for (let c = 0; c < s.ends; c++) {
       const e = endOfCol(L, c);
@@ -282,9 +312,9 @@ export function paint(P, s, L, sum) {
       for (let p = 1; p <= s.picks; p++) {
         if (p === s.picks || dd[p * s.ends + e] !== dd[p0 * s.ends + e]) {
           if (dd[p0 * s.ends + e] === 1) {
-            const y0 = Math.max(X.y, X.y + p0 * cell - inset);
-            const y1 = Math.min(X.y + X.h, X.y + p * cell + inset);
-            P.yarn(X.x + c * cell + inset, y0, w, y1 - y0, r, warpC[e], 'v', 'yarn');
+            const y0 = Math.max(X.y, X.y + p0 * ch - (p0 > 0 ? insF[p0 - 1] : 0));
+            const y1 = Math.min(X.y + X.h, X.y + p * ch + (p < s.picks ? insF[p] : 0));
+            P.yarn(X.x + c * cw + insW[e], y0, wW[e], y1 - y0, rad(wW[e], insW[e]), warpC[e], 'v', 'yarn');
           }
           p0 = p;
         }
@@ -296,9 +326,9 @@ export function paint(P, s, L, sum) {
         const cur = c < s.ends ? dd[row * s.ends + endOfCol(L, c)] : -1;
         if (cur !== dd[row * s.ends + endOfCol(L, c0)]) {
           if (dd[row * s.ends + endOfCol(L, c0)] === 0) {
-            const x0 = Math.max(X.x, X.x + c0 * cell - inset);
-            const x1 = Math.min(X.x + X.w, X.x + c * cell + inset);
-            P.yarn(x0, X.y + row * cell + inset, x1 - x0, w, r, weftC[row], 'h', 'yarn');
+            const x0 = Math.max(X.x, X.x + c0 * cw - (c0 > 0 ? insW[endOfCol(L, c0 - 1)] : 0));
+            const x1 = Math.min(X.x + X.w, X.x + c * cw + (c < s.ends ? insW[endOfCol(L, c)] : 0));
+            P.yarn(x0, X.y + row * ch + insF[row], x1 - x0, wF[row], rad(wF[row], insF[row]), weftC[row], 'h', 'yarn');
           }
           c0 = c;
         }
@@ -312,11 +342,11 @@ export function paint(P, s, L, sum) {
     P.group('float-warnings');
     for (const run of sum.long.warp) {
       const c = colOfEnd(L, run.e);
-      P.outline(X.x + c * cell, X.y + run.p0 * cell, cell, run.len * cell, PALETTE.warn, 1.5, 0.22, 'float-warn');
+      P.outline(X.x + c * cw, X.y + run.p0 * ch, cw, run.len * ch, PALETTE.warn, 1.5, 0.22, 'float-warn');
     }
     for (const run of sum.long.weft) {
       const cmin = colOfEnd(L, run.e0 + run.len - 1);
-      P.outline(X.x + cmin * cell, X.y + run.p * cell, run.len * cell, cell, PALETTE.warn, 1.5, 0.22, 'float-warn');
+      P.outline(X.x + cmin * cw, X.y + run.p * ch, run.len * cw, ch, PALETTE.warn, 1.5, 0.22, 'float-warn');
     }
     P.endGroup();
   }
@@ -324,6 +354,7 @@ export function paint(P, s, L, sum) {
   /* labels: shaft numbers down the left of the threading, treadle numbers
      over the tie-up, only when a digit can fit in a cell */
   if (L.labels) {
+    const cell = L.cell;
     const size = Math.min(11, Math.max(8, Math.round(cell * 0.72)));
     P.group('labels');
     for (let r = 0; r < s.shafts; r++) {
