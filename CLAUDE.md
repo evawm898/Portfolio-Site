@@ -10,6 +10,7 @@ Guidance for Claude Code sessions working in this repository.
 - Each project or experiment should remain isolated on its own feature branch.
 - Open pull requests targeting `main` so Netlify can generate Deploy Previews.
 - Do not merge any PR unless explicitly instructed to merge it.
+- **Standing exception (Eva, Oct 1):** a PR that touches ONLY README/docs files may be self-merged after green CI without asking, whatever the outcome of the work it records (gate failed, acceptance failed, or passed).
 - Do not push experimental work directly to `main`.
 - Do not manually publish or trigger a production deployment unless explicitly requested.
 - During iteration, changes are reviewed through the Netlify Deploy Preview associated with the PR.
