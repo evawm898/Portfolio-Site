@@ -189,12 +189,14 @@ const E2_TURN_XFAIL = {
      ran it — seven of the eight per-petal slider states on the default
      amount-1 row exceed the allowance. A twist rotates the section OUT OF
      PLANE, which the outline's plan turn cannot see — the buckle's class. */
+  'petalTwist max (180)':
+    { excessDeg: 0.307323, note: 'IN THE DEFAULT SUBSET SINCE the headroom PR (block 1 of tools/bloom-smoke.mjs): adds 45.307323 deg; face-to-face 49.99, outline 4.68 — the twist rotates the section out of plane, the buckle\'s class, on MAIN and on the slider alone. The form-variance rows below are this class reached per petal' },
   'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)':
     { excessDeg: 73.633038, note: 'NEW at #320: adds 118.633038 deg; face-to-face 124.79, outline 6.15 — the petal at curl 233.8 x cup 0 x twist -155.9, which reads 117.64 on the sliders alone at 234 / 0 / -156' },
   'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)':
     { excessDeg: 29.408025, note: 'NEW at #320: adds 74.408025 deg; face-to-face 100.38, outline 25.97 — curl 135 x cup -0.8 x twist 90, which reads 74.408025 on the sliders alone, identical to the sixth decimal' },
   'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)':
-    { excessDeg: 24.729474, note: 'NEW at #320: adds 69.729474 deg; face-to-face 94.70, outline 24.97 — a fan petal the field has twisted, the same class as the two rows above' },
+    { excessDeg: 14.498401, note: 'NEW at #320 at 24.729474 excess (adds 69.729474 deg; face-to-face 94.70, outline 24.97 — a fan petal the field has twisted, the same class as the two rows above). RE-RECORDED by the headroom follow-up: 14.498401 — at the default the headroom scales the DOWNWARD curl (room 180 of a 270 half-span) and DOWNWARD cup (0.8 of 1.0) continuously where the old law clipped them, so the curled-under fan petals carry a different composition (twist is symmetric about its default and is not scaled); the same row\'s self-approach moved 0.620 -> 0.767 mm in the same direction' },
   /* AND IT IS NOT THE INFILL'S, WHICH IS A TWO-SIDED FACT RATHER THAN A
      READING OF THE LABEL: the plan REFUSES a blade that is several panels, and
      I2 asserts on that row that the mesh is BIT-IDENTICAL to the same state
@@ -878,8 +880,17 @@ async function control() {
      matches, and the two clauses that hold a declared row to its recorded
      excess were exercised by nothing while the run reported 5 of 5. A clause
      nobody has shown can fire is the thing this whole file exists to avoid. */
-  const declaredRow = MATRIX.find((r) => Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, r.label));
-  if (!declaredRow) { console.error('edge-profile control: no matrix row carries an E2_TURN_XFAIL label — the declaration cannot be exercised'); process.exit(1); }
+  /* NAMED, NOT "THE FIRST DECLARED ROW IN MATRIX ORDER" — which is what it
+     was until the headroom PR declared `petalTwist max (180)`, a blanket-sweep
+     row that sits BEFORE every other declaration. It became the witness, and
+     neither rim mutation moves a twist's out-of-plane turn, so E2 went MISSED
+     on two mutants in CI while the clause itself was fine. The witness is a
+     row whose declared excess the RIM LAW moves; which row that is is a
+     property, not an ordering, so it is named here and fails loudly if it
+     goes missing or stops being declared. */
+  const DECLARED = 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step';
+  const declaredRow = MATRIX.find((r) => r.label === DECLARED);
+  if (!declaredRow || !Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, DECLARED)) { console.error(`edge-profile control: "${DECLARED}" is missing from the matrix or from E2_TURN_XFAIL — E2's magnitude clause would be exercised by nothing`); process.exit(1); }
   if (!rows.some((r) => r.label === declaredRow.label)) rows.push(declaredRow);
   /* AND THE CRAMPED PETAL, OR `the-corner-fan-is-not-gated` HAS NO MUTANT.
      The same shape as the declared row above, and the same lesson one clause

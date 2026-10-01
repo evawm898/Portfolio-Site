@@ -5176,12 +5176,42 @@ predicted); the 1.0 mm bar is advisory and X2 is the gate. **THE ONE REMAINING F
 CURL-360 FOLD REACHED THROUGH THE FIELD, AND IT IS DECLARED, NOT CLAMPED** (curl 180 + 270 clamps to
 360; capping the field's reach was ruled out as a fifth typed threshold): both entries carry field-OFF
 and field-ON numbers. **THE CLAMP FLATTENS THE VARIANCE** — 30 % of petals identical at curl -180 on
-the shipping default, 50 % at a slider end — reported, awaiting its own ruling. **`curl-x-cup-x-twist`
+the shipping default, 50 % at a slider end — RULED AND FIXED by headroom scaling, the block below. **`curl-x-cup-x-twist`
 is the combination gate's first TRIPLE**: 18 extreme cells, verdict PAIR-REACHES, the field's crest
 cell at 0.076 mm where its nearest face reads 0.275; the gate reads `self` (an approach) where the
 census's 0.8771 is a fold DEPTH. §17 is the shortlist of obvious thirds for Eva. **AND THE SEPAL
 SCAN'S CONGRUENCE KEY IGNORED PER-SLOT FIELDS** (a build-1 defect, fixed): under any size or form
 field it tested one sepal for a whorl of distinct neighbourhoods.
+
+**THE CLAMP IS GONE FROM THE FIELD'S PATH: EACH SIDE'S DELTA IS SCALED BY THE ROOM ON THAT SIDE, AND
+THE COMBINATION GATE HOLDS FIVE TRIPLES** (Eva's rulings on the pinning and the shortlist, the build-2
+follow-up — read §19 and §21 of `docs/bloom-organic-variance-form-outcome.md` before touching the
+slot-term loop in `resolveRoleOverrides`, `formScaled`, FV2 or `TRIPLES`). `applied = base + A * g *
+(g >= 0 ? min(half, max - base) : min(half, base - min))`, where `base` is the role composition
+CLAMPED — the value the petal has at amount 0 (measured from an unclamped 540 the wave's sign flips
+on every inner whorl). **No threshold and no constant**, and `room >= half` is a BRANCH, so a petal
+with a full half-span of room is built from the doubles it was. **Zero petals pinned at every
+INTERIOR slider setting of every control (was 30 % at the shipping default); at a slider END half
+the petals still sit at the end, which is the law** — zero room outward — and is why `ALL MAX` is
+unmoved: at an end headroom IS the old clamp term for term. **THE CURL-360 DECLARATION WAS
+RE-RECORDED, NOT RETIRED** (4,080 -> 2,464 pairs): the room above a slider at 90 is exactly the
+half-span, so the crest petal still lands on 360 from any slider at or above 90 — headroom stops the
+field driving curl PAST 360, not TO it. `the-headroom-is-the-old-clamp` is the STANDING mutant and
+`form-clamped-twice` is RETIRED (clamping the group value first is now the law). **The four new
+triples** (`cup-x-roll-x-curl` 48 cells, `curl-x-twist-x-roll` 18, `cup-x-tipshape-x-width` 12,
+`layers-x-curl-x-innercurl` 24) take the form axes' MINIMA where they read worse AND under the bar,
+because under headroom the minima ARE the field's downward reach. **THE COMPOSED STATE CLEARS ON THE
+GATE AND FOLDS ON THE CENSUS** — `self` reads 1.222 mm where X2 reads 1,968 pairs: the fold is the
+curl-360 class, which `self` does not see on the slider alone either — and it needed a new measure
+even for that, `self-every` (every petal, not ring 0's), because `innerCurl` never reaches the
+representative petal and CG1 would refuse the axis as inert (the must-fail plants exactly that).
+**AND `self` IS BLIND TO THAT FOLD BY DEFINITION, SO A MATRIX ROW IS ITS GUARD** (Eva ruled keep `self`;
+§22). The 1,968 pairs are all WITHIN single inner petals (25 shells), each tip (u 0.7-1.0) coiled into ITS
+OWN FOOT, and `measureWall` drops the foot rows. Block 44 (`COMPOSED: 3 whorls x curl 180 x innerCurl 360`)
+is declared from birth at 1,968 / 0.4218 and the triple's entry names it; `frozen/phase48` is the 992 rows
+at `1f0b3f0`. The other three triples hide nothing beyond declared single-axis rows (census over all 78
+cells). **17 gate controls pick their witness by "first match"** (8 files); one, the edge-profile
+`CONTROL_ROWS` slice, is drifting on `main` (no cleft, fringe or lobe row reaches it) — counted, not fixed.
 
 **THE EXPORT GATE IS EIGHT SHARDS AND A VERDICT JOB, AND ITS COVERAGE IS A RECONCILIATION,
 NOT AN ASSUMPTION** (read `tools/bloom-export-shards.mjs`'s header before touching

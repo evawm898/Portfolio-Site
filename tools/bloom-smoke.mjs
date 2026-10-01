@@ -164,6 +164,15 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'DEFAULT (the shipping configuration)',
         path: 'the shipping state; every guard OFF at once — petalFormIsFlat, domeIsFlat, thicknessIsUniform, curlIsUniform, one whorl, RADIAL, the bare apex (the centre rig is retired, session 20); O1 (every shell wound outward — the petal shells were inside-out until session 36) and O2 (volume sign and ray parity agree) on the nine-shell default, and X2 (exactly zero within-shell intersecting pairs) on the census\'s own calibration state' },
+      /* THE TWIST'S OWN MAXIMUM IS HERE FOR THE EDGE-PROFILE GATE, whose
+         default row set IS this subset (one owner of "interesting rows"): it
+         adds 45.307323 deg of rim-surface turn on `main`, over E2's 45 deg
+         allowance by 0.307 deg, and CI never ran it because no smoke row
+         carried a twisted blade (docs/bloom-organic-variance-form-outcome.md
+         §18, §20). Declared there with its magnitude, so a twist that turns the
+         rim further, or stops turning it, reddens that gate. */
+      { label: 'petalTwist max (180)',
+        path: 'the blanket sweep\'s twist maximum — the petal\'s own surface rotated out of plane along its length, the class the form-variance field reaches per petal; the edge-profile gate\'s default subset reads it through this row' },
     ],
   },
   /* Blocks 2 and 3 — the centre rig's style x spread and sub-control sweeps —
@@ -964,13 +973,20 @@ export const SMOKE_BLOCKS = [
     anchor: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
     rows: [
       { label: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
-        path: "the LAW — FV0 (the registry's varianceFormPresent against the geometry's guard through the page), FV1 (every petal's term restated from the controls and its emitted azimuth), FV2 (the role table plus the term, clamped once, is what the blade was built with) and FV4 (one aliasing judgement for the shared wave)" },
+        path: "the LAW — FV0 (the registry's varianceFormPresent against the geometry's guard through the page), FV1 (every petal's term restated from the controls and its emitted azimuth), FV2 (the clamped role composition plus the term scaled by the headroom on its own side is what the blade was built with) and FV4 (one aliasing judgement for the shared wave)" },
       { label: 'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)',
         path: 'the FAN — FV3 (mirror petals carry identical terms, not vacuously), beside Z4a/Z4b/Z8 and J7' },
       { label: 'FORM VARIANCE: x 3 whorls with innerCurl 360 on curl 180 (the ONE clamp — past 360 before the slot term)',
-        path: "FV2's CLAMP-ONCE arm — the inner whorls' group curl is past 360 before the slot term, so a composition clamped twice lands a different petal curl than one clamped once" },
+        path: "FV2's HEADROOM arm — the inner whorls' group curl is past 360 before the slot term, so the room is read from the CLAMPED composition; reading it from the unclamped 540 flips the field's sign on every inner whorl" },
       { label: 'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)',
         path: "the TOLD frequency on the form field — FV4's aliased arm and FV1's law on a wave the lattice cannot draw" },
+    ],
+  },  {
+    n: 44, title: 'the composed base state — the census as a guard the combination gate cannot be',
+    anchor: 'COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)',
+    rows: [
+      { label: 'COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)',
+        path: "X1 on a state declared from birth at 1,968 pairs / 0.4218 mm — each inner-whorl petal's tip coiling back into its own foot, which the combination gate's `self` excludes by definition (measureWall drops the foot rows); this row is what the gate's layers-x-curl-x-innercurl cell points at" },
     ],
   },
 ];

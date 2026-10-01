@@ -1418,7 +1418,7 @@ function varianceLine(v) {
 /* THE FORM VARIANCE LINE (organic variance, build 2) — the amount as the
    per-petal reach of each varied control, the RANGE each control actually
    spans over the petals BUILT (read off each petal's own `applied`, never
-   recomputed here), how many petals the one clamp bit, and the ALIASED clause
+   recomputed here), how many petals the headroom held in (and how many the one clamp still bit — only a role row can put a base out of range now), and the ALIASED clause
    from the record's own threshold. Absent at amount 0. */
 function formVarianceLine(v, petalsAll) {
   if (!v) return '';
@@ -1429,12 +1429,14 @@ function formVarianceLine(v, petalsAll) {
     return `${Math.min(...xs).toFixed(d)} to ${Math.max(...xs).toFixed(d)}`;
   };
   const clamped = ps.filter((p) => p.formClamped && p.formClamped.length).length;
+  const scaled = ps.filter((p) => p.formScaled && p.formScaled.length).length;
   const cyc = `${v.frequency} cycle${v.frequency === 1 ? '' : 's'}`;
   const law = v.frequency === 0
     ? (v.fan ? 'a ramp outward from the mirror line' : `a ramp round the flower with its seam at ${v.phaseDeg.toFixed(0)}°`)
     : (v.fan ? `${cyc} per turn, even about the mirror line (phase inert)` : `${cyc} round the flower, phase ${v.phaseDeg.toFixed(0)}°`);
   const nyq = Number.isInteger(v.nyquist) ? `${v.nyquist}` : v.nyquist.toFixed(1);
   return `FORM VARIANCE ${(v.amount * 100).toFixed(0)}%: over the ${ps.length} petal${ps.length === 1 ? '' : 's'} built, curl ${span('petalSpineCurl', 0)}°, cup ${span('petalCup', 2)}, twist ${span('petalTwist', 0)}° — ${law}, cup / curl / twist offset 0° / 120° / 240° along it, on ${v.n} slots`
+       + (scaled ? ` — ${scaled} petal${scaled === 1 ? '' : 's'} held inside a control's range by the headroom on that side` : '')
        + (clamped ? ` — ${clamped} petal${clamped === 1 ? '' : 's'} CLAMPED to a control's own range` : '')
        + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
        + `\n`;
@@ -2591,7 +2593,8 @@ window.__bloomMetrics = () => ({
   varianceFormAbsent: lastFormAbsent,
   petalSlotForms: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
     roles: { role: p.role ?? null, allRole: p.allRole ?? null, slotRole: p.slotRole ?? null, petalRole: p.petalRole ?? null }, formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
-    formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null })),
+    formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null,
+    formScaled: p.formScaled ? p.formScaled.map((c) => ({ ...c })) : null })),
   /* THE VORONOI INFILL (I0-I7, and route (z)'s own subject): the BUILDER's own
      plan record — the density asked, the count ACHIEVED, the refusal word if
      there is one — so a gate holds the read-out's two tellings to the number
