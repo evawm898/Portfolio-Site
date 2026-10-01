@@ -978,7 +978,7 @@ function buildBody(acc, p, L) {
    Returns { maxDepth, thin (bool), flags } where flags[i] marks dense outline
    sample i as lying on a thin part (for the editor's red highlight). */
 export const THIN_DEPTH_FRAC = 0.5;
-const THIN_RES = 6;   // pixel = floor/6: a depth error of about a sixth of the floor against a bar of half of it
+const THIN_RES = 12;  // pixel = floor/12. At floor/6 a sharp point's tip, thinner than a pixel, was never filled and read up to 0.5 mm shallow (measured against the gate's own measure); 12 halves that at ~1.7x the build time
 
 function edt1(f, n, d, v, z) {
   let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
@@ -1256,6 +1256,16 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   const thin = thinAnalysis(scalloped, p.minDiameter);
   part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau };
   part.meta.thinFlags = Array.from(thin.flags);
+  // the same flagged runs in WORLD millimetres, just above the top face — the
+  // page draws them red over the 3D view (an overlay, never part of the mesh
+  // or of either export), so a thin pair shows red even when it is not the
+  // pair open in the editor
+  const seg = [], lift = thick / 2 + 0.02;
+  if (thin.thin) for (let i = 0; i < scalloped.length; i++) {
+    const j = (i + 1) % scalloped.length;
+    if (thin.flags[i] && thin.flags[j]) seg.push(W(scalloped[i][0], scalloped[i][1], lift), W(scalloped[j][0], scalloped[j][1], lift));
+  }
+  part.meta.thinWorld = seg;
   acc.end();
 
 }
@@ -1499,11 +1509,19 @@ export function buildBug(params) {
     wingPairs: pairs.map((s) => {
       const part = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R');
       return { index: s.index, role: s.role, linked: s.linked, repaired: s.repaired, dense: s.dense, hingeY: hinges[s.index].y,
-        hasTail: !!s.hasTail, tags: s.tags || null, thin: part.meta.thin, thinFlags: part.meta.thinFlags };
+        hasTail: !!s.hasTail, tags: s.tags || null, thin: part.meta.thin, thinFlags: part.meta.thinFlags,
+        // both wings: the right's runs and their mirror images
+        thinSegments: [...part.meta.thinWorld, ...part.meta.thinWorld.map(([x, y, z]) => [mx(x), y, z])] };
     }),
     // every pair whose DRAWN planform is narrower than the floor somewhere: the
-    // STL exporter refuses the model while this list is not empty (see exportStl)
-    floorViolations: pairs.map((s) => ({ pair: s.index, ...acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.thin })).filter((v) => v.thin),
+    // STL exporter refuses the model while this list is not empty (see exportStl).
+    // A LINKED middle pair is not drawn by anyone: it is blended from the first
+    // and last pairs, and `blendedFrom` names them so the refusal can say what
+    // to widen (or that unlinking it makes it editable).
+    floorViolations: pairs.map((s) => ({
+      pair: s.index, ...acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.thin,
+      blendedFrom: s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null,
+    })).filter((v) => v.thin),
     notes,
     positions: Float64Array.from(acc.pos),
     indices: Uint32Array.from(acc.idx),
@@ -1566,11 +1584,24 @@ export function mirrorDiff(model) {
    for the gate's own analysis of a refused model (watertightness is still
    checked on it); the page never passes it. */
 export class FloorError extends Error {}
+/* One sentence per violating pair, each ending in what to DO about it. A drawn
+   pair (first, last, the only one, or an unlinked middle one) is widened where
+   it shows red in the editor. A linked middle pair has no drawing of its own,
+   so the sentence names the two drawn pairs it is blended from and the other
+   way out: unlink it and edit it directly. */
 export function floorReason(model) {
-  return model.floorViolations.map((v) => `pair ${v.pair + 1}'s drawn outline is narrower than the ${model.params.minDiameter.toFixed(2)} mm floor (the narrow part reaches ${v.maxDepth.toFixed(2)} mm past where a floor-wide disc fits — shown red in the editor)`).join('; ');
+  const f = model.params.minDiameter.toFixed(2);
+  return model.floorViolations.map((v) => {
+    const k = v.pair + 1, how = `the narrow part reaches ${v.maxDepth.toFixed(2)} mm past where a floor-wide disc fits`;
+    if (v.blendedFrom) {
+      const [a, b] = v.blendedFrom.map((i) => i + 1);
+      return `Pair ${k} is narrower than the ${f} mm floor (${how} — shown red in the view). Pair ${k} is blended from pairs ${a} and ${b}. Widen those, or unlink pair ${k} to edit it directly.`;
+    }
+    return `Pair ${k}'s drawn outline is narrower than the ${f} mm floor (${how} — shown red in the editor and the view). Widen it there.`;
+  }).join(' ');
 }
 export function exportStl(model, opts = {}) {
-  if (model.floorViolations && model.floorViolations.length && !opts.allowBelowFloor) throw new FloorError(`STL not exported: ${floorReason(model)}. Widen it there, or lower the floor in Print.`);
+  if (model.floorViolations && model.floorViolations.length && !opts.allowBelowFloor) throw new FloorError(`STL not exported. ${floorReason(model)} Or lower the floor in Print.`);
   const P = model.positions, I = model.indices, n = I.length / 3;
   const buf = new ArrayBuffer(84 + 50 * n);
   const dv = new DataView(buf);
@@ -1691,7 +1722,7 @@ export function exportSvg(model, opts = {}) {
     const d = u.loops.map((L) => 'M' + L.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L') + 'Z').join('');
     return {
       svg: head + meta + `<!-- cut-safe: union of every part, ${u.regions} connected region(s) -->\n<path d="${d}" fill="${SVG_INK}" fill-rule="evenodd"/>\n</svg>\n`,
-      regions: u.regions, widthMm: W, heightMm: H,
+      regions: u.regions, widthMm: W, heightMm: H, frame: { x0: b.x0, y1: b.y1, margin: M },
     };
   }
   let body = '';
@@ -1708,7 +1739,7 @@ export function exportSvg(model, opts = {}) {
     const y = P[3 * v0 + 1];
     body += `<line x1="${X(x0)}" y1="${Y(y)}" x2="${X(x1)}" y2="${Y(y)}" stroke="${SVG_LINE}" stroke-width="0.15"/>\n`;
   }
-  return { svg: head + meta + body + '</svg>\n', regions: null, widthMm: W, heightMm: H };
+  return { svg: head + meta + body + '</svg>\n', regions: null, widthMm: W, heightMm: H, frame: { x0: b.x0, y1: b.y1, margin: M } };
 }
 
 /* ------------------------------------------------------------------ */

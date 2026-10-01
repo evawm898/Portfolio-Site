@@ -67,10 +67,24 @@ function partGeometry(kinds, flat) {
   return geoms;
 }
 
+// A pair whose drawn outline is narrower than the floor shows red in the VIEW
+// too, whichever pair the editor has open: its wings take a red tint and the
+// narrow runs (model.wingPairs[k].thinSegments, the builder's own) are drawn
+// on top. Both are view chrome — nothing here reaches either export.
+MAT.thinWing = new THREE.MeshStandardMaterial({ color: 0xe0a3a3, roughness: 0.5, metalness: 0, flatShading: true, side: THREE.FrontSide });
+MAT.thinLine = new THREE.LineBasicMaterial({ color: 0xe5484d, depthTest: false, transparent: true });
 function rebuildMesh() {
   for (const c of [...root.children]) { root.remove(c); c.geometry.dispose(); }
   for (const g of partGeometry(['body', 'leg', 'antenna'], false)) root.add(new THREE.Mesh(g, MAT.body));
-  for (const g of partGeometry(WING_KINDS, true)) root.add(new THREE.Mesh(g, MAT.wing));
+  const thinKinds = new Set(model.floorViolations.map((v) => `wing${v.pair + 1}`));
+  for (const kind of WING_KINDS) for (const g of partGeometry([kind], true)) root.add(new THREE.Mesh(g, thinKinds.has(kind) ? MAT.thinWing : MAT.wing));
+  const seg = model.wingPairs.flatMap((w) => w.thinSegments || []);
+  if (seg.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(Float32Array.from(seg.flat()), 3));
+    const lines = new THREE.LineSegments(g, MAT.thinLine); lines.renderOrder = 10;
+    root.add(lines);
+  }
 }
 
 function modelBox() {
@@ -486,7 +500,16 @@ cutSafeEl.addEventListener('change', () => { drawSvg(cutSafeEl.checked); writeRe
 function drawSvg(withCut) {
   const cut = withCut && cutSafeEl.checked;
   const out = exportSvg(model, { cutSafe: cut });
-  document.getElementById('svgCard').innerHTML = out.svg;
+  // The PREVIEW (never the downloaded file) also carries the floor's red runs,
+  // projected with the export's own frame, so a thin pair shows red here too.
+  const seg = model.wingPairs.flatMap((w) => w.thinSegments || []);
+  let svg = out.svg;
+  if (seg.length && out.frame) {
+    const { x0, y1, margin } = out.frame, X = (x) => (x - x0 + margin).toFixed(3), Y = (y) => (y1 - y + margin).toFixed(3);
+    let d = ''; for (let i = 0; i + 1 < seg.length; i += 2) d += `M${X(seg[i][0])} ${Y(seg[i][1])}L${X(seg[i + 1][0])} ${Y(seg[i + 1][1])}`;
+    svg = svg.replace('</svg>', `<path class="thin-preview" d="${d}" fill="none" stroke="#e5484d" stroke-width="0.9" stroke-linecap="round"/></svg>`);
+  }
+  document.getElementById('svgCard').innerHTML = svg;
   if (cut) stats.cutRegions = out.regions;
   document.getElementById('svgNote').textContent = cutSafeEl.checked
     ? (cut ? `Cut-safe: the union of every part — ${out.regions} connected region${out.regions === 1 ? '' : 's'}.` : 'Cut-safe: computing the union…')
@@ -505,7 +528,7 @@ function writeReadout() {
     + `parts <b>${model.parts.length}</b> closed shells, overlapping\n`
     + `mirror diff <b>${m}</b>\n`
     + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness, drawn wing widths)\n`
-    + (model.floorViolations.length ? `STL <b class="bad">BLOCKED</b> — ${model.floorViolations.map((v) => `pair ${v.pair + 1} narrower than the floor`).join(', ')} (red in the editor)\n` : '')
+    + (model.floorViolations.length ? `STL <b class="bad">BLOCKED</b> — ${model.floorViolations.map((v) => `pair ${v.pair + 1}${v.blendedFrom ? ` (blended from ${v.blendedFrom.map((i) => i + 1).join(' and ')})` : ''} narrower than the floor`).join(', ')} (red in the view; Get STL says what to widen)\n` : '')
     + (model.notes.length ? `notes <b>${model.notes.join('; ')}</b>\n` : '')
     + `build <b>${stats.buildMs.toFixed(0)} ms</b>`;
 }
@@ -538,6 +561,7 @@ window.__bug = {
   svg: (cutSafe = false) => exportSvg(model, { cutSafe }),
   stl: () => Array.from(exportStl(model, { allowBelowFloor: true })),   // the sheet compares bytes; the page's own button refuses
   tryStl: () => { const r = tryExportStl(); return r.ok ? { ok: true, bytes: r.bytes.length } : r; },
+  thinView: () => ({ svgRed: document.querySelectorAll('#svgCard .thin-preview').length, tinted: root.children.filter((c) => c.material === MAT.thinWing).length, redSegments: root.children.filter((c) => c.isLineSegments).reduce((n, c) => n + c.geometry.attributes.position.count / 2, 0) }),
   floor: () => ({ violations: model.floorViolations.map((v) => ({ ...v })), pairs: model.wingPairs.map((w) => ({ hasTail: w.hasTail, thin: w.thin })) }),
   tailPoints: () => { const s = window.__bug.getParams(); return s.wings.tail; },
   triangleCount: () => model.triangleCount,

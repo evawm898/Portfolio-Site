@@ -559,7 +559,7 @@ exactly.
     off/on restores the edit, insert keeps the tag, deleting below two is
     refused, the tail follows the bottom pair at 1/2/4 pairs, migration gives
     11 points drawn on the bottom pair.
-- `--negative-control`: eleven mutations, every one caught by the clause
+- `--negative-control`: eleven mutations at the time (thirteen after §6.6), every one caught by the clause
   that names it, including the two new ones — **a middle pair carries tail
   geometry** (caught by T) and **a floor violation goes unreported** (caught
   by N, and by N's "the STL exported although…" line).
@@ -584,6 +584,44 @@ check-in, and **not** this session. #326 is a draft with auto-merge off; the
 one scheduled check-in this session owns says in its own prompt that it must
 never merge #326 or mark it ready — #326 merges only after Eva approves in
 this conversation.
+
+### 6.6 Approved, with one fix: a refusal on a BLENDED pair says what to do
+
+Eva approved the tail and the block (not thickening), with one fix before
+merge. A linked middle pair has no drawing of its own, so "widen it there"
+was not actionable on it.
+
+- **The message:** each violating pair gets its own sentence. A linked middle
+  pair's reads: "Pair 2 is narrower than the 1.00 mm floor (… — shown red in
+  the view). Pair 2 is blended from pairs 1 and 3. Widen those, or unlink
+  pair 2 to edit it directly." A drawn pair (first, last, the only one, or an
+  unlinked middle one) keeps "… shown red in the editor and the view. Widen it
+  there." One closing line for all: "Or lower the floor in Print."
+  `floorViolations[i].blendedFrom` names the two drawn pairs.
+- **Red in the view, whichever pair is open in the editor:** the builder
+  emits each thin pair's narrow runs in world millimetres just above the top
+  face (`wingPairs[k].thinSegments`, both wings). The 3D view tints that
+  pair's wings red and draws those runs on top; the page's SVG preview draws
+  them in red with the export's own frame. Both are view chrome — the
+  downloaded SVG and STL bytes are unchanged by them.
+- **Gate (N):** which pairs are blended is derived from the PARAMETERS (a
+  middle pair not in `unlinked`), never from the violation record. A blended
+  pair's refusal must contain the exact sentence naming pairs 1 and N and
+  offering to unlink. A drawn pair's refusal must not call it blended. Every
+  violating pair must have red segments for the view. New row: "blended pair
+  under the floor" (`blendedThin()`: the crossing blend at 3 pairs, last pair
+  36 mm at stretch 1.6 — pair 2 at 2.08 mm past the disc, pairs 1 and 3
+  clear). Two new negative-control mutations: the refusal names no drawn
+  pairs, and a thin pair not red in the view. Both are caught by N.
+- **A builder defect found on the way:** at a floor/6 raster a sharp point's
+  tip, thinner than a pixel, was never filled, so the builder read it up to
+  0.5 mm shallower than the gate did (0.37 against 0.90 mm on one fixture).
+  `THIN_RES` is now 12. That is ~1.4× the build time (default ~23 ms,
+  tail on ~62 ms, Node). Randomize still blocks 0 of 200 bugs.
+- **Verification:** `verify-bug --seeds 120` 174/174; `--negative-control`
+  13 of 13 caught. The screenshot is `docs/img/bug-blended-refusal.png`
+  (`node tools/shot-bug-blended.mjs <out.png>`, a real click of Get STL with
+  pair 1 open in the editor).
 
 ## 7. Phase 1 as first built (#324) — superseded where §5 and §6 say so
 

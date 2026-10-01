@@ -6,7 +6,7 @@
    hindwing and tail in the editor's own [u, w] frame), NOT a photograph. The
    traced outline is a set of control points placed ON that drawing. */
 
-import { sampleOutline } from '../bug-geometry.js';
+import { sampleOutline, defaultParams } from '../bug-geometry.js';
 
 /* The editor's drawing frame (bug.js reads the same numbers): [u, w] maps to
    x right / y up, u in [-0.08, 1.28], w in [-0.9, 0.46] (room below for a tail). */
@@ -42,6 +42,18 @@ export const HAND_OUTLINES = {
    search over 300 outlines, kept as data). The gate builds it as a 3-pair bug,
    so the middle pair is exactly that mix. */
 export const CROSSING_BLEND = { first: SWALLOWTAIL_TRACE, last: [[0, 0.105], [1.051, -0.188], [0.581, -0.253], [0.787, -0.141], [0, -0.128]] };
+
+/* A LINKED middle pair below the floor while both drawn pairs clear it: the
+   crossing blend at 3 pairs, its last pair 36 mm long at stretch 1.6 (which
+   blunts that pair's own point). Pair 2 (blended, eased) reads ~2.1 mm past
+   the floor disc; pairs 1 and 3 are clear by the builder's measure. */
+export function blendedThin() {
+  const p = defaultParams(); p.wingPairs = 3;
+  p.wings.first.points = CROSSING_BLEND.first.map((q) => q.slice());
+  p.wings.last.points = CROSSING_BLEND.last.map((q) => q.slice());
+  p.wings.last.length = 36; p.wings.last.stretch = 1.6;
+  return p;
+}
 
 /* A tail drawn DELIBERATELY thinner than the floor: a neck 0.02 of the pair's
    length wide (0.4 mm on a 20 mm hindwing, against the 1.0 mm floor). */

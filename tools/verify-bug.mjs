@@ -63,12 +63,12 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models eleven ways (plus the L clause at reach 1) and requires each to be
+   --negative-control  breaks built models thirteen ways (plus the L clause at reach 1) and requires each to be
                        caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
 import * as G from '../bug-geometry.js';
-import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL } from './bug-fixtures.mjs';
+import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin } from './bug-fixtures.mjs';
 
 const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
@@ -377,7 +377,21 @@ function floorChecks(model) {
   if (gateThin && !refused) bad.push('the STL exported although a drawn outline is narrower than the floor');
   if (refused !== model.floorViolations.length > 0) bad.push(`the STL ${refused ? 'was refused' : 'exported'} while the model reports ${model.floorViolations.length} floor violation(s)`);
   if (refused && !/narrower than the .* floor/.test(reason)) bad.push(`the refusal does not say why: "${reason}"`);
-  return { worst, gateThin, refused, border, bad };
+  // WHICH pairs are blended is derived here from the PARAMETERS (a middle pair
+  // with no unlinked drawing), never read off the builder's violation record:
+  // a blended pair's sentence must name the two drawn pairs it comes from and
+  // offer unlinking; a drawn pair's must not claim a blend. Every violating
+  // pair must also be drawn red in the view (its world segments non-empty).
+  const N = model.params.wingPairs, unl = model.params.wings.unlinked || {};
+  let blended = 0;
+  for (const v of model.floorViolations) {
+    const k = v.pair + 1, isBlend = v.pair > 0 && v.pair < N - 1 && !unl[v.pair];
+    const says = `Pair ${k} is blended from pairs 1 and ${N}. Widen those, or unlink pair ${k} to edit it directly.`;
+    if (isBlend) { blended++; if (refused && !reason.includes(says)) bad.push(`pair ${k} is blended but the refusal does not say "${says}": "${reason}"`); }
+    else if (refused && reason.includes(`Pair ${k} is blended`)) bad.push(`pair ${k} is drawn but the refusal calls it blended`);
+    if (!(model.wingPairs[v.pair].thinSegments || []).length) bad.push(`pair ${k} is below the floor but nothing is drawn red for it in the view`);
+  }
+  return { worst, gateThin, refused, border, bad, blended };
 }
 
 /* ---------- T: the tail lives on the bottom pair only ---------- */
@@ -423,6 +437,7 @@ function check(label, model, opts = {}) {
   const fc = floorChecks(model);
   for (const b of fc.bad) fails.push(`N: ${b}`);
   if (opts.expectThin && !fc.gateThin) fails.push('N: the deliberately thin row is not thin by this file\'s measure (vacuous)');
+  if (opts.expectBlended && !fc.blended) fails.push('N: the blended-pair row has no blended pair below the floor (vacuous)');
   if (opts.tailIso) for (const b of tailIsolation(model, opts.tailIso)) fails.push(`T: ${b}`);
   if (opts.repaired && !model.notes.some((n) => /eased toward the nearer drawn pair/.test(n))) fails.push('I: the crossing blend was not reported repaired');
   return { label, fails, md, stl, cn, mf, sv, rc, le, fc, notes: model.notes };
@@ -554,6 +569,7 @@ function rowsFor(nseeds) {
     rows.push(['tail ON, 4 pairs, one unlinked', p, { tailIso: G.buildBug(off) }]); }
   { const p = d(); p.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL)); rows.push(['tail drawn under the floor', p, { expectThin: true }]); }
   { const p = d(); p.wingPairs = 3; p.wings.first.points = CROSSING_BLEND.first; p.wings.last.points = CROSSING_BLEND.last; rows.push(['crossing blend (3 pairs)', p, { repaired: true }]); }
+  rows.push(['blended pair under the floor', blendedThin(), { repaired: true, expectBlended: true }]);
   return rows;
 }
 
@@ -565,6 +581,7 @@ if (NEG) {
   const tail4on = G.buildBug(t4); t4.wings.tail.on = false; const tail4off = G.buildBug(t4);
   const thinP = G.defaultParams(); thinP.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL));
   const thinModel = G.buildBug(thinP);
+  const blendedModel = G.buildBug(blendedThin());
   const clone = (m) => ({ ...m, positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices), parts: m.parts.map((p) => ({ ...p, meta: { ...p.meta } })) });
   const shiftPart = (m, pred, d) => { for (const p of m.parts.filter(pred)) for (let v = p.v0; v < p.v1; v++) for (let k = 0; k < 3; k++) m.positions[3 * v + k] += d[k] * (k === 0 && p.side === 'L' ? -1 : 1); };
   const muts = [
@@ -598,9 +615,11 @@ if (NEG) {
       for (const side of ['R', 'L']) { const p = m.parts.find((q) => q.kind === 'wing2' && q.side === side); m.positions[3 * p.v0 + 1] -= 2; }
     }],
     ['a floor violation goes unreported', 'N', thinModel, { expectThin: true }, (m) => { m.floorViolations = []; }],
+    ['the blended-pair refusal names no drawn pairs', 'N', blendedModel, { expectBlended: true }, (m) => { m.floorViolations = m.floorViolations.map((v) => ({ ...v, blendedFrom: null })); }],
+    ['a thin pair is not red in the view', 'N', blendedModel, { expectBlended: true }, (m) => { m.wingPairs = m.wingPairs.map((w) => ({ ...w, thinSegments: [] })); }],
     ['untuck the legs (move out 4 mm)', 'L', tuck, { tucked: true }, (m) => shiftPart(m, (q) => q.kind === 'leg', [4, 0, 0])],
   ];
-  const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true })];
+  const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true }), check('blended thin (clean: refused)', blendedModel, { expectBlended: true })];
   let ok = clean.every((r) => !r.fails.length);
   for (const r of clean) console.log(fmt(r));
   for (const [name, clause, src, opts, fn] of muts) {
