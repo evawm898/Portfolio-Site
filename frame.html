@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Frame — Eva Maskalenko</title>
+<meta name="description" content="Parametric Frame — ornamental frames and Gothic windows: a skeleton path with a molding profile swept along it, shaded as an engraving.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="frame.css">
+</head>
+<body>
+<main class="fr-stage" id="stage" aria-label="Frame drawing">
+  <div class="fr-paper" id="paper"></div>
+</main>
+
+<header class="fr-header">
+  <a class="fr-back" href="index.html">&larr; Index</a>
+  <div class="fr-eyebrow" style="margin-top:10px">EM / FRAME</div>
+  <h1>Parametric Frame</h1>
+  <p class="fr-sub">Phase 1 — the arch skeleton, a molding profile swept along it, engraved shading from the profile's own normal. Ornament, texture and ivy are later layers.</p>
+</header>
+
+<aside class="fr-panel fr-box" aria-label="Frame controls">
+  <div class="fr-row"><button class="fr-btn" id="resetBtn">Reset</button><button class="fr-btn fr-btn--solid" id="exportSvg">Get SVG &darr;</button></div>
+  <div id="controls"></div>
+  <div class="fr-readout" id="readout"></div>
+</aside>
+
+<script type="module" src="frame.js"></script>
+</body>
+</html>

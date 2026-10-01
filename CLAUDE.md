@@ -9661,3 +9661,16 @@ Bilateral symmetry is built (right half + mirror) and checked as an exact identi
 Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control` required before
 quoting a pass from a changed harness). Sheet: `node tools/shot-bug-sheet.mjs <dir>`.
 Neither runs in CI — run both by hand.
+
+## `/frame` — the Parametric Frame (pointer only)
+
+Hidden generative page (`frame.html`, `frame.css`, `frame.js`, `frame-registry.js`,
+`frame-geometry.js`, `frame-profile-editor.js`, `noindex`, unlinked). Its governing document
+is **`docs/frame-charter.md`** — read it before touching any frame file. The law: every frame
+is a SKELETON (spines) with a MOLDING PROFILE swept along it; `offsetCurve()` is the ONE
+producer of every curve parallel to a spine (the band edges, creases, hatch lines, the sill
+top the jambs stand on, the jamb and head inner edges the lights read); shading is derived
+from the profile's own normal against the registry's one fixed `LIGHT`, never painted. Phase 1
+is the arch only. Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
+quoting a pass from a changed harness; `--no-browser` for iteration). Sheet:
+`node tools/shot-frame-sheet.mjs <dir>`. Neither runs in CI — run both by hand.
