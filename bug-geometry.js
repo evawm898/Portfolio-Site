@@ -40,151 +40,554 @@ const TUBE_SIDES = 10;
 /* A tube's floor is on its INSCRIBED radius — the polygon a printer gets —
    so the vertex radius is the floor divided by cos(pi / sides). */
 const tubeFloorR = (p) => p.minDiameter / 2 / Math.cos(Math.PI / TUBE_SIDES);
-const WING_ROWS = 44;                       // span rows (graded toward the apex)
-const WING_COLS = 12;                       // chord columns
-const WING_LEAD_SHARE = 0.35;               // chord ahead of the span line: the costa carries little chord
-const WING_ROOT_F = 0.28;                   // root chord as a fraction of the max chord
 const SCALLOP_FROM = 0.3;                   // scallops run over the outer 70% of the span
-const TAIL_AT = 0.78;                       // hindwing tail root, fraction of span
-const TAIL_ANGLE = 20 * D2R;                // tail points backward, 20 deg outward
 const BAND_DEPTH = 0.14;                    // abdomen constriction depth when banding is on
-const ABD_DEPTH_RATIO = 0.9;
-const ABD_PEAK = 0.3;                      // abdomen widest at 30% of its length                // abdomen depth / width
+const ABD_DEPTH_RATIO = 0.9;                // abdomen depth / width
+const ABD_PEAK = 0.3;                       // abdomen widest at 30% of its length
 const HEAD_DEPTH_RATIO = 0.9;
 const LEG_ROOT_FRAC = 0.44;                 // leg root DIAMETER / thorax half-width
 const ANT_ROOT_FRAC = 0.10;                 // antenna root diameter / head size
+
+/* Wings (Phase 1 revision). */
+export const MAX_WING_PAIRS = 4;
+/* The thorax lengthens with each wing pair past two, so N roots can be spread
+   along it without stacking: effective length = thoraxLength * (1 + k (N - 2)). */
+export const THORAX_PER_PAIR = 0.3;
+/* Roots are spread evenly over the middle 70% of the (lengthened) thorax. */
+const WING_ROOT_SPAN = 0.7;
+/* Centripetal Catmull-Rom (alpha 0.5): no cusps and no self-intersection inside
+   a segment (Yuksel et al. 2011) — the trap a plain cubic spline falls into. */
+const CR_ALPHA = 0.5;
+export const CR_SAMPLES = 10;               // samples per control segment
+/* Middle pairs interpolate between the first and last DENSE curves, resampled
+   by arc length with the apex (the sample farthest out along the span) aligned,
+   so the two drawn outlines need not have the same number of control points. */
+export const INTERP_SAMPLES = 48;           // per half (leading / trailing)
+const WING_SUBDIV = 2;                      // 1->4 midpoint subdivisions of the triangulated planform
+/* Editor bounds of the drawn outline, in units of the wing's own length. */
+export const OUTLINE_BOUNDS = { u: [0, 1.2], w: [-0.9, 0.46] };   // room below for a tail
+const MIN_POINT_GAP = 0.012;                // consecutive control points closer than this are refused
+const MIN_ROOT_CHORD = 0.03;                // root lead must sit this far ahead of root trail
+export const MIN_OUTLINE_POINTS = 4;        // two roots + two interior
 
 /* ------------------------------------------------------------------ */
 /* Parameter declaration — the ONE place a control is defined          */
 /* ------------------------------------------------------------------ */
 
 export const SECTIONS = [
-  { id: 'plan', label: 'Body plan', open: true },
+  { id: 'plan', label: 'Body', open: true },
   { id: 'head', label: 'Head' },
   { id: 'thorax', label: 'Thorax' },
   { id: 'abdomen', label: 'Abdomen' },
   { id: 'legs', label: 'Legs' },
   { id: 'antennae', label: 'Antennae' },
-  { id: 'wings', label: 'Wings' },
-  { id: 'pair1', label: 'Pair 1 — forewings', parent: 'wings' },
-  { id: 'pair2', label: 'Pair 2 — hindwings', parent: 'wings' },
-  { id: 'tail', label: 'Hindwing tail', parent: 'pair2' },
+  { id: 'wings', label: 'Wings', open: true },
   { id: 'print', label: 'Print' },
 ];
 
-const isInsect = (p) => p.bodyPlan === 'insect';
+const isThree = (p) => p.bodyParts === '3';
 const hasLegs = (p) => p.legPairs > 0 && p.legsVisible;
 const hasAnt = (p) => p.antennaType !== 'none';
-const has1 = (p) => p.wingPairs >= 1;
-const has2 = (p) => p.wingPairs >= 2;
 
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen) =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
 
 export const PARAM_SPEC = [
-  { id: 'bodyPlan', section: 'plan', label: 'Plan', kind: 'choice', default: 'insect',
-    options: [['insect', 'Insect — 3 part'], ['spider', 'Spider — 2 part']] },
+  { id: 'bodyParts', section: 'plan', label: 'Body parts', kind: 'choice', default: '3',
+    options: [['3', '3 — head, thorax, abdomen'], ['2', '2 — cephalothorax, abdomen']] },
   R('roundness', 'plan', 'Cross-section roundness', 1.5, 6, 0.1, 2.0, '', null),
 
-  R('headSize', 'head', 'Head size', 2, 12, 0.1, 4.2, 'mm', isInsect),
+  R('headSize', 'head', 'Head size', 2, 12, 0.1, 4.0, 'mm', isThree),
 
-  R('thoraxLength', 'thorax', 'Length', 3, 20, 0.1, 8, 'mm'),
-  R('thoraxWidth', 'thorax', 'Width', 2.5, 14, 0.1, 5.2, 'mm'),
-  R('thoraxDepth', 'thorax', 'Depth', 2.5, 14, 0.1, 5.2, 'mm'),
+  R('thoraxLength', 'thorax', 'Length', 3, 20, 0.1, 7, 'mm'),
+  R('thoraxWidth', 'thorax', 'Width', 2.5, 14, 0.1, 5, 'mm'),
+  R('thoraxDepth', 'thorax', 'Depth', 2.5, 14, 0.1, 4.6, 'mm'),
 
-  R('abdomenLength', 'abdomen', 'Length', 2, 70, 0.5, 17, 'mm'),
-  R('abdomenWidth', 'abdomen', 'Width', 1.5, 18, 0.1, 3.8, 'mm'),
-  R('abdomenTaper', 'abdomen', 'Taper', 0, 1, 0.01, 0.55),
-  R('abdomenSegments', 'abdomen', 'Segment count', 1, 12, 1, 7),
+  R('abdomenLength', 'abdomen', 'Length', 2, 70, 0.5, 15, 'mm'),
+  R('abdomenWidth', 'abdomen', 'Width', 1.5, 18, 0.1, 5, 'mm'),
+  R('abdomenTaper', 'abdomen', 'Taper', 0, 1, 0.01, 0.5),
+  R('abdomenSegments', 'abdomen', 'Segment count', 1, 12, 1, 6),
   { id: 'banding', section: 'abdomen', label: 'Banding', kind: 'bool', default: true },
 
   R('legPairs', 'legs', 'Pairs', 0, 4, 1, 3),
   { id: 'legsVisible', section: 'legs', label: 'Visible', kind: 'bool', default: true },
+  R('legReach', 'legs', 'Reach — tucked under ↔ splayed out', 0, 1, 0.01, 1, '', hasLegs),
   R('coxa', 'legs', 'Coxa', 0.5, 5, 0.1, 1.2, 'mm', hasLegs),
   R('femur', 'legs', 'Femur', 1, 20, 0.1, 5, 'mm', hasLegs),
   R('tibia', 'legs', 'Tibia', 1, 20, 0.1, 5.5, 'mm', hasLegs),
   R('tarsus', 'legs', 'Tarsus', 0.5, 15, 0.1, 4, 'mm', hasLegs),
-  R('legSplay', 'legs', 'Splay', 0, 70, 1, 35, '°', hasLegs),
+  R('legSplay', 'legs', 'Splay — fan forward / back', 0, 70, 1, 35, '°', hasLegs),
   R('legBend', 'legs', 'Joint bend', 0, 90, 1, 45, '°', hasLegs),
   R('legTaper', 'legs', 'Taper', 0, 0.9, 0.01, 0.5, '', hasLegs),
 
-  { id: 'antennaType', section: 'antennae', label: 'Type', kind: 'choice', default: 'clubbed',
+  { id: 'antennaType', section: 'antennae', label: 'Type', kind: 'choice', default: 'filiform',
     options: [['clubbed', 'Clubbed'], ['feathered', 'Feathered'], ['filiform', 'Filiform'], ['bristle', 'Bristle'], ['none', 'None']] },
-  R('antennaLength', 'antennae', 'Length', 1, 40, 0.5, 16, 'mm', hasAnt),
+  R('antennaLength', 'antennae', 'Length', 1, 40, 0.5, 10, 'mm', hasAnt),
   R('antennaCurl', 'antennae', 'Curl', -120, 180, 1, 10, '°', hasAnt),
-  R('antennaSpread', 'antennae', 'Spread', 0, 80, 1, 22, '°', hasAnt),
+  R('antennaSpread', 'antennae', 'Spread', 0, 80, 1, 25, '°', hasAnt),
 
-  R('wingPairs', 'wings', 'Pairs', 0, 2, 1, 2),
-  R('wingOverlap', 'wings', 'Overlap between pairs', 0, 1, 0.01, 0.6, '', has2),
-
-  R('w1Length', 'pair1', 'Length', 5, 60, 0.5, 34, 'mm', has1),
-  R('w1Aspect', 'pair1', 'Aspect ratio', 1, 8, 0.05, 1.7, '', has1),
-  R('w1Sweep', 'pair1', 'Sweep', -30, 70, 1, -6, '°', has1),
-  R('w1Widest', 'pair1', 'Widest point', 0.3, 0.9, 0.01, 0.74, '', has1),
-  R('w1Apex', 'pair1', 'Apex roundness', 0.6, 3, 0.05, 1.6, '', has1),
-  R('w1Scallop', 'pair1', 'Scallop depth', 0, 0.4, 0.01, 0, '', has1),
-  R('w1ScallopCount', 'pair1', 'Scallop count', 2, 12, 1, 6, '', (p) => has1(p) && p.w1Scallop > 0),
-  R('w1Thickness', 'pair1', 'Thickness (STL)', 0.6, 4, 0.05, 1.2, 'mm', has1),
-  R('w1Dihedral', 'pair1', 'Tilt — dihedral', -60, 80, 1, 15, '°', has1),
-  R('w1Pitch', 'pair1', 'Tilt — pitch', -45, 45, 1, 0, '°', has1),
-
-  R('w2Size', 'pair2', 'Size ratio to pair 1', 0.3, 1.3, 0.01, 0.82, '', has2),
-  R('w2Aspect', 'pair2', 'Aspect ratio', 1, 8, 0.05, 1.25, '', has2),
-  R('w2Sweep', 'pair2', 'Sweep', -30, 70, 1, 42, '°', has2),
-  R('w2Widest', 'pair2', 'Widest point', 0.3, 0.9, 0.01, 0.6, '', has2),
-  R('w2Apex', 'pair2', 'Apex roundness', 0.6, 3, 0.05, 2.2, '', has2),
-  R('w2Scallop', 'pair2', 'Scallop depth', 0, 0.4, 0.01, 0.12, '', has2),
-  R('w2ScallopCount', 'pair2', 'Scallop count', 2, 12, 1, 6, '', (p) => has2(p) && p.w2Scallop > 0),
-  R('w2Thickness', 'pair2', 'Thickness (STL)', 0.6, 4, 0.05, 1.2, 'mm', has2),
-  R('w2Dihedral', 'pair2', 'Tilt — dihedral', -60, 80, 1, 10, '°', has2),
-  R('w2Pitch', 'pair2', 'Tilt — pitch', -45, 45, 1, 0, '°', has2),
-  R('tailLength', 'tail', 'Length', 0, 30, 0.5, 9, 'mm', has2),
-  R('tailWidth', 'tail', 'Width', 0.5, 6, 0.1, 2.4, 'mm', (p) => has2(p) && p.tailLength > 0),
-  R('tailClub', 'tail', 'Club', 0, 1, 0.01, 0.5, '', (p) => has2(p) && p.tailLength > 0),
+  R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
 
   R('minDiameter', 'print', 'Min feature diameter (STL floor)', 0.6, 2, 0.05, MIN_DIAMETER_DEFAULT, 'mm'),
 ];
 
-export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
+/* Per-pair wing fields. The drawn OUTLINE is the base shape; these are applied
+   on top of it: stretch (chord scale) and sweep (in-plane rotation) transform
+   the drawn curve, scallop / thickness / tilt are as before. */
+const WR = (id, label, min, max, step, def, unit = '', visibleWhen = null) => ({ id, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
+export const WING_FIELDS = [
+  WR('length', 'Length (span)', 5, 60, 0.5, 26, 'mm'),
+  WR('stretch', 'Stretch — chord scale of the drawn curve', 0.3, 3, 0.01, 1),
+  WR('sweep', 'Sweep — rotation of the drawn curve', -30, 70, 1, 0, '°'),
+  WR('scallop', 'Scallop depth', 0, 0.4, 0.01, 0),
+  WR('scallopCount', 'Scallop count', 2, 12, 1, 6, '', (w) => w.scallop > 0),
+  WR('thickness', 'Thickness (STL)', 0.6, 4, 0.05, 1.2, 'mm'),
+  WR('dihedral', 'Tilt — dihedral', -60, 80, 1, 12, '°'),
+  WR('pitch', 'Tilt — pitch', -45, 45, 1, 0, '°'),
+];
 
-/* ------------------------------------------------------------------ */
-/* Presets — readable deltas over DEFAULTS                              */
-/* ------------------------------------------------------------------ */
-
-export const PRESETS = {
-  butterfly: {},                                     // the defaults ARE the butterfly
-  moth: {
-    headSize: 4.2, thoraxLength: 8.5, thoraxWidth: 7, thoraxDepth: 6.5,
-    abdomenLength: 17, abdomenWidth: 5.6, abdomenTaper: 0.45, abdomenSegments: 8, roundness: 2.2,
-    femur: 4.5, tibia: 4.5, tarsus: 3.5, legSplay: 40, legBend: 50,
-    antennaType: 'feathered', antennaLength: 12, antennaCurl: -15, antennaSpread: 34,
-    w1Length: 30, w1Aspect: 2.5, w1Sweep: 26, w1Widest: 0.86, w1Apex: 1.05, w1Dihedral: 6,
-    w2Size: 0.72, w2Aspect: 1.55, w2Sweep: 38, w2Widest: 0.62, w2Apex: 2.6, w2Scallop: 0,
-    w2Dihedral: 4, tailLength: 0, wingOverlap: 0.75,
+/* The neutral default: a plain rounded forewing and a shorter, rounder hindwing
+   swept back. Not any named insect. Points are [u, w]: u along the span from the
+   root (units of the wing's length), w along the chord, + = toward the head.
+   First and last points are the ROOT LEAD and ROOT TRAIL, pinned at u = 0. */
+export const DEFAULT_WINGS = {
+  first: {
+    points: [[0, 0.09], [0.34, 0.17], [0.78, 0.14], [1.0, 0.0], [0.82, -0.17], [0.4, -0.22], [0, -0.1]],
+    length: 26, stretch: 1, sweep: 0, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 12, pitch: 0,
   },
-  dragonfly: {
-    headSize: 7.2, thoraxLength: 10, thoraxWidth: 6, thoraxDepth: 7.5,
-    abdomenLength: 52, abdomenWidth: 3.0, abdomenTaper: 0.3, abdomenSegments: 10, roundness: 2.0,
-    coxa: 1, femur: 3.5, tibia: 4, tarsus: 2.5, legSplay: 30, legBend: 55,
-    antennaType: 'bristle', antennaLength: 3, antennaCurl: 0, antennaSpread: 30,
-    w1Length: 42, w1Aspect: 6.2, w1Sweep: -4, w1Widest: 0.55, w1Apex: 2.0, w1Dihedral: 2, w1Pitch: 4,
-    w2Size: 0.98, w2Aspect: 4.6, w2Sweep: 6, w2Widest: 0.36, w2Apex: 2.0, w2Scallop: 0,
-    w2Dihedral: 2, w2Pitch: 4, tailLength: 0, wingOverlap: 0.15,
+  last: {
+    points: [[0, 0.08], [0.4, 0.2], [0.85, 0.12], [1.0, -0.06], [0.72, -0.28], [0.3, -0.26], [0, -0.09]],
+    length: 20, stretch: 1, sweep: 32, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 8, pitch: 0,
   },
-  spider: {
-    bodyPlan: 'spider', roundness: 2.0,
-    thoraxLength: 10, thoraxWidth: 9, thoraxDepth: 5.5,
-    abdomenLength: 15, abdomenWidth: 12, abdomenTaper: 0.15, abdomenSegments: 1, banding: false,
-    legPairs: 4, coxa: 2, femur: 12, tibia: 11, tarsus: 9, legSplay: 52, legBend: 62, legTaper: 0.6,
-    antennaType: 'none', wingPairs: 0,
-  },
+  unlinked: {},
+  tail: null,           // set below, once STARTER_TAIL exists
 };
 
-export function presetParams(name) {
-  return { ...DEFAULTS, ...PRESETS[name] };
+export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
+DEFAULTS.wings = DEFAULT_WINGS;   // .tail filled in after STARTER_TAIL (below)
+
+export const defaultParams = () => clone(DEFAULTS);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+/* ------------------------------------------------------------------ */
+/* Curve math: the drawn outline                                        */
+/* ------------------------------------------------------------------ */
+
+/* Centripetal Catmull-Rom through the control points (an OPEN chain from root
+   lead to root trail), with mirrored phantom points at both ends so the curve
+   passes through every control point, the roots included. Returns the dense
+   polyline, control points included exactly. */
+export function sampleOutline(points, per = CR_SAMPLES) {
+  const n = points.length;
+  const P = [sub2(mul2(points[0], 2), points[1]), ...points, sub2(mul2(points[n - 1], 2), points[n - 2])];
+  const out = [points[0].slice()];
+  for (let i = 1; i < n; i++) {
+    const p0 = P[i - 1], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2];
+    const t0 = 0;
+    const t1 = t0 + Math.max(1e-9, Math.pow(dist2(p0, p1), CR_ALPHA));
+    const t2 = t1 + Math.max(1e-9, Math.pow(dist2(p1, p2), CR_ALPHA));
+    const t3 = t2 + Math.max(1e-9, Math.pow(dist2(p2, p3), CR_ALPHA));
+    for (let k = 1; k <= per; k++) {
+      if (k === per) { out.push(p2.slice()); break; }
+      const t = t1 + ((t2 - t1) * k) / per;
+      const A1 = lerp2(p0, p1, (t - t0) / (t1 - t0));
+      const A2 = lerp2(p1, p2, (t - t1) / (t2 - t1));
+      const A3 = lerp2(p2, p3, (t - t2) / (t3 - t2));
+      const B1 = lerp2(A1, A2, (t - t0) / (t2 - t0));
+      const B2 = lerp2(A2, A3, (t - t1) / (t3 - t1));
+      out.push(lerp2(B1, B2, (t - t1) / (t2 - t1)));
+    }
+  }
+  return out;
+}
+const sub2 = (a, b) => [a[0] - b[0], a[1] - b[1]];
+const mul2 = (a, s) => [a[0] * s, a[1] * s];
+const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+/* Is the CLOSED polygon simple? Every pair of non-adjacent edges is tested for
+   intersection or touching; adjacent edges for folding back on themselves.
+   O(n^2) — n is a few hundred, run per drag event. */
+export function polygonSimple(poly) {
+  const n = poly.length;
+  if (n < 3) return false;
+  const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const onSeg = (a, b, c) => Math.min(a[0], b[0]) - 1e-12 <= c[0] && c[0] <= Math.max(a[0], b[0]) + 1e-12 && Math.min(a[1], b[1]) - 1e-12 <= c[1] && c[1] <= Math.max(a[1], b[1]) + 1e-12;
+  const inter = (p1, p2, p3, p4) => {
+    const d1 = orient(p3, p4, p1), d2 = orient(p3, p4, p2), d3 = orient(p1, p2, p3), d4 = orient(p1, p2, p4);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+    if (d1 === 0 && onSeg(p3, p4, p1)) return true;
+    if (d2 === 0 && onSeg(p3, p4, p2)) return true;
+    if (d3 === 0 && onSeg(p1, p2, p3)) return true;
+    if (d4 === 0 && onSeg(p1, p2, p4)) return true;
+    return false;
+  };
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n];
+    if (a[0] === b[0] && a[1] === b[1]) return false;
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) {
+        // adjacent: they share a vertex; reject only a fold-back (collinear, overlapping)
+        const c = j === i + 1 ? poly[(j + 1) % n] : poly[n - 1];
+        const s = j === i + 1 ? b : a, o = j === i + 1 ? a : b;
+        const cr = orient(o, s, c);
+        if (cr === 0 && ((s[0] - o[0]) * (c[0] - s[0]) + (s[1] - o[1]) * (c[1] - s[1])) < 0) return false;
+        continue;
+      }
+      if (inter(a, b, poly[j], poly[(j + 1) % n])) return false;
+    }
+  }
+  return true;
 }
 
-/* mulberry32 — the page's "random" button and the contact sheet share it. */
+/* CLEARANCE: simple is not enough. An outline that nearly touches itself is
+   simple and still pinches the wing into a neck a printer cannot hold, and a
+   cut-safe raster splits there (the first interpolation repair, which eased
+   only to "just simple", left a 0.012 mm neck and a 3-region cut file). Every
+   point must stand at least OUTLINE_CLEARANCE (units of the wing's length) from
+   every part of the outline more than 4x that away along the curve. A sharp
+   tip passes down to an included angle of about 29 degrees. */
+export const OUTLINE_CLEARANCE = 0.008;
+/* It was 0.015 until the drawn-width FLOOR existed (PR #326, second ruling).
+   With a real floor in millimetres, clearance only has to keep an outline from
+   nearly touching itself; a narrow-but-real feature (a thin tail neck) must be
+   drawable so the floor can show it red and refuse the STL. At 0.015 a 0.4 mm
+   neck on a 20 mm wing could not be drawn at all — the editor blocked it as a
+   pinch before the floor ever saw it. */
+export function polygonClear(poly, c = OUTLINE_CLEARANCE) {
+  const n = poly.length, cum = [0];
+  for (let i = 1; i <= n; i++) cum.push(cum[i - 1] + dist2(poly[i - 1], poly[i % n]));
+  const per = cum[n], sep = 4 * c;
+  for (let i = 0; i < n; i++) {
+    const p = poly[i];
+    for (let j = 0; j < n; j++) {
+      // arc distance from point i to segment j (its nearer end), the shorter way round
+      const d0 = Math.abs(cum[j] - cum[i]), d1 = Math.abs(cum[j + 1] - cum[i]);
+      const arc = Math.min(Math.min(d0, per - d0), Math.min(d1, per - d1));
+      if (arc <= sep) continue;
+      const a = poly[j], b = poly[(j + 1) % n], ab = sub2(b, a), L2 = ab[0] * ab[0] + ab[1] * ab[1] || 1e-12;
+      const t = clamp(((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2, 0, 1);
+      if (dist2(p, lerp2(a, b, t)) < c) return false;
+    }
+  }
+  return true;
+}
+const outlineOk = (dense) => polygonSimple(dense) && polygonClear(dense);   // last->first edge IS the root chord
+
+/* Validity of a control-point outline: the rule the editor enforces on every
+   drag, add and delete, and the rule a loaded file must pass. */
+export function outlineValid(points) {
+  if (!Array.isArray(points) || points.length < MIN_OUTLINE_POINTS) return { ok: false, reason: `needs at least ${MIN_OUTLINE_POINTS} points` };
+  for (const q of points) if (!Array.isArray(q) || q.length !== 2 || !Number.isFinite(q[0]) || !Number.isFinite(q[1])) return { ok: false, reason: 'a point is not a number pair' };
+  const n = points.length;
+  if (points[0][0] !== 0 || points[n - 1][0] !== 0) return { ok: false, reason: 'the root points must sit at u = 0' };
+  if (points[0][1] - points[n - 1][1] < MIN_ROOT_CHORD) return { ok: false, reason: 'the root lead must sit ahead of the root trail' };
+  const { u, w } = OUTLINE_BOUNDS;
+  for (const [a, b] of points) if (a < u[0] - 1e-9 || a > u[1] + 1e-9 || b < w[0] - 1e-9 || b > w[1] + 1e-9) return { ok: false, reason: 'a point is outside the drawing area' };
+  for (let i = 0; i + 1 < n; i++) if (dist2(points[i], points[i + 1]) < MIN_POINT_GAP) return { ok: false, reason: 'two neighbouring points coincide' };
+  const dense = sampleOutline(points);
+  if (!polygonSimple(dense)) return { ok: false, reason: 'the outline would cross itself' };
+  if (!polygonClear(dense)) return { ok: false, reason: 'the outline would pinch (nearly touch itself)' };
+  return { ok: true };
+}
+
+const clampOutlinePoint = (q, root) => {
+  const { u, w } = OUTLINE_BOUNDS;
+  return [root ? 0 : clamp(q[0], u[0], u[1]), clamp(q[1], w[0], w[1])];
+};
+
+/* Editor operations. Each returns { ok, points, reason }: an operation that
+   would make the outline invalid (a self-crossing above all) is BLOCKED — the
+   points come back unchanged. The editor shows the reason. */
+export function moveControlPoint(points, i, q) {
+  const next = points.map((p) => p.slice());
+  next[i] = clampOutlinePoint(q, i === 0 || i === points.length - 1);
+  const v = outlineValid(next);
+  return v.ok ? { ok: true, points: next } : { ok: false, points, reason: v.reason };
+}
+export function insertControlPoint(points, q) {
+  // insert into the control segment whose curve passes nearest q
+  const dense = sampleOutline(points);
+  let best = Infinity, seg = 0;
+  for (let k = 0; k + 1 < dense.length; k++) {
+    const a = dense[k], b = dense[k + 1];
+    const ab = sub2(b, a), L2 = ab[0] * ab[0] + ab[1] * ab[1] || 1e-12;
+    const t = clamp(((q[0] - a[0]) * ab[0] + (q[1] - a[1]) * ab[1]) / L2, 0, 1);
+    const d = dist2(q, lerp2(a, b, t));
+    if (d < best) { best = d; seg = Math.floor(k / CR_SAMPLES); }
+  }
+  const next = points.map((p) => p.slice());
+  next.splice(seg + 1, 0, clampOutlinePoint(q, false));
+  const v = outlineValid(next);
+  return v.ok ? { ok: true, points: next, index: seg + 1 } : { ok: false, points, reason: v.reason };
+}
+export function deleteControlPoint(points, i) {
+  if (i === 0 || i === points.length - 1) return { ok: false, points, reason: 'the root points cannot be deleted' };
+  const next = points.filter((_, k) => k !== i);
+  const v = outlineValid(next);
+  return v.ok ? { ok: true, points: next } : { ok: false, points, reason: v.reason };
+}
+
+/* Resample a dense open curve to 2M+1 points by arc length, apex aligned: the
+   leading half (root lead -> apex) and the trailing half (apex -> root trail)
+   are resampled separately, so two outlines with different point counts — and
+   different apex positions along their arc — correspond apex to apex. */
+export function resampleApexAligned(dense, M = INTERP_SAMPLES) {
+  let apex = 0;
+  for (let k = 1; k < dense.length; k++) if (dense[k][0] > dense[apex][0]) apex = k;
+  const half = (pts) => {
+    const cum = [0];
+    for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + dist2(pts[k - 1], pts[k]));
+    const L = cum[cum.length - 1], out = [];
+    let j = 0;
+    for (let m = 0; m <= M; m++) {
+      const s = (L * m) / M;
+      while (j + 1 < cum.length - 1 && cum[j + 1] < s) j++;
+      const seg = cum[j + 1] - cum[j] || 1;
+      out.push(m === M ? pts[pts.length - 1].slice() : lerp2(pts[j], pts[j + 1], (s - cum[j]) / seg));
+    }
+    out[0] = pts[0].slice();
+    return out;
+  };
+  const a = half(dense.slice(0, apex + 1)), b = half(dense.slice(apex));
+  return a.concat(b.slice(1));
+}
+
+/* A middle pair's dense outline: the first and last pairs' curves, resampled
+   apex-aligned, mixed at t. If the mix crosses itself (two simple outlines can
+   blend into a crossing one), it is REPAIRED by easing t toward the nearer drawn
+   pair until it is simple AND clear (see OUTLINE_CLEARANCE) — reported, never
+   silent. */
+export function interpolatedOutline(firstPts, lastPts, t) {
+  const A = resampleApexAligned(sampleOutline(firstPts));
+  const B = resampleApexAligned(sampleOutline(lastPts));
+  const mix = (s) => A.map((a, k) => [a[0] + (B[k][0] - a[0]) * s, a[1] + (B[k][1] - a[1]) * s]);
+  let c = mix(t);
+  if (outlineOk(c)) return { dense: c, tUsed: t, repaired: false };
+  const end = t < 0.5 ? 0 : 1;
+  let good = end, bad = t;                       // the endpoint passes: it is a validated drawn outline
+  for (let k = 0; k < 30; k++) { const m = (good + bad) / 2; if (outlineOk(mix(m))) good = m; else bad = m; }
+  return { dense: mix(good), tUsed: good, repaired: true };
+}
+
+/* Control points that reproduce a dense curve: used when a middle pair is
+   UNLINKED, so it starts from exactly what was on screen. K points, apex kept. */
+export function controlPointsFromDense(dense, K) {
+  let apex = 0;
+  for (let k = 1; k < dense.length; k++) if (dense[k][0] > dense[apex][0]) apex = k;
+  const lenOf = (pts) => pts.reduce((s, p, i) => (i ? s + dist2(pts[i - 1], p) : 0), 0);
+  const La = lenOf(dense.slice(0, apex + 1)), Lb = lenOf(dense.slice(apex));
+  const interior = Math.max(2, K - 2);                       // apex + others
+  const na = clamp(Math.round(((interior - 1) * La) / (La + Lb)), 0, interior - 1);
+  const nb = interior - 1 - na;
+  const pick = (pts, n) => {                                  // n points strictly inside pts, by arc length
+    const cum = [0];
+    for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + dist2(pts[k - 1], pts[k]));
+    const L = cum[cum.length - 1], out = [];
+    for (let m = 1; m <= n; m++) {
+      const s = (L * m) / (n + 1);
+      let j = 0; while (j + 1 < cum.length - 1 && cum[j + 1] < s) j++;
+      out.push(lerp2(pts[j], pts[j + 1], (s - cum[j]) / (cum[j + 1] - cum[j] || 1)));
+    }
+    return out;
+  };
+  const r = (q) => [+q[0].toFixed(4), +q[1].toFixed(4)];
+  const pts = [[0, dense[0][1]], ...pick(dense.slice(0, apex + 1), na), dense[apex], ...pick(dense.slice(apex), nb), [0, dense[dense.length - 1][1]]].map(r);
+  pts[0][0] = 0; pts[pts.length - 1][0] = 0;
+  return pts;
+}
+
+/* ------------------------------------------------------------------ */
+/* The TAIL: a tagged group of control points in the BOTTOM pair's outline */
+/* ------------------------------------------------------------------ */
+
+/* Eva's ruling (PR #326): the hindwing tail is part of the wing OUTLINE, not a
+   separate solid, behind a TAIL toggle on the BOTTOM pair only (the last pair,
+   or the only pair of one). The tail is stored ONCE, at the wings level:
+     wings.tail = { on, anchorU, points }
+   - `points` are OFFSETS (units of the bottom pair's length) from the ANCHOR —
+     the point where the trailing edge crosses u = anchorU — in the MARGIN'S
+     OWN FRAME: [a, b] = a along the trailing edge (toward the root), b along
+     its outward normal. Ordered from the outer side of the tail, round its
+     end, back to the inner side. (Plain (u, w) offsets were tried first: a
+     tail moved to a pair whose margin slopes differently had its roots land
+     INSIDE the wing and was refused — the margin frame keeps it hanging off
+     the edge on any pair.)
+   - The bottom pair's own control points (`base`) never contain the tail. The
+     outline the builder draws is composed: base up to the anchor's control
+     segment, then the tail points (anchor + offset), then the rest of base.
+   This is the tag, structurally: a tail point can only exist in `tail.points`,
+   so OFF drops exactly those and nothing else, ON brings back the edited group
+   (it was never deleted), a base edit cannot absorb a tail point, and the
+   first<->last blend reads `first.points` / `last.points` — the tail-less
+   bases — so a middle pair cannot inherit any part of a tail. Changing the pair
+   count moves the group with its edits, because it belongs to no pair: it is
+   composed onto whichever pair is the bottom one, at the same anchorU. */
+export const STARTER_TAIL = {
+  on: false,
+  anchorU: 0.6,
+  // spatulate swallowtail, [along, outward]: a neck 0.08 wide widening to a rounded paddle
+  points: [[-0.05, -0.005], [-0.075, 0.13], [-0.085, 0.25], [-0.14, 0.31], [-0.13, 0.4], [-0.06, 0.44], [0.005, 0.36], [-0.005, 0.25], [0.005, 0.13], [0.045, -0.005]],
+};
+export const MIN_TAIL_POINTS = 2;
+DEFAULT_WINGS.tail = JSON.parse(JSON.stringify(STARTER_TAIL));
+
+/* The anchor on a base outline: where its TRAILING half (apex -> root trail)
+   first reaches u = anchorU, and the base control segment that holds it. */
+export function tailAnchor(base, anchorU) {
+  const dense = sampleOutline(base);
+  let apex = 0; for (let k = 1; k < dense.length; k++) if (dense[k][0] > dense[apex][0]) apex = k;
+  const u = clamp(anchorU, dense[dense.length - 1][0], dense[apex][0]);
+  let j = apex;
+  while (j + 1 < dense.length - 1 && dense[j + 1][0] > u) j++;
+  const a = dense[j], b = dense[j + 1], t = b[0] === a[0] ? 0 : (u - a[0]) / (b[0] - a[0]);
+  // the margin's frame there: tangent along the curve's own direction (apex ->
+  // root trail), outward normal = the tangent turned a quarter clockwise-out
+  // (the outline runs clockwise in (u, w))
+  const j0 = Math.max(0, j - 2), j1 = Math.min(dense.length - 1, j + 3);
+  const tx = dense[j1][0] - dense[j0][0], ty = dense[j1][1] - dense[j0][1], tl = Math.hypot(tx, ty) || 1;
+  const T = [tx / tl, ty / tl], N = [-T[1], T[0]];
+  return { point: lerp2(a, b, clamp(t, 0, 1)), seg: Math.min(base.length - 2, Math.floor(j / CR_SAMPLES)), T, N };
+}
+const fromFrame = (A, [a, b]) => [A.point[0] + a * A.T[0] + b * A.N[0], A.point[1] + a * A.T[1] + b * A.N[1]];
+const toFrame = (A, q) => { const d = [q[0] - A.point[0], q[1] - A.point[1]]; return [d[0] * A.T[0] + d[1] * A.T[1], d[0] * A.N[0] + d[1] * A.N[1]]; };
+
+/* Compose the drawn outline: base, or base with the tail group spliced in.
+   Returns the points and a parallel tag array ('base' | 'tail') with each
+   point's index in its own group. */
+export function composeOutline(base, tail) {
+  if (!tail || !tail.on || !tail.points.length) return { points: base.map((q) => q.slice()), tags: base.map((_, i) => ['base', i]), anchor: null };
+  const A = tailAnchor(base, tail.anchorU);
+  const tp = tail.points.map((ab) => fromFrame(A, ab));
+  const points = [...base.slice(0, A.seg + 1).map((q) => q.slice()), ...tp, ...base.slice(A.seg + 1).map((q) => q.slice())];
+  const tags = [...base.slice(0, A.seg + 1).map((_, i) => ['base', i]), ...tp.map((_, i) => ['tail', i]), ...base.slice(A.seg + 1).map((_, i) => ['base', A.seg + 1 + i])];
+  return { points, tags, anchor: A };
+}
+
+/* Editor operations on the BOTTOM pair with its tail: they act on the composed
+   outline the editor shows, write back into base or tail by tag, and are
+   validated on the composed outline that WOULD result. A base edit keeps the
+   tail's offsets, so the tail rides the margin it hangs from. */
+export function moveComposed(base, tail, i, q) {
+  const c = composeOutline(base, tail), [kind, j] = c.tags[i];
+  if (kind === 'tail') {
+    const nt = { ...tail, points: tail.points.map((p) => p.slice()) };
+    const qq = clampOutlinePoint(q, false);
+    nt.points[j] = toFrame(c.anchor, qq);
+    const v = outlineValid(composeOutline(base, nt).points, true);
+    return v.ok ? { ok: true, base, tail: nt } : { ok: false, base, tail, reason: v.reason };
+  }
+  const nb = base.map((p) => p.slice());
+  nb[j] = clampOutlinePoint(q, j === 0 || j === base.length - 1);
+  const vb = outlineValid(nb);
+  if (!vb.ok) return { ok: false, base, tail, reason: vb.reason };
+  const v = outlineValid(composeOutline(nb, tail).points, true);
+  return v.ok ? { ok: true, base: nb, tail } : { ok: false, base, tail, reason: v.reason };
+}
+export function insertComposed(base, tail, q) {
+  const c = composeOutline(base, tail);
+  const r = insertControlPoint(c.points, q, true);
+  if (!r.ok) return { ok: false, base, tail, reason: r.reason };
+  const i = r.index;                                   // the new point sits between c.points[i-1] and c.points[i]
+  const before = c.tags[i - 1], after = c.tags[i];
+  if (before[0] === 'tail' && after && after[0] === 'tail') {
+    const nt = { ...tail, points: tail.points.map((p) => p.slice()) };
+    nt.points.splice(after[1], 0, toFrame(c.anchor, r.points[i]));
+    return { ok: true, base, tail: nt, index: i };
+  }
+  // a base point: its base index is the count of base points before it
+  const bi = c.tags.slice(0, i).filter((t) => t[0] === 'base').length;
+  const nb = base.map((p) => p.slice()); nb.splice(bi, 0, r.points[i].slice());
+  if (!outlineValid(nb).ok || !outlineValid(composeOutline(nb, tail).points, true).ok) return { ok: false, base, tail, reason: 'the point would move the tail off a valid outline' };
+  return { ok: true, base: nb, tail, index: i };
+}
+export function deleteComposed(base, tail, i) {
+  const c = composeOutline(base, tail), [kind, j] = c.tags[i];
+  if (kind === 'tail') {
+    if (tail.points.length <= MIN_TAIL_POINTS) return { ok: false, base, tail, reason: `a tail keeps at least ${MIN_TAIL_POINTS} points — turn TAIL off to remove it` };
+    const nt = { ...tail, points: tail.points.filter((_, k) => k !== j) };
+    const v = outlineValid(composeOutline(base, nt).points, true);
+    return v.ok ? { ok: true, base, tail: nt } : { ok: false, base, tail, reason: v.reason };
+  }
+  const r = deleteControlPoint(base, j);
+  if (!r.ok) return { ok: false, base, tail, reason: r.reason };
+  const v = outlineValid(composeOutline(r.points, tail).points, true);
+  return v.ok ? { ok: true, base: r.points, tail } : { ok: false, base, tail, reason: v.reason };
+}
+
+/* Saved designs written before the tail ruling carried the old tail SLIDERS
+   (tailLength / tailWidth / tailClub, mm). They migrate into a tagged group
+   that draws the same tail: the old builder hung a strap from the trailing
+   edge at 0.78 of the span, 20 degrees outward-backward, `tailWidth` wide,
+   tailLength + tailWidth long, swelling into a club near its end. The strap's
+   two edges and its rounded end become control points (offsets from the
+   anchor, in units of the bottom pair's length). Exact to the old solid only
+   up to the spline through those points; reported in the load notes. */
+export function migrateOldTail(old, bottomLength) {
+  const L = Math.max(1e-6, bottomLength);
+  const tw = Math.max(0.5, +old.tailWidth || 2.4), len = (+old.tailLength || 0) + tw, club = clamp(+old.tailClub || 0, 0, 1);
+  const a = 20 * D2R, d = [Math.sin(a), -Math.cos(a)], q = [Math.cos(a), Math.sin(a)];
+  const hw = (s) => {
+    let h = (tw / 2) * (1 - 0.35 * s) * (1 + club * 1.6 * Math.exp(-(((s - 0.86) / 0.1) ** 2)));
+    return Math.max(h, 0.3);
+  };
+  const S = [0.15, 0.5, 0.8, 0.92];
+  const at = (s, side) => [(d[0] * s * len + side * q[0] * hw(s)) / L, (d[1] * s * len + side * q[1] * hw(s)) / L];
+  const pts = [[(q[0] * tw / 2) / L, 0], ...S.map((s) => at(s, 1)), [(d[0] * len) / L, (d[1] * len) / L], ...S.slice().reverse().map((s) => at(s, -1)), [-(q[0] * tw / 2) / L, 0]];
+  // the old strap's direction was fixed in (u, w); the new group is stored in the
+  // margin frame, read as if the margin ran straight back toward the root
+  // (along -u, outward -w) — exact on a level trailing edge, rotated with the
+  // margin elsewhere, which is the point of the frame
+  return { on: true, anchorU: MIGRATED_TAIL_ANCHOR, points: pts.map(([u, w]) => [+(-u).toFixed(4), +(-w).toFixed(4)]) };
+}
+/* The old strap hung at 0.78 of the span; the group anchors at the starter's
+   0.6 instead, because on the default outline 0.78 lands ON a base control
+   point (a coincident neighbour) and pushes a long strap past the drawing
+   area. If the migrated group still does not fit the bottom pair it is
+   SCALED DOWN about its anchor until it does, and the note says by how much
+   — a migrated design never silently loses its tail. */
+export const MIGRATED_TAIL_ANCHOR = 0.6;
+export function fitMigratedTail(base, tail) {
+  for (let f = 1; f > 0.2; f = +(f - 0.05).toFixed(2)) {
+    const t = { ...tail, points: tail.points.map(([a, b]) => [+(a * f).toFixed(4), +(b * f).toFixed(4)]) };
+    if (outlineValid(composeOutline(base, t).points).ok) return { tail: t, scale: f };
+  }
+  return { tail, scale: null };
+}
+
+/* The N wing pairs, resolved: pair 0 is the drawn FIRST pair, pair N-1 the
+   drawn LAST pair, every pair between interpolates both (outline AND scalar
+   fields) unless it is UNLINKED, when it carries its own drawn spec. */
+export function resolveWingPairs(p) {
+  const N = p.wingPairs, W = p.wings, out = [];
+  for (let k = 0; k < N; k++) {
+    const role = k === 0 ? 'first' : k === N - 1 ? 'last' : 'mid';
+    if (role !== 'mid') {
+      // the BOTTOM pair (last, or the only pair) carries the tail group
+      let comp = composeOutline(W[role].points, k === N - 1 ? W.tail : null), tailFits = true;
+      if (comp.anchor && !outlineValid(comp.points).ok) { comp = composeOutline(W[role].points, null); tailFits = false; }
+      out.push({ index: k, role, linked: false, ...W[role], drawn: comp.points, tags: comp.tags, dense: sampleOutline(comp.points), repaired: false, tailFits, hasTail: !!comp.anchor });
+      continue;
+    }
+    const own = W.unlinked && W.unlinked[k];
+    if (own) { out.push({ index: k, role, linked: false, ...own, dense: sampleOutline(own.points), repaired: false }); continue; }
+    const t = k / (N - 1);
+    const io = interpolatedOutline(W.first.points, W.last.points, t);
+    const s = {};
+    for (const f of WING_FIELDS) {
+      const v = lerp(W.first[f.id], W.last[f.id], t);
+      s[f.id] = f.step >= 1 && f.id === 'scallopCount' ? Math.round(v) : v;
+    }
+    out.push({ index: k, role, linked: true, t, ...s, points: null, dense: io.dense, repaired: io.repaired, tUsed: io.tUsed });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Randomize — ranges chosen to produce plausible bugs most of the time */
+/* ------------------------------------------------------------------ */
+
+/* mulberry32 — the page's Randomize button and the contact sheet share it. */
 function rng(seed) {
   let a = seed >>> 0;
   return () => {
@@ -196,23 +599,99 @@ function rng(seed) {
   };
 }
 
-/* Every slider uniform across its own declared range, every choice uniform.
-   The floor is left at its default: a random floor would make random bugs a
-   test of the floor rather than of the generator. */
-export function randomParams(seed) {
-  const r = rng(seed);
-  const p = {};
-  for (const s of PARAM_SPEC) {
-    if (s.id === 'minDiameter') { p[s.id] = s.default; continue; }
-    if (s.kind === 'range') {
-      const n = Math.round((s.max - s.min) / s.step);
-      p[s.id] = +(s.min + Math.round(r() * n) * s.step).toFixed(6);
-    } else if (s.kind === 'choice') p[s.id] = s.options[Math.floor(r() * s.options.length)][0];
-    else p[s.id] = r() < 0.5 ? false : true;
+/* The ranges, as data, so the page and the design doc report the same table.
+   Lengths of limbs and wings are multiples of the THORAX length so a bug's
+   proportions hold together at any size. */
+export const RANDOM_RANGES = {
+  threePartChance: 0.8,
+  wingPairWeights: { 0: 0.08, 1: 0.12, 2: 0.6, 3: 0.12, 4: 0.08 },   // 3-part only; a 2-part bug gets 0
+  antennaNoneChance: 0.1,                                              // 3-part only; a 2-part bug gets none
+  roundness: [1.8, 3],
+  headSize: [2.6, 6.5],
+  thoraxLength: [4.5, 11], thoraxWidth: [3.5, 8.5], thoraxDepthOfWidth: [0.75, 1.05],
+  abdomenLengthOfThorax: { 3: [1.4, 4.2], 2: [1.1, 1.8] },
+  abdomenWidthOfThorax: { 3: [0.55, 1.25], 2: [1.0, 1.6] },
+  abdomenTaper: [0.2, 0.8], abdomenSegments: { 3: [4, 10], 2: [1, 3] }, bandingChance: 0.5,
+  legPairs: { 3: 3, 2: 4 },
+  // tucked or splayed, never the half-way pose: a mid reach reads as stubs
+  // poking out from under the wings (the Phase 1 sheet's butterfly complaint)
+  legTuckedChance: { 3: 0.3, 2: 0 }, legReach: [0.75, 1],
+  coxa: [0.8, 2], femurOfThorax: { 3: [0.5, 1.3], 2: [0.9, 1.6] }, tibiaOfFemur: [0.9, 1.25], tarsusOfFemur: [0.5, 1.0],
+  legSplay: [20, 55], legBend: [25, 70], legTaper: [0.3, 0.7],
+  antennaLengthOfHead: [1.2, 4.5], antennaCurl: [-30, 70], antennaSpread: [12, 45],
+  wingLengthOfThorax: [2.2, 4.8], lastWingOfFirst: [0.6, 1.0],
+  wingStretch: [0.75, 1.35], firstSweep: [-12, 20], lastSweep: [12, 50],
+  scallopChance: 0.3, scallop: [0.05, 0.2], wingThickness: [1.0, 1.5],
+  dihedral: [-5, 25], pitch: [-8, 8],
+  tailChance: 0.2,   // TAIL on the bottom pair with the starter shape, when it fits that outline
+};
+
+function randomOutline(r) {
+  // Star-shaped about (0.5, 0): control points ordered by angle are a simple
+  // polygon, and the centripetal spline through them stays simple — checked,
+  // and redrawn if not.
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const top = 0.12 + 0.18 * r(), bot = 0.14 + 0.28 * r(), lean = (r() - 0.5) * 0.18;
+    const n = 4 + Math.floor(r() * 4);                       // interior points
+    const pts = [[0, +(0.06 + 0.08 * r()).toFixed(3)]];
+    for (let k = 0; k < n; k++) {
+      const th = Math.PI * (0.78 - (1.56 * (k + 0.5)) / n);  // from upper-left round to lower-left
+      const b = th > 0 ? top : bot;
+      const rr = 1 + (r() - 0.5) * 0.22;
+      const u = 0.5 + 0.5 * Math.cos(th) * rr;
+      const w = (Math.sin(th) * b + lean * Math.cos(th)) * rr;
+      pts.push([+clamp(u, 0.05, 1.15).toFixed(3), +clamp(w, -0.6, 0.6).toFixed(3)]);
+    }
+    pts.push([0, -+(0.06 + 0.1 * r()).toFixed(3)]);
+    if (outlineValid(pts).ok) return pts;
   }
-  p.legsVisible = true;            // a random bug with hidden legs photographs a mislabelled preset
-  return p;
+  return DEFAULT_WINGS.first.points.map((q) => q.slice());
 }
+
+export function randomParams(seed) {
+  const r = rng(seed), K = RANDOM_RANGES;
+  const U = ([a, b]) => a + (b - a) * r();
+  const I = ([a, b]) => Math.round(U([a - 0.49, b + 0.49]));
+  const p = defaultParams();
+  const parts = r() < K.threePartChance ? '3' : '2';
+  p.bodyParts = parts;
+  p.roundness = U(K.roundness);
+  p.headSize = U(K.headSize);
+  p.thoraxLength = U(K.thoraxLength); p.thoraxWidth = U(K.thoraxWidth); p.thoraxDepth = p.thoraxWidth * U(K.thoraxDepthOfWidth);
+  p.abdomenLength = p.thoraxLength * U(K.abdomenLengthOfThorax[parts]);
+  p.abdomenWidth = p.thoraxWidth * U(K.abdomenWidthOfThorax[parts]);
+  p.abdomenTaper = U(K.abdomenTaper); p.abdomenSegments = I(K.abdomenSegments[parts]); p.banding = r() < K.bandingChance;
+  p.legPairs = K.legPairs[parts]; p.legsVisible = true; p.legReach = r() < K.legTuckedChance[parts] ? 0 : U(K.legReach);
+  p.coxa = U(K.coxa); p.femur = p.thoraxLength * U(K.femurOfThorax[parts]); p.tibia = p.femur * U(K.tibiaOfFemur); p.tarsus = p.femur * U(K.tarsusOfFemur);
+  p.legSplay = U(K.legSplay); p.legBend = U(K.legBend); p.legTaper = U(K.legTaper);
+  if (parts === '2' || r() < K.antennaNoneChance) p.antennaType = 'none';
+  else p.antennaType = ['clubbed', 'feathered', 'filiform', 'bristle'][Math.floor(r() * 4)];
+  p.antennaLength = p.headSize * U(K.antennaLengthOfHead); p.antennaCurl = U(K.antennaCurl); p.antennaSpread = U(K.antennaSpread);
+  let wp = 0;
+  if (parts === '3') { let x = r(); for (const [k, w] of Object.entries(K.wingPairWeights)) { if (x < w) { wp = +k; break; } x -= w; } }
+  p.wingPairs = wp;
+  const wing = (first) => {
+    const len = first ? p.thoraxLength * U(K.wingLengthOfThorax) : 0;
+    return {
+      points: randomOutline(r), length: len, stretch: U(K.wingStretch),
+      sweep: U(first ? K.firstSweep : K.lastSweep),
+      scallop: r() < K.scallopChance ? U(K.scallop) : 0, scallopCount: I([3, 9]),
+      thickness: U(K.wingThickness), dihedral: U(K.dihedral), pitch: U(K.pitch),
+    };
+  };
+  const f = wing(true), l = wing(false);
+  l.length = f.length * U(K.lastWingOfFirst);
+  p.wings = { first: f, last: l, unlinked: {}, tail: JSON.parse(JSON.stringify(STARTER_TAIL)) };
+  if (wp >= 1 && r() < K.tailChance) {
+    p.wings.tail.on = true;
+    const bottom = wp === 1 ? f : l;
+    const comp = composeOutline(bottom.points, p.wings.tail).points;
+    // never draw a tail that does not fit, or whose neck is under the floor on this pair's size
+    if (!outlineValid(comp).ok || thinAnalysis(sampleOutline(comp).map(([u, w]) => [u * bottom.length, w * bottom.length * bottom.stretch]), p.minDiameter).thin) p.wings.tail.on = false;
+  }
+  return normalizeParams(p);
+}
+
 
 /* ------------------------------------------------------------------ */
 /* Mesh accumulator                                                     */
@@ -401,8 +880,11 @@ function abdomenEnvelope(s, taper, segs, banding) {
 /* Layout of the body along y, read by the body builder AND by every part that
    attaches to it (one owner of where the thorax, head and abdomen are). */
 function bodyLayout(p) {
-  const Lt = p.thoraxLength, rt = p.thoraxWidth / 2, dt = p.thoraxDepth / 2;
-  const L = { Lt, rt, dt, insect: p.bodyPlan === 'insect' };
+  // The thorax lengthens with each wing pair past two (THORAX_PER_PAIR), so the
+  // roots spread along it instead of stacking.
+  const Lt = p.thoraxLength * (1 + THORAX_PER_PAIR * Math.max(0, p.wingPairs - 2));
+  const rt = p.thoraxWidth / 2, dt = p.thoraxDepth / 2;
+  const L = { Lt, rt, dt, insect: p.bodyParts === '3' };
   L.thorax = { y0: -Lt / 2, y1: Lt / 2 };
   if (L.insect) {
     L.Rh = p.headSize / 2;
@@ -479,15 +961,95 @@ function buildBody(acc, p, L) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Wings                                                                */
+/* Drawn-width floor (Eva's ruling on PR #326)                          */
 /* ------------------------------------------------------------------ */
 
-function chordProfile(t, widest, apex) {
-  if (t <= 0) return WING_ROOT_F;
-  if (t < widest) return WING_ROOT_F + (1 - WING_ROOT_F) * Math.sin((Math.PI / 2) * (t / widest));
-  const s = Math.min(1, (t - widest) / (1 - widest));
-  return Math.pow(Math.max(0, 1 - Math.pow(s, apex)), 1 / apex);
+/* Where is a drawn planform NARROWER than the floor? Morphological opening by
+   a disc of the floor's diameter: every disc of diameter `floor` that fits
+   inside the planform is kept, and the parts of the planform no such disc
+   reaches are THIN. A tail neck narrower than the floor is wholly thin; a wide
+   wing has no thin part except the tips of sharp corners, which every printer
+   rounds anyway — so a thin region only COUNTS when it reaches deeper than
+   THIN_DEPTH_FRAC x floor past the nearest kept material (a corner sharper than
+   about 60 degrees). Computed on a raster at floor / THIN_RES with exact
+   Euclidean distance transforms (Felzenszwalb-Huttenlocher), in millimetres.
+   THIN_RES 8 was measured first; it nearly doubled a 4-pair build (90 ms).
+
+   Returns { maxDepth, thin (bool), flags } where flags[i] marks dense outline
+   sample i as lying on a thin part (for the editor's red highlight). */
+export const THIN_DEPTH_FRAC = 0.5;
+const THIN_RES = 12;  // pixel = floor/12. At floor/6 a sharp point's tip, thinner than a pixel, was never filled and read up to 0.5 mm shallow (measured against the gate's own measure); 12 halves that at ~1.7x the build time
+
+function edt1(f, n, d, v, z) {
+  let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+    k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
 }
+/* squared distance (in pixels^2) from every pixel to the nearest pixel where `src` is set */
+function edt2(src, nx, ny) {
+  const INF = 1e20, out = new Float64Array(nx * ny), m = Math.max(nx, ny);
+  const f = new Float64Array(m), d = new Float64Array(m), v = new Int32Array(m), z = new Float64Array(m + 1);
+  for (let x = 0; x < nx; x++) {
+    for (let y = 0; y < ny; y++) f[y] = src[y * nx + x] ? 0 : INF;
+    edt1(f, ny, d, v, z);
+    for (let y = 0; y < ny; y++) out[y * nx + x] = d[y];
+  }
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) f[x] = out[y * nx + x];
+    edt1(f, nx, d, v, z);
+    for (let x = 0; x < nx; x++) out[y * nx + x] = d[x];
+  }
+  return out;
+}
+
+export function thinAnalysis(poly, floor) {
+  const h = floor / THIN_RES, r = floor / 2;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const pad = 3;
+  const nx = Math.ceil((x1 - x0) / h) + 2 * pad, ny = Math.ceil((y1 - y0) / h) + 2 * pad;
+  const gx = x0 - pad * h, gy = y0 - pad * h;
+  const inside = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) {                       // even-odd scanline fill at pixel centres (the polygon is simple)
+    const yc = gy + (j + 0.5) * h, xs = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      if ((a[1] <= yc) !== (b[1] <= yc)) xs.push(a[0] + ((yc - a[1]) / (b[1] - a[1])) * (b[0] - a[0]));
+    }
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      const i0 = Math.max(0, Math.ceil((xs[k] - gx) / h - 0.5)), i1 = Math.min(nx - 1, Math.floor((xs[k + 1] - gx) / h - 0.5));
+      for (let i = i0; i <= i1; i++) inside[j * nx + i] = 1;
+    }
+  }
+  const outside = new Uint8Array(nx * ny); for (let i = 0; i < outside.length; i++) outside[i] = inside[i] ? 0 : 1;
+  const dOut = edt2(outside, nx, ny);                   // inside pixels: distance to the outside
+  const core = new Uint8Array(nx * ny);                 // centres of floor-discs that fit
+  const r2 = (r / h) ** 2;
+  for (let i = 0; i < core.length; i++) core[i] = inside[i] && dOut[i] >= r2 ? 1 : 0;
+  const dCore = edt2(core, nx, ny);
+  const opened = new Uint8Array(nx * ny);               // material some floor-disc covers
+  for (let i = 0; i < opened.length; i++) opened[i] = inside[i] && dCore[i] <= r2 ? 1 : 0;
+  const dOpen = edt2(opened, nx, ny);
+  let maxDepth = 0;
+  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i]) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
+  const tau = THIN_DEPTH_FRAC * floor;
+  const flags = new Uint8Array(poly.length);
+  for (let k = 0; k < poly.length; k++) {
+    const i = clamp(Math.floor((poly[k][0] - gx) / h), 0, nx - 1), j = clamp(Math.floor((poly[k][1] - gy) / h), 0, ny - 1);
+    flags[k] = Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
+  }
+  return { maxDepth, thin: maxDepth > tau, flags, tau };
+}
+
+/* ------------------------------------------------------------------ */
+/* Wings                                                                */
+/* ------------------------------------------------------------------ */
 
 function scallopCut(t, depth, count) {
   if (depth <= 0 || t <= SCALLOP_FROM) return 0;
@@ -516,103 +1078,246 @@ function wingTransform(hinge, span, sweepDeg, pitchDeg, dihedralDeg) {
   };
 }
 
-function buildWing(acc, p, L, which) {
-  const one = which === 1;
-  const span = one ? p.w1Length : p.w1Length * p.w2Size;
-  const aspect = one ? p.w1Aspect : p.w2Aspect;
-  const widest = one ? p.w1Widest : p.w2Widest;
-  const apex = one ? p.w1Apex : p.w2Apex;
-  const scal = one ? p.w1Scallop : p.w2Scallop;
-  const scalN = one ? p.w1ScallopCount : p.w2ScallopCount;
-  const thick = Math.max(p.minDiameter, one ? p.w1Thickness : p.w2Thickness);
-  const chord = span / aspect;
+/* Where each pair's root sits on the thorax. ONE owner, read by the builder and
+   by the gate (roots must be distinct). Roots spread evenly over the middle of
+   the lengthened thorax, front to back; each later pair a little lower so the
+   pairs stack rather than share a plane, but never below the body's mid-height. */
+export function wingHinges(p, L) {
+  const N = p.wingPairs, out = [];
+  for (let k = 0; k < N; k++) {
+    const yH = N === 1 ? 0.18 * L.Lt : L.Lt * (WING_ROOT_SPAN / 2 - (WING_ROOT_SPAN * k) / (N - 1));
+    const kk = Math.sqrt(Math.max(0, 1 - (yH / (L.Lt / 2)) ** 2));
+    const drop = Math.min(k * 0.45 * p.minDiameter * 1.2, 0.6 * L.dt * kk);
+    out.push({ y: yH, k: kk, hinge: [0.5 * L.rt * kk, yH, 0.5 * L.dt * kk - drop] });
+  }
+  return out;
+}
 
-  // Hinge on the thorax's upper side, inside the body. Pair 2 sits behind
-  // pair 1 by (1 - overlap) of 60% of the thorax, and a thickness lower so the
-  // two pairs stack rather than share a plane.
-  const yF = 0.18 * L.Lt;
-  const yH = one ? yF : yF - (1 - p.wingOverlap) * 0.6 * L.Lt;
-  const k = Math.sqrt(Math.max(0, 1 - (yH / (L.Lt / 2)) ** 2));
-  const hinge = [0.5 * L.rt * k, yH, 0.5 * L.dt * k - (one ? 0 : thick)];
+/* Ear clipping of a simple CCW polygon. Of all valid ears it clips the one
+   with the LARGEST smallest angle, not the first found: first-found clipping
+   leaves long slivers along a nearly straight margin, and a sliver whose
+   vertices are almost collinear reads its facing as noise — the first sheet
+   showed them as stray zero-area contour loops (thin lines across the wing in
+   the SVG). Collinear vertices are removed without a triangle. */
+function earClip(poly) {
+  const V = [...Array(poly.length).keys()], tris = [];
+  const cr2 = (p, a, b) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+  const cr = (a, b, c) => cr2(poly[c], poly[a], poly[b]);
+  const same = (p, q) => p[0] === q[0] && p[1] === q[1];
+  const minAngle = (a, b, c) => {
+    const P = [poly[a], poly[b], poly[c]];
+    let m = Infinity;
+    for (let k = 0; k < 3; k++) {
+      const o = P[k], u = sub2(P[(k + 1) % 3], o), v = sub2(P[(k + 2) % 3], o);
+      m = Math.min(m, Math.acos(clamp((u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v) || 1e-30), -1, 1)));
+    }
+    return m;
+  };
+  const isEar = (i) => {
+    const a = V[(i + V.length - 1) % V.length], b = V[i], c = V[(i + 1) % V.length];
+    if (!(cr(a, b, c) > 0)) return false;
+    for (const m of V) {
+      if (m === a || m === b || m === c) continue;
+      const q = poly[m];
+      if (same(q, poly[a]) || same(q, poly[b]) || same(q, poly[c])) continue;
+      if (cr2(q, poly[a], poly[b]) >= 0 && cr2(q, poly[b], poly[c]) >= 0 && cr2(q, poly[c], poly[a]) >= 0) return false;
+    }
+    return true;
+  };
+  let guard = 0;
+  while (V.length > 3 && guard++ < 100000) {
+    // drop exactly collinear (or doubled) vertices first: they make no triangle
+    let dropped = false;
+    for (let i = 0; i < V.length && V.length > 3; i++) {
+      const a = V[(i + V.length - 1) % V.length], b = V[i], c = V[(i + 1) % V.length];
+      if (cr(a, b, c) === 0) { V.splice(i, 1); dropped = true; break; }
+    }
+    if (dropped) continue;
+    let best = -1, bq = -1;
+    for (let i = 0; i < V.length; i++) {
+      if (!isEar(i)) continue;
+      const q = minAngle(V[(i + V.length - 1) % V.length], V[i], V[(i + 1) % V.length]);
+      if (q > bq) { bq = q; best = i; }
+    }
+    if (best < 0) throw new Error('earClip: polygon is not simple');
+    tris.push([V[(best + V.length - 1) % V.length], V[best], V[(best + 1) % V.length]]);
+    V.splice(best, 1);
+  }
+  if (V.length === 3 && cr(V[0], V[1], V[2]) > 0) tris.push([V[0], V[1], V[2]]);
+  return tris;
+}
+
+/* Lawson flips: every interior edge whose two opposite angles sum past pi is
+   flipped (when the quad is convex) until none is — the constrained Delaunay
+   triangulation of the outline, which maximises the smallest angle. Boundary
+   edges are never flipped, so the outline is untouched. */
+function delaunayFlip(pts, tris) {
+  const T = tris.map((t) => t.slice());
+  const key = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
+  const ang = (o, p, q) => { const u = sub2(pts[p], pts[o]), v = sub2(pts[q], pts[o]); return Math.atan2(Math.abs(u[0] * v[1] - u[1] * v[0]), u[0] * v[0] + u[1] * v[1]); };
+  const orient = (a, b, c) => (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]);
+  for (let pass = 0; pass < 200; pass++) {
+    const edges = new Map();
+    T.forEach((t, i) => { for (let e = 0; e < 3; e++) { const k = key(t[e], t[(e + 1) % 3]); (edges.get(k) || edges.set(k, []).get(k)).push(i); } });
+    let flips = 0;
+    const done = new Set();
+    for (const [k, ts] of edges) {
+      if (ts.length !== 2 || done.has(ts[0]) || done.has(ts[1])) continue;
+      const [i, j] = ts, [a, b] = k.split(',').map(Number);
+      const c = T[i].find((v) => v !== a && v !== b), d = T[j].find((v) => v !== a && v !== b);
+      if (ang(c, a, b) + ang(d, a, b) <= Math.PI + 1e-12) continue;
+      // convex quad: c and d on opposite sides of ab, a and b on opposite sides of cd
+      if (!(orient(c, d, a) * orient(c, d, b) < 0)) continue;
+      // keep CCW orientation
+      const t1 = orient(c, d, a) > 0 ? [c, d, a] : [d, c, a];
+      const t2 = orient(c, d, b) > 0 ? [c, d, b] : [d, c, b];
+      T[i] = t1; T[j] = t2; done.add(i); done.add(j); flips++;
+    }
+    if (!flips) break;
+  }
+  return T;
+}
+
+/* 1 -> 4 midpoint subdivision; a midpoint is shared by both triangles of an
+   edge, so the result stays conforming (no T-junctions). */
+function subdivide(pts, tris) {
+  const mid = new Map(), P = pts.slice();
+  const m = (a, b) => {
+    const k = a < b ? `${a},${b}` : `${b},${a}`;
+    if (!mid.has(k)) { mid.set(k, P.length); P.push(lerp2(P[a], P[b], 0.5)); }
+    return mid.get(k);
+  };
+  const T = [];
+  for (const [a, b, c] of tris) {
+    const ab = m(a, b), bc = m(b, c), ca = m(c, a);
+    T.push([a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]);
+  }
+  return { pts: P, tris: T };
+}
+
+/* A solid slab over a triangulated planform: top face, bottom face, and a rim
+   walked along the top face's own boundary edges. */
+function planformSlab(acc, pts, tris, half, W, part) {
+  const T = pts.map(([u, w]) => acc.v(W(u, w, +half)));
+  const B = pts.map(([u, w]) => acc.v(W(u, w, -half)));
+  const dir = new Set();
+  for (const [a, b, c] of tris) {
+    acc.tri(T[a], T[b], T[c]); acc.tri(B[a], B[c], B[b]);
+    dir.add(`${a},${b}`); dir.add(`${b},${c}`); dir.add(`${c},${a}`);
+  }
+  for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+    if (!dir.has(`${q},${p}`)) acc.quad(T[q], T[p], B[p], B[q]);   // a boundary edge p->q: the rim takes its twin
+  }
+  part.meta.thickPairs = [];
+  for (let i = 0; i < pts.length; i += 7) part.meta.thickPairs.push([T[i], B[i]]);
+}
+
+function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
+  const thick = Math.max(p.minDiameter, spec.thickness);
+  const span = spec.length;
+  const { hinge, k } = hingeInfo;
   const embed = Math.max(0.6 * L.rt * k, thick);
-  const W = wingTransform(hinge, span, one ? p.w1Sweep : p.w2Sweep, one ? p.w1Pitch : p.w2Pitch,
-                          one ? p.w1Dihedral : p.w2Dihedral);
+  const W = wingTransform(hinge, span, spec.sweep, spec.pitch, spec.dihedral);
   const minW = p.minDiameter;
 
-  const halfChords = (t) => {
-    const f = chordProfile(t, widest, apex);
-    let lead = WING_LEAD_SHARE * chord * f;
-    let trail = (1 - WING_LEAD_SHARE) * chord * f * (1 - scallopCut(t, scal, scalN));
-    if (lead + trail < minW) { const g = minW / Math.max(lead + trail, 1e-9); if (lead + trail < 1e-9) { lead = minW * WING_LEAD_SHARE; trail = minW - lead; } else { lead *= g; trail *= g; } }
-    return [lead, trail];
-  };
-
-  const rows = [-embed / span];
-  for (let i = 0; i <= WING_ROWS; i++) rows.push(1 - Math.pow(1 - i / WING_ROWS, 1.4));
-  const grid = rows.map((t) => {
-    const [lead, trail] = halfChords(t);
-    const row = [];
-    for (let j = 0; j <= WING_COLS; j++) row.push([t * span, lerp(-trail, lead, j / WING_COLS)]);
-    return row;
-  });
-  const part = acc.begin(one ? 'forewing' : 'hindwing', one ? 'wing1' : 'wing2', 'R');
-  slab(acc, grid, thick / 2, W, part);
+  // The drawn curve in world millimetres: u by the length, w by length * stretch.
+  const base = spec.dense.map(([u, w]) => [u * span, w * span * spec.stretch]);
+  let umax = 0; for (const q of base) umax = Math.max(umax, q[0]);
+  let apex = 0; for (let i = 1; i < base.length; i++) if (base[i][0] > base[apex][0]) apex = i;
+  // Scallops on the TRAILING half (apex -> root trail), each point pulled
+  // toward the span line by the cut. If that crosses the outline the depth is
+  // halved until it does not (reported on the part).
+  let depth = spec.scallop, scalloped = base;
+  const applyScallop = (d) => base.map(([u, w], i) => (i > apex ? [u, w * (1 - scallopCut(u / umax, d, Math.round(spec.scallopCount)))] : [u, w]));
+  let scallopReduced = false;
+  if (depth > 0) {
+    const okW = (q) => polygonSimple(q) && polygonClear(q, OUTLINE_CLEARANCE * span);
+    for (let it = 0; it < 12; it++) { scalloped = applyScallop(depth); if (okW(scalloped)) break; depth /= 2; scallopReduced = true; }
+    if (!okW(scalloped)) { scalloped = base; depth = 0; }
+  }
+  // Root: the closing chord moved INTO the thorax by `embed`.
+  const n0 = scalloped[0], n1 = scalloped[scalloped.length - 1];
+  let poly = [[-embed, n0[1]], ...scalloped, [-embed, n1[1]]];
+  // the curve runs clockwise in (u, w); the triangulator wants CCW
+  poly = poly.reverse();
+  let tri = delaunayFlip(poly, earClip(poly)), pts = poly;
+  for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri } = subdivide(pts, tri));
+  const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
+  planformSlab(acc, pts, tri, thick / 2, W, part);
   part.meta.thickness = thick;
+  part.meta.planform = poly.slice();
+  part.meta.pair = spec.index;
+  part.meta.linked = spec.linked;
+  part.meta.repaired = spec.repaired;
+  part.meta.scallopReduced = scallopReduced;
+  part.meta.hingeY = hinge[1];
+  // drawn-width floor: the planform as drawn (tail and scallops included, the
+  // root tab inside the body excluded), in millimetres, against minDiameter
+  const thin = thinAnalysis(scalloped, p.minDiameter);
+  part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau };
+  part.meta.thinFlags = Array.from(thin.flags);
+  // the same flagged runs in WORLD millimetres, just above the top face — the
+  // page draws them red over the 3D view (an overlay, never part of the mesh
+  // or of either export), so a thin pair shows red even when it is not the
+  // pair open in the editor
+  const seg = [], lift = thick / 2 + 0.02;
+  if (thin.thin) for (let i = 0; i < scalloped.length; i++) {
+    const j = (i + 1) % scalloped.length;
+    if (thin.flags[i] && thin.flags[j]) seg.push(W(scalloped[i][0], scalloped[i][1], lift), W(scalloped[j][0], scalloped[j][1], lift));
+  }
+  part.meta.thinWorld = seg;
   acc.end();
 
-  if (!one && p.tailLength > 0) {
-    const tw = Math.max(minW, p.tailWidth);
-    const [, trailAt] = halfChords(TAIL_AT);
-    const d = [Math.sin(TAIL_ANGLE), -Math.cos(TAIL_ANGLE)];
-    const q = [Math.cos(TAIL_ANGLE), Math.sin(TAIL_ANGLE)];
-    const base = [TAIL_AT * span - d[0] * tw, -trailAt - d[1] * tw];   // starts inside the wing
-    const Lq = p.tailLength + tw;
-    const NQ = 24, NV = 6;
-    const tg = [];
-    for (let i = 0; i <= NQ; i++) {
-      const s = i / NQ;
-      let hw = (tw / 2) * (1 - 0.35 * s) * (1 + p.tailClub * 1.6 * Math.exp(-(((s - 0.86) / 0.1) ** 2)));
-      if (s > 0.86) hw *= Math.sqrt(Math.max(0, 1 - ((s - 0.86) / 0.14) ** 2));
-      hw = Math.max(hw, minW / 2);
-      const cx = base[0] + d[0] * s * Lq, cy = base[1] + d[1] * s * Lq;
-      const row = [];
-      for (let j = 0; j <= NV; j++) { const v = lerp(-hw, hw, j / NV); row.push([cx + q[0] * v, cy + q[1] * v]); }
-      tg.push(row);
-    }
-    const tp = acc.begin('tail', 'tail', 'R');
-    const tthick = Math.max(minW, 0.9 * thick);
-    slab(acc, tg, tthick / 2, W, tp);
-    tp.meta.thickness = tthick;
-    tp.meta.tubeMinWidth = minW;
-    acc.end();
-  }
 }
 
 /* ------------------------------------------------------------------ */
 /* Legs                                                                 */
 /* ------------------------------------------------------------------ */
 
+/* Reach 1: the Phase 1 pose — each leg heads outward on its splay azimuth.
+   Reach 0: TUCKED — the coxa drops, then femur back, tibia forward, tarsus back,
+   folded flat under the body along the root's own x (folding toward the
+   thorax's middle instead was measured and read WORSE: front tibiae reach out
+   under the narrow neck), so seen from above the
+   leg sits under the body's silhouette. Every segment's heading is a blend of
+   the two and is never zero-length (the splayed heading always has x > 0). */
 function buildLegs(acc, p, L) {
   const n = p.legPairs;
   const floorR = tubeFloorR(p);
   const r0 = Math.max(floorR, (LEG_ROOT_FRAC * L.rt) / 2);
   const r1 = Math.max(floorR, r0 * (1 - p.legTaper));
+  const reach = p.legReach;
   for (let i = 0; i < n; i++) {
     const yi = n === 1 ? 0 : (L.Lt / 2) * (0.5 - (1.0 * i) / (n - 1));
     const kk = Math.sqrt(Math.max(0, 1 - (yi / (L.Lt / 2)) ** 2));
-    const root = [0.35 * L.rt * kk, yi, -0.3 * L.dt * kk];
+    const rootX = lerp(0.2, 0.35, reach) * L.rt * kk;
+    const root = [rootX, yi, -0.3 * L.dt * kk];
     const az = (n === 1 ? 0 : p.legSplay * (1 - (2 * i) / (n - 1))) * D2R;   // + = forward
-    const h = [Math.cos(az), Math.sin(az), 0];
+    const out = [Math.cos(az), Math.sin(az), 0];
     const b = p.legBend;
-    const elev = [-35, 15 + 0.6 * b, 15 + 0.6 * b - (60 + b), 15 + 0.6 * b - (60 + b) + 35].map((e) => e * D2R);
+    const elevOut = [-35, 15 + 0.6 * b, 15 + 0.6 * b - (60 + b), 15 + 0.6 * b - (60 + b) + 35];
+    const elevTuck = [-70, -4, 0, -4];
+    const tuckH = [[0, 0, 0], [0, -1, 0], [0, 1, 0], [0, -1, 0]];
     const lens = [p.coxa, p.femur, p.tibia, p.tarsus];
     const total = lens.reduce((a, c) => a + c, 0);
     const pts = [root]; let acc0 = 0; const rad = [r0];
     for (let s = 0; s < 4; s++) {
-      const dir = add(mul(h, Math.cos(elev[s])), [0, 0, Math.sin(elev[s])]);
+      const e = lerp(elevTuck[s], elevOut[s], reach) * D2R;
+      const hz = norm(add(mul(tuckH[s], 1 - reach), mul(out, reach + (s === 0 ? 1e-3 : 0))));
+      const dir = add(mul(hz, Math.cos(e)), [0, 0, Math.sin(e)]);
       pts.push(add(pts[s], mul(dir, lens[s])));
       acc0 += lens[s];
       rad.push(Math.max(floorR, lerp(r0, r1, acc0 / total)));
+    }
+    // Tucked legs stay inside the body's own silhouette: every joint's x is
+    // held within the body's half-width at that joint's y (less the tube), so
+    // a fold that runs back past a wide thorax beside a narrow abdomen does
+    // not reappear there as two stubs (the revised sheet's random 8). Blended
+    // out by reach: a splayed leg is meant to show.
+    for (let s = 1; s <= 4; s++) {
+      const lim = Math.max(0, 0.85 * profileAt(p, L, pts[s][1])[0] - rad[s]);
+      const x = Math.min(pts[s][0], lim);
+      pts[s] = [lerp(x, pts[s][0], reach), pts[s][1], pts[s][2]];
     }
     const part = acc.begin(`leg${i + 1}`, 'leg', 'R');
     part.meta.tubeRings = [];
@@ -696,28 +1401,93 @@ function rotateAbout(v, k, a) {   // Rodrigues
 /* Assembly                                                             */
 /* ------------------------------------------------------------------ */
 
-export function normalizeParams(p) {
-  const q = { ...DEFAULTS };
+function normalizeWing(w, fallback, notes, label) {
+  const out = {};
+  for (const f of WING_FIELDS) {
+    let v = Number(w && w[f.id]);
+    if (!Number.isFinite(v)) v = fallback[f.id];
+    out[f.id] = clamp(v, f.min, f.max);
+  }
+  const pts = w && Array.isArray(w.points) ? w.points.map((q) => (Array.isArray(q) ? [Number(q[0]), Number(q[1])] : q)) : null;
+  const v = pts ? outlineValid(pts) : { ok: false, reason: 'no outline' };
+  if (v.ok) out.points = pts;
+  else { out.points = fallback.points.map((q) => q.slice()); if (w && w.points) notes.push(`${label} outline refused (${v.reason}); the default outline was used`); }
+  return out;
+}
+
+function normalizeTail(t, p, q, notes) {
+  // a design from before the tail ruling: the old sliders become a tagged group
+  if (!t && Number(p.tailLength) > 0) {
+    const bottom = q.wingPairs <= 1 ? q.wings.first : q.wings.last;
+    const fit = fitMigratedTail(bottom.points, migrateOldTail(p, bottom.length)), m = fit.tail;
+    const how = fit.scale === 1 ? '' : fit.scale ? `, scaled to ${Math.round(fit.scale * 100)}% to fit the bottom pair's outline` : ', but it does not fit the bottom pair\'s outline at any scale and is not drawn until the outline or the tail is edited';
+    notes.push(`the old tail sliders (length ${(+p.tailLength).toFixed(1)} mm, width ${(+p.tailWidth || 2.4).toFixed(1)} mm, club ${(+p.tailClub || 0).toFixed(2)}) were migrated into a TAIL group of ${m.points.length} control points on the bottom pair${how}`);
+    return m;
+  }
+  const out = JSON.parse(JSON.stringify(STARTER_TAIL));
+  if (!t) return out;
+  out.on = !!t.on;
+  if (Number.isFinite(+t.anchorU)) out.anchorU = clamp(+t.anchorU, 0, OUTLINE_BOUNDS.u[1]);
+  if (Array.isArray(t.points) && t.points.length >= MIN_TAIL_POINTS && t.points.every((d) => Array.isArray(d) && Number.isFinite(+d[0]) && Number.isFinite(+d[1]))) out.points = t.points.map((d) => [+d[0], +d[1]]);
+  else if (t.points) notes.push('the tail group in the file was unreadable; the starter tail was used');
+  return out;
+}
+
+/* Clamp every field to its range and validate every outline. An invalid
+   outline is REPLACED by the default and the replacement is reported in
+   `notes` — a design is never silently partly loaded. */
+export function normalizeParams(p, notes = []) {
+  const q = clone(DEFAULTS);
   for (const s of PARAM_SPEC) {
     if (!(s.id in p)) continue;
     let v = p[s.id];
-    if (s.kind === 'range') { v = Number(v); if (!Number.isFinite(v)) v = s.default; v = clamp(v, s.min, s.max); }
+    if (s.kind === 'range') { v = Number(v); if (!Number.isFinite(v)) v = s.default; v = clamp(v, s.min, s.max); if (s.step >= 1) v = Math.round(v); }
     else if (s.kind === 'bool') v = v === true || v === 'true' || v === 1;
-    else if (!s.options.some((o) => o[0] === v)) v = s.default;
+    else { v = String(v); if (!s.options.some((o) => o[0] === v)) v = s.default; }
     q[s.id] = v;
+  }
+  const W = p.wings || {};
+  q.wings = {
+    first: normalizeWing(W.first, DEFAULT_WINGS.first, notes, 'first pair'),
+    last: normalizeWing(W.last, DEFAULT_WINGS.last, notes, 'last pair'),
+    unlinked: {},
+  };
+  q.wings.tail = normalizeTail(W.tail, p, q, notes);
+  for (const [k, w] of Object.entries(W.unlinked || {})) {
+    const i = Number(k);
+    if (Number.isInteger(i) && i >= 1 && i <= MAX_WING_PAIRS - 2 && w) q.wings.unlinked[i] = normalizeWing(w, DEFAULT_WINGS.first, notes, `pair ${i + 1}`);
   }
   return q;
 }
 
+/* ---------------- designs (save / load) ---------------- */
+export const DESIGN_FORMAT = 'parametric-bug-design';
+export const DESIGN_VERSION = 2;   // 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export function designFromParams(p, name = '') {
+  return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
+}
+export function paramsFromDesign(doc) {
+  if (!doc || doc.format !== DESIGN_FORMAT) return { ok: false, reason: 'not a Parametric Bug design file' };
+  if (doc.version > DESIGN_VERSION) return { ok: false, reason: `design version ${doc.version} is newer than this page (${DESIGN_VERSION})` };
+  const notes = [];
+  const params = normalizeParams(doc.params || {}, notes);
+  return { ok: true, params, notes };
+}
+
 export function buildBug(params) {
-  const p = normalizeParams(params);
+  const notes = [];
+  const p = normalizeParams(params, notes);
   const L = bodyLayout(p);
   const acc = new Acc();
   buildBody(acc, p, L);
   if (p.legsVisible && p.legPairs > 0) buildLegs(acc, p, L);
   if (p.antennaType !== 'none') buildAntenna(acc, p, L);
-  if (p.wingPairs >= 1) buildWing(acc, p, L, 1);
-  if (p.wingPairs >= 2) buildWing(acc, p, L, 2);
+  const pairs = resolveWingPairs(p);
+  const hinges = wingHinges(p, L);
+  for (const spec of pairs) buildWingPair(acc, p, L, spec, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
+  for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
+  for (const s of pairs) if (s.repaired) notes.push(`pair ${s.index + 1}: the interpolated outline crossed itself and was eased toward the nearer drawn pair (t ${s.t.toFixed(2)} -> ${s.tUsed.toFixed(2)})`);
+  for (const part of acc.parts) if (part.meta.scallopReduced) notes.push(`pair ${part.meta.pair + 1}: scallop depth reduced so the outline does not cross itself`);
 
   // Mirror every right-side part into its left twin.
   const rightParts = acc.parts.filter((q) => q.side === 'R');
@@ -736,6 +1506,23 @@ export function buildBug(params) {
   return {
     params: p,
     layout: L,
+    wingPairs: pairs.map((s) => {
+      const part = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R');
+      return { index: s.index, role: s.role, linked: s.linked, repaired: s.repaired, dense: s.dense, hingeY: hinges[s.index].y,
+        hasTail: !!s.hasTail, tags: s.tags || null, thin: part.meta.thin, thinFlags: part.meta.thinFlags,
+        // both wings: the right's runs and their mirror images
+        thinSegments: [...part.meta.thinWorld, ...part.meta.thinWorld.map(([x, y, z]) => [mx(x), y, z])] };
+    }),
+    // every pair whose DRAWN planform is narrower than the floor somewhere: the
+    // STL exporter refuses the model while this list is not empty (see exportStl).
+    // A LINKED middle pair is not drawn by anyone: it is blended from the first
+    // and last pairs, and `blendedFrom` names them so the refusal can say what
+    // to widen (or that unlinking it makes it editable).
+    floorViolations: pairs.map((s) => ({
+      pair: s.index, ...acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.thin,
+      blendedFrom: s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null,
+    })).filter((v) => v.thin),
+    notes,
     positions: Float64Array.from(acc.pos),
     indices: Uint32Array.from(acc.idx),
     parts: acc.parts,
@@ -790,7 +1577,31 @@ export function mirrorDiff(model) {
 /* STL exporter — reads the model only                                  */
 /* ------------------------------------------------------------------ */
 
-export function exportStl(model) {
+/* The STL is REFUSED while any drawn planform is narrower than the floor
+   (model.floorViolations): it would ship geometry below the minimum feature
+   with nothing on the print to say so. Blocking, not thickening, is the
+   ruling's choice — see bug-project-design-doc.md §5.10. `allowBelowFloor` is
+   for the gate's own analysis of a refused model (watertightness is still
+   checked on it); the page never passes it. */
+export class FloorError extends Error {}
+/* One sentence per violating pair, each ending in what to DO about it. A drawn
+   pair (first, last, the only one, or an unlinked middle one) is widened where
+   it shows red in the editor. A linked middle pair has no drawing of its own,
+   so the sentence names the two drawn pairs it is blended from and the other
+   way out: unlink it and edit it directly. */
+export function floorReason(model) {
+  const f = model.params.minDiameter.toFixed(2);
+  return model.floorViolations.map((v) => {
+    const k = v.pair + 1, how = `the narrow part reaches ${v.maxDepth.toFixed(2)} mm past where a floor-wide disc fits`;
+    if (v.blendedFrom) {
+      const [a, b] = v.blendedFrom.map((i) => i + 1);
+      return `Pair ${k} is narrower than the ${f} mm floor (${how} — shown red in the view). Pair ${k} is blended from pairs ${a} and ${b}. Widen those, or unlink pair ${k} to edit it directly.`;
+    }
+    return `Pair ${k}'s drawn outline is narrower than the ${f} mm floor (${how} — shown red in the editor and the view). Widen it there.`;
+  }).join(' ');
+}
+export function exportStl(model, opts = {}) {
+  if (model.floorViolations && model.floorViolations.length && !opts.allowBelowFloor) throw new FloorError(`STL not exported. ${floorReason(model)} Or lower the floor in Print.`);
   const P = model.positions, I = model.indices, n = I.length / 3;
   const buf = new ArrayBuffer(84 + 50 * n);
   const dv = new DataView(buf);
@@ -819,6 +1630,17 @@ export function exportStl(model) {
    They chain into closed loops; projected to x-y and filled NONZERO they
    reproduce the part's projection exactly, because every projected point is
    covered by at least one front face and each covering front face winds +1. */
+/* A facet seen almost exactly edge-on (|nz| below EDGE_ON_REL of its edges'
+   squared lengths) is counted FRONT-facing. Its facing is decided by rounding
+   — a needle facet on a twisted wing can come out a hair negative — and
+   counting it back-facing cuts a zero-area hole in the contour that the SVG
+   then strokes as a hairline across the wing (the revised sheet showed them).
+   Counted front, it adds winding over an area of at most that tolerance and
+   no contour edge. nz is computed identically for a triangle and its mirror
+   twin, so the decision is symmetric. (A first fix dropped tiny LOOPS instead;
+   that broke the SVG's exact mirror symmetry, because the two sides chain the
+   same edges into loops differently.) */
+export const EDGE_ON_REL = 1e-4;
 export function contourLoops(model, part) {
   const P = model.positions, I = model.indices;
   const NV = model.positions.length / 3;
@@ -826,8 +1648,10 @@ export function contourLoops(model, part) {
   const front = [];
   for (let t = part.t0; t < part.t1; t++) {
     const a = I[3 * t], b = I[3 * t + 1], c = I[3 * t + 2];
-    const nz = (P[3 * b] - P[3 * a]) * (P[3 * c + 1] - P[3 * a + 1]) - (P[3 * b + 1] - P[3 * a + 1]) * (P[3 * c] - P[3 * a]);
-    front.push(nz > 0);
+    const ex = P[3 * b] - P[3 * a], ey = P[3 * b + 1] - P[3 * a + 1], fx = P[3 * c] - P[3 * a], fy = P[3 * c + 1] - P[3 * a + 1];
+    const nz = ex * fy - ey * fx;
+    const ez = P[3 * b + 2] - P[3 * a + 2], fz = P[3 * c + 2] - P[3 * a + 2];
+    front.push(nz > -EDGE_ON_REL * (ex * ex + ey * ey + ez * ez + fx * fx + fy * fy + fz * fz));
     const f = t - part.t0;
     owner.set(a * NV + b, f); owner.set(b * NV + c, f); owner.set(c * NV + a, f);
   }
@@ -864,7 +1688,14 @@ export function contourLoops(model, part) {
   return loops;
 }
 
-const DRAW_ORDER = ['leg', 'wing2', 'tail', 'wing1', 'antenna', 'body'];
+/* Anatomical draw order: legs, then the wing pairs back to front (the last
+   pair's tail straight after its own wing), antennae, body. */
+const drawOrder = (model) => {
+  const n = model.parts.filter((q) => /^wing\d$/.test(q.kind)).reduce((m, q) => Math.max(m, +q.kind.slice(4)), 0);
+  const wings = [];
+  for (let k = n; k >= 1; k--) { wings.push(`wing${k}`); if (k === n) wings.push('tail'); }
+  return ['leg', ...wings, 'antenna', 'body'];
+};
 export const SVG_INK = '#0A0A0C', SVG_LINE = '#EDEDE8';
 
 function bounds2(loops) {
@@ -875,7 +1706,7 @@ function bounds2(loops) {
 
 export function exportSvg(model, opts = {}) {
   const cutSafe = !!opts.cutSafe;
-  const groups = DRAW_ORDER.map((kind) => ({ kind, parts: model.parts.filter((q) => q.kind === kind) }));
+  const groups = drawOrder(model).map((kind) => ({ kind, parts: model.parts.filter((q) => q.kind === kind) }));
   const partLoops = [];
   for (const g of groups) for (const part of g.parts) partLoops.push({ part, loops: contourLoops(model, part) });
   const all = partLoops.flatMap((pl) => pl.loops);
@@ -891,7 +1722,7 @@ export function exportSvg(model, opts = {}) {
     const d = u.loops.map((L) => 'M' + L.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L') + 'Z').join('');
     return {
       svg: head + meta + `<!-- cut-safe: union of every part, ${u.regions} connected region(s) -->\n<path d="${d}" fill="${SVG_INK}" fill-rule="evenodd"/>\n</svg>\n`,
-      regions: u.regions, widthMm: W, heightMm: H,
+      regions: u.regions, widthMm: W, heightMm: H, frame: { x0: b.x0, y1: b.y1, margin: M },
     };
   }
   let body = '';
@@ -908,7 +1739,7 @@ export function exportSvg(model, opts = {}) {
     const y = P[3 * v0 + 1];
     body += `<line x1="${X(x0)}" y1="${Y(y)}" x2="${X(x1)}" y2="${Y(y)}" stroke="${SVG_LINE}" stroke-width="0.15"/>\n`;
   }
-  return { svg: head + meta + body + '</svg>\n', regions: null, widthMm: W, heightMm: H };
+  return { svg: head + meta + body + '</svg>\n', regions: null, widthMm: W, heightMm: H, frame: { x0: b.x0, y1: b.y1, margin: M } };
 }
 
 /* ------------------------------------------------------------------ */

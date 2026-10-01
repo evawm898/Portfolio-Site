@@ -31,6 +31,7 @@
     --font-mono:'Space Mono', 'IBM Plex Mono', monospace;
   }
   *{box-sizing:border-box;}
+  [hidden]{display:none!important;}
   html,body{height:100%;}
   body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--font-mono);font-size:12px;overflow:hidden;-webkit-font-smoothing:antialiased;}
   #bug-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;}
@@ -66,8 +67,8 @@
   .bg-ctrl.bg-bool label{justify-content:flex-start;gap:8px;align-items:center;}
 
   .bg-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-  button.bg-btn{background:transparent;color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:5px 9px;cursor:pointer;}
-  button.bg-btn:hover{border-color:var(--teal);color:var(--teal);}
+  button.bg-btn,label.bg-btn{background:transparent;color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:5px 9px;cursor:pointer;}
+  button.bg-btn:hover,label.bg-btn:hover{border-color:var(--teal);color:var(--teal);}
   button.bg-btn.is-on{border-color:var(--teal);color:var(--teal);}
   button.bg-btn--solid{background:var(--teal);color:var(--ink);border-color:var(--teal);}
   button.bg-btn--solid:hover{color:var(--ink);opacity:.85;}
@@ -80,7 +81,39 @@
   .bg-svgcard svg{max-width:100%;max-height:100%;width:auto;height:auto;}
   .bg-note{font-size:10px;color:var(--dim-2);line-height:1.5;margin:0;}
 
+  .bg-ctrl.is-linked output{color:var(--dim);}
+  .bg-ctrl input:disabled{opacity:.45;}
+  .bg-tabs button.bg-linked{border-style:dashed;color:var(--dim);}
+  .bg-pairs{border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:8px 0 4px;margin:4px 0 10px;}
+  .bg-pairs .bg-note{margin:0 0 8px;}
+  .bg-design input[type=text], .bg-design select{width:100%;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:4px;margin-bottom:6px;}
+  .bg-msg{font-size:10px;color:var(--dim);line-height:1.5;margin:0 0 8px;min-height:1em;}
+  .bg-msg.is-bad{color:#d98f6a;}
+  label.bg-file{display:inline-block;letter-spacing:0;text-transform:none;}
+  label.bg-file input{display:none;}
+
+  .bg-editor{position:fixed;left:336px;bottom:18px;z-index:4;padding:12px 14px;width:372px;}
+  #editor{width:340px;height:340px;display:block;background:#0f0f12;border:1px solid var(--line);touch-action:none;cursor:crosshair;margin:6px 0 6px;}
+  #editor .ax{stroke:rgba(237,237,232,.18);stroke-width:1;}
+  #editor .axl{fill:var(--dim-2);font-size:9px;font-family:var(--font-mono);}
+  #editor .curve{fill:rgba(95,160,160,.16);stroke:var(--teal);stroke-width:1.6;}
+  #editor .curve.is-linked{stroke-dasharray:4 3;fill:rgba(95,160,160,.07);}
+  #editor .chord{stroke:var(--teal);stroke-dasharray:2 3;fill:none;}
+  #editor .pt{fill:var(--ink);stroke:var(--paper);stroke-width:1.5;cursor:grab;}
+  #editor .pt.root{stroke:var(--teal);}
+  #editor .pt.is-sel{fill:var(--teal);}
+  #editor .pt.tail{stroke:#e2a74c;}
+  #editor .pt.tail.is-sel{fill:#e2a74c;}
+  #editor .thin{stroke:#e5484d;stroke-width:4;fill:none;stroke-linecap:round;opacity:.9;}
+  .bg-readout b.bad{color:#e5484d;}
+  .bg-export-msg{font-size:10px;color:#e5484d;line-height:1.5;margin:0 0 8px;min-height:0;}
+  .bg-ed-status{font-size:10px;color:#d98f6a;min-height:1.2em;margin:0 0 6px;}
+  .bg-bd{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
+  .bg-bd .bg-ctrl{margin:0;}
+
+  @media (max-width:1100px){ .bg-editor{left:auto;right:326px;} }
   @media (max-width:760px){
+    .bg-editor{display:none;}
     .bg-panel{top:auto;height:46vh;left:10px;right:10px;width:auto;bottom:10px;}
     .bg-view{display:none;}
     .bg-header h1{font-size:28px;}
@@ -94,7 +127,7 @@
   <a class="bg-back" href="index.html">&larr; Index</a>
   <div class="bg-eyebrow" style="margin-top:10px">EM / BUG</div>
   <h1>Parametric Bug</h1>
-  <p class="bg-sub">Phase 1 — body, legs, antennae, flat wings. One 3D model; the SVG is its top-down projection, the STL is the solid.</p>
+  <p class="bg-sub">Phase 1 — body, legs, antennae, drawn wings. One 3D model; the SVG is its top-down projection, the STL is the solid.</p>
 </header>
 
 <aside class="bg-view bg-box" aria-label="View and SVG">
@@ -111,16 +144,44 @@
   <p class="bg-note" id="svgNote"></p>
 </aside>
 
+<aside class="bg-editor bg-box" id="editorBox" aria-label="Wing outline editor">
+  <div class="bg-label" id="edTitle">Wing outline</div>
+  <svg id="editor" viewBox="0 0 340 340" preserveAspectRatio="none"></svg>
+  <p class="bg-ed-status" id="edStatus"></p>
+  <div class="bg-row">
+    <button class="bg-btn" id="delPoint">Delete point</button>
+    <span class="bg-note" style="align-self:center">drag a point · double-click the curve to add · right-click a point to delete</span>
+  </div>
+  <div class="bg-label" style="margin-top:4px">Reference backdrop</div>
+  <div class="bg-row">
+    <label class="bg-btn bg-file">Load image<input type="file" id="bdFile" accept="image/*"></label>
+    <button class="bg-btn" id="bdClear">Clear</button>
+  </div>
+  <div class="bg-bd">
+    <div class="bg-ctrl"><label for="bdOpacity"><span>Opacity</span></label><input type="range" id="bdOpacity" min="0" max="1" step="0.01" value="0.5"></div>
+    <div class="bg-ctrl"><label for="bdScale"><span>Scale</span></label><input type="range" id="bdScale" min="0.2" max="3" step="0.01" value="1"></div>
+    <div class="bg-ctrl"><label for="bdX"><span>Offset x</span></label><input type="range" id="bdX" min="-1" max="1" step="0.005" value="0"></div>
+    <div class="bg-ctrl"><label for="bdY"><span>Offset y</span></label><input type="range" id="bdY" min="-1" max="1" step="0.005" value="0"></div>
+  </div>
+</aside>
+
 <aside class="bg-panel bg-box" aria-label="Bug controls">
-  <div class="bg-label">Preset</div>
-  <div class="bg-row" id="presetButtons"></div>
-  <div class="bg-row"><button class="bg-btn" id="randomBtn">Random</button><button class="bg-btn" id="resetBtn">Reset</button></div>
+  <div class="bg-row"><button class="bg-btn" id="randomBtn">Randomize</button><button class="bg-btn" id="resetBtn">Default bug</button></div>
+  <div class="bg-design">
+    <div class="bg-label">My designs</div>
+    <input type="text" id="designName" placeholder="name this design">
+    <div class="bg-row"><button class="bg-btn" id="saveDesign">Save</button><button class="bg-btn" id="exportDesign">Export file</button><label class="bg-btn bg-file">Import file<input type="file" id="importDesign" accept=".json,application/json"></label></div>
+    <select id="designList"></select>
+    <div class="bg-row"><button class="bg-btn" id="loadDesign">Load</button><button class="bg-btn" id="deleteDesign">Delete</button></div>
+    <p class="bg-msg" id="designMsg"></p>
+  </div>
   <div id="controls"></div>
   <div class="bg-label" style="margin-top:12px">Export</div>
   <div class="bg-row">
     <button class="bg-btn bg-btn--solid" id="exportSvg">Get SVG &darr;</button>
     <button class="bg-btn bg-btn--solid" id="exportStl">Get STL &darr;</button>
   </div>
+  <p class="bg-export-msg" id="exportMsg"></p>
   <div class="bg-readout" id="readout"></div>
 </aside>
 
