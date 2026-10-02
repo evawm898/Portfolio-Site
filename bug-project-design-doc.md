@@ -205,6 +205,11 @@ strength claim in this repo is still theory.
 - An import is always mapped into the planform frame first, so it is subject to
   tilt, mirror, and both exports like everything else. Never a separate 2D
   layer pasted onto the SVG.
+- **PARKED by Eva's ruling (Oct 2): she does not want lace SVG import.** It was built
+  in full — roles, warps, blend, islands, the lace floor, against a stand-in test
+  pattern — on branch `claude/lucid-hopper-sjgl2d` (head `81033c1`, gate 219/219 with the
+  negative control passing) and opened as PR #343, which was CLOSED UNMERGED. The branch is
+  kept so the work can be revived; its design is §10 of this document as it stands on that branch. Nothing of it is on `main`.
 
 ### 3.8 Not yet scheduled
 - Colour per region in SVG; print orientation and supports (Phase 1 only REPORTS
@@ -224,7 +229,7 @@ strength claim in this repo is still theory.
 | 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | built (§8, #341 merged) |
 | elegance | the default becomes a pinned specimen; edge profile, teardrop club, groove/bulge segments, pointed tips, SET SPECIMEN | **built (§9)** — waits on Eva's ruling on `docs/img/bug-elegance-sheet.png` |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
-| 4 | SVG import (roles, warps, blend) | — |
+| 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
 Phase 2 started after Eva's ruling on the Phase 1 revision (§6.6, #326 merged).
 
@@ -1221,6 +1226,9 @@ forewings by hand; nothing in the brief derives it).
 read as hair, and the frayed / hairy margin is key to the target look. Revisit with
 Phase 4 (lace / SVG import), where fine line work is the medium. The table and the
 recommendation that followed it are kept as the record of what was weighed.
+**It STAYS OPEN after Phase 4 was parked (Eva, Oct 2)**: the lace branch carried only a
+design proposal for it (Option A via a fringe import, its §10.9), nothing built, and with
+the lace import parked that revisit no longer has a home — the fringe is still undecided.
 
 The fine hairs along a wing's margin are a key part of the target look and cannot
 survive the floor: a cilium is ~0.01–0.05 mm across, the floor 1.0 mm. Options, for
