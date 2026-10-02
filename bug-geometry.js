@@ -18,7 +18,8 @@
    triangles as exact doubles. */
 
 import { planVenation, bridgeHoles, MIN_CELL_MM_DEFAULT } from './bug-venation.js';
-export { MIN_CELL_MM_DEFAULT };
+import { laceWing, lacePattern, LACE_PX, LACE_MAX_BYTES, STAND_IN_NAME } from './bug-lace.js';
+export { MIN_CELL_MM_DEFAULT, STAND_IN_NAME };
 
 const D2R = Math.PI / 180;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -113,6 +114,7 @@ export const SECTIONS = [
   { id: 'antennae', label: 'Antennae' },
   { id: 'wings', label: 'Wings', open: true },
   { id: 'venation', label: 'Venation (Phase 2)' },
+  { id: 'lace', label: 'Lace import (Phase 4)' },
   { id: 'print', label: 'Print' },
 ];
 
@@ -120,6 +122,10 @@ const isThree = (p) => p.bodyParts === '3';
 const hasLegs = (p) => p.legPairs > 0 && p.legsVisible;
 const hasAnt = (p) => p.antennaType !== 'none';
 const hasVeins = (p) => p.venation !== 'none' && p.wingPairs > 0;
+/* Phase 4: does any pair carry a lace import? (the drawn pairs and any
+   unlinked middle one; a linked middle pair blends the two drawn ones) */
+export const anyLace = (p) => hasVeins(p) && [p.wings?.first, p.wings?.last, ...Object.values(p.wings?.unlinked || {})].some((w) => w && w.laceRole >= 0.5 && w.laceBlend > 0);
+const laceIslandsShown = (p) => anyLace(p) && p.venation === 'holes';
 
 const hasWings = (p) => p.wingPairs > 0;
 const isClubbed = (p) => p.antennaType === 'clubbed';
@@ -178,6 +184,17 @@ export const PARAM_SPEC = [
   R('ridgeHeight', 'venation', 'Ridge height (STL)', 0.2, 2, 0.05, 0.6, 'mm', (p) => hasVeins(p) && p.venation === 'ridges'),
   R('minCellMm', 'venation', 'Smallest hole across — smaller cells merge', 0.5, 5, 0.1, MIN_CELL_MM_DEFAULT, 'mm', (p) => hasVeins(p) && p.venation === 'holes'),
 
+  /* Phase 4 — the lace import (bug-lace.js). The artwork itself lives in
+     params.lace ({ name, svg }; '' is the STAND-IN test pattern); its role,
+     warp and placement are per pair (WING_FIELDS, blended on linked pairs).
+     ISLANDS: lace pieces joined to nothing would print loose. Three answers,
+     and deliberately NO DEFAULT among them (Eva's brief): while the choice is
+     unset and a HOLES lace has islands, the STL is blocked and says why. */
+  { id: 'laceIslands', section: 'lace', label: 'Islands (HOLES) — lace pieces joined to nothing', kind: 'choice', default: 'unset',
+    options: [['unset', '— choose — (no default: the STL waits)'], ['drop', 'DROP islands under a size'], ['bridge', 'BRIDGE islands to the frame with floored ties'], ['svg', 'SVG-ONLY lace — the STL keeps the procedural veins']], visibleWhen: laceIslandsShown },
+  R('laceDropMm2', 'lace', 'Drop islands smaller than', 0, 60, 0.5, 4, 'mm²', (p) => laceIslandsShown(p) && p.laceIslands === 'drop'),
+  R('laceTieMm', 'lace', 'Tie width (never under the min feature)', 0.6, 3, 0.05, 1.0, 'mm', (p) => laceIslandsShown(p) && p.laceIslands === 'bridge'),
+
   R('minDiameter', 'print', 'Min feature diameter (STL floor)', 0.6, 2, 0.05, MIN_DIAMETER_DEFAULT, 'mm'),
 ];
 
@@ -207,9 +224,22 @@ export const WING_FIELDS = [
   WR('stigma', 'Pterostigma (0 off, 1 on)', 0, 1, 1, 0, '', (w, p) => hasVeins(p)),
   WR('stigmaSize', 'Pterostigma size', 0.03, 0.4, 0.01, 0.12, '', (w, p) => hasVeins(p) && w.stigma >= 0.5),
   WR('marginBorder', 'Margin border width', 0.4, 4, 0.05, 1.0, 'mm', (w, p) => hasVeins(p)),
+  /* Phase 4 — the lace import, per pair. `labels` makes the page draw a
+     choice; the value stays an integer so a linked middle pair blends it like
+     every other field (rounded). */
+  { ...WR('laceRole', 'Lace import — role', 0, 2, 1, 0, '', (w, p) => hasVeins(p)), labels: ['none', 'FILL CELLS — lace in every cell, the veins stay', 'REPLACE VEINS — one lace panel, the veins hidden'] },
+  { ...WR('laceWarp', 'Lace warp', 0, 2, 1, 0, '', (w, p) => hasVeins(p) && w.laceRole >= 0.5), labels: ['CLIP — placed as drawn, no distortion', 'RADIAL — bent round the wing root', 'ENVELOPE — its box stretched to the outline'] },
+  WR('laceScale', 'Lace scale (1 — CLIP: 40 mm across; RADIAL / ENVELOPE: once over the wing)', 0.1, 4, 0.01, 1, '', (w, p) => hasVeins(p) && w.laceRole >= 0.5),
+  WR('laceRotate', 'Lace rotation', -180, 180, 1, 0, '°', (w, p) => hasVeins(p) && w.laceRole >= 0.5),
+  WR('laceOffsetU', 'Lace offset along the span', -1, 1, 0.01, 0, '', (w, p) => hasVeins(p) && w.laceRole >= 0.5),
+  WR('laceOffsetW', 'Lace offset across the chord', -1, 1, 0.01, 0, '', (w, p) => hasVeins(p) && w.laceRole >= 0.5),
+  { ...WR('laceTile', 'Lace — repeat the artwork', 0, 1, 1, 1, '', (w, p) => hasVeins(p) && w.laceRole >= 0.5), labels: ['once (a single panel)', 'tiled'] },
+  WR('laceBlend', 'Blend — procedural veins ↔ import', 0, 1, 0.01, 1, '', (w, p) => hasVeins(p) && w.laceRole >= 0.5),
 ];
+export const LACE_FIELD_IDS = ['laceRole', 'laceWarp', 'laceScale', 'laceRotate', 'laceOffsetU', 'laceOffsetW', 'laceTile', 'laceBlend'];
+const LACE_DEFAULTS = Object.fromEntries(WING_FIELDS.filter((f) => LACE_FIELD_IDS.includes(f.id)).map((f) => [f.id, f.default]));
 export const VENATION_FIELD_IDS = ['veinCount', 'veinBranch', 'discal', 'discalSize', 'discalPos', 'crossDensity', 'cellRegularity', 'veinWidth', 'veinTaper', 'stigma', 'stigmaSize', 'marginBorder'];
-const VEIN_DEFAULTS = Object.fromEntries(WING_FIELDS.filter((f) => VENATION_FIELD_IDS.includes(f.id)).map((f) => [f.id, f.default]));
+const VEIN_DEFAULTS = { ...Object.fromEntries(WING_FIELDS.filter((f) => VENATION_FIELD_IDS.includes(f.id)).map((f) => [f.id, f.default])), ...LACE_DEFAULTS };
 
 /* The neutral default: a plain rounded forewing and a shorter, rounder hindwing
    swept back. Not any named insect. Points are [u, w]: u along the span from the
@@ -259,6 +289,7 @@ export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, tho
 
 export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
 DEFAULTS.wings = DEFAULT_WINGS;   // .tail filled in after STARTER_TAIL (below)
+DEFAULTS.lace = { name: '', svg: '' };   // Phase 4: the imported artwork; '' = the stand-in test pattern
 
 export const defaultParams = () => clone(DEFAULTS);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -1251,7 +1282,7 @@ export function wingHinges(p, L) {
    vertices are almost collinear reads its facing as noise — the first sheet
    showed them as stray zero-area contour loops (thin lines across the wing in
    the SVG). Collinear vertices are removed without a triangle. */
-function earClip(poly) {
+export function earClip(poly) {
   const V = [...Array(poly.length).keys()], tris = [];
   const cr2 = (p, a, b) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
   const cr = (a, b, c) => cr2(poly[c], poly[a], poly[b]);
@@ -1296,6 +1327,68 @@ function earClip(poly) {
     V.splice(best, 1);
   }
   if (V.length === 3 && cr(V[0], V[1], V[2]) > 0) tris.push([V[0], V[1], V[2]]);
+  return tris;
+}
+
+/* Ear clipping for the LACE frames (Phase 4): a cell with a lace in it is one
+   polygon of a few thousand vertices once its holes are bridged in, and
+   earClip above (best ear by angle, every vertex tested against every ear)
+   is cubic in that. This is the textbook linear-walk clipper with the
+   blocking test confined to the REFLEX vertices, bucketed in a grid: only a
+   reflex vertex can lie inside an ear of a simple polygon. Quality comes
+   afterwards from improveTriangulation's flips. Exactly collinear vertices
+   are never an ear tip; if the walk stalls, one is dropped (as earClip drops
+   them) and triangulateCell puts the shared ones back. Coincident vertices —
+   the doubled ends of a bridge — never block. */
+export function fastEarClip(poly) {
+  const n = poly.length, tris = [];
+  if (n < 3) return tris;
+  const prev = new Int32Array(n), next = new Int32Array(n);
+  for (let i = 0; i < n; i++) { prev[i] = (i + n - 1) % n; next[i] = (i + 1) % n; }
+  const cr = (a, b, c) => (poly[b][0] - poly[a][0]) * (poly[c][1] - poly[a][1]) - (poly[b][1] - poly[a][1]) * (poly[c][0] - poly[a][0]);
+  const alive = new Uint8Array(n).fill(1);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const cs = Math.max(x1 - x0, y1 - y0) / Math.max(1, Math.sqrt(n)) || 1;
+  const gw = Math.floor((x1 - x0) / cs) + 1, gh = Math.floor((y1 - y0) / cs) + 1, grid = new Map();
+  const cellOf = (q) => [Math.floor((q[0] - x0) / cs), Math.floor((q[1] - y0) / cs)];
+  for (let i = 0; i < n; i++) if (cr(prev[i], i, next[i]) <= 0) { const [gx, gy] = cellOf(poly[i]); const k = gy * gw + gx; (grid.get(k) || grid.set(k, []).get(k)).push(i); }
+  const same = (p, q) => p[0] === q[0] && p[1] === q[1];
+  const isEar = (b) => {
+    const a = prev[b], c = next[b];
+    if (!(cr(a, b, c) > 0)) return false;
+    const A = poly[a], B = poly[b], C = poly[c];
+    const [ia, ja] = cellOf([Math.min(A[0], B[0], C[0]), Math.min(A[1], B[1], C[1])]), [ib, jb] = cellOf([Math.max(A[0], B[0], C[0]), Math.max(A[1], B[1], C[1])]);
+    for (let gy = Math.max(0, ja); gy <= Math.min(gh - 1, jb); gy++) for (let gx = Math.max(0, ia); gx <= Math.min(gw - 1, ib); gx++) {
+      const list = grid.get(gy * gw + gx); if (!list) continue;
+      for (const m of list) {
+        if (!alive[m] || m === a || m === b || m === c) continue;
+        const q = poly[m];
+        if (same(q, A) || same(q, B) || same(q, C)) continue;
+        if (cr(prev[m], m, next[m]) > 0) continue;   // convex now: cannot block
+        const o1 = (B[0] - A[0]) * (q[1] - A[1]) - (B[1] - A[1]) * (q[0] - A[0]);
+        const o2 = (C[0] - B[0]) * (q[1] - B[1]) - (C[1] - B[1]) * (q[0] - B[0]);
+        const o3 = (A[0] - C[0]) * (q[1] - C[1]) - (A[1] - C[1]) * (q[0] - C[0]);
+        if (o1 >= 0 && o2 >= 0 && o3 >= 0) return false;
+      }
+    }
+    return true;
+  };
+  let remaining = n, i = 0, stall = 0;
+  const unlink = (b) => { const a = prev[b], c = next[b]; next[a] = c; prev[c] = a; alive[b] = 0; remaining--; return a; };
+  while (remaining > 3) {
+    if (isEar(i)) { tris.push([prev[i], i, next[i]]); i = next[unlink(i)]; stall = 0; continue; }
+    i = next[i];
+    if (++stall > remaining) {
+      // no ear on a full walk: drop one exactly collinear (or doubled) vertex
+      let j = i, found = -1;
+      for (let k = 0; k < remaining; k++, j = next[j]) if (cr(prev[j], j, next[j]) === 0) { found = j; break; }
+      if (found < 0) throw new Error('fastEarClip: polygon is not simple');
+      i = next[unlink(found)]; stall = 0;
+    }
+  }
+  const a = prev[i], c = next[i];
+  if (cr(a, i, c) > 0) tris.push([a, i, c]);
   return tris;
 }
 
@@ -1455,8 +1548,27 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     const flags = tailFlagsFor(spec, scalloped.length);
     plan = planVenation(scalloped, flags, spec, { holes: mode === 'holes', minCellMm: p.minCellMm });
   }
+  /* Phase 4 — the LACE import, on the same planform and the same cells. The
+     blend at 0 is the procedural wing BY BRANCH (nothing below runs). */
+  let lace = null, laceRole = null, laceNote = null;
+  if (plan && spec.laceRole >= 0.5 && spec.laceBlend > 0) {
+    const pattern = lacePattern(p.lace);
+    if (!pattern.ok) laceNote = `pair ${spec.index + 1}: the lace import was not read (${pattern.reason}); the procedural venation is shown`;
+    else {
+      laceRole = spec.laceRole >= 1.5 ? 'replace' : 'fill';
+      lace = laceWing(laceInputs(p, spec, plan, mode, laceRole, pattern));
+      lace.name = pattern.name; lace.standIn = pattern.standIn; lace.importNotes = pattern.notes || [];
+    }
+  }
+  const svgOnly = !!(lace && mode === 'holes' && p.laceIslands === 'svg');
+  const laceMesh = !!(lace && mode === 'holes' && !svgOnly);
   let tri, pts;
-  if (plan && mode === 'holes') {
+  if (laceMesh) {
+    // the lace FRAME replaces the procedural one; it is dense already (a
+    // vertex every few tenths of a millimetre round every hole), so it is not
+    // subdivided
+    ({ pts, tris: tri } = laceFrameMesh(lace, plan, laceRole, embed, n0, n1));
+  } else if (plan && mode === 'holes') {
     // ONE conforming triangulation: every cut cell is a ring of quads between
     // its outline and its hole, every solid cell is ear-clipped with its shared
     // vertices kept, and the root tab is three triangles through R — so the
@@ -1466,7 +1578,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   } else {
     tri = delaunayFlip(poly, earClip(poly)); pts = poly;
   }
-  for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri } = subdivide(pts, tri));
+  if (!laceMesh) for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri } = subdivide(pts, tri));
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
   const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part);
   // the EDGE's own thickness, for the gate to measure off the emitted vertices:
@@ -1489,9 +1601,14 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // viewer and along the bottom rim where the wall faces up, so a gate
     // matching the contour against the top rim alone reads the bottom-rim
     // stretches as strays (1.04 mm off at a 1.2 mm sheet and 60 degrees)
-    part.meta.holeLoops = plan.cells.flatMap((c) => c.holes.flatMap((h) => [h.map((q) => xy(q, hAt(q))), h.map((q) => xy(q, -hAt(q)))]));
+    const holePolys = laceMesh ? lace.regions.flatMap((R) => R.holes) : plan.cells.flatMap((c) => c.holes);
+    part.meta.holeLoops = holePolys.flatMap((h) => [h.map((q) => xy(q, hAt(q))), h.map((q) => xy(q, -hAt(q)))]);
     part.meta.svgStigma = mode === 'ridges' ? plan.cells.filter((c) => c.role === 'stigma').map((c) => c.points.map((q) => xy(q, hAt(q)))) : [];
-    part.meta.svgVeins = mode === 'ridges' ? plan.veins.filter((v) => !v.dropped).map((v) => ({ pts: v.points.map((q) => xy(q, hAt(q))), width: (v.width[0] + v.width[1]) / 2 })) : [];
+    // a RIDGES lace that REPLACES the veins hides them (in the SVG too)
+    part.meta.svgVeins = mode === 'ridges' && laceRole !== 'replace' ? plan.veins.filter((v) => !v.dropped).map((v) => ({ pts: v.points.map((q) => xy(q, hAt(q))), width: (v.width[0] + v.width[1]) / 2 })) : [];
+    // RIDGES + lace: the wing is drawn as PAPER and the lace and veins in ink
+    // ("lace in black on the wing"); HOLES needs nothing — the wing IS the lace
+    part.meta.laceInk = !!(lace && mode === 'ridges');
     part.meta.veinWorld = plan.veins.filter((v) => !v.dropped).flatMap((v) => { const o = []; for (let i = 0; i + 1 < v.points.length; i++) o.push(W(v.points[i][0], v.points[i][1], hAt(v.points[i]) + 0.02), W(v.points[i + 1][0], v.points[i + 1][1], hAt(v.points[i + 1]) + 0.02)); return o; });
     // the vein floor: the narrowest vein (the tip width under the taper) and,
     // in HOLES, the margin border, against minDiameter — the same block-the-STL
@@ -1521,9 +1638,133 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     if (thin.flags[i] && thin.flags[j]) seg.push(W(scalloped[i][0], scalloped[i][1], lift(scalloped[i])), W(scalloped[j][0], scalloped[j][1], lift(scalloped[j])));
   }
   part.meta.thinWorld = seg;
+  // Phase 4: the lace record and its floor (the STL is blocked by a thin
+  // thread, and in HOLES by islands left loose — never by an SVG-only lace)
+  if (lace) {
+    const toWorld = (L) => { const o = []; for (let i = 0; i < L.length; i++) { const a = L[i], b = L[(i + 1) % L.length]; o.push(W(a[0], a[1], hAt(a) + 0.02), W(b[0], b[1], hAt(b) + 0.02)); } return o; };
+    const kept = mode === 'holes' ? lace.islands.length : 0;
+    part.meta.lace = {
+      role: laceRole, mode, svgOnly, name: lace.name, standIn: lace.standIn, importNotes: lace.importNotes,
+      spec: Object.fromEntries(LACE_FIELD_IDS.map((k) => [k, spec[k]])),
+      regions: lace.regions.map((R) => ({ id: R.id, polygon: R.polygon, holes: R.holes, islands: R.islands })),
+      islands: lace.islands, plates: lace.plates, ties: lace.ties, seam: lace.seam, thin: { thin: lace.thin.thin, depthMm: lace.thin.depthMm, thinPx: lace.thin.thinPx }, stats: lace.stats, mapper: lace.mapper,
+      islandOption: p.laceIslands, keptIslands: kept,
+    };
+    part.meta.laceFloor = {
+      thin: lace.thin.thin && !svgOnly, depthMm: lace.thin.depthMm,
+      islands: !svgOnly && kept > 0, islandCount: kept, islandOption: p.laceIslands, dropMm2: p.laceDropMm2,
+      largestIsland: lace.islands.reduce((m, x) => Math.max(m, x.area), 0),
+    };
+    part.meta.laceThinWorld = lace.thin.thin ? lace.thin.loops.flatMap(toWorld) : [];
+    part.meta.islandWorld = kept && !svgOnly ? lace.islands.flatMap((x) => toWorld(x.outer)) : [];
+    part.meta.laceNotes = [];
+    if (svgOnly && lace.thin.thin) part.meta.laceNotes.push(`pair ${spec.index + 1}: the SVG-only lace has threads narrower than the floor (it is not printed; the STL carries the procedural venation)`);
+  }
+  if (laceNote) part.meta.laceNotes = [laceNote];
   acc.end();
 
-  if (plan && mode === 'ridges') buildRidges(acc, plan, W, edge.flat ? () => thick / 2 : edge.h, p.ridgeHeight, spec.index);
+  const halfAt = edge.flat ? () => thick / 2 : edge.h;
+  // RIDGES: the vein strips (hidden when a lace REPLACES them), then the lace
+  // plates — each its own closed shell on the solid wing (no island problem)
+  if (plan && mode === 'ridges' && laceRole !== 'replace') buildRidges(acc, plan, W, halfAt, p.ridgeHeight, spec.index);
+  if (lace && mode === 'ridges' && lace.plates.length) buildLacePlates(acc, lace.plates, W, halfAt, p.ridgeHeight, spec.index);
+  // HOLES: islands that stay (unset / over the drop threshold) are their own
+  // part, so the cut-safe SVG can leave them out and the gate can count them
+  if (laceMesh && lace.islands.length) buildIslands(acc, lace.islands, W, halfAt, spec.index, false);
+  // SVG-ONLY: the lace frame and its islands are parts the STL skips (a
+  // declared exception to the one-model rule, §10.4) — the wing part above
+  // is the procedural frame the STL carries
+  if (svgOnly) {
+    const { pts: lp, tris: lt } = laceFrameMesh(lace, plan, laceRole, embed, n0, n1);
+    const sp = acc.begin(`svglace${spec.index + 1}`, `svglace${spec.index + 1}`, 'R');
+    planformSlab(acc, lp, lt, halfAt, W, sp);
+    delete sp.meta.thickPairs;
+    sp.meta.svgOnly = true; sp.meta.pair = spec.index;
+    acc.end();
+    if (lace.islands.length) buildIslands(acc, lace.islands, W, halfAt, spec.index, true);
+  }
+}
+
+/* Phase 4 — what laceWing needs for one wing: the regions (every cell in
+   FILL CELLS, the whole outline in REPLACE VEINS) with their frame bands (half
+   the vein width along a vein edge, the margin border along the outline and
+   the root — plus 1.5 raster pixels, the HOLES rule), and the procedural
+   material the blend morphs from. */
+function laceInputs(p, spec, plan, mode, role, pattern) {
+  const border = spec.marginBorder, slack = 1.5 * LACE_PX, O = plan.outline;
+  const ring = (P) => P.map((q, i) => [q, P[(i + 1) % P.length]]);
+  let regions;
+  if (role === 'fill') {
+    regions = plan.cells.map((c) => ({
+      id: c.id, polygon: c.points, solid: c.role === 'stigma',
+      bands: [...c.points.map((q, i) => [q, c.points[(i + 1) % c.points.length], (c.edges[i].kind === 'vein' ? c.edges[i].width / 2 : border) + slack]),
+        ...ring(O).map(([a, b]) => [a, b, border + slack])],
+    }));
+  } else regions = [{ id: 0, polygon: O, bands: ring(O).map(([a, b]) => [a, b, border + slack]) }];
+  const proc = mode === 'holes'
+    ? { holes: plan.cells.flatMap((c) => c.holes) }
+    : { capsules: plan.veins.filter((v) => !v.dropped).flatMap((v) => { const o = []; for (let i = 0; i + 1 < v.points.length; i++) o.push([v.points[i], v.points[i + 1], (v.width[0] + v.width[1]) / 4]); return o; }) };
+  return {
+    outline: O, regions, pattern, spec, mode, role, floor: p.minDiameter, minCellMm: p.minCellMm,
+    islands: p.laceIslands, dropMm2: p.laceDropMm2, tieMm: Math.max(p.laceTieMm, p.minDiameter), proc, span: spec.length,
+    seamWidth: Math.max(p.minDiameter, spec.veinWidth * (1 - spec.veinTaper / 2)),   // the blend's arc is a vein: the mid-taper width
+  };
+}
+
+/* One conforming triangulation of a lace frame: every region's EXACT polygon
+   with its traced holes bridged in (so a cell edge is still the same two
+   indices in both cells), plus the root tab fanned over the root chord. */
+function laceFrameMesh(lace, plan, role, embed, lead, trail) {
+  const key = new Map(), pts = [], tris = [];
+  const vid = (q) => { const k = `${q[0]},${q[1]}`; let i = key.get(k); if (i === undefined) { i = pts.length; pts.push([q[0], q[1]]); key.set(k, i); } return i; };
+  for (const R of lace.regions) {
+    const outer = R.polygon;
+    const bridged = R.holes.length ? bridgeHoles(outer, R.holes) : outer;
+    const poly = bridged || outer;
+    if (!bridged) { R.holes = []; R.bridgeFailed = true; }
+    const outerKeys = new Set(outer.map((q) => `${q[0]},${q[1]}`));
+    const keep = []; poly.forEach((q, i) => { if (outerKeys.has(`${q[0]},${q[1]}`)) keep.push(i); });
+    const ids = poly.map(vid);
+    for (const [a, b, c] of triangulateCell(poly, { fast: true, keep })) { const t = [ids[a], ids[b], ids[c]]; if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push(t); }
+  }
+  const tt = vid([-embed, trail[1]]), lt = vid([-embed, lead[1]]);
+  const O = plan.outline;
+  const ch = (role === 'fill' ? plan.rootChord : [O[0], O[O.length - 1]]).map(vid);   // trail ... lead
+  for (let i = 0; i + 1 < ch.length; i++) tris.push([tt, ch[i], ch[i + 1]]);
+  tris.push([tt, ch[ch.length - 1], lt]);
+  return { pts, tris };
+}
+
+/* polygons-with-holes -> one triangle set over one vertex pool */
+function polysMesh(list) {
+  const key = new Map(), pts = [], tris = [];
+  const vid = (q) => { const k = `${q[0]},${q[1]}`; let i = key.get(k); if (i === undefined) { i = pts.length; pts.push([q[0], q[1]]); key.set(k, i); } return i; };
+  for (const { outer, holes } of list) {
+    const poly = (holes.length && bridgeHoles(outer, holes)) || outer;
+    const ids = poly.map(vid);
+    for (const [a, b, c] of triangulateCell(poly, { fast: true, keep: [] })) { const t = [ids[a], ids[b], ids[c]]; if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push(t); }
+  }
+  return { pts, tris };
+}
+function buildIslands(acc, islands, W, halfAt, pairIndex, svgOnly) {
+  const { pts, tris } = polysMesh(islands);
+  const part = acc.begin(`island${pairIndex + 1}`, `island${pairIndex + 1}`, 'R');
+  planformSlab(acc, pts, tris, halfAt, W, part);
+  part.meta.pair = pairIndex; part.meta.island = true; part.meta.svgOnly = svgOnly; part.meta.count = islands.length;
+  acc.end();
+}
+/* RIDGES lace: every plate raised from just inside the top skin to
+   ridgeHeight above it — the vein strips' own section, as one closed part */
+function buildLacePlates(acc, plates, W, halfAt, ridgeH, pairIndex) {
+  const h0f = (u, w) => { const half = halfAt(u, w); return half - Math.min(0.15, half * 0.5); };
+  const h1f = (u, w) => halfAt(u, w) + ridgeH;
+  const { pts, tris } = polysMesh(plates);
+  const part = acc.begin(`lace${pairIndex + 1}`, `lace${pairIndex + 1}`, 'R');
+  const W2 = (u, w, h) => W(u, w, (h0f(u, w) + h1f(u, w)) / 2 + h);
+  planformSlab(acc, pts, tris, (u, w) => (h1f(u, w) - h0f(u, w)) / 2, W2, part);
+  delete part.meta.thickPairs;   // a plate's height is the ridge height; its floor is on its WIDTH (the lace floor)
+  part.meta.pair = pairIndex; part.meta.plates = plates.length;
+  acc.end();
 }
 
 /* Tail flags per DENSE outline sample: sampleOutline() emits CR_SAMPLES points
@@ -1547,7 +1788,7 @@ function tailFlagsFor(spec, n) {
    reads as two boundary edges). The collinear vertices are removed first,
    recorded, and after triangulation each is put back by splitting the one
    triangle that carries the chord it lies on. */
-function triangulateCell(poly) {
+export function triangulateCell(poly, opts = {}) {
   triangulateCell.failures = triangulateCell.failures || [];
   const n = poly.length;
   const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
@@ -1566,7 +1807,7 @@ function triangulateCell(poly) {
     }
   }
   let tris;
-  try { tris = earClip(V.map((i) => poly[i])).map((t) => t.map((k) => V[k])); }
+  try { tris = (opts.fast ? fastEarClip : earClip)(V.map((i) => poly[i])).map((t) => t.map((k) => V[k])); }
   catch (e) { // a numerically degenerate cell: fan from its first vertex (reported by the gate's O/W clauses if it ever mattered)
     triangulateCell.failures.push({ n: poly.length, reason: String(e.message || e) });
     tris = []; for (let i = 1; i + 1 < V.length; i++) tris.push([V[0], V[i], V[i + 1]]);
@@ -1580,7 +1821,7 @@ function triangulateCell(poly) {
     const ia = t.indexOf(a), forward = t[(ia + 1) % 3] === c;
     tris.splice(ti, 1, forward ? [a, m, x] : [m, a, x], forward ? [m, c, x] : [c, m, x]);
   }
-  return improveTriangulation(poly, reinsertUnused(poly, tris));
+  return improveTriangulation(poly, reinsertUnused(poly, tris, opts.keep));
 }
 
 /* earClip drops a vertex that is EXACTLY collinear with its two current
@@ -1596,7 +1837,7 @@ function triangulateCell(poly) {
    (the triangle across the edge too, when it is a diagonal); the dropped
    vertex is still USED elsewhere by the restored fan, so unused-ness is not
    the test, the spanning edge is. */
-function reinsertUnused(poly, tris) {
+function reinsertUnused(poly, tris, keep = null) {
   const onSeg = (p, a, b) => {
     const ab = [b[0] - a[0], b[1] - a[1]], L2 = ab[0] * ab[0] + ab[1] * ab[1];
     if (!(L2 > 0)) return Infinity;
@@ -1606,11 +1847,14 @@ function reinsertUnused(poly, tris) {
   };
   // every triangle edge that passes through a polygon vertex (not its own end,
   // and not a doubled copy of one) is split there, on both sides of the edge
-  for (let guard = 0; guard < 4 * poly.length; guard++) {
+  // `keep` (Phase 4's lace frames, thousands of vertices): only the vertices
+  // another cell shares can make a T-junction, so only they are scanned
+  const cand = keep || [...poly.keys()];
+  for (let guard = 0; guard < 4 * cand.length + 4; guard++) {
     let hit = null;
     for (let i = 0; i < tris.length && !hit; i++) for (let e = 0; e < 3 && !hit; e++) {
       const u = tris[i][e], v = tris[i][(e + 1) % 3];
-      for (let m = 0; m < poly.length; m++) {
+      for (const m of cand) {
         if (m === u || m === v) continue;
         const q = poly[m];
         if ((q[0] === poly[u][0] && q[1] === poly[u][1]) || (q[0] === poly[v][0] && q[1] === poly[v][1])) continue;
@@ -2005,12 +2249,16 @@ export function normalizeParams(p, notes = []) {
     const i = Number(k);
     if (Number.isInteger(i) && i >= 1 && i <= MAX_WING_PAIRS - 2 && w) q.wings.unlinked[i] = normalizeWing(w, DEFAULT_WINGS.first, notes, `pair ${i + 1}`);
   }
+  // Phase 4: the imported artwork (text), refused when too large
+  const L = p.lace || {};
+  q.lace = { name: typeof L.name === 'string' ? L.name.slice(0, 200) : '', svg: typeof L.svg === 'string' ? L.svg : '' };
+  if (q.lace.svg.length > LACE_MAX_BYTES) { notes.push(`the lace import is ${(q.lace.svg.length / 1e6).toFixed(1)} MB, over the ${(LACE_MAX_BYTES / 1e6).toFixed(0)} MB limit; the stand-in pattern was used`); q.lace = { name: '', svg: '' }; }
   return q;
 }
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 4;   // 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 5;   // 5: the lace import (Phase 4) — per-pair lace fields and params.lace, all defaulted (role none) when absent, so an older file looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -2040,6 +2288,8 @@ export function buildBug(params) {
   for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
   for (const s of pairs) if (s.repaired) notes.push(`pair ${s.index + 1}: the interpolated outline crossed itself and was eased toward the nearer drawn pair (t ${s.t.toFixed(2)} -> ${s.tUsed.toFixed(2)})`);
   for (const part of acc.parts) if (part.meta.scallopReduced) notes.push(`pair ${part.meta.pair + 1}: scallop depth reduced so the outline does not cross itself`);
+  for (const part of acc.parts) for (const n of part.meta.laceNotes || []) notes.push(n);
+  for (const part of acc.parts) if (part.meta.lace) for (const n of part.meta.lace.importNotes) notes.push(`lace import: ${n}`);
 
   // Mirror every right-side part into its left twin.
   const rightParts = acc.parts.filter((q) => q.side === 'R');
@@ -2065,10 +2315,15 @@ export function buildBug(params) {
         // Phase 2: the venation record (planform mm) — cells as closed polygons, veins, holes
         venation: part.meta.venation || null,
         veinFloor: part.meta.veinFloor || null,
+        // Phase 4: the lace record (planform mm; the right wing — the left is its mirror)
+        lace: part.meta.lace || null,
+        laceFloor: part.meta.laceFloor || null,
         // both wings: the right's runs and their mirror images; a vein-floor
         // violation adds the vein centrelines, so the page draws THEM red
         thinSegments: [...part.meta.thinWorld, ...part.meta.thinWorld.map(([x, y, z]) => [mx(x), y, z]),
-          ...(part.meta.veinFloor && part.meta.veinFloor.under ? [...part.meta.veinWorld, ...part.meta.veinWorld.map(([x, y, z]) => [mx(x), y, z])] : [])] };
+          ...(part.meta.veinFloor && part.meta.veinFloor.under ? [...part.meta.veinWorld, ...part.meta.veinWorld.map(([x, y, z]) => [mx(x), y, z])] : []),
+          ...(part.meta.laceFloor && part.meta.laceFloor.thin ? [...part.meta.laceThinWorld, ...part.meta.laceThinWorld.map(([x, y, z]) => [mx(x), y, z])] : []),
+          ...(part.meta.laceFloor && part.meta.laceFloor.islands ? [...part.meta.islandWorld, ...part.meta.islandWorld.map(([x, y, z]) => [mx(x), y, z])] : [])] };
     }),
     // every pair whose DRAWN planform is narrower than the floor somewhere: the
     // STL exporter refuses the model while this list is not empty (see exportStl).
@@ -2086,12 +2341,23 @@ export function buildBug(params) {
         const vf = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.veinFloor;
         return vf && vf.under ? { pair: s.index, kind: 'vein', veinMin: vf.veinMin, border: vf.border, thin: true, blendedFrom: s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null } : null;
       }).filter(Boolean),
+      // Phase 4: a lace thread under the floor, or (HOLES) islands left loose
+      ...pairs.flatMap((s) => {
+        const lf = acc.parts.find((q) => q.kind === `wing${s.index + 1}` && q.side === 'R').meta.laceFloor;
+        if (!lf) return [];
+        const blendedFrom = s.role === 'mid' && s.linked ? [0, p.wingPairs - 1] : null, out = [];
+        if (lf.thin) out.push({ pair: s.index, kind: 'lace', depthMm: lf.depthMm, thin: true, blendedFrom });
+        if (lf.islands) out.push({ pair: s.index, kind: 'island', count: lf.islandCount, option: lf.islandOption, dropMm2: lf.dropMm2, largest: lf.largestIsland, thin: true, blendedFrom });
+        return out;
+      }),
     ],
     notes,
     positions: Float64Array.from(acc.pos),
     indices: Uint32Array.from(acc.idx),
     parts: acc.parts,
     triangleCount: acc.idx.length / 3,
+    // what the STL carries: every part but an SVG-only lace's
+    stlTriangleCount: acc.parts.filter((q) => !q.meta.svgOnly).reduce((n, q) => n + q.t1 - q.t0, 0),
   };
 }
 
@@ -2105,7 +2371,7 @@ function mirrorMeta(m, shift) {
     else if (k === 'club') out[k] = { ...v, rings: v.rings.map(([a, n]) => [a + shift, n]) };
     else if (k === 'holeLoops' || k === 'svgStigma') out[k] = v.map((L) => L.map(([x, y]) => [mx(x), y]));
     else if (k === 'svgVeins') out[k] = v.map((l) => ({ ...l, pts: l.pts.map(([x, y]) => [mx(x), y]) }));
-    else if (k === 'veinWorld') out[k] = v.map(([x, y, z]) => [mx(x), y, z]);
+    else if (k === 'veinWorld' || k === 'laceThinWorld' || k === 'islandWorld') out[k] = v.map(([x, y, z]) => [mx(x), y, z]);
     else out[k] = v;
   }
   return out;
@@ -2164,6 +2430,13 @@ export function floorReason(model) {
   const f = model.params.minDiameter.toFixed(2);
   return model.floorViolations.map((v) => {
     const k = v.pair + 1;
+    const blendNote = v.blendedFrom ? (() => { const [a, b] = v.blendedFrom.map((i) => i + 1); return ` Pair ${k} is blended from pairs ${a} and ${b}. Change those, or unlink pair ${k} to edit it directly.`; })() : '';
+    if (v.kind === 'lace') return `Pair ${k}'s lace has threads narrower than the ${f} mm floor (the narrow part reaches ${v.depthMm.toFixed(2)} mm past where a floor-wide disc fits — shown red in the view).${blendNote || ' Raise its lace scale, or use a lace with heavier threads.'}`;
+    if (v.kind === 'island') {
+      const n = `${v.count} floating island${v.count === 1 ? '' : 's'} (lace pieces joined to nothing, which would print loose — shown red in the view)`;
+      if (v.option === 'drop') return `Pair ${k}'s lace keeps ${n}: ${v.count === 1 ? 'it is' : 'they are'} larger than the ${v.dropMm2.toFixed(1)} mm² drop size (the largest ${v.largest.toFixed(1)} mm²). Raise the drop size, or choose bridge or SVG-only under Lace import.${blendNote}`;
+      return `Pair ${k}'s lace has ${n}. Choose how islands are handled under Lace import — drop, bridge, or SVG-only.${blendNote}`;
+    }
     if (v.kind === 'vein') {
       const what = v.veinMin < model.params.minDiameter ? `veins taper to ${v.veinMin.toFixed(2)} mm` : `margin border is ${v.border.toFixed(2)} mm`;
       const fix = v.veinMin < model.params.minDiameter ? 'Raise its vein width or lower its taper' : 'Widen its margin border';
@@ -2179,8 +2452,16 @@ export function floorReason(model) {
   }).join(' ');
 }
 export function exportStl(model, opts = {}) {
-  if (model.floorViolations && model.floorViolations.length && !opts.allowBelowFloor) throw new FloorError(`STL not exported. ${floorReason(model)} Or lower the floor in Print.`);
-  const P = model.positions, I = model.indices, n = I.length / 3;
+  if (model.floorViolations && model.floorViolations.length && !opts.allowBelowFloor) {
+    const onlyIslands = model.floorViolations.every((v) => v.kind === 'island');
+    throw new FloorError(`STL not exported. ${floorReason(model)}${onlyIslands ? '' : ' Or lower the floor in Print.'}`);
+  }
+  // an SVG-ONLY lace (Phase 4, §10.4) is a declared exception to the one-model
+  // rule: its parts are drawn by the SVG and never written here
+  const P = model.positions;
+  const keep = model.parts.filter((q) => !q.meta.svgOnly);
+  const I = keep.length === model.parts.length ? model.indices : Uint32Array.from(keep.flatMap((q) => Array.from(model.indices.subarray(3 * q.t0, 3 * q.t1))));
+  const n = I.length / 3;
   const buf = new ArrayBuffer(84 + 50 * n);
   const dv = new DataView(buf);
   const header = 'Parametric Bug — eva-maskalenko.com/bug — mm';
@@ -2271,7 +2552,9 @@ export function contourLoops(model, part) {
 const drawOrder = (model) => {
   const n = model.parts.filter((q) => /^wing\d$/.test(q.kind)).reduce((m, q) => Math.max(m, +q.kind.slice(4)), 0);
   const wings = [];
-  for (let k = n; k >= 1; k--) { wings.push(`wing${k}`); if (k === n) wings.push('tail'); }
+  // each wing is followed by its Phase 4 lace parts: the SVG-only lace frame,
+  // its loose islands, and the RIDGES plates drawn in ink on a paper wing
+  for (let k = n; k >= 1; k--) { wings.push(`wing${k}`, `svglace${k}`, `island${k}`, `lace${k}`); if (k === n) wings.push('tail'); }
   return ['leg', ...wings, 'antenna', 'body'];
 };
 export const SVG_INK = '#0A0A0C', SVG_LINE = '#EDEDE8';
@@ -2284,34 +2567,45 @@ function bounds2(loops) {
 
 export function exportSvg(model, opts = {}) {
   const cutSafe = !!opts.cutSafe;
-  const groups = drawOrder(model).map((kind) => ({ kind, parts: model.parts.filter((q) => q.kind === kind) }));
+  // an SVG-ONLY lace (Phase 4) stands in for its wing: the wing part (the
+  // procedural frame the STL carries) is not drawn
+  const replaced = new Set(model.parts.filter((q) => /^svglace\d$/.test(q.kind)).map((q) => `wing${q.kind.slice(7)}|${q.side}`));
+  const groups = drawOrder(model).map((kind) => ({ kind, parts: model.parts.filter((q) => q.kind === kind && !replaced.has(`${q.kind}|${q.side}`)) }));
   const partLoops = [];
   for (const g of groups) for (const part of g.parts) partLoops.push({ part, loops: contourLoops(model, part) });
   const all = partLoops.flatMap((pl) => pl.loops);
   const b = bounds2(all);
+  const islandParts = partLoops.filter((pl) => pl.part.meta.island);
+  const svgOnlyNote = model.parts.some((q) => q.meta.svgOnly) ? ' SVG-ONLY LACE: the lace drawn here is NOT in the STL, which carries the procedural venation instead — a declared exception to the one-model rule (bug-project-design-doc.md §10.4).' : '';
   const M = 2;
   const W = b.x1 - b.x0 + 2 * M, H = b.y1 - b.y0 + 2 * M;
   const X = (x) => (x - b.x0 + M).toFixed(3), Y = (y) => (b.y1 - y + M).toFixed(3);
   const pathD = (loops) => loops.map((L) => 'M' + L.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L') + 'Z').join('');
   const head = `<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(3)}mm" height="${H.toFixed(3)}mm" viewBox="0 0 ${W.toFixed(3)} ${H.toFixed(3)}">\n`;
-  const meta = `<!-- Parametric Bug — top-down orthographic projection of the 3D model (units: mm). ${cutSafe ? 'CUT-SAFE' : 'layered'} -->\n`;
+  const meta = `<!-- Parametric Bug — top-down orthographic projection of the 3D model (units: mm). ${cutSafe ? 'CUT-SAFE' : 'layered'}.${svgOnlyNote} -->\n`;
   if (cutSafe) {
-    const u = unionOutline(all, 0.05);
+    // a loose lace island would fall out of a cut: it is left out of the line
+    const nIsl = islandParts.reduce((n, pl) => n + (pl.part.meta.count || 0), 0);
+    const u = unionOutline(partLoops.filter((pl) => !pl.part.meta.island).flatMap((pl) => pl.loops), 0.05);
     const d = u.loops.map((L) => 'M' + L.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L') + 'Z').join('');
     return {
-      svg: head + meta + `<!-- cut-safe: union of every part, ${u.regions} connected region(s) -->\n<path d="${d}" fill="${SVG_INK}" fill-rule="evenodd"/>\n</svg>\n`,
+      svg: head + meta + `<!-- cut-safe: union of every part, ${u.regions} connected region(s)${nIsl ? `; ${nIsl} floating lace island${nIsl === 1 ? '' : 's'} left out (they would fall out of a cut)` : ''} -->\n<path d="${d}" fill="${SVG_INK}" fill-rule="evenodd"/>\n</svg>\n`,
       regions: u.regions, widthMm: W, heightMm: H, frame: { x0: b.x0, y1: b.y1, margin: M },
     };
   }
   let body = '';
   for (const { part, loops } of partLoops) {
-    body += `<path data-part="${part.name}-${part.side}" d="${pathD(loops)}" fill="${SVG_INK}" fill-rule="nonzero" stroke="${SVG_LINE}" stroke-width="0.15" stroke-linejoin="round"/>\n`;
+    const paper = !!part.meta.laceInk, plate = /^lace\d$/.test(part.kind);
+    body += plate
+      ? `<path data-lace="${part.name}-${part.side}" d="${pathD(loops)}" fill="${SVG_INK}" fill-rule="nonzero"/>\n`
+      : `<path data-part="${part.name}-${part.side}" d="${pathD(loops)}" fill="${paper ? SVG_LINE : SVG_INK}" fill-rule="nonzero" stroke="${paper ? SVG_INK : SVG_LINE}" stroke-width="0.15" stroke-linejoin="round"/>\n`;
     // Phase 2, RIDGES: the veins as lines on the wing, read off the model's
     // own vein record (the ridge strips' centrelines, at the vein's width),
     // not the strips' contours, which would stroke every vein twice. In HOLES
     // the veins need no line: the cells are holes in the contour above.
-    for (const v of part.meta.svgVeins || []) body += `<path data-vein="${part.name}-${part.side}" d="${'M' + v.pts.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L')}" fill="none" stroke="${SVG_LINE}" stroke-width="${v.width.toFixed(3)}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
-    for (const L of part.meta.svgStigma || []) body += `<path data-stigma="${part.name}-${part.side}" d="${pathD([L])}" fill="${SVG_LINE}" fill-opacity="0.35"/>\n`;
+    const vc = part.meta.laceInk ? SVG_INK : SVG_LINE;
+    for (const v of part.meta.svgVeins || []) body += `<path data-vein="${part.name}-${part.side}" d="${'M' + v.pts.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L')}" fill="none" stroke="${vc}" stroke-width="${v.width.toFixed(3)}" stroke-linecap="${part.meta.laceInk ? 'butt' : 'round'}" stroke-linejoin="round"/>\n`;   // in ink on a paper wing a round cap would show past the margin
+    for (const L of part.meta.svgStigma || []) body += `<path data-stigma="${part.name}-${part.side}" d="${pathD([L])}" fill="${vc}" fill-opacity="${part.meta.laceInk ? 1 : 0.35}"/>\n`;
   }
   // Segment lines: read off the model's own band rings (their x extent at their y).
   const bodyPart = model.parts.find((q) => q.kind === 'body');

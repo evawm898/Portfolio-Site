@@ -74,3 +74,22 @@ export function swallowtailReferenceSvg(width = 680, height = 680) {
     + `<rect x="0" y="${Y(0.07).toFixed(1)}" width="${X(0).toFixed(1)}" height="${(Y(-0.08) - Y(0.07)).toFixed(1)}" fill="#1d1710"/>`
     + `<text x="12" y="28" font-family="monospace" font-size="16" fill="#3a2e1f">reference — swallowtail, schematic</text></svg>`;
 }
+
+/* Phase 4 — an imported LACE fixture that is NOT the stand-in: a honeycomb
+   net drawn as STROKED hexagons inside nested transformed groups, a free dot
+   (an island) in every other cell, plus things the reader must ignore (a
+   <defs> shape, a hidden rect, a raster <image>). Geometry only — like the
+   stand-in it is a test artwork, not lace, and it is labelled as a fixture. */
+export const LACE_FIXTURE_SVG = (() => {
+  const a = 8, h = Math.sqrt(3) * a, hexes = [], dots = [];
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 4; j++) {
+    const cx = a + 1.5 * a * i, cy = h / 2 + h * j + (i % 2 ? h / 2 : 0);
+    const pts = []; for (let k = 0; k < 6; k++) { const t = (Math.PI / 3) * k; pts.push(`${(cx + a * Math.cos(t)).toFixed(3)} ${(cy + a * Math.sin(t)).toFixed(3)}`); }
+    hexes.push(`<path d="M${pts.join('L')}Z"/>`);
+    if ((i + j) % 2 === 0) dots.push(`<circle cx="${cx.toFixed(3)}" cy="${cy.toFixed(3)}" r="2"/>`);
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 80"><title>bug-fixtures LACE_FIXTURE_SVG (test artwork, not lace)</title>`
+    + `<defs><rect width="999" height="999"/></defs><rect x="0" y="0" width="5" height="5" style="display:none"/><image href="nothing.png" width="9" height="9"/>`
+    + `<g transform="translate(4,4)"><g transform="matrix(1 0 0 1 0 0)" fill="none" stroke="#222" stroke-width="2.6" stroke-linejoin="round">${hexes.join('')}</g>`
+    + `<g fill="#222">${dots.join('')}</g></g></svg>`;
+})();

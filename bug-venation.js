@@ -679,7 +679,7 @@ export function erodeCell(points, edges, border, minCellMm, outline = null, px =
 }
 
 /* marching squares over pixel centres (4-connectivity), loops as [x, y] lists */
-function traceMask(g, nx, ny, cx, cy) {
+export function traceMask(g, nx, ny, cx, cy) {
   const pt = new Map(), adj = new Map();
   const node = (id, xy) => { if (!pt.has(id)) { pt.set(id, xy); adj.set(id, []); } return id; };
   const link = (a, b) => { adj.get(a).push(b); adj.get(b).push(a); };
@@ -726,7 +726,7 @@ function rdp(pts, tol) {
   if (best <= tol) return [pts[0], pts[pts.length - 1]];
   return rdp(pts.slice(0, bi + 1), tol).slice(0, -1).concat(rdp(pts.slice(bi), tol));
 }
-function simplifyLoop(loop, tol) {
+export function simplifyLoop(loop, tol) {
   if (loop.length < 8) return loop;
   let far = 0, fd = -1;
   for (let i = 1; i < loop.length; i++) { const dd = dist2(loop[i], loop[0]); if (dd > fd) { fd = dd; far = i; } }
@@ -771,6 +771,23 @@ export function bridgeHoles(outer, holes) {
       if (tan < bt || (tan === bt && dd < bd)) { bt = tan; bd = dd; bi = k; }
     }
     if (bi >= 0) { pk = bi; Pp = poly[pk]; }
+    // P may appear more than once (an earlier bridge already ends on it):
+    // the new bridge must leave from the copy whose interior wedge — CCW from
+    // its outgoing edge to its incoming one — contains the direction to M,
+    // or the two bridges cross at P and the polygon stops being weakly simple
+    {
+      const copies = []; for (let k = 0; k < poly.length; k++) if (same(poly[k], Pp)) copies.push(k);
+      if (copies.length > 1) {
+        const ang = (v) => Math.atan2(v[1], v[0]);
+        const dM = ang(sub2(Mp, Pp));
+        for (const k of copies) {
+          const nx = poly[(k + 1) % poly.length], pv = poly[(k + poly.length - 1) % poly.length];
+          const a0 = ang(sub2(nx, Pp)), a1 = ang(sub2(pv, Pp));
+          const span = ((a1 - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI), off = ((dM - a0) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+          if (off > 0 && off < span) { pk = k; break; }
+        }
+      }
+    }
     const cw = h.slice().reverse();                        // hole clockwise
     const start = cw.length - 1 - mi;                      // where M sits in the reversed loop
     const ring = [];

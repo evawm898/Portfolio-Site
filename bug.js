@@ -13,8 +13,9 @@ import {
   buildBug, exportStl, exportSvg, mirrorDiff, sampleOutline, resolveWingPairs,
   moveControlPoint, insertControlPoint, deleteControlPoint, controlPointsFromDense,
   designFromParams, paramsFromDesign, MAX_WING_PAIRS,
-  composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
+  composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose, anyLace, STAND_IN_NAME,
 } from './bug-geometry.js';
+import { parseSvg, LACE_MAX_BYTES } from './bug-lace.js';
 
 /* ---------------- state ---------------- */
 let params = defaultParams();
@@ -45,7 +46,10 @@ const MAT = {
   wing: new THREE.MeshStandardMaterial({ color: 0xc9d8d6, roughness: 0.5, metalness: 0, flatShading: true, side: THREE.FrontSide }),
 };
 let viewName = 'three';
-const WING_KINDS = ['tail', ...Array.from({ length: MAX_WING_PAIRS }, (_, k) => `wing${k + 1}`), 'vein'];   // 'vein': Phase 2 ridge strips and stigma plates
+// 'vein': Phase 2 ridge strips and stigma plates; lace / island: Phase 4's
+// RIDGES plates and loose HOLES islands. An SVG-ONLY lace (svglaceN) is not
+// drawn here: the 3D view shows what the STL carries.
+const WING_KINDS = ['tail', ...Array.from({ length: MAX_WING_PAIRS }, (_, k) => [`wing${k + 1}`, `lace${k + 1}`, `island${k + 1}`]).flat(), 'vein'];
 
 function partGeometry(kinds, flat) {
   const P = model.positions, I = model.indices;
@@ -155,7 +159,11 @@ const fmtVal = (s, v) => (s.kind === 'range' ? `${(+v).toFixed(s.step < 0.1 ? 2 
 function makeCtrl(s, id, onInput) {
   const w = document.createElement('div');
   w.className = 'bg-ctrl' + (s.kind === 'bool' ? ' bg-bool' : '');
-  if (s.kind === 'range') {
+  if (s.kind === 'range' && s.labels) {
+    // an integer field drawn as a choice (Phase 4's lace role / warp / tiling):
+    // the value is still the number, so a linked pair blends it like the rest
+    w.innerHTML = `<label for="${id}"><span>${s.label}</span></label><select id="${id}">${s.labels.map((l, i) => `<option value="${s.min + i}">${l}</option>`).join('')}</select>`;
+  } else if (s.kind === 'range') {
     w.innerHTML = `<label for="${id}"><span>${s.label}</span><output id="${id}-out"></output></label><input type="range" id="${id}" min="${s.min}" max="${s.max}" step="${s.step}">`;
   } else if (s.kind === 'choice') {
     w.innerHTML = `<label for="${id}"><span>${s.label}</span></label><select id="${id}">${s.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`;
@@ -179,6 +187,35 @@ for (const s of PARAM_SPEC) {
   ctrlEl[s.id] = w;
 }
 
+/* Phase 4 — the LACE IMPORT: an SVG file read as text into params.lace (so a
+   saved design carries it), or the stand-in test pattern when none is loaded.
+   The role, warp and placement are per pair, in the Wings block. */
+const laceBlock = document.createElement('div');
+laceBlock.className = 'bg-lace';
+laceBlock.innerHTML = `<p class="bg-note" id="laceSource"></p>
+  <div class="bg-row"><label class="bg-btn bg-file">Import lace SVG…<input type="file" id="laceFile" accept=".svg,image/svg+xml" hidden></label>
+  <button class="bg-btn" id="laceStandIn">Use the stand-in</button></div>
+  <p class="bg-note" id="laceMsg"></p>`;
+secEl.lace.querySelector('.bg-sec-body').prepend(laceBlock);
+function writeLaceSource() {
+  const L = params.lace || { svg: '' }, el = document.getElementById('laceSource');
+  if (!el) return;
+  if (!L.svg) { el.innerHTML = `Using the <b>${STAND_IN_NAME}</b> — Eva's lace files are not loaded yet, so the look cannot be ruled on it. Set a pair's lace role in Wings.`; return; }
+  const r = parseSvg(L.svg);
+  el.innerHTML = r.ok ? `Using <b>${(L.name || 'imported SVG').replace(/</g, '&lt;')}</b> — ${r.counts.elements} filled / stroked element${r.counts.elements === 1 ? '' : 's'}, ${(L.svg.length / 1024).toFixed(0)} KB.${r.notes.length ? ' ' + r.notes.join('; ') + '.' : ''}` : `The loaded file was not read (${r.reason}); the stand-in is used.`;
+}
+document.getElementById('laceFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const msg = document.getElementById('laceMsg');
+  if (f.size > LACE_MAX_BYTES) { msg.textContent = `Not loaded: ${f.name} is ${(f.size / 1e6).toFixed(1)} MB; the limit is ${(LACE_MAX_BYTES / 1e6).toFixed(0)} MB.`; return; }
+  const text = await f.text(), r = parseSvg(text);
+  if (!r.ok) { msg.textContent = `Not loaded: ${r.reason}.`; return; }
+  params.lace = { name: f.name, svg: text };
+  msg.textContent = `Loaded ${f.name}.`; writeLaceSource(); scheduleBuild();
+});
+document.getElementById('laceStandIn').addEventListener('click', () => { params.lace = { name: '', svg: '' }; document.getElementById('laceMsg').textContent = ''; writeLaceSource(); scheduleBuild(); });
+
 /* The per-pair block: tabs, link state, and WING_FIELDS for the selected pair. */
 const pairBlock = document.createElement('div');
 pairBlock.className = 'bg-pairs';
@@ -192,7 +229,7 @@ for (const f of WING_FIELDS) {
   const w = makeCtrl(f, `wf-${f.id}`, (v) => {
     const spec = editableSpec(editPair);
     if (!spec) return;
-    spec[f.id] = v; writePairFields(); scheduleBuild();
+    spec[f.id] = v; writePairFields(); applyVisibility(); scheduleBuild();   // a lace role shows / hides the Lace section's island choice
   });
   pairBlock.querySelector('#pairFields').appendChild(w);
   pairFieldEl[f.id] = w;
@@ -266,9 +303,9 @@ function writePairFields() {
   const own = editableSpec(editPair);
   const shown = own || resolvedPair(editPair);
   for (const f of WING_FIELDS) {
-    const w = pairFieldEl[f.id], input = w.querySelector('input');
-    input.value = shown[f.id]; input.disabled = !own;
-    document.getElementById(`wf-${f.id}-out`).textContent = fmtVal(f, shown[f.id]);
+    const w = pairFieldEl[f.id], input = w.querySelector('input,select');
+    input.value = f.labels ? Math.round(shown[f.id]) : shown[f.id]; input.disabled = !own;
+    const out = document.getElementById(`wf-${f.id}-out`); if (out) out.textContent = fmtVal(f, shown[f.id]);
     w.hidden = !!(f.visibleWhen && !f.visibleWhen(shown, params));
     w.classList.toggle('is-linked', !own);
   }
@@ -283,11 +320,14 @@ function writeControls() {
 }
 function writeOutputs() {
   for (const s of PARAM_SPEC) if (s.kind === 'range') document.getElementById(`${s.id}-out`).textContent = fmtVal(s, params[s.id]);
+  writeLaceSource();
 }
 function applyVisibility() {
   for (const s of PARAM_SPEC) ctrlEl[s.id].hidden = !!(s.visibleWhen && !s.visibleWhen(params));
   for (const s of [...SECTIONS].reverse()) {
     const d = secEl[s.id];
+    // the Lace section carries the import itself, so it shows wherever veins do
+    if (s.id === 'lace') { d.hidden = !(params.venation !== 'none' && params.wingPairs > 0); continue; }
     const own = PARAM_SPEC.filter((p) => p.section === s.id).some((p) => !ctrlEl[p.id].hidden);
     const kids = SECTIONS.filter((c) => c.parent === s.id).some((c) => !secEl[c.id].hidden);
     d.hidden = !(own || kids);
@@ -423,7 +463,12 @@ function drawEditor() {
     const thinV = wp.veinFloor && wp.veinFloor.under;
     h += `<path class="veins${thinV ? ' is-thin' : ''}" d="${d}"/>`;
     let hd = '';
-    for (const c of V.cells) for (const hole of c.holes || []) hd += 'M' + hole.map((q) => toUW(q).join(' ')).join('L') + 'Z';
+    // Phase 4: a HOLES lace replaces the procedural holes with its own (and
+    // its loose islands); a RIDGES lace draws its plates
+    const LC = wp.lace;
+    const holeSet = LC && LC.mode === 'holes' && !LC.svgOnly ? LC.regions.flatMap((R) => R.holes) : LC && LC.svgOnly ? LC.regions.flatMap((R) => R.holes) : V.cells.flatMap((c) => c.holes || []);
+    for (const hole of holeSet) hd += 'M' + hole.map((q) => toUW(q).join(' ')).join('L') + 'Z';
+    if (LC) for (const x of [...LC.islands, ...LC.plates]) for (const loop of [x.outer, ...x.holes]) hd += 'M' + loop.map((q) => toUW(q).join(' ')).join('L') + 'Z';
     if (hd) h += `<path class="holes" d="${hd}"/>`;
     for (const c of V.cells) if (c.role === 'stigma') h += `<path class="stigma" d="${'M' + c.points.map((q) => toUW(q).join(' ')).join('L') + 'Z'}"/>`;
   }
@@ -554,14 +599,15 @@ function writeReadout() {
   const m = stats.mirror === null ? 'checking…' : stats.mirror === 0 ? '0 (exact)' : `${stats.mirror} — NOT SYMMETRIC`;
   const L = model.layout;
   document.getElementById('readout').innerHTML =
-    `triangles <b>${n.toLocaleString()}</b>   STL <b>${((84 + 50 * n) / 1024).toFixed(0)} KiB</b>\n`
+    `triangles <b>${n.toLocaleString()}</b>   STL <b>${((84 + 50 * model.stlTriangleCount) / 1024).toFixed(0)} KiB</b>\n`
     + `size <b>${(b.x1 - b.x0).toFixed(1)} × ${(b.y1 - b.y0).toFixed(1)} × ${(b.z1 - b.z0).toFixed(1)} mm</b> (w × l × h)\n`
     + (params.wingPairs > 2 ? `thorax <b>${L.Lt.toFixed(1)} mm</b> (lengthened for ${params.wingPairs} wing pairs)\n` : '')
-    + `parts <b>${model.parts.length}</b> closed shells, overlapping\n`
+    + `parts <b>${model.parts.length}</b> closed shells, overlapping${model.stlTriangleCount !== n ? ` (${(n - model.stlTriangleCount).toLocaleString()} triangles of SVG-only lace are not in the STL)` : ''}\n`
     + `mirror diff <b>${m}</b>\n`
     + `min feature floor <b>${params.minDiameter.toFixed(2)} mm</b> (tubes, wing thickness, drawn wing widths, vein widths)\n`
     + venationLines()
-    + (model.floorViolations.length ? `STL <b class="bad">BLOCKED</b> — ${model.floorViolations.map((v) => `pair ${v.pair + 1}${v.blendedFrom ? ` (blended from ${v.blendedFrom.map((i) => i + 1).join(' and ')})` : ''} narrower than the floor`).join(', ')} (red in the view; Get STL says what to widen)\n` : '')
+    + laceLines()
+    + (model.floorViolations.length ? `STL <b class="bad">BLOCKED</b> — ${model.floorViolations.map((v) => `pair ${v.pair + 1}${v.blendedFrom ? ` (blended from ${v.blendedFrom.map((i) => i + 1).join(' and ')})` : ''} ${v.kind === 'island' ? `has ${v.count} loose lace island${v.count === 1 ? '' : 's'}` : v.kind === 'lace' ? 'lace narrower than the floor' : 'narrower than the floor'}`).join(', ')} (red in the view; Get STL says what to do)\n` : '')
     + (model.notes.length ? `notes <b>${model.notes.join('; ')}</b>\n` : '')
     + `build <b>${stats.buildMs.toFixed(0)} ms</b>`;
 }
@@ -583,6 +629,26 @@ function venationLines() {
     const vf = w.veinFloor;
     const floor = vf ? (vf.under ? `<b class="bad">veins ${vf.veinMin.toFixed(2)} mm${Number.isFinite(vf.border) ? ` / border ${vf.border.toFixed(2)} mm` : ''} — UNDER the floor</b>` : `veins ≥ ${vf.veinMin.toFixed(2)} mm`) : '';
     lines.push(`  pair ${w.index + 1}: ${parts.join(' · ')}${floor ? ' · ' + floor : ''}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+/* Phase 4 read-out: per pair, what the lace pipeline did — the source (the
+   STAND-IN said so), role, warp, holes cut, islands found and what happened
+   to them, ties, plates, and the floor. */
+function laceLines() {
+  const rows = model.wingPairs.filter((w) => w.lace);
+  if (!rows.length) return '';
+  const L0 = rows[0].lace;
+  const lines = [`lace <b>${L0.standIn ? STAND_IN_NAME : L0.name}</b>${params.venation === 'holes' ? ` · islands: <b>${{ unset: 'NOT CHOSEN', drop: `drop under ${params.laceDropMm2.toFixed(1)} mm²`, bridge: `bridge (ties ${Math.max(params.laceTieMm, params.minDiameter).toFixed(2)} mm)`, svg: 'SVG-ONLY' }[params.laceIslands]}</b>` : ''}`];
+  for (const w of rows) {
+    const L = w.lace, st = L.stats, s = L.spec, bits = [];
+    bits.push(`${L.role === 'fill' ? 'FILL CELLS' : 'REPLACE VEINS'} · ${(L.mapper.warp || '').toUpperCase()} · scale ${s.laceScale.toFixed(2)}${s.laceBlend < 1 ? ` · blend ${s.laceBlend.toFixed(2)}` : ''}`);
+    if (L.mode === 'holes') bits.push(`${st.holes} hole${st.holes === 1 ? '' : 's'}`, `${st.islandsFound} island${st.islandsFound === 1 ? '' : 's'}${st.dropped ? `, ${st.dropped} dropped` : ''}${st.bridged ? `, ${st.bridged} bridged` : ''}${L.keptIslands ? `, ${L.keptIslands} loose` : ''}`);
+    else bits.push(`${st.plates} raised plate${st.plates === 1 ? '' : 's'}`);
+    if (L.svgOnly) bits.push('<b>SVG-ONLY</b>: the 3D view and the STL carry the procedural veins');
+    bits.push(L.thin.thin ? `<b class="bad">threads under the floor</b>` : 'threads ≥ the floor');
+    lines.push(`  pair ${w.index + 1}: ${bits.join(' · ')} · ${st.ms} ms`);
   }
   return lines.join('\n') + '\n';
 }
@@ -625,6 +691,8 @@ window.__bug = {
   thinView: () => ({ svgRed: document.querySelectorAll('#svgCard .thin-preview').length, tinted: root.children.filter((c) => c.material === MAT.thinWing).length, redSegments: root.children.filter((c) => c.isLineSegments).reduce((n, c) => n + c.geometry.attributes.position.count / 2, 0) }),
   floor: () => ({ violations: model.floorViolations.map((v) => ({ ...v })), pairs: model.wingPairs.map((w) => ({ hasTail: w.hasTail, thin: w.thin })) }),
   venation: () => model.wingPairs.map((w) => (w.venation ? { stats: w.venation.stats, veinFloor: w.veinFloor } : null)),
+  lace: () => model.wingPairs.map((w) => (w.lace ? { role: w.lace.role, mode: w.lace.mode, svgOnly: w.lace.svgOnly, standIn: w.lace.standIn, stats: w.lace.stats, thin: w.lace.thin, keptIslands: w.lace.keptIslands, ties: w.lace.ties.length } : null)),
+  setLace: (name, svg) => { params.lace = { name, svg }; writeLaceSource(); buildNow(false); },
   tailPoints: () => { const s = window.__bug.getParams(); return s.wings.tail; },
   triangleCount: () => model.triangleCount,
   notes: () => model.notes.slice(),
