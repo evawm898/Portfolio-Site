@@ -1075,7 +1075,9 @@ measurement.
 - **`wingEdgeTaper`** (0–0.9, default **0.5**): the thickness falls linearly along
   the span from the pair's own thickness at the root to
   `max(floor, thickness × (1 − taper))` at its outermost point.
-- **`wingEdgeBevel`** (0–4 mm, default **1.2 mm**): within that distance of the
+- **`wingEdgeBevel`** (0–4 mm, default **4 mm** — Eva's ruling on the sheet, where
+  only the 4 mm cell visibly softened the slab edge in 3D; the first cut shipped
+  1.2): within that distance of the
   drawn outline (the root chord excluded — it is inside the body) both skins ramp
   linearly down to the **floor exactly at the outline**: a chamfer.
 - **Both 0 is the Phase 1/2 vertical-walled slab, by branch** (the same double on
@@ -1087,6 +1089,12 @@ measurement.
   the builder AND by `specimenPose`; `planformSlab` takes the half-thickness as a
   number or a function; the RIDGES strips and the pterostigma plate stand on the
   LOCAL top skin.
+- **Why the chamfer carries the delicacy, not the taper** (Eva's note, recorded): at
+  a 72 mm wingspan the 1.0 mm floor leaves almost no room for the taper — the root
+  is 1.8 mm, so the whole taper is 0.8 mm across 41 mm of span, invisible from any
+  normal viewing distance. The 3D delicacy comes mainly from the chamfer (the edge
+  meets the floor on a 4 mm ramp instead of a vertical wall) and from print scale
+  (a larger print gives the floor less of the wing's thickness).
 
 ### 9.2 The antenna club and the feathered antenna
 
@@ -1149,8 +1157,13 @@ nothing about it is a mode and every value stays editable after:
   the polygon the builder triangulates. With pitch 0, a planform direction
   (du, dw) lands at world dy = −du sin(sweep) + dw cos(sweep), so the margin is
   square at **sweep = atan2(dw, du)**; the mirror puts the left margin on the same
-  line. A sweep outside the slider (−30…70°) is clamped and **reported** (random:6
-  needs −43.1°: told, and the gate's Y accepts it only with the sweep at the bound);
+  line. **The sweep slider is −90…90° so the pose never clamps** (Eva's ruling; the
+  first cut's −30…70° clamped random:6, which needs −43.1°). The bound is an
+  argument, not a sample: every outline point sits at u ≥ 0 (`OUTLINE_BOUNDS`) and
+  the root trail at u = 0, so du ≥ 0 and atan2(dw, du) lies in [−90°, 90°] for any
+  wing the randomizer or the editor can produce. The gate's Y now REQUIRES the
+  margin square on every specimen row (a clamp is a failure), and a function check
+  runs the pose over 400 random bugs and requires no clamp note;
 - **every wing flat** (dihedral 0, pitch 0, on every drawn and unlinked pair);
 - **legs tucked** (`legReach` 0);
 - **antennae a symmetric V** (curl 0, spread 22°).
@@ -1168,7 +1181,7 @@ forewings by hand; nothing in the brief derives it).
 | antennae | clubbed teardrop, 17 mm, straight V at 22° | filiform 10 mm, ball tip |
 | forewing | angular apex, straight-to-slightly-concave outer margin, clear tornus; 41 mm; sweep **−25.59° derived by the pose** | rounded, 26 mm |
 | hindwing | rounded fan, scalloped margin (0.06 × 8); 29 mm, sweep 14° | rounded, 20 mm, sweep 32° |
-| wings | flat; 1.8 mm root tapering to the floor; 1.2 mm chamfer | dihedral 12 / 8, 1.2 mm slab |
+| wings | flat; 1.8 mm root tapering to the floor; 4 mm chamfer (was 1.2 on the first cut) | dihedral 12 / 8, 1.2 mm slab |
 
 - **The body : wingspan ratio landed on: 3.39×** — body (head front to abdomen
   tip) **21.3 mm**, wingspan (tip to tip, top-down) **72.1 mm**, read off the model
@@ -1202,7 +1215,12 @@ forewings by hand; nothing in the brief derives it).
 - The hindwing was made a little shallower at 60% of its span so the existing
   starter TAIL still fits it (the gate's T rows went vacuous on the first cut).
 
-### 9.7 OPEN DESIGN QUESTION — the margin fringe (cilia). NOT BUILT.
+### 9.7 OPEN — the margin fringe (cilia). NOT BUILT, NOT DECIDED.
+
+**Status, Eva's ruling: OPEN.** Option C below is *not* adopted: a scallop does not
+read as hair, and the frayed / hairy margin is key to the target look. Revisit with
+Phase 4 (lace / SVG import), where fine line work is the medium. The table and the
+recommendation that followed it are kept as the record of what was weighed.
 
 The fine hairs along a wing's margin are a key part of the target look and cannot
 survive the floor: a cilium is ~0.01–0.05 mm across, the floor 1.0 mm. Options, for
@@ -1216,15 +1234,24 @@ Eva's ruling:
 | Floor / print | nothing printed | every tooth at the floor; cut-safe stays one region (teeth are attached); many thin free cantilevers — the weakest part of the print, unmeasured | the drawn-width floor (§6.3) already polices it: a tooth narrower than the floor turns the STL red, so its density is capped by the floor at the wing's own size |
 | Cost | none in the STL; the SVG grows by the hair count | large: hundreds of closed parts per wing | small: outline points only |
 
-**Recommendation, not a ruling:** C for what prints, with A considered only as an
+**Recommendation at the time (superseded by the ruling above — kept as a record):** C for what prints, with A considered only as an
 explicit, labelled SVG-only layer if the paper / laser output must carry real hair —
 because A is the one option that changes §1. B is listed for completeness and is the
 one I would not build: it costs the most and looks least like the thing.
 
+### 9.7b Parked observation — RIDGES reads as busy stripes
+
+On the sheet the new default in RIDGES mode reads as busy parallel stripes across
+the wing rather than as venation. Recorded as an observation only; nothing is
+changed for it. Candidates when it is picked up: fewer / thinner ridges on the
+specimen default, ridge height falling toward the margin, or main veins only.
+
 ### 9.8 Verification
 
-- `node tools/verify-bug.mjs --seeds 40` (CI's setting): **173 / 173 PASS** — 28
-  function checks and 145 built rows (the old 135 + the elegance rows: the legacy
+- `node tools/verify-bug.mjs --seeds 40` (CI's setting): **174 / 174 PASS** after the
+  ruling (173 on the first cut) — 29
+  function checks (the new one: Set specimen never clamps on 400 random bugs, sweep
+  −48.2…5.0° inside −90…90°) and 145 built rows (the old 135 + the elegance rows: the legacy
   default; every new control at both ends; segment style 0.5; feathered pointed and
   rounded; filiform and bristle pointed; a 2-part pointed abdomen; floor 0.6 and 2.0
   mm against the edge law; HOLES and RIDGES with a 2 mm chamfer; the specimen pose on
@@ -1241,7 +1268,9 @@ one I would not build: it costs the most and looks least like the thing.
   bead as missing where the envelope still rises steeply — biased, rewritten);
   **Y** the inner margin square off the emitted vertices with the tornus by the gate's
   own rule, every wing's mid-surface flat, the antennae straight.
-- `--negative-control`: **PASS, 27 mutations + the L control**, six of them new —
+- `--negative-control`: **PASS, 28 mutations + the L control**, seven of them new — the
+  seventh (after the ruling) rebuilds random:6 with its sweep clamped at the old −30°
+  bound and requires Y to fire;
   an outline vertex thinned under the floor (B, F), the chamfer missing the outline
   (B), a pointed end blunted onto its ring (X), a tip ring thinned (X, F), a groove
   filled (G), the forewing margin not square (Y). The L control had assumed the
@@ -1255,11 +1284,13 @@ one I would not build: it costs the most and looks least like the thing.
   `main`'s own default **36**.
 - The sheet: `node tools/shot-bug-elegance.mjs <dir>` → `docs/img/bug-elegance-sheet.png`.
   SET SPECIMEN is a REAL click of the page's button. No pixel claim anywhere.
+  **The committed sheet predates the ruling**: its "new default" cells carry the
+  first-cut 1.2 mm chamfer; its "edge chamfer 4 mm" cell is what the default is now.
 
 ### 9.9 Decisions made without a ruling (reversible)
 
 1. The new outlines (forewing 12 points, hindwing 10), lengths 41 / 29 mm, the 1.8 mm
-   root thickness, taper 0.5 and chamfer 1.2 mm — tuned by eye on renders.
+   root thickness, taper 0.5 and first-cut chamfer 1.2 mm — tuned by eye on renders (the chamfer is now 4 mm by ruling).
 2. **`clubWidth`** — a third club slider beyond the brief's two (§9.2).
 3. The **feathered leaf rides the terminations toggle** (pointed ⇒ leaf, rounded ⇒ the
    old fan) rather than a control of its own.
@@ -1267,7 +1298,7 @@ one I would not build: it costs the most and looks least like the thing.
 5. `TIP_POINT` 2, the 0.16 mm nib, `GROOVE_SIGMA_MM` 0.18, `GROOVE_DEPTH` 0.12, the
    abdomen tip cone 1.6 floor radii, `TUCK_MIDLINE_GAP` 0.08 — constants with their
    reasons in the source.
-6. The specimen V is 22° straight; the pose leaves the hindwing sweep alone and clamps
-   (and reports) a forewing sweep outside −30…70°.
+6. The specimen V is 22° straight; the pose leaves the hindwing sweep alone. (The
+   forewing sweep range is now −90…90° by ruling, so it never clamps.)
 7. The tuck refinement (§9.6) changes partially splayed legs, not only tucked ones.
 8. Pre-v4 designs load at the old ends (§9.6).

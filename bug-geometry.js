@@ -167,7 +167,7 @@ export const PARAM_SPEC = [
 
   R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
-  R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: square wall)', 0, 4, 0.05, 1.2, 'mm', hasWings),
+  R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: square wall)', 0, 4, 0.05, 4, 'mm', hasWings),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -188,7 +188,7 @@ const WR = (id, label, min, max, step, def, unit = '', visibleWhen = null) => ({
 export const WING_FIELDS = [
   WR('length', 'Length (span)', 5, 60, 0.5, 26, 'mm'),
   WR('stretch', 'Stretch — chord scale of the drawn curve', 0.3, 3, 0.01, 1),
-  WR('sweep', 'Sweep — rotation of the drawn curve', -30, 70, 1, 0, '°'),
+  WR('sweep', 'Sweep — rotation of the drawn curve', -90, 90, 1, 0, '°'),
   WR('scallop', 'Scallop depth', 0, 0.4, 0.01, 0),
   WR('scallopCount', 'Scallop count', 2, 12, 1, 6, '', (w) => w.scallop > 0),
   WR('thickness', 'Thickness (STL)', 0.6, 4, 0.05, 1.2, 'mm'),

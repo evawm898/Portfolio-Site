@@ -104,7 +104,7 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models twenty-seven ways (plus the L clause at reach 1) and requires each to be
+   --negative-control  breaks built models twenty-eight ways (plus the L clause at reach 1) and requires each to be
                        caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
@@ -733,14 +733,14 @@ function specimenChecks(model) {
   const vy = (i) => P[3 * (part.v0 + i) + 1];
   if (!(part.meta.slab && part.meta.slab.uw[toPoly(best)][0] === outline[best][0] && part.meta.slab.uw[toPoly(best)][1] === outline[best][1])) bad.push('Y: the slab does not start with the planform polygon (cannot read the margin)');
   else {
-    // the sweep the margin NEEDS, by this file's own reading of the planform;
-    // inside the slider's range the emitted margin must be square, outside it
-    // the sweep must sit at the nearer bound (the pose clamps and says so)
+    // the sweep the margin NEEDS, by this file's own reading of the planform.
+    // Eva's ruling: the pose must SUCCEED on any wing — no clamp. The need
+    // must lie inside the slider's range and the emitted margin be square.
     const need = Math.atan2(outline[best][1] - rt[1], outline[best][0] - rt[0]) * 180 / Math.PI;
-    const f = G.WING_FIELDS.find((x) => x.id === 'sweep'), sw = model.params.wings.first.sweep;
+    const f = G.WING_FIELDS.find((x) => x.id === 'sweep');
     const dy = vy(toPoly(best)) - vy(toPoly(outline.length - 1));
-    if (need >= f.min && need <= f.max) { if (Math.abs(dy) > 1e-6) bad.push(`Y: the forewing's inner margin is not square to the body — its ends differ by ${dy.toFixed(4)} mm in y`); }
-    else if (sw !== (need < f.min ? f.min : f.max)) bad.push(`Y: the margin needs ${need.toFixed(1)}°, outside the slider, and the sweep is ${sw}, not the bound`);
+    if (need < f.min || need > f.max) bad.push(`Y: the margin needs ${need.toFixed(1)}°, outside the slider (${f.min}–${f.max}°) — Set specimen would clamp`);
+    else if (Math.abs(dy) > 1e-6) bad.push(`Y: the forewing's inner margin is not square to the body — its ends differ by ${dy.toFixed(4)} mm in y`);
   }
   for (const w of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
     const n = w.meta.slab.n; let z0 = Infinity, z1 = -Infinity;
@@ -925,6 +925,19 @@ function functionChecks() {
   const sp = G.specimenPose(G.defaultParams());
   ok(sp.params.legReach === 0 && sp.params.antennaCurl === 0 && sp.params.wings.first.dihedral === 0 && sp.params.wings.last.dihedral === 0 && sp.params.abdomenLength === G.defaultParams().abdomenLength, `Y: specimenPose sets legs tucked, antennae straight, wings flat, and leaves the body alone (forewing sweep ${sp.params.wings.first.sweep.toFixed(3)}°)`);
   ok(Math.abs(sp.params.wings.first.sweep - G.DEFAULTS.wings.first.sweep) < 1e-12, 'Y: the default IS the specimen pose of itself (its forewing sweep derived, not typed)');
+  // Eva's ruling: Set specimen SUCCEEDS — never clamps — on every random wing.
+  // Seeds well past the build rows (it is a planform read, so cheap), plus every
+  // wing-pair count the randomizer can produce forced on.
+  {
+    const clamped = [], f = G.WING_FIELDS.find((x) => x.id === 'sweep'); let lo = Infinity, hi = -Infinity, n = 0;
+    for (let s = 1; s <= Math.max(400, NSEEDS * 10); s++) {
+      const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; }
+      const r = G.specimenPose(p); n++;
+      if (r.notes.length) clamped.push(`random:${s}`);
+      const sw = r.params.wings.first.sweep; lo = Math.min(lo, sw); hi = Math.max(hi, sw);
+    }
+    ok(clamped.length === 0 && lo > f.min && hi < f.max, `Y: Set specimen squares the forewing without clamping on ${n} random bugs (sweep ${lo.toFixed(1)}..${hi.toFixed(1)}° inside ${f.min}..${f.max}°)${clamped.length ? ` — CLAMPED: ${clamped.slice(0, 8).join(', ')}` : ''}`);
+  }
   return out;
 }
 
@@ -1015,6 +1028,9 @@ if (NEG) {
   const tailVeinP = G.defaultParams(); tailVeinP.venation = 'ridges'; tailVeinP.wings.first.points = HAND_OUTLINES.swallowtail; tailVeinP.wings.tail.on = true; tailVeinP.wings.last.length = 30; tailVeinP.wings.last.stretch = 1.4;
   const tailVeinModel = G.buildBug(tailVeinP);
   const specModel = G.buildBug(G.specimenPose(G.defaultParams()).params);
+  // the first cut's clamp: random:6's forewing needs ~−43°; the old slider stopped at −30
+  const clampP = (() => { const p = G.randomParams(6); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } const q = G.specimenPose(p).params; q.wings.first.sweep = Math.max(-30, q.wings.first.sweep); return q; })();
+  const clampModel = G.buildBug(clampP);
   // the right forewing's outline vertex pairs (top, bottom), and their mirror twins
   const mutPair = (m, fn) => {
     const R = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'), L = m.parts.find((q) => q.kind === 'wing1' && q.side === 'L');
@@ -1077,6 +1093,7 @@ if (NEG) {
     ['a pointed end blunted onto its ring', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => /^leg\d$/.test(x.name) && x.side === side); const pt = q.meta.points[0], [v0, n] = pt.ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let d = 0; d < 3; d++) m.positions[3 * pt.apex + d] = c[d]; } }],
     ['a tip ring thinned under the floor', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.name === 'antenna' && x.side === side); const [v0, n] = q.meta.points[0].ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) m.positions[3 * (v0 + k) + d] = c[d] + 0.5 * (m.positions[3 * (v0 + k) + d] - c[d]); } }],
     ['a segment groove filled', 'G', base, { expectGrooves: true }, (m) => { const body = m.parts.find((q) => q.kind === 'body'), L = m.layout; for (let k = 1; k < m.params.abdomenSegments; k++) { const yb = L.yA0 - (k / m.params.abdomenSegments) * (L.yA0 - L.yA1); for (const r of body.meta.rings) if (Math.abs(r.y - yb) < 0.3) for (let j = 0; j < r.n; j++) { m.positions[3 * (r.v0 + j)] /= 1 - G.GROOVE_DEPTH * Math.exp(-(((r.y - yb) / G.GROOVE_SIGMA_MM) ** 2)); } } }],
+    ['the pose clamps at the old -30° bound (random:6)', 'Y', clampModel, { specimen: true }, () => {}],
     ['the forewing margin not square to the body', 'Y', specModel, { specimen: true }, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); for (let v = q.v0 + 1; v <= q.v0 + 12; v++) m.positions[3 * v + 1] += 1.5; } }],
   ];
   const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true }), check('blended thin (clean: refused)', blendedModel, { expectBlended: true }),
