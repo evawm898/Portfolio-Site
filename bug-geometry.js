@@ -51,6 +51,33 @@ const HEAD_DEPTH_RATIO = 0.9;
 const LEG_ROOT_FRAC = 0.44;                 // leg root DIAMETER / thorax half-width
 const ANT_ROOT_FRAC = 0.10;                 // antenna root diameter / head size
 
+/* Elegance pass (bug-project-design-doc.md §9). Every one of these shapes has an
+   "old" end on its control that is a BRANCH back to the Phase 1/2 code, so the
+   cute bug stays reachable bit for bit and only stops being the default. */
+/* A POINTED termination is a floored tube that closes in a cone whose apex
+   stands TIP_POINT ring radii beyond its last ring (a ~53 degree point). The
+   last ring is at or above the floor; the apex is the point, as a printer gets
+   it — the same reading the drawn-outline floor gives a sharp corner. */
+export const TIP_POINT = 2.0;
+/* ...and closes on a NIB this many mm in radius, not on a mathematical point:
+   a cone drawn diagonally in projection thins past one cut-safe raster pixel
+   (0.05 mm) before its apex, and the 4-connected union then cut the last
+   stretch off as an ISLAND — 5 of 40 random bugs read 2 cut-safe regions, every
+   one at a leg, antenna or pinna tip (measured; rounded ends read 1). A nib
+   0.16 mm across clears two pixels on any diagonal and is far under anything
+   a printer resolves. */
+export const TIP_NIB_MM = 0.08;
+/* An incised segment line: a Gaussian groove GROOVE_SIGMA_MM wide, cutting
+   GROOVE_DEPTH of the local radius, at each segment boundary. Fine lines, not
+   constrictions: the bulge end of the style axis is the old BAND_DEPTH bead. */
+export const GROOVE_SIGMA_MM = 0.18, GROOVE_DEPTH = 0.12;
+/* A pointed abdomen ends in a cone this many floor RADII long; above it the
+   abdomen's radius is floored at the floor (a tip does not thin to a hair). */
+const ABD_TIP_CONE = 1.6;
+/* A tucked leg keeps this far off the midline (mm) so it never coincides with
+   its own mirror image (see buildLegs). */
+const TUCK_MIDLINE_GAP = 0.08;
+
 /* Wings (Phase 1 revision). */
 export const MAX_WING_PAIRS = 4;
 /* The thorax lengthens with each wing pair past two, so N roots can be spread
@@ -94,6 +121,8 @@ const hasLegs = (p) => p.legPairs > 0 && p.legsVisible;
 const hasAnt = (p) => p.antennaType !== 'none';
 const hasVeins = (p) => p.venation !== 'none' && p.wingPairs > 0;
 
+const hasWings = (p) => p.wingPairs > 0;
+const isClubbed = (p) => p.antennaType === 'clubbed';
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen) =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
 
@@ -101,37 +130,44 @@ export const PARAM_SPEC = [
   { id: 'bodyParts', section: 'plan', label: 'Body parts', kind: 'choice', default: '3',
     options: [['3', '3 — head, thorax, abdomen'], ['2', '2 — cephalothorax, abdomen']] },
   R('roundness', 'plan', 'Cross-section roundness', 1.5, 6, 0.1, 2.0, '', null),
+  { id: 'pointedTips', section: 'plan', label: 'Terminations pointed — abdomen, tarsi, antennae (off: rounded ends)', kind: 'bool', default: true },
 
-  R('headSize', 'head', 'Head size', 2, 12, 0.1, 4.0, 'mm', isThree),
+  R('headSize', 'head', 'Head size', 2, 12, 0.1, 2.4, 'mm', isThree),
 
-  R('thoraxLength', 'thorax', 'Length', 3, 20, 0.1, 7, 'mm'),
-  R('thoraxWidth', 'thorax', 'Width', 2.5, 14, 0.1, 5, 'mm'),
-  R('thoraxDepth', 'thorax', 'Depth', 2.5, 14, 0.1, 4.6, 'mm'),
+  R('thoraxLength', 'thorax', 'Length', 3, 20, 0.1, 5, 'mm'),
+  R('thoraxWidth', 'thorax', 'Width', 2.5, 14, 0.1, 2.9, 'mm'),
+  R('thoraxDepth', 'thorax', 'Depth', 2.5, 14, 0.1, 2.9, 'mm'),
 
   R('abdomenLength', 'abdomen', 'Length', 2, 70, 0.5, 15, 'mm'),
-  R('abdomenWidth', 'abdomen', 'Width', 1.5, 18, 0.1, 5, 'mm'),
-  R('abdomenTaper', 'abdomen', 'Taper', 0, 1, 0.01, 0.5),
-  R('abdomenSegments', 'abdomen', 'Segment count', 1, 12, 1, 6),
-  { id: 'banding', section: 'abdomen', label: 'Banding', kind: 'bool', default: true },
+  R('abdomenWidth', 'abdomen', 'Width', 1.5, 18, 0.1, 2.2, 'mm'),
+  R('abdomenTaper', 'abdomen', 'Taper', 0, 1, 0.01, 0.75),
+  R('abdomenSegments', 'abdomen', 'Segment count', 1, 12, 1, 7),
+  { id: 'banding', section: 'abdomen', label: 'Segments marked', kind: 'bool', default: true },
+  R('segmentStyle', 'abdomen', 'Segments — groove (incised lines) ↔ bulge (beaded)', 0, 1, 0.01, 0, '', (p) => p.banding && p.abdomenSegments > 1),
 
   R('legPairs', 'legs', 'Pairs', 0, 4, 1, 3),
   { id: 'legsVisible', section: 'legs', label: 'Visible', kind: 'bool', default: true },
-  R('legReach', 'legs', 'Reach — tucked under ↔ splayed out', 0, 1, 0.01, 1, '', hasLegs),
-  R('coxa', 'legs', 'Coxa', 0.5, 5, 0.1, 1.2, 'mm', hasLegs),
-  R('femur', 'legs', 'Femur', 1, 20, 0.1, 5, 'mm', hasLegs),
-  R('tibia', 'legs', 'Tibia', 1, 20, 0.1, 5.5, 'mm', hasLegs),
-  R('tarsus', 'legs', 'Tarsus', 0.5, 15, 0.1, 4, 'mm', hasLegs),
+  R('legReach', 'legs', 'Reach — tucked under ↔ splayed out', 0, 1, 0.01, 0, '', hasLegs),
+  R('coxa', 'legs', 'Coxa', 0.5, 5, 0.1, 0.9, 'mm', hasLegs),
+  R('femur', 'legs', 'Femur', 1, 20, 0.1, 4, 'mm', hasLegs),
+  R('tibia', 'legs', 'Tibia', 1, 20, 0.1, 4.2, 'mm', hasLegs),
+  R('tarsus', 'legs', 'Tarsus', 0.5, 15, 0.1, 3.4, 'mm', hasLegs),
   R('legSplay', 'legs', 'Splay — fan forward / back', 0, 70, 1, 35, '°', hasLegs),
   R('legBend', 'legs', 'Joint bend', 0, 90, 1, 45, '°', hasLegs),
   R('legTaper', 'legs', 'Taper', 0, 0.9, 0.01, 0.5, '', hasLegs),
 
-  { id: 'antennaType', section: 'antennae', label: 'Type', kind: 'choice', default: 'filiform',
+  { id: 'antennaType', section: 'antennae', label: 'Type', kind: 'choice', default: 'clubbed',
     options: [['clubbed', 'Clubbed'], ['feathered', 'Feathered'], ['filiform', 'Filiform'], ['bristle', 'Bristle'], ['none', 'None']] },
-  R('antennaLength', 'antennae', 'Length', 1, 40, 0.5, 10, 'mm', hasAnt),
-  R('antennaCurl', 'antennae', 'Curl', -120, 180, 1, 10, '°', hasAnt),
-  R('antennaSpread', 'antennae', 'Spread', 0, 80, 1, 25, '°', hasAnt),
+  R('antennaLength', 'antennae', 'Length', 1, 40, 0.5, 17, 'mm', hasAnt),
+  R('antennaCurl', 'antennae', 'Curl', -120, 180, 1, 0, '°', hasAnt),
+  R('antennaSpread', 'antennae', 'Spread', 0, 80, 1, 22, '°', hasAnt),
+  R('clubLength', 'antennae', 'Club length — of the antenna (0: a round knob)', 0, 0.5, 0.01, 0.22, '', isClubbed),
+  R('clubWidth', 'antennae', 'Club width — × the shaft', 1, 4, 0.05, 1.8, '', (p) => isClubbed(p) && p.clubLength > 0),
+  R('clubTaper', 'antennae', 'Club taper — rounded end ↔ drawn back to the tip', 0, 1, 0.01, 0.35, '', (p) => isClubbed(p) && p.clubLength > 0),
 
   R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
+  R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
+  R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: square wall)', 0, 4, 0.05, 4, 'mm', hasWings),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -152,7 +188,7 @@ const WR = (id, label, min, max, step, def, unit = '', visibleWhen = null) => ({
 export const WING_FIELDS = [
   WR('length', 'Length (span)', 5, 60, 0.5, 26, 'mm'),
   WR('stretch', 'Stretch — chord scale of the drawn curve', 0.3, 3, 0.01, 1),
-  WR('sweep', 'Sweep — rotation of the drawn curve', -30, 70, 1, 0, '°'),
+  WR('sweep', 'Sweep — rotation of the drawn curve', -90, 90, 1, 0, '°'),
   WR('scallop', 'Scallop depth', 0, 0.4, 0.01, 0),
   WR('scallopCount', 'Scallop count', 2, 12, 1, 6, '', (w) => w.scallop > 0),
   WR('thickness', 'Thickness (STL)', 0.6, 4, 0.05, 1.2, 'mm'),
@@ -179,7 +215,29 @@ const VEIN_DEFAULTS = Object.fromEntries(WING_FIELDS.filter((f) => VENATION_FIEL
    swept back. Not any named insect. Points are [u, w]: u along the span from the
    root (units of the wing's length), w along the chord, + = toward the head.
    First and last points are the ROOT LEAD and ROOT TRAIL, pinned at u = 0. */
+/* The DEFAULT since the elegance pass (§9): a pinned specimen. The forewing has
+   an ANGULAR apex and a straight-to-slightly-concave outer margin down to a
+   clear tornus; the hindwing is a rounded fan with a gently scalloped margin.
+   The forewing's sweep is not typed here: specimenPose() sets it at the end of
+   this module so its inner margin is square to the body (see SPECIMEN). The
+   Phase 1/2 neutral default is LEGACY_DEFAULT_WINGS, kept for reachability. */
 export const DEFAULT_WINGS = {
+  first: {
+    points: [[0, 0.05], [0.3, 0.1], [0.65, 0.13], [0.9, 0.12], [1.0, 0.09], [0.9, -0.02], [0.795, -0.13], [0.69, -0.27], [0.62, -0.35], [0.5, -0.32], [0.26, -0.19], [0, -0.06]],
+    length: 41, stretch: 1, sweep: 0, scallop: 0, scallopCount: 6, thickness: 1.8, dihedral: 0, pitch: 0, ...VEIN_DEFAULTS,
+  },
+  last: {
+    points: [[0, 0.08], [0.3, 0.17], [0.62, 0.15], [0.86, 0.04], [0.98, -0.13], [0.92, -0.31], [0.72, -0.41], [0.44, -0.39], [0.17, -0.24], [0, -0.07]],
+    length: 29, stretch: 1, sweep: 14, scallop: 0.06, scallopCount: 8, thickness: 1.8, dihedral: 0, pitch: 0, ...VEIN_DEFAULTS,
+  },
+  unlinked: {},
+  tail: null,           // set below, once STARTER_TAIL exists
+};
+
+/* The Phase 1/2 neutral default, kept verbatim: with LEGACY_STYLE it rebuilds
+   the shipped Phase 2 default bit for bit (measured, §9.6) — the cute bug is
+   reachable, it is only no longer the default. */
+export const LEGACY_DEFAULT_WINGS = {
   first: {
     points: [[0, 0.09], [0.34, 0.17], [0.78, 0.14], [1.0, 0.0], [0.82, -0.17], [0.4, -0.22], [0, -0.1]],
     length: 26, stretch: 1, sweep: 0, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 12, pitch: 0, ...VEIN_DEFAULTS,
@@ -189,8 +247,15 @@ export const DEFAULT_WINGS = {
     length: 20, stretch: 1, sweep: 32, scallop: 0, scallopCount: 6, thickness: 1.2, dihedral: 8, pitch: 0, ...VEIN_DEFAULTS,
   },
   unlinked: {},
-  tail: null,           // set below, once STARTER_TAIL exists
+  tail: null,
 };
+/* The new controls at the ends that ARE the old code (each a branch). A design
+   saved before DESIGN_VERSION 4 loads with these, so it looks as it did. */
+export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0 };
+/* The Phase 1/2 default's body, legs and antennae (the values PARAM_SPEC used
+   to default to). */
+export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, thoraxDepth: 4.6, abdomenLength: 15, abdomenWidth: 5, abdomenTaper: 0.5, abdomenSegments: 6,
+  legReach: 1, coxa: 1.2, femur: 5, tibia: 5.5, tarsus: 4, antennaType: 'filiform', antennaLength: 10, antennaCurl: 10, antennaSpread: 25 };
 
 export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
 DEFAULTS.wings = DEFAULT_WINGS;   // .tail filled in after STARTER_TAIL (below)
@@ -460,6 +525,14 @@ export const STARTER_TAIL = {
 };
 export const MIN_TAIL_POINTS = 2;
 DEFAULT_WINGS.tail = JSON.parse(JSON.stringify(STARTER_TAIL));
+LEGACY_DEFAULT_WINGS.tail = JSON.parse(JSON.stringify(STARTER_TAIL));
+/* The Phase 1/2 default bug, whole: the cute end of every control. */
+export function legacyDefaultParams() {
+  const p = clone(DEFAULTS);
+  Object.assign(p, LEGACY_BODY, LEGACY_STYLE);
+  p.wings = clone(LEGACY_DEFAULT_WINGS);
+  return p;
+}
 
 /* The anchor on a base outline: where its TRAILING half (apex -> root trail)
    first reaches u = anchorU, and the base control segment that holds it. */
@@ -793,6 +866,7 @@ function loftRings(acc, rings, capA, capB, symHalf = 0) {
     const L = ids[ids.length - 1];
     acc.tri(cB, L[j1], L[j]);                  // twin of the last ring's edge j -> j1
   }
+  ids.capA = cA; ids.capB = cB;
   return ids;
 }
 
@@ -805,11 +879,20 @@ function ringAround(c, u, v, r, sides) {
   return out;
 }
 
-function frustum(acc, p0, p1, r0, r1, meta) {
+/* `point` (optional) is a POINTED termination at p1: the end closes in a cone
+   whose apex stands TIP_POINT x r1 beyond the last ring, recorded in `points`
+   as { apex, ring: [v0, n] } so the gate can measure the last ring against the
+   floor and the apex as a real point. */
+function frustum(acc, p0, p1, r0, r1, meta, points) {
   const d = norm(sub(p1, p0));
   const [u, v] = frameFor(d);
-  const ids = loftRings(acc, [ringAround(p0, u, v, r0, TUBE_SIDES), ringAround(p1, u, v, r1, TUBE_SIDES)], p0, p1);
-  if (meta) meta.push(...ids.map((r) => [r[0], r.length]));
+  const apex = points ? add(p1, mul(d, TIP_POINT * r1)) : null;
+  const rings = [ringAround(p0, u, v, r0, TUBE_SIDES), ringAround(p1, u, v, r1, TUBE_SIDES)];
+  if (apex) rings.push(ringAround(apex, u, v, TIP_NIB_MM, TUBE_SIDES));
+  const ids = loftRings(acc, rings, p0, apex || p1);
+  const tube = apex ? ids.slice(0, -1) : ids;               // the nib is not a tube ring: the floor is on the last REAL ring
+  if (meta) meta.push(...tube.map((r) => [r[0], r.length]));
+  if (points) { const L = tube[tube.length - 1]; points.push({ apex: ids.capB, ring: [L[0], L.length] }); }
 }
 
 function ellipsoid(acc, c, axes, radii, nLat = 8, nLon = 14) {
@@ -837,7 +920,7 @@ function ellipsoid(acc, c, axes, radii, nLat = 8, nLon = 14) {
 const sphere = (acc, c, r) => ellipsoid(acc, c, [[1, 0, 0], [0, 1, 0], [0, 0, 1]], [r, r, r]);
 
 /* A tube along a polyline with parallel-transport frames. */
-function tubeAlong(acc, pts, radii, meta) {
+function tubeAlong(acc, pts, radii, meta, points) {
   const n = pts.length;
   const T = pts.map((_, i) => norm(sub(pts[Math.min(n - 1, i + 1)], pts[Math.max(0, i - 1)])));
   let [N] = frameFor(T[0]);
@@ -847,8 +930,12 @@ function tubeAlong(acc, pts, radii, meta) {
     const B = cross(T[i], N);
     rings.push(ringAround(pts[i], N, B, radii[i], TUBE_SIDES));
   }
-  const ids = loftRings(acc, rings, pts[0], pts[n - 1]);
-  if (meta) meta.push(...ids.map((r) => [r[0], r.length]));
+  const apex = points ? add(pts[n - 1], mul(T[n - 1], TIP_POINT * radii[n - 1])) : null;
+  if (apex) rings.push(ringAround(apex, N, cross(T[n - 1], N), TIP_NIB_MM, TUBE_SIDES));
+  const ids = loftRings(acc, rings, pts[0], apex || pts[n - 1]);
+  const tube = apex ? ids.slice(0, -1) : ids;
+  if (meta) meta.push(...tube.map((r) => [r[0], r.length]));
+  if (points) { const L = tube[tube.length - 1]; points.push({ apex: ids.capB, ring: [L[0], L.length] }); }
   return T;
 }
 
@@ -890,18 +977,28 @@ function slab(acc, grid, half, W, part) {
 /* ------------------------------------------------------------------ */
 
 /* The abdomen's width envelope along s in [0, 1] (base -> tip). */
-function abdomenEnvelope(s, taper, segs, banding) {
+function abdomenEnvelope(s, taper, segs, banding, style = 1, lenMm = 1, pointed = false) {
   if (s <= 0 || s >= 1) return 0;
   // An egg: a quarter-ellipse rise to the widest point at ABD_PEAK, then an
   // ellipse fall that the taper pulls to a point (0 = round end, 1 = spike).
+  // POINTED (elegance pass): the fall is a cosine instead, which meets the axis
+  // at a finite slope — a tip, not a dome (the floor is applied in profileAt).
   let f;
   if (s < ABD_PEAK) f = Math.sqrt(1 - ((ABD_PEAK - s) / ABD_PEAK) ** 2);
-  else { const u = (s - ABD_PEAK) / (1 - ABD_PEAK); f = Math.sqrt(Math.max(0, 1 - u * u)) * (1 - taper * u); }
+  else { const u = (s - ABD_PEAK) / (1 - ABD_PEAK); f = (pointed ? Math.cos((Math.PI / 2) * u) : Math.sqrt(Math.max(0, 1 - u * u))) * (1 - taper * u); }
   if (banding && segs > 1) {
     const sig = 0.16 / segs;
     let notch = 0;
     for (let k = 1; k < segs; k++) notch = Math.max(notch, Math.exp(-(((s - k / segs) / sig) ** 2)));
-    f *= 1 - BAND_DEPTH * notch;
+    if (style >= 1) f *= 1 - BAND_DEPTH * notch;     // BULGE: the Phase 1/2 bead, by branch
+    else {
+      // the style axis: `style` of the bead, (1 - style) of a fine incised groove
+      if (style > 0) f *= 1 - BAND_DEPTH * style * notch;
+      const sg = GROOVE_SIGMA_MM / lenMm;
+      let g = 0;
+      for (let k = 1; k < segs; k++) g = Math.max(g, Math.exp(-(((s - k / segs) / sg) ** 2)));
+      f *= 1 - GROOVE_DEPTH * (1 - style) * g;
+    }
   }
   return f;
 }
@@ -939,8 +1036,15 @@ function profileAt(p, L, y) {
     if (Math.abs(h) < 1) { const k = Math.sqrt(1 - h * h); rx = Math.max(rx, L.Rh * k); rz = Math.max(rz, L.Rh * HEAD_DEPTH_RATIO * k); }
   }
   const s = (L.yA0 - y) / (L.yA0 - L.yA1);
-  const f = abdomenEnvelope(s, p.abdomenTaper, p.abdomenSegments, p.banding);
+  const f = abdomenEnvelope(s, p.abdomenTaper, p.abdomenSegments, p.banding, p.segmentStyle, p.abdomenLength, p.pointedTips);
   if (f > 0) { rx = Math.max(rx, L.ra * f); rz = Math.max(rz, L.ra * ABD_DEPTH_RATIO * f); }
+  // POINTED abdomen: floored at the floor's radius down to a cone ABD_TIP_CONE
+  // floor radii long, which closes on the loft's own apex at yMin
+  if (p.pointedTips && s > 0 && s < 1) {
+    const fl = p.minDiameter / 2, cone = ABD_TIP_CONE * fl, dy = y - L.yA1;
+    const lim = dy >= cone ? fl : (fl * dy) / cone;
+    rx = Math.max(rx, lim); rz = Math.max(rz, lim);
+  }
   // Junction floor: only inside the run between the head's middle and the
   // abdomen's middle, so it can only act on a neck or a waist, never on a pole.
   const front = L.insect ? L.yh : L.Lt / 4, back = L.yA0 - 0.5 * (L.yA0 - L.yA1);
@@ -966,9 +1070,27 @@ function superRing(y, rx, rz, n, z0 = 0) {
 function buildBody(acc, p, L) {
   const part = acc.begin('body', 'body', 'C');
   const N = Math.max(24, Math.ceil((L.yMax - L.yMin) / BODY_STEP_MM));
+  let stations = [];
+  for (let i = 1; i < N; i++) stations.push(L.yMin + ((L.yMax - L.yMin) * i) / N);
+  // GROOVE segments are finer than the station spacing: each segment boundary
+  // gets its own stations across its groove, the boundary itself among them
+  // (so the SVG's segment line is read off the groove's own ring). Bulge style
+  // adds none — the Phase 1/2 stations, by branch.
+  const grooves = p.banding && p.abdomenSegments > 1 && p.segmentStyle < 1;
+  if (grooves) {
+    // the groove's stations win: a uniform station within 0.03 mm of one is
+    // dropped (the boundary's own ring must sit ON the boundary — the gate's G
+    // clause caught a de-dup that dropped it instead)
+    const gs = [];
+    for (let k = 1; k < p.abdomenSegments; k++) {
+      const yb = L.yA0 - (k / p.abdomenSegments) * (L.yA0 - L.yA1);
+      for (const m of [-2, -1.25, -0.6, 0, 0.6, 1.25, 2]) gs.push(yb + m * GROOVE_SIGMA_MM);
+    }
+    stations = stations.filter((y) => gs.every((g) => Math.abs(y - g) > 0.03)).concat(gs.filter((y) => y > L.yMin && y < L.yMax));
+    stations.sort((a, b) => a - b);
+  }
   const rings = [], ys = [];
-  for (let i = 1; i < N; i++) {
-    const y = L.yMin + ((L.yMax - L.yMin) * i) / N;
+  for (const y of stations) {
     const [rx, rz] = profileAt(p, L, y);
     rings.push(superRing(y, Math.max(rx, 0.02), Math.max(rz, 0.02), p.roundness));
     ys.push(y);
@@ -976,6 +1098,7 @@ function buildBody(acc, p, L) {
   // rings run tail -> head; loftRings wants the caps at the matching ends
   const ids = loftRings(acc, rings, [0, L.yMin, 0], [0, L.yMax, 0], RING_HALF);
   part.meta.rings = ids.map((r, i) => ({ v0: r[0], n: r.length, y: ys[i] }));
+  part.meta.abdomen = { y0: L.yA0, y1: L.yA1, tipCone: p.pointedTips ? ABD_TIP_CONE * p.minDiameter / 2 : null, apex: ids.capA, grooves };
   // band rings for the SVG's segment lines: the ring nearest each boundary
   part.meta.bands = [];
   if (p.banding && p.abdomenSegments > 1) {
@@ -1226,30 +1349,36 @@ function subdivide(pts, tris) {
 
 /* A solid slab over a triangulated planform: top face, bottom face, and a rim
    walked along the top face's own boundary edges. */
+/* `half` is the half-thickness: a number (the Phase 1/2 even slab) or a
+   function of the planform point (the elegance pass's edge field — tapered
+   toward the margin and chamfered to the floor at it). Returns the boundary
+   vertices (pts indices) with their emitted top / bottom ids, so the builder
+   can record the EDGE's own thickness for the gate to measure. */
 function planformSlab(acc, pts, tris, half, W, part) {
-  const T = pts.map(([u, w]) => acc.v(W(u, w, +half)));
-  const B = pts.map(([u, w]) => acc.v(W(u, w, -half)));
+  const hf = typeof half === 'function' ? half : () => half;
+  const H = pts.map(([u, w]) => hf(u, w));
+  const T = pts.map(([u, w], i) => acc.v(W(u, w, +H[i])));
+  const B = pts.map(([u, w], i) => acc.v(W(u, w, -H[i])));
   const dir = new Set();
   for (const [a, b, c] of tris) {
     acc.tri(T[a], T[b], T[c]); acc.tri(B[a], B[c], B[b]);
     dir.add(`${a},${b}`); dir.add(`${b},${c}`); dir.add(`${c},${a}`);
   }
+  const rimV = new Set();
   for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
-    if (!dir.has(`${q},${p}`)) acc.quad(T[q], T[p], B[p], B[q]);   // a boundary edge p->q: the rim takes its twin
+    if (!dir.has(`${q},${p}`)) { acc.quad(T[q], T[p], B[p], B[q]); rimV.add(p); }   // a boundary edge p->q: the rim takes its twin
   }
   part.meta.thickPairs = [];
   for (let i = 0; i < pts.length; i += 7) part.meta.thickPairs.push([T[i], B[i]]);
+  return [...rimV].map((i) => ({ i, top: T[i], bot: B[i] }));
 }
 
-function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
-  const thick = Math.max(p.minDiameter, spec.thickness);
+/* The drawn planform in MILLIMETRES — the drawn curve scaled by the pair's
+   length and stretch, with the scallops cut on its trailing half. ONE owner:
+   buildWingPair triangulates exactly this, and specimenPose() reads its inner
+   margin off exactly this, so the pose squares the margin the STL carries. */
+function drawnPlanformMm(spec) {
   const span = spec.length;
-  const { hinge, k } = hingeInfo;
-  const embed = Math.max(0.6 * L.rt * k, thick);
-  const W = wingTransform(hinge, span, spec.sweep, spec.pitch, spec.dihedral);
-  const minW = p.minDiameter;
-
-  // The drawn curve in world millimetres: u by the length, w by length * stretch.
   const base = spec.dense.map(([u, w]) => [u * span, w * span * spec.stretch]);
   let umax = 0; for (const q of base) umax = Math.max(umax, q[0]);
   let apex = 0; for (let i = 1; i < base.length; i++) if (base[i][0] > base[apex][0]) apex = i;
@@ -1264,6 +1393,54 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     for (let it = 0; it < 12; it++) { scalloped = applyScallop(depth); if (okW(scalloped)) break; depth /= 2; scallopReduced = true; }
     if (!okW(scalloped)) { scalloped = base; depth = 0; }
   }
+  return { base, scalloped, apex, umax, scallopReduced };
+}
+
+/* The wing's EDGE PROFILE (elegance pass, §9.1): its half-thickness at a
+   planform point. Two controls, each a separate law, neither below the floor:
+     taper  — the thickness falls linearly along the span from the pair's own
+              thickness at the root to max(floor, thickness x (1 - taper)) at
+              the outermost point;
+     bevel  — within `bevel` mm of the drawn outline (the root chord excluded:
+              it is inside the body) the thickness ramps linearly down to the
+              FLOOR exactly at the outline — a chamfer, both skins inset.
+   Both at 0 is the Phase 1/2 vertical-walled slab, BY BRANCH (the same double
+   on every vertex). `dist` is the distance to the outline, so the builder can
+   tell the outline's own rim vertices from a hole's or the root tab's. */
+function edgeField(p, thick, outline, umax) {
+  const taper = p.wingEdgeTaper, bevel = p.wingEdgeBevel, floor = p.minDiameter;
+  const n = outline.length;
+  const dist = (u, w) => {
+    let d = Infinity;
+    for (let i = 0; i + 1 < n; i++) {
+      const a = outline[i], b = outline[i + 1], ax = b[0] - a[0], ay = b[1] - a[1], L2 = ax * ax + ay * ay || 1e-30;
+      const t = clamp(((u - a[0]) * ax + (w - a[1]) * ay) / L2, 0, 1);
+      const dd = Math.hypot(u - a[0] - t * ax, w - a[1] - t * ay); if (dd < d) d = dd;
+    }
+    return d;
+  };
+  if (!(taper > 0) && !(bevel > 0)) { const h = thick / 2; return { h: () => h, dist, flat: true, tip: thick }; }
+  const tip = Math.max(floor, thick * (1 - taper));
+  const h = (u, w) => {
+    const body = thick + (tip - thick) * clamp(u / umax, 0, 1);
+    if (!(bevel > 0)) return body / 2;
+    const d = dist(u, w);
+    return d >= bevel ? body / 2 : (floor + (body - floor) * (d / bevel)) / 2;
+  };
+  return { h, dist, flat: false, tip };
+}
+
+function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
+  const thick = Math.max(p.minDiameter, spec.thickness);
+  const span = spec.length;
+  const { hinge, k } = hingeInfo;
+  const embed = Math.max(0.6 * L.rt * k, thick);
+  const W = wingTransform(hinge, span, spec.sweep, spec.pitch, spec.dihedral);
+  const minW = p.minDiameter;
+
+  // The drawn curve in world millimetres, scallops cut (one owner: drawnPlanformMm).
+  const { scalloped, umax, scallopReduced } = drawnPlanformMm(spec);
+  const edge = edgeField(p, thick, scalloped, umax), hAt = (q) => edge.h(q[0], q[1]);
   // Root: the closing chord moved INTO the thorax by `embed`.
   const n0 = scalloped[0], n1 = scalloped[scalloped.length - 1];
   let poly = [[-embed, n0[1]], ...scalloped, [-embed, n1[1]]];
@@ -1291,7 +1468,19 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   }
   for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri } = subdivide(pts, tri));
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
-  planformSlab(acc, pts, tri, thick / 2, W, part);
+  const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part);
+  // the EDGE's own thickness, for the gate to measure off the emitted vertices:
+  // the rim vertices ON the drawn outline, and every other rim vertex (holes,
+  // the root tab)
+  part.meta.edgePairs = { outline: [], other: [] };
+  for (const r of rim) {
+    const q = pts[r.i], on = q[0] >= 0 && edge.dist(q[0], q[1]) < 1e-6;
+    part.meta.edgePairs[on ? 'outline' : 'other'].push([r.top, r.bot]);
+  }
+  part.meta.edge = { taper: p.wingEdgeTaper, bevel: p.wingEdgeBevel, root: thick, tip: edge.tip };
+  // the slab's layout, for the gate to MEASURE the thickness at every planform
+  // point: vertex v0 + i is point i's top, v0 + n + i its bottom
+  part.meta.slab = { n: pts.length, uw: pts };
   if (plan) {
     part.meta.venation = plan;
     const xy = (q, h) => { const v = W(q[0], q[1], h); return [v[0], v[1]]; };
@@ -1300,10 +1489,10 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // viewer and along the bottom rim where the wall faces up, so a gate
     // matching the contour against the top rim alone reads the bottom-rim
     // stretches as strays (1.04 mm off at a 1.2 mm sheet and 60 degrees)
-    part.meta.holeLoops = plan.cells.flatMap((c) => c.holes.flatMap((h) => [h.map((q) => xy(q, thick / 2)), h.map((q) => xy(q, -thick / 2))]));
-    part.meta.svgStigma = mode === 'ridges' ? plan.cells.filter((c) => c.role === 'stigma').map((c) => c.points.map((q) => xy(q, thick / 2))) : [];
-    part.meta.svgVeins = mode === 'ridges' ? plan.veins.filter((v) => !v.dropped).map((v) => ({ pts: v.points.map((q) => xy(q, thick / 2)), width: (v.width[0] + v.width[1]) / 2 })) : [];
-    part.meta.veinWorld = plan.veins.filter((v) => !v.dropped).flatMap((v) => { const o = []; for (let i = 0; i + 1 < v.points.length; i++) o.push(W(v.points[i][0], v.points[i][1], thick / 2 + 0.02), W(v.points[i + 1][0], v.points[i + 1][1], thick / 2 + 0.02)); return o; });
+    part.meta.holeLoops = plan.cells.flatMap((c) => c.holes.flatMap((h) => [h.map((q) => xy(q, hAt(q))), h.map((q) => xy(q, -hAt(q)))]));
+    part.meta.svgStigma = mode === 'ridges' ? plan.cells.filter((c) => c.role === 'stigma').map((c) => c.points.map((q) => xy(q, hAt(q)))) : [];
+    part.meta.svgVeins = mode === 'ridges' ? plan.veins.filter((v) => !v.dropped).map((v) => ({ pts: v.points.map((q) => xy(q, hAt(q))), width: (v.width[0] + v.width[1]) / 2 })) : [];
+    part.meta.veinWorld = plan.veins.filter((v) => !v.dropped).flatMap((v) => { const o = []; for (let i = 0; i + 1 < v.points.length; i++) o.push(W(v.points[i][0], v.points[i][1], hAt(v.points[i]) + 0.02), W(v.points[i + 1][0], v.points[i + 1][1], hAt(v.points[i + 1]) + 0.02)); return o; });
     // the vein floor: the narrowest vein (the tip width under the taper) and,
     // in HOLES, the margin border, against minDiameter — the same block-the-STL
     // rule as the drawn outline, reported on the part for floorViolations
@@ -1326,15 +1515,15 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // page draws them red over the 3D view (an overlay, never part of the mesh
   // or of either export), so a thin pair shows red even when it is not the
   // pair open in the editor
-  const seg = [], lift = thick / 2 + 0.02;
+  const seg = [], lift = (q) => hAt(q) + 0.02;
   if (thin.thin) for (let i = 0; i < scalloped.length; i++) {
     const j = (i + 1) % scalloped.length;
-    if (thin.flags[i] && thin.flags[j]) seg.push(W(scalloped[i][0], scalloped[i][1], lift), W(scalloped[j][0], scalloped[j][1], lift));
+    if (thin.flags[i] && thin.flags[j]) seg.push(W(scalloped[i][0], scalloped[i][1], lift(scalloped[i])), W(scalloped[j][0], scalloped[j][1], lift(scalloped[j])));
   }
   part.meta.thinWorld = seg;
   acc.end();
 
-  if (plan && mode === 'ridges') buildRidges(acc, plan, W, thick / 2, p.ridgeHeight, spec.index);
+  if (plan && mode === 'ridges') buildRidges(acc, plan, W, edge.flat ? () => thick / 2 : edge.h, p.ridgeHeight, spec.index);
 }
 
 /* Tail flags per DENSE outline sample: sampleOutline() emits CR_SAMPLES points
@@ -1525,8 +1714,10 @@ function frameMesh(plan, embed, lead, trail) {
    Each is its own closed part (kind 'vein'), overlapping the slab: the export
    contract's closed-shells-union. ridgeWidthPairs lets the gate MEASURE the
    emitted width against the floor. */
-function buildRidges(acc, plan, W, half, ridgeH, pairIndex) {
-  const h0 = half - Math.min(0.15, half * 0.5), h1 = half + ridgeH;
+function buildRidges(acc, plan, W, halfAt, ridgeH, pairIndex) {
+  // the ridge stands on the LOCAL top skin (the edge field may taper it)
+  const h0f = (u, w) => { const half = halfAt(u, w); return half - Math.min(0.15, half * 0.5); };
+  const h1f = (u, w) => halfAt(u, w) + ridgeH;
   for (const v of plan.veins) {
     if (v.dropped) continue;
     const pts = v.points, n = pts.length;
@@ -1541,9 +1732,11 @@ function buildRidges(acc, plan, W, half, ridgeH, pairIndex) {
       const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
       const d = [b[0] - a[0], b[1] - a[1]], dl = Math.hypot(d[0], d[1]) || 1, nn = [-d[1] / dl, d[0] / dl];
       const w = lerp(v.width[0], v.width[1], cum[i] / L) / 2, q = pts[i];
+      const h0 = h0f(q[0], q[1]), h1 = h1f(q[0], q[1]);
       rings.push([W(q[0] - nn[0] * w, q[1] - nn[1] * w, h0), W(q[0] + nn[0] * w, q[1] + nn[1] * w, h0), W(q[0] + nn[0] * w, q[1] + nn[1] * w, h1), W(q[0] - nn[0] * w, q[1] - nn[1] * w, h1)]);
     }
-    const ids = loftRings(acc, rings, W(pts[0][0], pts[0][1], (h0 + h1) / 2), W(pts[n - 1][0], pts[n - 1][1], (h0 + h1) / 2));
+    const mid = (q) => (h0f(q[0], q[1]) + h1f(q[0], q[1])) / 2;
+    const ids = loftRings(acc, rings, W(pts[0][0], pts[0][1], mid(pts[0])), W(pts[n - 1][0], pts[n - 1][1], mid(pts[n - 1])));
     for (const r of ids) part.meta.ridgeWidthPairs.push([r[0], r[1]]);
     acc.end();
   }
@@ -1551,8 +1744,8 @@ function buildRidges(acc, plan, W, half, ridgeH, pairIndex) {
     if (c.role !== 'stigma') continue;
     const part = acc.begin(`stigma${pairIndex + 1}`, 'vein', 'R');
     part.meta.pair = pairIndex;
-    const hc = (h0 + h1) / 2, W2 = (u, w, h) => W(u, w, hc + h);
-    planformSlab(acc, c.points, triangulateCell(c.points), (h1 - h0) / 2, W2, part);
+    const W2 = (u, w, h) => W(u, w, (h0f(u, w) + h1f(u, w)) / 2 + h);
+    planformSlab(acc, c.points, triangulateCell(c.points), (u, w) => (h1f(u, w) - h0f(u, w)) / 2, W2, part);
     delete part.meta.thickPairs;   // a plate's height is the ridge height, not the sheet: the floor is on its WIDTH, and a plate is wider than any vein
     acc.end();
   }
@@ -1578,7 +1771,10 @@ function buildLegs(acc, p, L) {
   for (let i = 0; i < n; i++) {
     const yi = n === 1 ? 0 : (L.Lt / 2) * (0.5 - (1.0 * i) / (n - 1));
     const kk = Math.sqrt(Math.max(0, 1 - (yi / (L.Lt / 2)) ** 2));
-    const rootX = lerp(0.2, 0.35, reach) * L.rt * kk;
+    // tucked, the coxae fold onto the midline (a pinned specimen's legs lie
+    // under the sternum): the Phase 1/2 0.2 rt was wider than a slim body's
+    // floor-wide waist. At reach 1 the old expression, untouched.
+    const rootX = (reach < 1 ? lerp(0.04, 0.35, reach) : lerp(0.2, 0.35, reach)) * L.rt * kk;
     const root = [rootX, yi, -0.3 * L.dt * kk];
     const az = (n === 1 ? 0 : p.legSplay * (1 - (2 * i) / (n - 1))) * D2R;   // + = forward
     const out = [Math.cos(az), Math.sin(az), 0];
@@ -1602,16 +1798,32 @@ function buildLegs(acc, p, L) {
     // a fold that runs back past a wide thorax beside a narrow abdomen does
     // not reappear there as two stubs (the revised sheet's random 8). Blended
     // out by reach: a splayed leg is meant to show.
+    // (Elegance pass: the hold is the NARROWEST body width along the segment
+    // that reaches the joint, not only the width at the joint's own y — on a
+    // slim body a femur folding back across the waist showed there, 6.3% of
+    // the legs' area on the new default. Applied only while tucked (reach < 1):
+    // at reach 1 the blend ignores the hold, and the arithmetic is the old one.)
     for (let s = 1; s <= 4; s++) {
-      const lim = Math.max(0, 0.85 * profileAt(p, L, pts[s][1])[0] - rad[s]);
+      let lim = Math.max(0, 0.85 * profileAt(p, L, pts[s][1])[0] - rad[s]);
+      if (reach < 1) {
+        const y0 = pts[s - 1][1], y1 = pts[s][1];
+        for (let k = 0; k <= 12; k++) lim = Math.min(lim, Math.max(0, 0.85 * profileAt(p, L, lerp(y0, y1, k / 12))[0] - Math.max(rad[s - 1], rad[s])));
+        // never ON the midline: there the left leg is the right one's exact
+        // mirror image, the two closed tubes coincide face for face and the
+        // welded STL reads every edge four times (measured, 1,506 edges)
+        lim = Math.max(lim, TUCK_MIDLINE_GAP);
+      }
       const x = Math.min(pts[s][0], lim);
       pts[s] = [lerp(x, pts[s][0], reach), pts[s][1], pts[s][2]];
     }
     const part = acc.begin(`leg${i + 1}`, 'leg', 'R');
     part.meta.tubeRings = [];
-    for (let s = 0; s < 4; s++) frustum(acc, pts[s], pts[s + 1], rad[s], rad[s + 1], part.meta.tubeRings);
+    if (p.pointedTips) part.meta.points = [];
+    for (let s = 0; s < 4; s++) frustum(acc, pts[s], pts[s + 1], rad[s], rad[s + 1], part.meta.tubeRings, s === 3 ? part.meta.points : undefined);
     acc.end();
-    for (let s = 1; s <= 4; s++) {
+    // a joint between two segments is a knuckle; the END of the tarsus is not a
+    // joint — POINTED, it is the cone above and carries no ball
+    for (let s = 1; s <= (p.pointedTips ? 3 : 4); s++) {
       acc.begin(`leg${i + 1}-joint${s}`, 'leg', 'R');
       sphere(acc, pts[s], Math.max(rad[s - 1], rad[s]) * 1.08);
       acc.end();
@@ -1623,6 +1835,27 @@ function buildLegs(acc, p, L) {
 /* Antennae                                                             */
 /* ------------------------------------------------------------------ */
 
+/* The antenna. Its END is where the elegance pass acts (§9.2, §9.4):
+   CLUBBED with clubLength > 0 is a TEARDROP — the shaft thickens gradually
+   over its last clubLength, peaks at clubWidth x the shaft, and closes toward
+   the tip by clubTaper (0 blunt, 1 drawn back to the floor) — never a sphere;
+   clubLength 0 is the Phase 1/2 ellipsoid knob, by branch.
+   POINTED tips: every antenna END is a floored cone (TIP_POINT), never a ball;
+   FEATHERED pinnae follow a LEAF envelope (short at the base, longest a third
+   of the way out, vanishing at the tip) and each pinna ends in a point. With
+   pointed off, the tip ball and the old fan of equal-taper pinnae, by branch. */
+/* A TEARDROP along x in [0, 1] of the club: the drop's thin tail toward the
+   shaft (a gradual sin^2 swell to clubWidth x the shaft at xp), its round head
+   toward the tip (an elliptical close). clubTaper moves the peak back and draws
+   the end down: 0 ends at 0.55 of the club's width (a rounded end), 1 closes
+   onto the floor. Never under the floor anywhere. */
+export function clubRadius(x, rBase, width, taper, floorR) {
+  const rClub = rBase * width, xp = lerp(0.82, 0.62, taper);
+  if (x <= xp) { const g = Math.sin((Math.PI / 2) * (x / xp)) ** 2; return rBase + (rClub - rBase) * g; }
+  const rEnd = Math.max(floorR, lerp(0.55 * rClub, floorR, taper));
+  const y = (x - xp) / (1 - xp);
+  return rEnd + (rClub - rEnd) * Math.sqrt(Math.max(0, 1 - y * y));
+}
 function buildAntenna(acc, p, L) {
   const type = p.antennaType;
   const floorR = tubeFloorR(p);
@@ -1635,7 +1868,9 @@ function buildAntenna(acc, p, L) {
   let dir = norm([Math.sin(sp), Math.cos(sp), 0.35]);
   const curlAxis = norm(cross(dir, [0, 0, 1]));
   const len0 = p.antennaLength;
-  const M = 28;
+  const teardrop = type === 'clubbed' && p.clubLength > 0;
+  const pointed = p.pointedTips;
+  const M = teardrop ? 56 : 28;
   const pts = [root], rad = [];
   const rTip = type === 'bristle' ? floorR : Math.max(floorR, r0 * 0.8);
   if (type === 'bristle') r0 = Math.max(floorR, r0 * 1.6);
@@ -1645,35 +1880,60 @@ function buildAntenna(acc, p, L) {
     const d = rotateAbout(dir, curlAxis, -ang);
     pts.push(add(pts[i - 1], mul(d, len0 / M)));
   }
-  for (let i = 0; i <= M; i++) rad.push(Math.max(floorR, lerp(r0, rTip, i / M)));
+  for (let i = 0; i <= M; i++) {
+    const s = i / M, rb = Math.max(floorR, lerp(r0, rTip, s));
+    const s0 = 1 - p.clubLength;
+    rad.push(teardrop && s > s0 ? clubRadius((s - s0) / p.clubLength, rb, p.clubWidth, p.clubTaper, floorR) : rb);
+  }
   const part = acc.begin('antenna', 'antenna', 'R');
   part.meta.tubeRings = [];
-  const T = tubeAlong(acc, pts, rad, part.meta.tubeRings);
+  if (pointed) part.meta.points = [];
+  const T = tubeAlong(acc, pts, rad, part.meta.tubeRings, pointed ? part.meta.points : undefined);
+  if (teardrop) part.meta.club = { length: p.clubLength, width: p.clubWidth, taper: p.clubTaper, rBase: rad[Math.floor(M * (1 - p.clubLength))], rings: part.meta.tubeRings.slice() };
   acc.end();
   const tip = pts[M];
-  if (type === 'clubbed') {
+  if (type === 'clubbed' && !teardrop) {
     const t = T[M];
     const [u, v] = frameFor(t);
     acc.begin('antenna-club', 'antenna', 'R');
     ellipsoid(acc, sub(tip, mul(t, 0.06 * len0)), [u, v, t], [rTip * 2.6, rTip * 2.6, Math.max(0.12 * len0, rTip * 3)]);
     acc.end();
-  } else {
+  } else if (!pointed) {
     acc.begin('antenna-tip', 'antenna', 'R');
-    sphere(acc, tip, rTip * 1.05);
+    sphere(acc, tip, (teardrop ? rad[M] : rTip) * 1.05);
     acc.end();
   }
   if (type === 'feathered') {
-    const K = 11;
     const pp = acc.begin('antenna-pinnae', 'antenna', 'R');
     pp.meta.tubeRings = [];
-    for (let k = 0; k < K; k++) {
-      const s = 0.12 + (0.85 * k) / (K - 1);
-      const i = Math.round(s * M);
-      const lat = norm(cross(T[i], [0, 0, 1]));
-      const pl = 0.32 * len0 * (1 - 0.6 * s);
-      for (const sg of [1, -1]) {
-        const d = norm(add(mul(T[i], 0.5), mul(lat, sg * 0.87)));
-        frustum(acc, pts[i], add(pts[i], mul(d, pl)), floorR, floorR, pp.meta.tubeRings);
+    if (!pointed) {
+      const K = 11;
+      for (let k = 0; k < K; k++) {
+        const s = 0.12 + (0.85 * k) / (K - 1);
+        const i = Math.round(s * M);
+        const lat = norm(cross(T[i], [0, 0, 1]));
+        const pl = 0.32 * len0 * (1 - 0.6 * s);
+        for (const sg of [1, -1]) {
+          const d = norm(add(mul(T[i], 0.5), mul(lat, sg * 0.87)));
+          frustum(acc, pts[i], add(pts[i], mul(d, pl)), floorR, floorR, pp.meta.tubeRings);
+        }
+      }
+    } else {
+      // a LEAF: K pinnae each side, lengths on a lanceolate envelope, each a
+      // floored wire ending in a point, swept toward the tip
+      pp.meta.points = [];
+      const K = 15;
+      const leaf = (s) => (s < 0.35 ? Math.sin((Math.PI / 2) * (s / 0.35)) ** 0.6 : ((1 - s) / 0.65) ** 1.15);
+      for (let k = 0; k < K; k++) {
+        const s = 0.06 + (0.9 * k) / (K - 1);
+        const i = Math.round(s * M);
+        const pl = 0.3 * len0 * leaf(s);
+        if (pl < 2 * floorR) continue;
+        const lat = norm(cross(T[i], [0, 0, 1]));
+        for (const sg of [1, -1]) {
+          const d = norm(add(mul(T[i], 0.75), mul(lat, sg * 0.66)));
+          frustum(acc, pts[i], add(pts[i], mul(d, pl)), floorR, floorR, pp.meta.tubeRings, pp.meta.points);
+        }
       }
     }
     acc.end();
@@ -1750,7 +2010,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 3;   // 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 4;   // 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -1758,7 +2018,11 @@ export function paramsFromDesign(doc) {
   if (!doc || doc.format !== DESIGN_FORMAT) return { ok: false, reason: 'not a Parametric Bug design file' };
   if (doc.version > DESIGN_VERSION) return { ok: false, reason: `design version ${doc.version} is newer than this page (${DESIGN_VERSION})` };
   const notes = [];
-  const params = normalizeParams(doc.params || {}, notes);
+  // a design saved before the elegance pass did not know the new controls: they
+  // load at their OLD ends (each a branch to the old code), so it looks as saved
+  const raw = { ...(doc.params || {}) };
+  if (!(doc.version >= 4)) for (const [k, v] of Object.entries(LEGACY_STYLE)) if (!(k in raw)) raw[k] = v;
+  const params = normalizeParams(raw, notes);
   return { ok: true, params, notes };
 }
 
@@ -1836,6 +2100,9 @@ function mirrorMeta(m, shift) {
   for (const [k, v] of Object.entries(m)) {
     if (k === 'tubeRings') out[k] = v.map(([a, n]) => [a + shift, n]);
     else if (k === 'thickPairs' || k === 'ridgeWidthPairs') out[k] = v.map(([a, b]) => [a + shift, b + shift]);
+    else if (k === 'edgePairs') out[k] = { outline: v.outline.map(([a, b]) => [a + shift, b + shift]), other: v.other.map(([a, b]) => [a + shift, b + shift]) };
+    else if (k === 'points') out[k] = v.map((q) => ({ apex: q.apex + shift, ring: [q.ring[0] + shift, q.ring[1]] }));
+    else if (k === 'club') out[k] = { ...v, rings: v.rings.map(([a, n]) => [a + shift, n]) };
     else if (k === 'holeLoops' || k === 'svgStigma') out[k] = v.map((L) => L.map(([x, y]) => [mx(x), y]));
     else if (k === 'svgVeins') out[k] = v.map((l) => ({ ...l, pts: l.pts.map(([x, y]) => [mx(x), y]) }));
     else if (k === 'veinWorld') out[k] = v.map(([x, y, z]) => [mx(x), y, z]);
@@ -2188,4 +2455,61 @@ function simplifyClosed(loop, tol) {
   for (let i = 1; i < loop.length; i++) { const d = Math.hypot(loop[i][0] - loop[0][0], loop[i][1] - loop[0][1]); if (d > fd) { fd = d; far = i; } }
   const a = rdp(loop.slice(0, far + 1), tol), b = rdp(loop.slice(far).concat([loop[0]]), tol);
   return a.slice(0, -1).concat(b.slice(0, -1));
+}
+
+/* ------------------------------------------------------------------ */
+/* Specimen pose (elegance pass, §9.5)                                  */
+/* ------------------------------------------------------------------ */
+
+/* A pinned specimen, as set on a spreading board: the FOREWINGS pulled forward
+   until their INNER MARGINS (root trail -> tornus) form one straight line
+   square to the body axis; every wing flat (dihedral 0, pitch 0); the legs
+   tucked; the antennae straight in a symmetric V. It SETS SLIDER VALUES and
+   returns them — nothing about it is a mode, and every value stays editable.
+
+   The tornus is the trailing-half point standing farthest OUTSIDE the chord
+   from the apex to the root trail (the rear corner of the wing), read off the
+   drawn planform in millimetres — the very polygon the builder triangulates
+   (drawnPlanformMm). Under the wing transform a planform direction (du, dw)
+   lands at world dy = -du sin(sweep) + dw cos(sweep) when pitch is 0, so the
+   inner margin is square to the body (dy = 0) at sweep = atan2(dw, du). The
+   mirror puts the left margin on the same line. A sweep outside the slider's
+   range is clamped and reported. */
+export const SPECIMEN = { legReach: 0, antennaCurl: 0, antennaSpread: 22 };
+export function innerMargin(outline) {
+  let apex = 0; for (let i = 1; i < outline.length; i++) if (outline[i][0] > outline[apex][0]) apex = i;
+  const rt = outline[outline.length - 1], A = outline[apex];
+  const dx = rt[0] - A[0], dy = rt[1] - A[1];
+  let best = -1, bc = 0;
+  for (let i = apex + 1; i < outline.length - 1; i++) {
+    const c = dx * (outline[i][1] - A[1]) - dy * (outline[i][0] - A[0]);   // > 0: outside the chord (the outline runs clockwise)
+    if (c > bc) { bc = c; best = i; }
+  }
+  if (best < 0) best = Math.max(apex, outline.length - 2);
+  return { rootTrail: rt, tornus: outline[best], tornusIndex: best, apexIndex: apex };
+}
+export function specimenPose(params) {
+  const p = normalizeParams(params);
+  const notes = [];
+  if (p.wingPairs > 0) {
+    const fw = resolveWingPairs(p)[0];
+    const m = innerMargin(drawnPlanformMm(fw).scalloped);
+    const du = m.tornus[0] - m.rootTrail[0], dw = m.tornus[1] - m.rootTrail[1];
+    const f = WING_FIELDS.find((x) => x.id === 'sweep');
+    const want = Math.atan2(dw, du) / D2R, got = clamp(want, f.min, f.max);
+    if (got !== want) notes.push(`the forewing's inner margin needs a sweep of ${want.toFixed(1)}°, outside the slider (${f.min}–${f.max}°); set to ${got}°`);
+    p.wings.first.sweep = got;
+    for (const w of [p.wings.first, p.wings.last, ...Object.values(p.wings.unlinked)]) { w.dihedral = 0; w.pitch = 0; }
+  }
+  Object.assign(p, SPECIMEN);
+  return { params: p, notes };
+}
+
+/* The DEFAULT is a pinned specimen: the pose is applied to it here, once, so
+   the forewing sweep in the default is DERIVED from its own outline (the
+   margin square to the body), never a typed angle. */
+{
+  const sp = specimenPose(DEFAULTS).params;
+  DEFAULT_WINGS.first.sweep = sp.wings.first.sweep;
+  Object.assign(DEFAULTS, SPECIMEN);
 }

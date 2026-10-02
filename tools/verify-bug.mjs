@@ -62,6 +62,24 @@
         V6 the discal cell touches the root chord when asked for; the
            pterostigma is exactly one cell, solid in HOLES and a plate in RIDGES.
 
+     The ELEGANCE PASS (design doc §9), on every row:
+     B  the wing's EDGE PROFILE: the taper + chamfer law restated here from
+        the parameters and the drawn planform, against the emitted top/bottom
+        pair of EVERY planform point (1e-9 mm); nothing under the floor; with a
+        chamfer every outline vertex reads the floor exactly.
+     X  POINTED terminations: from the parameters, every leg and antenna end a
+        point — its last ring at or over the floor, its apex at least a ring
+        radius beyond it — and no ball left; the abdomen at or over the floor
+        except its last 1.6 floor radii (restated); with them off, none of it.
+     G  SEGMENT style: at each boundary clear of the floor the ring dips
+        against the same bug with its segments unmarked by at least half of
+        what the style asks (groove share x (1 - style), bead share x style);
+        a groove puts a ring exactly ON the boundary.
+     Y  (specimen rows) the forewing's inner margin square to the body,
+        measured off the emitted vertices with the tornus found by this file's
+        own rule — or, where the margin needs a sweep outside the slider, the
+        sweep at the bound; every wing flat; the antennae straight.
+
    And, as pure-function checks of the editor and the interpolation:
      E  a drag that would make the outline cross itself is BLOCKED (points
         returned unchanged) and the requested outline really does cross (this
@@ -86,7 +104,7 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models twenty-one ways (plus the L clause at reach 1) and requires each to be
+   --negative-control  breaks built models twenty-eight ways (plus the L clause at reach 1) and requires each to be
                        caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
@@ -203,6 +221,7 @@ function minFeature(model) {
       // a polygon's inscribed diameter is 2 r cos(pi/n): what a printer actually gets
       tubeMin = Math.min(tubeMin, 2 * r * Math.cos(Math.PI / n));
     }
+    for (const [a, b] of [...(part.meta.edgePairs ? [...part.meta.edgePairs.outline, ...part.meta.edgePairs.other] : [])]) thickMin = Math.min(thickMin, Math.hypot(P[3 * a] - P[3 * b], P[3 * a + 1] - P[3 * b + 1], P[3 * a + 2] - P[3 * b + 2]));
     for (const [a, b] of part.meta.thickPairs || []) thickMin = Math.min(thickMin, Math.hypot(P[3 * a] - P[3 * b], P[3 * a + 1] - P[3 * b + 1], P[3 * a + 2] - P[3 * b + 2]));
     for (const [a, b] of part.meta.ridgeWidthPairs || []) ridgeMin = Math.min(ridgeMin, Math.hypot(P[3 * a] - P[3 * b], P[3 * a + 1] - P[3 * b + 1], P[3 * a + 2] - P[3 * b + 2]));
     if (part.kind === 'body') {
@@ -576,6 +595,168 @@ function venationChecks(model, opts) {
   return { bad, cells: cellsTotal, holes: holesTotal, minGap, minBorder };
 }
 
+/* ---------- the ELEGANCE PASS (design doc §9): B / X / G / Y ---------- */
+/* B — the wing's EDGE PROFILE. The law restated here from the PARAMETERS (the
+   pair's own thickness, the two edge controls, the floor) and the drawn
+   planform polygon (part.meta.planform, less its two root-tab vertices), with
+   this file's own distance-to-outline; the measured side is the emitted top /
+   bottom vertex pair of EVERY planform point (part.meta.slab: vertex v0 + i is
+   point i's top, v0 + n + i its bottom). Asserts: every point's emitted
+   thickness equals the law (1e-9 mm) and none is under the floor; with a
+   chamfer every vertex ON the outline reads the floor exactly. */
+function edgeChecks(model) {
+  const bad = [], p = model.params, floor = p.minDiameter, P = model.positions;
+  let minT = Infinity, worst = 0, onOutline = 0;
+  for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    const k = +part.kind.slice(4) - 1, spec = pairFieldsFor(p, k);
+    const S = part.meta.slab;
+    if (!S) { bad.push(`B: ${part.name} records no slab layout`); continue; }
+    const outline = part.meta.planform.slice(1, -1).reverse();            // the drawn outline, root lead -> root trail (open: the root chord is inside the body)
+    const umax = Math.max(...outline.map((q) => q[0]));
+    const thick = Math.max(floor, spec.thickness), taper = p.wingEdgeTaper, bevel = p.wingEdgeBevel;
+    const tip = Math.max(floor, thick * (1 - taper));
+    const dOut = (u, w) => { let d = Infinity; for (let i = 0; i + 1 < outline.length; i++) d = Math.min(d, segDist([u, w], outline[i], outline[i + 1])); return d; };
+    const law = (u, w) => {
+      if (!(taper > 0) && !(bevel > 0)) return thick;
+      const body = thick + (tip - thick) * Math.max(0, Math.min(1, u / umax));
+      if (!(bevel > 0)) return body;
+      const d = dOut(u, w);
+      return d >= bevel ? body : floor + (body - floor) * (d / bevel);
+    };
+    for (let i = 0; i < S.n; i++) {
+      const a = part.v0 + i, b = part.v0 + S.n + i;
+      const t = Math.hypot(P[3 * a] - P[3 * b], P[3 * a + 1] - P[3 * b + 1], P[3 * a + 2] - P[3 * b + 2]);
+      const [u, w] = S.uw[i], want = law(u, w);
+      minT = Math.min(minT, t); worst = Math.max(worst, Math.abs(t - want));
+      if (bevel > 0 && u >= 0 && dOut(u, w) < 1e-9) { onOutline++; if (Math.abs(t - floor) > 1e-6) bad.push(`B: ${part.name} an outline vertex is ${t.toFixed(4)} mm thick, the chamfer brings the outline to the ${floor} mm floor`); }
+    }
+    if (worst > 1e-9) bad.push(`B: ${part.name} emitted thickness departs from the edge law by ${worst.toExponential(2)} mm (taper ${taper}, chamfer ${bevel} mm)`);
+  }
+  if (minT < floor - 1e-9) bad.push(`B: a wing is ${minT.toFixed(4)} mm thick somewhere, under the ${floor} mm floor`);
+  if (p.wingEdgeBevel > 0 && p.wingPairs > 0 && !onOutline) bad.push('B: a chamfer is asked for and no vertex lies on the outline (vacuous)');
+  return { bad, minT: Number.isFinite(minT) ? minT : null, onOutline };
+}
+
+/* X — POINTED terminations. From the PARAMETERS: with pointed tips every leg
+   and antenna END is a point — the part records one (meta.points: its apex
+   and its last ring), measured here: the last ring's inscribed diameter at or
+   over the floor, the apex standing beyond the ring along the axis by at least
+   one ring radius (it is a point, not a cap); no ball at a tarsus end or an
+   antenna tip; the abdomen floored at the floor over all of it but the last
+   1.6 floor radii (restated here) before its tip. With them off, none of it. */
+function tipChecks(model) {
+  const bad = [], p = model.params, floor = p.minDiameter, P = model.positions;
+  const V = (v) => [P[3 * v], P[3 * v + 1], P[3 * v + 2]];
+  let pts = 0;
+  for (const part of model.parts) for (const q of part.meta.points || []) {
+    pts++;
+    const [v0, n] = q.ring;
+    const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += V(v0 + k)[d] / n;
+    let r = Infinity; for (let k = 0; k < n; k++) r = Math.min(r, Math.hypot(...V(v0 + k).map((x, d) => x - c[d])));
+    const dia = 2 * r * Math.cos(Math.PI / n), apex = V(q.apex), h = Math.hypot(...apex.map((x, d) => x - c[d]));
+    if (dia < floor - 1e-9) bad.push(`X: ${part.name}-${part.side} a pointed end's last ring is ${dia.toFixed(4)} mm across, under the floor`);
+    if (!(h >= r)) bad.push(`X: ${part.name}-${part.side} a pointed end's apex stands ${h.toFixed(3)} mm past its ring (radius ${r.toFixed(3)}) — not a point`);
+  }
+  const legs = model.parts.filter((q) => q.kind === 'leg' && /^leg\d$/.test(q.name));
+  const wantLegPts = p.pointedTips ? legs.length : 0, gotLegPts = legs.reduce((a, q) => a + (q.meta.points || []).length, 0);
+  if (gotLegPts !== wantLegPts) bad.push(`X: ${gotLegPts} pointed tarsus ends for ${legs.length} legs (pointed ${p.pointedTips})`);
+  const balls = model.parts.filter((q) => /^leg\d-joint4$/.test(q.name)).length;
+  if (p.pointedTips && balls) bad.push(`X: ${balls} tarsus ends still carry a ball`);
+  if (!p.pointedTips && legs.length && balls !== legs.length) bad.push(`X: rounded tips asked and ${balls} tarsus balls for ${legs.length} legs`);
+  const ant = model.parts.filter((q) => q.name === 'antenna');
+  if (ant.length && p.pointedTips && ant.some((q) => !(q.meta.points || []).length)) bad.push('X: an antenna end is not pointed');
+  if (p.pointedTips && model.parts.some((q) => q.name === 'antenna-tip')) bad.push('X: an antenna tip still carries a ball');
+  // the abdomen, from the body's own rings
+  const body = model.parts.find((q) => q.kind === 'body'), L = model.layout;
+  if (p.pointedTips) {
+    const cone = 1.6 * floor / 2;
+    let thin = Infinity;
+    for (const ring of body.meta.rings) {
+      if (!(ring.y < L.yA0 && ring.y >= L.yA1 + cone + 1e-9)) continue;
+      let xa = Infinity, xb = -Infinity, za = Infinity, zb = -Infinity;
+      for (let k = 0; k < ring.n; k++) { const [x, , z] = V(ring.v0 + k); xa = Math.min(xa, x); xb = Math.max(xb, x); za = Math.min(za, z); zb = Math.max(zb, z); }
+      thin = Math.min(thin, xb - xa, zb - za);
+    }
+    if (thin < floor - 1e-6) bad.push(`X: the pointed abdomen is ${thin.toFixed(4)} mm across above its tip cone, under the floor`);
+    const tipY = Math.min(...body.meta.rings.map((r) => r.y));
+    if (!(tipY - L.yA1 < cone)) bad.push('X: the pointed abdomen has no tip cone (its last ring is not inside the cone)');
+  }
+  return { bad, pts };
+}
+
+/* G — the SEGMENT style, measured on the body's own rings against the SAME
+   bug with its segments unmarked (banding off: a different branch of the
+   builder, the envelope alone), interpolated at the ring's own y. At a segment
+   boundary clear of the floor the dip must reach at least half of what the
+   style asks — a groove's share GROOVE_DEPTH x (1 - style) and a bead's
+   BAND_DEPTH x style (the bead's own constant restated here: 0.14) — and a
+   groove style must put a ring exactly ON the boundary. */
+function segmentChecks(model) {
+  const bad = [], p = model.params;
+  if (!(p.banding && p.abdomenSegments > 1)) return { bad, seen: 0 };
+  const twin = G.buildBug({ ...p, banding: false });
+  const body = model.parts.find((q) => q.kind === 'body'), tb = twin.parts.find((q) => q.kind === 'body'), L = model.layout;
+  const width = (m, ring) => { let a = Infinity, b = -Infinity; for (let k = 0; k < ring.n; k++) { const x = m.positions[3 * (ring.v0 + k)]; a = Math.min(a, x); b = Math.max(b, x); } return b - a; };
+  const twinAt = (y) => { const R = tb.meta.rings; let i = 0; while (i + 2 < R.length && R[i + 1].y < y) i++; const t = (y - R[i].y) / (R[i + 1].y - R[i].y); return width(twin, R[i]) + (width(twin, R[i + 1]) - width(twin, R[i])) * t; };
+  const seg = (L.yA0 - L.yA1) / p.abdomenSegments, s = p.segmentStyle;
+  const dip = 1 - (1 - 0.14 * s) * (1 - G.GROOVE_DEPTH * (1 - s));
+  let seen = 0;
+  for (let k = 1; k < p.abdomenSegments; k++) {
+    const yb = L.yA0 - k * seg;
+    const r0 = body.meta.rings.reduce((a, r) => (Math.abs(r.y - yb) < Math.abs(a.y - yb) ? r : a));
+    const ref = twinAt(r0.y);
+    if (ref < 1.4 * p.minDiameter) continue;          // the floor holds it there: nothing can show
+    seen++;
+    if (s < 1 && Math.abs(r0.y - yb) > 1e-9) bad.push(`G: no ring at segment boundary ${k} (nearest ${Math.abs(r0.y - yb).toFixed(3)} mm off)`);
+    const ratio = width(model, r0) / ref;
+    if (!(ratio <= 1 - 0.5 * dip)) bad.push(`G: segment boundary ${k} is not marked (width ${ratio.toFixed(4)} of the unmarked body, the style ${s} asks a ${(100 * dip).toFixed(1)}% dip)`);
+  }
+  return { bad, seen };
+}
+
+/* Y — the SPECIMEN pose, measured off the emitted right forewing: its inner
+   margin (root trail -> tornus, the tornus found by this file's own rule on
+   the drawn planform) lies square to the body — the two emitted top vertices
+   at the same y; every wing's mid-surface is flat (one z); the antennae run
+   straight (ring centres on one line). Rows without venation (the slab's
+   first vertices are the planform polygon's own, in order). */
+function specimenChecks(model) {
+  const bad = [], P = model.positions;
+  const part = model.parts.find((q) => q.kind === 'wing1' && q.side === 'R');
+  if (!part) return { bad: ['Y: no forewing'] };
+  const poly = part.meta.planform, outline = poly.slice(1, -1).reverse();
+  let apex = 0; for (let i = 1; i < outline.length; i++) if (outline[i][0] > outline[apex][0]) apex = i;
+  const rt = outline[outline.length - 1], A = outline[apex];
+  let best = -1, bc = 0;
+  for (let i = apex + 1; i < outline.length - 1; i++) { const c = (rt[0] - A[0]) * (outline[i][1] - A[1]) - (rt[1] - A[1]) * (outline[i][0] - A[0]); if (c > bc) { bc = c; best = i; } }
+  const toPoly = (j) => outline.length - j;                    // outline[j] is planform[outline.length - j]
+  const vy = (i) => P[3 * (part.v0 + i) + 1];
+  if (!(part.meta.slab && part.meta.slab.uw[toPoly(best)][0] === outline[best][0] && part.meta.slab.uw[toPoly(best)][1] === outline[best][1])) bad.push('Y: the slab does not start with the planform polygon (cannot read the margin)');
+  else {
+    // the sweep the margin NEEDS, by this file's own reading of the planform.
+    // Eva's ruling: the pose must SUCCEED on any wing — no clamp. The need
+    // must lie inside the slider's range and the emitted margin be square.
+    const need = Math.atan2(outline[best][1] - rt[1], outline[best][0] - rt[0]) * 180 / Math.PI;
+    const f = G.WING_FIELDS.find((x) => x.id === 'sweep');
+    const dy = vy(toPoly(best)) - vy(toPoly(outline.length - 1));
+    if (need < f.min || need > f.max) bad.push(`Y: the margin needs ${need.toFixed(1)}°, outside the slider (${f.min}–${f.max}°) — Set specimen would clamp`);
+    else if (Math.abs(dy) > 1e-6) bad.push(`Y: the forewing's inner margin is not square to the body — its ends differ by ${dy.toFixed(4)} mm in y`);
+  }
+  for (const w of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    const n = w.meta.slab.n; let z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < n; i++) { const z = (P[3 * (w.v0 + i) + 2] + P[3 * (w.v0 + n + i) + 2]) / 2; z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    if (z1 - z0 > 1e-9) bad.push(`Y: ${w.name} is not flat (mid-surface spans ${(z1 - z0).toFixed(4)} mm in z)`);
+  }
+  const ant = model.parts.find((q) => q.name === 'antenna' && q.side === 'R');
+  if (ant) {
+    const C = ant.meta.tubeRings.map(([v0, n]) => { const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += P[3 * (v0 + k) + d] / n; return c; });
+    const a = C[0], b = C[C.length - 1], ab = b.map((x, d) => x - a[d]), L2 = ab.reduce((s, x) => s + x * x, 0);
+    let dev = 0; for (const c of C) { const t = ab.reduce((s, x, d) => s + x * (c[d] - a[d]), 0) / L2; dev = Math.max(dev, Math.hypot(...c.map((x, d) => x - a[d] - t * ab[d]))); }
+    if (dev > 1e-6) bad.push(`Y: the antennae are not straight (a ring centre stands ${dev.toFixed(4)} mm off the line)`);
+  }
+  return { bad };
+}
+
 /* ---------- T: the tail lives on the bottom pair only ---------- */
 /* Build the same bug with TAIL off and compare: every wing part that is NOT the
    bottom pair must be bit-identical (so no middle pair carries any tail
@@ -622,11 +803,16 @@ function check(label, model, opts = {}) {
   if (opts.expectBlended && !fc.blended) fails.push('N: the blended-pair row has no blended pair below the floor (vacuous)');
   if (opts.tailIso) for (const b of tailIsolation(model, opts.tailIso)) fails.push(`T: ${b}`);
   if (opts.repaired && !model.notes.some((n) => /eased toward the nearer drawn pair/.test(n))) fails.push('I: the crossing blend was not reported repaired');
+  const ec = edgeChecks(model); for (const b of ec.bad) fails.push(b);
+  const xc = tipChecks(model); for (const b of xc.bad) fails.push(b);
+  const gc = segmentChecks(model); for (const b of gc.bad) fails.push(b);
+  if (opts.expectGrooves && !gc.seen) fails.push('G: the segment row measured no boundary (vacuous)');
+  if (opts.specimen) for (const b of specimenChecks(model).bad) fails.push(b);
   const vn = venationChecks(model, opts);
   for (const b of vn.bad) fails.push(b.startsWith('V') ? b : `V: ${b}`);
   if (opts.expectVeinThin && !gateVein(model).under) fails.push('V4: the deliberately thin-vein row is not under the floor by this file\'s reading (vacuous)');
   if (opts.expectTailVein && !model.wingPairs.some((w) => w.hasTail)) fails.push('V5: the tail-vein row has no tail (vacuous)');
-  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, notes: model.notes };
+  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, ec, xc, gc, notes: model.notes };
 }
 
 function fmt(r) {
@@ -636,6 +822,7 @@ function fmt(r) {
     + `minTube=${f(r.mf.tubeMin)} minThick=${f(r.mf.thickMin)} waist=${f(r.mf.waistMin)} roots=${r.rc.roots.length}${r.rc.roots.length > 1 ? `@${f(r.rc.minGap)}mm` : ''} cutRegions=${r.sv.regions}`
     + ` floor=${r.fc.refused ? 'STL-REFUSED' : 'ok'}(${r.fc.worst.toFixed(2)}mm${r.fc.border ? ',borderline' : ''})`
     + (r.vn.cells ? ` cells=${r.vn.cells}${r.vn.holes ? ` holes=${r.vn.holes} gap=${f(r.vn.minGap)} border=${f(r.vn.minBorder)}` : ''}` : '')
+    + ` edge=${r.ec.minT === null ? '—' : r.ec.minT.toFixed(3)}mm${r.ec.onOutline ? `(${r.ec.onOutline} on the outline)` : ''} points=${r.xc.pts}${r.gc.seen ? ` grooves=${r.gc.seen}` : ''}`
     + (r.le ? ` legsOutside=${r.le.outside.toFixed(2)}/${r.le.area.toFixed(2)}mm²` : '') + (r.notes.length ? `  notes: ${r.notes.join('; ')}` : '');
 }
 
@@ -724,6 +911,33 @@ function functionChecks() {
   ok(bb.ok && bb.notes.some((n) => /first pair outline refused/.test(n)), `D: an invalid outline in a file is refused with a note (${bb.notes[0]})`);
   const newer = G.designFromParams(norm); newer.version = 99;
   ok(!G.paramsFromDesign(newer).ok, 'D: a newer design version is refused, not partly read');
+  // the elegance pass (§9): a design saved before it loads at the OLD ends
+  const v3 = G.designFromParams(G.legacyDefaultParams(), 'v3'); v3.version = 3;
+  for (const k of Object.keys(G.LEGACY_STYLE)) delete v3.params[k];
+  const r3 = G.paramsFromDesign(JSON.parse(JSON.stringify(v3)));
+  const b3 = G.buildBug(r3.params), bl = G.buildBug(G.legacyDefaultParams());
+  ok(r3.ok && b3.positions.length === bl.positions.length && b3.positions.every((x, i) => Object.is(x, bl.positions[i])), 'D: a version-3 design (no elegance fields) loads at the OLD ends and builds bit-identically to the legacy default');
+  // the teardrop club never under the floor, at the grid of its controls
+  let clubMin = Infinity; const fr = 0.5 / Math.cos(Math.PI / 10);
+  for (const w of [1, 1.8, 4]) for (const t of [0, 0.35, 1]) for (let i = 0; i <= 200; i++) clubMin = Math.min(clubMin, G.clubRadius(i / 200, fr, w, t, fr) / fr);
+  ok(clubMin >= 1 - 1e-12, `X: the teardrop club's radius never falls under the floor (min ${clubMin.toFixed(4)} x the floor radius)`);
+  // the specimen pose SETS values and returns notes; it leaves the rest alone
+  const sp = G.specimenPose(G.defaultParams());
+  ok(sp.params.legReach === 0 && sp.params.antennaCurl === 0 && sp.params.wings.first.dihedral === 0 && sp.params.wings.last.dihedral === 0 && sp.params.abdomenLength === G.defaultParams().abdomenLength, `Y: specimenPose sets legs tucked, antennae straight, wings flat, and leaves the body alone (forewing sweep ${sp.params.wings.first.sweep.toFixed(3)}°)`);
+  ok(Math.abs(sp.params.wings.first.sweep - G.DEFAULTS.wings.first.sweep) < 1e-12, 'Y: the default IS the specimen pose of itself (its forewing sweep derived, not typed)');
+  // Eva's ruling: Set specimen SUCCEEDS — never clamps — on every random wing.
+  // Seeds well past the build rows (it is a planform read, so cheap), plus every
+  // wing-pair count the randomizer can produce forced on.
+  {
+    const clamped = [], f = G.WING_FIELDS.find((x) => x.id === 'sweep'); let lo = Infinity, hi = -Infinity, n = 0;
+    for (let s = 1; s <= Math.max(400, NSEEDS * 10); s++) {
+      const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; }
+      const r = G.specimenPose(p); n++;
+      if (r.notes.length) clamped.push(`random:${s}`);
+      const sw = r.params.wings.first.sweep; lo = Math.min(lo, sw); hi = Math.max(hi, sw);
+    }
+    ok(clamped.length === 0 && lo > f.min && hi < f.max, `Y: Set specimen squares the forewing without clamping on ${n} random bugs (sweep ${lo.toFixed(1)}..${hi.toFixed(1)}° inside ${f.min}..${f.max}°)${clamped.length ? ` — CLAMPED: ${clamped.slice(0, 8).join(', ')}` : ''}`);
+  }
   return out;
 }
 
@@ -774,6 +988,24 @@ function rowsFor(nseeds) {
     ven(mode, (p) => { p.wingPairs = 4; p.thoraxLength = 3; p.thoraxWidth = 2.5; p.thoraxDepth = 2.5; }, '4 pairs on the smallest thorax');
     for (let s = 1; s <= Math.max(4, Math.round(nseeds / 5)); s++) { const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } p.venation = mode; rows.push([`${mode}: random:${s}`, p, {}]); }
   }
+  // ELEGANCE PASS rows (design doc §9): the OLD default (every new control at
+  // its old end), each new control at both ends of its range on the new
+  // default, the floor at both ends against the edge law, both venation modes
+  // with the edge profile, and the specimen pose on the new default, the old
+  // default and random bugs (Y on each)
+  rows.push(['legacy default (the old ends)', G.legacyDefaultParams(), {}]);
+  const ends = [['wingEdgeTaper', 0, 0.9], ['wingEdgeBevel', 0, 4], ['clubLength', 0, 0.5], ['clubWidth', 1, 4], ['clubTaper', 0, 1], ['segmentStyle', 0, 1], ['pointedTips', false, true]];
+  for (const [id, lo, hi] of ends) for (const v of [lo, hi]) { const p = d(); p[id] = v; rows.push([`${id} ${v}`, p, id === 'segmentStyle' ? { expectGrooves: true } : {}]); }
+  { const p = d(); p.segmentStyle = 0.5; rows.push(['segmentStyle 0.5', p, { expectGrooves: true }]); }
+  for (const pt of [true, false]) { const p = d(); p.antennaType = 'feathered'; p.pointedTips = pt; p.legReach = 1; rows.push([`feathered, splayed, pointed ${pt}`, p, {}]); }
+  for (const t of ['filiform', 'bristle']) { const p = d(); p.antennaType = t; rows.push([`antenna ${t}, pointed`, p, {}]); }
+  { const p = d(); p.bodyParts = '2'; p.wingPairs = 0; p.legPairs = 4; p.antennaType = 'none'; p.abdomenWidth = 6; rows.push(['2-part, pointed abdomen', p, {}]); }
+  for (const f of [0.6, 2]) { const p = d(); p.minDiameter = f; rows.push([`floor ${f} mm against the edge law`, p, {}]); }
+  for (const mode of ['holes', 'ridges']) { const p = d(); p.venation = mode; p.wingEdgeBevel = 2; rows.push([`${mode} with taper + 2 mm chamfer`, p, {}]); }
+  rows.push(['specimen: the new default', G.specimenPose(d()).params, { specimen: true }]);
+  rows.push(['specimen: the old default', G.specimenPose(G.legacyDefaultParams()).params, { specimen: true }]);
+  { const p = d(); p.wingPairs = 4; rows.push(['specimen: 4 pairs', G.specimenPose(p).params, { specimen: true }]); }
+  for (let s = 1; s <= 6; s++) { const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } rows.push([`specimen: random:${s}`, G.specimenPose(p).params, { specimen: true }]); }
   for (const name of ['falcate', 'notched', 'strap']) { const p = d(); p.venation = 'holes'; p.wingPairs = 2; p.wings.first.points = HAND_OUTLINES[name]; p.wings.first.length = 36; p.wings.first.stretch = 1.3; rows.push([`holes: drawn:${name}`, p, {}]); }
   return rows;
 }
@@ -795,6 +1027,20 @@ if (NEG) {
   const thinVeinModel = G.buildBug(thinVeinP);
   const tailVeinP = G.defaultParams(); tailVeinP.venation = 'ridges'; tailVeinP.wings.first.points = HAND_OUTLINES.swallowtail; tailVeinP.wings.tail.on = true; tailVeinP.wings.last.length = 30; tailVeinP.wings.last.stretch = 1.4;
   const tailVeinModel = G.buildBug(tailVeinP);
+  const specModel = G.buildBug(G.specimenPose(G.defaultParams()).params);
+  // the first cut's clamp: random:6's forewing needs ~−43°; the old slider stopped at −30
+  const clampP = (() => { const p = G.randomParams(6); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } const q = G.specimenPose(p).params; q.wings.first.sweep = Math.max(-30, q.wings.first.sweep); return q; })();
+  const clampModel = G.buildBug(clampP);
+  // the right forewing's outline vertex pairs (top, bottom), and their mirror twins
+  const mutPair = (m, fn) => {
+    const R = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'), L = m.parts.find((q) => q.kind === 'wing1' && q.side === 'L');
+    const P = m.positions, V = (v) => [P[3 * v], P[3 * v + 1], P[3 * v + 2]];
+    for (const [a, b] of R.meta.edgePairs.outline.slice(3, 9)) {
+      const nt = fn(V(a), V(b)), la = a - R.v0 + L.v0;   // the left part is the right's vertices in order, x negated
+      for (let d = 0; d < 3; d++) P[3 * a + d] = nt[d];
+      P[3 * la] = -nt[0]; P[3 * la + 1] = nt[1]; P[3 * la + 2] = nt[2];
+    }
+  };
   const deepClone = (o) => JSON.parse(JSON.stringify(o));
   const clone = (m) => ({ ...m, positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices), parts: m.parts.map((p) => ({ ...p, meta: { ...p.meta } })) });
   const shiftPart = (m, pred, d) => { for (const p of m.parts.filter(pred)) for (let v = p.v0; v < p.v1; v++) for (let k = 0; k < 3; k++) m.positions[3 * v + k] += d[k] * (k === 0 && p.side === 'L' ? -1 : 1); };
@@ -841,8 +1087,17 @@ if (NEG) {
     ['a vein floor violation goes unreported', 'V4', thinVeinModel, { expectVeinThin: true }, (m) => { m.floorViolations = m.floorViolations.filter((v) => v.kind !== 'vein'); }],
     ['the tail vein stops short of the tail', 'V5', tailVeinModel, { expectTailVein: true }, (m) => { m.wingPairs = deepClone(m.wingPairs); const V = m.wingPairs[1].venation; const tv = V.veins.find((v) => v.tail); const n = tv.points.length; tv.points[n - 1] = [(tv.points[n - 1][0] + tv.points[n - 2][0]) / 2, (tv.points[n - 1][1] + tv.points[n - 2][1]) / 2]; }],
     ['a ridge strip missing', 'V', ridgesModel, {}, (m) => { const i = m.parts.findIndex((q) => q.kind === 'vein' && q.side === 'R'); m.parts.splice(i, 1); }],
+    // the elegance pass (§9) — each on BOTH sides so the mirror stays clean
+    ['an outline vertex thinned under the floor', 'B', base, {}, (m) => mutPair(m, (t, b) => b.map((x, d) => x + 0.4 * (t[d] - x)))],
+    ['the chamfer misses the outline', 'B', base, {}, (m) => mutPair(m, (t, b) => t.map((x, d) => x + 0.25 * (t[d] - b[d])))],
+    ['a pointed end blunted onto its ring', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => /^leg\d$/.test(x.name) && x.side === side); const pt = q.meta.points[0], [v0, n] = pt.ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let d = 0; d < 3; d++) m.positions[3 * pt.apex + d] = c[d]; } }],
+    ['a tip ring thinned under the floor', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.name === 'antenna' && x.side === side); const [v0, n] = q.meta.points[0].ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) m.positions[3 * (v0 + k) + d] = c[d] + 0.5 * (m.positions[3 * (v0 + k) + d] - c[d]); } }],
+    ['a segment groove filled', 'G', base, { expectGrooves: true }, (m) => { const body = m.parts.find((q) => q.kind === 'body'), L = m.layout; for (let k = 1; k < m.params.abdomenSegments; k++) { const yb = L.yA0 - (k / m.params.abdomenSegments) * (L.yA0 - L.yA1); for (const r of body.meta.rings) if (Math.abs(r.y - yb) < 0.3) for (let j = 0; j < r.n; j++) { m.positions[3 * (r.v0 + j)] /= 1 - G.GROOVE_DEPTH * Math.exp(-(((r.y - yb) / G.GROOVE_SIGMA_MM) ** 2)); } } }],
+    ['the pose clamps at the old -30° bound (random:6)', 'Y', clampModel, { specimen: true }, () => {}],
+    ['the forewing margin not square to the body', 'Y', specModel, { specimen: true }, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); for (let v = q.v0 + 1; v <= q.v0 + 12; v++) m.positions[3 * v + 1] += 1.5; } }],
   ];
   const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true }), check('blended thin (clean: refused)', blendedModel, { expectBlended: true }),
+    check('specimen (clean)', specModel, { specimen: true }),
     check('holes 3 pairs + stigma (clean)', holesModel, { expectStigma: true }), check('ridges 3 pairs (clean)', ridgesModel, {}), check('thin veins (clean: refused)', thinVeinModel, { expectVeinThin: true }), check('tail vein (clean)', tailVeinModel, { expectTailVein: true })];
   let ok = clean.every((r) => !r.fails.length);
   for (const r of clean) { console.log(fmt(r)); for (const x of r.fails) console.log('     ' + x); }
@@ -853,7 +1108,8 @@ if (NEG) {
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${r.fails.join(' | ') || 'nothing fired'}`);
     if (!fired) ok = false;
   }
-  const splay = legExposure(base);
+  const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
+  const splay = legExposure(G.buildBug(splayP));
   const lfires = !(splay.outside <= 0.02 * splay.area);
   console.log(`${lfires ? 'CAUGHT' : 'MISSED'} L at reach 1 (splayed legs must read as showing): ${splay.outside.toFixed(2)} of ${splay.area.toFixed(2)} mm² outside`);
   if (!lfires) ok = false;
