@@ -193,7 +193,7 @@ export const PARAM_SPEC = [
   { id: 'laceIslands', section: 'lace', label: 'Islands (HOLES) — lace pieces joined to nothing', kind: 'choice', default: 'unset',
     options: [['unset', '— choose — (no default: the STL waits)'], ['drop', 'DROP islands under a size'], ['bridge', 'BRIDGE islands to the frame with floored ties'], ['svg', 'SVG-ONLY lace — the STL keeps the procedural veins']], visibleWhen: laceIslandsShown },
   R('laceDropMm2', 'lace', 'Drop islands smaller than', 0, 60, 0.5, 4, 'mm²', (p) => laceIslandsShown(p) && p.laceIslands === 'drop'),
-  R('laceTieMm', 'lace', 'Tie width (never under the min feature)', 0.6, 3, 0.05, 1.0, 'mm', (p) => laceIslandsShown(p) && p.laceIslands === 'bridge'),
+  R('laceTieMm', 'lace', 'Tie width (never under the min feature)', 0.6, 3, 0.05, 1.2, 'mm', (p) => laceIslandsShown(p) && p.laceIslands === 'bridge'),
 
   R('minDiameter', 'print', 'Min feature diameter (STL floor)', 0.6, 2, 0.05, MIN_DIAMETER_DEFAULT, 'mm'),
 ];
@@ -1567,7 +1567,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // the lace FRAME replaces the procedural one; it is dense already (a
     // vertex every few tenths of a millimetre round every hole), so it is not
     // subdivided
-    ({ pts, tris: tri } = laceFrameMesh(lace, plan, laceRole, embed, n0, n1));
+    ({ pts, tris: tri } = laceFrameMesh(lace, plan, laceRole, embed, n0, n1, poly));
   } else if (plan && mode === 'holes') {
     // ONE conforming triangulation: every cut cell is a ring of quads between
     // its outline and its hole, every solid cell is ear-clipped with its shared
@@ -1675,7 +1675,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // declared exception to the one-model rule, §10.4) — the wing part above
   // is the procedural frame the STL carries
   if (svgOnly) {
-    const { pts: lp, tris: lt } = laceFrameMesh(lace, plan, laceRole, embed, n0, n1);
+    const { pts: lp, tris: lt } = laceFrameMesh(lace, plan, laceRole, embed, n0, n1, poly);
     const sp = acc.begin(`svglace${spec.index + 1}`, `svglace${spec.index + 1}`, 'R');
     planformSlab(acc, lp, lt, halfAt, W, sp);
     delete sp.meta.thickPairs;
@@ -1714,9 +1714,12 @@ function laceInputs(p, spec, plan, mode, role, pattern) {
 /* One conforming triangulation of a lace frame: every region's EXACT polygon
    with its traced holes bridged in (so a cell edge is still the same two
    indices in both cells), plus the root tab fanned over the root chord. */
-function laceFrameMesh(lace, plan, role, embed, lead, trail) {
+function laceFrameMesh(lace, plan, role, embed, lead, trail, planform) {
   const key = new Map(), pts = [], tris = [];
   const vid = (q) => { const k = `${q[0]},${q[1]}`; let i = key.get(k); if (i === undefined) { i = pts.length; pts.push([q[0], q[1]]); key.set(k, i); } return i; };
+  // the slab starts with the planform polygon, in its order, as the
+  // procedural frame's does (the gate reads the margin off the first n)
+  for (const q of planform) vid(q);
   for (const R of lace.regions) {
     const outer = R.polygon;
     const bridged = R.holes.length ? bridgeHoles(outer, R.holes) : outer;
@@ -2582,7 +2585,7 @@ export function exportSvg(model, opts = {}) {
   const X = (x) => (x - b.x0 + M).toFixed(3), Y = (y) => (b.y1 - y + M).toFixed(3);
   const pathD = (loops) => loops.map((L) => 'M' + L.map(([x, y]) => `${X(x)} ${Y(y)}`).join('L') + 'Z').join('');
   const head = `<svg xmlns="http://www.w3.org/2000/svg" width="${W.toFixed(3)}mm" height="${H.toFixed(3)}mm" viewBox="0 0 ${W.toFixed(3)} ${H.toFixed(3)}">\n`;
-  const meta = `<!-- Parametric Bug — top-down orthographic projection of the 3D model (units: mm). ${cutSafe ? 'CUT-SAFE' : 'layered'}.${svgOnlyNote} -->\n`;
+  const meta = `<!-- Parametric Bug — top-down orthographic projection of the 3D model (units: mm). ${cutSafe ? 'CUT-SAFE' : 'layered'}${svgOnlyNote ? `.${svgOnlyNote}` : ''} -->\n`;
   if (cutSafe) {
     // a loose lace island would fall out of a cut: it is left out of the line
     const nIsl = islandParts.reduce((n, pl) => n + (pl.part.meta.count || 0), 0);

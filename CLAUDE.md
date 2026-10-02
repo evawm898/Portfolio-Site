@@ -9807,12 +9807,18 @@ RIDGES raises the veins as closed strips; vein widths carry the same floor-block
 the drawn outline. **Since the elegance pass (§0, §9) the default is a pinned specimen**
 — bodies trend toward anatomy, wings carry the fantasy — and every new control's old end
 is a branch to the old code: `legacyDefaultParams()` builds bit-identically to the Phase
-1/2 default. Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control`
+1/2 default. **Phase 4 (the lace SVG import, §10) is built against a STAND-IN TEST PATTERN,
+not lace** — Eva's lace files were not supplied, so the look is unruled: `bug-lace.js`
+reads an SVG, warps it (CLIP / RADIAL / ENVELOPE), rasterises it with the frame at 0.05 mm
+and traces it back into the FILL CELLS or REPLACE VEINS role; islands have three options
+and NO default (unset blocks the STL), and the SVG-ONLY option is the one declared
+exception to the one-model rule (`meta.svgOnly`; the gate proves its STL is byte for byte
+the lace-less bug). Every non-lace build is bit-identical to the pre-lace tree. Gate: `node tools/verify-bug.mjs` (Node only; `--negative-control`
 required before quoting a pass from a changed harness) — **it runs in CI as
 `bug-gate.yml`**, path-filtered to `bug.html`, `bug*.js`, `tools/verify-bug*` and
 `tools/bug-fixtures.mjs`; the two flower gates name their own tools by file (#340 took
 them off `tools/**` on Oct 1), so a bug-only change runs this workflow and nothing else. Sheets: `node tools/shot-bug-sheet.mjs <dir>`
-(Phase 1), `node tools/shot-bug-venation.mjs <dir>` (Phase 2) and `node tools/shot-bug-elegance.mjs <dir>` (§9); none runs in CI.
+(Phase 1), `node tools/shot-bug-venation.mjs <dir>` (Phase 2) and `node tools/shot-bug-elegance.mjs <dir>` (§9) and `node tools/shot-bug-lace.mjs <dir>` (§10); none runs in CI.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

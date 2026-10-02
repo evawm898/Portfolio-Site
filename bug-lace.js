@@ -323,7 +323,13 @@ export function laceMapper(pattern, spec, frame) {
   const ou = 0, ow = Number.isFinite(lead[1]) && Number.isFinite(trail[1]) ? (lead[1] + trail[1]) / 2 : cw;
   let flo = Infinity, fhi = -Infinity, Rmax = 0;
   for (const [u, w] of O) { if (u <= 1e-9) continue; const f = Math.atan2(w - ow, u - ou); flo = Math.min(flo, f); fhi = Math.max(fhi, f); Rmax = Math.max(Rmax, Math.hypot(u - ou, w - ow)); }
-  const map = (x, y) => { const [a, c] = nPrime(x, y); const rr = a * Rmax, f = fhi - c * (fhi - flo); return [ou + rr * Math.cos(f), ow + rr * Math.sin(f)]; };
+  // a tile copy beyond the pattern box reaches a < 0 and an angle past the
+  // fan: a NEGATIVE radius at an angle past a right angle reflects through
+  // the origin back INTO the wing (measured: the diagonal tile copies flooded
+  // the hindwing solid). So the radius is clamped at the origin and the angle
+  // to within a half turn of the fan — both only ever move points that lie
+  // outside the wing already.
+  const map = (x, y) => { const [a, c] = nPrime(x, y); const rr = Math.max(0, a) * Rmax, f = clamp(fhi - c * (fhi - flo), flo - Math.PI, fhi + Math.PI); return [ou + rr * Math.cos(f), ow + rr * Math.sin(f)]; };
   return { warp, linear: false, map, invN, origin: [ou, ow], Rmax, phi: [flo, fhi], domain: { umin, umax, wmin, wmax } };
 }
 
@@ -369,7 +375,13 @@ function fillLoops(G, loops, rule, set) {
   if (j1 < j0) return;
   const rows = Array.from({ length: j1 - j0 + 1 }, () => []);
   for (const e of edges) {
-    const a = Math.max(j0, Math.ceil((Math.min(e[1], e[3]) - gy) / px - 0.5)), c = Math.min(j1, Math.floor((Math.max(e[1], e[3]) - gy) / px - 0.5));
+    // one row of slack each side: the bucket is computed by a division and
+    // the crossing test below by a product, and where an edge ends exactly on
+    // a pixel centre the two disagree by an ulp — leaving the edge out of the
+    // row it crosses drew a one-pixel HAIRLINE of material across a hole
+    // (measured on the blend at 0.25). The crossing test is exact, so a
+    // bucket too wide costs nothing.
+    const a = Math.max(j0, Math.ceil((Math.min(e[1], e[3]) - gy) / px - 0.5) - 1), c = Math.min(j1, Math.floor((Math.max(e[1], e[3]) - gy) / px - 0.5) + 1);
     for (let j = a; j <= c; j++) rows[j - j0].push(e);
   }
   for (let j = j0; j <= j1; j++) {

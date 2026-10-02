@@ -80,6 +80,31 @@
         own rule — or, where the margin needs a sweep outside the slider, the
         sweep at the bound; every wing flat; the antennae straight.
 
+     The LACE IMPORT (design doc §10), on every row carrying a lace:
+     LA0 a pair carries a lace record iff its fields ask for one; with no file
+         loaded the source is the STAND-IN, named as one.
+     LA1 clipped: every HOLES lace hole (and island) lies inside its own cell
+         (FILL) or the drawn outline (REPLACE) and does not cross itself; a
+         RIDGES plate stands no more than a raster pixel outside the outline.
+     LA2 a LINKED middle pair's lace fields equal the blend law restated here.
+     LA3 islands, per option, against the parameters: DROP drops exactly the
+         islands under the threshold, BRIDGE ties every one with a tie at or
+         over the floor inside the outline, an unset choice leaves them loose
+         AND reports a blocking violation (and only then builds island parts),
+         SVG-ONLY carries an SVG-only part and its STL is BYTE FOR BYTE the
+         same bug with every lace switched off; a RIDGES lace has no islands.
+     LA4 the thread floor by this file's own opening of the TRACED lace (0.05
+         mm grid, brute disc) against the builder's report, both directions,
+         with the thin lace drawn red.
+     LA5 the blend: below 1 the seam arc sits at the radius the law restated
+         here gives, and no hole crosses it.
+     LA6 the lace reaches the SVG: every HOLES lace hole is a contour loop of
+         its wing (nearly every vertex of some loop on that hole's two rims);
+         a RIDGES lace is in ink on a paper wing; an SVG-only lace replaces
+         its wing in the file.
+     LP  (functions) the SVG reader against hand-worked transforms, arcs,
+         hidden / <defs> / raster content, refusals and the size limit.
+
    And, as pure-function checks of the editor and the interpolation:
      E  a drag that would make the outline cross itself is BLOCKED (points
         returned unchanged) and the requested outline really does cross (this
@@ -104,7 +129,7 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models twenty-eight ways (plus the L clause at reach 1) and requires each to be
+   --negative-control  breaks built models thirty-seven ways (plus the L clause at reach 1) and requires each to be
                        caught by the clause that names it.
    --seeds N           number of random bugs (default 40).
    --only RE           iteration only: build the rows whose label matches RE (the run says it is a subset). */
@@ -600,7 +625,9 @@ function venationChecks(model, opts) {
   }
   if (mode === 'ridges') {
     const strips = model.parts.filter((q) => q.kind === 'vein' && q.side === 'R' && /^vein/.test(q.name)).length;
-    const want = model.wingPairs.reduce((n, w) => n + (w.venation ? w.venation.veins.filter((v) => !v.dropped).length : 0), 0);
+    // a REPLACE lace hides its pair's veins (the import is the venation, and a
+    // blend below 1 rasterises the procedural ridges into its plates)
+    const want = model.wingPairs.reduce((n, w) => n + (w.venation && !(w.lace && w.lace.role === 'replace') ? w.venation.veins.filter((v) => !v.dropped).length : 0), 0);
     if (strips !== want) bad.push(`V: ${strips} ridge strips emitted for ${want} veins in the record`);
   }
   return { bad, cells: cellsTotal, holes: holesTotal, minGap, minBorder };
@@ -793,7 +820,7 @@ function tailIsolation(modelOn, modelOff) {
    their holes, plus the islands; RIDGES — the plates. Outside the wing counts
    as material (the outline has its own floor), as in the builder. */
 function laceMaterial(L, outline, floor) {
-  const h = floor / 10;
+  const h = floor / 20;   // the builder rasterises at 0.05 mm; a coarser grid reads a floor-wide tie as thin (its disc is a pixel too wide)
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of outline) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   const box = { x0: x0 - 3 * h, y0: y0 - 3 * h, x1: x1 + 3 * h, y1: y1 + 3 * h };
@@ -924,17 +951,23 @@ function laceChecks(model, opts) {
       if (L.mode === 'ridges') { if (L.plates.length && !svg.includes(`data-lace="lace${k}-R"`)) bad.push(`LA6: pair ${k} the raised lace is not in the SVG`); if (!new RegExp(`data-part="wing${k}-R"[^>]*fill="${G.SVG_LINE}"`).test(svg)) bad.push(`LA6: pair ${k} the wing under a raised lace is not drawn as paper`); continue; }
       const part = model.parts.find((q) => q.kind === `wing${k}` && q.side === 'R');
       const loops = G.contourLoops(model, part);
-      const P = model.positions;
-      // the hole's world image: the builder's own wing transform is not exposed, so the
-      // check is on COUNT and on position via holeLoops — each lace hole's top rim is a
-      // recorded loop, and some contour loop must lie on it
-      const rims = part.meta.holeLoops.filter((_, i) => i % 2 === 0);
+      // each lace hole's two rims (top, bottom) are recorded loops in world
+      // space; the contour generator's loop for that hole is drawn from rim
+      // vertices — the top rim, the bottom, or (on a tilted wing) a mix — so
+      // a hole APPEARS when some contour loop has nearly every vertex on its
+      // two rims. (A centroid-inside test was tried first: a bridged hole is
+      // a C shape whose centroid is outside it, and it read as missing.)
       const nh = L.regions.reduce((n, R) => n + R.holes.length, 0);
-      if (rims.length !== nh) bad.push(`LA6: pair ${k} records ${rims.length} hole rims for ${nh} lace holes`);
+      if (part.meta.holeLoops.length !== 2 * nh) bad.push(`LA6: pair ${k} records ${part.meta.holeLoops.length / 2} hole rims for ${nh} lace holes`);
+      const cell = 0.05, keyOf = (q) => `${Math.round(q[0] / cell)},${Math.round(q[1] / cell)}`;
+      const loopKeys = loops.filter((l) => l.length >= 3).map((l) => l.map(keyOf));
       let missing = 0;
-      for (const rim of rims) { const c = rim.reduce((a, q) => [a[0] + q[0] / rim.length, a[1] + q[1] / rim.length], [0, 0]); if (!loops.some((l) => l.length >= 3 && l.some((q) => Math.min(...rim.map((r) => Math.hypot(r[0] - q[0], r[1] - q[1]))) < 0.05) && inPoly(c, l))) missing++; }
+      for (let i = 0; i + 1 < part.meta.holeLoops.length; i += 2) {
+        const near = new Set();
+        for (const q of [...part.meta.holeLoops[i], ...part.meta.holeLoops[i + 1]]) { const a = Math.round(q[0] / cell), b = Math.round(q[1] / cell); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add(`${a + dx},${b + dy}`); }
+        if (!loopKeys.some((ks) => ks.filter((x) => near.has(x)).length >= 0.9 * ks.length)) missing++;
+      }
       if (missing) bad.push(`LA6: pair ${k} ${missing} lace hole(s) do not appear in the SVG`);
-      void P;
     }
   }
   if (opts.expectLace && !any) bad.push('LA0: the lace row carries no lace (vacuous)');
@@ -1223,11 +1256,15 @@ function rowsFor(nseeds) {
   // random bugs carrying a lace
   const lace = (label, fn, opts = {}) => { const p = d(); p.venation = 'holes'; fn(p); rows.push([`lace: ${label}`, p, { expectLace: true, ...opts }]); };
   const both = (p, f) => { for (const w of [p.wings.first, p.wings.last]) f(w); };
+  // the FILL rows sit the stand-in a tenth of the span along: at offset 0 no
+  // ring lands whole inside a cell, and an island row with no island is vacuous
+  // (swept: scale 1 offset 0.1 is the nearest setting that finds one with no
+  // thin lace)
   for (const [role, rn] of [[1, 'FILL CELLS'], [2, 'REPLACE VEINS']]) {
-    lace(`${rn}, islands unset (blocked)`, (p) => both(p, (w) => { w.laceRole = role; }), { expectIslands: true });
-    lace(`${rn}, drop`, (p) => { p.laceIslands = 'drop'; both(p, (w) => { w.laceRole = role; }); }, { expectIslands: true });
-    lace(`${rn}, bridge`, (p) => { p.laceIslands = 'bridge'; both(p, (w) => { w.laceRole = role; }); }, { expectIslands: true });
-    lace(`${rn}, SVG-only`, (p) => { p.laceIslands = 'svg'; both(p, (w) => { w.laceRole = role; }); }, { expectIslands: true });
+    lace(`${rn}, islands unset (blocked)`, (p) => both(p, (w) => { w.laceRole = role; if (role === 1) w.laceOffsetU = 0.1; }), { expectIslands: true });
+    lace(`${rn}, drop`, (p) => { p.laceIslands = 'drop'; both(p, (w) => { w.laceRole = role; if (role === 1) w.laceOffsetU = 0.1; }); }, { expectIslands: true });
+    lace(`${rn}, bridge`, (p) => { p.laceIslands = 'bridge'; both(p, (w) => { w.laceRole = role; if (role === 1) w.laceOffsetU = 0.1; }); }, { expectIslands: true });
+    lace(`${rn}, SVG-only`, (p) => { p.laceIslands = 'svg'; both(p, (w) => { w.laceRole = role; if (role === 1) w.laceOffsetU = 0.1; }); }, { expectIslands: true });
   }
   lace('REPLACE, drop nothing (0.5 mm²): blocked', (p) => { p.laceIslands = 'drop'; p.laceDropMm2 = 0.5; both(p, (w) => { w.laceRole = 2; }); }, { expectIslands: true });
   lace('REPLACE, bridge with 2 mm ties', (p) => { p.laceIslands = 'bridge'; p.laceTieMm = 2; both(p, (w) => { w.laceRole = 2; }); }, { expectIslands: true });
@@ -1236,7 +1273,7 @@ function rowsFor(nseeds) {
   lace('CLIP, once (no tiling), scale 0.8', (p) => { p.laceIslands = 'bridge'; both(p, (w) => { w.laceRole = 2; w.laceTile = 0; w.laceScale = 0.8; }); });
   for (const b of [0.25, 0.5, 0.75]) lace(`blend ${b}, REPLACE, bridge`, (p) => { p.laceIslands = 'bridge'; both(p, (w) => { w.laceRole = 2; w.laceBlend = b; }); });
   lace('blend 0.5, FILL, drop', (p) => { p.laceIslands = 'drop'; both(p, (w) => { w.laceRole = 1; w.laceBlend = 0.5; }); });
-  for (const role of [1, 2]) lace(`RIDGES, role ${role}`, (p) => { p.venation = 'ridges'; both(p, (w) => { w.laceRole = role; }); });
+  for (const role of [1, 2]) lace(`RIDGES, role ${role}`, (p) => { p.venation = 'ridges'; both(p, (w) => { w.laceRole = role; if (role === 1) w.laceOffsetU = 0.1; }); });
   lace('RIDGES, ENVELOPE, blend 0.5', (p) => { p.venation = 'ridges'; both(p, (w) => { w.laceRole = 2; w.laceWarp = 2; w.laceBlend = 0.5; }); });
   lace('3 pairs, linked middle blends FILL/CLIP 1.0 -> REPLACE/ENVELOPE 1.6', (p) => { p.wingPairs = 3; p.laceIslands = 'bridge'; p.wings.first.laceRole = 1; p.wings.last.laceRole = 2; p.wings.last.laceWarp = 2; p.wings.last.laceScale = 1.6; p.wings.last.laceRotate = 20; });
   lace('4 pairs, REPLACE, bridge', (p) => { p.wingPairs = 4; p.laceIslands = 'bridge'; both(p, (w) => { w.laceRole = 2; }); });
@@ -1270,6 +1307,17 @@ if (NEG) {
   // the first cut's clamp: random:6's forewing needs ~−43°; the old slider stopped at −30
   const clampP = (() => { const p = G.randomParams(6); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } const q = G.specimenPose(p).params; q.wings.first.sweep = Math.max(-30, q.wings.first.sweep); return q; })();
   const clampModel = G.buildBug(clampP);
+  // Phase 4 — lace models (the stand-in; §10)
+  const laceP = (fn) => { const p = G.defaultParams(); p.venation = 'holes'; fn(p); return G.buildBug(p); };
+  const bothW = (p, f) => { for (const w of [p.wings.first, p.wings.last]) f(w); };
+  const laceRepl = laceP((p) => { p.laceIslands = 'bridge'; bothW(p, (w) => { w.laceRole = 2; }); });
+  const laceUnset = laceP((p) => { bothW(p, (w) => { w.laceRole = 2; }); });
+  const laceFill = laceP((p) => { p.laceIslands = 'bridge'; bothW(p, (w) => { w.laceRole = 1; w.laceOffsetU = 0.1; }); });
+  const laceSvg = laceP((p) => { p.laceIslands = 'svg'; bothW(p, (w) => { w.laceRole = 2; }); });
+  const laceBlend = laceP((p) => { p.laceIslands = 'bridge'; bothW(p, (w) => { w.laceRole = 2; w.laceBlend = 0.5; }); });
+  const laceMid = laceP((p) => { p.wingPairs = 3; p.laceIslands = 'bridge'; p.wings.first.laceRole = 1; p.wings.last.laceRole = 2; p.wings.last.laceWarp = 2; p.wings.last.laceScale = 1.6; p.wings.last.laceRotate = 20; });
+  const laceThin = laceP((p) => { p.laceIslands = 'bridge'; bothW(p, (w) => { w.laceRole = 2; w.laceScale = 0.45; }); });
+  const laceMut = (m, k, fn) => { m.wingPairs = m.wingPairs.map((w, i) => (i === k ? { ...w, lace: fn({ ...w.lace }) } : w)); };
   // the right forewing's outline vertex pairs (top, bottom), and their mirror twins
   const mutPair = (m, fn) => {
     const R = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'), L = m.parts.find((q) => q.kind === 'wing1' && q.side === 'L');
@@ -1334,10 +1382,21 @@ if (NEG) {
     ['a segment groove filled', 'G', base, { expectGrooves: true }, (m) => { const body = m.parts.find((q) => q.kind === 'body'), L = m.layout; for (let k = 1; k < m.params.abdomenSegments; k++) { const yb = L.yA0 - (k / m.params.abdomenSegments) * (L.yA0 - L.yA1); for (const r of body.meta.rings) if (Math.abs(r.y - yb) < 0.3) for (let j = 0; j < r.n; j++) { m.positions[3 * (r.v0 + j)] /= 1 - G.GROOVE_DEPTH * Math.exp(-(((r.y - yb) / G.GROOVE_SIGMA_MM) ** 2)); } } }],
     ['the pose clamps at the old -30° bound (random:6)', 'Y', clampModel, { specimen: true }, () => {}],
     ['the forewing margin not square to the body', 'Y', specModel, { specimen: true }, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); for (let v = q.v0 + 1; v <= q.v0 + 12; v++) m.positions[3 * v + 1] += 1.5; } }],
+    // Phase 4 — the lace record and its exports
+    ['the stand-in is not labelled as one', 'LA0', laceRepl, { expectLace: true }, (m) => laceMut(m, 0, (L) => ({ ...L, name: 'lace' }))],
+    ['a lace hole pushed out of its cell', 'LA1', laceFill, { expectLace: true }, (m) => laceMut(m, 0, (L) => { const regions = deepClone(L.regions); const R = regions.find((r) => r.holes.length); R.holes[0] = R.holes[0].map(([u, w]) => [u + 6, w]); return { ...L, regions }; })],
+    ['a linked pair keeps its own lace scale', 'LA2', laceMid, { expectLace: true }, (m) => laceMut(m, 1, (L) => ({ ...L, spec: { ...L.spec, laceScale: L.spec.laceScale + 0.3 } }))],
+    ['a loose island goes unreported', 'LA3', laceUnset, { expectLace: true, expectIslands: true }, (m) => { m.floorViolations = m.floorViolations.filter((v) => v.kind !== 'island'); }],
+    ['a tie drawn under the floor', 'LA3', laceRepl, { expectLace: true }, (m) => laceMut(m, 0, (L) => ({ ...L, ties: L.ties.map((t, i) => (i ? t : { ...t, width: 0.6 })) }))],
+    ['the SVG-only lace leaks into the STL', 'LA3', laceSvg, { expectLace: true }, (m) => { for (const q of m.parts) if (q.kind.startsWith('svglace')) q.meta.svgOnly = false; }],
+    ['a thin lace goes unreported', 'LA4', laceThin, { expectLace: true, expectLaceThin: true }, (m) => { m.floorViolations = m.floorViolations.filter((v) => v.kind !== 'lace'); }],
+    ['the blend seam moved off its law', 'LA5', laceBlend, { expectLace: true }, (m) => laceMut(m, 0, (L) => ({ ...L, seam: { ...L.seam, radius: L.seam.radius + 2 } }))],
+    ['a lace hole that is not in the SVG', 'LA6', laceRepl, { expectLace: true }, (m) => { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === 'R'); q.meta.holeLoops = q.meta.holeLoops.map((l, i) => (i < 2 ? l.map(([x, y]) => [x + 3, y]) : l)); }],
   ];
   const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true }), check('blended thin (clean: refused)', blendedModel, { expectBlended: true }),
     check('specimen (clean)', specModel, { specimen: true }),
-    check('holes 3 pairs + stigma (clean)', holesModel, { expectStigma: true }), check('ridges 3 pairs (clean)', ridgesModel, {}), check('thin veins (clean: refused)', thinVeinModel, { expectVeinThin: true }), check('tail vein (clean)', tailVeinModel, { expectTailVein: true })];
+    check('holes 3 pairs + stigma (clean)', holesModel, { expectStigma: true }), check('ridges 3 pairs (clean)', ridgesModel, {}), check('thin veins (clean: refused)', thinVeinModel, { expectVeinThin: true }), check('tail vein (clean)', tailVeinModel, { expectTailVein: true }),
+    check('lace REPLACE bridge (clean)', laceRepl, { expectLace: true }), check('lace islands unset (clean: refused)', laceUnset, { expectLace: true, expectIslands: true }), check('lace FILL (clean)', laceFill, { expectLace: true }), check('lace SVG-only (clean)', laceSvg, { expectLace: true }), check('lace blend 0.5 (clean)', laceBlend, { expectLace: true }), check('lace linked middle (clean)', laceMid, { expectLace: true }), check('lace too fine (clean: refused)', laceThin, { expectLace: true, expectLaceThin: true })];
   let ok = clean.every((r) => !r.fails.length);
   for (const r of clean) { console.log(fmt(r)); for (const x of r.fails) console.log('     ' + x); }
   for (const [name, clause, src, opts, fn] of muts) {

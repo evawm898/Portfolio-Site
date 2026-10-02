@@ -205,6 +205,7 @@ strength claim in this repo is still theory.
 - An import is always mapped into the planform frame first, so it is subject to
   tilt, mirror, and both exports like everything else. Never a separate 2D
   layer pasted onto the SVG.
+- **Built in Phase 4 — see §10** (and §10.4 for the one declared exception: SVG-only lace).
 
 ### 3.8 Not yet scheduled
 - Colour per region in SVG; print orientation and supports (Phase 1 only REPORTS
@@ -224,7 +225,7 @@ strength claim in this repo is still theory.
 | 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | built (§8, #341 merged) |
 | elegance | the default becomes a pinned specimen; edge profile, teardrop club, groove/bulge segments, pointed tips, SET SPECIMEN | **built (§9)** — waits on Eva's ruling on `docs/img/bug-elegance-sheet.png` |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
-| 4 | SVG import (roles, warps, blend) | — |
+| 4 | SVG import (roles, warps, blend, islands, lace floor) | **built (§10) against a STAND-IN test pattern** — the look waits on Eva's lace files |
 
 Phase 2 started after Eva's ruling on the Phase 1 revision (§6.6, #326 merged).
 
@@ -1302,3 +1303,205 @@ specimen default, ridge height falling toward the margin, or main veins only.
    forewing sweep range is now −90…90° by ruling, so it never clamps.)
 7. The tuck refinement (§9.6) changes partially splayed legs, not only tucked ones.
 8. Pre-v4 designs load at the old ends (§9.6).
+
+---
+
+## 10. Phase 4 — the lace import (SVG)
+
+**Everything in this phase was built and tested against a STAND-IN TEST PATTERN, not lace.**
+Eva's lace SVGs were not supplied (the brief's asset line was left as its placeholder), and
+the brief says not to draw or trace lace. So `bug-lace.js` ships `STAND_IN_SVG` — fifteen
+rings with a dot in each and one stroked zig-zag, 102 × 62 units — and every place it can
+appear says what it is: its name is `STAND-IN TEST PATTERN — not lace`, the panel prints it,
+the read-out prints it, the gate asserts the label (LA0), and every cell of the contact
+sheet carries it in red. **The look cannot be ruled until her files exist.** What can be
+ruled now is the mechanics: where an import goes, how it is clipped, warped, blended and
+made printable. Raster import is out of scope; an `<image>` in a file is ignored and SAID.
+
+### 10.1 The pipeline (one raster per wing, then back to polygons)
+
+`laceWing()` in `bug-lace.js` is the one owner. Per wing pair, in the wing's planform frame
+(so tilt, mirror and both exports carry it like everything else — §3.7's rule):
+
+1. **Read** the SVG (`parseSvg`): paths (all commands, arcs included), rect / circle /
+   ellipse / line / polyline / polygon, nested `transform`s, `fill`, `stroke`,
+   `stroke-width`, `fill-rule`, `display` / `visibility`; `<defs>`, `<symbol>`, hidden
+   shapes and anything not filled or stroked are skipped. The artwork is **binary** —
+   colour is ignored, anything painted is lace. Refused with a reason: not SVG, nothing
+   drawn, larger than `LACE_MAX_BYTES` (4 MB).
+2. **Warp** it into the planform (§10.3), tiled if asked, every mapped edge densified so a
+   curved map draws curved threads.
+3. **Rasterise** at `LACE_PX` = 0.05 mm (a twentieth of the floor) together with the
+   FRAME — the region's own bands: in FILL the cell's vein edges at half their vein width
+   and its outline edges at the margin border; in REPLACE the outline at the margin border;
+   a pterostigma cell is solid.
+4. **Clean**: voids too small to hold a `minCellMm` disc are filled (the HOLES rule for
+   cells), and diagonal "saddle" pixels are filled so 4- and 8-connectivity agree.
+5. **Islands** (HOLES only): material components touching no frame pixel (§10.4).
+6. **Floor**: a raster opening of the final material by a floor-wide disc; material the
+   opening does not cover deeper than half the floor is THIN — reported, drawn red, STL
+   refused (§10.5).
+7. **Trace** back to polygons (marching squares + a simplification that refuses to make
+   two loops cross), per region against that region's EXACT polygon, so a FILL lace keeps
+   the Phase 2 cell edges bit for bit and the frame mesh stays conforming across cells.
+
+The traced holes replace the procedural holes in the SAME frame mesh law (each region's
+exact polygon with its holes bridged in, ear-clipped, the root tab fanned over the root
+chord), so the wing is still one closed slab with the Phase 1 edge profile.
+
+### 10.2 The two roles (per wing pair; blended on linked middle pairs)
+
+- **FILL CELLS** (the butterfly target): the artwork is clipped to EACH cell of the Phase 2
+  record; the procedural veins stay. The pattern is ONE continuous artwork across the wing,
+  clipped per cell — not restarted in each cell — so the lace reads as one sheet behind the
+  vein network (a decision, §10.8).
+- **REPLACE VEINS** (the dragonfly target): one continuous panel clipped to the drawn
+  outline; the procedural veins are hidden (the margin border stays as the frame).
+
+The role and every placement control are WING fields, so a linked middle pair blends them
+with the same law as every other wing field (integers rounded) — LA2 restates it.
+
+### 10.3 Warps, scale, rotation, offset, tiling
+
+- **CLIP** — placed flat, no distortion, trimmed at the margin. Its scale is **absolute**:
+  scale 1 makes the artwork's larger side `LACE_CLIP_REF_MM` = 40 mm across, so the threads
+  are the same width on every wing of the bug. (A scale relative to each wing's span was
+  built first and made the hindwing's threads thinner than the forewing's — a FILL hindwing
+  went under the floor at the default.)
+- **RADIAL** — polar about the middle of the root chord: the artwork's width runs out along
+  the radius (0 → the farthest outline point), its height round the fan of the outline's
+  angles, so it fans with the veins. A tile copy beyond the artwork's box could reach a
+  NEGATIVE radius at an angle past a right angle, which reflects through the origin back
+  INTO the wing — measured, the diagonal copies flooded the hindwing solid — so the radius
+  is clamped at the origin and the angle to within a half turn of the fan (both only ever
+  move points that are already outside the wing).
+- **ENVELOPE** — the artwork's box mapped onto the planform: across, onto each vertical
+  slice of the outline (lead to trail); along, onto the span.
+- **Scale / rotation / offset** — scale and rotate about the artwork's centre, offset along
+  the span and across the chord (fractions of the span). **Tiling** repeats the artwork
+  (on by default; "once" draws a single panel).
+- RADIAL and ENVELOPE stretch ONE copy over the whole wing, so at scale 1 they squeeze the
+  stand-in's threads under the floor near the hinge and in the narrow parts — measured on
+  the specimen default, REPLACE: RADIAL is refused at 1 and 1.25 and exports from 1.5;
+  ENVELOPE is refused at 1, 1.25 and 1.5 and exports at 1.75. That is the floor working,
+  not a defect; the sheet shows both.
+
+### 10.4 Islands — the three options, deliberately NO default
+
+A lace piece connected to no frame (the stand-in's dots inside its rings) would print loose.
+All three answers are built and **none is the default** (Eva's brief): `laceIslands` starts
+at `unset`, and while it is unset a HOLES lace with islands **blocks the STL** and says why
+(the islands are built as their own red part so they can be seen).
+
+1. **DROP** — islands smaller than `laceDropMm2` (default 4 mm²) are removed; larger ones
+   stay and still block. On the specimen REPLACE: 5 + 3 dots dropped, one connected solid.
+2. **BRIDGE** — every island is tied STRAIGHT to its nearest frame-connected pixel (one
+   feature transform), with a tie `laceTieMm` wide, never under the floor. The tie default
+   is **1.2 mm, not 1.0** — a tie at exactly the floor sits on the knife edge of any
+   discrete floor measure (the gate's first coarse instrument read every floor-wide tie as
+   thin). On the specimen REPLACE: 5 + 3 ties, one connected solid.
+3. **SVG-ONLY** — the lace goes into the SVG only, and the **STL falls back to the
+   procedural venation**. **This is a deliberate, declared exception to the one-model rule
+   (§1).** Why it is offered at all: a paper/laser cut of lace can carry loose islands (the
+   cutter does not care) and threads finer than any print, while a print cannot; this lets
+   the two outputs each be the best version of themselves on purpose. Why it stays honest:
+   the exception is DATA, not a quiet second drawing — the lace frame is a model part with
+   `meta.svgOnly`, `exportStl` and the connectivity check skip exactly those parts, the SVG
+   says so in its header comment, the read-out says so, and the gate proves the STL is
+   **byte for byte** the same bug with every lace switched off (LA3). The 3D view shows what
+   the STL carries.
+
+Every option yields ONE connected solid (C and LA3 on every lace row); RIDGES has no island
+problem — a raised lace sits on a solid membrane — and builds no island machinery.
+
+### 10.5 The floor
+
+All lace respects `minDiameter`: the opening in step 6 is the same idea as the drawn-outline
+floor (§6.3) at a twentieth of the floor, judged at half the floor of depth
+(`THIN_DEPTH_FRAC_LACE` = the outline's own bar). Thin lace is listed as a `lace` violation,
+drawn red in the 3D view and the SVG preview, and **the STL is refused**, exactly as a thin vein is.
+Nothing is silently thickened. The gate measures it again by its own opening of the TRACED
+polygons (LA4), in both directions.
+
+### 10.6 RIDGES
+
+A RIDGES lace is a set of raised plates on the solid wing (`buildLacePlates`), built from the
+same raster: every material component is a plate. In REPLACE the procedural ridge strips are
+hidden (V counts ridge strips only on pairs whose veins are not replaced); in FILL they stay
+and merge with the lace into one plate per wing, which at the stand-in's scale reads mostly
+as ink in the SVG. In the SVG a RIDGES lace is drawn in black on a PAPER wing (butt caps on
+the vein lines there, so nothing shows past the margin).
+
+### 10.7 The blend — a spatial seam, NOT a morph
+
+`laceBlend` 1 is all import; 0 is the procedural wing (the builder branches, so blend 0 is
+**bit for bit** the procedural build — LA5 checks 53,120 triangles both ways). In between the
+wing is **procedural inside a vein-wide arc about the root chord's middle, at radius
+(1 − blend) × the farthest outline point, and the import outside it**; the arc itself is a
+vein (mid-taper vein width, never under the floor), so the halves meet on material and a lace
+piece the arc cuts off is joined to it. **A signed-distance MORPH between the two materials
+was built first and refused on measurement**: at blend 0.25 / 0.5 / 0.75 on the default it
+thinned both drawings under the floor (1.55 / 1.00 / 2.50 mm deep) — a morph's middle is
+neither drawing. The seam blend measured clean at 0.25, 0.5 and 0.75 in both roles once a
+scanline-fill defect was fixed: an edge ending exactly on a pixel centre was left out of the
+row it crosses (a division and a product disagreeing by an ulp), which drew a one-pixel
+HAIRLINE of material across a hole and read as 1.39 mm of thin lace at blend 0.25.
+
+### 10.8 Decisions made without a ruling (reversible)
+
+1. **No default island option** — as ruled; `unset` blocks the STL (§10.4).
+2. **Tiling on by default**, so a small artwork covers a wing without hunting for a scale.
+3. **CLIP scale is absolute** (40 mm at 1); RADIAL / ENVELOPE are relative to the wing.
+4. **One artwork for the whole bug** (`params.lace`), placed per pair. Per-pair artwork is a
+   field change, not an architectural one.
+5. **FILL is one continuous artwork clipped per cell**, not the artwork restarted in each
+   cell.
+6. Tie width default **1.2 mm** (§10.4); drop threshold 4 mm².
+7. The blend's seam origin is the middle of the root chord (the radial warp's origin too).
+
+### 10.9 The margin fringe (§9.7, OPEN) — a proposal, NOT built
+
+The lace pipeline makes Option A of §9.7 (an SVG-only hair fringe) cheap and HONEST, because
+SVG-only now exists as declared data rather than a quiet second drawing. The proposal, for
+Eva's ruling:
+
+- A **fringe import**: a second SVG (or the stand-in's stroke) whose artwork box is mapped
+  along the margin — the box's width along the outline's arc length (from the root's trailing
+  corner round to the leading one), its height outward along the outline's normal — the
+  ENVELOPE warp turned to run along the margin instead of across the wing.
+- **SVG-only by declaration** (`meta.svgOnly`, the same flag, the same gate clause), because
+  a cilium is 1/20 of the floor and no print can carry it.
+- For the print, nothing — or a floored version through the SAME mapping (§9.7 B, a comb)
+  if Eva wants the STL to carry a coarse fringe, policed by the outline floor.
+- It does **not** fall out of this pipeline for free: the margin-following map and its own
+  part are new code, so it is left as a design for the ruling.
+
+### 10.10 Verification and cost
+
+- `node tools/verify-bug.mjs --seeds 40` — the lace rows: both roles under every island
+  option, the three warps, scale / rotation / offset / tiling, the blend at 0.25 / 0.5 /
+  0.75, RIDGES in both roles, a linked middle pair blending FILL / CLIP into REPLACE /
+  ENVELOPE, 4 pairs, a tilted pair, a lace drawn too fine (refused), an imported artwork
+  that is not the stand-in (`LACE_FIXTURE_SVG`: strokes, transforms, a raster image that is
+  ignored and said) and four random bugs with a lace. The LA families are in the gate's
+  header. `--only RE` builds a subset for iteration and says so.
+- **Every non-lace configuration is bit-identical to `main`**: 50 configurations, 2,337,756
+  position floats under `Object.is`, every index, and the exported SVG (layered and cut-safe)
+  and STL bytes — 0 differ.
+- `--negative-control`: nine lace mutations, each caught by the clause that names it — the
+  stand-in unlabelled (LA0), a hole pushed out of its cell (LA1), a linked pair keeping its
+  own scale (LA2), a loose island unreported, a tie under the floor and the SVG-only lace
+  leaking into the STL (LA3), a thin lace unreported (LA4), the seam off its law (LA5), a
+  hole missing from the SVG (LA6).
+- **Two gate instruments were wrong before they were right**: LA6 first asked whether a
+  hole's centroid lay inside a contour loop, and a bridged hole is a C shape whose centroid
+  is outside it; LA4 first measured on a 0.1 mm grid, whose disc is a pixel wider than the
+  floor, and read a floor-wide tie as thin.
+- **Cost, specimen default, EXPORT, Node**: procedural HOLES 53,120 tris / 2,594 KiB /
+  0.25 s; FILL 20,120 / 983 KiB / 0.70 s; REPLACE 21,632 / 1,056 KiB / 0.59 s; blend 0.5
+  20,096 / 981 KiB; SVG-only 60,464 tris on screen (the STL is the procedural 2,594 KiB);
+  RIDGES REPLACE 36,912 / 1,802 KiB / 0.38 s; 4 pairs REPLACE 29,936 / 1,462 KiB / 1.1 s.
+  A lace wing is FEWER triangles than a procedural one because the lace frame is already
+  dense and is not subdivided. The lace raster costs 90–300 ms per pair.
+- The sheet: `node tools/shot-bug-lace.mjs <dir>` → `docs/img/bug-lace-sheet.png`. Every
+  cell is the stand-in and says so. No pixel claim anywhere.
