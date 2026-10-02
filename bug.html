@@ -76,10 +76,33 @@
   .bg-readout{font-size:10.5px;line-height:1.6;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:6px;white-space:pre-wrap;}
   .bg-readout b{color:var(--paper);font-weight:400;}
 
-  .bg-view{position:fixed;left:18px;bottom:18px;z-index:4;padding:12px 14px;width:300px;}
-  .bg-svgcard{background:var(--paper);height:240px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin:6px 0 8px;}
-  .bg-svgcard svg{max-width:100%;max-height:100%;width:auto;height:auto;}
+  .bg-view{position:fixed;left:18px;bottom:18px;z-index:5;padding:12px 14px;width:300px;}
   .bg-note{font-size:10px;color:var(--dim-2);line-height:1.5;margin:0;}
+
+  /* The main viewport's SVG mode (Top view only): the export's own projection,
+     drawn on paper, with the outline editor over the wing being edited. */
+  #svgStage{position:fixed;inset:0;z-index:2;background:var(--paper);}
+  #mainSvg{position:absolute;left:0;top:0;width:100%;height:100%;display:block;touch-action:none;}
+  #mainSvg .bug.is-traced path[fill]{fill-opacity:.45;}
+  #mainSvg .ed-curve{fill:none;stroke:var(--teal);stroke-width:1.6px;vector-effect:non-scaling-stroke;}
+  #mainSvg .ed-curve.mirror{stroke-dasharray:4 3;opacity:.7;}
+  #mainSvg .ed-curve.hit{stroke:transparent;stroke-width:14px;cursor:copy;}
+  #mainSvg .ed-chord{fill:none;stroke:var(--teal);stroke-dasharray:2 3;stroke-width:1px;vector-effect:non-scaling-stroke;}
+  #mainSvg .ed-sel{fill:rgba(95,160,160,.10);stroke:none;}
+  #mainSvg .pt{fill:var(--paper);stroke:#0f3b3b;stroke-width:1.5px;vector-effect:non-scaling-stroke;cursor:grab;}
+  #mainSvg .pt.root{stroke:var(--teal);}
+  #mainSvg .pt.is-sel{fill:var(--teal);}
+  #mainSvg .pt.tail{stroke:#c98a2a;}
+  #mainSvg .pt.tail.is-sel{fill:#e2a74c;}
+  #mainSvg .wing-hit{fill:transparent;cursor:pointer;}
+  .bg-viewtoggle{position:fixed;top:18px;right:328px;z-index:5;display:flex;gap:0;}
+  .bg-viewtoggle button{background:rgba(10,10,12,.86);}
+  .bg-viewtoggle button + button{border-left:0;}
+  body.is-svg .bg-header h1{color:var(--ink);} body.is-svg .bg-sub,body.is-svg .bg-back{color:#55554f;}
+  .bg-edbar{position:fixed;left:340px;bottom:18px;z-index:5;padding:10px 12px;width:min(620px, calc(100vw - 690px));}
+  .bg-edbar .bg-row{margin-bottom:6px;align-items:center;}
+  .bg-edbar .bg-bd{grid-template-columns:repeat(4,1fr);}
+  .bg-ed-title{font-size:11px;color:var(--paper);letter-spacing:.06em;}
 
   .bg-ctrl.is-linked output{color:var(--dim);}
   .bg-ctrl input:disabled{opacity:.45;}
@@ -92,32 +115,15 @@
   label.bg-file{display:inline-block;letter-spacing:0;text-transform:none;}
   label.bg-file input{display:none;}
 
-  .bg-editor{position:fixed;left:336px;bottom:18px;z-index:4;padding:12px 14px;width:372px;}
-  #editor{width:340px;height:340px;display:block;background:#0f0f12;border:1px solid var(--line);touch-action:none;cursor:crosshair;margin:6px 0 6px;}
-  #editor .ax{stroke:rgba(237,237,232,.18);stroke-width:1;}
-  #editor .axl{fill:var(--dim-2);font-size:9px;font-family:var(--font-mono);}
-  #editor .curve{fill:rgba(95,160,160,.16);stroke:var(--teal);stroke-width:1.6;}
-  #editor .curve.is-linked{stroke-dasharray:4 3;fill:rgba(95,160,160,.07);}
-  #editor .chord{stroke:var(--teal);stroke-dasharray:2 3;fill:none;}
-  #editor .pt{fill:var(--ink);stroke:var(--paper);stroke-width:1.5;cursor:grab;}
-  #editor .pt.root{stroke:var(--teal);}
-  #editor .pt.is-sel{fill:var(--teal);}
-  #editor .pt.tail{stroke:#e2a74c;}
-  #editor .pt.tail.is-sel{fill:#e2a74c;}
-  #editor .thin{stroke:#e5484d;stroke-width:4;fill:none;stroke-linecap:round;opacity:.9;}
-  #editor .veins{stroke:rgba(237,237,232,.55);stroke-width:1;fill:none;stroke-linecap:round;}
-  #editor .veins.is-thin{stroke:#e5484d;stroke-width:1.6;}
-  #editor .holes{fill:rgba(10,10,12,.55);stroke:rgba(237,237,232,.25);stroke-width:.6;}
-  #editor .stigma{fill:rgba(237,237,232,.18);stroke:none;}
   .bg-readout b.bad{color:#e5484d;}
   .bg-export-msg{font-size:10px;color:#e5484d;line-height:1.5;margin:0 0 8px;min-height:0;}
   .bg-ed-status{font-size:10px;color:#d98f6a;min-height:1.2em;margin:0 0 6px;}
   .bg-bd{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
   .bg-bd .bg-ctrl{margin:0;}
 
-  @media (max-width:1100px){ .bg-editor{left:auto;right:326px;} }
+  @media (max-width:1100px){ .bg-edbar{left:18px;bottom:auto;top:150px;width:300px;} .bg-edbar .bg-bd{grid-template-columns:1fr 1fr;} }
   @media (max-width:760px){
-    .bg-editor{display:none;}
+    .bg-edbar{display:none;} .bg-viewtoggle{right:12px;top:12px;}
     .bg-panel{top:auto;height:46vh;left:10px;right:10px;width:auto;bottom:10px;}
     .bg-view{display:none;}
     .bg-header h1{font-size:28px;}
@@ -131,38 +137,45 @@
   <a class="bg-back" href="index.html">&larr; Index</a>
   <div class="bg-eyebrow" style="margin-top:10px">EM / BUG</div>
   <h1>Parametric Bug</h1>
-  <p class="bg-sub">Phase 2 — body, legs, antennae, drawn wings, and venation: cells as holes or veins as ridges. One 3D model; the SVG is its top-down projection, the STL is the solid.</p>
+  <p class="bg-sub">Phase 2 — body, legs, antennae, drawn wings with rounded edges, and venation. One 3D model; the SVG is its top-down projection, the STL is the solid. Top view → SVG to draw a wing's outline on the wing itself.</p>
 </header>
 
-<aside class="bg-view bg-box" aria-label="View and SVG">
+<div id="svgStage" hidden><svg id="mainSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+<div class="bg-viewtoggle" id="viewToggle" aria-label="Top view: 3D render or SVG">
+  <button class="bg-btn is-on" data-main="render" title="The 3D model, seen from straight above">Render</button>
+  <button class="bg-btn" data-main="svg" title="The SVG projection — exactly what Get SVG exports. Click a wing to edit its outline here.">SVG</button>
+</div>
+
+<aside class="bg-view bg-box" aria-label="View">
   <div class="bg-label">View</div>
   <div class="bg-row" id="viewButtons">
-    <button class="bg-btn is-on" data-view="three">3/4</button>
-    <button class="bg-btn" data-view="top">Top</button>
+    <button class="bg-btn" data-view="three">3/4</button>
+    <button class="bg-btn is-on" data-view="top">Top</button>
     <button class="bg-btn" data-view="front">Front</button>
     <button class="bg-btn" data-view="side">Side</button>
   </div>
-  <div class="bg-label">SVG — top-down projection</div>
-  <div class="bg-svgcard" id="svgCard"></div>
-  <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="cutSafe"> Cut-safe (one connected region)</label></div>
+  <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="cutSafe"> Cut-safe SVG (one connected region)</label></div>
   <p class="bg-note" id="svgNote"></p>
 </aside>
 
-<aside class="bg-editor bg-box" id="editorBox" aria-label="Wing outline editor">
-  <div class="bg-label" id="edTitle">Wing outline</div>
-  <svg id="editor" viewBox="0 0 340 340" preserveAspectRatio="none"></svg>
+<aside class="bg-edbar bg-box" id="edBar" aria-label="Wing outline editor and reference backdrop" hidden>
+  <div class="bg-row"><span class="bg-ed-title" id="edTitle">Click a wing to edit its outline</span></div>
   <p class="bg-ed-status" id="edStatus"></p>
-  <div class="bg-row">
+  <div class="bg-row" id="edActions">
+    <button class="bg-btn" id="unlinkPair" hidden>Unlink this pair to edit it</button>
     <button class="bg-btn" id="delPoint">Delete point</button>
-    <span class="bg-note" style="align-self:center">drag a point · double-click the curve to add · right-click a point to delete</span>
+    <label class="bg-btn bg-file" id="edTailWrap"><input type="checkbox" id="edTail" style="display:inline;margin:0 6px 0 0"> Tail</label>
+    <button class="bg-btn" id="edDone">Done</button>
+    <span class="bg-note" id="edHelp">drag a point · double-click the curve to add · right-click a point to delete · Esc to finish</span>
   </div>
-  <div class="bg-label" style="margin-top:4px">Reference backdrop</div>
-  <div class="bg-row">
+  <div class="bg-row" style="margin-top:4px">
+    <span class="bg-label" style="margin:0">Reference backdrop</span>
     <label class="bg-btn bg-file">Load image<input type="file" id="bdFile" accept="image/*"></label>
     <button class="bg-btn" id="bdClear">Clear</button>
   </div>
   <div class="bg-bd">
-    <div class="bg-ctrl"><label for="bdOpacity"><span>Opacity</span></label><input type="range" id="bdOpacity" min="0" max="1" step="0.01" value="0.5"></div>
+    <div class="bg-ctrl"><label for="bdOpacity"><span>Opacity</span></label><input type="range" id="bdOpacity" min="0" max="1" step="0.01" value="0.6"></div>
     <div class="bg-ctrl"><label for="bdScale"><span>Scale</span></label><input type="range" id="bdScale" min="0.2" max="3" step="0.01" value="1"></div>
     <div class="bg-ctrl"><label for="bdX"><span>Offset x</span></label><input type="range" id="bdX" min="-1" max="1" step="0.005" value="0"></div>
     <div class="bg-ctrl"><label for="bdY"><span>Offset y</span></label><input type="range" id="bdY" min="-1" max="1" step="0.005" value="0"></div>

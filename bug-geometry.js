@@ -167,7 +167,8 @@ export const PARAM_SPEC = [
 
   R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
-  R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: square wall)', 0, 4, 0.05, 4, 'mm', hasWings),
+  R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: none)', 0, 4, 0.05, 0, 'mm', hasWings),
+  R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -251,7 +252,11 @@ export const LEGACY_DEFAULT_WINGS = {
 };
 /* The new controls at the ends that ARE the old code (each a branch). A design
    saved before DESIGN_VERSION 4 loads with these, so it looks as it did. */
-export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0 };
+export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0 };
+/* The edges pass (design doc §10): the rounded edge became the default. A design
+   saved at DESIGN_VERSION 4 carries the chamfer it was saved with and knows no
+   round radius, so it loads with the round at 0 (the square wall it had). */
+export const PRE_ROUND_STYLE = { wingEdgeRound: 0 };
 /* The Phase 1/2 default's body, legs and antennae (the values PARAM_SPEC used
    to default to). */
 export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, thoraxDepth: 4.6, abdomenLength: 15, abdomenWidth: 5, abdomenTaper: 0.5, abdomenSegments: 6,
@@ -1332,11 +1337,20 @@ function delaunayFlip(pts, tris) {
 
 /* 1 -> 4 midpoint subdivision; a midpoint is shared by both triangles of an
    edge, so the result stays conforming (no T-junctions). */
-function subdivide(pts, tris) {
-  const mid = new Map(), P = pts.slice();
+/* `apex` (optional): per point, the drawn-outline point its rounded edge's bead
+   reaches (insetLoops), or null for an interior point. A midpoint of a
+   BOUNDARY edge (one triangle) carries the midpoint of its two ends' apexes —
+   the original outline is a polyline, so that point lies on it. */
+function subdivide(pts, tris, apex = null) {
+  const mid = new Map(), P = pts.slice(), A = apex ? apex.slice() : null;
+  let ecount = null;
+  if (A) { ecount = new Map(); for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = p < q ? `${p},${q}` : `${q},${p}`; ecount.set(k, (ecount.get(k) || 0) + 1); } }
   const m = (a, b) => {
     const k = a < b ? `${a},${b}` : `${b},${a}`;
-    if (!mid.has(k)) { mid.set(k, P.length); P.push(lerp2(P[a], P[b], 0.5)); }
+    if (!mid.has(k)) {
+      mid.set(k, P.length); P.push(lerp2(P[a], P[b], 0.5));
+      if (A) A.push(ecount.get(k) === 1 && A[a] && A[b] ? lerp2(A[a], A[b], 0.5) : null);
+    }
     return mid.get(k);
   };
   const T = [];
@@ -1344,7 +1358,164 @@ function subdivide(pts, tris) {
     const ab = m(a, b), bc = m(b, c), ca = m(c, a);
     T.push([a, ab, ca], [ab, b, bc], [ca, bc, c], [ab, bc, ca]);
   }
-  return { pts: P, tris: T };
+  return { pts: P, tris: T, apex: A };
+}
+
+/* ------------------------------------------------------------------ */
+/* The ROUNDED EDGE (edges pass, design doc §10)                        */
+/* ------------------------------------------------------------------ */
+/* A full bullnose — a half-round bead — on every free edge of a slab: the
+   wing's outer margin, a drawn tail, every hole rim in HOLES, the pterostigma
+   plate. The silhouette does not move: the bead's APEX (its mid-plane point)
+   sits exactly ON the drawn outline (or the planned hole), and the two skins
+   stop short of it by the bead's in-plane radius `a`. The profile is a half
+   ellipse with that in-plane semi-axis and the local half-thickness H as its
+   vertical one — a half-round at round 1 (a = H), a square wall at round 0
+   (the slab as shipped, by branch: the bead is never built). It is tangent to
+   both skins (no step) and vertical only at its apex (no cliff anywhere).
+
+   `a` is round x H at the outline point, and it never takes material away
+   below the floor: the skins are only inset (their thickness is the edge
+   law's, unchanged), the bead's height IS the local thickness (>= the floor),
+   and `a` is held to ROUND_ROOM_FRAC of the material's local width (an inward
+   ray to the nearest other boundary), so the two beads of a narrow strip — a
+   vein between two holes, a tail — never meet: the strip keeps a flat of at
+   least 1 - 2 x 0.45 = 10% of its width between them. A vein the width of
+   its own thickness therefore becomes a near-round ROD. */
+export const ROUND_ROOM_FRAC = 0.45;
+export const EDGE_ROUND_SEGMENTS = 6;       // facets on a half-round bead (30 degrees each); even, so the apex is a ring vertex
+const ROUND_ROOT_RAMP_MM = 1.0;             // the bead grows from 0 at the root chord (inside the body) over this much span
+/* Inset the BOUNDARY LOOPS of a planform (before it is triangulated) inward by
+   their bead radius. `loops`: closed loops with the MATERIAL ON THEIR LEFT (the
+   outer outline CCW, a hole CW), each a list of [u, w]; `want(P)`: whether
+   point P is rounded (the root tab inside the body is not); `aAt(q, P)`: the
+   radius for rim point P evaluated at q, its new skin edge; `extraAt(P)`
+   (optional): the apex itself pulled in by that much (a plate on the wing).
+   Returns per loop the moved points and each point's apex (its old position)
+   and radius. The radius is a fixed point of a = aAt(P - a n) — taken at the
+   skin's new edge, where the bead's height is, so it never exceeds it; held to
+   ROUND_ROOM_FRAC of the inward ray to the nearest other boundary; and where
+   the inset loop would cross itself (a notch tighter than the bead) the radii
+   of the stretch between the crossing edges shrink until it does not. The
+   caller TRIANGULATES THE MOVED LOOPS, so no triangle can flip. */
+function insetLoops(loops, want, aAt, extraAt = null, capAt = null) {
+  const edges = [];
+  loops.forEach((L, li) => { for (let i = 0; i < L.length; i++) edges.push([li, i, L[i], L[(i + 1) % L.length]]); });
+  const out = loops.map((L, li) => {
+    const n = L.length, A = new Float64Array(n), E = new Float64Array(n), nrm = [], apex = [];
+    for (let i = 0; i < n; i++) {
+      const P = L[i], a0 = L[(i + n - 1) % n], b0 = L[(i + 1) % n];
+      // outward = the right normal of each incident edge (material on the left)
+      let ox = 0, oy = 0;
+      for (const [p, q] of [[a0, P], [P, b0]]) { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; ox += dy / l; oy += -dx / l; }
+      const l = Math.hypot(ox, oy), nn = l > 1e-12 ? [ox / l, oy / l] : [0, 0];
+      nrm.push(nn); apex.push([P[0], P[1]]);
+      if (!want(P) || !(l > 1e-12)) continue;
+      if (extraAt) { E[i] = extraAt(P); apex[i] = [P[0] - nn[0] * E[i], P[1] - nn[1] * E[i]]; }
+      let a = aAt(P, P);
+      if (!(a > 0)) continue;
+      for (let it = 0; it < 12; it++) a = aAt([P[0] - nn[0] * (a + E[i]), P[1] - nn[1] * (a + E[i])], P);
+      // the material's local width: the inward ray to the nearest boundary
+      // edge not incident to this point
+      const d = [-nn[0], -nn[1]];
+      let room = Infinity;
+      for (const [lj, j, p, q] of edges) {
+        if (lj === li && (j === i || (j + 1) % n === i)) continue;
+        const ex = q[0] - p[0], ey = q[1] - p[1], den = d[0] * ey - d[1] * ex;
+        if (Math.abs(den) < 1e-14) continue;
+        const wx = p[0] - P[0], wy = p[1] - P[1];
+        const t = (wx * ey - wy * ex) / den, sg = (wx * d[1] - wy * d[0]) / den;
+        if (t > 1e-9 && sg >= -1e-9 && sg <= 1 + 1e-9 && t < room) room = t;
+      }
+      A[i] = Math.max(0, Math.min(a, ROUND_ROOM_FRAC * room - E[i], capAt ? capAt(li, i, P) : Infinity));
+    }
+    const moved = () => L.map((q, i) => (A[i] + E[i] > 0 ? [q[0] - nrm[i][0] * (A[i] + E[i]), q[1] - nrm[i][1] * (A[i] + E[i])] : [q[0], q[1]]));
+    let M = moved(), reduced = new Set();
+    for (let it = 0; it < 24; it++) {
+      const x = loopCrossing(M);
+      if (!x) break;
+      // shrink the shorter run of the loop between the two crossing edges
+      let [i, j] = x; if (j - i > n / 2) [i, j] = [j, i + n];
+      for (let k = i; k <= j + 1; k++) { const v = k % n; if (A[v] > 0) { A[v] = it < 23 ? A[v] * 0.7 : 0; reduced.add(v); } }
+      M = moved();
+    }
+    // `shrink(f)`: scale every radius of this loop by f and re-place it (the
+    // caller's own containment checks use it)
+    const res = { pts: M, apex, a: A, reduced: reduced.size };
+    res.shrink = (f) => { for (let i = 0; i < n; i++) A[i] *= f; res.pts = moved(); res.reduced = n; };
+    return res;
+  });
+  return out;
+}
+/* The same inset on an already-TRIANGULATED coarse mesh, for HOLES: the
+   frame's cells are conforming and fragile to re-triangulate, so instead its
+   boundary points (the outline's and every hole rim's, found as the mesh's
+   own boundary edges) move in place, and wherever a triangle would flip or
+   collapse below ROUND_MIN_AREA_FRAC of its area the radii of its corners
+   shrink (x 0.7) until it does not — which also keeps a grown hole inside its
+   cell. Same radius law as insetLoops (fixed point, room clamp). */
+const ROUND_MIN_AREA_FRAC = 0.05;
+function insetMesh(pts, tris, want, aAt) {
+  const dir = new Set();
+  for (const [a, b, c] of tris) { dir.add(`${a},${b}`); dir.add(`${b},${c}`); dir.add(`${c},${a}`); }
+  const bnd = [], outN = pts.map(() => [0, 0]), isB = new Uint8Array(pts.length);
+  for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+    if (dir.has(`${q},${p}`)) continue;
+    bnd.push([p, q]); isB[p] = isB[q] = 1;
+    const dx = pts[q][0] - pts[p][0], dy = pts[q][1] - pts[p][1], L = Math.hypot(dx, dy) || 1;
+    for (const v of [p, q]) { outN[v][0] += dy / L; outN[v][1] += -dx / L; }
+  }
+  const apex = pts.map((q, i) => (isB[i] ? [q[0], q[1]] : null));
+  const A = new Float64Array(pts.length), nrm = pts.map(() => [0, 0]);
+  for (let i = 0; i < pts.length; i++) {
+    if (!isB[i]) continue;
+    const L = Math.hypot(outN[i][0], outN[i][1]);
+    if (!(L > 1e-9) || !want(pts[i])) continue;
+    const n = [outN[i][0] / L, outN[i][1] / L], P = pts[i]; nrm[i] = n;
+    let a = aAt(P, P);
+    if (!(a > 0)) continue;
+    for (let it = 0; it < 12; it++) a = aAt([P[0] - n[0] * a, P[1] - n[1] * a], P);
+    const d = [-n[0], -n[1]];
+    let room = Infinity;
+    for (const [p, q] of bnd) {
+      if (p === i || q === i) continue;
+      const ex = pts[q][0] - pts[p][0], ey = pts[q][1] - pts[p][1], den = d[0] * ey - d[1] * ex;
+      if (Math.abs(den) < 1e-14) continue;
+      const wx = pts[p][0] - P[0], wy = pts[p][1] - P[1];
+      const t = (wx * ey - wy * ex) / den, sg = (wx * d[1] - wy * d[0]) / den;
+      if (t > 1e-9 && sg >= -1e-9 && sg <= 1 + 1e-9 && t < room) room = t;
+    }
+    A[i] = Math.max(0, Math.min(a, ROUND_ROOM_FRAC * room));
+  }
+  const moved = () => pts.map((q, i) => (A[i] > 0 ? [q[0] - nrm[i][0] * A[i], q[1] - nrm[i][1] * A[i]] : [q[0], q[1]]));
+  const area2 = (P, a, b, c) => (P[b][0] - P[a][0]) * (P[c][1] - P[a][1]) - (P[b][1] - P[a][1]) * (P[c][0] - P[a][0]);
+  let out = moved(); const reduced = new Set();
+  for (let it = 0; it < 20; it++) {
+    let bad = false;
+    for (const [a, b, c] of tris) {
+      if (area2(out, a, b, c) > ROUND_MIN_AREA_FRAC * area2(pts, a, b, c)) continue;
+      for (const v of [a, b, c]) if (A[v] > 0) { A[v] = it < 19 ? A[v] * 0.7 : 0; reduced.add(v); bad = true; }
+    }
+    if (!bad) break;
+    out = moved();
+  }
+  return { pts: out, apex, reduced: reduced.size };
+}
+/* The first pair of non-adjacent edges of a closed loop that touch, or null. */
+function loopCrossing(L) {
+  const n = L.length;
+  const o = (a, b, c) => Math.sign((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
+  for (let i = 0; i < n; i++) {
+    const a = L[i], b = L[(i + 1) % n];
+    const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const c = L[j], d = L[(j + 1) % n];
+      if (Math.max(c[0], d[0]) < x0 || Math.min(c[0], d[0]) > x1 || Math.max(c[1], d[1]) < y0 || Math.min(c[1], d[1]) > y1) continue;
+      if (o(a, b, c) * o(a, b, d) <= 0 && o(c, d, a) * o(c, d, b) <= 0) return [i, j];
+    }
+  }
+  return null;
 }
 
 /* A solid slab over a triangulated planform: top face, bottom face, and a rim
@@ -1354,7 +1525,14 @@ function subdivide(pts, tris) {
    toward the margin and chamfered to the floor at it). Returns the boundary
    vertices (pts indices) with their emitted top / bottom ids, so the builder
    can record the EDGE's own thickness for the gate to measure. */
-function planformSlab(acc, pts, tris, half, W, part) {
+/* `apex` (optional, from insetLoops through subdivide): the rim becomes a
+   BEAD — per boundary point a ring of EDGE_ROUND_SEGMENTS + 1 points from the
+   top skin's edge through the apex to the bottom skin's, on the half ellipse
+   P' + sin(t) (apex - P'), H cos(t); consecutive rings joined by quads. A rim
+   point whose apex is itself (radius 0, the root tab) gets the same ring along
+   its vertical wall, so neighbouring rings always match point for point.
+   Without `apex`, the shipped square wall, verbatim. */
+function planformSlab(acc, pts, tris, half, W, part, apex = null) {
   const hf = typeof half === 'function' ? half : () => half;
   const H = pts.map(([u, w]) => hf(u, w));
   const T = pts.map(([u, w], i) => acc.v(W(u, w, +H[i])));
@@ -1365,7 +1543,27 @@ function planformSlab(acc, pts, tris, half, W, part) {
     dir.add(`${a},${b}`); dir.add(`${b},${c}`); dir.add(`${c},${a}`);
   }
   const rimV = new Set();
-  for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+  if (apex) {
+    const K = EDGE_ROUND_SEGMENTS, ring = new Map();
+    part.meta.bead = { K, rings: [] };
+    const ringOf = (v) => {
+      let r = ring.get(v);
+      if (r) return r;
+      const [u, w] = pts[v], A = apex[v] || pts[v], du = A[0] - u, dw = A[1] - w;
+      r = [T[v]];
+      for (let j = 1; j < K; j++) { const t = (Math.PI * j) / K, sn = j === K / 2 ? 1 : Math.sin(t), cs = j === K / 2 ? 0 : Math.cos(t); r.push(acc.v(W(u + sn * du, w + sn * dw, H[v] * cs))); }
+      r.push(B[v]);
+      ring.set(v, r);
+      part.meta.bead.rings.push({ i: v, ids: r, uw: [u, w], apex: [A[0], A[1]], a: Math.hypot(du, dw), H: H[v] });
+      return r;
+    };
+    for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+      if (dir.has(`${q},${p}`)) continue;
+      const Rp = ringOf(p), Rq = ringOf(q);
+      for (let j = 0; j < K; j++) acc.quad(Rq[j], Rp[j], Rp[j + 1], Rq[j + 1]);
+      rimV.add(p);
+    }
+  } else for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
     if (!dir.has(`${q},${p}`)) { acc.quad(T[q], T[p], B[p], B[q]); rimV.add(p); }   // a boundary edge p->q: the rim takes its twin
   }
   part.meta.thickPairs = [];
@@ -1455,7 +1653,15 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     const flags = tailFlagsFor(spec, scalloped.length);
     plan = planVenation(scalloped, flags, spec, { holes: mode === 'holes', minCellMm: p.minCellMm });
   }
-  let tri, pts;
+  /* The ROUNDED EDGE (§10): every free edge's boundary loop moves inward by
+     its bead radius — round x the local half-thickness, the root chord (u <= 0,
+     inside the body) square, ramped in over the first mm of span — remembering
+     where it was (the bead's apex), and the MOVED loops are what is
+     triangulated, so the skins conform and no triangle can flip. */
+  const round = p.wingEdgeRound;
+  const wantRound = (P) => P[0] > 1e-9;
+  const aRound = (q, P) => round * edge.h(q[0], q[1]) * clamp(P[0] / ROUND_ROOT_RAMP_MM, 0, 1);
+  let tri, pts, apex = null, movedOf = null, roundReduced = 0;
   if (plan && mode === 'holes') {
     // ONE conforming triangulation: every cut cell is a ring of quads between
     // its outline and its hole, every solid cell is ear-clipped with its shared
@@ -1463,18 +1669,44 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // frame is a single closed slab whose rim walk (planformSlab) finds the
     // hole rims by the same directed-edge rule as the outer rim.
     ({ pts, tris: tri } = frameMesh(plan, embed, n0, n1));
+    if (round > 0) {
+      const r = insetMesh(pts, tri, wantRound, aRound);
+      movedOf = new Map(pts.map((q, i) => [`${q[0]},${q[1]}`, r.pts[i]]));
+      ({ pts, apex, reduced: roundReduced } = r);
+    }
   } else {
-    tri = delaunayFlip(poly, earClip(poly)); pts = poly;
+    let P = poly;
+    if (round > 0) {
+      const [r] = insetLoops([poly], wantRound, aRound);
+      P = r.pts; apex = r.apex; roundReduced = r.reduced;
+      movedOf = new Map(poly.map((q, i) => [`${q[0]},${q[1]}`, P[i]]));
+    }
+    tri = delaunayFlip(P, earClip(P)); pts = P;
   }
-  for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri } = subdivide(pts, tri));
+  for (let s = 0; s < WING_SUBDIV; s++) ({ pts, tris: tri, apex } = subdivide(pts, tri, apex));
+  // a subdivision midpoint's radius is the mean of its ends' while its
+  // half-thickness is the edge law's at the chord's midpoint, which on a
+  // concave stretch can be a hair smaller: there the skin edge steps back
+  // toward the apex until the radius is round x the half-thickness again, so
+  // no bead is ever more than a half-round (measured up to 0.12% before)
+  if (apex) for (let i = 0; i < pts.length; i++) {
+    const A = apex[i]; if (!A) continue;
+    const dx = A[0] - pts[i][0], dy = A[1] - pts[i][1], a = Math.hypot(dx, dy);
+    if (!(a > 0)) continue;
+    let b = Math.min(a, round * edge.h(pts[i][0], pts[i][1]));
+    if (b >= a) continue;
+    for (let it = 0; it < 12; it++) b = Math.min(a, round * edge.h(A[0] - (dx / a) * b, A[1] - (dy / a) * b));
+    pts[i] = [A[0] - (dx / a) * b, A[1] - (dy / a) * b];
+  }
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
-  const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part);
+  const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part, apex);
+  if (round > 0) part.meta.round = { round, reduced: roundReduced };
   // the EDGE's own thickness, for the gate to measure off the emitted vertices:
   // the rim vertices ON the drawn outline, and every other rim vertex (holes,
   // the root tab)
   part.meta.edgePairs = { outline: [], other: [] };
   for (const r of rim) {
-    const q = pts[r.i], on = q[0] >= 0 && edge.dist(q[0], q[1]) < 1e-6;
+    const q = apex ? apex[r.i] || pts[r.i] : pts[r.i], on = q[0] >= 0 && edge.dist(q[0], q[1]) < 1e-6;
     part.meta.edgePairs[on ? 'outline' : 'other'].push([r.top, r.bot]);
   }
   part.meta.edge = { taper: p.wingEdgeTaper, bevel: p.wingEdgeBevel, root: thick, tip: edge.tip };
@@ -1489,7 +1721,11 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // viewer and along the bottom rim where the wall faces up, so a gate
     // matching the contour against the top rim alone reads the bottom-rim
     // stretches as strays (1.04 mm off at a 1.2 mm sheet and 60 degrees)
-    part.meta.holeLoops = plan.cells.flatMap((c) => c.holes.flatMap((h) => [h.map((q) => xy(q, hAt(q))), h.map((q) => xy(q, -hAt(q)))]));
+    // (with the rounded edge the skins stop short of the hole by the bead's
+    // radius: those inset rims and the bead's apex loop — the planned hole at
+    // mid-plane — are all on the record)
+    const mv = (q) => (movedOf && movedOf.get(`${q[0]},${q[1]}`)) || q;
+    part.meta.holeLoops = plan.cells.flatMap((c) => c.holes.flatMap((h) => [h.map((q) => xy(mv(q), hAt(mv(q)))), h.map((q) => xy(mv(q), -hAt(mv(q)))), ...(movedOf ? [h.map((q) => xy(q, 0))] : [])]));
     part.meta.svgStigma = mode === 'ridges' ? plan.cells.filter((c) => c.role === 'stigma').map((c) => c.points.map((q) => xy(q, hAt(q)))) : [];
     part.meta.svgVeins = mode === 'ridges' ? plan.veins.filter((v) => !v.dropped).map((v) => ({ pts: v.points.map((q) => xy(q, hAt(q))), width: (v.width[0] + v.width[1]) / 2 })) : [];
     part.meta.veinWorld = plan.veins.filter((v) => !v.dropped).flatMap((v) => { const o = []; for (let i = 0; i + 1 < v.points.length; i++) o.push(W(v.points[i][0], v.points[i][1], hAt(v.points[i]) + 0.02), W(v.points[i + 1][0], v.points[i + 1][1], hAt(v.points[i + 1]) + 0.02)); return o; });
@@ -1523,7 +1759,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   part.meta.thinWorld = seg;
   acc.end();
 
-  if (plan && mode === 'ridges') buildRidges(acc, plan, W, edge.flat ? () => thick / 2 : edge.h, p.ridgeHeight, spec.index);
+  if (plan && mode === 'ridges') buildRidges(acc, plan, W, edge.flat ? () => thick / 2 : edge.h, p.ridgeHeight, spec.index, round, (q) => edge.dist(q[0], q[1]));
 }
 
 /* Tail flags per DENSE outline sample: sampleOutline() emits CR_SAMPLES points
@@ -1714,10 +1950,20 @@ function frameMesh(plan, embed, lead, trail) {
    Each is its own closed part (kind 'vein'), overlapping the slab: the export
    contract's closed-shells-union. ridgeWidthPairs lets the gate MEASURE the
    emitted width against the floor. */
-function buildRidges(acc, plan, W, halfAt, ridgeH, pairIndex) {
+/* With the rounded edge (round > 0, §10) the ridge is ROUNDED TOO: its top is
+   a half ellipse — across the vein's own half-width, round x min(half-width,
+   ridge height) high — so at round 1 a ridge as tall as half its width is a
+   half-round rod lying on the skin. And a ridge that runs out to the drawn
+   outline STOPS SHORT of it: it ends inside the wing's flat skin, one bead
+   radius plus 0.05 mm in from the outline, its height ramping down over the
+   last 2 x the ridge height so the end dives into the skin — no end wall
+   standing over the margin's bead. Round 0 is the rectangular strip, by
+   branch. */
+function buildRidges(acc, plan, W, halfAt, ridgeH, pairIndex, round = 0, outlineDist = null) {
   // the ridge stands on the LOCAL top skin (the edge field may taper it)
   const h0f = (u, w) => { const half = halfAt(u, w); return half - Math.min(0.15, half * 0.5); };
   const h1f = (u, w) => halfAt(u, w) + ridgeH;
+  if (round > 0) return buildRoundRidges(acc, plan, W, halfAt, h0f, h1f, ridgeH, pairIndex, round, outlineDist);
   for (const v of plan.veins) {
     if (v.dropped) continue;
     const pts = v.points, n = pts.length;
@@ -1747,6 +1993,76 @@ function buildRidges(acc, plan, W, halfAt, ridgeH, pairIndex) {
     const W2 = (u, w, h) => W(u, w, (h0f(u, w) + h1f(u, w)) / 2 + h);
     planformSlab(acc, c.points, triangulateCell(c.points), (u, w) => (h1f(u, w) - h0f(u, w)) / 2, W2, part);
     delete part.meta.thickPairs;   // a plate's height is the ridge height, not the sheet: the floor is on its WIDTH, and a plate is wider than any vein
+    acc.end();
+  }
+}
+
+const RIDGE_ARC = 6;                        // facets over a rounded ridge's top
+function buildRoundRidges(acc, plan, W, halfAt, h0f, h1f, ridgeH, pairIndex, round, outlineDist) {
+  const onOutline = (q) => outlineDist && q[0] > 1e-9 && outlineDist(q) < 1e-6;
+  for (const v of plan.veins) {
+    if (v.dropped) continue;
+    const P0 = v.points, n0 = P0.length;
+    if (n0 < 2) continue;
+    const cum0 = [0]; for (let i = 1; i < n0; i++) cum0.push(cum0[i - 1] + Math.hypot(P0[i][0] - P0[i - 1][0], P0[i][1] - P0[i - 1][1]));
+    const L0 = cum0[n0 - 1];
+    if (!(L0 > 1e-6)) continue;
+    const at = (s) => { let i = 1; while (i < n0 - 1 && cum0[i] < s) i++; const t = (s - cum0[i - 1]) / ((cum0[i] - cum0[i - 1]) || 1); return lerp2(P0[i - 1], P0[i], clamp(t, 0, 1)); };
+    // stations along the path: arc-length s, and the ridge's height above the
+    // skin there (1 = full). An end on the outline is trimmed and ramped.
+    const endTrim = (q) => (onOutline(q) ? round * halfAt(q[0], q[1]) + 0.05 : 0);
+    const t0 = endTrim(P0[0]), t1 = endTrim(P0[n0 - 1]);
+    const ramp = Math.min(2 * ridgeH, 0.35 * L0);
+    let sA = t0, sB = L0 - t1;
+    if (!(sB - sA > 2 * ramp + 1e-3)) { sA = t0 ? Math.min(t0, 0.3 * L0) : 0; sB = t1 ? L0 - Math.min(t1, 0.3 * L0) : L0; }
+    const st = new Map();
+    const add = (s, f) => { const k = s.toFixed(9); if (!st.has(k)) st.set(k, { s, f }); };
+    for (let i = 0; i < n0; i++) if (cum0[i] > sA + 1e-6 && cum0[i] < sB - 1e-6) add(cum0[i], 1);
+    add(sA, t0 ? -1 : 1); add(sB, t1 ? -1 : 1);
+    if (t0) add(Math.min(sA + ramp, (sA + sB) / 2), 1);
+    if (t1) add(Math.max(sB - ramp, (sA + sB) / 2), 1);
+    const S = [...st.values()].sort((a, b) => a.s - b.s);
+    for (const x of S) if (x.f > 0) {
+      // between an end and its ramp station the height falls linearly
+      if (t0 && x.s < sA + ramp) x.f = Math.min(x.f, -1 + 2 * (x.s - sA) / ramp);
+      if (t1 && x.s > sB - ramp) x.f = Math.min(x.f, -1 + 2 * (sB - x.s) / ramp);
+    }
+    const part = acc.begin(`vein${pairIndex + 1}-${v.id}`, 'vein', 'R');
+    part.meta.pair = pairIndex; part.meta.ridgeWidthPairs = []; part.meta.ridgeRound = round;
+    const rings = [], mids = [];
+    for (let i = 0; i < S.length; i++) {
+      const q = at(S[i].s), qa = at(S[Math.max(0, i - 1)].s), qb = at(S[Math.min(S.length - 1, i + 1)].s);
+      const d = [qb[0] - qa[0], qb[1] - qa[1]], dl = Math.hypot(d[0], d[1]) || 1, nn = [-d[1] / dl, d[0] / dl];
+      const w = lerp(v.width[0], v.width[1], S[i].s / L0) / 2, half = halfAt(q[0], q[1]);
+      const h0 = h0f(q[0], q[1]);
+      // f = 1: the full ridge; f falls to -1 at a trimmed end, where the top
+      // sits 0.05 mm under the skin (inside the wing: hidden)
+      const above = S[i].f >= 0 ? ridgeH * S[i].f : 0.05 * S[i].f;
+      const h1 = Math.max(h0 + 0.02, half + above);
+      const rv = round * clamp(Math.min(w, h1 - half), 0, h1 - h0 - 0.01);
+      const zc = h1 - rv;
+      const R = [W(q[0] - nn[0] * w, q[1] - nn[1] * w, h0), W(q[0] + nn[0] * w, q[1] + nn[1] * w, h0)];
+      for (let j = 0; j <= RIDGE_ARC; j++) { const t = (Math.PI * j) / RIDGE_ARC, c = j === RIDGE_ARC ? -1 : Math.cos(t), sn = j === RIDGE_ARC ? 0 : Math.sin(t); R.push(W(q[0] + nn[0] * w * c, q[1] + nn[1] * w * c, zc + rv * sn)); }
+      rings.push(R); mids.push(W(q[0], q[1], (h0 + h1) / 2));
+    }
+    const ids = loftRings(acc, rings, mids[0], mids[mids.length - 1]);
+    for (const r of ids) part.meta.ridgeWidthPairs.push([r[0], r[1]]);
+    acc.end();
+  }
+  for (const c of plan.cells) {
+    if (c.role !== 'stigma') continue;
+    const part = acc.begin(`stigma${pairIndex + 1}`, 'vein', 'R');
+    part.meta.pair = pairIndex;
+    const W2 = (u, w, h) => W(u, w, (h0f(u, w) + h1f(u, w)) / 2 + h);
+    // the plate's bead is round x its own half-height, its apex on the cell's
+    // own outline like every other bead. (Pulling the plate's outline-side
+    // edge inside the wing's flat skin was tried: on a narrow stigma cell the
+    // pull ate the whole room, the bead went to 0 there and its vertical
+    // facets made the SVG contour chain asymmetrically. Where the plate meets
+    // the leading margin its rounded edge stands over the wing's own bead.)
+    const [ins] = insetLoops([c.points], () => true, (q) => round * (h1f(q[0], q[1]) - h0f(q[0], q[1])) / 2);
+    planformSlab(acc, ins.pts, triangulateCell(ins.pts), (u, w) => (h1f(u, w) - h0f(u, w)) / 2, W2, part, ins.apex);
+    delete part.meta.thickPairs;
     acc.end();
   }
 }
@@ -2010,7 +2326,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 4;   // 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 5;   // 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -2022,11 +2338,16 @@ export function paramsFromDesign(doc) {
   // load at their OLD ends (each a branch to the old code), so it looks as saved
   const raw = { ...(doc.params || {}) };
   if (!(doc.version >= 4)) for (const [k, v] of Object.entries(LEGACY_STYLE)) if (!(k in raw)) raw[k] = v;
+  if (!(doc.version >= 5)) for (const [k, v] of Object.entries(PRE_ROUND_STYLE)) if (!(k in raw)) raw[k] = v;
   const params = normalizeParams(raw, notes);
   return { ok: true, params, notes };
 }
 
-export function buildBug(params) {
+/* `opts.flatPair` (k, display only): pair k is built with its dihedral and
+   pitch at 0 — the page shows the wing being edited FLAT so a screen drag
+   maps exactly onto its outline (editorFrame). The parameters are untouched;
+   the page never exports a model built with this option. */
+export function buildBug(params, opts = {}) {
   const notes = [];
   const p = normalizeParams(params, notes);
   const L = bodyLayout(p);
@@ -2035,6 +2356,7 @@ export function buildBug(params) {
   if (p.legsVisible && p.legPairs > 0) buildLegs(acc, p, L);
   if (p.antennaType !== 'none') buildAntenna(acc, p, L);
   const pairs = resolveWingPairs(p);
+  if (Number.isInteger(opts.flatPair) && pairs[opts.flatPair]) { pairs[opts.flatPair] = { ...pairs[opts.flatPair], dihedral: 0, pitch: 0 }; }
   const hinges = wingHinges(p, L);
   for (const spec of pairs) buildWingPair(acc, p, L, spec, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
   for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
@@ -2095,6 +2417,31 @@ export function buildBug(params) {
   };
 }
 
+/* The ON-WING EDITOR's frame (edges pass, §10): pair k's RIGHT wing drawn
+   FLAT (dihedral and pitch 0 — buildBug's flatPair), as a map between the
+   drawn outline's own units (u along the span in lengths, w along the chord
+   in lengths x stretch... i.e. the editor's (u, w)) and WORLD millimetres seen
+   from above (x right, y head). It is the wing transform with no tilt, so it
+   is a rigid motion plus the two scales: sweep rotates, stretch scales the
+   chord, length scales both. ONE owner, read by the page to place the points
+   on the wing and to turn a pointer into an outline point, and by the gate's
+   Q clause, which measures it against the EMITTED geometry. */
+export function editorFrame(params, k) {
+  const p = normalizeParams(params);
+  const spec = resolveWingPairs(p)[k];
+  if (!spec) return null;
+  const { hinge } = wingHinges(p, bodyLayout(p))[k];
+  const L = spec.length, S = L * spec.stretch, sw = spec.sweep * D2R, cs = Math.cos(sw), sn = Math.sin(sw);
+  return {
+    pair: k, length: L, stretch: spec.stretch, sweep: spec.sweep, hinge: [hinge[0], hinge[1]],
+    toWorld: (u, w) => { const a = u * L, b = w * S; return [hinge[0] + a * cs + b * sn, hinge[1] - a * sn + b * cs]; },
+    fromWorld: (x, y) => { const dx = x - hinge[0], dy = y - hinge[1]; return [(dx * cs - dy * sn) / L, (dx * sn + dy * cs) / S]; },
+  };
+}
+/* The SVG export's own frame: world mm <-> the file's user units (mm, y down). */
+export const svgFromWorld = (frame, x, y) => [x - frame.x0 + frame.margin, frame.y1 - y + frame.margin];
+export const worldFromSvg = (frame, X, Y) => [X + frame.x0 - frame.margin, frame.y1 + frame.margin - Y];
+
 function mirrorMeta(m, shift) {
   const out = {};
   for (const [k, v] of Object.entries(m)) {
@@ -2106,6 +2453,7 @@ function mirrorMeta(m, shift) {
     else if (k === 'holeLoops' || k === 'svgStigma') out[k] = v.map((L) => L.map(([x, y]) => [mx(x), y]));
     else if (k === 'svgVeins') out[k] = v.map((l) => ({ ...l, pts: l.pts.map(([x, y]) => [mx(x), y]) }));
     else if (k === 'veinWorld') out[k] = v.map(([x, y, z]) => [mx(x), y, z]);
+    else if (k === 'bead') out[k] = { ...v, rings: v.rings.map((r) => ({ ...r, ids: r.ids.map((i) => i + shift) })) };
     else out[k] = v;
   }
   return out;

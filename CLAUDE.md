@@ -9812,7 +9812,14 @@ required before quoting a pass from a changed harness) — **it runs in CI as
 `bug-gate.yml`**, path-filtered to `bug.html`, `bug*.js`, `tools/verify-bug*` and
 `tools/bug-fixtures.mjs`; the two flower gates name their own tools by file (#340 took
 them off `tools/**` on Oct 1), so a bug-only change runs this workflow and nothing else. Sheets: `node tools/shot-bug-sheet.mjs <dir>`
-(Phase 1), `node tools/shot-bug-venation.mjs <dir>` (Phase 2) and `node tools/shot-bug-elegance.mjs <dir>` (§9); none runs in CI.
+(Phase 1), `node tools/shot-bug-venation.mjs <dir>` (Phase 2) and `node tools/shot-bug-elegance.mjs <dir>` (§9) and `node tools/shot-bug-edges.mjs <dir>` (§10); none runs in CI.
+**§10 (edges + editor)**: every wing edge — outer margin, tails, HOLES rims, RIDGES ridges —
+closes on a half-ellipse BULLNOSE (`wingEdgeRound`, default 1 = a full half-round, 0 = the old
+square wall; the chamfer default is now 0) whose apex sits ON the drawn outline, so the silhouette
+and the SVG do not move; the E family (E1–E7) gates it. The page loads in Top view with a
+Render / SVG toggle, and the outline editor lives ON THE WING in SVG mode (the edited pair is
+displayed flat through `buildBug(p, { flatPair })`, display only); the Q family proves a screen
+drag lands on the intended outline point. The separate editor panel and the SVG inset are gone.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

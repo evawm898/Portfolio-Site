@@ -14,6 +14,7 @@ import {
   moveControlPoint, insertControlPoint, deleteControlPoint, controlPointsFromDense,
   designFromParams, paramsFromDesign, MAX_WING_PAIRS,
   composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
+  editorFrame, contourLoops, CR_SAMPLES,
 } from './bug-geometry.js';
 
 /* ---------------- state ---------------- */
@@ -44,7 +45,7 @@ const MAT = {
   body: new THREE.MeshStandardMaterial({ color: 0xedede8, roughness: 0.62, metalness: 0 }),
   wing: new THREE.MeshStandardMaterial({ color: 0xc9d8d6, roughness: 0.5, metalness: 0, flatShading: true, side: THREE.FrontSide }),
 };
-let viewName = 'three';
+let viewName = 'top';               // the page opens looking straight down (edges pass, §10)
 const WING_KINDS = ['tail', ...Array.from({ length: MAX_WING_PAIRS }, (_, k) => `wing${k + 1}`), 'vein'];   // 'vein': Phase 2 ridge strips and stigma plates
 
 function partGeometry(kinds, flat) {
@@ -72,6 +73,8 @@ function partGeometry(kinds, flat) {
 // narrow runs (model.wingPairs[k].thinSegments, the builder's own) are drawn
 // on top. Both are view chrome — nothing here reaches either export.
 MAT.thinWing = new THREE.MeshStandardMaterial({ color: 0xe0a3a3, roughness: 0.5, metalness: 0, flatShading: true, side: THREE.FrontSide });
+MAT.wingSmooth = new THREE.MeshStandardMaterial({ color: 0xc9d8d6, roughness: 0.5, metalness: 0, side: THREE.FrontSide });
+MAT.thinWingSmooth = new THREE.MeshStandardMaterial({ color: 0xe0a3a3, roughness: 0.5, metalness: 0, side: THREE.FrontSide });
 MAT.thinLine = new THREE.LineBasicMaterial({ color: 0xe5484d, depthTest: false, transparent: true });
 function rebuildMesh() {
   for (const c of [...root.children]) { root.remove(c); c.geometry.dispose(); }
@@ -81,9 +84,12 @@ function rebuildMesh() {
   for (const kind of WING_KINDS) {
     const parts = model.parts.filter((q) => q.kind === kind);
     parts.forEach((q, i) => {
-      const g = partGeometry([kind], true)[i];
+      // a rounded edge is drawn SMOOTH (its bead is tangent to the skins, so
+      // vertex normals are honest); a square-walled slab keeps flat facets
+      const g = partGeometry([kind], !(params.wingEdgeRound > 0))[i];
       const red = kind === 'vein' ? thinVeinPairs.has(q.meta.pair) : thinKinds.has(kind);
-      root.add(new THREE.Mesh(g, red ? MAT.thinWing : MAT.wing));
+      const smooth = params.wingEdgeRound > 0;
+      root.add(new THREE.Mesh(g, red ? (smooth ? MAT.thinWingSmooth : MAT.thinWing) : smooth ? MAT.wingSmooth : MAT.wing));
     });
   }
   const seg = model.wingPairs.flatMap((w) => w.thinSegments || []);
@@ -110,6 +116,9 @@ function modelBox() {
 function setView(name) {
   viewName = name;
   document.querySelectorAll('#viewButtons button').forEach((b) => b.classList.toggle('is-on', b.dataset.view === name));
+  // the Render / SVG toggle belongs to the TOP view only; leaving it ends an edit
+  document.getElementById('viewToggle').hidden = name !== 'top';
+  if (name !== 'top' && editing) { editing = false; selectedPoint = -1; edStatus = ''; viewModel = model; }
   const b = modelBox();
   const c = new THREE.Vector3((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, -(b.y0 + b.y1) / 2);
   const r = 0.5 * Math.hypot(b.x1 - b.x0, b.y1 - b.y0, b.z1 - b.z0);
@@ -127,13 +136,18 @@ function setView(name) {
   camera.near = d / 50; camera.far = d * 10; camera.updateProjectionMatrix();
   controls.update();
   render();
+  drawMain();
 }
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
-  camera.aspect = w / h; camera.updateProjectionMatrix();
+  camera.aspect = w / h;
+  // centre the picture in the space LEFT of the control panel, not under it
+  if (w > 760) camera.setViewOffset(w, h, 164, 0, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
   render();
+  if (model) { vbox = null; drawMain(); }
 }
 function render() { renderer.render(scene, camera); }
 controls.addEventListener('change', render);
@@ -212,7 +226,6 @@ function drawPairUi() {
   const tabs = document.getElementById('pairTabs');
   tabs.innerHTML = '';
   pairBlock.hidden = N === 0;
-  document.getElementById('editorBox').hidden = N === 0;
   if (N === 0) return;
   editPair = Math.min(editPair, N - 1);
   for (let k = 0; k < N; k++) {
@@ -221,7 +234,7 @@ function drawPairUi() {
     const linked = role === 'mid' && !params.wings.unlinked[k];
     b.className = 'bg-btn' + (k === editPair ? ' is-on' : '') + (linked ? ' bg-linked' : '');
     b.textContent = N === 1 ? 'pair 1' : `${k + 1} ${role === 'first' ? 'first' : role === 'last' ? 'last' : linked ? 'linked' : 'drawn'}`;
-    b.addEventListener('click', () => { editPair = k; selectedPoint = -1; drawPairUi(); drawEditor(); });
+    b.addEventListener('click', () => { if (editing) startEditing(k); else { editPair = k; selectedPoint = -1; drawPairUi(); drawMain(); } });
     tabs.appendChild(b);
   }
   const role = roleOf(editPair);
@@ -245,20 +258,23 @@ document.getElementById('tailToggle').addEventListener('input', (e) => {
   // OFF drops exactly the tail group from the drawn outline; ON brings back the
   // group as last edited (it is stored, never deleted) — see composeOutline.
   params.wings.tail.on = e.target.checked;
-  selectedPoint = -1; edStatus = ''; drawPairUi(); drawEditor(); scheduleBuild();
+  selectedPoint = -1; edStatus = ''; drawPairUi(); drawMain(); scheduleBuild();
 });
+/* Unlink a middle pair: it starts from exactly what was on screen — its
+   interpolated values and curve — and is drawn by hand from then on. */
+function unlinkPair(k) {
+  if (params.wings.unlinked[k]) return;
+  const r = resolvedPair(k);
+  const K = Math.max(params.wings.first.points.length, params.wings.last.points.length);
+  const spec = {}; for (const f of WING_FIELDS) spec[f.id] = r[f.id];
+  spec.points = controlPointsFromDense(r.dense, K);
+  params.wings.unlinked[k] = spec;
+}
 document.getElementById('linkBtn').addEventListener('click', () => {
   const k = editPair;
   if (params.wings.unlinked[k]) delete params.wings.unlinked[k];
-  else {
-    // start from exactly what was on screen: the interpolated values and curve
-    const r = resolvedPair(k);
-    const K = Math.max(params.wings.first.points.length, params.wings.last.points.length);
-    const spec = {}; for (const f of WING_FIELDS) spec[f.id] = r[f.id];
-    spec.points = controlPointsFromDense(r.dense, K);
-    params.wings.unlinked[k] = spec;
-  }
-  selectedPoint = -1; drawPairUi(); drawEditor(); scheduleBuild();
+  else unlinkPair(k);
+  selectedPoint = -1; drawPairUi(); drawMain(); scheduleBuild();
 });
 
 function writePairFields() {
@@ -303,7 +319,7 @@ document.getElementById('resetBtn').addEventListener('click', () => { designName
    rebuilds; every value stays editable after. The pair being edited is kept. */
 function setSpecimen() {
   const r = specimenPose(params), k = editPair;
-  loadParams(r.params); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawEditor();
+  loadParams(r.params); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
   designMsg(r.notes.length ? `Specimen set, with notes: ${r.notes.join('; ')}.` : 'Specimen set: forewings square to the body, wings flat, legs tucked, antennae in a V. Adjust any slider after.', r.notes.length > 0);
   return r;
 }
@@ -311,8 +327,8 @@ document.getElementById('specimenBtn').addEventListener('click', setSpecimen);
 
 function loadParams(p) {
   params = normalizeParams(p);
-  editPair = 0; selectedPoint = -1;
-  writeControls(); buildNow(true); drawEditor();
+  editPair = 0; selectedPoint = -1; editing = false; edStatus = ''; vbox = null;
+  writeControls(); buildNow(true);
 }
 
 const STORE = 'parametric-bug-designs-v1';
@@ -360,87 +376,157 @@ document.getElementById('importDesign').addEventListener('change', async (e) => 
   try { applyDesign(JSON.parse(await f.text()), `“${f.name}”`); } catch { designMsg('Not loaded: the file is not JSON.', true); }
 });
 
-/* ---------------- the wing-outline editor ---------------- */
-/* The RIGHT wing's outline only, drawn in its own planform frame: u (span)
-   to the right, w (chord) up = toward the head. The left wing is the mirror,
-   built by the model — the editor cannot break symmetry because it never
-   touches the left. The frame matches tools/bug-fixtures.mjs EDITOR_VIEW. */
-const VIEW = { u0: -0.08, u1: 1.28, w0: -0.9, w1: 0.46 };   // room below the wing for a tail
-const ed = document.getElementById('editor');
-const EW = 340, EH = 340;
-const toX = (u) => ((u - VIEW.u0) / (VIEW.u1 - VIEW.u0)) * EW, toY = (w) => ((VIEW.w1 - w) / (VIEW.w1 - VIEW.w0)) * EH;
-const fromXY = (x, y) => [VIEW.u0 + (x / EW) * (VIEW.u1 - VIEW.u0), VIEW.w1 - (y / EH) * (VIEW.w1 - VIEW.w0)];
-const backdrop = { href: null, opacity: 0.5, scale: 1, dx: 0, dy: 0 };
+/* ---------------- the on-wing outline editor (edges pass, §10) ---------------- */
+/* In the TOP view the main viewport can show the SVG projection — exactly what
+   Get SVG exports — instead of the 3D render. There, a click on a wing selects
+   its pair for editing and the outline editor is drawn ON that wing: the RIGHT
+   wing's control points, edited in place; the left wing is the model's mirror
+   (its curve is drawn mirrored live while the model rebuilds). While a pair is
+   edited it is DISPLAYED FLAT (buildBug's flatPair — dihedral and pitch 0 for
+   the picture only), so a screen drag maps exactly onto its outline through
+   editorFrame(); the parameters never change from this, and both exports are
+   built from the real, tilted model. Drag / add / delete go through the
+   geometry module's own move / insert / delete (tail-aware on the bottom
+   pair), which BLOCK an edit that would make the outline cross or pinch. */
+const stage = document.getElementById('svgStage'), msvg = document.getElementById('mainSvg');
+const edBar = document.getElementById('edBar');
+const backdrop = { href: null, opacity: 0.6, scale: 1, dx: 0, dy: 0, w: 0, h: 0, cx: 0, cy: 0, aspect: 1 };
+let mainMode = 'render';          // 'render' | 'svg' — the TOP view's main viewport
+let editing = false;              // a pair is being edited on the wing (svg mode only)
 let edStatus = '';
-
-function evPoint(ev) {
-  const r = ed.getBoundingClientRect();
-  return fromXY(((ev.clientX - r.left) / r.width) * EW, ((ev.clientY - r.top) / r.height) * EH);
-}
-/* The outline the editor shows and edits: on the BOTTOM pair it is the base
-   with the tail group composed in (tail points tagged); elsewhere the pair's
-   own points. */
+let viewModel = null;             // what the SVG view shows: the model, or (editing a tilted pair) its flat display twin
+let vbox = null;                  // the SVG view's frame in world mm {x0, y0, x1, y1}: held while editing so the picture does not jump
+const NS = 'http://www.w3.org/2000/svg';
+const svgMode = () => viewName === 'top' && mainMode === 'svg';
 const isBottom = () => editPair === params.wingPairs - 1;
 function shownOutline() {
   const own = editableSpec(editPair);
   if (!own) return null;
   return composeOutline(own.points, isBottom() ? params.wings.tail : null);
 }
-function drawEditor() {
-  if (!params.wingPairs) return;
+const editedIsTilted = () => { const r = params.wingPairs ? resolvedPair(editPair) : null; return !!(r && (r.dihedral || r.pitch)); };
+/* world mm <-> the view's own units (mm, y down) */
+const toV = (x, y) => [x - vbox.x0, vbox.y1 - y];
+const fromV = (X, Y) => [X + vbox.x0, vbox.y1 - Y];
+function screenToWorld(ev) {
+  const pt = msvg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const q = pt.matrixTransform(msvg.getScreenCTM().inverse());
+  return fromV(q.x, q.y);
+}
+function worldToScreen(x, y) {
+  const pt = msvg.createSVGPoint(); [pt.x, pt.y] = toV(x, y);
+  const q = pt.matrixTransform(msvg.getScreenCTM());
+  return [q.x, q.y];
+}
+const pxPerMm = () => { const m = msvg.getScreenCTM(); return m ? Math.hypot(m.a, m.b) : 1; };
+/* The view's frame: the model's projected box with a margin, fitted into the
+   free area left of the control panel. Recomputed when not editing; frozen
+   while a pair is edited, so the point under the pointer stays put. */
+function fitBox(m, keep) {
+  const P = m.positions; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < P.length; i += 3) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
+  const pad = 0.12 * Math.max(x1 - x0, y1 - y0, 10);
+  const b = { x0: x0 - pad, y0: y0 - pad, x1: x1 + pad, y1: y1 + pad };
+  // while a pair is edited the frame is FROZEN: a frame that grew with the
+  // wing would rescale the picture under the pointer mid-drag, and the drag
+  // would run away from the hand (measured: a 16 px drag moved the apex 7.7 mm)
+  if (keep && vbox) return vbox;
+  return b;
+}
+function layoutStage() {
+  // the free area: right of nothing, left of the control panel (and on a
+  // narrow screen, the whole width above it)
+  const W = window.innerWidth, H = window.innerHeight, wide = W > 760;
+  const area = wide ? { l: 12, t: H > 700 ? 120 : 12, r: W - 328, b: H - (W > 1100 ? 196 : 12) } : { l: 0, t: 0, r: W, b: H * 0.54 };
+  msvg.style.left = area.l + 'px'; msvg.style.top = area.t + 'px';
+  msvg.style.width = (area.r - area.l) + 'px'; msvg.style.height = (area.b - area.t) + 'px';
+}
+function drawMain() {
+  if (!svgMode()) { stage.hidden = true; edBar.hidden = true; document.body.classList.remove('is-svg'); return; }
+  stage.hidden = false; edBar.hidden = false; document.body.classList.add('is-svg');
+  layoutStage();
+  const m = viewModel || model;
+  vbox = fitBox(m, editing);
+  const W = vbox.x1 - vbox.x0, H = vbox.y1 - vbox.y0;
+  msvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  msvg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const out = exportSvg(m, { cutSafe: cutSafeEl.checked && cutReady });
+  const fr = out.frame;
+  let inner = withThinPreview(out).replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+  const ox = fr.x0 - fr.margin - vbox.x0, oy = vbox.y1 - (fr.y1 + fr.margin);
+  let h = '';
+  if (backdrop.href) {
+    const bw = backdrop.w * backdrop.scale, bh = bw * backdrop.aspect;
+    const cx = backdrop.cx + backdrop.dx * backdrop.w, cy = backdrop.cy + backdrop.dy * backdrop.w;
+    const [X, Y] = toV(cx - bw / 2, cy + bh / 2);
+    h += `<image class="backdrop" href="${backdrop.href}" x="${X}" y="${Y}" width="${bw}" height="${bh}" opacity="${backdrop.opacity}" preserveAspectRatio="none"/>`;
+  }
+  h += `<svg class="bug${backdrop.href ? ' is-traced' : ''}" x="${ox}" y="${oy}" width="${out.widthMm}" height="${out.heightMm}" viewBox="0 0 ${out.widthMm} ${out.heightMm}" overflow="visible">${inner}</svg>`;
+  // click targets: every wing's projected contour (right and left), front pair on top
+  for (const part of [...m.parts].filter((q) => /^wing\d$|^tail$/.test(q.kind)).sort((a, b) => wingRank(b) - wingRank(a))) {
+    const loops = contourLoopsOf(m, part);
+    const d = loops.map((L) => 'M' + L.map(([x, y]) => toV(x, y).map((v) => v.toFixed(3)).join(' ')).join('L') + 'Z').join('');
+    h += `<path class="wing-hit" data-pair="${part.kind === 'tail' ? params.wingPairs - 1 : +part.kind.slice(4) - 1}" d="${d}"/>`;
+  }
+  if (editing && params.wingPairs) h += editorMarkup();
+  msvg.innerHTML = h;
+  drawEdBar();
+}
+const wingRank = (q) => (q.kind === 'tail' ? params.wingPairs - 0.5 : +q.kind.slice(4));   // pair 1 is drawn last (on top) in the SVG
+function contourLoopsOf(m, part) { return contourLoops(m, part); }
+function editorMarkup() {
   const own = editableSpec(editPair);
+  const F = editorFrame(params, editPair);
+  if (!F) return '';
   const shown = shownOutline();
   const dense = own ? sampleOutline(shown.points) : resolvedPair(editPair).dense;
-  const path = 'M' + dense.map(([u, w]) => `${toX(u).toFixed(1)} ${toY(w).toFixed(1)}`).join('L');
-  const chord = `M${toX(dense[dense.length - 1][0]).toFixed(1)} ${toY(dense[dense.length - 1][1]).toFixed(1)}L${toX(dense[0][0]).toFixed(1)} ${toY(dense[0][1]).toFixed(1)}`;
-  const bw = EW * backdrop.scale, bh = EH * backdrop.scale;
-  const bx = (EW - bw) / 2 + backdrop.dx * EW, by = (EH - bh) / 2 + backdrop.dy * EH;
-  let h = '';
-  if (backdrop.href) h += `<image href="${backdrop.href}" x="${bx}" y="${by}" width="${bw}" height="${bh}" opacity="${backdrop.opacity}" preserveAspectRatio="none"/>`;
-  h += `<line class="ax" x1="${toX(0)}" y1="0" x2="${toX(0)}" y2="${EH}"/><line class="ax" x1="0" y1="${toY(0)}" x2="${EW}" y2="${toY(0)}"/>`;
-  h += `<text class="axl" x="${toX(0) + 4}" y="12">body side · head ↑</text><text class="axl" x="${EW - 4}" y="${toY(0) - 4}" text-anchor="end">span →</text>`;
-  h += `<path class="curve${own ? '' : ' is-linked'}" d="${path}"/><path class="chord" d="${chord}"/>`;
-  // RED: where the BUILT planform (scallops and tail included) is narrower than
-  // the floor — read off the model's own analysis, so it is what the STL gate sees
-  const wp = model && model.wingPairs[editPair];
-  if (wp && wp.thinFlags) {
-    const D = wp.dense;
-    let seg = '';
-    for (let k = 0; k < D.length; k++) {
-      const k1 = (k + 1) % D.length;
-      if (wp.thinFlags[k] && wp.thinFlags[k1]) seg += `M${toX(D[k][0]).toFixed(1)} ${toY(D[k][1]).toFixed(1)}L${toX(D[k1][0]).toFixed(1)} ${toY(D[k1][1]).toFixed(1)}`;
-      else if (wp.thinFlags[k]) seg += `M${(toX(D[k][0]) - 0.1).toFixed(1)} ${toY(D[k][1]).toFixed(1)}L${(toX(D[k][0]) + 0.1).toFixed(1)} ${toY(D[k][1]).toFixed(1)}`;
-    }
-    if (seg) h += `<path class="thin" d="${seg}"/>`;
-  }
-  // Phase 2: the edited pair's VEINS (and in HOLES its holes) drawn in the
-  // planform frame — the model's own record scaled back to (u, w) units
-  if (wp && wp.venation) {
-    const V = wp.venation, L = (own || resolvedPair(editPair)).length, Sx = (own || resolvedPair(editPair)).stretch;
-    const toUW = ([x, y]) => [toX(x / L).toFixed(1), toY(y / (L * Sx)).toFixed(1)];
-    let d = '';
-    for (const v of V.veins) if (!v.dropped) d += 'M' + v.points.map((q) => toUW(q).join(' ')).join('L');
-    const thinV = wp.veinFloor && wp.veinFloor.under;
-    h += `<path class="veins${thinV ? ' is-thin' : ''}" d="${d}"/>`;
-    let hd = '';
-    for (const c of V.cells) for (const hole of c.holes || []) hd += 'M' + hole.map((q) => toUW(q).join(' ')).join('L') + 'Z';
-    if (hd) h += `<path class="holes" d="${hd}"/>`;
-    for (const c of V.cells) if (c.role === 'stigma') h += `<path class="stigma" d="${'M' + c.points.map((q) => toUW(q).join(' ')).join('L') + 'Z'}"/>`;
-  }
+  const r = pxPerMm(), rad = 5.5 / r, sq = 5 / r;
+  const path = (mirror) => 'M' + dense.map(([u, w]) => { const [x, y] = F.toWorld(u, w); return toV(mirror ? -x : x, y).map((v) => v.toFixed(3)).join(' '); }).join('L');
+  const [ax, ay] = F.toWorld(...dense[dense.length - 1]), [bx, by] = F.toWorld(...dense[0]);
+  const chord = `M${toV(ax, ay).join(' ')}L${toV(bx, by).join(' ')}`;
+  let h = `<path class="ed-sel" d="${path(false)}Z"/>`;
+  h += `<path class="ed-curve mirror" d="${path(true)}"/><path class="ed-curve${own ? '' : ' is-linked'}" d="${path(false)}"/><path class="ed-chord" d="${chord}"/>`;
+  if (own) h += `<path class="ed-curve hit" id="edHit" d="${path(false)}"/>`;
   if (own) shown.points.forEach(([u, w], i) => {
-    const isRoot = i === 0 || i === shown.points.length - 1;
-    const tail = shown.tags[i][0] === 'tail';
+    const [X, Y] = toV(...F.toWorld(u, w));
+    const isRoot = i === 0 || i === shown.points.length - 1, tail = shown.tags[i][0] === 'tail';
     h += isRoot
-      ? `<rect class="pt root${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" x="${toX(u) - 5}" y="${toY(w) - 5}" width="10" height="10"/>`
-      : `<circle class="pt${tail ? ' tail' : ''}${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" cx="${toX(u)}" cy="${toY(w)}" r="5.5"/>`;
+      ? `<rect class="pt root${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" x="${X - sq}" y="${Y - sq}" width="${2 * sq}" height="${2 * sq}"/>`
+      : `<circle class="pt${tail ? ' tail' : ''}${i === selectedPoint ? ' is-sel' : ''}" data-i="${i}" cx="${X}" cy="${Y}" r="${rad}"/>`;
   });
-  ed.innerHTML = h;
-  const n = own ? shown.points.length : 0;
-  const nt = own ? shown.tags.filter((t) => t[0] === 'tail').length : 0;
-  const thinNote = wp && wp.thin && wp.thin.thin ? ' · RED: narrower than the floor' : '';
-  document.getElementById('edTitle').textContent = `Pair ${editPair + 1} outline — right wing${own ? ` · ${n} points${nt ? ` (${nt} tail)` : ''}` : ' · linked (interpolated)'}${thinNote}`;
+  return h;
+}
+function drawEdBar() {
+  const N = params.wingPairs;
+  const title = document.getElementById('edTitle'), unl = document.getElementById('unlinkPair');
+  const own = editing && N ? editableSpec(editPair) : null;
+  const linked = editing && N && !own;
+  unl.hidden = !linked;
+  for (const id of ['delPoint', 'edDone']) document.getElementById(id).hidden = !editing;
+  document.getElementById('edTailWrap').hidden = !(editing && own && isBottom());
+  document.getElementById('edTail').checked = !!(params.wings.tail && params.wings.tail.on);
+  document.getElementById('edHelp').hidden = !own;
+  document.getElementById('delPoint').disabled = !(own && selectedPoint > 0 && selectedPoint < shownOutline().points.length - 1);
+  if (!N) title.textContent = 'No wings to edit';
+  else if (!editing) title.textContent = 'Click a wing to edit its outline';
+  else {
+    const shown = own ? shownOutline() : null, nt = shown ? shown.tags.filter((t) => t[0] === 'tail').length : 0;
+    const r = resolvedPair(editPair), flat = editedIsTilted() ? ` · shown FLAT while edited (its dihedral ${(+r.dihedral).toFixed(0)}° / pitch ${(+r.pitch).toFixed(0)}° stay in the model and the exports)` : '';
+    const wp = viewModel && viewModel.wingPairs[editPair], thin = wp && wp.thin && wp.thin.thin ? ' · RED: narrower than the floor' : '';
+    title.textContent = linked
+      ? `Pair ${editPair + 1} is LINKED — blended from pairs 1 and ${N}. Unlink it to draw it by hand.`
+      : `Editing pair ${editPair + 1} — right wing · ${shown.points.length} points${nt ? ` (${nt} tail)` : ''}${flat}${thin}`;
+  }
   document.getElementById('edStatus').textContent = edStatus;
-  document.getElementById('delPoint').disabled = !(own && selectedPoint > 0 && selectedPoint < n - 1);
+}
+function startEditing(k) {
+  editPair = k; selectedPoint = -1; edStatus = ''; editing = true;
+  drawPairUi(); buildNow(false);
+}
+function stopEditing() {
+  if (!editing) return;
+  editing = false; selectedPoint = -1; edStatus = '';
+  buildNow(false);      // the pose comes back: the view shows the real model again
 }
 /* One edit path for every pair: the bottom pair's edits go through the
    composed (tail-aware) operations, the rest through the plain ones. */
@@ -457,51 +543,81 @@ function applyEdit(op, ...args) {
   if (r.ok) own.points = r.points;
   return r;
 }
-function committed() { drawEditor(); scheduleBuild(); }
+const outlinePointAt = (ev) => editorFrame(params, editPair).fromWorld(...screenToWorld(ev));
+function committed() { drawMain(); scheduleBuild(); }
 let drag = null;
-ed.addEventListener('pointerdown', (ev) => {
-  const own = editableSpec(editPair);
-  if (!own) { edStatus = 'This pair is linked — Unlink it in the panel to draw it.'; drawEditor(); return; }
+msvg.addEventListener('pointerdown', (ev) => {
   const i = ev.target.dataset?.i;
-  if (i === undefined) { selectedPoint = -1; drawEditor(); return; }
-  selectedPoint = +i; drag = { i: +i, id: ev.pointerId };
-  ed.setPointerCapture(ev.pointerId);
-  edStatus = ''; drawEditor();
+  if (editing && i !== undefined && editableSpec(editPair)) {
+    selectedPoint = +i; drag = { i: +i, id: ev.pointerId };
+    msvg.setPointerCapture(ev.pointerId);
+    edStatus = ''; drawMain(); return;
+  }
+  if (editing && ev.target.id === 'edHit') return;          // a double-click on the curve adds a point
+  const pair = ev.target.dataset?.pair;
+  if (pair !== undefined) { if (!editing || +pair !== editPair) startEditing(+pair); return; }
+  if (editing) stopEditing();                                // a click on bare paper ends the edit
 });
-ed.addEventListener('pointermove', (ev) => {
+msvg.addEventListener('pointermove', (ev) => {
   if (!drag || ev.pointerId !== drag.id) return;
-  const r = applyEdit('move', drag.i, evPoint(ev));
+  const r = applyEdit('move', drag.i, outlinePointAt(ev));
   if (r.ok) { edStatus = ''; committed(); }
-  else { edStatus = `Blocked: ${r.reason}.`; stats.blocked++; drawEditor(); }
+  else { edStatus = `Blocked: ${r.reason}.`; stats.blocked++; drawEdBar(); }
 });
 const endDrag = (ev) => { if (drag && ev.pointerId === drag.id) drag = null; };
-ed.addEventListener('pointerup', endDrag); ed.addEventListener('pointercancel', endDrag);
-ed.addEventListener('dblclick', (ev) => {
+msvg.addEventListener('pointerup', endDrag); msvg.addEventListener('pointercancel', endDrag);
+msvg.addEventListener('dblclick', (ev) => {
+  if (!editing) return;
   const own = editableSpec(editPair); if (!own) return;
-  const r = applyEdit('insert', evPoint(ev));
+  const r = applyEdit('insert', outlinePointAt(ev));
   if (r.ok) { selectedPoint = r.index; edStatus = ''; committed(); }
-  else { edStatus = `Blocked: ${r.reason}.`; drawEditor(); }
+  else { edStatus = `Blocked: ${r.reason}.`; drawEdBar(); }
 });
 function deleteSelected() {
-  const own = editableSpec(editPair); if (!own || selectedPoint < 0) return;
+  const own = editableSpec(editPair); if (!editing || !own || selectedPoint < 0) return;
   const r = applyEdit('del', selectedPoint);
   if (r.ok) { selectedPoint = -1; edStatus = ''; committed(); }
-  else { edStatus = `Blocked: ${r.reason}.`; drawEditor(); }
+  else { edStatus = `Blocked: ${r.reason}.`; drawEdBar(); }
 }
-ed.addEventListener('contextmenu', (ev) => { const i = ev.target.dataset?.i; if (i === undefined) return; ev.preventDefault(); selectedPoint = +i; deleteSelected(); });
+msvg.addEventListener('contextmenu', (ev) => { const i = ev.target.dataset?.i; if (i === undefined || !editing) return; ev.preventDefault(); selectedPoint = +i; deleteSelected(); });
 document.getElementById('delPoint').addEventListener('click', deleteSelected);
-window.addEventListener('keydown', (ev) => { if ((ev.key === 'Delete' || ev.key === 'Backspace') && selectedPoint > 0 && document.activeElement?.tagName !== 'INPUT') deleteSelected(); });
+document.getElementById('edDone').addEventListener('click', stopEditing);
+document.getElementById('unlinkPair').addEventListener('click', () => { unlinkPair(editPair); startEditing(editPair); });
+document.getElementById('edTail').addEventListener('input', (e) => { params.wings.tail.on = e.target.checked; selectedPoint = -1; edStatus = ''; drawPairUi(); scheduleBuild(); });
+window.addEventListener('keydown', (ev) => {
+  if (document.activeElement?.tagName === 'INPUT') return;
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && selectedPoint > 0) deleteSelected();
+  if (ev.key === 'Escape') stopEditing();
+});
+document.getElementById('viewToggle').addEventListener('click', (e) => {
+  const v = e.target.dataset?.main; if (!v) return;
+  mainMode = v;
+  document.querySelectorAll('#viewToggle button').forEach((b) => b.classList.toggle('is-on', b.dataset.main === v));
+  if (v !== 'svg') stopEditing();
+  vbox = null; buildNow(false);
+});
 
+/* The REFERENCE BACKDROP: an image behind the whole bug in the SVG view, to
+   trace over. It is placed in WORLD millimetres (centred on the bug, as wide as
+   the bug when loaded), so it stays put while the outline is edited; scale and
+   offset are relative to that size. It is a tracing aid: never saved, never
+   exported. */
 for (const [id, k] of [['bdOpacity', 'opacity'], ['bdScale', 'scale'], ['bdX', 'dx'], ['bdY', 'dy']]) {
-  document.getElementById(id).addEventListener('input', (e) => { backdrop[k] = +e.target.value; drawEditor(); });
+  document.getElementById(id).addEventListener('input', (e) => { backdrop[k] = +e.target.value; drawMain(); });
+}
+function placeBackdrop(href, aspect) {
+  const P = model.positions; let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < P.length; i += 3) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
+  Object.assign(backdrop, { href, aspect, w: x1 - x0, cx: 0, cy: (y0 + y1) / 2 });
+  drawMain();
 }
 document.getElementById('bdFile').addEventListener('change', (e) => {
   const f = e.target.files[0]; if (!f) return;
   const rd = new FileReader();
-  rd.onload = () => { backdrop.href = rd.result; drawEditor(); };
+  rd.onload = () => { const img = new Image(); img.onload = () => placeBackdrop(rd.result, img.naturalHeight / img.naturalWidth || 1); img.src = rd.result; };
   rd.readAsDataURL(f);
 });
-document.getElementById('bdClear').addEventListener('click', () => { backdrop.href = null; drawEditor(); });
+document.getElementById('bdClear').addEventListener('click', () => { backdrop.href = null; drawMain(); });
 
 /* ---------------- build ---------------- */
 let pending = 0, idleTimer = 0;
@@ -510,42 +626,55 @@ function scheduleBuild() {
   if (pending) return;
   pending = requestAnimationFrame(() => { pending = 0; buildNow(false); });
 }
+/* ONE model for the 3D view, the readout and both exports. While a TILTED pair
+   is edited on the SVG view, the view shows its flat display twin (built with
+   buildBug's flatPair) and the real model is rebuilt when the hand rests — and
+   always before an export (realModel()). */
+let modelStale = false;
+function realModel() { if (modelStale) { model = buildBug(params); modelStale = false; rebuildMesh(); } return model; }
 function buildNow(reframe) {
   const t = performance.now();
-  model = buildBug(params);
+  const flat = editing && svgMode() && editedIsTilted();
+  if (flat) { viewModel = buildBug(params, { flatPair: editPair }); modelStale = true; if (!model) model = viewModel; }
+  else { model = buildBug(params); viewModel = model; modelStale = false; }
   stats.buildMs = performance.now() - t;
   // a refusal message describes the model it was shown for; once that model is
   // gone, so is the message (the readout's STL BLOCKED line stays live)
-  if (!model.floorViolations.length) document.getElementById('exportMsg').textContent = '';
-  stats.mirror = null;
-  rebuildMesh();
-  if (reframe) setView(viewName); else render();
-  drawSvg(false);
+  if (!flat && !model.floorViolations.length) document.getElementById('exportMsg').textContent = '';
+  stats.mirror = null; cutReady = false;
+  if (!flat) rebuildMesh();
+  if (reframe) setView(viewName); else { render(); drawMain(); }
+  writeSvgNote();
   writeReadout();
-  drawEditor();   // also mid-drag: the red floor highlight follows each rebuilt model
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => { stats.mirror = mirrorDiff(model); if (cutSafeEl.checked) drawSvg(true); writeReadout(); }, 350);
+  idleTimer = setTimeout(() => {
+    if (modelStale) { realModel(); render(); }
+    stats.mirror = mirrorDiff(model);
+    if (cutSafeEl.checked) { cutReady = true; drawMain(); }
+    writeSvgNote(); writeReadout();
+  }, 350);
 }
 
 const cutSafeEl = document.getElementById('cutSafe');
-cutSafeEl.addEventListener('change', () => { drawSvg(cutSafeEl.checked); writeReadout(); });
-function drawSvg(withCut) {
-  const cut = withCut && cutSafeEl.checked;
-  const out = exportSvg(model, { cutSafe: cut });
-  // The PREVIEW (never the downloaded file) also carries the floor's red runs,
-  // projected with the export's own frame, so a thin pair shows red here too.
-  const seg = model.wingPairs.flatMap((w) => w.thinSegments || []);
+let cutReady = false;     // the cut-safe union is a raster pass: computed when the hand rests
+cutSafeEl.addEventListener('change', () => { cutReady = cutSafeEl.checked; drawMain(); writeSvgNote(); writeReadout(); });
+/* The VIEW (never the downloaded file) also carries the floor's red runs,
+   projected with the export's own frame, so a thin pair shows red there too. */
+function withThinPreview(out) {
+  const m = viewModel || model;
+  const seg = m.wingPairs.flatMap((w) => w.thinSegments || []);
   let svg = out.svg;
   if (seg.length && out.frame) {
     const { x0, y1, margin } = out.frame, X = (x) => (x - x0 + margin).toFixed(3), Y = (y) => (y1 - y + margin).toFixed(3);
     let d = ''; for (let i = 0; i + 1 < seg.length; i += 2) d += `M${X(seg[i][0])} ${Y(seg[i][1])}L${X(seg[i + 1][0])} ${Y(seg[i + 1][1])}`;
     svg = svg.replace('</svg>', `<path class="thin-preview" d="${d}" fill="none" stroke="#e5484d" stroke-width="0.9" stroke-linecap="round"/></svg>`);
   }
-  document.getElementById('svgCard').innerHTML = svg;
-  if (cut) stats.cutRegions = out.regions;
-  document.getElementById('svgNote').textContent = cutSafeEl.checked
-    ? (cut ? `Cut-safe: the union of every part — ${out.regions} connected region${out.regions === 1 ? '' : 's'}.` : 'Cut-safe: computing the union…')
-    : `${out.widthMm.toFixed(1)} × ${out.heightMm.toFixed(1)} mm. Tilt changes the solid; the SVG projects it from straight above.`;
+  return svg;
+}
+function writeSvgNote() {
+  const out = exportSvg(model, { cutSafe: false });
+  const cutNote = cutSafeEl.checked ? (cutReady ? (() => { const r = exportSvg(model, { cutSafe: true }).regions; stats.cutRegions = r; return ` Cut-safe: the union of every part — ${r} connected region${r === 1 ? '' : 's'}.`; })() : ' Cut-safe: computing the union…') : '';
+  document.getElementById('svgNote').textContent = `SVG ${out.widthMm.toFixed(1)} × ${out.heightMm.toFixed(1)} mm — Top → SVG shows exactly the file Get SVG writes.${cutNote}`;
 }
 
 function writeReadout() {
@@ -595,7 +724,7 @@ function download(name, data, type) {
 }
 const stem = () => `bug-${(designName || 'custom').replace(/[^\w-]+/g, '-')}`;
 function tryExportStl() {
-  try { return { ok: true, bytes: exportStl(model) }; }
+  try { return { ok: true, bytes: exportStl(realModel()) }; }
   catch (e) { if (e instanceof FloorError) return { ok: false, reason: e.message }; throw e; }
 }
 document.getElementById('exportStl').addEventListener('click', () => {
@@ -604,7 +733,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
   if (r.ok) { msg.textContent = ''; download(`${stem()}.stl`, r.bytes, 'model/stl'); }
   else msg.textContent = r.reason;
 });
-document.getElementById('exportSvg').addEventListener('click', () => download(`${stem()}${cutSafeEl.checked ? '-cutsafe' : ''}.svg`, exportSvg(model, { cutSafe: cutSafeEl.checked }).svg, 'image/svg+xml'));
+document.getElementById('exportSvg').addEventListener('click', () => download(`${stem()}${cutSafeEl.checked ? '-cutsafe' : ''}.svg`, exportSvg(realModel(), { cutSafe: cutSafeEl.checked }).svg, 'image/svg+xml'));
 document.getElementById('viewButtons').addEventListener('click', (e) => { const v = e.target.dataset?.view; if (v) setView(v); });
 
 /* ---------------- test chrome (read by tools/shot-bug-sheet.mjs) ---------------- */
@@ -622,23 +751,42 @@ window.__bug = {
   svg: (cutSafe = false) => exportSvg(model, { cutSafe }),
   stl: () => Array.from(exportStl(model, { allowBelowFloor: true })),   // the sheet compares bytes; the page's own button refuses
   tryStl: () => { const r = tryExportStl(); return r.ok ? { ok: true, bytes: r.bytes.length } : r; },
-  thinView: () => ({ svgRed: document.querySelectorAll('#svgCard .thin-preview').length, tinted: root.children.filter((c) => c.material === MAT.thinWing).length, redSegments: root.children.filter((c) => c.isLineSegments).reduce((n, c) => n + c.geometry.attributes.position.count / 2, 0) }),
+  thinView: () => ({ svgRed: document.querySelectorAll('#mainSvg .thin-preview').length, tinted: root.children.filter((c) => c.material === MAT.thinWing || c.material === MAT.thinWingSmooth).length, redSegments: root.children.filter((c) => c.isLineSegments).reduce((n, c) => n + c.geometry.attributes.position.count / 2, 0) }),
   floor: () => ({ violations: model.floorViolations.map((v) => ({ ...v })), pairs: model.wingPairs.map((w) => ({ hasTail: w.hasTail, thin: w.thin })) }),
   venation: () => model.wingPairs.map((w) => (w.venation ? { stats: w.venation.stats, veinFloor: w.veinFloor } : null)),
   tailPoints: () => { const s = window.__bug.getParams(); return s.wings.tail; },
   triangleCount: () => model.triangleCount,
   notes: () => model.notes.slice(),
-  editPair: (k) => { editPair = k; selectedPoint = -1; drawPairUi(); drawEditor(); },
-  // the screen position of control point i of the edited pair (for REAL drags)
-  // index i is into the outline AS DRAWN in the editor (the tail's points
-  // included on the bottom pair) — the same index a pointer drag picks up
-  pointScreen: (i) => { const r = ed.getBoundingClientRect(); const p = shownOutline().points[i]; return [r.left + (toX(p[0]) / EW) * r.width, r.top + (toY(p[1]) / EH) * r.height]; },
+  editPair: (k) => { editPair = k; selectedPoint = -1; drawPairUi(); drawMain(); },
+  // the on-wing editor (Top view, SVG mode)
+  setMain: (v) => document.querySelector(`#viewToggle button[data-main="${v}"]`).click(),
+  mainMode: () => mainMode,
+  editing: () => (editing ? editPair : -1),
+  startEditing: (k) => startEditing(k),
+  stopEditing: () => stopEditing(),
+  // the screen position of control point i of the edited pair (for REAL
+  // drags), on the wing in the SVG view; index i is into the outline AS DRAWN
+  // (the tail's points included on the bottom pair)
+  pointScreen: (i) => { const p = shownOutline().points[i]; return worldToScreen(...editorFrame(params, editPair).toWorld(p[0], p[1])); },
+  uvScreen: (u, w) => worldToScreen(...editorFrame(params, editPair).toWorld(u, w)),
+  worldScreen: (x, y) => worldToScreen(x, y),
+  screenWorld: (cx, cy) => screenToWorld({ clientX: cx, clientY: cy }),
   shownTags: () => shownOutline().tags.map((t) => t.slice()),
   shownPoints: () => shownOutline().points.map((p) => p.slice()),
-  uvScreen: (u, w) => { const r = ed.getBoundingClientRect(); return [r.left + (toX(u) / EW) * r.width, r.top + (toY(w) / EH) * r.height]; },
+  // the EMITTED bead apex of control point i of the edited pair, in the view
+  // model (the flat display while editing): where the wing actually is
+  apexWorld: (i) => {
+    const m = viewModel || model, part = m.parts.find((q) => q.kind === `wing${editPair + 1}` && q.side === 'R');
+    const n = part.meta.planform.length, idx = n - 1 - (i * CR_SAMPLES + 1), r = part.meta.bead ? part.meta.bead.rings.find((x) => x.i === idx) : null;
+    const v = r ? r.ids[part.meta.bead.K / 2] : part.v0 + idx; return [m.positions[3 * v], m.positions[3 * v + 1]];
+  },
+  wingScreen: (k, side = 'R') => { const m = viewModel || model, part = m.parts.find((q) => q.kind === `wing${k + 1}` && q.side === side); const L = contourLoops(m, part).reduce((a, l) => (l.length > a.length ? l : a)); let cx = 0, cy = 0; for (const [x, y] of L) { cx += x; cy += y; } return worldToScreen(cx / L.length, cy / L.length); },
+  viewIsFlat: () => !!(viewModel && viewModel !== model),
   editorStatus: () => edStatus,
+  editorTitle: () => document.getElementById('edTitle').textContent,
   blockedCount: () => stats.blocked,
-  setBackdrop: (o) => { Object.assign(backdrop, o); drawEditor(); },
+  setBackdrop: (o) => { Object.assign(backdrop, o); drawMain(); },
+  backdrop: () => ({ ...backdrop, href: !!backdrop.href }),
   flushBuild: () => { if (pending) { cancelAnimationFrame(pending); pending = 0; } buildNow(false); },
   render,
 };
