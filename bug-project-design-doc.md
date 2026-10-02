@@ -228,6 +228,7 @@ strength claim in this repo is still theory.
 | **1 rev.** | presets removed → neutral default + Randomize + save/load; wings 0–4 pairs with drawn, linked outlines; curve editor with reference backdrop; tucked legs | **built (this PR, §5)** — waits on Eva's ruling on the revised sheet |
 | 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | built (§8, #341 merged) |
 | elegance | the default becomes a pinned specimen; edge profile, teardrop club, groove/bulge segments, pointed tips, SET SPECIMEN | **built (§9)** — waits on Eva's ruling on `docs/img/bug-elegance-sheet.png` |
+| edges | rounded edges (full bullnose on every wing edge, the default); Top view on load; Render / SVG toggle; the outline editor on the wing itself; the reference backdrop behind the whole bug | **built (§10)** — waits on Eva's ruling on `docs/img/bug-edges-sheet.png` |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
 | 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
@@ -1310,3 +1311,184 @@ specimen default, ridge height falling toward the margin, or main veins only.
    forewing sweep range is now −90…90° by ruling, so it never clamps.)
 7. The tuck refinement (§9.6) changes partially splayed legs, not only tucked ones.
 8. Pre-v4 designs load at the old ends (§9.6).
+
+
+## 10. The edges + editor pass — no 90° cliff on a wing, and the editor on the wing
+
+Eva's brief (Oct 2): every wing edge a full bullnose, the round radius a slider
+whose default and maximum is half the local thickness, never thinner than the floor;
+the page opening in the Top view; a Render / SVG toggle in the Top view; the outline
+editor drawn ON the wing being edited in the SVG view, with the edited wing shown
+flat; the reference backdrop behind the whole bug. Files: `bug-geometry.js` (the
+bead, `insetLoops` / `insetMesh`, `editorFrame`, `buildBug`'s `flatPair`),
+`bug.js` / `bug.html` (the view, the toggle, the on-wing editor, the toolbar),
+`tools/verify-bug.mjs` (the E family, Q, the rows and the mutations),
+`tools/shot-bug-edges.mjs` (the sheet, `docs/img/bug-edges-sheet.png`).
+
+### 10.1 The rounded edge — one construction for every free edge
+
+- **`wingEdgeRound`** (Wings, 0–1, default **1**) — the bead's in-plane radius as a
+  fraction of HALF THE LOCAL THICKNESS: 1 is the full half-round (radius = half the
+  thickness), 0 is the old square wall, **by branch** (the bead is never built, the
+  shipped slab verbatim — the 55-row legacy identity of §9.6 still reads through it,
+  and `legacyDefaultParams()` carries `wingEdgeRound: 0`). A fraction and not
+  millimetres because the thing Eva named is "half the local thickness", and that
+  is a different number at the root (1.8 mm sheet) and at the tip (the 1.0 mm
+  floor): a mm slider would be the full bead at one end and a flattened one at the
+  other.
+- **The silhouette does not move.** The two skins stop short of the drawn outline
+  by the radius `a` and a bead closes them, its apex — its mid-plane point — exactly
+  ON the drawn outline (or the planned hole). So the SVG projection of a flat wing is
+  the drawn outline to the double (gate E7), the editor's curve is still the wing's
+  edge, and the drawn-width floor (§6.3) reads the same polygon it always did.
+- **The profile is a half ellipse**, semi-axes `a` in the plane and the local
+  half-thickness `H` across it — a half-round at round 1, flattened as round falls,
+  tangent to both skins (no step) and vertical only at its apex; `EDGE_ROUND_SEGMENTS`
+  6 facets (30° each, even so the apex is a ring vertex). On every boundary point a
+  ring of 7 vertices from the top skin's edge through the apex to the bottom skin's;
+  the root chord (inside the body) carries the same ring along its vertical wall so
+  rings always match point for point, and the bead grows in over the first 1 mm of
+  span (`ROUND_ROOT_RAMP_MM`).
+- **`a` never exceeds half the thickness at the skin's new edge** — a fixed point of
+  `a = round x h(P - a n)`, since that is where the bead's height is taken; a
+  subdivision midpoint on a concave stretch (where the edge law's chord midpoint is a
+  hair thinner) steps its skin edge back until it holds (measured up to 0.12% over
+  before that step).
+- **It never removes material below the floor.** The skins are only inset — their
+  thickness is the edge law's (§9.1), unchanged, and gate B still holds it at every
+  planform point — and the bead's height IS the local thickness (≥ the floor, gate
+  E5). The radius is held to `ROUND_ROOM_FRAC` 0.45 of the material's local width
+  (an inward ray to the nearest other boundary), so the two beads of a narrow strip
+  never meet: a 10% flat always remains.
+- **How it is built**: the boundary LOOPS are inset before triangulation and the
+  moved loops are what is triangulated (`insetLoops`, the plain and RIDGES wings and
+  the pterostigma plate) — a notch tighter than the bead shrinks the radii of that
+  stretch until the inset loop no longer crosses itself. In HOLES the frame's cells
+  are fragile to re-triangulate (a first cut that re-planned the cells moved holes
+  out of their cells: 92 cut-safe regions), so the coarse frame mesh's boundary
+  points move in place instead (`insetMesh`) and any triangle that would flip or
+  collapse below 5% of its area shrinks its corners' radii. Either way the subdivided
+  skins conform and the slab is one closed shell.
+- **RIDGES**: the ridges are rounded too — a half-ellipse top across the vein's
+  half-width, `round x min(half-width, ridge height)` high (at the defaults, 1.2 mm
+  veins 0.6 mm tall: a half-round rod lying on the skin); a ridge that runs out to the
+  drawn outline stops one bead radius + 0.05 mm inside it and ramps down over the last
+  2 x the ridge height into the skin, so no end wall stands over the margin's bead.
+  The pterostigma plate carries its own bead (its apex on its cell, like every bead;
+  where it meets the leading margin it stands over the wing's own bead — pulling it
+  inside the wing's flat skin was tried and, on a narrow stigma cell, ate the whole
+  room and made the SVG contour chain asymmetrically).
+- **The chamfer and the taper stay** (`wingEdgeBevel`, `wingEdgeTaper`); the chamfer's
+  default went **4 mm → 0** (the bullnose is the default edge profile; a chamfer under
+  a bead still works — it brings the edge to the floor and the bead is then a 1 mm
+  rod), the taper stays 0.5 (it is the thickness law along the span, not an edge
+  profile). Square-edged slab: round 0 and chamfer 0.
+- **Designs**: `DESIGN_VERSION` 5. A version-4 file knows no round radius and loads
+  with it at 0 — the square-walled chamfer it was saved with, bit for bit (function
+  check D); older files load at the old ends as before (§9.6).
+
+### 10.2 The bullnose against the 1 mm floor — the veins become near-round rods
+
+Measured on the sheet, sections drawn from the two facing beads' emitted vertices:
+- HOLES default, a vein near the root: **1.26 mm wide × 1.53 mm thick, flat 0.12 mm**
+  — bead radii 0.57 against H 0.77 (the room, 0.45 x the width, binds before the
+  round): an upright near-round rod.
+- Veins at the floor (width 1.0, sheet 1.0): the beads are full half-rounds (radius
+  0.5 = H) wherever the vein is wide enough, and the 10% flat keeps the rod from
+  pinching — the vein reads as a **round rod at the floor's own diameter**.
+- A 3 mm sheet over 1.26 mm veins: the vein is taller than it is wide and the bead an
+  upright ellipse (radius 0.57 under H 1.25) — the room, not the round, decides it.
+- Over the default HOLES bug **123 of 1,520** hole-rim beads past the root are at the
+  full half-round; the rest are room-limited (the veins are narrower than the sheet is
+  thick near the root). On the plain default **756 of 780** outline beads are full;
+  the rest are the forewing's angular apex, whose ear is tighter than the bead.
+
+### 10.3 The page
+
+- **Opens in the Top view.** 3/4, Front and Side stay one click away. The 3D picture is
+  centred in the space left of the control panel (`setViewOffset`).
+- **Render / SVG toggle**, upper right of the viewport, shown in Top only: SVG puts the
+  export's own projection — exactly what Get SVG writes (`exportSvg` of the model,
+  cut-safe when that box is ticked) — on paper in the main viewport. **The small SVG
+  inset is removed** (the main view replaces it); the cut-safe box and the size note
+  stay in the View box.
+- **The outline editor is ON the wing.** In SVG mode a click on a wing selects its pair
+  (pair 1 is on top); points are edited on the RIGHT wing in place, the left is drawn
+  mirrored live (dashed) and rebuilt by the model. Everything the old editor did
+  carries over: drag, double-click the curve to add, right-click / Delete to delete,
+  blocked self-crossing with its reason, the red below-floor runs (now the view's own
+  thin-preview), the TAIL toggle on the bottom pair with amber tail points. A linked
+  middle pair offers **Unlink this pair to edit it** (the panel's own unlink law). A
+  click on bare paper, Escape or Done ends the edit.
+- **The edited pair is displayed FLAT** (`buildBug(params, { flatPair: k })`: dihedral
+  and pitch 0 for the picture only), so a screen drag maps exactly onto the outline
+  through `editorFrame()` — sweep, stretch and length, a rigid motion and two scales.
+  The parameters never change; the real model (tilted) is rebuilt when the hand rests
+  and always before an export (`realModel()`); the toolbar says the pair is shown flat
+  and what its tilt is. When the edit ends the pose comes back. **While a pair is edited
+  the view's frame is FROZEN** — a frame that grew with the wing rescaled the picture
+  under the pointer and a 16 px drag moved the apex 7.7 mm (measured, the first cut).
+- **The reference backdrop** sits in the main viewport behind the whole bug, placed in
+  WORLD millimetres (centred on the bug, as wide as the bug when loaded), so it stays
+  put while the outline is edited; opacity / scale / offset in the floating toolbar;
+  while one is loaded the bug's fills are drawn see-through so the photo reads under
+  them. Never saved, never exported (as before).
+- **The separate editor panel is removed.** Nothing needed it: outlines are drawn in
+  Top → SVG, and every other per-pair value is still in the panel.
+- **The 3D wings are drawn smooth-shaded when the edge is rounded** (a bead is tangent
+  to its skins, so vertex normals are honest); a square-walled slab keeps flat facets.
+
+### 10.4 Verification
+
+- **E** (every row): E1 every bead ring a half ellipse off its own emitted skin and
+  apex vertices (1e-9 mm where the wing is untwisted; a pitched wing is a helicoid, so
+  there the world chord carries the twist and only the "never more than a half-round"
+  bar is checked, at 1%), E2 no square wall left (and at round 0 every rim point has
+  one and no bead is recorded), E3 no rim point past the root left square, E4 every
+  apex on the drawn outline or a planned hole and every planned hole vertex some
+  bead's apex (every hole rim rounded), E5 every bead as tall as the floor, E6 no
+  top-skin triangle flipped (off the emitted vertices on a flat wing), E7 a flat wing's
+  silhouette is the drawn outline in world mm past the root ramp (inside the first
+  2 mm a ring next to a much smaller one can carry the contour along its 60° vertex,
+  ≤ 0.13 a inside the outline — 0.029 mm measured on the blended row).
+- **Q** (function check): three drags — a tilted forewing at stretch 1.3 / sweep −20,
+  a tilted hindwing at stretch 0.8 / sweep 35, an unlinked middle pair at stretch 1.6
+  / sweep 50 — each performed exactly as the page performs it (SVG units → world →
+  `editorFrame.fromWorld` → `moveControlPoint`), and the landing MEASURED on the
+  emitted bead apex of the moved point in the rebuilt flat display: **0 mm** off (to
+  1e-9); the control points are drawn on the emitted wing; the flat display leaves
+  every part but the edited pair bit-identical to the real model. In the browser the
+  sheet's REAL pointer drag on a tilted hindwing lands **0.000 px** from its target.
+- **Two instrument corrections**, both found by the new geometry, neither a loosening:
+  V2's "top face" was triangles with normal z > 0.5, and a rounded rim's sloped bead
+  facets read as extra "pieces" — it is the slab's own layout now (all three vertices
+  top-skin); and Y read the specimen margin off top-skin vertices, which the inset
+  moves off the outline — it reads the bead apexes now (its mutation shears the wing,
+  rings and all).
+- **Negative control**: seven bead mutations (a bead flattened to a square wall → E3,
+  dented → E1, thinned under the floor → E5, the silhouette pushed past the outline →
+  E7, a hole rim left square → E4, square walls under a round asked for → E2, a skin
+  triangle flipped → E6) and three broken editor frames (stretch ignored, sweep the
+  wrong way, the edited wing not displayed flat → Q), beside the existing ones.
+- **Cost, EXPORT**: default **30,512 → 46,992 triangles (+54%), 1,490 → 2,295 KiB**;
+  HOLES 53,120 → 84,400; RIDGES 31,920 → 50,880. The bead is 12 triangles per rim point
+  (6 quads) against the wall's 2. Build ~80 ms at the default in Node (the chamfer's
+  per-vertex distance is gone from the default); ~230 ms in HOLES.
+- The sheet: `node tools/shot-bug-edges.mjs <dir>` → `docs/img/bug-edges-sheet.png`.
+  Every page cell is a real click or a real pointer drag; no pixel claim anywhere.
+
+### 10.5 Decisions made without a ruling (reversible)
+
+1. The round radius is a FRACTION of half the local thickness (0–1), not mm (§10.1).
+2. The chamfer's default went to 0; the taper stays 0.5.
+3. Six facets on the bead; the 0.45 room fraction (the bloom's `RIM_ROOM_FRAC` value);
+   the 1 mm root ramp; ridges ending one bead radius + 0.05 mm inside the outline with
+   a 2 x height ramp; the stigma plate's bead on its own cell edge.
+4. The SVG view draws the bug with see-through fills while a backdrop is loaded; the
+   backdrop lives in the SVG view only (in the 3D render a photo cannot be registered
+   to the perspective camera).
+5. The toggle defaults to Render (the page loads as the 3D top view); the floating
+   toolbar sits bottom centre; the editor's frame is frozen while editing.
+6. Older sheet tools (`shot-bug-sheet`, `-venation`, `-elegance`, `-blended`) drove the
+   removed editor panel through `__bug` hooks that now point at the on-wing editor;
+   their committed sheets stand as records and were not re-shot.

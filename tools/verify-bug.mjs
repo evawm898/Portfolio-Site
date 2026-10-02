@@ -80,6 +80,22 @@
         own rule — or, where the margin needs a sweep outside the slider, the
         sweep at the bound; every wing flat; the antennae straight.
 
+   The EDGES PASS (design doc §10), on every row:
+     E  the ROUNDED EDGE, read off the emitted bead rings: E1 every ring a half
+        ellipse (M + sin t D + cos t V, 1e-9 mm where untwisted), never more
+        than a half-round, its radius square to the sheet; E2 no rim point
+        keeps a square wall (top joined straight to bottom) — and at round 0
+        every one does and no bead is recorded; E3 no rim point past the root
+        left square; E4 every bead's apex ON the drawn outline or a planned
+        hole, and every planned hole vertex some bead's apex; E5 every bead as
+        tall as the floor; E6 no top-skin triangle flipped by the inset; E7 a
+        flat wing's silhouette is the drawn outline in world mm.
+     Q  (function check) the ON-WING EDITOR: a drag to a point of the SVG view
+        lands there — measured on the EMITTED bead apex of the moved control
+        point in the rebuilt flat display — under stretch, sweep, tilt and an
+        unlinked middle pair; the points are drawn on the emitted wing; the
+        flat display moves only the edited pair.
+
    And, as pure-function checks of the editor and the interpolation:
      E  a drag that would make the outline cross itself is BLOCKED (points
         returned unchanged) and the requested outline really does cross (this
@@ -104,8 +120,8 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models twenty-eight ways (plus the L clause at reach 1) and requires each to be
-                       caught by the clause that names it.
+   --negative-control  breaks built models thirty-five ways (plus the L clause at reach 1 and three
+                       broken editor frames for Q) and requires each to be caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
 import * as G from '../bug-geometry.js';
@@ -116,6 +132,8 @@ const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
 const seedsArg = args.indexOf('--seeds');
 const NSEEDS = seedsArg >= 0 ? +args[seedsArg + 1] : 40;
+const onlyArg = args.indexOf('--only');                   // iteration only: rows whose label matches; reported as a SUBSET, never a pass of the gate
+const ONLY = onlyArg >= 0 ? new RegExp(args[onlyArg + 1]) : null;
 
 const segDist = (p, a, b) => { const ab = [b[0] - a[0], b[1] - a[1]], L2 = ab[0] * ab[0] + ab[1] * ab[1] || 1e-18; const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2)); return Math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1]); };
 
@@ -533,8 +551,15 @@ function venationChecks(model, opts) {
       if (part) {
         const I = model.indices, P = model.positions, nT = part.t1 - part.t0;
         const top = [];
-        // the top face: triangles whose unit normal points clearly UP (z > 0.5) — a near-vertical hole wall on a tilted wing flips facing at the edge-on threshold and is not the top face
-        for (let t = part.t0; t < part.t1; t++) { const a = I[3 * t], b = I[3 * t + 1], c = I[3 * t + 2]; const e1 = [P[3 * b] - P[3 * a], P[3 * b + 1] - P[3 * a + 1], P[3 * b + 2] - P[3 * a + 2]], e2 = [P[3 * c] - P[3 * a], P[3 * c + 1] - P[3 * a + 1], P[3 * c + 2] - P[3 * a + 2]]; const nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0]; const L = Math.hypot(nx, ny, nz); if (L > 0 && nz / L > 0.5) top.push(t); }
+        // the top face: triangles all three of whose vertices are TOP-SKIN
+        // vertices by the slab's own layout (v0 + i, i < n). (It was "unit
+        // normal z > 0.5" until the edges pass; a rounded rim has sloped bead
+        // facets, and a single facet of a slightly twisted bead quad read as
+        // its own "piece" of the top face — the instrument's definition, not
+        // the wing. The layout is topological and needs no threshold.)
+        const nS = part.meta.slab.n;
+        for (let t = part.t0; t < part.t1; t++) { const a = I[3 * t] - part.v0, b = I[3 * t + 1] - part.v0, c = I[3 * t + 2] - part.v0; if (a < nS && b < nS && c < nS) top.push(t); }
+        void P;
         const owner = new Map(); const adj = new Map();
         for (const t of top) { const v = [I[3 * t], I[3 * t + 1], I[3 * t + 2]]; for (let e = 0; e < 3; e++) { const a = v[e], b = v[(e + 1) % 3], kk = a < b ? `${a},${b}` : `${b},${a}`; if (owner.has(kk)) { const o = owner.get(kk); (adj.get(o) || adj.set(o, []).get(o)).push(t); (adj.get(t) || adj.set(t, []).get(t)).push(o); } else owner.set(kk, t); } }
         const seen = new Set([top[0]]), q = [top[0]];
@@ -628,13 +653,136 @@ function edgeChecks(model) {
       const t = Math.hypot(P[3 * a] - P[3 * b], P[3 * a + 1] - P[3 * b + 1], P[3 * a + 2] - P[3 * b + 2]);
       const [u, w] = S.uw[i], want = law(u, w);
       minT = Math.min(minT, t); worst = Math.max(worst, Math.abs(t - want));
-      if (bevel > 0 && u >= 0 && dOut(u, w) < 1e-9) { onOutline++; if (Math.abs(t - floor) > 1e-6) bad.push(`B: ${part.name} an outline vertex is ${t.toFixed(4)} mm thick, the chamfer brings the outline to the ${floor} mm floor`); }
+      if (bevel > 0 && !(p.wingEdgeRound > 0) && u >= 0 && dOut(u, w) < 1e-9) { onOutline++; if (Math.abs(t - floor) > 1e-6) bad.push(`B: ${part.name} an outline vertex is ${t.toFixed(4)} mm thick, the chamfer brings the outline to the ${floor} mm floor`); }
     }
     if (worst > 1e-9) bad.push(`B: ${part.name} emitted thickness departs from the edge law by ${worst.toExponential(2)} mm (taper ${taper}, chamfer ${bevel} mm)`);
   }
   if (minT < floor - 1e-9) bad.push(`B: a wing is ${minT.toFixed(4)} mm thick somewhere, under the ${floor} mm floor`);
-  if (p.wingEdgeBevel > 0 && p.wingPairs > 0 && !onOutline) bad.push('B: a chamfer is asked for and no vertex lies on the outline (vacuous)');
+  // (with the rounded edge the skins stop short of the outline by the bead's
+  // radius, so no SKIN vertex is on it: the bead's own clauses, E, take over)
+  if (p.wingEdgeBevel > 0 && !(p.wingEdgeRound > 0) && p.wingPairs > 0 && !onOutline) bad.push('B: a chamfer is asked for and no vertex lies on the outline (vacuous)');
   return { bad, minT: Number.isFinite(minT) ? minT : null, onOutline };
+}
+
+/* E — the ROUNDED EDGE (edges pass, design doc §10). The reference is the
+   PARAMETERS (wingEdgeRound, the floor) and the drawn planform / the planned
+   holes; the measured side is the EMITTED bead: per rim point the builder
+   records its ring of vertex ids (meta.bead.rings: top-skin vertex first,
+   bottom-skin vertex last, the apex in the middle), and every number below is
+   read off those vertices' positions.
+     E1 the bead IS a half ellipse: with M the mid-point of its two skin
+        vertices, V = top - M (the half-thickness, across the sheet) and D =
+        apex - M (the in-plane radius), every ring vertex j sits at
+        M + sin(t_j) D + cos(t_j) V (1e-9 mm) — exact where the wing is
+        untwisted (pitch 0), reported otherwise; |D| <= |V| (never more than a
+        half-round) and D is square to V.
+     E2 NO SQUARE WALL: no emitted edge joins a rim point's top-skin vertex to
+        its own bottom twin (the wall a square edge is made of) — structural.
+        At round 0 the clause turns round: every rim point MUST be so joined
+        and no bead may be recorded (the shipped slab, by branch).
+     E3 every free edge is rounded: every rim point beyond the root ramp
+        (apex u > 1 mm) has |D| > 0 — no point of the outline or of a hole rim
+        left square.
+     E4 the SILHOUETTE DOES NOT MOVE: every bead's apex (the record) lies ON the
+        drawn planform or ON a planned hole polygon (this file's own segment
+        distance, 1e-9 mm); and in HOLES every planned hole vertex is the apex
+        of some bead (every hole rim rounded).
+     E5 the floor: every bead's height 2|V| (the local thickness) is at or
+        over minDiameter — at a full round the bead is a rod of the sheet's
+        own thickness, never thinner than the floor.
+     E6 the inset skin stays an embedding: every top-skin triangle keeps one
+        orientation in the planform frame (none flipped by the inset).
+     E7 on a FLAT wing the contour (the SVG's silhouette, G.contourLoops) runs
+        through every outline apex — the projection is the drawn outline. */
+function edgeRoundChecks(model) {
+  const bad = [], p = model.params, P = model.positions, floor = p.minDiameter, round = p.wingEdgeRound;
+  const V3 = (v) => [P[3 * v], P[3 * v + 1], P[3 * v + 2]];
+  let beads = 0, full = 0, aMin = Infinity, ellRes = 0, ellSkipped = 0, holeApex = 0;
+  for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    const S = part.meta.slab, B = part.meta.bead, n = S.n;
+    const k = +part.kind.slice(4) - 1, spec = pairFieldsFor(p, k);
+    // edges of the part, for E2
+    const E = new Set(), I = model.indices;
+    for (let t = part.t0; t < part.t1; t++) { const v = [I[3 * t], I[3 * t + 1], I[3 * t + 2]]; for (let e = 0; e < 3; e++) { const a = v[e], b = v[(e + 1) % 3]; E.add(a < b ? `${a},${b}` : `${b},${a}`); } }
+    const joined = (a, b) => E.has(a < b ? `${a},${b}` : `${b},${a}`);
+    const rim = (part.meta.edgePairs ? [...part.meta.edgePairs.outline, ...part.meta.edgePairs.other] : []);
+    if (!(round > 0)) {
+      if (B) bad.push(`E2: ${part.name} records a bead at round 0`);
+      const walls = rim.filter(([a, b]) => joined(a, b)).length;
+      if (walls !== rim.length) bad.push(`E2: ${part.name} at round 0 only ${walls} of ${rim.length} rim points have the square wall`);
+      continue;
+    }
+    if (!B) { bad.push(`E2: ${part.name} records no bead at round ${round} (a square-walled rim)`); continue; }
+    const walls = rim.filter(([a, b]) => joined(a, b)).length;
+    if (walls) bad.push(`E2: ${part.name} ${walls} rim point(s) still have a square wall (top joined straight to bottom)`);
+    const outline = part.meta.planform.slice(1, -1).reverse();
+    const holes = (part.meta.venation ? part.meta.venation.cells.flatMap((c) => c.holes) : []);
+    const onCurve = (q) => {
+      let d = Infinity;
+      for (let i = 0; i + 1 < outline.length; i++) d = Math.min(d, segDist(q, outline[i], outline[i + 1]));
+      for (const h of holes) for (let i = 0; i < h.length; i++) d = Math.min(d, segDist(q, h[i], h[(i + 1) % h.length]));
+      return d;
+    };
+    const K = B.K, untwisted = !(spec.pitch) ;
+    let off = 0, flat = 0, under = 0, over = 0;
+    const apexKeys = new Set();
+    for (const r of B.rings) {
+      const top = V3(r.ids[0]), bot = V3(r.ids[K]), M = top.map((x, d) => (x + bot[d]) / 2);
+      const Vv = top.map((x, d) => x - M[d]), Dv = V3(r.ids[K / 2]).map((x, d) => x - M[d]);
+      const Vn = Math.hypot(...Vv), Dn = Math.hypot(...Dv);
+      beads++;
+      if (2 * Vn < floor - 1e-9) under++;
+      if (Dn > Vn * (1 + (untwisted ? 1e-9 : 1e-2)) + 1e-12) over++;   // a PITCHED wing is a helicoid: the world chord between two points of its mid-surface carries the twist between them (measured up to 0.12% on random:1, the planform record exactly 1), so there the bar is 1%
+      if (r.apex[0] > 1 + 1e-9) { aMin = Math.min(aMin, Dn / Vn); if (!(Dn > 0)) flat++; if (Dn >= 0.98 * Vn) full++; }
+      if (untwisted) {
+        for (let j = 0; j <= K; j++) { const t = (Math.PI * j) / K, X = V3(r.ids[j]); ellRes = Math.max(ellRes, Math.hypot(...X.map((x, d) => x - M[d] - Math.sin(t) * Dv[d] - Math.cos(t) * Vv[d]))); }
+        const dot = Vv.reduce((a, x, d) => a + x * Dv[d], 0);
+        if (Vn > 0 && Dn > 1e-6 && Math.abs(dot) / (Vn * Dn) > 1e-6) bad.push(`E1: ${part.name} a bead's radius is not square to the sheet (cos ${(dot / (Vn * Dn)).toExponential(2)})`);
+      } else ellSkipped++;
+      if (r.apex[0] > 1e-9 && onCurve(r.apex) > 1e-9) off++;
+      apexKeys.add(`${r.apex[0]},${r.apex[1]}`);
+    }
+    if (under) bad.push(`E5: ${part.name} ${under} bead(s) lower than the ${floor} mm floor`);
+    if (over) bad.push(`E1: ${part.name} ${over} bead(s) wider in plane than half the thickness (more than a half-round)`);
+    if (flat) bad.push(`E3: ${part.name} ${flat} rim point(s) past the root left square (radius 0)`);
+    if (off) bad.push(`E4: ${part.name} ${off} bead apex(es) off the drawn outline / the planned holes — the silhouette moved`);
+    for (const h of holes) for (const q of h) { if (!apexKeys.has(`${q[0]},${q[1]}`)) { bad.push(`E4: ${part.name} a planned hole vertex (${q[0].toFixed(3)}, ${q[1].toFixed(3)}) is the apex of no bead — that hole rim is not rounded`); break; } holeApex++; }
+    // E6: top-skin triangles keep one orientation — read off the EMITTED top
+    // vertices (x, y) on a flat wing, off the layout's (u, w) on a tilted one
+    const flatWing = !spec.pitch && !spec.dihedral;
+    const xyOf = (i) => (flatWing ? [P[3 * (part.v0 + i)], P[3 * (part.v0 + i) + 1]] : S.uw[i]);
+    let pos = 0, neg = 0;
+    for (let t = part.t0; t < part.t1; t++) {
+      const a = I[3 * t] - part.v0, b = I[3 * t + 1] - part.v0, c = I[3 * t + 2] - part.v0;
+      if (!(a < n && b < n && c < n)) continue;
+      const A = xyOf(a), Bq = xyOf(b), C = xyOf(c), cr = (Bq[0] - A[0]) * (C[1] - A[1]) - (Bq[1] - A[1]) * (C[0] - A[0]);
+      if (cr > 0) pos++; else neg++;
+    }
+    if (pos && neg) bad.push(`E6: ${part.name} ${Math.min(pos, neg)} top-skin triangle(s) flipped`);
+    // E7: a flat wing's SILHOUETTE is the drawn outline, in world mm — every
+    // point of its outer contour loop past the root lies on the drawn outline
+    // carried into the world by the flat wing transform (editorFrame, which Q
+    // measures independently against the emitted geometry)
+    if (flatWing) {
+      const F = G.editorFrame(p, k), Lmm = F.length, Smm = F.length * F.stretch;
+      const wo = outline.map(([u, w]) => F.toWorld(u / Lmm, w / Smm));
+      const loops = G.contourLoops(model, part), big = loops.reduce((a, l) => (l.length > a.length ? l : a), []);
+      let worst = 0, seen = 0;
+      for (const [x, y] of big) {
+        // past the root ramp (the bead grows from 0 over the first mm of span,
+        // and a ring next to a much smaller one can carry the contour along its
+        // 60-degree vertex, up to 0.13 a inside the outline — 0.029 mm measured
+        // on the blended row): past 2 mm the silhouette IS the outline
+        const [u] = F.fromWorld(x, y); if (u * Lmm <= 2 + 1e-9) continue;
+        let d = Infinity; for (let i = 0; i + 1 < wo.length; i++) d = Math.min(d, segDist([x, y], wo[i], wo[i + 1]));
+        worst = Math.max(worst, d); seen++;
+      }
+      if (!seen) bad.push(`E7: ${part.name} the flat wing has no silhouette past its root (vacuous)`);
+      else if (worst > 1e-6) bad.push(`E7: ${part.name} the flat wing's silhouette stands ${worst.toFixed(4)} mm off the drawn outline — the edge moved it`);
+    }
+  }
+  if (ellRes > 1e-9) bad.push(`E1: a bead departs from its half ellipse by ${ellRes.toExponential(2)} mm`);
+  return { bad, beads, full, aMin: Number.isFinite(aMin) ? aMin : null, ellRes, ellSkipped, holeApex };
 }
 
 /* X — POINTED terminations. From the PARAMETERS: with pointed tips every leg
@@ -730,8 +878,12 @@ function specimenChecks(model) {
   let best = -1, bc = 0;
   for (let i = apex + 1; i < outline.length - 1; i++) { const c = (rt[0] - A[0]) * (outline[i][1] - A[1]) - (rt[1] - A[1]) * (outline[i][0] - A[0]); if (c > bc) { bc = c; best = i; } }
   const toPoly = (j) => outline.length - j;                    // outline[j] is planform[outline.length - j]
-  const vy = (i) => P[3 * (part.v0 + i) + 1];
-  if (!(part.meta.slab && part.meta.slab.uw[toPoly(best)][0] === outline[best][0] && part.meta.slab.uw[toPoly(best)][1] === outline[best][1])) bad.push('Y: the slab does not start with the planform polygon (cannot read the margin)');
+  // with the rounded edge the skins are inset: the margin is read off the
+  // BEAD's apex vertex of that planform point (it sits on the drawn outline)
+  const apexOf = new Map(); if (part.meta.bead) for (const r of part.meta.bead.rings) apexOf.set(r.i, r.ids[part.meta.bead.K / 2]);
+  const vy = (i) => P[3 * (apexOf.has(i) ? apexOf.get(i) : part.v0 + i) + 1];
+  const atPoint = (i, q) => { const r = part.meta.bead ? part.meta.bead.rings.find((x) => x.i === i) : null; const at = r ? r.apex : part.meta.slab && part.meta.slab.uw[i]; return at && at[0] === q[0] && at[1] === q[1]; };
+  if (!(part.meta.slab && atPoint(toPoly(best), outline[best]) && atPoint(toPoly(outline.length - 1), outline[outline.length - 1]))) bad.push('Y: the slab does not start with the planform polygon (cannot read the margin)');
   else {
     // the sweep the margin NEEDS, by this file's own reading of the planform.
     // Eva's ruling: the pose must SUCCEED on any wing — no clamp. The need
@@ -804,6 +956,7 @@ function check(label, model, opts = {}) {
   if (opts.tailIso) for (const b of tailIsolation(model, opts.tailIso)) fails.push(`T: ${b}`);
   if (opts.repaired && !model.notes.some((n) => /eased toward the nearer drawn pair/.test(n))) fails.push('I: the crossing blend was not reported repaired');
   const ec = edgeChecks(model); for (const b of ec.bad) fails.push(b);
+  const er = edgeRoundChecks(model); for (const b of er.bad) fails.push(b);
   const xc = tipChecks(model); for (const b of xc.bad) fails.push(b);
   const gc = segmentChecks(model); for (const b of gc.bad) fails.push(b);
   if (opts.expectGrooves && !gc.seen) fails.push('G: the segment row measured no boundary (vacuous)');
@@ -812,7 +965,7 @@ function check(label, model, opts = {}) {
   for (const b of vn.bad) fails.push(b.startsWith('V') ? b : `V: ${b}`);
   if (opts.expectVeinThin && !gateVein(model).under) fails.push('V4: the deliberately thin-vein row is not under the floor by this file\'s reading (vacuous)');
   if (opts.expectTailVein && !model.wingPairs.some((w) => w.hasTail)) fails.push('V5: the tail-vein row has no tail (vacuous)');
-  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, ec, xc, gc, notes: model.notes };
+  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, ec, er, xc, gc, notes: model.notes };
 }
 
 function fmt(r) {
@@ -822,7 +975,9 @@ function fmt(r) {
     + `minTube=${f(r.mf.tubeMin)} minThick=${f(r.mf.thickMin)} waist=${f(r.mf.waistMin)} roots=${r.rc.roots.length}${r.rc.roots.length > 1 ? `@${f(r.rc.minGap)}mm` : ''} cutRegions=${r.sv.regions}`
     + ` floor=${r.fc.refused ? 'STL-REFUSED' : 'ok'}(${r.fc.worst.toFixed(2)}mm${r.fc.border ? ',borderline' : ''})`
     + (r.vn.cells ? ` cells=${r.vn.cells}${r.vn.holes ? ` holes=${r.vn.holes} gap=${f(r.vn.minGap)} border=${f(r.vn.minBorder)}` : ''}` : '')
-    + ` edge=${r.ec.minT === null ? '—' : r.ec.minT.toFixed(3)}mm${r.ec.onOutline ? `(${r.ec.onOutline} on the outline)` : ''} points=${r.xc.pts}${r.gc.seen ? ` grooves=${r.gc.seen}` : ''}`
+    + ` edge=${r.ec.minT === null ? '—' : r.ec.minT.toFixed(3)}mm${r.ec.onOutline ? `(${r.ec.onOutline} on the outline)` : ''}`
+    + (r.er.beads ? ` beads=${r.er.beads}(full ${r.er.full}, min a/H ${r.er.aMin === null ? '—' : r.er.aMin.toFixed(2)}${r.er.ellSkipped ? `, ${r.er.ellSkipped} twisted unchecked` : ''})` : '')
+    + ` points=${r.xc.pts}${r.gc.seen ? ` grooves=${r.gc.seen}` : ''}`
     + (r.le ? ` legsOutside=${r.le.outside.toFixed(2)}/${r.le.area.toFixed(2)}mm²` : '') + (r.notes.length ? `  notes: ${r.notes.join('; ')}` : '');
 }
 
@@ -911,6 +1066,13 @@ function functionChecks() {
   ok(bb.ok && bb.notes.some((n) => /first pair outline refused/.test(n)), `D: an invalid outline in a file is refused with a note (${bb.notes[0]})`);
   const newer = G.designFromParams(norm); newer.version = 99;
   ok(!G.paramsFromDesign(newer).ok, 'D: a newer design version is refused, not partly read');
+  // Q — the on-wing editor: a drag lands where the pointer is
+  { const qc = qCheck(qCases()); ok(!qc.bad.length, `Q: ${qc.n} drags on the flat-displayed wing land where the pointer is (worst ${qc.worstLand.toExponential(1)} mm; points drawn on the wing to ${qc.worstDraw.toExponential(1)} mm), the display changes only the edited pair${qc.bad.length ? ' — ' + qc.bad.join('; ') : ''}`); }
+  // the edges pass (§10): a version-4 design (no round radius) loads with the round at 0
+  { const v4 = G.designFromParams(G.defaultParams(), 'v4'); v4.version = 4; delete v4.params.wingEdgeRound; v4.params.wingEdgeBevel = 4;
+    const r4 = G.paramsFromDesign(JSON.parse(JSON.stringify(v4))), want = G.defaultParams(); want.wingEdgeRound = 0; want.wingEdgeBevel = 4;
+    const b4 = G.buildBug(r4.params), bw = G.buildBug(want);
+    ok(r4.ok && r4.params.wingEdgeRound === 0 && b4.positions.length === bw.positions.length && b4.positions.every((x, i) => Object.is(x, bw.positions[i])), 'D: a version-4 design (no round radius) loads with the round at 0 — the square-walled chamfer it was saved with, bit for bit'); }
   // the elegance pass (§9): a design saved before it loads at the OLD ends
   const v3 = G.designFromParams(G.legacyDefaultParams(), 'v3'); v3.version = 3;
   for (const k of Object.keys(G.LEGACY_STYLE)) delete v3.params[k];
@@ -939,6 +1101,73 @@ function functionChecks() {
     ok(clamped.length === 0 && lo > f.min && hi < f.max, `Y: Set specimen squares the forewing without clamping on ${n} random bugs (sweep ${lo.toFixed(1)}..${hi.toFixed(1)}° inside ${f.min}..${f.max}°)${clamped.length ? ` — CLAMPED: ${clamped.slice(0, 8).join(', ')}` : ''}`);
   }
   return out;
+}
+
+/* ---------- Q: the on-wing editor's frame ---------- */
+/* The page edits a wing in the TOP view on the SVG projection, the wing being
+   edited displayed FLAT (buildBug's flatPair). A pointer lands at a point S in
+   the SVG's own user units (the browser's getScreenCTM is the page's half);
+   the page carries it into the world (worldFromSvg, the export's frame) and
+   into the outline (editorFrame.fromWorld), and moves the control point there.
+   This clause performs exactly that and MEASURES where the moved point lands
+   in the rebuilt display model — its EMITTED bead apex vertex, carried back
+   through the export's frame — against S. The reference is the target the
+   gate picked; the measured side is geometry no part of the mapping wrote.
+   Under non-zero stretch and sweep, on a TILTED pair (displayed flat), and on
+   an unlinked middle pair. Also: the overlay draws every control point on the
+   emitted wing (toWorld against the apex), and the flat display changes ONLY
+   the edited pair (every other part bit-identical to the real model). */
+function apexOfControl(model, k, i) {
+  const part = model.parts.find((q) => q.kind === `wing${k + 1}` && q.side === 'R');
+  const n = part.meta.planform.length, d = i * G.CR_SAMPLES, idx = n - 1 - (d + 1);
+  const r = part.meta.bead.rings.find((x) => x.i === idx);
+  const v = r.ids[part.meta.bead.K / 2], P = model.positions;
+  return [P[3 * v], P[3 * v + 1], P[3 * v + 2]];
+}
+function qCheck(cases, mut = {}) {
+  const bad = [], frameOf = mut.frame || G.editorFrame;
+  let worstLand = 0, worstDraw = 0, n = 0;
+  for (const { label, p, k, i, du, dw } of cases) {
+    const disp = G.buildBug(p, mut.notFlat ? {} : { flatPair: k });
+    const F = frameOf(p, k), fr = G.exportSvg(disp).frame;
+    const spec = k === 0 ? p.wings.first : k === p.wingPairs - 1 ? p.wings.last : p.wings.unlinked[k];
+    // the overlay draws control point i ON the emitted wing
+    const A = apexOfControl(disp, k, i), Wd = F.toWorld(...spec.points[i]);
+    worstDraw = Math.max(worstDraw, Math.hypot(A[0] - Wd[0], A[1] - Wd[1]));
+    // a drag to S lands at S
+    const targetWorld = [A[0] + du, A[1] + dw], S = G.svgFromWorld(fr, ...targetWorld);
+    const q = F.fromWorld(...G.worldFromSvg(fr, ...S));
+    const mv = G.moveControlPoint(spec.points, i, q);
+    if (!mv.ok) { bad.push(`Q: ${label} the test drag was refused (${mv.reason}) — pick another`); continue; }
+    const p2 = JSON.parse(JSON.stringify(p)); const s2 = k === 0 ? p2.wings.first : k === p.wingPairs - 1 ? p2.wings.last : p2.wings.unlinked[k]; s2.points = mv.points;
+    const disp2 = G.buildBug(p2, mut.notFlat ? {} : { flatPair: k });
+    const A2 = apexOfControl(disp2, k, i), S2 = G.svgFromWorld(G.exportSvg(disp2).frame, A2[0], A2[1]);
+    // the frame of the REBUILT svg can move (its bounds moved): compare in world
+    const land = Math.hypot(A2[0] - targetWorld[0], A2[1] - targetWorld[1]);
+    void S2;
+    worstLand = Math.max(worstLand, land); n++;
+    if (land > 1e-9) bad.push(`Q: ${label} a drag to (${targetWorld.map((x) => x.toFixed(3))}) mm landed ${land.toFixed(4)} mm away — the screen does not map onto the outline`);
+    // the flat display is display only: every part but pair k is the real model's
+    const real = G.buildBug(p);
+    for (const part of real.parts) {
+      if (part.kind === `wing${k + 1}`) continue;
+      const o = disp.parts.find((x) => x.name === part.name && x.side === part.side);
+      const same = o && o.v1 - o.v0 === part.v1 - part.v0 && Array.from(real.positions.slice(3 * part.v0, 3 * part.v1)).every((x, j) => Object.is(x, disp.positions[3 * o.v0 + j]));
+      if (!same) { bad.push(`Q: ${label} the flat display moved ${part.name}-${part.side}, not only the edited pair`); break; }
+    }
+  }
+  if (worstDraw > 1e-9) bad.push(`Q: a control point is drawn ${worstDraw.toFixed(4)} mm off the emitted wing`);
+  return { bad, worstLand, worstDraw, n };
+}
+function qCases() {
+  const a = G.defaultParams(); a.wings.first.stretch = 1.3; a.wings.first.sweep = -20; a.wings.first.dihedral = 30; a.wings.first.pitch = 15;
+  const b = G.defaultParams(); b.wings.last.stretch = 0.8; b.wings.last.sweep = 35; b.wings.last.dihedral = -15; b.wings.last.pitch = -10;
+  const c = G.defaultParams(); c.wingPairs = 4; c.wings.unlinked[1] = { ...JSON.parse(JSON.stringify(c.wings.first)), stretch: 1.6, sweep: 50, dihedral: 20, pitch: 8 };
+  return [
+    { label: 'forewing, stretch 1.3, sweep -20, tilted 30/15', p: a, k: 0, i: 2, du: 0.6, dw: 0.4 },
+    { label: 'hindwing, stretch 0.8, sweep 35, tilted -15/-10', p: b, k: 1, i: 1, du: -0.5, dw: 0.7 },
+    { label: 'unlinked pair 2 of 4, stretch 1.6, sweep 50', p: c, k: 1, i: 2, du: 0.4, dw: -0.5 },
+  ];
 }
 
 /* ---------- rows ---------- */
@@ -994,7 +1223,7 @@ function rowsFor(nseeds) {
   // with the edge profile, and the specimen pose on the new default, the old
   // default and random bugs (Y on each)
   rows.push(['legacy default (the old ends)', G.legacyDefaultParams(), {}]);
-  const ends = [['wingEdgeTaper', 0, 0.9], ['wingEdgeBevel', 0, 4], ['clubLength', 0, 0.5], ['clubWidth', 1, 4], ['clubTaper', 0, 1], ['segmentStyle', 0, 1], ['pointedTips', false, true]];
+  const ends = [['wingEdgeTaper', 0, 0.9], ['wingEdgeBevel', 0, 4], ['wingEdgeRound', 0, 1], ['clubLength', 0, 0.5], ['clubWidth', 1, 4], ['clubTaper', 0, 1], ['segmentStyle', 0, 1], ['pointedTips', false, true]];
   for (const [id, lo, hi] of ends) for (const v of [lo, hi]) { const p = d(); p[id] = v; rows.push([`${id} ${v}`, p, id === 'segmentStyle' ? { expectGrooves: true } : {}]); }
   { const p = d(); p.segmentStyle = 0.5; rows.push(['segmentStyle 0.5', p, { expectGrooves: true }]); }
   for (const pt of [true, false]) { const p = d(); p.antennaType = 'feathered'; p.pointedTips = pt; p.legReach = 1; rows.push([`feathered, splayed, pointed ${pt}`, p, {}]); }
@@ -1006,6 +1235,19 @@ function rowsFor(nseeds) {
   rows.push(['specimen: the old default', G.specimenPose(G.legacyDefaultParams()).params, { specimen: true }]);
   { const p = d(); p.wingPairs = 4; rows.push(['specimen: 4 pairs', G.specimenPose(p).params, { specimen: true }]); }
   for (let s = 1; s <= 6; s++) { const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } rows.push([`specimen: random:${s}`, G.specimenPose(p).params, { specimen: true }]); }
+  // EDGES PASS rows (design doc §10): the round at half, over a chamfer, the
+  // old chamfer default (square wall), both venation modes at half a round, a
+  // 3 mm sheet in HOLES (the veins as near-round rods), the floor at 2 mm, a
+  // tilted and pitched pair, the tail, and random bugs in each mode
+  { const p = d(); p.wingEdgeRound = 0.5; rows.push(['round 0.5', p, {}]); }
+  { const p = d(); p.wingEdgeBevel = 4; rows.push(['round 1 over a 4 mm chamfer', p, {}]); }
+  { const p = d(); p.wingEdgeBevel = 4; p.wingEdgeRound = 0; rows.push(['the old default edge (4 mm chamfer, square wall)', p, {}]); }
+  for (const mode of ['holes', 'ridges']) { const p = d(); p.venation = mode; p.wingEdgeRound = 0.5; rows.push([`${mode} with round 0.5`, p, {}]); }
+  { const p = d(); p.venation = 'holes'; for (const w of [p.wings.first, p.wings.last]) w.thickness = 3; rows.push(['holes on a 3 mm sheet (veins near-round rods)', p, {}]); }
+  { const p = d(); p.venation = 'holes'; p.wings.first.veinWidth = 1.0; p.wings.first.veinTaper = 0; p.wings.first.thickness = 1.0; rows.push(['holes: veins at the floor, 1 x 1 mm (round rods)', p, {}]); }
+  { const p = d(); p.minDiameter = 2; p.wingEdgeRound = 1; rows.push(['round 1 with a 2 mm floor', p, {}]); }
+  { const p = d(); p.wings.first.dihedral = 35; p.wings.first.pitch = 20; p.wings.last.dihedral = -25; p.wings.last.pitch = -15; rows.push(['round 1, tilted and pitched pairs', p, {}]); }
+  { const p = d(); p.wings.tail.on = true; p.venation = 'holes'; rows.push(['holes, tail ON (rounded tail rims)', p, {}]); }
   for (const name of ['falcate', 'notched', 'strap']) { const p = d(); p.venation = 'holes'; p.wingPairs = 2; p.wings.first.points = HAND_OUTLINES[name]; p.wings.first.length = 36; p.wings.first.stretch = 1.3; rows.push([`holes: drawn:${name}`, p, {}]); }
   return rows;
 }
@@ -1044,7 +1286,29 @@ if (NEG) {
   const deepClone = (o) => JSON.parse(JSON.stringify(o));
   const clone = (m) => ({ ...m, positions: Float64Array.from(m.positions), indices: Uint32Array.from(m.indices), parts: m.parts.map((p) => ({ ...p, meta: { ...p.meta } })) });
   const shiftPart = (m, pred, d) => { for (const p of m.parts.filter(pred)) for (let v = p.v0; v < p.v1; v++) for (let k = 0; k < 3; k++) m.positions[3 * v + k] += d[k] * (k === 0 && p.side === 'L' ? -1 : 1); };
+  // the rounded edge (§10): mutate the EMITTED bead rings of the right
+  // forewing (and their mirror twins, so M stays clean)
+  const beadMut = (m, pick, fn) => {
+    const R = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'), L = m.parts.find((q) => q.kind === 'wing1' && q.side === 'L');
+    const P = m.positions, V = (v) => [P[3 * v], P[3 * v + 1], P[3 * v + 2]], B = R.meta.bead;
+    for (const r of B.rings.filter(pick)) {
+      const ids = r.ids, top = V(ids[0]), bot = V(ids[B.K]), M = top.map((x, d) => (x + bot[d]) / 2);
+      const Vv = top.map((x, d) => x - M[d]), Dv = V(ids[B.K / 2]).map((x, d) => x - M[d]);
+      ids.forEach((v, j) => { const nt = fn(j, B.K, M, Vv, Dv, V(v)); if (!nt) return; const lv = v - R.v0 + L.v0; for (let d = 0; d < 3; d++) P[3 * v + d] = nt[d]; P[3 * lv] = -nt[0]; P[3 * lv + 1] = nt[1]; P[3 * lv + 2] = nt[2]; });
+    }
+  };
+  const along = (r) => r.apex[0] > 8 && r.apex[0] < 30;          // a stretch of the outer margin, clear of the root
+  const holeRim = (m) => { const R = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); const h = R.meta.venation.cells.find((c) => c.holes.length).holes[0]; const keys = new Set(h.map((q) => `${q[0]},${q[1]}`)); return (r) => keys.has(`${r.apex[0]},${r.apex[1]}`); };
+  const square0 = G.defaultParams(); square0.wingEdgeRound = 0; const squareModel = G.buildBug(square0);
+  const holesRound = G.buildBug(holesP);
   const muts = [
+    ['a bead flattened into a square wall', 'E3', base, {}, (m) => beadMut(m, along, (j, K, M, V) => { const t = (Math.PI * j) / K; return M.map((x, d) => x + Math.cos(t) * V[d]); })],
+    ['a bead dented (not a half ellipse)', 'E1', base, {}, (m) => beadMut(m, along, (j, K, M, V, D) => (j === 1 ? M.map((x, d) => x + 0.2 * D[d] + Math.cos(Math.PI / K) * V[d]) : null))],
+    ['a bead thinned under the floor', 'E5', base, {}, (m) => beadMut(m, along, (j, K, M, V, D) => { const t = (Math.PI * j) / K; return M.map((x, d) => x + Math.sin(t) * D[d] + 0.4 * Math.cos(t) * V[d]); })],
+    ['the silhouette pushed out past the outline', 'E7', base, {}, (m) => beadMut(m, along, (j, K, M, V, D) => { const t = (Math.PI * j) / K, f = 1 + 0.4 * Math.sin(t); return M.map((x, d) => x + f * Math.sin(t) * D[d] + Math.cos(t) * V[d]); })],
+    ['a hole rim left square (not rounded)', 'E4', holesRound, {}, (m) => { const R = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); const pick = holeRim(m); beadMut(m, pick, (j, K, M, V) => { const t = (Math.PI * j) / K; return M.map((x, d) => x + Math.cos(t) * V[d]); }); R.meta.bead = { ...R.meta.bead, rings: R.meta.bead.rings.filter((r) => !pick(r)) }; }],
+    ['square walls under a round asked for', 'E2', squareModel, {}, (m) => { m.params = { ...m.params, wingEdgeRound: 1 }; }],
+    ['a top-skin triangle flipped by the inset', 'E6', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); const r = m.parts.find((x) => x.kind === 'wing1' && x.side === 'R').meta.bead.rings.find(along); const v = q.v0 + r.i; m.positions[3 * v + 1] += 4; } }],
     ['detach a wing', 'C', base, {}, (m) => shiftPart(m, (q) => q.kind === 'wing1', [0, 0, 40])],
     ['open a shell', 'W', base, {}, (m) => { m.indices = m.indices.slice(0, m.indices.length - 3); m.parts[m.parts.length - 1].t1 -= 1; }],
     ['nudge one vertex 1e-6', 'M', base, {}, (m) => { const p = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); m.positions[3 * (p.v0 + 5)] += 1e-6; }],
@@ -1094,9 +1358,11 @@ if (NEG) {
     ['a tip ring thinned under the floor', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.name === 'antenna' && x.side === side); const [v0, n] = q.meta.points[0].ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) m.positions[3 * (v0 + k) + d] = c[d] + 0.5 * (m.positions[3 * (v0 + k) + d] - c[d]); } }],
     ['a segment groove filled', 'G', base, { expectGrooves: true }, (m) => { const body = m.parts.find((q) => q.kind === 'body'), L = m.layout; for (let k = 1; k < m.params.abdomenSegments; k++) { const yb = L.yA0 - (k / m.params.abdomenSegments) * (L.yA0 - L.yA1); for (const r of body.meta.rings) if (Math.abs(r.y - yb) < 0.3) for (let j = 0; j < r.n; j++) { m.positions[3 * (r.v0 + j)] /= 1 - G.GROOVE_DEPTH * Math.exp(-(((r.y - yb) / G.GROOVE_SIGMA_MM) ** 2)); } } }],
     ['the pose clamps at the old -30° bound (random:6)', 'Y', clampModel, { specimen: true }, () => {}],
-    ['the forewing margin not square to the body', 'Y', specModel, { specimen: true }, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); for (let v = q.v0 + 1; v <= q.v0 + 12; v++) m.positions[3 * v + 1] += 1.5; } }],
+    // (the margin is read off the bead apexes now: the mutation shears the
+    // forewing's outer half back 1.5 mm, rings and all)
+    ['the forewing margin not square to the body', 'Y', specModel, { specimen: true }, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); for (let v = q.v0; v < q.v1; v++) if (Math.abs(m.positions[3 * v]) > 12) m.positions[3 * v + 1] += 1.5; } }],
   ];
-  const clean = [check('default (clean)', base), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true }), check('blended thin (clean: refused)', blendedModel, { expectBlended: true }),
+  const clean = [check('default (clean)', base), check('square edge, round 0 (clean)', squareModel), check('holes, rounded (clean)', holesRound), check('default tucked (clean)', tuck, { tucked: true }), check('tail ON 4 pairs (clean)', tail4on, { tailIso: tail4off }), check('thin tail (clean: refused)', thinModel, { expectThin: true }), check('blended thin (clean: refused)', blendedModel, { expectBlended: true }),
     check('specimen (clean)', specModel, { specimen: true }),
     check('holes 3 pairs + stigma (clean)', holesModel, { expectStigma: true }), check('ridges 3 pairs (clean)', ridgesModel, {}), check('thin veins (clean: refused)', thinVeinModel, { expectVeinThin: true }), check('tail vein (clean)', tailVeinModel, { expectTailVein: true })];
   let ok = clean.every((r) => !r.fails.length);
@@ -1106,6 +1372,17 @@ if (NEG) {
     const r = check(name, m, opts);
     const fired = r.fails.some((f) => f.startsWith(clause + ':') || (clause === 'V' && /^V\d?:/.test(f)));
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${r.fails.join(' | ') || 'nothing fired'}`);
+    if (!fired) ok = false;
+  }
+  // Q — the on-wing editor's frame, broken three ways the page could break it
+  const qmuts = [
+    ['the editor ignores the stretch', { frame: (p, k) => { const F = G.editorFrame(p, k); return { ...F, fromWorld: (x, y) => { const [u, w] = F.fromWorld(x, y); return [u, w * F.stretch]; }, toWorld: (u, w) => F.toWorld(u, w / F.stretch) }; } }],
+    ['the editor turns the sweep the wrong way', { frame: (p, k) => { const q = JSON.parse(JSON.stringify(p)); for (const w of [q.wings.first, q.wings.last, ...Object.values(q.wings.unlinked)]) w.sweep = -w.sweep; return G.editorFrame(q, k); } }],
+    ['the edited wing is not displayed flat', { notFlat: true }],
+  ];
+  for (const [name, mut] of qmuts) {
+    const r = qCheck(qCases(), mut), fired = r.bad.some((b) => b.startsWith('Q:'));
+    console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by Q  — ${r.bad.slice(0, 2).join(' | ') || 'nothing fired'}`);
     if (!fired) ok = false;
   }
   const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
@@ -1120,7 +1397,7 @@ if (NEG) {
 let failed = 0;
 const fc = functionChecks();
 for (const [c, msg] of fc) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
-const rows = rowsFor(NSEEDS);
+const rows = rowsFor(NSEEDS).filter(([label]) => !ONLY || ONLY.test(label));
 const support = [];
 for (const [label, params, opts] of rows) {
   const model = G.buildBug(params);
@@ -1139,5 +1416,5 @@ for (const [label, k] of support) {
 }
 const total = rows.length + fc.length;
 console.log(`\n${total - failed}/${total} pass (${fc.length} function checks + ${rows.length} built rows: ${NSEEDS} random).`);
-console.log(failed ? 'VERDICT: FAIL' : 'VERDICT: PASS');
+console.log(failed ? 'VERDICT: FAIL' : ONLY ? `VERDICT: SUBSET PASS (--only ${ONLY}) — not a gate pass` : 'VERDICT: PASS');
 process.exit(failed ? 1 : 0);
