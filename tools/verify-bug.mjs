@@ -113,6 +113,16 @@
      D  a design round-trips through JSON exactly; an invalid outline in a file
         is refused with a note; a newer version is refused.
 
+   IMAGE -> BUG (design doc §11) — the IM family, tools/verify-bug-image.mjs:
+     IM1-IM9 run against synthetic pictures drawn from KNOWN bugs (rotated,
+     asymmetric, noisy, patterned): pair count and mode, the mirror axis, the
+     outline against the KNOWN bug (never the fit's own reading), mirror-exact
+     from an asymmetric picture, the tail found (and not found where there is
+     none), a busy background refused, the tolerance at both ends, the split
+     line refitting both pairs, the erase brush. Every successful fit is ALSO
+     built as an ordinary row ('image: <name> (fitted)') through every clause
+     above: the fitted outline obeys every rule a drawn one does.
+
    It also REPORTS (not gates) FDM/resin overhang at the model's own
    orientation, and the tucked-leg exposure across the random seeds.
 
@@ -120,13 +130,20 @@
    narrower than the floor — not measured); free ends; self-intersection
    BETWEEN parts (overlapping closed shells are the export contract).
 
-   --negative-control  breaks built models thirty-five ways (plus the L clause at reach 1 and three
-                       broken editor frames for Q) and requires each to be caught by the clause that names it.
+   --negative-control  breaks built models thirty-five ways (plus the L clause at reach 1, three
+                       broken editor frames for Q, and ten CODE mutants of bug-image.js for IM — every
+                       anchor checked to match exactly once before any of them runs) and requires each
+                       to be caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
 import * as G from '../bug-geometry.js';
 import { polyArea as venArea } from '../bug-venation.js';
 import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin } from './bug-fixtures.mjs';
+import * as IMG from '../bug-image.js';
+import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
@@ -1385,6 +1402,35 @@ if (NEG) {
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by Q  — ${r.bad.slice(0, 2).join(' | ') || 'nothing fired'}`);
     if (!fired) ok = false;
   }
+  // IM — code mutants of bug-image.js, each a copy written beside it (it
+  // imports './bug-geometry.js') and imported; every anchor is checked FIRST
+  {
+    const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const src = fs.readFileSync(path.join(ROOT, 'bug-image.js'), 'utf8');
+    const edits = (m) => [[m[1], m[2]], ...(m[4] || [])];
+    const anchored = (m) => edits(m).every(([from]) => src.split(from).length - 1 === 1);
+    for (const m of IMAGE_MUTANTS) for (const [from] of edits(m)) {
+      const n = src.split(from).length - 1;
+      if (n !== 1) { console.log(`ANCHOR ${m[0]}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; }
+    }
+    const cleanIm = imageChecks(IMG).checks.filter(([c]) => !c);
+    console.log(cleanIm.length ? `IM clean run FAILED: ${cleanIm.map(([, m]) => m).join(' | ')}` : 'IM clean run: every check passes');
+    if (cleanIm.length) ok = false;
+    let k = 0;
+    for (const m of IMAGE_MUTANTS) {
+      const [name, , , clause] = m;
+      if (!anchored(m)) continue;
+      const file = path.join(ROOT, `.bug-image.mutant-${process.pid}-${k++}.mjs`);
+      fs.writeFileSync(file, edits(m).reduce((t, [from, to]) => t.replace(from, to), src));
+      let fails = [];
+      try { const M = await import(pathToFileURL(file).href); fails = imageChecks(M).checks.filter(([c]) => !c).map(([, m]) => m); }
+      catch (e) { fails = [`(threw) ${e.message}`]; }
+      finally { fs.unlinkSync(file); }
+      const fired = fails.some((f) => f.startsWith(clause + ':'));
+      console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${fails.slice(0, 2).join(' | ') || 'nothing fired'}`);
+      if (!fired) ok = false;
+    }
+  }
   const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
   const splay = legExposure(G.buildBug(splayP));
   const lfires = !(splay.outside <= 0.02 * splay.area);
@@ -1397,7 +1443,10 @@ if (NEG) {
 let failed = 0;
 const fc = functionChecks();
 for (const [c, msg] of fc) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
-const rows = rowsFor(NSEEDS).filter(([label]) => !ONLY || ONLY.test(label));
+const im = imageChecks(IMG);
+for (const [c, msg] of im.checks) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
+fc.push(...im.checks);
+const rows = [...rowsFor(NSEEDS), ...imageRows(im.results)].filter(([label]) => !ONLY || ONLY.test(label));
 const support = [];
 for (const [label, params, opts] of rows) {
   const model = G.buildBug(params);

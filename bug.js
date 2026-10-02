@@ -16,6 +16,7 @@ import {
   composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
   editorFrame, contourLoops, CR_SAMPLES,
 } from './bug-geometry.js';
+import { imageToBug, segment, traceOuter, WORK_MAX, IMPORT_DEFAULTS } from './bug-image.js';
 
 /* ---------------- state ---------------- */
 let params = defaultParams();
@@ -430,7 +431,7 @@ function fitBox(m, keep) {
   // while a pair is edited the frame is FROZEN: a frame that grew with the
   // wing would rescale the picture under the pointer mid-drag, and the drag
   // would run away from the hand (measured: a 16 px drag moved the apex 7.7 mm)
-  if (keep && vbox) return vbox;
+  if ((keep || splitDrag || eraseDrag) && vbox) return vbox;
   return b;
 }
 function layoutStage() {
@@ -455,12 +456,17 @@ function drawMain() {
   let inner = withThinPreview(out).replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
   const ox = fr.x0 - fr.margin - vbox.x0, oy = vbox.y1 - (fr.y1 + fr.margin);
   let h = '';
-  if (backdrop.href) {
+  if (backdrop.href && backdrop.M) {
+    // a picture placed by the IMAGE -> BUG fit: its own pixels -> world mm
+    // (rotation, scale, offset as fitted), then the toolbar's scale / offset
+    h += `<image class="backdrop" href="${backdrop.href}" x="0" y="0" width="${backdrop.nw}" height="${backdrop.nh}" opacity="${backdrop.opacity}" preserveAspectRatio="none" transform="matrix(${viewMatrix(backdrop.M).join(' ')})"/>`;
+  } else if (backdrop.href) {
     const bw = backdrop.w * backdrop.scale, bh = bw * backdrop.aspect;
     const cx = backdrop.cx + backdrop.dx * backdrop.w, cy = backdrop.cy + backdrop.dy * backdrop.w;
     const [X, Y] = toV(cx - bw / 2, cy + bh / 2);
     h += `<image class="backdrop" href="${backdrop.href}" x="${X}" y="${Y}" width="${bw}" height="${bh}" opacity="${backdrop.opacity}" preserveAspectRatio="none"/>`;
   }
+  h += importOverlay();
   h += `<svg class="bug${backdrop.href ? ' is-traced' : ''}" x="${ox}" y="${oy}" width="${out.widthMm}" height="${out.heightMm}" viewBox="0 0 ${out.widthMm} ${out.heightMm}" overflow="visible">${inner}</svg>`;
   // click targets: every wing's projected contour (right and left), front pair on top
   for (const part of [...m.parts].filter((q) => /^wing\d$|^tail$/.test(q.kind)).sort((a, b) => wingRank(b) - wingRank(a))) {
@@ -469,7 +475,9 @@ function drawMain() {
     h += `<path class="wing-hit" data-pair="${part.kind === 'tail' ? params.wingPairs - 1 : +part.kind.slice(4) - 1}" d="${d}"/>`;
   }
   if (editing && params.wingPairs) h += editorMarkup();
+  h += splitMarkup();
   msvg.innerHTML = h;
+  msvg.classList.toggle('is-erasing', !!(imp && imp.erasing));
   drawEdBar();
 }
 const wingRank = (q) => (q.kind === 'tail' ? params.wingPairs - 0.5 : +q.kind.slice(4));   // pair 1 is drawn last (on top) in the SVG
@@ -547,6 +555,7 @@ const outlinePointAt = (ev) => editorFrame(params, editPair).fromWorld(...screen
 function committed() { drawMain(); scheduleBuild(); }
 let drag = null;
 msvg.addEventListener('pointerdown', (ev) => {
+  if (importPointerDown(ev)) return;
   const i = ev.target.dataset?.i;
   if (editing && i !== undefined && editableSpec(editPair)) {
     selectedPoint = +i; drag = { i: +i, id: ev.pointerId };
@@ -559,12 +568,13 @@ msvg.addEventListener('pointerdown', (ev) => {
   if (editing) stopEditing();                                // a click on bare paper ends the edit
 });
 msvg.addEventListener('pointermove', (ev) => {
+  if (importPointerMove(ev)) return;
   if (!drag || ev.pointerId !== drag.id) return;
   const r = applyEdit('move', drag.i, outlinePointAt(ev));
   if (r.ok) { edStatus = ''; committed(); }
   else { edStatus = `Blocked: ${r.reason}.`; stats.blocked++; drawEdBar(); }
 });
-const endDrag = (ev) => { if (drag && ev.pointerId === drag.id) drag = null; };
+const endDrag = (ev) => { importPointerUp(ev); if (drag && ev.pointerId === drag.id) drag = null; };
 msvg.addEventListener('pointerup', endDrag); msvg.addEventListener('pointercancel', endDrag);
 msvg.addEventListener('dblclick', (ev) => {
   if (!editing) return;
@@ -608,7 +618,7 @@ for (const [id, k] of [['bdOpacity', 'opacity'], ['bdScale', 'scale'], ['bdX', '
 function placeBackdrop(href, aspect) {
   const P = model.positions; let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   for (let i = 0; i < P.length; i += 3) { x0 = Math.min(x0, P[i]); x1 = Math.max(x1, P[i]); y0 = Math.min(y0, P[i + 1]); y1 = Math.max(y1, P[i + 1]); }
-  Object.assign(backdrop, { href, aspect, w: x1 - x0, cx: 0, cy: (y0 + y1) / 2 });
+  Object.assign(backdrop, { href, aspect, w: x1 - x0, cx: 0, cy: (y0 + y1) / 2, M: null });
   drawMain();
 }
 document.getElementById('bdFile').addEventListener('change', (e) => {
@@ -617,7 +627,219 @@ document.getElementById('bdFile').addEventListener('change', (e) => {
   rd.onload = () => { const img = new Image(); img.onload = () => placeBackdrop(rd.result, img.naturalHeight / img.naturalWidth || 1); img.src = rd.result; };
   rd.readAsDataURL(f);
 });
-document.getElementById('bdClear').addEventListener('click', () => { backdrop.href = null; drawMain(); });
+document.getElementById('bdClear').addEventListener('click', () => { backdrop.href = null; backdrop.M = null; drawMain(); });
+
+/* ---------------- IMAGE -> BUG (design doc §11) ---------------- */
+/* A top-down picture, pasted, dropped or loaded, is drawn to a canvas at most
+   WORK_MAX px on its long side and handed to bug-image.js's imageToBug, which
+   returns ORDINARY params (control points, sliders) — loaded like a design. The
+   bug the picture is fitted onto is the one on screen when it arrived (its legs,
+   antennae, venation, floor and edges are kept; the body and wings come from the
+   picture), and every refit starts again from that snapshot, so moving a slider
+   twice does not compound. The picture becomes the reference backdrop, placed in
+   world mm by the fit's own transform (rotation, scale, offset), so the fit and
+   the source can be compared in Top -> SVG. A refit REPLACES the wings and body
+   — editing after a fit is ordinary editing, and the next refit discards it. */
+let imp = null;                  // { work: ImageData, href, nw, nh, f, base, erase, opts, result, Mwork, erasing, flip }
+let splitDrag = null, eraseDrag = null;
+const imEl = (id) => document.getElementById(id);
+function viewMatrix(M) {
+  const sc = backdrop.scale, w = backdrop.w || 1, cx = backdrop.cx, cy = backdrop.cy;
+  return [sc * M[0], -sc * M[1], sc * M[2], -sc * M[3],
+    sc * M[4] + (1 - sc) * cx + backdrop.dx * w - vbox.x0,
+    vbox.y1 - sc * M[5] - (1 - sc) * cy - backdrop.dy * w];
+}
+const invAffine = (M) => { const d = M[0] * M[3] - M[2] * M[1]; return (x, y) => { const X = x - M[4], Y = y - M[5]; return [(M[3] * X - M[2] * Y) / d, (-M[1] * X + M[0] * Y) / d]; }; };
+const applyAffine = (M, px, py) => [M[0] * px + M[2] * py + M[4], M[1] * px + M[3] * py + M[5]];
+/* the toolbar's scale / offset applied to a world point (the backdrop's own) */
+const bdWorld = ([x, y]) => [backdrop.scale * x + (1 - backdrop.scale) * backdrop.cx + backdrop.dx * (backdrop.w || 1), backdrop.scale * y + (1 - backdrop.scale) * backdrop.cy + backdrop.dy * (backdrop.w || 1)];
+function bugWingspan() {
+  if (!model) return 72;
+  let x = 0; for (const q of model.parts.filter((p) => /^wing\d$/.test(p.kind) && p.side === 'R')) for (let v = q.v0; v < q.v1; v++) x = Math.max(x, model.positions[3 * v]);
+  return x > 0 ? 2 * x : 72;
+}
+function importOpts() {
+  return {
+    threshold: imEl('imThrAuto').checked ? null : +imEl('imThr').value,
+    lightOnDark: imp && imp.polarityTouched ? imEl('imInvert').checked : null,
+    wingspanMm: +imEl('imSpan').value, toleranceMm: +imEl('imTol').value,
+    pairs: imEl('imPairs').value, tail: imEl('imTail').checked, flip: !!(imp && imp.flip),
+    erase: imp && imp.erase, split: imp && imp.split,
+  };
+}
+async function loadPicture(file) {
+  if (!file || !/^image\//.test(file.type)) { imMsg('Not a picture: paste, drop or load an image file.', true); return; }
+  const href = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(file); });
+  const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('unreadable')); im.src = href; }).catch(() => null);
+  if (!img) { imMsg('That picture could not be read.', true); return; }
+  const nw = img.naturalWidth, nh = img.naturalHeight, f = Math.min(1, WORK_MAX / Math.max(nw, nh));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(nw * f)); c.height = Math.max(1, Math.round(nh * f));
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);   // a transparent PNG reads as white paper
+  g.drawImage(img, 0, 0, c.width, c.height);
+  const work = g.getImageData(0, 0, c.width, c.height);
+  const base = JSON.parse(JSON.stringify(params));
+  imp = { work, href, nw, nh, f: c.width / nw, base, erase: new Uint8Array(c.width * c.height), split: null, flip: false, polarityTouched: false, erasing: false, name: file.name || 'pasted picture' };
+  imEl('imSpan').value = Math.min(130, Math.max(20, bugWingspan()));
+  imEl('imThrAuto').checked = true;
+  imEl('imCtrls').hidden = false; imEl('imClose').hidden = false; imEl('imSec').open = true;
+  // the picture is seen in the TOP view's SVG mode
+  if (viewName !== 'top') setView('top');
+  if (mainMode !== 'svg') document.querySelector('#viewToggle button[data-main="svg"]').click();
+  refit({ reframe: true });
+}
+function imMsg(t, bad = false) { const e = imEl('imMsg'); e.textContent = t; e.classList.toggle('is-bad', bad); e.classList.toggle('is-ok', !bad && !!t); }
+/* Run the fit on the picture and, if it worked, load its params. A refused fit
+   changes nothing about the bug (never a broken bug) and says why. */
+function refit({ reframe = false, live = false } = {}) {
+  if (!imp) return null;
+  const t = performance.now();
+  const r = imageToBug(imp.work, imp.base, importOpts());
+  r.ms = performance.now() - t;
+  imp.result = r;
+  // the threshold slider shows what was used
+  imEl('imThr').value = Math.round(r.seg.stats.threshold);
+  if (!imp.polarityTouched) imEl('imInvert').checked = r.seg.stats.lightOnDark;
+  writeImportOutputs();
+  if (r.ok) {
+    imp.Mwork = r.transform.matrix;
+    imp.split = r.split ? { outer: r.split.outer.slice(), root: r.split.root.slice() } : null;
+    imp.lastGood = r;
+    const keepFrame = live && vbox;
+    params = normalizeParams(r.params);
+    editPair = 0; selectedPoint = -1; editing = false; edStatus = '';
+    if (!keepFrame) vbox = null;
+    writeControls();
+    placeImportBackdrop();
+    buildNow(reframe && !live);
+    imMsg(importSummary(r));
+  } else {
+    if (!imp.Mwork) {
+      // nothing fitted yet: show the picture upright, 80 mm wide at the origin, so the brush has something to erase against
+      const W = imp.work.width, H = imp.work.height, sc = 80 / W;
+      imp.Mwork = [sc, 0, 0, -sc, -40, (sc * H) / 2];
+    }
+    placeImportBackdrop();
+    drawMain();
+    imMsg(`Not fitted: ${r.reason}.${imp.lastGood ? ' The bug on screen is the last good fit.' : ' The bug on screen is unchanged.'}`, true);
+  }
+  return r;
+}
+function placeImportBackdrop() {
+  const M = imp.Mwork, f = imp.f;
+  Object.assign(backdrop, { href: imp.href, M: [M[0] * f, M[1] * f, M[2] * f, M[3] * f, M[4], M[5]], nw: imp.nw, nh: imp.nh, w: bugWingspan(), cx: 0, cy: 0, scale: 1, dx: 0, dy: 0 });
+  imEl('bdScale').value = 1; imEl('bdX').value = 0; imEl('bdY').value = 0;
+}
+function importSummary(r) {
+  const pairs = r.pairs.map((q) => `pair ${q.pair + 1}: ${q.points} control points, the fit within ${q.maxDevMm.toFixed(2)} mm of the picture${q.tail && !q.tail.inline ? ` — a TAIL of ${q.tail.points} points (${q.tail.lengthMm.toFixed(1)} mm), TAIL on` : ''}`).join(' · ');
+  const how = r.mode === 'separate' ? `${r.pairs.length} separate wing${r.pairs.length > 1 ? 's' : ''} a side` : r.mode === 'split' ? 'one wing mass a side, split into 2 pairs at its notch (drag the pink split line in Top → SVG); the hindwing under the forewing is a GUESS — its hidden leading edge is the split line moved forward by 8% of the wing' : 'one pair';
+  const floor = model && model.floorViolations.length ? ' · RED: part of a fitted outline is narrower than the floor — widen it in the editor, or lower the floor in Print (the STL is blocked until then).' : '';
+  return `Fitted ${how}. ${pairs}. Body ${r.body.bodyLengthMm.toFixed(1)} mm long${r.body.headSeen ? '' : ' (no head showed in front of the wings: its size is the column\'s)'}; mirror axis at ${r.transform.axisDeg.toFixed(1)}°, ${Math.round(100 * r.transform.symmetry)}% symmetric — the two halves are averaged, the bug is mirror-exact. ${r.notes.length ? 'Notes: ' + r.notes.join('; ') + '. ' : ''}${floor} (${r.ms.toFixed(0)} ms)`;
+}
+function writeImportOutputs() {
+  imEl('imThr-out').textContent = imEl('imThr').value;
+  imEl('imSpan-out').textContent = `${(+imEl('imSpan').value).toFixed(1)} mm`;
+  imEl('imTol-out').textContent = `${(+imEl('imTol').value).toFixed(2)} mm`;
+  imEl('imBrush-out').textContent = `${imEl('imBrush').value} px`;
+}
+/* the teal outline of what was found and the red of what was erased, in the
+   picture's own pixels placed by the same transform as the backdrop */
+function importOverlay() {
+  if (!imp || !imp.Mwork || !imEl('imSeg').checked) return '';
+  const r = imp.result, M = imp.Mwork, W = imp.work.width;
+  let h = '';
+  const seg = r && r.seg;
+  if (seg && seg.mask) {
+    const loop = traceOuter(seg.mask, W, imp.work.height);
+    if (loop.length) h += `<path class="im-seg" d="M${loop.map(([i, j]) => toV(...bdWorld(applyAffine(M, i, j))).map((v) => v.toFixed(2)).join(' ')).join('L')}Z"/>`;
+  }
+  let any = false; for (const e of imp.erase) if (e) { any = true; break; }
+  if (any) {
+    if (!imp.eraseHref || imp.eraseDirty) {
+      const c = document.createElement('canvas'); c.width = W; c.height = imp.work.height;
+      const g = c.getContext('2d'), id = g.createImageData(W, imp.work.height);
+      for (let k = 0; k < imp.erase.length; k++) if (imp.erase[k]) { id.data[4 * k] = 229; id.data[4 * k + 1] = 72; id.data[4 * k + 2] = 77; id.data[4 * k + 3] = 140; }
+      g.putImageData(id, 0, 0); imp.eraseHref = c.toDataURL(); imp.eraseDirty = false;
+    }
+    const sc = backdrop.scale;
+    const m = [sc * M[0], -sc * M[1], sc * M[2], -sc * M[3], sc * M[4] + (1 - sc) * backdrop.cx + backdrop.dx * (backdrop.w || 1) - vbox.x0, vbox.y1 - sc * M[5] - (1 - sc) * backdrop.cy - backdrop.dy * (backdrop.w || 1)];
+    h += `<image href="${imp.eraseHref}" x="0" y="0" width="${W}" height="${imp.work.height}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" style="pointer-events:none"/>`;
+  }
+  return h;
+}
+/* the SPLIT LINE between the two pairs of one wing mass: right wing solid with
+   two handles, left mirrored dashed */
+function splitMarkup() {
+  if (!imp || !imp.split || !imp.result || !imp.result.ok || imp.result.mode !== 'split') return '';
+  const { outer, root } = imp.split, r = 6 / pxPerMm();
+  const L = (a, b, cls) => `<line class="im-split${cls}" x1="${toV(...a)[0]}" y1="${toV(...a)[1]}" x2="${toV(...b)[0]}" y2="${toV(...b)[1]}"/>`;
+  let h = L(root, outer, '') + L([-root[0], root[1]], [-outer[0], outer[1]], ' mirror');
+  for (const [k, q] of [['outer', outer], ['root', root]]) { const [X, Y] = toV(...q); h += `<circle class="im-h" data-split="${k}" cx="${X}" cy="${Y}" r="${r}"/>`; }
+  return h;
+}
+function eraseAt(ev) {
+  const [x, y] = screenToWorld(ev);
+  // the backdrop's world -> picture px (undo the toolbar's scale / offset first)
+  const sc = backdrop.scale, w = backdrop.w || 1;
+  const wx = (x - (1 - sc) * backdrop.cx - backdrop.dx * w) / sc, wy = (y - (1 - sc) * backdrop.cy - backdrop.dy * w) / sc;
+  const [px, py] = invAffine(imp.Mwork)(wx, wy);
+  const R = +imEl('imBrush').value, W = imp.work.width, H = imp.work.height;
+  for (let j = Math.max(0, Math.floor(py - R)); j <= Math.min(H - 1, Math.ceil(py + R)); j++) for (let i = Math.max(0, Math.floor(px - R)); i <= Math.min(W - 1, Math.ceil(px + R)); i++) if ((i + 0.5 - px) ** 2 + (j + 0.5 - py) ** 2 <= R * R) imp.erase[j * W + i] = 1;
+  imp.eraseDirty = true;
+}
+let splitFrame = 0;
+function importPointerDown(ev) {
+  if (!imp) return false;
+  const k = ev.target.dataset?.split;
+  if (k) { splitDrag = { k, id: ev.pointerId }; msvg.setPointerCapture(ev.pointerId); return true; }
+  if (imp.erasing) { eraseDrag = { id: ev.pointerId }; msvg.setPointerCapture(ev.pointerId); eraseAt(ev); drawMain(); return true; }
+  return false;
+}
+function importPointerMove(ev) {
+  if (splitDrag && ev.pointerId === splitDrag.id) {
+    imp.split[splitDrag.k] = screenToWorld(ev);
+    // a refit per animation frame: both pairs refit live from the moved line
+    if (!splitFrame) splitFrame = requestAnimationFrame(() => { splitFrame = 0; refit({ live: true }); });
+    else drawMain();
+    return true;
+  }
+  if (eraseDrag && ev.pointerId === eraseDrag.id) { eraseAt(ev); drawMain(); return true; }
+  return false;
+}
+function importPointerUp(ev) {
+  if (splitDrag && ev.pointerId === splitDrag.id) { splitDrag = null; if (splitFrame) { cancelAnimationFrame(splitFrame); splitFrame = 0; } refit({ live: true }); }
+  if (eraseDrag && ev.pointerId === eraseDrag.id) { eraseDrag = null; refit({ live: true }); }
+}
+imEl('imFile').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) loadPicture(f); });
+document.addEventListener('paste', (e) => {
+  if (document.activeElement && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.type === 'text') return;
+  const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
+  if (item) { e.preventDefault(); loadPicture(item.getAsFile()); }
+});
+window.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.items || [])].some((i) => i.kind === 'file')) { e.preventDefault(); document.body.classList.add('is-dropping'); } });
+window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('is-dropping'); });
+window.addEventListener('drop', (e) => {
+  document.body.classList.remove('is-dropping');
+  const f = [...(e.dataTransfer?.files || [])].find((x) => /^image\//.test(x.type));
+  if (f) { e.preventDefault(); loadPicture(f); }
+});
+let refitTimer = 0;
+const refitSoon = () => { clearTimeout(refitTimer); refitTimer = setTimeout(() => refit({ live: true }), 60); };
+for (const id of ['imThr', 'imSpan', 'imTol', 'imBrush']) imEl(id).addEventListener('input', () => { writeImportOutputs(); if (id === 'imThr') imEl('imThrAuto').checked = false; if (id === 'imSpan') imp && (imp.split = null); if (id !== 'imBrush') refitSoon(); });
+imEl('imThrAuto').addEventListener('change', () => refit({ live: true }));
+imEl('imInvert').addEventListener('change', () => { if (imp) imp.polarityTouched = true; imEl('imThrAuto').checked = true; refit({ live: true }); });
+imEl('imPairs').addEventListener('change', () => { if (imp) imp.split = null; refit({ live: true }); });
+imEl('imTail').addEventListener('change', () => refit({ live: true }));
+imEl('imFlip').addEventListener('click', () => { if (!imp) return; imp.flip = !imp.flip; imp.split = null; refit({ reframe: true }); });
+imEl('imErase').addEventListener('click', () => { if (!imp) return; imp.erasing = !imp.erasing; imEl('imErase').classList.toggle('is-on', imp.erasing); imEl('imBrushRow').hidden = !imp.erasing; if (imp.erasing && editing) stopEditing(); drawMain(); });
+imEl('imEraseClear').addEventListener('click', () => { if (!imp) return; imp.erase.fill(0); imp.eraseDirty = true; refit({ live: true }); });
+imEl('imSeg').addEventListener('change', () => drawMain());
+imEl('imClose').addEventListener('click', () => {
+  imp = null; backdrop.href = null; backdrop.M = null;
+  imEl('imCtrls').hidden = true; imEl('imClose').hidden = true; imEl('imErase').classList.remove('is-on'); imMsg('');
+  drawMain();
+});
+writeImportOutputs();
 
 /* ---------------- build ---------------- */
 let pending = 0, idleTimer = 0;
@@ -788,6 +1010,12 @@ window.__bug = {
   setBackdrop: (o) => { Object.assign(backdrop, o); drawMain(); },
   backdrop: () => ({ ...backdrop, href: !!backdrop.href }),
   flushBuild: () => { if (pending) { cancelAnimationFrame(pending); pending = 0; } buildNow(false); },
+  // IMAGE -> BUG
+  importState: () => (imp ? { ok: !!(imp.result && imp.result.ok), reason: imp.result && imp.result.reason, mode: imp.result && imp.result.mode, pairs: imp.result && imp.result.ok ? imp.result.pairs.map((q) => ({ points: q.points, maxDevMm: q.maxDevMm, tail: q.tail })) : null, split: imp.split, threshold: imp.result && imp.result.seg.stats.threshold, lightOnDark: imp.result && imp.result.seg.stats.lightOnDark, message: imEl('imMsg').textContent, erasing: imp.erasing } : null),
+  splitScreen: (k) => (imp && imp.split ? worldToScreen(...imp.split[k]) : null),
+  pictureScreen: (px, py) => (imp && imp.Mwork ? worldToScreen(...bdWorld(applyAffine(imp.Mwork, px * imp.f, py * imp.f))) : null),
+  pointCounts: () => (params.wingPairs ? resolveWingPairs(params).map((w) => (w.drawn || w.points || []).length) : []),
+  refitNow: () => { clearTimeout(refitTimer); return !!refit({ live: true }); },
   render,
 };
 
