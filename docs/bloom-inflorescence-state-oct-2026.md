@@ -526,3 +526,140 @@ less the one shipped, less build 2. It excludes the TUBE-on-florets and grid ses
 
 *Measurement scripts lived in the session scratchpad. Every figure reproduces from
 `DEFAULTS` plus the named set through `buildBloomInto` in Node, `new MeshBuilder({ exportMode })`.*
+
+---
+
+## Rulings (Eva, Oct 3, 2026 — on the six questions above, plus one she raised)
+
+Each is a RULING. Where it departs from this doc's recommendation, the departure is named
+rather than edited around. They are recorded here verbatim in substance. The "Findings
+against the rulings" notes after them were checked against source in the same session. They
+are hypotheses for the build session to confirm, not amendments to the rulings.
+
+1. **Ruling 11 is accepted narrowly. The grid stays.**
+   - **The intended joins are exempt by construction:** a floret against its own pedicel, and
+     a pedicel against the rachis. The connectedness families (ID0–ID6) already test them,
+     so no gap bar applies.
+   - They are **excluded with that reason recorded, and they are NOT xfail rows.**
+   - **Everything else stays in the grid at the normal bar (`MIN_FEATURE_MM`):**
+     - floret against floret;
+     - floret against the terminal head;
+     - floret against the stem;
+     - leaf against pedicel (ruling 5: adjacent, not joined).
+   - **Ruling 11 is not retired, and ruling 9 keeps its condition.**
+   - *Against the doc:* none of options (a)–(c) was taken as offered. This is (a) for the
+     intended joins and (b) for everything else.
+
+2. **Build 2 is the node laws, not per-node deltas.**
+   - This reorders the recommendation of §Q8.
+   - **Reason:** ruling 5 adds a join to prove, and that belongs with the other root-law work.
+     Per-node deltas are a resolver change and get their own PR.
+   - Eva referred to two follow-on prompts. **They were not included in the message that
+     carried these rulings**, so this record does not restate them.
+
+3. **Per-floret phase is derived and aimed outward from the axis.**
+   - Each floret's form-variance phase is fixed relative to its own node's RADIAL direction,
+     not to the world.
+   - **No new control.**
+   - If the code cannot express a per-node frame, that is a finding to report. It is never a
+     reason to fall back to world-fixed without asking.
+   - *Against the doc:* this is neither A, B nor C as written. It is B's O(1) mechanism aimed
+     at a node-relative direction rather than a world-fixed one.
+
+4. **The TUBE on florets is allowed, later.**
+   - Florets may be fused bells, each snapping its own slit count by the existing snap rule
+     (`tubeSnap`, nearest divisor, ties down), with the built-count readout.
+   - **Not build 2.** It needs budget headroom first, with `INFLO: ALL MAX` at 95.0%.
+   - Recorded now so the build order carries it. **This is what foxglove and campanula need.**
+
+5. **Leaves and florets share a node, with the leaf seated below.**
+   - This is Eva's ruling, **against the recommendation.**
+   - Each pedicel is subtended by a leaf below it at the same node, offset by a DERIVED amount.
+   - **The pedicel owns the node's azimuth.**
+   - **Two consequences, both binding:**
+     - **(a)** the leaf-to-rachis and pedicel-to-rachis roots at one node are a NEW JOIN. It
+       must be proved, with its own assertion family.
+     - **(b)** leaf-against-pedicel clearance stays in the combination grid at the normal bar,
+       because the two parts are adjacent rather than joined.
+   - The existing **leaf-against-stem 0.000 mm at 85°** reading
+     (`docs/bloom-leaves-outcome.md`) is the warning.
+
+6. **Ruling 4 stands: florets inherit the apex row ramp.**
+   - The ramp exists so the apex geometry resolves, not for decoration.
+   - Pinning risks reintroducing folds at the nib.
+   - **Petal count stays the only cost lever**, which is what ruling 4 said originally.
+   - *Against the doc:* §Q2's "partly superseded" reading of ruling 4 is withdrawn. #289's
+     ramp is consistent with ruling 4, not an exception to it.
+
+7. **Raised by Eva from this doc's findings, not asked: the 544% corner gets declared.**
+   - **The gap:** the reachable 8.16 M-triangle state (`INFLO: ALL MAX` × `layerCount 6`,
+     florets inheriting layers and infill) has no matrix row. Nothing tests that the app's
+     export refusal fires there.
+   - **Build 2 adds a row that asserts the refusal, or states why it cannot.**
+   - **A refusal that nothing witnesses is not a safeguard.**
+
+### Findings against the rulings, checked against source
+
+**Ruling 1.** The grid has no measure for most of the ruled parts.
+
+- `tools/bloom-combination-gate.mjs` has three measures: `self` (24 uses), `self-every` (1)
+  and `leaf-stem` (2).
+- **floret–floret, floret–head and leaf–pedicel need new measures.**
+- floret–stem can reuse `leaf-stem`'s owner, `freeStemDistanceMm`, which #272's own
+  report already calls.
+- **The exclusions need a declared mechanism.** Neither `COMBINATION_XFAIL` nor
+  `COMBINATION_INERT` means "a join, excluded by construction". A third declaration, or a
+  per-measure exclusion of the joined parts' own blocks (ST9's "name the rod" remedy), has to
+  be designed and given a must-fail.
+
+**Ruling 3 is expressible.**
+
+- `pedicelPlacement` already forms each node's radial direction,
+  `R = [cos az, sin az, 0]` (`bloom-geometry.js:15080`).
+- Its roll about the pedicel is the minimal rotation, so a derived roll aiming the floret's
+  phase origin at `R` is a rigid change and keeps the build O(1).
+
+Two questions the build session must answer, not assume:
+
+- **(i) The phase is shared.** `variancePhase` (`bloom-registry.js:3008`) drives BOTH the size
+  field and the form field. Fixing "the form-variance phase" per floret therefore moves the
+  size field with it. The ruling names form; whether size follows is unruled.
+- **(ii) A roll moves more than the field.** It rotates the whole floret, petals included, not
+  the field relative to the petals. These agree only while the floret is otherwise rotationally
+  symmetric. A per-floret phase that moves the field RELATIVE to the petals needs the per-node
+  delta machinery that ruling 2 defers.
+
+**Ruling 5: two node laws, one node.**
+
+- **Two counts exist today.** `leafNodes` (`bloom-registry.js:3641`) and `floretNodes` are
+  independent counts on independent pitch floors. On the shipping raceme with three leaves they
+  coincide only by accident, at 103.2 mm.
+- **One count must own the node** under the ruling. Whether `leafNodes` is hidden under a
+  raceme, or retired into `floretNodes`, is a registry decision with a partition.
+- **The node count is ruled, the depths are not.** The leaf's derived offset below the pedicel
+  must clear the pitch floor of both rods.
+
+**Ruling 7: the witness exists, but the cost is the risk.**
+
+- **What already exists.** `exportRefusalAssertion` (XR1/XR2) is the existing witness, so a
+  declared refusal is one `EXPORT_REFUSED_XFAIL` entry plus a matrix row. The ruling is
+  expressible.
+- **The cost.** The state builds 8,161,868 triangles in 18.5 s LIVE on this box (§Q5), and
+  the page builds it twice: live, then export on the click. Compare the existing `ALL MAX`
+  refusal, which builds 3,090,816 triangles. `CLAUDE.md` records that row taking 47.7 s and
+  timing out the harness's 30 s settle locally.
+- **The likely "why it cannot".** A row at 2.6× that count may not settle inside the
+  harness's own timeout on a CI runner. The build session should measure that before
+  committing the row, and if it fails, state it as the reason, as the ruling allows.
+
+### Q12 restated under these rulings
+
+The build order for the inflorescence programme, revised:
+
+| order | session | content |
+|---|---|---|
+| **2** | **node laws** | the sessile root law (ruling 7 of Sep 17); the leaf-below-pedicel shared node and its new join family (ruling 5); per-floret phase aimed outward (ruling 3); the combination grid rebuilt per ruling 1 with its join exclusions; the 544% refusal row (ruling 7) |
+| 3 | per-node deltas | the resolver change; the pedicel-length gradient and the derived corymb ride on it |
+| 4 | terminal flower and axis-0 | indeterminate raceme, apex umbel / fascicle |
+| — | TUBE on florets | ruling 4 of this list; after budget headroom exists |
+| — | openness, droop, cymes, compound | as in §Q8, unchanged |
