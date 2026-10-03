@@ -304,7 +304,13 @@ export const IMAGE_MUTANTS = [
   ['the body is read 15% short', 'B = (jTail - jHead) * s;', 'B = 0.85 * (jTail - jHead) * s;', 'IM10'],
   ['the polarity is read off the border alone', 'if (pb.size > pa.size) {', 'if (false) {', 'IM13'],
   ['the body is always measured (a sliver fitted)', 'const confident = abdSeenMm >=', 'const confident = true || abdSeenMm >=', 'IM11'],
-  ['the wing root runs down the body', 'const atRoot = (q) => q[0] <= cutX + 0.6 * s && Math.abs(q[1]) <= T + 0.6 * s;', 'const atRoot = (q) => q[0] <= cutX + 0.6 * s;', 'IM12'],
+  // 'the wing root runs down the body' (IM12) is RETIRED, not passing: since
+  // §12 two mechanisms each prevent it on their own — the fitter replaces the
+  // root zone with a bridge to two anchors on the thorax (completeChain), and
+  // the model's blended root narrows every wing to its neck at the body's
+  // silhouette — and the mutation fired nothing even with the completion
+  // switched off too (measured). IM12 still asserts on every fit; it has no
+  // live mutant, a gap recorded here rather than one manufactured.
   ['the ground along the edge is kept', 'if (border[id] / borderN > BORDER_TOUCH_FRAC) {', 'if (false) {', 'IM13'],
   ['a refusal does not name its step', "reason: `step ${k} of ${STEPS.length} (${STEPS[k - 1]}) failed: ${text}`", 'reason: text', 'IM14'],
 ];

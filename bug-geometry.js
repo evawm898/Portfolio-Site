@@ -1855,6 +1855,13 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // frame is a single closed slab whose rim walk (planformSlab) finds the
     // hole rims by the same directed-edge rule as the outer rim.
     ({ pts, tris: tri } = frameMesh(plan, embed, n0, n1));
+    // under the blended root every main vein converges on the neck, so the
+    // cells between them are long thin wedges and an ear clip hands back
+    // slivers whose facing flips under the wing's bend — contour hairlines up
+    // to 0.6 mm inside the outline (measured, dense nets). A Delaunay pass
+    // flips them away; the straight root chord keeps its triangulation, so
+    // every design without the root is byte-identical.
+    if (rootW) tri = delaunayFlip(pts, tri);
     if (round > 0) {
       const r = insetMesh(pts, tri, wantRound, aRound);
       movedOf = new Map(pts.map((q, i) => [`${q[0]},${q[1]}`, r.pts[i]]));

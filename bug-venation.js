@@ -507,7 +507,11 @@ export function planVenation(outline, tailFlags, spec, opts = {}) {
   };
   const perp = (pth, t) => { const a = pathAt(pth, Math.max(0, t - 0.01)), b = pathAt(pth, Math.min(1, t + 0.01)); const d = sub2(b, a), L = Math.hypot(d[0], d[1]) || 1; return [[-d[1] / L, d[0] / L], [d[1] / L, -d[0] / L]]; };
   const outerCut = (k, t, role) => {
-    const pth = paths[k]; const A = pathAt(pth, t);
+    // snapped like every other cut's end: materialised raw, a foot landing a
+    // fraction of a micron from a cross-vein's foot on the same path left two
+    // vertices that far apart once the holes' merges took the veins away — a
+    // sliver facet and a contour hairline (0.78 mm, measured)
+    const pth = paths[k]; const A = snapTo(cells, pathAt(pth, t));
     materialise(cells, A);
     const hits = cells.edgesAt(A);
     for (const h of hits) {

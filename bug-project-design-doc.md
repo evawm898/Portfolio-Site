@@ -1962,3 +1962,17 @@ forewing's drawn margin and requires J to fire.
    one-pixel island on ONE side. Measured identical on `main` at `d1fac30` with the same
    sweep — not this change. The row's sweep is pinned to its old value (its subject is the
    tail's isolation), with this note beside it.
+5. **IM12's mutant is retired, not passing.** "The wing root runs down the body" fired
+   nothing once the root was blended: the fitter's completion replaces the root zone with
+   a bridge to two anchors on the thorax, and the model narrows every wing to its neck —
+   the mutation stayed silent even with the completion switched off as well. IM12 still
+   asserts on every fit; it has no live mutant, recorded as a gap.
+6. **Two pre-existing slivers the root exposed, both fixed.** (a) A vein-to-margin cut
+   materialised its start point without the 0.1 mm snap every other cut uses, so a foot
+   landing 0.3 µm from a cross-vein's foot left two vertices that far apart once the holes'
+   merges took both veins away — a 0.78 mm contour hairline (gate row "holes: cross
+   density 1, long wing"). It is snapped now. (b) Under the blended root every main vein
+   converges on the neck, so the cells between them are long thin wedges whose ear-clipped
+   slivers flip facing under the wing's bend (0.59 mm, "holes: irregular dense net"); the
+   frame mesh gets a Delaunay pass under the root only, so every design with the straight
+   root chord keeps its triangulation byte for byte.
