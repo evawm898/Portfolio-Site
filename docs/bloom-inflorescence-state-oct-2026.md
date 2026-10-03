@@ -663,3 +663,101 @@ The build order for the inflorescence programme, revised:
 | 4 | terminal flower and axis-0 | indeterminate raceme, apex umbel / fascicle |
 | — | TUBE on florets | ruling 4 of this list; after budget headroom exists |
 | — | openness, droop, cymes, compound | as in §Q8, unchanged |
+
+---
+
+## Rulings, as restated by Eva (Oct 3, second message). These SUPERSEDE the section above.
+
+Eva restated all seven rulings when she closed this round, and the restatement **governs**.
+Where it differs from the "Rulings (Eva, Oct 3, 2026)" section above, this one wins and the
+difference is named. The difference that matters is **ruling 2: what build 2 contains.**
+
+1. **Ruling 11 is accepted narrowly.** The intended join (floret to its own pedicel, pedicel to
+   rachis) is **excluded by construction**, with that reason recorded. It is **not** declared as
+   an xfail magnitude, because the connectedness families (ID0–ID6) already test it. **Every
+   other pair stays in the grid at the normal bar:** floret×floret, floret×terminal head,
+   floret×stem and leaf×pedicel. **Ruling 11 is not retired; ruling 9 keeps its condition.**
+2. **Build 2 is the node laws:** the pedicel-length gradient, the embedded sessile root, the
+   shared-node seating from ruling 5, and the grid pairs those introduce. **Per-node deltas and
+   per-floret phase move to build 3.**
+   - **This contradicts this doc's own recommendation** (§Q8: per-node deltas first, with the
+     gradient riding on them).
+   - It also corrects the section above. That section put the pedicel gradient in build 3 and
+     per-floret phase in build 2; **this ruling puts the gradient in build 2 and the phase in
+     build 3.**
+3. **Per-floret phase is derived, fixed to each node's radial direction** (outward from the
+   axis), not to the world. **No new control.** If a per-node frame cannot be expressed, that
+   is reported rather than substituted with world-fixed. It is build 3's (ruling 2).
+4. **The TUBE on florets is allowed in principle and built in a later session.** Each floret
+   snaps its own slit count by the existing snap rule, with the built-count readout. **Not
+   build 2.**
+5. **Leaves and florets share a node**, with the leaf seated below the pedicel by a DERIVED
+   offset and the pedicel owning the azimuth.
+   - **This contradicts this doc's own recommendation** (§"Ranked questions" item 5 offered
+     sharing or exclusion as open; the ruling takes sharing with the leaf below).
+   - The shared node is a **new join, proved with its own assertion family.**
+   - **Leaf-against-pedicel clearance stays in the combination grid at the normal bar.**
+6. **Ruling 4: florets inherit the head's apex row ramp.** Petal count remains the only cost
+   lever.
+7. **The reachable 8.16 M-triangle corner gets a declared row** that asserts the export refusal
+   fires, **in build 2, or with a stated reason it cannot.**
+
+**One recorded consequence, from source rather than new discovery.** The pedicel is the
+floret's own stem: `floretState` sets `stemLength` to the pedicel length,
+`bloom-geometry.js:15035-15048`. So a pedicel-length gradient gives florets at different nodes
+different STATES, and that cannot be one build appended N times. Build 2's gradient therefore
+needs a build per distinct pedicel length. That is the core of what "per-node deltas" was going
+to provide. The build-2 session should say how it does this without building the per-node delta
+resolver that ruling 2 defers.
+
+### What ruling 11's narrow exemption means for the grid #272 sized
+
+Source: the two tables in `docs/bloom-inflorescence-outcome.md` §7, EXPORT, a 120 mm rachis,
+read as published. No cell was re-measured. Bar: `MIN_FEATURE_MM` = 1.000 mm.
+
+**What #272's measure was.** The nearest approach of any floret vertex **not on its own
+pedicel rod** to the free rachis's solid, through `freeStemDistanceMm`.
+
+- The intended join's rod was **already** excluded by name.
+- So **every cell is a floret×STEM reading**, and floret×stem is one of the pairs ruling 1
+  keeps at the normal bar.
+
+**The 16 cells: `pedicelAngle` {35, −60, 60, 90} × `pedicelLength` {20, 5, 40, 60}, CAP head.**
+
+| | excluded by construction | stay | under the bar (stay) |
+|---|---|---|---|
+| **16** | **0** | **16** | **9** |
+
+The 9 under the bar:
+
+- 35° × 5 mm (0.000);
+- −60° × 20 and × 5 (0.000, 0.000);
+- 60° × 20 and × 5 (0.000, 0.000);
+- 90° at all four lengths (0.000 each).
+
+**The companion grid, `pedicelAngle` × `hubShape` {CAP, SPHERE}, is 8 cells, not 16:**
+
+| | excluded | stay | under the bar |
+|---|---|---|---|
+| **8** | **0** | **8** | **7** |
+
+The 7 under the bar:
+
+- CAP at −60 / 60 / 90 (0.000);
+- SPHERE at 35° (0.823) and at −60 / 60 / 90 (0.000).
+
+**The count the exemption leaves:** 24 cells across both grids, **0 excluded, 24 stay, 16 under
+the bar.** The exemption moves no cell, because #272's measure had already applied it.
+
+**The correction this forces.** Outcome §7 says "11 of 16 cells are under the bar on each", and
+this doc's §Q2 row 11 and §Q3(c) repeated it. **Its own tables give 9 of 16 and 7 of 8.** The
+"11 of 16" figure is withdrawn here. The earlier lines stand as written, so the correction is
+legible.
+
+**What remains open for build 2: attribution by part.**
+
+- **The 0.000 cells at 5 mm and at 90°** may be the floret's own hub-to-stem join thickening
+  touching the rachis. That would be part of the intended join, which ruling 1 excludes.
+- **Or** they may be petals reaching the rachis, which stay at the bar.
+- The published tables cannot say which, so **the build-2 session must attribute those cells by
+  part before declaring any of them.**
