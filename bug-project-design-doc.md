@@ -1718,8 +1718,9 @@ as it was when the picture arrived, so moving a slider twice does not compound.
 
 1. **The head is the end nearer the top of the picture**, with a Flip button — there is no
    reliable cue.
-2. **The hidden overlap**: the split line moved forward by 8% of the wing, alongside the
-   segment, inside the silhouette (`HIDDEN_OVERLAP_FRAC`).
+2. **The hidden overlap**: a band up to 8% of the wing ahead of the split line, tapering
+   to nothing at the notch, alongside the segment, inside the silhouette
+   (`HIDDEN_OVERLAP_FRAC`; the taper is §11.7's).
 3. **The default split runs square to the body** from the notch.
 4. **The thorax is 0.24 of the body** and 1.1× the wider of head and abdomen (it is under
    the wings).
@@ -1735,3 +1736,93 @@ as it was when the picture arrived, so moving a slider twice does not compound.
 8. The tolerance cannot always reach 0.1 mm: points closer than 0.015 of the wing length
    are not added (the outline rule refuses neighbours under 0.012), so the closest fit on
    the butterfly reads 0.14–0.16 mm, and the message says the number it reached.
+
+### 11.7 Round 2 — Eva's Morpho photo: the body, clutter, the wingspan
+
+Eva tried a real Morpho photograph on PR #346. The outline fit was good; three things were
+not. Each fix below is gated (IM11–IM14), and the sheet is
+`node tools/shot-bug-image-fixes.mjs <dir> --base <worktree of the previous commit>` →
+`docs/img/bug-image-fixes.jpg`.
+
+**1. The body was swallowed — two causes, both fixed.**
+- **Cause one: the body was measured when it could not be seen.** On a photograph whose
+  dark body touches the dark wing roots, no narrow column shows between the wings — only
+  the abdomen's TIP below them.
+  - The old fit measured that tip: abdomen 1.65 mm, head and thorax at their slider
+    minimums, on the gate's same-tone picture. That reproduces Eva's 1.5 mm.
+  - The body now carries a CONFIDENCE. It is measured only when at least `ABD_SEEN_FRAC`
+    (6%) of the wingspan of abdomen shows below the wings, at least `ABD_WIDTH_SHARE`
+    (0.6) of the fallback's width.
+  - Otherwise it is ESTIMATED: the default specimen's body (`defaultParams`, one owner)
+    scaled by the fitted wingspan over the default's own wingspan.
+  - The page says which, and why ("Body ESTIMATED from the wingspan — only 2.1 mm of
+    abdomen shows below the wings…").
+  - Measured visible abdomen: 9.3–31 mm on the clean pictures (13–41% of the wingspan),
+    2.1 mm (2.9%) on the same-tone one.
+- **Cause two: the wing ROOT ran down the body.** A wing's outline closes on its root
+  chord (u = 0 at the model's hinge, inside the thorax). The old chord spanned every row
+  the picture's wing touched the body — on the hindwing, the whole length of the abdomen
+  — so the two wings covered the body as one plate whatever its width.
+  - The root now attaches only along the THORAX's span (|y| ≤ half the thorax length).
+  - Beside the abdomen (or the head) the wing's inner edge stays in the outline, ON the
+    body's edge (the cut at 1.15 × the body's half-width + 1 px).
+  - A pair that touches the body only beside the abdomen (a hindwing whose root is under
+    the forewing) gets a strip along the body's edge up to the thorax. The strip is
+    hidden under the pair ahead of it, at least twice the print floor wide and joined to
+    the thorax over at least twice the floor, so the wing's neck never falls under the
+    floor (it did at first, 0.8 mm).
+- **The hidden band now tapers** to nothing at the notch. Its square end was a hook
+  tighter than the bead, which folded there: a stray SVG contour line on the same-tone
+  picture.
+- **IM11** asserts the source (estimated on the same-tone picture, measured on every
+  other) and that an estimated body is no narrower than the default proportions at that
+  wingspan. Its reference is computed in the gate from `defaultParams`, not read from the
+  importer's own fallback.
+- **IM12** asserts no fitted right-wing point beside the abdomen or head lies inside the
+  BUILT body's own surface (per 0.5 mm band). The points within 1 mm of the thorax's span
+  are the root, which attaches there by design.
+- Measured: 0.29–0.57 mm outside the body on every picture.
+
+**2. Clutter, and refusals that name their step.**
+- Step 1 now drops clutter before anything is measured:
+  - a shape running along more than 4% of the picture's edge is the GROUND (a table, the
+    far side of a paper edge);
+  - a shape whose largest hole is at least 10% of its filled area ENCLOSES the bug (a
+    sheet of paper in view);
+  - of the rest, the largest shape is the bug, and every smaller detached mark (a scale
+    bar, text) is ignored and counted.
+- The polarity is chosen by the same rule: the polarity whose best acceptable shape is the
+  larger, no longer the border's median alone. A dark table along a white sheet's edge
+  turned that median the wrong way round.
+- Busy is refused when the kept shape is under 25% of everything that stands out (the busy
+  picture: 3%).
+- The symmetry check runs on that one shape. The previous commit on the gate's two clutter
+  pictures:
+  - the paper corner with a table larger than the bug: refused as busy, because the table
+    was the largest shape and ran along 46% of the edge;
+  - the whole sheet on a table: refused, because the sheet read as the subject (60% of
+    the picture).
+  - Both fit now (IM13).
+- Every refusal names its step — "step 2 of 5 (finding the mirror axis) failed: … the shape
+  it found is outlined on the picture…" — and returns the shape for the page (IM14).
+- The page switches "show what was found" ON when a fit is refused, and draws the dropped
+  clutter in amber beside the teal outline and the red erase.
+- What made Eva's attempt read 41% is not known: the photo is not in the repository. The
+  clutter pictures are the best reproduction of what she described.
+- **The price of the frame rule:** a bug with ONE see-through window over a tenth of its
+  area (a glasswing) reads as a sheet. Forcing the polarity with the Invert box turns the
+  frame rule off.
+
+**3. The wingspan slider was wired; the labels were the problem.**
+- Measured in the page: the slider at 20 fits a bug 20.06 mm tip to tip, at 130 one 130.0
+  mm. Nothing in the wiring was wrong.
+- The two numbers Eva compared are different quantities. The SVG note is the size of the
+  FILE: the whole bug with legs, antennae and margin, 76.1 mm for a 72.1 mm wingspan. And
+  a refit the picture refuses leaves the last good fit on screen while the slider keeps
+  the asked value.
+- The label is now "Wingspan, tip to tip (sets the fit's scale)".
+- Its readout adds "— the bug on screen is X mm (this wingspan was not fitted)" whenever
+  the two differ.
+- The SVG note says "(the file: the whole bug, legs and antennae and margin included; the
+  wingspan alone is X mm)".
+

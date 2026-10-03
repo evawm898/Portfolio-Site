@@ -9830,6 +9830,12 @@ run by `verify-bug.mjs`) judges every fit against the KNOWN bug the synthetic pi
 from, placed by the KNOWN transform — its first version used the fit's own transform and a
 wrong-scale mutant passed it. Sheet: `node tools/shot-bug-image.mjs <dir>`. Every test picture is
 synthetic; Eva's own pictures are not in the repository.
+**§11.7 (round 2, Eva's Morpho)**: the body carries a CONFIDENCE and is ESTIMATED (default
+proportions scaled by the wingspan) when no clear abdomen shows; a wing ROOT attaches only
+along the thorax, beside the abdomen its inner edge lies on the body's edge (IM11, IM12);
+step 1 drops the ground, a sheet around the bug and detached marks before the symmetry
+check, and every refusal names its step (IM13, IM14). Sheet: `node tools/shot-bug-image-fixes.mjs
+<dir> --base <worktree>`.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

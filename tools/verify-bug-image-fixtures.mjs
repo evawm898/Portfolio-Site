@@ -122,6 +122,60 @@ export function renderBug(params, o = {}) {
   return { width: W, height: H, data, truth: { params, model, toPx, fromPx, pxPerMm, angleDeg, asym, wingspanMm: 2 * span, origin: toPx([0, 0]) } };
 }
 
+/* The SAME-TONE body: a photograph's dark body touches the dark wing roots (a
+   Morpho's hindwings hug its abdomen), so no narrow column shows between the
+   wings — only the abdomen's tip below them. Drawn from the default bug with
+   the background between the body and each wing's inner edge inked over, from
+   the thorax back, wherever that inner edge is within `reach` mm of the axis.
+   What is inked is NOT the known bug's wing, so the outline comparison is
+   clipped beyond `reach` (truth.clipMm). */
+export function sameTone(params, o = {}, reach = 8) {
+  const img = renderBug(params, o), t = img.truth, W = img.width, H = img.height, m = t.model;
+  const loops = m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R').flatMap((q) => G.contourLoops(m, q));
+  const inner = (y) => { let best = Infinity; for (const L of loops) for (let k = 0; k < L.length; k++) { const a = L[k], b = L[(k + 1) % L.length]; if ((a[1] <= y) !== (b[1] <= y)) { const x = a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]); if (x > 0) best = Math.min(best, x); } } return best; };
+  const front = (params.thoraxLength || 5) / 2, ink = [42, 34, 30], r = rng(o.seed || 1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const [wx, wy] = t.fromPx([x + 0.5, y + 0.5]);
+    if (wy > front) continue;
+    const e = inner(wy);
+    if (e < reach && Math.abs(wx) <= e + 0.3) { const i = 4 * (y * W + x); for (let k = 0; k < 3; k++) img.data[i + k] = ink[k] + 9 * gauss(r); }
+  }
+  t.clipMm = reach + 0.3;
+  return img;
+}
+
+/* CLUTTER: a photograph of a pinned specimen — the bug on a sheet of paper
+   whose EDGE runs across one side with a dark table beyond it, a SCALE BAR
+   with "1 cm" beside it, and a typed LABEL. Nothing of it touches the bug.
+   The gate's claim is that the fit ignores all of it (and reports the marks). */
+const GLYPHS = { '1': ['010', '110', '010', '010', '010', '010', '111'], c: ['000', '000', '011', '100', '100', '100', '011'], m: ['00000', '00000', '11010', '10101', '10101', '10101', '10101'], ' ': ['0', '0', '0', '0', '0', '0', '0'] };
+export function clutter(params, o = {}) {
+  const img = renderBug(params, { ...o, margin: 150 }), t = img.truth, W = img.width, H = img.height, r = rng((o.seed || 1) + 7);
+  const px = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = 4 * (y * W + x); for (let k = 0; k < 3; k++) img.data[i + k] = c[k] + 8 * gauss(r); };
+  // the paper's edge: a line across the lower-right corner, the table beyond it
+  const ang = (o.edgeDeg ?? 24) * Math.PI / 180, nx = Math.cos(ang), ny = Math.sin(ang);
+  let reachBug = -Infinity; const lp = (q) => { const [a, b] = t.toPx(q); reachBug = Math.max(reachBug, a * nx + b * ny); };
+  for (const part of t.model.parts) for (let v = part.v0; v < part.v1; v++) lp([t.model.positions[3 * v], t.model.positions[3 * v + 1]]);
+  // and a second edge along the bottom: the paper's CORNER, so the table
+  // beyond it is a larger shape than the bug (the case a "keep the largest
+  // shape" rule gets wrong)
+  let lowBug = -Infinity; for (const part of t.model.parts) for (let v = part.v0; v < part.v1; v++) lowBug = Math.max(lowBug, t.toPx([t.model.positions[3 * v], t.model.positions[3 * v + 1]])[1]);
+  const edge = reachBug + 22, a2 = (o.edge2Deg ?? -4) * Math.PI / 180, mx = -Math.sin(a2), my = Math.cos(a2), edge2 = (lowBug + 30) * my + (W / 2) * mx;
+  // o.sheet: the WHOLE sheet in view, a rotated rectangle with the table all
+  // round it (the sheet then encloses the bug: a frame, not the subject)
+  const inSheet = (x, y) => { const c = Math.cos(0.06), sn = Math.sin(0.06), u = (x - W / 2) * c + (y - H / 2) * sn, v = -(x - W / 2) * sn + (y - H / 2) * c; return Math.abs(u) < W / 2 - 44 && Math.abs(v) < H / 2 - 44; };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (o.sheet ? !inSheet(x + 0.5, y + 0.5) : (x + 0.5) * nx + (y + 0.5) * ny > edge || (x + 0.5) * mx + (y + 0.5) * my > edge2) px(x, y, [64, 50, 40]);
+  // the scale bar: 1 cm long at the picture's own scale, bottom left, ticked
+  const L = Math.round(10 * t.pxPerMm), bx = o.sheet ? 34 : 14, by = Math.round(lowBug + 18);
+  for (let y = by; y < by + 4; y++) for (let x = bx; x <= bx + L; x++) px(x, y, [30, 26, 24]);
+  for (const x0 of [bx, bx + L]) for (let y = by - 6; y < by + 4; y++) for (let x = x0; x < x0 + 2; x++) px(x, y, [30, 26, 24]);
+  let gx = bx; const text = (str, x0, y0, sc) => { let x = x0; for (const ch of str) { const g = GLYPHS[ch] || GLYPHS[' ']; g.forEach((row, j) => [...row].forEach((b, i) => { if (b === '1') for (let a = 0; a < sc; a++) for (let c = 0; c < sc; c++) px(x + i * sc + a, y0 + j * sc + c, [30, 26, 24]); })); x += (g[0].length + 1) * sc; } return x; };
+  gx = text('1 cm', bx + L + 8, by - 10, 2);
+  // a typed label, top left: four lines of "words"
+  for (let line = 0; line < 4; line++) { let x = o.sheet ? 60 : 12; const y = (o.sheet ? 60 : 12) + line * 11; while (x < 12 + 70 + 10 * r()) { const w = 6 + Math.floor(14 * r()); for (let yy = y; yy < y + 6; yy++) for (let xx = x; xx < x + w; xx++) if (r() < 0.75) px(xx, yy, [40, 36, 34]); x += w + 5; } }
+  return img;
+}
+
 const D = () => G.defaultParams();
 /* The fixtures the gate and the sheet share. */
 export const IMAGE_FIXTURES = {
@@ -157,6 +211,12 @@ export const IMAGE_FIXTURES = {
     img.erase = erase;
     return img;
   },
+  // a SAME-TONE body (a Morpho's): the body touches the wing roots, no column shows
+  sametone: () => sameTone(D(), { angleDeg: 6, asym: 0.02, seed: 21 }),
+  // CLUTTER: rotated, on paper with an edge and a table beyond it, a 1 cm scale bar, a label
+  clutter: () => clutter(D(), { angleDeg: 9, asym: 0.02, seed: 22 }),
+  // the WHOLE sheet in view on a dark table: the sheet encloses the bug (a frame)
+  sheet: () => clutter(D(), { angleDeg: -7, asym: 0.02, seed: 23, sheet: true }),
   // a busy background: the butterfly over dense blobs — must be REFUSED
   busy: () => renderBug(D(), { angleDeg: 2, seed: 15, busy: 420 }),
 };

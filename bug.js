@@ -720,8 +720,12 @@ function refit({ reframe = false, live = false } = {}) {
       imp.Mwork = [sc, 0, 0, -sc, -40, (sc * H) / 2];
     }
     placeImportBackdrop();
+    // a refusal turns "show what was found" ON: the outline of the shape the
+    // fit was working on, and what it dropped as clutter, is what to erase against
+    imEl('imSeg').checked = true;
+    writeImportOutputs();
     drawMain();
-    imMsg(`Not fitted: ${r.reason}.${imp.lastGood ? ' The bug on screen is the last good fit.' : ' The bug on screen is unchanged.'}`, true);
+    imMsg(`Not fitted — ${r.reason}.${imp.lastGood ? ' The bug on screen is the last good fit.' : ' The bug on screen is unchanged.'}`, true);
   }
   return r;
 }
@@ -732,13 +736,24 @@ function placeImportBackdrop() {
 }
 function importSummary(r) {
   const pairs = r.pairs.map((q) => `pair ${q.pair + 1}: ${q.points} control points, the fit within ${q.maxDevMm.toFixed(2)} mm of the picture${q.tail && !q.tail.inline ? ` — a TAIL of ${q.tail.points} points (${q.tail.lengthMm.toFixed(1)} mm), TAIL on` : ''}`).join(' · ');
-  const how = r.mode === 'separate' ? `${r.pairs.length} separate wing${r.pairs.length > 1 ? 's' : ''} a side` : r.mode === 'split' ? 'one wing mass a side, split into 2 pairs at its notch (drag the pink split line in Top → SVG); the hindwing under the forewing is a GUESS — its hidden leading edge is the split line moved forward by 8% of the wing' : 'one pair';
+  const how = r.mode === 'separate' ? `${r.pairs.length} separate wing${r.pairs.length > 1 ? 's' : ''} a side` : r.mode === 'split' ? 'one wing mass a side, split into 2 pairs at its notch (drag the pink split line in Top → SVG); the hindwing under the forewing is a GUESS — its hidden leading edge lies up to 8% of the wing ahead of the split line, tapering to nothing at the notch' : 'one pair';
   const floor = model && model.floorViolations.length ? ' · RED: part of a fitted outline is narrower than the floor — widen it in the editor, or lower the floor in Print (the STL is blocked until then).' : '';
-  return `Fitted ${how}. ${pairs}. Body ${r.body.bodyLengthMm.toFixed(1)} mm long${r.body.headSeen ? '' : ' (no head showed in front of the wings: its size is the column\'s)'}; mirror axis at ${r.transform.axisDeg.toFixed(1)}°, ${Math.round(100 * r.transform.symmetry)}% symmetric — the two halves are averaged, the bug is mirror-exact. ${r.notes.length ? 'Notes: ' + r.notes.join('; ') + '. ' : ''}${floor} (${r.ms.toFixed(0)} ms)`;
+  const b = r.body, st = r.seg.stats, op = st.otherPolarity || {};
+  const body = b.source === 'measured'
+    ? `Body measured from the picture: ${b.bodyLengthMm.toFixed(1)} mm long, abdomen ${r.params.abdomenWidth.toFixed(1)} mm wide${b.headSeen ? '' : ' (no head showed in front of the wings: its size is the column\'s)'}`
+    : `Body ESTIMATED from the wingspan — ${b.why}; so the body is the default proportions at this wingspan (${b.bodyLengthMm.toFixed(1)} mm long, abdomen ${r.params.abdomenWidth.toFixed(1)} mm wide), and the wings are clipped at its edge`;
+  const ground = st.groundDropped + (op.groundDropped || 0), frames = st.framesDropped + (op.framesDropped || 0);
+  const clutter = [st.marksIgnored ? `${st.marksIgnored} detached mark${st.marksIgnored > 1 ? 's' : ''} (a scale bar, text, specks)` : '', ground ? `${ground} shape${ground > 1 ? 's' : ''} along the picture's edge (a table, a paper edge)` : '', frames ? 'a sheet around the bug' : ''].filter(Boolean);
+  return `Fitted ${how}. ${pairs}. ${body}.${clutter.length ? ` Ignored as clutter: ${clutter.join(', ')} — amber in "show what was found".` : ''} Mirror axis at ${r.transform.axisDeg.toFixed(1)}°, ${Math.round(100 * r.transform.symmetry)}% symmetric — the two halves are averaged, the bug is mirror-exact. ${r.notes.length ? 'Notes: ' + r.notes.join('; ') + '. ' : ''}${floor} (${r.ms.toFixed(0)} ms)`;
 }
 function writeImportOutputs() {
   imEl('imThr-out').textContent = imEl('imThr').value;
-  imEl('imSpan-out').textContent = `${(+imEl('imSpan').value).toFixed(1)} mm`;
+  // the slider IS the fit's wingspan (tip to tip); the readout also says when
+  // the bug on screen is not that wide — a refused refit leaves the last good
+  // fit on screen, and editing the wings afterwards changes the span
+  const asked = +imEl('imSpan').value, shown = model ? bugWingspan() : asked;
+  const refused = imp && imp.result && !imp.result.ok;
+  imEl('imSpan-out').textContent = Math.abs(shown - asked) > 0.5 ? `${asked.toFixed(1)} mm — the bug on screen is ${shown.toFixed(1)} mm${refused ? ' (this wingspan was not fitted)' : ''}` : `${asked.toFixed(1)} mm`;
   imEl('imTol-out').textContent = `${(+imEl('imTol').value).toFixed(2)} mm`;
   imEl('imBrush-out').textContent = `${imEl('imBrush').value} px`;
 }
@@ -752,6 +767,18 @@ function importOverlay() {
   if (seg && seg.mask) {
     const loop = traceOuter(seg.mask, W, imp.work.height);
     if (loop.length) h += `<path class="im-seg" d="M${loop.map(([i, j]) => toV(...bdWorld(applyAffine(M, i, j))).map((v) => v.toFixed(2)).join(' ')).join('L')}Z"/>`;
+  }
+  // what was dropped as CLUTTER (the ground, a sheet, detached marks): amber
+  if (seg && seg.clutter) {
+    if (imp.clutterOf !== seg.clutter) {
+      const c = document.createElement('canvas'); c.width = W; c.height = imp.work.height;
+      const g = c.getContext('2d'), id = g.createImageData(W, imp.work.height);
+      for (let k = 0; k < seg.clutter.length; k++) if (seg.clutter[k]) { id.data[4 * k] = 230; id.data[4 * k + 1] = 160; id.data[4 * k + 2] = 40; id.data[4 * k + 3] = 120; }
+      g.putImageData(id, 0, 0); imp.clutterHref = c.toDataURL(); imp.clutterOf = seg.clutter;
+    }
+    const sc = backdrop.scale;
+    const m = [sc * M[0], -sc * M[1], sc * M[2], -sc * M[3], sc * M[4] + (1 - sc) * backdrop.cx + backdrop.dx * (backdrop.w || 1) - vbox.x0, vbox.y1 - sc * M[5] - (1 - sc) * backdrop.cy - backdrop.dy * (backdrop.w || 1)];
+    h += `<image class="im-clutter" href="${imp.clutterHref}" x="0" y="0" width="${W}" height="${imp.work.height}" transform="matrix(${m.join(' ')})" preserveAspectRatio="none" style="pointer-events:none"/>`;
   }
   let any = false; for (const e of imp.erase) if (e) { any = true; break; }
   if (any) {
@@ -868,6 +895,7 @@ function buildNow(reframe) {
   if (reframe) setView(viewName); else { render(); drawMain(); }
   writeSvgNote();
   writeReadout();
+  if (imp) writeImportOutputs();   // the wingspan readout names the bug on screen
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     if (modelStale) { realModel(); render(); }
@@ -896,7 +924,7 @@ function withThinPreview(out) {
 function writeSvgNote() {
   const out = exportSvg(model, { cutSafe: false });
   const cutNote = cutSafeEl.checked ? (cutReady ? (() => { const r = exportSvg(model, { cutSafe: true }).regions; stats.cutRegions = r; return ` Cut-safe: the union of every part — ${r} connected region${r === 1 ? '' : 's'}.`; })() : ' Cut-safe: computing the union…') : '';
-  document.getElementById('svgNote').textContent = `SVG ${out.widthMm.toFixed(1)} × ${out.heightMm.toFixed(1)} mm — Top → SVG shows exactly the file Get SVG writes.${cutNote}`;
+  document.getElementById('svgNote').textContent = `SVG ${out.widthMm.toFixed(1)} × ${out.heightMm.toFixed(1)} mm (the file: the whole bug, legs and antennae and margin included; the wingspan alone is ${bugWingspan().toFixed(1)} mm) — Top → SVG shows exactly the file Get SVG writes.${cutNote}`;
 }
 
 function writeReadout() {
@@ -1011,7 +1039,7 @@ window.__bug = {
   backdrop: () => ({ ...backdrop, href: !!backdrop.href }),
   flushBuild: () => { if (pending) { cancelAnimationFrame(pending); pending = 0; } buildNow(false); },
   // IMAGE -> BUG
-  importState: () => (imp ? { ok: !!(imp.result && imp.result.ok), reason: imp.result && imp.result.reason, mode: imp.result && imp.result.mode, pairs: imp.result && imp.result.ok ? imp.result.pairs.map((q) => ({ points: q.points, maxDevMm: q.maxDevMm, tail: q.tail })) : null, split: imp.split, threshold: imp.result && imp.result.seg.stats.threshold, lightOnDark: imp.result && imp.result.seg.stats.lightOnDark, message: imEl('imMsg').textContent, erasing: imp.erasing } : null),
+  importState: () => (imp ? { ok: !!(imp.result && imp.result.ok), reason: imp.result && imp.result.reason, mode: imp.result && imp.result.mode, pairs: imp.result && imp.result.ok ? imp.result.pairs.map((q) => ({ points: q.points, maxDevMm: q.maxDevMm, tail: q.tail })) : null, split: imp.split, threshold: imp.result && imp.result.seg.stats.threshold, lightOnDark: imp.result && imp.result.seg.stats.lightOnDark, message: imEl('imMsg').textContent, erasing: imp.erasing, step: imp.result && imp.result.step, body: imp.result && imp.result.ok ? { source: imp.result.body.source, why: imp.result.body.why } : null, segShown: imEl('imSeg').checked, spanSlider: +imEl('imSpan').value, spanOut: imEl('imSpan-out').textContent, bugSpan: bugWingspan(), svgNote: document.getElementById('svgNote').textContent, clutterDrawn: !!document.querySelector('#mainSvg .im-clutter') } : null),
   splitScreen: (k) => (imp && imp.split ? worldToScreen(...imp.split[k]) : null),
   pictureScreen: (px, py) => (imp && imp.Mwork ? worldToScreen(...bdWorld(applyAffine(imp.Mwork, px * imp.f, py * imp.f))) : null),
   pointCounts: () => (params.wingPairs ? resolveWingPairs(params).map((w) => (w.drawn || w.points || []).length) : []),

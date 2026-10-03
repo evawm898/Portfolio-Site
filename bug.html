@@ -210,13 +210,13 @@
         <div class="bg-ctrl"><label for="imThr"><span>Threshold <span class="bg-dim">(auto: Otsu)</span></span><output id="imThr-out"></output></label><input type="range" id="imThr" min="1" max="254" step="1" value="128"></div>
         <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imThrAuto" checked> threshold automatic</label></div>
         <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imInvert"> invert — a light bug on a dark ground</label></div>
-        <div class="bg-ctrl"><label for="imSpan"><span>Wingspan (sets the scale)</span><output id="imSpan-out"></output></label><input type="range" id="imSpan" min="20" max="130" step="0.5" value="72"></div>
+        <div class="bg-ctrl"><label for="imSpan"><span>Wingspan, tip to tip (sets the fit's scale)</span><output id="imSpan-out"></output></label><input type="range" id="imSpan" min="20" max="130" step="0.5" value="72"></div>
         <div class="bg-ctrl"><label for="imTol"><span>Fit tolerance — fewer points ↔ closer fit</span><output id="imTol-out"></output></label><input type="range" id="imTol" min="0.1" max="3" step="0.05" value="0.6"></div>
         <div class="bg-ctrl"><label for="imPairs"><span>Wing pairs</span></label><select id="imPairs"><option value="auto">auto — separate wings, or a notch</option><option value="1">1 pair</option><option value="2">2 pairs (split at the notch)</option></select></div>
         <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imTail" checked> find a hindwing tail (TAIL group, on)</label></div>
         <div class="bg-row"><button class="bg-btn" id="imFlip" title="The head is taken to be the end nearer the top of the picture; flip it">Flip head ↔ tail</button><button class="bg-btn" id="imErase" title="Paint over stray regions in Top → SVG to remove them">Erase brush</button><button class="bg-btn" id="imEraseClear">Clear erasing</button></div>
         <div class="bg-ctrl" id="imBrushRow" hidden><label for="imBrush"><span>Brush size</span><output id="imBrush-out"></output></label><input type="range" id="imBrush" min="2" max="40" step="1" value="10"></div>
-        <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imSeg" checked> show what was found (teal outline; erased in red)</label></div>
+        <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imSeg" checked> show what was found (teal: the bug's outline; amber: ignored as clutter; red: erased)</label></div>
       </div>
       <p class="bg-msg" id="imMsg"></p>
     </div>

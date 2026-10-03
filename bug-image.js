@@ -34,7 +34,7 @@
 
 import {
   sampleOutline, outlineValid, composeOutline, tailAnchor, editorFrame, normalizeParams, buildBug, contourLoops,
-  OUTLINE_BOUNDS, MIN_TAIL_POINTS, MAX_WING_PAIRS, CR_SAMPLES, THORAX_PER_PAIR, WING_FIELDS,
+  OUTLINE_BOUNDS, MIN_TAIL_POINTS, MAX_WING_PAIRS, CR_SAMPLES, THORAX_PER_PAIR, WING_FIELDS, PARAM_SPEC, defaultParams,
 } from './bug-geometry.js';
 
 /* ------------------------------------------------------------------ */
@@ -81,6 +81,11 @@ export const NOTCH_MIN_FRAC = 0.06;
    show from above (the forewing is drawn over it) and the two pairs overlap in
    the model the way real wings do. */
 export const HIDDEN_OVERLAP_FRAC = 0.08;
+/* (The band TAPERS: that full width at the body, nothing at the notch, so the
+   hidden leading edge meets the margin at the notch in a line, not a step — a
+   square band end was a hook in the outline tighter than the rounded edge's
+   bead, which folded there: a stray contour line in the SVG on the same-tone
+   picture, measured.) */
 /* Tails: an opening of this radius (fraction of the bottom pair's extent)
    keeps the wing and drops long narrow protrusions; a dropped piece longer than
    TAIL_MIN_FRAC of the extent and at least TAIL_ASPECT times as long as it is
@@ -96,6 +101,19 @@ export const SYM_MIN = 0.8;             // the best mirror maps at least 80% of 
 /* The thorax's share of the body length — the default specimen's own (5 mm of
    21.3), because the thorax is under the wings and cannot be measured. */
 export const THORAX_SHARE = 0.24;
+/* BODY CONFIDENCE. The body is MEASURED from the narrow column only when the
+   abdomen shows clearly below the wings: at least ABD_SEEN_FRAC of the wingspan
+   of it, at least ABD_WIDTH_SHARE of the fallback's width. On a photograph whose
+   dark body touches dark wing roots (a Morpho's hindwings hug its abdomen) no
+   narrow column is visible — what is left is the abdomen's TIP, 2 mm of a
+   1.6 mm sliver — and fitting that made a body that all but vanished under the
+   wings (Eva's Morpho, PR #346). Then the body is ESTIMATED: the default
+   specimen's body proportions scaled by the fitted wingspan (FALLBACK below),
+   and the page says which happened. Measured on the gate's pictures: a visible
+   abdomen 9.3-31 mm on 72-75 mm wingspans (13-41%), the same-tone picture's tip
+   2.1 mm (2.9%). */
+export const ABD_SEEN_FRAC = 0.06;
+export const ABD_WIDTH_SHARE = 0.6;
 /* The fit: at most this many control points per wing (a cap, never reached by
    a sane tolerance), smoothing of the pixel staircase (sigma, px). */
 const MAX_POINTS = 60;
@@ -110,6 +128,23 @@ export const WINGSPAN_RANGE = [20, 130];   // mm — the forewing's length must 
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const hyp = Math.hypot;
+
+/* The FALLBACK body: the default specimen's own body (one owner: the geometry's
+   defaultParams) scaled by the fitted wingspan against the default's own
+   wingspan, measured off its built model once, each field inside its slider. */
+let DEFAULT_SPAN = null;
+const BODY_FIELDS = ['headSize', 'thoraxLength', 'thoraxWidth', 'thoraxDepth', 'abdomenLength', 'abdomenWidth'];
+export function fallbackBody(wingspanMm) {
+  const d = defaultParams();
+  if (DEFAULT_SPAN == null) {
+    const m = buildBug(d); let x = 0;
+    for (const q of m.parts.filter((p) => /^wing\d$/.test(p.kind) && p.side === 'R')) for (let v = q.v0; v < q.v1; v++) x = Math.max(x, m.positions[3 * v]);
+    DEFAULT_SPAN = 2 * x;
+  }
+  const k = wingspanMm / DEFAULT_SPAN, out = { k, defaultSpanMm: DEFAULT_SPAN };
+  for (const id of BODY_FIELDS) { const sp = PARAM_SPEC.find((q) => q.id === id); out[id] = clamp(d[id] * k, sp.min, sp.max); }
+  return out;
+}
 
 /* ------------------------------------------------------------------ */
 /* 1  Segmentation                                                      */
@@ -226,38 +261,119 @@ function fillHoles(M, W, H) {
   return { mask: out, filled };
 }
 
+/* THE STEPS a fit goes through, named in every refusal so Eva knows which one
+   failed and what to do about it. */
+export const STEPS = ['finding the bug in the picture', 'finding the mirror axis', 'reading the body', 'finding the wings', 'fitting the outlines'];
+const stepMsg = (k, text) => ({ step: k, stepName: STEPS[k - 1], reason: `step ${k} of ${STEPS.length} (${STEPS[k - 1]}) failed: ${text}` });
+
+/* CLUTTER. A real photograph carries more than the bug: a paper edge or a
+   table along a side, a scale bar ("1 cm"), a label, a pin's shadow. Each is
+   dropped before anything is measured:
+     - a shape that runs along more than BORDER_TOUCH_FRAC of the picture's edge
+       is the GROUND (a table, the far side of a paper edge), never the bug — a
+       bug is photographed whole;
+     - a shape whose largest hole is at least FRAME_HOLE_FRAC of its own filled
+       area ENCLOSES something: a sheet of paper with the bug lying on it;
+     - of what is left, the LARGEST shape is the bug and every smaller detached
+       mark (a scale bar, text, a speck) is ignored, and counted.
+   The subject's polarity (dark on light, or light on dark) is chosen by the
+   same rule: the polarity whose largest acceptable shape is the larger — not by
+   the border's median alone, which a dark table along one side of a white sheet
+   turns the wrong way round. The symmetry check then runs on that one shape. */
+export const BORDER_TOUCH_FRAC = 0.04;
+export const FRAME_HOLE_FRAC = 0.1;
+/* (A bug's own holes — the spots a threshold leaves, the gaps between touching
+   wings — are each a few % of it; the whole sheet in view on a table encloses
+   the bug at 19.5% on the gate's sheet picture, so 0.2 sat on the knife edge.
+   The price: a bug with ONE see-through window over a tenth of its area — a
+   glasswing — reads as a sheet. Forcing the polarity with the Invert box turns
+   the frame rule off, which is the escape.) */
+/* ...and the bug must DOMINATE what is left: the kept shape at least this share
+   of everything that stands out from the background. A busy picture (leaves,
+   a patterned cloth) breaks into many pieces, the kept one a small fraction of
+   them (the gate's busy picture: 3%); a photo with a paper edge and a scale bar
+   keeps the bug at more than half (measured on the clutter picture). */
+export const BUSY_SHAPE_SHARE = 0.25;
+const MARK_MIN_FRAC = 0.0001;   // a dropped piece smaller than this share of the picture is noise, not counted as a mark
+
+function holesOf(M, W, H) {
+  // the background components that do not touch the picture's edge: the holes
+  const bg = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) bg[i] = M[i] ? 0 : 1;
+  const { lab, sizes } = components(bg, W, H);
+  const touches = new Uint8Array(sizes.length);
+  for (let x = 0; x < W; x++) { if (lab[x] >= 0) touches[lab[x]] = 1; if (lab[(H - 1) * W + x] >= 0) touches[lab[(H - 1) * W + x]] = 1; }
+  for (let y = 0; y < H; y++) { if (lab[y * W] >= 0) touches[lab[y * W]] = 1; if (lab[y * W + W - 1] >= 0) touches[lab[y * W + W - 1]] = 1; }
+  let filled = 0, biggest = 0;
+  for (let k = 0; k < sizes.length; k++) if (!touches[k]) { filled += sizes[k]; biggest = Math.max(biggest, sizes[k]); }
+  return { lab, touches, filled, biggest };
+}
+/* One polarity: its components, the ground and frames rejected, the largest
+   acceptable shape returned with what was dropped. */
+function pickShape(raw, W, H, frames = true) {
+  const N = W * H, { lab, sizes } = components(raw, W, H);
+  const border = new Float64Array(sizes.length);
+  let borderN = 0;
+  const bAt = (i) => { borderN++; if (lab[i] >= 0) border[lab[i]]++; };
+  for (let x = 0; x < W; x++) { bAt(x); bAt((H - 1) * W + x); }
+  for (let y = 1; y < H - 1; y++) { bAt(y * W); bAt(y * W + W - 1); }
+  const order = sizes.map((n, id) => id).sort((a, b) => sizes[b] - sizes[a]);
+  const rejected = [];
+  let pick = -1;
+  for (const id of order) {
+    if (sizes[id] < MIN_SHAPE_FRAC * N) break;
+    if (border[id] / borderN > BORDER_TOUCH_FRAC) { rejected.push({ id, why: 'ground', size: sizes[id] }); continue; }
+    const M = new Uint8Array(N); for (let i = 0; i < N; i++) M[i] = lab[i] === id ? 1 : 0;
+    const h = holesOf(M, W, H);
+    if (frames && h.biggest >= FRAME_HOLE_FRAC * (sizes[id] + h.filled)) { rejected.push({ id, why: 'frame', size: sizes[id] }); continue; }
+    pick = id; break;
+  }
+  let marks = 0;
+  for (let id = 0; id < sizes.length; id++) if (id !== pick && sizes[id] >= MARK_MIN_FRAC * N && !rejected.some((q) => q.id === id)) marks++;
+  return { lab, sizes, pick, size: pick >= 0 ? sizes[pick] : 0, rejected, marks, borderN };
+}
+
 /* The segmentation alone (the page shows it as an overlay even when the fit is
-   refused, so the brush has something to erase against). */
+   refused, so Eva can see what was found and what to erase). */
 export function segment(img, opts = {}) {
   const W = img.width, H = img.height, N = W * H;
   const L = blur3(luminance(img), W, H);
   const threshold = opts.threshold == null ? otsu(L) : +opts.threshold;
   const border = borderValues(L, W, H), bMed = median(border);
-  // polarity: the border is background; the subject is whichever side of the
-  // threshold the border is NOT on (lightOnDark = a light subject on a dark ground)
-  const autoLight = bMed < threshold;
-  const lightOnDark = opts.lightOnDark == null ? autoLight : !!opts.lightOnDark;
-  const raw = new Uint8Array(N);
-  for (let i = 0; i < N; i++) raw[i] = (lightOnDark ? L[i] > threshold : L[i] < threshold) ? 1 : 0;
-  if (opts.erase) for (let i = 0; i < N; i++) if (opts.erase[i]) raw[i] = 0;
+  const rawOf = (light) => {
+    const raw = new Uint8Array(N);
+    for (let i = 0; i < N; i++) raw[i] = (light ? L[i] > threshold : L[i] < threshold) ? 1 : 0;
+    if (opts.erase) for (let i = 0; i < N; i++) if (opts.erase[i]) raw[i] = 0;
+    return raw;
+  };
+  // the polarity: forced by the Invert box, or the one whose best shape is the larger
+  const borderLight = bMed < threshold;
+  let lightOnDark, raw, pk, other = null;
+  if (opts.lightOnDark != null) { lightOnDark = !!opts.lightOnDark; raw = rawOf(lightOnDark); pk = pickShape(raw, W, H, false); }
+  else {
+    const A = rawOf(borderLight), pa = pickShape(A, W, H), B = rawOf(!borderLight), pb = pickShape(B, W, H);
+    if (pb.size > pa.size) { lightOnDark = !borderLight; raw = B; pk = pb; other = pa; } else { lightOnDark = borderLight; raw = A; pk = pa; other = pb; }
+  }
   let fg = 0; for (let i = 0; i < N; i++) fg += raw[i];
-  let borderFg = 0, borderN = 0;
-  const bAt = (i) => { borderN++; borderFg += raw[i]; };
-  for (let x = 0; x < W; x++) { bAt(x); bAt((H - 1) * W + x); }
-  for (let y = 1; y < H - 1; y++) { bAt(y * W); bAt(y * W + W - 1); }
-  const big = largest(raw, W, H);
-  const stats = { W, H, threshold, autoThreshold: opts.threshold == null, lightOnDark, autoPolarity: opts.lightOnDark == null, fgFrac: fg / N, borderFrac: borderFg / borderN, shapeFrac: big.size / N, pieces: big.sizes.length };
-  if (!big.size) return { ok: false, reason: 'nothing stands out from the background — try another threshold, or invert', stats, raw, mask: big.mask };
-  const fh = fillHoles(big.mask, W, H);
-  let area = 0, onBorder = 0; for (let i = 0; i < N; i++) area += fh.mask[i];
-  for (let x = 0; x < W; x++) onBorder += fh.mask[x] + fh.mask[(H - 1) * W + x];
-  for (let y = 1; y < H - 1; y++) onBorder += fh.mask[y * W] + fh.mask[y * W + W - 1];
-  Object.assign(stats, { holesFilled: fh.filled, area, shapeBorderFrac: onBorder / borderN });
+  const mask = new Uint8Array(N);
+  if (pk.pick >= 0) for (let i = 0; i < N; i++) mask[i] = pk.lab[i] === pk.pick ? 1 : 0;
+  // what was dropped as clutter, for the page to show
+  const clutter = new Uint8Array(N); for (let i = 0; i < N; i++) clutter[i] = raw[i] && !mask[i] ? 1 : 0;
+  const stats = { W, H, threshold, autoThreshold: opts.threshold == null, lightOnDark, autoPolarity: opts.lightOnDark == null, fgFrac: fg / N, shapeFrac: pk.size / N, pieces: pk.sizes.length, marksIgnored: pk.marks, groundDropped: pk.rejected.filter((q) => q.why === 'ground').length, framesDropped: pk.rejected.filter((q) => q.why === 'frame').length,
+    // what the OTHER polarity offered and why it lost (a white sheet under a dark bug is a frame there)
+    otherPolarity: other && { shapeFrac: other.size / N, groundDropped: other.rejected.filter((q) => q.why === 'ground').length, framesDropped: other.rejected.filter((q) => q.why === 'frame').length } };
   const busy = 'the background is too busy to find one clear shape — try another threshold, invert, or erase the stray regions with the brush';
-  if (stats.fgFrac > BUSY_FG_FRAC) return { ok: false, reason: `${busy} (${Math.round(100 * stats.fgFrac)}% of the picture reads as subject)`, stats, raw, mask: fh.mask };
-  if (stats.shapeBorderFrac > BUSY_BORDER_FRAC) return { ok: false, reason: `${busy} (the shape runs along ${Math.round(100 * stats.shapeBorderFrac)}% of the picture's edge)`, stats, raw, mask: fh.mask };
-  if (area < MIN_SHAPE_FRAC * N) return { ok: false, reason: 'no clear shape found — the largest one is a speck; try another threshold, or invert', stats, raw, mask: fh.mask };
-  return { ok: true, stats, raw, mask: fh.mask };
+  if (stats.fgFrac > BUSY_FG_FRAC) return { ok: false, ...stepMsg(1, `${busy} (${Math.round(100 * stats.fgFrac)}% of the picture reads as subject)`), stats, raw, mask, clutter };
+  if (pk.pick < 0) {
+    const why = pk.rejected.length
+      ? `everything large enough to be the bug runs into the picture's edge or encloses something (${pk.rejected.length} shape${pk.rejected.length > 1 ? 's' : ''} taken for the ground or a sheet of paper) — ${busy}`
+      : 'no clear shape found — nothing stands out from the background larger than a speck; try another threshold, or invert';
+    return { ok: false, ...stepMsg(1, why), stats, raw, mask, clutter };
+  }
+  if (pk.size < BUSY_SHAPE_SHARE * fg) return { ok: false, ...stepMsg(1, `${busy} (the largest clear shape is only ${Math.round((100 * pk.size) / fg)}% of what stands out from the background)`), stats, raw, mask, clutter };
+  const fh = fillHoles(mask, W, H);
+  let area = 0; for (let i = 0; i < N; i++) area += fh.mask[i];
+  Object.assign(stats, { holesFilled: fh.filled, area });
+  return { ok: true, stats, raw, mask: fh.mask, clutter };
 }
 
 /* ------------------------------------------------------------------ */
@@ -501,10 +617,13 @@ function fitOnce(img, base, opts) {
   const W = img.width, H = img.height;
   const seg = segment(img, o);
   const res = { ok: false, seg, notes: [] };
-  if (!seg.ok) return { ...res, reason: seg.reason };
+  if (!seg.ok) return { ...res, step: seg.step, stepName: seg.stepName, reason: seg.reason };
   const axis = findAxis(seg.mask, W, H);
   res.axis = axis;
-  if (axis.score < SYM_MIN) return { ...res, reason: `no clear symmetric shape — the best mirror axis maps only ${Math.round(100 * axis.score)}% of the shape onto itself; try another threshold, or erase what is not the bug` };
+  if (axis.score < SYM_MIN) {
+    const st = seg.stats, dropped = [st.marksIgnored ? `${st.marksIgnored} detached mark${st.marksIgnored > 1 ? 's' : ''} ignored` : '', st.groundDropped ? `${st.groundDropped} shape${st.groundDropped > 1 ? 's' : ''} along the picture's edge taken for the ground` : '', st.framesDropped ? 'a sheet around the bug taken for the ground' : ''].filter(Boolean);
+    return { ...res, ...stepMsg(2, `no clear symmetric shape — the best mirror axis maps only ${Math.round(100 * axis.score)}% of the shape onto itself (it needs ${Math.round(100 * SYM_MIN)}%). The shape it found is outlined on the picture${dropped.length ? ` (${dropped.join('; ')})` : ''}: erase what is not the bug with the brush, or try another threshold`) };
+  }
   const U = upright(seg.mask, W, H, axis, o.flip);
   const { R, NX, NY } = U;
   // the central run of each row, from the axis out
@@ -513,7 +632,7 @@ function fitOnce(img, base, opts) {
   const Hmax = Math.max(...h);
   const wide = [];
   for (let j = 0; j < NY; j++) if (h[j] >= BODY_ROW_FRAC * Hmax) wide.push(j);
-  if (!wide.length || Hmax < 6) return { ...res, reason: 'found a shape but no wings beside a narrow body — try another threshold, or erase what is not the bug' };
+  if (!wide.length || Hmax < 6) return { ...res, ...stepMsg(3, 'found a shape but no wings beside a narrow body — try another threshold, or erase what is not the bug') };
   // The column and the wings are found twice: a first guess of the wing rows
   // (rows whose central run is wide) gives the body's width and so the cut;
   // the WING PIECES beside that cut then give the true wing rows (an antenna
@@ -562,26 +681,57 @@ function fitOnce(img, base, opts) {
     G = wingRegion(col.cutI); comps = components(G, NX, NY); wings = pieces(comps, col.cutI);
   }
   const { jw0, jw1, headRows, abdRows, headHalf, abdHalf, bodyHalf } = col;
-  const cutI = col.cutI;
-  if (!wings.length) return { ...res, reason: 'found a shape but no wings attached to the body column — try another threshold' };
+  let cutI = col.cutI;
+  if (!wings.length) return { ...res, ...stepMsg(4, 'found a shape but no wings attached to the body column — try another threshold') };
   // the SCALE: the wingspan the picture is set to, tip to tip
   const spanPx = 2 * Math.max(...wings.map((q) => q.imax));
   const s = o.wingspanMm / spanPx;   // mm per upright pixel
 
-  // ---- 3 the BODY, from the narrow column ----
-  const jHead = headRows.length ? headRows[0] : jw0;
-  const jTail = abdRows.length ? abdRows[abdRows.length - 1] + 1 : jw1 + 1;
-  const B = (jTail - jHead) * s;
-  const headSize = clamp(2 * (headHalf || bodyHalf) * s, 2, 12);
-  const abdW = clamp(2 * (abdHalf || bodyHalf) * s, 1.5, 18);
-  const thoraxWidth = clamp(Math.max(headSize, abdW) * 1.1, 2.5, 14);
+  // ---- 3 the BODY: measured from the narrow column, or ESTIMATED ----
+  const fb = fallbackBody(o.wingspanMm);
+  const abdSeenMm = abdRows.length * s, abdSeenWmm = 2 * abdHalf * s;
+  const confident = abdSeenMm >= ABD_SEEN_FRAC * o.wingspanMm && abdSeenWmm >= ABD_WIDTH_SHARE * fb.abdomenWidth;
+  const bodyConf = {
+    source: confident ? 'measured' : 'estimated',
+    abdomenSeenMm: abdSeenMm, abdomenSeenWidthMm: abdSeenWmm,
+    needLenMm: ABD_SEEN_FRAC * o.wingspanMm, needWidthMm: ABD_WIDTH_SHARE * fb.abdomenWidth,
+    why: confident ? '' : abdSeenMm < ABD_SEEN_FRAC * o.wingspanMm
+      ? `only ${abdSeenMm.toFixed(1)} mm of abdomen shows below the wings (a clear body needs ${(ABD_SEEN_FRAC * o.wingspanMm).toFixed(1)} mm) — the body is hidden under, or the same tone as, the wings`
+      : `the abdomen that shows is ${abdSeenWmm.toFixed(1)} mm wide, under ${(ABD_WIDTH_SHARE * fb.abdomenWidth).toFixed(1)} mm — too thin to be the body, it is the tip of a body hidden under the wings`,
+  };
+  let headSize, abdW, thoraxWidth, LtEff, abdomenLength, jHead, B;
+  if (confident) {
+    jHead = headRows.length ? headRows[0] : jw0;
+    const jTail = abdRows.length ? abdRows[abdRows.length - 1] + 1 : jw1 + 1;
+    B = (jTail - jHead) * s;
+    headSize = clamp(2 * (headHalf || bodyHalf) * s, 2, 12);
+    abdW = clamp(2 * (abdHalf || bodyHalf) * s, 1.5, 18);
+    thoraxWidth = clamp(Math.max(headSize, abdW) * 1.1, 2.5, 14);
+    LtEff = clamp(THORAX_SHARE * B, 3, 40);
+    abdomenLength = clamp(B - 1.55 * headSize / 2 - 0.88 * LtEff, 2, 70);
+  } else {
+    // the default specimen's proportions at this wingspan; the head's front is
+    // where a head shows, else one head ahead of the wings' attachment
+    ({ headSize, thoraxWidth } = fb); abdW = fb.abdomenWidth; LtEff = fb.thoraxLength; abdomenLength = fb.abdomenLength;
+    jHead = headRows.length >= 2 ? headRows[0] : jw0 - Math.round((1.55 * headSize / 2) / s);
+    B = 1.55 * headSize / 2 + 0.88 * LtEff + abdomenLength;
+    // the wings are clipped at THIS body's edge, not at the sliver's
+    cutI = Math.ceil((Math.max(headSize, abdW) / 2 / s) * CUT_MARGIN + 1);
+    G = wingRegion(cutI); comps = components(G, NX, NY); wings = pieces(comps, cutI);
+    if (!wings.length) return { ...res, ...stepMsg(4, 'no wings beside the estimated body — try another threshold') };
+  }
   const Rh = headSize / 2;
-  const LtEff = clamp(THORAX_SHARE * B, 3, 40);
-  const abdomenLength = clamp(B - 1.55 * Rh - 0.88 * LtEff, 2, 70);
   const yHead = LtEff / 2 + 1.55 * Rh;                    // the head's front, in the model
   const toWorld = (i, j) => [i * s, yHead - (j - jHead) * s];        // upright corner -> world mm
   const toUpright = (x, y) => [x / s, jHead + (yHead - y) / s];
-  const body = { bodyParts: '3', headSize: +headSize.toFixed(2), thoraxWidth: +thoraxWidth.toFixed(2), thoraxDepth: +thoraxWidth.toFixed(2), abdomenLength: +abdomenLength.toFixed(2), abdomenWidth: +abdW.toFixed(2) };
+  const body = { bodyParts: '3', headSize: +headSize.toFixed(2), thoraxWidth: +thoraxWidth.toFixed(2), thoraxDepth: +(confident ? thoraxWidth : fb.thoraxDepth).toFixed(2), abdomenLength: +abdomenLength.toFixed(2), abdomenWidth: +abdW.toFixed(2) };
+  // the THORAX's span along the body (world y in [-T, T]): the only stretch of
+  // the body a wing ROOT may attach to. Below it is the abdomen, ahead of it the
+  // head — a wing there lies BESIDE the body, its inner edge on the body's edge,
+  // never across it (the root chord running down the abdomen was what laid the
+  // two wings over a Morpho's body as one plate).
+  const T = LtEff / 2;
+  const jFront = Math.round(toUpright(0, T)[1]), jRear = Math.round(toUpright(0, -T)[1]);
 
   // ---- 4 the WINGS: pieces, or one mass split at its notch ----
   const comp = (q, cc = comps) => { const M = new Uint8Array(NX * NY); for (let k = 0; k < NX * NY; k++) M[k] = cc.lab[k] === q.id ? 1 : 0; return M; };
@@ -650,7 +800,7 @@ function fitOnce(img, base, opts) {
         const k = j * NX + i; if (!M[k]) continue;
         const l = pcs.lab[k], front = l < 0 ? true : isFront(l), t = along(i, j);
         if (front) F[k] = 1; else Hh[k] = 1;
-        if (front && t >= 0 && t <= 1 && side(i, j) < band) Hh[k] = 1;   // the hindwing tucked under the forewing
+        if (front && t >= 0 && t <= 1 && side(i, j) < band * (1 - t)) Hh[k] = 1;   // the hindwing tucked under the forewing, tapering to the notch
       }
       const keepTouching = (X) => { const cc = components(X, NX, NY); const ps = pieces(cc, cutI); if (!ps.length) return null; const q = ps.reduce((a, b) => (b.size > a.size ? b : a)); return comp(q, cc); };
       const f = keepTouching(F), hw = keepTouching(Hh);
@@ -675,28 +825,49 @@ function fitOnce(img, base, opts) {
   // ---- 5 the fit, pair by pair ----
   const pairs = [];
   for (let k = 0; k < N; k++) {
-    const M = regions[k];
+    let M = regions[k];
+    // A pair that touches the body only BESIDE the abdomen (a hindwing whose
+    // root is under the forewing) or only beside the head is given a strip
+    // along the body's edge up to the thorax, hidden under the pair ahead of
+    // it: a root must sit on the thorax, and the strip is how the wing reaches
+    // it without crossing the body
+    {
+      let a0 = Infinity, a1 = -Infinity; for (let j = 0; j < NY; j++) if (M[j * NX + cutI]) { a0 = Math.min(a0, j); a1 = Math.max(a1, j); }
+      // the strip is wider than the print floor (it is part of the wing) and
+      // hidden under the pair ahead of it
+      // (and joined to the thorax over at least twice the floor, so the wing's
+      // neck is never thinner than the print can make)
+      const reach = Math.max(2, Math.ceil(Math.max(0.25 * T, 2 * (base.minDiameter || 1)) / s)), sw = Math.max(2, Math.ceil((2 * (base.minDiameter || 1)) / s));
+      const strip = (j0, j1) => { M = M.slice(); for (let j = Math.max(0, j0); j <= Math.min(NY - 1, j1); j++) for (let i = cutI; i < Math.min(NX, cutI + sw); i++) M[j * NX + i] = 1; };
+      if (Number.isFinite(a0) && a0 > jRear - reach) strip(jRear - reach, a0);
+      else if (Number.isFinite(a1) && a1 < jFront + reach) strip(a1, jFront + reach);
+    }
     const loop = smoothLoop(traceOuter(M, NX, NY)).map(([i, j]) => toWorld(i, j));
     // the hinge (x, y) of pair k with this body
     const F0 = editorFrame(p, k);
     const hx = F0.hinge[0], hy = F0.hinge[1];
     let cutX = cutI * s;
     if (cutX < hx + 0.2) { cutX = hx + 0.2; }
-    // the open chain: the loop with the stretch along the body cut removed
-    const off = loop.map((q) => q[0] > cutX + 0.6 * s);
+    // the open chain: the loop with its ROOT removed — the stretch along the
+    // body cut beside the THORAX. Along the cut beside the abdomen or the head
+    // the loop stays in the chain: that is the wing's inner edge, lying on the
+    // body's edge, so the fitted wing never crosses into the body
+    const atRoot = (q) => q[0] <= cutX + 0.6 * s && Math.abs(q[1]) <= T + 0.6 * s;
+    let off = loop.map((q) => !atRoot(q));
+    if (off.every(Boolean)) off = loop.map((q) => q[0] > cutX + 0.6 * s);
     let bestRun = null;
     for (let k0 = 0; k0 < loop.length; k0++) {
       if (!off[k0] || off[(k0 - 1 + loop.length) % loop.length]) continue;
       let m = 0; while (m < loop.length && off[(k0 + m) % loop.length]) m++;
       if (!bestRun || m > bestRun.m) bestRun = { k0, m };
     }
-    if (!bestRun) return { ...res, reason: `pair ${k + 1}: no outline beside the body` };
+    if (!bestRun) return { ...res, ...stepMsg(5, `pair ${k + 1}: no outline beside the body`) };
     let chainW = []; for (let m = 0; m < bestRun.m; m++) chainW.push(loop[(bestRun.k0 + m) % loop.length]);
     if (chainW[0][1] < chainW[chainW.length - 1][1]) chainW.reverse();   // root LEAD (toward the head) first
     // length: the apex at u = 1 (inside the slider's 5–60 mm)
     let xmax = 0; for (const q of chainW) xmax = Math.max(xmax, q[0]);
     let L = xmax - hx;
-    if (L > 60) { if ((xmax - hx) / 60 > OUTLINE_BOUNDS.u[1] - 0.01) return { ...res, reason: `pair ${k + 1} is ${(xmax - hx).toFixed(0)} mm long at this wingspan — beyond the 60 mm slider; lower the wingspan` }; L = 60; }
+    if (L > 60) { if ((xmax - hx) / 60 > OUTLINE_BOUNDS.u[1] - 0.01) return { ...res, ...stepMsg(5, `pair ${k + 1} is ${(xmax - hx).toFixed(0)} mm long at this wingspan — beyond the 60 mm slider; lower the wingspan`) }; L = 60; }
     if (L < 5) L = 5;
     let ymax = -Infinity, ymin = Infinity; for (const q of chainW) { ymax = Math.max(ymax, q[1] - hy); ymin = Math.min(ymin, q[1] - hy); }
     const S = clamp(Math.max(1, ymax / ((OUTLINE_BOUNDS.w[1] - 0.02) * L), -ymin / ((-OUTLINE_BOUNDS.w[0] - 0.02) * L)), 0.3, 3);
@@ -722,7 +893,7 @@ function fitOnce(img, base, opts) {
       if (fit.valid) break;
       tol *= 0.6;
     }
-    if (!fit.valid) return { ...res, reason: `pair ${k + 1}: no valid outline could be fitted (${outlineValid(fit.points).reason}) — try another threshold, or erase` };
+    if (!fit.valid) return { ...res, ...stepMsg(5, `pair ${k + 1}: no valid outline could be fitted (${outlineValid(fit.points).reason}) — try another threshold, or erase`) };
     if (tol < o.toleranceMm) res.notes.push(`pair ${k + 1}: the tolerance was tightened to ${tol.toFixed(2)} mm so the outline does not cross or pinch itself`);
     let pts = fit.points.map(([u, w]) => [+u.toFixed(5), +w.toFixed(5)]);
     pts[0][0] = 0; pts[pts.length - 1][0] = 0;
@@ -739,14 +910,14 @@ function fitOnce(img, base, opts) {
   const notes = [];
   const params = normalizeParams(p, notes);
   for (const nt of notes) res.notes.push(nt);
-  if (notes.some((n) => /refused/.test(n))) return { ...res, reason: `the fitted outline was refused by the model: ${notes.join('; ')}` };
+  if (notes.some((n) => /refused/.test(n))) return { ...res, ...stepMsg(5, `the fitted outline was refused by the model: ${notes.join('; ')}`) };
   // the picture -> world map (for the backdrop): source pixel (x, y) -> mm
   const { a, b, c, top } = U;
   const k0 = yHead - (top - jHead) * s;
   const matrix = [s * b[0], s * a[0], s * b[1], s * a[1], -s * (b[0] * c[0] + b[1] * c[1]), k0 - s * (a[0] * c[0] + a[1] * c[1])];   // x = m0 px + m2 py + m4 ; y = m1 px + m3 py + m5
   return {
     ...res, ok: true, params, pairs,
-    body: { ...body, bodyLengthMm: B, headSeen: headRows.length > 0, abdomenSeen: abdRows.length > 0 },
+    body: { ...body, bodyLengthMm: B, headSeen: headRows.length > 0, abdomenSeen: abdRows.length > 0, ...bodyConf, fallback: fb, thoraxSpanMm: T, cutMm: cutI * s },
     transform: { matrix, mmPerPx: s, axisDeg: axis.deg, symmetry: axis.score },
     toWorld, s,
   };

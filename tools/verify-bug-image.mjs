@@ -49,6 +49,22 @@
           The head size is REPORTED, not gated: a head is often hidden between
           the forewings' roots or merged with the antennae's bases (the moth's
           feathered antennae read a 3.9 mm head for a 2.4 mm one).
+     IM11 the body's CONFIDENCE (§11.7): ESTIMATED on the same-tone picture (its
+          body touches the wing roots, only the abdomen's tip shows), MEASURED on
+          every other; an estimated body is no narrower than the default
+          specimen's proportions at that wingspan — the reference computed HERE
+          from defaultParams, never read from the importer's own fallback.
+     IM12 no fitted wing crosses into the body: every right-wing point of the
+          BUILT bug beside the abdomen or head lies outside the built body's own
+          surface (per 0.5 mm band; within 1 mm of the thorax's span is the root,
+          which attaches there by design).
+     IM13 clutter dropped before anything is measured: the clutter picture (a
+          paper corner with a table LARGER than the bug, a 1 cm scale bar, a
+          label) and the sheet picture (the whole sheet on a table: a frame
+          around the bug) fit, with the ground / the sheet and the marks counted.
+     IM14 a refusal names its step and returns the shape it found: the busy
+          picture at step 1, a one-sided shape (the left forewing erased) at
+          step 2.
 */
 
 import * as G from '../bug-geometry.js';
@@ -59,6 +75,9 @@ export const EXPECT = {
   swallowtail: { pairs: 2, mode: 'split', tail: true },
   moth: { pairs: 1, mode: 'single', tail: false },
   dragonfly: { pairs: 2, mode: 'separate', tail: false },
+  sametone: { pairs: 2, mode: 'split', tail: false, body: 'estimated' },
+  clutter: { pairs: 2, mode: 'split', tail: false, clutter: { ground: 1, marks: 1 } },
+  sheet: { pairs: 2, mode: 'split', tail: false, clutter: { frame: 1, marks: 1 } },
 };
 const TOL = 0.6;
 
@@ -86,7 +105,9 @@ export function compareToKnown(img, fit) {
   const gK = partLoops(t.model, rightWings), gF = partLoops(fm, rightWings);
   const dy = cyOf(gK) - cyOf(gF);
   const fitted = rasterLoops(gF, ([x, y]) => t.toPx([x, y + dy]), W, H, 2);
-  const cut = Math.max(t.params.thoraxWidth, fit.params.thoraxWidth) / 2 + 1;
+  // (a picture whose body was inked into the wings' roots — the same-tone
+  // fixture — is compared only beyond the inked band: truth.clipMm)
+  const cut = Math.max(Math.max(t.params.thoraxWidth, fit.params.thoraxWidth) / 2 + 1, t.clipMm || 0);
   const clip = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) clip[y * W + x] = t.fromPx([x + 0.5, y + 0.5])[0] >= cut ? 1 : 0;
   const A = new Uint8Array(W * H), B = new Uint8Array(W * H);
@@ -132,6 +153,28 @@ export function compareToKnown(img, fit) {
   // (its boundary pixel count is its length in px, 4-connected, to ~10%)
   return { worstAt, hausMm: hausPx / t.pxPerMm, meanMm: xor / Math.max(1, eA.length) / t.pxPerMm, tailTipMm: lowK && lowF ? Math.hypot(lowK[0] - lowF[0], lowK[1] - lowF[1]) : Infinity, model: fm };
 }
+/* The default specimen's own wingspan (the gate measures it; the importer's
+   fallback is not the reference). */
+let DSPAN = null;
+const DEFAULT_SPAN = () => { if (DSPAN == null) { const m = G.buildBug(G.defaultParams()); let x = 0; for (const q of m.parts.filter(rightWings)) for (let v = q.v0; v < q.v1; v++) x = Math.max(x, m.positions[3 * v]); DSPAN = 2 * x; } return DSPAN; };
+/* How far every right-wing point of the built bug stays outside the BODY's own
+   built surface beside the abdomen and the head: per 0.5 mm band of y, the
+   body part's widest point; wing points within 1 mm of the thorax's span are
+   the ROOT (it attaches there by design, under the body) and are not asked. */
+export function bodyClearance(m, params) {
+  const N = Math.max(0, params.wingPairs - 2), T = (params.thoraxLength * (1 + G.THORAX_PER_PAIR * N)) / 2;
+  const body = m.parts.find((q) => q.kind === 'body'), bins = new Map(), key = (y) => Math.round(y * 2);
+  for (let v = body.v0; v < body.v1; v++) { const k = key(m.positions[3 * v + 1]); bins.set(k, Math.max(bins.get(k) || 0, Math.abs(m.positions[3 * v]))); }
+  let min = Infinity, at = [0, 0], n = 0;
+  for (const q of m.parts.filter(rightWings)) for (let v = q.v0; v < q.v1; v++) {
+    const x = m.positions[3 * v], y = m.positions[3 * v + 1];
+    if (Math.abs(y) <= T + 1) continue;
+    const bh = Math.max(bins.get(key(y)) ?? -Infinity, bins.get(key(y) - 1) ?? -Infinity, bins.get(key(y) + 1) ?? -Infinity);
+    if (!Number.isFinite(bh)) continue;
+    n++; if (x - bh < min) { min = x - bh; at = [x, y]; }
+  }
+  return { min, at, n };
+}
 export const boundMm = (img, tol) => tol + 3 / img.truth.pxPerMm + 0.5 * img.truth.asym * (img.truth.wingspanMm / 2);
 
 /* The IM checks, against a given bug-image module (the gate passes the shipped
@@ -146,7 +189,12 @@ export function imageChecks(I) {
   for (const [name, ex] of Object.entries(EXPECT)) {
     const img = F[name], r = fitOf(name);
     results[name] = r;
-    if (!r.ok) { ok(false, `IM1: ${name}: not fitted — ${r.reason}`); continue; }
+    if (!r.ok) {
+      ok(false, `IM1: ${name}: not fitted — ${r.reason}`);
+      // IM13's claim IS that the clutter picture fits: its refusal is IM13's failure too
+      if (ex.clutter) ok(false, `IM13: ${name}: the clutter was not dropped — the picture was refused: ${r.reason}`);
+      continue;
+    }
     ok(r.params.wingPairs === ex.pairs && r.mode === ex.mode, `IM1: ${name}: ${r.params.wingPairs} pair(s) by '${r.mode}' (expected ${ex.pairs} by '${ex.mode}')`);
     const want = (90 + img.truth.angleDeg + 180) % 180, got = ((r.transform.axisDeg % 180) + 180) % 180;
     const dA = Math.min(Math.abs(want - got), 180 - Math.abs(want - got));
@@ -157,7 +205,7 @@ export function imageChecks(I) {
     const md = c.model ? G.mirrorDiff(c.model) : NaN;
     ok(md === 0 && img.truth.asym > 0, `IM4: ${name}: the fitted bug is mirror-exact (mirrorDiff ${md}) from a picture whose left half is stretched ${(100 * img.truth.asym).toFixed(1)}%`);
     const bodyExt = (m) => { const q = m.parts.find((x) => x.kind === 'body'); let y0 = Infinity, y1 = -Infinity; for (let v = q.v0; v < q.v1; v++) { y0 = Math.min(y0, m.positions[3 * v + 1]); y1 = Math.max(y1, m.positions[3 * v + 1]); } return y1 - y0; };
-    if (c.model) {
+    if (c.model && !ex.body) {
       const lk = bodyExt(img.truth.model), lf = bodyExt(c.model), px = 1 / img.truth.pxPerMm;
       const lb = 3 * px + 0.02 * lk, wk = img.truth.params.abdomenWidth, wf = r.params.abdomenWidth;
       ok(Math.abs(lf - lk) <= lb && Math.abs(wf - wk) <= 3 * px, `IM10: ${name}: body ${lf.toFixed(2)} mm long against the known ${lk.toFixed(2)} (bound ±${lb.toFixed(2)}), abdomen ${wf.toFixed(2)} mm wide against ${wk.toFixed(2)} (±${(3 * px).toFixed(2)}); head ${r.params.headSize.toFixed(2)} mm against ${img.truth.params.headSize.toFixed(2)} (reported)`);
@@ -165,10 +213,38 @@ export function imageChecks(I) {
     const tl = r.params.wings.tail;
     if (ex.tail) ok(tl.on && tl.points.length >= 2 && c.tailTipMm <= b, `IM5: ${name}: TAIL group ${tl.on ? 'ON' : 'OFF'} with ${tl.points.length} points; the fitted tail tip ${c.tailTipMm.toFixed(3)} mm from the known one (bound ${b.toFixed(3)})`);
     else ok(!tl.on, `IM5: ${name}: no tail found where the picture has none (TAIL ${tl.on ? 'ON' : 'off'})`);
+    // IM11 — the body's confidence: ESTIMATED exactly where it cannot be seen,
+    // and then never narrower than the default proportions at this wingspan.
+    // The reference is the GEOMETRY's default specimen scaled here, in the
+    // gate — not the importer's own fallback (which a mutant would move too)
+    const src = r.body.source, wantSrc = ex.body || 'measured';
+    ok(src === wantSrc, `IM11: ${name}: the body is ${src} (expected ${wantSrc})${r.body.why ? ' — ' + r.body.why : ''}`);
+    if (src === 'estimated') {
+      const d = G.defaultParams(), k = img.truth.wingspanMm / DEFAULT_SPAN();
+      const nar = ['abdomenWidth', 'thoraxWidth', 'headSize'].filter((f) => r.params[f] < d[f] * k - 0.02);
+      ok(!nar.length, `IM11: ${name}: the estimated body is no narrower than the default proportions at a ${img.truth.wingspanMm.toFixed(1)} mm wingspan (abdomen ${r.params.abdomenWidth} >= ${(d.abdomenWidth * k).toFixed(2)}, thorax ${r.params.thoraxWidth} >= ${(d.thoraxWidth * k).toFixed(2)}, head ${r.params.headSize} >= ${(d.headSize * k).toFixed(2)})${nar.length ? ' — NARROWER: ' + nar.join(', ') : ''}`);
+    }
+    // IM12 — the wings never cross into the body
+    if (c.model) { const cl = bodyClearance(c.model, r.params); ok(cl.min >= 0, `IM12: ${name}: no fitted wing crosses into the body beside the abdomen or head — the nearest wing point is ${cl.min.toFixed(3)} mm outside the body's own surface (at ${cl.at.map((v) => v.toFixed(1)).join(', ')} mm; over ${cl.n} wing points)`); }
+    // IM13 — clutter dropped before anything was measured
+    if (ex.clutter) {
+      const st = r.seg.stats, op = st.otherPolarity || {};
+      const ground = st.groundDropped + (op.groundDropped || 0), frames = st.framesDropped + (op.framesDropped || 0);
+      ok(ground >= (ex.clutter.ground || 0) && frames >= (ex.clutter.frame || 0) && st.marksIgnored >= ex.clutter.marks, `IM13: ${name}: the clutter was dropped — ${ground} ground shape(s) along the edge, ${frames} sheet(s) around the bug, ${st.marksIgnored} detached mark(s) ignored (the scale bar, the label)`);
+    }
   }
   // IM6 — busy
   const busy = safe(() => I.imageToBug(F.busy, G.defaultParams(), { wingspanMm: F.busy.truth.wingspanMm }));
   ok(!busy.ok && /busy|symmetric|no clear/.test(busy.reason || '') && !busy.params, `IM6: the busy background is REFUSED: "${busy.reason}"${busy.params ? ' — and returned params' : ''}`);
+  // IM14 — a refusal NAMES the step that failed, and hands back what was found
+  ok(busy.step === 1 && /^step 1 of 5 \(finding the bug in the picture\)/.test(busy.reason || '') && busy.seg && busy.seg.mask, `IM14: the busy refusal names its step: "${(busy.reason || '').slice(0, 70)}…" (step ${busy.step}), and returns the shape it found for the page to show`);
+  {
+    // the LEFT FOREWING erased: the shape is not symmetric
+    const b = F.butterfly, t = b.truth, W = b.width, H = b.height, er = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const w = t.fromPx([x + 0.5, y + 0.5]); if (w[0] < -3 && w[1] > -1) er[y * W + x] = 1; }
+    const lop = safe(() => I.imageToBug(b, G.defaultParams(), { wingspanMm: t.wingspanMm, erase: er }));
+    ok(!lop.ok && lop.step === 2 && /^step 2 of 5 \(finding the mirror axis\)/.test(lop.reason || '') && /outlined on the picture/.test(lop.reason || '') && lop.seg && lop.seg.mask && !lop.params, `IM14: a one-sided shape is refused at the mirror-axis step: "${(lop.reason || '').slice(0, 90)}…" (step ${lop.step})`);
+  }
   // IM7 — the tolerance at both ends
   const lo = fitOf('butterfly', { toleranceMm: 0.1 }), hi = fitOf('butterfly', { toleranceMm: 3 });
   if (lo.ok && hi.ok) {
@@ -210,7 +286,7 @@ export const IMAGE_MUTANTS = [
   // score): disabling the border test alone is NOT a busy picture accepted —
   // the mirror score still refuses it (63%), which the first run of this
   // mutant measured as a MISS of the defect it named
-  ['a busy picture is accepted', 'export const BUSY_BORDER_FRAC = 0.15;', 'export const BUSY_BORDER_FRAC = 2;', 'IM6', [['export const BUSY_FG_FRAC = 0.55;', 'export const BUSY_FG_FRAC = 2;'], ['export const SYM_MIN = 0.8;', 'export const SYM_MIN = 0;']]],
+  ['a busy picture is accepted', 'export const BUSY_SHAPE_SHARE = 0.25;', 'export const BUSY_SHAPE_SHARE = 0;', 'IM6', [['export const BUSY_FG_FRAC = 0.55;', 'export const BUSY_FG_FRAC = 2;'], ['export const SYM_MIN = 0.8;', 'export const SYM_MIN = 0;']]],
   ['the axis is not searched (assumed vertical)', 'for (let d = 0; d < 180; d += 3)', 'for (let d = 90; d < 91; d += 3)', 'IM2'],
   ['the scale reads the half-span as 0.9 of it', 'const spanPx = 2 * Math.max', 'const spanPx = 1.8 * Math.max', 'IM3'],
   ['no tail is ever grouped', '  if (!best) return null;\n  const mask', '  return null;\n  const mask', 'IM5'],
@@ -218,6 +294,10 @@ export const IMAGE_MUTANTS = [
   ['the tolerance is ignored', 'fit = fitOutline(chain, metric, tol,', 'fit = fitOutline(chain, metric, 0.6,', 'IM7'],
   ['the erase mask is ignored', 'if (opts.erase) for', 'if (false) for', 'IM9'],
   ['separate wings are taken as one mass', 'if (wings.length >= 2) {', 'if (wings.length >= 99) {', 'IM1'],
-  ['the body is read 15% short', 'const B = (jTail - jHead) * s;', 'const B = 0.85 * (jTail - jHead) * s;', 'IM10'],
-  ['the polarity is not read off the border', 'const autoLight = bMed < threshold;', 'const autoLight = false;', 'IM1'],
+  ['the body is read 15% short', 'B = (jTail - jHead) * s;', 'B = 0.85 * (jTail - jHead) * s;', 'IM10'],
+  ['the polarity is read off the border alone', 'if (pb.size > pa.size) {', 'if (false) {', 'IM13'],
+  ['the body is always measured (a sliver fitted)', 'const confident = abdSeenMm >=', 'const confident = true || abdSeenMm >=', 'IM11'],
+  ['the wing root runs down the body', 'const atRoot = (q) => q[0] <= cutX + 0.6 * s && Math.abs(q[1]) <= T + 0.6 * s;', 'const atRoot = (q) => q[0] <= cutX + 0.6 * s;', 'IM12'],
+  ['the ground along the edge is kept', 'if (border[id] / borderN > BORDER_TOUCH_FRAC) {', 'if (false) {', 'IM13'],
+  ['a refusal does not name its step', "reason: `step ${k} of ${STEPS.length} (${STEPS[k - 1]}) failed: ${text}`", 'reason: text', 'IM14'],
 ];
