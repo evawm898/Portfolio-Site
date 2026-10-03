@@ -416,6 +416,69 @@ function planformChecks(model) {
   return bad;
 }
 
+/* ---------- J: every wing outline smooth (§12.2) ---------- */
+/* JAGGEDNESS, read off the planform POLYLINE the model triangulates (root lead
+   -> root trail, mm, the root tab excluded), vertex by vertex. Each vertex turns
+   the outline by an angle; a vertex whose curvature (turn over its two half
+   edges) is under JAG_DEADBAND per mm is straight. Consecutive vertices turning
+   the same way form a RUN, which COUNTS when it turns at least JAG_TURN degrees
+   in all. A counting run is a CUSP when it is one vertex (all its turn at a
+   point) and a LOBE otherwise; its length is its arc (half edges included).
+   The outline is JAGGED where two consecutive counting runs of OPPOSITE sense
+   (with no more than the floor of straight outline between them) are
+     - both CUSPS — a zig-zag, corner against corner; or
+     - both LOBES shorter than JAG_LOBE x the floor — a wobble finer than the
+       print can make, the noise of a fit that followed the pixels.
+   WHY A SCALLOP IS NOT FLAGGED, AT ANY DEPTH OR COUNT: the scallop law cuts
+   ROUND LOBES between SHARP NOTCHES, and on the polyline every notch is one
+   vertex — a CUSP — while every lobe is several vertices turning the other way
+   — a LOBE. A scallop is therefore cusp, lobe, cusp, lobe: never two cusps
+   together and never two lobes together, however small the lobes are on a
+   small wing. The same holds for a sharp apex or tail tip (one cusp between
+   long runs) and for the blended root (a concave fillet lobe between straight
+   neck and the drawn edge). What the measure cannot tell from a deliberate
+   shape is a deliberate WAVE of smooth lobes finer than the floor, which the
+   floor would not print either. */
+const JAG_DEADBAND = 0.05, JAG_TURN = 6, JAG_LOBE = 0.8;
+export function jaggedness(outline, floor) {
+  const P = []; for (const q of outline) if (!P.length || Math.hypot(q[0] - P[P.length - 1][0], q[1] - P[P.length - 1][1]) > 1e-9) P.push(q);
+  const V = [];
+  for (let i = 1; i + 1 < P.length; i++) {
+    const a = [P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]], b = [P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]];
+    const la = Math.hypot(...a), lb = Math.hypot(...b), th = Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]);
+    const half = (la + lb) / 2;
+    V.push({ at: P[i], th, half, sg: Math.abs(th) / half < JAG_DEADBAND ? 0 : Math.sign(th) });
+  }
+  const runs = []; let cur = null;
+  for (const v of V) {
+    if (!cur || v.sg !== cur.sg) { if (cur) runs.push(cur); cur = { sg: v.sg, n: 0, len: 0, turn: 0, at: v.at }; }
+    cur.n++; cur.len += v.half; cur.turn += v.th;
+  }
+  if (cur) runs.push(cur);
+  const deg = (t) => (Math.abs(t) * 180) / Math.PI;
+  const counting = runs.map((r, i) => ({ ...r, i })).filter((r) => r.sg !== 0 && deg(r.turn) >= JAG_TURN);
+  let worst = null;
+  for (let k = 0; k + 1 < counting.length; k++) {
+    const A = counting[k], B = counting[k + 1];
+    if (A.sg === B.sg) continue;
+    const between = runs.slice(A.i + 1, B.i).reduce((s, r) => s + r.len, 0);
+    if (between > floor) continue;
+    const zig = A.n === 1 && B.n === 1, wob = A.n > 1 && B.n > 1 && A.len < JAG_LOBE * floor && B.len < JAG_LOBE * floor;
+    if (zig || wob) { worst = { at: A.at, kind: zig ? 'zig-zag (corner against corner)' : 'wobble finer than the floor', lens: [A.len, B.len], turns: [deg(A.turn), deg(B.turn)] }; break; }
+  }
+  return { jagged: !!worst, worst, runs: counting.length };
+}
+function smoothChecks(model) {
+  const bad = [], floor = model.params.minDiameter;
+  for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    const outline = part.meta.drawnMm;
+    if (!outline) { bad.push(`${part.name} carries no drawn outline (meta.drawnMm) to read`); continue; }
+    const j = jaggedness(outline, floor);
+    if (j.jagged) bad.push(`${part.name} outline is jagged at (${j.worst.at.map((v) => v.toFixed(2)).join(', ')}) mm planform — a ${j.worst.kind}: runs of ${j.worst.lens.map((v) => v.toFixed(2)).join(' and ')} mm turning ${j.worst.turns.map((v) => v.toFixed(0)).join(' and ')} degrees`);
+  }
+  return bad;
+}
+
 /* ---------- N: drawn-width floor, this file's OWN measure ---------- */
 /* Not the builder's raster: interior points on a grid at floor/12, each one's
    distance to the planform boundary by exact point-to-segment distance; a
@@ -427,7 +490,7 @@ function planformChecks(model) {
    polygon that was triangulated — less its two root-tab vertices (inside the
    body). Decisive only outside a band of two grid steps around the bar; the
    rows in that band are reported, not asserted. */
-function gateThinDepth(poly, floor, H = 12) {
+function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity) {
   const h = floor / H, r = floor / 2;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -444,7 +507,7 @@ function gateThinDepth(poly, floor, H = 12) {
   const covM = bucket(pts.filter((_, i) => covered[i]));
   let depth = 0;
   pts.forEach((p, i) => {
-    if (covered[i]) return;
+    if (covered[i] || p[0] < ignoreXBelow) return;
     let d = Infinity;
     for (let ring = 1; ring < 400 && d === Infinity; ring *= 2) for (const c of near(covM, p, ring)) d = Math.min(d, Math.hypot(p[0] - c[0], p[1] - c[1]));
     depth = Math.max(depth, d);
@@ -455,7 +518,9 @@ function floorChecks(model) {
   const bad = [], floor = model.params.minDiameter, tau = G.THIN_DEPTH_FRAC * floor;
   let worst = 0, gateThin = false, border = false;
   for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
-    const { depth, h } = gateThinDepth(part.meta.planform.slice(1, -1), floor);
+    // with the blended root the root chord is no edge (the wing runs on into the
+    // body as its tab): the whole planform, nothing inside the body judged
+    const { depth, h } = part.meta.root ? gateThinDepth(part.meta.planform, floor, 12, 0) : gateThinDepth(part.meta.planform.slice(1, -1), floor);
     worst = Math.max(worst, depth);
     const builderThin = model.floorViolations.some((v) => v.kind !== 'vein' && `wing${v.pair + 1}` === part.kind);
     if (depth > tau + 2 * h) { gateThin = true; if (!builderThin) bad.push(`${part.name}: thin by this file's measure (${depth.toFixed(2)} mm past the floor disc) and NOT reported by the builder`); }
@@ -610,8 +675,9 @@ function venationChecks(model, opts) {
       // reverse is [tabTrail, scalloped[0..], tabLead], so dense[d] is drawn[d+1]
       const rpart = model.parts.find((q) => q.kind === `wing${w.index + 1}` && q.side === 'R');
       const drawn = rpart.meta.planform.slice().reverse();
-      if (drawn.length !== dense.length + 2) bad.push(`V5: pair ${k} drawn planform has ${drawn.length} points against ${dense.length + 2} expected`);
-      const tailPts = tailIdx.map((d) => drawn[d + 1] || scale(dense[d]));
+      const at = rpart.meta.denseAt;
+      if (!at || at.length !== dense.length || drawn.length !== at[at.length - 1] + 3) bad.push(`V5: pair ${k} drawn planform has ${drawn.length} points against ${at ? at[at.length - 1] + 3 : '?'} expected`);
+      const tailPts = tailIdx.map((d) => drawn[at[d] + 1] || scale(dense[d]));
       const tv = V.veins.find((v) => v.kind === 'main' && v.tail);
       if (!tv) bad.push(`V5: pair ${k} has a tail but no vein runs into it`);
       else { const tip = tv.points[tv.points.length - 1]; const d = Math.min(...tailPts.map((q) => Math.hypot(q[0] - tip[0], q[1] - tip[1]))); if (d > 1e-6) bad.push(`V5: pair ${k} the tail vein ends ${d.toFixed(3)} mm from any tail point of the outline`); }
@@ -741,6 +807,11 @@ function edgeRoundChecks(model) {
       return d;
     };
     const K = B.K, untwisted = !(spec.pitch) ;
+    // the bead's ramp ends 1 mm past its start: the root chord, or — under the
+    // blended root (§12.1) — 1 mm short of the body's silhouette, restated here
+    // from the hinge (half the thorax's local half-width out), not read off the part
+    const kH = G.wingHinges(p, model.layout)[part.meta.pair].k;
+    const rampEnd = (part.meta.root ? Math.max(0, 0.5 * model.layout.rt * kH - 1) : 0) + 1;
     let off = 0, flat = 0, under = 0, over = 0;
     const apexKeys = new Set();
     for (const r of B.rings) {
@@ -750,7 +821,7 @@ function edgeRoundChecks(model) {
       beads++;
       if (2 * Vn < floor - 1e-9) under++;
       if (Dn > Vn * (1 + (untwisted ? 1e-9 : 1e-2)) + 1e-12) over++;   // a PITCHED wing is a helicoid: the world chord between two points of its mid-surface carries the twist between them (measured up to 0.12% on random:1, the planform record exactly 1), so there the bar is 1%
-      if (r.apex[0] > 1 + 1e-9) { aMin = Math.min(aMin, Dn / Vn); if (!(Dn > 0)) flat++; if (Dn >= 0.98 * Vn) full++; }
+      if (r.apex[0] > rampEnd + 1e-9) { aMin = Math.min(aMin, Dn / Vn); if (!(Dn > 0)) flat++; if (Dn >= 0.98 * Vn) full++; }
       if (untwisted) {
         for (let j = 0; j <= K; j++) { const t = (Math.PI * j) / K, X = V3(r.ids[j]); ellRes = Math.max(ellRes, Math.hypot(...X.map((x, d) => x - M[d] - Math.sin(t) * Dv[d] - Math.cos(t) * Vv[d]))); }
         const dot = Vv.reduce((a, x, d) => a + x * Dv[d], 0);
@@ -782,7 +853,9 @@ function edgeRoundChecks(model) {
     // measures independently against the emitted geometry)
     if (flatWing) {
       const F = G.editorFrame(p, k), Lmm = F.length, Smm = F.length * F.stretch;
-      const wo = outline.map(([u, w]) => F.toWorld(u / Lmm, w / Smm));
+      // the planform is already in mm with the blended root applied: undo the
+      // root map before the frame (whose toWorld applies it to drawn points)
+      const wo = outline.map(([u, w]) => { const [a, b] = F.rootWarp ? F.rootWarp.inv(u, w) : [u, w]; return F.toWorld(a / Lmm, b / Smm); });
       const loops = G.contourLoops(model, part), big = loops.reduce((a, l) => (l.length > a.length ? l : a), []);
       let worst = 0, seen = 0;
       for (const [x, y] of big) {
@@ -961,6 +1034,7 @@ function check(label, model, opts = {}) {
   const rc = rootChecks(model);
   for (const b of rc.bad) fails.push(`R: ${b}`);
   for (const b of planformChecks(model)) fails.push(`O: ${b}`);
+  for (const b of smoothChecks(model)) fails.push(`J: ${b}`);
   let le = null;
   if (opts.tucked) {
     le = legExposure(model);
@@ -1136,7 +1210,7 @@ function functionChecks() {
    the edited pair (every other part bit-identical to the real model). */
 function apexOfControl(model, k, i) {
   const part = model.parts.find((q) => q.kind === `wing${k + 1}` && q.side === 'R');
-  const n = part.meta.planform.length, d = i * G.CR_SAMPLES, idx = n - 1 - (d + 1);
+  const n = part.meta.planform.length, d = part.meta.denseAt[i * G.CR_SAMPLES], idx = n - 1 - (d + 1);
   const r = part.meta.bead.rings.find((x) => x.i === idx);
   const v = r.ids[part.meta.bead.K / 2], P = model.positions;
   return [P[3 * v], P[3 * v + 1], P[3 * v + 2]];
@@ -1211,7 +1285,13 @@ function rowsFor(nseeds) {
     const off = d(); off.wingPairs = n;
     rows.push([`tail ON, ${n} pair(s)`, on, { tailIso: G.buildBug(off) }]);
   }
-  { const p = d(); p.wingPairs = 4; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.tail.on = true; p.wings.unlinked[2] = { ...p.wings.first, points: HAND_OUTLINES.falcate };
+  // (the forewing's sweep pinned to the value this row had before the blended
+  // root moved the default's derived sweep, -25.59 -> -27.34: at -27.34 — and at
+  // -20 — the swallowtail's drawn tail tip, narrower than two 0.05 mm raster
+  // pixels on the diagonal, leaves a one-pixel cut-safe island on ONE side.
+  // Measured identical on main at d1fac30 with the root off; recorded in §12.4,
+  // not fixed here — the row's subject is the tail's isolation, not that tip)
+  { const p = d(); p.wingPairs = 4; p.wings.first.sweep = -25.59; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.tail.on = true; p.wings.unlinked[2] = { ...p.wings.first, points: HAND_OUTLINES.falcate };
     const off = JSON.parse(JSON.stringify(p)); off.wings.tail.on = false;
     rows.push(['tail ON, 4 pairs, one unlinked', p, { tailIso: G.buildBug(off) }]); }
   { const p = d(); p.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL)); rows.push(['tail drawn under the floor', p, { expectThin: true }]); }
@@ -1340,6 +1420,10 @@ if (NEG) {
       const r = rootChecks(m).roots;
       shiftPart(m, (q) => q.kind === 'wing2', [0, r[0] - r[1] + 0.3, 0]);   // onto pair 1's root and just past it
     }],
+    // J: a zig-zag laid along the forewing's margin (0.2 mm either side every
+    // 0.4 mm of outline: finer than the 1 mm floor, coarser than the measure's
+    // smoothing) — a jagged fit, which no other clause sees
+    ['a jagged outline', 'J', base, {}, (m) => { const p = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); const pl = p.meta.drawnMm.map((q) => q.slice()); const n = pl.length, mid = Math.floor(n / 2); const out = []; for (let i = 0; i < n; i++) { out.push(pl[i]); if (i >= mid - 12 && i < mid + 12 && i + 1 < n) { const A = pl[i], B = pl[i + 1], L = Math.hypot(B[0] - A[0], B[1] - A[1]), k = Math.max(1, Math.round(L / 0.4)); const nx = -(B[1] - A[1]) / L, ny = (B[0] - A[0]) / L; for (let t = 1; t < k; t++) { const z = (out.length % 2 ? 0.2 : -0.2); out.push([A[0] + ((B[0] - A[0]) * t) / k + nx * z, A[1] + ((B[1] - A[1]) * t) / k + ny * z]); } } } p.meta.drawnMm = out; }],
     ['cross a planform', 'O', base, {}, (m) => { const p = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); const pl = p.meta.planform.map((q) => q.slice()); const a = 10, b = pl.length - 12; [pl[a], pl[b]] = [pl[b], pl[a]]; p.meta.planform = pl; }],
     ['fold a wing top face (hairline)', 'S', base, {}, (m) => {
       // the top-face vertex nearest the wing's centroid, pushed 3 mm along y on

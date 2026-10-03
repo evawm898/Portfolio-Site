@@ -273,7 +273,10 @@ export function planVenation(outline, tailFlags, spec, opts = {}) {
   // CCW with the root point R first: R, root trail, ... apex ..., root lead
   const ccw = outline.slice().reverse();
   const lead = ccw[ccw.length - 1], trail = ccw[0];
-  const R = [0, (lead[1] + trail[1]) / 2];       // the chord's middle: the fan's centre for ANGLES only
+  // the fan's centre for ANGLES: the root chord's middle — or, under the
+  // blended root (§12.1), the middle of the NECK, where every vein must pass
+  const neck = opts.neck || null;
+  const R = neck ? [neck.u, neck.c] : [0, (lead[1] + trail[1]) / 2];
   const flags = tailFlags ? tailFlags.slice().reverse() : null;
   const P = ccw;                                  // P[0] = root trail ... P[last] = root lead; the closing edge is the root chord
   const edges = [];
@@ -366,9 +369,15 @@ export function planVenation(outline, tailFlags, spec, opts = {}) {
     const ks = Array.from({ length: 1 + B }, (_, j) => i * (1 + B) + j);
     const tips = ks.map((k) => targets[k]);
     if (tips.some((q) => !q)) { dropped.main += 1 + B; for (const _ of ks) paths.push(null); continue; }
-    const S = startAt(ROOT_SPREAD_LO + (ROOT_SPREAD_HI - ROOT_SPREAD_LO) * ((i + 0.5) / N));
+    const fr = ROOT_SPREAD_LO + (ROOT_SPREAD_HI - ROOT_SPREAD_LO) * ((i + 0.5) / N);
+    const S = startAt(fr);
+    // under the blended root every vein runs through the NECK first, at the
+    // same fraction across it (inside its middle 80%): a straight chord from
+    // the root chord to a margin target would leave the wing at the neck
+    const Nk = neck ? [neck.u, neck.c - 0.8 * neck.half + 1.6 * neck.half * ((i + 0.5) / N)] : null;
+    const via = (A, B) => (Nk ? [[A, Nk, B], [A, B]] : candidatesTo(A, B));
     if (B === 0) {
-      const r = cut(cells, S, tips[0], candidatesTo(S, tips[0]), { kind: 'vein', width: widthAt(0.5), vein: vid });
+      const r = cut(cells, S, tips[0], via(S, tips[0]), { kind: 'vein', width: widthAt(0.5), vein: vid });
       if (!r) { dropped.main++; paths.push(null); continue; }
       const v = addVein('main', r.path, 0, 1, { main: i, terminal: ks[0] });
       for (const e of r.cells.flatMap((c) => c.edges)) if (e.vein === v.id) e.width = v.width[0] * 0.5 + v.width[1] * 0.5;
@@ -377,18 +386,19 @@ export function planVenation(outline, tailFlags, spec, opts = {}) {
     }
     // stem to the branch point (toward the mean tip), then a branch to each tip
     const mean = tips.reduce((a, q) => add2(a, mul2(q, 1 / tips.length)), [0, 0]);
-    const Bp = lerp2(S, mean, BRANCH_AT);
+    const Bp = lerp2(Nk || S, mean, BRANCH_AT);
+    const stemPts = Nk ? [S, Nk, Bp] : [S, Bp];
     // the stem is a chord only once the first branch reaches the margin: cut
     // stem + first branch as ONE chord, then the other branches from Bp
     let first = null;
     for (let j = 0; j < tips.length && !first; j++) {
-      const cand = candidatesTo(Bp, tips[j]).map((q) => [S, ...q]);
+      const cand = candidatesTo(Bp, tips[j]).map((q) => [...stemPts.slice(0, -1), ...q]);
       const r = cut(cells, S, tips[j], cand, { kind: 'vein', width: widthAt(0.5), vein: vid });
       if (r) first = { j, r };
     }
     if (!first) { dropped.main += 1 + B; for (const _ of ks) paths.push(null); continue; }
-    const stemLen = dist2(S, Bp);
-    const stem = addVein('main', [S, Bp], 0, 0, { main: i });
+    const stemLen = stemPts.reduce((a, q, k) => (k ? a + dist2(stemPts[k - 1], q) : 0), 0);
+    const stem = addVein('main', stemPts, 0, 0, { main: i });
     const fullLen = (p) => p.reduce((s, q, k) => (k ? s + dist2(p[k - 1], q) : 0), 0);
     const pathsHere = [];
     for (let j = 0; j < tips.length; j++) {
@@ -397,10 +407,10 @@ export function planVenation(outline, tailFlags, spec, opts = {}) {
       else {
         const r = cut(cells, Bp, tips[j], candidatesTo(Bp, tips[j]), { kind: 'vein', width: widthAt(0.7), vein: vid });
         if (!r) { dropped.main++; pathsHere.push(null); continue; }
-        path = [S, ...r.path];
+        path = [...stemPts.slice(0, -1), ...r.path];
       }
       const Lp = fullLen(path), tDiv = stemLen / Lp;
-      const bv = addVein('branch', path.slice(1), tDiv, 1, { main: i, terminal: ks[j] });
+      const bv = addVein('branch', path.slice(stemPts.length - 1), tDiv, 1, { main: i, terminal: ks[j] });
       stem.width = [widthAt(0), widthAt(tDiv)]; stem.t = [0, tDiv];
       pathsHere.push({ ...finish(path), divergeT: tDiv, main: i, vein: bv.id, s: dist2(S, trail) });
     }
@@ -408,7 +418,8 @@ export function planVenation(outline, tailFlags, spec, opts = {}) {
     for (const c of cells.list) for (let e = 0; e < c.edges.length; e++) {
       const a = c.pts[e], b = c.pts[(e + 1) % c.pts.length];
       if (c.edges[e].kind !== 'vein') continue;
-      const onStem = onSegment(a, S, Bp) !== null && onSegment(b, S, Bp) !== null;
+      const onSeg = (q) => stemPts.some((_, k) => k > 0 && onSegment(q, stemPts[k - 1], stemPts[k]) !== null);
+      const onStem = onSeg(a) && onSeg(b);
       if (onStem) { c.edges[e].width = (stem.width[0] + stem.width[1]) / 2; c.edges[e].vein = stem.id; }
     }
     paths.push(...pathsHere);

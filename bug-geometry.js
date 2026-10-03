@@ -169,6 +169,8 @@ export const PARAM_SPEC = [
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
   R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: none)', 0, 4, 0.05, 0, 'mm', hasWings),
   R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
+  R('wingRootWidth', 'wings', 'Root — width where the wing leaves the body (0: the old straight root chord)', 0, 6, 0.05, 1.6, 'mm', hasWings),
+  R('wingRootFillet', 'wings', 'Root — fillet radius onto the body', 0, 4, 0.05, 0.9, 'mm', (p) => hasWings(p) && p.wingRootWidth > 0),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -252,11 +254,14 @@ export const LEGACY_DEFAULT_WINGS = {
 };
 /* The new controls at the ends that ARE the old code (each a branch). A design
    saved before DESIGN_VERSION 4 loads with these, so it looks as it did. */
-export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0 };
+export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0, wingRootWidth: 0 };
 /* The edges pass (design doc §10): the rounded edge became the default. A design
    saved at DESIGN_VERSION 4 carries the chamfer it was saved with and knows no
    round radius, so it loads with the round at 0 (the square wall it had). */
 export const PRE_ROUND_STYLE = { wingEdgeRound: 0 };
+/* The blended root (§12.1): a design saved before DESIGN_VERSION 6 knows no root
+   width and loads with it at 0 — the straight root chord it was saved with. */
+export const PRE_ROOT_STYLE = { wingRootWidth: 0 };
 /* The Phase 1/2 default's body, legs and antennae (the values PARAM_SPEC used
    to default to). */
 export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, thoraxDepth: 4.6, abdomenLength: 15, abdomenWidth: 5, abdomenTaper: 0.5, abdomenSegments: 6,
@@ -666,6 +671,22 @@ export function fitMigratedTail(base, tail) {
    drawn LAST pair, every pair between interpolates both (outline AND scalar
    fields) unless it is UNLINKED, when it carries its own drawn spec. */
 export function resolveWingPairs(p) {
+  const out = resolveWingPairsRaw(p);
+  if (out.length && p.wingRootWidth > 0) {
+    const L = bodyLayout(p), H = wingHinges(p, L);
+    for (const spec of out) {
+      // the body's silhouette from the hinge: the hinge stands at half the
+      // thorax's local half-width, so the silhouette is that far again (not
+      // divided by the sweep's cosine: the sweep is DERIVED from this outline by
+      // the specimen pose, and a root that moved with the sweep would make the
+      // pose chase its own tail)
+      const k = H[spec.index].k;
+      spec.root = { width: p.wingRootWidth, fillet: p.wingRootFillet ?? 0, floor: p.minDiameter, ub: 0.5 * L.rt * k };
+    }
+  }
+  return out;
+}
+function resolveWingPairsRaw(p) {
   const N = p.wingPairs, W = p.wings, out = [];
   for (let k = 0; k < N; k++) {
     const role = k === 0 ? 'first' : k === N - 1 ? 'last' : 'mid';
@@ -1164,7 +1185,8 @@ function edt2(src, nx, ny) {
   return out;
 }
 
-export function thinAnalysis(poly, floor) {
+export function thinAnalysis(poly, floor, opts = {}) {
+  const ig = opts.ignoreXBelow ?? -Infinity;   // material at x < ig is not judged (the root tab, inside the body)
   const h = floor / THIN_RES, r = floor / 2;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -1194,12 +1216,12 @@ export function thinAnalysis(poly, floor) {
   for (let i = 0; i < opened.length; i++) opened[i] = inside[i] && dCore[i] <= r2 ? 1 : 0;
   const dOpen = edt2(opened, nx, ny);
   let maxDepth = 0;
-  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i]) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
+  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i] && gx + ((i % nx) + 0.5) * h >= ig) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
   const tau = THIN_DEPTH_FRAC * floor;
   const flags = new Uint8Array(poly.length);
   for (let k = 0; k < poly.length; k++) {
     const i = clamp(Math.floor((poly[k][0] - gx) / h), 0, nx - 1), j = clamp(Math.floor((poly[k][1] - gy) / h), 0, ny - 1);
-    flags[k] = Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
+    flags[k] = poly[k][0] >= ig && Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
   }
   return { maxDepth, thin: maxDepth > tau, flags, tau };
 }
@@ -1575,6 +1597,158 @@ function planformSlab(acc, pts, tris, half, W, part, apex = null) {
    length and stretch, with the scallops cut on its trailing half. ONE owner:
    buildWingPair triangulates exactly this, and specimenPose() reads its inner
    margin off exactly this, so the pose squares the margin the STL carries. */
+/* THE BLENDED ROOT (§12.1). A drawn outline closes on a straight root chord
+   (both root points pinned at u = 0); left at its drawn width that chord is a
+   vertical cut beside the body, and a forewing and a hindwing side by side read
+   as one rectangular block. The root is reshaped here, in planform MILLIMETRES,
+   by one map that every consumer reads (the builder through drawnPlanformMm, the
+   editor through editorFrame, the specimen pose):
+
+     w' = c(u) + (w - c0) * s(u)        u unchanged
+
+   c0 is the drawn root chord's centre and h0 its half-width; the map squeezes
+   the chord toward the HINGE (c -> 0) so every pair attaches at its own point on
+   the thorax. s(u) is E(u) / h0, where the ENVELOPE E(u) is the attachment's
+   half-width: hr (half the root width, never under half the floor) at the NECK,
+   flaring by a FILLET (curvature radius R at the neck, 45 degrees by the body's
+   silhouette at u = ub, and on at 45 degrees inside the body), then released
+   back to the drawn wing over the next `blend` mm by a smoothstep. It narrows
+   only, and only the band between the centre and each ROOT EDGE is scaled —
+   what lies beyond a root edge is shifted, never crushed.
+
+   For every u the map is affine in w with a positive slope, so it is a
+   BIJECTION of the plane: it cannot make a simple outline cross itself, and it
+   moves no point along the span (the apex, the tail, every index stay put).
+   Width 0 is the drawn root chord, BY BRANCH (the map is never built). */
+export const ROOT_EDGE_STEEP = 2.5;   // see rootWarp: a root edge ends where the outline runs more across than this x along
+export const ROOT_BLEND_SLOPE = 1.0;   // see rootWarp: the release is at least this x the narrowing long
+export const ROOT_BLEND_FRAC = 0.1;    // the release to the drawn wing runs over 0.1 of the pair's length (or 2.5 fillets, if longer)
+export function rootWarp(spec) {
+  const r = spec.root;
+  if (!r || !(r.width > 0)) return null;
+  const span = spec.length, S = span * spec.stretch;
+  const d = spec.dense, n = d.length;
+  const P = d.map(([u, w]) => [u * span, w * S]);
+  const wL = P[0][1], wT = P[n - 1][1];
+  const c0 = (wL + wT) / 2;
+  const hr = Math.max(r.width, r.floor) / 2, R = Math.max(0, r.fillet), ub = Math.max(0, r.ub);
+  if (!(wL > wT)) return null;
+  const un = ub + R;
+  // the DRAWN wing's two ROOT EDGES: the outline walked from the root lead
+  // (forward) and from the root trail (backward), each read where it first
+  // crosses a station u — on a grid of NS stations over [0, uEnd]
+  const NS = 240;
+  const edges = (uEnd) => {
+    const du = uEnd / NS, up = new Float64Array(NS + 1), dn = new Float64Array(NS + 1);
+    const edgeAt = (start, step, arr, sign) => {
+      let last = Math.abs(P[start][1] - c0);
+      for (let g = 0; g <= NS; g++) {
+        const u = Math.max(1e-9, g * du);
+        let found = null, walked = 0;
+        // only the outline NEAR the root is its root edge: a hindwing whose inner
+        // margin runs down beside the abdomen is not one, and reading it as one
+        // would make the whole anal lobe "the root" — the walk stops after
+        // 1.5 x the map's span of outline
+        for (let i = start; i + step >= 0 && i + step < n; i += step) {
+          const A = P[i], B = P[i + step];
+          // ... and it ends where the outline turns STEEP (more than
+          // ROOT_EDGE_STEEP across per along): an edge running off along the
+          // body (a hindwing's inner margin, a forewing's costa beside the head)
+          // is not the root edge, and is shifted with the wing, never crushed
+          if (Math.abs(B[1] - A[1]) > ROOT_EDGE_STEEP * Math.abs(B[0] - A[0]) && Math.hypot(B[0] - A[0], B[1] - A[1]) > 1e-9) break;
+          if ((A[0] <= u) !== (B[0] <= u)) { found = A[1] + ((u - A[0]) * (B[1] - A[1])) / (B[0] - A[0]); break; }
+          walked += Math.hypot(B[0] - A[0], B[1] - A[1]);
+          if (walked > 1.5 * uEnd + 1) break;
+        }
+        if (found !== null) last = sign * (found - c0);
+        arr[g] = Math.max(1e-6, last);
+      }
+    };
+    edgeAt(0, 1, up, 1);
+    edgeAt(n - 1, -1, dn, -1);
+    return { du, up, dn };
+  };
+  // the release runs over ROOT_BLEND_FRAC of the length, or 2.5 fillets — or
+  // ROOT_BLEND_SLOPE x the narrowing it has to undo (the root edges' widest
+  // reach over that first span, less the neck), so a deep squeeze is released
+  // gently, never as a kink the rounded edge folds on
+  const blend0 = Math.max(ROOT_BLEND_FRAC * span, 2.5 * R);
+  const first = edges(un + blend0);
+  let hd = 0; for (let g = 0; g <= NS; g++) hd = Math.max(hd, first.up[g], first.dn[g]);
+  const blend = Math.max(blend0, ROOT_BLEND_SLOPE * (hd - hr)), uEnd = un + blend;
+  const { du, up, dn } = blend === blend0 ? first : edges(uEnd);
+  const at = (arr, u) => { const x = clamp(u / du, 0, NS), i = Math.min(NS - 1, Math.floor(x)), f = x - i; return arr[i] * (1 - f) + arr[i + 1] * f; };
+  // the envelope toward the body: a parabola from the neck (curvature radius R
+  // there — the FILLET) reaching 45 degrees at the body's silhouette, then on at
+  // 45 degrees into the body: C1 everywhere, so no corner for the rounded edge
+  // to fold on (a quarter circle ends vertical at the silhouette and leaves a
+  // convex corner there, where the bead folded)
+  // ... and inside the body the slope eases from 45 degrees at the silhouette
+  // back to 0 at the root chord, so the edge meets the root tab TANGENT too (a
+  // 45-degree corner there folded the bead's ramp)
+  const Eb = R <= 0 ? hr + (un - ub) : un - ub <= R ? hr + ((un - ub) ** 2) / (2 * R) : hr + (un - ub) - R / 2;
+  const sb = R <= 0 ? 1 : Math.min(1, (un - ub) / R);   // the slope at the silhouette
+  const E = (u) => {
+    if (u < ub) return ub > 0 ? Eb + (sb * (ub * ub - Math.max(0, u) ** 2)) / (2 * ub) : Eb;
+    const x = un - u; return x <= 0 ? hr : R <= 0 ? hr + x : x <= R ? hr + (x * x) / (2 * R) : hr + x - R / 2;
+  };
+  const beta = (u) => { const t = clamp((u - un) / blend, 0, 1); return t * t * (3 - 2 * t); };
+  // each side: the band between the centre and the root edge is SCALED so the
+  // edge lands on e(u) (the envelope, released to the drawn edge by beta);
+  // beyond the root edge the wing is only SHIFTED by the same amount — so what
+  // lies past the root edge (a hindwing's inner margin beside the abdomen) keeps
+  // its shape instead of being crushed into the neck. Slope e/h then 1: monotone.
+  // (the drawn edge and the envelope meet through a SMOOTH minimum of width K:
+  // a plain min leaves a corner where the envelope first cuts the drawn edge, and
+  // the rounded edge folded on it)
+  const K = Math.max(R, 0.5);
+  const smin = (a, b) => { const q = Math.max(K - Math.abs(a - b), 0) / K; return Math.min(a, b) - (q * q * K) / 4; };
+  const eOf = (u, h) => { const target = Math.max(0.5 * hr, smin(h, E(u))), b = beta(u); return target + (h - target) * b; };
+  const map1 = (u, x) => {
+    if (u >= uEnd) return x;
+    const sd = x >= 0 ? 1 : -1, h = at(sd > 0 ? up : dn, Math.max(0, u)), e = eOf(u, h), ax = Math.abs(x);
+    return sd * (ax <= h ? (ax * e) / h : ax - h + e);
+  };
+  const inv1 = (u, y) => {
+    if (u >= uEnd) return y;
+    const sd = y >= 0 ? 1 : -1, h = at(sd > 0 ? up : dn, Math.max(0, u)), e = eOf(u, h), ay = Math.abs(y);
+    return sd * (ay <= e ? (ay * h) / e : ay - e + h);
+  };
+  // the centre: c0 at the drawn wing, 0 (the hinge) at the root
+  const cOf = (u) => c0 * beta(u);
+  return {
+    hr, R, ub, un, blend, c0, h0: (wL - wT) / 2,
+    fwd: (u, w) => [u, cOf(u) + map1(u, w - c0)],
+    inv: (u, w) => [u, c0 + inv1(u, w - cOf(u))],
+  };
+}
+export const ROOT_SAMPLE_MM = 0.5;    // the outline is resampled to this spacing where the root map acts, so the fillet and the neck are drawn, not chorded
+function applyRootWarp(spec, poly) {
+  const ident = () => ({ poly, warp: null, rootReduced: false, posOf: poly.map((_, i) => i), srcOf: poly.map((_, i) => i) });
+  const R = rootWarp(spec);
+  if (!R) return ident();
+  const uEnd = R.un + R.blend;
+  // densify every edge that reaches into the root map's span (the closing root
+  // chord too: it is the polygon's last edge, but it is not resampled — it is
+  // the straight root, inside the body)
+  const out = [], srcOf = [], posOf = [];
+  for (let i = 0; i < poly.length; i++) {
+    posOf.push(out.length); out.push(R.fwd(...poly[i])); srcOf.push(i);
+    if (i + 1 >= poly.length) break;
+    const A = poly[i], B = poly[i + 1];
+    if (Math.min(A[0], B[0]) >= uEnd) continue;
+    // only where the map MOVES the edge (where it leaves an edge alone it is
+    // the identity, and fine samples there only crowd the bead's ramp at the root)
+    const fa = R.fwd(...A), fb = R.fwd(...B);
+    if (fa[1] === A[1] && fb[1] === B[1]) continue;
+    // the length the edge has AFTER the map is what must be fine
+    const m = Math.ceil(Math.hypot(fb[0] - fa[0], fb[1] - fa[1], B[1] - A[1]) / ROOT_SAMPLE_MM);
+    for (let t = 1; t < m; t++) { out.push(R.fwd(A[0] + ((B[0] - A[0]) * t) / m, A[1] + ((B[1] - A[1]) * t) / m)); srcOf.push(-1); }
+  }
+  if (polygonSimple(out) && polygonClear(out, OUTLINE_CLEARANCE * spec.length)) return { poly: out, warp: R, rootReduced: false, posOf, srcOf };
+  return { ...ident(), rootReduced: true };
+}
+
 function drawnPlanformMm(spec) {
   const span = spec.length;
   const base = spec.dense.map(([u, w]) => [u * span, w * span * spec.stretch]);
@@ -1591,7 +1765,12 @@ function drawnPlanformMm(spec) {
     for (let it = 0; it < 12; it++) { scalloped = applyScallop(depth); if (okW(scalloped)) break; depth /= 2; scallopReduced = true; }
     if (!okW(scalloped)) { scalloped = base; depth = 0; }
   }
-  return { base, scalloped, apex, umax, scallopReduced };
+  // the blended root, after the scallop (it moves no point along the span)
+  const rw = applyRootWarp(spec, scalloped);
+  // the DRAWN outline before the scallop law cuts it (the same root map): what
+  // the smoothness clause reads — a scallop is a law applied on top, deliberate by construction
+  const drawn = rw.warp ? applyRootWarp(spec, base).poly : base;
+  return { base, drawn, scalloped: rw.poly, apex, umax, scallopReduced, rootWarp: rw.warp, rootReduced: rw.rootReduced, posOf: rw.posOf, srcOf: rw.srcOf };
 }
 
 /* The wing's EDGE PROFILE (elegance pass, §9.1): its half-thickness at a
@@ -1637,7 +1816,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   const minW = p.minDiameter;
 
   // The drawn curve in world millimetres, scallops cut (one owner: drawnPlanformMm).
-  const { scalloped, umax, scallopReduced } = drawnPlanformMm(spec);
+  const { scalloped, drawn, umax, scallopReduced, rootWarp: rootW, rootReduced, posOf, srcOf } = drawnPlanformMm(spec);
   const edge = edgeField(p, thick, scalloped, umax), hAt = (q) => edge.h(q[0], q[1]);
   // Root: the closing chord moved INTO the thorax by `embed`.
   const n0 = scalloped[0], n1 = scalloped[scalloped.length - 1];
@@ -1650,8 +1829,11 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   const mode = p.venation;
   let plan = null;
   if (mode !== 'none') {
-    const flags = tailFlagsFor(spec, scalloped.length);
-    plan = planVenation(scalloped, flags, spec, { holes: mode === 'holes', minCellMm: p.minCellMm });
+    // the tail flags are per DENSE sample; a point the root map inserted takes
+    // the flag of both its neighbours (it is never in a tail: the root is not)
+    const f0 = tailFlagsFor(spec, spec.dense.length);
+    const flags = f0 && srcOf.map((d, i) => (d >= 0 ? f0[d] : false));
+    plan = planVenation(scalloped, flags, spec, { holes: mode === 'holes', minCellMm: p.minCellMm, neck: rootW ? { u: rootW.un, c: 0, half: rootW.hr } : null });
   }
   /* The ROUNDED EDGE (§10): every free edge's boundary loop moves inward by
      its bead radius — round x the local half-thickness, the root chord (u <= 0,
@@ -1659,8 +1841,12 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
      where it was (the bead's apex), and the MOVED loops are what is
      triangulated, so the skins conform and no triangle can flip. */
   const round = p.wingEdgeRound;
-  const wantRound = (P) => P[0] > 1e-9;
-  const aRound = (q, P) => round * edge.h(q[0], q[1]) * clamp(P[0] / ROUND_ROOT_RAMP_MM, 0, 1);
+  // (under the blended root the bead starts at the body's silhouette, not at
+  // the root chord: the stretch inside the body is hidden, and a bead ramping
+  // up through the root's fillet folded there)
+  const r0 = rootW ? Math.max(0, rootW.ub - ROUND_ROOT_RAMP_MM) : 0;
+  const wantRound = (P) => P[0] > r0 + 1e-9;
+  const aRound = (q, P) => round * edge.h(q[0], q[1]) * clamp((P[0] - r0) / ROUND_ROOT_RAMP_MM, 0, 1);
   let tri, pts, apex = null, movedOf = null, roundReduced = 0;
   if (plan && mode === 'holes') {
     // ONE conforming triangulation: every cut cell is a ring of quads between
@@ -1741,10 +1927,24 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   part.meta.linked = spec.linked;
   part.meta.repaired = spec.repaired;
   part.meta.scallopReduced = scallopReduced;
+  part.meta.root = rootW ? { width: 2 * rootW.hr, fillet: rootW.R, ub: rootW.ub, neckU: rootW.un, blend: rootW.blend, drawnHalf: rootW.h0, centre: rootW.c0 } : null;
+  part.meta.rootReduced = rootReduced;
+  // dense sample d of the drawn curve is planform point posOf[d] of the outline
+  // (the root map inserts points near the root): consumers that index the
+  // planform by control point read this, never d itself
+  part.meta.denseAt = posOf;
+  // the drawn outline in mm BEFORE the scallop law (root map applied): the gate's smoothness clause reads it
+  part.meta.drawnMm = drawn;
   part.meta.hingeY = hinge[1];
   // drawn-width floor: the planform as drawn (tail and scallops included, the
   // root tab inside the body excluded), in millimetres, against minDiameter
-  const thin = thinAnalysis(scalloped, p.minDiameter);
+  // with the blended root the root chord is no edge: the wing runs on into the
+  // body as the root tab, so the measure reads the polygon WITH its tab and
+  // judges nothing inside the body (u < 0). Without it, the drawn polygon closed
+  // on its root chord, exactly as before.
+  const thin = rootW
+    ? (() => { const t = thinAnalysis([[-embed, n0[1]], ...scalloped, [-embed, n1[1]]], p.minDiameter, { ignoreXBelow: 0 }); return { ...t, flags: t.flags.slice(1, -1) }; })()
+    : thinAnalysis(scalloped, p.minDiameter);
   part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau };
   part.meta.thinFlags = Array.from(thin.flags);
   // the same flagged runs in WORLD millimetres, just above the top face — the
@@ -2326,7 +2526,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 5;   // 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 6;   // 6: the blended wing root (wingRootWidth, wingRootFillet) — a v5 file loads with the root width at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -2339,6 +2539,7 @@ export function paramsFromDesign(doc) {
   const raw = { ...(doc.params || {}) };
   if (!(doc.version >= 4)) for (const [k, v] of Object.entries(LEGACY_STYLE)) if (!(k in raw)) raw[k] = v;
   if (!(doc.version >= 5)) for (const [k, v] of Object.entries(PRE_ROUND_STYLE)) if (!(k in raw)) raw[k] = v;
+  if (!(doc.version >= 6)) for (const [k, v] of Object.entries(PRE_ROOT_STYLE)) if (!(k in raw)) raw[k] = v;
   const params = normalizeParams(raw, notes);
   return { ok: true, params, notes };
 }
@@ -2358,10 +2559,26 @@ export function buildBug(params, opts = {}) {
   const pairs = resolveWingPairs(p);
   if (Number.isInteger(opts.flatPair) && pairs[opts.flatPair]) { pairs[opts.flatPair] = { ...pairs[opts.flatPair], dihedral: 0, pitch: 0 }; }
   const hinges = wingHinges(p, L);
-  for (const spec of pairs) buildWingPair(acc, p, L, spec, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
+  for (const spec of pairs) {
+    // A blended root whose rounded edge cannot be inset (a hook at the root,
+    // tighter than the bead, squeezed tighter by the root map) is stepped down —
+    // half the fillet, no fillet, then the drawn root chord — and reported; the
+    // triangulation throws before anything of the pair is emitted, so a retry
+    // starts clean.
+    const tries = spec.root ? [spec.root.fillet, spec.root.fillet / 2, 0, null] : [undefined];
+    for (let t = 0; t < tries.length; t++) {
+      const s2 = tries[t] === undefined ? spec : { ...spec, root: tries[t] === null ? null : { ...spec.root, fillet: tries[t] } };
+      try {
+        buildWingPair(acc, p, L, s2, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
+        if (t > 0) notes.push(`pair ${spec.index + 1}: the rounded edge could not follow the blended root here, so ${tries[t] === null ? 'this pair keeps its drawn root chord' : `its fillet was reduced to ${tries[t].toFixed(2)} mm`}`);
+        break;
+      } catch (e) { if (t === tries.length - 1 || !/earClip|not simple/.test(e.message)) throw e; }
+    }
+  }
   for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
   for (const s of pairs) if (s.repaired) notes.push(`pair ${s.index + 1}: the interpolated outline crossed itself and was eased toward the nearer drawn pair (t ${s.t.toFixed(2)} -> ${s.tUsed.toFixed(2)})`);
   for (const part of acc.parts) if (part.meta.scallopReduced) notes.push(`pair ${part.meta.pair + 1}: scallop depth reduced so the outline does not cross itself`);
+  for (const part of acc.parts) if (part.meta.rootReduced) notes.push(`pair ${part.meta.pair + 1}: the blended root would make the outline cross or pinch, so this pair keeps its drawn root chord`);
 
   // Mirror every right-side part into its left twin.
   const rightParts = acc.parts.filter((q) => q.side === 'R');
@@ -2432,10 +2649,14 @@ export function editorFrame(params, k) {
   if (!spec) return null;
   const { hinge } = wingHinges(p, bodyLayout(p))[k];
   const L = spec.length, S = L * spec.stretch, sw = spec.sweep * D2R, cs = Math.cos(sw), sn = Math.sin(sw);
+  // the blended root's map (§12.1), the same one the builder applies — so a
+  // control point near the root is drawn on the wing it shapes, and a drag there
+  // lands where the hand put it (inverted exactly: the map is affine in w)
+  const rw = rootWarp(spec), fw = rw ? rw.fwd : (a, b) => [a, b], iw = rw ? rw.inv : (a, b) => [a, b];
   return {
-    pair: k, length: L, stretch: spec.stretch, sweep: spec.sweep, hinge: [hinge[0], hinge[1]],
-    toWorld: (u, w) => { const a = u * L, b = w * S; return [hinge[0] + a * cs + b * sn, hinge[1] - a * sn + b * cs]; },
-    fromWorld: (x, y) => { const dx = x - hinge[0], dy = y - hinge[1]; return [(dx * cs - dy * sn) / L, (dx * sn + dy * cs) / S]; },
+    pair: k, length: L, stretch: spec.stretch, sweep: spec.sweep, hinge: [hinge[0], hinge[1]], rootWarp: rw,
+    toWorld: (u, w) => { const [a, b] = fw(u * L, w * S); return [hinge[0] + a * cs + b * sn, hinge[1] - a * sn + b * cs]; },
+    fromWorld: (x, y) => { const dx = x - hinge[0], dy = y - hinge[1]; const [a, b] = iw(dx * cs - dy * sn, dx * sn + dy * cs); return [a / L, b / S]; },
   };
 }
 /* The SVG export's own frame: world mm <-> the file's user units (mm, y down). */

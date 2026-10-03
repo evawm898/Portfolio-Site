@@ -107,7 +107,14 @@ export function compareToKnown(img, fit) {
   const fitted = rasterLoops(gF, ([x, y]) => t.toPx([x, y + dy]), W, H, 2);
   // (a picture whose body was inked into the wings' roots — the same-tone
   // fixture — is compared only beyond the inked band: truth.clipMm)
-  const cut = Math.max(Math.max(t.params.thoraxWidth, fit.params.thoraxWidth) / 2 + 1, t.clipMm || 0);
+  // (and only beyond the KNOWN bug's own blended roots — §12.1: within each
+  // pair's root map, hinge -> neck -> release, both bugs carry a DESIGNED root,
+  // not the picture's, so what the fit draws there is not a reading of the
+  // picture. The extent is read off the known model, never off the fit.)
+  const HK = G.wingHinges(t.model.params, t.model.layout);
+  let rootX = 0;
+  for (const q of t.model.parts.filter(rightWings)) if (q.meta.root) rootX = Math.max(rootX, HK[q.meta.pair].hinge[0] + q.meta.root.neckU + q.meta.root.blend);
+  const cut = Math.max(Math.max(t.params.thoraxWidth, fit.params.thoraxWidth) / 2 + 1, t.clipMm || 0, rootX);
   const clip = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) clip[y * W + x] = t.fromPx([x + 0.5, y + 0.5])[0] >= cut ? 1 : 0;
   const A = new Uint8Array(W * H), B = new Uint8Array(W * H);
