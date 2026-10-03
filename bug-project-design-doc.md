@@ -229,6 +229,7 @@ strength claim in this repo is still theory.
 | 2 | venation: cells as data, HOLES and RIDGES as two renderings of one record, vein floor | built (§8, #341 merged) |
 | elegance | the default becomes a pinned specimen; edge profile, teardrop club, groove/bulge segments, pointed tips, SET SPECIMEN | **built (§9)** — waits on Eva's ruling on `docs/img/bug-elegance-sheet.png` |
 | edges | rounded edges (full bullnose on every wing edge, the default); Top view on load; Render / SVG toggle; the outline editor on the wing itself; the reference backdrop behind the whole bug | **built (§10)** — waits on Eva's ruling on `docs/img/bug-edges-sheet.png` |
+| image | IMAGE → BUG: paste / drop / load a top-down picture, fit an editable bug to it (outline and proportions only) | **built (§11)** — waits on Eva's ruling on `docs/img/bug-image-sheet.jpg` and on her own pictures in the preview |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
 | 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
@@ -1492,3 +1493,336 @@ Measured on the sheet, sections drawn from the two facing beads' emitted vertice
 6. Older sheet tools (`shot-bug-sheet`, `-venation`, `-elegance`, `-blended`) drove the
    removed editor panel through `__bug` hooks that now point at the on-wing editor;
    their committed sheets stand as records and were not re-shot.
+
+
+## 11. Image → bug — fit an editable bug to a top-down picture
+
+Eva's brief (Oct 2): paste, drag in or load a top-down picture of a butterfly, moth or
+dragonfly and the page does its best to replicate it as an editable bug, so she does not
+trace by hand. **Outline and proportions only — veins, spots and pattern are out of
+scope** (they are filled away). Lace import stays parked (§3.7) and is untouched.
+
+Files: **`bug-image.js`** (new, pure: no DOM, no canvas — the page hands it a canvas's
+`ImageData`, the gate an identical `{width, height, data}` rasterised in Node),
+`bug.js` / `bug.html` (the "From an image" section, paste / drop, the split line and the
+erase brush on the Top → SVG view, the backdrop placed by the fit),
+`tools/verify-bug-image.mjs` (the IM family), `tools/verify-bug-image-fixtures.mjs` (the
+synthetic pictures), `tools/shot-bug-image.mjs` (the sheet, `docs/img/bug-image-sheet.jpg`).
+**`bug-geometry.js` is untouched**: nothing here builds geometry — the import returns
+params, and `buildBug` builds them like every other bug.
+
+**In-browser, classical image processing, no library.** Every step is a few dozen lines
+of array code (Otsu, a chamfer distance transform, 4-connected labelling, crack-following
+contours, a convex hull); a CDN library (OpenCV.js is ~8 MB) would cost more to load than
+it saves to write, so none is used.
+
+### 11.1 The pipeline
+
+1. **Segment** (`segment`). Luminance, a 3×3 blur, a threshold — **Otsu's** unless the
+   slider sets one — and the **polarity read off the picture's border** (the border is
+   background; the subject is whichever side of the threshold the border is not), with an
+   **invert** toggle. The brush's erased pixels are removed, the **largest 4-connected
+   shape** is kept, and its holes are filled (a spot in a wing is pattern, not a hole).
+   The picture is drawn to a canvas at most `WORK_MAX` 560 px on its long side first.
+2. **Symmetry** (`findAxis`, `upright`). The mirror axis is **searched**, not assumed
+   vertical: every 3° over a half turn through the centroid, then refined to 0.1° and a
+   sub-pixel offset, scoring the fraction of the shape whose mirror image is shape. The
+   head is taken to be the end nearer the TOP of the picture — **a guess, with a Flip
+   button** (there is no reliable head/tail cue in a silhouette: a butterfly's head often
+   hides between its forewings). The shape is resampled upright, and **each cell is the
+   average of the shape at X and at −X** — the two halves averaged — and from then on only
+   the RIGHT half is used, so the model's mirror (§2.1) makes the bug **mirror-exact by
+   construction**, whatever the picture's asymmetry.
+3. **Body** — the narrow central column. The rows where wing pieces ATTACH (touch the
+   body cut) split the column into a head above and an abdomen below. Measured: the body
+   length (head front to abdomen tip), the head's width (`headSize`), the abdomen's widest
+   visible width. The thorax is UNDER the wings and cannot be seen: its length is
+   `THORAX_SHARE` 0.24 of the body (the default specimen's own share) and its width 1.1×
+   the wider of head and abdomen. The head block stops at a gap, at a sudden widening, or
+   once it is longer than 2.2× its width — a moth's feathered antennae merge into one
+   blade above the head, and the first cut read them as 9 mm of head. Everything is
+   clamped into the existing slider ranges; the body is always 3-part.
+4. **Wings.** The upright half beyond the body column (1.15 × its half-width + 1 px),
+   with thin attachments — an antenna against a wing, a splayed leg — removed by an
+   **opening-by-reconstruction** of radius 0.02 × the half-span (0.72 mm at 72 mm; wider
+   than a 1 mm antenna, narrower than a tail neck). The opening acts on the WING region
+   only: **a first cut opened the whole picture and took a slim abdomen off with the
+   antennae** — behind the hindwings an abdomen is about as wide as an antenna, so width
+   cannot tell them apart; where they are can. Pieces under 20% of the largest are
+   dropped (a feathered antenna's blade survived as a "7 mm wing").
+   - **2–4 separate pieces** (a dragonfly) are 2–4 pairs, front to back; the middle pairs
+     come back **unlinked**, each with its own fitted outline.
+   - **One mass** is one pair, or two if its outer margin has a **notch** deeper than 6%
+     of the wing (the deepest point of the outline inside its convex hull, away from the
+     body). Then a **SPLIT LINE** runs from the notch to the body — square to the body by
+     default (a pinned specimen's inner margin is) — drawn in Top → SVG as a pink line with
+     two handles. **Dragging either handle refits both pairs live** (a refit per animation
+     frame): the outer end **snaps to the nearest point of the outline** (so it slides
+     along the margin; a line ending inside the wing would let the halves meet round its
+     end), the root end slides along the body, kept off the attachment's ends. The line
+     is a WALL: the mass minus the wall falls into pieces, each in front of or behind it —
+     beyond the notch the line means nothing (an infinite line handed a forewing tornus
+     that hangs back past the notch to the hindwing, and the first cut grew a strip out to
+     the forewing's tip).
+   - **THE HIDDEN OVERLAP — the guess, stated.** What of the hindwing lies under the
+     forewing cannot be seen. The hindwing's hidden leading edge is taken to be **the split
+     line moved FORWARD by 8% of the wing's extent, alongside the segment only and clipped
+     to the visible silhouette**: the hindwing tucks under the forewing along a band.
+     Nothing of the guess can show from above (the forewing is drawn over it, and the band
+     lies inside the picture's own silhouette); in the model the two pairs overlap the way
+     real wings do. In the page's see-through SVG view (a backdrop loaded) the band reads
+     as a darker bar under the forewing — that bar IS the guess, made visible.
+5. **The fit** (`fitOutline`). Each wing's outline is traced (crack following, Gaussian
+   smoothing σ 1.2 px), the stretch along the body cut removed, its two ends brought to
+   `u = 0` (inside the body, hidden under it), and mapped into the pair's own `(u, w)`
+   frame: **sweep 0, the pair's hinge exactly where the model puts it** (read off
+   `editorFrame`), length = the apex's distance from the hinge, stretch raised only if the
+   chord would leave the drawing area. Control points are chain points (Catmull-Rom
+   interpolates them): inserted at the worst deviation until every control segment is
+   within the **tolerance in mm**, both ways (chain to spline and spline to chain — an
+   overshoot counts as much as a missed bump), then **pruned** — the point whose removal
+   hurts least goes while the fit stays inside the tolerance and the outline stays valid.
+   **The FEWEST points**, the slider's one job: on the butterfly 26 / 37 points at 0.1 mm,
+   9 / 11 at 0.6, 4 / 5 at 3.
+6. **The tail** (`findTail`, `tailGroup`). The bottom pair's region opened at 7% of its
+   extent; a removed piece reaching more than 12% of the extent and 2.5 opening radii
+   from the opened wing, at least as long as its mean width, behind the wing's middle, is
+   a tail. Its tip is kept as a control point; after the fit, **the control points inside
+   the tail (grown back by the opening radius, so the neck goes with it) become the tagged
+   TAIL group** (§6.1) and the TAIL toggle is ON. The anchor is chosen so that
+   `composeOutline(base, tail)` puts every point back **exactly** where the fit put it
+   (checked to 1e-9), and the base without the tail must be a valid outline on its own —
+   else the tail stays inline in the outline and the note says why. Off, the tail goes and
+   nothing else moves.
+7. **The result is ordinary state.** `imageToBug` returns params — normal control points,
+   normal sliders — normalised by the geometry module's own `normalizeParams` (an outline
+   it would refuse is a failed fit, never a substituted default). The bug the picture is
+   fitted onto is **the one on screen when the picture arrived**: its legs, antennae,
+   venation, floor and edge settings are kept; its body and wings come from the picture;
+   every wing is flat (dihedral 0, pitch 0 — a top-down picture shows a flat planform),
+   with no scallop (the outline carries the shape). Savable like any design; the picture
+   is not saved (§5.1's backdrop rule).
+8. **The backdrop.** The picture is loaded automatically as the reference backdrop, placed
+   by the fit's own transform — **rotated, scaled and offset in world millimetres** — so
+   the fitted bug sits on the source in Top → SVG (the view switches there on import). The
+   toolbar's opacity / scale / offset still work on it. A teal outline shows what the
+   segmentation found and the brush's strokes show red ("show what was found").
+
+**The scale.** A picture carries no millimetres. The **Wingspan** slider (20–130 mm; it
+starts at the bug's own span when the picture arrives, 72 mm on the default) sets it,
+tip to tip; every length follows from it.
+
+### 11.2 The rules apply to the fitted outline — and the one repair
+
+- **Self-crossing / pinch**: the fit is validated by the geometry module's own
+  `outlineValid`; a fit that will not validate gets more points, then a tighter tolerance
+  (said in a note), and failing that is **refused** — never a broken bug.
+- **Mirror diff 0, watertight, one connected region**: properties of the model; every
+  fitted fixture is built in the gate as an ordinary row through every clause (M, W, P, C,
+  F, S, R, O, N, E, B, X, G…) and passes.
+- **The drawn-width floor is NOT repaired**: a fitted wing narrower than the floor
+  somewhere (a tail tip at a coarse tolerance, measured on the swallowtail at 3 mm) shows
+  red and blocks the STL exactly as a drawn one does (§6.3), and the import's message says
+  so — widening is Eva's.
+- **The one repair — a stray contour line.** At some fitted tips tighter than the
+  bullnose bead (§10), the bead folds and the SVG grows a contour loop out in the wing
+  (the gate's S clause bars any more than 0.5 mm inside the outline; measured 0.70 mm at
+  the swallowtail's paddle end at tolerances 0.4–1.0 mm). The import builds the fitted bug
+  once, and if a stray line stands more than 0.4 mm inside, **moves the tolerance** — tighter
+  first, then looser — to the first value that builds clean, and **says so** ("the fit
+  tolerance was moved from 0.60 to 0.33 mm: at 0.60 mm the rounded edge folded at pair 2's
+  outline…"). If none does, the fit is kept and the note says where the line is. This is a
+  builder robustness edge the import can only step around, recorded rather than fixed here:
+  a hand-drawn tip that tight would fold the same way.
+
+### 11.3 Refusals — said in the page, the bug left as it was
+
+`segment` refuses when more than 55% of the picture reads as subject, when the shape runs
+along more than 15% of the picture's edge (**"the background is too busy to find one clear
+shape — try another threshold, invert, or erase the stray regions with the brush"**), or
+when the shape is under 1% of the picture; `findAxis` refuses below 80% mirror match ("no
+clear symmetric shape — the best mirror axis maps only N% of the shape onto itself"); the
+column and wing steps refuse when there are no wings beside a narrow body. A refused fit
+changes nothing about the bug: the message says the bug on screen is unchanged (or is the
+last good fit of that picture), and the picture and what was found stay on screen so the
+threshold, invert and brush have something to work against.
+
+### 11.4 Page
+
+"From an image" is a section at the top of the control panel: Load picture (and Ctrl/⌘V
+anywhere, and a drop anywhere on the page), Threshold (+ automatic), invert, Wingspan,
+**Fit tolerance — fewer points ↔ closer fit**, Wing pairs (auto / 1 / 2 — 3 and 4 need
+wings that are visibly separate), find a hindwing tail, Flip head ↔ tail, **Erase brush**
+(paint over stray regions in Top → SVG; brush size; Clear erasing), show what was found,
+Close picture. The message line under them is the fit's own report: pairs and how they
+were found, each pair's control points and how close the fit is, the tail, the body length,
+the mirror axis and its symmetry score, the notes (repairs, a refused tail), the floor, and
+the time. **A refit replaces the wings and body** — editing after a fit is ordinary editing,
+and the next refit (any import control moved) discards it; every refit starts from the bug
+as it was when the picture arrived, so moving a slider twice does not compound.
+
+### 11.5 Verification
+
+- **IM** in `tools/verify-bug.mjs` (which runs in CI as `bug-gate`), against synthetic
+  pictures DRAWN FROM KNOWN BUGS (`verify-bug-image-fixtures.mjs`: every part's own contour
+  loops filled at 6 px/mm, 3×3 supersampled, rotated −5…4°, the left half stretched
+  1.5–2.5%, background-coloured spots in the wings, a paper gradient, Gaussian noise σ 9):
+  a butterfly (the default specimen), a swallowtail (its TAIL on), a moth (one pair, a light
+  bug on a dark ground, feathered antennae), a dragonfly (two separate strap pairs, a
+  34 mm abdomen), a butterfly with a stray blob joined to a wingtip, and the butterfly over
+  420 overlapping dark blobs. **The reference is the KNOWN bug, never the fit's own
+  reading**: IM1 pairs and mode; IM2 the axis within 1°; IM3 the fitted right wings' union
+  silhouette within `tol + 3 px + half the asymmetry at the tip` of the known one
+  (boundary distance) and a mean offset within `tol / 2 + 1 px`; IM4 mirror-exact from an
+  asymmetric picture; IM5 the tail found (its tip within the IM3 bound) and not found where
+  there is none; IM6 the busy picture refused with no params; IM7 the tolerance's two ends;
+  IM8 the split line moved — both pairs refit, the union unchanged; IM9 the stray blob
+  spoils the fit and the erase mask restores it; IM10 the body length within 3 px + 2% and
+  the abdomen width within 3 px of the known bug (the head size REPORTED — a head is often
+  hidden between the forewings' roots or merged with the antennae: the moth reads 3.9 mm
+  for 2.4). Measured at 0.6 mm: the four fits within **0.50–0.67 mm** of the known outlines
+  (bounds 1.37–1.55), mean offsets **0.17–0.18 mm**, axes within **0.1°**, body lengths
+  within **0.3 mm**.
+- **IM3 was entangled in its first version and the negative control is what said so**: it
+  placed the fitted bug in the picture through the FIT'S OWN transform, so a deliberately
+  wrong scale (the mutant reading the half-span as 0.9 of it) moved both sides together and
+  the clause stayed green — the fourth durable rule (CLAUDE.md) in a new family. Both bugs
+  are placed by the KNOWN transform in millimetres now, the fitted one shifted along its
+  body axis only (to the known wings' centroid — the one freedom the import legitimately
+  has). A second correction: an IoU bar was tried first and dropped — it is a property of
+  the wing's WIDTH, not its outline (a strap wing read 0.946 at a 0.50 mm boundary distance).
+- **Every successful fit is also an ordinary built row** (`image: <name> (fitted)`) through
+  every clause of the gate.
+- **`--negative-control`** adds ten CODE mutants of `bug-image.js` (every anchor checked to
+  match exactly once before any runs; each copy written beside the module and imported): a
+  busy picture accepted (all three refusal layers off — disabling the border test alone is
+  NOT that defect: the mirror score still refuses the busy picture, which the first run of
+  this mutant measured as a miss), the axis assumed vertical, the scale misread, no tail
+  grouped, the split line ignored, the tolerance ignored, the erase mask ignored, separate
+  wings taken as one mass, the polarity not read off the border, the body read 15% short —
+  each caught by the IM clause that names it.
+- **The sheet** (`node tools/shot-bug-image.mjs <dir>`): the four fits, each loaded through
+  a different real route (the file input, a dispatched PASTE event, a dispatched DROP),
+  beside the source, in Top → SVG over the backdrop and in 3D at 3/4; the split line at
+  three positions by real pointer drags on its handles; the tolerance slider at both ends
+  with the point counts read back; a real brush stroke over the stray blob; the busy picture
+  refused with the page's message. **Every picture on it is synthetic — Eva's own reference
+  pictures are not in the repository, and how the import does on real photographs can only
+  be judged by trying them in the preview.**
+- **Cost**: a fit is ~200–300 ms in the page for these pictures (one build of the fitted
+  bug for the stray-line check included), ~1.5 s when the tolerance repair runs; the gate's
+  IM family adds ~8 s. The fitted bugs are 24,000–71,000 triangles (the default bug is
+  46,992).
+
+### 11.6 Decisions made without a ruling (reversible)
+
+1. **The head is the end nearer the top of the picture**, with a Flip button — there is no
+   reliable cue.
+2. **The hidden overlap**: a band up to 8% of the wing ahead of the split line, tapering
+   to nothing at the notch, alongside the segment, inside the silhouette
+   (`HIDDEN_OVERLAP_FRAC`; the taper is §11.7's).
+3. **The default split runs square to the body** from the notch.
+4. **The thorax is 0.24 of the body** and 1.1× the wider of head and abdomen (it is under
+   the wings).
+5. **Legs, antennae, venation, floor and edges come from the bug on screen**; every fitted
+   wing is flat with sweep 0 and no scallop.
+6. **Sweep 0, the hinge where the model puts it**: the drawn outline is the picture's wing
+   relative to the model's own hinge, so the silhouette lands where the picture has it.
+   Stretch rises above 1 only when the chord would leave the drawing area (the default
+   butterfly's forewing comes back at stretch 1.29).
+7. The constants in §11.1 (`THIN_OPEN_FRAC` 0.02, `NOTCH_MIN_FRAC` 0.06, the tail's 7% /
+   12% / 1.0, `PIECE_MIN_FRAC` 0.2, the refusal bars, the 0.4 mm stray bar) — each with its
+   reason in `bug-image.js`.
+8. The tolerance cannot always reach 0.1 mm: points closer than 0.015 of the wing length
+   are not added (the outline rule refuses neighbours under 0.012), so the closest fit on
+   the butterfly reads 0.14–0.16 mm, and the message says the number it reached.
+
+### 11.7 Round 2 — Eva's Morpho photo: the body, clutter, the wingspan
+
+Eva tried a real Morpho photograph on PR #346. The outline fit was good; three things were
+not. Each fix below is gated (IM11–IM14), and the sheet is
+`node tools/shot-bug-image-fixes.mjs <dir> --base <worktree of the previous commit>` →
+`docs/img/bug-image-fixes.jpg`.
+
+**1. The body was swallowed — two causes, both fixed.**
+- **Cause one: the body was measured when it could not be seen.** On a photograph whose
+  dark body touches the dark wing roots, no narrow column shows between the wings — only
+  the abdomen's TIP below them.
+  - The old fit measured that tip: abdomen 1.65 mm, head and thorax at their slider
+    minimums, on the gate's same-tone picture. That reproduces Eva's 1.5 mm.
+  - The body now carries a CONFIDENCE. It is measured only when at least `ABD_SEEN_FRAC`
+    (6%) of the wingspan of abdomen shows below the wings, at least `ABD_WIDTH_SHARE`
+    (0.6) of the fallback's width.
+  - Otherwise it is ESTIMATED: the default specimen's body (`defaultParams`, one owner)
+    scaled by the fitted wingspan over the default's own wingspan.
+  - The page says which, and why ("Body ESTIMATED from the wingspan — only 2.1 mm of
+    abdomen shows below the wings…").
+  - Measured visible abdomen: 9.3–31 mm on the clean pictures (13–41% of the wingspan),
+    2.1 mm (2.9%) on the same-tone one.
+- **Cause two: the wing ROOT ran down the body.** A wing's outline closes on its root
+  chord (u = 0 at the model's hinge, inside the thorax). The old chord spanned every row
+  the picture's wing touched the body — on the hindwing, the whole length of the abdomen
+  — so the two wings covered the body as one plate whatever its width.
+  - The root now attaches only along the THORAX's span (|y| ≤ half the thorax length).
+  - Beside the abdomen (or the head) the wing's inner edge stays in the outline, ON the
+    body's edge (the cut at 1.15 × the body's half-width + 1 px).
+  - A pair that touches the body only beside the abdomen (a hindwing whose root is under
+    the forewing) gets a strip along the body's edge up to the thorax. The strip is
+    hidden under the pair ahead of it, at least twice the print floor wide and joined to
+    the thorax over at least twice the floor, so the wing's neck never falls under the
+    floor (it did at first, 0.8 mm).
+- **The hidden band now tapers** to nothing at the notch. Its square end was a hook
+  tighter than the bead, which folded there: a stray SVG contour line on the same-tone
+  picture.
+- **IM11** asserts the source (estimated on the same-tone picture, measured on every
+  other) and that an estimated body is no narrower than the default proportions at that
+  wingspan. Its reference is computed in the gate from `defaultParams`, not read from the
+  importer's own fallback.
+- **IM12** asserts no fitted right-wing point beside the abdomen or head lies inside the
+  BUILT body's own surface (per 0.5 mm band). The points within 1 mm of the thorax's span
+  are the root, which attaches there by design.
+- Measured: 0.29–0.57 mm outside the body on every picture.
+
+**2. Clutter, and refusals that name their step.**
+- Step 1 now drops clutter before anything is measured:
+  - a shape running along more than 4% of the picture's edge is the GROUND (a table, the
+    far side of a paper edge);
+  - a shape whose largest hole is at least 10% of its filled area ENCLOSES the bug (a
+    sheet of paper in view);
+  - of the rest, the largest shape is the bug, and every smaller detached mark (a scale
+    bar, text) is ignored and counted.
+- The polarity is chosen by the same rule: the polarity whose best acceptable shape is the
+  larger, no longer the border's median alone. A dark table along a white sheet's edge
+  turned that median the wrong way round.
+- Busy is refused when the kept shape is under 25% of everything that stands out (the busy
+  picture: 3%).
+- The symmetry check runs on that one shape. The previous commit on the gate's two clutter
+  pictures:
+  - the paper corner with a table larger than the bug: refused as busy, because the table
+    was the largest shape and ran along 46% of the edge;
+  - the whole sheet on a table: refused, because the sheet read as the subject (60% of
+    the picture).
+  - Both fit now (IM13).
+- Every refusal names its step — "step 2 of 5 (finding the mirror axis) failed: … the shape
+  it found is outlined on the picture…" — and returns the shape for the page (IM14).
+- The page switches "show what was found" ON when a fit is refused, and draws the dropped
+  clutter in amber beside the teal outline and the red erase.
+- What made Eva's attempt read 41% is not known: the photo is not in the repository. The
+  clutter pictures are the best reproduction of what she described.
+- **The price of the frame rule:** a bug with ONE see-through window over a tenth of its
+  area (a glasswing) reads as a sheet. Forcing the polarity with the Invert box turns the
+  frame rule off.
+
+**3. The wingspan slider was wired; the labels were the problem.**
+- Measured in the page: the slider at 20 fits a bug 20.06 mm tip to tip, at 130 one 130.0
+  mm. Nothing in the wiring was wrong.
+- The two numbers Eva compared are different quantities. The SVG note is the size of the
+  FILE: the whole bug with legs, antennae and margin, 76.1 mm for a 72.1 mm wingspan. And
+  a refit the picture refuses leaves the last good fit on screen while the slider keeps
+  the asked value.
+- The label is now "Wingspan, tip to tip (sets the fit's scale)".
+- Its readout adds "— the bug on screen is X mm (this wingspan was not fitted)" whenever
+  the two differ.
+- The SVG note says "(the file: the whole bug, legs and antennae and margin included; the
+  wingspan alone is X mm)".
+

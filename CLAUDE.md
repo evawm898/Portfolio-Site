@@ -9820,6 +9820,22 @@ and the SVG do not move; the E family (E1–E7) gates it. The page loads in Top 
 Render / SVG toggle, and the outline editor lives ON THE WING in SVG mode (the edited pair is
 displayed flat through `buildBug(p, { flatPair })`, display only); the Q family proves a screen
 drag lands on the intended outline point. The separate editor panel and the SVG inset are gone.
+**§11 (image → bug)**: `bug-image.js` (pure — no DOM; the page hands it a canvas's `ImageData`)
+fits an editable bug to a pasted / dropped / loaded top-down picture: Otsu + border polarity,
+the mirror axis SEARCHED and the halves averaged (mirror-exact by construction), the body off the
+narrow column, wings as separate pieces or one mass split at its notch by a draggable SPLIT LINE,
+the fewest Catmull-Rom points within a tolerance in mm, a tail as the tagged TAIL group; it returns
+ordinary params and never touches `bug-geometry.js`. The IM family (`tools/verify-bug-image.mjs`,
+run by `verify-bug.mjs`) judges every fit against the KNOWN bug the synthetic picture was drawn
+from, placed by the KNOWN transform — its first version used the fit's own transform and a
+wrong-scale mutant passed it. Sheet: `node tools/shot-bug-image.mjs <dir>`. Every test picture is
+synthetic; Eva's own pictures are not in the repository.
+**§11.7 (round 2, Eva's Morpho)**: the body carries a CONFIDENCE and is ESTIMATED (default
+proportions scaled by the wingspan) when no clear abdomen shows; a wing ROOT attaches only
+along the thorax, beside the abdomen its inner edge lies on the body's edge (IM11, IM12);
+step 1 drops the ground, a sheet around the bug and detached marks before the symmetry
+check, and every refusal names its step (IM13, IM14). Sheet: `node tools/shot-bug-image-fixes.mjs
+<dir> --base <worktree>`.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

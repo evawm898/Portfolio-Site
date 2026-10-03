@@ -116,6 +116,15 @@
   label.bg-file input{display:none;}
 
   .bg-readout b.bad{color:#e5484d;}
+  .bg-dim{color:var(--dim-2);}
+  details.bg-import{border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:8px;}
+  .bg-msg.is-ok{color:var(--paper);}
+  #mainSvg .im-seg{fill:none;stroke:#2d8a8a;stroke-width:1.4px;vector-effect:non-scaling-stroke;pointer-events:none;}
+  #mainSvg .im-split{stroke:#c93f8f;stroke-width:1.6px;vector-effect:non-scaling-stroke;stroke-dasharray:6 3;}
+  #mainSvg .im-split.mirror{opacity:.5;}
+  #mainSvg .im-h{fill:#c93f8f;stroke:#fff;stroke-width:1.5px;vector-effect:non-scaling-stroke;cursor:grab;}
+  #mainSvg.is-erasing{cursor:crosshair;}
+  body.is-dropping::after{content:'drop the picture to fit a bug to it';position:fixed;inset:12px;border:2px dashed var(--teal);display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:14px;z-index:20;background:rgba(10,10,12,.6);pointer-events:none;}
   .bg-export-msg{font-size:10px;color:#e5484d;line-height:1.5;margin:0 0 8px;min-height:0;}
   .bg-ed-status{font-size:10px;color:#d98f6a;min-height:1.2em;margin:0 0 6px;}
   .bg-bd{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;}
@@ -137,7 +146,7 @@
   <a class="bg-back" href="index.html">&larr; Index</a>
   <div class="bg-eyebrow" style="margin-top:10px">EM / BUG</div>
   <h1>Parametric Bug</h1>
-  <p class="bg-sub">Phase 2 — body, legs, antennae, drawn wings with rounded edges, and venation. One 3D model; the SVG is its top-down projection, the STL is the solid. Top view → SVG to draw a wing's outline on the wing itself.</p>
+  <p class="bg-sub">Phase 2 — body, legs, antennae, drawn wings with rounded edges, and venation. One 3D model; the SVG is its top-down projection, the STL is the solid. Top view → SVG to draw a wing's outline on the wing itself — or paste a top-down picture to fit a bug to it.</p>
 </header>
 
 <div id="svgStage" hidden><svg id="mainSvg" xmlns="http://www.w3.org/2000/svg"></svg></div>
@@ -192,6 +201,26 @@
     <div class="bg-row"><button class="bg-btn" id="loadDesign">Load</button><button class="bg-btn" id="deleteDesign">Delete</button></div>
     <p class="bg-msg" id="designMsg"></p>
   </div>
+  <details class="bg-sec bg-import" id="imSec">
+    <summary>From an image</summary>
+    <div class="bg-sec-body">
+      <p class="bg-note">Paste (Ctrl/⌘ V), drop, or load a TOP-DOWN picture of a butterfly, moth or dragonfly: the page fits an editable bug to it — outline and proportions only (veins, spots and pattern are ignored). The picture is placed behind the bug in Top → SVG.</p>
+      <div class="bg-row"><label class="bg-btn bg-file">Load picture<input type="file" id="imFile" accept="image/*"></label><button class="bg-btn" id="imClose" hidden>Close picture</button></div>
+      <div id="imCtrls" hidden>
+        <div class="bg-ctrl"><label for="imThr"><span>Threshold <span class="bg-dim">(auto: Otsu)</span></span><output id="imThr-out"></output></label><input type="range" id="imThr" min="1" max="254" step="1" value="128"></div>
+        <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imThrAuto" checked> threshold automatic</label></div>
+        <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imInvert"> invert — a light bug on a dark ground</label></div>
+        <div class="bg-ctrl"><label for="imSpan"><span>Wingspan, tip to tip (sets the fit's scale)</span><output id="imSpan-out"></output></label><input type="range" id="imSpan" min="20" max="130" step="0.5" value="72"></div>
+        <div class="bg-ctrl"><label for="imTol"><span>Fit tolerance — fewer points ↔ closer fit</span><output id="imTol-out"></output></label><input type="range" id="imTol" min="0.1" max="3" step="0.05" value="0.6"></div>
+        <div class="bg-ctrl"><label for="imPairs"><span>Wing pairs</span></label><select id="imPairs"><option value="auto">auto — separate wings, or a notch</option><option value="1">1 pair</option><option value="2">2 pairs (split at the notch)</option></select></div>
+        <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imTail" checked> find a hindwing tail (TAIL group, on)</label></div>
+        <div class="bg-row"><button class="bg-btn" id="imFlip" title="The head is taken to be the end nearer the top of the picture; flip it">Flip head ↔ tail</button><button class="bg-btn" id="imErase" title="Paint over stray regions in Top → SVG to remove them">Erase brush</button><button class="bg-btn" id="imEraseClear">Clear erasing</button></div>
+        <div class="bg-ctrl" id="imBrushRow" hidden><label for="imBrush"><span>Brush size</span><output id="imBrush-out"></output></label><input type="range" id="imBrush" min="2" max="40" step="1" value="10"></div>
+        <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imSeg" checked> show what was found (teal: the bug's outline; amber: ignored as clutter; red: erased)</label></div>
+      </div>
+      <p class="bg-msg" id="imMsg"></p>
+    </div>
+  </details>
   <div id="controls"></div>
   <div class="bg-label" style="margin-top:12px">Export</div>
   <div class="bg-row">
