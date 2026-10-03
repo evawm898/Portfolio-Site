@@ -2006,6 +2006,8 @@ forewing's drawn margin and requires J to fire.
    (identical with the Delaunay pass and the snap both removed). `flipDegenerate` flips a
    flat triangle across its long edge, or drops it when that edge IS the outline; it visits
    no other triangle, so a mesh without one is byte-identical. And the negative control's
-   "fold a wing top face" mutant took HALF the part's vertices as the top face, true before
-   the rounded edge appended its beads; at pinch 0.3 it folded a bottom vertex and S stayed
-   silent — it reads `meta.slab.n` now.
+   "fold a wing top face" mutant pushed the top vertex nearest the centroid 3 mm along y —
+   right by luck of the vertex it landed on: once the pinch moved the centroid it landed on
+   an outline vertex, which only reshapes the outline, and S stayed silent. It now takes the
+   nearest INTERIOR top vertex (the slab's own `meta.slab.n`, rim vertices excluded) and
+   pushes it past its farthest neighbour, which folds the face at every pinch.

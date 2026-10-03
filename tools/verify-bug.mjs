@@ -1428,17 +1428,23 @@ if (NEG) {
     ['a jagged outline', 'J', base, {}, (m) => { const p = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); const pl = p.meta.drawnMm.map((q) => q.slice()); const n = pl.length, mid = Math.floor(n / 2); const out = []; for (let i = 0; i < n; i++) { out.push(pl[i]); if (i >= mid - 12 && i < mid + 12 && i + 1 < n) { const A = pl[i], B = pl[i + 1], L = Math.hypot(B[0] - A[0], B[1] - A[1]), k = Math.max(1, Math.round(L / 0.4)); const nx = -(B[1] - A[1]) / L, ny = (B[0] - A[0]) / L; for (let t = 1; t < k; t++) { const z = (out.length % 2 ? 0.2 : -0.2); out.push([A[0] + ((B[0] - A[0]) * t) / k + nx * z, A[1] + ((B[1] - A[1]) * t) / k + ny * z]); } } } p.meta.drawnMm = out; }],
     ['cross a planform', 'O', base, {}, (m) => { const p = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R'); const pl = p.meta.planform.map((q) => q.slice()); const a = 10, b = pl.length - 12; [pl[a], pl[b]] = [pl[b], pl[a]]; p.meta.planform = pl; }],
     ['fold a wing top face (hairline)', 'S', base, {}, (m) => {
-      // the top-face vertex nearest the wing's centroid, pushed 3 mm along y on
-      // BOTH sides (so M stays clean): its facets fold back -> an interior loop
+      // the INTERIOR top-face vertex nearest the wing's centroid (the top face
+      // is the slab's first meta.slab.n vertices; a rim vertex only reshapes
+      // the outline) pushed past its farthest neighbour, on BOTH sides (so M
+      // stays clean): its facets fold back -> an interior loop. (It used to
+      // take half the part's vertices as the top face and push the nearest
+      // one 3 mm along y — right by luck of the vertex it landed on, and
+      // silent once the root pinch moved the centroid.)
+      const P = m.positions;
       for (const side of ['R', 'L']) {
-        // (the TOP face is the slab's first n vertices — meta.slab.n; half the
-        // part's vertices was right before the rounded edge appended its beads,
-        // and at root pinch 0.3 it picked a BOTTOM vertex and S stayed silent)
         const p = m.parts.find((q) => q.kind === 'wing1' && q.side === side), nTop = p.meta.slab.n;
-        let cx = 0, cy = 0; for (let v = p.v0; v < p.v0 + nTop; v++) { cx += m.positions[3 * v] / nTop; cy += m.positions[3 * v + 1] / nTop; }
-        let best = p.v0, bd = Infinity;
-        for (let v = p.v0; v < p.v0 + nTop; v++) { const d = Math.hypot(m.positions[3 * v] - cx, m.positions[3 * v + 1] - cy); if (d < bd) { bd = d; best = v; } }
-        m.positions[3 * best + 1] += 3;
+        const rim = new Set(); for (const [t] of [...p.meta.edgePairs.outline, ...p.meta.edgePairs.other]) rim.add(t);
+        let cx = 0, cy = 0; for (let v = p.v0; v < p.v0 + nTop; v++) { cx += P[3 * v] / nTop; cy += P[3 * v + 1] / nTop; }
+        let best = -1, bd = Infinity;
+        for (let v = p.v0; v < p.v0 + nTop; v++) { if (rim.has(v)) continue; const d = Math.hypot(P[3 * v] - cx, P[3 * v + 1] - cy); if (d < bd) { bd = d; best = v; } }
+        let far = -1, fd = -1;
+        for (let t = p.t0; t < p.t1; t++) { const tr = [0, 1, 2].map((k) => m.indices[3 * t + k]); if (!tr.includes(best)) continue; for (const v of tr) if (v !== best) { const d = Math.hypot(P[3 * v] - P[3 * best], P[3 * v + 1] - P[3 * best + 1]); if (d > fd) { fd = d; far = v; } } }
+        P[3 * best] += 2 * (P[3 * far] - P[3 * best]); P[3 * best + 1] += 2 * (P[3 * far + 1] - P[3 * best + 1]);
       }
     }],
     ['a middle pair carries tail geometry', 'T', tail4on, { tailIso: tail4off }, (m) => {
