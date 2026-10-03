@@ -889,7 +889,7 @@ function fitOnce(img, base, opts) {
       // (and at least a tenth of the span apart: the outline rule wants the root
       // chord 0.03 of the length in (u, w), and the stretch can reach 3)
       let xm = -Infinity; for (const q of chainW) xm = Math.max(xm, q[0]);
-      const half = Math.max(base.wingRootWidth > 0 ? base.wingRootWidth : 1.6, base.minDiameter || 1, 0.1 * (xm - hx)) / 2;
+      const half = Math.max(1.6, base.minDiameter || 1, 0.1 * (xm - hx)) / 2;
       const done = completeChain(chainW, (q) => onCut(q) || inside(q), s, { xCut: cutX, yLead: hy + half, yTrail: hy - half });
       chainW = done.chain;
       if (done.bridged) rec0.bridged = done.bridged;

@@ -440,6 +440,14 @@ function planformChecks(model) {
    shape is a deliberate WAVE of smooth lobes finer than the floor, which the
    floor would not print either. */
 const JAG_DEADBAND = 0.05, JAG_TURN = 6, JAG_LOBE = 0.8;
+/* Every TAIL row pins its forewing's sweep to main's derived default (-25.59
+   degrees). The swallowtail's drawn tail tip is narrower than two 0.05 mm
+   raster pixels on the diagonal, and at some sweeps (-27.34, -26.12, -20 all
+   measured) it leaves a one-pixel cut-safe island on ONE side — with the root
+   pinch at 0 too, i.e. on main's own geometry (§12.4). The derived sweep moves
+   with the default root pinch, so without the pin every change of that default
+   would flip these rows; their subject is the tail, not that tip. */
+const TAIL_ROW_SWEEP = -25.59;
 export function jaggedness(outline, floor) {
   const P = []; for (const q of outline) if (!P.length || Math.hypot(q[0] - P[P.length - 1][0], q[1] - P[P.length - 1][1]) > 1e-9) P.push(q);
   const V = [];
@@ -1281,17 +1289,11 @@ function rowsFor(nseeds) {
   // against the same bug with the tail OFF (T); and a tail drawn thinner than
   // the floor, whose STL must be refused (N)
   for (const n of [1, 2, 3, 4]) {
-    const on = d(); on.wingPairs = n; on.wings.tail.on = true;
-    const off = d(); off.wingPairs = n;
+    const on = d(); on.wingPairs = n; on.wings.tail.on = true; on.wings.first.sweep = TAIL_ROW_SWEEP;
+    const off = d(); off.wingPairs = n; off.wings.first.sweep = TAIL_ROW_SWEEP;
     rows.push([`tail ON, ${n} pair(s)`, on, { tailIso: G.buildBug(off) }]);
   }
-  // (the forewing's sweep pinned to the value this row had before the blended
-  // root moved the default's derived sweep, -25.59 -> -27.34: at -27.34 — and at
-  // -20 — the swallowtail's drawn tail tip, narrower than two 0.05 mm raster
-  // pixels on the diagonal, leaves a one-pixel cut-safe island on ONE side.
-  // Measured identical on main at d1fac30 with the root off; recorded in §12.4,
-  // not fixed here — the row's subject is the tail's isolation, not that tip)
-  { const p = d(); p.wingPairs = 4; p.wings.first.sweep = -25.59; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.tail.on = true; p.wings.unlinked[2] = { ...p.wings.first, points: HAND_OUTLINES.falcate };
+  { const p = d(); p.wingPairs = 4; p.wings.first.sweep = TAIL_ROW_SWEEP; p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.tail.on = true; p.wings.unlinked[2] = { ...p.wings.first, points: HAND_OUTLINES.falcate };
     const off = JSON.parse(JSON.stringify(p)); off.wings.tail.on = false;
     rows.push(['tail ON, 4 pairs, one unlinked', p, { tailIso: G.buildBug(off) }]); }
   { const p = d(); p.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL)); rows.push(['tail drawn under the floor', p, { expectThin: true }]); }
@@ -1309,7 +1311,7 @@ function rowsFor(nseeds) {
     for (const dens of [0, 0.5, 1]) ven(mode, (p) => { for (const w of [p.wings.first, p.wings.last]) { w.crossDensity = dens; w.length = 40; w.stretch = 1.3; } }, `cross density ${dens}, long wing`);
     ven(mode, (p) => { for (const w of [p.wings.first, p.wings.last]) { w.crossDensity = 0.8; w.cellRegularity = 0; w.veinBranch = 2; w.veinCount = 6; w.length = 44; w.stretch = 1.4; } }, 'irregular dense net, 6 veins x 3');
     ven(mode, (p) => { for (const w of [p.wings.first, p.wings.last]) { w.stigma = 1; w.discal = 1; w.length = 40; w.stretch = 1.3; } }, 'pterostigma + discal', { expectStigma: true, expectDiscal: true });
-    ven(mode, (p) => { p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.tail.on = true; p.wings.last.length = 30; p.wings.last.stretch = 1.4; }, 'swallowtail with a tail', { expectTailVein: true });
+    ven(mode, (p) => { p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.first.sweep = TAIL_ROW_SWEEP; p.wings.tail.on = true; p.wings.last.length = 30; p.wings.last.stretch = 1.4; }, 'swallowtail with a tail', { expectTailVein: true });
     ven(mode, (p) => { p.wings.first.veinWidth = 0.6; p.wings.first.veinTaper = 0.5; }, 'veins drawn under the floor', { expectVeinThin: true });
     ven(mode, (p) => { p.wingPairs = 4; p.thoraxLength = 3; p.thoraxWidth = 2.5; p.thoraxDepth = 2.5; }, '4 pairs on the smallest thorax');
     for (let s = 1; s <= Math.max(4, Math.round(nseeds / 5)); s++) { const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } p.venation = mode; rows.push([`${mode}: random:${s}`, p, {}]); }
@@ -1344,7 +1346,7 @@ function rowsFor(nseeds) {
   { const p = d(); p.venation = 'holes'; p.wings.first.veinWidth = 1.0; p.wings.first.veinTaper = 0; p.wings.first.thickness = 1.0; rows.push(['holes: veins at the floor, 1 x 1 mm (round rods)', p, {}]); }
   { const p = d(); p.minDiameter = 2; p.wingEdgeRound = 1; rows.push(['round 1 with a 2 mm floor', p, {}]); }
   { const p = d(); p.wings.first.dihedral = 35; p.wings.first.pitch = 20; p.wings.last.dihedral = -25; p.wings.last.pitch = -15; rows.push(['round 1, tilted and pitched pairs', p, {}]); }
-  { const p = d(); p.wings.tail.on = true; p.venation = 'holes'; rows.push(['holes, tail ON (rounded tail rims)', p, {}]); }
+  { const p = d(); p.wings.tail.on = true; p.wings.first.sweep = TAIL_ROW_SWEEP; p.venation = 'holes'; rows.push(['holes, tail ON (rounded tail rims)', p, {}]); }
   for (const name of ['falcate', 'notched', 'strap']) { const p = d(); p.venation = 'holes'; p.wingPairs = 2; p.wings.first.points = HAND_OUTLINES[name]; p.wings.first.length = 36; p.wings.first.stretch = 1.3; rows.push([`holes: drawn:${name}`, p, {}]); }
   return rows;
 }

@@ -1843,9 +1843,28 @@ ruling on the exploded views.
 
 Every wing closed on a straight root chord at u = 0: left at its drawn width it was a
 vertical cut beside the body, and a forewing and a hindwing side by side read as one
-rectangular block. Two controls (Wings): **`wingRootWidth`** (0–6 mm, default **1.6**; 0 is
-the old straight root chord, BY BRANCH — the map is never built) and **`wingRootFillet`**
-(0–4 mm, default **0.9**).
+rectangular block. ONE control (Wings): **`wingRootPinch`** (0–1, provisional default **0.3**
+until Eva picks the step from the ladder; 0 is the old straight root chord, BY BRANCH — the
+map is never built).
+
+- **The pinch is RELATIVE to the drawn root (Eva's ruling on the first cut).** The first cut
+  was two absolute controls, a 1.6 mm neck and a 0.9 mm fillet, and it pinched the default's
+  4.51 mm root to a third of its width, carving teardrop gaps beside the body. Now the neck
+  at pinch 1 is `ROOT_NECK_AT_FULL × the drawn chord` (never under the floor) with fillet radius `ROOT_FILLET_AT_FULL × the drawn chord`
+  — the FULL neck at pinch 1 — and a lower pinch MIXES the straight chord with that full
+  neck, `w' = w + pinch (full(w) − w)`: the neck lands at `h0 − pinch (h0 − hr)`, both ends
+  fractions of the wing's OWN root, so one pinch reads the same on every shape. **Shrinking
+  the fillet radius with the pinch was built first and REJECTED BY THE GATE**: a smaller
+  copy of the same curve turns through the same angles, so a low pinch was a small kink
+  (J fired on six rows). Mixed, every slope and turn scales with the pinch (the effective
+  fillet radius is the full one over the pinch), and a convex mix of two increasing maps
+  is increasing, so the map stays a bijection; its inverse is solved by bisection. The
+  release is never shorter than two floors (a 1.55 mm root on random:29 read two 0.6 mm
+  lobes inside a millimetre). `ROOT_NECK_AT_FULL` 0.355 and `ROOT_FILLET_AT_FULL`
+  0.2 make pinch 1 the first cut exactly on the default forewing (1.60 mm / 0.90 mm, 57,392
+  triangles, unchanged). The floor at the neck still holds (`hr ≥ floor / 2`). The ladder
+  (pinch 0 / 0.15 / 0.3 / 0.45 / 0.6 / 1, default bug and library shape #9) is
+  `node tools/shot-bug-wing-root.mjs <dir> --library <candidates.json> --num 9`.
 
 - **One map, in planform millimetres, read by every consumer**: `rootWarp(spec)` —
   `w' = c(u) + f_u(w − c0)`, u unchanged. `drawnPlanformMm` applies it (so the builder,
@@ -1888,10 +1907,10 @@ the old straight root chord, BY BRANCH — the map is never built) and **`wingRo
   `model.notes` says so; a map that would make the outline cross or pinch keeps the drawn
   root chord, with a note. Neither fires on the default or on the 17 library shapes.
 - **Saved designs keep the old root** (`DESIGN_VERSION` 6; a file saved before loads with
-  `wingRootWidth` 0 — `PRE_ROOT_STYLE`): every earlier pass loaded an old design at its OLD
+  `wingRootPinch` 0 — `PRE_ROOT_STYLE`): every earlier pass loaded an old design at its OLD
   ends so it looks as saved (§9.6, §10.1), and this follows that rule. One slider turns the
   blended root on for an old design; the reverse (migrating) would change every saved
-  design's silhouette without asking. `LEGACY_STYLE` carries `wingRootWidth: 0`, so
+  design's silhouette without asking. `LEGACY_STYLE` carries `wingRootPinch: 0`, so
   `legacyDefaultParams()` still builds bit-identically to Phase 2.
 - **Cost, EXPORT**: the default **46,992 → 57,392 triangles (+22%)** (the resampled root
   zone under a 12-triangle-per-point bead). Build time is unchanged in practice.
@@ -1947,7 +1966,8 @@ forewing's drawn margin and requires J to fire.
 
 ### 12.4 Decisions made without a ruling (reversible)
 
-1. Root width 1.6 mm and fillet 0.9 mm defaults; `ROOT_BLEND_FRAC` 0.1, `ROOT_BLEND_SLOPE`
+1. `ROOT_NECK_AT_FULL` 0.355 and `ROOT_FILLET_AT_FULL` 0.2 (pinch 1 = the first cut on the
+   default forewing); the default pinch is provisional until Eva picks a step; `ROOT_BLEND_FRAC` 0.1, `ROOT_BLEND_SLOPE`
    1.0, `ROOT_SAMPLE_MM` 0.5; the neck sits one fillet beyond the body's silhouette.
 2. Saved designs keep the straight root chord (12.1).
 3. The fitter's root zone is 12% of the span; bridges are cubic Hermites with tangents 0.6
@@ -1960,8 +1980,11 @@ forewing's drawn margin and requires J to fire.
    "tail ON, 4 pairs, one unlinked" row reads 2 cut-safe regions: the swallowtail's drawn
    tail tip is narrower than two 0.05 mm raster pixels on the diagonal and leaves a
    one-pixel island on ONE side. Measured identical on `main` at `d1fac30` with the same
-   sweep — not this change. The row's sweep is pinned to its old value (its subject is the
-   tail's isolation), with this note beside it.
+   sweep — not this change. Since the root became a relative PINCH the derived sweep moves
+   with the default pinch (-26.12 at the provisional 0.3, where four more tail rows read the
+   same island, again identical at pinch 0), so EVERY tail row now pins its forewing sweep
+   to main's -25.59 (`TAIL_ROW_SWEEP` in the gate, with this note beside it) — their
+   subject is the tail, not that tip, and a change of the default must not flip them.
 5. **IM12's mutant is retired, not passing.** "The wing root runs down the body" fired
    nothing once the root was blended: the fitter's completion replaces the root zone with
    a bridge to two anchors on the thorax, and the model narrows every wing to its neck —

@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-/* shot-bug-wing-root.mjs <dir> — the close-up for the BLENDED ROOT
-   (bug-project-design-doc.md §12.1): the default bug with its OLD straight root
-   chord (wingRootWidth 0, the branch back to the shipped code) beside the NEW
-   blended root (width 1.6 mm, fillet 0.9 mm) — the SVG export cropped to the
-   thorax, and the real page's 3D view at 3/4 looking at the right wing roots.
-   No pixel claim: every number is read off the model. */
+/* shot-bug-wing-root.mjs <dir> [--library <candidates.json> --num <n>] — the
+   ROOT PINCH LADDER (bug-project-design-doc.md §12.1): the wing root at pinch
+   0, 0.15, 0.3, 0.45, 0.6 and 1.0 on the default bug — the SVG export cropped
+   to the thorax, and the real page's 3D view at 3/4 looking at the right wing
+   roots — plus the same ladder on one library shape when a fitted record is
+   given (the kept-shape records are a dev-time file, gitignored with their
+   sources). Pinch 0 is the straight root chord, by branch. No pixel claim:
+   every number is read off the model. */
 
 import http from 'node:http';
 import fs from 'node:fs';
@@ -14,8 +16,32 @@ import { chromium } from 'playwright-core';
 import * as G from '../bug-geometry.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.resolve(process.argv[2] || 'bug-wing-root');
+const args = process.argv.slice(2);
+const OUT = path.resolve(args.find((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--'))) || 'bug-wing-root');
+const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 fs.mkdirSync(OUT, { recursive: true });
+const PINCHES = [0, 0.15, 0.3, 0.45, 0.6, 1];
+
+// a library record applied to the default bug: its two outlines (and tail), nothing else
+// (the same rule as tools/bug-wing-library-fit.mjs's applyRecord)
+function applyRecord(base, rec) {
+  const p = JSON.parse(JSON.stringify(base));
+  p.wingPairs = 2;
+  const L = p.wings.first.length;
+  Object.assign(p.wings.first, { points: rec.fore.points.map((q) => q.slice()), stretch: rec.fore.stretch, sweep: 0 });
+  Object.assign(p.wings.last, { points: rec.hind.points.map((q) => q.slice()), stretch: rec.hind.stretch, sweep: 0, length: +(L * rec.hind.lengthRatio).toFixed(3) });
+  p.wings.unlinked = {};
+  p.wings.tail = rec.tail ? JSON.parse(JSON.stringify(rec.tail)) : (p.wings.tail ? { ...p.wings.tail, on: false } : null);
+  return p;
+}
+const rows = [{ label: 'the default bug', base: G.defaultParams() }];
+if (opt('--library')) {
+  const all = JSON.parse(fs.readFileSync(opt('--library'), 'utf8'));
+  const e = all.find((x) => String(x.num) === String(opt('--num') || 9));
+  if (!e) throw new Error(`no library record #${opt('--num')}`);
+  rows.push({ label: `library shape #${e.num}`, base: applyRecord(G.defaultParams(), e.record) });
+}
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const server = http.createServer((req, res) => {
   const p = path.join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -25,9 +51,9 @@ const server = http.createServer((req, res) => {
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}`;
-const exe = ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium'].find((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+const exe = fs.readdirSync('/opt/pw-browsers').filter((d) => d.startsWith('chromium-')).map((d) => `/opt/pw-browsers/${d}/chrome-linux/chrome`).find((p) => fs.existsSync(p));
 const browser = await chromium.launch({ executablePath: exe, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1100, height: 820 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 760, height: 560 }, deviceScaleFactor: 1 });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.route('**cdn.jsdelivr.net/**', (route) => {
@@ -40,35 +66,39 @@ await page.goto(`${base}/bug.html`);
 await page.waitForFunction(() => !!window.__bug);
 await page.addStyleTag({ content: '.bg-panel,.bg-view,.bg-header,.bg-edbar,.bg-viewtoggle{visibility:hidden!important}' });
 
-const OLD = { ...G.defaultParams(), wingRootWidth: 0 }, NEW = G.defaultParams();
-const cells = [];
-for (const [label, p] of [['OLD — the straight root chord (root width 0)', OLD], ['NEW — the blended root (width 1.6 mm, fillet 0.9 mm)', NEW]]) {
-  const m = G.buildBug(p), ex = G.exportSvg(m), fr = ex.frame;
-  // crop the SVG to the thorax: world x -14..14, y -10..9
-  const [X0, Y0] = G.svgFromWorld(fr, -14, 9), [X1, Y1] = G.svgFromWorld(fr, 14, -10);
-  const svg = ex.svg.replace(/<\?xml[^>]*>/, '').replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, '').replace(/viewBox="[^"]*"/, `viewBox="${X0} ${Y0} ${X1 - X0} ${Y1 - Y0}"`);
-  const H = G.wingHinges(p, m.layout);
-  const roots = m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R').map((q) => (q.meta.root ? `pair ${q.meta.pair + 1}: neck ${q.meta.root.width.toFixed(2)} mm at ${q.meta.root.neckU.toFixed(2)} mm from the hinge (body edge at ${q.meta.root.ub.toFixed(2)}), drawn root ${(2 * q.meta.root.drawnHalf).toFixed(2)} mm` : `pair ${q.meta.pair + 1}: straight root chord`));
-  await page.evaluate((q) => window.__bug.setParams(q), p);
-  await page.evaluate(() => window.__bug.flushBuild());
-  await page.evaluate(() => window.__bug.setView('three'));
-  const w = m.parts.find((q) => q.kind === 'wing1' && q.side === 'R');
-  const hinge = H[0].hinge;
-  await page.evaluate((c) => window.__bug.lookAt(c.t, c.d, c.dist), { t: [hinge[0] + 3, -1, 0], d: [0.55, -0.75, 0.95], dist: 30 });
-  const img = (await page.screenshot({ type: 'png' })).toString('base64');
-  cells.push({ label, svg, img, tris: m.indices.length / 3, roots, notes: m.notes, floor: m.floorViolations.length });
+for (const row of rows) {
+  row.cells = [];
+  for (const pinch of PINCHES) {
+    const p = { ...JSON.parse(JSON.stringify(row.base)), wingRootPinch: pinch };
+    const m = G.buildBug(p), ex = G.exportSvg(m), fr = ex.frame;
+    // the SVG cropped to the thorax: world x -14..14, y -10..9
+    const [X0, Y0] = G.svgFromWorld(fr, -14, 9), [X1, Y1] = G.svgFromWorld(fr, 14, -10);
+    const svg = ex.svg.replace(/<\?xml[^>]*>/, '').replace(/width="[^"]*"/, 'width="100%"').replace(/height="[^"]*"/, '').replace(/viewBox="[^"]*"/, `viewBox="${X0} ${Y0} ${X1 - X0} ${Y1 - Y0}"`);
+    const H = G.wingHinges(p, m.layout);
+    const roots = m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R').map((q) => (q.meta.root
+      ? `pair ${q.meta.pair + 1}: neck ${q.meta.root.width.toFixed(2)} of ${(2 * q.meta.root.drawnHalf).toFixed(2)} mm (${Math.round((100 * q.meta.root.width) / (2 * q.meta.root.drawnHalf))}%), fillet ${q.meta.root.fillet.toFixed(2)}`
+      : `pair ${q.meta.pair + 1}: straight chord`));
+    await page.evaluate((q) => window.__bug.setParams(q), p);
+    await page.evaluate(() => window.__bug.flushBuild());
+    await page.evaluate(() => window.__bug.setView('three'));
+    await page.evaluate((c) => window.__bug.lookAt(c.t, c.d, c.dist), { t: [H[0].hinge[0] + 3, -1, 0], d: [0.55, -0.75, 0.95], dist: 30 });
+    const img = (await page.screenshot({ type: 'png' })).toString('base64');
+    row.cells.push({ pinch, svg, img, tris: m.indices.length / 3, roots, notes: m.notes, floor: m.floorViolations.length });
+  }
 }
-const html = `<!doctype html><meta charset="utf-8"><title>bug — blended root</title><style>
-body{margin:0;background:#f4f3ee;color:#111;font:12px/1.4 ui-monospace,monospace;padding:18px;width:1240px}
-h1{font-size:16px;margin:0 0 6px} .g{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.c{background:#fff;border:1px solid #ccc;padding:8px} .c img{width:100%;display:block} .c svg{display:block;background:#fff}
-</style><h1>The wing root, close: OLD straight root chord vs NEW blended root — default bug, SVG export (cropped to the thorax) and 3D at 3/4</h1>
-<div class="g">${cells.map((c) => `<div class="c"><b>${c.label}</b>${c.svg}<div>${c.roots.join('<br>')}<br>${c.tris.toLocaleString()} triangles · STL ${c.floor ? 'REFUSED' : 'exports'}${c.notes.length ? ' · ' + c.notes.join('; ') : ''}</div></div>`).join('')}
-${cells.map((c) => `<div class="c"><b>${c.label} — 3D, 3/4, the right wing roots</b><img src="data:image/png;base64,${c.img}"></div>`).join('')}</div>`;
+const html = `<!doctype html><meta charset="utf-8"><title>bug — root pinch ladder</title><style>
+body{margin:0;background:#f4f3ee;color:#111;font:11px/1.35 ui-monospace,monospace;padding:16px;width:1900px}
+h1{font-size:16px;margin:0 0 4px} h2{font-size:13px;margin:14px 0 6px} .g{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.c{background:#fff;border:1px solid #ccc;padding:6px} .c img{width:100%;display:block;margin-top:4px} .c svg{display:block;background:#fff}
+.k{font-size:14px;font-weight:bold}
+</style><h1>Wing root pinch ladder — 0 (the old straight chord) · 0.15 · 0.3 · 0.45 · 0.6 · 1.0 (the first neck)</h1>
+<div>Each cell: SVG export cropped to the thorax (world x −14..14 mm), then the 3D view at 3/4 on the right wing roots. The pinch mixes the straight chord with the full neck, relative to each wing's own drawn root: the neck and every slope scale with it ("fillet" below is the effective radius, the full one over the pinch).</div>
+${rows.map((r) => `<h2>${r.label}</h2><div class="g">${r.cells.map((c) => `<div class="c"><div class="k">pinch ${c.pinch}</div>${c.svg}<img src="data:image/png;base64,${c.img}"><div>${c.roots.join('<br>')}<br>${c.tris.toLocaleString()} tris · STL ${c.floor ? 'REFUSED' : 'exports'}${c.notes.length ? ' · ' + c.notes.join('; ') : ''}</div></div>`).join('')}</div>`).join('')}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
-const sh = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const sh = await browser.newPage({ viewport: { width: 1932, height: 900 } });
 await sh.goto('file://' + path.join(OUT, 'index.html'));
 await sh.screenshot({ path: path.join(OUT, 'bug-wing-root.png'), fullPage: true });
 await browser.close(); server.close();
 console.log(errors.length ? `PAGE ERRORS:\n${errors.join('\n')}` : 'no page errors');
+for (const r of rows) for (const c of r.cells) console.log(r.label, c.pinch, c.tris, c.roots.join(' | '), c.notes.join('; '));
 if (errors.length) process.exit(1);

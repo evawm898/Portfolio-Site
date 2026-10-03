@@ -169,8 +169,7 @@ export const PARAM_SPEC = [
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
   R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: none)', 0, 4, 0.05, 0, 'mm', hasWings),
   R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
-  R('wingRootWidth', 'wings', 'Root — width where the wing leaves the body (0: the old straight root chord)', 0, 6, 0.05, 1.6, 'mm', hasWings),
-  R('wingRootFillet', 'wings', 'Root — fillet radius onto the body', 0, 4, 0.05, 0.9, 'mm', (p) => hasWings(p) && p.wingRootWidth > 0),
+  R('wingRootPinch', 'wings', 'Root — pinch where the wing meets the body (0: the straight root chord, 1: a neck at ROOT_NECK_AT_FULL of the drawn root)', 0, 1, 0.05, 0.3, '', hasWings),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -254,14 +253,14 @@ export const LEGACY_DEFAULT_WINGS = {
 };
 /* The new controls at the ends that ARE the old code (each a branch). A design
    saved before DESIGN_VERSION 4 loads with these, so it looks as it did. */
-export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0, wingRootWidth: 0 };
+export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0, wingRootPinch: 0 };
 /* The edges pass (design doc §10): the rounded edge became the default. A design
    saved at DESIGN_VERSION 4 carries the chamfer it was saved with and knows no
    round radius, so it loads with the round at 0 (the square wall it had). */
 export const PRE_ROUND_STYLE = { wingEdgeRound: 0 };
 /* The blended root (§12.1): a design saved before DESIGN_VERSION 6 knows no root
    width and loads with it at 0 — the straight root chord it was saved with. */
-export const PRE_ROOT_STYLE = { wingRootWidth: 0 };
+export const PRE_ROOT_STYLE = { wingRootPinch: 0 };
 /* The Phase 1/2 default's body, legs and antennae (the values PARAM_SPEC used
    to default to). */
 export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, thoraxDepth: 4.6, abdomenLength: 15, abdomenWidth: 5, abdomenTaper: 0.5, abdomenSegments: 6,
@@ -672,7 +671,7 @@ export function fitMigratedTail(base, tail) {
    fields) unless it is UNLINKED, when it carries its own drawn spec. */
 export function resolveWingPairs(p) {
   const out = resolveWingPairsRaw(p);
-  if (out.length && p.wingRootWidth > 0) {
+  if (out.length && p.wingRootPinch > 0) {
     const L = bodyLayout(p), H = wingHinges(p, L);
     for (const spec of out) {
       // the body's silhouette from the hinge: the hinge stands at half the
@@ -681,7 +680,7 @@ export function resolveWingPairs(p) {
       // the specimen pose, and a root that moved with the sweep would make the
       // pose chase its own tail)
       const k = H[spec.index].k;
-      spec.root = { width: p.wingRootWidth, fillet: p.wingRootFillet ?? 0, floor: p.minDiameter, ub: 0.5 * L.rt * k };
+      spec.root = { pinch: p.wingRootPinch, filletScale: 1, floor: p.minDiameter, ub: 0.5 * L.rt * k };
     }
   }
   return out;
@@ -1609,7 +1608,8 @@ function planformSlab(acc, pts, tris, half, W, part, apex = null) {
    c0 is the drawn root chord's centre and h0 its half-width; the map squeezes
    the chord toward the HINGE (c -> 0) so every pair attaches at its own point on
    the thorax. s(u) is E(u) / h0, where the ENVELOPE E(u) is the attachment's
-   half-width: hr (half the root width, never under half the floor) at the NECK,
+   half-width: hr at the NECK — the drawn half-width h0 narrowed by the PINCH,
+   h0 (1 - pinch (1 - ROOT_NECK_AT_FULL)), never under half the floor —
    flaring by a FILLET (curvature radius R at the neck, 45 degrees by the body's
    silhouette at u = ub, and on at 45 degrees inside the body), then released
    back to the drawn wing over the next `blend` mm by a smoothstep. It narrows
@@ -1619,20 +1619,33 @@ function planformSlab(acc, pts, tris, half, W, part, apex = null) {
    For every u the map is affine in w with a positive slope, so it is a
    BIJECTION of the plane: it cannot make a simple outline cross itself, and it
    moves no point along the span (the apex, the tail, every index stay put).
-   Width 0 is the drawn root chord, BY BRANCH (the map is never built). */
+   The pinch is RELATIVE to the drawn root (Eva's ruling on the first neck,
+   which was a fixed 1.6 mm and pinched a 4.5 mm root to a third of its width,
+   carving teardrop gaps beside the body): the neck and the fillet radius are
+   both fractions of the drawn root chord, so one pinch reads the same on
+   every wing shape and a low pinch is a gentle narrowing with a fillet small
+   enough to stay smooth. Pinch 1 is the first neck on the default forewing
+   (1.6 mm neck, 0.9 mm fillet on its 4.51 mm root). Pinch 0 is the drawn root
+   chord, BY BRANCH (the map is never built). */
+export const ROOT_NECK_AT_FULL = 0.355;    // the neck at pinch 1, as a fraction of the drawn root chord (1.6 / 4.51 on the default forewing)
+export const ROOT_FILLET_AT_FULL = 0.2;    // the fillet radius at pinch 1, as a fraction of the drawn root chord (0.9 / 4.51)
 export const ROOT_EDGE_STEEP = 2.5;   // see rootWarp: a root edge ends where the outline runs more across than this x along
 export const ROOT_BLEND_SLOPE = 1.0;   // see rootWarp: the release is at least this x the narrowing long
 export const ROOT_BLEND_FRAC = 0.1;    // the release to the drawn wing runs over 0.1 of the pair's length (or 2.5 fillets, if longer)
 export function rootWarp(spec) {
   const r = spec.root;
-  if (!r || !(r.width > 0)) return null;
+  if (!r || !(r.pinch > 0)) return null;
   const span = spec.length, S = span * spec.stretch;
   const d = spec.dense, n = d.length;
   const P = d.map(([u, w]) => [u * span, w * S]);
   const wL = P[0][1], wT = P[n - 1][1];
   const c0 = (wL + wT) / 2;
-  const hr = Math.max(r.width, r.floor) / 2, R = Math.max(0, r.fillet), ub = Math.max(0, r.ub);
   if (!(wL > wT)) return null;
+  // the FULL neck (pinch 1) is built below; a lower pinch is the straight
+  // chord and the full neck mixed, w' = w + pinch (full(w) - w) — see the return
+  const h0 = (wL - wT) / 2, pinch = clamp(r.pinch, 0, 1);
+  const hr = Math.max(h0 * ROOT_NECK_AT_FULL, r.floor / 2);
+  const R = Math.max(0, ROOT_FILLET_AT_FULL * 2 * h0 * (r.filletScale ?? 1)), ub = Math.max(0, r.ub);
   const un = ub + R;
   // the DRAWN wing's two ROOT EDGES: the outline walked from the root lead
   // (forward) and from the root trail (backward), each read where it first
@@ -1672,7 +1685,10 @@ export function rootWarp(spec) {
   // ROOT_BLEND_SLOPE x the narrowing it has to undo (the root edges' widest
   // reach over that first span, less the neck), so a deep squeeze is released
   // gently, never as a kink the rounded edge folds on
-  const blend0 = Math.max(ROOT_BLEND_FRAC * span, 2.5 * R);
+  // (and never shorter than two floors: on a small wing a release inside a
+  // millimetre is a wobble the print cannot make — random:29, a 1.55 mm root,
+  // read two 0.6 mm lobes once the neck became relative)
+  const blend0 = Math.max(ROOT_BLEND_FRAC * span, 2.5 * R, 2 * r.floor);
   const first = edges(un + blend0);
   let hd = 0; for (let g = 0; g <= NS; g++) hd = Math.max(hd, first.up[g], first.dn[g]);
   const blend = Math.max(blend0, ROOT_BLEND_SLOPE * (hd - hr)), uEnd = un + blend;
@@ -1716,10 +1732,27 @@ export function rootWarp(spec) {
   };
   // the centre: c0 at the drawn wing, 0 (the hinge) at the root
   const cOf = (u) => c0 * beta(u);
+  const full = (u, w) => cOf(u) + map1(u, w - c0);
+  if (pinch >= 1) return { hr, R, ub, un, blend, c0, h0, pinch, fwd: (u, w) => [u, full(u, w)], inv: (u, w) => [u, c0 + inv1(u, w - cOf(u))] };
+  // THE PINCH MIXES THE STRAIGHT CHORD WITH THE FULL NECK (Eva's ruling: a
+  // gentle narrowing, a small gap, no stalk). Shrinking the fillet's radius
+  // with the pinch does not do that: a smaller copy of the same curve turns
+  // through the same angles, so a low pinch came back as a small KINK (the J
+  // clause fired on six gate rows). Mixed, every slope and every turn of the
+  // narrowing scales with the pinch, the neck is h0 - pinch (h0 - hr) — the
+  // relative rule, never under the full neck's floor-held hr — and a convex
+  // mix of two increasing maps of w is increasing, so the map is still a
+  // bijection. Its inverse is solved by bisection on that monotone function.
+  const fwd1 = (u, w) => w + pinch * (full(u, w) - w);
   return {
-    hr, R, ub, un, blend, c0, h0: (wL - wT) / 2,
-    fwd: (u, w) => [u, cOf(u) + map1(u, w - c0)],
-    inv: (u, w) => [u, c0 + inv1(u, w - cOf(u))],
+    hr: h0 - pinch * (h0 - hr), R: R / pinch, ub, un, blend, c0, h0, pinch,
+    fwd: (u, w) => [u, u >= uEnd ? w : fwd1(u, w)],
+    inv: (u, y) => {
+      if (u >= uEnd) return [u, y];
+      let lo = y - 4 * h0 - Math.abs(c0) - 1, hi = y + 4 * h0 + Math.abs(c0) + 1;
+      for (let it = 0; it < 80; it++) { const m = 0.5 * (lo + hi); if (fwd1(u, m) < y) lo = m; else hi = m; }
+      return [u, 0.5 * (lo + hi)];
+    },
   };
 }
 export const ROOT_SAMPLE_MM = 0.5;    // the outline is resampled to this spacing where the root map acts, so the fillet and the neck are drawn, not chorded
@@ -1934,7 +1967,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   part.meta.linked = spec.linked;
   part.meta.repaired = spec.repaired;
   part.meta.scallopReduced = scallopReduced;
-  part.meta.root = rootW ? { width: 2 * rootW.hr, fillet: rootW.R, ub: rootW.ub, neckU: rootW.un, blend: rootW.blend, drawnHalf: rootW.h0, centre: rootW.c0 } : null;
+  part.meta.root = rootW ? { pinch: rootW.pinch, width: 2 * rootW.hr, fillet: rootW.R, ub: rootW.ub, neckU: rootW.un, blend: rootW.blend, drawnHalf: rootW.h0, centre: rootW.c0 } : null;
   part.meta.rootReduced = rootReduced;
   // dense sample d of the drawn curve is planform point posOf[d] of the outline
   // (the root map inserts points near the root): consumers that index the
@@ -2533,7 +2566,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 6;   // 6: the blended wing root (wingRootWidth, wingRootFillet) — a v5 file loads with the root width at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 6;   // 6: the blended wing root (wingRootPinch) — a v5 file loads with the pinch at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -2572,12 +2605,12 @@ export function buildBug(params, opts = {}) {
     // half the fillet, no fillet, then the drawn root chord — and reported; the
     // triangulation throws before anything of the pair is emitted, so a retry
     // starts clean.
-    const tries = spec.root ? [spec.root.fillet, spec.root.fillet / 2, 0, null] : [undefined];
+    const tries = spec.root ? [1, 0.5, 0, null] : [undefined];
     for (let t = 0; t < tries.length; t++) {
-      const s2 = tries[t] === undefined ? spec : { ...spec, root: tries[t] === null ? null : { ...spec.root, fillet: tries[t] } };
+      const s2 = tries[t] === undefined ? spec : { ...spec, root: tries[t] === null ? null : { ...spec.root, filletScale: tries[t] } };
       try {
         buildWingPair(acc, p, L, s2, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
-        if (t > 0) notes.push(`pair ${spec.index + 1}: the rounded edge could not follow the blended root here, so ${tries[t] === null ? 'this pair keeps its drawn root chord' : `its fillet was reduced to ${tries[t].toFixed(2)} mm`}`);
+        if (t > 0) notes.push(`pair ${spec.index + 1}: the rounded edge could not follow the blended root here, so ${tries[t] === null ? 'this pair keeps its drawn root chord' : `its fillet was reduced to ${tries[t] ? 'half' : 'none'}`}`);
         break;
       } catch (e) { if (t === tries.length - 1 || !/earClip|not simple/.test(e.message)) throw e; }
     }
