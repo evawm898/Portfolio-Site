@@ -1843,9 +1843,16 @@ ruling on the exploded views.
 
 Every wing closed on a straight root chord at u = 0: left at its drawn width it was a
 vertical cut beside the body, and a forewing and a hindwing side by side read as one
-rectangular block. ONE control (Wings): **`wingRootPinch`** (0–1, provisional default **0.3**
-until Eva picks the step from the ladder; 0 is the old straight root chord, BY BRANCH — the
-map is never built).
+rectangular block. Two controls (Wings): **`wingRootPinch`** (0–1, default **0 — Eva's pick
+from the ladder**; 0 is the old straight root chord, BY BRANCH — the map is never built) and
+**`wingRootLength`** (0.5–3×, default 1, shown only when the pinch is on): how far out from the
+body the narrowing reaches. It scales the neck's offset from the body's silhouette and the
+release back to the drawn wing together, LINEARLY — the release is derived at length 1 and
+then multiplied (re-deriving it over the longer stretch read the root edges wider and grew
+3.2× at ×2). Length 1 is the derived root unchanged. Since the default pinch is 0 the gate
+carries its own blended-root rows — the pinch ladder, the length range, 4 pairs, holes and
+ridges, the dense net, and every random bug given a seeded pinch and length (the page's
+Randomize leaves the root off).
 
 - **The pinch is RELATIVE to the drawn root (Eva's ruling on the first cut).** The first cut
   was two absolute controls, a 1.6 mm neck and a 0.9 mm fillet, and it pinched the default's
@@ -1967,7 +1974,7 @@ forewing's drawn margin and requires J to fire.
 ### 12.4 Decisions made without a ruling (reversible)
 
 1. `ROOT_NECK_AT_FULL` 0.355 and `ROOT_FILLET_AT_FULL` 0.2 (pinch 1 = the first cut on the
-   default forewing); the default pinch is provisional until Eva picks a step; `ROOT_BLEND_FRAC` 0.1, `ROOT_BLEND_SLOPE`
+   default forewing); the default pinch is 0 (Eva's ruling), the length 1; `ROOT_BLEND_FRAC` 0.1, `ROOT_BLEND_SLOPE`
    1.0, `ROOT_SAMPLE_MM` 0.5; the neck sits one fillet beyond the body's silhouette.
 2. Saved designs keep the straight root chord (12.1).
 3. The fitter's root zone is 12% of the span; bridges are cubic Hermites with tangents 0.6

@@ -169,7 +169,8 @@ export const PARAM_SPEC = [
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
   R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: none)', 0, 4, 0.05, 0, 'mm', hasWings),
   R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
-  R('wingRootPinch', 'wings', 'Root — pinch where the wing meets the body (0: the straight root chord, 1: a neck at ROOT_NECK_AT_FULL of the drawn root)', 0, 1, 0.05, 0.3, '', hasWings),
+  R('wingRootPinch', 'wings', 'Root — pinch where the wing meets the body (0: the straight root chord, 1: a neck at ROOT_NECK_AT_FULL of the drawn root)', 0, 1, 0.05, 0, '', hasWings),
+  R('wingRootLength', 'wings', 'Root — length: how far out from the body the narrowing reaches (1: as derived from the wing)', 0.5, 3, 0.05, 1, '×', (p) => hasWings(p) && p.wingRootPinch > 0),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -680,7 +681,7 @@ export function resolveWingPairs(p) {
       // the specimen pose, and a root that moved with the sweep would make the
       // pose chase its own tail)
       const k = H[spec.index].k;
-      spec.root = { pinch: p.wingRootPinch, filletScale: 1, floor: p.minDiameter, ub: 0.5 * L.rt * k };
+      spec.root = { pinch: p.wingRootPinch, length: p.wingRootLength ?? 1, filletScale: 1, floor: p.minDiameter, ub: 0.5 * L.rt * k };
     }
   }
   return out;
@@ -1697,7 +1698,11 @@ export function rootWarp(spec) {
   const h0 = (wL - wT) / 2, pinch = clamp(r.pinch, 0, 1);
   const hr = Math.max(h0 * ROOT_NECK_AT_FULL, r.floor / 2);
   const R = Math.max(0, ROOT_FILLET_AT_FULL * 2 * h0 * (r.filletScale ?? 1)), ub = Math.max(0, r.ub);
-  const un = ub + R;
+  // the LENGTH stretches the root outward: the neck's offset from the body's
+  // silhouette and the release back to the drawn wing both scale by it (1 =
+  // as derived; the curvature at the neck stays the fillet's)
+  const len = clamp(r.length ?? 1, 0.25, 4);
+  const un = ub + R * len;
   // the DRAWN wing's two ROOT EDGES: the outline walked from the root lead
   // (forward) and from the root trail (backward), each read where it first
   // crosses a station u — on a grid of NS stations over [0, uEnd]
@@ -1739,11 +1744,14 @@ export function rootWarp(spec) {
   // (and never shorter than two floors: on a small wing a release inside a
   // millimetre is a wobble the print cannot make — random:29, a 1.55 mm root,
   // read two 0.6 mm lobes once the neck became relative)
+  // (derived at length 1, then scaled: measured over a longer stretch the
+  // root edges read wider and the derived release grew faster than the slider)
+  const un1 = ub + R;
   const blend0 = Math.max(ROOT_BLEND_FRAC * span, 2.5 * R, 2 * r.floor);
-  const first = edges(un + blend0);
+  const first = edges(un1 + blend0);
   let hd = 0; for (let g = 0; g <= NS; g++) hd = Math.max(hd, first.up[g], first.dn[g]);
-  const blend = Math.max(blend0, ROOT_BLEND_SLOPE * (hd - hr)), uEnd = un + blend;
-  const { du, up, dn } = blend === blend0 ? first : edges(uEnd);
+  const blend = Math.max(blend0, ROOT_BLEND_SLOPE * (hd - hr)) * len, uEnd = un + blend;
+  const { du, up, dn } = len === 1 && blend === blend0 ? first : edges(uEnd);
   const at = (arr, u) => { const x = clamp(u / du, 0, NS), i = Math.min(NS - 1, Math.floor(x)), f = x - i; return arr[i] * (1 - f) + arr[i + 1] * f; };
   // the envelope toward the body: a parabola from the neck (curvature radius R
   // there — the FILLET) reaching 45 degrees at the body's silhouette, then on at

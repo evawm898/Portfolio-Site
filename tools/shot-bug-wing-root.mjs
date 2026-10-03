@@ -21,6 +21,8 @@ const OUT = path.resolve(args.find((a, i) => !a.startsWith('--') && !(i > 0 && a
 const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 fs.mkdirSync(OUT, { recursive: true });
 const PINCHES = [0, 0.15, 0.3, 0.45, 0.6, 1];
+const LENGTHS = [0.5, 0.75, 1, 1.5, 2, 3];   // the length ladder, at LENGTH_PINCH
+const LENGTH_PINCH = 0.6;
 
 // a library record applied to the default bug: its two outlines (and tail), nothing else
 // (the same rule as tools/bug-wing-library-fit.mjs's applyRecord)
@@ -34,12 +36,13 @@ function applyRecord(base, rec) {
   p.wings.tail = rec.tail ? JSON.parse(JSON.stringify(rec.tail)) : (p.wings.tail ? { ...p.wings.tail, on: false } : null);
   return p;
 }
-const rows = [{ label: 'the default bug', base: G.defaultParams() }];
+const pinchSteps = PINCHES.map((pinch) => ({ pinch, len: 1 })), lenSteps = LENGTHS.map((len) => ({ pinch: LENGTH_PINCH, len }));
+const rows = [{ label: 'the default bug — the pinch ladder (length 1)', base: G.defaultParams(), steps: pinchSteps }, { label: `the default bug — the LENGTH ladder (pinch ${LENGTH_PINCH})`, base: G.defaultParams(), steps: lenSteps }];
 if (opt('--library')) {
   const all = JSON.parse(fs.readFileSync(opt('--library'), 'utf8'));
   const e = all.find((x) => String(x.num) === String(opt('--num') || 9));
   if (!e) throw new Error(`no library record #${opt('--num')}`);
-  rows.push({ label: `library shape #${e.num}`, base: applyRecord(G.defaultParams(), e.record) });
+  rows.push({ label: `library shape #${e.num} — the pinch ladder`, base: applyRecord(G.defaultParams(), e.record), steps: pinchSteps }, { label: `library shape #${e.num} — the length ladder (pinch ${LENGTH_PINCH})`, base: applyRecord(G.defaultParams(), e.record), steps: lenSteps });
 }
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -68,8 +71,8 @@ await page.addStyleTag({ content: '.bg-panel,.bg-view,.bg-header,.bg-edbar,.bg-v
 
 for (const row of rows) {
   row.cells = [];
-  for (const pinch of PINCHES) {
-    const p = { ...JSON.parse(JSON.stringify(row.base)), wingRootPinch: pinch };
+  for (const { pinch, len } of row.steps) {
+    const p = { ...JSON.parse(JSON.stringify(row.base)), wingRootPinch: pinch, wingRootLength: len };
     const m = G.buildBug(p), ex = G.exportSvg(m), fr = ex.frame;
     // the SVG cropped to the thorax: world x -14..14, y -10..9
     const [X0, Y0] = G.svgFromWorld(fr, -14, 9), [X1, Y1] = G.svgFromWorld(fr, 14, -10);
@@ -83,7 +86,7 @@ for (const row of rows) {
     await page.evaluate(() => window.__bug.setView('three'));
     await page.evaluate((c) => window.__bug.lookAt(c.t, c.d, c.dist), { t: [H[0].hinge[0] + 3, -1, 0], d: [0.55, -0.75, 0.95], dist: 30 });
     const img = (await page.screenshot({ type: 'png' })).toString('base64');
-    row.cells.push({ pinch, svg, img, tris: m.indices.length / 3, roots, notes: m.notes, floor: m.floorViolations.length });
+    row.cells.push({ pinch, len, svg, img, tris: m.indices.length / 3, roots, notes: m.notes, floor: m.floorViolations.length });
   }
 }
 const html = `<!doctype html><meta charset="utf-8"><title>bug — root pinch ladder</title><style>
@@ -91,14 +94,14 @@ body{margin:0;background:#f4f3ee;color:#111;font:11px/1.35 ui-monospace,monospac
 h1{font-size:16px;margin:0 0 4px} h2{font-size:13px;margin:14px 0 6px} .g{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 .c{background:#fff;border:1px solid #ccc;padding:6px} .c img{width:100%;display:block;margin-top:4px} .c svg{display:block;background:#fff}
 .k{font-size:14px;font-weight:bold}
-</style><h1>Wing root pinch ladder — 0 (the old straight chord) · 0.15 · 0.3 · 0.45 · 0.6 · 1.0 (the first neck)</h1>
+</style><h1>Wing root — the pinch ladder (0 the straight chord … 1 the first neck) and the length ladder</h1>
 <div>Each cell: SVG export cropped to the thorax (world x −14..14 mm), then the 3D view at 3/4 on the right wing roots. The pinch mixes the straight chord with the full neck, relative to each wing's own drawn root: the neck and every slope scale with it ("fillet" below is the effective radius, the full one over the pinch).</div>
-${rows.map((r) => `<h2>${r.label}</h2><div class="g">${r.cells.map((c) => `<div class="c"><div class="k">pinch ${c.pinch}</div>${c.svg}<img src="data:image/png;base64,${c.img}"><div>${c.roots.join('<br>')}<br>${c.tris.toLocaleString()} tris · STL ${c.floor ? 'REFUSED' : 'exports'}${c.notes.length ? ' · ' + c.notes.join('; ') : ''}</div></div>`).join('')}</div>`).join('')}`;
+${rows.map((r) => `<h2>${r.label}</h2><div class="g">${r.cells.map((c) => `<div class="c"><div class="k">pinch ${c.pinch} · length ${c.len}</div>${c.svg}<img src="data:image/png;base64,${c.img}"><div>${c.roots.join('<br>')}<br>${c.tris.toLocaleString()} tris · STL ${c.floor ? 'REFUSED' : 'exports'}${c.notes.length ? ' · ' + c.notes.join('; ') : ''}</div></div>`).join('')}</div>`).join('')}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 const sh = await browser.newPage({ viewport: { width: 1932, height: 900 } });
 await sh.goto('file://' + path.join(OUT, 'index.html'));
 await sh.screenshot({ path: path.join(OUT, 'bug-wing-root.png'), fullPage: true });
 await browser.close(); server.close();
 console.log(errors.length ? `PAGE ERRORS:\n${errors.join('\n')}` : 'no page errors');
-for (const r of rows) for (const c of r.cells) console.log(r.label, c.pinch, c.tris, c.roots.join(' | '), c.notes.join('; '));
+for (const r of rows) for (const c of r.cells) console.log(r.label, c.pinch, c.len, c.tris, c.roots.join(' | '), c.notes.join('; '));
 if (errors.length) process.exit(1);
