@@ -1999,3 +1999,13 @@ forewing's drawn margin and requires J to fire.
    slivers flip facing under the wing's bend (0.59 mm, "holes: irregular dense net"); the
    frame mesh gets a Delaunay pass under the root only, so every design with the straight
    root chord keeps its triangulation byte for byte.
+7. **A pre-existing watertightness hole the pinch landed on, fixed.** A vein's end is
+   inserted ON an outline edge, exactly collinear with that edge's ends, and the cell's ear
+   clip could return flat triangles along the outline; subdivided, their slab's rim walk
+   lost its way — 24 boundary edges on "holes: 3 pairs, 8 -> 3 veins" at pinch 0.3 only
+   (identical with the Delaunay pass and the snap both removed). `flipDegenerate` flips a
+   flat triangle across its long edge, or drops it when that edge IS the outline; it visits
+   no other triangle, so a mesh without one is byte-identical. And the negative control's
+   "fold a wing top face" mutant took HALF the part's vertices as the top face, true before
+   the rounded edge appended its beads; at pinch 0.3 it folded a bottom vertex and S stayed
+   silent — it reads `meta.slab.n` now.

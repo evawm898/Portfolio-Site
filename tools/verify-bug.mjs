@@ -1355,7 +1355,7 @@ if (NEG) {
   const base = G.buildBug(G.defaultParams());
   const tuckP = G.defaultParams(); tuckP.legReach = 0;
   const tuck = G.buildBug(tuckP);
-  const t4 = G.defaultParams(); t4.wingPairs = 4; t4.wings.tail.on = true;
+  const t4 = G.defaultParams(); t4.wingPairs = 4; t4.wings.tail.on = true; t4.wings.first.sweep = TAIL_ROW_SWEEP;
   const tail4on = G.buildBug(t4); t4.wings.tail.on = false; const tail4off = G.buildBug(t4);
   const thinP = G.defaultParams(); thinP.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL));
   const thinModel = G.buildBug(thinP);
@@ -1366,7 +1366,7 @@ if (NEG) {
   const ridgesModel = G.buildBug(ridgesP);
   const thinVeinP = G.defaultParams(); thinVeinP.venation = 'holes'; thinVeinP.wings.first.veinWidth = 0.6; thinVeinP.wings.first.veinTaper = 0.5;
   const thinVeinModel = G.buildBug(thinVeinP);
-  const tailVeinP = G.defaultParams(); tailVeinP.venation = 'ridges'; tailVeinP.wings.first.points = HAND_OUTLINES.swallowtail; tailVeinP.wings.tail.on = true; tailVeinP.wings.last.length = 30; tailVeinP.wings.last.stretch = 1.4;
+  const tailVeinP = G.defaultParams(); tailVeinP.venation = 'ridges'; tailVeinP.wings.first.points = HAND_OUTLINES.swallowtail; tailVeinP.wings.first.sweep = TAIL_ROW_SWEEP; tailVeinP.wings.tail.on = true; tailVeinP.wings.last.length = 30; tailVeinP.wings.last.stretch = 1.4;
   const tailVeinModel = G.buildBug(tailVeinP);
   const specModel = G.buildBug(G.specimenPose(G.defaultParams()).params);
   // the first cut's clamp: random:6's forewing needs ~−43°; the old slider stopped at −30
@@ -1431,7 +1431,10 @@ if (NEG) {
       // the top-face vertex nearest the wing's centroid, pushed 3 mm along y on
       // BOTH sides (so M stays clean): its facets fold back -> an interior loop
       for (const side of ['R', 'L']) {
-        const p = m.parts.find((q) => q.kind === 'wing1' && q.side === side), nTop = (p.v1 - p.v0) / 2;
+        // (the TOP face is the slab's first n vertices — meta.slab.n; half the
+        // part's vertices was right before the rounded edge appended its beads,
+        // and at root pinch 0.3 it picked a BOTTOM vertex and S stayed silent)
+        const p = m.parts.find((q) => q.kind === 'wing1' && q.side === side), nTop = p.meta.slab.n;
         let cx = 0, cy = 0; for (let v = p.v0; v < p.v0 + nTop; v++) { cx += m.positions[3 * v] / nTop; cy += m.positions[3 * v + 1] / nTop; }
         let best = p.v0, bd = Infinity;
         for (let v = p.v0; v < p.v0 + nTop; v++) { const d = Math.hypot(m.positions[3 * v] - cx, m.positions[3 * v + 1] - cy); if (d < bd) { bd = d; best = v; } }

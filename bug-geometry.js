@@ -1356,6 +1356,57 @@ function delaunayFlip(pts, tris) {
   return T;
 }
 
+/* Flip away every ZERO-AREA triangle and touch nothing else. A vein's end is
+   inserted ON an outline edge, so it is exactly collinear with that edge's two
+   ends, and an ear clip of the cell can hand back the flat triangle the three
+   make: zero area on both skins, and after the subdivision a slab whose rim
+   walk loses its way — 24 boundary edges, measured (holes, 3 pairs, 8 -> 3
+   veins, at root pinch 0.3; pre-existing, the layout only had to land on it).
+   The flip is across the triangle's longest edge, so the middle point joins
+   the vertex opposite (one lying along the outline is dropped instead); a
+   triangle that is not degenerate is never visited, so every mesh without one
+   is byte-identical. */
+function flipDegenerate(pts, tris) {
+  const T = tris.map((t) => t.slice());
+  const orient = (a, b, c) => (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]);
+  const d2 = (a, b) => (pts[a][0] - pts[b][0]) ** 2 + (pts[a][1] - pts[b][1]) ** 2;
+  const flat = (t) => Math.abs(orient(t[0], t[1], t[2])) <= 1e-12 * Math.max(d2(t[0], t[1]), d2(t[1], t[2]), d2(t[2], t[0]));
+  if (!T.some(flat)) return T;
+  const key = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
+  for (let pass = 0; pass < 50; pass++) {
+    const edges = new Map();
+    T.forEach((t, i) => { for (let e = 0; e < 3; e++) { const k = key(t[e], t[(e + 1) % 3]); (edges.get(k) || edges.set(k, []).get(k)).push(i); } });
+    let flips = 0, left = 0;
+    const done = new Set(), drop = new Set();
+    T.forEach((t, i) => {
+      if (done.has(i) || !flat(t)) return;
+      left++;
+      let e = 0;
+      for (let k = 1; k < 3; k++) if (d2(t[k], t[(k + 1) % 3]) > d2(t[e], t[(e + 1) % 3])) e = k;
+      const a = t[e], b = t[(e + 1) % 3], c = t[(e + 2) % 3];
+      const ts = edges.get(key(a, b));
+      // a flat triangle whose long edge is on the BOUNDARY is a sliver lying
+      // along the outline (its short edges carry the in-line points the
+      // neighbours already use): it covers nothing, so it is dropped and the
+      // boundary runs through those points instead of across them
+      if (ts && ts.length === 1) { drop.add(i); done.add(i); flips++; return; }
+      if (!ts || ts.length !== 2) return;
+      const j = ts[0] === i ? ts[1] : ts[0];
+      if (done.has(j)) return;
+      const d = T[j].find((v) => v !== a && v !== b);
+      const t1 = orient(c, d, a) > 0 ? [c, d, a] : [d, c, a];
+      const t2 = orient(c, d, b) > 0 ? [c, d, b] : [d, c, b];
+      // (a neighbour that is itself on the line would only trade two flat
+      // triangles for two more: skip it — the chain unwinds from its end)
+      if (flat(t1) || flat(t2)) return;
+      T[i] = t1; T[j] = t2; done.add(i); done.add(j); flips++;
+    });
+    if (drop.size) { const keep = T.filter((_, i) => !drop.has(i)); T.length = 0; T.push(...keep); }
+    if (!left || !flips) break;
+  }
+  return T;
+}
+
 /* 1 -> 4 midpoint subdivision; a midpoint is shared by both triangles of an
    edge, so the result stays conforming (no T-junctions). */
 /* `apex` (optional): per point, the drawn-outline point its rounded edge's bead
@@ -1888,6 +1939,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // frame is a single closed slab whose rim walk (planformSlab) finds the
     // hole rims by the same directed-edge rule as the outer rim.
     ({ pts, tris: tri } = frameMesh(plan, embed, n0, n1));
+    tri = flipDegenerate(pts, tri);
     // under the blended root every main vein converges on the neck, so the
     // cells between them are long thin wedges and an ear clip hands back
     // slivers whose facing flips under the wing's bend — contour hairlines up
