@@ -21,7 +21,7 @@ const OUT = path.resolve(args.find((a, i) => !a.startsWith('--') && !(i > 0 && a
 const opt = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 fs.mkdirSync(OUT, { recursive: true });
 const PINCHES = [0, 0.15, 0.3, 0.45, 0.6, 1];
-const LENGTHS = [0.5, 0.75, 1, 1.5, 2, 3];   // the length ladder, at LENGTH_PINCH
+const LENGTHS = [0.5, 0.75, 1, 1.25, 1.5, 2];   // the length ladder, at LENGTH_PINCH
 const LENGTH_PINCH = 0.6;
 
 // a library record applied to the default bug: its two outlines (and tail), nothing else

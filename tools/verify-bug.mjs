@@ -1285,12 +1285,12 @@ function rowsFor(nseeds) {
   // holes row is the layout that found the flat-triangle hole), and the random
   // bugs each given a seeded pinch and length — the page's Randomize leaves the
   // root off; these are the gate's own draws.
-  for (const [pin, len] of [[0.15, 1], [0.3, 1], [0.45, 0.5], [0.6, 1], [0.6, 2], [1, 1], [1, 3]]) { const p = d(); p.wingRootPinch = pin; p.wingRootLength = len; rows.push([`root pinch ${pin}, length ${len}`, p, {}]); }
+  for (const [pin, len] of [[0.15, 1], [0.3, 1], [0.45, 0.5], [0.6, 1], [0.6, 2], [1, 1], [1, 2], [1, 0.5]]) { const p = d(); p.wingRootPinch = pin; p.wingRootLength = len; rows.push([`root pinch ${pin}, length ${len}`, p, {}]); }
   { const p = d(); p.wingRootPinch = 0.6; p.wingPairs = 4; rows.push(['root pinch 0.6, 4 pairs', p, {}]); }
   { const p = d(); p.wingRootPinch = 0.3; p.venation = 'holes'; p.wingPairs = 3; p.wings.first.veinCount = 8; p.wings.first.crossDensity = 1; p.wings.last.veinCount = 3; p.wings.last.crossDensity = 0; rows.push(['root pinch 0.3, holes 3 pairs 8→3 veins', p, {}]); }
   { const p = d(); p.wingRootPinch = 0.6; p.venation = 'ridges'; p.wingPairs = 3; rows.push(['root pinch 0.6, ridges 3 pairs', p, {}]); }
   { const p = d(); p.wingRootPinch = 0.45; p.wingRootLength = 2; p.venation = 'holes'; for (const w of [p.wings.first, p.wings.last]) { w.crossDensity = 0.8; w.cellRegularity = 0; w.veinBranch = 2; w.veinCount = 6; w.length = 44; w.stretch = 1.4; } rows.push(['root pinch 0.45 x2, holes irregular dense net', p, {}]); }
-  for (let s = 1; s <= nseeds; s++) { const p = G.randomParams(s); p.wingRootPinch = [0.15, 0.3, 0.45, 0.6, 0.8, 1][s % 6]; p.wingRootLength = [1, 0.5, 2, 1, 3, 1.5, 0.75][s % 7]; rows.push([`random:${s} root ${p.wingRootPinch}x${p.wingRootLength}`, p, {}]); }
+  for (let s = 1; s <= nseeds; s++) { const p = G.randomParams(s); p.wingRootPinch = [0.15, 0.3, 0.45, 0.6, 0.8, 1][s % 6]; p.wingRootLength = [1, 0.5, 2, 1, 1.75, 1.5, 0.75][s % 7]; rows.push([`random:${s} root ${p.wingRootPinch}x${p.wingRootLength}`, p, {}]); }
   for (const [name, pts] of Object.entries(HAND_OUTLINES)) {
     const p = d(); p.wingPairs = 4; p.wings.first.points = pts; rows.push([`drawn:${name} (4 pairs)`, p, {}]);
   }

@@ -1845,11 +1845,22 @@ Every wing closed on a straight root chord at u = 0: left at its drawn width it 
 vertical cut beside the body, and a forewing and a hindwing side by side read as one
 rectangular block. Two controls (Wings): **`wingRootPinch`** (0–1, default **0 — Eva's pick
 from the ladder**; 0 is the old straight root chord, BY BRANCH — the map is never built) and
-**`wingRootLength`** (0.5–3×, default 1, shown only when the pinch is on): how far out from the
+**`wingRootLength`** (0.5–2×, default 1, shown only when the pinch is on): how far out from the
 body the narrowing reaches. It scales the neck's offset from the body's silhouette and the
 release back to the drawn wing together, LINEARLY — the release is derived at length 1 and
 then multiplied (re-deriving it over the longer stretch read the root edges wider and grew
-3.2× at ×2). Length 1 is the derived root unchanged. Since the default pinch is 0 the gate
+3.2× at ×2), and the two-floor minimum is applied after the length. Length 1 is the derived
+root unchanged. The range stops at 2×: at 2.5× and up a full pinch left one flipped sliver
+facet where the wing meets the body's silhouette (a 0.47–0.58 mm contour loop, measured).
+**The image fitter follows the pinch**: with the straight chord (pinch 0) it keeps the root the
+picture shows along the thorax and bridges only the hidden stretches — the narrow anchors
+either side of the hinge are a neck, right only when the model blends it (at pinch 0 their
+embedded root tab stood past the body beside the head: IM12 −2.5 mm, IM3 up to 6 mm on every
+fixture). And every bridge's JOIN to the seen margin is kept as a control point: where a
+hidden edge emerges, the two wings' edges cross at a shallow angle, and a fit free to sit a
+tolerance off each edge slid that visible crossing by tolerance / sin(angle) — 1.74 mm on the
+same-tone fixture against `main`'s 0.83, 0.745 with the joins kept. The IM checks fit at the
+default pinch 0; the blended branch of the fitter has no IM row of its own (recorded gap). Since the default pinch is 0 the gate
 carries its own blended-root rows — the pinch ladder, the length range, 4 pairs, holes and
 ridges, the dense net, and every random bug given a seeded pinch and length (the page's
 Randomize leaves the root off).
