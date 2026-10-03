@@ -476,14 +476,18 @@ for (const [rowIndex, row] of rows.entries()) {
          florets multiply it. Every floret on a build is the same unit under a
          different matrix (ID5 measures that as an exact zero), which is why
          one record describes all of them. */
+      /* ONE RECORD PER FLORET BUILD (the node-laws session): a graded raceme
+         or a corymb builds one unit per distinct pedicel length, and a
+         sessile unit has no pedicel bore at all, so each unit declares its
+         own inner faces and carries its own placement count. */
       florets: (() => {
-        const B = m.inflorescenceBuilt, U = B && B.unit;
-        if (!B || !U) return null;
-        return {
-          count: B.count,
+        const B = m.inflorescenceBuilt;
+        if (!B || !Array.isArray(B.units) || !Array.isArray(B.placed)) return null;
+        return B.units.map((U, k) => ({
+          count: B.placed.filter((q) => q.unit === k).length,
           sphere: U.sphereMode === true,
           cavity: U.stemVoidMm > 0 && U.stemSolidBandMm > 0 && U.stemTipPlugMm > 0,
-        };
+        }));
       })(),
     };
   }));

@@ -212,6 +212,30 @@ const PREDICATE_MOVERS = {
     };
     return liveCount(mine) !== liveCount(base);
   },
+  /* THE INFLORESCENCE'S NODE LAWS (gradient, corymb, sessile, shared node).
+     A row moves iff the BASE tree builds a raceme (its own plan, read off its
+     own builder — the base does not know the gradient or the corymb, so this
+     never asks this tree's plan) AND either (i) some node's pedicel length on
+     this session's laws differs from the control — RESTATED here from the
+     controls and the base plan's own node depths, never read from this
+     tree's plan — or the top length is 0 (sessile: the base built a stemless
+     floret at a different root), or (ii) the base built leaves beside it
+     (the shared node re-seats every one of them). Everything else holds. */
+  'node-laws': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    if (!ip.present) return false;
+    if (base.leafPlan(st, sp, acc).present) return true;
+    const L0 = Number(st.pedicelLength), g = Number(st.pedicelGradient ?? 1);
+    if (L0 === 0) return true;
+    const corymbOn = String(st.pedicelCorymb ?? 'OFF') === 'ON';
+    const sinTh = Math.sin(Number(st.pedicelAngle) * Math.PI / 180);
+    if (ip.nodeDepthsMm.length < 2) return false;
+    if (corymbOn) return sinTh > 0;
+    return g !== 1;
+  },
 };
 if (MOVERS_PRED && !PREDICATE_MOVERS[MOVERS_PRED]) { console.error(`--movers-predicate ${MOVERS_PRED}: no such predicate (${Object.keys(PREDICATE_MOVERS).join(', ')})`); process.exit(2); }
 if (MOVERS_PRED && MOVERS) { console.error('--movers and --movers-predicate are two declarations of one partition; give one'); process.exit(2); }
