@@ -177,6 +177,7 @@ const INFLO_MEASURES = new Map([
   ['floret-head', `FLORET against the TERMINAL HEAD (the petals and the hub, [0, hubTriEnd); edge crossings read 0, searched to ${INFLO_SEARCH_CAP_MM} mm)`],
   ['floret-stem', 'FLORET against the FREE RACHIS (freeStemDistanceMm, the geometry\'s own; its own pedicel rod excluded by the builder\'s pedicelAxis, a SESSILE floret excluded whole — its hub IS the join)'],
   ['leaf-floret', `SUBTENDING LEAF against every FLORET, pedicel included (the shared node's own approach; the petiole-to-rachis join excluded; searched to ${INFLO_SEARCH_CAP_MM} mm)`],
+  ['leaf-pedicel', `SUBTENDING LEAF against every PEDICEL ROD, its own and the nodes' below (the emitted rods as cylinders; the petiole-to-rachis join excluded; searched to ${INFLO_SEARCH_CAP_MM} mm)`],
 ]);
 
 export const VERDICTS = Object.freeze(['product-only', 'single-reaches', 'clears']);
@@ -654,6 +655,24 @@ export const PAIRS = [
     verdict: 'single-reaches',
     cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the shared node seats the leaf by the STEEPER rod\'s cosine, exact for parallel rods and conservative otherwise; this measures what happens past the wall',
     why: 'a leaf steeper than its pedicel rises toward it; one shallower diverges; parallel ones hold their seated offset along the whole of the shorter rod',
+  },
+  {
+    id: 'inflo-leaf-nodes-x-leafangle',
+    tier: 2,
+    label: 'floretNodes x leafAngle on a short rachis — the subtending leaf against the node BELOW it',
+    measure: 'leaf-pedicel',
+    /* THE OTHER SIDE OF THE SHARED NODE (Eva's change 1: "the leaf must still
+       clear the node below it at the tightest reachable internode and at the
+       pitch floor"). 52 mm of rachis at 12 nodes is the tightest internode the
+       node law reaches (3.023 mm against its 3.000 mm pitch floor, measured by
+       sweeping every rachis length at 12 nodes); 5 nodes on the same rachis is
+       the default count. A 15 mm leaf, this pair's sibling's own length. */
+    base: { stemLength: 52, inflorescence: 'RACEME', leafLength: 15 },
+    a: { id: 'floretNodes', values: [5, 12] },
+    b: { id: 'leafAngle', values: [35, 0] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the shared node seats each leaf a derived offset below ITS OWN pedicel and nothing in that law reads the node below; the pitch floor is two pedicel radii, set for the pedicels against each other',
+    why: 'two nodes down on the same azimuth (alternate and opposite repeat every second node) the leaf stands only twice the internode less its own offset above that pedicel, and a level leaf runs straight over it',
   },
   {
     id: 'inflo-corymb-angle-x-length',
@@ -1161,13 +1180,22 @@ export const COMBINATION_XFAIL = Object.freeze({
   'inflo-scale-x-angle @ floretScale=1 x pedicelAngle=60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-scale-x-angle @ floretScale=1 x pedicelAngle=90': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-length-x-tilt-ff @ pedicelLength=0 x petalTilt=25': { mm: 0, note: 'the SPIKE: sessile florets one node pitch apart overlap their open petals at the shipped tilt (an edge crossing); at tilt 60 and 90 they clear' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
-  'inflo-leafangle-x-pedicelangle @ leafAngle=35 x pedicelAngle=35': { mm: 0.876, note: "the SHARED NODE's own default (parallel at 35 deg): the rods stand exactly the law's 3.1 mm apart, and the leaf BLADE's top skin and its cup stand 0.897 mm off the leaf's own axis where the petiole is 0.6, so the blade takes 0.124 mm of the 1 mm gap near its tip — the offset law clears the RODS and not the blade (outcome doc)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-leafangle-x-pedicelangle @ leafAngle=35 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
-  'inflo-leafangle-x-pedicelangle @ leafAngle=0 x pedicelAngle=35': { mm: 0.881, note: "the SHARED NODE's own default (parallel at 35 deg): the rods stand exactly the law's 3.1 mm apart, and the leaf BLADE's top skin and its cup stand 0.897 mm off the leaf's own axis where the petiole is 0.6, so the blade takes 0.124 mm of the 1 mm gap near its tip — the offset law clears the RODS and not the blade (outcome doc)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
-  'inflo-leafangle-x-pedicelangle @ leafAngle=0 x pedicelAngle=0': { mm: 0.876, note: "the SHARED NODE's own default (parallel at 35 deg): the rods stand exactly the law's 3.1 mm apart, and the leaf BLADE's top skin and its cup stand 0.897 mm off the leaf's own axis where the petiole is 0.6, so the blade takes 0.124 mm of the 1 mm gap near its tip — the offset law clears the RODS and not the blade (outcome doc)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-leafangle-x-pedicelangle @ leafAngle=0 x pedicelAngle=35': { mm: 0.723, note: "a LEVEL leaf against the FLORET TWO NODES BELOW on its own azimuth (alternate repeats every second node), whose petals reach up to it — the shared node's law reads its OWN pedicel and nothing below. Was 0.881 mm (and was mis-attributed to the blade's own top skin): Eva's change 1 seats every leaf 0.158 mm lower (3.784 -> 3.943 mm), and this approach falls by exactly that" + ' — measured on the node-laws tree, second round (change 1 + change 2), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  /* THE NODE BELOW (Eva's change 1, the other side of the widened seating) —
+     the `leaf-pedicel` measure, the leaf against every emitted pedicel rod.
+     All three are the PEDICEL TWO NODES BELOW on the leaf's own azimuth: the
+     leaf stands `2 x internode - offset` above it, and the node law's pitch
+     floor (two pedicel radii) was set for the pedicels against each other,
+     never for a leaf seated between them. Declared, never clamped (Eva:
+     "declare that cell with its mechanism rather than clamping anything
+     silently"). The same state on the pre-change tree reads -0.248 mm
+     (interpenetrating) at 12 nodes; the wider seating takes it to -0.378. */
+  'inflo-leaf-nodes-x-leafangle @ floretNodes=5 x leafAngle=0': { mm: 0, note: 'a LEVEL leaf at the default 5 nodes on a 52 mm rachis runs over the pedicel TWO NODES BELOW on its own azimuth (an edge crossing)' + ' — measured on the node-laws tree, second round, Node 22, EXPORT, emitted leaf vertices against the emitted pedicel rods.' },
+  'inflo-leaf-nodes-x-leafangle @ floretNodes=12 x leafAngle=35': { mm: 0, note: 'the TIGHTEST INTERNODE the node law reaches (3.023 mm against its 3.000 mm pitch floor): the leaf stands 2 x 3.023 - 3.943 = 2.10 mm above the pedicel two nodes below on its own azimuth, which needs about 3.86 mm of internode to clear — it passes through it' + ' — measured on the node-laws tree, second round, Node 22, EXPORT, emitted leaf vertices against the emitted pedicel rods.' },
+  'inflo-leaf-nodes-x-leafangle @ floretNodes=12 x leafAngle=0': { mm: 0, note: 'both at once: the tightest internode and a level leaf, through the pedicel two nodes below' + ' — measured on the node-laws tree, second round, Node 22, EXPORT, emitted leaf vertices against the emitted pedicel rods.' },
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=35': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
-  'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=60': { mm: 0.876, note: "the SHARED NODE's own default (parallel at 35 deg): the rods stand exactly the law's 3.1 mm apart, and the leaf BLADE's top skin and its cup stand 0.897 mm off the leaf's own axis where the petiole is 0.6, so the blade takes 0.124 mm of the 1 mm gap near its tip — the offset law clears the RODS and not the blade (outcome doc)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-corymb-angle-x-length @ pedicelAngle=35 x pedicelLength=40': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=20': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=0': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
@@ -1249,6 +1277,7 @@ export function measureLeafStemApproachMm(G, state, exportMode) {
   if (!m.leaf || !m.leaf.present) return { mm: Infinity, why: 'no leaf is built' };
   let best = Infinity, at = null, leaves = 0, verts = 0;
   for (let i = 0; i < m.leaf.azimuths.length; i++) {
+    if (m.leaf.nodeLengthsMm && !(m.leaf.nodeLengthsMm[i] > 0)) continue;   // the cap left no blade (the plan says so)
     for (const az of m.leaf.azimuths[i]) {
       const probe = new G.MeshBuilder({ exportMode });
       const rep = G.buildLeafInto(probe, m.leaf, state, i, az);

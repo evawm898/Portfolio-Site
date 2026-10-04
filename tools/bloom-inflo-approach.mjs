@@ -271,6 +271,8 @@ export function measureInfloApproachMm(G, state, measure) {
     const grid = triGrid(P, blocks.map(({ lo, hi, owner }) => ({ lo, hi, owner })));
     let best = SEARCH_CAP_MM, at = null, verts = 0, crossing = false, leaves = 0;
     for (let i = 0; i < m.leaf.azimuths.length; i++) {
+      /* a node whose length cap leaves no blade builds no leaf (the plan says so) */
+      if (m.leaf.nodeLengthsMm && !(m.leaf.nodeLengthsMm[i] > 0)) continue;
       for (const az of m.leaf.azimuths[i]) {
         /* THE SHIPPED BUILDER into a throwaway accumulator — the gate's own
            `leaf-stem` construction, so the leaf measured is the leaf built. */
@@ -294,6 +296,41 @@ export function measureInfloApproachMm(G, state, measure) {
     }
     if (!leaves) return { mm: Infinity, why: 'the shared node seated no leaf (every pedicel lacks room)' };
     return { mm: capped(best), at, verts, leaves, crossing, capped: best >= SEARCH_CAP_MM };
+  }
+  if (measure === 'leaf-pedicel') {
+    /* EVERY SUBTENDING LEAF AGAINST EVERY PEDICEL ROD — its own and every
+       other node's (Eva's change 1, "check the widened seating from the other
+       side"). The rods are the floret builder's own EMITTED ones
+       (`pedicelAxis`, ST9's segment), read as the cylinders they are: the
+       distance is the segment distance less the emitted radius, and a leaf
+       vertex INSIDE a rod reads 0 (an interpenetration). Where the florets of a
+       dense raceme overlap each other, `leaf-floret` reads 0 whatever the leaf
+       does; this measure is what can still say where the leaf stands against
+       the node below. The petiole-to-rachis join is excluded, as above. */
+    if (!m.leaf || !m.leaf.present || !m.leaf.shared) return { mm: Infinity, why: 'no subtending leaf is built (the shared node needs a raceme and a leaf length)' };
+    let best = SEARCH_CAP_MM, at = null, leaves = 0;
+    const rods = B.placed.filter((q) => q.pedicelAxis);
+    if (!rods.length) return { mm: Infinity, why: 'every floret is SESSILE — there is no pedicel rod' };
+    for (let i = 0; i < m.leaf.azimuths.length; i++) {
+      if (m.leaf.nodeLengthsMm && !(m.leaf.nodeLengthsMm[i] > 0)) continue;
+      for (const az of m.leaf.azimuths[i]) {
+        const probe = new G.MeshBuilder({ exportMode: true });
+        G.buildLeafInto(probe, m.leaf, state, i, az);
+        const Q = probe.positions;
+        leaves++;
+        for (let j = 0; j < Q.length; j += 3) {
+          const p = [Q[j], Q[j + 1], Q[j + 2]];
+          if (!outsideRachis(p)) continue;
+          for (const q of rods) {
+            const ax = q.pedicelAxis;
+            const d = Math.max(0, segDist(p, ax.inner, ax.outer) - ax.radiusMm);
+            if (d < best) { best = d; at = { node: i, azDeg: (az * 180) / Math.PI, rodNode: q.nodeIndex, rodAzDeg: (q.az * 180) / Math.PI, own: q.nodeIndex === i && Math.abs(q.az - az) < 1e-9 }; }
+          }
+        }
+      }
+    }
+    if (!leaves) return { mm: Infinity, why: 'the shared node seated no leaf with a blade' };
+    return { mm: capped(best), at, leaves, capped: best >= SEARCH_CAP_MM };
   }
   throw new Error(`bloom-inflo-approach: unknown measure ${JSON.stringify(measure)}`);
 }

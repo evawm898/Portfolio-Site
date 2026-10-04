@@ -6794,7 +6794,10 @@ export async function leafAssertions(page, row) {
   if (!Array.isArray(L.azimuths) || (!L.azimuths.length && !sharedEmpty)) {
     bad.push('LF1: the plan declares no azimuth list — the emitted leaf count cannot be predicted from it');
   } else {
-    const want = L.azimuths.reduce((n, a) => n + a.length, 0);
+    /* a node whose length cap leaves no blade carries no leaf (SN4 holds the
+       cap itself); the PLAN's per-node list says which, the builder's tally
+       is the other owner */
+    const want = L.azimuths.reduce((n, a, i) => n + (L.nodeLengthsMm && !(L.nodeLengthsMm[i] > 0) ? 0 : a.length), 0);
     if (L.built !== want) bad.push(`LF1: the plan asks for ${want} leaves (${L.azimuths.length} nodes) and the builder emitted ${L.built}`);
   }
 
@@ -6941,12 +6944,52 @@ export async function leafAssertions(page, row) {
       const rLfree = Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM) / 2;
       const cosDeg = (d) => (Math.abs(Number(d)) === 90 ? 0 : Math.cos(Number(d) * Math.PI / 180));
       const cMin = Math.min(cosDeg(ui.pedicelAngle), cosDeg(ui.leafAngle));
-      const off = cMin > 0 ? (P.pedicelR + rLfree + MIN_FEATURE_MM) / cMin : Infinity;
+      /* THE BLADE'S RISE, RESTATED (Eva's change 2 of the node-laws session's
+         second round: the offset clears the leaf BLADE's top skin and not only
+         the rods). The blade is a Node build of the shipped leaf builder at a
+         plan written HERE (angle 0, azimuth 0, no petiole), so it is the page's
+         blade in its own frame without the page's own law in the loop; the
+         rise is solved in CLOSED FORM at each emitted edge's stationary point
+         (`y = sgn(dz dy) |dz| R / hypot(dy, dz)`), where the geometry runs a
+         golden-section search — two methods over one blade. The leaf plan's
+         `sharedNodeOffsetMm` is never read. */
+      const bladeRise = (() => {
+        const acc0 = new GEOMETRY.MeshBuilder({ exportMode: true });
+        GEOMETRY.buildLeafInto(acc0, { angleDeg: 0, rootZ: 0, nodeDepthsMm: [0], nodeOffsets: null, rootR: 0, petioleR: acc0.floorThickness(Number(ui.sheetThickness)) / 2,
+          petioleLenMm: 0, embedMm: 0, lengthMm: Number(ui.leafLength), widthMm: Number(ui.leafWidth) }, { ...ui }, 0, 0);
+        const Q = acc0.positions, R = P.pedicelR + MIN_FEATURE_MM;
+        const skip = (2 * GEOMETRY.LEAF_PETIOLE_SIDES + 2 * (GEOMETRY.LEAF_PETIOLE_SIDES - 2)) * 9;
+        const f = (y, z) => (Math.abs(y) <= R ? z + Math.sqrt(R * R - y * y) : -Infinity);
+        let best = -Infinity;
+        for (let t = skip; t < Q.length; t += 9) for (let e = 0; e < 3; e++) {
+          const a = t + 3 * e, b = t + 3 * ((e + 1) % 3);
+          const ya = Q[a + 1], za = Q[a + 2], dy = Q[b + 1] - ya, dz = Q[b + 2] - za;
+          const cand = [0, 1];
+          if (dy !== 0) {
+            cand.push((-R - ya) / dy, (R - ya) / dy);
+            const ys = Math.sign(dz * dy) * Math.abs(dz) * R / Math.hypot(dy, dz);
+            cand.push((ys - ya) / dy);
+          }
+          for (const sv of cand) if (sv >= 0 && sv <= 1) { const v = f(ya + dy * sv, za + dz * sv); if (v > best) best = v; }
+        }
+        return best;
+      })();
+      const perpExact = Math.max(P.pedicelR + rLfree + MIN_FEATURE_MM, bladeRise);
+      /* the law's slack is one to two grid steps over the exact separation
+         (the grid is the geometry's DECLARATION, imported the way ST3 imports
+         Eva's 1.5 mm); SN2 holds the seat inside [exact, exact + 3 steps] —
+         strictly clear of the bar, and no further from it than the slack */
+      const step = GEOMETRY.SHARED_NODE_GRID_MM;
+      const off = cMin > 0 ? perpExact / cMin : Infinity;
+      const offHi = cMin > 0 ? (perpExact + 3 * step) / cMin : Infinity;
       /* SN3 — WHICH PEDICELS CARRY A LEAF: a leaf whose root would leave the
          free stem is not built, told; the kept nodes are a PREFIX. Restated
          from the stem's own length (`m.stem`, another owner). */
       const Sl = S ? S.lengthMm : NaN;
-      const wantKept = (() => { let k = 0; while (k < P.nodeDepthsMm.length && P.nodeDepthsMm[k] + off + rLfree <= Sl) k++; return k; })();
+      const keptAt = (o) => { let k = 0; while (k < P.nodeDepthsMm.length && P.nodeDepthsMm[k] + o + rLfree <= Sl) k++; return k; };
+      /* the slack can move a node's room only at a knife edge; either end of
+         the law's own band is an answer, and a count outside both is not */
+      const wantKept = SNr.kept === keptAt(offHi) ? keptAt(offHi) : keptAt(off);
       if (SNr.kept !== wantKept || L.nodesBuilt !== wantKept) bad.push(`SN3: ${L.nodesBuilt} pedicel node(s) carry a leaf (the record says ${SNr.kept}) and ${wantKept} of ${P.nodeDepthsMm.length} have room for one seated ${off.toFixed(3)} mm below on a ${Sl} mm stem`);
       if (SNr.noRoom !== P.nodeDepthsMm.length - wantKept) bad.push(`SN3: the record tells ${SNr.noRoom} pedicel node(s) without a leaf where ${P.nodeDepthsMm.length - wantKept} lack room`);
       /* SN1 — ONE LEAF PER PEDICEL, AT ITS AZIMUTH. Read off the EMITTED
@@ -6955,8 +6998,9 @@ export async function leafAssertions(page, row) {
          owners. Leaves and florets are both emitted node-major in azimuth
          order, so the j-th leaf is the j-th placed floret. */
       const placed = Array.isArray(B.placed) ? B.placed : [];
-      const wantLeaves = placed.filter((q) => q.nodeIndex < wantKept);
-      if (L.built !== wantLeaves.length) bad.push(`SN1: ${L.built} leaves were built for the ${wantLeaves.length} pedicels on the ${wantKept} node(s) with room — one leaf subtends each pedicel`);
+      const bladeAt = (i) => !L.nodeLengthsMm || L.nodeLengthsMm[i] > 0;
+      const wantLeaves = placed.filter((q) => q.nodeIndex < wantKept && bladeAt(q.nodeIndex));
+      if (L.built !== wantLeaves.length) bad.push(`SN1: ${L.built} leaves were built for the ${wantLeaves.length} pedicels on the ${wantKept} node(s) with room and a blade — one leaf subtends each pedicel`);
       else if (!Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built) bad.push(`SN1: the builder reports ${L.petioleAxes ? L.petioleAxes.length : 'no'} petiole axes for ${L.built} leaves`);
       else {
         let worstAz = 0, worstAt = -1;
@@ -6985,10 +7029,44 @@ export async function leafAssertions(page, row) {
           const leafZ = nodeZ(pa.inner, pa.outer, pa.inner);
           const pedZ = q.sessile || !q.pedicelAxis ? q.root[2] : nodeZ(q.pedicelAxis.outer, q.pedicelAxis.inner, q.pedicelAxis.outer);
           const got = pedZ - leafZ;
-          const err = Math.abs(got - off);
+          const err = got < off - 1e-9 ? off - got : got > offHi + 1e-9 ? got - offHi : 0;
           if (err > worstOff) { worstOff = err; worstJ = j; measuredAt = got; }
         }
-        if (worstOff > 1e-6) bad.push(`SN2: leaf ${worstJ} is seated ${Number(measuredAt).toFixed(6)} mm below its pedicel's node and the law gives ${off.toFixed(6)} mm (two rod radii ${P.pedicelR.toFixed(3)} + ${rLfree.toFixed(3)} and the ${MIN_FEATURE_MM} mm gap over the steeper rod's cosine) — a leaf rooted at its pedicel's own point exports as one watertight piece`);
+        if (worstOff > 0) bad.push(`SN2: leaf ${worstJ} is seated ${Number(measuredAt).toFixed(6)} mm below its pedicel's node and the law puts it in [${off.toFixed(6)}, ${offHi.toFixed(6)}] mm (the larger of two rod radii ${P.pedicelR.toFixed(3)} + ${rLfree.toFixed(3)} and the blade's own rise ${bladeRise.toFixed(4)} mm, plus the pedicel's radius and the ${MIN_FEATURE_MM} mm gap, over the steeper rod's cosine, up to three ${step} mm steps of slack) — a leaf rooted at its pedicel's own point exports as one watertight piece`);
+        /* SN4 — THE LEAF LENGTH AT A FLOWERING NODE (Eva's change 2: "a node
+           carrying a floret caps its leaf at the length that clears that
+           floret"). Two owners: the PLAN declares each node's built length,
+           its petiole and the cap it came from; the BUILDER reports how far
+           along its own axis the blade it EMITTED reaches. (a) the plan's
+           arithmetic, stated here: a node builds the asked length iff its cap
+           reaches it, nothing iff the cap is under one printable feature, the
+           cap otherwise, and the petiole follows the built length by its own
+           law; (b) the emitted blade reaches exactly the plan's petiole plus
+           built length — a builder that built the ASKED length under a cap
+           shows here, and only here (both STL gates, the census and the flood
+           fill read it as one watertight piece). Whether the capped blade
+           CLEARS its floret is the combination gate's leaf-floret measure. */
+        const NL = L.nodeLengthsMm, NP = L.nodePetioleLenMm, LC = L.lengthCap;
+        if (!wantKept) { /* no node kept a leaf (SN3): there is no length to cap */ }
+        else if (!Array.isArray(NL) || !Array.isArray(NP) || !LC || !Array.isArray(LC.capsMm)) bad.push('SN4: a shared-node leaf plan reports no per-node lengths, petioles or cap record — what each flowering node built is then stated by nothing');
+        else {
+          const asked = Number(ui.leafLength);
+          for (let i = 0; i < NL.length; i++) {
+            const cap = LC.capsMm[i] == null ? Infinity : LC.capsMm[i];
+            const want = cap >= asked ? asked : cap >= MIN_FEATURE_MM ? cap : 0;
+            if (NL[i] !== want) { bad.push(`SN4: node ${i} built a ${NL[i]} mm blade where its cap of ${cap} mm and the asked ${asked} mm give ${want}`); break; }
+            if (NL[i] > 0 && NL[i] < asked && Math.abs(NP[i] - Math.max(GEOMETRY.LEAF_PETIOLE_FRACTION * NL[i], NP[i])) > 0) { bad.push(`SN4: node ${i}'s petiole (${NP[i]} mm) is shorter than its own law gives for a ${NL[i]} mm blade`); break; }
+          }
+          if (Array.isArray(L.emittedReachMm) && L.emittedReachMm.length === wantLeaves.length) {
+            let worst = 0, at = -1, got = NaN, exp = NaN;
+            for (let j = 0; j < wantLeaves.length; j++) {
+              const i = wantLeaves[j].nodeIndex, e = NP[i] + NL[i];
+              const d = Math.abs(L.emittedReachMm[j] - e);
+              if (d > worst) { worst = d; at = j; got = L.emittedReachMm[j]; exp = e; }
+            }
+            if (worst > 1e-9) bad.push(`SN4: leaf ${at}'s emitted blade reaches ${Number(got).toFixed(6)} mm along its own axis where the plan builds ${Number(exp).toFixed(6)} (petiole plus the node's built length) — a blade built past its flowering node's cap runs into the floret, and exports as one watertight piece`);
+          } else bad.push(`SN4: the builder reports ${L.emittedReachMm ? L.emittedReachMm.length : 'no'} emitted blade reaches for ${wantLeaves.length} leaves`);
+        }
       }
     }
   }
@@ -6998,7 +7076,11 @@ export async function leafAssertions(page, row) {
      tip) — vacuous on zero leaves, and a `Math.max` of nothing reads -Infinity.
      SN0-SN3 above have already asserted that zero is the right count, and LF1
      that nothing was emitted, so the leaf family stops here. */
-  if (sharedEmpty && L.built === 0) return bad;
+  /* …and a shared node whose every flowering node's length cap left NO blade
+     (a spike: no blade clears a sessile floret) is the same empty case — SN4
+     has asserted those zeros against the caps. */
+  const sharedNoBlade = L.shared === true && Array.isArray(L.nodeLengthsMm) && L.nodeLengthsMm.length > 0 && L.nodeLengthsMm.every((x) => !(x > 0));
+  if ((sharedEmpty || sharedNoBlade) && L.built === 0) return bad;
 
   /* LF6 — THE BLADE CARRIES NO FOOT. Phase A's A1: with the root blend stood
      down the outline is independent of `ring.width` (0 of 4001 samples move),
@@ -7079,8 +7161,14 @@ export async function leafAssertions(page, row) {
     bad.push(`LF9: the builder reports no terminal-clamp record for ${L.built} leaves — the read-out's clamp clause would then be printed from nothing`);
   } else {
     const a = LEAF_BASE_TAPER, b = LEAF_TIP_TAPER, uPk = a / (a + b);
-    const halfW = Number(ui.leafWidth) / 2, lengthMm = Number(ui.leafLength);
+    const halfW = Number(ui.leafWidth) / 2;
+    /* each emitted leaf's own length: the control's, or — on a raceme — its
+       flowering node's built length (SN4 holds that against the cap) */
+    const lens = L.nodeLengthsMm
+      ? L.azimuths.flatMap((a, k) => (L.nodeLengthsMm[k] > 0 ? a.map(() => L.nodeLengthsMm[k]) : []))
+      : null;
     for (let i = 0; i < L.built; i++) {
+      const lengthMm = lens ? lens[i] : Number(ui.leafLength);
       const rows = L.rowHalfBaseMm[i], NU_ = rows.length - 1, cl = L.tipClamp[i];
       /* (b) the exponent off the rows. `hb` is `max(profile, TIP_HALF_MM)`, so
          only rows strictly above the floor carry the law. */
@@ -12016,7 +12104,13 @@ export function buildMatrix() {
   nodeLaw('SHARED NODE — a raceme with a leaf under every pedicel', { ...RAC, leafLength: 40 });
   nodeLaw('SHARED NODE x opposite', { ...RAC, leafLength: 40, floretPhyllotaxy: 'opposite' });
   nodeLaw('SHARED NODE x whorled', { ...RAC, leafLength: 40, floretPhyllotaxy: 'whorled' });
-  nodeLaw('SHARED NODE x a spike (a leaf under every sessile floret)', { ...RAC, leafLength: 40, pedicelLength: 0 });
+  nodeLaw('SHARED NODE x a spike (NO blade clears a sessile floret — every node carries none, told)', { ...RAC, leafLength: 40, pedicelLength: 0 });
+  /* THE LEAF LENGTH AT A FLOWERING NODE (Eva's change 2) — SN4's witnesses:
+     a cap per pedicel length (the gradient grades the caps), and a short
+     pedicel whose cap leaves a blade only a couple of millimetres long. The
+     default-length row above is capped too (40 asked, 15.8 built). */
+  nodeLaw('SHARED NODE x gradient 2 (a length cap per pedicel length)', { ...RAC, leafLength: 40, pedicelGradient: 2 });
+  nodeLaw('SHARED NODE x a 5 mm pedicel (CAPPED to a 2.5 mm blade)', { ...RAC, leafLength: 40, pedicelLength: 5 });
   nodeLaw('SHARED NODE x the corymb', { ...RAC, stemLength: 60, leafLength: 30, pedicelCorymb: 'ON' });
   nodeLaw('SHARED NODE x a steeper leaf (60 deg against 35 — the conservative offset)', { ...RAC, leafLength: 40, leafAngle: 60 });
   nodeLaw('SHARED NODE x a vertical pedicel (no offset exists — no leaf built, told)', { ...RAC, leafLength: 40, pedicelAngle: 90 });

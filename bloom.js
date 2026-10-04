@@ -1654,8 +1654,22 @@ function leafLine(leaf, leavesBuilt) {
   const sn = leaf.shared && leaf.sharedNode;
   const sharedLine = sn
     ? `\n     SHARED NODE one leaf under each pedicel, at the pedicel's own azimuth, seated ${Number.isFinite(sn.offsetMm) ? `${sn.offsetMm.toFixed(2)} mm` : 'INFINITELY'} below it`
-      + ` (two rod radii and the ${MIN_FEATURE_MM.toFixed(2)} mm gap, over the steeper rod's cosine) — the leaf's own Nodes and Arrangement are the pedicels'`
+      + ` (the pedicel clears the ${sn.bindsOn === 'blade' ? `leaf BLADE's own top skin — ${sn.bladeReachMm.toFixed(2)} mm of rise over the leaf's axis — which binds over the rods' ${sn.offsetRodMm.toFixed(2)}` : 'two rod radii, which bind over the blade'} by the ${MIN_FEATURE_MM.toFixed(2)} mm gap, over the steeper rod's cosine) — the leaf's own Nodes and Arrangement are the pedicels'`
       + (sn.noRoom ? ` — ${sn.noRoom} of ${sn.pedicelNodes} pedicel node${sn.pedicelNodes === 1 ? '' : 's'} carry NO leaf: seated that far below, the leaf would run off the stem's end (told, never refused)` : '')
+    : '';
+  /* THE LEAF LENGTH AT A FLOWERING NODE (Eva's change 2): the slider keeps
+     the ASKED length and this says what each node BUILT — TUBE's snap shape,
+     read off the plan's own per-node record, never re-derived here. */
+  const lc = leaf.lengthCap;
+  const capLine = lc && lc.capped
+    ? (() => {
+      const built = lc.lengthsMm.filter((x) => x > 0);
+      const uniq = [...new Set(built.map((x) => x.toFixed(2)))];
+      const what = uniq.length === 1 ? `${uniq[0]} mm` : `${Math.min(...built).toFixed(2)}-${Math.max(...built).toFixed(2)} mm`;
+      return `\n     LEAF LENGTH asked ${leaf.lengthMm} mm, BUILT ${built.length ? what : 'none'} at ${lc.capped - lc.noBlade} of ${lc.lengthsMm.length} flowering node${lc.lengthsMm.length === 1 ? '' : 's'} — the length that clears each node's own floret by ${MIN_FEATURE_MM.toFixed(2)} mm (the slider keeps ${leaf.lengthMm})`
+        + (lc.noBlade ? ` — ${lc.noBlade} node${lc.noBlade === 1 ? '' : 's'} build NO leaf: no blade ${MIN_FEATURE_MM.toFixed(2)} mm long clears the floret there (told, never refused)` : '')
+        + (lc.behind ? ` — ${lc.behind} floret vert${lc.behind === 1 ? 'ex stands' : 'ices stand'} within the gap of the petiole itself, which no length moves` : '');
+    })()
     : '';
   if (sn && !leaf.nodeDepthsMm.length) return `\n     LEAVES none built${sharedLine}\n`;
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node)`
@@ -1671,7 +1685,7 @@ function leafLine(leaf, leavesBuilt) {
     + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
     + (leaf.teethAsked !== undefined && leaf.teethBuilt !== undefined && leaf.teethBuilt < leaf.teethAsked
         ? `\n     TEETH CLAMPED ${leaf.teethAsked} -> ${leaf.teethBuilt} a margin — the cut law's own ceiling on a blade this size (told, never refused)` : '')
-    + tipLine + sharedLine
+    + tipLine + sharedLine + capLine
     + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
 }
 
@@ -2483,7 +2497,12 @@ window.__bloomMetrics = () => ({
     slenderness: lastLeaf.slenderness,
     /* THE SHARED NODE (SN0-SN3): the plan's own flag and record. */
     shared: lastLeaf.shared === true,
-    sharedNode: lastLeaf.sharedNode ? { ...lastLeaf.sharedNode, pedicelDepthsMm: lastLeaf.sharedNode.pedicelDepthsMm.slice() } : null,
+    sharedNode: lastLeaf.sharedNode ? (({ bladeP, ...rest }) => ({ ...rest, pedicelDepthsMm: rest.pedicelDepthsMm.slice() }))(lastLeaf.sharedNode) : null,
+    /* THE LEAF LENGTH AT A FLOWERING NODE (SN4): each node's built length and
+       petiole, and the cap's record — null off a raceme. */
+    nodeLengthsMm: lastLeaf.nodeLengthsMm ? lastLeaf.nodeLengthsMm.slice() : null,
+    nodePetioleLenMm: lastLeaf.nodePetioleLenMm ? lastLeaf.nodePetioleLenMm.slice() : null,
+    lengthCap: lastLeaf.lengthCap ? { ...lastLeaf.lengthCap, capsMm: lastLeaf.lengthCap.capsMm.map((x) => (Number.isFinite(x) ? x : null)), lengthsMm: lastLeaf.lengthCap.lengthsMm.slice() } : null,
     /* THE TIP (LF9): the exponent the PLAN declares, the half-widths the BLADE
        was built from, and the terminal-clamp record the read-out prints. */
     tipShape: lastLeaf.tipShape,
@@ -2492,6 +2511,7 @@ window.__bloomMetrics = () => ({
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
     crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),
+    emittedReachMm: (lastLeavesBuilt || []).map((r) => r.emittedReachMm),
     /* ST9's measured side — the axis of the rod each leaf's builder actually
        emitted. A petiole is rooted THROUGH the stem's wall, so it stands
        inside the free stem's own cylinder by design; ST9 reads these to tell

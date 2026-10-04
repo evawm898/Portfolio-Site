@@ -193,6 +193,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     const lfPlan = mod.leafPlan(ui, stPlan, accST, inPlan);
     if (lfPlan.present) {
       for (let i = 0; i < lfPlan.azimuths.length; i++) {
+        if (lfPlan.nodeLengthsMm && !(lfPlan.nodeLengthsMm[i] > 0)) continue;   // the cap left no blade (the plan says so)
         for (const az of lfPlan.azimuths[i]) mod.buildLeafInto(accST, lfPlan, ui, i, az);
       }
     }
