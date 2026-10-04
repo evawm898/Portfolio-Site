@@ -2131,3 +2131,13 @@ edge inset, like the root's retries) is a separate change.
 Gate: LB1–LB6 (tools/verify-bug-library.mjs) plus 31 built rows ("library: ..."); the negative
 control adds seven code mutants of bug-geometry.js and one data mutant. Sheet:
 `node tools/shot-bug-wing-library.mjs <dir>`.
+
+### 13.5 Adding shapes to the library
+
+`node tools/bug-wing-library-fit.mjs --add` fits every sheet in the gitignored
+`tools/bug-wing-sources/`, dedupes each fit against the CURRENT library (every entry applied to
+the default bug, the same Hausdorff and 3% bar as step 1) and then within the batch in reading
+order, and writes the step-2 exploded sheet to `out-add/`, survivors numbered on from the
+library's last id; a fit under the floor at 0.6 mm is re-fitted at the nearest tolerance that
+clears it, and still flagged (red row) when none does. Existing ids never change: kept shapes are
+APPENDED to `bug-wing-library.js` after Eva's keep / drop list.

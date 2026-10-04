@@ -36,7 +36,11 @@ const SRC = path.join(ROOT, 'tools/bug-wing-sources');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const KEPT = args.includes('--kept');   // only Eva's kept 17 (step 2): the exploded sheet
-const OUT = path.resolve(opt('--out', path.join(SRC, KEPT ? 'out-kept' : 'out')));
+/* --add: a NEW batch for the shipped library (§13.5). Every sheet is fitted, deduped
+   against the CURRENT library (bug-wing-library.js) as well as within the batch, and
+   numbered on from the library's last id, on the step-2 exploded sheet. */
+const ADD = args.includes('--add');
+const OUT = path.resolve(opt('--out', path.join(SRC, KEPT ? 'out-kept' : ADD ? 'out-add' : 'out')));
 fs.mkdirSync(OUT, { recursive: true });
 
 export const SPLIT_LUM = 215;        // darker than this is "butterfly" for the split only (the fit does its own Otsu)
@@ -198,7 +202,7 @@ async function main() {
       // default 0.6 mm tolerance) is re-fitted at the nearest tolerance that clears
       // it, and the sheet says so — the shape is never widened by hand
       let tolUsed = 0.6;
-      if (KEPT && r.ok && G.buildBug(r.params).floorViolations.length) {
+      if ((KEPT || ADD) && r.ok && G.buildBug(r.params).floorViolations.length) {
         for (const tol of [0.45, 0.8, 0.35, 1.0, 0.25, 1.3]) {
           const r2 = imageToBug(input === 'silhouette' ? c.sil : c.img, base, { toleranceMm: tol });
           if (r2.ok && !G.buildBug(r2.params).floorViolations.length) { r = r2; tolUsed = tol; break; }
@@ -229,6 +233,7 @@ async function main() {
   // dedupe: applied to the default bug, Hausdorff over the right-wing boundary, / wingspan
   const ok = cands.filter((c) => c.ok);
   if (KEPT) return keptSheet(cands, base);
+  if (ADD) return addSheet(cands, base);
   const span = 2 * Math.max(...rightWingBoundary(base).map((q) => q[0]));
   const bounds = ok.map((c) => rightWingBoundary(applyRecord(base, c.record)));
   const D = ok.map(() => ok.map(() => 0));
@@ -288,9 +293,9 @@ ${cands.map(cell).join('\n')}`;
 
 /* STEP 2 — the kept 17, re-fitted (complete wings, the blended root): source |
    EXPLODED (each wing alone, side by side, its own closed outline) | assembled. */
-async function keptSheet(cands, base) {
+async function keptSheet(cands, base, page = null) {
   const was = (name) => { const n = +name.split('#')[1]; return n < 17 ? n : n - 1; };   // the step-1 sheet's numbers (sheet-1#17 was the duplicate)
-  let num = 0; for (const c of cands) if (c.ok) c.num = ++num;
+  if (!page) { let num = 0; for (const c of cands) if (c.ok) c.num = ++num; }
   const exploded = (c) => {
     const W = c.wings, gap = 4, boxes = W.map((P) => { const xs = P.map((q) => q[0]), ys = P.map((q) => q[1]); return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]; });
     let x = 0; const placed = W.map((P, k) => { const b = boxes[k], dx = x - b[0]; x += b[1] - b[0] + gap; return P.map(([u, w]) => [u + dx, w]); });
@@ -302,9 +307,10 @@ async function keptSheet(cands, base) {
   const row = (c) => {
     const src = `<img src="data:image/png;base64,${c.cropPng}">`;
     if (!c.ok) return `<div class="row"><div class="n">—</div><div class="c">${src}</div><div class="c msg">REFUSED: ${esc(c.reason)}</div><div class="c"></div><div class="meta">${esc(c.name)}</div></div>`;
+    if (page && c.dupOf) return `<div class="row isdup"><div class="n dup">dup<br><small>of ${esc(c.dupOf)}</small></div><div class="c">${src}</div><div class="c wide">${exploded(c)}</div><div class="c svg">${c.svg.replace(/<\?xml[^>]*>/, '').replace(/width="[^"]*"/, '').replace(/height="[^"]*"/, '')}</div><div class="meta">${esc(c.name)} · DUPLICATE of ${esc(c.dupOf)} — shape distance ${c.dupMm} mm (${c.dupPct}% of the wingspan, under the ${DEDUPE_FRAC * 100}% bar)</div></div>`;
     const svg = c.svg.replace(/<\?xml[^>]*>/, '').replace(/width="[^"]*"/, '').replace(/height="[^"]*"/, '');
-    const meta = `${esc(c.name)} (step-1 #${was(c.name)}) · points ${c.fit.map((q) => q.points).join(' / ')} · max dev ${c.fit.map((q) => q.maxDevMm).join(' / ')} mm · tail ${c.record.tail ? c.record.tail.points.length + ' pts (a TAIL group)' : 'none'} · J: ${c.smooth.join(' / ')}${c.tolUsed !== 0.6 ? ` · <b>fitted at ${c.tolUsed} mm</b> (at 0.6 mm an outline fell under the floor)` : ''}<br>never seen in the picture, completed as a smooth curve — fore: ${esc(c.bridged[0])}; hind: ${esc(c.bridged[1] || '—')}${c.floor.length ? '<br><b>under the floor: ' + c.floor.join(', ') + '</b>' : ''}${[...c.notes, ...c.modelNotes].length ? '<br><span class="note">' + [...c.notes, ...c.modelNotes].map(esc).join('<br>') + '</span>' : ''}`;
-    return `<div class="row"><div class="n">#${c.num}</div><div class="c">${src}</div><div class="c wide">${exploded(c)}</div><div class="c svg">${svg}</div><div class="meta">${meta}</div></div>`;
+    const meta = `${esc(c.name)}${page ? ` · nearest library shape #${c.nearLib.id} at ${c.nearLib.mm} mm (${c.nearLib.pct}%)${c.nearNew ? ` · nearest in this batch ${esc(c.nearNew.name)} at ${c.nearNew.mm} mm (${c.nearNew.pct}%)` : ''}` : ` (step-1 #${was(c.name)})`} · points ${c.fit.map((q) => q.points).join(' / ')} · max dev ${c.fit.map((q) => q.maxDevMm).join(' / ')} mm · tail ${c.record.tail ? c.record.tail.points.length + ' pts (a TAIL group)' : 'none'} · J: ${c.smooth.join(' / ')}${c.tolUsed !== 0.6 ? ` · <b>fitted at ${c.tolUsed} mm</b> (at 0.6 mm an outline fell under the floor)` : ''}<br>never seen in the picture, completed as a smooth curve — fore: ${esc(c.bridged[0])}; hind: ${esc(c.bridged[1] || '—')}${c.floor.length ? '<br><b>under the floor: ' + c.floor.join(', ') + '</b>' : ''}${[...c.notes, ...c.modelNotes].length ? '<br><span class="note">' + [...c.notes, ...c.modelNotes].map(esc).join('<br>') + '</span>' : ''}`;
+    return `<div class="row${c.floor.length ? ' floor' : ''}"><div class="n">#${c.num}${c.floor.length ? '<br><small class="fl">FLOOR</small>' : ''}</div><div class="c">${src}</div><div class="c wide">${exploded(c)}</div><div class="c svg">${svg}</div><div class="meta">${meta}</div></div>`;
   };
   const html = `<!doctype html><meta charset="utf-8"><title>wing library — kept 17, exploded</title><style>
 body{font:12px/1.35 ui-monospace,monospace;background:#f4f3ee;color:#111;margin:16px;width:1180px}
@@ -313,15 +319,52 @@ h1{font-size:16px;margin:0 0 4px} .sum{margin:0 0 12px;max-width:1140px}
 .c{height:240px;display:flex;align-items:center;justify-content:center;background:#fff}
 .c img{max-width:100%;max-height:100%} .c svg{width:100%;height:100%}
 .n{font-size:20px;font-weight:bold;text-align:center} .meta{font-size:10.5px} .note{color:#7a4b00} .msg{color:#a00}
-.hdr{font-weight:bold;border:0}
-</style><h1>Wing-shape library — the kept 17, re-fitted (step 2, for Eva's ruling on the EXPLODED column)</h1>
-<p class="sum">Each wing is fitted as a COMPLETE shape: what the picture never showed (the split line between fore- and hindwing, the band the hindwing is tucked under, the run along the body) is replaced by a smooth curve tangent to the margin that was seen. Every wing then leaves the body through the BLENDED ROOT (default width 1.6 mm, fillet 0.9 mm). EXPLODED: each wing alone, in its own planform frame (span to the right, its root at the left), as the model builds it — the short edge at its left end is the root, inside the body.</p>
+.hdr{font-weight:bold;border:0} .isdup{opacity:.5} .dup{color:#888;font-size:13px} .fl{color:#b00;font-size:11px} .floor{background:#fbe9e9}
+</style>${page ? page.head : `<h1>Wing-shape library — the kept 17, re-fitted (step 2, for Eva's ruling on the EXPLODED column)</h1>
+<p class="sum">Each wing is fitted as a COMPLETE shape: what the picture never showed (the split line between fore- and hindwing, the band the hindwing is tucked under, the run along the body) is replaced by a smooth curve tangent to the margin that was seen. Every wing then leaves the body through the BLENDED ROOT (default width 1.6 mm, fillet 0.9 mm). EXPLODED: each wing alone, in its own planform frame (span to the right, its root at the left), as the model builds it — the short edge at its left end is the root, inside the body.</p>`}
 <div class="row hdr"><div>#</div><div>source</div><div>exploded — forewing (left) | hindwing (right)</div><div>assembled SVG</div><div>notes</div></div>
 ${cands.map(row).join('\n')}`;
   fs.writeFileSync(path.join(OUT, 'contact.html'), html);
-  fs.writeFileSync(path.join(OUT, 'candidates.json'), JSON.stringify(cands.map(({ cropPng, svg, overlay, ...rest }) => rest), null, 1));
+  fs.writeFileSync(path.join(OUT, 'candidates.json'), JSON.stringify(page ? { summary: page.summary, candidates: cands.map(({ cropPng, svg, overlay, ...rest }) => rest) } : cands.map(({ cropPng, svg, overlay, ...rest }) => rest), null, 1));
   await screenshot();
 }
+
+/* --add: dedupe against the CURRENT library first (an entry applied the way the
+   page applies it is measured by the same Hausdorff), then within the batch in
+   reading order; survivors numbered on from the library's last id. The assembled
+   SVG is the default bug, so its root is the current default root. */
+async function addSheet(cands, base) {
+  const lib = G.WING_LIBRARY;
+  const span = 2 * Math.max(...rightWingBoundary(base).map((q) => q[0]));
+  const pct = (d) => +(100 * d).toFixed(1), mm = (d) => +(d * span).toFixed(2);
+  const libB = lib.map((s) => rightWingBoundary(applyRecord(base, s)));
+  const ok = cands.filter((c) => c.ok), B = ok.map((c) => rightWingBoundary(applyRecord(base, c.record)));
+  ok.forEach((c, a) => {
+    let best = null; libB.forEach((L, k) => { const d = hausdorff(B[a], L) / span; if (!best || d < best.d) best = { d, id: lib[k].id }; });
+    c.nearLib = { id: best.id, mm: mm(best.d), pct: pct(best.d) };
+    if (best.d < DEDUPE_FRAC) { c.dupOf = `library #${best.id}`; c.dupMm = mm(best.d); c.dupPct = pct(best.d); }
+  });
+  const D = ok.map(() => ok.map(() => 0));
+  for (let a = 0; a < ok.length; a++) for (let b = a + 1; b < ok.length; b++) D[a][b] = D[b][a] = hausdorff(B[a], B[b]) / span;
+  for (let b = 0; b < ok.length; b++) {
+    let n = null; ok.forEach((d, a) => { if (a !== b && (!n || D[a][b] < n.d)) n = { d: D[a][b], name: d.name }; });
+    if (n) ok[b].nearNew = { name: n.name, mm: mm(n.d), pct: pct(n.d) };
+    if (ok[b].dupOf) continue;
+    for (let a = 0; a < b; a++) if (!ok[a].dupOf && D[a][b] < DEDUPE_FRAC) { ok[b].dupOf = ok[a].name; ok[b].dupMm = mm(D[a][b]); ok[b].dupPct = pct(D[a][b]); break; }
+  }
+  let num = Math.max(...lib.map((s) => s.id));
+  for (const c of cands) if (c.ok && !c.dupOf) c.num = ++num;
+  for (const c of ok) if (c.dupOf && !c.dupOf.startsWith('library')) c.dupOf = `#${ok.find((d) => d.name === c.dupOf).num} (${c.dupOf})`;
+  const dupLib = ok.filter((c) => c.dupOf && c.dupOf.startsWith('library')), dupNew = ok.filter((c) => c.dupOf && !c.dupOf.startsWith('library'));
+  const surv = ok.filter((c) => !c.dupOf), under = surv.filter((c) => c.floor.length);
+  const sheets = [...new Set(cands.map((c) => c.sheet))];
+  const summary = { sheets, found: cands.length, fitted: ok.length, refused: cands.filter((c) => !c.ok).map((c) => `${c.name}: ${c.reason}`), duplicatesOfLibrary: dupLib.map((c) => `${c.name} = ${c.dupOf} (${c.dupMm} mm)`), duplicatesInBatch: dupNew.map((c) => `${c.name} = ${c.dupOf} (${c.dupMm} mm)`), survivors: surv.map((c) => `#${c.num} ${c.name}`), underFloor: under.map((c) => `#${c.num}: ${c.floor.join(', ')}`), refittedAt: surv.filter((c) => c.tolUsed !== 0.6).map((c) => `#${c.num} at ${c.tolUsed} mm`), dedupe: `Hausdorff between applied shapes' right-wing silhouettes on the default bug (wingspan ${span.toFixed(1)} mm), duplicate under ${DEDUPE_FRAC * 100}% (${(DEDUPE_FRAC * span).toFixed(2)} mm), against the ${lib.length}-shape library and within this batch` };
+  console.log(JSON.stringify(summary, null, 1));
+  const head = `<h1>Wing-shape library — new batch, numbered on from #${lib.length} (for Eva's keep / drop list)</h1>
+<p class="sum">${sheets.join(', ')}: <b>${cands.length}</b> found · <b>${ok.length}</b> fitted · ${cands.length - ok.length} refused · <b>${dupLib.length}</b> duplicates of library shapes · ${dupNew.length} duplicates within the batch · <b>${surv.length} numbered survivors (#${lib.length + 1}–#${num})</b> · ${under.length} under the floor${under.length ? ' (red rows)' : ''}.<br>Near-identical = ${esc(summary.dedupe)}. Duplicates are shown greyed, unnumbered.<br>Columns: source crop | EXPLODED — forewing (left) | hindwing (right), each alone in its own planform frame as the model builds it (the short left edge is the root, inside the body) | the assembled bug's SVG with the CURRENT default root (pinch ${base.wingRootPinch}). Fit: the shipped image → bug fitter, default bug, 72 mm, 0.6 mm tolerance (re-fitted at the nearest tolerance that clears the floor when 0.6 does not, said per row).</p>`;
+  return keptSheet(cands, base, { head, summary });
+}
+
 async function screenshot() {
   try {
     const { chromium } = await import('playwright-core');
