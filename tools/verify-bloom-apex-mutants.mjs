@@ -1496,8 +1496,8 @@ const MUTANTS = [
         : `the mutant's blade rows ${m.rowsDiffer(c) ? 'differ' : 'AGREE'} with the clean tree's at 0.60 (plan says ${m.plan.tipShape} / ${c.plan.tipShape}) — the behaviour did not move`; } },
 
   { id: 'leaf-clamp-record-lies', why: 'the clamp record places the terminal at the widest point, so the read-out prints a stub covering the whole tip on every leaf; the blade itself is untouched, so only the biconditional against its rows can see it',
-    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * plan.lengthMm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };',
-    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * plan.lengthMm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };', names: ['LF9'],
+    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };',
+    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };', names: ['LF9'],
     witness: (M, C) => { const m = leafFacts(M, 1.3), c = leafFacts(C, 1.3);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.clamp.fromU < c.clamp.fromU - 0.1 && !m.rowsDiffer(c)) ? null
