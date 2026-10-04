@@ -30,7 +30,7 @@ condition. None was loosened. The byte tool's end-face clause, whose subject was
 all at one height", is re-derived onto the cut face's own projection and a point-to-face
 distance (§4f).
 
-**Scope, measured:** ⟨LIVE_MOVERS⟩ of 1,102 live rows move in both modes (§6); ⟨FROZEN_TAGS⟩
+**Scope, measured:** 161 of 1,102 live rows move in both modes (§6); ⟨FROZEN_TAGS⟩
 frozen tags' bytes stop reproducing over ⟨FROZEN_ROWS⟩ rows (§7); block 48 adds 13 rows
 (1,089 → 1,102); `frozen/phase52` is the 1,089 rows at `23b13bd`.
 
@@ -43,7 +43,7 @@ frozen tags' bytes stop reproducing over ⟨FROZEN_ROWS⟩ rows (§7); block 48 
   predicate 156 of 1,089 carry a stem: the 114 the brief names, plus the 33 raceme rows #353
   added (a raceme's rachis is a stem) and 9 of session 2's block 47. On `phase50` the same
   predicate reads exactly 114 of 1,047, which is the brief's figure reproduced. By the CUT's
-  own guard (stem present AND the cut made) the live count is ⟨LIVE_MOVERS⟩ of 1,102 — §6
+  own guard (stem present AND the cut made) the live count is 161 of 1,102 — §6
   has the partition. This was reported before building rather than treated as a material
   difference: the extra rows are the ones the brief's denominator predates.
 - **The frozen figure is likewise a count by "stem present" over the tags that existed then.**
@@ -305,7 +305,14 @@ stem-cut`, the whole 1,102-row matrix in both modes, positionally under `Object.
 40-row chunks and merged. The mover predicate is the GUARD — `stemPlan(...).present &&
 plan.cut.made`, read on the row's own plan — never a label.
 
-⟨PARTITION⟩
+**PASS — 161 of 161 predeclared movers MOVED and 0 floats moved on the 941 holders**,
+positionally under `Object.is`, over **1,131,655,608 export floats / 125,739,512 triangles and
+81,974,322 captured-grid values over 9,445 panels** (merged from 28 chunks of 40 rows, two of
+which were re-run after the box's background limit killed the loop mid-chunk; every chunk's
+census is in the merge). The 161 are `phase52`'s 151 plus the 10 cut rows of block 48; the
+FLAT holder, the 1 mm GATED row and the FLAT x RACEME row are holders by construction and
+measured as such, as are the shipping default (no stem) and every pedicel. `--control` over
+block 48: ⟨SB_CONTROL⟩.
 
 ## 7. The frozen sweep
 
