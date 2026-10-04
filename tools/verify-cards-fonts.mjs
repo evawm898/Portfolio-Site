@@ -156,7 +156,7 @@ for (const [url, file] of Object.entries(CDN_LOCAL)) {
 // evaluating, so window.__harnessReady below is the only honest signal.
 const HARNESS_JS = `
 import { resolveFont, ensureFontLoaded } from '/cards/font-manager.js';
-import { renderCardToCanvas, getCourtPlateRect, DEFAULT_STYLE } from '/cards/card-template.js';
+import { renderCardToCanvas, getCourtPlateRect, getPipLayout, DEFAULT_STYLE } from '/cards/card-template.js';
 import { getSafeRect } from '/cards/deck-builder.js';
 
 // Render one card and hand back its raw RGBA. \`awaitFont\` is the parameter
@@ -220,7 +220,9 @@ window.__renderStyledRGBA = async (spec, styleOverrides, { awaitFont = true } = 
   return {
     width: canvas.width,
     height: canvas.height,
-    data: Array.from(d.data),
+    // base64, not Array.from(): 3.7M numbers through JSON made every render
+    // seconds long, and the Layout sweep renders hundreds of cards.
+    b64: (() => { const u = d.data; let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); })(),
     plate: getCourtPlateRect(getSafeRect(), style),
     safe: getSafeRect(),
   };
@@ -254,6 +256,10 @@ window.__previewRGBA = (index) => {
   const d = c.getContext('2d').getImageData(0, 0, c.width, c.height);
   return { width: c.width, height: c.height, data: Array.from(d.data) };
 };
+
+// The page's own claim about where a number rank's pips are (after spread,
+// margin and the safe-area clamp) — what the exported file's pixels are held to.
+window.__pipLayout = (rank, ov) => getPipLayout(rank, { ...DEFAULT_STYLE, ...window.__cards.getStyle(), ...ov });
 
 window.__harnessReady = true;
 `;
@@ -476,7 +482,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') pageErrors.push('console: ' + m.text()); });
 
 await page.goto(`${BASE}/cards.html`, { waitUntil: 'load', timeout: 30000 });
-await page.waitForFunction(() => window.__cards && document.querySelectorAll('#previewGrid canvas').length === 8, null, { timeout: 20000 });
+await page.waitForFunction(() => window.__cards && document.querySelectorAll('#previewGrid canvas').length === 12, null, { timeout: 20000 });
 
 // ---------------------------------------------------------------------
 // Shared page helpers, installed once.
@@ -538,11 +544,11 @@ section('2. Disclosure — the panel collapses without disconnecting anything');
 // declared but no longer drives a rebuild once its section is folded away.
 const sections = await page.$$eval('details.cd-panel__section', (els) =>
   els.map((e) => ({ id: e.id, open: e.open, summary: e.querySelector('summary').textContent.trim() })));
-check(sections.length === 6, `all 6 numbered sections are <details> (${sections.map((x) => x.id).join(', ')})`);
+check(sections.length === 7, `all 7 numbered sections are <details> (${sections.map((x) => x.id).join(', ')})`);
 check(sections.every((x) => /^\d\d/.test(x.summary)),
   `every summary keeps its numbered label (${sections.map((x) => x.summary).join(' | ')})`);
 const openIds = sections.filter((x) => x.open).map((x) => x.id).join(',');
-check(openIds === 'section-01,section-02,section-05',
+check(openIds === 'section-01,section-02,section-06',
   `default-open set is the two short setup sections plus Export — got "${openIds}"`);
 
 // The font picker is its OWN section now, not a field buried in Style — the
@@ -550,6 +556,10 @@ check(openIds === 'section-01,section-02,section-05',
 // separately.
 check(sections[2].summary.startsWith('03Font'), `03 is the Font section (summary "${sections[2].summary}")`);
 check(sections[3].summary.startsWith('04Style'), `04 is Style (summary "${sections[3].summary}")`);
+check(sections[4].summary.startsWith('05Layout') && sections[5].summary.startsWith('06Export') && sections[6].summary.startsWith('07Print Spec'),
+  `05 is Layout and Export / Print Spec renumbered to 06 / 07 (${sections.slice(4).map((x) => x.summary).join(' | ')})`);
+check(await page.$eval('#section-05 #layoutPipSpreadX', (e) => Boolean(e)) && await page.$eval('#section-06 #btnExportPdf', (e) => Boolean(e)),
+  'the layout sliders live inside 05 Layout and the export buttons inside 06');
 check(await page.$eval('#section-03 #fontList', (e) => Boolean(e)), 'the font list lives inside 03 Font');
 check(await page.$eval('#section-04 #styleCourtPlateScale', (e) => Boolean(e)), 'the sliders live inside 04 Style');
 
@@ -674,7 +684,7 @@ await page.waitForTimeout(200);
   await page.evaluate(() => {
     window.scrollTo(0, 0);
     for (const d of document.querySelectorAll('details.cd-panel__section')) {
-      d.open = ['section-01', 'section-02', 'section-05'].includes(d.id);
+      d.open = ['section-01', 'section-02', 'section-06'].includes(d.id);
     }
   });
   await page.waitForTimeout(300);
@@ -899,7 +909,8 @@ section('6. Court letter centring — measured on the letter\'s own ink');
 
 async function renderStyled(spec, overrides) {
   const r = await page.evaluate(([sp, ov]) => window.__renderStyledRGBA(sp, ov), [spec, overrides || {}]);
-  return { ...r, buf: Buffer.from(r.data) };
+  const { b64, ...rest } = r;
+  return { ...rest, buf: Buffer.from(b64, 'base64') };
 }
 
 // Centring, measured — and measured on the WHOLE letter, including the parts
@@ -1089,6 +1100,218 @@ section('8. Court plate scale — the box moves, the letter does not');
     `at plate 150% x glyph 150% all ink stays inside the safe rect (ink y ${box.minY}..${box.maxY}, safe ${r.safe.y}..${(r.safe.y + r.safe.h).toFixed(0)})`);
 }
 
+
+// ---------------------------------------------------------------------
+section('8b. Layout — number-card controls (flip, scales, spread, presets), ranks 7-10 at the extremes');
+// ---------------------------------------------------------------------
+// Pixel instrument: ink connected components. A flood fill over non-white
+// pixels in a sub-rect, 4-connected. Independent of the page's layout code, so
+// "how many pips" and "where" are read off the pixels, never off the geometry
+// that drew them.
+function inkComponents(rgba, width, x0, y0, x1, y1, minPx = 60) {
+  const w = Math.ceil(x1) - Math.floor(x0), h = Math.ceil(y1) - Math.floor(y0);
+  const seen = new Uint8Array(w * h);
+  const isInk = (x, y) => {
+    const i = ((y + Math.floor(y0)) * width + (x + Math.floor(x0))) * 4;
+    return (rgba[i] * 299 + rgba[i + 1] * 587 + rgba[i + 2] * 114) / 1000 < 200;
+  };
+  const comps = [];
+  for (let sy = 0; sy < h; sy++) for (let sx = 0; sx < w; sx++) {
+    if (seen[sy * w + sx] || !isInk(sx, sy)) continue;
+    const stack = [[sx, sy]]; seen[sy * w + sx] = 1;
+    let n = 0, minX = 1e9, maxX = -1, minY = 1e9, maxY = -1;
+    while (stack.length) {
+      const [x, y] = stack.pop(); n++;
+      if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h || seen[ny * w + nx] || !isInk(nx, ny)) continue;
+        seen[ny * w + nx] = 1; stack.push([nx, ny]);
+      }
+    }
+    if (n >= minPx) comps.push({ n, minX: minX + Math.floor(x0), maxX: maxX + Math.floor(x0), minY: minY + Math.floor(y0), maxY: maxY + Math.floor(y0) });
+  }
+  return comps;
+}
+// Mean absolute luma difference between two same-size crops, optionally with
+// the second rotated 180 degrees. 0 = identical.
+function cropDiff(a, aw, ab, b, bw, bb, rotate) {
+  // Two boxes of the same glyph can differ by a pixel where antialiasing
+  // crosses the ink threshold, so compare over the larger of the two, each
+  // centred on its own box (and the second mirrored through its centre when
+  // rotating) rather than demanding identical bounding boxes.
+  const W = Math.max(ab.maxX - ab.minX, bb.maxX - bb.minX) + 3, H = Math.max(ab.maxY - ab.minY, bb.maxY - bb.minY) + 3;
+  const ax = (ab.minX + ab.maxX) / 2, ay = (ab.minY + ab.maxY) / 2, bx = (bb.minX + bb.maxX) / 2, by = (bb.minY + bb.maxY) / 2;
+  const L = (buf, bwid, x, y) => { const i = (Math.round(y) * bwid + Math.round(x)) * 4; return (buf[i] * 299 + buf[i + 1] * 587 + buf[i + 2] * 114) / 1000; };
+  let sum = 0;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = x - (W - 1) / 2, dy = y - (H - 1) / 2;
+    sum += Math.abs(L(a, aw, ax + dx, ay + dy) - L(b, bw, rotate ? bx - dx : bx + dx, rotate ? by - dy : by + dy));
+  }
+  return sum / (W * H);
+}
+// The card's pip field: everything between the two corner clusters. Corner
+// indices live in the outer 0.34 of the safe width at the top-left / bottom-
+// right, so the middle band between them holds only pips on a 2-10.
+const mid = (r) => [r.safe.x + 0.15 * r.safe.w, r.safe.y, r.safe.x + 0.85 * r.safe.w, r.safe.y + r.safe.h];
+// The ink component containing a point — how a glyph is picked out of the card
+// without trusting its sort position (a corner glyph can sort first).
+const compAt = (comps, x, y) => comps.find((c) => x >= c.minX && x <= c.maxX && y >= c.minY && y <= c.maxY);
+
+// --- defaults reproduce the pre-Layout card exactly -------------------
+{
+  const defaults = await page.evaluate(() => window.__cards.getStyle());
+  check(defaults.invertBottomPips === true && defaults.pipScale === 1 && defaults.aceScale === 1
+    && defaults.cornerGlyphScale === 1 && defaults.pipSpreadX === 1 && defaults.pipMarginPct === 16,
+    `all Layout controls read their defaults on load (${JSON.stringify({ f: defaults.invertBottomPips, p: defaults.pipScale, a: defaults.aceScale, c: defaults.cornerGlyphScale, x: defaults.pipSpreadX, y: defaults.pipMarginPct })})`);
+  // The classical layout, restated from the pre-change code's own numbers
+  // (field 0.16/0.68 of the safe height, columns at 0.25 / 0.75, rank-4 rows at
+  // 0.18 / 0.82) so the reference has a different owner from getPipLayout().
+  const r = await renderStyled({ suit: 'spades', rank: '4' }, {});
+  const L = await page.evaluate(() => window.__pipLayout('4', {}));
+  const fieldTop = r.safe.y + r.safe.h * 0.16, fieldH = r.safe.h * 0.68;
+  const want = [[0.25, 0.18], [0.75, 0.18], [0.25, 0.82], [0.75, 0.82]].map(([x, y]) => [r.safe.x + x * r.safe.w, fieldTop + y * fieldH]);
+  const worst = Math.max(...L.pips.map((p, i) => Math.hypot(p.x - want[i][0], p.y - want[i][1])));
+  check(worst < 1e-6, `at the defaults rank 4's pips sit exactly where the classical layout put them (worst ${worst.toExponential(2)} px)`);
+  check(!L.clamped, 'the safe-area clamp does not bind at the defaults');
+}
+
+// --- 1. flip -----------------------------------------------------------
+{
+  const rank = '4';
+  const trad = await renderStyled({ suit: 'spades', rank }, { invertBottomPips: true });
+  const up = await renderStyled({ suit: 'spades', rank }, { invertBottomPips: false });
+  const compsT = inkComponents(trad.buf, trad.width, ...mid(trad)).sort((a, b) => a.minY - b.minY || a.minX - b.minX);
+  const compsU = inkComponents(up.buf, up.width, ...mid(up)).sort((a, b) => a.minY - b.minY || a.minX - b.minX);
+  check(compsT.length === 4 && compsU.length === 4, `rank 4 reads as 4 pips in both modes (traditional ${compsT.length}, upright ${compsU.length})`);
+  if (compsT.length === 4 && compsU.length === 4) {
+    // top-left pip vs bottom-left pip (same column)
+    const [tl, , bl] = compsT, [utl, , ubl] = compsU;
+    const tradRot = cropDiff(trad.buf, trad.width, tl, trad.buf, trad.width, bl, true);
+    const tradPlain = cropDiff(trad.buf, trad.width, tl, trad.buf, trad.width, bl, false);
+    const upPlain = cropDiff(up.buf, up.width, utl, up.buf, up.width, ubl, false);
+    const upRot = cropDiff(up.buf, up.width, utl, up.buf, up.width, ubl, true);
+    check(tradRot < 6 && tradPlain > 20, `traditional: the bottom pip is the top pip turned 180° (diff ${tradRot.toFixed(1)} rotated vs ${tradPlain.toFixed(1)} plain)`);
+    check(upPlain < 6 && upRot > 20, `upright: the bottom pip is the top pip, same way up (diff ${upPlain.toFixed(1)} plain vs ${upRot.toFixed(1)} rotated)`);
+    // Positions do not move with the toggle — it is orientation only.
+    const moved = compsT.reduce((m, c, i) => Math.max(m, Math.abs(c.minX - compsU[i].minX), Math.abs(c.minY - compsU[i].minY)), 0);
+    check(moved <= 1, `the flip changes orientation only — pip boxes moved at most ${moved}px`);
+  }
+}
+
+// --- 2. three independent scales --------------------------------------
+{
+  // Corner measured on a rank 2 (its pips sit on the centre line, clear of the
+  // corner crop); the Ace and the pips are picked out by the restated centre
+  // point they are drawn about, so a corner glyph can never be mistaken for one.
+  const cornerBox = (r) => inkBoxIn(r.buf, r.width, r.safe.x, r.safe.y, r.safe.x + 0.2 * r.safe.w, r.safe.y + 0.3 * r.safe.h);
+  const aceBox = (r) => compAt(inkComponents(r.buf, r.width, ...mid(r)), r.safe.x + r.safe.w / 2, r.safe.y + r.safe.h / 2);
+  const pipBox = (r) => compAt(inkComponents(r.buf, r.width, ...mid(r)), r.safe.x + 0.75 * r.safe.w, r.safe.y + (0.16 + 0.18 * 0.68) * r.safe.h);
+  const h = (b) => (b ? b.maxY - b.minY : -1);
+  const R = (rank, ov) => renderStyled({ suit: 'spades', rank }, ov || {});
+  const base = { A: await R('A'), P: await R('4'), C: await R('2') };
+  for (const [knob, rank, key, measure] of [['pipScale', '4', 'P', pipBox], ['aceScale', 'A', 'A', aceBox], ['cornerGlyphScale', '2', 'C', cornerBox]]) {
+    const big = await R(rank, { [knob]: 1.5 });
+    const small = await R(rank, { [knob]: 0.5 });
+    const hb = h(measure(big)), hs = h(measure(small)), h0 = h(measure(base[key]));
+    check(hs > 0 && hs < h0 && h0 < hb, `${knob} 50% < 100% < 150% moves its own glyph (${hs} < ${h0} < ${hb} px)`);
+  }
+  // Independence: each knob leaves the OTHER two glyphs' sizes alone.
+  const sizes = async (ov) => ({
+    pip: h(pipBox(await R('4', ov))), ace: h(aceBox(await R('A', ov))), corner: h(cornerBox(await R('2', ov))),
+  });
+  const s0 = await sizes({});
+  for (const [knob, moves] of [['aceScale', 'ace'], ['pipScale', 'pip'], ['cornerGlyphScale', 'corner']]) {
+    const s = await sizes({ [knob]: 1.5 });
+    const others = ['pip', 'ace', 'corner'].filter((k) => k !== moves);
+    check(s[moves] > s0[moves] && others.every((k) => s[k] === s0[k]),
+      `${knob} 150% moves only the ${moves} glyph (${moves} ${s0[moves]}→${s[moves]} px; ${others.map((k) => `${k} ${s0[k]}→${s[k]}`).join(', ')})`);
+  }
+  // The old single control now moves the COURT glyphs only.
+  const courtBase = await renderStyled({ suit: 'spades', rank: 'J' }, {});
+  const courtBig = await renderStyled({ suit: 'spades', rank: 'J' }, { glyphScale: 1.5 });
+  const ptBig = await renderStyled({ suit: 'spades', rank: '4' }, { glyphScale: 1.5 });
+  check(Buffer.compare(ptBig.buf, base.P.buf) === 0, 'glyphScale no longer changes a number card');
+  check(Buffer.compare(courtBig.buf, courtBase.buf) !== 0, 'glyphScale still scales the court-card glyphs');
+}
+
+// --- 3. spread: sliders move the pips, and the clamp holds the safe edge ----
+{
+  const wide = await page.evaluate(() => window.__pipLayout('4', { pipSpreadX: 1.2, pipMarginPct: 16 }));
+  const narrow = await page.evaluate(() => window.__pipLayout('4', { pipSpreadX: 0.8, pipMarginPct: 16 }));
+  check(wide.pips[1].x - wide.pips[0].x > narrow.pips[1].x - narrow.pips[0].x, 'column spacing 120% puts the two columns further apart than 80%');
+  const a = await renderStyled({ suit: 'spades', rank: '4' }, { pipSpreadX: 0.8 });
+  const b = await renderStyled({ suit: 'spades', rank: '4' }, { pipSpreadX: 1.2 });
+  const ca = inkComponents(a.buf, a.width, ...mid(a)).sort((p, q) => p.minX - q.minX);
+  const cb = inkComponents(b.buf, b.width, ...mid(b)).sort((p, q) => p.minX - q.minX);
+  const gapA = ca[ca.length - 1].minX - ca[0].minX, gapB = cb[cb.length - 1].minX - cb[0].minX;
+  check(gapB > gapA + 20, `in the pixels, column spacing 120% is ${gapB}px between columns against ${gapA}px at 80%`);
+  const lo = await renderStyled({ suit: 'spades', rank: '4' }, { pipMarginPct: 4 });
+  const hi = await renderStyled({ suit: 'spades', rank: '4' }, { pipMarginPct: 28 });
+  const bl = inkBoxIn(lo.buf, lo.width, ...mid(lo)), bh = inkBoxIn(hi.buf, hi.width, ...mid(hi));
+  check(bl.maxY - bl.minY > bh.maxY - bh.minY + 40, `vertical margin 4% spans ${bl.maxY - bl.minY}px of pips, 28% only ${bh.maxY - bh.minY}px`);
+}
+
+// --- 5. ranks 7, 8, 9, 10 at slider EXTREMES --------------------------
+// Every corner of the slider box: spread {min,max} x margin {min,max} x pip
+// scale {min,max} x flip {on,off} x stretch {narrow,tall}. For each, ALL ink on
+// the card — pips, corner indices — must stay inside the safe rect, which is
+// itself SAFE_MARGIN_IN inside the trim line, and every pip the layout claims
+// must be solid ink at its claimed centre (so 7/8/9/10 pips are really there).
+// Reported, never gated: how many corners need the clamp, and how many have
+// neighbouring pips touching (the extremes of pip scale make that unavoidable
+// on a 10 — the ruling for the clamp was the safe area, not collision).
+{
+  // The safe rect restated from the print spec's own numbers (2.5x3.5 in trim,
+  // 300 DPI, 1/8 in bleed, 3/16 in safe margin), so the bar has a different
+  // owner from getSafeRect(): 38 px of bleed + 56 px of margin on every side.
+  const SAFE = { x: 94, y: 94, w: 825 - 188, h: 1125 - 188 };
+  const probe = await renderStyled({ suit: 'spades', rank: '7' }, {});
+  check(probe.safe.x === SAFE.x && probe.safe.y === SAFE.y && probe.safe.w === SAFE.w && probe.safe.h === SAFE.h,
+    `the page's safe rect is the print spec's (${JSON.stringify(probe.safe)})`);
+  let boxes = 0, clampedCount = 0, overlapCount = 0, worstEdge = Infinity;
+  const failures = [];
+  for (const rank of ['7', '8', '9', '10']) {
+    for (const spread of [0.5, 2]) for (const margin of [0, 30]) for (const scale of [0.5, 1.5]) for (const flip of [true, false]) for (const stretch of [0.5, 2]) {
+      const ov = { pipSpreadX: spread, pipMarginPct: margin, pipScale: scale, invertBottomPips: flip, glyphStretch: stretch, cornerGlyphScale: 1.5, cornerFontScale: 1.5, cornerInsetPct: 2 };
+      const r = await renderStyled({ suit: 'spades', rank }, ov);
+      const L = await page.evaluate(([rk, o]) => window.__pipLayout(rk, o), [rank, ov]);
+      boxes++;
+      if (L.clamped) clampedCount++;
+      const ink = inkBoxIn(r.buf, r.width, 0, 0, r.width, r.height);
+      const edge = Math.min(ink.minX - SAFE.x, SAFE.x + SAFE.w - 1 - ink.maxX, ink.minY - SAFE.y, SAFE.y + SAFE.h - 1 - ink.maxY);
+      worstEdge = Math.min(worstEdge, edge);
+      if (edge < -1) failures.push(`${rank} ${JSON.stringify([spread, margin, scale, flip, stretch])} ink ${edge.toFixed(1)}px past the safe rect`);
+      // Pips present: every claimed centre is ink. A centre pixel of the spade
+      // glyph is inside its body at every rotation and stretch.
+      const idx = (x, y) => (Math.round(y) * r.width + Math.round(x)) * 4;
+      let missing = 0;
+      for (const p of L.pips) { const i = idx(p.x, p.y); if ((r.buf[i] * 299 + r.buf[i + 1] * 587 + r.buf[i + 2] * 114) / 1000 >= 200) missing++; }
+      if (L.pips.length !== Number(rank)) failures.push(`${rank}: layout holds ${L.pips.length} pips`);
+      if (missing) failures.push(`${rank} ${JSON.stringify([spread, margin, scale, flip, stretch])}: ${missing} claimed pip centre(s) are blank in the render`);
+      const comps = inkComponents(r.buf, r.width, ...mid(r));
+      if (comps.length < Number(rank)) overlapCount++;
+    }
+  }
+  check(failures.length === 0, `ranks 7-10 at all ${boxes} slider-extreme corners: no ink outside the safe rect and every pip present${failures.length ? ' — ' + failures.slice(0, 4).join('; ') : ''}`);
+  check(boxes === 4 * 2 * 2 * 2 * 2 * 2, `${boxes} extreme states were actually rendered (4 ranks x 2^5 corners)`);
+  check(worstEdge >= -1, `closest any ink comes to the safe-rect edge over all of them: ${worstEdge.toFixed(1)} px`);
+  console.log(`  info clamp binds on ${clampedCount} of ${boxes} extreme states; pips touch/merge into fewer connected shapes on ${overlapCount} of them (reported, not gated)`);
+
+  // NEGATIVE CONTROL for the clamp. Take a state where it binds, read the pip's
+  // width off the PIXELS, and put the raw (unclamped) column where the slider
+  // value alone would: the ink would cross the safe edge. So the clean result
+  // above is the clamp's doing, not an artefact of the ranges being tame.
+  const ov = { pipSpreadX: 2, pipScale: 1.5 };
+  const r = await renderStyled({ suit: 'spades', rank: '7' }, ov);
+  const L = await page.evaluate((o) => window.__pipLayout('7', o), ov);
+  const comp = inkComponents(r.buf, r.width, ...mid(r)).sort((p, q) => p.minX - q.minX)[0];
+  const halfW = (comp.maxX - comp.minX + 1) / 2;
+  const rawRight = SAFE.x + (0.5 + 0.25 * 2) * SAFE.w + halfW;
+  check(L.clamped && rawRight > SAFE.x + SAFE.w + 5,
+    `CONTROL: at spread 200% x pip scale 150% the RAW column would put ink ${(rawRight - SAFE.x - SAFE.w).toFixed(1)} px past the safe edge (clamp reports binding: ${L.clamped}) — the clamp is what holds it`);
+}
+
 // ---------------------------------------------------------------------
 section('9. Exported PDF — inspect the file, not the preview');
 // ---------------------------------------------------------------------
@@ -1206,6 +1429,105 @@ check(pngPlate && zipRefPlate && Math.abs((pngPlate.maxY - pngPlate.minY) - (zip
   `the court letter in ${target} is ${pngPlate ? pngPlate.maxY - pngPlate.minY : -1}px tall, matching the in-page render — the court sliders reached the ZIP too`);
 check(pngPlate && Math.abs(pngPlate.cx - zipRef.plate.cx) <= CENTER_TOL && Math.abs(pngPlate.cy - zipRef.plate.cy) <= CENTER_TOL,
   `the court letter is still ink-centred IN THE EXPORTED PNG (${pngPlate ? (pngPlate.cx - zipRef.plate.cx).toFixed(1) + ', ' + (pngPlate.cy - zipRef.plate.cy).toFixed(1) : 'NO INK'} px off)`);
+
+
+// ---------------------------------------------------------------------
+section('10b. Layout controls reach the exported PDF and ZIP — measured on the files');
+// ---------------------------------------------------------------------
+// Every 05 Layout control, driven through the real DOM (sliders by input event,
+// the flip by its checkbox), all off their defaults at once, then exported.
+// The expectation is the same card rendered in-page under those values, and
+// the control is the same card at the Layout defaults: an export must match
+// the first and differ from the second, for a number card (rank 8: flip, pip
+// scale, spread, margin, corner glyph) and for the Ace (Ace scale). Either
+// comparison alone would pass a preview-only wiring.
+const meanAbs = (a, b) => {
+  let s = 0; const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i += 4) s += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+  return s / (n / 4 * 3);
+};
+const LAYOUT_DEFAULTS = { invertBottomPips: true, pipScale: 1, aceScale: 1, cornerGlyphScale: 1, pipSpreadX: 1, pipMarginPct: 16 };
+for (const [id, v] of [['layoutPipScale', 130], ['layoutAceScale', 70], ['layoutCornerGlyphScale', 140], ['layoutPipSpreadX', 150], ['layoutPipMarginY', 10]]) {
+  await driveSlider(id, v);
+}
+await page.evaluate(() => {
+  const el = document.getElementById('layoutInvertBottom');
+  el.checked = false;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+});
+await page.waitForTimeout(500);
+{
+  const st = await page.evaluate(() => window.__cards.getStyle());
+  check(st.invertBottomPips === false && st.pipScale === 1.3 && st.aceScale === 0.7 && st.cornerGlyphScale === 1.4 && st.pipSpreadX === 1.5 && st.pipMarginPct === 10,
+    `getStyle() carries all six Layout controls (${JSON.stringify({ f: st.invertBottomPips, p: st.pipScale, a: st.aceScale, c: st.cornerGlyphScale, x: st.pipSpreadX, y: st.pipMarginPct })})`);
+  check(await page.$eval('#layoutPresetValue', (e) => e.textContent.trim()) === 'Custom', 'the preset readout reads Custom once the sliders are moved');
+}
+// The expectation is built from the values THIS GATE drove, passed explicitly —
+// never from getStyle(), which is the quantity under test (a getStyle() that
+// dropped a control would then agree with itself all the way to the file).
+const LAYOUT_DRIVEN = { invertBottomPips: false, pipScale: 1.3, aceScale: 0.7, cornerGlyphScale: 1.4, pipSpreadX: 1.5, pipMarginPct: 10 };
+const layoutRefs = {};
+for (const rank of ['A', '8']) {
+  const spec = { suit: 'spades', rank };
+  const live = await renderStyled(spec, LAYOUT_DRIVEN);
+  const dflt = await renderStyled(spec, LAYOUT_DEFAULTS);
+  layoutRefs[rank] = { live: live.buf, dflt: dflt.buf };
+  check(meanAbs(live.buf, dflt.buf) > 1, `rank ${rank}: the Layout values change the card at all (${meanAbs(live.buf, dflt.buf).toFixed(2)} > 1) — otherwise the export checks prove nothing`);
+}
+
+const layoutPdf = extractPdfImages(await exportAndCapture('btnExportPdf'))
+  .filter((im) => im.colorSpace === 'DeviceRGB' && im.width === 825 && im.height === 1125);
+check(layoutPdf.length === 52, `the layout PDF holds ${layoutPdf.length} card rasters`);
+for (const [rank, idx] of [['A', 0], ['8', 7]]) {
+  const card = layoutPdf[idx];
+  const same = card ? meanAbs(card.rgba, layoutRefs[rank].live) : Infinity;
+  const other = card ? meanAbs(card.rgba, layoutRefs[rank].dflt) : 0;
+  check(same < 0.5, `PDF spades ${rank} matches the in-page render at the Layout values (${same.toFixed(3)} < 0.5)`);
+  check(other > 1, `PDF spades ${rank} is NOT the Layout-default card (${other.toFixed(2)} > 1) — the Layout controls reached the PDF`);
+}
+
+const layoutZip = await JSZipNode.loadAsync(await exportAndCapture('btnExportZip'));
+for (const [rank, key] of [['A', 'spades-A'], ['8', 'spades-8']]) {
+  const name = Object.keys(layoutZip.files).find((n) => n.includes(key + '.') || n.includes(key + '_') || n.endsWith(key + '.png'));
+  const png = name ? decodePNG(Buffer.from(await layoutZip.file(name).async('nodebuffer'))) : null;
+  const same = png ? meanAbs(png.data, layoutRefs[rank].live) : Infinity;
+  const other = png ? meanAbs(png.data, layoutRefs[rank].dflt) : 0;
+  check(same < 0.5, `ZIP ${name || key} matches the in-page render at the Layout values (${same.toFixed(3)} < 0.5)`);
+  check(other > 1, `ZIP ${name || key} is NOT the Layout-default card (${other.toFixed(2)} > 1) — the Layout controls reached the PNGs`);
+}
+
+// --- presets, driven through the real buttons --------------------------
+await page.evaluate(() => { const el = document.getElementById('layoutInvertBottom'); el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
+for (const [preset, want, label] of [
+  ['spacious', { pipSpreadX: 1.2, pipMarginPct: 8, pipScale: 0.9 }, 'Spacious'],
+  ['compact', { pipSpreadX: 0.8, pipMarginPct: 22, pipScale: 1 }, 'Compact'],
+  ['traditional', { pipSpreadX: 1, pipMarginPct: 16, pipScale: 1 }, 'Traditional'],
+]) {
+  await page.click(`[data-layout-preset="${preset}"]`);
+  await page.waitForTimeout(250);
+  const st = await page.evaluate(() => window.__cards.getStyle());
+  check(st.pipSpreadX === want.pipSpreadX && st.pipMarginPct === want.pipMarginPct && st.pipScale === want.pipScale,
+    `${label} sets spread ${want.pipSpreadX * 100}%, margin ${want.pipMarginPct}%, pip scale ${want.pipScale * 100}% in one click`);
+  const shown = await page.evaluate(() => ({ s: document.getElementById('layoutPresetValue').textContent.trim(), h: document.getElementById('layoutPresetName').textContent.trim(), sliders: ['layoutPipSpreadX', 'layoutPipMarginY', 'layoutPipScale'].map((i) => document.getElementById(i + 'Value').textContent.trim()) }));
+  check(shown.s === label && shown.h === label, `the readout (and the collapsed-summary readout) say "${label}"`);
+  const prev = await page.evaluate(() => window.__previewRGBA(8)); // spades 10, the number card in the preview
+  const fresh = await renderStyled({ suit: 'spades', rank: '10' }, { ...want, invertBottomPips: true, pipScale: want.pipScale });
+  check(meanAbs(Buffer.from(prev.data), fresh.buf) < 0.5, `${label}: the live preview's 10 is the card those slider values draw (${meanAbs(Buffer.from(prev.data), fresh.buf).toFixed(3)})`);
+}
+for (const [id, v] of [['layoutPipSpreadX', 105], ['layoutPipMarginY', 17], ['layoutPipScale', 95]]) {
+  await page.click('[data-layout-preset="traditional"]');
+  await driveSlider(id, v);
+  const shown = await page.$eval('#layoutPresetValue', (e) => e.textContent.trim());
+  check(shown === 'Custom', `moving ${id} off Traditional switches the readout to Custom (reads "${shown}")`);
+}
+await page.click('[data-layout-preset="traditional"]');
+await page.waitForTimeout(200);
+check((await page.evaluate(() => window.__cards.getStyle())).invertBottomPips === true,
+  'a preset leaves the flip toggle alone (it was on and stays on)');
+// The flip, ace and corner scales do not touch the preset readout.
+await driveSlider('layoutAceScale', 80);
+check(await page.$eval('#layoutPresetValue', (e) => e.textContent.trim()) === 'Traditional', 'the Ace scale is not a preset control — the readout stays Traditional');
+await driveSlider('layoutAceScale', 100);
 
 // ---------------------------------------------------------------------
 section('11. Hygiene');

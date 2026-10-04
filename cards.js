@@ -11,7 +11,7 @@
 // header of cards/font-manager.js for why document.fonts.check() is not the
 // test used.
 import { PRINT_SPEC, SUITS, buildDeckList } from './cards/deck-builder.js';
-import { renderCardToCanvas, DEFAULT_STYLE } from './cards/card-template.js';
+import { renderCardToCanvas, DEFAULT_STYLE, LAYOUT_PRESETS, matchLayoutPreset } from './cards/card-template.js';
 import { exportDeckPDF } from './cards/pdf-export.js';
 import { exportDeckZip } from './cards/png-export.js';
 import {
@@ -31,12 +31,17 @@ import { GLYPH_FAMILIES, isGlyphFamily, loadPresetFamily, loadPresetGlyph } from
 const SUIT_LABELS = { spades: 'Spades', hearts: 'Hearts', diamonds: 'Diamonds', clubs: 'Clubs' };
 
 // Representative subset shown live in the preview grid — the Ace and King
-// of every suit (8 cards). The full 52-card render only happens on export,
-// so editing colors/glyphs stays instant.
-const PREVIEW_SPECS = SUITS.flatMap((suit) => [
-  { suit, rank: 'A' },
-  { suit, rank: 'K' },
-]);
+// of every suit, then the 10 of every suit (12 cards; the 10 is the number card
+// with the most pips, so the 05 Layout pip controls are visible live). Appended
+// AFTER the A/K pairs so the first eight keep their positions. The full 52-card
+// render only happens on export, so editing colors/glyphs stays instant.
+const PREVIEW_SPECS = [
+  ...SUITS.flatMap((suit) => [
+    { suit, rank: 'A' },
+    { suit, rank: 'K' },
+  ]),
+  ...SUITS.map((suit) => ({ suit, rank: '10' })),
+];
 
 // suit -> loaded <img> or null (falls back to the built-in placeholder
 // glyph in card-template.js).
@@ -66,6 +71,13 @@ function getStyle() {
     courtPlateScale: pct('styleCourtPlateScale'),
     courtLetterScale: pct('styleCourtLetterScale'),
     glyphStretch: glyphStretchValue(),
+    // 05 Layout
+    invertBottomPips: document.getElementById('layoutInvertBottom').checked,
+    pipScale: pct('layoutPipScale'),
+    aceScale: pct('layoutAceScale'),
+    cornerGlyphScale: pct('layoutCornerGlyphScale'),
+    pipSpreadX: pct('layoutPipSpreadX'),
+    pipMarginPct: parseFloat(document.getElementById('layoutPipMarginY').value),
   };
 }
 
@@ -91,6 +103,11 @@ function buildStyleControls() {
     ['styleCornerFontScale', Math.round(DEFAULT_STYLE.cornerFontScale * 100)],
     ['styleCourtPlateScale', Math.round(DEFAULT_STYLE.courtPlateScale * 100)],
     ['styleCourtLetterScale', Math.round(DEFAULT_STYLE.courtLetterScale * 100)],
+    ['layoutPipScale', Math.round(DEFAULT_STYLE.pipScale * 100)],
+    ['layoutAceScale', Math.round(DEFAULT_STYLE.aceScale * 100)],
+    ['layoutCornerGlyphScale', Math.round(DEFAULT_STYLE.cornerGlyphScale * 100)],
+    ['layoutPipSpreadX', Math.round(DEFAULT_STYLE.pipSpreadX * 100)],
+    ['layoutPipMarginY', DEFAULT_STYLE.pipMarginPct],
   ];
 
   for (const [id, initial] of SLIDERS) {
@@ -100,13 +117,52 @@ function buildStyleControls() {
     output.textContent = `${input.value}%`;
     input.addEventListener('input', () => {
       output.textContent = `${input.value}%`;
+      syncLayoutPreset();
       requestPreview();
     });
+  }
+
+  const flip = document.getElementById('layoutInvertBottom');
+  flip.checked = DEFAULT_STYLE.invertBottomPips;
+  flip.addEventListener('change', requestPreview);
+
+  for (const btn of document.querySelectorAll('[data-layout-preset]')) {
+    btn.addEventListener('click', () => applyLayoutPreset(btn.dataset.layoutPreset));
+  }
+  syncLayoutPreset();
+}
+
+// Layout presets set the sliders (through the same DOM values getStyle() reads,
+// so preview and both exports see them) and the readout is DERIVED from the
+// slider values every time — never remembered — so moving any of the three
+// preset-controlled sliders reads "Custom" by construction.
+function applyLayoutPreset(id) {
+  const p = LAYOUT_PRESETS[id];
+  if (!p) return;
+  const set = (elId, v) => {
+    const el = document.getElementById(elId);
+    el.value = String(v);
+    document.getElementById(`${elId}Value`).textContent = `${el.value}%`;
+  };
+  set('layoutPipScale', Math.round(p.pipScale * 100));
+  set('layoutPipSpreadX', Math.round(p.pipSpreadX * 100));
+  set('layoutPipMarginY', p.pipMarginPct);
+  syncLayoutPreset();
+  requestPreview();
+}
+
+function syncLayoutPreset() {
+  const id = matchLayoutPreset(getStyle());
+  const label = id === 'custom' ? 'Custom' : LAYOUT_PRESETS[id].label;
+  document.getElementById('layoutPresetValue').textContent = label;
+  document.getElementById('layoutPresetName').textContent = label;
+  for (const btn of document.querySelectorAll('[data-layout-preset]')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.layoutPreset === id));
   }
 }
 
 // ---------------------------------------------------------------------
-// Preview zoom (07) — on-screen size only
+// Preview zoom (08) — on-screen size only
 // ---------------------------------------------------------------------
 // The base minimum card column width, matching --cd-card-min's declared value
 // in cards.css. Zoom multiplies it and nothing else: auto-fill re-flows the

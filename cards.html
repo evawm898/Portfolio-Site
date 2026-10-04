@@ -136,11 +136,11 @@
 
       <div class="cd-field">
         <div class="cd-field__row">
-          <label class="cd-field__label" for="styleGlyphScale">Suit glyph scale</label>
+          <label class="cd-field__label" for="styleGlyphScale">Court suit glyph scale</label>
           <output class="cd-field__value" id="styleGlyphScaleValue" for="styleGlyphScale">100%</output>
         </div>
         <input type="range" id="styleGlyphScale" min="50" max="150" step="5" value="100">
-        <span class="cd-field__sub">Scales the suit glyph relative to its size in each context (pips, ace, court plate). This is an OVERALL size — see "Suit glyph stretch" below for proportion.</span>
+        <span class="cd-field__sub">Scales the suit glyphs on J/Q/K only — pips, the Ace and the corner glyph have their own scales in 05 Layout. This is an OVERALL size — see "Suit glyph stretch" below for proportion.</span>
       </div>
 
       <div class="cd-field" id="styleGlyphStretchField" hidden>
@@ -149,7 +149,7 @@
           <output class="cd-field__value" id="styleGlyphStretchValue" for="styleGlyphStretch">100%</output>
         </div>
         <input type="range" id="styleGlyphStretch" min="50" max="200" step="5" value="100">
-        <span class="cd-field__sub">Width-vs-height PROPORTION of the glyph — not its overall size (that's "Suit glyph scale" above). 100% is undistorted; above stretches wider, below stretches taller. Shown once a family or a custom suit glyph is in use.</span>
+        <span class="cd-field__sub">Width-vs-height PROPORTION of the glyph — not its overall size (that's a scale control). 100% is undistorted; above stretches wider, below stretches taller. Shown once a family or a custom suit glyph is in use.</span>
       </div>
 
       <div class="cd-field">
@@ -162,22 +162,92 @@
       </div>
     </details>
 
-    <details class="cd-panel__section" id="section-05" open>
-      <summary class="cd-panel__label"><span>05</span>Export</summary>
+    <details class="cd-panel__section" id="section-05">
+      <summary class="cd-panel__label"><span>05</span>Layout<output class="cd-panel__label__value" id="layoutPresetName" for="layoutPresets">Traditional</output></summary>
+
+      <div class="cd-field" id="layoutPresets" role="group" aria-label="Layout presets">
+        <div class="cd-field__row">
+          <span class="cd-field__label">Preset</span>
+          <output class="cd-field__value" id="layoutPresetValue" for="layoutPresets">Traditional</output>
+        </div>
+        <div class="cd-preset-row">
+          <button type="button" class="cd-export-btn cd-export-btn--secondary" data-layout-preset="traditional">Traditional</button>
+          <button type="button" class="cd-export-btn cd-export-btn--secondary" data-layout-preset="spacious">Spacious</button>
+          <button type="button" class="cd-export-btn cd-export-btn--secondary" data-layout-preset="compact">Compact</button>
+        </div>
+        <span class="cd-field__sub">Sets pip scale, column spacing and vertical margin in one click. Moving any of those three afterwards switches this to Custom.</span>
+      </div>
+
+      <div class="cd-field">
+        <label class="cd-field__row cd-field__check" for="layoutInvertBottom">
+          <span class="cd-field__label">Invert bottom-half pips</span>
+          <input type="checkbox" id="layoutInvertBottom" checked>
+        </label>
+        <span class="cd-field__sub">On is the traditional card (bottom-half pips printed upside-down). Off prints every pip upright.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="layoutPipScale">Pip scale</label>
+          <output class="cd-field__value" id="layoutPipScaleValue" for="layoutPipScale">100%</output>
+        </div>
+        <input type="range" id="layoutPipScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the pips on 2–10 only.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="layoutAceScale">Ace scale</label>
+          <output class="cd-field__value" id="layoutAceScaleValue" for="layoutAceScale">100%</output>
+        </div>
+        <input type="range" id="layoutAceScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the Ace's single large glyph only.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="layoutCornerGlyphScale">Corner glyph scale</label>
+          <output class="cd-field__value" id="layoutCornerGlyphScaleValue" for="layoutCornerGlyphScale">100%</output>
+        </div>
+        <input type="range" id="layoutCornerGlyphScale" min="50" max="150" step="5" value="100">
+        <span class="cd-field__sub">Size of the mini suit glyph in the corner index. The corner letter has its own scale in 04 Style.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="layoutPipSpreadX">Pip column spacing</label>
+          <output class="cd-field__value" id="layoutPipSpreadXValue" for="layoutPipSpreadX">100%</output>
+        </div>
+        <input type="range" id="layoutPipSpreadX" min="50" max="200" step="5" value="100">
+        <span class="cd-field__sub">Distance of the side columns from the centre line. Clamped so a pip never reaches the safe-area edge.</span>
+      </div>
+
+      <div class="cd-field">
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="layoutPipMarginY">Pip vertical margin</label>
+          <output class="cd-field__value" id="layoutPipMarginYValue" for="layoutPipMarginY">16%</output>
+        </div>
+        <input type="range" id="layoutPipMarginY" min="0" max="30" step="1" value="16">
+        <span class="cd-field__sub">Gap between the safe-area top/bottom and the pip field. Clamped so a pip never crosses the safe-area edge.</span>
+      </div>
+    </details>
+
+    <details class="cd-panel__section" id="section-06" open>
+      <summary class="cd-panel__label"><span>06</span>Export</summary>
       <button id="btnExportPdf" class="cd-export-btn">Download PDF (52 pages)</button>
       <button id="btnExportZip" class="cd-export-btn cd-export-btn--secondary">Download PNGs (ZIP)</button>
       <div id="exportStatus" class="cd-status" role="status" aria-live="polite"></div>
     </details>
 
-    <details class="cd-panel__section" id="section-06">
-      <summary class="cd-panel__label"><span>06</span>Print Spec</summary>
+    <details class="cd-panel__section" id="section-07">
+      <summary class="cd-panel__label"><span>07</span>Print Spec</summary>
       <div class="cd-spec" id="specText"></div>
     </details>
   </section>
 
   <section class="cd-preview" aria-labelledby="preview-heading">
     <div class="cd-preview__head">
-      <h2 id="preview-heading" class="cd-preview__label"><span>07</span>Preview</h2>
+      <h2 id="preview-heading" class="cd-preview__label"><span>08</span>Preview</h2>
       <div class="cd-zoom">
         <label class="cd-zoom__label" for="previewZoom">Zoom</label>
         <input type="range" id="previewZoom" class="cd-zoom__range" min="100" max="400" step="25" value="100">
