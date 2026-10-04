@@ -1,6 +1,6 @@
 # Stem session 2 — ruling 6 built (nodes decoupled from leaves), Oct 4, 2026
 
-*Built on `main` at `a82f025`. Sources: `docs/bloom-stem-session-1-outcome.md` and
+*Built on `main` at `a82f025`, then merged with `main` at `af15342` (#353, the inflorescence node laws, landed while this PR was in CI — §1b). Sources: `docs/bloom-stem-session-1-outcome.md` and
 `docs/bloom-stem-state-oct-2026.md`. Measurements are Node builds through the shipped geometry,
 or the real browser gates where they say so. The stem's axis law is mode-free: every tip,
 station and triangle figure below reads the same in LIVE and EXPORT, and each table names its
@@ -20,9 +20,9 @@ mode.*
 **The scope holds exactly as ruled:**
 - **1 live row moves:** the old GATED no-leaves row, relabelled because its label was now false.
 - **1 row moves in each of `phase46`–`phase49`.** This is the same row, predicted by predicate.
-- **Block 46 adds 9 rows.** The 8 noded ones move against the base tree. The raceme row holds,
+- **Block 47 adds 9 rows.** The 8 noded ones move against the base tree. The raceme row holds,
   because the pedicel pin keeps its pedicels straight.
-- **A frozen phase is owed and registered:** `frozen/phase50`, the 1,047 rows at `a82f025`.
+- **A frozen phase is owed and registered:** `frozen/phase51`, the 1,080 rows at `af15342`.
 
 ## 1. Reconciliation
 
@@ -41,6 +41,27 @@ mode.*
   on 100 mm it gives 16 / 51 / 86.
 - **The registry comment claiming "NODE COUNT IS ITS OWN CONTROL" had been false since #240**,
   because the count was gated on leaves. It is true now, and the comment says so.
+
+## 1b. The merge with #353, and why the numbers are 51 and 47
+
+#353 (the inflorescence node laws) merged to `main` at 05:40, after this PR was pushed, and
+took both **`frozen/phase50`** and matrix **block 46**.
+
+- **phase50 at `754e3aa` is this session's first baseline, row for row.** The two 1,047-row
+  bodies merged with no conflict but a trailing comma, so the duplicate is dropped. This
+  change's own baseline is now **`frozen/phase51`, the 1,080 rows at `af15342`** — `main`'s
+  head before it, carrying #353's 33 NODE LAWS rows. It is registered in both maps and
+  `--verify-frozen --phase51` reads deep-equal.
+- **Bare-stem nodes are block 47**, appended after #353's block 46 (the byte tools pair rows
+  by index).
+- **One rule had to be composed, not chosen.** Ruling 6 shows the node count whenever there
+  is a stem. #353 made that same count the PEDICELS' on a raceme, where it moves neither the
+  nodes (inert under an inflorescence) nor the leaves (the shared node takes the pedicels'
+  count). The count therefore uses `leafNodeCountLive` — a stem and no raceme — and the
+  arrangement keeps #353's `leafNodesOwn`. The alternative is a visible control that does
+  nothing, which this panel does not ship. It is one term to change.
+- **`floretState`** takes #353's per-node length argument and still spreads `PEDICEL_PINS`.
+- **Every verification in §5 was re-run on the merged tree against `af15342`.**
 
 ## 2. The kink direction — two laws that never mix
 
@@ -111,22 +132,24 @@ node law reads, and a bare stem has no leaf record at all.
 
 ## 5. Verification
 
-**Byte partition.** `verify-bloom-surface-bytes --base <a82f025> --movers-predicate
-nodes-bare`, over the full 1,056-row matrix in both modes, in 32 foreground chunks merged with
-`--merge`. **PASS.**
+**Byte partition.** `verify-bloom-surface-bytes --base <af15342> --movers-predicate
+nodes-bare`, over the full 1,089-row matrix in both modes, in 36 foreground chunks merged with
+`--merge`. **PASS.** (The first run, against `a82f025` before the merge, also passed: 9 movers
+and 1,047 holders.)
 - The predicate is written from the controls (the ruling's sentence), never from either tree's
   guard.
 - **9 of 9 predeclared movers moved.**
-- **0 floats moved on the 1,047 holders:** 1,345,082,904 export floats and 81,442,712 grid
+- **0 floats moved on the 1,080 holders:** 1,459,186,560 export floats and 81,814,838 grid
   values, under `Object.is`.
   - Every LEAFED noded row is among the holders.
-  - So is every RACEME row, including the block-46 raceme whose head asks for prominence 1.
+  - So is every RACEME row: all 33 of #353's NODE LAWS rows, and the block-47 raceme whose
+    head asks for prominence 1.
 - **Every clause was shown able to fire:**
   - `--control` fires the export-stream clause and the grid clause.
   - Run with `--base` set to this tree, the "named a MOVER and held to the bit" clause fires on
     both bare rows.
 
-**Export gate and connectedness** (`--only` over blocks 41 and 46, the real browser):
+**Export gate and connectedness** (`--only` over blocks 41 and 47, the real browser, re-run on the merged tree):
 - **export:** PASS, 22 of 22, watertight, `tris(live) === tris(export)`;
 - **X2:** **0 within-shell pairs on all 22 rows**;
 - **connectedness:** PASS, 22 of 22, one connected body each.
@@ -149,21 +172,27 @@ every one firing on its own message through the shipped clause function.**
 - **This is a subset, not a sweep.** 12 of 88 mutants were run.
 
 **Build order.** `verify-bloom-build-order` forward, reverse and shuffled (seed 7), three
-processes over the full matrix in both modes. **PASS:** 2,112 digests identical across all
-passes, 4,224 pairwise comparisons, 0 throws. `--coupling` reads 0 of the 9 new rows.
+processes over the full matrix in both modes. **PASS on the merged tree:** 2,178 digests
+identical across all three passes, bit for bit. (Before the merge: 2,112 identical, 0 throws.)
+`--coupling` read 0 of the 9 new rows before the merge.
 
 **Separation.** `bloom-petal-separation.mjs` reads 144 builds, **0 not one piece**. It builds no
 stem, so for this feature the connectedness gate above is the witness that counts.
 
 **Panel gate:** PASS locally. **Smoke:** census OK at 143 rows over 42 blocks, and its negative
-control passes. **`--verify-frozen --phase50`:** deep-equal to `a82f025`'s own `buildMatrix()`.
+control passes. **`--verify-frozen --phase51`:** deep-equal to `af15342`'s own `buildMatrix()`.
+
+**#353's rows under this change** (the real browser, export gate `--only` over all 33 NODE
+LAWS rows): **PASS**. 32 rows reached the results and are watertight, with 0 within-shell
+pairs. The 33rd, `ALL MAX at 35 deg`, is its declared refusal. The panel gate passes with
+`leafNodeCountLive`.
 
 **Cost:**
 - **The shipping default is untouched:** 24,688 triangles, since `stemLength` 0 builds no stem.
 - A bare 100 × 6 mm stem goes from 26,796 to **35,820** at prominence 0.48 (1.75 MB STL).
 - On 3 mm it goes from 26,604 to 32,268.
 
-**No workflow file is edited**, so `phase50`'s base commit carries the same workflow files as
+**No workflow file is edited**, so `phase51`'s base commit carries the same workflow files as
 `main` at dispatch.
 
 ## 6. Reported, not fixed — the tip shortfall's real cause
@@ -179,7 +208,8 @@ control passes. **`--verify-frozen --phase50`:** deep-equal to `a82f025`'s own `
 **What it would move:**
 - **16 of the 20 live noded rows** overrun and would move. The four that fit are the 3 mm
   leafed and bare rows, the 4 mm thinnest-bore row, and the bare one-node row.
-- **50 of 60 frozen noded rows** would move, over 5 tags (`phase46`–`phase50`).
+- **60 of 72 frozen noded rows** would move, over 6 tags (`phase46`–`phase51`). `phase51`'s
+  first 1,047 rows are `phase50`'s, so it adds the same 10 of 12.
 - Triangle counts move too, because a shorter ramp is a sharper bend and the placer adds
   stations.
 - **Tips:**

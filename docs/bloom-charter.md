@@ -6374,7 +6374,7 @@ file in the repo. Rulings 1–4 are in `docs/bloom-stem-taper-laws.md` and
     interpenetration. A clamp would break two shipped rows already under it.
   - **BUILT in stem session 2** — `docs/bloom-stem-session-2-outcome.md`. The arrangement is
     shown only with leaves (on a bare stem it reaches nothing); the count is shown whenever
-    there is a stem. `frozen/phase50` is the 1,047 rows at `a82f025`.
+    there is a stem. `frozen/phase51` is the 1,080 rows at `af15342` (#353 took phase50 while this was in CI).
   - **Open, for a later ruling:** the 6 mm stem's tip shortfall is its last node's ramp running
     past the stem's end; clamping each ramp to the length left is costed there (16 live rows,
     50 frozen). The flower's length scaling is NOT adopted (#296's bead).

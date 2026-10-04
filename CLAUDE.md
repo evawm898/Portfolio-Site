@@ -3527,7 +3527,7 @@ gate's reference is restated from the CONTROLS (the flower's 0.16/0.86 layout, `
 the leaf record; ST12(e) keeps the leaf relation, ST12(f) the MERGED-swellings report (√2
 spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was latent on noded
 solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
-restated, not loosened. `frozen/phase50` is the 1,047 rows at `a82f025`; block 46 is nine rows.
+restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
 
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
