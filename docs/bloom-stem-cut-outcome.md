@@ -407,7 +407,11 @@ running the mutants and disbelieving a SILENT beside a red taken by hand found i
 - **Separation** (`bloom-petal-separation.mjs`): 144 builds, 0 not one piece at 0.6 mm, 0 after
   the 0.3 mm re-read.
 - **Stem-channel witness** (`verify-bloom-stem-channel.mjs` + `--control`) PASS.
-- **Build order**, three processes: ⟨BUILD_ORDER⟩
+- **Build order**, three processes: `verify-bloom-build-order.mjs --pass forward / reverse / shuffle --seed 7`, each its own
+  process (the shuffle pass resumed from its checkpoint after the box's background limit, so it
+  spans 2 process starts), then `--compare`: **PASS — 2,204 (row, mode) digests identical across
+  every pass, positionally, bit for bit** (4,408 pairwise comparisons, 163,832,244 triangles /
+  1,474,490,196 floats a pass, 0 builds threw).
 - **Census magnitudes** (`bloom-xfail-magnitudes --only <the 167 cut rows> --include-refused`): 4 declared rows among them (`STEM: x a hemisphere` 248 / 0.4262, `SPHERE STEM: x 40 petals x 6 turns` 372 / 0.2714, `INFILL: x a SPHERE head with a stem` 544 / 0.4675, `ALL MAX` 116,847 / 15.8503 measured in Node as an export-refused row), **all 4 at their recorded magnitude** — pairs exactly, span within ±0.00005 mm. The cut moves the stem's end and the free stem's rings; no declared fold lives there, and no re-record is owed.
 - **X2 across block 48:** silent on every row (0 within-shell pairs on all 13; none declared).
 - **The byte tool's cut arm over every stem-bearing block** (`verify-bloom-sphere-stem-bytes
