@@ -9888,3 +9888,32 @@ every edge so a rake exposes no bare band; the bouquet is the weakest of the fiv
 constants (a 9-tine comb, wave 0.55 of the spacing, z 95) are the ones to retune first; strokes
 preview as a PLAIN map (every vertex moves, none is added) and refine on commit; the random
 sequence is 36–70 drops and 2–5 strokes of every kind from the seed field.
+
+## `/tile` — the tessellation rollers (pointer only)
+
+Hidden page (`tile.html`, `tile.css`, `tile.js`, `tile-geometry.js`, `tile-roller.js`,
+`tile-sim.js`; `noindex`, unlinked). Draw ONE tile that tiles the plane by translation; get a
+pair of 3D-printable cookie-cutter rollers (plus one handle design) that cut a whole sheet of
+dough with no waste but the border. **`tile-design-doc.md` is the governing text — read §3 and
+§4 before touching `tile-roller.js`.** The law: the four corners are a parallelogram (forced),
+edge A is stored once and drawn as bottom and top, edge B as left and right, and the ONE
+validity rule is a simple outline — every edit that would break it is BLOCKED with the reason,
+never repaired. The curve law is /bug's `sampleOutline` (centripetal Catmull–Rom), with a smooth
+corner extended by its PERIODIC neighbour so each chained line is C1 there.
+**Crossbars, not rings**: roller A carries the edge-A lines and rolls along `tB`, B the edge-B
+lines along `tA`; circumference = repeats × the OTHER pitch, the diameter derived. **Rims at the
+blade-tip radius ride the board, so the dough must lie between them** — a rim on dough lifts
+every blade off the board. **Both rollers are held +Z end on the LEFT as they roll forward**
+(`â = ẑ × r̂`); a first draft that signed the axis per roller stamped A's line mirrored. **The
+index marks**: pegs at the corners of ONE bar of A lay a dimple track along `tA` in the near
+border (row `k* = −1`); B's collar at that row's axial position carries one tooth per bar at
+`s' = m·|tA| + k*·|tB| cos θ`; one seated tooth fixes both of B's free placements; "roll back,
+then forward" for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a
+blade that cannot clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for
+its roller. Gates, both in CI (`tile-gate.yml`), each with a negative control that must catch
+every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry, the seam
+over three revolutions, a rigid-body rolling simulation for registration, a DIRECTED-edge census
+on every STL, heights read off the mesh) and `node tools/verify-tile-page.mjs` (Chromium, real
+pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
+is designed in §10 and not built. Nothing has been printed: every printability number there is a
+declared rule of thumb.

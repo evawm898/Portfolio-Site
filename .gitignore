@@ -32,3 +32,8 @@ tools/.scratch/
 # because those modules import each other by relative path. Swept at start and
 # in a finally; ignored here so a crashed run cannot dirty the tree.
 scene/__mutant__*/
+
+# tools/verify-tile.mjs --negative-control writes mutated copies of the tile modules
+# into .tile-mutant-<pid>-<k>/ at the repo root (they import ../bug-geometry.js) and
+# removes them in a finally; ignored so a crashed run cannot dirty the tree.
+.tile-mutant-*/

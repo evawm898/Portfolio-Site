@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tessellation Rollers — Eva Maskalenko</title>
+<meta name="description" content="Tessellation Rollers — draw one tile that tiles the plane, get a pair of 3D-printable cookie-cutter rollers that cut a whole sheet of dough with no waste but the border.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- three pinned to the version every other generator here uses, so the
+     headless tools serve one local copy from node_modules for all of them. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+<link rel="stylesheet" href="tile.css">
+</head>
+<body>
+
+<main class="tl-main">
+  <header class="tl-header">
+    <a class="tl-back" href="index.html">&larr; Index</a>
+    <div class="tl-eyebrow">EM / TILE</div>
+    <h1>Tessellation Rollers</h1>
+    <p class="tl-sub">Draw one tile; every copy of it fills the plane. The page turns it into two cookie-cutter rollers — roll the first, then the second across it — that cut a whole sheet of dough into tiles with no waste but the border.</p>
+  </header>
+
+  <section class="tl-card tl-editor" aria-label="Tile editor">
+    <div class="tl-card-head">
+      <span class="tl-label">The tile</span>
+      <span class="tl-hint" id="edHint">drag a point or a corner · click an edge to add · Delete or double-click removes · S: sharp ↔ smooth</span>
+    </div>
+    <svg id="edSvg" class="tl-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The tile, its edges and their control points"></svg>
+    <p class="tl-status" id="edStatus" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="tl-card tl-patch" aria-label="Three by three preview">
+    <div class="tl-card-head">
+      <span class="tl-label">3 × 3</span>
+      <span class="tl-hint"><i class="tl-key tl-key--a"></i>roller A's lines <i class="tl-key tl-key--b"></i>roller B's lines</span>
+    </div>
+    <svg id="patchSvg" class="tl-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nine copies of the tile, with the two rollers' cut lines"></svg>
+  </section>
+
+  <section class="tl-card tl-rollers" aria-label="The rollers">
+    <div class="tl-card-head">
+      <span class="tl-label">The rollers</span>
+      <span class="tl-hint" id="rollHint">drag to turn · scroll to zoom</span>
+      <span class="tl-views" id="rollViews">
+        <button class="tl-btn tl-btn--sm is-on" data-show="all">All</button>
+        <button class="tl-btn tl-btn--sm" data-show="A">A</button>
+        <button class="tl-btn tl-btn--sm" data-show="B">B</button>
+        <button class="tl-btn tl-btn--sm" data-show="H">Handle</button>
+      </span>
+    </div>
+    <div class="tl-three"><canvas id="rollCanvas"></canvas><p class="tl-building" id="building" hidden>building…</p></div>
+  </section>
+</main>
+
+<aside class="tl-panel" aria-label="Controls">
+  <details class="tl-sec" open>
+    <summary>Tile</summary>
+    <div class="tl-sec-body">
+      <div class="tl-ctrl"><label for="pitchA"><span>Pitch A — along edge A</span><output id="pitchA-out"></output></label><input type="range" id="pitchA" min="15" max="120" step="0.5"></div>
+      <div class="tl-ctrl"><label for="pitchB"><span>Pitch B — along edge B</span><output id="pitchB-out"></output></label><input type="range" id="pitchB" min="15" max="120" step="0.5"></div>
+      <div class="tl-ctrl"><label for="angle"><span>Crossing angle θ</span><output id="angle-out"></output></label><input type="range" id="angle" min="30" max="150" step="1"></div>
+      <div class="tl-row">
+        <button class="tl-btn" id="toggleSharp" title="Toggle the selected point between a sharp corner and a smooth curve (S)">Sharp ↔ smooth</button>
+        <button class="tl-btn" id="deletePoint" title="Delete the selected point (Delete)">Delete point</button>
+      </div>
+      <p class="tl-note" id="selNote">No point selected.</p>
+      <div class="tl-row"><button class="tl-btn" id="resetTile">Default tile</button><button class="tl-btn" id="straightTile">Straight edges</button></div>
+    </div>
+  </details>
+
+  <details class="tl-sec" open>
+    <summary>Rollers</summary>
+    <div class="tl-sec-body">
+      <div class="tl-ctrl"><label for="repeatsA"><span>Roller A — bars round it</span><output id="repeatsA-out"></output></label><input type="range" id="repeatsA" min="2" max="12" step="1"></div>
+      <div class="tl-ctrl"><label for="spanA"><span>Roller A — tiles across</span><output id="spanA-out"></output></label><input type="range" id="spanA" min="1" max="8" step="1"></div>
+      <div class="tl-ctrl"><label for="repeatsB"><span>Roller B — bars round it</span><output id="repeatsB-out"></output></label><input type="range" id="repeatsB" min="2" max="12" step="1"></div>
+      <div class="tl-ctrl"><label for="spanB"><span>Roller B — tiles across</span><output id="spanB-out"></output></label><input type="range" id="spanB" min="1" max="8" step="1"></div>
+      <div class="tl-derived" id="derived"></div>
+    </div>
+  </details>
+
+  <details class="tl-sec">
+    <summary>Print</summary>
+    <div class="tl-sec-body" id="printCtrls"></div>
+  </details>
+
+  <details class="tl-sec" open>
+    <summary>Checks <span class="tl-count" id="flagCount"></span></summary>
+    <div class="tl-sec-body"><ul class="tl-flags" id="flags"></ul></div>
+  </details>
+
+  <details class="tl-sec" open>
+    <summary>Export</summary>
+    <div class="tl-sec-body">
+      <div class="tl-row">
+        <button class="tl-btn tl-btn--solid" data-stl="A">Roller A STL</button>
+        <button class="tl-btn tl-btn--solid" data-stl="B">Roller B STL</button>
+        <button class="tl-btn tl-btn--solid" data-stl="H">Handle STL</button>
+      </div>
+      <div class="tl-row"><button class="tl-btn tl-btn--solid" id="zipAll">All three + notes (.zip)</button></div>
+      <div class="tl-row"><button class="tl-btn" id="svgTile">Tile SVG</button><button class="tl-btn" id="svgPatch">3 × 3 SVG</button></div>
+      <p class="tl-msg" id="exportMsg"></p>
+      <div class="tl-row" style="margin-top:6px"><button class="tl-btn" id="saveDesign">Save design (.json)</button><label class="tl-btn tl-file">Open design<input type="file" id="openDesign" accept=".json,application/json"></label></div>
+      <p class="tl-msg" id="designMsg"></p>
+    </div>
+  </details>
+
+  <details class="tl-sec">
+    <summary>How to use the rollers</summary>
+    <div class="tl-sec-body tl-prose" id="howto"></div>
+  </details>
+
+  <details class="tl-sec">
+    <summary>Food safety</summary>
+    <div class="tl-sec-body tl-prose">
+      <p>Print in PLA or PETG from a filament sold as food-contact safe, with a stainless nozzle (some brass nozzles contain lead). The plastic is not the problem — the layer lines are: they trap dough and bacteria.</p>
+      <p>So: dust the rollers with flour before use, wash them by hand straight after in warm soapy water with a soft brush, and let them dry completely. No dishwasher — PLA softens near 55&nbsp;°C. They cut dough for minutes; don't store food in contact with them. If they wear rough or crack, print new ones.</p>
+    </div>
+  </details>
+</aside>
+
+<script type="module" src="tile.js"></script>
+</body>
+</html>
