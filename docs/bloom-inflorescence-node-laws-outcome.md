@@ -171,7 +171,11 @@ clause and no row had ever reached it, because every `INFLO:` row is a single wh
 ## 6. Bytes, frozen phase, cost
 
 **Byte partition** (`verify-bloom-surface-bytes --movers-predicate node-laws --base <worktree of
-754e3aa>`, the whole 1078-row matrix in both modes, positionally under `Object.is`): BYTES_LINE.
+754e3aa>`, the whole 1078-row matrix in both modes, positionally under `Object.is`): **PASS — 29 of 29
+predeclared movers moved, 0 floats moved on the 1,049 holders**, over 1,396,228,860 export floats /
+155,136,540 triangles and 81,673,074 captured-grid values (five chunks, `--merge`); `--control` fires
+both clauses on a 1e-9 perturbation. The 2-whorl ID4 witness row is a HOLDER (no node law reaches
+it — the fix is the harness's).
 The mover set is predeclared from the BASE tree's own state, not from labels: a row moves iff the
 base builds a raceme AND (it carries leaves — the shared node re-seats them — or its pedicel is 0, or
 it has two or more nodes and a live gradient or corymb). Every mover is in block 46; every `INFLO:`,
