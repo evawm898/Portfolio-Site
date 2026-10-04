@@ -1047,6 +1047,27 @@ export const SMOKE_BLOCKS = [
         path: "ID4's PEDICEL PIN — the floret state carries stemNodeProminence 0 and the floret's own stem is a two-station tube with no node law, though the head asks for prominence 1 and a pedicel is a bare stem the ungated law would otherwise node" },
     ],
   },
+  {
+    n: 48, title: "the florist's cut (ruling 7)",
+    anchor: 'STEM CUT: the widest stem (12 mm) — the longest cut and the longest plug',
+    /* FIVE ROWS: the widest cut (every SC clause on a hollow stem, ST10's
+       re-derived end face and plug), the control OFF (SC0's other arm, and
+       ST10's flat arm as it was), a cut on a noded stem (SC3's noded arm —
+       the ring follows the kinked axis), a SPHERE (ST9 locating a cut tip),
+       and the raceme (ID4's pin on every pedicel). */
+    rows: [
+      { label: 'STEM CUT: the widest stem (12 mm) — the longest cut and the longest plug',
+        path: "SC0 the two statements, SC1 made-iff-longer-than-the-cut, SC2 the land on the lattice from the print floor and the nozzle, SC3 the emitted cut ring vertex by vertex against the 45-degree plane restated from the controls; ST1 on the cut band (2N - 2) and the cut face (N - 2), ST10 on the face's projected area and the plug 2 rTip + W(sqrt 2 - 1) square to the face" },
+      { label: 'STEM CUT: FLAT — the control OFF (the end as before the cut; a holder)',
+        path: "SC0's other arm (the control OFF, the geometry absent) and SC1's 'no cut face on a FLAT end'; ST1 and ST10 on their flat arms, as before the cut" },
+      { label: 'STEM CUT: x bare NODES at prominence 1 on 12 mm (the tip leans; the face follows the kinked axis)',
+        path: "SC3's noded arm — every cut vertex on ITS OWN depth's ring, the node law restated at that depth; ST12 on the horizontal rings alone (the cut ring is not one); ST3's extremes over the horizontal rings" },
+      { label: 'STEM CUT: x a SPHERE with an 8 mm stem (ST9 locates the cut tip)',
+        path: "ST9 re-derived: the tip is the LOWEST vertex at the stem's radius (the land) and the root the populated level the control's length above it; ST7/ST8 on a cut stem's channel" },
+      { label: 'STEM CUT: x the RACEME on an 8 mm rachis (the rachis is cut; every PEDICEL pinned flat)',
+        path: "ID4's PEDICEL PIN for ruling 7 — the floret state carries stemCut FLAT and the floret's own stem reports no cut and emits no cut face, though the rachis is cut; SC0-SC3 on the rachis" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
