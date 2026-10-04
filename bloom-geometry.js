@@ -12552,6 +12552,24 @@ export function stemNodeStations(law, s0, s1) {
   return out;
 }
 
+/* hubAxisTopZ — THE HUB'S OWN TOP FACE ON THE AXIS, the face a stem is
+   rooted THROUGH from: flat, the slab's own +t/2; cap, the OUTER cap's apex
+   (`cap(Rd + t/2, ...)`'s own two numbers); SPHERE, the INNER sphere at the
+   RESERVED pole, `centreZ - (Rd - t/2)`. EXTRACTED VERBATIM from `stemPlan`
+   (the inflorescence's node-laws session) because a SESSILE floret needs the
+   same face with no stem present: its hub's underside on the axis is this
+   less one sheet — the flat slab's own -t/2, the inner cap's apex, the
+   sphere's outer far pole — and a second copy of the three arms here would
+   be the duplicate-expression defect `rodWallRootMm` was extracted to fix.
+   The expression is the one `stemPlan` carried, term for term, so no byte
+   moves by its moving. */
+export function hubAxisTopZ(dome, hubT) {
+  const sphere = !!(dome && dome.closed);
+  return sphere ? dome.centreZ - (dome.Rd - hubT / 2)
+    : dome ? dome.centreZ + dome.Rd + hubT / 2
+    : hubT / 2;
+}
+
 /* THE ONE OWNER OF EVERYTHING ABOUT A STEM ON THIS HUB — read by
    buildHubInto (for the join's profile), by buildStemInto (for the solid) and
    by the metrics hook (for the read-out and the gates). Nothing recomputes any
@@ -12644,9 +12662,7 @@ export function stemPlan(state, ring, acc) {
      `centreZ - (Rd - t/2)`. The stem then runs DOWN through the wall and out,
      so the overlap the slicer unions is a solid annulus at every setting, which
      is the identical property the flat arm's "rooted through the slab" has. */
-  const topZ = sphere ? dome.centreZ - (dome.Rd - hubT / 2)
-    : dome ? dome.centreZ + dome.Rd + hubT / 2
-    : hubT / 2;
+  const topZ = hubAxisTopZ(dome, hubT);
   /* THE UNDERSIDE ON THE AXIS is the top face less the join's REACH there
      (`axisDepth`) — the derived `joinT` at the default, or `hubLength` above it,
      so hubLength ADDS to the height below the head exactly as Eva ruled. At the
@@ -13663,7 +13679,215 @@ export function leafNodeDepthsMm(n, lengthMm, insetMm, pitchFloorMm = 0) {
 /* leafPlan — THE ONE OWNER of where leaves are and what they are made of.
    Reads the STEM's plan for the three lengths it needs (`boreR`, `outerR`,
    `rootZ`) and computes nothing the stem already owns. */
-export function leafPlan(state, stem, acc) {
+/* THE SHARED NODE'S OFFSET — how far below its pedicel a subtending leaf is
+   seated (ruling 5: "leaf seated below, pedicel owns the azimuth"), and the
+   ONE owner of that length. Both rods leave the wall at the SAME azimuth, so
+   the only room between them is vertical; two parallel rods at angle `th`
+   whose roots are `off` apart stand `off * cos(th)` apart, and they must stand
+   their two radii and one printable gap apart. Where the two angles differ
+   the STEEPER rod's cosine is used — exact when they are equal, conservative
+   when they are not (a leaf diverging downward from its pedicel is given more
+   room than it needs, never less). Where either rod is vertical the cosine is
+   0 and no offset exists: two rods leaving one azimuth straight up are the
+   same line however far apart their roots are, so the offset is infinite and
+   the leaf is NOT BUILT, told — never clamped to some finite number that
+   would put it inside its own pedicel.
+   EVERY TERM IS MODE-FREE, and that is what makes the leaf's EXISTENCE
+   mode-free (whether a leaf exists is topology, refused as mode-dependent
+   five times in this file): `pedicelR` is derived from the rachis control,
+   never floored by the export; the petiole's radius is read as
+   `leafNodePitchFloorMm(sheet) / 2`, the EXPORT radius in both modes (the
+   conservative one, the leaf node law's own choice); the gap is
+   `MIN_FEATURE_MM`, this project's one owner of the minimum printable gap. */
+export const SHARED_NODE_GRID_MM = 2 ** -16;
+export function sharedNodeOffsetMm(pedicelR, petioleR, pedicelAngleDeg, leafAngleDeg, bladeReach = null) {
+  /* THE CONTROL'S OWN RIGHT ANGLE IS EXACTLY VERTICAL: `Math.cos(pi / 2)` is
+     6.1e-17, not 0, which would hand a vertical rod an offset of 5e16 mm
+     rather than the infinity the geometry has. Both angles are stepped
+     integer CONTROLS, so this is an equality on a control value, never a
+     threshold on a computed one. */
+  const cosDeg = (d) => (Math.abs(Number(d)) === 90 ? 0 : Math.cos((Number(d) * Math.PI) / 180));
+  const c = Math.min(cosDeg(pedicelAngleDeg), cosDeg(leafAngleDeg));
+  /* THE PERPENDICULAR SEPARATION THE TWO PARALLEL AXES NEED is the larger of
+     the ROD's (petiole and pedicel, two radii and the gap) and the BLADE's
+     (Eva's change 1: the rod law left the pedicel 0.876 mm from the blade's
+     top skin at the defaults, because a cupped blade with its skin stands
+     higher over its axis than the petiole does). `bladeReach` is
+     `bladeReachMm(blade, pedicelR + MIN_FEATURE_MM)` — read off the leaf
+     builder's own emitted blade — and null keeps the rod law alone, which is
+     what a caller with no blade to clear asks. */
+  const perpExact = bladeReach == null ? pedicelR + petioleR + MIN_FEATURE_MM : Math.max(pedicelR + petioleR + MIN_FEATURE_MM, bladeReach);
+  /* THE LAW LANDS THE APPROACH ON THE BAR EXACTLY, so its last bit decides
+     which side of the bar the measured approach reads: the first cut of this
+     change read 0.9999999999999918 mm on the default raceme against a 1.0 mm
+     bar. The separation is therefore taken to the SECOND grid step above it
+     (`SHARED_NODE_GRID_MM`, 2^-16 mm, a power of two so the step is exact) —
+     between one and two steps over the exact value, never on it and never an
+     ulp over it (one step alone could land an ulp above a grid point). That is
+     a stated slack with its size beside it, not a tolerance on the gate. With
+     no blade the rod law is the expression it always was. */
+  const perp = bladeReach == null ? perpExact : (Math.floor(perpExact / SHARED_NODE_GRID_MM) + 2) * SHARED_NODE_GRID_MM;
+  return c > 0 ? perp / c : Infinity;
+}
+
+/* THE BLADE IN ITS OWN FRAME — the leaf builder's own emitted blade, built
+   once into a throwaway EXPORT accumulator at azimuth 0 and angle 0 with no
+   petiole length, so its coordinates ARE the leaf frame: x along the petiole's
+   direction from the blade's base, y across it, z along its normal (the side a
+   pedicel above it is on). It is the SHIPPED builder and not a restatement of
+   the cup and the skin offset (session 43's ST2 rule, applied to a law rather
+   than a clause). EXPORT IN BOTH MODES, the petiole radius's own choice one
+   paragraph down: the export sheet is the thicker one, so the conservative one,
+   and what this decides (where a leaf is seated, whether a blade fits at all)
+   must not change with the mode. The blade has no curl and no twist
+   (`leafBladeState`), so its frame is a RIGID motion of this one at every
+   angle and azimuth — which is why one build serves every node. The petiole's
+   own triangles (the first ones emitted) are dropped; the rod is the law's
+   other term, stated exactly. */
+export function leafBladeLocalTris(state, widthMm, lengthMm) {
+  const acc = new MeshBuilder({ exportMode: true });
+  const plan = {
+    angleDeg: 0, rootZ: 0, nodeDepthsMm: [0], nodeOffsets: null, rootR: 0,
+    petioleR: acc.floorThickness(state.sheetThickness) / 2, petioleLenMm: 0, embedMm: 0, lengthMm, widthMm,
+  };
+  buildLeafInto(acc, plan, state, 0, 0);
+  const petioleTris = 2 * LEAF_PETIOLE_SIDES + 2 * (LEAF_PETIOLE_SIDES - 2);
+  return acc.positions.slice(petioleTris * 9);
+}
+
+/* HOW FAR ABOVE THE LEAF'S AXIS A ROD OF RADIUS `reachR` MUST RUN, PARALLEL TO
+   IT, TO CLEAR THE BLADE. A rod along x at height `d` over the axis clears a
+   blade point (y, z) iff `y^2 + (d - z)^2 >= reachR^2`, i.e. `d >= z +
+   sqrt(reachR^2 - y^2)` wherever `|y| < reachR`. That is the maximum of a
+   CONCAVE function, so over a facet it lands on the boundary and over an edge
+   it is unimodal: every emitted edge is searched by golden-section on the part
+   of it inside `|y| <= reachR`. EDGES AND NOT VERTICES, and that is not
+   pedantry: NV = 10 is even, so no column lies on the midrib — the blade's
+   highest point under the rod is the MIDPOINT of an edge, and a vertex reading
+   sits up to `reachR - sqrt(reachR^2 - (column/2)^2)` low (0.5 mm on the
+   shipped leaf). */
+export function bladeReachMm(P, reachR) {
+  const R2 = reachR * reachR;
+  const f = (y, z) => z + Math.sqrt(Math.max(0, R2 - y * y));
+  let best = -Infinity;
+  const G = (Math.sqrt(5) - 1) / 2;
+  for (let t = 0; t < P.length; t += 9) {
+    for (let e = 0; e < 3; e++) {
+      const a = t + 3 * e, b = t + 3 * ((e + 1) % 3);
+      const ya = P[a + 1], za = P[a + 2], yb = P[b + 1], zb = P[b + 2];
+      const dy = yb - ya;
+      let s0 = 0, s1 = 1;
+      if (dy === 0) { if (Math.abs(ya) >= reachR) continue; }
+      else {
+        const sa = (-reachR - ya) / dy, sb = (reachR - ya) / dy;
+        s0 = Math.max(0, Math.min(sa, sb)); s1 = Math.min(1, Math.max(sa, sb));
+        if (!(s1 > s0)) continue;
+      }
+      const at = (sv) => f(ya + dy * sv, za + (zb - za) * sv);
+      let lo = s0, hi = s1;
+      for (let k = 0; k < 60; k++) {
+        const m1 = hi - G * (hi - lo), m2 = lo + G * (hi - lo);
+        if (at(m1) < at(m2)) lo = m1; else hi = m2;
+      }
+      const v = Math.max(at(s0), at(s1), at((lo + hi) / 2));
+      if (v > best) best = v;
+    }
+  }
+  return best;
+}
+
+/* The 2D distance from (y, z) to a triangle's projection on the (y, z) plane. */
+function distToTri2(py, pz, ay, az, by, bz, cy, cz) {
+  const cr = (x1, y1, x2, y2) => x1 * y2 - y1 * x2;
+  const s1 = cr(by - ay, bz - az, py - ay, pz - az), s2 = cr(cy - by, cz - bz, py - by, pz - bz), s3 = cr(ay - cy, az - cz, py - cy, pz - cz);
+  if ((s1 >= 0 && s2 >= 0 && s3 >= 0) || (s1 <= 0 && s2 <= 0 && s3 <= 0)) return 0;
+  const seg = (x1, y1, x2, y2) => {
+    const dx = x2 - x1, dz = y2 - y1, L2 = dx * dx + dz * dz;
+    let u = L2 > 0 ? ((py - x1) * dx + (pz - y1) * dz) / L2 : 0;
+    u = u < 0 ? 0 : u > 1 ? 1 : u;
+    return Math.hypot(py - (x1 + dx * u), pz - (y1 + dz * u));
+  };
+  return Math.min(seg(ay, az, by, bz), seg(by, bz, cy, cz), seg(cy, cz, ay, az));
+}
+
+/* THE LENGTH A SUBTENDING LEAF MAY HAVE AND STILL CLEAR ITS OWN FLORET (Eva's
+   change 2). The blade is treated as the PRISM of its whole cross-section
+   envelope `E` (every emitted blade facet projected onto the (y, z) plane of
+   its own frame) run from its base `xb` to `xb + L`: a SUPERSET of the blade,
+   so a length that clears the prism clears the blade. For each emitted floret
+   vertex `q` (in the leaf's frame) whose cross-plane distance `dE` to `E` is
+   under the gap, the prism's tip face must stand `sqrt(gap^2 - dE^2)` short of
+   it along x: the blade's TIP (measured from the leaf's root, petiole
+   included) may reach `q.x - sqrt(gap^2 - dE^2)` and no further, and the
+   reach returned is the least such bound. A floret vertex closer to the root
+   than the shortest petiole the law can build (`xMin`) is not a length
+   question — no length moves the base — and is counted rather than bounding
+   anything. The caller turns the reach into a length, because the petiole's
+   own length follows the blade's (`LEAF_PETIOLE_FRACTION`). The floret is the EXPORT unit in both modes for the same
+   reason as the envelope. Returns Infinity when nothing of the floret enters
+   the corridor. */
+export function leafFloretCapMm(bladeP, xMin, xMax, gapMm, floretP, toLeaf) {
+  let ymin = Infinity, ymax = -Infinity, zmin = Infinity, zmax = -Infinity;
+  for (let k = 0; k < bladeP.length; k += 3) {
+    const y = bladeP[k + 1], z = bladeP[k + 2];
+    if (y < ymin) ymin = y; if (y > ymax) ymax = y; if (z < zmin) zmin = z; if (z > zmax) zmax = z;
+  }
+  /* A 2D bucket grid over the projected facets, so each floret vertex visits
+     only the facets within one gap of it — the answer is the brute-force one
+     (every facet within reach is visited), only cheaper. */
+  const cell = gapMm;
+  const ny = Math.max(1, Math.ceil((ymax - ymin) / cell) + 1), nz = Math.max(1, Math.ceil((zmax - zmin) / cell) + 1);
+  const buckets = new Map();
+  for (let t = 0; t < bladeP.length; t += 9) {
+    const y0 = Math.min(bladeP[t + 1], bladeP[t + 4], bladeP[t + 7]), y1 = Math.max(bladeP[t + 1], bladeP[t + 4], bladeP[t + 7]);
+    const z0 = Math.min(bladeP[t + 2], bladeP[t + 5], bladeP[t + 8]), z1 = Math.max(bladeP[t + 2], bladeP[t + 5], bladeP[t + 8]);
+    for (let a = Math.floor((y0 - ymin) / cell); a <= Math.floor((y1 - ymin) / cell); a++) {
+      for (let b = Math.floor((z0 - zmin) / cell); b <= Math.floor((z1 - zmin) / cell); b++) {
+        const k = a * nz + b;
+        let l = buckets.get(k);
+        if (!l) { l = []; buckets.set(k, l); }
+        l.push(t);
+      }
+    }
+  }
+  let cap = Infinity, behind = 0, at = null;
+  const seen = new Set();
+  for (let k = 0; k < floretP.length; k += 3) {
+    const q = toLeaf(floretP[k], floretP[k + 1], floretP[k + 2]);
+    if (q[1] < ymin - gapMm || q[1] > ymax + gapMm || q[2] < zmin - gapMm || q[2] > zmax + gapMm) continue;
+    if (q[0] > xMax + gapMm) continue;
+    const key = `${q[0]},${q[1]},${q[2]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    let dE = Infinity;
+    const ca = Math.floor((q[1] - ymin) / cell), cb = Math.floor((q[2] - zmin) / cell);
+    for (let a = ca - 1; a <= ca + 1 && dE > 0; a++) {
+      if (a < 0 || a >= ny) continue;
+      for (let b = cb - 1; b <= cb + 1 && dE > 0; b++) {
+        if (b < 0 || b >= nz) continue;
+        const l = buckets.get(a * nz + b);
+        if (!l) continue;
+        for (const t of l) {
+          const d = distToTri2(q[1], q[2], bladeP[t + 1], bladeP[t + 2], bladeP[t + 4], bladeP[t + 5], bladeP[t + 7], bladeP[t + 8]);
+          if (d < dE) dE = d;
+          if (dE === 0) break;
+        }
+      }
+    }
+    if (!(dE < gapMm)) continue;
+    if (q[0] < xMin) { behind++; continue; }
+    const c = q[0] - Math.sqrt(gapMm * gapMm - dE * dE);
+    if (c < cap) { cap = c; at = q; }
+  }
+  /* The bound lands the approach ON the bar, so the reach is taken to the
+     SECOND grid step below it — between one and two steps of
+     `SHARED_NODE_GRID_MM` under the exact bound (the offset's own slack, for
+     its own reason). */
+  if (Number.isFinite(cap)) cap = (Math.floor(cap / SHARED_NODE_GRID_MM) - 1) * SHARED_NODE_GRID_MM;
+  return { tipReachMm: cap, behind, at };
+}
+
+export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
   if (leafIsAbsent(state) || !stem || !stem.present) {
     return { present: false, nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
   }
@@ -13677,7 +13901,47 @@ export function leafPlan(state, stem, acc) {
      states: the inset scales with the STEM while the rise scales with the LEAF
      and its ANGLE, and no fraction of one holds the other two. CLAMPED AND
      TOLD — the read-out says when it bound and by how much. */
-  const { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm } = leafNodeLayout(state, stem.lengthMm);
+  let { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm } = leafNodeLayout(state, stem.lengthMm);
+  /* ===================================================================
+     THE SHARED NODE (ruling 5, the node-laws session). On a RACEME the leaves
+     stop being their own arrangement: each pedicel is SUBTENDED by one leaf,
+     at the pedicel's own node, at the pedicel's own azimuth (the pedicel owns
+     it), seated `sharedNodeOffsetMm` BELOW it. What shipped before this put
+     the two on independent node laws over the same rachis, and at the
+     shipping counts they landed on ONE root point — the state document
+     measured both at 103.2 mm, azimuth 0, a leaf and a pedicel rooted inside
+     each other.
+
+     THE FLORETS DO NOT MOVE WHEN THE LEAVES DO. This reads the inflorescence
+     plan and nothing reads back: the floret nodes, their pitch floor and their
+     inset are the inflorescence's own, so turning leaves on or off moves no
+     floret float. `leafNodes` and `leafPhyllotaxy` are HIDDEN AND INERT here
+     (the registry's `leafNodesOwn` is the other statement) — the count and the
+     arrangement are the pedicels'.
+
+     A LEAF THAT DOES NOT FIT IS NOT BUILT, AND TOLD. Its root must be on the
+     free rachis: depth plus offset plus its own (mode-free) radius within the
+     rachis length. The depths increase down the rachis, so the nodes that
+     lose their leaf are a SUFFIX, and the plan's node list is the prefix that
+     keeps one — `nodeIndex` stays the floret's own, which is what lets the
+     shared-node family pair a leaf with its pedicel by index. */
+  const shared = !!(inflo && inflo.present);
+  let sharedRec = null;
+  if (shared) {
+    const petioleRFree = leafNodePitchFloorMm(state.sheetThickness) / 2;
+    const bladeP = leafBladeLocalTris(state, widthMm, lengthMm);
+    const bladeReach = bladeReachMm(bladeP, inflo.pedicelR + MIN_FEATURE_MM);
+    const offsetRodMm = sharedNodeOffsetMm(inflo.pedicelR, petioleRFree, inflo.angleDeg, angleDeg);
+    const offsetMm = sharedNodeOffsetMm(inflo.pedicelR, petioleRFree, inflo.angleDeg, angleDeg, bladeReach);
+    const fits = inflo.nodeDepthsMm.map((d) => d + offsetMm + petioleRFree <= stem.lengthMm);
+    let k = 0;
+    while (k < fits.length && fits[k]) k++;
+    nodeDepthsMm = inflo.nodeDepthsMm.slice(0, k).map((d) => d + offsetMm);
+    insetSatisfied = nodeDepthsMm.length ? nodeDepthsMm[0] >= insetNeededMm : true;
+    sharedRec = { offsetMm, offsetRodMm, bladeReachMm: bladeReach, bindsOn: bladeReach > inflo.pedicelR + petioleRFree + MIN_FEATURE_MM ? 'blade' : 'rod',
+      petioleRFree, pedicelNodes: inflo.nodes, kept: k, noRoom: inflo.nodes - k,
+      pedicelDepthsMm: inflo.nodeDepthsMm.slice(), pedicelAngleDeg: inflo.angleDeg, pedicelR: inflo.pedicelR, bladeP };
+  }
   /* CAN THE HEAD BE CLEARED AT ALL? A leaf that rises further than the stem's
      own node span is long has nowhere to sit that clears the head, and that is
      a reachable corner (120 mm of leaf on a 20 mm stem). It is TOLD rather
@@ -13691,8 +13955,11 @@ export function leafPlan(state, stem, acc) {
      `leafNodePitchFloorMm`): the stem's nodes read the same depths, so a
      count that differed live/export would be a stem topology that did. */
   const petioleR0 = acc.floorThickness(state.sheetThickness) / 2;
-  const nodesClamped = nodeDepthsMm.length < nodes;
-  const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
+  const nodesAskedEff = shared ? inflo.nodes : nodes;
+  const nodesClamped = nodeDepthsMm.length < nodesAskedEff;
+  const azimuths = shared
+    ? nodeDepthsMm.map((_, i) => inflo.azimuths[i].slice())
+    : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
   /* THE PETIOLE. Its root radius is the WALL'S MID-THICKNESS — Phase A's
      ruling — and its radius is `partRadius`'s own rule, the one every rod in
      this file already uses (the filament's and the style's). */
@@ -13710,13 +13977,82 @@ export function leafPlan(state, stem, acc) {
   const clearMm = (nodeOuterR - rootR) + 2 * acc.floorFeature(state.sheetThickness);
   const petioleLenMm = Math.max(LEAF_PETIOLE_FRACTION * lengthMm, clearMm);
   const embedMm = rodWallEmbedMm(stem);
+  /* ===================================================================
+     THE LEAF LENGTH AT A FLOWERING NODE (Eva's change 2 — "a node carrying a
+     floret caps its leaf at the length that clears that floret"). Every node
+     of the shared arm carries one, so every shared leaf is capped; a leaf off
+     a raceme has no list and keeps the slider's full range (a BRANCH: the
+     builder reads `nodeLengthsMm` only where it exists). The SLIDER KEEPS THE
+     ASKED VALUE and the read-out says what was built — TUBE's snap shape. The
+     cap is per distinct pedicel length (the floret UNIT) and is read off the
+     EXPORT unit in both modes, so whether a blade exists is mode-free.
+
+     A CAP UNDER ONE PRINTABLE FEATURE BUILDS NO BLADE AT THAT NODE, TOLD: a
+     blade shorter than `MIN_FEATURE_MM` is not a blade (its 56 rows would be
+     slivers under the degeneracy bar), so its length is 0 and the node keeps
+     only its pedicel. Never clamped to something else silently. */
+  let nodeLengthsMm = null, nodePetioleLenMm = null, capRec = null;
+  if (shared && nodeDepthsMm.length) {
+    const memo = floretUnits || floretUnitMemo(state, inflo);
+    const th = (angleDeg * Math.PI) / 180;
+    const D = [Math.cos(th), 0, Math.sin(th)], N = [-Math.sin(th), 0, Math.cos(th)];
+    const perUnit = new Map();
+    nodeLengthsMm = [];
+    nodePetioleLenMm = [];
+    const capsMm = [];
+    for (let i = 0; i < nodeDepthsMm.length; i++) {
+      const L = inflo.pedicelLensMm[i], sessile = inflo.sessileNodes[i];
+      const key = `${L}|${sessile ? 1 : 0}`;
+      if (!perUnit.has(key)) {
+        const U = memo.get(L, true);
+        const pl = pedicelPlacement(inflo, i, 0, U.tipZLocal, sessile);
+        const M = pl.M;
+        const base = [rootR, 0, stem.rootZ - nodeDepthsMm[i]];
+        const toLeaf = (x, y, z) => {
+          const w = [M[0] * x + M[1] * y + M[2] * z + M[3] - base[0], M[4] * x + M[5] * y + M[6] * z + M[7] - base[1], M[8] * x + M[9] * y + M[10] * z + M[11] - base[2]];
+          return [w[0] * D[0] + w[2] * D[2], w[1], w[0] * N[0] + w[2] * N[2]];
+        };
+        perUnit.set(key, leafFloretCapMm(sharedRec.bladeP, clearMm, petioleLenMm + lengthMm, MIN_FEATURE_MM, U.sub.positions, toLeaf));
+      }
+      const c = perUnit.get(key);
+      /* THE REACH BECOMES A LENGTH THROUGH THE PETIOLE'S OWN LAW: the blade
+         starts `max(LEAF_PETIOLE_FRACTION * L, clearMm)` out, so the largest
+         `L` whose tip stays inside the reach solves `L + max(f L, clear) =
+         reach` — on the `clear` branch while `f L <= clear`, else `L = reach /
+         (1 + f)`. Deriving the petiole from the ASKED length instead would make
+         a LONGER asked leaf build a SHORTER blade (measured: 120 mm asked built
+         6.21 mm where 40 mm built 15.81) — a slider running backwards. */
+      const reach = c.tipReachMm;
+      let cap = Infinity;
+      if (Number.isFinite(reach)) {
+        cap = reach - clearMm;
+        if (LEAF_PETIOLE_FRACTION * cap > clearMm) cap = reach / (1 + LEAF_PETIOLE_FRACTION);
+      }
+      capsMm.push(cap);
+      const Lb = cap >= lengthMm ? lengthMm : cap >= MIN_FEATURE_MM ? cap : 0;
+      nodeLengthsMm.push(Lb);
+      nodePetioleLenMm.push(Lb === lengthMm ? petioleLenMm : Math.max(LEAF_PETIOLE_FRACTION * Lb, clearMm));
+    }
+    capRec = {
+      capsMm, lengthsMm: nodeLengthsMm.slice(),
+      capped: nodeLengthsMm.filter((x) => x < lengthMm).length,
+      noBlade: nodeLengthsMm.filter((x) => x === 0).length,
+      behind: [...perUnit.values()].reduce((n, c) => n + c.behind, 0),
+    };
+  }
+  const builtAz = nodeLengthsMm ? azimuths.reduce((n, a, i) => n + (nodeLengthsMm[i] > 0 ? a.length : 0), 0) : null;
   return {
-    present: true, lengthMm, widthMm, angleDeg, nodes: nodeDepthsMm.length, phyllotaxy: phyllo,
+    present: true, lengthMm, widthMm, angleDeg, nodes: nodeDepthsMm.length,
+    /* the length each node's blade is BUILT to (null off a raceme), and the
+       cap's record */
+    nodeLengthsMm, nodePetioleLenMm, lengthCap: capRec, phyllotaxy: shared ? inflo.phyllotaxy : phyllo,
     nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm, nodeOffsets, nodeOuterR,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
-    nodesAsked: nodes, nodesBuilt: nodeDepthsMm.length, nodesClamped,
+    nodesAsked: nodesAskedEff, nodesBuilt: nodeDepthsMm.length, nodesClamped,
+    /* THE SHARED NODE'S RECORD — null off a raceme. */
+    shared, sharedNode: sharedRec,
     boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemLengthMm: stem.lengthMm,
-    built: azimuths.reduce((n, a) => n + a.length, 0),
+    built: builtAz != null ? builtAz : azimuths.reduce((n, a) => n + a.length, 0),
     /* THE SERRATION THE BLADE IS BUILT FROM — the LEAF's own controls, read
        here so LF7 can compare them against the PAGE's read-back control state,
        which is an owner this plan does not write. A leaf reading the petal's
@@ -13797,11 +14133,18 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
-  const bs = leafBladeState(state);
+  /* THE LENGTH THIS NODE'S BLADE IS BUILT TO. On a raceme the shared node caps
+     it at the length that clears the node's own floret (`leafPlan`'s
+     `nodeLengthsMm`, Eva's change 2); everywhere else there is no per-node
+     list and this is the plan's one length — a BRANCH, so a leaf off a raceme
+     is the expression it always was. */
+  const perNode = !!plan.nodeLengthsMm;
+  const Lmm = perNode ? plan.nodeLengthsMm[nodeIndex] : plan.lengthMm;
+  const bs = perNode ? leafBladeState({ ...state, leafLength: Lmm }) : leafBladeState(state);
   const form = petalForm(bs, plan.widthMm / 2, acc.floorThickness(state.sheetThickness));
   const nu = LEAF_BLADE_ROWS;
   const cap = { petiole: true, rowCapacity: nu };
-  const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, plan.widthMm / 2, cap, acc, plan.lengthMm);
+  const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, plan.widthMm / 2, cap, acc, Lmm);
   const t = acc.floorThickness(state.sheetThickness);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   /* ON THE DISPLACED AXIS where the stem has nodes, and the pre-node
@@ -13832,7 +14175,8 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     const a = (2 * Math.PI * (i + 0.5)) / sides, c = Math.cos(a) * rp, d = Math.sin(a) * rp;
     return [base[0] + D0[0] * sv + T[0] * c + bi[0] * d, base[1] + D0[1] * sv + T[1] * c + bi[1] * d, base[2] + D0[2] * sv + T[2] * c + bi[2] * d];
   });
-  const PA = pring(-plan.embedMm), PB = pring(plan.petioleLenMm);
+  const pLen = perNode ? plan.nodePetioleLenMm[nodeIndex] : plan.petioleLenMm;
+  const PA = pring(-plan.embedMm), PB = pring(pLen);
   for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(PA[i], PA[j], PB[j], PB[i]); }
   for (let i = 1; i < sides - 1; i++) { acc.tri(PA[0], PA[i + 1], PA[i]); acc.tri(PB[0], PB[i], PB[i + 1]); }
   /* THE SOLID THE PETIOLE ACTUALLY CROSSES — LF3's measured side, computed
@@ -13841,14 +14185,14 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      `wall / cos(th)`, saturating at the rod's own length when the angle takes
      it parallel to the wall. A leaf crossing nothing is a detached shell that
      exports watertight, which is why this is reported at all. */
-  const crossesSolidMm = rodWallCrossingMm(plan, th, plan.petioleLenMm, plan.embedMm);
+  const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
-  const bb = [base[0] + D0[0] * plan.petioleLenMm, base[1] + D0[1] * plan.petioleLenMm, base[2] + D0[2] * plan.petioleLenMm];
+  const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
   const rows = [], rowHalfBaseMm = [];
   for (let i = 0; i <= nu; i++) {
     const u = i / nu;
     const fr = form ? form.frameAt(R, T, th, u) : { D: D0, T, N: [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)] };
-    const C = [bb[0] + fr.D[0] * u * plan.lengthMm, bb[1] + fr.D[1] * u * plan.lengthMm, bb[2] + fr.D[2] * u * plan.lengthMm];
+    const C = [bb[0] + fr.D[0] * u * Lmm, bb[1] + fr.D[1] * u * Lmm, bb[2] + fr.D[2] * u * Lmm];
     const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
     const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
     rowHalfBaseMm.push(hb);
@@ -13862,6 +14206,16 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     rows.push(cols);
   }
   const off = (q, n, sv) => [q[0] + n[0] * sv, q[1] + n[1] * sv, q[2] + n[2] * sv];
+  /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
+     — read off the skins this builder emits, never `pLen + Lmm` beside them.
+     SN4's measured side: a builder that built the ASKED length where the plan
+     capped it shows as this exceeding the plan's own reach. */
+  let emittedReachMm = -Infinity;
+  for (const row of rows) for (const c of row) for (const sv of [t / 2, -t / 2]) {
+    const q = off(c.P, c.n, sv);
+    const r = (q[0] - base[0]) * D0[0] + (q[1] - base[1]) * D0[1] + (q[2] - base[2]) * D0[2];
+    if (r > emittedReachMm) emittedReachMm = r;
+  }
   for (let i = 0; i < nu; i++) for (let j = 0; j < NV; j++) {
     const A = rows[i][j], B = rows[i][j + 1], C2 = rows[i + 1][j + 1], D = rows[i + 1][j];
     acc.quad(off(A.P, A.n, t / 2), off(D.P, D.n, t / 2), off(C2.P, C2.n, t / 2), off(B.P, B.n, t / 2));
@@ -13921,10 +14275,10 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     if (!(prof.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
     else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (prof.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
     const fromU = hi;
-    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * plan.lengthMm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };
+    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };
   })();
   return {
-    directedMismatch,
+    directedMismatch, emittedReachMm,
     /* THE HALF-WIDTHS THE BLADE WAS BUILT FROM, row by row, the BASE outline
        before any cut — the value handed to the cross-section as `hb`. LF9
        reads the tip exponent back off these, so a plan reporting one exponent
@@ -14889,8 +15243,36 @@ export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME']);
 export const FLORET_NODE_RANGE = Object.freeze([1, 12]);
 export const FLORET_PETAL_RANGE = Object.freeze([3, 12]);
 export const FLORET_SCALE_RANGE = Object.freeze([0.20, 1.00]);
-export const PEDICEL_LENGTH_RANGE = Object.freeze([5, 60]);
+/* THE FLOOR IS 0 AND 0 IS SESSILE (ruling 7, the node-laws session). The
+   5 mm floor the raceme shipped with was a ROD's floor — a pedicel is a rod
+   and a rod must clear the wall it roots in — and the discovery said in as
+   many words that sessile is not a length of 0 but a TOPOLOGY: the floret's
+   hub rooted IN the rachis wall. So the range opens to 0 and 0 is a BRANCH,
+   not a very short rod: `floretState` builds the floret with no stem at all
+   and `pedicelPlacement` roots its HUB's underside on the bore (see its own
+   header). Between 0 and 5 the rod is simply a short rod, continuous with
+   what shipped. */
+export const PEDICEL_LENGTH_RANGE = Object.freeze([0, 60]);
 export const PEDICEL_ANGLE_RANGE = Object.freeze([-60, 90]);
+/* THE GRADIENT (the node-laws session) — a RATIO, the lowest node's pedicel
+   to the topmost one's, linear in MILLIMETRES DOWN THE RACHIS between them.
+   1 is today's raceme, by BRANCH: every pedicel is `pedicelLength` itself,
+   the same double, so a build at 1 forms no product at all. Above 1 the lower
+   pedicels lengthen (a raceme graded toward a corymb, and past the corymb an
+   ANTHELA-LIKE overtopping falls out for free — said, not exposed); below 1
+   they shorten, and 0 takes the lowest node SESSILE, so a spike tapering into
+   a raceme is reachable on one slider. `pedicelLength` stays the TOPMOST
+   node's length, so the node nearest the head — the one the inset is derived
+   for — never moves as this slider does. */
+export const PEDICEL_GRADIENT_RANGE = Object.freeze([0, 3]);
+/* THE CORYMB IS A DERIVED SOLVE BEHIND A TOGGLE, never a control on the
+   lengths (the discovery's "the level-tops solve, derived"). OFF is today's
+   raceme (and the gradient's), ON solves every pedicel so its floret's head
+   lands on ONE PLANE square to the rachis through the topmost floret's head:
+   `L_k = L_0 + (d_k - d_0) / sin(angle)`. A PLANE and not a shallow dome,
+   because the plane has NO free parameter — a dome needs a radius, which is
+   a number nobody asked for and would be a control by another name. */
+export const PEDICEL_CORYMB_VALUES = Object.freeze(['OFF', 'ON']);
 
 /* THE TWO STATEMENTS, and this is the geometry's half. The registry's twin is
    `PREDICATES.inflorescencePresent`; ID0 checks they agree per row and the
@@ -14965,6 +15347,49 @@ export function inflorescencePlan(state, stem, acc) {
   const nodesClamped = nodeDepthsMm.length < nodesAsked;
   const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
 
+  /* ===================================================================
+     THE PER-NODE PEDICEL LENGTH (the node-laws session). Two derived laws on
+     one array, and the guard of both is a BRANCH: with the gradient at 1 and
+     the corymb OFF every entry IS `pedicelLenMm`, the same double, so the
+     shipping raceme is bit-identical by construction rather than by an
+     argument about `L * 1`.
+
+     THE STATION IS A LENGTH, NOT AN INDEX — this project's first durable
+     rule. A node's place between the top and the bottom is its depth in
+     millimetres over the span the depths actually occupy, so a count clamped
+     by the pitch floor moves no surviving node's share of the gradient.
+
+     THE CORYMB SOLVE IS EXACT, AND ITS ONE OWNER IS THIS EXPRESSION. Every
+     floret head stands `L + c` along its own pedicel direction from its root
+     (`c` the floret's own constant offset from its pedicel's tip to its hub —
+     the same floret, the same `c`), every pedicel leaves at the same angle,
+     and the roots differ only in depth, so `z_k = z_0` is `(L_k - L_0) sin(th)
+     = d_k - d_0`. AT AN ANGLE AT OR BELOW LEVEL THERE IS NO SOLVE — a level or
+     descending pedicel cannot raise its head by lengthening — and the toggle
+     is INERT AND TOLD there rather than producing a negative or infinite
+     length. A SESSILE TOP (pedicelLength 0) carries a different `c` (no
+     pedicel, no join — see `pedicelPlacement`), so the plane then misses by
+     exactly that difference; the builder MEASURES the spread of the emitted
+     heads rather than this plan claiming it.
+
+     THE CEILING IS THE PEDICEL'S OWN OWNER, `STEM_LENGTH_RANGE` — the pedicel
+     IS the floret's stem — and a length past it is CLAMPED AND TOLD. The
+     floor is 0, sessile. */
+  const gradient = state.pedicelGradient === undefined ? 1 : Number(state.pedicelGradient);
+  const corymbAsked = String(state.pedicelCorymb ?? 'OFF') === 'ON';
+  const sinTh = Math.sin((angleDeg * Math.PI) / 180);
+  const corymb = corymbAsked && sinTh > 0;
+  const corymbInert = corymbAsked && !corymb;
+  const dTop = nodeDepthsMm[0], dLow = nodeDepthsMm[nodeDepthsMm.length - 1];
+  const graded = !corymbAsked && gradient !== 1;
+  const pedicelLensAskedMm = nodeDepthsMm.map((d) => (corymb ? pedicelLenMm + (d - dTop) / sinTh
+    : graded ? pedicelLenMm * (1 + (gradient - 1) * (dLow > dTop ? (d - dTop) / (dLow - dTop) : 0))
+    : pedicelLenMm));
+  const lenCeilMm = STEM_LENGTH_RANGE[1];
+  const pedicelLensMm = pedicelLensAskedMm.map((L) => clamp(L, 0, lenCeilMm));
+  const lengthsClamped = pedicelLensMm.some((L, i) => L !== pedicelLensAskedMm[i]);
+  const sessileNodes = pedicelLensMm.map((L) => L === 0);
+
   /* THE ROOT RADIUS IS THE WALL'S MID-THICKNESS — the leaf's Phase A ruling,
      and it is load-bearing rather than tidy: a rod rooted ON THE AXIS detaches
      above about 75 degrees because its escape length runs away as
@@ -15008,14 +15433,24 @@ export function inflorescencePlan(state, stem, acc) {
     Number(state.petalLength) > 0 ? LB.min / Number(state.petalLength) : 0,
     Number(state.petalWidth) > 0 ? WB.min / Number(state.petalWidth) : 0);
 
-  const crossesSolidMm = rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR },
-    (angleDeg * Math.PI) / 180, pedicelLenMm, embedMm);
+  /* THE CROSSING, per STALKED node, and the plan reports the THINNEST. A
+     sessile node has no rod to cross anything — its join is the hub in the
+     wall, which `buildInflorescenceInto` measures off the emitted floret
+     (`wallReachR`) — so it is not in this minimum; `null` where every node is
+     sessile. At one length the minimum is the one value, the same double. */
+  const crossings = pedicelLensMm.map((L) => (L > 0
+    ? rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm)
+    : null));
+  const stalked = crossings.filter((c) => c !== null);
+  const crossesSolidMm = stalked.length ? Math.min(...stalked) : null;
 
   return {
     present: true, type, phyllotaxy: phyllo, perNode,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
-    rootR, embedMm, crossesSolidMm,
+    rootR, embedMm, crossesSolidMm, crossings,
+    gradient, corymbAsked, corymb, corymbInert, graded, pedicelLensMm, pedicelLensAskedMm,
+    lengthsClamped, lenCeilMm, sessileNodes,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
     boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemTipZ: stem.tipZ, rachisLengthMm: stem.lengthMm,
     floretPetals: Math.round(Number(state.floretPetals)), scale,
@@ -15041,7 +15476,7 @@ export function inflorescencePlan(state, stem, acc) {
    the pedicel's two numbers go, and every clause ST0-ST11 already holds about
    them. `stemDiameter` is the DERIVED area-rule radius doubled, never a
    control. */
-export function floretState(state, plan) {
+export function floretState(state, plan, lengthMm = plan.pedicelLenMm) {
   return {
     ...state,
     /* A FLORET DOES NOT INHERIT THE TUBE (Eva's ruling): every whorl FREE */
@@ -15051,7 +15486,7 @@ export function floretState(state, plan) {
     petalCount: plan.floretPetals,
     petalLength: plan.petalLength,
     petalWidth: plan.petalWidth,
-    stemLength: plan.pedicelLenMm,
+    stemLength: lengthMm,
     stemDiameter: 2 * plan.pedicelR,
   };
 }
@@ -15084,15 +15519,31 @@ export function floretState(state, plan) {
    `PEDICEL_ANGLE_RANGE`, whose floor is -60 — the minimal rotation is not
    unique and the fallback picks the half-turn about `+x`; said rather than
    hidden. */
-export function pedicelPlacement(plan, nodeIndex, az, tipZLocal) {
+export function pedicelPlacement(plan, nodeIndex, az, tipZLocal, sessile = false) {
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0];
   const D = [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
   const base = [plan.rootR * R[0], plan.rootR * R[1], z];
   /* The pedicel's tip sits `embedMm` INSIDE the wall along `-D`, which is
-     where the leaf's own petiole ring starts (`pring(-plan.embedMm)`). */
-  const root = [base[0] - D[0] * plan.embedMm, base[1] - D[1] * plan.embedMm, base[2] - D[2] * plan.embedMm];
+     where the leaf's own petiole ring starts (`pring(-plan.embedMm)`).
+
+     THE SESSILE ROOT LAW (ruling 7: "rooted into the rachis wall by one wall
+     thickness — a root law, no control"). With no pedicel the floret's own
+     HUB is what roots, and the point placed on the wall is its UNDERSIDE ON
+     THE AXIS (`tipZLocal`, which `buildInflorescenceInto` reads off the
+     floret's own hub). It is placed `embedMm` RADIALLY inward of the wall's
+     mid-thickness — which is the BORE's own surface, `boreR`, at every angle
+     — never along `-D`: along the pedicel's direction the reach would be
+     `embedMm * (1 + cos th)`, one wall only when level and 0.91 of one at the
+     shipped 35 deg. Radially it is exactly `outerR - boreR` at every angle,
+     and the hub's own extent only reaches FURTHER in ("at least one wall",
+     the discovery's own wording). On a solid rachis `boreR` is 0 and the hub
+     is rooted to the axis. A BRANCH on the sessile flag, so every stalked
+     floret's root is the expression it always was. */
+  const root = sessile
+    ? [base[0] - R[0] * plan.embedMm, base[1] - R[1] * plan.embedMm, base[2]]
+    : [base[0] - D[0] * plan.embedMm, base[1] - D[1] * plan.embedMm, base[2] - D[2] * plan.embedMm];
   const kx = -D[1], ky = D[0], kz = 0;                 // z x D
   const kl = Math.hypot(kx, ky, kz);
   const k = kl === 0 ? [1, 0, 0] : [kx / kl, ky / kl, kz / kl];
@@ -15123,14 +15574,67 @@ export function pedicelPlacement(plan, nodeIndex, az, tipZLocal) {
    has a stream that is a PREFIX of the same bloom with one — the sepal
    session's own construction, and what lets the byte partition state its
    claim as "prefix plus a tail of exactly the declared instances". */
-export function buildInflorescenceInto(acc, state, plan) {
+/* THE FLORET UNITS, MEMOISED BY (MODE, LENGTH) — extracted from
+   `buildInflorescenceInto` verbatim so the SHARED NODE's leaf-length cap (Eva's
+   change 2, the node-laws session's second round) can read the very floret it
+   must clear BEFORE the leaves are emitted, without a second build of it. A unit
+   is a pure function of `(state, plan, length, mode)` — the build-order session
+   measured that a head is a pure function of its state — so building it earlier
+   moves no float of it, and the export-mode units the cap reads are the ones the
+   export build then appends. */
+export function floretUnitMemo(state, plan) {
+  const cache = new Map();
+  return {
+    get(L, exportMode) {
+      const key = `${exportMode ? 'E' : 'L'}|${L}`;
+      if (cache.has(key)) return cache.get(key);
+      const sub = new MeshBuilder({ exportMode });
+      const fs = floretState(state, plan, L);
+      const rec = buildBloomInto(sub, fs, { below: null });
+      const stalked = !!(rec.stem && rec.stem.present);
+      const hubT = sub.floorThickness(rec.hub.thickness);
+      const tipZ = stalked ? rec.stem.tipZ : hubAxisTopZ(rec.hub.dome, hubT) - hubT;
+      const U = { lengthMm: L, sub, fs, rec, stalked, tipZLocal: tipZ, tris: sub.triangleCount };
+      cache.set(key, U);
+      return U;
+    },
+  };
+}
+
+export function buildInflorescenceInto(acc, state, plan, memo = null) {
   if (!plan.present) return null;
   const tris0 = acc.triangleCount;
-  const sub = new MeshBuilder({ exportMode: acc.exportMode });
-  const fs = floretState(state, plan);
-  const unit = buildBloomInto(sub, fs, { below: null });
-  const unitTris = sub.triangleCount;
-  const tipZLocal = unit.stem && unit.stem.present ? unit.stem.tipZ : 0;
+  /* ONE BUILD PER DISTINCT PEDICEL LENGTH (the node-laws session). The
+     gradient and the corymb make the florets' states DIFFER — the pedicel is
+     the floret's own stem, so a length per node is by construction a state
+     per node — and the state document recorded the consequence before a line
+     was written: the build is memoised by the DISTINCT state, O(distinct)
+     rather than O(N). Here the only per-node difference is the length, so the
+     key is the length itself (an exact double: two nodes share a unit only if
+     their lengths are the same number). At the shipping raceme every node
+     asks the same length, so this is ONE build and N appends, exactly what
+     shipped. Units are built in node order, so unit 0 is always the TOPMOST
+     node's — `pedicelLength` itself — and the legacy `unit` / `unitTris` /
+     `tipZLocal` / `floretState` fields below are that unit's, unchanged.
+
+     A SESSILE UNIT (length 0) IS A FLORET WITH NO STEM, and the point that
+     roots is its hub's UNDERSIDE ON THE AXIS: `hubAxisTopZ` (the face a stem
+     would be rooted through from, extracted from `stemPlan`) less one sheet —
+     the flat slab's -t/2, the inner cap's apex, the sphere's outer far pole.
+     Read from the floret's OWN hub record, so a floret on a domed or spherical
+     head roots by the right face without a second derivation. */
+  const units = [], unitIndexOf = new Map();
+  const unitMemo = memo || floretUnitMemo(state, plan);
+  const unitFor = (L) => {
+    if (unitIndexOf.has(L)) return unitIndexOf.get(L);
+    units.push(unitMemo.get(L, acc.exportMode));
+    unitIndexOf.set(L, units.length - 1);
+    return units.length - 1;
+  };
+  for (let i = 0; i < plan.nodes; i++) unitFor(plan.pedicelLensMm[i]);
+  const sub = units[0].sub, fs = units[0].fs, unit = units[0].rec;
+  const unitTris = units[0].tris;
+  const tipZLocal = units[0].tipZLocal;
   const placed = [];
   /* THE PLACEMENT RESIDUAL — the ONLY witness for `appendTransformed`, and it
      is a SECOND EXPRESSION for the same arithmetic on purpose.
@@ -15185,21 +15689,32 @@ export function buildInflorescenceInto(acc, state, plan) {
     return Math.hypot(x - (a.inner[0] + ax * t), y - (a.inner[1] + ay * t), z - (a.inner[2] + az * t)) <= a.radiusMm + 1e-3;
   };
   for (let i = 0; i < plan.nodes; i++) {
+    const ui = unitIndexOf.get(plan.pedicelLensMm[i]), U = units[ui];
+    const sessile = plan.sessileNodes[i];
     for (const az of plan.azimuths[i]) {
-      const pl = pedicelPlacement(plan, i, az, tipZLocal);
+      const pl = pedicelPlacement(plan, i, az, U.tipZLocal, sessile);
       /* THE PEDICEL'S OWN AXIS IN WORLD SPACE, from the floret BUILDER's own
          emitted rod ends through THIS placement's matrix — computed once, so
          the flag below and ST9's excusal read one segment rather than two. */
       {
-        const sb = unit.stemBuilt;
+        const sb = U.rec.stemBuilt;
         const at3 = (z) => [pl.M[2] * z + pl.M[3], pl.M[6] * z + pl.M[7], pl.M[10] * z + pl.M[11]];
         pl.axis3 = sb && Number.isFinite(sb.emittedTopZ) && Number.isFinite(sb.emittedTipZ) && sb.emittedMaxR > 0
           ? { inner: at3(sb.emittedTopZ), outer: at3(sb.emittedTipZ), radiusMm: sb.emittedMaxR }
           : null;
       }
       const at = acc.positions.length;
-      const n = acc.appendTransformed(sub, pl.M);
-      const M = pl.M, src = sub.positions;
+      const n = acc.appendTransformed(U.sub, pl.M);
+      const M = pl.M, src = U.sub.positions;
+      /* THE SESSILE EMBED'S MEASURED SIDE — how far into the rachis the
+         floret's OWN emitted vertices reach: the least cylindrical radius of
+         any of them inside the rachis's own height span. The root law says
+         the hub's underside reaches the BORE (`boreR`) on a hollow rachis and
+         the axis on a solid one; this reads what was emitted, never the root
+         point the plan chose, so a hub left at the wall's mid-thickness (or
+         rooted along the pedicel's direction) shows as a radius short of the
+         bore. Measured on every placement, asserted on the sessile ones. */
+      let wallReachR = Infinity;
       for (let k = 0; k < src.length; k += 3) {
         const x = src[k], y = src[k + 1], z = src[k + 2];
         const dx = acc.positions[at + k] - (M[0] * x + M[1] * y + M[2] * z + M[3]);
@@ -15226,7 +15741,12 @@ export function buildInflorescenceInto(acc, state, plan) {
            rachis and a cap's do not. Reported, not clamped — the range Eva
            ruled stays reachable. */
         const X = acc.positions[at + k], Y = acc.positions[at + k + 1], Z = acc.positions[at + k + 2];
-        if (!onPedicelRod(X, Y, Z, pl)) {
+        if (Z <= plan.rootZ && Z >= plan.stemTipZ) { const rr = Math.hypot(X, Y); if (rr < wallReachR) wallReachR = rr; }
+        /* A SESSILE FLORET IS FUSED INTO ITS RACHIS BY THE ROOT LAW, so it is
+           not in this flag's subject: a clearance between two solids the
+           design joins means nothing (ST9's own scope sentence). Its join is
+           the embed, measured above. */
+        if (!sessile && !onPedicelRod(X, Y, Z, pl)) {
           const dd = freeStemDistanceMm(rachis, X, Y, Z);
           if (dd < rachisApproach) rachisApproach = dd;
         }
@@ -15250,11 +15770,31 @@ export function buildInflorescenceInto(acc, state, plan) {
          rod is, and a rod emitted somewhere other than where the plan says is
          the defect the naming exists to keep visible. */
       placed.push({ nodeIndex: i, az, M: pl.M, D: pl.D, root: pl.root, tris: n, at,
-        headAt: [pl.M[3], pl.M[7], pl.M[11]], pedicelAxis: pl.axis3 });
+        headAt: [pl.M[3], pl.M[7], pl.M[11]], pedicelAxis: pl.axis3,
+        unit: ui, lengthMm: U.lengthMm, sessile, wallReachR: Number.isFinite(wallReachR) ? wallReachR : null });
     }
   }
+  /* THE CORYMB'S MEASURED SIDE — the spread of the emitted heads' heights,
+     read off the placement matrices the appends used (local [0, 0, 0] is the
+     floret's hub, on its own axis). The plan solves the lengths; this says
+     whether the heads actually landed level. Reported on every raceme. */
+  const headZ = placed.map((q) => q.headAt[2]);
+  const headSpreadMm = headZ.length ? Math.max(...headZ) - Math.min(...headZ) : null;
   return {
-    present: true, unitTris, tipZLocal, count: placed.length, placed,
+    present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm,
+    /* EVERY DISTINCT UNIT, in node order — unit 0 is the topmost node's and
+       is the one the legacy single-unit fields below describe. */
+    units: units.map((U) => ({
+      lengthMm: U.lengthMm, tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
+      petalsBuilt: U.rec.petalsBuilt, hubRadius: U.rec.hub.radius, hubThickness: U.rec.hub.thickness,
+      stem: U.rec.stem, stemBuilt: U.rec.stemBuilt, sphereMode: U.rec.foot.sphereMode === true,
+      maxDimensionMm: U.sub.maxDimensionMm, minThickness: U.sub.minThickness,
+      omissionAsked: U.rec.stemOmission ? U.rec.stemOmission.asked : null,
+      omissionBuilt: U.rec.stemOmission ? U.rec.stemOmission.built : null,
+      omitted: U.rec.stemOmission ? U.rec.stemOmission.omitted.slice() : null,
+      floretState: { stemLength: U.fs.stemLength, stemDiameter: U.fs.stemDiameter },
+      positions: U.sub.positions,
+    })),
     tris: acc.triangleCount - tris0, placementResidual: residual, placementCompared: compared,
     /* THE FLAG: how near any floret's own body (never its pedicel rod) comes
        to the free rachis. Infinity where nothing was appended. */
@@ -16562,10 +17102,13 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
      §5 settled. ABSENT BY BRANCH at `leafLength` 0 (ruling 6): `leafPlan`
      returns `present: false`, the loop does not run, and the row is the
      pre-leaf expression term for term. */
-  const leafPlanned = leafPlan(state, stemPlanned, acc);
+  const floretUnits = infloPlanned && infloPlanned.present ? floretUnitMemo(state, infloPlanned) : null;
+  const leafPlanned = leafPlan(state, stemPlanned, acc, infloPlanned, floretUnits);
   const leavesBuilt = [];
   if (leafPlanned.present) {
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
+      /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
+      if (leafPlanned.nodeLengthsMm && !(leafPlanned.nodeLengthsMm[i] > 0)) continue;
       for (const az of leafPlanned.azimuths[i]) leavesBuilt.push(buildLeafInto(acc, leafPlanned, state, i, az));
     }
   }
@@ -16614,7 +17157,7 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
      sepals, so the stream of a bloom without an inflorescence is a PREFIX of
      the stream with one. Null by branch at type NONE and where there is no
      rachis to hang it on. */
-  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned);
+  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned, floretUnits);
   /* THE FILAMENT-AGAINST-STYLE FLAG (session 23; B2b's family, built on
      Eva's ruling of Sep 6 on the ±180 curl range: the crossing is not a
      property of the range's ends, so what closes the question is an

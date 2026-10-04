@@ -378,9 +378,14 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        it fire at once. It did, on this exact clause, the first time a leaf was
        built — which is the second time this clause has caught a new part, after
        the stem. The plan is asked of its ONE owner and nothing is re-derived. */
-    const lfPlan = mod.leafPlan(ui, stPlan, accST);
+    /* ON A RACEME THE LEAVES ARE THE PEDICELS' (the shared node, ruling 5),
+       so the leaf plan is handed the inflorescence plan exactly as the
+       builder hands it — asked of its one owner, before either emits. */
+    const inPlan = mod.inflorescencePlan(ui, stPlan, accST);
+    const lfPlan = mod.leafPlan(ui, stPlan, accST, inPlan);
     if (lfPlan.present) {
       for (let i = 0; i < lfPlan.azimuths.length; i++) {
+        if (lfPlan.nodeLengthsMm && !(lfPlan.nodeLengthsMm[i] > 0)) continue;   // the cap left no blade (the plan says so)
         for (const az of lfPlan.azimuths[i]) mod.buildLeafInto(accST, lfPlan, ui, i, az);
       }
     }
@@ -395,7 +400,6 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        rasterised. Crown closure is a property of the HEAD's own petals over
        the head's own disc, and a floret 20 mm out on a pedicel is no more
        "covering the crown" than a stamen over the centre is. */
-    const inPlan = mod.inflorescencePlan(ui, stPlan, accST);
     mod.buildInflorescenceInto(accST, ui, inPlan);
     const fr = mod.footRing(ui, accFull);
 
