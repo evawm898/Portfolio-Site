@@ -231,6 +231,7 @@ strength claim in this repo is still theory.
 | edges | rounded edges (full bullnose on every wing edge, the default); Top view on load; Render / SVG toggle; the outline editor on the wing itself; the reference backdrop behind the whole bug | **built (§10)** — waits on Eva's ruling on `docs/img/bug-edges-sheet.png` |
 | image | IMAGE → BUG: paste / drop / load a top-down picture, fit an editable bug to it (outline and proportions only) | **built (§11)** — waits on Eva's ruling on `docs/img/bug-image-sheet.jpg` and on her own pictures in the preview |
 | wing library, step 2 | the BLENDED ROOT (every wing narrows to its own short, filleted attachment); every fitted wing a COMPLETE shape; the smoothness clause J | **built (§12)** — waits on Eva's ruling on the exploded sheet; the library file and gallery are not built yet |
+| wing library, own frames | each wing fitted along its own long axis, its angle stored as the pair's sweep; the fore/hind split from the two wing axes; #1–#17 re-expressed (outline + sweep per pair) | **built (§13.6)** — waits on Eva's keep / drop list for #18–#55 |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
 | 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
@@ -2071,8 +2072,9 @@ its own seeded stream for every bug with wings, and the page prints the label.
    hindwing scallop that read as 9 "scallop depth reduced" repairs over the 17 shapes and put
    shape #1 under the floor. The count is kept (it is inert at depth 0). Undo: drop
    `scallop` from `applyWingShape` and `WING_SHAPE_WRITES` (and the gate's restated list).
-2. **Sweep is 0 on both pairs** (ruled: keep — Eva, on #349) — the shapes were fitted at sweep 0, so their orientation is
-   in the points; keeping the bug's sweep would rotate them off the fit.
+2. ~~**Sweep is 0 on both pairs** (ruled: keep — Eva, on #349) — the shapes were fitted at sweep 0, so their orientation is
+   in the points; keeping the bug's sweep would rotate them off the fit.~~ **SUPERSEDED by §13.6** (Eva's ruling on the
+   #18–#55 sheet): each shape stores its own sweep per pair, its outline in its own frame, and applying writes both.
 3. **A blend smooths margin detail — PARKED (Eva, on #349).** Random blends read plainer than
    either parent: two scalloped margins whose bumps do not line up average toward a smooth
    edge (and the blend re-expresses the mix with one more control point than the denser
@@ -2141,3 +2143,155 @@ order, and writes the step-2 exploded sheet to `out-add/`, survivors numbered on
 library's last id; a fit under the floor at 0.6 mm is re-fitted at the nearest tolerance that
 clears it, and still flagged (red row) when none does. Existing ids never change: kept shapes are
 APPENDED to `bug-wing-library.js` after Eva's keep / drop list.
+
+### 13.6 Each wing in its own frame — the angle is the sweep, not the points
+
+Eva's ruling on the #18–#55 sheet: the fitter assumed a butterfly attitude and baked each wing's
+angle into its outline points, and applying a library shape forced sweep 0 — so a moth's
+forewing swept back over its hindwing, or any wing at a non-butterfly angle, came out as a
+distorted shape at sweep 0 (#43's forewing a stub, #50's bulging toward the body with a hooked
+scrap of hindwing). Now:
+
+- **A wing is fitted in its OWN frame.** Its long axis runs from its hinge to its APEX, the point
+  of its outline farthest from the hinge (a tail excluded: a swallowtail's tail is not where the
+  wing points); u runs along it, w across it. The axis's angle is the pair's **sweep** (+ =
+  backward, the geometry's own sign), fitted per pair, fore and hind independently
+  (`wingAxis` in bug-image.js). In that frame the apex is the outline's largest u, the point
+  every apex rule in the geometry (resample, scallop, tail anchor, the blend) already reads.
+- **Units.** A wing's length is still its REACH across the body (the forewing's is the bug's
+  size, which applying a shape keeps; the hindwing's is that times its lengthRatio), so in its
+  own frame its apex sits at u = 1 / cos(sweep). `OUTLINE_BOUNDS.u` reaches 1.6 (it was 1.2):
+  1.40 is the most the library uses; a fitted wing swept past ~50 degrees has its length grown
+  to keep the apex at 1.55. (Normalising every wing to apex u = 1 was tried for the hindwing
+  first: #15's long hindwing then asked for 60.3 mm and the 60 mm slider clamped it.)
+- **The root is rebuilt square to the wing's own axis** (`rerootChain`). The geometry closes
+  every outline on a root chord at u = 0 — square to the wing's axis through its hinge — and a
+  root the picture shows runs along the BODY's edge, square to the axis only at sweep 0. So the
+  outline is kept from where it leaves the body and joined by a cubic Hermite, tangent to the
+  margin, to each end of a short root chord centred on the hinge (half-width 0.02 of the length
+  in w), arriving along the axis. (The #349 library's own chord, 0.10 of the length, was tried:
+  it put four of the 17 shapes' hindwings under the floor on the default bug and moved two
+  shapes past LB7's 0.05 mm.) Everything rebuilt is inside the body. A forewing swept forward
+  has a sliver of its trailing root BEHIND that chord's line (beside the body, behind the hinge),
+  so **`OUTLINE_BOUNDS.u` reaches -0.2 as well**: an outline may run a little behind its own root
+  line; the root points themselves stay at u = 0. (Trimming those points to u >= 0 was built
+  first: the forewing's trailing edge then turned up toward its hinge 0.5 mm outside the body,
+  opening a visible V between the pairs — a 3 mm difference on the assembled outline.)
+- **The root tab goes straight into the body** (`rootTab`, bug-geometry.js): the tab that buries
+  the root chord in the thorax now runs along world -x, square to the body, at any sweep, and
+  its two corners go to ONE world depth (`embed` past the chord's innermost end), so the tab's
+  deep end is square to the body too. Along the wing's own axis (as before) a swept library
+  wing's tab stood out of the body beside the head; moving both chord ends by the same distance
+  left the deep end slanted, and the gate's R clause read a sweep-40 falcate pair's root 1.01 mm
+  out of order. At sweep 0 it is the old `[-embed, w]` by branch; **every swept wing's buried tab moves —
+  the default bug's included (forewing -27°, hindwing 14°)** — all of it inside the body.
+- **The floor is not judged inside the body** (`thinAnalysis`'s `inBody`, `planformInBody`): on
+  a SWEPT wing every planform point is carried to world through the flat wing transform and
+  tested against the body's own silhouette half-width there (`profileAt`); at sweep 0 the old
+  tests stand by branch (u < 0 with the blended root; nothing excluded without it). A swept
+  wing's root is rebuilt inside the body, and on a SMALL bug that short chord read as a neck
+  under the floor: over the 17 plain shapes on 40 random bugs the re-expressed library was
+  refused 34 of 680 times against #349's 13 under the old test; under this one, 18 — 9 under
+  the floor (FEWER than #349's 13) and 9 a tail that will not fit (next). RANDOMIZE WINGS on
+  LB4's 12 random bases re-rolls 12 refused blends in 48 rolls, every one a tail, against
+  #349's 8. (A first cut excluded only what stands behind the hinge in world x; the hinge sits
+  inside the thorax, so the rebuilt root still read thin — every flagged point on #38, #40,
+  #49 and #54 was inside the default body.) The gate's own floor measure restates the rule
+  from a different owner: the body part's EMITTED contour (`contourLoops`), through
+  `editorFrame`'s hinge and sweep. **Still worse than #349, reported, not tuned:** #16's tail is
+  anchored in its HINDWING's own frame, and on a one-pair bug the tail goes on the only pair —
+  the forewing outline — where it now crosses (the 9); #349's forewing happened to take it.
+- **Three fitter repairs the refit sheet asked for.** (i) Where no notch has a wing on each
+  side (a hindwing under `AXIS_LOBE_FRAC` of the reach), the split falls back to the old rule —
+  the deepest concavity at `NOTCH_MIN_FRAC`, square to the body — instead of reading one pair
+  (#23). (ii) Two interior control points closer than the outline rule allows, at the tight tip
+  of a wing swept past 60 degrees, are merged into their midpoint rather than the tolerance
+  tightened, which only adds points there (#48's hindwing, 0.011 apart). (iii) A wing's length
+  keeps everything drawn inside u 1.55 along its axis, a TAIL included — the axis excludes the
+  tail, so #53's hindwing tail reached u 1.81 and was refused. (iv) Where the outline leaves the
+  body wholly to one side of the hinge (a forewing whose leading edge emerges behind the hinge
+  line), the root chord is centred between the two kept ends rather than on the hinge — still
+  at u = 0 — because bridges from a hinge-centred chord crossed (#36's forewing pinched).
+- **The fore / hind split uses the axes** (one wing mass, split at a notch). A notch between two
+  pairs must have a WING on each side of it: seen from the middle of the mass's attachment, the
+  farthest point of the outline ahead of the notch and the farthest behind it must each reach
+  `AXIS_LOBE_FRAC` (0.4) of the farthest point overall; the deepest concavity that passes is the
+  notch, from `AXIS_NOTCH_MIN_FRAC` (0.045) deep (0.06 without the axes). The split line then
+  runs from the notch to the MIDDLE of the attachment, between the two hinges, instead of square
+  to the body. **For a heavily overlapped pair** (a moth: the forewing swept back over most of
+  the hindwing) this is what changes: the notch is the shallow step where the forewing's tornus
+  meets the hindwing's margin — not a dent in the forewing's costa, which has no wing ahead of
+  it (#43's 0.066-deep costa dent cut its forewing off at the root; its real notch is 0.058
+  deep, under the old minimum) — and the diagonal line gives the forewing its own inner margin
+  instead of a slice of hindwing (#50). The hindwing's hidden leading edge under the forewing is
+  completed by §12.2's bridges, as before.
+- **A library shape is outline + sweep per pair**: `fore.sweep`, `hind.sweep` in
+  bug-wing-library.js; `applyWingShape` writes both (a record with no sweep applies at 0), so
+  the sweep slider and SET SPECIMEN act on a library shape like any other (13.3 #2's "sweep 0"
+  is superseded). `blendWingShapes` mixes each outline in its own frame (apex to apex along the
+  wings' own axes) and the sweeps separately, at the same t.
+- **#1–#17 re-expressed** (`node tools/bug-wing-reframe.mjs [id ...]`): each old outline as
+  drawn on the default bug, re-rooted as above, rotated into its own frame, and refitted — the
+  fewest-points fit at a loose tolerance, then its knots MOVED (Levenberg-Marquardt) until the
+  spline lies on the old curve, points of the old curve added where it still strays. (Rotating
+  the old control points alone is exact only at stretch 1: the spline is centripetal in the
+  editor's anisotropic units, so a rotation bends it between its knots — up to 0.25 mm at
+  stretch 1.8. The general fewest-points fitter stalled at 0.06–0.13 mm against its own minimum
+  point spacing.) The #349 data is kept verbatim in `tools/bug-wing-library-v1.mjs` for the
+  gate. Point counts grow modestly (see the table in 13.6.1). Shape numbers do not change.
+- **Saved designs are untouched**: a design stores its own points and sweep per pair.
+
+The 17 re-expressed (sweeps in degrees, + backward):
+
+| shape | fore points (#349 → own frame) | hind points | fore sweep | hind sweep |
+|---|---|---|---|---|
+| #1 | 12 → 18 | 17 → 25 | -27.21 | 44.68 |
+| #2 | 17 → 25 | 18 → 23 | -38.27 | 41.78 |
+| #3 | 12 → 18 | 15 → 20 | -36.29 | 40.73 |
+| #4 | 12 → 28 | 8 → 20 | -26.8 | 40.28 |
+| #5 | 15 → 21 | 15 → 22 | -32.51 | 34.31 |
+| #6 | 12 → 19 | 10 → 16 | -30.72 | 21.29 |
+| #7 | 8 → 15 | 8 → 15 | -16.93 | 54.75 |
+| #8 | 12 → 19 | 15 → 20 | -27.45 | 41.05 |
+| #9 | 14 → 22 | 22 → 27 | -28.78 | 44.88 |
+| #10 | 11 → 16 | 9 → 17 | -16.27 | 47.58 |
+| #11 | 17 → 24 | 19 → 25 | -31.61 | 50.16 |
+| #12 | 11 → 16 | 11 → 16 | -17.09 | 26.67 |
+| #13 | 13 → 19 | 21 → 26 | -26.96 | 54.52 |
+| #14 | 13 → 21 | 19 → 26 | -21.52 | 50.53 |
+| #15 | 21 → 28 | 18 → 23 | -38.65 | 40.5 |
+| #16 | 12 → 24 | 15 → 29 | -26.92 | 49.54 |
+| #17 | 18 → 24 | 19 → 23 | -20.87 | 59.81 |
+| all | 230 → 357 | 259 → 373 | | |
+
+#### 13.6.1 Verification
+
+- **LB7** — every re-expressed shape, applied to the default bug, assembles to its #349 outline
+  within 0.05 mm: the visible outline (both sides, less what any other wing or the body covers)
+  AS CURVES — the drawn spline sampled at 40 points a segment, through each pair's editorFrame —
+  beyond 1 mm of the body. Curves and not the mesh: the mesh draws the spline as 10 chords a
+  segment, and those chords stand up to 0.07 mm off the curve on the #349 shapes themselves, so
+  a 0.05 mm bar on the mesh would measure facets. **Within 1 mm of the body the root is rebuilt
+  and is NOT held** — the one place the re-expression is allowed to differ, said here rather
+  than hidden. The reference is the OLD DATA through the same apply, never the tool.
+- **OPEN — the rebuilt root shows, and the full gate says so.** LB7 holds every shape within
+  0.05 mm beyond 1 mm of the body, and inside that millimetre the root is rebuilt. The full
+  gate's J (outline jagged) and S (a stray contour loop — a line in the SVG) read that
+  millimetre: the hinge stands only ~0.9 mm inside the default thorax's edge, so a rebuilt root
+  has to turn a pair's whole sweep (27-60 degrees) within it, and the bead folds on the turn.
+  Measured, single-shape library rows failing J or S on the default bug (of 17): **the shipped
+  data (chord 0.02 of the length x the stretch) 17**; #349's own 0.10-of-the-length chord 9,
+  and it also put #9's and #15's hindwings under the floor and moved #8 0.080 mm past LB7; the
+  #349 outline kept to its old root corners — tried on #1 alone: J cleared, S did not; those
+  corners trimmed 0.5 mm past the hinge line 11 (#1 clean), and #16's tail moved 0.67 mm; the fit held to the body's edge
+  rather than 1 mm beyond it — no change on #5 and #8. What to change is Eva's (the session
+  report carries the options).
+- **LB8** — every shape stores a sweep per pair and its outline in its own frame (the apex on
+  the u axis within 1.5 degrees; the refit slides a rounded tip's farthest point by up to 1.05).
+- **LB2** applying writes the shape's sweep; **LB5** a blend's sweeps are the parents' at t.
+- **IM15** — each fitted pair's sweep is the bearing, from the fitted bug's own hinge, of the
+  KNOWN bug's apex (placed as IM3 places the known outline), within 3 degrees, and the params
+  carry it on every pair.
+- Negative control: `the fitted sweep is dropped` (bug-image.js, IM15), `applying ignores the
+  shape's sweep` (LB7), `a blend drops the sweep` (LB5), and a DATA mutant, `a library shape's
+  sweep zeroed` (LB7).

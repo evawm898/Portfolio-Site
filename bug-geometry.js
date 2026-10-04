@@ -97,7 +97,10 @@ export const CR_SAMPLES = 10;               // samples per control segment
 export const INTERP_SAMPLES = 48;           // per half (leading / trailing)
 const WING_SUBDIV = 2;                      // 1->4 midpoint subdivisions of the triangulated planform
 /* Editor bounds of the drawn outline, in units of the wing's own length. */
-export const OUTLINE_BOUNDS = { u: [0, 1.2], w: [-0.9, 0.46] };   // room below for a tail
+/* u reaches 1.6 (it was 1.2): a forewing drawn in its OWN frame (§13.6) keeps
+   the forewing's span as its unit, so its apex sits at 1 / cos(sweep) — 1.25 on
+   the library's 17, 1.56 at a 50-degree sweep. */
+export const OUTLINE_BOUNDS = { u: [-0.2, 1.6], w: [-0.9, 0.46] };   // room below for a tail
 const MIN_POINT_GAP = 0.012;                // consecutive control points closer than this are refused
 const MIN_ROOT_CHORD = 0.03;                // root lead must sit this far ahead of root trail
 export const MIN_OUTLINE_POINTS = 4;        // two roots + two interior
@@ -805,8 +808,11 @@ function randomOutline(r) {
      wings.unlinked — cleared, so 3–4 pairs' middles BLEND between the two
      wings.tail — the shape's tail group, on; or, for a shape with none, the
        bug's own tail group switched off (its points are kept, not deleted)
-   Sweep is 0 because the outline was fitted at sweep 0: the orientation is IN
-   the points. Scallop depth is 0 for the same reason: a fitted outline carries
+   Sweep is the shape's own, per pair (§13.6): each outline is stored in its OWN
+   frame (u along the wing's long axis, root to apex) and its angle is the
+   pair's sweep, so the sweep slider and SET SPECIMEN act on a library shape
+   like any other. A shape with no sweep field (a pre-§13.6 record, its
+   orientation in its points) applies at sweep 0. Scallop depth is 0 for the same reason: a fitted outline carries
    its OWN margin, and the procedural scallop would cut a second one into it
    (on the default bug's 0.06 hindwing scallop that read as 9 "scallop reduced"
    repairs over 17 shapes and put shape #1 under the floor). Its count is kept. The pair count, every per-pair field below the outline (scallop,
@@ -816,8 +822,8 @@ export const WING_SHAPE_WRITES = { first: ['points', 'stretch', 'sweep', 'scallo
 export function applyWingShape(params, shape) {
   const p = clone(params);
   const W = p.wings, lf = WING_FIELDS.find((f) => f.id === 'length');
-  W.first.points = shape.fore.points.map((q) => q.slice()); W.first.stretch = shape.fore.stretch; W.first.sweep = 0; W.first.scallop = 0;
-  W.last.points = shape.hind.points.map((q) => q.slice()); W.last.stretch = shape.hind.stretch; W.last.sweep = 0; W.last.scallop = 0;
+  W.first.points = shape.fore.points.map((q) => q.slice()); W.first.stretch = shape.fore.stretch; W.first.sweep = shape.fore.sweep ?? 0; W.first.scallop = 0;
+  W.last.points = shape.hind.points.map((q) => q.slice()); W.last.stretch = shape.hind.stretch; W.last.sweep = shape.hind.sweep ?? 0; W.last.scallop = 0;
   W.last.length = +clamp(W.first.length * shape.hind.lengthRatio, lf.min, lf.max).toFixed(3);
   W.unlinked = {};
   W.tail = shape.tail ? clone({ ...shape.tail, on: true }) : W.tail ? { ...clone(W.tail), on: false } : clone({ ...STARTER_TAIL, on: false });
@@ -828,8 +834,11 @@ export function applyWingShape(params, shape) {
    in TRUE planform (w x its own stretch, so two shapes drawn at different
    stretches mix as drawn, not as numbers), mixed, divided back by the mixed
    stretch and re-expressed as control points (one more than the denser of the
-   two, so the blend keeps the detail). The tail is the NEARER shape's (a tail
-   group's points cannot be mixed point for point with a shape that has none). */
+   two, so the blend keeps the detail). Each outline is mixed in its OWN frame
+   and the SWEEP is mixed separately (§13.6): two wings at different angles are
+   matched apex to apex along their own axes, not across the body. The tail is
+   the NEARER shape's (a tail group's points cannot be mixed point for point
+   with a shape that has none). */
 export function blendWingShapes(a, b, t) {
   const mixOutline = (pa, sa, pb, sb, s) => {
     const A = resampleApexAligned(sampleOutline(pa)), B = resampleApexAligned(sampleOutline(pb));
@@ -838,9 +847,10 @@ export function blendWingShapes(a, b, t) {
   };
   const fs = lerp(a.fore.stretch, b.fore.stretch, t), hs = lerp(a.hind.stretch, b.hind.stretch, t);
   const near = t < 0.5 ? a : b;
+  const sweep = (x, y) => +lerp(x.sweep ?? 0, y.sweep ?? 0, t).toFixed(2);
   return {
-    fore: { stretch: +fs.toFixed(4), points: mixOutline(a.fore.points, a.fore.stretch, b.fore.points, b.fore.stretch, fs) },
-    hind: { stretch: +hs.toFixed(4), lengthRatio: +lerp(a.hind.lengthRatio, b.hind.lengthRatio, t).toFixed(4), points: mixOutline(a.hind.points, a.hind.stretch, b.hind.points, b.hind.stretch, hs) },
+    fore: { stretch: +fs.toFixed(4), sweep: sweep(a.fore, b.fore), points: mixOutline(a.fore.points, a.fore.stretch, b.fore.points, b.fore.stretch, fs) },
+    hind: { stretch: +hs.toFixed(4), sweep: sweep(a.hind, b.hind), lengthRatio: +lerp(a.hind.lengthRatio, b.hind.lengthRatio, t).toFixed(4), points: mixOutline(a.hind.points, a.hind.stretch, b.hind.points, b.hind.stretch, hs) },
     tail: near.tail ? clone(near.tail) : null,
   };
 }
@@ -1302,6 +1312,11 @@ function edt2(src, nx, ny) {
 
 export function thinAnalysis(poly, floor, opts = {}) {
   const ig = opts.ignoreXBelow ?? -Infinity;   // material at x < ig is not judged (the root tab, inside the body)
+  // a SWEPT wing's body edge is not x = 0 in its own planform: `inBody(x, y)`,
+  // when given, says which planform points lie inside the body seen from
+  // above, and those are not judged; absent (sweep 0), the old test, by branch
+  const inBody = opts.inBody || null;
+  const judged = inBody ? (x, y) => !inBody(x, y) : (x) => x >= ig;
   const h = floor / THIN_RES, r = floor / 2;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -1331,12 +1346,12 @@ export function thinAnalysis(poly, floor, opts = {}) {
   for (let i = 0; i < opened.length; i++) opened[i] = inside[i] && dCore[i] <= r2 ? 1 : 0;
   const dOpen = edt2(opened, nx, ny);
   let maxDepth = 0;
-  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i] && gx + ((i % nx) + 0.5) * h >= ig) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
+  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i] && judged(gx + ((i % nx) + 0.5) * h, gy + (Math.floor(i / nx) + 0.5) * h)) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
   const tau = THIN_DEPTH_FRAC * floor;
   const flags = new Uint8Array(poly.length);
   for (let k = 0; k < poly.length; k++) {
     const i = clamp(Math.floor((poly[k][0] - gx) / h), 0, nx - 1), j = clamp(Math.floor((poly[k][1] - gy) / h), 0, ny - 1);
-    flags[k] = poly[k][0] >= ig && Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
+    flags[k] = judged(poly[k][0], poly[k][1]) && Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
   }
   return { maxDepth, thin: maxDepth > tau, flags, tau };
 }
@@ -2037,6 +2052,15 @@ function edgeField(p, thick, outline, umax) {
   return { h, dist, flat: false, tip };
 }
 
+/* Which planform points (a, b, mm) of a wing at `hinge` swept `sweepDeg` lie
+   INSIDE the body seen from above: the flat wing transform (editorFrame's,
+   no pitch or dihedral) to world, against the body's own silhouette half-width
+   there (profileAt). The floor is not judged inside the body (§13.6): a swept
+   wing's root is rebuilt there, and nothing of it is seen or printed alone. */
+function planformInBody(p, L, hinge, sweepDeg) {
+  const sw = sweepDeg * D2R, cs = Math.cos(sw), sn = Math.sin(sw);
+  return (a, b) => { const x = hinge[0] + a * cs + b * sn, y = hinge[1] - a * sn + b * cs; return Math.abs(x) < profileAt(p, L, y)[0]; };
+}
 function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   const thick = Math.max(p.minDiameter, spec.thickness);
   const span = spec.length;
@@ -2048,9 +2072,13 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // The drawn curve in world millimetres, scallops cut (one owner: drawnPlanformMm).
   const { scalloped, drawn, umax, scallopReduced, rootWarp: rootW, rootReduced, posOf, srcOf } = drawnPlanformMm(spec);
   const edge = edgeField(p, thick, scalloped, umax), hAt = (q) => edge.h(q[0], q[1]);
-  // Root: the closing chord moved INTO the thorax by `embed`.
+  // Root: the closing chord moved INTO the thorax by `embed` — straight in,
+  // square to the body (world -x), whatever the sweep: a tab run along a swept
+  // wing's own axis stood out of the body beside the head once library shapes
+  // carried their own sweep (§13.6). At sweep 0 it is the old [-embed, w] by branch.
   const n0 = scalloped[0], n1 = scalloped[scalloped.length - 1];
-  let poly = [[-embed, n0[1]], ...scalloped, [-embed, n1[1]]];
+  const tabOf = rootTab(embed, spec.sweep, [n0, n1]), T0 = tabOf(n0), T1 = tabOf(n1);
+  let poly = [T0, ...scalloped, T1];
   // the curve runs clockwise in (u, w); the triangulator wants CCW
   poly = poly.reverse();
   /* Phase 2 — VENATION. The cells are planned on the DRAWN planform (scallops
@@ -2084,7 +2112,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // vertices kept, and the root tab is three triangles through R — so the
     // frame is a single closed slab whose rim walk (planformSlab) finds the
     // hole rims by the same directed-edge rule as the outer rim.
-    ({ pts, tris: tri } = frameMesh(plan, embed, n0, n1));
+    ({ pts, tris: tri } = frameMesh(plan, T0, T1));
     tri = flipDegenerate(pts, tri);
     // under the blended root every main vein converges on the neck, so the
     // cells between them are long thin wedges and an ear clip hands back
@@ -2181,8 +2209,8 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // judges nothing inside the body (u < 0). Without it, the drawn polygon closed
   // on its root chord, exactly as before.
   const thin = rootW
-    ? (() => { const t = thinAnalysis([[-embed, n0[1]], ...scalloped, [-embed, n1[1]]], p.minDiameter, { ignoreXBelow: 0 }); return { ...t, flags: t.flags.slice(1, -1) }; })()
-    : thinAnalysis(scalloped, p.minDiameter);
+    ? (() => { const t = thinAnalysis([T0, ...scalloped, T1], p.minDiameter, spec.sweep ? { inBody: planformInBody(p, L, hinge, spec.sweep) } : { ignoreXBelow: 0 }); return { ...t, flags: t.flags.slice(1, -1) }; })()
+    : thinAnalysis(scalloped, p.minDiameter, spec.sweep ? { inBody: planformInBody(p, L, hinge, spec.sweep) } : {});
   part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau };
   part.meta.thinFlags = Array.from(thin.flags);
   // the same flagged runs in WORLD millimetres, just above the top face — the
@@ -2352,9 +2380,23 @@ function improveTriangulation(poly, tris) {
   return tris;
 }
 
+/* The root tab's corners for the root chord's two ends (planform mm): each
+   moved along world -x (the wing transform's inverse) to ONE world depth,
+   `embed` past the chord's innermost end — so the tab's deep end is square to
+   the body at any sweep, as it is at sweep 0. Moving both ends by the same
+   distance instead left a swept chord's deep end slanted, one corner deeper
+   than the other, and the gate's R clause (the mean y of the innermost tab
+   vertices) read a sweep-40 root a millimetre off its hinge. Sweep 0 is the
+   old [-embed, w], by branch. */
+function rootTab(embed, sweepDeg, ends) {
+  if (!sweepDeg) return (q) => [-embed, q[1]];
+  const sw = sweepDeg * D2R, cs = Math.cos(sw), sn = Math.sin(sw), wx = (q) => q[0] * cs + q[1] * sn;
+  const deep = Math.min(...ends.map(wx)) - embed;
+  return (q) => { const d = wx(q) - deep; return [q[0] - d * cs, q[1] - d * sn]; };
+}
 /* The HOLES frame as one triangle set over one vertex pool (vertices shared by
    coordinate, so a cell edge is the same two indices in both cells). */
-function frameMesh(plan, embed, lead, trail) {
+function frameMesh(plan, leadTab, trailTab) {
   const key = new Map(), pts = [];
   const vid = (q) => { const k = `${q[0]},${q[1]}`; let i = key.get(k); if (i === undefined) { i = pts.length; pts.push([q[0], q[1]]); key.set(k, i); } return i; };
   const tris = [];
@@ -2375,7 +2417,7 @@ function frameMesh(plan, embed, lead, trail) {
   }
   // the root tab, fanned over EVERY vertex on the root chord (the vein
   // starts), so the chord stays conforming with the cells
-  const tt = vid([-embed, trail[1]]), lt = vid([-embed, lead[1]]);
+  const tt = vid(trailTab), lt = vid(leadTab);
   const ch = plan.rootChord.map(vid);                       // trail ... lead
   for (let i = 0; i + 1 < ch.length; i++) tris.push([tt, ch[i], ch[i + 1]]);
   tris.push([tt, ch[ch.length - 1], lt]);

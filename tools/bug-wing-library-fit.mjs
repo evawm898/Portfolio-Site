@@ -54,7 +54,7 @@ export const DEDUPE_FRAC = 0.03;
    name, so a re-run of the split reproduces the same set. */
 export const KEEP = ['sheet-1#1', 'sheet-1#2', 'sheet-1#3', 'sheet-1#4', 'sheet-1#5', 'sheet-1#7', 'sheet-1#8', 'sheet-1#9', 'sheet-1#10', 'sheet-1#11', 'sheet-1#12', 'sheet-1#13', 'sheet-1#14', 'sheet-1#16', 'sheet-1#18', 'sheet-1#19', 'sheet-1#21'];     // near-identical: shape distance under 3% of the wingspan
 
-function decode(file) {
+export function decode(file) {
   const id = execFileSync('identify', ['-format', '%w %h', file]).toString().trim().split(' ').map(Number);
   const data = execFileSync('convert', [file, '-alpha', 'off', '-depth', '8', 'rgba:-'], { maxBuffer: 1 << 28 });
   return { width: id[0], height: id[1], data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.length) };
@@ -138,15 +138,16 @@ export function recordOf(params) {
   const fw = params.wings.first, hw = params.wings.last;
   return {
     pairs: params.wingPairs,
-    fore: { points: fw.points.map((q) => q.slice()), stretch: fw.stretch },
-    hind: { points: hw.points.map((q) => q.slice()), stretch: hw.stretch, lengthRatio: +(hw.length / fw.length).toFixed(4) },
+    fore: { points: fw.points.map((q) => q.slice()), stretch: fw.stretch, sweep: fw.sweep ?? 0 },
+    hind: { points: hw.points.map((q) => q.slice()), stretch: hw.stretch, sweep: hw.sweep ?? 0, lengthRatio: +(hw.length / fw.length).toFixed(4) },
     tail: params.wings.tail && params.wings.tail.on ? JSON.parse(JSON.stringify(params.wings.tail)) : null,
     _resolved: wp.length,
   };
 }
 
 /* SHAPE DISTANCE, the dedupe measure: each record applied to ONE reference bug
-   (the default bug, its forewing at its default 41 mm, sweep 0, flat), the
+   (the default bug, its forewing at its default 41 mm, each pair at the
+   record's own sweep — §13.6 — flat), the
    top-down silhouette of its right wings sampled densely, and the symmetric
    Hausdorff distance between two silhouettes' boundaries, as a fraction of the
    default bug's wingspan. Taken on the APPLIED shapes rather than on control
@@ -155,8 +156,8 @@ export function applyRecord(base, rec) {
   const p = JSON.parse(JSON.stringify(base));
   p.wingPairs = 2;
   const L = p.wings.first.length;
-  Object.assign(p.wings.first, { points: rec.fore.points.map((q) => q.slice()), stretch: rec.fore.stretch, sweep: 0 });
-  Object.assign(p.wings.last, { points: rec.hind.points.map((q) => q.slice()), stretch: rec.hind.stretch, sweep: 0, length: +(L * rec.hind.lengthRatio).toFixed(3) });
+  Object.assign(p.wings.first, { points: rec.fore.points.map((q) => q.slice()), stretch: rec.fore.stretch, sweep: rec.fore.sweep ?? 0 });
+  Object.assign(p.wings.last, { points: rec.hind.points.map((q) => q.slice()), stretch: rec.hind.stretch, sweep: rec.hind.sweep ?? 0, length: +(L * rec.hind.lengthRatio).toFixed(3) });
   p.wings.unlinked = {};
   p.wings.tail = rec.tail ? JSON.parse(JSON.stringify(rec.tail)) : (p.wings.tail ? { ...p.wings.tail, on: false } : null);
   return p;
@@ -181,6 +182,40 @@ function hausdorff(A, B) {
    this sheet says what the gate would — never a second copy of the rule */
 let JAG = null;
 const JAGGED = () => { if (!JAG) { const src = fs.readFileSync(path.join(ROOT, 'tools/verify-bug.mjs'), 'utf8'); const a = src.indexOf('const JAG_DEADBAND'), b = src.indexOf('function smoothChecks'); JAG = new Function(src.slice(a, b).replace('export function', 'function') + '; return jaggedness;')(); } return JAG; };
+/* One crop through the fitter: the silhouette first (the fitter's own Otsu
+   cannot see a white band or a glass pane as wing), the source pixels if the
+   silhouette is refused; a fit under the print floor at 0.6 mm is re-fitted at
+   the nearest tolerance that clears it, and the sheet says so — never widened
+   by hand. */
+export function fitCrop(c, base, extra = {}) {
+  let r = imageToBug(c.sil, base, { ...extra }), input = 'silhouette';
+  if (!r.ok) { const r2 = imageToBug(c.img, base, { ...extra }); if (r2.ok) { r = r2; input = 'source pixels'; } }
+  let tolUsed = 0.6;
+  if ((KEPT || ADD) && r.ok && G.buildBug(r.params).floorViolations.length) {
+    for (const tol of [0.45, 0.8, 0.35, 1.0, 0.25, 1.3]) {
+      const r2 = imageToBug(input === 'silhouette' ? c.sil : c.img, base, { ...extra, toleranceMm: tol });
+      if (r2.ok && !G.buildBug(r2.params).floorViolations.length) { r = r2; tolUsed = tol; break; }
+    }
+  }
+  if (!r.ok) return { ok: false, reason: r.reason, input };
+  const m = G.buildBug(r.params);
+  const rw = m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R');
+  return {
+    ok: true, input, tolUsed,
+    record: recordOf(r.params), notes: r.notes, transform: r.transform.matrix,
+    fit: r.pairs.map((q) => ({ points: q.points, maxDevMm: +q.maxDevMm.toFixed(3), tail: q.tail ? (q.tail.inline ? 'inline' : q.tail.points) : null })),
+    mode: r.pairs.length, split: r.split, splitMode: r.mode,
+    sweeps: r.pairs.map((q) => +(q.sweep ?? 0).toFixed(1)),
+    svg: G.exportSvg(m).svg,
+    overlay: m.parts.filter((q) => /^wing\d$/.test(q.kind)).flatMap((part) => G.contourLoops(m, part).map((L) => L.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)]))),
+    floor: (m.floorViolations || []).map((v) => `pair ${v.pair + 1}${v.kind ? ' ' + v.kind : ''}`),
+    // each wing ALONE in its OWN frame: its built planform (mm, before the sweep), root tab excluded
+    wings: rw.map((q) => q.meta.planform.slice(1, -1).map(([u, w]) => [+u.toFixed(3), +w.toFixed(3)])),
+    bridged: r.pairs.map((q) => (q.bridged || []).map((b) => `${b.kind} ${b.lengthMm} mm`).join(', ') || 'none'),
+    modelNotes: m.notes,
+    smooth: rw.map((q) => { const j = JAGGED()(q.meta.drawnMm, r.params.minDiameter); return j.jagged ? `JAGGED (${j.worst.kind})` : 'smooth'; }),
+  };
+}
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 async function main() {
   const sheets = args.includes('--sheet') ? args.flatMap((a, i) => (args[i - 1] === '--sheet' ? [a] : [])) : fs.readdirSync(SRC).filter((f) => /\.(webp|png|jpe?g)$/i.test(f)).sort().map((f) => path.join(SRC, f));
@@ -191,42 +226,17 @@ async function main() {
     const crops = splitSheet(img);
     console.log(`${path.basename(file)}: ${img.width}x${img.height}, ${crops.length} butterflies`);
     crops.forEach((c, j) => {
-      if (KEPT && !KEEP.includes(`${path.basename(file).replace(/\.\w+$/, '')}#${j + 1}`)) return;
-      const t0 = Date.now();
-      // the silhouette first (the fitter's own Otsu cannot see a white band or a
-      // glass pane as wing); the source pixels if the silhouette is refused
-      let r = imageToBug(c.sil, base, {}), input = 'silhouette';
-      if (!r.ok) { const r2 = imageToBug(c.img, base, {}); if (r2.ok) { r = r2; input = 'source pixels'; } }
-      // a library shape must build VALID at the default settings: a fit whose
-      // outline falls under the print floor somewhere (a pointed tail tip at the
-      // default 0.6 mm tolerance) is re-fitted at the nearest tolerance that clears
-      // it, and the sheet says so — the shape is never widened by hand
-      let tolUsed = 0.6;
-      if ((KEPT || ADD) && r.ok && G.buildBug(r.params).floorViolations.length) {
-        for (const tol of [0.45, 0.8, 0.35, 1.0, 0.25, 1.3]) {
-          const r2 = imageToBug(input === 'silhouette' ? c.sil : c.img, base, { toleranceMm: tol });
-          if (r2.ok && !G.buildBug(r2.params).floorViolations.length) { r = r2; tolUsed = tol; break; }
-        }
-      }
       const name = `${path.basename(file).replace(/\.\w+$/, '')}#${j + 1}`;
-      const cropPng = encodePNG(c.img);
-      const entry = { name, sheet: path.basename(file), index: j + 1, box: c.box, ok: r.ok, input, tolUsed, ms: Date.now() - t0, cropPng: cropPng.toString('base64') };
-      if (!r.ok) { entry.reason = r.reason; console.log(`  ${name}: REFUSED — ${r.reason}`); cands.push(entry); return; }
-      entry.record = recordOf(r.params);
-      entry.notes = r.notes;
-      entry.transform = r.transform.matrix;
-      entry.fit = r.pairs.map((q) => ({ points: q.points, maxDevMm: +q.maxDevMm.toFixed(3), tail: q.tail ? (q.tail.inline ? 'inline' : q.tail.points) : null }));
-      entry.mode = r.pairs.length;
-      const m = G.buildBug(r.params);
-      entry.svg = G.exportSvg(m).svg;
-      entry.overlay = m.parts.filter((q) => /^wing\d$/.test(q.kind)).flatMap((part) => G.contourLoops(m, part).map((L) => L.map(([x, y]) => [+x.toFixed(3), +y.toFixed(3)])));
-      entry.floor = (m.floorViolations || []).map((v) => `pair ${v.pair + 1}${v.kind ? ' ' + v.kind : ''}`);
-      // each wing ALONE: its built planform (mm, the blended root applied), root tab excluded
-      entry.wings = m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R').map((q) => q.meta.planform.slice(1, -1).map(([u, w]) => [+u.toFixed(3), +w.toFixed(3)]));
-      entry.bridged = r.pairs.map((q) => (q.bridged || []).map((b) => `${b.kind} ${b.lengthMm} mm`).join(', ') || 'none');
-      entry.modelNotes = m.notes;
-      entry.smooth = m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R').map((q) => { const j = JAGGED()(q.meta.drawnMm, r.params.minDiameter); return j.jagged ? `JAGGED (${j.worst.kind})` : 'smooth'; });
-      console.log(`  ${name}: ${r.pairs.length} pair(s), points ${r.pairs.map((q) => q.points).join('/')}, tail ${entry.record.tail ? 'yes' : 'no'}${entry.floor.length ? ', FLOOR ' + entry.floor.join(', ') : ''} (${entry.ms} ms)`);
+      if (KEPT && !KEEP.includes(name)) return;
+      if (ADD && ADD_DROPPED.includes(name)) { console.log(`  ${name}: dropped (Eva)`); return; }
+      const t0 = Date.now();
+      const entry = { name, sheet: path.basename(file), index: j + 1, box: c.box, cropPng: encodePNG(c.img).toString('base64'), ...fitCrop(c, base) };
+      entry.ms = Date.now() - t0;
+      // the same crop through the fitter as it was before §13.6 (no axes: the
+      // butterfly attitude, sweep 0, the split square to the body)
+      if (ADD) entry.before = fitCrop(c, base, { axisFrame: false });
+      if (!entry.ok) { console.log(`  ${name}: REFUSED — ${entry.reason}`); cands.push(entry); return; }
+      console.log(`  ${name}: ${entry.mode} pair(s), points ${entry.fit.map((q) => q.points).join('/')}, sweep ${entry.sweeps.join('/')}, tail ${entry.record.tail ? 'yes' : 'no'}${entry.floor.length ? ', FLOOR ' + entry.floor.join(', ') : ''} (${entry.ms} ms)`);
       cands.push(entry);
     });
   }
@@ -329,12 +339,51 @@ ${cands.map(row).join('\n')}`;
   await screenshot();
 }
 
-/* --add: dedupe against the CURRENT library first (an entry applied the way the
-   page applies it is measured by the same Hausdorff), then within the batch in
-   reading order; survivors numbered on from the library's last id. The assembled
-   SVG is the default bug, so its root is the current default root. */
+/* --add (§13.5, §13.6): dedupe against the CURRENT library first (an entry
+   applied the way the page applies it — outline AND sweep — measured by the
+   same Hausdorff), then within the batch in reading order. The numbers are
+   PINNED to the first sheet Eva saw (ADD_NUMBERS), so a shape keeps its number
+   across re-fits; a shape that sheet did not number is numbered on after them.
+   Every row shows the fitter BEFORE §13.6 beside it (no axes, sweep 0, the split
+   square to the body). The assembled SVG is the default bug, so its root is the
+   current default root. Last, four RANDOMIZE WINGS blends before / after (the
+   #349 library and blend against the re-expressed library and the blend that
+   mixes outline and sweep separately), with the margin-detail measure. */
+export const ADD_DROPPED = ['sheet-2#20'];   // #34, the same butterfly as #22 (Eva)
+export const ADD_NUMBERS = { 'sheet-2#1': 18, 'sheet-2#2': 19, 'sheet-2#3': 20, 'sheet-2#4': 21, 'sheet-2#5': 22, 'sheet-2#6': 23, 'sheet-2#7': 24, 'sheet-2#8': 25, 'sheet-2#9': 26, 'sheet-2#12': 27, 'sheet-2#13': 28, 'sheet-2#14': 29, 'sheet-2#15': 30, 'sheet-2#16': 31, 'sheet-2#17': 32, 'sheet-2#18': 33, 'sheet-2#20': 34, 'sheet-3#1': 35, 'sheet-3#2': 36, 'sheet-3#3': 37, 'sheet-3#4': 38, 'sheet-3#5': 39, 'sheet-3#6': 40, 'sheet-4#1': 41, 'sheet-4#2': 42, 'sheet-4#3': 43, 'sheet-4#4': 44, 'sheet-4#5': 45, 'sheet-4#6': 46, 'sheet-4#7': 47, 'sheet-4#8': 48, 'sheet-4#9': 49, 'sheet-4#10': 50, 'sheet-4#11': 51, 'sheet-4#12': 52, 'sheet-4#13': 53, 'sheet-4#14': 54, 'sheet-4#15': 55 };
+export const BLEND_SEEDS = [3, 7, 11, 19];
+
+/* MARGIN DETAIL, for the parked plain-blend problem (§13.3 #3): how far a
+   wing's built outline stands from the same outline smoothed along its own arc
+   (a Gaussian, sigma 2 mm) — the mean, in mm, over both wings. A plain blend
+   averages two margins' bumps away, so it reads LESS detail than its parents. */
+export function marginDetail(params) {
+  const m = G.buildBug(params);
+  let sum = 0, n = 0;
+  for (const part of m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    const P = part.meta.drawnMm; if (!P || P.length < 10) continue;
+    const cum = [0]; for (let k = 1; k < P.length; k++) cum.push(cum[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]));
+    const sig = 2;
+    for (let k = 0; k < P.length; k++) {
+      let wx = 0, wy = 0, ws = 0;
+      for (let j = 0; j < P.length; j++) { const d = cum[j] - cum[k]; if (Math.abs(d) > 3 * sig) continue; const w = Math.exp(-(d * d) / (2 * sig * sig)); wx += w * P[j][0]; wy += w * P[j][1]; ws += w; }
+      sum += Math.hypot(P[k][0] - wx / ws, P[k][1] - wy / ws); n++;
+    }
+  }
+  return n ? sum / n : 0;
+}
+export function blendDetailRatio(lib, seed) {
+  const r = G.randomWingBlend(G.defaultParams(), seed, { library: lib });
+  if (!r.blend || r.blend.a === r.blend.b) return null;
+  const pa = G.applyWingShape(G.defaultParams(), lib.find((x) => x.id === r.blend.a)), pb = G.applyWingShape(G.defaultParams(), lib.find((x) => x.id === r.blend.b));
+  const da = marginDetail(pa), db = marginDetail(pb), dm = marginDetail(r.params);
+  const t = r.blend.t;
+  return { label: r.label, ratio: dm / ((1 - t) * da + t * db), detail: dm, parents: [da, db], params: r.params };
+}
+
 async function addSheet(cands, base) {
   const lib = G.WING_LIBRARY;
+  const { WING_LIBRARY_V1 } = await import('./bug-wing-library-v1.mjs');
   const span = 2 * Math.max(...rightWingBoundary(base).map((q) => q[0]));
   const pct = (d) => +(100 * d).toFixed(1), mm = (d) => +(d * span).toFixed(2);
   const libB = lib.map((s) => rightWingBoundary(applyRecord(base, s)));
@@ -352,25 +401,73 @@ async function addSheet(cands, base) {
     if (ok[b].dupOf) continue;
     for (let a = 0; a < b; a++) if (!ok[a].dupOf && D[a][b] < DEDUPE_FRAC) { ok[b].dupOf = ok[a].name; ok[b].dupMm = mm(D[a][b]); ok[b].dupPct = pct(D[a][b]); break; }
   }
-  let num = Math.max(...lib.map((s) => s.id));
-  for (const c of cands) if (c.ok && !c.dupOf) c.num = ++num;
-  for (const c of ok) if (c.dupOf && !c.dupOf.startsWith('library')) c.dupOf = `#${ok.find((d) => d.name === c.dupOf).num} (${c.dupOf})`;
+  let next = Math.max(...Object.values(ADD_NUMBERS));
+  for (const c of cands) c.num = ADD_NUMBERS[c.name] ?? (c.ok && !c.dupOf ? ++next : null);
+  const numOf = (name) => (cands.find((d) => d.name === name) || {}).num;
+  for (const c of ok) if (c.dupOf && !c.dupOf.startsWith('library')) c.dupOf = `#${numOf(c.dupOf)} (${c.dupOf})`;
   const dupLib = ok.filter((c) => c.dupOf && c.dupOf.startsWith('library')), dupNew = ok.filter((c) => c.dupOf && !c.dupOf.startsWith('library'));
   const surv = ok.filter((c) => !c.dupOf), under = surv.filter((c) => c.floor.length);
+  // the split, before and after: changed when the pair count or the fitted fore/hind division moved
+  const splitMoved = (c) => c.before && c.before.ok && (c.before.mode !== c.mode || (c.split && c.before.split && Math.hypot(c.split.root[0] - c.before.split.root[0], c.split.root[1] - c.before.split.root[1]) + Math.hypot(c.split.outer[0] - c.before.split.outer[0], c.split.outer[1] - c.before.split.outer[1]) > 1));
   const sheets = [...new Set(cands.map((c) => c.sheet))];
-  const summary = { sheets, found: cands.length, fitted: ok.length, refused: cands.filter((c) => !c.ok).map((c) => `${c.name}: ${c.reason}`), duplicatesOfLibrary: dupLib.map((c) => `${c.name} = ${c.dupOf} (${c.dupMm} mm)`), duplicatesInBatch: dupNew.map((c) => `${c.name} = ${c.dupOf} (${c.dupMm} mm)`), survivors: surv.map((c) => `#${c.num} ${c.name}`), underFloor: under.map((c) => `#${c.num}: ${c.floor.join(', ')}`), refittedAt: surv.filter((c) => c.tolUsed !== 0.6).map((c) => `#${c.num} at ${c.tolUsed} mm`), dedupe: `Hausdorff between applied shapes' right-wing silhouettes on the default bug (wingspan ${span.toFixed(1)} mm), duplicate under ${DEDUPE_FRAC * 100}% (${(DEDUPE_FRAC * span).toFixed(2)} mm), against the ${lib.length}-shape library and within this batch` };
+  const blends = BLEND_SEEDS.map((seed) => ({ seed, before: blendDetailRatio(WING_LIBRARY_V1, seed), after: blendDetailRatio(lib, seed) }));
+  // the detail ratio over many seeds, both libraries
+  const many = (L) => { const r = []; for (let seed = 1; seed <= 60; seed++) { const b = blendDetailRatio(L, seed); if (b) r.push(b.ratio); } r.sort((x, y) => x - y); return { n: r.length, mean: r.reduce((a, x) => a + x, 0) / r.length, median: r[r.length >> 1] }; };
+  const detailBefore = many(WING_LIBRARY_V1), detailAfter = many(lib);
+  const summary = { sheets, dropped: ADD_DROPPED, found: cands.length, fitted: ok.length, refused: cands.filter((c) => !c.ok).map((c) => `${c.name}: ${c.reason}`), duplicatesOfLibrary: dupLib.map((c) => `#${c.num} ${c.name} = ${c.dupOf} (${c.dupMm} mm)`), duplicatesInBatch: dupNew.map((c) => `#${c.num} ${c.name} = ${c.dupOf} (${c.dupMm} mm)`), survivors: surv.map((c) => `#${c.num} ${c.name}`), underFloor: under.map((c) => `#${c.num}: ${c.floor.join(', ')}`), refittedAt: surv.filter((c) => c.tolUsed !== 0.6).map((c) => `#${c.num} at ${c.tolUsed} mm`), splitMoved: ok.filter(splitMoved).map((c) => `#${c.num} ${c.name}: ${c.before.mode} -> ${c.mode} pair(s)`), sweeps: surv.map((c) => `#${c.num} ${c.sweeps.join(' / ')}`), blendDetail: { before: detailBefore, after: detailAfter }, dedupe: `Hausdorff between applied shapes' right-wing silhouettes (outline and sweep) on the default bug (wingspan ${span.toFixed(1)} mm), duplicate under ${DEDUPE_FRAC * 100}% (${(DEDUPE_FRAC * span).toFixed(2)} mm), against the ${lib.length}-shape library and within this batch` };
   console.log(JSON.stringify(summary, null, 1));
-  const head = `<h1>Wing-shape library — new batch, numbered on from #${lib.length} (for Eva's keep / drop list)</h1>
-<p class="sum">${sheets.join(', ')}: <b>${cands.length}</b> found · <b>${ok.length}</b> fitted · ${cands.length - ok.length} refused · <b>${dupLib.length}</b> duplicates of library shapes · ${dupNew.length} duplicates within the batch · <b>${surv.length} numbered survivors (#${lib.length + 1}–#${num})</b> · ${under.length} under the floor${under.length ? ' (red rows)' : ''}.<br>Near-identical = ${esc(summary.dedupe)}. Duplicates are shown greyed, unnumbered.<br>Columns: source crop | EXPLODED — forewing (left) | hindwing (right), each alone in its own planform frame as the model builds it (the short left edge is the root, inside the body) | the assembled bug's SVG with the CURRENT default root (pinch ${base.wingRootPinch}). Fit: the shipped image → bug fitter, default bug, 72 mm, 0.6 mm tolerance (re-fitted at the nearest tolerance that clears the floor when 0.6 does not, said per row).</p>`;
-  return keptSheet(cands, base, { head, summary });
-}
 
-async function screenshot() {
+  const exploded = (f, label = true) => {
+    const W = f.wings, gap = 4, boxes = W.map((P) => { const xs = P.map((q) => q[0]), ys = P.map((q) => q[1]); return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]; });
+    let x = 0; const placed = W.map((P, k) => { const b = boxes[k], dx = x - b[0]; x += b[1] - b[0] + gap; return P.map(([u, w]) => [u + dx, w]); });
+    const y0 = Math.min(...boxes.map((b) => b[2])), y1 = Math.max(...boxes.map((b) => b[3])), mg = 2, top = 7;
+    const vb = [-mg, -y1 - mg - top, x - gap + 2 * mg, y1 - y0 + 2 * mg + top];
+    const fs = (vb[2] / 26).toFixed(2);
+    const pol = placed.map((P) => `<polygon points="${P.map(([u, w]) => `${u},${-w}`).join(' ')}" fill="#e9e7df" stroke="#0A0A0C" stroke-width="${(vb[2] / 400).toFixed(3)}" stroke-linejoin="round"/>`).join('');
+    const lab = label ? placed.map((P, k) => { const xs = P.map((q) => q[0]); return `<text x="${(Math.min(...xs) + Math.max(...xs)) / 2}" y="${-y1 - mg - 1}" font-size="${fs}" text-anchor="middle" font-family="monospace" fill="#a0004f">${k === 0 ? 'fore' : 'hind'} sweep ${f.sweeps[k] > 0 ? '+' : ''}${f.sweeps[k]}°</text>`; }).join('') : '';
+    return `<svg viewBox="${vb.join(' ')}">${pol}${lab}</svg>`;
+  };
+  const svgOf = (t) => t.replace(/<\?xml[^>]*>/, '').replace(/width="[^"]*"/, '').replace(/height="[^"]*"/, '');
+  const row = (c) => {
+    const src = `<img src="data:image/png;base64,${c.cropPng}">`;
+    const bef = c.before && c.before.ok ? `<div class="c wide bef">${exploded(c.before)}</div>` : `<div class="c wide msg">${c.before ? 'before: REFUSED — ' + esc(c.before.reason) : ''}</div>`;
+    if (!c.ok) return `<div class="row"><div class="n">${c.num ? '#' + c.num : '—'}</div><div class="c">${src}</div>${bef}<div class="c wide msg">REFUSED: ${esc(c.reason)}</div><div class="c"></div><div class="meta">${esc(c.name)}</div></div>`;
+    const moved = splitMoved(c);
+    if (c.dupOf) return `<div class="row isdup"><div class="n dup">dup<br><small>of ${esc(c.dupOf)}</small></div><div class="c">${src}</div>${bef}<div class="c wide">${exploded(c)}</div><div class="c svg">${svgOf(c.svg)}</div><div class="meta">${esc(c.name)} · DUPLICATE of ${esc(c.dupOf)} — ${c.dupMm} mm (${c.dupPct}% of the wingspan, under the ${DEDUPE_FRAC * 100}% bar)</div></div>`;
+    const meta = `${esc(c.name)} · sweep fore ${c.sweeps[0]}°${c.sweeps.length > 1 ? `, hind ${c.sweeps[c.sweeps.length - 1]}°` : ''}${moved ? ` · <b>split moved</b> (before: ${c.before.mode} pair${c.before.mode > 1 ? 's' : ''}, ${c.before.splitMode})` : ''} · nearest library #${c.nearLib.id} at ${c.nearLib.mm} mm (${c.nearLib.pct}%)${c.nearNew ? ` · nearest new ${esc(c.nearNew.name)} at ${c.nearNew.mm} mm` : ''} · points ${c.fit.map((q) => q.points).join(' / ')} · max dev ${c.fit.map((q) => q.maxDevMm).join(' / ')} mm · tail ${c.record.tail ? c.record.tail.points.length + ' pts' : 'none'} · J ${c.smooth.join(' / ')}${c.tolUsed !== 0.6 ? ` · <b>fitted at ${c.tolUsed} mm</b>` : ''}${c.floor.length ? '<br><b class="fl">UNDER THE FLOOR: ' + c.floor.join(', ') + '</b>' : ''}${[...c.notes, ...c.modelNotes].length ? '<br><span class="note">' + [...c.notes, ...c.modelNotes].map(esc).join('<br>') + '</span>' : ''}`;
+    return `<div class="row${c.floor.length ? ' floor' : ''}${moved ? ' moved' : ''}"><div class="n">#${c.num}${c.floor.length ? '<br><small class="fl">FLOOR</small>' : ''}</div><div class="c">${src}</div>${bef}<div class="c wide">${exploded(c)}</div><div class="c svg">${svgOf(c.svg)}</div><div class="meta">${meta}</div></div>`;
+  };
+  const blendRow = (b) => `<div class="brow"><div class="n">seed ${b.seed}</div><div class="c svg">${b.before ? svgOf(G.exportSvg(G.buildBug(b.before.params)).svg) : ''}</div><div class="c svg">${b.after ? svgOf(G.exportSvg(G.buildBug(b.after.params)).svg) : ''}</div><div class="meta">BEFORE: ${b.before ? esc(b.before.label) + ` — margin detail ${b.before.detail.toFixed(3)} mm, ${(100 * b.before.ratio).toFixed(0)}% of its parents'` : '—'}<br>AFTER: ${b.after ? esc(b.after.label) + ` — margin detail ${b.after.detail.toFixed(3)} mm, ${(100 * b.after.ratio).toFixed(0)}% of its parents'` : '—'}</div></div>`;
+  const html = `<!doctype html><meta charset="utf-8"><title>wing library — new batch, own frames</title><style>
+body{font:12px/1.35 ui-monospace,monospace;background:#f4f3ee;color:#111;margin:16px;width:1460px}
+h1{font-size:16px;margin:0 0 4px} h2{font-size:14px;margin:18px 0 4px} .sum{margin:0 0 12px;max-width:1420px}
+.row{display:grid;grid-template-columns:44px 120px 330px 330px 200px 1fr;gap:8px;align-items:center;border-top:1px solid #ccc;padding:6px 0}
+.brow{display:grid;grid-template-columns:70px 330px 330px 1fr;gap:8px;align-items:center;border-top:1px solid #ccc;padding:6px 0}
+.c{height:200px;display:flex;align-items:center;justify-content:center;background:#fff}
+.c img{max-width:100%;max-height:100%} .c svg{width:100%;height:100%} .bef{background:#f0f0f0}
+.n{font-size:18px;font-weight:bold;text-align:center} .meta{font-size:10.5px} .note{color:#7a4b00} .msg{color:#a00;font-size:11px;padding:6px}
+.hdr{font-weight:bold;border:0} .isdup{opacity:.5} .dup{color:#888;font-size:13px} .fl{color:#b00} .floor{background:#fbe9e9} .moved .n{color:#a0004f}
+</style>
+<h1>Wing-shape library — the new batch, refitted with each wing in its OWN frame (for Eva's keep / drop list)</h1>
+<p class="sum">${sheets.join(', ')}: <b>${cands.length}</b> found (#34 dropped: the same butterfly as #22) · <b>${ok.length}</b> fitted · ${cands.length - ok.length} refused · <b>${dupLib.length}</b> duplicates of library shapes · ${dupNew.length} duplicates within the batch · <b>${surv.length} numbered survivors</b> (numbers as on the first sheet) · <b>${under.length} under the floor</b>${under.length ? ' (red rows)' : ''} · the fore/hind split moved on ${ok.filter(splitMoved).length} (number in pink).<br>
+Each wing is fitted along its own LONG AXIS (hinge to apex) and its angle is the pair's SWEEP; the fore/hind split of one wing mass is taken at a notch with a wing lobe on BOTH sides, the split line running from the notch to the middle of the attachment.<br>
+Columns: source | BEFORE (grey): the fitter as it was, exploded | AFTER: exploded, each wing alone in its own frame (span to the right, root at the left — the short left edge is the root, inside the body), labelled with its fitted sweep | the assembled bug's SVG, current default root | notes. Near-identical = ${esc(summary.dedupe)}.</p>
+<div class="row hdr"><div>#</div><div>source</div><div>before — fore | hind</div><div>after — fore | hind, own frames</div><div>assembled SVG</div><div>notes</div></div>
+${cands.map(row).join('\n')}
+<h2>RANDOMIZE WINGS — four blends, before | after</h2>
+<p class="sum">BEFORE: the #349 library (orientation in the points) and its blend. AFTER: the re-expressed library (outline in its own frame + sweep) and the blend that mixes outline and sweep separately; the same seeds pick the same two shapes and t. MARGIN DETAIL: how far the built outline stands from itself smoothed along its arc (sigma 2 mm), mean mm over both wings; the ratio is the blend's against its parents' at the same t. Over seeds 1–60: before ${(100 * detailBefore.mean).toFixed(0)}% mean / ${(100 * detailBefore.median).toFixed(0)}% median (${detailBefore.n} blends), after ${(100 * detailAfter.mean).toFixed(0)}% / ${(100 * detailAfter.median).toFixed(0)}% (${detailAfter.n}).</p>
+<div class="brow hdr"><div></div><div>before</div><div>after</div><div></div></div>
+${blends.map(blendRow).join('\n')}`;
+  fs.writeFileSync(path.join(OUT, 'contact.html'), html);
+  fs.writeFileSync(path.join(OUT, 'candidates.json'), JSON.stringify({ summary, candidates: cands.map(({ cropPng, svg, overlay, before, ...rest }) => ({ ...rest, before: before && { ok: before.ok, mode: before.mode, sweeps: before.sweeps, split: before.split } })) }, null, 1));
+  await screenshot(1492);
+}
+async function screenshot(width = 1212) {
   try {
     const { chromium } = await import('playwright-core');
     const exe = fs.readdirSync('/opt/pw-browsers').find((d) => /^chromium-\d+$/.test(d));
     const b = await chromium.launch({ executablePath: path.join('/opt/pw-browsers', exe, 'chrome-linux/chrome') });
-    const pg = await b.newPage({ viewport: { width: 1212, height: 800 } });
+    const pg = await b.newPage({ viewport: { width, height: 800 } });
     await pg.goto('file://' + path.join(OUT, 'contact.html'));
     await pg.screenshot({ path: path.join(OUT, 'contact.png'), fullPage: true });
     await b.close();

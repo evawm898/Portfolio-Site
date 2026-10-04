@@ -28,7 +28,16 @@
           in [0.1, 0.9], and re-blending a, b at that t and applying it gives
           the SAME params, byte for byte.
      LB6  the whole-bug Randomize uses it: every random bug with wings carries a
-          label, and its wing outlines are that label's blend. */
+          label, and its wing outlines are that label's blend.
+     LB7  the OWN-FRAME re-expression (§13.6) moved nothing a viewer sees: every
+          shape applied to the default bug assembles to the outline its #349
+          form (tools/bug-wing-library-v1.mjs, kept verbatim) assembled to —
+          the visible outline as curves — within LB7_MM, beyond LB7_ROOT_ZONE_MM
+          of the body (the root is rebuilt there). The reference is the OLD
+          DATA through the same apply and frame, never the re-expression tool.
+     LB8  every shape stores a sweep per pair and its outline in its own frame
+          (the apex on the u axis). LB2 holds that applying writes the sweep,
+          LB5 that a blend's sweep is the parents' at t. */
 
 // this file's own crossing count (the gate's segment test, copied: importing
 // verify-bug.mjs would run the whole gate)
@@ -43,6 +52,47 @@ function selfCrossingCount(poly) {
   let n = 0; const N = poly.length;
   for (let i = 0; i < N; i++) for (let j = i + 2; j < N; j++) { if (i === 0 && j === N - 1) continue; if (segCross(poly[i], poly[(i + 1) % N], poly[j], poly[(j + 1) % N])) n++; }
   return n;
+}
+
+import { WING_LIBRARY_V1 } from './bug-wing-library-v1.mjs';
+export const LB7_MM = 0.05, LB7_ROOT_ZONE_MM = 1;
+/* LB8's bound: the re-expression moves the knots to hold the old curve, and the
+   farthest point of a rounded tip slides along it with them — 1.05 degrees at
+   worst on the 17, measured; 1.5 is a third over that and a tenth of the
+   smallest sweep stored. */
+export const LB8_AXIS_DEG = 1.5;
+/* LB7's measure, this file's own: the VISIBLE OUTLINE of the bug's wings seen
+   from above, AS CURVES — every pair's drawn outline (the hindwing's tail
+   composed) sampled at 40 points a control segment and carried into the world
+   by the pair's own frame (editorFrame — which the gate's Q clause holds to the
+   emitted mesh), both sides, less what lies inside any OTHER wing's outline or
+   the body's top-down contour — beyond LB7_ROOT_ZONE_MM of the body (the root
+   zone, rebuilt by the re-expression: a root chord must sit square to the
+   wing's own axis at its hinge, §13.6); the symmetric distance between the two
+   visible outlines, point to polyline. Curves and not the mesh: the mesh draws
+   the spline as 10 chords a segment, and those chords stand up to 0.07 mm off
+   the curve on the #349 shapes themselves — the bar would measure facets. */
+const inPoly = (p, L) => { let c = false; for (let i = 0, j = L.length - 1; i < L.length; j = i++) { const a = L[i], b = L[j]; if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+const segd = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-30, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2)); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+function visibleOutline(G, params) {
+  const p = G.normalizeParams(params), m = G.buildBug(p);
+  const body = G.contourLoops(m, m.parts.find((q) => q.kind === 'body'));
+  const wings = [];
+  G.resolveWingPairs(p).forEach((sp, k) => {
+    const F = G.editorFrame(p, k), R = G.sampleOutline(sp.drawn || sp.ctrl || sp.points, 40).map(([u, w]) => F.toWorld(u, w));
+    wings.push(R, R.map(([x, y]) => [-x, y]));
+  });
+  const near = (q) => body.some((L) => L.some((a, i) => segd(q, a, L[(i + 1) % L.length]) < LB7_ROOT_ZONE_MM));
+  const pts = [];
+  wings.forEach((W, i) => { for (const q of W) if (q[0] > 0 && !wings.some((V, j) => j !== i && inPoly(q, V)) && !body.some((L) => inPoly(q, L)) && !near(q)) pts.push(q); });
+  return { pts, lines: wings.filter((_, i) => i % 2 === 0) };
+}
+export function assembledDiff(G, pa, pb) {
+  const A = visibleOutline(G, pa), B = visibleOutline(G, pb);
+  let mm = 0, at = null;
+  const one = (P, lines) => { for (const q of P) { let d = Infinity; for (const L of lines) for (let k = 0; k + 1 < L.length; k++) { const e = segd(q, L[k], L[k + 1]); if (e < d) d = e; } if (d > mm) { mm = d; at = q; } } };
+  one(A.pts, B.lines); one(B.pts, A.lines);
+  return { mm, at, n: Math.min(A.pts.length, B.pts.length) };
 }
 
 // the fields applying may write — restated, not imported
@@ -94,8 +144,8 @@ export function libraryChecks(G) {
     if (!same(b, before)) bad2.push(`${name} #${s.id}: the BASE params were mutated`);
     if (strip(q) !== strip(b)) bad2.push(`${name} #${s.id}: a non-wing setting changed`);
     const W = q.wings, wantLen = +Math.max(5, Math.min(60, b.wings.first.length * s.hind.lengthRatio)).toFixed(3);
-    if (!same(W.first.points, s.fore.points) || W.first.stretch !== s.fore.stretch || W.first.sweep !== 0 || W.first.scallop !== 0) bad2.push(`${name} #${s.id}: the forewing is not the shape`);
-    if (!same(W.last.points, s.hind.points) || W.last.stretch !== s.hind.stretch || W.last.sweep !== 0 || W.last.scallop !== 0 || W.last.length !== wantLen) bad2.push(`${name} #${s.id}: the hindwing is not the shape (length ${W.last.length} vs ${wantLen})`);
+    if (!same(W.first.points, s.fore.points) || W.first.stretch !== s.fore.stretch || W.first.sweep !== s.fore.sweep || W.first.scallop !== 0) bad2.push(`${name} #${s.id}: the forewing is not the shape`);
+    if (!same(W.last.points, s.hind.points) || W.last.stretch !== s.hind.stretch || W.last.sweep !== s.hind.sweep || W.last.scallop !== 0 || W.last.length !== wantLen) bad2.push(`${name} #${s.id}: the hindwing is not the shape (length ${W.last.length} vs ${wantLen})`);
     if (W.first.length !== b.wings.first.length) bad2.push(`${name} #${s.id}: the forewing's length moved`);
     if (s.tail ? !(W.tail.on && same(W.tail.points, s.tail.points) && W.tail.anchorU === s.tail.anchorU) : W.tail.on || (b.wings.tail && !same(W.tail.points, b.wings.tail.points))) bad2.push(`${name} #${s.id}: the tail is not the shape's (or the bug's own tail group was not kept off)`);
   }
@@ -128,9 +178,12 @@ export function libraryChecks(G) {
     if (a === bb || !A || !B || t < 0.1 || t > 0.9) { bad5.push(`${name} seed ${seed}: "${r.label}" is not two shapes at t in [0.1, 0.9]`); continue; }
     if (strip(r.params) !== strip(b)) bad5.push(`${name} seed ${seed}: the blend changed a non-wing setting`);
     if (!same(G.applyWingShape(b, G.blendWingShapes(A, B, t)), r.params)) bad5.push(`${name} seed ${seed}: "${r.label}" is not the blend that was applied`);
+    // the sweep is blended SEPARATELY from the outline (§13.6): each pair's is
+    // the parents' at t — restated here, not read from the blend
+    for (const [role, k] of [['first', 'fore'], ['last', 'hind']]) { const want = (1 - t) * A[k].sweep + t * B[k].sweep; if (!(Math.abs(r.params.wings[role].sweep - want) <= 0.0051)) bad5.push(`${name} seed ${seed}: the ${k}wing's sweep is ${r.params.wings[role].sweep}, not the parents' at t (${want})`); }
   }
   ok(!bad4.length && rerolled > 0, `LB4: RANDOMIZE WINGS never produced an invalid wing over ${n4} rolls (${rb.length} bases); ${rerolled} roll(s) re-rolled a refused blend${rerolled ? '' : ' — the re-roll was NEVER exercised (vacuous)'}${bad4.length ? ' — ' + bad4.slice(0, 3).join(' | ') : ''}`);
-  ok(!bad5.length, `LB5: every label names the blend that was applied (re-derived byte for byte)${bad5.length ? ' — ' + bad5.slice(0, 3).join(' | ') : ''}`);
+  ok(!bad5.length, `LB5: every label names the blend that was applied (re-derived byte for byte), its sweeps the parents' at t${bad5.length ? ' — ' + bad5.slice(0, 3).join(' | ') : ''}`);
   // LB6
   const bad6 = []; let n6 = 0;
   for (let s = 1; s <= 24; s++) {
@@ -141,6 +194,33 @@ export function libraryChecks(G) {
     if (!same(r.params.wings.first.points, sh.fore.points) || !same(r.params.wings.last.points, sh.hind.points)) bad6.push(`random:${s}: the wings are not "${r.label}"`);
   }
   ok(!bad6.length && n6 > 0, `LB6: the whole-bug Randomize draws its wings from the library blend (${n6} winged bugs of 24)${bad6.length ? ' — ' + bad6.slice(0, 3).join(' | ') : ''}`);
+  // LB8 — every shape stores a SWEEP per pair and its outline in its OWN frame:
+  // the farthest point of the drawn outline (the hindwing's tail excluded) from
+  // the pivot lies on the u axis (within LB8_AXIS_DEG), and the sweeps are not
+  // all zero (a library re-expressed nowhere would pass the axis test vacuously
+  // only if every outline already pointed square to the body)
+  const bad8 = []; let nonzero = 0;
+  for (const s of lib) for (const k of ['fore', 'hind']) {
+    const w = s[k];
+    if (!Number.isFinite(w.sweep)) { bad8.push(`#${s.id} ${k}: no sweep stored`); continue; }
+    if (w.sweep !== 0) nonzero++;
+    let best = -1, at = null; for (const [u, v] of G.sampleOutline(w.points)) { const dd = Math.hypot(u, v * w.stretch); if (dd > best) { best = dd; at = [u, v * w.stretch]; } }
+    const off = Math.abs((Math.atan2(at[1], at[0]) * 180) / Math.PI);
+    if (off > LB8_AXIS_DEG) bad8.push(`#${s.id} ${k}: the apex stands ${off.toFixed(2)} deg off the wing's own axis (its angle is in the points, not the sweep)`);
+  }
+  ok(!bad8.length && nonzero >= lib.length, `LB8: every library shape stores a sweep per pair (${nonzero} of ${2 * lib.length} non-zero) and its outlines in their own frames${bad8.length ? ' — ' + bad8.slice(0, 4).join(' | ') : ''}`);
+  // LB7 — the re-expression moved nothing a viewer sees: every shape, applied to
+  // the default bug, assembles to the outline the #349 library (its orientation
+  // in its points, sweep 0) assembled to, within LB7_MM, beyond the root zone
+  const bad7 = []; let worst7 = 0, at7 = null;
+  for (const s of lib) {
+    const v1 = WING_LIBRARY_V1.find((x) => x.id === s.id);
+    if (!v1) { bad7.push(`#${s.id}: not in the #349 library`); continue; }
+    const r = assembledDiff(G, G.applyWingShape(d, v1), G.applyWingShape(d, s));
+    if (r.mm > worst7) { worst7 = r.mm; at7 = `#${s.id} at (${r.at.map((v) => v.toFixed(1)).join(', ')})`; }
+    if (!(r.mm <= LB7_MM) || r.n < 200) bad7.push(`#${s.id}: ${r.mm.toFixed(3)} mm at (${r.at ? r.at.map((v) => v.toFixed(1)).join(', ') : '-'}) over ${r.n} points`);
+  }
+  ok(!bad7.length, `LB7: every re-expressed shape assembles on the default bug to its #349 outline within ${LB7_MM} mm beyond ${LB7_ROOT_ZONE_MM} mm of the body (worst ${worst7.toFixed(3)} mm, ${at7})${bad7.length ? ' — ' + bad7.slice(0, 4).join(' | ') : ''}`);
   return out;
 }
 
@@ -164,5 +244,7 @@ export const LIBRARY_MUTANTS = [
   ['an unlinked middle survives the apply', '  W.unlinked = {};\n  W.tail', '  W.tail', 'LB3'],
   ['the re-roll is disabled', "const why = q.wingPairs > 0 ? wingShapeProblem(q) : null;", 'const why = null;', 'LB4'],
   ['the label names a t that was not used', 'const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], t));', 'const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], Math.min(0.9, t + 0.05)));', 'LB5'],
+  ['applying ignores the shape\'s sweep', 'W.first.sweep = shape.fore.sweep ?? 0;', 'W.first.sweep = 0;', 'LB7'],
+  ['a blend drops the sweep', 'const sweep = (x, y) => +lerp(x.sweep ?? 0, y.sweep ?? 0, t).toFixed(2);', 'const sweep = () => 0;', 'LB5'],
   ['the whole-bug Randomize keeps its own outlines', "  const b = randomWingBlend(q, Math.floor(r() * 4294967296));\n  return { params: b.params,", "  const b = randomWingBlend(q, Math.floor(r() * 4294967296));\n  return { params: q,", 'LB6'],
 ];
