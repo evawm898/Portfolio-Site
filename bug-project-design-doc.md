@@ -2286,3 +2286,10 @@ as they would be stored — pass the gate's library-row checks (`tools/verify-bu
 **Tally: 35 GOOD · 20 FIXABLE (every fix applied and shown) · 2 DROP.** Library #1–#17: all
 GOOD, nothing to fix in place. Verdicts are recorded in `VERDICTS` in the tool; Eva's keep /
 drop list decides what is appended (existing ids never change).
+
+**RULED (Eva, Oct 4): keep every GOOD and FIXABLE shape, drop #34 and #50.** The 38 kept
+candidates are appended to `bug-wing-library.js` as #18–#57 with the audit's own numbers (#34 and
+#50 are gaps, so a number on the review page is the number in the library), each record exactly
+the audit's — refitted at the library's root convention, with the fixes above. #1–#17 are
+unchanged. LB1 now restates the 55 kept ids in order.
+

@@ -75,7 +75,11 @@ export function wingProblems(G, params, model) {
 export function libraryChecks(G) {
   const out = [], ok = (c, m) => out.push([!!c, m]);
   const lib = G.WING_LIBRARY, d = G.defaultParams();
-  ok(lib.length === 17 && new Set(lib.map((s) => s.id)).size === 17, `LB1: the library holds Eva's 17 kept shapes (${lib.length}, ids unique)`);
+  // Eva's keep lists, RESTATED here (never read from the library): #1-#17 from
+  // the step-1 sheet, #18-#57 but #34 and #50 from the wing-shape audit (§13.7)
+  const KEPT = [...Array.from({ length: 57 }, (_, i) => i + 1).filter((id) => id !== 34 && id !== 50)];
+  const ids = lib.map((s) => s.id);
+  ok(ids.length === KEPT.length && KEPT.every((id, i) => ids[i] === id), `LB1: the library holds Eva's ${KEPT.length} kept shapes, ids in order (${lib.length}${ids.join(',') === KEPT.join(',') ? '' : ': ' + ids.join(',')})`);
   // LB1
   const bad1 = [];
   for (const s of lib) {
