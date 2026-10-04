@@ -2197,7 +2197,17 @@ are merged into their midpoint instead of tightening the tolerance (which only a
 there). Gate: 350 of 350 and the negative control (61 mutations) green with both — **and no
 mutant names the new split rule**: the IM fixtures have no moth, so its witness is the sheet's
 before / after column (#43's forewing whole instead of a stub), a gap recorded rather than closed.
-**Dropped from the batch by Eva:** #34 (= #22), #37 (under the floor), #50 (luna-type —
-the tail-hindwing cannot be separated from a flat picture; drawn in the editor instead) and #31
-(its hindwing fitted 79° back where the source spreads it out and down).
+**Excluded from this session's sheet** (not accepted by Eva — see Status below): #34 (judged
+the same as #22), #37 (under the floor), #50 (a luna-type moth — the tail-hindwing cannot be
+separated from a flat picture) and #31 (its hindwing fitted 79° back where the source spreads
+it out and down).
+
+**STATUS AT THE CLOSE OF THIS SESSION (Oct 4).** The library is UNCHANGED at #1–#17 (#349's
+data, sweep 0). The candidates #18–#57 are UNRULED and go to a full audit session. Eva has
+accepted neither this session's drops (#31, #34, #37, #50) nor its suggested strikes (#25,
+#29, #39, #40, #43 — each carries a stray contour line in the SVG near its root, which the
+gate's S clause would fail as a library row); the audit re-examines all of them. **The source
+images are gitignored** (`tools/bug-wing-sources/` — `sheet-2.webp`, `sheet-3.webp`,
+`sheet-4.webp`, Eva's three attached sheets) **and are not in the repository: they must be
+re-attached in the next session** before `node tools/bug-wing-library-fit.mjs --add` can run.
 

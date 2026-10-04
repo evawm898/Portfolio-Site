@@ -348,7 +348,7 @@ ${cands.map(row).join('\n')}`;
    with the wing-either-side split (§13.6). MOTH-TYPE rows — forewings swept
    back over most of the hindwing — come FIRST (MOTH_ROWS), so they can be
    struck in one pass. The assembled SVG is the default bug. */
-export const ADD_DROPPED = ['sheet-2#20', 'sheet-3#3', 'sheet-4#10', 'sheet-2#16'];   // Eva: #34 (= #22), #37 (under the floor), #50 (luna-type: the tail-hindwing cannot be separated from a flat picture), #31 (its hindwing fitted 79 deg back where the source spreads it out and down)
+export const ADD_DROPPED = ['sheet-2#20', 'sheet-3#3', 'sheet-4#10', 'sheet-2#16'];   // this session's exclusions, NOT accepted by Eva (design doc §13.6, Status): #34 (judged = #22), #37 (under the floor), #50 (luna-type), #31 (hindwing fitted 79 deg back) — the audit session re-examines them
 /* the moth-type crops, by eye from the sources: forewings swept back over most
    of the hindwing (heavily overlapped). #52's crop holds a tailed moth over a butterfly. */
 export const MOTH_ROWS = ['sheet-3#1', 'sheet-3#5', 'sheet-3#6', 'sheet-4#3', 'sheet-4#11', 'sheet-4#12'];
@@ -416,7 +416,7 @@ h1{font-size:16px;margin:0 0 4px} h2{font-size:14px;margin:18px 0 4px} .sum{marg
 .hdr{font-weight:bold;border:0} .isdup{opacity:.5} .dup{color:#888;font-size:13px} .fl{color:#b00} .floor{background:#fbe9e9} .moved .n{color:#a0004f}
 </style>
 <h1>Wing-shape library — the new batch, refitted (for Eva's keep / drop list) — MOTHS FIRST</h1>
-<p class="sum">${sheets.join(', ')}: <b>${cands.length}</b> found (dropped by Eva: #31, #34, #37, #50) · <b>${ok.length}</b> fitted · ${cands.length - ok.length} refused · <b>${dupLib.length}</b> duplicates of library shapes · ${dupNew.length} duplicates within the batch · <b>${surv.length} numbered survivors</b> (numbers as on the first sheet) · <b>${under.length} under the floor</b>${under.length ? ' (red rows)' : ''} · the fore/hind split moved on ${ok.filter(splitMoved).length} (number in pink).<br>
+<p class="sum">${sheets.join(', ')}: <b>${cands.length}</b> found (excluded this session, not yet ruled: #31, #34, #37, #50) · <b>${ok.length}</b> fitted · ${cands.length - ok.length} refused · <b>${dupLib.length}</b> duplicates of library shapes · ${dupNew.length} duplicates within the batch · <b>${surv.length} numbered survivors</b> (numbers as on the first sheet) · <b>${under.length} under the floor</b>${under.length ? ' (red rows)' : ''} · the fore/hind split moved on ${ok.filter(splitMoved).length} (number in pink).<br>
 As in the #349 library, each wing's angle is in its points and a shape applies at sweep 0. The fore/hind split of one wing mass is now taken at a notch with a WING ON EACH SIDE of it (else the deepest concavity, as before), the split line running from the notch to the middle of the attachment.<br>
 Columns: source | BEFORE (grey): the fit you last saw, exploded | AFTER: exploded (span to the right, root at the left — the short left edge is the root, inside the body) | the assembled bug's SVG, current default root | notes. Near-identical = ${esc(summary.dedupe)}.</p>
 <div class="row hdr"><div>#</div><div>source</div><div>before — fore | hind</div><div>after — fore | hind</div><div>assembled SVG</div><div>notes</div></div>
