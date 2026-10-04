@@ -3572,7 +3572,7 @@ must precede any workflow edit; that is the follow-up PR.** **The brief's "~114 
 `phase50`'s denominator**: the live matrix at `23b13bd` is 1,089, 156 carry a stem by "stem
 present" (the 114 plus #353's 33 raceme rows and 9 of block 47), and the partition by the cut's own
 guard is in the outcome doc. Block 48 is 13 rows (1,089 → 1,102), smoke block 48 five;
-`frozen/phase52` is the 1,089 rows at `23b13bd`. The cut stem uses LESS material than the flat end
+`frozen/phase52` is the 1,089 rows at `23b13bd`. **BOTH EXPORT-REFUSED ROWS MOVED +94 AND CI IS WHAT SAID SO** (§12 of the outcome doc): `ALL MAX` 3,090,816 → 3,090,910 and the NODE LAWS 101.1% corner 1,517,196 → 1,517,290, each carrying a 120 mm stem the cut now ends; `bloom-xfail-magnitudes --include-refused` censuses a refused row and never compares `EXPORT_REFUSED_XFAIL.tris`, so a change touching every stem must re-measure THAT list by hand — the census reproducing is a claim about the other one. The cut stem uses LESS material than the flat end
 at every diameter (−30.2 mm³ at 6 mm, −136.8 at 12 on 60 mm — the wedge outweighs the plug), +94
 triangles, and the default bloom (no stem) is untouched at 24,688.
 

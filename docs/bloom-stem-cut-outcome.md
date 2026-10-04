@@ -36,7 +36,7 @@ frozen tags' bytes stop reproducing over 2,006 of 33,512 rows (§7); block 48 ad
 
 ## 1. Reconciliation
 
-- **`main` has no commits after `23b13bd`.** Nothing in the brief was already shipped. No cut
+- **`main` had no commits after `23b13bd` when the session opened.** Nothing in the brief was already shipped. (During the session `main` gained #358, #359 and #360, none of which touches a bloom file; `23b13bd` is still an ancestor of the branch and the PR merges clean.) No cut
   code existed: both stem ends were horizontal rim-fan faces (`endFace`), as the state doc said.
 - **The brief's "~114 of 1,047 live rows" is a stale denominator, not a wrong count.** 1,047 is
   `frozen/phase50`'s row count; the live matrix at `23b13bd` is 1,089. By the "stem present"
@@ -412,7 +412,7 @@ running the mutants and disbelieving a SILENT beside a red taken by hand found i
   spans 2 process starts), then `--compare`: **PASS — 2,204 (row, mode) digests identical across
   every pass, positionally, bit for bit** (4,408 pairwise comparisons, 163,832,244 triangles /
   1,474,490,196 floats a pass, 0 builds threw).
-- **Census magnitudes** (`bloom-xfail-magnitudes --only <the 167 cut rows> --include-refused`): 4 declared rows among them (`STEM: x a hemisphere` 248 / 0.4262, `SPHERE STEM: x 40 petals x 6 turns` 372 / 0.2714, `INFILL: x a SPHERE head with a stem` 544 / 0.4675, `ALL MAX` 116,847 / 15.8503 measured in Node as an export-refused row), **all 4 at their recorded magnitude** — pairs exactly, span within ±0.00005 mm. The cut moves the stem's end and the free stem's rings; no declared fold lives there, and no re-record is owed.
+- **Census magnitudes** (`bloom-xfail-magnitudes --only <the 167 cut rows> --include-refused`): 4 declared rows among them (`STEM: x a hemisphere` 248 / 0.4262, `SPHERE STEM: x 40 petals x 6 turns` 372 / 0.2714, `INFILL: x a SPHERE head with a stem` 544 / 0.4675, `ALL MAX` 116,847 / 15.8503 measured in Node as an export-refused row), **all 4 at their recorded magnitude** — pairs exactly, span within ±0.00005 mm. The cut moves the stem's end and the free stem's rings; no declared fold lives there, and no census re-record is owed. **That sentence was half right, and the other half cost a CI cycle — §12.** The census tool measures `SELF_INTERSECTION_XFAIL` and only PRINTS a refused row's magnitude; it never compares `EXPORT_REFUSED_XFAIL`'s triangle count, and both refused rows carry a 120 mm stem the cut now ends.
 - **X2 across block 48:** silent on every row (0 within-shell pairs on all 13; none declared).
 - **The byte tool's cut arm over every stem-bearing block** (`verify-bloom-sphere-stem-bytes
   --change cut --base <worktree> --only <STEM, STEM CUT, SPHERE STEM, BARE NODES, STEM NODES,
@@ -432,3 +432,55 @@ running the mutants and disbelieving a SILENT beside a red taken by hand found i
   the bore is MEASURED (≥ 2.26 mm) and not derived in closed form.
 - `endFaceFacts`' probe states are 60 × 12 and 60 × 6; a mutation inert at those but live
   elsewhere would read "did not move" — the probe-state-is-part-of-the-claim rule.
+
+## 12. CI caught the refusal list stale — both refused rows moved by exactly the cut's +94
+
+`bloom-export-watertight` on `9e6cce3`, shard 7 of 8, dropped ONE row of 137 by a validity
+assertion and the other 136 exported watertight with identical live/export counts:
+
+```
+  - NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel (101.1% of budget — REFUSED): XR1: the read-out refused at 1517290 tris where the declaration records 1517196 (+94) — the refused build is not the size it was declared at. Re-measure it (node tools/bloom-xfail-magnitudes.mjs --include-refused) and re-record it in the commit that moved it, naming the move in its outcome doc.; XR1: the BUILDER's own tally is 1517290 where the declaration records 1517196 — a count that differs from the refused export's is a mode-dependent topology, which no row here may have
+  - row census: 137 rows attempted but 136 reached the results — dropped: NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel (101.1% of budget — REFUSED)
+```
+
+The second line is #220's row census reporting the drop, not a second defect. The first is
+XR1 doing exactly what #213 built it for: a declared magnitude that stops reproducing reddens
+in BOTH directions, and here the row got 94 triangles BIGGER.
+
+**Measured, both trees, both modes** (a throwaway script building each row through
+`buildBloomInto` and counting `positions.length / 9`; the base is a worktree of `23b13bd`):
+
+| row | base, export | base, live | this tree, export | this tree, live |
+|---|---|---|---|---|
+| `ALL MAX` | 3,090,816 | 3,090,816 | **3,090,910** | **3,090,910** |
+| `NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel` | 1,517,196 | 1,517,196 | **1,517,290** | **1,517,290** |
+
++94 on each, which is the cut's own cost on a single stem (§8: the cut band's `2N − 2`
+plus the land and plane fans' `N − 2` each, less the flat annulus — +94 at every diameter).
+Both rows carry a 120 mm stem — `ALL MAX` through the blanket sweep's `stemLength` maximum,
+the NODE LAWS corner through its raceme's rachis — and `stemCut` ships FLORIST, so the cut
+reaches them. The 36 pedicels on the NODE LAWS row move nothing: they are pinned FLAT through
+`PEDICEL_PINS`. Live and export agree on both, so XR1's second clause (the
+mode-dependent-topology one) is satisfied by the geometry and was only firing because the
+declaration was the base tree's number.
+
+**Why no local run said so.** §10 reports the four declared census rows among the 167 cut rows
+"at their recorded magnitude", `ALL MAX` among them — and that is TRUE of the self-intersection
+list. `bloom-xfail-magnitudes --include-refused` builds the refused row, censuses it and prints
+its pair count; it never reads `EXPORT_REFUSED_XFAIL.tris`, so a refused row whose triangle
+count moved is invisible to it, and the NODE LAWS row is not in the census list at all and is
+simply not built. The byte partition (§6) counted both rows as movers, correctly, and the
+export gate's `--only` runs were over block 48. **The only instrument that compares the refused
+count is XR1 in the two STL gates, and `ALL MAX` cannot complete a local settle on this box**
+(§10), so the first time either declaration was read against this tree was in CI. The lesson
+is the class CLAUDE.md already names for census magnitudes, arriving on the OTHER list: a
+change that touches every stem owes a re-measurement of every declared row that has one,
+and "the census reproduces" is a claim about one list.
+
+**Re-recorded in the same commit**, both entries carrying the previous figure in their note,
+exactly as the gate's own message asks; nothing widened, nothing skipped. `ALL MAX`'s shard
+had not reported when this was found and will have failed identically on `9e6cce3` — this
+re-record is the fix for both. `bloom-xfail-magnitudes` gaining a refused-count comparison
+would make this catchable locally and is one clause; it is recorded here rather than added
+to a PR already carrying one gate cycle.
+
