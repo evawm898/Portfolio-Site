@@ -410,6 +410,14 @@ running the mutants and disbelieving a SILENT beside a red taken by hand found i
 - **Build order**, three processes: ⟨BUILD_ORDER⟩
 - **Census magnitudes** (`bloom-xfail-magnitudes --only <the 167 cut rows> --include-refused`): 4 declared rows among them (`STEM: x a hemisphere` 248 / 0.4262, `SPHERE STEM: x 40 petals x 6 turns` 372 / 0.2714, `INFILL: x a SPHERE head with a stem` 544 / 0.4675, `ALL MAX` 116,847 / 15.8503 measured in Node as an export-refused row), **all 4 at their recorded magnitude** — pairs exactly, span within ±0.00005 mm. The cut moves the stem's end and the free stem's rings; no declared fold lives there, and no re-record is owed.
 - **X2 across block 48:** silent on every row (0 within-shell pairs on all 13; none declared).
+- **The byte tool's cut arm over every stem-bearing block** (`verify-bloom-sphere-stem-bytes
+  --change cut --base <worktree> --only <STEM, STEM CUT, SPHERE STEM, BARE NODES, STEM NODES,
+  NODE LAWS, LEAVES, INFLO, stemLength max, ALL MAX>`): **137 rows, 125 predeclared movers and
+  12 holders, 7,436,592 export floats under `Object.is` — clause 1 0 / 0, clause 2 0** (the run
+  is inside the stem's envelope, the base's end is the flat disc, the cut face covers the
+  section, the bore stays 1.5 mm off the face, nothing hangs below it). `--control` fires
+  clause 1 on 6 of 6 holders; `--control-only` fires clause 2 on 4 of 4 mover x mode builds.
+  Named rows only — never a pass of the matrix; the matrix-wide claim is §6's.
 
 ## 11. What is not done, named
 
