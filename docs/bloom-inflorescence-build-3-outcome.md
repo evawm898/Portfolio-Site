@@ -43,8 +43,9 @@ unfixed and names the mechanism this session fixed.
 
 `inflorescencePlan` (bloom-geometry.js) now builds the topmost floret unit — the very
 unit `buildInflorescenceInto` appends at node 0, from one memo carried on the plan — in
-BOTH modes, places it through `pedicelPlacement` at a node of depth 0, and reads
-`reach` as the highest world z of any emitted vertex above that node. The top node sits
+BOTH modes, places it through `pedicelPlacement` at a node of depth 0 **at every azimuth
+the phyllotaxy produces on any asked node**, and reads `reach` as the highest world z of
+any emitted vertex above that node, ceiled onto a 2^-16 mm grid. The top node sits
 
     insetNeeded = max(0, reach + (rootZ − headFloorZ) + MIN_FEATURE_MM)
 
@@ -55,14 +56,17 @@ plane. `reach` is the MAX over the two modes' units, so the node is where it is 
 — topology is mode-free by construction (the stem channel's own union), not by
 observation. `insetMm = max(asked, needed)`; `insetClamped` and `insetSatisfied` keep the
 leaf law's biconditional shape. No constant is typed: the gap is `MIN_FEATURE_MM`, the
-floor and the root plane are the stem plan's.
+floor and the root plane are the stem plan's, and the grid (`INFLO_REACH_GRID_MM`,
+2^-16 mm, CEILED so the gap survives the rounding) exists because the node COUNT is a
+discrete decision on the reach and the page's V8 and Node's differ in the last bits of a
+coordinate reached through trigonometry — the eighth instance of that class here.
 
 What it replaced: `insetNeeded = pedicelLen · sin(angle)` — the LEAF's law, inherited by
 build 1, which clears the ROD and not the flower on it.
 
 **Cost:** one extra floret unit build per raceme build (the other mode's), memoised and
 reused by the builder and the shared-node leaf cap; nothing is built twice. Default
-raceme: 467 ms live / 355 ms export in Node for the whole bloom.
+raceme: ~300-750 ms a mode in Node for the whole bloom (the extra unit dominates).
 
 **The reach is a plane clearance, deliberately.** It is one length read off emitted
 geometry against one plane, and the shipped head's own petals never reach below that
@@ -76,35 +80,49 @@ outside this subject and said so in the geometry's header.
 | | before (`23b13bd`) | after |
 |---|---|---|
 | inset asked (0.16 L) | 19.200 mm | 19.200 mm |
-| inset needed | 11.472 (the pedicel's rise) | **33.932** (reach 32.932 + 1.000 gap) |
-| top node below the hub | 19.200 | **33.932** |
-| node depths | 19.2 / 40.2 / 61.2 / 82.2 / 103.2 | 33.9 / 51.2 / 68.6 / 85.9 / 103.2 |
-| internode | 21.0 mm | **17.3 mm** |
-| floret-head approach (EXPORT, `bloom-inflo-approach`) | **0.000 — crossing** | **6.656 mm** |
-| floret-stem | — | 8.403 |
-| floret-floret | — | 2.233 |
+| inset needed | 11.472 (the pedicel's rise) | **37.735** (reach 36.735 + 1.000 gap) |
+| top node below the hub | 19.200 | **37.735** |
+| node depths | 19.2 / 40.2 / 61.2 / 82.2 / 103.2 | 37.7 / 54.1 / 70.5 / 86.8 / 103.2 |
+| internode | 21.0 mm | **16.4 mm** |
+| floret-head approach (EXPORT, `bloom-inflo-approach`) | **0.000 — crossing** | **10.103 mm** |
+| floret-floret (adjacent nodes, opposite sides) | 2.233 | **0.676 — UNDER THE 1.00 mm BAR** |
 | export triangles | 113,886 | 113,886 |
 
-The reach reads 32.9323 in LIVE and in EXPORT alike on the default sheet. The sweep that
-chose the law: dropping the top floret by 1..7 mm leaves it crossing, 8 mm reads 0.555,
-**9 mm is the first clear of the 1.00 mm bar (1.461)**, 14 mm 5.993, 20 mm 11.431 — the
-law lands it 14.7 mm lower than before and 6.656 mm clear, because the plane clearance is
-conservative where the head's petals rise away from the hub.
+The reach reads 36.7345 in LIVE and in EXPORT alike on the default sheet — 32.9323 at
+azimuth 0 and 36.7345 at azimuth π (node 1's side), because the placement's roll is the
+MINIMAL rotation and a floret's petal pattern lands with a different petal up at each
+azimuth (§2e). The sweep that chose the law: dropping the top floret by 1..7 mm leaves it
+crossing, 8 mm reads 0.555, **9 mm is the first clear of the 1.00 mm bar (1.461)**, 14 mm
+5.993, 20 mm 11.431 — the law lands it 18.5 mm lower than before and 10.10 mm clear,
+because the plane clearance is conservative where the head's petals rise away from the hub.
+
+**THE FINDING FOR EVA: the default is clean against the head and under the bar against
+itself.** At 16.4 mm internodes the florets one node apart, on opposite sides of the
+rachis, bring their petal tips to **0.676 mm** of each other (2.233 at the old 21.0 mm).
+It is one state read through three combination grids (`inflo-gradient-x-angle @ 1 x 35`,
+`inflo-gradient-x-tilt @ 1 x 25`, `inflo-length-x-tilt-ff @ 20 x 25`), declared on the day
+it was measured and NOT tuned: a law that kept the 21 mm internode and gave up the lowest
+node instead would be a change to build 2's node law (count gives only at the pitch floor)
+and wants a ruling. The two candidate rulings, with their cost: (i) keep this — the head is
+clean, the florets crowd; (ii) hold the internode and shorten the count — the default
+raceme becomes four nodes. Neither is pre-built.
 
 ### 2b. Where the two modes differ (the union's only witnesses)
 
 | state | reach LIVE | reach EXPORT | need |
 |---|---|---|---|
-| default | 32.9323 | 32.9323 | 33.93 |
-| sheet 0.60 | **32.0530** | **32.6769** | 33.68 |
-| SPHERE head | 31.9628 | 31.9628 | 32.96 (floor = rootZ = −8.850) |
-| headRise 1 (hemisphere) | 29.8257 | 29.8257 | 38.95 — the floor is the RIM, 8.13 mm under rootZ |
-| floretScale 1.00 | 45.7460 | 45.7460 | 46.75 |
-| petalTilt 120 | 26.2265 | 26.2265 | 27.23 |
+| default | 36.7345 | 36.7345 | 37.73 |
+| sheet 0.60 | **35.6071** | **36.4053** | 37.41 |
+| headRise 1 (hemisphere) | 33.63 | 33.63 | 42.8 — the floor is the RIM, 8.13 mm under rootZ |
+| floretScale 1.00 | 51.76 | 51.76 | 52.8 |
 | pedicelAngle −60 | 1.3995 | 1.3995 | 2.40 — the stem's own 19.2 stands (not clamped) |
-| sessile (pedicel 0) | 21.8341 | 21.8341 | 22.83 |
-| 250 mm at 35° | 164.8549 | 164.8549 | 165.85 — past 0.86 L: ONE node, told |
+| 100 mm at 35° | 82.62 | 82.62 | 83.6 — five nodes in the 19.6 mm left |
+| 250 mm at 35° | 168.66 | 168.66 | 169.7 — past 0.86 L: ONE node, told |
 | 250 mm at 90° | 259.1193 | 259.1193 | 260.12 — one node |
+
+(The sphere, tilt-120 and sessile figures of the first cut — 31.96 / 26.23 / 21.83 at
+azimuth 0 — are superseded by the azimuth-complete law and not re-tabulated; every row's
+own figure is on its read-out.)
 
 `REACH INSET: a 0.60 mm sheet` is in block 48 and the smoke subset because it is the one
 row on which a reach read from one mode is visible at all.
@@ -128,14 +146,31 @@ stopped refusing — XR1 fails hard on exactly that — and the row is redefined
 
 ### 2d. The corymb at the raised cap (defaults: 20 mm at 35°, corymb ON)
 
-Largest rachis the corymb solves level WITHOUT clamping: **192 mm** (lengths
-20.0 / 77.2 / 134.4 / 191.5 / 248.7), measured by sweeping `stemLength` 60..260 at 1 mm —
-beyond the stem control's own 120. On the full 120 mm rachis: **20.00 / 50.19 / 80.38 /
-110.57 / 140.76 mm, unclamped, heads spanning 0.000 mm** (the old cap clamped the lowest
+Largest rachis the corymb solves level WITHOUT clamping: **197 mm** (lengths
+20.0 / 77.4 / 134.8 / 192.2 / 249.6), measured by sweeping `stemLength` 60..260 at 1 mm —
+beyond the stem control's own 120. On the full 120 mm rachis: **20.00 / 48.53 / 77.07 /
+105.60 / 134.14 mm, unclamped, heads spanning 0.000 mm** (the old cap clamped the lowest
 at 120 and the heads spanned 26.64). Under the old law the brief's 81 mm figure
 reproduces as the clamp point; under the new inset the lowest pedicel is shorter at every
-rachis (the span it must climb is 69.3 mm instead of 84.0), which is why 192 and not
+rachis (the span it must climb is 65.5 mm instead of 84.0), which is why 197 and not
 `120 + ...`.
+
+### 2e. The azimuth finding — the smoke subset's, not reasoned
+
+The first cut measured the reach at azimuth 0 alone. `bloom-smoke --conn` then dropped
+`INFLO: WHORLED` on ID9 (d): the florets reached z = 0.4565 against a floor-less-gap of
+−2.9156 — **3.37 mm into the gap with `insetSatisfied` true**. The placement's roll about
+the pedicel is the MINIMAL rotation (about `z × D`), so a floret whose petals are not
+symmetric about its own axis lands with a different petal UP at each azimuth, and the two
+whorled florets the plan had not measured reached higher than the one it had. The law takes
+the max over every azimuth the phyllotaxy produces on any asked node (two, four, or
+whorled's rotating set — each one pass over the unit's vertices), which also makes the TOP
+node's inset conservative for every lower node; the builder's measured side is every
+placement (`floretsMaxZ`), not node 0's. On the default that moved the reach 32.93 →
+36.73 (azimuth π is node 1's side), the top node 33.9 → 37.7, the corymb's lowest pedicel
+140.8 → 134.1 and the internode 17.3 → 16.4 — which is what took the default's own
+floret-floret approach from 2.233 to 0.676. **Every figure in this document is the
+azimuth-complete law's; the first cut's are named as superseded where they appear.**
 
 ## 3. ID9 — the family, and what each clause can see
 
@@ -180,16 +215,17 @@ The inset moves EVERY raceme's nodes, so the whole inflorescence section of
 EXPORT):
 
 * **`inflo-length-x-angle` CLEARS** — all seven declared cells, the shipped raceme's own
-  among them, read 4.0 to 8.3 mm (20×35: 6.656, 20×60: 4.006, 20×90: 7.424, 0×35: 4.037,
-  5×35: 4.029, 60×60: 8.265, 60×90: 7.424). Seven entries retired, verdict
+  among them, read 4.0 to 8.3 mm at the first cut and higher again under the azimuth-complete law (the
+  default's 10.10). Seven entries retired, verdict
   `single-reaches` → `clears`, the pair KEPT so a top floret touching the head is loud
   again. **This is #355 closed on the grid that found it.**
 * **Two corymb cells retired**: 35°×40 mm clears at 15.000 (the search cap), 60°×40 at
   Infinity (one node — no pair).
-* **Three re-recorded WORSE** (0.654 → 0.000 twice, 0.723 → 0.000) and **eleven new cells
-  under the bar**, every one an edge crossing, and every one the same mechanism: **THE
-  TIGHTER INTERNODE.** The top node is 33.9 mm down the shipped rachis instead of 19.2,
-  the bottom node stays at 0.86 L, so the five nodes share 69.3 mm instead of 84.0 — 17.3
+* **Three re-recorded WORSE** (0.654 → 0.000 twice, 0.723 → 0.000), **fifteen new cells
+  under the bar** — three of them the DEFAULT RACEME's own 0.676 (§2a), one state through
+  three grids — and every other one an edge crossing by the same mechanism: **THE
+  TIGHTER INTERNODE.** The top node is 37.7 mm down the shipped rachis instead of 19.2,
+  the bottom node stays at 0.86 L, so the five nodes share 65.5 mm instead of 84.0 — 16.4
   mm apart against 21.0 — and florets on longer pedicels (the gradient at 2 and 3, 60 mm
   pedicels), the level heads of a corymb on a short rachis, and a 15 mm leaf two nodes
   up all reach their neighbours sooner. The node law (count gives only at the pitch
@@ -197,7 +233,7 @@ EXPORT):
 * **`inflo-leaf-nodes-x-leafangle`'s base was INERT and moved.** On its 52 mm rachis the
   deeper inset leaves 10.8 mm of span, so 5 and 12 asked both collapse to the same four
   nodes at the pitch floor and CG1 refused the axis at 0.000e+0 of movement — correctly.
-  The base is the shipped 120 mm rachis now (5 nodes 17.3 mm apart, 12 nodes 6.3 — the
+  The base is the shipped 120 mm rachis now (5 nodes 16.4 mm apart, 12 nodes 6.0 — the
   tightest internode the law reaches on it), a grid change inside the shipped ranges that
   restores the axis rather than manufactures a cell; one cell declared (12 × level),
   verdict `single-reaches` → `product-only`.

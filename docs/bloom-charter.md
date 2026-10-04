@@ -1803,7 +1803,9 @@ any of them.
   EMITTED PETAL REACH in both modes plus one printable gap, never the pedicel's rise (which
   cleared the rod and put the shipped raceme's top floret through the head); the pedicel's
   ceiling is its own range, 250, not the head's stem control; the price of the clean head is
-  a shorter node span (17.3 mm internodes at the default against 21.0), reported, not tuned.
+  a shorter node span (16.4 mm internodes at the default against 21.0) and the default raceme's
+  own florets 0.676 mm apart, under the printable bar — reported, declared, not tuned; whether
+  to hold the internode and give up a node instead is Eva's.
   Phase B — per-node deltas and the derived per-floret phase — waits on Eva's ruling on the
   Phase A sheet.
 

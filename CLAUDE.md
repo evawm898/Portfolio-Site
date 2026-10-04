@@ -3542,24 +3542,31 @@ built twice), places it through `pedicelPlacement` at depth 0, reads the highest
 vertex as `reach`, ceils it onto a 2^-16 mm grid (a node count is a discrete decision on it,
 and the page's V8 and Node's differ in the last bits — the eighth instance of that class here),
 and sets `insetNeeded = reach + (rootZ − headFloorZ) + MIN_FEATURE_MM`, `headFloorZ` the STEM
-plan's own lowest material (a dome's rim). The max over the modes makes the node depths
-mode-free BY CONSTRUCTION. **Measured on the default: top node 19.2 → 33.9 mm down, floret-head
-0.000 → 6.656 mm, 113,886 export tris unmoved.** **THE PRICE IS A SHORTER NODE SPAN — 17.3 mm
-internodes against 21.0 — and the combination grid says so**: all seven `inflo-length-x-angle`
-cells CLEAR (verdict `clears`, #355 closed on the grid that found it), three re-record WORSE
-and eleven new cells land under the bar, every one an edge crossing by the tighter internode;
+plan's own lowest material (a dome's rim). **THE REACH IS THE MAX OVER EVERY AZIMUTH THE
+PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by the smoke subset, not reasoned**: the placement's
+roll is the MINIMAL rotation, so a floret lands with a different petal up at each azimuth, and
+the first cut (azimuth 0 only) put `INFLO: WHORLED`'s other two florets 3.37 mm into the gap with
+`insetSatisfied` true. The max over the modes makes the node depths mode-free BY CONSTRUCTION.
+**Measured on the default: top node 19.2 → 37.7 mm down, floret-head 0.000 → 10.10 mm, 113,886
+export tris unmoved.** **THE PRICE IS A SHORTER NODE SPAN — 16.4 mm internodes against 21.0 — AND
+THE DEFAULT RACEME'S OWN FLORETS NOW STAND 0.676 mm FROM EACH OTHER, UNDER THE 1.00 mm BAR**
+(2.233 before; one state, three combination grids, declared, NOT tuned — the Phase A finding for
+Eva's ruling: keep it, or hold the internode and give up a node, which is build 2's node law to
+change). The grid says the rest: all seven `inflo-length-x-angle` cells CLEAR (verdict `clears`,
+#355 closed on the grid that found it), three re-record WORSE and fifteen new cells land under
+the bar, every one an edge crossing by the tighter internode;
 `inflo-leaf-nodes-x-leafangle`'s 52 mm base went INERT (both counts collapse to the pitch floor
 under the deeper inset — CG1 refused the axis, correctly) and moved to the 120 mm rachis.
 **THE CAP WAS TWO NUMBERS, NOT ONE**: `PEDICEL_LENGTH_RANGE` was [0, 60] and the per-node law
 clamped at the HEAD's `STEM_LENGTH_RANGE[1]` (120); both read 250 now, and **a shipped
 harness guard forbade exactly this** ("a pedicel outside the stem's own range is a rod nothing
 has ever been proved on") — restated on the ruling, with block 48's 250 mm rows as the proof it
-asked for. The corymb solves level to a **192 mm** rachis at the defaults (120 was 81), the
-full 120 mm stem at 20/50/80/111/141 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
+asked for. The corymb solves level to a **197 mm** rachis at the defaults (120 was 81), the
+full 120 mm stem at 20/49/77/106/134 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
 NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
 corner is block 48's `THE BUDGET CORNER` at 40 mm, 95.0%; the NODE LAWS refusal row EXPORTS
 at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
-family** — (d) reads the BUILDER's own `topNodeMaxZ`, never the plan; (f) is mode-freeness
+family** — (d) reads the BUILDER's own `floretsMaxZ` over every placement, never the plan; (f) is mode-freeness
 measured within ONE engine, because the first cut asked for `Object.is` across the page's V8
 and Node's and went red on depths equal to four decimals. `frozen/phase52` is the 1089 rows at
 `23b13bd`. **Phase B (per-node deltas, the derived per-floret phase) is NOT started — it waits
