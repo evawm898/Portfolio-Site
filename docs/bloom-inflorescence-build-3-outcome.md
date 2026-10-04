@@ -239,7 +239,7 @@ EXPORT):
   verdict `single-reaches` → `product-only`.
 * **The long-pedicel-against-stem column**: `inflo-length-x-tilt` gains 250 mm. Measured: **205.197 mm at every tilt** — a 250 mm rod stands its one floret 205 mm from the rachis; the column clears and is kept as the long-pedicel witness.
 
-**The full gate (every pair and triple, Node 22): 163 cells under the bar, 163 declared, across 25 pairs and triples, 0 strays, 0 inert mismatches — PASS; `--control`: every clause fired on a plant that names it, and the tree is green without them.** 88 s / 95 s on this box.
+**The full gate (every pair and triple, Node 22): 167 cells under the bar, 167 declared, across 25 pairs and triples, 0 strays, 0 inert mismatches — PASS; the inflorescence subset 41 under the bar, 41 declared; `--control`: every clause fired on a plant that names it, and the tree is green without them.**
 
 **For Eva, as a consequence rather than a defect:** the price of a clean head is a
 shorter node span. A law that kept the 21.0 mm internode and gave up the lowest node
@@ -256,7 +256,7 @@ stem plan's heights) — differs from the base plan's depths, or a pedicel asked
 base's 120 ceiling was clamped there. The first cut predicted on the INSET and was wrong
 twice, which the tool said: `INFLO: ONE node` sits at the flower's solo 0.55 L whatever
 the inset, and a raceme whose florets cannot clear the head collapses to one node on both
-trees — changed inset, unchanged depths, HOLDERS. **Over the 68 inflorescence rows (`--only 'INFLO|NODE LAWS|REACH INSET|BARE NODES: GATED|pedicel|floret'`), both modes, 197,928,900 export floats over 21,992,100 triangles and 753,112 captured-grid values: PASS — 60 predeclared movers moved, 8 holders bit-identical under `Object.is`.** The holders are the two GATED rows, the two no-rachis/none rows, `INFLO: ONE node`, the cannot-clear row, the GATED bare-nodes raceme and the descending (−60) row, whose reach (1.40 mm) sits under the stem's own inset. FULL_PARTITION_TBD
+trees — changed inset, unchanged depths, HOLDERS. **THE WHOLE 1099-ROW MATRIX, both modes, positionally under `Object.is`: PASS — 62 predeclared movers moved, 1037 holders bit-identical, over 1,469,736,180 export floats and 163,304,020 triangles** (run against the azimuth-0 module, whose holders the azimuth fix cannot touch — it changes only raceme rows, all of which are movers). The movers re-confirmed on the FINAL module over the 69 inflorescence rows (`--only 'INFLO|NODE LAWS|REACH INSET|BARE NODES: GATED|pedicel|floret|raceme'`): **61 of 61 moved, 8 holders to the bit, 198,158,220 floats**. The holders are the two GATED rows, the no-rachis row, `INFLO: ONE node` (the flower's solo 0.55 L, whatever the inset), the cannot-clear row (one node on both trees), the GATED bare-nodes raceme and the descending (−60) row, whose reach (1.40 mm) sits under the stem's own inset. `ALL MAX` and `ALL MIN` are holders by construction (no `INFLO:` row sets `inflorescence`, and `INFLO_SUB_IDS` keeps the pedicel out of the blanket sweep) and are measured as such.
 
 ## 7. Frozen baselines
 
