@@ -5098,6 +5098,41 @@ only change on the export path is one name in an import list. `frozen/phase36` i
 rows at `3ed45df`, registered in BOTH maps and proved deep-equal. The PANEL gate passes and
 its `--negative-control` closes with ALL SEVENTEEN ROUTES observing the failure.
 
+**INFLORESCENCE BUILD 2 — THE NODE LAWS: A PEDICEL LENGTH PER NODE, A SESSILE ROOT, AND A LEAF
+UNDER EVERY PEDICEL** (Eva's restated Oct 3 rulings — read `docs/bloom-inflorescence-node-laws-outcome.md`
+before touching `inflorescencePlan`'s lengths, `buildInflorescenceInto`'s units, `pedicelPlacement`'s
+sessile arm, `sharedNodeOffsetMm`, `leafPlan`'s shared arm, ID7/ID8, SN0-SN3 or
+`tools/bloom-inflo-approach.mjs`). `pedicelGradient` (0-3, default 1 = identity by BRANCH) ramps the
+lowest pedicel against the topmost in MILLIMETRES down the rachis, `pedicelLength` pinned at the top;
+`pedicelCorymb` (OFF/ON) solves `L_k = L_0 + (d_k - d_0)/sin(angle)` so every head lands on ONE PLANE —
+a plane and not a dome because the plane has no free parameter; inert and told at or below level,
+clamped and told at the pedicel's own 120 mm ceiling; the emitted heads span 0.000 mm unclamped. Past
+the corymb the gradient makes an anthela-like overtopping for free, unexposed. **ONE FLORET BUILD PER
+DISTINCT PEDICEL LENGTH** (memo keyed on the exact double); unit 0 is the topmost node's and the
+legacy `unit`/`unitTris`/`tipZLocal`/`floretState` fields are it. `PEDICEL_LENGTH_RANGE` opens to 0
+and **0 IS SESSILE (ruling 7)**: no floret stem, the hub's underside on the axis (`hubAxisTopZ` less
+one sheet — extracted verbatim from `stemPlan`) rooted RADIALLY to the bore at every angle. **ID8's
+must-fail is a hub rooted at mid-wall, NOT one rooted along the pedicel**: at 35 deg the tilted hub's
+own disc reaches past the bore either way, so ruling 7's "at least one wall" holds for both and ID8 is
+right not to separate them. **THE SHARED NODE (ruling 5)**: on a raceme with leaves, one leaf per
+pedicel at its node and azimuth, seated `(r_ped + r_pet + MIN_FEATURE_MM)/min(cos)` below — exact for
+parallel rods, infinite (no leaf, told) at a vertical rod; `leafNodes`/`leafPhyllotaxy` hidden and
+inert (`leafNodesOwn`); a leaf off the stem's end is not built, told. **THE LAW CLEARS THE RODS AND NOT
+THE BLADE**: at its own default the leaf blade's skin and cup take 0.124 mm of the gap (0.876 mm,
+declared). **THE COMBINATION GATE GAINED FOUR MEASURES AND EIGHT PAIRS** (floret-floret, floret-head,
+floret-stem, leaf-floret; 91 cells, 37 under the bar, all declared, edge crossings read 0, the joins
+excluded by construction and never declared) **and its findings include SHIPPED STATES: the shipped
+raceme's top floret passes through the terminal head's petals** (the inset clears the pedicel's rise,
+never the floret's petals), a 5 mm pedicel's floret folds onto its own rachis, and at -60/60/90 deg
+florets reach the rachis at every size. `INFLO: ALL MAX` is UNMOVED at 95.0% (its 90 deg pedicels
+admit no shared-node offset); the same corner at 35 deg with leaves is 1,517,196 (101.1%), a declared
+refusal row. **The 544% corner (`INFLO: ALL MAX` x `layerCount 6`) CANNOT be a row until #231 is
+fixed**: the refusal builds the whole 8.16 M export mesh before checking (9.6 min locally against the
+gate's 120 s), and the attempt found **ID4 predicting `floretPetals` where a floret builds
+`floretPetals x layerCount`** (it inherits the head's whorls) — fixed, witnessed by `NODE LAWS: x 2
+whorls`. Block 46 (31 rows), smoke block 46, `frozen/phase50` = the 1047 rows at `754e3aa`.
+Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
+
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
 `docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`

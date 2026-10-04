@@ -78,7 +78,7 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
    colour: [r,g,b] base. Returns rgb Buffer w*h*3. */
 export function render(positions, w, h, cam, opts = {}) {
   const ss = opts.supersample || 2; const W = w * ss, H = h * ss;
-  const bg = opts.bg || [24, 24, 28]; const base = opts.color || [214, 206, 190];
+  const bg = opts.bg || [24, 24, 28]; const base0 = opts.color || [214, 206, 190];
   const fwd = norm(cam.dir.map((c) => -c));            // looking along -dir
   let right = norm(cross(fwd, cam.up)); const up = norm(cross(right, fwd));
   const c = cam.center; const scale = (H / 2) / cam.halfHeight;
@@ -93,6 +93,10 @@ export function render(positions, w, h, cam, opts = {}) {
     if (dot(n, fwd) > 0) n = [-n[0], -n[1], -n[2]];   // two-sided: shade the face toward the camera
     const shade = 0.22 + 0.62 * Math.max(0, dot(n, L1)) + 0.28 * Math.max(0, dot(n, L2));
     const tint = opts.tint ? opts.tint(t) : 1;
+    /* OPTIONAL PER-TRIANGLE BASE COLOUR (opts.colorOf), so a sheet can tell
+       PARTS apart (head, stem, leaf, floret). Absent, every triangle takes
+       `opts.color` and this is the renderer it always was, to the byte. */
+    const base = opts.colorOf ? opts.colorOf(t) : base0;
     const r = Math.min(255, base[0] * shade * tint), g = Math.min(255, base[1] * shade * tint), b = Math.min(255, base[2] * shade * tint);
     /* OPTIONAL PER-VERTEX NORMALS (opts.normals, 9 per triangle, the builder's
        own captureNormals channel): interpolated across the triangle and shaded

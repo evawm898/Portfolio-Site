@@ -6993,6 +6993,13 @@ export async function leafAssertions(page, row) {
     }
   }
 
+  /* A SHARED NODE THAT SEATED NO LEAF HAS NO BLADE, and every family below is
+     a claim about an emitted blade (its foot, its winding, its teeth, its
+     tip) — vacuous on zero leaves, and a `Math.max` of nothing reads -Infinity.
+     SN0-SN3 above have already asserted that zero is the right count, and LF1
+     that nothing was emitted, so the leaf family stops here. */
+  if (sharedEmpty && L.built === 0) return bad;
+
   /* LF6 — THE BLADE CARRIES NO FOOT. Phase A's A1: with the root blend stood
      down the outline is independent of `ring.width` (0 of 4001 samples move),
      and that is what lets a leaf share the petal's outline at all. A leaf that
@@ -7773,9 +7780,20 @@ export async function inflorescenceAssertions(page, row) {
          pedicel. */
       const sphereFloret = sphereMode(ui);
       if (om !== (sphereFloret && B.unit.stemPresent === true)) bad.push(`ID4: the floret ${om ? 'declares' : 'declares NO'} stem channel while sphereMode() on the head's own ${ui.placement}/${ui.hubShape} reads ${sphereFloret} — a floret is a bloom and its channel fires on exactly the states a head's does`);
-      const wantPetals = om ? B.unit.omissionBuilt : P.floretPetals;
-      if (om && B.unit.omissionAsked !== P.floretPetals) bad.push(`ID4: the floret's channel was asked about ${B.unit.omissionAsked} slots and the plan asks for ${P.floretPetals} petals`);
-      if (B.unit.petalsBuilt !== wantPetals) bad.push(`ID4: the floret unit built ${B.unit.petalsBuilt} petals; the plan asks ${P.floretPetals}${om ? ` and its own stem channel takes ${B.unit.omissionAsked - B.unit.omissionBuilt} (slots ${JSON.stringify(B.unit.omitted)})` : ' and it declares no channel'}, so ${wantPetals}`);
+      /* A FLORET INHERITS THE HEAD'S WHORL COUNT (ruling 10: every flower
+         shares the head's controls), and `petalsBuilt` counts every petal the
+         builder emitted across them — so the asked count is the floret's
+         petals TIMES the whorls, restated from the CONTROLS. Found by the
+         544%% corner row (36 six-whorl florets): the clause predicted 12 where
+         a six-whorl floret correctly builds 72 — pre-existing since build 1,
+         and silent until a raceme row asked for more than one whorl. FAN's
+         slot law is not petals x whorls and is excluded by name, not guessed. */
+      const whorls = Math.max(1, Math.round(Number(ui.layerCount ?? 1)));
+      const fan = String(ui.placement) === 'FAN';
+      const askedPetals = P.floretPetals * whorls;
+      const wantPetals = om ? B.unit.omissionBuilt : askedPetals;
+      if (om && B.unit.omissionAsked !== askedPetals) bad.push(`ID4: the floret's channel was asked about ${B.unit.omissionAsked} slots and the plan asks for ${P.floretPetals} petals x ${whorls} whorl(s)`);
+      if (!fan && B.unit.petalsBuilt !== wantPetals) bad.push(`ID4: the floret unit built ${B.unit.petalsBuilt} petals; the plan asks ${P.floretPetals}${om ? ` and its own stem channel takes ${B.unit.omissionAsked - B.unit.omissionBuilt} (slots ${JSON.stringify(B.unit.omitted)})` : ' and it declares no channel'}, so ${wantPetals}`);
       /* EVERY OTHER UNIT, the same claim per build: a channel exists only on
          a floret that HAS a stem and a sphere head (a sessile floret has no
          stem to clear a channel for), and the petals built are the asked less
@@ -7783,8 +7801,8 @@ export async function inflorescenceAssertions(page, row) {
       for (const u of (Array.isArray(B.units) ? B.units : []).slice(1)) {
         const omU = u.omissionAsked !== null && u.omissionAsked !== undefined;
         if (omU !== (sphereFloret && u.stemPresent)) { bad.push(`ID4: the ${u.lengthMm} mm floret unit ${omU ? 'declares' : 'declares NO'} stem channel on a ${sphereFloret ? 'sphere' : 'non-sphere'} head ${u.stemPresent ? 'with' : 'without'} a stem`); break; }
-        const want = omU ? u.omissionBuilt : P.floretPetals;
-        if (u.petalsBuilt !== want) { bad.push(`ID4: the ${u.lengthMm} mm floret unit built ${u.petalsBuilt} petals; the plan asks ${P.floretPetals}${omU ? ` less its own channel's ${u.omissionAsked - u.omissionBuilt}` : ''}, so ${want}`); break; }
+        const want = omU ? u.omissionBuilt : askedPetals;
+        if (!fan && u.petalsBuilt !== want) { bad.push(`ID4: the ${u.lengthMm} mm floret unit built ${u.petalsBuilt} petals; the plan asks ${P.floretPetals}${omU ? ` less its own channel's ${u.omissionAsked - u.omissionBuilt}` : ''}, so ${want}`); break; }
         if (u.stemPresent !== (u.lengthMm > 0)) { bad.push(`ID4: the ${u.lengthMm} mm floret unit reports ${u.stemPresent ? 'a' : 'NO'} stem`); break; }
         if (u.stemPresent && Math.abs(u.stemOuterR - P.pedicelR) > 1e-9) { bad.push(`ID4: the ${u.lengthMm} mm floret unit's stem is ${(2 * u.stemOuterR).toFixed(4)} mm across and the derived pedicel ${(2 * P.pedicelR).toFixed(4)} mm`); break; }
       }
@@ -12011,6 +12029,12 @@ export function buildMatrix() {
      leaf under all 36 pedicels — 36 x 2,548 = 91,728 triangles more, 1,517,196
      in all, 101.1% of the budget. The app REFUSES it and that refusal is
      DECLARED (`EXPORT_REFUSED_XFAIL`), never clamped. */
+  /* TWO-WHORL FLORETS — ID4's witness. A floret inherits `layerCount` (ruling
+     10), and ID4 predicted its petal count as `floretPetals` alone until the
+     544%% corner (36 six-whorl florets) built 72 a floret where it said 12.
+     That corner cannot be a row (the outcome doc §5 says exactly why); this
+     is the cheap state that exercises the same arm. */
+  nodeLaw('x 2 whorls (every floret inherits the head\'s second whorl)', { ...RAC, layerCount: 2 });
   nodeLaw('ALL MAX at 35 deg x a leaf under every pedicel (101.1% of budget — REFUSED)', { ...RAC, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 60, pedicelAngle: 35, leafLength: 40 });
 
   return rows;
