@@ -312,7 +312,16 @@ plan.cut.made`, read on the row's own plan — never a label.
 `node tools/verify-bloom-seam-bytes.mjs --change cut --frozen-sweep` over all 51 registered
 matrices, by the same predicate:
 
-⟨FROZEN⟩
+**25 of 51 baselines carry at least one row whose bytes stop reproducing; 2,006 of 33,512
+frozen rows in total** (1,301 distinct states built). `phase2`–`phase27` read 0 (no stem yet —
+`phase27`, the 680 rows at the sphere-stem session's base, predates the stem), then 16 / 16 /
+23 / 23 / 35 / 39 / 54 / 68 / 68 / 90 / 92 / 93 × 7 / 105 / 106 / 108 / 108 / **110 of 1,047 on
+`phase50`** (the brief's "114" counted by "stem present"; the four it loses are stems too short
+to carry their own cut and the GATED rows) / 143 of 1,080 on `phase51` / **151 of 1,089 on
+`phase52`**. The brief's "1,666 rows across 22 of 48" was a count by "stem present" over the
+tags that existed then; by the cut's own predicate over all 51 registered matrices it is 2,006
+over 25. Every one of those tags' definitions is untouched — `--verify-frozen` deep-compares
+row order, labels and set lists and has never compared a byte.
 
 No phase is owed for the byte movement alone (session 24's rule); **`frozen/phase52` is owed
 for the 13 added rows** and is the 1,089 rows at `23b13bd`, registered in `FROZEN_MATRICES` and
