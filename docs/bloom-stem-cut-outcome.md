@@ -148,7 +148,7 @@ Stem-only edge census (boundary / non-manifold / degenerate / directed mismatch)
 12 mm (widest), 100 × 6 noded at prominence 1, FLAT, and the 1 mm stem on 3 mm — **0 / 0 / 0 /
 0 on every one.** Through the real gates over block 48 (13 rows): export **PASS 13/13**
 (`boundary=0 degenerate=0 nonManifold=0` on every row) and connectedness **PASS 13/13**
-(`components=1 stray=0`, re-read at 0.3 mm). Re-run after the last geometry edit: ⟨GATE3⟩.
+(`components=1 stray=0`, re-read at 0.3 mm). Re-run after the last geometry edit (the knife-edge-safe face fan and the 1 mm GATED row): export **PASS 13/13**, connectedness **PASS 13/13** again.
 
 ## 4. The six checks — old red, the rewrite, new red
 

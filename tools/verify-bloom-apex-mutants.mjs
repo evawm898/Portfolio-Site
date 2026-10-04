@@ -2161,9 +2161,14 @@ async function famsOn(rows) {
       const mm = /^(L\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE STEM FAMILY (session 43) — same rule again: a family added is a
-       family this table must be able to fire. */
+       family this table must be able to fire. AND THE CUT FAMILY (stem session
+       3) RIDES IN THE SAME CALL under its own prefix: `stemAssertions` pushes
+       `SC0`-`SC3` beside `ST*`, and a capture of `ST\d+` alone reported both cut
+       mutants `SILENT: SC2, SC3` on the first run while the same plants fired
+       both clauses through the harness directly — the ST10-as-ST1 lesson a
+       third time, this time a family the capture could not see at all. */
     for (const msg of await stemAssertions(page, row)) {
-      const mm = /^(ST\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(S[TC]\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {
