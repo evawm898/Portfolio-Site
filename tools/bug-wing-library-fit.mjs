@@ -41,7 +41,7 @@ const KEPT = args.includes('--kept');   // only Eva's kept 17 (step 2): the expl
    numbered on from the library's last id, on the step-2 exploded sheet. */
 const ADD = args.includes('--add');
 const OUT = path.resolve(opt('--out', path.join(SRC, KEPT ? 'out-kept' : ADD ? 'out-add' : 'out')));
-fs.mkdirSync(OUT, { recursive: true });
+if (import.meta.url === `file://${process.argv[1]}`) fs.mkdirSync(OUT, { recursive: true });
 
 export const SPLIT_LUM = 215;        // darker than this is "butterfly" for the split only (the fit does its own Otsu)
 export const CLOSE_PX = 3;           // closing radius before labelling
@@ -187,11 +187,11 @@ const JAGGED = () => { if (!JAG) { const src = fs.readFileSync(path.join(ROOT, '
    silhouette is refused; a fit under the print floor at 0.6 mm is re-fitted at
    the nearest tolerance that clears it, and the sheet says so — never widened
    by hand. */
-export function fitCrop(c, base, extra = {}) {
+export function fitCrop(c, base, extra = {}, { refit = KEPT || ADD } = {}) {
   let r = imageToBug(c.sil, base, { ...extra }), input = 'silhouette';
   if (!r.ok) { const r2 = imageToBug(c.img, base, { ...extra }); if (r2.ok) { r = r2; input = 'source pixels'; } }
   let tolUsed = 0.6;
-  if ((KEPT || ADD) && r.ok && G.buildBug(r.params).floorViolations.length) {
+  if (refit && r.ok && G.buildBug(r.params).floorViolations.length) {
     for (const tol of [0.45, 0.8, 0.35, 1.0, 0.25, 1.3]) {
       const r2 = imageToBug(input === 'silhouette' ? c.sil : c.img, base, { ...extra, toleranceMm: tol });
       if (r2.ok && !G.buildBug(r2.params).floorViolations.length) { r = r2; tolUsed = tol; break; }
