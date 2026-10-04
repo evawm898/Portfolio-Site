@@ -182,7 +182,7 @@ it has two or more nodes and a live gradient or corymb). Every mover is in block
 `LEAVES:` and `STEM NODES:` row of earlier blocks HOLDS, including the relabelled 5 mm row.
 
 `frozen/phase50` is the 1047 rows at `754e3aa`, registered in both maps and proved deep-equal;
-block 46 (31 rows) takes the live matrix to 1078, and smoke block 46 (6 rows) to 146 rows over 42
+block 46 (31 rows; 33 after the second round, §8) takes the live matrix to 1078 (1080), and smoke block 46 (6 rows) to 146 rows over 42
 blocks, 134 families both ways. No workflow file is edited, so no
 `TAG_PUSH_XFAIL` entry is owed.
 
@@ -311,5 +311,20 @@ Change 2 retires nothing on the gate, because the leaf pair's base leaf is 15 mm
 
 ### 8f. Bytes
 
-BYTES_PLACEHOLDER
+**The byte partition for this round** — `verify-bloom-surface-bytes --movers-predicate node-laws-2 --base <worktree of f869eff>`, the round's own base:
+- coverage: the whole 1080-row matrix in both modes, run in two chunks, positionally under `Object.is`;
+- result: **PASS — 12 of 12 predeclared movers moved, and 0 floats moved on the 1,068 holders**;
+- volume: 1,455,741,432 export floats over 161,749,048 triangles, and 81,690,794 captured-grid values.
+
+The movers are predeclared from the BASE tree's own leaf plan: a row moves iff the base builds at least one shared-node leaf. Every mover is in block 46. Every raceme WITHOUT leaves holds, which is the measured answer to "building the floret units before the leaves moves nothing".
+
+The first chunk (rows 0–539) holds no mover, so the tool's vacuity guard reports it as a FAIL by design. It is a chunking artefact, and its substance is 0 floats moved on 540 holders. The tool's `--control` was not re-run this round; it is unchanged since §6, where it fired both clauses.
+
+This **replaces §6's 29 / 1,049 for this round**: §6's partition is first-round only, against `754e3aa`. The live matrix is **1080 rows** (block 46: 31 → 33, the two SN4 witness rows).
+
+Gates on the round's tree:
+- block 46 through `verify-bloom-export` — PASS, 32 of 33, with the 101.1 % refusal asserted by XR1 (its triangle count is unmoved at 1,517,196);
+- `verify-bloom-connectedness` — PASS, 32 of 33 one piece;
+- the combination gate's `^inflo-` pairs — clean, 37 of 37 declared;
+- `bloom-smoke --check` and `--negative-control` — OK (146 rows, 135 families).
 
