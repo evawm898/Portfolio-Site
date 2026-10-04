@@ -27,6 +27,12 @@ allowed, the only shape rule being a simple tile outline; registration by index 
 on A punch a dimple track in the border waste, a toothed collar at one end of B rides it),
 never a frame or jig; removable handles, one design for both rollers.
 
+**Eva's ruling on the first version (held as PR #354): each blade is a closed wavy RING
+running AROUND the circumference — a jagged pizza-wheel edge wrapped round the pin — and
+each roller rolls along the direction of its own lines.** The first version laid the lines
+lengthwise as crossbars and rolled each roller along the OTHER family's chord; §3 to §7, §9,
+§11 and §12 are rederived for rings, and §3.1 says what the change costs.
+
 ---
 
 ## 1. The tiling
@@ -144,7 +150,7 @@ than 0.05 mm are also refused (the curve law divides by their distance).
 
 ## 3. The rollers
 
-### 3.1 Which way each roller rolls — and the decision that is not obvious
+### 3.1 Which way each roller rolls — rings, by ruling
 
 A roller stamps its **unrolled surface** onto the dough: rolling without slip, the surface
 point at arc length `s` lands at `start + s·r̂` (`r̂` the roll direction) and its axial position
@@ -153,64 +159,84 @@ round the roller is held does (flipping it end for end rotates the stamp 180°, 
 roller to cut a family of lines, that family must be **periodic along the roll direction with a
 period that divides the circumference**.
 
-Each family is periodic under the whole lattice, so a roller may roll along either lattice
-vector. Two candidate designs:
+Each family is periodic under the whole lattice, so a roller could roll along either lattice
+vector. The first version of this page rolled each roller along the OTHER family's chord, so
+its lines ran lengthwise across it as crossbars. **Eva ruled that the wrong axis: each blade is a
+closed wavy RING running around the circumference, and each roller rolls along the direction of
+its own lines.**
 
-| | **Rings** — roller A rolls along `tA`, its lines run *around* it | **Crossbars** — roller A rolls along `tB`, its lines run *across* it |
+| | **Rings** — roller A rolls along `tA` (ships) | Crossbars — roller A rolls along `tB` (retired) |
 |---|---|---|
-| period along the roll | `|tA|` | `|tB|` |
-| rolling support | continuous — every ring is a wheel at the tip radius | intermittent — needs rims (§3.5) |
+| period along the roll | `|tA|`, the roller's own pitch | `|tB|` |
+| rolling support | continuous — every ring is a wheel at the tip radius | intermittent — it needed rims |
 | cutting | progressive, pizza-wheel-like | a bar comes down, ravioli-roller-like |
-| **printed upright** | **every ring is a horizontal fin: an 8 mm, ~90° overhang, supported along its whole length** | every bar is a near-vertical wall; prints clean |
-| index marks (§4) | consistent | consistent |
+| **printed upright** | **every ring is a fin standing straight out of the body: support under every ring** | every bar a near-vertical wall |
 
-**Crossbars ship.** The deciding fact is printability: a roller is printed standing on its end,
-and a ring blade is a thin horizontal fin cantilevered 8 mm off a vertical wall — it cannot be
-printed without supports under every ring, and supports between closely spaced rings are the
-worst kind to remove. A crossbar's wall leans at the crossing angle θ from horizontal (90° at
-the default: vertical), and a thin wall prints cleanly down to roughly 20° from horizontal
-(each 0.2 mm layer steps out by `0.2 / tan β`, which a 1.2 mm wall overlaps for any
-`β > ~18°`). The rings' one real advantage, continuous support, is restored by **rims** (§3.5).
+**What the ruling costs, said rather than hidden.** A roller is printed standing on its end, and
+a ring blade is then a thin fin cantilevered `h` = 8 mm straight out of a vertical wall — a ~90°
+overhang along its whole length. It prints with **support under every ring**; tree supports come
+away most cleanly, and the rings are a pitch apart (40 mm on the default), so they can be reached.
+(Printed on its side the rings would stand vertical, but the body's underside and the lower half
+of every ring would overhang instead; on its end is still the better of the two.) The page's
+how-to (its printing note) and the zip's README both say so. The old crossbar argument for
+printability is recorded here as the price, not as a reason to go back.
 
-So, with Y the *other* family:
+So, with X a roller's own family and Y the other:
 
-* **Roller A** carries the edge-A lines and **rolls along `tB`**; **roller B** carries the
-  edge-B lines and **rolls along `tA`**. The angle between the two roll directions is θ.
-* The **pattern period along the roll is the other pitch**: A's bars are `|tB|` apart round its
-  circumference, B's are `|tA|` apart.
-* **Circumference at the blade tip `C = n · |tY|`**, `n` = repeats (bars per revolution, an
-  integer); **tip radius `R_tip = C / 2π`**, derived, never set. The read-out prints both
-  diameters.
+* **Roller A** carries the edge-A lines and **rolls along `tA`**; **roller B** carries the
+  edge-B lines and **rolls along `tB`**. The angle between the two roll directions is θ.
+* The **pattern period along the roll is the roller's own pitch**: an X-line repeats every
+  `|tX|` along `tX`.
+* **Circumference at the blade tip `C = n · |tX|`**, `n` = tiles round it (an integer); **tip
+  radius `R_tip = C / 2π`**, derived, never set. The read-out prints both diameters.
 
-### 3.2 The unrolled frame
+### 3.2 The unrolled frame and the rings
 
-For roller X: `r̂ = tY/|tY|` and **`â = ẑ × r̂`** — the roll direction turned 90° to the left,
-for BOTH rollers, so `(r̂, â, ẑ)` is right-handed for both. A sheet vector `P` (from the bar's
-first corner) has unrolled coordinates `s = P·r̂` (arc length at the tip radius) and
-`z = P·â` (along the axis). (A first draft signed `â` so that `tX·â > 0`; at θ = 90° that made
-roller A's frame left-handed and stamped its line MIRRORED. The simulator found it — §9 — which
-is the reason it derives the spin from a rigid-body roll rather than from this convention.) A **bar** is the chain of `K` copies of edge X, corner to corner,
-plus a 3 mm overrun past each end corner (so the cut fully crosses the outermost line of the
-other family). Bar `j` is bar 0 shifted `s += j·|tY|`, `j = 0…n−1`. At θ = 90° a bar runs straight
-along the axis; otherwise each copy advances `|tX| cos θ` in arc, so the bar leans at θ from
-the circumference.
+For roller X: `r̂ = tX/|tX|` and **`â = ẑ × r̂`** — the roll direction turned 90° to the left,
+for BOTH rollers, so `(r̂, â, ẑ)` is right-handed for both. A sheet vector `P` has unrolled
+coordinates `s = P·r̂` (arc length at the tip radius) and `z = P·â` (along the axis). (The first
+version signed `â` so that `tX·â > 0` and stamped a MIRRORED line; the simulator found it — §9.3 —
+which is why it derives the spin from a rigid-body roll rather than from this convention.)
 
-On the cylinder, a bar point `(s, z)` sits at roller angle **`φ = −s / R_tip`** and height
+**Ring 0** is `n` copies of edge X, corner to corner: copy `c` is edge X moved by `c·(|tX|, 0)`.
+Since `tX·â = 0`, a copy ends at the height it started, so the n-th copy ends at the first copy's
+start moved by `(C, 0)` — the same point of the cylinder. **The ring closes on itself by
+construction**, and because each copy meets the next at a corner through which the line is C1
+(a smooth corner, §2.2), the ring is C1 all the way round, its seam included. The mesh never
+emits a seam vertex: each offset loop is one period laid `n` times and wrapped back onto its own
+first vertex (§3.4).
+
+**Ring j** is line j of the family — the line moved by `j·tY` — so it is ring 0 moved by
+`j·(tY·r̂, tY·â)`: turned `j·|tY| cos θ` round the roller and moved `j·(tY·â)` along it. **The
+axial step is the perpendicular distance between neighbouring lines, `|tA × tB| / |tX| =
+|tY| sin θ`** — 40 mm on the default square tile, `34 · sin 60° = 29.4 mm` for roller A on the
+hook fixture (the gate measures it off the mesh, §9). On roller A the rings step toward +Z
+(`tB·â_A = |tB| sin θ > 0`); on roller B toward −Z (`tA·â_B = −|tA| sin θ`).
+
+On the cylinder a ring point `(s, z)` sits at roller angle **`φ = −s / R_tip`** and height
 **`Z = z + Z0`**, with the roller's +Z end held toward +`â`: **on your left as it rolls
-forward**, for either roller. (The simulator re-derives the spin from the no-slip condition of a
-3D rigid-body roll rather than reading this convention — a builder with the sign flipped stamps a
-mirrored line and fails R and S.)
+forward**, for either roller.
 
-### 3.3 Spans and the cookie block
+A ring need not be a graph over the angle: an edge that hooks back makes its ring double back
+round the roller (the hook fixture does), which a radially stamped blade cuts and a dragged one
+could not.
 
-A bar's length in tiles is the roller's **span**: roller A's bars span `K_A` tile *columns*,
-roller B's span `K_B` *rows*. One pass of each cuts a block of `K_A × K_B` whole cookies; the
-number of lines each roller stamps is set by how far it rolls (A stamps rows `0…K_B`, B stamps
-columns `0…K_A`). Outside the block the sheet is border waste (cut by one family only).
+### 3.3 The sheet: cookies and rings
+
+The sheet is **cols × rows** cookies — cols along edge A, rows along edge B. Roller A's rings
+are the A-lines that bound the rows — **rows + 1 of them**, so A's LENGTH follows the rows;
+roller B's rings are the B-lines that bound the columns — **cols + 1**, so B's length follows the
+columns. How far a roller is rolled decides how long its lines are, and its length how many it
+cuts. One pass of each cuts the cols × rows block; outside it the sheet is border waste, cut by
+one family only. The cut field is the parallelogram `cols·tA × rows·tB`.
+
+**The default is 4 × 3 = 12 cookies, 160 × 120 mm on the default tile** (Eva's ruling: at least
+about 4 × 3 — the first version's page could show a strip of three). Each roller's body runs
+3 mm past its outermost blade root, peg or collar.
 
 ### 3.4 The blade
 
-A bar is a wall standing radially on the body, following the bar curve at every radius (the
+A ring is a wall standing radially on the body, following the ring curve at every radius (the
 same `(φ, Z)` curve from root to tip, so the cut line is exactly the tip curve). Cross-section
 square to the curve: **`w_tip` at the edge** (the "blade wall thickness", the FDM floor),
 widening by the **draft angle** toward the root: `w_root = w_tip + 2·(h + e)·tan(draft)`,
@@ -218,40 +244,44 @@ where `h` is the blade height and `e` = 0.4 mm the root's embedding into the bod
 closed shells overlap instead of touching). The draft is for release: the wall is thinnest
 where it leaves the dough last.
 
-The two side faces are true **offsets** of the bar curve — computed in each radius's own
+The two side faces are true **offsets** of the ring curve — computed in each radius's own
 unrolled metric (at the root, arc lengths shrink by `R_root/R_tip`, which changes angles, so the
 root offset is not the tip offset scaled) — with round joins on the outside of a turn and the
-self-intersection loops on the inside of a tight turn removed. The four offset polylines (left
-and right, tip and root) are zipped into four strips and closed with two end caps: one closed
-tube per bar.
+self-intersection loops on the inside of a tight turn removed. A ring is PERIODIC, so its offset
+is computed on one period and a loop may straddle the period's start: the raw offset of one
+period is laid five times (each copy an exact translate, so indexable), cleaned in one pass, and
+cut at a point of the middle period that survived and whose translate one period on survived too
+— a safe cut no removed loop contains. That one period is laid `n` times round. The four offset
+loops (left and right, tip and root) are zipped into four **closed** strips: **one closed tube per
+ring, a torus, with no end caps and no seam vertex**.
 
 **Blade height must exceed dough thickness + 1.5 mm** (so the body never touches the dough);
 below that the STL is refused with the reason.
 
-### 3.5 Rims
+### 3.5 No rims — the rings are the rolling surface
 
-A crossbar roller is supported only by the bar that is down; between bars it would drop by
-about `R(1 − cos(π/n)) ≈ π|tY|/(4n)` — 6 mm on a 40 mm tile at 5 repeats, enough to put the
-body into the dough. So each roller has a **rim at each end**: a 4 mm band at exactly the
-blade-tip radius that rolls **on the board beside the dough**. With the rims the roller rolls at
-exactly `R_tip`: the bars come down radially, never drag, and the stamp's period is exactly the
-circumference the pattern was laid out on. The rims' inner shoulders ("skirts") are 45° cones,
-so they print without support.
+The crossbar rollers needed **rims**: a bar roller is supported only by the bar that is down,
+and between bars it would drop by about `R(1 − cos(π/n))`, enough to put the body into the dough.
+A ring roller does not. **Every ring runs all the way round, so at every angle every ring has a
+point at the bottom**: the roller rests on its blade tips at exactly `R_tip`, continuously, the
+blades come down radially and never drag, and the stamp's period is exactly the circumference the
+pattern was laid out on. The rims are dropped.
 
-**The dough must lie between the rims.** A rim that runs onto dough lifts the roller by the
-dough's thickness and every blade stops short of the board. The clear span between the skirts'
-feet is `L − 2·(rim + h)` — 181 mm on the default A, 175 mm on B — and the page's how-to states
-both. This bounds the sheet: no wider than A's span across A's path and B's across B's. Since
-each roller's bars already span the cookie field plus a 3 mm overrun, the border this leaves is
-narrow at the sides (a few millimetres past the field) and a tile or so at the near edge (the
-track). The cut field is a parallelogram `K_A·tA × K_B·tB`; at θ ≠ 90° the sheet is best laid as
-one too.
+**And with them the rule "the dough must lie between the rims" is DROPPED — it is not needed.**
+It existed only because a rim riding on dough lifts the roller by the dough's thickness and every
+blade stops short of the board. A ring rides the board *through* the dough (its blade is taller
+than the dough by at least 1.5 mm — the rule that stays, §3.4), so the outer rings may run over
+dough or over bare board alike and the roller stays level at `R_tip` either way. Nothing bounds
+the sheet now but the rollers' own lengths and how far they are rolled. The gate's R1 asserts
+the rolling radius read off the mesh IS the blade-tip radius — nothing may stand proud of the
+rings (a peg that did would lift every blade off the board; it has a mutant).
 
 ### 3.6 Body, bore, handle
 
-The body is a solid of revolution: a tube of wall **`t_wall`** (the "cylinder wall"), closed by
-end caps 8 mm thick, each with an **axle bore** (8 mm) through it; the cavity is open to both
-bores, so it drains and dries. The cavity's ceiling is a 45° cone (printable upright).
+The body is a solid of revolution: a tube of wall **`t_wall`** (the "cylinder wall") with 0.6 mm
+chamfered ends, closed by end caps 8 mm thick, each with an **axle bore** (8 mm) through it; the
+cavity is open to both bores, so it drains and dries. The cavity's ceiling is a 45° cone
+(printable upright). Roller B adds the collar band (§4.4), roller A the groove (§4.6).
 
 **The handle** (one design, print two): a 26 mm grip, a 45° taper to a shoulder that bears
 against the roller's end face, and an axle pin `0.25 mm` under the bore radius and 3 mm longer
@@ -267,27 +297,37 @@ rollers to wash. Printed grip-down.
 After A, the sheet carries the edge-A lines on the lattice `{m·tA + k·tB}` (up to where A was
 put down). B's lines land correctly iff B's lattice is the same lattice: B's stamp offset from
 A's must be `0` mod the lattice. A rolling cylinder has exactly two free placements — its
-**sideways position** (along its axis) and its **phase** (which bar is down at a given point of
-travel). The marks must fix both, and do nothing else.
+**sideways position** (along its axis) and its **phase** (how far round it has turned at a given
+point of travel). The marks must fix both, and do nothing else.
 
 ### 4.2 The collar decides the track's direction
 
-B's toothed collar is at one end of B, so as B rolls it travels along **B's roll direction,
-`tA`**, at a fixed position along B's axis. For its teeth to *ride* a track, **the track must
-run along `tA`** — i.e. along the edge-A lines. And it must lie **outside the cookie block**
-(border waste), at the edge B's collar end passes over: the edge of the block on B's
-collar side, which is the edge A **crosses first**.
+B's toothed collar is a ring of teeth at one end of B, so as B rolls it travels along **B's roll
+direction, `tB`**, at a fixed position along B's axis. For its teeth to *ride* a track, **the
+track must run along `tB`** — along edge B's direction, i.e. along a B-line. It must lie outside
+the cookie block (border waste), and it must be made of points B's teeth can sit in that are
+lattice points of A's pattern: **the corners of one B-line outside the block, column `m*`**
+(−1 normally) — the points `(m*, k) = m*·tA + k·tB`.
 
-### 4.3 A lays the track with its own bars
+### 4.3 A lays the track: a slanted row of pegs, one on each ring
 
-A line of dimples along `tA` is exactly what one of A's bars stamps (a bar *is* an edge-A
-line). So: **the pegs ride on one bar of A, at that bar's corners** — one peg per tile pitch
-along the bar, `K_A + 1` of them, i.e. "a row of pegs running lengthwise along the surface"
-(at θ = 90° the bar is exactly lengthwise; otherwise it leans at θ like every bar), once per
-revolution. The user starts A with the **pegged bar down first**, one row (or `|k*|` rows,
-§4.4) outside the block; that first bar stamps the track row `k*`: an edge-A line in the border
-plus a dimple on each of its corners. Dimples at corners are on the lattice by construction,
-so each is a lattice point of A's pattern.
+A rolls along `tA`, so to land a dimple on corner `(m*, k)` it needs a peg at that corner's place
+on its own unrolled surface,
+
+    s = m*·|tA| + k·|tB| cos θ        z = k·|tB| sin θ
+
+— **one peg on each ring k, at that ring's corner of column `m*`**, `k = 0…rows`. They form a
+**slanted row across A's surface**, rising `|tB| sin θ` along the axis and advancing
+`|tB| cos θ` round it per ring — an axial row only at θ = 90° (Eva's hint, verified rather than
+trusted: the gate's R2 finds exactly one dimple on every corner of the track to 1e-6 mm, and a
+mutant that lays the row straight across A instead puts the hook fixture's row-1 dimple 17 mm off
+its corner). Rolled, A lands peg k at `start + s·r̂ + z·â`, i.e. on `m*·tA + k·tB`: a straight line
+of dimples along `tB`, each on a lattice corner by construction.
+
+**Every peg stands ON its ring** — a ring passes through its own corners — so the peg's cone
+stands round the blade, the two closed shells overlapping (the slicer unions them), as the
+crossbar version's pegs stood on their bar. In the dough, A's line cuts through the middle of each
+dimple; the dimple is in the border either way, and a tooth seats on both halves of its cone.
 
 Each peg is a 45° cone (printable on a vertical wall) whose tip stands `δ` into the dough:
 `δ = min(½·t_dough, ½·D − 0.8 mm)` — at most half the dough, so it dimples and never punches —
@@ -296,76 +336,96 @@ a flat disk (radius `½·D − δ` ≥ 0.8 mm, blunt) and on a curved roller a f
 FURTHER at its rim than at its centre (`√(ρ² + r²)` against `ρ`), so the disk is set where its
 **rim** reaches `R_tip − t_dough + δ` — the 45° side's own equation with the limit at the top.
 The dimple is then exactly `δ` deep (the gate measures it off the mesh: 2.2000 mm at the
-defaults; the disk centred on the dough line instead reached 2.2110).
+defaults).
 
 The cone's **foot** is sunk into the body so its base rim stays 0.4 mm inside the body surface —
 solving `ρ² + (r_tip + top − ρ)² = (R_body − 0.4)²` for the larger root. On a small roller there
 is no root (no 45° cone that tall fits inside a body that curved: its base rim, going round the
 roller, always clears the surface — its least reach is `c/√2` at `ρ = c/2`); the foot then goes
-to `ρ = c/2`. **Either way it stays 0.3 mm above the hollow** — on the straight 30 mm tile the
-root lands at 11.25 mm, inside a 12.87 mm hollow, and the gate's H4 caught exactly that. The
-cone's sides may then show a little at the foot ROUND the roller (vertical faces as printed, so
-no overhang), never on its underside.
+to `ρ = c/2`. **Either way it stays 0.3 mm above the hollow** — the straight 30 mm tile at 5 round
+would otherwise sink its feet 1.6 mm into the hollow (the gate's H4 row for it). The cone's sides
+may then show a little at the foot ROUND the roller (vertical faces as printed, so no overhang),
+never on its underside.
 
-### 4.4 Where the collar sits
+### 4.4 Where the collar sits, and why one tooth fixes both placements
 
-The track is the edge-A line of row `k*` (< 0), i.e. the corners `C0 + m·tA + k*·tB`. In B's
-own unrolled frame (`s'` along `tA`, `z'` along B's axis), corner `(m, k)` is at
+In B's own unrolled frame (`s'` along `tB`, `z'` along B's axis), corner `(m, k)` is at
 
-    s' = m·|tA| + k·|tB| cos θ        z' = k·|tB| sin θ
+    s' = m·|tA| cos θ + k·|tB|        z' = −m·|tA| sin θ
 
-relative to B's first bar's first corner. So the collar is a ring at **`z' = k*·|tB| sin θ`** — the
-axial position of row `k*`, outside B's bars on B's collar end — carrying **one tooth per bar**,
-`n_B` of them, at **`s' = m·|tA| + k*·|tB| cos θ`**: each tooth sits where its bar would cross
-row `k*` if the bar went on (at θ = 90° directly in line with the bar). Teeth are the pegs'
-cones offset 0.3 mm smaller and 0.3 mm shorter, so a tooth seats on the dimple's cone wall and
-self-centres sideways. `k*` is the nearest row (−1 normally) whose collar clears B's bars,
-including their overrun and the lowest dip of edge B, by 1.5 mm.
+relative to B's ring 0's first corner. So the collar is a ring of teeth at **`z' = −m*·|tA| sin θ`**
+— the axial position of column `m*`, beyond B's ring 0 on B's +Z end (B's rings step toward −Z) —
+carrying **one tooth per tile pitch round it**, `n_B` teeth, at **`s' = m*·|tA| cos θ + j·|tB|`**: an
+evenly spaced ring of teeth at one height, phased by `m*·|tA| cos θ`. `m*` is the nearest column
+(−1 normally) whose collar clears B's ring 0, root and wiggle included, by 1.5 mm.
 
-Seat any tooth in the first dimple and B's lattice equals A's: the sideways position is fixed
-by the tooth sitting in the track's line, the phase by the tooth sitting on that dimple; B
-then rolls without slip on its rims, so every following tooth meets every following dimple
-(`|tA|` apart on both). **This is checked by simulation, not argued** (§9).
+**One seated tooth fixes both of B's free placements.** B's unrolled surface lands rigidly
+(rolling without slip). Seat tooth `j` — B's surface point `(s'_j, z'_c)` — in the dimple of track
+row `k₀`, the sheet point `D = m*·tA + k₀·tB`. Then every point `(s', z')` of B lands at
+
+    D + (s' − s'_j)·r̂_B + (z' − z'_c)·â_B
+
+— the tooth's two coordinates on the sheet fix the stamp's two free placements, the sideways one
+along `â_B` and the phase along `r̂_B`. With `r̂_B = tB/|tB|` and `â_B = ẑ × r̂_B`,
+`|tA|·(cos θ·r̂_B − sin θ·â_B) = tA` exactly, so B's corner `(m, k)` lands at
+
+    D + (m − m*)·tA + (k − j)·tB  =  m·tA + (k₀ + k − j)·tB
+
+— a lattice corner in column `m`. Every one of B's lines lands on its lattice column (the row
+shift `k₀ − j` changes nothing: a B-line is the same line moved by `tB`), and every later tooth
+`j'` comes down at `m*·tA + (k₀ + j' − j)·tB`, the next dimple, `|tB|` apart on both. **This is
+checked by simulation, not argued** (§9): B posed solely by seating tooth 0 in the first dimple
+puts all 20 corners of the default sheet on both families' lines (the worst 1.8e-14 mm); posed
+instead by its LAST tooth in the LAST row's dimple, or a middle tooth in row 1's, it stamps the
+same lines through the same corners.
+
+Teeth are the pegs' cones 0.3 mm smaller and 0.3 mm shorter, so a tooth seats on the dimple's
+cone wall and self-centres both ways. They stand on a **collar band** — a raised ring 1.2 mm high
+(less on a thin blade margin) with 45° shoulders — whose flat top runs 0.5 mm past every tooth's
+foot both ways. (The first ring build reused the crossbar band, and on a large roller a tooth's
+foot overhung its shoulder by 0.3 mm; the gate's H4 found it, §9.3.)
 
 ### 4.5 The peg row comes round again — and when that matters
 
-A's pegged bar returns after one revolution, `n_A` rows later. If that is still inside the
-block it dimples a row of cookie corners (on the cut lines, so small, but a defect). It lands
-in the far border iff
+A's peg row returns after one revolution, `n_A` columns on. If that is still inside the block it
+dimples a column of cookie corners (on the cut lines, so small, but a defect). It lands in the far
+border iff
 
-    n_A ≥ K_B + 1 + |k*|          (A's repeats ≥ B's rows + 2, normally)
+    n_A ≥ cols + 1 + |m*|          (A's tiles round ≥ the sheet's columns + 2, normally)
 
-The defaults satisfy it; otherwise the page **flags** it with the row it lands on. (A has one
-pegged bar, not one per tile: "at least once per revolution" is met by one, and every extra
-one would only add cookie dimples.)
+The defaults satisfy it — that is why roller A's default is 6 round (⌀ 76.4 mm on a 40 mm tile)
+where B's is 5 (⌀ 63.7 mm); otherwise the page **flags** it with the column it lands on. (A has
+one peg row, not one per tile: "at least once per revolution" is met by one, and every extra one
+would only add cookie dimples.) B's teeth never recur inside the block: they are all on the
+collar, on the track's column.
 
 ### 4.6 Orientation and order of use
 
-Holding a roller the other way round end-for-end rotates its stamp 180°; for a tile whose
-edges are not centrally symmetric that changes the cookie. B cannot be held wrong (its collar
-must be on the track). **A's +Z end carries a groove ring** on its end face. Both rollers are
-held with their +Z end on the LEFT as they roll forward (§3.2).
+Holding a roller the other way round end-for-end rotates its stamp 180°; for a tile whose edges
+are not centrally symmetric that changes the cookie. B cannot be held wrong (its collar must be
+on the track). **A's +Z end carries a groove ring** on its end face. Both rollers are held with
+their +Z end on the LEFT as they roll forward (§3.2).
 
-With `tB` pointing away from you (so `tA` points right at θ = 90°):
-
-1. Roll the dough `t_dough` thick on a floured board, no wider than the rollers' rims allow
-   (§3.5) — the rims run on the board.
-2. **Roller A** — grooved end on your **left**. Set it down at the near edge with the **pegged
-   bar** about to touch the dough, roll it **back** to the edge, then **away** from you across the
-   whole sheet in one pass. The pegs press a line of dimples into the near border: the track.
-3. **Roller B** — **collar end toward you**, collar on the track. Seat a tooth in the **first
-   dimple on the left**, roll B **back** to the left edge, then **along the track** across the whole
+1. Roll the dough `t_dough` thick on a floured board, a little bigger than the cut field, with a
+   border of about one tile on the side you start from. The rings run on the board through the
+   dough; there are no rims to keep it between.
+2. **Roller A** — grooved end on your **left**, rolling **along edge A** (the way its rings
+   run). Put it down near the edge of the dough with its **peg row** facing down, roll it **back**
+   to the edge, then **forward** across the whole sheet in one pass. The pegs press a line of
+   dimples into the border: the track.
+3. **Roller B** — rolling **along edge B**, **collar on the track**. Seat a tooth in the dimple at
+   one end of the track, roll B **back** to the edge, then **along the track** across the whole
    sheet in one pass; each tooth drops into a dimple.
-4. Lift the border away; the `K_A × K_B` cookies are already apart.
+4. Lift the border away; the cols × rows cookies are already apart.
 
-**Why "back, then forward" — measured, not cautious.** A bar leans at θ (§3.2), so its features
-come down at different points of travel. At an obtuse θ the parts of B's columns that lean back
-past the seated tooth are reached only by rolling back first: the simulator's first version
-rolled B forward from the seat only, and at 120° it found a block corner 34 mm from the nearest
-B line and 16 line meetings where 20 were owed. A's pegs lean the same way along the pegged bar. Rolling a
-roller back and forward re-stamps the same lines in the same place (no slip), so the instruction
-costs nothing at θ ≤ 90°. Any dimple will seat B — one fixes both its free placements (§4.1) —
-so a dimple lost off the dough edge is harmless.
+**Why "back, then forward" — measured, not cautious.** At θ ≠ 90° the peg row slants, so its pegs
+come down over `|tB| cos θ` of travel per ring — at an obtuse θ the later rings' pegs come down
+BEFORE the first, and are reached only by rolling back first (the first version's simulator,
+rolling forward only, found exactly this at 120°: a block corner 34 mm from the nearest line).
+B's lines are cut wherever B rolls, so B is rolled back from its seat to the edge, then across.
+Rolling back and forward re-stamps the same lines in the same places (no slip), so the instruction
+costs nothing at θ = 90°. Any dimple will seat B — one fixes both its free placements (§4.4) — so
+a dimple lost off the dough edge is harmless.
 
 ---
 
@@ -373,13 +433,13 @@ so a dimple lost off the dough edge is harmless.
 
 | group | control | default | range | notes |
 |---|---|---|---|---|
-| tile | pitch A (edge A's chord) | 40 mm | 15–120 | roller B's bar spacing |
-| | pitch B (edge B's chord) | 40 mm | 15–120 | roller A's bar spacing |
-| | crossing angle θ | 90° | 30–150° | the angle between the roll directions; bars lean at θ |
-| rollers | repeats A (bars per revolution) | 5 | 2–12 | `D_A = n_A·pitch B / π` |
-| | repeats B | 5 | 2–12 | `D_B = n_B·pitch A / π` |
-| | span A (cookie columns) | 4 | 1–8 | roller A's length |
-| | span B (cookie rows) | 3 | 1–8 | roller B's length |
+| tile | pitch A (edge A's chord) | 40 mm | 15–120 | roller A's circumference unit; roller B's rings are `pitch A · sin θ` apart |
+| | pitch B (edge B's chord) | 40 mm | 15–120 | roller B's circumference unit; roller A's rings are `pitch B · sin θ` apart |
+| | crossing angle θ | 90° | 30–150° | between the two chords, and so between the two roll directions |
+| sheet | cookies along edge A (`cols`) | 4 | 1–8 | roller B carries `cols + 1` rings — B's length |
+| | cookies along edge B (`rows`) | 3 | 1–8 | roller A carries `rows + 1` rings — A's length |
+| rollers | roller A — tiles round it (`n_A`) | 6 | 2–12 | `D_A = n_A · pitch A / π` |
+| | roller B — tiles round it (`n_B`) | 5 | 2–12 | `D_B = n_B · pitch B / π` |
 | print | dough thickness | 5 mm | 2–15 | |
 | | blade height | 8 mm | 4–20 | must exceed dough + 1.5 mm |
 | | blade wall (tip) | 1.2 mm | 0.6–3 | the FDM floor; also the point-spacing flag |
@@ -389,9 +449,17 @@ so a dimple lost off the dough edge is harmless.
 | | axle bore | 8 mm | 5–14 | the handle pin is 0.5 mm smaller |
 | check | min cookie width | 8 mm | 3–30 | the neck/spike flag |
 
-Default tile: a wave on each edge, corners smooth, 40 mm square cell. The default rollers are
-63.7 mm across the blade tips; A spans 4 columns, B 3 rows (plus the collar row), 12 cookies a
-pass; `n_A = 5 ≥ 3 + 2`, so no cookie is dimpled.
+The two sheet sliders replace the crossbar version's "span A / span B", and the two round sliders
+its "repeats (bars per revolution)". Neither old name survives, because neither old meaning does:
+a roller's **diameter** now follows its OWN pitch, and its **length** follows the cookie count in
+the OTHER direction (§3.3). Each control's tooltip says which roller it sizes, and the read-out
+prints, per roller, its rings, their spacing, its tiles round it and which edge it rolls along.
+
+Default tile: a wave on each edge, corners smooth, 40 mm square cell. **The page opens on
+4 × 3 = 12 cookies, a 160 × 120 mm cut field** (Eva: at least about 4 × 3). Roller A is 6 tiles
+round (⌀ 76.4 mm at the blade tips), roller B 5 (⌀ 63.7 mm). A is 6 rather than 5 so that its peg
+row's second pass lands in the far border: `n_A = 6 ≥ cols + 1 + |m*| = 6` (§4.5); at 5 the
+default would be flagged.
 
 ---
 
@@ -403,7 +471,7 @@ touching itself; two control points within 0.05 mm.
 **Refused** (the design builds and shows, but the roller STLs are not given out, with the
 reason): the blade cannot clear the dough (`h ≤ t_dough + 1.5`); a roller too small to hold its
 bore — its body under one cylinder wall around the bore (`R_body < bore/2 + t_wall + 0.4`, e.g.
-2 repeats of a 40 mm tile, a 25.5 mm roller); a peg too wide for its roller (the flat tip cannot
+2 tiles of 40 mm round it, a 25.5 mm roller); a peg too wide for its roller (the flat tip cannot
 sit with its rim on the dough line, `2·top² < (r_tip + top)²` — reachable only with big pegs on
 the smallest rollers).
 
@@ -417,11 +485,17 @@ the smallest rollers).
 2. **Control points closer than the blade wall** — the blade cannot show a feature smaller than
    its own thickness. Both points ringed red.
 3. **Blade height ≤ dough + 1.5 mm** — STL refused.
-4. **The pegged bar returns inside the cookie block** (§4.5).
-5. **Bar segments flatter than 30° from horizontal** in the upright print orientation — they
-   need support. Listed as the share of blade length.
-6. **A roller longer than 250 mm** — beyond common printers' build height.
-7. **A roller with no room for a hollow** — printed solid round the bore (information only).
+4. **A's peg row comes round again inside the sheet** (§4.5): `n_A < cols + 1 + |m*|`, flagged
+   with the column it lands on.
+5. **A roller longer than 250 mm** — beyond common printers' build height; fewer cookies in the
+   direction that sets its length, or smaller tiles.
+6. **A roller with no room for a hollow** — printed solid round the bore (information only).
+
+The crossbar version's **overhang flag** (bar segments flatter than 30° from horizontal) is
+**gone, deliberately**: printed upright, every ring is a fin standing straight out of the body —
+a 90° overhang along its whole length — so the flag would fire on every design and tell nothing.
+The cost is stated once instead, in the page's how-to (its printing note) and the zip's README:
+**print with support under every ring** (§3.1).
 
 ---
 
@@ -429,12 +503,19 @@ the smallest rollers).
 
 * **STL**: roller A, roller B, the handle — binary, millimetres — separately or all three in a
   ZIP (JSZip from the cdnjs pin `cards.html` uses, loaded on click) with a README carrying the
-  §4.6 sequence and the derived numbers. Every part is a set of closed shells (body, each bar,
-  each peg / tooth); overlapping closed shells are unioned by the slicer.
+  §4.6 sequence, the support note and the derived numbers. Every part is a set of closed shells
+  (the body, each ring a closed tube, each peg / tooth cone); overlapping closed shells are
+  unioned by the slicer.
 * **SVG**: the tile and the 3×3 patch, as cut lines in millimetres.
-* **Design**: saved and opened as JSON (`tessellation-roller-design`, version 1: the tile, the
-  print and roller settings — every number range-checked and the tile validated on the way in);
-  the page also keeps the current design in local storage, and the zip carries a copy.
+* **Design**: saved and opened as JSON (`tessellation-roller-design`, **version 2**: the tile, the
+  print settings, the sheet and the round counts — every number range-checked and the tile
+  validated on the way in); the zip carries a copy. **A version-1 file** (the crossbar page's)
+  still opens: its tile, print settings and sheet (`span A × span B` become `cols × rows`) are
+  kept, its bar counts are not — they counted the OTHER pitch round each roller — and the page
+  says what was reset. The page keeps the current design in local storage under a **new key**, so
+  a design the crossbar page left behind does not reopen by itself (Eva's preview showed 3
+  cookies on a 38 × 108 mm field — a 1 × 3 sheet at about 38 × 36 mm pitches, which the crossbar
+  page's own 4 × 3 default never produced; most likely a design an earlier visit left in storage).
 
 ---
 
@@ -459,29 +540,45 @@ runs.
 
 Rows: every hand-drawn fixture in `tools/tile-fixtures.mjs` (the default, straight edges, a hook
 at 60°, a sharp zigzag at 75°, a jigsaw knob, obtuse 120°, acute 40°, a finger, a pinch, close
-points), seeded random tiles (12 by default, 40 in CI), and parameter rows (unequal repeats and
-spans — one dimpling cookies and flagged, one where B turns twice to cross the block — a thin
-print, a deep dough, small rollers whose peg feet are founded below the curve, and two refusals:
-a blade that cannot clear the dough, and a roller too small for its bore). Through the SHIPPED
-modules:
+points), seeded random tiles (12 by default, 40 in CI), and parameter rows: round 3/7 on a 2 × 5
+sheet (its peg row comes round inside the sheet — flagged), round 8/3 on a 6 × 3 sheet (B turns
+more than once to cross it), a thin print, an obtuse tile in deep dough, small rollers (a
+straight 30 mm square at 5/4 round, whose peg feet are founded on the hollow's roof), and two
+refusals — a blade that cannot clear the dough, a roller too small for its bore. Through the
+SHIPPED modules, each clause in its own containment (a clause that throws is a finding, and the
+rest of the row still runs):
 
 * **T — tessellation, by the gate's own geometry.** T1 the outline is simple (its own segment
   test, not the builder's); T2 its signed area is `|tA × tB|` (1e-9 relative) and the nine tiles
   sum to 9×; T3 a scanline census over the 3×3 finds no run covered twice; T4 a probe 1 µm
   outside every boundary segment of the centre tile lands in exactly one neighbour and 1 µm inside
   in the centre only; T5 top = bottom + `tB`, right = left + `tA` (1e-12).
-* **S — seam.** Both rollers rolled three revolutions each way in `tile-sim.js` (and always far
-  enough to cross the whole block, with a revolution to spare): every stamped line starts on a
-  lattice point (S1, 1e-6 mm); the rows (A) and columns (B) are one contiguous run, each exactly
-  once, across every revolution boundary (S2); every stamped line is the ideal line of its row
-  or column, both ways (S3).
-* **R — registration.** R0 the mesh is the spec (every blade tip within half a blade of its
-  centreline, every centreline point with a tip beside it, every cone centred on its point);
-  R1 the rolling radius read off the mesh is the blade tips'; R2 A's pegged bar lays exactly one
-  dimple on each corner of the track row; R3 B, posed by seating ONE tooth in the first dimple
-  and rolled both ways, lands every tooth that reaches the track in a dimple and feeds every
-  dimple; R4 every corner of the cookie block lies on its A line and its B line (1e-6 mm);
-  R5 A's and B's lines meet at lattice corners only, `(K_A+1)(K_B+1)` of them.
+* **D — direction: every blade is a RING running AROUND its roller, never a bar along it**
+  (Eva's ruling's own check), read off the MESH. D1 each blade's tip edges cover every azimuth
+  (the union of their angular spans is the whole circle), and no tip edge is longer than the
+  line's own sampling — so a ring cannot close by a chord across a missing copy; D2 each blade's
+  axial extent is its line's own extent ACROSS the line (the gate's projection of the edge onto
+  the axis) plus the root width — a bar lying along the roller is a pitch or more long; D3 the
+  blades are spaced along the axis by `|tA × tB| / |chord|` (θ counted), and there are cookies + 1
+  of them. The mutant that lays the line along the axis fails D1 (its "ring" closes on a 119 mm
+  chord where the line is sampled every 1.1 mm).
+* **S — seam.** Both rollers rolled three revolutions either way in `tile-sim.js` (and always far
+  enough to cross the whole sheet, with a revolution to spare): S1 every corner of every stamped
+  line lands on a lattice point (1e-6 mm), all of one row (A) or one column (B); S2 the rows
+  0..rows (A) and columns 0..cols (B), each exactly once, every ring gaining exactly one period of
+  travel per time round — it closes on itself, once; S3 every stamped line is the ideal line of
+  its row or column, both ways, over every revolution boundary — the seam; S4 every blade's mesh
+  is a closed tube round the roller (a torus: `V − E + F = 0`) whose tip face hugs its spec ring
+  all the way round, the seam included.
+* **R — registration.** R0 the mesh is the spec: every spec ring point has blade tip beside it,
+  and every peg and tooth cone is centred on its spec point. R1 the rolling radius read off the
+  mesh is the blade tips' (nothing stands proud of the rings). R2 A's slanted peg row lays exactly
+  one dimple on each corner `(m*, k)`, `k = 0..rows`. R3 B, posed by seating ONE tooth in the
+  first dimple and rolled both ways: every tooth that reaches the track lands in a dimple, and
+  every dimple gets a tooth; and seated instead by its LAST tooth in the LAST row's dimple, or by
+  a middle tooth in row 1's, it stamps the same lines — one seat fixes both free placements.
+  R4 every corner of the cookie sheet lies on its A line and its B line (1e-6 mm). R5 the
+  sheet's A and B lines meet at lattice corners only, `(cols+1)(rows+1)` of them.
 * **W — watertight.** Each STL re-welded from its float32 bytes: no unmatched and no duplicated
   DIRECTED edge (an undirected census passes a face wound inside out), no degenerate triangle,
   every shell's signed volume positive. W5: the STL is refused exactly when the MEASURED roller
@@ -492,30 +589,38 @@ modules:
   read by casting rays from the axis against the body's own triangles (a vertex scan reads the
   hollow: the outer cylinder has vertices only at its ends); H2 every peg reaches exactly
   `δ = min(½·dough, ½·D − 0.8)` into the dough and every tooth 0.3 mm less (1e-6 mm), the law
-  restated in the gate; H3 the collar band clears the dough; H4 every cone's foot lies inside the
-  body's material (a ray through it crosses the body's skin an odd number of times first).
+  restated in the gate; H3 the collar band clears the dough; H4 every cone's foot — the centre of
+  its base — lies inside the body's material (a ray through it crosses the body's skin an odd
+  number of times first).
 * **F — flags.** Each fixture's neck / spike / close-point flags are exactly the ones it
-  expects; the close-point bar restated; the pegged bar's second pass is flagged iff the
-  simulation lands a dimple on a cookie corner.
+  expects; the close-point bar restated; A's peg row's second pass is flagged iff the simulation
+  lands a dimple on a sheet corner.
 * **E — the editor, as functions.** E1 an invalid tile is refused and really crosses (the gate's
   own test); E2 a drag into a crossing is blocked at the first crossing step, tile unchanged;
   E3 moves, inserts, deletes, toggles land; E4 a corner cannot be deleted; E5 a corner resize
   keeps θ and puts the corner at the pointer; E6 a smooth corner's line is C1 (§2.2) and a sharp
   one kinks; E7 a tile round-trips through JSON and a crossing tile in a file is refused.
 
-`--verbose` prints every row's measured heights and errors (the default fixture always does).
-The negative control has 22 mutations, among them: smooth corners losing their periodic
-neighbour, the top edge not the bottom + `tB`, the validator not checking simplicity, the roller
-axis right of the roll (the handedness defect above), each roller laid on its own pitch, π as
-3.14, the collar a row too far out, teeth ignoring the bars' slant, pegs mid-tile, a bar losing
-its end cap, a face wound backwards, rims proud of the blades, every refusal never raised, pegs
-reaching through the dough, the tip disk centred on the dough line, a peg foot sunk into the
-hollow.
+`--verbose` prints every row's measured heights, ring spacing and errors (the default fixture
+always does). `--mutant <regex>` runs a subset of the negative control. The negative control has
+**30 mutations**: smooth corners losing their periodic neighbour, the top edge not the bottom +
+`tB`, the validator not checking simplicity, a corner resize ignoring the opposite corner, the
+neck test never seeing two pieces, the close-point flag at a tenth of the blade; **the line laid
+along the axis — a bar, not a ring** (D), the ring spacing ignoring θ (D), one ring too few (D),
+the circumference laid on the other pitch (S), π as 3.14 (S), the spec ring's copies 0.05 mm off
+the pitch (S), a ring one copy short bridged by a chord (R0), the offset's copies repeating the
+point they meet at (W), the ring tubes or the spec rings not turned with their lines, the tip
+face wound backwards, the roller axis right of the roll (the handedness defect, §3.2); the pegs
+mid-tile, the peg row straight across A instead of slanted, the teeth a column too far out, the
+teeth ignoring the track's phase, a peg proud of the blades (R1), pegs through the dough, the tip
+disk centred on the dough line, a peg foot in the hollow (H4); and each refusal and the
+recurrence flag never raised.
 
 ### 9.2 `node tools/verify-tile-page.mjs` — the page (headless Chromium)
 
 Real pointer events, keys, clicks and downloads; every claim measured against the editor's
-DRAWN marks, the downloaded bytes or the tile read back (validated in Node):
+DRAWN marks, the downloaded bytes, the rollers' MESHES or the tile read back (validated in
+Node):
 
 P0 the page loads (four corners, both copies of every point, nine tiles, 4 + 4 cut lines, the
 rollers built); P1 a dragged point lands under the pointer and its copy is drawn exactly one
@@ -529,31 +634,62 @@ the editor and on all nine 3×3 tiles, too-close points get a ring on both copie
 design disables the roller buttons and says why; P12 the STL download is `84 + 50·n` bytes with
 the page's own `n`; P13 the SVG downloads (one closed path; 8 cut lines over nine tiles); P14 the
 zip holds both rollers, the handle, the notes and the design; P15 a saved design opens back to
-the same tile; P16 it survives a reload; P17 the rollers' view draws something.
+the same tile; P16 it survives a reload; P17 the rollers' view draws something; **P18** the sheet
+and round sliders size the right rollers — cookies along edge A sets roller B's rings to
+`cols + 1` and cookies along edge B roller A's to `rows + 1`, COUNTED OFF THE MESHES, and tiles
+round A sets A's diameter to `n_A · pitch A / π`; **P19** the page opens on at least 4 × 3 cookies
+and says so; **P20** a version-1 (crossbar) design file opens with its sheet kept and says what
+was reset; **P21** a design the crossbar page kept in local storage does not come back.
 
-Its negative control re-serves broken copies of `tile.js` (nine mutations: a drag ignoring which
-copy it holds, a blocked edit not told, a click adding itself instead of its point on the curve,
-Delete doing nothing, a double-click never deleting, a corner drag not holding the opposite
-corner, the 3×3 never showing thin parts, the roller buttons ignoring a refusal, the design never
-kept).
+Its negative control re-serves broken copies of `tile.js` and `tile-roller.js` (thirteen
+mutations: a drag ignoring which copy it holds, a blocked edit not told, a click adding itself
+instead of its point on the curve, Delete doing nothing, a double-click never deleting, a corner
+drag not holding the opposite corner, the 3×3 never showing thin parts, the roller buttons
+ignoring a refusal, the design never kept, the sheet sliders feeding the wrong roller, the page
+opening on one column of three cookies, a crossbar design file losing its sheet, and the page
+still reading the crossbar version's storage).
 
 ### 9.3 What the gates found
 
-Red clauses, each fixed at its cause:
+**Rebuilding for rings** (each fixed at its cause):
 
-* the handedness defect (§3.2) — R and S;
-* the simulator's window clipping B's columns at obtuse angles (§4.6) — R4, R5;
-* the dough-depth law stated to the tip disk's centre while its rim reached 0.011 mm deeper — H2;
-* a 30 mm tile's peg feet sunk into the hollow — H4;
-* the gate's own H1 reading the hollow's radius as the body's (it scanned vertices) — found when a
-  smaller roller's hollow fell under its window and the measurement became infinite;
-* the page's double-click never reaching the point (the press redraws the editor) — P5;
-* two page mutants that could not fire (a status set twice; a corner drag tested on the one
-  corner whose opposite never moves) — the page gate's own negative control.
+* **A ray along a shared edge sees neither triangle.** At 6 tiles round, A's first peg sits at
+  exactly 60°, on a seam of the revolved body, and the gate's ray-parity tests (H1's body radius,
+  H4's foot) missed the hit — the gate's instrument, not the roller. Its rays take a 1e-9 slack on
+  the edge test now and merge duplicate hits.
+* **H4 founded a cone on a vertex of its base RIM.** It took the cone's vertex nearest the axis as
+  the foot, and the base rim and centre tie on radius. It takes the base centre among the ties
+  now — and the corrected clause then found a real defect: **B's collar band was too short.** It
+  reused the crossbar band, and on a large roller (random seed 37) a tooth's foot overhung its
+  shoulder by ~0.3 mm. The band's flat now runs 0.5 mm past every tooth's foot (§4.4).
+* **A ring one copy short, closed by a chord, passed every S clause** — the tube is still a torus
+  and the stamped line is read at its vertices. D1 now bounds every tip edge by the line's own
+  sampling, and R0 finds the spec points along the missing copy with no blade beside them.
+* **One clause's exception erased the row.** The first sweep counted mutants as missed whose
+  damage had made an earlier clause throw — every finding after the throw was lost. Each clause
+  runs in its own containment now; R3's re-seat, which threw when its row's dimple was absent,
+  checks the dimple exists first and reports its absence.
+* **A corner-based clause cannot see a half-tile shift on a symmetric tile.** The default tile's
+  edges cross their chords at their midpoints, so a line moved half a pitch along itself still
+  passes through every lattice corner: the mutant that puts A's pegs mid-tile left every R clause
+  green on the default. It runs on the hook, whose edges are not symmetric.
+* **The axial-bar mutant first crashed instead of failing** — its first form gave the periodic
+  offset no safe cut, which is a crash, not a catch. It now transposes the line (each point's two
+  coordinates swapped, and the period with them) — a bar along the axis that the builder builds
+  and D1 refuses.
 
-And one found by reading the peg geometry's limits rather than by a red: rollers of 2 repeats
-of a 40 mm tile built a body of negative radius, silently. They are refused now, and W5 asserts
-the refusal from the measured rolling radius.
+**The crossbar version's findings, kept** because the code they fixed is still there: the
+handedness defect (§3.2) — R and S; the simulator's window clipping B's lines at obtuse angles —
+R4, R5 (§4.6's "back, then forward"); the dough-depth law stated to the tip disk's centre while
+its rim reached 0.011 mm deeper — H2; a 30 mm tile's peg feet sunk into the hollow — H4; the
+gate's own H1 reading the hollow's radius as the body's (it scanned vertices); the page's
+double-click never reaching the point (the press redraws the editor) — P5; two page mutants that
+could not fire (a status set twice; a corner drag tested on the one corner whose opposite never
+moves). And one found by reading the peg geometry's limits rather than by a red: rollers of 2
+tiles of 40 mm round built a body of negative radius, silently. They are refused now, and W5
+asserts the refusal from the measured rolling radius.
+
+---
 
 ## 10. Phase 2 (design only) — image → tile
 
@@ -583,27 +719,34 @@ Paste, drop or load a picture of one cookie shape; get an editable tile.
 
 ## 11. Decisions made without a ruling, and open questions
 
-1. **Crossbars, not rings** (§3.1) — printability. Reversing it would mean supports under every
-   ring.
-2. **Rims at the tip radius** (§3.5) — without them a crossbar roller bumps and its body hits the
-   dough. They run on the board or cut a line in the border.
-3. **The track is one tile row outside the block** (corner-registered) — so recurrences, if any,
-   land on cut junctions, not in cookies. A track half a row out would save half a row of border
-   but put any recurrence inside cookies.
-4. **Corners resize; θ is a slider.**
-5. **Corners default smooth.**
-6. **A's orientation mark is a groove ring on its +Z end face.**
-7. **No hollow-free cavity**: the body is a tube open to its bores, so it drains.
-8. **The dough lies between the rims** (§3.5) — the rims ride the board. The alternative (rims
-   riding on the dough) lifts every blade off the board.
-9. **"Back, then forward"** for both rollers (§4.6) — one procedure for every angle.
-10. **A roller too small for its bore is refused**, not clamped: a clamp would change the
+1. **Rings — by Eva's ruling, not a free decision** (§3.1). Its cost is recorded rather than
+   argued: support under every ring when printed upright. (The first version chose crossbars for
+   printability; the ruling reversed that, and nothing here re-opens it.)
+2. **No rims** (§3.5) — the rings roll on their own tips; the "dough between the rims" rule is
+   dropped with them.
+3. **The track is column `m*`, one column outside the sheet** (corner-registered) — so a
+   recurrence, if any, lands on cut junctions, not inside cookies. A track half a column out
+   would save half a column of border but put any recurrence inside cookies.
+4. **The collar is at the nearest column whose teeth clear B's first ring by 1.5 mm**, root and
+   wiggle included — `m* = −1` normally, further out on a tile whose B edge wiggles wide.
+5. **Roller A defaults to 6 tiles round, B to 5**, so A's peg row comes round outside the default
+   sheet (§4.5); with both at 5 the default would be flagged.
+6. **The sheet is two sliders — cookies along edge A and along edge B** — replacing span A and
+   span B, and **"tiles round it"** replaces "repeats"; the tooltips say which roller each one
+   sizes.
+7. **A version-1 (crossbar) design keeps its tile, print settings and sheet; its round counts are
+   reset**, and the local-storage key changed so an old design does not reopen by itself.
+8. **Corners resize; θ is a slider.**
+9. **Corners default smooth.**
+10. **A's orientation mark is a groove ring on its +Z end face.**
+11. **No hollow-free cavity**: the body is a tube open to its bores, so it drains.
+12. **"Back, then forward"** for both rollers (§4.6) — one procedure for every angle.
+13. **A roller too small for its bore is refused**, not clamped: a clamp would change the
     circumference, which is the one number the pattern is laid out on.
-11. **The overhang flag is at 30° from horizontal**, an advisory threshold: a 1.2 mm wall
-    printed at 0.2 mm layers steps out `0.2 / tan β` a layer.
 
-Open: whether `n_A ≥ K_B + 2` should be enforced rather than flagged (it couples A's diameter to
-B's length); the rims' width; the handle retention (friction only today); nothing has been
+Open: whether `n_A ≥ cols + 1 + |m*|` should be enforced rather than flagged (it couples A's
+diameter to the sheet's width); how the rings are best supported (tree supports are the
+expectation, not a measurement); the handle retention (friction only today); nothing has been
 printed — every printability figure here is a declared rule of thumb, not a measurement.
 
 ---
@@ -612,19 +755,23 @@ printed — every printability figure here is a declared rule of thumb, not a me
 
 | | roller A | roller B | handle |
 |---|---|---|---|
-| diameter at the blades | 63.7 mm (body 47.7) | 63.7 mm (body 47.7) | grip 26 mm |
-| length | 205 mm | 199 mm | 103 mm |
-| clear span between the skirts | 181 mm | 175 mm | — |
-| triangles | 21,420 | 18,220 | 1,536 |
-| binary STL | 1.02 MB | 890 KB | 75 KB |
+| diameter at the blades | 76.4 mm (body 60.4) | 63.7 mm (body 47.7) | grip 26 mm |
+| length | 141 mm | 219 mm | 103 mm |
+| rings | 4, 40 mm apart | 5, 40 mm apart | — |
+| triangles | 22,152 | 23,320 | 1,536 |
+| binary STL | 1.06 MB | 1.11 MB | 75 KB |
 
-12 cookies a pass (4 × 3), field 160 × 120 mm; track row −1; 5 pegs on one bar of A, 5 teeth on
-B's collar. Blade 8.00 mm above the body, peg dimple 2.20 mm, tooth 1.90 mm, collar band 6.80 mm
-above the board — all read off the mesh. Block corners within 3.2e-14 mm of both lines, 20/20
-line meetings, stamped lines within 2.3e-13 mm of their ideal over nine revolutions.
+12 cookies a pass (4 × 3), cut field 160 × 120 mm; track column −1; 4 pegs on A in a row (one per
+ring), 5 teeth on B's collar. Blade 8.00 mm above the body, peg dimple 2.20 mm, tooth 1.90 mm,
+collar band 6.80 mm above the board — all read off the mesh. Ring spacing 40.000 mm on both
+(1.9e-13 off), every ring covering the whole circle. Sheet corners within 1.8e-14 mm of both
+lines, 20/20 line meetings, stamped lines within 4.6e-13 mm of their ideal (3.3e-13 at the
+seams) over 13 revolutions of A and 12 of B.
 
-Cost in the page (Node, same code): the roller build 9–85 ms over the fixtures (63 ms at the
-default, 85 ms for the jigsaw knob, the most points), the neck/spike raster 9–45 ms, a validation
-0.2–2.8 ms — so the editor validates on every pointer move and rebuilds the rollers 120 ms after
-the hand stops. The largest fixture STL is the jigsaw knob's roller A, 2.0 MB (41,660
-triangles).
+Cost in the page (Node, same code): the roller build 6–114 ms over the fixtures (60 ms at the
+default, 114 ms for the jigsaw knob, the most points), the neck/spike raster 9–45 ms, a
+validation 0.2–2.8 ms — so the editor validates on every pointer move and rebuilds the rollers
+120 ms after the hand stops. The largest fixture STL is the jigsaw knob's roller B, 2.4 MB
+(49,720 triangles). Against the crossbar version at its own defaults (A 21,420 / B 18,220
+triangles, 1.02 MB / 890 KB), the ring rollers are 3% and 28% larger — B now carries five rings
+of five copies of its edge each.

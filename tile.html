@@ -84,12 +84,12 @@
   </details>
 
   <details class="tl-sec" open>
-    <summary>Rollers</summary>
+    <summary>Sheet and rollers</summary>
     <div class="tl-sec-body">
-      <div class="tl-ctrl"><label for="repeatsA"><span>Roller A — bars round it</span><output id="repeatsA-out"></output></label><input type="range" id="repeatsA" min="2" max="12" step="1"></div>
-      <div class="tl-ctrl"><label for="spanA"><span>Roller A — tiles across</span><output id="spanA-out"></output></label><input type="range" id="spanA" min="1" max="8" step="1"></div>
-      <div class="tl-ctrl"><label for="repeatsB"><span>Roller B — bars round it</span><output id="repeatsB-out"></output></label><input type="range" id="repeatsB" min="2" max="12" step="1"></div>
-      <div class="tl-ctrl"><label for="spanB"><span>Roller B — tiles across</span><output id="spanB-out"></output></label><input type="range" id="spanB" min="1" max="8" step="1"></div>
+      <div class="tl-ctrl"><label for="cols" title="Roller B carries one ring per line across the sheet this way: cookies + 1"><span>Cookies along edge A</span><output id="cols-out"></output></label><input type="range" id="cols" min="1" max="8" step="1"></div>
+      <div class="tl-ctrl"><label for="rows" title="Roller A carries one ring per line across the sheet this way: cookies + 1"><span>Cookies along edge B</span><output id="rows-out"></output></label><input type="range" id="rows" min="1" max="8" step="1"></div>
+      <div class="tl-ctrl"><label for="roundA" title="Roller A's circumference is this many copies of edge A: it sets the diameter"><span>Roller A — tiles round it</span><output id="roundA-out"></output></label><input type="range" id="roundA" min="2" max="12" step="1"></div>
+      <div class="tl-ctrl"><label for="roundB" title="Roller B's circumference is this many copies of edge B: it sets the diameter"><span>Roller B — tiles round it</span><output id="roundB-out"></output></label><input type="range" id="roundB" min="2" max="12" step="1"></div>
       <div class="tl-derived" id="derived"></div>
     </div>
   </details>

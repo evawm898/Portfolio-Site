@@ -9900,20 +9900,35 @@ edge A is stored once and drawn as bottom and top, edge B as left and right, and
 validity rule is a simple outline — every edit that would break it is BLOCKED with the reason,
 never repaired. The curve law is /bug's `sampleOutline` (centripetal Catmull–Rom), with a smooth
 corner extended by its PERIODIC neighbour so each chained line is C1 there.
-**Crossbars, not rings**: roller A carries the edge-A lines and rolls along `tB`, B the edge-B
-lines along `tA`; circumference = repeats × the OTHER pitch, the diameter derived. **Rims at the
-blade-tip radius ride the board, so the dough must lie between them** — a rim on dough lifts
-every blade off the board. **Both rollers are held +Z end on the LEFT as they roll forward**
-(`â = ẑ × r̂`); a first draft that signed the axis per roller stamped A's line mirrored. **The
-index marks**: pegs at the corners of ONE bar of A lay a dimple track along `tA` in the near
-border (row `k* = −1`); B's collar at that row's axial position carries one tooth per bar at
-`s' = m·|tA| + k*·|tB| cos θ`; one seated tooth fixes both of B's free placements; "roll back,
-then forward" for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a
-blade that cannot clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for
-its roller. Gates, both in CI (`tile-gate.yml`), each with a negative control that must catch
-every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry, the seam
-over three revolutions, a rigid-body rolling simulation for registration, a DIRECTED-edge census
-on every STL, heights read off the mesh) and `node tools/verify-tile-page.mjs` (Chromium, real
-pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
+**RINGS, NOT CROSSBARS — EVA'S RULING ON THE FIRST VERSION (#354, held, then rebuilt).** Each
+blade is a closed wavy RING running AROUND the circumference, a jagged pizza-wheel edge wrapped
+round the pin, and each roller rolls along its OWN lines: roller A carries the edge-A lines and
+rolls along `tA`, B the edge-B lines along `tB`. Circumference = tiles round it × its OWN pitch,
+the diameter derived; the rings step along the axis by `|tA × tB| / |chord|` (θ counted), and
+there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3 —
+the first version's page could open on a strip of three). A ring is one period laid `n` times and
+wrapped onto its own first vertex, so it closes on itself by construction: a TORUS, no end caps,
+no seam vertex. **No rims, and "the dough must lie between the rims" is DROPPED** — every ring is
+a wheel at the tip radius, so the roller rides its blade tips through the dough continuously.
+**The price is printing**: upright, every ring is a fin straight out of the body — support under
+every ring, said in the page's how-to and the zip's README, never hidden. **Both rollers are held +Z
+end on the LEFT as they roll forward** (`â = ẑ × r̂`); a first draft that signed the axis per
+roller stamped A's line mirrored. **The index marks**: the track runs along `tB` through the
+corners of B-line column `m*` (−1 normally) in the border; A lays it with a SLANTED row of pegs,
+one on each ring at that ring's corner of column `m*` (an axial row only at θ = 90°); B's collar
+sits at that column's axial position with one tooth per tile round it at
+`s' = m*·|tA| cos θ + j·|tB|`; one seated tooth fixes both of B's free placements, because
+`|tA|·(cos θ r̂_B − sin θ â_B) = tA` exactly; A's peg row comes round outside the sheet iff
+`n_A ≥ cols + 1 + |m*|`, which is why A defaults to 6 round and B to 5; "roll back, then forward"
+for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a blade that cannot
+clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for its roller. A
+version-1 (crossbar) design file opens with its tile and sheet kept and its round counts reset;
+the storage key moved so an old design does not reopen by itself. Gates, both in CI
+(`tile-gate.yml`), each with a negative control that must catch every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry; D, every
+blade a ring round its roller read off the mesh — full azimuth, an axial extent of one line's
+width, the θ spacing — which a bar along the axis fails; the seam over three revolutions, every
+ring closing once; a rigid-body rolling simulation for registration, re-seated by a different
+tooth and dimple; a DIRECTED-edge census on every STL; heights read off the mesh) and
+`node tools/verify-tile-page.mjs` (Chromium, real pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.

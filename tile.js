@@ -11,7 +11,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as G from './tile-geometry.js';
 import * as RL from './tile-roller.js';
 
-const STORE = 'tessellation-rollers-v1';
+const STORE = 'tessellation-rollers-v2';   // v1 held the crossbar rollers' settings; a stale one must not come back
 const JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
 const NS = 'http://www.w3.org/2000/svg';
 const D2R = Math.PI / 180;
@@ -366,9 +366,8 @@ function thinImage(th) {
 }
 
 /* ---------------- the panel's read-outs ---------------- */
-function clearSpan(R) { return R.L - 2 * (RL.RIM_WIDTH_MM + (R.Rtip - R.Rbody)); }
 function fieldSize() {
-  const { tA, tB } = G.latticeVectors(tile), KA = rollers.spanA, KB = rollers.spanB;
+  const { tA, tB } = G.latticeVectors(tile), KA = rollers.cols, KB = rollers.rows;
   const xs = [0, KA * tA[0], KB * tB[0], KA * tA[0] + KB * tB[0]], ys = [0, KA * tA[1], KB * tB[1], KA * tA[1] + KB * tB[1]];
   return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)];
 }
@@ -378,14 +377,14 @@ function writePanel() {
   if (!built) return;
   const L = built.layout, A = L.A, B = L.B;
   const [fw, fh] = fieldSize();
-  const cookies = rollers.spanA * rollers.spanB;
+  const cookies = rollers.cols * rollers.rows;
   const lines = [
+    `<b>${cookies}</b> cookies a sheet — ${rollers.cols} along edge A × ${rollers.rows} along edge B, each ${Math.abs(G.cellArea(tile)).toFixed(0)} mm² · cut field ${fw.toFixed(0)} × ${fh.toFixed(0)} mm`,
     `<b>Roller A</b> ⌀ <b>${A.dTip.toFixed(1)}</b> mm at the blades (body ${A.dBody.toFixed(1)}) · <b>${A.L.toFixed(0)}</b> mm long`,
-    `  ${A.n} bars × ${A.pitchRoll.toFixed(1)} mm = ${A.C.toFixed(1)} mm round · cuts ${A.K} tiles across`,
+    `  ${A.rings} rings, ${A.spacing.toFixed(1)} mm apart · ${A.n} tiles × ${A.pitch.toFixed(1)} mm = ${A.C.toFixed(1)} mm round · rolls along edge A`,
     `<b>Roller B</b> ⌀ <b>${B.dTip.toFixed(1)}</b> mm at the blades (body ${B.dBody.toFixed(1)}) · <b>${B.L.toFixed(0)}</b> mm long`,
-    `  ${B.n} bars × ${B.pitchRoll.toFixed(1)} mm = ${B.C.toFixed(1)} mm round · cuts ${B.K} tiles across`,
-    `<b>${cookies}</b> cookies a sheet (${rollers.spanA} × ${rollers.spanB}), each ${G.cellArea(tile).toFixed(0)} mm² · field ${fw.toFixed(0)} × ${fh.toFixed(0)} mm`,
-    `Track: row ${L.kStar} (the near border) · ${A.K + 1} pegs on one bar of A, ${B.n} teeth on B's collar`,
+    `  ${B.rings} rings, ${B.spacing.toFixed(1)} mm apart · ${B.n} tiles × ${B.pitch.toFixed(1)} mm = ${B.C.toFixed(1)} mm round · rolls along edge B`,
+    `Track: column ${L.mStar} (the border before the first cookies) · ${A.rings} pegs on A in a ${Math.abs(Math.cos(L.theta)) < 1e-9 ? 'straight' : 'slanted'} row, ${B.n} teeth on B's collar`,
     `Triangles: A ${built.A.mesh.indices.length / 3} · B ${built.B.mesh.indices.length / 3} · handle ${built.H.mesh.indices.length / 3}`,
     `STL: A ${kb(stlBytes(built.A.mesh))} · B ${kb(stlBytes(built.B.mesh))} · handle ${kb(stlBytes(built.H.mesh))}`,
   ];
@@ -420,15 +419,17 @@ function writeFlags() {
 function writeHowTo() {
   const L = built.layout, A = L.A, B = L.B;
   const [fw, fh] = fieldSize();
+  const slant = Math.abs(Math.cos(L.theta)) < 1e-9 ? 'in a straight row along it' : 'in a row slanting round it';
   $('howto').innerHTML = `
     <ol>
-      <li>Roll the dough <b>${print.dough} mm</b> thick on a floured board. The rollers run on the <b>rims at their ends</b>, on the board beside the dough — so keep the dough between them: under <b>${clearSpan(A).toFixed(0)} mm</b> across roller A's path and <b>${clearSpan(B).toFixed(0)} mm</b> across B's. The cut field is about ${fw.toFixed(0)} × ${fh.toFixed(0)} mm.</li>
-      <li><b>Roller A</b> — the one with a row of pegs on one bar, and a groove on one end. Groove end on your <b>left</b>. Set it down at the near edge with the <b>pegged bar</b> about to touch the dough, roll it back to the edge, then <b>away from you</b> across the whole sheet in one pass. The pegs press a line of dimples into the near border: the <b>track</b>.</li>
-      <li><b>Roller B</b> — the one with the toothed collar. Collar end <b>toward you</b>, collar on the track. Seat a tooth in the <b>first dimple</b> on the left, roll B back to the left edge, then <b>along the track</b> across the whole sheet in one pass. Each tooth drops into a dimple: that is what keeps B's lines on A's corners.</li>
-      <li>Lift the border away. The ${rollers.spanA * rollers.spanB} cookies are already apart.</li>
+      <li>Roll the dough <b>${print.dough} mm</b> thick on a floured board, a little bigger than the cut field (about ${fw.toFixed(0)} × ${fh.toFixed(0)} mm) plus a border of one tile on the side you start from. The rings are the wheels: each runs on its blade tips, through the dough to the board, so the rollers need nothing to run on but the board under the dough.</li>
+      <li><b>Roller A</b> — the one with a row of pegs and a groove on one end. Groove end on your <b>left</b>, and roll it <b>along edge A</b>, the way its rings run. Put it down near the edge of the dough with its pegs (${slant}) facing down, roll it back to the edge, then forward across the whole sheet in one pass. The pegs press a line of dimples into the border: the <b>track</b>.</li>
+      <li><b>Roller B</b> — the one with the toothed collar. Roll it <b>along edge B</b>, the way its rings run, with the collar on the track. Seat a tooth in a dimple at one end of the track, roll B back to the edge, then <b>along the track</b> across the whole sheet in one pass. Each tooth drops into a dimple: that is what puts B's lines through A's corners.</li>
+      <li>Lift the border away. The ${rollers.cols * rollers.rows} cookies are already apart.</li>
     </ol>
-    <p>Roll steadily and don't lift a roller mid-pass: they register by rolling without slipping. If a dimple is missing, seat the tooth in any other.</p>
-    <p>The handle's pin fits either roller's bore (${print.bore} mm); hold the roller at both ends, or use two handles.</p>`;
+    <p>Roll steadily and don't lift a roller mid-pass: they register by rolling without slipping. One seated tooth fixes B both sideways and round its turn — if a dimple is missing, seat the tooth in any other.</p>
+    <p>The handle's pin fits either roller's bore (${print.bore} mm); hold the roller at both ends, or use two handles.</p>
+    <p>Printing: stand each roller on its end. Each ring is a fin sticking straight out of the body, so it needs <b>support under every ring</b> (tree supports come away most cleanly); the pegs and teeth are 45° cones and need none.</p>`;
 }
 
 /* ---------------- the rollers in 3D ---------------- */
@@ -487,8 +488,8 @@ function rebuild3D() {
   if (!built) return;
   const A = built.layout.A, B = built.layout.B;
   // A above B, both lying along x; the handle beside them
-  setGroup(groups.A, partMeshes(built.A.mesh, (n) => (n === 'body' ? MAT.body : /^bar/.test(n) ? MAT.bladeA : MAT.peg)), A.L, A.Rtip + 8, 0);
-  setGroup(groups.B, partMeshes(built.B.mesh, (n) => (n === 'body' ? MAT.body : /^bar/.test(n) ? MAT.bladeB : MAT.peg)), B.L, -(B.Rtip + 8), 0);
+  setGroup(groups.A, partMeshes(built.A.mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? MAT.bladeA : MAT.peg)), A.L, A.Rtip + 8, 0);
+  setGroup(groups.B, partMeshes(built.B.mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? MAT.bladeB : MAT.peg)), B.L, -(B.Rtip + 8), 0);
   let hz = 0; for (let i = 2; i < built.H.mesh.positions.length; i += 3) hz = Math.max(hz, built.H.mesh.positions[i]);
   setGroup(groups.H, partMeshes(built.H.mesh, () => MAT.handle), hz, 0, Math.max(A.L, B.L) / 2 + 30 + hz / 2);
   applyShow(!fitted);
@@ -563,9 +564,10 @@ function readme() {
   return [
     'Tessellation rollers — eva-maskalenko.com/tile', '',
     `Tile: ${tile.pitchA.toFixed(1)} x ${tile.pitchB.toFixed(1)} mm at ${tile.angle.toFixed(0)} degrees (${G.cellArea(tile).toFixed(0)} mm2 a cookie).`,
-    `Roller A: diameter ${L.A.dTip.toFixed(1)} mm at the blades, ${L.A.L.toFixed(0)} mm long, ${L.A.n} bars. Roller B: ${L.B.dTip.toFixed(1)} mm, ${L.B.L.toFixed(0)} mm, ${L.B.n} bars.`,
+    `Sheet: ${rollers.cols} x ${rollers.rows} = ${rollers.cols * rollers.rows} cookies (${rollers.cols} along edge A, ${rollers.rows} along edge B).`,
+    `Roller A: diameter ${L.A.dTip.toFixed(1)} mm at the blades, ${L.A.L.toFixed(0)} mm long, ${L.A.rings} rings ${L.A.spacing.toFixed(1)} mm apart, ${L.A.n} tiles round. Roller B: ${L.B.dTip.toFixed(1)} mm, ${L.B.L.toFixed(0)} mm, ${L.B.rings} rings ${L.B.spacing.toFixed(1)} mm apart, ${L.B.n} tiles round.`,
     `Print: dough ${print.dough} mm, blades ${print.bladeHeight} mm tall and ${print.bladeWall} mm thin at the edge (draft ${print.draft} deg), axle bore ${print.bore} mm.`,
-    'Print each roller standing on its end, no supports needed for the blades of a smooth tile; the handle grip-end down.', '',
+    'Print each roller standing on its end WITH SUPPORT UNDER EVERY RING (each ring is a fin sticking straight out; tree supports come away most cleanly); the handle grip-end down.', '',
     'HOW TO USE', strip($('howto').innerHTML), '',
     'FOOD SAFETY', [...document.querySelectorAll('details.tl-sec .tl-prose p')].slice(-2).map((p) => p.textContent.replace(/\s+/g, ' ').trim()).join('\n'), '',
     'design.json (in this zip) reopens the design on the page.', '',
@@ -599,23 +601,32 @@ function readNumbers(src, ranges, fallback) {
   }
   return { ok: true, out };
 }
+/* Version 1 described CROSSBAR rollers: its sheet (spanA columns × spanB rows)
+   is kept as the sheet; its bar counts round each roller measured the OTHER
+   pitch, so they mean nothing to a ring roller and the round counts reset. */
+function upgradeRollers(doc) {
+  if (doc.version !== 1 || !doc.rollers) return { rollers: doc.rollers, note: '' };
+  const { spanA, spanB } = doc.rollers;
+  return { rollers: { cols: spanA, rows: spanB }, note: ' It was made for the old crossbar rollers: its tile, print settings and sheet are kept; the tiles round each roller are reset.' };
+}
 function applyDesign(doc) {
   if (!doc || doc.format !== G.DESIGN_FORMAT) return { ok: false, reason: 'not a tessellation-roller design file' };
   if (doc.version > G.DESIGN_VERSION) return { ok: false, reason: `made by a newer version (${doc.version}) of this page` };
   const t = G.readTile(doc.tile);
   if (!t.ok) return t;
   const p = readNumbers(doc.print, RL.PRINT_RANGES, RL.PRINT_DEFAULTS); if (!p.ok) return p;
-  const r = readNumbers(doc.rollers, RL.ROLLER_RANGES, RL.ROLLER_DEFAULTS); if (!r.ok) return r;
+  const up = upgradeRollers(doc);
+  const r = readNumbers(up.rollers, RL.ROLLER_RANGES, RL.ROLLER_DEFAULTS); if (!r.ok) return r;
   tile = t.tile; print = p.out; rollers = r.out; sel = null; status = '';
   writeOutputs(); afterEdit();
-  return { ok: true };
+  return { ok: true, note: up.note };
 }
 $('saveDesign').addEventListener('click', () => download(`${stem()}.json`, JSON.stringify(designDoc(), null, 1), 'application/json'));
 $('openDesign').addEventListener('change', async (e) => {
   const f = e.target.files && e.target.files[0]; if (!f) return;
   let r;
   try { r = applyDesign(JSON.parse(await f.text())); } catch (err) { r = { ok: false, reason: `unreadable (${err.message})` }; }
-  $('designMsg').textContent = r.ok ? `Opened ${f.name}.` : `Not opened: ${r.reason}.`;
+  $('designMsg').textContent = r.ok ? `Opened ${f.name}.${r.note || ''}` : `Not opened: ${r.reason}.`;
   $('designMsg').classList.toggle('is-bad', !r.ok);
   e.target.value = '';
 });
@@ -648,7 +659,13 @@ window.__tile = {
   edgeScreen: (which, copy, f) => { const p = G.edgeDense(tile, which).pts; return clientOf(add2(p[Math.round(f * (p.length - 1))], add2(org, copyOffset(tile, which, copy)))); },
   worldOf: (cx, cy) => { const r = edSvg.getBoundingClientRect(); return sub2(fromS(edFrame || editorFrame(), cx - r.left, cy - r.top), org); },
   flags: () => flagList().map((f) => ({ level: f.level, id: f.id })),
-  layout: () => (built ? { dA: built.layout.A.dTip, dB: built.layout.B.dTip, LA: built.layout.A.L, LB: built.layout.B.L, kStar: built.layout.kStar, flags: built.layout.flags.map((f) => f.id), trisA: built.A.mesh.indices.length / 3, trisB: built.B.mesh.indices.length / 3, trisH: built.H.mesh.indices.length / 3 } : null),
+  layout: () => (built ? {
+    dA: built.layout.A.dTip, dB: built.layout.B.dTip, LA: built.layout.A.L, LB: built.layout.B.L, mStar: built.layout.mStar, flags: built.layout.flags.map((f) => f.id),
+    trisA: built.A.mesh.indices.length / 3, trisB: built.B.mesh.indices.length / 3, trisH: built.H.mesh.indices.length / 3,
+    // counted off the MESHES, not the layout record: one closed blade shell per ring
+    ringsA: built.A.mesh.parts.filter((p) => /^ring/.test(p.name)).length, ringsB: built.B.mesh.parts.filter((p) => /^ring/.test(p.name)).length,
+  } : null),
+  derivedText: () => $('derived').textContent,
   patchCounts: () => ({ tiles: patchSvg.querySelectorAll('path.t0,path.t1,path.centre').length, aLines: patchSvg.querySelectorAll('path.la').length, bLines: patchSvg.querySelectorAll('path.lb').length, thin: patchSvg.querySelectorAll('image.thin').length }),
   editorCounts: () => ({ points: edSvg.querySelectorAll('.pt').length, corners: edSvg.querySelectorAll('.corner').length, rings: edSvg.querySelectorAll('.ring').length, thin: edSvg.querySelectorAll('image.thin').length }),
   tryStl: (w) => { const r = tryStl(w); return r.ok ? { ok: true, bytes: r.bytes.length } : { ok: false, reason: r.reason }; },
@@ -662,8 +679,8 @@ window.__tile = {
     controls.target.copy(c); controls.update(); render3D();
   },
   // a peg / tooth of the built roller, in the 3D view's world: where it is and its outward direction
-  anchorOf: (which, kind, m) => {
-    const spec = built[which].spec, f = (kind === 'peg' ? spec.pegs : spec.teeth).find((q) => q.m === m);
+  anchorOf: (which, kind, i) => {
+    const spec = built[which].spec, f = (kind === 'peg' ? spec.pegs : spec.teeth).find((q) => q.i === i);
     if (!f) return null;
     const g = groups[which], L = built.layout[which].L, R = built.layout[which].Rtip;
     g.updateMatrixWorld(true);

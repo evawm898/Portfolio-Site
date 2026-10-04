@@ -4,22 +4,28 @@
    the roll directions, the circumference law and the index marks are derived
    there, and everything here implements that derivation and nothing else.
 
-   ROLLER X (A carries the edge-A lines, B the edge-B lines) rolls along the
-   OTHER lattice vector tY, so its lines are BARS across it, |tY| apart round
-   its circumference (doc §3.1 — crossbars print upright, rings would not):
-       r̂ = tY/|tY|, â = ẑ × r̂ (90° left of the roll),
+   ROLLER X (A carries the edge-A lines, B the edge-B lines) carries its lines
+   as RINGS — each a closed wavy blade running AROUND the circumference, like a
+   jagged pizza-wheel edge wrapped round the pin — and rolls along its OWN chord
+   tX, the direction its lines run (Eva's ruling, doc §3.1):
+       r̂ = tX/|tX|, â = ẑ × r̂ (90° left of the roll),
        a sheet vector P maps to unrolled (s, z) = (P·r̂, P·â),
-       circumference at the blade tip C = n·|tY|, R_tip = C / 2π,
-       a bar point (s, z) sits at roller angle φ = −s / R_tip and height Z = z + Z0,
-   the roller's +Z end held on the LEFT as it rolls forward. Bar j is bar 0
-   turned by 2πj/n.
+       circumference at the blade tip C = n·|tX|, R_tip = C / 2π,
+       a ring point (s, z) sits at roller angle φ = −s / R_tip and height Z = z + Z0,
+   the roller's +Z end held on the LEFT as it rolls forward. An X-line repeats
+   along tX every |tX|, so n copies of edge X, corner to corner, close on
+   themselves round the circumference: ring 0. The NEXT line of the family is
+   the line moved by the other lattice vector tY, so ring j is ring 0 moved by
+   j·(tY·r̂) round the roller and j·(tY·â) along it — the second is the
+   perpendicular distance between neighbouring lines, |tA × tB| / |tX|.
 
-   Every solid is a CLOSED SHELL — the revolved body (rims, bore, cavity, the
-   collar band, the orientation groove), each bar (four offset polylines zipped
-   into a tube), each peg and tooth (a 45° cone) — and overlapping closed shells
-   are unioned by the slicer. The roller SPEC (bar centrelines, pegs and teeth in
-   (φ, Z)) is exported beside the mesh so tile-sim.js can roll it; the sim reads
-   the rolling radius off the MESH, never off this file's numbers. */
+   Every solid is a CLOSED SHELL — the revolved body (bore, cavity, B's collar
+   band, A's orientation groove), each ring (four offset loops zipped into a
+   closed tube: a torus, no end caps), each peg and tooth (a 45° cone) — and
+   overlapping closed shells are unioned by the slicer. The roller SPEC (ring
+   centrelines, pegs and teeth in (φ, Z)) is exported beside the mesh so
+   tile-sim.js can roll it; the sim reads the rolling radius off the MESH,
+   never off this file's numbers. */
 
 import { edgeDense, latticeVectors } from './tile-geometry.js';
 
@@ -28,25 +34,25 @@ import { edgeDense, latticeVectors } from './tile-geometry.js';
 /* ------------------------------------------------------------------ */
 
 export const PRINT_DEFAULTS = { dough: 5, bladeHeight: 8, bladeWall: 1.2, draft: 2, cylWall: 3, pegSize: 6, bore: 8, minCookie: 8 };
-export const ROLLER_DEFAULTS = { repeatsA: 5, repeatsB: 5, spanA: 4, spanB: 3 };
+/* round: tiles round each roller's circumference (C = round × its own pitch);
+   cols / rows: the cookie sheet, cookies along edge A and along edge B —
+   roller B carries cols + 1 rings, roller A rows + 1 (doc §3.3). */
+export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 4, rows: 3 };
 export const PRINT_RANGES = {
   dough: [2, 15, 0.5], bladeHeight: [4, 20, 0.5], bladeWall: [0.6, 3, 0.1], draft: [0, 10, 0.5],
   cylWall: [1.6, 8, 0.2], pegSize: [3, 12, 0.5], bore: [5, 14, 0.5], minCookie: [3, 30, 0.5],
 };
-export const ROLLER_RANGES = { repeatsA: [2, 12, 1], repeatsB: [2, 12, 1], spanA: [1, 8, 1], spanB: [1, 8, 1] };
+export const ROLLER_RANGES = { roundA: [2, 12, 1], roundB: [2, 12, 1], cols: [1, 8, 1], rows: [1, 8, 1] };
 
 export const BODY_CLEARANCE_MM = 1.5;   // blade height must exceed dough + this, or the body touches the dough
-export const OVERRUN_MM = 3;            // each bar runs this far past its end corners, so its cut fully crosses the other family's outermost line
 export const EMBED_MM = 0.4;            // blade roots sink this far into the body: overlapping shells, never touching faces
-export const RIM_WIDTH_MM = 4;          // the rolling rim's band at the blade-tip radius (doc §3.5)
-export const END_GAP_MM = 3;            // between a rim's 45° skirt and the nearest bar or collar
+export const END_MARGIN_MM = 3;         // the body runs this far past the outermost blade root, peg or collar
 export const CAP_MM = 8;                // end-cap thickness = the axle's bearing length
 export const PIN_CLEARANCE_MM = 0.25;   // the handle pin is this much under the bore, radially
 export const PEG_TIP_MIN_MM = 0.8;      // a peg's blunt tip radius, at least
 export const TOOTH_CLEARANCE_MM = 0.3;  // a tooth is the peg's cone this much smaller, and this much shorter, so it seats on the dimple's wall
-export const COLLAR_CLEAR_MM = 1.5;     // the collar stands this far clear of the nearest bar, overrun included
+export const COLLAR_CLEAR_MM = 1.5;     // the collar stands this far clear of the nearest ring's root
 export const BUILD_HEIGHT_MM = 250;     // a roller longer than this is flagged (common printers' build height)
-export const OVERHANG_DEG = 30;         // bar segments flatter than this from horizontal (upright print) are flagged as needing support
 export const LOOP_ARC_MULT = 30;        // an offset self-crossing is removed as a swallowtail only within this many offset distances of arc
 export const REVOLVE_SEGMENTS = 180;    // 2° — chord error 0.004 mm on a 32 mm radius
 export const CONE_SIDES = 24;
@@ -66,82 +72,55 @@ const unit2 = (a) => { const l = len2(a) || 1; return [a[0] / l, a[1] / l]; };
 /* Frames and layout                                                    */
 /* ------------------------------------------------------------------ */
 
-/* The unrolled frame of roller X: its roll direction r̂ (along the other lattice
-   vector) and its axis â = ẑ × r̂ — 90° LEFT of the roll, for both rollers, so
-   (r̂, â, ẑ) is right-handed and a bar point (s, z) sits at φ = −s / R_tip
+/* The unrolled frame of roller X: its roll direction r̂ along its OWN chord tX
+   and its axis â = ẑ × r̂ — 90° LEFT of the roll, for both rollers, so
+   (r̂, â, ẑ) is right-handed and a ring point (s, z) sits at φ = −s / R_tip
    (doc §3.2). The user holds every roller with its +Z end on the LEFT as it
-   rolls forward; the bars may run toward −Z (roller A's do at θ = 90°). */
+   rolls forward. tY is the other lattice vector: the step from one line of the
+   family to the next. */
 export function rollerFrame(tile, which) {
   const { tA, tB } = latticeVectors(tile);
   const tX = which === 'A' ? tA : tB, tY = which === 'A' ? tB : tA;
-  const r = unit2(tY);
+  const r = unit2(tX);
   const a = [-r[1], r[0]];
-  return { tX, tY, r, a, toUnrolled: (P) => [dot2(P, r), dot2(P, a)] };
+  return { tX, tY, r, a, pitch: which === 'A' ? tile.pitchA : tile.pitchB, toUnrolled: (P) => [dot2(P, r), dot2(P, a)] };
 }
 
-/* The bar's centreline in the unrolled frame: K copies of the edge, corner to
-   corner, plus OVERRUN_MM past each end corner along the periodic chain.
-   corners[m] is the index of corner m (m = 0..K) in the returned polyline. */
-export function barCenterline(tile, which, K) {
+/* ONE period of ring 0's centreline in the unrolled frame: edge X from its
+   first corner up to (not including) its second, which is the next copy's
+   first. The ring is n of these, copy c moved by c·T, T = (|tX|, 0); the point
+   after the last is the first moved by n·T = (C, 0) — the same point of the
+   cylinder, so the ring closes on itself by construction (doc §3.2). */
+export function ringPeriod(tile, which) {
   const F = rollerFrame(tile, which);
   const d = edgeDense(tile, which);
-  const t = d.t;
-  const one = d.pts.map((p) => F.toUnrolled(p));
-  const tu = F.toUnrolled(t);
-  let Lcopy = 0;
-  for (let k = 1; k < one.length; k++) Lcopy += len2(sub2(one[k], one[k - 1]));
-  // copies -1 .. K, then trimmed to [Lcopy - o, (K + 1) Lcopy + o] of arc
-  const pts = [];
-  for (let c = -1; c <= K; c++) {
-    const off = mul2(tu, c);
-    for (let k = c === -1 ? 0 : 1; k < one.length; k++) pts.push(add2(one[k], off));
-  }
-  const cornerIdx = [];                        // corner m sits at copy boundary m
-  const per = one.length - 1;
-  for (let m = 0; m <= K; m++) cornerIdx.push(per * (m + 1));
-  // trim by arc length
-  const cum = [0];
-  for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + len2(sub2(pts[k], pts[k - 1])));
-  const o = Math.min(OVERRUN_MM, 0.45 * Lcopy);
-  const s0 = cum[cornerIdx[0]] - o, s1 = cum[cornerIdx[K]] + o;
-  const at = (s) => {
-    let k = 1; while (k < cum.length - 1 && cum[k] < s) k++;
-    const f = (s - cum[k - 1]) / ((cum[k] - cum[k - 1]) || 1);
-    return { k, p: add2(pts[k - 1], mul2(sub2(pts[k], pts[k - 1]), f)) };
-  };
-  const a = at(s0), b = at(s1);
-  const out = [a.p];
-  for (let k = a.k; k < b.k; k++) out.push(pts[k]);
-  out.push(b.p);
-  const shift = a.k - 1;                        // pts index k -> out index k - shift
-  const corners = cornerIdx.map((i) => i - shift);
-  // drop exact duplicates the trim may leave (never a corner)
-  const clean = [out[0]], remap = [0];
-  for (let k = 1; k < out.length; k++) {
-    if (len2(sub2(out[k], clean[clean.length - 1])) < 1e-9) { remap.push(clean.length - 1); continue; }
-    remap.push(clean.length); clean.push(out[k]);
-  }
-  return { pts: clean, corners: corners.map((i) => remap[i]), frame: F, tu, overrun: o };
+  const one = d.pts.slice(0, -1).map((p) => F.toUnrolled(p));
+  return { one, T: [F.pitch, 0], frame: F };
 }
 
-/* All the derived numbers for both rollers: radii, the collar row k*, the axial
-   layout, the lengths and the roller-side flags. */
+/* All the derived numbers for both rollers: radii, the ring layout, the track
+   column m*, the axial layout, the lengths and the roller-side flags. */
 export function rollerLayout(tile, print, rollers) {
   const h = print.bladeHeight, td = print.dough;
   const theta = tile.angle * D2R;
   const wTip = print.bladeWall;
-  const wRootAt = (depth) => wTip + 2 * depth * Math.tan(print.draft * D2R);
-  const out = { theta, wTip, wRoot: wRootAt(h + EMBED_MM), flags: [] };
+  const wRoot = wTip + 2 * (h + EMBED_MM) * Math.tan(print.draft * D2R);
+  const out = { theta, wTip, wRoot, KA: rollers.cols, KB: rollers.rows, flags: [] };
   for (const which of ['A', 'B']) {
-    const n = which === 'A' ? rollers.repeatsA : rollers.repeatsB;
-    const K = which === 'A' ? rollers.spanA : rollers.spanB;
-    const pitchRoll = which === 'A' ? tile.pitchB : tile.pitchA;
-    const C = n * pitchRoll, Rtip = C / TAU, Rbody = Rtip - h, Rroot = Rbody - EMBED_MM;
-    const bar = barCenterline(tile, which, K);
-    let zmin = Infinity, zmax = -Infinity;
-    for (const [, z] of bar.pts) { zmin = Math.min(zmin, z); zmax = Math.max(zmax, z); }
-    const half = out.wRoot / 2;
-    out[which] = { which, n, K, pitchRoll, C, Rtip, Rbody, Rroot, bar, zmin: zmin - half, zmax: zmax + half, dTip: 2 * Rtip, dBody: 2 * Rbody };
+    const n = which === 'A' ? rollers.roundA : rollers.roundB;
+    const rings = (which === 'A' ? rollers.rows : rollers.cols) + 1;
+    const period = ringPeriod(tile, which), F = period.frame;
+    const C = n * F.pitch, Rtip = C / TAU, Rbody = Rtip - h, Rroot = Rbody - EMBED_MM;
+    const step = F.toUnrolled(F.tY);                     // ring j = ring 0 + j·step
+    let z0 = Infinity, z1 = -Infinity;
+    for (const [, z] of period.one) { z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const zs = [0, (rings - 1) * step[1]];
+    out[which] = {
+      which, n, rings, pitch: F.pitch, C, Rtip, Rbody, Rroot, period, frame: F, step, spacing: Math.abs(step[1]),
+      ringZ: [z0 - wRoot / 2, z1 + wRoot / 2],             // ring 0's own axial extent, root included
+      zmin: Math.min(...zs) + z0 - wRoot / 2, zmax: Math.max(...zs) + z1 + wRoot / 2,
+      dTip: 2 * Rtip, dBody: 2 * Rbody,
+    };
   }
   /* pegs and teeth (doc §4.3–4.4): a 45° cone whose tip stands δ into the dough;
      D = the dimple's diameter at the dough surface */
@@ -157,50 +136,45 @@ export function rollerLayout(tile, print, rollers) {
   B.toothTopRho = B.Rtip - td + delta - TOOTH_CLEARANCE_MM;
   B.toothTipR = Math.max(0.3, pegTipR - TOOTH_CLEARANCE_MM);
   B.toothBase = coneBase(B.Rbody + B.bandH - EMBED_MM, B.toothTopRho, B.toothTipR, B.Rbody - print.cylWall);
-  B.bandW = 2 * B.toothBase.r + 1;
+  B.bandW = 2 * (B.toothBase.r + B.bandH) + 1;           // its flat top runs 0.5 mm past the tooth's foot both ways
   // the flat tip needs 2·top² ≥ (tipR + top)² to sit with its rim at `top` (emitCone)
   for (const [nm, top, tr] of [['peg', A.pegTopRho, pegTipR], ['tooth', B.toothTopRho, B.toothTipR]])
     if (2 * top * top < (tr + top) * (tr + top)) out.flags.push({ id: 'pegWide', stl: true, text: `A ${D.toFixed(1)} mm ${nm} is too wide for a roller this small (its blunt tip would reach past the dough line). A smaller peg / tooth size or a larger roller. STL refused.` });
-  // A's z-extent includes its pegs on bar 0's corners
-  const fA = A.bar.frame;
-  for (let m = 0; m <= A.K; m++) {
-    const z = fA.toUnrolled(mul2(fA.tX, m))[1];
-    A.zmin = Math.min(A.zmin, z - A.pegBase.r); A.zmax = Math.max(A.zmax, z + A.pegBase.r);
-  }
-  // k*: the nearest row below the bars whose collar clears them (doc §4.4)
-  const rowZ = dot2(B.bar.frame.tX, B.bar.frame.a);    // a row's axial pitch on B: tB·â_B = pitchB·sin θ > 0
+  /* m*: the track's column (doc §4.4) — the nearest column outside the block,
+     on B's +Z side, whose collar clears B's nearest ring. A column's axial
+     position on B is m·(tA·â_B) = −m·|tA| sin θ: positive for m < 0. */
+  const colZ = (m) => B.frame.toUnrolled(mul2(B.frame.tY, m))[1];
   const collarHalf = B.bandW / 2;
-  let kStar = -1;
-  while ((kStar * rowZ) + collarHalf + COLLAR_CLEAR_MM > B.zmin && kStar > -20) kStar--;
-  out.kStar = kStar;
-  B.collarZu = kStar * rowZ;                            // unrolled z of the collar's centre
-  B.zminAll = Math.min(B.zmin, B.collarZu - collarHalf);
-  A.zminAll = A.zmin;
+  let mStar = -1;
+  while (colZ(mStar) - collarHalf - COLLAR_CLEAR_MM < B.zmax && mStar > -20) mStar--;
+  out.mStar = mStar;
+  B.collarZu = colZ(mStar);                                // unrolled z of the collar's centre
+  B.zminAll = B.zmin; B.zmaxAll = Math.max(B.zmax, B.collarZu + collarHalf);
+  // A's pegs: on ring k at corner (m*, k), k = 0..rows — a slanted row across A
+  A.zminAll = A.zmin; A.zmaxAll = A.zmax;
+  for (let k = 0; k < A.rings; k++) {
+    const z = k * A.step[1];
+    A.zminAll = Math.min(A.zminAll, z - A.pegBase.r); A.zmaxAll = Math.max(A.zmaxAll, z + A.pegBase.r);
+  }
   for (const R of [A, B]) {
-    const start = RIM_WIDTH_MM + (R.Rtip - R.Rbody) + END_GAP_MM;
-    R.Z0 = start - R.zminAll;
-    R.L = R.Z0 + R.zmax + END_GAP_MM + (R.Rtip - R.Rbody) + RIM_WIDTH_MM;
+    R.Z0 = END_MARGIN_MM - R.zminAll;
+    R.L = R.Z0 + R.zmaxAll + END_MARGIN_MM;
   }
   B.collarZ = B.collarZu + B.Z0;
   // flags (doc §6)
   if (!(h > td + BODY_CLEARANCE_MM)) out.flags.push({ id: 'blade', stl: true, text: `Blade height ${h.toFixed(1)} mm must exceed the dough ${td.toFixed(1)} mm + ${BODY_CLEARANCE_MM} mm, or the roller's body presses the dough. STL refused.` });
   for (const R of [A, B]) {
     const need = print.bore / 2 + print.cylWall + EMBED_MM;
-    if (R.Rbody < need) out.flags.push({ id: 'small' + R.which, stl: true, text: `Roller ${R.which} is too small: ${R.n} repeats of ${R.pitchRoll.toFixed(1)} mm make a ${(2 * R.Rtip).toFixed(1)} mm roller, whose body (${(2 * R.Rbody).toFixed(1)} mm under ${h.toFixed(1)} mm blades) leaves less than one ${print.cylWall.toFixed(1)} mm wall around the ${print.bore.toFixed(1)} mm bore — it needs at least ${(2 * (need + h)).toFixed(1)} mm. More repeats, or a larger tile. STL refused.` });
+    if (R.Rbody < need) out.flags.push({ id: 'small' + R.which, stl: true, text: `Roller ${R.which} is too small: ${R.n} tiles of ${R.pitch.toFixed(1)} mm round it make a ${(2 * R.Rtip).toFixed(1)} mm roller, whose body (${(2 * R.Rbody).toFixed(1)} mm under ${h.toFixed(1)} mm blades) leaves less than one ${print.cylWall.toFixed(1)} mm wall around the ${print.bore.toFixed(1)} mm bore — it needs at least ${(2 * (need + h)).toFixed(1)} mm. More tiles round it, or a larger tile. STL refused.` });
   }
-  const need = B.K + 1 + Math.abs(kStar);
-  if (A.n < need) out.flags.push({ id: 'pegRecur', text: `Roller A's pegged bar comes round again at row ${kStar + A.n} — inside the cookie block (rows 0–${B.K}): it would dimple that row's cookie corners. Give roller A at least ${need} repeats, or roller B fewer rows.` });
-  for (const R of [A, B]) if (R.L > BUILD_HEIGHT_MM) out.flags.push({ id: 'length' + R.which, text: `Roller ${R.which} is ${R.L.toFixed(0)} mm long — longer than a common printer's ${BUILD_HEIGHT_MM} mm build height. Fewer tiles across it, or smaller tiles.` });
-  for (const R of [A, B]) {
-    const o = overhangShare(R.bar.pts);
-    R.overhang = o;
-    if (o.share > 0.005) out.flags.push({ id: 'overhang' + R.which, text: `${(100 * o.share).toFixed(1)}% of roller ${R.which}'s blade runs flatter than ${OVERHANG_DEG}° from horizontal as printed upright — it will want support there.` });
-  }
+  const need = out.KA + 1 + Math.abs(mStar);
+  if (A.n < need) out.flags.push({ id: 'pegRecur', text: `Roller A's pegs come round again at column ${mStar + A.n} — inside the cookie sheet (columns 0–${out.KA}): they would dimple that column's cookie corners. Give roller A at least ${need} tiles round it, or cut fewer cookies along edge A.` });
+  for (const R of [A, B]) if (R.L > BUILD_HEIGHT_MM) out.flags.push({ id: 'length' + R.which, text: `Roller ${R.which} is ${R.L.toFixed(0)} mm long — longer than a common printer's ${BUILD_HEIGHT_MM} mm build height. Fewer cookies ${R.which === 'A' ? 'along edge B' : 'along edge A'}, or smaller tiles.` });
   for (const R of [A, B]) if (R.Rbody - print.cylWall - print.bore / 2 < 2 && R.Rbody >= print.bore / 2 + print.cylWall + EMBED_MM) out.flags.push({ id: 'solid' + R.which, text: `Roller ${R.which} has no room for a hollow: it prints solid around the bore (more plastic, no weaker).` });
   return out;
 }
 /* A 45° cone with its tip at radius `top` (tip radius tipR) and its base
-   sunk so the base circle's rim stays inside radius `limit` (doc §5): solve
+   sunk so the base circle's rim stays inside radius `limit` (doc §4.3): solve
    ρ² + (tipR + top − ρ)² = limit² for the larger root. */
 function coneBase(limit, top, tipR, inner = 0) {
   const c = tipR + top, disc = 2 * limit * limit - c * c;
@@ -215,53 +189,45 @@ function coneBase(limit, top, tipR, inner = 0) {
   const rho = Math.min(limit, Math.max(disc >= 0 ? (c + Math.sqrt(disc)) / 2 : c / 2, inner + 0.3));
   return { rho, r: tipR + (top - rho) };
 }
-/* the share of the bar's length whose direction is flatter than OVERHANG_DEG
-   from the circumferential (horizontal, printed upright) direction */
-export function overhangShare(pts) {
-  let flat = 0, all = 0;
-  const lim = Math.tan(OVERHANG_DEG * D2R);
-  for (let k = 1; k < pts.length; k++) {
-    const ds = pts[k][0] - pts[k - 1][0], dz = pts[k][1] - pts[k - 1][1];
-    const l = Math.hypot(ds, dz);
-    all += l;
-    if (Math.abs(dz) < lim * Math.abs(ds)) flat += l;
-  }
-  return { share: all ? flat / all : 0, flatMm: flat, totalMm: all };
-}
 
 /* ------------------------------------------------------------------ */
 /* The SPEC — what the simulator rolls                                  */
 /* ------------------------------------------------------------------ */
 
+/* Ring j's centreline, the full circumference, in (φ, Z): n periods, copy c
+   moved by c·T, then the whole ring moved by j·step. The corner of copy c is
+   at index c·M. Closed: the point after the last is the first. */
+function ringPoints(R, j) {
+  const { one, T } = R.period, M = one.length, out = [];
+  for (let c = 0; c < R.n; c++) for (let i = 0; i < M; i++) {
+    const s = one[i][0] + c * T[0] + j * R.step[0], z = one[i][1] + c * T[1] + j * R.step[1];
+    out.push([-s / R.Rtip, z + R.Z0]);
+  }
+  return out;
+}
 export function rollerSpec(tile, print, rollers, layout = rollerLayout(tile, print, rollers)) {
-  const spec = {};
+  const spec = { mStar: layout.mStar, KA: layout.KA, KB: layout.KB };
   for (const which of ['A', 'B']) {
-    const R = layout[which];
-    const toRoller = ([s, z]) => [-s / R.Rtip, z + R.Z0];
-    const base = R.bar.pts.map(toRoller);
-    const bars = [];
-    for (let j = 0; j < R.n; j++) {
-      const dphi = (TAU * j) / R.n;
-      bars.push(base.map(([phi, Z]) => [phi - dphi, Z]));
-    }
-    spec[which] = { which, Rtip: R.Rtip, Rbody: R.Rbody, n: R.n, K: R.K, pitchRoll: R.pitchRoll, Z0: R.Z0, L: R.L, bars, corners: R.bar.corners.slice() };
+    const R = layout[which], M = R.period.one.length;
+    const rings = [];
+    for (let j = 0; j < R.rings; j++) rings.push(ringPoints(R, j));
+    const corners = []; for (let c = 0; c < R.n; c++) corners.push(c * M);
+    spec[which] = { which, Rtip: R.Rtip, Rbody: R.Rbody, n: R.n, pitch: R.pitch, step: R.step.slice(), Z0: R.Z0, L: R.L, rings, corners };
   }
-  // pegs: on bar 0 of A, at its corners m = 0..K_A (doc §4.3)
-  const A = layout.A, fA = A.bar.frame;
+  // pegs: on A's ring k at the track corner (m*, k), k = 0..rows (doc §4.3)
+  const A = layout.A, fA = A.frame;
   spec.A.pegs = [];
-  for (let m = 0; m <= A.K; m++) {
-    const [s, z] = fA.toUnrolled(mul2(fA.tX, m));
-    spec.A.pegs.push({ m, phi: -s / A.Rtip, Z: z + A.Z0, rho: A.pegTopRho });
+  for (let k = 0; k < A.rings; k++) {
+    const [s, z] = fA.toUnrolled(add2(mul2(fA.tX, layout.mStar), mul2(fA.tY, k)));   // m*·tA + k·tB
+    spec.A.pegs.push({ i: k, phi: -s / A.Rtip, Z: z + A.Z0, rho: A.pegTopRho });
   }
-  // teeth: one per bar of B, on row k* (doc §4.4)
-  const B = layout.B, fB = B.bar.frame;
+  // teeth: round B's collar, one per tile pitch, at the corners (m*, j) (doc §4.4)
+  const B = layout.B, fB = B.frame;
   spec.B.teeth = [];
-  for (let m = 0; m < B.n; m++) {
-    const P = add2(mul2(fB.tY, m), mul2(fB.tX, layout.kStar));      // m·tA + k*·tB  (for B, tY = tA, tX = tB)
-    const [s, z] = fB.toUnrolled(P);
-    spec.B.teeth.push({ m, phi: -s / B.Rtip, Z: z + B.Z0, rho: B.toothTopRho });
+  for (let j = 0; j < B.n; j++) {
+    const [s, z] = fB.toUnrolled(add2(mul2(fB.tY, layout.mStar), mul2(fB.tX, j)));   // m*·tA + j·tB
+    spec.B.teeth.push({ i: j, phi: -s / B.Rtip, Z: z + B.Z0, rho: B.toothTopRho });
   }
-  spec.kStar = layout.kStar;
   return spec;
 }
 
@@ -313,20 +279,21 @@ function revolve(mesh, prof, segs = REVOLVE_SEGMENTS) {
   }
 }
 
-/* The body profile (doc §3.5–3.6): rims at the tip radius with 45° skirts, the
-   tube, the end caps with the bore, the cavity with a 45° ceiling; plus B's
-   collar band and A's orientation groove. Counter-clockwise in (r, z). */
+/* The body profile (doc §3.5–3.6): the tube at the body radius with chamfered
+   ends, the end caps with the bore, the cavity with a 45° ceiling; plus B's
+   collar band and A's orientation groove. No rims: the rings are the rolling
+   surface (§3.5). Counter-clockwise in (r, z). */
 export function bodyProfile(R, print, opts = {}) {
-  const { Rtip, Rbody, L } = R;
-  const rb = print.bore / 2, ch = 0.6, sk = Rtip - Rbody, Rin = Rbody - print.cylWall;
-  const p = [[rb, 0], [Rtip - ch, 0], [Rtip, ch], [Rtip, RIM_WIDTH_MM], [Rbody, RIM_WIDTH_MM + sk]];
+  const { Rbody, L } = R;
+  const rb = print.bore / 2, ch = 0.6, Rin = Rbody - print.cylWall;
+  const p = [[rb, 0], [Rbody - ch, 0], [Rbody, ch]];
   if (opts.collar) {
     const { z, w, h } = opts.collar;
     p.push([Rbody, z - w / 2], [Rbody + h, z - w / 2 + h], [Rbody + h, z + w / 2 - h], [Rbody, z + w / 2]);
   }
-  p.push([Rbody, L - RIM_WIDTH_MM - sk], [Rtip, L - RIM_WIDTH_MM], [Rtip, L - ch], [Rtip - ch, L]);
+  p.push([Rbody, L - ch], [Rbody - ch, L]);
   if (opts.groove) {
-    const rg = (Rtip + rb + 5) / 2, gw = GROOVE.width, gd = GROOVE.depth;
+    const rg = (Rbody - ch + rb) / 2, gw = GROOVE.width, gd = GROOVE.depth;
     p.push([rg + gw / 2, L], [rg, L - gd], [rg - gw / 2, L]);
   }
   p.push([rb, L]);
@@ -337,31 +304,46 @@ export function bodyProfile(R, print, opts = {}) {
   return p;
 }
 
-/* Offset an OPEN polyline by d (left of travel for d > 0): round joins on the
-   outer side of a turn, both offset ends on the inner side (they cross), then
-   the swallowtail loops removed — only short ones (LOOP_ARC_MULT·|d| of arc), so
-   two far-apart stretches of a line that come close are never spliced
-   together. Returns { pts, kept } (kept = unremoved long-range crossings). */
-export function offsetOpen(poly, d) {
-  const n = poly.length;
-  const tan = [], nrm = [];
-  for (let i = 0; i + 1 < n; i++) { const t = unit2(sub2(poly[i + 1], poly[i])); tan.push(t); nrm.push([-t[1], t[0]]); }
-  const out = [add2(poly[0], mul2(nrm[0], d))];
-  for (let i = 1; i < n - 1; i++) {
-    const t0 = tan[i - 1], t1 = tan[i], n0 = nrm[i - 1], n1 = nrm[i];
+/* Offset a PERIODIC polyline by d (left of travel for d > 0): one period
+   `one` (M points), the point after the last being one[0] + T. Round joins on
+   the outer side of a turn, both offset ends on the inner side (they cross),
+   then the swallowtail loops removed — only short ones (LOOP_ARC_MULT·|d| of
+   arc), so two far-apart stretches of a line that come close are never
+   spliced together.
+   A loop may straddle the period's start, so the raw offset of ONE period is
+   laid five times (each copy the first moved by c·T, so the copies are exact
+   translates and indexable) and cleaned in one pass; a point of the middle
+   period that survived, and whose translate one period on survived too, is a
+   SAFE cut: no removed loop contains it. The period from it to its translate
+   is the answer. Returns { pts } — one period of the offset, the point after
+   its last being pts[0] + T. */
+export function offsetPeriodic(one, T, d) {
+  const M = one.length;
+  const at = (j) => (j < 0 ? sub2(one[j + M], T) : j >= M ? add2(one[j - M], T) : one[j]);
+  const raw = [];
+  for (let j = 0; j < M; j++) {
+    const p = one[j];
+    const t0 = unit2(sub2(p, at(j - 1))), t1 = unit2(sub2(at(j + 1), p));
+    const n0 = [-t0[1], t0[0]], n1 = [-t1[1], t1[0]];
     const turn = cross2(t0, t1), c = dot2(t0, t1);
-    if (Math.abs(turn) < 1e-12 && c > 0) { out.push(add2(poly[i], mul2(n1, d))); continue; }
-    const inner = turn * d > 0;
-    if (inner) { out.push(add2(poly[i], mul2(n0, d)), add2(poly[i], mul2(n1, d))); continue; }
-    // round join from n0 to n1 about poly[i]
+    if (Math.abs(turn) < 1e-12 && c > 0) { raw.push(add2(p, mul2(n1, d))); continue; }
+    if (turn * d > 0) { raw.push(add2(p, mul2(n0, d)), add2(p, mul2(n1, d))); continue; }   // inner side: the ends cross
+    // round join from n0 to n1 about p
     const a0 = Math.atan2(n0[1], n0[0]);
     let da = Math.atan2(n1[1], n1[0]) - a0;
     while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU;
     const steps = Math.max(1, Math.ceil(Math.abs(da) / (15 * D2R)));
-    for (let k = 0; k <= steps; k++) { const a = a0 + (da * k) / steps; out.push(add2(poly[i], [Math.cos(a) * d, Math.sin(a) * d])); }
+    for (let k = 0; k <= steps; k++) { const a = a0 + (da * k) / steps; raw.push(add2(p, [Math.cos(a) * d, Math.sin(a) * d])); }
   }
-  out.push(add2(poly[n - 1], mul2(nrm[n - 2], d)));
-  return removeLoops(out, LOOP_ARC_MULT * Math.abs(d));
+  const K = raw.length, all = [], index = new Map();
+  for (let c = -2; c <= 2; c++) for (let e = 0; e < K; e++) { const q = [raw[e][0] + c * T[0], raw[e][1] + c * T[1]]; index.set(q, (c + 2) * K + e); all.push(q); }
+  const Q = removeLoops(all, LOOP_ARC_MULT * Math.abs(d));
+  const where = new Map(); Q.forEach((q, i) => { if (index.has(q)) where.set(index.get(q), i); });
+  for (let e = 0; e < K; e++) {
+    const a = where.get(2 * K + e), b = where.get(3 * K + e);
+    if (a !== undefined && b !== undefined && b > a) return { pts: Q.slice(a, b) };
+  }
+  throw new Error('offsetPeriodic: no safe cut — the offset loops over a whole period');
 }
 function segX(p1, p2, p3, p4) {
   const d1 = cross2(sub2(p4, p3), sub2(p1, p3)), d2 = cross2(sub2(p4, p3), sub2(p2, p3));
@@ -374,7 +356,8 @@ function segX(p1, p2, p3, p4) {
 }
 /* One forward pass: each new segment is tested against the recent ones (within
    maxArc of arc); a crossing truncates the polyline back to it — the loop
-   between is dropped as it forms. O(n·k), k the segments within maxArc. */
+   between is dropped as it forms. O(n·k), k the segments within maxArc. A point
+   that survives is pushed as the SAME array (offsetPeriodic finds it by that). */
 function removeLoops(pts, maxArc) {
   const out = [pts[0]], cum = [0];
   for (let i = 1; i < pts.length; i++) {
@@ -392,7 +375,7 @@ function removeLoops(pts, maxArc) {
     const q = out[out.length - 1], l = len2(sub2(p, q));
     if (l > 1e-5) { out.push(p); cum.push(cum[cum.length - 1] + l); }   // 1e-5: closer points would weld in the float32 STL
   }
-  return { pts: out, kept: 0 };
+  return out;
 }
 
 /* Zip two polylines running the same way into a strip, by normalized arc length. */
@@ -406,32 +389,44 @@ function zip(mesh, P, Q) {
     else { mesh.t(P[i].id, Q[j + 1].id, Q[j].id); j++; }
   }
 }
+/* Zip two CLOSED loops running the same way: Q is started at its point nearest
+   P's start, and both are closed by repeating their first vertex — the same
+   vertex id, so the strip closes on itself with no seam vertex. */
+function zipClosed(mesh, P, Q) {
+  let best = Infinity, k0 = 0;
+  for (let k = 0; k < Q.length; k++) { const e = Math.hypot(Q[k].x - P[0].x, Q[k].y - P[0].y, Q[k].z - P[0].z); if (e < best) { best = e; k0 = k; } }
+  const Qr = [...Q.slice(k0), ...Q.slice(0, k0)];
+  zip(mesh, [...P, P[0]], [...Qr, Qr[0]]);
+}
 
-/* One bar as a closed tube (doc §3.4): the centreline offset ±w/2 at the tip
-   radius in the tip's own unrolled metric, and ±w_root/2 at the root radius in
-   the ROOT's (arc lengths shrink by R_root/R_tip there, which changes angles),
-   zipped into four strips, two end caps. Built once, emitted n times turned. */
-function barGeometry(R, layout) {
+/* One ring's geometry, built once and emitted rings times, moved (doc §3.4):
+   the period offset ±w/2 at the tip radius in the tip's own unrolled metric,
+   and ±w_root/2 at the root radius in the ROOT's (arc lengths shrink by
+   R_root/R_tip there, which changes angles), each laid n times round. */
+function ringGeometry(R, layout) {
   const k = R.Rroot / R.Rtip;
-  const cen = R.bar.pts;
-  const tipL = offsetOpen(cen, layout.wTip / 2), tipR = offsetOpen(cen, -layout.wTip / 2);
-  const root = cen.map(([s, z]) => [s * k, z]);
-  const rootL = offsetOpen(root, layout.wRoot / 2), rootR = offsetOpen(root, -layout.wRoot / 2);
-  const toCyl = (pts, rho, scale) => pts.pts.map(([s, z]) => ({ phi: -(s / scale) / R.Rtip, Z: z + R.Z0, rho }));
+  const { one, T } = R.period;
+  const root = one.map(([s, z]) => [s * k, z]), Troot = [T[0] * k, 0];
+  const loop = (pts, Tp, rho, scale) => {
+    const out = [];
+    for (let c = 0; c < R.n; c++) for (const [s, z] of pts) out.push({ phi: -((s + c * Tp[0]) / scale) / R.Rtip, Z: z + c * Tp[1] + R.Z0, rho });
+    return out;
+  };
   return {
-    Lt: toCyl(tipL, R.Rtip, 1), Rt: toCyl(tipR, R.Rtip, 1),
-    Lr: toCyl(rootL, R.Rroot, k), Rr: toCyl(rootR, R.Rroot, k),
-    kept: tipL.kept + tipR.kept + rootL.kept + rootR.kept,
+    Lt: loop(offsetPeriodic(one, T, layout.wTip / 2).pts, T, R.Rtip, 1),
+    Rt: loop(offsetPeriodic(one, T, -layout.wTip / 2).pts, T, R.Rtip, 1),
+    Lr: loop(offsetPeriodic(root, Troot, layout.wRoot / 2).pts, Troot, R.Rroot, k),
+    Rr: loop(offsetPeriodic(root, Troot, -layout.wRoot / 2).pts, Troot, R.Rroot, k),
   };
 }
-function emitBar(mesh, g, dphi, name) {
+/* Ring j: ring 0's tube turned by −step_s/R_tip and moved step_z along the
+   axis — four closed loops zipped into four closed strips: a torus. */
+function emitRing(mesh, g, R, j, name) {
   mesh.begin(name);
-  const place = (L) => L.map((p) => ({ id: mesh.v(p.rho * Math.cos(p.phi - dphi), p.rho * Math.sin(p.phi - dphi), p.Z), x: p.rho * Math.cos(p.phi - dphi), y: p.rho * Math.sin(p.phi - dphi), z: p.Z }));
+  const dphi = -(j * R.step[0]) / R.Rtip, dZ = j * R.step[1];
+  const place = (L) => L.map((p) => { const a = p.phi + dphi, x = p.rho * Math.cos(a), y = p.rho * Math.sin(a), z = p.Z + dZ; return { id: mesh.v(x, y, z), x, y, z }; });
   const Lt = place(g.Lt), Rt = place(g.Rt), Rr = place(g.Rr), Lr = place(g.Lr);
-  zip(mesh, Lt, Rt); zip(mesh, Rt, Rr); zip(mesh, Rr, Lr); zip(mesh, Lr, Lt);
-  const s = 0, e = (L) => L.length - 1;
-  mesh.t(Lt[s].id, Rt[s].id, Rr[s].id); mesh.t(Lt[s].id, Rr[s].id, Lr[s].id);
-  mesh.t(Lt[e(Lt)].id, Lr[e(Lr)].id, Rr[e(Rr)].id); mesh.t(Lt[e(Lt)].id, Rr[e(Rr)].id, Rt[e(Rt)].id);
+  zipClosed(mesh, Lt, Rt); zipClosed(mesh, Rt, Rr); zipClosed(mesh, Rr, Lr); zipClosed(mesh, Lr, Lt);
   return mesh.end();
 }
 /* A 45° cone standing radially at (φ, Z): base at radius base.rho (radius
@@ -469,12 +464,12 @@ export function buildRoller(tile, print, rollers, which, layout = rollerLayout(t
   const opts = which === 'B' ? { collar: { z: R.collarZ, w: R.bandW, h: R.bandH } } : { groove: true };
   revolve(mesh, bodyProfile(R, print, opts));
   mesh.end();
-  const g = barGeometry(R, layout);
-  for (let j = 0; j < R.n; j++) emitBar(mesh, g, (TAU * j) / R.n, `bar${j}`);
+  const g = ringGeometry(R, layout);
+  for (let j = 0; j < R.rings; j++) emitRing(mesh, g, R, j, `ring${j}`);
   const spec = rollerSpec(tile, print, rollers, layout);
-  if (which === 'A') for (const pg of spec.A.pegs) emitCone(mesh, pg.phi, pg.Z, R.pegBase, R.pegTopRho, layout.peg.tipR, `peg${pg.m}`);
-  else for (const th of spec.B.teeth) emitCone(mesh, th.phi, th.Z, R.toothBase, R.toothTopRho, R.toothTipR, `tooth${th.m}`);
-  return { mesh: mesh.finish(), spec: spec[which], fullSpec: spec, layout, R, loopsKept: g.kept };
+  if (which === 'A') for (const pg of spec.A.pegs) emitCone(mesh, pg.phi, pg.Z, R.pegBase, R.pegTopRho, layout.peg.tipR, `peg${pg.i}`);
+  else for (const th of spec.B.teeth) emitCone(mesh, th.phi, th.Z, R.toothBase, R.toothTopRho, R.toothTipR, `tooth${th.i}`);
+  return { mesh: mesh.finish(), spec: spec[which], fullSpec: spec, layout, R };
 }
 
 /* The handle (doc §3.6): grip, 45° taper, shoulder, pin. Grip end down. */
@@ -492,9 +487,9 @@ export function buildHandle(print) {
   return { mesh: mesh.finish() };
 }
 
-/* Binary STL, millimetres. Refused (throws) when the blade cannot clear the
-   dough (doc §6.3) unless allowBelowFloor — the gate and the sheet use that to
-   look at a refused design. */
+/* Binary STL, millimetres. Refused (throws) when a flag refuses the design
+   (doc §6) unless allowRefused — the gate and the sheet use that to look at a
+   refused design. */
 export class RefusedError extends Error {}
 export function exportStl(model, label, opts = {}) {
   if (opts.layout && opts.layout.flags.some((f) => f.stl) && !opts.allowRefused) throw new RefusedError(opts.layout.flags.filter((f) => f.stl).map((f) => f.text).join(' '));

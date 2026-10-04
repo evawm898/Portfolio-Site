@@ -1,13 +1,15 @@
 # /tile — the tessellation rollers (tile-design-doc.md §9).
 #
 # geometry: tools/verify-tile.mjs, pure Node — the tiling (no overlap, no gap,
-#   area), the seam over three revolutions of each roller, the registration
+#   area), every blade a closed RING round its roller (never a bar along it),
+#   the seam over three revolutions of each roller, the registration
 #   simulation (A's track, B's teeth in its dimples, A's and B's lines meeting
 #   at the corners and only there), every STL watertight by a DIRECTED edge
 #   census, the blade, peg and tooth heights measured off the mesh — then its
 #   negative control (every mutation caught by the clause that names it).
 # page: tools/verify-tile-page.mjs, headless Chromium with real pointer events,
-#   then its negative control (broken copies of tile.js re-served).
+#   then its negative control (broken copies of tile.js and tile-roller.js
+#   re-served).
 #
 # PATH SCOPE: the tile's own files, the two bug-geometry functions it reuses
 # (sampleOutline, polygonSimple), and the two shared tools the page gate
@@ -82,5 +84,5 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Page gate (real pointer events, keys, downloads)
         run: node tools/verify-tile-page.mjs
-      - name: Negative control (broken copies of tile.js, each caught by its check)
+      - name: Negative control (broken copies of tile.js and tile-roller.js, each caught by its check)
         run: node tools/verify-tile-page.mjs --negative-control

@@ -32,8 +32,8 @@ import { sampleOutline, polygonSimple } from './bug-geometry.js';
 /* Constants — each with its reason                                     */
 /* ------------------------------------------------------------------ */
 
-export const PITCH_RANGE = [15, 120];       // mm; below 15 a cookie is a crumb and the pegs crowd the bars
-export const ANGLE_RANGE = [30, 150];       // degrees; a bar leans at θ from horizontal when printed, and a thin wall prints cleanly above ~20°
+export const PITCH_RANGE = [15, 120];       // mm; below 15 a cookie is a crumb and the pegs crowd the rings
+export const ANGLE_RANGE = [30, 150];       // degrees; past these the cell is a sliver: the rings close up to pitch·sin θ apart and every cookie has two needle corners
 export const CR_PER = 20;                   // samples per Catmull–Rom segment: 0.75 mm spacing on a 15 mm segment, chord error ~0.01 mm at a 7 mm bend
 export const MIN_POINT_GAP_MM = 0.05;       // consecutive control points closer than this are REFUSED: the curve law divides by their distance
 /* Interior points are clamped into a generous box in lattice coordinates; the
@@ -500,7 +500,7 @@ export function patchSvg(tile) {
 /* ------------------------------------------------------------------ */
 
 export const DESIGN_FORMAT = 'tessellation-roller-design';
-export const DESIGN_VERSION = 1;
+export const DESIGN_VERSION = 2;   // 2: ring rollers (round counts and the sheet); 1 was the crossbar rollers, read by tile.js with its sheet kept
 /* Read a tile from untrusted JSON: the numbers are copied field by field and
    the result must pass validate(); anything else is refused with the reason. */
 export function readTile(obj) {

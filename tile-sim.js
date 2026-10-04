@@ -1,42 +1,44 @@
 /* tile-sim.js — rolls the two rollers onto a virtual sheet of dough, from first
    principles, and reports what they cut (tile-design-doc.md §4, §9).
 
-   It is the gate's registration and seam instrument, and the page's "sheet"
-   preview. It shares NO placement code with tile-roller.js: it takes the
-   roller's SPEC (bar centrelines, pegs, teeth — each a roller angle φ and a
-   height Z) and its MESH, and
+   It is the gate's registration and seam instrument. It shares NO placement
+   code with tile-roller.js: it takes the roller's SPEC (ring centrelines, pegs,
+   teeth — each a roller angle φ and a height Z) and its MESH, and
 
-     * reads the ROLLING RADIUS off the mesh (its outermost vertices: the rims
-       and the blade tips, which must agree);
+     * reads the ROLLING RADIUS off the mesh (its outermost vertices: the ring
+       blades' tips, which nothing else may stand proud of);
      * poses the roller as a rigid body — its axis horizontal along â (the
        user's handling: +Z toward +â), its start angle the feature that touches
        first — and derives the spin from the NO-SLIP condition
        v_centre + ω × (contact − centre) = 0, never from a sign convention;
      * stamps each feature where it is at the bottom: a point at roller angle φ
        and height Z lands at O + d(φ)·r̂ + Z·â, d(φ) the travel that turns it to
-       the bottom (unwrapped along a polyline, every revolution included).
+       the bottom. A RING is a closed loop on the cylinder: unwrapped along its
+       own points it gains exactly one period of travel per time round (else it
+       is not a ring), and its revolutions laid end to end are ONE line — the
+       seam is where one revolution's last point meets the next one's first.
 
-   Roller A starts with its pegged bar down at the sheet origin (the first
-   dimple, D0). Roller B is POSED BY ENGAGEMENT: one collar tooth seated in D0.
-   Everything the gate asserts — teeth in dimples, lines through corners, cells
-   the shape of the tile, the pattern continuous over the seam — is read off
+   Roller A starts with its peg row's first peg down at the sheet origin (the
+   first dimple, D0 — corner (m*, 0)). Roller B is POSED BY ENGAGEMENT: one
+   collar tooth seated in D0. Everything the gate asserts — teeth in dimples,
+   lines through corners, the pattern continuous over the seam — is read off
    these stamps against the TILE's own lattice and edges. */
 
 import { latticeVectors, edgeDense } from './tile-geometry.js';
 
 const TAU = Math.PI * 2;
-const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross3 = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const unit2 = (a) => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; };
 
-/* The user's handling of a roller (doc §4.6): A rolls along tB, B along tA,
-   each with its +Z end on the LEFT as it rolls forward — the axis is the roll
-   direction turned 90° left. An instruction about USE, restated here from the
-   doc; the spin's sign is not taken from it but derived (pose, below). */
+/* The user's handling of a roller (doc §4.6): A rolls along tA, B along tB —
+   each along the direction its own lines run — each with its +Z end on the
+   LEFT as it rolls forward: the axis is the roll direction turned 90° left. An
+   instruction about USE, restated here from the doc; the spin's sign is not
+   taken from it but derived (pose, below). */
 export function handling(tile, which) {
   const { tA, tB } = latticeVectors(tile);
-  const r = unit2(which === 'A' ? tB : tA);
+  const r = unit2(which === 'A' ? tA : tB);
   return { roll: r, axis: [-r[1], r[0]] };
 }
 
@@ -48,7 +50,7 @@ export function radii(mesh) {
   for (let i = 0; i < P.length; i += 3) all = Math.max(all, Math.hypot(P[i], P[i + 1]));
   let blade = 0;
   for (const part of mesh.parts) {
-    if (!/^bar/.test(part.name)) continue;
+    if (!/^ring/.test(part.name)) continue;
     for (let v = part.v0; v < part.v1; v++) blade = Math.max(blade, Math.hypot(P[3 * v], P[3 * v + 1]));
   }
   return { rolling: all, blade };
@@ -74,25 +76,34 @@ function travelOf(P, phi) {
 /* the sheet point where (φ, Z) touches, at travel d */
 const landAt = (P, d, Z) => [P.origin[0] + d * P.r3[0] + Z * P.a3[0], P.origin[1] + d * P.r3[1] + Z * P.a3[1]];
 
-/* Stamp a polyline of (φ, Z): the first vertex on its first branch, every next
-   one on the branch nearest its predecessor; then every revolution copy whose
-   travel range meets [d0, d1]. */
-export function stampPolyline(P, pts, d0, d1) {
+/* Stamp a closed RING of (φ, Z) over the travel window [d0, d1]. The ring's
+   points are unwrapped along it (each on the branch nearest its
+   predecessor); the travel it gains going once round, `turn`, is ONE period
+   for a ring (and 0 for a blade that does not go round). Its revolutions are
+   laid end to end — revolution r is the ring moved r·period — as one line,
+   with the index where each revolution starts (`seams`) and of every corner. */
+export function stampRing(P, pts, d0, d1, corners = []) {
   const ds = [];
   let prev = null;
-  for (const [phi, Z] of pts) {
+  for (const [phi] of pts) {
     let d = travelOf(P, phi);
-    if (prev !== null) { const k = Math.round((prev - d) / P.period); d += k * P.period; }
+    if (prev !== null) d += Math.round((prev - d) / P.period) * P.period;
     ds.push(d); prev = d;
   }
+  let dEnd = travelOf(P, pts[0][0]);                       // the ring's first point again, closing the loop
+  dEnd += Math.round((prev - dEnd) / P.period) * P.period;
+  const turn = dEnd - ds[0];                                  // a whole number of periods: +1 for a ring
   const lo = Math.min(...ds), hi = Math.max(...ds);
-  const out = [];
-  for (let k = Math.floor((d0 - hi) / P.period) - 1; k <= Math.ceil((d1 - lo) / P.period) + 1; k++) {
-    const sh = k * P.period;
-    if (hi + sh < d0 || lo + sh > d1) continue;
-    out.push({ rev: k, dStart: ds[0] + sh, pts: pts.map(([, Z], i) => landAt(P, ds[i] + sh, Z)) });
+  const r0 = Math.floor((d0 - hi) / P.period) - 1, r1 = Math.ceil((d1 - lo) / P.period) + 1;
+  const isCorner = new Set(corners);
+  const out = [], cornerAt = [], seams = [];
+  for (let r = r0; r <= r1; r++) {
+    const sh = r * P.period;
+    seams.push(out.length);
+    for (let i = 0; i < pts.length; i++) { if (isCorner.has(i)) cornerAt.push(out.length); out.push(landAt(P, ds[i] + sh, pts[i][1])); }
   }
-  return out;
+  out.push(landAt(P, ds[0] + (r1 + 1) * P.period, pts[0][1]));
+  return { pts: out, corners: cornerAt, seams, revs: r1 - r0 + 1, turn };
 }
 export function stampPoints(P, feats, d0, d1) {
   const out = [];
@@ -108,60 +119,72 @@ export function stampPoints(P, feats, d0, d1) {
 }
 
 /* Roll A, then B engaged in A's track (doc §4.4, §4.6). Each roller is rolled
-   over `revs` revolutions EITHER WAY of its start: A's start is arbitrary, and B,
-   once a tooth is seated, may be rolled back to the sheet's edge and forward —
-   at an obtuse crossing angle its slanted bars come down before the collar's
-   next tooth does, so a one-way pass from the seat would miss part of a line.
+   over `revs` revolutions EITHER WAY of its start — and always across the
+   whole cookie sheet with a revolution to spare: once a tooth is seated B may
+   be rolled back to the sheet's edge and forward, and at an obtuse crossing
+   angle A's slanted peg row comes down partly before its first peg does.
    Every stamped line is labelled with its lattice row (A) or column (B), read
-   off where its first corner landed; every dimple and tooth likewise. */
+   off where its corners landed; every dimple and tooth likewise. */
 export function simulate(tile, built, opts = {}) {
   const { A, B } = built;
   const specA = A.spec, specB = B.spec;
-  const KA = specA.K, KB = specB.K, kStar = built.spec.kStar;
+  const { KA, KB, mStar } = built.spec;
   const rA = radii(A.mesh), rB = radii(B.mesh);
   const hA = handling(tile, 'A'), hB = handling(tile, 'B');
   const revs = opts.revs || 1;
   const { tA, tB } = latticeVectors(tile);
-  /* The travel window: at least `revs` revolutions either way, and always the
-     whole cookie block (every corner (m, k), m 0..KA, k k*..KB, by its distance
-     along the roll from D0) with a revolution to spare at each end — a short
-     roller (few repeats) has to turn several times to cross a long block. */
+  /* The travel window: at least `revs` revolutions either way, and always every
+     corner of the sheet and its track (m* .. KA, rows 0 .. KB), by its distance
+     along the roll from D0, with a revolution to spare at each end. */
   const windowFor = (P, hand) => {
     let lo = 0, hi = 0;
-    for (let m = 0; m <= KA; m++) for (let k = kStar; k <= KB; k++) {
-      const s = (m * tA[0] + (k - kStar) * tB[0]) * hand.roll[0] + (m * tA[1] + (k - kStar) * tB[1]) * hand.roll[1];
+    for (let m = mStar; m <= KA; m++) for (let k = 0; k <= KB; k++) {
+      const x = (m - mStar) * tA[0] + k * tB[0], y = (m - mStar) * tA[1] + k * tB[1];
+      const s = x * hand.roll[0] + y * hand.roll[1];
       lo = Math.min(lo, s); hi = Math.max(hi, s);
     }
     return [Math.min(-(revs + 1) * P.period, lo - P.period), Math.max((revs + 1) * P.period, hi + P.period)];
   };
-  // A: the pegged bar's first corner (peg m = 0) touches the sheet origin
-  const peg0 = specA.pegs.find((p) => p.m === 0);
+  // A: its first peg (on ring 0, at corner (m*, 0)) touches the sheet origin
+  const peg0 = specA.pegs.find((p) => p.i === 0);
   const PA = pose(hA, rA.rolling, peg0.phi, [-peg0.Z * hA.axis[0], -peg0.Z * hA.axis[1]]);
   const wA = windowFor(PA, hA);
   const dimplesRaw = stampPoints(PA, specA.pegs, wA[0], wA[1]);
-  const first = dimplesRaw.find((d) => d.m === 0 && Math.abs(d.d) < 1e-9);
+  const first = dimplesRaw.find((d) => d.i === 0 && Math.abs(d.d) < 1e-9);
   const D0 = first.at;
-  const frame = { D0, kStar };
+  const frame = { D0, mStar };
   const lab = (p) => latticeOf(tile, frame, p);
-  const labelLines = (lines, corners) => lines.map((L) => { const [u, v] = lab(L.pts[corners[0]]); return { ...L, m: Math.round(u), k: Math.round(v), off: Math.hypot(u - Math.round(u), v - Math.round(v)) }; });
+  /* a stamped line's label: the row (A) or column (B) its corners lie on, and
+     the worst distance of any corner from a lattice point (in lattice units) */
+  const labelLine = (L, fam) => {
+    let off = 0; const us = [], vs = [];
+    for (const c of L.corners) { const [u, v] = lab(L.pts[c]); us.push(u); vs.push(v); off = Math.max(off, Math.hypot(u - Math.round(u), v - Math.round(v))); }
+    const along = fam === 'A' ? vs : us;
+    const id = Math.round(along[0]);
+    const mixed = along.some((x) => Math.round(x) !== id);
+    return { ...L, k: fam === 'A' ? id : null, m: fam === 'B' ? id : null, off, mixed, span: fam === 'A' ? [Math.min(...us), Math.max(...us)] : [Math.min(...vs), Math.max(...vs)] };
+  };
   const labelPts = (pts) => pts.map((q) => { const [u, v] = lab(q.at); return { ...q, lm: Math.round(u), lk: Math.round(v) }; });
-  const aLines = labelLines(specA.bars.flatMap((bar, j) => stampPolyline(PA, bar, wA[0], wA[1]).map((s) => ({ ...s, bar: j }))), specA.corners);
+  const aLines = specA.rings.map((ring, j) => ({ ...labelLine(stampRing(PA, ring, wA[0], wA[1], specA.corners), 'A'), ring: j }));
   const dimples = labelPts(dimplesRaw);
-  // B: posed by ENGAGEMENT — tooth 0 seated in D0
-  const tooth0 = specB.teeth.find((t) => t.m === 0);
-  const PB = pose(hB, rB.rolling, tooth0.phi, [D0[0] - tooth0.Z * hB.axis[0], D0[1] - tooth0.Z * hB.axis[1]]);
+  /* B: posed by ENGAGEMENT — one collar tooth seated in one dimple of the
+     track, where A actually stamped it (by default tooth 0 in D0) */
+  const seat = opts.seat || { tooth: 0, row: 0 };
+  const toothS = specB.teeth.find((t) => t.i === seat.tooth);
+  const dimS = dimples.find((d) => d.lm === mStar && d.lk === seat.row);
+  const PB = pose(hB, rB.rolling, toothS.phi, [dimS.at[0] - toothS.Z * hB.axis[0], dimS.at[1] - toothS.Z * hB.axis[1]]);
   const wB = windowFor(PB, hB);
-  const bLines = labelLines(specB.bars.flatMap((bar, j) => stampPolyline(PB, bar, wB[0], wB[1]).map((s) => ({ ...s, bar: j }))), specB.corners);
+  const bLines = specB.rings.map((ring, j) => ({ ...labelLine(stampRing(PB, ring, wB[0], wB[1], specB.corners), 'B'), ring: j }));
   const teeth = labelPts(stampPoints(PB, specB.teeth, wB[0], wB[1]));
-  return { D0, kStar, KA, KB, PA, PB, rA, rB, aLines, bLines, dimples, teeth };
+  return { D0, mStar, KA, KB, PA, PB, rA, rB, aLines, bLines, dimples, teeth, seat };
 }
-/* the lines that bound the cookie block: A rows 0..KB, B columns 0..KA */
+/* the lines that bound the cookie sheet: A rows 0..KB, B columns 0..KA */
 export const blockLines = (sim) => ({
-  a: sim.aLines.filter((L) => L.m === 0 && L.k >= 0 && L.k <= sim.KB),
-  b: sim.bLines.filter((L) => L.k === 0 && L.m >= 0 && L.m <= sim.KA),
+  a: sim.aLines.filter((L) => L.k >= 0 && L.k <= sim.KB),
+  b: sim.bLines.filter((L) => L.m >= 0 && L.m <= sim.KA),
 });
-/* the track: the dimples of A's first pass of the pegged bar (row k*, m = 0..KA) */
-export const trackDimples = (sim) => sim.dimples.filter((d) => d.lk === sim.kStar && d.lm >= 0 && d.lm <= sim.KA);
+/* the track: the dimples of column m* at rows 0..KB */
+export const trackDimples = (sim) => sim.dimples.filter((d) => d.lm === sim.mStar && d.lk >= 0 && d.lk <= sim.KB);
 
 /* ---------------- what the stamps say ---------------- */
 
@@ -175,25 +198,22 @@ export function polyDist(p, poly) {
   for (let k = 0; k + 1 < poly.length; k++) best = Math.min(best, segDist(p, poly[k], poly[k + 1]));
   return best;
 }
-/* the lattice corner (m, k) — row k counted from the cookie block's first
-   line; D0 is corner (0, k*) */
+/* the lattice corner (m, k) — D0 is corner (m*, 0) */
 export function cornerOf(tile, sim, m, k) {
   const { tA, tB } = latticeVectors(tile);
-  const kk = k - sim.kStar;
-  return [sim.D0[0] + m * tA[0] + kk * tB[0], sim.D0[1] + m * tA[1] + kk * tB[1]];
+  const mm = m - sim.mStar;
+  return [sim.D0[0] + mm * tA[0] + k * tB[0], sim.D0[1] + mm * tA[1] + k * tB[1]];
 }
-/* lattice coordinates of a sheet point relative to D0 (row counted as above) */
+/* lattice coordinates of a sheet point (column counted as above) */
 export function latticeOf(tile, sim, p) {
   const { tA, tB } = latticeVectors(tile);
   const x = p[0] - sim.D0[0], y = p[1] - sim.D0[1];
   const det = tA[0] * tB[1] - tA[1] * tB[0];
-  return [(x * tB[1] - y * tB[0]) / det, (tA[0] * y - tA[1] * x) / det + sim.kStar];
+  return [(x * tB[1] - y * tB[0]) / det + sim.mStar, (tA[0] * y - tA[1] * x) / det];
 }
 /* The ideal line of a family through corner (m, k), copies c0..c1 along it. */
 export function idealLine(tile, sim, which, m, k, c0, c1) {
   const d = edgeDense(tile, which);
-  const { tA, tB } = latticeVectors(tile);
-  const t = which === 'A' ? tA : tB;
   const out = [];
   for (let c = c0; c <= c1; c++) {
     const base = which === 'A' ? cornerOf(tile, sim, m + c, k) : cornerOf(tile, sim, m, k + c);

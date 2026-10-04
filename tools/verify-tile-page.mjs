@@ -36,9 +36,19 @@
      P15 a saved design opens back to the same tile.
      P16 the design survives a reload (local storage).
      P17 the rollers' view draws something.
+     P18 the sheet and round sliders set the rollers: cookies along edge A
+         sets roller B's rings (cols + 1), cookies along edge B roller A's
+         (rows + 1) — counted off the MESHES — and tiles round A sets A's
+         diameter to round × pitch A / π.
+     P19 the page opens on a sheet of at least 4 × 3 cookies, and says so.
+     P20 a design file from the crossbar version of the page (version 1) opens
+         with its sheet kept and says what was reset.
+     P21 a design the crossbar version kept in local storage does not come
+         back: the page opens on the defaults.
 
    --negative-control re-serves deliberately broken copies of tile.js and
-   requires each to fail the check that names it. Every anchor is checked first. */
+   tile-roller.js and requires each to fail the check that names it. Every
+   anchor is checked first. */
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,6 +91,13 @@ async function run(override = null) {
     const ec = await T(() => window.__tile.editorCounts()), pc = await T(() => window.__tile.patchCounts()), lay = await T(() => window.__tile.layout());
     const t0 = await T(() => window.__tile.tile());
     ok(ec.corners === 4 && ec.points === 2 * (t0.edgeA.length + t0.edgeB.length) && pc.tiles === 9 && pc.aLines === 4 && pc.bLines === 4 && lay && lay.trisA > 0, `P0: the page loads — ${ec.corners} corners, ${ec.points} point handles, ${pc.tiles} tiles, ${pc.aLines} + ${pc.bLines} cut lines, rollers ${lay ? lay.trisA + '/' + lay.trisB : 'not built'} triangles`);
+    // P19 the opening sheet: at least 4 × 3 cookies, the rings to cut it, and the read-out saying so
+    {
+      const r = await T(() => window.__tile.rollers()), txt = await T(() => window.__tile.derivedText());
+      const n = r.cols * r.rows, m = new RegExp(`${n} cookies a sheet`).test(txt);
+      ok(Math.max(r.cols, r.rows) >= 4 && Math.min(r.cols, r.rows) >= 3 && lay && lay.ringsA === r.rows + 1 && lay.ringsB === r.cols + 1 && m,
+        `P19: the page opens on ${r.cols} × ${r.rows} = ${n} cookies (roller A ${lay ? lay.ringsA : '—'} rings, B ${lay ? lay.ringsB : '—'}), and the read-out ${m ? 'says so' : 'does not say so'}`);
+    }
 
     // P1 drag edge A point 0 by its base copy
     {
@@ -255,6 +272,32 @@ async function run(override = null) {
       const share = ink / (im.width * im.height);
       ok(share > 0.03, `P17: the rollers' view draws ${(100 * share).toFixed(1)}% of its pixels`);
     }
+    // P18 the sheet and round sliders
+    {
+      await page.locator('#cols').fill('5'); await page.locator('#rows').fill('2'); await page.locator('#roundA').fill('7');
+      await T(() => window.__tile.flush());
+      const l = await T(() => window.__tile.layout()), t = await T(() => window.__tile.tile()), txt = await T(() => window.__tile.derivedText());
+      const wantD = (7 * t.pitchA) / Math.PI;
+      ok(l.ringsB === 6 && l.ringsA === 3 && Math.abs(l.dA - wantD) < 1e-9 && /10 cookies a sheet/.test(txt),
+        `P18: 5 cookies along edge A gives roller B ${l.ringsB} rings, 2 along edge B gives roller A ${l.ringsA}; 7 round A makes it ⌀ ${l.dA.toFixed(3)} mm (7 × ${t.pitchA} / π = ${wantD.toFixed(3)})`);
+    }
+    // P20 a version-1 (crossbar) design file
+    {
+      const v1 = { format: 'tessellation-roller-design', version: 1, tile: { pitchA: 40, pitchB: 40, angle: 90, cornerSmooth: true, edgeA: [[0.3, 0.13, 0], [0.7, -0.13, 0]], edgeB: [[-0.13, 0.3, 0], [0.13, 0.7, 0]] }, print: { dough: 5 }, rollers: { repeatsA: 5, repeatsB: 5, spanA: 3, spanB: 2 } };
+      const file = path.join(os.tmpdir(), `tile-v1-${process.pid}.json`); fs.writeFileSync(file, JSON.stringify(v1));
+      await page.locator('#openDesign').setInputFiles(file);
+      await page.waitForFunction(() => /Opened|Not opened/.test(document.getElementById('designMsg').textContent));
+      const r = await T(() => window.__tile.rollers()), msg = await page.locator('#designMsg').textContent();
+      ok(r.cols === 3 && r.rows === 2 && /crossbar/.test(msg), `P20: a version-1 design opens with its sheet kept (${r.cols} × ${r.rows}) — "${msg.slice(0, 90)}…"`);
+      fs.rmSync(file, { force: true });
+    }
+    // P21 the crossbar version's local storage does not come back
+    {
+      await T(() => { localStorage.clear(); localStorage.setItem('tessellation-rollers-v1', JSON.stringify({ format: 'tessellation-roller-design', version: 1, tile: { pitchA: 38, pitchB: 36, angle: 90, cornerSmooth: true, edgeA: [], edgeB: [] }, print: {}, rollers: { repeatsA: 5, repeatsB: 5, spanA: 1, spanB: 3 } })); });
+      await page.reload(); await page.waitForFunction(() => !!window.__tile && !!window.__tile.layout());
+      const r = await T(() => window.__tile.rollers()), t = await T(() => window.__tile.tile());
+      ok(r.cols * r.rows >= 12 && t.pitchA === 40, `P21: a design kept by the crossbar page (1 × 3 cookies, pitch 38) does not come back — the page opens on ${r.cols} × ${r.rows}, pitch ${t.pitchA}`);
+    }
     ok(errors.length === 0, `P: no page errors${errors.length ? ` — ${errors.slice(0, 2).join(' | ')}` : ''}`);
   } catch (e) {
     ok(false, `P: the run threw — ${e.message.split('\n')[0]}`);
@@ -262,6 +305,7 @@ async function run(override = null) {
   return res;
 }
 
+/* [name, from, to, claim, file] — file defaults to tile.js */
 const MUTANTS = [
   ['a drag ignores which copy it holds', "const q = sub2(sub2(w, org), copyOffset(tile, drag.which, drag.copy));", 'const q = sub2(w, org);', 'P2'],
   ['a blocked edit is not told', "  status = what ? `Blocked (${what}): ${r.reason}.` : `Blocked: ${r.reason}.`;\n", '', 'P3'],
@@ -272,6 +316,10 @@ const MUTANTS = [
   ['the 3 x 3 never shows the thin parts', 'if (thin && thinUrl) {\n    const fr = thin.frame;\n    for (const q of tiles)', 'if (false) {\n    const fr = thin.frame;\n    for (const q of tiles)', 'P10'],
   ['the roller buttons ignore a refusal', "  return RL.exportStl(built[which].mesh, which, { layout: built.layout });", "  return RL.exportStl(built[which].mesh, which, {});", 'P11'],
   ['the design is never kept', "try { localStorage.setItem(STORE, JSON.stringify(designDoc())); } catch", 'try { void 0; } catch', 'P16'],
+  ['the sheet sliders feed the wrong roller', "const rings = (which === 'A' ? rollers.rows : rollers.cols) + 1;", "const rings = (which === 'A' ? rollers.cols : rollers.rows) + 1;", 'P18', 'tile-roller.js'],
+  ['the page opens on one column of three cookies', 'export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 4, rows: 3 };', 'export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 1, rows: 3 };', 'P19', 'tile-roller.js'],
+  ['a crossbar design file loses its sheet', 'return { rollers: { cols: spanA, rows: spanB }, note:', 'return { rollers: {}, note:', 'P20'],
+  ['the page still reads the crossbar version\'s storage', "const STORE = 'tessellation-rollers-v2';", "const STORE = 'tessellation-rollers-v1';", 'P21'],
 ];
 
 if (!NEG) {
@@ -282,16 +330,17 @@ if (!NEG) {
   console.log(bad ? 'VERDICT: FAIL' : 'VERDICT: PASS');
   process.exit(bad ? 1 : 0);
 } else {
-  const src = fs.readFileSync(path.join(REPO, 'tile.js'), 'utf8');
+  const srcs = {};
+  for (const m of MUTANTS) { const f = m[4] || 'tile.js'; if (!srcs[f]) srcs[f] = fs.readFileSync(path.join(REPO, f), 'utf8'); }
   let good = true;
-  for (const [name, from] of MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: matches ${n} times (must be 1) — disarmed`); good = false; } }
+  for (const [name, from, , , file = 'tile.js'] of MUTANTS) { const n = srcs[file].split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: matches ${n} times in ${file} (must be 1) — disarmed`); good = false; } }
   if (!good) { console.log('\nNEGATIVE CONTROL FAIL (anchors)'); process.exit(1); }
   const clean = await run();
   const cleanBad = clean.filter(([c]) => !c);
   console.log(cleanBad.length ? `CLEAN RUN FAILED: ${cleanBad.map(([, m]) => m).join(' | ')}` : `clean run: ${clean.length}/${clean.length}`);
   if (cleanBad.length) good = false;
-  for (const [name, from, to, claim] of MUTANTS) {
-    const res = await run({ '/tile.js': src.replace(from, to) });
+  for (const [name, from, to, claim, file = 'tile.js'] of MUTANTS) {
+    const res = await run({ [`/${file}`]: srcs[file].replace(from, to) });
     const fails = res.filter(([c]) => !c).map(([, m]) => m);
     const fired = fails.some((m) => m.startsWith(claim + ':'));
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(70)} by ${claim} — ${(fails.find((m) => m.startsWith(claim + ':')) || fails[0] || 'nothing fired').slice(0, 140)}`);

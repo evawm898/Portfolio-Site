@@ -47,7 +47,7 @@ export async function openTile({ root = REPO, viewport = { width: 1440, height: 
   await page.route('**fonts.gstatic.com/**', (r) => r.abort());
   // the stored design is set ONCE per tab (an init script runs on every load,
   // and a reload must find what the page itself saved)
-  if (storage !== null) await page.addInitScript((s) => { try { if (sessionStorage.getItem('__tileSeeded')) return; sessionStorage.setItem('__tileSeeded', '1'); localStorage.clear(); if (s) localStorage.setItem('tessellation-rollers-v1', s); } catch {} }, storage);
+  if (storage !== null) await page.addInitScript((s) => { try { if (sessionStorage.getItem('__tileSeeded')) return; sessionStorage.setItem('__tileSeeded', '1'); localStorage.clear(); if (s) localStorage.setItem('tessellation-rollers-v2', s); } catch {} }, storage);
   await page.goto(`${base}/tile.html`);
   await page.waitForFunction(() => !!window.__tile && !!window.__tile.layout());
   const close = async () => { await browser.close(); server.close(); };
