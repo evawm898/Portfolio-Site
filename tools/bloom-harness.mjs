@@ -9357,7 +9357,19 @@ export const EXPORT_REFUSED_XFAIL = Object.freeze({
      is unmoved at 1,425,468 (95.0%%). At the shipped 35 deg the same corner
      seats one leaf under each of its 36 pedicels: 36 x 2,548 = 91,728 more,
      measured in Node on EXPORT. Declared rather than clamped (the brief). */
-  'NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (101.1% of budget — REFUSED)': { tris: 1517196, note: 'REDEFINED by build 3 (the reach inset): on 60 mm pedicels the floret reach puts the top node 78.85 mm down a 120 mm rachis, the node law then holds NINE nodes, and the same corner EXPORTS at 1,144,596 (76.3%%) — a declared refusal that started exporting, which XR1 fails hard on, so the row moved to 40 mm, the longest pedicel at which this corner still refuses (12 nodes, the count the 101.1%% was measured at; measured in Node, export mode, over 5/20/40/60/80/100/120/250 mm). The original: ' +  'ruling 9\'s corner (12 nodes x whorled = 36 florets of 12 petals at 1.00x on 60 mm pedicels) at the shipped 35 deg instead of ALL MAX\'s 90, with a 40 mm leaf seated under every pedicel by the shared node: 1,425,468 + 36 x 2,548 = 1,517,196 tris (export), 101.1%% of the 1,500,000 budget. The same corner at 90 deg seats NO leaf (the offset is infinite there) and exports at 95.0%%. Measured in Node, export mode.' },
+  /* RETIRED BY RULING 1 (the florets' own internode floor): the corner that
+     refused at 1,517,196 (101.1%%) held TWELVE nodes under the rods' 6 mm
+     floor; under the florets' floor (68.20 mm on this state) the 120 mm rachis
+     holds ONE node of three florets and the same control set EXPORTS at
+     150,996 (10.1%%) — a declared refusal that started exporting, which XR1
+     fails hard on, so the entry is gone and the row's label says what it is
+     now. NO SINGLE-WHORL RACEME REACHES THE BUDGET any more: the floor grows
+     with the floret, so the count falls as the per-floret cost rises (12
+     petals x 1.00 x whorled holds two nodes on the full rachis, 259,908);
+     the refusal path is still exercised by `ALL MAX` above. The entry as it
+     stood, for the record:
+     'NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (101.1% of budget — REFUSED)': { tris: 1517196, note: 'REDEFINED by build 3 (the reach inset): on 60 mm pedicels the floret reach puts the top node 78.85 mm down a 120 mm rachis, the node law then holds NINE nodes, and the same corner EXPORTS at 1,144,596 (76.3%%) — a declared refusal that started exporting, which XR1 fails hard on, so the row moved to 40 mm, the longest pedicel at which this corner still refuses (12 nodes, the count the 101.1%% was measured at; measured in Node, export mode, over 5/20/40/60/80/100/120/250 mm). The original: ' +  'ruling 9\'s corner (12 nodes x whorled = 36 florets of 12 petals at 1.00x on 60 mm pedicels) at the shipped 35 deg instead of ALL MAX\'s 90, with a 40 mm leaf seated under every pedicel by the shared node: 1,425,468 + 36 x 2,548 = 1,517,196 tris (export), 101.1%% of the 1,500,000 budget. The same corner at 90 deg seats NO leaf (the offset is infinite there) and exports at 95.0%%. Measured in Node, export mode.' },
+  */
 });
 for (const [label, e] of Object.entries(EXPORT_REFUSED_XFAIL)) {
   if (!e || !Number.isInteger(e.tris) || e.tris < 1) throw new Error(`EXPORT_REFUSED_XFAIL: "${label}" declares no triangle count (${JSON.stringify(e)}) — an entry is {tris[, note]}, and a declaration without a number is a label`);
@@ -12754,7 +12766,7 @@ export function buildMatrix() {
      That corner cannot be a row (the outcome doc §5 says exactly why); this
      is the cheap state that exercises the same arm. */
   nodeLaw('x 2 whorls (every floret inherits the head\'s second whorl)', { ...RAC, layerCount: 2 });
-  nodeLaw('ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (101.1% of budget — REFUSED)', { ...RAC, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 40, pedicelAngle: 35, leafLength: 40 });
+  nodeLaw('ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (ONE node under the florets\' own floor — 10.1% of budget, EXPORTS; was 101.1% REFUSED at twelve nodes before ruling 1)', { ...RAC, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 40, pedicelAngle: 35, leafLength: 40 });
 
   /* 47. BARE-STEM NODES — NODES DECOUPLED FROM LEAVES (Eva's ruling 6, stem
         session 2; docs/bloom-stem-session-2-outcome.md). A stem with NO leaves
@@ -12815,8 +12827,9 @@ export function buildMatrix() {
         whose floor is its RIM and not the stem's root plane; the full-size
         floret; and THE BUDGET CORNER, which `INFLO: ALL MAX` stopped being
         when its pedicel went to 250 (one node) — the densest raceme the
-        controls reach is the same corner at 40 mm, 95.0% of the budget,
-        measured over the whole pedicel sweep. */
+        controls reach WAS the same corner at 40 mm, 95.0% of the budget,
+        measured over the whole pedicel sweep — and ruling 1's floor took it
+        to TWO nodes and 17.3% (the row's label carries both). */
   const reachRow = (label, sets) => rows.push({ label: `REACH INSET: ${label}`, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   const RACEME = { stemLength: 120, inflorescence: 'RACEME' };
   reachRow('250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)', { ...RACEME, pedicelLength: 250 });
@@ -12828,7 +12841,7 @@ export function buildMatrix() {
   reachRow('descending (-60 deg): the reach is under the node and the stem\'s own inset stands (not clamped)', { ...RACEME, pedicelAngle: -60 });
   reachRow('a hemisphere head (the floor is the RIM, 8.8 mm under the stem\'s root plane)', { ...RACEME, headRise: 1 });
   reachRow('full-size florets (1.00x — the deepest reach a default head carries)', { ...RACEME, floretScale: 1 });
-  reachRow('THE BUDGET CORNER — 12 x whorled x 12 petals x 1.00 on 40 mm straight up (95.0% of budget; INFLO: ALL MAX holds one node now)', { ...RACEME, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 40, pedicelAngle: 90 });
+  reachRow('THE BUDGET CORNER — 12 x whorled x 12 petals x 1.00 on 40 mm straight up (TWO nodes under the florets\' own floor, 17.3% of budget; was 95.0% at twelve before ruling 1)', { ...RACEME, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 40, pedicelAngle: 90 });
 
   /* 49. PER-NODE VARIATION AND THE DERIVED FLORET PHASE (inflorescence build
         3, Phase B — Eva's ruling 10 and her Oct 3 phase ruling;

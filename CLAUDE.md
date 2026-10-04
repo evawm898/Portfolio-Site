@@ -3564,7 +3564,9 @@ has ever been proved on") — restated on the ruling, with block 48's 250 mm row
 asked for. The corymb solves level to a **197 mm** rachis at the defaults (120 was 81), the
 full 120 mm stem at 20/49/77/106/134 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
 NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
-corner is block 48's `THE BUDGET CORNER` at 40 mm, 95.0%; the NODE LAWS refusal row EXPORTS
+corner is block 48's `THE BUDGET CORNER` at 40 mm, 95.0% (**17.3% at TWO nodes since ruling 1's
+floor; and the NODE LAWS refusal row below holds ONE node and EXPORTS at 10.1% — its refusal
+entry is RETIRED, and no single-whorl raceme reaches the budget any more**); the NODE LAWS refusal row EXPORTS
 at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
 family** — (d) reads the BUILDER's own `floretsMaxZByNode` and `floretsMaxZ`, never the plan; (f) is mode-freeness
 measured within ONE engine, because the first cut asked for `Object.is` across the page's V8

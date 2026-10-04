@@ -261,6 +261,12 @@ The panel gate passes (`--negative-control` not re-run — no route was added).
   at the pedicel's own 120 mm ceiling" (180 mm now, under 250), the corymb-on-120 row
   "CLAMPED" (solved exactly now), and `INFLO: 60 mm pedicels (the ceiling)` (build 1's).
   `frozen/phase52` keeps all five as they were.
+* **After ruling 1 (§12), two more**: `NODE LAWS: ALL MAX at 35 deg …` → "(ONE node under
+  the florets' own floor — 10.1% of budget, EXPORTS; was 101.1% REFUSED at twelve nodes
+  before ruling 1)", its refusal entry retired; `REACH INSET: THE BUDGET CORNER` → "(TWO
+  nodes under the florets' own floor, 17.3% of budget; was 95.0% at twelve before ruling
+  1)". Same control sets; the labels said a count and a budget share the floor made
+  false. `frozen/phase50`–`phase52` keep the old labels.
 
 ## 5. The combination grid — what moved and why
 
@@ -610,7 +616,19 @@ Deterministic renderer, no pixel delta quoted.
 * **Triangles against the 1,500,000 budget (EXPORT)**: the shipping default is untouched
   (24,688); the default raceme 113,886 → **96,468 (6.4 %)** by the lost node; at
   `nodeVariance` 1 on the 4-node raceme 96,468 (the deltas move no count); the sheet's
-  5-node ON cell 113,886 (7.6 %). __CORNERS__
+  5-node ON cell 113,886 (7.6 %). **THE BUDGET CORNERS MOVED WITH THE FLOOR, AND ONE DECLARED REFUSAL IS RETIRED** (EXPORT, Node 22, measured
+  on the full builds): `INFLO: ALL MAX` is unmoved at one node, 143,352 (9.6 %; its floor
+  reads 252.30 mm — past the rachis); `REACH INSET: THE BUDGET CORNER` (12 whorled x 12
+  petals x 1.00 on 40 mm straight up) goes **twelve nodes → TWO under a 42.30 mm floor,
+  1,425,468 → 259,908 (17.3 %)**; and `NODE LAWS: ALL MAX at 35 deg x a leaf under every
+  pedicel` — the one declared RACEME refusal — goes twelve nodes → ONE under a 68.20 mm
+  floor and **EXPORTS at 150,996 (10.1 %)**. A declared refusal that starts exporting is
+  what XR1 fails hard on, so its `EXPORT_REFUSED_XFAIL` entry is RETIRED (kept as a
+  comment with its figures) and both rows are relabelled (§4). **No single-whorl raceme
+  reaches the budget any more**: the floor grows with the floret, so the count falls as
+  the per-floret cost rises. The refusal path is still exercised by the head's own
+  `ALL MAX` (2,354,268). Ruling 9's "one declared `INFLO: ALL MAX` refusal row" is
+  therefore further from true than build 1 left it, and said so rather than manufactured.
 * **Plan time**: the floor's column map costs ~0.6 s on the default raceme (the constant's
   own table), so a raceme build is ~0.8 s; with node variance on it is one floret build per
   distinct azimuth — ~2.7 s on the default at amount 1, and the whorled x 8 cost corner
