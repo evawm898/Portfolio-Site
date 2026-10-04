@@ -6357,13 +6357,27 @@ file in the repo. Rulings 1–4 are in `docs/bloom-stem-taper-laws.md` and
     is one whose leaf dropped. The stem does not get a second, independent count.
   - Nodes are pinned OFF on every pedicel: a floret's stem does not sprout nodes because the
     main stem did. The same pin will carry ruling 7's cut, from one place.
-  - The kink direction cannot stay "away from the node's first leaf" on a bare stem, which
+  - ~~The kink direction cannot stay "away from the node's first leaf" on a bare stem, which
     has no first leaf. Ruled: the golden angle, as the flower does, subject to seeing what it
     does to a LEAFED stem first (stop and report if the shift is large). **That measurement
-    was taken on Oct 4 and the shift is large; the leafed-stem half is open.** See
-    `docs/bloom-stem-session-1-outcome.md`.
-  - Bare-stem node placement is a function of the stem's length, derived, with no new
-    control.
+    was taken on Oct 4 and the shift is large; the leafed-stem half is open.**~~ **RULED
+    (stem session 2), and the first instruction is withdrawn as Eva's own error:** where a
+    node HAS leaves the bend keeps turning away from its first leaf, unchanged; where a node
+    has NO leaves it turns at the golden angle. The two never mix — `leafLength` is global
+    and one count governs both, so either every node has leaves or none does — which is why
+    two laws coexist without reproducing the flower's leaves/bends disagreement.
+  - Bare-stem node placement is a function of the stem's length — and it ALREADY WAS: with no
+    leaf the layout's rise is 0, so nodes sit at 0.16 L … 0.86 L, the flower's own
+    `stemNodeParams`. Kept, not re-derived.
+  - **The spacing floor is REPORTED, NOT CLAMPED:** two swellings merge into one bump below
+    √2 × spindle (4.63 stem radii); the read-out says so, the way the neighbour flag reports
+    interpenetration. A clamp would break two shipped rows already under it.
+  - **BUILT in stem session 2** — `docs/bloom-stem-session-2-outcome.md`. The arrangement is
+    shown only with leaves (on a bare stem it reaches nothing); the count is shown whenever
+    there is a stem. `frozen/phase51` is the 1,080 rows at `af15342` (#353 took phase50 while this was in CI).
+  - **Open, for a later ruling:** the 6 mm stem's tip shortfall is its last node's ramp running
+    past the stem's end; clamping each ramp to the length left is costed there (16 live rows,
+    50 frozen). The flower's length scaling is NOT adopted (#296's bead).
 - **Ruling 7 — a full 45° florist's cut on the stem's free end, as the shipped default.**
   - The object not standing is accepted.
   - A cut HOLLOW stem ends SOLID, preserving the tip-plug ruling (#238), at the cost of a

@@ -3493,8 +3493,8 @@ the children's full names are BOTH placements made without a ruling** and are Ev
 **THE STEM HAS NODES — THE FLOWER'S SWELLING AND KINK AS ONE CONTROL, SHIPPED OFF** (Eva's
 rulings on #299 — read `docs/bloom-stem-nodes-outcome.md` before touching `stemNodeLaw`,
 `stemNodeStations`, `buildStemInto`'s noded arm, `nodedStemDistanceMm`, `leafNodeLayout` or
-ST12). `stemNodeProminence` (Stem, 0–1, default **0**, hidden and inert without leaves or under
-a raceme) swells the stem by `0.6·prom` over a spindle of **3.2738 stem radii** (the flower's
+ST12). `stemNodeProminence` (Stem, 0–1, default **0**, hidden and inert under a raceme; **since
+stem session 2 a BARE stem carries nodes too — see the next paragraph**) swells the stem by `0.6·prom` over a spindle of **3.2738 stem radii** (the flower's
 0.055 of a 4-unit stem at radius 0.0672, a RATIO, never a fraction of the length) and kinks it
 by `atan(0.13·prom)` eased in over 0.12/0.055 spindles — so the bend's curvature peaks **0.818
 of the spindle below each node, inside the swelling, at every prominence and diameter**, which
@@ -3513,6 +3513,21 @@ scales stations as L/R. ST12's four arms each fire on a planted record through
 `node tools/verify-bloom-stem-nodes.mjs` (preflight in `bloom-export-watertight.yml`); six node
 mutants in the apex table. Block 41 is 13 rows, smoke block 41 is 4. `frozen/phase45` is the 957
 rows at `c170500` (45, not 44: #300 took 44 while this PR was in CI), pre-declared in `TAG_PUSH_XFAIL`. `docs/img/stem-nodes.png` is the sheet.
+
+**NODES ARE DECOUPLED FROM LEAVES, AND TWO KINK LAWS COEXIST WITHOUT BEING THE FLOWER'S
+DISAGREEMENT** (Eva's ruling 6, stem session 2 — read `docs/bloom-stem-session-2-outcome.md`
+before touching `stemNodesAbsent`, `stemNodeLaw`'s direction line, `PEDICEL_PINS` or
+`restatedStemNodes`). The leaf term is gone from both statements; ONE count (`leafNodes`, now
+under Stem) governs nodes and leaves. **A leafed node still turns away from its first leaf; a
+bare node turns at the golden angle** — legal only because `leafLength` is global, so a stem's
+nodes are all leafed or all bare, and a golden bend never sits under a leaf.
+`the-golden-kink-reaches-leafed-stems` is the standing mutant against the mistake. **Every
+pedicel is pinned node-free in ONE place, `PEDICEL_PINS`** — ruling 7's cut joins it there. The
+gate's reference is restated from the CONTROLS (the flower's 0.16/0.86 layout, `π(3−√5)`), never
+the leaf record; ST12(e) keeps the leaf relation, ST12(f) the MERGED-swellings report (√2
+spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was latent on noded
+solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
+restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
 
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
