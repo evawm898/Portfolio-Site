@@ -9976,7 +9976,13 @@ pure, seeded from the material seed, `TEX_W × TEX_H` bytes compared in M1/M2. T
 view; **the SVG is vector only** — one multiply `<g>` per layer, fill-opacity, a 0.5-unit
 quarter-opacity rim stroke, no raster. The bath frame costs what it did (64.5 against 65.6 ms
 flushed on the 200-op sheet); run the gate ALONE — its two timing bars (B10, B14) read the box,
-and a negative control running beside it reddened both once.
+and a negative control running beside it reddened both once. **THE NEGATIVE CONTROL HAD NEVER
+COMPLETED BEFORE THIS SESSION**: its first mutant throws every region five times further on every
+drop, a hundred-op pattern then costs ~3 s an op, and a stale run was found at 26 minutes with no
+mutant reported. A MUTANT's replays are bounded at `REPLAY_BUDGET_MS` (20 s) and an overrun reads as
+that clause firing (the shipped run is unbounded); three claim lists that had never been run were
+corrected by measurement (the uncentred comb still reaches the budget at segScale 1.35, refinement-off
+still prunes 8 of 22,461 vertices, the dropped falloff reaches H3 and H5). 10 of 10 behave in 95 s.
 
 ## `/tile` — the tessellation rollers (pointer only)
 
