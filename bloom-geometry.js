@@ -12369,22 +12369,25 @@ export const STEM_NODE_STATION_GRID = 1 / 4096;
 /* THE TWO STATEMENTS. The registry HIDES the control on this condition and
    this makes it INERT; ST12 asserts the two agree per row.
 
-   NODES ARE THE LEAVES' NODES, AND THAT IS A DECISION MADE WITHOUT A RULING —
-   REVERSIBLE, AND STATED RATHER THAN HIDDEN. The flower's nodes exist whether
-   or not it has leaves; the bloom's node depths already have ONE owner,
-   `leafNodeDepthsMm`, which exists only when leaves do, and #296 §3 built its
-   whole node costing on that owner. A second, leafless node law would be a
-   second producer of "where the nodes are" that could put a swelling where no
-   leaf grows. So the control is hidden AND inert without leaves, and without
-   a stem.
+   NODES ARE DECOUPLED FROM LEAVES — A BARE STEM CARRIES NODES (Eva's ruling
+   6, Oct 3; built in stem session 2). The leaf term this predicate carried
+   from #301 ("nodes are the leaves' nodes", a decision made without a ruling)
+   is GONE. What did NOT change is the owner of WHERE the nodes are: one count
+   (`leafNodes`, now shown under Stem) governs nodes and leaves both, and
+   `leafNodeLayout` places them. A node is where a leaf attaches; a bare node is
+   one whose leaf dropped. With no leaf the layout's rise term is 0, so the
+   nodes sit at 0.16 L .. 0.86 L — the flower's own `stemNodeParams`, which the
+   no-leaf layout ALREADY was before this ruling (recorded so, not re-derived).
 
    AND INERT UNDER AN INFLORESCENCE, ALSO WITHOUT A RULING: the rachis carries
    floret nodes on its own `leafNodeDepthsMm` call with a different pitch
    floor, so a leafed raceme has TWO node sets on one stem, and whether a
-   floret node swells the rachis is #296 §3's own open question for Eva. Both
-   arms are one predicate term to reverse. */
+   floret node swells the rachis is #296 §3's own open question for Eva. One
+   predicate term to reverse. (A floret's OWN stem — the pedicel — is pinned
+   off separately, by `PEDICEL_PINS`, because a floret's state has no raceme
+   in it and this term would not reach it.) */
 export function stemNodesAbsent(state) {
-  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || leafIsAbsent(state) || !inflorescenceIsAbsent(state);
+  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || !inflorescenceIsAbsent(state);
 }
 
 /* THE LEAF NODE PITCH FLOOR, MODE-FREE. It was `2 x petioleR0`, which is
@@ -12419,6 +12422,20 @@ export function leafNodeLayout(state, stemLengthMm) {
 /* THE NODE LAW, or NULL. Each node carries its depth `s` (mm below the hub's
    underside, the placer's own argument) and the AZIMUTH it kinks toward.
 
+   TWO DIRECTION LAWS COEXIST HERE, AND THIS IS NOT THE FLOWER'S FORBIDDEN
+   DISAGREEMENT (Eva's ruling on the kink, stem session 2). Where a node HAS
+   leaves it turns AWAY FROM ITS FIRST LEAF, unchanged (the paragraph below).
+   Where a node has NO leaves — a bare stem — it turns at the GOLDEN ANGLE,
+   node k toward `k * GOLDEN_ANGLE`, the flower's own law: a bare node has no
+   first leaf, so the leaf law has no reference to read. THE TWO NEVER MIX ON
+   ONE STEM: `leafLength` is global and one count governs nodes and leaves, so
+   either every node carries leaves or none does. What the flower does wrong
+   is draw its golden bends UNDER leaves flipping 180 degrees — leaves and
+   bends that disagree on one stem. That cannot happen here: a golden bend only
+   exists where there is no leaf to disagree with. Applying the golden angle to
+   a LEAFED stem is the mistake, and the mutant table carries it
+   (`the-golden-kink-reaches-leafed-stems`).
+
    THE KINK DIRECTION IS TIED TO THE LEAVES, AND THIS IS THE ONE PLACE THE
    FLOWER IS DELIBERATELY NOT COPIED. The flower turns node k toward
    `k * GOLDEN_ANGLE` while its leaves flip 180 degrees a node, so its leaves
@@ -12437,14 +12454,30 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
   const phyllo = String(state.leafPhyllotaxy);
   const spreadMm = STEM_NODE_SPREAD_RADII * outerR;
   const rampMm = STEM_NODE_RAMP_SPREADS * spreadMm;
+  const bare = leafIsAbsent(state);
   const nodes = layout.nodeDepthsMm.map((s, i) => {
-    const az = leafAzimuths(phyllo, i)[0] + Math.PI;
+    const az = bare ? i * GOLDEN_ANGLE : leafAzimuths(phyllo, i)[0] + Math.PI;
     return { s, az, dx: Math.cos(az), dy: Math.sin(az) };
   });
+  /* THE SWELLINGS MERGE, AND THAT IS REPORTED, NEVER CLAMPED (Eva's ruling on
+     the spacing floor). Two Gaussian swellings of half-width w sum to ONE bump
+     — a single maximum between them — exactly when their separation is at most
+     `sqrt(2) w`: 4.63 stem radii at the flower's 3.2738. Below it the two
+     nodes stop reading as two joints. A clamp on the count would break two
+     shipped rows already under the line (whorled x 8 at 12.00 mm against
+     13.89; the thin sheet on a short stem at 1.15 mm), so the read-out says it
+     the way the neighbour flag reports interpenetration. Pairs are adjacent
+     nodes in depth order, gap in mm. */
+  const mergeGapMm = Math.SQRT2 * spreadMm;
+  const mergedPairs = [];
+  for (let i = 1; i < nodes.length; i++) {
+    const gap = nodes[i].s - nodes[i - 1].s;
+    if (gap <= mergeGapMm) mergedPairs.push({ a: i - 1, b: i, gapMm: gap });
+  }
   return {
     prominence: prom, outerR, lengthMm: stemLengthMm,
     swell: STEM_NODE_SWELL * prom, slope: STEM_NODE_SLOPE * prom,
-    spreadMm, rampMm, nodes,
+    spreadMm, rampMm, nodes, bare, mergeGapMm, mergedPairs,
     /* WHERE EACH BEND PEAKS — the phasing, as a number a reader and a gate can
        both hold: 0.375 of the ramp below each node (the smoothstep-weighted
        ramp's own curvature maximum), stated against the spindle's width. */
@@ -15041,13 +15074,26 @@ export function inflorescencePlan(state, stem, acc) {
    the pedicel's two numbers go, and every clause ST0-ST11 already holds about
    them. `stemDiameter` is the DERIVED area-rule radius doubled, never a
    control. */
+/* WHAT A PEDICEL NEVER INHERITS FROM THE MAIN STEM — THE ONE PLACE (Eva's
+   ruling 6, stem session 2: "nodes are pinned OFF on every pedicel; the cut
+   will use the same pin"). A floret's own stem is built by `buildStemInto` on
+   `floretState`'s spread of the HEAD's state, so every stem feature the head
+   carries reaches every pedicel unless it is pinned here. Until ruling 6 the
+   node pin was a SIDE EFFECT of `leafLength: 0` (nodes required leaves); with
+   nodes decoupled it must be stated, and it is stated beside the two pins it
+   lives with. Ruling 7's cut adds its own control to THIS object and nowhere
+   else. `the-pedicel-pin-is-dropped` is the standing mutant. */
+export const PEDICEL_PINS = Object.freeze({
+  inflorescence: 'NONE',      // a floret is one flower, never a raceme of its own
+  leafLength: 0,              // no leaves on a pedicel
+  stemNodeProminence: 0,      // no nodes on a pedicel (ruling 6)
+});
 export function floretState(state, plan) {
   return {
     ...state,
     /* A FLORET DOES NOT INHERIT THE TUBE (Eva's ruling): every whorl FREE */
     ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),
-    inflorescence: 'NONE',
-    leafLength: 0,
+    ...PEDICEL_PINS,
     petalCount: plan.floretPetals,
     petalLength: plan.petalLength,
     petalWidth: plan.petalWidth,
@@ -15282,7 +15328,8 @@ export function buildInflorescenceInto(acc, state, plan) {
        `floretState` overrides. ID4 compares these against the plan and the
        page's own read-back, which is an owner this record does not write. */
     floretState: { inflorescence: fs.inflorescence, leafLength: fs.leafLength, petalCount: fs.petalCount,
-      petalLength: fs.petalLength, petalWidth: fs.petalWidth, stemLength: fs.stemLength, stemDiameter: fs.stemDiameter },
+      petalLength: fs.petalLength, petalWidth: fs.petalWidth, stemLength: fs.stemLength, stemDiameter: fs.stemDiameter,
+      stemNodeProminence: fs.stemNodeProminence },
   };
 }
 

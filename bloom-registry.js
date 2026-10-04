@@ -392,19 +392,23 @@ export const PREDICATES = {
 
   /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
      lobeDepth pattern, one control the guard and the rest following it, hidden
-     AND inert. NODE COUNT IS ITS OWN CONTROL, so a stem can carry nodes with no
-     leaves; what it cannot do is carry leaves with no stem, which is why the
+     AND inert. THE NODE COUNT LIVES UNDER STEM (ruling 6, stem session 2) and is
+     shown whenever there is a stem, so a stem can carry nodes with no leaves —
+     this sentence said so from #240 and was false until then, because the
+     count was gated on leaves. What a stem cannot do is carry leaves with no
+     stem, which is why the
      geometry's `leafIsAbsent` reads BOTH lengths and LF0 compares the two
      statements. The registry states the leaf's half; the geometry states its
      own, and a green run must not endorse one without the other. */
   leafPresent: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }] },
   /* THE STEM'S NODES (#299's port). The registry's half of the geometry's
-     `stemNodesAbsent`: nodes are the LEAVES' nodes, so the control needs
-     leaves, and a raceme's rachis carries a second node set whose swelling is
-     an open question for Eva, so it is inert under an inflorescence. Both are
-     decisions made without a ruling and are one term each to reverse. ST12
-     checks the two statements against each other per row. */
-  stemNodesEligible: { all: [{ ref: 'leafPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+     `stemNodesAbsent`. NODES ARE DECOUPLED FROM LEAVES (Eva's ruling 6, stem
+     session 2): a bare stem carries nodes, so the control needs only a stem.
+     A raceme's rachis carries a second node set whose swelling is an open
+     question for Eva, so it stays inert under an inflorescence — a decision
+     made without a ruling, one term to reverse. ST12 checks the two
+     statements against each other per row. */
+  stemNodesEligible: { all: [{ ref: 'stemPresent' }, { not: { ref: 'inflorescencePresent' } }] },
   stemNodesPresent: { all: [{ ref: 'stemNodesEligible' }, { id: 'stemNodeProminence', awayFrom: 0, by: 0.005 }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
@@ -3565,8 +3569,37 @@ export const CONTROLS = [
   { id: 'stemNodeProminence', section: 'stem', kind: 'slider',
     min: STEM_NODE_PROMINENCE_RANGE[0], max: STEM_NODE_PROMINENCE_RANGE[1], step: 0.01, default: 0,
     label: 'Node prominence',
-    fmt: (v) => (Number(v) === 0 ? 'smooth — no nodes' : `${Number(v).toFixed(2)} — swollen, gently kinked nodes at the leaves (the read-out says by how much)`),
+    fmt: (v, ui) => (Number(v) === 0 ? 'smooth — no nodes'
+      : `${Number(v).toFixed(2)} — swollen, gently kinked nodes ${Number(ui.leafLength) > 0 ? 'at the leaves, each turning away from its first leaf' : 'on a bare stem, turning at the golden angle'} (the read-out says by how much)`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemNodesEligible' } },
+  /* THE NODE COUNT AND THE ARRANGEMENT, UNDER STEM (Eva's ruling 6, stem
+     session 2). ONE count governs nodes and leaves both — a node is where a
+     leaf attaches, a bare node is one whose leaf dropped — so the stem gets no
+     second count; the ids stay `leafNodes` / `leafPhyllotaxy` because renaming
+     them would retire two ids and move every frozen row that names them. The
+     COUNT is shown whenever there is a stem. THE ARRANGEMENT IS SHOWN ONLY WITH
+     LEAVES, and that is not a softening of "always visible": on a bare stem it
+     reaches nothing — node depths do not read it and a bare node kinks at the
+     golden angle, not by its leaves — so showing it there would be a dead
+     control, which this panel never ships. */
+  { id: 'leafNodes', section: 'stem', kind: 'slider',
+    min: LEAF_NODE_RANGE[0], max: LEAF_NODE_RANGE[1], step: 1, default: 3,
+    label: 'Nodes',
+    fmt: (v, ui) => { const n = Math.round(Number(v));
+      if (!(Number(ui.leafLength) > 0)) return `${n} along the stem · bare — no leaves${Number(ui.stemNodeProminence) > 0 ? '' : ' (they show once node prominence is above 0 or leaves are added)'}`;
+      const per = ui.leafPhyllotaxy === 'opposite' ? 2 : ui.leafPhyllotaxy === 'whorled' ? 3 : 1;
+      return `${n} along the stem · ${n * per} leaves`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'leafPhyllotaxy', section: 'stem', kind: 'choice', default: 'alternate',
+    options: [
+      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
+      { value: 'opposite', label: 'Opposite (two across, decussate)' },
+      { value: 'whorled', label: 'Whorled (three at 120)' },
+    ],
+    label: 'Arrangement',
+    fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
+      return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
 
   /* ===================================================================
      THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem
@@ -3637,23 +3670,6 @@ export const CONTROLS = [
        anything. Told, never clamped. */
     fmt: (v) => { const a = Number(v), over = 90 - Math.abs(a);
       return `${a} deg from horizontal (${a < 0 ? 'drooping' : a === 0 ? 'level' : 'rising'}) · ${over} deg overhang from vertical${over > 45 ? ' — PAST the classic 45, supports likely' : ''}`; },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
-  { id: 'leafNodes', section: 'leaves', kind: 'slider',
-    min: LEAF_NODE_RANGE[0], max: LEAF_NODE_RANGE[1], step: 1, default: 3,
-    label: 'Nodes',
-    fmt: (v, ui) => { const n = Math.round(Number(v));
-      const per = ui.leafPhyllotaxy === 'opposite' ? 2 : ui.leafPhyllotaxy === 'whorled' ? 3 : 1;
-      return `${n} along the stem · ${n * per} leaves`; },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
-  { id: 'leafPhyllotaxy', section: 'leaves', kind: 'choice', default: 'alternate',
-    options: [
-      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
-      { value: 'opposite', label: 'Opposite (two across, decussate)' },
-      { value: 'whorled', label: 'Whorled (three at 120)' },
-    ],
-    label: 'Arrangement',
-    fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
-      return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
 
   /* THE TIP SHAPE (Eva, the leaf tip-shape session: "it always shows as this

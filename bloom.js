@@ -1755,9 +1755,15 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
 function stemNodesLine(stem) {
   const L = stem.nodeLaw;
   if (!L) return '';
-  return `\n     NODES ${L.nodes.length} at the leaves · prominence ${L.prominence.toFixed(2)}`
+  /* MERGED SWELLINGS ARE TOLD, NEVER CLAMPED (Eva's ruling on the spacing
+     floor): the plan's own `mergedPairs`, against `sqrt(2)` spindles. */
+  const merged = L.mergedPairs && L.mergedPairs.length
+    ? ` · SWELLINGS MERGED: ${L.mergedPairs.length} adjacent pair${L.mergedPairs.length > 1 ? 's' : ''} closer than ${L.mergeGapMm.toFixed(2)} mm (sqrt(2) spindles), the nearest ${Math.min(...L.mergedPairs.map((q) => q.gapMm)).toFixed(2)} mm apart — they read as one bump, not separate joints (reported, not clamped)`
+    : '';
+  return `\n     NODES ${L.nodes.length} ${L.bare ? 'on a bare stem' : 'at the leaves'} · prominence ${L.prominence.toFixed(2)}`
     + ` · swell +${(L.swell * 100).toFixed(1)}% of radius over a ${L.spreadMm.toFixed(2)} mm spindle (${STEM_NODE_SPREAD_RADII.toFixed(2)} stem radii, the flower's own proportion)`
-    + ` · turn ${L.turnDeg.toFixed(2)}° a node, away from its first leaf, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle — inside the swelling)`
+    + ` · turn ${L.turnDeg.toFixed(2)}° a node, ${L.bare ? 'at the golden angle (no leaf to turn from)' : 'away from its first leaf'}, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle — inside the swelling)`
+    + merged
     + ` · tip ${stem.nodeTipOffsetMm.toFixed(2)} mm off straight · worst lean ${stem.nodeTiltMaxDeg.toFixed(2)}°`
     + (stem.nodeWallPerpMm !== null && stem.nodeWallPerpMm !== undefined
         ? ` · wall ${stem.nodeWallPerpMm.toFixed(4)} mm measured square to the leaning axis (${STEM_MIN_WALL_MM} mm horizontally, as ruled — the perpendicular figure is a reported consequence)`
@@ -2550,6 +2556,12 @@ window.__bloomMetrics = () => ({
       stemLengthMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.lengthMm : null,
       stemRootZ: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.rootZ : null,
       stemTipZ: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.tipZ : null,
+      /* THE PEDICEL'S NODES, AS BUILT (Eva's ruling 6, stem session 2): ID4
+         asserts a pedicel carries none. Read off the floret's OWN stem record
+         — the artefact — so the pin in `PEDICEL_PINS` is not asked whether it
+         pinned. */
+      stemNodeCount: lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.nodeLaw ? lastInfloBuilt.unit.stem.nodeLaw.nodes.length : 0,
+      stemStationCount: lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.stations ? lastInfloBuilt.unit.stem.stations.length : null,
       /* THE PEDICEL'S OWN VOID, for O1's declared inward count. A floret is a
          bloom and its pedicel is a stem, so its bore becomes a sealed CAVITY
          under exactly the condition the rachis's does — and O1's baseline is

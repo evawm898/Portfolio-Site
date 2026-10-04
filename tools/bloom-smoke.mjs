@@ -952,8 +952,8 @@ export const SMOKE_BLOCKS = [
         path: "the SOLID arm — ST12 and ST1 through the no-void arm, ST3's narrowest vertex on the outer ring, ST10's bottom disc at the swollen tip radius" },
       { label: 'STEM NODES: x a SPHERE with a stem (the channel against a noded stem)',
         path: "the SPHERE — ST7 (the omission criterion and the meridian margin at the root's own radius), ST8, ST9 (the channel located in the FILE by the restated law and measured with the harness's own distance), ST12 on a stem leaving a pole" },
-      { label: 'STEM NODES: GATED — prominence 1 with no leaves (hidden AND inert)',
-        path: "the GUARD — ST12's two statements where they can disagree (prominence at its maximum and no leaves to node) and prominence-0's identity at the plan (no law, no noded rings, `stemStations`' own two stations)" },
+      { label: 'STEM NODES: GATED — prominence 1 under a raceme (hidden AND inert)',
+        path: "the GUARD — ST12's two statements where they can disagree (prominence at its maximum under a raceme, where the head's nodes are inert) and prominence-0's identity at the plan (no law, no noded rings, `stemStations`' own two stations). It replaces the no-leaves GATED row, which ruling 6 (stem session 2) turned into a mover" },
     ],
   },
   {
@@ -1005,6 +1005,21 @@ export const SMOKE_BLOCKS = [
         path: "a DECLARED fold — X1 holds it to 318 pairs / 0.3800 mm in both directions" },
       { label: 'TUBE: GATED — the buckle (unavailable, inert)',
         path: "TU0's other arm — a ring asked where the ruling makes it unavailable: the geometry reports unavailable, no ring is built" },
+    ],
+  },
+  {
+    n: 46, title: 'bare-stem nodes — nodes decoupled from leaves (ruling 6)',
+    anchor: "BARE NODES: the flower's 0.48 on 100 x 6 mm, three nodes, golden angle",
+    /* THREE ROWS: the golden-angle law on a hollow bare stem, the MERGED
+       report (told, never clamped), and the raceme, where the head's nodes are
+       inert and ID4 carries the PEDICEL PIN on every floret's own stem. */
+    rows: [
+      { label: "BARE NODES: the flower's 0.48 on 100 x 6 mm, three nodes, golden angle",
+        path: "ST12 on a BARE stem — the two statements with no leaf term, the emitted rings against the node law restated from the CONTROLS (the flower's 0.16/0.86 layout, the golden angle written as pi(3 - sqrt 5)), the phasing, and (e)'s other half: a bare stem reports no leaf record; ST1/ST2/ST3/ST10 restated onto it" },
+      { label: 'BARE NODES: eight nodes on 60 mm (SWELLINGS MERGED — told, not clamped)',
+        path: "ST12(f) — the plan's `mergedPairs` against the restated gaps and sqrt(2) spindles, both directions; the count is NOT clamped, so ST12(c) still holds all eight nodes to the law" },
+      { label: 'BARE NODES: GATED — prominence 1 under a raceme (head inert; every PEDICEL pinned straight)',
+        path: "ID4's PEDICEL PIN — the floret state carries stemNodeProminence 0 and the floret's own stem is a two-station tube with no node law, though the head asks for prominence 1 and a pedicel is a bare stem the ungated law would otherwise node" },
     ],
   },
 ];

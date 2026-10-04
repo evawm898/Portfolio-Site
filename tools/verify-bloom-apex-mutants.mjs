@@ -290,6 +290,26 @@ const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw
 /* THE NODE WITNESS (#299's port) — the MUTATED module's own stem plan, builder
    and leaves on a noded state, compared against the clean module's. */
 const NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeProminence: 0.48 });
+/* RULING 6's TWO WITNESS STATES (stem session 2): a BARE noded stem, and a
+   raceme whose head asks for prominence 1 — the state where every floret's own
+   stem is a bare stem the ungated law would node unless the pedicel pin holds. */
+const BARE_NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, stemNodeProminence: 0.48 });
+const RACEME_NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', stemNodeProminence: 1 });
+function pedicelNodes(M) {
+  try {
+    const b = M.buildBloomInto(new M.MeshBuilder({ exportMode: true }), RACEME_NODE_STATE());
+    const st = b.inflorescenceBuilt && b.inflorescenceBuilt.unit && b.inflorescenceBuilt.unit.stem;
+    if (!st) return { threw: 'no floret stem record' };
+    return { nodes: st.nodeLaw ? st.nodeLaw.nodes.length : 0, stations: st.stations.length };
+  } catch (e) { return { threw: e.message }; }
+}
+function firstKinkDeg(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const plan = M.stemPlan(state, M.footRing(state, acc).hub, acc);
+    return plan.nodeLaw ? { az: plan.nodeLaw.nodes.map((n) => ((n.az * 180 / Math.PI) % 360 + 360) % 360) } : { az: null };
+  } catch (e) { return { threw: e.message }; }
+}
 function nodeFacts(M, state = NODE_STATE()) {
   try {
     const acc = new M.MeshBuilder({ exportMode: true });
@@ -1695,6 +1715,31 @@ const MUTANTS = [
     witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.maxCentreOff < 1e-9 && c.maxCentreOff > 1) ? null : `the mutant's rings stand up to ${m.maxCentreOff} mm off the world axis against ${c.maxCentreOff} clean`; } },
+  /* ===== RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2) ===== */
+  { id: 'the-nodes-are-gated-on-leaves-again', why: "the geometry's guard takes back its leaf term, so a BARE stem at prominence 0.48 builds a straight cylinder while the registry (ruling 6) shows the control live — a dead slider on every bare stem, watertight and one piece at the pre-node count",
+    find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || !inflorescenceIsAbsent(state);',
+    into: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || leafIsAbsent(state) || !inflorescenceIsAbsent(state);', names: ['ST12', 'ST2'],
+    witness: (M, C) => { const m = nodeFacts(M, BARE_NODE_STATE()), c = nodeFacts(C, BARE_NODE_STATE());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.hasLaw && c.hasLaw) ? null : `on a bare stem the mutant's plan ${m.hasLaw ? 'carries' : 'carries no'} node law and the clean tree's ${c.hasLaw ? 'carries' : 'carries no'} one`; } },
+  { id: 'the-pedicel-pin-is-dropped', why: "the floret state stops pinning stemNodeProminence, so under a raceme whose head asks for nodes every PEDICEL — a bare stem now that nodes need no leaves — kinks and swells at the golden angle: watertight, one piece, the floret count unchanged",
+    find: '  stemNodeProminence: 0,      // no nodes on a pedicel (ruling 6)\n',
+    into: '', names: ['ID4'],
+    witness: (M, C) => { const m = pedicelNodes(M), c = pedicelNodes(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.nodes > 0 && c.nodes === 0 && c.stations === 2) ? null : `the mutant's pedicel carries ${m.nodes} node(s) against the clean tree's ${c.nodes} on ${c.stations} stations`; } },
+  /* THE LAW'S OWN WITNESS AGAINST THE MISTAKE (Eva, stem session 2: "that
+     last is the law's own witness against the mistake I just made"). The
+     golden angle applied to a LEAFED stem reproduces the flower's forbidden
+     leaves-flip-180 / bends-turn-golden disagreement — moving the leafed
+     100 x 6 mm row's tip 5.52 mm (measured, stem session 1). */
+  { id: 'the-golden-kink-reaches-leafed-stems', why: "every node turns at the golden angle whatever its leaves, so a leafed stem's bends stop turning away from its leaves — the flower's own leaves/bends disagreement, the thing ruled out twice; a watertight stem at the identical station count",
+    find: '    const az = bare ? i * GOLDEN_ANGLE : leafAzimuths(phyllo, i)[0] + Math.PI;',
+    into: '    const az = i * GOLDEN_ANGLE;', names: ['ST12', 'ST2'],
+    witness: (M, C) => { const m = firstKinkDeg(M, NODE_STATE()), c = firstKinkDeg(C, NODE_STATE());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (!m.az || !c.az) return 'the leafed witness state carries no node law';
+      return (Math.abs(m.az[0] - c.az[0]) > 1 || Math.abs(m.az[1] - c.az[1]) > 1) ? null : `the mutant's leafed kinks turn [${m.az.join(', ')}] against the clean tree's [${c.az.join(', ')}]`; } },
   { id: 'the-petiole-roots-on-the-world-axis', why: "each petiole is rooted about the WORLD axis while the stem has kinked away from it, so a leaf at a lower node roots in the bore or outside the wall — both export watertight",
     find: '  const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];',
     into: '  const base = [plan.rootR * R[0], plan.rootR * R[1], z];', names: ['LF2'],
@@ -1877,6 +1922,15 @@ const ROWS = [
      bites, since ST12's two statements can only disagree where the guard does. */
   { label: "the stem's nodes at the flower's 0.48 (100 x 6 mm, three alternate leaves)",
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0.48' }] },
+  /* RULING 6's ROWS (stem session 2): the BARE noded stem, where
+     `the-nodes-are-gated-on-leaves-again` bites (on a leafed stem the leaf
+     term is satisfied and the mutation is a no-op), and the raceme whose
+     pedicels the pin holds straight — the only state where
+     `the-pedicel-pin-is-dropped` moves anything. */
+  { label: 'a BARE stem at the flower\'s 0.48 (100 x 6 mm, no leaves — golden-angle nodes)',
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'stemNodeProminence', value: '0.48' }] },
+  { label: 'a raceme whose head asks for prominence 1 (the head is inert; every pedicel must stay straight)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'stemNodeProminence', value: '1' }] },
   { label: 'the same leafed stem at prominence 0 (the guard, where the two statements can disagree)',
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',

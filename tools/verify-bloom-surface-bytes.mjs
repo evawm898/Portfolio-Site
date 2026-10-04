@@ -152,6 +152,17 @@ const rows = MATRIX.slice(RFROM, RTO).filter((r) => !ONLY || ONLY.test(r.label))
    change moves a record the BASE tree owns, the BASE tree's own builder — so
    the prediction's owner is never the quantity under test. */
 const PREDICATE_MOVERS = {
+  /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
+     it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
+     raceme, and no leaves. Written from the CONTROLS — the ruling's own
+     sentence — never from either tree's `stemNodesAbsent`, so the prediction's
+     owner is not the guard under test. Every LEAFED noded row must HOLD (the
+     leafed kink law is unchanged by ruling), and every RACEME row must hold
+     too: the head's nodes are inert there, and each floret's own stem is a bare
+     stem the pedicel pin must keep straight — a raceme row that moved would be
+     the pin failing. */
+  'nodes-bare': (st) => Number(st.stemLength) > 0 && Number(st.stemNodeProminence) !== 0
+    && String(st.inflorescence ?? 'NONE') === 'NONE' && !(Number(st.leafLength) > 0),
   /* ORGANIC VARIANCE, BUILD 2 (form). A row moves iff the FORM field exists on
      this tree — the geometry's own `varianceFormIsAbsent`, the guard. Every
      other row, the SIZE rows included, must hold to the bit: that is the claim
