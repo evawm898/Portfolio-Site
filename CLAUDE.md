@@ -5130,7 +5130,22 @@ refusal row. **The 544% corner (`INFLO: ALL MAX` x `layerCount 6`) CANNOT be a r
 fixed**: the refusal builds the whole 8.16 M export mesh before checking (9.6 min locally against the
 gate's 120 s), and the attempt found **ID4 predicting `floretPetals` where a floret builds
 `floretPetals x layerCount`** (it inherits the head's whorls) — fixed, witnessed by `NODE LAWS: x 2
-whorls`. Block 46 (31 rows), smoke block 46, `frozen/phase50` = the 1047 rows at `754e3aa`.
+whorls`. Block 46 (33 rows), smoke block 46, `frozen/phase50` = the 1047 rows at `754e3aa`.
+**SECOND ROUND (Eva's sheet rulings, §8 of that doc): THE OFFSET CLEARS THE BLADE AND A FLOWERING NODE
+CAPS ITS LEAF.** The offset's separation is `max(rods, the blade's own rise)`, where the rise is read off
+the leaf builder's own emitted blade, maximised along EDGES (NV is even, so no column lies on the
+midrib), and taken two `SHARED_NODE_GRID_MM` steps above exact. The first cut read 0.9999999999999918
+against the bar. At the defaults it goes 3.784 → 3.943 mm, and the blade clears its pedicel at 1.00002.
+The leaf length is `min(asked, cap)`. The cap comes from the export floret unit (`floretUnitMemo`,
+built before the leaves and shared with the export append) through the petiole's own law. Taking the
+petiole from the ASKED length made a longer asked leaf build a SHORTER blade. Under one printable
+feature no leaf is built, told. A spike builds none.
+SN4 holds the cap (the emitted blade reach against the plan); `leaf-pedicel` is the fifth approach
+measure. **At the tightest internode (3.023 mm) the leaf passes through the pedicel TWO NODES BELOW on
+its own azimuth on both trees** (−0.248 → −0.378 mm): declared, never clamped.
+**Build 3's lead item is evawm898/portfolio-site#355** (the top floret through the head's petals). The
+corymb solves level only up to an 81 mm rachis at the defaults; raising the 120 mm cap is Eva's
+ruling. #231 blocks the 544 % corner from ever being a row.
 Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,

@@ -1025,7 +1025,7 @@ export const SMOKE_BLOCKS = [
       { label: 'NODE LAWS: SESSILE — a true spike (the floret hub rooted one wall deep)',
         path: "the SPIKE — ID8 at every node (rooted radially to the bore at 35 deg, not along the pedicel), ID2's crossing NULL exactly where every node is sessile, ID4 on a stemless unit" },
       { label: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel',
-        path: "the SHARED NODE — SN0 (the registry's leafNodesOwn against the geometry's flag and the controls), SN1 (one leaf per pedicel, at the pedicel's emitted azimuth), SN2 (each leaf seated the law's offset below its pedicel, read off both emitted rods), SN3 (the kept prefix restated from the stem's length); LF1/LF4/LF5 in their shared arms" },
+        path: "the SHARED NODE — SN0 (the registry's leafNodesOwn against the geometry's flag and the controls), SN1 (one leaf per pedicel, at the pedicel's emitted azimuth), SN2 (each leaf seated the law's offset below its pedicel, read off both emitted rods), SN3 (the kept prefix restated from the stem's length), SN4 (every flowering node CAPS its 40 mm leaf at 17.46 mm, the emitted blade reach read against the plan's petiole plus built length); LF1/LF4/LF5 in their shared arms" },
       { label: 'NODE LAWS: SHARED NODE x a 30 mm rachis (the lowest pedicel carries none, told)',
         path: "SN3's OMISSION — the lowest pedicel's leaf would run off the stem's end, so it is not built and the record tells it; SN1 pairs the kept leaves with the first four pedicels" },
       { label: "NODE LAWS: GATED — the leaf's own 8 nodes and whorled under a raceme (hidden AND inert)",

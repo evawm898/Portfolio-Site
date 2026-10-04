@@ -207,3 +207,109 @@ Contact sheet: `node tools/shot-bloom-node-laws.mjs docs/img/inflorescence-node-
 - `--verify-frozen phase50` — deep-equal.
 
 The full matrix on both STL gates, in CI, is the merge criterion.
+
+## 8. Second round — Eva's four rulings from the sheet
+
+The sheet was approved. Two changes were made to the code before merge; two findings are recorded and handed forward.
+
+### 8a. Change 1 — the shared-node offset clears the leaf BLADE, not just the rods
+
+**The law.** The perpendicular separation the two parallel axes need is now the larger of:
+- the rods' term: `r_pedicel + r_petiole + MIN_FEATURE_MM`;
+- the blade's term: `max over the blade of z + sqrt(R^2 - y^2)`, with `R = r_pedicel + MIN_FEATURE_MM`.
+
+The result is divided by the steeper rod's cosine, as before.
+
+The blade's term is read off the LEAF BUILDER's own emitted blade (`leafBladeLocalTris`), built once in an EXPORT accumulator in its own frame. The leaf has no curl and no twist, so one build serves every node, angle and azimuth. The term is maximised along every emitted EDGE by golden-section search, not at the vertices. NV = 10 is even, so no column lies on the midrib, and a vertex reading sits up to 0.5 mm low under the rod.
+
+**The numbers, export, at the defaults:**
+- The blade's rise is **3.2296 mm** over the leaf's axis, against the rods' 3.100 mm, so the **blade binds**.
+- The seating offset along the stem goes **3.784 mm → 3.943 mm** (+0.158 mm).
+- The worst leaf-to-own-pedicel approach goes **0.876 → 1.003 mm** on the combination gate's parallel cells (15 mm leaf). On the default raceme with a 40 mm leaf it reads **1.0000166 mm**.
+- The worst cell of the leaf×pedicel pair is unchanged at **0.000** at leafAngle 35 × pedicelAngle 0, the converging rods. That cell was declared before and still is.
+
+**THE LAW LANDS THE APPROACH ON THE BAR, SO ITS LAST BIT DECIDES WHICH SIDE.** The first cut read **0.9999999999999918 mm** against the 1.0 mm bar. The separation is therefore taken to the second step of `SHARED_NODE_GRID_MM` (2^-16 mm) above the exact value. That puts it between one and two steps over the bar (1.5–3.1e-5 mm), and never on it. One step alone can land an ulp above a grid point, which is why the margin is two. This is a stated slack with its size beside it, not a tolerance on the gate. The length cap (8b) takes the same two-step slack in the other direction.
+
+**FROM THE OTHER SIDE — the node below.** The widened seating puts each leaf 0.158 mm closer to the node below it. A fifth approach measure, `leaf-pedicel`, was added to `tools/bloom-inflo-approach.mjs`: the leaf against every emitted pedicel rod, its own and every other node's. It exists because on a dense raceme `leaf-floret` reads 0 whatever the leaf does: the florets themselves overlap there (floret-floret 0.000).
+
+Measured, the nearest approach of a leaf to ANOTHER node's pedicel rod, base tree → this tree:
+
+| state | internode | before | after |
+|---|---|---|---|
+| defaults (5 nodes, 120 mm) | 21.000 mm | 17.938 mm | **17.808 mm** |
+| 12 nodes, 60 mm | 3.648 mm | 0.777 mm | **0.647 mm** |
+| 12 nodes, 40 mm | 3.275 mm | 0.166 mm | **0.037 mm** |
+| **12 nodes, 52 mm — the TIGHTEST reachable internode** | **3.023 mm** (pitch floor 3.000) | **−0.248 mm** (through it) | **−0.378 mm** (through it) |
+
+The tightest internode was found by sweeping every rachis length at 12 nodes.
+
+**THE MECHANISM.** Alternate and opposite phyllotaxy repeat an azimuth every second node. So a leaf stands only `2 × internode − offset` above the pedicel two nodes below it, on its own azimuth. Clearing it needs about **3.86 mm** of internode: the half-sum of the two seating offsets, above and below. The node law's pitch floor is two pedicel radii, set for the pedicels against each other, so a leaf seated between them can fail it. This was pre-existing at the pitch floor (−0.248 mm on the base tree) and is 0.13 mm deeper now. Whorled racemes cross neighbouring azimuths at dense internodes on both trees (−1.04 → −1.17 mm).
+
+**DECLARED, NOT CLAMPED.** Per Eva: *"declare that cell with its mechanism rather than clamping anything silently."* The new pair `inflo-leaf-nodes-x-leafangle` (floretNodes 5/12 × leafAngle 35/0 on a 52 mm rachis, `leaf-pedicel`) carries three declared cells at 0.000. The leafAngle 0 × pedicelAngle 35 cell of the existing pair went **0.881 → 0.723 mm**. That cell was mis-attributed before: it is a level leaf against the floret two nodes below, not the blade's own skin. It is re-recorded with that mechanism.
+
+### 8b. Change 2 — the leaf length is capped at a flowering node
+
+Every node of the shared arm carries a floret, so every subtending leaf is capped:
+- **built = min(asked, cap)**;
+- **no leaf** where the cap is under one printable feature (`MIN_FEATURE_MM`) — told, never refused;
+- leaves off a raceme have no per-node list and keep the slider's full range (a branch).
+
+The slider keeps the asked value. The read-out's `LEAF LENGTH asked … BUILT …` line says what each node built, in TUBE's snap shape.
+
+**How the cap is derived.** The blade is treated as the PRISM of its whole emitted cross-section envelope. That is a superset of the blade, so a length that clears the prism clears the blade. The floret is the EXPORT floret unit in both modes, so whether a blade exists is mode-free. Each floret vertex inside the gap of that envelope bounds how far the blade's tip may reach along the leaf's axis. The reach then becomes a length through the petiole's own law, `L + max(0.12 L, clear) = reach`.
+
+**WHY THE PETIOLE LAW IS IN THE SOLVE.** The first cut took the petiole from the ASKED length. A longer asked leaf then built a SHORTER blade (120 mm asked built 6.21 mm where 40 mm built 15.81) — a slider running backwards.
+
+**The floret units are now built through one memo** (`floretUnitMemo`) before the leaves, so the cap reads the very unit the export build then appends. Building a unit earlier moves no float of it; the byte partition below holds every raceme without leaves.
+
+**The numbers, export:**
+- Default raceme with a 40 mm leaf: **17.46 mm built at all 5 nodes** (petiole 3.15 mm), approach **1.0000166 mm**. Any asked length from 17.46 to 120 builds the same.
+- Gradient 2 gives a cap per pedicel length: **17.46 / 22.46 / 27.33 / 31.80 / 36.26 mm**.
+- A 5 mm pedicel: **2.46 mm** blade.
+- A spike (sessile florets) builds **no blade at any node**. The cap is −0.29 mm there, and 564 floret vertices stand within the gap of the petiole itself.
+- A 15 mm leaf is not capped anywhere on the default raceme.
+- This removes the sheet's 40 mm blade-through-the-floret frame (not re-rendered, as ruled).
+
+**Cost.** Leaf triangles are a fixed lattice, so triangle counts are unchanged except where a node loses its blade. In LIVE mode the cap builds one EXPORT floret unit per distinct pedicel length, measured at about +250 ms on the default raceme under load (best of four runs, 696 ms against 441 ms).
+
+### 8c. The witnesses, re-run because the law moved
+
+**SN2 is restated onto the new law.** The blade's rise is solved in CLOSED FORM at each emitted edge's stationary point, over a Node build of the shipped leaf builder at a plan the gate writes; the geometry uses a golden-section search instead, so the two sides are different methods. The seat must lie in `[exact, exact + 3 grid steps] / cos`: strictly clear of the bar, and no further from it than the slack.
+
+**SN4 is new** — the length cap:
+- (a) the plan's per-node arithmetic, stated in the gate;
+- (b) each emitted blade's reach along its own axis (`emittedReachMm`, read off the skins the builder emitted) equals the plan's petiole plus built length, to 1e-9 mm. It measures to 4e-15.
+
+LF1, LF9 and SN1/SN3 now read the per-node lengths. A spike whose every node lost its blade stops the leaf family the way an empty shared node does.
+
+**The mutants**, each in a throwaway worktree of the round's commit, run through the real export gate, each red on the clause it names:
+
+| mutant | row | fires |
+|---|---|---|
+| leaf seated at its pedicel's own point | default shared row | **SN2** |
+| leaf on its own arrangement | whorled shared row | **SN1 + LF5** |
+| a no-room leaf kept | 30 mm rachis | **SN3 + SN1** |
+| the offset clears only the rods (the OLD law) | default shared row | **SN2** (3.784 against [3.9426, 3.9427]) |
+| **a leaf that ignores the cap** | default shared row (a flowering node) | **SN4** (reach 43.150 mm against the plan's 20.610), plus LF9 — true of it, since the clamp record follows the built length |
+
+The clean tree passes every shared-node row.
+
+### 8d. Combination gate — the leaf-involving pairs
+
+**9 inflorescence pairs, 95 cells, 37 under the bar, all 37 declared** (was 8 pairs, 91 cells, 37 of 91). Of the 37:
+- **3 RETIRED by change 1** — the three parallel cells of `inflo-leafangle-x-pedicelangle` (35/35, 0/0, 60/60), 0.876 → 1.003 mm;
+- **1 re-recorded** — leafAngle 0 × pedicelAngle 35, 0.881 → 0.723, with the corrected mechanism;
+- **3 new** — the node-below pair's cells.
+
+Change 2 retires nothing on the gate, because the leaf pair's base leaf is 15 mm and is never capped. What it removes is the 40 mm crossing that pair's own comment records.
+
+### 8e. Records, not built
+
+1. **BUILD 3'S LEAD ITEM — evawm898/portfolio-site#355.** The shipped raceme's top floret passes through the terminal head's petals. `floret-head` reads 0 (an edge crossing) at 20 mm / 35°, and floret and head vertices stand 0.087 mm apart. The top inset is derived from the PEDICEL's rise and never from the floret's own petals.
+2. **THE CORYMB SOLVES LEVEL ONLY ON A SHORT RACHIS — a known limitation.** `L_k = L_0 + (d_k − d_0) / sin θ` must stay inside the pedicel's own ceiling, `STEM_LENGTH_RANGE[1]` = 120 mm. So the node span must be at most `(120 − L_0) sin θ` = **(120 − 20) sin 35° = 57.4 mm** at the defaults. The default node span is 0.70 of the rachis, so the corymb solves exactly up to an **81 mm** rachis (measured: 80 mm asks 20/44.4/68.8/93.2/117.6; 85 mm already clamps). On the shipped 120 mm rachis it asks 20/56.6/93.2/129.8/166.4 mm and the lowest two clamp. **Raising the 120 mm cap is a registry bound change and needs Eva's ruling; it is NOT raised here.**
+3. **#231 BLOCKS THE 544 % CORNER FROM EVER BEING A ROW** (§5). The refusal path builds the whole 8.16 M-triangle export mesh before it checks the count: 9.6 min locally against the gate's 120 s. Until #231 refuses on the LIVE count, or counts before building, `INFLO: ALL MAX` × `layerCount 6` cannot be a matrix row. Do not rediscover this at 9.6 minutes a run.
+
+### 8f. Bytes
+
+BYTES_PLACEHOLDER
+

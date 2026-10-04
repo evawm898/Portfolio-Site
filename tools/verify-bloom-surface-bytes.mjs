@@ -236,6 +236,21 @@ const PREDICATE_MOVERS = {
     if (corymbOn) return sinTh > 0;
     return g !== 1;
   },
+  /* THE NODE LAWS' SECOND ROUND (Eva's change 1 and change 2): the shared
+     node's offset clears the leaf BLADE now, so every subtending leaf moves
+     (deeper by 0.158 mm at the defaults), and a flowering node caps its
+     leaf's length, so a capped leaf moves again or is not built at all. A row
+     moves iff the BASE tree builds at least one shared-node leaf — read off
+     the base tree's own leaf plan, never off the labels. */
+  'node-laws-2': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    if (!ip.present) return false;
+    const lp = base.leafPlan(st, sp, acc, ip);
+    return !!(lp.present && lp.shared && lp.built > 0);
+  },
 };
 if (MOVERS_PRED && !PREDICATE_MOVERS[MOVERS_PRED]) { console.error(`--movers-predicate ${MOVERS_PRED}: no such predicate (${Object.keys(PREDICATE_MOVERS).join(', ')})`); process.exit(2); }
 if (MOVERS_PRED && MOVERS) { console.error('--movers and --movers-predicate are two declarations of one partition; give one'); process.exit(2); }
