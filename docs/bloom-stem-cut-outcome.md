@@ -265,8 +265,18 @@ sit at different depths of a leaning axis. The straight 6 mm stem reads 2.34. Th
 the solve now, and it reads 0.06 on the mutant.
 **And the envelope clause mis-sized a noded stem** before the cut existed to show it: it took
 the tube's radius as `outerR`, and the seven `BARE NODES` rows reported their own swelling
-(r 3.14–3.62 against 3) as "outside the stem". The envelope is the plan's own `nodeMaxOuterR +
-nodeTipOffsetMm` now — exact over the emitted vertices, and `outerR` / 0 on a straight stem.
+(r 3.14–3.62 against 3) as "outside the stem". Two more corrections came off the wider sweep
+over every stem block, both the tool's: the envelope is now the larger of the TWO trees' plans,
+per station, of the law's radius plus the axis offset THERE (the drifts of different nodes
+point different ways, so |offset| is not monotone and the tip's is not the largest — `STEM
+NODES: whorled x 8` reads a ring at 12.1596 against `nodeMaxOuterR + nodeTipOffsetMm`
+12.1325; and the branch re-places the tube's ladder over `L − span`, so the base's rings sit
+nearer the swelling's peak); and the face clause reads ONLY the stem's own triangle block
+(`[hubTriEnd, hubTriEnd + stemBuilt.tris)` on each tree) — a leaf's petiole rooted near the
+tip or a pedicel on a short rachis is a down-facing triangle inside the cut's window and the
+tube's radius, and the first sweep summed them into the face (`LEAVES: the STEEP angle`
+113.85 against 112.77 mm²; `INFLO: 12 nodes on a 20 mm rachis` 32.24 against 28.19). On a
+straight stem with nothing near its tip every one of these is the expression it was.
 
 ### 4g. SC0–SC3 — the new family
 

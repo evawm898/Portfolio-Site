@@ -235,7 +235,35 @@ function onlyTheStemsInteriorWent(set, em) {
      before this existed: `--change cut` reported all seven `BARE NODES:` rows
      as runs reaching "outside" a radius-3 envelope at r 3.14..3.62, which is
      the node's own swelling. */
-  const ENV_R = plan.nodeLaw ? plan.nodeMaxOuterR + plan.nodeTipOffsetMm : R;
+  /* AND THE SWELLING IS SAMPLED AT EACH TREE'S OWN STATIONS: `nodeMaxOuterR` is
+     the law's maximum over the plan's stations, and under `--change cut` the
+     branch re-places the tube's ladder over `L - span`, so the base's rings can
+     sit nearer the peak than the branch's (`STEM NODES: on the widest bore`
+     read r 10.2198 against the branch plan's 10.1770 — a BASE ring). The
+     envelope is the larger of the two plans' own extents. */
+  const stA = { ...DB, ...set };
+  const planA = GB.stemPlan(stA, GB.footRing(stA, new GB.MeshBuilder({ exportMode: em })).hub,
+                            new GB.MeshBuilder({ exportMode: em }));
+  /* Per STATION, radius plus the axis offset THERE: the drifts of different
+     nodes point in different directions, so |offset| is not monotone in depth
+     and the tip's is not the largest (`STEM NODES: whorled x 8` reads a ring at
+     r 12.1596 against nodeMaxOuterR + nodeTipOffsetMm = 12.1325). */
+  const extentOf = (M, pl) => {
+    if (!pl.nodeLaw) return pl.outerR;
+    let e = 0;
+    for (const sd of pl.stations) { const c = M.stemNodeAxisMm(pl.nodeLaw, sd); e = Math.max(e, M.stemNodeRadiusMm(pl.nodeLaw, sd) + Math.hypot(c[0], c[1])); }
+    return e;
+  };
+  const ENV_R = Math.max(extentOf(G, plan), extentOf(GB, planA));
+  /* THE STEM'S OWN TRIANGLE BLOCK on each stream: `buildBloomInto` emits the
+     stem directly after the hub (`hubTriEnd`) and reports its tally, so the
+     block is [hubTriEnd, hubTriEnd + stemBuilt.tris) on each tree. The cut-face
+     clause reads ONLY this block — a leaf's petiole rooted near the tip or a
+     pedicel on a short rachis is a down-facing triangle inside the cut's window
+     and the tube's radius, and the first sweep summed them into the face
+     (`LEAVES: the STEEP angle` 113.85 against 112.77; `INFLO: 12 nodes on a
+     20 mm rachis` 32.24 against 28.19 — the pedicels). */
+  const blockOf = (rep) => rep.stemBuilt ? [rep.hubTriEnd * 9, (rep.hubTriEnd + rep.stemBuilt.tris) * 9] : [0, 0];
   const a = accA.positions, b = accB.positions;
   if (a.length !== b.length) {
     /* A LENGTH CHANGE IS EXPECTED HERE — the band emits a different triangle
@@ -325,7 +353,7 @@ function onlyTheStemsInteriorWent(set, em) {
         }
       }
     }
-    return CHANGE === 'cut' ? cutFaceClause(a, b, plan, R) : bottomFaceClause(a, b, plan, R);
+    return CHANGE === 'cut' ? cutFaceClause(a, b, plan, R, blockOf(repA), blockOf(repB)) : bottomFaceClause(a, b, plan, R);
   }
   /* (a) — compare only where the two streams align; the differing tail is the
      band's own, and its vertices are checked against the envelope. */
@@ -414,7 +442,9 @@ function bottomFaceClause(a, b, plan, R) {
           pierces it).
    The window and the plane are the plan's own declaration of WHERE the cut
    is; the claims are about what the file holds there. */
-function cutFaceClause(a, b, plan, R0) {
+function cutFaceClause(a0, b0, plan, R0, blockA, blockB) {
+  if (blockA[1] <= blockA[0] || blockB[1] <= blockB[0]) return 'no stem block on one of the trees — the cut-face clause has nothing to read';
+  const a = Float64Array.from(a0.slice(blockA[0], blockA[1])), b = Float64Array.from(b0.slice(blockB[0], blockB[1]));
   /* ON A NODED STEM THE END IS THE TIP'S OWN RING: its radius is the law's
      `rTip` (the plan's own, carried on `cut.rTip`) and its centre is the node
      axis at the tip's depth, `stemNodeAxisMm(law, rootZ - z)` — the builder's
