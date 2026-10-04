@@ -74,13 +74,11 @@ const CUT_MARGIN = 1.15;
 /* A concavity in the outer margin deeper than this fraction of the wing's
    extent is a NOTCH between two pairs. The default bug's notch is 0.19. */
 export const NOTCH_MIN_FRAC = 0.06;
-/* A notch between two pairs has a wing lobe each side whose farthest point
-   reaches at least this fraction of the mass's farthest point. */
-export const AXIS_LOBE_FRAC = 0.4;
-/* ... and with a wing confirmed each side, a notch this shallow is enough (a
-   moth's forewing overlaps the hindwing, so the notch between them is shallow:
-   #43's is 0.058 of the extent, under NOTCH_MIN_FRAC). */
-export const AXIS_NOTCH_MIN_FRAC = 0.045;
+/* The split's wing-either-side test (§13.6): each side's farthest outline
+   point must reach this fraction of the mass's farthest; the notch may then
+   be as shallow as NOTCH_LOBE_MIN_FRAC (#43's real notch is 0.058). */
+export const NOTCH_LOBE_FRAC = 0.4;
+export const NOTCH_LOBE_MIN_FRAC = 0.045;
 /* THE HIDDEN OVERLAP: what of the hindwing lies under the forewing cannot be
    seen. The guess: the hindwing's hidden leading edge is the split line moved
    FORWARD by this fraction of the wing's extent — it tucks under the forewing
@@ -757,27 +755,30 @@ function fitOnce(img, base, opts) {
     const loop = smoothLoop(traceOuter(M, NX, NY));
     const extent = wings[0].imax - cutI;
     const hull = convexHull(loop);
-    // THE TWO WING AXES (§13.6). A notch between two pairs has a WING on each
-    // side of it: seen from the middle of the mass's attachment, the farthest
-    // point of the outline ahead of the notch (the forewing's apex) and the
-    // farthest behind it (the hindwing's) must each reach AXIS_LOBE_FRAC of the
-    // farthest point overall. The deepest concavity that passes is the notch
-    // (from AXIS_NOTCH_MIN_FRAC deep, against NOTCH_MIN_FRAC without the axes). On a butterfly that is the
-    // outer margin's own notch, as before; on a moth it keeps the notch off a
-    // shallow dent in the forewing's costa, which has no wing ahead of it (that
-    // dent cut #43's forewing off at the root)
+    // A NOTCH BETWEEN TWO PAIRS HAS A WING ON EACH SIDE OF IT (§13.6): seen
+    // from the middle of the mass's attachment, the farthest point of the
+    // outline ahead of the notch (the forewing's) and the farthest behind it
+    // (the hindwing's) must each reach NOTCH_LOBE_FRAC of the farthest point
+    // overall; the deepest concavity that passes is the notch, from
+    // NOTCH_LOBE_MIN_FRAC deep, and the split line runs to the middle of the
+    // attachment. On a butterfly that is the outer margin's own notch, as
+    // before; on a moth it keeps the notch off a shallow dent in the
+    // forewing's costa, which has no wing ahead of it (that dent cut #43's
+    // forewing off at its root). Where no concavity passes (a hindwing under
+    // NOTCH_LOBE_FRAC of the reach), the deepest concavity at NOTCH_MIN_FRAC,
+    // split square to the body, as before. `notchLobes: false` is the old rule.
     let a0 = Infinity, a1 = -Infinity; for (let j = 0; j < NY; j++) if (M[j * NX + cutI]) { a0 = Math.min(a0, j); a1 = Math.max(a1, j + 1); }
     const Rm = [cutI, (a0 + a1) / 2];
-    const bearing = (p) => Math.atan2(-(p[1] - Rm[1]), p[0] - Rm[0]) * 180 / Math.PI;
+    const bearing = (p) => Math.atan2(-(p[1] - Rm[1]), p[0] - Rm[0]);
     const dist = (p) => hyp(p[0] - Rm[0], p[1] - Rm[1]);
-    const outer = (p) => p[0] >= cutI + 0.12 * extent;
-    const depthAt = loop.map((p) => { if (!outer(p)) return -1; let d = Infinity; for (let m = 0; m < hull.length; m++) d = Math.min(d, segDist(p, hull[m], hull[(m + 1) % hull.length])); return d; });
-    let best = -1, depth = 0, axes = null;
-    if (o.axisFrame !== false) {
-      let dmax = 0; for (const p of loop) if (outer(p)) dmax = Math.max(dmax, dist(p));
+    const outerPt = (p) => p[0] >= cutI + 0.12 * extent;
+    const depthAt = loop.map((p) => { if (!outerPt(p)) return -1; let d = Infinity; for (let m = 0; m < hull.length; m++) d = Math.min(d, segDist(p, hull[m], hull[(m + 1) % hull.length])); return d; });
+    let best = -1, depth = 0, lobes = null;
+    if (o.notchLobes !== false) {
+      let dmax = 0; for (const p of loop) if (outerPt(p)) dmax = Math.max(dmax, dist(p));
       const cand = [];
       for (let k = 0; k < loop.length; k++) {
-        const d = depthAt[k]; if (d < AXIS_NOTCH_MIN_FRAC * extent) continue;
+        const d = depthAt[k]; if (d < NOTCH_LOBE_MIN_FRAC * extent) continue;
         let isMax = true; for (let m = -4; m <= 4 && isMax; m++) if (m && depthAt[(k + m + loop.length) % loop.length] > d) isMax = false;
         if (isMax) cand.push(k);
       }
@@ -785,31 +786,22 @@ function fitOnce(img, base, opts) {
       for (const k of cand) {
         const bn = bearing(loop[k]);
         let F = -1, H = -1;
-        loop.forEach((p, m) => { if (!outer(p)) return; if (bearing(p) > bn) { if (F < 0 || dist(p) > dist(loop[F])) F = m; } else if (H < 0 || dist(p) > dist(loop[H])) H = m; });
-        if (F < 0 || H < 0 || dist(loop[F]) < AXIS_LOBE_FRAC * dmax || dist(loop[H]) < AXIS_LOBE_FRAC * dmax) continue;
-        best = k; depth = depthAt[k]; axes = { fore: loop[F], hind: loop[H] }; break;
+        loop.forEach((p, m) => { if (!outerPt(p)) return; if (bearing(p) > bn) { if (F < 0 || dist(p) > dist(loop[F])) F = m; } else if (H < 0 || dist(p) > dist(loop[H])) H = m; });
+        if (F < 0 || H < 0 || dist(loop[F]) < NOTCH_LOBE_FRAC * dmax || dist(loop[H]) < NOTCH_LOBE_FRAC * dmax) continue;
+        best = k; depth = depthAt[k]; lobes = { fore: loop[F], hind: loop[H] }; break;
       }
     }
-    // no notch with a wing on each side (a hindwing under AXIS_LOBE_FRAC of the
-    // reach — #23's small hindwings): the old rule, the deepest concavity at
-    // NOTCH_MIN_FRAC, split square to the body. Without it that butterfly read
-    // as ONE pair, where the margin-notch fitter had split it.
-    if (!axes) loop.forEach((p, k) => { if (depthAt[k] > depth) { depth = depthAt[k]; best = k; } });
+    if (!lobes) loop.forEach((p, k) => { if (depthAt[k] > depth) { depth = depthAt[k]; best = k; } });
     notch = best >= 0 ? { at: loop[best], depth, frac: depth / extent } : null;
-    res.axes = axes ? { fore: toWorld(...axes.fore), hind: toWorld(...axes.hind), root: toWorld(...Rm) } : null;
-    const want = o.pairs === 'auto' ? (notch && notch.frac >= (axes ? AXIS_NOTCH_MIN_FRAC : NOTCH_MIN_FRAC) ? 2 : 1) : clamp(+o.pairs, 1, 2);
+    res.lobes = lobes ? { fore: toWorld(...lobes.fore), hind: toWorld(...lobes.hind), root: toWorld(...Rm) } : null;
+    const want = o.pairs === 'auto' ? (notch && notch.frac >= (lobes ? NOTCH_LOBE_MIN_FRAC : NOTCH_MIN_FRAC) ? 2 : 1) : clamp(+o.pairs, 1, 2);
     if (o.pairs !== 'auto' && +o.pairs > 2) res.notes.push('one wing mass can only be split into 2 pairs; 3 or 4 pairs need wings that are visibly separate in the picture');
     if (want === 2 && notch) {
       // the split line, upright px: from the notch inward, square to the body by
       // default — or where the page's handles put it (world mm)
-      // (under the axes the line runs from the notch to the MIDDLE of the
-      // attachment, between the two wings' hinges, instead of square to the
-      // body: a forewing swept back over the hindwing has its inner margin on
-      // that diagonal, and the square line handed it a slice of hindwing — #50)
-      let outer = notch.at, root = [cutI, axes ? Rm[1] : notch.at[1]];
+      let outer = notch.at, root = [cutI, lobes ? Rm[1] : notch.at[1]];
       if (o.split && o.split.outer && o.split.root) { outer = toUpright(...o.split.outer); root = toUpright(...o.split.root); root[0] = cutI; }
       // the root end clamped onto the wing's own attachment along the body
-      let a0 = Infinity, a1 = -Infinity; for (let j = 0; j < NY; j++) if (M[j * NX + cutI]) { a0 = Math.min(a0, j); a1 = Math.max(a1, j + 1); }
       // (kept off its ends: each pair needs a root chord of its own)
       root = [cutI, clamp(root[1], a0 + 0.15 * (a1 - a0), a1 - 0.15 * (a1 - a0))];
       // the line must END ON THE MARGIN (a wall ending inside the wing would
@@ -947,57 +939,29 @@ function fitOnce(img, base, opts) {
       if (done.bridged) rec0.bridged = done.bridged;
       joinsW = done.joins || [];
     }
-    // the TAIL — the bottom pair only (found first: the wing's axis ignores it)
-    let tailRegion = null;
-    if (o.tail && k === N - 1) tailRegion = findTail(M, NX, NY, cutI);
-    // THE WING'S OWN FRAME (§13.6): its long axis, hinge to apex, is the
-    // pair's sweep; the outline is fitted along it, re-rooted on a short chord
-    // square to it at the hinge
-    const axisMode = o.axisFrame !== false;
-    let sweep = 0, apexDist = 0;
-    if (axisMode) {
-      const inT = tailRegion ? (q) => { const [x, y] = toUpright(...q), i = Math.floor(x), j = Math.floor(y); return i >= 0 && j >= 0 && i < NX && j < NY && tailRegion.mask[j * NX + i] === 1; } : () => false;
-      const ax = wingAxis(chainW, [hx, hy], inT);
-      sweep = clamp(+ax.sweep.toFixed(1), -89, 89); apexDist = ax.dist;
-    }
-    // length: a wing's length is its REACH across the body, as before (the
-    // forewing's is the bug's size — what applying a library shape keeps), so
-    // in its own frame its apex sits at u = 1 / cos(sweep); past the outline
-    // rule's 1.6 (a wing swept beyond 50 degrees) the length grows to keep it there
+    // length: the apex at u = 1 (inside the slider's 5–60 mm)
     let xmax = 0; for (const q of chainW) xmax = Math.max(xmax, q[0]);
-    // (and so does anything drawn past the apex along the axis — a tail, which
-    // the axis excludes: #53's hindwing tail reached u 1.81)
-    let reach = apexDist;
-    if (axisMode) { const sw = (sweep * Math.PI) / 180, ax = [Math.cos(sw), -Math.sin(sw)]; for (const q of chainW) reach = Math.max(reach, (q[0] - hx) * ax[0] + (q[1] - hy) * ax[1]); }
-    let L = !axisMode ? xmax - hx : Math.max(xmax - hx, reach / (OUTLINE_BOUNDS.u[1] - 0.05));
-    if (L > 60) { if ((axisMode ? reach : xmax - hx) / 60 > OUTLINE_BOUNDS.u[1] - 0.01) return { ...res, ...stepMsg(5, `pair ${k + 1} is ${(xmax - hx).toFixed(0)} mm long at this wingspan — beyond the 60 mm slider; lower the wingspan`) }; L = 60; }
+    let L = xmax - hx;
+    if (L > 60) { if ((xmax - hx) / 60 > OUTLINE_BOUNDS.u[1] - 0.01) return { ...res, ...stepMsg(5, `pair ${k + 1} is ${(xmax - hx).toFixed(0)} mm long at this wingspan — beyond the 60 mm slider; lower the wingspan`) }; L = 60; }
     if (L < 5) L = 5;
-    const F1 = axisFrame([hx, hy], sweep, 1, 1);
-    let ymax = -Infinity, ymin = Infinity; for (const q of chainW) { const w = F1.toUW(q)[1]; ymax = Math.max(ymax, w); ymin = Math.min(ymin, w); }
+    let ymax = -Infinity, ymin = Infinity; for (const q of chainW) { ymax = Math.max(ymax, q[1] - hy); ymin = Math.min(ymin, q[1] - hy); }
     const S = clamp(Math.max(1, ymax / ((OUTLINE_BOUNDS.w[1] - 0.02) * L), -ymin / ((-OUTLINE_BOUNDS.w[0] - 0.02) * L)), 0.3, 3);
-    // the root chord: ROOT_HALF_FRAC of the length in w (x the stretch in mm), never under the floor
-    if (axisMode) {
-      const half = Math.max(ROOT_HALF_FRAC * L * S, (base.minDiameter || 1) / 2);
-      const rr = rerootChain(chainW, [hx, hy], sweep, half, (q) => q[0] < cutX + 0.6 * s);
-      if (!rr) return { ...res, ...stepMsg(5, `pair ${k + 1}: nothing of the wing stands ahead of its own root`) };
-      chainW = rr.chain;
-    }
-    const FR = axisFrame([hx, hy], sweep, L, S);
-    const toUW = FR.toUW, metric = FR.toWorld;
+    const toUW = (q) => [(q[0] - hx) / L, (q[1] - hy) / (L * S)];
+    const metric = ([u, w]) => [hx + u * L, hy + w * L * S];
     let chain = chainW.map(toUW);
-    if (axisMode) { chain[0] = [0, chain[0][1]]; chain[chain.length - 1] = [0, chain[chain.length - 1][1]]; }
-    else {
-      // the root: the chain's two ends brought to u = 0 (inside the body, hidden under it)
-      const r0 = chain[0], r1 = chain[chain.length - 1];
-      chain = [[0, r0[1]], ...chain, [0, r1[1]]];
-    }
+    // the root: the chain's two ends brought to u = 0 (inside the body, hidden under it)
+    const r0 = chain[0], r1 = chain[chain.length - 1];
+    chain = [[0, r0[1]], ...chain, [0, r1[1]]];
     // decimate to ~0.5 px so the fit is quick (the chain is already smooth),
     // and keep nothing within MIN_GAP_UW of a root point: two control points
     // that close are refused as coincident by the outline rule
     chain = decimate(chain, metric, 0.5 * s);
     chain = chain.filter((q, k) => k === 0 || k === chain.length - 1 || (hyp(q[0] - chain[0][0], q[1] - chain[0][1]) >= MIN_GAP_UW && hyp(q[0] - chain[chain.length - 1][0], q[1] - chain[chain.length - 1][1]) >= MIN_GAP_UW));
     const spec = specOf(k);
-    Object.assign(spec, { length: +L.toFixed(3), stretch: +S.toFixed(4), sweep });
+    Object.assign(spec, { length: +L.toFixed(3), stretch: +S.toFixed(4) });
+    // the TAIL — the bottom pair only
+    let tailRegion = null;
+    if (o.tail && k === N - 1) tailRegion = findTail(M, NX, NY, cutI);
     // a bridge's JOIN to the margin the picture showed is kept as a control
     // point: where a hidden edge emerges two wings' edges CROSS at a shallow
     // angle, and a fit free to sit a tolerance off each edge slides that
@@ -1008,9 +972,8 @@ function fitOnce(img, base, opts) {
     for (let t = 0; t < 6; t++) {
       fit = fitOutline(chain, metric, tol, { keep: [...(tailRegion ? tailTip(chain, tailRegion, toUpright, metric) : []), ...joinKeep] });
       if (fit.valid) break;
-      // two interior points at a sharp apex closer than the outline rule allows
-      // (a wing swept past 60 degrees draws its tip tight): merged into their
-      // midpoint, which tightening only makes worse (#48's hindwing, 0.011)
+      // two interior points closer than the outline rule allows, at a tight
+      // tip: merged into their midpoint, which tightening only makes worse
       const merged = mergeClose(fit.points);
       if (merged && outlineValid(merged).ok) { fit = { ...fit, points: merged, valid: true }; break; }
       tol *= 0.6;
@@ -1020,7 +983,7 @@ function fitOnce(img, base, opts) {
     let pts = fit.points.map(([u, w]) => [+u.toFixed(5), +w.toFixed(5)]);
     pts[0][0] = 0; pts[pts.length - 1][0] = 0;
     if (!outlineValid(pts).ok) pts = fit.points.map((q) => q.slice());
-    const rec = { ...rec0, pair: k, points: pts.length, maxDevMm: fit.maxDevMm, tolMm: tol, length: L, stretch: S, sweep, tail: null, chain: chainW };
+    const rec = { ...rec0, pair: k, points: pts.length, maxDevMm: fit.maxDevMm, tolMm: tol, length: L, stretch: S, tail: null, chain: chainW };
     // split the tail's control points into the tagged group
     if (tailRegion) {
       const tg = tailGroup(pts, tailRegion, toUpright, metric);
@@ -1117,6 +1080,17 @@ export const COMPLETE_TANGENT_MM = 1.2;   // the seen margin's direction is read
 export const COMPLETE_MIN_SEEN_MM = 1.0;  // a shorter seen stretch between unseen runs is wall noise
 export const COMPLETE_ROOT_ZONE = 0.12;   // of the wing's span from the body: the root zone
 export const COMPLETE_HERMITE = 0.6;      // the bridge's tangent length, of its chord
+/* Consecutive INTERIOR control points closer than MIN_GAP_UW merged into
+   their midpoint (the two root points are never moved); null if none were. */
+function mergeClose(P) {
+  const out = [P[0]]; let any = false;
+  for (let i = 1; i < P.length; i++) {
+    const q = P[i], last = out[out.length - 1], interior = out.length > 1 && i < P.length - 1;
+    if (interior && hyp(q[0] - last[0], q[1] - last[1]) < MIN_GAP_UW) { out[out.length - 1] = [(q[0] + last[0]) / 2, (q[1] + last[1]) / 2]; any = true; }
+    else out.push(q);
+  }
+  return any ? out : null;
+}
 export function completeChain(chain, unseen, s, root) {
   const n = chain.length;
   if (n < 6) return { chain, bridged: null };
@@ -1175,82 +1149,6 @@ export function completeChain(chain, unseen, s, root) {
   out.push(...hermite(chain[b0], dirAt(b0, -1) || unit([trail[0] - chain[b0][0], trail[1] - chain[b0][1]]), trail, [-1, 0]), trail); joins.push(chain[b0]);
   bridged.push({ kind: 'root, trail side', lengthMm: +hyp(chain[b0][0] - trail[0], chain[b0][1] - trail[1]).toFixed(2) });
   return { chain: out, bridged, joins };
-}
-
-/* THE WING'S OWN FRAME (design doc §13.6). A wing is fitted along its own LONG
-   AXIS — from the hinge to its APEX, the point of its outline farthest from the
-   hinge — and the axis's angle is stored as the pair's SWEEP (+ = backward, the
-   geometry's sign), so the outline's points carry the shape and nothing of the
-   angle. `wingAxis` reads it off a chain in world mm (the tail excluded: a
-   swallowtail's tail is not where the wing points).
-
-   The ROOT in that frame. The geometry closes every outline on a root chord at
-   u = 0 — square to the wing's own axis through its hinge. A root the picture
-   shows runs along the BODY's edge, which is square to the axis only at sweep 0,
-   so the chain is re-rooted: kept from where it leaves the body (`hidden`) and
-   stands ahead of the root line (u > 0 — nothing of an outline may sit behind
-   its own root), and joined by a cubic Hermite, tangent to the margin, to each
-   end of a short root chord centred on the hinge (half `halfMm` either side),
-   arriving along the axis. Everything rebuilt lies in the body's root zone. */
-/* Consecutive INTERIOR control points closer than MIN_GAP_UW merged into
-   their midpoint (the two root points are never moved); null if none were. */
-function mergeClose(P) {
-  const out = [P[0]]; let any = false;
-  for (let i = 1; i < P.length; i++) {
-    const q = P[i], last = out[out.length - 1], interior = out.length > 1 && i < P.length - 1;
-    if (interior && hyp(q[0] - last[0], q[1] - last[1]) < MIN_GAP_UW) { out[out.length - 1] = [(q[0] + last[0]) / 2, (q[1] + last[1]) / 2]; any = true; }
-    else out.push(q);
-  }
-  return any ? out : null;
-}
-export function wingAxis(chain, hinge, skip = () => false) {
-  let best = -1, at = null;
-  for (const q of chain) { if (skip(q)) continue; const d = hyp(q[0] - hinge[0], q[1] - hinge[1]); if (d > best) { best = d; at = q; } }
-  return { sweep: (Math.atan2(-(at[1] - hinge[1]), at[0] - hinge[0]) * 180) / Math.PI, dist: best, apex: at };
-}
-export const ROOT_HALF_FRAC = 0.02;   // the re-rooted chord's half-width, of the wing's length (the outline rule wants 0.03 whole)
-export function rerootChain(chain, hinge, sweepDeg, halfMm, hidden, opts = {}) {
-  const sw = (sweepDeg * Math.PI) / 180, s = [Math.cos(sw), -Math.sin(sw)], c = [Math.sin(sw), Math.cos(sw)];
-  const uOf = (q) => (q[0] - hinge[0]) * s[0] + (q[1] - hinge[1]) * s[1];
-  const behind = (q) => hidden(q);
-  let a = 0; while (a < chain.length - 1 && behind(chain[a])) a++;
-  let b = chain.length - 1; while (b > a && behind(chain[b])) b--;
-  if (b - a < 3) return null;
-  const kept = chain.slice(a, b + 1);
-  // the chord is centred on the hinge — unless the outline leaves the body
-  // wholly to one side of it (a forewing whose leading edge emerges BEHIND the
-  // hinge line, #36), where bridges from a hinge-centred chord would cross:
-  // there it is centred between the two kept ends, still at u = 0
-  const wOf = (q) => (q[0] - hinge[0]) * c[0] + (q[1] - hinge[1]) * c[1];
-  const wl = wOf(kept[0]), wt = wOf(kept[kept.length - 1]);
-  const mid = (wl < halfMm || wt > -halfMm) && wl - wt > 2 * halfMm ? (wl + wt) / 2 : 0;
-  const lead = [hinge[0] + (mid + halfMm) * c[0], hinge[1] + (mid + halfMm) * c[1]], trail = [hinge[0] + (mid - halfMm) * c[0], hinge[1] + (mid - halfMm) * c[1]];
-  const unit = (v) => { const L = hyp(v[0], v[1]) || 1; return [v[0] / L, v[1] / L]; };
-  const tan = (from, dir) => { let m = from, len = 0; while (m + dir >= 0 && m + dir < kept.length && len < COMPLETE_TANGENT_MM) { len += hyp(kept[m + dir][0] - kept[m][0], kept[m + dir][1] - kept[m][1]); m += dir; } return m === from ? null : unit(dir > 0 ? [kept[m][0] - kept[from][0], kept[m][1] - kept[from][1]] : [kept[from][0] - kept[m][0], kept[from][1] - kept[m][1]]); };
-  const step = opts.stepMm || 0.1;
-  const hermite = (P0, T0, P1, T1) => {
-    const out = [], L = hyp(P1[0] - P0[0], P1[1] - P0[1]), mag = COMPLETE_HERMITE * L, N = Math.max(2, Math.ceil(L / step));
-    for (let i = 1; i < N; i++) {
-      const t = i / N, t2 = t * t, t3 = t2 * t, h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
-      out.push([h00 * P0[0] + h10 * mag * T0[0] + h01 * P1[0] + h11 * mag * T1[0], h00 * P0[1] + h10 * mag * T0[1] + h01 * P1[1] + h11 * mag * T1[1]]);
-    }
-    return out;
-  };
-  const L0 = kept[0], L1 = kept[kept.length - 1];
-  const leadBr = hermite(lead, s, L0, tan(0, +1) || unit([L0[0] - lead[0], L0[1] - lead[1]]));
-  const trailBr = hermite(L1, tan(kept.length - 1, -1) || unit([trail[0] - L1[0], trail[1] - L1[1]]), trail, [-s[0], -s[1]]);
-  // nothing behind the root line (a bridge that dipped there is pushed onto it)
-  const fix = (q) => q;
-  return { chain: [lead, ...leadBr.map(fix), ...kept, ...trailBr.map(fix), trail], keptFrom: a, keptTo: b, lead, trail };
-}
-/* world mm -> the wing's own (u, w), and back: u along the axis in lengths, w
-   across it in lengths x stretch (the editor's units at that sweep) */
-export function axisFrame(hinge, sweepDeg, L, S) {
-  const sw = (sweepDeg * Math.PI) / 180, cs = Math.cos(sw), sn = Math.sin(sw);
-  return {
-    toUW: (q) => { const dx = q[0] - hinge[0], dy = q[1] - hinge[1]; return [(dx * cs - dy * sn) / L, (dx * sn + dy * cs) / (L * S)]; },
-    toWorld: ([u, w]) => { const a = u * L, b = w * L * S; return [hinge[0] + a * cs + b * sn, hinge[1] - a * sn + b * cs]; },
-  };
 }
 
 /* Keep chain points at least `step` mm apart (the ends always). */

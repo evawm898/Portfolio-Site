@@ -141,8 +141,8 @@
    BETWEEN parts (overlapping closed shells are the export contract).
 
    --negative-control  breaks built models thirty-five ways (plus the L clause at reach 1, three
-                       broken editor frames for Q, fourteen CODE mutants of bug-image.js for IM, and nine CODE
-                       mutants of bug-geometry.js plus two data mutants for LB — every anchor checked to
+                       broken editor frames for Q, ten CODE mutants of bug-image.js for IM, and seven CODE
+                       mutants of bug-geometry.js plus one data mutant for LB — every anchor checked to
                        match exactly once before any of them runs) and requires each
                        to be caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
@@ -535,7 +535,7 @@ function smoothChecks(model) {
    polygon that was triangulated — less its two root-tab vertices (inside the
    body). Decisive only outside a band of two grid steps around the bar; the
    rows in that band are reported, not asserted. */
-function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity, inBody = null) {
+function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity) {
   const h = floor / H, r = floor / 2;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -552,7 +552,7 @@ function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity, inBody = n
   const covM = bucket(pts.filter((_, i) => covered[i]));
   let depth = 0;
   pts.forEach((p, i) => {
-    if (covered[i] || (inBody ? inBody(p[0], p[1]) : p[0] < ignoreXBelow)) return;
+    if (covered[i] || p[0] < ignoreXBelow) return;
     let d = Infinity;
     for (let ring = 1; ring < 400 && d === Infinity; ring *= 2) for (const c of near(covM, p, ring)) d = Math.min(d, Math.hypot(p[0] - c[0], p[1] - c[1]));
     depth = Math.max(depth, d);
@@ -561,22 +561,11 @@ function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity, inBody = n
 }
 function floorChecks(model) {
   const bad = [], floor = model.params.minDiameter, tau = G.THIN_DEPTH_FRAC * floor;
-  let worst = 0, gateThin = false, border = false, bodyLoops = null;
+  let worst = 0, gateThin = false, border = false;
   for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
     // with the blended root the root chord is no edge (the wing runs on into the
-    // body as its tab): the whole planform, nothing inside the body judged —
-    // and on a SWEPT wing "inside the body" is inside the BODY's own emitted
-    // silhouette seen from above (contourLoops of the body part — not the
-    // builder's profileAt), the planform carried to world through editorFrame's
-    // hinge and sweep with no pitch or dihedral
-    const fr = G.editorFrame(model.params, part.meta.pair), sw = fr?.sweep || 0;
-    let inBody = null;
-    if (sw) {
-      const cs = Math.cos((sw * Math.PI) / 180), sn = Math.sin((sw * Math.PI) / 180), hg = fr.hinge;
-      bodyLoops ??= G.contourLoops(model, model.parts.find((q) => q.kind === 'body'));
-      inBody = (a, b) => { const x = hg[0] + a * cs + b * sn, y = hg[1] - a * sn + b * cs; return bodyLoops.some((Lp) => { let c = false; for (let i = 0, j = Lp.length - 1; i < Lp.length; j = i++) { const P = Lp[i], Q = Lp[j]; if ((P[1] > y) !== (Q[1] > y) && x < ((Q[0] - P[0]) * (y - P[1])) / (Q[1] - P[1]) + P[0]) c = !c; } return c; }); };
-    }
-    const { depth, h } = part.meta.root ? gateThinDepth(part.meta.planform, floor, 12, 0, inBody) : gateThinDepth(part.meta.planform.slice(1, -1), floor, 12, -Infinity, inBody);
+    // body as its tab): the whole planform, nothing inside the body judged
+    const { depth, h } = part.meta.root ? gateThinDepth(part.meta.planform, floor, 12, 0) : gateThinDepth(part.meta.planform.slice(1, -1), floor);
     worst = Math.max(worst, depth);
     const builderThin = model.floorViolations.some((v) => v.kind !== 'vein' && `wing${v.pair + 1}` === part.kind);
     if (depth > tau + 2 * h) { gateThin = true; if (!builderThin) bad.push(`${part.name}: thin by this file's measure (${depth.toFixed(2)} mm past the floor disc) and NOT reported by the builder`); }
@@ -1618,11 +1607,6 @@ if (NEG) {
     const fails = libraryChecks({ ...G, WING_LIBRARY: lib }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${'a library shape crosses itself'.padEnd(32)} by LB1  — ${fails.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
     if (!fired) ok = false;
-    // a library shape whose fitted sweep is zeroed, its own-frame points kept (§13.6)
-    { const lib2 = JSON.parse(JSON.stringify(G.WING_LIBRARY)); lib2[4].fore.sweep = 0;
-      const f2 = libraryChecks({ ...G, WING_LIBRARY: lib2 }).filter(([c]) => !c).map(([, m]) => m), hit = f2.some((x) => x.startsWith('LB7:'));
-      console.log(`${hit ? 'CAUGHT' : 'MISSED'} ${"a library shape's sweep zeroed".padEnd(32)} by LB7  — ${f2.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
-      if (!hit) ok = false; }
   }
   const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
   const splay = legExposure(G.buildBug(splayP));

@@ -65,11 +65,6 @@
      IM14 a refusal names its step and returns the shape it found: the busy
           picture at step 1, a one-sided shape (the left forewing erased) at
           step 2.
-     IM15 each pair is fitted in its OWN frame (§13.6): the fitted sweep is the
-          bearing, from the fitted bug's own hinge, of the KNOWN bug's apex (the
-          farthest point of its drawn outline from its hinge, placed as IM3
-          places it) within SWEEP_TOL_DEG, and the params carry the fitted sweep
-          on every pair.
 */
 
 import * as G from '../bug-geometry.js';
@@ -191,11 +186,6 @@ export const boundMm = (img, tol) => tol + 3 / img.truth.pxPerMm + 0.5 * img.tru
 
 /* The IM checks, against a given bug-image module (the gate passes the shipped
    one; the negative control passes mutants). Returns [[ok, message], ...]. */
-/* IM15's bound: the fitted axis against the known one. The apex is one point of
-   a rasterised outline, so its bearing is read to about a pixel over the wing's
-   length (0.5 degrees at 40 px), and the picture's asymmetry moves the averaged
-   half's tip by half of it (2% here, about 0.6 degrees). */
-export const SWEEP_TOL_DEG = 3;
 export function imageChecks(I) {
   const out = [], ok = (c, m) => out.push([!!c, m]);
   const F = fixtures();
@@ -230,28 +220,6 @@ export function imageChecks(I) {
     const tl = r.params.wings.tail;
     if (ex.tail) ok(tl.on && tl.points.length >= 2 && c.tailTipMm <= b, `IM5: ${name}: TAIL group ${tl.on ? 'ON' : 'OFF'} with ${tl.points.length} points; the fitted tail tip ${c.tailTipMm.toFixed(3)} mm from the known one (bound ${b.toFixed(3)})`);
     else ok(!tl.on, `IM5: ${name}: no tail found where the picture has none (TAIL ${tl.on ? 'ON' : 'off'})`);
-    // IM15 — each pair's SWEEP is fitted and stored (§13.6). The reference is
-    // the KNOWN bug's apex — the farthest point of its drawn outline (tail
-    // excluded) from its own hinge, carried into the world by the KNOWN frame
-    // and placed in the fitted bug's world the way IM3 places it (the two
-    // right-wing silhouettes' centroids aligned in y) — seen from the FITTED
-    // bug's hinge, the pivot the stored angle turns about (the hinge is a body
-    // measurement, not the quantity under test). And the params carry it.
-    if (c.model && r.params.wingPairs === img.truth.params.wingPairs) {
-      const tp = img.truth.params, known = G.resolveWingPairs(G.normalizeParams(tp));
-      const cyOf = (m) => { let A = 0, Cy = 0; for (const g of partLoops(m, rightWings)) for (const L of g) for (let k = 0; k < L.length; k++) { const [x0, y0] = L[k], [x1, y1] = L[(k + 1) % L.length], cc = x0 * y1 - x1 * y0; A += cc; Cy += (y0 + y1) * cc; } return Cy / (3 * A); };
-      const dy = cyOf(img.truth.model) - cyOf(c.model);
-      const want = known.map((sp, k) => {
-        const pts = sp.points || sp.ctrl; let best = -1, at = null;
-        for (const [u, w] of G.sampleOutline(pts)) { const d = Math.hypot(u, w * sp.stretch); if (d > best) { best = d; at = [u, w]; } }
-        const P = G.editorFrame(tp, k).toWorld(at[0], at[1]), H = G.editorFrame(r.params, k).hinge;
-        return (Math.atan2(-(P[1] - dy - H[1]), P[0] - H[0]) * 180) / Math.PI;
-      });
-      const W = r.params.wings, N = r.params.wingPairs;
-      const stored = r.pairs.map((q, k) => (k === 0 ? W.first : k === N - 1 ? W.last : W.unlinked[k]).sweep);
-      const errs = r.pairs.map((q, k) => Math.abs(q.sweep - want[k]));
-      ok(errs.every((e) => e <= SWEEP_TOL_DEG) && r.pairs.every((q, k) => stored[k] === q.sweep), `IM15: ${name}: fitted sweeps ${r.pairs.map((q) => q.sweep.toFixed(1)).join(' / ')} deg against the known apexes' bearings ${want.map((v) => v.toFixed(1)).join(' / ')} from the fitted hinges (off ${errs.map((e) => e.toFixed(2)).join(' / ')}, bound ${SWEEP_TOL_DEG}); stored ${stored.join(' / ')}`);
-    }
     // IM11 — the body's confidence: ESTIMATED exactly where it cannot be seen,
     // and then never narrower than the default proportions at this wingspan.
     // The reference is the GEOMETRY's default specimen scaled here, in the
@@ -344,6 +312,5 @@ export const IMAGE_MUTANTS = [
   // switched off too (measured). IM12 still asserts on every fit; it has no
   // live mutant, a gap recorded here rather than one manufactured.
   ['the ground along the edge is kept', 'if (border[id] / borderN > BORDER_TOUCH_FRAC) {', 'if (false) {', 'IM13'],
-  ['the fitted sweep is dropped', 'stretch: +S.toFixed(4), sweep });', 'stretch: +S.toFixed(4), sweep: 0 });', 'IM15'],
   ['a refusal does not name its step', "reason: `step ${k} of ${STEPS.length} (${STEPS[k - 1]}) failed: ${text}`", 'reason: text', 'IM14'],
 ];
