@@ -192,6 +192,12 @@ the 0.60 mm row — its witness refuses a probe state whose two reaches agree),
 `the-pedicel-ceiling-is-the-stems-again` (ID7, on the 250 mm row). Two rows added to the
 table for them. **Run (`--only=` the three, after two anchor corrections of this session's own — the one-mode mutant's anchor moved when the reach was quantised): each fires exactly the family it names and the clean tree is silent on every row; the ceiling mutant also reddens ID4 (a 250 mm pedicel clamped to 120 changes the floret's own stem length, which ID4 reads), recorded as collateral. 88 mutants were not run — a SUBSET, never a sweep.** The clean-tree control first fired ID9 on three rows, and all three were defects in ID9 itself, found by the real export gate rather than reasoned: (e) asserted the top node equals the inset on a row whose florets cannot clear the head (the node law holds its single node at 0.86 L there — guarded on `insetSatisfied`); (d) read a unit source stream the metrics hook never projects (the builder's own `topNodeMaxZ` now); (f) asked for `Object.is` between the page's V8 and Node's on a reach reached through trigonometry and went red on depths equal to four decimals (within one engine now, the page held to the same-mode rebuild within the arithmetic's bound). The export gate on the five witness rows then read 4 of 5 reaching the results; the fifth, the hemisphere row, is X2 — the HEAD's own rise-1 fold (248 pairs at 0.4262 mm on `STEM: x a hemisphere`) plus five florets inheriting rise 1 at 220 each, 1348 — declared from birth and reproduced in Node at exactly that count.
 
+**The smoke subset, both gates, on the final tree: export PASS (151 of 151 reached the
+results, every one watertight) and connectedness PASS (151 of 151 one piece)** — run as the
+two gates on `SMOKE_REGEX` less `ALL MAX`, which on this box exceeds the 30 s settle budget
+on the base tree too (47.7 s there) and is CI's. The first smoke run is what found §2e.
+The panel gate passes (`--negative-control` not re-run — no route was added).
+
 ## 4. Row definitions moved (declared, never silent)
 
 * `INFLO: ALL MAX` → `pedicelLength 250` ("ONE node of 3 florets: a 250 mm pedicel
