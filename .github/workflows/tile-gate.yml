@@ -1,0 +1,88 @@
+# /tile — the tessellation rollers (tile-design-doc.md §9).
+#
+# geometry: tools/verify-tile.mjs, pure Node — the tiling (no overlap, no gap,
+#   area), every blade a closed RING round its roller (never a bar along it),
+#   the seam over three revolutions of each roller, the registration
+#   simulation (A's track, B's teeth in its dimples, A's and B's lines meeting
+#   at the corners and only there), every STL watertight by a DIRECTED edge
+#   census, the blade, peg and tooth heights measured off the mesh — then its
+#   negative control (every mutation caught by the clause that names it).
+# page: tools/verify-tile-page.mjs, headless Chromium with real pointer events,
+#   then its negative control (broken copies of tile.js and tile-roller.js
+#   re-served).
+#
+# PATH SCOPE: the tile's own files, the two bug-geometry functions it reuses
+# (sampleOutline, polygonSimple), and the two shared tools the page gate
+# imports. Nothing else here reads them.
+name: tile-gate
+
+on:
+  pull_request:
+    paths:
+      - tile.html
+      - tile.css
+      - 'tile*.js'
+      - bug-geometry.js
+      - 'tools/verify-tile*.mjs'
+      - 'tools/tile-*.mjs'
+      - tools/pngdec.mjs
+      - tools/chromium-harness.mjs
+      - tile-design-doc.md
+      - .github/workflows/tile-gate.yml
+  push:
+    branches: [main]
+    paths:
+      - tile.html
+      - tile.css
+      - 'tile*.js'
+      - bug-geometry.js
+      - 'tools/verify-tile*.mjs'
+      - 'tools/tile-*.mjs'
+      - tools/pngdec.mjs
+      - tools/chromium-harness.mjs
+      - tile-design-doc.md
+      - .github/workflows/tile-gate.yml
+  workflow_dispatch: {}
+
+# A run on a superseded commit is not evidence about the head. Keyed to the
+# workflow AND the ref, so it can never cancel across PRs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Gate (every fixture, 40 random tiles, the parameter rows)
+        run: node tools/verify-tile.mjs --seeds 40 --verbose
+      - name: Negative control (every mutation caught by the clause that names it)
+        run: node tools/verify-tile.mjs --negative-control
+
+  page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Pinned playwright, the same pin the other browser workflows here carry;
+      # three at the version tile.html's import map names, and JSZip for the
+      # zip download — all three in ONE install (a second --no-save prunes the first).
+      - name: Install render deps
+        run: npm i --no-save playwright@1.62.1 three@0.161.0 jszip@3.10.1
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: |
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Page gate (real pointer events, keys, downloads)
+        run: node tools/verify-tile-page.mjs
+      - name: Negative control (broken copies of tile.js and tile-roller.js, each caught by its check)
+        run: node tools/verify-tile-page.mjs --negative-control
