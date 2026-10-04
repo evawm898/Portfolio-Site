@@ -705,7 +705,12 @@ function fitOnce(img, base, opts) {
     const jTail = abdRows.length ? abdRows[abdRows.length - 1] + 1 : jw1 + 1;
     B = (jTail - jHead) * s;
     headSize = clamp(2 * (headHalf || bodyHalf) * s, 2, 12);
-    abdW = clamp(2 * (abdHalf || bodyHalf) * s, 1.5, 18);
+    // the abdomen's width from the rows BEHIND the thorax: with the blended
+    // root (§12.1) a wing attaches only at its neck, so the rows just behind it
+    // show the thorax's rear (and the root's fillet beside it) as a body column
+    const jT = (jw0 + jw1) / 2 + (THORAX_SHARE * B) / 2 / s;
+    const behind = abdRows.filter((j) => j >= jT), abdHalfT = behind.length ? Math.max(...behind.map((j) => h[j])) : abdHalf;
+    abdW = clamp(2 * (abdHalfT || bodyHalf) * s, 1.5, 18);
     thoraxWidth = clamp(Math.max(headSize, abdW) * 1.1, 2.5, 14);
     LtEff = clamp(THORAX_SHARE * B, 3, 40);
     abdomenLength = clamp(B - 1.55 * headSize / 2 - 0.88 * LtEff, 2, 70);
@@ -862,8 +867,42 @@ function fitOnce(img, base, opts) {
       if (!bestRun || m > bestRun.m) bestRun = { k0, m };
     }
     if (!bestRun) return { ...res, ...stepMsg(5, `pair ${k + 1}: no outline beside the body`) };
-    let chainW = []; for (let m = 0; m < bestRun.m; m++) chainW.push(loop[(bestRun.k0 + m) % loop.length]);
+    const rec0 = {};
+    let chainW = [], joinsW = []; for (let m = 0; m < bestRun.m; m++) chainW.push(loop[(bestRun.k0 + m) % loop.length]);
     if (chainW[0][1] < chainW[chainW.length - 1][1]) chainW.reverse();   // root LEAD (toward the head) first
+    // EACH WING A COMPLETE SHAPE ON ITS OWN (§12.2): the stretches of the chain
+    // the picture never showed — the split wall, the hidden band under the
+    // forewing, the strip to the thorax, the run along the body's edge — are
+    // replaced by smooth curves joined tangent to the margin that WAS seen
+    if (o.complete !== false) {
+      const inside = (q) => {
+        const [x, y] = toUpright(...q), r = COMPLETE_INSIDE_PX;
+        for (let a = 0; a < 8; a++) {
+          const i = Math.floor(x + r * Math.cos(a * Math.PI / 4)), j = Math.floor(y + r * Math.sin(a * Math.PI / 4));
+          if (i < 0 || j < 0 || i >= NX || j >= NY || !R[j * NX + i]) return false;
+        }
+        return true;
+      };
+      const onCut = (q) => q[0] <= cutX + COMPLETE_CUT_PX * s;
+      // the root anchors: on the body's edge, either side of THIS pair's hinge,
+      // half the blended root's width apart (never under the floor)
+      // (and at least a tenth of the span apart: the outline rule wants the root
+      // chord 0.03 of the length in (u, w), and the stretch can reach 3)
+      let xm = -Infinity; for (const q of chainW) xm = Math.max(xm, q[0]);
+      const half = Math.max(1.6, base.minDiameter || 1, 0.1 * (xm - hx)) / 2;
+      // with the straight root chord (pinch 0) the anchors are the picture's
+      // own root ends on the cut, held to the thorax: the narrow anchors either
+      // side of the hinge are a NECK, right only when the model blends it — at
+      // pinch 0 their embedded root tab stood past the body beside the head
+      const blended = (base.wingRootPinch || 0) > 0;
+      const e0 = chainW[0][1], e1 = chainW[chainW.length - 1][1];
+      const done = completeChain(chainW, (q) => onCut(q) || inside(q), s, blended
+        ? { xCut: cutX, yLead: hy + half, yTrail: hy - half }
+        : { xCut: cutX, yLead: clamp(e0, -T, T), yTrail: clamp(e1, -T, T), keepRoot: true });
+      chainW = done.chain;
+      if (done.bridged) rec0.bridged = done.bridged;
+      joinsW = done.joins || [];
+    }
     // length: the apex at u = 1 (inside the slider's 5–60 mm)
     let xmax = 0; for (const q of chainW) xmax = Math.max(xmax, q[0]);
     let L = xmax - hx;
@@ -887,9 +926,15 @@ function fitOnce(img, base, opts) {
     // the TAIL — the bottom pair only
     let tailRegion = null;
     if (o.tail && k === N - 1) tailRegion = findTail(M, NX, NY, cutI);
+    // a bridge's JOIN to the margin the picture showed is kept as a control
+    // point: where a hidden edge emerges two wings' edges CROSS at a shallow
+    // angle, and a fit free to sit a tolerance off each edge slides that
+    // visible crossing along by tolerance / sin(angle) — 1.7 mm on the
+    // same-tone fixture's notch at 0.6 mm
+    const joinKeep = [...new Set(joinsW.map((q) => { const u = toUW(q); let bk = -1, bd = Infinity; for (let k2 = 1; k2 + 1 < chain.length; k2++) { const d = hyp(chain[k2][0] - u[0], chain[k2][1] - u[1]); if (d < bd) { bd = d; bk = k2; } } return bk; }).filter((k2) => k2 > 0))];
     let tol = o.toleranceMm, fit = null;
     for (let t = 0; t < 6; t++) {
-      fit = fitOutline(chain, metric, tol, { keep: tailRegion ? tailTip(chain, tailRegion, toUpright, metric) : [] });
+      fit = fitOutline(chain, metric, tol, { keep: [...(tailRegion ? tailTip(chain, tailRegion, toUpright, metric) : []), ...joinKeep] });
       if (fit.valid) break;
       tol *= 0.6;
     }
@@ -898,7 +943,7 @@ function fitOnce(img, base, opts) {
     let pts = fit.points.map(([u, w]) => [+u.toFixed(5), +w.toFixed(5)]);
     pts[0][0] = 0; pts[pts.length - 1][0] = 0;
     if (!outlineValid(pts).ok) pts = fit.points.map((q) => q.slice());
-    const rec = { pair: k, points: pts.length, maxDevMm: fit.maxDevMm, tolMm: tol, length: L, stretch: S, tail: null, chain: chainW };
+    const rec = { ...rec0, pair: k, points: pts.length, maxDevMm: fit.maxDevMm, tolMm: tol, length: L, stretch: S, tail: null, chain: chainW };
     // split the tail's control points into the tagged group
     if (tailRegion) {
       const tg = tailGroup(pts, tailRegion, toUpright, metric);
@@ -970,6 +1015,89 @@ export function imageToBug(img, base, opts = {}) {
   }
   first.notes.push(`a stray contour line remains in the SVG ${was.worst.toFixed(2)} mm inside pair ${was.where.pair + 1}'s outline (at ${was.where.at.map((v) => v.toFixed(1)).join(', ')} mm): the rounded edge folds at a fitted tip tighter than the bead and no tolerance cleared it — smooth that tip in the editor, or lower the edge round`);
   return first;
+}
+
+/* COMPLETING A WING (§12.2). `chain` is the wing's open outline in world mm,
+   root lead first. A point is SEEN when it lies on the picture's own silhouette
+   margin; it is UNSEEN when it lies inside the silhouette (the split wall, the
+   band the hindwing is tucked under, the strip to the thorax) or on the cut
+   along the body. The ROOT ZONE — the stretch of each end within
+   COMPLETE_ROOT_ZONE of the wing's span from the body — is unseen too: there the
+   picture shows the wing pressed against the body, not where it attaches.
+   Every unseen run is replaced by a curve:
+     - between two seen stretches: a cubic Hermite tangent to both (the margin's
+       own directions, read over COMPLETE_TANGENT_MM of seen outline);
+     - at each END: a cubic from the seen margin, tangent to it, to the wing's
+       ROOT ANCHOR — a point on the body's edge beside the hinge, `root.half`
+       either side of it, arriving square to the body. So every fitted wing
+       narrows to its own short attachment beside its own hinge (the blended
+       root then shapes the last millimetres).
+   A seen stretch shorter than COMPLETE_MIN_SEEN_MM between two unseen runs is
+   noise on the wall and joins them. */
+export const COMPLETE_INSIDE_PX = 2;      // a point is inside the silhouette when 8 probes this far out are all shape
+export const COMPLETE_CUT_PX = 1.5;       // ... and on the body's edge within this of the cut
+export const COMPLETE_TANGENT_MM = 1.2;   // the seen margin's direction is read over this length
+export const COMPLETE_MIN_SEEN_MM = 1.0;  // a shorter seen stretch between unseen runs is wall noise
+export const COMPLETE_ROOT_ZONE = 0.12;   // of the wing's span from the body: the root zone
+export const COMPLETE_HERMITE = 0.6;      // the bridge's tangent length, of its chord
+export function completeChain(chain, unseen, s, root) {
+  const n = chain.length;
+  if (n < 6) return { chain, bridged: null };
+  const U = chain.map((q) => !!unseen(q));
+  let xmax = -Infinity; for (const q of chain) xmax = Math.max(xmax, q[0]);
+  // (the ROOT ZONE is replaced only when the model will blend the root: with
+  // the straight root chord — root pinch 0, the default — the root the picture
+  // shows along the thorax is kept, and only the hidden stretches are bridged)
+  if (!root.keepRoot) {
+    const zone = root.xCut + COMPLETE_ROOT_ZONE * (xmax - root.xCut);
+    for (let k = 0; k < n && chain[k][0] < zone; k++) U[k] = true;
+    for (let k = n - 1; k >= 0 && chain[k][0] < zone; k--) U[k] = true;
+  }
+  U[0] = U[n - 1] = true;
+  // short seen stretches between unseen runs join them
+  for (let a = 0; a < n;) {
+    if (U[a]) { a++; continue; }
+    let b = a, len = 0; while (b + 1 < n && !U[b + 1]) { len += hyp(chain[b + 1][0] - chain[b][0], chain[b + 1][1] - chain[b][1]); b++; }
+    if (len < COMPLETE_MIN_SEEN_MM) for (let k = a; k <= b; k++) U[k] = true;
+    a = b + 1;
+  }
+  if (U.every(Boolean)) return { chain, bridged: null };
+  const unit = (v) => { const L = hyp(v[0], v[1]) || 1; return [v[0] / L, v[1] / L]; };
+  const dirAt = (k, dir) => {
+    let m = k, len = 0;
+    while (m + dir >= 0 && m + dir < n && !U[m + dir] && len < COMPLETE_TANGENT_MM) { len += hyp(chain[m + dir][0] - chain[m][0], chain[m + dir][1] - chain[m][1]); m += dir; }
+    return m === k ? null : unit(dir < 0 ? [chain[k][0] - chain[m][0], chain[k][1] - chain[m][1]] : [chain[m][0] - chain[k][0], chain[m][1] - chain[k][1]]);
+  };
+  const hermite = (P0, T0, P1, T1) => {
+    const out = [], L = hyp(P1[0] - P0[0], P1[1] - P0[1]), mag = COMPLETE_HERMITE * L, N = Math.max(2, Math.ceil(L / (0.5 * s)));
+    for (let i = 1; i < N; i++) {
+      const t = i / N, t2 = t * t, t3 = t2 * t, h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      out.push([h00 * P0[0] + h10 * mag * T0[0] + h01 * P1[0] + h11 * mag * T1[0], h00 * P0[1] + h10 * mag * T0[1] + h01 * P1[1] + h11 * mag * T1[1]]);
+    }
+    return out;
+  };
+  const lead = [root.xCut, root.yLead], trail = [root.xCut, root.yTrail];
+  const out = [], bridged = [], joins = [];
+  // the lead end: anchor -> first seen point
+  let a0 = 0; while (U[a0]) a0++;
+  const leadBr = hermite(lead, [1, 0], chain[a0], dirAt(a0, +1) || unit([chain[a0][0] - lead[0], chain[a0][1] - lead[1]]));
+  out.push(lead, ...leadBr); joins.push(chain[a0]);
+  bridged.push({ kind: 'root, lead side', lengthMm: +hyp(chain[a0][0] - lead[0], chain[a0][1] - lead[1]).toFixed(2) });
+  let b0 = n - 1; while (U[b0]) b0--;
+  let k = a0;
+  while (k <= b0) {
+    if (!U[k]) { out.push(chain[k]); k++; continue; }
+    let b = k; while (U[b + 1]) b++;
+    const A = chain[k - 1], B = chain[b + 1];
+    const br = hermite(A, dirAt(k - 1, -1) || unit([B[0] - A[0], B[1] - A[1]]), B, dirAt(b + 1, +1) || unit([B[0] - A[0], B[1] - A[1]]));
+    out.push(...br); joins.push(A, B);
+    bridged.push({ kind: 'hidden', lengthMm: +hyp(B[0] - A[0], B[1] - A[1]).toFixed(2) });
+    k = b + 1;
+  }
+  // the trail end: last seen point -> anchor
+  out.push(...hermite(chain[b0], dirAt(b0, -1) || unit([trail[0] - chain[b0][0], trail[1] - chain[b0][1]]), trail, [-1, 0]), trail); joins.push(chain[b0]);
+  bridged.push({ kind: 'root, trail side', lengthMm: +hyp(chain[b0][0] - trail[0], chain[b0][1] - trail[1]).toFixed(2) });
+  return { chain: out, bridged, joins };
 }
 
 /* Keep chain points at least `step` mm apart (the ends always). */

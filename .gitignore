@@ -32,3 +32,8 @@ tools/.scratch/
 # because those modules import each other by relative path. Swept at start and
 # in a finally; ignored here so a crashed run cannot dirty the tree.
 scene/__mutant__*/
+
+# tools/bug-wing-library-fit.mjs reads Eva's reference sheets (stock art, one
+# watermarked) from here. They are never committed; only the fitted outline
+# data (bug-wing-library.js) is.
+tools/bug-wing-sources/

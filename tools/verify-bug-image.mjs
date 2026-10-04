@@ -107,7 +107,14 @@ export function compareToKnown(img, fit) {
   const fitted = rasterLoops(gF, ([x, y]) => t.toPx([x, y + dy]), W, H, 2);
   // (a picture whose body was inked into the wings' roots — the same-tone
   // fixture — is compared only beyond the inked band: truth.clipMm)
-  const cut = Math.max(Math.max(t.params.thoraxWidth, fit.params.thoraxWidth) / 2 + 1, t.clipMm || 0);
+  // (and only beyond the KNOWN bug's own blended roots — §12.1: within each
+  // pair's root map, hinge -> neck -> release, both bugs carry a DESIGNED root,
+  // not the picture's, so what the fit draws there is not a reading of the
+  // picture. The extent is read off the known model, never off the fit.)
+  const HK = G.wingHinges(t.model.params, t.model.layout);
+  let rootX = 0;
+  for (const q of t.model.parts.filter(rightWings)) if (q.meta.root) rootX = Math.max(rootX, HK[q.meta.pair].hinge[0] + q.meta.root.neckU + q.meta.root.blend);
+  const cut = Math.max(Math.max(t.params.thoraxWidth, fit.params.thoraxWidth) / 2 + 1, t.clipMm || 0, rootX);
   const clip = new Uint8Array(W * H);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) clip[y * W + x] = t.fromPx([x + 0.5, y + 0.5])[0] >= cut ? 1 : 0;
   const A = new Uint8Array(W * H), B = new Uint8Array(W * H);
@@ -297,7 +304,13 @@ export const IMAGE_MUTANTS = [
   ['the body is read 15% short', 'B = (jTail - jHead) * s;', 'B = 0.85 * (jTail - jHead) * s;', 'IM10'],
   ['the polarity is read off the border alone', 'if (pb.size > pa.size) {', 'if (false) {', 'IM13'],
   ['the body is always measured (a sliver fitted)', 'const confident = abdSeenMm >=', 'const confident = true || abdSeenMm >=', 'IM11'],
-  ['the wing root runs down the body', 'const atRoot = (q) => q[0] <= cutX + 0.6 * s && Math.abs(q[1]) <= T + 0.6 * s;', 'const atRoot = (q) => q[0] <= cutX + 0.6 * s;', 'IM12'],
+  // 'the wing root runs down the body' (IM12) is RETIRED, not passing: since
+  // §12 two mechanisms each prevent it on their own — the fitter replaces the
+  // root zone with a bridge to two anchors on the thorax (completeChain), and
+  // the model's blended root narrows every wing to its neck at the body's
+  // silhouette — and the mutation fired nothing even with the completion
+  // switched off too (measured). IM12 still asserts on every fit; it has no
+  // live mutant, a gap recorded here rather than one manufactured.
   ['the ground along the edge is kept', 'if (border[id] / borderN > BORDER_TOUCH_FRAC) {', 'if (false) {', 'IM13'],
   ['a refusal does not name its step', "reason: `step ${k} of ${STEPS.length} (${STEPS[k - 1]}) failed: ${text}`", 'reason: text', 'IM14'],
 ];
