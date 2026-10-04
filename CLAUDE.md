@@ -9651,6 +9651,25 @@ it. Any NEW render path inherits the same obligation.
   CONFIRMED loaded separates them, and exactly two checks moved under that
   mutation. Deleting the `await` in `drawPreviewNow()` moves exactly one, which
   is why that check reads the preview grid's own canvas instead of re-rendering.
+- **`05 Layout` owns number-card layout, and sections are now 01-07 plus 08 Preview.**
+  Flip toggle (`invertBottomPips`, default on = traditional), separate `pipScale` /
+  `aceScale` / `cornerGlyphScale` (the old `glyphScale` now scales the J/Q/K suit
+  glyphs only, relabelled "Court suit glyph scale"), pip column spacing and vertical
+  margin, and Traditional / Spacious / Compact presets (they set spacing, margin and
+  pip scale; the readout is DERIVED from the slider values, so it says Custom the
+  moment any of the three moves). `getPipLayout()` in `cards/card-template.js` is the
+  one owner of pip positions and clamps the slider VALUES (not each pip) so no pip's
+  ink can cross the safe rect, which is already inside the trim line. All defaults are
+  byte-identical to before (52 of 52 cards, measured against `main`). The preview now
+  shows the 10 of each suit after the A/K pairs (12 cards) so the pip controls are
+  visible live. **Gate section 8b / 10b**: ranks 7-10 at all 128 slider-extreme
+  corners are checked for ink outside a safe rect RESTATED from the print spec
+  (38 + 56 px), the clamp has a control that shows the raw slider value would leave
+  it, and the exports are compared against an expectation built from the values the
+  gate drove — NOT from `getStyle()`, which a first draft used and which made a
+  `getStyle()` that dropped a control agree with itself all the way to the file.
+  Pip-to-pip and pip-to-corner overlap at the extremes are REPORTED (the `info` line),
+  not gated: the ruling was the safe area, and 150% pips on a 10 touch at defaults.
 - The other cards gate, `node tools/verify-cards-svg-glyphs.mjs`, still covers
   the suit-glyph upload path and must stay green alongside it. **Neither runs in
   CI, and nothing else covers cards either — run both by hand before calling a

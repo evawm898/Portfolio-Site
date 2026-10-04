@@ -786,3 +786,13 @@ details:not([open]) > summary.cd-panel__label { margin-bottom: 0; }
 }
 
 .sr-only[hidden] { display: none; }
+
+/* 05 Layout — preset buttons sit in a row (each is the secondary export
+   button, whose own margin rule stacks siblings), and the flip toggle is a
+   label row with the checkbox on the right. */
+.cd-preset-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.cd-preset-row .cd-export-btn { flex: 1 1 0; width: auto; margin-top: 0; padding-left: 0.5rem; padding-right: 0.5rem; }
+.cd-preset-row .cd-export-btn + .cd-export-btn { margin-top: 0; }
+.cd-preset-row .cd-export-btn[aria-pressed="true"] { background: var(--petrol); color: var(--paper-raised); }
+.cd-field__check { cursor: pointer; }
+.cd-field__check input { accent-color: var(--petrol-bright); width: 1.1rem; height: 1.1rem; }
