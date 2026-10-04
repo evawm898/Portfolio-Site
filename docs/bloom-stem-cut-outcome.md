@@ -275,8 +275,11 @@ nearer the swelling's peak); and the face clause reads ONLY the stem's own trian
 (`[hubTriEnd, hubTriEnd + stemBuilt.tris)` on each tree) — a leaf's petiole rooted near the
 tip or a pedicel on a short rachis is a down-facing triangle inside the cut's window and the
 tube's radius, and the first sweep summed them into the face (`LEAVES: the STEEP angle`
-113.85 against 112.77 mm²; `INFLO: 12 nodes on a 20 mm rachis` 32.24 against 28.19). On a
-straight stem with nothing near its tip every one of these is the expression it was.
+113.85 against 112.77 mm²; `INFLO: 12 nodes on a 20 mm rachis` 32.24 against 28.19). And a third, the same clause again: the extent is taken over every depth a ring is DRAWN at —
+the stations, the void's own, and the cut ring's `L − h(θ)` per column, which are not
+stations (`STEM NODES: the longest leaf on the shortest stem` read a cut-ring vertex 1e-4 mm
+past the station-sampled extent). On a straight stem with nothing near its tip every one of
+these is the expression it was.
 
 ### 4g. SC0–SC3 — the new family
 

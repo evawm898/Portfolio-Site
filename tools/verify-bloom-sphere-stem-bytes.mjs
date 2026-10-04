@@ -250,8 +250,19 @@ function onlyTheStemsInteriorWent(set, em) {
      r 12.1596 against nodeMaxOuterR + nodeTipOffsetMm = 12.1325). */
   const extentOf = (M, pl) => {
     if (!pl.nodeLaw) return pl.outerR;
+    /* Every depth a ring is drawn at: the tube's stations, the void's own
+       (relative to `voidTopZ`), and — on the branch — the cut ring's, one per
+       column at `L - h(theta)`, which are NOT stations (`STEM NODES: the longest
+       leaf on the shortest stem` read a cut-ring vertex 1e-4 past the
+       station-sampled extent). */
+    const depths = [...pl.stations];
+    if (pl.voidStations) for (const v of pl.voidStations) depths.push((pl.rootZ - pl.voidTopZ) + v);
+    if (pl.cut && pl.cut.made) {
+      const N = pl.sides, step = 2 * Math.PI / N;
+      for (let i = 0; i < N; i++) depths.push(pl.lengthMm - Math.max(0, pl.cut.slope * pl.cut.rTip * (pl.cut.cosJ - Math.cos(Math.min(i, N - i) * step))));
+    }
     let e = 0;
-    for (const sd of pl.stations) { const c = M.stemNodeAxisMm(pl.nodeLaw, sd); e = Math.max(e, M.stemNodeRadiusMm(pl.nodeLaw, sd) + Math.hypot(c[0], c[1])); }
+    for (const sd of depths) { const c = M.stemNodeAxisMm(pl.nodeLaw, sd); e = Math.max(e, M.stemNodeRadiusMm(pl.nodeLaw, sd) + Math.hypot(c[0], c[1])); }
     return e;
   };
   const ENV_R = Math.max(extentOf(G, plan), extentOf(GB, planA));
