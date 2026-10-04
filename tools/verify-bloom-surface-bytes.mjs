@@ -163,6 +163,44 @@ const PREDICATE_MOVERS = {
      the pin failing. */
   'nodes-bare': (st) => Number(st.stemLength) > 0 && Number(st.stemNodeProminence) !== 0
     && String(st.inflorescence ?? 'NONE') === 'NONE' && !(Number(st.leafLength) > 0),
+  /* INFLORESCENCE BUILD 3, PHASE A — THE REACH INSET AND THE 250 mm CEILING
+     (#355). A row moves iff the BASE tree's own raceme plan would be placed
+     differently under the new law: its inset (the pedicel's RISE, `L sin th`,
+     against the stem's own 0.16 L) is not what the floret's own emitted reach
+     asks (the base tree's own `floretUnitMemo` + `pedicelPlacement`, in both
+     modes, plus the gap and the head-floor term), or a pedicel asked past the
+     base tree's 120 mm ceiling was clamped there. Read ENTIRELY off the base
+     tree's builder and plan — the new law is restated here from pieces the
+     base tree already owns, never imported from this tree — so the
+     prediction's owner is not the quantity under test. Every row with no
+     raceme is a holder by the first line, which is the claim that nothing
+     outside the inflorescence moved. */
+  'inflo-reach': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    if (!ip.present) return false;
+    if (ip.lengthsClamped) return true;
+    const memo = base.floretUnitMemo(st, ip);
+    const sessile = ip.pedicelLenMm === 0;
+    let reach = -Infinity;
+    for (const exportMode of [false, true]) {
+      const U = memo.get(ip.pedicelLenMm, exportMode);
+      const pl = base.pedicelPlacement({ ...ip, rootZ: 0, nodeDepthsMm: [0] }, 0, 0, U.tipZLocal, sessile);
+      const M = pl.M, src = U.sub.positions;
+      for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > reach) reach = z; }
+    }
+    const floorZ = Math.min(sp.rootZ, Number.isFinite(sp.lowestHubZ) ? sp.lowestHubZ : sp.rootZ);
+    const needed = Math.max(0, reach + (sp.rootZ - floorZ) + base.MIN_FEATURE_MM);
+    /* THE DEPTHS, NOT THE INSET: the node law is a function of the inset and
+       two rows the first cut mis-called were the proof — ONE node sits at the
+       flower's solo 0.55 L whatever the inset, and a raceme whose florets
+       cannot clear the head collapses to the same single node on both trees —
+       so a changed inset with unchanged depths is a HOLDER. */
+    const depths = base.leafNodeDepthsMm(ip.nodesAsked, sp.lengthMm, Math.max(ip.insetAskedMm, needed), 2 * ip.pedicelR);
+    return depths.length !== ip.nodeDepthsMm.length || depths.some((d, i) => !Object.is(d, ip.nodeDepthsMm[i]));
+  },
   /* ORGANIC VARIANCE, BUILD 2 (form). A row moves iff the FORM field exists on
      this tree — the geometry's own `varianceFormIsAbsent`, the guard. Every
      other row, the SIZE rows included, must hold to the bit: that is the claim

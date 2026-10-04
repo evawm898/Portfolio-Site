@@ -3825,7 +3825,9 @@ export const CONTROLS = [
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 
   /* THE PEDICEL IS THE FLORET'S OWN STEM, so this is the floret's
-     `stemLength` and its range sits inside `STEM_LENGTH_RANGE`. The DIAMETER
+     `stemLength`; its range is the PEDICEL'S OWN (0..250 mm, Eva's Oct 4
+     ruling — past the head's `STEM_LENGTH_RANGE`, so a corymb solves level on
+     the full 120 mm rachis). The DIAMETER
      is NOT a control: it is the area rule read downward from the rachis
      (`r_rachis / sqrt(N)`), floored at the stem control's own minimum and
      TOLD — the discovery's Q10 names that exact number as "the number to
@@ -3910,8 +3912,8 @@ export const CONTROLS = [
       const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
       if (!p || !p.present) return base;
       return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
-        + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm to clear it` : '')
-        + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets rise further than the stem is long, so they stand among the petals (told, never refused)');
+        + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm so the top floret's own petals (reaching ${p.reachMm.toFixed(1)} mm above its node) clear it by ${p.insetGapMm.toFixed(2)} mm` : '')
+        + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets reach further than the stem is long, so they stand among the petals (told, never refused)');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 

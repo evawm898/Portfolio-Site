@@ -3529,6 +3529,42 @@ spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was lat
 solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
 restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
 
+**INFLORESCENCE BUILD 3, PHASE A — THE TOP NODE'S INSET IS THE FLORET'S OWN PETAL REACH, AND
+THE PEDICEL'S CEILING IS 250** (Eva's Oct 4 brief and ruling; issue #355 — read
+`docs/bloom-inflorescence-build-3-outcome.md` before touching `inflorescencePlan`'s inset block,
+`INFLO_REACH_GRID_MM`, `PEDICEL_LENGTH_RANGE`, `lenCeilMm`, the harness's pedicel-range guard,
+ID9 or block 48). Build 1 inherited the LEAF's inset law — the pedicel's rise, `L sin th` —
+which clears the ROD and not the flower on it: the shipped raceme's top floret stood with its
+petals THROUGH the terminal head's at 0.000 mm while `insetSatisfied` read true, and both STL
+gates were blind to it (overlapping closed shells). **THE LAW:** the plan builds the topmost
+floret unit in BOTH modes (the memo it carries, which the builder then appends — nothing is
+built twice), places it through `pedicelPlacement` at depth 0, reads the highest emitted
+vertex as `reach`, ceils it onto a 2^-16 mm grid (a node count is a discrete decision on it,
+and the page's V8 and Node's differ in the last bits — the eighth instance of that class here),
+and sets `insetNeeded = reach + (rootZ − headFloorZ) + MIN_FEATURE_MM`, `headFloorZ` the STEM
+plan's own lowest material (a dome's rim). The max over the modes makes the node depths
+mode-free BY CONSTRUCTION. **Measured on the default: top node 19.2 → 33.9 mm down, floret-head
+0.000 → 6.656 mm, 113,886 export tris unmoved.** **THE PRICE IS A SHORTER NODE SPAN — 17.3 mm
+internodes against 21.0 — and the combination grid says so**: all seven `inflo-length-x-angle`
+cells CLEAR (verdict `clears`, #355 closed on the grid that found it), three re-record WORSE
+and eleven new cells land under the bar, every one an edge crossing by the tighter internode;
+`inflo-leaf-nodes-x-leafangle`'s 52 mm base went INERT (both counts collapse to the pitch floor
+under the deeper inset — CG1 refused the axis, correctly) and moved to the 120 mm rachis.
+**THE CAP WAS TWO NUMBERS, NOT ONE**: `PEDICEL_LENGTH_RANGE` was [0, 60] and the per-node law
+clamped at the HEAD's `STEM_LENGTH_RANGE[1]` (120); both read 250 now, and **a shipped
+harness guard forbade exactly this** ("a pedicel outside the stem's own range is a rod nothing
+has ever been proved on") — restated on the ruling, with block 48's 250 mm rows as the proof it
+asked for. The corymb solves level to a **192 mm** rachis at the defaults (120 was 81), the
+full 120 mm stem at 20/50/80/111/141 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
+NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
+corner is block 48's `THE BUDGET CORNER` at 40 mm, 95.0%; the NODE LAWS refusal row EXPORTS
+at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
+family** — (d) reads the BUILDER's own `topNodeMaxZ`, never the plan; (f) is mode-freeness
+measured within ONE engine, because the first cut asked for `Object.is` across the page's V8
+and Node's and went red on depths equal to four decimals. `frozen/phase52` is the 1089 rows at
+`23b13bd`. **Phase B (per-node deltas, the derived per-floret phase) is NOT started — it waits
+on Eva's ruling on `docs/img/inflo-build-3-phase-a.png`.**
+
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
 then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships

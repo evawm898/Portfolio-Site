@@ -255,6 +255,11 @@ function infloFacts(M, over = {}) {
         return n ? [x / n, y / n, z / n] : null;
       })(),
       residual: B.placementResidual, compared: B.placementCompared,
+      /* THE REACH INSET (build 3): the plan's own inset fields and node depths,
+         read so the three inset mutants can witness on the MUTATED plan. */
+      insetNeededMm: P.insetNeededMm, insetMm: P.insetMm, insetAskedMm: P.insetAskedMm,
+      reach: P.floretReachMm ? { ...P.floretReachMm } : null, nodeDepths: P.nodeDepthsMm.slice(),
+      lenCeilMm: P.lenCeilMm, pedicelLens: P.pedicelLensMm.slice(), lengthsClamped: P.lengthsClamped,
     };
   } catch (e) { return { threw: String(e && e.message || e) }; }
 }
@@ -1173,6 +1178,40 @@ const MUTANTS = [
         : `the pedicel roots at r = ${m.rootR} on the mutant and ${c.rootR} on the clean tree — the root did not move to the axis`;
     } },
 
+  /* ---- THE REACH INSET (inflorescence build 3, Phase A — #355) ---- */
+  { id: 'the-inset-reads-the-pedicel-again',
+    why: "the top node's inset goes back to build 1's law — the PEDICEL's rise, `L sin th` — which clears the rod and not the flower on it: the shipped raceme's top floret stands with its petals through the terminal head's at 0.000 mm again, watertight, one piece, the same triangle count, `insetSatisfied` true. ID9 (c) restates the law from the floret builder's own emitted vertices and (d) reads the emitted florets against the head's floor",
+    find: '  const insetNeededMm = Math.max(0, reachMm + (stem.rootZ - headFloorZ) + MIN_FEATURE_MM);',
+    into: '  const insetNeededMm = Math.max(0, pedicelLenMm * Math.sin((angleDeg * Math.PI) / 180));', names: ['ID9'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.insetNeededMm < c.insetNeededMm - 10 && m.nodeDepths[0] < c.nodeDepths[0]) ? null
+        : `the mutant needs ${m.insetNeededMm} mm of inset and the clean tree ${c.insetNeededMm} — the law did not go back to the rise`;
+    } },
+  { id: 'the-reach-reads-one-mode',
+    why: "the reach is the LIVE unit's alone, so where the export unit reaches further (a 0.60 mm sheet floors to 1.00 at export and its floret reaches 0.62 mm higher) the export build's top node is shallower than its own reach asks — and the two modes' node depths DIFFER, which is a mode-dependent topology, refused seven times here. Invisible on the shipping sheet, where the two reaches are the same double; ID9 (a) and (f) on the 0.60 mm row",
+    find: '  const reachRawMm = Math.max(reachLive.reachMm, reachExport.reachMm);',
+    into: '  const reachRawMm = reachLive.reachMm;', names: ['ID9'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { sheetThickness: 0.6 });
+      const t = bothBuilt(m, c); if (t) return t;
+      if (!m.reach || !c.reach) return 'the plan reports no reach record';
+      if (!(c.reach.export > c.reach.live)) return `the probe state's export reach (${c.reach.export}) does not exceed its live reach (${c.reach.live}) on the clean tree — the mutation is invisible here`;
+      return (m.insetNeededMm < c.insetNeededMm) ? null
+        : `the mutant needs ${m.insetNeededMm} mm and the clean tree ${c.insetNeededMm} — reading one mode did not shorten the inset`;
+    } },
+  { id: 'the-pedicel-ceiling-is-the-stems-again',
+    why: "the per-node pedicel ceiling goes back to the head's `STEM_LENGTH_RANGE[1]` (120) while the slider runs to 250: a 250 mm pedicel asked for is built at 120 and told as clamped, and the corymb on the full rachis clamps its lowest pedicels again. ID7 restates the ceiling as the pedicel's own range; the row at 250 is where the two differ",
+    find: '  const lenCeilMm = PEDICEL_LENGTH_RANGE[1];',
+    into: '  const lenCeilMm = STEM_LENGTH_RANGE[1];', names: ['ID7'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { pedicelLength: 250 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.lenCeilMm === 120 && m.lengthsClamped && m.pedicelLens[0] === 120 && c.pedicelLens[0] === 250 && !c.lengthsClamped) ? null
+        : `the mutant's ceiling reads ${m.lenCeilMm} (top pedicel ${m.pedicelLens[0]}) and the clean tree's ${c.lenCeilMm} (${c.pedicelLens[0]}) — the ceiling did not move back`;
+    } },
+
   { id: 'the-placement-carries-a-scale',
     why: "ruling 3's own prohibition, made false: the rigid transform gains a 0.9 scale, so the floret's SIZE comes from the matrix rather than from parameters — which silently carries a sheet that was floored at export through a shrink, i.e. a printable wall that is no longer printable, at an identical triangle count and a watertight, one-piece export",
     find: '  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;',
@@ -2040,6 +2079,14 @@ const ROWS = [
   { label: "a raceme on a SPHERE head — the FLORET's own stem channel, the only state ID4's omission clause can speak on",
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' },
           { id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }] },
+  /* THE REACH INSET's two rows (build 3): the sheet whose LIVE and EXPORT
+     reach DIFFER — on the shipping sheet they are the same double, so a reach
+     read from one mode is invisible there — and the 250 mm pedicel, the only
+     length at which the pedicel's own ceiling and the stem's disagree. */
+  { label: 'a raceme on a 0.60 mm sheet (the two modes reach differently — the reach union\'s only witness)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
+  { label: 'a raceme on 250 mm pedicels (past the head\'s own stem range — the ceiling is the pedicel\'s)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelLength', value: '250' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
      against the registry's predicate, and the two agree on every state where

@@ -1047,6 +1047,25 @@ export const SMOKE_BLOCKS = [
         path: "ID4's PEDICEL PIN — the floret state carries stemNodeProminence 0 and the floret's own stem is a two-station tube with no node law, though the head asks for prominence 1 and a pedicel is a bare stem the ungated law would otherwise node" },
     ],
   },
+  {
+    n: 48, title: 'the reach inset and the 250 mm pedicel (inflorescence build 3, Phase A — #355)',
+    anchor: 'REACH INSET: 250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)',
+    /* FOUR ROWS: the ceiling at the shipped angle (ID7's clamp law at 250 and
+       the reach EXCEEDING the rachis — one node, the unsatisfied arm), the
+       corymb on the full rachis the old cap clamped, the sheet whose two modes'
+       reach DIFFER (the union is the only thing a one-mode mutant can be seen
+       on), and the descending pedicel where the stem's own inset stands. */
+    rows: [
+      { label: 'REACH INSET: 250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)',
+        path: "ID9 — the top node's inset restated from the floret BUILDER's own emitted vertices placed at depth 0 in BOTH modes plus the printable gap, (a)-(c); the reach (164.9 mm) exceeds the 0.86 L node span so `insetSatisfied` is FALSE and (e)'s biconditional holds on that arm; ID7's ceiling at the pedicel's own 250 (unclamped); ID1's node count at 1" },
+      { label: 'REACH INSET: LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 140.8 mm, past the old 120 cap)',
+        path: 'ID7 — the corymb solve on the full rachis, UNCLAMPED at the 250 mm ceiling where the 120 cap clamped the lowest three, every head at one height measured off the placements; ID9 (d) the emitted top-node florets under the head floor less the gap' },
+      { label: 'REACH INSET: a 0.60 mm sheet (the LIVE and EXPORT reach differ — the union decides the node)',
+        path: "ID9 (a) both modes' reach restated and (f) the other mode's node depths bit-identical — the only row where a reach read from ONE mode would place the node differently, so `the-reach-reads-one-mode` is visible here and nowhere else" },
+      { label: "REACH INSET: descending (-60 deg): the reach is under the node and the stem's own inset stands (not clamped)",
+        path: "ID9 (e) `insetClamped` FALSE — the floret's reach is below its node so the stem's own 0.16 L inset stands, the biconditional's other arm; ID1, ID2 at a descending pedicel" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

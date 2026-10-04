@@ -1616,10 +1616,14 @@ function infloLine(plan, builtInflo) {
       : `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
         + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)'))
     + `\n     NODES top ${plan.nodeDepthsMm[0].toFixed(1)} mm below the hub`
+    /* THE INSET IS THE FLORET'S OWN PETAL REACH (build 3, #355): the topmost
+       floret's highest emitted vertex, in both modes, one printable gap under
+       the head's lowest material — never the pedicel's rise, which cleared the
+       rod and put the shipped raceme's top floret through the head. */
     + (plan.insetClamped
-        ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm this pedicel needs to clear the head`
-        : ` (the stem's own inset; the pedicel needs ${plan.insetNeededMm.toFixed(1)} mm and has it)`)
-    + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the florets rise further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
+        ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm the top FLORET needs: its petals reach ${plan.reachMm.toFixed(1)} mm above its node (live ${plan.floretReachMm.live.toFixed(1)} / export ${plan.floretReachMm.export.toFixed(1)}, the larger decides)${plan.rootZ - plan.headFloorZ > 1e-9 ? ` + ${(plan.rootZ - plan.headFloorZ).toFixed(1)} mm to the head's rim` : ''} + the ${plan.insetGapMm.toFixed(2)} mm printable gap`
+        : ` (the stem's own inset; the top floret's petals reach ${plan.reachMm.toFixed(1)} mm above its node and need ${plan.insetNeededMm.toFixed(1)} mm, which it has)`)
+    + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the floret reaches further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
     /* THE FLORET AGAINST THE RACHIS — a FLAG with a number, never a refusal.
        Two parts of one solid fusing is OVER-connection (the crowding
        ruling's own grounds, Eva Sep 3): no boundary edge, no split in the
@@ -2422,6 +2426,9 @@ window.__bloomMetrics = () => ({
        node law's offset at the stem's length with them (`stemAxisAt`, the one
        front door). ST2 restates that offset rather than reading it here. */
     root: [0, 0, lastStem.rootZ], tip: [...stemAxisAt(lastStem, lastStem.lengthMm), lastStem.tipZ],
+    /* the two heights ID9 reads the head's FLOOR from (build 3): the root plane
+       and the plan's own lowest head material (a dome's rim) */
+    rootZ: lastStem.rootZ, lowestHubZ: lastStem.lowestHubZ,
     voidStations: lastStem.voidStations ? lastStem.voidStations.slice() : null,
     /* MEASURED FROM WHAT THE BUILDER EMITTED, not from the plan's own two
        heights: ST4 asks whether the root really runs THROUGH the slab, and a
@@ -2572,6 +2579,9 @@ window.__bloomMetrics = () => ({
     insetAskedMm: lastInflo.insetAskedMm, insetNeededMm: lastInflo.insetNeededMm,
     insetMm: lastInflo.insetMm, insetClamped: lastInflo.insetClamped,
     insetSatisfied: lastInflo.insetSatisfied,
+    /* the reach law's own inputs (build 3) — never the memo, which is a closure */
+    floretReachMm: lastInflo.floretReachMm ? { ...lastInflo.floretReachMm } : null,
+    reachMm: lastInflo.reachMm, reachRawMm: lastInflo.reachRawMm, reachGridMm: lastInflo.reachGridMm, headFloorZ: lastInflo.headFloorZ, insetGapMm: lastInflo.insetGapMm,
     floretPetals: lastInflo.floretPetals, scale: lastInflo.scale,
     petalLength: lastInflo.petalLength, petalWidth: lastInflo.petalWidth,
     lengthAsked: lastInflo.lengthAsked, widthAsked: lastInflo.widthAsked,
@@ -2635,6 +2645,7 @@ window.__bloomMetrics = () => ({
        pedicel length, in node order, unit 0 the topmost node's and the one
        `unit` above describes. Positions stay out, for `unitPositions`' reason. */
     headSpreadMm: lastInfloBuilt.headSpreadMm,
+    topNodeMaxZ: lastInfloBuilt.topNodeMaxZ,
     units: lastInfloBuilt.units.map((U) => ({
       lengthMm: U.lengthMm, tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
       petalsBuilt: U.petalsBuilt, hubRadius: U.hubRadius, hubThickness: U.hubThickness,
