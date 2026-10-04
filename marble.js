@@ -6,9 +6,21 @@
    committed state every frame (plain mapping, no refinement — cheap), and
    commits it on release through the one path everything else uses. Undo pops a
    whole group (a pattern is one group); recent states are kept as snapshots
-   because the engine never mutates a state, so a snapshot is a reference. */
+   because the engine never mutates a state, so a snapshot is a reference.
+
+   LAYERS (the realism session): a document is up to MAX_LAYERS layers of op
+   groups. The LAST is the live bath — the one every tool works in; the earlier
+   ones are PRINTED pulls, frozen states that never change again. "Pull &
+   re-marble" freezes the bath as a printed layer and opens a fresh one; undo on
+   an empty bath un-pulls. Two VIEWS: the BATH (dark water, the live ink on it)
+   while working, and the PAPER (every layer multiplied onto the paper preset
+   with its texture, mottle, granulation and transfer flaws) behind "Lay paper".
+   A gesture always returns the page to the bath. Per-ink properties are kept
+   per colour and written into every drop, so the hash carries them. */
 
 import * as M from './marble-math.js';
+import * as T from './marble-material.js';
+import * as R from './marble-render.js';
 
 const SITE_COLORS = [['ink', '#0A0A0C'], ['teal', '#5FA0A0'], ['paper', '#EDEDE8'], ['amber', '#D6A15C'], ['dim', '#8A8A85'], ['rust', '#D98F6A'], ['red', '#E5484D']];
 const SHEET_CHOICES = [['paper', '#EDEDE8'], ['ink', '#0A0A0C'], ['teal', '#5FA0A0'], ['dim', '#8A8A85']];
@@ -32,30 +44,50 @@ export const SETTINGS = [
   { id: 'waveAmp', label: 'Wave amplitude', min: 0, max: 120, step: 1, default: 30, unit: '', tools: ['wavy'] },
   { id: 'waveLength', label: 'Wavelength', min: 40, max: 600, step: 1, default: 220, unit: '', tools: ['wavy'] },
 ];
+/* the ink's own properties: per colour, written into every drop of that colour */
+export const INK_SETTINGS = [
+  { id: 'conc', label: 'Concentration', min: M.INK_RANGES.conc[0], max: M.INK_RANGES.conc[1], step: 0.05, default: M.INK_DEFAULTS.conc, hint: 'how strong the ink reads before it spreads; a spread-out region goes paler by its area' },
+  { id: 'opa', label: 'Opacity', min: M.INK_RANGES.opa[0], max: M.INK_RANGES.opa[1], step: 0.05, default: M.INK_DEFAULTS.opa, hint: 'how much the paper shows through' },
+  { id: 'gall', label: 'Spread (gall)', min: M.INK_RANGES.gall[0], max: M.INK_RANGES.gall[1], step: 0.05, default: M.INK_DEFAULTS.gall, hint: 'surfactant: a wider push and a paler film from the same ink' },
+  { id: 'gran', label: 'Granulation', min: M.INK_RANGES.gran[0], max: M.INK_RANGES.gran[1], step: 0.05, default: M.INK_DEFAULTS.gran, hint: 'pigment that settles as specks on the paper' },
+];
 const MAX_Z = 1500, MAX_SWEEP = 3 * 2 * Math.PI, STIR_MIN_R = 10;
 const SNAPSHOTS = 8;
+const LAY_MS = 320;
 
 /* ---------------- state ---------------- */
 let sheet = DEFAULT_SHEET;
-let groups = [];          // committed op groups, in order
-let redoStack = [];       // groups undone, newest last
-let state = M.emptyState(sheet);
-let snaps = [];           // [{ count, state }] for the last SNAPSHOTS group counts
+let material = M.roundMaterial();
+let layers = [[]];        // op groups per layer; the LAST is the live bath
+let printed = [];         // frozen states of the printed layers (layers.length - 1 of them)
+let redoStack = [];       // undone actions, newest last: { t: 'g', ops } | { t: 'pull' } | { t: 'restore', layers, printed }
+let state = M.emptyState(sheet);   // the live bath
+let snaps = [];           // [{ count, state }] for the live bath's last SNAPSHOTS group counts
 let tool = 'drop';
 const settings = Object.fromEntries(SETTINGS.map((s) => [s.id, s.default]));
 let color = SITE_COLORS[0][1];
 let customColors = [];
+let inkProps = {};        // colour hex → { conc, opa, gall, gran }
 let autoAdvance = true;
 let preview = null;       // { op, state } while a gesture is live
 let gesture = null;
-const stats = { lastOpMs: 0, frameMs: 0, previewMs: 0, replayMs: 0 };
+let view = 'bath';        // 'bath' | 'paper'
+let lay = { t: 0, from: 0, to: 0, t0: 0 };   // the view blend: 0 bath, 1 paper
+const stats = { lastOpMs: 0, frameMs: 0, previewMs: 0, replayMs: 0, paperMs: 0 };
+const groups = () => layers[layers.length - 1];
 
 try { customColors = JSON.parse(localStorage.getItem('marble.customColors') || '[]').map(M.normHex); } catch { customColors = []; }
+try { const p = JSON.parse(localStorage.getItem('marble.inkProps') || '{}'); for (const [k, v] of Object.entries(p)) inkProps[M.normHex(k)] = { ...M.INK_DEFAULTS, ...v }; } catch { inkProps = {}; }
+const inkFor = (hex) => inkProps[hex] || { ...M.INK_DEFAULTS };
+const withInk = (ops) => ops.map((op) => (op.k === 'd' ? { ...inkFor(M.normHex(op.color)), ...op } : op));
 
 /* ---------------- canvas ---------------- */
 const canvas = document.getElementById('sheet');
 const ctx = canvas.getContext('2d');
-let view = { css: 0, scale: 1, dpr: 1 };
+let view2 = { css: 0, scale: 1, dpr: 1 };
+let bathCanvas = null, paperCanvas = null;
+const paperCache = R.makeCache();
+let paperDirty = true;
 function fitSheet() {
   const stage = document.getElementById('stage');
   const cs = getComputedStyle(stage);
@@ -66,21 +98,44 @@ function fitSheet() {
   const cw = Math.round(M.SHEET.w * scale), ch = Math.round(M.SHEET.h * scale);
   canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
   canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
-  view = { css: cw, scale: cw / M.SHEET.w, dpr };
+  view2 = { css: cw, scale: cw / M.SHEET.w, dpr };
+  bathCanvas = document.createElement('canvas'); bathCanvas.width = canvas.width; bathCanvas.height = canvas.height;
+  paperCanvas = document.createElement('canvas'); paperCanvas.width = canvas.width; paperCanvas.height = canvas.height;
+  paperDirty = true;
   render();
+}
+const docStates = () => [...printed, state];
+function renderPaperCanvas() {
+  const t = performance.now();
+  const pc = paperCanvas.getContext('2d');
+  pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, paperCanvas.width, paperCanvas.height);
+  R.renderPaper(pc, { sheet, material, states: docStates() }, view2.scale * view2.dpr, paperCache);
+  stats.paperMs = performance.now() - t;
+  paperDirty = false;
 }
 function render() {
   const t = performance.now();
   const st = preview ? preview.state : state;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  M.drawState(ctx, st, view.scale * view.dpr);
+  if (lay.t <= 0) {
+    // the bath alone (every gesture frame): drawn STRAIGHT to the display canvas, the path
+    // the page always had — an offscreen bath forced a synchronous raster per frame
+    R.renderBath(ctx, st, view2.scale * view2.dpr);
+  } else {
+    const bc = bathCanvas.getContext('2d');
+    bc.setTransform(1, 0, 0, 1, 0, 0); bc.clearRect(0, 0, bathCanvas.width, bathCanvas.height);
+    R.renderBath(bc, st, view2.scale * view2.dpr);
+    ctx.drawImage(bathCanvas, 0, 0);
+    if (paperDirty) renderPaperCanvas();
+    ctx.globalAlpha = lay.t; ctx.drawImage(paperCanvas, 0, 0); ctx.globalAlpha = 1;
+  }
   if (preview) drawGuide(preview.op);
   stats.frameMs = performance.now() - t;
 }
 /* the gesture's own guide: the tine lines a comb will rake along, the stir ring */
 function drawGuide(op) {
-  const k = view.scale * view.dpr;
+  const k = view2.scale * view2.dpr;
   ctx.save(); ctx.scale(k, k);
   ctx.strokeStyle = 'rgba(95,160,160,0.9)'; ctx.lineWidth = 1 / k; ctx.setLineDash([4 / k, 4 / k]);
   if (op.k === 't' || op.k === 'k' || op.k === 'w') {
@@ -110,6 +165,34 @@ function drawGuide(op) {
   ctx.restore();
 }
 
+/* ---------------- views ---------------- */
+let layRaf = 0;
+function setView(v, instant = false) {
+  if (view === v && !layRaf) return;
+  view = v;
+  const to = v === 'paper' ? 1 : 0;
+  if (instant) { lay = { t: to, from: to, to, t0: 0 }; if (layRaf) { cancelAnimationFrame(layRaf); layRaf = 0; } render(); writeViewUi(); return; }
+  lay = { t: lay.t, from: lay.t, to, t0: performance.now() };
+  if (to === 1 && paperDirty) renderPaperCanvas();
+  if (!layRaf) layRaf = requestAnimationFrame(tickLay);
+  writeViewUi();
+}
+function tickLay() {
+  layRaf = 0;
+  const u = Math.min(1, (performance.now() - lay.t0) / LAY_MS);
+  const e = u * u * (3 - 2 * u);
+  lay.t = lay.from + (lay.to - lay.from) * e;
+  render();
+  if (u < 1) layRaf = requestAnimationFrame(tickLay); else { lay.t = lay.to; render(); }
+}
+function writeViewUi() {
+  const b = document.getElementById('layBtn');
+  b.textContent = view === 'paper' ? 'Back to the bath' : 'Lay paper';
+  b.classList.toggle('is-on', view === 'paper');
+  document.getElementById('viewTag').textContent = view === 'paper' ? 'paper' : 'bath';
+  canvas.classList.toggle('is-paper', view === 'paper');
+}
+
 /* ---------------- commits, history, hash ---------------- */
 function rotation() {
   const list = [...SITE_COLORS.map((c) => c[1]), ...customColors].filter((c) => c !== sheet);
@@ -126,62 +209,88 @@ function advanceColour() {
 }
 function applyGroup(ops) {
   const t = performance.now();
-  const rounded = ops.map(M.roundOp);
+  const rounded = withInk(ops).map(M.roundOp);
   for (const op of rounded) state = M.applyOp(state, op);
   stats.lastOpMs = performance.now() - t;
-  groups.push(rounded);
+  groups().push(rounded);
   redoStack = [];
   snapshot();
   afterChange();
   return rounded;
 }
 function snapshot() {
-  snaps.push({ count: groups.length, state });
+  snaps.push({ count: groups().length, state });
   if (snaps.length > SNAPSHOTS) snaps.shift();
 }
 function stateAt(count) {
   const s = snaps.find((q) => q.count === count);
   if (s) return s.state;
   const t = performance.now();
-  const st = M.replay(groups.slice(0, count).flat(), sheet);
+  const st = M.replay(groups().slice(0, count).flat(), sheet);
   stats.replayMs = performance.now() - t;
   return st;
 }
 function undo() {
-  if (!groups.length || gesture) return;
-  redoStack.push(groups.pop());
-  snaps = snaps.filter((q) => q.count <= groups.length);
-  state = stateAt(groups.length);
+  if (gesture) return;
+  if (groups().length) {
+    redoStack.push({ t: 'g', ops: groups().pop() });
+    snaps = snaps.filter((q) => q.count <= groups().length);
+    state = stateAt(groups().length);
+  } else if (layers.length > 1) {
+    // an empty bath over a pull: un-pull — the last printed layer is the bath again
+    layers.pop(); state = printed.pop(); snaps = [{ count: groups().length, state }];
+    redoStack.push({ t: 'pull' });
+  } else return;
   afterChange();
 }
 function redo() {
   if (!redoStack.length || gesture) return;
-  const g = redoStack.pop();
-  for (const op of g) state = M.applyOp(state, op);
-  groups.push(g);
-  snapshot();
+  const a = redoStack.pop();
+  if (a.t === 'g') { for (const op of a.ops) state = M.applyOp(state, op); groups().push(a.ops); snapshot(); }
+  else if (a.t === 'pull') { if (!pull(false)) { redoStack.push(a); return; } }
+  else if (a.t === 'restore') { layers = a.layers; printed = a.printed; state = a.state; snaps = [{ count: groups().length, state }]; }
   afterChange();
 }
 function clearSheet() {
   if (gesture) return;
-  if (groups.length) redoStack.push(...groups.reverse());
-  groups = []; snaps = []; state = M.emptyState(sheet);
+  if (layers.flat().length || layers.length > 1) redoStack.push({ t: 'restore', layers, printed, state });
+  layers = [[]]; printed = []; snaps = []; state = M.emptyState(sheet);
   afterChange();
+}
+/* Pull & re-marble: the bath is printed as a layer and a fresh bath is opened */
+function pull(say_ = true) {
+  if (gesture) return false;
+  if (!state.regions.length) { if (say_) say('nothing in the bath to pull — drop some ink first', true); return false; }
+  if (layers.length >= M.MAX_LAYERS) { if (say_) say(`${M.MAX_LAYERS} layers is the most a sheet takes`, true); return false; }
+  printed.push(state);
+  layers.push([]);
+  state = M.emptyState(sheet); snaps = [{ count: 0, state }];
+  if (say_) { redoStack = []; say(`layer ${printed.length} printed — the bath is clear for the next pull`); }
+  afterChange();
+  return true;
 }
 function setSheet(hex) {
   sheet = M.normHex(hex);
   // the sheet colour is not an op: every state is re-coloured, no geometry moves
   state = { ...state, sheet };
+  printed = printed.map((s) => ({ ...s, sheet }));
   snaps = snaps.map((q) => ({ count: q.count, state: { ...q.state, sheet } }));
   afterChange();
 }
-function afterChange() {
-  preview = null;
-  writeHash(); render(); writeReadout(); drawSwatches();
-  document.getElementById('undoBtn').disabled = !groups.length;
-  document.getElementById('redoBtn').disabled = !redoStack.length;
+function setMaterial(m) {
+  material = M.roundMaterial({ ...material, ...m });
+  writeMaterialUi();
+  afterChange();
 }
-function currentHash() { return M.encodeHash(groups, sheet); }
+function afterChange() {
+  preview = null; paperDirty = true;
+  writeHash(); render(); writeReadout(); drawSwatches();
+  document.getElementById('undoBtn').disabled = !(groups().length || layers.length > 1);
+  document.getElementById('redoBtn').disabled = !redoStack.length;
+  document.getElementById('pullBtn').disabled = layers.length >= M.MAX_LAYERS || !state.regions.length;
+  document.getElementById('layerTag').textContent = `layer ${layers.length} of ${M.MAX_LAYERS}${printed.length ? ` · ${printed.length} printed` : ''}`;
+}
+function currentHash() { return M.encodeDoc({ sheet, material, layers }); }
 let lastWritten = '';
 function writeHash() {
   const h = currentHash();
@@ -189,12 +298,14 @@ function writeHash() {
   history.replaceState(null, '', '#' + h);
 }
 function loadHash(h) {
-  const { sheet: sh, groups: gs } = M.decodeHash(h);
+  const d = M.decodeDoc(h);
   const t = performance.now();
-  sheet = sh; groups = gs; redoStack = []; snaps = [];
-  state = M.replay(groups.flat(), sheet);
+  sheet = d.sheet; material = d.material; layers = d.layers; redoStack = []; snaps = [];
+  printed = layers.slice(0, -1).map((gs) => M.replay(gs.flat(), sheet));
+  state = M.replay(groups().flat(), sheet);
   stats.replayMs = performance.now() - t;
   snapshot();
+  writeMaterialUi();
   afterChange();
 }
 window.addEventListener('hashchange', () => {
@@ -234,6 +345,7 @@ function stirOp(g) {
   z = Math.max(-MAX_Z, Math.min(MAX_Z, z));
   return { k: 's', x: g.x0, y: g.y0, r, z, c: settings.falloff };
 }
+const dropOp = (x, y, r) => ({ k: 'd', x, y, r, color, ...inkFor(color) });
 let raf = 0;
 function schedulePreview() { if (!raf) raf = requestAnimationFrame(tickPreview); }
 function tickPreview() {
@@ -243,7 +355,7 @@ function tickPreview() {
   if (gesture.kind === 'drop') {
     const r0 = settings.dropRadius, cap = Math.min(300, r0 * 3);
     const r = Math.min(cap, r0 + settings.growRate * (performance.now() - gesture.t0) / 1000);
-    op = { k: 'd', x: gesture.x0, y: gesture.y0, r, color };
+    op = dropOp(gesture.x0, gesture.y0, r);
     gesture.r = r;
     if (settings.growRate > 0 && r < cap) schedulePreview();
   } else if (gesture.kind === 'stir') op = stirOp(gesture);
@@ -255,6 +367,7 @@ function tickPreview() {
 canvas.addEventListener('pointerdown', (e) => {
   if (gesture || e.button !== 0) return;
   e.preventDefault();
+  if (view === 'paper') setView('bath');      // work happens in the bath
   canvas.setPointerCapture(e.pointerId);
   const [x, y] = toSheet(e);
   gesture = { kind: tool, id: e.pointerId, x0: x, y0: y, lx: x, ly: y, t0: performance.now(), sweep: 0, rSum: 0, samples: 0, la: null, moved: 0 };
@@ -277,7 +390,7 @@ function endGesture(e, commit) {
   const g = gesture; gesture = null;
   if (raf) { cancelAnimationFrame(raf); raf = 0; }
   if (commit) {
-    if (g.kind === 'drop') { applyGroup([{ k: 'd', x: g.x0, y: g.y0, r: g.r ?? settings.dropRadius, color }]); if (autoAdvance) advanceColour(); return; }
+    if (g.kind === 'drop') { applyGroup([dropOp(g.x0, g.y0, g.r ?? settings.dropRadius)]); if (autoAdvance) advanceColour(); return; }
     if (g.kind === 'stir') { if (g.moved >= 3) { applyGroup([stirOp(g)]); return; } }
     else if (g.moved >= 3) { applyGroup([strokeOp(g, g.lx, g.ly)]); return; }
   }
@@ -309,8 +422,27 @@ const fmtVal = (s, v) => `${(+v).toFixed(s.step < 1 ? 2 : 0)}${s.unit ? ' ' + s.
     const input = w.querySelector('input');
     input.addEventListener('input', () => { settings[s.id] = +input.value; writeOutputs(); if (gesture) schedulePreview(); });
   }
+  const ih = document.getElementById('inkControls');
+  for (const s of INK_SETTINGS) {
+    const w = document.createElement('div');
+    w.className = 'mb-ctrl';
+    w.innerHTML = `<label for="ink-${s.id}" title="${s.hint}"><span>${s.label}</span><output id="ink-${s.id}-out"></output></label><input type="range" id="ink-${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.default}">`;
+    ih.appendChild(w);
+    const input = w.querySelector('input');
+    input.addEventListener('input', () => { setInk({ [s.id]: +input.value }); if (gesture) schedulePreview(); });
+  }
 }
 function writeOutputs() { for (const s of SETTINGS) { document.getElementById(`${s.id}-out`).textContent = fmtVal(s, settings[s.id]); document.getElementById(s.id).value = settings[s.id]; } }
+function writeInkOutputs() {
+  const p = inkFor(color);
+  for (const s of INK_SETTINGS) { document.getElementById(`ink-${s.id}-out`).textContent = (+p[s.id]).toFixed(2) + (s.id === 'gall' ? '×' : ''); document.getElementById(`ink-${s.id}`).value = p[s.id]; }
+  document.getElementById('inkSum').textContent = `${color} · ${p.conc.toFixed(2)} / ${p.opa.toFixed(2)} / ${p.gall.toFixed(2)}× / ${p.gran.toFixed(2)}`;
+}
+function setInk(o) {
+  inkProps[color] = { ...inkFor(color), ...o };
+  try { localStorage.setItem('marble.inkProps', JSON.stringify(inkProps)); } catch { /* private mode */ }
+  writeInkOutputs();
+}
 
 function drawSwatches() {
   const ink = document.getElementById('inkSwatches');
@@ -333,6 +465,7 @@ function drawSwatches() {
     sh.appendChild(b);
   }
   document.getElementById('colourSum').textContent = `${color} on ${sheet}`;
+  writeInkOutputs();
 }
 function saveCustom() { try { localStorage.setItem('marble.customColors', JSON.stringify(customColors)); } catch { /* private mode */ } }
 function addCustom(hex) {
@@ -344,6 +477,27 @@ document.getElementById('customAdd').addEventListener('click', () => addCustom(d
 document.getElementById('customPick').addEventListener('input', (e) => { document.getElementById('customHex').value = e.target.value.toUpperCase(); });
 document.getElementById('customHex').addEventListener('keydown', (e) => { if (e.key === 'Enter') addCustom(e.target.value); });
 document.getElementById('autoAdvance').addEventListener('change', (e) => { autoAdvance = e.target.checked; });
+
+/* material */
+{
+  const sel = document.getElementById('paperSel');
+  T.PAPERS.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.label; sel.appendChild(o); });
+  sel.addEventListener('change', () => { const i = +sel.value; setSheet(T.paperOf(i).hex); setMaterial({ paper: i }); });
+  const fl = document.getElementById('flaws');
+  fl.addEventListener('input', () => setMaterial({ flaws: +fl.value }));
+  const ms = document.getElementById('matSeed');
+  ms.addEventListener('change', () => setMaterial({ seed: Math.max(0, Math.floor(+ms.value) || 0) }));
+  document.getElementById('matReroll').addEventListener('click', () => setMaterial({ seed: Math.floor(Math.random() * 1e6) }));
+}
+function writeMaterialUi() {
+  document.getElementById('paperSel').value = material.paper;
+  document.getElementById('flaws').value = material.flaws;
+  document.getElementById('flaws-out').textContent = material.flaws.toFixed(2);
+  document.getElementById('matSeed').value = material.seed;
+  document.getElementById('materialSum').textContent = `${T.paperOf(material.paper).label.toLowerCase()} · flaws ${material.flaws.toFixed(2)}`;
+}
+document.getElementById('layBtn').addEventListener('click', () => { if (gesture) return; setView(view === 'paper' ? 'bath' : 'paper'); });
+document.getElementById('pullBtn').addEventListener('click', () => pull(true));
 
 {
   const host = document.getElementById('patterns');
@@ -377,6 +531,7 @@ window.addEventListener('keydown', (e) => {
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
   else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
   else if (!mod && e.key >= '1' && e.key <= '5') setTool(TOOLS[+e.key - 1]);
+  else if (!mod && e.key.toLowerCase() === 'p') { e.preventDefault(); if (!gesture) setView(view === 'paper' ? 'bath' : 'paper'); }
 });
 
 /* ---------------- export ---------------- */
@@ -387,14 +542,20 @@ function download(name, data, type) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-function pngBlob(scale = 2) {
+/* the PNG is the PAPER view at `scale` px per unit: the full material look */
+function pngBlob(scale = 2, { flat = false } = {}) {
   const c = document.createElement('canvas');
   c.width = M.SHEET.w * scale; c.height = M.SHEET.h * scale;
-  M.drawState(c.getContext('2d'), state, scale);
+  const cx = c.getContext('2d');
+  if (flat) { // the plain draw of every layer, no material — the gate's control for "the PNG carries the material"
+    cx.fillStyle = sheet; cx.fillRect(0, 0, c.width, c.height);
+    cx.save(); cx.scale(scale, scale); for (const st of docStates()) M.paintRegions(cx, st.regions, scale, { rim: false, hairline: false }); cx.restore();
+  } else R.renderPaper(cx, { sheet, material, states: docStates() }, scale, R.makeCache());
   return new Promise((res) => c.toBlob(res, 'image/png'));
 }
-document.getElementById('exportSvg').addEventListener('click', () => { const s = M.exportSvg(state); download(`marble-${stamp()}.svg`, s, 'image/svg+xml'); say(`SVG: ${state.regions.length} regions, ${(s.length / 1024).toFixed(0)} KB`); });
-document.getElementById('exportPng').addEventListener('click', async () => { const b = await pngBlob(2); download(`marble-${stamp()}.png`, b); say(`PNG: ${M.SHEET.w * 2} × ${M.SHEET.h * 2}, ${(b.size / 1024).toFixed(0)} KB`); });
+const svgText = () => M.exportSvg(docStates());
+document.getElementById('exportSvg').addEventListener('click', () => { const s = svgText(); download(`marble-${stamp()}.svg`, s, 'image/svg+xml'); say(`SVG: ${docStates().reduce((n, s) => n + s.regions.length, 0)} regions in ${layers.length} layer group${layers.length > 1 ? 's' : ''}, ${(s.length / 1024).toFixed(0)} KB — vector only, no texture`); });
+document.getElementById('exportPng').addEventListener('click', async () => { const b = await pngBlob(2); download(`marble-${stamp()}.png`, b); say(`PNG: ${M.SHEET.w * 2} × ${M.SHEET.h * 2}, ${(b.size / 1024).toFixed(0)} KB — the paper view with its material`); });
 document.getElementById('copyLink').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(location.href); say(`link copied — ${location.hash.length} characters`); }
   catch { say('could not reach the clipboard; copy the address bar', true); }
@@ -402,32 +563,45 @@ document.getElementById('copyLink').addEventListener('click', async () => {
 
 /* ---------------- readout ---------------- */
 function writeReadout() {
-  const n = M.pointCount(state), ops = groups.flat().length;
+  const n = M.pointCount(state), ops = groups().flat().length;
+  const all = layers.flat().length, totalN = docStates().reduce((a, s) => a + M.pointCount(s), 0);
   const coarse = state.segScale > 1 ? `\n<span class="warn">past the point budget — edges simplified ×${state.segScale.toFixed(2)}</span>` : '';
+  const paperLine = `paper <b>${T.paperOf(material.paper).label.toLowerCase()}</b> · flaws <b>${material.flaws.toFixed(2)}</b> · texture seed <b>${material.seed}</b> · view <b>${view}</b>${stats.paperMs ? ` (paper render <b>${stats.paperMs.toFixed(0)} ms</b>)` : ''}`;
   document.getElementById('readout').innerHTML =
-    `<b>${ops}</b> ops in <b>${groups.length}</b> steps · <b>${state.regions.length}</b> regions · <b>${n.toLocaleString()}</b> points\n`
+    `bath: <b>${ops}</b> ops in <b>${groups().length}</b> steps · <b>${state.regions.length}</b> regions · <b>${n.toLocaleString()}</b> points\n`
+    + `layers <b>${layers.length}</b> of ${M.MAX_LAYERS} (${printed.length} printed) · all layers <b>${all}</b> ops · <b>${totalN.toLocaleString()}</b> points\n`
     + `last step <b>${stats.lastOpMs.toFixed(1)} ms</b> · preview <b>${stats.previewMs.toFixed(1)} ms</b> · frame <b>${stats.frameMs.toFixed(1)} ms</b>\n`
+    + paperLine + `\n`
     + `link <b>${currentHash().length}</b> characters · sheet ${M.SHEET.w} × ${M.SHEET.h}`
     + coarse;
 }
 
 /* ---------------- test chrome (read by tools/verify-marble.mjs) ---------------- */
 window.__marble = {
-  SETTINGS,
-  ops: () => groups.map((g) => g.map((o) => ({ ...o }))),
+  SETTINGS, INK_SETTINGS,
+  ops: () => groups().map((g) => g.map((o) => ({ ...o }))),
+  layersOps: () => layers.map((l) => l.map((g) => g.map((o) => ({ ...o })))),
   hash: () => currentHash(),
   load: (h) => loadHash(h),
   digest: () => M.digest(state),
-  summary: () => ({ regions: state.regions.length, points: M.pointCount(state), groups: groups.length, ops: groups.flat().length, redo: redoStack.length, segScale: state.segScale, sheet, color, tool }),
+  digests: () => docStates().map(M.digest),
+  summary: () => ({ regions: state.regions.length, points: M.pointCount(state), groups: groups().length, ops: groups().flat().length, redo: redoStack.length, segScale: state.segScale, sheet, color, tool, layers: layers.length, printed: printed.length, totalRegions: docStates().reduce((n, s) => n + s.regions.length, 0), view, material: { ...material } }),
   commit: (ops) => applyGroup(ops),
   undo, redo, clear: clearSheet,
+  pull: () => pull(true),
+  setView: (v) => setView(v, true),
+  layBlend: () => lay.t,
   setTool,
   setSettings: (o) => { Object.assign(settings, o); writeOutputs(); },
   setColor: (h) => { color = M.normHex(h); drawSwatches(); },
+  setInk: (o) => setInk(o),
+  ink: () => ({ ...inkFor(color) }),
   setSheet,
+  setMaterial: (m) => setMaterial(m),
   setAutoAdvance: (v) => { autoAdvance = !!v; document.getElementById('autoAdvance').checked = autoAdvance; },
-  svg: () => M.exportSvg(state),
-  pngSize: async (scale = 2) => (await pngBlob(scale)).size,
+  svg: () => svgText(),
+  pngSize: async (scale = 2, opts = {}) => (await pngBlob(scale, opts)).size,
+  paperMs: async () => { const t = performance.now(); renderPaperCanvas(); return performance.now() - t; },
   stats: () => ({ ...stats }),
   previewing: () => !!preview,
   gesture: () => (gesture ? { ...gesture, op: gesture.op } : null),
@@ -435,13 +609,15 @@ window.__marble = {
   sheetRect: () => { const r = canvas.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; },
   readout: () => document.getElementById('readout').textContent,
   controls: () => Object.fromEntries(SETTINGS.map((s) => [s.id, !ctrlEl[s.id].hidden])),
-  pixel: (x, y) => { const px = Math.round(x * view.scale * view.dpr), py = Math.round(y * view.scale * view.dpr); return Array.from(ctx.getImageData(px, py, 1, 1).data); },
+  pixel: (x, y) => { const px = Math.round(x * view2.scale * view2.dpr), py = Math.round(y * view2.scale * view2.dpr); return Array.from(ctx.getImageData(px, py, 1, 1).data); },
 };
 
 /* ---------------- boot ---------------- */
 writeOutputs();
 setTool('drop');
 drawSwatches();
+writeMaterialUi();
+writeViewUi();
 window.addEventListener('resize', fitSheet);
 fitSheet();
 const h0 = location.hash.replace(/^#/, '');

@@ -9953,6 +9953,36 @@ every edge so a rake exposes no bare band; the bouquet is the weakest of the fiv
 constants (a 9-tine comb, wave 0.55 of the spacing, z 95) are the ones to retune first; strokes
 preview as a PLAIN map (every vertex moves, none is added) and refine on commit; the random
 sequence is 36–70 drops and 2–5 strokes of every kind from the seed field.
+**REALISM SITS BESIDE THE TRANSFORMS AND TOUCHES NONE OF THEM** (the realism session — read the
+headers of `marble-material.js` and `marble-render.js` before touching the paper view). A drop
+carries four ink properties (`conc`, `opa`, `gall`, `gran`), kept PER COLOUR on the page and
+written into every drop, so the hash carries them; a region remembers the area it was dropped as
+and **the dilution law is `strength = conc · area0 / area`, clamped** (`inkStrength`), the colour
+mixed toward white by it, the opacity letting the paper through. **THE FOUR TRANSFORMS ARE
+MEASURE-PRESERVING, SO THAT LAW IS INERT UNDER A RAKE — MEASURED, NOT ARGUED**: the drop takes ρ to
+sqrt(ρ² + r²) (ρ'dρ' = ρ dρ), a tine is a shear, a stir a radius-wise rotation, and a region pushed
+by a neighbouring drop keeps its area to 3e-5. D2 asserts that as the equations' own consequence.
+What dilutes ink on this sheet is its gall (the push and the disc at `r·gall`, the strength
+`conc/gall²`) and its concentration; the law's "doubled area halves it" is checked on a scaled
+copy (D1) and guarded by the `dilution-ignores-the-area` mutant. A DOCUMENT is up to `MAX_LAYERS`
+(4) layers of op groups — the last the live bath, the rest printed pulls — in a v2 hash
+`v2_<sheet>_<paper>,<flaws>,<seed>_L!L!L`; a v1 link still decodes as one layer with default ink.
+Two views: the BATH (dark water, the live layer only — printed layers are NOT ghosted under it, a
+judgment call) and the PAPER behind "Lay paper" (320 ms fade): every layer rendered to its own
+cached canvas (rims darkened, hairlines under 1.6 units dashed, granulation specks, mottle masked
+to the ink, the pull's voids / skips / one uneven edge / touch-down line from `flawPlan`) and
+MULTIPLIED onto the paper preset, then the preset's texture multiplied over all — every texture
+pure, seeded from the material seed, `TEX_W × TEX_H` bytes compared in M1/M2. The PNG is the paper
+view; **the SVG is vector only** — one multiply `<g>` per layer, fill-opacity, a 0.5-unit
+quarter-opacity rim stroke, no raster. The bath frame costs what it did (64.5 against 65.6 ms
+flushed on the 200-op sheet); run the gate ALONE — its two timing bars (B10, B14) read the box,
+and a negative control running beside it reddened both once. **THE NEGATIVE CONTROL HAD NEVER
+COMPLETED BEFORE THIS SESSION**: its first mutant throws every region five times further on every
+drop, a hundred-op pattern then costs ~3 s an op, and a stale run was found at 26 minutes with no
+mutant reported. A MUTANT's replays are bounded at `REPLAY_BUDGET_MS` (20 s) and an overrun reads as
+that clause firing (the shipped run is unbounded); three claim lists that had never been run were
+corrected by measurement (the uncentred comb still reaches the budget at segScale 1.35, refinement-off
+still prunes 8 of 22,461 vertices, the dropped falloff reaches H3 and H5). 10 of 10 behave in 95 s.
 
 ## `/tile` — the tessellation rollers (pointer only)
 
