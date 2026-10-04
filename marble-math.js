@@ -27,10 +27,29 @@
    STRAIGHT comb composes EXACTLY as a sum (d is invariant under a shift along M),
    a wavy one is applied tine by tine. The hash codec is here too: an op list is a
    string and a string is an op list, numbers rounded to one decimal AT COMMIT so
-   what the page applied is what the link replays — bit for bit. */
+   what the page applied is what the link replays — bit for bit.
+
+   REALISM (the realism session) sits BESIDE the transforms and touches none of
+   them. A drop carries four ink properties — conc (concentration), opa
+   (opacity), gall (spread strength) and gran (granulation) — and a region
+   remembers the AREA of the ink it was dropped as, πr² at the ASKED radius.
+   Gall scales the drop's push and painted disc to r·gall (the mapper is handed
+   the scaled radius; the equation is untouched), and the dilution law then
+   lowers its strength on its own: displayed strength = conc · area0 / area,
+   clamped to [0, 1], so ink spread by a rake or by gall goes paler. Colour
+   strength mixes the ink toward white; opacity is what lets the paper through.
+   A DOCUMENT is a sheet colour, a material record and up to MAX_LAYERS layers
+   of op groups — a pull freezes the bath as a printed layer and the next bath
+   multiplies over it. The hash is v2: v2_<sheet>_<paper>,<flaws>,<seed>_L!L!L
+   (a layer is groups joined by '~'); a v1 link still decodes, as one layer. */
 
 export const SHEET = Object.freeze({ w: 1000, h: 1250 });   // logical sheet, 4:5 portrait
-export const FORMAT_VERSION = 'v1';
+export const FORMAT_VERSION = 'v2';
+export const LEGACY_VERSION = 'v1';
+export const MAX_LAYERS = 4;
+export const INK_DEFAULTS = Object.freeze({ conc: 1, opa: 1, gall: 1, gran: 0 });
+export const INK_RANGES = Object.freeze({ conc: [0.1, 1], opa: [0.2, 1], gall: [0.5, 2], gran: [0, 1] });
+export const MATERIAL_DEFAULTS = Object.freeze({ paper: 0, flaws: 0.2, seed: 1 });
 export const MAX_SEG = 2.5;        // longest mapped edge before a midpoint is inserted (sheet units)
 export const MIN_SEG = 0.6;        // an edge shorter than this is a pruning candidate
 export const PRUNE_TOL = 0.12;     // ...and is pruned when its vertex sits this close to the chord
@@ -82,7 +101,7 @@ export function combOffsets(n, s) {
 export function mapperFor(op) {
   switch (op.k) {
     case 'd': {
-      const { x: cx, y: cy, r } = op; const r2 = r * r;
+      const { x: cx, y: cy } = op; const r = dropRadius(op); const r2 = r * r;
       return (x, y, o) => {
         const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy;
         if (d2 < 1e-24) { o[0] = cx; o[1] = cy; return; }
@@ -215,6 +234,53 @@ export function circlePolygon(cx, cy, r, maxSeg = MAX_SEG) {
   return pts;
 }
 
+/* ---------------- ink: dilution, colour ---------------- */
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+/* the radius the drop PUSHES with and is painted at: the asked radius × gall */
+export function dropRadius(op) { return op.r * (op.gall ?? INK_DEFAULTS.gall); }
+/* a region as dropped: its ink properties and the area of the ink it was
+   dropped as — π r² at the ASKED radius, so gall's wider disc is already
+   diluted by the same law that a rake applies later */
+export function newRegion(op, seg = MAX_SEG) {
+  const conc = op.conc ?? INK_DEFAULTS.conc, opa = op.opa ?? INK_DEFAULTS.opa, gran = op.gran ?? INK_DEFAULTS.gran;
+  const g = op.gall ?? INK_DEFAULTS.gall;
+  const pts = circlePolygon(op.x, op.y, dropRadius(op), seg);
+  // area0 is the painted disc's own polygon area over gall², so an ungalled drop
+  // reads EXACTLY conc until something stretches it, and a galled one conc/gall²
+  return { pts, color: op.color, conc, opa, gran, area0: polygonArea(pts) / (g * g) };
+}
+/* shoelace, absolute */
+export function polygonArea(pts) {
+  let a = 0; const n = pts.length;
+  for (let i = 0; i < n; i += 2) { const j = i + 2 === n ? 0 : i + 2; a += pts[i] * pts[j + 1] - pts[j] * pts[i + 1]; }
+  return Math.abs(a) / 2;
+}
+export function polygonPerimeter(pts) {
+  let l = 0; const n = pts.length;
+  for (let i = 0; i < n; i += 2) { const j = i + 2 === n ? 0 : i + 2; l += Math.hypot(pts[j] - pts[i], pts[j + 1] - pts[i + 1]); }
+  return l;
+}
+/* THE DILUTION LAW: strength = conc · (area at drop ÷ current area), clamped.
+   A region not yet stretched reads exactly conc; one spread over twice the
+   area reads half. A region with no area at all (never drawn) reads conc. */
+export function inkStrength(rg) {
+  const conc = rg.conc ?? INK_DEFAULTS.conc, a0 = rg.area0;
+  if (!(a0 > 0)) return clamp01(conc);
+  const a = polygonArea(rg.pts);
+  if (!(a > 1e-9)) return clamp01(conc);
+  return clamp01(conc * a0 / a);
+}
+export function hexToRgb(hex) { const h = normHex(hex).slice(1); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+export function rgbToHex(r, g, b) { const q = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'); return ('#' + q(r) + q(g) + q(b)).toUpperCase(); }
+/* the colour a region DISPLAYS: the ink mixed toward white by its strength */
+export function inkColour(rg) {
+  const s = inkStrength(rg); const [r, g, b] = hexToRgb(rg.color);
+  return rgbToHex(255 - (255 - r) * s, 255 - (255 - g) * s, 255 - (255 - b) * s);
+}
+export function darken(hex, k = 0.72) { const [r, g, b] = hexToRgb(hex); return rgbToHex(r * k, g * k, b * k); }
+/* mean width of a region: 2·area/perimeter — a strip's own width, a disc's half radius */
+export function meanWidth(pts) { const p = polygonPerimeter(pts); return p > 0 ? 2 * polygonArea(pts) / p : 0; }
+
 /* ---------------- state ---------------- */
 // A state is { sheet: '#hex', regions: [{ pts: Float64Array, color }] }. Regions
 // are painted in order, so the newest drop sits on top of everything it pushed aside.
@@ -239,9 +305,9 @@ export function applyOp(state, op, { refine = true, prune = true, maxSeg = null,
     if (refine) pts = mapPolygon(rg.pts, rg.pts.length / 2, f, seg, depthCap);
     else { pts = new Float64Array(rg.pts.length); for (let i = 0; i < pts.length; i += 2) { f(rg.pts[i], rg.pts[i + 1], o); pts[i] = o[0]; pts[i + 1] = o[1]; } }
     if (prune) pts = prunePolygon(pts, MIN_SEG * (seg / MAX_SEG), PRUNE_TOL * (seg / MAX_SEG));
-    return { pts, color: rg.color };
+    return { ...rg, pts };
   });
-  if (op.k === 'd') regions.push({ pts: circlePolygon(op.x, op.y, op.r, seg), color: op.color });
+  if (op.k === 'd') regions.push(newRegion(op, seg));
   const out = { sheet: state.sheet, regions, segScale };
   // one op can multiply the count (a fine comb over a raked sheet), so the budget
   // is also enforced AFTER mapping: simplify toward it with a tolerance derived
@@ -252,7 +318,7 @@ export function applyOp(state, op, { refine = true, prune = true, maxSeg = null,
     let n = pointCount(out), guard = 0;
     while (n > POINT_BUDGET * 1.25 && guard++ < 4) {
       const sc = n / POINT_BUDGET;
-      out.regions = out.regions.map((rg) => ({ pts: prunePolygon(rg.pts, MAX_SEG * sc, PRUNE_TOL * sc), color: rg.color }));
+      out.regions = out.regions.map((rg) => ({ ...rg, pts: prunePolygon(rg.pts, MAX_SEG * sc, PRUNE_TOL * sc) }));
       out.segScale = Math.max(out.segScale, sc);
       n = pointCount(out);
     }
@@ -269,18 +335,27 @@ export function replay(ops, sheet = '#EDEDE8') {
 /* ---------------- rounding + codec ---------------- */
 const q1 = (v) => Math.round(v * 10) / 10 + 0;      // one decimal; "+ 0" turns -0 into +0
 const FIELDS = {
-  d: ['x', 'y', 'r'],
+  d: ['x', 'y', 'r', 'conc', 'opa', 'gall', 'gran'],
   t: ['x0', 'y0', 'x1', 'y1', 'z', 'c'],
   k: ['x0', 'y0', 'x1', 'y1', 'z', 'c', 'n', 's'],
   w: ['x0', 'y0', 'x1', 'y1', 'z', 'c', 'n', 's', 'A', 'L', 'phi'],
   s: ['x', 'y', 'r', 'z', 'c'],
 };
 const INT = new Set(['n']);
+const q2 = (v) => Math.round(v * 100) / 100 + 0;    // two decimals, for the ink's own fractions
+const INK_FIELDS = new Set(Object.keys(INK_DEFAULTS));
 export function roundOp(op) {
   const out = { k: op.k };
-  for (const f of FIELDS[op.k]) out[f] = INT.has(f) ? Math.round(op[f]) : q1(op[f]);
+  for (const f of FIELDS[op.k]) {
+    const v = INK_FIELDS.has(f) ? (op[f] ?? INK_DEFAULTS[f]) : op[f];
+    out[f] = INT.has(f) ? Math.round(v) : INK_FIELDS.has(f) ? q2(v) : q1(v);
+  }
   if (op.k === 'd') out.color = normHex(op.color);
   return out;
+}
+/* the material record, rounded the way the hash carries it */
+export function roundMaterial(m = {}) {
+  return { paper: Math.max(0, Math.round(m.paper ?? MATERIAL_DEFAULTS.paper)), flaws: Math.max(0, Math.min(1, q2(m.flaws ?? MATERIAL_DEFAULTS.flaws))), seed: Math.max(0, Math.round(m.seed ?? MATERIAL_DEFAULTS.seed)) };
 }
 export function normHex(c) {
   const m = String(c).trim().replace(/^#/, '');
@@ -290,35 +365,66 @@ export function normHex(c) {
 }
 const num = (v) => { const s = String(v); return s; };
 
-/* groups: an array of op arrays. The hash is  v1_<sheet hex>_<group>~<group>…,
-   a group is ops joined by ';', an op is its kind and fields joined by ','.
-   Every character used is allowed in a URI fragment unescaped. */
-export function encodeHash(groups, sheet) {
-  const body = groups.map((g) => g.map((op) => {
-    const r = roundOp(op);
-    const parts = [r.k, ...FIELDS[r.k].map((f) => num(r[f]))];
-    if (r.k === 'd') parts.push(r.color.slice(1));
-    return parts.join(',');
-  }).join(';')).join('~');
-  return `${FORMAT_VERSION}_${normHex(sheet).slice(1)}_${body}`;
+/* A document is { sheet, material, layers: [groups, groups, …] } — the LAST
+   layer is the live bath, every earlier one a printed pull. The hash is
+     v2_<sheet hex>_<paper>,<flaws>,<seed>_<layer>!<layer>!…
+   a layer is groups joined by '~', a group is ops joined by ';', an op is its
+   kind and fields joined by ','. Every character used is allowed in a URI
+   fragment unescaped. A trailing '!' is a pulled bath with nothing in it yet,
+   which is a real state and is kept. encodeHash(groups, sheet) is the one-layer
+   form the page used before layers existed and is kept for it. */
+const encodeGroups = (groups) => groups.map((g) => g.map((op) => {
+  const r = roundOp(op);
+  const parts = [r.k, ...FIELDS[r.k].map((f) => num(r[f]))];
+  if (r.k === 'd') parts.push(r.color.slice(1));
+  return parts.join(',');
+}).join(';')).join('~');
+export function encodeDoc({ sheet, material, layers }) {
+  if (!layers.length || layers.length > MAX_LAYERS) throw new Error(`a document holds 1 to ${MAX_LAYERS} layers`);
+  const m = roundMaterial(material);
+  const body = layers.map(encodeGroups).join('!');
+  return `${FORMAT_VERSION}_${normHex(sheet).slice(1)}_${m.paper},${num(m.flaws)},${m.seed}_${body}`;
 }
-export function decodeHash(hash) {
+export function encodeHash(groups, sheet, material = MATERIAL_DEFAULTS) {
+  return encodeDoc({ sheet, material, layers: [groups] });
+}
+export function decodeDoc(hash) {
   const h = String(hash).replace(/^#/, '');
-  if (!h) return { sheet: '#EDEDE8', groups: [] };
-  const [ver, sheetHex, body = ''] = h.split('_');
+  if (!h) return { sheet: '#EDEDE8', material: roundMaterial(), layers: [[]] };
+  const segs = h.split('_');
+  const ver = segs[0];
+  if (ver === LEGACY_VERSION) {
+    const [, sheetHex, body = ''] = segs;
+    return { sheet: normHex(sheetHex), material: roundMaterial(), layers: [parseGroups(body, ver)] };
+  }
   if (ver !== FORMAT_VERSION) throw new Error(`unknown marble format ${ver}`);
-  const sheet = normHex(sheetHex);
-  const groups = body ? body.split('~').map((g) => g ? g.split(';').map(parseOp) : []) : [];
-  return { sheet, groups: groups.filter((g) => g.length) };
+  if (segs.length !== 4) throw new Error('a v2 link has four parts');
+  const [, sheetHex, mat, body] = segs;
+  const mp = mat.split(',').map(Number);
+  if (mp.length !== 3 || !mp.every(Number.isFinite)) throw new Error(`bad material ${mat}`);
+  const material = roundMaterial({ paper: mp[0], flaws: mp[1], seed: mp[2] });
+  const layers = body.split('!').map((seg) => parseGroups(seg, ver));
+  if (layers.length > MAX_LAYERS) throw new Error(`a link holds at most ${MAX_LAYERS} layers`);
+  return { sheet: normHex(sheetHex), material, layers };
 }
-function parseOp(s) {
+/* the one-layer reading: groups is the LIVE bath's groups (the last layer) */
+export function decodeHash(hash) {
+  const d = decodeDoc(hash);
+  return { sheet: d.sheet, groups: d.layers[d.layers.length - 1], layers: d.layers, material: d.material };
+}
+function parseGroups(body, ver) {
+  return body ? body.split('~').map((g) => g ? g.split(';').map((s) => parseOp(s, ver)) : []).filter((g) => g.length) : [];
+}
+const LEGACY_FIELDS = { ...FIELDS, d: ['x', 'y', 'r'] };   // a v1 drop carried no ink properties
+function parseOp(s, ver = FORMAT_VERSION) {
   const parts = s.split(',');
   const k = parts[0];
-  const fields = FIELDS[k];
+  const fields = (ver === LEGACY_VERSION ? LEGACY_FIELDS : FIELDS)[k];
   if (!fields) throw new Error(`unknown op ${k}`);
   const op = { k };
   fields.forEach((f, i) => { const v = Number(parts[i + 1]); if (!Number.isFinite(v)) throw new Error(`bad field ${f} in ${s}`); op[f] = v; });
-  if (k === 'd') op.color = normHex(parts[fields.length + 1]);
+  if (k === 'd') { if (parts.length !== fields.length + 2) throw new Error(`bad drop ${s}`); op.color = normHex(parts[fields.length + 1]); }
+  else if (parts.length !== fields.length + 1) throw new Error(`bad op ${s}`);
   return roundOp(op);
 }
 
@@ -420,34 +526,80 @@ export function randomSequence(seed, colors) {
 
 /* ---------------- export ---------------- */
 const f1 = (v) => (Math.round(v * 10) / 10).toString();
-export function exportSvg(state) {
+/* a region's SVG attributes: the diluted colour, its opacity, and a LIGHT rim
+   stroke (the edge darkening's vector approximation — a quarter-opacity stroke
+   half a unit wide, never a raster) */
+export function regionSvgAttrs(rg) {
+  const col = inkColour(rg), opa = rg.opa ?? INK_DEFAULTS.opa;
+  let a = `fill="${col}"`;
+  if (opa < 1) a += ` fill-opacity="${f1(opa * 100) / 100}"`;
+  a += ` stroke="${darken(col)}" stroke-width="0.5" stroke-opacity="${(0.25 * opa).toFixed(3)}" stroke-linejoin="round"`;
+  return a;
+}
+const pathOf = (p) => { let d = `M${f1(p[0])} ${f1(p[1])}`; for (let i = 2; i < p.length; i += 2) d += `L${f1(p[i])} ${f1(p[i + 1])}`; return d + 'Z'; };
+/* one state, or a list of states (printed layers first, the live bath last):
+   each layer is its own <g> composited with multiply, so the file stays vector —
+   regions, opacity and blend groups, no raster texture */
+export function exportSvg(stateOrLayers) {
+  const layers = Array.isArray(stateOrLayers) ? stateOrLayers : [stateOrLayers];
+  const sheet = layers[0]?.sheet ?? '#EDEDE8';
   const parts = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`,
-    `<rect width="${W}" height="${H}" fill="${state.sheet}"/>`];
-  for (const rg of state.regions) {
-    const p = rg.pts; let d = `M${f1(p[0])} ${f1(p[1])}`;
-    for (let i = 2; i < p.length; i += 2) d += `L${f1(p[i])} ${f1(p[i + 1])}`;
-    parts.push(`<path d="${d}Z" fill="${rg.color}"/>`);
-  }
+    `<rect width="${W}" height="${H}" fill="${sheet}"/>`];
+  layers.forEach((st, i) => {
+    parts.push(`<g id="layer-${i + 1}" style="mix-blend-mode:multiply">`);
+    for (const rg of st.regions) parts.push(`<path d="${pathOf(rg.pts)}" ${regionSvgAttrs(rg)}/>`);
+    parts.push('</g>');
+  });
   parts.push('</svg>');
   return parts.join('\n');
 }
-/* draw into any CanvasRenderingContext2D at `scale` px per sheet unit. Each
-   region is filled and then STROKED one device pixel wide in its own colour:
-   two fills sharing an edge are antialiased separately and let the sheet show
-   through as a hairline (the conflation artefact), and the stroke covers it. */
-export function drawState(ctx, state, scale, { clip = true, seam = true } = {}) {
+/* paint one state's regions into any CanvasRenderingContext2D at `scale` px per
+   sheet unit: each region filled in its DILUTED colour at its own opacity, then
+   its rim stroked a little darker — the edge darkening of a real ink film, and
+   the cover for the conflation hairline two antialiased fills leave between
+   them. Thin regions (meanWidth under hairline) break into dashes and specks
+   instead of a solid fill, seeded per region. Draws no sheet; the caller does. */
+export const HAIRLINE_WIDTH = 1.6;    // sheet units: a strip thinner than this breaks up
+export const RIM_WIDTH = 0.9;         // sheet units: the darkened rim's width
+export function tracePath(ctx, p) {
+  ctx.beginPath(); ctx.moveTo(p[0], p[1]);
+  for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+  ctx.closePath();
+}
+export function paintRegions(ctx, regions, scale, { rim = true, hairline = true, seed = 1 } = {}) {
+  const px = 1 / scale;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  regions.forEach((rg, i) => {
+    const col = inkColour(rg), opa = rg.opa ?? INK_DEFAULTS.opa;
+    const w = hairline ? meanWidth(rg.pts) : Infinity;
+    tracePath(ctx, rg.pts);
+    if (w < HAIRLINE_WIDTH) {
+      // a hairline: the two long sides stroked at the strip's own width, dashed
+      // on a seeded pattern, so the strip reads as dashes with specks between
+      const rand = mulberry32((seed * 7919 + i) >>> 0);
+      const t = w / HAIRLINE_WIDTH;
+      ctx.setLineDash([2 + rand() * 10, 1 + rand() * 4 * (1.2 - t), 1 + rand() * 3, 1 + rand() * 6 * (1.2 - t)]);
+      ctx.lineDashOffset = rand() * 20;
+      ctx.lineWidth = Math.max(w, 0.5);
+      ctx.strokeStyle = col; ctx.globalAlpha = opa * (0.55 + 0.45 * t);
+      ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 1;
+      return;
+    }
+    ctx.fillStyle = col; ctx.globalAlpha = opa; ctx.fill();
+    if (rim) { ctx.lineWidth = Math.max(px, RIM_WIDTH); ctx.strokeStyle = darken(col); ctx.globalAlpha = 0.3 * opa; ctx.stroke(); }
+    else { ctx.lineWidth = px; ctx.strokeStyle = col; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  });
+}
+/* the flat picture: the sheet, then the regions — what the page drew before the
+   bath and paper views existed, kept for any caller that wants a plain draw */
+export function drawState(ctx, state, scale, { clip = true, rim = true, hairline = false } = {}) {
   ctx.save();
   ctx.scale(scale, scale);
   if (clip) { ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip(); }
   ctx.fillStyle = state.sheet; ctx.fillRect(0, 0, W, H);
-  ctx.lineWidth = 1 / scale; ctx.lineJoin = 'round';
-  for (const rg of state.regions) {
-    const p = rg.pts;
-    ctx.beginPath(); ctx.moveTo(p[0], p[1]);
-    for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
-    ctx.closePath(); ctx.fillStyle = rg.color; ctx.fill();
-    if (seam) { ctx.strokeStyle = rg.color; ctx.stroke(); }
-  }
+  paintRegions(ctx, state.regions, scale, { rim, hairline });
   ctx.restore();
 }
 /* a digest of every coordinate, for "the same sheet" claims in the gate */
@@ -460,7 +612,7 @@ export function digest(state) {
       view.setFloat64(0, p[i]);
       for (let b = 0; b < 8; b++) { h ^= view.getUint8(b); h = Math.imul(h, 0x01000193) >>> 0; }
     }
-    for (const ch of rg.color) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+    for (const ch of `${rg.color}|${rg.conc}|${rg.opa}|${rg.gran}|${rg.area0}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
   }
   return `${state.sheet}:${state.regions.length}:${n}:${h.toString(16)}`;
 }

@@ -28,7 +28,21 @@
         and REPLAYS BIT-IDENTICALLY (Object.is on every coordinate); every
         pattern and the random sequence round-trip the same way; the string
         uses only fragment-safe characters; a corrupt or newer link is refused.
-     S  the SVG export: one path per region, the sheet's viewBox, finite.
+     S  the SVG export: one path per region, the sheet's viewBox, finite; a
+        layered document is one <g> per layer composited with multiply, every
+        region carrying its diluted colour and opacity, no raster anywhere.
+     D  THE DILUTION LAW (the realism session), restated here as
+        strength = conc · area0 / area, clamped: an unchanged drop reads EXACTLY
+        its concentration; the same region scaled to twice its area reads half;
+        a galled drop reads conc / gall²; the displayed colour is the ink mixed
+        toward white by that strength (a 50 % strength is the midpoint).
+     H5 a document of several layers, each its own groups, with a material
+        record, round-trips the hash bit-identically layer by layer, a trailing
+        empty bath included; a v1 link still decodes as one layer; a fifth
+        layer is refused.
+     M  the material is SEEDED and DETERMINISTIC: the same seed gives the same
+        paper texture, mottle and flaw plan to the byte, a different seed a
+        different one, every preset its own texture, and flaws 0 is a clean pull.
      T  timing (REPORTED, bar in part two): replay of 200 ops, one preview pass.
 
    PART TWO (Chromium) drives the real page with real pointer events:
@@ -40,10 +54,16 @@
         REPRODUCES: a second page opened on the hash reports the same digest ·
         SVG and PNG exports are non-empty and the SVG parses with one path per
         region · at 200 ops a real comb drag's worst preview+frame is under the
-        bar · at phone width (390 × 844, touch) nothing scrolls sideways, the
-        sheet fits, and a tap drops ink.
+        bar · PULL: a pull freezes the bath as a printed layer, the hash carries
+        both, a second page reproduces every layer's digest, undo on the empty
+        bath un-pulls, the fifth layer is refused · LAY PAPER: the paper view is
+        a different picture from the bath, a gesture returns to the bath, and the
+        PNG (the paper view) is larger than the bath's flat draw · at 200 ops ×
+        4 layers the paper render and a comb drag's preview both stay under
+        their bars · at phone width (390 × 844, touch) nothing scrolls sideways,
+        the sheet fits, and a tap drops ink.
 
-   --negative-control  nine mutations of marble-math.js, each served to part
+   --negative-control  ten mutations of marble-math.js, each served to part
                        one from tools/.scratch and required to redden exactly
                        the clauses it names. Part two is NOT mutated.
    --no-browser        part one only.
@@ -264,7 +284,7 @@ async function partOne(G, label = 'shipped') {
   // H hash
   // the fields an op must carry are written down HERE, not read from the module:
   // a codec that drops one still round-trips against itself (NaN on both sides)
-  const FIELDS = { d: ['k', 'x', 'y', 'r', 'color'], t: ['k', 'x0', 'y0', 'x1', 'y1', 'z', 'c'], k: ['k', 'x0', 'y0', 'x1', 'y1', 'z', 'c', 'n', 's'], w: ['k', 'x0', 'y0', 'x1', 'y1', 'z', 'c', 'n', 's', 'A', 'L', 'phi'], s: ['k', 'x', 'y', 'r', 'z', 'c'] };
+  const FIELDS = { d: ['k', 'x', 'y', 'r', 'conc', 'opa', 'gall', 'gran', 'color'], t: ['k', 'x0', 'y0', 'x1', 'y1', 'z', 'c'], k: ['k', 'x0', 'y0', 'x1', 'y1', 'z', 'c', 'n', 's'], w: ['k', 'x0', 'y0', 'x1', 'y1', 'z', 'c', 'n', 's', 'A', 'L', 'phi'], s: ['k', 'x', 'y', 'r', 'z', 'c'] };
   const census = (op) => { const have = Object.keys(op).sort().join(','), want = [...FIELDS[op.k]].sort().join(','); return have === want && FIELDS[op.k].every((f) => f === 'k' || f === 'color' || Number.isFinite(op[f])); };
   const finite = (st) => st.regions.every((rg) => rg.pts.every(Number.isFinite));
   {
@@ -299,7 +319,7 @@ async function partOne(G, label = 'shipped') {
   }
   {
     const refused = (h) => { try { G.decodeHash(h); return false; } catch { return true; } };
-    rec('H4 a newer format, a garbled op and a bad colour are refused rather than partly read', refused('v2_EDEDE8_d,1,2,3,0A0A0C') && refused('v1_EDEDE8_d,1,x,3,0A0A0C') && refused('v1_EDEDE8_d,1,2,3,0A0A0') && refused('v1_EDEDE8_q,1,2'));
+    rec('H4 a newer format, a garbled op and a bad colour are refused rather than partly read', refused('v9_EDEDE8_0,0.2,1_d,1,2,3,1,1,1,0,0A0A0C') && refused('v2_EDEDE8_0,0.2,1_d,1,x,3,1,1,1,0,0A0A0C') && refused('v2_EDEDE8_0,0.2,1_d,1,2,3,1,1,1,0,0A0A0') && refused('v2_EDEDE8_0,0.2,1_q,1,2') && refused('v2_EDEDE8_0,x,1_') && refused('v1_EDEDE8_d,1,x,3,0A0A0C'), 'v9, a NaN field, a five-digit colour, an unknown op, a bad material and a garbled v1 all refused');
   }
 
   // S svg
@@ -308,6 +328,70 @@ async function partOne(G, label = 'shipped') {
     const svg = G.exportSvg(st);
     const paths = (svg.match(/<path /g) || []).length;
     rec('S1 the SVG holds one path per region on the sheet\'s viewBox, every coordinate finite', paths === st.regions.length && svg.includes(`viewBox="0 0 ${G.SHEET.w} ${G.SHEET.h}"`) && !/NaN|Infinity/.test(svg), `${paths} paths, ${(svg.length / 1024).toFixed(0)} KB`);
+  }
+
+  {
+    // S2 a layered document: one group per layer, multiply, no raster, opacity carried
+    const a = G.replay([{ k: 'd', x: 300, y: 300, r: 80, color: '#5FA0A0', opa: 0.6 }]), b = G.replay([{ k: 'd', x: 600, y: 700, r: 60, color: '#D6A15C' }]);
+    const svg = G.exportSvg([a, b]);
+    const gs = (svg.match(/<g id="layer-\d+" style="mix-blend-mode:multiply">/g) || []).length;
+    rec('S2 a two-layer document exports one multiply <g> per layer, one path per region, fill-opacity where the ink is not opaque, and no raster image', gs === 2 && (svg.match(/<path /g) || []).length === 2 && /fill-opacity="0.6"/.test(svg) && !/<image|data:/.test(svg) && !/NaN|Infinity/.test(svg), `${gs} groups`);
+  }
+
+  // D the dilution law, restated: strength = conc · area0 / area, clamped
+  {
+    const area = (pts) => { let a = 0; for (let i = 0; i < pts.length; i += 2) { const j = (i + 2) % pts.length; a += pts[i] * pts[j + 1] - pts[j] * pts[i + 1]; } return Math.abs(a) / 2; };
+    const st = G.replay([{ k: 'd', x: 400, y: 500, r: 50, color: '#0A0A0C', conc: 0.8 }]);
+    const rg = st.regions[0];
+    const s1 = G.inkStrength(rg);
+    const scaled = (rg, k) => { const p = new Float64Array(rg.pts.length); for (let i = 0; i < p.length; i += 2) { p[i] = 400 + (rg.pts[i] - 400) * k; p[i + 1] = 500 + (rg.pts[i + 1] - 500) * k; } return { ...rg, pts: p }; };
+    const dbl = scaled(rg, Math.SQRT2), quad = scaled(rg, 2), shrunk = scaled(rg, 0.5);
+    const s2 = G.inkStrength(dbl), s4 = G.inkStrength(quad), sh = G.inkStrength(shrunk);
+    rec('D1 an unchanged drop reads EXACTLY its concentration; the same region at twice its area reads half, at four times a quarter, and a compressed one is clamped at 1', s1 === 0.8 && near(s2, 0.4, 1e-9) && near(s4, 0.2, 1e-9) && sh === 1 && near(area(dbl.pts) / area(rg.pts), 2, 1e-9), `${s1} · ${s2.toFixed(9)} · ${s4.toFixed(9)} · ${sh} (areas ×${(area(dbl.pts) / area(rg.pts)).toFixed(6)})`);
+    // a rake: the pushed region's strength is its own area ratio, read off the geometry
+    // the four transforms are MEASURE-PRESERVING (the drop takes ρ to sqrt(ρ² + r²), so
+    // ρ'dρ' = ρ dρ; a tine is a shear; a stir rotates each radius) — so a region pushed
+    // by a neighbouring drop keeps its area to the discretisation, and the law reads
+    // conc × (an area ratio within 2e-3 of 1). Asserted as the equations' own consequence:
+    // what dilutes a region on this sheet is its gall and its concentration, not a rake.
+    const pushed = G.applyOp(st, { k: 'd', x: 470, y: 500, r: 60, color: '#5FA0A0' });
+    const r2 = pushed.regions[0], ratio = rg.area0 / area(r2.pts), expect = Math.min(1, 0.8 * ratio);
+    rec('D2 the strength after a neighbouring drop is conc × dropped area over area now, and that ratio is within 2e-3 of 1 because the push is measure-preserving; the colour is the ink mixed toward white by the strength', near(G.inkStrength(r2), expect, 1e-12) && Math.abs(ratio - 1) < 2e-3 && G.inkColour({ ...rg, pts: dbl.pts, color: '#000000', conc: 1 }) === '#808080' && G.inkColour(rg) === G.inkColour({ ...rg, conc: 0.8 }), `strength ${G.inkStrength(r2).toFixed(6)} = 0.8 × ${ratio.toFixed(6)} · black at half strength → ${G.inkColour({ ...rg, pts: dbl.pts, color: '#000000', conc: 1 })}`);
+    // gall: the push and the disc are at r·gall, the strength conc / gall²
+    const g2 = G.replay([{ k: 'd', x: 400, y: 500, r: 50, color: '#0A0A0C', gall: 2 }]).regions[0];
+    const plain = G.replay([{ k: 'd', x: 400, y: 500, r: 100, color: '#0A0A0C' }]).regions[0];
+    const probe = G.mapperFor({ k: 'd', x: 400, y: 500, r: 50, gall: 2 }); const o = [0, 0]; probe(700, 500, o);
+    rec('D3 gall 2 paints the disc at twice the radius, pushes as a drop of twice the radius would, and reads a quarter of the strength', near(area(g2.pts), area(plain.pts), 1e-9) && near(o[0], 400 + 300 * Math.sqrt(1 + 100 * 100 / (300 * 300)), 1e-9) && near(G.inkStrength(g2), 0.25, 1e-12), `area ${area(g2.pts).toFixed(3)} = ${area(plain.pts).toFixed(3)} · strength ${G.inkStrength(g2)}`);
+  }
+
+  // H5 layers in the hash
+  {
+    const L1 = [[{ k: 'd', x: 300, y: 300, r: 60, color: '#5FA0A0', conc: 0.7, opa: 0.9, gall: 1.2, gran: 0.3 }], [{ k: 't', x0: 100, y0: 300, x1: 900, y1: 320, z: 120, c: 30 }]];
+    const L2 = [[{ k: 'd', x: 600, y: 800, r: 40, color: '#D6A15C' }, { k: 's', x: 600, y: 800, r: 60, z: 90, c: 20 }]];
+    const doc = { sheet: '#ECE8DC', material: { paper: 1, flaws: 0.35, seed: 42 }, layers: [L1.map((g) => g.map(G.roundOp)), L2.map((g) => g.map(G.roundOp)), []] };
+    const r = safe(() => {
+      const h = G.encodeDoc(doc); const dec = G.decodeDoc(h);
+      const bits = dec.layers.length === 3 && dec.layers.every((gs, i) => sameFloats(G.replay(gs.flat(), dec.sheet), G.replay(doc.layers[i].flat(), doc.sheet)));
+      const legacy = G.decodeDoc('v1_EDEDE8_d,500,600,36,5FA0A0~t,1,2,3,4,5,6');
+      let fifth = false; try { G.encodeDoc({ ...doc, layers: [[], [], [], [], []] }); } catch { fifth = true; }
+      let fifthDec = false; try { G.decodeDoc('v2_EDEDE8_0,0.2,1_!!!!'); } catch { fifthDec = true; }
+      return { h, dec, bits, same: JSON.stringify(dec.layers) === JSON.stringify(doc.layers), mat: JSON.stringify(dec.material) === JSON.stringify({ paper: 1, flaws: 0.35, seed: 42 }), sheet: dec.sheet === '#ECE8DC', legacyOk: legacy.layers.length === 1 && legacy.layers[0].length === 2 && legacy.layers[0][0][0].conc === 1 && legacy.layers[0][0][0].gall === 1, fifth, fifthDec, frag: /^[A-Za-z0-9_~;,.!\-]+$/.test(h) };
+    });
+    rec('H5 a three-layer document (the last an empty bath) with a material record round-trips the hash bit-identically layer by layer; a v1 link decodes as one layer with default ink; a fifth layer is refused both ways; fragment-safe', !r.threw && r.bits && r.same && r.mat && r.sheet && r.legacyOk && r.fifth && r.fifthDec && r.frag, r.threw || `${r.h}`);
+  }
+
+  // M material determinism (the material module is not mutated; it is imported once)
+  if (label === 'shipped') {
+    const T = await import(pathToFileURL(path.join(ROOT, 'marble-material.js')).href);
+    const dig = T.digestBytes;
+    const a = T.paperTexture(2, 7), b = T.paperTexture(2, 7), c = T.paperTexture(2, 8);
+    const presets = T.PAPERS.map((_, i) => dig(T.paperTexture(i, 7)));
+    const m1 = T.mottleTexture(7), m2 = T.mottleTexture(7), m3 = T.mottleTexture(9);
+    const f1 = JSON.stringify(T.flawPlan(7, 0.4, 1)), f2 = JSON.stringify(T.flawPlan(7, 0.4, 1)), f3 = JSON.stringify(T.flawPlan(8, 0.4, 1)), f4 = JSON.stringify(T.flawPlan(7, 0.4, 2));
+    const clean = T.flawPlan(7, 0, 0);
+    const sp1 = JSON.stringify(T.granulationSpecks(7, 3, 0.5, a.pts || new Float64Array([0, 0, 100, 0, 100, 100, 0, 100]), 10000)), sp2 = JSON.stringify(T.granulationSpecks(7, 3, 0.5, new Float64Array([0, 0, 100, 0, 100, 100, 0, 100]), 10000));
+    rec('M1 the paper texture is seeded and deterministic to the byte: same seed same bytes, a different seed different ones, every preset its own', dig(a) === dig(b) && dig(a) !== dig(c) && new Set(presets).size === presets.length && a.length === T.TEX_W * T.TEX_H * 4, `${T.PAPERS.length} presets: ${presets.join(' ')}`);
+    rec('M2 the mottle, the granulation specks and the flaw plan are seeded the same way; the plan differs per layer; flaws 0 is a clean pull', dig(m1) === dig(m2) && dig(m1) !== dig(m3) && f1 === f2 && f1 !== f3 && f1 !== f4 && sp1 === sp2 && clean.voids.length === 0 && clean.edge === null && clean.line === null && JSON.parse(f1).voids.length > 0 && JSON.parse(f1).edge.pts.length > 10, `${JSON.parse(f1).voids.length} voids, ${JSON.parse(f1).skips.length} skips at flaws 0.4`);
   }
 
   // T timing (reported)
@@ -333,6 +417,7 @@ const MUTANTS = [
   { id: 'comb-not-centred-on-the-stroke', from: 'out.push((i - (n - 1) / 2) * s);', to: 'out.push(i * s);', breaks: ['P5', 'E4'] },   // E4: the stack's combs land off-sheet and the budget is never reached
   { id: 'codec-drops-the-falloff', from: "t: ['x0', 'y0', 'x1', 'y1', 'z', 'c'],", to: "t: ['x0', 'y0', 'x1', 'y1', 'z'],", breaks: ['H1'] },
   { id: 'pruning-ignores-the-tolerance', from: 'if (within) { keep[i] = 0; kept--; continue; }', to: 'if (true) { keep[i] = 0; kept--; continue; }', breaks: ['E3'] },
+  { id: 'dilution-ignores-the-area', from: 'return clamp01(conc * a0 / a);', to: 'return clamp01(conc * a0 / a0);', breaks: ['D1', 'D2', 'D3'] },   // D3: a galled drop's quarter strength IS the law applied to its own wider disc
 ];
 async function negativeControl() {
   const src = fs.readFileSync(path.join(ROOT, 'marble-math.js'), 'utf8');
@@ -416,7 +501,7 @@ async function partTwo(G) {
   const s2 = await summary(page);
   const px = await page.evaluate(() => window.__marble.pixel(500, 600));
   const hash2 = await page.evaluate(() => window.__marble.hash());
-  check('B2 a real click drops one region of the chosen colour where it was clicked, and the hash carries it', s2.regions === 1 && s2.ops === 1 && px[0] === 0x5F && px[1] === 0xA0 && px[2] === 0xA0 && /^v1_EDEDE8_d,500,600,36,5FA0A0$/.test(hash2), `pixel ${px.slice(0, 3).join(',')} · ${hash2}`);
+  check('B2 a real click drops one region of the chosen colour where it was clicked, and the hash carries it', s2.regions === 1 && s2.ops === 1 && px[0] === 0x5F && px[1] === 0xA0 && px[2] === 0xA0 && /^v2_EDEDE8_0,0.2,1_d,500,600,36,1,1,1,0,5FA0A0$/.test(hash2), `pixel ${px.slice(0, 3).join(',')} · ${hash2}`);
 
   // B3 hold to grow
   await page.evaluate(() => window.__marble.setSettings({ growRate: 120, dropRadius: 20 }));
@@ -512,6 +597,58 @@ async function partTwo(G) {
   const d200 = await drag(page, [100, 200], [900, 1000], 12);
   const after200 = await summary(page);
   check(`B10 at 200 ops a real comb drag previews every step with worst preview+frame under ${PREVIEW_BAR_MS} ms (headless, software GL)`, d200.sawPreview && d200.worstMs < PREVIEW_BAR_MS && after200.ops === 201, `replay of 200 ops ${t200.ms.toFixed(0)} ms (${t200.s.points.toLocaleString()} points) · worst ${d200.worstMs.toFixed(1)} ms · ${after200.points.toLocaleString()} points after`);
+
+  // B12 pull & re-marble, the layered hash, un-pull, the cap
+  await page.click('#clearBtn'); await frames(page, 1);
+  await page.evaluate(() => { window.__marble.setTool('drop'); window.__marble.setSettings({ growRate: 0, dropRadius: 60 }); window.__marble.setColor('#D6A15C'); window.__marble.setInk({ conc: 0.9, opa: 0.8, gall: 1.2, gran: 0.4 }); });
+  const cA = await client(page, 400, 500); await page.mouse.click(cA.x, cA.y); await frames(page, 1);
+  const before12 = await summary(page);
+  await page.click('#pullBtn'); await frames(page, 1);
+  const pulled = await summary(page);
+  const cB = await client(page, 600, 700); await page.mouse.click(cB.x, cB.y); await frames(page, 1);
+  const two = await page.evaluate(() => ({ s: window.__marble.summary(), hash: window.__marble.hash(), digs: window.__marble.digests(), layers: window.__marble.layersOps() }));
+  const page3 = await open({ viewport: { width: 900, height: 700 }, deviceScaleFactor: 1 }, two.hash);
+  const again3 = await page3.evaluate(() => ({ digs: window.__marble.digests(), s: window.__marble.summary(), hash: window.__marble.hash() }));
+  await page3.close();
+  check('B12a a pull freezes the bath as a printed layer and opens an empty bath; the next drop lands in the new layer; the hash holds both layers and a second page reproduces every layer\'s digest', before12.layers === 1 && before12.regions === 1 && pulled.layers === 2 && pulled.printed === 1 && pulled.regions === 0 && two.s.layers === 2 && two.s.regions === 1 && two.s.totalRegions === 2 && two.layers.length === 2 && two.layers[0][0][0].conc === 0.9 && two.layers[0][0][0].gall === 1.2 && two.hash.includes('!') && JSON.stringify(again3.digs) === JSON.stringify(two.digs) && again3.hash === two.hash && again3.s.layers === 2, `${two.hash}`);
+  await page.click('#undoBtn'); await frames(page, 1);
+  const u12a = await summary(page);
+  await page.click('#undoBtn'); await frames(page, 1);
+  const u12b = await page.evaluate(() => ({ s: window.__marble.summary(), dig: window.__marble.digest() }));
+  await page.click('#redoBtn'); await frames(page, 1);
+  const r12 = await summary(page);
+  check('B12b undo on the new layer pops its drop, undo on the EMPTY bath un-pulls (the printed layer is the bath again, same digest as before the pull), and redo pulls again', u12a.layers === 2 && u12a.regions === 0 && u12b.s.layers === 1 && u12b.s.regions === 1 && u12b.dig === two.digs[0] && r12.layers === 2 && r12.printed === 1, `layers ${u12a.layers} → ${u12b.s.layers} → ${r12.layers}`);
+  // drop, pull, drop, pull… through the test chrome's pull (the button is disabled at the cap, so
+  // a real click there cannot happen); the fifth attempt must be refused with the bath intact
+  const pulls = [];
+  for (let i = 0; i < 4; i++) { const cc = await client(page, 200 + i * 150, 300); await page.mouse.click(cc.x, cc.y); await frames(page, 1); pulls.push(await page.evaluate(() => window.__marble.pull())); await frames(page, 1); }
+  const capped = await page.evaluate(() => ({ s: window.__marble.summary(), disabled: document.getElementById('pullBtn').disabled, msg: document.getElementById('exportMsg').textContent }));
+  check(`B12c the sheet takes at most ${G.MAX_LAYERS} layers: the third and fourth pulls refuse, the pull button is disabled at the cap, the bath keeps its ink and the refusal is said`, JSON.stringify(pulls) === JSON.stringify([true, true, false, false]) && capped.s.layers === G.MAX_LAYERS && capped.s.printed === G.MAX_LAYERS - 1 && capped.disabled && capped.s.regions === 2 && /most/.test(capped.msg), `pulls ${pulls.join(',')} · ${capped.s.layers} layers, ${capped.s.printed} printed, pull ${capped.disabled ? 'disabled' : 'ENABLED'} · "${capped.msg}"`);
+
+  // B13 lay paper: a different picture, a gesture returns to the bath, PNG is the paper view
+  const bathPx = await page.evaluate(() => [window.__marble.pixel(50, 50), window.__marble.pixel(200 + 450, 300)]);
+  await page.click('#layBtn'); await page.waitForTimeout(450); await frames(page, 2);
+  const laid = await page.evaluate(() => ({ s: window.__marble.summary(), blend: window.__marble.layBlend(), px: [window.__marble.pixel(50, 50), window.__marble.pixel(200 + 450, 300)], btn: document.getElementById('layBtn').textContent }));
+  const cD = await client(page, 800, 1100); await page.mouse.move(cD.x, cD.y); await page.mouse.down(); await frames(page, 2);
+  const mid = await page.evaluate(() => ({ view: window.__marble.summary().view, previewing: window.__marble.previewing() }));
+  await page.mouse.up(); await page.waitForTimeout(450); await frames(page, 1);
+  const backPx = await page.evaluate(() => ({ s: window.__marble.summary(), blend: window.__marble.layBlend(), px: window.__marble.pixel(50, 50) }));
+  const bathBg = bathPx[0], paperBg = laid.px[0];
+  check('B13a Lay paper fades to the paper view in under half a second: bare water is dark and bare paper is light, the ink pixel changes with the material, and the button says how to come back', laid.s.view === 'paper' && laid.blend === 1 && bathBg[0] + bathBg[1] + bathBg[2] < 200 && paperBg[0] + paperBg[1] + paperBg[2] > 500 && laid.px[1].join() !== bathPx[1].join() && /bath/i.test(laid.btn), `water ${bathBg.slice(0, 3).join(',')} → paper ${paperBg.slice(0, 3).join(',')} · ink ${bathPx[1].slice(0, 3).join(',')} → ${laid.px[1].slice(0, 3).join(',')}`);
+  check('B13b a pointer gesture on the paper view returns the page to the bath (previewing there) and the bath is back once released', mid.view === 'bath' && mid.previewing && backPx.s.view === 'bath' && backPx.blend === 0 && backPx.px.join() === bathBg.join(), `view ${mid.view}, blend after ${backPx.blend}`);
+  const sizes = await page.evaluate(async () => ({ png: await window.__marble.pngSize(1), flat: await window.__marble.pngSize(1, { flat: true }), svg: window.__marble.svg() }));
+  const svgDoc = (() => { const gs = (sizes.svg.match(/<g id="layer-/g) || []).length, paths = (sizes.svg.match(/<path /g) || []).length; return { gs, paths }; })();
+  check('B13c the PNG carries the material (the same four layers drawn flat compress to a far smaller file) and the SVG keeps one group per layer with no raster', sizes.png > 3 * sizes.flat && svgDoc.gs === G.MAX_LAYERS && svgDoc.paths === capped.s.totalRegions && !/<image/.test(sizes.svg), `PNG ${(sizes.png / 1024).toFixed(0)} KB against ${(sizes.flat / 1024).toFixed(0)} KB flat · ${svgDoc.gs} groups, ${svgDoc.paths} paths`);
+
+  // B14 200 ops × 4 layers: the paper render and a live comb drag
+  const hash800 = (() => { const layersOps = []; for (let L = 0; L < 4; L++) { let ops = []; for (let s = 1 + L * 50; ops.length < 200; s++) ops = ops.concat(G.randomSequence(s, COLORS)); layersOps.push([ops.slice(0, 200)]); } return G.encodeDoc({ sheet: '#EDEDE8', material: { paper: 2, flaws: 0.4, seed: 3 }, layers: layersOps }); })();
+  const t800 = await page.evaluate((h) => { const t = performance.now(); window.__marble.load(h); return { ms: performance.now() - t, s: window.__marble.summary() }; }, hash800);
+  const paperMs = await page.evaluate(() => window.__marble.paperMs());
+  const paperMs2 = await page.evaluate(() => window.__marble.paperMs());
+  await page.evaluate(() => { window.__marble.setView('bath'); window.__marble.setTool('comb'); window.__marble.setSettings({ combTines: 8, combSpacing: 40, strength: 0.5 }); });
+  const d800 = await drag(page, [100, 200], [900, 1000], 12);
+  const after800 = await summary(page);
+  check(`B14 at 200 ops × 4 layers (${t800.s.layers} layers, ${t800.s.totalRegions} regions) the paper view renders in under 4 s cold and the live comb drag's worst preview+frame stays under ${PREVIEW_BAR_MS} ms`, t800.s.layers === 4 && paperMs < 4000 && d800.sawPreview && d800.worstMs < PREVIEW_BAR_MS && after800.ops === 201, `load ${t800.ms.toFixed(0)} ms · paper render ${paperMs.toFixed(0)} ms cold, ${paperMs2.toFixed(0)} ms with the three printed layers cached · drag worst ${d800.worstMs.toFixed(1)} ms · link ${hash800.length} chars`);
 
   check('page: no errors', errors.length === 0, errors.join(' | '));
   await page.close();

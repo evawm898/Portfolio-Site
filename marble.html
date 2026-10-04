@@ -39,8 +39,14 @@
   <div class="mb-row">
     <button class="mb-btn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
     <button class="mb-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)">Redo</button>
-    <button class="mb-btn" id="clearBtn">Clear sheet</button>
+    <button class="mb-btn" id="clearBtn" title="Clears the bath and every printed layer">Clear sheet</button>
   </div>
+  <div class="mb-label">View &amp; layers</div>
+  <div class="mb-row">
+    <button class="mb-btn mb-btn--lay" id="layBtn" title="Lay the paper on the bath and see the print (P)">Lay paper</button>
+    <button class="mb-btn" id="pullBtn" title="Print the bath as a layer and start a fresh bath over it">Pull &amp; re-marble</button>
+  </div>
+  <p class="mb-hint"><span id="viewTag">bath</span> view · <span id="layerTag">layer 1 of 4</span> — work in the bath; lay paper to see the print, with its paper, mottle and flaws; a pull freezes the bath as a printed layer and the next bath multiplies over it.</p>
 
   <details class="mb-sec" id="secColour" open>
     <summary>Colour <span class="mb-sumval" id="colourSum"></span></summary>
@@ -53,8 +59,21 @@
         <button class="mb-btn" id="customAdd">Add</button>
       </div>
       <div class="mb-ctrl mb-bool"><label><input type="checkbox" id="autoAdvance" checked> Next colour after each drop</label></div>
+      <div class="mb-label">This ink <span class="mb-sumval" id="inkSum"></span></div>
+      <div id="inkControls"></div>
+      <p class="mb-hint">Kept per colour and written into every drop of it. Concentration reads full until the ink spreads — a region twice its dropped area reads half. Spread (gall) pushes wider from the same ink, so it drops paler.</p>
       <div class="mb-label">Sheet</div>
       <div class="mb-swatches" id="sheetSwatches"></div>
+    </div>
+  </details>
+
+  <details class="mb-sec" id="secMaterial" open>
+    <summary>Material <span class="mb-sumval" id="materialSum"></span></summary>
+    <div class="mb-sec-body">
+      <div class="mb-ctrl"><label for="paperSel"><span>Paper</span></label><select id="paperSel"></select></div>
+      <div class="mb-ctrl"><label for="flaws"><span>Transfer flaws</span><output id="flaws-out"></output></label><input type="range" id="flaws" min="0" max="1" step="0.05" value="0.2"></div>
+      <div class="mb-ctrl"><label for="matSeed"><span>Texture seed</span></label><div class="mb-addrow"><input type="number" id="matSeed" value="1" min="0" step="1" aria-label="Texture seed"><button class="mb-btn" id="matReroll" title="A new texture seed">Reroll</button></div></div>
+      <p class="mb-hint">Shown on the paper view and in the PNG: the paper's texture, a faint mottle inside the ink, each ink's granulation, hairlines breaking into dashes, and the pull's skips, air bubbles, uneven edge and touch-down line — all seeded, so the link reproduces them. The SVG stays clean vector.</p>
     </div>
   </details>
 
