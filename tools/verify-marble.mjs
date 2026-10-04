@@ -65,7 +65,14 @@
 
    --negative-control  ten mutations of marble-math.js, each served to part
                        one from tools/.scratch and required to redden exactly
-                       the clauses it names. Part two is NOT mutated.
+                       the clauses it names. Part two is NOT mutated. A MUTANT's
+                       pattern replays are WALL-CLOCK BOUNDED (REPLAY_BUDGET_MS
+                       per replay): a mutation that makes a hundred-op pattern
+                       cost seconds an op (the broken drop throws every region
+                       five times further on every drop and the refinement
+                       explodes to its depth cap) is a defect those clauses
+                       reveal, and a replay that overruns reads as that clause
+                       FIRING, said in its detail. The shipped run is unbounded.
    --no-browser        part one only.
 
    NOT COVERED: that the pictures look like marbling — the sheet is ruled by
@@ -118,8 +125,12 @@ function distToPoly(p, pts) {
 const sameFloats = (a, b) => a.regions.length === b.regions.length && a.regions.every((ra, i) => { const rb = b.regions[i]; return ra.color === rb.color && ra.pts.length === rb.pts.length && ra.pts.every((v, k) => Object.is(v, rb.pts[k])); });
 
 /* ================= PART ONE ================= */
+const REPLAY_BUDGET_MS = 20000;
 async function partOne(G, label = 'shipped') {
   const out = [];
+  const budget = label === 'shipped' ? Infinity : REPLAY_BUDGET_MS;
+  // a replay with a wall-clock bound (mutants only): past the budget it throws, and the clause reads it
+  const replay = (ops, sheet = '#EDEDE8') => { let st = G.emptyState(sheet); const t0 = performance.now(); for (const op of ops) { st = G.applyOp(st, op); if (performance.now() - t0 > budget) throw new Error(`PATHOLOGICAL: replay exceeded ${budget} ms after ${G.pointCount(st).toLocaleString()} points`); } return st; };
   const rec = (name, ok, detail = '') => { out.push({ name, ok: !!ok, detail }); if (label === 'shipped') check(name, ok, detail); };
   const safe = (fn) => { try { return fn(); } catch (e) { return { threw: String(e) }; } };
   const pts = samples(11);
@@ -269,14 +280,13 @@ async function partOne(G, label = 'shipped') {
     const pruned = G.prunePolygon(dense);
     let w3 = 0; const removed = dense.length / 2 - pruned.length / 2;
     for (let i = 0; i < dense.length; i += 2) w3 = Math.max(w3, distToPoly([dense[i], dense[i + 1]], pruned));
-    const base = G.replay(G.stonePattern(COLORS, { rand: G.mulberry32(3) }));
-    const pass = G.getGelPasses()[0];
-    const nNo = G.pointCount(G.applyOp(base, pass, { prune: false })), nYes = G.pointCount(G.applyOp(base, pass));
-    rec('E3 pruning removes vertices and moves the outline by at most PRUNE_TOL (a densely sampled square, corners included); on a raked stone base it fires too', removed > 0 && pruned.length / 2 >= 3 && w3 <= G.PRUNE_TOL + 1e-9 && nYes < nNo, `${removed} removed of ${dense.length / 2}, outline moved ${w3.toFixed(4)} ≤ ${G.PRUNE_TOL} · get-gel pass: ${nNo.toLocaleString()} → ${nYes.toLocaleString()} vertices`);
+    const e3 = safe(() => { const base = replay(G.stonePattern(COLORS, { rand: G.mulberry32(3) })); const pass = G.getGelPasses()[0]; return { nNo: G.pointCount(G.applyOp(base, pass, { prune: false })), nYes: G.pointCount(G.applyOp(base, pass)) }; });
+    const { nNo = -1, nYes = -1 } = e3.threw ? {} : e3;
+    rec('E3 pruning removes vertices and moves the outline by at most PRUNE_TOL (a densely sampled square, corners included); on a raked stone base it fires too', removed > 0 && pruned.length / 2 >= 3 && w3 <= G.PRUNE_TOL + 1e-9 && !e3.threw && nYes < nNo, e3.threw || `${removed} removed of ${dense.length / 2}, outline moved ${w3.toFixed(4)} ≤ ${G.PRUNE_TOL} · get-gel pass: ${nNo.toLocaleString()} → ${nYes.toLocaleString()} vertices`);
   }
   {
     const stack = [...G.getGelPattern(COLORS), ...G.nonpareilPattern(COLORS), G.nonpareilComb({ x: 7 })];
-    const st = safe(() => G.replay(stack));
+    const st = safe(() => replay(stack));
     const n = st.threw ? -1 : G.pointCount(st);
     rec('E4 a pathological stack (get-gel + nonpareil + a second fine comb) lands under 1.25× the point budget and the coarsening is TOLD', !st.threw && n <= G.POINT_BUDGET * 1.25 && st.segScale > 1, st.threw || `${n.toLocaleString()} points against ${G.POINT_BUDGET.toLocaleString()}, segScale ${st.segScale.toFixed(2)}`);
   }
@@ -293,7 +303,7 @@ async function partOne(G, label = 'shipped') {
     const r = safe(() => {
       const h = G.encodeHash([[rounded[0]], [rounded[1]]], '#EDEDE8');
       const dec = G.decodeHash(h);
-      const a = G.replay(rounded, '#EDEDE8'), b = G.replay(dec.groups.flat(), dec.sheet);
+      const a = replay(rounded, '#EDEDE8'), b = replay(dec.groups.flat(), dec.sheet);
       return { h, dec, same: JSON.stringify(dec.groups) === JSON.stringify([[rounded[0]], [rounded[1]]]), bits: sameFloats(a, b), dig: [G.digest(a), G.digest(b)], n: G.pointCount(a), fields: dec.groups.flat().every(census), finite: finite(a) && finite(b) };
     });
     rec('H1 a drop followed by a tine encodes, decodes to the same ops carrying every field the gate lists, and replays BIT-IDENTICALLY to finite coordinates', !r.threw && r.same && r.bits && r.fields && r.finite && r.dec.groups.length === 2, r.threw || `${r.h} · ${r.n} coordinates pairwise Object.is-equal · digests ${r.dig[0] === r.dig[1] ? 'agree' : 'DIFFER'}`);
@@ -308,12 +318,13 @@ async function partOne(G, label = 'shipped') {
       const r = safe(() => {
         const rounded = ops.map(G.roundOp);
         const h = G.encodeHash([rounded], '#0A0A0C'); const dec = G.decodeHash(h);
-        const a = G.replay(rounded, '#0A0A0C'), b = G.replay(dec.groups.flat(), dec.sheet);
+        const a = replay(rounded, '#0A0A0C'), b = replay(dec.groups.flat(), dec.sheet);
         return { same: JSON.stringify(dec.groups[0]) === JSON.stringify(rounded), bits: sameFloats(a, b), sheet: dec.sheet === '#0A0A0C', len: h.length, n: ops.length, groups: dec.groups.length, fields: dec.groups.flat().every(census), finite: finite(b) };
       });
       const good = !r.threw && r.same && r.bits && r.sheet && r.groups === 1 && r.fields && r.finite;
       if (!good) ok = false;
-      det.push(`${id} ${r.threw ? 'THREW' : `${r.n} ops, ${r.len} chars${good ? '' : ' MISMATCH'}`}`);
+      det.push(`${id} ${r.threw ? 'THREW ' + String(r.threw).slice(7, 60) : `${r.n} ops, ${r.len} chars${good ? '' : ' MISMATCH'}`}`);
+      if (r.threw && label !== 'shipped') break;   // one pathological pattern says it; the rest would say it again at the same price
     }
     rec('H3 every pattern and the random sequence round-trip the hash bit-identically, as one group, with the sheet colour', ok, det.join(' · '));
   }
@@ -408,14 +419,14 @@ async function partOne(G, label = 'shipped') {
 
 /* ================= NEGATIVE CONTROL ================= */
 const MUTANTS = [
-  { id: 'drop-takes-the-root-of-the-ratio', from: 'const f = Math.sqrt(1 + r2 / d2); o[0] = cx + dx * f;', to: 'const f = Math.sqrt(1 + r2 / Math.sqrt(d2)); o[0] = cx + dx * f;', breaks: ['F1', 'E1a', 'P6'] },
+  { id: 'drop-takes-the-root-of-the-ratio', from: 'const f = Math.sqrt(1 + r2 / d2); o[0] = cx + dx * f;', to: 'const f = Math.sqrt(1 + r2 / Math.sqrt(d2)); o[0] = cx + dx * f;', breaks: ['F1', 'E1a', 'P6', 'E3', 'E4', 'H3', 'D2', 'D3'] },   // E3/E4/H3: every region is thrown ~5× further on every drop and the replays are PATHOLOGICAL (seconds an op) — bounded, so they read as fired; D2/D3: the broken push is not measure-preserving and a galled disc pushes differently
   { id: 'tine-falloff-is-not-a-halving', from: 'for (let i = 0; i < m; i++) s += Math.exp(-Math.abs(dn - offs[i]) * kc);', to: 'for (let i = 0; i < m; i++) s += 1 / (1 + Math.abs(dn - offs[i]) * kc);', breaks: ['F2', 'P5', 'E1b'] },
   { id: 'wavy-phase-dropped', from: 'A * Math.sin(w * (px * mx + py * my) + phi);', to: 'A * Math.sin(w * (px * mx + py * my));', breaks: ['F3'] },
   { id: 'stir-angle-not-divided-by-the-radius', from: 'const th = z * Math.exp(-Math.abs(rho - r) * kc) / rho;', to: 'const th = z * Math.exp(-Math.abs(rho - r) * kc);', breaks: ['F4'] },
   { id: 'the-point-function-and-the-mapper-disagree', from: 'const th = z * Math.exp(-Math.abs(rho - r) * LN2 / c) / rho;', to: 'const th = z * Math.exp(-Math.abs(rho - r) * LN2 / c);', breaks: ['F4', 'P4'] },
-  { id: 'refinement-off', from: 'if (dx * dx + dy * dy <= seg2 || depth >= depthCap) return;', to: 'return;', breaks: ['E1a', 'E1b', 'E2', 'E3', 'E4'] },   // E4: a sheet that never refines never reaches the budget, so nothing is told
-  { id: 'comb-not-centred-on-the-stroke', from: 'out.push((i - (n - 1) / 2) * s);', to: 'out.push(i * s);', breaks: ['P5', 'E4'] },   // E4: the stack's combs land off-sheet and the budget is never reached
-  { id: 'codec-drops-the-falloff', from: "t: ['x0', 'y0', 'x1', 'y1', 'z', 'c'],", to: "t: ['x0', 'y0', 'x1', 'y1', 'z'],", breaks: ['H1'] },
+  { id: 'refinement-off', from: 'if (dx * dx + dy * dy <= seg2 || depth >= depthCap) return;', to: 'return;', breaks: ['E1a', 'E1b', 'E2', 'E4'] },   // E4: a sheet that never refines never reaches the budget, so nothing is told. NOT E3: the get-gel pass still lets pruning take 8 of 22,461 vertices (measured) — the clause is about pruning and does not need refinement
+  { id: 'comb-not-centred-on-the-stroke', from: 'out.push((i - (n - 1) / 2) * s);', to: 'out.push(i * s);', breaks: ['P5'] },   // NOT E4: half of each uncentred comb still lands on the sheet and the stack still reaches the budget (188,375 points, segScale 1.35, measured) — the claim it once carried was never run
+  { id: 'codec-drops-the-falloff', from: "t: ['x0', 'y0', 'x1', 'y1', 'z', 'c'],", to: "t: ['x0', 'y0', 'x1', 'y1', 'z'],", breaks: ['H1', 'H3', 'H5'] },   // every pattern and the layered document carry a tine
   { id: 'pruning-ignores-the-tolerance', from: 'if (within) { keep[i] = 0; kept--; continue; }', to: 'if (true) { keep[i] = 0; kept--; continue; }', breaks: ['E3'] },
   { id: 'dilution-ignores-the-area', from: 'return clamp01(conc * a0 / a);', to: 'return clamp01(conc * a0 / a0);', breaks: ['D1', 'D2', 'D3'] },   // D3: a galled drop's quarter strength IS the law applied to its own wider disc
 ];
@@ -636,9 +647,10 @@ async function partTwo(G) {
   const bathBg = bathPx[0], paperBg = laid.px[0];
   check('B13a Lay paper fades to the paper view in under half a second: bare water is dark and bare paper is light, the ink pixel changes with the material, and the button says how to come back', laid.s.view === 'paper' && laid.blend === 1 && bathBg[0] + bathBg[1] + bathBg[2] < 200 && paperBg[0] + paperBg[1] + paperBg[2] > 500 && laid.px[1].join() !== bathPx[1].join() && /bath/i.test(laid.btn), `water ${bathBg.slice(0, 3).join(',')} → paper ${paperBg.slice(0, 3).join(',')} · ink ${bathPx[1].slice(0, 3).join(',')} → ${laid.px[1].slice(0, 3).join(',')}`);
   check('B13b a pointer gesture on the paper view returns the page to the bath (previewing there) and the bath is back once released', mid.view === 'bath' && mid.previewing && backPx.s.view === 'bath' && backPx.blend === 0 && backPx.px.join() === bathBg.join(), `view ${mid.view}, blend after ${backPx.blend}`);
-  const sizes = await page.evaluate(async () => ({ png: await window.__marble.pngSize(1), flat: await window.__marble.pngSize(1, { flat: true }), svg: window.__marble.svg() }));
+  // B13b's press-and-release was a DROP (the tool is drop), so the region count is read afresh here
+  const sizes = await page.evaluate(async () => ({ png: await window.__marble.pngSize(1), flat: await window.__marble.pngSize(1, { flat: true }), svg: window.__marble.svg(), total: window.__marble.summary().totalRegions }));
   const svgDoc = (() => { const gs = (sizes.svg.match(/<g id="layer-/g) || []).length, paths = (sizes.svg.match(/<path /g) || []).length; return { gs, paths }; })();
-  check('B13c the PNG carries the material (the same four layers drawn flat compress to a far smaller file) and the SVG keeps one group per layer with no raster', sizes.png > 3 * sizes.flat && svgDoc.gs === G.MAX_LAYERS && svgDoc.paths === capped.s.totalRegions && !/<image/.test(sizes.svg), `PNG ${(sizes.png / 1024).toFixed(0)} KB against ${(sizes.flat / 1024).toFixed(0)} KB flat · ${svgDoc.gs} groups, ${svgDoc.paths} paths`);
+  check('B13c the PNG carries the material (the same four layers drawn flat compress to a far smaller file) and the SVG keeps one group per layer with no raster', sizes.png > 3 * sizes.flat && svgDoc.gs === G.MAX_LAYERS && svgDoc.paths === sizes.total && sizes.total === capped.s.totalRegions + 1 && !/<image/.test(sizes.svg), `PNG ${(sizes.png / 1024).toFixed(0)} KB against ${(sizes.flat / 1024).toFixed(0)} KB flat · ${svgDoc.gs} groups, ${svgDoc.paths} paths`);
 
   // B14 200 ops × 4 layers: the paper render and a live comb drag
   const hash800 = (() => { const layersOps = []; for (let L = 0; L < 4; L++) { let ops = []; for (let s = 1 + L * 50; ops.length < 200; s++) ops = ops.concat(G.randomSequence(s, COLORS)); layersOps.push([ops.slice(0, 200)]); } return G.encodeDoc({ sheet: '#EDEDE8', material: { paper: 2, flaws: 0.4, seed: 3 }, layers: layersOps }); })();

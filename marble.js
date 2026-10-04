@@ -116,13 +116,17 @@ function renderPaperCanvas() {
 function render() {
   const t = performance.now();
   const st = preview ? preview.state : state;
-  const bc = bathCanvas.getContext('2d');
-  bc.setTransform(1, 0, 0, 1, 0, 0); bc.clearRect(0, 0, bathCanvas.width, bathCanvas.height);
-  R.renderBath(bc, st, view2.scale * view2.dpr);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bathCanvas, 0, 0);
-  if (lay.t > 0) {
+  if (lay.t <= 0) {
+    // the bath alone (every gesture frame): drawn STRAIGHT to the display canvas, the path
+    // the page always had — an offscreen bath forced a synchronous raster per frame
+    R.renderBath(ctx, st, view2.scale * view2.dpr);
+  } else {
+    const bc = bathCanvas.getContext('2d');
+    bc.setTransform(1, 0, 0, 1, 0, 0); bc.clearRect(0, 0, bathCanvas.width, bathCanvas.height);
+    R.renderBath(bc, st, view2.scale * view2.dpr);
+    ctx.drawImage(bathCanvas, 0, 0);
     if (paperDirty) renderPaperCanvas();
     ctx.globalAlpha = lay.t; ctx.drawImage(paperCanvas, 0, 0); ctx.globalAlpha = 1;
   }
