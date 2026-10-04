@@ -155,7 +155,7 @@ Mutants (`tools/verify-bloom-apex-mutants.mjs`, each witnessed on the MUTATED mo
 own plan): `the-inset-reads-the-pedicel-again` (ID9), `the-reach-reads-one-mode` (ID9, on
 the 0.60 mm row — its witness refuses a probe state whose two reaches agree),
 `the-pedicel-ceiling-is-the-stems-again` (ID7, on the 250 mm row). Two rows added to the
-table for them. MUTANT_RESULT_TBD
+table for them. **Run (`--only=` the three, after two anchor corrections of this session's own — the one-mode mutant's anchor moved when the reach was quantised): each fires exactly the family it names and the clean tree is silent on every row; the ceiling mutant also reddens ID4 (a 250 mm pedicel clamped to 120 changes the floret's own stem length, which ID4 reads), recorded as collateral. 88 mutants were not run — a SUBSET, never a sweep.** The clean-tree control first fired ID9 on three rows, and all three were defects in ID9 itself, found by the real export gate rather than reasoned: (e) asserted the top node equals the inset on a row whose florets cannot clear the head (the node law holds its single node at 0.86 L there — guarded on `insetSatisfied`); (d) read a unit source stream the metrics hook never projects (the builder's own `topNodeMaxZ` now); (f) asked for `Object.is` between the page's V8 and Node's on a reach reached through trigonometry and went red on depths equal to four decimals (within one engine now, the page held to the same-mode rebuild within the arithmetic's bound). The export gate on the five witness rows then read 4 of 5 reaching the results; the fifth, the hemisphere row, is X2 — the HEAD's own rise-1 fold (248 pairs at 0.4262 mm on `STEM: x a hemisphere`) plus five florets inheriting rise 1 at 220 each, 1348 — declared from birth and reproduced in Node at exactly that count.
 
 ## 4. Row definitions moved (declared, never silent)
 
@@ -201,9 +201,9 @@ EXPORT):
   tightest internode the law reaches on it), a grid change inside the shipped ranges that
   restores the axis rather than manufactures a cell; one cell declared (12 × level),
   verdict `single-reaches` → `product-only`.
-* **The long-pedicel-against-stem column**: `inflo-length-x-tilt` gains 250 mm. GATE_250_TBD
+* **The long-pedicel-against-stem column**: `inflo-length-x-tilt` gains 250 mm. Measured: **205.197 mm at every tilt** — a 250 mm rod stands its one floret 205 mm from the rachis; the column clears and is kept as the long-pedicel witness.
 
-COMBINATION_GATE_RESULT_TBD
+**The full gate (every pair and triple, Node 22): 163 cells under the bar, 163 declared, across 25 pairs and triples, 0 strays, 0 inert mismatches — PASS; `--control`: every clause fired on a plant that names it, and the tree is green without them.** 88 s / 95 s on this box.
 
 **For Eva, as a consequence rather than a defect:** the price of a clean head is a
 shorter node span. A law that kept the 21.0 mm internode and gave up the lowest node
@@ -220,20 +220,20 @@ stem plan's heights) — differs from the base plan's depths, or a pedicel asked
 base's 120 ceiling was clamped there. The first cut predicted on the INSET and was wrong
 twice, which the tool said: `INFLO: ONE node` sits at the flower's solo 0.55 L whatever
 the inset, and a raceme whose florets cannot clear the head collapses to one node on both
-trees — changed inset, unchanged depths, HOLDERS. PARTITION_TBD
+trees — changed inset, unchanged depths, HOLDERS. **Over the 68 inflorescence rows (`--only 'INFLO|NODE LAWS|REACH INSET|BARE NODES: GATED|pedicel|floret'`), both modes, 197,928,900 export floats over 21,992,100 triangles and 753,112 captured-grid values: PASS — 60 predeclared movers moved, 8 holders bit-identical under `Object.is`.** The holders are the two GATED rows, the two no-rachis/none rows, `INFLO: ONE node`, the cannot-clear row, the GATED bare-nodes raceme and the descending (−60) row, whose reach (1.40 mm) sits under the stem's own inset. FULL_PARTITION_TBD
 
 ## 7. Frozen baselines
 
 `frozen/phase52` = the 1089 rows at `23b13bd`, registered in both maps and proved
 deep-equal (`--verify-frozen --phase52 --base <worktree>`: PASS, row for row). A phase is
-owed because the row set changed (block 48, +10). FROZEN_TBD
+owed because the row set changed (block 48, +10). **Which tags' bytes stop reproducing (the predicate above applied to every registered frozen matrix on the base tree, memoised on the control set): 376 of 33,512 frozen rows over 16 of 51 baselines — phase37 18 of 883, phase38–45 19 each, phase46–49 20 each, phase50 21, phase51 52 of 1080, phase52 53 of 1089; phase2–36 0 (no raceme row exists before phase37).** Every definition still deep-compares. The tag is dispatched after the merge (`bloom-frozen-tags`), and `phase52`'s base `23b13bd` is on `main` with workflow files identical to HEAD's, so it is expected to publish; it is not pre-declared in `TAG_PUSH_XFAIL`.
 
 ## 8. Files this session must not touch (predeclared) — verified by diff at close
 
 `flower*`, `print*`, `plot*`, `scene*`, `cards*`, `weave*`, `bug*`, `frame*`, `marble*`,
 `tile*`, `artist-tracker.html`, every `tools/verify-flower-*`, `bloom-grid-gltf.js`,
 `bloom-geometry.js` outside `inflorescencePlan` / `PEDICEL_LENGTH_RANGE` / the memo
-hand-off in `buildBloomInto`. DIFF_TBD
+hand-off in `buildBloomInto`. `git status` at the first commit: `CLAUDE.md`, `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`, `docs/bloom-charter.md`, five `tools/` files, and the three new files (the doc, the sheet, its tool). Nothing on the manifest moved. Inside `bloom-geometry.js` the diff is the range constant and its grid, `inflorescencePlan`'s inset block (the size block moved above it), `lenCeilMm`, `buildInflorescenceInto`'s `topNodeMaxZ`, and the memo hand-off.
 
 ## 9. The sheet
 
