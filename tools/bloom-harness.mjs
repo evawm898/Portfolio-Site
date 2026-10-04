@@ -9316,6 +9316,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      row on main names because the matrix varies one control at a time, found
      the moment a new block put two controls together. */
   'STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)': { pairs: 248, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — the HEAD\'s, not the stem\'s: the identical state with stemLength 0 reads the same 216 pairs at the same point, and so does "headRise max (1)") — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 216 -> 248 pairs, 0.4176 -> 0.4262 mm' },
+  'REACH INSET: a hemisphere head (the floor is the RIM, 8.8 mm under the stem\'s root plane)': { pairs: 1348, worstMm: 0.4262, note: 'THE HEAD\'s OWN HEMISPHERE FOLD, NOT THE INSET\'s: the head alone reads 248 at this exact span (`STEM: x a hemisphere`, the EFFECTIVE-TILT-PAST-90 class) and the five florets inherit rise 1 (ruling 10) and each carry the same fold — 248 + 5 x 220 = 1348. Declared from birth (build 3, measured in the gate\'s Chromium and reproduced in Node).' },
   /* AND THE SAME SHAPE ONE BLOCK ON (the sphere-stem session), measured the
      same two-sided way rather than read off the label: the identical state with
      `stemLength` 0 reads the SAME 199 pairs at the SAME point, and so does a
