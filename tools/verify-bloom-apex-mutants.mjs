@@ -1308,7 +1308,14 @@ const MUTANTS = [
   { id: 'the-memo-keys-on-the-length-alone',
     why: "the floret memo keys on the pedicel length and nothing else, so under a node term the FIRST azimuth's unit is served to every node — each node's placement appends a floret built for another node's azimuth: the slider changes one floret and the others copy it. Watertight, one piece, the same counts. NV4 holds every placement to the unit its own azimuth asks for",
     find: "      return `${exportMode ? 'E' : 'L'}|${L}|${o ? JSON.stringify(o) : ''}`;",
-    into: "      return `${exportMode ? 'E' : 'L'}|${L}`;", names: ['NV1', 'NV4'],
+    /* NV4 ALONE, AND THE CLAIM ON NV1 CAME OFF THE LIST BY MEASUREMENT: the
+       one unit the broken memo serves is built for its OWN azimuth and
+       carries the term that azimuth asks for, so NV1 — which reads each
+       UNIT against the term restated from the azimuth it was built for —
+       is correctly silent; what is wrong is which unit each PLACEMENT got,
+       and that is NV4's. A mutation that stays green on a clause is
+       sometimes the claim being wrong rather than the clause. */
+    into: "      return `${exportMode ? 'E' : 'L'}|${L}`;", names: ['NV4'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C, { nodeVariance: 1 });
       const t = bothBuilt(m, c); if (t) return t;
