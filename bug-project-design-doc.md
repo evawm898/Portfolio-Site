@@ -230,6 +230,7 @@ strength claim in this repo is still theory.
 | elegance | the default becomes a pinned specimen; edge profile, teardrop club, groove/bulge segments, pointed tips, SET SPECIMEN | **built (§9)** — waits on Eva's ruling on `docs/img/bug-elegance-sheet.png` |
 | edges | rounded edges (full bullnose on every wing edge, the default); Top view on load; Render / SVG toggle; the outline editor on the wing itself; the reference backdrop behind the whole bug | **built (§10)** — waits on Eva's ruling on `docs/img/bug-edges-sheet.png` |
 | image | IMAGE → BUG: paste / drop / load a top-down picture, fit an editable bug to it (outline and proportions only) | **built (§11)** — waits on Eva's ruling on `docs/img/bug-image-sheet.jpg` and on her own pictures in the preview |
+| wing library, step 2 | the BLENDED ROOT (every wing narrows to its own short, filleted attachment); every fitted wing a COMPLETE shape; the smoothness clause J | **built (§12)** — waits on Eva's ruling on the exploded sheet; the library file and gallery are not built yet |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
 | 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
@@ -1826,3 +1827,307 @@ not. Each fix below is gated (IM11–IM14), and the sheet is
 - The SVG note says "(the file: the whole bug, legs and antennae and margin included; the
   wingspan alone is X mm)".
 
+
+
+## 12. Wing-shape library, step 2 — the blended root, complete wings, smoothness
+
+Eva's ruling on the step-1 candidate sheet (17 of 20 kept; #6, #15, #19 struck as under
+the floor; the near-duplicate out): before the library or the gallery is built, two
+outline-quality fixes that affect EVERY bug, not only fitted ones. The reference sheets
+stay out of the repository (`tools/bug-wing-sources/`, gitignored); the dev-time batch fit
+is `tools/bug-wing-library-fit.mjs` (`--kept` re-fits Eva's 17 and writes the exploded
+sheet). **The library data file and the gallery UI are not built yet** — they wait on her
+ruling on the exploded views.
+
+### 12.1 The blended root
+
+Every wing closed on a straight root chord at u = 0: left at its drawn width it was a
+vertical cut beside the body, and a forewing and a hindwing side by side read as one
+rectangular block. Two controls (Wings): **`wingRootPinch`** (0–1, default **0 — Eva's pick
+from the ladder**; 0 is the old straight root chord, BY BRANCH — the map is never built) and
+**`wingRootLength`** (0.5–2×, default 1, shown only when the pinch is on): how far out from the
+body the narrowing reaches. It scales the neck's offset from the body's silhouette and the
+release back to the drawn wing together, LINEARLY — the release is derived at length 1 and
+then multiplied (re-deriving it over the longer stretch read the root edges wider and grew
+3.2× at ×2), and the two-floor minimum is applied after the length. Length 1 is the derived
+root unchanged. The range stops at 2×: at 2.5× and up a full pinch left one flipped sliver
+facet where the wing meets the body's silhouette (a 0.47–0.58 mm contour loop, measured).
+**The image fitter follows the pinch**: with the straight chord (pinch 0) it keeps the root the
+picture shows along the thorax and bridges only the hidden stretches — the narrow anchors
+either side of the hinge are a neck, right only when the model blends it (at pinch 0 their
+embedded root tab stood past the body beside the head: IM12 −2.5 mm, IM3 up to 6 mm on every
+fixture). And every bridge's JOIN to the seen margin is kept as a control point: where a
+hidden edge emerges, the two wings' edges cross at a shallow angle, and a fit free to sit a
+tolerance off each edge slid that visible crossing by tolerance / sin(angle) — 1.74 mm on the
+same-tone fixture against `main`'s 0.83, 0.745 with the joins kept. The IM checks fit at the
+default pinch 0; the blended branch of the fitter has no IM row of its own (recorded gap). Since the default pinch is 0 the gate
+carries its own blended-root rows — the pinch ladder, the length range, 4 pairs, holes and
+ridges, the dense net, and every random bug given a seeded pinch and length (the page's
+Randomize leaves the root off).
+
+- **The pinch is RELATIVE to the drawn root (Eva's ruling on the first cut).** The first cut
+  was two absolute controls, a 1.6 mm neck and a 0.9 mm fillet, and it pinched the default's
+  4.51 mm root to a third of its width, carving teardrop gaps beside the body. Now the neck
+  at pinch 1 is `ROOT_NECK_AT_FULL × the drawn chord` (never under the floor) with fillet radius `ROOT_FILLET_AT_FULL × the drawn chord`
+  — the FULL neck at pinch 1 — and a lower pinch MIXES the straight chord with that full
+  neck, `w' = w + pinch (full(w) − w)`: the neck lands at `h0 − pinch (h0 − hr)`, both ends
+  fractions of the wing's OWN root, so one pinch reads the same on every shape. **Shrinking
+  the fillet radius with the pinch was built first and REJECTED BY THE GATE**: a smaller
+  copy of the same curve turns through the same angles, so a low pinch was a small kink
+  (J fired on six rows). Mixed, every slope and turn scales with the pinch (the effective
+  fillet radius is the full one over the pinch), and a convex mix of two increasing maps
+  is increasing, so the map stays a bijection; its inverse is solved by bisection. The
+  release is never shorter than two floors (a 1.55 mm root on random:29 read two 0.6 mm
+  lobes inside a millimetre). `ROOT_NECK_AT_FULL` 0.355 and `ROOT_FILLET_AT_FULL`
+  0.2 make pinch 1 the first cut exactly on the default forewing (1.60 mm / 0.90 mm, 57,392
+  triangles, unchanged). The floor at the neck still holds (`hr ≥ floor / 2`). The ladder
+  (pinch 0 / 0.15 / 0.3 / 0.45 / 0.6 / 1, default bug and library shape #9) is
+  `node tools/shot-bug-wing-root.mjs <dir> --library <candidates.json> --num 9`.
+
+- **One map, in planform millimetres, read by every consumer**: `rootWarp(spec)` —
+  `w' = c(u) + f_u(w − c0)`, u unchanged. `drawnPlanformMm` applies it (so the builder,
+  the venation, the floor, the specimen pose and the SVG all see it) and `editorFrame`
+  composes it (so the on-wing editor draws the shaped curve and a drag lands where the hand
+  put it — the map is inverted exactly). Drawn, fitted and library wings all go through it.
+- **Each side separately**: the band between the root chord's centre c0 and each ROOT EDGE
+  (the outline walked from the root lead / root trail — only the outline NEAR the root, so
+  a hindwing's inner margin running down beside the abdomen is not taken for its root) is
+  SCALED so the edge lands on the envelope; what lies beyond a root edge is only SHIFTED by
+  the same amount, never crushed. For every u the map is monotone in w, so it is a
+  **bijection of the plane: it cannot make a simple outline cross itself**, and it moves no
+  point along the span (the apex, the tail, every index stay put). The centre moves from c0
+  to the hinge, so **each pair attaches at its own hinge; between hinges the thorax shows.**
+- **The envelope**: the neck half-width `hr = max(width, floor)/2` at `un = ub + R`
+  (`ub` the body's silhouette, half the thorax's local half-width beyond the hinge); toward
+  the body a parabola with curvature radius R at the neck (the FILLET) reaching 45° at the
+  silhouette, easing back to horizontal at the root chord inside the body — C1 everywhere.
+  A quarter circle was tried first: it ends vertical at the silhouette, leaving a convex
+  corner where the rounded edge folded (a stray SVG contour line). The drawn edge and the
+  envelope meet through a SMOOTH minimum (a plain min left a corner there too). Outward,
+  the map releases to the drawn wing over `blend = max(0.1 L, 2.5 R, 1.0 × the narrowing)`
+  by a smoothstep — a deep squeeze released over a short span was a kink the bead folded on.
+- **The bead starts at the silhouette** (1 mm short of it) instead of at the root chord:
+  the stretch inside the body is hidden, and the bead ramping through the fillet folded.
+- **The floor at the neck**: the neck is never narrower than the floor (`hr ≥ floor/2`).
+  The drawn-width measure reads the polygon WITH its root tab and judges nothing inside the
+  body (u < 0) — the root chord is no edge any more (the wing runs on into the body), and
+  read as one it flagged the stub's corners (0.53 mm "thin" on the default). Without the
+  blended root the measure is exactly what it was. The gate's N clause restates the same.
+- **Venation through the neck**: every main vein leaves its root-chord point THROUGH the
+  neck (at the same fraction across its middle 80%) — a straight chord from the root chord
+  to a margin target would leave the wing at the neck (4 of 8 terminals dropped on the
+  pterostigma row before; 2 after). The fan's angles are taken from the neck's middle.
+- **The outline is resampled at 0.5 mm where the map moves it**, so the fillet is drawn,
+  not chorded; `part.meta.denseAt` maps a dense sample to its planform point (the editor's
+  apex lookup, the gate's Q and V5 read it).
+- **Robustness, said**: a pair whose rounded edge still cannot be inset (a hook at the root
+  tighter than the bead) steps down — half the fillet, no fillet, the drawn root chord — and
+  `model.notes` says so; a map that would make the outline cross or pinch keeps the drawn
+  root chord, with a note. Neither fires on the default or on the 17 library shapes.
+- **Saved designs keep the old root** (`DESIGN_VERSION` 6; a file saved before loads with
+  `wingRootPinch` 0 — `PRE_ROOT_STYLE`): every earlier pass loaded an old design at its OLD
+  ends so it looks as saved (§9.6, §10.1), and this follows that rule. One slider turns the
+  blended root on for an old design; the reverse (migrating) would change every saved
+  design's silhouette without asking. `LEGACY_STYLE` carries `wingRootPinch: 0`, so
+  `legacyDefaultParams()` still builds bit-identically to Phase 2.
+- **Cost, EXPORT**: the default **46,992 → 57,392 triangles (+22%)** (the resampled root
+  zone under a 12-triangle-per-point bead). Build time is unchanged in practice.
+
+### 12.2 Every wing a complete shape on its own
+
+The fitter used to keep, as the wing's outline, whatever bounded its region in the picture:
+the straight SPLIT line between fore- and hindwing, the straight edge of the band the
+hindwing is tucked under, the strip to the thorax, the run along the body. Viewed alone a
+wing had flat cuts and hooks wherever the other wing hid it. Now (`completeChain` in
+`bug-image.js`): a point of the traced chain is SEEN when it lies on the picture's own
+silhouette margin, UNSEEN when it lies inside the silhouette (8 probes 2 px out all shape)
+or on the body cut; the stretch of each end within 12% of the span from the body (the ROOT
+ZONE) is unseen too. Every unseen run between seen stretches is replaced by a cubic Hermite
+tangent to the seen margin on both sides; each END is a cubic from the seen margin to the
+pair's ROOT ANCHOR on the body's edge beside its own hinge, arriving square to the body.
+So the hindwing's hidden leading edge is a smooth convex curve under the forewing, the
+forewing's inner margin a smooth curve from its tornus to its root, and every fitted wing
+narrows to its own attachment (the blended root then shapes the last millimetres). A seen
+stretch shorter than 1 mm between unseen runs is noise on a wall and joins them.
+
+The image gate's IM3 is compared only beyond the KNOWN bug's own blended roots (read off
+the known model, never off the fit): within each pair's root map both bugs carry a designed
+root, not the picture's. IM10's abdomen width is read from the rows behind the thorax: with
+the blended root the rows just behind a wing's neck show the thorax's rear as body column
+(the moth read 3.61 mm for 2.20 before).
+
+### 12.3 The smoothness clause, J
+
+`jaggedness(outline, floor)` in `tools/verify-bug.mjs`, on every built row, reads the DRAWN
+outline before the scallop law (`part.meta.drawnMm`, root map applied), vertex by vertex: a
+vertex's curvature under 0.05 /mm is straight; consecutive vertices turning the same way are
+a RUN, which counts at ≥ 6° in all; a one-vertex run is a CUSP, a longer one a LOBE. The
+outline is **jagged** where two consecutive counting runs of opposite sense (with no more
+than the floor of straight between) are both CUSPS (a zig-zag) or both LOBES shorter than
+0.8 × the floor (a wobble finer than the print can make — the noise of a fit that followed
+the pixels).
+
+**How it tells a deliberate scallop from jaggedness**: the scallop SLIDER is a law the
+builder applies on top of the drawn outline, so it is deliberate by construction and the
+clause reads the outline it is applied to. A wave DRAWN into the control points (a
+picture's real scalloped margin) is a run of lobes separated by notches; every lobe of a
+scallop that prints is longer than 0.8 × the floor, so lobe-against-lobe below that scale
+never occurs in a printable scallop, and the Catmull-Rom spline never makes cusps. What the
+clause cannot tell from a deliberate shape is a deliberate wave of smooth lobes finer than
+the floor — which the floor would not print either. (Reading the post-scallop polyline was
+tried first: every scallop notch is one polyline vertex, and on a small wing a lobe is two
+or three vertices, so cusp-against-cusp appeared on deliberate scallops; it was the wrong
+subject, not a wrong threshold.)
+
+Negative control: `a jagged outline` lays a zig-zag (±0.2 mm every 0.4 mm) along the
+forewing's drawn margin and requires J to fire.
+
+### 12.4 Decisions made without a ruling (reversible)
+
+1. `ROOT_NECK_AT_FULL` 0.355 and `ROOT_FILLET_AT_FULL` 0.2 (pinch 1 = the first cut on the
+   default forewing); the default pinch is 0 (Eva's ruling), the length 1; `ROOT_BLEND_FRAC` 0.1, `ROOT_BLEND_SLOPE`
+   1.0, `ROOT_SAMPLE_MM` 0.5; the neck sits one fillet beyond the body's silhouette.
+2. Saved designs keep the straight root chord (12.1).
+3. The fitter's root zone is 12% of the span; bridges are cubic Hermites with tangents 0.6
+   of the chord; a library shape whose fit falls under the floor at 0.6 mm is re-fitted at
+   the nearest tolerance that clears it (#15, the zebra swallowtail, at 0.45 mm), never
+   widened by hand.
+4. **Found, not fixed — a pre-existing cut-safe island.** The blended root moves the
+   default forewing's DERIVED sweep (-25.59° -> -27.34°: the specimen pose reads the inner
+   margin off the shaped outline). At -27.34° (and at -20°) the gate's
+   "tail ON, 4 pairs, one unlinked" row reads 2 cut-safe regions: the swallowtail's drawn
+   tail tip is narrower than two 0.05 mm raster pixels on the diagonal and leaves a
+   one-pixel island on ONE side. Measured identical on `main` at `d1fac30` with the same
+   sweep — not this change. Since the root became a relative PINCH the derived sweep moves
+   with the default pinch (-26.12 at the provisional 0.3, where four more tail rows read the
+   same island, again identical at pinch 0), so EVERY tail row now pins its forewing sweep
+   to main's -25.59 (`TAIL_ROW_SWEEP` in the gate, with this note beside it) — their
+   subject is the tail, not that tip, and a change of the default must not flip them.
+5. **IM12's mutant is retired, not passing.** "The wing root runs down the body" fired
+   nothing once the root was blended: the fitter's completion replaces the root zone with
+   a bridge to two anchors on the thorax, and the model narrows every wing to its neck —
+   the mutation stayed silent even with the completion switched off as well. IM12 still
+   asserts on every fit; it has no live mutant, recorded as a gap.
+6. **Two pre-existing slivers the root exposed, both fixed.** (a) A vein-to-margin cut
+   materialised its start point without the 0.1 mm snap every other cut uses, so a foot
+   landing 0.3 µm from a cross-vein's foot left two vertices that far apart once the holes'
+   merges took both veins away — a 0.78 mm contour hairline (gate row "holes: cross
+   density 1, long wing"). It is snapped now. (b) Under the blended root every main vein
+   converges on the neck, so the cells between them are long thin wedges whose ear-clipped
+   slivers flip facing under the wing's bend (0.59 mm, "holes: irregular dense net"); the
+   frame mesh gets a Delaunay pass under the root only, so every design with the straight
+   root chord keeps its triangulation byte for byte.
+7. **A pre-existing watertightness hole the pinch landed on, fixed.** A vein's end is
+   inserted ON an outline edge, exactly collinear with that edge's ends, and the cell's ear
+   clip could return flat triangles along the outline; subdivided, their slab's rim walk
+   lost its way — 24 boundary edges on "holes: 3 pairs, 8 -> 3 veins" at pinch 0.3 only
+   (identical with the Delaunay pass and the snap both removed). `flipDegenerate` flips a
+   flat triangle across its long edge, or drops it when that edge IS the outline; it visits
+   no other triangle, so a mesh without one is byte-identical. And the negative control's
+   "fold a wing top face" mutant pushed the top vertex nearest the centroid 3 mm along y —
+   right by luck of the vertex it landed on: once the pinch moved the centroid it landed on
+   an outline vertex, which only reshapes the outline, and S stayed silent. It now takes the
+   nearest INTERIOR top vertex (the slab's own `meta.slab.n`, rim vertices excluded) and
+   pushes it past its farthest neighbour, which folds the face at every pinch.
+
+## 13. Wing-shape library, step 3 — the library file, the gallery, RANDOMIZE WINGS
+
+The library is `bug-wing-library.js`: 17 entries, Eva's kept shapes from the step-1 sheet,
+each a forewing and a hindwing outline in the editor's planform units, the chord stretch each
+was drawn at, the hindwing's length as a ratio of the forewing's, and an optional tail group
+(one entry, #16, has one). **Outlines only — there are no whole-bug presets.** The data is
+the fitter's output; the stock-art sheets it was fitted from stay in the gitignored
+`tools/bug-wing-sources/`. Entries are unlabeled (`name: ''`); a name typed on the page for
+the last applied shape is kept in that browser only.
+
+### 13.1 Apply — what it writes, and nothing else
+
+`applyWingShape(params, shape)` (bug-geometry.js) is the one function that knows what applying
+may write: the first pair's points / stretch / sweep / scallop, the last pair's points /
+stretch / sweep / scallop / length, the cleared `unlinked` map and the tail group. Every other
+byte of the params — body, legs, antennae, venation, thickness, tilt, the pair count, the
+forewing's length — is untouched, and LB2 holds that against a list RESTATED in the gate.
+With 3–4 pairs the shape lands on the first and last pairs and the middles blend (an unlinked
+middle is cleared). With one pair the forewing outline is the pair. With no wings the shape is
+stored and the page says to add a pair (the pair count is not a shape setting).
+Applying is undoable on the page (an undo stack of whole params; Undo, or Ctrl/⌘ Z outside a
+text field); a randomize and a randomize-wings push onto it too.
+
+### 13.2 RANDOMIZE WINGS
+
+`randomWingBlend(params, seed)` picks two different shapes and a t in [0.1, 0.9] (two decimals,
+rounded BEFORE the blend, so the label "blend of #a and #b at t" is the t used), blends them
+(`blendWingShapes`: each outline resampled apex-aligned in TRUE planform — w times its own
+stretch — mixed, divided by the mixed stretch, re-expressed as control points; the tail is the
+nearer shape's) and applies it. A blend that crosses, whose tail does not fit, or that puts a
+wing under the floor (read off the BUILT model) is RE-ROLLED, up to 24 times, then a plain
+library shape. Over the gate's 88 rolls 10 re-rolled once. The whole-bug Randomize calls it on
+its own seeded stream for every bug with wings, and the page prints the label.
+
+### 13.3 Decisions made without a ruling (reversible)
+
+1. **Applying sets the scallop depth to 0 on both pairs** (ruled: keep — Eva, on #349). A fitted outline carries its own
+   margin; the bug's procedural scallop cut a second one into it — on the default bug's 0.06
+   hindwing scallop that read as 9 "scallop depth reduced" repairs over the 17 shapes and put
+   shape #1 under the floor. The count is kept (it is inert at depth 0). Undo: drop
+   `scallop` from `applyWingShape` and `WING_SHAPE_WRITES` (and the gate's restated list).
+2. **Sweep is 0 on both pairs** (ruled: keep — Eva, on #349) — the shapes were fitted at sweep 0, so their orientation is
+   in the points; keeping the bug's sweep would rotate them off the fit.
+3. **A blend smooths margin detail — PARKED (Eva, on #349).** Random blends read plainer than
+   either parent: two scalloped margins whose bumps do not line up average toward a smooth
+   edge (and the blend re-expresses the mix with one more control point than the denser
+   parent, which keeps the overall shape and not every bump). Candidate fixes, not built:
+   carry the margin detail from ONE parent onto the blended shape, or bias t toward the ends
+   so a blend stays near one parent's margin.
+4. **A shape without a tail switches the bug's own tail group OFF and keeps its points**
+   (the tail toggle brings it back); a blend takes the nearer parent's tail.
+5. The gallery is a 4-column grid of filled silhouettes (both wings and their mirror, placed
+   as on the default bug through `editorFrame`), in a "Wing shapes" section open by default
+   above "From an image".
+
+### 13.4 What the library exposed in the core, and the fixes
+
+The library's outlines are fitted, so their margins carry real detail and their roots are
+narrow and curved. Three pre-existing mechanisms that had only ever seen smooth random
+outlines broke the J clause on them (measured over 276 pinched random bugs with library
+wings: 39 jagged before, 0 after; and 24 of 272 library-shape x pair-count x pinch states on
+the default bug, 0 after):
+
+1. **A middle pair is drawn through control points.** A linked middle pair was the raw
+   per-sample mix of the first and last pairs — 48 samples a half, 1.6 mm chords on a
+   41 mm wing — and two detailed margins mixed into a 20-degree zig-zag. Resampling finer
+   made it worse (it kept lobes under the floor on small wings). Now the mix is decided
+   exactly as before (whether it crosses, how far it is eased) and what is DRAWN is that mix
+   re-expressed as control points (one more than the denser drawn pair) through the same
+   spline as every drawn outline; unlinking starts from exactly those points. If the
+   re-expression is not simple and clear, the raw mix is drawn, as before. **This moves
+   every 3–4 pair design's middle pairs slightly** (a smoother curve through the same blend).
+2. **A root near the floor is not pinched.** The full neck is held at half the floor, so on a
+   small wing with a narrow root the "pinch" was a dip of a tenth of a millimetre. The pinch
+   now fades in with the full narrowing h0 − hr: none under 3/4 of a floor, whole from 1 1/4
+   floors (a ramp, never a step). The default forewing narrows by 1.45 mm: untouched.
+3. **The neck is at least one floor out from the body's silhouette** (it was R x length,
+   0.4 mm on a small wing, putting the root tab's shoulder and the neck's fillet two
+   opposite turns apart under the floor). On the default bug R is 0.9 mm, so the neck moves
+   0.1 mm out at length 1 — a pinched default is a hair different from the ladder sheet.
+4. **J judges the visible outline.** The stretch of a wing's outline inside the body's
+   top-down silhouette (the buried root tab) is drawn in neither export and is now skipped,
+   the outline judged run by run between such stretches; the silhouette is the body's own
+   emitted contour. With (3) the neck is never buried, so the fillet J allows stays judged.
+
+The pinch shipped in this same unmerged PR, so (2)–(3) move no saved design. The gate's
+"blended pair under the floor" fixture went vacuous with (1) — the re-expression smooths away
+the waist its eased mix had — and is replaced by one found by search (`blendedThin()` in
+tools/bug-fixtures.mjs, its reasoning beside it).
+
+**Found and NOT fixed (pre-existing, outside the library's reach):** `buildBug` THROWS
+(`earClip: polygon is not simple`) on library forewing #15's outline at about 15–16 mm long and
+stretch 0.6, at any pair count, with the rounded edge on (round 0 builds) — reproduced
+identically on the tree before this work. The rounded edge's inset is not simple on that narrow
+wing and nothing catches it. Applying or blending a shape always sets its own stretch (1.0 or
+more), so the library cannot reach it; a hand-set stretch can. Its own fix (a fallback in the
+edge inset, like the root's retries) is a separate change.
+
+Gate: LB1–LB6 (tools/verify-bug-library.mjs) plus 31 built rows ("library: ..."); the negative
+control adds seven code mutants of bug-geometry.js and one data mutant. Sheet:
+`node tools/shot-bug-wing-library.mjs <dir>`.

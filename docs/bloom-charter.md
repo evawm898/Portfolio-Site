@@ -6335,9 +6335,45 @@ matters should be measured this way.
 - **Decided without a ruling, each reversible:** nodes are the leaves' nodes (inert without
   leaves); inert under a raceme; the kink turns away from each node's first leaf rather than
   at the flower's golden angle; the leaf-node pitch floor is mode-free.
-- **Waiting on Eva:** the wall measured square to the leaning axis is 1.5·cos(lean), under
+- ~~**Waiting on Eva:** the wall measured square to the leaning axis is 1.5·cos(lean), under
   the stated 1.5 mm by 3 microns at 0.48 and 12.5 at 1.00. Real geometry, reported on the
-  read-out, not asserted either way; closing it is `1/cos(lean)` on the bore.
+  read-out, not asserted either way; closing it is `1/cos(lean)` on the bore.~~ **Closed by
+  ruling 5 below: the wall is measured horizontally.**
+
+## The stem — rulings 5, 6 and 7 (Eva, Oct 3; recorded Oct 4)
+
+Stated in the stem-state brief (`docs/bloom-stem-state-oct-2026.md`, which records them as
+"stated in the brief, dated Oct 3") and written down here because until now they were in no
+file in the repo. Rulings 1–4 are in `docs/bloom-stem-taper-laws.md` and
+`docs/bloom-stem-nodes-outcome.md`.
+
+- **Ruling 5 — the 1.5 mm wall is measured HORIZONTALLY.** Declared in
+  `STEM_MIN_WALL_MM`'s own comment. The wall square to a leaning axis (1.4971 mm at
+  prominence 0.48, 1.4875 at 1.00) is a REPORTED CONSEQUENCE, not a violation. The read-out
+  no longer calls it "Eva's to rule". Do not "fix" it with `1/cos(lean)` on the bore.
+- **Ruling 6 — nodes are decoupled from leaves; a bare stem carries nodes.**
+  - The node count and arrangement move UP to Stem: ONE count governs nodes and leaves and
+    is visible whether or not there are leaves. A node is where a leaf attaches; a bare node
+    is one whose leaf dropped. The stem does not get a second, independent count.
+  - Nodes are pinned OFF on every pedicel: a floret's stem does not sprout nodes because the
+    main stem did. The same pin will carry ruling 7's cut, from one place.
+  - The kink direction cannot stay "away from the node's first leaf" on a bare stem, which
+    has no first leaf. Ruled: the golden angle, as the flower does, subject to seeing what it
+    does to a LEAFED stem first (stop and report if the shift is large). **That measurement
+    was taken on Oct 4 and the shift is large; the leafed-stem half is open.** See
+    `docs/bloom-stem-session-1-outcome.md`.
+  - Bare-stem node placement is a function of the stem's length, derived, with no new
+    control.
+- **Ruling 7 — a full 45° florist's cut on the stem's free end, as the shipped default.**
+  - The object not standing is accepted.
+  - A cut HOLLOW stem ends SOLID, preserving the tip-plug ruling (#238), at the cost of a
+    plug of D + 0.62 mm measured from the long point.
+  - `stemLength` measures to the cut's LONG point.
+  - The long point gets a small flat LAND, not a knife edge: a wedge tapering to nothing sits
+    under the print floor, and a 0.4 mm nozzle cannot make it. The land is decided
+    mode-free (whether the point exists is topology).
+  - It is session 2's, deliberately separate from ruling 6: it moves about 114 live rows and
+    would make ruling 6's one-row partition impossible to attribute.
 
 ## The NU coupling (Eva's ruling on #303)
 
