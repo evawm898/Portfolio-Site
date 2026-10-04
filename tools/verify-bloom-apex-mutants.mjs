@@ -240,6 +240,14 @@ function infloFacts(M, over = {}) {
          137.251 mm on both trees while every floret had been collapsed onto
          x = 0. A witness has to probe the axis the mutation acts on. */
       extent: [acc.hi[0] - acc.lo[0], acc.hi[1] - acc.lo[1], acc.hi[2] - acc.lo[2]],
+      /* BUILD 3's RECORDS (Phase A's floor and cap, Phase B's units): read
+         off the plan and the builder for the witnesses below, never asserted
+         here */
+      pitchFloorMm: P.pitchFloorMm, pitchFloretRawMm: P.pitchFloretRawMm, pitchFloorIsFlorets: P.pitchFloorIsFlorets,
+      gradient: P.gradient, gradientAsked: P.gradientAsked, gradientMax: P.gradientMax, gradientClamped: P.gradientClamped,
+      unitCount: B.units.length,
+      units: B.units.map((u) => ({ az: u.az, overrides: u.nodeOverrides ? { ...u.nodeOverrides } : null, curl: u.floretState.petalSpineCurl, cup: u.floretState.petalCup, twist: u.floretState.petalTwist, phase: u.floretState.variancePhase, pins: Object.fromEntries(Object.keys(M.PEDICEL_PINS).map((k) => [k, u.floretState[k]])) })),
+      floretsMaxZByNode: B.floretsMaxZByNode ? B.floretsMaxZByNode.slice() : null, headFloorZ: P.headFloorZ, insetGapMm: P.insetGapMm,
       /* AND THE FIRST PLACED BLOCK'S OWN CENTROID, read out of the emitted
          stream at the offset the builder declared. The WHOLE bloom's extent
          does not move either: the HEAD is 81.6 mm across and the florets on
@@ -1212,6 +1220,91 @@ const MUTANTS = [
         : `the mutant's ceiling reads ${m.lenCeilMm} (top pedicel ${m.pedicelLens[0]}) and the clean tree's ${c.lenCeilMm} (${c.pedicelLens[0]}) — the ceiling did not move back`;
     } },
 
+  /* BUILD 3, PHASE A's TWO LAWS AND PHASE B's TWO (Eva's rulings, Oct 4). Each
+     witness reads the MUTATED module's own plan or builder record against the
+     clean one, on a state where the law binds; never the assertion it names. */
+  { id: 'the-internode-floor-is-the-rods-again',
+    why: "the node law's pitch floor goes back to two pedicel radii alone — the florets' own floor derived from their emitted triangles is computed and ignored — so the shipped raceme's florets stand 0.676 mm from each other again (Phase A's finding, the state ruling 1 was written for): five nodes, watertight, one piece. ID10 (b) holds the emitted spacing to the restated floor and (d) reads the file",
+    find: '  const pitchFloorMm = Math.max(pitchFloorRodMm, pitchFloretMm);',
+    into: '  const pitchFloorMm = pitchFloorRodMm;', names: ['ID10'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.pitchFloorMm === 2 * m.pedicelR && c.pitchFloorMm > 2 * c.pedicelR + 5 && m.nodes > c.nodes) ? null
+        : `the mutant's floor is ${m.pitchFloorMm} (${m.nodes} nodes) and the clean tree's ${c.pitchFloorMm} (${c.nodes}) — the floor did not go back to the rods'`;
+    } },
+  { id: 'the-floor-reads-one-mode',
+    why: "the florets' floor is the LIVE unit's alone, so where the export unit stands taller the export build's nodes sit under their own floor — and whether the two modes' node counts agree becomes a matter of luck, a mode-dependent topology refused eight times here. ID10 (a) restates the floor over BOTH modes' units",
+    find: '  const pitchFloretRawMm = Math.max(pitchLive.floorMm, pitchExport.floorMm);',
+    into: '  const pitchFloretRawMm = pitchLive.floorMm;', names: ['ID10'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { sheetThickness: 0.6 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.pitchFloretRawMm < c.pitchFloretRawMm) ? null
+        : `the mutant's florets' floor is ${m.pitchFloretRawMm} and the clean tree's ${c.pitchFloretRawMm} on the 0.60 mm sheet — reading one mode did not lower it (the two modes' units may stand the same height here; choose a state where they do not)`;
+    } },
+  { id: 'the-gradient-cap-is-dropped',
+    why: "the gradient's cap goes back to infinity, so a lower pedicel three times the top's rises through the terminal head again — build 2's anthela through the back door, the shape ruling 2 forbids — watertight, one piece, told by nothing. ID7 restates the cap from the inset's own law; ID9 (d) reads the florets against the head's floor on every node with INFLO_OVERTOP_XFAIL empty",
+    find: '  const gradientClamped = !corymbAsked && gradientAsked > gradientMax;',
+    into: '  const gradientClamped = false;', names: ['ID7', 'ID9'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { pedicelGradient: 3, floretNodes: 12, pedicelLength: 60 });
+      const t = bothBuilt(m, c); if (t) return t;
+      if (!c.gradientClamped) return `the clean tree does not clamp gradient 3 on the probe state (max ${c.gradientMax}) — the cap does not bind here`;
+      const bar = m.headFloorZ - m.insetGapMm;
+      const over = m.floretsMaxZByNode ? Math.max(...m.floretsMaxZByNode.slice(1)) - bar : NaN;
+      return (!m.gradientClamped && m.gradient === 3 && over > 1) ? null
+        : `the mutant ${m.gradientClamped ? 'still clamps' : 'does not clamp'} and its lowest florets stand ${over.toFixed(3)} mm over the bar — the ramp did not reach the head`;
+    } },
+  { id: 'the-node-term-is-never-formed',
+    why: "`nodeVarianceTerm` returns null whatever the control reads, so `nodeVariance` is a dead slider: every floret is the head's own form, one build serves every node, and the raceme exports watertight and one piece at the pre-variation count. NV0's two statements still agree (the predicate is untouched) — NV1 reads each unit's bases against the term restated from the controls, and NV4 the one build",
+    find: '  if (nodeVarianceIsAbsent(state)) return null;\n  const amount = Number(state.nodeVariance);\n  const term = {};',
+    into: '  return null;\n  const amount = Number(state.nodeVariance);\n  const term = {};', names: ['NV1', 'NV4'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { nodeVariance: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.unitCount === 1 && c.unitCount === 2 && m.units[0].cup === c.units[0].cup - (c.units[0].overrides ? 0 : 0) && c.units.some((u) => u.cup !== m.units[0].cup)) ? null
+        : `the mutant built ${m.unitCount} unit(s) and the clean tree ${c.unitCount}; the clean units' cups read ${c.units.map((u) => u.cup).join('/')} against the mutant's ${m.units.map((u) => u.cup).join('/')} — the term still forms`;
+    } },
+  { id: 'the-node-term-outranks-the-pins',
+    why: "the per-node overrides are spread AFTER the pedicel pins, so a term that happened to carry a pinned id would win over the pin — today none does, so this is caught by NV3's reading of the pins on every unit under a planted term that DOES: the witness plants `stemNodeProminence` into the overrides and sees the pedicel node",
+    find: '    /* PER-NODE VARIATION (Phase B) — applied FIRST so the pins below win */\n    ...(nodeOverrides || {}),',
+    into: '    ...(nodeOverrides ? { ...nodeOverrides, stemNodeProminence: 1 } : {}),', names: ['NV3'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { nodeVariance: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.units.some((u) => u.pins.stemNodeProminence !== 0) && c.units.every((u) => u.pins.stemNodeProminence === 0)) ? null
+        : `the mutant's units carry stemNodeProminence ${m.units.map((u) => u.pins.stemNodeProminence).join('/')} and the clean tree's ${c.units.map((u) => u.pins.stemNodeProminence).join('/')} — the pin still wins`;
+    } },
+  { id: 'the-floret-phase-is-the-heads',
+    why: "`floretPhaseDeg` returns null for every floret, so each one keeps the HEAD's `variancePhase` — the world-fixed frame the Oct 3 ruling forbids: every floret's field crest sits on the same world side whatever node it hangs from. Watertight, one piece, the same counts. NV2 re-derives the outward phase from each placement's own matrix",
+    find: '  if (varianceIsAbsent(state) && varianceFormIsAbsent(state)) return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;',
+    into: '  return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;', names: ['NV2'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { varianceForm: 0.5 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.units.every((u) => u.phase === 0) && c.units.some((u) => u.phase !== 0)) ? null
+        : `the mutant's unit phases read ${m.units.map((u) => u.phase).join('/')} and the clean tree's ${c.units.map((u) => u.phase).join('/')} — the florets did not fall back to the head's phase`;
+    } },
+  { id: 'the-outward-phase-ignores-the-pedicels-sign',
+    why: "a DESCENDING pedicel hangs its floret inverted, so the outward direction sits at the floret's azimuth plus a half turn; the derivation drops that term and puts the crest on the INWARD side of every hanging floret — the right rule for a rising pedicel, wrong by exactly 180 degrees on a falling one. NV2 reads the direction off the placement matrix, which knows which way the floret hangs",
+    find: '  let psi = ((az + (a < 0 ? Math.PI : 0)) * 180) / Math.PI;',
+    into: '  let psi = (az * 180) / Math.PI;', names: ['NV2'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { varianceForm: 0.5, pedicelAngle: -60 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const d = Math.abs(((m.units[0].phase - c.units[0].phase) % 360 + 360) % 360);
+      return (Math.abs(d - 180) < 1e-6) ? null : `the mutant's phase and the clean tree's differ by ${d} degrees on a descending pedicel — not the half turn the sign term carries`;
+    } },
+  { id: 'the-memo-keys-on-the-length-alone',
+    why: "the floret memo keys on the pedicel length and nothing else, so under a node term the FIRST azimuth's unit is served to every node — each node's placement appends a floret built for another node's azimuth: the slider changes one floret and the others copy it. Watertight, one piece, the same counts. NV4 holds every placement to the unit its own azimuth asks for",
+    find: "      return `${exportMode ? 'E' : 'L'}|${L}|${o ? JSON.stringify(o) : ''}`;",
+    into: "      return `${exportMode ? 'E' : 'L'}|${L}`;", names: ['NV1', 'NV4'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { nodeVariance: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.unitCount === 1 && c.unitCount === 2) ? null : `the mutant built ${m.unitCount} unit(s) and the clean tree ${c.unitCount} — the key still carries the term`;
+    } },
   { id: 'the-placement-carries-a-scale',
     why: "ruling 3's own prohibition, made false: the rigid transform gains a 0.9 scale, so the floret's SIZE comes from the matrix rather than from parameters — which silently carries a sheet that was floored at export through a shrink, i.e. a printable wall that is no longer printable, at an identical triangle count and a watertight, one-piece export",
     find: '  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;',
@@ -1970,6 +2063,19 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'stemNodeProminence', value: '0.48' }] },
   { label: 'a raceme whose head asks for prominence 1 (the head is inert; every pedicel must stay straight)',
     set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'stemNodeProminence', value: '1' }] },
+  /* BUILD 3's ROWS: the node term ON under the head's own field (NV1-NV4 and
+     NV2's outward phase on one row), the DESCENDING pedicel (the sign term's
+     only witness), the gradient at the ceiling on twelve 60 mm nodes (the cap
+     binds — asked 3, built 2.24), and the 0.60 mm sheet (the one-mode floor
+     mutant's only witness, where the two modes' units differ). */
+  { label: 'per-node variation 1 under the form field 0.5 (two distinct builds, the phase derived outward)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'nodeVariance', value: '1' }, { id: 'varianceForm', value: '0.5' }] },
+  { label: 'the form field 0.5 on DESCENDING pedicels (-60 deg — the outward point a half turn round)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'varianceForm', value: '0.5' }, { id: 'pedicelAngle', value: '-60' }] },
+  { label: 'gradient 3 x 12 nodes x 60 mm (the cap binds: asked 3.00, built 2.24)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelGradient', value: '3' }, { id: 'floretNodes', value: '12' }, { id: 'pedicelLength', value: '60' }] },
+  { label: 'the raceme on a 0.60 mm sheet (the two modes\' units stand different heights)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
   { label: 'the same leafed stem at prominence 0 (the guard, where the two statements can disagree)',
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',

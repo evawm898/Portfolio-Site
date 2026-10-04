@@ -208,6 +208,34 @@ const PREDICATE_MOVERS = {
     const depths = base.leafNodeDepthsMm(ip.nodesAsked, sp.lengthMm, Math.max(ip.insetAskedMm, needed), 2 * ip.pedicelR);
     return depths.length !== ip.nodeDepthsMm.length || depths.some((d, i) => !Object.is(d, ip.nodeDepthsMm[i]));
   },
+  /* INFLORESCENCE BUILD 3, RULINGS 1-2 AND PHASE B (the derived internode
+     floor, the gradient cap, the per-node deltas). A row moves iff the raceme
+     is PLACED differently or a floret is BUILT differently: the BASE tree's
+     own plan and this tree's plan disagree on the node count, a node depth, a
+     pedicel length or the built gradient, or any node's azimuth carries a
+     non-null node term (`floretNodeOverrides` on this tree, which the base
+     tree does not have — the amount at 0 returns null by BRANCH, so every
+     row with `nodeVariance` 0 reads null and is a holder unless its placement
+     moved). STATED PLAINLY: the floor is a column-map bound over the floret's
+     own emitted triangles and cannot be restated from the base tree's pieces
+     in a line, so the PLAN side of this predicate is read off BOTH trees'
+     plans (the discrete decisions each declares) rather than rebuilt from the
+     base alone; what the partition then holds is the MESH against those
+     declarations — a row whose plan agrees on both trees and whose bytes
+     moved is a finding, and a row whose plan disagrees and whose bytes did not
+     is the vacuous mover the tool refuses. Every row with no raceme is a
+     holder by the first line, which is the claim that nothing outside the
+     inflorescence moved; the two GATED rows (`nodeVariance` with no raceme)
+     are holders by it too. */
+  'inflo-build3': (st) => {
+    const planOf = (M) => { const acc = new M.MeshBuilder({ exportMode: true }); const fr = M.footRing(st, acc); const sp = M.stemPlan(st, fr.hub, acc); return M.inflorescencePlan(st, sp, acc); };
+    const a = planOf(base), b = planOf(mine);
+    if (!a.present && !b.present) return false;
+    if (a.present !== b.present) return true;
+    const same = (x, y) => x.length === y.length && x.every((v, i) => Object.is(v, y[i]));
+    if (a.nodes !== b.nodes || !same(a.nodeDepthsMm, b.nodeDepthsMm) || !same(a.pedicelLensMm, b.pedicelLensMm) || !Object.is(a.gradient, b.gradient)) return true;
+    return b.azimuths.flat().some((az) => mine.floretNodeOverrides(st, b, az) !== null);
+  },
   /* ORGANIC VARIANCE, BUILD 2 (form). A row moves iff the FORM field exists on
      this tree — the geometry's own `varianceFormIsAbsent`, the guard. Every
      other row, the SIZE rows included, must hold to the bit: that is the claim

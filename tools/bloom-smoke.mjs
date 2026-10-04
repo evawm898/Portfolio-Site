@@ -1025,13 +1025,14 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'NODE LAWS: CORYMB on a 40 mm rachis (level tops, solved exactly)',
         path: "the CORYMB — ID7 (the lengths restated from the controls as the plane solve, every placement built from the unit at its own node's length, the memo by DISTINCT length, and the heads' heights read off the emitted placement matrices to one level), with ID1/ID5/ID6 per unit" },
-      { label: 'NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)',
-        path: "the GRADIENT to its floor — ID7's ramp in millimetres down the rachis, five distinct floret builds, and ID8 on the one sessile node (the floret's own emitted vertices reaching the stem's bore) beside four stalked ones; ID4 per unit (a stem exactly where the length is non-zero)" },
-      /* THE GRADIENT AT ITS CEILING is the one state where a LOWER node
-         outreaches the top one the inset was derived from; CI found ID9 (d)
-         red on it with no smoke row to see it first. A declared overtop. */
+      /* THE GRADIENT AT ITS CEILING was the one state where a LOWER node
+         outreached the top one the inset was derived from; CI found ID9 (d)
+         red on it with no smoke row to see it first. Since ruling 2 the
+         GRADIENT CAP (ID7) stops the ramp there: asked 3, built 2.24. */
       { label: 'NODE LAWS: gradient 3 x 12 nodes x 60 mm (was CLAMPED at the old 120 mm ceiling — the lowest pedicel 180 mm now, under the 250 cap)',
-        path: "the GRADIENT at its ceiling — ID7's ramp over twelve nodes, UNCLAMPED under the 250 mm cap; ID9 (d)'s two arms on one row: the TOP node's own florets clear the head floor, and node 12's longer pedicel OVERTOPS it by its DECLARED 26.3068 mm (INFLO_OVERTOP_XFAIL, held both ways)" },
+        path: "the GRADIENT CAP (ID7's gradientMax, restated from the inset's own law and the node depths — asked 3.00, CLAMPED at 2.24 where the lowest floret would overtop the head), ID9 (d)'s every-node arm reading at or under the bar on the capped ramp with INFLO_OVERTOP_XFAIL empty; ID10's floor over three nodes" },
+      { label: 'NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)',
+        path: "the GRADIENT to its floor — ID7's ramp in millimetres down the rachis, four distinct floret builds, and ID8 on the one sessile node (the floret's own emitted vertices reaching the stem's bore) beside three stalked ones; ID4 per unit (a stem exactly where the length is non-zero); ID10 (d) on a DECLARED row — INFLO_APPROACH_XFAIL's one entry, where node 3 passes THROUGH node 2 (a crossing, 0.0000 mm, held both ways by the file's own float32 through the combination gate's engine)" },
       { label: 'NODE LAWS: SESSILE — a true spike (the floret hub rooted one wall deep)',
         path: "the SPIKE — ID8 at every node (rooted radially to the bore at 35 deg, not along the pedicel), ID2's crossing NULL exactly where every node is sessile, ID4 on a stemless unit" },
       { label: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel',
@@ -1074,6 +1075,27 @@ export const SMOKE_BLOCKS = [
         path: "ID9 (a) both modes' reach restated and (f) the other mode's node depths bit-identical — the only row where a reach read from ONE mode would place the node differently, so `the-reach-reads-one-mode` is visible here and nowhere else" },
       { label: "REACH INSET: descending (-60 deg): the reach is under the node and the stem's own inset stands (not clamped)",
         path: "ID9 (e) `insetClamped` FALSE — the floret's reach is below its node so the stem's own 0.16 L inset stands, the biconditional's other arm; ID1, ID2 at a descending pedicel" },
+    ],
+  },
+  {
+    n: 49, title: 'per-node variation and the derived floret phase (inflorescence build 3, Phase B)',
+    anchor: 'NODE VARIANCE: amount 1 on the raceme (each floret\'s curl, cup and twist by its node\'s azimuth — two distinct builds)',
+    /* FOUR ROWS: the amount alone (NV1's restated term through the resolver,
+       NV4's one build per distinct state — two on an alternate raceme), the
+       amount under the head's field (NV2's derived phase read off the
+       placement matrix, the head's slot field composing on the moved base),
+       the LEVEL pedicel (NV2's inert arm — the one state the derivation has
+       no answer for, the head's phase standing), and the GATED row (NV0's
+       other arm, NV4's single build). */
+    rows: [
+      { label: 'NODE VARIANCE: amount 1 on the raceme (each floret\'s curl, cup and twist by its node\'s azimuth — two distinct builds)',
+        path: "NV0 (the control against the geometry's nodeVarianceIsAbsent through the page), NV1 (each unit's curl, cup and twist ARE the head's composed with the node term restated from the controls — amount x cos(azimuth + the restated 120-degree offsets) x the registry's half-span — through the shipped resolver), NV3 (the pins hold on every unit), NV4 (two units for two distinct states on an alternate raceme, every placement appending its own azimuth's); ID10's floor taken over the per-azimuth units" },
+      { label: 'NODE VARIANCE: 0.5 x the form field 0.5 (the head\'s slot field composing on the moved base; the phase DERIVED outward)',
+        path: "NV2 (each unit's variancePhase re-derived from its own PLACEMENT MATRIX — the outward direction's floret azimuth, the crest put there at the shared frequency — never the head's phase), NV1 under a field (the slot term composing on the moved base inside the floret), FV1/FV2 inside every floret; ID9 (a)'s reach over per-azimuth units" },
+      { label: 'NODE VARIANCE: the derived phase at a LEVEL pedicel (INERT, told — the outward direction is the floret\'s own axis)',
+        path: "NV2's INERT arm — at a level pedicel the outward direction projects to nothing in the petal plane, so the floret keeps the head's own phase (asserted equal, not merely finite); NV4's single build (no node term, one state)" },
+      { label: 'NODE VARIANCE: GATED — amount 1 with NO inflorescence (hidden AND inert)',
+        path: "NV0's other arm — the control at 1 with no raceme is hidden by the registry and forms no term in the geometry; ID0 on the absent plan" },
     ],
   },
 ];

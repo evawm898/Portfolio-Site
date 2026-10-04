@@ -3583,6 +3583,52 @@ rows are smoke rows now (155 over 44 blocks). `frozen/phase52` is the 1089 rows 
 `23b13bd`. **Phase B (per-node deltas, the derived per-floret phase) is NOT started — it waits
 on Eva's ruling on `docs/img/inflo-build-3-phase-a.png`.**
 
+**BUILD 3 RULED AND PHASE B SHIPPED — THE INTERNODE FLOOR IS THE FLORETS' OWN, THE GRADIENT IS
+CAPPED AT THE HEAD, EVERY SHIPPED DEFAULT CLEARS THE BAR IN CI, AND A FLORET'S FORM MOVES WITH
+ITS NODE'S AZIMUTH WITH ITS PHASE DERIVED OUTWARD** (Eva's three rulings on Phase A and the
+Phase B brief, Oct 4 — read §11–§19 of `docs/bloom-inflorescence-build-3-outcome.md` before
+touching `floretPitchFloorMm`, `floretPairClasses`, `INFLO_PITCH_CELLS_PER_GAP`, the plan's
+`gradientMax`, `nodeVarianceTerm`, `floretPhaseDeg`, `floretNodeOverrides`, the memo's azimuth
+key, ID10, NV0–NV4, DB0–DB2 or block 49). **RULING 1**: `pitchFloorMm = max(2·pedicelR, the
+florets' own)`, derived from the floret unit the builder EMITS — a column map per azimuth (cells
+a quarter of the gap, each triangle's z-range CLIPPED to the cell through its plane), over the
+distinct `(a, b, d)` pairs the phyllotaxy produces (**a pair is two azimuths and a depth, never
+an azimuth difference** — the placement roll is minimal, so the first cut's difference classes
+read 11.5 mm against a measured 0.68), both modes, the larger ceiled onto the reach grid. The
+default raceme: **floor 17.97 mm (exact mesh crossing 16.55), 5 → 4 nodes, florets 0.676 →
+9.614 mm apart, 113,886 → 96,468 tris** — one fewer floret, the ruling's own price. **Derived
+for EQUAL pedicels and said so**: a graded or corymb raceme is MEASURED instead (ID10 (d), on
+the exported file through the combination gate's own `triGrid`/`nearest`/`crosses` — one
+owner, so the clause and the gate's `floret-floret` cannot disagree), and same-node florets
+are the PHYLLOTAXY's (`sameNodeMayTouch`, told). **Two reachable rows cannot clear the bar and
+are DECLARED with their mechanism in `INFLO_APPROACH_XFAIL`, never clamped**: the gradient at
+0 (node 3 through node 2) and three sessile whorled florets of one node 120° apart on a 6 mm
+rachis. **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
+the terminal head's floor (the reach law's own inset), floored onto the grid so the cap sits a
+hair under the bar rather than on it; told as `GRADIENT CLAMPED`, hatched on the control, ID7
+restates it. At the extreme (gradient 3 x 12 nodes x 60 mm) it caps **3.00 → 2.2356**; the
+corymb arm is untouched character for character and ID7 asserts the solve on every corymb
+row. `INFLO_OVERTOP_XFAIL` is EMPTY and kept; the anthela arrives named or not at all.
+**RULING 3 IS A STANDING RULE: `node tools/verify-bloom-defaults-bar.mjs` (DB0–DB2) holds
+`DEFAULTS` plus each guarded feature's RULED DEFAULTS — eight states, each PINNED BY NAME to
+a `buildMatrix()` row — at or over `MIN_FEATURE_MM` on every measure the combination gate
+owns, in CI before the browser; `--control` plants three must-fails. ADDING A GUARDED
+FEATURE ADDS ITS RULED-DEFAULT ROW THERE.** **PHASE B**: `nodeVariance` (Floret, 0–1,
+default 0 — the guard, out of the sweep through `INFLO_SUBS`) moves each floret's curl, cup
+and twist by `A·cos(az + offset_b)·half_b` — the head's own form law at frequency one about
+the rachis — through `resolveRoleOverrides`'s slot term (headroom scaling, the clamp, nothing
+new), spread BEFORE `PEDICEL_PINS`; **the per-floret phase is DERIVED, no control**: the
+minimal roll keeps a floret's local x̂ world-fixed (measured — the ruling's suspected defect
+was real), so `floretPhaseDeg` puts the crest at the node azimuth ψ (+180° on a descending
+pedicel; the head's own phase kept and told at a level one; φ = −f·ψ, the ramp φ = ψ), and
+NV2 re-derives it from the placement MATRIX. One build per DISTINCT STATE: the memo keys on
+`(length, mode, azimuth quantised to 1e-9 rad in one turn)` — unquantised, `cos(2π + x)`
+keyed five builds on a two-way alternate raceme. The sheet is `docs/img/inflo-build-3-phase-b.png`
+(`tools/shot-bloom-node-variance.mjs`): OFF against ON side-on on one camera at a held node
+count, the re-floored default, the cap. Block 49 is eleven rows (matrix 1110), eight mutants
+in the apex table, and **every inflorescence mutant was RE-RUN because rulings 1 and 2 are law
+changes** (Eva: "any mutant that went green against the old laws is stale evidence").
+
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
 then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships

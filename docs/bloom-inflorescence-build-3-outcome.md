@@ -1,10 +1,13 @@
-# Inflorescence build 3 — Phase A: the reach inset (#355) and the 250 mm pedicel
+# Inflorescence build 3 — Phase A: the reach inset (#355) and the 250 mm pedicel; Eva's three rulings; Phase B: per-node variance
 
 Session of Oct 4, 2026, on `claude/adoring-curie-p3zjlo` against `main` at `23b13bd`.
 Eva's brief: "Derive the clearance from the floret's actual petal reach rather than
 from the pedicel, so the default is clean. Do not add a control for it", and "Raise the
-pedicel cap from 120 mm to 250 mm (my ruling, Oct 4)". **Phase A stops for her ruling;
-Phase B (per-node deltas, the derived per-floret phase) is not started.**
+pedicel cap from 120 mm to 250 mm (my ruling, Oct 4)". Phase A stopped for her ruling;
+**§11 onward is the ruling (three decisions) and Phase B, built on `06e489c` — the
+sections above describe the tree as Phase A left it and are kept as the record Eva ruled
+on; where a figure of theirs has moved (the 16.4 mm internode, the 0.676 mm default,
+`INFLO_OVERTOP_XFAIL`'s two rows), §12–§13 say what replaced it.**
 
 Every figure below names its MODE and its SAMPLING. "Node 22" is this container's
 `node` (v22.22.0); the browser-side numbers are from the gate's Chromium where it says so.
@@ -330,7 +333,7 @@ of the base commit's module) and AFTER, whole and at the top node; the corymb on
 120 mm stem before (clamped at 120, heads spanning 26.64 mm) and after (solved, 0.000),
 at 8 nodes, and the 250 mm pedicel at 35°. Deterministic renderer, no pixel delta quoted.
 
-## 10. Phase B — not started, and two notes for it
+## 10. Phase B — as it stood at the Phase A stop (two notes, both discharged in §15)
 
 * Per-node deltas go through `resolveRoleOverrides`'s existing composition; a delta may
   not reach `PEDICEL_PINS` and must respect the memo-by-distinct-state (a delta per node
@@ -340,3 +343,292 @@ at 8 nodes, and the 250 mm pedicel at 35°. Deterministic renderer, no pixel del
   roll rotates the whole floret rather than the field relative to its petals; the brief's
   "report and stop rather than substitute world-fixed" applies if the frame cannot be
   expressed in `varianceWave`'s own terms.
+
+
+## 11. Eva's Phase A ruling (Oct 4), verbatim in substance
+
+1. **INTERNODE — derive the floor, lose the node.** "A shipped default does not go under
+   the 1.0 mm bar … Derive the internode floor from the floret's actual reach so the
+   default clears 1.0 mm, rather than hard-coding a number. One fewer floret on the
+   default raceme is an acceptable price." Report the derived floor, the default's
+   approach, the node count across the reachable range, and any reachable setting that
+   still cannot clear the bar — declared with its mechanism, never clamped silently.
+2. **OVERTOPPING — clamp it.** "The gradient caps so the lowest head does not exceed the
+   terminal head's height. Build 2 left the anthela shape unexposed deliberately, and it
+   is not arriving through the back door unnamed." Report the cap's cost at the extreme;
+   confirm the corymb's level solve is untouched.
+3. **DEFAULTS CLEAR THE BAR — a standing clause**, with a mutant that goes red when one
+   does not. Built in Phase B if it fits.
+Then Phase B: per-node deltas through the existing resolver, the per-floret phase derived
+from each node's radial direction (outward from the axis, never world-fixed; report and
+stop if the construction cannot express it). "Changes 1 and 2 are law changes, so any
+mutant that went green against the old laws is stale evidence — re-run them."
+
+## 12. Ruling 1 — the internode floor is the florets' own
+
+### 12a. The law (`floretPitchFloorMm`, `floretPairClasses`, `bloom-geometry.js`)
+
+The pitch floor the node law hands `leafNodeDepthsMm` was `2 · pedicelR` — the RODS' own
+floor, which is why the default raceme's florets stood 0.676 mm apart with the rods clear.
+It is now `pitchFloorMm = max(2·pedicelR, pitchFloretMm)`, where `pitchFloretMm` is
+derived from the floret unit the builder EMITS:
+
+* **A pair is two azimuths and a depth, `(a, b, d)`, never an azimuth DIFFERENCE.** The
+  placement roll is the MINIMAL rotation, so a floret at azimuth `a` and one at `b` are
+  not congruent under rotation by `b − a` — the first cut classed pairs by difference and
+  derived an 11.5 mm floor against a measured 0.68 mm approach. `floretPairClasses(phyllo,
+  n, dMax)` enumerates the distinct `(a, b, d)` the phyllotaxy produces over the asked
+  node count (azimuths reduced mod 2π and quantised to 1e-9 rad), with `d` in node steps
+  up to `dMax`.
+* **The bound is a column map.** Each azimuth's placed unit is binned in xy on cells of
+  `gap / INFLO_PITCH_CELLS_PER_GAP` (= 4; the constant's comment carries the trade:
+  19.16 / 19.14 / 17.97 / 17.97 mm at 1 / 2 / 4 / 8 cells a gap for 0.45 / 0.47 / 0.63 /
+  1.55 s of plan time, against an exact mesh crossing of 16.55), each cell holding the
+  z-range of the triangles that cross it — CLIPPED to the cell through each triangle's own
+  plane, because a long pedicel rod's triangles span far more z than they occupy over any
+  one cell (unclipped the bound read 39.4 mm against an exact 33.1). For every cell of the
+  upper floret and every cell of the lower within `gap` in xy the shift that puts them
+  `sqrt(gap² − r²)` apart in z is the pair's bound; `floorMm = max over pairs of
+  bound(a, b) / d`.
+* **Both modes, ceiled.** The bound is taken in LIVE and EXPORT (the units differ at the
+  print floor) and the larger wins, then ceiled onto `INFLO_REACH_GRID_MM` (2⁻¹⁶ mm) —
+  topology is mode-free by construction, the eighth time this file has refused the
+  alternative.
+* **Equal pedicels only, said.** The floor is derived for the ungraded raceme. A graded or
+  corymb raceme's lower florets sit on pedicels of another length and are MEASURED
+  instead (ID10 (d), §12d); deriving the floor from the graded lengths would be count →
+  lengths → floor → count, the fixed point the pedicel radius's own comment refuses.
+* **Same-node florets are the phyllotaxy's, not the internode's.** The `d = 0` pairs
+  cannot be moved apart by any pitch; the plan REPORTS whether the bound admits a
+  contact there (`sameNodeMayTouch`), the read-out prints it, ID10 (c) holds it both
+  ways, and a row where they do touch is declared by name (§12d).
+
+The read-out's INTERNODE line prints the internode, the floor, which owner won (`the
+FLORETS' own` with the pair and the shift, or `the RODS' own` with what the florets
+asked), and the FLORETS OF ONE NODE clause when it applies.
+
+### 12b. The default (EXPORT, Node 22, `stemLength 120, inflorescence RACEME`)
+
+| | Phase A (`06e489c`) | ruled (this tree) |
+|---|---|---|
+| pitch floor | 6.00 mm (the rods') | **17.97 mm** (the florets' — the floret at 0° against the one a node below at 216°, from 17.97 mm of shift; exact mesh crossing 16.55) |
+| nodes | 5 | **4** |
+| internode | 16.4 mm | 23.5 mm |
+| floret-to-floret (ID10 (d), the file) | 0.676 mm | **9.614 mm** |
+| export triangles | 113,886 | **96,468** (6.4 % of budget) |
+
+One fewer floret, as the ruling priced it; the floor is 1.42 mm over the exact crossing
+(the column map's own conservatism: two parts just over a gap apart in xy are held to a
+full gap in z), reported, not tuned away.
+
+### 12c. The reachable range (`sweep3.mjs`, every inflorescence row of the matrix, EXPORT)
+
+Node counts before → after, the floor and who owns it (F florets / R rods), the measured
+approach (the gate's own engine), and whether a graded length was clamped:
+
+| row | nodes | floor | approach |
+|---|---|---|---|
+| the shipped raceme | 5 → 4 | 17.97 F | 9.614 |
+| WHORLED (3 a node) | 5 → 2 | 38.20 F | 11.502 (same-node may touch, and does not) |
+| size 1.00x | 5 → 2 | 26.58 F | 8.846 |
+| pedicels straight up (90°) | 5 → 4 | 22.96 F | 2.482 |
+| 12 petals a floret | 5 → 4 | 19.80 F | 5.308 |
+| 3 petals a floret | 5 → 4 | 17.25 F | 11.381 |
+| 5 mm pedicels | 5 → 3 | 29.49 F | 10.875 |
+| 60 mm pedicels | 5 → 3 | 17.97 F | 15.000 (the cap — no pair) |
+| descending (−60°) | 5 → 3 | 39.64 F | 3.455 |
+| 12 nodes on the 120 mm rachis | 12 → 4 | 17.97 F | 9.614 |
+| x a SPHERE head | 5 → 5 | 14.29 F | 8.704 (held: the sphere floret is shorter) |
+| ONE node | 1 → 1 | 6.00 R | — (the only row where the rods' floor still wins) |
+| SESSILE (a spike) | 5 → 3 | 31.73 F | 6.942 |
+| SESSILE x whorled x 12 nodes | 12 → 3 | 32.37 F | **0.000 — same-node crossing, DECLARED** |
+| gradient 0.5 / 2 / 3 | 5 → 4 | 17.97 F | 5.192 / 4.879 / 2.043 |
+| gradient 0 (the floor) | 5 → 4 | 17.97 F | **0.000 — node 3 through node 2, DECLARED** |
+| gradient 3 x 12 nodes x 60 mm | 12 → 3 | 17.97 F | 8.695 (gradient CLAMPED 3 → 2.2356, §13) |
+| corymb on 120 / 40 mm | 5 → 4 / 1 → 1 | 17.97 F | 9.614 / — |
+| REACH INSET: gradient 3 x 100 mm | 5 → 2 | 17.98 F | 15.000 (gradient CLAMPED 3 → 1.3414) |
+| LEVEL TOPS x 8 nodes | 8 → 4 | 17.97 F | 9.614 |
+| a hemisphere head | 5 → 4 | 17.50 F | 6.871 |
+| VARIANCE x the raceme | 5 → 3 | 23.80 F | 13.261 |
+
+Over the 61 buildable inflorescence rows **59 clear the bar and 2 are under it, both
+crossings and both declared in `INFLO_APPROACH_XFAIL` with their mechanism**: the
+gradient at its floor (lower pedicels shorten to zero and node 3 walks back through node
+2 — graded, outside the floor's subject) and three sessile florets of one node 120° apart
+on a 6 mm rachis (the phyllotaxy's — no internode moves two florets of one node apart; the
+row's own floor of 32.37 mm IS met one node apart). **Nothing is clamped silently**: the
+read-out names both mechanisms where they occur and the gate holds each entry at its
+number both ways (band 5e-4 mm, a declared row that starts clearing trips it).
+
+### 12d. ID10 — the family (`inflorescenceAssertions` / `infloApproachAssertions`)
+
+(a) the plan's declared floor is the geometry's own bound RESTATED on units the harness
+rebuilds in Node per azimuth, both modes — the harness owns its copy of the enumeration,
+the geometry owns the law; (b) every emitted internode is at or over the declared floor;
+(c) `pitchFloorIsFlorets` and `sameNodeMayTouch` as biconditionals against that bound;
+**(d) the EXPORTED FILE**: every floret block's unique vertices against the other blocks'
+triangles through `triGrid` / `nearest` / `crosses` IMPORTED from
+`tools/bloom-inflo-approach.mjs` (the combination gate's own engine, one owner — so this
+clause and the gate's `floret-floret` measure cannot disagree about what an approach is),
+the rachis join excluded by `freeStemDistanceMm` as the gate excludes it, a crossing
+reading 0. Its first cut tested a `present` flag the stem projection does not carry and
+RETURNED before claiming anything — the fifth durable rule inside the clause written to
+apply it — and the export gate read `ok` on the gradient-0 row whose florets pass through
+each other; it reads `S.tip[2]` now and fails loudly on any missing field. Rides in both
+STL gates after ST9; `infloApproachCoverage` refuses a declaration the matrix never ran.
+`INFLO_OVERTOP_XFAIL` is EMPTIED (the cap makes its two rows unreachable, §13) and the
+list is kept so a row that overtops again is a declaration rather than a silence.
+
+## 13. Ruling 2 — the gradient cap
+
+`gradientMax = floor((1 + ((dLow − dTop) + (dTop − insetNeededMm)) / (L0 · sinθ)) / grid)
+· grid`: the lowest pedicel may be as long as puts its floret's reach exactly at the
+terminal head's floor — the inset the reach law already derived — and no longer; floored
+onto `INFLO_REACH_GRID_MM` so the capped floret sits a measurable hair under the bar rather
+than on it (ID9 (d) holds every node to the bar on the emitted florets, and a cap landing
+exactly on it would be decided by the last bit). Inert (Infinity) at `sinθ ≤ 0` (a level or
+descending pedicel cannot overtop), at a sessile raceme and at one node. `gradientAsked`,
+`gradientMax`, `gradientClamped` and `gradient` are all on the plan; the read-out's
+GRADIENT line prints `GRADIENT CLAMPED at Mx (asked Nx): past it the lowest floret would
+overtop the head`, the control carries `cap` so the dead travel is hatched on the track
+(`stamenSpread`'s ruling), and ID7 restates the cap from the plan's own depths and inset
+and holds the clamp as a biconditional.
+
+**What it costs at the extreme** (EXPORT): `NODE LAWS: gradient 3 x 12 nodes x 60 mm` —
+the row CI found overtopping by 26.31 mm — is capped **3.00 → 2.2356** (12 nodes → 3 under
+the floor, so the lowest pedicel is 134.1 mm instead of 180); `REACH INSET: gradient 3 x
+100 mm` is capped **3.00 → 1.3414** (its 71.35 mm overtop gone), and the matrix row that
+carries the cap at its hardest is block 49's `GRADIENT CAP: gradient 3 x 100 mm straight
+up on 12 nodes` (79,050 tris). Every other graded row in the matrix is under its cap and
+unmoved by it (`gradient 2` → 2, `0.5` → 0.5, `gradient 3` on the 120 mm rachis → 3).
+**The corymb arm is untouched**: `corymbAsked` short-circuits the clamp, the level-solve
+expression is the node-laws session's character for character, and ID7 asserts the
+corymb's lengths are the solve's own on every corymb row (all corymb rows read the same
+lengths as on `06e489c`; the 120 mm corymb still spans 0.000 mm). The anthela shape is
+thereby unreachable through the gradient, as ruled.
+
+## 14. Ruling 3 — every shipped default clears the bar (`tools/verify-bloom-defaults-bar.mjs`)
+
+The standing clause, built in Phase B because it fitted: **DB0** every table row is pinned
+BY NAME to a `buildMatrix()` row whose control set it must equal (a renamed or re-ruled
+anchor reddens the gate rather than measuring a state nobody ships); **DB1** every measure
+the combination gate owns — `self` (the wall instrument's), `leaf-stem`, the five
+inflorescence approaches, the in-sheet infill wall — reads at or over `MIN_FEATURE_MM`
+(imported) in EXPORT on each state; **DB2** REPORTS which guard controls the table turns
+on and which it does not, so the coverage is a printed list. The subject, stated as a set:
+the bloom ships ONE default and NO design presets (`bloom-view-presets.js` is camera
+chrome), so the table is `DEFAULTS` plus each guarded feature's RULED DEFAULTS — eight
+states: the default head, the raceme, the shared-node raceme, the leaves, the infill, the
+sepals, the stem with nodes, the tube. **PASS in 29 s; `--control` plants three must-fails
+(a row under the bar, a stale anchor, a measure removed) and all three fire** — the first
+names the shared-node row as collateral it is allowed to redden (the leaf blade's 0.876 mm
+is also measured through that same state). It rides in `bloom-export-watertight.yml` after
+the combination gate, Node only, before the browser. **The standing rule is in CLAUDE.md:
+adding a guarded feature adds its ruled-default row here, and a default that goes under
+the bar reddens CI rather than waiting for someone to go looking.**
+
+## 15. Phase B — per-node variance, and the derived outward phase
+
+### 15a. What ships
+
+`nodeVariance` (Floret, 0–1, step 0.01, default **0** — the guard; hidden with no
+inflorescence; out of the blanket sweep through `INFLO_SUBS`; the range imported). At
+amount A each floret's curl, cup and twist move by `A · cos(az + offset_b) · half_b` over
+`FORM_VARIANCE_BASES` — the head's own form-variance law at **frequency one and phase zero
+ABOUT THE RACHIS**, the three bases a third of a cycle apart exactly as the head's
+(`FORM_VARIANCE_OFFSET_DEG`), composed through `resolveRoleOverrides(state, [], null,
+term)` with headroom scaling and the clamp, so a floret's deltas go through the resolver
+every petal already goes through and nothing is a second composition law. **No per-node ×
+per-petal groups**, as ruled. `floretNodeOverrides(state, plan, az)` is the ONE object: the
+node term's resolved deltas plus the derived phase, or `null` when neither applies — and
+`floretState` spreads it BEFORE `PEDICEL_PINS`, so a delta can never reach a pin
+(`the-node-term-outranks-the-pins` is the standing mutant).
+
+**THE PHASE IS DERIVED, NEVER A CONTROL** (`floretPhaseDeg`): the head's size and form
+fields put their crest at `variancePhase`, a world-fixed angle; a floret on a pedicel
+should put its crest OUTWARD — the petal facing away from the rachis. Measured on the
+placement matrix, the minimal roll keeps the floret's local x̂ world-fixed (the ruling's
+suspected defect was real), so the outward direction in the floret's own frame is its
+node azimuth ψ = az, flipped by 180° on a DESCENDING pedicel (the floret hangs, so its
+outward petal is the one facing the rachis's far side); the crest of `cos(fθ + φ)` lands at
+ψ when φ = −f·ψ (the ramp at f 0 takes φ = ψ). At a LEVEL pedicel (angle 0) there is no
+outward direction and the head's own phase is kept, told; with neither head field on,
+nothing is written. **The construction CAN express it** — one phase per floret through the
+field the head already reads — so the ruling's "report and stop" did not arise, and NV2
+re-derives ψ from the placement MATRIX itself rather than from the azimuth the builder
+was handed.
+
+**One build per DISTINCT floret state**: `floretUnitMemo` keys on `(length, mode,
+quantised azimuth)` and `floretNodeAzimuth` reduces the azimuth into one turn at 1e-9 rad
+(the pair classes' own grid) — `leafAzimuths` hands the i-th node `i·π` and the like, and
+`cos(2π + x)` is not `cos(x)` in the last bits, so the first cut keyed FIVE builds on an
+alternate raceme whose nodes face two ways (two now). The default raceme at amount 1 is 4
+distinct builds (the golden-angle sequence over 4 nodes); whorled x 8 nodes is the cost
+corner, 24 azimuths. The read-out prints the distinct-build count on the control.
+
+### 15b. The family
+
+NV0 amount 0 ⇒ every unit's `nodeOverrides` null and one build per length (the guard,
+both ways); NV1 the resolved deltas on every unit are the law restated from the CONTROLS
+and the unit's own azimuth (never the builder's record); NV2 the phase re-derived from the
+placement matrix (outward, sign-flipped on a descending pedicel, null at level); NV3 no
+pin is overridden on any unit; NV4 the memo's distinct-state count equals the distinct
+`(length, azimuth)` set. ID7's "one build per distinct LENGTH" became "one per distinct
+STATE" and ID9 (e)'s solo arm reads the ASKED count (the floor now takes a 12-asked
+raceme to 3 nodes, so the BUILT count is no longer the solo test). The coverage
+instruments' R1 re-emit the florets with the per-azimuth units.
+
+### 15c. Mutants (eight, `verify-bloom-apex-mutants.mjs`, four probe rows)
+
+`the-internode-floor-is-the-rods-again`, `the-floor-reads-one-mode`,
+`the-gradient-cap-is-dropped`, `the-node-term-is-never-formed`,
+`the-node-term-outranks-the-pins`, `the-floret-phase-is-the-heads`,
+`the-outward-phase-ignores-the-pedicels-sign`, `the-memo-keys-on-the-length-alone` — each
+witnessed on the MUTATED module's own plan or units, never on the assertion it names.
+__MUTANT_RESULT__
+
+## 16. Block 49, the smoke subset, the sheet
+
+Block 49 is eleven `NODE VARIANCE:` rows (matrix 1089 → 1110 with Phase A's block 48): the
+amount at 1 on the raceme, 0.5 over the head's form field at 0.5, x OPPOSITE (four distinct
+builds), x WHORLED x 8 nodes (the cost corner), the DERIVED PHASE alone on descending
+pedicels, the form field at frequency 3 with the head's phase at 90, the INERT level-pedicel
+phase, x gradient 2 (a delta AND a length per node), GATED (amount 1 with no inflorescence —
+a holder), INTERNODE FLOOR at full-size WHORLED florets (the floor at its widest, 38.20 mm),
+and GRADIENT CAP (gradient 3 x 100 mm straight up on 12 nodes). Four are smoke rows (159
+over 45 blocks; 142 families both ways under CLAUSE C).
+
+`node tools/shot-bloom-node-variance.mjs docs/img/inflo-build-3-phase-b.png` → the sheet
+Eva rules on: row 1 the raceme with node variance OFF and ON side-on on ONE camera, the
+node count held at 4 so the difference is the only thing moving (ON: each floret's curl,
+cup and twist by its node's azimuth, the crest outward), with a macro pair at one node;
+row 2 the re-floored default raceme whole (96,468 tris, 6.4 %), and the gradient cap row.
+Deterministic renderer, no pixel delta quoted.
+
+## 17. Costs
+
+* **Triangles against the 1,500,000 budget (EXPORT)**: the shipping default is untouched
+  (24,688); the default raceme 113,886 → **96,468 (6.4 %)** by the lost node; at
+  `nodeVariance` 1 on the 4-node raceme 96,468 (the deltas move no count); the sheet's
+  5-node ON cell 113,886 (7.6 %). __CORNERS__
+* **Plan time**: the floor's column map costs ~0.6 s on the default raceme (the constant's
+  own table), so a raceme build is ~0.8 s; with node variance on it is one floret build per
+  distinct azimuth — ~2.7 s on the default at amount 1, and the whorled x 8 cost corner
+  builds 24 units. Told on the control (the distinct-build count), never capped.
+* **Gate time**: the defaults-bar gate 29 s plus its control, Node only.
+
+## 18. The byte partition (`--movers-predicate inflo-build3`)
+
+A row moves iff the BASE tree's plan and this tree's disagree on the node count, a node
+depth, a pedicel length or the built gradient, or any node's azimuth carries a non-null
+`floretNodeOverrides` on this tree. Stated plainly in the predicate's own comment: the
+floor is a column-map bound over the floret's emitted triangles and cannot be restated
+from the base tree's pieces in a line, so the PLAN side is read off both trees' declared
+decisions; what the partition holds is the MESH against those declarations, both ways. The
+amount at 0 returns null BY BRANCH, so every row with `nodeVariance` 0 is a holder unless
+its placement moved; every row with no raceme is a holder by the first line.
+__PARTITION__
+
+## 19. Gates on the final tree
+
+__GATES__

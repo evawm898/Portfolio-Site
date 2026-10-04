@@ -58,7 +58,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { buildMatrix, exportRefusedLine, exportRefusedCoverage, infloOvertopCoverage, JUNCTION_SCOPE, ZYGO_SCOPE, STAMEN_SCOPE, GYNOECIUM_SCOPE, STEM_SCOPE, curlCoverage,
+import { buildMatrix, exportRefusedLine, exportRefusedCoverage, infloOvertopCoverage, infloApproachCoverage, JUNCTION_SCOPE, ZYGO_SCOPE, STAMEN_SCOPE, GYNOECIUM_SCOPE, STEM_SCOPE, curlCoverage,
          ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_TOLERANCE, STEM_CHANNEL_SCOPE,
          selfIntersectionCoverage, selfIntersectionRefusedNote } from './bloom-harness.mjs';
 import { crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
@@ -125,7 +125,7 @@ export function summarize({ results, refused, attempted, validity, matrixLevel, 
     if (r.liveTris !== r.tris) countMoved.push(r);
     if (r.degenerate !== 0) degenerates.push(r);
   }
-  if (matrixLevel) validity.push(...exportRefusedCoverage(attempted), ...infloOvertopCoverage(attempted));
+  if (matrixLevel) validity.push(...exportRefusedCoverage(attempted), ...infloOvertopCoverage(attempted), ...infloApproachCoverage(attempted));
   /* THE DENOMINATOR ITSELF, asserted — and the three real populations printed
      beside it (#220). A DECLARED REFUSAL IS NOT A DROPPED ROW (XR1). */
   const got = new Set(results.map((r) => r.label));
