@@ -30,8 +30,8 @@ condition. None was loosened. The byte tool's end-face clause, whose subject was
 all at one height", is re-derived onto the cut face's own projection and a point-to-face
 distance (§4f).
 
-**Scope, measured:** 161 of 1,102 live rows move in both modes (§6); ⟨FROZEN_TAGS⟩
-frozen tags' bytes stop reproducing over ⟨FROZEN_ROWS⟩ rows (§7); block 48 adds 13 rows
+**Scope, measured:** 161 of 1,102 live rows move in both modes (§6); 25 of 51
+frozen tags' bytes stop reproducing over 2,006 of 33,512 rows (§7); block 48 adds 13 rows
 (1,089 → 1,102); `frozen/phase52` is the 1,089 rows at `23b13bd`.
 
 ## 1. Reconciliation
@@ -311,8 +311,12 @@ positionally under `Object.is`, over **1,131,655,608 export floats / 125,739,512
 which were re-run after the box's background limit killed the loop mid-chunk; every chunk's
 census is in the merge). The 161 are `phase52`'s 151 plus the 10 cut rows of block 48; the
 FLAT holder, the 1 mm GATED row and the FLAT x RACEME row are holders by construction and
-measured as such, as are the shipping default (no stem) and every pedicel. `--control` over
-block 48: ⟨SB_CONTROL⟩.
+measured as such, as are the shipping default (no stem) and every pedicel. `--control` fires BOTH
+clauses on a 1e-9 perturbation of the FLAT holder (`1 of 241164 floats moved` on the export stream and
+`1 of 4430 values moved` on the captured grid) — run over a range whose FIRST row is a holder, because the
+control perturbs the run's first row and a perturbed MOVER is a difference the partition expects (the
+first attempt, over the whole of block 48, landed on the thinnest hollow stem and reported `CONTROL DID
+NOT FIRE`, which is the tool's own vacuity guard doing its job).
 
 ## 7. The frozen sweep
 
@@ -371,7 +375,7 @@ Run through the table (`--only`, a SUBSET — never a sweep):
 - the ten older stem mutants (`stem-declared-and-not-built`, `stem-off-the-axis`,
   `stem-runs-the-wrong-length`, `bore-is-not-evas-rule`, `hairline-root`,
   `the-tip-plug-is-never-built`, `the-tip-plug-is-typed`, `the-two-closures-are-allowed-to-
-  cross`, `the-noded-rings-stay-on-the-world-axis`, ⟨PEDICEL_PIN⟩) each fire the family they
+  cross`, `the-noded-rings-stay-on-the-world-axis`, `the-pedicel-pin-is-dropped`, which names ID4 and fires ID4 alone) each fire the family they
   name on the cut tree, and the clean tree is silent on every probe row including the FLAT one.
 
 **The table itself had a defect the cut family exposed.** Its stem-family capture read
