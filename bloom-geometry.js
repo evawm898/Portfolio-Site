@@ -12121,7 +12121,16 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
    =================================================================== */
 /* EVA'S RULE, as one expression and one owner. Solid at the 3 mm floor
    (bore 0) and hollow above it; the wall is exactly STEM_MIN_WALL_MM at every
-   diameter above the floor, which is what makes the rule one line. */
+   diameter above the floor, which is what makes the rule one line.
+
+   THE 1.5 mm IS MEASURED HORIZONTALLY (Eva's ruling 5, Oct 3 — recorded in the
+   charter's stem entry). Every ring of the tube is a horizontal circle, and the
+   wall is `outerR - boreR` in that ring's own plane, which is exactly 1.5 at
+   every hollow diameter. Where a node leans the axis, the wall measured SQUARE
+   to the axis is `1.5 cos(lean)` — 1.4971 mm at prominence 0.48, 1.4875 at
+   1.00 — and that is a REPORTED CONSEQUENCE of the ruling (`nodeWallPerpMm`
+   on the plan, printed on the read-out), not a violation of it. Do not
+   "close" it with `1/cos(lean)` on the bore: the ruling chose horizontal. */
 export const STEM_MIN_WALL_MM = 1.5;
 export const STEM_LENGTH_RANGE = Object.freeze([0, 120]);
 export const STEM_DIAMETER_RANGE = Object.freeze([3, 12]);
@@ -12327,8 +12336,8 @@ export const HUB_SECTORS = 48;
    still horizontal circles, and `endFace` is untouched. What a horizontal ring
    on a tilted axis costs — the wall measured PERPENDICULAR to the axis is
    `cos(tilt)` of the wall measured horizontally — is REPORTED on the plan
-   (`nodeWallPerpMm`) and left to Eva; it is not a violation this file can
-   decide on its own.
+   (`nodeWallPerpMm`); it is not a violation, because the wall is measured
+   HORIZONTALLY by Eva's ruling 5 (see STEM_MIN_WALL_MM).
 
    PROMINENCE 0 IS THE IDENTITY BY BRANCH, NEVER BY ARITHMETIC. `stemNodeLaw`
    returns NULL and every consumer takes its pre-node expression verbatim —
@@ -12471,8 +12480,8 @@ export function stemNodeAxisMm(law, s) {
 
 /* THE HEADING TILT AT DEPTH `s` — how far the axis leans from vertical there,
    in radians. The wall a horizontal ring makes is `cos` of this thinner
-   measured perpendicular to the axis, which is the one number the plan
-   reports and Eva rules on. */
+   measured perpendicular to the axis, which is the number the plan reports
+   (a consequence of ruling 5's horizontal wall, not a violation of it). */
 export function stemNodeTiltRad(law, s) {
   let gx = 0, gy = 0;
   for (const n of law.nodes) {
