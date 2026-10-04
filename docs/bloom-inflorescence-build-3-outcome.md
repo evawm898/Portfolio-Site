@@ -485,6 +485,29 @@ STL gates after ST9; `infloApproachCoverage` refuses a declaration the matrix ne
 `INFLO_OVERTOP_XFAIL` is EMPTIED (the cap makes its two rows unreachable, §13) and the
 list is kept so a row that overtops again is a declaration rather than a silence.
 
+### 12e. The combination gate under the floor (`node tools/bloom-combination-gate.mjs`, EXPORT, Node 22)
+
+The floor re-records the whole inflorescence family of `COMBINATION_XFAIL`, which Phase A had
+just re-recorded for the reach inset. On the first full run after ruling 1 the gate read
+**31 findings**, every one of them this ruling's: **24 declared cells CLEAR** (the shipped
+raceme's own 0.676 mm through three grids reads **9.614**; every gradient-x-angle,
+gradient-x-tilt, length-x-tilt-ff, leafangle-x-pedicelangle and corymb cell the reach inset
+declared reads 1.003 to 15.000), **one cell IMPROVED without clearing** (the corymb's sessile
+top at 60 deg, 0.000 → **0.2144** — the floor is derived for EQUAL pedicels and the corymb
+lengthens the lower ones to one level, so it clears the other eight corymb cells and not this
+one), **two cells are NEW under the bar** (the gradient at ZERO on both gradient grids, 0.000
+— every pedicel the top's length, so node 3 passes through node 2: the floor's own declared
+residual, the same state the harness holds in `INFLO_APPROACH_XFAIL`), **one axis went
+INERT** (`inflo-leaf-nodes-x-leafangle`'s `floretNodes`: the floor holds five nodes on the
+82 mm the inset leaves of a 120 mm rachis, so 12 asked builds the SAME five as 5 asked and
+CG1 refused the axis at exactly 0.000e+0 — declared in `COMBINATION_INERT` with the number,
+the `leafToothDepth` shape, so a sixth node ever fitting fails CG7 both ways), and **three
+verdicts moved**: `inflo-length-x-tilt-ff` single-reaches → **clears**,
+`inflo-corymb-angle-x-length` single-reaches → **product-only** (its only cell under the bar
+is interior), `inflo-leaf-nodes-x-leafangle` product-only → **clears**. Declared cells
+**167 → 145**; no grid was widened and no range moved. The re-recorded gate and its
+`--control` are in §19.
+
 ## 13. Ruling 2 — the gradient cap
 
 `gradientMax = floor((1 + ((dLow − dTop) + (dTop − insetNeededMm)) / (L0 · sinθ)) / grid)

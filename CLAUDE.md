@@ -3605,7 +3605,12 @@ owner, so the clause and the gate's `floret-floret` cannot disagree), and same-n
 are the PHYLLOTAXY's (`sameNodeMayTouch`, told). **Two reachable rows cannot clear the bar and
 are DECLARED with their mechanism in `INFLO_APPROACH_XFAIL`, never clamped**: the gradient at
 0 (node 3 through node 2) and three sessile whorled florets of one node 120° apart on a 6 mm
-rachis. **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
+rachis. **THE FLOOR RE-RECORDS THE COMBINATION GATE'S WHOLE INFLORESCENCE FAMILY** (§12e): 24
+declared cells CLEAR (the default's 0.676 reads 9.614), the corymb's sessile 60-deg cell improves
+0.000 → 0.2144 without clearing, the two gradient-0 cells are new at 0.000, `floretNodes` on the
+leaf-nodes pair goes INERT (five nodes is all the floor admits on the span the inset leaves —
+declared in `COMBINATION_INERT` with the number) and three verdicts move; declared 167 → 145.
+**RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
 the terminal head's floor (the reach law's own inset), floored onto the grid so the cap sits a
 hair under the bar rather than on it; told as `GRADIENT CLAMPED`, hatched on the control, ID7
 restates it. At the extreme (gradient 3 x 12 nodes x 60 mm) it caps **3.00 → 2.2356**; the
