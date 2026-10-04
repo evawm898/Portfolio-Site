@@ -1749,7 +1749,8 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
    told in the units a reader can hold: how many nodes, the swelling, the turn,
    where each bend peaks against the spindle (the phasing Eva likes, as a
    number), how far the tip ends up off straight, and the wall measured square
-   to the leaning axis — the one figure left for Eva to rule on. Absent where
+   to the leaning axis — a reported consequence of the horizontal wall (Eva's
+   ruling 5), not an open question. Absent where
    the control is at 0 or has nothing to act on. */
 function stemNodesLine(stem) {
   const L = stem.nodeLaw;
@@ -1759,7 +1760,7 @@ function stemNodesLine(stem) {
     + ` · turn ${L.turnDeg.toFixed(2)}° a node, away from its first leaf, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle — inside the swelling)`
     + ` · tip ${stem.nodeTipOffsetMm.toFixed(2)} mm off straight · worst lean ${stem.nodeTiltMaxDeg.toFixed(2)}°`
     + (stem.nodeWallPerpMm !== null && stem.nodeWallPerpMm !== undefined
-        ? ` · wall ${stem.nodeWallPerpMm.toFixed(4)} mm measured square to the leaning axis (${STEM_MIN_WALL_MM} mm horizontally — reported, Eva's to rule)`
+        ? ` · wall ${stem.nodeWallPerpMm.toFixed(4)} mm measured square to the leaning axis (${STEM_MIN_WALL_MM} mm horizontally, as ruled — the perpendicular figure is a reported consequence)`
         : ' · solid stem, no bore — the wall question does not arise')
     + ` · ${stem.stations.length} stations`;
 }
