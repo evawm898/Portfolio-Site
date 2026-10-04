@@ -2066,16 +2066,19 @@ its own seeded stream for every bug with wings, and the page prints the label.
 
 ### 13.3 Decisions made without a ruling (reversible)
 
-1. **Applying sets the scallop depth to 0 on both pairs.** A fitted outline carries its own
+1. **Applying sets the scallop depth to 0 on both pairs** (ruled: keep — Eva, on #349). A fitted outline carries its own
    margin; the bug's procedural scallop cut a second one into it — on the default bug's 0.06
    hindwing scallop that read as 9 "scallop depth reduced" repairs over the 17 shapes and put
    shape #1 under the floor. The count is kept (it is inert at depth 0). Undo: drop
    `scallop` from `applyWingShape` and `WING_SHAPE_WRITES` (and the gate's restated list).
-2. **Sweep is 0 on both pairs** — the shapes were fitted at sweep 0, so their orientation is
+2. **Sweep is 0 on both pairs** (ruled: keep — Eva, on #349) — the shapes were fitted at sweep 0, so their orientation is
    in the points; keeping the bug's sweep would rotate them off the fit.
-3. **A blend smooths margin detail.** Two scalloped hindwings whose bumps do not line up
-   average toward a smooth margin; the blend re-expresses the mix with one more control point
-   than the denser parent, which keeps the overall shape and not every bump.
+3. **A blend smooths margin detail — PARKED (Eva, on #349).** Random blends read plainer than
+   either parent: two scalloped margins whose bumps do not line up average toward a smooth
+   edge (and the blend re-expresses the mix with one more control point than the denser
+   parent, which keeps the overall shape and not every bump). Candidate fixes, not built:
+   carry the margin detail from ONE parent onto the blended shape, or bias t toward the ends
+   so a blend stays near one parent's margin.
 4. **A shape without a tail switches the bug's own tail group OFF and keeps its points**
    (the tail toggle brings it back); a blend takes the nearer parent's tail.
 5. The gallery is a 4-column grid of filled silhouettes (both wings and their mirror, placed
