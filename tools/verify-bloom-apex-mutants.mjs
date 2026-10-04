@@ -1727,9 +1727,14 @@ const MUTANTS = [
   { id: 'the-node-field-never-reaches-the-stem', why: "the plan drops the node law whatever the control says, so the stem stays a straight cylinder under a prominence the panel reports — watertight, one piece, the pre-node triangle count; the defect Eva's 'one control' would ship as a dead slider",
     find: '  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);',
     into: '  const nodeLaw = null;', names: ['ST12', 'ST2'],
-    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
-      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.stations === 2 && c.stations > 2) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations}`; } },
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C), s0 = nodeFacts(C, { ...NODE_STATE(), stemNodeProminence: 0 });
+      if (m.threw || c.threw || s0.threw) return `the witness threw: ${m.threw || c.threw || s0.threw}`;
+      /* The straight stem's station count is READ off the clean tree at prominence 0 (the
+         identity row), never typed: this witness carried `=== 2` until the florist's cut
+         appended the long point as a third station and the sweep went red naming a mutant
+         whose edit had applied — a row count standing in for a shape (the stale-harness-row
+         class, in a witness). */
+      return (m.stations === s0.stations && c.stations > s0.stations) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations} (a straight stem on the clean tree carries ${s0.stations})`; } },
   { id: 'prominence-zero-is-not-the-identity', why: 'the guard drops its prominence term, so a leafed stem at prominence 0 builds a node law — a zero swelling and a zero kink on the noded arm — which is the identity only by an argument about arithmetic, never by branch',
     find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state)',
     into: '  return stemIsAbsent(state)', names: ['ST12'],

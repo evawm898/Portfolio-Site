@@ -484,3 +484,26 @@ re-record is the fix for both. `bloom-xfail-magnitudes` gaining a refused-count 
 would make this catchable locally and is one clause; it is recorded here rather than added
 to a PR already carrying one gate cycle.
 
+## 13. CI also caught a witness pinned to a row count — `the-node-field-never-reaches-the-stem`
+
+`bloom-apex-mutants` on `9e6cce3`: shards 0, 1 and 2 green (69 mutants), shard 3 FAILED on one
+line, with every other mutant in it `ok`:
+
+```
+  the-node-field-never-reaches-the-stem: the edit applied but the BEHAVIOUR did not move — the mutant's stem carries 3 stations against the clean tree's 47
+```
+
+The edit applied and the behaviour DID move (3 against 47); what was wrong was the witness.
+It asserted `m.stations === 2` — "a straight stem" written as the count `stemStations()`
+returned the day it was written — and the cut appends the long point as a third station
+(§2, `stations = [...tube, lengthMm]`), so a straight 100 mm stem on this tree carries 3. CLAUDE.md's
+second durable rule, inside a witness: **a row chosen against a row COUNT goes stale when the
+count changes.** The witness now reads the straight count off the clean tree at
+`stemNodeProminence` 0 — the identity row, an owner the mutation does not write — and asserts
+the mutant lands ON it while the clean noded stem lands above it. Re-run: `names ST12, ST2 ·
+fired SC2, SC3, ST10, ST12, ST2   ok`. The pedicel witness two mutants down still reads
+`c.stations === 2` and is right to: a pedicel is pinned FLAT through `PEDICEL_PINS`, so its
+station list is `stemStations()`'s own and the cut cannot reach it; recorded so the next count
+change knows where the typed 2 is. §10's mutant figures were a `--only` subset of the cut and
+stem families, which is why this one was first read in CI.
+
