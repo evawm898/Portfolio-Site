@@ -366,7 +366,7 @@ the plug expression moved; 91 anchors match exactly once.
   the 0.3 mm re-read.
 - **Stem-channel witness** (`verify-bloom-stem-channel.mjs` + `--control`) PASS.
 - **Build order**, three processes: ⟨BUILD_ORDER⟩
-- **Census magnitudes** over the ⟨LIVE_CUT_ROWS⟩ cut rows: ⟨CENSUS⟩
+- **Census magnitudes** (`bloom-xfail-magnitudes --only <the 167 cut rows> --include-refused`): 4 declared rows among them (`STEM: x a hemisphere` 248 / 0.4262, `SPHERE STEM: x 40 petals x 6 turns` 372 / 0.2714, `INFILL: x a SPHERE head with a stem` 544 / 0.4675, `ALL MAX` 116,847 / 15.8503 measured in Node as an export-refused row), **all 4 at their recorded magnitude** — pairs exactly, span within ±0.00005 mm. The cut moves the stem's end and the free stem's rings; no declared fold lives there, and no re-record is owed.
 - **X2 across block 48:** silent on every row (0 within-shell pairs on all 13; none declared).
 
 ## 11. What is not done, named
