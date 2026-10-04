@@ -155,6 +155,7 @@
    =================================================================== */
 
 import { measureInfillWallMm } from './bloom-infill-wall.mjs';
+import { measureInfloApproachMm, SEARCH_CAP_MM as INFLO_SEARCH_CAP_MM } from './bloom-inflo-approach.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -170,6 +171,14 @@ const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === path.resolv
    a large row and reddens a small one on noise (#213); the same reasoning
    applies to a distance in millimetres. */
 export const COMBINATION_TOLERANCE_MM = 5e-4;
+/* THE INFLORESCENCE'S MEASURES and the words the table prints for each. */
+const INFLO_MEASURES = new Map([
+  ['floret-floret', `FLORET against every OTHER floret (emitted vertices against emitted triangles, edge crossings read 0, searched to ${INFLO_SEARCH_CAP_MM} mm; the pedicel-to-rachis join inside the rachis's own solid excluded by construction)`],
+  ['floret-head', `FLORET against the TERMINAL HEAD (the petals and the hub, [0, hubTriEnd); edge crossings read 0, searched to ${INFLO_SEARCH_CAP_MM} mm)`],
+  ['floret-stem', 'FLORET against the FREE RACHIS (freeStemDistanceMm, the geometry\'s own; its own pedicel rod excluded by the builder\'s pedicelAxis, a SESSILE floret excluded whole — its hub IS the join)'],
+  ['leaf-floret', `SUBTENDING LEAF against every FLORET, pedicel included (the shared node's own approach; the petiole-to-rachis join excluded; searched to ${INFLO_SEARCH_CAP_MM} mm)`],
+  ['leaf-pedicel', `SUBTENDING LEAF against every PEDICEL ROD, its own and the nodes' below (the emitted rods as cylinders; the petiole-to-rachis join excluded; searched to ${INFLO_SEARCH_CAP_MM} mm)`],
+]);
 
 export const VERDICTS = Object.freeze(['product-only', 'single-reaches', 'clears']);
 
@@ -534,6 +543,151 @@ export const PAIRS = [
     verdict: 'clears',
     cite: 'docs/bloom-combination-gate.md §4 — a guess, and the most expensive one measured: a lobed build costs four times any other candidate in this tier and this grid clears',
     why: 'a guess: that a sinus cut into the margin lets the curl bring two crests together. It does not — the cut removes material from exactly the place the curl would have folded',
+  },
+  /* ---------------------------------------------- THE INFLORESCENCE (build 2)
+     Eva's ruling 1 restated (Oct 3): "the combination grid rebuilt with its
+     join exclusions". FOUR MEASURES (tools/bloom-inflo-approach.mjs, whose
+     header is the argument) and EIGHT PAIRS, each on the shipped raceme (a
+     120 mm rachis, RACEME) unless its `base` says otherwise:
+       * THE INTENDED JOINS ARE EXCLUDED BY CONSTRUCTION, NEVER DECLARED AS A
+         FAILING MAGNITUDE: a floret is never measured against its own block
+         (its pedicel IS its stem — the pair is never formed), the
+         pedicel-to-rachis and petiole-to-rachis joins live inside the rachis's
+         own solid and are not measured there, a floret's own pedicel rod is
+         named out of floret-stem by the builder's `pedicelAxis`, and a SESSILE
+         floret is out of floret-stem whole (its hub IS its join).
+       * KEPT AT THE NORMAL BAR, as ruled: floret x floret, floret x the
+         terminal head, floret x the stem, the leaf x its pedicel (and the
+         floret on it), and the GRADIENT and the SESSILE end against the PETAL
+         controls that change a floret's own geometry (tilt, cup).
+     The tier is 2 — a mechanism argued from the geometry (a floret IS a
+     bloom built on its pedicel, so every petal control reaches it; the
+     pedicel's length and angle are what put it near anything) — and the
+     findings are measured, not guessed. */
+  {
+    id: 'inflo-gradient-x-angle',
+    tier: 2,
+    label: 'pedicelGradient x pedicelAngle — graded pedicels, florets against each other',
+    measure: 'floret-floret',
+    base: { stemLength: 120, inflorescence: 'RACEME' },
+    a: { id: 'pedicelGradient', values: [1, 0, 2, 3] },
+    b: { id: 'pedicelAngle', values: [35, 0, 60] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md and tools/bloom-inflo-approach.mjs — the gradient changes how far each floret stands out along its pedicel, the angle how far above its node; the two decide which neighbours a floret reaches',
+    why: 'a longer lower pedicel carries its floret up and out toward the node above, and the angle sets how much of that length is rise',
+  },
+  {
+    id: 'inflo-gradient-x-tilt',
+    tier: 2,
+    label: 'pedicelGradient x petalTilt — graded pedicels under open florets',
+    measure: 'floret-floret',
+    base: { stemLength: 120, inflorescence: 'RACEME' },
+    a: { id: 'pedicelGradient', values: [1, 0, 3] },
+    b: { id: 'petalTilt', values: [25, 60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — every floret inherits the head\'s petal controls (ruling 10), so petalTilt opens every floret at once',
+    why: 'the tilt sets how far a floret\'s petals reach back down its own pedicel and so toward the floret below',
+  },
+  {
+    id: 'inflo-length-x-angle',
+    tier: 2,
+    label: 'pedicelLength x pedicelAngle — the top floret against the terminal head',
+    measure: 'floret-head',
+    base: { stemLength: 120, inflorescence: 'RACEME' },
+    a: { id: 'pedicelLength', values: [20, 0, 5, 60] },
+    b: { id: 'pedicelAngle', values: [35, 0, 60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the top inset clears the PEDICEL\'s rise (`insetSatisfied`) and not the FLORET\'s own petals, which this measures',
+    why: 'the inset is derived from the pedicel\'s rise alone, so a floret whose petals reach further than its pedicel rises can still stand among the head\'s petals',
+  },
+  {
+    id: 'inflo-length-x-tilt',
+    tier: 2,
+    label: 'pedicelLength x petalTilt — a floret\'s petals against its own rachis',
+    measure: 'floret-stem',
+    base: { stemLength: 120, inflorescence: 'RACEME' },
+    a: { id: 'pedicelLength', values: [20, 5, 60] },
+    b: { id: 'petalTilt', values: [25, 60, 90, 120] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the builder already flags the floret against the rachis on every raceme (rachisApproachMm); this holds it to the bar on a grid',
+    why: 'a short pedicel stands a floret beside its rachis, and a steep petal tilt folds its petals back toward it',
+  },
+  {
+    id: 'inflo-scale-x-angle',
+    tier: 2,
+    label: 'floretScale x pedicelAngle — floret size against the rachis',
+    measure: 'floret-stem',
+    base: { stemLength: 120, inflorescence: 'RACEME' },
+    a: { id: 'floretScale', values: [0.6, 0.2, 1] },
+    b: { id: 'pedicelAngle', values: [35, -60, 0, 60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-outcome.md — the floret-against-rachis approach swept over pedicelAngle there (0.8234 mm at 35 deg on a sphere, 8.2475 on a cap)',
+    why: 'a bigger floret reaches further from its pedicel; the angle swings that reach toward or away from the rachis',
+  },
+  /* `petalCup` WAS TRIED FIRST AND CG1 REFUSED IT, measured: the nearest
+     approach between two florets is between their OPEN petals' tips and the
+     cup moves it by 2.3e-4 mm across 0..1.2 — under the band. The tilt is the
+     petal control that reaches this measure. */
+  {
+    id: 'inflo-length-x-tilt-ff',
+    tier: 2,
+    label: 'pedicelLength x petalTilt — the sessile end under open florets',
+    measure: 'floret-floret',
+    base: { stemLength: 120, inflorescence: 'RACEME' },
+    a: { id: 'pedicelLength', values: [20, 0, 60] },
+    b: { id: 'petalTilt', values: [25, 60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — a sessile floret sits ON its node, so florets one pitch apart are as close as the node law ever puts them',
+    why: 'the sessile end brings every floret to its own node; the tilt sets how far its petals reach toward a neighbour',
+  },
+  {
+    id: 'inflo-leafangle-x-pedicelangle',
+    tier: 2,
+    label: 'leafAngle x pedicelAngle — the subtending leaf against its pedicel and floret',
+    measure: 'leaf-floret',
+    /* A 15 mm LEAF, about the pedicel's own length: a longer leaf runs its
+       blade through the floret its pedicel carries at every angle measured
+       (40 mm reads 0.000 on eight of nine cells), which is a finding about
+       leaf length and not about the two angles this pair is for. */
+    base: { stemLength: 120, inflorescence: 'RACEME', leafLength: 15 },
+    a: { id: 'leafAngle', values: [35, 0, 60] },
+    b: { id: 'pedicelAngle', values: [35, 0, 60] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the shared node seats the leaf by the STEEPER rod\'s cosine, exact for parallel rods and conservative otherwise; this measures what happens past the wall',
+    why: 'a leaf steeper than its pedicel rises toward it; one shallower diverges; parallel ones hold their seated offset along the whole of the shorter rod',
+  },
+  {
+    id: 'inflo-leaf-nodes-x-leafangle',
+    tier: 2,
+    label: 'floretNodes x leafAngle on a short rachis — the subtending leaf against the node BELOW it',
+    measure: 'leaf-pedicel',
+    /* THE OTHER SIDE OF THE SHARED NODE (Eva's change 1: "the leaf must still
+       clear the node below it at the tightest reachable internode and at the
+       pitch floor"). 52 mm of rachis at 12 nodes is the tightest internode the
+       node law reaches (3.023 mm against its 3.000 mm pitch floor, measured by
+       sweeping every rachis length at 12 nodes); 5 nodes on the same rachis is
+       the default count. A 15 mm leaf, this pair's sibling's own length. */
+    base: { stemLength: 52, inflorescence: 'RACEME', leafLength: 15 },
+    a: { id: 'floretNodes', values: [5, 12] },
+    b: { id: 'leafAngle', values: [35, 0] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the shared node seats each leaf a derived offset below ITS OWN pedicel and nothing in that law reads the node below; the pitch floor is two pedicel radii, set for the pedicels against each other',
+    why: 'two nodes down on the same azimuth (alternate and opposite repeat every second node) the leaf stands only twice the internode less its own offset above that pedicel, and a level leaf runs straight over it',
+  },
+  {
+    id: 'inflo-corymb-angle-x-length',
+    tier: 2,
+    label: 'pedicelAngle x pedicelLength under the CORYMB — level-topped heads against each other',
+    measure: 'floret-floret',
+    /* THREE NODES ON A 60 mm RACHIS: five on 40 mm read 0.000 on every cell
+       (the level heads overlap at every setting), which reaches nothing CG1
+       can tell apart. */
+    base: { stemLength: 60, inflorescence: 'RACEME', pedicelCorymb: 'ON', floretNodes: 3 },
+    a: { id: 'pedicelAngle', values: [35, 10, 60] },
+    b: { id: 'pedicelLength', values: [20, 0, 40] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the corymb solve lands every head on one level, so the heads stand side by side at one height',
+    why: 'level tops put every head in one plane; a shallow angle spreads them far apart in length and a steep one stacks them close',
   },
 ];
 
@@ -994,6 +1148,58 @@ export const COMBINATION_XFAIL = Object.freeze({
   "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=3 x petalWidth=30": { mm: 0.39, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.352 mm against its nearest face (petalCup=1.2 x petalTipShape=3 x petalWidth=16) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
 
   /* ===== None (the headroom PR, §21) */
+  /* ---------------------------------------- THE INFLORESCENCE (build 2)
+     Measured by `--emit` on the node-laws tree. Every 0.000 here is an EDGE
+     CROSSING — the two parts pass through each other — and every positive
+     number a vertex-to-surface approach. The intended joins (a floret and its
+     own pedicel, a pedicel or petiole in the rachis's own solid, a sessile
+     hub in its wall) are excluded by construction and are NOT here. */
+  'inflo-gradient-x-angle @ pedicelGradient=0 x pedicelAngle=60': { mm: 0, note: 'the lower florets on longer pedicels at 60 deg rise into the floret above, an edge crossing (an interpenetration, not a gap)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-gradient-x-angle @ pedicelGradient=2 x pedicelAngle=60': { mm: 0, note: 'the lower florets on longer pedicels at 60 deg rise into the floret above, an edge crossing (an interpenetration, not a gap)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-gradient-x-angle @ pedicelGradient=3 x pedicelAngle=35': { mm: 0.654, note: 'the graded lower floret, 3x the top pedicel, reaches the floret one node up — the single-axis cell, so the gradient alone reaches it at the shipped angle' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-gradient-x-angle @ pedicelGradient=3 x pedicelAngle=60': { mm: 0, note: 'the lower florets on longer pedicels at 60 deg rise into the floret above, an edge crossing (an interpenetration, not a gap)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-gradient-x-tilt @ pedicelGradient=3 x petalTilt=25': { mm: 0.654, note: 'the gradient-3 single cell, the same state `inflo-gradient-x-angle` reads at its default angle (one state, two grids, one number)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=20 x pedicelAngle=35': { mm: 0, note: "THE SHIPPED RACEME (20 mm at 35 deg) puts the TOP floret's petals through the terminal head's — the inset is derived from the pedicel's RISE (`insetSatisfied`) and never from the floret's own petals, so it clears the rod and not the flower: pre-existing in build 1, measured here for the first time" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=20 x pedicelAngle=60': { mm: 0, note: "the top floret's petals against the terminal head's; an edge crossing" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=20 x pedicelAngle=90': { mm: 0, note: "the top floret's petals against the terminal head's; an edge crossing" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=0 x pedicelAngle=35': { mm: 0.727, note: "a SESSILE top floret 0.727 mm from the head's own petals — the nearest a sessile floret comes to the head on this grid" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=5 x pedicelAngle=35': { mm: 0, note: "the top floret's petals against the terminal head's; an edge crossing" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=60 x pedicelAngle=60': { mm: 0, note: "the top floret's petals against the terminal head's; an edge crossing" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-angle @ pedicelLength=60 x pedicelAngle=90': { mm: 0, note: "the top floret's petals against the terminal head's; an edge crossing" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-tilt @ pedicelLength=5 x petalTilt=25': { mm: 0, note: "a 5 mm pedicel stands its floret beside the rachis and the floret's own petals reach back onto it (floret-stem, the floret's own rod excluded) — at every tilt measured, so the length alone reaches it" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-tilt @ pedicelLength=5 x petalTilt=60': { mm: 0, note: "a 5 mm pedicel stands its floret beside the rachis and the floret's own petals reach back onto it (floret-stem, the floret's own rod excluded) — at every tilt measured, so the length alone reaches it" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-tilt @ pedicelLength=5 x petalTilt=90': { mm: 0, note: "a 5 mm pedicel stands its floret beside the rachis and the floret's own petals reach back onto it (floret-stem, the floret's own rod excluded) — at every tilt measured, so the length alone reaches it" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-tilt @ pedicelLength=5 x petalTilt=120': { mm: 0, note: "a 5 mm pedicel stands its floret beside the rachis and the floret's own petals reach back onto it (floret-stem, the floret's own rod excluded) — at every tilt measured, so the length alone reaches it" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=0.6 x pedicelAngle=-60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=0.6 x pedicelAngle=60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=0.6 x pedicelAngle=90': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=0.2 x pedicelAngle=-60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=0.2 x pedicelAngle=60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=0.2 x pedicelAngle=90': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=1 x pedicelAngle=-60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=1 x pedicelAngle=60': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-scale-x-angle @ floretScale=1 x pedicelAngle=90': { mm: 0, note: "at -60, 60 and 90 deg the floret's petals reach the free rachis at every size measured — the angle alone does it (a rod near the rachis's own direction carries its floret's disc across it)" + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-length-x-tilt-ff @ pedicelLength=0 x petalTilt=25': { mm: 0, note: 'the SPIKE: sessile florets one node pitch apart overlap their open petals at the shipped tilt (an edge crossing); at tilt 60 and 90 they clear' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-leafangle-x-pedicelangle @ leafAngle=35 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-leafangle-x-pedicelangle @ leafAngle=0 x pedicelAngle=35': { mm: 0.723, note: "a LEVEL leaf against the FLORET TWO NODES BELOW on its own azimuth (alternate repeats every second node), whose petals reach up to it — the shared node's law reads its OWN pedicel and nothing below. Was 0.881 mm (and was mis-attributed to the blade's own top skin): Eva's change 1 seats every leaf 0.158 mm lower (3.784 -> 3.943 mm), and this approach falls by exactly that" + ' — measured on the node-laws tree, second round (change 1 + change 2), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  /* THE NODE BELOW (Eva's change 1, the other side of the widened seating) —
+     the `leaf-pedicel` measure, the leaf against every emitted pedicel rod.
+     All three are the PEDICEL TWO NODES BELOW on the leaf's own azimuth: the
+     leaf stands `2 x internode - offset` above it, and the node law's pitch
+     floor (two pedicel radii) was set for the pedicels against each other,
+     never for a leaf seated between them. Declared, never clamped (Eva:
+     "declare that cell with its mechanism rather than clamping anything
+     silently"). The same state on the pre-change tree reads -0.248 mm
+     (interpenetrating) at 12 nodes; the wider seating takes it to -0.378. */
+  'inflo-leaf-nodes-x-leafangle @ floretNodes=5 x leafAngle=0': { mm: 0, note: 'a LEVEL leaf at the default 5 nodes on a 52 mm rachis runs over the pedicel TWO NODES BELOW on its own azimuth (an edge crossing)' + ' — measured on the node-laws tree, second round, Node 22, EXPORT, emitted leaf vertices against the emitted pedicel rods.' },
+  'inflo-leaf-nodes-x-leafangle @ floretNodes=12 x leafAngle=35': { mm: 0, note: 'the TIGHTEST INTERNODE the node law reaches (3.023 mm against its 3.000 mm pitch floor): the leaf stands 2 x 3.023 - 3.943 = 2.10 mm above the pedicel two nodes below on its own azimuth, which needs about 3.86 mm of internode to clear — it passes through it' + ' — measured on the node-laws tree, second round, Node 22, EXPORT, emitted leaf vertices against the emitted pedicel rods.' },
+  'inflo-leaf-nodes-x-leafangle @ floretNodes=12 x leafAngle=0': { mm: 0, note: 'both at once: the tightest internode and a level leaf, through the pedicel two nodes below' + ' — measured on the node-laws tree, second round, Node 22, EXPORT, emitted leaf vertices against the emitted pedicel rods.' },
+  'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=35': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-corymb-angle-x-length @ pedicelAngle=35 x pedicelLength=40': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=20': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=0': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=40': { mm: 0, note: 'the level-topped heads overlap side by side: the corymb solve puts every head at one height, and on a steep angle or long pedicels they stand closer than a floret is wide (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -1071,6 +1277,7 @@ export function measureLeafStemApproachMm(G, state, exportMode) {
   if (!m.leaf || !m.leaf.present) return { mm: Infinity, why: 'no leaf is built' };
   let best = Infinity, at = null, leaves = 0, verts = 0;
   for (let i = 0; i < m.leaf.azimuths.length; i++) {
+    if (m.leaf.nodeLengthsMm && !(m.leaf.nodeLengthsMm[i] > 0)) continue;   // the cap left no blade (the plan says so)
     for (const az of m.leaf.azimuths[i]) {
       const probe = new G.MeshBuilder({ exportMode });
       const rep = G.buildLeafInto(probe, m.leaf, state, i, az);
@@ -1115,6 +1322,10 @@ function measureState({ G, W, R }, DEFAULTS, pair, state, where) {
      SHIPPED plan (tools/bloom-infill-wall.mjs), because `self` is
      bit-identically inert in the density (its header has the numbers). */
   if (pair.measure === 'infill-wall') return measureInfillWallMm(G, R.DEFAULTS, state);
+  /* THE INFLORESCENCE'S FOUR (the node-laws session) — tools/bloom-inflo-
+     approach.mjs, whose header names the joins it excludes by construction
+     and why. */
+  if (INFLO_MEASURES.has(pair.measure)) return measureInfloApproachMm(G, state, pair.measure);
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
   const m = G.buildBloomInto(acc, state);
   /* `self-every` — THE SAME `self`, ON EVERY PETAL THE BUILDER EMITTED
@@ -1295,7 +1506,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
 
     /* ---------------------------------------------- the table, per pair */
     say(`  [tier ${pair.tier}${pair.guess ? ', a GUESS' : ''}] ${pair.label}`);
-    say(`    measure: ${pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
+    say(`    measure: ${pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
     say('      ' + `${pair.a.id} \\ ${pair.b.id}`.padEnd(30) + pair.b.values.map((v) => (num(v) + (Object.is(v, pair.b.values[0]) ? '*' : '')).padStart(10)).join(''));
     for (let i = 0; i < grid.length; i++) {
       const lead = num(pair.a.values[i]) + (i === 0 ? '*' : '');
@@ -1353,7 +1564,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
         fails.push(`CG1 reachability: "${pair.id}" moves the measure by at most ${moved.toExponential(2)} mm across the whole of ${ax.id} — under the ${COMBINATION_TOLERANCE_MM} mm band its own records are held to, so that control does not reach this measure and the pair is a ${other.id} sweep wearing a product's clothes. Every other clause about it is vacuous. Either the pair is wrong, or the measure is, or the inertness is a finding and belongs in COMBINATION_INERT with its number.`);
       }
     }
-    if (!Number.isFinite(base.mm) && (pair.measure === 'leaf-stem' || pair.measure === 'infill-wall')) {
+    if (!Number.isFinite(base.mm) && (pair.measure === 'leaf-stem' || pair.measure === 'infill-wall' || INFLO_MEASURES.has(pair.measure))) {
       fails.push(`CG1 reachability: "${pair.id}" measures nothing at its own default cell (${base.why || 'no reading'}) — its base set does not build the parts it is about`);
     }
 

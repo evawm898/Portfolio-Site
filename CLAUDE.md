@@ -5113,6 +5113,56 @@ only change on the export path is one name in an import list. `frozen/phase36` i
 rows at `3ed45df`, registered in BOTH maps and proved deep-equal. The PANEL gate passes and
 its `--negative-control` closes with ALL SEVENTEEN ROUTES observing the failure.
 
+**INFLORESCENCE BUILD 2 — THE NODE LAWS: A PEDICEL LENGTH PER NODE, A SESSILE ROOT, AND A LEAF
+UNDER EVERY PEDICEL** (Eva's restated Oct 3 rulings — read `docs/bloom-inflorescence-node-laws-outcome.md`
+before touching `inflorescencePlan`'s lengths, `buildInflorescenceInto`'s units, `pedicelPlacement`'s
+sessile arm, `sharedNodeOffsetMm`, `leafPlan`'s shared arm, ID7/ID8, SN0-SN3 or
+`tools/bloom-inflo-approach.mjs`). `pedicelGradient` (0-3, default 1 = identity by BRANCH) ramps the
+lowest pedicel against the topmost in MILLIMETRES down the rachis, `pedicelLength` pinned at the top;
+`pedicelCorymb` (OFF/ON) solves `L_k = L_0 + (d_k - d_0)/sin(angle)` so every head lands on ONE PLANE —
+a plane and not a dome because the plane has no free parameter; inert and told at or below level,
+clamped and told at the pedicel's own 120 mm ceiling; the emitted heads span 0.000 mm unclamped. Past
+the corymb the gradient makes an anthela-like overtopping for free, unexposed. **ONE FLORET BUILD PER
+DISTINCT PEDICEL LENGTH** (memo keyed on the exact double); unit 0 is the topmost node's and the
+legacy `unit`/`unitTris`/`tipZLocal`/`floretState` fields are it. `PEDICEL_LENGTH_RANGE` opens to 0
+and **0 IS SESSILE (ruling 7)**: no floret stem, the hub's underside on the axis (`hubAxisTopZ` less
+one sheet — extracted verbatim from `stemPlan`) rooted RADIALLY to the bore at every angle. **ID8's
+must-fail is a hub rooted at mid-wall, NOT one rooted along the pedicel**: at 35 deg the tilted hub's
+own disc reaches past the bore either way, so ruling 7's "at least one wall" holds for both and ID8 is
+right not to separate them. **THE SHARED NODE (ruling 5)**: on a raceme with leaves, one leaf per
+pedicel at its node and azimuth, seated `(r_ped + r_pet + MIN_FEATURE_MM)/min(cos)` below — exact for
+parallel rods, infinite (no leaf, told) at a vertical rod; `leafNodes`/`leafPhyllotaxy` hidden and
+inert (`leafNodesOwn`); a leaf off the stem's end is not built, told. **THE LAW CLEARS THE RODS AND NOT
+THE BLADE**: at its own default the leaf blade's skin and cup take 0.124 mm of the gap (0.876 mm,
+declared). **THE COMBINATION GATE GAINED FOUR MEASURES AND EIGHT PAIRS** (floret-floret, floret-head,
+floret-stem, leaf-floret; 91 cells, 37 under the bar, all declared, edge crossings read 0, the joins
+excluded by construction and never declared) **and its findings include SHIPPED STATES: the shipped
+raceme's top floret passes through the terminal head's petals** (the inset clears the pedicel's rise,
+never the floret's petals), a 5 mm pedicel's floret folds onto its own rachis, and at -60/60/90 deg
+florets reach the rachis at every size. `INFLO: ALL MAX` is UNMOVED at 95.0% (its 90 deg pedicels
+admit no shared-node offset); the same corner at 35 deg with leaves is 1,517,196 (101.1%), a declared
+refusal row. **The 544% corner (`INFLO: ALL MAX` x `layerCount 6`) CANNOT be a row until #231 is
+fixed**: the refusal builds the whole 8.16 M export mesh before checking (9.6 min locally against the
+gate's 120 s), and the attempt found **ID4 predicting `floretPetals` where a floret builds
+`floretPetals x layerCount`** (it inherits the head's whorls) — fixed, witnessed by `NODE LAWS: x 2
+whorls`. Block 46 (33 rows), smoke block 46, `frozen/phase50` = the 1047 rows at `754e3aa`.
+**SECOND ROUND (Eva's sheet rulings, §8 of that doc): THE OFFSET CLEARS THE BLADE AND A FLOWERING NODE
+CAPS ITS LEAF.** The offset's separation is `max(rods, the blade's own rise)`, where the rise is read off
+the leaf builder's own emitted blade, maximised along EDGES (NV is even, so no column lies on the
+midrib), and taken two `SHARED_NODE_GRID_MM` steps above exact. The first cut read 0.9999999999999918
+against the bar. At the defaults it goes 3.784 → 3.943 mm, and the blade clears its pedicel at 1.00002.
+The leaf length is `min(asked, cap)`. The cap comes from the export floret unit (`floretUnitMemo`,
+built before the leaves and shared with the export append) through the petiole's own law. Taking the
+petiole from the ASKED length made a longer asked leaf build a SHORTER blade. Under one printable
+feature no leaf is built, told. A spike builds none.
+SN4 holds the cap (the emitted blade reach against the plan); `leaf-pedicel` is the fifth approach
+measure. **At the tightest internode (3.023 mm) the leaf passes through the pedicel TWO NODES BELOW on
+its own azimuth on both trees** (−0.248 → −0.378 mm): declared, never clamped.
+**Build 3's lead item is evawm898/portfolio-site#355** (the top floret through the head's petals). The
+corymb solves level only up to an 81 mm rachis at the defaults; raising the 120 mm cap is Eva's
+ruling. #231 blocks the 544 % corner from ever being a row.
+Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
+
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
 `docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`
@@ -9903,3 +9953,47 @@ every edge so a rake exposes no bare band; the bouquet is the weakest of the fiv
 constants (a 9-tine comb, wave 0.55 of the spacing, z 95) are the ones to retune first; strokes
 preview as a PLAIN map (every vertex moves, none is added) and refine on commit; the random
 sequence is 36–70 drops and 2–5 strokes of every kind from the seed field.
+
+## `/tile` — the tessellation rollers (pointer only)
+
+Hidden page (`tile.html`, `tile.css`, `tile.js`, `tile-geometry.js`, `tile-roller.js`,
+`tile-sim.js`; `noindex`, unlinked). Draw ONE tile that tiles the plane by translation; get a
+pair of 3D-printable cookie-cutter rollers (plus one handle design) that cut a whole sheet of
+dough with no waste but the border. **`tile-design-doc.md` is the governing text — read §3 and
+§4 before touching `tile-roller.js`.** The law: the four corners are a parallelogram (forced),
+edge A is stored once and drawn as bottom and top, edge B as left and right, and the ONE
+validity rule is a simple outline — every edit that would break it is BLOCKED with the reason,
+never repaired. The curve law is /bug's `sampleOutline` (centripetal Catmull–Rom), with a smooth
+corner extended by its PERIODIC neighbour so each chained line is C1 there.
+**RINGS, NOT CROSSBARS — EVA'S RULING ON THE FIRST VERSION (#354, held, then rebuilt).** Each
+blade is a closed wavy RING running AROUND the circumference, a jagged pizza-wheel edge wrapped
+round the pin, and each roller rolls along its OWN lines: roller A carries the edge-A lines and
+rolls along `tA`, B the edge-B lines along `tB`. Circumference = tiles round it × its OWN pitch,
+the diameter derived; the rings step along the axis by `|tA × tB| / |chord|` (θ counted), and
+there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3 —
+the first version's page could open on a strip of three). A ring is one period laid `n` times and
+wrapped onto its own first vertex, so it closes on itself by construction: a TORUS, no end caps,
+no seam vertex. **No rims, and "the dough must lie between the rims" is DROPPED** — every ring is
+a wheel at the tip radius, so the roller rides its blade tips through the dough continuously.
+**The price is printing**: upright, every ring is a fin straight out of the body — support under
+every ring, said in the page's how-to and the zip's README, never hidden. **Both rollers are held +Z
+end on the LEFT as they roll forward** (`â = ẑ × r̂`); a first draft that signed the axis per
+roller stamped A's line mirrored. **The index marks**: the track runs along `tB` through the
+corners of B-line column `m*` (−1 normally) in the border; A lays it with a SLANTED row of pegs,
+one on each ring at that ring's corner of column `m*` (an axial row only at θ = 90°); B's collar
+sits at that column's axial position with one tooth per tile round it at
+`s' = m*·|tA| cos θ + j·|tB|`; one seated tooth fixes both of B's free placements, because
+`|tA|·(cos θ r̂_B − sin θ â_B) = tA` exactly; A's peg row comes round outside the sheet iff
+`n_A ≥ cols + 1 + |m*|`, which is why A defaults to 6 round and B to 5; "roll back, then forward"
+for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a blade that cannot
+clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for its roller. A
+version-1 (crossbar) design file opens with its tile and sheet kept and its round counts reset;
+the storage key moved so an old design does not reopen by itself. Gates, both in CI
+(`tile-gate.yml`), each with a negative control that must catch every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry; D, every
+blade a ring round its roller read off the mesh — full azimuth, an axial extent of one line's
+width, the θ spacing — which a bar along the axis fails; the seam over three revolutions, every
+ring closing once; a rigid-body rolling simulation for registration, re-seated by a different
+tooth and dimple; a DIRECTED-edge census on every STL; heights read off the mesh) and
+`node tools/verify-tile-page.mjs` (Chromium, real pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
+is designed in §10 and not built. Nothing has been printed: every printability number there is a
+declared rule of thumb.

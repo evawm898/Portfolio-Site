@@ -38,7 +38,7 @@
    in either direction.
    =================================================================== */
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
-  PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE } from './bloom-geometry.js';
+  PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE, PEDICEL_GRADIENT_RANGE, PEDICEL_CORYMB_VALUES } from './bloom-geometry.js';
 import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
@@ -409,6 +409,23 @@ export const PREDICATES = {
      made without a ruling, one term to reverse. ST12 checks the two
      statements against each other per row. */
   stemNodesEligible: { all: [{ ref: 'stemPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+  /* THE LEAVES' OWN NODE LAW (the node-laws session, ruling 5). On a RACEME
+     each pedicel is subtended by one leaf at the pedicel's own node and
+     azimuth, so the leaf's node COUNT and ARRANGEMENT are the pedicels' and
+     the two controls are HIDDEN AND INERT. The geometry's half is
+     `leafPlan`'s `shared` flag; SN0 checks the two statements per row. */
+  leafNodesOwn: { all: [{ ref: 'leafPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+  /* THE NODE COUNT'S OWN VISIBILITY (stem session 2 merged with the node-laws
+     session). Ruling 6 put the count under Stem and shows it whenever there is
+     a stem; the node-laws session made it the PEDICELS' on a raceme, where it
+     moves neither the nodes (inert under an inflorescence) nor the leaves (the
+     shared node takes the pedicels' count). So: a stem, and no raceme. The
+     ARRANGEMENT keeps `leafNodesOwn` — it also needs leaves. */
+  leafNodeCountLive: { all: [{ ref: 'stemPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+  /* THE GRADIENT IS A RAMP AND THE CORYMB A SOLVE OVER THE SAME LENGTHS, so
+     with the corymb ON the gradient is hidden and inert — one owner of the
+     lengths at a time. */
+  pedicelGradientLive: { all: [{ ref: 'inflorescencePresent' }, { id: 'pedicelCorymb', oneOf: ['OFF'] }] },
   stemNodesPresent: { all: [{ ref: 'stemNodesEligible' }, { id: 'stemNodeProminence', awayFrom: 0, by: 0.005 }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
@@ -3589,7 +3606,7 @@ export const CONTROLS = [
       if (!(Number(ui.leafLength) > 0)) return `${n} along the stem · bare — no leaves${Number(ui.stemNodeProminence) > 0 ? '' : ' (they show once node prominence is above 0 or leaves are added)'}`;
       const per = ui.leafPhyllotaxy === 'opposite' ? 2 : ui.leafPhyllotaxy === 'whorled' ? 3 : 1;
       return `${n} along the stem · ${n * per} leaves`; },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodeCountLive' } },
   { id: 'leafPhyllotaxy', section: 'stem', kind: 'choice', default: 'alternate',
     options: [
       { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
@@ -3599,7 +3616,7 @@ export const CONTROLS = [
     label: 'Arrangement',
     fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
       return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodesOwn' } },
 
   /* ===================================================================
      THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem
@@ -3771,7 +3788,7 @@ export const CONTROLS = [
       if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
       const per = p.perNode;
       return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
-        + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris each, ${b.tris.toLocaleString('en-US')} in all` : '');
+        + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris ${b.units && b.units.length > 1 ? `at the top node (${b.units.length} floret builds, one per distinct pedicel length)` : 'each'}, ${b.tris.toLocaleString('en-US')} in all` : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'stemPresent' } },
 
@@ -3818,12 +3835,64 @@ export const CONTROLS = [
     label: 'Pedicel',
     fmt: (v, ui, shown) => {
       const p = shown && shown.inflorescence;
-      const base = `${Number(v).toFixed(0)} mm from the stem to each floret`;
+      const base = Number(v) === 0
+        ? 'SESSILE at the top — the floret\'s own hub is rooted into the stem\'s wall, one wall deep'
+        : `${Number(v).toFixed(0)} mm from the stem to the topmost floret`;
       if (!p || !p.present) return base;
+      if (p.crossesSolidMm === null) return base;
       return `${base} · ${(2 * p.pedicelR).toFixed(2)} mm across`
         + (p.pedicelRClamped ? ` — FLOORED: the area rule asks ${(2 * p.areaRuleR).toFixed(2)} mm for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem, and no rod here prints thinner than ${(2 * p.pedicelRFloor).toFixed(2)} mm`
           : ` — the area rule's own answer for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem`)
         + ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE PEDICEL-LENGTH GRADIENT (the node-laws session) — a RATIO, the
+     lowest node's pedicel to the topmost one's, linear in millimetres down
+     the rachis. 1 is today's raceme, by BRANCH in the geometry. Above 1 the
+     lower pedicels lengthen toward a corymb's silhouette (and past it the
+     lower florets overtop the upper — an anthela-like form that falls out of
+     the ramp for free and is not given a control of its own); below 1 they
+     shorten, and 0 takes the lowest node SESSILE. `pedicelLength` is the
+     TOPMOST node's length, so the node nearest the head never moves. The
+     lengths are read back from the PLAN, never recomputed here. */
+  { id: 'pedicelGradient', section: 'inflorescence', kind: 'slider',
+    min: PEDICEL_GRADIENT_RANGE[0], max: PEDICEL_GRADIENT_RANGE[1], step: 0.05, default: 1,
+    label: 'Gradient',
+    fmt: (v, ui, shown) => {
+      const g = Number(v);
+      const p = shown && shown.inflorescence;
+      const base = g === 1 ? 'every pedicel the same length' : `the lowest pedicel ${g.toFixed(2)}x the topmost`;
+      if (!p || !p.present || !p.pedicelLensMm || p.pedicelLensMm.length < 2 || g === 1) return base;
+      const L = p.pedicelLensMm;
+      return `${base} · ${L[0].toFixed(1)} mm at the top to ${L[L.length - 1].toFixed(1)} mm at the bottom`
+        + (L.some((x) => x === 0) ? ` — ${L.filter((x) => x === 0).length} SESSILE (rooted in the stem's wall)` : '')
+        + (p.lengthsClamped ? ` — CLAMPED at ${p.lenCeilMm} mm, the pedicel's own ceiling as a stem` : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'pedicelGradientLive' } },
+
+  /* THE CORYMB IS A DERIVED SOLVE BEHIND A TOGGLE, never a control on the
+     lengths: ON solves every pedicel so its floret's head lands on ONE PLANE
+     square to the stem through the topmost floret's head. A PLANE and not a
+     dome because the plane has no free parameter. INERT AND TOLD at an angle
+     at or below level — a level pedicel cannot raise its head by lengthening.
+     The read-out prints the MEASURED spread of the emitted heads, so the
+     claim "level-topped" is a number on the page. */
+  { id: 'pedicelCorymb', section: 'inflorescence', kind: 'choice', default: PEDICEL_CORYMB_VALUES[0],
+    options: [
+      { value: 'OFF', label: 'Off — the gradient sets the lengths' },
+      { value: 'ON', label: 'On — level tops (a corymb)' },
+    ],
+    label: 'Level tops',
+    fmt: (v, ui, shown) => {
+      if (String(v) !== 'ON') return 'off — the pedicels follow the gradient';
+      const p = shown && shown.inflorescence, b = shown && shown.inflorescenceBuilt;
+      if (!p || !p.present) return 'a corymb — every head solved onto one level';
+      if (p.corymbInert) return `INERT — at ${Number(p.angleDeg).toFixed(0)} deg a pedicel cannot raise its head by lengthening, so there is no level to solve for`;
+      const L = p.pedicelLensMm;
+      return `a corymb · ${L[0].toFixed(1)} mm at the top to ${L[L.length - 1].toFixed(1)} mm at the bottom`
+        + (b && b.headSpreadMm !== null ? ` · the heads span ${b.headSpreadMm.toFixed(3)} mm in height` : '')
+        + (p.lengthsClamped ? ` — CLAMPED at ${p.lenCeilMm} mm, so the lowest heads stand below the level` : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 
@@ -3858,7 +3927,7 @@ export const CONTROLS = [
     fmt: (v, ui, shown) => {
       const n = Math.round(Number(v));
       const b = shown && shown.inflorescenceBuilt;
-      return `${n} a floret` + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris each (pedicel included)` : '');
+      return `${n} a floret` + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris ${b.units && b.units.length > 1 ? 'at the top node' : 'each'} (pedicel included)` : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 

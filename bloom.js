@@ -1599,13 +1599,22 @@ function infloLine(plan, builtInflo) {
     + (plan.nodesClamped ? ` — NODE COUNT CLAMPED ${plan.nodesAsked} -> ${plan.nodesBuilt}: the span left cannot hold them a pedicel apart` : '')
     + `\n     FLORET ${plan.floretPetals} petals at ${plan.petalLength.toFixed(1)} x ${plan.petalWidth.toFixed(1)} mm (${plan.scale.toFixed(2)}x the head's own)`
     + (plan.sizeClamped ? ` — CLAMPED from ${plan.lengthAsked.toFixed(1)} x ${plan.widthAsked.toFixed(1)} mm at the petal sliders' own floors` : '')
-    + (builtInflo ? ` · ${builtInflo.unitTris.toLocaleString('en-US')} tris each, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
-    + `\n     PEDICEL ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg · ${(2 * plan.pedicelR).toFixed(2)} mm across`
+    + (builtInflo ? ` · ${builtInflo.unitTris.toLocaleString('en-US')} tris at the top node, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
+    + `\n     PEDICEL ${plan.pedicelLenMm === 0 ? 'SESSILE' : `${plan.pedicelLenMm.toFixed(0)} mm`} at the top, ${plan.angleDeg} deg · ${(2 * plan.pedicelR).toFixed(2)} mm across`
+    + (plan.corymb || plan.graded
+        ? ` · ${plan.corymb ? 'LEVEL TOPS (a corymb, solved)' : `GRADED ${Number(plan.gradient).toFixed(2)}x`}: ${plan.pedicelLensMm.map((L) => L.toFixed(1)).join(' / ')} mm top to bottom`
+          + (builtInflo && builtInflo.units ? ` · ${builtInflo.units.length} distinct floret build${builtInflo.units.length === 1 ? '' : 's'}` : '')
+          + (plan.lengthsClamped ? ` — CLAMPED at ${plan.lenCeilMm} mm, the pedicel's own ceiling as a stem` : '')
+        : '')
+    + (plan.corymbInert ? ` · LEVEL TOPS INERT: at ${plan.angleDeg} deg a pedicel cannot raise its head by lengthening` : '')
+    + (plan.corymb && builtInflo && builtInflo.headSpreadMm !== null ? ` · the heads span ${builtInflo.headSpreadMm.toFixed(3)} mm in height, MEASURED off the placements` : '')
+    + (plan.sessileNodes.some((x) => x) ? ` · ${plan.sessileNodes.filter((x) => x).length} node${plan.sessileNodes.filter((x) => x).length === 1 ? '' : 's'} SESSILE: the floret's own hub rooted to the bore, one wall deep (ruling 7)` : '')
     + (plan.pedicelRClamped
         ? ` — FLOORED: the area rule asks ${(2 * plan.areaRuleR).toFixed(2)} mm for ${plan.built} off a ${(2 * plan.outerR).toFixed(2)} mm stem and nothing here prints thinner than ${(2 * plan.pedicelRFloor).toFixed(2)} mm`
         : ` — the area rule's own (r_stem / sqrt(${plan.built}))`)
-    + `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
-    + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)')
+    + (plan.crossesSolidMm === null ? ''
+      : `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
+        + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)'))
     + `\n     NODES top ${plan.nodeDepthsMm[0].toFixed(1)} mm below the hub`
     + (plan.insetClamped
         ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm this pedicel needs to clear the head`
@@ -1637,6 +1646,32 @@ function leafLine(leaf, leavesBuilt) {
     ? `\n     TIP shape ${Number(leaf.tipShape).toFixed(2)} · ends ${cl.terminalMm.toFixed(2)} mm across (the print terminal, both modes) — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
       + (cl.fraction > 0.05 ? ` — CLAMPED: a pointier shape LENGTHENS the stub and a wider leaf shortens it; the share is set by the width, never the length` : '')
     : '';
+  /* THE SHARED NODE (ruling 5): on a raceme the leaves are the PEDICELS'
+     — one under each, at its azimuth, seated a derived offset below — so the
+     node and arrangement the leaf's own two controls would set are told as
+     the pedicels', and a pedicel whose leaf would run off the stem's end is
+     told by count. */
+  const sn = leaf.shared && leaf.sharedNode;
+  const sharedLine = sn
+    ? `\n     SHARED NODE one leaf under each pedicel, at the pedicel's own azimuth, seated ${Number.isFinite(sn.offsetMm) ? `${sn.offsetMm.toFixed(2)} mm` : 'INFINITELY'} below it`
+      + ` (the pedicel clears the ${sn.bindsOn === 'blade' ? `leaf BLADE's own top skin — ${sn.bladeReachMm.toFixed(2)} mm of rise over the leaf's axis — which binds over the rods' ${sn.offsetRodMm.toFixed(2)}` : 'two rod radii, which bind over the blade'} by the ${MIN_FEATURE_MM.toFixed(2)} mm gap, over the steeper rod's cosine) — the leaf's own Nodes and Arrangement are the pedicels'`
+      + (sn.noRoom ? ` — ${sn.noRoom} of ${sn.pedicelNodes} pedicel node${sn.pedicelNodes === 1 ? '' : 's'} carry NO leaf: seated that far below, the leaf would run off the stem's end (told, never refused)` : '')
+    : '';
+  /* THE LEAF LENGTH AT A FLOWERING NODE (Eva's change 2): the slider keeps
+     the ASKED length and this says what each node BUILT — TUBE's snap shape,
+     read off the plan's own per-node record, never re-derived here. */
+  const lc = leaf.lengthCap;
+  const capLine = lc && lc.capped
+    ? (() => {
+      const built = lc.lengthsMm.filter((x) => x > 0);
+      const uniq = [...new Set(built.map((x) => x.toFixed(2)))];
+      const what = uniq.length === 1 ? `${uniq[0]} mm` : `${Math.min(...built).toFixed(2)}-${Math.max(...built).toFixed(2)} mm`;
+      return `\n     LEAF LENGTH asked ${leaf.lengthMm} mm, BUILT ${built.length ? what : 'none'} at ${lc.capped - lc.noBlade} of ${lc.lengthsMm.length} flowering node${lc.lengthsMm.length === 1 ? '' : 's'} — the length that clears each node's own floret by ${MIN_FEATURE_MM.toFixed(2)} mm (the slider keeps ${leaf.lengthMm})`
+        + (lc.noBlade ? ` — ${lc.noBlade} node${lc.noBlade === 1 ? '' : 's'} build NO leaf: no blade ${MIN_FEATURE_MM.toFixed(2)} mm long clears the floret there (told, never refused)` : '')
+        + (lc.behind ? ` — ${lc.behind} floret vert${lc.behind === 1 ? 'ex stands' : 'ices stand'} within the gap of the petiole itself, which no length moves` : '');
+    })()
+    : '';
+  if (sn && !leaf.nodeDepthsMm.length) return `\n     LEAVES none built${sharedLine}\n`;
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node)`
     + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
     + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
@@ -1650,7 +1685,7 @@ function leafLine(leaf, leavesBuilt) {
     + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
     + (leaf.teethAsked !== undefined && leaf.teethBuilt !== undefined && leaf.teethBuilt < leaf.teethAsked
         ? `\n     TEETH CLAMPED ${leaf.teethAsked} -> ${leaf.teethBuilt} a margin — the cut law's own ceiling on a blade this size (told, never refused)` : '')
-    + tipLine
+    + tipLine + sharedLine + capLine
     + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
 }
 
@@ -2467,6 +2502,14 @@ window.__bloomMetrics = () => ({
     insetSatisfied: lastLeaf.insetSatisfied,
     nodesAsked: lastLeaf.nodesAsked, nodesBuilt: lastLeaf.nodesBuilt, nodesClamped: lastLeaf.nodesClamped,
     slenderness: lastLeaf.slenderness,
+    /* THE SHARED NODE (SN0-SN3): the plan's own flag and record. */
+    shared: lastLeaf.shared === true,
+    sharedNode: lastLeaf.sharedNode ? (({ bladeP, ...rest }) => ({ ...rest, pedicelDepthsMm: rest.pedicelDepthsMm.slice() }))(lastLeaf.sharedNode) : null,
+    /* THE LEAF LENGTH AT A FLOWERING NODE (SN4): each node's built length and
+       petiole, and the cap's record — null off a raceme. */
+    nodeLengthsMm: lastLeaf.nodeLengthsMm ? lastLeaf.nodeLengthsMm.slice() : null,
+    nodePetioleLenMm: lastLeaf.nodePetioleLenMm ? lastLeaf.nodePetioleLenMm.slice() : null,
+    lengthCap: lastLeaf.lengthCap ? { ...lastLeaf.lengthCap, capsMm: lastLeaf.lengthCap.capsMm.map((x) => (Number.isFinite(x) ? x : null)), lengthsMm: lastLeaf.lengthCap.lengthsMm.slice() } : null,
     /* THE TIP (LF9): the exponent the PLAN declares, the half-widths the BLADE
        was built from, and the terminal-clamp record the read-out prints. */
     tipShape: lastLeaf.tipShape,
@@ -2475,6 +2518,7 @@ window.__bloomMetrics = () => ({
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
     crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),
+    emittedReachMm: (lastLeavesBuilt || []).map((r) => r.emittedReachMm),
     /* ST9's measured side — the axis of the rod each leaf's builder actually
        emitted. A petiole is rooted THROUGH the stem's wall, so it stands
        inside the free stem's own cylinder by design; ST9 reads these to tell
@@ -2532,6 +2576,14 @@ window.__bloomMetrics = () => ({
     petalLength: lastInflo.petalLength, petalWidth: lastInflo.petalWidth,
     lengthAsked: lastInflo.lengthAsked, widthAsked: lastInflo.widthAsked,
     sizeClamped: lastInflo.sizeClamped, sizeDeadBelow: lastInflo.sizeDeadBelow,
+    /* THE NODE LAWS (the node-laws session): the per-node lengths the plan
+       solved, the two laws' own flags, and which nodes are sessile. */
+    crossings: lastInflo.crossings.slice(),
+    gradient: lastInflo.gradient, corymbAsked: lastInflo.corymbAsked, corymb: lastInflo.corymb,
+    corymbInert: lastInflo.corymbInert, graded: lastInflo.graded,
+    pedicelLensMm: lastInflo.pedicelLensMm.slice(), pedicelLensAskedMm: lastInflo.pedicelLensAskedMm.slice(),
+    lengthsClamped: lastInflo.lengthsClamped, lenCeilMm: lastInflo.lenCeilMm,
+    sessileNodes: lastInflo.sessileNodes.slice(), stemTipZ: lastInflo.stemTipZ,
   } : null,
   /* WHAT THE BUILDER EMITTED. `unitPositions` is deliberately NOT here — the
      floret unit's whole triangle stream is up to 270k floats and the claim it
@@ -2579,7 +2631,25 @@ window.__bloomMetrics = () => ({
       omissionBuilt: lastInfloBuilt.unit.omissionBuilt,
       omitted: lastInfloBuilt.unit.omitted ? lastInfloBuilt.unit.omitted.slice() : null,
     },
+    /* EVERY DISTINCT FLORET BUILD (the node-laws session) — one per distinct
+       pedicel length, in node order, unit 0 the topmost node's and the one
+       `unit` above describes. Positions stay out, for `unitPositions`' reason. */
+    headSpreadMm: lastInfloBuilt.headSpreadMm,
+    units: lastInfloBuilt.units.map((U) => ({
+      lengthMm: U.lengthMm, tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
+      petalsBuilt: U.petalsBuilt, hubRadius: U.hubRadius, hubThickness: U.hubThickness,
+      stemPresent: !!(U.stem && U.stem.present),
+      stemOuterR: U.stem && U.stem.present ? U.stem.outerR : null,
+      stemVoidMm: U.stem && U.stem.present ? U.stem.voidMm : null,
+      stemSolidBandMm: U.stem && U.stem.present ? U.stem.solidBandMm : null,
+      stemTipPlugMm: U.stem && U.stem.present ? U.stem.tipPlugMm : null,
+      sphereMode: U.sphereMode, maxDimensionMm: U.maxDimensionMm, minThickness: U.minThickness,
+      omissionAsked: U.omissionAsked, omissionBuilt: U.omissionBuilt,
+      omitted: U.omitted ? U.omitted.slice() : null,
+      floretState: { ...U.floretState },
+    })),
     placed: lastInfloBuilt.placed.map((q) => ({
+      unit: q.unit, lengthMm: q.lengthMm, sessile: q.sessile, wallReachR: q.wallReachR,
       nodeIndex: q.nodeIndex, az: q.az, M: q.M.slice(), D: q.D.slice(), root: q.root.slice(),
       /* `at` IS THE BLOCK'S OFFSET IN THE EXPORTED STREAM and ST9 needs it:
          the STL is written from these very positions in order, so `at` and

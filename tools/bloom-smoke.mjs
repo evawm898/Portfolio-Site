@@ -1008,7 +1008,32 @@ export const SMOKE_BLOCKS = [
     ],
   },
   {
-    n: 46, title: 'bare-stem nodes — nodes decoupled from leaves (ruling 6)',
+    n: 46, title: 'the inflorescence node laws — gradient, corymb, sessile, shared node',
+    anchor: 'NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)',
+    /* ONE ROW PER LAW AND ONE PER JOIN, on the axes the session has: the
+       gradient with a sessile end (ID7's ramp and ID8's embed on one rachis,
+       several distinct floret builds), the CORYMB solved exactly (ID7's plane,
+       measured off the emitted heads), the SPIKE (ID8 at every node), the
+       SHARED NODE (SN0-SN3 with every pedicel subtended), the shared node's
+       no-room tail (SN3's told omission), and the GATED leaf controls (SN0's
+       other arm: the leaf's own Nodes and Arrangement inert under a raceme). */
+    rows: [
+      { label: 'NODE LAWS: CORYMB on a 40 mm rachis (level tops, solved exactly)',
+        path: "the CORYMB — ID7 (the lengths restated from the controls as the plane solve, every placement built from the unit at its own node's length, the memo by DISTINCT length, and the heads' heights read off the emitted placement matrices to one level), with ID1/ID5/ID6 per unit" },
+      { label: 'NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)',
+        path: "the GRADIENT to its floor — ID7's ramp in millimetres down the rachis, five distinct floret builds, and ID8 on the one sessile node (the floret's own emitted vertices reaching the stem's bore) beside four stalked ones; ID4 per unit (a stem exactly where the length is non-zero)" },
+      { label: 'NODE LAWS: SESSILE — a true spike (the floret hub rooted one wall deep)',
+        path: "the SPIKE — ID8 at every node (rooted radially to the bore at 35 deg, not along the pedicel), ID2's crossing NULL exactly where every node is sessile, ID4 on a stemless unit" },
+      { label: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel',
+        path: "the SHARED NODE — SN0 (the registry's leafNodesOwn against the geometry's flag and the controls), SN1 (one leaf per pedicel, at the pedicel's emitted azimuth), SN2 (each leaf seated the law's offset below its pedicel, read off both emitted rods), SN3 (the kept prefix restated from the stem's length), SN4 (every flowering node CAPS its 40 mm leaf at 17.46 mm, the emitted blade reach read against the plan's petiole plus built length); LF1/LF4/LF5 in their shared arms" },
+      { label: 'NODE LAWS: SHARED NODE x a 30 mm rachis (the lowest pedicel carries none, told)',
+        path: "SN3's OMISSION — the lowest pedicel's leaf would run off the stem's end, so it is not built and the record tells it; SN1 pairs the kept leaves with the first four pedicels" },
+      { label: "NODE LAWS: GATED — the leaf's own 8 nodes and whorled under a raceme (hidden AND inert)",
+        path: "SN0's other arm — the leaf's own Nodes and Arrangement at values that would build 24 leaves on their own law, hidden AND inert under the raceme: LF5 reads the FLORET's arrangement and SN1 holds one leaf per pedicel" },
+    ],
+  },
+  {
+    n: 47, title: 'bare-stem nodes — nodes decoupled from leaves (ruling 6)',
     anchor: "BARE NODES: the flower's 0.48 on 100 x 6 mm, three nodes, golden angle",
     /* THREE ROWS: the golden-angle law on a hollow bare stem, the MERGED
        report (told, never clamped), and the raceme, where the head's nodes are
