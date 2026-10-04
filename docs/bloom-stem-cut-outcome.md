@@ -355,7 +355,25 @@ Four older mutants were re-anchored (`stem-off-the-axis`, `the-noded-rings-stay-
 axis`, `the-tip-plug-is-never-built`, `the-tip-plug-is-typed`) because the ring producer and
 the plug expression moved; 91 anchors match exactly once.
 
-⟨MUTANTS⟩
+Run through the table (`--only`, a SUBSET — never a sweep):
+- `the-cut-is-flattened` names SC2, SC3, ST10 · fired SC1, SC2, SC3, ST10, ST12, ST2 — ok
+  (the band collapses to zero height, so ST2's increasing-stations and ST12's ladder fire as
+  collateral);
+- `the-land-is-removed` names SC2, SC3 · fired SC2, SC3, ST10, ST12 — ok;
+- `the-bore-opens-through-the-cut-face` names ST10 · fired ST10 — ok;
+- the ten older stem mutants (`stem-declared-and-not-built`, `stem-off-the-axis`,
+  `stem-runs-the-wrong-length`, `bore-is-not-evas-rule`, `hairline-root`,
+  `the-tip-plug-is-never-built`, `the-tip-plug-is-typed`, `the-two-closures-are-allowed-to-
+  cross`, `the-noded-rings-stay-on-the-world-axis`, ⟨PEDICEL_PIN⟩) each fire the family they
+  name on the cut tree, and the clean tree is silent on every probe row including the FLAT one.
+
+**The table itself had a defect the cut family exposed.** Its stem-family capture read
+`/^(ST\d+):/` on `stemAssertions`' messages, and `stemCutClauses` pushes `SC0`–`SC3` through
+the same call — so the first run reported both cut mutants `SILENT: SC2, SC3` while the same
+plants fired both clauses through the harness directly (§4g's reds). That is the ST10-as-ST1
+misattribution class a third time, for a family the capture could not see at all; it reads
+`/^(S[TC]\d+):/` now. **A green table is exactly what a blind capture looks like**, and only
+running the mutants and disbelieving a SILENT beside a red taken by hand found it.
 
 ## 10. Also run
 
