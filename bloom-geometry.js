@@ -15467,14 +15467,27 @@ export function inflorescencePlan(state, stem, acc) {
     pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootZ: 0, nodeDepthsMm: [0] };
   const unitMemo = floretUnitMemo(state, pre);
   const sessileTop = pedicelLenMm === 0;
+  /* OVER EVERY AZIMUTH THE PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by
+     the smoke subset, not reasoned: the placement's roll about the pedicel is
+     the MINIMAL rotation (about `z x D`), so a floret whose petals are not
+     symmetric about its own axis lands with a different petal UP at each
+     azimuth, and on `INFLO: WHORLED` the two florets the first cut did not
+     measure reached 3.37 mm higher than the one at azimuth 0 — into the gap,
+     with `insetSatisfied` reading true. The max over the whole azimuth set
+     makes the TOP node's inset conservative for every node (each lower node is
+     deeper by at least the pitch), and the distinct azimuths are few (two,
+     four, or whorled's rotating set), each a pass over the unit's vertices. */
+  const reachAzimuths = [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i)).flat())];
   const reachOf = (exportMode) => {
     const U = unitMemo.get(pedicelLenMm, exportMode);
-    const pl = pedicelPlacement(pre, 0, 0, U.tipZLocal, sessileTop);
-    const M = pl.M, src = U.sub.positions;
+    const src = U.sub.positions;
     let top = -Infinity;
-    for (let k = 0; k < src.length; k += 3) {
-      const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11];
-      if (z > top) top = z;
+    for (const az of reachAzimuths) {
+      const M = pedicelPlacement(pre, 0, az, U.tipZLocal, sessileTop).M;
+      for (let k = 0; k < src.length; k += 3) {
+        const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11];
+        if (z > top) top = z;
+      }
     }
     return { reachMm: top, tris: U.tris };
   };
@@ -15564,7 +15577,7 @@ export function inflorescencePlan(state, stem, acc) {
     gradient, corymbAsked, corymb, corymbInert, graded, pedicelLensMm, pedicelLensAskedMm,
     lengthsClamped, lenCeilMm, sessileNodes,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
-    floretReachMm, reachRawMm, reachMm, reachGridMm: INFLO_REACH_GRID_MM, headFloorZ, insetGapMm: MIN_FEATURE_MM, unitMemo,
+    floretReachMm, reachRawMm, reachMm, reachGridMm: INFLO_REACH_GRID_MM, reachAzimuths, headFloorZ, insetGapMm: MIN_FEATURE_MM, unitMemo,
     boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemTipZ: stem.tipZ, rachisLengthMm: stem.lengthMm,
     floretPetals: Math.round(Number(state.floretPetals)), scale,
     petalLength, petalWidth, lengthAsked, widthAsked, sizeClamped, sizeDeadBelow,
@@ -15796,10 +15809,12 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
      BUILDER emitted, carried through this placement — never re-derived from
      the plan's length and angle, which is session 43's ST2. */
   let rachisApproach = Infinity;
-  /* THE TOP NODE'S OWN HIGHEST EMITTED VERTEX (build 3) — ID9's measured side
-     for the reach inset, read in the pass that already walks every appended
-     float, so the plan's declared reach and the artefact have two owners. */
-  let topNodeMaxZ = -Infinity;
+  /* THE FLORETS' HIGHEST EMITTED VERTEX over EVERY placement (build 3) —
+     ID9's measured side for the reach inset, read in the pass that already
+     walks every appended float, so the plan's declared reach and the artefact
+     have two owners. Every placement, not node 0's: the law is conservative
+     for every node, and a lower floret rolled petal-up is the case it covers. */
+  let floretsMaxZ = -Infinity;
   /* THE DISTANCE IS `freeStemDistanceMm`'s, NOT A SECOND COPY OF IT. The
      first cut wrote `hypot(max(0, r - outerR), max(0, tipZ - z, z - rootZ))`
      out again here — which is that function term for term, i.e. exactly the
@@ -15872,7 +15887,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
            ruled stays reachable. */
         const X = acc.positions[at + k], Y = acc.positions[at + k + 1], Z = acc.positions[at + k + 2];
         if (Z <= plan.rootZ && Z >= plan.stemTipZ) { const rr = Math.hypot(X, Y); if (rr < wallReachR) wallReachR = rr; }
-        if (i === 0 && Z > topNodeMaxZ) topNodeMaxZ = Z;
+        if (Z > floretsMaxZ) floretsMaxZ = Z;
         /* A SESSILE FLORET IS FUSED INTO ITS RACHIS BY THE ROOT LAW, so it is
            not in this flag's subject: a clearance between two solids the
            design joins means nothing (ST9's own scope sentence). Its join is
@@ -15913,7 +15928,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
   const headSpreadMm = headZ.length ? Math.max(...headZ) - Math.min(...headZ) : null;
   return {
     present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm,
-    topNodeMaxZ: Number.isFinite(topNodeMaxZ) ? topNodeMaxZ : null,
+    floretsMaxZ: Number.isFinite(floretsMaxZ) ? floretsMaxZ : null,
     /* EVERY DISTINCT UNIT, in node order — unit 0 is the topmost node's and
        is the one the legacy single-unit fields below describe. */
     units: units.map((U) => ({

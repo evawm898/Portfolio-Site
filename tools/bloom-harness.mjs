@@ -8212,10 +8212,16 @@ export async function inflorescenceAssertions(page, row) {
       const stalked = !!(rec.stem && rec.stem.present);
       const hubT = sub.floorThickness(rec.hub.thickness);
       const tipZ = stalked ? rec.stem.tipZ : GEOMETRY.hubAxisTopZ(rec.hub.dome, hubT) - hubT;
-      const pl = GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm }, 0, 0, tipZ, sessileTop);
-      const M = pl.M, src = sub.positions;
+      /* over every azimuth the phyllotaxy puts on any asked node — restated
+         from the CONTROLS through `leafAzimuths`, never the plan's own list */
+      const n = Math.max(1, Math.round(Number(ui.floretNodes)));
+      const azs = [...new Set(Array.from({ length: n }, (_, i) => GEOMETRY.leafAzimuths(String(ui.floretPhyllotaxy), i)).flat())];
+      const src = sub.positions;
       let top = -Infinity;
-      for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > top) top = z; }
+      for (const az of azs) {
+        const M = GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm }, 0, az, tipZ, sessileTop).M;
+        for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > top) top = z; }
+      }
       return top;
     };
     const rL = reachIn(false), rE = reachIn(true);
@@ -8241,8 +8247,8 @@ export async function inflorescenceAssertions(page, row) {
     if (!(Math.abs(P.insetNeededMm - wantNeeded) <= tol)) bad.push(`ID9: (c) the plan needs ${P.insetNeededMm.toFixed(6)} mm of inset and the law — the floret's own reach ${Math.max(rL, rE).toFixed(6)} mm (live ${rL.toFixed(6)} / export ${rE.toFixed(6)}) ceiled onto the ${grid} mm grid, + ${(S.rootZ - floorZ).toFixed(4)} mm to the head's floor + the ${MIN_FEATURE_MM} mm gap — gives ${wantNeeded.toFixed(6)}: the inset is not derived from the floret's petals${Math.abs(P.insetNeededMm - wantNeeded) <= 2 * grid ? ' (ONE GRID STEP apart: the page and Node straddle a grid line — a knife edge, not a wrong law)' : ''}`);
     if (!Number.isFinite(P.reachGridMm) || P.reachGridMm !== grid) bad.push(`ID9: the plan quantises its reach on a ${P.reachGridMm} mm grid and the geometry declares ${grid}`);
     if (P.insetGapMm !== MIN_FEATURE_MM) bad.push(`ID9: the plan's clearance gap is ${P.insetGapMm} mm and the project's minimum printable gap is ${MIN_FEATURE_MM} — the gap is typed`);
-    /* (d) THE EMITTED FLORETS at the top node — the BUILDER's own highest
-       appended vertex over every node-0 placement (`topNodeMaxZ`, read in the
+    /* (d) THE EMITTED FLORETS — the BUILDER's own highest appended vertex over
+       EVERY placement (`floretsMaxZ`, read in the
        pass that walks every appended float, ID5's residual's own owner), never
        the plan's declaration: at or below the head's floor less the gap
        wherever the plan says the inset is satisfied. In the page's own mode the
@@ -8250,8 +8256,8 @@ export async function inflorescenceAssertions(page, row) {
        asks, so this is one-sided by construction; a plan that computed the
        right number and a builder that ignored it fails here and nowhere else. */
     if (P.insetSatisfied === true) {
-      if (!Number.isFinite(B.topNodeMaxZ)) bad.push('ID9: (d) the builder reports no `topNodeMaxZ` — the top node\'s emitted reach is measured by nothing');
-      else if (B.topNodeMaxZ > floorZ - MIN_FEATURE_MM + tol) bad.push(`ID9: (d) the top-node florets reach z = ${B.topNodeMaxZ.toFixed(4)} mm (the builder's own emitted vertices) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${(floorZ - MIN_FEATURE_MM).toFixed(4)}) — the plan says the inset is satisfied and the emitted floret stands ${(B.topNodeMaxZ - (floorZ - MIN_FEATURE_MM)).toFixed(4)} mm into the gap`);
+      if (!Number.isFinite(B.floretsMaxZ)) bad.push('ID9: (d) the builder reports no `floretsMaxZ` — the florets\' emitted reach is measured by nothing');
+      else if (B.floretsMaxZ > floorZ - MIN_FEATURE_MM + tol) bad.push(`ID9: (d) the florets reach z = ${B.floretsMaxZ.toFixed(4)} mm (the builder's own emitted vertices, every placement) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${(floorZ - MIN_FEATURE_MM).toFixed(4)}) — the plan says the inset is satisfied and an emitted floret stands ${(B.floretsMaxZ - (floorZ - MIN_FEATURE_MM)).toFixed(4)} mm into the gap`);
     }
     /* (e) the two biconditionals, in the plan's own fields */
     if ((P.insetClamped === true) !== (P.insetNeededMm > P.insetAskedMm)) bad.push(`ID9: (e) insetClamped reads ${P.insetClamped} while the floret needs ${P.insetNeededMm.toFixed(3)} mm against the stem's own ${P.insetAskedMm.toFixed(3)} — the clamp must be a biconditional`);
@@ -12317,7 +12323,7 @@ export function buildMatrix() {
   nodeLaw('gradient 3 x 12 nodes x 60 mm (was CLAMPED at the old 120 mm ceiling — the lowest pedicel 180 mm now, under the 250 cap)', { ...RAC, pedicelGradient: 3, floretNodes: 12, pedicelLength: 60 });
   nodeLaw('CORYMB on a 40 mm rachis (level tops, solved exactly)', { ...RAC, stemLength: 40, pedicelCorymb: 'ON' });
   nodeLaw('CORYMB on a 40 mm rachis at 60 deg', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', pedicelAngle: 60 });
-  nodeLaw('CORYMB on the 120 mm rachis (solved exactly at the 250 mm ceiling — the lowest pedicel 140.8 mm, which the old 120 cap CLAMPED)', { ...RAC, pedicelCorymb: 'ON' });
+  nodeLaw('CORYMB on the 120 mm rachis (solved exactly at the 250 mm ceiling — the lowest pedicel 134.3 mm, which the old 120 cap CLAMPED)', { ...RAC, pedicelCorymb: 'ON' });
   nodeLaw('CORYMB at a level pedicel (INERT, told)', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', pedicelAngle: 0 });
   nodeLaw('CORYMB x whorled', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', floretPhyllotaxy: 'whorled' });
   nodeLaw('GATED — gradient 3 under the CORYMB (hidden AND inert)', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', pedicelGradient: 3 });
@@ -12425,7 +12431,7 @@ export function buildMatrix() {
   reachRow('250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)', { ...RACEME, pedicelLength: 250 });
   reachRow('250 mm straight up (90 deg) — the reach is the pedicel plus the floret, one node', { ...RACEME, pedicelLength: 250, pedicelAngle: 90 });
   reachRow('100 mm pedicels (the inset at 80 mm of a 120 mm rachis — five nodes in the 23 mm left)', { ...RACEME, pedicelLength: 100 });
-  reachRow('LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 140.8 mm, past the old 120 cap)', { ...RACEME, pedicelCorymb: 'ON', floretNodes: 8 });
+  reachRow('LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 134.3 mm, past the old 120 cap)', { ...RACEME, pedicelCorymb: 'ON', floretNodes: 8 });
   reachRow('gradient 3 x 100 mm (the lowest pedicel CLAMPED at the 250 mm ceiling)', { ...RACEME, pedicelLength: 100, pedicelGradient: 3 });
   reachRow('a 0.60 mm sheet (the LIVE and EXPORT reach differ — the union decides the node)', { ...RACEME, sheetThickness: 0.6 });
   reachRow('descending (-60 deg): the reach is under the node and the stem\'s own inset stands (not clamped)', { ...RACEME, pedicelAngle: -60 });

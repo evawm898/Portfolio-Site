@@ -1058,7 +1058,7 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'REACH INSET: 250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)',
         path: "ID9 — the top node's inset restated from the floret BUILDER's own emitted vertices placed at depth 0 in BOTH modes plus the printable gap, (a)-(c); the reach (164.9 mm) exceeds the 0.86 L node span so `insetSatisfied` is FALSE and (e)'s biconditional holds on that arm; ID7's ceiling at the pedicel's own 250 (unclamped); ID1's node count at 1" },
-      { label: 'REACH INSET: LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 140.8 mm, past the old 120 cap)',
+      { label: 'REACH INSET: LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 134.3 mm, past the old 120 cap)',
         path: 'ID7 — the corymb solve on the full rachis, UNCLAMPED at the 250 mm ceiling where the 120 cap clamped the lowest three, every head at one height measured off the placements; ID9 (d) the emitted top-node florets under the head floor less the gap' },
       { label: 'REACH INSET: a 0.60 mm sheet (the LIVE and EXPORT reach differ — the union decides the node)',
         path: "ID9 (a) both modes' reach restated and (f) the other mode's node depths bit-identical — the only row where a reach read from ONE mode would place the node differently, so `the-reach-reads-one-mode` is visible here and nowhere else" },

@@ -185,14 +185,21 @@ const PREDICATE_MOVERS = {
     const memo = base.floretUnitMemo(st, ip);
     const sessile = ip.pedicelLenMm === 0;
     let reach = -Infinity;
+    /* over every azimuth the phyllotaxy produces on any asked node (the
+       smoke subset's whorled finding — the minimal roll lands a different
+       petal up at each azimuth) */
+    const azs = [...new Set(Array.from({ length: Math.max(1, ip.nodesAsked) }, (_, i) => base.leafAzimuths(ip.phyllotaxy, i)).flat())];
     for (const exportMode of [false, true]) {
       const U = memo.get(ip.pedicelLenMm, exportMode);
-      const pl = base.pedicelPlacement({ ...ip, rootZ: 0, nodeDepthsMm: [0] }, 0, 0, U.tipZLocal, sessile);
-      const M = pl.M, src = U.sub.positions;
-      for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > reach) reach = z; }
+      const src = U.sub.positions;
+      for (const az of azs) {
+        const M = base.pedicelPlacement({ ...ip, rootZ: 0, nodeDepthsMm: [0] }, 0, az, U.tipZLocal, sessile).M;
+        for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > reach) reach = z; }
+      }
     }
     const floorZ = Math.min(sp.rootZ, Number.isFinite(sp.lowestHubZ) ? sp.lowestHubZ : sp.rootZ);
-    const needed = Math.max(0, reach + (sp.rootZ - floorZ) + base.MIN_FEATURE_MM);
+    const G = 2 ** -16;   // INFLO_REACH_GRID_MM, restated (the base tree has no such constant)
+    const needed = Math.max(0, Math.ceil(reach / G) * G + (sp.rootZ - floorZ) + base.MIN_FEATURE_MM);
     /* THE DEPTHS, NOT THE INSET: the node law is a function of the inset and
        two rows the first cut mis-called were the proof — ONE node sits at the
        flower's solo 0.55 L whatever the inset, and a raceme whose florets

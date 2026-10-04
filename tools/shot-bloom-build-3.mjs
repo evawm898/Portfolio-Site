@@ -67,11 +67,11 @@ const rows = [
     BASE ? { set: R, mod: BASE, cam: whole, cap: (b) => ['BEFORE (23b13bd) - 20 MM AT 35 DEG', insetCap(b)] } : null,
     { set: R, cam: whole, cap: (b) => ['AFTER - THE SAME CONTROLS', insetCap(b)] },
     BASE ? { set: R, mod: BASE, cam: (b) => topNode(b, 34), cap: (b) => ['BEFORE - THE TOP NODE', 'PETALS THROUGH THE HEAD (0.000 MM)'] } : null,
-    { set: R, cam: (b) => topNode(b, 34), cap: (b) => ['AFTER - THE TOP NODE', `REACH ${b.m.inflorescence.reachMm.toFixed(1)} + ${b.m.inflorescence.insetGapMm.toFixed(2)} GAP - 6.656 MM CLEAR`] },
+    { set: R, cam: (b) => topNode(b, 34), cap: (b) => ['AFTER - THE TOP NODE', `REACH ${b.m.inflorescence.reachMm.toFixed(1)} MM OVER ${b.m.inflorescence.reachAzimuths.length} AZIMUTHS + ${b.m.inflorescence.insetGapMm.toFixed(2)} GAP`] },
   ].filter(Boolean) },
   { title: 'THE 250 MM CEILING - A CORYMB ON THE FULL 120 MM STEM, SOLVED LEVEL', cells: [
     BASE ? { set: { ...R, pedicelCorymb: 'ON' }, mod: BASE, cam: whole, cap: (b) => ['BEFORE - CLAMPED AT 120 MM', `${b.m.inflorescence.pedicelLensMm.map((x) => x.toFixed(0)).join('/')} MM - HEADS SPAN ${b.m.inflorescenceBuilt.headSpreadMm.toFixed(2)}`] } : null,
-    { set: { ...R, pedicelCorymb: 'ON' }, cam: whole, cap: (b) => ['AFTER - THE LOWEST PEDICEL 140.8 MM', `${b.m.inflorescence.pedicelLensMm.map((x) => x.toFixed(0)).join('/')} MM - HEADS SPAN ${b.m.inflorescenceBuilt.headSpreadMm.toFixed(3)}`] },
+    { set: { ...R, pedicelCorymb: 'ON' }, cam: whole, cap: (b) => ['AFTER - THE LOWEST PEDICEL 134.3 MM', `${b.m.inflorescence.pedicelLensMm.map((x) => x.toFixed(0)).join('/')} MM - HEADS SPAN ${b.m.inflorescenceBuilt.headSpreadMm.toFixed(3)}`] },
     { set: { ...R, pedicelCorymb: 'ON', floretNodes: 8 }, cam: whole, cap: (b) => ['AFTER - 8 NODES, LEVEL', `${b.m.inflorescence.pedicelLensMm.map((x) => x.toFixed(0)).join('/')} MM`] },
     { set: { ...R, pedicelLength: 250 }, cam: whole, cap: (b) => ['250 MM PEDICELS AT 35 DEG', `REACH ${b.m.inflorescence.reachMm.toFixed(0)} MM PASSES THE RACHIS - ${b.m.inflorescence.nodes} NODE, TOLD`] },
   ].filter(Boolean) },

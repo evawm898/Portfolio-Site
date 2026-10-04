@@ -2581,7 +2581,7 @@ window.__bloomMetrics = () => ({
     insetSatisfied: lastInflo.insetSatisfied,
     /* the reach law's own inputs (build 3) — never the memo, which is a closure */
     floretReachMm: lastInflo.floretReachMm ? { ...lastInflo.floretReachMm } : null,
-    reachMm: lastInflo.reachMm, reachRawMm: lastInflo.reachRawMm, reachGridMm: lastInflo.reachGridMm, headFloorZ: lastInflo.headFloorZ, insetGapMm: lastInflo.insetGapMm,
+    reachMm: lastInflo.reachMm, reachRawMm: lastInflo.reachRawMm, reachGridMm: lastInflo.reachGridMm, reachAzimuths: lastInflo.reachAzimuths ? lastInflo.reachAzimuths.slice() : null, headFloorZ: lastInflo.headFloorZ, insetGapMm: lastInflo.insetGapMm,
     floretPetals: lastInflo.floretPetals, scale: lastInflo.scale,
     petalLength: lastInflo.petalLength, petalWidth: lastInflo.petalWidth,
     lengthAsked: lastInflo.lengthAsked, widthAsked: lastInflo.widthAsked,
@@ -2645,7 +2645,7 @@ window.__bloomMetrics = () => ({
        pedicel length, in node order, unit 0 the topmost node's and the one
        `unit` above describes. Positions stay out, for `unitPositions`' reason. */
     headSpreadMm: lastInfloBuilt.headSpreadMm,
-    topNodeMaxZ: lastInfloBuilt.topNodeMaxZ,
+    floretsMaxZ: lastInfloBuilt.floretsMaxZ,
     units: lastInfloBuilt.units.map((U) => ({
       lengthMm: U.lengthMm, tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
       petalsBuilt: U.petalsBuilt, hubRadius: U.hubRadius, hubThickness: U.hubThickness,
