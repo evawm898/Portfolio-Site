@@ -123,6 +123,16 @@
      built as an ordinary row ('image: <name> (fitted)') through every clause
      above: the fitted outline obeys every rule a drawn one does.
 
+   The WING-SHAPE LIBRARY (design doc §13) — the LB family,
+   tools/verify-bug-library.mjs: LB1 every library shape applied to the default
+   bug builds valid; LB2 applying leaves every non-wing setting byte-identical
+   (the writable fields restated there, not imported) and writes the shape; LB3
+   at 3–4 pairs the shape sets the first and last pairs and the middles blend;
+   LB4 RANDOMIZE WINGS never produces an invalid wing across seeds and bases,
+   and the re-roll is exercised; LB5 the label is the blend applied (re-derived
+   byte for byte); LB6 the whole-bug Randomize draws its wings from it. Every
+   shape, and eight random blends, are ALSO built rows ('library: ...').
+
    It also REPORTS (not gates) FDM/resin overhang at the model's own
    orientation, and the tucked-leg exposure across the random seeds.
 
@@ -131,8 +141,9 @@
    BETWEEN parts (overlapping closed shells are the export contract).
 
    --negative-control  breaks built models thirty-five ways (plus the L clause at reach 1, three
-                       broken editor frames for Q, and ten CODE mutants of bug-image.js for IM — every
-                       anchor checked to match exactly once before any of them runs) and requires each
+                       broken editor frames for Q, ten CODE mutants of bug-image.js for IM, and seven CODE
+                       mutants of bug-geometry.js plus one data mutant for LB — every anchor checked to
+                       match exactly once before any of them runs) and requires each
                        to be caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
@@ -141,6 +152,7 @@ import { polyArea as venArea } from '../bug-venation.js';
 import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin } from './bug-fixtures.mjs';
 import * as IMG from '../bug-image.js';
 import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
+import { libraryChecks, libraryRows, LIBRARY_MUTANTS } from './verify-bug-library.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -476,12 +488,37 @@ export function jaggedness(outline, floor) {
   }
   return { jagged: !!worst, worst, runs: counting.length };
 }
+/* J's subject is the VISIBLE outline: the stretch of a wing's drawn outline
+   that lies inside the body's top-down silhouette — the root tab, buried in the
+   thorax — is drawn in neither export (the layered SVG paints the body over
+   it, the STL unions it into the body) and is skipped; the outline is judged
+   run by run between such stretches. The silhouette is read off the BODY's own
+   emitted contour (contourLoops), and the outline is carried into the world by
+   the editor's frame (editorFrame — the map the Q clause holds to the emitted
+   wing). A point counts as buried only 0.05 mm or more inside the silhouette.
+   The blended root's NECK is never buried: the builder keeps it at least one
+   floor out from the silhouette (§13.3), so the fillet lobe J was written to
+   allow stays in its subject. */
+function visibleRuns(model, part, outline) {
+  const body = model.parts.find((q) => q.kind === 'body');
+  const F = G.editorFrame(model.params, part.meta.pair);
+  if (!body || !F) return [outline];
+  const loops = G.contourLoops(model, body);
+  const sw = (F.sweep * Math.PI) / 180, cs = Math.cos(sw), sn = Math.sin(sw);
+  const toW = ([a, b]) => [F.hinge[0] + a * cs + b * sn, F.hinge[1] - a * sn + b * cs];
+  const buried = (q) => { const p = toW(q); let inside = false; for (const L of loops) if (inPoly(p, L)) inside = !inside; if (!inside) return false; for (const L of loops) for (let i = 0; i < L.length; i++) if (segDist(p, L[i], L[(i + 1) % L.length]) < 0.05) return false; return true; };
+  const runs = []; let cur = [];
+  for (const q of outline) { if (buried(q)) { if (cur.length >= 3) runs.push(cur); cur = []; } else cur.push(q); }
+  if (cur.length >= 3) runs.push(cur);
+  return runs;
+}
 function smoothChecks(model) {
   const bad = [], floor = model.params.minDiameter;
   for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
     const outline = part.meta.drawnMm;
     if (!outline) { bad.push(`${part.name} carries no drawn outline (meta.drawnMm) to read`); continue; }
-    const j = jaggedness(outline, floor);
+    let j = { jagged: false };
+    for (const run of visibleRuns(model, part, outline)) { j = jaggedness(run, floor); if (j.jagged) break; }
     if (j.jagged) bad.push(`${part.name} outline is jagged at (${j.worst.at.map((v) => v.toFixed(2)).join(', ')}) mm planform — a ${j.worst.kind}: runs of ${j.worst.lens.map((v) => v.toFixed(2)).join(' and ')} mm turning ${j.worst.turns.map((v) => v.toFixed(0)).join(' and ')} degrees`);
   }
   return bad;
@@ -1381,8 +1418,11 @@ if (NEG) {
   const tailVeinP = G.defaultParams(); tailVeinP.venation = 'ridges'; tailVeinP.wings.first.points = HAND_OUTLINES.swallowtail; tailVeinP.wings.first.sweep = TAIL_ROW_SWEEP; tailVeinP.wings.tail.on = true; tailVeinP.wings.last.length = 30; tailVeinP.wings.last.stretch = 1.4;
   const tailVeinModel = G.buildBug(tailVeinP);
   const specModel = G.buildBug(G.specimenPose(G.defaultParams()).params);
-  // the first cut's clamp: random:6's forewing needs ~−43°; the old slider stopped at −30
-  const clampP = (() => { const p = G.randomParams(6); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } const q = G.specimenPose(p).params; q.wings.first.sweep = Math.max(-30, q.wings.first.sweep); return q; })();
+  // the first cut's clamp: a forewing that needs a sweep past the old slider's −30
+  // (random:70 needs −38.6°; it was random:6 at −43° until the whole-bug
+  // Randomize took its wings from the library, §13, and random:6 stopped needing it)
+  const CLAMP_SEED = 70;
+  const clampP = (() => { const p = G.randomParams(CLAMP_SEED); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } const q = G.specimenPose(p).params; q.wings.first.sweep = Math.max(-30, q.wings.first.sweep); return q; })();
   const clampModel = G.buildBug(clampP);
   // the right forewing's outline vertex pairs (top, bottom), and their mirror twins
   const mutPair = (m, fn) => {
@@ -1481,7 +1521,7 @@ if (NEG) {
     ['a pointed end blunted onto its ring', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => /^leg\d$/.test(x.name) && x.side === side); const pt = q.meta.points[0], [v0, n] = pt.ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let d = 0; d < 3; d++) m.positions[3 * pt.apex + d] = c[d]; } }],
     ['a tip ring thinned under the floor', 'X', base, {}, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.name === 'antenna' && x.side === side); const [v0, n] = q.meta.points[0].ring; const c = [0, 0, 0]; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) c[d] += m.positions[3 * (v0 + k) + d] / n; for (let k = 0; k < n; k++) for (let d = 0; d < 3; d++) m.positions[3 * (v0 + k) + d] = c[d] + 0.5 * (m.positions[3 * (v0 + k) + d] - c[d]); } }],
     ['a segment groove filled', 'G', base, { expectGrooves: true }, (m) => { const body = m.parts.find((q) => q.kind === 'body'), L = m.layout; for (let k = 1; k < m.params.abdomenSegments; k++) { const yb = L.yA0 - (k / m.params.abdomenSegments) * (L.yA0 - L.yA1); for (const r of body.meta.rings) if (Math.abs(r.y - yb) < 0.3) for (let j = 0; j < r.n; j++) { m.positions[3 * (r.v0 + j)] /= 1 - G.GROOVE_DEPTH * Math.exp(-(((r.y - yb) / G.GROOVE_SIGMA_MM) ** 2)); } } }],
-    ['the pose clamps at the old -30° bound (random:6)', 'Y', clampModel, { specimen: true }, () => {}],
+    [`the pose clamps at the old -30° bound (random:${CLAMP_SEED})`, 'Y', clampModel, { specimen: true }, () => {}],
     // (the margin is read off the bead apexes now: the mutation shears the
     // forewing's outer half back 1.5 mm, rings and all)
     ['the forewing margin not square to the body', 'Y', specModel, { specimen: true }, (m) => { for (const side of ['R', 'L']) { const q = m.parts.find((x) => x.kind === 'wing1' && x.side === side); for (let v = q.v0; v < q.v1; v++) if (Math.abs(m.positions[3 * v]) > 12) m.positions[3 * v + 1] += 1.5; } }],
@@ -1538,6 +1578,36 @@ if (NEG) {
       if (!fired) ok = false;
     }
   }
+  // LB — code mutants of bug-geometry.js (the wing-shape library's apply /
+  // blend / randomize), each a copy written beside it (it imports
+  // './bug-venation.js' and './bug-wing-library.js') and imported; every anchor
+  // is checked FIRST; plus one DATA mutant (a library shape that crosses itself)
+  {
+    const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const src = fs.readFileSync(path.join(ROOT, 'bug-geometry.js'), 'utf8');
+    for (const [name, from] of LIBRARY_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
+    const cleanLb = libraryChecks(G).filter(([c]) => !c);
+    console.log(cleanLb.length ? `LB clean run FAILED: ${cleanLb.map(([, m]) => m).join(' | ')}` : 'LB clean run: every check passes');
+    if (cleanLb.length) ok = false;
+    let k = 0;
+    for (const [name, from, to, clause] of LIBRARY_MUTANTS) {
+      if (src.split(from).length - 1 !== 1) continue;
+      const file = path.join(ROOT, `.bug-geometry.mutant-${process.pid}-${k++}.mjs`);
+      fs.writeFileSync(file, src.replace(from, to));
+      let fails = [];
+      try { const M = await import(pathToFileURL(file).href); fails = libraryChecks(M).filter(([c]) => !c).map(([, m]) => m); }
+      catch (e) { fails = [`(threw) ${e.message}`]; }
+      finally { fs.unlinkSync(file); }
+      const fired = fails.some((f) => f.startsWith(clause + ':'));
+      console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${fails.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
+      if (!fired) ok = false;
+    }
+    // a library shape whose forewing crosses itself (two interior points swapped)
+    const lib = JSON.parse(JSON.stringify(G.WING_LIBRARY)), f = lib[4].fore.points; [f[3], f[f.length - 4]] = [f[f.length - 4], f[3]];
+    const fails = libraryChecks({ ...G, WING_LIBRARY: lib }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
+    console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${'a library shape crosses itself'.padEnd(32)} by LB1  — ${fails.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
+    if (!fired) ok = false;
+  }
   const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
   const splay = legExposure(G.buildBug(splayP));
   const lfires = !(splay.outside <= 0.02 * splay.area);
@@ -1553,7 +1623,10 @@ for (const [c, msg] of fc) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!
 const im = imageChecks(IMG);
 for (const [c, msg] of im.checks) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
 fc.push(...im.checks);
-const rows = [...rowsFor(NSEEDS), ...imageRows(im.results)].filter(([label]) => !ONLY || ONLY.test(label));
+const lb = libraryChecks(G);
+for (const [c, msg] of lb) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
+fc.push(...lb);
+const rows = [...rowsFor(NSEEDS), ...imageRows(im.results), ...libraryRows(G)].filter(([label]) => !ONLY || ONLY.test(label));
 const support = [];
 for (const [label, params, opts] of rows) {
   const model = G.buildBug(params);

@@ -43,15 +43,25 @@ export const HAND_OUTLINES = {
    so the middle pair is exactly that mix. */
 export const CROSSING_BLEND = { first: SWALLOWTAIL_TRACE, last: [[0, 0.105], [1.051, -0.188], [0.581, -0.253], [0.787, -0.141], [0, -0.128]] };
 
-/* A LINKED middle pair below the floor while both drawn pairs clear it: the
-   crossing blend at 3 pairs, its last pair 36 mm long at stretch 1.6 (which
-   blunts that pair's own point). Pair 2 (blended, eased) reads ~2.1 mm past
-   the floor disc; pairs 1 and 3 are clear by the builder's measure. */
+/* A LINKED middle pair below the floor while both drawn pairs clear it. Since
+   the wing-shape library (design doc §13.4) a middle pair is DRAWN through
+   control points re-expressed from the mix, which smooths away the waist the
+   old fixture's eased mix had (the crossing blend at 3 pairs, last pair 36 mm
+   at stretch 1.6 — it no longer reads below the floor). This one was found by
+   search: library hindwing #15's outline (kept here as data, so the fixture
+   does not move with the library) as the FIRST pair, 30 mm at stretch 1.6, and
+   the hand-drawn notched outline as the last, 15 mm at stretch 1.3, at 4 pairs.
+   Pair 2's mix crosses and is eased (barely: t 0.33 -> 0.33); pair 3 (linked)
+   reads 0.61 mm past the floor disc; pairs 1 and 4 are clear by the builder's
+   measure. (A first candidate with a 45 mm last pair stacked the roots: R.) */
+const BLENDED_THIN_FIRST = [[0, 0.05], [0.13272, 0.03457], [0.37211, -0.12721], [0.66513, -0.44907], [0.70704, -0.49285], [0.70509, -0.61476], [0.7632, -0.6509], [0.90505, -0.78324], [1, -0.84032], [0.967, -0.86506], [0.68641, -0.69959], [0.63926, -0.73439], [0.59277, -0.72438], [0.50235, -0.76609], [0.44617, -0.61662], [0.20244, -0.43194], [0.07471, -0.05102], [0, -0.05]];
 export function blendedThin() {
-  const p = defaultParams(); p.wingPairs = 3;
-  p.wings.first.points = CROSSING_BLEND.first.map((q) => q.slice());
-  p.wings.last.points = CROSSING_BLEND.last.map((q) => q.slice());
-  p.wings.last.length = 36; p.wings.last.stretch = 1.6;
+  const p = defaultParams(); p.wingPairs = 4;
+  p.wings.first.points = BLENDED_THIN_FIRST.map((q) => q.slice());
+  p.wings.last.points = HAND_OUTLINES.notched.map((q) => q.slice());
+  p.wings.first.length = 30; p.wings.first.stretch = 1.6;
+  p.wings.last.length = 15; p.wings.last.stretch = 1.3; p.wings.last.scallop = 0;
+  p.wings.tail.on = false;
   return p;
 }
 

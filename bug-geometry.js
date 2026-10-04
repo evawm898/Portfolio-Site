@@ -18,6 +18,8 @@
    triangles as exact doubles. */
 
 import { planVenation, bridgeHoles, MIN_CELL_MM_DEFAULT } from './bug-venation.js';
+import { WING_LIBRARY } from './bug-wing-library.js';
+export { WING_LIBRARY };
 export { MIN_CELL_MM_DEFAULT };
 
 const D2R = Math.PI / 180;
@@ -466,12 +468,26 @@ export function interpolatedOutline(firstPts, lastPts, t) {
   const A = resampleApexAligned(sampleOutline(firstPts));
   const B = resampleApexAligned(sampleOutline(lastPts));
   const mix = (s) => A.map((a, k) => [a[0] + (B[k][0] - a[0]) * s, a[1] + (B[k][1] - a[1]) * s]);
-  let c = mix(t);
-  if (outlineOk(c)) return { dense: c, tUsed: t, repaired: false };
+  // whether the blend crosses, and how far it is eased if it does, are read
+  // off the raw mix (unchanged); what is DRAWN is that mix re-expressed as
+  // control points (one more than the denser drawn pair) through the same
+  // spline as every drawn outline (§13.3): the raw per-sample mix of two
+  // detailed margins (the wing-shape library's) came out as 1.6 mm chords
+  // zig-zagging 20 degrees, and resampled finer it kept lobes under the floor
+  // on a small wing — the J clause on both. Unlinking the pair starts from
+  // exactly these points. If the re-expression is not itself simple and clear,
+  // the raw mix is drawn, as before.
+  const K = Math.max(firstPts.length, lastPts.length) + 1;
+  const drawn = (raw, tUsed, repaired) => {
+    const ctrl = controlPointsFromDense(raw, K), dense = sampleOutline(ctrl);
+    return outlineOk(dense) ? { dense, ctrl, tUsed, repaired } : { dense: raw, ctrl: null, tUsed, repaired };
+  };
+  const c = mix(t);
+  if (outlineOk(c)) return drawn(c, t, false);
   const end = t < 0.5 ? 0 : 1;
   let good = end, bad = t;                       // the endpoint passes: it is a validated drawn outline
   for (let k = 0; k < 30; k++) { const m = (good + bad) / 2; if (outlineOk(mix(m))) good = m; else bad = m; }
-  return { dense: mix(good), tUsed: good, repaired: true };
+  return drawn(mix(good), good, true);
 }
 
 /* Control points that reproduce a dense curve: used when a middle pair is
@@ -706,7 +722,7 @@ function resolveWingPairsRaw(p) {
       const v = lerp(W.first[f.id], W.last[f.id], t);
       s[f.id] = f.step >= 1 ? Math.round(v) : v;   // integer-stepped fields (scallop count, vein count, branching, the two on/off flags) round
     }
-    out.push({ index: k, role, linked: true, t, ...s, points: null, dense: io.dense, repaired: io.repaired, tUsed: io.tUsed });
+    out.push({ index: k, role, linked: true, t, ...s, points: null, ctrl: io.ctrl, dense: io.dense, repaired: io.repaired, tUsed: io.tUsed });
   }
   return out;
 }
@@ -776,7 +792,103 @@ function randomOutline(r) {
   return DEFAULT_WINGS.first.points.map((q) => q.slice());
 }
 
-export function randomParams(seed) {
+/* ------------------------------------------------------------------ */
+/* The WING-SHAPE LIBRARY: apply, blend, randomize (design doc §13)      */
+/* ------------------------------------------------------------------ */
+
+/* What applying a library shape may write, and NOTHING else (the gate's AP
+   clause holds every other byte of the params to this list):
+     wings.first.points / .stretch / .sweep / .scallop — the forewing outline as fitted
+     wings.last.points / .stretch / .sweep / .scallop / .length — the hindwing outline,
+       its length as the shape's ratio of the forewing's (the forewing keeps
+       the length the bug already has)
+     wings.unlinked — cleared, so 3–4 pairs' middles BLEND between the two
+     wings.tail — the shape's tail group, on; or, for a shape with none, the
+       bug's own tail group switched off (its points are kept, not deleted)
+   Sweep is 0 because the outline was fitted at sweep 0: the orientation is IN
+   the points. Scallop depth is 0 for the same reason: a fitted outline carries
+   its OWN margin, and the procedural scallop would cut a second one into it
+   (on the default bug's 0.06 hindwing scallop that read as 9 "scallop reduced"
+   repairs over 17 shapes and put shape #1 under the floor). Its count is kept. The pair count, every per-pair field below the outline (scallop,
+   thickness, tilt, venation) and every body / leg / antenna control are left
+   alone — there are no whole-bug presets. */
+export const WING_SHAPE_WRITES = { first: ['points', 'stretch', 'sweep', 'scallop'], last: ['points', 'stretch', 'sweep', 'scallop', 'length'], wings: ['unlinked', 'tail'] };
+export function applyWingShape(params, shape) {
+  const p = clone(params);
+  const W = p.wings, lf = WING_FIELDS.find((f) => f.id === 'length');
+  W.first.points = shape.fore.points.map((q) => q.slice()); W.first.stretch = shape.fore.stretch; W.first.sweep = 0; W.first.scallop = 0;
+  W.last.points = shape.hind.points.map((q) => q.slice()); W.last.stretch = shape.hind.stretch; W.last.sweep = 0; W.last.scallop = 0;
+  W.last.length = +clamp(W.first.length * shape.hind.lengthRatio, lf.min, lf.max).toFixed(3);
+  W.unlinked = {};
+  W.tail = shape.tail ? clone({ ...shape.tail, on: true }) : W.tail ? { ...clone(W.tail), on: false } : clone({ ...STARTER_TAIL, on: false });
+  return p;
+}
+
+/* A blend of two library shapes at t: each outline is resampled apex-aligned
+   in TRUE planform (w x its own stretch, so two shapes drawn at different
+   stretches mix as drawn, not as numbers), mixed, divided back by the mixed
+   stretch and re-expressed as control points (one more than the denser of the
+   two, so the blend keeps the detail). The tail is the NEARER shape's (a tail
+   group's points cannot be mixed point for point with a shape that has none). */
+export function blendWingShapes(a, b, t) {
+  const mixOutline = (pa, sa, pb, sb, s) => {
+    const A = resampleApexAligned(sampleOutline(pa)), B = resampleApexAligned(sampleOutline(pb));
+    const dense = A.map((q, k) => [lerp(q[0], B[k][0], t), lerp(q[1] * sa, B[k][1] * sb, t) / s]);
+    return controlPointsFromDense(dense, Math.max(pa.length, pb.length) + 1);
+  };
+  const fs = lerp(a.fore.stretch, b.fore.stretch, t), hs = lerp(a.hind.stretch, b.hind.stretch, t);
+  const near = t < 0.5 ? a : b;
+  return {
+    fore: { stretch: +fs.toFixed(4), points: mixOutline(a.fore.points, a.fore.stretch, b.fore.points, b.fore.stretch, fs) },
+    hind: { stretch: +hs.toFixed(4), lengthRatio: +lerp(a.hind.lengthRatio, b.hind.lengthRatio, t).toFixed(4), points: mixOutline(a.hind.points, a.hind.stretch, b.hind.points, b.hind.stretch, hs) },
+    tail: near.tail ? clone(near.tail) : null,
+  };
+}
+
+/* Why a wing shape on these params is NOT acceptable, or null. Invalid is what
+   the brief names: an outline that crosses (or pinches) itself, a tail that
+   would cross its outline, or a wing under the printable floor — read off the
+   BUILT model (its floorViolations are the builder's own). */
+export function wingShapeProblem(params, model) {
+  const p = normalizeParams(params);
+  for (const role of ['first', 'last']) { const v = outlineValid(p.wings[role].points); if (!v.ok) return `the ${role} outline is refused (${v.reason})`; }
+  const pairs = resolveWingPairsRaw(p);
+  for (const s of pairs) if (s.tailFits === false) return `the tail would cross pair ${s.index + 1}'s outline`;
+  const m = model || buildBug(p);
+  const thin = m.floorViolations;
+  if (thin.length) return `pair ${thin[0].pair + 1} is under the ${p.minDiameter} mm floor`;
+  return null;
+}
+
+/* RANDOMIZE WINGS: two different library shapes blended at a random t (two
+   decimals, rounded BEFORE the blend, so the label is the t that was used),
+   applied to the params; a blend wingShapeProblem() refuses is RE-ROLLED, up
+   to `maxTries`, and if none passes, a plain library shape (each is held valid
+   by the gate) is used and the label says so. Returns the params and the label. */
+export const BLEND_T_RANGE = [0.1, 0.9];
+export function randomWingBlend(params, seed, opts = {}) {
+  const r = rng(seed), lib = opts.library || WING_LIBRARY, maxTries = opts.maxTries ?? 24, refused = [];
+  for (let k = 0; k < maxTries; k++) {
+    const i = Math.floor(r() * lib.length); let j = Math.floor(r() * (lib.length - 1)); if (j >= i) j++;
+    const t = +(BLEND_T_RANGE[0] + (BLEND_T_RANGE[1] - BLEND_T_RANGE[0]) * r()).toFixed(2);
+    const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], t));
+    const why = q.wingPairs > 0 ? wingShapeProblem(q) : null;
+    if (!why) return { params: q, blend: { a: lib[i].id, b: lib[j].id, t, tries: k + 1, refused }, label: `blend of #${lib[i].id} and #${lib[j].id} at ${t.toFixed(2)}` };
+    refused.push({ a: lib[i].id, b: lib[j].id, t, why });
+  }
+  for (const s of lib) {
+    const q = applyWingShape(params, s);
+    if (!(q.wingPairs > 0) || !wingShapeProblem(q)) return { params: q, blend: { a: s.id, b: s.id, t: 0, tries: maxTries, refused }, label: `#${s.id} (no blend passed in ${maxTries} tries)` };
+  }
+  return { params: clone(params), blend: null, refused, label: 'no library shape fits this bug' };
+}
+
+/* The whole-bug Randomize: the body, legs and antennae from RANDOM_RANGES, and
+   the WING OUTLINES from the library — randomWingBlend(), the same function the
+   RANDOMIZE WINGS button calls, seeded off this bug's own stream (design doc
+   §13). randomParamsWithBlend also returns the blend's label for the page. */
+export function randomParams(seed) { return randomParamsWithBlend(seed).params; }
+export function randomParamsWithBlend(seed) {
   const r = rng(seed), K = RANDOM_RANGES;
   const U = ([a, b]) => a + (b - a) * r();
   const I = ([a, b]) => Math.round(U([a - 0.49, b + 0.49]));
@@ -817,7 +929,10 @@ export function randomParams(seed) {
     // never draw a tail that does not fit, or whose neck is under the floor on this pair's size
     if (!outlineValid(comp).ok || thinAnalysis(sampleOutline(comp).map(([u, w]) => [u * bottom.length, w * bottom.length * bottom.stretch]), p.minDiameter).thin) p.wings.tail.on = false;
   }
-  return normalizeParams(p);
+  const q = normalizeParams(p);
+  if (!(wp >= 1)) return { params: q, blend: null, label: '' };
+  const b = randomWingBlend(q, Math.floor(r() * 4294967296));
+  return { params: b.params, blend: b.blend, label: b.label };
 }
 
 
@@ -1695,8 +1810,22 @@ export function rootWarp(spec) {
   if (!(wL > wT)) return null;
   // the FULL neck (pinch 1) is built below; a lower pinch is the straight
   // chord and the full neck mixed, w' = w + pinch (full(w) - w) — see the return
-  const h0 = (wL - wT) / 2, pinch = clamp(r.pinch, 0, 1);
+  const h0 = (wL - wT) / 2;
   const hr = Math.max(h0 * ROOT_NECK_AT_FULL, r.floor / 2);
+  // A ROOT ALREADY NEAR THE FLOOR HAS NOTHING TO NARROW: the full neck is
+  // held at half the floor, so on a small wing with a narrow root it is only
+  // a few tenths of a millimetre under the drawn chord, and the "pinch" came
+  // out as a dip finer than the floor — the J clause, on library shapes at
+  // small sizes (a 1.2 mm root narrowed by 0.1 mm, §13.3). The pinch fades in
+  // with the full narrowing h0 - hr: none while it is under 3/4 of a floor,
+  // whole from 1 1/4 floors (a ramp, so no slider position or wing size
+  // switches it on as a step; the first cut faded from 1/2 to 1 floor and
+  // left 7-9 degree S-bends on the ramp). A root whose full narrowing is 1 1/4
+  // floors or more — the default bug's forewing narrows by 1.45 mm — is
+  // untouched.
+  const fade = clamp((h0 - hr) / (r.floor / 2) - 1.5, 0, 1);
+  const pinch = clamp(r.pinch, 0, 1) * fade;
+  if (!(pinch > 0)) return null;
   const R = Math.max(0, ROOT_FILLET_AT_FULL * 2 * h0 * (r.filletScale ?? 1)), ub = Math.max(0, r.ub);
   // the LENGTH stretches the root outward: the neck's offset from the body's
   // silhouette and the release back to the drawn wing both scale by it (1 =
@@ -1705,7 +1834,11 @@ export function rootWarp(spec) {
   // where the wing meets the body's silhouette — measured, a 0.47-0.58 mm
   // contour loop; the range stops below it rather than carry it)
   const len = clamp(r.length ?? 1, 0.25, 2);
-  const un = ub + R * len;
+  // (and never closer to the body's silhouette than one floor: the root tab's
+  // shoulder at the silhouette and the neck's fillet turn opposite ways, and
+  // on a small wing R x len put them 0.4 mm apart — a wobble finer than the
+  // floor, the J clause, §13.3)
+  const un = ub + Math.max(R * len, r.floor);
   // the DRAWN wing's two ROOT EDGES: the outline walked from the root lead
   // (forward) and from the root trail (backward), each read where it first
   // crosses a station u — on a grid of NS stations over [0, uEnd]
@@ -1749,7 +1882,7 @@ export function rootWarp(spec) {
   // read two 0.6 mm lobes once the neck became relative)
   // (derived at length 1, then scaled: measured over a longer stretch the
   // root edges read wider and the derived release grew faster than the slider)
-  const un1 = ub + R;
+  const un1 = ub + Math.max(R, r.floor);
   const blend0 = Math.max(ROOT_BLEND_FRAC * span, 2.5 * R, 2 * r.floor);
   const first = edges(un1 + blend0);
   let hd = 0; for (let g = 0; g <= NS; g++) hd = Math.max(hd, first.up[g], first.dn[g]);
@@ -2683,6 +2816,8 @@ export function buildBug(params, opts = {}) {
   for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
   for (const s of pairs) if (s.repaired) notes.push(`pair ${s.index + 1}: the interpolated outline crossed itself and was eased toward the nearer drawn pair (t ${s.t.toFixed(2)} -> ${s.tUsed.toFixed(2)})`);
   for (const part of acc.parts) if (part.meta.scallopReduced) notes.push(`pair ${part.meta.pair + 1}: scallop depth reduced so the outline does not cross itself`);
+  // a narrow root's pinch is EASED (rootWarp's fade, §13.4): said, never silent
+  for (const s of pairs) { if (!s.root) continue; const rw = rootWarp(s), eff = rw ? rw.pinch : 0; if (eff < s.root.pinch - 1e-9) notes.push(`pair ${s.index + 1}: its drawn root is narrow — within 1¼ floors of the floor-held neck — so the root pinch is eased to ${eff > 0 ? eff.toFixed(2) : 'none'}`); }
   for (const part of acc.parts) if (part.meta.rootReduced) notes.push(`pair ${part.meta.pair + 1}: the blended root would make the outline cross or pinch, so this pair keeps its drawn root chord`);
 
   // Mirror every right-side part into its left twin.

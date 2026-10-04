@@ -2029,3 +2029,102 @@ forewing's drawn margin and requires J to fire.
    an outline vertex, which only reshapes the outline, and S stayed silent. It now takes the
    nearest INTERIOR top vertex (the slab's own `meta.slab.n`, rim vertices excluded) and
    pushes it past its farthest neighbour, which folds the face at every pinch.
+
+## 13. Wing-shape library, step 3 — the library file, the gallery, RANDOMIZE WINGS
+
+The library is `bug-wing-library.js`: 17 entries, Eva's kept shapes from the step-1 sheet,
+each a forewing and a hindwing outline in the editor's planform units, the chord stretch each
+was drawn at, the hindwing's length as a ratio of the forewing's, and an optional tail group
+(one entry, #16, has one). **Outlines only — there are no whole-bug presets.** The data is
+the fitter's output; the stock-art sheets it was fitted from stay in the gitignored
+`tools/bug-wing-sources/`. Entries are unlabeled (`name: ''`); a name typed on the page for
+the last applied shape is kept in that browser only.
+
+### 13.1 Apply — what it writes, and nothing else
+
+`applyWingShape(params, shape)` (bug-geometry.js) is the one function that knows what applying
+may write: the first pair's points / stretch / sweep / scallop, the last pair's points /
+stretch / sweep / scallop / length, the cleared `unlinked` map and the tail group. Every other
+byte of the params — body, legs, antennae, venation, thickness, tilt, the pair count, the
+forewing's length — is untouched, and LB2 holds that against a list RESTATED in the gate.
+With 3–4 pairs the shape lands on the first and last pairs and the middles blend (an unlinked
+middle is cleared). With one pair the forewing outline is the pair. With no wings the shape is
+stored and the page says to add a pair (the pair count is not a shape setting).
+Applying is undoable on the page (an undo stack of whole params; Undo, or Ctrl/⌘ Z outside a
+text field); a randomize and a randomize-wings push onto it too.
+
+### 13.2 RANDOMIZE WINGS
+
+`randomWingBlend(params, seed)` picks two different shapes and a t in [0.1, 0.9] (two decimals,
+rounded BEFORE the blend, so the label "blend of #a and #b at t" is the t used), blends them
+(`blendWingShapes`: each outline resampled apex-aligned in TRUE planform — w times its own
+stretch — mixed, divided by the mixed stretch, re-expressed as control points; the tail is the
+nearer shape's) and applies it. A blend that crosses, whose tail does not fit, or that puts a
+wing under the floor (read off the BUILT model) is RE-ROLLED, up to 24 times, then a plain
+library shape. Over the gate's 88 rolls 10 re-rolled once. The whole-bug Randomize calls it on
+its own seeded stream for every bug with wings, and the page prints the label.
+
+### 13.3 Decisions made without a ruling (reversible)
+
+1. **Applying sets the scallop depth to 0 on both pairs.** A fitted outline carries its own
+   margin; the bug's procedural scallop cut a second one into it — on the default bug's 0.06
+   hindwing scallop that read as 9 "scallop depth reduced" repairs over the 17 shapes and put
+   shape #1 under the floor. The count is kept (it is inert at depth 0). Undo: drop
+   `scallop` from `applyWingShape` and `WING_SHAPE_WRITES` (and the gate's restated list).
+2. **Sweep is 0 on both pairs** — the shapes were fitted at sweep 0, so their orientation is
+   in the points; keeping the bug's sweep would rotate them off the fit.
+3. **A blend smooths margin detail.** Two scalloped hindwings whose bumps do not line up
+   average toward a smooth margin; the blend re-expresses the mix with one more control point
+   than the denser parent, which keeps the overall shape and not every bump.
+4. **A shape without a tail switches the bug's own tail group OFF and keeps its points**
+   (the tail toggle brings it back); a blend takes the nearer parent's tail.
+5. The gallery is a 4-column grid of filled silhouettes (both wings and their mirror, placed
+   as on the default bug through `editorFrame`), in a "Wing shapes" section open by default
+   above "From an image".
+
+### 13.4 What the library exposed in the core, and the fixes
+
+The library's outlines are fitted, so their margins carry real detail and their roots are
+narrow and curved. Three pre-existing mechanisms that had only ever seen smooth random
+outlines broke the J clause on them (measured over 276 pinched random bugs with library
+wings: 39 jagged before, 0 after; and 24 of 272 library-shape x pair-count x pinch states on
+the default bug, 0 after):
+
+1. **A middle pair is drawn through control points.** A linked middle pair was the raw
+   per-sample mix of the first and last pairs — 48 samples a half, 1.6 mm chords on a
+   41 mm wing — and two detailed margins mixed into a 20-degree zig-zag. Resampling finer
+   made it worse (it kept lobes under the floor on small wings). Now the mix is decided
+   exactly as before (whether it crosses, how far it is eased) and what is DRAWN is that mix
+   re-expressed as control points (one more than the denser drawn pair) through the same
+   spline as every drawn outline; unlinking starts from exactly those points. If the
+   re-expression is not simple and clear, the raw mix is drawn, as before. **This moves
+   every 3–4 pair design's middle pairs slightly** (a smoother curve through the same blend).
+2. **A root near the floor is not pinched.** The full neck is held at half the floor, so on a
+   small wing with a narrow root the "pinch" was a dip of a tenth of a millimetre. The pinch
+   now fades in with the full narrowing h0 − hr: none under 3/4 of a floor, whole from 1 1/4
+   floors (a ramp, never a step). The default forewing narrows by 1.45 mm: untouched.
+3. **The neck is at least one floor out from the body's silhouette** (it was R x length,
+   0.4 mm on a small wing, putting the root tab's shoulder and the neck's fillet two
+   opposite turns apart under the floor). On the default bug R is 0.9 mm, so the neck moves
+   0.1 mm out at length 1 — a pinched default is a hair different from the ladder sheet.
+4. **J judges the visible outline.** The stretch of a wing's outline inside the body's
+   top-down silhouette (the buried root tab) is drawn in neither export and is now skipped,
+   the outline judged run by run between such stretches; the silhouette is the body's own
+   emitted contour. With (3) the neck is never buried, so the fillet J allows stays judged.
+
+The pinch shipped in this same unmerged PR, so (2)–(3) move no saved design. The gate's
+"blended pair under the floor" fixture went vacuous with (1) — the re-expression smooths away
+the waist its eased mix had — and is replaced by one found by search (`blendedThin()` in
+tools/bug-fixtures.mjs, its reasoning beside it).
+
+**Found and NOT fixed (pre-existing, outside the library's reach):** `buildBug` THROWS
+(`earClip: polygon is not simple`) on library forewing #15's outline at about 15–16 mm long and
+stretch 0.6, at any pair count, with the rounded edge on (round 0 builds) — reproduced
+identically on the tree before this work. The rounded edge's inset is not simple on that narrow
+wing and nothing catches it. Applying or blending a shape always sets its own stretch (1.0 or
+more), so the library cannot reach it; a hand-set stretch can. Its own fix (a fallback in the
+edge inset, like the root's retries) is a separate change.
+
+Gate: LB1–LB6 (tools/verify-bug-library.mjs) plus 31 built rows ("library: ..."); the negative
+control adds seven code mutants of bug-geometry.js and one data mutant. Sheet:
+`node tools/shot-bug-wing-library.mjs <dir>`.

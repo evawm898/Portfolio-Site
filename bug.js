@@ -15,6 +15,7 @@ import {
   designFromParams, paramsFromDesign, MAX_WING_PAIRS,
   composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
   editorFrame, contourLoops, CR_SAMPLES,
+  WING_LIBRARY, applyWingShape, randomWingBlend, randomParamsWithBlend,
 } from './bug-geometry.js';
 import { imageToBug, segment, traceOuter, WORK_MAX, IMPORT_DEFAULTS } from './bug-image.js';
 
@@ -268,7 +269,7 @@ function unlinkPair(k) {
   const r = resolvedPair(k);
   const K = Math.max(params.wings.first.points.length, params.wings.last.points.length);
   const spec = {}; for (const f of WING_FIELDS) spec[f.id] = r[f.id];
-  spec.points = controlPointsFromDense(r.dense, K);
+  spec.points = r.ctrl ? r.ctrl.map((q) => q.slice()) : controlPointsFromDense(r.dense, K);   // the linked pair IS drawn through these (§13.3)
   params.wings.unlinked[k] = spec;
 }
 document.getElementById('linkBtn').addEventListener('click', () => {
@@ -313,7 +314,12 @@ function applyVisibility() {
 
 /* ---------------- randomize / reset / designs ---------------- */
 let randomSeed = 1;
-document.getElementById('randomBtn').addEventListener('click', () => { designName = ''; loadParams(randomParams((Date.now() ^ (randomSeed++ * 2654435761)) >>> 0)); });
+document.getElementById('randomBtn').addEventListener('click', () => {
+  designName = '';
+  const r = randomParamsWithBlend((Date.now() ^ (randomSeed++ * 2654435761)) >>> 0);
+  pushUndo(); loadParams(r.params); wlApplied = r.blend ? { id: null, label: r.label } : null; drawLibrary();
+  wlMsg(r.blend ? `Randomize — the wings are a ${r.label}.` : 'Randomize — this bug has no wings.');
+});
 document.getElementById('resetBtn').addEventListener('click', () => { designName = ''; loadParams(defaultParams()); });
 /* SET SPECIMEN: one click writes the pose's slider values (forewing sweep from
    its own inner margin, every wing flat, legs tucked, antennae a V) and
@@ -326,10 +332,109 @@ function setSpecimen() {
 }
 document.getElementById('specimenBtn').addEventListener('click', setSpecimen);
 
+/* ---------------- the wing-shape library (design doc §13) ---------------- */
+/* A click applies a library shape's OUTLINES (applyWingShape — the one function
+   that knows what applying may write); RANDOMIZE WINGS blends two of them
+   (randomWingBlend, which re-rolls a blend that crosses or is under the floor).
+   Both are undoable: the params before each are kept on a stack (Undo, or
+   Ctrl/⌘ Z outside a text field). Shapes are unlabeled; a name typed for one is
+   kept in this browser only. */
+const undoStack = [];
+const UNDO_MAX = 40;
+let wlApplied = null;              // { id, label } of the last library action, for the panel
+const WL_NAMES = 'parametric-bug-wing-names-v1';
+const readNames = () => { try { return JSON.parse(localStorage.getItem(WL_NAMES) || '{}'); } catch { return {}; } };
+const wlMsg = (t, bad = false) => { const e = document.getElementById('wlMsg'); e.textContent = t; e.classList.toggle('is-bad', bad); };
+function pushUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(params)));
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  document.getElementById('wlUndo').disabled = false;
+}
+function undo() {
+  if (!undoStack.length) return false;
+  const p = undoStack.pop(), k = editPair;
+  loadParams(p); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
+  document.getElementById('wlUndo').disabled = !undoStack.length;
+  drawLibrary(); wlMsg('Undone.');
+  return true;
+}
+function applyShapeId(id) {
+  const s = WING_LIBRARY.find((x) => x.id === id);
+  if (!s) return false;
+  pushUndo();
+  const k = editPair;
+  loadParams(applyWingShape(params, s)); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
+  wlApplied = { id, label: `#${id}` };
+  drawLibrary();
+  wlMsg(params.wingPairs ? `Applied shape #${id}${s.tail ? ' (with its tail)' : ''}. Undo to go back.` : `Shape #${id} is stored, but this bug has no wings — add a wing pair to see it.`, !params.wingPairs);
+  return true;
+}
+function randomizeWings(seed) {
+  const r = randomWingBlend(params, seed ?? ((Date.now() ^ (randomSeed++ * 2654435761)) >>> 0));
+  if (!r.blend) { wlMsg(`Randomize wings: ${r.label}.`, true); return r; }
+  pushUndo();
+  const k = editPair;
+  loadParams(r.params); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
+  wlApplied = { id: null, label: r.label };
+  drawLibrary();
+  wlMsg(`Wings: ${r.label}${r.blend.tries > 1 ? ` (${r.blend.tries - 1} blend${r.blend.tries > 2 ? 's' : ''} re-rolled: crossing or under the floor)` : ''}.${params.wingPairs ? '' : ' This bug has no wings — add a wing pair to see it.'}`);
+  return r;
+}
+/* A thumbnail is the shape's two right wings and their mirror, placed as on the
+   default bug (editorFrame — the editor's own planform -> world map), filled. */
+function shapeSilhouette(s) {
+  const base = applyWingShape(defaultParams(), s), loops = [];
+  for (const k of [0, 1]) {
+    const fr = editorFrame(base, k);
+    const pts = k === 1 ? composeOutline(base.wings.last.points, base.wings.tail).points : base.wings.first.points;
+    const L = sampleOutline(pts).map(([u, w]) => fr.toWorld(u, w));
+    loops.push(L, L.map(([x, y]) => [-x, y]));
+  }
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const L of loops) for (const [x, y] of L) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const m = 0.04 * Math.max(x1 - x0, y1 - y0), d = loops.map((L) => 'M' + L.map(([x, y]) => `${(x - x0 + m).toFixed(2)} ${(y1 - y + m).toFixed(2)}`).join('L') + 'Z').join('');
+  return `<svg viewBox="0 0 ${(x1 - x0 + 2 * m).toFixed(2)} ${(y1 - y0 + 2 * m).toFixed(2)}" aria-hidden="true"><path d="${d}"/></svg>`;
+}
+const thumbCache = {};
+function drawLibrary() {
+  const grid = document.getElementById('wlGrid'), names = readNames();
+  if (!grid.children.length) {
+    for (const s of WING_LIBRARY) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.dataset.id = s.id;
+      b.innerHTML = (thumbCache[s.id] ||= shapeSilhouette(s)) + `<span class="bg-wl-name"></span>`;
+      b.addEventListener('click', () => applyShapeId(s.id));
+      grid.appendChild(b);
+    }
+  }
+  for (const b of grid.children) {
+    const id = +b.dataset.id, nm = names[id] || '';
+    b.querySelector('.bg-wl-name').textContent = nm ? `#${id} ${nm}` : `#${id}`;
+    b.title = nm ? `#${id} — ${nm}` : `shape #${id}`;
+    b.classList.toggle('is-on', !!(wlApplied && wlApplied.id === id));
+  }
+  const nameEl = document.getElementById('wlName'), id = wlApplied && wlApplied.id;
+  nameEl.disabled = !id; nameEl.value = id ? names[id] || '' : '';
+  nameEl.placeholder = id ? `name shape #${id} (optional)` : 'apply a shape to name it (optional)';
+}
+document.getElementById('wlName').addEventListener('input', (e) => {
+  const id = wlApplied && wlApplied.id; if (!id) return;
+  const names = readNames(), v = e.target.value.trim();
+  if (v) names[id] = v; else delete names[id];
+  try { localStorage.setItem(WL_NAMES, JSON.stringify(names)); } catch {}
+  drawLibrary(); e.target.focus();
+});
+document.getElementById('wlRandom').addEventListener('click', () => randomizeWings());
+document.getElementById('wlUndo').addEventListener('click', undo);
+window.addEventListener('keydown', (ev) => {
+  if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.key.toLowerCase() === 'z' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) { if (undo()) ev.preventDefault(); }
+});
+
 function loadParams(p) {
   params = normalizeParams(p);
   editPair = 0; selectedPoint = -1; editing = false; edStatus = ''; vbox = null;
-  writeControls(); buildNow(true);
+  wlApplied = null;                // any load ends "this is library shape #n" until the caller says otherwise
+  writeControls(); buildNow(true); drawLibrary();
 }
 
 const STORE = 'parametric-bug-designs-v1';
@@ -1044,6 +1149,12 @@ window.__bug = {
   pictureScreen: (px, py) => (imp && imp.Mwork ? worldToScreen(...bdWorld(applyAffine(imp.Mwork, px * imp.f, py * imp.f))) : null),
   pointCounts: () => (params.wingPairs ? resolveWingPairs(params).map((w) => (w.drawn || w.points || []).length) : []),
   refitNow: () => { clearTimeout(refitTimer); return !!refit({ live: true }); },
+  // the wing-shape library
+  applyShape: (id) => applyShapeId(id),
+  randomWings: (seed) => { const r = randomizeWings(seed); return { label: r.label, blend: r.blend }; },
+  undo: () => undo(),
+  library: () => ({ thumbs: document.querySelectorAll('#wlGrid button svg path').length, ids: [...document.querySelectorAll('#wlGrid button')].map((b) => +b.dataset.id), selected: [...document.querySelectorAll('#wlGrid button.is-on')].map((b) => +b.dataset.id), message: document.getElementById('wlMsg').textContent, undoDepth: undoStack.length, undoDisabled: document.getElementById('wlUndo').disabled }),
+  libraryScreen: (id) => { const b = document.querySelector(`#wlGrid button[data-id="${id}"]`); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; },
   render,
 };
 
