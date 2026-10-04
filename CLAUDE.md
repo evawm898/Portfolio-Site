@@ -3529,6 +3529,53 @@ spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was lat
 solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
 restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
 
+**THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
+IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
+`docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
+`buildStemInto`'s cut ring / `cutFaceInto`, `STEM_CUT_*`, `NOZZLE_MM`, SC0–SC3 or
+`tools/verify-bloom-stem-cut.mjs`). `stemCut` (Stem, a CHOICE, FLORIST / FLAT, default
+**FLORIST**; FLAT is the end as it was, bit for bit). **`STEM_CUT_SLOPE = 1`, never
+`Math.tan(Math.PI / 4)`** (0.9999999999999999 — a 45° carried as a tangent puts the short point an
+ulp off the long point's own arithmetic and the land's lattice decision on a bar that is not 45 at the
+last bit). **The land is `max(MIN_FEATURE_MM, 2 × NOZZLE_MM)` = max(1.00, 0.80) = 1.00 mm** — the
+thinnest horizontal section the point may have, typed from neither number, mode-free — and it is
+DRAWN ON THE TUBE'S OWN LATTICE at or beyond the floor (column j, 1.00–1.24 mm): an inserted chord
+column lands ON a lattice column at 4 mm (`acos(1/2)` = 60°) and the first construction read 24
+degenerate triangles there. `stemLength` measures to the long point, which IS the land. **A cut
+HOLLOW stem ends SOLID: the plug is `2·rTip·s + W(√(1+s²) − s)` = D + 0.62 mm from the long point**,
+so the bore's floor stands Eva's 1.5 mm SQUARE to the face over the whole bore and never touches it
+(point-to-face 2.34 mm on the 6 mm stem, 2.26–3.77 on the noded ones, measured); the void closes on
+a horizontal rim fan facing up and the bore wall runs vertically to the root band. At 3 mm the stem
+is solid and the cut costs no plug. **The cut is pinned OFF on every pedicel through session 2's
+`PEDICEL_PINS`** — one place. A stem shorter than its own span is TOLD (`cut.inertShort`), not cut.
+**THE SIX CHECKS THE RULING NAMED EACH KEEP THEIR CATCH, SHOWN RED ON BOTH TREES**: ST1
+(`stemCountClause`, the cut band's `2N − 2` and the land+plane fans' `N − 2`), ST2 (the long point is
+the tip), ST3 (a cut stem's lowest rings are the void floor — the second no-inner-ring case), ST9
+(the tip is the LOWEST vertex at `outerR`, the root the populated level above), ST10
+(`stemPlugClauses`: the plug restated at 1e-9, the face's projected area against
+`restatedCutRing`'s shoelace, `N − 2` face triangles, lowest at the tip, highest at tip + span) and
+the byte tool's end-face clause, whose subject was "the triangles all at one height" — re-derived as
+`cutFaceClause` (the base's disc, the branch's down-facing window projected to the closed end's
+area, a POINT-TO-TRIANGLE distance from every bore vertex to the face ≥ 1.5, no stem-radius vertex
+under the face). **That distance clause's first version read SHORT on noded stems** (1.65 mm by a
+per-azimuth plane height against a solved 3.05) and was replaced by the solve rather than widened;
+**and the same tool's envelope had mis-sized a noded stem all along** (`outerR` against a swelling it
+reported as "outside"), fixed to the plan's own `nodeMaxOuterR + nodeTipOffsetMm`. On a noded stem
+the cut ring's vertices sit on their OWN depth's rings, so the face follows the kinked axis and is a
+plane only where the tube is a cylinder. **SC0–SC3 is the new family** (two statements; made ⟺ long
+enough; the land and span restated from the controls; the emitted ring vertex by vertex at 1e-9 and
+the land's `2j + 1`), with three standing mutants (`the-cut-is-flattened`, `the-land-is-removed`,
+`the-bore-opens-through-the-cut-face`), each witnessed on the mutated module's own end-face facts,
+and `node tools/verify-bloom-stem-cut.mjs` the must-fail (24 plants, each firing its own clause by
+its own message and no other) — **NOT yet in the export preflight, because `phase52`'s dispatch
+must precede any workflow edit; that is the follow-up PR.** **The brief's "~114 of 1,047" was
+`phase50`'s denominator**: the live matrix at `23b13bd` is 1,089, 156 carry a stem by "stem
+present" (the 114 plus #353's 33 raceme rows and 9 of block 47), and the partition by the cut's own
+guard is in the outcome doc. Block 48 is 13 rows (1,089 → 1,102), smoke block 48 five;
+`frozen/phase52` is the 1,089 rows at `23b13bd`. The cut stem uses LESS material than the flat end
+at every diameter (−30.2 mm³ at 6 mm, −136.8 at 12 on 60 mm — the wedge outweighs the plug), +94
+triangles, and the default bloom (no stem) is untouched at 24,688.
+
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
 then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships
