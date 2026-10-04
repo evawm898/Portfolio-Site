@@ -2078,7 +2078,12 @@ its own seeded stream for every bug with wings, and the page prints the label.
    edge (and the blend re-expresses the mix with one more control point than the denser
    parent, which keeps the overall shape and not every bump). Candidate fixes, not built:
    carry the margin detail from ONE parent onto the blended shape, or bias t toward the ends
-   so a blend stays near one parent's margin.
+   so a blend stays near one parent's margin. **Blending the sweep separately does NOT fix it
+   (measured, §13.6, Oct 4 — the item stays parked):** with each outline in its own frame and
+   the sweep mixed apart from it, a blend kept the same absolute margin detail as before
+   (0.153 against 0.156 mm on seed 3; 0.142 / 0.148, 0.152 / 0.154, 0.178 / 0.187 on seeds 11,
+   19, 7) and looked the same; its share of its parents' detail fell from 42 % to 34 % over 60
+   seeds only because the re-expressed parents carried more points.
 4. **A shape without a tail switches the bug's own tail group OFF and keeps its points**
    (the tail toggle brings it back); a blend takes the nearer parent's tail.
 5. The gallery is a 4-column grid of filled silhouettes (both wings and their mirror, placed
@@ -2131,3 +2136,78 @@ edge inset, like the root's retries) is a separate change.
 Gate: LB1–LB6 (tools/verify-bug-library.mjs) plus 31 built rows ("library: ..."); the negative
 control adds seven code mutants of bug-geometry.js and one data mutant. Sheet:
 `node tools/shot-bug-wing-library.mjs <dir>`.
+
+### 13.5 Adding shapes to the library
+
+`node tools/bug-wing-library-fit.mjs --add` fits every sheet in the gitignored
+`tools/bug-wing-sources/`, dedupes each fit against the CURRENT library (every entry applied to
+the default bug, the same Hausdorff and 3% bar as step 1) and then within the batch in reading
+order, and writes the step-2 exploded sheet to `out-add/`, survivors numbered on from the
+library's last id; a fit under the floor at 0.6 mm is re-fitted at the nearest tolerance that
+clears it, and still flagged (red row) when none does. Existing ids never change: kept shapes are
+APPENDED to `bug-wing-library.js` after Eva's keep / drop list.
+
+### 13.6 Each wing in its own frame — TRIED AND REVERTED; the split kept
+
+Eva's ruling on the #18–#55 sheet asked for each wing to be fitted in its own frame (along its
+own long axis, hinge to apex) with its angle stored as the pair's SWEEP, #1–#17 re-expressed
+so the assembled bug is unchanged, and a library shape applied as outline + sweep. It was
+built (commit `9273d92`, kept in the branch history) and **reverted under her fallback ruling
+(Oct 4)**: the library is #349's data again, each wing's angle in its points, a shape applies
+at sweep 0, and §13.3 #2 stands.
+
+**Why it was reverted, measured.** The geometry closes every outline on a root chord at u = 0,
+square to the wing's own axis through its hinge. A wing re-expressed in its own frame at a
+sweep therefore needs its root REBUILT, and on the default bug the hinge sits only ~0.9 mm
+inside the thorax's edge, so the rebuilt root turns the pair's whole sweep (27–60°) within
+that millimetre and the rounded edge folds on the turn. Every assembled outline held within
+0.05 mm of #349 beyond 1 mm of the body (worst 0.045 mm), but inside that millimetre the full
+gate's J (outline jagged) and S (a stray line in the SVG) failed on all 17 library rows and on
+three random rows whose wings are library blends — 334 of 359. Four root constructions were
+measured and none was clean (a 0.10-of-the-length chord: 9 of 17 rows still failing, and #9's
+and #15's hindwings under the floor; the whole #349 outline kept to its old root corners; the
+corners trimmed 0.5 mm past the hinge line: 11 of 17, and #16's tail moved 0.67 mm; the fit
+held to the body's edge: no change).
+
+**The root square to the BODY (Eva's ruling 1, Oct 4) was probed and not built.** About 37
+places assume the root chord is at u = 0 (the root pinch's neck, the venation fan from the
+chord's middle, the rounded edge's ramp, the root tab, the floor's exclusion, the editor), so
+re-cutting the root square to the body in the planform touches all of them. The contained
+form — a warp applied only in the planform-to-world transform, shearing the root square to
+the body and easing to the rigid sweep over the root region (3.9 mm on the default forewing,
+1.8 mm on its hindwing) — was put in the builder and editorFrame and gated on every non-
+library row: it broke the DEFAULT bug's rounded edge (E1: 13 beads wider in plane than a
+half-round on the forewing, hundreds on random bugs; E7: the silhouette moved 0.028 mm), and
+IM12 (fitted wings crossing into the body). Making that green means re-deriving the E family,
+the fitter and the re-expression around a non-rigid root — the open-ended iteration the
+fallback ruling exists to stop. The probe is not in the tree.
+
+**What was kept** (the gate green with it): the fore/hind split of one wing mass needs a WING
+ON EACH SIDE of its notch — seen from the middle of the mass's attachment, the farthest outline
+point ahead of the notch and the farthest behind it must each reach `NOTCH_LOBE_FRAC` (0.4) of
+the farthest overall; the deepest concavity that passes is the notch, from
+`NOTCH_LOBE_MIN_FRAC` (0.045) deep, and the split line runs from the notch to the MIDDLE of the
+attachment. For a heavily overlapped pair (a moth's forewing swept back over its hindwing) the
+notch is the shallow step where the forewing's back corner meets the hindwing's margin, not a
+dent in the forewing's leading edge with no wing ahead of it (that dent cut #43's forewing off
+at the root). Where no concavity passes, the old rule (the deepest, at `NOTCH_MIN_FRAC`, split
+square to the body). `notchLobes: false` is the old rule, and the sheet's BEFORE column.
+Also kept: two interior control points closer than the outline rule allows, at a tight tip,
+are merged into their midpoint instead of tightening the tolerance (which only adds points
+there). Gate: 350 of 350 and the negative control (61 mutations) green with both — **and no
+mutant names the new split rule**: the IM fixtures have no moth, so its witness is the sheet's
+before / after column (#43's forewing whole instead of a stub), a gap recorded rather than closed.
+**Excluded from this session's sheet** (not accepted by Eva — see Status below): #34 (judged
+the same as #22), #37 (under the floor), #50 (a luna-type moth — the tail-hindwing cannot be
+separated from a flat picture) and #31 (its hindwing fitted 79° back where the source spreads
+it out and down).
+
+**STATUS AT THE CLOSE OF THIS SESSION (Oct 4).** The library is UNCHANGED at #1–#17 (#349's
+data, sweep 0). The candidates #18–#57 are UNRULED and go to a full audit session. Eva has
+accepted neither this session's drops (#31, #34, #37, #50) nor its suggested strikes (#25,
+#29, #39, #40, #43 — each carries a stray contour line in the SVG near its root, which the
+gate's S clause would fail as a library row); the audit re-examines all of them. **The source
+images are gitignored** (`tools/bug-wing-sources/` — `sheet-2.webp`, `sheet-3.webp`,
+`sheet-4.webp`, Eva's three attached sheets) **and are not in the repository: they must be
+re-attached in the next session** before `node tools/bug-wing-library-fit.mjs --add` can run.
+
