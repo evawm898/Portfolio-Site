@@ -1263,13 +1263,22 @@ const MUTANTS = [
     witness: (M, C) => {
       const [m, c] = infloPair(M, C, { nodeVariance: 1 });
       const t = bothBuilt(m, c); if (t) return t;
-      return (m.unitCount === 1 && c.unitCount === 2 && m.units[0].cup === c.units[0].cup - (c.units[0].overrides ? 0 : 0) && c.units.some((u) => u.cup !== m.units[0].cup)) ? null
+      /* the mutant's one unit is the HEAD's own cup (the control's value, no
+         term), where the clean tree's units carry the term; the first cut
+         compared the mutant's cup against the clean FIRST unit's, which
+         carries the term by construction, and read "the term still forms" */
+      const headCup = Number(INFLO_STATE({ nodeVariance: 1 }).petalCup);
+      return (m.unitCount === 1 && c.unitCount >= 2 && m.units.every((u) => u.overrides === null && u.cup === headCup) && c.units.some((u) => u.cup !== headCup)) ? null
         : `the mutant built ${m.unitCount} unit(s) and the clean tree ${c.unitCount}; the clean units' cups read ${c.units.map((u) => u.cup).join('/')} against the mutant's ${m.units.map((u) => u.cup).join('/')} — the term still forms`;
     } },
   { id: 'the-node-term-outranks-the-pins',
     why: "the per-node overrides are spread AFTER the pedicel pins, so a term that happened to carry a pinned id would win over the pin — today none does, so this is caught by NV3's reading of the pins on every unit under a planted term that DOES: the witness plants `stemNodeProminence` into the overrides and sees the pedicel node",
-    find: '    /* PER-NODE VARIATION (Phase B) — applied FIRST so the pins below win */\n    ...(nodeOverrides || {}),',
-    into: '    ...(nodeOverrides ? { ...nodeOverrides, stemNodeProminence: 1 } : {}),', names: ['NV3'],
+    /* THE FIRST CUT PLANTED THE PIN INTO THE OVERRIDES AND LEFT THEM SPREAD
+       BEFORE `PEDICEL_PINS`, so the pins still won and the witness reported
+       "the behaviour did not move" — the mutation has to move the SPREAD
+       past the pins, which is the defect it names. */
+    find: '    /* PER-NODE VARIATION (Phase B) — applied FIRST so the pins below win */\n    ...(nodeOverrides || {}),\n    /* A FLORET DOES NOT INHERIT THE TUBE (Eva\'s ruling): every whorl FREE */\n    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,',
+    into: '    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,\n    ...(nodeOverrides ? { ...nodeOverrides, stemNodeProminence: 1 } : {}),', names: ['NV3'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C, { nodeVariance: 1 });
       const t = bothBuilt(m, c); if (t) return t;
@@ -2263,8 +2272,15 @@ async function famsOn(rows) {
        it is the first family here whose subject is a SECOND HEAD: every clause
        below is silent on a bloom that is one head at the origin, which is every
        other row this table drives. */
+    /* AND THE PER-NODE FAMILY (build 3, Phase B) RIDES IN THE SAME CALL: the
+       first run of its eight mutants reported three SILENT on NV1/NV2/NV4
+       while the page's clauses were firing — because this capture read
+       `ID\d+` alone and dropped every `NV` message on the floor. ST10's
+       misattribution class, in the other direction: a family whose messages
+       reach the table through a call the table captures under another
+       family's prefix is silent by construction. */
     for (const msg of await inflorescenceAssertions(page, row)) {
-      const mm = /^(ID\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(ID\d+|NV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE SIZE FIELD (organic variance, build 1) — the rule once more, and the
        first family whose subject is a per-SLOT quantity: every clause is
