@@ -192,6 +192,51 @@ the 0.60 mm row — its witness refuses a probe state whose two reaches agree),
 `the-pedicel-ceiling-is-the-stems-again` (ID7, on the 250 mm row). Two rows added to the
 table for them. **Run (`--only=` the three, after two anchor corrections of this session's own — the one-mode mutant's anchor moved when the reach was quantised): each fires exactly the family it names and the clean tree is silent on every row; the ceiling mutant also reddens ID4 (a 250 mm pedicel clamped to 120 changes the floret's own stem length, which ID4 reads), recorded as collateral. 88 mutants were not run — a SUBSET, never a sweep.** The clean-tree control first fired ID9 on three rows, and all three were defects in ID9 itself, found by the real export gate rather than reasoned: (e) asserted the top node equals the inset on a row whose florets cannot clear the head (the node law holds its single node at 0.86 L there — guarded on `insetSatisfied`); (d) read a unit source stream the metrics hook never projects (the builder's own `topNodeMaxZ` now); (f) asked for `Object.is` between the page's V8 and Node's on a reach reached through trigonometry and went red on depths equal to four decimals (within one engine now, the page held to the same-mode rebuild within the arithmetic's bound). The export gate on the five witness rows then read 4 of 5 reaching the results; the fifth, the hemisphere row, is X2 — the HEAD's own rise-1 fold (248 pairs at 0.4262 mm on `STEM: x a hemisphere`) plus five florets inheriting rise 1 at 220 each, 1348 — declared from birth and reproduced in Node at exactly that count.
 
+### 3a. CI's first full run found two more defects in ID9, and one real finding under them
+
+The pushed head `06b96b7` went red on shards 1 and 3 of `bloom-export-watertight` (run
+37217876478), one dropped row each, both ID9's own clauses, and the smoke subset had no
+row that could have seen either — the same shape as §2e, from the other direction.
+
+**(e) on `INFLO: ONE node`** — "the top node sits 66 mm below the hub and the inset is
+34.63". The clause asserted the top node IS the inset wherever the inset is satisfied, and
+`leafNodeDepthsMm` has a separate arm for ONE node: the flower's solo station,
+`LEAF_NODE_SOLO` (0.55 L = 66 mm on the 120 mm rachis), never shallower than the inset and
+never past the span's end. Deeper than the law asks, which clears the head by more. The
+clause is restated from the geometry's two constants (`max(solo, inset)` clamped to the
+span for one node; the inset otherwise) with a second, count-free statement beside it:
+no top node may ever stand shallower than the inset. `INFLO: ONE node` is a smoke row now
+(block 37, 155 rows over 44 blocks).
+
+**(d) on `NODE LAWS: gradient 3 x 12 nodes x 60 mm`** — "the florets reach z = 23.39 mm
+against a head floor of −1.92 less the gap: an emitted floret stands 26.31 mm into the
+gap" while `insetSatisfied` read TRUE and was right. The clause asserted every placement
+clears, and the law never claimed that: the inset is the TOP unit's reach, and build 2's
+gradient gives a LOWER node a LONGER pedicel — node 12's is 180 mm against the top's 60,
+and at 35° it rises straight through the terminal head. The builder's own comment beside
+`floretsMaxZ` said *"the law is conservative for every node"*; that was false under a
+gradient and is replaced by a measurement. **Swept in Node over all 65 buildable
+inflorescence rows (ALL MAX and the two refusal corners excluded), both modes agreeing to
+the double: exactly two rows overtop, both gradient 3** — this one at 26.3068 mm and
+`REACH INSET: gradient 3 x 100 mm` at 71.3519 mm (node 5, its ramp clamped at the 250 mm
+ceiling). Every corymb row reads 0 (level heads clear exactly as the top does) and so
+does every gradient-1 row, the shipping raceme included.
+
+What ships: the builder reports `floretsMaxZByNode` beside `floretsMaxZ`; (d) is two
+clauses with their subjects stated as sets — node 1's own maximum clears on every
+satisfied row, unconditionally (the law's claim, the clause the mutant fires), and the
+whole-placement maximum is held to `INFLO_OVERTOP_XFAIL` in BOTH directions (#213's form,
+±5e-4 mm; an undeclared row must read 0, a declared one at its number, a declared row
+whose plan is not satisfied is stale, and a declared label the matrix did not run fails
+`ID9 coverage` beside `XR coverage`). The read-out tells it on every build where it
+happens — *"A LOWER FLORET OVERTOPS THE HEAD: node 12's (180.0 mm pedicel, 3.00x the
+top's) stands 26.31 mm into the gap under the head"* — and the gradient row is a smoke
+row (block 46). **This is a Phase A finding for Eva beside §2a's 0.676 mm:** the gradient
+at its top makes an anthela whose lower heads pass through the terminal head, and nothing
+in the reach inset can reach it (insetting the top node deeper only moves the whole ramp
+down with it). Not clamped: the range Eva ruled stays reachable, and whether a graded
+raceme should solve its LOWER nodes' clearance as well is a node-law question, build 2's.
+
 **The smoke subset, both gates, on the final tree: export PASS (151 of 151 reached the
 results, every one watertight) and connectedness PASS (151 of 151 one piece)** — run as the
 two gates on `SMOKE_REGEX` less `ALL MAX`, which on this box exceeds the 30 s settle budget

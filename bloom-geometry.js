@@ -15812,9 +15812,20 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
   /* THE FLORETS' HIGHEST EMITTED VERTEX over EVERY placement (build 3) —
      ID9's measured side for the reach inset, read in the pass that already
      walks every appended float, so the plan's declared reach and the artefact
-     have two owners. Every placement, not node 0's: the law is conservative
-     for every node, and a lower floret rolled petal-up is the case it covers. */
+     have two owners. Every placement — and per node below, because the next
+     sentence this comment carried was wrong. */
   let floretsMaxZ = -Infinity;
+  /* ...AND PER NODE, because the law insets the TOP node from the TOP unit's
+     reach and a LOWER node may carry a LONGER pedicel (the gradient, build
+     2's ramp; the corymb's solve is level by construction). CI found it
+     (`NODE LAWS: gradient 3 x 12 nodes x 60 mm`, ID9 (d)): the lowest
+     pedicel at 3x the top's rose through the terminal head by 26 mm while
+     the plan, satisfied about the top node, read true. The comment that
+     stood here — "the law is conservative for every node" — was FALSE under
+     a gradient and is replaced by a measurement: node 0's own maximum is the
+     law's claim and must always clear; every other node's is reported, and
+     an overtopping node is told on the read-out and declared by name. */
+  const floretsMaxZByNode = Array.from({ length: plan.nodes }, () => -Infinity);
   /* THE DISTANCE IS `freeStemDistanceMm`'s, NOT A SECOND COPY OF IT. The
      first cut wrote `hypot(max(0, r - outerR), max(0, tipZ - z, z - rootZ))`
      out again here — which is that function term for term, i.e. exactly the
@@ -15888,6 +15899,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
         const X = acc.positions[at + k], Y = acc.positions[at + k + 1], Z = acc.positions[at + k + 2];
         if (Z <= plan.rootZ && Z >= plan.stemTipZ) { const rr = Math.hypot(X, Y); if (rr < wallReachR) wallReachR = rr; }
         if (Z > floretsMaxZ) floretsMaxZ = Z;
+        if (Z > floretsMaxZByNode[i]) floretsMaxZByNode[i] = Z;
         /* A SESSILE FLORET IS FUSED INTO ITS RACHIS BY THE ROOT LAW, so it is
            not in this flag's subject: a clearance between two solids the
            design joins means nothing (ST9's own scope sentence). Its join is
@@ -15929,6 +15941,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
   return {
     present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm,
     floretsMaxZ: Number.isFinite(floretsMaxZ) ? floretsMaxZ : null,
+    floretsMaxZByNode: floretsMaxZByNode.map((z) => (Number.isFinite(z) ? z : null)),
     /* EVERY DISTINCT UNIT, in node order — unit 0 is the topmost node's and
        is the one the legacy single-unit fields below describe. */
     units: units.map((U) => ({

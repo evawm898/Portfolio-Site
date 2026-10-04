@@ -831,6 +831,11 @@ export const SMOKE_BLOCKS = [
         path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build, and the exported file's own clearance) on a rachis that now also carries pedicels, beside ID2's crossing and S1-S4 on the main head; the leaf session's ST9 defect is exactly this shape and was found by a row that was there for a different reason" },
       { label: "INFLO: WHORLED (three at 120 deg a node)",
         path: "the DENSEST placement — ID1's per-node count against the phyllotaxy law, ID2's pitch floor (two pedicel radii) and the area rule binding together at three pedicels a node, ID6 on three azimuths that share one node depth" },
+      /* ONE NODE is its own arm of the node law (`LEAF_NODE_SOLO`, the
+         flower's 0.55 L, deeper than the inset) and CI found ID9 (e) red on
+         it with no smoke row to see it first: the count floor is an axis. */
+      { label: "INFLO: ONE node (the count floor — a solitary lateral flower)",
+        path: "the COUNT FLOOR — ID9 (e)'s one-node arm (the top node at the solo station, never shallower than the inset), ID1 at a count of 1, ID2's crossing on a single pedicel" },
     ],
   },
   {
@@ -1022,6 +1027,11 @@ export const SMOKE_BLOCKS = [
         path: "the CORYMB — ID7 (the lengths restated from the controls as the plane solve, every placement built from the unit at its own node's length, the memo by DISTINCT length, and the heads' heights read off the emitted placement matrices to one level), with ID1/ID5/ID6 per unit" },
       { label: 'NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)',
         path: "the GRADIENT to its floor — ID7's ramp in millimetres down the rachis, five distinct floret builds, and ID8 on the one sessile node (the floret's own emitted vertices reaching the stem's bore) beside four stalked ones; ID4 per unit (a stem exactly where the length is non-zero)" },
+      /* THE GRADIENT AT ITS CEILING is the one state where a LOWER node
+         outreaches the top one the inset was derived from; CI found ID9 (d)
+         red on it with no smoke row to see it first. A declared overtop. */
+      { label: 'NODE LAWS: gradient 3 x 12 nodes x 60 mm (was CLAMPED at the old 120 mm ceiling — the lowest pedicel 180 mm now, under the 250 cap)',
+        path: "the GRADIENT at its ceiling — ID7's ramp over twelve nodes, UNCLAMPED under the 250 mm cap; ID9 (d)'s two arms on one row: the TOP node's own florets clear the head floor, and node 12's longer pedicel OVERTOPS it by its DECLARED 26.3068 mm (INFLO_OVERTOP_XFAIL, held both ways)" },
       { label: 'NODE LAWS: SESSILE — a true spike (the floret hub rooted one wall deep)',
         path: "the SPIKE — ID8 at every node (rooted radially to the bore at 35 deg, not along the pedicel), ID2's crossing NULL exactly where every node is sessile, ID4 on a stemless unit" },
       { label: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel',

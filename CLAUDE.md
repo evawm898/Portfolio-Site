@@ -3566,9 +3566,20 @@ full 120 mm stem at 20/49/77/106/134 mm, heads spanning 0.000. **`INFLO: ALL MAX
 NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
 corner is block 48's `THE BUDGET CORNER` at 40 mm, 95.0%; the NODE LAWS refusal row EXPORTS
 at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
-family** — (d) reads the BUILDER's own `floretsMaxZ` over every placement, never the plan; (f) is mode-freeness
+family** — (d) reads the BUILDER's own `floretsMaxZByNode` and `floretsMaxZ`, never the plan; (f) is mode-freeness
 measured within ONE engine, because the first cut asked for `Object.is` across the page's V8
-and Node's and went red on depths equal to four decimals. `frozen/phase52` is the 1089 rows at
+and Node's and went red on depths equal to four decimals. **AND CI'S FIRST FULL RUN FOUND TWO
+MORE OF ID9'S OWN, ON ROWS THE SMOKE SUBSET DID NOT HOLD** (§3a of the doc): (e) asserted the
+top node IS the inset, and ONE node sits at `LEAF_NODE_SOLO` (0.55 L — deeper, never shallower;
+restated from the two constants); (d) asserted EVERY placement clears, and the law only ever
+claimed the TOP unit's — under build 2's GRADIENT a lower node's LONGER pedicel rises through
+the terminal head (`gradient 3 x 12 nodes x 60 mm`: node 12 at 180 mm, 26.31 mm into the gap,
+`insetSatisfied` TRUE and right). **Swept over all 65 buildable inflorescence rows: exactly two
+overtop, both gradient 3** (26.3068 and 71.3519 mm), declared by name in `INFLO_OVERTOP_XFAIL`
+and held both ways; node 1's own clearance is asserted unconditionally and never declared; the
+read-out says `A LOWER FLORET OVERTOPS THE HEAD`. A second Phase A finding for Eva — the reach
+inset cannot fix it (a deeper top node moves the whole ramp down), it is the node law's. Both
+rows are smoke rows now (155 over 44 blocks). `frozen/phase52` is the 1089 rows at
 `23b13bd`. **Phase B (per-node deltas, the derived per-floret phase) is NOT started — it waits
 on Eva's ruling on `docs/img/inflo-build-3-phase-a.png`.**
 

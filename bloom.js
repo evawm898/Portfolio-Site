@@ -1592,6 +1592,23 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    range. And the one thing that is not a clamp but is an absence: the GRID
    export writes the head at the origin only, so a raceme's florets are not in
    it — said here rather than discovered by a reader of a nearly-empty .glb. */
+/* THE OVERTOP LINE — which node, if any, stands above the floor the top node
+   was inset under. Node 0 is the law's own subject and is never named here
+   (ID9 (d) asserts it); a lower node is a LONGER pedicel's (the gradient),
+   told with the intrusion in millimetres, read off the builder's per-node
+   maxima and the plan's own floor and gap — the same two numbers the law used. */
+function overtopLine(plan, builtInflo) {
+  const by = builtInflo && builtInflo.floretsMaxZByNode;
+  if (!plan.insetSatisfied || !Array.isArray(by) || !Number.isFinite(plan.headFloorZ)) return '';
+  const bar = plan.headFloorZ - plan.insetGapMm;
+  let worst = -1, worstZ = -Infinity;
+  for (let i = 1; i < by.length; i++) if (Number.isFinite(by[i]) && by[i] > bar && by[i] > worstZ) { worst = i; worstZ = by[i]; }
+  if (worst < 0) return '';
+  const intr = worstZ - bar;
+  const over = by.filter((z, i) => i > 0 && Number.isFinite(z) && z > bar).length;
+  return ` — A LOWER FLORET OVERTOPS THE HEAD: node ${worst + 1}'s (${plan.pedicelLensMm[worst].toFixed(1)} mm pedicel, ${(plan.pedicelLensMm[worst] / Math.max(1e-9, plan.pedicelLensMm[0])).toFixed(2)}x the top's) stands ${intr.toFixed(2)} mm into the gap under the head${over > 1 ? ` (${over} of ${by.length - 1} lower nodes do)` : ''} — the inset is the TOP floret's reach and a longer lower pedicel outreaches it (told, never clamped)`;
+}
+
 function infloLine(plan, builtInflo) {
   const per = plan.perNode;
   const n = builtInflo ? builtInflo.count : plan.built;
@@ -1624,6 +1641,11 @@ function infloLine(plan, builtInflo) {
         ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm the top FLORET needs: its petals reach ${plan.reachMm.toFixed(1)} mm above its node (live ${plan.floretReachMm.live.toFixed(1)} / export ${plan.floretReachMm.export.toFixed(1)}, the larger decides)${plan.rootZ - plan.headFloorZ > 1e-9 ? ` + ${(plan.rootZ - plan.headFloorZ).toFixed(1)} mm to the head's rim` : ''} + the ${plan.insetGapMm.toFixed(2)} mm printable gap`
         : ` (the stem's own inset; the top floret's petals reach ${plan.reachMm.toFixed(1)} mm above its node and need ${plan.insetNeededMm.toFixed(1)} mm, which it has)`)
     + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the floret reaches further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
+    /* A LOWER NODE ON A LONGER PEDICEL (the gradient) can overtop the head
+       the top node was inset to clear — the inset is the TOP unit's reach and
+       nothing else's. Told, never clamped: read off the builder's own per-node
+       highest emitted vertex against the same floor the law used. */
+    + overtopLine(plan, builtInflo)
     /* THE FLORET AGAINST THE RACHIS — a FLAG with a number, never a refusal.
        Two parts of one solid fusing is OVER-connection (the crowding
        ruling's own grounds, Eva Sep 3): no boundary edge, no split in the
@@ -2646,6 +2668,7 @@ window.__bloomMetrics = () => ({
        `unit` above describes. Positions stay out, for `unitPositions`' reason. */
     headSpreadMm: lastInfloBuilt.headSpreadMm,
     floretsMaxZ: lastInfloBuilt.floretsMaxZ,
+    floretsMaxZByNode: lastInfloBuilt.floretsMaxZByNode ? lastInfloBuilt.floretsMaxZByNode.slice() : null,
     units: lastInfloBuilt.units.map((U) => ({
       lengthMm: U.lengthMm, tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
       petalsBuilt: U.petalsBuilt, hubRadius: U.hubRadius, hubThickness: U.hubThickness,

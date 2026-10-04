@@ -8255,10 +8255,38 @@ export async function inflorescenceAssertions(page, row) {
        law's union can only have put the node DEEPER than that mode's reach
        asks, so this is one-sided by construction; a plan that computed the
        right number and a builder that ignored it fails here and nowhere else. */
+    /* ...AND CI FOUND THE CLAIM TOO WIDE ON ITS FIRST FULL RUN. "Every
+       placement" asserted something the law never claimed: the inset is the
+       TOP unit's reach, and under build 2's GRADIENT a lower node carries a
+       LONGER pedicel (`NODE LAWS: gradient 3 x 12 nodes x 60 mm` — the lowest
+       at 3x the top's rose 26.3 mm through the terminal head while
+       `insetSatisfied` was TRUE and right). So (d) is TWO clauses now, with
+       the subject stated as a set each time: node 0's own emitted maximum
+       (`floretsMaxZByNode[0]`) is the law's claim and must clear on every row
+       the plan calls satisfied — unconditional, undeclared, the clause the
+       mutant table fires; every placement's maximum is a real printability
+       question the law does not answer, so a row where a LOWER node overtops
+       is DECLARED BY NAME with its intrusion in `INFLO_OVERTOP_XFAIL` (#213's
+       form — held to its number in BOTH directions), and an undeclared row
+       must read 0 intrusion. A declared row whose top node overtops is still a
+       failure: the declaration excuses the gradient, never the law. */
+    const bar = floorZ - MIN_FEATURE_MM;
+    const overtopDecl = Object.prototype.hasOwnProperty.call(INFLO_OVERTOP_XFAIL, row.label) ? INFLO_OVERTOP_XFAIL[row.label] : null;
     if (P.insetSatisfied === true) {
       if (!Number.isFinite(B.floretsMaxZ)) bad.push('ID9: (d) the builder reports no `floretsMaxZ` — the florets\' emitted reach is measured by nothing');
-      else if (B.floretsMaxZ > floorZ - MIN_FEATURE_MM + tol) bad.push(`ID9: (d) the florets reach z = ${B.floretsMaxZ.toFixed(4)} mm (the builder's own emitted vertices, every placement) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${(floorZ - MIN_FEATURE_MM).toFixed(4)}) — the plan says the inset is satisfied and an emitted floret stands ${(B.floretsMaxZ - (floorZ - MIN_FEATURE_MM)).toFixed(4)} mm into the gap`);
-    }
+      const by = Array.isArray(B.floretsMaxZByNode) ? B.floretsMaxZByNode : null;
+      if (!by || by.length !== P.nodes || !Number.isFinite(by[0])) bad.push(`ID9: (d) the builder reports per-node maxima ${JSON.stringify(by)} for ${P.nodes} node(s) — the TOP node's own reach is measured by nothing`);
+      else if (by[0] > bar + tol) bad.push(`ID9: (d) the TOP node's florets reach z = ${by[0].toFixed(4)} mm (the builder's own emitted vertices, every placement on node 1) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${bar.toFixed(4)}) — the plan says the inset is satisfied and the floret the inset was derived FROM stands ${(by[0] - bar).toFixed(4)} mm into the gap`);
+      if (Number.isFinite(B.floretsMaxZ)) {
+        const intr = B.floretsMaxZ - bar;
+        if (overtopDecl) {
+          if (Math.abs(intr - overtopDecl.intrusionMm) > OVERTOP_BAND_MM) bad.push(`ID9: (d) this row is DECLARED overtopping by ${overtopDecl.intrusionMm} mm (a lower node's longer pedicel) and the builder's florets stand ${intr.toFixed(4)} mm into the gap — ${intr > overtopDecl.intrusionMm ? 'WORSE' : 'better'} than its record by ${Math.abs(intr - overtopDecl.intrusionMm).toFixed(4)}: re-record it, or if it reads at or under 0 remove its INFLO_OVERTOP_XFAIL entry, in the same commit`);
+        } else if (intr > tol) {
+          const who = by ? by.map((z, i) => (Number.isFinite(z) && z > bar + tol ? `node ${i + 1} (${(z - bar).toFixed(3)} mm, pedicel ${Number.isFinite(P.pedicelLensMm?.[i]) ? P.pedicelLensMm[i].toFixed(1) : '?'} mm)` : null)).filter(Boolean).join(', ') : 'unknown nodes';
+          bad.push(`ID9: (d) the florets reach z = ${B.floretsMaxZ.toFixed(4)} mm (the builder's own emitted vertices, every placement) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${bar.toFixed(4)}) — the plan says the inset is satisfied and an emitted floret stands ${intr.toFixed(4)} mm into the gap: ${who}. A LOWER node on a longer pedicel is the gradient's and is declared by name in INFLO_OVERTOP_XFAIL with its number; the top node's is the law's and is never declared`);
+        }
+      }
+    } else if (overtopDecl) bad.push(`ID9: (d) this row is declared in INFLO_OVERTOP_XFAIL and the plan does not call its inset satisfied — the declaration names a state the row is not in; remove it`);
     /* (e) the two biconditionals, in the plan's own fields */
     if ((P.insetClamped === true) !== (P.insetNeededMm > P.insetAskedMm)) bad.push(`ID9: (e) insetClamped reads ${P.insetClamped} while the floret needs ${P.insetNeededMm.toFixed(3)} mm against the stem's own ${P.insetAskedMm.toFixed(3)} — the clamp must be a biconditional`);
     if ((P.insetSatisfied === true) !== (P.insetNeededMm <= GEOMETRY.LEAF_NODE_BOTTOM * P.rachisLengthMm)) bad.push(`ID9: (e) insetSatisfied reads ${P.insetSatisfied} while the floret needs ${P.insetNeededMm.toFixed(3)} mm of a ${(GEOMETRY.LEAF_NODE_BOTTOM * P.rachisLengthMm).toFixed(3)} mm node span`);
@@ -8266,7 +8294,20 @@ export async function inflorescenceAssertions(page, row) {
     /* the top node IS the inset only where the inset fits the span; past it
        the node law holds its single node at the span's end (0.86 L) and the
        plan says so with `insetSatisfied` false */
-    if (P.insetSatisfied === true && Array.isArray(P.nodeDepthsMm) && P.nodeDepthsMm.length && !(Math.abs(P.nodeDepthsMm[0] - P.insetMm) <= tol)) bad.push(`ID9: (e) the top node sits ${P.nodeDepthsMm[0]} mm below the hub and the inset is ${P.insetMm}`);
+    /* ...AND A SOLITARY NODE IS NOT AT THE INSET — CI found that too (`INFLO:
+       ONE node`, 66 mm against 34.63): `leafNodeDepthsMm` puts ONE node at
+       the flower's solo station, `LEAF_NODE_SOLO` (0.55 L), never shallower
+       than the inset and never past the span's end — deeper than the law
+       asks, which clears the head by MORE. Restated from the geometry's own
+       two constants rather than read off the plan: the count's own arm. */
+    if (P.insetSatisfied === true && Array.isArray(P.nodeDepthsMm) && P.nodeDepthsMm.length) {
+      const L = P.rachisLengthMm;
+      const wantTop = P.nodeDepthsMm.length === 1
+        ? Math.min(Math.max(GEOMETRY.LEAF_NODE_SOLO * L, P.insetMm), GEOMETRY.LEAF_NODE_BOTTOM * L)
+        : P.insetMm;
+      if (!(Math.abs(P.nodeDepthsMm[0] - wantTop) <= tol)) bad.push(`ID9: (e) the top node sits ${P.nodeDepthsMm[0]} mm below the hub and the node law puts it at ${wantTop} (${P.nodeDepthsMm.length === 1 ? `ONE node: max(the solo station ${GEOMETRY.LEAF_NODE_SOLO} x ${L} = ${(GEOMETRY.LEAF_NODE_SOLO * L).toFixed(3)}, the inset ${P.insetMm})` : `the inset ${P.insetMm}`})`);
+      if (P.nodeDepthsMm[0] < P.insetMm - tol) bad.push(`ID9: (e) the top node sits ${P.nodeDepthsMm[0]} mm below the hub, SHALLOWER than the ${P.insetMm} mm inset — whatever the count, no node may stand above the floret's own reach`);
+    }
     /* (f) MODE-FREE, MEASURED — WITHIN ONE ENGINE. The plan rebuilt in Node in
        BOTH modes must carry the same node depths to the bit (the union makes
        that an identity, and a one-mode reach breaks it on the 0.60 mm row);
@@ -8965,6 +9006,37 @@ export function orientationAssertions(positions, row, head) {
    closest any row now comes to the bar and it is named here for that reason;
    the whole 909-row matrix was re-swept in EXPORT mode at four segments and it
    is the ONLY row within 20%% under, with the next highest at 46%%. */
+/* INFLO_OVERTOP_XFAIL — ROWS WHERE A LOWER NODE'S FLORET OVERTOPS THE HEAD
+   (ID9 (d), build 3). The reach inset clears the TOP node's floret from the
+   head; it says nothing about a LOWER node whose pedicel is LONGER (build
+   2's gradient — the corymb solves LEVEL and so clears exactly as the top
+   does). Where one does, the row is named here with the INTRUSION in
+   millimetres — how far the highest emitted floret vertex stands above the
+   head's floor less the printable gap, in the page's LIVE build, measured by
+   the builder's own `floretsMaxZ` — and the gate holds it to that number in
+   BOTH directions (±OVERTOP_BAND_MM, the record's own rounding plus the two
+   engines' last bits). A row reading 0 is stale and must come off; an
+   undeclared row reading above 0 is a finding. The top node is NEVER declared
+   here: node 0's clearance is the law's own claim. Measured in Node over
+   every inflorescence row of the matrix (`overtop.mjs`, both modes agreeing
+   to the double) and confirmed on the page by the export gate. */
+export const OVERTOP_BAND_MM = 5e-4;
+export const INFLO_OVERTOP_XFAIL = Object.freeze({
+  /* BOTH ARE THE GRADIENT'S — the only two rows of the 65 inflorescence rows
+     the sweep could build (ALL MAX and the two refusal corners excluded) where
+     any lower node outreaches the top. On the 12-node row the lowest pedicel
+     is 3x the top's (180 against 60 mm) and its floret rises 26.3 mm through
+     the terminal head; on the 5-node row the ramp is clamped at the 250 mm
+     ceiling and the lowest floret stands 71.4 mm above the floor. The corymb
+     rows read 0 — level heads clear exactly as the top does — and so does
+     every gradient-1 row. LIVE and EXPORT read the same double on both. */
+  'NODE LAWS: gradient 3 x 12 nodes x 60 mm (was CLAMPED at the old 120 mm ceiling — the lowest pedicel 180 mm now, under the 250 cap)': { intrusionMm: 26.3068, note: 'node 12 (180 mm pedicel, 3.00x the top\'s 60) — found red in CI on the first full run of build 3 (shard 3 of run 37217876478), ID9 (d) over every placement; the gradient\'s overtopping is build 2\'s own "anthela-like" ramp reaching the head, not the reach inset\'s, which clears node 1 at exactly its law' },
+  'REACH INSET: gradient 3 x 100 mm (the lowest pedicel CLAMPED at the 250 mm ceiling)': { intrusionMm: 71.3519, note: 'node 5 (250 mm pedicel, the ceiling, 2.50x the top\'s 100) — the same ramp on build 3\'s own row, measured in Node over the whole inflorescence matrix (overtop.mjs) before CI reached it' },
+});
+for (const [label, e] of Object.entries(INFLO_OVERTOP_XFAIL)) {
+  if (!e || !Number.isFinite(e.intrusionMm) || !(e.intrusionMm > 0)) throw new Error(`INFLO_OVERTOP_XFAIL: "${label}" declares no positive intrusion (${JSON.stringify(e)}) — an entry is {intrusionMm[, note]}, and a declaration without a number is a label`);
+}
+
 export const EXPORT_REFUSED_XFAIL = Object.freeze({
   'ALL MAX': { tris: 3090816, note: 'THE PETAL EDGE PROFILE (the rim taper and bead) takes this row 2,354,268 -> 3,090,816 tris (export), 157.0%% -> 206.1%% of the 1,500,000 budget. AT EIGHT BEAD SEGMENTS IT READ 4,239,920 (282.7%%); Eva ruled the count down to FOUR (eight puts facets at about 0.2 mm, under Nylon 12 White\'s ~0.35-0.4 mm resolvable detail) and this row fell 27.1%%. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +31.3%% over main here against +29.7%% on the shipping default. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +80.1%% here against +73.7%% on the shipping default. Measured in Node on both trees by `node tools/bloom-xfail-magnitudes.mjs --include-refused`; XR1\'s builder tally agrees with the refused count. Before that: 2,354,268 tris (export) against the 1,500,000 budget (ORGANIC VARIANCE build 1 — docs/bloom-organic-variance-size-outcome.md §6: the blanket sweep hands `varianceSize` its 0.50, and the FRINGE\'s tooth ceiling is a rule about the terminal\'s WIDTH, `W >= (2N-1) * MIN_FEATURE_MM`, so the 0.5x petals of the wave cut fewer teeth — per petal 10/9/8/…/1 where the unvaried row cut 10/8/6/4/3 per whorl — and the row lost 152,384 triangles: 2,506,652 -> 2,354,268, measured in Node on both amounts. A topology move by the fringe\'s own width rule, mode-free as that rule is; XR1\'s builder tally agrees with the refused count.) Before that: 2,506,652 tris, a 119.5 MiB file (sepals part 1: the blanket sweep now also hands `sepalCount` its maximum, 40 sepals at the shipped sub-control defaults on the 40-petal rim, +94,240 tris over the 2,412,412 the row read on main after the stem tip plug (the sepal session first quoted +94,140, computed against the stale 2,412,512; the count itself was measured); the sepal sub-controls are hidden at DEFAULTS and stay out of the sweep; the count is re-measured on the merged tree by `node tools/bloom-xfail-magnitudes.mjs --include-refused`). Before that, the fringe: the blanket sweep hands the three fringe controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.' },
   /* THE SHARED NODE ON RULING 9'S CORNER (the node-laws session). Not a
@@ -9030,6 +9102,13 @@ export function exportRefusedLine(label, r) {
 
 /* A declaration naming a row the matrix did not run is worse than an absence —
    `SELF_INTERSECTION_XFAIL`'s own coverage clause, for the same reason. */
+/* The same coverage clause for the overtop list: a declared row the matrix
+   did not run is a declaration nothing measures. */
+export function infloOvertopCoverage(attemptedLabels) {
+  const have = new Set(attemptedLabels);
+  const stray = Object.keys(INFLO_OVERTOP_XFAIL).filter((l) => !have.has(l));
+  return stray.length ? [`ID9 coverage: INFLO_OVERTOP_XFAIL names ${stray.length} row(s) the matrix did not run — ${stray.map((l) => `"${l}"`).join(', ')} — a declaration nothing measures is worse than an absence`] : [];
+}
 export function exportRefusedCoverage(attemptedLabels) {
   const have = new Set(attemptedLabels);
   const stray = Object.keys(EXPORT_REFUSED_XFAIL).filter((l) => !have.has(l));
