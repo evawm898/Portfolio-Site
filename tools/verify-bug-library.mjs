@@ -29,6 +29,13 @@
           the SAME params, byte for byte.
      LB6  the whole-bug Randomize uses it: every random bug with wings carries a
           label, and its wing outlines are that label's blend.
+     LB7  the draws are keyed on shape IDS, not on library position (§15.1): on
+          every random gate row (random:1..40, the whole-bug Randomize) and on
+          RANDOMIZE WINGS seeds 1..8 on the default, the library with one shape
+          the row never drew (accepted or refused) REMOVED gives the same label,
+          the same tries and byte-identical params, and so does the library in
+          REVERSED order; and (non-vacuity) removing the shape a row DID draw
+          changes that row. The reference is the full library's own draw.
 
    The WING ANGLE (design doc §14). The library stores each wing turned to
    angle 0 with the angle it was found at; applying poses it.
@@ -95,12 +102,14 @@ export function wingProblems(G, params, model) {
   return out;
 }
 
-export function libraryChecks(G) {
+export function libraryChecks(G, opts = {}) {
   const out = [], ok = (c, m) => out.push([!!c, m]);
   const lib = G.WING_LIBRARY, d = G.defaultParams();
   // Eva's keep lists, RESTATED here (never read from the library): #1-#17 from
-  // the step-1 sheet, #18-#57 but #34 and #50 from the wing-shape audit (§13.7)
-  const KEPT = [...Array.from({ length: 57 }, (_, i) => i + 1).filter((id) => ![34, 50].includes(id))];
+  // the step-1 sheet, #18-#57 but #34 and #50 from the wing-shape audit (§13.7),
+  // less #22 (merged into #4) and #19 (merged into #10) — her ruling on the
+  // wing-angle audit (§14.5, applied §15.4)
+  const KEPT = [...Array.from({ length: 57 }, (_, i) => i + 1).filter((id) => ![34, 50, 22, 19].includes(id))];
   const ids = lib.map((s) => s.id);
   ok(ids.length === KEPT.length && KEPT.every((id, i) => ids[i] === id), `LB1: the library holds Eva's ${KEPT.length} kept shapes, ids in order (${lib.length}${ids.join(',') === KEPT.join(',') ? '' : ': ' + ids.join(',')})`);
   // LB1
@@ -172,6 +181,38 @@ export function libraryChecks(G) {
     if (!same(r.params.wings.first.points, sh.fore.points) || !same(r.params.wings.last.points, sh.hind.points)) bad6.push(`random:${s}: the wings are not "${r.label}"`);
   }
   ok(!bad6.length && n6 > 0, `LB6: the whole-bug Randomize draws its wings from the library blend (${n6} winged bugs of 24)${bad6.length ? ' — ' + bad6.slice(0, 3).join(' | ') : ''}`);
+  // LB7 (opts.lb7 === false skips it: the negative control runs it only on the
+  // clean module and on the mutant that names it — every other mutant names
+  // another clause, and LB7's ~200 builds ten times over cost the CI job its
+  // 30 minutes)
+  if (opts.lb7 !== false) {
+    const bad7 = []; let n7 = 0, moved = 0, tried = 0;
+    const ids = (r) => new Set(r.blend ? [r.blend.a, r.blend.b, ...r.blend.refused.flatMap((x) => [x.a, x.b])] : []);
+    const rev = [...lib].reverse();
+    // the SAME verdict (wingShapeProblem) cached on the candidate params: a row
+    // run against a smaller or reordered library draws the same candidates and
+    // need not rebuild them; the draw itself is what LB7 tests
+    const memo = new Map(), problem = (q) => { const k = JSON.stringify(q); if (!memo.has(k)) memo.set(k, G.wingShapeProblem(q)); return memo.get(k); };
+    const cases = [];
+    for (let s = 1; s <= 40; s++) cases.push([`random:${s}`, (o) => G.randomParamsWithBlend(s, o)]);
+    for (let s = 1; s <= 8; s++) cases.push([`RANDOMIZE WINGS seed ${s}`, (o) => G.randomWingBlend(d, s, o)]);
+    for (const [name, run] of cases) {
+      let r; try { r = run({ problem }); } catch (e) { bad7.push(`${name}: ${e.message}`); continue; }
+      if (!r.blend) continue;
+      const used = ids(r), unrel = lib.find((x) => !used.has(x.id)), unrel2 = [...lib].reverse().find((x) => !used.has(x.id));
+      n7++;
+      for (const [what, L] of [[`without #${unrel.id}`, lib.filter((x) => x !== unrel)], [`without #${unrel2.id}`, lib.filter((x) => x !== unrel2)], ['reversed', rev]]) {
+        let r2; try { r2 = run({ library: L, problem }); } catch (e) { bad7.push(`${name} ${what}: ${e.message}`); continue; }
+        if (r2.label !== r.label || !r2.blend || r2.blend.tries !== r.blend.tries || !same(r2.params, r.params)) bad7.push(`${name} ${what}: "${r2.label}" where the full library drew "${r.label}"`);
+      }
+      if (tried < 3) {
+        tried++;
+        const A = lib.find((x) => x.id === r.blend.a), r3 = run({ library: lib.filter((x) => x !== A), problem });
+        if (r3.label === r.label) bad7.push(`${name}: removing #${A.id}, which it drew, left "${r.label}" (vacuous)`); else moved++;
+      }
+    }
+    ok(!bad7.length && n7 > 0 && tried === 3 && moved === 3, `LB7: the draws are keyed on shape ids — ${n7} random rows unchanged by removing either of two shapes they never drew and by reversing the library; ${moved}/3 rows move when the shape they drew is removed${bad7.length ? ' — ' + bad7.slice(0, 3).join(' | ') : ''}`);
+  }
   return out;
 }
 
@@ -193,9 +234,10 @@ export const LIBRARY_MUTANTS = [
   ['applying resets the venation', "W.last.scallop = 0;", "W.last.scallop = 0; W.last.veinCount = 2;", 'LB2'],
   ['the hindwing keeps its own length', '  W.last.length = +clamp(W.first.length * shape.hind.lengthRatio, lf.min, lf.max).toFixed(3);\n', '', 'LB2'],
   ['an unlinked middle survives the apply', '  W.unlinked = {};\n  W.tail', '  W.tail', 'LB3'],
-  ['the re-roll is disabled', "const why = q.wingPairs > 0 ? wingShapeProblem(q) : null;", 'const why = null;', 'LB4'],
+  ['the re-roll is disabled', "const why = q.wingPairs > 0 ? (opts.problem || wingShapeProblem)(q) : null;", 'const why = null;', 'LB4'],
   ['the label names a t that was not used', 'const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], t));', 'const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], Math.min(0.9, t + 0.05)));', 'LB5'],
-  ['the whole-bug Randomize keeps its own outlines', "  const b = randomWingBlend(q, Math.floor(r() * 4294967296));\n  return { params: b.params,", "  const b = randomWingBlend(q, Math.floor(r() * 4294967296));\n  return { params: q,", 'LB6'],
+  ['the whole-bug Randomize keeps its own outlines', "  const b = randomWingBlend(q, Math.floor(r() * 4294967296), opts);\n  return { params: b.params,", "  const b = randomWingBlend(q, Math.floor(r() * 4294967296), opts);\n  return { params: q,", 'LB6'],
+  ['the draw picks by library POSITION again', 'const A = drawShape(lib, seed, k, 1), B = drawShape(lib, seed, k, 2, A);', 'const ia = Math.floor(drawHash(seed, k, 1) * lib.length); let ib = Math.floor(drawHash(seed, k, 2) * (lib.length - 1)); if (ib >= ia) ib++; const A = lib[ia], B = lib[ib];', 'LB7'],
 ];
 
 /* ---------- WA: the wing angle (§14) ---------- */

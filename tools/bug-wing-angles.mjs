@@ -170,10 +170,10 @@ else if (CMD === 'review') (await import('./bug-wing-angles-review.mjs')).review
    anchor is on the posed outline). Header and ids untouched. */
 if (CMD === 'store') {
   // Eva's ruling on the wing-angle audit (Oct 5): #22 into #4 and #19 into #10
-  // are APPROVED and DEFERRED to a follow-up PR with two builder fixes (removing
-  // them reshuffles the random draws onto blends main's builder gets wrong,
-  // §14.5). Fill MERGED there; ids never change, a merged id is a gap.
-  const MERGED = {};
+  // (§14.5), applied with the two builder fixes and stable draws (§15): the
+  // merged id -> the shape it was merged into. Ids never change; a merged id is
+  // a gap.
+  const MERGED = { 22: 4, 19: 10 };
   const snap = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/bug-wing-library-snapshot.json'), 'utf8')).filter((s) => !(s.id in MERGED));
   const file = path.join(ROOT, 'bug-wing-library.js'), src = fs.readFileSync(file, 'utf8');
   const head = src.slice(0, src.indexOf('export const WING_LIBRARY'));

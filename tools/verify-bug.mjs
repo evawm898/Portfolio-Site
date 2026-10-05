@@ -141,15 +141,16 @@
    BETWEEN parts (overlapping closed shells are the export contract).
 
    --negative-control  breaks built models thirty-five ways (plus the L clause at reach 1, three
-                       broken editor frames for Q, ten CODE mutants of bug-image.js for IM, and seven CODE
-                       mutants of bug-geometry.js plus one data mutant for LB — every anchor checked to
+                       broken editor frames for Q, ten CODE mutants of bug-image.js for IM, eight CODE
+                       mutants of bug-geometry.js plus one data mutant for LB, and two ROW mutants of
+                       bug-geometry.js built on the §15 fixtures for N and E1 — every anchor checked to
                        match exactly once before any of them runs) and requires each
                        to be caught by the clause that names it.
    --seeds N           number of random bugs (default 40). */
 
 import * as G from '../bug-geometry.js';
 import { polyArea as venArea } from '../bug-venation.js';
-import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin } from './bug-fixtures.mjs';
+import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin, rootUnderFloor, pitchedBeadHoles } from './bug-fixtures.mjs';
 import * as IMG from '../bug-image.js';
 import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
 import { libraryChecks, libraryRows, LIBRARY_MUTANTS, angleChecks, angleRows, ANGLE_MUTANTS } from './verify-bug-library.mjs';
@@ -865,7 +866,7 @@ function edgeRoundChecks(model) {
       const Vn = Math.hypot(...Vv), Dn = Math.hypot(...Dv);
       beads++;
       if (2 * Vn < floor - 1e-9) under++;
-      if (Dn > Vn * (1 + (untwisted ? 1e-9 : 1e-2)) + 1e-12) over++;   // a PITCHED wing is a helicoid: the world chord between two points of its mid-surface carries the twist between them (measured up to 0.12% on random:1, the planform record exactly 1), so there the bar is 1%
+      if (Dn > Vn * (1 + 1e-9) + 1e-12) over++;   // the WORLD chord, on a pitched wing too: a pitched wing is a helicoid that stretches planform distances along the span, so the builder sizes the bead by its world chord (design doc §15.3); the old 1% allowance for pitch let a 1.12% bead through (#55/#27 at 0.37, holes)
       if (r.apex[0] > rampEnd + 1e-9) { aMin = Math.min(aMin, Dn / Vn); if (!(Dn > 0)) flat++; if (Dn >= 0.98 * Vn) full++; }
       if (untwisted) {
         for (let j = 0; j <= K; j++) { const t = (Math.PI * j) / K, X = V3(r.ids[j]); ellRes = Math.max(ellRes, Math.hypot(...X.map((x, d) => x - M[d] - Math.sin(t) * Dv[d] - Math.cos(t) * Vv[d]))); }
@@ -1236,6 +1237,26 @@ function functionChecks() {
     }
     ok(clamped.length === 0 && lo > f.min && hi < f.max, `Y: Set specimen squares the forewing without clamping on ${n} random bugs (sweep ${lo.toFixed(1)}..${hi.toFixed(1)}° inside ${f.min}..${f.max}°)${clamped.length ? ` — CLAMPED: ${clamped.slice(0, 8).join(', ')}` : ''}`);
   }
+  // N0 (§15.2): the builder's floor measure and this file's are ONE definition
+  // on one lattice — a floor-disc centre is a grid point at least floor/2 from
+  // the boundary by exact segment distance — so they agree to the grid on every
+  // wing; on the root-under-floor fixture's hindwing both read it thin and the
+  // builder reports it
+  {
+    const bad = []; let n = 0, worst = 0, fx = null;
+    const rowsN0 = [['fixture root under floor', rootUnderFloor()], ['default', G.defaultParams()], ['blended thin', blendedThin()], ...[1, 2, 3, 4, 5, 6].map((s) => [`random:${s}`, G.randomParams(s)])];
+    for (const [name, p] of rowsN0) {
+      const m = G.buildBug(p), floor = m.params.minDiameter;
+      for (const part of m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+        const poly = part.meta.root ? part.meta.planform : part.meta.planform.slice(1, -1), ig = part.meta.root ? 0 : -Infinity;
+        const g = gateThinDepth(poly, floor, 12, ig), b = G.thinAnalysis(poly, floor, { ignoreXBelow: ig });
+        n++; worst = Math.max(worst, Math.abs(g.depth - b.maxDepth));
+        if (Math.abs(g.depth - b.maxDepth) > g.h + 1e-9) bad.push(`${name} ${part.name}: gate ${g.depth.toFixed(3)} mm, builder ${b.maxDepth.toFixed(3)}`);
+        if (name.startsWith('fixture') && part.kind === 'wing3') fx = { g: g.depth, b: b.maxDepth, viol: m.floorViolations.some((v) => v.pair === 2 && v.kind !== 'vein') };
+      }
+    }
+    ok(!bad.length && fx && fx.g > 0.5 + 1e-9 && fx.b > 0.5 + 1e-9 && fx.viol, `N0: the builder's floor measure and this file's agree within one grid step on ${n} wings (worst ${worst.toFixed(3)} mm); the #20/#31 hindwing root reads ${fx ? fx.g.toFixed(2) : '?'} / ${fx ? fx.b.toFixed(2) : '?'} mm past the floor disc${fx && fx.viol ? ' and is reported' : ' — NOT reported by the builder'}${bad.length ? ' — ' + bad.slice(0, 3).join(' | ') : ''}`);
+  }
   return out;
 }
 
@@ -1348,6 +1369,12 @@ function rowsFor(nseeds) {
   { const p = d(); p.wings.tail = JSON.parse(JSON.stringify(THIN_TAIL)); rows.push(['tail drawn under the floor', p, { expectThin: true }]); }
   { const p = d(); p.wingPairs = 3; p.wings.first.points = CROSSING_BLEND.first; p.wings.last.points = CROSSING_BLEND.last; rows.push(['crossing blend (3 pairs)', p, { repaired: true }]); }
   rows.push(['blended pair under the floor', blendedThin(), { repaired: true, expectBlended: true }]);
+  // §15.2: a library blend whose hindwing root channel is under the floor —
+  // the builder's disc test once read it clear (0.42 mm against the gate's
+  // 1.04) and exported; §15.3: a pitched holes blend whose world beads were
+  // wider than a half-round (E1). Both kept as params (tools/bug-fixtures.mjs).
+  rows.push(['fixture: #20/#31 at 0.62, hindwing root under the floor (refused)', rootUnderFloor(), { expectThin: true }]);
+  rows.push(['fixture: #55/#27 at 0.37, pitched, holes', pitchedBeadHoles(), {}]);
   // VENATION rows (Phase 2): both modes on the default and at 4 pairs (V3 on
   // the linked middle pairs), the cross-vein density axis, the regularity
   // axis, a tail with a vein into it, the pterostigma, veins drawn under the
@@ -1592,11 +1619,12 @@ if (NEG) {
     let k = 0;
     for (const [name, from, to, clause] of [...LIBRARY_MUTANTS, ...ANGLE_MUTANTS]) {
       if (src.split(from).length - 1 !== 1) continue;
+      const lbOpts = { lb7: clause === 'LB7' };   // LB7 only where it is the clause named (cost; see libraryChecks)
       const file = path.join(ROOT, `.bug-geometry.mutant-${process.pid}-${k++}.mjs`);
       fs.writeFileSync(file, src.replace(from, to));
       let fails = [];
       try { const M = await import(pathToFileURL(file).href); const run = (f) => { try { return f(M).filter(([c]) => !c).map(([, m]) => m); } catch (e) { return [`(threw) ${e.message}`]; } };
-        fails = [...run(libraryChecks), ...run(angleChecks)]; }
+        fails = [...run((X) => libraryChecks(X, lbOpts)), ...run(angleChecks)]; }
       catch (e) { fails = [`(threw) ${e.message}`]; }
       finally { fs.unlinkSync(file); }
       const fired = fails.some((f) => f.startsWith(clause + ':'));
@@ -1605,7 +1633,7 @@ if (NEG) {
     }
     // a library shape whose forewing crosses itself (two interior points swapped)
     const lib = JSON.parse(JSON.stringify(G.WING_LIBRARY)), f = lib[4].fore.points; [f[3], f[f.length - 4]] = [f[f.length - 4], f[3]];
-    const fails = libraryChecks({ ...G, WING_LIBRARY: lib }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
+    const fails = libraryChecks({ ...G, WING_LIBRARY: lib }, { lb7: false }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${'a library shape crosses itself'.padEnd(32)} by LB1  — ${fails.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
     if (!fired) ok = false;
     // the stored wing angles ZEROED (a library that forgot where its wings were found)
@@ -1613,6 +1641,39 @@ if (NEG) {
       const f0 = angleChecks({ ...G, WING_LIBRARY: lib0 }).filter(([c]) => !c).map(([, m]) => m), fired0 = f0.some((x) => x.startsWith('WA1:')) && f0.some((x) => x.startsWith('WA2:'));
       console.log(`${fired0 ? 'CAUGHT' : 'MISSED'} ${'the stored angles are zeroed'.padEnd(32)} by WA1+WA2  — ${f0.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
       if (!fired0) ok = false; }
+  }
+  // ROW mutants of bug-geometry.js (§15.2, §15.3): the builder fixes undone,
+  // each a copy written beside it and imported; the fixture row is BUILT by the
+  // mutated module and run through this file's own row clauses, which must name
+  // the defect (every anchor checked first; the clean module must pass the row)
+  {
+    const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const src = fs.readFileSync(path.join(ROOT, 'bug-geometry.js'), 'utf8');
+    const OLD_CORE = `  const outside = new Uint8Array(nx * ny); for (let i = 0; i < outside.length; i++) outside[i] = inside[i] ? 0 : 1;
+  const dOut = edt2(outside, nx, ny);
+  const core = new Uint8Array(nx * ny);
+  const r2 = (r / h) ** 2;
+  for (let i = 0; i < core.length; i++) core[i] = inside[i] && dOut[i] >= r2 ? 1 : 0;
+  if (0) {`;
+    const ROW_MUTANTS = [
+      ['the disc test reads a pixel distance again', '  const core = new Uint8Array(nx * ny);\n  const r2 = (r / h) ** 2;\n  {', OLD_CORE, 'N', rootUnderFloor, { expectThin: true }],
+      ['a pitched bead is sized in the planform', 'const kPitch = spec.pitch ? Math.abs((spec.pitch * D2R) / span) : 0;', 'const kPitch = 0;', 'E1', pitchedBeadHoles, {}],
+    ];
+    for (const [name, from] of ROW_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
+    for (const [name, , , , fx, opts] of ROW_MUTANTS) { const r = check(`${name} (clean)`, G.buildBug(fx()), opts); console.log(fmt(r)); for (const x of r.fails) console.log('     ' + x); if (r.fails.length) ok = false; }
+    let k = 0;
+    for (const [name, from, to, clause, fx, opts] of ROW_MUTANTS) {
+      if (src.split(from).length - 1 !== 1) continue;
+      const file = path.join(ROOT, `.bug-geometry.rowmutant-${process.pid}-${k++}.mjs`);
+      fs.writeFileSync(file, src.replace(from, to));
+      let fails = [];
+      try { const M = await import(pathToFileURL(file).href); fails = check(name, M.buildBug(fx()), opts).fails; }
+      catch (e) { fails = [`(threw) ${e.message}`]; }
+      finally { fs.unlinkSync(file); }
+      const fired = fails.some((f) => f.startsWith(clause + ':'));
+      console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${fails.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
+      if (!fired) ok = false;
+    }
   }
   const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
   const splay = legExposure(G.buildBug(splayP));
