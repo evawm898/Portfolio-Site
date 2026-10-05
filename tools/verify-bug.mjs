@@ -152,7 +152,7 @@ import { polyArea as venArea } from '../bug-venation.js';
 import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin } from './bug-fixtures.mjs';
 import * as IMG from '../bug-image.js';
 import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
-import { libraryChecks, libraryRows, LIBRARY_MUTANTS } from './verify-bug-library.mjs';
+import { libraryChecks, libraryRows, LIBRARY_MUTANTS, angleChecks, angleRows, ANGLE_MUTANTS } from './verify-bug-library.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -1585,17 +1585,17 @@ if (NEG) {
   {
     const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
     const src = fs.readFileSync(path.join(ROOT, 'bug-geometry.js'), 'utf8');
-    for (const [name, from] of LIBRARY_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
-    const cleanLb = libraryChecks(G).filter(([c]) => !c);
+    for (const [name, from] of [...LIBRARY_MUTANTS, ...ANGLE_MUTANTS]) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
+    const cleanLb = [...libraryChecks(G), ...angleChecks(G)].filter(([c]) => !c);
     console.log(cleanLb.length ? `LB clean run FAILED: ${cleanLb.map(([, m]) => m).join(' | ')}` : 'LB clean run: every check passes');
     if (cleanLb.length) ok = false;
     let k = 0;
-    for (const [name, from, to, clause] of LIBRARY_MUTANTS) {
+    for (const [name, from, to, clause] of [...LIBRARY_MUTANTS, ...ANGLE_MUTANTS]) {
       if (src.split(from).length - 1 !== 1) continue;
       const file = path.join(ROOT, `.bug-geometry.mutant-${process.pid}-${k++}.mjs`);
       fs.writeFileSync(file, src.replace(from, to));
       let fails = [];
-      try { const M = await import(pathToFileURL(file).href); fails = libraryChecks(M).filter(([c]) => !c).map(([, m]) => m); }
+      try { const M = await import(pathToFileURL(file).href); fails = [...libraryChecks(M), ...angleChecks(M)].filter(([c]) => !c).map(([, m]) => m); }
       catch (e) { fails = [`(threw) ${e.message}`]; }
       finally { fs.unlinkSync(file); }
       const fired = fails.some((f) => f.startsWith(clause + ':'));
@@ -1607,6 +1607,11 @@ if (NEG) {
     const fails = libraryChecks({ ...G, WING_LIBRARY: lib }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${'a library shape crosses itself'.padEnd(32)} by LB1  — ${fails.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
     if (!fired) ok = false;
+    // the stored wing angles ZEROED (a library that forgot where its wings were found)
+    { const lib0 = JSON.parse(JSON.stringify(G.WING_LIBRARY)); for (const s of lib0) { s.fore.sweep = 0; s.hind.sweep = 0; }
+      const f0 = angleChecks({ ...G, WING_LIBRARY: lib0 }).filter(([c]) => !c).map(([, m]) => m), fired0 = f0.some((x) => x.startsWith('WA1:')) && f0.some((x) => x.startsWith('WA2:'));
+      console.log(`${fired0 ? 'CAUGHT' : 'MISSED'} ${'the stored angles are zeroed'.padEnd(32)} by WA1+WA2  — ${f0.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
+      if (!fired0) ok = false; }
   }
   const splayP = G.defaultParams(); splayP.legReach = 1;              // the default is tucked now: splay it explicitly
   const splay = legExposure(G.buildBug(splayP));
@@ -1617,16 +1622,31 @@ if (NEG) {
   process.exit(ok ? 0 : 1);
 }
 
+/* --rows <file.json>: [[label, params], ...] built through every row clause
+   and NOTHING else (no function checks, no fixture rows) — the wing-angle
+   sweep's instrument (tools/bug-wing-angles.mjs). Never a gate pass. */
+const rowsArg = args.indexOf('--rows');
+if (rowsArg >= 0) {
+  let bad = 0; const list = JSON.parse(fs.readFileSync(args[rowsArg + 1], 'utf8'));
+  for (const [label, params] of list) {
+    let r; try { r = check(label, G.buildBug(params), {}); } catch (e) { r = { label, fails: [`THROW: ${e.message}`] }; }
+    console.log(`${r.fails.length ? 'FAIL' : 'ok  '} ${label}`); for (const f of r.fails) console.log('     ' + f);
+    if (r.fails.length) bad++;
+  }
+  console.log(`ROWS: ${list.length - bad}/${list.length} pass — not a gate pass`);
+  process.exit(bad ? 1 : 0);
+}
+
 let failed = 0;
 const fc = functionChecks();
 for (const [c, msg] of fc) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
 const im = imageChecks(IMG);
 for (const [c, msg] of im.checks) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
 fc.push(...im.checks);
-const lb = libraryChecks(G);
+const lb = [...libraryChecks(G), ...angleChecks(G)];
 for (const [c, msg] of lb) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
 fc.push(...lb);
-const rows = [...rowsFor(NSEEDS), ...imageRows(im.results), ...libraryRows(G)].filter(([label]) => !ONLY || ONLY.test(label));
+const rows = [...rowsFor(NSEEDS), ...imageRows(im.results), ...libraryRows(G), ...angleRows(G)].filter(([label]) => !ONLY || ONLY.test(label));
 const support = [];
 for (const [label, params, opts] of rows) {
   const model = G.buildBug(params);
