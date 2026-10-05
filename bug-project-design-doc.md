@@ -2293,3 +2293,132 @@ candidates are appended to `bug-wing-library.js` as #18–#57 with the audit's o
 the audit's — refitted at the library's root convention, with the fixes above. #1–#17 are
 unchanged. LB1 now restates the 55 kept ids in order.
 
+
+
+## 14. Wing angles — each preset carries the angle it was found at
+
+Eva's brief (Oct 5): presets carry their own wing angle, the library knows when two presets are
+the same wing shape at different angles, and applying a preset sets the angle it was found at.
+Eva calls it "tilt"; it is an in-plane angle about the hinge, seen from above — **not** the
+pair's `sweep` field (which stays 0, §13.3 #2), and never dihedral or pitch.
+
+### 14.1 The convention (one for every wing)
+
+In TRUE planform — (u, w × stretch), units of the wing's own length, so the measure is isotropic —
+the wing's AXIS runs from the hinge (0, 0) to the arc-length centroid of the drawn outline
+**beyond the root bridge** (r > `WING_ANGLE_RAMP[1]` = 0.3 lengths; the tail group is not part of
+it). The angle is that axis's angle from the span direction (+u, square to the body),
+**positive backward** — the sweep field's sign. `wingAngleOf` is its one owner. A farthest-point
+axis was built first and dropped: #4 and #22, near-identical wings, read 8° apart because their
+farthest points sat on different lobes; the centroid reads them 2.4° apart, which the
+angle-free alignment confirms (2.7°).
+
+### 14.2 Store and apply — the builder learns nothing (§13.6 not repeated)
+
+Each library wing is stored at ANGLE 0 (`points`: its outline turned onto its own axis, 9
+decimals) with the angle it was found at (`sweep`, degrees) and the RANGE its control allows
+(`range`, offsets from that angle, measured — §14.4). Applying (`posedWing` →
+`rotateWingBlade`) regenerates an ORDINARY outline: each control point turns by
+deg × ramp(r), r its distance from the hinge — 0 inside `WING_ANGLE_RAMP[0]` (0.06; the root
+anchors on u = 0 stay where they are, the root chord square to the body), 1 beyond 0.3 (the
+blade turns rigidly), a smoothstep between (the root bridge, tangent-continuous at both ends).
+A turn about the hinge keeps r, so turns add exactly; a stretch too small for the turned
+outline is raised (the true shape unchanged); the tail turns with the blade and is re-anchored
+on the turned margin, its offsets re-read in the new anchor's frame. `buildBug`,
+`editorFrame` and every root construction are untouched: the engine only sees outlines.
+
+**Why not the fitter's root completion (`completeChain`) literally**: completion bridges a dense
+chain and is then re-FITTED to control points at a 0.6 mm tolerance, so it cannot reproduce
+today's outline at the found angle within 0.05 mm, and a turn of 0.5° would jump by the fit's
+own error. The ramp is the same construction on the control points — a root on u = 0 square to
+the body, joined tangent-continuously to the turned blade — and it is the identity at 0°.
+
+**At each preset's own angle the bug is #361's to the bit**: posing the 9-decimal canonical
+outline rounds back to the 5-decimal points it came from. WA1 measures it in world mm through
+`editorFrame` against `tools/bug-wing-library-snapshot.json` (#361's data, applied by the old
+rule restated in the gate): worst **0.00 mm** over 55 shapes × both pairs (bar 0.05 mm).
+On the way: #16's tail first landed 0.59 mm off with 5-decimal canonicals — its anchor sits
+exactly on a control point's u, where a 1e-5 nudge swings the tail frame's tangent window by
+2.6°.
+
+### 14.3 The page
+
+A per-pair **Wing angle** slider in the pair block (first, last, and unlinked middle pairs; a
+linked middle blends). Its value is the outline's own measured angle; it runs the wing's
+measured range about the angle the wing was FOUND at (a library shape), or ±20° about the angle
+it was loaded at (anything else — unmeasured, said in the tooltip); setting it calls
+`setWingAngle` (turn, then two small corrections: the spline is drawn in (u, w), so a turn in
+true planform is not exactly a turned curve when the stretch is not 1 — lands within 0.01°). A
+turn the outline rule refuses is told and not made. Undoable.
+
+### 14.4 The range — measured per wing, not declared
+
+Each wing's `range` is what `node tools/bug-wing-angles.mjs sweep` found: every whole degree
+from −20 to +20 that the outline rule accepts (the span), each built on the default bug through
+EVERY row clause of the gate (`verify-bug.mjs --rows`): **3,948 built rows, 63 failing, all
+S** (the rounded edge leaving a contour line 0.50–0.81 mm inside the outline — the class §13.7
+met, knife-edge in the angle: #4's forewing fails at +2..+5 and passes beyond). The range is
+the widest run about 0 with no failure, stored in MEASURED degrees (a raw turn reads slightly
+less where the stretch is raised: +16 raw is +15.81 on #16's hindwing — the first version
+stored raw degrees and the control, which asks for measured ones, was refused at that edge;
+WA3 caught it), clamped to ±20.
+
+- **Forewings: 49 of 55 turn the full ±20°** (median −19.8…+19.8). Narrowest: #4 (−20…+1.9),
+  #29 (−19.7…+5.9), #15 (−20…+10), #26 (−6.9…+19.5) — each stopped by an S hairline.
+- **Hindwings: 8 of 55 turn the full ±20°; median −19.8…+12.0.** Turned BACK, a hindwing's
+  inner edge runs along the abdomen and reaches into the body (u < 0), which the outline rule
+  refuses — the commonest limit, a property of the shape, not of the turn. Turned forward a few
+  outrun the drawing area. Narrowest: #31 (−5.9…+0.9), #17 (−1.9…+7.9), #55 (−0.9…+8.1), #40
+  (−4.9…+3.9), #25 (−6.9…+3.0).
+
+The gate cannot afford 3,948 rows; it holds the range three ways: WA3 (every wing, both ends
+and the midpoints, the control lands within 0.01°), WA4 (every wing's range, the root unmoved)
+and 18 built rows `angle: …` (#5, #13, #31 at both ends of the range, each pair alone and both).
+Between the integer degrees the sweep built, the slider's half-degree stops are not built — the
+sweep is the evidence and says what it covers.
+
+### 14.5 Same shape, different angle — the audit
+
+`node tools/bug-wing-angles.mjs measure` compares every pair of shapes with the angle taken out
+(each wing turned onto its own axis, then the residual turn that best aligns them, ±12°), in
+units of each wing's own length, the root zone (r < 0.15) left out; bar: the library's dedupe
+bar (2.16 mm at a 41 mm wing). Two groups pass on BOTH wings:
+
+| group | forewings aligned (as drawn) | hindwings aligned (as drawn) | Δ angle fore / hind |
+|---|---|---|---|
+| #4 ~ #22 | 1.47 (2.50) mm | 1.18 (2.50) | 2.7° / −2.5° |
+| #4 ~ #57 | 1.86 (4.04) | 2.19 (2.67) | −6.7° / −1.1° |
+| #22 ~ #57 | 2.02 (4.67) | 2.05 (2.81) | −7.3° / 1.6° |
+| #10 ~ #19 | 1.42 (1.74) | 2.11 (2.55) | 0.5° / −0.7° |
+
+#4 / #22 and #10 / #19 are near-duplicates at nearly the same angle; #57 is #4 / #22's forewing
+turned ~7° back. Near pairs the angle explains most of (as drawn ≫ aligned, over the bar):
+#12 ~ #39 (fore 11.66 → 3.06 mm at −14.5°, hind 7.41 → 2.45 at −11°), #38 ~ #54 fore
+(10.61 → 2.28 at −14.7°), #9 ~ #10 fore (7.96 → 3.03 at −11.7°), #22 ~ #35 / #4 ~ #35 fore
+(~9 → 3.2 at ~−10°). **RULED (Eva, Oct 5): merging #22 into #4 and #19 into #10 is APPROVED and DEFERRED** to a
+follow-up PR, together with two builder fixes. Removing the two entries reshuffles the random
+bugs' blends (picked by position in the library), and the new draws hit two pre-existing
+builder defects, both reproduced on `main`'s own code: random:3's blend #20/#31 at 0.62 has a
+hindwing the gate's N measure reads 1.04 mm past the floor disc while the builder reads 0.42
+(under its 0.5 bar) and exports; random:1's blend #55/#27 at 0.37 in HOLES fails E1 (6 beads
+wider than a half-round). The library therefore stays at 55 shapes in this PR (option A);
+`tools/bug-wing-angles.mjs store`'s MERGED map is where the follow-up applies the merge.
+**#57 is kept** as its own shape: a narrower forewing tip and a ~16% longer hindwing, so it adds
+variety even though its forewing is #4's turned ~7° back. The angle ladder and the regenerated
+root were approved from the review page.
+
+### 14.6 Verification
+
+WA1–WA4 (tools/verify-bug-library.mjs, function checks) and the 18 `angle:` rows; the negative
+control adds three: the stored angle ignored on apply (WA1), the root turning with the blade and
+the bridge starting at the hinge (WA4), and a DATA mutant zeroing every stored angle (WA1 + WA2).
+**The angles were measured from the AUDITED FITS, not re-checked against the source sheets**
+(Eva's ruling, Oct 5: the fits were laid back over their sources and judged in §13.7, so the
+angle check against the pictures was skipped). The sheets were not in `tools/bug-wing-sources/`
+this session (they arrived in the chat as pictures, not files); the review tool draws each
+angle on the source crop when they are present.
+
+Tools: `node tools/bug-wing-angles.mjs measure | sweep | store | review [--out <dir>]` — the
+angles and groups, the per-wing range sweep (every built row through `verify-bug.mjs --rows`),
+the library rewrite from `tools/bug-wing-library-snapshot.json` (#361's data, also WA1's
+reference) and the review page.

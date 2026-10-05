@@ -812,16 +812,127 @@ function randomOutline(r) {
    repairs over 17 shapes and put shape #1 under the floor). Its count is kept. The pair count, every per-pair field below the outline (scallop,
    thickness, tilt, venation) and every body / leg / antenna control are left
    alone — there are no whole-bug presets. */
+/* A library wing is stored at ANGLE 0 (`points`, its outline turned onto its
+   own axis) with the angle it was found at (`sweep`, degrees, wingAngleOf's
+   convention — NOT the pair's sweep field, which stays 0). Posing it is one
+   rotateWingBlade: an ordinary outline, root anchors on u = 0 untouched. A
+   shape whose points are already posed (a blend) carries sweep 0, and posing
+   it is the identity. A pose the outline rule refuses throws: every library
+   shape is held valid at its own angle by the gate (WA1). */
+export function posedWing(w) {
+  const r = rotateWingBlade(w.points, w.stretch, w.sweep || 0);
+  if (!r.ok) throw new Error(`a library wing cannot be posed at ${w.sweep} deg: ${r.reason}`);
+  return r;
+}
 export const WING_SHAPE_WRITES = { first: ['points', 'stretch', 'sweep', 'scallop'], last: ['points', 'stretch', 'sweep', 'scallop', 'length'], wings: ['unlinked', 'tail'] };
 export function applyWingShape(params, shape) {
   const p = clone(params);
   const W = p.wings, lf = WING_FIELDS.find((f) => f.id === 'length');
-  W.first.points = shape.fore.points.map((q) => q.slice()); W.first.stretch = shape.fore.stretch; W.first.sweep = 0; W.first.scallop = 0;
-  W.last.points = shape.hind.points.map((q) => q.slice()); W.last.stretch = shape.hind.stretch; W.last.sweep = 0; W.last.scallop = 0;
+  const fore = posedWing(shape.fore), hind = posedWing(shape.hind);
+  W.first.points = fore.points; W.first.stretch = fore.stretch; W.first.sweep = 0; W.first.scallop = 0;
+  W.last.points = hind.points; W.last.stretch = hind.stretch; W.last.sweep = 0; W.last.scallop = 0;
   W.last.length = +clamp(W.first.length * shape.hind.lengthRatio, lf.min, lf.max).toFixed(3);
   W.unlinked = {};
   W.tail = shape.tail ? clone({ ...shape.tail, on: true }) : W.tail ? { ...clone(W.tail), on: false } : clone({ ...STARTER_TAIL, on: false });
   return p;
+}
+
+/* WING ANGLE (Eva's "tilt"; on this page it is a SWEEP-like angle in the
+   top-down plane, NOT the pair's sweep field and never dihedral or pitch).
+   Convention, one for every wing: in TRUE planform (u, w x stretch — units of
+   the wing's own length, isotropic) the wing's AXIS runs from the hinge (0, 0)
+   to the arc-length centroid of the drawn outline BEYOND the root bridge (the
+   blade; the tail group is not part of it); the angle is that axis's angle
+   from the span direction (+u, square to the body), POSITIVE BACKWARD (toward
+   the tail) — the sign of the sweep field. (A farthest-point axis was tried
+   first and dropped: two near-identical wings read 8 deg apart because their
+   farthest points sat on different lobes.)
+
+   rotateWingBlade turns a drawn outline by `deg` about the hinge and returns
+   an ORDINARY outline: each control point rotates by deg x ramp(r), r its
+   distance from the hinge in lengths — 0 inside WING_ANGLE_RAMP[0] (the root
+   anchors stay on u = 0, the root chord square to the body), 1 beyond
+   WING_ANGLE_RAMP[1] (the blade turns rigidly), a smoothstep between (the root
+   bridge, tangent-continuous at both ends). Because a rotation about the hinge
+   keeps r, two turns add exactly: rotate(rotate(P, a), b) = rotate(P, a + b).
+   The builder never sees anything but the result: buildBug is untouched.
+   A chord stretch too small for the turned outline is RAISED (the true shape
+   is unchanged); a turn that leaves the drawing area (u < 0: into the body) or
+   makes the outline invalid is refused with the outline's own reason. A tail
+   group follows the margin: its anchor is re-found at the turned anchor point. */
+export const WING_ANGLE_RAMP = [0.06, 0.3];
+export const WING_ANGLE_RANGE = [-20, 20];   // offset from the measured angle the control allows (design doc §14)
+const rampAt = (r) => { const t = clamp((r - WING_ANGLE_RAMP[0]) / (WING_ANGLE_RAMP[1] - WING_ANGLE_RAMP[0]), 0, 1); return t * t * (3 - 2 * t); /* the root bridge */ };
+export function wingAngleOf(points, stretch) {
+  // the BLADE's axis: the arc-length centroid of the drawn outline beyond the
+  // root bridge (r > WING_ANGLE_RAMP[1]), which turns rigidly with the blade
+  const d = sampleOutline(points).map(([u, w]) => [u, w * stretch]);
+  let cu = 0, cb = 0;
+  for (let k = 0; k + 1 < d.length; k++) {
+    const a = d[k], b = d[k + 1], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if (Math.hypot(m[0], m[1]) <= WING_ANGLE_RAMP[1]) continue;
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]); cu += l * m[0]; cb += l * m[1];
+  }
+  return Math.atan2(-cb, cu) / D2R;
+}
+/* set a wing to an ABSOLUTE angle: turn by the difference, then correct the
+   small residual (the spline is drawn in (u, w), so a turn in true planform is
+   not exactly a turn of the drawn curve when the stretch is not 1) — two
+   corrections land within 0.01 deg */
+export function setWingAngle(points, stretch, deg, tail = null) {
+  let r = { ok: true, points, stretch, tail };
+  for (let it = 0; it < 3; it++) {
+    const d = deg - wingAngleOf(r.points, r.stretch);
+    if (Math.abs(d) < 0.005) break;
+    const n = rotateWingBlade(r.points, r.stretch, d, r.tail);
+    if (!n.ok) return n;
+    r = n;
+  }
+  return r;
+}
+function turnPoints(points, stretch, deg) {
+  return points.map(([u, w]) => {
+    const b = w * stretch, r = Math.hypot(u, b), a = deg * D2R * rampAt(r);
+    if (a === 0) return [u, b];
+    const c = Math.cos(a), s = Math.sin(a);
+    return [u * c + b * s, -u * s + b * c];
+  });
+}
+/* the raw turn, NOT validated and not clamped to the drawing area: the
+   library's canonical outlines (turned to angle 0) are made with it */
+export function turnWingRaw(points, stretch, deg) {
+  return turnPoints(points, stretch, deg).map(([u, b], k) => [k === 0 || k === points.length - 1 ? 0 : u, b / stretch]);
+}
+export function rotateWingBlade(points, stretch, deg, tail = null) {
+  if (deg === 0) return { ok: true, points: points.map((q) => q.slice()), stretch, tail: tail ? clone(tail) : null };
+  const T = turnPoints(points, stretch, deg);
+  // the tail's own drawn points turn too (beyond the bridge: rigidly), and
+  // count for the drawing area
+  const C = tail && tail.points && tail.points.length ? composeOutline(points, { ...tail, on: true }) : null;
+  const TT = C ? turnPoints([C.anchor.point, ...C.points.filter((_, k) => C.tags[k][0] === 'tail')], stretch, deg) : [];
+  const { u: UB, w: WB } = OUTLINE_BOUNDS;
+  for (const [u] of [...T, ...TT]) if (u < UB[0] - 1e-9) return { ok: false, reason: 'the turned wing would reach into the body (u < 0)' };
+  for (const [u] of [...T, ...TT]) if (u > UB[1]) return { ok: false, reason: 'the turned wing is longer than the drawing area' };
+  let S = stretch;
+  for (const [, b] of [...T, ...TT.slice(1)]) S = Math.max(S, b > 0 ? b / WB[1] : -b / -WB[0]);
+  if (S !== stretch) S = Math.ceil(S * 1e4) / 1e4;
+  const out = T.map(([u, b], k) => [k === 0 || k === T.length - 1 ? 0 : +u.toFixed(5), clamp(+(b / S).toFixed(5), WB[0], WB[1])]);
+  const v = outlineValid(out);
+  if (!v.ok) return { ok: false, reason: v.reason };
+  let nt = null;
+  if (C) {
+    // re-anchored on the turned margin at the turned anchor point, and the
+    // offsets re-read in THAT anchor's frame: the frame is re-derived from the
+    // margin's own tangent window, so offsets carried over unchanged would
+    // swing with it (2.6 deg, 0.59 mm at #16's tail tip, from a 1e-5 nudge)
+    const tp = TT.map(([u, b]) => [u, b / S]);
+    const A = tailAnchor(out, tp[0][0]);
+    if (A.seg !== C.anchor.seg || Math.hypot(A.point[0] - tp[0][0], (A.point[1] - tp[0][1]) * S) > 0.01) return { ok: false, reason: 'the tail anchor cannot be re-found on the turned margin' };
+    const toF = (q) => { const dx = q[0] - A.point[0], dy = q[1] - A.point[1]; return [dx * A.T[0] + dy * A.T[1], dx * A.N[0] + dy * A.N[1]]; };
+    nt = { ...clone(tail), anchorU: tp[0][0], points: tp.slice(1).map(toF) };
+    if (!outlineValid(composeOutline(out, { ...nt, on: true }).points).ok) return { ok: false, reason: 'the tail would cross the turned outline' };
+  }
+  return { ok: true, points: out, stretch: S, tail: nt };
 }
 
 /* A blend of two library shapes at t: each outline is resampled apex-aligned
@@ -836,11 +947,15 @@ export function blendWingShapes(a, b, t) {
     const dense = A.map((q, k) => [lerp(q[0], B[k][0], t), lerp(q[1] * sa, B[k][1] * sb, t) / s]);
     return controlPointsFromDense(dense, Math.max(pa.length, pb.length) + 1);
   };
+  // each parent POSED at its own angle (as it is applied), so a blend mixes
+  // the wings as they are drawn; the blend is stored posed, at sweep 0
+  const pz = (s) => { const f = posedWing(s.fore), h = posedWing(s.hind); return { ...s, fore: { ...s.fore, points: f.points, stretch: f.stretch }, hind: { ...s.hind, points: h.points, stretch: h.stretch } }; };
+  a = pz(a); b = pz(b);
   const fs = lerp(a.fore.stretch, b.fore.stretch, t), hs = lerp(a.hind.stretch, b.hind.stretch, t);
   const near = t < 0.5 ? a : b;
   return {
-    fore: { stretch: +fs.toFixed(4), points: mixOutline(a.fore.points, a.fore.stretch, b.fore.points, b.fore.stretch, fs) },
-    hind: { stretch: +hs.toFixed(4), lengthRatio: +lerp(a.hind.lengthRatio, b.hind.lengthRatio, t).toFixed(4), points: mixOutline(a.hind.points, a.hind.stretch, b.hind.points, b.hind.stretch, hs) },
+    fore: { stretch: +fs.toFixed(4), sweep: 0, points: mixOutline(a.fore.points, a.fore.stretch, b.fore.points, b.fore.stretch, fs) },
+    hind: { stretch: +hs.toFixed(4), sweep: 0, lengthRatio: +lerp(a.hind.lengthRatio, b.hind.lengthRatio, t).toFixed(4), points: mixOutline(a.hind.points, a.hind.stretch, b.hind.points, b.hind.stretch, hs) },
     tail: near.tail ? clone(near.tail) : null,
   };
 }

@@ -16,6 +16,7 @@ import {
   composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
   editorFrame, contourLoops, CR_SAMPLES,
   WING_LIBRARY, applyWingShape, randomWingBlend, randomParamsWithBlend,
+  wingAngleOf, setWingAngle, WING_ANGLE_RANGE,
 } from './bug-geometry.js';
 import { imageToBug, segment, traceOuter, WORK_MAX, IMPORT_DEFAULTS } from './bug-image.js';
 
@@ -201,6 +202,7 @@ pairBlock.className = 'bg-pairs';
 pairBlock.innerHTML = `<div class="bg-row bg-tabs" id="pairTabs"></div><p class="bg-note" id="pairNote"></p>
   <div class="bg-row" id="linkRow"><button class="bg-btn" id="linkBtn"></button></div>
   <div class="bg-ctrl bg-bool" id="tailRow"><label><input type="checkbox" id="tailToggle"> Tail — part of this outline (bottom pair only)</label></div>
+  <div class="bg-ctrl" id="angleRow"><label for="wingAngle"><span>Wing angle — the blade turned about its hinge, root kept square to the body</span><output id="wingAngle-out"></output></label><input type="range" id="wingAngle" step="0.5"></div>
   <div id="pairFields"></div>`;
 secEl.wings.querySelector('.bg-sec-body').insertBefore(pairBlock, secEl.wings.querySelector('.bg-sec-body details'));
 const pairFieldEl = {};
@@ -213,6 +215,40 @@ for (const f of WING_FIELDS) {
   pairBlock.querySelector('#pairFields').appendChild(w);
   pairFieldEl[f.id] = w;
 }
+
+/* WING ANGLE (design doc §14): Eva's "tilt" — the wing's blade turned in the
+   top-down plane about its hinge (setWingAngle: an ordinary outline comes back,
+   the root anchors untouched, so the builder sees nothing new). The value is the
+   outline's own measured angle (wingAngleOf, + backward); the slider runs
+   WING_ANGLE_RANGE about the angle the outline was LOADED at (a library shape's
+   found angle, or what a design or a hand drawing had) — the range the gate
+   holds valid. A turn the outline rule refuses is told and not made. */
+const angleRef = {}, angleRange = {};   // per pair key: the angle it was loaded at, and the range measured for it (a library shape's), else WING_ANGLE_RANGE, unmeasured
+const angleKey = (k) => (roleOf(k) === 'mid' ? `mid${k}` : roleOf(k));
+let angleUndoArmed = true;
+function writeAngleRow() {
+  const row = document.getElementById('angleRow'), own = params.wingPairs ? editableSpec(editPair) : null;
+  row.hidden = !own;
+  if (!own) return;
+  const a = wingAngleOf(own.points, own.stretch), key = angleKey(editPair);
+  if (!(key in angleRef)) angleRef[key] = a;
+  const ref = angleRef[key], R = angleRange[key] || WING_ANGLE_RANGE, input = document.getElementById('wingAngle');
+  input.min = (ref + R[0]).toFixed(1); input.max = (ref + R[1]).toFixed(1); input.value = a.toFixed(1);
+  const off = a - ref;
+  document.getElementById('wingAngle-out').textContent = `${a.toFixed(1)}° ${Math.abs(off) < 0.05 ? (angleRange[key] ? '(as found)' : '(as loaded)') : `(${off > 0 ? '+' : ''}${off.toFixed(1)}° from ${ref.toFixed(1)}°)`}`;
+  row.title = angleRange[key] ? `this shape's measured range: ${R[0]}° to +${R[1]}° from the angle it was found at (a hindwing turned further back reaches into the body)` : `range ±${WING_ANGLE_RANGE[1]}° — not measured for this outline; a turn the outline rule refuses is told and not made`;
+}
+document.getElementById('wingAngle').addEventListener('pointerdown', () => { angleUndoArmed = true; });
+document.getElementById('wingAngle').addEventListener('keydown', () => { angleUndoArmed = true; });
+document.getElementById('wingAngle').addEventListener('input', (e) => {
+  const own = editableSpec(editPair); if (!own) return;
+  const bottom = editPair === params.wingPairs - 1, tail = bottom && params.wings.tail && params.wings.tail.points.length ? params.wings.tail : null;
+  const r = setWingAngle(own.points, own.stretch, +e.target.value, tail);
+  if (!r.ok) { edStatus = `Wing angle: ${r.reason}`; writeAngleRow(); drawMain(); return; }
+  if (angleUndoArmed) { pushUndo(); angleUndoArmed = false; }
+  own.points = r.points; own.stretch = r.stretch; if (tail && r.tail) params.wings.tail = { ...r.tail, on: params.wings.tail.on };
+  edStatus = ''; selectedPoint = -1; writeAngleRow(); writePairFields(); drawMain(); scheduleBuild();
+});
 
 function roleOf(k) { const N = params.wingPairs; return k === 0 ? 'first' : k === N - 1 ? 'last' : 'mid'; }
 /* The stored spec a pair edits, or null if the pair is LINKED (interpolated). */
@@ -254,7 +290,7 @@ function drawPairUi() {
       : `Pair ${editPair + 1} is UNLINKED: drawn by hand. Relink to interpolate it again (its drawing is discarded).`;
     lb.textContent = linked ? 'Unlink this pair' : 'Relink (interpolate)';
   } else note.textContent = `The ${role} pair is always drawn by hand; pairs between it and the ${role === 'first' ? 'last' : 'first'} interpolate unless unlinked.`;
-  writePairFields();
+  writePairFields(); writeAngleRow();
 }
 document.getElementById('tailToggle').addEventListener('input', (e) => {
   // OFF drops exactly the tail group from the drawn outline; ON brings back the
@@ -363,7 +399,11 @@ function applyShapeId(id) {
   if (!s) return false;
   pushUndo();
   const k = editPair;
-  loadParams(applyWingShape(params, s)); editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
+  loadParams(applyWingShape(params, s));
+  // the angle control: centred on the angle each wing was FOUND at, over its measured range (§14)
+  angleRef.first = s.fore.sweep; angleRef.last = s.hind.sweep;
+  if (s.fore.range) angleRange.first = s.fore.range; if (s.hind.range) angleRange.last = s.hind.range;
+  editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
   wlApplied = { id, label: `#${id}` };
   drawLibrary();
   wlMsg(params.wingPairs ? `Applied shape #${id}${s.tail ? ' (with its tail)' : ''}. Undo to go back.` : `Shape #${id} is stored, but this bug has no wings — add a wing pair to see it.`, !params.wingPairs);
@@ -434,6 +474,8 @@ function loadParams(p) {
   params = normalizeParams(p);
   editPair = 0; selectedPoint = -1; editing = false; edStatus = ''; vbox = null;
   wlApplied = null;                // any load ends "this is library shape #n" until the caller says otherwise
+  for (const k of Object.keys(angleRef)) delete angleRef[k];   // the angle range re-centres on what was loaded
+  for (const k of Object.keys(angleRange)) delete angleRange[k];
   writeControls(); buildNow(true); drawLibrary();
 }
 
@@ -1113,6 +1155,9 @@ window.__bug = {
   triangleCount: () => model.triangleCount,
   notes: () => model.notes.slice(),
   editPair: (k) => { editPair = k; selectedPoint = -1; drawPairUi(); drawMain(); },
+  // the wing-angle control of the edited pair (§14): its state, and a REAL input event
+  angle: () => { const i = document.getElementById('wingAngle'); return { hidden: document.getElementById('angleRow').hidden, value: +i.value, min: +i.min, max: +i.max, out: document.getElementById('wingAngle-out').textContent }; },
+  setAngle: (v) => { const i = document.getElementById('wingAngle'); i.value = v; i.dispatchEvent(new Event('input')); return +i.value; },
   // the on-wing editor (Top view, SVG mode)
   setMain: (v) => document.querySelector(`#viewToggle button[data-main="${v}"]`).click(),
   mainMode: () => mainMode,
