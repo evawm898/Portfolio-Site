@@ -2395,13 +2395,24 @@ bar (2.16 mm at a 41 mm wing). Two groups pass on BOTH wings:
 turned ~7° back. Near pairs the angle explains most of (as drawn ≫ aligned, over the bar):
 #12 ~ #39 (fore 11.66 → 3.06 mm at −14.5°, hind 7.41 → 2.45 at −11°), #38 ~ #54 fore
 (10.61 → 2.28 at −14.7°), #9 ~ #10 fore (7.96 → 3.03 at −11.7°), #22 ~ #35 / #4 ~ #35 fore
-(~9 → 3.2 at ~−10°). **No merge is made**; recommendations are on the review page and are
-Eva's to rule.
+(~9 → 3.2 at ~−10°). **RULED (Eva, Oct 5): #22 is merged into #4 and #19 into #10** (each the same wing at nearly
+the same angle; the merged ids are gaps, like #34 and #50 — LB1 restates the 53 kept ids).
+**#57 is kept** as its own shape: a narrower forewing tip and a ~16% longer hindwing, so it adds
+variety even though its forewing is #4's turned ~7° back. The angle ladder and the regenerated
+root were approved from the review page.
 
 ### 14.6 Verification
 
 WA1–WA4 (tools/verify-bug-library.mjs, function checks) and the 18 `angle:` rows; the negative
 control adds three: the stored angle ignored on apply (WA1), the root turning with the blade and
 the bridge starting at the hinge (WA4), and a DATA mutant zeroing every stored angle (WA1 + WA2).
-The measured angles have NOT been checked against the source pictures: the four sheets arrived
-in the chat as images, not files, and `tools/bug-wing-sources/` was empty this session.
+**The angles were measured from the AUDITED FITS, not re-checked against the source sheets**
+(Eva's ruling, Oct 5: the fits were laid back over their sources and judged in §13.7, so the
+angle check against the pictures was skipped). The sheets were not in `tools/bug-wing-sources/`
+this session (they arrived in the chat as pictures, not files); the review tool draws each
+angle on the source crop when they are present.
+
+Tools: `node tools/bug-wing-angles.mjs measure | sweep | store | review [--out <dir>]` — the
+angles and groups, the per-wing range sweep (every built row through `verify-bug.mjs --rows`),
+the library rewrite from `tools/bug-wing-library-snapshot.json` (#361's data, also WA1's
+reference) and the review page.

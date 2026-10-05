@@ -169,7 +169,11 @@ else if (CMD === 'review') (await import('./bug-wing-angles-review.mjs')).review
    (canonical, 9 decimals so posing it at its own angle rounds back to the 5-decimal points it came from, bit for bit) and its measured angle as `sweep`; the tail as it was (its
    anchor is on the posed outline). Header and ids untouched. */
 if (CMD === 'store') {
-  const snap = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/bug-wing-library-snapshot.json'), 'utf8'));
+  // Eva's ruling on the wing-angle audit (Oct 5): #22 merged into #4 and #19
+  // into #10 (the same wing at nearly the same angle); #57 kept. Ids never change:
+  // a merged id is a gap, like #34 and #50.
+  const MERGED = { 22: 4, 19: 10 };
+  const snap = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/bug-wing-library-snapshot.json'), 'utf8')).filter((s) => !(s.id in MERGED));
   const file = path.join(ROOT, 'bug-wing-library.js'), src = fs.readFileSync(file, 'utf8');
   const head = src.slice(0, src.indexOf('export const WING_LIBRARY'));
   const r5 = (x) => +x.toFixed(9), pts = (P) => JSON.stringify(P.map(([u, w]) => [r5(u), r5(w)]));
