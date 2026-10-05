@@ -86,13 +86,17 @@ export function minPitchFactor(nominal, opts) {
 /* Every petal of a state through the REAL whorl primitive and the REAL
    builder. `remap(azimuths, slots)` returns new azimuths; `perSlot(slot)`
    returns `{ scale, state }` overrides for the size/form routes. */
-export function buildPetals(state, { remap = null, perSlot = null, exportMode = true } = {}) {
+export function buildPetals(state, { remap = null, perSlot = null, exportMode = true, fields = false } = {}) {
   const acc = new G.MeshBuilder({ exportMode, captureGrid: true });
   const fr = G.footRing(state, acc);
   const petals = [];
+  /* `fields: true` (organic variance, build 3) hands the whorl primitive the
+     SHIPPED size, form and spacing fields, exactly as buildBloomInto does, so
+     the slots are the builder's own and no remap is applied here. */
+  const F = fields ? { sizeField: G.sizeVarianceField(state, fr), formField: G.formVarianceField(state, fr), spacingField: G.spacingVarianceField(state, fr) } : {};
   const whorl = (count, radius, sizeRamp, angleRamp, phase, placement, fan, ringOf) => {
     const slots = [];
-    G.buildWhorlInto({ count, radius, height: 0, sizeRamp, angleRamp, phase, placement, fan, blade: (slot) => slots.push({ ...slot }) });
+    G.buildWhorlInto({ count, radius, height: 0, sizeRamp, angleRamp, phase, placement, fan, ...F, blade: (slot) => slots.push({ ...slot }) });
     const az = slots.map((s) => s.azimuth);
     const az2 = remap ? remap(az, slots) : az;
     slots.forEach((slot, i) => {

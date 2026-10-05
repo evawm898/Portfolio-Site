@@ -1119,6 +1119,28 @@ export const SMOKE_BLOCKS = [
         path: "NV0's other arm — the control at 1 with no raceme is hidden by the registry and forms no term in the geometry; ID0 on the absent plan" },
     ],
   },
+  {
+    n: 51, title: 'organic variance, build 3 — the spacing field',
+    anchor: 'SPACING VARIANCE: 0.9, the ruled maximum (1 cycle, phase 0)',
+    /* FIVE ROWS: the law at the ruled maximum (SV0-SV2, SV3's order and floor
+       on a ring, SV4), the aliased wave (SV3's floor where neighbouring slots
+       read opposite crests, SV4's aliased arm), the FAN (SV3's held span and
+       odd map, J7 beside it), the layered whorls (SV2's restated layer phase
+       and SV3 per whorl), and the GATED row (SV1's amount-0 arm — every
+       azimuth the nominal law to the bit). */
+    rows: [
+      { label: 'SPACING VARIANCE: 0.9, the ruled maximum (1 cycle, phase 0)',
+        path: "the LAW — SV0 (the registry's varianceSpacingPresent against the geometry's guard through the page), SV1 (the record and its floor 1 - A), SV2 (every emitted azimuth is the pitch law's integral restated from the controls over the nominal law restated from footRing's fields), SV3 (the cyclic order kept and every neighbour pair at least the floor apart) and SV4 (one aliasing judgement)" },
+      { label: 'SPACING VARIANCE: 0.9 at 5 cycles on 8 slots (ALIASED past n/2 — scatter, told and not capped)',
+        path: "SV3 where neighbouring slots read near-opposite crests — the pitch law still keeps every pair at least 1 - A apart, which a DIRECT offset (the circular reading) does not — and SV4's aliased arm" },
+      { label: 'SPACING VARIANCE: 0.9 x FAN, phase 90 (even about the mirror line, the phase INERT, the span held by renormalising)',
+        path: "the FAN — SV2's renormalised map, SV3's held span (the outermost slots exactly at the nominal outermost azimuths) and odd map (mirror slots exact negations), the floor (1 - A) / (1 + A); J7, Z4b and Z8 beside it" },
+      { label: 'SPACING VARIANCE: 0.9 x 3 whorls at layer offset 0.5 (one circle map — the whorls keep their mutual order)',
+        path: "SV2 with the layer phase restated per whorl and SV3 per whorl; VS5's told pitch under the floor" },
+      { label: 'SPACING VARIANCE: GATED — frequency and phase at MAXIMUM with every amount 0 (hidden AND inert)',
+        path: "SV1's AMOUNT-0 arm — every emitted azimuth is the nominal law restated here, to the bit, and SV0's other direction" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

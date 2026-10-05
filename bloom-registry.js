@@ -58,7 +58,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
-import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
+import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
 /* ===================================================================
@@ -391,10 +391,13 @@ export const PREDICATES = {
   /* BUILD 2 (form): the registry's statement of `varianceFormIsAbsent`, the
      same half-step rule on the form amount's own 0.01 step. */
   varianceFormPresent: { id: 'varianceForm', awayFrom: 0, by: 0.005 },
+  /* BUILD 3 (spacing): the registry's statement of `varianceSpacingIsAbsent`,
+     the same half-step rule on the spacing amount's own 0.01 step. */
+  varianceSpacingPresent: { id: 'varianceSpacing', awayFrom: 0, by: 0.005 },
   /* THE SHARED FREQUENCY AND PHASE (ruling 2) are live when ANY amount is —
      they are one wave read by every field, so hiding them behind the size
      amount alone would make them inert-looking controls that move the form. */
-  varianceAnyPresent: { any: [{ ref: 'variancePresent' }, { ref: 'varianceFormPresent' }] },
+  varianceAnyPresent: { any: [{ ref: 'variancePresent' }, { ref: 'varianceFormPresent' }, { ref: 'varianceSpacingPresent' }] },
 
   /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
      lobeDepth pattern, one control the guard and the rest following it, hidden
@@ -451,6 +454,7 @@ export const PREDICATES = {
     { not: { ref: 'sphereMode' } },
     { not: { ref: 'variancePresent' } },
     { not: { ref: 'varianceFormPresent' } },
+    { not: { ref: 'varianceSpacingPresent' } },
     { not: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
     { id: 'fringeCount', oneOf: ['0'] },
     { not: { ref: 'infillPresent' } },
@@ -705,6 +709,7 @@ const TUBE_UNAVAILABLE = {
     const why = [];
     if (String(ui.placement) !== 'RADIAL') why.push(`the placement is ${ui.placement} (Tube is RADIAL only)`);
     if (Math.abs(Number(ui.varianceSize)) >= 0.005 || Math.abs(Number(ui.varianceForm)) >= 0.005) why.push('a variance field gives every petal its own shape');
+    if (Math.abs(Number(ui.varianceSpacing)) >= 0.005) why.push('spacing variance moves the petals off uniform azimuths');
     if (Math.abs(Number(ui.buckleAmp)) >= 0.005) why.push('the margin buckle differs petal to petal');
     if (Number(ui.fringeCount) >= 1) why.push('a fringe splits the blade into panels');
     if (String(ui.petalInfill) === 'VORONOI') why.push('the petals are infilled');
@@ -3015,6 +3020,26 @@ export const CONTROLS = [
       return `${(a * 100).toFixed(0)}% — per petal, up to ±${(a * 270).toFixed(0)}° curl, ±${(a * 1).toFixed(2)} cup, ±${(a * 180).toFixed(0)}° twist, by azimuth, the three a third of a cycle apart so no petal takes all three crests (clamped to each control's own range)`;
     },
     visibleWhen: { all: [] } },
+  /* ===================================================================
+     ORGANIC VARIANCE, BUILD 3 OF 3 — SPACING. ONE amount moving WHERE each
+     petal stands round the axis, as a PITCH density `1 + A g(theta)` whose
+     integral is the azimuth map (the geometry's `spacingVarianceField`). The
+     FIXED maximum is 0.9, strictly below A = 1 where neighbours coincide
+     (ruling 3); the pitch is positive for every A < 1, so the map is strictly
+     monotonic and no petal can pass or meet its neighbour — nothing is
+     clamped. It reads the SHARED frequency and phase; 0 is the GUARD. */
+  { id: 'varianceSpacing', section: 'variance', kind: 'slider',
+    min: VARIANCE_SPACING_RANGE[0], max: VARIANCE_SPACING_RANGE[1], step: 0.01, default: 0,
+    label: 'Spacing variance', tier: 'standard', role: 'arrangement',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      if (!(a > 0)) return 'off — every petal at its nominal azimuth';
+      const rec = shown ? shown.spacingVariance : null;
+      const fan = rec ? rec.fan : ui.placement === 'FAN';
+      const floor = fan ? (1 - a) / (1 + a) : 1 - a;
+      return `${(a * 100).toFixed(0)}% — the pitch runs from ${(1 - a).toFixed(2)}x to ${(1 + a).toFixed(2)}x of nominal round the ${fan ? 'fan (even about the mirror line, its span held)' : 'flower'}; every pair of petals at least ${floor.toFixed(3)}x the angle it stood apart at 0${fan ? ' (the fan is renormalised to keep its span)' : ''}`;
+    },
+    visibleWhen: { all: [] } },
   { id: 'varianceFrequency', section: 'variance', kind: 'slider',
     min: VARIANCE_FREQUENCY_RANGE[0], max: VARIANCE_FREQUENCY_RANGE[1], step: 1, default: 1,
     label: 'Variance frequency', tier: 'standard', role: 'arrangement',
@@ -3025,7 +3050,7 @@ export const CONTROLS = [
        prints the OWNER's number rather than re-deriving one from the sliders. */
     fmt: (v, ui, shown) => {
       const f = Number(v);
-      const rec = shown ? (shown.variance || shown.formVariance || null) : null;
+      const rec = shown ? (shown.variance || shown.formVariance || shown.spacingVariance || null) : null;
       const fan = rec ? rec.fan : ui.placement === 'FAN';
       if (f === 0) return fan ? 'a ramp — smallest on the mirror line, largest at the edges of the fan' : 'a ramp — one side of the flower to the other, its seam at the phase';
       return `${f} cycle${f === 1 ? '' : 's'} ${fan ? 'across the fan (even about the mirror line)' : 'round the flower'}`
@@ -3041,7 +3066,7 @@ export const CONTROLS = [
        stands where `f * azimuth + phase` is a whole turn; the ramp's SEAM
        (smallest beside largest) stands at the phase itself. */
     fmt: (v, ui, shown) => {
-      const rec = shown ? (shown.variance || shown.formVariance || null) : null;
+      const rec = shown ? (shown.variance || shown.formVariance || shown.spacingVariance || null) : null;
       const fan = rec ? rec.fan : ui.placement === 'FAN';
       if (fan) return `${Number(v).toFixed(0)}° — INERT on a fan: the field is even about the mirror line`;
       return `${Number(v).toFixed(0)}° — turns the wave round the axis (the ramp's seam sits here)`;

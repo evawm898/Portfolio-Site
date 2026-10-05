@@ -1,25 +1,32 @@
 #!/usr/bin/env node
-/* What "headroom" can mean for a per-slot ANGULAR offset (organic variance,
-   build 3 — spacing). No geometry: the slot azimuths of one RADIAL whorl under
-   four candidate laws, at the ruled maximum A = 0.9, with the SHIPPED wave
-   (an integer frequency, cos(f theta + phi), the ring ramp at f = 0).
+/* Which quantity a per-slot SPACING field may act on (organic variance, build
+   3). No geometry: the slot azimuths of one RADIAL whorl under four candidate
+   laws at the ruled maximum A = 0.9, with the SHIPPED wave (an integer
+   frequency, cos(f theta + phi), the ring ramp at f = 0). Eva RULED law a
+   (docs/bloom-organic-variance-spacing-law.md); the other three are kept as the
+   record of why.
 
-     a   HEADROOM ON THE PITCH. The varied quantity is the local pitch density,
-         base 1 (the amount-0 pitch), min 0 (coincidence), half-span 1. Room is
-         min(half, base - min) = 1 = half on both sides, so the law is
-         rho = 1 + A g and the azimuths are its integral:
-         F(theta) = theta + (A/f) sin(f theta + phi)  (slot 0 held). This is the
-         discovery's §2a law, the one the A 0.9 ruling was measured on.
-     b1  HEADROOM ON THE OFFSET, room = the base gap to the neighbour's BASE
-         position (not circular). delta_i = A g_i p.
-     b2  HEADROOM ON THE OFFSET, room = half the base gap (the nominal sector).
-     c   HEADROOM ON THE OFFSET, room = the gap to the neighbour AS MOVED — the
-         reading the brief describes. It is a fixed point; resolving it in slot
-         order is one concrete answer, and the column says how far the answer
-         moves when the order is reversed.
+     a   THE PITCH LAW (ruled, shipped). The varied quantity is the local pitch
+         density in units of the amount-0 pitch, rho = 1 + A g, and the azimuths
+         are its integral: F(theta) = theta + (A/f) sin(f theta + phi). The
+         pitch stays positive for every A < 1, so F is strictly monotonic and
+         nothing can cross or coincide — the law never binds, as a PROPERTY.
+     b1  A DIRECT OFFSET, each slot moved by A g times the base gap to its
+         neighbour's BASE position. Not circular, and unsafe: neighbours meet
+         from A 0.5 and cross beyond it.
+     b2  A DIRECT OFFSET confined to the slot's own nominal sector (half the
+         gap). Safe, and a weaker, different look from the one ruled on.
+     c   A DIRECT OFFSET scaled by the gap to the neighbour AS MOVED — a fixed
+         point. Resolving it in slot order is one concrete answer; the column
+         says how far the answer moves when the order is reversed.
 
-   `node tools/bloom-spacing-headroom-laws.mjs` prints the table and a dense
-   sweep of law a (n 3..40, f 0..20, phase 0..355 step 5). */
+   (These were first framed as candidate meanings of "headroom". That framing
+   was wrong and is withdrawn: headroom is FORM's fix for a delta driving a
+   BOUNDED control into its range end. Size is a plain factor with no bound,
+   spacing a pitch that only has to stay positive — three amounts, two shapes.)
+
+   `node tools/bloom-spacing-laws.mjs` prints the table and a dense sweep of
+   law a (n 3..40, f 0..20, phase 0..355 step 5). */
 const TAU = 2 * Math.PI;
 const wrap = (x) => ((x % TAU) + TAU) % TAU;
 const gFor = (f, phi) => (th) => (f === 0 ? -1 + (2 * wrap(th - phi)) / TAU : Math.cos(f * th + phi));

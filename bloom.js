@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, nodeVarianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, nodeVarianceIsAbsent } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -583,6 +583,7 @@ let lastFitCenter = [0, 0, 0];
 let lastTube = null;
 let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPetalsAll = [];
 let lastFormVariance = null, lastFormAbsent = true;
+let lastSpacingVariance = null, lastSpacingAbsent = true;
 let lastInfill = null, lastInfillAbsent = true;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
@@ -668,6 +669,9 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     /* BUILD 2: the FORM field's record and the geometry's own guard answer (FV0). */
     lastFormVariance = built.formVariance || null;
     lastFormAbsent = varianceFormIsAbsent(uiForBuild);
+    /* BUILD 3: the SPACING field's record and the geometry's own guard answer (SV0). */
+    lastSpacingVariance = built.spacingVariance || null;
+    lastSpacingAbsent = varianceSpacingIsAbsent(uiForBuild);
     /* THE INFILL, from the FIRST BUILT PETAL's own plan record — the one the
        read-out's INFILL line speaks and route (z) holds it to. Taken off a
        petal rather than off `built` because the plan is a property of a BLADE
@@ -1462,6 +1466,26 @@ function formVarianceLine(v, petalsAll) {
        + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
        + `\n`;
 }
+/* THE SPACING VARIANCE LINE (organic variance, build 3) — the pitch law told
+   in the builder's own numbers: the range the pitch density reaches, the floor
+   it guarantees (1 - A on a ring, (1 - A) / (1 + A) on a fan whose span is
+   held), the tightest pitch the whorl primitive actually EMITTED (the told
+   flag's own reading), and the ALIASED clause. No clamp exists to report:
+   the pitch stays positive for every amount the control reaches, so the
+   azimuth map is strictly monotonic and no petal passes its neighbour.
+   Absent at amount 0. */
+function spacingVarianceLine(v, nb) {
+  if (!v) return '';
+  const cyc = `${v.frequency} cycle${v.frequency === 1 ? '' : 's'}`;
+  const law = v.frequency === 0
+    ? (v.fan ? 'a ramp outward from the mirror line' : `a ramp round the flower with its seam at ${v.phaseDeg.toFixed(0)}°`)
+    : (v.fan ? `${cyc} per turn, even about the mirror line (phase inert)` : `${cyc} round the flower, phase ${v.phaseDeg.toFixed(0)}°`);
+  const nyq = Number.isInteger(v.nyquist) ? `${v.nyquist}` : v.nyquist.toFixed(1);
+  const tight = nb && nb.pitch ? `, the tightest emitted pitch ${nb.pitch.ratio.toFixed(3)}x` : '';
+  return `SPACING VARIANCE ${(v.amount * 100).toFixed(0)}%: pitch density from ${(1 - v.amount).toFixed(2)}x to ${(1 + v.amount).toFixed(2)}x of nominal — ${law}, on ${v.n} slots${v.fan ? ` over a ${(2 * v.halfSpanDeg).toFixed(0)}° fan whose span is held (renormalised)` : ''}; every pair of petals at least ${v.floor.toFixed(3)}x the angle it stood apart at amount 0, by construction${tight}`
+       + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
+       + `\n`;
+}
 /* THE NEIGHBOURS LINE — THE TOLD FLAG (Eva's ruling 1, the condition of the
    variance family: the generator REPORTS the tightest pitch, the nearest feet
    and the nearest petal approach, and clamps nothing). Every number is the
@@ -1998,6 +2022,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built ? tubeLine(built.tube) : '')
        + (built ? varianceLine(built.variance) : '')
        + (built ? formVarianceLine(built.formVariance, built.petalsAll) : '')
+       + (built ? spacingVarianceLine(built.spacingVariance, built.neighbour) : '')
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
@@ -2089,6 +2114,7 @@ function regenerate() {
                      phase control says it is inert on a fan from the builder's own word. */
                   variance: built.variance || null,
                   formVariance: built.formVariance || null,
+                  spacingVariance: built.spacingVariance || null,
                   /* THE INFILL's record joins for the same reason once more, and
                      ruling 3 is why it MUST: density is a REQUEST, so a user who
                      asks for 40 cells and is handed 16 holes has to read that on
@@ -2790,6 +2816,11 @@ window.__bloomMetrics = () => ({
      composition. */
   formVariance: lastFormVariance ? { ...lastFormVariance, halves: { ...lastFormVariance.halves } } : null,
   varianceFormAbsent: lastFormAbsent,
+  /* BUILD 3 — THE SPACING FIELD: its record and the geometry's own guard
+     answer through the page (SV0's half). The emitted azimuths are already
+     `slotAzimuths`; SV1 restates the law from the controls against them. */
+  spacingVariance: lastSpacingVariance ? { ...lastSpacingVariance } : null,
+  varianceSpacingAbsent: lastSpacingAbsent,
   petalSlotForms: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
     roles: { role: p.role ?? null, allRole: p.allRole ?? null, slotRole: p.slotRole ?? null, petalRole: p.petalRole ?? null }, formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
     formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null,

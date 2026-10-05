@@ -43,6 +43,14 @@ is byte-identical by branch rather than by an IEEE argument. On the geometry sid
 merge in `petalSurface`, one law function, one ramp per property. The harness side is most of the
 build (§8).
 
+> **Correction (build 3, Oct 5 — Eva's ruling on the spacing law,
+> `docs/bloom-organic-variance-spacing-law.md` §0):** the paragraph above is true of the FORM
+> term only. The three amounts do NOT share one composition law. Size is a plain factor on
+> `slot.scale` with no bound, spacing a pitch density whose integral maps the azimuth inside the
+> whorl primitive (not a `footRing` azimuth list through the `LIST` arm, as the table's spacing
+> row predicted), and only form composes with the role rows and needs headroom — three amounts,
+> two shapes.
+
 The sepal session's instancing census (PR #243, §1 of its outcome doc) holds here too: every
 builder read is of `ps` or of the slot, so a slot term reaches `widthProfile`, `petalForm`,
 `petalFormIsFlat` (which decides whether the form is constructed at all) and `thicknessProfile`

@@ -3012,7 +3012,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
       const wrap = (id) => document.getElementById(id).closest('.bl-ctrl');
       return {
-        V: m.variance, N: m.neighbour, fan: !!m.fan,
+        V: m.variance, N: m.neighbour, fan: !!m.fan, S: m.spacingVariance,
+        sline: /SPACING VARIANCE (\d+)%: pitch density from ([\d.]+)x to ([\d.]+)x of nominal — [^\n]*?every pair of petals at least ([\d.]+)x the angle it stood apart at amount 0, by construction(?:, the tightest emitted pitch ([\d.]+)x)?/.exec(txt),
         line: /SIZE VARIANCE ±(\d+)%: petals from ([\d.]+)x to ([\d.]+)x of nominal — ([^\n]*)/.exec(txt),
         aliasedSaid: /ALIASED: above ([\d.]+) cycles/.test(txt),
         rampSaid: /— a ramp /.test(txt),
@@ -3024,10 +3025,20 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       };
     });
     const p = [];
-    const V = res.V, N = res.N;
+    const V = res.V, N = res.N, S = res.S;
     /* THE FIELD LINE, iff the record */
     if (!!res.line !== !!V) p.push(`the SIZE VARIANCE line is ${res.line ? 'shown' : 'absent'} while the builder reports ${V ? 'a field' : 'no field'}`);
-    if (res.freqHidden !== !V || res.phaseHidden !== !V) p.push(`the frequency/phase controls are ${res.freqHidden ? 'hidden' : 'shown'}/${res.phaseHidden ? 'hidden' : 'shown'} while the builder reports ${V ? 'a field' : 'no field'}`);
+    const anyField = !!(V || S);
+    if (res.freqHidden !== !anyField || res.phaseHidden !== !anyField) p.push(`the frequency/phase controls are ${res.freqHidden ? 'hidden' : 'shown'}/${res.phaseHidden ? 'hidden' : 'shown'} while the builder reports ${anyField ? 'a field' : 'no field'}`);
+    /* BUILD 3 — THE SPACING LINE, iff the record; its amount, range and floor
+       against the record, its tightest pitch against the told flag's */
+    if (!!res.sline !== !!S) p.push(`the SPACING VARIANCE line is ${res.sline ? 'shown' : 'absent'} while the builder reports ${S ? 'a spacing field' : 'no spacing field'}`);
+    if (S && res.sline) {
+      if (Number(res.sline[1]) !== Math.round(S.amount * 100)) p.push(`the spacing line says ${res.sline[1]}%, the record ${S.amount}`);
+      if (Math.abs(Number(res.sline[2]) - (1 - S.amount)) > 0.005 || Math.abs(Number(res.sline[3]) - (1 + S.amount)) > 0.005) p.push(`the spacing line says ${res.sline[2]}x..${res.sline[3]}x for amount ${S.amount}`);
+      if (Math.abs(Number(res.sline[4]) - S.floor) > 0.0005) p.push(`the spacing line says a floor of ${res.sline[4]}x, the record ${S.floor}`);
+      if (N && N.pitch && (res.sline[5] === undefined || Math.abs(Number(res.sline[5]) - N.pitch.ratio) > 0.0005)) p.push(`the spacing line says a tightest emitted pitch of ${res.sline[5]}x, the told flag ${N.pitch.ratio}`);
+    }
     if (V && res.line) {
       if (Number(res.line[1]) !== Math.round(V.amount * 100)) p.push(`the line says ±${res.line[1]}%, the record ${V.amount}`);
       if (Math.abs(Number(res.line[2]) - V.lo) > 0.005 || Math.abs(Number(res.line[3]) - V.hi) > 0.005) p.push(`the line says ${res.line[2]}x..${res.line[3]}x, the record ${V.lo}..${V.hi}`);
@@ -3060,6 +3071,12 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await step('the RAMP — "a ramp" on the line', [{ id: 'varianceFrequency', value: '0' }]);
   await step('a FAN at 2 cycles, phase 90 — "phase inert" on the line and INERT on the phase control', [{ id: 'placement', value: 'FAN' }, { id: 'varianceFrequency', value: '2' }, { id: 'variancePhase', value: '90' }]);
   await step('back to 0 on a RADIAL whorl — no field line, the sub-controls hidden, the flag line at the default\'s own numbers', [{ id: 'placement', value: 'RADIAL' }, { id: 'varianceSize', value: '0' }]);
+  /* BUILD 3: the spacing amount ALONE — the shared frequency and phase are
+     shown by it (varianceAnyPresent), the SPACING line states the floor and
+     the tightest emitted pitch, and back at 0 every trace of it goes. */
+  await step('spacing 0.9 alone at 1 cycle — the SPACING line, its floor 0.100x and the told pitch, the sub-controls shown', [{ id: 'varianceFrequency', value: '1' }, { id: 'variancePhase', value: '0' }, { id: 'varianceSpacing', value: '0.9' }]);
+  await step('spacing 0.9 on a FAN — the floor (1 - A)/(1 + A) = 0.053x on the line', [{ id: 'placement', value: 'FAN' }]);
+  await step('spacing back to 0 on a RADIAL whorl — no spacing line, the sub-controls hidden', [{ id: 'placement', value: 'RADIAL' }, { id: 'varianceSpacing', value: '0' }]);
 }
 
 /* ---------------- (z) THE ACHIEVED COUNT IS TOLD, BOTH DIRECTIONS ----------

@@ -5469,6 +5469,30 @@ at `1f0b3f0`. The other three triples hide nothing beyond declared single-axis r
 cells). **17 gate controls pick their witness by "first match"** (8 files); one, the edge-profile
 `CONTROL_ROWS` slice, is drifting on `main` (no cleft, fringe or lobe row reaches it) — counted, not fixed.
 
+**ORGANIC VARIANCE, BUILD 3 — SPACING IS A PITCH DENSITY WHOSE INTEGRAL MAPS THE AZIMUTH, AND IT
+NEVER BINDS AS A PROPERTY** (Eva's ruling on the settlement — read `docs/bloom-organic-variance-spacing-law.md`,
+then `docs/bloom-organic-variance-spacing-outcome.md`, before touching `spacingVarianceField`,
+`buildWhorlInto`'s azimuth line, `VARIANCE_SPACING_RANGE` or SV0–SV4). `varianceSpacing` (0–0.9,
+default 0, the guard) reads the SHARED frequency and phase: pitch `1 + A g`, azimuth
+`F(θ) = θ + (A/f) sin(fθ + φ)` (the ramp's `D(w) = −w + w²/2π`), applied INSIDE the whorl primitive as
+a branch, so every placement, layer and the sphere's sequence take one expression and size/form are
+read at the MAPPED azimuth. **THREE AMOUNTS, TWO SHAPES — IT IS NOT HEADROOM**: headroom is FORM's fix
+for a delta driving a BOUNDED control into its range end; size is a plain factor and spacing a pitch
+that only has to stay positive. The pitch is `>= 1 − A > 0` for every A < 1, so the map is strictly
+monotonic — order kept, nothing crosses or coincides; coincidence is only at A = 1 (J7's clause), which
+is why the FIXED maximum is 0.9. Measured (`tools/bloom-spacing-laws.mjs`): tightest 0.1010 of nominal,
+0 crossings over 3–40 petals × f 0–20 × all phases. A DIRECT azimuth offset is the circular version
+Eva ruled out; `spacing-is-a-direct-azimuth-offset` is its standing mutant. The FAN renormalises over
+the half-arc to hold J7's span (floor `(1 − A)/(1 + A)`, 0.053 at 0.9, told not clamped). **The sepals
+STAY at nominal** (SP4 reads the nominal petal law under the field; following the map is its own
+session) and the tube is unavailable under the field. **What it does to the accepted look**: the
+8-petal overlap barely moves (−1.194 → −1.199 mm, saturated at one sheet) but the cross-shell
+crossing census goes 992 → 4,509, the 40-petal crowding D_max 4 → 14 (CROWDED), and at 3 and 5
+petals spacing CREATES crossings (+17.1 → −1.2 mm) — reported for Eva's re-rule, not clamped. **The
+mutant table's family regex did not know SV and read both spacing mutants SILENT** until it was
+widened — the prefix class again, as a regex. `tools/verify-bloom-spacing.mjs` is the per-clause
+must-fail. `frozen/phase53` is the 1,123 rows at `1740881`.
+
 **THE EXPORT GATE IS EIGHT SHARDS AND A VERDICT JOB, AND ITS COVERAGE IS A RECONCILIATION,
 NOT AN ASSUMPTION** (read `tools/bloom-export-shards.mjs`'s header before touching
 `--shard`, the census, `summarize()` or the workflow's three jobs). One job ran **342 min on
@@ -9938,6 +9962,14 @@ docs-only commit while holding for a ruling: all four bloom gates re-triggered (
 are evaluated against the WHOLE PR diff) and `cancel-in-progress` killed the two long runs
 mid-flight, losing 23 minutes. Full worked case, including the session's own retraction of a
 wrong first reading, in the charter's push-once entry.
+**CARVE-OUT (Eva, Oct 5, variance build 3): PUSHING IS PERMITTED WHEN NO FILE IN THE PR'S DIFF
+MATCHES ANY WORKFLOW'S PATH FILTER.** The rule exists to avoid re-triggering the gates, and a
+push that starts no run costs nothing. Check it against the WHOLE PR diff, not the commit
+(`paths` filters are evaluated against the cumulative diff), by reading every workflow's
+`paths:` list under `.github/workflows/`. Since #335/#340 no workflow names `tools/**` or
+`docs/**`, so a PR whose diff is docs plus a NEW tool that no workflow lists triggers nothing.
+The moment the diff touches a filtered path, the rule applies again in full. The spacing-law
+settlement (#371) was the first push under it: a doc and a new Node tool, no run started.
 
 **AND `cancel-in-progress` IS NOT A CLEANUP MECHANISM — IT ONLY FIRES WHEN A NEW RUN ENTERS
 THE SAME CONCURRENCY GROUP, so REMOVING the path-matching files from a PR ORPHANS the

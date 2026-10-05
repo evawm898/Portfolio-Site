@@ -3289,6 +3289,116 @@ export function formVarianceField(state, fr) {
 }
 
 /* ===================================================================
+   ORGANIC VARIANCE, BUILD 3 OF 3 — SPACING (docs/bloom-organic-variance-spacing-outcome.md;
+   Eva's rulings §9 of the discovery doc and her ruling on the settlement,
+   docs/bloom-organic-variance-spacing-law.md). ONE amount, `varianceSpacing`,
+   reading the SHARED frequency and phase, that moves WHERE each petal stands
+   round the axis.
+
+   THE LAW IS ON THE PITCH, NOT ON THE OFFSET. The varied quantity is the local
+   pitch density, in units of the amount-0 pitch: `rho = 1 + A * g(theta)`, the
+   same `g` the size and form fields read. The azimuths are its integral, so a
+   slot at nominal azimuth `theta` stands at
+     f >= 1   F(theta) = theta + (A / f) * sin(f * theta + phi)
+     f  = 0   F(theta) = theta + A * D(wrap(theta - phi)),  D(w) = -w + w^2 / TAU
+   — the discovery's §2a law term for term, the one the A 0.9 maximum and
+   "coincidence at A = 1" were ruled on. The frequency is an INTEGER
+   (`varianceWave` rounds it), so the wave integrates to exactly zero over a
+   turn and the ring needs no renormalisation; the ramp's integral D vanishes
+   at both ends of its period, so the seam (at the phase) is continuous too.
+
+   WHY THE LAW NEVER BINDS — A PROPERTY, NOT A SHORTFALL. The pitch is
+   `1 + A g >= 1 - A > 0` for every A < 1, so F is STRICTLY MONOTONIC on the
+   circle: the cyclic order of every azimuth it maps is preserved, and no two
+   petals can cross or coincide. Every pair's angular separation shrinks by at
+   most a factor `1 - A`, whatever the frequency, including aliased ones.
+   Coincidence arrives only at A = 1 — duplicate geometry, J7's own clause —
+   which is why the FIXED maximum sits at 0.9 below it. Measured, no geometry:
+   `node tools/bloom-spacing-laws.mjs` over 3..40 petals x f 0..20 x
+   every phase in 5-degree steps reads a tightest pitch of 0.1010 of nominal and
+   ZERO crossings. There is no clamp and nothing to scale: SIZE is a plain
+   factor with no bound, SPACING a pitch that only has to stay positive, and
+   FORM alone composes by headroom, because form alone drives a BOUNDED control
+   into its range end. Three amounts, two shapes.
+
+   A DIRECT OFFSET IS THE CIRCULAR VERSION AND IS RULED OUT. Moving each petal
+   by `A g` times its room to a neighbour is a fixed point when the neighbour
+   moves too (the slot order then moves a petal up to 42 degrees), and its
+   non-circular forms cross from A 0.5 (room = the base gap) or are a weaker,
+   different look (room = half the gap). The apex mutant table carries
+   `spacing-is-a-direct-azimuth-offset` as this law's own witness.
+
+   ON A FAN THE MAP IS ODD ABOUT THE MIRROR PLANE (the field is even, §5), with
+   the phase INERT, and the FAN'S SPAN IS CONSERVED: footRing derives the arc
+   and the notch (J7 asserts both), and `integral of (1 + A cos f s)` over the
+   half-arc H equals H only where sin(fH) = 0. So the density is RENORMALISED
+   over the half-arc: `F(t) = sign(t) * H * P(|t|) / P(H)`, P the pitch's
+   integral from the mirror line. That is conservation of the span, not a clamp,
+   and it costs the floor: the tightest fan pitch is bounded by
+   `(1 - A) / (1 + A)` of the base step — 0.053 at A 0.9 — REPORTED, not
+   clamped (Eva's ruling). The fan's ramp, `-1 + 2|t|/H`, integrates to exactly
+   H and needs no renormalisation.
+
+   AMOUNT 0 IS A NULL RECORD and the whorl primitive BRANCHES on it, so the
+   shipping default places every petal with the very expression it did — the
+   size and form fields' discipline, and the byte partition is predeclared from
+   `varianceSpacingIsAbsent`.
+
+   WHAT THE MAP REACHES: every PETAL azimuth the whorl primitive emits — RADIAL
+   (every layer, through the absolute azimuth, so the whorls keep their mutual
+   order), SPIRAL, FAN, CONTINUOUS and the SPHERE's golden-angle sequence (the
+   polar sequence, the equal-area law and the reserved pole are untouched; the
+   omission mask probes each slot at its MAPPED azimuth). The size and form
+   fields are evaluated at the MAPPED azimuth, because both are indexed on the
+   EMITTED one. NOT the sepals, which stay at their nominal azimuths (whether
+   they follow the map is its own session — the outcome doc costs both), and
+   not the tube, which is unavailable under any variance field. */
+export const VARIANCE_SPACING_RANGE = Object.freeze([0, 0.9]);
+export function varianceSpacingIsAbsent(state) {
+  return !(Number(state.varianceSpacing) > 0);
+}
+/* The integral of the ring ramp's g over [0, w): `-w + w^2 / TAU`, zero at
+   both ends of a turn. */
+const spacingRampIntegral = (w) => -w + (w * w) / TAU;
+export function spacingVarianceField(state, fr) {
+  if (varianceSpacingIsAbsent(state)) return null;
+  const amount = Number(state.varianceSpacing);
+  const w = varianceWave(state, fr);
+  const f = w.frequency;
+  const phi = (w.phaseDeg * Math.PI) / 180;
+  const fan = fr.fan;
+  let map;
+  if (fan) {
+    const H = (fan.spanDeg * Math.PI) / 360;
+    const P = f === 0
+      ? (s) => s + amount * (-s + (s * s) / H)
+      : (s) => s + (amount / f) * Math.sin(f * s);
+    const PH = P(H);
+    map = (t) => {
+      if (t === 0) return t;
+      const s = Math.abs(t);
+      const m = s === H ? H : (H * P(s)) / PH;
+      return t < 0 ? -m : m;
+    };
+  } else if (f === 0) {
+    map = (az) => {
+      let v = (az - phi) % TAU; if (v < 0) v += TAU;
+      return az + amount * spacingRampIntegral(v);
+    };
+  } else {
+    map = (az) => az + (amount / f) * Math.sin(f * az + phi);
+  }
+  /* The guaranteed floor on any neighbouring pair's pitch, as a fraction of
+     the nominal: 1 - A on a ring, (1 - A) / (1 + A) on a renormalised fan. */
+  const floor = fan ? (1 - amount) / (1 + amount) : 1 - amount;
+  return {
+    amount, frequency: f, phaseDeg: w.phaseDeg, phaseInert: w.phaseInert, fan: w.fan, n: w.n, nyquist: w.nyquist, aliased: w.aliased,
+    halfSpanDeg: w.halfSpanDeg, floor,
+    map,
+  };
+}
+
+/* ===================================================================
    THE TOLD FLAG (ruling 1's condition — "the told flag ships with the FIRST
    variance PR"): the generator REPORTS how close the petals stand, it never
    clamps. Three numbers, each with its own owner and its own sampling, on
@@ -3560,7 +3670,7 @@ function fanAzimuth(i, { perSide, centre, step }) {
   return i < perSide ? (i + 0.5) * step : -((2 * perSide - 0.5 - i) * step);
 }
 
-export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null, sizeField = null, formField = null }) {
+export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null, sizeField = null, formField = null, spacingField = null }) {
   /* LIST (sepals, part 1): explicit azimuths, one per slot — the arm a fan's
      sepals take, because their positions are footRing()'s own answer (the
      fan's lattice shifted by the phase, the `count` nearest the mirror line)
@@ -3596,9 +3706,17 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
      placement law — which is what makes "indexed on the emitted azimuth" a
      property of the code rather than a claim. */
   for (let i = 0; i < count; i++) {
-    const azimuth = placement === 'FAN'
-      ? phase + fanAzimuth(i, fan)
-      : (placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE);
+    /* THE SPACING FIELD (build 3) maps the nominal azimuth through the pitch
+       law's integral, and it is a BRANCH: with no field the azimuth is the
+       very expression it was. On a FAN the map acts on the angle from the
+       mirror plane (a fan ring's phase is exactly 0) and is odd about it. */
+    const azimuth = spacingField === null
+      ? (placement === 'FAN'
+        ? phase + fanAzimuth(i, fan)
+        : (placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE))
+      : (placement === 'FAN'
+        ? phase + spacingField.map(fanAzimuth(i, fan))
+        : spacingField.map(placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE));
     const sizeFactor = sizeField === null ? null : sizeField.at(azimuth);
     const scale = sizeFactor === null ? sizeRamp(i, count) : sizeRamp(i, count) * sizeFactor;
     blade({
@@ -13234,7 +13352,7 @@ export function petalFreeStemApproachMm(state, ring, slot, cap, plan, exportMode
    the matching-mode probe into the real accumulator, and a cheap reach envelope
    that skips petals nowhere near the pole) are costed in the outcome doc and
    deliberately not built in a PR this size. */
-export function stemOmission(state, fr, cap, plan, sizeField = null, formField = null) {
+export function stemOmission(state, fr, cap, plan, sizeField = null, formField = null, spacingField = null) {
   if (!plan || !plan.present || !fr.sphereMode) return null;
   const clearanceMm = STEM_PETAL_CLEARANCE_MM;
   const K = fr.rings.length;
@@ -13258,6 +13376,7 @@ export function stemOmission(state, fr, cap, plan, sizeField = null, formField =
        a slot the field shrinks or grows is probed at the size it will have. */
     sizeField,
     formField,
+    spacingField,
     blade: (slot) => {
       const ring = fr.rings[slot.index];
       let hit = false;
@@ -16259,7 +16378,7 @@ export function nodeVarianceTerm(state, az) {
   return term;
 }
 export function floretPhaseDeg(state, az, angleDeg) {
-  if (varianceIsAbsent(state) && varianceFormIsAbsent(state)) return null;
+  if (varianceIsAbsent(state) && varianceFormIsAbsent(state) && varianceSpacingIsAbsent(state)) return null;
   const a = Number(angleDeg);
   if (a === 0) return null;
   const f = Math.round(Number(state.varianceFrequency));
@@ -17184,6 +17303,7 @@ export function tubeEligible(state) {
   if (sphereMode(state)) return false;
   if (Math.abs(Number(state.varianceSize) || 0) >= 0.005) return false;
   if (Math.abs(Number(state.varianceForm) || 0) >= 0.005) return false;
+  if (Math.abs(Number(state.varianceSpacing) || 0) >= 0.005) return false;
   if (Math.abs(Number(state.buckleAmp) || 0) > 0) return false;
   if (Number(state.fringeCount) >= 1) return false;
   if (state.petalInfill === 'VORONOI') return false;
@@ -17830,7 +17950,10 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
   /* THE FORM FIELD (build 2): null at amount 0, read by the same two whorl
      calls and by the omission mask, so the petal measured is the petal built. */
   const formField = formVarianceField(state, fr);
-  const omission = stemOmission(state, fr, capability, stemPlanned, sizeField, formField);
+  /* THE SPACING FIELD (build 3): null at amount 0; it moves WHERE each slot
+     stands, so the omission mask probes each slot at its mapped azimuth. */
+  const spacingField = spacingVarianceField(state, fr);
+  const omission = stemOmission(state, fr, capability, stemPlanned, sizeField, formField, spacingField);
   /* ONE FACTOR ROW PER WHORL, parallel to `slotAzimuths` (the same shape, the
      same indexing, one entry per SLOT whether or not a petal was built on it),
      null when the field is — the metrics hook's per-slot applied record, which
@@ -17868,6 +17991,7 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
       placement: state.placement,
       sizeField,
       formField,
+      spacingField,
       /* THE OMISSION IS A MASK AND NOT A RENUMBERING, and this is where that is
          true or false. The whorl primitive still runs every slot 0..K-1 and
          still hands each one the azimuth its own index earns, so dropping slot
@@ -17930,6 +18054,7 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
       fan: fr.fan,
       sizeField,
       formField,
+      spacingField,
       blade: (slot) => {
         petalsBuilt++;
         azOf[slot.index] = slot.azimuth;
@@ -18118,6 +18243,12 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
     formVariance: formField ? { amount: formField.amount, frequency: formField.frequency, phaseDeg: formField.phaseDeg, phaseInert: formField.phaseInert,
       fan: formField.fan, n: formField.n, nyquist: formField.nyquist, aliased: formField.aliased, halfSpanDeg: formField.halfSpanDeg,
       halves: formField.halves } : null,
+    /* build 3: the spacing field's record — the map itself is never exported;
+       the emitted azimuths are `slotAzimuths`, and SV restates the law from the
+       controls against them. */
+    spacingVariance: spacingField ? { amount: spacingField.amount, frequency: spacingField.frequency, phaseDeg: spacingField.phaseDeg, phaseInert: spacingField.phaseInert,
+      fan: spacingField.fan, n: spacingField.n, nyquist: spacingField.nyquist, aliased: spacingField.aliased, halfSpanDeg: spacingField.halfSpanDeg,
+      floor: spacingField.floor } : null,
     neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
     /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
        with `p.grid` captured whenever a whorl of sepals exists) — telemetry,
