@@ -238,4 +238,53 @@ the tag's base workflow files equal `main` HEAD's at dispatch, and it is not pre
 
 ## 8. Close-out figures
 
-(filled in at close — see the PR)
+**Amount 0 is byte-inert, measured over the whole matrix in both modes.**
+
+- Command: `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 1740881>
+  --movers-predicate variance-spacing`, run in four `--range` chunks (0:290, 290:580, 580:870,
+  870:1144) and closed with `--merge`.
+- **PASS.** 20 of 20 predeclared movers moved, and **0 floats moved on the 1,124 holders**,
+  positionally, under `Object.is`.
+- Coverage: 1,371,519,000 export floats over 152,391,000 triangles, and 82,362,502
+  captured-grid values over 9,517 panels.
+
+The movers are predeclared from the GUARD FUNCTION (`varianceSpacingIsAbsent`), never from
+labels. They are:
+
+- the 18 block-51 rows that set an amount;
+- `varianceSpacing max (0.9)`;
+- **`ALL MAX`**, which the blanket sweep hands 0.90.
+
+The holders are:
+
+- every one of `main`'s other 1,122 rows;
+- `varianceSpacing min (0)`;
+- block 51's GATED row, which holds frequency and phase at their maxima with every amount 0.
+
+**`--control` fires both clauses.** On rows 100:104, which hold one mover, a 1e-9 perturbation
+is reported once in the export stream and once in the captured grid. On a range with no mover
+the tool also refuses the run as VACUOUS.
+
+**`ALL MAX` moves, and both of its records were re-recorded with the old figure kept in the
+note:**
+
+- **Census:** 116,847 pairs / 15.8503 mm → **93,107 / 13.6547**. It improves.
+- **Export refusal:** 3,090,910 → **2,716,406 triangles**, in both modes. It is still refused,
+  at 181.1 % of the 1,500,000 budget. The same 240 petals are built and none is omitted.
+- **Why the triangle count falls.** The size field reads each slot's EMITTED azimuth. The
+  pitch-density law gathers slots where the shared wave is negative, so more petals stand at
+  the small end of the size wave. The fringe's width rule then cuts them fewer teeth.
+- **Read this as a property of the shared wave, not a defect.** With one frequency and one
+  phase, the crowded petals are the small ones.
+
+**Gates run locally on the branch:**
+
+- The export gate over block 51 and the sweep rows: 21/21 PASS, X2 free on all 21.
+- Connectedness: 21/21 PASS, one piece.
+- The panel gate: PASS.
+- `--verify-frozen phase53`: PASS, deep-equal.
+- The apex mutant table over the three spacing mutants: each fires its own SV clause.
+- `tools/verify-bloom-spacing.mjs`: five plants, each firing exactly its own clause, with the
+  clean records silent.
+
+The full matrix is CI's, and it is the merge criterion.
