@@ -19,7 +19,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import * as G from '../bug-geometry.js';
-import { canonicalDense, posedShape } from './bug-wing-angles.mjs';
+let canonicalDense, posedShape;   // handed over by bug-wing-angles.mjs (importing it back would be a cycle)
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const LADDER = [5, 13, 31];
@@ -61,13 +61,16 @@ function svgWithAngles(params) {
 }
 
 function rung(s, off) {
-  const p = G.applyWingShape(G.defaultParams(), s);
-  for (const [which, tailOk] of [['first', false], ['last', true]]) {
-    const W = p.wings[which], r = G.setWingAngle(W.points, W.stretch, G.wingAngleOf(W.points, W.stretch) + off, tailOk && s.tail ? p.wings.tail : null);
+  // each wing turned by `off`, CLAMPED to its own measured range (said on the rung)
+  const p = G.applyWingShape(G.defaultParams(), s), clamps = [];
+  for (const [which, w, tailOk] of [['first', s.fore, false], ['last', s.hind, true]]) {
+    const R = w.range || [-20, 20], o = Math.max(R[0], Math.min(R[1], off));
+    if (o !== off) clamps.push(`${which === 'first' ? 'fore' : 'hind'} clamped at ${o > 0 ? '+' : ''}${o}°`);
+    const W = p.wings[which], r = G.setWingAngle(W.points, W.stretch, G.wingAngleOf(W.points, W.stretch) + o, tailOk && s.tail ? p.wings.tail : null);
     if (!r.ok) return { ok: false, reason: `${which}: ${r.reason}` };
     W.points = r.points; W.stretch = r.stretch; if (r.tail) p.wings.tail = r.tail;
   }
-  return { ok: true, params: p };
+  return { ok: true, params: p, clamps };
 }
 
 async function renders(jobs) {
@@ -99,7 +102,8 @@ async function renders(jobs) {
   return errors;
 }
 
-export async function review(OUT) {
+export async function review(OUT, helpers) {
+  ({ canonicalDense, posedShape } = helpers);
   const A = JSON.parse(fs.readFileSync(path.join(OUT, 'angles.json'), 'utf8'));
   const SW = fs.existsSync(path.join(OUT, 'sweep.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, 'sweep.json'), 'utf8')) : null;
   const sheets = fs.existsSync(path.join(ROOT, 'tools/bug-wing-sources')) && fs.readdirSync(path.join(ROOT, 'tools/bug-wing-sources')).filter((f) => /^sheet-\d/.test(f));
@@ -144,14 +148,15 @@ img.z,svg.z{position:fixed;inset:2vh 2vw;width:96vw;height:96vh;object-fit:conta
   const jobs = [];
   for (const id of LADDER) for (const off of RUNGS) { const s = G.WING_LIBRARY.find((x) => x.id === id), r = rung(s, off); jobs.push({ id, off, ...r }); }
   const errors = await renders(jobs.filter((j) => j.ok));
-  html += `<h2>4. The angle ladder — both pairs turned together, ${RUNGS.join(', ')}° from the measured angles</h2><p>Each rung: the SVG with the angle lines, the page's 3D 3/4 view, and a close-up of the right forewing's root (the bridge from the root chord, square to the body, to the turned blade). Page errors while rendering: ${errors.length ? esc(errors.join(' | ')) : 'none'}.</p>`;
+  html += `<h2>4. The angle ladder — both pairs turned together, ${RUNGS.join(', ')}° from the measured angles</h2><p>Each wing is turned by the rung's offset, clamped to its own measured range (the clamp is printed). Each rung: the SVG with the angle lines, the page's 3D 3/4 view, and a close-up of the right forewing's root (the bridge from the root chord, square to the body, to the turned blade). Page errors while rendering: ${errors.length ? esc(errors.join(' | ')) : 'none'}.</p>`;
   for (const id of LADDER) {
     const a = A.shapes.find((x) => x.id === id);
-    html += `<div class="g"><b>#${id}</b> — found at fore ${a.fore}°, hind ${a.hind}°<div class="lad">`;
+    const sh = G.WING_LIBRARY.find((x) => x.id === id);
+    html += `<div class="g"><b>#${id}</b> — found at fore ${a.fore}°, hind ${a.hind}° · measured range fore ${sh.fore.range.join('..')}°, hind ${sh.hind.range.join('..')}°<div class="lad">`;
     for (const j of jobs.filter((q) => q.id === id)) {
       if (!j.ok) { html += `<div><b>${j.off > 0 ? '+' : ''}${j.off}°</b><p class="bad">refused: ${esc(j.reason)}</p></div>`; continue; }
       const W = j.params.wings;
-      html += `<div><b>${j.off > 0 ? '+' : ''}${j.off}°</b> <span class="cap">fore ${G.wingAngleOf(W.first.points, W.first.stretch).toFixed(1)}°, hind ${G.wingAngleOf(W.last.points, W.last.stretch).toFixed(1)}°</span>${svgWithAngles(j.params)}<img src="data:image/png;base64,${j.three}"><img src="data:image/png;base64,${j.root}"></div>`;
+      html += `<div><b>${j.off > 0 ? '+' : ''}${j.off}°</b> <span class="cap">fore ${G.wingAngleOf(W.first.points, W.first.stretch).toFixed(1)}°, hind ${G.wingAngleOf(W.last.points, W.last.stretch).toFixed(1)}°${j.clamps.length ? ` — <span class="bad">${j.clamps.join(', ')}</span>` : ''}</span>${svgWithAngles(j.params)}<img src="data:image/png;base64,${j.three}"><img src="data:image/png;base64,${j.root}"></div>`;
     }
     html += '</div></div>';
   }

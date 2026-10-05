@@ -162,7 +162,7 @@ async function sweep() {
 
 if (CMD === 'measure') measure();
 else if (CMD === 'sweep') await sweep();
-else if (CMD === 'review') (await import('./bug-wing-angles-review.mjs')).review(OUT);
+else if (CMD === 'review') (await import('./bug-wing-angles-review.mjs')).review(OUT, { canonicalDense, posedShape });
 
 /* store: rewrite bug-wing-library.js from the SNAPSHOT of #361's library
    (tools/bug-wing-library-snapshot.json): each pair's points turned to angle 0
