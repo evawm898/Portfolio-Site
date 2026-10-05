@@ -12,6 +12,12 @@ harness's own `buildMatrix()` and `FROZEN_MATRICES`.*
 `docs/bloom-stem-nodes-outcome.md` (#301), and the charter's "The stem's nodes" entry
 (`docs/bloom-charter.md:6328`).*
 
+*SUPERSEDED IN TWO PLACES SINCE: ruling 6 was built in stem session 2
+(`docs/bloom-stem-session-2-outcome.md`) and ruling 7 — the 45° cut this file says "does not
+exist" — in stem session 3 (`docs/bloom-stem-cut-outcome.md`). §Q2 row 7, §Q3's ruling-7 costing
+and the "decision owed" there describe the tree as it was on Oct 3; read them as the brief the
+cut was built from, not as its state.*
+
 ---
 
 ## 0. The answer in one paragraph

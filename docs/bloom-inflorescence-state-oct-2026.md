@@ -11,6 +11,10 @@ that box. They are anecdotes and should be read only against each other.*
 Sep 17, `7acccd9` / #247) and `docs/bloom-inflorescence-outcome.md` (the one build session).
 This file supersedes neither. It records which ruling the tree honours and which it does not.*
 
+**[Oct 5 docs sweep: a dated snapshot, kept as written. Since it was taken, build 2 (#353) opened
+`PEDICEL_LENGTH_RANGE` to `[0, 60]` with 0 the sessile root, and build 3 (#357) to `[0, 250]`;
+the `5–60 mm` and "floors at 5 mm" below describe `bf1e4ee`, not `main`.]**
+
 ---
 
 ## 0. The answer in one paragraph

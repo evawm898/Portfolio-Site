@@ -1797,6 +1797,17 @@ any of them.
   inflorescence multiplies node counts, so the session that opens one owes that
   arithmetic BEFORE it builds, at the corner `ALL MAX` reaches and not at a
   representative row.
+  **BUILD 2 (the node laws) and BUILD 3 PHASE A (the reach inset, #355, and the 250 mm
+  pedicel) are shipped** — `docs/bloom-inflorescence-node-laws-outcome.md` and
+  `docs/bloom-inflorescence-build-3-outcome.md`. The top node's inset is the FLORET'S OWN
+  EMITTED PETAL REACH in both modes plus one printable gap, never the pedicel's rise (which
+  cleared the rod and put the shipped raceme's top floret through the head); the pedicel's
+  ceiling is its own range, 250, not the head's stem control; the price of the clean head is
+  a shorter node span (16.4 mm internodes at the default against 21.0) and the default raceme's
+  own florets 0.676 mm apart, under the printable bar — reported, declared, not tuned; whether
+  to hold the internode and give up a node instead is Eva's.
+  Phase B — per-node deltas and the derived per-floret phase — waits on Eva's ruling on the
+  Phase A sheet.
 
 - **ORGANIC VARIANCE IS SCHEDULED IN THREE BUILDS AND THE FIRST SHIPPED THE SIZE FIELD WITH THE
   TOLD FLAG** (Eva's rulings, `docs/bloom-organic-variance-discovery.md` §9; the build's
@@ -6388,6 +6399,22 @@ file in the repo. Rulings 1–4 are in `docs/bloom-stem-taper-laws.md` and
     mode-free (whether the point exists is topology).
   - It is session 2's, deliberately separate from ruling 6: it moves about 114 live rows and
     would make ruling 6's one-row partition impossible to attribute.
+  - **BUILT in stem session 3** — `docs/bloom-stem-cut-outcome.md`. `stemCut` (Stem, a
+    CHOICE, FLORIST / FLAT, default FLORIST). The angle is a SLOPE and the slope is exactly 1
+    (`Math.tan(Math.PI / 4)` is an ulp under); the land is `max(MIN_FEATURE_MM, 2 × NOZZLE_MM)`
+    = 1.00 mm, drawn on the tube's own 48-column lattice at or beyond it (an inserted chord
+    column lands ON a lattice column at 4 mm and reads 24 degenerate triangles); the plug is
+    `2·rTip + 1.5·(√2 − 1)` = D + 0.62 mm, so the bore's floor stands 1.5 mm SQUARE to the
+    face over the whole bore and never touches it (2.34 mm on the 6 mm stem, measured). The
+    cut is pinned off on every pedicel through `PEDICEL_PINS`. A stem shorter than its own
+    cut is told (`cut.inertShort`), not cut. The six checks the ruling named — ST1, ST2,
+    ST3, ST9, ST10 and the byte tool's end-face clause — were each shown red on the old
+    geometry, re-derived onto the cut, and shown red again on the new; none was loosened.
+    `frozen/phase52` is the 1,089 rows at `23b13bd`. The "~114 live rows" above was counted
+    on `phase50`'s 1,047; the live matrix at the base is 1,089 and the cut moves 156 stem rows
+    by "stem present" **[Oct 5 docs sweep: 156 is the count of the BASE's 1,089 rows that carry a
+    stem; the cut's own guard moves 161 of the 1,102-row branch matrix in both modes —
+    `docs/bloom-stem-cut-outcome.md` §0 and §6]** — see the outcome doc's reconciliation for the measured partition.
 
 ## The NU coupling (Eva's ruling on #303)
 

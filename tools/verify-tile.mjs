@@ -33,29 +33,46 @@
         blade's mesh is a closed tube round the roller (a torus: V − E + F = 0)
         whose tip face hugs its spec ring all the way round, seam included.
      R  REGISTRATION. R0 the mesh is the spec: every spec ring point has blade
-        tip beside it; every peg and tooth cone is centred on its spec point.
+        tip beside it; every fiducial pin is centred on its spec point.
         R1 the rolling radius read off the mesh is the blade tips' (the blades
-        touch the board; nothing stands proud of them). R2 the track: A's
-        slanted peg row lays one dimple on each corner (m*, k), k = 0..rows.
-        R3 B, posed by seating one collar tooth in the first dimple and rolled
-        both ways: every tooth that lands on the track lands in a dimple, and
-        every dimple gets a tooth; and seated by a DIFFERENT tooth in a
-        DIFFERENT dimple it stamps the same lines — one seat fixes both of B's
-        free placements. R4 every corner of the cookie sheet lies on its A line
-        and its B line (1e-6 mm). R5 the sheet's A and B lines meet at lattice
-        corners only, (cols+1)(rows+1) of them.
-     W  WATERTIGHT. Each STL (A, B, handle) re-welded from its float32 bytes:
-        no unmatched and no duplicated DIRECTED edge (an undirected census passes
-        a face wound inside out), no degenerate triangle; every shell's signed
-        volume positive. W5 a design whose blade cannot clear the dough, or
-        whose roller cannot hold its bore, is REFUSED an STL, with the reason.
+        touch the board; nothing stands proud of them). R2 A, started on its
+        detent at the dough's edge and rolled forward, punches the two sight
+        pinholes B needs: the first from the edge, and one exactly B's pointer
+        span from it along edge B. R3 B, posed by TWO POINTS — on its detent,
+        its two pointers over those pinholes — lands its second pointer on its
+        pinhole (1e-6 mm). R4 every corner of the cookie sheet lies on its A
+        line and its B line (1e-6 mm). R5 the sheet's A and B lines meet at
+        lattice corners only, (cols+1)(rows+1) of them. R6 placement error:
+        each pointer swept round a circle of e = 0.5, 1, 2 mm, the worst corner
+        mismatch measured through the simulator equals tile-roller's own
+        sightTolerance (the page's number) — two owners of one figure.
+     K  THE DETENT, off the meshes. K1 each roller has a V notch on BOTH end
+        faces, at one angle, DETENT_DEPTH deep (the law restated); K2 the notch
+        is opposite the start pose the spec declares (A: ring 0's first
+        corner on the contact line; B: its contact line through the sight
+        fiducials), and the handle's nub reaches into it and stands on its
+        flat; K3 started on its detent at the dough's edge, A puts both sight
+        pinholes on the dough (a pin radius + 2 mm past the edge), outside
+        the cookie sheet, and every sheet corner past the edge and inside its
+        roll.
+     V  THE SIGHT ARMS, off the handle meshes. V1 with the nub in the notch,
+        the pointer is on the contact line: the roller angle under it is the
+        start pose's; V2 its tip hovers dough + 0.5 mm above the board (the
+        law restated); V3 the handle is mirror symmetric (one part for either
+        end) and its arm and tab stand clear of the roller's end face.
+     W  WATERTIGHT. Each STL (A, B, handle A, handle B) re-welded from its
+        float32 bytes: no unmatched and no duplicated DIRECTED edge (an
+        undirected census passes a face wound inside out), no degenerate
+        triangle; every shell's signed volume positive. W5 a design whose blade
+        cannot clear the dough, whose roller cannot hold its bore, or whose end
+        face has no room for the detent, is REFUSED an STL, with the reason.
      H  HEIGHTS, measured off the mesh. H1 blade height > dough + 1.5 mm;
-        H2 peg and tooth tips inside the dough and above the board, the tooth
-        shallower than the peg; H3 the collar band above the dough; H4 every
-        cone founded in the body.
+        H2 every fiducial pin reaches the board (flush with the blade tips) and
+        is its own width wherever it is in the dough; H4 every pin founded in
+        the body.
      F  FLAGS. Each fixture's neck / spike / close-point flags are exactly the
-        ones it expects; A's peg row's second pass is flagged iff the
-        simulation lands a dimple on a cookie corner.
+        ones it expects; A punches a pinhole inside the cookie sheet off a
+        corner iff the recurrence flag is raised.
 
    And, once, pure-function checks of the editor (E): INVALID tiles refused and
    really crossing (this file's test); a drag into a crossing BLOCKED with the
@@ -205,7 +222,7 @@ function census(bytes) {
 }
 function watertight(M, built) {
   const { RL } = M, bad = [], info = {};
-  for (const [nm, b] of [['A', built.A], ['B', built.B], ['handle', built.H]]) {
+  for (const [nm, b] of [['A', built.A], ['B', built.B], ['handleA', built.HA], ['handleB', built.HB]]) {
     const c = census(RL.exportStl(b.mesh, nm, { layout: built.layout, allowRefused: true }));
     info[nm] = c;
     if (c.unmatched || c.dup || c.degen) bad.push(`W: ${nm}.stl has ${c.unmatched} unmatched and ${c.dup} duplicated directed edges, ${c.degen} degenerate triangles`);
@@ -221,9 +238,9 @@ function watertight(M, built) {
 const rad = (P, v) => Math.hypot(P[3 * v], P[3 * v + 1]);
 /* a ray through a SHARED edge (or vertex) of two triangles must hit both, never
    neither: the barycentric bounds take this much slack, and crossings() merges
-   the two hits at the same distance into one. A peg sits exactly on a revolve
-   seam whenever 360° / (tiles round) is a whole number of the body's 2° steps —
-   six round A puts peg 0 at 60° — and the strict bounds missed it there. */
+   the two hits at the same distance into one. A pin sits exactly on a revolve
+   seam whenever its angle is a whole number of the body's 2° steps (the old
+   pegs at 60° on six round A) — and the strict bounds missed it there. */
 const EDGE_EPS = 1e-9;
 /* every crossing (distance from the axis) of the ray from (0, 0, z) toward
    angle `ang` with a part's triangles, sorted, duplicates at shared edges merged */
@@ -322,53 +339,49 @@ function heights(M, built, print, meas = {}) {
     /* The body's OUTER radius, read by casting rays out from the axis against
        the body's own triangles and keeping the farthest hit — the outer skin,
        never the cavity's or the bore's (a vertex scan cannot tell them apart:
-       the outer cylinder has vertices only at its ends and at the collar). */
+       the outer cylinder has vertices only at its ends). */
     const body = mesh.parts.find((q) => q.name === 'body');
-    let zlo = Infinity, zhi = -Infinity, rband = 0;
-    for (let v = body.v0; v < body.v1; v++) { zlo = Math.min(zlo, P[3 * v + 2]); zhi = Math.max(zhi, P[3 * v + 2]); rband = Math.max(rband, rad(P, v)); }
+    let zlo = Infinity, zhi = -Infinity;
+    for (let v = body.v0; v < body.v1; v++) { zlo = Math.min(zlo, P[3 * v + 2]); zhi = Math.max(zhi, P[3 * v + 2]); }
     let rbody = Infinity;
-    const lo = zlo + 2, hi = zhi - 2;                          // past the end chamfers
+    const lo = zlo + 2, hi = zhi - 2;                          // past the end chamfers (and the notches)
     for (let i = 0; i <= 60; i++) {
       const z = lo + ((hi - lo) * i) / 60;
       for (const ang of [0.1, 1.7, 3.3, 4.9]) rbody = Math.min(rbody, outerHit(mesh, body, z, ang));
     }
     const h = tip - rbody;
     meas[`blade${which}`] = h;
-    if (which === 'B') meas.bandAbove = roll - rband;
     if (!(h > print.dough + 1.5 - 1e-9)) bad.push(`H1: roller ${which}'s blade stands ${h.toFixed(3)} mm, not more than the dough ${print.dough} + 1.5 mm`);
     if (Math.abs(tip - roll) > 1e-9) bad.push(`R1: roller ${which} rolls on radius ${roll.toFixed(6)} but its blade tips reach ${tip.toFixed(6)} — ${tip < roll ? 'something stands proud of the blades, and they never touch the board' : 'the blades are not the outermost'}`);
     meas[`roll${which}`] = roll;
-    const cones = mesh.parts.filter((q) => /^(peg|tooth)/.test(q.name));
-    for (const c of cones) {
+    for (const c of mesh.parts.filter((q) => /^pin/.test(q.name))) {
       let r = 0; for (let v = c.v0; v < c.v1; v++) r = Math.max(r, rad(P, v));
-      const above = roll - r;
-      /* the doc's law restated (§4.3): a peg reaches δ = min(½·dough, ½·D − 0.8)
-         into the dough — never more than half of it, so it dimples and never
-         punches — and a tooth 0.3 mm less, so it seats on the dimple's wall */
-      const delta = Math.min(0.5 * print.dough, print.pegSize / 2 - 0.8), want = /^peg/.test(c.name) ? delta : delta - 0.3;
-      if (!(Math.abs(print.dough - above - want) < 1e-6)) bad.push(`H2: ${which}/${c.name} reaches ${(print.dough - above).toFixed(4)} mm into the ${print.dough} mm dough, not the ${want.toFixed(4)} mm its law gives`);
-      /* H4 the cone is FOUNDED: its base disk's centre (its innermost vertex)
-         lies in the body's material along its own radial line — a ray from the
-         axis through it crosses the body's skin an odd number of times first */
-      /* the base disk's centre: the innermost vertex — and the base RIM's two
-         axial extremes are exactly as far from the axis, so among the ties the
-         one midway between them in z (the centre is the mean of its rim) */
-      let rmin = Infinity; for (let v = c.v0; v < c.v1; v++) rmin = Math.min(rmin, rad(P, v));
-      const ties = []; for (let v = c.v0; v < c.v1; v++) if (rad(P, v) - rmin < 1e-9) ties.push(v);
-      const zMid = ties.reduce((a, v) => a + P[3 * v + 2], 0) / ties.length;
-      let vin = ties[0]; for (const v of ties) if (Math.abs(P[3 * v + 2] - zMid) < Math.abs(P[3 * vin + 2] - zMid)) vin = v;
+      /* H2 the pin reaches the board — flush with the blade tips, so it punches
+         through the dough and never lifts the roller (R1 says nothing stands
+         prouder) — and wherever it is in the dough it is its own width: its
+         axis is radial through the mean of its vertices (rings about the axis),
+         and no vertex deeper than the dough's top is further than pinSize / 2
+         from it (the hole it leaves is the pin, not a crater) */
+      if (!(Math.abs(roll - r) < 1e-6)) bad.push(`H2: ${which}/${c.name} reaches ${(roll - r).toFixed(4)} mm short of the board — a pinhole must go through the dough`);
+      let mx = 0, my = 0, mz = 0; const nv = c.v1 - c.v0;
+      for (let v = c.v0; v < c.v1; v++) { mx += P[3 * v]; my += P[3 * v + 1]; mz += P[3 * v + 2]; }
+      const ph = Math.atan2(my, mx), e = [Math.cos(ph), Math.sin(ph)], Zc = mz / nv;
+      let wide = 0;
+      for (let v = c.v0; v < c.v1; v++) {
+        if (rad(P, v) < roll - print.dough - 1e-9) continue;
+        const along = P[3 * v] * e[0] + P[3 * v + 1] * e[1], q = [P[3 * v] - along * e[0], P[3 * v + 1] - along * e[1], P[3 * v + 2] - Zc];
+        wide = Math.max(wide, Math.hypot(...q));
+      }
+      meas.pinHalf = Math.max(meas.pinHalf || 0, wide);
+      if (wide > print.pinSize / 2 + 1e-6) bad.push(`H2: ${which}/${c.name} is ${(2 * wide).toFixed(3)} mm across in the dough, not its ${print.pinSize} mm — it would leave a crater, not a pinhole`);
+      /* H4 founded: its base disk's centre (its innermost vertex — the centre
+         is nearer the axis than any rim point) lies in the body's material: a
+         ray from the axis through it crosses the body's skin an odd number of
+         times first */
+      let vin = c.v0; for (let v = c.v0; v < c.v1; v++) if (rad(P, v) < rad(P, vin)) vin = v;
       const ang = Math.atan2(P[3 * vin + 1], P[3 * vin]), rin = rad(P, vin);
-      const hits = crossings(mesh, body, P[3 * vin + 2], ang).filter((t) => t < rin);
+      const hits = crossings(mesh, body, P[3 * vin + 2], ang).filter((tt) => tt < rin);
       if (hits.length % 2 !== 1) bad.push(`H4: ${which}/${c.name}'s foot (radius ${rin.toFixed(3)} mm) is not inside the body — ${hits.length} skin crossings below it`);
-    }
-    if (which === 'B') {
-      if (!(roll - rband > print.dough)) bad.push(`H3: the collar band reaches ${(roll - rband).toFixed(3)} mm above the board — into the dough`);
-      const tipR = (m, parts) => Math.max(...parts.map((q) => { let r = 0; for (let v = q.v0; v < q.v1; v++) r = Math.max(r, rad(m.positions, v)); return r; }));
-      const pegTip = tipR(built.A.mesh, built.A.mesh.parts.filter((q) => /^peg/.test(q.name)));
-      let rollA = 0; for (let v = 0; v < built.A.mesh.positions.length / 3; v++) rollA = Math.max(rollA, rad(built.A.mesh.positions, v));
-      const pegDepth = print.dough - (rollA - pegTip), toothDepth = print.dough - (roll - tipR(mesh, cones));
-      meas.pegDepth = pegDepth; meas.toothDepth = toothDepth;
-      if (!(toothDepth < pegDepth)) bad.push(`H2: a tooth reaches ${toothDepth.toFixed(3)} mm into the dough, not shallower than the peg's ${pegDepth.toFixed(3)} mm dimple`);
     }
   }
   return bad;
@@ -392,11 +405,11 @@ function meshIsSpec(M, built, layout) {
       }
       if (lonely) bad.push(`R0: ${lonely} of ${which}/ring${j}'s spec points have no blade tip beside them`);
     });
-    for (const f of [...(spec.pegs || []).map((p) => ['peg', p]), ...(spec.teeth || []).map((p) => ['tooth', p])]) {
+    for (const f of (spec.pins || []).map((p) => ['pin', p])) {
       const [kind, s] = f;
       const part = mesh.parts.find((q) => q.name === `${kind}${s.i}`);
       if (!part) { bad.push(`R0: no mesh for ${which}/${kind}${s.i}`); continue; }
-      // a frustum's rings are circles about its axis: the mean of all its vertices is on the axis
+      // a pin's rings are circles about its axis: the mean of all its vertices is on the axis
       let x = 0, y = 0, z = 0; const nv = part.v1 - part.v0;
       for (let v = part.v0; v < part.v1; v++) { x += P[3 * v]; y += P[3 * v + 1]; z += P[3 * v + 2]; }
       x /= nv; y /= nv; z /= nv;
@@ -479,53 +492,36 @@ function direction(M, tile, built, print, rollers, dm = {}) {
 }
 
 /* ---------------- R and S ---------------- */
-function registration(M, tile, built, r4 = {}) {
-  const { S } = M, bad = [];
-  const sim = S.simulate(tile, built, { revs: 1 });
-  const { KA, KB, mStar } = sim;
-  // R2 the track: one dimple on each corner (m*, k), k = 0..KB
-  const track = sim.dimples.filter((d) => d.lm === mStar);   // the peg row's later passes land n_A columns further on
-  for (let k = 0; k <= KB; k++) {
-    const at = track.filter((d) => d.lk === k);
-    if (at.length !== 1) { bad.push(`R2: corner (${mStar}, ${k}) of the track has ${at.length} dimples`); continue; }
-    const c = S.cornerOf(tile, sim, mStar, k), e = Math.hypot(at[0].at[0] - c[0], at[0].at[1] - c[1]);
-    if (e > TOL) bad.push(`R2: the dimple for corner (${mStar}, ${k}) is ${e.toExponential(2)} mm off the corner`);
+const DETENT_DEPTH = 0.6;      // the doc's notch depth (§4.3), restated
+const HOVER = 0.5;             // the pointer hovers this far above the dough (§4.4), restated
+const EDGE = 2;                // a sight pinhole stands a pin radius + this past the dough's edge (§4.2), restated
+const along = (p, roll) => p[0] * roll[0] + p[1] * roll[1];
+function cornersOnLines(S, tile, s) {
+  const { a, b } = S.blockLines(s);
+  let wA = 0, wB = 0, missing = 0;
+  for (let m = 0; m <= s.KA; m++) for (let k = 0; k <= s.KB; k++) {
+    const c = S.cornerOf(tile, s, m, k);
+    const la = a.find((L) => L.k === k), lb = b.find((L) => L.m === m);
+    if (!la || !lb) { missing++; continue; }
+    wA = Math.max(wA, polyDist(c, la.pts)); wB = Math.max(wB, polyDist(c, lb.pts));
   }
-  if (track.some((d) => d.lk < 0 || d.lk > KB)) bad.push(`R2: A lays track dimples outside rows 0–${KB}`);
-  // R3 teeth in dimples
-  const tr = S.trackDimples(sim);
-  const onTrack = sim.teeth.filter((t) => t.lm === mStar && t.lk >= 0 && t.lk <= KB);
-  let stray = 0;
-  for (const t of onTrack) if (!tr.some((d) => Math.hypot(d.at[0] - t.at[0], d.at[1] - t.at[1]) < TOL)) stray++;
-  const fed = tr.filter((d) => onTrack.some((t) => Math.hypot(d.at[0] - t.at[0], d.at[1] - t.at[1]) < TOL)).length;
-  if (stray) bad.push(`R3: ${stray} collar teeth land on the track beside its dimples`);
-  if (fed !== tr.length) bad.push(`R3: ${tr.length - fed} of ${tr.length} track dimples receive no tooth`);
-  if (!sim.teeth.some((t) => t.lm === mStar)) bad.push('R3: no collar tooth lands on the track column at all');
+  return { wA, wB, missing };
+}
+function registration(M, tile, built, print, opts = {}, r4 = {}) {
+  const { S, RL } = M, bad = [];
+  const sim = S.simulate(tile, built, { revs: 1 });
+  if (!sim.pinholes) return { bad: [`R2: ${sim.error}`], sim };
+  const { KA, KB } = sim;
+  // R2 the sight pinholes: the first from the edge, and one the pointers' span from it along edge B
+  if (!sim.pair) { bad.push(`R2: ${sim.error}`); return { bad, sim }; }
+  r4.span = sim.span;
+  // R3 two-point placement: the second pointer lands on its pinhole
+  if (Math.abs(sim.pair.residual) > TOL) bad.push(`R3: with B's first pointer on its pinhole, its second lands ${Math.abs(sim.pair.residual).toExponential(2)} mm off the other`);
   // R4 corners on both lines
-  const cornersOnLines = (s) => {
-    const { a, b } = S.blockLines(s);
-    let wA = 0, wB = 0, missing = 0;
-    for (let m = 0; m <= KA; m++) for (let k = 0; k <= KB; k++) {
-      const c = S.cornerOf(tile, s, m, k);
-      const la = a.find((L) => L.k === k), lb = b.find((L) => L.m === m);
-      if (!la || !lb) { missing++; continue; }
-      wA = Math.max(wA, polyDist(c, la.pts)); wB = Math.max(wB, polyDist(c, lb.pts));
-    }
-    return { wA, wB, missing };
-  };
-  const c0 = cornersOnLines(sim);
+  const c0 = cornersOnLines(S, tile, sim);
   if (c0.missing) bad.push(`R4: ${c0.missing} corners of the sheet have no A line or no B line stamped through their row / column`);
   r4.worst = Math.max(c0.wA, c0.wB);
   if (c0.wA > TOL || c0.wB > TOL) bad.push(`R4: a sheet corner stands ${c0.wA.toExponential(2)} mm off its A line, ${c0.wB.toExponential(2)} mm off its B line`);
-  /* R3 one seat fixes both free placements: B seated by a DIFFERENT tooth in a
-     DIFFERENT dimple of the track stamps the same lines through the same corners */
-  const nB = built.B.spec.teeth.length;
-  for (const seat of [{ tooth: nB - 1, row: KB }, { tooth: Math.floor(nB / 2), row: Math.min(1, KB) }]) {
-    if (!track.some((d) => d.lk === seat.row)) { bad.push(`R3: there is no track dimple in row ${seat.row} to seat B in`); continue; }
-    const s2 = S.simulate(tile, built, { revs: 1, seat });
-    const c2 = cornersOnLines(s2);
-    if (c2.missing || c2.wB > TOL) bad.push(`R3: seated by tooth ${seat.tooth} in the dimple of row ${seat.row}, B's lines miss the sheet's corners by ${c2.wB.toExponential(2)} mm (${c2.missing} missing) — one seat does not fix B`);
-  }
   // R5 meetings only at corners
   const { a, b } = S.blockLines(sim);
   const cs = S.contacts(a, b, TOL);
@@ -534,11 +530,106 @@ function registration(M, tile, built, r4 = {}) {
   if (off) bad.push(`R5: the sheet's A and B lines meet at ${off} points that are not tile corners`);
   r4.meetings = cs.length - off; r4.want = (KA + 1) * (KB + 1);
   if (cs.length - off !== (KA + 1) * (KB + 1)) bad.push(`R5: ${cs.length - off} corner meetings, not ${(KA + 1) * (KB + 1)}`);
-  // F: the peg row's second pass lands on a cookie corner iff flagged
-  const cookieDimples = sim.dimples.filter((d) => d.lk >= 0 && d.lk <= KB && d.lm >= 0 && d.lm <= KA).length;
-  const flagged = built.layout.flags.some((f) => f.id === 'pegRecur');
-  if ((cookieDimples > 0) !== flagged) bad.push(`F: the simulation lands ${cookieDimples} dimples on cookie corners but the recurrence flag is ${flagged ? 'raised' : 'not raised'}`);
+  /* R6 placement error, through the simulator: each pointer swept round a
+     circle of radius e (8 directions each, every pair), B re-posed by the
+     least-squares two-point placement, and the worst distance from a sheet
+     corner to the nearest corner B stamps — against tile-roller's own figure */
+  if (opts.tolerance) {
+    const pre = { nA: sim.notch.A, nB: sim.notch.B, gA: sim.handle.A, gB: sim.handle.B };
+    const corners = []; for (let m = 0; m <= KA; m++) for (let k = 0; k <= KB; k++) corners.push(S.cornerOf(tile, sim, m, k));
+    r4.tol = {};
+    for (const e of [0, 0.5, 1, 2]) {
+      let worst = 0;
+      const D = 8;
+      for (let i = 0; i < D; i++) for (let k = 0; k < D; k++) {
+        const dP = [e * Math.cos((2 * Math.PI * i) / D), e * Math.sin((2 * Math.PI * i) / D)], dQ = [e * Math.cos((2 * Math.PI * k) / D), e * Math.sin((2 * Math.PI * k) / D)];
+        const s2 = S.simulate(tile, built, { pre, cornersOnly: true, perturb: [dP, dQ] });
+        for (const c of corners) { let best = Infinity; for (const q of s2.bCorners) best = Math.min(best, Math.hypot(q[0] - c[0], q[1] - c[1])); worst = Math.max(worst, best); }
+        if (e === 0) break;
+      }
+      const theirs = RL.sightTolerance(tile, built.layout, e, D);
+      r4.tol[e] = worst;
+      if (Math.abs(worst - theirs) > 1e-6) bad.push(`R6: with each pointer within ${e} mm of its pinhole the simulator measures a worst corner mismatch of ${worst.toFixed(4)} mm, the page's figure is ${theirs.toFixed(4)} mm`);
+    }
+  }
+  /* F: a pinhole inside the cookie sheet off a corner (a hole in a cookie)
+     iff the recurrence flag is raised */
+  const inCookie = sim.pinholes.filter((d) => d.u > -1e-6 && d.u < KA + 1e-6 && d.v > -1e-6 && d.v < KB + 1e-6 && Math.hypot(d.u - Math.round(d.u), d.v - Math.round(d.v)) > 1e-6).length;
+  const flagged = built.layout.flags.some((f) => f.id === 'pinRecur');
+  if ((inCookie > 0) !== flagged) bad.push(`F: the simulation punches ${inCookie} pinholes inside cookies but the recurrence flag is ${flagged ? 'raised' : 'not raised'}`);
   return { bad, sim };
+}
+
+/* ---------------- K and V: the detent and the sight arms ---------------- */
+function detentAndSight(M, tile, built, print, sim, km = {}) {
+  const { S } = M, bad = [];
+  for (const which of ['A', 'B']) {
+    const { mesh, spec } = built[which], H = built[`H${which}`].mesh;
+    const n = S.readNotch(mesh), h = S.readHandle(H);
+    // K1 a notch on both faces, one angle, DETENT_DEPTH deep
+    if (!n.bottom || !n.top) { bad.push(`K1: roller ${which} has ${n.bottom ? '' : 'no notch on its −Z face '}${n.top ? '' : 'no notch on its +Z face'}— a handle there has nothing to click into`); continue; }
+    const dAng = Math.abs(Math.atan2(Math.sin(n.bottom.phi - n.top.phi), Math.cos(n.bottom.phi - n.top.phi)));
+    if (dAng > 1e-9) bad.push(`K1: roller ${which}'s two notches are ${(dAng * 180 / Math.PI).toFixed(3)}° apart — its two handles cannot both hang their pointers down`);
+    for (const f of ['bottom', 'top']) if (Math.abs(n[f].depth - DETENT_DEPTH) > 1e-9) bad.push(`K1: roller ${which}'s ${f} notch is ${n[f].depth.toFixed(4)} mm deep, not the doc's ${DETENT_DEPTH}`);
+    // K2 opposite the declared start pose; the nub reaches in
+    const declared = which === 'A' ? spec.rings[0][spec.corners[0]][0] : spec.startPhi;
+    const dK = Math.abs(Math.atan2(Math.sin(n.bottom.phi - declared - Math.PI), Math.cos(n.bottom.phi - declared - Math.PI)));
+    km[`notch${which}`] = dK;
+    if (dK > 1e-9) bad.push(`K2: roller ${which}'s notch is ${(dK * 180 / Math.PI).toFixed(3)}° (${(dK * spec.Rtip).toFixed(3)} mm at the blade tips) from opposite its start pose`);
+    if (!h) { bad.push(`K2: roller ${which}'s handle has no nub or no pointer`); continue; }
+    if (!(h.nubAbove > 0 && h.nubAbove <= DETENT_DEPTH + 1e-9)) bad.push(`K2: roller ${which}'s handle nub stands ${h.nubAbove.toFixed(3)} mm past its bearing face — it must reach into the ${DETENT_DEPTH} mm notch and not bottom out`);
+    // V1 the pointer is on the contact line
+    const under = S.startAngle(n.bottom.phi, h);
+    const want = which === 'A' ? spec.rings[0][spec.corners[0]][0] : spec.startPhi;
+    const dV = Math.abs(Math.atan2(Math.sin(under - want), Math.cos(under - want)));
+    km[`ptr${which}`] = dV;
+    if (dV > 1e-9) bad.push(`V1: with the nub in roller ${which}'s notch its pointer hangs over roller angle ${under.toFixed(5)} rad, not the start pose's contact line at ${want.toFixed(5)} — ${(dV * spec.Rtip).toFixed(3)} mm off round the roller`);
+    // V2 hovering just above the dough
+    const rollR = S.radii(mesh).rolling, wantR = rollR - print.dough - HOVER;
+    km[`hover${which}`] = rollR - h.ptrR - print.dough;
+    if (Math.abs(h.ptrR - wantR) > 1e-6) bad.push(`V2: roller ${which}'s pointer tip is ${(rollR - h.ptrR).toFixed(3)} mm above the board, not just above the ${print.dough} mm dough (${(print.dough + HOVER).toFixed(1)} mm)`);
+    // V3 symmetric; clear of the end face
+    const P = H.positions, keys = new Set();
+    const fx = (x) => (Math.abs(x) < 5e-8 ? 0 : x).toFixed(7);
+    for (let v = 0; v < P.length / 3; v++) keys.add(`${fx(P[3 * v])},${fx(P[3 * v + 1])},${fx(P[3 * v + 2])}`);
+    let asym = 0;
+    for (let v = 0; v < P.length / 3; v++) if (!keys.has(`${fx(-P[3 * v])},${fx(P[3 * v + 1])},${fx(P[3 * v + 2])}`)) asym++;
+    if (asym) bad.push(`V3: roller ${which}'s handle has ${asym} vertices with no mirror image — it is not one part for either end`);
+    let reach = -Infinity;
+    for (const part of built[`H${which}`].mesh.parts.filter((q) => q.name === 'arm' || q.name === 'tab' || q.name === 'pointer')) for (let v = part.v0; v < part.v1; v++) reach = Math.max(reach, P[3 * v + 2]);
+    if (!(reach < h.zSh - 0.3)) bad.push(`V3: roller ${which}'s handle arm or tab reaches ${(reach - h.zSh).toFixed(3)} mm from its bearing face — it would rub the roller's end face`);
+  }
+  // K3 A's sight pinholes on the dough, outside the sheet; the sheet past the edge and inside A's roll
+  if (sim && sim.pair) {
+    const hA = S.handling(tile, 'A'), clear = print.pinSize / 2 + EDGE;
+    for (const [nm, q] of [['first', sim.pair.Q], ['second', sim.pair.P]]) {
+      const d = along(q.at, hA.roll);
+      if (d < clear - 1e-9) bad.push(`K3: the ${nm} sight pinhole lands ${d.toFixed(2)} mm past the dough's edge, not the ${clear.toFixed(2)} mm a whole pinhole needs`);
+      if (q.u > -1e-6 && q.u < sim.KA + 1e-6 && q.v > -1e-6 && q.v < sim.KB + 1e-6) bad.push(`K3: the ${nm} sight pinhole (${q.u.toFixed(2)}, ${q.v.toFixed(2)}) is inside the cookie sheet`);
+      km.edge = Math.min(km.edge ?? Infinity, d);
+    }
+    let behind = 0, beyond = 0;
+    for (let m = 0; m <= sim.KA; m++) for (let k = 0; k <= sim.KB; k++) { const d = along(S.cornerOf(tile, sim, m, k), hA.roll); if (d < -1e-9) behind++; if (d > sim.rollEnd + 1e-9) beyond++; }
+    /* K4 no IMPOSTOR: no other pair of the pinholes A actually laid lies within
+       3 mm of B's pointer span and 10° of its direction — a person placing each
+       pointer within a millimetre or two could take it for the right pair.
+       A pair with exactly the true pair's vector is the true pair a whole
+       revolution of A along, which registers B exactly; it is allowed. */
+    const tv = [sim.pair.Q.at[0] - sim.pair.P.at[0], sim.pair.Q.at[1] - sim.pair.P.at[1]], ta = Math.atan2(tv[1], tv[0]);
+    let imp = null;
+    for (const X of sim.pinholes) for (const Y of sim.pinholes) {
+      if (X === Y || imp) continue;
+      const v = [Y.at[0] - X.at[0], Y.at[1] - X.at[1]], l = Math.hypot(v[0], v[1]);
+      if (Math.hypot(v[0] - tv[0], v[1] - tv[1]) < 1e-6) continue;
+      const da = Math.abs(Math.atan2(Math.sin(Math.atan2(v[1], v[0]) - ta), Math.cos(Math.atan2(v[1], v[0]) - ta)));
+      if (Math.abs(l - sim.span) < 3 && da < 10 * Math.PI / 180) imp = { X, Y, off: l - sim.span, da };
+    }
+    km.impostor = imp;
+    if (imp && !built.layout.flags.some((f) => f.id === 'impostor')) bad.push(`K4: A also lays pinholes (${imp.X.u.toFixed(2)}, ${imp.X.v.toFixed(2)}) and (${imp.Y.u.toFixed(2)}, ${imp.Y.v.toFixed(2)}), ${imp.off.toFixed(3)} mm off B's pointer span and ${(imp.da * 180 / Math.PI).toFixed(2)}° off its direction — easy to take for the right pair, and not flagged`);
+    if (behind) bad.push(`K3: ${behind} sheet corners lie behind the dough's edge where A starts`);
+    if (beyond) bad.push(`K3: ${beyond} sheet corners lie beyond A's roll`);
+  }
+  return bad;
 }
 function seam(M, tile, built, rollers, print, sm = {}) {
   const { S } = M, bad = [];
@@ -638,26 +729,47 @@ function checkRow(M, label, tile, print, rollers, opts = {}) {
      less body, off the mesh) does not clear the dough by 1.5 mm, or its rolling
      radius (off the mesh) less the blade leaves no cylinder wall round the bore.
      Never read off the builder's own flag: that is the quantity under test. */
-  const meas = {}, r4 = {}, sm = {}, dm = {};
+  const meas = {}, r4 = {}, sm = {}, dm = {}, km = {};
   /* a stage that throws is a failure OF THAT STAGE, reported under its own
      clause — never a crash that loses what the other stages found */
   const stage = (clause, f) => { try { return f(); } catch (e) { return [`${clause}: (threw) ${e.message}`]; } };
   const hb = stage('H', () => heights(M, built, print, meas));
   const why = [];
+  /* each measured cause, with the flag that must name it: a refusal for the
+     wrong reason tells the user to fix the wrong thing */
+  const causes = [];
   for (const which of ['A', 'B']) {
-    if (!(meas[`blade${which}`] > print.dough + 1.5 - 1e-9)) why.push(`${which}'s blade stands ${meas[`blade${which}`].toFixed(2)} mm against ${print.dough} + 1.5`);
+    if (!(meas[`blade${which}`] > print.dough + 1.5 - 1e-9)) { why.push(`${which}'s blade stands ${meas[`blade${which}`].toFixed(2)} mm against ${print.dough} + 1.5`); causes.push('blade'); }
     const body = meas[`roll${which}`] - print.bladeHeight;
-    if (body < print.bore / 2 + print.cylWall + 0.4 - 1e-9) why.push(`${which}'s body is ${(2 * body).toFixed(1)} mm across round a ${print.bore} mm bore`);
+    if (body < print.bore / 2 + print.cylWall + 0.4 - 1e-9) { why.push(`${which}'s body is ${(2 * body).toFixed(1)} mm across round a ${print.bore} mm bore`); causes.push('small' + which); }
+    /* the detent's room, the doc's law restated (§4.3): the notch's outer end
+       0.5 mm inside the 0.6 mm chamfer (on A also clear of its 2 mm groove by
+       1 mm, the groove 1.5 mm inside the chamfer), its inner end a millimetre
+       past the bearing boss, and the tab at least 6 mm long from the boss */
+    else {
+      const rs = print.bore / 2 + 2.5, nr = which === 'A' ? body - 0.6 - 1.5 - 1 - 1 - 2 : body - 0.6 - 0.5 - 2;
+      if (nr - 2 < rs + 1 || nr - rs < 6) { why.push(`${which}'s end face (body ${(2 * body).toFixed(1)} mm) has no room for the detent`); causes.push('detent' + which); }
+    }
   }
+  const named = built.layout.flags.filter((f) => f.stl).map((f) => f.id);
+  for (const c of causes) if (!named.includes(c)) fails.push(`W5: the roller measures "${c}" but the refusal names ${named.length ? named.join(', ') : 'nothing'} — it would send the user after the wrong fix`);
+  for (const nm of named) if (!causes.includes(nm)) fails.push(`W5: the refusal names "${nm}" but the rollers do not measure it`);
   if (meas.rollA === undefined || meas.rollB === undefined) fails.push('W5: the rollers could not be measured, so the refusal cannot be checked');
   else if ((why.length > 0) !== refused) fails.push(`W5: the STL is ${refused ? 'refused' : 'exported'} while ${why.length ? why.join('; ') : 'the rollers measure sound'}`);
   if (!refused) { fails.push(...w.bad); fails.push(...hb); }
   fails.push(...stage('R0', () => meshIsSpec(M, built, built.layout)));
   fails.push(...stage('D', () => direction(M, tile, built, print, rollers, dm)));
-  fails.push(...stage('R', () => registration(M, tile, built, r4).bad));
-  if (!opts.noSeam) fails.push(...stage('S', () => seam(M, tile, built, rollers, print, sm)));
+  /* a REFUSED design is not a roller anyone will use: W5 asserts the refusal,
+     and the claims about using it (the detent, the sight arms, registration,
+     the seam) are not made of it */
+  if (!refused) {
+    let sim = null;
+    fails.push(...stage('R', () => { const r = registration(M, tile, built, print, opts, r4); sim = r.sim; return r.bad; }));
+    fails.push(...stage('K', () => detentAndSight(M, tile, built, print, sim, km)));
+    if (!opts.noSeam) fails.push(...stage('S', () => seam(M, tile, built, rollers, print, sm)));
+  }
   fails.push(...stage('F', () => shapeFlags(M, tile, print, opts.expect)));
-  return { label, fails, tris: [w.info.A.n, w.info.B.n, w.info.handle.n], bytes: [w.info.A.bytes, w.info.B.bytes, w.info.handle.bytes], layout: built.layout, meas, r4, sm, dm };
+  return { label, fails, tris: [w.info.A.n, w.info.B.n, w.info.handleA.n, w.info.handleB.n], bytes: [w.info.A.bytes, w.info.B.bytes, w.info.handleA.bytes, w.info.handleB.bytes], layout: built.layout, meas, r4, sm, dm, km };
 }
 
 /* ---------------- E: the editor, as functions ---------------- */
@@ -732,14 +844,17 @@ function editorChecks(M) {
 function rowsFor(M) {
   const { G, RL } = M;
   const P = RL.PRINT_DEFAULTS, R = RL.ROLLER_DEFAULTS;
-  const rows = FIXTURES.map((f) => [`fixture: ${f.name}`, f.tile, P, R, { expect: f.expect }]);
+  const rows = FIXTURES.map((f) => [`fixture: ${f.name}`, f.tile, P, R, { expect: f.expect, tolerance: /^(default|hook|acute|obtuse)/.test(f.name) }]);
   for (let s = 1; s <= NSEEDS; s++) rows.push([`random ${s}`, randomTile(s, G.validate), P, R, {}]);
-  rows.push(['default: round 3/7, sheet 2 × 5 (dimples cookies: flagged)', G.defaultTile(), P, { roundA: 3, roundB: 7, cols: 2, rows: 5 }, {}]);
-  rows.push(['default: round 8/3, sheet 6 × 3 (B turns more than once to cross the sheet)', G.defaultTile(), P, { roundA: 8, roundB: 3, cols: 6, rows: 3 }, {}]);
-  rows.push(['hook: thin print (dough 3, blade 5, wall 0.8, draft 6, peg 4, bore 6)', FIXTURES.find((f) => /hook/.test(f.name)).tile, { ...P, dough: 3, bladeHeight: 5, bladeWall: 0.8, draft: 6, pegSize: 4, bore: 6 }, R, {}]);
-  rows.push(['obtuse: deep dough (dough 9, blade 14, peg 10, cylinder 5)', FIXTURES.find((f) => /obtuse/.test(f.name)).tile, { ...P, dough: 9, bladeHeight: 14, pegSize: 10, cylWall: 5 }, R, {}]);
+  rows.push(['zigzag: round 5/5 (a fiducial post comes round inside the sheet: flagged)', FIXTURES.find((f) => /zigzag/.test(f.name)).tile, P, { roundA: 5, roundB: 5, cols: 4, rows: 3 }, {}]);
+  rows.push(['default at 91° (A\'s two pins nearly one: the fiducials move to avoid a second pair)', { ...G.defaultTile(), angle: 91 }, P, R, {}]);
+  rows.push(['default: round 8/4, sheet 6 × 3 (unequal rollers, a long B)', G.defaultTile(), P, { roundA: 8, roundB: 4, cols: 6, rows: 3 }, {}]);
+  rows.push(['hook: thin print (dough 3, blade 5, wall 0.8, draft 6, pin 2, bore 6)', FIXTURES.find((f) => /hook/.test(f.name)).tile, { ...P, dough: 3, bladeHeight: 5, bladeWall: 0.8, draft: 6, pinSize: 2, bore: 6 }, R, {}]);
+  rows.push(['obtuse: deep dough (dough 9, blade 14, pin 5, cylinder 5)', FIXTURES.find((f) => /obtuse/.test(f.name)).tile, { ...P, dough: 9, bladeHeight: 14, pinSize: 5, cylWall: 5 }, R, {}]);
+  rows.push(['zigzag: sheet 8 × 1 (B\'s fiducials more rows apart than the sheet is deep: A grows past its last ring)', FIXTURES.find((f) => /zigzag/.test(f.name)).tile, P, { roundA: 6, roundB: 5, cols: 8, rows: 1 }, {}]);
   rows.push(['default: blade cannot clear the dough (refused)', G.defaultTile(), { ...P, dough: 6, bladeHeight: 7 }, R, {}]);
-  rows.push(['straight 30 mm square: round 5/4, sheet 2 × 1 (small rollers: the peg feet founded on the hollow\'s roof)', FIXTURES.find((f) => /30 mm square/.test(f.name)).tile, P, { roundA: 5, roundB: 4, cols: 2, rows: 1 }, {}]);
+  rows.push(['straight 30 mm square: round 6/5, sheet 2 × 1 (small rollers: the pin feet founded near the hollow)', FIXTURES.find((f) => /30 mm square/.test(f.name)).tile, P, { roundA: 6, roundB: 5, cols: 2, rows: 1 }, {}]);
+  rows.push(['straight 30 mm square: round 6/4 (roller B\'s end face has no room for the detent: refused)', FIXTURES.find((f) => /30 mm square/.test(f.name)).tile, P, { roundA: 6, roundB: 4, cols: 2, rows: 1 }, {}]);
   rows.push(['default: round 2/5 (roller A too small for its bore: refused)', G.defaultTile(), P, { roundA: 2, roundB: 5, cols: 4, rows: 1 }, {}]);
   return rows.filter(([label]) => !ONLY || ONLY.test(label));
 }
@@ -756,11 +871,12 @@ async function main() {
     const r = checkRow(M, label, tile, print, rollers, opts);
     const ms = performance.now() - t0;
     const L = r.layout;
-    const meta = L ? ` · ⌀ ${L.A.dTip.toFixed(1)}/${L.B.dTip.toFixed(1)} mm · L ${L.A.L.toFixed(0)}/${L.B.L.toFixed(0)} mm · rings ${L.A.rings}/${L.B.rings} · tris ${r.tris.join('/')} · m* ${L.mStar} · flags [${L.flags.map((f) => f.id).join(',')}] · ${ms.toFixed(0)} ms` : '';
+    const meta = L ? ` · ⌀ ${L.A.dTip.toFixed(1)}/${L.B.dTip.toFixed(1)} mm · L ${L.A.L.toFixed(0)}/${L.B.L.toFixed(0)} mm · rings ${L.A.rings}/${L.B.rings} · tris ${r.tris.join('/')} · j ${L.sight.j} · flags [${L.flags.map((f) => f.id).join(',')}] · ${ms.toFixed(0)} ms` : '';
     console.log(`${r.fails.length ? 'FAIL' : 'ok  '} ${label}${meta}`);
-    if (r.meas && (args.includes('--verbose') || /^fixture: default$/.test(label))) {
+    if (r.meas && (args.includes('--verbose') || /^fixture: default$/.test(label) || (r.r4 && r.r4.tol))) {
       const m = r.meas, f = (x, d = 2) => (x === undefined ? '—' : x.toFixed(d)), e = (x) => (x === undefined ? '—' : x.toExponential(1));
-      console.log(`       measured: blade A/B ${f(m.bladeA)}/${f(m.bladeB)} mm above the body · peg dimple ${f(m.pegDepth)} mm, tooth ${f(m.toothDepth)} mm deep · collar band ${f(m.bandAbove)} mm above the board`);
+      console.log(`       measured: blade A/B ${f(m.bladeA)}/${f(m.bladeB)} mm above the body · pins ${f(2 * (m.pinHalf || 0))} mm across in the dough, flush with the blades · notch / pointer off the start pose ${e(Math.max(r.km.notchA ?? 0, r.km.notchB ?? 0))} / ${e(Math.max(r.km.ptrA ?? 0, r.km.ptrB ?? 0))} rad · pointers ${f(r.km.hoverA, 3)}/${f(r.km.hoverB, 3)} mm above the dough · first sight pinhole ${f(r.km.edge)} mm in from the edge · B's pointer span ${f(r.r4.span)} mm`);
+      if (r.r4.tol) console.log(`       placement error: each pointer within ±0.5 / ±1 / ±2 mm of its pinhole → worst corner off by ${f(r.r4.tol[0.5], 3)} / ${f(r.r4.tol[1], 3)} / ${f(r.r4.tol[2], 3)} mm (simulator = the page's figure; 0 mm → ${e(r.r4.tol[0])})`);
       console.log(`       rings: spacing ${f(r.dm.A && r.dm.A.spacing, 3)}/${f(r.dm.B && r.dm.B.spacing, 3)} mm (off by ${e(Math.max(r.dm.A ? r.dm.A.sp : 0, r.dm.B ? r.dm.B.sp : 0))}) · azimuth gap ${e(Math.max(r.dm.A ? r.dm.A.gap : 0, r.dm.B ? r.dm.B.gap : 0))} rad · extent off ${f(Math.max(r.dm.A ? r.dm.A.ext : 0, r.dm.B ? r.dm.B.ext : 0), 4)} mm · tip within ${f(Math.max(r.sm.tipA || 0, r.sm.tipB || 0), 3)} mm of the spec ring`);
       console.log(`       sheet corners within ${e(r.r4.worst)} mm of both lines · ${r.r4.meetings}/${r.r4.want} line meetings · stamped lines within ${e(Math.max(r.sm.A ?? 0, r.sm.B ?? 0))} mm of ideal (${e(Math.max(r.sm.seamA ?? 0, r.sm.seamB ?? 0))} at the seams) over ${r.sm.revsA}/${r.sm.revsB} revolutions`);
     }
@@ -800,20 +916,28 @@ const MUTANTS = [
   ['the spec rings are not turned with their lines', 'tile-roller.js', 'const s = one[i][0] + c * T[0] + j * R.step[0]', 'const s = one[i][0] + c * T[0]', 'R', 'hook'],
   ['the tip face is wound backwards', 'tile-roller.js', 'zipClosed(mesh, Lt, Rt); zipClosed(mesh, Rt, Rr);', 'zipClosed(mesh, Rt, Lt); zipClosed(mesh, Rt, Rr);', 'W', 'default'],
   ['the roller axis points right of the roll', 'tile-roller.js', 'const a = [-r[1], r[0]];', 'const a = [r[1], -r[0]];', 'R', 'default|hook'],
-  // the index marks
-  ['the pegs sit mid-tile, not on corners', 'tile-roller.js', 'fA.toUnrolled(add2(mul2(fA.tX, layout.mStar), mul2(fA.tY, k)))', 'fA.toUnrolled(add2(mul2(fA.tX, layout.mStar + 0.5), mul2(fA.tY, k)))', 'R', 'hook'],
-  ['the peg row runs straight across A, not slanted with the lines', 'tile-roller.js', 'const [s, z] = fA.toUnrolled(add2(mul2(fA.tX, layout.mStar), mul2(fA.tY, k)));', 'const [s, z] = [layout.mStar * A.pitch, k * A.step[1]];', 'R', 'hook'],
-  ['the collar teeth sit one column too far out', 'tile-roller.js', 'fB.toUnrolled(add2(mul2(fB.tY, layout.mStar), mul2(fB.tX, j)))', 'fB.toUnrolled(add2(mul2(fB.tY, layout.mStar - 1), mul2(fB.tX, j)))', 'R', 'default'],
-  ['the teeth ignore the track\'s phase round B', 'tile-roller.js', 'spec.B.teeth.push({ i: j, phi: -s / B.Rtip, Z: z + B.Z0, rho: B.toothTopRho });', 'spec.B.teeth.push({ i: j, phi: -(j * B.pitch) / B.Rtip, Z: z + B.Z0, rho: B.toothTopRho });', 'R', 'hook'],
-  ['a peg stands proud of the blades', 'tile-roller.js', 'A.pegTopRho = A.Rtip - td + delta;', 'A.pegTopRho = A.Rtip + 0.5;', 'R1', 'default'],
-  ['the pegs reach through the dough', 'tile-roller.js', 'A.pegTopRho = A.Rtip - td + delta;', 'A.pegTopRho = A.Rtip - 0.2;', 'H2', 'default'],
-  ['a peg\'s flat tip is centred on the dough line, its rim past it', 'tile-roller.js', 'const tip = coneBase(topRho, topRho, tipR);', 'const tip = { rho: topRho, r: tipR };', 'H2', 'default'],
-  ['a peg foot sinks into the hollow', 'tile-roller.js', 'const rho = Math.min(limit, Math.max(disc >= 0 ? (c + Math.sqrt(disc)) / 2 : c / 2, inner + 0.3));', 'const rho = Math.min(limit, disc >= 0 ? (c + Math.sqrt(disc)) / 2 : c / 2);', 'H4', 'small rollers'],
+  // the fiducials, the detent and the sight arms
+  ['a fiducial pin is removed', 'tile-roller.js', '  /* the pin: its own width through the dough', '  A.pins = A.pins.slice(1);\n  /* the pin: its own width through the dough', 'R', 'default|hook'],
+  ['the sight fiducials ignore the crossing angle', 'tile-roller.js', 'const rho = Math.abs(Math.cos(theta)) < 1e-12 ? 0 : (tile.pitchA * Math.cos(theta)) / tile.pitchB;', 'const rho = 0;', 'R', 'hook'],
+  ['the second sight fiducial is laid at the first one\'s height', 'tile-roller.js', 'const vAt = rho > 0 ? [vHi, vLo] : rho < 0 ? [vLo, vHi] : [0, 0];', 'const vAt = [vHi, vHi];', 'R', 'hook'],
+  ['B\'s pointer span ignores the fiducial columns (its ends one g short)', 'tile-roller.js', 'B.L = (rollers.cols + jT + jB) * s - 2 * dg.g;', 'B.L = (rollers.cols + jT + jB) * s - dg.g;', 'R', 'default'],
+  ['roller B\'s detent is half a tile off its start pose', 'tile-roller.js', 'B.startPhi = -sB / B.Rtip;', 'B.startPhi = -(sB + B.pitch / 2) / B.Rtip;', 'R', 'hook'],
+  ['roller A\'s detent is one tile early', 'tile-roller.js', 'A.notchPhi = Math.PI;', 'A.notchPhi = Math.PI - A.pitch / A.Rtip;', 'K', 'default|hook'],
+  ['roller B\'s notch is cut one tile round from its start pose', 'tile-roller.js', 'B.notchPhi = B.startPhi + Math.PI;', 'B.notchPhi = B.startPhi + Math.PI + B.pitch / B.Rtip;', 'K', 'default'],
+  ['the notch is cut in one end face only', 'tile-roller.js', "return pv[2] === 'bottom' ? dz : -dz;", "return pv[2] === 'bottom' ? dz : 0;", 'K', 'default'],
+  ['the sight arm hangs off the contact line', 'tile-roller.js', "emitStack(mesh, [0, -ptrBase, hg.zMid], [0, -1, 0]", "emitStack(mesh, [1, -ptrBase, hg.zMid], [0, -1, 0]", 'V', 'hook'],
+  ['the sight arm is one length for both rollers', 'tile-roller.js', 'notchR: R.notchR, ptrR: R.ptrR,', 'notchR: R.notchR, ptrR: layout.A.ptrR,', 'V', 'default'],
+  ['a pin stands proud of the blades', 'tile-roller.js', 'const tipRho = Math.sqrt(A.Rtip * A.Rtip - pinR * pinR);', 'const tipRho = A.Rtip + 0.3;', 'R1', 'default'],
+  ['a pin\'s flat tip is centred on the blade-tip radius, its rim past it', 'tile-roller.js', 'const tipRho = Math.sqrt(A.Rtip * A.Rtip - pinR * pinR);', 'const tipRho = A.Rtip;', 'R1', 'default'],
+  ['a pin stops short of the board', 'tile-roller.js', 'const tipRho = Math.sqrt(A.Rtip * A.Rtip - pinR * pinR);', 'const tipRho = Math.sqrt(A.Rtip * A.Rtip - pinR * pinR) - 0.5;', 'H2', 'default'],
+  ['a pin is wider than its size in the dough', 'tile-roller.js', 'A.pin = { r: pinR, tipRho, neck,', 'A.pin = { r: pinR + 0.5, tipRho, neck,', 'H2', 'default'],
   // refusals and flags
   ['the STL is never refused', 'tile-roller.js', "if (opts.layout && opts.layout.flags.some((f) => f.stl) && !opts.allowRefused)", 'if (false)', 'W5', 'cannot clear'],
   ['the blade-clearance flag is never raised', 'tile-roller.js', 'if (!(h > td + BODY_CLEARANCE_MM)) out.flags.push', 'if (false) out.flags.push', 'W5', 'cannot clear'],
   ['the too-small refusal is never raised', 'tile-roller.js', "if (R.Rbody < need) out.flags.push({ id: 'small'", "if (false) out.flags.push({ id: 'small'", 'W5', 'too small'],
-  ['the recurrence flag is never raised', 'tile-roller.js', 'if (A.n < need) out.flags.push', 'if (false) out.flags.push', 'F', 'dimples cookies'],
+  ['the detent-room refusal is never raised', 'tile-roller.js', '    else if (R.notchR - DETENT.halfLen < dg.rs + 1 || R.notchR - dg.rs < DETENT.tabMin) {', '    else if (false) {', 'W5', 'no room for the detent'],
+  ['the impostor search is skipped', 'tile-roller.js', '    if (!p.impostor) { best = p; break; }', '    { best = p; break; }', 'K', '91°'],
+  ['the recurrence flag is never raised', 'tile-roller.js', '  if (hit.length) {', '  if (false) {', 'F', 'comes round inside'],
 ];
 async function negativeControl() {
   const src = {}; for (const f of ['tile-geometry.js', 'tile-roller.js', 'tile-sim.js']) src[f] = fs.readFileSync(path.join(ROOT, f), 'utf8');

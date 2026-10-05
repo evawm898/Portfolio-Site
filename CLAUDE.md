@@ -18,6 +18,14 @@ Guidance for Claude Code sessions working in this repository.
 - Production publishing may be locked in Netlify while work is being reviewed.
 - If multiple finished feature branches are intended for one portfolio update, do not independently merge them to `main` — check first. A combined release branch / release PR may be wanted so the entire site updates in one production deployment.
 - Never delete old branches without explicit approval.
+- **Some squash-merge messages on `main` are WRONG and CANNOT be corrected** (#302 item 26). A commit
+  message is part of the commit's hash: changing it rewrites `main`'s history, which this file forbids,
+  and `git notes` are not pushed by the session proxy. So the corrections live here, where a reader of
+  `git log` should meet them, and the PR's own doc is the authority over its squash message:
+  #288 says "four families / 16 SVGs" (12 shipped); #278 says "13 moved / 896 held" (that partition is
+  not the change against `main`); #289 says "bloom-geometry.js byte-identical to main" (+211 lines);
+  #279 says "68 within-shell count moves" (67). Add to this list rather than leaving the next one to be
+  rediscovered.
 - Before making branch-history changes, rebases, force pushes, or destructive Git operations, stop and ask first.
 
 ## Operational gotchas
@@ -75,7 +83,7 @@ inside the instrument written to catch second producers — so every witness rea
 `buildBloomInto`'s own report.
 
 **EVERY PETAL SHELL IS WOUND OUTWARD NOW, THE ORIENTATION IS A GATE WITH ONE DECLARED
-BASELINE, AND THE CENSUS IS A GATE WITH A 318-ROW XFAIL LIST MEASURED ON `main`** (session
+BASELINE, AND THE CENSUS IS A GATE WITH A 318-ROW XFAIL LIST MEASURED ON `main`** **[Oct 5 docs sweep: 318 was session 36's count; `SELF_INTERSECTION_XFAIL` holds **239** entries on `ebe617a`. #302 item 8]** (session
 36, Eva's ruling on session 35's two findings — read `docs/bloom-session-36-outcome.md`
 before touching `emitPanel`, `tools/bloom-self-intersection.mjs` or the O/X families).
 `emitPanel` emits each quad as `(a, d, c, b)` where it was `(a, b, c, d)`: the same
@@ -404,7 +412,7 @@ constant. Cost over the 909-row matrix in EXPORT: **50,377,084 -> 64,789,898 tri
 14.4M against eight segments, more than halving because the corner fans and the degenerate
 skipping scale with K too. **`INFLO: ALL MAX` was a NEW refusal at eight segments and is NOT
 one at four** (1,425,468 of the 1,500,000 budget, 95.0% — the closest any row comes to the
-bar, the next highest at 46%), so its declaration was WITHDRAWN rather than left standing.
+bar, the next highest at 46% **[Oct 5 docs sweep: stale: the infill's `INFILL: x 40 x 3` corner later read 75.1–81.8% (the infill blocks below); `INFLO: ALL MAX` was redefined by build 3 and its budget corner now reads 17.3%. #302 item 15]**), so its declaration was WITHDRAWN rather than left standing.
 **0 of 909 rows differ live/export.**
 **THE APEX DOES NOT FOLD** (ruling 3, measured over the tip-shape range rather than argued).
 **THE RIM MAY DIP BELOW THE FLOOR ON A NARROW SPAN AND EVERY SUCH LOCATION IS REPORTED**
@@ -441,7 +449,7 @@ boundary, so the vertex-welded shell decomposition SPLITS them** and a tooth's b
 overlap with its base panel moves from the WITHIN column to the CROSS one: 205,930 of the
 312,934 pairs the list loses are that, and all 19 multi-panel rows (every FRINGE, every CLEFT)
 are in it. **`ALL MAX` reads 107,485 pairs · 10.1332 mm on 3,090,816 triangles and 2,048
-shells** — the count FALLS and the span RISES for that one reason.
+shells** — the count FALLS and the span RISES for that one reason. **[Oct 5 docs sweep: that was the edge-profile session's reading. The entry has moved four times since (91,808 at the apex nib, then the two variance builds); `SELF_INTERSECTION_XFAIL['ALL MAX']` reads **116,847 / 15.8503** on `ebe617a`, and the refusal entry **3,090,910** triangles (the florist's cut, +94). #302 item 1]**
 **AND `process.exit()` DOES NOT FLUSH A PIPED STDOUT, WHICH MADE A FAILING GATE READ AS A
 CRASH.** Both STL gates destroyed their own diagnosis on exactly the runs where it mattered: a
 CI log is a pipe, so the report was CUT MID-BLOCK and the run looked like it had died rather
@@ -515,19 +523,19 @@ positionally under `Object.is` over 1,133,544,024 export floats and 77,966,806 c
 values, every predeclared mover moving** — where the count partition is 10 / 899. Seven declared
 census magnitudes moved with it and ALL SEVEN IMPROVED (`DEPTH: 6 turns x layerSize min x
 petalCount 40` 73,265 -> 65,822 pairs at 0.2984 -> 0.2900 mm is the largest), re-recorded in
-the same commit because #213's list does not gate MAGNITUDE and every one of them would have
+the same commit because #213's list does not gate MAGNITUDE **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]** and every one of them would have
 passed silently — and **BROWSER-CONFIRMED, because a re-record measured in Node is not
 confirmed until Chromium's V8 agrees**: all thirteen movers through `node
 tools/verify-bloom-export.mjs --only <the 13 labels>` read **PASS, 12 of 13 reaching the
 results and exporting watertight with `degenerate=0` and `tris(live) === tris(export)` on
 every one, the 13th the declared refusal, and every X1 line still failing at its RECORDED
-magnitude**. **`ALL MAX` is a floor mover whose census is UNMOVED at 107,485 / 10.1332** —
+magnitude**. **`ALL MAX` is a floor mover whose census is UNMOVED at 107,485 / 10.1332** **[Oct 5 docs sweep: true of that tree; the entry reads 116,847 / 15.8503 on `ebe617a`]** —
 a negative result, measured rather than assumed. **No frozen phase is owed** (909 rows on both
 trees), and every frozen tag's bytes stop reproducing on every row with a petal, which is what
 a change that re-triangulates every perimeter is expected to do.
 **AND THE SMOKE SUBSET HAD NO CRAMPED PETAL, WHICH IS WHY A THREE-AND-A-HALF-HOUR GATE WAS THE
 ONLY THING THAT COULD SEE THIS.** `SPHERE: 6 turns x layerSize min` is a block-22 smoke row
-now (111 rows over 34 blocks, 115 families both ways), and `pickRows()` in the edge-profile
+now (111 rows over 34 blocks, 115 families both ways **[Oct 5 docs sweep: then; `bloom-smoke --check` reads **164 rows over 46 blocks, 146 families** on `ebe617a`]**), and `pickRows()` in the edge-profile
 gate draws from `SMOKE_LABELS`, so the row reaches that gate too and its control set REFUSES
 the run if it is absent. **A subset earns its keep by covering the axes a feature has** — the
 leaf session's lesson, arriving from the other direction: there the missing axis was another
@@ -573,7 +581,7 @@ on both gates, in CI, is the merge criterion, and what the subset is BLIND to is
 in that tool's own header. Do not also run the full matrix locally except at a
 milestone (charter, "the iteration loop"). Note two of the six CI jobs on a bloom
 PR are FLOWER gates (`'tools/**'` filtered), so "six verify jobs green" overstates
-the bloom evidence — it is four.
+the bloom evidence — it is four. **[Oct 5 docs sweep: true of the six-job layout then. Both long gates are SHARDED now (`bloom-export-watertight`: preflight + 8 shards + verdict; `bloom-connectedness`: 4 shards + verdict), and #340 took the flower gates off `'tools/**'`, so count jobs from the PR's own check list. #302 item 21]**
 **Frozen baselines are frozen at commits on `main`, never at a branch head, and
 are tagged at freeze time** — `tools/publish-frozen-tags.sh` pins all sixteen
 (`frozen/phase2`..`frozen/phase17`) so a branch delete or a force-push cannot
@@ -1309,7 +1317,7 @@ tool caught the session's own shell bug rather than answering plausibly** — an
 variable left `--strip` empty, and it recorded `strip: []`, refused 71 rows BY NAME and wrote
 `complete: false` instead of closing a partition over the 501 rows that happened to apply.
 **`frozen/phase21` IS THE 572 ROWS AT `b323268`** — main's head before this retirement, owed
-because the matrix shrank, and **the newest baseline that is fully replayable** (see the
+because the matrix shrank, and **the newest baseline that is fully replayable** **[Oct 5 docs sweep: true of its session; the newest frozen baseline is **`phase52`** (the 1,089 rows at `23b13bd`) on `ebe617a`. #302 item 19]** (see the
 charter's scheduled fix: phase19 and phase20 can no longer be byte-re-exported from main at
 all, because session 31's retirement postdates both). The sheet is
 `node tools/shot-bloom-apex.mjs <dir> [base-tree]`, now a RETIREMENT sheet — the phase-C
@@ -1657,7 +1665,7 @@ against the harness's 30 s settle timeout, and **46.3 s on a worktree of the bas
 is the box and not this change. CI only. **It IS a mover of this change, through its forty SEPALS
 and not its petals** (block 1 hands it `petalTipEnd` 1, which is the nib's third guard, while
 `sepalBladeState` zeroes that control by declaration), and its census entry was MEASURED rather
-than carried forward: **107,485 / 10.1332, unmoved**, in 311 s through
+than carried forward: **107,485 / 10.1332, unmoved** **[Oct 5 docs sweep: WRONG when written: the same PR re-recorded it 107,485 → 91,808 (`docs/bloom-apex-nib-outcome.md`, "The census list: 233 -> 211"), and #302 measured 91,808; it reads 116,847 / 15.8503 on `ebe617a`]**, in 311 s through
 `bloom-xfail-magnitudes --include-refused`. Nothing would have caught a move there, because the
 sweep skips an export-refused row — no STL exists for X1 to read.
 **AND THE CUP FOLDS THE NIB, THE CLAMP IS AN OUTPUT CLAMP ON THE SECTION'S RADIUS, AND THE
@@ -1695,7 +1703,7 @@ at an IDENTICAL 1.0967 — the cap saturating, so cup 0.6/0.9/1.2 draw the same 
 and #265's measured sum rule stops separating them — plus `gradient-x-curl` and `cup-x-length`), **19
 RE-RECORD** (ten worse, nine better; worst either way −0.032 and +0.024), and **ONE IS A NEW HAZARD
 THE CLAMP CREATED**: `cup-x-width @ cup 1.2 x width 23` reads **1.0002 mm pre-clamp and 0.9814 here**.
-Declared 74 -> 63. **THREE PAIRS GO PRODUCT-ONLY -> CLEARS AND NO GRID IS WIDENED** — the gate offers
+Declared 74 -> 63 **[Oct 5 docs sweep: 64 at #302 and 145 on `2885afe`, after the inflorescence families joined]**. **THREE PAIRS GO PRODUCT-ONLY -> CLEARS AND NO GRID IS WIDENED** — the gate offers
 "widen the grid inside the shipped ranges, or declare it CLEARS", and widening one to manufacture a
 failing cell is tuning a gate to keep a verdict; #265 built the third arm precisely so a clearing pair
 fails loudly the day it stops clearing. **THE MECHANISM IS THAT THE CLAMP BINDS BELOW THE NIB, WHERE
@@ -1747,14 +1755,14 @@ IN THE ROOT BLEND, THIRTEEN MICRONS FROM THE NIB'S OWN REGION** (§12 of the out
 PRs were in flight against one base and #284 merged first). Measured three ways: main's geometry
 through THIS tree's census reads 0 on all eight, the same control sets with the infill guard OFF
 read 0, and only the two together fold — including `INFILL: the ruled defaults`, the feature's own
-shipping state, at **4 pairs / span 0.0000**. `bloom-census-attribute.mjs` puts EVERY pair at
+shipping state, at **4 pairs / span 0.0000**. **[Oct 5 docs sweep: that row is no longer declared and reads 0 (`docs/bloom-infill-ruled-defaults.md`), but issue #286's TITLE still names it as folding; the issue body is right as a record of the day it was filed. #302 item 18]** `bloom-census-attribute.mjs` puts EVERY pair at
 **u < 0.30** while the nib begins at drawn u 0.9889. **THE MECHANISM IS `toLaw`:** `petalLength` is
 the ASKED length, the blade is drawn to wherever the cap closes, and `widthProfile` reparameterises
 the WHOLE outline — the root blend included — so the BASAL outline moves **0.0135 mm at u 0.1607**
 (against 0.7500 mm at u 1.0000, which is the nib). That is enough because the basal rows are the
 HELD uniform ones and the outline turns fastest there, so the infill's facets are already nearly
 tangent — #284's own declared CONFORMANCE LIMIT, reached by a second route. Four of the eight read
-span EXACTLY 0.0000 (tangencies). **The infill's TRIANGLE COUNTS move with the nib on every
+span EXACTLY 0.0000 (tangencies). **[Oct 5 docs sweep: **FIVE**, not four — #286, the harness notes and the corrected §12 of the apex-nib doc (#287) all say five. #302 item 17]** **The infill's TRIANGLE COUNTS move with the nib on every
 infilled row** (the shipping infilled default 53,536 -> 52,320) because the cells are planned
 against the outline, while the PLAN is unmoved (`cells`, `achieved`, `solid`, `mSplit` identical;
 `floorU` moves in the sixth decimal). **A FEATURE-BY-FEATURE COMPOSITION IS AS INVISIBLE TO THE
@@ -1885,24 +1893,31 @@ that file — `refusing to allow a GitHub App to create or update workflow
 commit and every object under it were already on the remote; a tag at an UNMERGED branch head
 that edits `bloom-frozen-tags.yml` **published**; a tag at an unmerged head with no workflow edit
 **published**. That pair on `main` is a single-variable comparison, so the check is on CONTENT,
-not on objects. **THE RULE:** *a frozen tag publishes when its base commit's workflow files are
-identical to `main` HEAD's at dispatch time, or when the base is not on `main`; it is refused
-when the base is on `main` and its workflow files differ from `main` HEAD's.* It fits 4 of 4
+not on objects. **THE RULE (NARROWED, Eva's ruling, Oct 5):** *a frozen tag publishes when every workflow file
+that EXISTS AT ITS BASE COMMIT is identical to `main` HEAD's at dispatch time, or when the base is
+not on `main`; it is refused when the base is on `main` and a workflow file that EXISTS AT THE
+BASE differs from `main` HEAD's.* A workflow file ADDED to `main` after the base costs nothing.
+**The Sep 29 wording ("its workflow files differ") was falsified by `phase50`**: its base
+`754e3aa` differed from its first dispatch head `af15342` ONLY by a newly added file
+(`tile-gate.yml`, #354), and it PUBLISHED (`docs/bloom-state-of-play-oct-5.md` §4). The narrowed
+wording fits all seven of the newest tags (`phase46`..`phase52`, `phase49` refused on a MODIFIED
+`bloom-export-watertight.yml`) and every declared refusal. The original wording fit 4 of 4
 probes and all six declared refusals (`phase5`, `phase22`, `phase23`, `phase42`, `phase43`,
 `phase45` — each dispatched from a `main` head of which its base is an ancestor, each with a
-workflow file differing). **`phase24` in run 9 is a known counterexample and is NOT explained**
-(its `bloom-export-watertight.yml` differed from the dispatch head's and it published), which is
-why this is a rule of thumb. **THE MECHANISM IS UNKNOWN AND IS NOT TO BE INVESTIGATED FURTHER**
+workflow file differing). **`phase24` in run 9 is a known counterexample and is NOT explained under EITHER wording**
+(its `bloom-export-watertight.yml` existed at its base, was MODIFIED by the dispatch head, and it
+published), which is why this is a rule of thumb. **THE MECHANISM IS UNKNOWN AND IS NOT TO BE INVESTIGATED FURTHER**
 — its whole cost is that a pointer tag sometimes fails to publish while the matrices themselves
 live in `FROZEN_MATRICES` and `FROZEN_BASE_COMMITS` and `--verify-frozen` passes regardless.
-**THE CONSEQUENCE IS THE PART THAT MATTERS: editing a workflow file costs frozen tags — not the
+**THE CONSEQUENCE IS THE PART THAT MATTERS: editing an EXISTING workflow file costs frozen tags
+(adding a new one does not) — not the
 editing PR's own (it adds no matrix rows and owes no phase) but every tag dispatched afterwards
 from a base that predates the edit.** That is exactly the `phase42/43/45` shape. Hence:
 **dispatch every owed frozen tag BEFORE merging anything that edits a workflow file.** The
 session-side push is still a flat 403 on every tag ref (measured again Sep 29, on a tag at a
 commit already on `main`), so the dispatch is the only route, and it is the session's to fire
 after its own merge (the ruling above). `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh`
-declares the six by name with the file GitHub named; a declared entry that starts publishing is
+declares them by name with the file GitHub named (SEVEN since #339 added `phase49` on Oct 1); a declared entry that starts publishing is
 called out as stale, and a re-dispatch after `main`'s workflow files have moved again does not
 recover one — the rule says why.
 
@@ -2482,7 +2497,7 @@ construction**: in Node both sides share one call chain and the difference is ex
 and no smoke row carries a cusped notch. The bar is now the quantity's own conditioning —
 `LOBE_SINUS_STATION_ULPS = 8` times the per-ulp sensitivity measured from the build's own
 profile, FLOORED at 1e-9 so it tightens nowhere and loosens only where it was measuring the
-two engines. §6e of the outcome doc has the table. **No mutant names L5**, so that clause
+two engines. §6e of the outcome doc has the table. **No mutant names L5** **[Oct 5 docs sweep: no longer true: session 42 added two L5 mutants to `tools/verify-bloom-apex-mutants.mjs` and its comment says it closes #221 — but GitHub issue #221 is still OPEN as of Oct 5, pending Eva's ruling. #302 item 5]**, so that clause
 rests on its own reading; recorded, not closed. These do not reach the lobe
 stationing and cannot: the arc table is built on the outline BEFORE the cut.
 **THE LADDER DOES NOT PILE AT THE NEW KINKS, measured rather than assumed** (the turning
@@ -2640,7 +2655,7 @@ ratio carries the taper as a `1/hb` term LINEAR in the offset. Measured before i
 an asked notch power of 3.00 read **1.966**. Both notes are kept, the old above the new,
 so the inversion is checkable. L3's minima count moved onto the mode-free lamina (the
 mode's own floor manufactured a THIRD dip on a two-sinus row).
-**#221 IS CLOSED and one half of it is VACUOUS under MODEL B**, which the table says
+**#221 IS CLOSED and one half of it is VACUOUS under MODEL B** **[Oct 5 docs sweep: closed IN THE CODE (the apex table's L5 mutants); the GitHub issue is still OPEN as of Oct 5, awaiting Eva's ruling on closing it]**, which the table says
 rather than shipping a mutant that can never apply: the per-period guard is derived so no
 floor can bind AT a sinus. And **the L5 guard mutant's witness must build in LIVE** — the
 EXPORT floor IS the bound the guard protects, so in export a broken guard is invisible on
@@ -3174,7 +3189,7 @@ every law reads `ps`; the one read that bypasses the resolver (`shapeN` telemetr
 argument that IS the substate on the sepal ring. So instancing is reachable without restructuring
 and costs one spread per whorl build. The registry rows for the twins are GENERATED from the
 geometry's table (`sepalTwinControls`), so a pair cannot drift; the panel gate treats the family
-as INSTANCED with label and role per instance. Twenty controls, four sections (`Sepals` between
+as INSTANCED with label and role per instance. Twenty controls **[Oct 5 docs sweep: 21 since `sepalHeight` (part 1, second round). #302 item 23]**, four sections (`Sepals` between
 `Center` and `Stem`, its three children mirroring Petal's). **`sepalCount` 0 IS THE GUARD, 0
 BYTES**: `node tools/verify-bloom-sepal-bytes.mjs --base <worktree>` reads 65 MOVERS / 780
 HOLDERS over the 845-row live matrix, every mover's base stream a PREFIX of the branch's with the
@@ -3288,7 +3303,7 @@ between sepal and petal.
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,
 before touching `leafPlan`, `buildLeafInto`, `leafBladeState` or the LF family).
-SIMPLE leaves, one blade per node. Nine controls: `leafLength` / `leafWidth` in
+SIMPLE leaves, one blade per node. Nine controls **[Oct 5 docs sweep: 10 since `leafTipShape`; `leafNodes` and `leafPhyllotaxy` moved under Stem in stem session 2. #302 item 23]**: `leafLength` / `leafWidth` in
 absolute MILLIMETRES (ruling 5 — the flower's `leafSize` multiplies only the length
 while the width is fixed in world units, which is why three of its four types come out
 wider than long), `leafAngle` (**EVA RULED 35 DEG**), `leafNodes`, `leafPhyllotaxy`
@@ -3363,7 +3378,7 @@ to the bit. Counted: **0 shared vertices at azimuth 0, exactly 2 at 120, exactly
 325 WELD and 35 do not**; `alternate` (0, 180) and `opposite` (0, 90, 180, 270) sit
 entirely on the clear 9.7% at every node and `whorled` does not. **So an XFAIL ENTRY WAS
 DECLINED**: its count would be a function of which azimuths a phyllotaxy happens to land
-on, and #213 does not gate MAGNITUDE, so it would absorb a real fold in silence — an
+on, and #213 does not gate MAGNITUDE **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]**, so it would absorb a real fold in silence — an
 xfail is a declaration somebody can check, and that one would not have been. The fix
 REMOVES THE VERTEX rather than declaring the pairs (session 43's stem cap verbatim, a
 centre fan sharing the hub's apex made a rim fan), and it is `NV = 10`'s reasoning one
@@ -3461,7 +3476,7 @@ not send a reader looking for a petal that is not there.
 leaf rows.** It covered phyllotaxy, the bore, the angle, the inset, the serration and both
 guards — every axis the feature has — and NOT the one axis that reaches another family's
 clause, because block 33's anchor is the `alternate` row on a CAP head where ST9 returns before
-claiming anything. The sphere row is in the subset now (85 rows, 29 blocks, 90 families).
+claiming anything. The sphere row is in the subset now (85 rows, 29 blocks, 90 families **[Oct 5 docs sweep: then; **164 / 46 / 146** on `ebe617a`]**).
 **A SUBSET EARNS ITS KEEP BY COVERING THE AXES A FEATURE HAS — INCLUDING THE AXIS THAT IS
 ANOTHER FAMILY'S REGION.** Session's own X2 defect was caught by a subset row that was there
 for a DIFFERENT reason; this one was missed because no row was there for this reason at all.
@@ -3529,6 +3544,181 @@ spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was lat
 solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
 restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
 
+**THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
+IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
+`docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
+`buildStemInto`'s cut ring / `cutFaceInto`, `STEM_CUT_*`, `NOZZLE_MM`, SC0–SC3 or
+`tools/verify-bloom-stem-cut.mjs`). `stemCut` (Stem, a CHOICE, FLORIST / FLAT, default
+**FLORIST**; FLAT is the end as it was, bit for bit). **`STEM_CUT_SLOPE = 1`, never
+`Math.tan(Math.PI / 4)`** (0.9999999999999999 — a 45° carried as a tangent puts the short point an
+ulp off the long point's own arithmetic and the land's lattice decision on a bar that is not 45 at the
+last bit). **The land is `max(MIN_FEATURE_MM, 2 × NOZZLE_MM)` = max(1.00, 0.80) = 1.00 mm** — the
+thinnest horizontal section the point may have, typed from neither number, mode-free — and it is
+DRAWN ON THE TUBE'S OWN LATTICE at or beyond the floor (column j, 1.00–1.24 mm): an inserted chord
+column lands ON a lattice column at 4 mm (`acos(1/2)` = 60°) and the first construction read 24
+degenerate triangles there. `stemLength` measures to the long point, which IS the land. **A cut
+HOLLOW stem ends SOLID: the plug is `2·rTip·s + W(√(1+s²) − s)` = D + 0.62 mm from the long point**,
+so the bore's floor stands Eva's 1.5 mm SQUARE to the face over the whole bore and never touches it
+(point-to-face 2.34 mm on the 6 mm stem, 2.26–3.77 on the noded ones, measured); the void closes on
+a horizontal rim fan facing up and the bore wall runs vertically to the root band. At 3 mm the stem
+is solid and the cut costs no plug. **The cut is pinned OFF on every pedicel through session 2's
+`PEDICEL_PINS`** — one place. A stem shorter than its own span is TOLD (`cut.inertShort`), not cut.
+**THE SIX CHECKS THE RULING NAMED EACH KEEP THEIR CATCH, SHOWN RED ON BOTH TREES**: ST1
+(`stemCountClause`, the cut band's `2N − 2` and the land+plane fans' `N − 2`), ST2 (the long point is
+the tip), ST3 (a cut stem's lowest rings are the void floor — the second no-inner-ring case), ST9
+(the tip is the LOWEST vertex at `outerR`, the root the populated level above), ST10
+(`stemPlugClauses`: the plug restated at 1e-9, the face's projected area against
+`restatedCutRing`'s shoelace, `N − 2` face triangles, lowest at the tip, highest at tip + span) and
+the byte tool's end-face clause, whose subject was "the triangles all at one height" — re-derived as
+`cutFaceClause` (the base's disc, the branch's down-facing window projected to the closed end's
+area, a POINT-TO-TRIANGLE distance from every bore vertex to the face ≥ 1.5, no stem-radius vertex
+under the face). **That distance clause's first version read SHORT on noded stems** (1.65 mm by a
+per-azimuth plane height against a solved 3.05) and was replaced by the solve rather than widened;
+**and the same tool's envelope had mis-sized a noded stem all along** (`outerR` against a swelling it
+reported as "outside"), fixed to the plan's own `nodeMaxOuterR + nodeTipOffsetMm`. On a noded stem
+the cut ring's vertices sit on their OWN depth's rings, so the face follows the kinked axis and is a
+plane only where the tube is a cylinder. **SC0–SC3 is the new family** (two statements; made ⟺ long
+enough; the land and span restated from the controls; the emitted ring vertex by vertex at 1e-9 and
+the land's `2j + 1`), with three standing mutants (`the-cut-is-flattened`, `the-land-is-removed`,
+`the-bore-opens-through-the-cut-face`), each witnessed on the mutated module's own end-face facts,
+and `node tools/verify-bloom-stem-cut.mjs` the must-fail (24 plants, each firing its own clause by
+its own message and no other) — **in the export preflight beside the stem-nodes must-fail,
+added by the follow-up PR AFTER `frozen/phase52` was dispatched from `main` and read back at
+`23b13bd` (the merge was `a22ca83`); every tag absent from the remote is one of the seven declared
+in `TAG_PUSH_XFAIL`.** **The brief's "~114 of 1,047" was
+`phase50`'s denominator**: the live matrix at `23b13bd` is 1,089, 156 carry a stem by "stem
+present" (the 114 plus #353's 33 raceme rows and 9 of block 47), and the partition by the cut's own
+guard is in the outcome doc. Block 48 is 13 rows (1,089 → 1,102), smoke block 48 five;
+`frozen/phase52` is the 1,089 rows at `23b13bd`. **BOTH EXPORT-REFUSED ROWS MOVED +94 AND CI IS WHAT SAID SO** (§12 of the outcome doc): `ALL MAX` 3,090,816 → 3,090,910 and the NODE LAWS 101.1% corner 1,517,196 → 1,517,290, each carrying a 120 mm stem the cut now ends; `bloom-xfail-magnitudes --include-refused` censuses a refused row and never compares `EXPORT_REFUSED_XFAIL.tris`, so a change touching every stem must re-measure THAT list by hand — the census reproducing is a claim about the other one. The cut stem uses LESS material than the flat end
+at every diameter (−30.2 mm³ at 6 mm, −136.8 at 12 on 60 mm — the wedge outweighs the plug), +94
+triangles, and the default bloom (no stem) is untouched at 24,688.
+
+**INFLORESCENCE BUILD 3, PHASE A — THE TOP NODE'S INSET IS THE FLORET'S OWN PETAL REACH, AND
+THE PEDICEL'S CEILING IS 250** (Eva's Oct 4 brief and ruling; issue #355 — read
+`docs/bloom-inflorescence-build-3-outcome.md` before touching `inflorescencePlan`'s inset block,
+`INFLO_REACH_GRID_MM`, `PEDICEL_LENGTH_RANGE`, `lenCeilMm`, the harness's pedicel-range guard,
+ID9 or block 49). Build 1 inherited the LEAF's inset law — the pedicel's rise, `L sin th` —
+which clears the ROD and not the flower on it: the shipped raceme's top floret stood with its
+petals THROUGH the terminal head's at 0.000 mm while `insetSatisfied` read true, and both STL
+gates were blind to it (overlapping closed shells). **THE LAW:** the plan builds the topmost
+floret unit in BOTH modes (the memo it carries, which the builder then appends — nothing is
+built twice), places it through `pedicelPlacement` at depth 0, reads the highest emitted
+vertex as `reach`, ceils it onto a 2^-16 mm grid (a node count is a discrete decision on it,
+and the page's V8 and Node's differ in the last bits — the eighth instance of that class here),
+and sets `insetNeeded = reach + (rootZ − headFloorZ) + MIN_FEATURE_MM`, `headFloorZ` the STEM
+plan's own lowest material (a dome's rim). **THE REACH IS THE MAX OVER EVERY AZIMUTH THE
+PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by the smoke subset, not reasoned**: the placement's
+roll is the MINIMAL rotation, so a floret lands with a different petal up at each azimuth, and
+the first cut (azimuth 0 only) put `INFLO: WHORLED`'s other two florets 3.37 mm into the gap with
+`insetSatisfied` true. The max over the modes makes the node depths mode-free BY CONSTRUCTION.
+**Measured on the default: top node 19.2 → 37.7 mm down, floret-head 0.000 → 10.10 mm, 113,886
+export tris unmoved.** **THE PRICE IS A SHORTER NODE SPAN — 16.4 mm internodes against 21.0 — AND
+THE DEFAULT RACEME'S OWN FLORETS NOW STAND 0.676 mm FROM EACH OTHER, UNDER THE 1.00 mm BAR**
+(2.233 before; one state, three combination grids, declared, NOT tuned — the Phase A finding for
+Eva's ruling: keep it, or hold the internode and give up a node, which is build 2's node law to
+change). The grid says the rest: all seven `inflo-length-x-angle` cells CLEAR (verdict `clears`,
+#355 closed on the grid that found it **[Oct 5 docs sweep: its CELLS cleared; GitHub issue #355 is still OPEN as of Oct 5, awaiting Eva's ruling]**), three re-record WORSE and fifteen new cells land under
+the bar, every one an edge crossing by the tighter internode;
+`inflo-leaf-nodes-x-leafangle`'s 52 mm base went INERT (both counts collapse to the pitch floor
+under the deeper inset — CG1 refused the axis, correctly) and moved to the 120 mm rachis.
+**THE CAP WAS TWO NUMBERS, NOT ONE**: `PEDICEL_LENGTH_RANGE` was [0, 60] and the per-node law
+clamped at the HEAD's `STEM_LENGTH_RANGE[1]` (120); both read 250 now, and **a shipped
+harness guard forbade exactly this** ("a pedicel outside the stem's own range is a rod nothing
+has ever been proved on") — restated on the ruling, with block 49's 250 mm rows as the proof it
+asked for. The corymb solves level to a **197 mm** rachis at the defaults (120 was 81), the
+full 120 mm stem at 20/49/77/106/134 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
+NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
+corner is block 49's `THE BUDGET CORNER` at 40 mm, 95.0% (**17.3% at TWO nodes since ruling 1's
+floor; and the NODE LAWS refusal row below holds ONE node and EXPORTS at 10.1% — its refusal
+entry is RETIRED, and no single-whorl raceme reaches the budget any more**); the NODE LAWS refusal row EXPORTS
+at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
+family** — (d) reads the BUILDER's own `floretsMaxZByNode` and `floretsMaxZ`, never the plan; (f) is mode-freeness
+measured within ONE engine, because the first cut asked for `Object.is` across the page's V8
+and Node's and went red on depths equal to four decimals. **AND CI'S FIRST FULL RUN FOUND TWO
+MORE OF ID9'S OWN, ON ROWS THE SMOKE SUBSET DID NOT HOLD** (§3a of the doc): (e) asserted the
+top node IS the inset, and ONE node sits at `LEAF_NODE_SOLO` (0.55 L — deeper, never shallower;
+restated from the two constants); (d) asserted EVERY placement clears, and the law only ever
+claimed the TOP unit's — under build 2's GRADIENT a lower node's LONGER pedicel rises through
+the terminal head (`gradient 3 x 12 nodes x 60 mm`: node 12 at 180 mm, 26.31 mm into the gap,
+`insetSatisfied` TRUE and right). **Swept over all 65 buildable inflorescence rows: exactly two
+overtop, both gradient 3** (26.3068 and 71.3519 mm), declared by name in `INFLO_OVERTOP_XFAIL`
+and held both ways; node 1's own clearance is asserted unconditionally and never declared; the
+read-out says `A LOWER FLORET OVERTOPS THE HEAD`. A second Phase A finding for Eva — the reach
+inset cannot fix it (a deeper top node moves the whole ramp down), it is the node law's. Both
+rows are smoke rows now (155 over 44 blocks). `frozen/phase52` is the 1089 rows at
+`23b13bd`. **Phase B (per-node deltas, the derived per-floret phase) is NOT started — it waits
+on Eva's ruling on `docs/img/inflo-build-3-phase-a.png`.**
+
+**BUILD 3 RULED AND PHASE B SHIPPED — THE INTERNODE FLOOR IS THE FLORETS' OWN, THE GRADIENT IS
+CAPPED AT THE HEAD, EVERY SHIPPED DEFAULT CLEARS THE BAR IN CI, AND A FLORET'S FORM MOVES WITH
+ITS NODE'S AZIMUTH WITH ITS PHASE DERIVED OUTWARD** (Eva's three rulings on Phase A and the
+Phase B brief, Oct 4 — read §11–§19 of `docs/bloom-inflorescence-build-3-outcome.md` before
+touching `floretPitchFloorMm`, `floretPairClasses`, `INFLO_PITCH_CELLS_PER_GAP`, the plan's
+`gradientMax`, `nodeVarianceTerm`, `floretPhaseDeg`, `floretNodeOverrides`, the memo's azimuth
+key, ID10, NV0–NV4, DB0–DB2 or block 50). **RULING 1**: `pitchFloorMm = max(2·pedicelR, the
+florets' own)`, derived from the floret unit the builder EMITS — a column map per azimuth (cells
+a quarter of the gap, each triangle's z-range CLIPPED to the cell through its plane), over the
+distinct `(a, b, d)` pairs the phyllotaxy produces (**a pair is two azimuths and a depth, never
+an azimuth difference** — the placement roll is minimal, so the first cut's difference classes
+read 11.5 mm against a measured 0.68), both modes, the larger ceiled onto the reach grid. The
+default raceme: **floor 17.97 mm (exact mesh crossing 16.55), 5 → 4 nodes, florets 0.676 →
+9.614 mm apart, 113,886 → 96,468 tris** — one fewer floret, the ruling's own price. **Derived
+for EQUAL pedicels and said so**: a graded or corymb raceme is MEASURED instead (ID10 (d), on
+the exported file through the combination gate's own `triGrid`/`nearest`/`crosses` — one
+owner, so the clause and the gate's `floret-floret` cannot disagree), and same-node florets
+are the PHYLLOTAXY's (`sameNodeMayTouch`, told). **Two reachable rows cannot clear the bar and
+are DECLARED with their mechanism in `INFLO_APPROACH_XFAIL`, never clamped**: the gradient at
+0 (node 3 through node 2) and three sessile whorled florets of one node 120° apart on a 6 mm
+rachis. **THE FLOOR RE-RECORDS THE COMBINATION GATE'S WHOLE INFLORESCENCE FAMILY** (§12e): 24
+declared cells CLEAR (the default's 0.676 reads 9.614), the corymb's sessile 60-deg cell improves
+0.000 → 0.2144 without clearing, the two gradient-0 cells are new at 0.000, `floretNodes` on the
+leaf-nodes pair goes INERT (five nodes is all the floor admits on the span the inset leaves —
+declared in `COMBINATION_INERT` with the number) and three verdicts move; declared 167 → 145.
+**AND THE FLOOR'S PER-PAIR SWEEP WAS NOT FREE — ITS OWN HEADER SAID IT WAS** (§12f): on the whorled
+rows 564 pairs each walked every upper cell against 81 offsets through a `Map`, 67 of 87 profiled
+seconds, `NODE LAWS: ALL MAX at 35 deg` 188 s on the live page against the 30 s settle (an uncaught
+settle timeout kills a CI shard). The lower map is dilated once per offset RING now and a pair is one
+pass against nine values — the same maximum in another order, bit-identical by construction and
+measured on thirteen rows (`where` recovered by the first form's own scan for the winning pair);
+214 → 10 s, the five heaviest rows 2.4–11.7 s on the page. **A profile, not a reading of the code,
+is what says which half of a two-part cost is the one that scales.** **Two corners the floor opened to ID10 (d)** — `INFLO: ALL MAX` and `THE BUDGET CORNER`,
+three full-size twelve-petal florets of ONE node through each other, the sessile spike's mechanism at
+the other end of the size range — are declared in `INFLO_APPROACH_XFAIL`, and **NV4 compares the
+per-node overrides within 8 ulp** (`NV_OVERRIDE_ULPS`): the page's `Math.cos` and Node's differ in the
+last bit at one of twenty-four azimuths, and an exact string across two engines is session 38 §B10.7's
+class again. **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
+the terminal head's floor (the reach law's own inset), floored onto the grid so the cap sits a
+hair under the bar rather than on it; told as `GRADIENT CLAMPED`, hatched on the control, ID7
+restates it. At the extreme (gradient 3 x 12 nodes x 60 mm) it caps **3.00 → 2.2356**; the
+corymb arm is untouched character for character and ID7 asserts the solve on every corymb
+row. `INFLO_OVERTOP_XFAIL` is EMPTY and kept; the anthela arrives named or not at all.
+**RULING 3 IS A STANDING RULE: `node tools/verify-bloom-defaults-bar.mjs` (DB0–DB2) holds
+`DEFAULTS` plus each guarded feature's RULED DEFAULTS — eight states, each PINNED BY NAME to
+a `buildMatrix()` row — at or over `MIN_FEATURE_MM` on every measure the combination gate
+owns, in CI before the browser; `--control` plants three must-fails. ADDING A GUARDED
+FEATURE ADDS ITS RULED-DEFAULT ROW THERE.** **PHASE B**: `nodeVariance` (Floret, 0–1,
+default 0 — the guard, out of the sweep through `INFLO_SUBS`) moves each floret's curl, cup
+and twist by `A·cos(az + offset_b)·half_b` — the head's own form law at frequency one about
+the rachis — through `resolveRoleOverrides`'s slot term (headroom scaling, the clamp, nothing
+new), spread BEFORE `PEDICEL_PINS`; **the per-floret phase is DERIVED, no control**: the
+minimal roll keeps a floret's local x̂ world-fixed (measured — the ruling's suspected defect
+was real), so `floretPhaseDeg` puts the crest at the node azimuth ψ (+180° on a descending
+pedicel; the head's own phase kept and told at a level one; φ = −f·ψ, the ramp φ = ψ), and
+NV2 re-derives it from the placement MATRIX. One build per DISTINCT STATE: the memo keys on
+`(length, mode, azimuth quantised to 1e-9 rad in one turn)` — unquantised, `cos(2π + x)`
+keyed five builds on a two-way alternate raceme. The sheet is `docs/img/inflo-build-3-phase-b.png`
+(`tools/shot-bloom-node-variance.mjs`): OFF against ON side-on on one camera at a held node
+count, the re-floored default, the cap. Block 50 is eleven rows (matrix 1110 **[Oct 5 docs sweep: the PR-head figure; after merging with stem session 3's block 48 the live matrix is **1,123** (`buildMatrix().length` on `ebe617a`)]**; 49 and 50, not 48 and 49: stem session 3 took 48 while this PR was in CI), and the merge with stem session 3 adds +94 triangles to every raceme row (the cut on the rachis; the pedicels are pinned FLAT by ruling 7's pin) — 96,468 → 96,562 on the default raceme, every percentage unchanged, eight mutants
+in the apex table, and **every inflorescence mutant was RE-RUN because rulings 1 and 2 are law
+changes** (Eva: "any mutant that went green against the old laws is stale evidence"). **AND THE
+MERGED TREE'S FIRST FULL CI RUN FOUND TWO THINGS NO LOCAL RUN COULD** (§19a of the doc): the
+defaults-bar gate imports the harness and so sits AFTER the npm install (ST9's placement rule,
+re-learned on `45003cd`), and the edge-profile gate's E2 — which draws from the smoke subset,
+so block 50 had never reached it — reads **49.478652°** on `NODE VARIANCE: 0.5 x the form field
+0.5`: a FLORET petal at twist −111 where the node term and the head's form field compose, the
+declared twist-out-of-plane class (twist −111 on the sliders alone adds 49.10° through the same
+gate), declared in `E2_TURN_XFAIL` at its magnitude and not clamped. **Merged to `main` as `f812047` on Eva's approval of the sheet (Oct 5); §20 of the outcome doc is the close — what was derived, what was declared rather than fixed, and the frozen-tag read-back (no phase owed beyond phase52).**
+
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
 then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships
@@ -3543,7 +3733,7 @@ a CHOICE is out of the blanket sweep by construction — which is why this file 
 that no non-`INFLO:` row sets `inflorescence` at all. **The four SUB-sliders still owe an
 `INFILL_SUB_IDS` entry in that chain** (density, relaxation, density law, anisotropy — sliders
 hidden behind a guard, the `CURL_SUBS` / `INFLO_SUB_IDS` shape), and the consequence to check at
-build time is that `ALL MAX` is a HOLDER whose declared 2,354,268-triangle export refusal does not
+build time is that `ALL MAX` is a HOLDER whose declared 2,354,268-triangle **[Oct 5 docs sweep: 3,090,910 on `ebe617a`]** export refusal does not
 move.
 **THE METRIC IS REQUIRED FOR PRINT SAFETY AND NOT FOR THE LOOK, WHICH IS WHAT EVERY EARLIER DOC
 SAID** — on `petalCup` 1.2 × `petalSpineCurl` 360 the flat plan emits a **0.118 mm wall where it
@@ -3560,7 +3750,7 @@ per-quad rim cost from `RIM_BEAD_SEGMENTS = 8` and #278's published 33,072, givi
 tris/quad and a ~73,000-triangle bloom. The constant was **capped at 4** and the shipped default
 is **24,688**, so it is **~7.27 tris/quad** and the infilled bloom is **~41,000** — 2.7 % of
 budget, a 1.67× multiplier rather than 2.22×. The CI projection moves with it: the export gate
-lands near **293 min against the 360-minute job limit** rather than the withdrawn ~340-345.
+lands near **293 min against the 360-minute job limit** rather than the withdrawn ~340-345. **[Oct 5 docs sweep: superseded by #294's sharding: the export gate now runs as eight shards of about an hour each]**
 **Both figures are kept in the doc so the correction is legible, and the projection is a two-point
 extrapolation whose own connectedness fit returns an implausible 3.3 min of per-row overhead —
 size a real wait off `actions_list`, never off that table.** ~~**THERE IS STILL NO INFILL IN
@@ -3651,7 +3841,7 @@ tree alone reports `grid shape moved — 1 captured values against 4430` on the 
 tool's own `--control` still fires both clauses. **THE ELEVEN PASS**: 14,610,816 export floats and
 2,702,390 captured values, 0 moved. **THE TEST, restated because it cost a run to find: for ANY
 instrument keyed on a slot index, ask what it reads when that slot is not built.**
-**THE PORT IS NOT BLOCKED BY THE TRIANGLE BUDGET AND IS BLOCKED BY THE EMITTER.** CLAUDE.md's
+**THE PORT IS NOT BLOCKED BY THE TRIANGLE BUDGET AND IS BLOCKED BY THE EMITTER.** **[Oct 5 docs sweep: true when written; the emitter (S1), the metric (S2) and the builder (S3) have all SHIPPED — see the S1, S2 and S3 blocks below. #302 item 14]** CLAUDE.md's
 37,830-a-petal figure is the FLOWER's emitter; construction B is **2,496 a petal at the floor
 against a plain 2,356**, and the whole bloom **20,016 against 19,040 (+5.1 %)**. What disqualifies
 it is that `cutThrough` fans a solid cell FLAT — a chord across a surface that wraps — so under
@@ -3915,7 +4105,7 @@ halves of the same rule.** The row set cannot change here (the failing values ar
 through the registry, so the witness is not a matrix row), and the charter is explicit that a
 phase is owed when the ROW SET changes and **never for a byte move the outcome doc names**
 (session 24) — measured, the live matrix is **852 rows on both trees, 0 rows differing in
-definition**, so `frozen/phase34` stays the newest baseline. What IS owed is the naming, and
+definition**, so `frozen/phase34` stays the newest baseline **[Oct 5 docs sweep: true of its session; the newest frozen baseline is **`phase52`** (the 1,089 rows at `23b13bd`) on `ebe617a`. #302 item 19]**. What IS owed is the naming, and
 it is in §6 of the outcome doc: **31 of 33 tags move, 2,785 of 16,229 frozen rows**, phase34
 itself **112 of 778**, and the only two that hold entirely are `frozen/phase2` and
 `frozen/phase3` — the matrix carried no curled row until phase4. Every one of those tags'
@@ -4011,7 +4201,7 @@ and the lobe cut it used to carry is no longer built — that entry went stale o
 
 **THE GENERATOR REFUSES TO EXPORT `ALL MAX`, AND THAT REFUSAL IS NOW A DECLARED,
 ASSERTED OUTCOME — XR1/XR2** (Eva's ruling, Sep 13, on the fringe's own CI failure).
-`bloom.js`'s `EXPORT_TRI_BUDGET` (1,500,000) refuses the export above its bar, and its own
+`bloom.js`'s **[Oct 5 docs sweep: it moved to `bloom-geometry.js` in #289 and `bloom.js` imports it; value unchanged. #302 item 22]** `EXPORT_TRI_BUDGET` (1,500,000) refuses the export above its bar, and its own
 comment said the budget *"exists so the refusal path is real before it is ever needed"* —
 **the fringe is the first configuration ever to reach it**, so the first thing to need it is
 also the thing that proves the path works. `ALL MAX` builds **2,412,512 tris (export), a
@@ -4024,7 +4214,7 @@ nobody asked for. The reference has a different owner from the quantity (the fou
 rule): the refusal is read off the APP's own read-out, the count is cross-checked against the
 BUILDER's tally through `__bloomMetrics()`, and neither the budget nor the count is restated
 in the harness. `EXPORT_REFUSED_XFAIL` carries one entry, one row, one number, the
-`SELF_INTERSECTION_XFAIL` shape; like that list it does not gate MAGNITUDE, and for the same
+`SELF_INTERSECTION_XFAIL` shape; like that list it does not gate MAGNITUDE **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]**, and for the same
 reason. **THE THREE OBVIOUS ANSWERS WERE ALL REFUSED AND EACH IS WORTH NOT RE-PROPOSING:**
 raising the budget is a guard tuned to the thing it guards against (and 115 MiB is a file no
 slicer opens); trimming `ALL MAX` makes a row stop meaning its own label, when "everything at
@@ -4217,7 +4407,7 @@ on every ring of every row, 0 violations over the matrix), replaced by the two r
 no spacing can fix it; the algebra reverses past a right angle) and **SEAM CLAMPED (5 rows** —
 the blade is SHORTER than the fold it must clear, the worst asking 9.0840x its own length,
 told in the read-out and asserted as a biconditional). **Whether the tilt control should reach
-past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** — a
+past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]** — a
 declared row whose count doubles passes silently, which is how those 15 landed without a red;
 recorded as issue #213, not built. Every tag is DERIVED per row from the builder's own ladder
 records rather than written by hand, and CLEFT (9 rows) is the third class.
@@ -4282,7 +4472,7 @@ acts above `u0 = 0.2857` where the 0.55 onset sits; what is new is that somethin
 One declared entry with its numbers, failing hard if another row's count moves OR if this one
 stops moving. **Do not write "the row count is fixed so the topology cannot move" about a
 cleft.** **No frozen phase is owed**
-(no row added or removed). **The newest baseline is `frozen/phase24`** (the 624 rows at
+(no row added or removed). **The newest baseline is `frozen/phase24`** **[Oct 5 docs sweep: true of its session; the newest frozen baseline is **`phase52`** (the 1,089 rows at `23b13bd`) on `ebe617a`. #302 item 19]** (the 624 rows at
 `59c0657`, added by the lobe work), and **its bytes stop reproducing on 157 of its 624 rows**
 — PREDECLARED from the seam-step sweep of phase24's own rows and confirmed exactly by
 `--matrix phase24 --expect 157/467`, PASS, with the foot identical across 5,555,844 captured
@@ -4460,7 +4650,7 @@ beside a derivation. Control ids are unchanged; nothing is retired.
 **PETAL ROLES IS THE "ADJUST PETALS AS A GROUP" SECTION AT EVERY DEPTH, AND THE
 ONE-WHORL ORCHID IS GIVEN UP** (Eva, Sep 3, from the deploy preview, overruling
 the session's "nothing to build"). At one whorl the group is ALL petals: three
-DELTAS (`allCurl` / `allCup` / `allTipBreadth`, role `ALL`, the first three
+DELTAS (`allCurl` / `allCup` / `allTipBreadth` **[Oct 5 docs sweep: `allTipBreadth` and Petal shape's Tip breadth were RETIRED in session 32 (`RETIRED_IDS`); the live ALL deltas are `allCurl` and `allCup`. #302 item 16]**, role `ALL`, the first three
 `ROLE_OVERRIDES` rows) riding on Petal form's Spine curl and Cup and Petal
 shape's Tip breadth exactly as the Inner trio rides on them above one whorl —
 one composition law, nothing owns a number twice. Slot roles need TWO OR MORE
@@ -4545,7 +4735,7 @@ no extra builds and a moved default reddens the gate rather than silently re-poi
 and `petalSpineCurl` `[0, 180, 270, 360]` wherever either appears — so a cell turning up in
 two grids is the same state read twice and its two records cannot disagree.
 **ALL FIFTEEN BOUGHT PAIRS SHIP (Eva's ruling, #265), TAKING THE GATE TO TWENTY: 5 tier-1
-(#263's) · 9 tier-2 · 6 tier-3, 262 cells, 78 declared cells across SIXTEEN pairs** — the
+(#263's) · 9 tier-2 · 6 tier-3, 262 cells, 78 declared cells across SIXTEEN pairs** **[Oct 5 docs sweep: #265's figures. On `2885afe` (docs-only since) the gate reads **513 cells (120 in triples) over 31 pairs + 5 triples, 145 under the bar, all declared** (`docs/bloom-state-of-play-oct-5.md` §3); `cup-x-gradient` now CLEARS, and `curl-x-twist` reads 0.053 / 0.007, so the not-monotone and cup+gradient sum-rule readings below describe the grid as it was. Quote the gate's own run, never this paragraph. #302 item 10]** — the
 gate prints both totals on every run, and quote them from a run rather than from here, since
 #265 itself shipped "eleven pairs" in four places against a real sixteen and no clause could
 have said so. Her reasoning: at
@@ -4671,7 +4861,7 @@ this project prefers a number: `verify-bloom-surface-bytes --base <worktree>` re
 0 floats moved** over **836,485,992 export floats / 92,942,888 triangles and 77,135,222
 captured-grid values**, the whole 860-row matrix in both modes, positionally under
 `Object.is`. **NO FROZEN PHASE IS OWED** — no matrix row is added or removed, so
-`frozen/phase35` stays the newest baseline and no tag's bytes stop reproducing. Its
+`frozen/phase35` stays the newest baseline **[Oct 5 docs sweep: true of its session; the newest frozen baseline is **`phase52`** (the 1,089 rows at `23b13bd`) on `ebe617a`. #302 item 19]** and no tag's bytes stop reproducing. Its
 `--control` fires BOTH clauses (export stream and captured grid) on a 1e-9 perturbation,
 which is what stops the second one being a log line.
 
@@ -4679,14 +4869,14 @@ which is what stops the second one being a log line.
 `docs/bloom-infill-builder.md` before touching `petalInfillPlan`, `emitInfillPanel`,
 `buildPetalInto`'s panel loop, the material mask or the I family; the picture is
 `docs/img/infill-shipped.png`). `petalInfill` (a CHOICE, NONE / VORONOI, default **NONE** — the
-guard) and `infillDensity` (8–40, default **16**, hidden AND inert at the guard) in an **Infill**
+guard) and `infillDensity` (8–40, default **16** **[Oct 5 docs sweep: **20** since Eva's ruled defaults — see the ruled-defaults block below]**, hidden AND inert at the guard) in an **Infill**
 drop-down inside Petal, declared after `roles` and all nine of its children. The wall is
 `MIN_FEATURE_MM`, the hole bar 1.50 mm and the drop cap `INFILL_DROP_PASSES = 2` — none of them a
 control. `buildPetalInto`'s panel loop is a TWO-ARM CHOICE and `trimPanels` is untouched: the basal
 sub-panel goes through `emitPanel` verbatim and the cells are drawn above it.
 **THE GUARD IS A CHOICE AND THAT IS STRUCTURAL, NOT A PREFERENCE**: `SWEEPABLE` filters
 `SLIDERS()`, so a CHOICE is out of the blanket sweep by construction and `ALL MAX` reads **24,688
-triangles, unchanged**, with its declared export refusal untouched; `INFILL_SUBS` keeps the density
+triangles, unchanged** **[Oct 5 docs sweep: 24,688 is the SHIPPING DEFAULT's count, copied here by mistake; `ALL MAX` exports-refuses at **3,090,816** at that tree and **3,090,910** on `ebe617a` (XR1 holds it exactly). What the sentence meant — that the infill guard leaves `ALL MAX` untouched — is true. #302 item 2]**, with its declared export refusal untouched; `INFILL_SUBS` keeps the density
 out of block 1. Sepals are pinned off in `sepalBladeState`. **0 BYTES AT THE GUARD**, measured:
 `node tools/verify-bloom-infill-bytes.mjs --base <worktree>` reads 15 HOLDERS x 2 modes over
 21,322,224 export floats and 3,299,136 captured-grid values under `Object.is`, 0 moved, with the
@@ -4880,7 +5070,7 @@ ONE OWNER — `emitRimLoop`** (read `docs/bloom-infill-s5-hole-rims.md` before t
 H / O / B families). `emitRimLoop` + `rimProfile` were MOVED VERBATIM out of `emitPanel` (129 rows,
 both modes, positions AND bead normals, 0 moved) and both callers close through them; S3's flat-wall
 `emitRim` is gone — the cell region's OUTLINE edges go through the same owner as its `w = 0` step
-profile (byte-identical walls) and are STILL FLAT, the declared #278 regression above the split
+profile (byte-identical walls) and are STILL FLAT **[Oct 5 docs sweep: FIXED by #297, the margin-bead session below]**, the declared #278 regression above the split
 standing, because the cells' refined skin has vertices within a bead's width of the margin that
 nothing moves. **BEAD-ONLY, MEASURED:** the room is the plan's 1.00 mm wall, the 0.45 x room arm
 binds on EVERY hole (`r = 0.45`, 0.10 mm of flat left down each wall, every clamped hole a record on
@@ -4910,7 +5100,7 @@ x sheetThickness 0.60` (952). The picture is `docs/img/infill-hole-rim.png`.
 (the roundness session — read `docs/bloom-infill-roundness-and-bevel.md`; nothing in the generator
 moved). "Cells always round, no control" is SUPERSEDED. Measured: on an infilled default petal
 **91 of 95 margin stations are a 1.200 mm flat wall meeting both skins at 90.00°** (S5 §5's declared
-regression) — that is the hard edge, not K and not shading. **Smoothing is ON in both views** (live:
+regression **[Oct 5 docs sweep: FIXED by #297 — the next block — where the margin body turns 44.96° at the defaults]**) — that is the hard edge, not K and not shading. **Smoothing is ON in both views** (live:
 crease normals at 60°; print preview: the builder's closed-form bead normals, whatever bloom.js's
 comment says). **K>4 refuses two shipped rows** (K=6: `INFILL: x 40 x 3` 101.1%, `INFLO: ALL MAX`
 110.4%) — a budget ruling. **The fillet shipped ABSOLUTE (0.8 mm, clamp binding on 33.5% of corners),
@@ -5009,7 +5199,7 @@ three with `NU` untouched; the ceiling this session ships is 12 nodes x 3 = 36 f
 top-level Inflorescence section, with `floretNodes` (1-12, 5), `floretPhyllotaxy` (the
 LEAF's own three), `floretPetals` (3-12, 5), `floretScale` (0.20-1.00, 0.60),
 `pedicelLength` (5-60 mm, 20) and `pedicelAngle` (-60..90 deg, 35) in a nested Floret
-section, all hidden AND inert at NONE and on a bloom with no rachis. **NOTHING IS A SECOND
+section, **[Oct 5 docs sweep: only `floretPetals` and `floretScale` (and build 3's `nodeVariance`) are in the nested `floret` section; `floretNodes`, `floretPhyllotaxy` and the four `pedicel*` controls sit in the top-level `inflorescence` section, and `PEDICEL_LENGTH_RANGE` is `[0, 250]` since builds 2 and 3. #302 item 23]** all hidden AND inert at NONE and on a bloom with no rachis. **NOTHING IS A SECOND
 OWNER**: nodes are `leafNodeDepthsMm`, azimuths are `leafAzimuths`, the rod's root and
 embed are `rodWallRootMm` / `rodWallEmbedMm`, the crossing is `rodWallCrossingMm`, the size
 clamp is `OVERRIDE_BOUNDS`, the gap is `MIN_FEATURE_MM`. **THE PEDICEL'S RADIUS IS DERIVED
@@ -5073,7 +5263,7 @@ shipped `zStemEnd + frac * extentMm` — 0 matches on BOTH trees), re-anchored h
 its own comment predicts; both coverage instruments build the florets from
 `inflorescencePlan`'s own record now.
 **`INFLO: ALL MAX` DOES NOT REFUSE — 1,114,828 export triangles of the 1,500,000 budget,
-74.3%, 54,435 KiB — SO THE ROW EXISTS AND THE `EXPORT_REFUSED_XFAIL` ENTRY DOES NOT, WHICH
+74.3%, 54,435 KiB **[Oct 5 docs sweep: superseded: build 2 measured it at 95.0%, and build 3 redefined `INFLO: ALL MAX` (a 250 mm pedicel admits one node) — see the build-3 blocks. #302 item 15]** — SO THE ROW EXISTS AND THE `EXPORT_REFUSED_XFAIL` ENTRY DOES NOT, WHICH
 IS A DISAGREEMENT WITH RULING 9 RATHER THAN A SHORTFALL.** That ruling asks for the
 sub-controls out of the blanket sweep "with one declared `INFLO: ALL MAX` refusal row"; the
 ROW is built and is in the matrix — 12 nodes x whorled x 12 petals x size 1.00 x a 60 mm
@@ -5141,7 +5331,7 @@ raceme's top floret passes through the terminal head's petals** (the inset clear
 never the floret's petals), a 5 mm pedicel's floret folds onto its own rachis, and at -60/60/90 deg
 florets reach the rachis at every size. `INFLO: ALL MAX` is UNMOVED at 95.0% (its 90 deg pedicels
 admit no shared-node offset); the same corner at 35 deg with leaves is 1,517,196 (101.1%), a declared
-refusal row. **The 544% corner (`INFLO: ALL MAX` x `layerCount 6`) CANNOT be a row until #231 is
+refusal row. **[Oct 5 docs sweep: RETIRED by build 3: under ruling 1's floor that row holds one node and EXPORTS at 10.1%; `EXPORT_REFUSED_XFAIL` holds only `ALL MAX` on `ebe617a`]** **The 544% corner (`INFLO: ALL MAX` x `layerCount 6`) CANNOT be a row until #231 is
 fixed**: the refusal builds the whole 8.16 M export mesh before checking (9.6 min locally against the
 gate's 120 s), and the attempt found **ID4 predicting `floretPetals` where a floret builds
 `floretPetals x layerCount`** (it inherits the head's whorls) — fixed, witnessed by `NODE LAWS: x 2
@@ -5208,7 +5398,7 @@ A2 now admits a descendant that was raw-open before the click (siblings stay exc
 **PARTITION, PREDECLARED FROM THE GUARD** (a row moves iff `varianceIsAbsent` is false, and the
 label regex `^VARIANCE: (?!GATED)|^varianceSize max|^ALL MAX$` reproduces that set both ways):
 **24 MOVED / 885 HELD over the 909-row live matrix in both modes** — `verify-bloom-surface-bytes --base <worktree of f1fbdf9>` reads PASS over 863,686,368 export floats / 95,965,152 triangles and 77,685,464 captured-grid values (the 908 rows before the fringe row, plus that row in a two-row run), all predeclared movers moving, 0 floats on any holder, `--control` firing both clauses on a 1e-9 perturbation; the shipping default holds by branch and the two GATED rows are measured holders. `ALL MAX` moves and its census entry is RE-RECORDED, 192,270 / 3.1556 →
-**196,142 / 5.7609** (a 1.5x petal at the deepest ring), and its refusal entry too, 2,506,652 → **2,354,268 triangles — the FRINGE's tooth ceiling is a rule about the terminal's WIDTH, so the half-size petals cut fewer teeth**: the one way this field moves TOPOLOGY, through another feature's own law, mode-free as that law is;
+**196,142 / 5.7609** (a 1.5x petal at the deepest ring), and its refusal entry too, 2,506,652 → **2,354,268 triangles **[Oct 5 docs sweep: then; 3,090,910 on `ebe617a`, after the edge profile and the florist's cut]** — the FRINGE's tooth ceiling is a rule about the terminal's WIDTH, so the half-size petals cut fewer teeth**: the one way this field moves TOPOLOGY, through another feature's own law, mode-free as that law is;
 three block-38 rows are declared where their base rows are clean or lighter (cup 1.2 → 794 /
 0.3210, the buckle → 4 / 0.0188, the IRIS a span-0 knife edge of 3). **UNDER INSTANCING every
 floret carries the SAME factor set on its own azimuths — its largest petal at azimuth 0 IN THE
@@ -5383,7 +5573,7 @@ them as optional or experimental.
   Never add a bare single-sided surface or zero-thickness membrane to the export
   mesh.
 - Respect `exportMode`: at export, tube/bead radii and slab/blade thickness are
-  floored to the printable minimum (`MIN_FEATURE_MM = 0.8`). Any new solid
+  floored to the printable minimum (`MIN_FEATURE_MM = 0.8` **[Oct 5 docs sweep: 0.8 is the FALLBACK; the live floor is process-dependent, `PROCESS_FLOOR_MM = { sls: 1.0, sla: 0.4, fdm: 0.8 }` in `flower.js:330`. #302 item 28]**). Any new solid
   primitive must honor the same floor.
 - **Verify before calling a geometry change done:** run
   `node tools/verify-flower-export.mjs`. It renders the page headless, exports an
@@ -7884,7 +8074,7 @@ figures, because a number nobody prints is a number nobody watches.
 
 **THE PANEL IS 8 CONTROLS HEAVIER AND THE UI OVERHAUL IS NOW OVERDUE.** BLOOM sits
 between DRAW and PETAL so the two-level selection reads top-down. That takes `/plot`
-to eight panels and thirty-two controls, two of which (the bloom picker and the petal
+to eight panels and thirty-two controls **[Oct 5 docs sweep: this figure supersedes the 'twenty-four controls … seven panels' in the NEXT list below. #302 item 23]**, two of which (the bloom picker and the petal
 picker) change what a dozen others MEAN. The overhaul was already the most pressing
 backlog item; it is more so.
 
@@ -7903,7 +8093,7 @@ how hard it is to undo:
 3. **The last bloom cannot be removed.** *Rejected:* removing down to zero — an empty
    viewport is indistinguishable from a page that broke, a reading this project already
    refused once for a failed grid load. *Undo:* one comparison in `removeInstance`.
-4. **`MAX_INSTANCES` is 8**, so the placement ladder (~92 mm a bloom on this grid) stays
+4. **`MAX_INSTANCES` is 8** **[Oct 5 docs sweep: `plot.js:335` reads **12** on `ebe617a`, so the ±800 mm argument below is about the old cap. #302 item 13]**, so the placement ladder (~92 mm a bloom on this grid) stays
    inside the position sliders' ±800 mm. The reference is five. *Undo:* one constant.
 5. **The petal cursor RESETS when the bloom changes** rather than carrying the number
    across — petal 3 of one bloom is a different blade from petal 3 of another.
@@ -8252,7 +8442,7 @@ strand modes) is in that doc so it is not re-derived.
 1. **A UI overhaul for `/plot`, and it is now the most pressing thing on this
    list.** The panels are `/print`'s grammar applied as-is, which was right for
    shipping a viewer and is not a considered design for this page. There are
-   **twenty-four controls and twelve buttons across seven panels** now, one of
+   **twenty-four controls and twelve buttons across seven panels** **[Oct 5 docs sweep: stale — thirty-two controls across eight panels since the multi-bloom session]** now, one of
    them — the petal picker — changes what four of the others MEAN and another —
    the POLARITY — changes what two more mean and relabels one of them, and the
    left column has grown tall enough that it covers canvas a hand wants to drag
@@ -8286,7 +8476,7 @@ strand modes) is in that doc so it is not re-derived.
 `scene.html` / `scene.css` / `scene.js` / `scene/*` are a full-viewport section
 built to host up to **eight** independent ambient scenes, one at a time. It is
 `noindex`, it exports nothing, and it touches no other page. Scene 1 (a koi pond
-in the rain) is built; slots 2-8 are declared and render as disabled nav numbers.
+in the rain) is built; slots 2-8 are declared and render as disabled nav numbers. **[Oct 5 docs sweep: stale. **Scene 3, the beach swash line, is built too** (#269, #271; `scene/registry.js` slot 3, `scene/beach-*.js`; docs `docs/beach-drawing-layer.md`, `docs/beach-wave-object.md`). Slots 2 and 4–8 are the disabled ones. This file has no beach section. #302 item 11]**
 
 **IT DOES NOT LOAD `styles.css` AND THAT IS THE POINT.** The rest of the
 portfolio is teal on #0A0A0C; this section is thin light line art on near-black
@@ -8794,14 +8984,14 @@ placement. **`koi-pads.js` HAD TO BE ADDED TO THE DISCIPLINE SCAN'S `SCENE_MODUL
 which is a hand-written coverage list — a module missing from it passes every discipline
 check by not being read.
 
-**Verify with `node tools/verify-scene.mjs`** (97 checks). Part one drives the
+**Verify with `node tools/verify-scene.mjs`** (97 checks **[Oct 5 docs sweep: stale since scene 3; part one alone passed 91/91 at #302 — count from a run]**). Part one drives the
 shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
 ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
 never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: thirty-nine mutations, each naming the checks it must redden,
+a changed harness**: thirty-nine mutations **[Oct 5 docs sweep: the `MUTANTS` array holds about 72 by a static count on `ebe617a`]**, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
 alone in seconds, and the guard is SECTION-AWARE so that combination does not
@@ -8879,7 +9069,7 @@ and which is one white wash plus a jolt. **The hint line came off this list by
 being ruled on** — see the no-text section above.
 
 **Out of scope on purpose, and none of it foreclosed:** colour palettes and
-time-of-day variants, scenes 2-8, sound, and any change to the other pages.
+time-of-day variants, scenes 2-8 **[Oct 5 docs sweep: scene 3 has since shipped]**, sound, and any change to the other pages.
 
 ## Artist Tracker (`artist-tracker.html`)
 
@@ -10019,30 +10209,37 @@ blade is a closed wavy RING running AROUND the circumference, a jagged pizza-whe
 round the pin, and each roller rolls along its OWN lines: roller A carries the edge-A lines and
 rolls along `tA`, B the edge-B lines along `tB`. Circumference = tiles round it × its OWN pitch,
 the diameter derived; the rings step along the axis by `|tA × tB| / |chord|` (θ counted), and
-there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3 —
-the first version's page could open on a strip of three). A ring is one period laid `n` times and
-wrapped onto its own first vertex, so it closes on itself by construction: a TORUS, no end caps,
-no seam vertex. **No rims, and "the dough must lie between the rims" is DROPPED** — every ring is
-a wheel at the tip radius, so the roller rides its blade tips through the dough continuously.
-**The price is printing**: upright, every ring is a fin straight out of the body — support under
-every ring, said in the page's how-to and the zip's README, never hidden. **Both rollers are held +Z
-end on the LEFT as they roll forward** (`â = ẑ × r̂`); a first draft that signed the axis per
-roller stamped A's line mirrored. **The index marks**: the track runs along `tB` through the
-corners of B-line column `m*` (−1 normally) in the border; A lays it with a SLANTED row of pegs,
-one on each ring at that ring's corner of column `m*` (an axial row only at θ = 90°); B's collar
-sits at that column's axial position with one tooth per tile round it at
-`s' = m*·|tA| cos θ + j·|tB|`; one seated tooth fixes both of B's free placements, because
-`|tA|·(cos θ r̂_B − sin θ â_B) = tA` exactly; A's peg row comes round outside the sheet iff
-`n_A ≥ cols + 1 + |m*|`, which is why A defaults to 6 round and B to 5; "roll back, then forward"
-for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a blade that cannot
-clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for its roller. A
-version-1 (crossbar) design file opens with its tile and sheet kept and its round counts reset;
-the storage key moved so an old design does not reopen by itself. Gates, both in CI
-(`tile-gate.yml`), each with a negative control that must catch every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry; D, every
-blade a ring round its roller read off the mesh — full azimuth, an axial extent of one line's
-width, the θ spacing — which a bar along the axis fails; the seam over three revolutions, every
-ring closing once; a rigid-body rolling simulation for registration, re-seated by a different
-tooth and dimple; a DIRECTED-edge census on every STL; heights read off the mesh) and
-`node tools/verify-tile-page.mjs` (Chromium, real pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
+there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3).
+A ring is one period laid `n` times and wrapped onto its own first vertex: a TORUS, no end caps.
+**No rims** — every ring is a wheel at the tip radius. **The price is printing**: support under
+every ring. **ALIGNMENT IS EVA'S METHOD (Oct 5), DONE BY THE ROLLERS AND HANDLES ALONE — the
+dimple track and B's toothed collar are GONE** (read §4 of `tile-design-doc.md` before touching
+`rollerLayout`'s sight/start block, the notch, `buildHandle` or the K/V/R families). Each roller
+spins on TWO handles (one per end, so the handle never turns with it); a V notch in both end
+faces and a spring tab on the handle click at the START POSE (the phase); each handle's sight arm
+hangs a pointer just past the roller's end, ON its straight contact line, 0.5 mm above the dough.
+A starts on its detent at the dough's straight edge and its pin(s) punch two PINHOLES; B is put
+down on its detent with both pointers over them — two points fix position, sideways and angle.
+**Two physics findings changed the brief, and are proved in §4.2:** B's END-RING contact points
+cannot both be corners at θ ≠ 90° (needs `cols·|tA|cosθ/|tB|` integer), and a pointer cannot sit
+over a point under the roller — so the fiducials are on B's contact line at virtual columns −j
+and cols + j (side borders): corners of row 0 on A's first ring at 90° (one pin lays both on the
+default), one corner + one post between A's rings otherwise. **The pins are FLUSH with the blade
+tips, not taller** (a proud pin lifts the roller; R1). **A whole-tile notch error on B is the same
+pose by symmetry** — only K2 (the declaration) sees it; half a tile misregisters (R). The page
+quotes the placement tolerance (±1 mm at each pointer → 1.51 mm worst corner on the default),
+computed by `sightTolerance` and cross-checked through the simulator (R6). Refused: a blade that
+cannot clear the dough, a roller too small for its bore, an end face with no room for the detent
+— and W5 checks the refusal NAMES the measured cause. Gates, both in CI (`tile-gate.yml`), each
+with a negative control that must catch every mutation (38 geometry, 18 page). **NO IMPOSTOR:** A's
+pins come round every revolution; the layout adds fiducial columns until no other pair of A's
+pinholes lies within 3 mm / 10° of B's pointer span (91° with A six round laid one 0.04 mm off),
+and K4 checks the stamped holes:
+`node tools/verify-tile.mjs` (Node: T tessellation, D rings, S seam, R two-point registration and
+tolerance, K detent and impostors, V sight arms, W directed-edge watertight on all four STLs, H heights, F flags)
+and `node tools/verify-tile-page.mjs` (Chromium: real pointer events and downloads; P22 the how-to's
+numbered steps and ±1 mm figure, P23 a fresh profile opens on 4 × 3). Sheet:
+`node tools/shot-tile.mjs <dir>` (the notch, the tab in it, a sight arm over the contact line, A's
+pin, B in use at 90° and 60°). Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.

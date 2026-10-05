@@ -1,6 +1,6 @@
 # The partition comparison, re-measured against the fixed clip bound
 
-Every row of the option table in `docs/flower-lobed-voronoi-findings.md` was measured
+Every row of the option table in `docs/flower-lobed-voronoi-findings.md` **[Oct 5 docs sweep: that file is not in the repository and never was on `main`; the citation is kept as written. #302 item 27]** was measured
 against a clip polygon with a collapsed neck in it. PR #77 removed the neck, so "today" is
 not the same today. Re-run before any of it is used to justify building the partition.
 

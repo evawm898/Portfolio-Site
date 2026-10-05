@@ -199,6 +199,22 @@ const E2_TURN_XFAIL = {
     { excessDeg: 29.408025, note: 'NEW at #320: adds 74.408025 deg; face-to-face 100.38, outline 25.97 — curl 135 x cup -0.8 x twist 90, which reads 74.408025 on the sliders alone, identical to the sixth decimal' },
   'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)':
     { excessDeg: 14.498401, note: 'NEW at #320 at 24.729474 excess (adds 69.729474 deg; face-to-face 94.70, outline 24.97 — a fan petal the field has twisted, the same class as the two rows above). RE-RECORDED by the headroom follow-up: 14.498401 — at the default the headroom scales the DOWNWARD curl (room 180 of a 270 half-span) and DOWNWARD cup (0.8 of 1.0) continuously where the old law clipped them, so the curled-under fan petals carry a different composition (twist is symmetric about its default and is not scaled); the same row\'s self-approach moved 0.620 -> 0.767 mm in the same direction' },
+  /* NODE VARIANCE (inflorescence build 3, Phase B): the same class one level
+     down — a FLORET's petal whose twist two fields composed. The row's worst
+     floret petal is curl 45.3 x cup 0.61 x twist -111 (the node term's -45
+     of twist on the head's slot field's -45 to +88 — measured from the
+     builder's own `applied` record on each distinct unit); the form field
+     alone on this raceme reaches twist +/-88 and node variance alone +/-45,
+     and both of those sibling rows PASS E2 in the same CI run, so it is the
+     composition. Two-sided through this gate's own measurement on a PLAIN
+     bloom at the sliders: twist -111 ALONE adds 49.099660 deg (face-to-face
+     51.28, outline 2.18), curl 45 x cup 0.6 x twist -111 adds 53.656988, and
+     the other node's -15 x -0.46 x 111 adds 48.978261 — the row reads 49.48 on
+     a 0.60-scale five-petal floret. Found by CI on 5cf74e2 (the merged tree's
+     first full `gates` job); the row is block 50's and had never reached this
+     gate before the merge put it in the smoke subset. */
+  'NODE VARIANCE: 0.5 x the form field 0.5 (the head\'s slot field composing on the moved base; the phase DERIVED outward)':
+    { excessDeg: 4.478652, note: 'NEW with build 3 Phase B (block 50): adds 49.478652 deg; face-to-face 50.75, outline 1.28 — a floret petal at twist -111, the twist\'s out-of-plane class (petalTwist max (180) above), reached by the node term composing on the head\'s form field. Twist -111 on the sliders alone adds 49.099660' },
   /* AND IT IS NOT THE INFILL'S, WHICH IS A TWO-SIDED FACT RATHER THAN A
      READING OF THE LABEL: the plan REFUSES a blade that is several panels, and
      I2 asserts on that row that the mesh is BIT-IDENTICAL to the same state

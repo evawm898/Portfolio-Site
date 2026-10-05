@@ -347,11 +347,34 @@ jobs:
       # which imports playwright-core at load) and before the browser.
       - name: ST12 — every arm of the stem-node clause must be able to fail
         run: node tools/verify-bloom-stem-nodes.mjs
+      # THE STEM'S CUT (ruling 7, stem session 3): SC0-SC3, ST10's two cut
+      # arms, ST1's cut band, ST12's cut ladder and ID4's cut pin, each planted
+      # into records the shipped geometry builds and required to fire BY ITS
+      # OWN MESSAGE through the clauses both STL gates call. Here beside the
+      # stem-nodes must-fail for the same reason (it imports the harness).
+      # Added AFTER frozen/phase52 was dispatched from main (docs/bloom-stem-cut-outcome.md).
+      - name: SC0-SC3 — every arm of the stem-cut clauses must be able to fail
+        run: node tools/verify-bloom-stem-cut.mjs
       # S5: every infilled row under the export budget on its own mesh. It
       # imports the harness (for the matrix), which imports playwright at
       # module load, so it sits after the npm install.
       - name: Every infilled state is under the triangle budget (B0-B2)
         run: node tools/verify-bloom-infill-budget.mjs --negative-control
+      # EVERY SHIPPED DEFAULT CLEARS THE PRINTABLE BAR (DB0-DB2; Eva's standing
+      # rule, inflorescence build 3): the registry's default and each guarded
+      # feature's ruled-defaults row, pinned by name to the matrix, through
+      # the combination gate's own measures. Node-only and half a minute — but
+      # it imports `buildMatrix` from tools/bloom-harness.mjs, which imports
+      # playwright-core at MODULE LOAD, so it sits HERE, after the npm install
+      # and before the browser, beside the budget gate above it for the same
+      # reason. Its first placement was beside the combination gate, before the
+      # install, and the first CI run on the merged tree died on
+      # ERR_MODULE_NOT_FOUND there — red for a reason that had nothing to do
+      # with the bar (45003cd, preflight).
+      - name: Every shipped default clears the printable bar (DB0-DB2)
+        run: node tools/verify-bloom-defaults-bar.mjs
+      - name: ... and that clause must be able to fail
+        run: node tools/verify-bloom-defaults-bar.mjs --control
 
   # THE GATES THAT RAN IN NO WORKFLOW (D14, the gate-coverage session). Eight
   # bloom gates carried must-fail controls and were run by hand or not at all;

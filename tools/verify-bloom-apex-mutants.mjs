@@ -240,6 +240,14 @@ function infloFacts(M, over = {}) {
          137.251 mm on both trees while every floret had been collapsed onto
          x = 0. A witness has to probe the axis the mutation acts on. */
       extent: [acc.hi[0] - acc.lo[0], acc.hi[1] - acc.lo[1], acc.hi[2] - acc.lo[2]],
+      /* BUILD 3's RECORDS (Phase A's floor and cap, Phase B's units): read
+         off the plan and the builder for the witnesses below, never asserted
+         here */
+      pitchFloorMm: P.pitchFloorMm, pitchFloretRawMm: P.pitchFloretRawMm, pitchFloorIsFlorets: P.pitchFloorIsFlorets,
+      gradient: P.gradient, gradientAsked: P.gradientAsked, gradientMax: P.gradientMax, gradientClamped: P.gradientClamped,
+      unitCount: B.units.length,
+      units: B.units.map((u) => ({ az: u.az, overrides: u.nodeOverrides ? { ...u.nodeOverrides } : null, curl: u.floretState.petalSpineCurl, cup: u.floretState.petalCup, twist: u.floretState.petalTwist, phase: u.floretState.variancePhase, pins: Object.fromEntries(Object.keys(M.PEDICEL_PINS).map((k) => [k, u.floretState[k]])) })),
+      floretsMaxZByNode: B.floretsMaxZByNode ? B.floretsMaxZByNode.slice() : null, headFloorZ: P.headFloorZ, insetGapMm: P.insetGapMm,
       /* AND THE FIRST PLACED BLOCK'S OWN CENTROID, read out of the emitted
          stream at the offset the builder declared. The WHOLE bloom's extent
          does not move either: the HEAD is 81.6 mm across and the florets on
@@ -255,6 +263,11 @@ function infloFacts(M, over = {}) {
         return n ? [x / n, y / n, z / n] : null;
       })(),
       residual: B.placementResidual, compared: B.placementCompared,
+      /* THE REACH INSET (build 3): the plan's own inset fields and node depths,
+         read so the three inset mutants can witness on the MUTATED plan. */
+      insetNeededMm: P.insetNeededMm, insetMm: P.insetMm, insetAskedMm: P.insetAskedMm,
+      reach: P.floretReachMm ? { ...P.floretReachMm } : null, nodeDepths: P.nodeDepthsMm.slice(),
+      lenCeilMm: P.lenCeilMm, pedicelLens: P.pedicelLensMm.slice(), lengthsClamped: P.lengthsClamped,
     };
   } catch (e) { return { threw: String(e && e.message || e) }; }
 }
@@ -385,6 +398,35 @@ function plugFacts(M, state = STEM_STATE()) {
     return { plan, tris: built.tris, bottomArea, tipZ,
              emittedVoid: !!built.emittedVoid,
              plugMm: built.emittedVoid ? built.emittedVoidBottomZ - built.emittedTipZ : null };
+  } catch (e) { return { threw: e.message }; }
+}
+
+/* THE CUT FACE, as the MUTATED module emits it (stem session 3): how far the
+   face rises above the long point, how many of its vertices sit on the land,
+   and how far the void's floor stands below the cut plane at the bore's far
+   edge (positive = the bore opens through the face). Read off the emitted
+   cut ring and the emitted void floor — never off the plan's `cut` record,
+   which a mutation inside the plan would move with it. */
+function endFaceFacts(M, state = STEM_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    const plan = M.stemPlan(state, fr.hub, acc);
+    const sacc = new M.MeshBuilder({ exportMode: true });
+    const built = M.buildStemInto(sacc, plan);
+    const E = built.emittedCut;
+    if (!E) return { threw: 'the builder emitted no cut face' };
+    let zmax = -Infinity, zmin = Infinity, landCount = 0;
+    for (const v of E.ring) { if (v[2] > zmax) zmax = v[2]; if (v[2] < zmin) zmin = v[2]; }
+    for (const v of E.ring) if (v[2] === zmin) landCount++;
+    /* The plane through the ring's own far column and its land edge: height
+       at the bore's far edge (x = -b) by linear interpolation of the emitted
+       ring between the long side and the far column. */
+    const far = E.ring[E.ring.length / 2], near = E.ring.find((v, i) => v[2] > zmin) || E.ring[0];
+    const slope = (far[2] - near[2]) / (near[0] - far[0]);
+    const planeAtFarBore = near[2] + slope * (near[0] - (-plan.boreR));
+    const voidBelowPlaneMm = built.emittedVoid ? planeAtFarBore - built.emittedVoidBottomZ : -Infinity;
+    return { tris: built.tris, faceRiseMm: zmax - zmin, landCount, voidBelowPlaneMm };
   } catch (e) { return { threw: e.message }; }
 }
 
@@ -1173,6 +1215,141 @@ const MUTANTS = [
         : `the pedicel roots at r = ${m.rootR} on the mutant and ${c.rootR} on the clean tree — the root did not move to the axis`;
     } },
 
+  /* ---- THE REACH INSET (inflorescence build 3, Phase A — #355) ---- */
+  { id: 'the-inset-reads-the-pedicel-again',
+    why: "the top node's inset goes back to build 1's law — the PEDICEL's rise, `L sin th` — which clears the rod and not the flower on it: the shipped raceme's top floret stands with its petals through the terminal head's at 0.000 mm again, watertight, one piece, the same triangle count, `insetSatisfied` true. ID9 (c) restates the law from the floret builder's own emitted vertices and (d) reads the emitted florets against the head's floor",
+    find: '  const insetNeededMm = Math.max(0, reachMm + (stem.rootZ - headFloorZ) + MIN_FEATURE_MM);',
+    into: '  const insetNeededMm = Math.max(0, pedicelLenMm * Math.sin((angleDeg * Math.PI) / 180));', names: ['ID9'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.insetNeededMm < c.insetNeededMm - 10 && m.nodeDepths[0] < c.nodeDepths[0]) ? null
+        : `the mutant needs ${m.insetNeededMm} mm of inset and the clean tree ${c.insetNeededMm} — the law did not go back to the rise`;
+    } },
+  { id: 'the-reach-reads-one-mode',
+    why: "the reach is the LIVE unit's alone, so where the export unit reaches further (a 0.60 mm sheet floors to 1.00 at export and its floret reaches 0.62 mm higher) the export build's top node is shallower than its own reach asks — and the two modes' node depths DIFFER, which is a mode-dependent topology, refused seven times here. Invisible on the shipping sheet, where the two reaches are the same double; ID9 (a) and (f) on the 0.60 mm row",
+    find: '  const reachRawMm = Math.max(reachLive.reachMm, reachExport.reachMm);',
+    into: '  const reachRawMm = reachLive.reachMm;', names: ['ID9'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { sheetThickness: 0.6 });
+      const t = bothBuilt(m, c); if (t) return t;
+      if (!m.reach || !c.reach) return 'the plan reports no reach record';
+      if (!(c.reach.export > c.reach.live)) return `the probe state's export reach (${c.reach.export}) does not exceed its live reach (${c.reach.live}) on the clean tree — the mutation is invisible here`;
+      return (m.insetNeededMm < c.insetNeededMm) ? null
+        : `the mutant needs ${m.insetNeededMm} mm and the clean tree ${c.insetNeededMm} — reading one mode did not shorten the inset`;
+    } },
+  { id: 'the-pedicel-ceiling-is-the-stems-again',
+    why: "the per-node pedicel ceiling goes back to the head's `STEM_LENGTH_RANGE[1]` (120) while the slider runs to 250: a 250 mm pedicel asked for is built at 120 and told as clamped, and the corymb on the full rachis clamps its lowest pedicels again. ID7 restates the ceiling as the pedicel's own range; the row at 250 is where the two differ",
+    find: '  const lenCeilMm = PEDICEL_LENGTH_RANGE[1];',
+    into: '  const lenCeilMm = STEM_LENGTH_RANGE[1];', names: ['ID7'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { pedicelLength: 250 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.lenCeilMm === 120 && m.lengthsClamped && m.pedicelLens[0] === 120 && c.pedicelLens[0] === 250 && !c.lengthsClamped) ? null
+        : `the mutant's ceiling reads ${m.lenCeilMm} (top pedicel ${m.pedicelLens[0]}) and the clean tree's ${c.lenCeilMm} (${c.pedicelLens[0]}) — the ceiling did not move back`;
+    } },
+
+  /* BUILD 3, PHASE A's TWO LAWS AND PHASE B's TWO (Eva's rulings, Oct 4). Each
+     witness reads the MUTATED module's own plan or builder record against the
+     clean one, on a state where the law binds; never the assertion it names. */
+  { id: 'the-internode-floor-is-the-rods-again',
+    why: "the node law's pitch floor goes back to two pedicel radii alone — the florets' own floor derived from their emitted triangles is computed and ignored — so the shipped raceme's florets stand 0.676 mm from each other again (Phase A's finding, the state ruling 1 was written for): five nodes, watertight, one piece. ID10 (b) holds the emitted spacing to the restated floor and (d) reads the file",
+    find: '  const pitchFloorMm = Math.max(pitchFloorRodMm, pitchFloretMm);',
+    into: '  const pitchFloorMm = pitchFloorRodMm;', names: ['ID10'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.pitchFloorMm === 2 * m.pedicelR && c.pitchFloorMm > 2 * c.pedicelR + 5 && m.nodes > c.nodes) ? null
+        : `the mutant's floor is ${m.pitchFloorMm} (${m.nodes} nodes) and the clean tree's ${c.pitchFloorMm} (${c.nodes}) — the floor did not go back to the rods'`;
+    } },
+  { id: 'the-floor-reads-one-mode',
+    why: "the florets' floor is the LIVE unit's alone, so where the export unit stands taller the export build's nodes sit under their own floor — and whether the two modes' node counts agree becomes a matter of luck, a mode-dependent topology refused eight times here. ID10 (a) restates the floor over BOTH modes' units",
+    find: '  const pitchFloretRawMm = Math.max(pitchLive.floorMm, pitchExport.floorMm);',
+    into: '  const pitchFloretRawMm = pitchLive.floorMm;', names: ['ID10'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { sheetThickness: 0.6 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.pitchFloretRawMm < c.pitchFloretRawMm) ? null
+        : `the mutant's florets' floor is ${m.pitchFloretRawMm} and the clean tree's ${c.pitchFloretRawMm} on the 0.60 mm sheet — reading one mode did not lower it (the two modes' units may stand the same height here; choose a state where they do not)`;
+    } },
+  { id: 'the-gradient-cap-is-dropped',
+    why: "the gradient's cap goes back to infinity, so a lower pedicel three times the top's rises through the terminal head again — build 2's anthela through the back door, the shape ruling 2 forbids — watertight, one piece, told by nothing. ID7 restates the cap from the inset's own law; ID9 (d) reads the florets against the head's floor on every node with INFLO_OVERTOP_XFAIL empty",
+    find: '  const gradientClamped = !corymbAsked && gradientAsked > gradientMax;',
+    into: '  const gradientClamped = false;', names: ['ID7', 'ID9'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { pedicelGradient: 3, floretNodes: 12, pedicelLength: 60 });
+      const t = bothBuilt(m, c); if (t) return t;
+      if (!c.gradientClamped) return `the clean tree does not clamp gradient 3 on the probe state (max ${c.gradientMax}) — the cap does not bind here`;
+      const bar = m.headFloorZ - m.insetGapMm;
+      const over = m.floretsMaxZByNode ? Math.max(...m.floretsMaxZByNode.slice(1)) - bar : NaN;
+      return (!m.gradientClamped && m.gradient === 3 && over > 1) ? null
+        : `the mutant ${m.gradientClamped ? 'still clamps' : 'does not clamp'} and its lowest florets stand ${over.toFixed(3)} mm over the bar — the ramp did not reach the head`;
+    } },
+  { id: 'the-node-term-is-never-formed',
+    why: "`nodeVarianceTerm` returns null whatever the control reads, so `nodeVariance` is a dead slider: every floret is the head's own form, one build serves every node, and the raceme exports watertight and one piece at the pre-variation count. NV0's two statements still agree (the predicate is untouched) — NV1 reads each unit's bases against the term restated from the controls, and NV4 the one build",
+    find: '  if (nodeVarianceIsAbsent(state)) return null;\n  const amount = Number(state.nodeVariance);\n  const term = {};',
+    into: '  return null;\n  const amount = Number(state.nodeVariance);\n  const term = {};', names: ['NV1', 'NV4'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { nodeVariance: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      /* the mutant's one unit is the HEAD's own cup (the control's value, no
+         term), where the clean tree's units carry the term; the first cut
+         compared the mutant's cup against the clean FIRST unit's, which
+         carries the term by construction, and read "the term still forms" */
+      const headCup = Number(INFLO_STATE({ nodeVariance: 1 }).petalCup);
+      return (m.unitCount === 1 && c.unitCount >= 2 && m.units.every((u) => u.overrides === null && u.cup === headCup) && c.units.some((u) => u.cup !== headCup)) ? null
+        : `the mutant built ${m.unitCount} unit(s) and the clean tree ${c.unitCount}; the clean units' cups read ${c.units.map((u) => u.cup).join('/')} against the mutant's ${m.units.map((u) => u.cup).join('/')} — the term still forms`;
+    } },
+  { id: 'the-node-term-outranks-the-pins',
+    why: "the per-node overrides are spread AFTER the pedicel pins, so a term that happened to carry a pinned id would win over the pin — today none does, so this is caught by NV3's reading of the pins on every unit under a planted term that DOES: the witness plants `stemNodeProminence` into the overrides and sees the pedicel node",
+    /* THE FIRST CUT PLANTED THE PIN INTO THE OVERRIDES AND LEFT THEM SPREAD
+       BEFORE `PEDICEL_PINS`, so the pins still won and the witness reported
+       "the behaviour did not move" — the mutation has to move the SPREAD
+       past the pins, which is the defect it names. */
+    find: '    /* PER-NODE VARIATION (Phase B) — applied FIRST so the pins below win */\n    ...(nodeOverrides || {}),\n    /* A FLORET DOES NOT INHERIT THE TUBE (Eva\'s ruling): every whorl FREE */\n    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,',
+    into: '    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,\n    ...(nodeOverrides ? { ...nodeOverrides, stemNodeProminence: 1 } : {}),', names: ['NV3'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { nodeVariance: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.units.some((u) => u.pins.stemNodeProminence !== 0) && c.units.every((u) => u.pins.stemNodeProminence === 0)) ? null
+        : `the mutant's units carry stemNodeProminence ${m.units.map((u) => u.pins.stemNodeProminence).join('/')} and the clean tree's ${c.units.map((u) => u.pins.stemNodeProminence).join('/')} — the pin still wins`;
+    } },
+  { id: 'the-floret-phase-is-the-heads',
+    why: "`floretPhaseDeg` returns null for every floret, so each one keeps the HEAD's `variancePhase` — the world-fixed frame the Oct 3 ruling forbids: every floret's field crest sits on the same world side whatever node it hangs from. Watertight, one piece, the same counts. NV2 re-derives the outward phase from each placement's own matrix",
+    find: '  if (varianceIsAbsent(state) && varianceFormIsAbsent(state)) return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;',
+    into: '  return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;', names: ['NV2'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { varianceForm: 0.5 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.units.every((u) => u.phase === 0) && c.units.some((u) => u.phase !== 0)) ? null
+        : `the mutant's unit phases read ${m.units.map((u) => u.phase).join('/')} and the clean tree's ${c.units.map((u) => u.phase).join('/')} — the florets did not fall back to the head's phase`;
+    } },
+  { id: 'the-outward-phase-ignores-the-pedicels-sign',
+    why: "a DESCENDING pedicel hangs its floret inverted, so the outward direction sits at the floret's azimuth plus a half turn; the derivation drops that term and puts the crest on the INWARD side of every hanging floret — the right rule for a rising pedicel, wrong by exactly 180 degrees on a falling one. NV2 reads the direction off the placement matrix, which knows which way the floret hangs",
+    find: '  let psi = ((az + (a < 0 ? Math.PI : 0)) * 180) / Math.PI;',
+    into: '  let psi = (az * 180) / Math.PI;', names: ['NV2'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { varianceForm: 0.5, pedicelAngle: -60 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const d = Math.abs(((m.units[0].phase - c.units[0].phase) % 360 + 360) % 360);
+      return (Math.abs(d - 180) < 1e-6) ? null : `the mutant's phase and the clean tree's differ by ${d} degrees on a descending pedicel — not the half turn the sign term carries`;
+    } },
+  { id: 'the-memo-keys-on-the-length-alone',
+    why: "the floret memo keys on the pedicel length and nothing else, so under a node term the FIRST azimuth's unit is served to every node — each node's placement appends a floret built for another node's azimuth: the slider changes one floret and the others copy it. Watertight, one piece, the same counts. NV4 holds every placement to the unit its own azimuth asks for",
+    find: "      return `${exportMode ? 'E' : 'L'}|${L}|${o ? JSON.stringify(o) : ''}`;",
+    /* NV4 ALONE, AND THE CLAIM ON NV1 CAME OFF THE LIST BY MEASUREMENT: the
+       one unit the broken memo serves is built for its OWN azimuth and
+       carries the term that azimuth asks for, so NV1 — which reads each
+       UNIT against the term restated from the azimuth it was built for —
+       is correctly silent; what is wrong is which unit each PLACEMENT got,
+       and that is NV4's. A mutation that stays green on a clause is
+       sometimes the claim being wrong rather than the clause. */
+    into: "      return `${exportMode ? 'E' : 'L'}|${L}`;", names: ['NV4'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { nodeVariance: 1 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.unitCount === 1 && c.unitCount === 2) ? null : `the mutant built ${m.unitCount} unit(s) and the clean tree ${c.unitCount} — the key still carries the term`;
+    } },
   { id: 'the-placement-carries-a-scale',
     why: "ruling 3's own prohibition, made false: the rigid transform gains a 0.9 scale, so the floret's SIZE comes from the matrix rather than from parameters — which silently carries a sheet that was floored at export through a shrink, i.e. a printable wall that is no longer printable, at an identical triangle count and a watertight, one-piece export",
     find: '  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;',
@@ -1344,8 +1521,10 @@ const MUTANTS = [
       : (f.tris === 0 && f.plan.present ? null : `the stem still emitted ${f.tris} triangles`); } },
 
   { id: 'stem-off-the-axis', why: 'every stem ring is offset from the axis by a millimetre — watertight, one piece, the same triangle count',
-    find: '    const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];',
-    into: '    const th = (k * TAU) / N; return [rad * Math.cos(th) + 1, rad * Math.sin(th), z];', names: ['ST2'],
+    /* RE-ANCHORED (stem session 3): the ring is one `thetas.map` now, the
+       one producer of a ring's vertices cut or uncut. */
+    find: '  const ringAt = (rad, z) => thetas.map((th) => [rad * Math.cos(th), rad * Math.sin(th), z]);',
+    into: '  const ringAt = (rad, z) => thetas.map((th) => [rad * Math.cos(th) + 1, rad * Math.sin(th), z]);', names: ['ST2'],
     witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.maxR - c.maxR) > 0.5) ? null : `the emitted stem's furthest vertex is ${m.maxR} against the clean tree's ${c.maxR} — it did not move off the axis`; } },
@@ -1376,33 +1555,42 @@ const MUTANTS = [
   /* ===== THE BORE'S TIP PLUG (the tip-plug session) ===== */
 
   { id: 'the-tip-plug-is-never-built', why: 'the bore runs all the way to the tip again, so a hollow stem ends as a CUT PIPE — watertight, one connected piece, the same shell count, and the only thing wrong with it is the picture Eva asked for',
-    find: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;',
+    /* RE-ANCHORED (stem session 3): the plug is the cut's derived length
+       under a florist's cut and Eva's wall otherwise; this removes BOTH. */
+    find: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;',
     /* NAMES ST10 AND NOT ST1, WHICH IS A CORRECTION THE TABLE MADE RATHER THAN
        A JUDGEMENT: ST1 predicts the triangle count FROM THE PLAN, and this
        mutation moves the plan — it declares an open bottom and the builder
        emits one, so the two agree and ST1 is correctly blind. Measured SILENT
        before the claim came off. The clause is right; the claim was wrong. */
     into: '  const tipPlugMm = 0;', names: ['ST10'],
-    witness: (M, C) => { const m = plugFacts(M), c = plugFacts(C);
+    witness: (M, C) => { const st = { ...STEM_STATE(), stemCut: 'FLAT' }; const m = plugFacts(M, st), c = plugFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      /* THE BOTTOM FACE'S OWN AREA. On the clean tree it is a full disc; with
-         the plug gone it is the tube's section, a quarter smaller at this
-         diameter. A triangle COUNT would also move here, but the area is what
-         says WHICH way — a count cannot tell a closed bottom from an open one
-         with a different ladder. */
+      /* THE BOTTOM FACE'S OWN AREA, on the FLAT end (stem session 3: under a
+         cut the triangles at the tip's one height are the LAND alone, and the
+         cut face's own witness is `endFaceFacts` below). On the clean tree it
+         is a full disc; with the plug gone it is the tube's section, a
+         quarter smaller at this diameter. A triangle COUNT would also move
+         here, but the area is what says WHICH way — a count cannot tell a
+         closed bottom from an open one with a different ladder. */
       return (m.bottomArea < c.bottomArea * 0.95) ? null
         : `the emitted bottom face measures ${m.bottomArea} mm^2 against the clean tree's ${c.bottomArea} — it did not re-open`; } },
 
   { id: 'the-tip-plug-is-typed', why: "the plug is a typed 3 mm instead of the wall Eva's own bore rule already spends — the SAME triangle count, the same shells, the same faces, and a closure that is no longer derived from anything",
-    find: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;',
-    into: '  const tipPlugMm = boreR > 0 ? 3 : 0;', names: ['ST10'],
+    /* RE-ANCHORED (stem session 3). The typed 3 mm is probed on a FLAT
+       stem below, where the clean plug is Eva's 1.5 and the cut arm is not
+       taken; under the default cut the plug is 6.62 on the shipped stem and
+       a typed 3 would be the bore opening through the face, which is
+       `the-bore-opens-through-the-cut-face`'s own witness. */
+    find: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;',
+    into: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : 3) : 0;', names: ['ST10'],
     /* THE ONE THAT ISOLATES ST10'S EXTENT CLAUSE. The bottom stays closed and
        the void keeps its own two-ring ladder, so the count is unmoved and ST1
        is blind by construction; the census, the flood fill, the orientation
        gate and the byte tool's own bottom-face clause are all blind for the
        same reason. What moved is WHERE the bore stops, and one clause reads
        that. */
-    witness: (M, C) => { const m = plugFacts(M), c = plugFacts(C);
+    witness: (M, C) => { const st = { ...STEM_STATE(), stemCut: 'FLAT' }; const m = plugFacts(M, st), c = plugFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (m.tris !== c.tris) return `the triangle count moved ${c.tris} -> ${m.tris}; this mutant's whole point is that it does not`;
       return (m.plugMm !== null && c.plugMm !== null && Math.abs(m.plugMm - c.plugMm) > 1) ? null
@@ -1687,9 +1875,14 @@ const MUTANTS = [
   { id: 'the-node-field-never-reaches-the-stem', why: "the plan drops the node law whatever the control says, so the stem stays a straight cylinder under a prominence the panel reports — watertight, one piece, the pre-node triangle count; the defect Eva's 'one control' would ship as a dead slider",
     find: '  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);',
     into: '  const nodeLaw = null;', names: ['ST12', 'ST2'],
-    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
-      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.stations === 2 && c.stations > 2) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations}`; } },
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C), s0 = nodeFacts(C, { ...NODE_STATE(), stemNodeProminence: 0 });
+      if (m.threw || c.threw || s0.threw) return `the witness threw: ${m.threw || c.threw || s0.threw}`;
+      /* The straight stem's station count is READ off the clean tree at prominence 0 (the
+         identity row), never typed: this witness carried `=== 2` until the florist's cut
+         appended the long point as a third station and the sweep went red naming a mutant
+         whose edit had applied — a row count standing in for a shape (the stale-harness-row
+         class, in a witness). */
+      return (m.stations === s0.stations && c.stations > s0.stations) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations} (a straight stem on the clean tree carries ${s0.stations})`; } },
   { id: 'prominence-zero-is-not-the-identity', why: 'the guard drops its prominence term, so a leafed stem at prominence 0 builds a node law — a zero swelling and a zero kink on the noded arm — which is the identity only by an argument about arithmetic, never by branch',
     find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state)',
     into: '  return stemIsAbsent(state)', names: ['ST12'],
@@ -1710,8 +1903,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return Math.abs(m.spread - c.spread) > 0.5 ? null : `the mutant's spindle is ${m.spread} mm against ${c.spread}`; } },
   { id: 'the-noded-rings-stay-on-the-world-axis', why: 'the builder draws every noded ring about the world axis while the plan declares the kink — the swelling ships and the kink does not, on a watertight stem at the predicted count',
-    find: '      const c = stemNodeAxisMm(law, sDepth);\n      return Array.from({ length: N }, (_, k) => {',
-    into: '      const c = [0, 0];\n      return Array.from({ length: N }, (_, k) => {', names: ['ST2', 'ST12'],
+    find: '      const c = stemNodeAxisMm(law, sDepth);\n      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);',
+    into: '      const c = [0, 0];\n      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);', names: ['ST2', 'ST12'],
     witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.maxCentreOff < 1e-9 && c.maxCentreOff > 1) ? null : `the mutant's rings stand up to ${m.maxCentreOff} mm off the world axis against ${c.maxCentreOff} clean`; } },
@@ -1747,6 +1940,28 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return Math.abs(m.lastPetioleX - c.lastPetioleX) > 0.5 || Math.abs(m.lastPetioleY - c.lastPetioleY) > 0.5 ? null
         : `the mutant's lowest petiole roots at (${m.lastPetioleX}, ${m.lastPetioleY}) against (${c.lastPetioleX}, ${c.lastPetioleY}) clean`; } },
+  /* ===== RULING 7 — THE FLORIST'S CUT (stem session 3) ===== Three standing
+     mutants, each witnessed on the MUTATED module's own cut face
+     (`endFaceFacts`), never on the clause it names. */
+  { id: 'the-cut-is-flattened', why: "the cut plane's slope is 0, so the stem ends on a flat face at its full length while the plan still says FLORIST — one piece at the same triangle count, with the cut band collapsed to zero height (every cut vertex at the long point's own z, so the band's quads are zero-area and the directed census reads them), which is why ST2 and ST12 fire on its ladder beside the three families named",
+    find: 'export const STEM_CUT_SLOPE = 1;',
+    into: 'export const STEM_CUT_SLOPE = 0;', names: ['SC2', 'SC3', 'ST10'],
+    witness: (M, C) => { const m = endFaceFacts(M), c = endFaceFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.faceRiseMm > 1 && m.faceRiseMm < 1e-9) ? null : `the mutant's cut face rises ${m.faceRiseMm} mm above the long point against the clean tree's ${c.faceRiseMm} — it did not flatten`; } },
+  { id: 'the-land-is-removed', why: 'the land floor is 0, so the cut runs to a KNIFE EDGE at the long point — the last millimetre of the point under the print floor, which a 0.4 mm nozzle cannot lay; watertight, one piece, the face at N - 2 triangles',
+    find: 'export const STEM_CUT_LAND_MIN_MM = Math.max(MIN_FEATURE_MM, 2 * NOZZLE_MM);',
+    into: 'export const STEM_CUT_LAND_MIN_MM = 0;', names: ['SC2', 'SC3'],
+    witness: (M, C) => { const m = endFaceFacts(M), c = endFaceFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.landCount >= 3 && m.landCount === 1) ? null : `the mutant's land holds ${m.landCount} vertex/vertices against the clean tree's ${c.landCount} — the land did not go`; } },
+  { id: 'the-bore-opens-through-the-cut-face', why: "the plug under a cut hollow stem is Eva's flat 1.5 mm again, so the void's floor sits BELOW the cut plane on the short-point side and the bore opens through the face — the shell self-intersects, but it is still watertight by the edge census, one piece, and at the same triangle count",
+    find: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;',
+    into: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;', names: ['ST10'],
+    witness: (M, C) => { const m = endFaceFacts(M), c = endFaceFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (m.tris !== c.tris) return `the triangle count moved ${c.tris} -> ${m.tris}; this mutant's whole point is that it does not`;
+      return (c.voidBelowPlaneMm < -1 && m.voidBelowPlaneMm > 1) ? null : `the mutant's void floor stands ${m.voidBelowPlaneMm} mm BELOW the cut plane at the bore's far edge against the clean tree's ${c.voidBelowPlaneMm} — the bore did not open through the face`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -1927,10 +2142,28 @@ const ROWS = [
      term is satisfied and the mutation is a no-op), and the raceme whose
      pedicels the pin holds straight — the only state where
      `the-pedicel-pin-is-dropped` moves anything. */
+  /* THE FLORIST'S CUT (stem session 3): the shipped 60 x 6 stem is cut by
+     default and is already a row above; this is the control OFF, where the
+     flat arms of ST10 and SC0's other half can disagree. */
+  { label: 'the shipped stem with the cut OFF (FLAT — the end as it was)',
+    set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }, { id: 'stemCut', value: 'FLAT' }] },
   { label: 'a BARE stem at the flower\'s 0.48 (100 x 6 mm, no leaves — golden-angle nodes)',
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'stemNodeProminence', value: '0.48' }] },
   { label: 'a raceme whose head asks for prominence 1 (the head is inert; every pedicel must stay straight)',
     set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'stemNodeProminence', value: '1' }] },
+  /* BUILD 3's ROWS: the node term ON under the head's own field (NV1-NV4 and
+     NV2's outward phase on one row), the DESCENDING pedicel (the sign term's
+     only witness), the gradient at the ceiling on twelve 60 mm nodes (the cap
+     binds — asked 3, built 2.24), and the 0.60 mm sheet (the one-mode floor
+     mutant's only witness, where the two modes' units differ). */
+  { label: 'per-node variation 1 under the form field 0.5 (two distinct builds, the phase derived outward)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'nodeVariance', value: '1' }, { id: 'varianceForm', value: '0.5' }] },
+  { label: 'the form field 0.5 on DESCENDING pedicels (-60 deg — the outward point a half turn round)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'varianceForm', value: '0.5' }, { id: 'pedicelAngle', value: '-60' }] },
+  { label: 'gradient 3 x 12 nodes x 60 mm (the cap binds: asked 3.00, built 2.24)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelGradient', value: '3' }, { id: 'floretNodes', value: '12' }, { id: 'pedicelLength', value: '60' }] },
+  { label: 'the raceme on a 0.60 mm sheet (the two modes\' units stand different heights)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
   { label: 'the same leafed stem at prominence 0 (the guard, where the two statements can disagree)',
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
@@ -2040,6 +2273,14 @@ const ROWS = [
   { label: "a raceme on a SPHERE head — the FLORET's own stem channel, the only state ID4's omission clause can speak on",
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' },
           { id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }] },
+  /* THE REACH INSET's two rows (build 3): the sheet whose LIVE and EXPORT
+     reach DIFFER — on the shipping sheet they are the same double, so a reach
+     read from one mode is invisible there — and the 250 mm pedicel, the only
+     length at which the pedicel's own ceiling and the stem's disagree. */
+  { label: 'a raceme on a 0.60 mm sheet (the two modes reach differently — the reach union\'s only witness)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
+  { label: 'a raceme on 250 mm pedicels (past the head\'s own stem range — the ceiling is the pedicel\'s)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelLength', value: '250' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
      against the registry's predicate, and the two agree on every state where
@@ -2094,9 +2335,14 @@ async function famsOn(rows) {
       const mm = /^(L\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE STEM FAMILY (session 43) — same rule again: a family added is a
-       family this table must be able to fire. */
+       family this table must be able to fire. AND THE CUT FAMILY (stem session
+       3) RIDES IN THE SAME CALL under its own prefix: `stemAssertions` pushes
+       `SC0`-`SC3` beside `ST*`, and a capture of `ST\d+` alone reported both cut
+       mutants `SILENT: SC2, SC3` on the first run while the same plants fired
+       both clauses through the harness directly — the ST10-as-ST1 lesson a
+       third time, this time a family the capture could not see at all. */
     for (const msg of await stemAssertions(page, row)) {
-      const mm = /^(ST\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(S[TC]\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {
@@ -2110,8 +2356,15 @@ async function famsOn(rows) {
        it is the first family here whose subject is a SECOND HEAD: every clause
        below is silent on a bloom that is one head at the origin, which is every
        other row this table drives. */
+    /* AND THE PER-NODE FAMILY (build 3, Phase B) RIDES IN THE SAME CALL: the
+       first run of its eight mutants reported three SILENT on NV1/NV2/NV4
+       while the page's clauses were firing — because this capture read
+       `ID\d+` alone and dropped every `NV` message on the floor. ST10's
+       misattribution class, in the other direction: a family whose messages
+       reach the table through a call the table captures under another
+       family's prefix is silent by construction. */
     for (const msg of await inflorescenceAssertions(page, row)) {
-      const mm = /^(ID\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(ID\d+|NV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE SIZE FIELD (organic variance, build 1) — the rule once more, and the
        first family whose subject is a per-SLOT quantity: every clause is
