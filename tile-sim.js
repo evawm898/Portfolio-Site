@@ -2,15 +2,19 @@
    principles, and reports what they cut (tile-design-doc.md §4, §9).
 
    It is the gate's registration and seam instrument. It shares NO placement
-   code with tile-roller.js: it takes the roller's SPEC (ring centrelines, pegs,
-   teeth — each a roller angle φ and a height Z) and its MESH, and
+   code with tile-roller.js: it takes the roller's SPEC (ring centrelines and
+   pins, each a roller angle φ and a height Z), the roller MESHES and the
+   HANDLE meshes, and
 
      * reads the ROLLING RADIUS off the mesh (its outermost vertices: the ring
        blades' tips, which nothing else may stand proud of);
-     * poses the roller as a rigid body — its axis horizontal along â (the
-       user's handling: +Z toward +â), its start angle the feature that touches
-       first — and derives the spin from the NO-SLIP condition
-       v_centre + ω × (contact − centre) = 0, never from a sign convention;
+     * reads each roller's START POSE off the meshes: the detent notch cut in
+       its end faces, and on the handle the nub (which sits in the notch) and
+       the sight arm's pointer — so the roller angle that is at the bottom when
+       the pointer hangs straight down is notch + (pointer − nub);
+     * poses the roller as a rigid body — its axis horizontal, the spin derived
+       from the NO-SLIP condition v_centre + ω × (contact − centre) = 0, never
+       from a sign convention;
      * stamps each feature where it is at the bottom: a point at roller angle φ
        and height Z lands at O + d(φ)·r̂ + Z·â, d(φ) the travel that turns it to
        the bottom. A RING is a closed loop on the cylinder: unwrapped along its
@@ -18,11 +22,13 @@
        is not a ring), and its revolutions laid end to end are ONE line — the
        seam is where one revolution's last point meets the next one's first.
 
-   Roller A starts with its peg row's first peg down at the sheet origin (the
-   first dimple, D0 — corner (m*, 0)). Roller B is POSED BY ENGAGEMENT: one
-   collar tooth seated in D0. Everything the gate asserts — teeth in dimples,
-   lines through corners, the pattern continuous over the seam — is read off
-   these stamps against the TILE's own lattice and edges. */
+   Roller A starts on its detent at the dough's edge (its contact line through
+   the sheet origin) and rolls forward; its pins punch pinholes. Roller B is
+   POSED BY TWO POINTS: on its detent, its two pointers — one past each end, on
+   its contact line — over the first pinhole from the edge and the one exactly
+   the pointers' span from it. Everything the gate asserts — the pinholes, the
+   lines through the corners, the pattern continuous over the seam — is read
+   off these stamps against the TILE's own lattice and edges. */
 
 import { latticeVectors, edgeDense } from './tile-geometry.js';
 
@@ -55,6 +61,71 @@ export function radii(mesh) {
   }
   return { rolling: all, blade };
 }
+
+/* The detent notch on a roller's end faces, read off the body's mesh: the end
+   face vertices (within 1.5 mm of an end) whose Z is not constant round their
+   ring are the notch; the deepest of them lie on its centreline. Returns, per
+   face, the notch's angle (circular mean of the deepest vertices) and depth —
+   or null where a face has none. */
+export function readNotch(mesh) {
+  const body = mesh.parts.find((q) => q.name === 'body'), P = mesh.positions;
+  let zlo = Infinity, zhi = -Infinity;
+  for (let v = body.v0; v < body.v1; v++) { zlo = Math.min(zlo, P[3 * v + 2]); zhi = Math.max(zhi, P[3 * v + 2]); }
+  const face = (end) => {
+    const rings = new Map();
+    for (let v = body.v0; v < body.v1; v++) {
+      const z = P[3 * v + 2], depth = end === 'bottom' ? z - zlo : zhi - z;
+      if (depth > 1.5) continue;
+      const r = Math.hypot(P[3 * v], P[3 * v + 1]);
+      const k = r.toFixed(6);
+      if (!rings.has(k)) rings.set(k, []);
+      rings.get(k).push([v, depth]);
+    }
+    let best = -1, deep = [];
+    for (const vs of rings.values()) {
+      const ds = vs.map((x) => x[1]), lo = Math.min(...ds), hi = Math.max(...ds);
+      if (hi - lo < 1e-6) continue;                          // a ring at one height: not the notch
+      for (const [v, d] of vs) { const rel = d - lo; if (rel > best + 1e-9) { best = rel; deep = [v]; } else if (Math.abs(rel - best) <= 1e-9) deep.push(v); }
+    }
+    if (!deep.length) return null;
+    let cx = 0, cy = 0; for (const v of deep) { const a = Math.atan2(P[3 * v + 1], P[3 * v]); cx += Math.cos(a); cy += Math.sin(a); }
+    return { phi: Math.atan2(cy, cx), depth: best, count: deep.length };
+  };
+  return { bottom: face('bottom'), top: face('top'), zlo, zhi };
+}
+/* The handle's geometry off its mesh: the bearing face (the highest point of
+   the revolved part outside the pin), the nub's tip (the highest vertex of
+   part `nub`), the pointer's tip (the vertex of part `pointer` farthest from
+   the axis). */
+export function readHandle(hmesh) {
+  const P = hmesh.positions, part = (n) => hmesh.parts.find((q) => q.name === n);
+  const hp = part('handle'), nub = part('nub'), ptr = part('pointer');
+  if (!hp || !nub || !ptr) return null;
+  /* the pin's radius: the widest point of the part's top millimetre; the bearing
+     face: the highest point of the part wider than the pin */
+  let zTop = -Infinity; for (let v = hp.v0; v < hp.v1; v++) zTop = Math.max(zTop, P[3 * v + 2]);
+  let rpin = 0; for (let v = hp.v0; v < hp.v1; v++) if (P[3 * v + 2] >= zTop - 1) rpin = Math.max(rpin, Math.hypot(P[3 * v], P[3 * v + 1]));
+  let zSh = -Infinity; for (let v = hp.v0; v < hp.v1; v++) if (Math.hypot(P[3 * v], P[3 * v + 1]) > rpin + 1e-3) zSh = Math.max(zSh, P[3 * v + 2]);
+  /* a tip is a small flat disk: the mean of its rim and centre is its centre */
+  const meanOf = (part, key, tol) => {
+    let best = -Infinity; for (let v = part.v0; v < part.v1; v++) best = Math.max(best, key(v));
+    const s = [0, 0, 0]; let n = 0;
+    for (let v = part.v0; v < part.v1; v++) if (key(v) >= best - tol) { s[0] += P[3 * v]; s[1] += P[3 * v + 1]; s[2] += P[3 * v + 2]; n++; }
+    return s.map((x) => x / n);
+  };
+  const nubTip = meanOf(nub, (v) => P[3 * v + 2], 1e-9);
+  const ptrTip = meanOf(ptr, (v) => Math.hypot(P[3 * v], P[3 * v + 1]), 0.25);
+  return {
+    zSh, rpin, nubTip, ptrTip,
+    nubPhi: Math.atan2(nubTip[1], nubTip[0]), nubR: Math.hypot(nubTip[0], nubTip[1]), nubAbove: nubTip[2] - zSh,
+    ptrPhi: Math.atan2(ptrTip[1], ptrTip[0]), ptrR: Math.hypot(ptrTip[0], ptrTip[1]),
+    g: zSh - ptrTip[2],                                       // the pointer's distance past the roller's end face
+  };
+}
+/* The roller angle at the bottom when the handle's nub sits in the notch and
+   the pointer hangs straight down: the handle turns with the roller through
+   the detent, so the pointer is at roller angle notch + (pointer − nub). */
+export function startAngle(notchPhi, h) { return notchPhi + (h.ptrPhi - h.nubPhi); }
 
 /* A rigid-body pose. The roller frame (X, Y, Z) maps to the world as columns
    Xw, Yw, Zw = â; the start angle φs is placed at the bottom (−ẑ). The spin
@@ -118,73 +189,98 @@ export function stampPoints(P, feats, d0, d1) {
   return out;
 }
 
-/* Roll A, then B engaged in A's track (doc §4.4, §4.6). Each roller is rolled
-   over `revs` revolutions EITHER WAY of its start — and always across the
-   whole cookie sheet with a revolution to spare: once a tooth is seated B may
-   be rolled back to the sheet's edge and forward, and at an obtuse crossing
-   angle A's slanted peg row comes down partly before its first peg does.
-   Every stamped line is labelled with its lattice row (A) or column (B), read
-   off where its corners landed; every dimple and tooth likewise. */
+/* Roll A from the dough's edge, then place B by two points on A's pinholes
+   and roll it (doc §4). Every ring is stamped over `revs` revolutions EITHER
+   WAY of its start (and always across the whole sheet with a revolution to
+   spare), because a ring cuts wherever its roller runs; A's pins are stamped
+   only where A really runs — forward from the edge, across everything
+   (spec.A.rollEnd travel, which the gate checks covers the sheet). Every
+   stamped line is labelled with its lattice row (A) or column (B), read off
+   where its corners landed.
+   opts.perturb = [δ1, δ2]: B's two pointers placed δ off their pinholes (the
+   least-squares rigid placement: the pointers' midpoint on the holes'
+   midpoint, the axis along them). */
 export function simulate(tile, built, opts = {}) {
-  const { A, B } = built;
+  const { A, B, HA, HB } = built;
   const specA = A.spec, specB = B.spec;
-  const { KA, KB, mStar } = built.spec;
+  const { KA, KB } = built.spec;
   const rA = radii(A.mesh), rB = radii(B.mesh);
   const hA = handling(tile, 'A'), hB = handling(tile, 'B');
   const revs = opts.revs || 1;
   const { tA, tB } = latticeVectors(tile);
-  /* The travel window: at least `revs` revolutions either way, and always every
-     corner of the sheet and its track (m* .. KA, rows 0 .. KB), by its distance
-     along the roll from D0, with a revolution to spare at each end. */
-  const windowFor = (P, hand) => {
-    let lo = 0, hi = 0;
-    for (let m = mStar; m <= KA; m++) for (let k = 0; k <= KB; k++) {
-      const x = (m - mStar) * tA[0] + k * tB[0], y = (m - mStar) * tA[1] + k * tB[1];
-      const s = x * hand.roll[0] + y * hand.roll[1];
-      lo = Math.min(lo, s); hi = Math.max(hi, s);
-    }
-    return [Math.min(-(revs + 1) * P.period, lo - P.period), Math.max((revs + 1) * P.period, hi + P.period)];
-  };
-  // A: its first peg (on ring 0, at corner (m*, 0)) touches the sheet origin
-  const peg0 = specA.pegs.find((p) => p.i === 0);
-  const PA = pose(hA, rA.rolling, peg0.phi, [-peg0.Z * hA.axis[0], -peg0.Z * hA.axis[1]]);
-  const wA = windowFor(PA, hA);
-  const dimplesRaw = stampPoints(PA, specA.pegs, wA[0], wA[1]);
-  const first = dimplesRaw.find((d) => d.i === 0 && Math.abs(d.d) < 1e-9);
-  const D0 = first.at;
-  const frame = { D0, mStar };
+  const pre = opts.pre || {};
+  const nA = pre.nA || readNotch(A.mesh), nB = pre.nB || readNotch(B.mesh), gA = pre.gA || readHandle(HA.mesh), gB = pre.gB || readHandle(HB.mesh);
+  if (!nA.bottom || !nB.bottom || !gA || !gB) return { error: 'no detent notch or handle to pose from' };
+  const phiA = startAngle(nA.bottom.phi, gA), phiB = startAngle(nB.bottom.phi, gB);
+  // A: its start contact line through the sheet origin
+  const PA = pose(hA, rA.rolling, phiA, [0, 0]);
+  const wide = (P, lo, hi) => [Math.min(-(revs + 1) * P.period, lo - P.period), Math.max((revs + 1) * P.period, hi + P.period)];
+    /* the lattice: ring 0's first corner on or past the edge is column a0 (the
+     design's start column), row 0 — A defines the frame */
+  const ring0 = stampRing(PA, specA.rings[0], 0, PA.period, specA.corners);
+  const firstCorner = ring0.corners.map((c) => ring0.pts[c]).map((p) => [p, p[0] * hA.roll[0] + p[1] * hA.roll[1]]).filter(([, d]) => d > -1e-9).sort((x, y) => x[1] - y[1])[0][0];
+  const a0 = built.spec.a0;
+  const D0 = [firstCorner[0] - a0 * tA[0], firstCorner[1] - a0 * tA[1]];
+  const frame = { D0 };
   const lab = (p) => latticeOf(tile, frame, p);
-  /* a stamped line's label: the row (A) or column (B) its corners lie on, and
-     the worst distance of any corner from a lattice point (in lattice units) */
+  const along = (p, hand) => p[0] * hand.roll[0] + p[1] * hand.roll[1];
+  // everything the user rolls over: the sheet's corners, by distance along A's roll from the edge
+  const sheetCorners = []; for (let m = 0; m <= KA; m++) for (let k = 0; k <= KB; k++) sheetCorners.push(cornerOf(tile, frame, m, k));
+  const sA = sheetCorners.map((p) => along(p, hA));
+  const wA = wide(PA, Math.min(...sA), Math.max(...sA));
+  const rollEnd = built.layout.A.rollEnd;
+  const pinholes = labelPts(lab, stampPoints(PA, specA.pins || [], 0, rollEnd));
   const labelLine = (L, fam) => {
     let off = 0; const us = [], vs = [];
     for (const c of L.corners) { const [u, v] = lab(L.pts[c]); us.push(u); vs.push(v); off = Math.max(off, Math.hypot(u - Math.round(u), v - Math.round(v))); }
-    const along = fam === 'A' ? vs : us;
-    const id = Math.round(along[0]);
-    const mixed = along.some((x) => Math.round(x) !== id);
+    const al = fam === 'A' ? vs : us;
+    const id = Math.round(al[0]);
+    const mixed = al.some((x) => Math.round(x) !== id);
     return { ...L, k: fam === 'A' ? id : null, m: fam === 'B' ? id : null, off, mixed, span: fam === 'A' ? [Math.min(...us), Math.max(...us)] : [Math.min(...vs), Math.max(...vs)] };
   };
-  const labelPts = (pts) => pts.map((q) => { const [u, v] = lab(q.at); return { ...q, lm: Math.round(u), lk: Math.round(v) }; });
-  const aLines = specA.rings.map((ring, j) => ({ ...labelLine(stampRing(PA, ring, wA[0], wA[1], specA.corners), 'A'), ring: j }));
-  const dimples = labelPts(dimplesRaw);
-  /* B: posed by ENGAGEMENT — one collar tooth seated in one dimple of the
-     track, where A actually stamped it (by default tooth 0 in D0) */
-  const seat = opts.seat || { tooth: 0, row: 0 };
-  const toothS = specB.teeth.find((t) => t.i === seat.tooth);
-  const dimS = dimples.find((d) => d.lm === mStar && d.lk === seat.row);
-  const PB = pose(hB, rB.rolling, toothS.phi, [dimS.at[0] - toothS.Z * hB.axis[0], dimS.at[1] - toothS.Z * hB.axis[1]]);
-  const wB = windowFor(PB, hB);
+  const aLines = opts.cornersOnly ? [] : specA.rings.map((ring, j) => ({ ...labelLine(stampRing(PA, ring, wA[0], wA[1], specA.corners), 'A'), ring: j }));
+  /* B: two-point placement. Its pointers stand g past each end face on its
+     contact line: at roller Z = −g and Z = L + g (L the body's length, g off
+     the handle mesh). The span between them, off the meshes: */
+  const zLo = nB.zlo - gB.g, zHi = nB.zhi + gB.g, span = zHi - zLo;
+  /* the first pinhole from the edge, and the pinhole exactly the span from it
+     whose roll direction (the pair's axis turned right) is along edge B */
+  const byEdge = pinholes.slice().sort((p, q) => along(p.at, hA) - along(q.at, hA));
+  let pair = null;
+  for (const Q of byEdge) {
+    for (const P of byEdge) {
+      if (P === Q) continue;
+      const ax = [Q.at[0] - P.at[0], Q.at[1] - P.at[1]], dl = Math.hypot(ax[0], ax[1]);
+      if (Math.abs(dl - span) > 0.05) continue;
+      const roll = [ax[1] / dl, -ax[0] / dl];
+      if (roll[0] * hB.roll[0] + roll[1] * hB.roll[1] < Math.cos(Math.PI / 6)) continue;
+      pair = { P, Q, residual: dl - span }; break;
+    }
+    if (pair) break;
+  }
+  const base = { D0, KA, KB, PA, rA, rB, aLines, pinholes, a0, phiA, phiB, notch: { A: nA, B: nB }, handle: { A: gA, B: gB }, span, zLo, zHi, rollEnd, frame };
+  if (!pair) return { ...base, error: `no pair of pinholes ${span.toFixed(3)} mm apart along edge B for B's pointers`, bLines: [] };
+  const dP = (opts.perturb && opts.perturb[0]) || [0, 0], dQ = (opts.perturb && opts.perturb[1]) || [0, 0];
+  const Pp = [pair.P.at[0] + dP[0], pair.P.at[1] + dP[1]], Qp = [pair.Q.at[0] + dQ[0], pair.Q.at[1] + dQ[1]];
+  const ax = unit2([Qp[0] - Pp[0], Qp[1] - Pp[1]]);
+  const handB = { axis: ax, roll: [ax[1], -ax[0]] };
+  const M = [(Pp[0] + Qp[0]) / 2, (Pp[1] + Qp[1]) / 2], zm = (zLo + zHi) / 2;
+  const PB = pose(handB, rB.rolling, phiB, [M[0] - zm * ax[0], M[1] - zm * ax[1]]);
+  const sB = sheetCorners.map((p) => along(p, handB));
+  const wB = wide(PB, Math.min(...sB) - along(M, handB), Math.max(...sB) - along(M, handB));
+  if (opts.cornersOnly) {
+    const pts = []; for (const ring of specB.rings) for (const c of specB.corners) pts.push({ phi: ring[c][0], Z: ring[c][1], rho: rB.rolling });
+    return { ...base, pair, PB, bCorners: stampPoints(PB, pts, wB[0], wB[1]).map((q) => q.at) };
+  }
   const bLines = specB.rings.map((ring, j) => ({ ...labelLine(stampRing(PB, ring, wB[0], wB[1], specB.corners), 'B'), ring: j }));
-  const teeth = labelPts(stampPoints(PB, specB.teeth, wB[0], wB[1]));
-  return { D0, mStar, KA, KB, PA, PB, rA, rB, aLines, bLines, dimples, teeth, seat };
+  return { ...base, pair, PB, bLines };
 }
+function labelPts(lab, pts) { return pts.map((q) => { const [u, v] = lab(q.at); return { ...q, u, v }; }); }
 /* the lines that bound the cookie sheet: A rows 0..KB, B columns 0..KA */
 export const blockLines = (sim) => ({
   a: sim.aLines.filter((L) => L.k >= 0 && L.k <= sim.KB),
   b: sim.bLines.filter((L) => L.m >= 0 && L.m <= sim.KA),
 });
-/* the track: the dimples of column m* at rows 0..KB */
-export const trackDimples = (sim) => sim.dimples.filter((d) => d.lm === sim.mStar && d.lk >= 0 && d.lk <= sim.KB);
 
 /* ---------------- what the stamps say ---------------- */
 
@@ -198,18 +294,17 @@ export function polyDist(p, poly) {
   for (let k = 0; k + 1 < poly.length; k++) best = Math.min(best, segDist(p, poly[k], poly[k + 1]));
   return best;
 }
-/* the lattice corner (m, k) — D0 is corner (m*, 0) */
+/* the lattice corner (m, k) — D0 is corner (0, 0) */
 export function cornerOf(tile, sim, m, k) {
   const { tA, tB } = latticeVectors(tile);
-  const mm = m - sim.mStar;
-  return [sim.D0[0] + mm * tA[0] + k * tB[0], sim.D0[1] + mm * tA[1] + k * tB[1]];
+  return [sim.D0[0] + m * tA[0] + k * tB[0], sim.D0[1] + m * tA[1] + k * tB[1]];
 }
-/* lattice coordinates of a sheet point (column counted as above) */
+/* lattice coordinates (u, v) of a sheet point */
 export function latticeOf(tile, sim, p) {
   const { tA, tB } = latticeVectors(tile);
   const x = p[0] - sim.D0[0], y = p[1] - sim.D0[1];
   const det = tA[0] * tB[1] - tA[1] * tB[0];
-  return [(x * tB[1] - y * tB[0]) / det + sim.mStar, (tA[0] * y - tA[1] * x) / det];
+  return [(x * tB[1] - y * tB[0]) / det, (tA[0] * y - tA[1] * x) / det];
 }
 /* The ideal line of a family through corner (m, k), copies c0..c1 along it. */
 export function idealLine(tile, sim, which, m, k, c0, c1) {

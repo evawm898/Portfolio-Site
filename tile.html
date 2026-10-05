@@ -60,7 +60,8 @@
         <button class="tl-btn tl-btn--sm is-on" data-show="all">All</button>
         <button class="tl-btn tl-btn--sm" data-show="A">A</button>
         <button class="tl-btn tl-btn--sm" data-show="B">B</button>
-        <button class="tl-btn tl-btn--sm" data-show="H">Handle</button>
+        <button class="tl-btn tl-btn--sm" data-show="H">Handles</button>
+        <button class="tl-btn tl-btn--sm" data-show="use">In use</button>
       </span>
     </div>
     <div class="tl-three"><canvas id="rollCanvas"></canvas><p class="tl-building" id="building" hidden>building…</p></div>
@@ -110,9 +111,12 @@
       <div class="tl-row">
         <button class="tl-btn tl-btn--solid" data-stl="A">Roller A STL</button>
         <button class="tl-btn tl-btn--solid" data-stl="B">Roller B STL</button>
-        <button class="tl-btn tl-btn--solid" data-stl="H">Handle STL</button>
       </div>
-      <div class="tl-row"><button class="tl-btn tl-btn--solid" id="zipAll">All three + notes (.zip)</button></div>
+      <div class="tl-row">
+        <button class="tl-btn tl-btn--solid" data-stl="HA" title="Print two: one for each end of roller A">Handle A STL</button>
+        <button class="tl-btn tl-btn--solid" data-stl="HB" title="Print two: one for each end of roller B">Handle B STL</button>
+      </div>
+      <div class="tl-row"><button class="tl-btn tl-btn--solid" id="zipAll">Rollers, handles + notes (.zip)</button></div>
       <div class="tl-row"><button class="tl-btn" id="svgTile">Tile SVG</button><button class="tl-btn" id="svgPatch">3 × 3 SVG</button></div>
       <p class="tl-msg" id="exportMsg"></p>
       <div class="tl-row" style="margin-top:6px"><button class="tl-btn" id="saveDesign">Save design (.json)</button><label class="tl-btn tl-file">Open design<input type="file" id="openDesign" accept=".json,application/json"></label></div>

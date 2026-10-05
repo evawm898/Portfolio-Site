@@ -45,6 +45,15 @@
          with its sheet kept and says what was reset.
      P21 a design the crossbar version kept in local storage does not come
          back: the page opens on the defaults.
+     P22 the how-to gives the start method as numbered steps in order — click
+         A to its start, roll A; click B to its start, both pointers on the
+         pinholes, press and roll — and quotes the ±1 mm placement figure, the
+         same number tile-roller computes for the design.
+     P23 a FRESH browser profile (nothing in storage, nothing seeded) opens on
+         the 4 × 3 sheet.
+     P24 the handle buttons download handle A and handle B (84 + 50·n bytes,
+         the page's own n), and the In use view draws roller B on the board
+         with its handles on.
 
    --negative-control re-serves deliberately broken copies of tile.js and
    tile-roller.js and requires each to fail the check that names it. Every
@@ -238,7 +247,7 @@ async function run(override = null) {
     {
       const [dz] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.locator('#zipAll').click()]);
       const z = fs.readFileSync(await dz.path()).toString('latin1');
-      const names = ['roller-A.stl', 'roller-B.stl', 'handle.stl', 'README.txt', 'design.json'];
+      const names = ['roller-A.stl', 'roller-B.stl', 'handle-A.stl', 'handle-B.stl', 'README.txt', 'design.json'];
       ok(names.every((n) => z.includes(n)) && z.startsWith('PK'), `P14: the zip holds ${names.filter((n) => z.includes(n)).join(', ')}`);
     }
     // P15 save then open
@@ -298,10 +307,49 @@ async function run(override = null) {
       const r = await T(() => window.__tile.rollers()), t = await T(() => window.__tile.tile());
       ok(r.cols * r.rows >= 12 && t.pitchA === 40, `P21: a design kept by the crossbar page (1 × 3 cookies, pitch 38) does not come back — the page opens on ${r.cols} × ${r.rows}, pitch ${t.pitchA}`);
     }
+    // P22 the how-to: the steps in order, and the ±1 mm figure
+    {
+      await T(() => { localStorage.clear(); }); await page.reload(); await page.waitForFunction(() => !!window.__tile && !!window.__tile.layout());
+      await T(() => window.__tile.flush());
+      const steps = await T(() => window.__tile.howtoSteps()), txt = await T(() => window.__tile.howtoText()), tol = await T(() => window.__tile.tolerance(1));
+      const want = [/click a to its start/i, /roll a/i, /click b to its start/i, /both pointers on the pinholes/i, /press, then roll/i];
+      let at = -1, inOrder = true;
+      for (const re of want) { const i = steps.findIndex((s, k) => k > at && re.test(s)); if (i < 0) { inOrder = false; break; } at = i; }
+      const quoted = new RegExp(`±1 mm[^.]*?${tol.toFixed(1).replace('.', '\\.')} mm`).test(txt);
+      ok(inOrder && quoted && tol > 0, `P22: the how-to's ${steps.length} numbered steps run click A · roll A · click B · pointers on the pinholes · press and roll ${inOrder ? 'in order' : 'OUT OF ORDER'}, and it ${quoted ? 'quotes' : 'does NOT quote'} the ±1 mm figure (${tol.toFixed(2)} mm)`);
+    }
+    // P24 the handle STLs, and the In use view
+    {
+      const l = await T(() => window.__tile.layout());
+      const got = {};
+      for (const w of ['HA', 'HB']) {
+        const [dl] = await Promise.all([page.waitForEvent('download'), page.locator(`[data-stl="${w}"]`).click()]);
+        const buf = fs.readFileSync(await dl.path());
+        got[w] = { n: buf.readUInt32LE(80), len: buf.length, name: dl.suggestedFilename() };
+      }
+      await T(() => window.__tile.useView('B'));
+      const png = await page.locator('#rollCanvas').screenshot();
+      const { decodePNG } = await import('./pngdec.mjs');
+      const im = decodePNG(png);
+      let ink = 0; for (let i = 0; i < im.data.length; i += 4) if (Math.abs(im.data[i] - 0x12) + Math.abs(im.data[i + 1] - 0x12) + Math.abs(im.data[i + 2] - 0x15) > 24) ink++;
+      await T(() => window.__tile.show('all'));
+      ok(got.HA.n === l.trisHA && got.HA.len === 84 + 50 * got.HA.n && got.HB.n === l.trisHB && got.HB.len === 84 + 50 * got.HB.n && /handle-A\.stl$/.test(got.HA.name) && /handle-B\.stl$/.test(got.HB.name) && ink / (im.width * im.height) > 0.05,
+        `P24: ${got.HA.name} ${got.HA.len} bytes (${got.HA.n} tris, the page's ${l.trisHA}), ${got.HB.name} ${got.HB.len} bytes (${got.HB.n}, the page's ${l.trisHB}); the In use view draws ${(100 * ink / (im.width * im.height)).toFixed(1)}% of its pixels`);
+    }
     ok(errors.length === 0, `P: no page errors${errors.length ? ` — ${errors.slice(0, 2).join(' | ')}` : ''}`);
   } catch (e) {
     ok(false, `P: the run threw — ${e.message.split('\n')[0]}`);
   } finally { await s.close(); }
+  // P23 a FRESH profile: a new browser, nothing seeded or cleared — what a first visit sees
+  {
+    const f = await openTile({ storage: null, override });
+    try {
+      const r = await f.page.evaluate(() => window.__tile.rollers()), l = await f.page.evaluate(() => window.__tile.layout());
+      const stored = await f.page.evaluate(() => localStorage.length);
+      ok(r.cols === 4 && r.rows === 3 && l.ringsA === 4 && l.ringsB === 5, `P23: a fresh browser profile (${stored} storage entries before the page's own save) opens on ${r.cols} × ${r.rows} cookies (rings ${l.ringsA}/${l.ringsB})`);
+    } catch (e) { ok(false, `P23: the fresh profile threw — ${e.message.split('\n')[0]}`); }
+    finally { await f.close(); }
+  }
   return res;
 }
 
@@ -320,6 +368,11 @@ const MUTANTS = [
   ['the page opens on one column of three cookies', 'export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 4, rows: 3 };', 'export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 1, rows: 3 };', 'P19', 'tile-roller.js'],
   ['a crossbar design file loses its sheet', 'return { rollers: { cols: spanA, rows: spanB }, note:', 'return { rollers: {}, note:', 'P20'],
   ['the page still reads the crossbar version\'s storage', "const STORE = 'tessellation-rollers-v2';", "const STORE = 'tessellation-rollers-v1';", 'P21'],
+  ['the how-to drops the ±1 mm figure', "<p><b>How exact it needs to be:</b> with each pointer within <b>±1 mm</b> of its pinhole, the worst cookie corner is off by up to <b>${tol.toFixed(1)} mm</b>", '<p><b>How exact it needs to be:</b> place each pointer carefully', 'P22'],
+  ['the how-to puts B before A', "      <li><b>Click A to its start.</b>", "      <li><b>Click B to its start</b> first.</li>\n      <li><b>Click A to its start.</b>", 'P22'],
+  ['the page opens on a 1 × 1 sheet in a fresh profile', 'export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 4, rows: 3 };', 'export const ROLLER_DEFAULTS = { roundA: 6, roundB: 5, cols: 1, rows: 1 };', 'P23', 'tile-roller.js'],
+  ['the zip leaves out the handles', "zip.file('handle-A.stl', stlOf('HA')); zip.file('handle-B.stl', stlOf('HB'));", '', 'P14'],
+  ['the handle B button gives handle A', "  if (which === 'HA' || which === 'HB') return RL.exportStl(built[which].mesh, `handle ${which[1]}`);", "  if (which === 'HA' || which === 'HB') return RL.exportStl(built.HA.mesh, `handle ${which[1]}`);", 'P24'],
 ];
 
 if (!NEG) {
