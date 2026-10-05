@@ -3693,7 +3693,7 @@ NV2 re-derives it from the placement MATRIX. One build per DISTINCT STATE: the m
 `(length, mode, azimuth quantised to 1e-9 rad in one turn)` — unquantised, `cos(2π + x)`
 keyed five builds on a two-way alternate raceme. The sheet is `docs/img/inflo-build-3-phase-b.png`
 (`tools/shot-bloom-node-variance.mjs`): OFF against ON side-on on one camera at a held node
-count, the re-floored default, the cap. Block 50 is eleven rows (matrix 1110; 49 and 50, not 48 and 49: stem session 3 took 48 while this PR was in CI), eight mutants
+count, the re-floored default, the cap. Block 50 is eleven rows (matrix 1110; 49 and 50, not 48 and 49: stem session 3 took 48 while this PR was in CI), and the merge with stem session 3 adds +94 triangles to every raceme row (the cut on the rachis; the pedicels are pinned FLAT by ruling 7's pin) — 96,468 → 96,562 on the default raceme, every percentage unchanged, eight mutants
 in the apex table, and **every inflorescence mutant was RE-RUN because rulings 1 and 2 are law
 changes** (Eva: "any mutant that went green against the old laws is stale evidence").
 

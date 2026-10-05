@@ -723,6 +723,25 @@ Deterministic renderer, no pixel delta quoted.
   builds 24 units. Told on the control (the distinct-build count), never capped.
 * **Gate time**: the defaults-bar gate 29 s plus its control, Node only.
 
+### 17a. The merge with `main` (stem session 3's florist's cut, shipping ON)
+
+`main` moved under this PR while it was in CI (#358–#364: the florist's cut, the tile, marble,
+bug and cards work). The merge conflicted in four files and resolved as: both sessions' CLAUDE.md
+paragraphs kept; `bloom.js` the union of the two import lists; this PR's matrix blocks **48 and 49
+renumbered 49 and 50** (stem session 3 took 48 for the cut — the smoke census reads 164 rows over
+46 blocks, 146 families both ways, 1123 matrix rows); the two `phase52Matrix()` definitions — both
+at `23b13bd`, both 1089 rows, **row-identical** (compared through a scratch copy before the second
+was dropped, #353's precedent) — reduced to one with both reasons on its base-commit line; and the
+`NODE LAWS: ALL MAX at 35 deg` refusal, which `main` re-recorded at +94 while this branch had
+retired it, stays retired with `main`'s re-record noted in the retirement comment. **The cut adds
+exactly +94 triangles to every raceme row** (its 120 mm rachis; the pedicels are pinned `FLAT` by
+ruling 7's own pin): the default raceme 96,468 → **96,562**, `NODE LAWS: ALL MAX at 35 deg` 150,996 →
+151,090, `THE BUDGET CORNER` 259,908 → 260,002, `INFLO: ALL MAX` 143,352 → 143,446 — every
+percentage above unchanged to one decimal. The figures in §12–§17 are this PR's own measurements on
+its own base and stand as such; the +94 is `main`'s change and `main`'s partition. On the merged
+tree: defaults bar PASS, the stem-cut must-fail OK, the combination gate, the export subset with the
+two cut-raceme rows, and the mutants' anchor pre-check are in §19.
+
 ## 18. The byte partition (`--movers-predicate inflo-build3`)
 
 A row moves iff the BASE tree's plan and this tree's disagree on the node count, a node
