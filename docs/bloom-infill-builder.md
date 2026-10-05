@@ -41,7 +41,7 @@ and draws the cells above it. `trimPanels` is untouched.
 which is Eva's ruling and has a structural consequence**: `SWEEPABLE` filters
 `SLIDERS()`, so a CHOICE is out of the blanket sweep by construction and
 `ALL MAX` never turns the infill on. Measured: `ALL MAX` reads **24,688
-triangles with the guard off** on this tree, unchanged, and its declared export
+triangles with the guard off** **[Oct 5 docs sweep: 24,688 is the SHIPPING DEFAULT's count, not `ALL MAX`'s; `ALL MAX` export-refuses at 3,090,816 triangles on this tree and 3,090,910 on `ebe617a`. The structural claim — the guard leaves it untouched — holds. #302 item 2]** on this tree, unchanged, and its declared export
 refusal is untouched. The four sub-slider ids are kept out of block 1 and out of
 `SWEEPABLE` through `INFILL_SUBS` / `INFILL_SUB_IDS`, the `CURL_SUBS` shape.
 
@@ -540,7 +540,7 @@ Export mode, whole bloom, measured on this tree:
 | guard ON at density 40 | 46,848 | 3.1 % |
 | 40 petals × 3 whorls, guard OFF | 367,632 | 24.5 % |
 | **40 petals × 3 whorls, guard ON** | **726,752** | **48.5 %** |
-| `ALL MAX` (a CHOICE away, uninfilled) | 24,688 | unchanged |
+| `ALL MAX` (a CHOICE away, uninfilled) | 3,090,816 (export-refused; the 24,688 first written here was the default's count — Oct 5 docs sweep) | unchanged |
 
 The infilled default is **2.17×** the plain one. `docs/bloom-infill-port-plan.md`
 projected ~41,000 triangles before S3 measured the mode-free subdivision the

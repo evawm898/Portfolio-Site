@@ -341,6 +341,11 @@ exit 0
 
 ## §5 What is NOT done, and is Eva's
 
+**[Oct 5 docs sweep: SUPERSEDED by Eva's ruling of Sep 24 — sessions own the `bloom-frozen-tags`
+dispatch after their own merge and report the read-back (`CLAUDE.md`, "SESSIONS OWN THE
+`bloom-frozen-tags` DISPATCH"); the run history shows sessions firing it. The paragraph below is
+this doc's record of the rule on the day it was written. #302 item 20]**
+
 **The dispatch.** `bloom-frozen-tags` is `workflow_dispatch`-only and a session cannot fire
 it. The rule stands unchanged: a session registers the baseline in both maps, proves it with
 `bloom-frozen-matrices`, and stops; the tag is published by one dispatch from `main` after

@@ -6412,7 +6412,9 @@ file in the repo. Rulings 1–4 are in `docs/bloom-stem-taper-laws.md` and
     geometry, re-derived onto the cut, and shown red again on the new; none was loosened.
     `frozen/phase52` is the 1,089 rows at `23b13bd`. The "~114 live rows" above was counted
     on `phase50`'s 1,047; the live matrix at the base is 1,089 and the cut moves 156 stem rows
-    by "stem present" — see the outcome doc's reconciliation for the measured partition.
+    by "stem present" **[Oct 5 docs sweep: 156 is the count of the BASE's 1,089 rows that carry a
+    stem; the cut's own guard moves 161 of the 1,102-row branch matrix in both modes —
+    `docs/bloom-stem-cut-outcome.md` §0 and §6]** — see the outcome doc's reconciliation for the measured partition.
 
 ## The NU coupling (Eva's ruling on #303)
 
