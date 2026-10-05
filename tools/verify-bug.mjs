@@ -1595,7 +1595,8 @@ if (NEG) {
       const file = path.join(ROOT, `.bug-geometry.mutant-${process.pid}-${k++}.mjs`);
       fs.writeFileSync(file, src.replace(from, to));
       let fails = [];
-      try { const M = await import(pathToFileURL(file).href); fails = [...libraryChecks(M), ...angleChecks(M)].filter(([c]) => !c).map(([, m]) => m); }
+      try { const M = await import(pathToFileURL(file).href); const run = (f) => { try { return f(M).filter(([c]) => !c).map(([, m]) => m); } catch (e) { return [`(threw) ${e.message}`]; } };
+        fails = [...run(libraryChecks), ...run(angleChecks)]; }
       catch (e) { fails = [`(threw) ${e.message}`]; }
       finally { fs.unlinkSync(file); }
       const fired = fails.some((f) => f.startsWith(clause + ':'));

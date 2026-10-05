@@ -177,6 +177,7 @@ if (CMD === 'store') {
   // angle: the sweep's (<out>/sweep.json) widest run about 0 over which every
   // built row passes, ends included; without a sweep, none is written
   const SW = fs.existsSync(path.join(OUT, 'sweep.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, 'sweep.json'), 'utf8')) : null;
+  const SW_SHAPE = (id) => G.WING_LIBRARY.find((x) => x.id === id);   // the library as stored (posing reproduces #361 exactly, WA1)
   const rangeOf = (id, which) => {
     if (!SW) return null;
     const sp = SW.spans.find((x) => x.id === id && x.which === which); if (!sp) return null;
@@ -184,7 +185,14 @@ if (CMD === 'store') {
     const tested = [...new Set(R.map((x) => x.d))].sort((a, b) => a - b);
     let hi = 0; for (const d of tested.filter((d) => d > 0)) { if (bad(d)) break; hi = d; }
     let lo = 0; for (const d of tested.filter((d) => d < 0).reverse()) { if (bad(d)) break; lo = d; }
-    return [lo, hi];
+    // the sweep turned by RAW degrees (rotateWingBlade); the control asks for
+    // MEASURED degrees (setWingAngle), and the two differ where the stretch is
+    // raised (a raw +16 reads +15.81 on #16's hindwing). The range is stored in
+    // measured degrees: what the last verified raw turn reads, toward 0 to 0.1
+    const posed = G.posedWing(which === 'fore' ? SW_SHAPE(id).fore : SW_SHAPE(id).hind), a0 = G.wingAngleOf(posed.points, posed.stretch);
+    const tail = which === 'hind' && SW_SHAPE(id).tail ? { ...SW_SHAPE(id).tail, on: true } : null;
+    const meas = (d) => { if (!d) return 0; const r = G.rotateWingBlade(posed.points, posed.stretch, d, tail); const m = G.wingAngleOf(r.points, r.stretch) - a0; return Math.sign(m) * Math.floor(Math.abs(m) * 10) / 10; };
+    return [Math.max(-20, meas(lo)), Math.min(20, meas(hi))];
   };
   const wing = (id, which, w, extra) => { const a = +G.wingAngleOf(w.points, w.stretch).toFixed(3), r = rangeOf(id, which); return `{ stretch: ${w.stretch}, ${extra}sweep: ${a},${r ? ` range: [${r[0]}, ${r[1]}],` : ''} points: ${pts(G.turnWingRaw(w.points, w.stretch, -a))} }`; };
   const body = snap.map((s) => `  { id: ${s.id}, name: ${JSON.stringify(s.name)}, source: ${JSON.stringify(s.source)},\n    fore: ${wing(s.id, 'fore', s.fore, '')},\n    hind: ${wing(s.id, 'hind', s.hind, `lengthRatio: ${s.hind.lengthRatio}, `)},\n    tail: ${JSON.stringify(s.tail)} },`).join('\n');
