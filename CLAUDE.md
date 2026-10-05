@@ -3610,7 +3610,14 @@ declared cells CLEAR (the default's 0.676 reads 9.614), the corymb's sessile 60-
 0.000 → 0.2144 without clearing, the two gradient-0 cells are new at 0.000, `floretNodes` on the
 leaf-nodes pair goes INERT (five nodes is all the floor admits on the span the inset leaves —
 declared in `COMBINATION_INERT` with the number) and three verdicts move; declared 167 → 145.
-**RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
+**AND THE FLOOR'S PER-PAIR SWEEP WAS NOT FREE — ITS OWN HEADER SAID IT WAS** (§12f): on the whorled
+rows 564 pairs each walked every upper cell against 81 offsets through a `Map`, 67 of 87 profiled
+seconds, `NODE LAWS: ALL MAX at 35 deg` 188 s on the live page against the 30 s settle (an uncaught
+settle timeout kills a CI shard). The lower map is dilated once per offset RING now and a pair is one
+pass against nine values — the same maximum in another order, bit-identical by construction and
+measured on thirteen rows (`where` recovered by the first form's own scan for the winning pair);
+214 → 10 s, the five heaviest rows 2.4–11.7 s on the page. **A profile, not a reading of the code,
+is what says which half of a two-part cost is the one that scales.** **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
 the terminal head's floor (the reach law's own inset), floored onto the grid so the cap sits a
 hair under the bar rather than on it; told as `GRADIENT CLAMPED`, hatched on the control, ID7
 restates it. At the extreme (gradient 3 x 12 nodes x 60 mm) it caps **3.00 → 2.2356**; the

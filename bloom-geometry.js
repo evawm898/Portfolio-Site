@@ -15471,16 +15471,107 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     return maps.get(key);
   };
   /* the shift above which the body at `b` (lower) clears the body at `a`
-     (upper): the largest lower.zmax - upper.zmin + gap over cells within one
-     gap of each other in xy */
+     (upper): the largest lower.zmax - upper.zmin + sqrt(gap^2 - r^2) over
+     cells within one gap of each other in xy, `r` the cells' own clearance.
+
+     EVALUATED AS A DILATION PER MAP AND A SWEEP PER PAIR, NOT A SWEEP OVER
+     EVERY OFFSET PER PAIR — the same maximum over the same candidate set.
+     The first form walked, for every pair, every upper cell against its 81
+     neighbouring offsets through a Map, and a whorled raceme asks for every
+     (a, b) over twenty-four azimuths: 564 pairs, 67 of the 87 profiled
+     seconds on `NODE LAWS: SESSILE x whorled x 12 nodes` and 214 s of plan on
+     `NODE LAWS: ALL MAX at 35 deg`, against the harness's 30 s settle, which
+     dropped the row — and an uncaught settle timeout takes the shard with it.
+     The header above says "the map costs one pass per DISTINCT AZIMUTH and
+     makes every pair free"; that was true of the maps and false of the pairs.
+     What makes a pair cheap: the sqrt term depends on the OFFSET RING alone
+     (the offsets sharing one `r`), and the neighbour maximum within a ring is
+     a property of the LOWER map alone — `D_r(c) = max over the ring's offsets
+     of lower.zmax(c + off)` — so each lower map is dilated once per ring (nine
+     rings at four cells a gap, on dense arrays over the map's own bounding
+     box) and a pair is then one pass over the upper cells against nine
+     values. BIT-IDENTICAL BY CONSTRUCTION: a maximum is independent of the
+     order it is taken in, and `(x - u) + s` is monotone in `x`, so the
+     ring's max taken before the subtraction is the same double as the max
+     of the differences; checked on the shipped rows against the first form
+     (floor, bound, azimuths and `where` equal under Object.is). `where` —
+     the cell the bound was read at, telemetry — is recovered for the ONE
+     winning pair by the first form's own scan in its own order, so a tie
+     resolves exactly as it did. */
+  const SUB = sub;
+  const rings = (() => {
+    const by = new Map();
+    for (let di = -SUB; di <= SUB; di++) for (let dj = -SUB; dj <= SUB; dj++) {
+      const r = Math.hypot(Math.max(0, Math.abs(di) - 1) * cell, Math.max(0, Math.abs(dj) - 1) * cell);
+      if (r >= gapMm) continue;
+      if (!by.has(r)) by.set(r, { s: Math.sqrt(gapMm * gapMm - r * r), offs: [] });
+      by.get(r).offs.push([di, dj]);
+    }
+    return [...by.values()];
+  })();
+  const decode = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; const i = (key2 - jw) / KEY; const j = jw > KEY / 2 ? jw - KEY : jw; return [i, j]; };
+  /* a map as dense arrays over its own bounding box, and the lower's dilations */
+  const denses = new Map();
+  const dense = (az) => {
+    let w = az % TAU; if (w < 0) w += TAU;
+    const key = Math.round(w * 1e9);
+    if (denses.has(key)) return denses.get(key);
+    const m = map(w);
+    let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
+    for (const k of m.keys()) { const [i, j] = decode(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    if (!(i0 <= i1)) { denses.set(key, { empty: true }); return denses.get(key); }
+    const W = i1 - i0 + 1, H = j1 - j0 + 1;
+    const zmin = new Float64Array(W * H).fill(Infinity), zmax = new Float64Array(W * H).fill(-Infinity);
+    for (const [k, r] of m) { const [i, j] = decode(k); const x = (i - i0) * H + (j - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
+    /* dilations on a grid padded by SUB on every side, so an upper cell just
+       outside the lower's box still reads the lower cells within a gap */
+    const Wd = W + 2 * SUB, Hd = H + 2 * SUB;
+    const dil = rings.map(() => new Float64Array(Wd * Hd).fill(-Infinity));
+    for (let i = 0; i < W; i++) for (let j = 0; j < H; j++) {
+      const z = zmax[i * H + j]; if (z === -Infinity) continue;
+      for (let q = 0; q < rings.length; q++) {
+        const D = dil[q];
+        for (const [di, dj] of rings[q].offs) {
+          const x = (i - di + SUB) * Hd + (j - dj + SUB);
+          if (z > D[x]) D[x] = z;
+        }
+      }
+    }
+    const out = { empty: false, i0, j0, W, H, zmin, zmax, Wd, Hd, dil };
+    denses.set(key, out);
+    return out;
+  };
   const bounds = new Map();
   const boundOf = (a, b) => {
     const key = `${Math.round(a * 1e9)}|${Math.round(b * 1e9)}`;
     if (bounds.has(key)) return bounds.get(key);
+    const U = dense(a), L = dense(b);
+    let sup = -Infinity;
+    if (!U.empty && !L.empty) {
+      for (let i = 0; i < U.W; i++) {
+        const li = i + U.i0 - L.i0 + SUB; if (li < 0 || li >= L.Wd) continue;
+        for (let j = 0; j < U.H; j++) {
+          const umin = U.zmin[i * U.H + j]; if (umin === Infinity) continue;
+          const lj = j + U.j0 - L.j0 + SUB; if (lj < 0 || lj >= L.Hd) continue;
+          const x = li * L.Hd + lj;
+          for (let q = 0; q < rings.length; q++) {
+            const D = L.dil[q][x]; if (D === -Infinity) continue;
+            const need = (D - umin) + rings[q].s;
+            if (need > sup) sup = need;
+          }
+        }
+      }
+    }
+    bounds.set(key, { sup, a, b });
+    return bounds.get(key);
+  };
+  /* the first form's own scan, run once for the winning pair, so `where`
+     is the cell it would have named */
+  const whereOf = (a, b, supWanted) => {
     const upper = map(a), lower = map(b);
     let sup = -Infinity, where = null;
     for (const [key2, uz] of upper) {
-      const jw = ((key2 % KEY) + KEY) % KEY, i = (key2 - jw) / KEY, j = jw > KEY / 2 ? jw - KEY : jw;
+      const [i, j] = decode(key2);
       for (let di = -sub; di <= sub; di++) for (let dj = -sub; dj <= sub; dj++) {
         const lz = lower.get((i + di) * KEY + ((((j + dj) % KEY) + KEY) % KEY));
         if (!lz) continue;
@@ -15490,12 +15581,12 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
         if (need > sup) { sup = need; where = { xy: [i * cell, j * cell], upperZmin: uz[0], lowerCellXY: [(i + di) * cell, (j + dj) * cell], lowerZmax: lz[1] }; }
       }
     }
-    bounds.set(key, { sup, where });
-    return bounds.get(key);
+    if (!Object.is(sup, supWanted)) throw new Error(`floretPitchFloorMm: the dilated bound (${supWanted}) and the direct scan (${sup}) disagree — the two forms are supposed to be one maximum`);
+    return where;
   };
   let floorMm = 0, at = null, sameNodeMayTouch = false, sameNodePairs = 0, worstSameNode = -Infinity;
   for (const { a, b, d } of pairs) {
-    const { sup, where } = boundOf(a, b);
+    const { sup } = boundOf(a, b);
     if (d === 0) {
       sameNodePairs++;
       if (sup > worstSameNode) worstSameNode = sup;
@@ -15503,8 +15594,9 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
       continue;
     }
     const need = sup / d;
-    if (need > floorMm) { floorMm = need; at = { aDeg: (a * 180) / Math.PI, bDeg: (b * 180) / Math.PI, nodesApart: d, boundMm: sup, where }; }
+    if (need > floorMm) { floorMm = need; at = { aDeg: (a * 180) / Math.PI, bDeg: (b * 180) / Math.PI, nodesApart: d, boundMm: sup, where: null, _a: a, _b: b }; }
   }
+  if (at) { at.where = whereOf(at._a, at._b, at.boundMm); delete at._a; delete at._b; }
   return { floorMm, at, sameNodeMayTouch, sameNodePairs, azimuths: maps.size, pairs: bounds.size };
 }
 

@@ -485,6 +485,37 @@ STL gates after ST9; `infloApproachCoverage` refuses a declaration the matrix ne
 `INFLO_OVERTOP_XFAIL` is EMPTIED (the cap makes its two rows unreachable, §13) and the
 list is kept so a row that overtops again is a declaration rather than a silence.
 
+### 12f. The floor's cost, and the sweep that was not free (found by the browser, fixed, bit-identical)
+
+The export subset went red on this box twice at the harness's 30 s `settleBuild` — an
+uncaught `TimeoutError` at the first row, which on a sharded CI run kills the shard and
+leaves the verdict with no census — and the first reading was box contention (the partition's
+heavy rows were building beside it). It was not only that. Probed row by row on the live page,
+alone: `NODE LAWS: SESSILE x whorled x 12 nodes` settled in **37 s**, `NODE LAWS: ALL MAX at 35
+deg …` in **188 s**, `REACH INSET: THE BUDGET CORNER` past **240 s**, `NODE VARIANCE: x WHORLED x
+8 nodes` in 28 s. In Node the plan alone read 41 / 214 / 16 / 36 s, and the CPU profile put
+**67 of 87 s in `boundOf`**, the per-pair sweep: the law's header said the column map "makes
+every pair free", which was true of the maps (0.9 s) and false of the pairs — a whorled raceme
+asks for every (a, b) over twenty-four azimuths, 564 pairs, each a walk of every upper cell
+against its 81 neighbouring offsets through a `Map`.
+
+The fix evaluates the SAME maximum over the SAME candidate set in a different order: the
+`sqrt(gap² − r²)` term depends on the offset RING alone, and the neighbour maximum within a
+ring is a property of the LOWER map alone — `D_r(c) = max over the ring's offsets of
+lower.zmax(c + off)` — so each lower map is dilated once per ring (nine rings at four cells a
+gap, dense arrays over the map's own bounding box) and a pair is one pass over the upper cells
+against nine values. **Bit-identical by construction** (a maximum is order-independent and
+`(x − u) + s` is monotone in `x`, so the ring's max taken before the subtraction is the same
+double), and **measured** on thirteen rows in both modes against the pre-change module with the
+whole plan serialised: floor, bound, `sameNodeMayTouch`, node depths and `at.where` equal under
+`Object.is` — `where` is recovered for the one winning pair by the first form's own scan, which
+also throws if the two forms ever disagree. Plan time: the whorled spike **41 → 2.1 s**, `ALL
+MAX at 35` **214 → 10 s**, the budget corner 16 s, `INFLO: ALL MAX` 16 s; on the live page the
+five heaviest rows settle in **2.4 / 7.8 / 11.7 / 8.4 / 11.6 s**. What is left is the dilation
+itself (15 s of the budget corner's 16 in Node) and, on the node-variance corner, the
+twenty-four distinct units Phase B builds per mode (13 s of `tipLaw`), which is that feature's
+own cost and is what its cost-corner row is for.
+
 ### 12e. The combination gate under the floor (`node tools/bloom-combination-gate.mjs`, EXPORT, Node 22)
 
 The floor re-records the whole inflorescence family of `COMBINATION_XFAIL`, which Phase A had
@@ -674,13 +705,15 @@ chunks (`--json` each, `--merge` closing them; the merge REFUSES chunks that ove
 gap, which it did once — rows 1089 twice — and the set was re-tiled rather than deduplicated):
 **75 of 75 predeclared movers MOVED and 0 floats moved on the 1035 holders, positionally under
 `Object.is`, over 1,293,722,028 export floats / 143,746,892 triangles and 82,000,898
-captured-grid values (9,448 panels).** The 75 are every row whose plan the floor, the cap or the
-field moves — the inflorescence blocks 30, 46, 48 and 49, `INFLO: ALL MAX`, the two `ALL MAX`
-corners of block 46/48, the shared-node and sepal rows that build a raceme — and every row with
-no raceme or at `nodeVariance` 0 with an unmoved plan held, the shipping default among them.
+captured-grid values (9,448 panels).** The 75, named by block from the predicate run over the matrix on both trees: **NODE LAWS 32,
+INFLO 19, REACH INSET 10, NODE VARIANCE 10**, and four single rows the raceme reaches through
+another feature — `VARIANCE: x the RACEME`, and the three GATED rows (`STEM NODES`, `BARE
+NODES`, `TUBE`) that build a raceme to prove something else inert. Every row with no raceme,
+and every raceme row with an unmoved plan at `nodeVariance` 0 (the two inflorescence GATED
+rows among them), held — the shipping default by the first line of the predicate.
 The three heaviest rows (`INFLO: ALL MAX`, `NODE LAWS: ALL MAX at 35 deg …`, `REACH INSET: THE
-BUDGET CORNER`) each build a ~1.4 M-triangle base tree twice and ran alone, 43 to 70 minutes
-apiece on this box; a one-row chunk of a mover reports its own vacuity clause (no holder float
+BUDGET CORNER`) each build a ~1.4 M-triangle base tree twice and ran alone, 18 to 43 minutes
+apiece on this box (43 / 18 / 43 min); a one-row chunk of a mover reports its own vacuity clause (no holder float
 to compare) and the merge is where the vacuity is judged.
 
 ## 19. Gates on the final tree
