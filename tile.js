@@ -301,7 +301,7 @@ function writeSelNote() {
 /* ---------------- the panel's controls ---------------- */
 const PRINT_LABELS = {
   dough: ['Dough thickness', 'mm'], bladeHeight: ['Blade height', 'mm'], bladeWall: ['Blade wall (at the edge)', 'mm'],
-  draft: ['Blade draft, each side', '°'], cylWall: ['Cylinder wall', 'mm'], pegSize: ['Peg / tooth size', 'mm'],
+  draft: ['Blade draft, each side', '°'], cylWall: ['Cylinder wall', 'mm'], pinSize: ['Fiducial pin (pinhole) size', 'mm'],
   bore: ['Axle bore', 'mm'], minCookie: ['Thinnest cookie part', 'mm'],
 };
 const printHost = $('printCtrls');
@@ -384,15 +384,15 @@ function writePanel() {
     `  ${A.rings} rings, ${A.spacing.toFixed(1)} mm apart · ${A.n} tiles × ${A.pitch.toFixed(1)} mm = ${A.C.toFixed(1)} mm round · rolls along edge A`,
     `<b>Roller B</b> ⌀ <b>${B.dTip.toFixed(1)}</b> mm at the blades (body ${B.dBody.toFixed(1)}) · <b>${B.L.toFixed(0)}</b> mm long`,
     `  ${B.rings} rings, ${B.spacing.toFixed(1)} mm apart · ${B.n} tiles × ${B.pitch.toFixed(1)} mm = ${B.C.toFixed(1)} mm round · rolls along edge B`,
-    `Track: column ${L.mStar} (the border before the first cookies) · ${A.rings} pegs on A in a ${Math.abs(Math.cos(L.theta)) < 1e-9 ? 'straight' : 'slanted'} row, ${B.n} teeth on B's collar`,
-    `Triangles: A ${built.A.mesh.indices.length / 3} · B ${built.B.mesh.indices.length / 3} · handle ${built.H.mesh.indices.length / 3}`,
-    `STL: A ${kb(stlBytes(built.A.mesh))} · B ${kb(stlBytes(built.B.mesh))} · handle ${kb(stlBytes(built.H.mesh))}`,
+    `Fiducials: ${L.A.pins.length === 1 ? 'one pin on A lays both' : `${L.A.pins.length} pins on A`} · B's pointers ${(B.L + 2 * L.sight.g).toFixed(1)} mm apart · ±1 mm at each pointer → corners within ${RL.sightTolerance(tile, L, 1).toFixed(1)} mm`,
+    `Triangles: A ${built.A.mesh.indices.length / 3} · B ${built.B.mesh.indices.length / 3} · handle A ${built.HA.mesh.indices.length / 3} · handle B ${built.HB.mesh.indices.length / 3}`,
+    `STL: A ${kb(stlBytes(built.A.mesh))} · B ${kb(stlBytes(built.B.mesh))} · handles ${kb(stlBytes(built.HA.mesh))} each`,
   ];
   $('derived').innerHTML = lines.join('\n');
   writeFlags();
   writeHowTo();
   const refused = L.flags.some((f) => f.stl);
-  for (const b of document.querySelectorAll('[data-stl="A"],[data-stl="B"],#zipAll')) b.disabled = refused;
+  for (const b of document.querySelectorAll('[data-stl],#zipAll')) b.disabled = refused;
   $('exportMsg').textContent = refused ? L.flags.filter((f) => f.stl).map((f) => f.text).join(' ') : '';
   $('exportMsg').classList.toggle('is-bad', refused);
 }
@@ -419,17 +419,22 @@ function writeFlags() {
 function writeHowTo() {
   const L = built.layout, A = L.A, B = L.B;
   const [fw, fh] = fieldSize();
-  const slant = Math.abs(Math.cos(L.theta)) < 1e-9 ? 'in a straight row along it' : 'in a row slanting round it';
+  const tol = RL.sightTolerance(tile, L, 1), span = B.L + 2 * L.sight.g;
+  const square = Math.abs(Math.cos(L.theta)) < 1e-9;
   $('howto').innerHTML = `
+    <p>Each roller has a <b>handle at each end</b>: the roller spins on the handles' axle pins, the handles stay in your hands. Each handle has a <b>spring tab</b> that clicks into a notch on the roller's end face at the roller's <b>start</b>, and a <b>pointer</b> on an arm that hangs down past the roller's end, just above the dough, on the line where the roller touches it. Handles marked A fit roller A, B fit B (their arms differ in length).</p>
     <ol>
-      <li>Roll the dough <b>${print.dough} mm</b> thick on a floured board, a little bigger than the cut field (about ${fw.toFixed(0)} × ${fh.toFixed(0)} mm) plus a border of one tile on the side you start from. The rings are the wheels: each runs on its blade tips, through the dough to the board, so the rollers need nothing to run on but the board under the dough.</li>
-      <li><b>Roller A</b> — the one with a row of pegs and a groove on one end. Groove end on your <b>left</b>, and roll it <b>along edge A</b>, the way its rings run. Put it down near the edge of the dough with its pegs (${slant}) facing down, roll it back to the edge, then forward across the whole sheet in one pass. The pegs press a line of dimples into the border: the <b>track</b>.</li>
-      <li><b>Roller B</b> — the one with the toothed collar. Roll it <b>along edge B</b>, the way its rings run, with the collar on the track. Seat a tooth in a dimple at one end of the track, roll B back to the edge, then <b>along the track</b> across the whole sheet in one pass. Each tooth drops into a dimple: that is what puts B's lines through A's corners.</li>
+      <li>Roll the dough <b>${print.dough} mm</b> thick on a floured board: the cut field is about ${fw.toFixed(0)} × ${fh.toFixed(0)} mm; leave a border of about a tile all round, and a straight edge on the side you start A from.</li>
+      <li><b>Click A to its start.</b> Turn roller A in its handles until both tabs click. Groove end on your <b>left</b>, pointers hanging straight down, set it on the dough at the straight edge, rolling direction <b>along edge A</b>.</li>
+      <li><b>Roll A</b> forward across the whole sheet in one pass, without lifting it. The tabs let go as soon as it turns. Its pin punches a small hole through the dough ${square ? 'on its first line, one tile in from each side of the cookies' : 'beside the cookies, one on each side'}: these two <b>pinholes</b> are the marks for B.</li>
+      <li><b>Click B to its start</b> the same way: turn it in its handles until both tabs click.</li>
+      <li><b>Put both pointers on the pinholes.</b> Holding B by its handles, rolling direction <b>along edge B</b>, lower it so each pointer hangs straight over a pinhole — the two nearest A's starting edge that both pointers reach at once (they are exactly ${span.toFixed(0)} mm apart; a stray hole has no partner).</li>
+      <li><b>Press, then roll</b> B across the whole sheet in one pass${square ? '' : ', back to the near edge first and then forward'}.</li>
       <li>Lift the border away. The ${rollers.cols * rollers.rows} cookies are already apart.</li>
     </ol>
-    <p>Roll steadily and don't lift a roller mid-pass: they register by rolling without slipping. One seated tooth fixes B both sideways and round its turn — if a dimple is missing, seat the tooth in any other.</p>
-    <p>The handle's pin fits either roller's bore (${print.bore} mm); hold the roller at both ends, or use two handles.</p>
-    <p>Printing: stand each roller on its end. Each ring is a fin sticking straight out of the body, so it needs <b>support under every ring</b> (tree supports come away most cleanly); the pegs and teeth are 45° cones and need none.</p>`;
+    <p><b>How exact it needs to be:</b> with each pointer within <b>±1 mm</b> of its pinhole, the worst cookie corner is off by up to <b>${tol.toFixed(1)} mm</b> (±0.5 mm → ${RL.sightTolerance(tile, L, 0.5).toFixed(1)} mm, ±2 mm → ${RL.sightTolerance(tile, L, 2).toFixed(1)} mm). Keep the handles upright as you place it: a pointer on a tilted arm hovers a little off the line.</p>
+    <p>Roll steadily and don't lift a roller mid-pass: they register by rolling without slipping. The detent only holds the start — it is a light click, and it lets go as the roller turns.</p>
+    <p>Printing: stand each roller on its end. Each ring is a fin sticking straight out of the body, so it needs <b>support under every ring</b> (tree supports come away most cleanly); A's pin stands on its ring or its body and needs the same. Print <b>two handles of each</b> (A and B), grip end down, with support under the arm and the tab.</p>`;
 }
 
 /* ---------------- the rollers in 3D ---------------- */
@@ -449,10 +454,16 @@ const MAT = {
   body: new THREE.MeshStandardMaterial({ color: 0xd9d9d3, roughness: 0.66, metalness: 0, flatShading: true }),
   bladeA: new THREE.MeshStandardMaterial({ color: 0x6fb2b2, roughness: 0.55, metalness: 0, flatShading: true }),
   bladeB: new THREE.MeshStandardMaterial({ color: 0xd6a15c, roughness: 0.55, metalness: 0, flatShading: true }),
-  peg: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0, flatShading: true }),
+  pin: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0, flatShading: true }),
+  board: new THREE.MeshStandardMaterial({ color: 0x2a2a2f, roughness: 0.9, metalness: 0 }),
+  dough: new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.9, metalness: 0, transparent: true, opacity: 0.35, depthWrite: false }),
+  hole: new THREE.MeshBasicMaterial({ color: 0x050505 }),
+  contact: new THREE.LineBasicMaterial({ color: 0xe5484d }),
   handle: new THREE.MeshStandardMaterial({ color: 0xbfbfb8, roughness: 0.7, metalness: 0, flatShading: true }),
+  handleGhost: new THREE.MeshStandardMaterial({ color: 0x9fd0d0, roughness: 0.7, metalness: 0, flatShading: true, transparent: true, opacity: 0.4, depthWrite: false }),
 };
-const groups = { A: new THREE.Group(), B: new THREE.Group(), H: new THREE.Group() };
+const groups = { A: new THREE.Group(), B: new THREE.Group(), H: new THREE.Group(), use: new THREE.Group() };
+let useWhich = 'B', useGhost = false;
 for (const g of Object.values(groups)) scene.add(g);
 let show = 'all', fitted = false;
 
@@ -487,16 +498,59 @@ function setGroup(g, meshes, L, y, x) {
 function rebuild3D() {
   if (!built) return;
   const A = built.layout.A, B = built.layout.B;
-  // A above B, both lying along x; the handle beside them
-  setGroup(groups.A, partMeshes(built.A.mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? MAT.bladeA : MAT.peg)), A.L, A.Rtip + 8, 0);
-  setGroup(groups.B, partMeshes(built.B.mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? MAT.bladeB : MAT.peg)), B.L, -(B.Rtip + 8), 0);
-  let hz = 0; for (let i = 2; i < built.H.mesh.positions.length; i += 3) hz = Math.max(hz, built.H.mesh.positions[i]);
-  setGroup(groups.H, partMeshes(built.H.mesh, () => MAT.handle), hz, 0, Math.max(A.L, B.L) / 2 + 30 + hz / 2);
+  // A above B, both lying along x; the two handles beside them
+  setGroup(groups.A, partMeshes(built.A.mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? MAT.bladeA : MAT.pin)), A.L, A.Rtip + 8, 0);
+  setGroup(groups.B, partMeshes(built.B.mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? MAT.bladeB : MAT.pin)), B.L, -(B.Rtip + 8), 0);
+  for (const c of groups.H.children.slice()) { groups.H.remove(c); }
+  let hz = 0; for (let i = 2; i < built.HA.mesh.positions.length; i += 3) hz = Math.max(hz, built.HA.mesh.positions[i]);
+  const hx = Math.max(A.L, B.L) / 2 + 30 + hz / 2;
+  for (const [k, H, y] of [['A', built.HA, A.Rtip + 8], ['B', built.HB, -(B.Rtip + 8)]]) {
+    const g = new THREE.Group();
+    for (const m of partMeshes(H.mesh, () => MAT.handle)) { m.position.z = -hz / 2; g.add(m); }
+    g.rotation.set(0, Math.PI / 2, 0); g.position.set(hx, y, 0); g.name = `handle${k}`;
+    groups.H.add(g);
+  }
+  rebuildUse();
   applyShow(!fitted);
   fitted = true;
 }
+/* A roller IN USE at its start pose (doc §4): on the board, on the dough, both
+   handles clicked into its notches with their pointers hanging straight down
+   past its ends — the contact line drawn in red, B's two pinholes under its
+   pointers. World x is the roller's axis, y up; the board at y = −R_tip. */
+function rebuildUse() {
+  const g = groups.use;
+  for (const c of g.children.slice()) g.remove(c);
+  const w = useWhich, R = built.layout[w], H = built[`H${w}`], hg = H.geom;
+  const spec = built[w].spec, L = R.L, gap = built.layout.sight.g;
+  const roller = new THREE.Group();                       // the roller frame: axis z, angle φ in xy
+  roller.rotation.z = -Math.PI / 2 - spec.startPhi;       // the start angle at the bottom (−y after the turn below)
+  const inner = new THREE.Group(); inner.position.z = -L / 2; roller.add(inner);
+  for (const m of partMeshes(built[w].mesh, (n) => (n === 'body' ? MAT.body : /^ring/.test(n) ? (w === 'A' ? MAT.bladeA : MAT.bladeB) : MAT.pin))) inner.add(m);
+  // the −Z handle: its nub (+y) turned onto the notch, its bearing face on the end face
+  const lo = new THREE.Group(); lo.rotation.z = spec.notchPhi - Math.PI / 2;
+  const hm = useGhost ? MAT.handleGhost : MAT.handle;
+  for (const m of partMeshes(H.mesh, () => hm)) { m.position.z = -hg.zSh; lo.add(m); }
+  inner.add(lo);
+  // the +Z handle: the same part turned end for end
+  const hi = new THREE.Group(); hi.rotation.z = spec.notchPhi - Math.PI / 2;
+  const flip = new THREE.Group(); flip.rotation.y = Math.PI; flip.position.z = L + hg.zSh;
+  for (const m of partMeshes(H.mesh, () => hm)) flip.add(m);
+  hi.add(flip); inner.add(hi);
+  const frame = new THREE.Group(); frame.rotation.set(0, Math.PI / 2, 0); frame.add(roller);
+  g.add(frame);
+  // the board, the dough, the contact line and (for B) the pinholes
+  const W = L + 80, D = 3 * R.Rtip, y0 = -R.Rtip;
+  const board = new THREE.Mesh(new THREE.BoxGeometry(W, 2, D), MAT.board); board.position.set(0, y0 - 1, 0); g.add(board);
+  const dough = new THREE.Mesh(new THREE.BoxGeometry(W - 20, print.dough, D - 20), MAT.dough); dough.position.set(0, y0 + print.dough / 2, 0); g.add(dough);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-W / 2, y0 + 0.05, 0), new THREE.Vector3(W / 2, y0 + 0.05, 0)]), MAT.contact); g.add(line);
+  if (w === 'B') for (const x of [-L / 2 - gap, L / 2 + gap]) {
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(print.pinSize / 2, 24), MAT.hole);
+    hole.rotation.x = -Math.PI / 2; hole.position.set(x, y0 + print.dough + 0.06, 0); g.add(hole);
+  }
+}
 function applyShow(refit) {
-  for (const [k, g] of Object.entries(groups)) g.visible = show === 'all' || show === k;
+  for (const [k, g] of Object.entries(groups)) g.visible = (show === 'all' && k !== 'use') || show === k;
   document.querySelectorAll('#rollViews button').forEach((b) => b.classList.toggle('is-on', b.dataset.show === show));
   if (refit) fit3D();
   render3D();
@@ -537,7 +591,7 @@ function download(name, data, type) {
 const stem = () => `tile-${tile.pitchA.toFixed(0)}x${tile.pitchB.toFixed(0)}-${tile.angle.toFixed(0)}deg`;
 function stlOf(which) {
   if (!built) heavyNow();
-  if (which === 'H') return RL.exportStl(built.H.mesh, 'handle');
+  if (which === 'HA' || which === 'HB') return RL.exportStl(built[which].mesh, `handle ${which[1]}`);
   return RL.exportStl(built[which].mesh, which, { layout: built.layout });
 }
 function tryStl(which) {
@@ -546,7 +600,7 @@ function tryStl(which) {
 }
 for (const b of document.querySelectorAll('[data-stl]')) b.addEventListener('click', () => {
   const w = b.dataset.stl, r = tryStl(w);
-  if (r.ok) download(`${stem()}-${w === 'H' ? 'handle' : `roller-${w}`}.stl`, r.bytes, 'model/stl');
+  if (r.ok) download(`${stem()}-${w[0] === 'H' ? `handle-${w[1]}` : `roller-${w}`}.stl`, r.bytes, 'model/stl');
   else { $('exportMsg').textContent = r.reason; $('exportMsg').classList.add('is-bad'); }
 });
 $('svgTile').addEventListener('click', () => download(`${stem()}-tile.svg`, G.tileSvg(tile).svg, 'image/svg+xml'));
@@ -567,7 +621,8 @@ function readme() {
     `Sheet: ${rollers.cols} x ${rollers.rows} = ${rollers.cols * rollers.rows} cookies (${rollers.cols} along edge A, ${rollers.rows} along edge B).`,
     `Roller A: diameter ${L.A.dTip.toFixed(1)} mm at the blades, ${L.A.L.toFixed(0)} mm long, ${L.A.rings} rings ${L.A.spacing.toFixed(1)} mm apart, ${L.A.n} tiles round. Roller B: ${L.B.dTip.toFixed(1)} mm, ${L.B.L.toFixed(0)} mm, ${L.B.rings} rings ${L.B.spacing.toFixed(1)} mm apart, ${L.B.n} tiles round.`,
     `Print: dough ${print.dough} mm, blades ${print.bladeHeight} mm tall and ${print.bladeWall} mm thin at the edge (draft ${print.draft} deg), axle bore ${print.bore} mm.`,
-    'Print each roller standing on its end WITH SUPPORT UNDER EVERY RING (each ring is a fin sticking straight out; tree supports come away most cleanly); the handle grip-end down.', '',
+    `Fiducials: ${L.A.pins.length} pin(s) on roller A; roller B's pointers ${(L.B.L + 2 * L.sight.g).toFixed(1)} mm apart. With each pointer within 1 mm of its pinhole, the worst cookie corner is off by up to ${RL.sightTolerance(tile, L, 1).toFixed(1)} mm.`,
+    'Print each roller standing on its end WITH SUPPORT UNDER EVERY RING (each ring is a fin sticking straight out; tree supports come away most cleanly). Print TWO of handle-A.stl and TWO of handle-B.stl, grip end down, with support under the arm and the tab.', '',
     'HOW TO USE', strip($('howto').innerHTML), '',
     'FOOD SAFETY', [...document.querySelectorAll('details.tl-sec .tl-prose p')].slice(-2).map((p) => p.textContent.replace(/\s+/g, ' ').trim()).join('\n'), '',
     'design.json (in this zip) reopens the design on the page.', '',
@@ -581,7 +636,7 @@ $('zipAll').addEventListener('click', async () => {
     msg.textContent = 'zipping…'; msg.classList.remove('is-bad');
     await loadScript(JSZIP_URL);
     const zip = new window.JSZip();
-    zip.file('roller-A.stl', ra.bytes); zip.file('roller-B.stl', rb.bytes); zip.file('handle.stl', stlOf('H'));
+    zip.file('roller-A.stl', ra.bytes); zip.file('roller-B.stl', rb.bytes); zip.file('handle-A.stl', stlOf('HA')); zip.file('handle-B.stl', stlOf('HB'));
     zip.file('README.txt', readme()); zip.file('design.json', JSON.stringify(designDoc(), null, 1));
     download(`${stem()}-rollers.zip`, await zip.generateAsync({ type: 'uint8array' }), 'application/zip');
     msg.textContent = '';
@@ -660,8 +715,9 @@ window.__tile = {
   worldOf: (cx, cy) => { const r = edSvg.getBoundingClientRect(); return sub2(fromS(edFrame || editorFrame(), cx - r.left, cy - r.top), org); },
   flags: () => flagList().map((f) => ({ level: f.level, id: f.id })),
   layout: () => (built ? {
-    dA: built.layout.A.dTip, dB: built.layout.B.dTip, LA: built.layout.A.L, LB: built.layout.B.L, mStar: built.layout.mStar, flags: built.layout.flags.map((f) => f.id),
-    trisA: built.A.mesh.indices.length / 3, trisB: built.B.mesh.indices.length / 3, trisH: built.H.mesh.indices.length / 3,
+    dA: built.layout.A.dTip, dB: built.layout.B.dTip, LA: built.layout.A.L, LB: built.layout.B.L, j: built.layout.sight.j, flags: built.layout.flags.map((f) => f.id),
+    trisA: built.A.mesh.indices.length / 3, trisB: built.B.mesh.indices.length / 3, trisHA: built.HA.mesh.indices.length / 3, trisHB: built.HB.mesh.indices.length / 3,
+    pinsA: built.A.mesh.parts.filter((p) => /^pin/.test(p.name)).length, span: built.layout.B.L + 2 * built.layout.sight.g, ptrA: built.layout.A.ptrR, ptrB: built.layout.B.ptrR,
     // counted off the MESHES, not the layout record: one closed blade shell per ring
     ringsA: built.A.mesh.parts.filter((p) => /^ring/.test(p.name)).length, ringsB: built.B.mesh.parts.filter((p) => /^ring/.test(p.name)).length,
   } : null),
@@ -678,9 +734,9 @@ window.__tile = {
     camera.position.copy(c).addScaledVector(d, dist); camera.near = dist / 100; camera.far = dist * 10; camera.updateProjectionMatrix();
     controls.target.copy(c); controls.update(); render3D();
   },
-  // a peg / tooth of the built roller, in the 3D view's world: where it is and its outward direction
+  // a pin of roller A, in the 3D view's world: where it is and its outward direction
   anchorOf: (which, kind, i) => {
-    const spec = built[which].spec, f = (kind === 'peg' ? spec.pegs : spec.teeth).find((q) => q.i === i);
+    const spec = built[which].spec, f = (spec.pins || []).find((q) => q.i === i);
     if (!f) return null;
     const g = groups[which], L = built.layout[which].L, R = built.layout[which].Rtip;
     g.updateMatrixWorld(true);
@@ -688,6 +744,19 @@ window.__tile = {
     const out = new THREE.Vector3(Math.cos(f.phi), Math.sin(f.phi), 0).applyQuaternion(g.quaternion);
     return { at: at.toArray(), out: out.toArray() };
   },
+  // the in-use view: which roller, and where (world) its −Z pointer tip, its notch and the contact line are
+  useView: (w, ghost = false) => { useWhich = w; useGhost = ghost; rebuildUse(); show = 'use'; applyShow(true); const R = built.layout[w], g = built.layout.sight.g; return { L: R.L, Rtip: R.Rtip, ptrR: R.ptrR, gap: g, dough: print.dough, notchR: R.notchR }; },
+  // the notch on roller w's −Z face, in the view's world (the roller's own group): where, and its outward direction
+  notchAnchor: (w) => {
+    const g = groups[w], R = built.layout[w], phi = R.notchPhi;
+    g.updateMatrixWorld(true);
+    const at = g.localToWorld(new THREE.Vector3(R.notchR * Math.cos(phi), R.notchR * Math.sin(phi), -R.L / 2));
+    const out = new THREE.Vector3(Math.cos(phi), Math.sin(phi), 0).applyQuaternion(g.quaternion);
+    return { at: at.toArray(), out: out.toArray() };
+  },
+  tolerance: (e) => RL.sightTolerance(tile, built.layout, e),
+  howtoText: () => $('howto').textContent,
+  howtoSteps: () => [...$('howto').querySelectorAll('ol > li')].map((li) => li.textContent.replace(/\s+/g, ' ').trim()),
   camera3D: () => ({ target: controls.target.toArray(), position: camera.position.toArray() }),
   render3D,
 };

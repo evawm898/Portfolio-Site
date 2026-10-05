@@ -10019,30 +10019,37 @@ blade is a closed wavy RING running AROUND the circumference, a jagged pizza-whe
 round the pin, and each roller rolls along its OWN lines: roller A carries the edge-A lines and
 rolls along `tA`, B the edge-B lines along `tB`. Circumference = tiles round it × its OWN pitch,
 the diameter derived; the rings step along the axis by `|tA × tB| / |chord|` (θ counted), and
-there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3 —
-the first version's page could open on a strip of three). A ring is one period laid `n` times and
-wrapped onto its own first vertex, so it closes on itself by construction: a TORUS, no end caps,
-no seam vertex. **No rims, and "the dough must lie between the rims" is DROPPED** — every ring is
-a wheel at the tip radius, so the roller rides its blade tips through the dough continuously.
-**The price is printing**: upright, every ring is a fin straight out of the body — support under
-every ring, said in the page's how-to and the zip's README, never hidden. **Both rollers are held +Z
-end on the LEFT as they roll forward** (`â = ẑ × r̂`); a first draft that signed the axis per
-roller stamped A's line mirrored. **The index marks**: the track runs along `tB` through the
-corners of B-line column `m*` (−1 normally) in the border; A lays it with a SLANTED row of pegs,
-one on each ring at that ring's corner of column `m*` (an axial row only at θ = 90°); B's collar
-sits at that column's axial position with one tooth per tile round it at
-`s' = m*·|tA| cos θ + j·|tB|`; one seated tooth fixes both of B's free placements, because
-`|tA|·(cos θ r̂_B − sin θ â_B) = tA` exactly; A's peg row comes round outside the sheet iff
-`n_A ≥ cols + 1 + |m*|`, which is why A defaults to 6 round and B to 5; "roll back, then forward"
-for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a blade that cannot
-clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for its roller. A
-version-1 (crossbar) design file opens with its tile and sheet kept and its round counts reset;
-the storage key moved so an old design does not reopen by itself. Gates, both in CI
-(`tile-gate.yml`), each with a negative control that must catch every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry; D, every
-blade a ring round its roller read off the mesh — full azimuth, an axial extent of one line's
-width, the θ spacing — which a bar along the axis fails; the seam over three revolutions, every
-ring closing once; a rigid-body rolling simulation for registration, re-seated by a different
-tooth and dimple; a DIRECTED-edge census on every STL; heights read off the mesh) and
-`node tools/verify-tile-page.mjs` (Chromium, real pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
+there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3).
+A ring is one period laid `n` times and wrapped onto its own first vertex: a TORUS, no end caps.
+**No rims** — every ring is a wheel at the tip radius. **The price is printing**: support under
+every ring. **ALIGNMENT IS EVA'S METHOD (Oct 5), DONE BY THE ROLLERS AND HANDLES ALONE — the
+dimple track and B's toothed collar are GONE** (read §4 of `tile-design-doc.md` before touching
+`rollerLayout`'s sight/start block, the notch, `buildHandle` or the K/V/R families). Each roller
+spins on TWO handles (one per end, so the handle never turns with it); a V notch in both end
+faces and a spring tab on the handle click at the START POSE (the phase); each handle's sight arm
+hangs a pointer just past the roller's end, ON its straight contact line, 0.5 mm above the dough.
+A starts on its detent at the dough's straight edge and its pin(s) punch two PINHOLES; B is put
+down on its detent with both pointers over them — two points fix position, sideways and angle.
+**Two physics findings changed the brief, and are proved in §4.2:** B's END-RING contact points
+cannot both be corners at θ ≠ 90° (needs `cols·|tA|cosθ/|tB|` integer), and a pointer cannot sit
+over a point under the roller — so the fiducials are on B's contact line at virtual columns −j
+and cols + j (side borders): corners of row 0 on A's first ring at 90° (one pin lays both on the
+default), one corner + one post between A's rings otherwise. **The pins are FLUSH with the blade
+tips, not taller** (a proud pin lifts the roller; R1). **A whole-tile notch error on B is the same
+pose by symmetry** — only K2 (the declaration) sees it; half a tile misregisters (R). The page
+quotes the placement tolerance (±1 mm at each pointer → 1.51 mm worst corner on the default),
+computed by `sightTolerance` and cross-checked through the simulator (R6). Refused: a blade that
+cannot clear the dough, a roller too small for its bore, an end face with no room for the detent
+— and W5 checks the refusal NAMES the measured cause. Gates, both in CI (`tile-gate.yml`), each
+with a negative control that must catch every mutation (38 geometry, 18 page). **NO IMPOSTOR:** A's
+pins come round every revolution; the layout adds fiducial columns until no other pair of A's
+pinholes lies within 3 mm / 10° of B's pointer span (91° with A six round laid one 0.04 mm off),
+and K4 checks the stamped holes:
+`node tools/verify-tile.mjs` (Node: T tessellation, D rings, S seam, R two-point registration and
+tolerance, K detent and impostors, V sight arms, W directed-edge watertight on all four STLs, H heights, F flags)
+and `node tools/verify-tile-page.mjs` (Chromium: real pointer events and downloads; P22 the how-to's
+numbered steps and ±1 mm figure, P23 a fresh profile opens on 4 × 3). Sheet:
+`node tools/shot-tile.mjs <dir>` (the notch, the tab in it, a sight arm over the contact line, A's
+pin, B in use at 90° and 60°). Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.
