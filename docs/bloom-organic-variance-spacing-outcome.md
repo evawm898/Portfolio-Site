@@ -288,3 +288,51 @@ note:**
   clean records silent.
 
 The full matrix is CI's, and it is the merge criterion.
+
+## 9. CI found a tie in the sepal contact rule (`f982aca`)
+
+The first full CI run on `c2990a8` dropped `ALL MAX` from both long gates' shard 0, on
+**SP8**: *"one step above the limit (-36°) the harness's own contact test finds NO clip in
+either mode."* Every other job was green.
+
+**What happened.** The geometry's sepal scan and the harness's independent contact test
+both found the same nearest point: sepal 39 against petal 237, **2.359 mm against a
+2.4 mm sheet**. That point lies on an **interior edge** that two facets share. Both tests
+then decided "above or below" against **one facet's own normal**. At that crease the two
+faces disagree: one reads the point **−2.06 mm below**, the other **+0.09 mm above**. Each
+test took whichever facet it reached first (grid order against triangle order).
+
+The spacing field put `ALL MAX`'s petals on the tie. The rule itself was ill-posed before
+this build.
+
+**The fix: one tie-free quantity, read by two independent routes.** Both tests now read
+the side against the **emitted normal interpolated at the nearest point**. On a shared
+edge, both facets interpolate the same two endpoint normals. The geometry computes it with
+dot-product barycentrics, the harness with area ratios.
+
+An "above if ANY tied facet says so" rule was tried first, in the harness only, and
+**rejected**. It read a clip at the built angle on `FORM VARIANCE: x SEPALS`, which passes
+on `main`. It also found one at `ALL MAX`'s built angle.
+
+**Measured:**
+
+- **Limits.** The limit moves on **1 of the 80** live-matrix rows with sepals: `ALL MAX`,
+  −37° to **−40°**. That row is already this build's predeclared mover, so the byte
+  partition's mover set is unchanged. No other row calls the scan.
+- **`ALL MAX`'s records are unmoved.** Census **93,107 / 13.6547 mm** (`bloom-xfail-magnitudes
+  --include-refused`); export refusal **2,716,406** triangles, live and export alike.
+- **SP8 on the other 79 sepal rows.** Its two halves (no clip at the built angle; a clip
+  one step above) agree on all 79 in Node.
+- **Export gate in the browser.** **73/73** sepal rows pass (`verify-bloom-export --only`).
+- **Mutants.** `sepal-angle-clamp-removed` and `sepal-limit-drawn-at-the-rim` still fire
+  SP8, and the clean tree is silent.
+
+**Frozen bytes, named.** The new rule also moves the **spacing-0** `ALL MAX` state from
+−37° to −40°. That state is `frozen/phase53`'s own `ALL MAX` row, so **phase53's bytes stop
+reproducing on that one row**; its definitions are unchanged. `ALL MAX` also carries 40
+sepals in phase35 through phase52, so those rows may move the same way. They are
+predicted, not measured.
+
+**Recorded, not changed.** The harness test still treats a facet DIAGONAL between two
+boundary vertices as boundary. It is more lenient there than the geometry's per-edge flag.
+It moved nothing on any row measured here.
