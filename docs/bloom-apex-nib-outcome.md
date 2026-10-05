@@ -1347,7 +1347,10 @@ The sheet is `node tools/shot-bloom-fold-clamp.mjs <dir> --cuponly <worktree>`
   could move**: what would move it is the sepals, not the petals.
   **Its `SELF_INTERSECTION_XFAIL` entry IS MEASURED AND IS UNMOVED** —
   `node tools/bloom-xfail-magnitudes.mjs --include-refused --only '^ALL MAX$'`
-  reads **107,485 pairs / 10.1332 mm against a declared 107,485 / 10.1332**, in
+  reads **107,485 pairs / 10.1332 mm against a declared 107,485 / 10.1332**
+  **[Oct 5 docs sweep: this contradicts this doc's own section "The census list: 233 -> 211", which
+  records the move 107,485 -> 91,808; #302 measured 91,808 / 10.1332, and the entry
+  reads 116,847 / 15.8503 on `ebe617a` after the two variance builds. #302 item 1]**, in
   311 s on a 3.1-million-triangle build. It was going to be carried forward
   unmeasured and that would have been wrong: the sweep skips an export-refused
   row because no STL exists for X1 to read, so NOTHING would have caught a move
