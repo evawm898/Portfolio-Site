@@ -15399,6 +15399,19 @@ const boundaryHit = (lam, T, where) => {
 };
 /* THE CONTACT TEST — does the sepal lamina S clip any petal lamina in the
    grid? Returns null or the first finding. `t` is the sheet. */
+/* the lamina's EMITTED normal at a point q of facet T, barycentrically
+   interpolated from the facet's three corner normals (laminaContact's side
+   test; see there) */
+function emittedNormalAt(lam, T, q) {
+  const A = lam.pts[T[0]], B = lam.pts[T[1]], C = lam.pts[T[2]];
+  const v0 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], v1 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]], v2 = [q[0] - A[0], q[1] - A[1], q[2] - A[2]];
+  const d00 = v0[0] * v0[0] + v0[1] * v0[1] + v0[2] * v0[2], d01 = v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2], d11 = v1[0] * v1[0] + v1[1] * v1[1] + v1[2] * v1[2];
+  const d20 = v2[0] * v0[0] + v2[1] * v0[1] + v2[2] * v0[2], d21 = v2[0] * v1[0] + v2[1] * v1[1] + v2[2] * v1[2];
+  const den = d00 * d11 - d01 * d01;
+  const b = (d11 * d20 - d01 * d21) / den, c = (d00 * d21 - d01 * d20) / den, a = 1 - b - c;
+  const na = lam.nrm[T[0]], nb = lam.nrm[T[1]], nc = lam.nrm[T[2]];
+  return [a * na[0] + b * nb[0] + c * nc[0], a * na[1] + b * nb[1] + c * nc[1], a * na[2] + b * nb[2] + c * nc[2]];
+}
 export function laminaContact(S, petals, G, t) {
   const cell = G.cell, g = (x) => Math.floor(x / cell);
   const boxOverlaps = (L) => !(S.hi[0] < L.lo[0] - t || S.lo[0] > L.hi[0] + t || S.hi[1] < L.lo[1] - t || S.lo[1] > L.hi[1] + t || S.hi[2] < L.lo[2] - t || S.lo[2] > L.hi[2] + t);
@@ -15434,14 +15447,22 @@ export function laminaContact(S, petals, G, t) {
     const lam = petals[L];
     if (boundaryHit(lam, T, where)) continue;
     const A = lam.pts[T[0]], B = lam.pts[T[1]], C = lam.pts[T[2]];
-    /* the facet's own normal, ORIENTED onto the emitted normal at its first
-       corner — the top skin's side, which is what `above` means. The bare
-       cross product points the other way (T x dir is -n), measured: it read
-       every sepal hanging below a petal as above it. */
-    const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
-    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const na = lam.nrm[T[0]];
-    if (n[0] * na[0] + n[1] * na[1] + n[2] * na[2] < 0) { n[0] = -n[0]; n[1] = -n[1]; n[2] = -n[2]; }
+    /* WHICH SIDE is read against the EMITTED normal interpolated at the
+       nearest point q — the builder's own top-skin direction, which is what
+       `above` means — and never against one facet's own normal. The facet
+       normal was the shipped rule (oriented onto the emitted normal at its
+       first corner, because the bare cross product points the other way) and
+       it is ILL-POSED wherever q lands on an edge or vertex SHARED by several
+       facets: at a crease the faces disagree, and the answer was whichever
+       facet the grid walk reached first. Measured on `ALL MAX` under the
+       spacing field (organic variance, build 3): one face of petal 237 read a
+       sepal point -2.06 mm below and the other +0.09 mm above, at one nearest
+       point to the last bit, so SP8's independent check (nearest first in
+       TRIANGLE order) took the other face and disagreed. On a shared edge both
+       facets interpolate the same two endpoint normals, so this answer does
+       not depend on which facet is asked. It moved ONE row's limit over the
+       live matrix (ALL MAX, -37 -> -40, already this build's mover). */
+    const n = emittedNormalAt(lam, T, q);
     const nl = Math.hypot(n[0], n[1], n[2]); if (!(nl > 0)) continue;
     const side = ((P[0] - q[0]) * n[0] + (P[1] - q[1]) * n[1] + (P[2] - q[2]) * n[2]) / nl;
     if (side >= -1e-9) return { kind: d < 1e-9 ? 'coincident' : 'above', petal: L, at: q.slice(), mm: d, sepalAt: P.slice() };

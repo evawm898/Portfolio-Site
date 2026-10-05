@@ -9186,9 +9186,20 @@ function harnessContact(S, petals, t) {
       const ends = [[T[0], T[1]], [T[1], T[2]], [T[2], T[0]]][r.onEdge];
       if (L.edge[ends[0]] && L.edge[ends[1]]) continue;
     }
-    let n = hCross(hSub(B, A), hSub(C, A));
-    if (hDot(n, L.nrm[T[0]]) < 0) n = [-n[0], -n[1], -n[2]];
-    const side = hDot(hSub(P, r.q), n) / Math.hypot(n[0], n[1], n[2]);
+    /* the side is read against the lamina's EMITTED normal at the nearest
+       point (area-weighted from the facet's corners), never one facet's own
+       normal: where the nearest point is an edge or vertex several facets
+       share, the facets disagree at a crease and the answer would be whichever
+       one this loop met first — measured on ALL MAX under the spacing field,
+       -2.06 mm below one face and +0.09 above the other at the same point.
+       The geometry's laminaContact reads the same quantity by its own route. */
+    const fn = hCross(hSub(B, A), hSub(C, A)), fa = hDot(fn, fn);
+    if (!(fa > 0)) continue;
+    const wA = hDot(hCross(hSub(B, r.q), hSub(C, r.q)), fn) / fa, wB = hDot(hCross(hSub(C, r.q), hSub(A, r.q)), fn) / fa, wC = 1 - wA - wB;
+    const NA = L.nrm[T[0]], NB = L.nrm[T[1]], NC = L.nrm[T[2]];
+    const n = [wA * NA[0] + wB * NB[0] + wC * NC[0], wA * NA[1] + wB * NB[1] + wC * NC[1], wA * NA[2] + wB * NB[2] + wC * NC[2]];
+    const nl = Math.hypot(n[0], n[1], n[2]); if (!(nl > 0)) continue;
+    const side = hDot(hSub(P, r.q), n) / nl;
     if (side >= -1e-9) return `sepal point ${i} ${Math.sqrt(best.dd) < 1e-9 ? 'in' : 'above'} a petal lamina by ${Math.sqrt(best.dd).toFixed(4)} mm`;
   }
   for (const L of near) {
