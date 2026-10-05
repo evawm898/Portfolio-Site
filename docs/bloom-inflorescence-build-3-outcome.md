@@ -798,3 +798,27 @@ All run on this box on the tree as pushed, each after its last code change (the 
   merged tree), both firing.
 - **Not run locally, CI's**: the full 1110-row matrix on both STL gates (eight shards), the frozen sweep,
   the arc-stability witness, the stem-channel and stem-nodes witnesses in preflight.
+
+### 19a. What CI found on the merged tree that the local runs could not
+
+Two reds on the first full run after the merge, neither a geometry change and both recorded
+where they live:
+
+- **`preflight` on `45003cd`** — `verify-bloom-defaults-bar.mjs` imports `buildMatrix` from the
+  harness, which imports `playwright-core` at module load, and the step sat before the npm
+  install (§14's note). Moved after it; reproduced locally by removing the package.
+- **`gates` on `5cf74e2`** — the edge-profile gate's E2 on `NODE VARIANCE: 0.5 x the form field
+  0.5`: the rim treatment adds **49.478652°** of turn within 2 mm of a rim against the 45°
+  allowance (face-to-face 50.75°, outline 1.28°). That gate draws its rows from the smoke
+  subset, so block 50's rows had never reached it before the merge; locally it reproduces to
+  the sixth decimal in 6 s. **Attributed, two-sided, to the declared twist-out-of-plane class
+  (`petalTwist max (180)`, the FORM VARIANCE rows) reached on a FLORET by the two fields
+  composing**: the builder's own `applied` record puts the row's worst floret petal at curl
+  45.3 × cup 0.61 × twist −111 (the node term's −45 of twist on the head's field's −45..+88);
+  the form field alone on this raceme reaches twist ±88 and node variance alone ±45, and both
+  sibling smoke rows pass E2 in the same CI run; through the gate's own measurement on a plain
+  bloom at the sliders, twist −111 ALONE adds 49.099660°, curl 45 × cup 0.6 × twist −111 adds
+  53.656988° and the other node's −15 × −0.46 × 111 adds 48.978261°. Declared in `E2_TURN_XFAIL`
+  at 4.478652° of excess with the band's own stale clause firing when the record is moved
+  (checked at 4.4: *"re-record it"*). Not clamped: the field's reach is headroom-scaled by
+  ruling, and a cap on the composition would be the fifth typed threshold build 2 refused.

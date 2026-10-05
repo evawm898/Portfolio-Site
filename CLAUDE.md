@@ -3695,7 +3695,14 @@ keyed five builds on a two-way alternate raceme. The sheet is `docs/img/inflo-bu
 (`tools/shot-bloom-node-variance.mjs`): OFF against ON side-on on one camera at a held node
 count, the re-floored default, the cap. Block 50 is eleven rows (matrix 1110; 49 and 50, not 48 and 49: stem session 3 took 48 while this PR was in CI), and the merge with stem session 3 adds +94 triangles to every raceme row (the cut on the rachis; the pedicels are pinned FLAT by ruling 7's pin) — 96,468 → 96,562 on the default raceme, every percentage unchanged, eight mutants
 in the apex table, and **every inflorescence mutant was RE-RUN because rulings 1 and 2 are law
-changes** (Eva: "any mutant that went green against the old laws is stale evidence").
+changes** (Eva: "any mutant that went green against the old laws is stale evidence"). **AND THE
+MERGED TREE'S FIRST FULL CI RUN FOUND TWO THINGS NO LOCAL RUN COULD** (§19a of the doc): the
+defaults-bar gate imports the harness and so sits AFTER the npm install (ST9's placement rule,
+re-learned on `45003cd`), and the edge-profile gate's E2 — which draws from the smoke subset,
+so block 50 had never reached it — reads **49.478652°** on `NODE VARIANCE: 0.5 x the form field
+0.5`: a FLORET petal at twist −111 where the node term and the head's form field compose, the
+declared twist-out-of-plane class (twist −111 on the sliders alone adds 49.10° through the same
+gate), declared in `E2_TURN_XFAIL` at its magnitude and not clamped.
 
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
