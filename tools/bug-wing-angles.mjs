@@ -169,10 +169,11 @@ else if (CMD === 'review') (await import('./bug-wing-angles-review.mjs')).review
    (canonical, 9 decimals so posing it at its own angle rounds back to the 5-decimal points it came from, bit for bit) and its measured angle as `sweep`; the tail as it was (its
    anchor is on the posed outline). Header and ids untouched. */
 if (CMD === 'store') {
-  // Eva's ruling on the wing-angle audit (Oct 5): #22 merged into #4 and #19
-  // into #10 (the same wing at nearly the same angle); #57 kept. Ids never change:
-  // a merged id is a gap, like #34 and #50.
-  const MERGED = { 22: 4, 19: 10 };
+  // Eva's ruling on the wing-angle audit (Oct 5): #22 into #4 and #19 into #10
+  // are APPROVED and DEFERRED to a follow-up PR with two builder fixes (removing
+  // them reshuffles the random draws onto blends main's builder gets wrong,
+  // §14.5). Fill MERGED there; ids never change, a merged id is a gap.
+  const MERGED = {};
   const snap = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/bug-wing-library-snapshot.json'), 'utf8')).filter((s) => !(s.id in MERGED));
   const file = path.join(ROOT, 'bug-wing-library.js'), src = fs.readFileSync(file, 'utf8');
   const head = src.slice(0, src.indexOf('export const WING_LIBRARY'));
@@ -181,7 +182,7 @@ if (CMD === 'store') {
   // angle: the sweep's (<out>/sweep.json) widest run about 0 over which every
   // built row passes, ends included; without a sweep, none is written
   const SW = fs.existsSync(path.join(OUT, 'sweep.json')) ? JSON.parse(fs.readFileSync(path.join(OUT, 'sweep.json'), 'utf8')) : null;
-  const SW_SHAPE = (id) => G.WING_LIBRARY.find((x) => x.id === id);   // the library as stored (posing reproduces #361 exactly, WA1)
+  const SW_SHAPE = (id) => snap.find((x) => x.id === id);   // #361's posed outlines (the snapshot), never this tool's own previous output
   const rangeOf = (id, which) => {
     if (!SW) return null;
     const sp = SW.spans.find((x) => x.id === id && x.which === which); if (!sp) return null;
@@ -193,7 +194,7 @@ if (CMD === 'store') {
     // MEASURED degrees (setWingAngle), and the two differ where the stretch is
     // raised (a raw +16 reads +15.81 on #16's hindwing). The range is stored in
     // measured degrees: what the last verified raw turn reads, toward 0 to 0.1
-    const posed = G.posedWing(which === 'fore' ? SW_SHAPE(id).fore : SW_SHAPE(id).hind), a0 = G.wingAngleOf(posed.points, posed.stretch);
+    const sw = which === 'fore' ? SW_SHAPE(id).fore : SW_SHAPE(id).hind, posed = { points: sw.points, stretch: sw.stretch }, a0 = G.wingAngleOf(posed.points, posed.stretch);
     const tail = which === 'hind' && SW_SHAPE(id).tail ? { ...SW_SHAPE(id).tail, on: true } : null;
     const meas = (d) => { if (!d) return 0; const r = G.rotateWingBlade(posed.points, posed.stretch, d, tail); const m = G.wingAngleOf(r.points, r.stretch) - a0; return Math.sign(m) * Math.floor(Math.abs(m) * 10) / 10; };
     return [Math.max(-20, meas(lo)), Math.min(20, meas(hi))];

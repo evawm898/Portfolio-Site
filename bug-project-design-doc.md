@@ -2395,8 +2395,14 @@ bar (2.16 mm at a 41 mm wing). Two groups pass on BOTH wings:
 turned ~7° back. Near pairs the angle explains most of (as drawn ≫ aligned, over the bar):
 #12 ~ #39 (fore 11.66 → 3.06 mm at −14.5°, hind 7.41 → 2.45 at −11°), #38 ~ #54 fore
 (10.61 → 2.28 at −14.7°), #9 ~ #10 fore (7.96 → 3.03 at −11.7°), #22 ~ #35 / #4 ~ #35 fore
-(~9 → 3.2 at ~−10°). **RULED (Eva, Oct 5): #22 is merged into #4 and #19 into #10** (each the same wing at nearly
-the same angle; the merged ids are gaps, like #34 and #50 — LB1 restates the 53 kept ids).
+(~9 → 3.2 at ~−10°). **RULED (Eva, Oct 5): merging #22 into #4 and #19 into #10 is APPROVED and DEFERRED** to a
+follow-up PR, together with two builder fixes. Removing the two entries reshuffles the random
+bugs' blends (picked by position in the library), and the new draws hit two pre-existing
+builder defects, both reproduced on `main`'s own code: random:3's blend #20/#31 at 0.62 has a
+hindwing the gate's N measure reads 1.04 mm past the floor disc while the builder reads 0.42
+(under its 0.5 bar) and exports; random:1's blend #55/#27 at 0.37 in HOLES fails E1 (6 beads
+wider than a half-round). The library therefore stays at 55 shapes in this PR (option A);
+`tools/bug-wing-angles.mjs store`'s MERGED map is where the follow-up applies the merge.
 **#57 is kept** as its own shape: a narrower forewing tip and a ~16% longer hindwing, so it adds
 variety even though its forewing is #4's turned ~7° back. The angle ladder and the regenerated
 root were approved from the review page.
