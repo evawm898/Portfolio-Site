@@ -12135,6 +12135,65 @@ export const STEM_MIN_WALL_MM = 1.5;
 export const STEM_LENGTH_RANGE = Object.freeze([0, 120]);
 export const STEM_DIAMETER_RANGE = Object.freeze([3, 12]);
 export function stemBoreRadius(outerR) { return Math.max(0, outerR - STEM_MIN_WALL_MM); }
+/* ===================================================================
+   THE FLORIST'S CUT (Eva's ruling 7, Oct 3; built in stem session 3 —
+   docs/bloom-stem-cut-outcome.md). The stem's FREE end is cut at a full 45
+   degrees, as a florist cuts a stem, and it ships as a CONTROL defaulting ON.
+   The object not standing is accepted by ruling.
+
+   THE ANGLE IS CARRIED AS A SLOPE, AND THE SLOPE IS EXACTLY 1. `Math.tan(Math.PI
+   / 4)` is 0.9999999999999999 in IEEE-754, so a "45 degrees" written as a tangent
+   of pi/4 would put every short point an ulp off the long point's own arithmetic
+   and hand the land's chord azimuths a bar that is not 45 at the last bit. The
+   ruled angle is a RISE PER MILLIMETRE OF RUN, and at 45 degrees that number is
+   1 exactly; `STEM_CUT_DEG` is the ruling's own word for the read-out and is
+   never used in arithmetic.
+
+   THE LAND IS DERIVED FROM TWO PRINT NUMBERS AND TYPED FROM NEITHER. A 45-degree
+   wedge is `d` mm thick `d` mm from its edge, so the last millimetre of the point
+   is thinner than anything this project calls printable, and the ruling asks for
+   a small flat LAND at the long point rather than a knife edge. The land's width
+   is the thinnest horizontal section the point is allowed to have — truncating
+   the wedge at a horizontal flat of radial width `w` leaves the point's thinnest
+   section exactly `w` — so it is the larger of the two floors a printed feature
+   has to clear: the project's own minimum feature (`MIN_FEATURE_MM`, 1.00 mm, a
+   declared guess) and TWO NOZZLE WIDTHS (a wall needs an outer and an inner
+   perimeter to be laid at all; `NOZZLE_MM` 0.4 is the nozzle the charter's own
+   ruling names, and like every print number here it is an ASSUMPTION — nothing
+   in this project has been printed). The floor binds: max(1.00, 0.80) = 1.00 mm,
+   with the nozzle 0.20 mm under it. It is decided mode-free — whether the point
+   exists is topology, and the export floor may not decide it (session 32's rule).
+   THE DRAWN LAND IS THE LATTICE'S, AT OR BEYOND THAT FLOOR: the land's inner
+   edge is the chord between two columns of the tube's own 48-column lattice
+   (the smallest chord at least the floor deep), never a vertex inserted between
+   columns. The first construction inserted the exact chord as two extra
+   columns, and at a 4 mm stem the chord's azimuth is acos(1/2) = 60 degrees —
+   a lattice column to the last bit — so every band carried two zero-width
+   slivers and the degeneracy census counted 24. On the lattice the land is
+   1.00 mm at the floor and up to one column deeper (1.24 mm on the 6 mm stem),
+   and `plan.cut.landMm` is the land as drawn.
+
+   `stemLength` MEASURES TO THE LONG POINT (ruled), which is the land itself: the
+   land lies at the stem's full length and the cut plane rises from the land's
+   inner edge to the short point `slope x (2 r - w)` above it. A cut HOLLOW stem
+   ends SOLID (ruled — the tip-plug ruling, #238, survives the cut): the plug is
+   derived in `stemPlan` from the cut's own geometry and Eva's own wall, and at the
+   ruled 45 degrees it is `D + 0.62 mm` measured from the long point. At 3 mm the
+   stem is already solid and the cut costs nothing there.
+   =================================================================== */
+export const STEM_CUT_VALUES = Object.freeze(['FLORIST', 'FLAT']);
+export const STEM_CUT_DEG = 45;
+export const STEM_CUT_SLOPE = 1;
+export const NOZZLE_MM = 0.4;
+export const STEM_CUT_LAND_MIN_MM = Math.max(MIN_FEATURE_MM, 2 * NOZZLE_MM);
+/* THE TWO STATEMENTS, the stemNodesAbsent / stemNodesEligible pattern: the
+   registry's `stemCutLive` says when the control is live and this says when the
+   geometry cuts nothing; SC0 asserts they are exact complements. A stem too
+   short to carry its own cut (`lengthMm <= span`) is NOT a statement here — it is
+   the plan's `cut.inertShort`, told on the read-out, the corymb's own shape. */
+export function stemCutAbsent(state) {
+  return stemIsAbsent(state) || String(state.stemCut === undefined ? STEM_CUT_VALUES[0] : state.stemCut) !== 'FLORIST';
+}
 /* THE TWO STATEMENTS, the androeciumEligible / gynoeciumEligible pattern: the
    registry HIDES a control on this condition and this makes it INERT, and the
    harness asserts the two agree (ST0).
@@ -12876,7 +12935,76 @@ export function stemPlan(state, ring, acc) {
      mode-free wherever the band's condition is, because on a sphere the band IS
      the join and the head's thickness cancels out of the difference. The
      pre-existing half is the BAND's and is not touched here. */
-  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;
+  /* THE NODES (#299's port) — NULL at prominence 0, and then every field
+     below is the pre-node plan verbatim: the station list is `stemStations`'
+     own two, and nothing else is read. Computed HERE, ahead of the cut and the
+     plug, because the cut is made on the tip ring's OWN radius (the law's at
+     the full length), which is `outerR` to the bit where there is no law. */
+  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);
+  /* ===================================================================
+     THE FLORIST'S CUT (ruling 7). Everything about it is derived from the
+     controls and two print numbers, and it is a BRANCH: with the control at
+     FLAT every field below reads exactly what it read before the cut existed,
+     so a FLAT stem — every pedicel, by `PEDICEL_PINS` — is byte-identical by
+     construction rather than by an argument about arithmetic.
+
+     THE GEOMETRY. The cut plane rises at `STEM_CUT_SLOPE` from the LAND's inner
+     edge (radius `rTip - land` on the long-point side, azimuth 0) to the SHORT
+     POINT on the far wall, so its axial span is `slope x (2 rTip - land)`. The
+     land is the horizontal flat where that plane would fall below the stem's
+     full length, a circular segment `land` mm deep, bounded by the chord at
+     azimuths +-acos(1 - land / rTip). The tube above the cut is the placer's
+     own ladder over the length that is left (`lengthMm - span`), and the
+     stations carry the long point as their last entry, so ST2's "the last
+     station is the stem's length" is still what the rings' depths say.
+
+     A STEM SHORTER THAN ITS OWN CUT IS TOLD, NEVER REFUSED: at the widest
+     stem the span is 11 mm, and `stemLength` reaches 1. `cut.inertShort` is
+     the record and the read-out prints it; the stem then ends flat. The
+     comparison `lengthMm > spanMm` is a discrete decision on two CONTROLS
+     (an integer-step length against a quarter-step radius less a 1.00 mm
+     land), both exact doubles, so equality at `stemLength` 2 on a 3 mm stem
+     is decided by exact arithmetic and not by a last bit.
+
+     THE PLUG UNDER THE CUT (ruled: a cut hollow stem ends SOLID). The void's
+     floor must stand Eva's wall away from the cut plane measured PERPENDICULAR
+     to it, over the whole bore; the plane is lowest on the long-point side
+     and highest at `x = -b` on the short-point side, where its height above
+     the long point is `slope x (rTip + b)`. A perpendicular wall of W is
+     `W sqrt(1 + slope^2)` of height, so the floor sits at
+     `slope x (rTip + b) + W sqrt(1 + slope^2)` = `2 rTip slope + W (sqrt(1 +
+     slope^2) - slope)` above the long point (using `rTip - b = W`, Eva's own
+     rule). At the ruled slope of 1 that is `D + 0.62 mm`, the ruling's own
+     figure; it is written as the derivation and not as the figure, and it is
+     measured from the FULL cut's long point so the land only ever adds margin
+     (0.71 mm of it at the land's own width). */
+  const cutOn = !stemCutAbsent(state);
+  const rTip = nodeLaw ? stemNodeRadiusMm(nodeLaw, lengthMm) : outerR;
+  /* THE LAND ON THE LATTICE: column `j` is the first whose chord from the
+     long-point column (azimuth 0) is at least the floor deep — the smallest
+     `j` with `rTip (1 - cos(j step)) >= floor`. Both halves of the comparison
+     are the controls' (the tip radius and a derived constant), and the two
+     columns +-j are the land's edge; `cosJ` is the one number the cut plane's
+     height is written against, so the plane is EXACTLY 0 at those columns. */
+  const cutStep = TAU / HUB_SECTORS;
+  let cutLandIdx = 0;
+  if (cutOn) { while (cutLandIdx < HUB_SECTORS / 2 && !(rTip * (1 - Math.cos(cutLandIdx * cutStep)) >= STEM_CUT_LAND_MIN_MM)) cutLandIdx++; }
+  const cutCosJ = Math.cos(cutLandIdx * cutStep);
+  const cutLandMm = cutOn ? rTip * (1 - cutCosJ) : 0;
+  const cutSpanMm = cutOn ? STEM_CUT_SLOPE * rTip * (cutCosJ + 1) : 0;
+  const cutMade = cutOn && lengthMm > cutSpanMm;
+  const cut = {
+    on: cutOn, made: cutMade, inertShort: cutOn && !cutMade,
+    deg: STEM_CUT_DEG, slope: STEM_CUT_SLOPE, landMinMm: STEM_CUT_LAND_MIN_MM, landMm: cutLandMm, landIdx: cutLandIdx, cosJ: cutCosJ, rTip, spanMm: cutSpanMm,
+    shortDepthMm: cutMade ? lengthMm - cutSpanMm : null,
+    /* THE ANGLE AGAINST THE LOCAL AXIS, where a node leans the tip: the plane
+       is 45 degrees to the WORLD vertical — every ring here is horizontal and
+       only its centre moves (ruling 5's convention) — so against a leaning
+       axis it reads 45 +- the lean. Reported, as ruling 5's wall is. */
+    tipTiltDeg: nodeLaw ? stemNodeTiltRad(nodeLaw, lengthMm) * 180 / Math.PI : 0,
+  };
+  const cutPlugMm = 2 * rTip * STEM_CUT_SLOPE + STEM_MIN_WALL_MM * (Math.sqrt(1 + STEM_CUT_SLOPE * STEM_CUT_SLOPE) - STEM_CUT_SLOPE);
+  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;
   const voidTopZ = topZ - solidBandMm;
   /* THE BORE THAT SURVIVES THE TWO CLOSURES. `voidBottomZ` is derived FROM
      `voidMm` rather than from `tipZ + tipPlugMm`, so that the ladder
@@ -12890,11 +13018,14 @@ export function stemPlan(state, ring, acc) {
      which: one is Eva's bore rule closing at the 3 mm floor, the other is the
      two derived closures meeting across a short stem. */
   const solidThrough = boreR > 0 && !(voidMm > 0);
-  /* THE NODES (#299's port) — NULL at prominence 0, and then every field
-     below is the pre-node plan verbatim: the station list is `stemStations`'
-     own two, and nothing else is read. */
-  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);
-  const stations = nodeLaw ? stemNodeStations(nodeLaw, 0, lengthMm) : stemStations(lengthMm);
+  /* THE TUBE'S OWN LADDER runs to the SHORT POINT when the stem is cut — the
+     placer asked for its own length rather than the full ladder filtered by a
+     comparison (the void's own construction, so a station an ulp inside the
+     cut is never a degenerate band) — and the long point is appended as the
+     last station, the depth of the land. Uncut, it is the expression it was. */
+  const tubeLengthMm = cutMade ? lengthMm - cutSpanMm : lengthMm;
+  const tube = nodeLaw ? stemNodeStations(nodeLaw, 0, tubeLengthMm) : stemStations(tubeLengthMm);
+  const stations = cutMade ? [...tube, lengthMm] : tube;
   /* THE VOID'S OWN LADDER, owned HERE so ST1 can predict the emitted count
      from the plan: the same placer over the void's own depths, mapped back to
      millimetres from the void's top with both ENDS set exactly — `voidTopZ -
@@ -12952,6 +13083,7 @@ export function stemPlan(state, ring, acc) {
     headOuterMm, headInsideBore, solidBandMm,
     tipPlugMm, voidTopZ, voidMm, voidBottomZ, solidThrough,
     stations, sides: HUB_SECTORS,
+    cut, tubeStations: tube,
     voidStations, nodeLaw, nodeTiltMaxDeg, nodeTipOffsetMm, nodeMaxOuterR, nodeWallPerpMm, nodeWallPerpAtMm,
   };
 }
@@ -13256,8 +13388,15 @@ export function buildStemInto(acc, plan) {
   if (!plan.present) return { tris: 0 };
   const N = plan.sides, R = plan.outerR, b = plan.boreR;
   const before = acc.triangleCount;
+  /* THE AZIMUTH LIST IS ONE LIST FOR EVERY RING OF THE STEM, cut or not: the
+     `HUB_SECTORS` lattice, each azimuth the double `(k * TAU) / N` it always
+     was. A cut inserts NO column — its land is a chord of this lattice. */
+  const CUT = plan.cut && plan.cut.made ? plan.cut : null;
+  const thetas = Array.from({ length: N }, (_, k) => (k * TAU) / N);
   /* THE RINGS ARE THE PLACER'S OWN STATIONS, in millimetres of arc from the
-     hub, plus the root band above them. Station 0 is the underside. */
+     hub, plus the root band above them. Station 0 is the underside. With a
+     cut the LAST station is the long point, and its ring is the CUT RING —
+     built below from the ring above it rather than from `zs`. */
   const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];
   /* THE TOP THE BUILDER ACTUALLY EMITTED — ST4's measured side. Reading the
      plan's own `topZ - rootZ` would put BOTH sides of that clause on the plan,
@@ -13265,9 +13404,7 @@ export function buildStemInto(acc, plan) {
      started at the underside instead of through the slab would leave the plan
      untouched and the clause green. */
   const emittedTopZ = zs[0];
-  const ringAt = (rad, z) => Array.from({ length: N }, (_, k) => {
-    const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];
-  });
+  const ringAt = (rad, z) => thetas.map((th) => [rad * Math.cos(th), rad * Math.sin(th), z]);
   /* WHAT THE RINGS ACTUALLY CAME OUT AS — ST2's and ST3's measured side, and
      they are here because reading the PLAN's declared radii and axis put BOTH
      sides of those clauses on the plan. A builder that rang every station a
@@ -13312,9 +13449,7 @@ export function buildStemInto(acc, plan) {
     const law = plan.nodeLaw;
     const ringAtS = (rad, z, sDepth) => {
       const c = stemNodeAxisMm(law, sDepth);
-      return Array.from({ length: N }, (_, k) => {
-        const th = (k * TAU) / N; return [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z];
-      });
+      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);
     };
     const emittedRings = [];
     const measureAbout = (rings, which) => {
@@ -13334,7 +13469,11 @@ export function buildStemInto(acc, plan) {
       }
     };
     const outerDepths = [plan.rootZ - plan.topZ, ...plan.stations];
-    nodeOuter = zs.map((z, i) => ringAtS(stemNodeRadiusMm(law, outerDepths[i]), z, outerDepths[i]));
+    /* With a cut the last station's ring is NOT a horizontal ring — it is
+       the cut ring, built from the one above it below — so the horizontal
+       rings stop at the short point. */
+    const horizontal = CUT ? zs.length - 1 : zs.length;
+    nodeOuter = zs.slice(0, horizontal).map((z, i) => ringAtS(stemNodeRadiusMm(law, outerDepths[i]), z, outerDepths[i]));
     measureAbout(nodeOuter, 'outer');
     nodeInner = (mm) => { const z = plan.voidTopZ - mm; return ringAtS(b, z, plan.rootZ - z); };
     /* THE VOID'S OWN LADDER IS THE PLAN'S (`plan.voidStations`), so ST1
@@ -13343,11 +13482,64 @@ export function buildStemInto(acc, plan) {
     nodeMeasureInner = (rings) => measureAbout(rings, 'inner');
     nodeReport = () => emittedRings;
   }
-  const outer = nodeOuter || zs.map((z) => ringAt(R, z));
+  const outer = nodeOuter || (CUT ? zs.slice(0, zs.length - 1) : zs).map((z) => ringAt(R, z));
   if (!nodeOuter) measure(outer);
   for (let i = 0; i < outer.length - 1; i++) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
+  }
+  /* ===================================================================
+     THE CUT RING AND THE CUT BAND (ruling 7). The ring above is the tube's
+     last, at the SHORT POINT's depth; the cut ring hangs below it, one vertex
+     per column, each at the height the cut plane has at its azimuth:
+     `h = slope x (rTip - land - rTip cos th)`, clamped at the land. A vertex
+     on a noded stem sits on ITS OWN depth's ring — the law's centre and
+     radius at `rootZ - z` — so the face follows the kinked axis exactly as
+     every horizontal ring does (rings horizontal, centres from the law).
+
+     THREE EXACT IDENTITIES, none of them a tolerance:
+       - the SHORT-POINT column's cut vertex IS the ring above's vertex, by
+         reference: the plane meets the wall there at the ring's own height
+         and a second computation of that height (`tipZ + span` against
+         `rootZ - (L - span)`) is two roundings of one number;
+       - the two LAND-EDGE columns (+-j) sit ON the land: the plane's height
+         is written as `slope x rTip x (cosJ - cos th)`, and at those columns
+         `cos th` IS `cosJ` — the same double from the same call;
+       - every land column is at `tipZ` exactly — `Math.max(0, h)` where the
+         plane is below the land, and `h` there is negative by whole columns.
+     So the band's two triangles at the short-point column have two vertices
+     that are the SAME ARRAY, and they are skipped by that identity — no
+     epsilon, no area test; `acc.quad` would emit them zero-area and the
+     degeneracy census would count them. */
+  let cutRing = null, cutRingDepths = null;
+  if (CUT) {
+    const up = outer[outer.length - 1];
+    if (N % 2) throw new Error('buildStemInto: the lattice has no column at the short point (HUB_SECTORS must be even)');
+    const shortIdx = N / 2;
+    cutRing = []; cutRingDepths = [];
+    for (let i = 0; i < N; i++) {
+      if (i === shortIdx) { cutRing.push(up[i]); cutRingDepths.push(plan.cut.shortDepthMm); continue; }
+      const th = thetas[i];
+      /* The plane's height at column i is written against the column's
+         DISTANCE FROM THE LONG POINT IN COLUMNS, `min(i, N - i)`, so the two
+         mirrored columns +-i take the SAME cosine — `cos((N - j) step)` is
+         not the double `cos(j step)` is, and the land's far edge sat
+         1.8e-15 above the land until this read the mirror. */
+      const h = Math.max(0, CUT.slope * CUT.rTip * (CUT.cosJ - Math.cos(Math.min(i, N - i) * (TAU / N))));
+      const z = plan.tipZ + h;
+      const depth = plan.rootZ - z;
+      const c = plan.nodeLaw ? stemNodeAxisMm(plan.nodeLaw, depth) : [0, 0];
+      const rad = plan.nodeLaw ? stemNodeRadiusMm(plan.nodeLaw, depth) : R;
+      cutRing.push([c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);
+      cutRingDepths.push(depth);
+    }
+    const dn = cutRing;
+    const tri = (a, b2, c) => { if (a === b2 || b2 === c || a === c) return; acc.tri(a, b2, c); };
+    for (let k = 0; k < N; k++) {
+      const k2 = (k + 1) % N;
+      tri(up[k], dn[k], dn[k2]);
+      tri(up[k], dn[k2], up[k2]);
+    }
   }
   /* ===================================================================
      THE BORE'S TWO ENDS, ONE LAW AND ONE EXPRESSION (the tip-plug session;
@@ -13412,6 +13604,36 @@ export function buildStemInto(acc, plan) {
     }
   };
   const tOut = outer[0], bOut = outer[outer.length - 1];
+  /* THE CUT FACE IS TWO PLANAR FANS SHARING THE CHORD — the LAND (horizontal,
+     facing down, a circular segment) and the CUT PLANE (a circle less that
+     segment), each convex in plan so a fan from a chord vertex lies in its
+     own plane. Wound as the flat bottom disc is wound, so the directed-edge
+     census (ST10) and the orientation gate read it the same way. The face's
+     own triangle range is recorded so its projected area can be read off
+     exactly the triangles emitted here. */
+  let cutFaceFrom = null, cutFaceTo = null;
+  const cutFaceInto = () => {
+    const cr = cutRing, M = cr.length;
+    const iA = CUT.landIdx, iB = M - CUT.landIdx;
+    cutFaceFrom = acc.triangleCount;
+    /* A land of ZERO columns (a knife edge — reachable only by removing the
+       land's floor, which `the-land-is-removed` does) is one vertex, so its
+       fan is empty and the plane's polygon is the whole ring closing on that
+       vertex; the identity skip below is what keeps the closing triangle
+       out, so the face is N - 2 triangles at every land width. */
+    const tri = (a, b2, c) => { if (a === b2 || b2 === c || a === c) return; acc.tri(a, b2, c); };
+    const land = [];
+    for (let i = iB; i < M; i++) land.push(cr[i]);
+    for (let i = 0; i <= iA; i++) land.push(cr[i]);
+    for (let j = 1; j < land.length - 1; j++) tri(land[0], land[j + 1], land[j]);
+    const plane = [];
+    for (let i = iA; i <= iB; i++) plane.push(cr[i % M]);
+    for (let j = 1; j < plane.length - 1; j++) tri(plane[0], plane[j + 1], plane[j]);
+    cutFaceTo = acc.triangleCount;
+  };
+  /* The void's own floor under a cut: a rim fan facing UP into the bore —
+     `endFace`'s closed cap, term for term, on the one ring. */
+  const voidCapInto = (cap) => { for (let k = 1; k < N - 1; k++) acc.tri(cap[0], cap[k], cap[k + 1]); };
   let emittedVoid = false, emittedVoidTopZ, emittedVoidBottomZ;
   if (plan.voidMm > 0) {
     /* THE VOID GETS ITS OWN LADDER FROM THE ONE PLACER, over its own length,
@@ -13452,7 +13674,13 @@ export function buildStemInto(acc, plan) {
     emittedVoidTopZ = inner[0][0][2];
     emittedVoidBottomZ = inner[inner.length - 1][0][2];
     endFace(tOut, inner[0], plan.solidBandMm > 0, true);
-    endFace(bOut, inner[inner.length - 1], plan.tipPlugMm > 0, false);
+    if (CUT) { cutFaceInto(); voidCapInto(inner[inner.length - 1]); }
+    else endFace(bOut, inner[inner.length - 1], plan.tipPlugMm > 0, false);
+  } else if (CUT) {
+    /* NO BORE under a CUT: the top cap as the solid arm emits it, the cut
+       face below. */
+    for (let k = 1; k < N - 1; k++) acc.tri(tOut[0], tOut[k], tOut[k + 1]);
+    cutFaceInto();
   } else {
     /* NO BORE LEFT TO SEE — either the stem never had one (at or under the 3 mm
        floor `stemBoreRadius` returns 0) or the two closures MEET across a short
@@ -13519,8 +13747,26 @@ export function buildStemInto(acc, plan) {
       if (seen.get(key) !== 1 || !seen.has(`${bq}>${a}`)) directedMismatch++;
     }
   }
+  /* THE CUT FACE AS EMITTED — the measured side of SC1 and of ST10's
+     end-face clause: the cut ring's own vertices (what the law is restated
+     against, vertex by vertex, from the controls), and the PROJECTED area of
+     the face's own triangles, which a face with a hole in it cannot reach. */
+  let emittedCut = null;
+  if (CUT) {
+    const P = acc.positions;
+    let projected = 0, maxZ = -Infinity, minZ = Infinity;
+    for (let t = cutFaceFrom * 9; t < cutFaceTo * 9; t += 9) {
+      const ux = P[t + 3] - P[t], uy = P[t + 4] - P[t + 1];
+      const vx = P[t + 6] - P[t], vy = P[t + 7] - P[t + 1];
+      projected += Math.abs(ux * vy - uy * vx) / 2;
+      for (const k of [2, 5, 8]) { if (P[t + k] > maxZ) maxZ = P[t + k]; if (P[t + k] < minZ) minZ = P[t + k]; }
+    }
+    emittedCut = { ring: cutRing.map((v) => v.slice()), depths: cutRingDepths.slice(), azimuths: thetas.slice(),
+                   faceTris: cutFaceTo - cutFaceFrom, projectedAreaMm2: projected, faceMaxZ: maxZ, faceMinZ: minZ,
+                   landCount: cutRing.filter((v) => v[2] === plan.tipZ).length };
+  }
   return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1],
-           emittedVoid, emittedVoidTopZ, emittedVoidBottomZ, directedMismatch, emittedBottomAreaMm2,
+           emittedVoid, emittedVoidTopZ, emittedVoidBottomZ, directedMismatch, emittedBottomAreaMm2, emittedCut,
            emittedMaxR, emittedMinR: emittedMinR === Infinity ? 0 : emittedMinR, emittedAxisOffset,
            ...(nodeReport ? { emittedRings: nodeReport() } : {}) };
 }
@@ -15522,6 +15768,7 @@ export const PEDICEL_PINS = Object.freeze({
   inflorescence: 'NONE',      // a floret is one flower, never a raceme of its own
   leafLength: 0,              // no leaves on a pedicel
   stemNodeProminence: 0,      // no nodes on a pedicel (ruling 6)
+  stemCut: 'FLAT',            // no florist's cut on a pedicel (ruling 7): its free end is the one rooted THROUGH the rachis wall
 });
 export function floretState(state, plan, lengthMm = plan.pedicelLenMm) {
   return {
@@ -15869,7 +16116,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
        page's own read-back, which is an owner this record does not write. */
     floretState: { inflorescence: fs.inflorescence, leafLength: fs.leafLength, petalCount: fs.petalCount,
       petalLength: fs.petalLength, petalWidth: fs.petalWidth, stemLength: fs.stemLength, stemDiameter: fs.stemDiameter,
-      stemNodeProminence: fs.stemNodeProminence },
+      stemNodeProminence: fs.stemNodeProminence, stemCut: fs.stemCut },
   };
 }
 

@@ -6388,6 +6388,20 @@ file in the repo. Rulings 1–4 are in `docs/bloom-stem-taper-laws.md` and
     mode-free (whether the point exists is topology).
   - It is session 2's, deliberately separate from ruling 6: it moves about 114 live rows and
     would make ruling 6's one-row partition impossible to attribute.
+  - **BUILT in stem session 3** — `docs/bloom-stem-cut-outcome.md`. `stemCut` (Stem, a
+    CHOICE, FLORIST / FLAT, default FLORIST). The angle is a SLOPE and the slope is exactly 1
+    (`Math.tan(Math.PI / 4)` is an ulp under); the land is `max(MIN_FEATURE_MM, 2 × NOZZLE_MM)`
+    = 1.00 mm, drawn on the tube's own 48-column lattice at or beyond it (an inserted chord
+    column lands ON a lattice column at 4 mm and reads 24 degenerate triangles); the plug is
+    `2·rTip + 1.5·(√2 − 1)` = D + 0.62 mm, so the bore's floor stands 1.5 mm SQUARE to the
+    face over the whole bore and never touches it (2.34 mm on the 6 mm stem, measured). The
+    cut is pinned off on every pedicel through `PEDICEL_PINS`. A stem shorter than its own
+    cut is told (`cut.inertShort`), not cut. The six checks the ruling named — ST1, ST2,
+    ST3, ST9, ST10 and the byte tool's end-face clause — were each shown red on the old
+    geometry, re-derived onto the cut, and shown red again on the new; none was loosened.
+    `frozen/phase52` is the 1,089 rows at `23b13bd`. The "~114 live rows" above was counted
+    on `phase50`'s 1,047; the live matrix at the base is 1,089 and the cut moves 156 stem rows
+    by "stem present" — see the outcome doc's reconciliation for the measured partition.
 
 ## The NU coupling (Eva's ruling on #303)
 

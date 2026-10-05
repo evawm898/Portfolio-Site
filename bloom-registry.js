@@ -53,7 +53,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
-         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_PROMINENCE_RANGE,
+         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_PROMINENCE_RANGE, STEM_CUT_VALUES, STEM_CUT_DEG,
          HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
@@ -376,6 +376,12 @@ export const PREDICATES = {
   sepalsEligible: { not: { ref: 'sphereMode' } },
   sepalsPresent: { all: [{ ref: 'sepalsEligible' }, { id: 'sepalCount', min: 1 }] },
   stemPresent: { id: 'stemLength', min: 1 },
+  /* THE FLORIST'S CUT (Eva's ruling 7, stem session 3). The registry's
+     statement of the geometry's `stemCutAbsent`: the control is live wherever
+     there is a stem and the end is FLORIST; SC0 holds the two to be exact
+     complements. A stem too short to carry its own cut is NOT a term here — it
+     is the plan's `inertShort`, told on the read-out (the corymb's shape). */
+  stemCutLive: { all: [{ ref: 'stemPresent' }, { id: 'stemCut', oneOf: ['FLORIST'] }] },
   /* ORGANIC VARIANCE (build 1, size). The registry's statement of the
      geometry's `varianceIsAbsent` guard: the field exists iff the size amount
      is off zero — half of the slider's own 0.01 step, so it admits exactly the
@@ -3578,6 +3584,29 @@ export const CONTROLS = [
     fmt: (v) => { const R = Number(v) / 2, bore = stemBoreRadius(R);
       return bore === 0 ? `${v} mm across — SOLID (the bore closes at or under ${2 * STEM_MIN_WALL_MM} mm)`
                         : `${v} mm across, ${(2 * bore).toFixed(1)} mm bore — a ${STEM_MIN_WALL_MM} mm wall`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  /* THE STEM'S END (Eva's ruling 7, stem session 3 — docs/bloom-stem-cut-outcome.md).
+     A full 45-degree florist's cut at the FREE end, shipping ON. The object not
+     standing is accepted by ruling; accepting that the default does not stand
+     is not forbidding a stem that does, which is why this is a CONTROL and not
+     a constant. Every number it prints is the plan's own (`shown.stem.cut`):
+     the land is DERIVED from the print floor and the nozzle and drawn on the
+     tube's own lattice, the plug under a cut hollow stem is derived from the
+     cut and Eva's wall, and a stem shorter than its own cut is TOLD. */
+  { id: 'stemCut', section: 'stem', kind: 'choice', default: STEM_CUT_VALUES[0],
+    options: [
+      { value: 'FLORIST', label: `${STEM_CUT_DEG}\u00b0 florist's cut (the object does not stand)` },
+      { value: 'FLAT', label: 'Flat (square across)' },
+    ],
+    label: 'Stem end',
+    fmt: (v, ui, shown) => {
+      if (String(v) !== 'FLORIST') return 'flat — square across, as before the cut';
+      const c = shown && shown.stem && shown.stem.cut;
+      if (!c) return `a ${STEM_CUT_DEG}\u00b0 florist's cut at the free end — the long point at the full length, a small land there (the read-out says the mm)`;
+      if (c.inertShort) return `INERT — a ${Number(ui.stemLength)} mm stem is shorter than its own ${c.spanMm.toFixed(2)} mm cut, so the end stays flat (told, not refused)`;
+      return `a ${STEM_CUT_DEG}\u00b0 cut: the short point ${c.spanMm.toFixed(2)} mm above the long point, a ${c.landMm.toFixed(2)} mm land at the point (floor ${c.landMinMm.toFixed(2)} on the lattice)`
+        + (shown.stem.boreR > 0 ? ` · the bore closes ${shown.stem.tipPlugMm.toFixed(2)} mm from the long point` : ' · solid stem, the cut costs nothing');
+    },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   /* NODE PROMINENCE — the flower's own control, ported (Eva's rulings on #299):
      the swelling and the kink are ONE control, it ships OFF, and 0 is the
