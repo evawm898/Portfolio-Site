@@ -3617,7 +3617,12 @@ settle timeout kills a CI shard). The lower map is dilated once per offset RING 
 pass against nine values — the same maximum in another order, bit-identical by construction and
 measured on thirteen rows (`where` recovered by the first form's own scan for the winning pair);
 214 → 10 s, the five heaviest rows 2.4–11.7 s on the page. **A profile, not a reading of the code,
-is what says which half of a two-part cost is the one that scales.** **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
+is what says which half of a two-part cost is the one that scales.** **Two corners the floor opened to ID10 (d)** — `INFLO: ALL MAX` and `THE BUDGET CORNER`,
+three full-size twelve-petal florets of ONE node through each other, the sessile spike's mechanism at
+the other end of the size range — are declared in `INFLO_APPROACH_XFAIL`, and **NV4 compares the
+per-node overrides within 8 ulp** (`NV_OVERRIDE_ULPS`): the page's `Math.cos` and Node's differ in the
+last bit at one of twenty-four azimuths, and an exact string across two engines is session 38 §B10.7's
+class again. **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
 the terminal head's floor (the reach law's own inset), floored onto the grid so the cap sits a
 hair under the bar rather than on it; told as `GRADIENT CLAMPED`, hatched on the control, ID7
 restates it. At the extreme (gradient 3 x 12 nodes x 60 mm) it caps **3.00 → 2.2356**; the
