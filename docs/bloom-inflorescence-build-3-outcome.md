@@ -822,3 +822,76 @@ where they live:
   at 4.478652° of excess with the band's own stale clause firing when the record is moved
   (checked at 4.4: *"re-record it"*). Not clamped: the field's reach is headroom-scaled by
   ruling, and a cap on the composition would be the fifth typed threshold build 2 refused.
+
+## 20. Close — ruled, merged, and what the next session inherits
+
+**Eva approved the Phase B sheet (`docs/img/inflo-build-3-phase-b.png`) on Oct 5 and the
+ruling was the release: #357 merged to `main` as `f812047` (a merge commit; the branch head
+was `f03bf57`, every bloom workflow green on it).** The items below are each detailed in the
+section named; this is the one place they stand together, with what was FOUND AND DECLARED
+rather than fixed called out as such.
+
+- **The internode floor is derived from the florets' own emitted unit** (§12a). `pitchFloorMm =
+  max(2·pedicelR, pitchFloretMm)`, the floret term a column-map bound over the distinct
+  `(a, b, d)` pairs the phyllotaxy produces, both modes, ceiled onto the 2⁻¹⁶ mm reach grid,
+  derived for equal pedicels only. **What it cost in nodes**: the shipped raceme **5 → 4**
+  (floor 17.97 mm against the rods' 6.00; exact mesh crossing 16.55), florets 0.676 → 9.614 mm
+  apart, 113,886 → 96,468 export triangles; the whorled raceme 5 → 2, size 1.00x 5 → 2, the
+  12-node rachis 12 → 4, the budget corner 12 → 2, the full table in §12c. **Declared, not
+  fixed**: two reachable rows under the bar (`INFLO_APPROACH_XFAIL`) — the gradient at 0 (node 3
+  through node 2, a graded raceme outside the floor's subject) and three sessile florets of one
+  node 120° apart (the phyllotaxy's, no internode can move them) — plus the two corners the floor
+  opened to ID10 (d) at 0.0000 mm (`INFLO: ALL MAX`, `THE BUDGET CORNER`: three full-size
+  florets of one node through each other, §12g). The sweep that made the floor affordable
+  (564 pairs → nine ring dilations, bit-identical, 213 → 10 s on the heaviest row) is §12f.
+- **The overtopping clamp** (§13). `gradientMax` is the gradient at which the lowest floret's
+  reach meets the terminal head's floor, floored onto the grid so the cap sits a hair under the
+  bar; told as `GRADIENT CLAMPED`, hatched on the control, ID7 the biconditional. At the extreme
+  `gradient 3 x 12 nodes x 60 mm` caps **3.00 → 2.2356**, `REACH INSET: gradient 3 x 100 mm`
+  **3.00 → 1.3414**; the corymb arm is character-for-character untouched. `INFLO_OVERTOP_XFAIL`
+  is empty and kept.
+- **Every shipped default clears the bar** (§14). `tools/verify-bloom-defaults-bar.mjs`
+  (DB0–DB2) holds `DEFAULTS` plus each guarded feature's ruled defaults — eight states, each
+  pinned by name to a matrix row — at or over `MIN_FEATURE_MM` on every measure the combination
+  gate owns; **`--control` plants three must-fails (a row under the bar, a stale anchor, a
+  measure removed) and all three fire.** The standing rule: a new guarded feature adds its row
+  there. It runs in the export preflight AFTER the npm install (§19a — the first placement was
+  red for a reason that was not the bar's).
+- **The per-node delta controls as shipped** (§15a). ONE control, `nodeVariance` (Floret, 0–1,
+  default 0 — the guard, out of the blanket sweep), moving each floret's curl, cup and twist by
+  `A · cos(az + offset_b) · half_b` over the head's own three form bases a third of a cycle
+  apart, composed through `resolveRoleOverrides`' slot term with headroom scaling and the clamp,
+  spread BEFORE `PEDICEL_PINS`. No per-node × per-petal groups.
+- **The per-floret phase frame** (§15a). Derived, no control: the minimal placement roll keeps a
+  floret's local x̂ world-fixed (measured — the ruling's suspected defect was real), so the
+  crest is put at the node azimuth ψ by `φ = −f·ψ` (the ramp takes `φ = ψ`), flipped by 180° on
+  a descending pedicel, the head's own phase kept and told at a level one; NV2 re-derives ψ
+  from the placement MATRIX. One build per distinct `(length, mode, azimuth quantised to 1e-9
+  rad in one turn)`.
+- **The byte partition** (§18). `verify-bloom-surface-bytes --base <23b13bd> --movers-predicate
+  inflo-build3`, the whole 1110-row matrix in both modes: **75 of 75 predeclared movers moved, 0
+  floats on the 1035 holders, positionally under `Object.is`, over 1,293,722,028 export floats /
+  143,746,892 triangles and 82,000,898 captured-grid values.** The 75 by block: NODE LAWS 32,
+  INFLO 19, REACH INSET 10, NODE VARIANCE 10, plus `VARIANCE: x the RACEME` and the three GATED
+  rows that build a raceme to prove something else inert.
+- **The combination gate** (§12e, §19). **513 cells, 145 under the bar, 145 declared**
+  (167 → 145 on the floor's re-record: 24 declared cells CLEAR, one improves without clearing,
+  two new at 0.000 — the gradient at zero — one axis INERT by the number, three verdicts moved);
+  CG0–CG7 clean, `--control` every clause fired. No grid widened, no range moved.
+- **Found on the merged tree and declared, not clamped** (§19a): the edge-profile gate's E2 on
+  `NODE VARIANCE: 0.5 x the form field 0.5` at **49.478652°** against the 45° allowance — a floret
+  petal at twist −111 where the node term composes on the head's form field, the declared
+  twist-out-of-plane class (twist −111 alone adds 49.10°). In `E2_TURN_XFAIL` at its magnitude.
+- **Frozen baselines**: no new phase is owed beyond `frozen/phase52` (the 1089 rows at
+  `23b13bd`, already registered and dispatched by stem session 3); the matrix grew to 1110 on
+  this PR's own blocks 49 and 50 and the next session that adds a row owes the phase at
+  `f812047`'s matrix. `bloom-frozen-tags` was dispatched from `main` after the merge
+  (run 37314761111) and read back — see the line below this list.
+- **Open for Eva, carried**: whether the florets of one node may share a 6 mm rachis at full
+  size (the two 0.0000 corners above are the head's own two controls, not the raceme's); the
+  anthela stays unreachable through the gradient as ruled; `INFLO_OVERTOP_XFAIL` stays empty.
+
+**Frozen tags, read back off the remote after the dispatch** (`git ls-remote --tags origin
+'refs/tags/frozen/*'`, not the workflow's exit code): 44 tags present, `frozen/phase52` among
+them; the seven absent — phase5, 22, 23, 42, 43, 45, 49 — are exactly the seven
+`TAG_PUSH_XFAIL` declares, none stale. Nothing new was owed and nothing new was published.
