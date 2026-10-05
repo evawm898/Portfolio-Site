@@ -485,6 +485,24 @@ STL gates after ST9; `infloApproachCoverage` refuses a declaration the matrix ne
 `INFLO_OVERTOP_XFAIL` is EMPTIED (the cap makes its two rows unreachable, §13) and the
 list is kept so a row that overtops again is a declaration rather than a silence.
 
+### 12g. Two corners the floor opened to ID10 (d), declared; and NV4's exact-string claim across two engines
+
+The export subset on the final tree dropped three rows, two of them ruling 1's own doing: at twelve
+nodes `REACH INSET: THE BUDGET CORNER` was a declared refusal and never censused, and `INFLO: ALL
+MAX`'s single 250 mm node had never been read by ID10 (d); under the floor the corner holds two
+nodes and exports, and (d) reads **0.0000 mm** on both — **three full-size twelve-petal florets of
+ONE node, 120 deg apart on a 6 mm rachis, passing through each other at the node**, the sessile
+spike's mechanism at the other end of the size range, which no internode can move apart
+(`sameNodeMayTouch` is told on both). Declared in `INFLO_APPROACH_XFAIL` with that mechanism,
+never clamped: a floret's size and petal count are the head's own two controls. The third was the
+harness's: NV4 compared each placement's per-node overrides against its own restatement as JSON
+strings, and on `NODE VARIANCE: x WHORLED x 8 nodes` `petalCup` read 0.7071067814675859 on the
+page against 0.707106781467586 here — one ulp, Chromium's `Math.cos` against Node's at one of the
+twenty-four azimuths, session 38 §B10.7's class. The clause compares each override within
+`NV_OVERRIDE_ULPS` (8) of the value's own magnitude now, the length exactly and the field set
+exactly; the within-page distinct-state count stays exact (one engine, one build). The
+re-measurement and the NV4 mutant on the bounded clause are in §19.
+
 ### 12f. The floor's cost, and the sweep that was not free (found by the browser, fixed, bit-identical)
 
 The export subset went red on this box twice at the harness's 30 s `settleBuild` — an

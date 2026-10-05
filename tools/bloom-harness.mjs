@@ -73,6 +73,11 @@ const TAU = Math.PI * 2;
    derivation and both measured endpoints: 1.5 ULP worst over the live matrix,
    2.41e15 ULP on the mutant that names A7. */
 const SEAM_FRAME_RESIDUAL_ULP = 8;
+/* NV4's bound on a per-node override read on the page against its restatement
+   here: the two V8s differ in the last bit of `Math.cos` at some azimuths (one
+   ulp measured on the whorled cost corner), and 8 ulp of the value's own
+   magnitude is the seam-frame precedent above. */
+const NV_OVERRIDE_ULPS = 8;
 /* ST5's OWN BUDGET, declared here as its one owner rather than inline at the
    clause — see the clause for the whole derivation. */
 const STEM_JOIN_ULP = 8;
@@ -8529,11 +8534,33 @@ export async function inflorescenceAssertions(page, row) {
       const keyOf = (u) => `${u.lengthMm}|${u.nodeOverrides ? JSON.stringify(u.nodeOverrides) : ''}`;
       const keys = new Set(units.map(keyOf));
       if (keys.size !== units.length) bad.push(`NV4: ${units.length} units were built for ${keys.size} distinct states — a state was built twice`);
+      /* THE PLACEMENT'S UNIT AGAINST THE HARNESS'S OWN RESTATEMENT OF THE TERM,
+         BOUNDED IN THE VALUE'S OWN ULP, NEVER AS STRINGS. The first cut compared
+         the two as JSON and went red on `NODE VARIANCE: x WHORLED x 8 nodes`
+         with petalCup 0.7071067814675859 against 0.707106781467586: the unit
+         is built on the PAGE (Chromium's V8) and the restatement here in Node,
+         and the two engines' `Math.cos` differ in the last bit at some of the
+         twenty-four azimuths — session 38 §B10.7's class, an exact-equality
+         claim across two engines that is a claim about floating point, not
+         about the law (the fourth durable rule's remedy: bound the difference
+         in the unit the quantity carries). The term is `base + A g room`, so
+         its error is a few ulp of its own magnitude; the length is the plan's
+         own grid value and stays exact; the FIELD SET is exact too (a missing
+         or extra control is the law, not the bits). The within-page clause
+         above stays exact — one engine, one build. */
+      const ulpOf = (x) => { const a = Math.abs(x); return a === 0 ? Number.MIN_VALUE : a * Number.EPSILON; };
+      const sameOverride = (got, want) => {
+        if (!got !== !want) return false;
+        if (!got) return true;
+        const kg = Object.keys(got).sort(), kw = Object.keys(want).sort();
+        if (kg.join() !== kw.join()) return false;
+        return kg.every((k) => Math.abs(got[k] - want[k]) <= NV_OVERRIDE_ULPS * ulpOf(Math.max(Math.abs(got[k]), Math.abs(want[k]))));
+      };
       for (const q of B.placed || []) {
         const u = units[q.unit];
         const o = GEOMETRY.floretNodeOverrides({ ...ui }, prePlan, q.az);
         const wantKey = `${P.pedicelLensMm[q.nodeIndex]}|${o ? JSON.stringify(o) : ''}`;
-        if (!u || keyOf(u) !== wantKey) { bad.push(`NV4: the placement at node ${q.nodeIndex + 1}, ${((q.az * 180) / Math.PI).toFixed(1)} deg, appended unit ${q.unit} (${u ? keyOf(u) : 'none'}) where its own azimuth asks for ${wantKey}`); break; }
+        if (!u || !Object.is(u.lengthMm, P.pedicelLensMm[q.nodeIndex]) || !sameOverride(u.nodeOverrides, o)) { bad.push(`NV4: the placement at node ${q.nodeIndex + 1}, ${((q.az * 180) / Math.PI).toFixed(1)} deg, appended unit ${q.unit} (${u ? keyOf(u) : 'none'}) where its own azimuth asks for ${wantKey} (overrides compared within ${NV_OVERRIDE_ULPS} ulp of their own magnitude, the length exactly)`); break; }
       }
       if (regAbsent && !fieldOn) {
         const lens = new Set(units.map((u) => u.lengthMm));
@@ -8635,6 +8662,17 @@ export const INFLO_APPROACH_XFAIL = Object.freeze({
      row and the top node's own three pass THROUGH each other (a crossing,
      0.0000 mm). The row's internode floor (32.37 mm, the florets' own one
      node apart) is met; this is the phyllotaxy's, declared by name. */
+  /* THREE FULL-SIZE FLORETS ON ONE NODE, TWELVE PETALS EACH: the same
+     mechanism at the other end of the size range — a whorl of three 1.00x
+     florets with 12 petals on a 6 mm rachis overlap EACH OTHER at the node,
+     120 deg apart, and no internode moves two florets of one node apart
+     (`sameNodeMayTouch` told on both). Found by the export subset the day the
+     floor took these corners from twelve nodes to one and two: at twelve nodes
+     the budget corner was refused and never censused, and `INFLO: ALL MAX`'s
+     one 250 mm node had never been read by ID10 (d). Declared, never clamped —
+     a floret's size and petal count are the head's own two controls. */
+  'INFLO: ALL MAX — every inflorescence control at its maximum (ONE node of 3 florets: a 250 mm pedicel reaches past the rachis)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three full-size twelve-petal florets of ONE node, 120 deg apart, pass through each other at the node; no internode moves them apart' },
+  'REACH INSET: THE BUDGET CORNER — 12 x whorled x 12 petals x 1.00 on 40 mm straight up (TWO nodes under the florets\' own floor, 17.3% of budget; was 95.0% at twelve before ruling 1)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three full-size twelve-petal florets of ONE node, 120 deg apart, pass through each other at the node; no internode moves them apart' },
   'NODE LAWS: SESSILE x whorled x 12 nodes (the densest spike)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three sessile florets of one node, 120 deg apart on a 6 mm rachis, which no internode moves apart; the top node\'s own pass through each other' },
 });
 for (const [label, e] of Object.entries(INFLO_APPROACH_XFAIL)) {
