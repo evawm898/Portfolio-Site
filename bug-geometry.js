@@ -979,19 +979,37 @@ export function wingShapeProblem(params, model) {
    decimals, rounded BEFORE the blend, so the label is the t that was used),
    applied to the params; a blend wingShapeProblem() refuses is RE-ROLLED, up
    to `maxTries`, and if none passes, a plain library shape (each is held valid
-   by the gate) is used and the label says so. Returns the params and the label. */
+   by the gate) is used and the label says so. Returns the params and the label.
+
+   The draw is keyed on each shape's ID, never on its POSITION in the library
+   (design doc §15.1): on try k every shape gets a score drawHash(seed, k, slot,
+   id) and the lowest score wins the slot ('a' = slot 1, 'b' = slot 2 among the
+   rest); t is drawHash(seed, k, 3). Removing or adding a shape therefore moves
+   only the rolls that shape wins (or would win) — every other roll is the same
+   blend at the same t — and the library's array order is irrelevant. LB7. */
 export const BLEND_T_RANGE = [0.1, 0.9];
+function drawHash(...v) {                       // murmur3-style mix of 32-bit integers -> [0, 1)
+  let h = 0x9E3779B9;
+  for (const x of v) { h = Math.imul(h ^ (x >>> 0), 0x85EBCA6B); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE35); h ^= h >>> 16; }
+  return (h >>> 0) / 4294967296;
+}
+function drawShape(lib, seed, k, slot, not = null) {
+  let best = null, bs = Infinity;
+  for (const s of lib) { if (s === not) continue; const x = drawHash(seed, k, slot, s.id); if (x < bs || (x === bs && s.id < best.id)) { bs = x; best = s; } }
+  return best;
+}
 export function randomWingBlend(params, seed, opts = {}) {
-  const r = rng(seed), lib = opts.library || WING_LIBRARY, maxTries = opts.maxTries ?? 24, refused = [];
-  for (let k = 0; k < maxTries; k++) {
-    const i = Math.floor(r() * lib.length); let j = Math.floor(r() * (lib.length - 1)); if (j >= i) j++;
-    const t = +(BLEND_T_RANGE[0] + (BLEND_T_RANGE[1] - BLEND_T_RANGE[0]) * r()).toFixed(2);
+  const lib = opts.library || WING_LIBRARY, maxTries = opts.maxTries ?? 24, refused = [];
+  for (let k = 0; k < maxTries && lib.length >= 2; k++) {
+    const A = drawShape(lib, seed, k, 1), B = drawShape(lib, seed, k, 2, A);
+    const t = +(BLEND_T_RANGE[0] + (BLEND_T_RANGE[1] - BLEND_T_RANGE[0]) * drawHash(seed, k, 3)).toFixed(2);
+    const i = lib.indexOf(A), j = lib.indexOf(B);
     const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], t));
     const why = q.wingPairs > 0 ? wingShapeProblem(q) : null;
     if (!why) return { params: q, blend: { a: lib[i].id, b: lib[j].id, t, tries: k + 1, refused }, label: `blend of #${lib[i].id} and #${lib[j].id} at ${t.toFixed(2)}` };
     refused.push({ a: lib[i].id, b: lib[j].id, t, why });
   }
-  for (const s of lib) {
+  for (const s of [...lib].sort((x, y) => x.id - y.id)) {
     const q = applyWingShape(params, s);
     if (!(q.wingPairs > 0) || !wingShapeProblem(q)) return { params: q, blend: { a: s.id, b: s.id, t: 0, tries: maxTries, refused }, label: `#${s.id} (no blend passed in ${maxTries} tries)` };
   }
@@ -1002,8 +1020,8 @@ export function randomWingBlend(params, seed, opts = {}) {
    the WING OUTLINES from the library — randomWingBlend(), the same function the
    RANDOMIZE WINGS button calls, seeded off this bug's own stream (design doc
    §13). randomParamsWithBlend also returns the blend's label for the page. */
-export function randomParams(seed) { return randomParamsWithBlend(seed).params; }
-export function randomParamsWithBlend(seed) {
+export function randomParams(seed, opts) { return randomParamsWithBlend(seed, opts).params; }
+export function randomParamsWithBlend(seed, opts = {}) {
   const r = rng(seed), K = RANDOM_RANGES;
   const U = ([a, b]) => a + (b - a) * r();
   const I = ([a, b]) => Math.round(U([a - 0.49, b + 0.49]));
@@ -1046,7 +1064,7 @@ export function randomParamsWithBlend(seed) {
   }
   const q = normalizeParams(p);
   if (!(wp >= 1)) return { params: q, blend: null, label: '' };
-  const b = randomWingBlend(q, Math.floor(r() * 4294967296));
+  const b = randomWingBlend(q, Math.floor(r() * 4294967296), opts);
   return { params: b.params, blend: b.blend, label: b.label };
 }
 
@@ -1436,11 +1454,44 @@ export function thinAnalysis(poly, floor, opts = {}) {
       for (let i = i0; i <= i1; i++) inside[j * nx + i] = 1;
     }
   }
-  const outside = new Uint8Array(nx * ny); for (let i = 0; i < outside.length; i++) outside[i] = inside[i] ? 0 : 1;
-  const dOut = edt2(outside, nx, ny);                   // inside pixels: distance to the outside
-  const core = new Uint8Array(nx * ny);                 // centres of floor-discs that fit
+  /* centres of floor-discs that fit: a pixel centre whose EXACT distance to the
+     polygon's boundary (point to segment) is at least r. The first version read
+     that distance off a pixel EDT to the nearest OUTSIDE pixel centre, which is
+     never less than the true distance and can exceed it by a pixel or more —
+     enough, in a channel about a floor wide, to admit disc centres that do not
+     fit and so call a sub-floor root clear (design doc §15.2: a hindwing root
+     the gate read 1.04 mm past the floor disc, this read 0.42 and exported).
+     The segments are bucketed by cells of side r, so every segment within r of
+     a pixel is in the 3x3 block of cells around it. This is the gate's own
+     definition of a core point, on the gate's own lattice. */
+  const core = new Uint8Array(nx * ny);
   const r2 = (r / h) ** 2;
-  for (let i = 0; i < core.length; i++) core[i] = inside[i] && dOut[i] >= r2 ? 1 : 0;
+  {
+    const cell = new Map(), ck = (cx, cy) => cx * 73856093 ^ cy * 19349663;
+    for (let k = 0; k < poly.length; k++) {
+      const a = poly[k], b = poly[(k + 1) % poly.length];
+      const cx0 = Math.floor((Math.min(a[0], b[0]) - gx) / r), cx1 = Math.floor((Math.max(a[0], b[0]) - gx) / r);
+      const cy0 = Math.floor((Math.min(a[1], b[1]) - gy) / r), cy1 = Math.floor((Math.max(a[1], b[1]) - gy) / r);
+      for (let cx = cx0; cx <= cx1; cx++) for (let cy = cy0; cy <= cy1; cy++) { const key = ck(cx, cy); let L = cell.get(key); if (!L) cell.set(key, (L = [])); L.push(k); }
+    }
+    const seen = new Int32Array(poly.length).fill(-1);
+    for (let i = 0; i < core.length; i++) {
+      if (!inside[i]) continue;
+      const px = gx + ((i % nx) + 0.5) * h, py = gy + (Math.floor(i / nx) + 0.5) * h;
+      const cx = Math.floor((px - gx) / r), cy = Math.floor((py - gy) / r);
+      let fits = true;
+      for (let dx = -1; dx <= 1 && fits; dx++) for (let dy = -1; dy <= 1 && fits; dy++) {
+        const L = cell.get(ck(cx + dx, cy + dy)); if (!L) continue;
+        for (const k of L) {
+          if (seen[k] === i) continue; seen[k] = i;
+          const a = poly[k], b = poly[(k + 1) % poly.length], ex = b[0] - a[0], ey = b[1] - a[1], L2 = ex * ex + ey * ey || 1e-12;
+          const t = Math.max(0, Math.min(1, ((px - a[0]) * ex + (py - a[1]) * ey) / L2));
+          if (Math.hypot(px - a[0] - t * ex, py - a[1] - t * ey) < r) { fits = false; break; }
+        }
+      }
+      core[i] = fits ? 1 : 0;
+    }
+  }
   const dCore = edt2(core, nx, ny);
   const opened = new Uint8Array(nx * ny);               // material some floor-disc covers
   for (let i = 0; i < opened.length; i++) opened[i] = inside[i] && dCore[i] <= r2 ? 1 : 0;
@@ -2228,14 +2279,34 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // concave stretch can be a hair smaller: there the skin edge steps back
   // toward the apex until the radius is round x the half-thickness again, so
   // no bead is ever more than a half-round (measured up to 0.12% before)
+  //
+  // A PITCHED wing is a helicoid: the transform turns each span station by its
+  // own angle, so it stretches planform distances along u by sqrt(1 + (w a')^2)
+  // (a' the pitch per mm of span) — a bead exactly half-round in the planform
+  // is up to 1.1% wider than half-round in the WORLD far from the hinge chord
+  // (design doc §15.3: a long blended hindwing at 7 degrees, w ~ 26 mm). So on a
+  // pitched wing the radius is the WORLD chord from the skin point to the apex
+  // on the mid-surface (the same W that emits the bead), stepped back until it
+  // is round x the half-thickness. Pitch 0 is a rigid transform: untouched.
+  const pitched = !!spec.pitch;
+  const chord = (P, A) => { const a3 = W(A[0], A[1], 0), p3 = W(P[0], P[1], 0); return Math.hypot(a3[0] - p3[0], a3[1] - p3[1], a3[2] - p3[2]); };
   if (apex) for (let i = 0; i < pts.length; i++) {
     const A = apex[i]; if (!A) continue;
     const dx = A[0] - pts[i][0], dy = A[1] - pts[i][1], a = Math.hypot(dx, dy);
     if (!(a > 0)) continue;
+    const at = (b) => [A[0] - (dx / a) * b, A[1] - (dy / a) * b];
     let b = Math.min(a, round * edge.h(pts[i][0], pts[i][1]));
-    if (b >= a) continue;
-    for (let it = 0; it < 12; it++) b = Math.min(a, round * edge.h(A[0] - (dx / a) * b, A[1] - (dy / a) * b));
-    pts[i] = [A[0] - (dx / a) * b, A[1] - (dy / a) * b];
+    let moved = b < a;
+    if (moved) for (let it = 0; it < 12; it++) b = Math.min(a, round * edge.h(...at(b)));
+    if (pitched) {
+      for (let it = 0; it < 12; it++) {
+        const P = at(b), c = chord(P, A), want = round * edge.h(P[0], P[1]);
+        if (!(c > want)) break;
+        b = b * (want / c) * (1 - 1e-12); moved = true;
+      }
+    }
+    if (!moved) continue;
+    pts[i] = at(b);
   }
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
   const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part, apex);

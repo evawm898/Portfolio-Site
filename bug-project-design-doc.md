@@ -2055,7 +2055,7 @@ text field); a randomize and a randomize-wings push onto it too.
 
 ### 13.2 RANDOMIZE WINGS
 
-`randomWingBlend(params, seed)` picks two different shapes and a t in [0.1, 0.9] (two decimals,
+`randomWingBlend(params, seed)` picks two different shapes (keyed on their ids since §15.1) and a t in [0.1, 0.9] (two decimals,
 rounded BEFORE the blend, so the label "blend of #a and #b at t" is the t used), blends them
 (`blendWingShapes`: each outline resampled apex-aligned in TRUE planform — w times its own
 stretch — mixed, divided by the mixed stretch, re-expressed as control points; the tail is the
@@ -2395,7 +2395,7 @@ bar (2.16 mm at a 41 mm wing). Two groups pass on BOTH wings:
 turned ~7° back. Near pairs the angle explains most of (as drawn ≫ aligned, over the bar):
 #12 ~ #39 (fore 11.66 → 3.06 mm at −14.5°, hind 7.41 → 2.45 at −11°), #38 ~ #54 fore
 (10.61 → 2.28 at −14.7°), #9 ~ #10 fore (7.96 → 3.03 at −11.7°), #22 ~ #35 / #4 ~ #35 fore
-(~9 → 3.2 at ~−10°). **RULED (Eva, Oct 5): merging #22 into #4 and #19 into #10 is APPROVED and DEFERRED** to a
+(~9 → 3.2 at ~−10°). **RULED (Eva, Oct 5): merging #22 into #4 and #19 into #10 is APPROVED and DEFERRED** (applied in §15) to a
 follow-up PR, together with two builder fixes. Removing the two entries reshuffles the random
 bugs' blends (picked by position in the library), and the new draws hit two pre-existing
 builder defects, both reproduced on `main`'s own code: random:3's blend #20/#31 at 0.62 has a
@@ -2422,3 +2422,112 @@ Tools: `node tools/bug-wing-angles.mjs measure | sweep | store | review [--out <
 angles and groups, the per-wing range sweep (every built row through `verify-bug.mjs --rows`),
 the library rewrite from `tools/bug-wing-library-snapshot.json` (#361's data, also WA1's
 reference) and the review page.
+
+## 15. Stable random draws, the floor measure made one, the pitched bead, the merges
+
+Eva's follow-up to §14 (Oct 5): the two merges §14.5 approved and deferred, and the three things
+that had to land first. Removing #22 and #19 reshuffled every random gate row (the blends were
+picked by POSITION in the library), and the new draws hit two pre-existing builder defects, both
+reproduced on `main`'s own code.
+
+### 15.1 The random draws are keyed on shape ids
+
+`randomWingBlend` used to pick `lib[floor(r() · n)]`, so adding or removing any shape changed
+every random row's blend, and unrelated defects showed up as "new" failures. Now each try `k`
+gives every shape a score `drawHash(seed, k, slot, id)` (a 32-bit integer mix, then [0, 1)), and
+the lowest score wins. Shape a is slot 1, shape b is slot 2 among the rest, and t is
+`drawHash(seed, k, 3)`. This is rendezvous hashing. Removing a shape changes a roll only when that
+shape won one of the roll's slots, and adding one changes a roll only when the new shape wins one.
+Every other roll keeps the same blend at the same t, and the library's array order plays no part.
+The plain-shape fallback walks the library in id order. `randomParams` and `randomParamsWithBlend`
+pass an optional `{ library }` through, for the gate.
+
+This change itself reshuffles the random rows once, against the positional draws. After it, the
+merges below moved exactly the rows that had drawn #22 or #19, measured: 4 of the 40 random gate
+rows (random:7, :11, :13, :31, all of which had drawn #22). The other 36 kept the same label.
+random:11's blend was a re-rolled draw, so its t moved with it (#3/#22 at 0.50 became #29/#14 at
+0.22).
+
+**LB7** (tools/verify-bug-library.mjs) runs this on all 40 random gate rows and on RANDOMIZE WINGS
+seeds 1–8 on the default bug. Three changes to the library must leave each row's label, its tries
+and its params byte-identical: removing either of two shapes the row never drew (accepted or
+refused), and reversing the library's order. For non-vacuity, removing the shape a row DID draw
+must change that row (3 rows). The negative control restores a position-keyed pick (`the draw picks
+by library POSITION again`) and LB7 catches it.
+
+### 15.2 The floor measure: one definition, and the builder refuses the root
+
+**The case.** random:3's body with blend #20/#31 at 0.62, three pairs (now fixed as data,
+`rootUnderFloor()` in tools/bug-fixtures.mjs). The hindwing closes on a straight root chord
+0.85 mm wide and stays narrower than a floor-wide disc for its first stretch. The gate's N read it
+**1.04 mm** past the floor disc. The builder read **0.42**, under its 0.5 bar, and the STL
+exported.
+
+**The cause.** Both measures read the same polygon on the same lattice (pixel centres at
+floor/12). Where they differed was the CORE: the centres where a floor-wide disc fits. The gate
+takes the exact point-to-segment distance to the boundary. The builder read the distance off a
+pixel EDT to the nearest *outside pixel centre*. That distance is never less than the true one and
+can exceed it by a pixel or more. In a channel about a floor wide, it admitted disc centres the
+exact measure refuses: one at **0.458 mm** from the edge, against a 0.5 radius. The covered region
+then spread across the root, and the depth fell from 1.04 to 0.42.
+
+**The fix.** `thinAnalysis` decides the core by the exact segment distance, with the segments
+bucketed in cells of side floor/2 (any segment within r of a pixel lies in the 3×3 block). The
+covering and the depth are unchanged: exact EDTs on the lattice, which is also what the gate
+computes. The two measures are now the same definition on the same lattice. They can differ only
+in how a point lying on the boundary is classified. The builder reads the fixture's hindwing at
+**1.044 mm**, the gate at **1.044**; the builder reports pair 3 and the STL is refused. Build time
+is unchanged within noise (126 against 140 ms a build, seven bugs).
+
+**Verification.**
+- **N0** (function check) builds the fixture, the default, the blended-thin fixture and random:1–6,
+  and requires the two measures to agree within one grid step on every wing (worst read 0.000 mm).
+  It also requires the fixture's hindwing to read thin by both measures and to be reported.
+- The fixture is a built row, `fixture: #20/#31 at 0.62, hindwing root under the floor (refused)`,
+  run with `expectThin`. A row mutant, `the disc test reads a pixel distance again`, restores the
+  old core, builds the fixture with the mutated module and must fail N.
+
+### 15.3 The pitched bead (E1)
+
+**The case.** random:1's body with blend #55/#27 at 0.37, two pairs, HOLES, pitch −7.2° / +7.0°
+(`pitchedBeadHoles()`). E1 found 14 beads up to **1.12%** wider in plane than half the thickness.
+The gate's allowance for a pitched wing was 1%.
+
+**The cause.** In the wing's own planform every bead was exactly a half-round (a/H ≤ 1.000000).
+But a pitched wing is a helicoid: the transform turns each span station by its own angle. The
+mid-surface metric is then diag(1 + (w a′)², 1), with a′ the pitch per mm of span, so planform
+distances along u stretch by √(1 + (w a′)²). This long hindwing reaches 26 mm back from the hinge
+chord. There, a′ ≈ 0.0058 rad/mm gives +1.1%, so the emitted bead really is wider than a
+half-round in the world.
+
+**The fix.** On a pitched wing, the builder sizes each bead by its WORLD chord: the distance from
+the skin point to the apex on the mid-surface, through the same `W` that emits the bead. The skin
+point steps back toward the apex until that chord is round × the half-thickness. Pitch 0 is a
+rigid transform and is untouched by branch, so the default bug and every unpitched wing are
+byte-identical.
+
+**Verification.**
+- E1's bar is now 1e-9 on pitched wings too (the 1% allowance is gone).
+- The fixture is a built row, `fixture: #55/#27 at 0.37, pitched, holes`. Its worst world ratio is
+  1.00000 with 0 beads over.
+- The row mutant `a pitched bead is sized in the planform` must fail E1.
+- Every pitched wing's bead moves by up to ~1% of its radius (a few µm). The ellipse-residual half
+  of E1 stays reported-only on twisted wings: the ring between skin and apex is not an exact world
+  ellipse on a helicoid.
+
+### 15.4 The merges
+
+#22 is merged into #4 and #19 into #10, as Eva ruled in §14.5. Both entries are gone from
+`bug-wing-library.js`. Ids never change, so 22 and 19 are gaps, like 34 and 50. #57 stays.
+`tools/bug-wing-angles.mjs store` carries `MERGED = { 22: 4, 19: 10 }`, so a re-store keeps them
+merged. LB1's restated keep list drops them. The library holds 53 shapes.
+
+### 15.5 Sheet
+
+`node tools/shot-bug-follow-up.mjs <dir> --base <worktree of main>` renders:
+- the two fixtures before (`main`'s code, served from its worktree) and after (this tree), each as
+  the SVG and the 3D ¾ view;
+- the #20/#31 hindwing root as a close-up;
+- the gallery before and after the merges, drawn from each tree's own library data.
+
+Every number on the sheet is read off the model each tree built.
