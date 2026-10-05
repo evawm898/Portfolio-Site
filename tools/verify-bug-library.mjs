@@ -106,7 +106,8 @@ export function libraryChecks(G) {
   // LB1
   const bad1 = [];
   for (const s of lib) {
-    const q = G.applyWingShape(d, s), m = G.buildBug(q), pr = wingProblems(G, q, m);
+    let q; try { q = G.applyWingShape(d, s); } catch (e) { bad1.push(`#${s.id}: ${e.message}`); continue; }   // a shape that cannot be posed is refused, not a crash
+    const m = G.buildBug(q), pr = wingProblems(G, q, m);
     const tailDrawn = !s.tail || m.wingPairs[1].hasTail;
     if (pr.length || m.notes.length || !tailDrawn) bad1.push(`#${s.id}: ${[...pr, ...m.notes, tailDrawn ? '' : 'its tail is not drawn'].filter(Boolean).join('; ')}`);
   }
@@ -117,7 +118,7 @@ export function libraryChecks(G) {
   for (const s of [2, 3, 6]) { const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } bases.push([`random:${s}`, p]); }
   const bad2 = [];
   for (const [name, b] of bases) for (const s of lib) {
-    const before = JSON.parse(JSON.stringify(b)), q = G.applyWingShape(b, s);
+    const before = JSON.parse(JSON.stringify(b)); let q; try { q = G.applyWingShape(b, s); } catch (e) { bad2.push(`${name} #${s.id}: ${e.message}`); continue; }
     if (!same(b, before)) bad2.push(`${name} #${s.id}: the BASE params were mutated`);
     if (strip(q) !== strip(b)) bad2.push(`${name} #${s.id}: a non-wing setting changed`);
     const W = q.wings, wantLen = +Math.max(5, Math.min(60, b.wings.first.length * s.hind.lengthRatio)).toFixed(3);
@@ -133,7 +134,8 @@ export function libraryChecks(G) {
   for (const n of [3, 4]) {
     const p = G.defaultParams(); p.wingPairs = n; p.wings.unlinked[1] = { ...p.wings.first, points: p.wings.first.points.map((x) => x.slice()) };
     for (const s of [lib[1], lib[15]]) {
-      const q = G.applyWingShape(p, s), R = G.resolveWingPairs(G.normalizeParams(q));
+      let q; try { q = G.applyWingShape(p, s); } catch (e) { bad3.push(`${n} pairs #${s.id}: ${e.message}`); continue; }
+      const R = G.resolveWingPairs(G.normalizeParams(q));
       if (Object.keys(q.wings.unlinked).length) bad3.push(`${n} pairs #${s.id}: an unlinked middle survived`);
       if (!same(R[0].points, G.posedWing(s.fore).points) || !same(R[n - 1].points, G.posedWing(s.hind).points)) bad3.push(`${n} pairs #${s.id}: the shape is not on the first and last pairs`);
       if (!R.slice(1, n - 1).every((r) => r.role === 'mid' && r.linked)) bad3.push(`${n} pairs #${s.id}: a middle pair does not blend`);
@@ -146,7 +148,7 @@ export function libraryChecks(G) {
   for (let s = 1; s <= 12; s++) { const p = G.randomParams(s); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } rb.push([`random:${s}`, p]); }
   const bad4 = [], bad5 = []; let rerolled = 0, n4 = 0;
   for (const [name, b] of rb) for (let seed = 1; seed <= (name === 'default' ? 40 : 4); seed++) {
-    const r = G.randomWingBlend(b, seed); n4++;
+    let r; try { r = G.randomWingBlend(b, seed); } catch (e) { bad4.push(`${name} seed ${seed}: ${e.message}`); continue; } n4++;
     if (!r.blend) { bad4.push(`${name} seed ${seed}: no result (${r.label})`); continue; }
     if (r.blend.tries > 1) rerolled++;
     const pr = wingProblems(G, r.params); if (pr.length) bad4.push(`${name} seed ${seed} (${r.label}): ${pr.join('; ')}`);
@@ -155,17 +157,18 @@ export function libraryChecks(G) {
     const a = +mm[1], bb = +mm[2], t = +mm[3], A = lib.find((x) => x.id === a), B = lib.find((x) => x.id === bb);
     if (a === bb || !A || !B || t < 0.1 || t > 0.9) { bad5.push(`${name} seed ${seed}: "${r.label}" is not two shapes at t in [0.1, 0.9]`); continue; }
     if (strip(r.params) !== strip(b)) bad5.push(`${name} seed ${seed}: the blend changed a non-wing setting`);
-    if (!same(G.applyWingShape(b, G.blendWingShapes(A, B, t)), r.params)) bad5.push(`${name} seed ${seed}: "${r.label}" is not the blend that was applied`);
+    let again = null; try { again = G.applyWingShape(b, G.blendWingShapes(A, B, t)); } catch (e) { bad5.push(`${name} seed ${seed}: re-deriving "${r.label}" threw (${e.message})`); continue; }
+    if (!same(again, r.params)) bad5.push(`${name} seed ${seed}: "${r.label}" is not the blend that was applied`);
   }
   ok(!bad4.length && rerolled > 0, `LB4: RANDOMIZE WINGS never produced an invalid wing over ${n4} rolls (${rb.length} bases); ${rerolled} roll(s) re-rolled a refused blend${rerolled ? '' : ' — the re-roll was NEVER exercised (vacuous)'}${bad4.length ? ' — ' + bad4.slice(0, 3).join(' | ') : ''}`);
   ok(!bad5.length, `LB5: every label names the blend that was applied (re-derived byte for byte)${bad5.length ? ' — ' + bad5.slice(0, 3).join(' | ') : ''}`);
   // LB6
   const bad6 = []; let n6 = 0;
   for (let s = 1; s <= 24; s++) {
-    const r = G.randomParamsWithBlend(s); if (!(r.params.wingPairs > 0)) continue; n6++;
+    let r; try { r = G.randomParamsWithBlend(s); } catch (e) { bad6.push(`random:${s}: ${e.message}`); continue; } if (!(r.params.wingPairs > 0)) continue; n6++;
     const mm = /^blend of #(\d+) and #(\d+) at (\d\.\d\d)$/.exec(r.label);
     if (!mm) { bad6.push(`random:${s}: label "${r.label}"`); continue; }
-    const A = lib.find((x) => x.id === +mm[1]), B = lib.find((x) => x.id === +mm[2]), sh = G.blendWingShapes(A, B, +mm[3]);
+    const A = lib.find((x) => x.id === +mm[1]), B = lib.find((x) => x.id === +mm[2]); let sh; try { sh = G.blendWingShapes(A, B, +mm[3]); } catch (e) { bad6.push(`random:${s}: ${e.message}`); continue; }
     if (!same(r.params.wings.first.points, sh.fore.points) || !same(r.params.wings.last.points, sh.hind.points)) bad6.push(`random:${s}: the wings are not "${r.label}"`);
   }
   ok(!bad6.length && n6 > 0, `LB6: the whole-bug Randomize draws its wings from the library blend (${n6} winged bugs of 24)${bad6.length ? ' — ' + bad6.slice(0, 3).join(' | ') : ''}`);
