@@ -6299,7 +6299,15 @@ export function stemNodeClauses({ S, ui, NL, regNodes, geoAbsent, hasLeaf, leaf 
          tube ABOVE the cut plus the long point — [0, L - span, L] — with the
          span restated here from the controls; uncut it is exactly [0, L]. */
       const Lmm = Number(ui.stemLength), Rmm = Number(ui.stemDiameter) / 2;
-      const cutSpan = String(ui.stemCut) === 'FLORIST' && Lmm > 0 && Array.isArray(S.stations) ? restatedCutSpan(Rmm, S.sides).spanMm : 0;
+      /* The span is a function of the SIDE COUNT (the land is drawn on the
+         tube's own lattice), so a record with no `sides` cannot restate it —
+         and `restatedCutSpan(R, undefined)` returns a null span, which a bare
+         `> 0` reads as "no cut" and falls to the UNCUT ladder: the clause then
+         fires on a correct cut stem. That is how the stem-nodes must-fail went
+         red on its own baseline in CI (its record carried no `sides`). A
+         missing field is a validity failure here, never the softer branch. */
+      if (String(ui.stemCut) === 'FLORIST' && Lmm > 0 && Array.isArray(S.stations) && !(S.sides > 2)) bad.push(`ST12: the stem record carries no side count (sides = ${S.sides}), so the florist's cut span cannot be restated and the straight stem's ladder cannot be checked`);
+      const cutSpan = String(ui.stemCut) === 'FLORIST' && Lmm > 0 && Array.isArray(S.stations) && S.sides > 2 ? restatedCutSpan(Rmm, S.sides).spanMm : 0;
       const cutLadder = cutSpan > 0 && Lmm > cutSpan;
       const wantLadder = cutLadder ? [0, Lmm - cutSpan, Lmm] : [0, Lmm];
       if (Array.isArray(S.stations) && (S.stations.length !== wantLadder.length || S.stations.some((v, i) => Math.abs(v - wantLadder[i]) > (i === 0 ? 0 : 1e-9)))) bad.push(`ST12: a stem with no nodes carries a ${S.stations.length}-station ladder [${S.stations.join(', ')}] where \`stemStations\` ${cutLadder ? `over the tube above a ${cutSpan} mm cut, plus the long point,` : ''} gives exactly [${wantLadder.join(', ')}]`);

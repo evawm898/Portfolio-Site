@@ -507,3 +507,34 @@ station list is `stemStations()`'s own and the cut cannot reach it; recorded so 
 change knows where the typed 2 is. §10's mutant figures were a `--only` subset of the cut and
 stem families, which is why this one was first read in CI.
 
+
+## 14. CI caught a third: the stem-nodes must-fail's record carried no `sides`, and the ST12 ladder clause read a null span as "no cut"
+
+`preflight` on `7184d14` (the first time that job completed on this branch — every earlier
+run was cancelled by a later push) went red at `node tools/verify-bloom-stem-nodes.mjs`:
+
+```
+  *** ST12: a stem with no nodes carries a 3-station ladder [0, 95.17371571297383, 100] where `stemStations`  gives exactly [0, 100]
+```
+
+The baseline — the SHIPPED geometry at prominence 0 — fired the clause §7 re-derived for the
+cut. Two defects, one in each file. **The must-fail's record** shaped `S` as `{ root,
+stations, nodeLaw, emittedRings }` and the metrics hook's record carries `sides` beside them
+(`bloom.js`'s `sides: lastStem.sides`); the cut span is a function of the side count (the land
+is drawn on the tube's own lattice, §3), so `restatedCutSpan(R, undefined)` returned a NULL
+span. **And the harness's clause** read that null through a bare `cutSpan > 0`, which is
+false, and fell to the UNCUT ladder `[0, L]` — a correct cut stem then reads as a defect. The
+fifth durable rule in a validity shape: a missing field moved the clause to its softer branch
+instead of refusing. The record carries `sides: plan.sides` now, and the clause pushes a
+validity message when a FLORIST stem's record has no side count rather than reading null as
+"no cut". The two spaces in the message (`\`stemStations\`  gives`) were the empty cut text,
+which is how it was read off the log.
+
+**And the plant was MISSED for a third reason**: `(b) identity: a ladder at prominence 0`
+wanted the substring `station ladder where`, which the §7 message no longer contains (the
+ladder's own values now sit between the two words). It wants `station ladder [` now and fires
+on `[0, 50, 100]` against the cut ladder `[0, 95.174, 100]`. Must-fail re-run: baseline silent,
+17 plants, every arm by its own message, exit 0. The preflight steps after it were run locally
+(`infill-budget`, both decoupled tools, `surface-offstation`, `rim-arc`, `infill-conform`,
+`infill-metric`, `edge-profile`, the apex anchors, and `verify-bloom-stem-cut` since the
+harness moved): all green. No geometry moved; nothing is re-measured.
