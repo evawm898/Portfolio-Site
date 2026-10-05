@@ -46,7 +46,45 @@ export const DEFAULT_STYLE = {
   // glyph, court glyphs) — the panel only shows the control when it would do
   // something a viewer could tell apart from glyphScale (see cards.js).
   glyphStretch: 1, // 0.5–2
+
+  // --- "05 Layout" — number-card layout -------------------------------
+  // glyphScale above now scales ONLY the court-card suit glyphs: the pip, Ace
+  // and corner-index glyphs each have their own scale below, independent of it
+  // and of each other (same reason as the three scales above — each multiplies
+  // a base derived from the safe rect, never another control's output).
+  // Every default reproduces the pre-Layout output exactly.
+  pipScale: 1, // 0.5–1.5, the pips on 2–10
+  aceScale: 1, // 0.5–1.5, the Ace's single large glyph
+  cornerGlyphScale: 1, // 0.5–1.5, the mini suit glyph in the corner index
+  // true = traditional (bottom-half pips printed inverted); false = every pip
+  // upright.
+  invertBottomPips: true,
+  // Horizontal column spacing, as a multiple of the classical column offset
+  // (the side columns sit 0.25 of the safe width from the centre line).
+  pipSpreadX: 1, // 0.5–2 (the clamp, not the range, is what holds the safe edge)
+  // Vertical margin: the gap between the safe rect's top/bottom edge and the
+  // pip field, as a % of the safe height. 16 is the classical field.
+  pipMarginPct: 16, // 0–30
 };
+
+// The three layout presets. They set the two spread sliders and the pip scale
+// (the three controls that move where pips sit and how much room they have);
+// the flip toggle and the Ace / corner-glyph scales are separate choices and a
+// preset leaves them alone. Traditional IS the default, so it is the reset.
+export const LAYOUT_PRESETS = {
+  traditional: { label: 'Traditional', pipSpreadX: 1, pipMarginPct: 16, pipScale: 1 },
+  spacious: { label: 'Spacious', pipSpreadX: 1.2, pipMarginPct: 8, pipScale: 0.9 },
+  compact: { label: 'Compact', pipSpreadX: 0.8, pipMarginPct: 22, pipScale: 1 },
+};
+
+// Which preset (if any) these three values are exactly — the readout says
+// "Custom" otherwise. Exact comparison on the slider's own stored values.
+export function matchLayoutPreset(style) {
+  for (const [id, p] of Object.entries(LAYOUT_PRESETS)) {
+    if (p.pipSpreadX === style.pipSpreadX && p.pipMarginPct === style.pipMarginPct && p.pipScale === style.pipScale) return id;
+  }
+  return 'custom';
+}
 
 // Base sizes, before any scale slider. Named because three call sites and the
 // verification gate all have to agree on what "100%" means.
@@ -291,7 +329,7 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
   // The mini glyph is sized from the UNSCALED font size on purpose. Deriving it
   // from the scaled one would make "corner font scale" silently a second suit-
   // glyph scale, and the panel already has one of those.
-  const glyphSize = baseFontSize * BASE.cornerGlyph * style.glyphScale;
+  const glyphSize = baseFontSize * BASE.cornerGlyph * style.cornerGlyphScale;
   const pad = safe.w * (style.cornerInsetPct / 100);
   const cornerFont = cardFont(style, fontSize);
 
@@ -348,24 +386,68 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
   drawOne(true);
 }
 
-function drawPipCard(ctx, rank, suit, palette, safe, suitImages, style) {
+// Where the pips of a number rank go, in canvas pixels, after the spread and
+// margin sliders and the safe-area clamp. Exported so the gate can compare the
+// file's pixels against the page's own claim. The clamp is applied to the
+// slider VALUES (spread, margin), not to each pip, so a clamped layout keeps
+// its shape instead of collapsing pips onto the edge.
+//
+// THE CLAMP: a pip's ink is a box of half-extent (halfW, halfH) about its
+// centre (a 180 degree turn does not change it). The widest column must keep
+// centre +/- halfW inside the safe rect, and the outermost row centre +/- halfH
+// likewise. Both bounds are closed-form in the slider values, so no slider
+// value can put ink on or past the trim line — the safe rect is already
+// SAFE_MARGIN_IN inside the trim.
+export function getPipLayout(rank, style, safe = getSafeRect()) {
+  const s = { ...DEFAULT_STYLE, ...style };
   const layout = PIP_LAYOUTS[rank];
-  const pipSize = safe.w * 0.16 * style.glyphScale;
-  const fieldTop = safe.y + safe.h * 0.16;
-  const fieldH = safe.h * 0.68;
+  const size = safe.w * 0.16 * s.pipScale;
+  const stretch = s.glyphStretch || 1;
+  const halfW = (size * stretch) / 2;
+  const halfH = size / stretch / 2;
+
+  let maxDx = 0;
+  let edge = 0.5; // distance of the outermost row from the nearer end of the pip field
+  for (const p of layout) {
+    maxDx = Math.max(maxDx, Math.abs(p.x - 0.5));
+    edge = Math.min(edge, p.y, 1 - p.y);
+  }
+  const spread = maxDx > 0
+    ? Math.max(0, Math.min(s.pipSpreadX, (safe.w / 2 - halfW) / (maxDx * safe.w)))
+    : s.pipSpreadX;
+  // Outermost centre is at  m + edge(1 - 2m)  of the safe height; it must be
+  // at least halfH from the safe edge:  m >= (hh - edge) / (1 - 2 edge).
+  const hh = halfH / safe.h;
+  const marginMin = Math.max(0, (hh - edge) / (1 - 2 * edge));
+  const margin = Math.min(0.49, Math.max(s.pipMarginPct / 100, marginMin));
+
+  const fieldTop = safe.y + safe.h * margin;
+  const fieldH = safe.h * (1 - 2 * margin);
+  return {
+    size,
+    spread,
+    marginPct: margin * 100,
+    clamped: spread < s.pipSpreadX || margin * 100 > s.pipMarginPct,
+    pips: layout.map((p) => ({
+      x: safe.x + (0.5 + (p.x - 0.5) * spread) * safe.w,
+      y: fieldTop + p.y * fieldH,
+      rot: s.invertBottomPips ? (p.rot || 0) : 0,
+    })),
+  };
+}
+
+function drawPipCard(ctx, rank, suit, palette, safe, suitImages, style) {
+  const { size, pips } = getPipLayout(rank, style, safe);
   const color = suitColor(suit, palette);
   const [sx, sy] = glyphStretchXY(style);
-
-  for (const p of layout) {
-    const px = safe.x + p.x * safe.w;
-    const py = fieldTop + p.y * fieldH;
-    drawSuitGlyph(ctx, suit, px, py, pipSize, color, p.rot || 0, suitImages, sx, sy);
+  for (const p of pips) {
+    drawSuitGlyph(ctx, suit, p.x, p.y, size, color, p.rot, suitImages, sx, sy);
   }
 }
 
 function drawAceCard(ctx, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
-  const size = safe.w * 0.52 * style.glyphScale;
+  const size = safe.w * 0.52 * style.aceScale;
   const [sx, sy] = glyphStretchXY(style);
   drawSuitGlyph(ctx, suit, safe.x + safe.w / 2, safe.y + safe.h / 2, size, color, 0, suitImages, sx, sy);
 }

@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, nodeVarianceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, nodeVarianceIsAbsent } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -486,7 +486,7 @@ let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequ
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
-let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true, lastStemNodesAbsent = true;
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true, lastStemNodesAbsent = true, lastStemCutAbsent = true;
 let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris = 0;
 /* THE SEPALS (part 1) — footRing()'s descriptor (the ring, the count and its
    ceiling, the phase, the foot), the builder's own emitted whorl and the angle
@@ -690,6 +690,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        __bloomMetrics. */
     lastStemAbsent = stemIsAbsent(uiForBuild);
     lastStemNodesAbsent = stemNodesAbsent(uiForBuild);
+    lastStemCutAbsent = stemCutAbsent(uiForBuild);
     /* LEAVES — LF0-LF7's measured side. `leaf` is NULL and not absent where
        there are none: LF1 distinguishes "the builder says there are none" from
        "the builder says nothing", and a missing key is the second. The
@@ -1809,6 +1810,7 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
           + (stem.tipPlugMm > 0
               ? ` · SOLID for the last ${stem.tipPlugMm.toFixed(2)} mm — the bore is CLOSED at the TIP, as thick as the ${stem.wallMm.toFixed(2)} mm wall it closes, so the bottom reads as a stem end and not a cut pipe; ${stem.voidMm.toFixed(2)} mm of SEALED bore between the two`
               : ''))
+    + stemCutLine(stem)
     + `\n     HUB ${stem.hubStyle}`
     + (stem.swellActive
         ? ` · ${stem.hubAmount.toFixed(2)}x pronounced · reaches ${stem.axisDepth.toFixed(2)} mm below the head`
@@ -1820,6 +1822,22 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
     + stemNodesLine(stem)
     + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm thick at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — thickness DERIVED from the stem's own section, no control` : inertBecause}\n`
     + stemChannelLine(omission);
+}
+
+/* THE STEM'S END (Eva's ruling 7, stem session 3) — the cut, told in the
+   numbers the plan derived: where the short point is, how deep the land is
+   and from what, where the bore closes under it, and the one case where the
+   cut cannot be made. Absent on a FLAT end, which is what every pedicel has. */
+function stemCutLine(stem) {
+  const c = stem.cut;
+  if (!c || !c.on) return '';
+  if (c.inertShort) return `\n     END: CUT NOT MADE — a ${stem.lengthMm} mm stem is shorter than its own ${c.spanMm.toFixed(2)} mm cut at ${c.deg}°, so the end stays flat (told, not refused)`;
+  return `\n     END: a ${c.deg}° florist's cut · the LONG point at the full ${stem.lengthMm} mm, the short point ${c.spanMm.toFixed(2)} mm above it`
+    + ` · a ${c.landMm.toFixed(2)} mm LAND at the long point — the floor is ${c.landMinMm.toFixed(2)} mm (max of the ${MIN_FEATURE_MM.toFixed(2)} mm print floor and two ${NOZZLE_MM.toFixed(1)} mm nozzle widths), drawn on the tube's own lattice as the chord at column ${c.landIdx}`
+    + (stem.boreR > 0 ? ` · the bore CLOSES ${stem.tipPlugMm.toFixed(2)} mm from the long point (the full cut's ${(2 * c.rTip).toFixed(2)} mm plus ${(stem.tipPlugMm - 2 * c.rTip).toFixed(2)} — Eva's ${STEM_MIN_WALL_MM} mm wall measured square to the face), so the cut face is SOLID`
+                        : ' · the stem is SOLID here, so the cut costs no plug')
+    + (c.tipTiltDeg > 1e-9 ? ` · the tip's axis leans ${c.tipTiltDeg.toFixed(2)}° (nodes), so against the LOCAL axis the face is ${(c.deg - c.tipTiltDeg).toFixed(1)}–${(c.deg + c.tipTiltDeg).toFixed(1)}° — the cut is ${c.deg}° to the vertical, as every ring is horizontal (ruling 5)` : '')
+    + ' · the object does not stand on this end (ruled)';
 }
 
 /* THE STEM'S NODES (#299's port) — what the build made of the one control,
@@ -2509,6 +2527,14 @@ window.__bloomMetrics = () => ({
     tipPlugMm: lastStem.tipPlugMm, voidMm: lastStem.voidMm,
     voidTopZ: lastStem.voidTopZ, voidBottomZ: lastStem.voidBottomZ,
     solidThrough: lastStem.solidThrough,
+    /* THE FLORIST'S CUT (ruling 7) — the PLAN's own record (what was asked:
+       on/made/inert, the land, the span, the plug) beside the cut ring the
+       BUILDER emitted (`emittedCut`: the vertices, the face's projected area,
+       the land count). SC1 restates the cut from the CONTROLS and reads the
+       emitted ring; ST10's end-face clause reads the emitted face. */
+    cut: lastStem.cut ? JSON.parse(JSON.stringify(lastStem.cut)) : null,
+    tubeStations: lastStem.tubeStations ? lastStem.tubeStations.slice() : null,
+    emittedCut: lastStemBuilt && lastStemBuilt.emittedCut ? JSON.parse(JSON.stringify(lastStemBuilt.emittedCut)) : null,
     emittedTopZ: lastStemBuilt ? lastStemBuilt.emittedTopZ : undefined,
     emittedVoid: lastStemBuilt ? lastStemBuilt.emittedVoid : undefined,
     emittedVoidTopZ: lastStemBuilt ? lastStemBuilt.emittedVoidTopZ : undefined,
@@ -2670,6 +2696,12 @@ window.__bloomMetrics = () => ({
          — the artefact — so the pin in `PEDICEL_PINS` is not asked whether it
          pinned. */
       stemNodeCount: lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.nodeLaw ? lastInfloBuilt.unit.stem.nodeLaw.nodes.length : 0,
+      /* THE PEDICEL'S CUT, AS BUILT (ruling 7): a pedicel's free end is the
+         one rooted through the rachis wall, so it is never cut. Read off the
+         floret's OWN stem record and its own emitted cut — the artefact. */
+      stemCutOn: !!(lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.cut && lastInfloBuilt.unit.stem.cut.on),
+      stemCutMade: !!(lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.cut && lastInfloBuilt.unit.stem.cut.made),
+      stemCutEmitted: !!(lastInfloBuilt.unit.stemBuilt && lastInfloBuilt.unit.stemBuilt.emittedCut),
       stemStationCount: lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.stations ? lastInfloBuilt.unit.stem.stations.length : null,
       /* THE PEDICEL'S OWN VOID, for O1's declared inward count. A floret is a
          bloom and its pedicel is a stem, so its bore becomes a sealed CAVITY
@@ -2800,6 +2832,9 @@ window.__bloomMetrics = () => ({
   /* THE NODES' TWO STATEMENTS (ST12) — the geometry's answer from the running
      module, never a Node import, for ST0's own reason. */
   stemNodesAbsent: lastStemNodesAbsent,
+  /* THE GEOMETRY'S OWN ANSWER TO "IS THE CUT ABSENT HERE" — SC0's half, as
+     the RUNNING module gave it (the ST0 / stemNodesAbsent shape). */
+  stemCutAbsent: lastStemCutAbsent,
   /* THE SEPALS (SP0-SP9). The RING's own declarations (footRing's descriptor)
      beside the BUILDER's own emitted records: the count it built, each sepal's
      azimuth as the whorl primitive placed it, its foot frames and length as

@@ -3,7 +3,7 @@
    PARTITION, AND THE CLAIM THAT ONLY THE OMITTED PETALS WENT.
 
      node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree>
-        [--change omission|band|plug] [--control] [--control-only] [--rows N] [--only re]
+        [--change omission|band|plug|cut] [--control] [--control-only] [--rows N] [--only re]
 
    TWO CLAUSES, and the second is the one this feature is actually about.
 
@@ -118,7 +118,7 @@ const CONTROL_ONLY = process.argv.includes('--control-only');
    channel that named it; `band` is the SOLID ROOT BAND, whose movers and whose
    second clause are different questions about the same builder. */
 const CHANGE = process.argv.includes('--change') ? process.argv[process.argv.indexOf('--change') + 1] : 'omission';
-if (!['omission', 'band', 'plug'].includes(CHANGE)) { console.error(`--change must be omission|band|plug, not ${CHANGE}`); process.exit(2); }
+if (!['omission', 'band', 'plug', 'cut'].includes(CHANGE)) { console.error(`--change must be omission|band|plug|cut, not ${CHANGE}`); process.exit(2); }
 if (!BASE || !fs.existsSync(BASE)) { console.error('verify-bloom-sphere-stem-bytes: need --base <worktree of the base commit>'); process.exit(2); }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
@@ -160,6 +160,17 @@ function movesByRecord(set) {
       if (!fr.hub) continue;
       const plan = G.stemPlan(st, fr.hub, acc);
       if (plan.present && plan.solidBandMm > 0) return true;
+    } else if (CHANGE === 'cut') {
+      /* THE CUT'S OWN RECORD (ruling 7, stem session 3): a row moves iff THIS
+         tree's plan reports a cut MADE — the control ON, a stem present, and
+         the stem longer than its own cut. The base tree has no cut and cannot
+         say; this is the guard predicate the whole partition is declared
+         from, read off the plan rather than the labels. A row with the
+         control FLAT, or a stem too short to cut, is a HOLDER and must hold
+         to the bit — which is the by-branch claim measured. */
+      if (!fr.hub) continue;
+      const plan = G.stemPlan(st, fr.hub, acc);
+      if (plan.present && plan.cut && plan.cut.made) return true;
     } else if (CHANGE === 'plug') {
       /* THE PLUG'S OWN RECORD, and it is the widest predicate of the three
          because the plug is the widest change: a row moves iff the plan reports
@@ -212,6 +223,58 @@ function onlyTheStemsInteriorWent(set, em) {
   const plan = G.stemPlan(st, G.footRing(st, new G.MeshBuilder({ exportMode: em })).hub,
                           new G.MeshBuilder({ exportMode: em }));
   const R = plan.outerR, EPS = 1e-9;
+  /* THE ENVELOPE ON A NODED STEM IS THE SWOLLEN, LEANING ONE. `outerR` is the
+     tube's nominal radius; under `stemNodeProminence` the rings swell to the
+     plan's own `nodeMaxOuterR` (the law evaluated AT the stations the rings sit
+     on, so it is exact over the emitted vertices) and their centres walk off the
+     axis by up to `nodeTipOffsetMm` (the offset grows monotonically with depth,
+     so the tip's is the largest). Both are the PLAN's own numbers about the
+     tube, which is not the quantity this clause doubts (something OUTSIDE the
+     stem moving). On a straight stem both collapse to `outerR` and 0, so the
+     envelope is the one every earlier change was measured against. Measured
+     before this existed: `--change cut` reported all seven `BARE NODES:` rows
+     as runs reaching "outside" a radius-3 envelope at r 3.14..3.62, which is
+     the node's own swelling. */
+  /* AND THE SWELLING IS SAMPLED AT EACH TREE'S OWN STATIONS: `nodeMaxOuterR` is
+     the law's maximum over the plan's stations, and under `--change cut` the
+     branch re-places the tube's ladder over `L - span`, so the base's rings can
+     sit nearer the peak than the branch's (`STEM NODES: on the widest bore`
+     read r 10.2198 against the branch plan's 10.1770 — a BASE ring). The
+     envelope is the larger of the two plans' own extents. */
+  const stA = { ...DB, ...set };
+  const planA = GB.stemPlan(stA, GB.footRing(stA, new GB.MeshBuilder({ exportMode: em })).hub,
+                            new GB.MeshBuilder({ exportMode: em }));
+  /* Per STATION, radius plus the axis offset THERE: the drifts of different
+     nodes point in different directions, so |offset| is not monotone in depth
+     and the tip's is not the largest (`STEM NODES: whorled x 8` reads a ring at
+     r 12.1596 against nodeMaxOuterR + nodeTipOffsetMm = 12.1325). */
+  const extentOf = (M, pl) => {
+    if (!pl.nodeLaw) return pl.outerR;
+    /* Every depth a ring is drawn at: the tube's stations, the void's own
+       (relative to `voidTopZ`), and — on the branch — the cut ring's, one per
+       column at `L - h(theta)`, which are NOT stations (`STEM NODES: the longest
+       leaf on the shortest stem` read a cut-ring vertex 1e-4 past the
+       station-sampled extent). */
+    const depths = [...pl.stations];
+    if (pl.voidStations) for (const v of pl.voidStations) depths.push((pl.rootZ - pl.voidTopZ) + v);
+    if (pl.cut && pl.cut.made) {
+      const N = pl.sides, step = 2 * Math.PI / N;
+      for (let i = 0; i < N; i++) depths.push(pl.lengthMm - Math.max(0, pl.cut.slope * pl.cut.rTip * (pl.cut.cosJ - Math.cos(Math.min(i, N - i) * step))));
+    }
+    let e = 0;
+    for (const sd of depths) { const c = M.stemNodeAxisMm(pl.nodeLaw, sd); e = Math.max(e, M.stemNodeRadiusMm(pl.nodeLaw, sd) + Math.hypot(c[0], c[1])); }
+    return e;
+  };
+  const ENV_R = Math.max(extentOf(G, plan), extentOf(GB, planA));
+  /* THE STEM'S OWN TRIANGLE BLOCK on each stream: `buildBloomInto` emits the
+     stem directly after the hub (`hubTriEnd`) and reports its tally, so the
+     block is [hubTriEnd, hubTriEnd + stemBuilt.tris) on each tree. The cut-face
+     clause reads ONLY this block — a leaf's petiole rooted near the tip or a
+     pedicel on a short rachis is a down-facing triangle inside the cut's window
+     and the tube's radius, and the first sweep summed them into the face
+     (`LEAVES: the STEEP angle` 113.85 against 112.77; `INFLO: 12 nodes on a
+     20 mm rachis` 32.24 against 28.19 — the pedicels). */
+  const blockOf = (rep) => rep.stemBuilt ? [rep.hubTriEnd * 9, (rep.hubTriEnd + rep.stemBuilt.tris) * 9] : [0, 0];
   const a = accA.positions, b = accB.positions;
   if (a.length !== b.length) {
     /* A LENGTH CHANGE IS EXPECTED HERE — the band emits a different triangle
@@ -243,9 +306,17 @@ function onlyTheStemsInteriorWent(set, em) {
     }
     return out.sort();
   };
-  const wa = wall(a), wb = wall(b);
-  if (wa.length !== wb.length) return `the stem's OUTER WALL has ${wa.length} triangles on the base and ${wb.length} on the branch — the ${CHANGE} changed a surface that can be SEEN`;
-  for (let i = 0; i < wa.length; i++) if (wa[i] !== wb[i]) return `a stem OUTER WALL triangle moved (${wa[i]} -> ${wb[i]}) — the ${CHANGE} moved the tube's own side, which neither closure has any business reaching`;
+  /* UNDER `--change cut` THE WALL'S TRIANGLES ARE NOT THE SAME TRIANGLES —
+     the tube's ladder gains the short-point station and its last band ends on
+     the plane — so bit-identity of the wall is not the claim; what IS the
+     claim is in `cutFaceClause` (iv): every branch wall vertex still lies ON
+     the cylinder, and none hangs below the cut plane. The two closures'
+     wall-identity clause stays exactly as it was for them. */
+  if (CHANGE !== 'cut') {
+    const wa = wall(a), wb = wall(b);
+    if (wa.length !== wb.length) return `the stem's OUTER WALL has ${wa.length} triangles on the base and ${wb.length} on the branch — the ${CHANGE} changed a surface that can be SEEN`;
+    for (let i = 0; i < wa.length; i++) if (wa[i] !== wb[i]) return `a stem OUTER WALL triangle moved (${wa[i]} -> ${wb[i]}) — the ${CHANGE} moved the tube's own side, which neither closure has any business reaching`;
+  }
   /* (a) — AND UNDER `--change plug` IT IS A CONTIGUOUS-RUN COMPARISON, because
      an INDEX-ALIGNED one is wrong the moment anything follows the stem.
 
@@ -269,7 +340,7 @@ function onlyTheStemsInteriorWent(set, em) {
      the outer cylinder wall (below) is untouched. A change that moved a petal
      as well as the stem would widen the run past the envelope; one that moved
      something and compensated elsewhere would break the length identity. */
-  if (CHANGE === 'plug') {
+  if (CHANGE === 'plug' || CHANGE === 'cut') {
     const la = a.length, lb = b.length;
     const stemA = repA.stemBuilt ? repA.stemBuilt.tris : 0;
     const stemB = repB.stemBuilt ? repB.stemBuilt.tris : 0;
@@ -280,7 +351,7 @@ function onlyTheStemsInteriorWent(set, em) {
     let i0 = 0; while (i0 < lim && Object.is(a[i0], b[i0])) i0++;
     let k0 = 0; while (k0 < lim - i0 && Object.is(a[la - 1 - k0], b[lb - 1 - k0])) k0++;
     if (i0 >= lim && la === lb) return null;                 // nothing differed at all
-    const inEnv = (x, y, z) => Math.hypot(x, y) <= R + 1e-6 && z <= plan.topZ + 1e-6 && z >= plan.tipZ - 1e-6;
+    const inEnv = (x, y, z) => Math.hypot(x, y) <= ENV_R + 1e-6 && z <= plan.topZ + 1e-6 && z >= plan.tipZ - 1e-6;
     /* The run is walked on VERTEX boundaries: `i0` can land mid-vertex, so it is
        rounded down to a multiple of 3 and the tail up, which only ever WIDENS
        the region being checked. */
@@ -289,11 +360,11 @@ function onlyTheStemsInteriorWent(set, em) {
       const hi = Math.ceil((len - k0) / 3) * 3;
       for (let i = lo; i < hi && i + 2 < len; i += 3) {
         if (!inEnv(arr[i], arr[i + 1], arr[i + 2])) {
-          return `the one contiguous run that differs reaches OUTSIDE the stem's own envelope at float ${i}: (r ${Math.hypot(arr[i], arr[i + 1]).toFixed(4)}, z ${arr[i + 2].toFixed(4)}) against a stem of radius ${R} spanning z ${plan.tipZ.toFixed(4)}..${plan.topZ.toFixed(4)} — the plug reached the head, a petal, the hub or the centre`;
+          return `the one contiguous run that differs reaches OUTSIDE the stem's own envelope at float ${i}: (r ${Math.hypot(arr[i], arr[i + 1]).toFixed(4)}, z ${arr[i + 2].toFixed(4)}) against a stem of radius ${ENV_R} spanning z ${plan.tipZ.toFixed(4)}..${plan.topZ.toFixed(4)} — the plug reached the head, a petal, the hub or the centre`;
         }
       }
     }
-    return bottomFaceClause(a, b, plan, R);
+    return CHANGE === 'cut' ? cutFaceClause(a, b, plan, R, blockOf(repA), blockOf(repB)) : bottomFaceClause(a, b, plan, R);
   }
   /* (a) — compare only where the two streams align; the differing tail is the
      band's own, and its vertices are checked against the envelope. */
@@ -301,8 +372,8 @@ function onlyTheStemsInteriorWent(set, em) {
   for (let i = 0; i < n; i += 3) {
     if (Object.is(a[i], b[i]) && Object.is(a[i + 1], b[i + 1]) && Object.is(a[i + 2], b[i + 2])) continue;
     const rA = Math.hypot(a[i], a[i + 1]), rB = Math.hypot(b[i], b[i + 1]);
-    const inA = rA <= R + 1e-6 && a[i + 2] <= plan.topZ + 1e-6 && a[i + 2] >= plan.tipZ - 1e-6;
-    const inB = rB <= R + 1e-6 && b[i + 2] <= plan.topZ + 1e-6 && b[i + 2] >= plan.tipZ - 1e-6;
+    const inA = rA <= ENV_R + 1e-6 && a[i + 2] <= plan.topZ + 1e-6 && a[i + 2] >= plan.tipZ - 1e-6;
+    const inB = rB <= ENV_R + 1e-6 && b[i + 2] <= plan.topZ + 1e-6 && b[i + 2] >= plan.tipZ - 1e-6;
     if (!inA || !inB) return `a vertex OUTSIDE the stem's own envelope moved at float ${i}: base (r ${rA.toFixed(4)}, z ${a[i + 2].toFixed(4)}) against branch (r ${rB.toFixed(4)}, z ${b[i + 2].toFixed(4)}) — the ${CHANGE} reached the head, a petal or the hub`;
   }
   const strayB = outside(b.slice(n)), strayA = outside(a.slice(n));
@@ -355,6 +426,156 @@ function bottomFaceClause(a, b, plan, R) {
   if (Math.abs(gotBranch - wantBranch) > tol) {
     return `the bottom face measures ${gotBranch.toFixed(4)} mm^2 against a closed disc's ${wantBranch.toFixed(4)} — the bore is NOT closed at the tip and the stem still ends as a cut pipe`;
   }
+  return null;
+}
+
+/* (c') — UNDER `--change cut`, THE END FACE IS THE FEATURE, AND THE FLAT
+   CLAUSE ABOVE CANNOT HOLD IT (ruling 7, stem session 3). `bottomFaceClause`
+   defines the end face as "the triangles all at one height", and a 45-degree
+   face is at no one height: kept, it would read the LAND alone on the branch
+   and call the end open on every cut stem; dropped, the one surface this
+   change is about would be asserted by nothing. RE-DERIVED, NOT LOOSENED:
+     (i)  the BASE's end is the flat closed disc it was (the plug landed
+          before this change), read exactly as before — a tool that reads the
+          wrong face reports on itself first;
+     (ii) the BRANCH's end face is every stem triangle facing DOWN (its normal's
+          z under -1/2: the land at -1, the 45-degree plane at -0.707, the
+          wall at 0, the void's floor at +1) whose vertices all lie in the cut's
+          own window, and its PROJECTED area must be the regular N-gon's — the
+          same closed form the flat clause used, in projection, which a face
+          missing its land fan or its plane fan cannot reach;
+     (iii) THE BORE DOES NOT OPEN THROUGH THE FACE: every branch vertex on the
+          bore (radius `boreR`) stands at least Eva's wall, measured SQUARE to
+          the cut plane, above that plane at its own x — the plug's own law,
+          read off the file rather than off the plan that asked for it. This
+          is the clause `the-bore-opens-through-the-cut-face` moves, and the
+          projected-area clause cannot see it (the face is intact; the void
+          pierces it).
+   The window and the plane are the plan's own declaration of WHERE the cut
+   is; the claims are about what the file holds there. */
+function cutFaceClause(a0, b0, plan, R0, blockA, blockB) {
+  if (blockA[1] <= blockA[0] || blockB[1] <= blockB[0]) return 'no stem block on one of the trees — the cut-face clause has nothing to read';
+  const a = Float64Array.from(a0.slice(blockA[0], blockA[1])), b = Float64Array.from(b0.slice(blockB[0], blockB[1]));
+  /* ON A NODED STEM THE END IS THE TIP'S OWN RING: its radius is the law's
+     `rTip` (the plan's own, carried on `cut.rTip`) and its centre is the node
+     axis at the tip's depth, `stemNodeAxisMm(law, rootZ - z)` — the builder's
+     own `ringAtS` mapping, restated here so every radial test below is taken
+     about the ring's own centre rather than the world axis. On a straight stem
+     `rTip === outerR` and the centre is [0, 0], so the straight case is the
+     expression it was. */
+  const C = plan.cut;
+  const R = C && C.made ? C.rTip : R0;
+  const centreAt = (z) => plan.nodeLaw ? G.stemNodeAxisMm(plan.nodeLaw, plan.rootZ - z) : [0, 0];
+  const radiusAt = (z) => plan.nodeLaw ? G.stemNodeRadiusMm(plan.nodeLaw, plan.rootZ - z) : R0;
+  const rAbout = (x, y, z) => { const c = centreAt(z); return Math.hypot(x - c[0], y - c[1]); };
+  /* THE FACE'S HEIGHT IS A FUNCTION OF THE AZIMUTH, not of x: the builder's cut
+     ring puts the vertex at azimuth th at `tipZ + h(th)` with
+     `h = max(0, slope * rTip * (cosJ - cos th))`, and on a noded stem that
+     vertex sits on ITS OWN DEPTH's ring (the law's centre and radius there),
+     so the surface is only a plane where the tube is a cylinder. Taken about
+     the vertex's own ring centre, `h(th)` is the same law in both cases. */
+  const faceZAt = (x, y, z) => {
+    if (!C || !C.made) return plan.tipZ;
+    const c = centreAt(z), th = Math.atan2(y - c[1], x - c[0]);
+    return plan.tipZ + Math.max(0, C.slope * R * (C.cosJ - Math.cos(th)));
+  };
+  const poly = (rad) => 0.5 * plan.sides * rad * rad * Math.sin(2 * Math.PI / plan.sides);
+  /* The closed end's area: a flat polygon of the tip's radius on a straight
+     stem, and on a noded one the shoelace area of the cut ring the law gives
+     (each vertex at its own depth's centre and radius) — `restatedCutRing`'s
+     own expression in the harness, restated here from the plan's law. */
+  const expectedFace = () => {
+    if (!plan.nodeLaw || !C || !C.made) return poly(R);
+    const N = plan.sides, ring = [];
+    for (let i = 0; i < N; i++) {
+      const th = (i * 2 * Math.PI) / N;
+      const h = Math.max(0, C.slope * R * (C.cosJ - Math.cos(Math.min(i, N - i) * (2 * Math.PI / N))));
+      const z = plan.tipZ + h, c = centreAt(z), rad = radiusAt(z);
+      ring.push([c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th)]);
+    }
+    let a2 = 0;
+    for (let i = 0; i < N; i++) { const p = ring[i], q = ring[(i + 1) % N]; a2 += p[0] * q[1] - q[0] * p[1]; }
+    return Math.abs(a2) / 2;
+  };
+  const tol = 1e-6 * Math.max(1, poly(R));
+  const faceAreaAt = (pos, z) => {
+    let A = 0;
+    for (let i = 0; i < pos.length; i += 9) {
+      if (!(pos[i + 2] === z && pos[i + 5] === z && pos[i + 8] === z)) continue;
+      if (rAbout(pos[i], pos[i + 1], z) > R + 1e-6) continue;
+      const ux = pos[i + 3] - pos[i], uy = pos[i + 4] - pos[i + 1];
+      const vx = pos[i + 6] - pos[i], vy = pos[i + 7] - pos[i + 1];
+      A += Math.abs(ux * vy - uy * vx) / 2;
+    }
+    return A;
+  };
+  const gotBase = faceAreaAt(a, plan.tipZ);
+  if (Math.abs(gotBase - poly(R)) > tol) return `the BASE's bottom face measures ${gotBase.toFixed(4)} mm^2 at z = ${plan.tipZ}; a closed flat disc is ${poly(R).toFixed(4)} — this tool is not reading the face it thinks it is`;
+  if (!C || !C.made) return 'the plan declares no cut made on a row predeclared as a cut mover';
+  const zTop = plan.tipZ + C.spanMm + 1e-9;
+  const want = expectedFace();
+  let projected = 0, faceTris = 0;
+  const faceTriangles = [];
+  for (let i = 0; i < b.length; i += 9) {
+    const z0 = b[i + 2], z1 = b[i + 5], z2 = b[i + 8];
+    if (z0 > zTop || z1 > zTop || z2 > zTop || z0 < plan.tipZ - 1e-9 || z1 < plan.tipZ - 1e-9 || z2 < plan.tipZ - 1e-9) continue;
+    if (rAbout(b[i], b[i + 1], z0) > radiusAt(z0) + 1e-6 || rAbout(b[i + 3], b[i + 4], z1) > radiusAt(z1) + 1e-6 || rAbout(b[i + 6], b[i + 7], z2) > radiusAt(z2) + 1e-6) continue;
+    const ux = b[i + 3] - b[i], uy = b[i + 4] - b[i + 1], uz = z1 - z0;
+    const vx = b[i + 6] - b[i], vy = b[i + 7] - b[i + 1], vz = z2 - z0;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const L = Math.hypot(nx, ny, nz);
+    if (!(L > 0) || nz / L > -0.5) continue;
+    projected += Math.abs(nz) / 2; faceTris++;
+    faceTriangles.push([[b[i], b[i + 1], z0], [b[i + 3], b[i + 4], z1], [b[i + 6], b[i + 7], z2]]);
+  }
+  if (Math.abs(projected - want) > tol) return `the branch's cut face (${faceTris} down-facing triangles in the cut's window) projects to ${projected.toFixed(4)} mm^2 against a closed end's ${want.toFixed(4)} — the end does not cover the section`;
+  /* (iii) THE BORE DOES NOT OPEN THROUGH THE FACE, as the DISTANCE from every
+     bore vertex in the plug's window to the emitted face triangles — the
+     wall Eva's 1.5 mm is a wall SQUARE TO THE FACE, and a point-to-triangle
+     solve is that quantity whatever the face's shape. The first cut of this
+     clause subtracted a per-azimuth plane height from the vertex's own z,
+     which is exact on a cylinder and reads SHORT on a noded stem (1.65 mm on
+     `BARE NODES: eight nodes on 60 mm` against a solved 3.05), because a bore
+     ring's centre and the face vertex's at the same azimuth sit at different
+     depths of a leaning axis. Measured, every noded row's true clearance is
+     above the straight stem's own 2.34. On a straight stem with the plug put
+     back to the flat 1.5 mm the floor and the face INTERSECT and this reads 0. */
+  if (plan.boreR > 0 && plan.voidMm > 0) {
+    const W = 1.5;
+    const sub = (p, q) => [p[0] - q[0], p[1] - q[1], p[2] - q[2]], dot = (p, q) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+    const closest = (p, A, B, Cc) => {
+      const ab = sub(B, A), ac = sub(Cc, A), ap = sub(p, A); const d1 = dot(ab, ap), d2 = dot(ac, ap); if (d1 <= 0 && d2 <= 0) return A;
+      const bp = sub(p, B); const d3 = dot(ab, bp), d4 = dot(ac, bp); if (d3 >= 0 && d4 <= d3) return B;
+      const vc = d1 * d4 - d3 * d2; if (vc <= 0 && d1 >= 0 && d3 <= 0) { const v = d1 / (d1 - d3); return [A[0] + ab[0] * v, A[1] + ab[1] * v, A[2] + ab[2] * v]; }
+      const cp = sub(p, Cc); const d5 = dot(ab, cp), d6 = dot(ac, cp); if (d6 >= 0 && d5 <= d6) return Cc;
+      const vb = d5 * d2 - d1 * d6; if (vb <= 0 && d2 >= 0 && d6 <= 0) { const w = d2 / (d2 - d6); return [A[0] + ac[0] * w, A[1] + ac[1] * w, A[2] + ac[2] * w]; }
+      const va = d3 * d6 - d5 * d4; if (va <= 0 && (d4 - d3) >= 0 && (d5 - d6) >= 0) { const w = (d4 - d3) / ((d4 - d3) + (d5 - d6)); return [B[0] + (Cc[0] - B[0]) * w, B[1] + (Cc[1] - B[1]) * w, B[2] + (Cc[2] - B[2]) * w]; }
+      const den = 1 / (va + vb + vc), v = vb * den, w = vc * den; return [A[0] + ab[0] * v + ac[0] * w, A[1] + ab[1] * v + ac[1] * w, A[2] + ab[2] * v + ac[2] * w];
+    };
+    const zWin = plan.tipZ + plan.tipPlugMm + C.spanMm + 1e-6;
+    let worst = Infinity, probed = 0;
+    for (let i = 0; i < b.length; i += 3) {
+      if (b[i + 2] > zWin || b[i + 2] < plan.tipZ) continue;
+      if (Math.abs(rAbout(b[i], b[i + 1], b[i + 2]) - plan.boreR) > 1e-6) continue;
+      probed++;
+      const p = [b[i], b[i + 1], b[i + 2]];
+      for (const t of faceTriangles) { const q = closest(p, t[0], t[1], t[2]); const d = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); if (d < worst) worst = d; }
+    }
+    if (!probed) return 'no bore vertex was found in the plug window on a hollow cut stem — this clause is not reading the bore it thinks it is';
+    if (worst < W - 1e-9) return `a bore vertex stands ${worst.toFixed(4)} mm from the cut face where Eva's ${W} mm wall square to the ${C.deg}-degree face asks for ${W} — the bore opens through the cut face`;
+  }
+  /* (iv) THE CUT REMOVED MATERIAL AND ADDED NONE: every branch vertex at the
+     stem's radius stands ON or ABOVE the cut plane at its own x (the land at
+     the long point, the plane everywhere else), and every differing vertex
+     at that radius lies in the cut's window — the tube above the short point
+     is the cylinder it was. */
+  let below = 0, worstBelow = 0;
+  for (let i = 0; i < b.length; i += 3) {
+    if (Math.abs(rAbout(b[i], b[i + 1], b[i + 2]) - radiusAt(b[i + 2])) > 1e-6) continue;
+    const planeZ = faceZAt(b[i], b[i + 1], b[i + 2]);
+    if (b[i + 2] < planeZ - 1e-9) { below++; worstBelow = Math.max(worstBelow, planeZ - b[i + 2]); }
+  }
+  if (below) return `${below} branch vertex/vertices at the stem's radius hang up to ${worstBelow.toFixed(4)} mm BELOW the cut plane — the cut added material under the face`;
   return null;
 }
 
@@ -424,7 +645,7 @@ for (const r of rows) {
     movers++;
     if (!differs) badMove.push(r.label);
     if (!CONTROL) for (const em of [true, false]) {
-      const why = CHANGE === 'band' || CHANGE === 'plug' ? onlyTheStemsInteriorWent(set, em) : onlyTheOmittedWent(set, em);
+      const why = CHANGE === 'band' || CHANGE === 'plug' || CHANGE === 'cut' ? onlyTheStemsInteriorWent(set, em) : onlyTheOmittedWent(set, em);
       if (why) badOnly.push(`${r.label} [${em ? 'EXPORT' : 'LIVE'}]: ${why}`);
     }
   } else { holders++; if (differs) badHold.push(`${r.label} (${n} floats)`); }
@@ -436,7 +657,9 @@ for (const b of badMove) console.log('   ' + b);
 console.log(`CLAUSE 1  holders that MOVED: ${badHold.length}`);
 for (const b of badHold.slice(0, 12)) console.log('   ' + b);
 if (!CONTROL) {
-  console.log(CHANGE === 'plug'
+  console.log(CHANGE === 'cut'
+    ? `CLAUSE 2  movers where anything outside the stem moved, the base's end was not the flat disc, the cut face does not cover the section, or the bore opens through it: ${badOnly.length}`
+    : CHANGE === 'plug'
     ? `CLAUSE 2  movers where the stem's OUTER WALL moved, anything outside the stem did, or the bottom face is not a closed DISC: ${badOnly.length}`
     : CHANGE === 'band'
     ? `CLAUSE 2  movers where the stem's OUTER WALL moved, or anything outside the stem did: ${badOnly.length}`
@@ -450,13 +673,15 @@ const pass = !badMove.length && !badHold.length && !badOnly.length;
 if (CONTROL_ONLY) {
   const fired = badOnly.length > 0;
   console.log(fired
-    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where ${CHANGE === 'band' || CHANGE === 'plug' ? 'a float OUTSIDE the stem had moved' : 'a KEPT petal had moved'}`
+    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where ${CHANGE === 'band' || CHANGE === 'plug' || CHANGE === 'cut' ? 'a float OUTSIDE the stem had moved' : 'a KEPT petal had moved'}`
     : '\nCONTROL-ONLY FAILED TO FIRE — clause 2 cannot see a kept petal moving, so its PASS is not evidence');
   if (!movers) console.log('   (and there were NO MOVERS in this row set, so the control was vacuous — narrow to rows that build a stem on a sphere)');
   process.exit(fired && movers ? 0 : 1);
 }
 console.log(CONTROL ? (pass ? '\nCONTROL FAILED TO FIRE — the comparison cannot see a 1e-9 perturbation, so neither clause is evidence' : '\nCONTROL OK — CLAUSE 1 detected the perturbation on the holders (clause 2 is NOT exercised here — that is `--control-only`)')
-                    : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : (CHANGE === 'plug'
+                    : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : (CHANGE === 'cut'
+                        ? '\nPASS — every predeclared mover moved, every holder held, and on every mover every float that went lies INSIDE the stem, its cut face covers the section and the bore stays Eva\'s wall clear of it.'
+                        : CHANGE === 'plug'
                         ? '\nPASS — every predeclared mover moved, every holder held, and on every mover every float that went lies INSIDE the stem, its outer wall stayed bit-identical, and its bottom face came out a CLOSED DISC where the base had an annulus.'
                         : CHANGE === 'band'
                         ? '\nPASS — every predeclared mover moved, every holder held, and on every mover every float that went lies INSIDE the stem while its outer wall stayed bit-identical.'

@@ -243,6 +243,12 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
      rows it reaches are the ones with an inner whorl turning far enough to
      shift the seam. Every other cleft and claw row in the matrix is a single
      whorl at the shipping tilt, seam step 1, and its count is unmoved. */
+  /* THE CUT moves every cut stem's triangle count (the cut band loses two
+     triangles and the tube gains a station), so a per-row table would be the
+     whole mover set; the full partition is `verify-bloom-surface-bytes
+     --movers-predicate stem-cut`, and this change rides here for the
+     `--frozen-sweep` alone. */
+  cut: {},
   widest: {
     'CAPABILITY: cleft x 3 layers': '85024 -> 85344',
     'CAPABILITY: cleft x CONTINUOUS x 3 turns': '84944 -> 85424',
@@ -313,7 +319,7 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
    partition; the run fails on an undeclared one AND on a declared one whose
    definition turns out identical. */
 const ROW_DEF_MOVED_BY_CHANGE = {
-  seam: {}, widest: {}, arc: {}, nib: {}, nu: {},
+  seam: {}, widest: {}, arc: {}, nib: {}, nu: {}, cut: {},
   tilt: {
     'petalTilt max (120)': "block 1 sweeps every SWEEPABLE slider to its own max, so this row's label and value ARE the range; the base tree calls it `petalTilt max (75)`",
     'ALL MAX': 'block 4 hands every SWEEPABLE slider its max at once, so this row carries petalTilt 120 here and 75 on the base — one label over two different states',
@@ -386,6 +392,13 @@ const MOVER_BY_CHANGE = {
      latent (the drawn limit unchanged under a ramped head), so this
      predeclaration says no sepal row moves, and a sepal row that DID move
      would fail the run as an undeclared mover rather than be absorbed. */
+  /* THE FLORIST'S CUT (ruling 7, stem session 3): a row moves iff it builds
+     a stem whose end is cut — on THIS tree's plan (`stem.cut.made`), since
+     the base has no cut; a frozen row never sets `stemCut`, so under the
+     default every stem the frozen matrices build is cut unless it is shorter
+     than its own cut. The pedicels of a raceme are pinned flat, but the
+     raceme row still moves through its rachis. */
+  cut: (built) => !!(built.stem && built.stem.present && built.stem.cut && built.stem.cut.made),
   nu: (built) => {
     const head = (built.petalsAll || []).filter((p) => p && p.bladeLadder);
     const last = head.length ? head[head.length - 1].bladeLadder.rows : null;
@@ -463,6 +476,9 @@ const predicted = new Map();      // label -> true (predeclared mover) | false
    be the same on both trees — but "it happens to agree" is the reasoning the
    fourth durable rule exists to refuse, and requiring the base tree costs
    nothing here because the byte comparison needs it anyway. */
+/* `cut` reads `stem.cut.made`, a record ONLY this tree writes (the base has
+   no cut at all), so it is evaluated on THIS tree by construction and
+   `--base` is for the byte comparison alone. */
 const PREDICATE_READS_WHAT_THE_CHANGE_WRITES = new Set(['tilt', 'nib']);
 if (frozenSweep) {
   if (!MOVER_OF) { console.error(`REFUSED: --change ${change} declares no mover predicate, so there is nothing to sweep with.`); process.exit(2); }
@@ -711,6 +727,7 @@ if (controlMode && modeFindings === 1) { console.log('  the mode clause fired on
    asserted otherwise would be asserting that no change may ever ship that
    moves the shipping bloom — so it is a table now, with the reason in it. */
 const DEFAULT_HOLDS_BY_CHANGE = {
+  cut: 'the shipping default has `stemLength` 0, so no stem is built and there is nothing to cut',
   seam: 'the clearance floor does not bind at the defaults, so `m` is 1 and the ladder takes the same uniform slice',
   widest: "the gap measure's leading term was always `r[0]`, which the blend cannot move, so the default's ladder is unchanged",
   arc: 'the default is at curl exactly 0, where `spineAt` takes the straight arm and no arc is formed at all',

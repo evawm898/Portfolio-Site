@@ -43,9 +43,12 @@ await page.goto(`${base}/bug.html`);
 await page.waitForFunction(() => !!window.__bug);
 
 // 1. the gallery in the page: the panel, scrolled to the section
+// (the whole section, every thumbnail: the viewport is made tall enough for
+// it for this one shot — at 860 px the panel cut the gallery off at 24 of 55)
+await page.setViewportSize({ width: 1280, height: 3200 });
 await page.evaluate(() => document.getElementById('wlSec').scrollIntoView({ block: 'start' }));
-const panelBox = await page.locator('.bg-panel').boundingBox();
-const gallery = (await page.screenshot({ type: 'png', clip: { x: panelBox.x, y: panelBox.y, width: panelBox.width, height: Math.min(panelBox.height, 560) } })).toString('base64');
+const gallery = (await page.locator('#wlSec').screenshot({ type: 'png' })).toString('base64');
+await page.setViewportSize({ width: 1280, height: 860 });
 const libState = await page.evaluate(() => window.__bug.library());
 
 // undo: a real click on a thumbnail, then on Undo, must give back the params byte for byte

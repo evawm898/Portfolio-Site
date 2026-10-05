@@ -3529,11 +3529,60 @@ spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was lat
 solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
 restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
 
+**THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
+IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
+`docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
+`buildStemInto`'s cut ring / `cutFaceInto`, `STEM_CUT_*`, `NOZZLE_MM`, SC0–SC3 or
+`tools/verify-bloom-stem-cut.mjs`). `stemCut` (Stem, a CHOICE, FLORIST / FLAT, default
+**FLORIST**; FLAT is the end as it was, bit for bit). **`STEM_CUT_SLOPE = 1`, never
+`Math.tan(Math.PI / 4)`** (0.9999999999999999 — a 45° carried as a tangent puts the short point an
+ulp off the long point's own arithmetic and the land's lattice decision on a bar that is not 45 at the
+last bit). **The land is `max(MIN_FEATURE_MM, 2 × NOZZLE_MM)` = max(1.00, 0.80) = 1.00 mm** — the
+thinnest horizontal section the point may have, typed from neither number, mode-free — and it is
+DRAWN ON THE TUBE'S OWN LATTICE at or beyond the floor (column j, 1.00–1.24 mm): an inserted chord
+column lands ON a lattice column at 4 mm (`acos(1/2)` = 60°) and the first construction read 24
+degenerate triangles there. `stemLength` measures to the long point, which IS the land. **A cut
+HOLLOW stem ends SOLID: the plug is `2·rTip·s + W(√(1+s²) − s)` = D + 0.62 mm from the long point**,
+so the bore's floor stands Eva's 1.5 mm SQUARE to the face over the whole bore and never touches it
+(point-to-face 2.34 mm on the 6 mm stem, 2.26–3.77 on the noded ones, measured); the void closes on
+a horizontal rim fan facing up and the bore wall runs vertically to the root band. At 3 mm the stem
+is solid and the cut costs no plug. **The cut is pinned OFF on every pedicel through session 2's
+`PEDICEL_PINS`** — one place. A stem shorter than its own span is TOLD (`cut.inertShort`), not cut.
+**THE SIX CHECKS THE RULING NAMED EACH KEEP THEIR CATCH, SHOWN RED ON BOTH TREES**: ST1
+(`stemCountClause`, the cut band's `2N − 2` and the land+plane fans' `N − 2`), ST2 (the long point is
+the tip), ST3 (a cut stem's lowest rings are the void floor — the second no-inner-ring case), ST9
+(the tip is the LOWEST vertex at `outerR`, the root the populated level above), ST10
+(`stemPlugClauses`: the plug restated at 1e-9, the face's projected area against
+`restatedCutRing`'s shoelace, `N − 2` face triangles, lowest at the tip, highest at tip + span) and
+the byte tool's end-face clause, whose subject was "the triangles all at one height" — re-derived as
+`cutFaceClause` (the base's disc, the branch's down-facing window projected to the closed end's
+area, a POINT-TO-TRIANGLE distance from every bore vertex to the face ≥ 1.5, no stem-radius vertex
+under the face). **That distance clause's first version read SHORT on noded stems** (1.65 mm by a
+per-azimuth plane height against a solved 3.05) and was replaced by the solve rather than widened;
+**and the same tool's envelope had mis-sized a noded stem all along** (`outerR` against a swelling it
+reported as "outside"), fixed to the plan's own `nodeMaxOuterR + nodeTipOffsetMm`. On a noded stem
+the cut ring's vertices sit on their OWN depth's rings, so the face follows the kinked axis and is a
+plane only where the tube is a cylinder. **SC0–SC3 is the new family** (two statements; made ⟺ long
+enough; the land and span restated from the controls; the emitted ring vertex by vertex at 1e-9 and
+the land's `2j + 1`), with three standing mutants (`the-cut-is-flattened`, `the-land-is-removed`,
+`the-bore-opens-through-the-cut-face`), each witnessed on the mutated module's own end-face facts,
+and `node tools/verify-bloom-stem-cut.mjs` the must-fail (24 plants, each firing its own clause by
+its own message and no other) — **in the export preflight beside the stem-nodes must-fail,
+added by the follow-up PR AFTER `frozen/phase52` was dispatched from `main` and read back at
+`23b13bd` (the merge was `a22ca83`); every tag absent from the remote is one of the seven declared
+in `TAG_PUSH_XFAIL`.** **The brief's "~114 of 1,047" was
+`phase50`'s denominator**: the live matrix at `23b13bd` is 1,089, 156 carry a stem by "stem
+present" (the 114 plus #353's 33 raceme rows and 9 of block 47), and the partition by the cut's own
+guard is in the outcome doc. Block 48 is 13 rows (1,089 → 1,102), smoke block 48 five;
+`frozen/phase52` is the 1,089 rows at `23b13bd`. **BOTH EXPORT-REFUSED ROWS MOVED +94 AND CI IS WHAT SAID SO** (§12 of the outcome doc): `ALL MAX` 3,090,816 → 3,090,910 and the NODE LAWS 101.1% corner 1,517,196 → 1,517,290, each carrying a 120 mm stem the cut now ends; `bloom-xfail-magnitudes --include-refused` censuses a refused row and never compares `EXPORT_REFUSED_XFAIL.tris`, so a change touching every stem must re-measure THAT list by hand — the census reproducing is a claim about the other one. The cut stem uses LESS material than the flat end
+at every diameter (−30.2 mm³ at 6 mm, −136.8 at 12 on 60 mm — the wedge outweighs the plug), +94
+triangles, and the default bloom (no stem) is untouched at 24,688.
+
 **INFLORESCENCE BUILD 3, PHASE A — THE TOP NODE'S INSET IS THE FLORET'S OWN PETAL REACH, AND
 THE PEDICEL'S CEILING IS 250** (Eva's Oct 4 brief and ruling; issue #355 — read
 `docs/bloom-inflorescence-build-3-outcome.md` before touching `inflorescencePlan`'s inset block,
 `INFLO_REACH_GRID_MM`, `PEDICEL_LENGTH_RANGE`, `lenCeilMm`, the harness's pedicel-range guard,
-ID9 or block 48). Build 1 inherited the LEAF's inset law — the pedicel's rise, `L sin th` —
+ID9 or block 49). Build 1 inherited the LEAF's inset law — the pedicel's rise, `L sin th` —
 which clears the ROD and not the flower on it: the shipped raceme's top floret stood with its
 petals THROUGH the terminal head's at 0.000 mm while `insetSatisfied` read true, and both STL
 gates were blind to it (overlapping closed shells). **THE LAW:** the plan builds the topmost
@@ -3560,11 +3609,11 @@ under the deeper inset — CG1 refused the axis, correctly) and moved to the 120
 **THE CAP WAS TWO NUMBERS, NOT ONE**: `PEDICEL_LENGTH_RANGE` was [0, 60] and the per-node law
 clamped at the HEAD's `STEM_LENGTH_RANGE[1]` (120); both read 250 now, and **a shipped
 harness guard forbade exactly this** ("a pedicel outside the stem's own range is a rod nothing
-has ever been proved on") — restated on the ruling, with block 48's 250 mm rows as the proof it
+has ever been proved on") — restated on the ruling, with block 49's 250 mm rows as the proof it
 asked for. The corymb solves level to a **197 mm** rachis at the defaults (120 was 81), the
 full 120 mm stem at 20/49/77/106/134 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
 NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
-corner is block 48's `THE BUDGET CORNER` at 40 mm, 95.0% (**17.3% at TWO nodes since ruling 1's
+corner is block 49's `THE BUDGET CORNER` at 40 mm, 95.0% (**17.3% at TWO nodes since ruling 1's
 floor; and the NODE LAWS refusal row below holds ONE node and EXPORTS at 10.1% — its refusal
 entry is RETIRED, and no single-whorl raceme reaches the budget any more**); the NODE LAWS refusal row EXPORTS
 at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
@@ -3591,7 +3640,7 @@ ITS NODE'S AZIMUTH WITH ITS PHASE DERIVED OUTWARD** (Eva's three rulings on Phas
 Phase B brief, Oct 4 — read §11–§19 of `docs/bloom-inflorescence-build-3-outcome.md` before
 touching `floretPitchFloorMm`, `floretPairClasses`, `INFLO_PITCH_CELLS_PER_GAP`, the plan's
 `gradientMax`, `nodeVarianceTerm`, `floretPhaseDeg`, `floretNodeOverrides`, the memo's azimuth
-key, ID10, NV0–NV4, DB0–DB2 or block 49). **RULING 1**: `pitchFloorMm = max(2·pedicelR, the
+key, ID10, NV0–NV4, DB0–DB2 or block 50). **RULING 1**: `pitchFloorMm = max(2·pedicelR, the
 florets' own)`, derived from the floret unit the builder EMITS — a column map per azimuth (cells
 a quarter of the gap, each triangle's z-range CLIPPED to the cell through its plane), over the
 distinct `(a, b, d)` pairs the phyllotaxy produces (**a pair is two azimuths and a depth, never
@@ -3644,7 +3693,7 @@ NV2 re-derives it from the placement MATRIX. One build per DISTINCT STATE: the m
 `(length, mode, azimuth quantised to 1e-9 rad in one turn)` — unquantised, `cos(2π + x)`
 keyed five builds on a two-way alternate raceme. The sheet is `docs/img/inflo-build-3-phase-b.png`
 (`tools/shot-bloom-node-variance.mjs`): OFF against ON side-on on one camera at a held node
-count, the re-floored default, the cap. Block 49 is eleven rows (matrix 1110), eight mutants
+count, the re-floored default, the cap. Block 50 is eleven rows (matrix 1110; 49 and 50, not 48 and 49: stem session 3 took 48 while this PR was in CI), eight mutants
 in the apex table, and **every inflorescence mutant was RE-RUN because rulings 1 and 2 are law
 changes** (Eva: "any mutant that went green against the old laws is stale evidence").
 
@@ -9770,6 +9819,25 @@ it. Any NEW render path inherits the same obligation.
   CONFIRMED loaded separates them, and exactly two checks moved under that
   mutation. Deleting the `await` in `drawPreviewNow()` moves exactly one, which
   is why that check reads the preview grid's own canvas instead of re-rendering.
+- **`05 Layout` owns number-card layout, and sections are now 01-07 plus 08 Preview.**
+  Flip toggle (`invertBottomPips`, default on = traditional), separate `pipScale` /
+  `aceScale` / `cornerGlyphScale` (the old `glyphScale` now scales the J/Q/K suit
+  glyphs only, relabelled "Court suit glyph scale"), pip column spacing and vertical
+  margin, and Traditional / Spacious / Compact presets (they set spacing, margin and
+  pip scale; the readout is DERIVED from the slider values, so it says Custom the
+  moment any of the three moves). `getPipLayout()` in `cards/card-template.js` is the
+  one owner of pip positions and clamps the slider VALUES (not each pip) so no pip's
+  ink can cross the safe rect, which is already inside the trim line. All defaults are
+  byte-identical to before (52 of 52 cards, measured against `main`). The preview now
+  shows the 10 of each suit after the A/K pairs (12 cards) so the pip controls are
+  visible live. **Gate section 8b / 10b**: ranks 7-10 at all 128 slider-extreme
+  corners are checked for ink outside a safe rect RESTATED from the print spec
+  (38 + 56 px), the clamp has a control that shows the raw slider value would leave
+  it, and the exports are compared against an expectation built from the values the
+  gate drove — NOT from `getStyle()`, which a first draft used and which made a
+  `getStyle()` that dropped a control agree with itself all the way to the file.
+  Pip-to-pip and pip-to-corner overlap at the extremes are REPORTED (the `info` line),
+  not gated: the ruling was the safe area, and 150% pips on a 10 touch at defaults.
 - The other cards gate, `node tools/verify-cards-svg-glyphs.mjs`, still covers
   the suit-glyph upload path and must stay green alongside it. **Neither runs in
   CI, and nothing else covers cards either — run both by hand before calling a
@@ -10072,6 +10140,36 @@ every edge so a rake exposes no bare band; the bouquet is the weakest of the fiv
 constants (a 9-tine comb, wave 0.55 of the spacing, z 95) are the ones to retune first; strokes
 preview as a PLAIN map (every vertex moves, none is added) and refine on commit; the random
 sequence is 36–70 drops and 2–5 strokes of every kind from the seed field.
+**REALISM SITS BESIDE THE TRANSFORMS AND TOUCHES NONE OF THEM** (the realism session — read the
+headers of `marble-material.js` and `marble-render.js` before touching the paper view). A drop
+carries four ink properties (`conc`, `opa`, `gall`, `gran`), kept PER COLOUR on the page and
+written into every drop, so the hash carries them; a region remembers the area it was dropped as
+and **the dilution law is `strength = conc · area0 / area`, clamped** (`inkStrength`), the colour
+mixed toward white by it, the opacity letting the paper through. **THE FOUR TRANSFORMS ARE
+MEASURE-PRESERVING, SO THAT LAW IS INERT UNDER A RAKE — MEASURED, NOT ARGUED**: the drop takes ρ to
+sqrt(ρ² + r²) (ρ'dρ' = ρ dρ), a tine is a shear, a stir a radius-wise rotation, and a region pushed
+by a neighbouring drop keeps its area to 3e-5. D2 asserts that as the equations' own consequence.
+What dilutes ink on this sheet is its gall (the push and the disc at `r·gall`, the strength
+`conc/gall²`) and its concentration; the law's "doubled area halves it" is checked on a scaled
+copy (D1) and guarded by the `dilution-ignores-the-area` mutant. A DOCUMENT is up to `MAX_LAYERS`
+(4) layers of op groups — the last the live bath, the rest printed pulls — in a v2 hash
+`v2_<sheet>_<paper>,<flaws>,<seed>_L!L!L`; a v1 link still decodes as one layer with default ink.
+Two views: the BATH (dark water, the live layer only — printed layers are NOT ghosted under it, a
+judgment call) and the PAPER behind "Lay paper" (320 ms fade): every layer rendered to its own
+cached canvas (rims darkened, hairlines under 1.6 units dashed, granulation specks, mottle masked
+to the ink, the pull's voids / skips / one uneven edge / touch-down line from `flawPlan`) and
+MULTIPLIED onto the paper preset, then the preset's texture multiplied over all — every texture
+pure, seeded from the material seed, `TEX_W × TEX_H` bytes compared in M1/M2. The PNG is the paper
+view; **the SVG is vector only** — one multiply `<g>` per layer, fill-opacity, a 0.5-unit
+quarter-opacity rim stroke, no raster. The bath frame costs what it did (64.5 against 65.6 ms
+flushed on the 200-op sheet); run the gate ALONE — its two timing bars (B10, B14) read the box,
+and a negative control running beside it reddened both once. **THE NEGATIVE CONTROL HAD NEVER
+COMPLETED BEFORE THIS SESSION**: its first mutant throws every region five times further on every
+drop, a hundred-op pattern then costs ~3 s an op, and a stale run was found at 26 minutes with no
+mutant reported. A MUTANT's replays are bounded at `REPLAY_BUDGET_MS` (20 s) and an overrun reads as
+that clause firing (the shipped run is unbounded); three claim lists that had never been run were
+corrected by measurement (the uncentred comb still reaches the budget at segScale 1.35, refinement-off
+still prunes 8 of 22,461 vertices, the dropped falloff reaches H3 and H5). 10 of 10 behave in 95 s.
 
 ## `/tile` — the tessellation rollers (pointer only)
 
@@ -10089,30 +10187,37 @@ blade is a closed wavy RING running AROUND the circumference, a jagged pizza-whe
 round the pin, and each roller rolls along its OWN lines: roller A carries the edge-A lines and
 rolls along `tA`, B the edge-B lines along `tB`. Circumference = tiles round it × its OWN pitch,
 the diameter derived; the rings step along the axis by `|tA × tB| / |chord|` (θ counted), and
-there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3 —
-the first version's page could open on a strip of three). A ring is one period laid `n` times and
-wrapped onto its own first vertex, so it closes on itself by construction: a TORUS, no end caps,
-no seam vertex. **No rims, and "the dough must lie between the rims" is DROPPED** — every ring is
-a wheel at the tip radius, so the roller rides its blade tips through the dough continuously.
-**The price is printing**: upright, every ring is a fin straight out of the body — support under
-every ring, said in the page's how-to and the zip's README, never hidden. **Both rollers are held +Z
-end on the LEFT as they roll forward** (`â = ẑ × r̂`); a first draft that signed the axis per
-roller stamped A's line mirrored. **The index marks**: the track runs along `tB` through the
-corners of B-line column `m*` (−1 normally) in the border; A lays it with a SLANTED row of pegs,
-one on each ring at that ring's corner of column `m*` (an axial row only at θ = 90°); B's collar
-sits at that column's axial position with one tooth per tile round it at
-`s' = m*·|tA| cos θ + j·|tB|`; one seated tooth fixes both of B's free placements, because
-`|tA|·(cos θ r̂_B − sin θ â_B) = tA` exactly; A's peg row comes round outside the sheet iff
-`n_A ≥ cols + 1 + |m*|`, which is why A defaults to 6 round and B to 5; "roll back, then forward"
-for both rollers covers obtuse angles. Refused (STL withheld, reason shown): a blade that cannot
-clear the dough + 1.5 mm, a roller too small for its bore, a peg too wide for its roller. A
-version-1 (crossbar) design file opens with its tile and sheet kept and its round counts reset;
-the storage key moved so an old design does not reopen by itself. Gates, both in CI
-(`tile-gate.yml`), each with a negative control that must catch every mutation: `node tools/verify-tile.mjs` (Node: tessellation by its own geometry; D, every
-blade a ring round its roller read off the mesh — full azimuth, an axial extent of one line's
-width, the θ spacing — which a bar along the axis fails; the seam over three revolutions, every
-ring closing once; a rigid-body rolling simulation for registration, re-seated by a different
-tooth and dimple; a DIRECTED-edge census on every STL; heights read off the mesh) and
-`node tools/verify-tile-page.mjs` (Chromium, real pointer events and downloads). Sheet: `node tools/shot-tile.mjs <dir>`. Phase 2 (image → tile)
+there are rows + 1 of them on A and cols + 1 on B (the sheet is cols × rows, default 4 × 3).
+A ring is one period laid `n` times and wrapped onto its own first vertex: a TORUS, no end caps.
+**No rims** — every ring is a wheel at the tip radius. **The price is printing**: support under
+every ring. **ALIGNMENT IS EVA'S METHOD (Oct 5), DONE BY THE ROLLERS AND HANDLES ALONE — the
+dimple track and B's toothed collar are GONE** (read §4 of `tile-design-doc.md` before touching
+`rollerLayout`'s sight/start block, the notch, `buildHandle` or the K/V/R families). Each roller
+spins on TWO handles (one per end, so the handle never turns with it); a V notch in both end
+faces and a spring tab on the handle click at the START POSE (the phase); each handle's sight arm
+hangs a pointer just past the roller's end, ON its straight contact line, 0.5 mm above the dough.
+A starts on its detent at the dough's straight edge and its pin(s) punch two PINHOLES; B is put
+down on its detent with both pointers over them — two points fix position, sideways and angle.
+**Two physics findings changed the brief, and are proved in §4.2:** B's END-RING contact points
+cannot both be corners at θ ≠ 90° (needs `cols·|tA|cosθ/|tB|` integer), and a pointer cannot sit
+over a point under the roller — so the fiducials are on B's contact line at virtual columns −j
+and cols + j (side borders): corners of row 0 on A's first ring at 90° (one pin lays both on the
+default), one corner + one post between A's rings otherwise. **The pins are FLUSH with the blade
+tips, not taller** (a proud pin lifts the roller; R1). **A whole-tile notch error on B is the same
+pose by symmetry** — only K2 (the declaration) sees it; half a tile misregisters (R). The page
+quotes the placement tolerance (±1 mm at each pointer → 1.51 mm worst corner on the default),
+computed by `sightTolerance` and cross-checked through the simulator (R6). Refused: a blade that
+cannot clear the dough, a roller too small for its bore, an end face with no room for the detent
+— and W5 checks the refusal NAMES the measured cause. Gates, both in CI (`tile-gate.yml`), each
+with a negative control that must catch every mutation (38 geometry, 18 page). **NO IMPOSTOR:** A's
+pins come round every revolution; the layout adds fiducial columns until no other pair of A's
+pinholes lies within 3 mm / 10° of B's pointer span (91° with A six round laid one 0.04 mm off),
+and K4 checks the stamped holes:
+`node tools/verify-tile.mjs` (Node: T tessellation, D rings, S seam, R two-point registration and
+tolerance, K detent and impostors, V sight arms, W directed-edge watertight on all four STLs, H heights, F flags)
+and `node tools/verify-tile-page.mjs` (Chromium: real pointer events and downloads; P22 the how-to's
+numbered steps and ±1 mm figure, P23 a fresh profile opens on 4 × 3). Sheet:
+`node tools/shot-tile.mjs <dir>` (the notch, the tab in it, a sight arm over the contact line, A's
+pin, B in use at 90° and 60°). Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.

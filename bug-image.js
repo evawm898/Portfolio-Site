@@ -74,6 +74,11 @@ const CUT_MARGIN = 1.15;
 /* A concavity in the outer margin deeper than this fraction of the wing's
    extent is a NOTCH between two pairs. The default bug's notch is 0.19. */
 export const NOTCH_MIN_FRAC = 0.06;
+/* The split's wing-either-side test (§13.6): each side's farthest outline
+   point must reach this fraction of the mass's farthest; the notch may then
+   be as shallow as NOTCH_LOBE_MIN_FRAC (#43's real notch is 0.058). */
+export const NOTCH_LOBE_FRAC = 0.4;
+export const NOTCH_LOBE_MIN_FRAC = 0.045;
 /* THE HIDDEN OVERLAP: what of the hindwing lies under the forewing cannot be
    seen. The guess: the hindwing's hidden leading edge is the split line moved
    FORWARD by this fraction of the wing's extent — it tucks under the forewing
@@ -750,22 +755,53 @@ function fitOnce(img, base, opts) {
     const loop = smoothLoop(traceOuter(M, NX, NY));
     const extent = wings[0].imax - cutI;
     const hull = convexHull(loop);
-    let best = -1, depth = 0;
-    loop.forEach((p, k) => {
-      if (p[0] < cutI + 0.12 * extent) return;
-      let d = Infinity; for (let m = 0; m < hull.length; m++) d = Math.min(d, segDist(p, hull[m], hull[(m + 1) % hull.length]));
-      if (d > depth) { depth = d; best = k; }
-    });
+    // A NOTCH BETWEEN TWO PAIRS HAS A WING ON EACH SIDE OF IT (§13.6): seen
+    // from the middle of the mass's attachment, the farthest point of the
+    // outline ahead of the notch (the forewing's) and the farthest behind it
+    // (the hindwing's) must each reach NOTCH_LOBE_FRAC of the farthest point
+    // overall; the deepest concavity that passes is the notch, from
+    // NOTCH_LOBE_MIN_FRAC deep, and the split line runs to the middle of the
+    // attachment. On a butterfly that is the outer margin's own notch, as
+    // before; on a moth it keeps the notch off a shallow dent in the
+    // forewing's costa, which has no wing ahead of it (that dent cut #43's
+    // forewing off at its root). Where no concavity passes (a hindwing under
+    // NOTCH_LOBE_FRAC of the reach), the deepest concavity at NOTCH_MIN_FRAC,
+    // split square to the body, as before. `notchLobes: false` is the old rule.
+    let a0 = Infinity, a1 = -Infinity; for (let j = 0; j < NY; j++) if (M[j * NX + cutI]) { a0 = Math.min(a0, j); a1 = Math.max(a1, j + 1); }
+    const Rm = [cutI, (a0 + a1) / 2];
+    const bearing = (p) => Math.atan2(-(p[1] - Rm[1]), p[0] - Rm[0]);
+    const dist = (p) => hyp(p[0] - Rm[0], p[1] - Rm[1]);
+    const outerPt = (p) => p[0] >= cutI + 0.12 * extent;
+    const depthAt = loop.map((p) => { if (!outerPt(p)) return -1; let d = Infinity; for (let m = 0; m < hull.length; m++) d = Math.min(d, segDist(p, hull[m], hull[(m + 1) % hull.length])); return d; });
+    let best = -1, depth = 0, lobes = null;
+    if (o.notchLobes !== false) {
+      let dmax = 0; for (const p of loop) if (outerPt(p)) dmax = Math.max(dmax, dist(p));
+      const cand = [];
+      for (let k = 0; k < loop.length; k++) {
+        const d = depthAt[k]; if (d < NOTCH_LOBE_MIN_FRAC * extent) continue;
+        let isMax = true; for (let m = -4; m <= 4 && isMax; m++) if (m && depthAt[(k + m + loop.length) % loop.length] > d) isMax = false;
+        if (isMax) cand.push(k);
+      }
+      cand.sort((x, y) => depthAt[y] - depthAt[x]);
+      for (const k of cand) {
+        const bn = bearing(loop[k]);
+        let F = -1, H = -1;
+        loop.forEach((p, m) => { if (!outerPt(p)) return; if (bearing(p) > bn) { if (F < 0 || dist(p) > dist(loop[F])) F = m; } else if (H < 0 || dist(p) > dist(loop[H])) H = m; });
+        if (F < 0 || H < 0 || dist(loop[F]) < NOTCH_LOBE_FRAC * dmax || dist(loop[H]) < NOTCH_LOBE_FRAC * dmax) continue;
+        best = k; depth = depthAt[k]; lobes = { fore: loop[F], hind: loop[H] }; break;
+      }
+    }
+    if (!lobes) loop.forEach((p, k) => { if (depthAt[k] > depth) { depth = depthAt[k]; best = k; } });
     notch = best >= 0 ? { at: loop[best], depth, frac: depth / extent } : null;
-    const want = o.pairs === 'auto' ? (notch && notch.frac >= NOTCH_MIN_FRAC ? 2 : 1) : clamp(+o.pairs, 1, 2);
+    res.lobes = lobes ? { fore: toWorld(...lobes.fore), hind: toWorld(...lobes.hind), root: toWorld(...Rm) } : null;
+    const want = o.pairs === 'auto' ? (notch && notch.frac >= (lobes ? NOTCH_LOBE_MIN_FRAC : NOTCH_MIN_FRAC) ? 2 : 1) : clamp(+o.pairs, 1, 2);
     if (o.pairs !== 'auto' && +o.pairs > 2) res.notes.push('one wing mass can only be split into 2 pairs; 3 or 4 pairs need wings that are visibly separate in the picture');
     if (want === 2 && notch) {
       // the split line, upright px: from the notch inward, square to the body by
       // default — or where the page's handles put it (world mm)
-      let outer = notch.at, root = [cutI, notch.at[1]];
+      let outer = notch.at, root = [cutI, lobes ? Rm[1] : notch.at[1]];
       if (o.split && o.split.outer && o.split.root) { outer = toUpright(...o.split.outer); root = toUpright(...o.split.root); root[0] = cutI; }
       // the root end clamped onto the wing's own attachment along the body
-      let a0 = Infinity, a1 = -Infinity; for (let j = 0; j < NY; j++) if (M[j * NX + cutI]) { a0 = Math.min(a0, j); a1 = Math.max(a1, j + 1); }
       // (kept off its ends: each pair needs a root chord of its own)
       root = [cutI, clamp(root[1], a0 + 0.15 * (a1 - a0), a1 - 0.15 * (a1 - a0))];
       // the line must END ON THE MARGIN (a wall ending inside the wing would
@@ -936,6 +972,10 @@ function fitOnce(img, base, opts) {
     for (let t = 0; t < 6; t++) {
       fit = fitOutline(chain, metric, tol, { keep: [...(tailRegion ? tailTip(chain, tailRegion, toUpright, metric) : []), ...joinKeep] });
       if (fit.valid) break;
+      // two interior points closer than the outline rule allows, at a tight
+      // tip: merged into their midpoint, which tightening only makes worse
+      const merged = mergeClose(fit.points);
+      if (merged && outlineValid(merged).ok) { fit = { ...fit, points: merged, valid: true }; break; }
       tol *= 0.6;
     }
     if (!fit.valid) return { ...res, ...stepMsg(5, `pair ${k + 1}: no valid outline could be fitted (${outlineValid(fit.points).reason}) — try another threshold, or erase`) };
@@ -1040,6 +1080,17 @@ export const COMPLETE_TANGENT_MM = 1.2;   // the seen margin's direction is read
 export const COMPLETE_MIN_SEEN_MM = 1.0;  // a shorter seen stretch between unseen runs is wall noise
 export const COMPLETE_ROOT_ZONE = 0.12;   // of the wing's span from the body: the root zone
 export const COMPLETE_HERMITE = 0.6;      // the bridge's tangent length, of its chord
+/* Consecutive INTERIOR control points closer than MIN_GAP_UW merged into
+   their midpoint (the two root points are never moved); null if none were. */
+function mergeClose(P) {
+  const out = [P[0]]; let any = false;
+  for (let i = 1; i < P.length; i++) {
+    const q = P[i], last = out[out.length - 1], interior = out.length > 1 && i < P.length - 1;
+    if (interior && hyp(q[0] - last[0], q[1] - last[1]) < MIN_GAP_UW) { out[out.length - 1] = [(q[0] + last[0]) / 2, (q[1] + last[1]) / 2]; any = true; }
+    else out.push(q);
+  }
+  return any ? out : null;
+}
 export function completeChain(chain, unseen, s, root) {
   const n = chain.length;
   if (n < 6) return { chain, bridged: null };

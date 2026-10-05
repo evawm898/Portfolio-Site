@@ -42,7 +42,7 @@ function records(over) {
   const built = G.buildStemInto(new G.MeshBuilder({ exportMode: true }), plan);
   const lp = G.leafPlan(state, plan, acc);
   const S = {
-    root: [0, 0, plan.rootZ], stations: plan.stations.slice(),
+    root: [0, 0, plan.rootZ], stations: plan.stations.slice(), sides: plan.sides,
     nodeLaw: plan.nodeLaw ? JSON.parse(JSON.stringify(plan.nodeLaw)) : null,
     emittedRings: built.emittedRings ? built.emittedRings.map((r) => ({ ...r })) : null,
   };
@@ -92,7 +92,7 @@ const plants = [
   { arm: '(a) the two statements', want: 'stemNodesPresent says', make: () => ({ rec: on, NL: NLon, over: { geoAbsent: true } }) },
   { arm: '(b) identity: a law declared at prominence 0', want: 'must be the identity', make: () => { const r = clone(off); r.S.nodeLaw = on.S.nodeLaw; return { rec: r, NL: NLoff }; } },
   { arm: '(b) identity: noded rings at prominence 0', want: 'noded arm ran where the straight one should have', make: () => { const r = clone(off); r.S.emittedRings = on.S.emittedRings; return { rec: r, NL: NLoff }; } },
-  { arm: '(b) identity: a ladder at prominence 0', want: 'station ladder where', make: () => { const r = clone(off); r.S.stations = [0, 50, 100]; return { rec: r, NL: NLoff }; } },
+  { arm: '(b) identity: a ladder at prominence 0', want: 'station ladder [', make: () => { const r = clone(off); r.S.stations = [0, 50, 100]; return { rec: r, NL: NLoff }; } },
   { arm: '(c) the control never reached the stem', want: 'the control never reached the stem', make: () => { const r = clone(on); r.S.nodeLaw = null; return { rec: r, NL: NLon }; } },
   { arm: '(c) no noded rings reported', want: 'reports no noded rings', make: () => { const r = clone(on); r.S.emittedRings = null; return { rec: r, NL: NLon }; } },
   { arm: "(c) a ring's centre a micron off", want: "ring's centre stands", make: () => { const r = clone(on); r.S.emittedRings[7].cx += 1e-6; return { rec: r, NL: NLon }; } },

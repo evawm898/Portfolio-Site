@@ -36,7 +36,7 @@ unfixed and names the mechanism this session fixed.
    range moved — measured, the harness refused to load at 250. It is RESTATED, not
    deleted: the pedicel's floor is the stem's, its ceiling is never narrower than the
    stem's, and the ceiling is Eva's 250 (a re-narrowed cap is caught at load). The rows
-   that prove the rod are block 48's, which is the proof the old sentence asked for.
+   that prove the rod are block 49's, which is the proof the old sentence asked for.
 3. **`INFLO: ALL MAX` could not keep its label at the new cap.** "Every inflorescence
    control at its maximum" at 250 mm pedicels straight up builds ONE node (the floret's
    reach, 265 mm, exceeds the 120 mm rachis), 143,352 export triangles — it stops being
@@ -127,7 +127,7 @@ raceme becomes four nodes. Neither is pre-built.
 azimuth 0 — are superseded by the azimuth-complete law and not re-tabulated; every row's
 own figure is on its read-out.)
 
-`REACH INSET: a 0.60 mm sheet` is in block 48 and the smoke subset because it is the one
+`REACH INSET: a 0.60 mm sheet` is in block 49 and the smoke subset because it is the one
 row on which a reach read from one mode is visible at all.
 
 ### 2c. The budget corners (EXPORT, Node 22, against 1,500,000)
@@ -185,8 +185,8 @@ law restated; (d) THE EMITTED top-node florets, read off the builder's placement
 source stream, at or below the head floor less the gap wherever the plan says the inset is
 satisfied — the one clause no rebuild can stand in for; (e) the two biconditionals; (f)
 mode-freeness measured — the other mode's plan rebuilt in Node carries the same node
-depths to the bit. Smoke census: 136 families, ID9 claimed by block 48's rows, both
-directions. Block 48 is ten rows (1089 → 1099), smoke block 48 four rows (153 over 44
+depths to the bit. Smoke census: 136 families, ID9 claimed by block 49's rows, both
+directions. Block 49 is ten rows (1089 → 1099), smoke block 49 four rows (153 over 44
 blocks).
 
 Mutants (`tools/verify-bloom-apex-mutants.mjs`, each witnessed on the MUTATED module's
@@ -254,7 +254,7 @@ The panel gate passes (`--negative-control` not re-run — no route was added).
 * `NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel` → `pedicelLength 40`
   (the longest pedicel at which the corner still refuses), 1,517,196 tris, 101.1%, the
   entry's note carries the original.
-* `REACH INSET: THE BUDGET CORNER` (block 48) = the old `INFLO: ALL MAX` state at 40 mm,
+* `REACH INSET: THE BUDGET CORNER` (block 49) = the old `INFLO: ALL MAX` state at 40 mm,
   1,425,468 (95.0%) — the densest raceme the controls reach, and the row a future
   per-petal feature checks first.
 * Three relabels of live rows whose text stopped being true: the gradient-3 row "CLAMPED
@@ -322,7 +322,7 @@ trees — changed inset, unchanged depths, HOLDERS. **THE WHOLE 1099-ROW MATRIX,
 
 `frozen/phase52` = the 1089 rows at `23b13bd`, registered in both maps and proved
 deep-equal (`--verify-frozen --phase52 --base <worktree>`: PASS, row for row). A phase is
-owed because the row set changed (block 48, +10). **Which tags' bytes stop reproducing (the predicate above applied to every registered frozen matrix on the base tree, memoised on the control set): 376 of 33,512 frozen rows over 16 of 51 baselines — phase37 18 of 883, phase38–45 19 each, phase46–49 20 each, phase50 21, phase51 52 of 1080, phase52 53 of 1089; phase2–36 0 (no raceme row exists before phase37).** Every definition still deep-compares. The tag is dispatched after the merge (`bloom-frozen-tags`), and `phase52`'s base `23b13bd` is on `main` with workflow files identical to HEAD's, so it is expected to publish; it is not pre-declared in `TAG_PUSH_XFAIL`.
+owed because the row set changed (block 49, +10). **Which tags' bytes stop reproducing (the predicate above applied to every registered frozen matrix on the base tree, memoised on the control set): 376 of 33,512 frozen rows over 16 of 51 baselines — phase37 18 of 883, phase38–45 19 each, phase46–49 20 each, phase50 21, phase51 52 of 1080, phase52 53 of 1089; phase2–36 0 (no raceme row exists before phase37).** Every definition still deep-compares. The tag is dispatched after the merge (`bloom-frozen-tags`), and `phase52`'s base `23b13bd` is on `main` with workflow files identical to HEAD's, so it is expected to publish; it is not pre-declared in `TAG_PUSH_XFAIL`.
 
 ## 8. Files this session must not touch (predeclared) — verified by diff at close
 
@@ -577,7 +577,7 @@ and holds the clamp as a biconditional.
 the row CI found overtopping by 26.31 mm — is capped **3.00 → 2.2356** (12 nodes → 3 under
 the floor, so the lowest pedicel is 134.1 mm instead of 180); `REACH INSET: gradient 3 x
 100 mm` is capped **3.00 → 1.3414** (its 71.35 mm overtop gone), and the matrix row that
-carries the cap at its hardest is block 49's `GRADIENT CAP: gradient 3 x 100 mm straight
+carries the cap at its hardest is block 50's `GRADIENT CAP: gradient 3 x 100 mm straight
 up on 12 nodes` (79,050 tris). Every other graded row in the matrix is under its cap and
 unmoved by it (`gradient 2` → 2, `0.5` → 0.5, `gradient 3` on the 120 mm rachis → 3).
 **The corymb arm is untouched**: `corymbAsked` short-circuits the clamp, the level-solve
@@ -681,9 +681,9 @@ matching once.** The twelve pre-existing inflorescence mutants were re-run as Ev
 evidence against the old laws"): all twelve fire the family they name on the ruled laws, the clean tree
 silent.
 
-## 16. Block 49, the smoke subset, the sheet
+## 16. Block 50, the smoke subset, the sheet
 
-Block 49 is eleven `NODE VARIANCE:` rows (matrix 1089 → 1110 with Phase A's block 48): the
+Block 50 is eleven `NODE VARIANCE:` rows (matrix 1089 → 1110 with Phase A's block 49; the blocks were 48 and 49 until `main`'s stem session 3 took 48 for the florist's cut while this PR was in CI — renumbered on the merge, the smoke census's own precedent): the
 amount at 1 on the raceme, 0.5 over the head's form field at 0.5, x OPPOSITE (four distinct
 builds), x WHORLED x 8 nodes (the cost corner), the DERIVED PHASE alone on descending
 pedicels, the form field at frequency 3 with the head's phase at 90, the INERT level-pedicel

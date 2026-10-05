@@ -401,6 +401,35 @@ function plugFacts(M, state = STEM_STATE()) {
   } catch (e) { return { threw: e.message }; }
 }
 
+/* THE CUT FACE, as the MUTATED module emits it (stem session 3): how far the
+   face rises above the long point, how many of its vertices sit on the land,
+   and how far the void's floor stands below the cut plane at the bore's far
+   edge (positive = the bore opens through the face). Read off the emitted
+   cut ring and the emitted void floor — never off the plan's `cut` record,
+   which a mutation inside the plan would move with it. */
+function endFaceFacts(M, state = STEM_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    const plan = M.stemPlan(state, fr.hub, acc);
+    const sacc = new M.MeshBuilder({ exportMode: true });
+    const built = M.buildStemInto(sacc, plan);
+    const E = built.emittedCut;
+    if (!E) return { threw: 'the builder emitted no cut face' };
+    let zmax = -Infinity, zmin = Infinity, landCount = 0;
+    for (const v of E.ring) { if (v[2] > zmax) zmax = v[2]; if (v[2] < zmin) zmin = v[2]; }
+    for (const v of E.ring) if (v[2] === zmin) landCount++;
+    /* The plane through the ring's own far column and its land edge: height
+       at the bore's far edge (x = -b) by linear interpolation of the emitted
+       ring between the long side and the far column. */
+    const far = E.ring[E.ring.length / 2], near = E.ring.find((v, i) => v[2] > zmin) || E.ring[0];
+    const slope = (far[2] - near[2]) / (near[0] - far[0]);
+    const planeAtFarBore = near[2] + slope * (near[0] - (-plan.boreR));
+    const voidBelowPlaneMm = built.emittedVoid ? planeAtFarBore - built.emittedVoidBottomZ : -Infinity;
+    return { tris: built.tris, faceRiseMm: zmax - zmin, landCount, voidBelowPlaneMm };
+  } catch (e) { return { threw: e.message }; }
+}
+
 /* THE SPHERE'S STEM CHANNEL, as the builder reports it on a state that has
    one — the witnesses above read this rather than the assertion they name,
    which is the circularity the table exists to avoid. */
@@ -1492,8 +1521,10 @@ const MUTANTS = [
       : (f.tris === 0 && f.plan.present ? null : `the stem still emitted ${f.tris} triangles`); } },
 
   { id: 'stem-off-the-axis', why: 'every stem ring is offset from the axis by a millimetre — watertight, one piece, the same triangle count',
-    find: '    const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];',
-    into: '    const th = (k * TAU) / N; return [rad * Math.cos(th) + 1, rad * Math.sin(th), z];', names: ['ST2'],
+    /* RE-ANCHORED (stem session 3): the ring is one `thetas.map` now, the
+       one producer of a ring's vertices cut or uncut. */
+    find: '  const ringAt = (rad, z) => thetas.map((th) => [rad * Math.cos(th), rad * Math.sin(th), z]);',
+    into: '  const ringAt = (rad, z) => thetas.map((th) => [rad * Math.cos(th) + 1, rad * Math.sin(th), z]);', names: ['ST2'],
     witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.maxR - c.maxR) > 0.5) ? null : `the emitted stem's furthest vertex is ${m.maxR} against the clean tree's ${c.maxR} — it did not move off the axis`; } },
@@ -1524,33 +1555,42 @@ const MUTANTS = [
   /* ===== THE BORE'S TIP PLUG (the tip-plug session) ===== */
 
   { id: 'the-tip-plug-is-never-built', why: 'the bore runs all the way to the tip again, so a hollow stem ends as a CUT PIPE — watertight, one connected piece, the same shell count, and the only thing wrong with it is the picture Eva asked for',
-    find: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;',
+    /* RE-ANCHORED (stem session 3): the plug is the cut's derived length
+       under a florist's cut and Eva's wall otherwise; this removes BOTH. */
+    find: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;',
     /* NAMES ST10 AND NOT ST1, WHICH IS A CORRECTION THE TABLE MADE RATHER THAN
        A JUDGEMENT: ST1 predicts the triangle count FROM THE PLAN, and this
        mutation moves the plan — it declares an open bottom and the builder
        emits one, so the two agree and ST1 is correctly blind. Measured SILENT
        before the claim came off. The clause is right; the claim was wrong. */
     into: '  const tipPlugMm = 0;', names: ['ST10'],
-    witness: (M, C) => { const m = plugFacts(M), c = plugFacts(C);
+    witness: (M, C) => { const st = { ...STEM_STATE(), stemCut: 'FLAT' }; const m = plugFacts(M, st), c = plugFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      /* THE BOTTOM FACE'S OWN AREA. On the clean tree it is a full disc; with
-         the plug gone it is the tube's section, a quarter smaller at this
-         diameter. A triangle COUNT would also move here, but the area is what
-         says WHICH way — a count cannot tell a closed bottom from an open one
-         with a different ladder. */
+      /* THE BOTTOM FACE'S OWN AREA, on the FLAT end (stem session 3: under a
+         cut the triangles at the tip's one height are the LAND alone, and the
+         cut face's own witness is `endFaceFacts` below). On the clean tree it
+         is a full disc; with the plug gone it is the tube's section, a
+         quarter smaller at this diameter. A triangle COUNT would also move
+         here, but the area is what says WHICH way — a count cannot tell a
+         closed bottom from an open one with a different ladder. */
       return (m.bottomArea < c.bottomArea * 0.95) ? null
         : `the emitted bottom face measures ${m.bottomArea} mm^2 against the clean tree's ${c.bottomArea} — it did not re-open`; } },
 
   { id: 'the-tip-plug-is-typed', why: "the plug is a typed 3 mm instead of the wall Eva's own bore rule already spends — the SAME triangle count, the same shells, the same faces, and a closure that is no longer derived from anything",
-    find: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;',
-    into: '  const tipPlugMm = boreR > 0 ? 3 : 0;', names: ['ST10'],
+    /* RE-ANCHORED (stem session 3). The typed 3 mm is probed on a FLAT
+       stem below, where the clean plug is Eva's 1.5 and the cut arm is not
+       taken; under the default cut the plug is 6.62 on the shipped stem and
+       a typed 3 would be the bore opening through the face, which is
+       `the-bore-opens-through-the-cut-face`'s own witness. */
+    find: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;',
+    into: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : 3) : 0;', names: ['ST10'],
     /* THE ONE THAT ISOLATES ST10'S EXTENT CLAUSE. The bottom stays closed and
        the void keeps its own two-ring ladder, so the count is unmoved and ST1
        is blind by construction; the census, the flood fill, the orientation
        gate and the byte tool's own bottom-face clause are all blind for the
        same reason. What moved is WHERE the bore stops, and one clause reads
        that. */
-    witness: (M, C) => { const m = plugFacts(M), c = plugFacts(C);
+    witness: (M, C) => { const st = { ...STEM_STATE(), stemCut: 'FLAT' }; const m = plugFacts(M, st), c = plugFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (m.tris !== c.tris) return `the triangle count moved ${c.tris} -> ${m.tris}; this mutant's whole point is that it does not`;
       return (m.plugMm !== null && c.plugMm !== null && Math.abs(m.plugMm - c.plugMm) > 1) ? null
@@ -1835,9 +1875,14 @@ const MUTANTS = [
   { id: 'the-node-field-never-reaches-the-stem', why: "the plan drops the node law whatever the control says, so the stem stays a straight cylinder under a prominence the panel reports — watertight, one piece, the pre-node triangle count; the defect Eva's 'one control' would ship as a dead slider",
     find: '  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);',
     into: '  const nodeLaw = null;', names: ['ST12', 'ST2'],
-    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
-      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.stations === 2 && c.stations > 2) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations}`; } },
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C), s0 = nodeFacts(C, { ...NODE_STATE(), stemNodeProminence: 0 });
+      if (m.threw || c.threw || s0.threw) return `the witness threw: ${m.threw || c.threw || s0.threw}`;
+      /* The straight stem's station count is READ off the clean tree at prominence 0 (the
+         identity row), never typed: this witness carried `=== 2` until the florist's cut
+         appended the long point as a third station and the sweep went red naming a mutant
+         whose edit had applied — a row count standing in for a shape (the stale-harness-row
+         class, in a witness). */
+      return (m.stations === s0.stations && c.stations > s0.stations) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations} (a straight stem on the clean tree carries ${s0.stations})`; } },
   { id: 'prominence-zero-is-not-the-identity', why: 'the guard drops its prominence term, so a leafed stem at prominence 0 builds a node law — a zero swelling and a zero kink on the noded arm — which is the identity only by an argument about arithmetic, never by branch',
     find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state)',
     into: '  return stemIsAbsent(state)', names: ['ST12'],
@@ -1858,8 +1903,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return Math.abs(m.spread - c.spread) > 0.5 ? null : `the mutant's spindle is ${m.spread} mm against ${c.spread}`; } },
   { id: 'the-noded-rings-stay-on-the-world-axis', why: 'the builder draws every noded ring about the world axis while the plan declares the kink — the swelling ships and the kink does not, on a watertight stem at the predicted count',
-    find: '      const c = stemNodeAxisMm(law, sDepth);\n      return Array.from({ length: N }, (_, k) => {',
-    into: '      const c = [0, 0];\n      return Array.from({ length: N }, (_, k) => {', names: ['ST2', 'ST12'],
+    find: '      const c = stemNodeAxisMm(law, sDepth);\n      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);',
+    into: '      const c = [0, 0];\n      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);', names: ['ST2', 'ST12'],
     witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.maxCentreOff < 1e-9 && c.maxCentreOff > 1) ? null : `the mutant's rings stand up to ${m.maxCentreOff} mm off the world axis against ${c.maxCentreOff} clean`; } },
@@ -1895,6 +1940,28 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return Math.abs(m.lastPetioleX - c.lastPetioleX) > 0.5 || Math.abs(m.lastPetioleY - c.lastPetioleY) > 0.5 ? null
         : `the mutant's lowest petiole roots at (${m.lastPetioleX}, ${m.lastPetioleY}) against (${c.lastPetioleX}, ${c.lastPetioleY}) clean`; } },
+  /* ===== RULING 7 — THE FLORIST'S CUT (stem session 3) ===== Three standing
+     mutants, each witnessed on the MUTATED module's own cut face
+     (`endFaceFacts`), never on the clause it names. */
+  { id: 'the-cut-is-flattened', why: "the cut plane's slope is 0, so the stem ends on a flat face at its full length while the plan still says FLORIST — one piece at the same triangle count, with the cut band collapsed to zero height (every cut vertex at the long point's own z, so the band's quads are zero-area and the directed census reads them), which is why ST2 and ST12 fire on its ladder beside the three families named",
+    find: 'export const STEM_CUT_SLOPE = 1;',
+    into: 'export const STEM_CUT_SLOPE = 0;', names: ['SC2', 'SC3', 'ST10'],
+    witness: (M, C) => { const m = endFaceFacts(M), c = endFaceFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.faceRiseMm > 1 && m.faceRiseMm < 1e-9) ? null : `the mutant's cut face rises ${m.faceRiseMm} mm above the long point against the clean tree's ${c.faceRiseMm} — it did not flatten`; } },
+  { id: 'the-land-is-removed', why: 'the land floor is 0, so the cut runs to a KNIFE EDGE at the long point — the last millimetre of the point under the print floor, which a 0.4 mm nozzle cannot lay; watertight, one piece, the face at N - 2 triangles',
+    find: 'export const STEM_CUT_LAND_MIN_MM = Math.max(MIN_FEATURE_MM, 2 * NOZZLE_MM);',
+    into: 'export const STEM_CUT_LAND_MIN_MM = 0;', names: ['SC2', 'SC3'],
+    witness: (M, C) => { const m = endFaceFacts(M), c = endFaceFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.landCount >= 3 && m.landCount === 1) ? null : `the mutant's land holds ${m.landCount} vertex/vertices against the clean tree's ${c.landCount} — the land did not go`; } },
+  { id: 'the-bore-opens-through-the-cut-face', why: "the plug under a cut hollow stem is Eva's flat 1.5 mm again, so the void's floor sits BELOW the cut plane on the short-point side and the bore opens through the face — the shell self-intersects, but it is still watertight by the edge census, one piece, and at the same triangle count",
+    find: '  const tipPlugMm = boreR > 0 ? (cutMade ? cutPlugMm : STEM_MIN_WALL_MM) : 0;',
+    into: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;', names: ['ST10'],
+    witness: (M, C) => { const m = endFaceFacts(M), c = endFaceFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (m.tris !== c.tris) return `the triangle count moved ${c.tris} -> ${m.tris}; this mutant's whole point is that it does not`;
+      return (c.voidBelowPlaneMm < -1 && m.voidBelowPlaneMm > 1) ? null : `the mutant's void floor stands ${m.voidBelowPlaneMm} mm BELOW the cut plane at the bore's far edge against the clean tree's ${c.voidBelowPlaneMm} — the bore did not open through the face`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -2075,6 +2142,11 @@ const ROWS = [
      term is satisfied and the mutation is a no-op), and the raceme whose
      pedicels the pin holds straight — the only state where
      `the-pedicel-pin-is-dropped` moves anything. */
+  /* THE FLORIST'S CUT (stem session 3): the shipped 60 x 6 stem is cut by
+     default and is already a row above; this is the control OFF, where the
+     flat arms of ST10 and SC0's other half can disagree. */
+  { label: 'the shipped stem with the cut OFF (FLAT — the end as it was)',
+    set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }, { id: 'stemCut', value: 'FLAT' }] },
   { label: 'a BARE stem at the flower\'s 0.48 (100 x 6 mm, no leaves — golden-angle nodes)',
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'stemNodeProminence', value: '0.48' }] },
   { label: 'a raceme whose head asks for prominence 1 (the head is inert; every pedicel must stay straight)',
@@ -2263,9 +2335,14 @@ async function famsOn(rows) {
       const mm = /^(L\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE STEM FAMILY (session 43) — same rule again: a family added is a
-       family this table must be able to fire. */
+       family this table must be able to fire. AND THE CUT FAMILY (stem session
+       3) RIDES IN THE SAME CALL under its own prefix: `stemAssertions` pushes
+       `SC0`-`SC3` beside `ST*`, and a capture of `ST\d+` alone reported both cut
+       mutants `SILENT: SC2, SC3` on the first run while the same plants fired
+       both clauses through the harness directly — the ST10-as-ST1 lesson a
+       third time, this time a family the capture could not see at all. */
     for (const msg of await stemAssertions(page, row)) {
-      const mm = /^(ST\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(S[TC]\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {

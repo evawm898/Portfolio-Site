@@ -2,7 +2,7 @@
 
 Hidden page (`tile.html`, `tile.css`, `tile.js`, `tile-geometry.js`, `tile-roller.js`,
 `tile-sim.js`; `noindex`, unlinked). A parametric tessellation designer whose output is a
-**pair of 3D-printable cookie-cutter rollers plus one removable handle design**: roll A
+**pair of 3D-printable cookie-cutter rollers plus their handles**: roll A
 across a sheet of dough, roll B across it in the crossing direction, and the two families of
 cut lines divide the sheet into identical interlocking cookies with no waste except the
 sheet's border.
@@ -23,9 +23,18 @@ carrying ONE family of curvy blade lines; a lattice of translated copies of one 
 tile with two shared edge curves (edge A top and bottom, edge B left and right); the crossing
 angle between the two roll directions a parameter (default 90°); each circumference an
 integer number of pattern repeats, the diameter derived and never set; overhangs and hooks
-allowed, the only shape rule being a simple tile outline; registration by index marks (pegs
-on A punch a dimple track in the border waste, a toothed collar at one end of B rides it),
-never a frame or jig; removable handles, one design for both rollers.
+allowed, the only shape rule being a simple tile outline; registration done by the rollers
+and handles alone, never a frame, jig, mat, bracket or square; removable handles.
+
+**Eva's ruling on alignment (Oct 5) replaces the first ring version's index marks** — pegs
+on A punching a dimple track, a toothed collar on B riding it — with her method: a
+**start detent** on each roller (a notch in its end face, a spring tab on its handle that
+clicks at the start of the tessellation), **fiducial pinholes** that roller A punches, and
+**sight arms** on B's handles whose pointers are put on two of those pinholes. §4 derives
+it, including θ ≠ 90°, and says where the physics forced it to differ from the brief. The
+dimple track, the collar and the "seat a tooth" steps are gone. **If a test print shows B
+drifting mid-roll, a continuous track can come back** — the old derivation is in this
+file's history (§4 of the version merged as #354).
 
 **Eva's ruling on the first version (held as PR #354): each blade is a closed wavy RING
 running AROUND the circumference — a jagged pizza-wheel edge wrapped round the pin — and
@@ -232,7 +241,8 @@ one family only. The cut field is the parallelogram `cols·tA × rows·tB`.
 
 **The default is 4 × 3 = 12 cookies, 160 × 120 mm on the default tile** (Eva's ruling: at least
 about 4 × 3 — the first version's page could show a strip of three). Each roller's body runs
-3 mm past its outermost blade root, peg or collar.
+at least 3 mm past its outermost blade root or pin; roller B's ends are set by its
+pointers (§4.2).
 
 ### 3.4 The blade
 
@@ -274,158 +284,241 @@ than the dough by at least 1.5 mm — the rule that stays, §3.4), so the outer 
 dough or over bare board alike and the roller stays level at `R_tip` either way. Nothing bounds
 the sheet now but the rollers' own lengths and how far they are rolled. The gate's R1 asserts
 the rolling radius read off the mesh IS the blade-tip radius — nothing may stand proud of the
-rings (a peg that did would lift every blade off the board; it has a mutant).
+rings (a pin that did would lift every blade off the board; it has a mutant).
 
 ### 3.6 Body, bore, handle
 
 The body is a solid of revolution: a tube of wall **`t_wall`** (the "cylinder wall") with 0.6 mm
 chamfered ends, closed by end caps 8 mm thick, each with an **axle bore** (8 mm) through it; the
 cavity is open to both bores, so it drains and dries. The cavity's ceiling is a 45° cone
-(printable upright). Roller B adds the collar band (§4.4), roller A the groove (§4.6).
+(printable upright). Both end faces carry the detent notch (§4.3); roller A's +Z face also
+the orientation groove (§4.7).
 
-**The handle** (one design, print two): a 26 mm grip, a 45° taper to a shoulder that bears
-against the roller's end face, and an axle pin `0.25 mm` under the bore radius and 3 mm longer
-than the cap is thick. The roller turns on the two pins; pulling the handles off leaves bare
-rollers to wash. Printed grip-down.
+**The handles** (§4.4): two per roller, one at each end, the roller spinning on their axle
+pins (`0.25 mm` under the bore radius, 3 mm longer than the cap is thick) — so a handle
+never turns with the roller, which is what lets it carry the detent tab and the sight arm.
+Pulling the handles off leaves bare rollers to wash. Printed grip-down.
 
 ---
 
-## 4. The index marks — derivation
+## 4. Aligning the rollers — the start detent, the fiducials and the sight arms
 
 ### 4.1 What registration needs
 
 After A, the sheet carries the edge-A lines on the lattice `{m·tA + k·tB}` (up to where A was
-put down). B's lines land correctly iff B's lattice is the same lattice: B's stamp offset from
-A's must be `0` mod the lattice. A rolling cylinder has exactly two free placements — its
-**sideways position** (along its axis) and its **phase** (how far round it has turned at a given
-point of travel). The marks must fix both, and do nothing else.
+put down). B's lines land correctly iff B's lattice is the same lattice. A rolling cylinder
+put down on a sheet has **four** free placements: its **phase** (which of its points is at the
+bottom), and its rigid placement on the sheet — position along its roll, position sideways,
+and the **angle** of its axis. (The first ring version fixed the angle by eye and the other two
+with a tooth in a dimple; Eva's method fixes all four with the rollers and handles alone.)
 
-### 4.2 The collar decides the track's direction
+* **The detent fixes the phase.** A notch in the roller's end face and a spring tab on the
+  handle click together at one roller angle: the start of the tessellation (§4.3).
+* **Two points fix the other three.** With the phase fixed, the roller's straight contact line
+  is known on the roller; putting two of its points on two marks on the sheet fixes its
+  position along the roll, sideways, and its angle (one point would let it pivot). Two points
+  give four numbers for three unknowns; the fourth is the check that the marks are the right
+  distance apart, which they are by construction (§4.2).
+* **A needs neither marks nor pointers**: it defines the frame. It starts on its detent at the
+  dough's straight edge so the pattern begins a known distance in, and so that its pins land
+  on the dough (§4.5).
 
-B's toothed collar is a ring of teeth at one end of B, so as B rolls it travels along **B's roll
-direction, `tB`**, at a fixed position along B's axis. For its teeth to *ride* a track, **the
-track must run along `tB`** — along edge B's direction, i.e. along a B-line. It must lie outside
-the cookie block (border waste), and it must be made of points B's teeth can sit in that are
-lattice points of A's pattern: **the corners of one B-line outside the block, column `m*`**
-(−1 normally) — the points `(m*, k) = m*·tA + k·tB`.
+### 4.2 Where the fiducials go — derived, θ ≠ 90° included
 
-### 4.3 A lays the track: a slanted row of pegs, one on each ring
+**B's contact line.** At any instant roller B touches the sheet along a straight line along
+its axis `â_B = ẑ × t̂B` — square to its roll direction `tB`. In B's unrolled frame `(s', z')`
+(`s' = P·t̂B`, `z' = P·â_B`) every point of that line has the same `s'`. Lattice point
+`u·tA + v·tB` has
 
-A rolls along `tA`, so to land a dimple on corner `(m*, k)` it needs a peg at that corner's place
-on its own unrolled surface,
+    s' = u·|tA| cos θ + v·|tB|          z' = −u·|tA| sin θ
 
-    s = m*·|tA| + k·|tB| cos θ        z = k·|tB| sin θ
+so `z'` depends on the column `u` alone (B's ring for column `m` sits at `z' = −m·|tA| sin θ`),
+and along the contact line `v` falls by **`ρ = |tA| cos θ / |tB|`** per column.
 
-— **one peg on each ring k, at that ring's corner of column `m*`**, `k = 0…rows`. They form a
-**slanted row across A's surface**, rising `|tB| sin θ` along the axis and advancing
-`|tB| cos θ` round it per ring — an axial row only at θ = 90° (Eva's hint, verified rather than
-trusted: the gate's R2 finds exactly one dimple on every corner of the track to 1e-6 mm, and a
-mutant that lays the row straight across A instead puts the hook fixture's row-1 dimple 17 mm off
-its corner). Rolled, A lands peg k at `start + s·r̂ + z·â`, i.e. on `m*·tA + k·tB`: a straight line
-of dimples along `tB`, each on a lattice corner by construction.
+**The brief's version is impossible for θ ≠ 90°, and that is proved, not assumed.** The
+brief asks for the contact points of B's two END rings (columns 0 and `cols`) to land on two
+fiducials that A's blades punch at tile corners. Both points are on the contact line, so their
+heights differ by `cols·ρ`. A point on B's ring for column `m` is on B-line `m`; A's pins on A's
+blades are on A-lines; an A-line and a B-line meet only at corners (gate R5). So both end
+points are corners iff `cols·|tA| cos θ / |tB|` is a whole number — at 90° always, at 60°
+on the hook fixture never. And there is a second, physical, objection at every angle: **a
+pointer cannot sit above a point under the roller.** The end ring's contact point is under the
+roller's body; nothing can be seen or pointed at there.
 
-**Every peg stands ON its ring** — a ring passes through its own corners — so the peg's cone
-stands round the blade, the two closed shells overlapping (the slicer unions them), as the
-crossbar version's pegs stood on their bar. In the dough, A's line cuts through the middle of each
-dimple; the dimple is in the border either way, and a tooth seats on both halves of its cone.
+**What ships.** The pointers sit just past B's two ends, ON B's contact line (§4.4), and A
+punches the fiducials there. Because the contact line is straight, two points on it fix B
+exactly as two points on its end rings would. Each pointer is at the axial position of a
+VIRTUAL column of B — `u = −j` past its +Z end and `u = cols + j` past its −Z end — where `j`
+is the fewest whole columns that leave every blade root `END_MARGIN` (3 mm) inside B's end
+faces with the pointer `g` beyond them (`g` = 2 mm, §4.4). So B's length is
 
-Each peg is a 45° cone (printable on a vertical wall) whose tip stands `δ` into the dough:
-`δ = min(½·t_dough, ½·D − 0.8 mm)` — at most half the dough, so it dimples and never punches —
-and the dimple is a cone of diameter `D` (the "peg/tooth size") at the dough surface. The tip is
-a flat disk (radius `½·D − δ` ≥ 0.8 mm, blunt) and on a curved roller a flat disk reaches
-FURTHER at its rim than at its centre (`√(ρ² + r²)` against `ρ`), so the disk is set where its
-**rim** reaches `R_tip − t_dough + δ` — the 45° side's own equation with the limit at the top.
-The dimple is then exactly `δ` deep (the gate measures it off the mesh: 2.2000 mm at the
-defaults).
+    L_B = (cols + 2j)·|tA| sin θ − 2g       and the pointers are (cols + 2j)·|tA| sin θ apart.
 
-The cone's **foot** is sunk into the body so its base rim stays 0.4 mm inside the body surface —
-solving `ρ² + (r_tip + top − ρ)² = (R_body − 0.4)²` for the larger root. On a small roller there
-is no root (no 45° cone that tall fits inside a body that curved: its base rim, going round the
-roller, always clears the surface — its least reach is `c/√2` at `ρ = c/2`); the foot then goes
-to `ρ = c/2`. **Either way it stays 0.3 mm above the hollow** — the straight 30 mm tile at 5 round
-would otherwise sink its feet 1.6 mm into the hollow (the gate's H4 row for it). The cone's sides
-may then show a little at the foot ROUND the roller (vertical faces as printed, so no overhang),
-never on its underside.
+On B's contact line the two fiducials are the lattice points
 
-### 4.4 Where the collar sits, and why one tooth fixes both placements
+    F₁ = (−j, v₁)        F₂ = (cols + j, v₂)        v₂ − v₁ = −(cols + 2j)·ρ
 
-In B's own unrolled frame (`s'` along `tB`, `z'` along B's axis), corner `(m, k)` is at
+and the remaining freedom — the height of the line — is chosen so the fiducials cost nothing
+and A grows as little as possible. Let `S = (cols + 2j)|ρ|`:
 
-    s' = m·|tA| cos θ + k·|tB|        z' = −m·|tA| sin θ
+* **θ = 90° (ρ = 0):** `v₁ = v₂ = 0`. Both fiducials are corners of row 0 — on A's FIRST ring,
+  at tile corners, one column outside the cookies on each side: **Eva's picture exactly.** On
+  the default design they are `n_A = cols + 2j = 6` columns apart, i.e. one revolution of A, so
+  **one pin lays both** (the layout merges pins that coincide on the roller).
+* **S ≤ rows:** the higher fiducial at a whole row, `⌈S⌉` — a corner, on A's ring `⌈S⌉` — and
+  the lower `S` rows beneath it: a post on A's body between its rings (a flush pin standing from
+  the body, §4.5).
+* **S > rows:** the lower at row 0 (a corner on A's first ring), the higher `S` rows up: a post
+  beyond A's last ring, so **A grows** by `(S − rows)·|tB| sin θ`. (The zigzag 8 × 1 row in the
+  gate is this case.)
 
-relative to B's ring 0's first corner. So the collar is a ring of teeth at **`z' = −m*·|tA| sin θ`**
-— the axial position of column `m*`, beyond B's ring 0 on B's +Z end (B's rings step toward −Z) —
-carrying **one tooth per tile pitch round it**, `n_B` teeth, at **`s' = m*·|tA| cos θ + j·|tB|`**: an
-evenly spaced ring of teeth at one height, phased by `m*·|tA| cos θ`. `m*` is the nearest column
-(−1 normally) whose collar clears B's ring 0, root and wiggle included, by 1.5 mm.
+**No impostor pair.** A's pins come round every revolution, so A lays more pinholes than the two.
+The true pair moved a whole revolution along is harmless (it registers B exactly, a revolution
+along). Any OTHER pair close to B's span and direction is a trap: a person placing each pointer
+within a millimetre could take it for the right one. The first random-tile sweep found exactly
+that — at **91°** with A six tiles round, A's two pins sit 4.5 mm apart at almost the same angle,
+so every revolution lays a second pair **0.04 mm and 1° off** B's span, and the simulator itself
+took it (B misregistered by 2 mm). So the layout tries the fewest extra columns past either end
+(`jT`, `jB`, up to four more in total) until no pair of A's pinholes lies within **3 mm and 10°**
+of B's pointers other than the true pair moved whole revolutions; if none works the design is
+flagged. The cost is B's length: the default tile at 91° gets one more column (B 236 → 276 mm,
+flagged as long). Gate K4 checks the pinholes the simulator actually stamped.
 
-**One seated tooth fixes both of B's free placements.** B's unrolled surface lands rigidly
-(rolling without slip). Seat tooth `j` — B's surface point `(s'_j, z'_c)` — in the dimple of track
-row `k₀`, the sheet point `D = m*·tA + k₀·tB`. Then every point `(s', z')` of B lands at
+Which column gets the higher one follows ρ's sign. **They are always in the SIDE borders**
+(columns −j and cols + j), so they never land on a cookie whatever their height, and they need
+not lie on any cut line. That is why the brief's "a row of fiducials along A's first line" is
+**two** pinholes, not a whole row: a pinhole at every corner of row 0 would let B be put down a
+column off — still registered, but a column off the sheet that was rolled. (At 90° the two are
+on A's first line, at the spacing B needs, which is the brief's picture.)
 
-    D + (s' − s'_j)·r̂_B + (z' − z'_c)·â_B
+**The proof that every corner lands, for every `cols` and every θ.** B's start angle (§4.3) puts
+its contact line at `s'_d = −j·|tA| cos θ + v₁·|tB|`, which equals the `s'` of F₂ as well
+(substitute `v₂`). B's unrolled surface lands rigidly (no slip): with the pointer at `z'(−j)` on
+F₁ and the pointer at `z'(cols + j)` on F₂, B's surface point `(s', z')` lands at
 
-— the tooth's two coordinates on the sheet fix the stamp's two free placements, the sideways one
-along `â_B` and the phase along `r̂_B`. With `r̂_B = tB/|tB|` and `â_B = ẑ × r̂_B`,
-`|tA|·(cos θ·r̂_B − sin θ·â_B) = tA` exactly, so B's corner `(m, k)` lands at
+    F₁ + (s' − s'_d)·t̂B + (z' − z'(−j))·â_B
 
-    D + (m − m*)·tA + (k − j)·tB  =  m·tA + (k₀ + k − j)·tB
+and B's ring-corner `(m, k)` — at `s' = m|tA| cos θ + k|tB|`, `z' = −m|tA| sin θ` — lands at
 
-— a lattice corner in column `m`. Every one of B's lines lands on its lattice column (the row
-shift `k₀ − j` changes nothing: a B-line is the same line moved by `tB`), and every later tooth
-`j'` comes down at `m*·tA + (k₀ + j' − j)·tB`, the next dimple, `|tB|` apart on both. **This is
-checked by simulation, not argued** (§9): B posed solely by seating tooth 0 in the first dimple
-puts all 20 corners of the default sheet on both families' lines (the worst 1.8e-14 mm); posed
-instead by its LAST tooth in the LAST row's dimple, or a middle tooth in row 1's, it stamps the
-same lines through the same corners.
+    F₁ + (m + j)·|tA|·(cos θ·t̂B − sin θ·â_B) + (k − v₁)·tB  =  m·tA + k·tB
 
-Teeth are the pegs' cones 0.3 mm smaller and 0.3 mm shorter, so a tooth seats on the dimple's
-cone wall and self-centres both ways. They stand on a **collar band** — a raised ring 1.2 mm high
-(less on a thin blade margin) with 45° shoulders — whose flat top runs 0.5 mm past every tooth's
-foot both ways. (The first ring build reused the crossbar band, and on a large roller a tooth's
-foot overhung its shoulder by 0.3 mm; the gate's H4 found it, §9.3.)
+because `|tA|·(cos θ·t̂B − sin θ·â_B) = tA` exactly. Every one of B's corners lands on its own
+lattice corner, so every B line lands on its lattice column — for any `cols`, `j` and θ. The
+second pointer lands on F₂ by the same identity (it is the check, not a constraint). **This is
+checked by simulation, not argued** (§9, R2–R5): A is posed off its own meshes and rolled from
+the dough's edge, B is posed by two points off ITS meshes and its handle's, and every corner of
+every fixture lands on both families' lines (worst 8.1e-14 mm).
 
-### 4.5 The peg row comes round again — and when that matters
+### 4.3 The start detent
 
-A's peg row returns after one revolution, `n_A` columns on. If that is still inside the block it
-dimples a column of cookie corners (on the cut lines, so small, but a defect). It lands in the far
-border iff
+**Roller side:** a radial V notch cut into BOTH end faces at the same angle — 90° across,
+**0.6 mm deep**, running 2 mm either side of the nub's radius and tapering out over one depth at
+its two radial ends — at the angle **opposite the start pose** (the start is at the bottom, the
+notch at the top). The nub's radius is as far out as the face allows (0.5 mm inside the end
+chamfer; on A also 1 mm clear of the groove), so the tab is long and springy.
 
-    n_A ≥ cols + 1 + |m*|          (A's tiles round ≥ the sheet's columns + 2, normally)
+**Start poses.** A's: ring 0's first corner on the contact line ("the start of the
+tessellation"). B's: its contact line through both fiducials, `s'_d` above. At 90° that is a
+corner of ring 0 too; at θ ≠ 90° it is a corner of B's virtual column (−j or cols + j) — no real
+ring of B has a corner there, by §4.2's impossibility.
 
-The defaults satisfy it — that is why roller A's default is 6 round (⌀ 76.4 mm on a 40 mm tile)
-where B's is 5 (⌀ 63.7 mm); otherwise the page **flags** it with the column it lands on. (A has
-one peg row, not one per tile: "at least once per revolution" is met by one, and every extra one
-would only add cookie dimples.) B's teeth never recur inside the block: they are all on the
-collar, on the track's column.
+**Light friction, not a lock:** the nub stands 0.5 mm into the 0.6 mm notch (0.1 mm short of the
+bottom so it seats on the V's walls); turning the roller in its handles pushes the 1.2 mm tab
+0.5 mm back. It holds while you place and press and lets go as soon as the roller turns. (Tab
+strain at the 6 mm minimum length ≈ 1.5·t·δ/L² = 2.5 %, at the default lengths 0.2–0.4 %;
+the minimum is enforced, §6.)
 
-### 4.6 Orientation and order of use
+**A whole-tile error on B is not an error.** B's rings are periodic by `tB`, so a notch one tile
+round from the start pose is the same pose: B's lines are identical. Only the declaration check
+(K2) can see it, and it does. On A a one-tile error matters physically — it moves the pattern
+one column relative to the dough's edge, and one tile EARLY puts the first fiducial at the edge
+(K3, and the registration it breaks). Half a tile on B misregisters everything (R).
+
+### 4.4 The handles and the sight arms
+
+Two handles per roller, one at each end; the roller spins on their axle pins, so **a handle
+never turns with the roller** and can carry the tab and the arm. Each handle: a 26 mm grip
+coaxial with the axle, a bearing boss (`bore/2 + 2.5` mm) against the end face, the axle pin;
+standing 0.5 mm off the end face, the **spring tab** runs up (+y) to the nub, and the **sight
+arm** runs down (−y), 6 × 3 mm, to a cone **pointer** whose tip, when the arm hangs straight
+down, is **on the contact line, 0.5 mm above the dough** (`R_tip − dough − 0.5` from the axle),
+at the arm's mid-plane `g = 2 mm` past the end face.
+
+* **One part for both ends of a roller:** it is mirror-symmetric about its x = 0 plane (V3), so
+  turned end for end it is the same part, and the two notches are at the same angle (K1).
+* **Not one part for both rollers:** each pointer must reach its own roller's contact line,
+  and the rollers' diameters differ (`n_A·pitch A ≠ n_B·pitch B` in general), so the arm's
+  length differs. Same design, same code, same tab and hub — two STLs, **handle A and handle
+  B, print two of each.** (Where the diameters match, the two files are the same.)
+* **Why hover and not touch:** a pointer that reached the board would plough the dough as soon
+  as the roller rolled. Hovering costs a little: a handle tilted by α puts the start point
+  `≈ (dough + 0.5)·α` off — 0.5 mm at 5°. (A pointer at the full blade-tip radius would make
+  that error third-order, `R(α − sin α)`, but it would drag.)
+
+### 4.5 Roller A: its start and its pins
+
+A starts on its detent at the dough's straight edge: its ring-0 corner on the contact line is
+column `a0`, the first whole column behind every cookie corner and both fiducials by a pin
+radius + 2 mm, so both pinholes land whole on the dough (K3). It rolls forward across
+everything (`rollEnd`).
+
+**The pins are flush, not taller than the blade** — a deliberate departure from the brief's
+"slightly taller". The blades already cut through the dough to the board, so a pin flush with
+the blade tips already punches a hole through it; a pin that stood proud would lift the whole
+roller off the board by its overshoot every time it came round, and every blade near it would
+stop short (gate R1 asserts nothing stands proud of the rings). What makes the hole VISIBLE is
+its width: the pin is **3 mm** across (the "fiducial pin size", 1.5–6 mm) where the blade is
+1.2, its own width through the dough and 0.5 mm above it (H2: no crater), then a 45° flare into
+the body. Its flat tip's rim, not its centre, is at the blade-tip radius.
+
+**A pin comes round every revolution.** A corner pin comes round on a corner (free). A post
+between rings, coming round inside the cookie sheet, would punch a hole in a cookie — flagged
+with the round count that avoids it (§6), and the gate checks the flag against the simulation.
+
+### 4.6 Placement error
+
+The pointers are placed by eye. With each pointer anywhere within `e` of its pinhole, B is the
+least-squares rigid placement (the pointers' midpoint on the holes' midpoint, the axis along
+them); the worst cookie corner moves by (default design, 16 directions per pointer, every pair):
+
+| each pointer within | ±0.5 mm | ±1 mm | ±2 mm |
+|---|---|---|---|
+| worst corner off by | 0.75 mm | 1.51 mm | 3.02 mm |
+
+Linear in `e`, as it must be; it is the translation plus the rotation `≈ 2e / span` swung over the
+sheet's far corners (the pointers are 240 mm apart; the farthest corner 144 mm from their
+midpoint). Other fixtures: hook at 60° 1.49, obtuse 1.73, acute 40° 2.29 mm at ±1 mm (the acute
+tile's pointers are only 162 mm apart). **The page computes this for the current design and
+puts the ±1 mm figure in its how-to**; the gate measures the same thing through the simulator
+and requires the two to agree (R6). Not included: detent play, which shifts B along its roll by
+`R·δφ`.
+
+### 4.7 Orientation and order of use
 
 Holding a roller the other way round end-for-end rotates its stamp 180°; for a tile whose edges
-are not centrally symmetric that changes the cookie. B cannot be held wrong (its collar must be
-on the track). **A's +Z end carries a groove ring** on its end face. Both rollers are held with
-their +Z end on the LEFT as they roll forward (§3.2).
+are not centrally symmetric that changes the cookie. **A's +Z end carries a groove ring** on its
+end face; both rollers are held with their +Z end on the LEFT as they roll forward (§3.2).
 
-1. Roll the dough `t_dough` thick on a floured board, a little bigger than the cut field, with a
-   border of about one tile on the side you start from. The rings run on the board through the
-   dough; there are no rims to keep it between.
-2. **Roller A** — grooved end on your **left**, rolling **along edge A** (the way its rings
-   run). Put it down near the edge of the dough with its **peg row** facing down, roll it **back**
-   to the edge, then **forward** across the whole sheet in one pass. The pegs press a line of
-   dimples into the border: the track.
-3. **Roller B** — rolling **along edge B**, **collar on the track**. Seat a tooth in the dimple at
-   one end of the track, roll B **back** to the edge, then **along the track** across the whole
-   sheet in one pass; each tooth drops into a dimple.
-4. Lift the border away; the cols × rows cookies are already apart.
+1. Roll the dough `t_dough` thick on a floured board, a border of about a tile all round and a
+   straight edge on the side A starts from.
+2. **Click A to its start**: turn it in its handles until both tabs click; groove end left,
+   pointers straight down, set it at the straight edge, rolling along edge A.
+3. **Roll A** forward across the whole sheet in one pass. Its pin(s) punch the two pinholes.
+4. **Click B to its start** the same way.
+5. **Put both pointers on the pinholes** — the two nearest A's starting edge that both pointers
+   reach at once (they are exactly the pointer span apart; a stray hole has no partner).
+6. **Press, then roll** B across the whole sheet in one pass (at θ ≠ 90°, back to the near edge
+   first and then forward).
+7. Lift the border away.
 
-**Why "back, then forward" — measured, not cautious.** At θ ≠ 90° the peg row slants, so its pegs
-come down over `|tB| cos θ` of travel per ring — at an obtuse θ the later rings' pegs come down
-BEFORE the first, and are reached only by rolling back first (the first version's simulator,
-rolling forward only, found exactly this at 120°: a block corner 34 mm from the nearest line).
-B's lines are cut wherever B rolls, so B is rolled back from its seat to the edge, then across.
-Rolling back and forward re-stamps the same lines in the same places (no slip), so the instruction
-costs nothing at θ = 90°. Any dimple will seat B — one fixes both its free placements (§4.4) — so
-a dimple lost off the dough edge is harmless.
+**Why "back, then forward" for B at θ ≠ 90°** — measured, not cautious: B's start line crosses
+the sheet slantwise (it passes through the side-border pinholes at different rows), so part of
+the sheet lies behind it along B's roll. Rolling back and forward re-stamps the same lines in the
+same places (no slip), so it costs nothing.
+
+![the detent notch](docs/img/tile-detent-notch.png)
+![a sight arm over the contact line](docs/img/tile-sight-arm.png)
+![A's fiducial pin](docs/img/tile-fiducial-pin.png)
 
 ---
 
@@ -445,7 +538,7 @@ a dimple lost off the dough edge is harmless.
 | | blade wall (tip) | 1.2 mm | 0.6–3 | the FDM floor; also the point-spacing flag |
 | | draft angle | 2° | 0–10° | wall widens toward the root |
 | | cylinder wall | 3 mm | 1.6–8 | |
-| | peg / tooth size | 6 mm | 3–12 | dimple diameter at the dough surface |
+| | fiducial pin size | 3 mm | 1.5–6 | the pinhole's diameter (§4.5) |
 | | axle bore | 8 mm | 5–14 | the handle pin is 0.5 mm smaller |
 | check | min cookie width | 8 mm | 3–30 | the neck/spike flag |
 
@@ -457,9 +550,8 @@ prints, per roller, its rings, their spacing, its tiles round it and which edge 
 
 Default tile: a wave on each edge, corners smooth, 40 mm square cell. **The page opens on
 4 × 3 = 12 cookies, a 160 × 120 mm cut field** (Eva: at least about 4 × 3). Roller A is 6 tiles
-round (⌀ 76.4 mm at the blade tips), roller B 5 (⌀ 63.7 mm). A is 6 rather than 5 so that its peg
-row's second pass lands in the far border: `n_A = 6 ≥ cols + 1 + |m*| = 6` (§4.5); at 5 the
-default would be flagged.
+round (⌀ 76.4 mm at the blade tips), roller B 5 (⌀ 63.7 mm). At 6 round, A's two fiducials are
+exactly one revolution apart, so one pin lays both (§4.2).
 
 ---
 
@@ -471,9 +563,9 @@ touching itself; two control points within 0.05 mm.
 **Refused** (the design builds and shows, but the roller STLs are not given out, with the
 reason): the blade cannot clear the dough (`h ≤ t_dough + 1.5`); a roller too small to hold its
 bore — its body under one cylinder wall around the bore (`R_body < bore/2 + t_wall + 0.4`, e.g.
-2 tiles of 40 mm round it, a 25.5 mm roller); a peg too wide for its roller (the flat tip cannot
-sit with its rim on the dough line, `2·top² < (r_tip + top)²` — reachable only with big pegs on
-the smallest rollers).
+2 tiles of 40 mm round it, a 25.5 mm roller); an end face with no room for the detent (the
+notch's inner end a millimetre past the handle's bearing boss and its tab at least 6 mm long —
+e.g. 4 tiles of 30 mm round B). W5 checks the refusal names the measured cause.
 
 **Flagged** (drawn red and listed; nothing silently fixed):
 
@@ -485,8 +577,8 @@ the smallest rollers).
 2. **Control points closer than the blade wall** — the blade cannot show a feature smaller than
    its own thickness. Both points ringed red.
 3. **Blade height ≤ dough + 1.5 mm** — STL refused.
-4. **A's peg row comes round again inside the sheet** (§4.5): `n_A < cols + 1 + |m*|`, flagged
-   with the column it lands on.
+4. **A's fiducial post comes round again inside the sheet** (§4.5) — a hole in a cookie —
+   flagged with the round count that avoids it.
 5. **A roller longer than 250 mm** — beyond common printers' build height; fewer cookies in the
    direction that sets its length, or smaller tiles.
 6. **A roller with no room for a hollow** — printed solid round the bore (information only).
@@ -501,11 +593,12 @@ The cost is stated once instead, in the page's how-to (its printing note) and th
 
 ## 7. Exports
 
-* **STL**: roller A, roller B, the handle — binary, millimetres — separately or all three in a
-  ZIP (JSZip from the cdnjs pin `cards.html` uses, loaded on click) with a README carrying the
-  §4.6 sequence, the support note and the derived numbers. Every part is a set of closed shells
-  (the body, each ring a closed tube, each peg / tooth cone); overlapping closed shells are
-  unioned by the slicer.
+* **STL**: roller A, roller B, handle A, handle B (print two of each handle) — binary,
+  millimetres — separately or all four in a ZIP (JSZip from the cdnjs pin `cards.html` uses,
+  loaded on click) with a README carrying the §4.7 sequence, the ±1 mm figure, the support note
+  and the derived numbers. Every part is a set of closed shells (the body with its notches, each
+  ring a closed tube, each pin; the handle's grip, tab, nub, arm and pointer); overlapping closed
+  shells are unioned by the slicer.
 * **SVG**: the tile and the 3×3 patch, as cut lines in millimetres.
 * **Design**: saved and opened as JSON (`tessellation-roller-design`, **version 2**: the tile, the
   print settings, the sheet and the round counts — every number range-checked and the tile
@@ -540,11 +633,12 @@ runs.
 
 Rows: every hand-drawn fixture in `tools/tile-fixtures.mjs` (the default, straight edges, a hook
 at 60°, a sharp zigzag at 75°, a jigsaw knob, obtuse 120°, acute 40°, a finger, a pinch, close
-points), seeded random tiles (12 by default, 40 in CI), and parameter rows: round 3/7 on a 2 × 5
-sheet (its peg row comes round inside the sheet — flagged), round 8/3 on a 6 × 3 sheet (B turns
-more than once to cross it), a thin print, an obtuse tile in deep dough, small rollers (a
-straight 30 mm square at 5/4 round, whose peg feet are founded on the hollow's roof), and two
-refusals — a blade that cannot clear the dough, a roller too small for its bore. Through the
+points), seeded random tiles (12 by default, 40 in CI), and parameter rows: the zigzag at round
+5/5 (its fiducial post comes round inside the sheet — flagged), round 8/4 on a 6 × 3 sheet, a thin
+print, an obtuse tile in deep dough, the zigzag on an 8 × 1 sheet (its fiducials more rows apart
+than the sheet is deep, so A grows past its last ring), small rollers (a straight 30 mm square at
+6/5 round), and three refusals — a blade that cannot clear the dough, an end face with no room for
+the detent, a roller too small for its bore. Through the
 SHIPPED modules, each clause in its own containment (a clause that throws is a finding, and the
 rest of the row still runs):
 
@@ -571,30 +665,41 @@ rest of the row still runs):
   is a closed tube round the roller (a torus: `V − E + F = 0`) whose tip face hugs its spec ring
   all the way round, the seam included.
 * **R — registration.** R0 the mesh is the spec: every spec ring point has blade tip beside it,
-  and every peg and tooth cone is centred on its spec point. R1 the rolling radius read off the
-  mesh is the blade tips' (nothing stands proud of the rings). R2 A's slanted peg row lays exactly
-  one dimple on each corner `(m*, k)`, `k = 0..rows`. R3 B, posed by seating ONE tooth in the
-  first dimple and rolled both ways: every tooth that reaches the track lands in a dimple, and
-  every dimple gets a tooth; and seated instead by its LAST tooth in the LAST row's dimple, or by
-  a middle tooth in row 1's, it stamps the same lines — one seat fixes both free placements.
-  R4 every corner of the cookie sheet lies on its A line and its B line (1e-6 mm). R5 the
-  sheet's A and B lines meet at lattice corners only, `(cols+1)(rows+1)` of them.
-* **W — watertight.** Each STL re-welded from its float32 bytes: no unmatched and no duplicated
-  DIRECTED edge (an undirected census passes a face wound inside out), no degenerate triangle,
-  every shell's signed volume positive. W5: the STL is refused exactly when the MEASURED roller
-  cannot work — its blade (tip less body, off the mesh) does not clear the dough by 1.5 mm, or
-  its rolling radius less the blade leaves no cylinder wall round the bore. Never read off the
-  builder's own flag (the quantity under test).
-* **H — heights, off the mesh.** H1 blade above the body > dough + 1.5 mm, the body's radius
-  read by casting rays from the axis against the body's own triangles (a vertex scan reads the
-  hollow: the outer cylinder has vertices only at its ends); H2 every peg reaches exactly
-  `δ = min(½·dough, ½·D − 0.8)` into the dough and every tooth 0.3 mm less (1e-6 mm), the law
-  restated in the gate; H3 the collar band clears the dough; H4 every cone's foot — the centre of
-  its base — lies inside the body's material (a ray through it crosses the body's skin an odd
-  number of times first).
-* **F — flags.** Each fixture's neck / spike / close-point flags are exactly the ones it
-  expects; the close-point bar restated; A's peg row's second pass is flagged iff the simulation
-  lands a dimple on a sheet corner.
+  and every fiducial pin is centred on its spec point. R1 the rolling radius read off the mesh is
+  the blade tips' (nothing stands proud of the rings — the pins are flush). R2 A, posed off its
+  own notch and handle meshes at the dough's edge and rolled forward, punches the two sight
+  pinholes: the first from the edge, and one exactly B's pointer span (off B's body and handle
+  meshes) from it along edge B. R3 B, posed by TWO POINTS — its start angle off its notch and
+  handle, its first pointer on the first pinhole, its axis along the pair — lands its second
+  pointer on the second pinhole (1e-6 mm). R4 every corner of the cookie sheet lies on its A line
+  and its B line (1e-6 mm). R5 the sheet's A and B lines meet at lattice corners only,
+  `(cols+1)(rows+1)` of them. R6 (default, hook, obtuse, acute): each pointer swept round a circle
+  of 0.5 / 1 / 2 mm (8 directions each, every pair), B re-posed through the simulator — the worst
+  corner mismatch equals tile-roller's own `sightTolerance` (the page's figure) to 1e-6 mm, and is
+  ~1e-13 at 0 mm.
+* **K — the detent, off the meshes.** K1 a V notch on BOTH end faces of each roller, at one angle,
+  0.6 mm deep (the law restated); K2 the notch is opposite the start pose the spec declares, and
+  the handle's nub reaches into it without bottoming; K3 A puts both sight pinholes whole on the
+  dough (a pin radius + 2 mm past its starting edge) and outside the cookie sheet, and every sheet
+  corner lies past the edge and inside A's roll.
+* **V — the sight arms, off the handle meshes.** V1 with the nub in the notch, the pointer hangs
+  over the start pose's contact line (1e-9 rad); V2 its tip hovers dough + 0.5 mm above the board;
+  V3 the handle is mirror-symmetric (one part for either end) and its arm and tab stand clear of the
+  end face.
+* **W — watertight.** Each STL (A, B, handle A, handle B) re-welded from its float32 bytes: no
+  unmatched and no duplicated DIRECTED edge (an undirected census passes a face wound inside out),
+  no degenerate triangle, every shell's signed volume positive. W5: the STL is refused exactly when
+  the MEASURED roller cannot work — its blade does not clear the dough by 1.5 mm, its rolling radius
+  less the blade leaves no wall round the bore, or its end face has no room for the detent (the
+  doc's law restated) — AND the refusal names that measured cause. Never read off the builder's own
+  flag (the quantity under test). A refused design is not checked for R, K, V or S.
+* **H — heights, off the mesh.** H1 blade above the body > dough + 1.5 mm, the body's radius read by
+  casting rays from the axis against the body's own triangles; H2 every pin reaches the board
+  (1e-6 mm) and is its own width wherever it is in the dough (no crater); H4 every pin's foot lies
+  inside the body's material (a ray through it crosses the body's skin an odd number of times first).
+* **F — flags.** Each fixture's neck / spike / close-point flags are exactly the ones it expects;
+  the close-point bar restated; A punches a pinhole inside a cookie (off a corner) iff the
+  recurrence flag is raised.
 * **E — the editor, as functions.** E1 an invalid tile is refused and really crosses (the gate's
   own test); E2 a drag into a crossing is blocked at the first crossing step, tile unchanged;
   E3 moves, inserts, deletes, toggles land; E4 a corner cannot be deleted; E5 a corner resize
@@ -603,18 +708,22 @@ rest of the row still runs):
 
 `--verbose` prints every row's measured heights, ring spacing and errors (the default fixture
 always does). `--mutant <regex>` runs a subset of the negative control. The negative control has
-**30 mutations**: smooth corners losing their periodic neighbour, the top edge not the bottom +
+**38 mutations**: smooth corners losing their periodic neighbour, the top edge not the bottom +
 `tB`, the validator not checking simplicity, a corner resize ignoring the opposite corner, the
 neck test never seeing two pieces, the close-point flag at a tenth of the blade; **the line laid
 along the axis — a bar, not a ring** (D), the ring spacing ignoring θ (D), one ring too few (D),
 the circumference laid on the other pitch (S), π as 3.14 (S), the spec ring's copies 0.05 mm off
 the pitch (S), a ring one copy short bridged by a chord (R0), the offset's copies repeating the
 point they meet at (W), the ring tubes or the spec rings not turned with their lines, the tip
-face wound backwards, the roller axis right of the roll (the handedness defect, §3.2); the pegs
-mid-tile, the peg row straight across A instead of slanted, the teeth a column too far out, the
-teeth ignoring the track's phase, a peg proud of the blades (R1), pegs through the dough, the tip
-disk centred on the dough line, a peg foot in the hollow (H4); and each refusal and the
-recurrence flag never raised.
+face wound backwards, the roller axis right of the roll (the handedness defect, §3.2); **a fiducial
+pin removed** (R), the fiducials ignoring θ (R), the second fiducial at the first one's height (R),
+B's pointer span one `g` short (R), **B's detent half a tile off its start pose** (R — the physical
+catch: everything misregisters by 17 mm on the hook), **A's detent one tile early** (K), **B's notch
+one tile round** (K — the same pose by symmetry, §4.3, so only the declaration check sees it), the
+notch in one end face only (K1), **the sight arm off the contact line** (V, and R: 1.15 mm round
+the roller), the arm one length for both rollers (V2), a pin proud of the blades or its tip disk
+centred on the tip radius (R1), a pin short of the board or too wide in the dough (H2); and each
+refusal, the recurrence flag never raised, and the impostor search skipped (K4, on the 91° row).
 
 ### 9.2 `node tools/verify-tile-page.mjs` — the page (headless Chromium)
 
@@ -633,23 +742,56 @@ pointer, θ unchanged; P9 the sliders set the tile; P10 a pinched tile shows its
 the editor and on all nine 3×3 tiles, too-close points get a ring on both copies; P11 a refused
 design disables the roller buttons and says why; P12 the STL download is `84 + 50·n` bytes with
 the page's own `n`; P13 the SVG downloads (one closed path; 8 cut lines over nine tiles); P14 the
-zip holds both rollers, the handle, the notes and the design; P15 a saved design opens back to
+zip holds both rollers, both handles, the notes and the design; P15 a saved design opens back to
 the same tile; P16 it survives a reload; P17 the rollers' view draws something; **P18** the sheet
 and round sliders size the right rollers — cookies along edge A sets roller B's rings to
 `cols + 1` and cookies along edge B roller A's to `rows + 1`, COUNTED OFF THE MESHES, and tiles
 round A sets A's diameter to `n_A · pitch A / π`; **P19** the page opens on at least 4 × 3 cookies
 and says so; **P20** a version-1 (crossbar) design file opens with its sheet kept and says what
-was reset; **P21** a design the crossbar page kept in local storage does not come back.
+was reset; **P21** a design the crossbar page kept in local storage does not come back. **P22** the how-to gives
+the start method as numbered steps IN ORDER — click A to its start, roll A, click B to its start,
+both pointers on the pinholes, press then roll — and quotes the ±1 mm figure, the number
+tile-roller computes for the design; **P23** a FRESH browser profile (nothing stored, nothing
+seeded or cleared) opens on 4 × 3; **P24** the handle buttons download handle A and handle B
+(`84 + 50·n`, the page's own `n`), and the In use view draws roller B on the board with its
+handles on.
 
-Its negative control re-serves broken copies of `tile.js` and `tile-roller.js` (thirteen
+Its negative control re-serves broken copies of `tile.js` and `tile-roller.js` (eighteen
 mutations: a drag ignoring which copy it holds, a blocked edit not told, a click adding itself
 instead of its point on the curve, Delete doing nothing, a double-click never deleting, a corner
 drag not holding the opposite corner, the 3×3 never showing thin parts, the roller buttons
 ignoring a refusal, the design never kept, the sheet sliders feeding the wrong roller, the page
-opening on one column of three cookies, a crossbar design file losing its sheet, and the page
-still reading the crossbar version's storage).
+opening on one column of three cookies, a crossbar design file losing its sheet, the page still
+reading the crossbar version's storage; the how-to dropping the ±1 mm figure, the how-to putting
+B before A, the page opening on 1 × 1 in a fresh profile, the zip leaving out the handles, and the
+handle B button giving handle A).
 
 ### 9.3 What the gates found
+
+**The alignment rework (Oct 5):**
+
+* **A refusal for the wrong reason passed.** With the "too small for its bore" refusal removed, the
+  detent-room refusal fired instead — the STL was still refused, so W5 (refused iff the roller
+  measures unusable) stayed green on a page that would tell the user to fix the wrong thing. W5 now
+  checks the refusal NAMES each measured cause.
+* **The handle reader took the axle pin's tip for the bearing face**, so the first two-point
+  simulation looked for pinholes 262 mm apart instead of 240 and found none. It read the pin's
+  radius from a window that held no pin vertex; it reads the widest point of the part's top
+  millimetre now.
+* **A tip read as one vertex is off its axis.** The pointer's and the nub's flat tips are small
+  disks; their farthest vertex is a rim vertex, 0.2 mm off the axis. The readers take the mean of
+  the disk (its centre).
+* **The mirror check reported 26 asymmetric vertices on a symmetric part**: `−0` and `0` format
+  differently. Zeroed below 5e-8 first.
+* **An impostor pair of pinholes on 2 of 40 random tiles** (both at 91°) — the simulator took it
+  and misregistered B by 2 mm; a person would have too. The layout now avoids it and K4 checks
+  for it (§4.2).
+* **On the default design the two fiducials are the same pin** — exactly one revolution of A
+  apart (`n_A = cols + 2j = 6`) — and the first build emitted two coincident pins. They are merged.
+
+**The first ring version (#354)** — the peg, tooth and collar code these fixed is gone with this
+rework; the findings are kept because the instruments they changed are still here:
+
 
 **Rebuilding for rings** (each fixed at its cause):
 
@@ -724,13 +866,12 @@ Paste, drop or load a picture of one cookie shape; get an editable tile.
    printability; the ruling reversed that, and nothing here re-opens it.)
 2. **No rims** (§3.5) — the rings roll on their own tips; the "dough between the rims" rule is
    dropped with them.
-3. **The track is column `m*`, one column outside the sheet** (corner-registered) — so a
-   recurrence, if any, lands on cut junctions, not inside cookies. A track half a column out
-   would save half a column of border but put any recurrence inside cookies.
-4. **The collar is at the nearest column whose teeth clear B's first ring by 1.5 mm**, root and
-   wiggle included — `m* = −1` normally, further out on a tile whose B edge wiggles wide.
-5. **Roller A defaults to 6 tiles round, B to 5**, so A's peg row comes round outside the default
-   sheet (§4.5); with both at 5 the default would be flagged.
+3. **The fiducials are at whole virtual columns of B (−j, cols + j)** — so at 90° they are corners on
+   A's first ring (Eva's picture), at the cost of up to one column of B's length per end. Pointers
+   at the minimum margin would shorten B and put the fiducials between corners.
+4. **Two fiducial pins, not a pin at every corner of row 0** (§4.2): a full row lets B be put down
+   a column off.
+5. **Roller A defaults to 6 tiles round, B to 5** — at 6, one pin lays both fiducials.
 6. **The sheet is two sliders — cookies along edge A and along edge B** — replacing span A and
    span B, and **"tiles round it"** replaces "repeats"; the tooltips say which roller each one
    sizes.
@@ -738,40 +879,46 @@ Paste, drop or load a picture of one cookie shape; get an editable tile.
    reset**, and the local-storage key changed so an old design does not reopen by itself.
 8. **Corners resize; θ is a slider.**
 9. **Corners default smooth.**
-10. **A's orientation mark is a groove ring on its +Z end face.**
+10. **A's orientation mark is a groove ring on its +Z end face**, moved out to clear the detent.
+14. **The pins are flush with the blade tips, not taller** (§4.5) — the brief said slightly taller.
+15. **The pointers hover 0.5 mm above the dough** rather than touch (§4.4): touching would plough the
+    dough when rolling; the cost is ≈ (dough + 0.5)·tilt.
+16. **Two handle STLs (A and B), print two of each** — one design, but each arm must reach its own
+    roller's contact line (§4.4).
+17. **The detent is a 0.6 mm V and a 1.2 mm tab**, at least 6 mm long; ends with less room are
+    refused.
 11. **No hollow-free cavity**: the body is a tube open to its bores, so it drains.
-12. **"Back, then forward"** for both rollers (§4.6) — one procedure for every angle.
+12. **B rolls "back, then forward" at θ ≠ 90°** (§4.7); A starts at the dough's edge and rolls forward.
 13. **A roller too small for its bore is refused**, not clamped: a clamp would change the
     circumference, which is the one number the pattern is laid out on.
 
-Open: whether `n_A ≥ cols + 1 + |m*|` should be enforced rather than flagged (it couples A's
-diameter to the sheet's width); how the rings are best supported (tree supports are the
-expectation, not a measurement); the handle retention (friction only today); nothing has been
-printed — every printability figure here is a declared rule of thumb, not a measurement.
+Open: whether the fiducial-post recurrence should be enforced rather than flagged; how the rings
+are best supported (tree supports are the expectation, not a measurement); the handle retention
+(friction only today); whether a 0.6 mm detent clicks firmly enough in PLA (a rule of thumb); B
+drifting mid-roll now that no track guides it (if a print shows it, the track comes back — §0);
+nothing has been printed — every printability figure here is a declared rule of thumb.
 
 ---
 
 ## 12. Measured (the default design)
 
-| | roller A | roller B | handle |
-|---|---|---|---|
-| diameter at the blades | 76.4 mm (body 60.4) | 63.7 mm (body 47.7) | grip 26 mm |
-| length | 141 mm | 219 mm | 103 mm |
-| rings | 4, 40 mm apart | 5, 40 mm apart | — |
-| triangles | 22,152 | 23,320 | 1,536 |
-| binary STL | 1.06 MB | 1.11 MB | 75 KB |
+| | roller A | roller B | handle A (print 2) | handle B (print 2) |
+|---|---|---|---|---|
+| diameter at the blades | 76.4 mm (body 60.4) | 63.7 mm (body 47.7) | grip 26 mm | grip 26 mm |
+| length | 138 mm | 236 mm | — | — |
+| rings | 4, 40 mm apart | 5, 40 mm apart | — | — |
+| pointer from the axle | — | — | 32.70 mm | 26.33 mm |
+| triangles | 24,876 | 24,280 | 1,800 | 1,800 |
+| binary STL | 1.19 MB | 1.16 MB | 88 KB | 88 KB |
 
-12 cookies a pass (4 × 3), cut field 160 × 120 mm; track column −1; 4 pegs on A in a row (one per
-ring), 5 teeth on B's collar. Blade 8.00 mm above the body, peg dimple 2.20 mm, tooth 1.90 mm,
-collar band 6.80 mm above the board — all read off the mesh. Ring spacing 40.000 mm on both
-(1.9e-13 off), every ring covering the whole circle. Sheet corners within 1.8e-14 mm of both
-lines, 20/20 line meetings, stamped lines within 4.6e-13 mm of their ideal (3.3e-13 at the
-seams) over 13 revolutions of A and 12 of B.
+12 cookies a pass (4 × 3), cut field 160 × 120 mm. One fiducial pin on A (3 mm, flush with the
+blades, lays both pinholes, at columns −1 and 5 of row 0); A starts at column −2, the first
+pinhole 40 mm in from the dough's edge. B's pointers 240 mm apart, 0.500 mm above the dough. The
+notch 0.6 mm deep on both faces of both rollers, opposite the start pose to 5e-16 rad — all read
+off the meshes. Sheet corners within 4.7e-14 mm of both lines after the two-point placement, 20/20
+line meetings, stamped lines within 4.6e-13 mm of their ideal (3.3e-13 at the seams). Placement:
+±0.5 / ±1 / ±2 mm at each pointer → 0.75 / 1.51 / 3.02 mm worst corner (§4.6).
 
-Cost in the page (Node, same code): the roller build 6–114 ms over the fixtures (60 ms at the
-default, 114 ms for the jigsaw knob, the most points), the neck/spike raster 9–45 ms, a
-validation 0.2–2.8 ms — so the editor validates on every pointer move and rebuilds the rollers
-120 ms after the hand stops. The largest fixture STL is the jigsaw knob's roller B, 2.4 MB
-(49,720 triangles). Against the crossbar version at its own defaults (A 21,420 / B 18,220
-triangles, 1.02 MB / 890 KB), the ring rollers are 3% and 28% larger — B now carries five rings
-of five copies of its edge each.
+Against the first ring version: B is 17 mm longer (its ends are set by the pointers, §4.2) and A
+3 mm shorter; A gains 2,724 triangles (the notches and the pin, against four pegs), B 960 (notches,
+against the collar). The page rebuilds in the same ~60 ms.

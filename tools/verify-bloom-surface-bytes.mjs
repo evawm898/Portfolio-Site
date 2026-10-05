@@ -242,6 +242,23 @@ const PREDICATE_MOVERS = {
      that the form amount at 0 is inert AND that factoring the shared wave out
      of the size field moved no size float. The base tree does not know
      `varianceForm` at all, so a mover builds its default form there. */
+  /* THE FLORIST'S CUT (ruling 7, stem session 3). A row moves iff THIS
+     tree's plan reports a cut MADE — the guard predicate: the control ON, a
+     stem present, and the stem longer than its own cut (a 2 mm stem on 3 mm
+     asks for a cut it cannot carry and is a HOLDER, told). Written from the
+     plan `stemPlan` reports rather than from the labels; the base tree has
+     no cut and cannot say. Every FLAT row, every stemless row and every row
+     under the length must hold to the bit — including the raceme with the
+     control FLAT, where nothing anywhere is cut. A raceme with the control
+     ON moves through its RACHIS alone: the pedicels are pinned flat, and a
+     pedicel that moved would be the pin failing (ID4). */
+  'stem-cut': (st) => {
+    const acc = new mine.MeshBuilder({ exportMode: true });
+    const fr = mine.footRing(st, acc);
+    if (!fr.hub) return false;
+    const sp = mine.stemPlan(st, fr.hub, acc);
+    return !!(sp.present && sp.cut && sp.cut.made);
+  },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* FORM VARIANCE HEADROOM (the build-2 follow-up — docs/bloom-organic-
      variance-form-outcome.md §19). The law changed only where a petal's
