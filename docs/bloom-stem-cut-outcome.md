@@ -539,3 +539,20 @@ on `[0, 50, 100]` against the cut ladder `[0, 95.174, 100]`. Must-fail re-run: b
 `infill-metric`, the apex anchors, and `verify-bloom-stem-cut` since the harness moved):
 all green; `edge-profile` was still running locally at push time and is CI's to confirm — it
 does not reach `stemNodeClauses`. No geometry moved; nothing is re-measured.
+
+## 15. Merged, the tag published, and the must-fail into the preflight
+
+`#362` merged as `a22ca83` (`main` had taken #363 — tile and bug files and CLAUDE.md's tile
+section, none of which a bloom gate reads; the merge was clean). `bloom-frozen-tags` was
+dispatched from `main` at once and read back off the remote:
+
+```
+23b13bd08cf7579eb47c9c82724f6f21bb1a3991	refs/tags/frozen/phase52
+```
+
+— the declared base to the commit. The remote holds 44 `frozen/*` tags, phase2 through phase52
+less exactly the seven `TAG_PUSH_XFAIL` declares (5, 22, 23, 42, 43, 45, 49); no undeclared
+absence and no stale exception. **Only then** was `.github/workflows/bloom-export-watertight.yml`
+edited: `node tools/verify-bloom-stem-cut.mjs` runs in the preflight beside the stem-nodes
+must-fail (the same import reason). This PR adds no matrix row and owes no phase; the tag it
+would have cost was dispatched first, which is the rule.

@@ -347,6 +347,14 @@ jobs:
       # which imports playwright-core at load) and before the browser.
       - name: ST12 — every arm of the stem-node clause must be able to fail
         run: node tools/verify-bloom-stem-nodes.mjs
+      # THE STEM'S CUT (ruling 7, stem session 3): SC0-SC3, ST10's two cut
+      # arms, ST1's cut band, ST12's cut ladder and ID4's cut pin, each planted
+      # into records the shipped geometry builds and required to fire BY ITS
+      # OWN MESSAGE through the clauses both STL gates call. Here beside the
+      # stem-nodes must-fail for the same reason (it imports the harness).
+      # Added AFTER frozen/phase52 was dispatched from main (docs/bloom-stem-cut-outcome.md).
+      - name: SC0-SC3 — every arm of the stem-cut clauses must be able to fail
+        run: node tools/verify-bloom-stem-cut.mjs
       # S5: every infilled row under the export budget on its own mesh. It
       # imports the harness (for the matrix), which imports playwright at
       # module load, so it sits after the npm install.
