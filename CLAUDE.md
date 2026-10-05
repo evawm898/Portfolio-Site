@@ -289,7 +289,7 @@ member of that set, or a random one? If a different random draw would have let t
 pass, the fixture IS the clause.**
 
 **AN XFAIL ENTRY CARRIES ITS MAGNITUDE AS A NUMBER THE GATE READS, IN BOTH DIRECTIONS**
-(#213, closed — read `docs/bloom-xfail-magnitudes.md` before touching `SELF_INTERSECTION_XFAIL`,
+(#213, the list gating magnitude — read `docs/bloom-xfail-magnitudes.md` before touching `SELF_INTERSECTION_XFAIL`,
 `EXPORT_REFUSED_XFAIL`, the wall instrument's `SELF_XFAIL` or its V4 marker). Every entry is
 structured now — `{ pairs, worstMm, note }`, `{ tris, note }`, `{ selfMm, note }`,
 `{ ownDeficitMm, note }` — and the module REFUSES TO LOAD on an entry with no number. X1
@@ -523,7 +523,7 @@ positionally under `Object.is` over 1,133,544,024 export floats and 77,966,806 c
 values, every predeclared mover moving** — where the count partition is 10 / 899. Seven declared
 census magnitudes moved with it and ALL SEVEN IMPROVED (`DEPTH: 6 turns x layerSize min x
 petalCount 40` 73,265 -> 65,822 pairs at 0.2984 -> 0.2900 mm is the largest), re-recorded in
-the same commit because #213's list does not gate MAGNITUDE **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]** and every one of them would have
+the same commit because #213's list does not gate MAGNITUDE **[Oct 5 docs sweep: #246 answered #213 (the list gating magnitude): X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]** and every one of them would have
 passed silently — and **BROWSER-CONFIRMED, because a re-record measured in Node is not
 confirmed until Chromium's V8 agrees**: all thirteen movers through `node
 tools/verify-bloom-export.mjs --only <the 13 labels>` read **PASS, 12 of 13 reaching the
@@ -2497,7 +2497,7 @@ construction**: in Node both sides share one call chain and the difference is ex
 and no smoke row carries a cusped notch. The bar is now the quantity's own conditioning —
 `LOBE_SINUS_STATION_ULPS = 8` times the per-ulp sensitivity measured from the build's own
 profile, FLOORED at 1e-9 so it tightens nowhere and loosens only where it was measuring the
-two engines. §6e of the outcome doc has the table. **No mutant names L5** **[Oct 5 docs sweep: no longer true: session 42 added two L5 mutants to `tools/verify-bloom-apex-mutants.mjs` and its comment says it closes #221 — but GitHub issue #221 is still OPEN as of Oct 5, pending Eva's ruling. #302 item 5]**, so that clause
+two engines. §6e of the outcome doc has the table. **No mutant names L5** **[Oct 5 docs sweep: no longer true: session 42 added two L5 mutants to `tools/verify-bloom-apex-mutants.mjs` for #221 (the finding that no mutant names L5). #302 item 5]**, so that clause
 rests on its own reading; recorded, not closed. These do not reach the lobe
 stationing and cannot: the arc table is built on the outline BEFORE the cut.
 **THE LADDER DOES NOT PILE AT THE NEW KINKS, measured rather than assumed** (the turning
@@ -2655,7 +2655,7 @@ ratio carries the taper as a `1/hb` term LINEAR in the offset. Measured before i
 an asked notch power of 3.00 read **1.966**. Both notes are kept, the old above the new,
 so the inversion is checkable. L3's minima count moved onto the mode-free lamina (the
 mode's own floor manufactured a THIRD dip on a two-sinus row).
-**#221 IS CLOSED and one half of it is VACUOUS under MODEL B** **[Oct 5 docs sweep: closed IN THE CODE (the apex table's L5 mutants); the GitHub issue is still OPEN as of Oct 5, awaiting Eva's ruling on closing it]**, which the table says
+**#221 (NO MUTANT NAMES L5) IS ANSWERED IN THE CODE and one half of it is VACUOUS under MODEL B**, which the table says
 rather than shipping a mutant that can never apply: the per-period guard is derived so no
 floor can bind AT a sinus. And **the L5 guard mutant's witness must build in LIVE** — the
 EXPORT floor IS the bound the guard protects, so in export a broken guard is invisible on
@@ -3060,7 +3060,7 @@ option 1 answers the sphere case and does nothing for the CAP one — **predicte
 MEASURED once the band shipped: a CAP's component count is IDENTICAL with the band and without
 it, and the stray piece is 12 voxels at a SINGLE z of −3.696, which is `hubT/2 − joinT`
 exactly.** That is #236's own zero-volume join shell and not the head, so #236 was filed open
-here and it wanted its own PR — **and it got one: #236 is CLOSED by #242 (`f64f3bc`, the hub's
+here and it wanted its own PR — **and it got one: #236 is FIXED by #242 (`f64f3bc`, the hub's
 shape session).** The join is inert where the head is not wider than the stem, so the
 zero-volume shell is no longer built, and the solid root band is generalised from sphere-only
 to cap and flat heads; both halves, all three styles, one connected piece, measured there.
@@ -3378,7 +3378,7 @@ to the bit. Counted: **0 shared vertices at azimuth 0, exactly 2 at 120, exactly
 325 WELD and 35 do not**; `alternate` (0, 180) and `opposite` (0, 90, 180, 270) sit
 entirely on the clear 9.7% at every node and `whorled` does not. **So an XFAIL ENTRY WAS
 DECLINED**: its count would be a function of which azimuths a phyllotaxy happens to land
-on, and #213 does not gate MAGNITUDE **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]**, so it would absorb a real fold in silence — an
+on, and #213 does not gate MAGNITUDE **[Oct 5 docs sweep: #246 answered #213 (the list gating magnitude): X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]**, so it would absorb a real fold in silence — an
 xfail is a declaration somebody can check, and that one would not have been. The fix
 REMOVES THE VERTEX rather than declaring the pairs (session 43's stem cap verbatim, a
 centre fan sharing the hub's apex made a rim fan), and it is `NV = 10`'s reasoning one
@@ -3617,7 +3617,7 @@ THE DEFAULT RACEME'S OWN FLORETS NOW STAND 0.676 mm FROM EACH OTHER, UNDER THE 1
 (2.233 before; one state, three combination grids, declared, NOT tuned — the Phase A finding for
 Eva's ruling: keep it, or hold the internode and give up a node, which is build 2's node law to
 change). The grid says the rest: all seven `inflo-length-x-angle` cells CLEAR (verdict `clears`,
-#355 closed on the grid that found it **[Oct 5 docs sweep: its CELLS cleared; GitHub issue #355 is still OPEN as of Oct 5, awaiting Eva's ruling]**), three re-record WORSE and fifteen new cells land under
+#355 — the top floret through the terminal head — answered on the grid that found it), three re-record WORSE and fifteen new cells land under
 the bar, every one an edge crossing by the tighter internode;
 `inflo-leaf-nodes-x-leafangle`'s 52 mm base went INERT (both counts collapse to the pitch floor
 under the deeper inset — CG1 refused the axis, correctly) and moved to the 120 mm rachis.
@@ -4214,7 +4214,7 @@ nobody asked for. The reference has a different owner from the quantity (the fou
 rule): the refusal is read off the APP's own read-out, the count is cross-checked against the
 BUILDER's tally through `__bloomMetrics()`, and neither the budget nor the count is restated
 in the harness. `EXPORT_REFUSED_XFAIL` carries one entry, one row, one number, the
-`SELF_INTERSECTION_XFAIL` shape; like that list it does not gate MAGNITUDE **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]**, and for the same
+`SELF_INTERSECTION_XFAIL` shape; like that list it does not gate MAGNITUDE **[Oct 5 docs sweep: #246 answered #213 (the list gating magnitude): X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]**, and for the same
 reason. **THE THREE OBVIOUS ANSWERS WERE ALL REFUSED AND EACH IS WORTH NOT RE-PROPOSING:**
 raising the budget is a guard tuned to the thing it guards against (and 115 MiB is a file no
 slicer opens); trimming `ALL MAX` makes a row stop meaning its own label, when "everything at
@@ -4407,7 +4407,7 @@ on every ring of every row, 0 violations over the matrix), replaced by the two r
 no spacing can fix it; the algebra reverses past a right angle) and **SEAM CLAMPED (5 rows** —
 the blade is SHORTER than the fold it must clear, the worst asking 9.0840x its own length,
 told in the read-out and asserted as a biconditional). **Whether the tilt control should reach
-past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** **[Oct 5 docs sweep: #213 was CLOSED by #246: X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]** — a
+past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** **[Oct 5 docs sweep: #246 answered #213 (the list gating magnitude): X1 now holds every declared self-intersection row to its pair count exactly and its worst span within ±5e-5 mm, and XR1 holds the refused row's triangle count exactly (the xfail-magnitudes block near the top of this file). True when written; #302 item 6]** — a
 declared row whose count doubles passes silently, which is how those 15 landed without a red;
 recorded as issue #213, not built. Every tag is DERIVED per row from the builder's own ladder
 records rather than written by hand, and CLEFT (9 rows) is the third class.

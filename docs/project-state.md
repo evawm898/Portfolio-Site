@@ -150,8 +150,8 @@ a counted call-site total.
 **Alive:** #217 (bloom session 41, lobe-shape law) — a different, currently-running session
 owns it, with your standing ruling to squash-merge once bloom CI is green. Not touched here.
 
-**[Oct 5 docs sweep: of the six below only #111 is still open; #41, #64, #71, #78 and #110 have
-since merged or closed. The list is kept as the record of the day it was written. #302 item 25]**
+**[Oct 5 docs sweep: the list is the record of the day it was written; whether each PR is still
+open is GitHub's to say, not this file's. #302 item 25]**
 
 **Dormant, yours to close or revive** — all `state=open`, zero activity in 12–24+ days, every
 base 100+ commits behind main, each one's auto-watch long expired:
