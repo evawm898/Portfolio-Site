@@ -752,4 +752,20 @@ to compare) and the merge is where the vacuity is judged.
 
 ## 19. Gates on the final tree
 
-__GATES__
+All run on this box on the tree as pushed, each after its last code change (the sweep rewrite
+§12f, the NV4 bound and the two declarations §12g, the combination re-record §12e):
+
+- **Byte partition** — §18: PASS, 75/75 movers moved, 0 floats on 1035 holders, 1,293,722,028 export floats.
+- **Export gate**, the 23 inflorescence and Phase B rows (`--only`): 23/23 reached the results, watertight,
+  X1 at recorded magnitudes (20 in one run, the three the first run dropped re-run after §12g: PASS 3/3).
+- **Smoke subset, both gates, without `ALL MAX`** (CI's on this box — it exceeds the 30 s settle on the
+  base tree too): export **158/158** watertight (35 declared X1 rows at magnitude), connectedness
+  **158/158** one piece. Census `--check`: 159 rows over 45 blocks, 142 families both ways.
+- **Combination gate**: 513 cells, 145 under the bar, 145 declared, CG0–CG7 clean; `--control` every
+  clause fired on a plant that names it.
+- **Defaults bar** (`verify-bloom-defaults-bar.mjs`): PASS, 8 shipped states; its `--control` plants fire.
+- **Panel gate**: PASS; `--negative-control` 12,167 breaks caught, all twenty-one routes observing.
+- **Mutants** — §15c: the eight new and the twelve pre-existing inflorescence mutants, each firing its
+  family; the two floor mutants re-run on the rewritten sweep and the memo mutant on the bounded NV4.
+- **Not run locally, CI's**: the full 1110-row matrix on both STL gates (eight shards), the frozen sweep,
+  the arc-stability witness, the stem-channel and stem-nodes witnesses in preflight.
