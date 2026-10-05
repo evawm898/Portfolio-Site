@@ -536,5 +536,6 @@ ladder's own values now sit between the two words). It wants `station ladder [` 
 on `[0, 50, 100]` against the cut ladder `[0, 95.174, 100]`. Must-fail re-run: baseline silent,
 17 plants, every arm by its own message, exit 0. The preflight steps after it were run locally
 (`infill-budget`, both decoupled tools, `surface-offstation`, `rim-arc`, `infill-conform`,
-`infill-metric`, `edge-profile`, the apex anchors, and `verify-bloom-stem-cut` since the
-harness moved): all green. No geometry moved; nothing is re-measured.
+`infill-metric`, the apex anchors, and `verify-bloom-stem-cut` since the harness moved):
+all green; `edge-profile` was still running locally at push time and is CI's to confirm — it
+does not reach `stemNodeClauses`. No geometry moved; nothing is re-measured.
