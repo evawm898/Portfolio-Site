@@ -510,7 +510,8 @@ double), and **measured** on thirteen rows in both modes against the pre-change 
 whole plan serialised: floor, bound, `sameNodeMayTouch`, node depths and `at.where` equal under
 `Object.is` — `where` is recovered for the one winning pair by the first form's own scan, which
 also throws if the two forms ever disagree. Plan time: the whorled spike **41 → 2.1 s**, `ALL
-MAX at 35` **214 → 10 s**, the budget corner 16 s, `INFLO: ALL MAX` 16 s; on the live page the
+MAX at 35` **213 → 10 s**, the budget corner **522 → 16 s**, `INFLO: ALL MAX` **518 → 16 s** (the two
+that never settled on the page at all); on the live page the
 five heaviest rows settle in **2.4 / 7.8 / 11.7 / 8.4 / 11.6 s**. What is left is the dilation
 itself (15 s of the budget corner's 16 in Node) and, on the node-variance corner, the
 twenty-four distinct units Phase B builds per mode (13 s of `tipLaw`), which is that feature's
