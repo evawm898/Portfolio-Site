@@ -2293,3 +2293,60 @@ candidates are appended to `bug-wing-library.js` as #18–#57 with the audit's o
 the audit's — refitted at the library's root convention, with the fixes above. #1–#17 are
 unchanged. LB1 now restates the 55 kept ids in order.
 
+
+
+## 14. Wing angles — each preset carries the angle it was found at
+
+Eva's brief (Oct 5): presets carry their own wing angle, the library knows when two presets are
+the same wing shape at different angles, and applying a preset sets the angle it was found at.
+Eva calls it "tilt"; it is an in-plane angle about the hinge, seen from above — **not** the
+pair's `sweep` field (which stays 0, §13.3 #2), and never dihedral or pitch.
+
+### 14.1 The convention (one for every wing)
+
+In TRUE planform — (u, w × stretch), units of the wing's own length, so the measure is isotropic —
+the wing's AXIS runs from the hinge (0, 0) to the arc-length centroid of the drawn outline
+**beyond the root bridge** (r > `WING_ANGLE_RAMP[1]` = 0.3 lengths; the tail group is not part of
+it). The angle is that axis's angle from the span direction (+u, square to the body),
+**positive backward** — the sweep field's sign. `wingAngleOf` is its one owner. A farthest-point
+axis was built first and dropped: #4 and #22, near-identical wings, read 8° apart because their
+farthest points sat on different lobes; the centroid reads them 2.4° apart, which the
+angle-free alignment confirms (2.7°).
+
+### 14.2 Store and apply — the builder learns nothing (§13.6 not repeated)
+
+Each library wing is stored at ANGLE 0 (`points`: its outline turned onto its own axis, 9
+decimals) with the angle it was found at (`sweep`, degrees) and the RANGE its control allows
+(`range`, offsets from that angle, measured — §14.4). Applying (`posedWing` →
+`rotateWingBlade`) regenerates an ORDINARY outline: each control point turns by
+deg × ramp(r), r its distance from the hinge — 0 inside `WING_ANGLE_RAMP[0]` (0.06; the root
+anchors on u = 0 stay where they are, the root chord square to the body), 1 beyond 0.3 (the
+blade turns rigidly), a smoothstep between (the root bridge, tangent-continuous at both ends).
+A turn about the hinge keeps r, so turns add exactly; a stretch too small for the turned
+outline is raised (the true shape unchanged); the tail turns with the blade and is re-anchored
+on the turned margin, its offsets re-read in the new anchor's frame. `buildBug`,
+`editorFrame` and every root construction are untouched: the engine only sees outlines.
+
+**Why not the fitter's root completion (`completeChain`) literally**: completion bridges a dense
+chain and is then re-FITTED to control points at a 0.6 mm tolerance, so it cannot reproduce
+today's outline at the found angle within 0.05 mm, and a turn of 0.5° would jump by the fit's
+own error. The ramp is the same construction on the control points — a root on u = 0 square to
+the body, joined tangent-continuously to the turned blade — and it is the identity at 0°.
+
+**At each preset's own angle the bug is #361's to the bit**: posing the 9-decimal canonical
+outline rounds back to the 5-decimal points it came from. WA1 measures it in world mm through
+`editorFrame` against `tools/bug-wing-library-snapshot.json` (#361's data, applied by the old
+rule restated in the gate): worst **0.00 mm** over 55 shapes × both pairs (bar 0.05 mm).
+On the way: #16's tail first landed 0.59 mm off with 5-decimal canonicals — its anchor sits
+exactly on a control point's u, where a 1e-5 nudge swings the tail frame's tangent window by
+2.6°.
+
+### 14.3 The page
+
+A per-pair **Wing angle** slider in the pair block (first, last, and unlinked middle pairs; a
+linked middle blends). Its value is the outline's own measured angle; it runs the wing's
+measured range about the angle the wing was FOUND at (a library shape), or ±20° about the angle
+it was loaded at (anything else — unmeasured, said in the tooltip); setting it calls
+`setWingAngle` (turn, then two small corrections: the spline is drawn in (u, w), so a turn in
+true planform is not exactly a turned curve when the stretch is not 1 — lands within 0.01°). A
+turn the outline rule refuses is told and not made. Undoable.
