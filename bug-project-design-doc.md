@@ -2455,6 +2455,16 @@ refused), and reversing the library's order. For non-vacuity, removing the shape
 must change that row (3 rows). The negative control restores a position-keyed pick (`the draw picks
 by library POSITION again`) and LB7 catches it.
 
+**Cost.** LB7's first version rebuilt about 200 bugs, and the negative control ran it inside every
+library mutant. The PR's first CI run then hit `bug-gate`'s 30-minute timeout: the negative
+control took 16.3 min against `main`'s 9.4, and the gate was cut off.
+
+Two changes fixed it, with no workflow edit:
+- `randomWingBlend` takes an optional `problem` hook, and LB7 passes `wingShapeProblem` cached
+  on the candidate params. The draws under test are unchanged, and a library variant reuses the
+  verdicts the full library's run already reached. LB7 costs 13.5 s.
+- The negative control runs LB7 only on the clean module and on the mutant that names it.
+
 ### 15.2 The floor measure: one definition, and the builder refuses the root
 
 **The case.** random:3's body with blend #20/#31 at 0.62, three pairs (now fixed as data,

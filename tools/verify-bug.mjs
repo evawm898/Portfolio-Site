@@ -1619,11 +1619,12 @@ if (NEG) {
     let k = 0;
     for (const [name, from, to, clause] of [...LIBRARY_MUTANTS, ...ANGLE_MUTANTS]) {
       if (src.split(from).length - 1 !== 1) continue;
+      const lbOpts = { lb7: clause === 'LB7' };   // LB7 only where it is the clause named (cost; see libraryChecks)
       const file = path.join(ROOT, `.bug-geometry.mutant-${process.pid}-${k++}.mjs`);
       fs.writeFileSync(file, src.replace(from, to));
       let fails = [];
       try { const M = await import(pathToFileURL(file).href); const run = (f) => { try { return f(M).filter(([c]) => !c).map(([, m]) => m); } catch (e) { return [`(threw) ${e.message}`]; } };
-        fails = [...run(libraryChecks), ...run(angleChecks)]; }
+        fails = [...run((X) => libraryChecks(X, lbOpts)), ...run(angleChecks)]; }
       catch (e) { fails = [`(threw) ${e.message}`]; }
       finally { fs.unlinkSync(file); }
       const fired = fails.some((f) => f.startsWith(clause + ':'));
@@ -1632,7 +1633,7 @@ if (NEG) {
     }
     // a library shape whose forewing crosses itself (two interior points swapped)
     const lib = JSON.parse(JSON.stringify(G.WING_LIBRARY)), f = lib[4].fore.points; [f[3], f[f.length - 4]] = [f[f.length - 4], f[3]];
-    const fails = libraryChecks({ ...G, WING_LIBRARY: lib }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
+    const fails = libraryChecks({ ...G, WING_LIBRARY: lib }, { lb7: false }).filter(([c]) => !c).map(([, m]) => m), fired = fails.some((x) => x.startsWith('LB1:'));
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${'a library shape crosses itself'.padEnd(32)} by LB1  — ${fails.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
     if (!fired) ok = false;
     // the stored wing angles ZEROED (a library that forgot where its wings were found)

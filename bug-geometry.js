@@ -1005,7 +1005,7 @@ export function randomWingBlend(params, seed, opts = {}) {
     const t = +(BLEND_T_RANGE[0] + (BLEND_T_RANGE[1] - BLEND_T_RANGE[0]) * drawHash(seed, k, 3)).toFixed(2);
     const i = lib.indexOf(A), j = lib.indexOf(B);
     const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], t));
-    const why = q.wingPairs > 0 ? wingShapeProblem(q) : null;
+    const why = q.wingPairs > 0 ? (opts.problem || wingShapeProblem)(q) : null;   // opts.problem: the gate's cache of the same verdict (LB7)
     if (!why) return { params: q, blend: { a: lib[i].id, b: lib[j].id, t, tries: k + 1, refused }, label: `blend of #${lib[i].id} and #${lib[j].id} at ${t.toFixed(2)}` };
     refused.push({ a: lib[i].id, b: lib[j].id, t, why });
   }
