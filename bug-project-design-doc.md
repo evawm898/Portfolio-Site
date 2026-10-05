@@ -2500,10 +2500,19 @@ distances along u stretch by √(1 + (w a′)²). This long hindwing reaches 26 
 chord. There, a′ ≈ 0.0058 rad/mm gives +1.1%, so the emitted bead really is wider than a
 half-round in the world.
 
-**The fix.** On a pitched wing, the builder sizes each bead by its WORLD chord: the distance from
-the skin point to the apex on the mid-surface, through the same `W` that emits the bead. The skin
-point steps back toward the apex until that chord is round × the half-thickness. Pitch 0 is a
-rigid transform and is untouched by branch, so the default bug and every unpitched wing are
+**The fix.** On a pitched wing, the bead's planform radius is round × h divided by an UPPER
+BOUND on the stretch over its whole reach: √(1 + (a′ (|w| + round·h))²). The world chord from the
+skin point to the apex is never longer than the planform segment's length in the world metric, and
+that length is at most this bound times the planform radius. So the world chord is at most
+round × h, and a bead whose radius runs along w comes out slightly under a half-round (by ≤ 1%).
+The radius is decided BEFORE the inset (`aRound`) and in the existing concavity step after
+subdivision, through one function (`radius`), so the inset's own flip guards apply.
+
+**A per-point world-chord step-back AFTER the inset was built first and reverted.** It moved skin
+points by at most 4 µm, each along its own direction. On the #20/#31 fixture that flipped one
+near-collinear sliver at the margin (cross product −2.4e-7, E6) and left a 0.51 mm contour
+hairline (S). The full gate found it; no clause on the bead alone could have. Pitch 0 is a rigid
+transform: the factor is not formed, so the default bug and every unpitched wing are
 byte-identical.
 
 **Verification.**

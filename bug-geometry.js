@@ -2242,7 +2242,26 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // up through the root's fillet folded there)
   const r0 = rootW ? Math.max(0, rootW.ub - ROUND_ROOT_RAMP_MM) : 0;
   const wantRound = (P) => P[0] > r0 + 1e-9;
-  const aRound = (q, P) => round * edge.h(q[0], q[1]) * clamp((P[0] - r0) / ROUND_ROOT_RAMP_MM, 0, 1);
+  /* A PITCHED wing is a helicoid: the transform turns each span station by its
+     own angle (a' = pitch / span per mm, 0 < u < span), and the mid-surface's
+     metric is diag(1 + (w a')^2, 1) — planform lengths along u stretch by up to
+     sqrt(1 + (w a')^2) in the world. A bead exactly half-round in the planform
+     was up to 1.12% wider than half-round in the WORLD far from the hinge chord
+     (design doc §15.3: a long blended hindwing at 7 degrees, w ~ 26 mm). So the
+     bead's planform radius is round x h divided by an UPPER BOUND on that
+     stretch over its whole reach (|w| plus the radius itself): the world chord
+     from the skin point to the apex — never longer than the planform segment's
+     length in the world metric — is then at most round x h. A per-point step
+     back AFTER the inset was tried first and flipped a near-collinear sliver
+     (E6, a 0.51 mm contour hairline, S); sized here, the inset's own guards
+     apply. Pitch 0 is a rigid transform: the factor is exactly 1, by branch. */
+  const kPitch = spec.pitch ? Math.abs((spec.pitch * D2R) / span) : 0;
+  const radius = (x, y) => {
+    const h = round * edge.h(x, y);
+    if (!kPitch || x - h >= span) return h;
+    return h / Math.sqrt(1 + (kPitch * (Math.abs(y) + h)) ** 2);
+  };
+  const aRound = (q, P) => radius(q[0], q[1]) * clamp((P[0] - r0) / ROUND_ROOT_RAMP_MM, 0, 1);
   let tri, pts, apex = null, movedOf = null, roundReduced = 0;
   if (plan && mode === 'holes') {
     // ONE conforming triangulation: every cut cell is a ring of quads between
@@ -2279,34 +2298,14 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // concave stretch can be a hair smaller: there the skin edge steps back
   // toward the apex until the radius is round x the half-thickness again, so
   // no bead is ever more than a half-round (measured up to 0.12% before)
-  //
-  // A PITCHED wing is a helicoid: the transform turns each span station by its
-  // own angle, so it stretches planform distances along u by sqrt(1 + (w a')^2)
-  // (a' the pitch per mm of span) — a bead exactly half-round in the planform
-  // is up to 1.1% wider than half-round in the WORLD far from the hinge chord
-  // (design doc §15.3: a long blended hindwing at 7 degrees, w ~ 26 mm). So on a
-  // pitched wing the radius is the WORLD chord from the skin point to the apex
-  // on the mid-surface (the same W that emits the bead), stepped back until it
-  // is round x the half-thickness. Pitch 0 is a rigid transform: untouched.
-  const pitched = !!spec.pitch;
-  const chord = (P, A) => { const a3 = W(A[0], A[1], 0), p3 = W(P[0], P[1], 0); return Math.hypot(a3[0] - p3[0], a3[1] - p3[1], a3[2] - p3[2]); };
   if (apex) for (let i = 0; i < pts.length; i++) {
     const A = apex[i]; if (!A) continue;
     const dx = A[0] - pts[i][0], dy = A[1] - pts[i][1], a = Math.hypot(dx, dy);
     if (!(a > 0)) continue;
-    const at = (b) => [A[0] - (dx / a) * b, A[1] - (dy / a) * b];
-    let b = Math.min(a, round * edge.h(pts[i][0], pts[i][1]));
-    let moved = b < a;
-    if (moved) for (let it = 0; it < 12; it++) b = Math.min(a, round * edge.h(...at(b)));
-    if (pitched) {
-      for (let it = 0; it < 12; it++) {
-        const P = at(b), c = chord(P, A), want = round * edge.h(P[0], P[1]);
-        if (!(c > want)) break;
-        b = b * (want / c) * (1 - 1e-12); moved = true;
-      }
-    }
-    if (!moved) continue;
-    pts[i] = at(b);
+    let b = Math.min(a, radius(pts[i][0], pts[i][1]));
+    if (b >= a) continue;
+    for (let it = 0; it < 12; it++) b = Math.min(a, radius(A[0] - (dx / a) * b, A[1] - (dy / a) * b));
+    pts[i] = [A[0] - (dx / a) * b, A[1] - (dy / a) * b];
   }
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
   const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part, apex);

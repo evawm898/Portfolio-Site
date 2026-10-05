@@ -1656,7 +1656,7 @@ if (NEG) {
   if (0) {`;
     const ROW_MUTANTS = [
       ['the disc test reads a pixel distance again', '  const core = new Uint8Array(nx * ny);\n  const r2 = (r / h) ** 2;\n  {', OLD_CORE, 'N', rootUnderFloor, { expectThin: true }],
-      ['a pitched bead is sized in the planform', 'const pitched = !!spec.pitch;', 'const pitched = false;', 'E1', pitchedBeadHoles, {}],
+      ['a pitched bead is sized in the planform', 'const kPitch = spec.pitch ? Math.abs((spec.pitch * D2R) / span) : 0;', 'const kPitch = 0;', 'E1', pitchedBeadHoles, {}],
     ];
     for (const [name, from] of ROW_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
     for (const [name, , , , fx, opts] of ROW_MUTANTS) { const r = check(`${name} (clean)`, G.buildBug(fx()), opts); console.log(fmt(r)); for (const x of r.fails) console.log('     ' + x); if (r.fails.length) ok = false; }
