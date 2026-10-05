@@ -786,5 +786,10 @@ All run on this box on the tree as pushed, each after its last code change (the 
 - **Panel gate**: PASS; `--negative-control` 12,167 breaks caught, all twenty-one routes observing.
 - **Mutants** — §15c: the eight new and the twelve pre-existing inflorescence mutants, each firing its
   family; the two floor mutants re-run on the rewritten sweep and the memo mutant on the bounded NV4.
+- **On the merged tree** (§17a): defaults bar PASS; `verify-bloom-stem-cut.mjs` must-fail OK; combination gate
+  513 cells / 145 declared, clean; export gate on the 23 rows plus `STEM CUT: x the RACEME` and `STEM CUT:
+  the widest stem` **25/25** watertight, X1 at magnitude; smoke census 164 rows / 46 blocks / 146 families;
+  the memo and floor mutants with the whole table's anchor pre-check (every anchor matching once on the
+  merged tree), both firing.
 - **Not run locally, CI's**: the full 1110-row matrix on both STL gates (eight shards), the frozen sweep,
   the arc-stability witness, the stem-channel and stem-nodes witnesses in preflight.
