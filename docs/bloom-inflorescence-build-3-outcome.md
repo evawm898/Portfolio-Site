@@ -601,8 +601,13 @@ states: the default head, the raceme, the shared-node raceme, the leaves, the in
 sepals, the stem with nodes, the tube. **PASS in 29 s; `--control` plants three must-fails
 (a row under the bar, a stale anchor, a measure removed) and all three fire** — the first
 names the shared-node row as collateral it is allowed to redden (the leaf blade's 0.876 mm
-is also measured through that same state). It rides in `bloom-export-watertight.yml` after
-the combination gate, Node only, before the browser. **The standing rule is in CLAUDE.md:
+is also measured through that same state). It rides in `bloom-export-watertight.yml`
+AFTER THE npm INSTALL and before the browser, beside the infill-budget gate, Node only —
+not beside the combination gate, where it was first placed: it imports `buildMatrix` from
+the harness, which imports `playwright-core` at module load, and the first CI run on the
+merged tree (`45003cd`, preflight) died on `ERR_MODULE_NOT_FOUND` there, red for a reason
+that had nothing to do with the bar (ST9's own placement rule, re-learned; local runs had
+the package installed and could not see it). **The standing rule is in CLAUDE.md:
 adding a guarded feature adds its ruled-default row here, and a default that goes under
 the bar reddens CI rather than waiting for someone to go looking.**
 
