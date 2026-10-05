@@ -439,6 +439,9 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     /* BUILD 2: the FORM field, for the same reason — this census re-emits the
        petals, so a walk without it re-emits every slot at its ring's form. */
     const formField = mod.formVarianceField(ui, fr);
+    /* BUILD 3: the SPACING field — it moves WHERE each slot stands, so a walk
+       without it re-emits every petal at its nominal azimuth. */
+    const spacingField = mod.spacingVarianceField(ui, fr);
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
     const near = (a, b, tol) => Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
     const omittedHere = new Set((builtFull.stemOmission && builtFull.stemOmission.omitted) || []);
@@ -451,7 +454,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         angleRamp: (i) => fr.rings[i].tiltExtra,
         phase: fr.rings[0].phase,
         placement: ui.placement,
-        sizeField, formField,
+        sizeField, formField, spacingField,
         blade: (slot) => {
           /* A SLOT THE STEM CHANNEL DID NOT BUILD IS NOT PART OF THE
              ORCHESTRATION (the sphere-stem session). R1 exists because this
@@ -479,7 +482,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         mod.buildWhorlInto({
           count: fr.slotCount, radius: ring.radius, height: 0,
           sizeRamp: () => ring.scale, angleRamp: () => ring.tiltExtra, phase: ring.phase,
-          placement: ui.placement, fan: fr.fan, sizeField, formField,
+          placement: ui.placement, fan: fr.fan, sizeField, formField, spacingField,
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];

@@ -260,6 +260,14 @@ const PREDICATE_MOVERS = {
     return !!(sp.present && sp.cut && sp.cut.made);
   },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
+  /* ORGANIC VARIANCE, BUILD 3 (spacing). A row moves iff the SPACING field
+     exists on this tree — the geometry's own `varianceSpacingIsAbsent`, the
+     guard, never a label. Every other row, the size and form rows and every
+     row of the blanket sweep with the amount at 0 included, must hold to the
+     bit: that is the amount-0 byte-inertness claim, measured. The base tree
+     does not know `varianceSpacing`, so a mover builds there at nominal
+     azimuths. */
+  'variance-spacing': (st) => !mine.varianceSpacingIsAbsent(st),
   /* FORM VARIANCE HEADROOM (the build-2 follow-up — docs/bloom-organic-
      variance-form-outcome.md §19). The law changed only where a petal's
      slot term meets a side with LESS room than the half-span, so a row moves

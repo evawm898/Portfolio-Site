@@ -132,7 +132,12 @@ function amountsFor(field) {
   if (field === 'size') return [[0, 0], [sz / 2, 0], [sz, 0]];
   if (field === 'form') { if (fm == null) throw new Error('--field form: this tree has no form variance'); return [[0, 0], [0, fm / 2], [0, fm]]; }
   if (field === 'both') { if (fm == null) throw new Error('--field both: this tree has no form variance'); return [[0, 0], [sz, fm]]; }
-  throw new Error(`--field ${field}: size | form | both`);
+  /* BUILD 3: the spacing amount (third element), alone at half and at the
+     ruled maximum, and all three amounts at their limits together. */
+  const sp = G.VARIANCE_SPACING_RANGE ? G.VARIANCE_SPACING_RANGE[1] : null;
+  if (field === 'spacing') { if (sp == null) throw new Error('--field spacing: this tree has no spacing variance'); return [[0, 0, 0], [0, 0, sp / 2], [0, 0, sp]]; }
+  if (field === 'all') { if (sp == null || fm == null) throw new Error('--field all: this tree lacks a field'); return [[0, 0, 0], [sz, fm, sp]]; }
+  throw new Error(`--field ${field}: size | form | both | spacing | all`);
 }
 
 function run() {
@@ -143,20 +148,21 @@ function run() {
   const rows = [];
   for (const [bi, set] of BASES.entries()) {
     if (only && !only.has(bi)) continue;
-    for (const exportMode of (LIVE ? [true, false] : [true])) for (const [aS, aF] of amountsFor(FIELD)) {
-      const on = aS > 0 || aF > 0;
-      if (AMOUNTS && !AMOUNTS.split(',').map(Number).includes(aS + aF)) continue;
+    for (const exportMode of (LIVE ? [true, false] : [true])) for (const [aS, aF, aP = 0] of amountsFor(FIELD)) {
+      const on = aS > 0 || aF > 0 || aP > 0;
+      if (AMOUNTS && !AMOUNTS.split(',').map(Number).includes(aS + aF + aP)) continue;
       for (const f of (on ? [1, 20] : [1])) for (const ph of (on ? [0, 90] : [0])) {
         if (SETTINGS_ONLY && on && !SETTINGS_ONLY.split(',').includes(`${f}:${ph}`)) continue;
         const state = { ...DEFAULTS, ...set, varianceSize: aS, varianceFrequency: f, variancePhase: ph };
         if ('varianceForm' in DEFAULTS) state.varianceForm = aF;
+        if ('varianceSpacing' in DEFAULTS) state.varianceSpacing = aP;
         const acc = new G.MeshBuilder({ exportMode });
         const built = G.buildBloomInto(acc, state);
         const fac = built.variance?.factors?.flat?.() ?? [];
         const deltas = built.formVariance?.deltas ?? [];
         const c6 = components(acc.positions, 0.6);
         const c3 = c6 > 1 ? components(acc.positions, 0.3) : c6;
-        const r = { base: bi, set: JSON.stringify(set), mode: exportMode ? 'export' : 'live', size: aS, form: aF, f, ph, tris: acc.triangleCount, c6, c3,
+        const r = { base: bi, set: JSON.stringify(set), mode: exportMode ? 'export' : 'live', size: aS, form: aF, spacing: aP, pitch: built.neighbour && built.neighbour.pitch ? built.neighbour.pitch.ratio : null, f, ph, tris: acc.triangleCount, c6, c3,
           minFactor: fac.length ? Math.min(...fac) : null,
           maxCurlDelta: deltas.length ? Math.max(...deltas.map((d) => Math.abs(d.petalSpineCurl ?? 0))) : null };
         rows.push(r);
@@ -166,7 +172,7 @@ function run() {
   }
   if (AMOUNTS || SETTINGS_ONLY || ONLY) console.log(`\nA SUBSET (--only ${ONLY ?? 'all'} --amounts ${AMOUNTS ?? 'all'} --settings ${SETTINGS_ONLY ?? 'all'}) — not a sweep`);
   const off = rows.filter((r) => r.c3 !== 1);
-  const withField = rows.filter((r) => r.size > 0 || r.form > 0);
+  const withField = rows.filter((r) => r.size > 0 || r.form > 0 || r.spacing > 0);
   const byBase = new Map(); for (const r of rows) (byBase.get(r.base) ?? byBase.set(r.base, []).get(r.base)).push(r);
   const trisMove = [...byBase.values()].filter((v) => new Set(v.filter((r) => r.mode === 'export').map((r) => r.tris)).size > 1).length;
   console.log(`\n${rows.length} builds (${withField.length} with the field on); NOT one piece at 0.6 mm: ${rows.filter((r) => r.c6 !== 1).length}; after the 0.3 mm re-read: ${off.length}`);

@@ -297,6 +297,23 @@ function formFacts(M, over = {}) {
   } catch (e) { return { threw: e.message }; }
 }
 const formPair = (M, C, over = {}) => [formFacts(M, over), formFacts(C, over)];
+/* THE SPACING FIELD'S FACTS (build 3): the azimuths the whorl primitive
+   EMITTED on a build of the MUTATED module, the record, and the cyclic order —
+   never the SV clause the mutant names. */
+function spacingFacts(M, over = {}) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, varianceSpacing: 0.9, varianceFrequency: 1, variancePhase: 0, ...over };
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, st);
+    const az = b.slotAzimuths[0].slice();
+    const TAU = 2 * Math.PI, wrap = (x) => ((x % TAU) + TAU) % TAU;
+    const order = [...az.keys()].sort((p, q) => wrap(az[p]) - wrap(az[q]));
+    const k = order.indexOf(0);
+    const ordered = order.every((_, t) => order[(k + t) % order.length] === t);
+    return { az, record: b.spacingVariance ?? null, absent: M.varianceSpacingIsAbsent(st), ordered, n: az.length };
+  } catch (e) { return { threw: e.message }; }
+}
+const spacingPair = (M, C, over = {}) => [spacingFacts(M, over), spacingFacts(C, over)];
 const infloPair = (M, C, over = {}) => [infloFacts(M, over), infloFacts(C, over)];
 const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw || c.threw}` : null;
 
@@ -1064,7 +1081,7 @@ const MUTANTS = [
   { id: 'aliasing-is-never-told',
     why: "ruling 4's flag is deleted: a wave above n/2 aliases into scatter and the record says nothing, so the read-out's ALIASED clause never prints and the frequency slider silently draws noise past the bar — no byte differs from the honest tree, and VS4 is the only witness",
     find: '  const aliased = frequency > 0 && frequency > nyquist;',
-    into: '  const aliased = false;', names: ['VS4', 'FV4'],
+    into: '  const aliased = false;', names: ['VS4', 'FV4', 'SV4'],
     witness: (M, C) => {
       const [m, c] = varPair(M, C, { varianceFrequency: 20 });
       const t = bothBuilt(m, c); if (t) return t;
@@ -1161,6 +1178,30 @@ const MUTANTS = [
       let diff = 0;
       for (let i = 0; i < m.petals.length; i++) if (m.petals[i].curl !== c.petals[i].curl) diff++;
       return diff > 0 ? null : `every petal's composed curl agrees on the mutant and the clean tree (${m.petals.length} petals) — the unclamped room moved nothing`;
+    } },
+  /* ORGANIC VARIANCE, BUILD 3 — THE SPACING FIELD. The two STANDING mutants
+     Eva asked for, each witnessed on the MUTATED module's own emitted
+     azimuths. The per-clause must-fail is tools/verify-bloom-spacing.mjs. */
+  { id: 'spacing-amount-0-is-not-the-identity',
+    why: "THE STANDING MUTANT FOR THE SPACING GUARD: at amount 0 the field returns a record with a hair of amplitude instead of null, so every slot's azimuth is mapped through the pitch law at A 1e-9 and moves by up to ~1e-9 rad — invisible to the eye, the census, both STL gates and the triangle count, and the '0 moved' partition becomes false; SV1's amount-0 arm is the witness",
+    find: '  if (varianceSpacingIsAbsent(state)) return null;\n  const amount = Number(state.varianceSpacing);',
+    into: '  const amount = varianceSpacingIsAbsent(state) ? 1e-9 : Number(state.varianceSpacing);', names: ['SV1'],
+    witness: (M, C) => {
+      const [m, c] = spacingPair(M, C, { varianceSpacing: 0 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const moved = m.az.some((a, i) => a !== c.az[i]);
+      return (moved && m.record !== null && c.record === null) ? null
+        : `at amount 0 the mutant ${m.record ? 'reports a record' : 'reports no record'} and ${moved ? 'moved' : 'did not move'} an azimuth against the clean tree (${c.record ? 'a record' : 'no record'}) — the identity did not break`;
+    } },
+  { id: 'spacing-is-a-direct-azimuth-offset',
+    why: "THE LAW'S OWN WITNESS AGAINST THE CIRCULAR VERSION Eva ruled out: each slot is moved by A g times its nominal pitch (a direct offset on the azimuth) instead of standing at the pitch law's integral. It exports watertight, one piece, at an identical triangle count; on the shipping whorl the petals simply stand elsewhere (SV2), and past n/2 neighbours swap order — the crossing the pitch law makes impossible (SV3)",
+    find: '    map = (az) => az + (amount / f) * Math.sin(f * az + phi);',
+    into: '    map = (az) => az + amount * Math.cos(f * az + phi) * (TAU / w.n);', names: ['SV2', 'SV3'],
+    witness: (M, C) => {
+      const [m, c] = spacingPair(M, C, { varianceFrequency: 5 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (!m.ordered && c.ordered && m.az.some((a, i) => a !== c.az[i])) ? null
+        : `at 5 cycles on 8 slots the mutant's order is ${m.ordered ? 'KEPT' : 'broken'} and the clean tree's ${c.ordered ? 'kept' : 'BROKEN'} — the direct offset did not cross`;
     } },
   { id: 'form-guard-moves-off-zero',
     why: "the geometry's form guard becomes `amount > 0.1` while the registry's `varianceFormPresent` still says `> 0`: between 0.01 and 0.10 the shared frequency and phase are SHOWN and the form is INERT — PP7's, JS0's and VS0's defect in the form family; the load-time twin check runs on the unmutated Node import, so FV0 through the page is the only witness",
@@ -1316,7 +1357,7 @@ const MUTANTS = [
     } },
   { id: 'the-floret-phase-is-the-heads',
     why: "`floretPhaseDeg` returns null for every floret, so each one keeps the HEAD's `variancePhase` — the world-fixed frame the Oct 3 ruling forbids: every floret's field crest sits on the same world side whatever node it hangs from. Watertight, one piece, the same counts. NV2 re-derives the outward phase from each placement's own matrix",
-    find: '  if (varianceIsAbsent(state) && varianceFormIsAbsent(state)) return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;',
+    find: '  if (varianceIsAbsent(state) && varianceFormIsAbsent(state) && varianceSpacingIsAbsent(state)) return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;',
     into: '  return null;\n  const a = Number(angleDeg);\n  if (a === 0) return null;', names: ['NV2'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C, { varianceForm: 0.5 });
@@ -2263,6 +2304,13 @@ const ROWS = [
     set: [{ id: 'varianceForm', value: '1' }, { id: 'varianceFrequency', value: '20' }] },
   { label: 'the form field on 3 whorls, curl 180 + innerCurl 360 (the ONE clamp)',
     set: [{ id: 'layerCount', value: '3' }, { id: 'petalSpineCurl', value: '180' }, { id: 'innerCurl', value: '360' }, { id: 'varianceForm', value: '1' }] },
+  /* THE SPACING FIELD (build 3): the ruled maximum at 1 cycle (SV2's law) and
+     the aliased wave (SV3's order — where a direct offset swaps neighbours).
+     The amount-0 arm is the shipping default's own row. */
+  { label: 'the spacing field: 0.9 at 1 cycle on the shipping whorl',
+    set: [{ id: 'varianceSpacing', value: '0.9' }] },
+  { label: 'the spacing field: 0.9 at 5 cycles on 8 slots (ALIASED — a direct offset crosses)',
+    set: [{ id: 'varianceSpacing', value: '0.9' }, { id: 'varianceFrequency', value: '5' }] },
   { label: 'the told flag on the continuous mum (40 x 3, amount 0 — the all-pairs approach between turns)',
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
   { label: 'a raceme, nothing clamped (5 nodes x 1, 5-petal florets on 20 mm pedicels at 35 deg)',
@@ -2370,7 +2418,7 @@ async function famsOn(rows) {
        first family whose subject is a per-SLOT quantity: every clause is
        silent on a bloom whose amount is 0, which is every other row here. */
     for (const msg of await varianceAssertions(page, row)) {
-      const mm = /^(VS\d+|FV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(VS\d+|FV\d+|SV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE APEX NIB (the apex-nib session) — the rule once more, and note the
        code is `AN\d+` and NOT `A\d+`: the A family's own capture above is
