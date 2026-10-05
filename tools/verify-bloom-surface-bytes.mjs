@@ -163,6 +163,79 @@ const PREDICATE_MOVERS = {
      the pin failing. */
   'nodes-bare': (st) => Number(st.stemLength) > 0 && Number(st.stemNodeProminence) !== 0
     && String(st.inflorescence ?? 'NONE') === 'NONE' && !(Number(st.leafLength) > 0),
+  /* INFLORESCENCE BUILD 3, PHASE A — THE REACH INSET AND THE 250 mm CEILING
+     (#355). A row moves iff the BASE tree's own raceme plan would be placed
+     differently under the new law: its inset (the pedicel's RISE, `L sin th`,
+     against the stem's own 0.16 L) is not what the floret's own emitted reach
+     asks (the base tree's own `floretUnitMemo` + `pedicelPlacement`, in both
+     modes, plus the gap and the head-floor term), or a pedicel asked past the
+     base tree's 120 mm ceiling was clamped there. Read ENTIRELY off the base
+     tree's builder and plan — the new law is restated here from pieces the
+     base tree already owns, never imported from this tree — so the
+     prediction's owner is not the quantity under test. Every row with no
+     raceme is a holder by the first line, which is the claim that nothing
+     outside the inflorescence moved. */
+  'inflo-reach': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    if (!ip.present) return false;
+    if (ip.lengthsClamped) return true;
+    const memo = base.floretUnitMemo(st, ip);
+    const sessile = ip.pedicelLenMm === 0;
+    let reach = -Infinity;
+    /* over every azimuth the phyllotaxy produces on any asked node (the
+       smoke subset's whorled finding — the minimal roll lands a different
+       petal up at each azimuth) */
+    const azs = [...new Set(Array.from({ length: Math.max(1, ip.nodesAsked) }, (_, i) => base.leafAzimuths(ip.phyllotaxy, i)).flat())];
+    for (const exportMode of [false, true]) {
+      const U = memo.get(ip.pedicelLenMm, exportMode);
+      const src = U.sub.positions;
+      for (const az of azs) {
+        const M = base.pedicelPlacement({ ...ip, rootZ: 0, nodeDepthsMm: [0] }, 0, az, U.tipZLocal, sessile).M;
+        for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > reach) reach = z; }
+      }
+    }
+    const floorZ = Math.min(sp.rootZ, Number.isFinite(sp.lowestHubZ) ? sp.lowestHubZ : sp.rootZ);
+    const G = 2 ** -16;   // INFLO_REACH_GRID_MM, restated (the base tree has no such constant)
+    const needed = Math.max(0, Math.ceil(reach / G) * G + (sp.rootZ - floorZ) + base.MIN_FEATURE_MM);
+    /* THE DEPTHS, NOT THE INSET: the node law is a function of the inset and
+       two rows the first cut mis-called were the proof — ONE node sits at the
+       flower's solo 0.55 L whatever the inset, and a raceme whose florets
+       cannot clear the head collapses to the same single node on both trees —
+       so a changed inset with unchanged depths is a HOLDER. */
+    const depths = base.leafNodeDepthsMm(ip.nodesAsked, sp.lengthMm, Math.max(ip.insetAskedMm, needed), 2 * ip.pedicelR);
+    return depths.length !== ip.nodeDepthsMm.length || depths.some((d, i) => !Object.is(d, ip.nodeDepthsMm[i]));
+  },
+  /* INFLORESCENCE BUILD 3, RULINGS 1-2 AND PHASE B (the derived internode
+     floor, the gradient cap, the per-node deltas). A row moves iff the raceme
+     is PLACED differently or a floret is BUILT differently: the BASE tree's
+     own plan and this tree's plan disagree on the node count, a node depth, a
+     pedicel length or the built gradient, or any node's azimuth carries a
+     non-null node term (`floretNodeOverrides` on this tree, which the base
+     tree does not have — the amount at 0 returns null by BRANCH, so every
+     row with `nodeVariance` 0 reads null and is a holder unless its placement
+     moved). STATED PLAINLY: the floor is a column-map bound over the floret's
+     own emitted triangles and cannot be restated from the base tree's pieces
+     in a line, so the PLAN side of this predicate is read off BOTH trees'
+     plans (the discrete decisions each declares) rather than rebuilt from the
+     base alone; what the partition then holds is the MESH against those
+     declarations — a row whose plan agrees on both trees and whose bytes
+     moved is a finding, and a row whose plan disagrees and whose bytes did not
+     is the vacuous mover the tool refuses. Every row with no raceme is a
+     holder by the first line, which is the claim that nothing outside the
+     inflorescence moved; the two GATED rows (`nodeVariance` with no raceme)
+     are holders by it too. */
+  'inflo-build3': (st) => {
+    const planOf = (M) => { const acc = new M.MeshBuilder({ exportMode: true }); const fr = M.footRing(st, acc); const sp = M.stemPlan(st, fr.hub, acc); return M.inflorescencePlan(st, sp, acc); };
+    const a = planOf(base), b = planOf(mine);
+    if (!a.present && !b.present) return false;
+    if (a.present !== b.present) return true;
+    const same = (x, y) => x.length === y.length && x.every((v, i) => Object.is(v, y[i]));
+    if (a.nodes !== b.nodes || !same(a.nodeDepthsMm, b.nodeDepthsMm) || !same(a.pedicelLensMm, b.pedicelLensMm) || !Object.is(a.gradient, b.gradient)) return true;
+    return b.azimuths.flat().some((az) => mine.floretNodeOverrides(st, b, az) !== null);
+  },
   /* ORGANIC VARIANCE, BUILD 2 (form). A row moves iff the FORM field exists on
      this tree — the geometry's own `varianceFormIsAbsent`, the guard. Every
      other row, the SIZE rows included, must hold to the bit: that is the claim

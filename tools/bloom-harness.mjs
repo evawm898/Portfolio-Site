@@ -48,6 +48,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findChromium } from './chromium-harness.mjs';
 import { firstSlot } from './bloom-first-slot.mjs';
 import { census as selfIntersectionCensus, orientation as shellOrientation } from './bloom-self-intersection.mjs';
+import { triGrid as infloTriGrid, nearest as infloNearest, crosses as infloCrosses, SEARCH_CAP_MM as INFLO_APPROACH_CAP_MM } from './bloom-inflo-approach.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const THREE_VERSION = '0.161.0';   // must match the importmap in bloom.html
@@ -72,6 +73,11 @@ const TAU = Math.PI * 2;
    derivation and both measured endpoints: 1.5 ULP worst over the live matrix,
    2.41e15 ULP on the mutant that names A7. */
 const SEAM_FRAME_RESIDUAL_ULP = 8;
+/* NV4's bound on a per-node override read on the page against its restatement
+   here: the two V8s differ in the last bit of `Math.cos` at some azimuths (one
+   ulp measured on the whorled cost corner), and 8 ulp of the value's own
+   magnitude is the seam-frame precedent above. */
+const NV_OVERRIDE_ULPS = 8;
 /* ST5's OWN BUDGET, declared here as its one owner rather than inline at the
    clause — see the clause for the whole derivation. */
 const STEM_JOIN_ULP = 8;
@@ -425,11 +431,27 @@ for (const [id, want] of Object.entries(INFLO_EXPECTED)) {
   if (words(lf) !== words(fp)) throw new Error(`floretPhyllotaxy offers [${words(fp)}] and leafPhyllotaxy [${words(lf)}] — one owner of what an arrangement down an axis can be, and an unknown word falls through to alternate in silence`);
   if (fp.default !== lf.default) throw new Error(`floretPhyllotaxy defaults to ${fp.default} and leafPhyllotaxy to ${lf.default}`);
   if (fp.section !== 'inflorescence') throw new Error(`registry floretPhyllotaxy sits in section ${fp.section}, the inflorescence's is inflorescence`);
-  /* THE PEDICEL'S RANGE MUST LIE INSIDE THE STEM'S, because the pedicel IS
-     the floret's own stem and every ST clause is proved on that control's
-     own bounds. */
-  if (PEDICEL_LENGTH_RANGE[0] < STEM_LENGTH_RANGE[0] || PEDICEL_LENGTH_RANGE[1] > STEM_LENGTH_RANGE[1]) {
-    throw new Error(`the pedicel runs ${PEDICEL_LENGTH_RANGE[0]}..${PEDICEL_LENGTH_RANGE[1]} mm and the stem control it IS runs ${STEM_LENGTH_RANGE[0]}..${STEM_LENGTH_RANGE[1]} — a pedicel outside the stem's own range is a rod nothing has ever been proved on`);
+  /* THE PEDICEL'S RANGE REACHES PAST THE STEM'S, BY RULING (Eva, Oct 4 —
+     inflorescence build 3: the cap is 250 mm). This guard used to REFUSE a
+     pedicel ceiling above `STEM_LENGTH_RANGE[1]` on the ground that "a pedicel
+     outside the stem's own range is a rod nothing has ever been proved on" —
+     and that was a true sentence about the matrix on the day it was written.
+     The build-3 brief ruled the ceiling to 250 for a measured reason (at 120
+     the corymb held level only up to an 81 mm rachis, a short-stem-only
+     feature), which collided with this guard the moment the range moved: a
+     SHIPPED GUARD standing in a brief's way is a finding, and it is restated
+     here rather than deleted. What it asserts now: the pedicel's FLOOR is the
+     stem's (0, sessile — a rod cannot be shorter than nothing), its CEILING is
+     at least the stem's (a floret's stem may be as long as the head's own,
+     never shorter by range), and the ceiling is Eva's number, 250, so a later
+     edit that quietly re-narrows it is caught at load. The rows that prove the
+     rod are block 48's (`REACH INSET: 250 mm ...`), which is the proof the old
+     sentence asked for. */
+  if (PEDICEL_LENGTH_RANGE[0] < STEM_LENGTH_RANGE[0] || PEDICEL_LENGTH_RANGE[1] < STEM_LENGTH_RANGE[1]) {
+    throw new Error(`the pedicel runs ${PEDICEL_LENGTH_RANGE[0]}..${PEDICEL_LENGTH_RANGE[1]} mm and the stem control it IS runs ${STEM_LENGTH_RANGE[0]}..${STEM_LENGTH_RANGE[1]} — a pedicel's floor is the stem's and its ceiling is never narrower than the stem's`);
+  }
+  if (PEDICEL_LENGTH_RANGE[1] !== 250) {
+    throw new Error(`the pedicel's ceiling reads ${PEDICEL_LENGTH_RANGE[1]} mm and Eva's Oct 4 ruling is 250 — a re-narrowed cap takes the corymb's level solve back to a short-stem-only feature; move this number only on a ruling`);
   }
   for (const type of INFLORESCENCE_TYPES) {
     for (const L of [0, 1, 60, STEM_LENGTH_RANGE[1]]) {
@@ -8075,6 +8097,11 @@ export async function inflorescenceAssertions(page, row) {
       const gap = P.nodeDepthsMm[i] - P.nodeDepthsMm[i - 1];
       if (!(gap > 0)) { bad.push(`ID2: nodes ${i - 1} and ${i} sit ${gap.toFixed(4)} mm apart — the node list is not strictly increasing down the rachis`); break; }
       if (gap + 1e-9 < pitchFloor) { bad.push(`ID2: nodes ${i - 1} and ${i} sit ${gap.toFixed(4)} mm apart, under the ${pitchFloor.toFixed(4)} mm pitch floor (two pedicel radii) — adjacent pedicels merge`); break; }
+      /* the FLORETS' floor (build 3, ruling 1) is ID10's to derive; here the
+         emitted spacing is held to whatever the plan declares, so a plan
+         that derived a floor and then ignored it is caught by the cheaper
+         clause first */
+      if (Number.isFinite(P.pitchFloorMm) && gap + 1e-9 < P.pitchFloorMm) { bad.push(`ID2: nodes ${i - 1} and ${i} sit ${gap.toFixed(4)} mm apart, under the ${P.pitchFloorMm.toFixed(4)} mm floor the plan itself declares`); break; }
     }
     const nAsked = Math.round(Number(ui.floretNodes));
     if (P.nodesAsked !== nAsked) bad.push(`ID2: the plan says ${P.nodesAsked} nodes asked, the page's floretNodes reads ${nAsked}`);
@@ -8283,13 +8310,33 @@ export async function inflorescenceAssertions(page, row) {
      is then read off the EMITTED placements: the heads' heights, from the
      matrices the appends used. */
   {
-    const L0 = Number(ui.pedicelLength), g = Number(ui.pedicelGradient ?? 1);
+    const L0 = Number(ui.pedicelLength), gAsked = Number(ui.pedicelGradient ?? 1);
     const corymbOn = String(ui.pedicelCorymb ?? 'OFF') === 'ON';
     const sinTh = Math.sin(Number(ui.pedicelAngle) * Math.PI / 180);
     const corymb = corymbOn && sinTh > 0;
     const d = Array.isArray(P.nodeDepthsMm) ? P.nodeDepthsMm : [];
     const dT = d[0], dL = d[d.length - 1];
-    const ceil = STEM_LENGTH_RANGE[1];
+    /* THE GRADIENT'S CAP (build 3, Eva's ruling 2): no lower floret may rise
+       past the floor the top one was inset under. Restated from the inset's
+       OWN law — `P.insetNeededMm`, which ID9 (c) has already rebuilt from the
+       floret's emitted reach — and the node depths ID2 tied to the floor: a
+       longer pedicel raises its floret by exactly `dL sin th`, so the lowest
+       node binds at `1 + ((dL - dT) + (dT - insetNeeded)) / (L0 sin th)`,
+       floored onto the reach grid (the geometry's own declaration). Inert at
+       or below level and with a sessile top; a biconditional on the flag. */
+    const grid = GEOMETRY.INFLO_REACH_GRID_MM;
+    const gMax = (sinTh > 0 && L0 > 0 && dL > dT && Number.isFinite(P.insetNeededMm))
+      ? Math.floor((1 + ((dL - dT) + (dT - P.insetNeededMm)) / (L0 * sinTh)) / grid) * grid
+      : Infinity;
+    if (!(Math.abs((Number.isFinite(gMax) ? gMax : 0) - (Number.isFinite(P.gradientMax) ? P.gradientMax : 0)) <= 16 * Number.EPSILON * Math.max(1, Math.abs(gMax) || 0)) || Number.isFinite(gMax) !== Number.isFinite(P.gradientMax)) bad.push(`ID7: the plan caps the gradient at ${P.gradientMax} and the law off the controls and the inset — 1 + ((${dL} - ${dT}) + (${dT} - ${P.insetNeededMm})) / (${L0} sin ${ui.pedicelAngle}), floored onto the ${grid} grid — gives ${gMax}`);
+    const gClamped = !corymbOn && gAsked > gMax;
+    if ((P.gradientClamped === true) !== gClamped) bad.push(`ID7: the plan says gradientClamped = ${P.gradientClamped} while ${gAsked}x was asked against a cap of ${gMax}${corymbOn ? ' (corymb ON: the gradient is inert and never clamped)' : ''}`);
+    if (P.gradientAsked !== gAsked) bad.push(`ID7: the plan echoes an asked gradient of ${P.gradientAsked}; the control reads ${gAsked}`);
+    const g = gClamped ? gMax : gAsked;
+    if (!(Object.is(P.gradient, g))) bad.push(`ID7: the plan applies a gradient of ${P.gradient}; the asked ${gAsked} under a cap of ${gMax} is ${g}`);
+    /* the ceiling is the PEDICEL'S OWN range, 250 (Eva, Oct 4 — build 3); it
+       was the head's `STEM_LENGTH_RANGE[1]` through build 2 */
+    const ceil = PEDICEL_LENGTH_RANGE[1];
     const wantAsked = d.map((x) => (corymb ? L0 + (x - dT) / sinTh
       : (!corymbOn && g !== 1) ? L0 * (1 + (g - 1) * (dL > dT ? (x - dT) / (dL - dT) : 0)) : L0));
     const want = wantAsked.map((x) => Math.min(ceil, Math.max(0, x)));
@@ -8302,6 +8349,14 @@ export async function inflorescenceAssertions(page, row) {
       const tol = 16 * Number.EPSILON * Math.max(ceil, L0);
       if (worst > tol) bad.push(`ID7: node ${at}'s pedicel is ${P.pedicelLensMm[at]} mm and the ${corymb ? 'corymb solve' : (!corymbOn && g !== 1) ? `${g}x gradient` : 'uniform raceme'} off the controls gives ${want[at]} mm — the plan is not the law`);
       if (!corymbOn && g === 1 && !P.pedicelLensMm.every((x) => Object.is(x, L0))) bad.push('ID7: at gradient 1 with the corymb off every pedicel must BE `pedicelLength`, the same double — the guard is a branch, not an arithmetic identity');
+      /* the cap's own claim on the artefact: the capped lowest pedicel never
+         carries its floret above the bar — ID9 (d) holds every node there,
+         so here only the corymb is checked for being UNTOUCHED by the cap:
+         its lengths are the solve's, whatever the gradient control reads */
+      if (corymb && gAsked !== 1 && d.length > 1) {
+        const solve = d.map((x) => Math.min(ceil, Math.max(0, L0 + (x - dT) / sinTh)));
+        if (solve.some((x, i) => Math.abs(x - P.pedicelLensMm[i]) > 16 * Number.EPSILON * Math.max(ceil, L0))) bad.push(`ID7: under the corymb the gradient control reads ${gAsked} and the lengths are not the level solve's — the cap or the ramp reached the corymb arm`);
+      }
       const clamped = wantAsked.some((x, i) => x !== want[i]);
       if ((P.lengthsClamped === true) !== clamped) bad.push(`ID7: the plan says lengthsClamped = ${P.lengthsClamped} while the law asks ${wantAsked.map((x) => x.toFixed(2)).join('/')} mm against a ${ceil} mm ceiling`);
       if ((P.corymbInert === true) !== (corymbOn && !(sinTh > 0))) bad.push(`ID7: the plan says corymbInert = ${P.corymbInert} with the toggle ${corymbOn ? 'ON' : 'OFF'} at ${ui.pedicelAngle} deg — inert exactly where a pedicel cannot raise its head`);
@@ -8316,8 +8371,14 @@ export async function inflorescenceAssertions(page, row) {
         }
         if (q.sessile !== (P.pedicelLensMm[q.nodeIndex] === 0)) { bad.push(`ID7: the floret at node ${q.nodeIndex} is placed ${q.sessile ? 'SESSILE' : 'on a pedicel'} while its node's length is ${P.pedicelLensMm[q.nodeIndex]} mm`); break; }
       }
-      const distinct = new Set(P.pedicelLensMm).size;
-      if (U.length !== distinct) bad.push(`ID7: the builder made ${U.length} floret builds for ${distinct} distinct pedicel lengths — the memo is by DISTINCT length, O(distinct) not O(N)`);
+      /* ONE BUILD PER DISTINCT STATE (Phase B widened the key from the
+         length alone to the length plus what the node's azimuth adds —
+         `floretNodeOverrides`, null with no node term and no field): the
+         distinct count is restated over every PLACEMENT's own (length,
+         overrides), so a raceme with neither is still one build per length */
+      const prePlan7 = { floretPetals: P.floretPetals, petalLength: P.petalLength, petalWidth: P.petalWidth, pedicelR: P.pedicelR, pedicelLenMm: L0, angleDeg: Number(ui.pedicelAngle) };
+      const distinct = new Set((B.placed || []).map((q) => { const o = GEOMETRY.floretNodeOverrides({ ...ui }, prePlan7, q.az); return `${P.pedicelLensMm[q.nodeIndex]}|${o ? JSON.stringify(o) : ''}`; })).size;
+      if (U.length !== distinct) bad.push(`ID7: the builder made ${U.length} floret builds for ${distinct} distinct floret states (length x the node's own overrides) — the memo is by DISTINCT state, O(distinct) not O(N)`);
       /* THE CORYMB, MEASURED: where the solve was not clamped and the top node
          has a pedicel (a sessile top carries a different hub offset and misses
          by that, told), every head stands at one height to the position bound
@@ -8351,7 +8412,477 @@ export async function inflorescenceAssertions(page, row) {
       if (q.wallReachR > S.boreR + tol) { bad.push(`ID8: sessile floret ${q.nodeIndex}/${(q.az * 180 / Math.PI).toFixed(0)}deg reaches r = ${q.wallReachR.toFixed(4)} mm and the bore is at ${S.boreR.toFixed(4)} mm — it is rooted ${(S.outerR - q.wallReachR).toFixed(4)} mm into a ${(S.outerR - S.boreR).toFixed(4)} mm wall, short of one wall thickness`); break; }
     }
   }
+
+  /* ID9 — THE TOP NODE'S INSET IS THE FLORET'S OWN PETAL REACH (issue #355;
+     Eva's Oct 4 brief, build 3). Build 1 inherited the LEAF's inset law — the
+     pedicel's RISE, `L sin th` — which clears the rod and not the flower on
+     it: the shipped raceme put the top floret's petals THROUGH the terminal
+     head's at 0.000 mm (the combination gate's `inflo-length-x-angle` cell)
+     while `insetSatisfied` read true, because the plan was satisfied about a
+     rod. BOTH STL GATES ARE BLIND TO ALL OF IT (overlapping closed shells are
+     the export contract), and no clause here ever asserted the inflorescence's
+     inset at all — LF4 asserts the LEAF's.
+
+     THE LAW, RESTATED FROM THE CONTROLS AND THE FLORET BUILDER rather than
+     read off the plan: the topmost unit (`floretState` at the top pedicel
+     length, the floret BUILDER's own emitted vertices) placed through
+     `pedicelPlacement` at a node of depth 0, in BOTH modes; `reach` is the
+     highest world z of any vertex; the top node sits
+         reach + (rootZ - headFloorZ) + MIN_FEATURE_MM
+     below the stem's root plane, with `headFloorZ` the stem plan's own lowest
+     head material (`rootZ`, or `lowestHubZ` where a dome's rim hangs lower),
+     and the inset is the MAX over the two modes so the node is where it is in
+     either (topology is mode-free here, the stem channel's own union).
+
+     WHO OWNS WHAT. The measured side is the PAGE's plan (`insetNeededMm`,
+     `floretReachMm`), which the mutant table serves its mutation to; the
+     reference is this Node rebuild through the UNMUTATED harness import — so a
+     page whose plan reads the pedicel again, or one mode only, disagrees with
+     it (the leaf cap's own construction, SN4). The clause that no rebuild can
+     stand in for is (d): the EMITTED florets, read off the placements the
+     builder reports, against the head's floor plane — a plan that computed the
+     right number and a builder that ignored it would pass (a)-(c). (e) is the
+     biconditional pair the leaf's LF4 carries, in the inflorescence's own
+     fields; (f) is mode-freeness measured, not argued: the OTHER mode's plan,
+     rebuilt in Node, must carry the same node depths to the bit. */
+  if (P && B && S && !(Number.isFinite(S.rootZ) && Number.isFinite(S.lowestHubZ))) bad.push(`ID9: the stem's metrics projection carries rootZ ${S.rootZ} and lowestHubZ ${S.lowestHubZ} — the head's floor cannot be read from it`);
+  else if (P && B && S) {
+    const topL = Number.isFinite(P.pedicelLenMm) ? P.pedicelLenMm : Number(ui.pedicelLength);
+    const sessileTop = topL === 0;
+    /* THE TOP UNIT REBUILT IN NODE, PER AZIMUTH (Phase B: a per-node delta
+       or a derived phase is a state per azimuth, keyed on what the node's
+       azimuth adds — `floretNodeOverrides` — so a raceme with neither is one
+       unit here as it is in the builder). Shared by ID9 (a) and ID10. */
+    const prePlan = { floretPetals: P.floretPetals, petalLength: P.petalLength, petalWidth: P.petalWidth, pedicelR: P.pedicelR, pedicelLenMm: topL, angleDeg: Number(ui.pedicelAngle) };
+    const unitCache = new Map();
+    const unitAt = (exportMode, az) => {
+      const o = GEOMETRY.floretNodeOverrides({ ...ui }, prePlan, az);
+      const key = `${exportMode ? 'E' : 'L'}|${o ? JSON.stringify(o) : ''}`;
+      if (unitCache.has(key)) return unitCache.get(key);
+      const sub = new GEOMETRY.MeshBuilder({ exportMode });
+      const fs = GEOMETRY.floretState({ ...ui }, prePlan, topL, az);
+      const rec = GEOMETRY.buildBloomInto(sub, fs, { below: null });
+      const stalked = !!(rec.stem && rec.stem.present);
+      const hubT = sub.floorThickness(rec.hub.thickness);
+      const tipZ = stalked ? rec.stem.tipZ : GEOMETRY.hubAxisTopZ(rec.hub.dome, hubT) - hubT;
+      const U = { sub, tipZ, fs };
+      unitCache.set(key, U);
+      return U;
+    };
+    const placeAt = (az, tipZ) => GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm }, 0, az, tipZ, sessileTop).M;
+    /* over every azimuth the phyllotaxy puts on any asked node — restated
+       from the CONTROLS through `leafAzimuths`, never the plan's own list */
+    const nAsked = Math.max(1, Math.round(Number(ui.floretNodes)));
+    const azsAll = [...new Set(Array.from({ length: nAsked }, (_, i) => GEOMETRY.leafAzimuths(String(ui.floretPhyllotaxy), i)).flat())];
+    const reachIn = (exportMode) => {
+      let top = -Infinity;
+      for (const az of azsAll) {
+        const U = unitAt(exportMode, az);
+        const src = U.sub.positions;
+        const M = placeAt(az, U.tipZ);
+        for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > top) top = z; }
+      }
+      return top;
+    };
+    const rL = reachIn(false), rE = reachIn(true);
+    const floorZ = Math.min(S.rootZ, Number.isFinite(S.lowestHubZ) ? S.lowestHubZ : S.rootZ);
+    /* the grid is the geometry's DECLARATION (imported, ST3's precedent); the
+       law is restated through it, ceiled as the geometry ceils */
+    const grid = GEOMETRY.INFLO_REACH_GRID_MM;
+    const wantReach = Math.ceil(Math.max(rL, rE) / grid) * grid;
+    const wantNeeded = Math.max(0, wantReach + (S.rootZ - floorZ) + MIN_FEATURE_MM);
+    /* the bound is the arithmetic's own: a max over emitted doubles plus two
+       lengths, so a few ULP of the largest length in it */
+    const tol = 16 * Number.EPSILON * Math.max(1, Math.abs(rL), Math.abs(rE), Math.abs(S.rootZ), Math.abs(floorZ), P.rachisLengthMm);
+    if (!P.floretReachMm || !Number.isFinite(P.floretReachMm.live) || !Number.isFinite(P.floretReachMm.export)) bad.push('ID9: the plan reports no `floretReachMm` {live, export} — the inset is derived from nothing it can name');
+    else {
+      if (Math.abs(P.floretReachMm.live - rL) > tol) bad.push(`ID9: (a) the plan's LIVE floret reach is ${P.floretReachMm.live.toFixed(6)} mm and the top unit rebuilt in Node reaches ${rL.toFixed(6)} mm above its node`);
+      if (Math.abs(P.floretReachMm.export - rE) > tol) bad.push(`ID9: (a) the plan's EXPORT floret reach is ${P.floretReachMm.export.toFixed(6)} mm and the top unit rebuilt in Node reaches ${rE.toFixed(6)} mm above its node`);
+    }
+    if (!(Math.abs(P.headFloorZ - floorZ) <= tol)) bad.push(`ID9: (b) the plan's head floor is z = ${P.headFloorZ} and the stem plan's own lowest material is ${floorZ.toFixed(6)} (rootZ ${S.rootZ.toFixed(4)}, lowestHubZ ${S.lowestHubZ})`);
+    /* (c) is an EXACT comparison through the grid: both sides are a ceil onto
+       2^-16 mm plus two lengths, so they agree to the bit unless the two
+       engines' reach straddles a grid line — a 1.5e-5 mm window that the
+       grid exists to make rare and that this message names if it happens */
+    if (!(Math.abs(P.insetNeededMm - wantNeeded) <= tol)) bad.push(`ID9: (c) the plan needs ${P.insetNeededMm.toFixed(6)} mm of inset and the law — the floret's own reach ${Math.max(rL, rE).toFixed(6)} mm (live ${rL.toFixed(6)} / export ${rE.toFixed(6)}) ceiled onto the ${grid} mm grid, + ${(S.rootZ - floorZ).toFixed(4)} mm to the head's floor + the ${MIN_FEATURE_MM} mm gap — gives ${wantNeeded.toFixed(6)}: the inset is not derived from the floret's petals${Math.abs(P.insetNeededMm - wantNeeded) <= 2 * grid ? ' (ONE GRID STEP apart: the page and Node straddle a grid line — a knife edge, not a wrong law)' : ''}`);
+    if (!Number.isFinite(P.reachGridMm) || P.reachGridMm !== grid) bad.push(`ID9: the plan quantises its reach on a ${P.reachGridMm} mm grid and the geometry declares ${grid}`);
+    if (P.insetGapMm !== MIN_FEATURE_MM) bad.push(`ID9: the plan's clearance gap is ${P.insetGapMm} mm and the project's minimum printable gap is ${MIN_FEATURE_MM} — the gap is typed`);
+    /* (d) THE EMITTED FLORETS — the BUILDER's own highest appended vertex over
+       EVERY placement (`floretsMaxZ`, read in the
+       pass that walks every appended float, ID5's residual's own owner), never
+       the plan's declaration: at or below the head's floor less the gap
+       wherever the plan says the inset is satisfied. In the page's own mode the
+       law's union can only have put the node DEEPER than that mode's reach
+       asks, so this is one-sided by construction; a plan that computed the
+       right number and a builder that ignored it fails here and nowhere else. */
+    /* ...AND CI FOUND THE CLAIM TOO WIDE ON ITS FIRST FULL RUN. "Every
+       placement" asserted something the law never claimed: the inset is the
+       TOP unit's reach, and under build 2's GRADIENT a lower node carries a
+       LONGER pedicel (`NODE LAWS: gradient 3 x 12 nodes x 60 mm` — the lowest
+       at 3x the top's rose 26.3 mm through the terminal head while
+       `insetSatisfied` was TRUE and right). So (d) is TWO clauses now, with
+       the subject stated as a set each time: node 0's own emitted maximum
+       (`floretsMaxZByNode[0]`) is the law's claim and must clear on every row
+       the plan calls satisfied — unconditional, undeclared, the clause the
+       mutant table fires; every placement's maximum is a real printability
+       question the law does not answer, so a row where a LOWER node overtops
+       is DECLARED BY NAME with its intrusion in `INFLO_OVERTOP_XFAIL` (#213's
+       form — held to its number in BOTH directions), and an undeclared row
+       must read 0 intrusion. A declared row whose top node overtops is still a
+       failure: the declaration excuses the gradient, never the law. */
+    const bar = floorZ - MIN_FEATURE_MM;
+    const overtopDecl = Object.prototype.hasOwnProperty.call(INFLO_OVERTOP_XFAIL, row.label) ? INFLO_OVERTOP_XFAIL[row.label] : null;
+    if (P.insetSatisfied === true) {
+      if (!Number.isFinite(B.floretsMaxZ)) bad.push('ID9: (d) the builder reports no `floretsMaxZ` — the florets\' emitted reach is measured by nothing');
+      const by = Array.isArray(B.floretsMaxZByNode) ? B.floretsMaxZByNode : null;
+      if (!by || by.length !== P.nodes || !Number.isFinite(by[0])) bad.push(`ID9: (d) the builder reports per-node maxima ${JSON.stringify(by)} for ${P.nodes} node(s) — the TOP node's own reach is measured by nothing`);
+      else if (by[0] > bar + tol) bad.push(`ID9: (d) the TOP node's florets reach z = ${by[0].toFixed(4)} mm (the builder's own emitted vertices, every placement on node 1) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${bar.toFixed(4)}) — the plan says the inset is satisfied and the floret the inset was derived FROM stands ${(by[0] - bar).toFixed(4)} mm into the gap`);
+      if (Number.isFinite(B.floretsMaxZ)) {
+        const intr = B.floretsMaxZ - bar;
+        if (overtopDecl) {
+          if (Math.abs(intr - overtopDecl.intrusionMm) > OVERTOP_BAND_MM) bad.push(`ID9: (d) this row is DECLARED overtopping by ${overtopDecl.intrusionMm} mm (a lower node's longer pedicel) and the builder's florets stand ${intr.toFixed(4)} mm into the gap — ${intr > overtopDecl.intrusionMm ? 'WORSE' : 'better'} than its record by ${Math.abs(intr - overtopDecl.intrusionMm).toFixed(4)}: re-record it, or if it reads at or under 0 remove its INFLO_OVERTOP_XFAIL entry, in the same commit`);
+        } else if (intr > tol) {
+          const who = by ? by.map((z, i) => (Number.isFinite(z) && z > bar + tol ? `node ${i + 1} (${(z - bar).toFixed(3)} mm, pedicel ${Number.isFinite(P.pedicelLensMm?.[i]) ? P.pedicelLensMm[i].toFixed(1) : '?'} mm)` : null)).filter(Boolean).join(', ') : 'unknown nodes';
+          bad.push(`ID9: (d) the florets reach z = ${B.floretsMaxZ.toFixed(4)} mm (the builder's own emitted vertices, every placement) against a head floor of ${floorZ.toFixed(4)} less the ${MIN_FEATURE_MM} mm gap (${bar.toFixed(4)}) — the plan says the inset is satisfied and an emitted floret stands ${intr.toFixed(4)} mm into the gap: ${who}. A LOWER node on a longer pedicel is the gradient's and is declared by name in INFLO_OVERTOP_XFAIL with its number; the top node's is the law's and is never declared`);
+        }
+      }
+    } else if (overtopDecl) bad.push(`ID9: (d) this row is declared in INFLO_OVERTOP_XFAIL and the plan does not call its inset satisfied — the declaration names a state the row is not in; remove it`);
+    /* (e) the two biconditionals, in the plan's own fields */
+    if ((P.insetClamped === true) !== (P.insetNeededMm > P.insetAskedMm)) bad.push(`ID9: (e) insetClamped reads ${P.insetClamped} while the floret needs ${P.insetNeededMm.toFixed(3)} mm against the stem's own ${P.insetAskedMm.toFixed(3)} — the clamp must be a biconditional`);
+    if ((P.insetSatisfied === true) !== (P.insetNeededMm <= GEOMETRY.LEAF_NODE_BOTTOM * P.rachisLengthMm)) bad.push(`ID9: (e) insetSatisfied reads ${P.insetSatisfied} while the floret needs ${P.insetNeededMm.toFixed(3)} mm of a ${(GEOMETRY.LEAF_NODE_BOTTOM * P.rachisLengthMm).toFixed(3)} mm node span`);
+    if (!(Math.abs(P.insetMm - Math.max(P.insetAskedMm, P.insetNeededMm)) <= tol)) bad.push(`ID9: (e) the inset is ${P.insetMm} mm and max(asked ${P.insetAskedMm}, needed ${P.insetNeededMm}) is ${Math.max(P.insetAskedMm, P.insetNeededMm)}`);
+    /* the top node IS the inset only where the inset fits the span; past it
+       the node law holds its single node at the span's end (0.86 L) and the
+       plan says so with `insetSatisfied` false */
+    /* ...AND A SOLITARY NODE IS NOT AT THE INSET — CI found that too (`INFLO:
+       ONE node`, 66 mm against 34.63): `leafNodeDepthsMm` puts ONE node at
+       the flower's solo station, `LEAF_NODE_SOLO` (0.55 L), never shallower
+       than the inset and never past the span's end — deeper than the law
+       asks, which clears the head by MORE. Restated from the geometry's own
+       two constants rather than read off the plan: the count's own arm. */
+    if (P.insetSatisfied === true && Array.isArray(P.nodeDepthsMm) && P.nodeDepthsMm.length) {
+      const L = P.rachisLengthMm;
+      /* the solo station is the law's answer to ONE node ASKED; a count
+         CLAMPED to one by the pitch floor sits at the inset (the span's top),
+         which build 3's florets' floor made reachable on a whorled 1.00x
+         raceme — CI found the first cut reading the BUILT count here */
+      const soloAsked = Math.round(Number(ui.floretNodes)) === 1;
+      const wantTop = soloAsked
+        ? Math.min(Math.max(GEOMETRY.LEAF_NODE_SOLO * L, P.insetMm), GEOMETRY.LEAF_NODE_BOTTOM * L)
+        : Math.min(P.insetMm, GEOMETRY.LEAF_NODE_BOTTOM * L);
+      if (!(Math.abs(P.nodeDepthsMm[0] - wantTop) <= tol)) bad.push(`ID9: (e) the top node sits ${P.nodeDepthsMm[0]} mm below the hub and the node law puts it at ${wantTop} (${soloAsked ? `ONE node ASKED: max(the solo station ${GEOMETRY.LEAF_NODE_SOLO} x ${L} = ${(GEOMETRY.LEAF_NODE_SOLO * L).toFixed(3)}, the inset ${P.insetMm})` : `the inset ${P.insetMm}, held to the span's end`})`);
+      if (P.nodeDepthsMm[0] < P.insetMm - tol) bad.push(`ID9: (e) the top node sits ${P.nodeDepthsMm[0]} mm below the hub, SHALLOWER than the ${P.insetMm} mm inset — whatever the count, no node may stand above the floret's own reach`);
+    }
+    /* (f) MODE-FREE, MEASURED — WITHIN ONE ENGINE. The plan rebuilt in Node in
+       BOTH modes must carry the same node depths to the bit (the union makes
+       that an identity, and a one-mode reach breaks it on the 0.60 mm row);
+       the PAGE's depths are then held to the same-mode Node rebuild within
+       the arithmetic's bound rather than to the bit, because the page's V8 and
+       Node's differ in the last bits of a reach reached through trigonometry
+       (session 38 §B10.7) — the first cut asked for `Object.is` across the two
+       engines and went red on depths equal to four decimals. */
+    {
+      const plans = [false, true].map((exportMode) => {
+        const other = new GEOMETRY.MeshBuilder({ exportMode });
+        const fr = GEOMETRY.footRing({ ...ui }, other);
+        const sp = GEOMETRY.stemPlan({ ...ui }, fr.hub, other);
+        return GEOMETRY.inflorescencePlan({ ...ui }, sp, other);
+      });
+      const dL = Array.isArray(plans[0].nodeDepthsMm) ? plans[0].nodeDepthsMm : [], dE = Array.isArray(plans[1].nodeDepthsMm) ? plans[1].nodeDepthsMm : [];
+      if (dL.length !== dE.length || dL.some((x, i) => !Object.is(x, dE[i]))) bad.push(`ID9: (f) the node depths are ${dL.map((x) => x.toFixed(4)).join('/')} mm in LIVE and ${dE.map((x) => x.toFixed(4)).join('/')} in EXPORT (both rebuilt in Node) — where the nodes sit is topology and may not follow the mode`);
+      const mineD = plans[m.exportMode ? 1 : 0].nodeDepthsMm || [], pageD = Array.isArray(P.nodeDepthsMm) ? P.nodeDepthsMm : [];
+      if (mineD.length !== pageD.length) bad.push(`ID9: (f) the page holds ${pageD.length} nodes and the same plan rebuilt in Node holds ${mineD.length} — the node COUNT differs between the two engines`);
+      else { let worst = 0; for (let i = 0; i < mineD.length; i++) worst = Math.max(worst, Math.abs(mineD[i] - pageD[i])); if (worst > tol) bad.push(`ID9: (f) the page's node depths and the same plan rebuilt in Node differ by ${worst.toExponential(3)} mm`); }
+    }
+
+    /* ID10 — THE INTERNODE FLOOR IS THE FLORETS' OWN (build 3, Eva's Phase A
+       ruling 1): "derive the internode floor from the floret's actual reach
+       so the default clears 1.0 mm, rather than hard-coding a number". The
+       plan's floor is RESTATED here on the top unit rebuilt in Node in both
+       modes (the units ID9 (a) already builds), over the pair classes the
+       phyllotaxy produces off the CONTROLS, through the geometry's own
+       `floretPitchFloorMm` — the bound is the geometry's declaration (a
+       column map, conservative by construction, its header says how much)
+       and what this clause can see is a plan that did not take it, took it
+       on one mode, took it off the wrong unit, or took it and ignored it.
+       The emitted florets' own approach is ID10 (d), on the exported FILE
+       (`infloApproachAssertions`), which is the measured side and the only
+       one that can say whether the bound was enough. */
+    {
+      const n = nAsked;
+      const phyllo = String(ui.floretPhyllotaxy);
+      const rodFloor = 2 * P.pedicelR;
+      const extentIn = (exportMode) => {
+        let lo = Infinity, hi = -Infinity;
+        for (const az of azsAll) {
+          const U = unitAt(exportMode, az);
+          const M = placeAt(az, U.tipZ);
+          for (let k = 0; k < U.sub.positions.length; k += 3) { const z = M[8] * U.sub.positions[k] + M[9] * U.sub.positions[k + 1] + M[10] * U.sub.positions[k + 2] + M[11]; if (z > hi) hi = z; if (z < lo) lo = z; }
+        }
+        return hi - lo;
+      };
+      const extent = Math.max(extentIn(false), extentIn(true));
+      const dMax = Math.max(1, Math.ceil((extent + MIN_FEATURE_MM) / rodFloor));
+      const pairs = GEOMETRY.floretPairClasses(phyllo, n, dMax);
+      const bodyOf = (exportMode) => (az) => { const U = unitAt(exportMode, az); return { positions: U.sub.positions, M: placeAt(az, U.tipZ) }; };
+      const fL = GEOMETRY.floretPitchFloorMm(bodyOf(false), pairs, MIN_FEATURE_MM);
+      const fE = GEOMETRY.floretPitchFloorMm(bodyOf(true), pairs, MIN_FEATURE_MM);
+      const raw = Math.max(fL.floorMm, fE.floorMm);
+      const grid = GEOMETRY.INFLO_REACH_GRID_MM;
+      const wantFloret = Math.ceil(raw / grid) * grid;
+      const wantFloor = Math.max(rodFloor, wantFloret);
+      const tolF = 16 * Number.EPSILON * Math.max(1, extent, P.rachisLengthMm);
+      if (!Number.isFinite(P.pitchFloretRawMm) || !Number.isFinite(P.pitchFloorMm)) bad.push('ID10: the plan reports no internode floor — the florets\' spacing is derived from nothing it can name');
+      else {
+        if (Math.abs(P.pitchFloretRawMm - raw) > tolF) bad.push(`ID10: (a) the plan's florets' floor is ${P.pitchFloretRawMm.toFixed(6)} mm and the bound rebuilt in Node on the top unit over ${pairs.length} pair class(es) (live ${fL.floorMm.toFixed(6)} / export ${fE.floorMm.toFixed(6)}, the larger decides) is ${raw.toFixed(6)}${Math.abs(P.pitchFloretRawMm - Math.max(fL.floorMm, fE.floorMm)) <= tolF ? '' : ` — ${Math.abs(P.pitchFloretRawMm - fL.floorMm) <= tolF ? 'it is the LIVE unit\'s alone' : Math.abs(P.pitchFloretRawMm - fE.floorMm) <= tolF ? 'it is the EXPORT unit\'s alone' : 'neither mode\'s unit reads it'}`}`);
+        if (!(Math.abs(P.pitchFloorMm - wantFloor) <= tolF)) bad.push(`ID10: (b) the plan's internode floor is ${P.pitchFloorMm} mm and max(the rods' ${rodFloor.toFixed(4)}, the florets' ${raw.toFixed(6)} ceiled onto the ${grid} grid = ${wantFloret}) is ${wantFloor}${Math.abs(P.pitchFloorMm - wantFloor) <= 2 * grid ? ' (ONE GRID STEP apart: a knife edge, not a wrong law)' : ''}`);
+        if ((P.pitchFloorIsFlorets === true) !== (wantFloret > rodFloor)) bad.push(`ID10: (b) pitchFloorIsFlorets reads ${P.pitchFloorIsFlorets} while the florets ask ${wantFloret} against the rods' ${rodFloor}`);
+        if (P.sameNodeMayTouch !== (fL.sameNodeMayTouch || fE.sameNodeMayTouch)) bad.push(`ID10: (c) the plan says sameNodeMayTouch = ${P.sameNodeMayTouch} and the bound over the ${phyllo} node's own pairs says ${fL.sameNodeMayTouch || fE.sameNodeMayTouch}`);
+        /* the floor was TAKEN: the emitted spacing is at or over it (ID2 holds
+           the plan's declared floor; this holds the restated one) */
+        const dd = Array.isArray(P.nodeDepthsMm) ? P.nodeDepthsMm : [];
+        for (let i = 1; i < dd.length; i++) if (dd[i] - dd[i - 1] + tolF < wantFloor) { bad.push(`ID10: (b) nodes ${i - 1} and ${i} sit ${(dd[i] - dd[i - 1]).toFixed(4)} mm apart under the restated ${wantFloor.toFixed(4)} mm floor — the plan derived a floor it did not take`); break; }
+        /* and the count is the node law's at that floor, restated */
+        const wantN = GEOMETRY.leafNodeDepthsMm(n, P.rachisLengthMm, P.insetMm, wantFloor).length;
+        if (dd.length !== wantN) bad.push(`ID10: (b) the plan holds ${dd.length} nodes and the node law at the restated ${wantFloor.toFixed(4)} mm floor holds ${wantN}`);
+      }
+    }
+
+    /* NV0-NV4 — PER-NODE VARIATION (inflorescence build 3, Phase B; Eva's
+       ruling 10 and her Oct 3 phase ruling). Both STL gates are blind to all
+       of it: a floret built from the head's own form where a node asked for
+       a delta, a delta that reached a pinned id, a field whose crest sits on
+       the world's +x on every floret, and one build serving nodes that asked
+       for different states ALL export watertight, one piece, at the same
+       counts. What this family asks, each clause with its own owners:
+         NV0  the two statements (the registry's control against the
+              geometry's `nodeVarianceIsAbsent`, through the page)
+         NV1  each unit's three form bases ARE the head's composed with the
+              node term RESTATED from the controls and the restated offsets
+              (never the geometry's `nodeVarianceTerm`), through the shipped
+              resolver; at amount 0 they are the head's own doubles
+         NV2  each unit's `variancePhase` is the OUTWARD phase, re-derived
+              from the PLACEMENT MATRIX of a placement that used it (the
+              frame the world sees, never the closed form's own sign rule),
+              and the head's own where no field is on or the pedicel is level
+         NV3  the pins hold on every unit whatever the delta
+         NV4  one build per DISTINCT state, and every placement's unit is the
+              one its own azimuth asks for */
+    {
+      const amount = Number(ui.nodeVariance ?? 0);
+      const regAbsent = !(amount > 0);
+      if (m.nodeVarianceAbsent === undefined) bad.push('NV0: the metrics hook reports no `nodeVarianceAbsent` — the geometry states nothing about whether the node term is formed');
+      else if (m.nodeVarianceAbsent !== regAbsent) bad.push(`NV0: the control reads nodeVariance=${ui.nodeVariance} (${regAbsent ? 'absent' : 'present'}) and the geometry says the node term is ${m.nodeVarianceAbsent ? 'ABSENT' : 'formed'}`);
+      const units = Array.isArray(B.units) ? B.units : [];
+      const fieldOn = Number(ui.varianceSize) > 0 || Number(ui.varianceForm) > 0;
+      const f = Math.round(Number(ui.varianceFrequency));
+      const angle = Number(ui.pedicelAngle);
+      const headPhase = Number(ui.variancePhase);
+      for (let k = 0; k < units.length; k++) {
+        const u = units[k];
+        if (!u.floretState) { bad.push(`NV1: unit ${k} carries no floretState`); break; }
+        const pl = (B.placed || []).find((q) => q.unit === k);
+        const az = pl ? pl.az : u.az;
+        /* NV1 — the bases */
+        if (regAbsent) {
+          for (const { base } of FORM_VARIANCE_BASES) if (!Object.is(u.floretState[base], Number(ui[base]))) { bad.push(`NV1: at nodeVariance 0 unit ${k}'s ${base} is ${u.floretState[base]} and the head's control reads ${ui[base]} — the guard is a branch, and it moved a base`); break; }
+          if (u.nodeOverrides && FORM_VARIANCE_BASES.some(({ base }) => base in u.nodeOverrides)) bad.push(`NV1: at nodeVariance 0 unit ${k} carries node overrides ${JSON.stringify(u.nodeOverrides)} on a form base`);
+        } else if (!Number.isFinite(az)) {
+          bad.push(`NV1: unit ${k} is placed nowhere and carries no azimuth, so its node term cannot be restated`);
+        } else {
+          const term = {};
+          for (const { base } of FORM_VARIANCE_BASES) {
+            const c = CONTROLS.find((x) => x.id === base);
+            const off = (FORM_OFFSET_DEG_RESTATED[base] * Math.PI) / 180;
+            term[base] = amount * Math.cos(az + off) * ((c.max - c.min) / 2);
+          }
+          const want = GEOMETRY.resolveRoleOverrides({ ...ui }, [], null, term) || {};
+          for (const { base } of FORM_VARIANCE_BASES) {
+            const c = CONTROLS.find((x) => x.id === base);
+            const expect = base in want ? want[base] : Number(ui[base]);
+            /* the two engines' cosines differ in the last bits: a bound in
+               the unit of the base's own range */
+            if (!(Math.abs(u.floretState[base] - expect) <= 1e-9 * (c.max - c.min))) { bad.push(`NV1: unit ${k} (azimuth ${((az * 180) / Math.PI).toFixed(1)} deg) builds ${base} at ${u.floretState[base]}; the head's ${ui[base]} composed with the node term ${term[base].toFixed(6)} (${amount} x cos(az + ${FORM_OFFSET_DEG_RESTATED[base]} deg) x half-span) through the resolver gives ${expect}`); break; }
+          }
+        }
+        /* NV2 — the derived phase, from the placement matrix */
+        if (!fieldOn || angle === 0) {
+          if (!Object.is(u.floretState.variancePhase, headPhase)) bad.push(`NV2: unit ${k}'s variancePhase is ${u.floretState.variancePhase} with ${fieldOn ? 'a LEVEL pedicel (the outward direction is the floret\'s own axis — inert, the head\'s phase stands)' : 'no field on (nothing to orient)'} and the head's reads ${headPhase}`);
+        } else if (!pl) {
+          bad.push(`NV2: unit ${k} is placed nowhere, so its outward phase cannot be read off a placement`);
+        } else {
+          const M = pl.M;
+          const rot = (v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[4] * v[0] + M[5] * v[1] + M[6] * v[2], M[8] * v[0] + M[9] * v[1] + M[10] * v[2]];
+          const ex = rot([1, 0, 0]), ey = rot([0, 1, 0]), D = pl.D;
+          const R = [Math.cos(pl.az), Math.sin(pl.az), 0];
+          const rd = R[0] * D[0] + R[1] * D[1] + R[2] * D[2];
+          const Rp = [R[0] - rd * D[0], R[1] - rd * D[1], R[2] - rd * D[2]];
+          const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+          if (Math.hypot(...Rp) < 1e-9) bad.push(`NV2: the outward direction projects to nothing in unit ${k}'s petal plane at ${angle} deg — only a level pedicel does that, and this one is not level`);
+          else {
+            let psi = (Math.atan2(dot(Rp, ey), dot(Rp, ex)) * 180) / Math.PI; psi = ((psi % 360) + 360) % 360;
+            let want = f === 0 ? psi : (((-f * psi) % 360) + 360) % 360;
+            const got = Number(u.floretState.variancePhase);
+            let diff = Math.abs(got - want) % 360; diff = Math.min(diff, 360 - diff);
+            if (!(diff <= 1e-6)) bad.push(`NV2: unit ${k} (azimuth ${((pl.az * 180) / Math.PI).toFixed(1)} deg, ${angle} deg) carries variancePhase ${got.toFixed(6)}; the outward direction read off its own placement matrix sits at floret azimuth ${psi.toFixed(4)} deg, so at frequency ${f} the crest wants phase ${want.toFixed(6)} — the floret's field is not fixed to its node's radial direction`);
+            if (Object.is(got, headPhase) && Math.abs(want - headPhase) > 1e-6) bad.push(`NV2: unit ${k}'s phase is the head's own ${headPhase} — world-fixed, which the ruling forbids`);
+          }
+        }
+        /* NV3 — the pins */
+        for (const [id, v] of Object.entries(GEOMETRY.PEDICEL_PINS)) if (!Object.is(u.floretState[id], v)) { bad.push(`NV3: unit ${k}'s ${id} is ${u.floretState[id]} — the pin (${v}) did not win over the node term`); break; }
+      }
+      /* NV4 — one build per distinct state; each placement's unit is its own */
+      const keyOf = (u) => `${u.lengthMm}|${u.nodeOverrides ? JSON.stringify(u.nodeOverrides) : ''}`;
+      const keys = new Set(units.map(keyOf));
+      if (keys.size !== units.length) bad.push(`NV4: ${units.length} units were built for ${keys.size} distinct states — a state was built twice`);
+      /* THE PLACEMENT'S UNIT AGAINST THE HARNESS'S OWN RESTATEMENT OF THE TERM,
+         BOUNDED IN THE VALUE'S OWN ULP, NEVER AS STRINGS. The first cut compared
+         the two as JSON and went red on `NODE VARIANCE: x WHORLED x 8 nodes`
+         with petalCup 0.7071067814675859 against 0.707106781467586: the unit
+         is built on the PAGE (Chromium's V8) and the restatement here in Node,
+         and the two engines' `Math.cos` differ in the last bit at some of the
+         twenty-four azimuths — session 38 §B10.7's class, an exact-equality
+         claim across two engines that is a claim about floating point, not
+         about the law (the fourth durable rule's remedy: bound the difference
+         in the unit the quantity carries). The term is `base + A g room`, so
+         its error is a few ulp of its own magnitude; the length is the plan's
+         own grid value and stays exact; the FIELD SET is exact too (a missing
+         or extra control is the law, not the bits). The within-page clause
+         above stays exact — one engine, one build. */
+      const ulpOf = (x) => { const a = Math.abs(x); return a === 0 ? Number.MIN_VALUE : a * Number.EPSILON; };
+      const sameOverride = (got, want) => {
+        if (!got !== !want) return false;
+        if (!got) return true;
+        const kg = Object.keys(got).sort(), kw = Object.keys(want).sort();
+        if (kg.join() !== kw.join()) return false;
+        return kg.every((k) => Math.abs(got[k] - want[k]) <= NV_OVERRIDE_ULPS * ulpOf(Math.max(Math.abs(got[k]), Math.abs(want[k]))));
+      };
+      for (const q of B.placed || []) {
+        const u = units[q.unit];
+        const o = GEOMETRY.floretNodeOverrides({ ...ui }, prePlan, q.az);
+        const wantKey = `${P.pedicelLensMm[q.nodeIndex]}|${o ? JSON.stringify(o) : ''}`;
+        if (!u || !Object.is(u.lengthMm, P.pedicelLensMm[q.nodeIndex]) || !sameOverride(u.nodeOverrides, o)) { bad.push(`NV4: the placement at node ${q.nodeIndex + 1}, ${((q.az * 180) / Math.PI).toFixed(1)} deg, appended unit ${q.unit} (${u ? keyOf(u) : 'none'}) where its own azimuth asks for ${wantKey} (overrides compared within ${NV_OVERRIDE_ULPS} ulp of their own magnitude, the length exactly)`); break; }
+      }
+      if (regAbsent && !fieldOn) {
+        const lens = new Set(units.map((u) => u.lengthMm));
+        if (units.length !== lens.size) bad.push(`NV4: with no node term and no field ${units.length} units were built for ${lens.size} distinct length(s) — the guard is not a branch`);
+      }
+    }
+  }
   return bad;
+}
+
+/* ID10 (d) — THE FLORETS' EMITTED APPROACH, read from THIS row's STL bytes
+   (ST9's construction: the FILE, never the plan or the builder's own echo).
+   Every floret's vertices against every OTHER floret's triangles — the
+   combination gate's own `floret-floret` measure, restated here over the
+   file's own float32 with the builder's declared block ranges (`placed[].at`
+   / `tris`, which ST9 already relies on) — must stand at or above the
+   printable gap, or the row is declared in `INFLO_APPROACH_XFAIL` with the
+   MECHANISM that puts it under: two florets of ONE node (the phyllotaxy's —
+   no internode moves them apart), a GRADED or CORYMB raceme (lower florets on
+   LONGER pedicels rising toward the node above — the floor is derived for
+   equal pedicels, said in `floretPitchFloorMm`'s header), or a floret
+   against a neighbour's PEDICEL ROD. Held both ways to the record (the
+   #213 rule): a declared row reading above the bar is stale, an undeclared
+   row under it is a finding. The pedicel-to-rachis join region is excluded
+   by construction exactly as the combination gate excludes it (vertices
+   inside the free rachis's own solid, by `freeStemDistanceMm`), because every
+   part there is fused to the rachis by design. SAMPLING, named: EXPORT mode
+   (the file), unique vertex positions of each block against the triangles
+   of the others within `INFLO_APPROACH_CAP_MM`, in float32. */
+export const INFLO_APPROACH_BAND_MM = 5e-4;
+export function infloApproachAssertions(positions, row, m, ui) {
+  const bad = [];
+  const P = m && m.inflorescence, B = m && m.inflorescenceBuilt, S = m && m.stem;
+  const decl = INFLO_APPROACH_XFAIL[row.label];
+  /* THE ENTRY IS THE PLAN'S OWN PRESENCE AND NOTHING ELSE — the first cut
+     also tested a `present` flag on the STEM projection, which that
+     projection does not carry, so the clause RETURNED before claiming
+     anything on every row and the export gate read `ok` on a raceme whose
+     florets pass through each other (measured, the gradient-0 row): the
+     fifth durable rule, in the clause written to apply it. Every field read
+     below is checked for being there, loudly. */
+  if (!P || !P.present || !B || !Array.isArray(B.placed) || B.placed.length < 2) {
+    if (decl) bad.push(`ID10: (d) this row is declared in INFLO_APPROACH_XFAIL at ${decl.approachMm} mm and builds ${B && Array.isArray(B.placed) ? B.placed.length : 0} floret(s) — there is no pair to measure; remove the entry`);
+    return bad;
+  }
+  if (!S || !Number.isFinite(S.outerR) || !Number.isFinite(S.rootZ) || !Array.isArray(S.tip) || !Number.isFinite(S.tip[2])) { bad.push(`ID10: (d) the stem's metrics projection carries outerR ${S && S.outerR}, rootZ ${S && S.rootZ} and tip ${S && JSON.stringify(S.tip)} — the free rachis cannot be located, so the join region cannot be excluded`); return bad; }
+  const P32 = positions;
+  const blocks = B.placed.map((q, k) => ({ lo: q.at, hi: q.at + q.tris * 9, owner: `floret${k}`, q }));
+  for (const b of blocks) if (!(Number.isFinite(b.lo) && Number.isFinite(b.hi) && b.lo >= 0 && b.hi <= P32.length && b.hi > b.lo)) { bad.push(`ID10: (d) ${b.owner}'s declared block [${b.lo}, ${b.hi}) does not lie in the file's ${P32.length} floats`); return bad; }
+  /* THE ENGINE IS THE COMBINATION GATE'S OWN (`tools/bloom-inflo-approach.mjs`,
+     imported, one owner): the same grid, the same nearest search, the same
+     segment-against-triangle crossing — so this clause and the gate's
+     `floret-floret` measure cannot disagree about what an approach IS, and a
+     floret passing THROUGH another reads 0 here as it does there. What
+     differs is the artefact: this reads the FILE's own floats. */
+  const rachis = { outerR: S.outerR, rootZ: S.rootZ, tipZ: S.tip[2] };
+  const outside = (p) => GEOMETRY.freeStemDistanceMm(rachis, p[0], p[1], p[2]) > 0;
+  const grid = infloTriGrid(P32, blocks.map(({ lo, hi, owner }) => ({ lo, hi, owner })));
+  let best = INFLO_APPROACH_CAP_MM, at = null, verts = 0, crossing = false;
+  for (const b of blocks) {
+    const seen = new Set();
+    for (let j = b.lo; j < b.hi; j += 3) {
+      const sk = `${P32[j]},${P32[j + 1]},${P32[j + 2]}`;
+      if (seen.has(sk)) continue;
+      seen.add(sk);
+      const p = [P32[j], P32[j + 1], P32[j + 2]];
+      if (!outside(p)) continue;
+      verts++;
+      const d = infloNearest(grid, p, b.owner, best);
+      if (d < best) { best = d; at = { node: b.q.nodeIndex, azDeg: (b.q.az * 180) / Math.PI }; }
+    }
+    if (best > 0 && infloCrosses(grid, P32, b.lo, b.hi, b.owner, outside)) { best = 0; crossing = true; at = { node: b.q.nodeIndex, azDeg: (b.q.az * 180) / Math.PI, crossing: true }; }
+  }
+  if (!verts) { bad.push('ID10: (d) no floret vertex lies outside the rachis — nothing to measure'); return bad; }
+  const where = at ? `the floret at node ${at.node + 1} (${at.azDeg.toFixed(0)} deg)${at.crossing ? ' PASSES THROUGH another' : ''}` : 'no pair within the cap';
+  const mech = (P.graded || P.corymb) ? 'a graded or corymb raceme — lower florets on pedicels of another length rise toward the node above; the floor is derived for EQUAL pedicels' : P.perNode > 1 ? 'the phyllotaxy — two florets of one node, which no internode moves apart' : 'the internode floor is derived to clear this, so a pair under it is a FINDING about the bound';
+  if (decl) {
+    if (best >= MIN_FEATURE_MM) bad.push(`ID10: (d) this row is DECLARED under the bar at ${decl.approachMm} mm (${decl.mechanism}) and its florets stand ${best.toFixed(4)} mm apart, at or over the ${MIN_FEATURE_MM} mm gap — the entry is stale; remove it in the same commit`);
+    else if (Math.abs(best - decl.approachMm) > INFLO_APPROACH_BAND_MM) bad.push(`ID10: (d) this row is declared at ${decl.approachMm} mm (${decl.mechanism}) and its florets stand ${best.toFixed(4)} mm apart — ${best < decl.approachMm ? 'WORSE' : 'better'} than its record by ${Math.abs(best - decl.approachMm).toFixed(4)}: re-record it in the same commit (${where})`);
+  } else if (best < MIN_FEATURE_MM) {
+    bad.push(`ID10: (d) the florets stand ${best.toFixed(4)} mm apart at the nearest — ${where} — under the ${MIN_FEATURE_MM} mm printable gap, and the row is not declared in INFLO_APPROACH_XFAIL (the mechanism to name: ${mech})`);
+  }
+  return bad;
+}
+/* INFLO_APPROACH_XFAIL — rows whose florets stand under the printable gap of
+   EACH OTHER, each with the number ID10 (d) measures and the MECHANISM that
+   puts it there (the three named in that clause's header). The module
+   refuses to load on an entry with no number or no mechanism. */
+export const INFLO_APPROACH_XFAIL = Object.freeze({
+  /* THE GRADIENT AT ITS FLOOR: the lower pedicels shorten to zero, so the
+     florets below the top walk back toward the rachis and the third node's
+     passes THROUGH the one above it (a crossing, 0.0000 mm, both engines).
+     The floor is derived for EQUAL pedicels and says so; a graded raceme's
+     clearance is this clause's to measure and this entry's to declare. */
+  'NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)': { approachMm: 0, mechanism: 'the GRADIENT at 0 — lower florets on shorter pedicels, the floor is derived for equal pedicels; node 3 passes through node 2' },
+  /* THREE SESSILE FLORETS ON ONE NODE: a spike's hubs are rooted in the
+     rachis wall 120 deg apart on a 6 mm rachis, and no internode can move
+     two florets of ONE node apart — the plan says `sameNodeMayTouch` on this
+     row and the top node's own three pass THROUGH each other (a crossing,
+     0.0000 mm). The row's internode floor (32.37 mm, the florets' own one
+     node apart) is met; this is the phyllotaxy's, declared by name. */
+  /* THREE FULL-SIZE FLORETS ON ONE NODE, TWELVE PETALS EACH: the same
+     mechanism at the other end of the size range — a whorl of three 1.00x
+     florets with 12 petals on a 6 mm rachis overlap EACH OTHER at the node,
+     120 deg apart, and no internode moves two florets of one node apart
+     (`sameNodeMayTouch` told on both). Found by the export subset the day the
+     floor took these corners from twelve nodes to one and two: at twelve nodes
+     the budget corner was refused and never censused, and `INFLO: ALL MAX`'s
+     one 250 mm node had never been read by ID10 (d). Declared, never clamped —
+     a floret's size and petal count are the head's own two controls. */
+  'INFLO: ALL MAX — every inflorescence control at its maximum (ONE node of 3 florets: a 250 mm pedicel reaches past the rachis)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three full-size twelve-petal florets of ONE node, 120 deg apart, pass through each other at the node; no internode moves them apart' },
+  'REACH INSET: THE BUDGET CORNER — 12 x whorled x 12 petals x 1.00 on 40 mm straight up (TWO nodes under the florets\' own floor, 17.3% of budget; was 95.0% at twelve before ruling 1)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three full-size twelve-petal florets of ONE node, 120 deg apart, pass through each other at the node; no internode moves them apart' },
+  'NODE LAWS: SESSILE x whorled x 12 nodes (the densest spike)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three sessile florets of one node, 120 deg apart on a 6 mm rachis, which no internode moves apart; the top node\'s own pass through each other' },
+});
+for (const [label, e] of Object.entries(INFLO_APPROACH_XFAIL)) {
+  if (!e || !Number.isFinite(e.approachMm) || !(e.approachMm >= 0) || !(e.approachMm < MIN_FEATURE_MM) || typeof e.mechanism !== 'string' || !e.mechanism) throw new Error(`INFLO_APPROACH_XFAIL: "${label}" needs { approachMm: a number under ${MIN_FEATURE_MM}, mechanism: a string }`);
+}
+export function infloApproachCoverage(attemptedLabels) {
+  const ran = new Set(attemptedLabels);
+  const stray = Object.keys(INFLO_APPROACH_XFAIL).filter((l) => !ran.has(l));
+  return stray.length ? [`ID10 coverage: INFLO_APPROACH_XFAIL names ${stray.length} row(s) the matrix did not run — ${stray.map((l) => `"${l}"`).join(', ')} — a declaration nothing measures is worse than an absence`] : [];
 }
 
 /* THE HARNESS'S OWN CONTACT TEST — deliberately not the geometry's. Laminae
@@ -9040,6 +9571,36 @@ export function orientationAssertions(positions, row, head) {
    closest any row now comes to the bar and it is named here for that reason;
    the whole 909-row matrix was re-swept in EXPORT mode at four segments and it
    is the ONLY row within 20%% under, with the next highest at 46%%. */
+/* INFLO_OVERTOP_XFAIL — ROWS WHERE A LOWER NODE'S FLORET OVERTOPS THE HEAD
+   (ID9 (d), build 3). The reach inset clears the TOP node's floret from the
+   head; it says nothing about a LOWER node whose pedicel is LONGER (build
+   2's gradient — the corymb solves LEVEL and so clears exactly as the top
+   does). Where one does, the row is named here with the INTRUSION in
+   millimetres — how far the highest emitted floret vertex stands above the
+   head's floor less the printable gap, in the page's LIVE build, measured by
+   the builder's own `floretsMaxZ` — and the gate holds it to that number in
+   BOTH directions (±OVERTOP_BAND_MM, the record's own rounding plus the two
+   engines' last bits). A row reading 0 is stale and must come off; an
+   undeclared row reading above 0 is a finding. The top node is NEVER declared
+   here: node 0's clearance is the law's own claim. Measured in Node over
+   every inflorescence row of the matrix (`overtop.mjs`, both modes agreeing
+   to the double) and confirmed on the page by the export gate. */
+export const OVERTOP_BAND_MM = 5e-4;
+export const INFLO_OVERTOP_XFAIL = Object.freeze({
+  /* EMPTY SINCE BUILD 3's RULING 2 (Eva: "the gradient caps so the lowest
+     head does not exceed the terminal head's height"). The two rows that
+     stood here — `NODE LAWS: gradient 3 x 12 nodes x 60 mm` at 26.3068 mm
+     and `REACH INSET: gradient 3 x 100 mm` at 71.3519 — were the gradient's
+     ramp reaching the head, and the cap (`gradientMax`, ID7) now stops the
+     ramp exactly where that would start: both read at or under 0 on the
+     capped tree. The list and its clauses STAY, so a future law that lets a
+     lower floret past the bar has to declare it here by name with its
+     number, and so an entry nobody re-measures goes stale loudly. */
+});
+for (const [label, e] of Object.entries(INFLO_OVERTOP_XFAIL)) {
+  if (!e || !Number.isFinite(e.intrusionMm) || !(e.intrusionMm > 0)) throw new Error(`INFLO_OVERTOP_XFAIL: "${label}" declares no positive intrusion (${JSON.stringify(e)}) — an entry is {intrusionMm[, note]}, and a declaration without a number is a label`);
+}
+
 export const EXPORT_REFUSED_XFAIL = Object.freeze({
   'ALL MAX': { tris: 3090910, note: 'THE FLORIST\'S CUT (stem session 3, docs/bloom-stem-cut-outcome.md §12) takes this row 3,090,816 -> 3,090,910 tris (+94, both modes): the blanket sweep hands `stemLength` its 120 mm at the default 6 mm diameter, so this row carries a stem and `stemCut` ships FLORIST, and the cut costs exactly the +94 the shipping stem does (the cut band\'s 2N-2 plus the two fans less the flat annulus). Measured in Node on both trees, export and live. Before that: 3,090,816 tris. THE PETAL EDGE PROFILE (the rim taper and bead) takes this row 2,354,268 -> 3,090,816 tris (export), 157.0%% -> 206.1%% of the 1,500,000 budget. AT EIGHT BEAD SEGMENTS IT READ 4,239,920 (282.7%%); Eva ruled the count down to FOUR (eight puts facets at about 0.2 mm, under Nylon 12 White\'s ~0.35-0.4 mm resolvable detail) and this row fell 27.1%%. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +31.3%% over main here against +29.7%% on the shipping default. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +80.1%% here against +73.7%% on the shipping default. Measured in Node on both trees by `node tools/bloom-xfail-magnitudes.mjs --include-refused`; XR1\'s builder tally agrees with the refused count. Before that: 2,354,268 tris (export) against the 1,500,000 budget (ORGANIC VARIANCE build 1 — docs/bloom-organic-variance-size-outcome.md §6: the blanket sweep hands `varianceSize` its 0.50, and the FRINGE\'s tooth ceiling is a rule about the terminal\'s WIDTH, `W >= (2N-1) * MIN_FEATURE_MM`, so the 0.5x petals of the wave cut fewer teeth — per petal 10/9/8/…/1 where the unvaried row cut 10/8/6/4/3 per whorl — and the row lost 152,384 triangles: 2,506,652 -> 2,354,268, measured in Node on both amounts. A topology move by the fringe\'s own width rule, mode-free as that rule is; XR1\'s builder tally agrees with the refused count.) Before that: 2,506,652 tris, a 119.5 MiB file (sepals part 1: the blanket sweep now also hands `sepalCount` its maximum, 40 sepals at the shipped sub-control defaults on the 40-petal rim, +94,240 tris over the 2,412,412 the row read on main after the stem tip plug (the sepal session first quoted +94,140, computed against the stale 2,412,512; the count itself was measured); the sepal sub-controls are hidden at DEFAULTS and stay out of the sweep; the count is re-measured on the merged tree by `node tools/bloom-xfail-magnitudes.mjs --include-refused`). Before that, the fringe: the blanket sweep hands the three fringe controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.' },
   /* THE SHARED NODE ON RULING 9'S CORNER (the node-laws session). Not a
@@ -9048,7 +9609,23 @@ export const EXPORT_REFUSED_XFAIL = Object.freeze({
      is unmoved at 1,425,468 (95.0%%). At the shipped 35 deg the same corner
      seats one leaf under each of its 36 pedicels: 36 x 2,548 = 91,728 more,
      measured in Node on EXPORT. Declared rather than clamped (the brief). */
-  'NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel (101.1% of budget — REFUSED)': { tris: 1517290, note: 'THE FLORIST\'S CUT (stem session 3) takes this row 1,517,196 -> 1,517,290 tris (+94, both modes): its 120 mm rachis is cut like any stem (the pedicels are pinned FLAT through PEDICEL_PINS and move nothing). CI caught it — shard 7 of bloom-export-watertight on 9e6cce3, XR1 on both the read-out and the builder\'s tally — because the session re-measured the self-intersection census and not the refusal list, and no local instrument reads it: the fix is this re-record, named in docs/bloom-stem-cut-outcome.md §12. Before that: ruling 9\'s corner (12 nodes x whorled = 36 florets of 12 petals at 1.00x on 60 mm pedicels) at the shipped 35 deg instead of ALL MAX\'s 90, with a 40 mm leaf seated under every pedicel by the shared node: 1,425,468 + 36 x 2,548 = 1,517,196 tris (export), 101.1%% of the 1,500,000 budget. The same corner at 90 deg seats NO leaf (the offset is infinite there) and exports at 95.0%%. Measured in Node, export mode.' },
+  /* RETIRED BY RULING 1 (the florets' own internode floor): the corner that
+     refused at 1,517,196 (101.1%%) held TWELVE nodes under the rods' 6 mm
+     floor; under the florets' floor (68.20 mm on this state) the 120 mm rachis
+     holds ONE node of three florets and the same control set EXPORTS at
+     150,996 (10.1%%) — a declared refusal that started exporting, which XR1
+     fails hard on, so the entry is gone and the row's label says what it is
+     now. NO SINGLE-WHORL RACEME REACHES THE BUDGET any more: the floor grows
+     with the floret, so the count falls as the per-floret cost rises (12
+     petals x 1.00 x whorled holds two nodes on the full rachis, 259,908);
+     the refusal path is still exercised by `ALL MAX` above. The entry as it
+     stood, for the record:
+     'NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (101.1% of budget — REFUSED)': { tris: 1517196, note: 'REDEFINED by build 3 (the reach inset): on 60 mm pedicels the floret reach puts the top node 78.85 mm down a 120 mm rachis, the node law then holds NINE nodes, and the same corner EXPORTS at 1,144,596 (76.3%%) — a declared refusal that started exporting, which XR1 fails hard on, so the row moved to 40 mm, the longest pedicel at which this corner still refuses (12 nodes, the count the 101.1%% was measured at; measured in Node, export mode, over 5/20/40/60/80/100/120/250 mm). The original: ' +  'ruling 9\'s corner (12 nodes x whorled = 36 florets of 12 petals at 1.00x on 60 mm pedicels) at the shipped 35 deg instead of ALL MAX\'s 90, with a 40 mm leaf seated under every pedicel by the shared node: 1,425,468 + 36 x 2,548 = 1,517,196 tris (export), 101.1%% of the 1,500,000 budget. The same corner at 90 deg seats NO leaf (the offset is infinite there) and exports at 95.0%%. Measured in Node, export mode.' },
+     MAIN RE-RECORDED THE SAME ROW AT +94 (the florist's cut on its 120 mm rachis,
+     stem session 3, 1,517,196 -> 1,517,290) while this branch was in CI; under the
+     floor the row holds one node and exports, so that entry is retired too and the
+     cut's +94 is on the live row's count instead.
+  */
 });
 for (const [label, e] of Object.entries(EXPORT_REFUSED_XFAIL)) {
   if (!e || !Number.isInteger(e.tris) || e.tris < 1) throw new Error(`EXPORT_REFUSED_XFAIL: "${label}" declares no triangle count (${JSON.stringify(e)}) — an entry is {tris[, note]}, and a declaration without a number is a label`);
@@ -9105,6 +9682,13 @@ export function exportRefusedLine(label, r) {
 
 /* A declaration naming a row the matrix did not run is worse than an absence —
    `SELF_INTERSECTION_XFAIL`'s own coverage clause, for the same reason. */
+/* The same coverage clause for the overtop list: a declared row the matrix
+   did not run is a declaration nothing measures. */
+export function infloOvertopCoverage(attemptedLabels) {
+  const have = new Set(attemptedLabels);
+  const stray = Object.keys(INFLO_OVERTOP_XFAIL).filter((l) => !have.has(l));
+  return stray.length ? [`ID9 coverage: INFLO_OVERTOP_XFAIL names ${stray.length} row(s) the matrix did not run — ${stray.map((l) => `"${l}"`).join(', ')} — a declaration nothing measures is worse than an absence`] : [];
+}
 export function exportRefusedCoverage(attemptedLabels) {
   const have = new Set(attemptedLabels);
   const stray = Object.keys(EXPORT_REFUSED_XFAIL).filter((l) => !have.has(l));
@@ -9397,6 +9981,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      row on main names because the matrix varies one control at a time, found
      the moment a new block put two controls together. */
   'STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)': { pairs: 248, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — the HEAD\'s, not the stem\'s: the identical state with stemLength 0 reads the same 216 pairs at the same point, and so does "headRise max (1)") — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 216 -> 248 pairs, 0.4176 -> 0.4262 mm' },
+  'REACH INSET: a hemisphere head (the floor is the RIM, 8.8 mm under the stem\'s root plane)': { pairs: 1128, worstMm: 0.4262, note: 'THE HEAD\'s OWN HEMISPHERE FOLD, NOT THE INSET\'s: the head alone reads 248 at this exact span (`STEM: x a hemisphere`, the EFFECTIVE-TILT-PAST-90 class) and each floret inherits rise 1 (ruling 10) and carries the same fold — 248 + 4 x 220 = 1128 since the INTERNODE FLOOR (build 3, ruling 1) took this raceme 5 -> 4 nodes; was 248 + 5 x 220 = 1348. Declared from birth (build 3, measured in the gate\'s Chromium and reproduced in Node).' },
   /* AND THE SAME SHAPE ONE BLOCK ON (the sphere-stem session), measured the
      same two-sided way rather than read off the label: the identical state with
      `stemLength` 0 reads the SAME 199 pairs at the SAME point, and so does a
@@ -11948,7 +12533,7 @@ export function buildMatrix() {
        no longer is, so it says what it is — the frozen matrices keep the old
        words, as a verbatim snapshot must. */
     ['INFLO: 5 mm pedicels (short — the old floor, florets against the rachis)', { stemLength: 120, inflorescence: 'RACEME', pedicelLength: 5 }],
-    ['INFLO: 60 mm pedicels (the ceiling — half the rachis)', { stemLength: 120, inflorescence: 'RACEME', pedicelLength: 60 }],
+    ['INFLO: 60 mm pedicels (build 1\'s ceiling — half the rachis; the ceiling is 250 since build 3)', { stemLength: 120, inflorescence: 'RACEME', pedicelLength: 60 }],
     ['INFLO: pedicels DESCENDING (-60 deg — the florets hang below their nodes)', { stemLength: 120, inflorescence: 'RACEME', pedicelAngle: -60 }],
     ['INFLO: pedicels STRAIGHT UP (90 deg — the placement rotation is the identity there)', { stemLength: 120, inflorescence: 'RACEME', pedicelAngle: 90 }],
     /* THE RACHIS ITSELF. At 3 mm it is SOLID (bore = max(0, 1.5 - 1.5) = 0)
@@ -11983,7 +12568,7 @@ export function buildMatrix() {
        whorled(3) = 36 florets, each a full-size 12-petal head on a 60 mm
        pedicel pointing straight up. Measured at 1,114,828 export triangles —
        74.3% of the budget, so it exports rather than refusing. */
-    ['INFLO: ALL MAX — every inflorescence control at its maximum (36 florets)', { stemLength: 120, inflorescence: 'RACEME', floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 60, pedicelAngle: 90 }],
+    ['INFLO: ALL MAX — every inflorescence control at its maximum (ONE node of 3 florets: a 250 mm pedicel reaches past the rachis)', { stemLength: 120, inflorescence: 'RACEME', floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 250, pedicelAngle: 90 }],
     /* THE TWO GATED ROWS — hidden AND INERT, in both of the guard's arms.
        Each must be BIT-IDENTICAL to the same state with every inflorescence
        control at its own default, which is what the byte partition measures;
@@ -12394,10 +12979,10 @@ export function buildMatrix() {
   nodeLaw('gradient 0.5 (the lower pedicels shorter)', { ...RAC, pedicelGradient: 0.5 });
   nodeLaw('gradient 2 (the lower pedicels longer)', { ...RAC, pedicelGradient: 2 });
   nodeLaw('gradient 3 (the ceiling — the lowest florets overtop the upper)', { ...RAC, pedicelGradient: 3 });
-  nodeLaw('gradient 3 x 12 nodes x 60 mm (CLAMPED at the pedicel\'s own 120 mm ceiling)', { ...RAC, pedicelGradient: 3, floretNodes: 12, pedicelLength: 60 });
+  nodeLaw('gradient 3 x 12 nodes x 60 mm (was CLAMPED at the old 120 mm ceiling — the lowest pedicel 180 mm now, under the 250 cap)', { ...RAC, pedicelGradient: 3, floretNodes: 12, pedicelLength: 60 });
   nodeLaw('CORYMB on a 40 mm rachis (level tops, solved exactly)', { ...RAC, stemLength: 40, pedicelCorymb: 'ON' });
   nodeLaw('CORYMB on a 40 mm rachis at 60 deg', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', pedicelAngle: 60 });
-  nodeLaw('CORYMB on the 120 mm rachis (CLAMPED — the lowest heads below the level, told)', { ...RAC, pedicelCorymb: 'ON' });
+  nodeLaw('CORYMB on the 120 mm rachis (solved exactly at the 250 mm ceiling — the lowest pedicel 134.3 mm, which the old 120 cap CLAMPED)', { ...RAC, pedicelCorymb: 'ON' });
   nodeLaw('CORYMB at a level pedicel (INERT, told)', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', pedicelAngle: 0 });
   nodeLaw('CORYMB x whorled', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', floretPhyllotaxy: 'whorled' });
   nodeLaw('GATED — gradient 3 under the CORYMB (hidden AND inert)', { ...RAC, stemLength: 40, pedicelCorymb: 'ON', pedicelGradient: 3 });
@@ -12437,7 +13022,7 @@ export function buildMatrix() {
      That corner cannot be a row (the outcome doc §5 says exactly why); this
      is the cheap state that exercises the same arm. */
   nodeLaw('x 2 whorls (every floret inherits the head\'s second whorl)', { ...RAC, layerCount: 2 });
-  nodeLaw('ALL MAX at 35 deg x a leaf under every pedicel (101.1% of budget — REFUSED)', { ...RAC, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 60, pedicelAngle: 35, leafLength: 40 });
+  nodeLaw('ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (ONE node under the florets\' own floor — 10.1% of budget, EXPORTS; was 101.1% REFUSED at twelve nodes before ruling 1)', { ...RAC, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 40, pedicelAngle: 35, leafLength: 40 });
 
   /* 47. BARE-STEM NODES — NODES DECOUPLED FROM LEAVES (Eva's ruling 6, stem
         session 2; docs/bloom-stem-session-2-outcome.md). A stem with NO leaves
@@ -12516,6 +13101,76 @@ export function buildMatrix() {
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
+
+  /* 49. THE REACH INSET AND THE 250 mm PEDICEL (inflorescence build 3, Phase A;
+        docs/bloom-inflorescence-build-3-outcome.md). Issue #355: the top
+        floret's petals passed through the terminal head's on the SHIPPED
+        raceme, because the inset was the LEAF's law — the pedicel's rise —
+        and cleared the rod rather than the flower. The inset is the floret's
+        own emitted petal reach now, in both modes, plus one printable gap
+        (ID9); and the pedicel's ceiling is 250 mm (Eva, Oct 4), the pedicel's
+        own range rather than the head's stem control.
+
+        WHAT THESE ROWS ARE FOR: both STL gates are blind to a floret inside
+        the head (overlapping closed shells). ID9 is the witness. The axes: the
+        two ends of the new ceiling at the shipped angle and straight up (the
+        reach then EXCEEDS the rachis — one node, told, the other arm of the
+        satisfied biconditional); the corymb on the FULL 120 mm rachis, which
+        the old cap clamped and the new one solves exactly; the gradient
+        clamped AT the new ceiling; the sheet whose live and export reach
+        DIFFER (the union is what decides the node — the mutant's only
+        witness); a descending pedicel, where the reach is under the node and
+        the stem's own inset stands (the clamp's other arm); a domed head,
+        whose floor is its RIM and not the stem's root plane; the full-size
+        floret; and THE BUDGET CORNER, which `INFLO: ALL MAX` stopped being
+        when its pedicel went to 250 (one node) — the densest raceme the
+        controls reach WAS the same corner at 40 mm, 95.0% of the budget,
+        measured over the whole pedicel sweep — and ruling 1's floor took it
+        to TWO nodes and 17.3% (the row's label carries both). */
+  const reachRow = (label, sets) => rows.push({ label: `REACH INSET: ${label}`, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  const RACEME = { stemLength: 120, inflorescence: 'RACEME' };
+  reachRow('250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)', { ...RACEME, pedicelLength: 250 });
+  reachRow('250 mm straight up (90 deg) — the reach is the pedicel plus the floret, one node', { ...RACEME, pedicelLength: 250, pedicelAngle: 90 });
+  reachRow('100 mm pedicels (the inset at 80 mm of a 120 mm rachis — five nodes in the 23 mm left)', { ...RACEME, pedicelLength: 100 });
+  reachRow('LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 134.3 mm, past the old 120 cap)', { ...RACEME, pedicelCorymb: 'ON', floretNodes: 8 });
+  reachRow('gradient 3 x 100 mm (the lowest pedicel CLAMPED at the 250 mm ceiling)', { ...RACEME, pedicelLength: 100, pedicelGradient: 3 });
+  reachRow('a 0.60 mm sheet (the LIVE and EXPORT reach differ — the union decides the node)', { ...RACEME, sheetThickness: 0.6 });
+  reachRow('descending (-60 deg): the reach is under the node and the stem\'s own inset stands (not clamped)', { ...RACEME, pedicelAngle: -60 });
+  reachRow('a hemisphere head (the floor is the RIM, 8.8 mm under the stem\'s root plane)', { ...RACEME, headRise: 1 });
+  reachRow('full-size florets (1.00x — the deepest reach a default head carries)', { ...RACEME, floretScale: 1 });
+  reachRow('THE BUDGET CORNER — 12 x whorled x 12 petals x 1.00 on 40 mm straight up (TWO nodes under the florets\' own floor, 17.3% of budget; was 95.0% at twelve before ruling 1)', { ...RACEME, floretNodes: 12, floretPhyllotaxy: 'whorled', floretPetals: 12, floretScale: 1.00, pedicelLength: 40, pedicelAngle: 90 });
+
+  /* 50. PER-NODE VARIATION AND THE DERIVED FLORET PHASE (inflorescence build
+        3, Phase B — Eva's ruling 10 and her Oct 3 phase ruling;
+        docs/bloom-inflorescence-build-3-outcome.md §5). `nodeVariance` moves
+        each floret's curl, cup and twist by its node's azimuth about the
+        rachis through the one resolver (NV1), and every floret carrying a
+        field takes a phase DERIVED from its own node's outward direction
+        rather than the head's (NV2). Both STL gates are blind to all of it.
+        The axes: the amount alone; the amount under the head's own field
+        (the slot field composing on the moved base, the phase derived);
+        opposite and whorled (two and twenty-four distinct states — the cost
+        the discovery predicted, a build per distinct node); the phase alone
+        on a descending pedicel (the outward point flips) and at a LEVEL one
+        (inert, the head's phase stands — the one state the derivation has no
+        answer for); the head's own frequency and phase moved, which the
+        florets must not follow; the amount under a gradient (the memo's key
+        carries both the length and the term); and the GATED row. The
+        INTERNODE FLOOR (ruling 1) and the GRADIENT CAP (ruling 2) ride on
+        every inflorescence row (ID10, ID7); the two rows below that name
+        them are the states where each binds hardest. */
+  const nv = (label, sets) => rows.push({ label: `NODE VARIANCE: ${label}`, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  nv('amount 1 on the raceme (each floret\'s curl, cup and twist by its node\'s azimuth — two distinct builds)', { ...RACEME, nodeVariance: 1 });
+  nv('0.5 x the form field 0.5 (the head\'s slot field composing on the moved base; the phase DERIVED outward)', { ...RACEME, nodeVariance: 0.5, varianceForm: 0.5 });
+  nv('x OPPOSITE (the two florets of a node take opposite signs — four distinct builds)', { ...RACEME, nodeVariance: 1, floretPhyllotaxy: 'opposite' });
+  nv('x WHORLED x 8 nodes (twenty-four azimuths — the cost corner, a build per distinct node)', { ...RACEME, nodeVariance: 1, floretPhyllotaxy: 'whorled', floretNodes: 8 });
+  nv('the DERIVED PHASE alone — the size field on DESCENDING pedicels (-60 deg: the outward point flips)', { ...RACEME, varianceSize: 0.5, pedicelAngle: -60 });
+  nv('the derived phase at a LEVEL pedicel (INERT, told — the outward direction is the floret\'s own axis)', { ...RACEME, varianceSize: 0.5, pedicelAngle: 0 });
+  nv('x the form field at frequency 3 with the head\'s phase at 90 (the florets\' phase is their own, never the head\'s)', { ...RACEME, varianceForm: 0.5, varianceFrequency: 3, variancePhase: 90 });
+  nv('x gradient 2 (a delta per node AND a length per node — the memo keys on both)', { ...RACEME, nodeVariance: 1, pedicelGradient: 2 });
+  nv('GATED — amount 1 with NO inflorescence (hidden AND inert)', { stemLength: 120, inflorescence: 'NONE', nodeVariance: 1 });
+  nv('INTERNODE FLOOR: full-size WHORLED florets (the florets\' floor at its widest — the count the rachis holds at 1.00x)', { ...RACEME, floretPhyllotaxy: 'whorled', floretScale: 1 });
+  nv('GRADIENT CAP: gradient 3 x 100 mm straight up on 12 nodes (the cap binds hardest — asked 3.00, the ramp stops where the lowest floret would overtop the head)', { ...RACEME, pedicelGradient: 3, pedicelLength: 100, pedicelAngle: 90, floretNodes: 12 });
 
   return rows;
 }
@@ -30038,7 +30693,7 @@ export const FROZEN_BASE_COMMITS = {
   phase49: 'f266606',   // main's head before the TUBE (corolla fusion); the 993 rows before block 45
   phase50: '754e3aa',   // main's head before the INFLORESCENCE NODE LAWS (gradient, corymb, sessile, shared node); the 1047 rows before block 46
   phase51: 'af15342',   // main's head before NODES DECOUPLED FROM LEAVES (ruling 6, stem session 2); the 1080 rows while a stem with no leaves carried no nodes
-  phase52: '23b13bd',   // main's head before the FLORIST'S CUT (ruling 7, stem session 3); the 1089 rows while every stem ended on a flat face
+  phase52: '23b13bd',   // main's head before the FLORIST'S CUT (ruling 7, stem session 3) AND before INFLORESCENCE BUILD 3 (#355, the reach inset and the 250 mm pedicel) — two sessions in flight against one base, one baseline; the 1089 rows while every stem ended on a flat face and the top node's inset was the pedicel's rise
   phase39: '8bb8685',   // main's head before the APEX NIB; the 931 rows while every petal ended on a FLAT face two print floors across whatever exponent was asked, and petalLength was the drawn length as well as the asked one
 };
 
@@ -46832,6 +47487,7 @@ export function phase51Matrix() {
     {"label":"NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel (101.1% of budget — REFUSED)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretPetals","value":"12"},{"id":"floretScale","value":"1"},{"id":"pedicelLength","value":"60"},{"id":"pedicelAngle","value":"35"},{"id":"leafLength","value":"40"}]},
   ];
 }
+
 
 export const FROZEN_MATRICES = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,

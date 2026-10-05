@@ -129,7 +129,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { parseShard, shardOf, matrixHash, writeCensus, slimConn, summarizeConn } from './bloom-connectedness-shards.mjs';
-import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 /* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
@@ -501,6 +501,11 @@ for (const [rowIndex, row] of rows.entries()) {
     await page.evaluate(() => window.__bloomMetrics()),
     await page.evaluate(() => window.__bloomUIState()));
   if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
+  /* ID10 (d) — THE FLORETS AGAINST EACH OTHER, read from THIS row's STL bytes
+     (build 3, ruling 1): the internode floor is derived to clear it, and the
+     file is the only thing that can say whether it did. */
+  const infloAp = infloApproachAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics()), await page.evaluate(() => window.__bloomUIState()));
+  if (infloAp.length) { validity.push(`${row.label}: ${infloAp.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the ONE thing in
      this file that can see OVER-connection. This gate's whole criterion is
      "one region": 120 feet fused into a single mass at the base are the most

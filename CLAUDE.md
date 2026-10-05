@@ -3578,6 +3578,132 @@ guard is in the outcome doc. Block 48 is 13 rows (1,089 → 1,102), smoke block 
 at every diameter (−30.2 mm³ at 6 mm, −136.8 at 12 on 60 mm — the wedge outweighs the plug), +94
 triangles, and the default bloom (no stem) is untouched at 24,688.
 
+**INFLORESCENCE BUILD 3, PHASE A — THE TOP NODE'S INSET IS THE FLORET'S OWN PETAL REACH, AND
+THE PEDICEL'S CEILING IS 250** (Eva's Oct 4 brief and ruling; issue #355 — read
+`docs/bloom-inflorescence-build-3-outcome.md` before touching `inflorescencePlan`'s inset block,
+`INFLO_REACH_GRID_MM`, `PEDICEL_LENGTH_RANGE`, `lenCeilMm`, the harness's pedicel-range guard,
+ID9 or block 49). Build 1 inherited the LEAF's inset law — the pedicel's rise, `L sin th` —
+which clears the ROD and not the flower on it: the shipped raceme's top floret stood with its
+petals THROUGH the terminal head's at 0.000 mm while `insetSatisfied` read true, and both STL
+gates were blind to it (overlapping closed shells). **THE LAW:** the plan builds the topmost
+floret unit in BOTH modes (the memo it carries, which the builder then appends — nothing is
+built twice), places it through `pedicelPlacement` at depth 0, reads the highest emitted
+vertex as `reach`, ceils it onto a 2^-16 mm grid (a node count is a discrete decision on it,
+and the page's V8 and Node's differ in the last bits — the eighth instance of that class here),
+and sets `insetNeeded = reach + (rootZ − headFloorZ) + MIN_FEATURE_MM`, `headFloorZ` the STEM
+plan's own lowest material (a dome's rim). **THE REACH IS THE MAX OVER EVERY AZIMUTH THE
+PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by the smoke subset, not reasoned**: the placement's
+roll is the MINIMAL rotation, so a floret lands with a different petal up at each azimuth, and
+the first cut (azimuth 0 only) put `INFLO: WHORLED`'s other two florets 3.37 mm into the gap with
+`insetSatisfied` true. The max over the modes makes the node depths mode-free BY CONSTRUCTION.
+**Measured on the default: top node 19.2 → 37.7 mm down, floret-head 0.000 → 10.10 mm, 113,886
+export tris unmoved.** **THE PRICE IS A SHORTER NODE SPAN — 16.4 mm internodes against 21.0 — AND
+THE DEFAULT RACEME'S OWN FLORETS NOW STAND 0.676 mm FROM EACH OTHER, UNDER THE 1.00 mm BAR**
+(2.233 before; one state, three combination grids, declared, NOT tuned — the Phase A finding for
+Eva's ruling: keep it, or hold the internode and give up a node, which is build 2's node law to
+change). The grid says the rest: all seven `inflo-length-x-angle` cells CLEAR (verdict `clears`,
+#355 closed on the grid that found it), three re-record WORSE and fifteen new cells land under
+the bar, every one an edge crossing by the tighter internode;
+`inflo-leaf-nodes-x-leafangle`'s 52 mm base went INERT (both counts collapse to the pitch floor
+under the deeper inset — CG1 refused the axis, correctly) and moved to the 120 mm rachis.
+**THE CAP WAS TWO NUMBERS, NOT ONE**: `PEDICEL_LENGTH_RANGE` was [0, 60] and the per-node law
+clamped at the HEAD's `STEM_LENGTH_RANGE[1]` (120); both read 250 now, and **a shipped
+harness guard forbade exactly this** ("a pedicel outside the stem's own range is a rod nothing
+has ever been proved on") — restated on the ruling, with block 49's 250 mm rows as the proof it
+asked for. The corymb solves level to a **197 mm** rachis at the defaults (120 was 81), the
+full 120 mm stem at 20/49/77/106/134 mm, heads spanning 0.000. **`INFLO: ALL MAX` AT 250 IS ONE
+NODE** (a 265 mm reach passes the rachis — 143,352 tris) so it is REDEFINED and the budget
+corner is block 49's `THE BUDGET CORNER` at 40 mm, 95.0% (**17.3% at TWO nodes since ruling 1's
+floor; and the NODE LAWS refusal row below holds ONE node and EXPORTS at 10.1% — its refusal
+entry is RETIRED, and no single-whorl raceme reaches the budget any more**); the NODE LAWS refusal row EXPORTS
+at 60 mm now (76.3%) and is redefined to 40 mm, where it still refuses at 101.1%. **ID9 is the
+family** — (d) reads the BUILDER's own `floretsMaxZByNode` and `floretsMaxZ`, never the plan; (f) is mode-freeness
+measured within ONE engine, because the first cut asked for `Object.is` across the page's V8
+and Node's and went red on depths equal to four decimals. **AND CI'S FIRST FULL RUN FOUND TWO
+MORE OF ID9'S OWN, ON ROWS THE SMOKE SUBSET DID NOT HOLD** (§3a of the doc): (e) asserted the
+top node IS the inset, and ONE node sits at `LEAF_NODE_SOLO` (0.55 L — deeper, never shallower;
+restated from the two constants); (d) asserted EVERY placement clears, and the law only ever
+claimed the TOP unit's — under build 2's GRADIENT a lower node's LONGER pedicel rises through
+the terminal head (`gradient 3 x 12 nodes x 60 mm`: node 12 at 180 mm, 26.31 mm into the gap,
+`insetSatisfied` TRUE and right). **Swept over all 65 buildable inflorescence rows: exactly two
+overtop, both gradient 3** (26.3068 and 71.3519 mm), declared by name in `INFLO_OVERTOP_XFAIL`
+and held both ways; node 1's own clearance is asserted unconditionally and never declared; the
+read-out says `A LOWER FLORET OVERTOPS THE HEAD`. A second Phase A finding for Eva — the reach
+inset cannot fix it (a deeper top node moves the whole ramp down), it is the node law's. Both
+rows are smoke rows now (155 over 44 blocks). `frozen/phase52` is the 1089 rows at
+`23b13bd`. **Phase B (per-node deltas, the derived per-floret phase) is NOT started — it waits
+on Eva's ruling on `docs/img/inflo-build-3-phase-a.png`.**
+
+**BUILD 3 RULED AND PHASE B SHIPPED — THE INTERNODE FLOOR IS THE FLORETS' OWN, THE GRADIENT IS
+CAPPED AT THE HEAD, EVERY SHIPPED DEFAULT CLEARS THE BAR IN CI, AND A FLORET'S FORM MOVES WITH
+ITS NODE'S AZIMUTH WITH ITS PHASE DERIVED OUTWARD** (Eva's three rulings on Phase A and the
+Phase B brief, Oct 4 — read §11–§19 of `docs/bloom-inflorescence-build-3-outcome.md` before
+touching `floretPitchFloorMm`, `floretPairClasses`, `INFLO_PITCH_CELLS_PER_GAP`, the plan's
+`gradientMax`, `nodeVarianceTerm`, `floretPhaseDeg`, `floretNodeOverrides`, the memo's azimuth
+key, ID10, NV0–NV4, DB0–DB2 or block 50). **RULING 1**: `pitchFloorMm = max(2·pedicelR, the
+florets' own)`, derived from the floret unit the builder EMITS — a column map per azimuth (cells
+a quarter of the gap, each triangle's z-range CLIPPED to the cell through its plane), over the
+distinct `(a, b, d)` pairs the phyllotaxy produces (**a pair is two azimuths and a depth, never
+an azimuth difference** — the placement roll is minimal, so the first cut's difference classes
+read 11.5 mm against a measured 0.68), both modes, the larger ceiled onto the reach grid. The
+default raceme: **floor 17.97 mm (exact mesh crossing 16.55), 5 → 4 nodes, florets 0.676 →
+9.614 mm apart, 113,886 → 96,468 tris** — one fewer floret, the ruling's own price. **Derived
+for EQUAL pedicels and said so**: a graded or corymb raceme is MEASURED instead (ID10 (d), on
+the exported file through the combination gate's own `triGrid`/`nearest`/`crosses` — one
+owner, so the clause and the gate's `floret-floret` cannot disagree), and same-node florets
+are the PHYLLOTAXY's (`sameNodeMayTouch`, told). **Two reachable rows cannot clear the bar and
+are DECLARED with their mechanism in `INFLO_APPROACH_XFAIL`, never clamped**: the gradient at
+0 (node 3 through node 2) and three sessile whorled florets of one node 120° apart on a 6 mm
+rachis. **THE FLOOR RE-RECORDS THE COMBINATION GATE'S WHOLE INFLORESCENCE FAMILY** (§12e): 24
+declared cells CLEAR (the default's 0.676 reads 9.614), the corymb's sessile 60-deg cell improves
+0.000 → 0.2144 without clearing, the two gradient-0 cells are new at 0.000, `floretNodes` on the
+leaf-nodes pair goes INERT (five nodes is all the floor admits on the span the inset leaves —
+declared in `COMBINATION_INERT` with the number) and three verdicts move; declared 167 → 145.
+**AND THE FLOOR'S PER-PAIR SWEEP WAS NOT FREE — ITS OWN HEADER SAID IT WAS** (§12f): on the whorled
+rows 564 pairs each walked every upper cell against 81 offsets through a `Map`, 67 of 87 profiled
+seconds, `NODE LAWS: ALL MAX at 35 deg` 188 s on the live page against the 30 s settle (an uncaught
+settle timeout kills a CI shard). The lower map is dilated once per offset RING now and a pair is one
+pass against nine values — the same maximum in another order, bit-identical by construction and
+measured on thirteen rows (`where` recovered by the first form's own scan for the winning pair);
+214 → 10 s, the five heaviest rows 2.4–11.7 s on the page. **A profile, not a reading of the code,
+is what says which half of a two-part cost is the one that scales.** **Two corners the floor opened to ID10 (d)** — `INFLO: ALL MAX` and `THE BUDGET CORNER`,
+three full-size twelve-petal florets of ONE node through each other, the sessile spike's mechanism at
+the other end of the size range — are declared in `INFLO_APPROACH_XFAIL`, and **NV4 compares the
+per-node overrides within 8 ulp** (`NV_OVERRIDE_ULPS`): the page's `Math.cos` and Node's differ in the
+last bit at one of twenty-four azimuths, and an exact string across two engines is session 38 §B10.7's
+class again. **RULING 2**: `gradientMax` is the gradient at which the lowest floret's reach meets
+the terminal head's floor (the reach law's own inset), floored onto the grid so the cap sits a
+hair under the bar rather than on it; told as `GRADIENT CLAMPED`, hatched on the control, ID7
+restates it. At the extreme (gradient 3 x 12 nodes x 60 mm) it caps **3.00 → 2.2356**; the
+corymb arm is untouched character for character and ID7 asserts the solve on every corymb
+row. `INFLO_OVERTOP_XFAIL` is EMPTY and kept; the anthela arrives named or not at all.
+**RULING 3 IS A STANDING RULE: `node tools/verify-bloom-defaults-bar.mjs` (DB0–DB2) holds
+`DEFAULTS` plus each guarded feature's RULED DEFAULTS — eight states, each PINNED BY NAME to
+a `buildMatrix()` row — at or over `MIN_FEATURE_MM` on every measure the combination gate
+owns, in CI before the browser; `--control` plants three must-fails. ADDING A GUARDED
+FEATURE ADDS ITS RULED-DEFAULT ROW THERE.** **PHASE B**: `nodeVariance` (Floret, 0–1,
+default 0 — the guard, out of the sweep through `INFLO_SUBS`) moves each floret's curl, cup
+and twist by `A·cos(az + offset_b)·half_b` — the head's own form law at frequency one about
+the rachis — through `resolveRoleOverrides`'s slot term (headroom scaling, the clamp, nothing
+new), spread BEFORE `PEDICEL_PINS`; **the per-floret phase is DERIVED, no control**: the
+minimal roll keeps a floret's local x̂ world-fixed (measured — the ruling's suspected defect
+was real), so `floretPhaseDeg` puts the crest at the node azimuth ψ (+180° on a descending
+pedicel; the head's own phase kept and told at a level one; φ = −f·ψ, the ramp φ = ψ), and
+NV2 re-derives it from the placement MATRIX. One build per DISTINCT STATE: the memo keys on
+`(length, mode, azimuth quantised to 1e-9 rad in one turn)` — unquantised, `cos(2π + x)`
+keyed five builds on a two-way alternate raceme. The sheet is `docs/img/inflo-build-3-phase-b.png`
+(`tools/shot-bloom-node-variance.mjs`): OFF against ON side-on on one camera at a held node
+count, the re-floored default, the cap. Block 50 is eleven rows (matrix 1110; 49 and 50, not 48 and 49: stem session 3 took 48 while this PR was in CI), and the merge with stem session 3 adds +94 triangles to every raceme row (the cut on the rachis; the pedicels are pinned FLAT by ruling 7's pin) — 96,468 → 96,562 on the default raceme, every percentage unchanged, eight mutants
+in the apex table, and **every inflorescence mutant was RE-RUN because rulings 1 and 2 are law
+changes** (Eva: "any mutant that went green against the old laws is stale evidence"). **AND THE
+MERGED TREE'S FIRST FULL CI RUN FOUND TWO THINGS NO LOCAL RUN COULD** (§19a of the doc): the
+defaults-bar gate imports the harness and so sits AFTER the npm install (ST9's placement rule,
+re-learned on `45003cd`), and the edge-profile gate's E2 — which draws from the smoke subset,
+so block 50 had never reached it — reads **49.478652°** on `NODE VARIANCE: 0.5 x the form field
+0.5`: a FLORET petal at twist −111 where the node term and the head's form field compose, the
+declared twist-out-of-plane class (twist −111 on the sliders alone adds 49.10° through the same
+gate), declared in `E2_TURN_XFAIL` at its magnitude and not clamped.
+
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
 then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships

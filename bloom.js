@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, nodeVarianceIsAbsent } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -502,6 +502,7 @@ let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepa
    builder reports as `placementResidual`, by a second expression beside the
    method under test. */
 let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0;
+let lastNodeVarianceAbsent = true;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
    question does not arise (no stem, or not a sphere), never a passing 0. */
@@ -709,6 +710,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfloBuilt = built.inflorescenceBuilt || null;
     lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
     lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
+    lastNodeVarianceAbsent = nodeVarianceIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
@@ -1593,17 +1595,38 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    range. And the one thing that is not a clamp but is an absence: the GRID
    export writes the head at the origin only, so a raceme's florets are not in
    it — said here rather than discovered by a reader of a nearly-empty .glb. */
+/* THE OVERTOP LINE — which node, if any, stands above the floor the top node
+   was inset under. Node 0 is the law's own subject and is never named here
+   (ID9 (d) asserts it); a lower node is a LONGER pedicel's (the gradient),
+   told with the intrusion in millimetres, read off the builder's per-node
+   maxima and the plan's own floor and gap — the same two numbers the law used. */
+function overtopLine(plan, builtInflo) {
+  const by = builtInflo && builtInflo.floretsMaxZByNode;
+  if (!plan.insetSatisfied || !Array.isArray(by) || !Number.isFinite(plan.headFloorZ)) return '';
+  const bar = plan.headFloorZ - plan.insetGapMm;
+  let worst = -1, worstZ = -Infinity;
+  for (let i = 1; i < by.length; i++) if (Number.isFinite(by[i]) && by[i] > bar && by[i] > worstZ) { worst = i; worstZ = by[i]; }
+  if (worst < 0) return '';
+  const intr = worstZ - bar;
+  const over = by.filter((z, i) => i > 0 && Number.isFinite(z) && z > bar).length;
+  return ` — A LOWER FLORET OVERTOPS THE HEAD: node ${worst + 1}'s (${plan.pedicelLensMm[worst].toFixed(1)} mm pedicel, ${(plan.pedicelLensMm[worst] / Math.max(1e-9, plan.pedicelLensMm[0])).toFixed(2)}x the top's) stands ${intr.toFixed(2)} mm into the gap under the head${over > 1 ? ` (${over} of ${by.length - 1} lower nodes do)` : ''} — the inset is the TOP floret's reach and a longer lower pedicel outreaches it (told, never clamped)`;
+}
+
 function infloLine(plan, builtInflo) {
   const per = plan.perNode;
   const n = builtInflo ? builtInflo.count : plan.built;
   return `\n     INFLORESCENCE ${plan.type} · ${n} floret${n === 1 ? '' : 's'} on ${plan.nodes} node${plan.nodes === 1 ? '' : 's'} · ${plan.phyllotaxy} (${per} a node)`
-    + (plan.nodesClamped ? ` — NODE COUNT CLAMPED ${plan.nodesAsked} -> ${plan.nodesBuilt}: the span left cannot hold them a pedicel apart` : '')
+    + (plan.nodesClamped ? ` — NODE COUNT CLAMPED ${plan.nodesAsked} -> ${plan.nodesBuilt}: the span left cannot hold them ${plan.pitchFloorIsFlorets ? 'a floret' : 'a pedicel'} apart` : '')
     + `\n     FLORET ${plan.floretPetals} petals at ${plan.petalLength.toFixed(1)} x ${plan.petalWidth.toFixed(1)} mm (${plan.scale.toFixed(2)}x the head's own)`
     + (plan.sizeClamped ? ` — CLAMPED from ${plan.lengthAsked.toFixed(1)} x ${plan.widthAsked.toFixed(1)} mm at the petal sliders' own floors` : '')
     + (builtInflo ? ` · ${builtInflo.unitTris.toLocaleString('en-US')} tris at the top node, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
     + `\n     PEDICEL ${plan.pedicelLenMm === 0 ? 'SESSILE' : `${plan.pedicelLenMm.toFixed(0)} mm`} at the top, ${plan.angleDeg} deg · ${(2 * plan.pedicelR).toFixed(2)} mm across`
     + (plan.corymb || plan.graded
         ? ` · ${plan.corymb ? 'LEVEL TOPS (a corymb, solved)' : `GRADED ${Number(plan.gradient).toFixed(2)}x`}: ${plan.pedicelLensMm.map((L) => L.toFixed(1)).join(' / ')} mm top to bottom`
+          /* THE GRADIENT'S CAP (build 3, ruling 2): the lowest floret may not
+             rise past the floor the top one was inset under, so the ramp is
+             capped where it would — told with the asked value beside it. */
+          + (plan.gradientClamped ? ` — GRADIENT CLAMPED at ${Number(plan.gradientMax).toFixed(2)}x (asked ${Number(plan.gradientAsked).toFixed(2)}x): past it the lowest floret would overtop the head` : '')
           + (builtInflo && builtInflo.units ? ` · ${builtInflo.units.length} distinct floret build${builtInflo.units.length === 1 ? '' : 's'}` : '')
           + (plan.lengthsClamped ? ` — CLAMPED at ${plan.lenCeilMm} mm, the pedicel's own ceiling as a stem` : '')
         : '')
@@ -1617,10 +1640,29 @@ function infloLine(plan, builtInflo) {
       : `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
         + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)'))
     + `\n     NODES top ${plan.nodeDepthsMm[0].toFixed(1)} mm below the hub`
+    /* THE INTERNODE FLOOR IS THE FLORETS' OWN (build 3, ruling 1): derived
+       from the floret unit's emitted triangles — the shift at which a floret
+       provably clears the one above it by the printable gap, over every
+       azimuth pair the phyllotaxy produces — never a number typed here. The
+       rods' own floor (two pedicel radii) stands beside it and binds only
+       where the florets are smaller than their stalks are thick. */
+    + (plan.nodeDepthsMm.length > 1
+        ? ` · INTERNODE ${(plan.nodeDepthsMm[1] - plan.nodeDepthsMm[0]).toFixed(1)} mm, floor ${plan.pitchFloorMm.toFixed(2)} mm ${plan.pitchFloorIsFlorets && plan.pitchFloorAt ? `(the FLORETS' own: the floret at ${plan.pitchFloorAt.aDeg.toFixed(0)} deg against the one ${plan.pitchFloorAt.nodesApart} node${plan.pitchFloorAt.nodesApart === 1 ? '' : 's'} below it at ${plan.pitchFloorAt.bDeg.toFixed(0)} deg clears the ${plan.insetGapMm.toFixed(2)} mm gap from ${plan.pitchFloorAt.boundMm.toFixed(1)} mm of shift; the rods' own is ${plan.pitchFloorRodMm.toFixed(2)})` : `(the RODS' own, two pedicel radii; the florets ask ${plan.pitchFloretMm.toFixed(2)})`}`
+        : ` · floor ${plan.pitchFloorMm.toFixed(2)} mm ${plan.pitchFloorIsFlorets ? "(the FLORETS' own)" : "(the RODS' own)"}`)
+    + (plan.sameNodeMayTouch ? ` — FLORETS OF ONE NODE MAY STAND WITHIN THE GAP OF EACH OTHER (the phyllotaxy's, not the internode's — no pitch moves two florets of one node apart; told)` : '')
+    /* THE INSET IS THE FLORET'S OWN PETAL REACH (build 3, #355): the topmost
+       floret's highest emitted vertex, in both modes, one printable gap under
+       the head's lowest material — never the pedicel's rise, which cleared the
+       rod and put the shipped raceme's top floret through the head. */
     + (plan.insetClamped
-        ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm this pedicel needs to clear the head`
-        : ` (the stem's own inset; the pedicel needs ${plan.insetNeededMm.toFixed(1)} mm and has it)`)
-    + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the florets rise further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
+        ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm the top FLORET needs: its petals reach ${plan.reachMm.toFixed(1)} mm above its node (live ${plan.floretReachMm.live.toFixed(1)} / export ${plan.floretReachMm.export.toFixed(1)}, the larger decides)${plan.rootZ - plan.headFloorZ > 1e-9 ? ` + ${(plan.rootZ - plan.headFloorZ).toFixed(1)} mm to the head's rim` : ''} + the ${plan.insetGapMm.toFixed(2)} mm printable gap`
+        : ` (the stem's own inset; the top floret's petals reach ${plan.reachMm.toFixed(1)} mm above its node and need ${plan.insetNeededMm.toFixed(1)} mm, which it has)`)
+    + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the floret reaches further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
+    /* A LOWER NODE ON A LONGER PEDICEL (the gradient) can overtop the head
+       the top node was inset to clear — the inset is the TOP unit's reach and
+       nothing else's. Told, never clamped: read off the builder's own per-node
+       highest emitted vertex against the same floor the law used. */
+    + overtopLine(plan, builtInflo)
     /* THE FLORET AGAINST THE RACHIS — a FLAG with a number, never a refusal.
        Two parts of one solid fusing is OVER-connection (the crowding
        ruling's own grounds, Eva Sep 3): no boundary edge, no split in the
@@ -2440,6 +2482,9 @@ window.__bloomMetrics = () => ({
        node law's offset at the stem's length with them (`stemAxisAt`, the one
        front door). ST2 restates that offset rather than reading it here. */
     root: [0, 0, lastStem.rootZ], tip: [...stemAxisAt(lastStem, lastStem.lengthMm), lastStem.tipZ],
+    /* the two heights ID9 reads the head's FLOOR from (build 3): the root plane
+       and the plan's own lowest head material (a dome's rim) */
+    rootZ: lastStem.rootZ, lowestHubZ: lastStem.lowestHubZ,
     voidStations: lastStem.voidStations ? lastStem.voidStations.slice() : null,
     /* MEASURED FROM WHAT THE BUILDER EMITTED, not from the plan's own two
        heights: ST4 asks whether the root really runs THROUGH the slab, and a
@@ -2584,7 +2629,7 @@ window.__bloomMetrics = () => ({
      distinguishes "the builder says there are none" from "the builder says
      nothing", and a missing key is the second. */
   inflorescence: lastInflo ? {
-    type: lastInflo.type, phyllotaxy: lastInflo.phyllotaxy, perNode: lastInflo.perNode,
+    present: lastInflo.present, type: lastInflo.type, phyllotaxy: lastInflo.phyllotaxy, perNode: lastInflo.perNode,
     nodes: lastInflo.nodes, nodesAsked: lastInflo.nodesAsked, nodesBuilt: lastInflo.nodesBuilt,
     nodesClamped: lastInflo.nodesClamped, built: lastInflo.built,
     nodeDepthsMm: lastInflo.nodeDepthsMm.slice(),
@@ -2598,6 +2643,9 @@ window.__bloomMetrics = () => ({
     insetAskedMm: lastInflo.insetAskedMm, insetNeededMm: lastInflo.insetNeededMm,
     insetMm: lastInflo.insetMm, insetClamped: lastInflo.insetClamped,
     insetSatisfied: lastInflo.insetSatisfied,
+    /* the reach law's own inputs (build 3) — never the memo, which is a closure */
+    floretReachMm: lastInflo.floretReachMm ? { ...lastInflo.floretReachMm } : null,
+    reachMm: lastInflo.reachMm, reachRawMm: lastInflo.reachRawMm, reachGridMm: lastInflo.reachGridMm, reachAzimuths: lastInflo.reachAzimuths ? lastInflo.reachAzimuths.slice() : null, headFloorZ: lastInflo.headFloorZ, insetGapMm: lastInflo.insetGapMm,
     floretPetals: lastInflo.floretPetals, scale: lastInflo.scale,
     petalLength: lastInflo.petalLength, petalWidth: lastInflo.petalWidth,
     lengthAsked: lastInflo.lengthAsked, widthAsked: lastInflo.widthAsked,
@@ -2605,8 +2653,17 @@ window.__bloomMetrics = () => ({
     /* THE NODE LAWS (the node-laws session): the per-node lengths the plan
        solved, the two laws' own flags, and which nodes are sessile. */
     crossings: lastInflo.crossings.slice(),
-    gradient: lastInflo.gradient, corymbAsked: lastInflo.corymbAsked, corymb: lastInflo.corymb,
+    gradient: lastInflo.gradient, gradientAsked: lastInflo.gradientAsked, gradientMax: lastInflo.gradientMax, gradientClamped: lastInflo.gradientClamped,
+    corymbAsked: lastInflo.corymbAsked, corymb: lastInflo.corymb,
     corymbInert: lastInflo.corymbInert, graded: lastInflo.graded,
+    /* THE INTERNODE FLOOR (build 3, ruling 1): the florets' own, the rods'
+       own, which binds, and the pair it binds on. `pairClasses` is the (a,
+       b, d) list the floor was taken over — small, and ID10 reads it. */
+    pitchFloorMm: lastInflo.pitchFloorMm, pitchFloorRodMm: lastInflo.pitchFloorRodMm, pitchFloretMm: lastInflo.pitchFloretMm,
+    pitchFloretRawMm: lastInflo.pitchFloretRawMm, pitchFloorIsFlorets: lastInflo.pitchFloorIsFlorets,
+    pitchFloorAt: lastInflo.pitchFloorAt ? JSON.parse(JSON.stringify(lastInflo.pitchFloorAt)) : null,
+    sameNodeMayTouch: lastInflo.sameNodeMayTouch, unitExtentMm: lastInflo.unitExtentMm,
+    pairClasses: Array.isArray(lastInflo.pairClasses) ? lastInflo.pairClasses.map((c) => ({ ...c })) : null,
     pedicelLensMm: lastInflo.pedicelLensMm.slice(), pedicelLensAskedMm: lastInflo.pedicelLensAskedMm.slice(),
     lengthsClamped: lastInflo.lengthsClamped, lenCeilMm: lastInflo.lenCeilMm,
     sessileNodes: lastInflo.sessileNodes.slice(), stemTipZ: lastInflo.stemTipZ,
@@ -2667,8 +2724,11 @@ window.__bloomMetrics = () => ({
        pedicel length, in node order, unit 0 the topmost node's and the one
        `unit` above describes. Positions stay out, for `unitPositions`' reason. */
     headSpreadMm: lastInfloBuilt.headSpreadMm,
+    floretsMaxZ: lastInfloBuilt.floretsMaxZ,
+    floretsMaxZByNode: lastInfloBuilt.floretsMaxZByNode ? lastInfloBuilt.floretsMaxZByNode.slice() : null,
     units: lastInfloBuilt.units.map((U) => ({
-      lengthMm: U.lengthMm, tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
+      lengthMm: U.lengthMm, az: U.az, nodeOverrides: U.nodeOverrides ? { ...U.nodeOverrides } : null,
+      tris: U.tris, tipZLocal: U.tipZLocal, stalked: U.stalked,
       petalsBuilt: U.petalsBuilt, hubRadius: U.hubRadius, hubThickness: U.hubThickness,
       stemPresent: !!(U.stem && U.stem.present),
       stemOuterR: U.stem && U.stem.present ? U.stem.outerR : null,
@@ -2701,6 +2761,7 @@ window.__bloomMetrics = () => ({
      and can never disagree (session 41's L7). ID0 compares it against the
      REGISTRY's declaration. */
   inflorescenceAbsent: lastInfloAbsent,
+  nodeVarianceAbsent: lastNodeVarianceAbsent,
   /* ORGANIC VARIANCE (build 1, size): the builder's own field record — null
      at amount 0, which VS0 reads as the guard's own answer — with one factor
      row per whorl parallel to `slotAzimuths`, so VS1 can restate the law from

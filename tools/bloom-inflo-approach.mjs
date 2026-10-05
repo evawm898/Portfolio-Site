@@ -112,7 +112,7 @@ function segHitsTri(p, q, a, b, c) {
 }
 
 /* A hash grid over a set of triangles, each tagged with an owner id. */
-function triGrid(P, ranges) {
+export function triGrid(P, ranges) {
   const cells = new Map();
   const key = (i, j, k) => `${i},${j},${k}`;
   const tris = [];
@@ -156,7 +156,7 @@ function boxLowerBound(grid, p, skipOwner) {
 
 /* Nearest distance from point p to any triangle in the grid whose owner is
    not `skipOwner`, searched in growing shells out to SEARCH_CAP_MM. */
-function nearest(grid, p, skipOwner, best) {
+export function nearest(grid, p, skipOwner, best) {
   if (boxLowerBound(grid, p, skipOwner) >= best) return best;
   const ci = [0, 1, 2].map((x) => Math.floor(p[x] / CELL_MM));
   const maxR = Math.ceil(SEARCH_CAP_MM / CELL_MM);
@@ -181,7 +181,7 @@ function nearest(grid, p, skipOwner, best) {
 
 /* Does any edge of a triangle in `src` (owner `own`) cross a triangle of
    the grid with a different owner? */
-function crosses(grid, P, lo, hi, own, keep) {
+export function crosses(grid, P, lo, hi, own, keep) {
   for (let t = lo; t < hi; t += 9) {
     const v = [[P[t], P[t + 1], P[t + 2]], [P[t + 3], P[t + 4], P[t + 5]], [P[t + 6], P[t + 7], P[t + 8]]];
     for (let e = 0; e < 3; e++) {

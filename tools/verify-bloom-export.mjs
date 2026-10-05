@@ -61,7 +61,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          stemAssertions, STEM_SCOPE,
          leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -343,6 +343,11 @@ for (const [rowIndex, row] of rows.entries()) {
     await page.evaluate(() => window.__bloomMetrics()),
     await page.evaluate(() => window.__bloomUIState()));
   if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
+  /* ID10 (d) — THE FLORETS AGAINST EACH OTHER, read from THIS row's STL bytes
+     (build 3, ruling 1): the internode floor is derived to clear it, and the
+     file is the only thing that can say whether it did. */
+  const infloAp = infloApproachAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics()), await page.evaluate(() => window.__bloomUIState()));
+  if (infloAp.length) { validity.push(`${row.label}: ${infloAp.join('; ')}`); continue; }
   const sx = await selfIntersectionAssertions(page, buf, row);
   if (sx.bad.length) { validity.push(`${row.label}: ${sx.bad.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the one thing

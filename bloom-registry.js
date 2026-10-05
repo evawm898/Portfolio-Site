@@ -58,7 +58,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
-import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE } from './bloom-geometry.js';
+import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
 /* ===================================================================
@@ -3854,7 +3854,9 @@ export const CONTROLS = [
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 
   /* THE PEDICEL IS THE FLORET'S OWN STEM, so this is the floret's
-     `stemLength` and its range sits inside `STEM_LENGTH_RANGE`. The DIAMETER
+     `stemLength`; its range is the PEDICEL'S OWN (0..250 mm, Eva's Oct 4
+     ruling — past the head's `STEM_LENGTH_RANGE`, so a corymb solves level on
+     the full 120 mm rachis). The DIAMETER
      is NOT a control: it is the area rule read downward from the rachis
      (`r_rachis / sqrt(N)`), floored at the stem control's own minimum and
      TOLD — the discovery's Q10 names that exact number as "the number to
@@ -3898,7 +3900,11 @@ export const CONTROLS = [
         + (L.some((x) => x === 0) ? ` — ${L.filter((x) => x === 0).length} SESSILE (rooted in the stem's wall)` : '')
         + (p.lengthsClamped ? ` — CLAMPED at ${p.lenCeilMm} mm, the pedicel's own ceiling as a stem` : '');
     },
-    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'pedicelGradientLive' } },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'pedicelGradientLive' },
+    /* THE CAP IS DERIVED (build 3, ruling 2): the ramp stops where the lowest
+       floret would overtop the head — the plan's own `gradientMax`, drawn as
+       the dead-travel tick the way the stamen spread's saturation is. */
+    cap: (shown) => (shown && shown.inflorescence && shown.inflorescence.present && Number.isFinite(shown.inflorescence.gradientMax) ? shown.inflorescence.gradientMax : null) },
 
   /* THE CORYMB IS A DERIVED SOLVE BEHIND A TOGGLE, never a control on the
      lengths: ON solves every pedicel so its floret's head lands on ONE PLANE
@@ -3939,8 +3945,8 @@ export const CONTROLS = [
       const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
       if (!p || !p.present) return base;
       return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
-        + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm to clear it` : '')
-        + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets rise further than the stem is long, so they stand among the petals (told, never refused)');
+        + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm so the top floret's own petals (reaching ${p.reachMm.toFixed(1)} mm above its node) clear it by ${p.insetGapMm.toFixed(2)} mm` : '')
+        + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets reach further than the stem is long, so they stand among the petals (told, never refused)');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 
@@ -3989,6 +3995,32 @@ export const CONTROLS = [
        half the track marked dead when the dead part is underneath it. The
        number is TOLD above and the track is left alone until there is a
        low-end hatch to draw it with. */
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* PER-NODE VARIATION (inflorescence build 3, Phase B — Eva's ruling 10:
+     shared head controls plus per-node deltas through the existing resolver).
+     ONE amount: each floret's curl, cup and twist move by `amount x cos(its
+     node's azimuth + the form field's own 120-degree offset for that base) x
+     half the base's range`, through `resolveRoleOverrides` (headroom-scaled,
+     clamped once) BEFORE the floret's own petals are built, so the head's
+     own slot field composes on top. 0 is the guard: no term is formed and
+     every node shares one build, as shipped. The wave about the rachis is at
+     frequency one, phase zero, FIXED — the head's shared frequency and phase
+     are hidden whenever the head's own amounts are 0, and a hidden control
+     must be inert. Hidden with no inflorescence; out of the blanket sweep
+     through the derived `INFLO_SUBS` (this predicate's driver). THE RANGE IS
+     IMPORTED (Q6's bound). The FLORETS' FORM-VARIANCE PHASE IS DERIVED beside
+     it with no control of its own: outward from the rachis at each node,
+     never the head's phase — see `floretPhaseDeg`. */
+  { id: 'nodeVariance', section: 'floret', kind: 'slider',
+    min: NODE_VARIANCE_RANGE[0], max: NODE_VARIANCE_RANGE[1], step: 0.01, default: 0,
+    label: 'Node variance',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      if (!(a > 0)) return 'off — every floret the head\'s own form';
+      const B = shown && shown.inflorescenceBuilt;
+      return `${a.toFixed(2)} — each floret\'s curl, cup and twist move with its node\'s azimuth about the rachis (frequency one, a third of a cycle apart)${B && B.units ? ` · ${B.units.length} distinct floret build${B.units.length === 1 ? '' : 's'}` : ''}`;
+    },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 ];
 
