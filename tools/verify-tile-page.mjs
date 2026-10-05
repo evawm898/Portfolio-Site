@@ -68,6 +68,8 @@ import { FIXTURES } from './tile-fixtures.mjs';
 
 const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
+// --only=<substring>[,...] runs a SUBSET of the mutants (anchors are still checked for every one).
+const ONLY = (args.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 
 async function domPoint(page, sel) {
   return page.evaluate((s) => {
@@ -248,7 +250,11 @@ async function run(override = null) {
       const [dz] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.locator('#zipAll').click()]);
       const z = fs.readFileSync(await dz.path()).toString('latin1');
       const names = ['roller-A.stl', 'roller-B.stl', 'handle-A.stl', 'handle-B.stl', 'README.txt', 'design.json'];
-      ok(names.every((n) => z.includes(n)) && z.startsWith('PK'), `P14: the zip holds ${names.filter((n) => z.includes(n)).join(', ')}`);
+      // Entry names read off the central directory: the README names the files too, so a plain search
+      // for the name finds the README's sentence and passes a zip that left the handles out.
+      const raw = fs.readFileSync(await dz.path()), entries = [];
+      for (let i = raw.indexOf('PK\x01\x02', 0, 'latin1'); i >= 0; i = raw.indexOf('PK\x01\x02', i + 4, 'latin1')) entries.push(raw.toString('latin1', i + 46, i + 46 + raw.readUInt16LE(i + 28)));
+      ok(names.every((n) => entries.includes(n)) && z.startsWith('PK'), `P14: the zip's entries are ${entries.join(', ')}`);
     }
     // P15 save then open
     {
@@ -313,8 +319,10 @@ async function run(override = null) {
       await T(() => window.__tile.flush());
       const steps = await T(() => window.__tile.howtoSteps()), txt = await T(() => window.__tile.howtoText()), tol = await T(() => window.__tile.tolerance(1));
       const want = [/click a to its start/i, /roll a/i, /click b to its start/i, /both pointers on the pinholes/i, /press, then roll/i];
-      let at = -1, inOrder = true;
-      for (const re of want) { const i = steps.findIndex((s, k) => k > at && re.test(s)); if (i < 0) { inOrder = false; break; } at = i; }
+      // The FIRST step matching each pattern, and those firsts strictly increasing: a search that only
+      // looks past the previous match passes a list with a stray "click B" ahead of A.
+      const firsts = want.map((re) => steps.findIndex((s) => re.test(s)));
+      const inOrder = firsts.every((i, k) => i >= 0 && (k === 0 || i > firsts[k - 1]));
       const quoted = new RegExp(`±1 mm[^.]*?${tol.toFixed(1).replace('.', '\\.')} mm`).test(txt);
       ok(inOrder && quoted && tol > 0, `P22: the how-to's ${steps.length} numbered steps run click A · roll A · click B · pointers on the pinholes · press and roll ${inOrder ? 'in order' : 'OUT OF ORDER'}, and it ${quoted ? 'quotes' : 'does NOT quote'} the ±1 mm figure (${tol.toFixed(2)} mm)`);
     }
@@ -325,16 +333,22 @@ async function run(override = null) {
       for (const w of ['HA', 'HB']) {
         const [dl] = await Promise.all([page.waitForEvent('download'), page.locator(`[data-stl="${w}"]`).click()]);
         const buf = fs.readFileSync(await dl.path());
-        got[w] = { n: buf.readUInt32LE(80), len: buf.length, name: dl.suggestedFilename() };
+        const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+        for (let t = 0, n = buf.readUInt32LE(80); t < n; t++) for (let v = 0; v < 3; v++) for (let a = 0; a < 3; a++) { const x = buf.readFloatLE(84 + 50 * t + 12 + 12 * v + 4 * a); lo[a] = Math.min(lo[a], x); hi[a] = Math.max(hi[a], x); }
+        got[w] = { n: buf.readUInt32LE(80), len: buf.length, name: dl.suggestedFilename(), buf, span: hi.reduce((acc, h, a) => acc + h - lo[a], 0) };
       }
+      // The two handles share a design and a triangle count, so the count cannot tell them apart: their
+      // bytes must differ, and the longer arm (the larger pointer radius) must make the larger part (its
+      // three extents summed: the grip's length is the same on both and swamps any single largest extent).
+      const distinct = !got.HA.buf.equals(got.HB.buf) && Math.sign(got.HB.span - got.HA.span) === Math.sign(l.ptrB - l.ptrA);
       await T(() => window.__tile.useView('B'));
       const png = await page.locator('#rollCanvas').screenshot();
       const { decodePNG } = await import('./pngdec.mjs');
       const im = decodePNG(png);
       let ink = 0; for (let i = 0; i < im.data.length; i += 4) if (Math.abs(im.data[i] - 0x12) + Math.abs(im.data[i + 1] - 0x12) + Math.abs(im.data[i + 2] - 0x15) > 24) ink++;
       await T(() => window.__tile.show('all'));
-      ok(got.HA.n === l.trisHA && got.HA.len === 84 + 50 * got.HA.n && got.HB.n === l.trisHB && got.HB.len === 84 + 50 * got.HB.n && /handle-A\.stl$/.test(got.HA.name) && /handle-B\.stl$/.test(got.HB.name) && ink / (im.width * im.height) > 0.05,
-        `P24: ${got.HA.name} ${got.HA.len} bytes (${got.HA.n} tris, the page's ${l.trisHA}), ${got.HB.name} ${got.HB.len} bytes (${got.HB.n}, the page's ${l.trisHB}); the In use view draws ${(100 * ink / (im.width * im.height)).toFixed(1)}% of its pixels`);
+      ok(got.HA.n === l.trisHA && got.HA.len === 84 + 50 * got.HA.n && got.HB.n === l.trisHB && got.HB.len === 84 + 50 * got.HB.n && /handle-A\.stl$/.test(got.HA.name) && /handle-B\.stl$/.test(got.HB.name) && distinct && ink / (im.width * im.height) > 0.05,
+        `P24: ${distinct ? 'two different handles' : 'the two handle files are NOT two different handles'} (extents summed ${got.HA.span.toFixed(2)} / ${got.HB.span.toFixed(2)} mm, pointer radius ${l.ptrA.toFixed(2)} / ${l.ptrB.toFixed(2)}); ${got.HA.name} ${got.HA.len} bytes (${got.HA.n} tris, the page's ${l.trisHA}), ${got.HB.name} ${got.HB.len} bytes (${got.HB.n}, the page's ${l.trisHB}); the In use view draws ${(100 * ink / (im.width * im.height)).toFixed(1)}% of its pixels`);
     }
     ok(errors.length === 0, `P: no page errors${errors.length ? ` — ${errors.slice(0, 2).join(' | ')}` : ''}`);
   } catch (e) {
@@ -393,6 +407,7 @@ if (!NEG) {
   console.log(cleanBad.length ? `CLEAN RUN FAILED: ${cleanBad.map(([, m]) => m).join(' | ')}` : `clean run: ${clean.length}/${clean.length}`);
   if (cleanBad.length) good = false;
   for (const [name, from, to, claim, file = 'tile.js'] of MUTANTS) {
+    if (ONLY.length && !ONLY.some((o) => name.includes(o))) continue;
     const res = await run({ [`/${file}`]: srcs[file].replace(from, to) });
     const fails = res.filter(([c]) => !c).map(([, m]) => m);
     const fired = fails.some((m) => m.startsWith(claim + ':'));
