@@ -3702,7 +3702,7 @@ re-learned on `45003cd`), and the edge-profile gate's E2 — which draws from th
 so block 50 had never reached it — reads **49.478652°** on `NODE VARIANCE: 0.5 x the form field
 0.5`: a FLORET petal at twist −111 where the node term and the head's form field compose, the
 declared twist-out-of-plane class (twist −111 on the sliders alone adds 49.10° through the same
-gate), declared in `E2_TURN_XFAIL` at its magnitude and not clamped.
+gate), declared in `E2_TURN_XFAIL` at its magnitude and not clamped. **Merged to `main` as `f812047` on Eva's approval of the sheet (Oct 5); §20 of the outcome doc is the close — what was derived, what was declared rather than fixed, and the frozen-tag read-back (no phase owed beyond phase52).**
 
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
