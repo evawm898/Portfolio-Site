@@ -664,7 +664,22 @@ instruments' R1 re-emit the florets with the per-azimuth units.
 `the-node-term-outranks-the-pins`, `the-floret-phase-is-the-heads`,
 `the-outward-phase-ignores-the-pedicels-sign`, `the-memo-keys-on-the-length-alone` — each
 witnessed on the MUTATED module's own plan or units, never on the assertion it names.
-__MUTANT_RESULT__
+**All eight verified on the final tree, each firing the family it names and the clean tree silent
+on every probe row** — `the-internode-floor-is-the-rods-again` ID10 (with ID9), `the-floor-reads-one-mode`
+ID10, `the-gradient-cap-is-dropped` ID7 and ID9, `the-node-term-is-never-formed` NV1 and NV4,
+`the-node-term-outranks-the-pins` NV3, `the-floret-phase-is-the-heads` NV2, `the-outward-phase-ignores-the-pedicels-sign`
+NV2, `the-memo-keys-on-the-length-alone` NV4 (ID10, ID7 and ID9 beside it, legitimately — a unit built
+for the wrong azimuth is a wrong raceme). The first run was silent on three of them and the cause was in
+the TABLE, not the geometry: `famsOn` captured `/^(ID\d+):/` and dropped every NV message (ST10's
+two-digit-family class, one family later), and two witnesses were wrong — the dead-term witness
+compared against a unit that carried the term, and the pin mutant spread the overrides BEFORE the pins
+so the pins still won. The memo mutant claimed NV1 as well and NV1 is correctly blind to it (a unit per
+distinct state is NV4's claim; NV1 reads the term on each unit, which a mis-keyed memo still carries), so
+the claim was removed rather than the clause widened. **The two floor mutants were re-run after the
+sweep's rewrite (§12f) and the memo mutant after NV4's bound (§12g): all three still fire, anchors
+matching once.** The twelve pre-existing inflorescence mutants were re-run as Eva asked ("stale
+evidence against the old laws"): all twelve fire the family they name on the ruled laws, the clean tree
+silent.
 
 ## 16. Block 49, the smoke subset, the sheet
 
