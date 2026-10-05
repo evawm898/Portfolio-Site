@@ -3567,8 +3567,10 @@ enough; the land and span restated from the controls; the emitted ring vertex by
 the land's `2j + 1`), with three standing mutants (`the-cut-is-flattened`, `the-land-is-removed`,
 `the-bore-opens-through-the-cut-face`), each witnessed on the mutated module's own end-face facts,
 and `node tools/verify-bloom-stem-cut.mjs` the must-fail (24 plants, each firing its own clause by
-its own message and no other) — **NOT yet in the export preflight, because `phase52`'s dispatch
-must precede any workflow edit; that is the follow-up PR.** **The brief's "~114 of 1,047" was
+its own message and no other) — **in the export preflight beside the stem-nodes must-fail,
+added by the follow-up PR AFTER `frozen/phase52` was dispatched from `main` and read back at
+`23b13bd` (the merge was `a22ca83`); every tag absent from the remote is one of the seven declared
+in `TAG_PUSH_XFAIL`.** **The brief's "~114 of 1,047" was
 `phase50`'s denominator**: the live matrix at `23b13bd` is 1,089, 156 carry a stem by "stem
 present" (the 114 plus #353's 33 raceme rows and 9 of block 47), and the partition by the cut's own
 guard is in the outcome doc. Block 48 is 13 rows (1,089 → 1,102), smoke block 48 five;
