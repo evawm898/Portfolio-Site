@@ -668,7 +668,20 @@ from the base tree's pieces in a line, so the PLAN side is read off both trees' 
 decisions; what the partition holds is the MESH against those declarations, both ways. The
 amount at 0 returns null BY BRANCH, so every row with `nodeVariance` 0 is a holder unless
 its placement moved; every row with no raceme is a holder by the first line.
-__PARTITION__
+**MEASURED, PASS** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 23b13bd>
+--movers-predicate inflo-build3`, the whole 1110-row matrix in both modes, run as 29 `--range`
+chunks (`--json` each, `--merge` closing them; the merge REFUSES chunks that overlap or leave a
+gap, which it did once — rows 1089 twice — and the set was re-tiled rather than deduplicated):
+**75 of 75 predeclared movers MOVED and 0 floats moved on the 1035 holders, positionally under
+`Object.is`, over 1,293,722,028 export floats / 143,746,892 triangles and 82,000,898
+captured-grid values (9,448 panels).** The 75 are every row whose plan the floor, the cap or the
+field moves — the inflorescence blocks 30, 46, 48 and 49, `INFLO: ALL MAX`, the two `ALL MAX`
+corners of block 46/48, the shared-node and sepal rows that build a raceme — and every row with
+no raceme or at `nodeVariance` 0 with an unmoved plan held, the shipping default among them.
+The three heaviest rows (`INFLO: ALL MAX`, `NODE LAWS: ALL MAX at 35 deg …`, `REACH INSET: THE
+BUDGET CORNER`) each build a ~1.4 M-triangle base tree twice and ran alone, 43 to 70 minutes
+apiece on this box; a one-row chunk of a mover reports its own vacuity clause (no holder float
+to compare) and the merge is where the vacuity is judged.
 
 ## 19. Gates on the final tree
 
