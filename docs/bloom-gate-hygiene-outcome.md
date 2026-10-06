@@ -240,3 +240,17 @@ The counts are identical in both modes, and so are the triangle counts.
 
 So **six tags carry the move (48–53) and thirteen do not (35–47)**. That replaces the
 prediction recorded on the charter.
+
+## 4. The byte proof — no geometry moved
+
+I ran `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 7af97f4> --control` over
+the whole live matrix:
+- **Coverage:** 1144 rows × 2 modes, which is **1,420,414,308 export floats over 157,823,812
+  triangles**, plus **82,612,696 captured-grid values**. Every one was compared positionally
+  under `Object.is`.
+- **Findings:** exactly **two**. They are the run's own planted 1e-9 perturbations on DEFAULT
+  (live), one per clause, which also proves each clause can fire.
+- **Everything else:** **0 floats moved.** As expected of a control run, the tool exits 1.
+
+`bloom-geometry.js`, `bloom-registry.js`, `bloom.js`, `bloom.html` and `bloom-grid-gltf.js`
+are sha256-identical to `main`'s.
