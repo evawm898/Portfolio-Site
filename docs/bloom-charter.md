@@ -1857,6 +1857,12 @@ any of them.
     row (measured: −37° to −40°). **Phases 35–52 are PREDICTED to move the same way, without
     being measured.** That is a prediction, recorded in those words so it does not become fact by
     repetition. It is scheduled for the gate-hygiene session.
+    **MEASURED (gate-hygiene session, Oct 6, `docs/bloom-gate-hygiene-outcome.md` §3): the
+    prediction holds for phases 48–52 and FAILS for 35–47.** Phases 48–52 carry phase53's own
+    `ALL MAX` set and move identically (−37° → −40°, 1,059,120 floats in each mode). Phases 35–47
+    are **bit-identical** under the fix: their sets build the sepals at −8°, −14° or −20°, where
+    the scan never reaches the crease tie, which needs `varianceForm` (added at phase48). Six tags
+    carry the move, thirteen do not.
 
 ## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
 

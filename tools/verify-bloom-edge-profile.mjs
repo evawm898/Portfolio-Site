@@ -890,8 +890,47 @@ async function control() {
      three-minute census) to say what a 30-thousand-triangle petal already
      says. These five reach the plain span, a cleft's sinus, a fringe's teeth,
      a lobed margin and a thin sheet — every arm of the rim law. */
-  const CONTROL_ROWS = /^DEFAULT|^FRINGE: THE CARNATION|^LOBES: the shipped|^THIN: ALL THIN|^CAPABILITY: cleft \(/;
-  const rows = MATRIX.filter((r) => CONTROL_ROWS.test(r.label)).slice(0, 5);
+  /* NAMED, NOT `regex.filter(...).slice(0, 5)` (gate-hygiene session, Oct 6).
+     That was the shape this comment promised and did not deliver: the regex
+     matched eight rows, the slice kept DEFAULT and four `THIN:` rows, the
+     cleft and the carnation were dropped, and `^LOBES: the shipped` matched no
+     row at all — so for at least two sessions (measured Sep 30 and Oct 5) the
+     control ran over two arms of the rim law where it claims five, and stayed
+     green because every mutation still fired on the plain span. Five labels,
+     each REQUIRED: a name that goes missing refuses the run. The lobed margin
+     is the shipped three-tooth row (an odd count, so a crest at the apex),
+     which is what "the shipped lobe" can mean since MODEL B. */
+  const CONTROL_ROWS = [
+    'DEFAULT (the shipping configuration)',                                     // the plain span
+    'CAPABILITY: cleft (two-span domain)',                                      // a cleft's sinus
+    'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',  // a fringe's teeth
+    'LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', // a lobed margin
+    'THIN: ALL THIN',                                                           // a thin sheet
+  ];
+  const missingRows = CONTROL_ROWS.filter((l) => !MATRIX.some((r) => r.label === l));
+  if (missingRows.length) { console.error(`edge-profile control: the named control row(s) ${missingRows.map((l) => `"${l}"`).join(', ')} are not in the matrix — an arm of the rim law would be exercised by nothing`); process.exit(1); }
+  const rows = CONTROL_ROWS.map((l) => MATRIX.find((r) => r.label === l));
+  /* AND EACH NAMED ROW MUST STILL EXERCISE THE ARM IT IS NAMED FOR, read off
+     the clean builder's own record. A row that keeps its label while the arm
+     goes away (a cleft that stops splitting, a carnation whose teeth are
+     refused, a lobe count that clamps to 0, a sheet no longer under the floor)
+     would satisfy the name and empty the claim. */
+  {
+    const arm = [
+      ['CAPABILITY: cleft (two-span domain)', (p) => (p.panels || []).length > 1, 'more than one panel (the sinus)'],
+      ['FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth', (p) => !!(p.fringe && p.fringe.built && p.fringe.count > 0), 'fringe teeth built'],
+      ['LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', (p) => !!(p.lobes && p.lobes.countBuilt > 0 && !p.lobes.noRoom), 'lobes cut'],
+      ['THIN: ALL THIN', (p) => !!(p.thickness && p.thickness.floorBinds), 'the export floor binding on the sheet'],
+    ];
+    const lost = [];
+    for (const [l, ok, what] of arm) {
+      const row = rows.find((r) => r.label === l);
+      const acc = new G0.MeshBuilder({ exportMode: true });
+      const b = G0.buildBloomInto(acc, stateFor(row), { below: null, capability: row.capability || null });
+      if (!b.petal || !ok(b.petal)) lost.push(`"${l.slice(0, 60)}" no longer has ${what}`);
+    }
+    if (lost.length) { console.error(`edge-profile control: a named control row stopped exercising its arm — ${lost.join('; ')}`); process.exit(1); }
+  }
   /* AND AT LEAST ONE DECLARED ROW, OR E2's MAGNITUDE CLAUSE HAS NO MUTANT.
      It did not, and only asking which messages the control actually printed
      found it: the regex names the carnation, `.slice(0, 5)` took five earlier

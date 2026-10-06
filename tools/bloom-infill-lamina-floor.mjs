@@ -400,7 +400,15 @@ async function control() {
     }
     if (!ok) k1 = false;
     /* and the clause can fail: the same test applied to the TIP_FLOOR break must reject it */
-    const wrong = c2.surface.profile.laminaSlopeBreaks().find((x) => x.to === 'TIP_FLOOR' && x.u > 0.5);
+    /* NAMED, NOT FIRST-MATCH (gate-hygiene session, Oct 6): the break this
+       negative leg plants is the CORE -> TIP_FLOOR handover — the tip's own —
+       and it must exist EXACTLY ONCE. "The first TIP_FLOOR handover above
+       u 0.5" was the same break on both probes today, by luck of the list's
+       order; a second qualifying break, or none, now fails K1 loudly rather
+       than quietly testing another one. */
+    const wrongs = c2.surface.profile.laminaSlopeBreaks().filter((x) => x.from === 'CORE' && x.to === 'TIP_FLOOR');
+    if (wrongs.length !== 1) { console.log(`K1  ${nm.padEnd(18)} the named negative break CORE -> TIP_FLOOR appears ${wrongs.length} times, not once — **the leg has no single witness**`); k1 = false; }
+    const wrong = wrongs.length === 1 ? wrongs[0] : null;
     if (wrong && Math.abs(wrong.u - ww.searchU) > ww.searchStepU) k1CanFail = true;
   }
   console.log(`K1  and the test REJECTS the tip's own break when it is put in the floor's place: ${k1CanFail ? 'YES' : '**NO — the clause accepts anything**'}`);

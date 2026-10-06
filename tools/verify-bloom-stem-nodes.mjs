@@ -88,6 +88,17 @@ const NLmerged = restatedStemNodes(merged.state);
 /* A plant: a function that returns { rec, NL, over } and the arm whose message
    must appear. Every message the plant produces is printed — the red is the
    deliverable, not a count. */
+/* THE RADIUS PLANT'S RING, BY NAME (gate-hygiene session, Oct 6): emitted
+   ring 1, an OUTER ring. It was the first outer ring after ring 0 in emission
+   order, so a reordering of the emitted rings re-pointed it and a stem with no
+   such ring crashed on a TypeError instead of refusing. Named beside the
+   centre plant's own fixed ring 7, and checked. */
+const NAMED_RADIUS_RING = 1;
+const namedRadiusRing = (r) => {
+  const g = r.S.emittedRings[NAMED_RADIUS_RING];
+  if (!g || g.which !== 'outer') { say(`REFUSED: the radius plant's named ring ${NAMED_RADIUS_RING} is ${g ? `a "${g.which}" ring` : 'absent'}, not an OUTER ring — name another`); process.exit(2); }
+  return g;
+};
 const plants = [
   { arm: '(a) the two statements', want: 'stemNodesPresent says', make: () => ({ rec: on, NL: NLon, over: { geoAbsent: true } }) },
   { arm: '(b) identity: a law declared at prominence 0', want: 'must be the identity', make: () => { const r = clone(off); r.S.nodeLaw = on.S.nodeLaw; return { rec: r, NL: NLoff }; } },
@@ -96,7 +107,7 @@ const plants = [
   { arm: '(c) the control never reached the stem', want: 'the control never reached the stem', make: () => { const r = clone(on); r.S.nodeLaw = null; return { rec: r, NL: NLon }; } },
   { arm: '(c) no noded rings reported', want: 'reports no noded rings', make: () => { const r = clone(on); r.S.emittedRings = null; return { rec: r, NL: NLon }; } },
   { arm: "(c) a ring's centre a micron off", want: "ring's centre stands", make: () => { const r = clone(on); r.S.emittedRings[7].cx += 1e-6; return { rec: r, NL: NLon }; } },
-  { arm: "(c) a ring's radius a micron off", want: "ring's radius is", make: () => { const r = clone(on); const g = r.S.emittedRings.find((q) => q.which === 'outer' && q !== r.S.emittedRings[0]); g.r += 1e-6; return { rec: r, NL: NLon }; } },
+  { arm: "(c) a ring's radius a micron off", want: "ring's radius is", make: () => { const r = clone(on); const g = namedRadiusRing(r); g.r += 1e-6; return { rec: r, NL: NLon }; } },
   /* (d) ALONE — the reference and the artefact moved TOGETHER, so (c) cannot
      see it: every ring's centre is re-drawn from a law whose kinks start a
      whole ramp ABOVE their nodes, and the restated law handed in is that same

@@ -145,6 +145,32 @@ function stateFinding(aDoc, bDoc) {
   return null;
 }
 
+/* THE PERTURBED PETAL, BY NAME (gate-hygiene session, Oct 6): ring 0's slot 0
+   — whorl 0, slot index 0 — and EXACTLY that one. Both controls used to take
+   the FIRST petal in \`petalsAll\` that carried a grid, so a row whose slot 0 is
+   not built (the sphere stem's omission) silently moved the plant to another
+   petal. A named petal that is missing, duplicated or gridless now fails the
+   run rather than being substituted. */
+const NAMED_PETAL = { whorl: 0, slotIndex: 0 };
+/* THE ONE ROW IN THIS SET WHOSE SLOT 0 IS NOT BUILT, named with the petal it
+   uses instead. Measured (Oct 6): on main the first-match rule silently took
+   slot 2 here (the sphere stem's channel omits slots 0 and 1, in both modes);
+   it still fired, so nothing said the plant had moved. A CONTINUOUS sphere's
+   petals carry fractional `whorl` values, so this override names the slot
+   index alone and still requires exactly one match. */
+const NAMED_PETAL_BY_ROW = {
+  'SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)': { slotIndex: 2 },
+};
+const namedPetalGrid = (built, label) => {
+  const want = NAMED_PETAL_BY_ROW[label] || NAMED_PETAL;
+  const hits = (built.petalsAll || []).filter((p) => p && (want.whorl === undefined || p.whorl === want.whorl) && p.slotIndex === want.slotIndex);
+  const g = hits.length === 1 && hits[0].grid && hits[0].grid[0];
+  if (!(g && g.rows && g.rows.length)) {
+    console.error(`grid-bytes control: REFUSED — "${label}" has ${hits.length} petal(s) at ${want.whorl === undefined ? '' : `whorl ${want.whorl} `}slot ${want.slotIndex}${hits.length === 1 ? ' and it carries no captured grid' : ''}; the named control petal must exist exactly once, and substituting another petal is the drift this naming removed`);
+    process.exit(2);
+  }
+  return g;
+};
 const gltfOf = (T, row, exportMode, perturb) => {
   const acc = new T.G.MeshBuilder({ exportMode, captureGrid: true });
   const built = T.G.buildBloomInto(acc, stateFor(T.R.DEFAULTS, row), { below: null, capability: row.capability || null });
@@ -155,10 +181,7 @@ const gltfOf = (T, row, exportMode, perturb) => {
        this repo's own `--control-mode` lesson, one tool later. `halfWidth` is
        carried in the JSON as `halfWidthMm` and nowhere else, so moving it
        moves the stripped JSON and leaves BIN alone. */
-    for (const p of (built.petalsAll || [])) {
-      const g = p && p.grid && p.grid[0];
-      if (g && g.rows && g.rows.length) { g.rows[g.rows.length - 1].halfWidth += 1e-3; break; }
-    }
+    { const g = namedPetalGrid(built, row.label); g.rows[g.rows.length - 1].halfWidth += 1e-3; }
   } else if (perturb) {
     /* ONE captured mid-surface value, by 1e-3 mm, AND THE SIZE IS THE FILE'S
        OWN RESOLUTION RATHER THAN A CHOICE. The .glb stores positions as
@@ -173,10 +196,7 @@ const gltfOf = (T, row, exportMode, perturb) => {
        perturbation planted on row 0 never reaches the file and the control
        reported 0 of 242 while claiming the comparison worked. A control that
        has not been seen to fire is a log line; this one fired at itself. */
-    for (const p of (built.petalsAll || [])) {
-      const g = p && p.grid && p.grid[0];
-      if (g && g.rows && g.rows.length) { g.rows[g.rows.length - 1].mid[0][0] += 1e-3; break; }
-    }
+    { const g = namedPetalGrid(built, row.label); g.rows[g.rows.length - 1].mid[0][0] += 1e-3; }
   }
   return new Uint8Array(T.X.buildGridGltf(built, { mode: exportMode ? 'export' : 'live', state: stateFor(T.R.DEFAULTS, row) }));
 };

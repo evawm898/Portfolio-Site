@@ -5467,7 +5467,13 @@ OWN FOOT, and `measureWall` drops the foot rows. Block 44 (`COMPOSED: 3 whorls x
 is declared from birth at 1,968 / 0.4218 and the triple's entry names it; `frozen/phase48` is the 992 rows
 at `1f0b3f0`. The other three triples hide nothing beyond declared single-axis rows (census over all 78
 cells). **17 gate controls pick their witness by "first match"** (8 files); one, the edge-profile
-`CONTROL_ROWS` slice, is drifting on `main` (no cleft, fringe or lobe row reaches it) — counted, not fixed.
+`CONTROL_ROWS` slice, is drifting on `main` (no cleft, fringe or lobe row reaches it) — counted, not fixed. **[Oct 6: all 17 NAMED,
+each refusing loudly on a missing name or a lost property; three were already drifting (edge-profile,
+grid-bytes on the sphere stem, seam-bytes `--control` under `nib`) and two more were re-pointed by the
+naming session's own re-records before it named them — `docs/bloom-gate-hygiene-outcome.md` §2. AND
+`measureWall` SEES THE FOOT NOW (as a SELF target only, never a query, never inside the seam window, so
+`wall` is unchanged by construction): the composed state reads 0.199 mm and curl 360 alone 0.676; 43 of
+513 combination cells moved, 145 -> 179 declared, seven verdicts flipped. BLOCK 44 KEPT (Eva, Oct 6) on the DIFFERENT-OWNER rule, not as cover: the triple's cell IS its control set, but it reads nearest approach in Node while the row reads the exported file's census in the browser, and `measureWall` was blind to this class until that PR. Curl 360 ALONE is now the wall instrument's `curl-max` row (0.676 mm), the single-control guard the ten pair/triple cells reaching it at their defaults point to. §1, §1c]**
 
 **ORGANIC VARIANCE, BUILD 3 — SPACING IS A PITCH DENSITY WHOSE INTEGRAL MAPS THE AZIMUTH, AND IT
 NEVER BINDS AS A PROPERTY** (Eva's ruling on the settlement — read `docs/bloom-organic-variance-spacing-law.md`,

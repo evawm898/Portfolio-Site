@@ -558,12 +558,23 @@ if (added > 0) {
    can be read against them.
    =================================================================== */
 const redefPlant = { undeclared: null, declared: null };
+/* THE PLANTS' WITNESSES, BY NAME (gate-hygiene session, Oct 6). Both used to
+   be the FIRST row in matrix order that met the plant's property, so a matrix
+   edit ahead of them, or a new ROW_DEF_MOVED entry, silently re-pointed the
+   plant at another row. Each is named here and the run REFUSES if the name is
+   missing or stops having the property the plant needs:
+     (a) an undeclared row with a set, identical on both trees
+     (b) per change, the declared row whose LABEL held while its SET moved
+         (the harder half). Only `tilt` declares one. */
+const REDEF_WITNESS_UNDECLARED = 'petalCount 3';
+const REDEF_WITNESS_DECLARED_BY_CHANGE = { tilt: 'ALL MAX' };
 if (controlRedef) {
   /* (a) A GENUINE UNDECLARED REDEFINITION: relabel and re-value a row that is
      NOT in ROW_DEF_MOVED and whose definition is identical today. A relabel
      is the canonical matrix edit (`petalTilt max (75)` -> `(120)` is one), and
      the set value is moved too so both halves of `sigOf` are exercised. */
   for (let i = 0; i < rowsB.length; i++) {
+    if (rowsA[i].label !== REDEF_WITNESS_UNDECLARED) continue;
     if (rowsA[i].label in ROW_DEF_MOVED) continue;
     if (!(rowsA[i].set || []).length) continue;   // both halves of `sigOf` or the plant tests half a guard
     if (sigOf(rowsA[i]) !== sigOf(rowsB[i])) continue;
@@ -583,6 +594,7 @@ if (controlRedef) {
      instead, so this looks for the declared row whose LABEL held and whose
      SET moved — the harder half, and the one `ALL MAX` is. */
   for (let i = 0; i < rowsB.length; i++) {
+    if (rowsA[i].label !== REDEF_WITNESS_DECLARED_BY_CHANGE[change]) continue;
     if (!(rowsA[i].label in ROW_DEF_MOVED)) continue;
     if (rowsA[i].label !== rowsB[i].label) continue;
     if (sigOf(rowsA[i]) === sigOf(rowsB[i])) continue;
@@ -591,8 +603,10 @@ if (controlRedef) {
     break;
   }
   const why = [];
-  if (!redefPlant.undeclared) why.push('no row is undeclared, carries a set, and is identical on the two trees, so an UNDECLARED redefinition cannot be planted with both halves of `sigOf` moved');
-  if (!redefPlant.declared) why.push(`--change ${change} declares no row whose label held while its set moved, so a DECLARED-REDEFINITION-THAT-DID-NOT-HAPPEN cannot be planted — a control with nothing to plant cannot be wrong`);
+  if (!redefPlant.undeclared) why.push(`the named witness "${REDEF_WITNESS_UNDECLARED}" is missing, declared, carries no set, or differs between the two trees, so an UNDECLARED redefinition cannot be planted with both halves of \`sigOf\` moved — name another row in REDEF_WITNESS_UNDECLARED`);
+  if (!redefPlant.declared) why.push(REDEF_WITNESS_DECLARED_BY_CHANGE[change]
+    ? `the named witness "${REDEF_WITNESS_DECLARED_BY_CHANGE[change]}" is missing, not declared in ROW_DEF_MOVED_BY_CHANGE.${change}, relabelled, or no longer moves its set, so a DECLARED-REDEFINITION-THAT-DID-NOT-HAPPEN cannot be planted`
+    : `--change ${change} names no declared-redefinition witness, so a DECLARED-REDEFINITION-THAT-DID-NOT-HAPPEN cannot be planted — a control with nothing to plant cannot be wrong`);
   if (why.length) { console.error(`REFUSED (vacuous control): ${why.join('; ')}.`); process.exit(2); }
   console.log(`  control-redef: PLANTED into the head's live matrix —`);
   console.log(`      row ${redefPlant.undeclared.i}: "${redefPlant.undeclared.was}" relabelled, and its "${redefPlant.undeclared.id}" moved ${redefPlant.undeclared.from} -> ${redefPlant.undeclared.to}, declared NOWHERE -> the UNDECLARED clause must fire`);
@@ -602,6 +616,20 @@ if (controlRedef) {
 
 const bad = [];
 let floats = 0, footValues = 0, movedCount = 0, heldCount = 0, controlSaw = false;
+/* `--control`'s HELD ROW, BY NAME (gate-hygiene session, Oct 6). It was the
+   first row in EXPORT order that compared equal — DEFAULT wherever the default
+   holds, and on `nib` whatever held first — and there was NO GUARD: if no row
+   held, the control silently never ran, and the vacuity guard below took the
+   `--control` FLAG as having discharged it. Named per change now, and the run
+   fails if the named row is absent from the matrix or does not hold. */
+const CONTROL_HOLDER_BY_CHANGE = {
+  seam: 'DEFAULT (the shipping configuration)', widest: 'DEFAULT (the shipping configuration)', arc: 'DEFAULT (the shipping configuration)',
+  tilt: 'DEFAULT (the shipping configuration)', nu: 'DEFAULT (the shipping configuration)', cut: 'DEFAULT (the shipping configuration)',
+  nib: 'petalTipEnd max (1)',   // a SQUARED TERMINAL above the floor: #229's guard, the holder class the nib partition predeclares
+};
+const controlHolder = CONTROL_HOLDER_BY_CHANGE[change] || null;
+if (control && !controlHolder) { console.error(`REFUSED: --change ${change} names no --control holder in CONTROL_HOLDER_BY_CHANGE.`); process.exit(2); }
+if (control && !rowsA.some((r) => r.label === controlHolder)) { console.error(`REFUSED: --control's named holder "${controlHolder}" is not in the ${which} matrix.`); process.exit(2); }
 const classes = new Map();       // label -> { export: 'moved'|'held', live: ... }
 const movers = [];
 
@@ -661,7 +689,8 @@ for (const mode of ['export', 'live']) {
     floats += pa.length;
     let moved = false;
     for (let k = 0; k < pa.length; k++) if (!Object.is(pa[k], pb[k])) { moved = true; break; }
-    if (control && !moved && !controlSaw) {
+    if (control && row.label === controlHolder && mode === 'export' && moved) bad.push(`CONTROL: the named holder "${controlHolder}" MOVED under --change ${change}, so it cannot carry the held-class control — name a row this change holds`);
+    if (control && !moved && !controlSaw && row.label === controlHolder) {
       /* the positive control: one held row, one coordinate, 1e-9 */
       const probe = Float64Array.from(pa); probe[0] += 1e-9;
       let saw = false;
@@ -761,7 +790,8 @@ if (which === 'live') for (const l of Object.keys(TRI_COUNT_XFAIL)) {
    failure when nothing has shown this run could have said otherwise. Either
    `--control` (which perturbs a held row and requires the verdict to move) or
    an explicit `--expect` discharges it. */
-if (!movers.length && !control && !expect) bad.push('VACUOUS: no row moved, and neither --control nor --expect ran — nothing here has shown this tool could report movement at all');
+if (control && !controlSaw) bad.push(`CONTROL: the named holder "${controlHolder}" was never compared as held, so --control perturbed nothing — it used to be silent here`);
+if (!movers.length && !controlSaw && !expect) bad.push('VACUOUS: no row moved, and neither --control nor --expect ran — nothing here has shown this tool could report movement at all');
 
 /* THE SET, EXACT IN BOTH DIRECTIONS — where the change declares one. A count
    that matches over the wrong rows is not a partition. */
