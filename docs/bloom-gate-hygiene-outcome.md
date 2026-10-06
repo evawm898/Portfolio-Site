@@ -150,6 +150,60 @@ deepens, and the reverse.
 reaching its foot. The recommendation, for the ruling: keep it as the export-side witness.
 If it goes, the class survives only as a model-side approach.
 
+## 1c. Eva's rulings on §1b and on `curl-x-twist` (Oct 6), and what checking them found
+
+**Ruling 1 was premised on "the triple's grid does not sample block 44's state", and the
+premise is FALSE.** Measured against the grid as shipped, `layers-x-curl-x-innercurl`'s
+axes are:
+- `layerCount` [1, 3, 6];
+- `petalSpineCurl` [0, 180, 270, 360];
+- `innerCurl` [0, 360].
+
+Curl 180 is on the curl axis **on purpose**. The axis comment says the grid carries "the
+composed state's own values (3 whorls, curl 180) — the one candidate with a measured fold
+behind it, so it is measured rather than bracketed".
+
+So the cell `layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=180 x innerCurl=360`
+**is** block 44's control set, `{ layerCount: 3, petalSpineCurl: 180, innerCurl: 360 }`,
+exactly. It reads **0.199 mm**, is declared, and CG2/CG3 hold it both ways. It is also
+the triple's named `CONTROL_WITNESSES` failing cell.
+
+Keeping block 44 therefore rests on §1b's argument and not on coverage:
+- X1 holds the **pair count and fold depth of the exported file** (1,968 / 0.4218 mm, in
+  the browser).
+- The gate holds the **two-skin model's approach** (0.199 mm, in Node).
+
+These are two quantities with two owners. Ruling 1 was handed back for re-ruling on that
+basis, and the PR is **held unmerged** until it is.
+
+**Ruling 2, ACCEPTED: `curl-x-twist` is `single-reaches`.** Nothing got worse: the
+measure stopped being blind. Two follow-ups, report only:
+
+**(a) Does the matrix catch the single control on its own row?**
+- **The FOLD: yes.** Matrix row `petalSpineCurl max (360)` is declared in
+  `SELF_INTERSECTION_XFAIL` at **920 pairs / 0.5158 mm**. X1/X2 hold it in the export gate
+  on every run.
+- **The SELF-APPROACH (0.676 mm): no, and that is a gap.** The one-control `self` gate is the
+  wall instrument's V5. Its rows carry no curl-360-alone state:
+  - `form-max` has curl 360 composed with every other form control, and is declared at
+    0.008 mm.
+  - `twist-max` is twist alone.
+
+  So no single-control row holds the 0.676 mm figure anywhere. Named, not fixed here.
+
+**(b) Where does the declared magnitude live?** On the **pairs**, only. The single-curl-360
+state is declared ten times, once per pair or triple that has a curl axis, each at the
+cell where every other axis sits at its default:
+- `cup-x-curl`, `curl-x-buckle`, `density-x-curl`, `gradient-x-curl`, `curl-x-twist`,
+  `lobedepth-x-curl`;
+- the four triples `curl-x-cup-x-twist`, `cup-x-roll-x-curl`, `curl-x-twist-x-roll`,
+  `layers-x-curl-x-innercurl`.
+
+Each is at **0.6764 mm**. No single-control entry declares it: the wall instrument's
+`SELF_XFAIL` has no curl-360 row. So the hazard is filed under ten pair causes, each now
+known to be untrue, and not under the one control that owns it. Counting the curl-360
+cells off the defaults too, it is 14 declarations of one measurement (§1b's figure).
+
 ## 2. Named witnesses — 17 sites, and what each resolved to
 
 Every site below used to pick the row / cell / entry its control perturbs by **first
