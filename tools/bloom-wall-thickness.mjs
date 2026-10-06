@@ -439,6 +439,7 @@ export const SELF_XFAIL_TOLERANCE_MM = 5e-4;
 export const SELF_XFAIL = Object.freeze({
   'roll-max': { selfMm: 0.658, note: 'petalRoll 330 folds the blade into a near-closed quill: 0.564 mm on main at 2a97e96, 0.659 at session 34, still 0.659 on main at 7ebfb7f (2026-09-17), and 0.658 on the APEX NIB tree — the worst site is at u 0.21, nowhere near the tip, so the 0.001 mm is the nib\'s reparameterisation moving every station rather than anything at the apex. Pre-existing, recorded as found-in-passing by session 33, its own session.' },
   'form-max': { selfMm: 0.008, note: 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 at session 34, 0.042 on main at 7ebfb7f (2026-09-17 — IMPROVED since the string was written and nobody had re-recorded it), and 0.008 on the APEX NIB tree — WORSE, at the SAME site (u 0.11, v 1.00), which is the base of the blade and not the apex: the nib shortens the drawn blade, so every station moves and a near-contact this tight moves with them. DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.' },
+  'curl-max': { selfMm: 0.676, note: 'petalSpineCurl 360 ALONE: the tip coils back onto its own FOOT (worst site u 0.93). 1.230 mm (clear) while measureWall dropped the foot rows, 0.676 once the foot is a SELF target (gate-hygiene session, Oct 6) — the instrument stopped being blind, nothing in the geometry moved. The same state is the census fold `petalSpineCurl max (360)` in SELF_INTERSECTION_XFAIL (pairs and depth, in the browser); this is the approach, in Node. Added as its own row on Eva\'s ruling so the single-control fact is not declared only under the ten combination-gate cells that reach it at their other axes\' defaults.' },
   'buckle-on-form': { selfMm: 0.300, note: 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 at session 34, 0.254 on main at 7ebfb7f (2026-09-17 — WORSE since the string was written and nobody had re-recorded it: a finding, docs/bloom-xfail-magnitudes.md), and 0.300 on the APEX NIB tree — IMPROVED, at the same site (u 0.29, v 1.00), the same reparameterisation moving every station. This is the row that established self-approach as the hazard; it fails on main WITHOUT session 34\'s controls, so it is pre-existing too.' },
 });
 for (const [id, e] of Object.entries(SELF_XFAIL)) {
@@ -458,6 +459,17 @@ export const STATES = [
   { id: 'cup-max',         label: 'SHIPPED cup 1.2',              set: { petalCup: 1.2 } },
   { id: 'roll-max',        label: 'SHIPPED roll 330',             set: { petalRoll: 330 } },
   { id: 'twist-max',       label: 'SHIPPED twist 180',            set: { petalTwist: 180 } },
+  /* CURL 360 ALONE (Eva's ruling, gate-hygiene session, Oct 6). Once
+     `measureWall` took the foot rows as SELF targets, this single control
+     read 0.676 mm — a tip coiling onto its own foot, the census's
+     `petalSpineCurl max (360)` fold seen as an approach — and the only
+     places that number was declared were TEN combination-gate cells, each a
+     pair or triple whose other axes sit at their defaults. A single-control
+     fact filed under pair causes that are not true, which a later trim of
+     the shortlist would delete by accident. This row is its single-control
+     guard; the ten cells are annotated to point here. An INSTRUMENT row:
+     not in `buildMatrix()`, so no frozen phase is owed. */
+  { id: 'curl-max',        label: 'SHIPPED curl 360',             set: { petalSpineCurl: 360 } },
   { id: 'form-max',        label: 'SHIPPED all form at maximum',
     set: { petalCup: 1.2, petalRoll: 330, petalTwist: 180, petalSpineCurl: 360, petalCupGradient: 1.2 } },
   { id: 'buckle-gentle',   label: 'buckle A=0.10 x half-width · f=2', set: { buckleAmp: 0.10, buckleFreq: 2 }, buckled: true },
@@ -550,7 +562,7 @@ const withoutBuckle = (set) => {
   return o;
 };
 
-async function run({ root = ROOT, defaults = null, label = 'head' } = {}) {
+async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {} } = {}) {
   const G = await loadGeometry(root);
   const D = defaults || (await import(pathToFileURL(path.join(root, 'bloom-registry.js')).href)).DEFAULTS;
   const one = (set) => {
@@ -561,7 +573,7 @@ async function run({ root = ROOT, defaults = null, label = 'head' } = {}) {
        this instrument runnable against an older worktree. */
     const ap = m.petal && m.petal.tipCap && m.petal.tipCap.apex;
     const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
-    return { ...measureWall(m.petal.grid, { nibFromU }), tris: acc.positions.length / 9, positions: acc.positions };
+    return { ...measureWall(m.petal.grid, { nibFromU, ...wallOpts }), tris: acc.positions.length / 9, positions: acc.positions };
   };
   const out = [];
   for (const st of STATES) {
@@ -589,7 +601,7 @@ function floatDiff(a, b) {
 export async function verify({ root = ROOT, quiet = false, perturb = null } = {}) {
   const fails = [];
   const say = (...a) => { if (!quiet) console.log(...a); };
-  const { G, D, rows } = await run({ root });
+  const { G, D, rows } = await run({ root, wallOpts: (perturb && perturb.wallOpts) || {} });
   /* THE RECORD CONTROL. `perturb` swaps ONE declared magnitude for a wrong
      one — { selfXfail: { id, selfMm } } or { v4: { ownDeficitMm } } — so the
      magnitude clauses below can be seen to fire without a geometry mutation.
@@ -708,7 +720,8 @@ export async function verify({ root = ROOT, quiet = false, perturb = null } = {}
   /* V5 THE SHEET MUST NOT APPROACH ITSELF (session 34, Eva's ruling: gate it,
      with the known failures declared). SELF was a reported flag; a reported
      number becomes folklore within two sessions, so it is an assertion now.
-     The three pre-existing failures are declared in SELF_XFAIL above and MUST
+     The pre-existing failures are declared in SELF_XFAIL above (three when
+     this was written, four since `curl-max` joined on Oct 6) and MUST
      fail; anything else falling under the bar is this session's or a later
      one's, and reddens immediately. */
   {
@@ -1149,6 +1162,11 @@ if (IS_MAIN) {
         ['V5 record stale, better', { selfXfail: { id: 'roll-max', selfMm: SELF_XFAIL['roll-max'].selfMm - 0.1 } }, 'V5 xfail magnitude'],
         ['V4 record stale, worse',  { v4: { id: 'buckle-on-form', ownDeficitMm: 0.3 } }, 'V4 xfail magnitude'],
         ['V4 record stale, better', { v4: { id: 'buckle-on-form', ownDeficitMm: 0.9 } }, 'V4 xfail magnitude'],
+        /* THE OLD INSTRUMENT, PLANTED (gate-hygiene, Oct 6): the foot rows
+           dropped again. `curl-max` is the one row whose reading depends on
+           the foot, so it must read 1.230 and trip "now clears the bar" —
+           on its OWN witness and on no other row. */
+        ['foot dropped (curl-max)', { wallOpts: { footTargets: false } }, 'V5 xfail: "SHIPPED curl 360" now clears the bar'],
       ];
       for (const [name, perturb, want] of legs) {
         const { fails } = await verify({ quiet: true, perturb });

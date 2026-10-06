@@ -168,13 +168,26 @@ So the cell `layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=180 x inn
 exactly. It reads **0.199 mm**, is declared, and CG2/CG3 hold it both ways. It is also
 the triple's named `CONTROL_WITNESSES` failing cell.
 
-Keeping block 44 therefore rests on §1b's argument and not on coverage:
+Keeping block 44 therefore rests on §1b's argument and not on coverage, and that is
+how it was ruled (below):
 - X1 holds the **pair count and fold depth of the exported file** (1,968 / 0.4218 mm, in
   the browser).
 - The gate holds the **two-skin model's approach** (0.199 mm, in Node).
 
 These are two quantities with two owners. Ruling 1 was handed back for re-ruling on that
-basis, and the PR is **held unmerged** until it is.
+basis.
+
+**Re-ruled (Eva, Oct 6): KEEP block 44, as an application of the different-owner rule — not
+belt-and-braces.**
+- The gate reads **nearest approach** (0.199 mm) on the two-skin model, in **Node**.
+- Block 44 reads the **exported file's self-intersection census** (1,968 pairs /
+  0.4218 mm), in the **browser**.
+
+Different quantity, different engine, different owner: a green approach number does not
+entail an unfolded STL. And `measureWall` was blind to exactly this class until this PR, so
+retiring the row that caught what it missed would mean trusting an instrument just shown
+fallible in that very area. The same reason is written beside the row in
+`tools/bloom-harness.mjs`.
 
 **Ruling 2, ACCEPTED: `curl-x-twist` is `single-reaches`.** Nothing got worse: the
 measure stopped being blind. Two follow-ups, report only:
@@ -189,7 +202,22 @@ measure stopped being blind. Two follow-ups, report only:
     0.008 mm.
   - `twist-max` is twist alone.
 
-  So no single-control row holds the 0.676 mm figure anywhere. Named, not fixed here.
+  So no single-control row held the 0.676 mm figure anywhere.
+
+  **CLOSED, Oct 6 (Eva's ruling).** The wall instrument has a `curl-max` row now
+  (`SHIPPED curl 360`, `{ petalSpineCurl: 360 }`), declared in its `SELF_XFAIL` at
+  **0.676 mm** and held by V5 within ±5e-4 mm in both directions.
+  - It is an **instrument** row (`STATES` in `tools/bloom-wall-thickness.mjs`), not a
+    `buildMatrix()` row, so no frozen phase is owed. Nothing else imports `STATES`.
+  - Its must-fail is a new record-control leg, `foot dropped (curl-max)`. The leg plants
+    the old instrument (`footTargets: false`) through the shipped `verify()`. It requires
+    exactly one clause to fire, on its own row:
+    `V5 xfail: "SHIPPED curl 360" now clears the bar at 1.230 mm and PASSES`. No other
+    clause fires: the other rows do not depend on the foot.
+  - Measured: `--negative-control` reads "all mutants behaved", with the new leg `ok`.
+    The plain run exits 0.
+
+  This was named by both follow-ups, and it is closed by the row.
 
 **(b) Where does the declared magnitude live?** On the **pairs**, only. The single-curl-360
 state is declared ten times, once per pair or triple that has a curl axis, each at the
@@ -199,8 +227,16 @@ cell where every other axis sits at its default:
 - the four triples `curl-x-cup-x-twist`, `cup-x-roll-x-curl`, `curl-x-twist-x-roll`,
   `layers-x-curl-x-innercurl`.
 
-Each is at **0.6764 mm**. No single-control entry declares it: the wall instrument's
-`SELF_XFAIL` has no curl-360 row. So the hazard is filed under ten pair causes, each now
+Each is at **0.6764 mm**. No single-control entry declared it: the wall instrument's
+`SELF_XFAIL` had no curl-360 row until `curl-max` (above).
+
+**The ten are KEPT and ANNOTATED, not removed.** They are still where the number appears,
+and removing them would redden CG2. Each note now ends with:
+- **TRUE CAUSE:** `petalSpineCurl` 360 alone reaches this.
+- **The guard:** `SELF_XFAIL['curl-max']` is the single-control guard.
+
+A later trim of the shortlist can then drop a pair without dropping the only declaration
+of a single-control fact. So the hazard is filed under ten pair causes, each now
 known to be untrue, and not under the one control that owns it. Counting the curl-360
 cells off the defaults too, it is 14 declarations of one measurement (§1b's figure).
 

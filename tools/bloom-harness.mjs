@@ -13090,8 +13090,16 @@ export function buildMatrix() {
      target now, so the triple's cell reads 0.199 mm and is declared — the
      sentence above about `self` being blind is history, kept so the change is
      legible. The ROW LABEL still says "`self` cannot see it"; a label is the
-     row's identity and is not edited for prose. Whether this block is now
-     redundant is Eva's to rule: docs/bloom-gate-hygiene-outcome.md §1b.] */
+     row's identity and is not edited for prose.
+     KEPT, Eva's ruling (Oct 6), and the reason is the DIFFERENT-OWNER RULE,
+     not belt-and-braces: the triple's cell is this exact control set, but it
+     reads NEAREST APPROACH (0.199 mm) on the two-skin model in Node, while
+     this row reads the EXPORTED FILE's self-intersection census (1,968 pairs
+     / 0.4218 mm) in the browser — different quantity, different engine,
+     different owner, and a green approach does not entail an unfolded STL.
+     And `measureWall` was blind to exactly this class until that session, so
+     retiring the row that caught what it missed would trust an instrument just
+     shown fallible in this very area. docs/bloom-gate-hygiene-outcome.md §1c.] */
   for (const [name, sets] of [
     ['COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)', { layerCount: 3, petalSpineCurl: 180, innerCurl: 360 }],
   ]) {

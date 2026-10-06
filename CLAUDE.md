@@ -5473,7 +5473,7 @@ grid-bytes on the sphere stem, seam-bytes `--control` under `nib`) and two more 
 naming session's own re-records before it named them — `docs/bloom-gate-hygiene-outcome.md` §2. AND
 `measureWall` SEES THE FOOT NOW (as a SELF target only, never a query, never inside the seam window, so
 `wall` is unchanged by construction): the composed state reads 0.199 mm and curl 360 alone 0.676; 43 of
-513 combination cells moved, 145 -> 179 declared, seven verdicts flipped. Block 44 kept for Eva's ruling. §1]**
+513 combination cells moved, 145 -> 179 declared, seven verdicts flipped. BLOCK 44 KEPT (Eva, Oct 6) on the DIFFERENT-OWNER rule, not as cover: the triple's cell IS its control set, but it reads nearest approach in Node while the row reads the exported file's census in the browser, and `measureWall` was blind to this class until that PR. Curl 360 ALONE is now the wall instrument's `curl-max` row (0.676 mm), the single-control guard the ten pair/triple cells reaching it at their defaults point to. §1, §1c]**
 
 **ORGANIC VARIANCE, BUILD 3 — SPACING IS A PITCH DENSITY WHOSE INTEGRAL MAPS THE AZIMUTH, AND IT
 NEVER BINDS AS A PROPERTY** (Eva's ruling on the settlement — read `docs/bloom-organic-variance-spacing-law.md`,
