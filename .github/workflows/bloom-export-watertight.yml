@@ -152,12 +152,17 @@ concurrency:
 # EVERY JOB HAS AN EXPLICIT TIMEOUT, well under GitHub's 360, so a hang is
 # DECLARED by the timeout and shows up in the verdict as a shard with no
 # census. The preflight runs in PARALLEL with the shards: a red preflight is
-# still red within its own ~26 minutes, and serialising it would add that to
+# still red within its own run (~50-60 minutes by Oct 6), and serialising it would add that to
 # every green run's wall time.
 jobs:
   preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 90, NOT 60 (gate-hygiene, Oct 6). main's own preflight at 1899bfa ran
+    # 48.8 min — 81% of a 60-minute budget — and this PR's run, ~20-25% slower
+    # on EVERY step including steps it does not touch, hit 60:02 at DB0-DB2.
+    # Runner variance alone takes 48.8 past 60, so the budget was the defect;
+    # a timeout is for declaring a HANG, and 90 still does that.
+    timeout-minutes: 90
     steps:
       # fetch-depth 0 IS FOR CA5 AND NOTHING ELSE, AND A SHALLOW FETCH CANNOT
       # REPLACE IT. On a pull_request `actions/checkout` takes refs/pull/N/merge
