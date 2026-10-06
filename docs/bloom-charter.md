@@ -214,6 +214,13 @@ FIRST number in this project deliberately placed below the floor rather than cla
 it**, so unlike the four below it the coupon does not merely improve a clamp — it either
 ratifies a ruling or refutes it. `docs/bloom-apex-nib-outcome.md` has the construction.
 
+**AND THE FIRST PRINT SETTLES WHETHER DENSE PACKING TRAPS POWDER** (Eva's ruling, Oct 6, on
+organic-variance build 3). At `varianceSpacing` 0.90 the 40-petal crowding peak reaches
+**D_max 14 (CROWDED)**, so inter-petal gaps get small. On SLS a gap below the
+powder-evacuation limit traps powder, and that limit has never been measured here. **The
+coupon's gap rows (G, H, Z) answer it.** Until they do, CROWDED is the flag it always was
+(Eva, Sep 3), never a gate.
+
 **`TIP_HALF_MM` 0.8 CHANGED STATUS on Sep 1 and belongs at the top of that list.** For four
 sessions it was a quiet constant that blunted a tip nobody had ruled on. It is now the number
 that DECIDES HOW POINTED THE PRINTED TIP CAN BE, on a shape Eva ruled by eye and approved
@@ -1824,6 +1831,32 @@ any of them.
   frequency means for spacing), per-floret phase under instancing (ruling 10's second half), and
   any clamp on the neighbour approach (ruling 1 — revisitable on a printed crossing collar and on
   nothing else).
+
+- **BUILD 3 (SPACING) SHIPPED AND `varianceSpacing`'s MAXIMUM STANDS AT 0.90** (Eva's ruling, Oct 6;
+  merged as `1899bfa`, #371; the law is `docs/bloom-organic-variance-spacing-law.md`, the measurements
+  `docs/bloom-organic-variance-spacing-outcome.md`). **The basis, for the record:**
+  - The accepted-look ruling was made on the blade overlap VS5 pins. It moved from −1.194 to
+    −1.199 mm, which is noise.
+  - Everything else that moved is REPORTED rather than clamped, which is what interpenetration
+    ruling 1 specified.
+  - All 27 checks were green on the merged head, and the invariant (one connected, watertight
+    solid) holds.
+  - Crossings are harmless on SLS: overlapping closed solids union into one watertight part.
+  - A user who drags a slider to its end has chosen the result. This is the reasoning that refused
+    a frequency cap.
+
+  Three items are **OPEN**, and none of them is a defect:
+  - **OPEN, for Eva's eye, not a gate.** At 3 and 5 petals the blade gap goes from +17.1 / +5.7 mm
+    to **−1.2 mm, crossing**. That is the largest qualitative change the field makes, at counts a
+    user would plausibly pick. It is a LOOK question awaiting her review in the viewer. Nothing is
+    to be clamped for it.
+  - **OPEN, for the first print.** The 40-petal crowding peak reaches **D_max 14 (CROWDED)**. Dense
+    packing means small inter-petal gaps, and on SLS a gap below the powder-evacuation limit traps
+    powder. The coupon's gap rows (G, H, Z) answer it. It is entered under "Standing gaps" above.
+  - **OPEN, measured nowhere.** The sepal-normal fix (`f982aca`) moves `frozen/phase53`'s `ALL MAX`
+    row (measured: −37° to −40°). **Phases 35–52 are PREDICTED to move the same way, without
+    being measured.** That is a prediction, recorded in those words so it does not become fact by
+    repetition. It is scheduled for the gate-hygiene session.
 
 ## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
 
