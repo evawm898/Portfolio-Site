@@ -98,6 +98,18 @@ const headRows = H.buildMatrix(), baseRows = BH.buildMatrix();
 const fails = [], out = [];
 if (headRows.length !== baseRows.length) fails.push(`the two matrices differ in length (${headRows.length} here, ${baseRows.length} on the base) — pairing by index is not available`);
 let control = null;
+/* THE CONTROL'S HOLDER, BY NAME (gate-hygiene session, Oct 6). It was the
+   FIRST holder of whatever shard ran, and it retired the LAST "a HOLDER moved"
+   finding it saw — so a genuine holder move elsewhere in the shard could
+   satisfy the control and be deleted while the plant stayed. One named row
+   now: the control must run on the shard that holds it, the row must be a
+   predeclared HOLDER, and only that row's own finding counts and is retired. */
+const CONTROL_HOLDER = 'DEFAULT (the shipping configuration)';
+if (CONTROL) {
+  const ci = headRows.findIndex((r) => r.label === CONTROL_HOLDER);
+  if (ci < 0) { console.error(`REFUSED: the named control holder "${CONTROL_HOLDER}" is not in the matrix.`); process.exit(2); }
+  if (ci % N !== K) { console.error(`REFUSED: the named control holder "${CONTROL_HOLDER}" is row ${ci}, which shard ${K}/${N} does not build — run --control on shard ${ci % N}/${N}.`); process.exit(2); }
+}
 for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
   if (i % N !== K) continue;
   const hr = headRows[i], br = baseRows[i];
@@ -107,7 +119,10 @@ for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
   for (const exportMode of [true, false]) {
     const b = build(BG, bs, br, exportMode), h = build(G, hs, hr, exportMode);
     if (exportMode) mover = (b.built.petalsAll || []).some((p) => p && p.infill && !p.infill.refused);
-    if (CONTROL && !control && !mover && exportMode) { h.pos[0] += 1e-9; control = `perturbed "${hr.label}" by 1e-9`; }
+    if (CONTROL && exportMode && hr.label === CONTROL_HOLDER) {
+      if (mover) { fails.push(`control: the named holder "${CONTROL_HOLDER}" is a predeclared MOVER on the base tree, so it cannot carry the holder control — name a row this change holds`); }
+      else { h.pos[0] += 1e-9; control = `perturbed "${hr.label}" by 1e-9`; }
+    }
     floats += b.pos.length; gridValues += b.grid.length;
     const d = !sameArr(b.pos, h.pos) || !sameArr(b.grid, h.grid);
     moved = moved || d;
@@ -118,10 +133,11 @@ for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
   console.error(`${String(i).padStart(4)} ${mover ? 'MOVER ' : 'holder'} ${moved ? 'moved' : 'held '} ${hr.label.slice(0, 80)}`);
 }
 if (CONTROL) {
-  const hit = fails.some((f) => control && f.includes('a HOLDER moved'));
-  if (!control) fails.push('control: no holder in this shard to perturb');
-  else if (!hit) fails.push(`control: ${control} and the holder clause did NOT report it`);
-  else { control += ' — the holder clause reported it'; for (let j = fails.length - 1; j >= 0; j--) if (fails[j].includes('a HOLDER moved')) { fails.splice(j, 1); break; } }
+  const own = (f) => f.includes(`"${CONTROL_HOLDER}": a HOLDER moved`);
+  const j = fails.findIndex(own);
+  if (!control) fails.push(`control: the named holder "${CONTROL_HOLDER}" was never perturbed`);
+  else if (j < 0) fails.push(`control: ${control} and the holder clause did NOT report it`);
+  else { control += ' — the holder clause reported it'; fails.splice(j, 1); }
 }
 const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control };
 if (arg('--out')) fs.writeFileSync(arg('--out'), JSON.stringify(res));

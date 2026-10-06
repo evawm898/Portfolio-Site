@@ -117,7 +117,19 @@ if (CONTROL) {
      the true record. One row, seconds, no browser: a clause nobody has seen
      go red is a hope. `--root <mutated tree>` is the OTHER control, on the
      measured side, and is run by hand (docs/bloom-xfail-magnitudes.md §4). */
-  const label = [...Object.keys(H.SELF_INTERSECTION_XFAIL)].find((l) => byLabel.has(l) && !H.EXPORT_REFUSED_HAS(l) && (!ONLY || ONLY.test(l)));
+  /* THE CONTROL ROW, BY NAME (gate-hygiene session, Oct 6). It was the FIRST
+     key of SELF_INTERSECTION_XFAIL that met the conditions, so re-ordering or
+     prepending an entry re-pointed the must-fail at another row, and a list
+     with no qualifying key crashed in \`stateOf\` instead of refusing. Named now
+     (the row it has resolved to since the list was structured, #246), and a
+     name that is missing, undeclared or export-refused REFUSES the run. A
+     \`--only\` that excludes it refuses too rather than silently picking another. */
+  const label = 'petalSpineCurl max (360)';
+  const whyNot = !byLabel.has(label) ? 'is not a matrix row'
+    : !Object.prototype.hasOwnProperty.call(H.SELF_INTERSECTION_XFAIL, label) ? 'is no longer declared in SELF_INTERSECTION_XFAIL'
+    : H.EXPORT_REFUSED_HAS(label) ? 'is export-refused, so it has no STL for X1 to read'
+    : (ONLY && !ONLY.test(label)) ? 'is excluded by --only' : null;
+  if (whyNot) { console.error(`REFUSED: the named control row "${label}" ${whyNot} — name another declared row here rather than letting the control pick one.`); process.exit(2); }
   const row = byLabel.get(label);
   const r = measure(row);
   const d = H.SELF_INTERSECTION_XFAIL[label];

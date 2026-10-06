@@ -13085,7 +13085,13 @@ export function buildMatrix() {
      nearest a foot point, the rest the petal's own tip rows). So the census
      is this state's guard, X1 holds it to its record in both directions, and
      the triple's cell points here. Appended as the final block: the byte
-     tools pair rows by index. */
+     tools pair rows by index.
+     [Oct 6, the gate-hygiene session: `measureWall` takes the foot as a SELF
+     target now, so the triple's cell reads 0.199 mm and is declared — the
+     sentence above about `self` being blind is history, kept so the change is
+     legible. The ROW LABEL still says "`self` cannot see it"; a label is the
+     row's identity and is not edited for prose. Whether this block is now
+     redundant is Eva's to rule: docs/bloom-gate-hygiene-outcome.md §1b.] */
   for (const [name, sets] of [
     ['COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)', { layerCount: 3, petalSpineCurl: 180, innerCurl: 360 }],
   ]) {

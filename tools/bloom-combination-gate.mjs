@@ -222,7 +222,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
     b: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
-    verdict: 'product-only',
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'product-only'. the curl axis's own single cell (petalSpineCurl 360, the other axis at its default) reads 0.676 mm once the foot is a SELF target — the curl-360 census fold, a tip on its own foot, which `self` was blind to by definition while `measureWall` dropped the foot rows. CG4 is what said so. */
+    verdict: 'single-reaches',
     cite: "tools/bloom-wall-thickness.mjs already BUILDS this pair's cup 1.2 x curl 180 cell on every run — it is `buckle-on-form`'s own buckle-free control — and reads its wall while throwing its SELF away; the harness declares the census on the same state plus a buckle (`BUCKLE: THE COMPOSITION (cup 1.2 x curl 180)`, 2,078 pairs)",
     why: 'curl bends the spine into a hoop and cup lifts the margins across it; the curl brings distant stations of one blade together and the cup decides how much room is left between them',
   },
@@ -245,7 +246,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
     b: { id: 'buckleAmp', values: [0, 0.2, 0.4] },
-    verdict: 'product-only',
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'product-only'. the curl axis's own single cell (petalSpineCurl 360, the other axis at its default) reads 0.676 mm once the foot is a SELF target — the curl-360 census fold, a tip on its own foot, which `self` was blind to by definition while `measureWall` dropped the foot rows. CG4 is what said so. */
+    verdict: 'single-reaches',
     cite: "SELF_XFAIL['buckle-on-form'] in tools/bloom-wall-thickness.mjs names this pair in its own note (`curl+buckle 1.182`) — as a CURVATURE reading; this gate measures the SELF-APPROACH on it for the first time",
     why: 'the curl closes the blade on itself and the buckle spends the clearance that is left; session 34 measured that the composition has LOWER curvature than the base while the wall collapses, so no curvature bound can see it',
   },
@@ -296,7 +298,8 @@ export const PAIRS = [
     base: { petalInfill: 'VORONOI' },
     a: { id: 'infillDensity', values: [20, 8, 24, 40] },
     b: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
-    verdict: 'clears',
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'clears'. the curl axis's own single cell (petalSpineCurl 360, the other axis at its default) reads 0.676 mm once the foot is a SELF target — the curl-360 census fold, a tip on its own foot, which `self` was blind to by definition while `measureWall` dropped the foot rows. CG4 is what said so. */
+    verdict: 'single-reaches',
     cite: 'docs/bloom-infill-port-plan.md §1 and §3 — the wall a flat plan quartered was a product of cup and curl; docs/bloom-infill-s4-outcome.md carries the grid and the two inertness measurements',
     why: 'the curl brings distant stations of one blade together and the cells put walls at every station; the compression along the spine is what S2 measured the plan for — and measured, the cells never bring the sheet nearer itself than the plain blade',
   },
@@ -400,7 +403,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'petalCupGradient', values: [0, 0.6, 0.9, 1.2] },
     b: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
-    verdict: 'product-only',
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'product-only'. the curl axis's own single cell (petalSpineCurl 360, the other axis at its default) reads 0.676 mm once the foot is a SELF target — the curl-360 census fold, a tip on its own foot, which `self` was blind to by definition while `measureWall` dropped the foot rows. CG4 is what said so. */
+    verdict: 'single-reaches',
     cite: "bloom-geometry.js — `cAt(u, r)` is the cup's own coefficient and the gradient lives inside it, so this is `cup-x-curl`'s mechanism with the coefficient varying along the blade; docs/bloom-combination-gate.md §3",
     why: 'the curl brings distant stations of one blade together and the gradient decides how much of the cup is spent at the stations that meet',
   },
@@ -422,7 +426,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
     b: { id: 'petalTwist', values: [0, 60, 120, 180] },
-    verdict: 'product-only',
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'product-only'. the curl axis's own single cell (petalSpineCurl 360, the other axis at its default) reads 0.676 mm once the foot is a SELF target — the curl-360 census fold, a tip on its own foot, which `self` was blind to by definition while `measureWall` dropped the foot rows. CG4 is what said so. */
+    verdict: 'single-reaches',
     cite: "bloom-geometry.js — `petalForm`'s own ordering argument: curl builds the centreline and the base frame, and twist rotates THAT frame about the curled length direction, so the twist a blade receives is a function of the curl it already carries; docs/bloom-combination-gate.md §3",
     why: 'the strongest candidate in its tier and the reason it is tier 2 rather than tier 1 is only that no doc cites it: 0.012 mm with both singles clear (twist 180 reads 1.163, curl 360 reads 1.245)',
   },
@@ -540,7 +545,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'lobeDepth', values: [0, 0.3, 0.6, 1] },
     b: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
-    verdict: 'clears',
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'clears'. the curl axis's own single cell (petalSpineCurl 360, the other axis at its default) reads 0.676 mm once the foot is a SELF target — the curl-360 census fold, a tip on its own foot, which `self` was blind to by definition while `measureWall` dropped the foot rows. CG4 is what said so. */
+    verdict: 'single-reaches',
     cite: 'docs/bloom-combination-gate.md §4 — a guess, and the most expensive one measured: a lobed build costs four times any other candidate in this tier and this grid clears',
     why: 'a guess: that a sinus cut into the margin lets the curl bring two crests together. It does not — the cut removes material from exactly the place the curl would have folded',
   },
@@ -859,28 +865,25 @@ export const TRIPLES = [
       { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
       { id: 'innerCurl', values: [0, 360] },
     ],
-    /* THIS CELL IS NOT THE GUARD FOR THIS STATE, AND IT SAYS SO (Eva's ruling
-       on the headroom follow-up, docs/bloom-organic-variance-form-outcome.md
-       §22). It CLEARS on a state that FOLDS: the census reads 1,968
-       within-shell pairs / 0.4218 mm on 3 whorls x curl 180 x innerCurl 360
-       (EXPORT, the builder's doubles) while `self-every` reads 1.222 mm.
-       WHAT THE BLINDNESS IS, MEASURED — and it is not "between parts": the
-       census counts pairs WITHIN one closed shell, the state has 25 (24
-       petals and the hub), and every pair is inside ONE inner-whorl petal,
-       its tip (u 0.7-1.0) coiling back into ITS OWN FOOT (571 of the sites
-       nearest a foot point). `measureWall` drops the foot rows
-       (`r.row >= footRows`), so `self` is blind to it BY DEFINITION, on every
-       petal it reads — the fifth durable rule, a subject that excludes the
-       failure. The curl-360 slider alone is the same class (census 920 /
-       0.5158, `self` 1.230).
-       WHAT COVERS IT: the matrix row `COMPOSED: 3 whorls x curl 180 x
-       innerCurl 360 ...` (block 44 of tools/bloom-harness.mjs), declared from
-       birth in SELF_INTERSECTION_XFAIL at 1,968 / 0.4218 and held to it both
-       ways by X1 in the export gate. The cell stays `clears` and on `self`
-       (Eva: a pair count here would be incomparable with the other cells, all
-       mm of approach), so it still fails loudly the day the APPROACH comes
-       within the bar — which is all it can claim. */
-    verdict: 'clears',
+    /* THIS TRIPLE COULD NOT SEE THE COMPOSED STATE'S FOLD, AND NOW IT CAN
+       (Eva's ruling on the headroom follow-up, docs/bloom-organic-variance-form-
+       outcome.md §22; the foot made a target by the gate-hygiene session, Oct 6,
+       docs/bloom-gate-hygiene-outcome.md). The census reads 1,968 within-shell
+       pairs / 0.4218 mm on 3 whorls x curl 180 x innerCurl 360, every pair inside
+       ONE inner-whorl petal, its tip (u 0.7-1.0) coiling back into ITS OWN FOOT.
+       `measureWall` used to drop the foot rows (`r.row >= footRows`), so
+       `self-every` read a CLEARING 1.222 mm there — blind BY DEFINITION, the fifth
+       durable rule. The foot is a SELF target now, and the same cell reads
+       0.199 mm at u 0.856: declared, held both ways by CG2/CG3, and the verdict
+       moved clears -> pair-reaches because the curl-360 single reaches the bar on
+       its own (0.676). Block 44 (`COMPOSED: 3 whorls x curl 180 x innerCurl 360`)
+       is KEPT and still guards the census pair count through X1 in the export
+       gate; whether it is redundant now is Eva's to rule. Still declared
+       blindness: `self` is the two-skin MODEL's approach, never a fold depth or a
+       pair count, so this cell says "a tip comes within 0.199 mm of its own foot"
+       and X1 says "and it passes through it 1,968 times". */
+    /* RE-DECLARED BY THE FOOT TARGETS (gate-hygiene session, Oct 6): was 'clears'. a SINGLE-axis cell (layerCount 1 x petalSpineCurl 360 x innerCurl 0) reads 0.676 mm and the composed state's own cell 0.199 once the foot is a SELF target — the class this triple was declared blind to is visible now. CG4 is what said so. */
+    verdict: 'pair-reaches',
     cite: 'docs/bloom-organic-variance-form-outcome.md §17 and §22 — the composed base state folds at 1,968 pairs / 0.4218 mm with NO field; §22 attributes every pair to a petal\'s tip in its own foot, which `self` excludes, and names block 44 as the guard',
     why: 'a role row composes curl 180 + innerCurl 360 to 540 on every inner whorl and the clamp puts it at 360 — the declared curl-360 fold on two whorls of three, a state the matrix cannot see because it varies one control at a time',
   },
@@ -962,7 +965,7 @@ export const COMBINATION_XFAIL = Object.freeze({
      fourth column would cost two builds to re-measure one state. */
   /* REMOVED BY THE APEX NIB: 'cup-x-buckle @ petalCup=1.2 x buckleAmp=0.2' was declared at 0.99 mm and now CLEARS at 1.126. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
   /* REMOVED BY THE APEX NIB: 'cup-x-buckle @ petalCup=1.2 x buckleAmp=0.4' was declared at 0.963 mm and now CLEARS at 1.114. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
-  'curl-x-buckle @ petalSpineCurl=360 x buckleAmp=0.4': { mm: 0.852, note: "measured 2026-09-19 on 937263a. Session 34 named this pair in `buckle-on-form`'s note as a CURVATURE reading (1.182 /mm); this is its self-approach, measured for the first time. — RE-RECORDED BY THE APEX NIB: was 0.912 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
+  'curl-x-buckle @ petalSpineCurl=360 x buckleAmp=0.4': { mm: 0.55, note: "measured 2026-09-19 on 937263a. Session 34 named this pair in `buckle-on-form`'s note as a CURVATURE reading (1.182 /mm); this is its self-approach, measured for the first time. — RE-RECORDED BY THE APEX NIB: was 0.912 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.852 mm, now 0.55 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.910, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
 
   /* THE LEAF CELLS — `leafAngle`'s hazard, at every stem diameter, which
      is what CG4's `single-reaches` arm asserts about this pair. */
@@ -1061,8 +1064,8 @@ export const COMBINATION_XFAIL = Object.freeze({
   'curl-x-twist @ petalSpineCurl=180 x petalTwist=180': { mm: 0.811, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.620 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
   'curl-x-twist @ petalSpineCurl=270 x petalTwist=120': { mm: 0.448, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.411 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
   'curl-x-twist @ petalSpineCurl=270 x petalTwist=180': { mm: 0.275, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.105 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
-  'curl-x-twist @ petalSpineCurl=360 x petalTwist=60': { mm: 0.933, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.615 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
-  'curl-x-twist @ petalSpineCurl=360 x petalTwist=120': { mm: 0.053, note: "measured 2026-09-19 on c29a8b5 — this tier's worst cell, and the same twelve microns TIER 1's `cup 1.2 x curl 360` reads. Both singles clear: twist 180 reads 1.163 and curl 360 reads 1.245. — RE-RECORDED BY THE APEX NIB: was 0.012 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
+  'curl-x-twist @ petalSpineCurl=360 x petalTwist=60': { mm: 0.04, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.615 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.933 mm, now 0.04 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.983, the curl\'s tip against its own foot. Measured on main\'s geometry at 7af97f4, Node 22, EXPORT.' },
+  'curl-x-twist @ petalSpineCurl=360 x petalTwist=120': { mm: 0.006, note: "measured 2026-09-19 on c29a8b5 — this tier's worst cell, and the same twelve microns TIER 1's `cup 1.2 x curl 360` reads. Both singles clear: twist 180 reads 1.163 and curl 360 reads 1.245. — RE-RECORDED BY THE APEX NIB: was 0.012 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.053 mm, now 0.006 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.983, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   'curl-x-twist @ petalSpineCurl=360 x petalTwist=180': { mm: 0.007, note: 'measured 2026-09-19 on c29a8b5 — NOT monotone: 120 deg of twist reads nearer than 180. — RE-RECORDED BY THE APEX NIB: was 0.025 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* ONE LIFT, TWO CONTROLS — AND THE MEASURE DEPENDS ON THEIR SUM. Read
@@ -1131,7 +1134,7 @@ export const COMBINATION_XFAIL = Object.freeze({
   "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0": { mm: 0.08, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=-180": { mm: 0.079, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.001 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
   "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=270": { mm: 0.08, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
-  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=360": { mm: 0.08, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=360": { mm: 0.035, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=-330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721) — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.08 mm, now 0.035 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.946, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0": { mm: 0.012, note: "a FACE of the triple (petalCup x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=-180": { mm: 0.012, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
   "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=330 x petalSpineCurl=270": { mm: 0.012, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.000 mm against its nearest face (petalCup=-0.8 x petalRoll=330 x petalSpineCurl=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
@@ -1167,10 +1170,10 @@ export const COMBINATION_XFAIL = Object.freeze({
   "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=180 x petalRoll=0": { mm: 0.275, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "curl-x-twist-x-roll @ petalSpineCurl=270 x petalTwist=180 x petalRoll=330": { mm: 0.61, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.334 mm against its nearest face (petalSpineCurl=270 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
   "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=0 x petalRoll=330": { mm: 0.436, note: "a FACE of the triple (petalSpineCurl x petalRoll moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
-  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=-180 x petalRoll=0": { mm: 0.01, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
-  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=-180 x petalRoll=330": { mm: 0.469, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.459 mm against its nearest face (petalSpineCurl=360 x petalTwist=-180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=-180 x petalRoll=0": { mm: 0.008, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.01 mm, now 0.008 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.898, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=-180 x petalRoll=330": { mm: 0.19, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.459 mm against its nearest face (petalSpineCurl=360 x petalTwist=-180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721) — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.469 mm, now 0.19 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.983, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=0": { mm: 0.007, note: "a FACE of the triple (petalSpineCurl x petalTwist moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
-  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=330": { mm: 0.527, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.520 mm against its nearest face (petalSpineCurl=360 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=330": { mm: 0.19, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.520 mm against its nearest face (petalSpineCurl=360 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721) — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.527 mm, now 0.19 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.983, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
 
   /* ===== cup-x-tipshape-x-width (the headroom PR, §21) */
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=30": { mm: 0.92, note: "a FACE of the triple (petalCup x petalWidth moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
@@ -1234,6 +1237,48 @@ export const COMBINATION_XFAIL = Object.freeze({
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=35': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=0': { mm: 0.2144, note: 'RE-RECORDED by build 3 ruling 1 (the florets\' own internode floor): read 0.000 (an edge crossing) through builds 2 and 3 Phase A; under the floor the three level-topped heads on a 60 mm rachis stand 0.2144 mm apart — the ONE corymb cell still under the bar, an INTERIOR cell (the sessile top at 60 deg), so the pair is PRODUCT-ONLY now. The floor is derived for EQUAL pedicels and the corymb lengthens the lower ones to one level, which is why the floor clears the other eight cells and not this one' + ' — measured by build 3 (ruling 1), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+  /* ===== THE FOOT JOINS THE MEASURE (gate-hygiene session, Oct 6) — 34 cells
+     that cleared while `measureWall` dropped the foot rows and read under the bar
+     once the foot is a SELF target. Every one is a tip coiling onto its own foot:
+     `petalSpineCurl` 360 alone reads 1.230 -> 0.676 mm at u 0.932 (the curl-360
+     census fold, 920 pairs, already a declared matrix row), and on the inner
+     whorls the composed state (block 44) reads 1.222 -> 0.199 at u 0.856. The
+     geometry did not move; the instrument stopped excluding the failure it
+     doubts (the fifth durable rule). */
+  "cup-x-curl @ petalCup=0 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "cup-x-curl @ petalCup=0.6 x petalSpineCurl=360": { mm: 0.692, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.024 mm (clear) while `measureWall` dropped the foot rows, now 0.692 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "curl-x-buckle @ petalSpineCurl=360 x buckleAmp=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "curl-x-buckle @ petalSpineCurl=360 x buckleAmp=0.2": { mm: 0.644, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.061 mm (clear) while `measureWall` dropped the foot rows, now 0.644 mm at u 0.910. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "density-x-curl @ infillDensity=20 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "density-x-curl @ infillDensity=8 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "density-x-curl @ infillDensity=24 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "density-x-curl @ infillDensity=40 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "gradient-x-curl @ petalCupGradient=0 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360": { mm: 0.691, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.123 mm (clear) while `measureWall` dropped the foot rows, now 0.691 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360": { mm: 0.695, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.058 mm (clear) while `measureWall` dropped the foot rows, now 0.695 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "curl-x-twist @ petalSpineCurl=360 x petalTwist=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "lobedepth-x-curl @ lobeDepth=0 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "lobedepth-x-curl @ lobeDepth=0.3 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.221 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "lobedepth-x-curl @ lobeDepth=0.6 x petalSpineCurl=360": { mm: 0.677, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.221 mm (clear) while `measureWall` dropped the foot rows, now 0.677 mm at u 0.933. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "lobedepth-x-curl @ lobeDepth=1 x petalSpineCurl=360": { mm: 0.677, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.22 mm (clear) while `measureWall` dropped the foot rows, now 0.677 mm at u 0.933. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "curl-x-cup-x-twist @ petalSpineCurl=360 x petalCup=0 x petalTwist=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=0 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "cup-x-roll-x-curl @ petalCup=0 x petalRoll=-330 x petalSpineCurl=360": { mm: 0.128, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.176 mm (clear) while `measureWall` dropped the foot rows, now 0.128 mm at u 0.898. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "cup-x-roll-x-curl @ petalCup=-0.8 x petalRoll=0 x petalSpineCurl=360": { mm: 0.04, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.239 mm (clear) while `measureWall` dropped the foot rows, now 0.04 mm at u 0.946. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=0 x petalRoll=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=1 x petalSpineCurl=360 x innerCurl=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=1 x petalSpineCurl=360 x innerCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=0 x innerCurl=360": { mm: 0.199, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.222 mm (clear) while `measureWall` dropped the foot rows, now 0.199 mm at u 0.856. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=180 x innerCurl=360": { mm: 0.199, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.222 mm (clear) while `measureWall` dropped the foot rows, now 0.199 mm at u 0.856. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=270 x innerCurl=360": { mm: 0.199, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.222 mm (clear) while `measureWall` dropped the foot rows, now 0.199 mm at u 0.856. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=360 x innerCurl=0": { mm: 0.199, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.222 mm (clear) while `measureWall` dropped the foot rows, now 0.199 mm at u 0.856. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=360 x innerCurl=360": { mm: 0.199, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.222 mm (clear) while `measureWall` dropped the foot rows, now 0.199 mm at u 0.856. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=0 x innerCurl=360": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=180 x innerCurl=360": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=270 x innerCurl=0": { mm: 0.865, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.216 mm (clear) while `measureWall` dropped the foot rows, now 0.865 mm at u 0.802. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=270 x innerCurl=360": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=360 x innerCurl=0": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=360 x innerCurl=360": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -1359,10 +1404,14 @@ async function loadTree(root) {
 /* Build one cell and return its approach in mm. EXPORT mode throughout:
    the print floor is what the bar is about, and mixing modes in one table
    would make the column headings lie. */
-function measureCell(tree, DEFAULTS, pair, va, vb) {
-  return measureState(tree, DEFAULTS, pair, { ...DEFAULTS, ...(pair.base || {}), [pair.a.id]: va, [pair.b.id]: vb }, `${pair.a.id}=${num(va)} x ${pair.b.id}=${num(vb)}`);
+function measureCell(tree, DEFAULTS, pair, va, vb, wallOpts = {}) {
+  return measureState(tree, DEFAULTS, pair, { ...DEFAULTS, ...(pair.base || {}), [pair.a.id]: va, [pair.b.id]: vb }, `${pair.a.id}=${num(va)} x ${pair.b.id}=${num(vb)}`, wallOpts);
 }
-function measureState({ G, W, R }, DEFAULTS, pair, state, where) {
+/* `wallOpts` exists for ONE caller: the control's foot leg, which hands
+   `measureWall` `{ footTargets: false }` — the instrument as it was before the
+   gate-hygiene session — and requires the declared foot cells to go red. The
+   shipped run never passes it. */
+function measureState({ G, W, R }, DEFAULTS, pair, state, where, wallOpts = {}) {
   if (pair.measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
   /* THE INFILL'S OWN MEASURE — the in-sheet wall between two holes on the
      SHIPPED plan (tools/bloom-infill-wall.mjs), because `self` is
@@ -1391,7 +1440,7 @@ function measureState({ G, W, R }, DEFAULTS, pair, state, where) {
       n++;
       const ap = p.tipCap && p.tipCap.apex;
       const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
-      const r = W.measureWall(p.grid, { nibFromU });
+      const r = W.measureWall(p.grid, { nibFromU, ...wallOpts });
       if (r.self < best.mm) best = { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1], whorl: p.whorl, slot: p.slotIndex }, rows: r.rows, columns: r.columns };
     }
     if (!n) throw new Error(`combination gate: "${pair.id}" at ${where} built NO petal with a grid, so \`self-every\` has nothing to read.`);
@@ -1414,11 +1463,11 @@ function measureState({ G, W, R }, DEFAULTS, pair, state, where) {
      region is excluded and what owns it instead. */
   const ap = m.petal.tipCap && m.petal.tipCap.apex;
   const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
-  const r = W.measureWall(m.petal.grid, { nibFromU });
+  const r = W.measureWall(m.petal.grid, { nibFromU, ...wallOpts });
   return { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1] }, rows: r.rows, columns: r.columns };
 }
 
-export async function run({ root = HERE, only = null, pairs = PAIRS, triples = TRIPLES } = {}) {
+export async function run({ root = HERE, only = null, pairs = PAIRS, triples = TRIPLES, wallOpts = {} } = {}) {
   const tree = await loadTree(root);
   const { R } = tree;
   const chosen = pairs.filter((p) => !only || only.test(p.id));
@@ -1431,7 +1480,7 @@ export async function run({ root = HERE, only = null, pairs = PAIRS, triples = T
       if (i === t.axes.length) {
         const state = { ...R.DEFAULTS, ...(t.base || {}) };
         t.axes.forEach((ax, k) => { state[ax.id] = vals[k]; });
-        cells.push({ vals, key: tripleKey(t, vals), ...measureState(tree, R.DEFAULTS, t, state, vals.map((v, k) => `${t.axes[k].id}=${num(v)}`).join(' x ')) });
+        cells.push({ vals, key: tripleKey(t, vals), ...measureState(tree, R.DEFAULTS, t, state, vals.map((v, k) => `${t.axes[k].id}=${num(v)}`).join(' x '), wallOpts) });
         builds++;
         return;
       }
@@ -1444,7 +1493,7 @@ export async function run({ root = HERE, only = null, pairs = PAIRS, triples = T
     const grid = [];
     for (const va of p.a.values) {
       const row = [];
-      for (const vb of p.b.values) { row.push({ va, vb, key: cellKey(p, va, vb), ...measureCell(tree, R.DEFAULTS, p, va, vb) }); builds++; }
+      for (const vb of p.b.values) { row.push({ va, vb, key: cellKey(p, va, vb), ...measureCell(tree, R.DEFAULTS, p, va, vb, wallOpts) }); builds++; }
       grid.push(row);
     }
     out.push({ pair: p, grid });
@@ -1456,7 +1505,7 @@ export async function run({ root = HERE, only = null, pairs = PAIRS, triples = T
    a wrong one so CG3 can be SEEN to fire without a geometry mutation —
    the wall instrument's own idiom, and it exists because a clause nobody
    has watched go red is a hope. */
-export async function verify({ root = HERE, quiet = false, only = null, pairs = PAIRS, triples = TRIPLES, xfail = COMBINATION_XFAIL, inert = COMBINATION_INERT, cached = null } = {}) {
+export async function verify({ root = HERE, quiet = false, only = null, pairs = PAIRS, triples = TRIPLES, xfail = COMBINATION_XFAIL, inert = COMBINATION_INERT, cached = null, wallOpts = {} } = {}) {
   const fails = [];
   const say = (...a) => { if (!quiet) console.log(...a); };
   /* A CACHED GRID IS REUSED ONLY WHERE IT IS PROVABLY THE SAME GRID. The
@@ -1469,7 +1518,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
      grid from the one the plant describes. */
   let { tree, rows, tripleRows, builds, skipped } = cached
     ? { ...cached, builds: 0 }
-    : await run({ root, only, pairs, triples });
+    : await run({ root, only, pairs, triples, wallOpts });
   if (cached) {
     const sig = (ps) => JSON.stringify(ps.map((p) => [p.id, p.a.id, p.a.values, p.b.id, p.b.values, p.base || null]));
     if (sig(rows.map((r) => r.pair)) !== sig(pairs.filter((p) => !only || only.test(p.id)))) {
@@ -1812,6 +1861,71 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
    minutes to re-measure states already measured; `only` rebuilds the
    twelve or sixteen cells the plant actually describes. Every other
    plant changes a declaration or a flag, which moves no geometry. */
+/* THE CONTROL'S WITNESSES, BY NAME (gate-hygiene session, Oct 6). Every leg
+   below used to pick its witness by FIRST MATCH of a property other
+   declarations can change — the first declared cell under the bar, the first
+   pair with each verdict, the first inert key, the first tier-3 pair, each
+   triple's first declared failing cell. A declaration added or re-ordered then
+   silently re-points the leg at a different row, which still fires and so
+   reads green: the edge-profile control drifted exactly that way and nobody
+   noticed for a session. THE SAME SESSION THAT NAMED THESE MEASURED IT
+   HAPPENING HERE: flipping six verdicts for the foot targets moved the
+   `single-reaches` arm from `leafangle-x-stem` to `cup-x-curl` and the
+   `cup-x-roll-x-curl` triple's failing cell to a curl-360 single, with every
+   leg still green. So each witness is the one `main` ran with at 7af97f4,
+   named, and the control REFUSES (exit 2) if a name goes missing or stops
+   having the property its leg needs. Moving one is an edit to this table,
+   which a reviewer sees. */
+export const CONTROL_WITNESSES = Object.freeze({
+  failing: 'cup-x-tipshape @ petalCup=0.6 x petalTipShape=3',          // declared AND under the bar
+  clearing: 'cup-x-tipshape @ petalCup=0 x petalTipShape=1.7',         // clears the bar AND undeclared
+  'product-only': 'cup-x-tipshape',
+  'single-reaches': 'leafangle-x-stem',
+  clears: 'cup-x-buckle',
+  inert: 'density-x-cup @ infillDensity',                              // a COMBINATION_INERT key
+  tier3: 'leafangle-x-tooth',                                          // a tier-3 pair (declares `guess`)
+  /* each triple's declared failing cell (a triple that declares CLEARS has none) */
+  triples: Object.freeze({
+    'curl-x-cup-x-twist': 'curl-x-cup-x-twist @ petalSpineCurl=270 x petalCup=0 x petalTwist=180',
+    'cup-x-roll-x-curl': 'cup-x-roll-x-curl @ petalCup=0 x petalRoll=-330 x petalSpineCurl=-180',
+    'curl-x-twist-x-roll': 'curl-x-twist-x-roll @ petalSpineCurl=0 x petalTwist=0 x petalRoll=330',
+    'cup-x-tipshape-x-width': 'cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=30',
+    /* NEW with the foot targets: the composed state's OWN cell, block 44's
+       state, the reason this triple exists */
+    'layers-x-curl-x-innercurl': 'layers-x-curl-x-innercurl @ layerCount=3 x petalSpineCurl=180 x innerCurl=360',
+  }),
+});
+/* The checks each named witness must pass before any leg runs. Returns the
+   list of reasons it cannot serve; empty means every name resolves. */
+export function controlWitnessProblems({ cells, tripleCells, bar, pairs = PAIRS, triples = TRIPLES, xfail = COMBINATION_XFAIL, inert = COMBINATION_INERT, W = CONTROL_WITNESSES }) {
+  const why = [];
+  const cellBy = new Map(cells.map((c) => [c.key, c]));
+  const f = cellBy.get(W.failing);
+  if (!f) why.push(`the named failing witness "${W.failing}" is no cell of any shipped pair`);
+  else if (!(Number.isFinite(f.mm) && f.mm < bar && xfail[f.key])) why.push(`the named failing witness "${W.failing}" is no longer both under the bar and declared (reads ${f.mm})`);
+  const c = cellBy.get(W.clearing);
+  if (!c) why.push(`the named clearing witness "${W.clearing}" is no cell of any shipped pair`);
+  else if (!(Number.isFinite(c.mm) && c.mm >= bar && !xfail[c.key])) why.push(`the named clearing witness "${W.clearing}" no longer clears the bar undeclared (reads ${c.mm})`);
+  for (const v of VERDICTS) {
+    const p = pairs.find((q) => q.id === W[v]);
+    if (!p) why.push(`the named "${v}" witness "${W[v]}" is no shipped pair`);
+    else if (p.verdict !== v) why.push(`the named "${v}" witness "${W[v]}" now declares "${p.verdict}"`);
+  }
+  if (!Object.prototype.hasOwnProperty.call(inert, W.inert)) why.push(`the named inert witness "${W.inert}" is not a COMBINATION_INERT key`);
+  else if (!pairs.some((p) => p.id === W.inert.split(' @ ')[0])) why.push(`the named inert witness "${W.inert}" names no shipped pair`);
+  const t3 = pairs.find((q) => q.id === W.tier3);
+  if (!t3 || t3.tier !== 3) why.push(`the named tier-3 witness "${W.tier3}" is ${t3 ? `tier ${t3.tier}` : 'no shipped pair'}`);
+  for (const t of triples) {
+    const name = W.triples[t.id];
+    if (t.verdict === 'clears') { if (name) why.push(`triple "${t.id}" declares CLEARS and still names a failing witness "${name}"`); continue; }
+    if (!name) { why.push(`triple "${t.id}" declares ${t.verdict} and names no failing witness in CONTROL_WITNESSES.triples`); continue; }
+    const tc = (tripleCells.get(t.id) || []).find((x) => x.key === name);
+    if (!tc) why.push(`triple "${t.id}"'s named failing witness "${name}" is no cell of it`);
+    else if (!(Number.isFinite(tc.mm) && tc.mm < bar && xfail[tc.key])) why.push(`triple "${t.id}"'s named failing witness "${name}" is no longer both under the bar and declared (reads ${tc.mm})`);
+  }
+  for (const id of Object.keys(W.triples)) if (!triples.some((t) => t.id === id)) why.push(`CONTROL_WITNESSES.triples names "${id}", which is no shipped triple`);
+  return why;
+}
 async function control({ root = HERE } = {}) {
   const baseRun = await run({ root });
   const { fails: baseFails, rows, bar } = await verify({ root, quiet: true, cached: baseRun });
@@ -1823,16 +1937,34 @@ async function control({ root = HERE } = {}) {
   console.log('  baseline: the shipped tree is green, so every red below is the plant\'s.\n');
 
   const allCells = rows.flatMap((r) => r.grid.flat());
-  const failing = allCells.find((c) => Number.isFinite(c.mm) && c.mm < bar && COMBINATION_XFAIL[c.key]);
-  const clearing = allCells.find((c) => Number.isFinite(c.mm) && c.mm >= bar && !COMBINATION_XFAIL[c.key]);
-  const arm = (v) => PAIRS.find((p) => p.verdict === v);
-  const inertPairId = Object.keys(COMBINATION_INERT)[0]?.split(' @ ')[0];
-  const why = [];
-  if (!failing) why.push('no cell is both under the bar and declared, so neither the CG2 removal nor the CG3 record legs have anything to plant');
-  if (!clearing) why.push('no cell clears the bar undeclared, so the CG2 "declared but clearing" leg has nothing to plant');
-  for (const v of VERDICTS) if (!arm(v)) why.push(`PAIRS carries no pair with verdict "${v}", so CG4 cannot be exercised on that arm`);
-  if (!inertPairId || !PAIRS.some((p) => p.id === inertPairId)) why.push('COMBINATION_INERT names no axis of any shipped pair, so the CG7 legs have nothing to plant');
-  if (why.length) { console.error(`REFUSED (vacuous control): ${why.join('; ')}.`); return 2; }
+  const tripleCells = new Map((baseRun.tripleRows || []).map((r) => [r.triple.id, r.cells]));
+  const why = controlWitnessProblems({ cells: allCells, tripleCells, bar });
+  if (why.length) { console.error(`REFUSED (a named control witness cannot serve): ${why.join('; ')}.`); return 2; }
+  /* AND THE GUARD ITSELF MUST BE SEEN TO FIRE: each kind of loss — a name
+     that no longer resolves, a name whose row lost its property — planted
+     into a COPY of the table, each required to produce a reason naming it. */
+  {
+    const W0 = CONTROL_WITNESSES;
+    const guardLegs = [
+      ['a failing witness renamed to a cell no pair produces', { ...W0, failing: 'cup-x-tipshape @ petalCup=99 x petalTipShape=99' }, {}, 'failing witness'],
+      ['the failing witness loses its declaration', W0, { xfail: (() => { const o = { ...COMBINATION_XFAIL }; delete o[W0.failing]; return o; })() }, 'failing witness'],
+      ['a verdict arm names a pair that no longer declares it', { ...W0, clears: W0['product-only'] }, {}, '"clears" witness'],
+      ['a triple witness names a cell that clears', { ...W0, triples: { ...W0.triples, 'layers-x-curl-x-innercurl': 'layers-x-curl-x-innercurl @ layerCount=1 x petalSpineCurl=0 x innerCurl=0' } }, {}, 'layers-x-curl-x-innercurl'],
+    ];
+    let gbad = 0;
+    for (const [name, W, extra, must] of guardLegs) {
+      const got = controlWitnessProblems({ cells: allCells, tripleCells, bar, W, ...extra });
+      const ok = got.some((r) => r.includes(must));
+      if (!ok) gbad++;
+      console.log(`  ${ok ? 'ok  ' : 'FAIL'} witness guard: ${name.padEnd(56)} ${ok ? 'REFUSED — ' + got.find((r) => r.includes(must)).slice(0, 120) : 'did NOT refuse'}`);
+    }
+    if (gbad) { console.error(`  MISSED: the witness guard stayed silent on ${gbad} planted loss(es) — a named witness could go missing unseen`); return gbad; }
+    console.log('');
+  }
+  const byKey = new Map(allCells.map((c) => [c.key, c]));
+  const failing = byKey.get(CONTROL_WITNESSES.failing), clearing = byKey.get(CONTROL_WITNESSES.clearing);
+  const arm = (v) => PAIRS.find((p) => p.id === CONTROL_WITNESSES[v]);
+  console.log(`  witnesses (named, CONTROL_WITNESSES): failing "${failing.key}" · clearing "${clearing.key}" · arms ${VERDICTS.map((v) => `${v}=${arm(v).id}`).join(', ')} · inert "${CONTROL_WITNESSES.inert}" · tier-3 "${CONTROL_WITNESSES.tier3}"\n`);
 
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const asVerdict = (id, v) => PAIRS.map((p) => (p.id === id ? { ...clone(p), verdict: v } : p));
@@ -1853,7 +1985,7 @@ async function control({ root = HERE } = {}) {
   const cg1 = patch(prod.id, (p) => ({ ...p, b: { id: 'stamenCount', values: [0, 60] } }));
   const without = (k) => { const o = { ...COMBINATION_XFAIL }; delete o[k]; return o; };
   const withoutInert = (k) => { const o = { ...COMBINATION_INERT }; delete o[k]; return o; };
-  const inertKeyReal = Object.keys(COMBINATION_INERT)[0];
+  const inertKeyReal = CONTROL_WITNESSES.inert;
   /* CG7's "it started moving" plant declares a control that MOVES the
      measure as inert — the direction that matters, because an axis whose
      inertness has expired is a pair that has quietly become real. */
@@ -1862,6 +1994,10 @@ async function control({ root = HERE } = {}) {
   const legs = [
     ['CG0 an axis no longer starts at its control\'s default', { pairs: cg0, only: new RegExp(`^${prod.id}$`) }, 'CG0', true],
     ['CG1 an axis cannot reach the measure at all', { pairs: cg1, only: new RegExp(`^${prod.id}$`) }, 'CG1', true],
+    /* THE FOOT LEG ON A PAIR (gate-hygiene session, Oct 6), the triple's own
+       twin below: the instrument with the foot dropped must leave the curl-360
+       single cleared, which CG2 reports on its declared cell by name. */
+    ['CG2 "cup-x-curl" measured with the FOOT DROPPED again (measureWall footTargets: false)', { wallOpts: { footTargets: false }, only: /^cup-x-curl$/ }, 'CG2', true, 'cup-x-curl'],
     ['CG1 the declared inertness is removed', { inert: withoutInert(inertKeyReal) }, 'CG1'],
     ['CG2 a failing cell\'s declaration is removed', { xfail: without(failing.key) }, 'CG2'],
     ['CG2 a CLEARING cell is declared as failing', { xfail: { ...COMBINATION_XFAIL, [clearing.key]: { mm: 0.5, note: 'CONTROL' } } }, 'CG2'],
@@ -1874,7 +2010,7 @@ async function control({ root = HERE } = {}) {
     [`CG4 "${prod.id}" declares a verdict that is not one of the three`, { pairs: asVerdict(prod.id, 'mostly-fine') }, 'CG4'],
     ['CG5 a declaration names a cell no grid produces', { xfail: { ...COMBINATION_XFAIL, [strayKey]: { mm: 0.5, note: 'CONTROL' } } }, 'CG5'],
     [`CG6 "${prod.id}" declares no tier`, { pairs: patch(prod.id, (p) => { delete p.tier; return p; }) }, 'CG6'],
-    [`CG6 a TIER 3 pair stops declaring itself a guess`, { pairs: patch(PAIRS.find((p) => p.tier === 3).id, (p) => { delete p.guess; return p; }) }, 'CG6'],
+    [`CG6 a TIER 3 pair stops declaring itself a guess`, { pairs: patch(CONTROL_WITNESSES.tier3, (p) => { delete p.guess; return p; }) }, 'CG6'],
     [`CG6 "${prod.id}" cites a file that does not exist`, { pairs: patch(prod.id, (p) => ({ ...p, cite: 'docs/bloom-this-doc-was-never-written.md — the argument' })) }, 'CG6'],
     ['CG7 an axis that MOVES the measure is declared inert', { inert: { ...COMBINATION_INERT, [movingAxis]: { maxMoveMm: 0, note: 'CONTROL' } } }, 'CG7'],
     ['CG7 the inert record overstates the movement', { inert: { ...COMBINATION_INERT, [inertKeyReal]: { ...COMBINATION_INERT[inertKeyReal], maxMoveMm: 0.5 } } }, 'CG7'],
@@ -1895,8 +2031,8 @@ async function control({ root = HERE } = {}) {
   const flips = { 'pair-reaches': ['triple-only', 'clears'], 'triple-only': ['pair-reaches', 'clears'], clears: ['pair-reaches', 'triple-only'] };
   for (const [ti, { triple: T, cells }] of tRows.entries()) {
     const tAs = (v) => TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), verdict: v } : t));
-    const tFail = cells.find((c) => Number.isFinite(c.mm) && c.mm < bar && COMBINATION_XFAIL[c.key]);
-    if (!tFail && T.verdict !== 'clears') { console.error(`REFUSED (vacuous control): "${T.id}" declares ${T.verdict} and no cell of it is both under the bar and declared.`); return 2; }
+    /* named, checked above by controlWitnessProblems */
+    const tFail = CONTROL_WITNESSES.triples[T.id] ? cells.find((c) => c.key === CONTROL_WITNESSES.triples[T.id]) : null;
     if (tFail) legs.push(
       [`CG2 triple: "${T.id}" loses a failing cell's declaration`, { xfail: without(tFail.key) }, 'CG2', false, T.id],
       [`CG3 triple: "${T.id}" record is stale, the cell reads WORSE`, { xfail: { ...COMBINATION_XFAIL, [tFail.key]: { ...COMBINATION_XFAIL[tFail.key], mm: COMBINATION_XFAIL[tFail.key].mm + 0.1 } } }, 'CG3', false, T.id],
@@ -1905,6 +2041,11 @@ async function control({ root = HERE } = {}) {
     for (const v of flips[T.verdict] || []) legs.push([`CG4 triple: "${T.id}" ${T.verdict} -> ${v}`, { triples: tAs(v) }, 'CG4', false, T.id]);
     if (ti === 0) legs.push([`CG0 triple: "${T.id}" an axis no longer starts at its default`, { triples: TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), axes: t.axes.map((a, i) => (i === 2 ? { ...a, values: [a.values[1], 90] } : a)) } : t)), only: new RegExp(`^${T.id}$`) }, 'CG0', true, T.id]);
     if (T.measure === 'self-every') {
+      /* THE FOOT LEG (gate-hygiene session, Oct 6): the instrument as it was —
+         `measureWall` dropping the foot rows — must leave this triple's
+         declared foot cells CLEARING, which CG2 reports by name. Without it the
+         foot targets are a claim nobody has seen fail. */
+      legs.push([`CG2 triple: "${T.id}" measured with the FOOT DROPPED again (measureWall footTargets: false)`, { wallOpts: { footTargets: false }, only: new RegExp(`^${T.id}$`) }, 'CG2', true, T.id]);
       legs.push([`CG1 triple: "${T.id}" measured on the representative petal alone`, { triples: TRIPLES.map((t) => (t.id === T.id ? { ...clone(t), measure: 'self' } : t)), only: new RegExp(`^${T.id}$`) }, 'CG1', true, T.id]);
     }
   }

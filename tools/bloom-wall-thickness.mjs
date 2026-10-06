@@ -148,8 +148,10 @@ function ptTri(p, a, b, c) {
 }
 
 /* THE MEASUREMENT. `grid` is buildPetalInto's captured panels; `footRows` is
-   how many rows at the head of each panel are the FOOT, which is flat and not
-   under test. Returns the two numbers and where each was found. */
+   how many rows at the head of each panel are the FOOT, which is never QUERIED
+   (its wall is the hub's question) and, since the gate-hygiene session, is a
+   SELF TARGET — see "THE FOOT IS A SELF TARGET" below. Returns the two numbers
+   and where each was found. */
 /* `nibFromU` — THE ONE PLACE THIS INSTRUMENT'S MODEL IS DECLARED INADEQUATE
    (the apex-nib session), and it is a carve-out, so it is stated at length.
 
@@ -202,9 +204,39 @@ function ptTri(p, a, b, c) {
    A QUAD IS MATERIAL ONLY IF ALL FOUR OF ITS CORNERS ARE. A quad with one
    corner in a hole straddles the rim and is not a piece of sheet; counting it
    would put a triangle through the hole it is beside. */
-export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null } = {}) {
-  const rows = grid.flatMap((pan) => pan.rows).filter((r) => r.row >= footRows);
-  if (rows.length < 2) throw new Error('measureWall: fewer than two blade rows captured — nothing to measure');
+/* THE FOOT IS A SELF TARGET, AND ONLY THAT (the gate-hygiene session, Oct 6).
+   `measureWall` used to drop the foot rows outright (`r.row >= footRows`), so
+   neither measure could see the foot at all — and the one fold this project has
+   measured into a foot is the class `self` exists for: block 44's composed state
+   (3 whorls x curl 180 x innerCurl 360) coils every inner petal's TIP into ITS
+   OWN FOOT, 1,968 census pairs, while `self-every` read a clearing 1.222 mm.
+   The fifth durable rule — a subject that excludes the failure it doubts.
+   So the foot rows now contribute BOTTOM-SKIN TRIANGLES to the SELF branch and
+   nothing else:
+     - a foot row is NEVER A QUERY. The foot lies on the hub; "how thick is the
+       wall under me" there is the hub's question, and the foot's own top skin
+       against the blade's underside at the seam's inside angle is the kink, not
+       an approach.
+     - a foot triangle inside the `near` window of a query is IGNORED rather than
+       counted as WALL. That window is the foot-to-blade seam's own
+       neighbourhood: the blade's first rows sit against the foot by
+       construction, and counting the seam quads as wall reads the KINK as a
+       thinning (measured: the default's wall 1.2000 -> 1.1976, tilt 120
+       1.2000 -> 0.8432 with the foot as a wall target). Ignoring them keeps
+       `wall` the number it was, by construction: its subject is unchanged.
+     - a foot triangle OUTSIDE the window is a self target like any other.
+   Measured on the shipped tree when this landed: `self-every` on the composed
+   state 1.222 -> 0.199 mm at u 0.856 (an inner whorl); `petalSpineCurl` 360
+   alone 1.230 -> 0.676 at u 0.932; tilt 105 and 120 (blade lying back over its
+   foot) UNMOVED at 1.2377, so the seam window does what it says.
+   `footTargets: false` is the old instrument, kept ONLY so the combination
+   gate's control can plant "the foot is dropped again" and require the
+   composed triple's declared cells to go red (their CG2 leg). */
+export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null, footTargets = true } = {}) {
+  const rows = grid.flatMap((pan) => pan.rows).filter((r) => footTargets || r.row >= footRows);
+  const isFoot = (i) => rows[i].row < footRows;
+  const bladeRows = rows.filter((r) => r.row >= footRows);
+  if (bladeRows.length < 2) throw new Error('measureWall: fewer than two blade rows captured — nothing to measure');
   for (const r of rows) {
     if (!Array.isArray(r.material) || r.material.length !== r.v.length) {
       /* NOT "because it would go green" — measured, it would not: both numbers
@@ -268,12 +300,13 @@ export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null } = 
   let skipped = 0, asked = 0;
   for (let i = 0; i < T.length; i++) {
     for (let j = 0; j < NVc; j++) {
+      if (isFoot(i)) continue;                      // the foot is a target, never a query — see above
       if (!mat(i, j)) { skipped++; continue; }
       asked++;
       let dn = Infinity, df = Infinity;
       for (const tr of tris) {
         const d = ptTri(T[i][j], tr[0], tr[1], tr[2]);
-        if (Math.abs(tr[3] - i) <= near && Math.abs(tr[4] - j) <= near) { if (d < dn) dn = d; }
+        if (Math.abs(tr[3] - i) <= near && Math.abs(tr[4] - j) <= near) { if (!isFoot(tr[3]) && d < dn) dn = d; }
         else if (onNib(tr[3])) { /* the partner is inside the nib's wedge — see nibFromU */ }
         else if (d < df) df = d;
       }
@@ -282,7 +315,7 @@ export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null } = 
       if (df < self) { self = df; selfAt = [rows[i].u, rows[i].v[j]]; }
     }
   }
-  return { wall, wallAt, self, selfAt, declared: rows[0].thickness, rows: rows.length, columns: NVc, holes: skipped, samples: asked };
+  return { wall, wallAt, self, selfAt, declared: bladeRows[0].thickness, rows: bladeRows.length, columns: NVc, holes: skipped, samples: asked, footTargets };
 }
 
 /* ------------------------------------------------------------ curvature */
