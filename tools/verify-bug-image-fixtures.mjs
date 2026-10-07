@@ -176,7 +176,10 @@ export function clutter(params, o = {}) {
   return img;
 }
 
-const D = () => G.defaultParams();
+// (the pictures stand for insects as DRAWN: the junction blend — the builder's
+// own fill between a wing and the body, design doc §16 — is off in them, so
+// an abdomen shows beside the hindwing as in a photograph)
+const D = () => ({ ...G.defaultParams(), wingJunction: 0 });
 /* The fixtures the gate and the sheet share. */
 export const IMAGE_FIXTURES = {
   // the default specimen butterfly: one wing mass per side with a notch
