@@ -197,7 +197,8 @@ function runST9(G, ui) {
      is in it for a reason that is about the future rather than about today:
      ST9 excuses the PETIOLES (a leaf is rooted through the stem's wall, so it
      stands inside the free stem's own cylinder by design), and it reads that
-     exemption off `m.leaf.petioleAxes`. None of the rows below carries a leaf,
+     exemption off `m.leaf.rodAxes` (S3: every rod a leaf emitted, which on a
+     simple leaf is its one petiole). None of the rows below carries a leaf,
      so `leaf` is null on every one of them and this is measured inert — but a
      witness that fed ST9 a DIFFERENT input from the gates would stop being a
      witness for the clause that ships the first time somebody wrote a leafy
@@ -205,7 +206,8 @@ function runST9(G, ui) {
      while the gates stay green. Built from the BUILDER's own per-leaf records,
      exactly as bloom.js's metrics hook builds it. */
   const m = { sphereMode: true,
-              leaf: b.leaf && b.leaf.present ? { petioleAxes: (b.leavesBuilt || []).map((r) => r.petioleAxis) } : null };
+              leaf: b.leaf && b.leaf.present ? { petioleAxes: (b.leavesBuilt || []).map((r) => r.petioleAxis),
+                                                 rodAxes: (b.leavesBuilt || []).flatMap((r) => r.rodAxes || [r.petioleAxis]) } : null };
   return { fired: stemChannelAssertions(p, null, m, ui),
            om: b.stemOmission,
            built: b.stemOmission ? b.stemOmission.built : b.petalsBuilt };

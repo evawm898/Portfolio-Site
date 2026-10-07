@@ -773,6 +773,56 @@ for (const o of ROLE_OVERRIDES) {
     throw new Error(`the two statements of the gynoecium gating disagree — a control the registry HIDES that the geometry still reads, or the reverse:\n  ${bad.join('\n  ')}`);
   }
 }
+/* THE SAME TWO-STATEMENT CHECK FOR THE LEAF TYPE (leaf/stem build S3). The
+   registry's `leafCompound` shows the Leaflets drop-down; the geometry builds
+   a compound tree exactly where `leafIsCompound` holds on a leafed stem that
+   OWNS its nodes — under a raceme the shared node pins the leaf to SIMPLE
+   (`SHARED_NODE_LEAF_PINS`, one place) and the plan says so. Swept over the
+   guard's every arm: leaf length 0 / 40, stem length 0 / 120, raceme or none,
+   both types. The control is the CHOICE SIMPLE / COMPOUND with SIMPLE the
+   default (the byte-identical arm), and every leaflet range is the
+   geometry's own export — Q6, a registry literal would be a second owner. */
+{
+  const bad = [];
+  const G = GEOMETRY;
+  const ctl = CONTROLS.find((c) => c.id === 'leafType');
+  if (!ctl) throw new Error('the registry declares no `leafType` control — the compound leaf and LF14 both read it');
+  if (ctl.kind !== 'choice' || ctl.options.map((o) => o.value).join(',') !== G.LEAF_TYPES.join(',')) throw new Error(`registry leafType is not the choice ${G.LEAF_TYPES.join(' / ')} the builder branches on (got ${ctl.kind} ${JSON.stringify(ctl.options && ctl.options.map((o) => o.value))})`);
+  if (ctl.default !== 'SIMPLE') throw new Error(`registry leafType default ${ctl.default} — the leaf ships SIMPLE (the byte-identical arm)`);
+  if (G.SHARED_NODE_LEAF_PINS.leafType !== 'SIMPLE') throw new Error('the shared-node pin no longer pins the leaf to SIMPLE');
+  const ranges = [
+    ['leafletPairs', G.LEAFLET_PAIRS_RANGE, G.LEAFLET_PAIRS_DEFAULT], ['leafletFirst', G.LEAFLET_FIRST_RANGE, G.LEAFLET_FIRST_DEFAULT],
+    ['leafletLast', G.LEAFLET_LAST_RANGE, G.LEAFLET_LAST_DEFAULT], ['leafletAngle', G.LEAFLET_ANGLE_RANGE, G.LEAFLET_ANGLE_DEFAULT],
+    ['leafletLength', G.LEAFLET_LENGTH_RANGE, G.LEAFLET_LENGTH_DEFAULT], ['leafletWidth', G.LEAF_WIDTH_RANGE, G.LEAFLET_WIDTH_DEFAULT],
+    ['leafletBasalRatio', G.LEAFLET_BASAL_RANGE, G.LEAFLET_BASAL_DEFAULT], ['leafletTerminalLength', G.LEAFLET_LENGTH_RANGE, G.LEAFLET_TERMINAL_LENGTH_DEFAULT],
+    ['leafletTerminalWidth', G.LEAF_WIDTH_RANGE, G.LEAFLET_TERMINAL_WIDTH_DEFAULT], ['leafletStalk', G.LEAFLET_STALK_RANGE, G.LEAFLET_STALK_DEFAULT],
+    ['leafletTerminalStalk', G.LEAFLET_TERMINAL_STALK_RANGE, G.LEAFLET_TERMINAL_STALK_DEFAULT],
+  ];
+  for (const [id, r, d] of ranges) {
+    const c = CONTROLS.find((x) => x.id === id);
+    if (!c) { bad.push(`the registry declares no \`${id}\``); continue; }
+    if (c.min !== r[0] || c.max !== r[1]) bad.push(`${id} is ${c.min}..${c.max} in the registry and ${r[0]}..${r[1]} in the geometry`);
+    if (c.default !== d) bad.push(`${id} defaults to ${c.default} in the registry and ${d} in the geometry`);
+  }
+  const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets');
+  if (subs.length !== ranges.length) bad.push(`the Leaflets section holds ${subs.length} controls, the geometry's layout reads ${ranges.length}`);
+  for (const leafLength of [0, 40]) for (const stemLength of [0, 120]) for (const inflorescence of ['NONE', 'RACEME']) for (const leafType of G.LEAF_TYPES) {
+    const st = { ...DEFAULTS, leafLength, stemLength, inflorescence, leafType };
+    const geo = G.leafIsCompound(st) && !G.leafIsAbsent(st) && G.inflorescenceIsAbsent(st);
+    const reg = evalPredicate({ ref: 'leafCompound' }, st);
+    const tag = `leafLength ${leafLength} x stemLength ${stemLength} x ${inflorescence} x ${leafType}`;
+    if (geo !== reg) bad.push(`${tag}: geometry builds ${geo ? 'a compound leaf' : 'no compound leaf'}, registry leafCompound says ${reg}`);
+    for (const c of subs) {
+      const shown = evalPredicate(c.visibleWhen, st);
+      if (shown && !geo) bad.push(`${tag}: ${c.id} is SHOWN while no compound leaf is built`);
+    }
+    const typeShown = evalPredicate(ctl.visibleWhen, st);
+    if (typeShown !== (!G.leafIsAbsent(st) && G.inflorescenceIsAbsent(st))) bad.push(`${tag}: leafType is ${typeShown ? 'shown' : 'hidden'} while the leaf's node is ${!G.leafIsAbsent(st) && G.inflorescenceIsAbsent(st) ? 'its own' : 'absent or shared'}`);
+  }
+  if (bad.length) {
+    throw new Error(`the two statements of the leaf type disagree — a control the registry SHOWS that the geometry does not read, or the reverse:\n  ${bad.join('\n  ')}`);
+  }
+}
 
 /* The four curves. Named once, read by formAssertions and by the matrix's
    named-corner block; the ids themselves live in the registry. */
@@ -6112,9 +6162,75 @@ export function restatedPhylloTurn(phyllo, divergenceDeg) {
    over the blade, `z(s) = (cos theta - cos(theta + k s)) / k`, whose highest
    point is at its far end or where `sin(phi)` changes sign inside it. An upward
    arch rises ABOVE the chord, which is why the inset must read it. */
+/* THE COMPOUND LEAF'S LAYOUT, RESTATED FROM THE CONTROLS (leaf/stem build
+   S3) — never imported: the geometry's `compoundLeafLayout` is the quantity
+   under test. Each value is clamped to its REGISTRY control's own declared
+   bounds (a different owner from the layout law), pair k of p stands at the
+   weighted mean `(first (p-1-k) + last k) / (p-1)` of the two stations — a
+   different expression from the geometry's `first + (last - first) k / (p-1)`
+   so a defect in one is not shared by the other — and a scaled leaflet is
+   floored at the minima of the CONTROLS it scales from. NULL where the
+   registry's `leafCompound` is false: SIMPLE, or a raceme's shared node,
+   where the geometry pins the type (LF14 holds the two statements). */
+const ctlOf = (id) => { const c = CONTROLS.find((q) => q.id === id); if (!c) throw new Error(`bloom-harness: the registry declares no ${id} — the compound leaf cannot be restated`); return c; };
+export function restatedCompound(ui) {
+  if (!evalPredicate({ ref: 'leafCompound' }, ui)) return null;
+  const cl = (id) => { const c = ctlOf(id); return Math.min(Number(c.max), Math.max(Number(c.min), Number(ui[id]))); };
+  const p = Math.round(cl('leafletPairs'));
+  const first = cl('leafletFirst'), last = cl('leafletLast');
+  const len = cl('leafletLength'), wid = cl('leafletWidth'), basal = cl('leafletBasalRatio');
+  const minL = Number(ctlOf('leafletLength').min), minW = Number(ctlOf('leafletWidth').min);
+  const rachisMm = Number(ui.leafLength);
+  const lateral = [];
+  for (let k = 0; k < p; k++) {
+    const frac = p === 1 ? first : (first * (p - 1 - k) + last * k) / (p - 1);
+    const ratio = p === 1 ? 1 : (basal * (p - 1 - k) + k) / (p - 1);
+    lateral.push({ k, frac, stationMm: frac * rachisMm, lengthMm: Math.max(minL, len * ratio), widthMm: Math.max(minW, wid * ratio) });
+  }
+  const terminal = { lengthMm: cl('leafletTerminalLength'), widthMm: cl('leafletTerminalWidth') };
+  const blades = [];
+  for (const q of lateral) for (const side of [1, -1]) blades.push({ role: 'lateral', k: q.k, side, lengthMm: q.lengthMm, widthMm: q.widthMm, stationMm: q.stationMm });
+  blades.push({ role: 'terminal', k: p, side: 0, lengthMm: terminal.lengthMm, widthMm: terminal.widthMm, stationMm: rachisMm });
+  return {
+    pairs: p, first, last, angleDeg: cl('leafletAngle'), rachisMm, lateral, terminal, blades, count: 2 * p + 1,
+    stalkMm: cl('leafletStalk'), terminalStalkMm: cl('leafletTerminalStalk'),
+  };
+}
+/* THE RACHIS'S CENTRELINE AND NORMAL from the controls, in the SUM-OF-SINES
+   closed form (LF11's own), from the rachis base `bb` at azimuth `az`. */
+export function restatedRachisAt(ui, bb, az, s) {
+  const th = (Number(ui.leafAngle) * Math.PI) / 180;
+  const arch = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
+  const L = Number(ui.leafLength);
+  const Rr = [Math.cos(az), Math.sin(az)];
+  let C, phi = th;
+  if (arch === 0) {
+    C = [bb[0] + Rr[0] * Math.cos(th) * s, bb[1] + Rr[1] * Math.cos(th) * s, bb[2] + Math.sin(th) * s];
+  } else {
+    const k = ((-arch * Math.PI) / 180) / L;
+    phi = th + k * s;
+    const along = (Math.sin(phi) - Math.sin(th)) / k, up = (Math.cos(th) - Math.cos(phi)) / k;
+    C = [bb[0] + Rr[0] * along, bb[1] + Rr[1] * along, bb[2] + up];
+  }
+  return { C, phi, D: [Rr[0] * Math.cos(phi), Rr[1] * Math.cos(phi), Math.sin(phi)], N: [-Rr[0] * Math.sin(phi), -Rr[1] * Math.sin(phi), Math.cos(phi)], T: [-Rr[1], Rr[0], 0] };
+}
 export function restatedLeafRiseMm(ui) {
   const L = Number(ui.leafLength), th = (Number(ui.leafAngle) * Math.PI) / 180;
   const arch = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
+  /* A COMPOUND LEAF (S3) rises by its whole tree: the rachis arc's own maximum
+     (the simple law below on the rachis), the terminal's tip along the
+     rachis's end tangent, every lateral leaflet's tip along its own direction
+     (whose rise is cos(angle) of the rachis's at its station). */
+  const cp = restatedCompound(ui);
+  if (cp) {
+    const arcMax = restatedLeafRiseMm({ ...ui, leafType: 'SIMPLE' });
+    const at = (s) => restatedRachisAt(ui, [0, 0, 0], 0, s);
+    const end = at(cp.rachisMm);
+    let best = Math.max(arcMax, end.C[2] + (cp.terminalStalkMm + cp.terminal.lengthMm) * Math.sin(end.phi));
+    const cA = Math.cos((cp.angleDeg * Math.PI) / 180);
+    for (const q of cp.lateral) { const a = at(q.stationMm); best = Math.max(best, a.C[2], a.C[2] + (cp.stalkMm + q.lengthMm) * cA * Math.sin(a.phi)); }
+    return best;
+  }
   if (arch === 0) return L * Math.sin(th);
   const turn = (-arch * Math.PI) / 180, k = turn / L;
   const z = (phi) => (Math.cos(th) - Math.cos(phi)) / k;
@@ -7342,6 +7458,22 @@ export async function leafAssertions(page, row) {
     if (L.built !== want) bad.push(`LF1: the plan asks for ${want} leaves (${L.azimuths.length} nodes) and the builder emitted ${L.built}`);
   }
 
+  /* PER BLADE, NOT PER LEAF (leaf/stem build S3). Every clause below that
+     holds a BLADE to the blade law reads the metrics hook's per-blade arrays
+     (`bladeOf` names each entry): a simple leaf is one blade, a compound leaf
+     one per leaflet. The blade each entry SHOULD be — its role and the length
+     and width it was asked for — is RESTATED here from the CONTROLS, never read
+     off the plan: a simple blade is the leaf's own size (on a raceme, its
+     flowering node's built length, SN4's), a compound leaf's leaflets are
+     `restatedCompound`'s, in its build order. */
+  const builtNodes = L.nodeLengthsMm
+    ? (L.azimuths || []).map((a, k) => (L.nodeLengthsMm[k] > 0 ? a.map((az) => ({ az, len: L.nodeLengthsMm[k] })) : [])).flat()
+    : (L.azimuths || []).map((a) => a.map((az) => ({ az, len: Number(ui.leafLength) }))).flat();
+  const cpR = restatedCompound(ui);
+  const bladesR = builtNodes.flatMap((n, i) => (cpR
+    ? cpR.blades.map((b) => ({ ...b, leaf: i }))
+    : [{ leaf: i, role: 'blade', k: 0, side: 0, lengthMm: n.len, widthMm: Number(ui.leafWidth) }]));
+
   /* LF2 — EVERY PETIOLE IS ROOTED IN THE WALL. This is Phase A's ruling
      measured on every row: a petiole on the AXIS of a hollow stem still reads
      ONE PIECE, so the flood fill cannot see the difference and this clause is
@@ -7701,7 +7833,7 @@ export async function leafAssertions(page, row) {
        every emitted leaf declares NO ROOM with the relief floor as its cause —
        and LF13 holds that declaration against the floor restated from the
        controls, so a builder cannot excuse itself by declaring it. */
-    const allFloored = Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === L.built && L.built > 0
+    const allFloored = Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === bladesR.length && L.built > 0
       && L.serrationBuilt.every((r) => r && r.noRoom && r.noRoomWhy === 'relief floor');
     if (want4.depth > 0 && !(L.serration.count >= 1) && !allFloored) bad.push(`LF7: leaf serration depth is ${want4.depth} but the builder cut ${L.serration.count} teeth and declares no relief-floor NO ROOM for it`);
     if (!(want4.depth > 0) && L.serration.count) bad.push(`LF7: leaf serration depth is 0 but the builder reports ${L.serration.count} teeth — the guard must be inert`);
@@ -7738,20 +7870,17 @@ export async function leafAssertions(page, row) {
   const nWant = Number(ui.leafTipShape);
   if (L.tipShape === undefined) bad.push('LF9: the plan reports no `tipShape` — which exponent the blade was built from is asserted by nothing');
   else if (Math.abs(Number(L.tipShape) - nWant) > 1e-9) bad.push(`LF9: the plan reports the blade built at tip shape ${L.tipShape} where the LEAF's own control says ${nWant}`);
-  if (!Array.isArray(L.rowHalfBaseMm) || L.rowHalfBaseMm.length !== L.built) {
-    bad.push(`LF9: the builder reports no per-row base half-widths for ${L.built} leaves — the exponent the blade was actually built from cannot be read back`);
-  } else if (!Array.isArray(L.tipClamp) || L.tipClamp.length !== L.built) {
-    bad.push(`LF9: the builder reports no terminal-clamp record for ${L.built} leaves — the read-out's clamp clause would then be printed from nothing`);
+  if (!Array.isArray(L.rowHalfBaseMm) || L.rowHalfBaseMm.length !== bladesR.length) {
+    bad.push(`LF9: the builder reports ${Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm.length : 'no'} per-blade base half-width lists for the ${bladesR.length} blade(s) of ${L.built} leaves — the exponent the blade was actually built from cannot be read back`);
+  } else if (!Array.isArray(L.tipClamp) || L.tipClamp.length !== bladesR.length) {
+    bad.push(`LF9: the builder reports no terminal-clamp record for the ${bladesR.length} blade(s) of ${L.built} leaves — the read-out's clamp clause would then be printed from nothing`);
   } else {
     const a = LEAF_BASE_TAPER, b = LEAF_TIP_TAPER, uPk = a / (a + b);
-    const halfW = Number(ui.leafWidth) / 2;
-    /* each emitted leaf's own length: the control's, or — on a raceme — its
-       flowering node's built length (SN4 holds that against the cap) */
-    const lens = L.nodeLengthsMm
-      ? L.azimuths.flatMap((a, k) => (L.nodeLengthsMm[k] > 0 ? a.map(() => L.nodeLengthsMm[k]) : []))
-      : null;
-    for (let i = 0; i < L.built; i++) {
-      const lengthMm = lens ? lens[i] : Number(ui.leafLength);
+    /* each emitted BLADE's own length and width, restated (S3): the
+       control's, or on a raceme its flowering node's built length (SN4 holds
+       that against the cap), or a compound leaf's leaflet's */
+    for (let i = 0; i < bladesR.length; i++) {
+      const lengthMm = bladesR[i].lengthMm, halfW = bladesR[i].widthMm / 2;
       const rows = L.rowHalfBaseMm[i], NU_ = rows.length - 1, cl = L.tipClamp[i];
       /* (b) the exponent off the rows. `hb` is `max(profile, TIP_HALF_MM)`, so
          only rows strictly above the floor carry the law. */
@@ -7765,17 +7894,17 @@ export async function leafAssertions(page, row) {
         for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (Math.pow(y, mid) + Math.pow(sPow, mid) > 1) lo = mid; else hi = mid; }
         ns.push((lo + hi) / 2);
       }
-      if (ns.length < 3) { bad.push(`LF9: leaf ${i} has only ${ns.length} row(s) above the widest point and above the floor — the exponent cannot be read back (the terminal has taken the whole tip)`); break; }
+      if (ns.length < 3) { bad.push(`LF9: blade ${i} has only ${ns.length} row(s) above the widest point and above the floor — the exponent cannot be read back (the terminal has taken the whole tip)`); break; }
       ns.sort((x, y) => x - y);
       const nRead = ns[Math.floor(ns.length / 2)];
-      if (Math.abs(nRead - nWant) > 1e-6) { bad.push(`LF9: leaf ${i}'s blade reads back a tip exponent of ${nRead.toFixed(6)} off the half-widths it was built from, where the LEAF's own control says ${nWant} (the plan says ${L.tipShape})`); break; }
+      if (Math.abs(nRead - nWant) > 1e-6) { bad.push(`LF9: blade ${i}'s blade reads back a tip exponent of ${nRead.toFixed(6)} off the half-widths it was built from, where the LEAF's own control says ${nWant} (the plan says ${L.tipShape})`); break; }
       /* (c) the clamp, a biconditional against the same rows — OVER THE TIP
          STRETCH [uPk, 1] the record is about. The first cut swept every row
          and fired on the CLEAN tree at row 0: the leaf's base outline reaches
          zero where it meets the petiole (the base taper's own u = 0), so that
          row sits on the same floor for a reason that has nothing to do with
          the tip, and the mutant table's control pass is what said so. */
-      if (!cl || !(cl.fromU >= uPk && cl.fromU <= 1)) { bad.push(`LF9: leaf ${i}'s clamp record is missing or places the terminal at u = ${cl && cl.fromU}, outside [widest point, 1]`); break; }
+      if (!cl || !(cl.fromU >= uPk && cl.fromU <= 1)) { bad.push(`LF9: blade ${i}'s clamp record is missing or places the terminal at u = ${cl && cl.fromU}, outside [widest point, 1]`); break; }
       let wrong = null;
       for (let j = 0; j <= NU_; j++) {
         const u = j / NU_, atFloor = rows[j] === TIP_HALF_MM;
@@ -7784,9 +7913,9 @@ export async function leafAssertions(page, row) {
         if (u >= cl.fromU && !atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) is ${rows[j].toFixed(4)} mm ABOVE the floor at or past the declared clamp station ${cl.fromU.toFixed(4)}`; break; }
       }
       if (wrong) { bad.push(`LF9: the terminal clamp the read-out prints is not what the blade was built from — ${wrong}`); break; }
-      if (Math.abs(cl.terminalMm - 2 * TIP_HALF_MM) > 1e-12) { bad.push(`LF9: leaf ${i} declares a ${cl.terminalMm} mm terminal where the leaf's floor is ${2 * TIP_HALF_MM} mm`); break; }
+      if (Math.abs(cl.terminalMm - 2 * TIP_HALF_MM) > 1e-12) { bad.push(`LF9: blade ${i} declares a ${cl.terminalMm} mm terminal where the leaf's floor is ${2 * TIP_HALF_MM} mm`); break; }
       if (Math.abs(cl.fraction - (1 - cl.fromU)) > 1e-12 || Math.abs(cl.mm - (1 - cl.fromU) * lengthMm) > 1e-9 || Math.abs(cl.ofWidth - (2 * TIP_HALF_MM) / (2 * halfW)) > 1e-12) {
-        bad.push(`LF9: leaf ${i}'s clamp record (${cl.mm} mm, ${cl.fraction} of the length, ${cl.ofWidth} of the width) is not its own station ${cl.fromU} applied to the control's ${lengthMm} x ${2 * halfW} mm`); break;
+        bad.push(`LF9: blade ${i}'s clamp record (${cl.mm} mm, ${cl.fraction} of the length, ${cl.ofWidth} of the width) is not its own station ${cl.fromU} applied to the control's ${lengthMm} x ${2 * halfW} mm`); break;
       }
     }
   }
@@ -7801,10 +7930,10 @@ export async function leafAssertions(page, row) {
      side is the builder's own per-row record (one entry per emitted row), the
      artefact rather than a plan. The witness row is
      `LEAVES: x petalTipShape 3.00`. */
-  if (Array.isArray(L.rowHalfBaseMm) && L.rowHalfBaseMm.length === L.built) {
-    for (let i = 0; i < L.built; i++) {
+  if (Array.isArray(L.rowHalfBaseMm) && L.rowHalfBaseMm.length === bladesR.length) {
+    for (let i = 0; i < bladesR.length; i++) {
       const rowsBuilt = L.rowHalfBaseMm[i].length - 1;
-      if (rowsBuilt !== BLADE_ROWS) { bad.push(`LF10: leaf ${i}'s blade was built on ${rowsBuilt} rows where a leaf's own lattice is ${BLADE_ROWS} (petalTipShape ${ui.petalTipShape}, leafTipShape ${ui.leafTipShape}) — the leaf is reading a row count some other part left behind`); break; }
+      if (rowsBuilt !== BLADE_ROWS) { bad.push(`LF10: blade ${i}'s blade was built on ${rowsBuilt} rows where a leaf's own lattice is ${BLADE_ROWS} (petalTipShape ${ui.petalTipShape}, leafTipShape ${ui.leafTipShape}) — the leaf is reading a row count some other part left behind`); break; }
     }
   }
   /* ===================================================================
@@ -7821,11 +7950,8 @@ export async function leafAssertions(page, row) {
      and the edge-profile gate's E4 proves the margin apexes those rows put
      the bead on are in the emitted stream.
      =================================================================== */
-  /* Per emitted leaf, in build order: its azimuth and its own length (the
-     control's, or on a raceme its flowering node's built length). */
-  const builtNodes = L.nodeLengthsMm
-    ? L.azimuths.map((a, k) => (L.nodeLengthsMm[k] > 0 ? a.map((az) => ({ az, len: L.nodeLengthsMm[k] })) : [])).flat()
-    : L.azimuths.map((a) => a.map((az) => ({ az, len: Number(ui.leafLength) }))).flat();
+  /* (`builtNodes`, per emitted leaf in build order — its azimuth and its own
+     length — is declared above, beside the per-blade restatement.) */
   /* LF11 — THE ARCH IS THE PETAL'S SPINE LAW ON THE LEAF'S OWN CONTROL. The
      centreline of a blade of length L leaving its petiole at angle theta,
      arched by `leafArch` degrees (positive = the tip falls), is the circular
@@ -7840,7 +7966,44 @@ export async function leafAssertions(page, row) {
      a sheet) all export watertight, one piece, at the same triangle count. */
   const archDeg = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
   if (L.archDeg === undefined || Math.abs(Number(L.archDeg) - archDeg) > 1e-12) bad.push(`LF11: the plan reports an arch of ${L.archDeg} where the LEAF's own control says ${archDeg}`);
-  if (!Array.isArray(L.rowCentre) || L.rowCentre.length !== L.built || !Array.isArray(L.rowNormal) || L.rowNormal.length !== L.built || !Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built || builtNodes.length !== L.built) {
+  /* A COMPOUND LEAF'S ARCH IS ITS RACHIS'S (leaf/stem build S3; the brief:
+     "arch applies to the whole leaf ... no per-leaflet arch"). The same arc,
+     restated from the controls over the RACHIS length from the emitted
+     petiole's outer ring, is held against the AXIS ROD's own emitted ring
+     centroids: every ring from the petiole's end to the rachis tip lies on the
+     arc's circle (in its plane) and one of them IS the arc's far end. The
+     leaflets are flat in the rachis's plane — LF16's. */
+  if (cpR) {
+    const CB = L.compoundBuilt;
+    if (!Array.isArray(CB) || CB.length !== L.built || CB.some((c) => !c) || !Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built || builtNodes.length !== L.built) {
+      bad.push(`LF11: a compound leaf reports no axis rod for ${L.built} leaves — the rachis's arch is then asserted by nothing`);
+    } else {
+      const th = (Number(ui.leafAngle) * Math.PI) / 180, turn = (-archDeg * Math.PI) / 180, Lr = cpR.rachisMm;
+      let worst = 0, tipMiss = Infinity, at = null;
+      for (let i = 0; i < L.built; i++) {
+        const { az } = builtNodes[i], bb = L.petioleAxes[i].outer;
+        const tip = restatedRachisAt(ui, bb, az, Lr).C;
+        const T = [-Math.sin(az), Math.cos(az), 0], R = [Math.cos(az), Math.sin(az), 0];
+        const cs = CB[i].axisRod.centres;
+        let tipAt = -1;
+        for (let j = 1; j < cs.length; j++) { const d = Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2]); if (d < 1e-9) { tipAt = j; break; } }
+        if (tipAt < 0) { let best = Infinity; for (let j = 1; j < cs.length; j++) best = Math.min(best, Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2])); tipMiss = Math.min(tipMiss, best); at = `leaf ${i}: no emitted ring at the restated rachis tip (nearest ${best.toExponential(3)} mm)`; continue; }
+        for (let j = 1; j <= tipAt; j++) {
+          const w = [cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]];
+          const off = Math.abs(w[0] * T[0] + w[1] * T[1]), al = w[0] * R[0] + w[1] * R[1], up = w[2];
+          let d;
+          if (turn === 0) { const s0 = al * Math.cos(th) + up * Math.sin(th); d = Math.hypot(al - s0 * Math.cos(th), up - s0 * Math.sin(th)); }
+          else { const k = turn / Lr; d = Math.abs(Math.hypot(al + Math.sin(th) / k, up - Math.cos(th) / k) - 1 / Math.abs(k)); }
+          d = Math.hypot(d, off);
+          if (d > worst) { worst = d; at = `leaf ${i} ring ${j}`; }
+        }
+        const tb = L.leafArchBuilt && L.leafArchBuilt[i];
+        if (!tb || Math.abs(tb.turnRad - turn) > 1e-12) { bad.push(`LF11: compound leaf ${i} reports a built turn of ${tb && tb.turnRad} rad over its rachis where the LEAF's arch of ${archDeg} deg asks ${turn}`); break; }
+      }
+      if (Number.isFinite(tipMiss)) bad.push(`LF11: the axis rod never reaches the rachis tip the controls restate (arch ${archDeg} deg over ${Lr} mm) — ${at}`);
+      else if (worst > 1e-9) bad.push(`LF11: the rachis is ${worst.toExponential(3)} mm off the arc restated from the controls (arch ${archDeg} deg, angle ${ui.leafAngle} deg, ${Lr} mm) at ${at}`);
+    }
+  } else if (!Array.isArray(L.rowCentre) || L.rowCentre.length !== L.built || !Array.isArray(L.rowNormal) || L.rowNormal.length !== L.built || !Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built || builtNodes.length !== L.built) {
     bad.push(`LF11: the builder reports no per-row centre and frame for ${L.built} leaves — the arch is then asserted by nothing, and both STL gates are blind to it`);
   } else {
     const th = (Number(ui.leafAngle) * Math.PI) / 180, turn = (-archDeg * Math.PI) / 180;
@@ -7888,12 +8051,12 @@ export async function leafAssertions(page, row) {
      the clamp, is a different surface at the same triangle count. */
   const cupCtl = ui.leafCup === undefined ? GEOMETRY.LEAF_CUP : Number(ui.leafCup);
   if (L.cup === undefined || Math.abs(Number(L.cup) - cupCtl) > 1e-12) bad.push(`LF12: the plan reports a cup of ${L.cup} where the LEAF's own control says ${cupCtl}`);
-  if (!Array.isArray(L.rowMarginLiftMm) || L.rowMarginLiftMm.length !== L.built || !Array.isArray(L.rowHalfMm) || L.rowHalfMm.length !== L.built) {
-    bad.push(`LF12: the builder reports no per-row margin lift for ${L.built} leaves — the cup is then asserted by nothing`);
+  if (!Array.isArray(L.rowMarginLiftMm) || L.rowMarginLiftMm.length !== bladesR.length || !Array.isArray(L.rowHalfMm) || L.rowHalfMm.length !== bladesR.length) {
+    bad.push(`LF12: the builder reports no per-row margin lift for the ${bladesR.length} blade(s) of ${L.built} leaves — the cup is then asserted by nothing`);
   } else {
     const tSheet = Number(ui.sheetThickness);
     let worst = 0, at = null;
-    for (let i = 0; i < L.built; i++) {
+    for (let i = 0; i < bladesR.length; i++) {
       const lifts = L.rowMarginLiftMm[i], hs = L.rowHalfMm[i], hbs = L.rowHalfBaseMm[i], NU_ = lifts.length - 1;
       for (let j = 0; j <= NU_; j++) {
         if (j / NU_ < FORM_ONSET_END) continue;
@@ -7901,7 +8064,7 @@ export async function leafAssertions(page, row) {
         const cap = hb / (FOLD_CLAMP_MARGIN * tSheet);
         const c = Math.abs(cupCtl) <= cap ? cupCtl : (cupCtl < 0 ? -cap : cap);
         const want = c * h * h / hb;
-        for (const got of lifts[j]) { const d = Math.abs(got - want); if (d > worst) { worst = d; at = `leaf ${i} row ${j} (asked lift ${want.toFixed(4)} mm, read ${got.toFixed(4)})`; } }
+        for (const got of lifts[j]) { const d = Math.abs(got - want); if (d > worst) { worst = d; at = `blade ${i} row ${j} (asked lift ${want.toFixed(4)} mm, read ${got.toFixed(4)})`; } }
       }
     }
     if (worst > 1e-9) bad.push(`LF12: a margin's cup lift is ${worst.toExponential(3)} mm off the LEAF's own cup ${cupCtl} restated with the fold clamp, at ${at}`);
@@ -7920,33 +8083,209 @@ export async function leafAssertions(page, row) {
      clause can restate: where even the widest point has less than the floor
      of headroom over the print floor, no tooth may be built; where the record
      says the count gave to the floor, the count it gave to is the built one. */
-  if (Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === L.built) {
-    const depth = Number(ui.leafToothDepth), halfW = Number(ui.leafWidth) / 2;
-    for (let i = 0; i < L.built; i++) {
-      const S = L.serrationBuilt[i];
-      if (!(depth > 0)) { if (S) { bad.push(`LF13: leaf ${i} carries a serration record at tooth depth 0 — the guard must be inert`); break; } continue; }
-      if (!S) { bad.push(`LF13: leaf ${i} carries no serration record at tooth depth ${depth}`); break; }
-      if (S.reliefFloorMm !== MIN_FEATURE_MM) { bad.push(`LF13: leaf ${i}'s relief floor reads ${S.reliefFloorMm} where the ruling's floor is MIN_FEATURE_MM = ${MIN_FEATURE_MM} (both modes, the constant)`); break; }
-      if (Math.abs(S.peakHalfMm - halfW) > 1e-9) { bad.push(`LF13: leaf ${i}'s declared widest half-width is ${S.peakHalfMm} where the control's width says ${halfW}`); break; }
+  if (Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === bladesR.length) {
+    const depth = Number(ui.leafToothDepth);
+    for (let i = 0; i < bladesR.length; i++) {
+      const S = L.serrationBuilt[i], halfW = bladesR[i].widthMm / 2;
+      if (!(depth > 0)) { if (S) { bad.push(`LF13: blade ${i} carries a serration record at tooth depth 0 — the guard must be inert`); break; } continue; }
+      if (!S) { bad.push(`LF13: blade ${i} carries no serration record at tooth depth ${depth}`); break; }
+      if (S.reliefFloorMm !== MIN_FEATURE_MM) { bad.push(`LF13: blade ${i}'s relief floor reads ${S.reliefFloorMm} where the ruling's floor is MIN_FEATURE_MM = ${MIN_FEATURE_MM} (both modes, the constant)`); break; }
+      if (Math.abs(S.peakHalfMm - halfW) > 1e-9) { bad.push(`LF13: blade ${i}'s declared widest half-width is ${S.peakHalfMm} where the control's width says ${halfW}`); break; }
       const asked = depth * Math.max(0, halfW - TIP_HALF_MM);
-      if (!(halfW - TIP_HALF_MM >= MIN_FEATURE_MM) && !(S.noRoom && S.countBuilt === 0)) { bad.push(`LF13: leaf ${i} cuts ${S.countBuilt} teeth on a blade whose widest half-width has only ${(halfW - TIP_HALF_MM).toFixed(3)} mm over the print floor — no notch can be ${MIN_FEATURE_MM} mm deep anywhere on it`); break; }
+      if (!(halfW - TIP_HALF_MM >= MIN_FEATURE_MM) && !(S.noRoom && S.countBuilt === 0)) { bad.push(`LF13: blade ${i} cuts ${S.countBuilt} teeth on a blade whose widest half-width has only ${(halfW - TIP_HALF_MM).toFixed(3)} mm over the print floor — no notch can be ${MIN_FEATURE_MM} mm deep anywhere on it`); break; }
       if (S.noRoom) {
-        if (S.countBuilt !== 0) { bad.push(`LF13: leaf ${i} declares NO ROOM and builds ${S.countBuilt} teeth`); break; }
+        if (S.countBuilt !== 0) { bad.push(`LF13: blade ${i} declares NO ROOM and builds ${S.countBuilt} teeth`); break; }
         continue;
       }
-      if (Math.abs(S.reliefAskedMm - asked) > 1e-9) { bad.push(`LF13: leaf ${i}'s asked relief reads ${S.reliefAskedMm} mm where depth ${depth} x (${halfW} - ${TIP_HALF_MM}) is ${asked}`); break; }
+      if (Math.abs(S.reliefAskedMm - asked) > 1e-9) { bad.push(`LF13: blade ${i}'s asked relief reads ${S.reliefAskedMm} mm where depth ${depth} x (${halfW} - ${TIP_HALF_MM}) is ${asked}`); break; }
       const built = Math.max(asked, MIN_FEATURE_MM);
-      if (Math.abs(S.reliefBuiltMm - built) > 1e-9 || S.reliefFloored !== (asked < MIN_FEATURE_MM)) { bad.push(`LF13: leaf ${i} cuts at a relief of ${S.reliefBuiltMm} mm (floored: ${S.reliefFloored}) where max(${asked.toFixed(4)}, ${MIN_FEATURE_MM}) is ${built}`); break; }
+      if (Math.abs(S.reliefBuiltMm - built) > 1e-9 || S.reliefFloored !== (asked < MIN_FEATURE_MM)) { bad.push(`LF13: blade ${i} cuts at a relief of ${S.reliefBuiltMm} mm (floored: ${S.reliefFloored}) where max(${asked.toFixed(4)}, ${MIN_FEATURE_MM}) is ${built}`); break; }
       const margin = S.reliefMm.filter((r, k) => S.apexIsCrest || k !== (S.periods - 1) / 2);
       const under = margin.filter((r) => !(r >= MIN_FEATURE_MM));
-      if (under.length) { bad.push(`LF13: leaf ${i} cuts ${under.length} margin notch(es) under the ${MIN_FEATURE_MM} mm floor (shallowest ${Math.min(...under).toFixed(4)} mm in the record)`); break; }
+      if (under.length) { bad.push(`LF13: blade ${i} cuts ${under.length} margin notch(es) under the ${MIN_FEATURE_MM} mm floor (shallowest ${Math.min(...under).toFixed(4)} mm in the record)`); break; }
       const drawn = (S.sinusReliefMm || []).filter((r) => !(r >= MIN_FEATURE_MM - 1e-6));
-      if (!S.sinusReliefMm || !S.sinusReliefMm.length || drawn.length) { bad.push(`LF13: leaf ${i}'s OUTLINE carries ${drawn.length ? `a notch of ${Math.min(...drawn).toFixed(4)} mm at a margin sinus` : 'no margin sinus at all'} — the floor is in the record and not in the cut`); break; }
-      if (S.countBuilt > S.countAsked) { bad.push(`LF13: leaf ${i} builds ${S.countBuilt} teeth of ${S.countAsked} asked`); break; }
-      if ((S.clampedBy === 'relief floor') !== (S.countReliefCap !== null && S.countReliefCap === S.countBuilt && S.countBuilt < Math.min(S.countAsked, S.countRowsCap, S.countFloorCap))) { bad.push(`LF13: leaf ${i}'s count says CLAMPED BY ${S.clampedBy} with a relief-floor cap of ${S.countReliefCap} and ${S.countBuilt} built — the cause must be a biconditional`); break; }
+      if (!S.sinusReliefMm || !S.sinusReliefMm.length || drawn.length) { bad.push(`LF13: blade ${i}'s OUTLINE carries ${drawn.length ? `a notch of ${Math.min(...drawn).toFixed(4)} mm at a margin sinus` : 'no margin sinus at all'} — the floor is in the record and not in the cut`); break; }
+      if (S.countBuilt > S.countAsked) { bad.push(`LF13: blade ${i} builds ${S.countBuilt} teeth of ${S.countAsked} asked`); break; }
+      if ((S.clampedBy === 'relief floor') !== (S.countReliefCap !== null && S.countReliefCap === S.countBuilt && S.countBuilt < Math.min(S.countAsked, S.countRowsCap, S.countFloorCap))) { bad.push(`LF13: blade ${i}'s count says CLAMPED BY ${S.clampedBy} with a relief-floor cap of ${S.countReliefCap} and ${S.countBuilt} built — the cause must be a biconditional`); break; }
     }
   } else if (Number(ui.leafToothDepth) > 0) {
     bad.push(`LF13: the builder reports no per-leaf serration record for ${L.built} leaves — the tooth floor is then asserted by nothing`);
+  }
+  bad.push(...compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR));
+  return bad;
+}
+
+/* ===================================================================
+   LF14-LF17 — THE COMPOUND LEAF (Eva's architecture ruling, Oct 6 — leaf/stem
+   build S3; docs/bloom-leaf-compound-outcome.md). WRITTEN BEFORE THE GEOMETRY
+   AND SEEN RED on a scratch tree whose builder ignored the type (the plan said
+   COMPOUND and the blades were one), as LF0-LF13 were. Each clause RESTATES
+   its law from the page's read-back CONTROLS (`restatedCompound`,
+   `restatedRachisAt`) and reads its measured side off what the builder
+   EMITTED — ring centroids and radii measured off the emitted rings, the row
+   centres handed to emitPanel — never off the plan beside them. BOTH STL
+   GATES ARE BLIND TO ALL OF IT: a leaflet on the wrong station, a stalk that
+   stops short of its blade, a terminal off the rachis tip and a rachis at the
+   wrong radius all export watertight and, overlapping, as one piece.
+
+   LF14 — THE TYPE: the registry's `leafCompound` and the plan's type are one
+          statement in two places; a raceme PINS a compound ask SIMPLE (told);
+          under SIMPLE nothing compound exists (inert in both directions);
+          under COMPOUND the plan's layout is the one the controls restate.
+   LF15 — THE LEAFLET COUNT: the declared `2 x pairs + 1` is what each leaf
+          emits, in the restated build order, every leaflet a blade.
+   LF16 — THE PLACEMENT: every leaflet's base sits on its stalk (the base row
+          is the stalk's own point and the stalk's EMITTED end runs past it
+          into the blade by the blade's beaded base), the terminal sits on the
+          rachis tip, and every leaflet lies FLAT along its restated direction
+          in the rachis's local plane (no per-leaflet arch).
+   LF17 — THE RODS: every emitted ring's radius (measured) is the derived law
+          restated — the area rule read down from the petiole, floored at the
+          wire — and the area rule's ASK the read-out tells is the restated
+          one.
+   =================================================================== */
+export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
+  const bad = [];
+  const regCompound = evalPredicate({ ref: 'leafCompound' }, ui);
+  const raceme = evalPredicate({ ref: 'inflorescencePresent' }, ui);
+  /* LF14 — the two statements, the pin, inertness */
+  if (L.type === undefined) { bad.push('LF14: the plan reports no leaf `type` — whether a leaf is compound is stated by nothing'); return bad; }
+  if (regCompound !== (L.type === 'COMPOUND')) bad.push(`LF14: the registry's leafCompound says ${regCompound} and the plan builds a ${L.type} leaf — the Leaflets drop-down must show exactly where a compound leaf is built`);
+  const wantPinned = String(ui.leafType) === 'COMPOUND' && raceme;
+  if ((L.typePinned === true) !== wantPinned) bad.push(`LF14: the plan says typePinned = ${L.typePinned} on a state that ${wantPinned ? 'asks for COMPOUND on a raceme (the shared node is SIMPLE)' : 'has nothing to pin'}`);
+  const CB = Array.isArray(L.compoundBuilt) ? L.compoundBuilt : null;
+  if (!CB || CB.length !== L.built) { bad.push(`LF14: the builder reports ${CB ? CB.length : 'no'} compound records for ${L.built} leaves`); return bad; }
+  if (!cpR) {
+    if (L.compound !== null) bad.push('LF14: a SIMPLE leaf carries a compound layout in its plan — the type must be inert');
+    if (CB.some((c) => c !== null)) bad.push(`LF14: ${CB.filter((c) => c).length} of ${L.built} SIMPLE leaves emitted a compound tree — hidden and NOT inert`);
+    if (Array.isArray(L.bladeOf) && L.bladeOf.some((b) => b.role !== 'blade')) bad.push('LF14: a SIMPLE leaf reports leaflet blades');
+    return bad;
+  }
+  const P = L.compound;
+  if (!P) { bad.push('LF14: a COMPOUND leaf reports no layout in its plan'); return bad; }
+  if (CB.some((c) => !c)) { bad.push(`LF14: ${CB.filter((c) => !c).length} of ${L.built} leaves of a COMPOUND plan emitted no compound tree`); return bad; }
+  {
+    const near = (a, b) => Math.abs(Number(a) - Number(b)) <= 1e-9;
+    let wrong = null;
+    if (P.pairs !== cpR.pairs) wrong = `${P.pairs} pairs where the control says ${cpR.pairs}`;
+    else if (!near(P.angleDeg, cpR.angleDeg) || !near(P.stalkMm, cpR.stalkMm) || !near(P.terminalStalkMm, cpR.terminalStalkMm) || !near(P.rachisMm, cpR.rachisMm)) wrong = `angle ${P.angleDeg} / stalks ${P.stalkMm}, ${P.terminalStalkMm} / rachis ${P.rachisMm} where the controls say ${cpR.angleDeg} / ${cpR.stalkMm}, ${cpR.terminalStalkMm} / ${cpR.rachisMm}`;
+    else if (!near(P.terminal.lengthMm, cpR.terminal.lengthMm) || !near(P.terminal.widthMm, cpR.terminal.widthMm)) wrong = `a ${P.terminal.lengthMm} x ${P.terminal.widthMm} mm terminal where the controls say ${cpR.terminal.lengthMm} x ${cpR.terminal.widthMm}`;
+    else for (let k = 0; k < cpR.pairs; k++) {
+      const a = P.lateral[k], b = cpR.lateral[k];
+      if (!a || !near(a.stationMm, b.stationMm) || !near(a.lengthMm, b.lengthMm) || !near(a.widthMm, b.widthMm)) { wrong = `pair ${k} at ${a && a.stationMm} mm, ${a && a.lengthMm} x ${a && a.widthMm} mm where the controls restate ${b.stationMm} mm, ${b.lengthMm} x ${b.widthMm} mm`; break; }
+    }
+    if (wrong) bad.push(`LF14: the plan's compound layout is not the controls' — ${wrong}`);
+  }
+  /* LF15 — the count and the order, per leaf, off the BUILDER's tree */
+  for (let i = 0; i < L.built; i++) {
+    const lf = CB[i].leaflets;
+    if (!Array.isArray(lf) || lf.length !== cpR.count) { bad.push(`LF15: leaf ${i} emits ${lf ? lf.length : 'no'} leaflets where ${cpR.pairs} pair(s) and a terminal declare ${cpR.count}`); break; }
+    const order = lf.map((q) => `${q.role}${q.k}${q.side}`).join(' '), want = cpR.blades.map((q) => `${q.role}${q.k}${q.side}`).join(' ');
+    if (order !== want) { bad.push(`LF15: leaf ${i}'s leaflets come out ${order} where the layout's order is ${want}`); break; }
+    if (lf.some((q) => !(q.tris > 0))) { bad.push(`LF15: leaf ${i} declares a leaflet that emitted no triangles — counted and never built`); break; }
+  }
+  if (!Array.isArray(L.bladeOf) || L.bladeOf.length !== bladesR.length) bad.push(`LF15: the metrics hook names ${L.bladeOf ? L.bladeOf.length : 'no'} blades where ${L.built} compound leaves of ${cpR.count} leaflets are ${bladesR.length}`);
+  /* LF16 — the placement, restated from the controls and the emitted petiole */
+  if (bad.length) return bad;
+  {
+    const A = (cpR.angleDeg * Math.PI) / 180;
+    let worst = 0, at = null, flat = 0, flatAt = null;
+    const note = (d, what) => { if (d > worst) { worst = d; at = what; } };
+    const freeBad = [];
+    let bi = 0;
+    for (let i = 0; i < L.built; i++) {
+      const { az } = builtNodes[i], bb = L.petioleAxes[i].outer, C = CB[i];
+      const tipF = restatedRachisAt(ui, bb, az, cpR.rachisMm);
+      let si = 0;
+      for (let j = 0; j < cpR.count; j++, bi++) {
+        const b = cpR.blades[j];
+        const F = b.role === 'terminal' ? tipF : restatedRachisAt(ui, bb, az, b.stationMm);
+        const dir = b.role === 'terminal' ? F.D : [Math.cos(A) * F.D[0] + b.side * Math.sin(A) * F.T[0], Math.cos(A) * F.D[1] + b.side * Math.sin(A) * F.T[1], Math.cos(A) * F.D[2] + b.side * Math.sin(A) * F.T[2]];
+        const stalk = b.role === 'terminal' ? cpR.terminalStalkMm : cpR.stalkMm;
+        const embed = (GEOMETRY.RIM_TIP_ROWS * b.lengthMm) / BLADE_ROWS;
+        const at3 = (d) => [F.C[0] + dir[0] * d, F.C[1] + dir[1] * d, F.C[2] + dir[2] * d];
+        const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+        const rows = L.rowCentre[bi], norms = L.rowNormal[bi];
+        /* the base row IS the stalk's point at the stalk's length */
+        note(dist(rows[0], at3(stalk)), `leaf ${i} ${b.role} ${b.k}${b.side > 0 ? 'L' : b.side < 0 ? 'R' : ''}: the blade's base row`);
+        /* AND THE BASE IS FREE — closed on the bead, as the tip is. A leaflet
+           whose base is emitted BURIED (the simple blade's petiole end, a
+           square step) exports watertight, as one piece, at the identical
+           triangle count, with its base row exactly where it should be, so
+           nothing above can see it. The emitter's own report is the measured
+           side: the free base's semi-axis, which only a beaded base has. */
+        const q = C.leaflets[j];
+        if (!q || !(q.baseAxisMm > 0)) freeBad.push(`leaf ${i} ${b.role} ${b.k}${b.side > 0 ? 'L' : b.side < 0 ? 'R' : ''} (base semi-axis ${q ? q.baseAxisMm : 'n/a'})`);
+        /* the holding rod: its root on the rachis (or the axis rod through the
+           tip) and its EMITTED end past the base by the beaded base */
+        if (b.role === 'terminal') {
+          const cs = C.axisRod.centres;
+          note(dist(cs[cs.length - 1], at3(stalk + embed)), `leaf ${i} terminal: the axis rod's end`);
+        } else {
+          const r = C.stalkRods[si++];
+          if (!r) { note(Infinity, `leaf ${i} ${b.role} ${b.k}: no stalk rod`); continue; }
+          note(dist(r.root, F.C), `leaf ${i} pair ${b.k}${b.side > 0 ? 'L' : 'R'}: the stalk's root on the rachis`);
+          note(dist(r.end, at3(stalk + embed)), `leaf ${i} pair ${b.k}${b.side > 0 ? 'L' : 'R'}: the stalk's emitted end`);
+        }
+        /* FLAT, in the rachis's local plane: every row centre on the straight
+           line and every row normal the rachis's own at the station */
+        for (let r = 0; r < rows.length; r++) {
+          const u = r / (rows.length - 1);
+          const d = Math.max(dist(rows[r], at3(stalk + u * b.lengthMm)), dist(norms[r], F.N));
+          if (d > flat) { flat = d; flatAt = `leaf ${i} ${b.role} ${b.k}${b.side > 0 ? 'L' : b.side < 0 ? 'R' : ''} row ${r}`; }
+        }
+      }
+      if (si !== C.stalkRods.length) note(Infinity, `leaf ${i}: ${C.stalkRods.length} stalk rods for ${si} lateral leaflets`);
+    }
+    if (worst > 1e-9) bad.push(`LF16: a leaflet is not on its stalk, or a stalk not on the rachis, by ${worst === Infinity ? 'a missing rod' : `${worst.toExponential(3)} mm`} — ${at} (restated from the controls: ${cpR.pairs} pair(s) at ${cpR.lateral.map((q) => q.stationMm.toFixed(3)).join(', ')} mm, ${cpR.angleDeg} deg, stalks ${cpR.stalkMm} / ${cpR.terminalStalkMm} mm)`);
+    if (flat > 1e-9) bad.push(`LF16: a leaflet is ${flat.toExponential(3)} off FLAT in the rachis's own plane at ${flatAt} — a per-leaflet arch or a leaflet off its restated direction`);
+    if (freeBad.length) bad.push(`LF16: ${freeBad.length} leaflet base(s) are BURIED, not free — no bead closes them: ${freeBad.slice(0, 4).join('; ')}`);
+  }
+  /* LF17 — the rods, measured off the emitted rings */
+  {
+    const t = Number(ui.sheetThickness);
+    const rP = (m.shownMode === 'export' ? Math.max(t, MIN_FEATURE_MM) : t) / 2;
+    const N = cpR.count;
+    const law = (n) => Math.max(rP, rP * Math.sqrt(n / N));
+    const stations = cpR.lateral.map((q) => q.stationMm);
+    const carriedEnding = (s) => 1 + 2 * stations.filter((x) => x >= s - 1e-9).length;
+    const carriedStarting = (s) => 1 + 2 * stations.filter((x) => x > s + 1e-9).length;
+    let worst = 0, at = null;
+    for (let i = 0; i < L.built; i++) {
+      const { az } = builtNodes[i], bb = L.petioleAxes[i].outer, C = CB[i];
+      const R = [Math.cos(az), Math.sin(az)], th = (Number(ui.leafAngle) * Math.PI) / 180;
+      const cs = C.axisRod.centres, rs = C.axisRod.radii;
+      const tip = restatedRachisAt(ui, bb, az, cpR.rachisMm).C;
+      let pastTip = false;
+      for (let j = 0; j < cs.length; j++) {
+        let want;
+        if (j <= 1) want = [rP];
+        else if (pastTip) want = [law(1)];
+        else {
+          /* the ring's station along the rachis, read back off its centre */
+          const w = [cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]];
+          const al = w[0] * R[0] + w[1] * R[1], up = w[2];
+          const arch = Number(ui.leafArch ?? 0);
+          let s;
+          if (arch === 0) s = al * Math.cos(th) + up * Math.sin(th);
+          else { const k = ((-arch * Math.PI) / 180) / cpR.rachisMm; const phi = Math.atan2(k * (al + Math.sin(th) / k), -k * (up - Math.cos(th) / k)); s = (phi - th) / k; }
+          want = [law(carriedEnding(s)), law(carriedStarting(s))];
+          if (Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2]) < 1e-9) { want.push(law(1)); pastTip = true; }
+        }
+        const d = Math.min(...want.map((x) => Math.abs(rs[j] - x)));
+        if (d > worst) { worst = d; at = `leaf ${i} axis ring ${j} (radius ${rs[j].toFixed(6)} mm against ${want.map((x) => x.toFixed(6)).join(' or ')})`; }
+      }
+      for (const r of C.stalkRods) for (const x of [r.radiusMm, r.endRadiusMm]) { const d = Math.abs(x - law(1)); if (d > worst) { worst = d; at = `leaf ${i} stalk (radius ${x.toFixed(6)} mm against ${law(1).toFixed(6)})`; } }
+    }
+    if (worst > 1e-9) bad.push(`LF17: a rod's emitted radius is ${worst.toExponential(3)} mm off the derived law restated from the controls (the area rule read down from the ${(2 * rP).toFixed(3)} mm petiole over ${N} leaflets, floored at the petiole's own wire) — ${at}`);
+    const P = L.compound;
+    if (P && P.rachis && Array.isArray(P.rachis.intervals)) {
+      for (const iv of P.rachis.intervals) {
+        const ask = rP * Math.sqrt(carriedEnding(iv.toMm) / N);
+        if (Math.abs(iv.askedMm - ask) > 1e-9) { bad.push(`LF17: the read-out tells an area-rule ask of ${iv.askedMm} mm for the rachis up to ${iv.toMm} mm where the law restates ${ask}`); break; }
+      }
+      if (Math.abs(P.stalkAskedMm - rP / Math.sqrt(N)) > 1e-9) bad.push(`LF17: the read-out tells a stalk ask of ${P.stalkAskedMm} mm where the law restates ${rP / Math.sqrt(N)}`);
+    } else bad.push('LF17: the plan reports no rachis intervals — the rods\' asked radii are told from nothing');
   }
   return bad;
 }
@@ -9511,7 +9850,13 @@ function nodedChannelAssertions(positions, m, ui, NL, bad) {
   }
   const Rout = -rootZ;
   if (!(Rout > 0)) { bad.push(`ST9: the free stem's root stands at z ${rootZ}, which is not below the equator — the hub's outer surface cannot be located`); return bad; }
-  const rods = (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : [])
+  /* EVERY ROD A LEAF EMITTED (S3): a compound leaf's rachis segments and
+     leaflet stalks are rods rooted on its petiole, so a rachis leaving a
+     steep petiole near the stem is the same third part the petiole is —
+     NAMED on the builder's own emitted axes, never a widened region. On a
+     simple leaf `rodAxes` IS `[petioleAxis]`, so every simple row reads the
+     list it always did. */
+  const rods = (m && m.leaf && Array.isArray(m.leaf.rodAxes) ? m.leaf.rodAxes : (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : []))
     .filter((a) => a && Array.isArray(a.inner) && Array.isArray(a.outer) && Number.isFinite(a.radiusMm) && a.radiusMm > 0);
   const onRod = (x, y, z) => rods.some((a) => {
     const ax = a.outer[0] - a.inner[0], ay = a.outer[1] - a.inner[1], az = a.outer[2] - a.inner[2];
@@ -9680,8 +10025,11 @@ export function stemChannelAssertions(positions, row, m, ui) {
      `rods.length` stopped meaning "this build has leaves" — so a raceme with
      no leaves at all would have printed it. */
   const leafRods = (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes.length : 0);
+  /* A COMPOUND LEAF'S RACHIS AND STALKS ARE RODS OF THE SAME LEAF (S3), read
+     off the builder's own `rodAxes` — which on a simple leaf IS its one
+     petiole, so every pre-S3 row reads the identical list. */
   const rods = [
-    ...(m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : []),
+    ...(m && m.leaf && Array.isArray(m.leaf.rodAxes) ? m.leaf.rodAxes : (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : [])),
     ...(m && m.inflorescenceBuilt && Array.isArray(m.inflorescenceBuilt.placed)
       ? m.inflorescenceBuilt.placed.map((q) => q && q.pedicelAxis) : []),
   ].filter((a) => a && Array.isArray(a.inner) && Array.isArray(a.outer) && Number.isFinite(a.radiusMm) && a.radiusMm > 0);
@@ -13768,6 +14116,60 @@ export function buildMatrix() {
   lf('TOOTH FLOOR: the ROSE leaflet (23 x 12 mm, 12 fine teeth at depth 0.1 — the serration coarsens)', { ...LEAF, leafLength: 23, leafWidth: 12, leafToothCount: 12, leafToothDepth: 0.1 });
   lf('LEAF POSE: arch 90 under a raceme\'s shared node (the offset clears the ARCHED blade)', { stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', leafLength: 40, leafArch: 90 });
   lf('LEAF POSE: GATED — arch and cup at their maxima with length 0 (hidden AND inert)', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafArch: 180, leafCup: 1.2 });
+
+  /* 54. THE COMPOUND LEAF (Eva's rulings, Oct 7 — leaf/stem build S3;
+        docs/bloom-leaf-compound-outcome.md). ONE leaf: the petiole runs on
+        into a rachis, lateral leaflets leave it in pairs on short stalks and a
+        terminal leaflet sits on its tip, every leaflet a blade through
+        emitPanel with a FREE base. SIMPLE is the default and moves nothing, so
+        every row before this one is a holder; this block carries what is NEW.
+        The ROSE heads it (the reference: an alternate 137.5 spiral with the
+        node kink, two pairs and a terminal, a slight arch, fine serrate
+        leaflets), then BOTH ENDS of every leaflet control on a plain compound
+        stem, the pose at its extremes (the arch bends the RACHIS, LF11), the
+        sheet both ways (the rod law's wire floor), a SPHERE head (ST9 must
+        excuse the rachis and stalks by name), the steep and drooping leaf,
+        the cost corner (four pairs on a whorled 8-node stem — 24 leaves of
+        nine leaflets), the raceme's shared node (pinned to SIMPLE in ONE
+        place, SHARED_NODE_LEAF_PINS, and told), and the GATED arm (the type
+        and every leaflet control at an extreme with no leaf at all).
+        Appended as the FINAL block, after 53. */
+  const CPD = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 3, leafType: 'COMPOUND' };
+  lf('COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, 2 pairs + terminal, arch 10, cup 0.28, 12 fine teeth at 0.12', { stemLength: 120, stemDiameter: 4.5, leafLength: 40, leafType: 'COMPOUND', leafNodes: 4, leafPhyllotaxy: 'alternate', leafDivergence: 137.5, stemNodeKink: 0.8, stemNodeSwelling: 0.25, leafArch: 10, leafCup: 0.28, leafToothCount: 12, leafToothDepth: 0.12, leafCrestShape: 1.6, leafNotchShape: 1.6 });
+  lf('COMPOUND: the shipped compound defaults (2 pairs + terminal on a 40 mm rachis, 3 alternate nodes)', { ...CPD });
+  lf('COMPOUND: leafletPairs min (1 — first and last coincide, basal ratio inert)', { ...CPD, leafletPairs: 1 });
+  lf('COMPOUND: leafletPairs max (4 — nine leaflets)', { ...CPD, leafletPairs: 4 });
+  lf('COMPOUND: leafletFirst min (0.05)', { ...CPD, leafletFirst: 0.05 });
+  lf('COMPOUND: leafletFirst max (0.45)', { ...CPD, leafletFirst: 0.45 });
+  lf('COMPOUND: leafletLast min (0.5)', { ...CPD, leafletLast: 0.5 });
+  lf('COMPOUND: leafletLast max (1 — the top pair beside the terminal)', { ...CPD, leafletLast: 1 });
+  lf('COMPOUND: leafletAngle min (20)', { ...CPD, leafletAngle: 20 });
+  lf('COMPOUND: leafletAngle max (90 — square to the rachis)', { ...CPD, leafletAngle: 90 });
+  lf('COMPOUND: leafletLength min (4)', { ...CPD, leafletLength: 4 });
+  lf('COMPOUND: leafletLength max (60)', { ...CPD, leafletLength: 60 });
+  lf('COMPOUND: leafletWidth min (3 — the laterals lose their teeth)', { ...CPD, leafletWidth: 3 });
+  lf('COMPOUND: leafletWidth max (40)', { ...CPD, leafletWidth: 40 });
+  lf('COMPOUND: leafletBasalRatio min (0.4 — the basal pair at 40%, its teeth clamped)', { ...CPD, leafletBasalRatio: 0.4 });
+  lf('COMPOUND: leafletBasalRatio max (1.4 — the basal pair LARGER than the top)', { ...CPD, leafletBasalRatio: 1.4 });
+  lf('COMPOUND: leafletTerminalLength min (4)', { ...CPD, leafletTerminalLength: 4 });
+  lf('COMPOUND: leafletTerminalLength max (60 — the leaf\'s rise takes nodes off the stem)', { ...CPD, leafletTerminalLength: 60 });
+  lf('COMPOUND: leafletTerminalWidth min (3 — the terminal loses its teeth)', { ...CPD, leafletTerminalWidth: 3 });
+  lf('COMPOUND: leafletTerminalWidth max (40)', { ...CPD, leafletTerminalWidth: 40 });
+  lf('COMPOUND: leafletStalk min (0 — sessile laterals on the rachis)', { ...CPD, leafletStalk: 0 });
+  lf('COMPOUND: leafletStalk max (20)', { ...CPD, leafletStalk: 20 });
+  lf('COMPOUND: leafletTerminalStalk min (0 — the terminal on the rachis tip)', { ...CPD, leafletTerminalStalk: 0 });
+  lf('COMPOUND: leafletTerminalStalk max (30)', { ...CPD, leafletTerminalStalk: 30 });
+  lf('COMPOUND: arch 180 (the RACHIS arcs over; the leaflets ride it, unarched)', { ...CPD, leafArch: 180 });
+  lf('COMPOUND: arch -90 (the rachis curls up)', { ...CPD, leafArch: -90 });
+  lf('COMPOUND: cup 1.2 (every leaflet cupped; the fold clamp at each stub)', { ...CPD, leafCup: 1.2 });
+  lf('COMPOUND: sheetThickness 2.4 (the rods follow the petiole, floored at the wire)', { ...CPD, sheetThickness: 2.4 });
+  lf('COMPOUND: sheetThickness 0.6 (the export floor raises the rods with the sheet)', { ...CPD, sheetThickness: 0.6 });
+  lf('COMPOUND: leafAngle 85 (steep — the rachis leaves near the stem)', { ...CPD, leafAngle: 85 });
+  lf('COMPOUND: leafAngle -60 (drooping)', { ...CPD, leafAngle: -60 });
+  lf('COMPOUND: a SPHERE head with a stem (ST9 excuses the rachis and stalks by name)', { ...CPD, placement: 'CONTINUOUS', hubShape: 'SPHERE' });
+  lf('COMPOUND: whorled x 8 nodes x leafletPairs 4 (24 leaves of nine leaflets — the cost corner)', { stemLength: 90, stemDiameter: 6, leafLength: 45, leafNodes: 8, leafPhyllotaxy: 'whorled', leafType: 'COMPOUND', leafletPairs: 4 });
+  lf('COMPOUND: under a raceme\'s shared node (PINNED to SIMPLE, and told)', { stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', leafLength: 40, leafType: 'COMPOUND' });
+  lf('COMPOUND: GATED — the type and every leaflet control at an extreme with length 0 (hidden AND inert)', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafType: 'COMPOUND', leafletPairs: 4, leafletAngle: 90, leafletStalk: 20, leafletTerminalStalk: 30, leafletBasalRatio: 1.4 });
 
   return rows;
 }
