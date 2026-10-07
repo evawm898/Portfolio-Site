@@ -59,6 +59,14 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT,
          LEAF_ARCH_RANGE, LEAF_ARCH_STEP, LEAF_CUP, LEAF_CUP_RANGE } from './bloom-geometry.js';
+/* THE COMPOUND LEAF (leaf/stem build S3) — its type values and every range
+   and default IMPORTED (Q6), never restated: the geometry's
+   `compoundLeafLayout` is the one owner of what each value means. */
+import { LEAF_TYPES, LEAFLET_PAIRS_RANGE, LEAFLET_PAIRS_DEFAULT, LEAFLET_FIRST_RANGE, LEAFLET_FIRST_DEFAULT,
+         LEAFLET_LAST_RANGE, LEAFLET_LAST_DEFAULT, LEAFLET_ANGLE_RANGE, LEAFLET_ANGLE_DEFAULT, LEAFLET_LENGTH_RANGE,
+         LEAFLET_LENGTH_DEFAULT, LEAFLET_WIDTH_DEFAULT, LEAFLET_BASAL_RANGE, LEAFLET_BASAL_DEFAULT,
+         LEAFLET_TERMINAL_LENGTH_DEFAULT, LEAFLET_TERMINAL_WIDTH_DEFAULT, LEAFLET_STALK_RANGE, LEAFLET_STALK_DEFAULT,
+         LEAFLET_TERMINAL_STALK_RANGE, LEAFLET_TERMINAL_STALK_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -503,6 +511,18 @@ export const PREDICATES = {
      hidden AND inert, which LF5 measures by restating every arrangement's
      azimuths from the controls. */
   leafDivergenceLive: { all: [{ ref: 'leafNodesOwn' }, { id: 'leafPhyllotaxy', oneOf: ['alternate'] }] },
+  /* THE COMPOUND LEAF (leaf/stem build S3). The registry's half of the
+     plan's type: COMPOUND is asked AND the leaves are the stem's own — on a
+     raceme every leaf is a shared node's, pinned SIMPLE in the geometry
+     (`SHARED_NODE_LEAF_PINS`), so the type and the whole Leaflets drop-down
+     are hidden AND inert there. LF14 compares the two statements per row. */
+  leafCompound: { all: [{ ref: 'leafNodesOwn' }, { id: 'leafType', oneOf: ['COMPOUND'] }] },
+  /* with ONE pair the pair is the apical pair, full size, at `first`: the
+     last station and the basal ratio reach nothing and are hidden AND inert */
+  leafCompoundPairs: { all: [{ ref: 'leafCompound' }, { id: 'leafletPairs', min: 2 }] },
+  /* A SIMPLE BLADE'S WIDTH — inert under COMPOUND, where every leaflet has
+     its own; live again on a raceme, where the shared node is SIMPLE. */
+  leafSimpleBlade: { all: [{ ref: 'leafPresent' }, { not: { ref: 'leafCompound' } }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
   leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
@@ -1138,6 +1158,11 @@ export const SECTIONS = [
      is a drop-down INSIDE it, the antherTip / stigmaTip precedent: it is the
      leaf's own edge treatment and not a second top-level family. */
   { id: 'leaves', label: 'Leaves', open: false, parent: 'stem' },
+  /* LEAFLETS (leaf/stem build S3): a compound leaf's own tree, a drop-down
+     inside Leaves beside Serration — the Leaves > Serration shape, one more
+     child of the part it belongs to. Declared BEFORE Serration because the
+     leaf's structure comes before its edge; the census reads this order. */
+  { id: 'leafLeaflets', label: 'Leaflets', parent: 'leaves', open: false },
   { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
   /* THE INFLORESCENCE — a NEW TOP-LEVEL SECTION AFTER STEM (Eva's ruling 2,
      `docs/bloom-inflorescence-discovery.md`), holding the law enum and the
@@ -3833,13 +3858,34 @@ export const CONTROLS = [
        units, which is why three of its four leaf types come out wider than
        long at the default — a length multiplier wearing a size control's name.
        Both axes here are absolute. */
-    fmt: (v) => (Number(v) === 0 ? 'none — no leaves are built' : `${v} mm from the petiole to the tip`),
+    /* ON A COMPOUND LEAF THE LENGTH IS THE RACHIS (the leaf-lab's §6a tree:
+       "length (midrib / rachis)") — from the petiole's end to the terminal
+       leaflet's stalk; the leaflets carry their own lengths. */
+    fmt: (v, ui) => (Number(v) === 0 ? 'none — no leaves are built'
+      : String(ui.leafType) === 'COMPOUND' && !(String(ui.inflorescence) === 'RACEME') ? `${v} mm of rachis, from the petiole to the terminal leaflet's stalk` : `${v} mm from the petiole to the tip`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  /* THE LEAF'S TYPE (Eva's architecture ruling, Oct 6 — leaf/stem build S3):
+     a SIMPLE leaf is one blade on its petiole; a COMPOUND leaf is ONE leaf —
+     petiole, rachis, lateral leaflet pairs on short stalks and a terminal
+     leaflet. A CHOICE, not a slider, so it is out of the blanket sweep by
+     construction (`SWEEPABLE` filters sliders) and `ALL MAX` never reaches it;
+     SIMPLE is the default and is the shipped leaf by branch. Hidden on a
+     raceme, where the shared node pins every leaf SIMPLE. */
+  { id: 'leafType', section: 'leaves', kind: 'choice', default: 'SIMPLE',
+    options: [
+      { value: LEAF_TYPES[0], label: 'Simple (one blade)' },
+      { value: LEAF_TYPES[1], label: 'Compound (leaflets on a rachis)' },
+    ],
+    label: 'Leaf type',
+    fmt: (v, ui) => (String(v) === 'COMPOUND'
+      ? `compound · ${2 * Math.round(Number(ui.leafletPairs)) + 1} leaflets — ${Math.round(Number(ui.leafletPairs))} pair${Math.round(Number(ui.leafletPairs)) === 1 ? '' : 's'} and a terminal`
+      : 'simple · one blade on its petiole'),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodesOwn' } },
   { id: 'leafWidth', section: 'leaves', kind: 'slider',
     min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: 17,
     label: 'Leaf width',
     fmt: (v, ui) => `${v} mm across at the widest point${Number(ui.leafLength) > 0 ? ` · ${(Number(ui.leafLength) / Number(v)).toFixed(1)}:1` : ''}`,
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSimpleBlade' } },
   { id: 'leafAngle', section: 'leaves', kind: 'slider',
     min: LEAF_ANGLE_RANGE[0], max: LEAF_ANGLE_RANGE[1], step: 1, default: LEAF_ANGLE_DEFAULT,
     label: 'Leaf angle',
@@ -3925,6 +3971,74 @@ export const CONTROLS = [
         + (cl.fraction > 0.05 ? ` — CLAMPED: a point below ${cl.terminalMm.toFixed(2)} mm cannot be printed, and a pointier shape only LENGTHENS the stub; a WIDER leaf shortens it (the share is set by the width, never the length)` : '');
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+
+  /* THE LEAFLETS (leaf/stem build S3) — the compound leaf's own tree, every
+     value the leaf-lab's ROSE (its §6b PINNATE_COMPOUND tree, on the
+     registry's conventions: millimetres, pair stations as fractions of the
+     rachis). NONE OF THE DEFAULTS IS RULED. The rods are NOT controls: the
+     rachis and stalk radii are derived (the area rule read down from the
+     petiole, floored at the wire) and told on the read-out — rod sizing is an
+     open question for Eva. Every row is hidden AND inert under SIMPLE. */
+  { id: 'leafletPairs', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_PAIRS_RANGE[0], max: LEAFLET_PAIRS_RANGE[1], step: 1, default: LEAFLET_PAIRS_DEFAULT,
+    label: 'Leaflet pairs',
+    fmt: (v) => { const p = Math.round(Number(v)); return `${p} lateral pair${p === 1 ? '' : 's'} + the terminal = ${2 * p + 1} leaflets`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletFirst', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_FIRST_RANGE[0], max: LEAFLET_FIRST_RANGE[1], step: 0.01, default: LEAFLET_FIRST_DEFAULT,
+    label: 'First pair at',
+    fmt: (v, ui) => `${(100 * Number(v)).toFixed(0)}% along the rachis${Number(ui.leafLength) > 0 ? ` · ${(Number(v) * Number(ui.leafLength)).toFixed(1)} mm from the petiole` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletLast', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_LAST_RANGE[0], max: LEAFLET_LAST_RANGE[1], step: 0.01, default: LEAFLET_LAST_DEFAULT,
+    label: 'Last pair at',
+    fmt: (v, ui) => `${(100 * Number(v)).toFixed(0)}% along the rachis${Number(v) === 1 ? ' — at the tip, beside the terminal' : ''}${Number(ui.leafLength) > 0 ? ` · ${(Number(v) * Number(ui.leafLength)).toFixed(1)} mm` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompoundPairs' } },
+  { id: 'leafletAngle', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_ANGLE_RANGE[0], max: LEAFLET_ANGLE_RANGE[1], step: 1, default: LEAFLET_ANGLE_DEFAULT,
+    label: 'Leaflet angle',
+    fmt: (v) => `${v} deg off the rachis, in the rachis's own plane${Number(v) === 90 ? ' — square to it' : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletLength', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_LENGTH_RANGE[0], max: LEAFLET_LENGTH_RANGE[1], step: 0.5, default: LEAFLET_LENGTH_DEFAULT,
+    label: 'Leaflet length',
+    fmt: (v) => `${v} mm — the apical pair's; the pairs below scale by the basal ratio`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletWidth', section: 'leafLeaflets', kind: 'slider',
+    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: LEAFLET_WIDTH_DEFAULT,
+    label: 'Leaflet width',
+    fmt: (v, ui) => `${v} mm across · ${(Number(ui.leafletLength) / Number(v)).toFixed(1)}:1`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletBasalRatio', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_BASAL_RANGE[0], max: LEAFLET_BASAL_RANGE[1], step: 0.05, default: LEAFLET_BASAL_DEFAULT,
+    label: 'Basal size ratio',
+    /* the CLAMP is told from the SHOWN build's record (the stamen spread's
+       precedent): a scaled leaflet under the leaf's own minimum size */
+    fmt: (v, ui, shown) => {
+      const c = shown && shown.leaf && shown.leaf.compound;
+      return `${Number(v).toFixed(2)}x — the basal pair against the apical, ramping between${c && c.clamped ? ` · CLAMPED: ${c.clamped} pair${c.clamped === 1 ? '' : 's'} would fall under the leaf's own ${LEAF_WIDTH_RANGE[0]} mm x ${LEAFLET_LENGTH_RANGE[0]} mm minimum and are built at it (told, never refused)` : ''}`;
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompoundPairs' } },
+  { id: 'leafletTerminalLength', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_LENGTH_RANGE[0], max: LEAFLET_LENGTH_RANGE[1], step: 0.5, default: LEAFLET_TERMINAL_LENGTH_DEFAULT,
+    label: 'Terminal length',
+    fmt: (v) => `${v} mm`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletTerminalWidth', section: 'leafLeaflets', kind: 'slider',
+    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: LEAFLET_TERMINAL_WIDTH_DEFAULT,
+    label: 'Terminal width',
+    fmt: (v, ui) => `${v} mm across · ${(Number(ui.leafletTerminalLength) / Number(v)).toFixed(1)}:1`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletStalk', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_STALK_RANGE[0], max: LEAFLET_STALK_RANGE[1], step: 0.5, default: LEAFLET_STALK_DEFAULT,
+    label: 'Lateral stalk',
+    fmt: (v) => (Number(v) === 0 ? '0 mm — the lateral leaflets sit on the rachis' : `${v} mm from the rachis to each lateral leaflet`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  { id: 'leafletTerminalStalk', section: 'leafLeaflets', kind: 'slider',
+    min: LEAFLET_TERMINAL_STALK_RANGE[0], max: LEAFLET_TERMINAL_STALK_RANGE[1], step: 0.5, default: LEAFLET_TERMINAL_STALK_DEFAULT,
+    label: 'Terminal stalk',
+    fmt: (v) => (Number(v) === 0 ? '0 mm — the terminal leaflet sits on the rachis tip' : `${v} mm from the rachis tip to the terminal leaflet`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
 
   /* THE EDGE. Serration is botanically a LEAF feature, which is what Eva ruled
      in September, and this applies it to the organ it belongs on. It shares the
