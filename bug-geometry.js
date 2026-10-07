@@ -2352,7 +2352,17 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // one BURY_PAIR_STEP_MM lower, as far as the body's depth allows (two pairs
     // on one plane would cross where they overlap; and lower, never higher —
     // what is under the mid-plane the body hides from above)
-    const s0 = Math.min(1, B.half(v[0], v[1]) / Hh), zT = -Math.min(B.room(v[0], v[1]), spec.index * BURY_PAIR_STEP_MM);
+    // (the skins lie along the wing's NORMAL, which a dihedral or a pitch
+    // tilts: a skin lands half x sin(tilt) to one side of the mid-surface
+    // point, where the body can be shallower — so the depth is read where the
+    // two skins land, and the lower skin's own drop is what has to fit.
+    // Measured: a 23.6-degree pair 3 at a waist put its lower skin 0.24 mm
+    // further out and 0.06 mm under the body, JB3)
+    const n1 = W(u, w, 1), nx = n1[0] - v[0], ny = n1[1] - v[1], nz = Math.abs(n1[2] - v[2]);
+    const h0 = B.half(v[0], v[1]);
+    const dSk = Math.min(B.depth(v[0] + h0 * nx, v[1] + h0 * ny), B.depth(v[0] - h0 * nx, v[1] - h0 * ny));
+    const half = B.halfFor(dSk), room = Math.max(0, dSk - half * nz);
+    const s0 = Math.min(1, half / Hh), zT = -Math.min(room, spec.index * BURY_PAIR_STEP_MM);
     return [1 + beta * (s0 - 1), beta * (zT - v[2])];
   } : null;
   // (and where the burial thins the slab the bead shrinks with it: a ring's
@@ -3244,7 +3254,7 @@ function burialField(p, L, outline) {
     // stays inside the body
     depth: (x, y) => depthAt(x, y),
     half: (x, y) => Math.max(floorHalf, BURY_DEPTH_FRAC * depthAt(x, y)),
-    room: (x, y) => { const z = depthAt(x, y); return Math.max(0, z - Math.max(floorHalf, BURY_DEPTH_FRAC * z)); },
+    halfFor: (dep) => Math.max(floorHalf, BURY_DEPTH_FRAC * dep),
   };
 }
 

@@ -127,7 +127,8 @@ export function makeJunctionMeasures(G) {
     return { depth: worst.depth, at: worst.at, comps: wb };
   }
   /* JB2 — NO NECK. For each right wing, the widest disc that can travel from the
-     body into the wing, top-down, through the wing's own emitted material and
+     body into the wing, top-down, through the wing's own emitted OUTLINE (its
+     outer contour, holes filled) and
      the body's: a max-min path on the distance transform of (wing + body), from
      every body pixel to the wing pixel standing farthest from any edge within
      NECK_REACH_MM of the body. Twice that radius is the width of the narrowest
@@ -138,7 +139,13 @@ export function makeJunctionMeasures(G) {
   function neckScan(model) {
     const bv = bodyView(model), out = [];
     for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
-      const wl = G.contourLoops(model, part), bb = loopsBox(bv.loops, NECK_REACH_MM), px = NECK_PX;
+      // (the wing's OUTER contour, its holes filled: the junction's neck is a
+    // property of the outline; a HOLES wing hangs from the body by its vein
+    // frame there, and the veins have their own floor — measured through the
+    // cut material this read a vein's width, 1.20 mm, or no path at all where
+    // a cell cut the wing inside the window)
+    const all = G.contourLoops(model, part), areaOf = (l) => Math.abs(l.reduce((a, [x, y], i) => { const [x2, y2] = l[(i + 1) % l.length]; return a + x * y2 - x2 * y; }, 0));
+    const wl = all.length ? [all.reduce((a, l) => (areaOf(l) > areaOf(a) ? l : a))] : [], bb = loopsBox(bv.loops, NECK_REACH_MM), px = NECK_PX;
       const nx = Math.ceil((bb.x1 - bb.x0) / px), ny = Math.ceil((bb.y1 - bb.y0) / px), N = nx * ny;
       const B = fillRaster(bv.loops, px, bb), Wg = fillRaster(wl, px, bb);
       const out0 = new Uint8Array(N); for (let i = 0; i < N; i++) out0[i] = B[i] || Wg[i] ? 0 : 1;
@@ -166,8 +173,17 @@ export function makeJunctionMeasures(G) {
      more inside the body's top-down contour is inside the body's SOLID: a
      vertical ray from it crosses the body part's emitted triangles an odd number
      of times. (Nearer the contour than that the wing is leaving the body through
-     its flank, where the body is thinner than the sheet.) */
-  const JB3_INSET_MM = 0.5;
+     its flank, where the body is thinner than the sheet.)
+     TWO ARMS, by the body's own emitted thickness T over the vertex (the span
+     of that vertical ray's crossings): where T is at least the floor a sheet
+     the floor allows fits inside, and the vertex must be inside the solid
+     (above); where T is under the floor NO legal sheet fits — the floor holds
+     the sheet at its own thickness — and the vertex may stand out by at most
+     half the difference, (floor - T) / 2, the least a floor-thick sheet centred
+     in the body can show (JB3_THIN_TOL_MM over it; measured 0.0002 mm on the
+     default body at floors 1.2 / 1.5 / 2, where every protruding vertex is
+     over a body thinner than the floor and none over a thicker one). */
+  const JB3_INSET_MM = 0.5, JB3_THIN_TOL_MM = 0.005;
   function buriedScan(model) {
     const bv = bodyView(model), P = model.positions, I = model.indices, out = [];
     if (!bv.body) return out;
@@ -177,30 +193,41 @@ export function makeJunctionMeasures(G) {
       const xs = [P[3 * a], P[3 * b], P[3 * c]], ys = [P[3 * a + 1], P[3 * b + 1], P[3 * c + 1]];
       for (let i = Math.floor(Math.min(...xs) / cell); i <= Math.floor(Math.max(...xs) / cell); i++) for (let j = Math.floor(Math.min(...ys) / cell); j <= Math.floor(Math.max(...ys) / cell); j++) { const k = key(i, j); (grid.get(k) || grid.set(k, []).get(k)).push(t); }
     }
-    const crossings = (x, y, z) => {
-      let n = 0;
+    // the body's emitted crossings of the vertical line through (x, y), sorted
+    const zsAt = (x, y) => {
+      const zs = [];
       for (const t of grid.get(key(Math.floor(x / cell), Math.floor(y / cell))) || []) {
         const a = I[3 * t], b = I[3 * t + 1], c = I[3 * t + 2];
         const ax = P[3 * a], ay = P[3 * a + 1], bx = P[3 * b], by = P[3 * b + 1], cx = P[3 * c], cy = P[3 * c + 1];
         const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy); if (Math.abs(d) < 1e-18) continue;
         const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / d, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / d, l3 = 1 - l1 - l2;
         if (l1 < 0 || l2 < 0 || l3 < 0) continue;
-        if (l1 * P[3 * a + 2] + l2 * P[3 * b + 2] + l3 * P[3 * c + 2] > z) n++;
+        zs.push(l1 * P[3 * a + 2] + l2 * P[3 * b + 2] + l3 * P[3 * c + 2]);
       }
-      return n;
+      return zs.sort((u, v) => u - v);
     };
+    const floor = model.params.minDiameter;
     for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
-      let judged = 0, exposed = 0, worst = null;
+      let judged = 0, exposed = 0, worst = null, thin = 0, thinOver = 0, thinWorst = null;
       for (let v = part.v0; v < part.v1; v++) {
         const x = P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2], d = bv.sd(x, y);
         if (d > -JB3_INSET_MM) continue;
         judged++;
-        if (crossings(x, y, z) % 2 === 0) { exposed++; if (!worst || -d > worst.inset) worst = { inset: -d, at: [x, y, z] }; }
+        const zs = zsAt(x, y), above = zs.filter((q) => q > z).length;
+        if (above % 2 === 1) continue;
+        const T = zs.length >= 2 ? zs[zs.length - 1] - zs[0] : 0;
+        if (zs.length >= 2 && T < floor) {
+          thin++;
+          const out = Math.max(z - zs[zs.length - 1], zs[0] - z), excess = out - (floor - T) / 2;
+          if (excess > JB3_THIN_TOL_MM) { thinOver++; if (!thinWorst || excess > thinWorst.excess) thinWorst = { excess, out, T, at: [x, y, z] }; }
+          continue;
+        }
+        exposed++; if (!worst || -d > worst.inset) worst = { inset: -d, at: [x, y, z] };
       }
-      out.push({ part: part.name, judged, exposed, worst });
+      out.push({ part: part.name, judged, exposed, worst, thin, thinOver, thinWorst });
     }
     return out;
   }
-  return { bodyView, wingXY, slotScan, neckScan, buriedScan, SLOT_PX, SLOT_DEPTH_MM, NECK_PX, NECK_REACH_MM, NECK_FLOORS, JB3_INSET_MM };
+  return { bodyView, wingXY, slotScan, neckScan, buriedScan, SLOT_PX, SLOT_DEPTH_MM, NECK_PX, NECK_REACH_MM, NECK_FLOORS, JB3_INSET_MM, JB3_THIN_TOL_MM };
 }
 export { segDist, fillRaster };

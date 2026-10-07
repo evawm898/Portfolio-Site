@@ -407,6 +407,7 @@ function junctionChecks(model) {
   for (const nk of necks) if (!(nk.neck >= NECK_FLOORS * floor)) bad.push(`JB2: ${nk.part} hangs from the body by a ${nk.neck.toFixed(2)} mm neck, under ${NECK_FLOORS} x the ${floor} mm floor`);
   const buried = buriedScan(model);
   for (const bq of buried) if (bq.exposed) bad.push(`JB3: ${bq.part} ${bq.exposed} of ${bq.judged} vertices ${JB3_INSET_MM} mm or more inside the body's contour show outside its solid (worst ${bq.worst.inset.toFixed(2)} mm in, at ${bq.worst.at.map((v) => v.toFixed(2)).join(', ')})`);
+  for (const bq of buried) if (bq.thinOver) bad.push(`JB3: ${bq.part} ${bq.thinOver} vertices over a body thinner than the ${floor} mm floor stand out more than half the difference (worst ${bq.thinWorst.out.toFixed(3)} mm over a ${bq.thinWorst.T.toFixed(3)} mm body, ${bq.thinWorst.excess.toFixed(3)} mm past (floor - T) / 2, at ${bq.thinWorst.at.map((v) => v.toFixed(2)).join(', ')})`);
   if (!buried.some((bq) => bq.judged)) bad.push('JB3: no wing vertex lies inside the body (vacuous)');
   return { bad, slot: sl, necks, buried };
 }
@@ -976,7 +977,19 @@ function edgeRoundChecks(model) {
       // root map before the frame (whose toWorld applies it to drawn points)
       const wo = outline.map(([u, w]) => { const [a, b] = F.rootWarp ? F.rootWarp.inv(u, w) : [u, w]; return F.toWorld(a / Lmm, b / Smm); });
       const loops = G.contourLoops(model, part), big = loops.reduce((a, l) => (l.length > a.length ? l : a), []);
-      let worst = 0, seen = 0;
+      let worst = 0, seen = 0, grown = 0;
+      // under the junction blend the wing also THINS over the burial fade
+      // (BURY_FADE_MM outside the body's silhouette as the builder smooths it,
+      // half a millimetre either way) and its bead shrinks with it, so in that
+      // band a ring beside a smaller one carries the contour INSIDE the outline
+      // as on the root ramp — never outside it. Past the fade plus one
+      // millimetre (a ring spacing beyond its edge, with room) the silhouette
+      // IS the outline again. Measured over 212 rows (the library x none /
+      // holes / ridges, the drawn outlines, 40 random): every point the blend
+      // moves lies inside the outline, the farthest 2.81 mm from the body,
+      // 0.060 mm in (lib #25, holes)
+      const fadeOut = G.BURY_FADE_MM + 1;
+      const inside = (x, y) => { let c = false; for (let i = 0, j = wo.length - 1; i < wo.length; j = i++) { const a = wo[i], b = wo[j]; if ((a[1] > y) !== (b[1] > y) && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
       for (const [x, y] of big) {
         // past the root ramp (the bead grows from 0 over the first mm of span,
         // and a ring next to a much smaller one can carry the contour along its
@@ -987,12 +1000,15 @@ function edgeRoundChecks(model) {
         // silhouette, read off a silhouette smoothed half a millimetre either
         // way, and a ring beside a smaller one carries the contour inside the
         // outline there, as past the drawn root's first 2 mm above)
-        if (J) { if (bv.sd(x, y) < 2) continue; } else { const [u] = F.fromWorld(x, y); if (u * Lmm <= 2 + 1e-9) continue; }
+        let inFade = false;
+        if (J) { const s = bv.sd(x, y); if (s < 2) continue; inFade = s < fadeOut; } else { const [u] = F.fromWorld(x, y); if (u * Lmm <= 2 + 1e-9) continue; }
         let d = Infinity; for (let i = 0; i + 1 < wo.length; i++) d = Math.min(d, segDist([x, y], wo[i], wo[i + 1]));
+        if (inFade) { if (d > 1e-6 && !inside(x, y)) grown = Math.max(grown, d); continue; }
         worst = Math.max(worst, d); seen++;
       }
       if (!seen) bad.push(`E7: ${part.name} the flat wing has no silhouette past its root (vacuous)`);
       else if (worst > 1e-6) bad.push(`E7: ${part.name} the flat wing's silhouette stands ${worst.toFixed(4)} mm off the drawn outline — the edge moved it`);
+      if (grown) bad.push(`E7: ${part.name} over the burial fade the silhouette stands ${grown.toFixed(4)} mm OUTSIDE the drawn outline — the edge grew it`);
     }
   }
   if (ellRes > 1e-9) bad.push(`E1: a bead departs from its half ellipse by ${ellRes.toExponential(2)} mm`);
@@ -1205,7 +1221,7 @@ function fmt(r) {
     + ` edge=${r.ec.minT === null ? '—' : r.ec.minT.toFixed(3)}mm${r.ec.onOutline ? `(${r.ec.onOutline} on the outline)` : ''}`
     + (r.er.beads ? ` beads=${r.er.beads}(full ${r.er.full}, min a/H ${r.er.aMin === null ? '—' : r.er.aMin.toFixed(2)}${r.er.ellSkipped ? `, ${r.er.ellSkipped} twisted unchecked` : ''})` : '')
     + ` points=${r.xc.pts}${r.gc.seen ? ` grooves=${r.gc.seen}` : ''}`
-    + (r.jb && r.jb.slot ? ` junction=slot ${r.jb.slot.depth.toFixed(2)}mm neck ${r.jb.necks.map((q) => q.neck.toFixed(2)).join('/')}mm buried ${r.jb.buried.map((q) => `${q.judged - q.exposed}/${q.judged}`).join(' ')}` : '')
+    + (r.jb && r.jb.slot ? ` junction=slot ${r.jb.slot.depth.toFixed(2)}mm neck ${r.jb.necks.map((q) => q.neck.toFixed(2)).join('/')}mm buried ${r.jb.buried.map((q) => `${q.judged - q.exposed - q.thinOver}/${q.judged}${q.thin ? `(${q.thin} over a body under the floor)` : ''}`).join(' ')}` : '')
     + (r.le ? ` legsOutside=${r.le.outside.toFixed(2)}/${r.le.area.toFixed(2)}mm²` : '') + (r.notes.length ? `  notes: ${r.notes.join('; ')}` : '');
 }
 
@@ -1534,7 +1550,11 @@ function rowsFor(nseeds) {
   rows.push(['junction fixture: #20/#31 root at the default blend', junctionFixture(), {}]);
   { const p = d(); p.venation = 'holes'; p.wingJunction = 3; rows.push(['holes, junction 3 mm', p, {}]); }
   { const p = d(); p.wingPairs = 4; p.wingJunction = 2; rows.push(['4 pairs, junction 2 mm', p, {}]); }
-  { const p = d(); p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.first.sweep = TAIL_ROW_SWEEP; p.wings.tail.on = true; p.wingJunction = 2; rows.push(['drawn swallowtail + tail, junction 2 mm', p, {}]); }
+  // (the hindwing is the tail rows' own 30 mm x 1.4 one: on the DEFAULT
+  // hindwing at this pinned sweep the tail tip leaves the one-pixel cut-safe
+  // island TAIL_ROW_SWEEP's note describes — measured identical with the blend
+  // off and on main's own code, so it is not the junction's)
+  { const p = d(); p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.first.sweep = TAIL_ROW_SWEEP; p.wings.tail.on = true; p.wings.last.length = 30; p.wings.last.stretch = 1.4; p.wingJunction = 2; rows.push(['drawn swallowtail + tail, junction 2 mm', p, {}]); }
   return rows;
 }
 
@@ -1775,6 +1795,11 @@ if (NEG) {
       // alone leaves the tabs showing through the body and nothing else
       ['the junction blend is never built', 'const junction = p.wingJunction > 0 && pairs.length ? junctionFor(p, L, pairs, hinges) : null;', 'const junction = null;', 'JB1+JB2+JB3', junctionFixture, {}],
       ['the buried part is not buried', '  const bury = J ? (u, w, Hh) => {', '  const bury = J ? (u, w, Hh) => { return null;', 'JB3', junctionFixture, {}],
+      // JB3's other arm: at a 2 mm floor the default abdomen (1.74 mm) is
+      // thinner than the floor, so the sheet sits centred and stands out by half
+      // the difference; stepping the hindwing down the full pair step regardless
+      // of the room the body has puts it 0.3 mm further out than that
+      ['a later pair is stepped down past the body', 'zT = -Math.min(room, spec.index * BURY_PAIR_STEP_MM);', 'zT = -spec.index * BURY_PAIR_STEP_MM;', 'JB3', () => ({ ...G.defaultParams(), minDiameter: 2 }), {}],
     ];
     for (const [name, from] of ROW_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
     for (const [name, , , , fx, opts] of ROW_MUTANTS) { const r = check(`${name} (clean)`, G.buildBug(fx()), opts); console.log(fmt(r)); for (const x of r.fails) console.log('     ' + x); if (r.fails.length) ok = false; }
