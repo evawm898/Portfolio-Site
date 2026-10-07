@@ -2780,8 +2780,9 @@ minutes, is SPLIT into two parallel jobs (negative control / gate) rather than g
 timeout. Measured on this container, each tree's gate and negative control run side by side:
 `main` 21.8 + 16.0 min, this branch 26.2 + 17.6 (+20% / +10%; most of the gate's rise is the
 blend inside every build, the K and LB checks' random bugs included, since `wingShapeProblem` builds
-the whole bug). CI ran `main`'s two as ONE job in 25 min, so the two halves should land near 17
-and 12 minutes, each against its own 30. JB3's distance is pre-filtered by the body's contour box
+the whole bug). Measured on the PR's own CI run: the gate job **23.0 min** and the negative
+control **16.0 min**, each against its own 30 (a projection from `main`'s 25-minute single job had
+said 17 and 12 — too low; size a wait off the workflow's own runs). JB3's distance is pre-filtered by the body's contour box
 shrunk by its 0.5 mm inset — exact (identical on 17 bugs), 4.6× faster.
 
 ### 16.8 Decisions made without a ruling (reversible)
