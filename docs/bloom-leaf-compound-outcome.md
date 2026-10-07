@@ -1,7 +1,7 @@
 # Leaf/stem build S3 — the compound leaf (outcome)
 
-Eva's rulings (Oct 7) built into the generator. Branch `claude/epic-fermat-cm70ub`, base `be375b0`
-(S2, #378). The sheet is `docs/img/leaf-compound.png` (`node tools/shot-bloom-leaf-compound.mjs <png>`).
+Eva's rulings (Oct 7) built into the generator. Branch `claude/epic-fermat-cm70ub`, branched at
+`be375b0` (S2, #378), with `main` merged in at `363aacb` (#379, /bug only). The sheet is `docs/img/leaf-compound.png` (`node tools/shot-bloom-leaf-compound.mjs <png>`).
 
 **What a compound leaf is here:** one leaf. The petiole runs on into a rachis. Lateral leaflets
 leave the rachis in pairs on short stalks. A terminal leaflet sits on the rachis tip. Every leaflet
@@ -270,9 +270,14 @@ builder's own `rodAxes`: the petiole, rachis segments and stalks. On a simple le
   - the raceme pin;
   - the two GATED arms (SIMPLE with every leaflet control at an extreme; and no leaf at all).
 - **Smoke block 54 is nine rows.**
-- **`frozen/phase56` is the 1,174 rows at `be375b0`.** It is registered in both maps and proved
-  deep-equal to that commit's own `buildMatrix()`.
-- **No workflow file is edited**, so the tag should publish under the Oct 5 rule.
+- **`frozen/phase56` is the 1,174 rows at `363aacb`**, `main`'s head when this branch merged it.
+  - It was generated from `be375b0`'s own `buildMatrix()`, and `--verify-frozen` proves it
+    deep-equal to BOTH (#379 between them touched /bug only).
+  - It is registered in both maps.
+  - **Based on 363aacb, not be375b0, for the tag's sake.** #379 edited `bug-gate.yml`, which exists
+    at be375b0. Under the Oct 5 rule, a tag at be375b0 would be refused; 363aacb's workflow files
+    match `main` HEAD at dispatch.
+- **This PR edits no workflow file**, so the tag should publish.
 
 ## 9. Open questions for Eva (from the sheet)
 

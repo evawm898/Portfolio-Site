@@ -3622,7 +3622,8 @@ leaf-stem measure excuse the builder's own `rodAxes` (petiole, rachis, stalks) B
 rings coincided and WELDED (78 non-manifold edges) — the left side takes the other half step now.** The
 leaf's root base has one owner (`leafRootBase`): the duplicate expression had disarmed an apex mutant.
 Eight compound mutants plus three re-anchored, each firing what it names. Block 54 (36 rows, 1,210),
-smoke block 54 (9), `frozen/phase56` = the 1,174 rows at `be375b0`. Sheet: `docs/img/leaf-compound.png`.
+smoke block 54 (9), `frozen/phase56` = the 1,174 rows at `363aacb` (be375b0's rows; based on #379's head because
+#379 edited `bug-gate.yml` and an older base's tag would be refused). Sheet: `docs/img/leaf-compound.png`.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read

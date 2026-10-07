@@ -31697,7 +31697,7 @@ export const FROZEN_BASE_COMMITS = {
   phase53: '1740881',   // main's head before ORGANIC VARIANCE BUILD 3 (the spacing field); the 1123 rows while every petal stood at its nominal azimuth
   phase54: 'f4b5baa',   // main's head before LEAF/STEM BUILD S1 (the node split and the alternate divergence); the 1144 rows while a stem node was one control and every alternate stem was distichous
   phase55: 'eb75119',   // main's head before LEAF/STEM BUILD S2 (leaves through emitPanel, arch + cup, the tooth floor); the 1156 rows while every leaf closed on a flat wall and posed straight
-  phase56: 'be375b0',   // main's head before LEAF/STEM BUILD S3 (the compound leaf); the 1174 rows while every leaf was one blade on its petiole
+  phase56: '363aacb',   // main's head before LEAF/STEM BUILD S3 (the compound leaf); the 1174 rows while every leaf was one blade on its petiole — be375b0's rows exactly (#379 touched /bug only), based here because #379 edited bug-gate.yml and a base predating that edit would have its tag refused
   phase39: '8bb8685',   // main's head before the APEX NIB; the 931 rows while every petal ended on a FLAT face two print floors across whatever exponent was asked, and petalLength was the drawn length as well as the asked one
 };
 
@@ -50882,15 +50882,18 @@ export function phase55Matrix() {
 
 
 /* ===================================================================
-   phase56Matrix() — THE 1174 ROWS AS THEY STOOD AT be375b0, frozen.
+   phase56Matrix() — THE 1174 ROWS AS THEY STOOD AT 363aacb, frozen.
 
    main's head before LEAF/STEM BUILD S3 (the compound leaf —
    docs/bloom-leaf-compound-outcome.md): every leaf was one blade on its
    petiole, and the leaf type, the eleven leaflet controls and the free
    leaflet base did not exist. A PHASE IS OWED because that session appends
-   block 54 (36 rows), which changes the ROW SET. Generated from that base
-   commit's own `buildMatrix()`; the labels and the sets are verbatim. Never
-   edit a label here.
+   block 54 (36 rows), which changes the ROW SET. Generated from be375b0's
+   own `buildMatrix()` (S2's merge) and proved deep-equal to 363aacb's, the
+   head the session merged: #379 between them touched /bug only, and it
+   edited `bug-gate.yml`, so the tag is based on 363aacb — a base whose
+   workflow files match `main` HEAD at dispatch publishes (the Oct 5 rule).
+   The labels and the sets are verbatim. Never edit a label here.
    =================================================================== */
 export function phase56Matrix() {
   return [
