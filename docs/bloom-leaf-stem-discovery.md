@@ -38,11 +38,12 @@ Wherever a measurement depends on its sampling, the sampling is named beside it.
    - It stops at the second level. Teeth on the lobe flanks have to stay shallow, because the chevron's
      innermost cell folds across the V where the half-width falls steeply (§3d).
 2. **A (blade tree + fusion) is built and works end to end.**
-   - One slider runs from a compound leaf to an entire one.
+   - One slider (fusion) runs from a compound leaf to a lobed one and on to a crenate one. Fusion 1
+     keeps the notches between lobe tips, so it is not entire (§3a).
    - The TUBE's notch transfers as a law: it is `Object.is`-identical to the shipped `tubeNotchDepth`
      over 2,564 samples. It transfers because the fusion web uses the TUBE's own frame.
-   - Its one-lean assumption does NOT transfer: a leaf sinus leans 44–54° on one side and −11 to −25°
-     on the other.
+   - Its one-lean assumption does NOT transfer. A leaf sinus is asymmetric: the basal lobe's margin
+     leans 44–54° (16° on one sinus) and the apical lobe's −11 to −25°.
    - A is a union of overlapping shells: 11 on the mum, 19 on the exaggerated mum. Building it
      surfaced **three failure modes**, each found by measurement:
      - pinholes at lobe junctions;
@@ -196,7 +197,7 @@ Wherever a measurement depends on its sampling, the sampling is named beside it.
     `RIM_TIP_ROWS` (2). For a sessile leaf that is right. For a **free leaflet base** (the rose's
     leaflets on their petiolules) the base gets the buried treatment it does not need. A per-end
     flag would be needed.
-  - The leaf's row count must be the grid writer's 10 columns. The shipped leaf's 11 do not fit.
+  - The leaf's column count must be the grid writer's 10. The shipped leaf's 11 do not fit.
 - **Thickness taper:** two different things go by that name.
   - The rim's own taper is inside `emitPanel` and comes free with it.
   - The petal's `tipThinning` (`t(u) = base · (1 − tipThinning · u)`) arrives through `emitPanel`'s
@@ -358,7 +359,8 @@ tools/leaf-lab.html                                                         # li
   1. **One lean per sinus.** The TUBE's sinus lies between two petals of one whorl and is symmetric. A
      leaf's sinus lies between a basal lobe and an apical one. Measured on the mum: the basal lobe's
      margin leans **β_a = 44.0°** away from the sinus while the apical lobe's leans **β_b = −11.4°**
-     toward it. On the exaggerated mum it is 47–54° against −19 to −25°. The prototype averages and
+     toward it. On the exaggerated mum it is 47–54° on three of its four sinuses (16.3° on L3–L4) against
+     −19 to −25°. The prototype averages and
      clamps to ±60° (16.3° on the mum), so **the U is tangent to neither margin exactly.** A two-lean U
      (one arc per side) is the generalisation. It is not built.
   2. **The frame.** In the petal's perpendicular-row frame a forward sinus is a sheared channel.
@@ -687,9 +689,8 @@ The cost is real:
 - /plot needs a leaf axis.
 
 If a single cut-in surface, /plot warpability and gate simplicity outweigh toothed lobes, then B,
-accepting an oak-like mum. A hybrid (B's chevron for one-level pinnatifid leaves, A for everything
-else) is reachable too. It is B with one more builder and gets the worst of both: two constructions
-to gate.
+accepting an oak-like mum. A hybrid is reachable too: B's chevron for shallow-toothed pinnatifid leaves and
+A's fused tree for toothed-lobed ones. It keeps both lobed constructions, so both have to be gated.
 
 ---
 
