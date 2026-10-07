@@ -39,8 +39,8 @@ builder's own normals (the bead's closed-form normal), deterministic renderer, n
 
 New ids, nothing retired. Both are hidden and inert behind `leafPresent`, so they are `STEM_SUBS`, out of
 the blanket sweep, and `ALL MAX` never reaches them (measured: `ALL MAX` carries no leaf). The cup's
-range is the petal cup's own (`[-0.8, 1.2]`); **the arch's range is a starting point for Eva's ruling
-from the sheet** — see §8.
+range is the petal cup's own (`[-0.8, 1.2]`). **Both ranges are RULED KEPT (Eva, Oct 7, from the deploy
+preview)**, and so is the floored serration — see §8.
 
 **The read-out** gains three leaf lines, every number off the BUILDER's record: `POSE` (the arch, its
 radius from the spine law, "UNDER ONE SHEET THICKNESS" told never clamped; the cup and the fold clamp
@@ -138,7 +138,7 @@ tooth's depth is its **RELIEF** — the millimetres the cut removes at a sinus �
 - **The PITCH was already floored**: `lobePitchFloor = max(sheet, MIN_FEATURE_MM)` covers leaves as it
   covers petals, so nothing new there.
 - **Leaves only.** It is the leaf's `cap.toothReliefFloorMm`; **petal lobes are untouched by this ruling**
-  (whether the same floor should reach petals is a question for Eva, §8).
+  (whether the same floor should reach petals was not part of Eva's Oct 7 ruling, §8).
 - **The constant, never the mode's floor**, so live and export cut the same teeth — which teeth exist is
   topology.
 
@@ -268,16 +268,26 @@ not reproduce on its 50 leaf rows** (the partition above, exactly), and neither 
 tag that names a leaf row — definitions untouched, the class phase17 / 19 / 21 / 23 / 24 already belong
 to. No workflow file is edited, so phase55's dispatch is not expected to be refused.
 
-## 8. For Eva
+## 8. Rulings (Eva, Oct 7, from the deploy preview)
 
-1. **The arch range, −90..180°, step 5, is a starting point.** At 180 a 52 mm blade turns back on a
-   16.6 mm radius and its tip points down and in (row 2's last cell); −90 curls the tip up and onto the
-   stem at steeper angles (the combination gate's new cell). Both ends export watertight and one piece.
-2. **The cup's range is the petal cup's own** (−0.8..1.2); the fold clamp binds near the tip at both ends
-   and at 0.8, told on the read-out.
-3. **The floored serration**: fine teeth coarsen to 1.00 mm notches and narrow blades lose teeth (row 4).
-   Whether the same floor should reach PETAL lobes is not part of this ruling and was not done.
-4. **The narrow-blade bead turns harder than E2's 45°** by 0.4–7° on leaves 1.6–2.9 mm across (§6) —
-   declared, against a flat wall that turned 90° there. A thinner sheet or a wider leaf removes it.
-5. **The midrib column is gone** (11 → 10 columns, §2) — nothing measured depends on it.
-6. **The leaf still ends on its 1.60 mm stub**, now beaded. A leaf apex nib is its own ruling.
+Three questions were open when this PR went up. Eva ruled on all three from the deploy preview, and no
+code changed as a result: each ruling keeps what shipped.
+
+1. **`leafArch` −90..180°, step 5: KEPT AS SHIPPED. The extremes stay reachable and declared.** At 180 a
+   52 mm blade turns back on a 16.6 mm radius and its tip points down and in (row 2's last cell of the
+   sheet). At −90 the tip curls up and reaches the stem at steeper angles. That is the combination gate's
+   `leafarch-x-angle` pair, whose five cells under the bar are declared by value in `COMBINATION_XFAIL`
+   and never clamped. Both ends export watertight and as one piece.
+2. **`leafCup` −0.8..1.2 (the petal cup's own range): KEPT.** The fold clamp binds near the tip at both
+   ends and at 0.8, and the read-out says so.
+3. **The floored serration: ACCEPTED AS BUILT.** Every margin sinus is cut at least `MIN_FEATURE_MM`
+   (1.00 mm) deep. Fine teeth therefore coarsen to 1 mm notches, and a narrow blade builds fewer teeth than
+   it was asked for. The read-out reports asked against built, with the cause (row 4 of the sheet; §4).
+   Whether the same floor should reach PETAL lobes was not part of the ruling and was not done.
+
+**Notes carried with the PR, not rulings:**
+
+- **The narrow-blade bead turns harder than E2's 45°**, by 0.4–7° on leaves 1.6–2.9 mm across (§6). This is
+  declared. The flat wall it replaces turned 90° there. A thinner sheet or a wider leaf removes it.
+- **The midrib column is gone** (11 → 10 columns, §2). Nothing measured depends on it.
+- **The leaf still ends on its 1.60 mm stub**, now beaded. A leaf apex nib needs its own ruling.

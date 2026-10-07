@@ -14082,9 +14082,10 @@ export const LEAF_CUP_RANGE = Object.freeze([-0.8, 1.2]);
    (positive curls a petal's tip UP and in) — so `leafBladeState` hands the
    law `-leafArch`. Default 0 is today's flat leaf BY BRANCH (the builder takes
    the straight centreline expression verbatim where the law's curvature is
-   exactly 0). The range is a starting point for Eva's ruling from the sheet:
-   -90 (the tip curling up toward the stem's axis) to 180 (a leaf that arches
-   over and hangs back down), stepped at the petal curl's own 5. */
+   exactly 0). The range is RULED (Eva, Oct 7, from the sheet — kept as
+   shipped, the extremes reachable and declared): -90 (the tip curling up
+   toward the stem's axis) to 180 (a leaf that arches over and hangs back
+   down), stepped at the petal curl's own 5. */
 export const LEAF_ARCH_RANGE = Object.freeze([-90, 180]);
 export const LEAF_ARCH_STEP = 5;
 /* HOW HIGH THE BLADE RISES OVER ITS OWN ROOT — the inset law's input, for an

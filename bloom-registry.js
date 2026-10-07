@@ -3858,8 +3858,8 @@ export const CONTROLS = [
      so a leaf that shipped is unmoved by the controls. The arch is DEGREES OF
      TOTAL TURN along the blade with POSITIVE ARCHING THE TIP DOWN (the
      carnation's fall), the opposite sign to the petal's spine curl, and the
-     ranges are both IMPORTED from the geometry (Q6), the arch's a starting
-     point for Eva's ruling from the sheet and the cup's the petal cup's own. */
+     ranges are both IMPORTED from the geometry (Q6) and both RULED KEPT (Eva,
+     Oct 7): the arch's -90..180 and the cup's the petal cup's own. */
   { id: 'leafArch', section: 'leaves', kind: 'slider',
     min: LEAF_ARCH_RANGE[0], max: LEAF_ARCH_RANGE[1], step: LEAF_ARCH_STEP, default: 0,
     label: 'Arch',

@@ -3599,6 +3599,8 @@ narrow-span clamp — declared in `E2_TURN_XFAIL`, never widened. Combination ga
 cells re-record 0.001-0.004 mm CLOSER (the bead at the base margin); `leafarch-x-angle` is new, and arch
 −90 on a 60° leaf reaches the stem where neither alone does. Block 53 (18 rows, 1,174), smoke block 53,
 four apex mutants, `frozen/phase55` = the 1,156 rows at `eb75119`. Sheet: `docs/img/leaf-edge-arch-cup.png`.
+**RULED (Eva, Oct 7): both ranges KEPT as shipped (arch −90..180 with the extremes reachable and declared,
+cup the petal's −0.8..1.2) and the floored serration ACCEPTED as built** — §8 of the outcome doc.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
