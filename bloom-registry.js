@@ -53,11 +53,11 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
-         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_PROMINENCE_RANGE, STEM_CUT_VALUES, STEM_CUT_DEG,
+         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_SWELLING_RANGE, STEM_NODE_KINK_RANGE, STEM_NODE_SWELL, STEM_NODE_SLOPE, STEM_CUT_VALUES, STEM_CUT_DEG,
          HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
-         LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
+         LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -118,7 +118,24 @@ if (TIP_INSTANCES.map((t) => t.prefix).join() !== TIP_PREFIXES.join()) {
    own precedent for `reliefMode`'s values: they were only ever meaningful as
    values OF `centerStyle`, and reserving them would burn three common words.
    The corona that RING stood in for is a phase-2 group of its own and will
-   carry its own ids (charter, session 20). Never remove an entry. */
+   carry its own ids (charter, session 20). Never remove an entry.
+
+   AN ENTRY MAY CARRY AN EXACT `migrateTo` (leaf/stem build S1, the first that
+   does): the LIVE controls the retired value is copied into, verbatim, which
+   reproduce it to the byte; `migrateControls()` below is the ONE owner of
+   applying it. DATA, NOT A FUNCTION, on the predicates' own ground (an
+   introspectable declaration a gate can read and a page can be handed — the
+   panel gate serialises this list into the browser, and a closure does not
+   cross). It exists only where the replacement is exact — a split of one
+   control into parts that keep its law term for term, so the value copies —
+   and an entry without it stays a refusal: a frozen row naming `centerStyle`
+   must keep failing loudly on a tree with no centre rig, never be quietly
+   stripped into a state that draws something else. `verifySections()` refuses
+   a `migrateTo` that names anything but live controls. The first feature that persists a
+   design applies `migrateControls()` on load; until then its consumers are the
+   harness's `applyConfig` (a frozen row replayed on this tree) and the node
+   split's byte gate, which is where its exactness is measured rather than
+   claimed (`tools/verify-bloom-node-split-bytes.mjs`). */
 export const RETIRED_IDS = [
   { id: 'centerStyle', retiredAt: 20, schema: null, why: 'The A/B centre rig (NONE / DOME / DISC / RING, DISC the shipping default since Aug 31). Retired whole on Eva\'s ruling (Sep 5, phase 2 B1): the centre is the reproductive parts and nothing else; DISC and DOME were placeholders doing two jobs that belong elsewhere (a surface is HEAD\'s, covering the junction is the junction\'s and never a control), and RING was torusInto with a bore slider standing in for a corona, which is a flared collar between petals and stamens and does not grow out of a torus. Single-valued once its three styles went, so the control and its section went with them.' },
   { id: 'centerSize', retiredAt: 20, schema: null, why: 'The centre\'s outer radius as a fraction of the foot ring, shared by all three styles. Retired with centerStyle; the androecium\'s radial extent is its own control with its own derivation (Phase A Q1/Q5 rulings) and must not inherit this name.' },
@@ -132,7 +149,46 @@ export const RETIRED_IDS = [
   { id: 'innerTipBreadth', retiredAt: 32, schema: null, why: 'The inner-whorl delta on petalTipBreadth, retired with its base (session 32). Not replaced, with its base.' },
   { id: 'labellumTipBreadth', retiredAt: 32, schema: null, why: 'The labellum\'s delta on petalTipBreadth, retired with its base (session 32). Not replaced, with its base.' },
   { id: 'lobeTipShape', retiredAt: 41, schema: null, why: 'The lobe cut profile\'s single exponent (0.50..2.00, default 1.00): the cut was ((1 - cos 2 pi f)/2)^q = sin(pi f)^{2q}, so q was the crest\'s local power halved and the NOTCH was parabolic at every value of it. Retired on Eva\'s ruling (session 41) because one control cannot carry the two quantities her model names separately: the expansion about the sinus is 1 - q pi^2 e^2 + O(e^4) for EVERY exponent, so the notch\'s included angle was 180 degrees across the whole range and beyond it — an identity of the law (session 40, §1), not a range that could be widened. What q did buy at the notch was a RADIUS, and it tightened at the same end of the control that flattened the crest, so the two features moved in opposition and "both acute" (a serrate margin) was unreachable anywhere in (0, infinity). Replaced by lobeCrestShape and lobeNotchShape, each the LOCAL POWER of the cut at its own feature, independent by construction. A stored 0.50 under this name is a pointed crest over a round sinus and under either new name is a cusp, so the name may never come back.' },
+  { id: 'stemNodeProminence', retiredAt: 54, session: 'leaf/stem build S1 (numbered by the frozen phase it registers; sessions stopped carrying numbers after 43)', schema: null,
+    migrateTo: ['stemNodeSwelling', 'stemNodeKink'],
+    why: 'The stem node\'s ONE control (0..1, default 0), driving the Gaussian swelling (0.6 x prominence over 3.27 stem radii) AND the kink (atan(0.13 x prominence)) together — #299\'s ruling "the swelling and the kink as one control". Retired on Eva\'s ruling (Oct 6, leaf/stem build S1), which superseded #299: the carnation\'s node is a swelling with no kink and the rose\'s a few degrees of zig-zag with almost no swelling, and one control can draw neither. Replaced by stemNodeSwelling and stemNodeKink, each the same 0..1 scale and the same law term. The id could NOT be kept as either half: a stored 0.48 under this name drew a swelling AND a kink, and read as the swelling alone it would silently drop the kink — so the name is retired and the value MIGRATES into both, which reproduces the old look to the byte (measured over every stored control set, both modes).' },
 ];
+
+/* migrateControls / migrateSet — THE ONE OWNER of replaying a control set
+   stored before a retirement (see RETIRED_IDS' `migrateTo`). Applies ONLY the
+   entries that carry an exact `migrateTo`; every other retired id is left in
+   place so the consumer refuses it as it always did. A set that names a
+   retired id AND one of its replacements is refused outright — no set stored
+   before the retirement can carry both, so it is a set somebody edited by
+   hand, and guessing which value wins is the silent partial restore this
+   project's file formats are built against. Pure; never mutates its input. */
+const MIGRATING = () => RETIRED_IDS.filter((r) => Array.isArray(r.migrateTo));
+const migratedFrom = (r, v) => Object.fromEntries(r.migrateTo.map((k) => [k, v]));
+export function migrateControls(state) {
+  if (!state || typeof state !== 'object') return state;
+  let out = state;
+  for (const r of MIGRATING()) {
+    if (!Object.prototype.hasOwnProperty.call(out, r.id)) continue;
+    const add = migratedFrom(r, out[r.id]);
+    for (const k of Object.keys(add)) if (Object.prototype.hasOwnProperty.call(out, k)) throw new Error(`migrateControls: the set names the retired "${r.id}" AND its replacement "${k}" — no set stored before the retirement carries both`);
+    const next = {};
+    for (const [k, v] of Object.entries(out)) { if (k === r.id) Object.assign(next, add); else next[k] = v; }
+    out = next;
+  }
+  return out;
+}
+export function migrateSet(set) {
+  if (!Array.isArray(set)) return set;
+  let out = set;
+  for (const r of MIGRATING()) {
+    const at = out.findIndex((w) => w && w.id === r.id);
+    if (at < 0) continue;
+    const add = migratedFrom(r, out[at].value);
+    for (const k of Object.keys(add)) if (out.some((w) => w && w.id === k)) throw new Error(`migrateSet: the set names the retired "${r.id}" AND its replacement "${k}" — no set stored before the retirement carries both`);
+    out = [...out.slice(0, at), ...Object.entries(add).map(([id, value]) => ({ id, value })), ...out.slice(at + 1)];
+  }
+  return out;
+}
 
 /* VISIBILITY PREDICATES — the condition itself, never a name for one.
    Same structured grammar as the flower registry (kept introspectable rather
@@ -435,7 +491,17 @@ export const PREDICATES = {
      with the corymb ON the gradient is hidden and inert — one owner of the
      lengths at a time. */
   pedicelGradientLive: { all: [{ ref: 'inflorescencePresent' }, { id: 'pedicelCorymb', oneOf: ['OFF'] }] },
-  stemNodesPresent: { all: [{ ref: 'stemNodesEligible' }, { id: 'stemNodeProminence', awayFrom: 0, by: 0.005 }] },
+  /* THE NODE IS TWO CONTROLS (Eva's ruling, Oct 6), and a node exists when
+     EITHER half is away from 0 — the geometry's `stemNodesAbsent` is the same
+     disjunction, and ST12 compares the two statements per row. */
+  stemNodesPresent: { all: [{ ref: 'stemNodesEligible' }, { any: [{ id: 'stemNodeSwelling', awayFrom: 0, by: 0.005 }, { id: 'stemNodeKink', awayFrom: 0, by: 0.005 }] }] },
+  /* THE ALTERNATE DIVERGENCE (Eva's ruling, Oct 6) is live exactly where it
+     reaches a leaf: the leaves' own node law (`leafNodesOwn` — a raceme's
+     leaves stand at the PEDICELS' azimuths) and the ALTERNATE arrangement
+     (opposite and whorled carry their own fixed turns). Off it the slider is
+     hidden AND inert, which LF5 measures by restating every arrangement's
+     azimuths from the controls. */
+  leafDivergenceLive: { all: [{ ref: 'leafNodesOwn' }, { id: 'leafPhyllotaxy', oneOf: ['alternate'] }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
   leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
@@ -1289,6 +1355,19 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     if (!r.why || String(r.why).trim().length < 20) bad.push(`RETIRED_IDS "${r.id}": needs a why — a reservation nobody can evaluate is a claim with no grounds`);
     if (controls.some((c) => c.id === r.id)) bad.push(`retired id "${r.id}" is a live control — a retired id may never be reused; every design saved before it was retired still carries a value under this name`);
     if (Object.prototype.hasOwnProperty.call(defaults, r.id)) bad.push(`retired id "${r.id}" is a DEFAULTS key`);
+    /* AN EXACT MIGRATION MUST LAND ON LIVE CONTROLS, and on more than none —
+       a migrateTo naming a retired or unknown id would hand the consumer a key
+       it refuses, and an empty one would be the delete-only "migration" that
+       this list's own header forbids standing in for an exact one. Checked
+       against the REGISTRY's own controls only: the panel gate's nesting route
+       hands this function written-down fixture controls to ask about SECTIONS,
+       and a fixture that does not carry the swelling is not a statement about
+       the retirement (the collision checks above stay on the passed set,
+       where a fixture can only ever pass them). */
+    if ('migrateTo' in r && controls === CONTROLS) {
+      if (!Array.isArray(r.migrateTo) || !r.migrateTo.length) bad.push(`RETIRED_IDS "${r.id}": migrateTo must be a non-empty list of live control ids — an exact migration replaces the value, it never just deletes it`);
+      else for (const k of r.migrateTo) if (!controls.some((c) => c.id === k)) bad.push(`RETIRED_IDS "${r.id}": migrateTo names "${k}", which is not a live control`);
+    }
     if (ids.has(r.id)) bad.push(`retired id "${r.id}" is a section id`);
     for (const c of controls) {
       for (const o of c.options || []) if (String(o.value) === r.id) bad.push(`retired id "${r.id}" collides with option value "${o.value}" on live control "${c.id}" — a retired name reused as a value is the same silent corruption`);
@@ -3633,15 +3712,25 @@ export const CONTROLS = [
         + (shown.stem.boreR > 0 ? ` · the bore closes ${shown.stem.tipPlugMm.toFixed(2)} mm from the long point` : ' · solid stem, the cut costs nothing');
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
-  /* NODE PROMINENCE — the flower's own control, ported (Eva's rulings on #299):
-     the swelling and the kink are ONE control, it ships OFF, and 0 is the
-     identity by branch. The law and every constant are `stemNodeLaw`'s; the
-     read-out states what the build made of it. */
-  { id: 'stemNodeProminence', section: 'stem', kind: 'slider',
-    min: STEM_NODE_PROMINENCE_RANGE[0], max: STEM_NODE_PROMINENCE_RANGE[1], step: 0.01, default: 0,
-    label: 'Node prominence',
-    fmt: (v, ui) => (Number(v) === 0 ? 'smooth — no nodes'
-      : `${Number(v).toFixed(2)} — swollen, gently kinked nodes ${Number(ui.leafLength) > 0 ? 'at the leaves, each turning away from its first leaf' : 'on a bare stem, turning at the golden angle'} (the read-out says by how much)`),
+  /* THE NODE — SWELLING AND KINK, TWO CONTROLS (Eva's ruling, Oct 6,
+     superseding #299's "one control"; `stemNodeProminence` is RETIRED and a
+     stored value migrates into BOTH, exactly — see RETIRED_IDS). Each keeps the
+     retired control's 0..1 scale and its law term (`stemNodeLaw`): swelling is
+     `0.6 x` of the radius over the flower's 3.27-radius spindle, kink a turn of
+     `atan(0.13 x)` eased in below each node. Both ship OFF; both at 0 is the
+     identity by branch, and either alone builds a node with the other's term
+     an exact zero. The read-out states what the build made of them. */
+  { id: 'stemNodeSwelling', section: 'stem', kind: 'slider',
+    min: STEM_NODE_SWELLING_RANGE[0], max: STEM_NODE_SWELLING_RANGE[1], step: 0.01, default: 0,
+    label: 'Node swelling',
+    fmt: (v) => (Number(v) === 0 ? 'none — the stem keeps its radius at the nodes'
+      : `${Number(v).toFixed(2)} — the stem swells +${(100 * STEM_NODE_SWELL * Number(v)).toFixed(1)}% of its radius at each node (the carnation's joint; the read-out says over what length)`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemNodesEligible' } },
+  { id: 'stemNodeKink', section: 'stem', kind: 'slider',
+    min: STEM_NODE_KINK_RANGE[0], max: STEM_NODE_KINK_RANGE[1], step: 0.01, default: 0,
+    label: 'Node kink',
+    fmt: (v, ui) => (Number(v) === 0 ? 'none — the stem runs straight through its nodes'
+      : `${Number(v).toFixed(2)} — a ${(Math.atan(STEM_NODE_SLOPE * Number(v)) * 180 / Math.PI).toFixed(2)}° turn below each node (the rose's zig-zag), ${Number(ui.leafLength) > 0 ? 'away from that node\'s first leaf' : 'at the golden angle on a bare stem'}`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemNodesEligible' } },
   /* THE NODE COUNT AND THE ARRANGEMENT, UNDER STEM (Eva's ruling 6, stem
      session 2). ONE count governs nodes and leaves both — a node is where a
@@ -3657,13 +3746,17 @@ export const CONTROLS = [
     min: LEAF_NODE_RANGE[0], max: LEAF_NODE_RANGE[1], step: 1, default: 3,
     label: 'Nodes',
     fmt: (v, ui) => { const n = Math.round(Number(v));
-      if (!(Number(ui.leafLength) > 0)) return `${n} along the stem · bare — no leaves${Number(ui.stemNodeProminence) > 0 ? '' : ' (they show once node prominence is above 0 or leaves are added)'}`;
+      if (!(Number(ui.leafLength) > 0)) return `${n} along the stem · bare — no leaves${Number(ui.stemNodeSwelling) > 0 || Number(ui.stemNodeKink) > 0 ? '' : ' (they show once a node swelling or kink is above 0 or leaves are added)'}`;
       const per = ui.leafPhyllotaxy === 'opposite' ? 2 : ui.leafPhyllotaxy === 'whorled' ? 3 : 1;
       return `${n} along the stem · ${n * per} leaves`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodeCountLive' } },
   { id: 'leafPhyllotaxy', section: 'stem', kind: 'choice', default: 'alternate',
     options: [
-      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
+      /* RELABELLED, NOT RE-IDED (Eva's ruling, Oct 6: "rename labels, never
+         IDs"). The value `alternate` keeps its meaning — one leaf a node —
+         and the angle between nodes is the divergence slider below, which
+         defaults to the 180 this option used to be fixed at. */
+      { value: 'alternate', label: 'Alternate (one a node, at the divergence angle)' },
       { value: 'opposite', label: 'Opposite (two across, decussate)' },
       { value: 'whorled', label: 'Whorled (three at 120)' },
     ],
@@ -3671,6 +3764,21 @@ export const CONTROLS = [
     fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
       return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodesOwn' } },
+  /* THE DIVERGENCE (Eva's ruling, Oct 6). Degrees between one node's leaf and
+     the next on an ALTERNATE stem: 180 the distichous zig-zag (the default,
+     and what every stored `alternate` resolves to), ~137.5 the rose's golden
+     spiral, 120 three-ranked, 90 four-ranked. The range and the turn law are
+     `LEAF_DIVERGENCE_RANGE` / `leafDivergenceTurn` in the geometry, imported
+     rather than restated. */
+  { id: 'leafDivergence', section: 'stem', kind: 'slider',
+    min: LEAF_DIVERGENCE_RANGE[0], max: LEAF_DIVERGENCE_RANGE[1], step: 0.5, default: LEAF_DIVERGENCE_DEFAULT,
+    label: 'Divergence',
+    fmt: (v) => { const d = Number(v);
+      const name = d === 180 ? 'distichous — two ranks, a flat zig-zag'
+        : Math.abs(d - 137.5) <= 0.5 ? 'the golden angle — a spiral, the rose'
+        : d === 120 ? 'three ranks' : d === 144 ? 'two-fifths — five ranks' : d === 135 ? 'three-eighths — eight ranks' : d === 90 ? 'four ranks' : 'a spiral';
+      return `${d.toFixed(1)}° between one node's leaf and the next · ${name}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafDivergenceLive' } },
 
   /* ===================================================================
      THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem

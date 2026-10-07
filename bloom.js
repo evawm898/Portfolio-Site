@@ -1739,7 +1739,7 @@ function leafLine(leaf, leavesBuilt) {
     })()
     : '';
   if (sn && !leaf.nodeDepthsMm.length) return `\n     LEAVES none built${sharedLine}\n`;
-  return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node)`
+  return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node${leaf.divergenceDeg !== null && leaf.divergenceDeg !== undefined ? `, ${leaf.divergenceDeg.toFixed(1)}° between nodes${leaf.divergenceDeg === 180 ? ' — distichous' : ''}` : ''})`
     + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
     + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
     + `\n     PETIOLE rooted at r = ${leaf.rootR.toFixed(2)} mm, the WALL's mid-thickness — embedded at every angle, and more so as the angle steepens`
@@ -1879,9 +1879,17 @@ function stemNodesLine(stem) {
   const merged = L.mergedPairs && L.mergedPairs.length
     ? ` · SWELLINGS MERGED: ${L.mergedPairs.length} adjacent pair${L.mergedPairs.length > 1 ? 's' : ''} closer than ${L.mergeGapMm.toFixed(2)} mm (sqrt(2) spindles), the nearest ${Math.min(...L.mergedPairs.map((q) => q.gapMm)).toFixed(2)} mm apart — they read as one bump, not separate joints (reported, not clamped)`
     : '';
-  return `\n     NODES ${L.nodes.length} ${L.bare ? 'on a bare stem' : 'at the leaves'} · prominence ${L.prominence.toFixed(2)}`
-    + ` · swell +${(L.swell * 100).toFixed(1)}% of radius over a ${L.spreadMm.toFixed(2)} mm spindle (${STEM_NODE_SPREAD_RADII.toFixed(2)} stem radii, the flower's own proportion)`
-    + ` · turn ${L.turnDeg.toFixed(2)}° a node, ${L.bare ? 'at the golden angle (no leaf to turn from)' : 'away from its first leaf'}, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle — inside the swelling)`
+  /* TWO HALVES, EACH TOLD — or told as absent (Eva's ruling, Oct 6: the
+     swelling and the kink are two controls). A half at 0 is an exact zero in
+     the law, so "none" is a statement about the geometry, not a rounding. */
+  const swellPart = L.swell > 0
+    ? ` · swelling ${L.swelling.toFixed(2)}: +${(L.swell * 100).toFixed(1)}% of radius over a ${L.spreadMm.toFixed(2)} mm spindle (${STEM_NODE_SPREAD_RADII.toFixed(2)} stem radii, the flower's own proportion)`
+    : ' · no swelling (the stem keeps its radius at the nodes)';
+  const kinkPart = L.slope > 0
+    ? ` · kink ${L.kink.toFixed(2)}: turn ${L.turnDeg.toFixed(2)}° a node, ${L.bare ? 'at the golden angle (no leaf to turn from)' : 'away from its first leaf'}, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle${L.swell > 0 ? ' — inside the swelling' : ''})`
+    : ' · no kink (the stem runs straight through its nodes)';
+  return `\n     NODES ${L.nodes.length} ${L.bare ? 'on a bare stem' : 'at the leaves'}`
+    + swellPart + kinkPart
     + merged
     + ` · tip ${stem.nodeTipOffsetMm.toFixed(2)} mm off straight · worst lean ${stem.nodeTiltMaxDeg.toFixed(2)}°`
     + (stem.nodeWallPerpMm !== null && stem.nodeWallPerpMm !== undefined
@@ -2590,7 +2598,7 @@ window.__bloomMetrics = () => ({
      Two owners, and the arithmetic between them is stated in the clause. */
   leaf: lastLeaf ? {
     lengthMm: lastLeaf.lengthMm, widthMm: lastLeaf.widthMm, angleDeg: lastLeaf.angleDeg,
-    nodes: lastLeaf.nodes, phyllotaxy: lastLeaf.phyllotaxy,
+    nodes: lastLeaf.nodes, phyllotaxy: lastLeaf.phyllotaxy, divergenceDeg: lastLeaf.divergenceDeg,
     nodeDepthsMm: lastLeaf.nodeDepthsMm.slice(),
     azimuths: lastLeaf.azimuths.map((a) => a.slice()),
     rootR: lastLeaf.rootR, petioleR: lastLeaf.petioleR, petioleLenMm: lastLeaf.petioleLenMm,

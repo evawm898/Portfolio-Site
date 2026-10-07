@@ -31,7 +31,7 @@ if (!out) { console.error('usage: node tools/shot-bloom-stem-nodes.mjs <out.png>
 
 const CW = 330, CH = 700, CAP = 58;
 function build(d, prom) {
-  const st = { ...DEFAULTS, stemLength: 100, stemDiameter: d, leafLength: 40, leafNodes: 3, stemNodeProminence: prom };
+  const st = { ...DEFAULTS, stemLength: 100, stemDiameter: d, leafLength: 40, leafNodes: 3, stemNodeSwelling: prom, stemNodeKink: prom };
   const acc = new G.MeshBuilder({ exportMode: true });
   const b = G.buildBloomInto(acc, st, { below: null });
   return { acc, S: b.stem, SB: b.stemBuilt };

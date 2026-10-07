@@ -3505,7 +3505,10 @@ and `leaves` under `stem`; Stem > Leaves > Serration is the second third level a
 the children's full names are BOTH placements made without a ruling** and are Eva's to rule on.
 `frozen/phase32` is the 758 rows at `3f664be`.
 
-**THE STEM HAS NODES — THE FLOWER'S SWELLING AND KINK AS ONE CONTROL, SHIPPED OFF** (Eva's
+**THE STEM HAS NODES — THE FLOWER'S SWELLING AND KINK AS ONE CONTROL, SHIPPED OFF** **[Oct 7: the
+"ONE CONTROL" half is SUPERSEDED by Eva's Oct 6 ruling — `stemNodeProminence` is RETIRED into
+`stemNodeSwelling` + `stemNodeKink`; see the node-split block below. The law, the phasing and every
+number here still hold, with "prominence p" now meaning both halves at p.]** (Eva's
 rulings on #299 — read `docs/bloom-stem-nodes-outcome.md` before touching `stemNodeLaw`,
 `stemNodeStations`, `buildStemInto`'s noded arm, `nodedStemDistanceMm`, `leafNodeLayout` or
 ST12). `stemNodeProminence` (Stem, 0–1, default **0**, hidden and inert under a raceme; **since
@@ -3543,6 +3546,28 @@ the leaf record; ST12(e) keeps the leaf relation, ST12(f) the MERGED-swellings r
 spindles, told never clamped), ID4 the pin. **ST3's narrowest-vertex arm was latent on noded
 solid stems** (a Gaussian tail is never zero) and only the bare layout's 0.16 L node reached it —
 restated, not loosened. `frozen/phase51` is the 1,080 rows at `af15342`; block 47 is nine rows (51 and 47, not 50 and 46: #353 took both while this PR was in CI — its phase50 at `754e3aa` is row-for-row this session's first baseline, so the duplicate was dropped; under a raceme the count is the PEDICELS', so `leafNodeCountLive` hides it there).
+
+**THE NODE IS TWO CONTROLS AND ALTERNATE TAKES A DIVERGENCE — EVERY STORED SET STILL RENDERS TO THE
+BYTE** (Eva's rulings, Oct 6 — leaf/stem build S1; read `docs/bloom-node-split-outcome.md` before
+touching `stemNodeLaw`'s amounts, `leafAzimuths`, `leafDivergenceTurn`, `migrateControls` /
+`migrateSet`, `RETIRED_IDS`' `migrateTo`, ST12(d) or LF5). `stemNodeSwelling` and `stemNodeKink`
+(Stem, 0–1, default 0) replace `stemNodeProminence`, which is RETIRED with an EXACT `migrateTo:
+[swelling, kink]` — DATA, not a closure (the panel gate serialises `RETIRED_IDS` into the page) —
+because a stored 0.48 read as either half alone would silently drop the other. Each half keeps the
+law term for term, so the value COPIES. `leafPhyllotaxy` KEEPS ITS ID (its meaning — one leaf a node —
+did not change) and `leafDivergence` (90–180°, default 180, live only on the leaves' own ALTERNATE)
+carries the angle; the turn is `(deg/180)·π`, which is `Math.PI` to the bit at 180. `leafAzimuths`
+REQUIRES the alternate turn as an argument (a floret passes `DISTICHOUS_TURN`; it throws without
+one). **THE BLOOM PERSISTS NO DESIGN AND SHIPS NO PRESETS**, so "every saved design" is every stored
+matrix set: `node tools/verify-bloom-node-split-bytes.mjs --base <worktree>` built the base tree's
+1,404 distinct sets (live + 52 phases) on both trees through the migration — **1,179 compared, 0
+moved** over 1.84 G export floats and 250 M grid values in both modes, 225 excluded by name (old rows
+naming ids the base itself retired) — and its `--wrong-migration` (kink defaulted to 0) **fails on
+exactly the 21 sets the base built a node law for**. ST12(d) splits by the half it reads, and **its
+bend arm cannot resolve a bend moved ABOVE a node on a kink-only stem** (the placer spends no stations
+there; (c) is the witness — declared). LF5 now holds node *i*'s first leaf at `i × turn` restated
+from the controls. Block 52 (12 rows); blocks 41/47/48 set both halves, labels verbatim.
+`frozen/phase54` is the 1,144 rows at `f4b5baa`. Sheet: `docs/img/node-split.png`.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read

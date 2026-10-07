@@ -319,12 +319,18 @@ const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw
 
 /* THE NODE WITNESS (#299's port) — the MUTATED module's own stem plan, builder
    and leaves on a noded state, compared against the clean module's. */
-const NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeProminence: 0.48 });
+const NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeSwelling: 0.48, stemNodeKink: 0.48 });
+/* THE SPLIT's WITNESS STATES (Eva's ruling, Oct 6): the halves APART, where a
+   law reading the wrong half differs from the right one (on every state with
+   the halves equal the coupled mutant is a no-op), and the rose's divergence,
+   where an ignored divergence differs from 180. */
+const SPLIT_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeSwelling: 0.3, stemNodeKink: 1 });
+const DIVERGENCE_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 5, leafDivergence: 137.5, ...over });
 /* RULING 6's TWO WITNESS STATES (stem session 2): a BARE noded stem, and a
    raceme whose head asks for prominence 1 — the state where every floret's own
    stem is a bare stem the ungated law would node unless the pedicel pin holds. */
-const BARE_NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, stemNodeProminence: 0.48 });
-const RACEME_NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', stemNodeProminence: 1 });
+const BARE_NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, stemNodeSwelling: 0.48, stemNodeKink: 0.48 });
+const RACEME_NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', stemNodeSwelling: 1, stemNodeKink: 1 });
 function pedicelNodes(M) {
   try {
     const b = M.buildBloomInto(new M.MeshBuilder({ exportMode: true }), RACEME_NODE_STATE());
@@ -1342,18 +1348,18 @@ const MUTANTS = [
         : `the mutant built ${m.unitCount} unit(s) and the clean tree ${c.unitCount}; the clean units' cups read ${c.units.map((u) => u.cup).join('/')} against the mutant's ${m.units.map((u) => u.cup).join('/')} — the term still forms`;
     } },
   { id: 'the-node-term-outranks-the-pins',
-    why: "the per-node overrides are spread AFTER the pedicel pins, so a term that happened to carry a pinned id would win over the pin — today none does, so this is caught by NV3's reading of the pins on every unit under a planted term that DOES: the witness plants `stemNodeProminence` into the overrides and sees the pedicel node",
+    why: "the per-node overrides are spread AFTER the pedicel pins, so a term that happened to carry a pinned id would win over the pin — today none does, so this is caught by NV3's reading of the pins on every unit under a planted term that DOES: the witness plants `stemNodeKink` into the overrides and sees the pedicel node (it planted the retired `stemNodeProminence` before the node split)",
     /* THE FIRST CUT PLANTED THE PIN INTO THE OVERRIDES AND LEFT THEM SPREAD
        BEFORE `PEDICEL_PINS`, so the pins still won and the witness reported
        "the behaviour did not move" — the mutation has to move the SPREAD
        past the pins, which is the defect it names. */
     find: '    /* PER-NODE VARIATION (Phase B) — applied FIRST so the pins below win */\n    ...(nodeOverrides || {}),\n    /* A FLORET DOES NOT INHERIT THE TUBE (Eva\'s ruling): every whorl FREE */\n    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,',
-    into: '    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,\n    ...(nodeOverrides ? { ...nodeOverrides, stemNodeProminence: 1 } : {}),', names: ['NV3'],
+    into: '    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),\n    ...PEDICEL_PINS,\n    ...(nodeOverrides ? { ...nodeOverrides, stemNodeKink: 1 } : {}),', names: ['NV3'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C, { nodeVariance: 1 });
       const t = bothBuilt(m, c); if (t) return t;
-      return (m.units.some((u) => u.pins.stemNodeProminence !== 0) && c.units.every((u) => u.pins.stemNodeProminence === 0)) ? null
-        : `the mutant's units carry stemNodeProminence ${m.units.map((u) => u.pins.stemNodeProminence).join('/')} and the clean tree's ${c.units.map((u) => u.pins.stemNodeProminence).join('/')} — the pin still wins`;
+      return (m.units.some((u) => u.pins.stemNodeKink !== 0) && c.units.every((u) => u.pins.stemNodeKink === 0)) ? null
+        : `the mutant's units carry stemNodeKink ${m.units.map((u) => u.pins.stemNodeKink).join('/')} and the clean tree's ${c.units.map((u) => u.pins.stemNodeKink).join('/')} — the pin still wins`;
     } },
   { id: 'the-floret-phase-is-the-heads',
     why: "`floretPhaseDeg` returns null for every floret, so each one keeps the HEAD's `variancePhase` — the world-fixed frame the Oct 3 ruling forbids: every floret's field crest sits on the same world side whatever node it hangs from. Watertight, one piece, the same counts. NV2 re-derives the outward phase from each placement's own matrix",
@@ -1916,7 +1922,7 @@ const MUTANTS = [
   { id: 'the-node-field-never-reaches-the-stem', why: "the plan drops the node law whatever the control says, so the stem stays a straight cylinder under a prominence the panel reports — watertight, one piece, the pre-node triangle count; the defect Eva's 'one control' would ship as a dead slider",
     find: '  const nodeLaw = stemNodeLaw(state, lengthMm, outerR);',
     into: '  const nodeLaw = null;', names: ['ST12', 'ST2'],
-    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C), s0 = nodeFacts(C, { ...NODE_STATE(), stemNodeProminence: 0 });
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C), s0 = nodeFacts(C, { ...NODE_STATE(), stemNodeSwelling: 0, stemNodeKink: 0 });
       if (m.threw || c.threw || s0.threw) return `the witness threw: ${m.threw || c.threw || s0.threw}`;
       /* The straight stem's station count is READ off the clean tree at prominence 0 (the
          identity row), never typed: this witness carried `=== 2` until the florist's cut
@@ -1924,13 +1930,14 @@ const MUTANTS = [
          whose edit had applied — a row count standing in for a shape (the stale-harness-row
          class, in a witness). */
       return (m.stations === s0.stations && c.stations > s0.stations) ? null : `the mutant's stem carries ${m.stations} stations against the clean tree's ${c.stations} (a straight stem on the clean tree carries ${s0.stations})`; } },
-  { id: 'prominence-zero-is-not-the-identity', why: 'the guard drops its prominence term, so a leafed stem at prominence 0 builds a node law — a zero swelling and a zero kink on the noded arm — which is the identity only by an argument about arithmetic, never by branch',
-    find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state)',
+  /* RENAMED with the node split (Oct 6): it was `prominence-zero-is-not-the-identity`; the guard now reads BOTH halves. */
+  { id: 'both-node-amounts-zero-is-not-the-identity', why: 'the guard drops its amount term, so a leafed stem with swelling and kink both 0 builds a node law — a zero swelling and a zero kink on the noded arm — which is the identity only by an argument about arithmetic, never by branch',
+    find: '  return !(Number(state.stemNodeSwelling) || Number(state.stemNodeKink)) || stemIsAbsent(state)',
     into: '  return stemIsAbsent(state)', names: ['ST12'],
-    witness: (M, C) => { const st = { ...NODE_STATE(), stemNodeProminence: 0 };
+    witness: (M, C) => { const st = { ...NODE_STATE(), stemNodeSwelling: 0, stemNodeKink: 0 };
       const m = nodeFacts(M, st), c = nodeFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.hasLaw && !c.hasLaw) ? null : `at prominence 0 the mutant's plan ${m.hasLaw ? 'carries' : 'carries no'} node law and the clean tree's ${c.hasLaw ? 'carries' : 'carries no'} one`; } },
+      return (m.hasLaw && !c.hasLaw) ? null : `with both amounts 0 the mutant's plan ${m.hasLaw ? 'carries' : 'carries no'} node law and the clean tree's ${c.hasLaw ? 'carries' : 'carries no'} one`; } },
   { id: 'the-bend-peaks-above-its-node', why: 'each kink starts a whole ramp ABOVE its node, so the stem turns before the joint instead of inside the swelling below it — the phasing Eva likes, lost, on a watertight stem with the same station count',
     find: '    const past = s - n.s;\n    if (!(past > 0)) continue;\n    const q = past >= law.rampMm ? 1 : (past / law.rampMm);',
     into: '    const past = s - n.s + law.rampMm;\n    if (!(past > 0)) continue;\n    const q = past >= law.rampMm ? 1 : (past / law.rampMm);', names: ['ST12', 'ST2'],
@@ -1951,13 +1958,13 @@ const MUTANTS = [
       return (m.maxCentreOff < 1e-9 && c.maxCentreOff > 1) ? null : `the mutant's rings stand up to ${m.maxCentreOff} mm off the world axis against ${c.maxCentreOff} clean`; } },
   /* ===== RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2) ===== */
   { id: 'the-nodes-are-gated-on-leaves-again', why: "the geometry's guard takes back its leaf term, so a BARE stem at prominence 0.48 builds a straight cylinder while the registry (ruling 6) shows the control live — a dead slider on every bare stem, watertight and one piece at the pre-node count",
-    find: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || !inflorescenceIsAbsent(state);',
-    into: '  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || leafIsAbsent(state) || !inflorescenceIsAbsent(state);', names: ['ST12', 'ST2'],
+    find: '  return !(Number(state.stemNodeSwelling) || Number(state.stemNodeKink)) || stemIsAbsent(state) || !inflorescenceIsAbsent(state);',
+    into: '  return !(Number(state.stemNodeSwelling) || Number(state.stemNodeKink)) || stemIsAbsent(state) || leafIsAbsent(state) || !inflorescenceIsAbsent(state);', names: ['ST12', 'ST2'],
     witness: (M, C) => { const m = nodeFacts(M, BARE_NODE_STATE()), c = nodeFacts(C, BARE_NODE_STATE());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.hasLaw && c.hasLaw) ? null : `on a bare stem the mutant's plan ${m.hasLaw ? 'carries' : 'carries no'} node law and the clean tree's ${c.hasLaw ? 'carries' : 'carries no'} one`; } },
-  { id: 'the-pedicel-pin-is-dropped', why: "the floret state stops pinning stemNodeProminence, so under a raceme whose head asks for nodes every PEDICEL — a bare stem now that nodes need no leaves — kinks and swells at the golden angle: watertight, one piece, the floret count unchanged",
-    find: '  stemNodeProminence: 0,      // no nodes on a pedicel (ruling 6)\n',
+  { id: 'the-pedicel-pin-is-dropped', why: "the floret state stops pinning both halves of the node, so under a raceme whose head asks for nodes every PEDICEL — a bare stem now that nodes need no leaves — kinks and swells at the golden angle: watertight, one piece, the floret count unchanged",
+    find: '  stemNodeSwelling: 0,        // no nodes on a pedicel (ruling 6) — neither half of the node (the split, Oct 6)\n  stemNodeKink: 0,\n',
     into: '', names: ['ID4'],
     witness: (M, C) => { const m = pedicelNodes(M), c = pedicelNodes(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
@@ -1968,12 +1975,36 @@ const MUTANTS = [
      leaves-flip-180 / bends-turn-golden disagreement — moving the leafed
      100 x 6 mm row's tip 5.52 mm (measured, stem session 1). */
   { id: 'the-golden-kink-reaches-leafed-stems', why: "every node turns at the golden angle whatever its leaves, so a leafed stem's bends stop turning away from its leaves — the flower's own leaves/bends disagreement, the thing ruled out twice; a watertight stem at the identical station count",
-    find: '    const az = bare ? i * GOLDEN_ANGLE : leafAzimuths(phyllo, i)[0] + Math.PI;',
+    find: '    const az = bare ? i * GOLDEN_ANGLE : leafAzimuths(phyllo, i, turn)[0] + Math.PI;',
     into: '    const az = i * GOLDEN_ANGLE;', names: ['ST12', 'ST2'],
     witness: (M, C) => { const m = firstKinkDeg(M, NODE_STATE()), c = firstKinkDeg(C, NODE_STATE());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (!m.az || !c.az) return 'the leafed witness state carries no node law';
       return (Math.abs(m.az[0] - c.az[0]) > 1 || Math.abs(m.az[1] - c.az[1]) > 1) ? null : `the mutant's leafed kinks turn [${m.az.join(', ')}] against the clean tree's [${c.az.join(', ')}]`; } },
+  /* ===== THE NODE SPLIT AND THE DIVERGENCE (Eva's rulings, Oct 6 — leaf/stem
+     build S1). Each witnessed on the MUTATED module's own plan or leaf record,
+     never on the clause it names. ===== */
+  { id: 'the-node-halves-are-coupled-again', why: "the kink reads the SWELLING's amount, so the two controls are one again — #299's coupling the Oct 6 ruling took apart. Invisible on every state with the halves equal (every row before the split), watertight and one piece at a plausible count; only the halves APART can see it",
+    find: '    swell: STEM_NODE_SWELL * swelling, slope: STEM_NODE_SLOPE * kink,',
+    into: '    swell: STEM_NODE_SWELL * swelling, slope: STEM_NODE_SLOPE * swelling,', names: ['ST12', 'ST2'],
+    witness: (M, C) => { const law = (Mm) => { try { const st = SPLIT_STATE(), acc = new Mm.MeshBuilder({ exportMode: true }); return Mm.stemPlan(st, Mm.footRing(st, acc).hub, acc).nodeLaw; } catch (e) { return { threw: e.message }; } };
+      const m = law(M), c = law(C);
+      if (!m || !c || m.threw || c.threw) return `the witness threw or built no law: ${(m && m.threw) || (c && c.threw) || 'no law'}`;
+      return (m.slope !== c.slope && m.swell === c.swell) ? null : `the mutant's slope ${m.slope} / swell ${m.swell} against the clean tree's ${c.slope} / ${c.swell} on the halves-apart state`; } },
+  { id: 'the-divergence-never-reaches-the-leaves', why: "the leaves stand at 180 whatever the divergence slider says, while the stem's kinks follow the divergence — the rose's spiral never drawn, on a watertight stem at the identical leaf count, and the leaves and bends disagreeing exactly as the flower's forbidden law does",
+    find: '    : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, leafDivergenceTurn(state)));',
+    into: '    : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, Math.PI));', names: ['LF5'],
+    witness: (M, C) => { const az = (Mm) => { try { const st = DIVERGENCE_STATE(), acc = new Mm.MeshBuilder({ exportMode: true }); const sp = Mm.stemPlan(st, Mm.footRing(st, acc).hub, acc); return Mm.leafPlan(st, sp, acc).azimuths.map((a) => a[0]); } catch (e) { return { threw: e.message }; } };
+      const m = az(M), c = az(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m[1] - Math.PI) < 1e-12 && Math.abs(c[1] - (137.5 / 180) * Math.PI) < 1e-12) ? null : `the mutant's second leaf stands at ${m[1]} rad and the clean tree's at ${c[1]}`; } },
+  { id: 'the-divergence-leaks-onto-an-opposite-stem', why: "the opposite arrangement's node turn reads the divergence too, so a hidden slider moves an opposite stem's leaves — a control the panel hides doing something, the dead-slider defect inverted; watertight, one piece, two leaves a node at 180 apart",
+    find: "  if (phyllo === 'opposite') { const b = i * Math.PI / 2; return [b, b + Math.PI]; }",
+    into: "  if (phyllo === 'opposite') { const b = i * (Number.isFinite(alternateTurn) ? alternateTurn : Math.PI) / 2; return [b, b + Math.PI]; }", names: ['LF5'],
+    witness: (M, C) => { const az = (Mm) => { try { const st = DIVERGENCE_STATE({ leafNodes: 4, leafPhyllotaxy: 'opposite', leafDivergence: 90 }), acc = new Mm.MeshBuilder({ exportMode: true }); const sp = Mm.stemPlan(st, Mm.footRing(st, acc).hub, acc); return Mm.leafPlan(st, sp, acc).azimuths.map((a) => a[0]); } catch (e) { return { threw: e.message }; } };
+      const m = az(M), c = az(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(c[1] - Math.PI / 2) < 1e-12 && Math.abs(m[1] - Math.PI / 4) < 1e-12) ? null : `the mutant's second opposite node turns ${m[1]} rad and the clean tree's ${c[1]}`; } },
   { id: 'the-petiole-roots-on-the-world-axis', why: "each petiole is rooted about the WORLD axis while the stem has kinked away from it, so a leaf at a lower node roots in the bore or outside the wall — both export watertight",
     find: '  const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];',
     into: '  const base = [plan.rootR * R[0], plan.rootR * R[1], z];', names: ['LF2'],
@@ -2174,10 +2205,10 @@ const ROWS = [
      and would read 1.30 against 1.30 at the default: a witness state is part
      of the claim (`bore-is-not-evas-rule`'s lesson, one family later). */
   /* THE NODE ROWS (#299's port): the flower's own setting, and the SAME leafed
-     stem at prominence 0 — the state where `prominence-zero-is-not-the-identity`
+     stem with both node amounts 0 — the state where `both-node-amounts-zero-is-not-the-identity`
      bites, since ST12's two statements can only disagree where the guard does. */
   { label: "the stem's nodes at the flower's 0.48 (100 x 6 mm, three alternate leaves)",
-    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0.48' }] },
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeSwelling', value: '0.48' }, { id: 'stemNodeKink', value: '0.48' }] },
   /* RULING 6's ROWS (stem session 2): the BARE noded stem, where
      `the-nodes-are-gated-on-leaves-again` bites (on a leafed stem the leaf
      term is satisfied and the mutation is a no-op), and the raceme whose
@@ -2189,9 +2220,9 @@ const ROWS = [
   { label: 'the shipped stem with the cut OFF (FLAT — the end as it was)',
     set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }, { id: 'stemCut', value: 'FLAT' }] },
   { label: 'a BARE stem at the flower\'s 0.48 (100 x 6 mm, no leaves — golden-angle nodes)',
-    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'stemNodeProminence', value: '0.48' }] },
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'stemNodeSwelling', value: '0.48' }, { id: 'stemNodeKink', value: '0.48' }] },
   { label: 'a raceme whose head asks for prominence 1 (the head is inert; every pedicel must stay straight)',
-    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'stemNodeProminence', value: '1' }] },
+    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'stemNodeSwelling', value: '1' }, { id: 'stemNodeKink', value: '1' }] },
   /* BUILD 3's ROWS: the node term ON under the head's own field (NV1-NV4 and
      NV2's outward phase on one row), the DESCENDING pedicel (the sign term's
      only witness), the gradient at the ceiling on twelve 60 mm nodes (the cap
@@ -2206,7 +2237,17 @@ const ROWS = [
   { label: 'the raceme on a 0.60 mm sheet (the two modes\' units stand different heights)',
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
   { label: 'the same leafed stem at prominence 0 (the guard, where the two statements can disagree)',
-    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeProminence', value: '0' }] },
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeSwelling', value: '0' }, { id: 'stemNodeKink', value: '0' }] },
+  /* THE SPLIT's ROWS (Eva's rulings, Oct 6): the halves APART — the only
+     state where `the-node-halves-are-coupled-again` moves anything — and the
+     rose's 137.5 divergence plus 90 under OPPOSITE, the two states where the
+     divergence can be ignored and where it can leak. */
+  { label: 'the halves APART — swelling 0.3 x kink 1 on three alternate leaves',
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }, { id: 'stemNodeSwelling', value: '0.3' }, { id: 'stemNodeKink', value: '1' }] },
+  { label: 'alternate at the golden 137.5 (five leaves — the divergence APART from 180)',
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '5' }, { id: 'leafDivergence', value: '137.5' }] },
+  { label: 'divergence 90 under OPPOSITE (hidden AND inert — where a leak would show)',
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafPhyllotaxy', value: 'opposite' }, { id: 'leafDivergence', value: '90' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'leafTipShape', value: '0.6' }] },
   /* THE NU COUPLING'S ROW (#303's finding, fixed): the petals ramp to 112

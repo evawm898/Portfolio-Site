@@ -12245,7 +12245,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
    charter's stem entry). Every ring of the tube is a horizontal circle, and the
    wall is `outerR - boreR` in that ring's own plane, which is exactly 1.5 at
    every hollow diameter. Where a node leans the axis, the wall measured SQUARE
-   to the axis is `1.5 cos(lean)` — 1.4971 mm at prominence 0.48, 1.4875 at
+   to the axis is `1.5 cos(lean)` — 1.4971 mm at kink 0.48, 1.4875 at
    1.00 — and that is a REPORTED CONSEQUENCE of the ruling (`nodeWallPerpMm`
    on the plan, printed on the read-out), not a violation of it. Do not
    "close" it with `1/cos(lean)` on the bore: the ruling chose horizontal. */
@@ -12478,9 +12478,10 @@ export function stemStations(lengthMm) { return [0, lengthMm]; }
 export const HUB_SECTORS = 48;
 
 /* ===================================================================
-   THE STEM'S NODES — A SWELLING AND A KINK, ONE CONTROL (Eva's rulings on
-   `docs/bloom-flower-stem-comparison.md`, #299). Read that document and
-   `docs/bloom-stem-nodes-outcome.md` before touching any of this.
+   THE STEM'S NODES — A SWELLING AND A KINK, TWO CONTROLS (Eva's rulings on
+   `docs/bloom-flower-stem-comparison.md`, #299, and her Oct 6 ruling that
+   split the one control in two — `docs/bloom-node-split-outcome.md`). Read
+   those and `docs/bloom-stem-nodes-outcome.md` before touching any of this.
 
    WHAT IS PORTED, AND WHAT IS NOT. The flower's `stemNodeParams` /
    `stemCenterline` / `stemRadiusFn` (flower.js:1777-1830) carry two terms on
@@ -12516,17 +12517,30 @@ export const HUB_SECTORS = 48;
    (`nodeWallPerpMm`); it is not a violation, because the wall is measured
    HORIZONTALLY by Eva's ruling 5 (see STEM_MIN_WALL_MM).
 
-   PROMINENCE 0 IS THE IDENTITY BY BRANCH, NEVER BY ARITHMETIC. `stemNodeLaw`
-   returns NULL and every consumer takes its pre-node expression verbatim —
-   the `domeIsFlat` / `plan.inert` discipline — so a stem with the control at 0
-   is byte-identical to one built before the control existed.
+   BOTH AMOUNTS AT 0 IS THE IDENTITY BY BRANCH, NEVER BY ARITHMETIC.
+   `stemNodeLaw` returns NULL and every consumer takes its pre-node expression
+   verbatim — the `domeIsFlat` / `plan.inert` discipline — so a stem with both
+   controls at 0 is byte-identical to one built before either existed. ONE
+   amount at 0 is NOT a branch: the other still builds a law, and the zero
+   term is an exact zero inside it (`R (1 + 0 x sw)` is R; `0 x past x sm` is
+   0), so a swelling-only stem stays on the axis and a kink-only stem keeps
+   its radius to the bit.
    =================================================================== */
 const FLOWER_STEM = Object.freeze({
   lengthUnits: 4,                                   // flower-registry stemLength default
   topRadiusUnits: (0.008 + (0.030 - 0.008) * 0.4) * 4.0,  // tubeRadius at tube 0.4, times lerp(4.0, 1.8, 0)
   spread: 0.055, ramp: 0.12, slope: 0.13, swell: 0.6,     // stemRadiusFn / stemCenterline, verbatim
 });
-export const STEM_NODE_PROMINENCE_RANGE = Object.freeze([0, 1]);
+/* SWELLING AND KINK ARE TWO CONTROLS (Eva's ruling, Oct 6 — leaf/stem build
+   S1, superseding #299's "the swelling and the kink as one control"): the
+   carnation's node is a swelling with no kink, the rose's a few degrees of
+   zig-zag with almost no swelling, and one control could draw neither. Both
+   amounts keep the retired `stemNodeProminence`'s 0..1 scale and its law term
+   for term (`STEM_NODE_SWELL * swelling`, `STEM_NODE_SLOPE * kink`), which is
+   what makes the migration EXACT: a stored prominence p becomes swelling p and
+   kink p, and the law forms the same two doubles it formed before. */
+export const STEM_NODE_SWELLING_RANGE = Object.freeze([0, 1]);
+export const STEM_NODE_KINK_RANGE = Object.freeze([0, 1]);
 export const STEM_NODE_SWELL = FLOWER_STEM.swell;
 export const STEM_NODE_SLOPE = FLOWER_STEM.slope;
 export const STEM_NODE_SPREAD_RADII = FLOWER_STEM.spread * FLOWER_STEM.lengthUnits / FLOWER_STEM.topRadiusUnits;
@@ -12564,7 +12578,7 @@ export const STEM_NODE_STATION_GRID = 1 / 4096;
    off separately, by `PEDICEL_PINS`, because a floret's state has no raceme
    in it and this term would not reach it.) */
 export function stemNodesAbsent(state) {
-  return !Number(state.stemNodeProminence) || stemIsAbsent(state) || !inflorescenceIsAbsent(state);
+  return !(Number(state.stemNodeSwelling) || Number(state.stemNodeKink)) || stemIsAbsent(state) || !inflorescenceIsAbsent(state);
 }
 
 /* THE LEAF NODE PITCH FLOOR, MODE-FREE. It was `2 x petioleR0`, which is
@@ -12626,14 +12640,25 @@ export function leafNodeLayout(state, stemLengthMm) {
    brief asks, and never one the leaves contradict. One line to reverse. */
 export function stemNodeLaw(state, stemLengthMm, outerR) {
   if (stemNodesAbsent(state)) return null;
-  const prom = Math.min(STEM_NODE_PROMINENCE_RANGE[1], Math.max(STEM_NODE_PROMINENCE_RANGE[0], Number(state.stemNodeProminence)));
+  /* Each amount clamped exactly as the retired single control was, so a
+     migrated state (both amounts equal to the old prominence) forms the same
+     two doubles below. A non-number reads as 0 — the guard above has already
+     required one of the two to be non-zero. */
+  const amt = (v, R) => { const x = Number(v); return Number.isFinite(x) ? Math.min(R[1], Math.max(R[0], x)) : 0; };
+  const swelling = amt(state.stemNodeSwelling, STEM_NODE_SWELLING_RANGE);
+  const kink = amt(state.stemNodeKink, STEM_NODE_KINK_RANGE);
   const layout = leafNodeLayout(state, stemLengthMm);
   const phyllo = String(state.leafPhyllotaxy);
   const spreadMm = STEM_NODE_SPREAD_RADII * outerR;
   const rampMm = STEM_NODE_RAMP_SPREADS * spreadMm;
   const bare = leafIsAbsent(state);
+  /* A LEAFED node turns away from its first leaf, and with the divergence
+     (ruling, Oct 6) the first leaf of an ALTERNATE stem stands wherever the
+     divergence put it — so a rose at 137.5 kinks in a spiral, each bend on the
+     far side of its own leaf, and the bends never contradict the leaves. */
+  const turn = bare ? null : leafDivergenceTurn(state);
   const nodes = layout.nodeDepthsMm.map((s, i) => {
-    const az = bare ? i * GOLDEN_ANGLE : leafAzimuths(phyllo, i)[0] + Math.PI;
+    const az = bare ? i * GOLDEN_ANGLE : leafAzimuths(phyllo, i, turn)[0] + Math.PI;
     return { s, az, dx: Math.cos(az), dy: Math.sin(az) };
   });
   /* THE SWELLINGS MERGE, AND THAT IS REPORTED, NEVER CLAMPED (Eva's ruling on
@@ -12645,21 +12670,24 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
      13.89; the thin sheet on a short stem at 1.15 mm), so the read-out says it
      the way the neighbour flag reports interpenetration. Pairs are adjacent
      nodes in depth order, gap in mm. */
+  /* With NO swelling there is nothing to merge: a kink-only stem's nodes are
+     bends, and two bends closer than the spindle are two bends. Telemetry only
+     — the geometry never reads this list. */
   const mergeGapMm = Math.SQRT2 * spreadMm;
   const mergedPairs = [];
-  for (let i = 1; i < nodes.length; i++) {
+  if (swelling > 0) for (let i = 1; i < nodes.length; i++) {
     const gap = nodes[i].s - nodes[i - 1].s;
     if (gap <= mergeGapMm) mergedPairs.push({ a: i - 1, b: i, gapMm: gap });
   }
   return {
-    prominence: prom, outerR, lengthMm: stemLengthMm,
-    swell: STEM_NODE_SWELL * prom, slope: STEM_NODE_SLOPE * prom,
+    swelling, kink, outerR, lengthMm: stemLengthMm,
+    swell: STEM_NODE_SWELL * swelling, slope: STEM_NODE_SLOPE * kink,
     spreadMm, rampMm, nodes, bare, mergeGapMm, mergedPairs,
     /* WHERE EACH BEND PEAKS — the phasing, as a number a reader and a gate can
        both hold: 0.375 of the ramp below each node (the smoothstep-weighted
        ramp's own curvature maximum), stated against the spindle's width. */
     bendPeakBelowMm: 0.375 * rampMm, bendPeakInSpreads: (0.375 * rampMm) / spreadMm,
-    turnDeg: Math.atan(STEM_NODE_SLOPE * prom) * 180 / Math.PI,
+    turnDeg: Math.atan(STEM_NODE_SLOPE * kink) * 180 / Math.PI,
   };
 }
 
@@ -13053,7 +13081,7 @@ export function stemPlan(state, ring, acc) {
      mode-free wherever the band's condition is, because on a sphere the band IS
      the join and the head's thickness cancels out of the difference. The
      pre-existing half is the BAND's and is not touched here. */
-  /* THE NODES (#299's port) — NULL at prominence 0, and then every field
+  /* THE NODES (#299's port) — NULL with both node amounts at 0, and then every field
      below is the pre-node plan verbatim: the station list is `stemStations`'
      own two, and nothing else is read. Computed HERE, ahead of the cut and the
      plug, because the cut is made on the tip ring's OWN radius (the law's at
@@ -13549,7 +13577,7 @@ export function buildStemInto(acc, plan) {
   /* ===================================================================
      THE NODED STEM — a SEPARATE ARM, entered only where the plan carries a
      node law, so the arm above and below is the pre-node builder verbatim and
-     prominence 0 is byte-identical by BRANCH. Everything it emits is the same
+     both node amounts at 0 are byte-identical by BRANCH. Everything it emits is the same
      topology the straight tube emits (horizontal rings on a ladder, the same
      two end expressions); what moves is each ring's CENTRE and the OUTER
      radius, both read from the plan's one law at the ring's own depth.
@@ -14047,10 +14075,46 @@ export function rodWallCrossingMm(wall, th, lenOut, lenIn) {
   return Math.max(0, hi - lo);
 }
 
-export function leafAzimuths(phyllo, i) {
+/* THE ALTERNATE DIVERGENCE (Eva's ruling, Oct 6 — leaf/stem build S1).
+   ALTERNATE is one leaf a node, and the angle between one node's leaf and the
+   next is a SLIDER now: the rose's ~137.5 degree spiral, and 180 — the
+   distichous zig-zag that was ALTERNATE's only meaning before — which stays
+   reachable and is the DEFAULT, so every stored `alternate` resolves to what
+   it always drew. The id `leafPhyllotaxy` keeps its three values and its
+   meaning ("how the leaves stand at a node"); the botanical word "alternate"
+   has always covered both the distichous and the spiral arrangement, and the
+   divergence is the parameter that was missing, not a redefinition.
+
+   THE RANGE STOPS AT A QUARTER TURN, a decision made without a ruling (one
+   constant to widen): every spiral fraction a stem shows — 1/2, 1/3, 2/5, 3/8,
+   5/13, and the golden limit — lies in [120, 180], and 90 adds the four-ranked
+   case. A divergence d and 360 - d are mirror images, so nothing above 180 is
+   a new arrangement.
+
+   180 IS THE IDENTITY BY CONSTRUCTION, NOT BY A BRANCH: the turn is formed as
+   `(deg / 180) * PI`, and `180 / 180` is exactly 1, so the turn IS `Math.PI`
+   and node i's azimuth is `i * Math.PI` — the pre-ruling expression, the same
+   double. (`deg * PI / 180` is not: `180 * PI` rounds before the division.)
+
+   A FLORET'S ALTERNATE IS NOT THE LEAF'S AND STAYS DISTICHOUS: the floret has
+   no divergence control, so its callers pass `DISTICHOUS_TURN` by name — an
+   explicit argument rather than a default, so a leaf caller that forgot the
+   divergence would throw instead of silently drawing 180. */
+export const LEAF_DIVERGENCE_RANGE = Object.freeze([90, 180]);
+export const LEAF_DIVERGENCE_DEFAULT = 180;
+export const DISTICHOUS_TURN = Math.PI;
+export function divergenceTurn(deg) { return (Number(deg) / 180) * Math.PI; }
+export function leafDivergenceDeg(state) {
+  const asked = Number(state.leafDivergence);
+  if (!Number.isFinite(asked)) throw new Error(`leafDivergenceDeg: the state carries no leafDivergence (${state.leafDivergence}) — a state built without the registry's DEFAULTS, which would otherwise draw 180 in silence`);
+  return Math.min(LEAF_DIVERGENCE_RANGE[1], Math.max(LEAF_DIVERGENCE_RANGE[0], asked));
+}
+export function leafDivergenceTurn(state) { return divergenceTurn(leafDivergenceDeg(state)); }
+export function leafAzimuths(phyllo, i, alternateTurn) {
   if (phyllo === 'opposite') { const b = i * Math.PI / 2; return [b, b + Math.PI]; }
   if (phyllo === 'whorled') { const b = i * (Math.PI / 4); return [b, b + 2 * Math.PI / 3, b + 4 * Math.PI / 3]; }
-  return [i * Math.PI];
+  if (!Number.isFinite(alternateTurn)) throw new Error(`leafAzimuths: an alternate arrangement needs its divergence turn (got ${alternateTurn}) — a leaf passes leafDivergenceTurn(state), a floret DISTICHOUS_TURN`);
+  return [i * alternateTurn];
 }
 
 /* THE NODES, IN MILLIMETRES DOWN FROM THE HUB'S UNDERSIDE — the one owner.
@@ -14357,13 +14421,13 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
   const nodesClamped = nodeDepthsMm.length < nodesAskedEff;
   const azimuths = shared
     ? nodeDepthsMm.map((_, i) => inflo.azimuths[i].slice())
-    : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
+    : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, leafDivergenceTurn(state)));
   /* THE PETIOLE. Its root radius is the WALL'S MID-THICKNESS — Phase A's
      ruling — and its radius is `partRadius`'s own rule, the one every rod in
      this file already uses (the filament's and the style's). */
   const rootR = rodWallRootMm(stem);
   const petioleR = petioleR0;
-  /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null at prominence
+  /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null with both node amounts
      0). Two things move with them and nothing else does: every petiole roots
      on the DISPLACED axis at its own depth (`nodeOffsets`), and the clearance
      reads the SWOLLEN radius — #296 §3 measured a short leaf's blade base
@@ -14447,6 +14511,10 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     /* the length each node's blade is BUILT to (null off a raceme), and the
        cap's record */
     nodeLengthsMm, nodePetioleLenMm, lengthCap: capRec, phyllotaxy: shared ? inflo.phyllotaxy : phyllo,
+    /* the ALTERNATE divergence the azimuths were built at (degrees, clamped),
+       or null where it reaches nothing — opposite, whorled, or a raceme's
+       shared node (the pedicels' arrangement, distichous). */
+    divergenceDeg: !shared && phyllo === 'alternate' ? leafDivergenceDeg(state) : null,
     nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm, nodeOffsets, nodeOuterR,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
     nodesAsked: nodesAskedEff, nodesBuilt: nodeDepthsMm.length, nodesClamped,
@@ -15995,7 +16063,7 @@ export function floretPairClasses(phyllo, n, dMax) {
   const out = [], seen = new Set();
   const red = (x) => { let w = x % TAU; if (w < 0) w += TAU; return w; };
   for (let i = 0; i < n; i++) for (let d = 0; d <= Math.min(dMax, n - 1 - i); d++) {
-    const A = leafAzimuths(phyllo, i), B = leafAzimuths(phyllo, i + d);
+    const A = leafAzimuths(phyllo, i, DISTICHOUS_TURN), B = leafAzimuths(phyllo, i + d, DISTICHOUS_TURN);
     for (let p = 0; p < A.length; p++) for (let q = 0; q < B.length; q++) {
       if (d === 0 && q <= p) continue;
       const a = red(A[p]), b = red(B[q]);
@@ -16148,7 +16216,7 @@ export function inflorescencePlan(state, stem, acc) {
      makes the TOP node's inset conservative for every node (each lower node is
      deeper by at least the pitch), and the distinct azimuths are few (two,
      four, or whorled's rotating set), each a pass over the unit's vertices. */
-  const reachAzimuths = [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i)).flat())];
+  const reachAzimuths = [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN)).flat())];
   const reachOf = (exportMode) => {
     let top = -Infinity;
     for (const az of reachAzimuths) {
@@ -16218,7 +16286,7 @@ export function inflorescencePlan(state, stem, acc) {
   const sameNodeMayTouch = pitchLive.sameNodeMayTouch || pitchExport.sameNodeMayTouch;
   const nodeDepthsMm = leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, pitchFloorMm);
   const nodesClamped = nodeDepthsMm.length < nodesAsked;
-  const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
+  const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN));
 
   /* ===================================================================
      THE PER-NODE PEDICEL LENGTH (the node-laws session). Two derived laws on
@@ -16445,7 +16513,8 @@ export function floretNodeOverrides(state, plan, az) {
 export const PEDICEL_PINS = Object.freeze({
   inflorescence: 'NONE',      // a floret is one flower, never a raceme of its own
   leafLength: 0,              // no leaves on a pedicel
-  stemNodeProminence: 0,      // no nodes on a pedicel (ruling 6)
+  stemNodeSwelling: 0,        // no nodes on a pedicel (ruling 6) — neither half of the node (the split, Oct 6)
+  stemNodeKink: 0,
   stemCut: 'FLAT',            // no florist's cut on a pedicel (ruling 7): its free end is the one rooted THROUGH the rachis wall
 });
 export function floretState(state, plan, lengthMm = plan.pedicelLenMm, az = null) {
@@ -16835,7 +16904,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
        page's own read-back, which is an owner this record does not write. */
     floretState: { inflorescence: fs.inflorescence, leafLength: fs.leafLength, petalCount: fs.petalCount,
       petalLength: fs.petalLength, petalWidth: fs.petalWidth, stemLength: fs.stemLength, stemDiameter: fs.stemDiameter,
-      stemNodeProminence: fs.stemNodeProminence, stemCut: fs.stemCut },
+      stemNodeSwelling: fs.stemNodeSwelling, stemNodeKink: fs.stemNodeKink, stemCut: fs.stemCut },
   };
 }
 

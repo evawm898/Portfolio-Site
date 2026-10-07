@@ -83,7 +83,7 @@ const wide = records({});
 const solid = records({ stemDiameter: 3 });
 const flat = records({ stemDiameter: 6, stemCut: 'FLAT' });
 const short = records({ stemLength: 1, stemDiameter: 3 });
-const noded = records({ stemLength: 100, stemNodeProminence: 1 });
+const noded = records({ stemLength: 100, stemNodeSwelling: 1, stemNodeKink: 1 });
 
 /* ---- the baselines: silent, and not vacuous ---- */
 {
@@ -143,7 +143,7 @@ for (const p of plants) {
 }
 /* ---- ID4's pin for the cut ---- */
 {
-  const F = { inflorescence: 'NONE', leafLength: 0, stemNodeProminence: 0, stemCut: 'FLAT' };
+  const F = { inflorescence: 'NONE', leafLength: 0, stemNodeSwelling: 0, stemNodeKink: 0, stemCut: 'FLAT' };
   const U = { stemPresent: true, stemNodeCount: 0, stemStationCount: 2, stemCutOn: false, stemCutMade: false, stemCutEmitted: false };
   const base = pedicelPinClauses(F, U);
   say(`BASELINE pedicel pin: ${base.length} message(s)`);
