@@ -448,6 +448,29 @@ export const PAIRS = [
     cite: "bloom-geometry.js — `cAt(u, r)` composes the two into ONE cup coefficient, so they are one term and two controls in the strictest sense available here; docs/bloom-combination-gate.md §3",
     why: 'the amplitude and its along-blade ramp compose multiplicatively at the tip, which is where the two margins are nearest to begin with',
   },
+  {
+    id: 'leafarch-x-angle',
+    tier: 2,
+    label: 'leafArch x leafAngle — the arched blade against the stem it hangs off',
+    measure: 'leaf-stem',
+    base: { stemLength: 70, leafLength: 52, leafWidth: 17, leafNodes: 3 },
+    a: { id: 'leafArch', values: [0, 90, 180, -90] },
+    b: { id: 'leafAngle', values: [35, 0, 60, 85] },
+    /* NEW WITH LEAF/STEM BUILD S2. The arch is a uniform turn measured from
+       the blade's own start direction. A POSITIVE arch arches the blade OVER
+       and down (the carnation's recurve) — away from the stem, so at 35 and
+       60 deg it moves this measure by exactly nothing (the near point stays
+       the blade's base). A NEGATIVE arch curls the blade UP and inward, and
+       at -90 on a leaf already at 60 deg the tip comes round onto the stem
+       above its own node: 1.851 mm alone, 0.000 with the arch — a cell no
+       single axis reaches. The arch is the first leaf control that moves the
+       blade toward the stem from anywhere but its base. Declared at what this
+       tree measures; the grid is the shipped range's ends and the ruled
+       defaults, nothing tuned. */
+    verdict: 'single-reaches',
+    cite: "bloom-geometry.js — `leafSurface`'s arc (the petal's own `arcStep` on the leaf's frame, turn = −leafArch); docs/bloom-leaf-emitter-arch-cup-outcome.md carries the grid",
+    why: 'the arch turns the blade about its own base, so the tip of a leaf curled UP (negative arch) travels toward the stem it hangs off, and a steeper leaf starts nearer it',
+  },
 
   /* ------------------------------------------------------------ TIER 3
      GUESSES, SAID PLAINLY. No citation on the pair itself and no shared
@@ -969,12 +992,19 @@ export const COMBINATION_XFAIL = Object.freeze({
 
   /* THE LEAF CELLS — `leafAngle`'s hazard, at every stem diameter, which
      is what CG4's `single-reaches` arm asserts about this pair. */
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=6': { mm: 0.824, note: "docs/bloom-leaves-outcome.md's own figure (0.824), reproduced exactly through an instrument that shares no code with the one that produced it." },
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=3': { mm: 0.826, note: 'measured 2026-09-19 on 937263a.' },
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=12': { mm: 0.822, note: "measured 2026-09-19 on 937263a — 0.002 mm from the 6 mm stem's reading, which is the whole of what the second control contributes." },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=6': { mm: 0.821, note: "docs/bloom-leaves-outcome.md's own figure (0.824), reproduced exactly through an instrument that shares no code with the one that produced it. RE-RECORDED 0.824 -> 0.821 by leaf/stem build S2: the leaf's margin closes on the bead now, and the near point to the stem is at the blade's base margin, where the bead's profile replaces the flat wall's corner." },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=3': { mm: 0.822, note: 'measured 2026-09-19 on 937263a. RE-RECORDED 0.826 -> 0.822 by S2 (the bead at the base margin).' },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=12': { mm: 0.821, note: "measured 2026-09-19 on 937263a — 0.002 mm from the 6 mm stem's reading, which is the whole of what the second control contributes. RE-RECORDED 0.822 -> 0.821 by S2 (the bead at the base margin)." },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=6': { mm: 0, note: "docs/bloom-leaves-outcome.md's 80-90 deg cell: the blade reaches the stem's own surface. `LEAVES: the STEEP angle (85 deg)` is a shipped MATRIX ROW, so this hazard was reachable, built and exported on every full gate run — nothing measured it." },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=3': { mm: 0, note: 'measured 2026-09-19 on 937263a.' },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=12': { mm: 0, note: 'measured 2026-09-19 on 937263a.' },
+  /* leafarch-x-angle (leaf/stem build S2): the arch's own grid. Four cells are
+     the 85 deg column, which the angle reaches alone; ONE is the product. */
+  'leafarch-x-angle @ leafArch=0 x leafAngle=85': { mm: 0, note: 'a SINGLE-axis cell — the 85 deg blade reaches the stem with no arch at all (`leafangle-x-stem @ leafAngle=85` declares the same state). Measured on the S2 tree.' },
+  'leafarch-x-angle @ leafArch=90 x leafAngle=85': { mm: 0, note: 'the angle\'s own hazard under an over-arch; the arch moves nothing toward the stem from 85 deg. Measured on the S2 tree.' },
+  'leafarch-x-angle @ leafArch=180 x leafAngle=85': { mm: 0, note: 'as the cell above, at the arch\'s maximum. Measured on the S2 tree.' },
+  'leafarch-x-angle @ leafArch=-90 x leafAngle=60': { mm: 0, note: 'THE PRODUCT: 60 deg alone reads 1.851 mm and -90 alone (at 35 deg) 4.018; together the up-curled tip comes round onto the stem above its own node. No single axis reaches it. Measured on the S2 tree.' },
+  'leafarch-x-angle @ leafArch=-90 x leafAngle=85': { mm: 0, note: 'the angle\'s own hazard, curled. Measured on the S2 tree.' },
 
   /* ================================================== TIER 2 (#265)
      Every entry below was produced by `--emit` on this tree at c29a8b5
@@ -1088,9 +1118,9 @@ export const COMBINATION_XFAIL = Object.freeze({
      own two failing angles re-read three times each. They are declared
      because CG2 declares every cell under the bar and an undeclared one
      is a red; what they are worth is the inertness record above them. */
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.26': { mm: 0.824, note: "a SINGLE-axis cell, and the same state `leafangle-x-stem @ leafAngle=70 x stemDiameter=6` declares at the same 0.824. Measured 2026-09-19 on c29a8b5." },
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.6': { mm: 0.824, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the cell above it; the teeth do not reach this measure.' },
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=1': { mm: 0.824, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the two cells above it.' },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.26': { mm: 0.821, note: "a SINGLE-axis cell, and the same state `leafangle-x-stem @ leafAngle=70 x stemDiameter=6` declares at the same figure. Measured 2026-09-19 on c29a8b5 at 0.824; RE-RECORDED 0.821 by S2 (the bead at the base margin)." },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.6': { mm: 0.821, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the cell above it; the teeth do not reach this measure. RE-RECORDED 0.824 -> 0.821 by S2.' },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=1': { mm: 0.821, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the two cells above it. RE-RECORDED 0.824 -> 0.821 by S2.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=0.26': { mm: 0, note: 'a SINGLE-axis cell: the blade reaches the stem surface at 85 deg whatever the teeth do. Measured 2026-09-19 on c29a8b5.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=0.6': { mm: 0, note: 'measured 2026-09-19 on c29a8b5.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=1': { mm: 0, note: 'measured 2026-09-19 on c29a8b5.' },
