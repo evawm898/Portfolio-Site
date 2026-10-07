@@ -55,7 +55,7 @@
    RUN: node tools/verify-bloom-edge-profile.mjs [--all] [--only <regex>]
         node tools/verify-bloom-edge-profile.mjs --control     (REQUIRED
         before quoting a pass from a changed harness: it rewrites
-        bloom-geometry.js five ways and each mutation must redden the clause
+        bloom-geometry.js several ways and each mutation must redden the clause
         it names and no clause it does not.)
    ========================================================================= */
 import fs from 'node:fs';
@@ -155,6 +155,24 @@ const E2_TURN_BAND_DEG = 5e-5;
    change that moved it (#283 and #289), and this is where it is named. The
    ruling on whether a nibbed bead may turn past the allowance is Eva's. */
 const E2_TURN_XFAIL = {
+  /* LEAVES ENTERED E2's SUBJECT WITH LEAF/STEM BUILD S2 (the blade through
+     `emitPanel`; before it a leaf closed on a flat 90-degree wall that no
+     clause here read). Four smoke rows exceed the allowance and every site is
+     where the BLADE IS NARROW — 1.6 to 2.9 mm across against a 1.2 mm sheet
+     (a sinus cut to the print floor, a 3-6 mm blade near its base, an acute
+     tip's stub): the narrow-span clamp shrinks the bead and the skin turns
+     into it harder than the 45 deg allowance. Declared at the measured
+     magnitude, never widened; the flat wall they replace turned 90 deg at
+     every one of them. Located by (u, v) on each leaf's own surface in
+     docs/bloom-leaf-emitter-arch-cup-outcome.md. */
+  'LEAVES: tip shape ACUTE (0.60 — the floor; the 1.6 mm terminal stub is at its longest)':
+    { excessDeg: 0.501270, note: 'NEW with S2 (leaves through emitPanel): adds 45.501270 deg; face-to-face 45.63, outline 0.13 — a serration sinus cut to the print floor (h 0.80 mm at u 0.652, v -0.95), the narrow-span clamp' },
+  'LEAF POSE: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, arched linear leaves (60 x 6 mm, arch 90, cup 0.6, entire)':
+    { excessDeg: 1.666347, note: 'NEW with S2: adds 46.666347 deg; face-to-face 48.06, outline 1.39 — a 6 mm blade near its base (h 1.45 mm at u 0.099, v -0.95), the narrow-span clamp' },
+  'TOOTH FLOOR: a 5 mm blade (the count GIVES — 9 asked, fewer fit a 1 mm notch)':
+    { excessDeg: 0.446864, note: 'NEW with S2: adds 45.446864 deg; face-to-face 45.78, outline 0.34 — a floored sinus on a 5 mm blade (h 1.06 mm at u 0.848, v 0.95), the narrow-span clamp' },
+  'TOOTH FLOOR: a 3.5 mm blade (NO ROOM — the widest point has 0.95 mm over the print floor)':
+    { excessDeg: 1.321726, note: 'NEW with S2: adds 46.321726 deg; face-to-face 46.73, outline 0.41 — a 3.5 mm blade near its base (h 1.43 mm at u 0.224, v -0.95), the narrow-span clamp' },
   'TUBE: GATED — the buckle (unavailable, inert)':
     { excessDeg: 3.295065, note: 'NEW with the tube PR\'s smoke block 45: adds 48.295065 deg; face-to-face 56.43, outline 8.14 — the BUCKLE\'s out-of-plane class (the tube is unavailable and inert on this row, so this is the buckle alone)' },
   'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)':
@@ -518,7 +536,7 @@ function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm, r
 
 async function runRows(G, rows, fails, notes, fullSet = false) {
   const check = (clause, ok, msg) => { if (!ok) fails.push(`${clause}: ${msg}`); return ok; };
-  let profiles = 0, worstTurn = 0, worstCorner = 0, worstRamp = 0, minRim = Infinity, clamps = 0;
+  let profiles = 0, worstTurn = 0, worstCorner = 0, worstRamp = 0, minRim = Infinity, clamps = 0, leafRows = 0, leafApexAll = 0;
   let done = 0;
   const declaredSeen = new Set();
   for (const row of rows) {
@@ -535,6 +553,17 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       const rim = [], rimE2 = [];
       for (const p of (built.petalsAll || [])) if (p && p.rim) { rim.push(p.rim); if (!cutsAPattern(p)) rimE2.push(p.rim); }
       for (const s of (built.sepals && built.sepals.built) || []) if (s && s.rim) { rim.push(s.rim); if (!cutsAPattern(s)) rimE2.push(s.rim); }
+      /* LEAVES ARE IN THE SUBJECT (leaf/stem build S2): the blade goes through
+         `emitPanel` and closes on the same bead, so every clause here asks of
+         a leaf rim what it asks of a petal's. A leaf row whose leaves carry no
+         treated rim at all is E0's — the treatment silently not reaching the
+         leaves would otherwise leave this whole family green over them. */
+      let leafApex = 0;
+      for (const l of built.leavesBuilt || []) if (l && l.rim) { rim.push(l.rim); rimE2.push(l.rim); leafApex += (l.rim.apex || []).length; }
+      if ((built.leavesBuilt || []).length) {
+        check('E0', leafApex > 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${built.leavesBuilt.length} leaves built and none carries a treated rim — the bead did not reach the leaves`);
+        leafRows++; leafApexAll += leafApex;
+      }
       const apexRecs = rim.flatMap((r) => r.apex || []);
       const clampRecs = rim.flatMap((r) => r.clamps || []);
       per[exportMode ? 'export' : 'live'] = { tris: mesh.tris, apexes: apexRecs.length };
@@ -681,7 +710,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
         check('E2', turn.edges > 0, `${row.label}: no edge lies within ${RIM_NEAR_MM} mm of a treated apex — the window found nothing to measure`);
         const declared = E2_TURN_XFAIL[row.label];
         if (!declared) {
-          check('E2', turn.deg < DIH_BAR, `${row.label}: the treatment adds ${turn.deg.toFixed(6)} deg of turn within ${RIM_NEAR_MM} mm of a rim, at or over the ${DIH_BAR} deg allowance (the face-to-face turn there is ${turn.raw.toFixed(2)} deg and the OUTLINE's own turn is ${turn.outline.toFixed(2)})`);
+          check('E2', turn.deg < DIH_BAR, `${row.label}: the treatment adds ${turn.deg.toFixed(6)} deg of turn within ${RIM_NEAR_MM} mm of a rim, at or over the ${DIH_BAR} deg allowance (the face-to-face turn there is ${turn.raw.toFixed(2)} deg and the OUTLINE's own turn is ${turn.outline.toFixed(2)}) at [${turn.at ? turn.at.map((x) => x.toFixed(3)).join(', ') : '?'}]`);
         } else {
           /* BOTH DIRECTIONS. A declaration is a record of the tree, and a
              record that stops reproducing is stale whether the row got worse
@@ -712,7 +741,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       check('E2', declaredSeen.has(label), `E2_TURN_XFAIL declares "${label}" and no row of this gate carries that label — a declaration nothing evaluates`);
     }
   }
-  notes.push(`declared surface-turn rows ${declaredSeen.size} of ${Object.keys(E2_TURN_XFAIL).length} · rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn the treatment ADDS ${worstTurn.toFixed(2)} deg (allowance ${DIH_BAR}, over and above the outline's own) · worst EXCESS at an outline corner ${worstCorner.toFixed(2)} deg · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default)`);
+  notes.push(`declared surface-turn rows ${declaredSeen.size} of ${Object.keys(E2_TURN_XFAIL).length} · rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn the treatment ADDS ${worstTurn.toFixed(2)} deg (allowance ${DIH_BAR}, over and above the outline's own) · worst EXCESS at an outline corner ${worstCorner.toFixed(2)} deg · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default) · leaf row-modes ${leafRows}, leaf treated profiles ${leafApexAll}`);
   return { profiles, worstTurn, worstCorner, minRim, clamps };
 }
 
@@ -793,6 +822,19 @@ const MUTATIONS = [
      loosening: a smaller bead radius is a different surface, so the buckle
      row's declared excess moves 6.236137 -> 6.526126 deg. Named as collateral,
      because the honest remedy for an unclaimed red that is real is to name it. */
+  /* LEAVES (leaf/stem build S2). The blade goes through `emitPanel`, so every
+     mutation above reaches leaves through the shared emitter (the leaf row in
+     CONTROL_ROWS is what makes each of them ask a leaf too); this one reaches
+     the LEAF alone and is what says the leaves are in this gate's subject
+     rather than merely sharing its code. A leaf whose rim record is dropped
+     still exports watertight with its bead; E0's leaf clause is the only
+     thing that sees it. (A leaf handed HALF its sheet was tried as a second
+     and fires nothing, correctly: the taper eases toward the floor and never
+     raises a sheet already under it, so a thinner body is a law-abiding rim
+     and E1 reads it as one. Not a mutant of this gate.) */
+  { id: 'the-leaf-rim-is-not-recorded', breaks: ['E0'],
+    from: "emitPanel(acc, rows, { label: 'leaf', rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] }, () => t, rim);",
+    to:   "emitPanel(acc, rows, { label: 'leaf', rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] }, () => t, null);" },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
@@ -906,6 +948,7 @@ async function control() {
     'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',  // a fringe's teeth
     'LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', // a lobed margin
     'THIN: ALL THIN',                                                           // a thin sheet
+    'LEAVES: alternate x 3 nodes at the ruled 35 deg',                          // a leaf's margin (S2)
   ];
   const missingRows = CONTROL_ROWS.filter((l) => !MATRIX.some((r) => r.label === l));
   if (missingRows.length) { console.error(`edge-profile control: the named control row(s) ${missingRows.map((l) => `"${l}"`).join(', ')} are not in the matrix — an arm of the rim law would be exercised by nothing`); process.exit(1); }
@@ -921,13 +964,14 @@ async function control() {
       ['FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth', (p) => !!(p.fringe && p.fringe.built && p.fringe.count > 0), 'fringe teeth built'],
       ['LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', (p) => !!(p.lobes && p.lobes.countBuilt > 0 && !p.lobes.noRoom), 'lobes cut'],
       ['THIN: ALL THIN', (p) => !!(p.thickness && p.thickness.floorBinds), 'the export floor binding on the sheet'],
+      ['LEAVES: alternate x 3 nodes at the ruled 35 deg', (p, b) => b.leavesBuilt.length > 0, 'leaves built'],
     ];
     const lost = [];
     for (const [l, ok, what] of arm) {
       const row = rows.find((r) => r.label === l);
       const acc = new G0.MeshBuilder({ exportMode: true });
       const b = G0.buildBloomInto(acc, stateFor(row), { below: null, capability: row.capability || null });
-      if (!b.petal || !ok(b.petal)) lost.push(`"${l.slice(0, 60)}" no longer has ${what}`);
+      if (!b.petal || !ok(b.petal, b)) lost.push(`"${l.slice(0, 60)}" no longer has ${what}`);
     }
     if (lost.length) { console.error(`edge-profile control: a named control row stopped exercising its arm — ${lost.join('; ')}`); process.exit(1); }
   }

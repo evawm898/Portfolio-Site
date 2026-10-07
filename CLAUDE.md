@@ -3569,6 +3569,39 @@ there; (c) is the witness — declared). LF5 now holds node *i*'s first leaf at 
 from the controls. Block 52 (12 rows); blocks 41/47/48 set both halves, labels verbatim.
 `frozen/phase54` is the 1,144 rows at `f4b5baa`. Sheet: `docs/img/node-split.png`.
 
+**LEAVES CLOSE ON THE PETAL'S BEAD, ARCH ALONG THEIR LENGTH, TAKE A CUP CONTROL, AND THEIR TEETH ARE
+FLOORED AT `MIN_FEATURE_MM`** (Eva's rulings, Oct 6 — leaf/stem build S2; read
+`docs/bloom-leaf-emitter-arch-cup-outcome.md` before touching `leafSurface`, `buildLeafInto`'s
+`emitPanel` call, `leafArchRiseMm`, `cap.toothReliefFloorMm`, the lobe block's `sinusesFit` /
+`reliefBuiltMm`, SN4's arc reach or LF11-LF13). `leafSurface` is the leaf's surface law (the
+`petalSurface` shape) and the blade goes through `emitPanel` — row 0 BURIED (the petiole holds it), the
+last row the exposed tip, **columns 11 -> `NV` 10 so the MIDRIB COLUMN IS GONE** (nothing measured
+depends on it), the 1.60 mm stub now beaded (a leaf apex nib is its own ruling). **2,548 -> 3,044
+triangles a leaf, fixed**; the worst leaf corner (24 leaves, whorled x 8) is 99,946 for the bloom, 6.66%
+of budget. `leafArch` (Leaves, −90..180°, step 5, default 0 — **POSITIVE ARCHES THE TIP DOWN**, the
+opposite sign to the petal's spine curl, `petalSpineCurl = −leafArch`) is the petal's own uniform arc
+through `arcStep` on the leaf frame; `leafCup` (−0.8..1.2, default `LEAF_CUP` 0.35) is the petal cup's
+coefficient. **The inset is arch-aware** (`leafArchRiseMm`, `L sin θ` verbatim at arch 0, restated in the
+harness as `restatedLeafRiseMm`), and **SN4 measures an arched blade's reach ALONG ITS ARC** (each emitted
+vertex footed on the arc's circle; a straight projection is shortened by the bend — it went red first).
+**THE FLOOR IS THE RELIEF AT EVERY MARGIN SINUS** (`max(asked, 1.00)`), the count GIVES where a sinus
+lacks the material (asked kept on the slider, built and cause on the read-out, NO ROOM `'relief floor'`
+when none fits), the even-count face notch exempt, the pitch already floored, LEAVES ONLY (petal lobes
+untouched), the constant never the mode's floor. **50 MOVERS / 1,106 HOLDERS** over the base's 1,156 rows,
+predeclared from the BASE tree's builder record, everything outside the leaf block identical, the
+mid-surface law reproducing 551,760 of 551,760 base skin vertices where the floor does not bind (5 rows
+exempt by the base's own profile record), **11 shared-node rows' seating moved up to 0.196 mm** because
+the offset reads the emitted blade's reach and the bead changed it (`bladeReachMm`, declared), and the
+/plot grid bytes unmoved — `node tools/verify-bloom-leaf-bytes.mjs --change emitter --base <worktree>`
+(`--shard k/n`; four controls, one a clause). **E2 on leaves**: the leaf rims are E's subject now, and four
+smoke rows where the blade is 1.6-2.9 mm across turn 0.4-1.7° past the 45° allowance under the
+narrow-span clamp — declared in `E2_TURN_XFAIL`, never widened. Combination gate: six `leafAngle 70`
+cells re-record 0.001-0.004 mm CLOSER (the bead at the base margin); `leafarch-x-angle` is new, and arch
+−90 on a 60° leaf reaches the stem where neither alone does. Block 53 (18 rows, 1,174), smoke block 53,
+four apex mutants, `frozen/phase55` = the 1,156 rows at `eb75119`. Sheet: `docs/img/leaf-edge-arch-cup.png`.
+**RULED (Eva, Oct 7): both ranges KEPT as shipped (arch −90..180 with the extremes reachable and declared,
+cup the petal's −0.8..1.2) and the floored serration ACCEPTED as built** — §8 of the outcome doc.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,

@@ -57,7 +57,8 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
-         LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT } from './bloom-geometry.js';
+         LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT,
+         LEAF_ARCH_RANGE, LEAF_ARCH_STEP, LEAF_CUP, LEAF_CUP_RANGE } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -3850,6 +3851,41 @@ export const CONTROLS = [
     fmt: (v) => { const a = Number(v), over = 90 - Math.abs(a);
       return `${a} deg from horizontal (${a < 0 ? 'drooping' : a === 0 ? 'level' : 'rising'}) · ${over} deg overhang from vertical${over > 45 ? ' — PAST the classic 45, supports likely' : ''}`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  /* THE POSE (Eva's ruling, Oct 6 — leaf/stem build S2): the leaf ARCHES along
+     its length and its CUP is a control. Each is the petal's own law on the
+     LEAF's own value (`leafBladeState` maps them, the serration split's rule),
+     and each defaults to today's pose — a flat arch and the old 0.35 constant —
+     so a leaf that shipped is unmoved by the controls. The arch is DEGREES OF
+     TOTAL TURN along the blade with POSITIVE ARCHING THE TIP DOWN (the
+     carnation's fall), the opposite sign to the petal's spine curl, and the
+     ranges are both IMPORTED from the geometry (Q6) and both RULED KEPT (Eva,
+     Oct 7): the arch's -90..180 and the cup's the petal cup's own. */
+  { id: 'leafArch', section: 'leaves', kind: 'slider',
+    min: LEAF_ARCH_RANGE[0], max: LEAF_ARCH_RANGE[1], step: LEAF_ARCH_STEP, default: 0,
+    label: 'Arch',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      if (a === 0) return '0° — flat along its length';
+      const L = Number(ui.leafLength) || 0;
+      const r = L > 0 ? (L / (Math.abs(a) * Math.PI / 180)) : null;
+      const b = shown && shown.leaf && shown.leaf.archBuilt && shown.leaf.archBuilt[0];
+      return `${a}° — the tip ${a > 0 ? 'falls away (arching down)' : 'curls up'}${r ? ` · a ${r.toFixed(1)} mm radius over the blade` : ''}${b && b.underFloor ? ' — UNDER ONE SHEET THICKNESS (told, never clamped)' : ''}`;
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafCup', section: 'leaves', kind: 'slider',
+    min: LEAF_CUP_RANGE[0], max: LEAF_CUP_RANGE[1], step: 0.01, default: LEAF_CUP,
+    label: 'Cup',
+    /* The edge lift in mm at the widest point — the petal cup's own read-out
+       quantity, `cup x half-width` — and the fold clamp told from the SHOWN
+       build's record (the stamen spread's precedent). */
+    fmt: (v, ui, shown) => {
+      const c = Number(v);
+      const h = Number(ui.leafWidth) / 2;
+      const cl = shown && shown.leaf && shown.leaf.cupBuilt && shown.leaf.cupBuilt[0] && shown.leaf.cupBuilt[0].clamp;
+      const base = c === 0 ? '0.00 — a flat section' : `${c.toFixed(2)} — the margins ${c > 0 ? 'lifted' : 'turned down'} ${Math.abs(c * h).toFixed(2)} mm at the widest point`;
+      return base + (cl && cl.u !== null ? ` · CLAMPED at u ${Number(cl.u).toFixed(3)}, where the blade narrows (the section may not fold through its own skins)` : '');
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
 
   /* THE TIP SHAPE (Eva, the leaf tip-shape session: "it always shows as this
      very thick tip when it should be coming to a point, or at least have the
@@ -3905,7 +3941,11 @@ export const CONTROLS = [
   { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
     min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: 9,
     label: 'Teeth',
-    fmt: (v) => `${Math.round(Number(v))} along each margin`,
+    /* THE COUNT IS TEETH OVER THE WHOLE RIM — both margins and the apex — and
+       not "along each margin", which this label said until leaf/stem build S2:
+       MODEL B's count is the free-standing teeth between adjacent sinuses over
+       the treated arc (session 42), so 9 is four a margin plus one at the tip. */
+    fmt: (v) => `${Math.round(Number(v))} in all — both margins and the tip`,
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
   { id: 'leafCrestShape', section: 'leafSerration', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,

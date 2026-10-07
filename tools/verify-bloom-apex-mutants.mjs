@@ -631,9 +631,13 @@ const MUTANTS = [
        LOBE_RELIEF_GRID moved the line this edits, and the table reported
        MUTATION DID NOT APPLY rather than passing falsely — which is the one
        thing that makes a disarmed mutant survivable. Fourth instance here of
-       a refactor disarming a mutant; the anchor check is what says so. */
-    find: '    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefAskedMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);',
-    into: '    const reliefMm = sinusD.map(() => Math.floor(Math.min(reliefAskedMm, headroomAt(uPk)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);', names: ['L5'],
+       a refactor disarming a mutant; the anchor check is what says so.
+       RE-ANCHORED AGAIN (leaf/stem build S2): the leaf's tooth floor puts the
+       BUILT relief in that line where the asked one stood (the same double
+       wherever no floor is set — every petal), and the pre-check reported the
+       anchor at 0 matches before any mutant ran. */
+    find: '    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefBuiltMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);',
+    into: '    const reliefMm = sinusD.map(() => Math.floor(Math.min(reliefBuiltMm, headroomAt(uPk)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);', names: ['L5'],
     witness: (M, C) => {
       const set = { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1 };
       const m = lobeRelief(M, set), c = lobeRelief(C, set);
@@ -1759,6 +1763,45 @@ const MUTANTS = [
         : `the mutant's clamp station is ${m.clamp.fromU} against ${c.clamp.fromU} and its rows ${m.rowsDiffer(c) ? 'moved' : 'held'} — the record did not move on its own`; } },
 
   /* ===================================================================
+     THE LEAF POSE AND THE TOOTH FLOOR (leaf/stem build S2) — LF11, LF12,
+     LF13. Three families were added, so the table runs them, each on a
+     mutation that is the plausible way its control could be wired wrong while
+     both STL gates stay green (an arched, cupped or floored leaf is still one
+     closed blade on its petiole). Every witness reads the MUTATED module's own
+     builder output in Node on the table's S2 row, never the assertion it
+     names. */
+  { id: 'the-leaf-arch-is-ignored', why: 'the blade is built straight whatever the arch slider says, while the plan reports the slider — a dead control with a truthful-looking record beside it',
+    find: '    petalSpineCurl: state.leafArch === undefined || Number(state.leafArch) === 0 ? 0 : -Number(state.leafArch),',
+    into: '    petalSpineCurl: 0,', names: ['LF11'],
+    witness: (M, C) => { const m = leafPoseFacts(M), c = leafPoseFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.arch.turnRad === 0 && c.rep.arch.turnRad !== 0 && m.tipCentreDiffers(c)) ? null
+        : `the mutant's arch turn is ${m.rep.arch.turnRad} against ${c.rep.arch.turnRad} and its tip centre ${m.tipCentreDiffers(c) ? 'moved' : 'held'} — the behaviour did not move`; } },
+  { id: 'the-leaf-cup-is-the-constant', why: 'the blade is cupped by the retired constant LEAF_CUP whatever the cup slider says — the control reaches nothing',
+    find: '    petalCup: state.leafCup === undefined ? LEAF_CUP : Number(state.leafCup),',
+    into: '    petalCup: LEAF_CUP,', names: ['LF12'],
+    witness: (M, C) => { const m = leafPoseFacts(M), c = leafPoseFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.liftDiffers(c) && m.rep.cup.coefficient !== c.rep.cup.coefficient) ? null
+        : `the mutant's margin lifts ${m.liftDiffers(c) ? 'differ from' : 'AGREE with'} the clean tree's — the behaviour did not move`; } },
+  { id: 'the-tooth-floor-is-removed', why: 'the leaf cuts its teeth at whatever relief the depth asks, under the minimum feature — the ruling undone, and every tooth still a closed blade',
+    find: '  cap.toothReliefFloorMm = MIN_FEATURE_MM;',
+    into: '  cap.toothReliefFloorMm = 0;', names: ['LF13'],
+    witness: (M, C) => { const m = leafPoseFacts(M), c = leafPoseFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ms = m.rep.serration, cs = c.rep.serration;
+      return (ms && cs && Math.min(...ms.sinusReliefMm) < 1 && Math.min(...cs.sinusReliefMm) >= 1 - 1e-6) ? null
+        : `the mutant's shallowest sinus relief is ${ms ? Math.min(...ms.sinusReliefMm) : 'n/a'} against the clean tree's ${cs ? Math.min(...cs.sinusReliefMm) : 'n/a'} — the behaviour did not move`; } },
+  { id: 'the-floor-is-recorded-and-not-cut', why: 'the record says the relief was floored to the minimum feature and the outline is cut at the asked relief — the read-out tells a floor the print does not carry',
+    find: '    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefBuiltMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);',
+    into: '    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefAskedMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);', names: ['LF13'],
+    witness: (M, C) => { const m = leafPoseFacts(M), c = leafPoseFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ms = m.rep.serration, cs = c.rep.serration;
+      return (ms && cs && ms.reliefBuiltMm === cs.reliefBuiltMm && ms.reliefFloored && Math.min(...ms.sinusReliefMm) < 1 - 1e-6) ? null
+        : `the mutant's record reads relief ${ms ? ms.reliefBuiltMm : 'n/a'} (floored ${ms ? ms.reliefFloored : 'n/a'}) with a shallowest cut sinus of ${ms ? Math.min(...ms.sinusReliefMm) : 'n/a'} — the record and the cut did not part`; } },
+
+  /* ===================================================================
      THE SEPALS (sepals, part 1) — SP0-SP9. A family was added, so the table
      runs it. Eight mutations, each the plausible way the whorl could be
      wired wrong while both STL gates stay green (a sepal is a closed shell
@@ -2055,6 +2098,24 @@ function sepalFacts(MOD, extra = {}) {
 /* THE LEAF WITNESS — one leaf, alone, from a module's own builder at a given
    tip exponent: the plan's record, the rows the blade was built from and the
    clamp record, so a mutation is judged on what that module EMITS. */
+/* THE S2 LEAF ROW'S STATE — arched and cupped APART from the defaults on a
+   5 mm blade whose teeth the floor reshapes (depth 0.3 asks 0.51 mm of relief;
+   the floor builds 1.00 and the count gives) — and the mutated module's own
+   solo leaf built on it. One state witnesses all four S2 mutants, and it is
+   the table row of the same name. */
+const LEAF_POSE_SET = { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 5, leafNodes: 1, leafArch: 90, leafCup: 0.8, leafToothDepth: 0.3 };
+function leafPoseFacts(MOD) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, ...LEAF_POSE_SET };
+    const acc = new MOD.MeshBuilder({ exportMode: true });
+    const fr = MOD.footRing(st, acc);
+    const plan = MOD.leafPlan(st, MOD.stemPlan(st, fr.hub, acc), acc);
+    const rep = MOD.buildLeafInto(new MOD.MeshBuilder({ exportMode: true }), plan, st, 0, 0);
+    return { rep,
+      tipCentreDiffers(o) { const a = this.rep.rowCentre.at(-1), b = o.rep.rowCentre.at(-1); return a.some((x, i) => x !== b[i]); },
+      liftDiffers(o) { return this.rep.rowMarginLiftMm.some((p, i) => p[0] !== o.rep.rowMarginLiftMm[i][0] || p[1] !== o.rep.rowMarginLiftMm[i][1]); } };
+  } catch (e) { return { threw: e.message }; }
+}
 function leafFacts(MOD, n) {
   try {
     const st = { ...REGISTRY_DEFAULTS, stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 1, leafTipShape: n };
@@ -2250,6 +2311,13 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafPhyllotaxy', value: 'opposite' }, { id: 'leafDivergence', value: '90' }] },
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'leafTipShape', value: '0.6' }] },
+  /* THE S2 LEAF ROW (leaf/stem build S2): arch 90 and cup 0.8 APART from
+     their defaults (a mutation pinning either reads the same as the clean
+     tree at arch 0 / cup 0.35, so the witness state is part of the claim), on
+     a 5 mm blade at tooth depth 0.3 where the floor both raises the relief and
+     gives the count. `LEAF_POSE_SET` above is the same state. */
+  { label: 'a leaf arched 90 and cupped 0.8 on a 5 mm blade whose teeth the floor reshapes (depth 0.3)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '5' }, { id: 'leafNodes', value: '1' }, { id: 'leafArch', value: '90' }, { id: 'leafCup', value: '0.8' }, { id: 'leafToothDepth', value: '0.3' }] },
   /* THE NU COUPLING'S ROW (#303's finding, fixed): the petals ramp to 112
      rows at petalTipShape 3.00, which is the ONLY state where a leaf reading
      the petals' NU and a leaf reading its own 56 disagree — at the default

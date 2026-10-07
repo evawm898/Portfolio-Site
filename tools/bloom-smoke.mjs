@@ -1162,6 +1162,31 @@ export const SMOKE_BLOCKS = [
         path: "LF5's node-to-node turn restated WITHOUT the divergence on an opposite stem — the hidden slider at its floor must move no leaf; the registry's leafDivergenceLive is false here" },
     ],
   },
+  {
+    n: 53, title: 'the leaf through emitPanel, the arch, the cup and the tooth floor (Oct 6, S2)',
+    anchor: "LEAF POSE: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, arched linear leaves (60 x 6 mm, arch 90, cup 0.6, entire)",
+    /* FIVE ROWS: the carnation (the headline — LF11's arc on four decussate
+       nodes over a swollen stem, LF12's cup at 0.6, an entire margin), the arch
+       at its maximum with the cup at its maximum (LF11's arc at 180 and LF12's
+       FOLD CLAMP binding at the stub), the upward arch that rises above its
+       chord (LF4's restated rise — the inset must read the arc), the relief
+       floor GIVING the count on a narrow blade (LF13's cause biconditional and
+       its sinus reliefs), and the shallow depth FLOORED up (LF13's built
+       relief). Every block-33 leaf row already in this subset is an emitter
+       mover, so the bead and E1-E6 on a leaf rim are exercised there. */
+    rows: [
+      { label: "LEAF POSE: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, arched linear leaves (60 x 6 mm, arch 90, cup 0.6, entire)",
+        path: "LF11's arc restated from the controls on eight leaves over four decussate nodes of a SWOLLEN stem (the petiole's emitted ring is the arc's start, the node offset included); LF12's lift at cup 0.6; LF7/LF13 inert at depth 0; ST12's swelling arm beside the leaves" },
+      { label: 'LEAF POSE: arch 180 x cup 1.2 (both at their maxima)',
+        path: "LF11 at the arch's maximum (the centreline and the frame normal both on the arc) and LF12 with the FOLD CLAMP restated — the cup is clamped where the blade narrows to its stub, read back off the margin lift" },
+      { label: 'LEAF POSE: arch -30 (an upward arch rising HIGHER than its chord — LF4 restates the arc)',
+        path: "LF4's inset biconditional against the ARC's rise (higher than L sin theta by the mean value theorem) restated from the controls, and LF11 with the arch negative" },
+      { label: 'TOOTH FLOOR: a 5 mm blade (the count GIVES — 9 asked, fewer fit a 1 mm notch)',
+        path: "LF13 — the count clamped by the relief floor as a biconditional, every margin notch at or over 1.00 mm in the record AND in the outline, the relief FLOORED up; LF7's re-derived arm (teeth are still cut)" },
+      { label: 'TOOTH FLOOR: a 3.5 mm blade (NO ROOM — the widest point has 0.95 mm over the print floor)',
+        path: "LF13's necessary condition (no tooth where even the widest point has under 1.00 mm of headroom over the print floor) and LF7's re-derived NO ROOM arm" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
