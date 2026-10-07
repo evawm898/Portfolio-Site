@@ -2550,3 +2550,264 @@ merged. LB1's restated keep list drops them. The library holds 53 shapes.
 - the gallery before and after the merges, drawn from each tree's own library data.
 
 Every number on the sheet is read off the model each tree built.
+
+## 16. The wing–body junction blend
+
+Eva, from the live page (Oct 6): where the wings meet the body there were awkward thin gaps —
+**(a)** a narrow wedge between the forewing's leading edge and the head/thorax, **(b)** a narrow
+slot between the hindwing's inner edge and the abdomen, which pinched the hindwing's attachment
+into a neck that would snap when printed — and **the buried root tabs showed in 3D as a flat,
+lighter plate on the thorax**. Wing outlines, library shapes and wing angles were done and are
+not changed; Phase 3 is not started. The ask was ONE general rule on the assembled top-down
+silhouette, the same for every library shape, blend, hand-drawn outline, tail and angle.
+
+**The rule.** `wingJunction` (Wings, "Junction blend", 0–3 mm, step 0.05, **default 1.0 mm**,
+0 = off): a morphological CLOSING of the assembled silhouette (body + every wing) by a disc of
+radius r. It fills every gap between a wing and the body narrower than about 2r, and — because a
+closing by a disc rounds every concave corner it reaches to radius r — it is also the fillet of
+radius r on every concave wing–body corner. In 3D the fill is wing-thickness material that sinks
+into the round body: no step, no plate, the bullnose edge (§10) all the way round. Unlike §13.6
+(each wing re-expressed in its own frame, reverted), nothing is re-expressed: the blend works in
+WORLD millimetres on the silhouette the wings already make, and hands each wing back an outline
+in its own planform.
+
+### 16.1 The 2D blend (`bug-junction.js`)
+
+- **Input**: the body's right-half silhouette (`bodySilhouette`, the analytic outline) and every
+  right wing's DRAWN planform (scallops, tail, root pinch included) carried into world mm by its
+  own transform at its REAL pose (the editor's flat display pair gets the outline its real pose
+  blends to), densified to `JUNCTION_DENSIFY_MM` 0.1 mm in the planform so every probe point is
+  exactly on a drawn edge.
+- **The raster**: pixel `r / 12`, clamped to 0.03–0.08 mm; the window reaches `6r + 2` mm past
+  the body (a fill reaching further is a wedge narrower than 2r over 6r of length, under 19°),
+  with a mirror strip at x < 0 so the midline is not an edge.
+- **The closing**, exact: an EDT to the solid (body + wings), the free r-disc centres, an EDT
+  to those; fill = empty pixels no free disc covers.
+- **Which fill is the junction's**: a component (8-connected) that touches a wing AND reaches to
+  within r of the body. "Reaches", not "touches": two wings whose edges cross AT the body's edge
+  close a pocket the body bounds at a point (§16.5, the root-pinch lens). A pocket between two
+  wings far from the body, or a hole in one, is not the junction's.
+- **Ownership**: a fill goes to the highest-index pair it touches (the pair drawn UNDER the
+  others), so the pair in front still covers it from above; where it meets another wing it runs
+  3 pixels on under it (`JUNCTION_TUCK_PX` — past the trace's 2.5-pixel exposure probe), and so
+  does a pair that abuts the one in front edge to edge (cracks of 0.004–0.08 mm, measured, between
+  library pairs drawn edge to edge, which no closing can see). The seam tuck stays inside the
+  closing's window.
+- **The attachment**: body pixels in or beside the wing's footprint, swept toward the midline by
+  the thorax's radius — the old root tab's job, as an area inside the body.
+- **The new outline**: the largest 4-connected region, holes filled, traced (marching squares on
+  a lightly blurred indicator). The DRAWN outline is kept wherever nothing was added beside it —
+  its own drawn vertices, so every consumer of the drawn outline (the venation's cells) still
+  carries them; elsewhere the traced boundary, resampled at 0.25 mm, smoothed, joined to the drawn
+  outline over 0.6 mm along the drawn edge's own ONE-SIDED tangent (C1 even where the drawn
+  outline has a corner there), and never inside the drawn wing (0.01 mm). The trace's raster
+  reaches past the closing's window by the longest drawn edge crossing it plus 10 pixels (wings
+  only out there — no fill, no free disc, no tuck), so a kept stretch is never trimmed back to a
+  drawn vertex outside the raster (§16.5).
+- **Back to the planform**: each new point by Newton on the wing's own transform. A pair whose
+  blend cannot be traced or triangulated keeps its drawn root and says so in a note — measured,
+  **0 of 73 bugs** (53 library shapes, 20 random) fall back at any of 0.25 / 0.5 / 0.75 / 1 /
+  1.5 / 2 / 3 mm.
+
+### 16.2 The 3D burial (`bug-geometry.js`)
+
+- Inside the body's silhouette the slab is laid at the body's MID-PLANE — each later pair
+  `BURY_PAIR_STEP_MM` (0.3 mm) lower, as far as the body's depth over the point allows (two pairs
+  on one plane would cross where they overlap) — and its half-thickness is held to
+  `BURY_DEPTH_FRAC` (0.6) of the body's half-depth there, never under half the floor. Outside it
+  eases back to the wing's own height and thickness over `BURY_FADE_MM` (2.5 mm, smoothstep).
+- The body's depth at (x, y) is its superellipse cross-section (exponent = `roundness`) on radii
+  smoothed by a running MINIMUM then a mean, so a waist or a groove is never overstated; the fade
+  reads a running maximum (a groove is a dip, never a peak).
+- The depth is read WHERE THE TWO SKINS LAND: a dihedral or a pitch tilts the wing's normal, so
+  each skin sits half a thickness × sin(tilt) to one side of the mid-surface point, where the body
+  can be shallower; the shallower of the two is what the sheet and its pair step must fit (§16.5).
+- **Where the body is thinner than the floor, the floor wins**: no legal sheet fits inside, so the
+  sheet sits centred on the mid-plane (no pair step) at half the floor and stands out above and
+  below by half the difference. Measured on the default body: nothing at floors up to 1 mm; at
+  1.2 / 1.5 / 2 mm, where the abdomen near the hindwing's root is thinner than the floor, 2 / 10 /
+  228 vertices stand out by at most 0.006 / 0.044 / 0.133 mm — each by half the difference to
+  within 0.0002 mm, and none anywhere the body is at least as thick as the floor.
+- It is a z move and a thickness scale PER PLANFORM POINT (a bead ring moves as one), never an
+  x-y move: the silhouette is the outline's.
+- The bead scales with the burial's thinning (never more than a half-round, E1) and ramps to
+  nothing over the last `ROUND_ROOT_RAMP_MM` (1 mm) INSIDE the body's EXACT silhouette (§16.5:
+  the smoothed one stands out past a steep flank).
+- The floor check (N) does not judge blended material within `JUNCTION_FUSED_FRAC` (0.5) floors
+  of the exact silhouette alone: it is fused into the body there.
+
+### 16.3 The default, 1.0 mm
+
+Measured on the default bug (the sheet's own numbers; slot = JB1's measure with the 1.5 mm gap,
+neck = JB2's per right wing, "showing" = JB3's buried vertices outside the body's solid):
+
+| r | slot | necks fore / hind | showing | hindwing joins the abdomen | tris |
+|---|---|---|---|---|---|
+| off (main) | 1.82 mm | 4.63 / 4.57 | 28 | 3.78 of 15.00 mm | 46,992 |
+| 0.5 | 0.51 | 3.98 / 4.14 | 0 | 5.27 | 52,752 |
+| **1.0** | **0.11** | **3.98 / 4.30** | **0** | **6.74** | **53,392** |
+| 1.5 | 0.10 | 3.98 / 4.30 | 0 | 7.91 | 53,392 |
+| 2.0 | 0.10 | 3.98 / 4.30 | 0 | 8.91 | 53,552 |
+| 3.0 | 0.16 | 3.98 / 4.30 | 0 | 11.51 | 55,472 |
+
+Over the 53 library shapes and the #20/#31 fixture at each radius: **0.5 mm leaves a real slot**
+(the fixture's, 4.3 mm deep — a gap between 1 and 1.5 mm wide, which a 0.5 mm closing does not
+reach; #40 reads 0.49); **1.0 mm leaves none** (deepest 0.16 mm — a rounded corner, not a slot)
+**and every neck at or above 1.73 mm** (#55; 1.5 floors is the bar);
+1.5 mm is clean too and only runs the hindwing further down the abdomen. So **1.0 mm is the
+smallest radius that clears everything**, which keeps the hindwing joined to the abdomen for 6.7
+of its 15 mm on the default — the wings still read as separate shapes — where 3 mm would run 77%
+of it. (On a sharply swept hindwing, #31 at 72°, the gap along the abdomen is wider than 2r and
+stays open: the blend fills slivers, not gaps.)
+
+### 16.4 The root pinch, and saved designs
+
+**The root pinch is KEPT, at its default of 0 (it was already 0), not retired.** Its §12.1 job of
+blending a straight root chord into the body is now the junction's; what the pinch still does is
+shape a deliberate narrow neck, and with the blend on that neck is rebuilt into the closing (the
+gate's twelve root-pinch rows pass with the blend). Nothing about it moved.
+
+**Saved designs follow the §12.1 convention: `DESIGN_VERSION` is 7**, and a file saved before it
+(v1–6) loads with `wingJunction: 0` (`PRE_JUNCTION_STYLE`) — its drawn roots and root tabs, so it
+looks as saved; `LEGACY_STYLE` carries `wingJunction: 0` too. **Blend 0 is the old code by
+branch**: 24 of 24 bugs (the default, both venation modes, the legacy default, 4 pairs, a root
+pinch, random:1–12, six library shapes) are byte-identical to `main` at 0.
+
+### 16.5 What the gate found in the blend (each fixed at its cause)
+
+- **A kept stretch trimmed outside the raster** (lib #18 at r 0.25–0.5): a hindwing's wedge fill
+  ran to x 5.6 against a window edge at 6.46, the drawn vertex it was trimmed back to stood one
+  2.2 mm drawn edge further out, 0.50 mm off the trace, and the pair fell back to its drawn root,
+  tab and all. Now the trace's raster reaches past the window (§16.1).
+- **A pocket closed by a wing crossing at the body's edge** (root pinch 0.45 and 0.6): the pinch
+  opened a lens 0.75 mm wide and 2.5 mm long between the forewing's trailing edge and the
+  hindwing's leading edge, its apex on the body's edge; a contact test left it empty (JB1: 4.84
+  and 0.59 mm deep). Now "reaches to within r of the body".
+- **A folded ear at the abdomen's edge** (random:8, :18, :37 — E6): the bead cap after
+  subdivision steps skin points back by amounts that change fast where the burial ramps the bead
+  down, and three consecutive rim points a hair off collinear folded their ear (cross product
+  −2e-5 to −9e-5). Stepping the points further does not unfold it (the triangulation was made on
+  the inset rim, and at the apexes the same ear is folded); the ear's interior edge is flipped.
+- **A cap that does not converge** (random:5 with a root pinch of 1 — E1): there the allowed
+  radius falls faster than the radius as the point steps toward its apex (slope ~1.34), and the
+  fixed-point iteration left one bead 0.26% over a half-round; the radius is bisected instead.
+- **A square rim outside the body** (random:4 at 4 pairs — E3): a rim point 8 µm outside a
+  thorax's back end, where it falls steeply to the waist, read a millimetre INSIDE on the
+  burial's smoothed silhouette (a running maximum) and got no bead; the bead now reads the exact
+  silhouette.
+
+- **A tilted skin under a waist** (HOLES, random:3, its third pair at a 23.6° dihedral — JB3): the
+  burial read the body's depth under the mid-surface point, the tilted lower skin landed 0.24 mm
+  further out where the waist is shallower, and stood 0.06 mm under the body. Now the depth is read
+  where both skins land (§16.2).
+
+All six are on the blend's path only (`J`), so blend 0 stays the old code. The gate also found
+four things in ITS OWN clauses, each restated from a measurement rather than relaxed:
+
+- **JB2 walked through the veins.** In HOLES the neck path ran on the wing's full contour, so it
+  could be forced through a vein between two holes (random:3 read a 0.00 mm neck, random:4 1.26 /
+  1.20, a drawn strap 1.49) — a vein is not how a wing hangs from the body. JB2 now reads each
+  wing's OUTER contour with its holes filled; those rows read 3.10–7.30 mm.
+- **E7 stopped short of the fade.** It skipped the silhouette within 2 mm of the body, while the
+  burial thins the wing — and its bead with it — over 2.5 mm, so a ring beside a smaller one
+  carried the contour inside the outline past the 2 mm mark (0.041 mm on a notched drawn wing in
+  HOLES). Over 212 rows (the library × none / holes / ridges, the drawn outlines, 40 random) every
+  point the blend moves is INSIDE the outline and within 2.81 mm of the body (worst 0.060 mm in, lib
+  #25 in HOLES). E7 now holds the band out to the fade plus 1 mm to "never OUTSIDE the drawn
+  outline", and is exact beyond it.
+- **JB3 asked the impossible over a thin body** (the two 2 mm-floor rows): see §16.2. JB3 now has
+  two arms by the body's own emitted thickness T over each vertex — at T ≥ the floor the vertex is
+  inside the solid; under it, it stands out by no more than (floor − T)/2 (+0.005 mm). A third row
+  mutant (`a later pair is stepped down past the body`, at a 2 mm floor) must fail the second arm.
+- **A new row met an old speck.** The drawn swallowtail with its tail at 2 mm, on the DEFAULT
+  hindwing at the pinned tail sweep, leaves the one-pixel cut-safe island `TAIL_ROW_SWEEP`'s note
+  already describes — identically with the blend off and on `main`'s own code. The row takes the
+  other tail rows' 30 mm × 1.4 hindwing.
+
+**Recorded, not fixed (pre-existing, outside the gate's rows):** E7 on library shapes in HOLES
+(no gate row runs them) finds 56 contour points off the drawn outline by up to 0.0225 mm, as far
+as 35 mm from the body (lib #25, #47) — identical on `main` and on this tree with the blend off.
+
+### 16.6 Verification
+
+- **JB1 — no slot**: the empty space between a wing and the body narrower than the stated
+  minimum gap, **1.5 r (1.5 mm at the default)** — 3/4 of the closing's 2r, so the raster's own
+  reading never sits on the bar — measured on the EMITTED top-down union (the body's and every
+  wing's contour loops, 0.05 mm raster): a closing at half the gap, its components reaching both
+  the body and a wing and not lying inside a wing's own hole; depth = the farthest pixel from open
+  space; bar 0.5 mm (a rounded corner reads 0.10–0.30, the slots the blend removes 1.9–6.9).
+- **JB2 — no neck**: per right wing, the widest disc that can travel from the body into the
+  wing through the wing's OUTER contour (holes filled — a vein between two holes is not how a wing
+  hangs) and the body's emitted material (a max-min path on their distance
+  transform, to the wing's widest point within 6 mm of the body); twice its radius ≥ **1.5
+  floors**. Narrowest over 180 blended bugs: 1.73 floors; the fixture's drawn root, blend off, 0.99.
+- **JB3 — no visible plate**: every right-wing vertex 0.5 mm or more inside the body's top-down
+  contour is inside the body's SOLID (an odd number of the body's triangles above it) — where the
+  body there is at least as thick as the floor; where it is thinner, no legal sheet fits, and the
+  vertex may stand out by at most half the difference (§16.2).
+- The three measures are `tools/bug-junction-measure.mjs`, built on whichever geometry module it
+  is handed — the gate's on this tree, the sheet's on the base tree too — so a number on the sheet
+  is the gate's number for that tree. They run on every row whose PARAMETER asks for the blend (a
+  blend asked for and never built is held to them).
+- **Negative control**: `the junction blend is never built` must fail JB1 AND JB2 AND JB3 on the
+  junction fixture (the #20/#31 bug at the default blend), `the buried part is not buried`
+  must fail JB3, and `a later pair is stepped down past the body` must fail JB3's thin-body arm at
+  a 2 mm floor — all three row mutants on the module itself.
+- **Restated clauses** (each to the blended outline, not relaxed): B (the edge law exactly where
+  the burial does nothing), E (the closed blended outline; E3 and E7 outside the body's contour),
+  S (a loop wholly inside the body's contour is the body's), R (the root at the drawn root chord's
+  midpoint on the emitted mid-surface), Y, V5, Q (through `denseAtPlanform`), N and N0 (the fused
+  band), D (a v6 design loads with the blend off, byte-identical, non-vacuous). E7's fade band is
+  §16.5's.
+- **Fixtures**: `rootUnderFloor()` and `pitchedBeadHoles()` pin the blend OFF (they were frozen
+  before it; with it, the first's hindwing root reads 0.08 mm past the floor disc, not 1.04), and
+  the image fitter's pictures and its comparison build with the blend off (IM12 is about the
+  fitted wings, and the blend's fill runs along the abdomen by design).
+- **Rows**: the blend at 0, the radius ladder (0.5 / 2 / 3), the junction fixture, HOLES at 3 mm,
+  4 pairs at 2 mm, a drawn swallowtail with its tail at 2 mm (on the tail rows' own hindwing,
+  §16.5) — on top of every existing row,
+  which now runs at the default 1.0.
+- **Sweeps** (not in CI): the 53 library shapes × none / holes / ridges, random 1–80, pairs 1–4
+  in two modes and the ladder — 252 rows, 0 bad; the fallback survey above.
+
+### 16.7 Cost
+
+The default bug: **46,992 → 53,392 triangles (+13.6%)**, STL 2,295 → 2,607 KiB; HOLES 84,400 →
+91,824; 4 pairs 86,864 → 97,744. A warm build of the default: **94 → ~168 ms** on this container
+(the closing's raster ~38 ms, the rest the larger floor analysis and triangulation) — a slider
+drag rebuilds at about six frames a second instead of ten. The CI job, already at ~25 of its 30
+minutes, is SPLIT into two parallel jobs (negative control / gate) rather than given a longer
+timeout. Measured on this container, each tree's gate and negative control run side by side:
+`main` 21.8 + 16.0 min, this branch 26.2 + 17.6 (+20% / +10%; most of the gate's rise is the
+blend inside every build, the K and LB checks' random bugs included, since `wingShapeProblem` builds
+the whole bug). Measured on the PR's own CI run: the gate job **23.0 min** and the negative
+control **16.0 min**, each against its own 30 (a projection from `main`'s 25-minute single job had
+said 17 and 12 — too low; size a wait off the workflow's own runs). JB3's distance is pre-filtered by the body's contour box
+shrunk by its 0.5 mm inset — exact (identical on 17 bugs), 4.6× faster.
+
+### 16.8 Decisions made without a ruling (reversible)
+
+1. **The default radius, 1.0 mm** (§16.3): the smallest that clears every slot and neck measured.
+   One constant (`JUNCTION_DEFAULT_MM`).
+2. **The fill belongs to the BACK pair** (the highest index touching it) and tucks under the front.
+   Giving it to the front pair would put it on top, over the back wing's root.
+3. **A pocket counts when it reaches within r of the body**, not only when it touches it.
+4. **JB1's stated minimum gap is 1.5 r** (1.5 mm at the default) with a 0.5 mm depth bar, and
+   **JB2's bar is 1.5 floors**.
+5. **The root pinch stays** (default 0) — retiring it would delete a reachable shape the blend
+   does not make.
+6. **The bead reads the exact silhouette; the burial's height and thickness read smoothed fields**
+   (a mid-plane and a depth that never jump with the body's segment grooves).
+7. **The slider runs to 3 mm** — past 2 mm the hindwing runs most of the abdomen and the wings read
+   as one mass with the body; reachable, not the default.
+
+### 16.9 Sheet
+
+`node tools/shot-bug-junction.mjs <dir> --base <worktree of main>` renders, BEFORE (main's code,
+served from its worktree) and AFTER (this tree): the default bug (SVG export, 3D ¾, and close-ups
+at (a) the forewing's leading edge by the head, (b) the hindwing's inner edge by the abdomen, and
+the 3D thorax); the radius ladder (off / 0.5 / **1.0** / 1.5 / 2 / 3); six library shapes — the
+most swept (#31, #40), the narrowest root with the blend off (#48), the deepest slots (#18, #39),
+the narrowest neck with the blend on (#55); a hand-drawn forewing (`HAND_OUTLINES.falcate`); and
+the #20/#31 blend whose STL `main` refuses. Every number under a panel is the gate's own measure
+on the model that tree built. Click a panel to see it full size.

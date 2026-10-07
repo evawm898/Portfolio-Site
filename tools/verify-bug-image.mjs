@@ -57,7 +57,10 @@
      IM12 no fitted wing crosses into the body: every right-wing point of the
           BUILT bug beside the abdomen or head lies outside the built body's own
           surface (per 0.5 mm band; within 1 mm of the thorax's span is the root,
-          which attaches there by design).
+          which attaches there by design). Read on the bug built with the
+          JUNCTION BLEND OFF (design doc §16): the blend's own fill runs along
+          the abdomen by design and JB1-JB3 gate it; this clause is about the
+          fitted wings.
      IM13 clutter dropped before anything is measured: the clutter picture (a
           paper corner with a table LARGER than the bug, a 1 cm scale bar, a
           label) and the sheet picture (the whole sheet on a table: a frame
@@ -100,7 +103,9 @@ export function compareToKnown(img, fit) {
   // the wrong-scale mutant passed). The one freedom the import legitimately
   // has — where along the body axis it puts the thorax — is taken out by
   // aligning the two right-wing silhouettes' area centroids in y.
-  const fm = G.buildBug(fit.params);
+  // (built with the junction blend OFF, as the picture's own bug is: the fit's
+  // subject is the drawn wings, and the blend is the builder's, gated by JB)
+  const fm = G.buildBug({ ...fit.params, wingJunction: 0 });
   const cyOf = (groups) => { let A = 0, Cy = 0; for (const g of groups) for (const L of g) for (let k = 0; k < L.length; k++) { const [x0, y0] = L[k], [x1, y1] = L[(k + 1) % L.length], c = x0 * y1 - x1 * y0; A += c; Cy += (y0 + y1) * c; } return Cy / (3 * A); };
   const gK = partLoops(t.model, rightWings), gF = partLoops(fm, rightWings);
   const dy = cyOf(gK) - cyOf(gF);
