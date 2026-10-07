@@ -1755,8 +1755,11 @@ const MUTANTS = [
         : `the mutant's blade rows ${m.rowsDiffer(c) ? 'differ' : 'AGREE'} with the clean tree's at 0.60 (plan says ${m.plan.tipShape} / ${c.plan.tipShape}) — the behaviour did not move`; } },
 
   { id: 'leaf-clamp-record-lies', why: 'the clamp record places the terminal at the widest point, so the read-out prints a stub covering the whole tip on every leaf; the blade itself is untouched, so only the biconditional against its rows can see it',
-    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };',
-    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };', names: ['LF9'],
+    /* RE-ANCHORED (leaf/stem build S3): the clamp record moved into
+       `emitLeafBladeInto`, which reads the blade's own `widthMm` (a leaflet's,
+       or the simple leaf's `plan.widthMm`). */
+    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };',
+    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };', names: ['LF9'],
     witness: (M, C) => { const m = leafFacts(M, 1.3), c = leafFacts(C, 1.3);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.clamp.fromU < c.clamp.fromU - 0.1 && !m.rowsDiffer(c)) ? null
@@ -1800,6 +1803,77 @@ const MUTANTS = [
       const ms = m.rep.serration, cs = c.rep.serration;
       return (ms && cs && ms.reliefBuiltMm === cs.reliefBuiltMm && ms.reliefFloored && Math.min(...ms.sinusReliefMm) < 1 - 1e-6) ? null
         : `the mutant's record reads relief ${ms ? ms.reliefBuiltMm : 'n/a'} (floored ${ms ? ms.reliefFloored : 'n/a'}) with a shallowest cut sinus of ${ms ? Math.min(...ms.sinusReliefMm) : 'n/a'} — the record and the cut did not part`; } },
+
+  /* ===================================================================
+     THE COMPOUND LEAF (leaf/stem build S3) — LF14, LF15, LF16, LF17. Four
+     families were added, so the table runs them, each on a mutation that is
+     the plausible way the compound tree could be wired wrong while both STL
+     gates stay green (every leaflet and rod is a closed shell overlapping its
+     neighbour, so a missing leaflet, a stalk that stops short, a terminal off
+     the tip, a buried base and a rod of the wrong radius ALL export
+     watertight). Every witness reads the MUTATED module's own build on the
+     table's compound row — at sheet 2.4, where the petiole is 1.2 mm in
+     radius and a typed 0.6 rod is not the derived one (at the shipped sheet
+     they are the same double, so the witness state is part of the claim) —
+     never the assertion it names. */
+  { id: 'the-leaf-type-is-ignored', why: 'the plan never lays out a compound tree, so a COMPOUND ask builds a simple blade while the Leaflets drop-down shows — eleven controls reaching nothing',
+    find: '    compound: leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR) : null,',
+    into: '    compound: null,', names: ['LF14'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.compound === null && c.plan.compound && !m.rep.compound && c.rep.compound) ? null
+        : `the mutant's plan ${m.plan.compound ? 'carries' : 'has no'} compound layout and its leaf ${m.rep.compound ? 'is' : 'is not'} compound — the behaviour did not move`; } },
+  { id: 'the-leaflet-controls-leak-into-the-simple-leaf', why: 'a SIMPLE leaf turns compound when the hidden leaflet-pairs slider is at its maximum — hidden and NOT inert',
+    find: "export function leafIsCompound(state) { return String(state.leafType) === 'COMPOUND'; }",
+    into: "export function leafIsCompound(state) { return String(state.leafType) === 'COMPOUND' || Number(state.leafletPairs) >= 4; }", names: ['LF14'],
+    witness: (M, C) => { const m = compoundFacts(M, SIMPLE_WIT), c = compoundFacts(C, SIMPLE_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep && m.rep.compound && c.rep && !c.rep.compound) ? null
+        : `on SIMPLE with leafletPairs 4 the mutant's leaf ${m.rep && m.rep.compound ? 'is' : 'is not'} compound and the clean tree's ${c.rep && c.rep.compound ? 'is' : 'is not'} — the leak did not happen`; } },
+  { id: 'a-lateral-leaflet-is-not-built', why: 'the first lateral leaflet is laid out and never emitted — a pair with one leaflet, watertight and one piece',
+    find: '  const specs = cp.leaflets.map((sp) => ({ ...sp, ...leafletOf(sp) }));',
+    into: '  const specs = cp.leaflets.slice(1).map((sp) => ({ ...sp, ...leafletOf(sp) }));', names: ['LF15'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.leaflets.length === c.rep.leaflets.length - 1) ? null
+        : `the mutant emits ${m.rep.leaflets.length} leaflets against the clean tree's ${c.rep.leaflets.length} — the behaviour did not move`; } },
+  { id: 'the-stalk-stops-short-of-the-blade', why: "each stalk ends AT its leaflet's base row instead of reaching through the beaded base into the full sheet — the leaflet held at the tip of its own bead",
+    find: '    const len = F.stalkMm + sp.embedMm;',
+    into: '    const len = F.stalkMm;', names: ['LF16'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const len = (r) => Math.hypot(r.end[0] - r.root[0], r.end[1] - r.root[1], r.end[2] - r.root[2]);
+      return (len(m.rep.stalkRods[0]) < len(c.rep.stalkRods[0]) - 0.1) ? null
+        : `the mutant's first stalk is ${len(m.rep.stalkRods[0])} mm against the clean tree's ${len(c.rep.stalkRods[0])} — the behaviour did not move`; } },
+  { id: 'the-terminal-leaves-the-rachis-tip', why: "the terminal leaflet is rooted 1.5 mm off the rachis's tip along the rachis's normal — a leaflet floating beside the axis rod",
+    find: '    if (sp.role === \'terminal\') return { root: tipC, D: FE.D, T, N: FE.N, stalkMm: cp.terminalStalkMm };',
+    into: '    if (sp.role === \'terminal\') return { root: [tipC[0] + 1.5 * FE.N[0], tipC[1] + 1.5 * FE.N[1], tipC[2] + 1.5 * FE.N[2]], D: FE.D, T, N: FE.N, stalkMm: cp.terminalStalkMm };', names: ['LF16'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const off = (r) => { const q = r.leaflets.at(-1).root, t = r.rachis.tipC; return Math.hypot(q[0] - t[0], q[1] - t[1], q[2] - t[2]); };
+      return (off(m.rep) > 1 && off(c.rep) < 1e-9) ? null
+        : `the mutant's terminal stands ${off(m.rep)} mm off the rachis tip against the clean tree's ${off(c.rep)} — the behaviour did not move`; } },
+  { id: 'the-leaflet-base-is-buried', why: "every leaflet's base is emitted as the simple blade's buried end (a square step) instead of closing on the bead — a free base that is not free",
+    find: '  const baseExposed = !!panel.baseExposed && !per;',
+    into: '  const baseExposed = false;', names: ['LF16'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!(m.rep.leaflets[0].rim.baseAxisMm > 0) && c.rep.leaflets[0].rim.baseAxisMm > 0) ? null
+        : `the mutant's first leaflet reports a base semi-axis of ${m.rep.leaflets[0].rim.baseAxisMm} against the clean tree's ${c.rep.leaflets[0].rim.baseAxisMm} — the behaviour did not move`; } },
+  { id: 'the-rod-floor-is-removed', why: 'the rachis and stalks follow the area rule with no wire under them — rods thinner than the petiole they hang from',
+    find: '  const wireR = petioleR;',
+    into: '  const wireR = 0;', names: ['LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.compound.stalkR < c.plan.compound.stalkR - 1e-6) ? null
+        : `the mutant's stalk radius is ${m.plan.compound.stalkR} against the clean tree's ${c.plan.compound.stalkR} — the behaviour did not move`; } },
+  { id: 'the-rods-are-typed', why: "every rod is a typed 0.6 mm radius whatever the sheet — the lab's own constant, invisible at the shipped sheet where the petiole is the same double",
+    find: '  return Math.max(wireR, petioleR * Math.sqrt(carried / total));',
+    into: '  return 0.6;', names: ['LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.compound.stalkR === 0.6 && c.plan.compound.stalkR > 0.6 + 1e-6) ? null
+        : `the mutant's stalk radius is ${m.plan.compound.stalkR} against the clean tree's ${c.plan.compound.stalkR} at sheet 2.4 — the behaviour did not move`; } },
 
   /* ===================================================================
      THE SEPALS (sepals, part 1) — SP0-SP9. A family was added, so the table
@@ -2049,8 +2123,10 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(c[1] - Math.PI / 2) < 1e-12 && Math.abs(m[1] - Math.PI / 4) < 1e-12) ? null : `the mutant's second opposite node turns ${m[1]} rad and the clean tree's ${c[1]}`; } },
   { id: 'the-petiole-roots-on-the-world-axis', why: "each petiole is rooted about the WORLD axis while the stem has kinked away from it, so a leaf at a lower node roots in the bore or outside the wall — both export watertight",
-    find: '  const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];',
-    into: '  const base = [plan.rootR * R[0], plan.rootR * R[1], z];', names: ['LF2'],
+    /* RE-ANCHORED (leaf/stem build S3) onto `leafRootBase`, the one owner the
+       simple blade and the compound tree share. */
+    find: '  return o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];',
+    into: '  return [plan.rootR * R[0], plan.rootR * R[1], z];', names: ['LF2'],
     witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return Math.abs(m.lastPetioleX - c.lastPetioleX) > 0.5 || Math.abs(m.lastPetioleY - c.lastPetioleY) > 0.5 ? null
@@ -2104,6 +2180,19 @@ function sepalFacts(MOD, extra = {}) {
    solo leaf built on it. One state witnesses all four S2 mutants, and it is
    the table row of the same name. */
 const LEAF_POSE_SET = { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 5, leafNodes: 1, leafArch: 90, leafCup: 0.8, leafToothDepth: 0.3 };
+/* THE COMPOUND WITNESS (leaf/stem build S3) — the mutated module's own build
+   of one compound leaf at sheet 2.4 (the derived rods APART from a typed 0.6),
+   and of one SIMPLE leaf with the hidden leaflet controls at an extreme (where
+   a leak would show). Both are table rows of the same state. */
+const CPD_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', sheetThickness: 2.4 };
+const SIMPLE_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafletPairs: 4, leafletStalk: 20 };
+function compoundFacts(MOD, set) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, ...set };
+    const b = MOD.buildBloomInto(new MOD.MeshBuilder({ exportMode: true }), st);
+    return { plan: b.leaf, rep: (b.leavesBuilt || [])[0] || null };
+  } catch (e) { return { threw: e.message }; }
+}
 function leafPoseFacts(MOD) {
   try {
     const st = { ...REGISTRY_DEFAULTS, ...LEAF_POSE_SET };
@@ -2316,6 +2405,13 @@ const ROWS = [
      tree at arch 0 / cup 0.35, so the witness state is part of the claim), on
      a 5 mm blade at tooth depth 0.3 where the floor both raises the relief and
      gives the count. `LEAF_POSE_SET` above is the same state. */
+  /* THE COMPOUND ROWS (leaf/stem build S3): `CPD_WIT` and `SIMPLE_WIT` above
+     are the same states. Sheet 2.4 separates the derived rods from a typed
+     one; the SIMPLE row carries the hidden leaflet controls at an extreme. */
+  { label: 'a compound leaf at sheet 2.4 (2 pairs + terminal — the rods APART from a typed 0.6)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'sheetThickness', value: '2.4' }] },
+  { label: 'a SIMPLE leaf with the hidden leaflet controls at an extreme (pairs 4, stalk 20 — where a leak would show)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafletPairs', value: '4' }, { id: 'leafletStalk', value: '20' }] },
   { label: 'a leaf arched 90 and cupped 0.8 on a 5 mm blade whose teeth the floor reshapes (depth 0.3)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '5' }, { id: 'leafNodes', value: '1' }, { id: 'leafArch', value: '90' }, { id: 'leafCup', value: '0.8' }, { id: 'leafToothDepth', value: '0.3' }] },
   /* THE NU COUPLING'S ROW (#303's finding, fixed): the petals ramp to 112

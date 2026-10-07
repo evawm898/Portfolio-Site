@@ -1385,8 +1385,9 @@ function segDist(p, a, b) {
    `buildLeafInto` — `petalFreeStemApproachMm`'s own construction, for its
    own reason: a second producer of the blade would agree with a broken
    blade by being broken alongside it (session 43's ST2, session 41's L7).
-   The rod is excluded by the builder's OWN reported `petioleAxis`, never
-   by re-deriving where the petiole is from `leafPlan`.
+   The rod is excluded by the builder's OWN reported `rodAxes` (on a simple
+   leaf, its one `petioleAxis`; S3 adds a compound leaf's rachis and
+   stalks), never by re-deriving where the petiole is from `leafPlan`.
    NAMES ITS SAMPLING: emitted VERTICES, the population the leaves
    outcome doc measured too. A chord between two cleared vertices can dip
    nearer than either by at most the mesh's own chord scale; that is a
@@ -1402,13 +1403,17 @@ export function measureLeafStemApproachMm(G, state, exportMode) {
     for (const az of m.leaf.azimuths[i]) {
       const probe = new G.MeshBuilder({ exportMode });
       const rep = G.buildLeafInto(probe, m.leaf, state, i, az);
-      const ax = rep.petioleAxis;
+      /* EVERY ROD THE LEAF EMITTED (S3): a compound leaf's rachis segments
+         and leaflet stalks beside its petiole, read off the builder's own
+         `rodAxes`; on a simple leaf that list IS `[petioleAxis]`, and a
+         `--root` tree that predates it falls back to exactly that. */
+      const axes = Array.isArray(rep.rodAxes) ? rep.rodAxes : [rep.petioleAxis];
       const P = probe.positions;
       leaves++;
       for (let j = 0; j < P.length; j += 3) {
         const p0 = P[j], p1 = P[j + 1], p2 = P[j + 2];
-        /* THE ROD ITSELF, named rather than the region widened. */
-        if (segDist([p0, p1, p2], ax.inner, ax.outer) <= ax.radiusMm * (1 + 1e-6)) continue;
+        /* THE RODS THEMSELVES, named rather than the region widened. */
+        if (axes.some((ax) => segDist([p0, p1, p2], ax.inner, ax.outer) <= ax.radiusMm * (1 + 1e-6))) continue;
         verts++;
         const d = G.freeStemDistanceMm(m.stem, p0, p1, p2);
         if (d < best) { best = d; at = { node: i, azDeg: (az * 180) / Math.PI }; }

@@ -1703,6 +1703,10 @@ function infloLine(plan, builtInflo) {
         : '')
     + `\n     GRID EXPORT writes the head at the origin ONLY — a raceme's florets are not in the .glb\n`;
 }
+/* A BUILT LEAF'S BLADES — a simple leaf is its own one blade; a compound
+   leaf's are its leaflets, in the layout's build order (leaf/stem build S3).
+   The one place the metrics hook flattens leaves into blades. */
+function leafBlades(r) { return r.compound ? r.leaflets : [r]; }
 function leafLine(leaf, leavesBuilt) {
   const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
   const over = 90 - Math.abs(leaf.angleDeg);
@@ -1762,8 +1766,10 @@ function leafLine(leaf, leavesBuilt) {
     for (const c of R0.clamps) if (c.thicknessMm < thin) { thin = c.thicknessMm; room = c.roomMm; }
     rimClampLine = ` — RIM CLAMPED at ${R0.clamps.length} location${R0.clamps.length === 1 ? '' : 's'}, ${thin.toFixed(3)} mm on a ${room.toFixed(2)} mm span (told, never refused)`;
   }
+  const cpd = leaf.compound;
   const edgeLine = R0 && R0.segments
-    ? `\n     EDGE the margin closes on a ${R0.drawnMaxMm.toFixed(2)} mm half-round in ${R0.segments} segments (the petal's own bead), buried where the petiole holds it and easing in over ${RIM_TAPER_MM.toFixed(1)} mm of margin`
+    ? `\n     EDGE the margin closes on a ${R0.drawnMaxMm.toFixed(2)} mm half-round in ${R0.segments} segments (the petal's own bead), `
+      + (cpd ? `and every leaflet's BASE is FREE — its stalk runs into it, so it closes on the bead like its tip (${R0.baseAxisMm === null || R0.baseAxisMm === undefined ? '—' : R0.baseAxisMm.toFixed(2)} mm along the length, the first ${RIM_TIP_ROWS} rows)` : `buried where the petiole holds it and easing in over ${RIM_TAPER_MM.toFixed(1)} mm of margin`)
       + (R0.tipAxisMm === null ? '' : ` · the ${(2 * TIP_HALF_MM).toFixed(2)} mm stub ends on the bead's nose, ${R0.tipAxisMm.toFixed(2)} mm along the length (the last ${RIM_TIP_ROWS} rows)`)
       + rimClampLine
     : '';
@@ -1781,15 +1787,40 @@ function leafLine(leaf, leavesBuilt) {
         : `NO ROOM (${Sr.noRoomWhy}), told`);
   } else if (Sr) {
     const margin = Sr.reliefMm.filter((r, i) => Sr.apexIsCrest || i !== (Sr.periods - 1) / 2);
-    teethLine = `\n     TEETH ${Sr.countBuilt} built${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : ''}`
+    const perLeaflet = cpd && b0 && b0.leaflets ? b0.leaflets.map((q) => (q.serration && !q.serration.noRoom ? q.serration.countBuilt : 0)) : null;
+    teethLine = `\n     TEETH ${Sr.countBuilt} built${perLeaflet ? ` on the first leaflet (each leaflet its own blade: ${perLeaflet.join(' / ')} of ${Sr.countAsked} asked — the relief floor gives on the small ones, the ruled behaviour)` : ''}${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : ''}`
       + (margin.length ? ` · relief ${Math.min(...margin).toFixed(2)}${Math.max(...margin) > Math.min(...margin) ? `–${Math.max(...margin).toFixed(2)}` : ''} mm at the sinuses` : '')
       + (Sr.reliefFloored ? ` (asked ${Sr.reliefAskedMm.toFixed(2)} mm, FLOORED at the ${Sr.reliefFloorMm.toFixed(2)} mm minimum feature — design view included; the slider keeps its value)` : ` (the floor is ${Sr.reliefFloorMm.toFixed(2)} mm)`)
       + (Sr.rowReliefMm && Sr.rowReliefMm.length ? ` · the rows draw ${Math.min(...Sr.rowReliefMm).toFixed(2)}–${Math.max(...Sr.rowReliefMm).toFixed(2)} mm of it (they sample the cut between stations)` : '')
       + (Sr.apexIsCrest === false ? ' · an even count puts its apex notch on the terminal face, where it cuts nothing' : '');
   }
   if (sn && !leaf.nodeDepthsMm.length) return `\n     LEAVES none built${sharedLine}\n`;
+  /* THE COMPOUND LEAF (leaf/stem build S3): the tree off the PLAN's own
+     layout and the BUILDER's own rods — the leaflet count, where the pairs
+     stand, each leaflet's built size (and which scaled leaflets the leaf's own
+     minimum clamped), and the RODS, whose radii are derived and told: the
+     area rule's asked radius beside the wire floor that binds. Rod sizing is
+     an open question for Eva and the line says so. */
+  const compoundLine = cpd
+    ? (() => {
+      const lat = cpd.lateral;
+      const sz = (q) => `${q.lengthMm.toFixed(1)} x ${q.widthMm.toFixed(1)}`;
+      const ivs = cpd.rachis.intervals;
+      const asked = [...new Set(ivs.map((q) => q.askedMm.toFixed(2)))];
+      const embeds = b0 && b0.leaflets ? b0.leaflets.map((q) => q.embedMm) : [];
+      return `\n     COMPOUND ${cpd.count} leaflets — ${cpd.pairs} pair${cpd.pairs === 1 ? '' : 's'} and a terminal — on a ${cpd.rachisMm.toFixed(1)} mm rachis`
+        + ` · pairs at ${lat.map((q) => `${(100 * q.frac).toFixed(0)}%`).join(', ')} (${lat.map((q) => q.stationMm.toFixed(1)).join(', ')} mm), ${cpd.angleDeg}° off the rachis in its own plane, flat and cupped (the arch is the RACHIS's)`
+        + `\n     LEAFLETS lateral ${lat.map(sz).join(' -> ')} mm${cpd.pairs > 1 ? ` (basal ratio ${cpd.basal.toFixed(2)})` : ''}, terminal ${sz(cpd.terminal)} mm`
+        + ` · stalks ${cpd.stalkMm.toFixed(1)} mm lateral, ${cpd.terminalStalkMm.toFixed(1)} mm terminal, each reaching ${embeds.length ? `${Math.min(...embeds).toFixed(2)}–${Math.max(...embeds).toFixed(2)}` : '—'} mm on into its leaflet's beaded base`
+        + (cpd.clamped ? ` — CLAMPED: ${cpd.clamped} pair${cpd.clamped === 1 ? '' : 's'} scaled under the leaf's own minimum size, built at it (told, never refused)` : '')
+        + `\n     RODS petiole ${(2 * cpd.petioleR).toFixed(2)} mm · rachis ${ivs.map((q) => (2 * q.radiusMm).toFixed(2)).join(' / ')} mm · stalks ${(2 * cpd.stalkR).toFixed(2)} mm — DERIVED: the area rule read down from the petiole asks ${asked.map((x) => (2 * Number(x)).toFixed(2)).join(' / ')} mm for the rachis and ${(2 * cpd.stalkAskedMm).toFixed(2)} mm for a stalk`
+        + (cpd.floorBinds ? ` and the ${(2 * cpd.wireR).toFixed(2)} mm wire floor (the petiole's own radius rule) binds on ${cpd.floorBinds} rod${cpd.floorBinds === 1 ? '' : 's'}` : '')
+        + ' — rod sizing is an OPEN QUESTION for Eva';
+    })()
+    : '';
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node${leaf.divergenceDeg !== null && leaf.divergenceDeg !== undefined ? `, ${leaf.divergenceDeg.toFixed(1)}° between nodes${leaf.divergenceDeg === 180 ? ' — distichous' : ''}` : ''})`
-    + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
+    + (cpd ? ` · COMPOUND, a ${leaf.lengthMm} mm rachis at ${leaf.angleDeg} deg` : ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`)
+    + (leaf.typePinned ? ' · COMPOUND asked, PINNED SIMPLE: a raceme\'s shared node carries a simple leaf (told)' : '')
     + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
     + `\n     PETIOLE rooted at r = ${leaf.rootR.toFixed(2)} mm, the WALL's mid-thickness — embedded at every angle, and more so as the angle steepens`
     + ` · ${(2 * leaf.petioleR).toFixed(2)} mm across x ${leaf.petioleLenMm.toFixed(2)} mm`
@@ -1801,7 +1832,10 @@ function leafLine(leaf, leavesBuilt) {
     + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
     + archLine + edgeLine + teethLine
     + tipLine + sharedLine + capLine
-    + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
+    + compoundLine
+    + (cpd
+      ? `\n     SLENDERNESS rachis ${cpd.slenderness.ld.toFixed(1)} (the longest unsupported rod on the bloom: ${(cpd.rachisMm + cpd.terminalStalkMm).toFixed(1)} mm of rachis and terminal stalk at ${cpd.slenderness.diameterMm.toFixed(2)} mm) — UNMEASURED — no coupon has been printed\n`
+      : `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`);
 }
 
 /* THE SEPALS LINE (part 1). Everything the whorl clamps, it TELLS from the
@@ -2150,6 +2184,18 @@ function regenerate() {
      must print the OWNER's cap rather than re-derive it from the sliders.
      The petal's own form telemetry is where it lives; null on a flat build. */
   const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium, tube: built.tube || null,
+                  /* THE LEAVES' records (leaf/stem build S3), for the leaf controls'
+                     own read-outs. `leafArch`, `leafCup` and `leafTipShape` have
+                     read `shown.leaf` since S2 and the tip-shape session — and
+                     NOTHING EVER SET IT, so their clamp clauses (the arch under one
+                     sheet thickness, the cup's fold clamp, the tip's stub) had never
+                     once printed on the control; the read-out panel carried them.
+                     Found by the compound leaf's own basal-ratio clamp, which reads
+                     the same key. The leaf's arch (a compound leaf's is its
+                     rachis's), the first blade's cup and tip, and the plan's tree. */
+                  leaf: built.leaf && built.leaf.present && built.leavesBuilt && built.leavesBuilt.length
+                    ? { archBuilt: built.leavesBuilt.map((r) => r.arch), cupBuilt: built.leavesBuilt.map((r) => r.cup), tipClamp: built.leavesBuilt.map((r) => r.tipClamp), compound: built.leaf.compound || null }
+                    : null,
                   buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
                   /* THE LOBES' two caps join the record for the same reason (session
                      38): the count's and the depth's marks print the OWNER's numbers. */
@@ -2666,8 +2712,23 @@ window.__bloomMetrics = () => ({
     /* THE TIP (LF9): the exponent the PLAN declares, the half-widths the BLADE
        was built from, and the terminal-clamp record the read-out prints. */
     tipShape: lastLeaf.tipShape,
-    rowHalfBaseMm: (lastLeavesBuilt || []).map((r) => r.rowHalfBaseMm),
-    tipClamp: (lastLeavesBuilt || []).map((r) => r.tipClamp),
+    /* THE LEAF'S TYPE (leaf/stem build S3): the PLAN's statement, whether a
+       raceme's shared node pinned a compound ask, and the compound tree the
+       plan laid out (null for a simple leaf). LF14 holds the plan against the
+       registry's `leafCompound` and the builder's emitted blades. */
+    type: lastLeaf.type, typePinned: lastLeaf.typePinned === true,
+    compound: lastLeaf.compound ? JSON.parse(JSON.stringify(lastLeaf.compound)) : null,
+    /* PER BLADE, NOT PER LEAF (S3): every array below that describes a BLADE
+       has one entry per emitted blade — a simple leaf's one, a compound
+       leaf's every leaflet in the layout's own build order — so LF9-LF13 hold
+       every leaflet to the blade law exactly as they hold a simple blade.
+       `bladeOf` names each entry's leaf and role. A simple leaf is one blade,
+       so on every simple row these are the per-leaf arrays they always were. */
+    bladeOf: (lastLeavesBuilt || []).flatMap((r, i) => leafBlades(r).map((b) => (r.compound
+      ? { leaf: i, role: b.role, k: b.k, side: b.side, lengthMm: b.lengthMm, widthMm: b.widthMm }
+      : { leaf: i, role: 'blade', k: 0, side: 0, lengthMm: null, widthMm: null }))),
+    rowHalfBaseMm: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowHalfBaseMm)),
+    tipClamp: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.tipClamp)),
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
     crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),
@@ -2677,6 +2738,17 @@ window.__bloomMetrics = () => ({
        inside the free stem's own cylinder by design; ST9 reads these to tell
        that third part from the petal it exists to doubt. */
     petioleAxes: (lastLeavesBuilt || []).map((r) => r.petioleAxis),
+    /* EVERY ROD A LEAF EMITTED (S3) — the petiole of a simple leaf, and a
+       compound leaf's petiole, rachis segments and stalks — the exemption ST9
+       and the combination gate NAME, never a widened region. */
+    rodAxes: (lastLeavesBuilt || []).flatMap((r) => r.rodAxes),
+    /* A COMPOUND LEAF'S RODS AND LEAFLET PLACEMENTS AS EMITTED — the compound
+       clauses' measured side (null per simple leaf). */
+    compoundBuilt: (lastLeavesBuilt || []).map((r) => (r.compound ? {
+      axisRod: r.axisRod, stalkRods: r.stalkRods, rachis: r.rachis,
+      leaflets: r.leaflets.map((q) => ({ role: q.role, k: q.k, side: q.side, lengthMm: q.lengthMm, widthMm: q.widthMm, embedMm: q.embedMm,
+        root: q.root, base: q.base, D: q.D, T: q.T, N: q.N, holder: q.holder, tris: q.tris, baseAxisMm: q.rim.baseAxisMm ?? null })),
+    } : null)),
     /* LF8's measured side — the builder's own DIRECTED-edge census, which both
        STL gates are blind to because theirs keys on a sorted pair. */
     directedMismatch: (lastLeavesBuilt || []).map((r) => r.directedMismatch),
@@ -2706,14 +2778,16 @@ window.__bloomMetrics = () => ({
        the OUTLINE carries at every margin sinus (LF13), and the form's own
        cup-clamp record and the arch's radius for the read-out. */
     archDeg: lastLeaf.archDeg, cup: lastLeaf.cup,
-    rowCentre: (lastLeavesBuilt || []).map((r) => r.rowCentre),
-    rowNormal: (lastLeavesBuilt || []).map((r) => r.rowNormal),
-    rowHalfMm: (lastLeavesBuilt || []).map((r) => r.rowHalfMm),
-    rowMarginLiftMm: (lastLeavesBuilt || []).map((r) => r.rowMarginLiftMm),
-    archBuilt: (lastLeavesBuilt || []).map((r) => ({ ...r.arch, radiusMm: Number.isFinite(r.arch.radiusMm) ? r.arch.radiusMm : null })),
-    cupBuilt: (lastLeavesBuilt || []).map((r) => ({ coefficient: r.cup.coefficient, clamp: r.cup.clamp ? { ...r.cup.clamp, askedRadiusMm: Number.isFinite(r.cup.clamp.askedRadiusMm) ? r.cup.clamp.askedRadiusMm : null, drawnRadiusMm: Number.isFinite(r.cup.clamp.drawnRadiusMm) ? r.cup.clamp.drawnRadiusMm : null } : null })),
-    serrationBuilt: (lastLeavesBuilt || []).map((r) => r.serration),
-    rimClamps: (lastLeavesBuilt || []).map((r) => r.rim.clamps.length),
+    rowCentre: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowCentre)),
+    rowNormal: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowNormal)),
+    rowHalfMm: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowHalfMm)),
+    rowMarginLiftMm: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowMarginLiftMm)),
+    archBuilt: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => ({ ...b.arch, radiusMm: Number.isFinite(b.arch.radiusMm) ? b.arch.radiusMm : null }))),
+    /* the LEAF's own arch (a compound leaf's is its RACHIS's), per leaf */
+    leafArchBuilt: (lastLeavesBuilt || []).map((r) => ({ ...r.arch, radiusMm: Number.isFinite(r.arch.radiusMm) ? r.arch.radiusMm : null })),
+    cupBuilt: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => ({ coefficient: b.cup.coefficient, clamp: b.cup.clamp ? { ...b.cup.clamp, askedRadiusMm: Number.isFinite(b.cup.clamp.askedRadiusMm) ? b.cup.clamp.askedRadiusMm : null, drawnRadiusMm: Number.isFinite(b.cup.clamp.drawnRadiusMm) ? b.cup.clamp.drawnRadiusMm : null } : null }))),
+    serrationBuilt: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.serration)),
+    rimClamps: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rim.clamps.length)),
   } : null,
   leafTris: lastLeafTris,
   leafAbsent: lastLeafAbsent,

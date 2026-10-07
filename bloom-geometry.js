@@ -9512,6 +9512,19 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   const grid = (acc.captureGrid || acc.captureLamina) ? [] : null;
   const rowFrom = panel.rowFrom, rowTo = panel.rowTo;
   const tipExposed = rowTo === rows.length - 1;
+  /* THE FREE BASE (leaf/stem build S3, the compound leaf). A leaflet on its
+     stalk has nothing burying its first row: the stalk runs INTO the blade,
+     and the blade's own base is a free edge exactly as its tip is. So a panel
+     may declare `baseExposed`, and its base is then treated as the tip is —
+     the first RIM_TIP_ROWS rows become the base's apex ring, the margin bead
+     runs at full strength down to the base corners (no ramp from a buried
+     end), and the taper reads the distance to the base edge as it reads the
+     distance to the tip. NO PETAL AND NO SIMPLE LEAF DECLARES IT, so every
+     expression below takes its pre-S3 form for them: `skinFrom` IS `rowFrom`,
+     `skOf(i)` IS `Math.min(i, skinTo) - rowFrom` (i >= rowFrom always), and
+     every new term sits behind a branch on the flag, never an arithmetic
+     identity argued exact. */
+  const baseExposed = !!panel.baseExposed && !per;
   /* The buried stretch at the panel's start: the foot's rows all carry
      u === 0 (clause 3 of the grid gate asserts that), and a lobe or a tooth
      starts PANEL_OVERLAP_ROWS inside the panel below it. Both are ends the
@@ -9525,6 +9538,9 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      the ladder's own last gap rather than the ruled radius — reported, per
      state, on `rim.tipAxis`. */
   const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;
+  const skinFrom = baseExposed ? Math.min(skinTo, rowFrom + RIM_TIP_ROWS) : rowFrom;
+  const skOf = (i) => Math.min(Math.max(i, skinFrom), skinTo) - skinFrom;
+  const sOff = skinFrom - rowFrom;
 
   /* ---- the original boundary: the apexes, the room, and the arc measure ---- */
   const NROW = rowTo - rowFrom + 1;
@@ -9554,7 +9570,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   const top = [], bot = [], skinV = [], skinP = [], skinN = [], skinB = [];
   const rimClamped = [];
   let drawnMax = 0, sheetMax = 0;
-  for (let i = rowFrom; i <= skinTo; i++) {
+  for (let i = skinFrom; i <= skinTo; i++) {
     const k = i - rowFrom, row = rows[i], tBody = tBodyOf[k];
     const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);
     /* THE RAMP. Zero at every buried end and full RIM_TAPER_MM of surface
@@ -9562,7 +9578,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        inset AND the taper's depth together, so at a buried end the panel
        emits the flat wall at the body's own thickness — which is the whole
        of "the base stretch must emit exactly what it emits today". */
-    const gBase = rimEase((sMargin[k] - sBase) / RIM_TAPER_MM);
+    const gBase = baseExposed ? 1 : rimEase((sMargin[k] - sBase) / RIM_TAPER_MM);
     const g = tipExposed ? gBase : Math.min(gBase, rimEase((sTip - sMargin[k]) / RIM_TAPER_MM));
     /* AND A FLOOR ON THE DRAWN RADIUS WHERE IT IS ALREADY NON-ZERO. The fan
        gate above is the ruled fix and it does not finish the job. Measured on
@@ -9606,8 +9622,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     for (let j = 1; j < NVp; j++) arc.push(arc[j - 1] + rimDist(Ps[j - 1], Ps[j]));
     const dEdge = a;
     const dTipRow = tipExposed ? (sTip - sMargin[k]) : Infinity;
+    const dBaseRow = baseExposed ? (sMargin[k] - sBase) : Infinity;
     for (let j = 0; j < NVp; j++) {
-      const d = per ? dTipRow : Math.min(dEdge + arc[j], dEdge + (arc[NVp - 1] - arc[j]), dTipRow);
+      const d = per ? dTipRow
+        : baseExposed ? Math.min(dEdge + arc[j], dEdge + (arc[NVp - 1] - arc[j]), dTipRow, dBaseRow)
+          : Math.min(dEdge + arc[j], dEdge + (arc[NVp - 1] - arc[j]), dTipRow);
       const b0 = tBody / 2 + g * (r - tBody / 2) * (1 - rimEase(d / RIM_TAPER_MM));
       /* a panel that declares `thinAt` (the tube's ring, and nothing else) is
          trimmed where another shell lies on it; every other panel takes b0 */
@@ -9661,7 +9680,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      skins (boundary 0, directed census 0 — measured by the prototype's sweep
      and by the TU family). */
   if (per) {
-    const mk = (i, js) => js.map((j) => { const sk = Math.min(i, skinTo) - rowFrom; return rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], oP[i - rowFrom][j], top[sk][j], bot[sk][j]); });
+    const mk = (i, js) => js.map((j) => { const sk = skOf(i); return rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], oP[i - rowFrom][j], top[sk][j], bot[sk][j]); });
     const asc = Array.from({ length: NVp }, (_, j) => j);
     emitRimLoop(acc, mk(rowFrom, asc), K);
     emitRimLoop(acc, mk(rowTo, asc.slice().reverse()), K);
@@ -9696,11 +9715,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   const entries = [];
   for (let k = 0; k < loop.length; k++) {
     const [i, j] = loop[k];
-    const sk = Math.min(i, skinTo) - rowFrom;
+    const sk = skOf(i);
     entries.push({ apex: oP[i - rowFrom][j], sk, j });
     const n = (k + 1) % loop.length;
     const [i2, j2] = loop[n];
-    const sk2 = Math.min(i2, skinTo) - rowFrom;
+    const sk2 = skOf(i2);
     /* A PIVOT ONLY WHERE THE TREATMENT IS. At a buried end the profile is the
        flat wall and its apex IS its skin point, so an interpolated apex would
        point along the margin from a skin point that has no bead — a flap main
@@ -9784,7 +9803,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
         return (Math.acos(d) * 180) / Math.PI;
       };
       for (let k = 0; k < loop.length; k++) {
-        const [i, j] = loop[k], sk = Math.min(i, skinTo) - rowFrom;
+        const [i, j] = loop[k], sk = skOf(i);
         const apex = oP[i - rowFrom][j];
         /* THE THREE EMITTED VERTICES OF A TREATED PROFILE, as the SAME arrays
            the mesh got — the apex and the two points where the bead meets the
@@ -9792,7 +9811,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
            before it measures anything with them, so this points at the
            artefact rather than standing in for it: the rim's thickness is
            |top - bot| between two vertices the mesh demonstrably has. */
-        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk], clamped: rimClamped[sk][j], roomMm: roomMm[sk], outlineTurnDeg: turnAt(k) });
+        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk + sOff], clamped: rimClamped[sk][j], roomMm: roomMm[sk + sOff], outlineTurnDeg: turnAt(k) });
         /* AND THE PERIMETER THE TREATMENT DID NOT REACH — the buried stretch,
            which is a flat wall at ninety degrees BY DESIGN on this tree and on
            main. The dihedral clause needs it so it can attribute an edge to
@@ -9815,15 +9834,21 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          from. On main the same corner is part of a 90 degree wall. */
       for (const r of RUN) {
         const [i, j] = loop[r === 0 ? loop.length - 1 : r - 1];
-        const sk = Math.min(i, skinTo) - rowFrom;
+        const sk = skOf(i);
         if (!rimSameP(oP[i - rowFrom][j], skinP[sk][j])) rim.corner.push(oP[i - rowFrom][j]);
       }
     }
     rim.segments = Math.max(rim.segments, K);
     rim.drawnMaxMm = Math.max(rim.drawnMaxMm, drawnMax);
     if (skinTo < rowTo) {
-      const gap = rimDist(oP[NROW - 1][0], skinP[skinTo - rowFrom][0]);
+      const gap = rimDist(oP[NROW - 1][0], skinP[skinTo - skinFrom][0]);
       rim.tipAxisMm = rim.tipAxisMm === null ? gap : Math.min(rim.tipAxisMm, gap);
+    }
+    /* THE FREE BASE'S OWN SEMI-AXIS, the tip's mirror — reported only where a
+       panel declared one, so no existing record grows a field. */
+    if (baseExposed && skinFrom > rowFrom) {
+      const gap = rimDist(oP[0][0], skinP[0][0]);
+      rim.baseAxisMm = rim.baseAxisMm === undefined || rim.baseAxisMm === null ? gap : Math.min(rim.baseAxisMm, gap);
     }
   }
   return grid;
@@ -12660,7 +12685,11 @@ export function leafNodeLayout(state, stemLengthMm) {
      rises higher than its chord, and the inset is what keeps the top leaf out
      of the head. `leafArchRiseMm` returns `lengthMm * Math.sin(...)` verbatim
      at arch 0, so no shipped node depth moves. */
-  const rise = leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));
+  /* A COMPOUND LEAF RISES BY ITS WHOLE TREE (leaf/stem build S3): the rachis
+     arc, the terminal on its stalk and every lateral leaflet's tip, each from
+     its own station — `compoundLeafRiseMm`, the one owner, and a BRANCH, so a
+     simple leaf takes the arch law verbatim. */
+  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));
   const insetAskedMm = LEAF_NODE_TOP * stemLengthMm;
   const insetNeededMm = Math.max(0, rise);
   const insetMm = Math.max(insetAskedMm, insetNeededMm);
@@ -14472,6 +14501,16 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
   if (leafIsAbsent(state) || !stem || !stem.present) {
     return { present: false, nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
   }
+  /* A SHARED NODE'S LEAF IS SIMPLE, PINNED HERE AND NOWHERE ELSE (leaf/stem
+     build S3; `SHARED_NODE_LEAF_PINS` beside the pedicel's own pins). The
+     shared-node laws below are written for ONE blade: the seating offset reads
+     a single blade's reach under the pedicel, and the flowering node's cap
+     solves for a single blade's LENGTH against a prism of its own section. A
+     compound leaf's lateral leaflets are neither, so it does not compose and
+     is not asked to. The spread happens ONLY for a compound ask, so a simple
+     shared leaf reads the very state object it always did. */
+  const askedCompound = leafIsCompound(state);
+  if (askedCompound && inflo && inflo.present) state = { ...state, ...SHARED_NODE_LEAF_PINS };
   const lengthMm = Number(state.leafLength);
   const widthMm = Number(state.leafWidth);
   const angleDeg = Number(state.leafAngle);
@@ -14663,6 +14702,14 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     /* SLENDERNESS, the coupon question. Reported, never a bound: nothing in
        this project has ever been printed. */
     slenderness: lengthMm / (2 * petioleR),
+    /* THE LEAF'S TYPE (leaf/stem build S3) and, for a compound leaf, its tree:
+       the layout (`compoundLeafLayout`, the one owner of where every leaflet
+       is and how big) and the rods' derived radii (`compoundRodRadii`). Null
+       for a simple leaf — by branch — and `typePinned` says when a raceme's
+       shared node pinned a compound ask to SIMPLE. */
+    type: leafIsCompound(state) ? 'COMPOUND' : 'SIMPLE',
+    typePinned: askedCompound && !leafIsCompound(state),
+    compound: leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR) : null,
   };
 }
 
@@ -14750,6 +14797,39 @@ export function leafBladeState(state) {
    blade base exactly (`arcStep(th, th, 0)` is the zero displacement), so the
    blade still leaves its petiole on the petiole's own line.
    =================================================================== */
+/* THE BLADE LAW ON A LEAF'S OWN STATE — the form, the row count and the
+   outline, one call (leaf/stem build S3). Extracted VERBATIM from
+   `leafSurface` so a compound leaf's every LEAFLET is built by the same calls
+   in the same order as a simple leaf's one blade: `petalForm`, `widthProfile`
+   with the petiole cap and the tooth floor, `LEAF_BLADE_ROWS`. One blade law,
+   never a second; a leaflet differs from a simple blade only in the length
+   and width it is handed and the frame it is laid on. */
+function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
+  const form = petalFormIsFlat(bs) ? null : petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness));
+  const nu = LEAF_BLADE_ROWS;
+  const cap = { petiole: true, rowCapacity: nu };
+  /* THE TOOTH RELIEF IS FLOORED AT THE MINIMUM FEATURE (Eva's ruling, Oct 6:
+     "tooth depth is ALWAYS floored at MIN_FEATURE_MM, design view included").
+     The constant, never the mode's floor, so LIVE and EXPORT cut the SAME
+     teeth — which teeth exist is topology. See the lobe block's own header for
+     exactly what is floored and how the count gives. A LEAF's cap only: petal
+     lobes are untouched by this ruling. Every LEAFLET carries it too (S3:
+     "small leaflets losing teeth to the floor is the ruled behaviour"). */
+  cap.toothReliefFloorMm = MIN_FEATURE_MM;
+  const prof = widthProfile(bs, { width: 0, thickness: sheetThickness }, widthMm / 2, cap, acc, Lmm);
+  const t = acc.floorThickness(sheetThickness);
+  return { form, nu, cap, prof, t };
+}
+/* ONE ROW's half-widths and cross-section on a given frame — the leaf row's
+   own expressions, extracted verbatim for the same reason. */
+function leafRowSect(prof, form, C, T, N, u) {
+  const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
+  const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
+  const sect = form
+    ? form.sectAt(C, T, N, h, u, hb)
+    : (v) => ({ P: [C[0] + T[0] * h * v, C[1] + T[1] * h * v, C[2] + T[2] * h * v], n: N });
+  return { h, hb, sect };
+}
 export function leafSurface(acc, plan, state, nodeIndex, az) {
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
@@ -14767,23 +14847,12 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
      takes the flat arm below rather than the zero-form law argued exact. Before
      the cup was a control no reachable leaf was flat, so this moves nothing
      that shipped. */
-  const form = petalFormIsFlat(bs) ? null : petalForm(bs, plan.widthMm / 2, acc.floorThickness(state.sheetThickness));
-  const nu = LEAF_BLADE_ROWS;
-  const cap = { petiole: true, rowCapacity: nu };
-  /* THE TOOTH RELIEF IS FLOORED AT THE MINIMUM FEATURE (Eva's ruling, Oct 6:
-     "tooth depth is ALWAYS floored at MIN_FEATURE_MM, design view included").
-     The constant, never the mode's floor, so LIVE and EXPORT cut the SAME
-     teeth — which teeth exist is topology. See the lobe block's own header for
-     exactly what is floored and how the count gives. A LEAF's cap only: petal
-     lobes are untouched by this ruling. */
-  cap.toothReliefFloorMm = MIN_FEATURE_MM;
-  const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, plan.widthMm / 2, cap, acc, Lmm);
-  const t = acc.floorThickness(state.sheetThickness);
+  const { form, nu, cap, prof, t } = leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   /* ON THE DISPLACED AXIS where the stem has nodes, and the pre-node
      expression verbatim where it has none (a branch, never `+ 0`). */
   const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
-  const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
+  const base = leafRootBase(plan, o, R, z);
   const pLen = perNode ? plan.nodePetioleLenMm[nodeIndex] : plan.petioleLenMm;
   const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
   /* THE ARCH'S CURVATURE, from the form's own `curlRad` (the leaf's arch,
@@ -14807,14 +14876,112 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
       C = [bb[0] + R[0] * dAlong, bb[1] + R[1] * dAlong, bb[2] + dAcross];
       fr = form.frameAt(R, T, phi, u);
     }
-    const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
-    const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
-    const sect = form
-      ? form.sectAt(C, fr.T, fr.N, h, u, hb)
-      : (v) => ({ P: [C[0] + fr.T[0] * h * v, C[1] + fr.T[1] * h * v, C[2] + fr.T[2] * h * v], n: fr.N });
+    const { h, hb, sect } = leafRowSect(prof, form, C, fr.T, fr.N, u);
     return { u, h, hb, C, D: fr.D, T: fr.T, N: fr.N, phi, sect };
   };
   return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, rowAt };
+}
+
+/* THE DIRECTED-EDGE CENSUS over the triangles emitted since `tris0`. */
+function leafDirectedMismatch(acc, tris0) {
+  let directedMismatch = 0;
+  const P = acc.positions;
+  const k = (i) => `${P[i]},${P[i + 1]},${P[i + 2]}`;
+  const dir = new Map();
+  for (let q = tris0 * 9; q < P.length; q += 9) {
+    const v = [k(q), k(q + 3), k(q + 6)];
+    for (let m = 0; m < 3; m++) { const e = `${v[m]}|${v[(m + 1) % 3]}`; dir.set(e, (dir.get(e) || 0) + 1); }
+  }
+  for (const [e, n] of dir) {
+    const [a, b] = e.split('|');
+    if ((dir.get(`${b}|${a}`) || 0) !== n) directedMismatch++;
+  }
+  return directedMismatch;
+}
+
+/* ONE LEAF BLADE THROUGH `emitPanel`, AND WHAT IT WAS BUILT FROM — the simple
+   leaf's own blade code, extracted verbatim (leaf/stem build S3) so a compound
+   leaf's every leaflet is emitted and reported by the same lines. `rowAt(u)`
+   is the row plan on whatever frame the caller lays the blade on; `free` is
+   the BASE's treatment — false for a simple leaf, whose petiole holds row 0
+   (emitPanel's buried base, today's bytes), true for a leaflet on its stalk,
+   whose base is a free edge (`baseExposed`, emitPanel's own new flag). */
+function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free) {
+  const rows = [], rowHalfBaseMm = [], rowHalfMm = [], rowCentre = [], rowNormal = [], rowMarginLiftMm = [];
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  for (let i = 0; i <= nu; i++) {
+    const row = rowAt(i / nu);
+    rows.push(row);
+    rowHalfBaseMm.push(row.hb);
+    rowHalfMm.push(row.h);
+    rowCentre.push(row.C);
+    rowNormal.push(row.N);
+    /* THE CUP AS THE SURFACE CARRIES IT — the lift of each margin's mid-surface
+       point over the row's centre along the row's own normal. LF12 reads the
+       cup coefficient back off these against the LEAF's own control. */
+    const pm = row.sect(-1).P, pp = row.sect(1).P;
+    rowMarginLiftMm.push([dot3([pm[0] - row.C[0], pm[1] - row.C[1], pm[2] - row.C[2]], row.N), dot3([pp[0] - row.C[0], pp[1] - row.C[1], pp[2] - row.C[2]], row.N)]);
+  }
+  /* THE EDGE PROFILE'S OWN RECORD, the petal builder's shape: the narrow-span
+     clamps always, the treated apexes when the accumulator captures rims (the
+     edge-profile gate's E family reads them — leaves are in its subject now). */
+  const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], pivotsSkipped: 0, segments: 0, drawnMaxMm: 0, tipAxisMm: null };
+  if (free) rim.baseAxisMm = null;
+  const panel = free
+    ? { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1], baseExposed: true }
+    : { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] };
+  emitPanel(acc, rows, panel, () => t, rim);
+  /* THE TERMINAL CLAMP, TOLD (the leaf tip-shape session). The half-width
+     above is `max(profile, TIP_HALF_MM)`, so the blade ends 2 x TIP_HALF_MM
+     across at every exponent and in both modes; where the outline MEETS that
+     floor is the one number that says how much of the leaf is the stub. Found
+     on the profile's own base outline by bisection over [widest point, 1] —
+     the outline is monotone there, and the floor is the constant rather than
+     the mode floor, so the station is the same in LIVE and EXPORT (measured:
+     identical to six figures at every exponent). A LENGTH derived from a
+     length: the station times the leaf's own length, never a row count. */
+  const tipClamp = (() => {
+    let lo = prof.uPk, hi = 1;
+    if (!(prof.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
+    else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (prof.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
+    const fromU = hi;
+    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };
+  })();
+  /* THE SERRATION AS BUILT — the lobe record the outline was cut from, with
+     the relief the OUTLINE carries at every margin sinus (base minus drawn
+     half-width, at the sinus station the record declares). LF13's measured
+     side: a floor applied to the record and not to the cut shows as these
+     disagreeing with it. */
+  const L0 = prof.lobes;
+  const serration = !L0 ? null : {
+    noRoom: !!L0.noRoom, noRoomWhy: L0.noRoomWhy || null,
+    countAsked: L0.countAsked, countBuilt: L0.countBuilt, clampedBy: L0.clampedBy || null,
+    countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
+    depthAsked: L0.depthAsked, peakHalfMm: L0.peakHalfMm, reliefAskedMm: L0.reliefAskedMm,
+    reliefFloorMm: L0.reliefFloorMm, reliefBuiltMm: L0.reliefBuiltMm, reliefFloored: !!L0.reliefFloored,
+    periods: L0.periods, apexIsCrest: L0.apexIsCrest, reliefMm: (L0.reliefMm || []).slice(),
+    sinusU: (L0.sinusU || []).slice(),
+    sinusReliefMm: (L0.sinusU || []).map((u) => prof.halfWidthBaseAt(u) - prof.halfWidthAt(u)),
+    /* THE DRAWN DEPTH, honestly: the deepest emitted ROW in each margin
+       period, which samples the cut between stations and so reads at or under
+       the law's own relief. Reported, never floored — the floor is on the law
+       at the sinus (docs/bloom-leaf-emitter-arch-cup-outcome.md §4). */
+    rowReliefMm: (L0.sinusU || []).map((us, k) => {
+      /* sinus k lies between margin crests k and k + 1 (they alternate from
+         the treated end toward the apex); past the last margin crest the
+         period runs to the tip. */
+      const lo = L0.crestU[k] === undefined ? 0 : L0.crestU[k], hi = L0.crestU[k + 1] === undefined ? 1 : L0.crestU[k + 1];
+      let best = 0;
+      for (let i = 0; i <= nu; i++) {
+        const u = i / nu;
+        if (u < lo || u > hi) continue;
+        const d = rowHalfBaseMm[i] - rowHalfMm[i];
+        if (d > best) best = d;
+      }
+      return best;
+    }),
+  };
+  return { rows, rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim, tipClamp, serration };
 }
 
 /* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
@@ -14845,7 +15012,21 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
    defaults the only geometry change is the edge: the bead, its inset and the
    column count. `tools/verify-bloom-leaf-bytes.mjs --change emitter` checks it
    as an identity against the base tree's own emitted skin vertices. */
+/* WHERE A LEAF IS ROOTED — the stem wall's mid-thickness, ON THE DISPLACED
+   AXIS where the stem has nodes and the pre-node expression verbatim where it
+   has none (a branch, never `+ 0`). ONE OWNER (leaf/stem build S3): the simple
+   blade and the compound tree both root here, so a mutation of the root
+   reaches both and an anchored mutant cannot match twice (§9b(i)'s class). */
+function leafRootBase(plan, o, R, z) {
+  return o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
+}
 export function buildLeafInto(acc, plan, state, nodeIndex, az) {
+  /* A COMPOUND LEAF (leaf/stem build S3) is its own builder, chosen by the
+     PLAN — the one owner of the leaf's type — and never by the state, so a
+     raceme's shared node, which pins the type to SIMPLE in the plan, cannot be
+     overridden by a control the plan has already overruled. A BRANCH: a simple
+     leaf runs every line below exactly as before. */
+  if (plan.compound) return buildCompoundLeafInto(acc, plan, state, nodeIndex, az);
   const tris0 = acc.triangleCount;
   const S = leafSurface(acc, plan, state, nodeIndex, az);
   const { R, T, D0, base, pLen, Lmm, nu, prof, t, form, law } = S;
@@ -14889,26 +15070,8 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bladeTris0 = acc.triangleCount;
-  const rows = [], rowHalfBaseMm = [], rowHalfMm = [], rowCentre = [], rowNormal = [], rowMarginLiftMm = [];
-  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  for (let i = 0; i <= nu; i++) {
-    const row = S.rowAt(i / nu);
-    rows.push(row);
-    rowHalfBaseMm.push(row.hb);
-    rowHalfMm.push(row.h);
-    rowCentre.push(row.C);
-    rowNormal.push(row.N);
-    /* THE CUP AS THE SURFACE CARRIES IT — the lift of each margin's mid-surface
-       point over the row's centre along the row's own normal. LF12 reads the
-       cup coefficient back off these against the LEAF's own control. */
-    const pm = row.sect(-1).P, pp = row.sect(1).P;
-    rowMarginLiftMm.push([dot3([pm[0] - row.C[0], pm[1] - row.C[1], pm[2] - row.C[2]], row.N), dot3([pp[0] - row.C[0], pp[1] - row.C[1], pp[2] - row.C[2]], row.N)]);
-  }
-  /* THE EDGE PROFILE'S OWN RECORD, the petal builder's shape: the narrow-span
-     clamps always, the treated apexes when the accumulator captures rims (the
-     edge-profile gate's E family reads them — leaves are in its subject now). */
-  const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], pivotsSkipped: 0, segments: 0, drawnMaxMm: 0, tipAxisMm: null };
-  emitPanel(acc, rows, { label: 'leaf', rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] }, () => t, rim);
+  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false);
+  const { rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim } = B;
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
      — read off the triangles this builder EMITTED (the bead included), never
      `pLen + Lmm` beside them. SN4's measured side: a builder that built the
@@ -14955,70 +15118,16 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      S2 (the stem census's key): the bead puts distinct vertices closer than
      the 1e-4 mm the old quantised key merged, and a quantised key would read
      two real vertices as one and report a mismatch the mesh does not have. */
-  let directedMismatch = 0;
-  {
-    const P = acc.positions;
-    const k = (i) => `${P[i]},${P[i + 1]},${P[i + 2]}`;
-    const dir = new Map();
-    for (let q = tris0 * 9; q < P.length; q += 9) {
-      const v = [k(q), k(q + 3), k(q + 6)];
-      for (let m = 0; m < 3; m++) { const e = `${v[m]}|${v[(m + 1) % 3]}`; dir.set(e, (dir.get(e) || 0) + 1); }
-    }
-    for (const [e, n] of dir) {
-      const [a, b] = e.split('|');
-      if ((dir.get(`${b}|${a}`) || 0) !== n) directedMismatch++;
-    }
-  }
-  /* THE TERMINAL CLAMP, TOLD (the leaf tip-shape session). The half-width
-     above is `max(profile, TIP_HALF_MM)`, so the blade ends 2 x TIP_HALF_MM
-     across at every exponent and in both modes; where the outline MEETS that
-     floor is the one number that says how much of the leaf is the stub. Found
-     on the profile's own base outline by bisection over [widest point, 1] —
-     the outline is monotone there, and the floor is the constant rather than
-     the mode floor, so the station is the same in LIVE and EXPORT (measured:
-     identical to six figures at every exponent). A LENGTH derived from a
-     length: the station times the leaf's own length, never a row count. */
-  const tipClamp = (() => {
-    let lo = prof.uPk, hi = 1;
-    if (!(prof.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
-    else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (prof.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
-    const fromU = hi;
-    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };
+  const directedMismatch = leafDirectedMismatch(acc, tris0);
+  const { tipClamp, serration } = B;
+  const petioleAxis = (() => {
+    const mid = (ring) => {
+      let x = 0, y = 0, z = 0;
+      for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
+      return [x / ring.length, y / ring.length, z / ring.length];
+    };
+    return { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
   })();
-  /* THE SERRATION AS BUILT — the lobe record the outline was cut from, with
-     the relief the OUTLINE carries at every margin sinus (base minus drawn
-     half-width, at the sinus station the record declares). LF13's measured
-     side: a floor applied to the record and not to the cut shows as these
-     disagreeing with it. */
-  const L0 = prof.lobes;
-  const serration = !L0 ? null : {
-    noRoom: !!L0.noRoom, noRoomWhy: L0.noRoomWhy || null,
-    countAsked: L0.countAsked, countBuilt: L0.countBuilt, clampedBy: L0.clampedBy || null,
-    countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
-    depthAsked: L0.depthAsked, peakHalfMm: L0.peakHalfMm, reliefAskedMm: L0.reliefAskedMm,
-    reliefFloorMm: L0.reliefFloorMm, reliefBuiltMm: L0.reliefBuiltMm, reliefFloored: !!L0.reliefFloored,
-    periods: L0.periods, apexIsCrest: L0.apexIsCrest, reliefMm: (L0.reliefMm || []).slice(),
-    sinusU: (L0.sinusU || []).slice(),
-    sinusReliefMm: (L0.sinusU || []).map((u) => prof.halfWidthBaseAt(u) - prof.halfWidthAt(u)),
-    /* THE DRAWN DEPTH, honestly: the deepest emitted ROW in each margin
-       period, which samples the cut between stations and so reads at or under
-       the law's own relief. Reported, never floored — the floor is on the law
-       at the sinus (docs/bloom-leaf-emitter-arch-cup-outcome.md §4). */
-    rowReliefMm: (L0.sinusU || []).map((us, k) => {
-      /* sinus k lies between margin crests k and k + 1 (they alternate from
-         the treated end toward the apex); past the last margin crest the
-         period runs to the tip. */
-      const lo = L0.crestU[k] === undefined ? 0 : L0.crestU[k], hi = L0.crestU[k + 1] === undefined ? 1 : L0.crestU[k + 1];
-      let best = 0;
-      for (let i = 0; i <= nu; i++) {
-        const u = i / nu;
-        if (u < lo || u > hi) continue;
-        const d = rowHalfBaseMm[i] - rowHalfMm[i];
-        if (d > best) best = d;
-      }
-      return best;
-    }),
-  };
   return {
     directedMismatch, emittedReachMm,
     /* THE HALF-WIDTHS THE BLADE WAS BUILT FROM, row by row, the BASE outline
@@ -15065,14 +15174,13 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        third part from the petal it exists to doubt, and the answer is to name
        the petiole rather than to widen the region, because a region wide
        enough to hold a petiole is wide enough to hold a petal. */
-    petioleAxis: (() => {
-      const mid = (ring) => {
-        let x = 0, y = 0, z = 0;
-        for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
-        return [x / ring.length, y / ring.length, z / ring.length];
-      };
-      return { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
-    })(),
+    petioleAxis,
+    /* EVERY ROD THIS LEAF EMITTED, as straight axis segments — ST9's and the
+       combination gate's exemption list (leaf/stem build S3). A simple leaf
+       has one rod, its petiole; a compound leaf names its rachis and every
+       stalk the same way, so the exemption is NAMED rods and never a wider
+       region. */
+    rodAxes: [petioleAxis],
     /* THE BUILDER'S OWN TALLY, not a formula beside it — ST1's lesson one
        family later: a computed count and an emitted one are two owners, and
        this file has already shipped a stem arm whose computed count was wrong
@@ -15089,6 +15197,416 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
    real ring; with it down the outline is the shape term alone. */
 function widthProfileBlendIsDown(prof) {
   return prof.winnerAt(0).term !== 'ROOT_BLEND' && prof.winnerAt(1 / (2 * LEAF_BLADE_ROWS)).term !== 'ROOT_BLEND';
+}
+
+/* ===================================================================
+   THE COMPOUND LEAF (Eva's rulings, Oct 6 — leaf/stem build S3; read
+   docs/bloom-leaf-compound-outcome.md).
+
+   ONE LEAF, A TREE OF BLADES: the petiole leaves the stem wall as a simple
+   leaf's does, runs on as the RACHIS, and the rachis carries LATERAL leaflet
+   PAIRS on short stalks and a TERMINAL leaflet on its own stalk at the tip.
+   Leaflet count is a LEAF property, never a node's (the architecture ruling).
+   It is the leaf-lab's tree at fusion 0 (`tools/leaf-lab-core.mjs`,
+   `treeFromParams` + `buildTreeLeaf`) PORTED, not reinvented — with three
+   departures, each forced by a ruling and named:
+
+     1. EVERY LEAFLET IS THE SIMPLE LEAF'S OWN BLADE LAW (`leafBladeLaw` +
+        `emitLeafBladeInto`, extracted verbatim from the simple builder) on
+        the leaflet's own length and width: the petal outline with the
+        petiole cap, the tooth floor, `leafTipShape`, the LEAF's cup and S2's
+        bead. The lab's prototype law (`bladeHalf`, a skewed tooth) is NOT
+        ported — "one blade law, not a second one".
+     2. THE ARCH IS THE LEAF'S, NOT A LEAFLET'S (the S3 brief): the RACHIS
+        follows the petal's uniform arc (`arcStep`, the one owner of an arc's
+        displacement) over its own length, the petiole stays the straight rod
+        rooted in the wall (LF2/LF3's law, untouched), and each leaflet is laid
+        FLAT in the rachis's local plane at its station, cupped but never
+        arched. The lab bent its planform through one surface map, which also
+        bends every leaflet; the ruling is a flat leaflet on a drooping rachis.
+     3. A LEAFLET'S BASE IS FREE (`emitPanel`'s `baseExposed`): its stalk runs
+        INTO it, so its first row is a free edge beaded like its tip rather
+        than the buried base a petiole needs.
+
+   NOTHING HERE RUNS FOR A SIMPLE LEAF: the type is a CHOICE (`leafType`,
+   SIMPLE by default, out of the blanket sweep by construction), the plan
+   carries `compound: null`, and `buildLeafInto` branches on the plan. */
+export const LEAF_TYPES = Object.freeze(['SIMPLE', 'COMPOUND']);
+export function leafIsCompound(state) { return String(state.leafType) === 'COMPOUND'; }
+/* A RACEME'S SHARED-NODE LEAF NEVER INHERITS THE COMPOUND TYPE — THE ONE
+   PLACE (the `PEDICEL_PINS` pattern; `leafPlan` reads it). */
+export const SHARED_NODE_LEAF_PINS = Object.freeze({ leafType: 'SIMPLE' });
+/* THE RANGES (the lab's §6b tree on the registry's conventions: lengths in
+   millimetres, the pair stations as FRACTIONS of the rachis so a length change
+   moves no pair off the rachis). The defaults are the lab's ROSE (its §6
+   values) so the type's own default IS the reference leaf the session was
+   asked to anchor on — none of them is ruled.
+   THE PAIR COUNT STOPS AT FOUR ON COST, measured: a leaflet is one blade
+   (3,000 triangles), so a leaf of `p` pairs is about `(2p + 1) x 3,000` plus
+   its rods, and the worst reachable leaf corner is 24 leaves (whorled x 8).
+   At four pairs that corner is under half the export budget; at five it is
+   past it (docs/bloom-leaf-compound-outcome.md §3 has the numbers).
+   THE TWO STATIONS CANNOT MEET: the first pair's range ends below the last's
+   begins, so two pairs never stand at one station — identical leaflets at one
+   point would weld vertex for vertex into one shell, and the census would read
+   their by-design overlap as a fold. */
+export const LEAFLET_PAIRS_RANGE = Object.freeze([1, 4]);
+export const LEAFLET_PAIRS_DEFAULT = 2;
+export const LEAFLET_FIRST_RANGE = Object.freeze([0.05, 0.45]);
+export const LEAFLET_FIRST_DEFAULT = 0.15;
+export const LEAFLET_LAST_RANGE = Object.freeze([0.5, 1]);
+export const LEAFLET_LAST_DEFAULT = 0.65;
+export const LEAFLET_ANGLE_RANGE = Object.freeze([20, 90]);
+export const LEAFLET_ANGLE_DEFAULT = 62;
+export const LEAFLET_LENGTH_RANGE = Object.freeze([4, 60]);
+export const LEAFLET_LENGTH_DEFAULT = 20;
+export const LEAFLET_WIDTH_DEFAULT = 12;
+export const LEAFLET_BASAL_RANGE = Object.freeze([0.4, 1.4]);
+export const LEAFLET_BASAL_DEFAULT = 0.8;
+export const LEAFLET_TERMINAL_LENGTH_DEFAULT = 23;
+export const LEAFLET_TERMINAL_WIDTH_DEFAULT = 14;
+export const LEAFLET_STALK_RANGE = Object.freeze([0, 20]);
+export const LEAFLET_STALK_DEFAULT = 2.5;
+export const LEAFLET_TERMINAL_STALK_RANGE = Object.freeze([0, 30]);
+export const LEAFLET_TERMINAL_STALK_DEFAULT = 7;
+
+/* compoundLeafLayout — THE ONE OWNER of where every leaflet is and how big,
+   PURE ON THE STATE (no stem, no accumulator), so the inset law can read it
+   before the stem exists. Stations are millimetres along the RACHIS from its
+   base (the petiole's end); `leafLength` IS the rachis length (the lab's
+   `lengthMm`, §6a: "length (midrib / rachis)"). Pair k of p sits at the
+   fraction `first + (last - first) k / (p - 1)` — one pair at `first` — and
+   its size ramps linearly from the BASAL RATIO at pair 0 to 1 at the apical
+   pair; a single pair is the apical pair, full size (the ratio and `last` are
+   then inert, and the registry hides them).
+   A SCALED LEAFLET IS FLOORED AT THE LEAF'S OWN MINIMA, CLAMPED AND TOLD: no
+   blade narrower than `LEAF_WIDTH_RANGE[0]` (3 mm — under it the 1.60 mm print
+   terminal is the whole blade) and none shorter than `LEAFLET_LENGTH_RANGE[0]`.
+   The sliders keep their asked values; `clamped` says which leaflet gave. */
+export function compoundLeafLayout(state) {
+  const num = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+  const clamp = (x, R) => Math.min(R[1], Math.max(R[0], x));
+  const pairs = Math.round(clamp(num(state.leafletPairs, LEAFLET_PAIRS_DEFAULT), LEAFLET_PAIRS_RANGE));
+  const first = clamp(num(state.leafletFirst, LEAFLET_FIRST_DEFAULT), LEAFLET_FIRST_RANGE);
+  const last = clamp(num(state.leafletLast, LEAFLET_LAST_DEFAULT), LEAFLET_LAST_RANGE);
+  const angleDeg = clamp(num(state.leafletAngle, LEAFLET_ANGLE_DEFAULT), LEAFLET_ANGLE_RANGE);
+  const lenAsk = clamp(num(state.leafletLength, LEAFLET_LENGTH_DEFAULT), LEAFLET_LENGTH_RANGE);
+  const widAsk = clamp(num(state.leafletWidth, LEAFLET_WIDTH_DEFAULT), LEAF_WIDTH_RANGE);
+  const basal = clamp(num(state.leafletBasalRatio, LEAFLET_BASAL_DEFAULT), LEAFLET_BASAL_RANGE);
+  const tLen = clamp(num(state.leafletTerminalLength, LEAFLET_TERMINAL_LENGTH_DEFAULT), LEAFLET_LENGTH_RANGE);
+  const tWid = clamp(num(state.leafletTerminalWidth, LEAFLET_TERMINAL_WIDTH_DEFAULT), LEAF_WIDTH_RANGE);
+  const stalkMm = clamp(num(state.leafletStalk, LEAFLET_STALK_DEFAULT), LEAFLET_STALK_RANGE);
+  const terminalStalkMm = clamp(num(state.leafletTerminalStalk, LEAFLET_TERMINAL_STALK_DEFAULT), LEAFLET_TERMINAL_STALK_RANGE);
+  const rachisMm = Number(state.leafLength);
+  const lateral = [];
+  for (let k = 0; k < pairs; k++) {
+    const f = pairs > 1 ? k / (pairs - 1) : 0;
+    const frac = pairs > 1 ? first + (last - first) * f : first;
+    const ratio = pairs > 1 ? basal + (1 - basal) * f : 1;
+    const lengthAskedMm = lenAsk * ratio, widthAskedMm = widAsk * ratio;
+    const lengthMm = Math.max(LEAFLET_LENGTH_RANGE[0], lengthAskedMm), widthMm = Math.max(LEAF_WIDTH_RANGE[0], widthAskedMm);
+    lateral.push({ k, frac, stationMm: frac * rachisMm, ratio, lengthAskedMm, widthAskedMm, lengthMm, widthMm,
+      clamped: lengthMm !== lengthAskedMm || widthMm !== widthAskedMm });
+  }
+  return {
+    pairs, first, last, angleDeg, basal, rachisMm, stalkMm, terminalStalkMm,
+    lateral, terminal: { lengthMm: tLen, widthMm: tWid },
+    /* the leaflets IN BUILD ORDER: each pair left (+T) then right (-T), the
+       terminal last — the order every record below is in */
+    leaflets: [...lateral.flatMap((q) => [{ role: 'lateral', k: q.k, side: 1 }, { role: 'lateral', k: q.k, side: -1 }]), { role: 'terminal', k: pairs, side: 0 }],
+    count: 2 * pairs + 1,
+    clamped: lateral.filter((q) => q.clamped).length,
+  };
+}
+
+/* THE RACHIS ARC — a function of the LEAF's own angle and arch over the
+   rachis length, the simple blade's uniform arc on the rachis: `phi(s) =
+   theta + k s` with `k = -arch / L` (positive arches the tip DOWN). Returns
+   the arc's planar coordinates in the leaf's (radial, up) plane from the
+   rachis base, so the rise law and the builder read one expression. */
+function rachisArc(angleDeg, archDeg, rachisMm) {
+  const th = (angleDeg * Math.PI) / 180;
+  const a = Number(archDeg) || 0;
+  const k = a !== 0 && rachisMm > 0 ? ((-a * Math.PI) / 180) / rachisMm : 0;
+  return {
+    th, k,
+    phiAt: (s) => (k === 0 ? th : th + k * s),
+    /* (along, up) displacement from the rachis base */
+    at: (s) => {
+      if (k === 0) return [s * Math.cos(th), s * Math.sin(th)];
+      const { dAlong, dAcross } = arcStep(th, th + k * s, s);
+      return [dAlong, dAcross];
+    },
+  };
+}
+
+/* HOW HIGH A COMPOUND LEAF RISES OVER ITS RACHIS BASE — the inset law's
+   input. Every part is straight but the rachis, so the maximum is the rachis
+   arc's own (`leafArchRiseMm`, the simple leaf's law on the rachis) or the far
+   END of a straight part: the terminal's tip along the rachis's end tangent,
+   or a lateral leaflet's tip along its own direction, whose rise is `cos A`
+   of the rachis's at its station (the leaflet leaves the rachis at A inside
+   the rachis's local plane, whose across-direction is level). Like the simple
+   law it ignores the petiole and the blades' widths — the inset's own,
+   pre-existing approximation, unchanged. The harness restates it (LF4). */
+export function compoundLeafRiseMm(state) {
+  const lay = compoundLeafLayout(state);
+  const angleDeg = Number(state.leafAngle), archDeg = Number(state.leafArch ?? 0);
+  const arc = rachisArc(angleDeg, archDeg, lay.rachisMm);
+  let best = leafArchRiseMm(lay.rachisMm, angleDeg, archDeg);
+  const zEnd = arc.at(lay.rachisMm)[1];
+  best = Math.max(best, zEnd + (lay.terminalStalkMm + lay.terminal.lengthMm) * Math.sin(arc.phiAt(lay.rachisMm)));
+  const cA = Math.cos((lay.angleDeg * Math.PI) / 180);
+  for (const q of lay.lateral) {
+    const z0 = arc.at(q.stationMm)[1];
+    best = Math.max(best, z0, z0 + (lay.stalkMm + q.lengthMm) * cA * Math.sin(arc.phiAt(q.stationMm)));
+  }
+  return best;
+}
+
+/* THE RODS' RADII — DERIVED, NEVER A CONTROL (the S3 brief: "area rule from
+   the petiole, floored at the 1.2 mm wire"), and FLAGGED FOR EVA rather than
+   decided. The area rule read DOWNWARD from the petiole, the pedicel's own
+   precedent: a rod carrying `n` of the leaf's `N` leaflets asks
+   `petioleR sqrt(n / N)`, each leaflet's own stalk `petioleR / sqrt(N)` —
+   floored at the WIRE, which is the petiole's own radius rule
+   (`floorThickness(sheet) / 2`, the leaf's `partRadius`): the 1.2 mm wire on
+   the shipped sheet, in the MODE's own floor so no child rod is ever thicker
+   than its petiole in either mode.
+   WHAT THAT MEANS ON THIS TREE, said plainly because it is the finding: the
+   petiole IS the wire, so the floor binds on EVERY rod and every rod is the
+   petiole's 1.20 mm. The law is built and reported (asked against built) so
+   the day the petiole is thicker — or the wire thinner — the rachis tapers
+   without a code change; whether it SHOULD (a petiole grown by the area rule
+   upward, the lab's 2.68 mm for five leaflets) is Eva's question. */
+export function compoundRodRadiusMm(petioleR, wireR, carried, total) {
+  return Math.max(wireR, petioleR * Math.sqrt(carried / total));
+}
+export function compoundLeafPlan(state, rachisMm, petioleR) {
+  const lay = compoundLeafLayout(state);
+  const wireR = petioleR;
+  const N = lay.count;
+  /* the rachis KEY stations (base, every pair, tip), each interval's carried
+     count — the terminal plus every pair at or beyond the interval's END */
+  const keys = [...new Set([0, ...lay.lateral.map((q) => q.stationMm), rachisMm])].sort((x, y) => x - y);
+  const intervals = [];
+  for (let j = 0; j + 1 < keys.length; j++) {
+    const carried = 1 + 2 * lay.lateral.filter((q) => q.stationMm >= keys[j + 1]).length;
+    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, askedMm: petioleR * Math.sqrt(carried / N), radiusMm: compoundRodRadiusMm(petioleR, wireR, carried, N) });
+  }
+  const stalkAskedMm = petioleR * Math.sqrt(1 / N);
+  const stalkR = compoundRodRadiusMm(petioleR, wireR, 1, N);
+  return {
+    ...lay,
+    petioleR, wireR,
+    rachis: { keysMm: keys, intervals },
+    stalkR, stalkAskedMm,
+    /* WHERE THE FLOOR BINDS — every rod whose area-rule radius is under the
+       wire (reported; at the shipped sheet that is every rod). */
+    floorBinds: intervals.filter((q) => q.askedMm < wireR).length + (stalkAskedMm < wireR ? N : 0),
+    /* THE LONGEST UNSUPPORTED ROD, the coupon question: the rachis from the
+       petiole's end to the terminal's base. Reported, never a bound. */
+    slenderness: { rachisMm, diameterMm: 2 * intervals[intervals.length - 1].radiusMm, ld: (rachisMm + lay.terminalStalkMm) / (2 * intervals[intervals.length - 1].radiusMm) },
+  };
+}
+
+/* A CLOSED ROD ALONG A POLYLINE — rings at given centres on given (T, N)
+   frames and radii, the petiole's own ring law (12 sides, offset a half step
+   so no vertex lies on the binormal) and winding (outward side walls, end caps
+   facing out). Two consecutive centres that are the SAME point with different
+   radii are a SHOULDER: the quad between them is the flat annulus, wound out
+   by the same expression (a step DOWN along the rod faces forward). */
+function rodPolylineInto(acc, centres, Ts, Ns, radii, phase = 0.5) {
+  const sides = LEAF_PETIOLE_SIDES;
+  const rings = centres.map((C, k) => Array.from({ length: sides }, (_, i) => {
+    const a = (2 * Math.PI * (i + phase)) / sides, c = Math.cos(a) * radii[k], d = Math.sin(a) * radii[k];
+    const T = Ts[k], N = Ns[k];
+    return [C[0] + T[0] * c + N[0] * d, C[1] + T[1] * c + N[1] * d, C[2] + T[2] * c + N[2] * d];
+  }));
+  for (let k = 0; k + 1 < rings.length; k++) {
+    const A = rings[k], B = rings[k + 1];
+    for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(A[i], A[j], B[j], B[i]); }
+  }
+  const PA = rings[0], PB = rings[rings.length - 1];
+  for (let i = 1; i < sides - 1; i++) { acc.tri(PA[0], PA[i + 1], PA[i]); acc.tri(PB[0], PB[i], PB[i + 1]); }
+  return rings;
+}
+const ringMid = (ring) => {
+  let x = 0, y = 0, z = 0;
+  for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
+  return [x / ring.length, y / ring.length, z / ring.length];
+};
+/* a ring's radius AS EMITTED — the mean distance of its vertices from its own
+   centroid, read off the emitted ring rather than the radius it was asked for */
+const ringRadius = (ring) => {
+  const c = ringMid(ring);
+  let s = 0;
+  for (const q of ring) s += Math.hypot(q[0] - c[0], q[1] - c[1], q[2] - c[2]);
+  return s / ring.length;
+};
+
+/* buildCompoundLeafInto — ONE COMPOUND LEAF. The axis rod first (petiole,
+   rachis, terminal stalk: ONE polyline, one shell), then each lateral stalk,
+   then every leaflet blade, laterals pair by pair (left, right) and the
+   terminal last — the layout's own order. */
+function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
+  const tris0 = acc.triangleCount;
+  const cp = plan.compound;
+  const th = (plan.angleDeg * Math.PI) / 180;
+  const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
+  const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
+  const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
+  const base = leafRootBase(plan, o, R, z);
+  const pLen = plan.petioleLenMm;
+  const t = acc.floorThickness(state.sheetThickness);
+  const D0 = [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
+  const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
+  const arc = rachisArc(plan.angleDeg, state.leafArch ?? 0, cp.rachisMm);
+  const frameAt = (phi) => ({ D: [R[0] * Math.cos(phi), R[1] * Math.cos(phi), Math.sin(phi)], N: [-R[0] * Math.sin(phi), -R[1] * Math.sin(phi), Math.cos(phi)] });
+  const rachisAt = (s) => { const [al, up] = arc.at(s); return [bb[0] + R[0] * al, bb[1] + R[1] * al, bb[2] + up]; };
+  /* each leaflet's blade law, built ONCE per leaflet (the form's cup clamp is
+     per blade), and how far its stalk reaches into it: the blade's BEADED
+     BASE — the RIM_TIP_ROWS row gaps over which a free base closes — so the
+     rod ends where the blade's full sheet begins and carries across the one
+     stretch whose section is under the sheet. A length read off the blade's
+     own lattice, never typed. */
+  const leafletOf = (spec) => {
+    const L = spec.role === 'terminal' ? cp.terminal.lengthMm : cp.lateral[spec.k].lengthMm;
+    const W = spec.role === 'terminal' ? cp.terminal.widthMm : cp.lateral[spec.k].widthMm;
+    return { L, W, embedMm: (RIM_TIP_ROWS * L) / LEAF_BLADE_ROWS };
+  };
+  const specs = cp.leaflets.map((sp) => ({ ...sp, ...leafletOf(sp) }));
+  /* ---- the AXIS ROD: petiole (straight, rooted in the wall), the rachis
+     (the arc), the terminal stalk (straight along the rachis's end tangent)
+     and its reach into the terminal blade ---------------------------------- */
+  const term = specs[specs.length - 1];
+  const phiEnd = arc.phiAt(cp.rachisMm);
+  const FE = frameAt(phiEnd);
+  const tipC = rachisAt(cp.rachisMm);
+  const centres = [], Ts = [], Ns = [], radii = [];
+  const push = (C, N, r) => { centres.push(C); Ts.push(T); Ns.push(N); radii.push(r); };
+  const N0 = frameAt(th).N;
+  push([base[0] - D0[0] * plan.embedMm, base[1] - D0[1] * plan.embedMm, base[2] - D0[2] * plan.embedMm], N0, plan.petioleR);
+  /* the rachis stations: every key, each interval subdivided where the rachis
+     ARCHES into as many pieces as the blade law's own rows would give that
+     length (`LEAF_BLADE_ROWS` over the rachis) — a straight rachis needs its
+     keys alone */
+  const ivs = cp.rachis.intervals;
+  let rPrev = plan.petioleR;
+  for (let j = 0; j < ivs.length; j++) {
+    const iv = ivs[j];
+    const m = arc.k === 0 ? 1 : Math.max(1, Math.ceil(((iv.toMm - iv.fromMm) / cp.rachisMm) * LEAF_BLADE_ROWS));
+    const C0 = rachisAt(iv.fromMm), N0j = frameAt(arc.phiAt(iv.fromMm)).N;
+    if (j === 0) push(C0, N0j, rPrev);
+    if (iv.radiusMm !== rPrev) push(C0, N0j, iv.radiusMm);   // a shoulder (never on this tree: the wire binds)
+    for (let q = 1; q <= m; q++) {
+      const s = q === m ? iv.toMm : iv.fromMm + ((iv.toMm - iv.fromMm) * q) / m;
+      push(rachisAt(s), frameAt(arc.phiAt(s)).N, iv.radiusMm);
+    }
+    rPrev = iv.radiusMm;
+  }
+  if (cp.stalkR !== rPrev) push(tipC, FE.N, cp.stalkR);
+  const termEnd = cp.terminalStalkMm + term.embedMm;
+  push([tipC[0] + FE.D[0] * termEnd, tipC[1] + FE.D[1] * termEnd, tipC[2] + FE.D[2] * termEnd], FE.N, cp.stalkR);
+  const axisRings = rodPolylineInto(acc, centres, Ts, Ns, radii);
+  const PA = axisRings[0], PB = axisRings[1];
+  const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
+  const rodAxes = [];
+  for (let k = 0; k + 1 < axisRings.length; k++) {
+    if (centres[k] === centres[k + 1] || (centres[k][0] === centres[k + 1][0] && centres[k][1] === centres[k + 1][1] && centres[k][2] === centres[k + 1][2])) continue;
+    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: Math.max(radii[k], radii[k + 1]), part: k === 0 ? 'petiole' : 'rachis' });
+  }
+  /* ---- the LATERAL STALKS: rooted ON THE RACHIS's AXIS at their station —
+     the solid rod's own "mid-thickness", the petiole-in-the-wall rule for a
+     wall with no bore — and reaching into their leaflet's beaded base ---- */
+  const leafletFrames = specs.map((sp) => {
+    if (sp.role === 'terminal') return { root: tipC, D: FE.D, T, N: FE.N, stalkMm: cp.terminalStalkMm };
+    const st = cp.lateral[sp.k].stationMm;
+    const F = frameAt(arc.phiAt(st));
+    const A = (cp.angleDeg * Math.PI) / 180, cA = Math.cos(A), sA = Math.sin(A) * sp.side;
+    return {
+      root: rachisAt(st),
+      D: [cA * F.D[0] + sA * T[0], cA * F.D[1] + sA * T[1], cA * F.D[2] + sA * T[2]],
+      T: [-sA * F.D[0] + cA * T[0], -sA * F.D[1] + cA * T[1], -sA * F.D[2] + cA * T[2]],
+      N: F.N, stalkMm: cp.stalkMm,
+    };
+  });
+  const stalkRings = [];
+  specs.forEach((sp, i) => {
+    if (sp.role === 'terminal') return;
+    const F = leafletFrames[i];
+    const len = F.stalkMm + sp.embedMm;
+    /* THE TWO SIDES' LATTICES INTERLEAVE. At a leaflet angle of exactly 90
+       the pair's two stalks leave one rachis station back to back: their
+       frames are mirror images (T flips with the side), so the half-step
+       lattice maps onto ITSELF and both root rings are the same twelve
+       points — the two rods WELD into one shell (measured: 78 edges carrying
+       a third face, 40 shells -> 34). The petiole's own remedy: the left
+       side's ring takes the other half step, so its vertices sit between the
+       right side's at every angle and no vertex is shared. */
+    const rings = rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T], [F.N, F.N], [cp.stalkR, cp.stalkR], sp.side < 0 ? 0 : 0.5);
+    stalkRings.push(rings);
+    rodAxes.push({ inner: ringMid(rings[0]), outer: ringMid(rings[1]), radiusMm: cp.stalkR, part: `stalk ${i}` });
+  });
+  /* ---- the LEAFLETS: the simple blade law, flat in the rachis's local plane,
+     its base free ---------------------------------------------------------- */
+  const leaflets = specs.map((sp, i) => {
+    const F = leafletFrames[i];
+    const bs = leafBladeState({ ...state, leafLength: sp.L, leafWidth: sp.W, leafArch: 0 });
+    const { form, nu, prof } = leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness);
+    const B0 = [F.root[0] + F.D[0] * F.stalkMm, F.root[1] + F.D[1] * F.stalkMm, F.root[2] + F.D[2] * F.stalkMm];
+    const rowAt = (u) => {
+      const C = [B0[0] + F.D[0] * u * sp.L, B0[1] + F.D[1] * u * sp.L, B0[2] + F.D[2] * u * sp.L];
+      const { h, hb, sect } = leafRowSect(prof, form, C, F.T, F.N, u);
+      return { u, h, hb, C, D: F.D, T: F.T, N: F.N, phi: 0, sect };
+    };
+    const tb = acc.triangleCount;
+    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true);
+    return {
+      role: sp.role, k: sp.k, side: sp.side, lengthMm: sp.L, widthMm: sp.W, embedMm: sp.embedMm,
+      root: F.root, base: B0, D: F.D, T: F.T, N: F.N,
+      /* which rod holds it: the axis rod for the terminal, its own stalk else */
+      holder: sp.role === 'terminal' ? 'axis' : `stalk ${i}`,
+      rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
+      rim: Bl.rim, tipClamp: Bl.tipClamp, serration: Bl.serration,
+      cup: { coefficient: bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
+      arch: { turnRad: form ? form.curlRad : 0, radiusMm: Infinity, underFloor: false },
+      serrationBuilt: prof.lobes && !prof.lobes.noRoom ? prof.lobes.countBuilt : 0,
+      rootBlendDown: prof.footHalf === 0 || widthProfileBlendIsDown(prof),
+      tris: acc.triangleCount - tb,
+    };
+  });
+  const directedMismatch = leafDirectedMismatch(acc, tris0);
+  const law = arc.k !== 0 ? spineLaw({ curlRad: arc.k * cp.rachisMm, bias: 0, start: 0, length: cp.rachisMm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: LEAF_BLADE_ROWS }) : null;
+  const petioleAxis = { inner: ringMid(PA), outer: ringMid(PB), radiusMm: plan.petioleR };
+  return {
+    compound: true,
+    directedMismatch,
+    /* the shared node's reach (SN4) is a simple blade's; a compound leaf is
+       pinned off the shared node, so it has none */
+    emittedReachMm: null,
+    emittedRootR: (() => {
+      const [x, y] = ringMid(PA);
+      return o ? Math.hypot(x - o[0], y - o[1]) : Math.hypot(x, y);
+    })(),
+    crossesSolidMm,
+    petioleAxis,
+    rodAxes,
+    /* THE AXIS ROD AS EMITTED — every ring's centroid and radius (read off the
+       ring the builder emitted, never the plan), the rachis's own record for
+       the compound clauses */
+    axisRod: { centres: axisRings.map(ringMid), radii: axisRings.map(ringRadius), rings: axisRings.length },
+    stalkRods: stalkRings.map((r) => ({ root: ringMid(r[0]), end: ringMid(r[1]), radiusMm: ringRadius(r[0]), endRadiusMm: ringRadius(r[1]) })),
+    leaflets,
+    arch: { turnRad: arc.k * cp.rachisMm, radiusMm: law ? law.peakRadius : Infinity, underFloor: law ? law.underFloor : false },
+    rachis: { baseC: bb, tipC, phiEnd, k: arc.k },
+    tris: acc.triangleCount - tris0,
+    rootBlendDown: leaflets.every((q) => q.rootBlendDown),
+    serrationBuilt: leaflets.reduce((n, q) => Math.max(n, q.serrationBuilt), 0),
+    /* the first leaflet's records stand for the leaf on the read-out (the
+       simple leaf's "first built leaf" shape) */
+    rim: leaflets[0].rim, tipClamp: leaflets[0].tipClamp, serration: leaflets[0].serration, cup: leaflets[0].cup,
+  };
 }
 export function buildHubInto(acc, state, ring) {
   const t = acc.floorThickness(ring.thickness);

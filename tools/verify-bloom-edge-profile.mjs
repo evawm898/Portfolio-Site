@@ -559,7 +559,10 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
          treated rim at all is E0's — the treatment silently not reaching the
          leaves would otherwise leave this whole family green over them. */
       let leafApex = 0;
-      for (const l of built.leavesBuilt || []) if (l && l.rim) { rim.push(l.rim); rimE2.push(l.rim); leafApex += (l.rim.apex || []).length; }
+      /* A COMPOUND LEAF IS MANY BLADES (leaf/stem build S3): every leaflet is a
+         blade through `emitPanel` with its own rim — the free BASE beaded as
+         the tip is — so each one is in the subject, not the first. */
+      for (const l of built.leavesBuilt || []) for (const b of (l && l.compound ? l.leaflets : [l])) if (b && b.rim) { rim.push(b.rim); rimE2.push(b.rim); leafApex += (b.rim.apex || []).length; }
       if ((built.leavesBuilt || []).length) {
         check('E0', leafApex > 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${built.leavesBuilt.length} leaves built and none carries a treated rim — the bead did not reach the leaves`);
         leafRows++; leafApexAll += leafApex;
@@ -833,8 +836,11 @@ const MUTATIONS = [
      raises a sheet already under it, so a thinner body is a law-abiding rim
      and E1 reads it as one. Not a mutant of this gate.) */
   { id: 'the-leaf-rim-is-not-recorded', breaks: ['E0'],
-    from: "emitPanel(acc, rows, { label: 'leaf', rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] }, () => t, rim);",
-    to:   "emitPanel(acc, rows, { label: 'leaf', rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] }, () => t, null);" },
+    /* RE-ANCHORED (leaf/stem build S3): the blade's emitPanel call moved into
+       `emitLeafBladeInto`, the one emitter a simple leaf and every leaflet go
+       through, so the mutation reaches both. */
+    from: "  emitPanel(acc, rows, panel, () => t, rim);",
+    to:   "  emitPanel(acc, rows, panel, () => t, null);" },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
