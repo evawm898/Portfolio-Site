@@ -5354,8 +5354,36 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        (one step below the floor cannot be reached by any control). */
     const samplesPerLobe = cap && cap.lobeSamplesPerLobe ? Number(cap.lobeSamplesPerLobe) : lobeSamplesPerLobe(crestShape, notchShape);
     const buckleFreq = buckleIsFlat(state) ? 0 : Number(state.buckleFreq);
-    const base = { coverage, crestShape, notchShape, countAsked, depthAsked, pitchFloorMm, samplesPerLobe };
-    const noRoom = (why, extra = {}) => ({ ...base, noRoom: true, noRoomWhy: why, countBuilt: 0, rowsCapacity: 0, countRowsCap: 0, countFloorCap: 0, countCap: 0,
+    /* THE TOOTH RELIEF FLOOR (leaf/stem build S2, Eva's ruling of Oct 6: "tooth
+       depth is ALWAYS floored at MIN_FEATURE_MM, design view included"). A
+       CAPABILITY of the caller, declared by the LEAF builder and by nothing
+       else — petal lobes are not under the ruling and take every expression
+       below exactly as before (the floor is 0 there, and every use of it is a
+       branch on `> 0`). WHAT IS FLOORED, exactly:
+         1. THE RELIEF — the depth of each cut notch below the uncut outline AT
+            ITS OWN SINUS, in millimetres (`R_k` below): the asked relief is
+            raised to the floor, `max(R, floor)`, so a shallow serration cuts
+            notches the floor deep rather than notches a printer cannot
+            resolve. The slider keeps its asked value; the record carries both.
+         2. THE COUNT — a margin sinus whose material cannot take a notch the
+            floor deep (the per-period headroom guard below would cut it
+            shallower) is a tooth that cannot fit, so the count GIVES: the
+            largest count at or under the asked (and under the row and pitch
+            caps) whose every MARGIN sinus has at least the floor of headroom.
+            Fewer, evenly re-spaced teeth — never a sub-floor notch, and never
+            an uneven gap where one was dropped. Told as `clampedBy: 'relief
+            floor'`; NO ROOM at all is told with that cause.
+         3. NOT the even-count apex notch on the terminal face — it already
+            cuts nothing (its headroom is exactly zero, session 42's parity
+            fact) and is told by `apexIsCrest`.
+       The PITCH needs no new floor: `lobePitchFloor` is already
+       `max(sheet, MIN_FEATURE_MM)` on every caller, the leaf included. The
+       floor is the CONSTANT and never the mode's floor, so both modes cut the
+       same teeth. */
+    const reliefFloorMm = cap && cap.toothReliefFloorMm ? Number(cap.toothReliefFloorMm) : 0;
+    const base = { coverage, crestShape, notchShape, countAsked, depthAsked, pitchFloorMm, samplesPerLobe, reliefFloorMm };
+    const noRoom = (why, extra = {}) => ({ ...base, noRoom: true, noRoomWhy: why, countBuilt: 0, rowsCapacity: 0, countRowsCap: 0, countFloorCap: 0, countCap: 0, countReliefCap: null,
+      reliefBuiltMm: 0, reliefFloored: false,
       countClamped: countAsked > 0, clampedBy: why === 'region' ? 'rows' : why,
       depthBuilt: 0, depthCap: 0, depthClamped: false, pitchMm: 0, pitchBelowFloor: false,
       halfRimMm: 0, marginArcMm: 0, faceMm: 0, treatedHalfMm: 0, periods: 0, apexIsCrest: null, apexReliefMm: null,
@@ -5425,12 +5453,36 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     let countRowsCap = 0;
     for (let n = 1; n <= LOBE_COUNT_RANGE[1]; n++) { if (sumOf(demandFor(n)) <= capacity) countRowsCap = n; else break; }
     const countFloorCap = Math.max(0, Math.floor(2 * treatedHalfMm / pitchFloorMm + 1e-9) - 1);
-    const countBuilt = Math.min(countAsked, countRowsCap, countFloorCap);
+    let countBuilt = Math.min(countAsked, countRowsCap, countFloorCap);
     const peakHalfMm = laminaHalf(uPk);
-    if (countBuilt < 1) return noRoom(countRowsCap < 1 ? 'rows' : 'pitch',
-      { rowsCapacity: capacity, countRowsCap, countFloorCap, halfRimMm, marginArcMm, faceMm, treatedHalfMm, peakHalfMm, askedWindowU: [u0, u1] });
+    /* THE COUNT GIVES TO THE RELIEF FLOOR (item 2 above). A margin sinus's
+       headroom is the SAME expression `headroomOf` reads below — the mode-free
+       lamina less the print floor, at the sinus's own station — so a count that
+       passes here cuts every margin notch at least `reliefFloorMm` deep there:
+       `min(max(R, floor), headroom) >= floor`, and the relief grid floors onto a
+       power of two that the floor (1.0) is itself on. */
+    let countReliefCap = null;
+    if (reliefFloorMm > 0 && countBuilt >= 1) {
+      const sinusesFit = (n) => {
+        const per = n + 1, pitch = 2 * treatedHalfMm / per;
+        for (let k = 0; k < per; k++) {
+          const a = Math.abs(treatedHalfMm - (k + 0.5) * pitch);
+          if (!onMargin(a)) continue;
+          if (Math.max(0, laminaHalf(uAtD(a)) - TIP_HALF_MM) < reliefFloorMm) return false;
+        }
+        return true;
+      };
+      let n = countBuilt;
+      while (n >= 1 && !sinusesFit(n)) n--;
+      countReliefCap = n;
+      countBuilt = n;
+    }
+    if (countBuilt < 1) return noRoom(countRowsCap < 1 ? 'rows' : countFloorCap < 1 ? 'pitch' : 'relief floor',
+      { rowsCapacity: capacity, countRowsCap, countFloorCap, countReliefCap, halfRimMm, marginArcMm, faceMm, treatedHalfMm, peakHalfMm, askedWindowU: [u0, u1] });
     const countClamped = countAsked > countBuilt;
-    const clampedBy = !countClamped ? null : (countFloorCap < countRowsCap && countFloorCap < countAsked) ? 'pitch' : 'rows';
+    const clampedBy = !countClamped ? null
+      : (countReliefCap !== null && countReliefCap < Math.min(countAsked, countRowsCap, countFloorCap)) ? 'relief floor'
+      : (countFloorCap < countRowsCap && countFloorCap < countAsked) ? 'pitch' : 'rows';
     const periods = countBuilt + 1;
     const pitchMm = 2 * treatedHalfMm / periods;
     /* False by construction now that the pitch cap clamps the count all the
@@ -5462,6 +5514,10 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        its distance-from-the-apex's, and that is |d|. */
     const headroomOf = (dd) => { const a = Math.abs(dd); return headroomAt(onMargin(a) ? uAtD(a) : 1); };
     const reliefAskedMm = depthAsked * Math.max(0, peakHalfMm - TIP_HALF_MM);
+    /* THE RELIEF THE CUT IS MADE AT: the asked one, raised to the floor where a
+       floor is declared (item 1 above). Without a floor it IS the asked double. */
+    const reliefBuiltMm = reliefFloorMm > 0 ? Math.max(reliefAskedMm, reliefFloorMm) : reliefAskedMm;
+    const reliefFloored = reliefBuiltMm > reliefAskedMm;
     /* THE RELIEF LANDS ON A GRID, AND THAT IS ABOUT REPRODUCIBILITY RATHER
        THAN PRECISION (session 42). Each period's relief is read at a sinus
        station that a BISECTION on the arc table produces, so it carries that
@@ -5479,7 +5535,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        the outline a few parts in 10^5 below the print floor — and
        2^-16 mm is 1.5e-5, four orders under the 0.8 mm floor and eleven
        above the divergence it removes. */
-    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefAskedMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);
+    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefBuiltMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);
     /* THE APEX NOTCH IS ITS OWN FACT AND NOT A CLAMP. At an EVEN count a
        sinus sits at d = 0, on the terminal mini-face, where the base outline
        is already at the print floor — so its headroom is exactly 0 and its
@@ -5488,7 +5544,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        nothing about the depth; it is reported by `apexIsCrest` /
        `apexReliefMm` and asserted by L8 instead. */
     const marginSinus = sinusD.filter((dd) => onMargin(Math.abs(dd)));
-    const reliefLimited = marginSinus.filter((dd) => headroomOf(dd) < reliefAskedMm - 1e-12).length;
+    const reliefLimited = marginSinus.filter((dd) => headroomOf(dd) < reliefBuiltMm - 1e-12).length;
     const headroomMin = marginSinus.length ? Math.min(...marginSinus.map(headroomOf)) : 0;
     /* TELEMETRY, NEVER A CLAMP: the depth at which the first period WITH ROOM
        saturates. `depthClamped` is the same statement read as a boolean and
@@ -5556,7 +5612,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
       countClamped, clampedBy, depthBuilt, depthCap, depthClamped, pitchMm, pitchBelowFloor,
       halfRimMm, marginArcMm, faceMm, treatedHalfMm, periods, apexIsCrest,
       apexReliefMm: apexIsCrest ? null : reliefMm[(periods - 1) / 2],
-      peakHalfMm, reliefAskedMm, reliefMm, reliefLimited,
+      peakHalfMm, reliefAskedMm, reliefMm, reliefLimited, reliefBuiltMm, reliefFloored, countReliefCap,
       windowU: [u0, u1], askedWindowU: [u0, u1], sinusU, crestU, cutMm, u0, u1,
       angleChordMm,
       notchAngleDeg: sinusU.length ? includedAt(sinusU[Math.floor(sinusU.length / 2)]) : null,
@@ -12600,7 +12656,11 @@ export function leafNodeLayout(state, stemLengthMm) {
   const lengthMm = Number(state.leafLength);
   const angleDeg = Number(state.leafAngle);
   const nodes = Math.round(Number(state.leafNodes));
-  const rise = lengthMm * Math.sin((angleDeg * Math.PI) / 180);
+  /* THE ARCH REACHES THE INSET (leaf/stem build S2): an upward-arched blade
+     rises higher than its chord, and the inset is what keeps the top leaf out
+     of the head. `leafArchRiseMm` returns `lengthMm * Math.sin(...)` verbatim
+     at arch 0, so no shipped node depth moves. */
+  const rise = leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));
   const insetAskedMm = LEAF_NODE_TOP * stemLengthMm;
   const insetNeededMm = Math.max(0, rise);
   const insetMm = Math.max(insetAskedMm, insetNeededMm);
@@ -13998,7 +14058,62 @@ export const LEAF_PHYLLOTAXY = Object.freeze(['alternate', 'opposite', 'whorled'
    the stem — two lengths, no invented constant standing for a distance. */
 export const LEAF_PETIOLE_FRACTION = 0.12;
 export const LEAF_PETIOLE_SIDES = 12;
+/* LEAF_CUP IS THE CUP CONTROL'S DEFAULT NOW (Eva's ruling, Oct 6 — leaf/stem
+   build S2: "cup becomes a control; defaults reproduce today's pose"). It was
+   the one fixed constant the paragraph above defended; the control is the one
+   registry row that paragraph said it would cost. The RANGE is the petal cup's
+   own, -0.8 (reflexed, the margins turned down) to 1.2 (a deep channel), so the
+   two organs read the same scale on the same law — and the leaf keeps its OWN
+   value through `leafBladeState`, never the petal's. The fold clamp in
+   `sectAt` (`|c| <= hb / (FOLD_CLAMP_MARGIN * t)`) applies to a leaf exactly
+   as it does to a petal and binds where the blade narrows to its 1.60 mm
+   stub; the builder reports the form's own `cupClamp` record and the read-out
+   tells it. */
 export const LEAF_CUP = 0.35;
+export const LEAF_CUP_RANGE = Object.freeze([-0.8, 1.2]);
+/* THE ARCH ALONG THE LEAF (Eva's ruling, Oct 6): the carnation's defining
+   pose, which the shipped leaf could not make (`leafBladeState` pinned the
+   curl to 0, so only the cup bent it). It is the PETAL'S OWN SPINE LAW — the
+   uniform arc `phi(s) = theta + k s` through `arcStep`, `spineLaw` evaluated
+   beside it for the radius and the floor — on the LEAF's own control, in the
+   leaf's own (radial, up) plane. DEGREES OF TOTAL TURN along the blade, and
+   POSITIVE ARCHES THE TIP DOWN (the carnation: the blade rises off its node
+   and falls away), which is the opposite sign to the petal's spine curl
+   (positive curls a petal's tip UP and in) — so `leafBladeState` hands the
+   law `-leafArch`. Default 0 is today's flat leaf BY BRANCH (the builder takes
+   the straight centreline expression verbatim where the law's curvature is
+   exactly 0). The range is RULED (Eva, Oct 7, from the sheet — kept as
+   shipped, the extremes reachable and declared): -90 (the tip curling up
+   toward the stem's axis) to 180 (a leaf that arches over and hangs back
+   down), stepped at the petal curl's own 5. */
+export const LEAF_ARCH_RANGE = Object.freeze([-90, 180]);
+export const LEAF_ARCH_STEP = 5;
+/* HOW HIGH THE BLADE RISES OVER ITS OWN ROOT — the inset law's input, for an
+   arched leaf. The straight leaf's rise is `L sin(theta)`, and that expression
+   is returned VERBATIM at arch 0 (a branch, so no shipped node depth moves).
+   Under an arch the centreline is a circular arc, `z(s) = (cos theta -
+   cos(theta + k s)) / k`, whose maximum over the blade is at an end or where
+   the blade passes level (phi = 0, an arch over the top) or vertical-reversed
+   (phi = +-180): those are the zeros of z' = sin(phi), the only interior
+   candidates. An UPWARD arch rises HIGHER than the chord — by the mean value
+   theorem z(L) / L = sin(xi) for xi between theta and theta + T — so without
+   this the plan's `insetSatisfied` would CLAIM the top leaf clears the head
+   while an arched blade stood inside it. ONE OWNER: `leafNodeLayout` reads it,
+   and the harness RESTATES it (LF4, restatedNodeDepthsMm) rather than
+   importing it. Like the straight law it measures the blade from its own base
+   and ignores the petiole and the blade's width — the inset's pre-existing
+   approximation, unchanged. */
+export function leafArchRiseMm(lengthMm, angleDeg, archDeg) {
+  const th = (angleDeg * Math.PI) / 180;
+  if (!(Number(archDeg) !== 0)) return lengthMm * Math.sin(th);
+  const T = (-Number(archDeg) * Math.PI) / 180;
+  const k = T / lengthMm;
+  const z = (phi) => (Math.cos(th) - Math.cos(phi)) / k;
+  let best = z(th + T);
+  const lo = Math.min(th, th + T), hi = Math.max(th, th + T);
+  for (const c of [-Math.PI, 0, Math.PI]) if (c > lo && c < hi && z(c) > best) best = z(c);
+  return best;
+}
 /* The leaf's own outline: a LANCEOLATE blade, widest below the middle. Fixed
    rather than inherited — see leafBladeState's own note. */
 export const LEAF_BASE_TAPER = 0.85, LEAF_TIP_TAPER = 1.15;
@@ -14201,9 +14316,13 @@ export function sharedNodeOffsetMm(pedicelR, petioleR, pedicelAngleDeg, leafAngl
    than a clause). EXPORT IN BOTH MODES, the petiole radius's own choice one
    paragraph down: the export sheet is the thicker one, so the conservative one,
    and what this decides (where a leaf is seated, whether a blade fits at all)
-   must not change with the mode. The blade has no curl and no twist
-   (`leafBladeState`), so its frame is a RIGID motion of this one at every
-   angle and azimuth — which is why one build serves every node. The petiole's
+   must not change with the mode. The blade has no twist (`leafBladeState`),
+   and its ARCH (leaf/stem build S2) is a turn measured FROM the blade's own
+   start direction, so its frame is still a RIGID motion of this one at every
+   angle and azimuth — which is why one build serves every node. SINCE S2 THIS
+   BUILD CARRIES THE BEAD, so the blade's reach under a pedicel — and with it
+   a shared node's seating — moves with the edge: the partition tool's clause
+   3b declares those rows and reports by how much. The petiole's
    own triangles (the first ones emitted) are dropped; the rod is the law's
    other term, stated exactly. */
 export function leafBladeLocalTris(state, widthMm, lengthMm) {
@@ -14535,6 +14654,12 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
        reports the control while the blade is built from something else is
        exactly what this field cannot see. */
     tipShape: Number(state.leafTipShape),
+    /* THE POSE THE BLADE IS BUILT FROM (leaf/stem build S2) — the LEAF's own
+       arch and cup controls, read here for the read-out and so LF11/LF12 have
+       the plan's claim beside the rows the builder reports. The clauses
+       restate the laws from the PAGE's read-back controls, never from these. */
+    archDeg: state.leafArch === undefined ? 0 : Number(state.leafArch),
+    cup: state.leafCup === undefined ? LEAF_CUP : Number(state.leafCup),
     /* SLENDERNESS, the coupon question. Reported, never a bound: nothing in
        this project has ever been printed. */
     slenderness: lengthMm / (2 * petioleR),
@@ -14587,18 +14712,45 @@ export function leafBladeState(state) {
        reason: the flower forced its blades flat and they read as paper
        cutouts); everything else the petal can do is off, so nothing here moves
        when a petal's form control does. */
-    petalCup: LEAF_CUP, petalCupGradient: 0, petalTwist: 0, petalRoll: 0, petalRollTaper: 0,
-    petalSpineCurl: 0, curlBias: 0, curlStart: 0, buckleAmp: 0,
+    /* CUP AND ARCH ARE THE LEAF'S OWN CONTROLS NOW (Eva's ruling, Oct 6 —
+       leaf/stem build S2), mapped onto the two parameters the shared form law
+       reads, exactly as `leafLength` is mapped onto `petalLength`: the SAME
+       law, the LEAF's VALUES. The arch is handed in NEGATED, because the
+       control's positive arches the tip DOWN and the spine law's positive
+       curls it UP (see LEAF_ARCH_RANGE). A state that predates the controls
+       carries neither, and reads the defaults the controls were given — the
+       old constant and a flat leaf — so nothing that shipped moves. */
+    petalCup: state.leafCup === undefined ? LEAF_CUP : Number(state.leafCup),
+    petalCupGradient: 0, petalTwist: 0, petalRoll: 0, petalRollTaper: 0,
+    petalSpineCurl: state.leafArch === undefined || Number(state.leafArch) === 0 ? 0 : -Number(state.leafArch),
+    curlBias: 0, curlStart: 0, buckleAmp: 0,
     petalTilt: 0, tipThinning: 0,
   };
 }
 
-/* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
-   the petiole's own frame. Returns what it EMITTED, because every clause that
-   asks "what came out" must read the builder and not the plan (session 43's
-   ST2/ST3, where a clause reading the plan fired nothing). */
-export function buildLeafInto(acc, plan, state, nodeIndex, az) {
-  const tris0 = acc.triangleCount;
+/* ===================================================================
+   leafSurface — THE ONE OWNER OF WHERE A LEAF'S BLADE IS (leaf/stem build S2).
+
+   The `petalSurface` shape, one organ later: `rowAt(u)` is the row plan (the
+   centre, the frame, the half-widths and the row's own `sect(v)`), and the
+   builder below does nothing with the blade but hand those rows to
+   `emitPanel`. It exists as its own function for the reason `petalSurface`
+   does — a tool that asks "is this leaf's mid-surface what it was" must read
+   the surface the mesh is built from, not a second copy of it — and the
+   leaf's emitter change rests on exactly that question (see buildLeafInto).
+
+   THE ARCH. Where the form law's curvature is exactly 0 (arch 0, today's leaf)
+   the centreline is the pre-S2 expression VERBATIM — `bb + D * u * L` with the
+   frame read at the leaf angle — a BRANCH, so a flat leaf's mid-surface is the
+   same doubles it always was. Where it is not, it is the petal's uniform arc:
+   `phi(s) = theta + kC s` displaced through `arcStep` (the one owner of an
+   arc's displacement) in the leaf's own (radial, up) plane, and the row's
+   frame is `frameAt(R, T, phi, u)` — so the normal turns with the arch and the
+   two skins stay a constant-thickness shell. At u = 0 the arc returns the
+   blade base exactly (`arcStep(th, th, 0)` is the zero displacement), so the
+   blade still leaves its petiole on the petiole's own line.
+   =================================================================== */
+export function leafSurface(acc, plan, state, nodeIndex, az) {
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
@@ -14610,9 +14762,21 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const perNode = !!plan.nodeLengthsMm;
   const Lmm = perNode ? plan.nodeLengthsMm[nodeIndex] : plan.lengthMm;
   const bs = perNode ? leafBladeState({ ...state, leafLength: Lmm }) : leafBladeState(state);
-  const form = petalForm(bs, plan.widthMm / 2, acc.floorThickness(state.sheetThickness));
+  /* THE FORM IS BUILT ONLY WHERE IT DEFORMS (the petal builder's own guard,
+     `petalFormIsFlat`): cup 0 with no arch is a flat sheet, and a flat sheet
+     takes the flat arm below rather than the zero-form law argued exact. Before
+     the cup was a control no reachable leaf was flat, so this moves nothing
+     that shipped. */
+  const form = petalFormIsFlat(bs) ? null : petalForm(bs, plan.widthMm / 2, acc.floorThickness(state.sheetThickness));
   const nu = LEAF_BLADE_ROWS;
   const cap = { petiole: true, rowCapacity: nu };
+  /* THE TOOTH RELIEF IS FLOORED AT THE MINIMUM FEATURE (Eva's ruling, Oct 6:
+     "tooth depth is ALWAYS floored at MIN_FEATURE_MM, design view included").
+     The constant, never the mode's floor, so LIVE and EXPORT cut the SAME
+     teeth — which teeth exist is topology. See the lobe block's own header for
+     exactly what is floored and how the count gives. A LEAF's cap only: petal
+     lobes are untouched by this ruling. */
+  cap.toothReliefFloorMm = MIN_FEATURE_MM;
   const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, plan.widthMm / 2, cap, acc, Lmm);
   const t = acc.floorThickness(state.sheetThickness);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
@@ -14620,6 +14784,72 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      expression verbatim where it has none (a branch, never `+ 0`). */
   const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
   const base = o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
+  const pLen = perNode ? plan.nodePetioleLenMm[nodeIndex] : plan.petioleLenMm;
+  const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
+  /* THE ARCH'S CURVATURE, from the form's own `curlRad` (the leaf's arch,
+     negated by `leafBladeState`), and the petal's spine LAW evaluated beside it
+     for what the read-out tells: the radius the blade bends at and whether
+     that radius is under one sheet thickness (the uniform arc is TOLD, never
+     clamped — the petal's own doctrine for a uniform curl). `rows` is the
+     LEAF's own row count, never the module's `NU`, which the petals ramp:
+     #303's coupling, refused a second time. */
+  const kC = form ? form.curlRad / Lmm : 0;
+  const law = kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
+  const rowAt = (u) => {
+    let C, fr, phi = th;
+    if (kC === 0) {
+      fr = form ? form.frameAt(R, T, th, u) : { D: D0, T, N: [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)] };
+      C = [bb[0] + fr.D[0] * u * Lmm, bb[1] + fr.D[1] * u * Lmm, bb[2] + fr.D[2] * u * Lmm];
+    } else {
+      const s = u * Lmm;
+      phi = th + kC * s;
+      const { dAlong, dAcross } = arcStep(th, phi, s);
+      C = [bb[0] + R[0] * dAlong, bb[1] + R[1] * dAlong, bb[2] + dAcross];
+      fr = form.frameAt(R, T, phi, u);
+    }
+    const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
+    const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
+    const sect = form
+      ? form.sectAt(C, fr.T, fr.N, h, u, hb)
+      : (v) => ({ P: [C[0] + fr.T[0] * h * v, C[1] + fr.T[1] * h * v, C[2] + fr.T[2] * h * v], n: fr.N });
+    return { u, h, hb, C, D: fr.D, T: fr.T, N: fr.N, phi, sect };
+  };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, rowAt };
+}
+
+/* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
+   the petiole's own frame. Returns what it EMITTED, because every clause that
+   asks "what came out" must read the builder and not the plan (session 43's
+   ST2/ST3, where a clause reading the plan fired nothing).
+
+   THE BLADE GOES THROUGH `emitPanel` (Eva's ruling, Oct 6 — leaf/stem build
+   S2), so a leaf margin closes on the same half-round bead a petal's does and
+   the 90-degree wall this builder carried since the leaf sessions is gone.
+   `emitPanel` is the ONE owner of how a panel's skins and rim are emitted, and
+   the leaf was the last organ in the bloom with a flat wall of its own.
+   WHAT THAT TAKES, each measured and stated in docs/bloom-leaf-emitter-arch-cup-outcome.md:
+     - emitPanel's contract BURIES ROW 0 (the bead ramps in over RIM_TAPER_MM
+       of margin from it) and treats the LAST row as the exposed tip (the last
+       RIM_TIP_ROWS rows become the apex ring). For a petiolate leaf that is
+       right: row 0 is the end the petiole holds, and the tip is free. A free
+       blade base (a leaflet on its petiolule) is S3's, not built here.
+     - THE LATTICE IS emitPanel's NV = 10 COLUMNS, nine intervals with NO
+       column on v = 0, where the leaf's own loop drew eleven with the midrib
+       as its sixth. The mid-surface law is unchanged; only where it is
+       sampled across the width moved.
+     - The tip still ends on the 1.60 mm stub (`h >= TIP_HALF_MM`); the apex
+       nib is not ruled for leaves and is not built. With a bead the stub's end
+       face is the bead's nose over the last two rows.
+   AT ARCH 0 AND CUP = LEAF_CUP THE MID-SURFACE IS THE ONE THAT SHIPPED, TO THE
+   DOUBLE — the rows below are the pre-S2 rows term for term — so at the
+   defaults the only geometry change is the edge: the bead, its inset and the
+   column count. `tools/verify-bloom-leaf-bytes.mjs --change emitter` checks it
+   as an identity against the base tree's own emitted skin vertices. */
+export function buildLeafInto(acc, plan, state, nodeIndex, az) {
+  const tris0 = acc.triangleCount;
+  const S = leafSurface(acc, plan, state, nodeIndex, az);
+  const { R, T, D0, base, pLen, Lmm, nu, prof, t, form, law } = S;
+  const th = S.th;
   /* ---- the petiole ---------------------------------------------------- */
   const sides = LEAF_PETIOLE_SIDES, rp = plan.petioleR;
   const bi = [D0[1] * T[2] - D0[2] * T[1], D0[2] * T[0] - D0[0] * T[2], D0[0] * T[1] - D0[1] * T[0]];
@@ -14639,12 +14869,14 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      removing the vertex rather than declaring the pairs), and the half step is
      `NV = 10`'s reasoning one solid later: the binormal axis is where the rod
      is TANGENT to the blade's skin, so the lattice straddles it instead of
-     putting a vertex on it. Derived from the ring's own step, never typed. */
+     putting a vertex on it. Derived from the ring's own step, never typed.
+     (Since S2 the blade is emitPanel's ten columns, which carry no column on
+     v = 0 at all, so the blade has no centre vertex to weld to; the half step
+     stays, because it is the rod's own reason and costs nothing.) */
   const pring = (sv) => Array.from({ length: sides }, (_, i) => {
     const a = (2 * Math.PI * (i + 0.5)) / sides, c = Math.cos(a) * rp, d = Math.sin(a) * rp;
     return [base[0] + D0[0] * sv + T[0] * c + bi[0] * d, base[1] + D0[1] * sv + T[1] * c + bi[1] * d, base[2] + D0[2] * sv + T[2] * c + bi[2] * d];
   });
-  const pLen = perNode ? plan.nodePetioleLenMm[nodeIndex] : plan.petioleLenMm;
   const PA = pring(-plan.embedMm), PB = pring(pLen);
   for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(PA[i], PA[j], PB[j], PB[i]); }
   for (let i = 1; i < sides - 1; i++) { acc.tri(PA[0], PA[i + 1], PA[i]); acc.tri(PB[0], PB[i], PB[i + 1]); }
@@ -14656,73 +14888,80 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      exports watertight, which is why this is reported at all. */
   const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
-  const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
-  const rows = [], rowHalfBaseMm = [];
+  const bladeTris0 = acc.triangleCount;
+  const rows = [], rowHalfBaseMm = [], rowHalfMm = [], rowCentre = [], rowNormal = [], rowMarginLiftMm = [];
+  const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   for (let i = 0; i <= nu; i++) {
-    const u = i / nu;
-    const fr = form ? form.frameAt(R, T, th, u) : { D: D0, T, N: [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)] };
-    const C = [bb[0] + fr.D[0] * u * Lmm, bb[1] + fr.D[1] * u * Lmm, bb[2] + fr.D[2] * u * Lmm];
-    const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
-    const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
-    rowHalfBaseMm.push(hb);
-    const sect = form ? form.sectAt(C, fr.T, fr.N, h, u, hb) : null;
-    const cols = [];
-    for (let j = 0; j <= NV; j++) {
-      const v = -1 + (2 * j) / NV;
-      if (sect) { const q = sect(v); cols.push({ P: q.P, n: q.n }); }
-      else cols.push({ P: [C[0] + fr.T[0] * h * v, C[1] + fr.T[1] * h * v, C[2] + fr.T[2] * h * v], n: fr.N });
-    }
-    rows.push(cols);
+    const row = S.rowAt(i / nu);
+    rows.push(row);
+    rowHalfBaseMm.push(row.hb);
+    rowHalfMm.push(row.h);
+    rowCentre.push(row.C);
+    rowNormal.push(row.N);
+    /* THE CUP AS THE SURFACE CARRIES IT — the lift of each margin's mid-surface
+       point over the row's centre along the row's own normal. LF12 reads the
+       cup coefficient back off these against the LEAF's own control. */
+    const pm = row.sect(-1).P, pp = row.sect(1).P;
+    rowMarginLiftMm.push([dot3([pm[0] - row.C[0], pm[1] - row.C[1], pm[2] - row.C[2]], row.N), dot3([pp[0] - row.C[0], pp[1] - row.C[1], pp[2] - row.C[2]], row.N)]);
   }
-  const off = (q, n, sv) => [q[0] + n[0] * sv, q[1] + n[1] * sv, q[2] + n[2] * sv];
+  /* THE EDGE PROFILE'S OWN RECORD, the petal builder's shape: the narrow-span
+     clamps always, the treated apexes when the accumulator captures rims (the
+     edge-profile gate's E family reads them — leaves are in its subject now). */
+  const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], pivotsSkipped: 0, segments: 0, drawnMaxMm: 0, tipAxisMm: null };
+  emitPanel(acc, rows, { label: 'leaf', rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] }, () => t, rim);
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
-     — read off the skins this builder emits, never `pLen + Lmm` beside them.
-     SN4's measured side: a builder that built the ASKED length where the plan
-     capped it shows as this exceeding the plan's own reach. */
+     — read off the triangles this builder EMITTED (the bead included), never
+     `pLen + Lmm` beside them. SN4's measured side: a builder that built the
+     ASKED length where the plan capped it shows as this exceeding the plan's
+     own reach.
+     ON AN ARCHED BLADE THE AXIS IS AN ARC, so the reach is measured ALONG IT:
+     each emitted vertex's foot on the arc's own circle (centre `1/kC` off the
+     blade base, square to the start direction), as arc length from the base.
+     A straight projection is SHORTENED by the bend (an arch of 90 on a 16 mm
+     blade reaches 10.2 mm along the straight axis), which is a measurement of
+     the arch and not of the length. Exact for the same reason the straight
+     projection is: every point of a row's section is offset from its centre
+     along the row's own normal and the across-blade direction, both square to
+     the arc's tangent there, so the tip row's vertices all foot at the built
+     length, and the bead only ever insets toward the base. LF11 ties this arc
+     to the controls. The straight blade is the projection verbatim (a BRANCH,
+     so every unarched leaf reads the number it always did). */
   let emittedReachMm = -Infinity;
-  for (const row of rows) for (const c of row) for (const sv of [t / 2, -t / 2]) {
-    const q = off(c.P, c.n, sv);
-    const r = (q[0] - base[0]) * D0[0] + (q[1] - base[1]) * D0[1] + (q[2] - base[2]) * D0[2];
-    if (r > emittedReachMm) emittedReachMm = r;
-  }
-  for (let i = 0; i < nu; i++) for (let j = 0; j < NV; j++) {
-    const A = rows[i][j], B = rows[i][j + 1], C2 = rows[i + 1][j + 1], D = rows[i + 1][j];
-    acc.quad(off(A.P, A.n, t / 2), off(D.P, D.n, t / 2), off(C2.P, C2.n, t / 2), off(B.P, B.n, t / 2));
-    acc.quad(off(A.P, A.n, -t / 2), off(B.P, B.n, -t / 2), off(C2.P, C2.n, -t / 2), off(D.P, D.n, -t / 2));
-  }
-  /* THE RIMS, AND THE TWO OF EACH PAIR ARE WOUND OPPOSITELY. The margin at
-     v = -1 faces the other way from the one at v = +1, and the base end faces
-     the other way from the tip end, so a single winding for both members of a
-     pair leaves the shell INCONSISTENT — 134 duplicated and 134 unmatched
-     DIRECTED edges, measured. Both STL gates are blind to it by construction:
-     `analyzeStl`'s edge census keys on a SORTED pair, so two traversals the
-     same way count as a matched edge and boundary-edge = 0 still holds. O2
-     caught it as a validity failure on the 24-leaf row ("the divergence sign
-     and the ray parity DISAGREE"), which is the right alarm and the wrong
-     resolution; LF8 is the clause that names it. */
-  for (let i = 0; i < nu; i++) for (const j of [0, NV]) {
-    const A = rows[i][j], B = rows[i + 1][j];
-    const a = off(A.P, A.n, t / 2), b = off(B.P, B.n, t / 2);
-    const c = off(B.P, B.n, -t / 2), d = off(A.P, A.n, -t / 2);
-    if (j === 0) acc.quad(a, d, c, b); else acc.quad(a, b, c, d);
-  }
-  for (const i of [0, nu]) for (let j = 0; j < NV; j++) {
-    const A = rows[i][j], B = rows[i][j + 1];
-    const a = off(A.P, A.n, t / 2), b = off(B.P, B.n, t / 2);
-    const c = off(B.P, B.n, -t / 2), d = off(A.P, A.n, -t / 2);
-    if (i === 0) acc.quad(a, b, c, d); else acc.quad(a, d, c, b);
+  {
+    const P = acc.positions;
+    if (S.kC === 0) {
+      for (let i = bladeTris0 * 9; i < P.length; i += 3) {
+        const r = (P[i] - base[0]) * D0[0] + (P[i + 1] - base[1]) * D0[1] + (P[i + 2] - base[2]) * D0[2];
+        if (r > emittedReachMm) emittedReachMm = r;
+      }
+    } else {
+      const k = S.kC, th = S.th, half = (k * Lmm) / 2;
+      const cx = -Math.sin(th) / k, cz = Math.cos(th) / k;
+      for (let i = bladeTris0 * 9; i < P.length; i += 3) {
+        const dx = P[i] - S.bb[0], dy = P[i + 1] - S.bb[1], dz = P[i + 2] - S.bb[2];
+        const wx = dx * S.R[0] + dy * S.R[1] - cx, wz = dz - cz;
+        const phi = Math.atan2(k * wx, -k * wz);
+        let d = phi - th - half;
+        d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
+        const r = pLen + (d + half) / k;
+        if (r > emittedReachMm) emittedReachMm = r;
+      }
+    }
   }
   /* THE DIRECTED-EDGE CENSUS, folded over the triangles THIS call emitted —
      the stem's ST10 precedent, and owed for the same reason: a fix without a
      witness is folklore. On a closed, consistently wound shell every edge is
-     traversed exactly once in each direction. */
+     traversed exactly once in each direction. KEYED ON THE EXACT DOUBLE since
+     S2 (the stem census's key): the bead puts distinct vertices closer than
+     the 1e-4 mm the old quantised key merged, and a quantised key would read
+     two real vertices as one and report a mismatch the mesh does not have. */
   let directedMismatch = 0;
   {
-    const q = (x) => Math.round(x * 1e4) / 1e4;
-    const k = (i) => `${q(acc.positions[i])},${q(acc.positions[i + 1])},${q(acc.positions[i + 2])}`;
+    const P = acc.positions;
+    const k = (i) => `${P[i]},${P[i + 1]},${P[i + 2]}`;
     const dir = new Map();
-    for (let t = tris0 * 9; t < acc.positions.length; t += 9) {
-      const v = [k(t), k(t + 3), k(t + 6)];
+    for (let q = tris0 * 9; q < P.length; q += 9) {
+      const v = [k(q), k(q + 3), k(q + 6)];
       for (let m = 0; m < 3; m++) { const e = `${v[m]}|${v[(m + 1) % 3]}`; dir.set(e, (dir.get(e) || 0) + 1); }
     }
     for (const [e, n] of dir) {
@@ -14746,6 +14985,40 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     const fromU = hi;
     return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };
   })();
+  /* THE SERRATION AS BUILT — the lobe record the outline was cut from, with
+     the relief the OUTLINE carries at every margin sinus (base minus drawn
+     half-width, at the sinus station the record declares). LF13's measured
+     side: a floor applied to the record and not to the cut shows as these
+     disagreeing with it. */
+  const L0 = prof.lobes;
+  const serration = !L0 ? null : {
+    noRoom: !!L0.noRoom, noRoomWhy: L0.noRoomWhy || null,
+    countAsked: L0.countAsked, countBuilt: L0.countBuilt, clampedBy: L0.clampedBy || null,
+    countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
+    depthAsked: L0.depthAsked, peakHalfMm: L0.peakHalfMm, reliefAskedMm: L0.reliefAskedMm,
+    reliefFloorMm: L0.reliefFloorMm, reliefBuiltMm: L0.reliefBuiltMm, reliefFloored: !!L0.reliefFloored,
+    periods: L0.periods, apexIsCrest: L0.apexIsCrest, reliefMm: (L0.reliefMm || []).slice(),
+    sinusU: (L0.sinusU || []).slice(),
+    sinusReliefMm: (L0.sinusU || []).map((u) => prof.halfWidthBaseAt(u) - prof.halfWidthAt(u)),
+    /* THE DRAWN DEPTH, honestly: the deepest emitted ROW in each margin
+       period, which samples the cut between stations and so reads at or under
+       the law's own relief. Reported, never floored — the floor is on the law
+       at the sinus (docs/bloom-leaf-emitter-arch-cup-outcome.md §4). */
+    rowReliefMm: (L0.sinusU || []).map((us, k) => {
+      /* sinus k lies between margin crests k and k + 1 (they alternate from
+         the treated end toward the apex); past the last margin crest the
+         period runs to the tip. */
+      const lo = L0.crestU[k] === undefined ? 0 : L0.crestU[k], hi = L0.crestU[k + 1] === undefined ? 1 : L0.crestU[k + 1];
+      let best = 0;
+      for (let i = 0; i <= nu; i++) {
+        const u = i / nu;
+        if (u < lo || u > hi) continue;
+        const d = rowHalfBaseMm[i] - rowHalfMm[i];
+        if (d > best) best = d;
+      }
+      return best;
+    }),
+  };
   return {
     directedMismatch, emittedReachMm,
     /* THE HALF-WIDTHS THE BLADE WAS BUILT FROM, row by row, the BASE outline
@@ -14753,6 +15026,14 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        reads the tip exponent back off these, so a plan reporting one exponent
        while the blade is built from another shows as the two disagreeing. */
     rowHalfBaseMm,
+    /* and the DRAWN half-width (after the cut), the centre and frame normal
+       each row was built on, and each margin's cup lift — LF11 (the arch) and
+       LF12 (the cup) read these against laws restated from the controls. */
+    rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm,
+    arch: { turnRad: form ? form.curlRad : 0, radiusMm: law ? law.peakRadius : Infinity, underFloor: law ? law.underFloor : false },
+    cup: { coefficient: S.bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
+    serration,
+    rim,
     tipClamp,
     /* THE RADIUS THE PETIOLE ACTUALLY ROOTS AT, from the CENTROID of the ring
        this builder just emitted — not from `plan.rootR` beside it. A mutation
@@ -14765,7 +15046,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
          the stem has nodes. That offset is the stem's own declared law, and
          LF2 compares the result against the WALL, so a petiole rooted off the
          stem's axis still reads off it. */
-      return o ? Math.hypot(x / PA.length - o[0], y / PA.length - o[1]) : Math.hypot(x / PA.length, y / PA.length);
+      return S.o ? Math.hypot(x / PA.length - S.o[0], y / PA.length - S.o[1]) : Math.hypot(x / PA.length, y / PA.length);
     })(),
     crossesSolidMm,
     /* THE AXIS OF THE ROD THIS BUILDER JUST EMITTED — the two rings' own
@@ -18196,6 +18477,11 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
   const floretUnits = infloPlanned && infloPlanned.present ? infloPlanned.unitMemo : null;
   const leafPlanned = leafPlan(state, stemPlanned, acc, infloPlanned, floretUnits);
   const leavesBuilt = [];
+  /* WHERE THE LEAVES SIT IN THE STREAM — the builder's own tally, so a byte
+     tool can delimit the leaf block without rebuilding the bloom leafless (on
+     a noded stem a leafless rebuild turns the nodes BARE, which moves the stem
+     too, and a prefix read off it lands in the wrong place). */
+  const leafTris0 = acc.triangleCount;
   if (leafPlanned.present) {
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
       /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
@@ -18203,6 +18489,7 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
       for (const az of leafPlanned.azimuths[i]) leavesBuilt.push(buildLeafInto(acc, leafPlanned, state, i, az));
     }
   }
+  const leafTriRange = [leafTris0, acc.triangleCount];
   /* THE ANDROECIUM (session 21) — read from the descriptor, placed through
      the arrangement primitive's EXISTING azimuth arms (RING: the RADIAL law;
      DISC: SPIRAL's golden angle over the Vogel radii the owner stamped), one
@@ -18339,7 +18626,7 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
     spacingVariance: spacingField ? { amount: spacingField.amount, frequency: spacingField.frequency, phaseDeg: spacingField.phaseDeg, phaseInert: spacingField.phaseInert,
       fan: spacingField.fan, n: spacingField.n, nyquist: spacingField.nyquist, aliased: spacingField.aliased, halfSpanDeg: spacingField.halfSpanDeg,
       floor: spacingField.floor } : null,
-    neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
+    neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, leafTriRange, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
     /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
        with `p.grid` captured whenever a whorl of sepals exists) — telemetry,
        so `tools/bloom-sepal-contact.mjs` can draw the same petals densely
