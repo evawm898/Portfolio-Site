@@ -161,7 +161,10 @@ const PREDICATE_MOVERS = {
      too: the head's nodes are inert there, and each floret's own stem is a bare
      stem the pedicel pin must keep straight — a raceme row that moved would be
      the pin failing. */
-  'nodes-bare': (st) => Number(st.stemLength) > 0 && Number(st.stemNodeProminence) !== 0
+  /* (the node split, Oct 6: the one control these rows named is two now and
+     the live rows set both halves to the old value, so "away from 0" is
+     either half away from 0 — the same set of rows) */
+  'nodes-bare': (st) => Number(st.stemLength) > 0 && (Number(st.stemNodeSwelling) !== 0 || Number(st.stemNodeKink) !== 0)
     && String(st.inflorescence ?? 'NONE') === 'NONE' && !(Number(st.leafLength) > 0),
   /* INFLORESCENCE BUILD 3, PHASE A — THE REACH INSET AND THE 250 mm CEILING
      (#355). A row moves iff the BASE tree's own raceme plan would be placed
@@ -188,7 +191,7 @@ const PREDICATE_MOVERS = {
     /* over every azimuth the phyllotaxy produces on any asked node (the
        smoke subset's whorled finding — the minimal roll lands a different
        petal up at each azimuth) */
-    const azs = [...new Set(Array.from({ length: Math.max(1, ip.nodesAsked) }, (_, i) => base.leafAzimuths(ip.phyllotaxy, i)).flat())];
+    const azs = [...new Set(Array.from({ length: Math.max(1, ip.nodesAsked) }, (_, i) => base.leafAzimuths(ip.phyllotaxy, i, Math.PI)).flat())];
     for (const exportMode of [false, true]) {
       const U = memo.get(ip.pedicelLenMm, exportMode);
       const src = U.sub.positions;

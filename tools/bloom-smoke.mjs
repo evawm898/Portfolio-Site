@@ -1055,7 +1055,7 @@ export const SMOKE_BLOCKS = [
       { label: 'BARE NODES: eight nodes on 60 mm (SWELLINGS MERGED — told, not clamped)',
         path: "ST12(f) — the plan's `mergedPairs` against the restated gaps and sqrt(2) spindles, both directions; the count is NOT clamped, so ST12(c) still holds all eight nodes to the law" },
       { label: 'BARE NODES: GATED — prominence 1 under a raceme (head inert; every PEDICEL pinned straight)',
-        path: "ID4's PEDICEL PIN — the floret state carries stemNodeProminence 0 and the floret's own stem is a two-station tube with no node law, though the head asks for prominence 1 and a pedicel is a bare stem the ungated law would otherwise node" },
+        path: "ID4's PEDICEL PIN — the floret state carries stemNodeSwelling 0 and stemNodeKink 0 and the floret's own stem is a two-station tube with no node law, though the head asks for both at 1 and a pedicel is a bare stem the ungated law would otherwise node" },
     ],
   },
   {
@@ -1139,6 +1139,27 @@ export const SMOKE_BLOCKS = [
         path: "SV2 with the layer phase restated per whorl and SV3 per whorl; VS5's told pitch under the floor" },
       { label: 'SPACING VARIANCE: GATED — frequency and phase at MAXIMUM with every amount 0 (hidden AND inert)',
         path: "SV1's AMOUNT-0 arm — every emitted azimuth is the nominal law restated here, to the bit, and SV0's other direction" },
+    ],
+  },
+  {
+    n: 52, title: 'the node split and the alternate divergence (Oct 6)',
+    anchor: 'NODE SPLIT: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, no kink',
+    /* FOUR ROWS: the two references by name — the rose (kink only on a
+       137.5 spiral: ST12's bend arm alone and (c) holding the absent swelling
+       at R, LF5's node-to-node turn at the divergence) and the carnation
+       (swelling only, decussate: ST12's swelling arm alone and (c) holding the
+       absent kink on the axis) — the halves APART with both non-zero (the
+       coupled-halves mutant's only row), and the divergence's GATED arm under
+       OPPOSITE (LF5's turn restated without it: the hidden slider inert). */
+    rows: [
+      { label: 'NODE SPLIT: the ROSE — alternate at 137.5 x 4 nodes, kink 0.8 (~6 deg), no swelling',
+        path: "ST12 with the KINK alone — the two statements reading either half, (c) every ring's centre on the kinked law and every radius exactly R, (d)'s bend arm and NOT its swelling arm; LF5's node-to-node turn at (137.5 / 180) pi restated from the divergence control, so the kink follows each leaf round the spiral" },
+      { label: 'NODE SPLIT: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, no kink',
+        path: "ST12 with the SWELLING alone — (c) every ring's centre on the world axis and every radius on the swelling, (d)'s swelling arm and NOT its bend arm, (f)'s merge report; LF5's opposite turn (pi/2 a node) with the divergence inert" },
+      { label: 'NODE SPLIT: the halves APART — swelling 0.3 x kink 1 on three alternate leaves',
+        path: "ST12 where a law reading the wrong half differs from the right one — (c) holds the swelling at 0.3 and the kink at 1 on every ring, which the halves-equal rows of blocks 41/47/48 cannot tell apart" },
+      { label: 'DIVERGENCE: GATED — 90 under OPPOSITE (hidden AND inert)',
+        path: "LF5's node-to-node turn restated WITHOUT the divergence on an opposite stem — the hidden slider at its floor must move no leaf; the registry's leafDivergenceLive is false here" },
     ],
   },
 ];
