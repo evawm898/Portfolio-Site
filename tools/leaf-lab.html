@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Leaf Lab — scratch prototype</title>
+<!-- A SCRATCH PROTOTYPE for the leaf + stem discovery (docs/bloom-leaf-stem-discovery.md).
+     Unlinked, noindex, ships nothing. Builds through tools/leaf-lab-core.mjs, which reaches the
+     SHIPPED emitPanel through an in-memory patch of bloom-geometry.js (never written). -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root { --ink: #1d231c; --dim: #66705f; --line: #d7dccf; --bg: #f6f6f1; --panel: #ffffff; --accent: #4f7d45; --warn: #a0522d; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  body { display: grid; grid-template-columns: 300px 1fr 300px; grid-template-rows: auto 1fr auto; height: 100vh; }
+  header { grid-column: 1 / 4; padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; }
+  header .tag { color: var(--warn); }
+  header label { display: inline-flex; gap: 6px; align-items: center; }
+  .col { overflow-y: auto; padding: 6px 10px 20px; border-right: 1px solid var(--line); background: var(--panel); }
+  .col.right { border-right: 0; border-left: 1px solid var(--line); }
+  .col h2 { font-size: 13px; margin: 8px 0 4px; }
+  details { border-top: 1px solid var(--line); padding: 3px 0; }
+  summary { cursor: pointer; font-weight: 600; padding: 3px 0; }
+  .row { display: grid; grid-template-columns: 1fr 60px; gap: 4px; align-items: center; margin: 2px 0; }
+  .row label { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row input[type=range] { grid-column: 1 / 3; width: 100%; }
+  .row output { text-align: right; }
+  .chk { display: flex; gap: 6px; align-items: center; margin: 3px 0; color: var(--dim); }
+  #view { position: relative; overflow: hidden; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  .half { position: absolute; top: 6px; padding: 2px 6px; background: rgba(255,255,255,.85); border: 1px solid var(--line); }
+  #labA { left: 8px; } #labB { left: calc(50% + 8px); }
+  footer { grid-column: 1 / 4; border-top: 1px solid var(--line); padding: 6px 12px; max-height: 26vh; overflow-y: auto; white-space: pre-wrap; font-size: 12px; }
+  .ref { color: var(--dim); max-width: 60ch; }
+  button { font: inherit; }
+  @media (max-width: 900px) { body { display: flex; flex-direction: column; height: auto; } header { order: 0; } #view { order: 1; height: 55vh; flex: none; } footer { order: 2; max-height: none; } #colA { order: 3; } #colB { order: 4; } .col { border: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Leaf Lab</h1><span class="tag">scratch prototype · discovery only · nothing here ships</span>
+  <label>species <select id="species"><option value="carnation">carnation</option><option value="rose">rose</option><option value="mum">chrysanthemum</option><option value="mumX">chrysanthemum (exaggerated)</option></select></label>
+  <label>show <select id="show"><option value="leaf">one leaf, A beside B</option><option value="stem">stem demo</option></select></label>
+  <label>mode <select id="mode"><option value="export">export (floored)</option><option value="live">live</option></select></label>
+  <button id="reset">reset to preset</button>
+  <button id="glbA">grid .glb (A)</button><button id="glbB">grid .glb (B)</button>
+  <span class="ref" id="ref"></span>
+</header>
+<div class="col" id="colA"><h2>A — blade tree + fusion</h2><div id="ctlA"></div></div>
+<div id="view"><span class="half" id="labA">A</span><span class="half" id="labB">B</span></div>
+<div class="col right" id="colB"><h2>B — separate builders</h2><div id="ctlB"></div><h2>Stem demo</h2><div id="ctlS"></div></div>
+<footer id="out">loading…</footer>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as L from './leaf-lab-core.mjs';
+import { buildGridGltf } from '../bloom-grid-gltf.js';
+
+L.setLoader({
+  read: async () => (await fetch('../bloom-geometry.js')).text(),
+  load: async (src) => { const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' })); try { return await import(url); } finally { URL.revokeObjectURL(url); } },
+});
+const G = await L.geometry();
+
+/* ---------------- the parameter specs (the draft trees, doc §5) ---------------- */
+const TEETH = (p, label) => [
+  [`${p}.count`, `${label} teeth`, 0, 30, 1], [`${p}.depth`, 'tooth depth', 0, 0.8, 0.01], [`${p}.crest`, 'crest power', 0.6, 3, 0.05],
+  [`${p}.notch`, 'notch power', 0.6, 3, 0.05], [`${p}.skew`, 'skew (serrate < 0.5)', 0.1, 0.9, 0.01], [`${p}.from`, 'teeth from u', 0, 0.9, 0.01],
+];
+const A_SPEC = [
+  ['LEAF', [
+    { path: 'venation', label: 'venation', kind: 'select', options: L.VENATION },
+    ['lengthMm', 'midrib / rachis length', 10, 90, 0.5], ['petioleMm', 'petiole', 0, 30, 0.5],
+    { path: 'rootLamina', label: 'lamina on the midrib (off = compound rachis)', kind: 'check' },
+    ['pairs', 'child pairs', 0, 6, 1], ['firstMm', 'first pair at', 0, 40, 0.5], ['lastMm', 'last pair at', 0, 60, 0.5],
+    ['fusion', 'FUSION (0 free … 1 entire)', 0, 1, 0.01], ['sinusBlend', 'sinus blend (TUBE notch)', 0, 1, 0.01],
+  ]],
+  ['BLADE — midrib', [['rootWidth', 'width', 0.5, 20, 0.1], ['rootBaseTaper', 'base taper', 0.1, 2, 0.01], ['rootTipTaper', 'tip taper', 0.1, 2, 0.01], ['rootBaseHalf', 'broad base (half, mm)', 0, 6, 0.1], ...TEETH('rootTeeth', 'midrib')]],
+  ['BLADE — children', [['angleDeg', 'angle (apical pair)', 0, 90, 1], ['angleBaseDeg', 'angle (basal pair)', 0, 90, 1], ['childLenMm', 'length', 2, 40, 0.5], ['childLenBase', 'basal size ratio', 0.3, 1.5, 0.01],
+    ['childWidth', 'width', 1, 25, 0.1], ['childBaseTaper', 'base taper', 0.1, 2, 0.01], ['childTipTaper', 'tip taper', 0.1, 2, 0.01], ['childBaseHalf', 'broad base (half)', 0, 6, 0.1], ['childStalkMm', 'stalk (petiolule)', 0, 15, 0.1], ...TEETH('childTeeth', 'child')]],
+  ['BLADE — terminal', [{ path: 'terminal', label: 'terminal child', kind: 'check' }, ['terminalAtMm', 'at', 0, 80, 0.5], ['terminalLenMm', 'length', 2, 40, 0.5], ['terminalWidth', 'width', 1, 25, 0.1], ['terminalStalkMm', 'stalk', 0, 15, 0.1], ...TEETH('terminalTeeth', 'terminal')]],
+  ['STIPULES', [{ path: 'stipules', label: 'stipules', kind: 'check' }, ['stipules.atMm', 'at (from petiole base)', 0, 20, 0.1], ['stipules.angleDeg', 'angle', 0, 80, 1], ['stipules.lengthMm', 'length', 1, 20, 0.1], ['stipules.width', 'width', 0.5, 8, 0.1]]],
+  ['POSE', [['archDeg', 'arch along the leaf', -60, 140, 1], ['cup', 'cup', -0.6, 0.8, 0.01]]],
+  ['RODS', [['stalkR', 'stalk radius', 0.3, 1.5, 0.05], ['rachisR', 'petiole radius (lamina)', 0.3, 1.5, 0.05]]],
+];
+const B_SPECS = {
+  LINEAR: [
+    ['LEAF', [['lengthMm', 'length', 10, 90, 0.5], ['petioleMm', 'petiole', 0, 30, 0.5]]],
+    ['BLADE', [['width', 'width', 1, 30, 0.1], ['baseTaper', 'base taper', 0.1, 2, 0.01], ['tipTaper', 'tip taper', 0.1, 2, 0.01], ['baseHalf', 'broad base (half)', 0, 6, 0.1], ...TEETH('teeth', 'margin')]],
+    ['POSE', [['archDeg', 'arch', -60, 140, 1], ['cup', 'cup', -0.6, 0.8, 0.01]]],
+  ],
+  PINNATE_COMPOUND: [
+    ['LEAF', [['petioleMm', 'petiole', 0, 30, 0.5], ['rachisMm', 'rachis', 5, 80, 0.5], ['pairs', 'leaflet pairs', 0, 6, 1], ['firstMm', 'first pair at', 0, 40, 0.5], ['lastMm', 'last pair at', 0, 70, 0.5]]],
+    ['BLADE — leaflets', [['leafletAngleDeg', 'angle', 0, 90, 1], ['leafletLenMm', 'length', 3, 40, 0.5], ['leafletWidth', 'width', 1, 25, 0.1], ['basalScale', 'basal size ratio', 0.3, 1.5, 0.01], ['leafletBaseTaper', 'base taper', 0.1, 2, 0.01], ['leafletTipTaper', 'tip taper', 0.1, 2, 0.01], ['lateralStalkMm', 'lateral stalk', 0, 15, 0.1], ...TEETH('teeth', 'leaflet')]],
+    ['BLADE — terminal', [['terminalLenMm', 'length', 3, 40, 0.5], ['terminalWidth', 'width', 1, 25, 0.1], ['terminalStalkMm', 'stalk', 0, 20, 0.1]]],
+    ['STIPULES', [{ path: 'stipules', label: 'stipules', kind: 'check' }, ['stipules.atMm', 'at', 0, 20, 0.1], ['stipules.angleDeg', 'angle', 0, 80, 1], ['stipules.lengthMm', 'length', 1, 20, 0.1], ['stipules.width', 'width', 0.5, 8, 0.1]]],
+    ['POSE', [['archDeg', 'arch', -60, 140, 1], ['cup', 'cup', -0.6, 0.8, 0.01]]],
+    ['RODS', [['stalkR', 'stalk radius', 0.3, 1.5, 0.05]]],
+  ],
+  PINNATIFID: [
+    ['LEAF', [['lengthMm', 'length', 10, 90, 0.5], ['petioleMm', 'petiole', 0, 30, 0.5]]],
+    ['BLADE — envelope', [['width', 'width', 5, 60, 0.5], ['baseTaper', 'base taper', 0.1, 2, 0.01], ['tipTaper', 'tip taper', 0.1, 2, 0.01]]],
+    ['BLADE — lobes', [['lobes', 'lobes per side', 0, 8, 1], ['lobeFrom', 'lobes from u', 0, 0.6, 0.01], ['lobeTo', 'lobes to u', 0.3, 1, 0.01], ['sinusDepth', 'sinus depth', 0, 0.95, 0.01], ['lobeShape', 'lobe shape', 0.2, 3, 0.01], ['lobeAngleDeg', 'row tilt (lobe angle)', 0, 70, 1], ['tiltEaseFrom', 'tilt eases from u', 0.2, 1, 0.01], ...TEETH('teeth', 'lobe')]],
+    ['POSE', [['archDeg', 'arch', -60, 140, 1], ['cup', 'cup', -0.6, 0.8, 0.01]]],
+  ],
+};
+const S_SPEC = [
+  ['STEM', [['lengthMm', 'stem length', 40, 200, 1], ['diameterMm', 'diameter', 2, 10, 0.1], ['swell', 'node swelling', 0, 1, 0.01], ['kinkDeg', 'node kink (deg)', 0, 20, 0.5], ['topMm', 'first node from top', 4, 60, 0.5], ['internodeMm', 'internode', 6, 60, 0.5], ['internodeGrowth', 'internode growth / node', 0.7, 1.4, 0.01]]],
+  ['ARRANGEMENT', [{ path: 'arrangement.type', label: 'arrangement', kind: 'select', options: L.ARRANGEMENTS }, ['nodes', 'nodes', 1, 10, 1], ['arrangement.divergenceDeg', 'divergence (alternate)', 0, 180, 0.5], { path: 'arrangement.decussate', label: 'decussate (opposite)', kind: 'check' }, ['arrangement.whorlN', 'leaves per whorl', 2, 6, 1], { path: 'arrangement.whorlAlternate', label: 'whorls alternate', kind: 'check' }]],
+  ['POSE', [['leafAngleDeg', 'leaf angle from horizontal', -60, 90, 1]]],
+];
+const TEETH_DEFAULT = { count: 0, depth: 0.3, crest: 1.4, notch: 1.6, skew: 0.5, from: 0.3, to: 0.98 };
+const STIP_DEFAULT = { atMm: 2.5, angleDeg: 22, lengthMm: 8, width: 2.6 };
+const getPath = (o, p) => p.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
+function setPath(o, p, v) {
+  const ks = p.split('.'); let a = o;
+  for (let i = 0; i < ks.length - 1; i++) {
+    if (a[ks[i]] == null) a[ks[i]] = ks[i].toLowerCase().includes('teeth') ? { ...TEETH_DEFAULT } : ks[i] === 'stipules' ? { ...STIP_DEFAULT } : {};
+    a = a[ks[i]];
+  }
+  a[ks[ks.length - 1]] = v;
+}
+
+/* ---------------- state ---------------- */
+const $ = (id) => document.getElementById(id);
+const clone = (x) => JSON.parse(JSON.stringify(x));
+let st = {};
+function loadPreset(sp) {
+  const S = clone(L.STEM_PRESETS[sp === 'mumX' ? 'mum' : sp]);
+  /* every arrangement field defined, so switching the arrangement type never reads an undefined */
+  S.arrangement = { divergenceDeg: L.GOLDEN_DEG, decussate: true, whorlN: 3, whorlAlternate: true, ...S.arrangement };
+  st = { sp, A: clone({ ...L.A_DEFAULTS, ...L.A_PRESETS[sp] }), Btype: L.B_PRESETS[sp].type, B: clone(L.B_PRESETS[sp].q), S };
+  $('ref').textContent = L.REFERENCES[sp];
+  $('species').value = sp;
+  render();
+}
+function controls(host, spec, obj, onChange, extraTop = null) {
+  host.innerHTML = '';
+  if (extraTop) host.appendChild(extraTop);
+  for (const [group, items] of spec) {
+    const d = document.createElement('details'); d.open = group === 'LEAF' || group === 'STEM' || group === 'ARRANGEMENT' || group.startsWith('BLADE — lobes') || group === 'BLADE — children';
+    const s = document.createElement('summary'); s.textContent = group; d.appendChild(s);
+    for (const it of items) {
+      if (Array.isArray(it)) {
+        const [path, label, min, max, step] = it;
+        const row = document.createElement('div'); row.className = 'row';
+        const lab = document.createElement('label'); lab.textContent = label; lab.title = path;
+        const out = document.createElement('output');
+        const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step;
+        const v = getPath(obj, path); inp.value = v == null ? min : v; out.textContent = v == null ? '—' : (+v).toFixed(step < 1 ? 2 : 0);
+        inp.addEventListener('input', () => { setPath(obj, path, +inp.value); out.textContent = (+inp.value).toFixed(step < 1 ? 2 : 0); onChange(); });
+        row.append(lab, out, inp); d.appendChild(row);
+      } else if (it.kind === 'check') {
+        const row = document.createElement('label'); row.className = 'chk';
+        const inp = document.createElement('input'); inp.type = 'checkbox';
+        const v = getPath(obj, it.path); inp.checked = !!v;
+        inp.addEventListener('change', () => {
+          if (it.path === 'stipules') obj.stipules = inp.checked ? { ...STIP_DEFAULT } : null; else setPath(obj, it.path, inp.checked);
+          onChange(); render();
+        });
+        row.append(inp, document.createTextNode(it.label)); d.appendChild(row);
+      } else if (it.kind === 'select') {
+        const row = document.createElement('div'); row.className = 'row';
+        const lab = document.createElement('label'); lab.textContent = it.label;
+        const sel = document.createElement('select'); for (const o of it.options) { const op = document.createElement('option'); op.value = op.textContent = o; sel.appendChild(op); }
+        sel.value = getPath(obj, it.path); sel.addEventListener('change', () => { setPath(obj, it.path, sel.value); onChange(); });
+        row.append(lab, sel); d.appendChild(row);
+      }
+    }
+    host.appendChild(d);
+  }
+}
+function render() {
+  controls($('ctlA'), A_SPEC, st.A, schedule);
+  const tsel = document.createElement('div'); tsel.className = 'row';
+  const tl = document.createElement('label'); tl.textContent = 'B builder (leaf type)';
+  const sel = document.createElement('select'); for (const t of L.B_TYPES) { const op = document.createElement('option'); op.value = op.textContent = t; sel.appendChild(op); }
+  sel.value = st.Btype;
+  sel.addEventListener('change', () => {
+    st.Btype = sel.value;
+    /* a builder's parameters are its own: switching builder loads that builder's species preset */
+    const donor = Object.values(L.B_PRESETS).find((x) => x.type === st.Btype);
+    st.B = clone(donor.q); render(); schedule();
+  });
+  tsel.append(tl, sel);
+  controls($('ctlB'), B_SPECS[st.Btype], st.B, schedule, tsel);
+  controls($('ctlS'), S_SPEC, st.S, schedule);
+  schedule();
+}
+
+/* ---------------- three ---------------- */
+const view = $('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+view.appendChild(renderer.domElement);
+renderer.setScissorTest(true);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.5, 4000);
+let controlsCam = new OrbitControls(camera, renderer.domElement);
+const scenes = [new THREE.Scene(), new THREE.Scene()];
+for (const sc of scenes) {
+  sc.background = new THREE.Color(0xf6f6f1);
+  sc.add(new THREE.HemisphereLight(0xffffff, 0x8a8a7a, 1.1));
+  const d = new THREE.DirectionalLight(0xffffff, 1.4); d.position.set(40, -60, 90); sc.add(d);
+}
+const COL = { blade: [0.41, 0.62, 0.38], chevron: [0.41, 0.62, 0.38], web: [0.6, 0.69, 0.33], rod: [0.54, 0.42, 0.3], stem: [0.49, 0.55, 0.36] };
+let meshes = [null, null];
+function toMesh(acc, parts) {
+  const g = new THREE.BufferGeometry();
+  const pos = new Float32Array(acc.positions);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const col = new Float32Array(pos.length);
+  for (const p of parts) { const c = COL[p.kind] || [0.7, 0.7, 0.7]; for (let t = p.t0; t < p.t1; t++) for (let k = 0; k < 3; k++) col.set(c, t * 9 + k * 3); }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide, flatShading: true }));
+}
+function resize() {
+  const r = view.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = (r.width / 2) / r.height; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+let fitted = null;
+/* THE FRAMING: a leaf alone is shown TIP UP, looked at from above and a
+   little in front (the sheet's own front view); the stem demo stands z-up. The
+   bounding sphere is fitted to the NARROWER of the two fields of view, because
+   each half of the canvas is taller than it is wide. OrbitControls caches the
+   up vector when it is built, so a change of view rebuilds it. */
+function fit(box, stem) {
+  const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() / 2;
+  camera.up.copy(stem ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0));
+  controlsCam.dispose(); controlsCam = new OrbitControls(camera, renderer.domElement);
+  const vf = (camera.fov * Math.PI) / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
+  const dist = (r / Math.sin(Math.min(vf, hf) / 2)) * 1.02;
+  const dir = stem ? new THREE.Vector3(-0.5, -0.7, 0.45) : new THREE.Vector3(-0.15, -0.35, 1);
+  controlsCam.target.copy(c);
+  camera.position.copy(c).add(dir.normalize().multiplyScalar(dist));
+  camera.updateProjectionMatrix(); controlsCam.update();
+}
+function frame() {
+  requestAnimationFrame(frame);
+  controlsCam.update();
+  const r = view.getBoundingClientRect(), w = r.width / 2;
+  for (let i = 0; i < 2; i++) { renderer.setViewport(i * w, 0, w, r.height); renderer.setScissor(i * w, 0, w, r.height); renderer.render(scenes[i], camera); }
+}
+
+/* ---------------- build ---------------- */
+let timer = null, lastLeaves = [null, null];
+function schedule() { clearTimeout(timer); timer = setTimeout(build, 60); }
+async function build() {
+  const t0 = performance.now();
+  const exportMode = $('mode').value === 'export';
+  const leaves = [L.buildTreeLeaf(L.treeFromParams(st.A)), L.buildTypedLeaf(st.Btype, st.B)];
+  const lines = [];
+  const box = new THREE.Box3();
+  for (let i = 0; i < 2; i++) {
+    const acc = new G.MeshBuilder({ exportMode, captureGrid: true });
+    let parts;
+    if ($('show').value === 'stem') {
+      /* the same stem twice: A's leaf on the left, B's on the right */
+      ({ parts } = await L.emitStemDemo(acc, st.S, leaves[i], { sheetMm: 1.2 }));
+    } else {
+      parts = await L.emitLeaf(leaves[i], { acc, sheetMm: 1.2 });
+    }
+    if (meshes[i]) { scenes[i].remove(meshes[i]); meshes[i].geometry.dispose(); }
+    meshes[i] = toMesh(acc, parts); scenes[i].add(meshes[i]);
+    meshes[i].geometry.computeBoundingBox(); box.union(meshes[i].geometry.boundingBox);
+    lastLeaves[i] = { leaf: leaves[i], parts: parts.filter((p) => p.grid || p.kind === 'rod'), acc };
+    const lf = leaves[i];
+    const jmin = Math.min(...lf.panels.map((p) => p.jac.min));
+    lines.push(`${i === 0 ? 'A' : `B (${st.Btype})`}: ${acc.triangleCount} triangles ${exportMode ? 'EXPORT' : 'LIVE'} · ${lf.panels.length} panels · ${lf.rods.length} rods · lattice min cell ${jmin.toExponential(2)} mm²${jmin > 0 ? '' : '  ← FOLDED (C2)'}`);
+    for (const w of lf.webs || []) lines.push(`   ${w.label}: sinus ${w.closedBeyond ? `open at the rim but CLOSED further out (blades overlap) — notch inert, web runs to the blades (pocket rule)` : w.open ? `open, half-width ${w.W.toFixed(2)} mm, lean ${w.beta.toFixed(1)}°, notch r ${w.r.toFixed(2)} mm, depth ${w.depthMm.toFixed(2)} mm` : 'closed at the rim — notch inert, web runs to the blades (pocket rule)'}${w.clampedColumns ? ` · notch clamped at the midrib on ${w.clampedColumns} columns` : ''}`);
+    for (const n of lf.notes || []) lines.push(`   ${n}`);
+    for (const r of lf.rods) { let len = 0; for (let k = 0; k + 1 < r.pts2.length; k++) len += Math.hypot(r.pts2[k + 1][0] - r.pts2[k][0], r.pts2[k + 1][1] - r.pts2[k][1]); lines.push(`   rod ${r.label}: Ø ${(2 * Math.min(...r.radii)).toFixed(2)} mm × ${len.toFixed(1)} mm (L/d ${(len / (2 * Math.min(...r.radii))).toFixed(1)})`); }
+  }
+  $('labA').textContent = $('show').value === 'stem' ? 'stem · A leaves' : 'A — blade tree + fusion';
+  $('labB').textContent = $('show').value === 'stem' ? `stem · B leaves (${st.Btype})` : `B — ${st.Btype}`;
+  const key = `${st.sp}|${$('show').value}`;
+  if (fitted !== key) { fit(box, $('show').value === 'stem'); fitted = key; }
+  lines.push(`built in ${(performance.now() - t0).toFixed(0)} ms. Sheet 1.20 mm; every panel through the shipped emitPanel (edge bead, grid capture).`);
+  $('out').textContent = lines.join('\n');
+}
+function downloadGlb(i) {
+  const l = lastLeaves[i]; if (!l || $('show').value !== 'leaf') { alert('show a single leaf first'); return; }
+  const glb = buildGridGltf(L.gridBuilt([{ leaf: l.leaf, parts: l.parts }]), { mode: $('mode').value, state: null, generator: `leaf-lab-${i === 0 ? 'A' : 'B'}` });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([glb], { type: 'model/gltf-binary' })); a.download = `leaf-lab-${st.sp}-${i === 0 ? 'A' : 'B'}-grid.glb`; a.click();
+}
+$('species').addEventListener('change', () => loadPreset($('species').value));
+$('reset').addEventListener('click', () => loadPreset(st.sp));
+$('show').addEventListener('change', () => { fitted = null; schedule(); });
+$('mode').addEventListener('change', schedule);
+$('glbA').addEventListener('click', () => downloadGlb(0));
+$('glbB').addEventListener('click', () => downloadGlb(1));
+resize();
+loadPreset('mum');
+frame();
+window.__leafLab = { L, st: () => st, build };
+</script>
+</body>
+</html>
