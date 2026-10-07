@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, nodeVarianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -1738,6 +1738,55 @@ function leafLine(leaf, leavesBuilt) {
         + (lc.behind ? ` — ${lc.behind} floret vert${lc.behind === 1 ? 'ex stands' : 'ices stand'} within the gap of the petiole itself, which no length moves` : '');
     })()
     : '';
+  /* THE POSE (leaf/stem build S2): the arch and the cup, each the LEAF's own
+     control on the petal's own law, told from the BUILDER's records — the
+     arch's radius from the spine law, the cup's clamp from the form's own
+     `cupClamp` (the fold clamp binds where the blade narrows to its stub). */
+  const b0 = leavesBuilt && leavesBuilt[0];
+  const arch = Number(leaf.archDeg) || 0;
+  const archLine = `\n     POSE arch ${arch}°`
+    + (arch === 0 ? ' — flat along its length, as shipped'
+      : ` — the tip ${arch > 0 ? 'falls away (arching DOWN)' : 'curls UP'}, a uniform arc of ${b0 && b0.arch && Number.isFinite(b0.arch.radiusMm) ? `${b0.arch.radiusMm.toFixed(1)} mm` : '—'} radius (the petal's own spine law)`
+        + (b0 && b0.arch && b0.arch.underFloor ? ' — UNDER ONE SHEET THICKNESS of radius (told, never clamped)' : ''))
+    + ` · cup ${Number(leaf.cup).toFixed(2)}${Number(leaf.cup) === 0 ? ' — a flat section' : Number(leaf.cup) < 0 ? ' — the margins turned DOWN' : ' — the margins lifted'}`
+    + (b0 && b0.cup && b0.cup.clamp && b0.cup.clamp.u !== null
+        ? ` — CUP CLAMPED at u ${b0.cup.clamp.u.toFixed(3)} (asked radius ${b0.cup.clamp.askedRadiusMm.toFixed(3)} mm, drawn ${b0.cup.clamp.drawnRadiusMm.toFixed(3)} — the section may not fold through its own skins, told, never refused)`
+        : '');
+  /* THE EDGE (leaf/stem build S2): the blade goes through the petal's own
+     emitter, so its margin closes on the petal's bead — read off the builder's
+     rim record, never restated. */
+  const R0 = b0 && b0.rim;
+  let rimClampLine = '';
+  if (R0 && R0.clamps.length) {
+    let thin = Infinity, room = 0;
+    for (const c of R0.clamps) if (c.thicknessMm < thin) { thin = c.thicknessMm; room = c.roomMm; }
+    rimClampLine = ` — RIM CLAMPED at ${R0.clamps.length} location${R0.clamps.length === 1 ? '' : 's'}, ${thin.toFixed(3)} mm on a ${room.toFixed(2)} mm span (told, never refused)`;
+  }
+  const edgeLine = R0 && R0.segments
+    ? `\n     EDGE the margin closes on a ${R0.drawnMaxMm.toFixed(2)} mm half-round in ${R0.segments} segments (the petal's own bead), buried where the petiole holds it and easing in over ${RIM_TAPER_MM.toFixed(1)} mm of margin`
+      + (R0.tipAxisMm === null ? '' : ` · the ${(2 * TIP_HALF_MM).toFixed(2)} mm stub ends on the bead's nose, ${R0.tipAxisMm.toFixed(2)} mm along the length (the last ${RIM_TIP_ROWS} rows)`)
+      + rimClampLine
+    : '';
+  /* THE TEETH (leaf/stem build S2, Eva's ruling: the relief is ALWAYS floored
+     at the minimum feature, design view included). ASKED against BUILT, the
+     fringe's and the stamen spread's pattern, from the builder's own record.
+     (This replaces a TEETH CLAMPED clause that read `teethAsked` off the PLAN,
+     which never carried it, so it had never once printed.) */
+  const Sr = b0 && b0.serration;
+  let teethLine = '';
+  if (Sr && Sr.noRoom) {
+    teethLine = `\n     TEETH NONE BUILT of ${Sr.countAsked} asked — `
+      + (Sr.noRoomWhy === 'relief floor'
+        ? `no margin sinus has ${Sr.reliefFloorMm.toFixed(2)} mm of material for a notch (the widest half-width ${Sr.peakHalfMm.toFixed(2)} mm less the ${TIP_HALF_MM.toFixed(2)} mm print floor) — the relief floor, told, never refused`
+        : `NO ROOM (${Sr.noRoomWhy}), told`);
+  } else if (Sr) {
+    const margin = Sr.reliefMm.filter((r, i) => Sr.apexIsCrest || i !== (Sr.periods - 1) / 2);
+    teethLine = `\n     TEETH ${Sr.countBuilt} built${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : ''}`
+      + (margin.length ? ` · relief ${Math.min(...margin).toFixed(2)}${Math.max(...margin) > Math.min(...margin) ? `–${Math.max(...margin).toFixed(2)}` : ''} mm at the sinuses` : '')
+      + (Sr.reliefFloored ? ` (asked ${Sr.reliefAskedMm.toFixed(2)} mm, FLOORED at the ${Sr.reliefFloorMm.toFixed(2)} mm minimum feature — design view included; the slider keeps its value)` : ` (the floor is ${Sr.reliefFloorMm.toFixed(2)} mm)`)
+      + (Sr.rowReliefMm && Sr.rowReliefMm.length ? ` · the rows draw ${Math.min(...Sr.rowReliefMm).toFixed(2)}–${Math.max(...Sr.rowReliefMm).toFixed(2)} mm of it (they sample the cut between stations)` : '')
+      + (Sr.apexIsCrest === false ? ' · an even count puts its apex notch on the terminal face, where it cuts nothing' : '');
+  }
   if (sn && !leaf.nodeDepthsMm.length) return `\n     LEAVES none built${sharedLine}\n`;
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node${leaf.divergenceDeg !== null && leaf.divergenceDeg !== undefined ? `, ${leaf.divergenceDeg.toFixed(1)}° between nodes${leaf.divergenceDeg === 180 ? ' — distichous' : ''}` : ''})`
     + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
@@ -1750,8 +1799,7 @@ function leafLine(leaf, leavesBuilt) {
         : ` (the stem's own inset; the leaf needs ${leaf.insetNeededMm.toFixed(1)} mm and has it)`)
     + (leaf.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: a ${leaf.lengthMm} mm leaf rises further than this stem's node span is long, so the top leaf stands inside the head (told, not refused)`)
     + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
-    + (leaf.teethAsked !== undefined && leaf.teethBuilt !== undefined && leaf.teethBuilt < leaf.teethAsked
-        ? `\n     TEETH CLAMPED ${leaf.teethAsked} -> ${leaf.teethBuilt} a margin — the cut law's own ceiling on a blade this size (told, never refused)` : '')
+    + archLine + edgeLine + teethLine
     + tipLine + sharedLine + capLine
     + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
 }
@@ -2650,6 +2698,22 @@ window.__bloomMetrics = () => ({
        family does not restate it. */
     teethAsked: lastLeaf.toothCount,
     teethBuilt: (lastLeavesBuilt || []).reduce((n, r) => Math.max(n, r.serrationBuilt), 0),
+    /* THE POSE AND THE FLOOR (leaf/stem build S2) — LF11-LF13's measured side.
+       The plan's arch and cup beside, per emitted leaf, the centre and frame
+       normal each row was built on (LF11 restates the arc from the controls),
+       each margin's cup lift and the drawn and base half-widths (LF12 reads the
+       cup coefficient back), the builder's serration record with the relief
+       the OUTLINE carries at every margin sinus (LF13), and the form's own
+       cup-clamp record and the arch's radius for the read-out. */
+    archDeg: lastLeaf.archDeg, cup: lastLeaf.cup,
+    rowCentre: (lastLeavesBuilt || []).map((r) => r.rowCentre),
+    rowNormal: (lastLeavesBuilt || []).map((r) => r.rowNormal),
+    rowHalfMm: (lastLeavesBuilt || []).map((r) => r.rowHalfMm),
+    rowMarginLiftMm: (lastLeavesBuilt || []).map((r) => r.rowMarginLiftMm),
+    archBuilt: (lastLeavesBuilt || []).map((r) => ({ ...r.arch, radiusMm: Number.isFinite(r.arch.radiusMm) ? r.arch.radiusMm : null })),
+    cupBuilt: (lastLeavesBuilt || []).map((r) => ({ coefficient: r.cup.coefficient, clamp: r.cup.clamp ? { ...r.cup.clamp, askedRadiusMm: Number.isFinite(r.cup.clamp.askedRadiusMm) ? r.cup.clamp.askedRadiusMm : null, drawnRadiusMm: Number.isFinite(r.cup.clamp.drawnRadiusMm) ? r.cup.clamp.drawnRadiusMm : null } : null })),
+    serrationBuilt: (lastLeavesBuilt || []).map((r) => r.serration),
+    rimClamps: (lastLeavesBuilt || []).map((r) => r.rim.clamps.length),
   } : null,
   leafTris: lastLeafTris,
   leafAbsent: lastLeafAbsent,
