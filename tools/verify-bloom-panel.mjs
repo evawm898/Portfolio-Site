@@ -365,6 +365,18 @@ const WITNESS = {
                       and the 10 is the cut law's OWN ceiling clamping an asked
                       12, which is a quantity no control can write directly. */
                    read: (m) => `${m.leaf && m.leaf.serration && m.leaf.serration.count}`, what: 'leaf.serration.count' },
+  /* THE LEAFLETS (leaf/stem build S3) — a drop-down inside Leaves, collapsed
+     at first load and shown only on a COMPOUND leaf. Witnessed by the PAIRS
+     through the BUILDER's own tree: how many blades it emitted and how many
+     leaflets the first leaf carries, which the slider cannot write directly
+     (the count is the layout's answer, and a pairs control that moved the
+     slider and built the same leaf would read the same number twice). The row
+     needs a stem, a leaf and the COMPOUND type, which is why the driver sets
+     all three first. */
+  leafLeaflets: { id: 'leafletPairs', value: '4',
+                  pre: [{ id: 'stemLength', value: '70' }, { id: 'leafLength', value: '40' }, { id: 'leafType', value: 'COMPOUND' }],
+                  read: (m) => `${m.leaf && m.leaf.bladeOf && m.leaf.bladeOf.length}/${m.leaf && m.leaf.compoundBuilt && m.leaf.compoundBuilt[0] ? m.leaf.compoundBuilt[0].leaflets.length : null}`,
+                  what: 'leaf.bladeOf.length/leaf.compoundBuilt[0].leaflets.length' },
   /* SEPALS (part 1) — a top-level section after Center, collapsed at first
      load, holding the count and three drop-downs mirroring Petal's. Witnessed
      by the COUNT through the builder's own tally — a count that moved the

@@ -74,6 +74,11 @@ export const SHIPPED_STATES = Object.freeze([
   { id: 'the sepals at the shipped whorl', matrixRow: 'SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)', set: { sepalCount: 5 }, measures: ['self'] },
   { id: 'the androecium candidate', matrixRow: 'STAMENS: 6 on a RING (the six-stamen candidate)', set: { stamenCount: 6 }, measures: ['self'] },
   { id: 'the leaves at the ruled 35 deg', matrixRow: 'LEAVES: alternate x 3 nodes at the ruled 35 deg', set: { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafAngle: 35, leafNodes: 3, leafPhyllotaxy: 'alternate' }, measures: ['self', 'leaf-stem'] },
+  /* THE COMPOUND LEAF (leaf/stem build S3) — the leaf type is a guarded feature,
+     so its shipped defaults join the table the day it lands (ruling 3). The
+     defaults are the session's, put to Eva from the sheet; when she rules them
+     this row follows the ruling. */
+  { id: 'the compound leaf at its shipped defaults', matrixRow: 'COMPOUND: the shipped compound defaults (2 pairs + terminal on a 40 mm rachis, 3 alternate nodes)', set: { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 3, leafType: 'COMPOUND' }, measures: ['self', 'leaf-stem'] },
   { id: 'the infill at its ruled defaults', matrixRow: 'INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)', set: { petalInfill: 'VORONOI' }, measures: ['self', 'infill-wall'] },
   { id: 'the raceme at its defaults', matrixRow: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)', set: { stemLength: 120, inflorescence: 'RACEME' }, measures: ['self', 'floret-floret', 'floret-head', 'floret-stem'] },
   { id: 'the shared node — a leaf under every pedicel', matrixRow: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel', set: { stemLength: 120, inflorescence: 'RACEME', leafLength: 40 }, measures: ['leaf-floret', 'leaf-pedicel', 'floret-floret', 'floret-head', 'leaf-stem'] },
