@@ -3602,6 +3602,28 @@ four apex mutants, `frozen/phase55` = the 1,156 rows at `eb75119`. Sheet: `docs/
 **RULED (Eva, Oct 7): both ranges KEPT as shipped (arch −90..180 with the extremes reachable and declared,
 cup the petal's −0.8..1.2) and the floored serration ACCEPTED as built** — §8 of the outcome doc.
 
+**A LEAF CAN BE COMPOUND: ONE LEAF, A RACHIS, LEAFLETS ON STALKS, EVERY LEAFLET A BLADE OF THE ONE BLADE
+LAW** (Eva's rulings, Oct 7 — leaf/stem build S3; read `docs/bloom-leaf-compound-outcome.md` before
+touching `leafType`, `compoundLeafPlan`, `buildCompoundLeafInto`, `emitLeafBladeInto`, `emitPanel`'s
+`baseExposed`, `leafRootBase`, `SHARED_NODE_LEAF_PINS`, `rodAxes` or LF14-LF17). `leafType` (SIMPLE /
+COMPOUND, default SIMPLE) plus eleven leaflet controls in a Leaflets drop-down, all hidden AND inert under
+SIMPLE; under COMPOUND `leafLength` is the RACHIS and the pair stations are FRACTIONS of it. **SIMPLE moves
+0 floats** (1,177 holders, 1,450,872,792 export floats and 83,241,760 grid values, both modes, the whole
+1,210-row matrix; the /plot grid glTF names no leaf). A leaflet's base is FREE — `emitPanel`'s
+`baseExposed` closes it on the bead as the tip is, reported as `rim.baseAxisMm` — and its stalk runs past
+the base by the beaded base; the arch bends the RACHIS, leaflets lie flat in its plane (no per-leaflet
+arch). **THE RODS' LAW COLLAPSES AT THIS TREE AND THAT IS EVA'S QUESTION**: the area rule floored at the
+wire, and the bloom's petiole IS the 1.2 mm wire (`t/2`), so every rod is the petiole at every sheet
+(`floorBinds` 7 of 7) — a fixed 1.2 mm wire or a thicker compound petiole are the alternatives, §4.
+**A raceme's shared node pins the leaf to SIMPLE in ONE place** (`SHARED_NODE_LEAF_PINS`, told), because
+the seating offset and the floret cap are single-blade laws. ST9, its witness and the combination gate's
+leaf-stem measure excuse the builder's own `rodAxes` (petiole, rachis, stalks) BY NAME. Pairs capped at
+4: the whorled-8 corner is 721,114 tris (48.1%); 5 would be ~57.9%. **At exactly 90° a pair's two stalk
+rings coincided and WELDED (78 non-manifold edges) — the left side takes the other half step now.** The
+leaf's root base has one owner (`leafRootBase`): the duplicate expression had disarmed an apex mutant.
+Eight compound mutants plus three re-anchored, each firing what it names. Block 54 (36 rows, 1,210),
+smoke block 54 (9), `frozen/phase56` = the 1,174 rows at `be375b0`. Sheet: `docs/img/leaf-compound.png`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,

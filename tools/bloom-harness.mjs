@@ -14167,7 +14167,7 @@ export function buildMatrix() {
   lf('COMPOUND: leafAngle 85 (steep — the rachis leaves near the stem)', { ...CPD, leafAngle: 85 });
   lf('COMPOUND: leafAngle -60 (drooping)', { ...CPD, leafAngle: -60 });
   lf('COMPOUND: a SPHERE head with a stem (ST9 excuses the rachis and stalks by name)', { ...CPD, placement: 'CONTINUOUS', hubShape: 'SPHERE' });
-  lf('COMPOUND: whorled x 8 nodes x leafletPairs 4 (24 leaves of nine leaflets — the cost corner)', { stemLength: 90, stemDiameter: 6, leafLength: 45, leafNodes: 8, leafPhyllotaxy: 'whorled', leafType: 'COMPOUND', leafletPairs: 4 });
+  lf('COMPOUND: whorled x 8 nodes x leafletPairs 4 x arch 180 (24 leaves of nine leaflets, the rachis subdivided — the cost corner)', { stemLength: 90, stemDiameter: 6, leafLength: 45, leafNodes: 8, leafPhyllotaxy: 'whorled', leafType: 'COMPOUND', leafletPairs: 4, leafArch: 180 });
   lf('COMPOUND: under a raceme\'s shared node (PINNED to SIMPLE, and told)', { stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', leafLength: 40, leafType: 'COMPOUND' });
   lf('COMPOUND: GATED — SIMPLE with every leaflet control at an extreme (hidden AND inert)', { ...CPD, leafType: 'SIMPLE', leafletPairs: 4, leafletAngle: 90, leafletLength: 60, leafletStalk: 20, leafletTerminalStalk: 30, leafletBasalRatio: 1.4 });
   lf('COMPOUND: GATED — the type and every leaflet control at an extreme with length 0 (hidden AND inert)', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafType: 'COMPOUND', leafletPairs: 4, leafletAngle: 90, leafletStalk: 20, leafletTerminalStalk: 30, leafletBasalRatio: 1.4 });
