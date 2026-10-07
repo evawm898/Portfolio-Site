@@ -1177,7 +1177,10 @@ window.__bug = {
   // model (the flat display while editing): where the wing actually is
   apexWorld: (i) => {
     const m = viewModel || model, part = m.parts.find((q) => q.kind === `wing${editPair + 1}` && q.side === 'R');
-    const n = part.meta.planform.length, idx = n - 1 - (part.meta.denseAt[i * CR_SAMPLES] + 1), r = part.meta.bead ? part.meta.bead.rings.find((x) => x.i === idx) : null;
+    // (the builder's own map from a dense sample to its planform point; a point
+    // the junction blend swallowed — inside the body — has no emitted apex)
+    const idx = part.meta.denseAtPlanform[i * CR_SAMPLES], r = part.meta.bead ? part.meta.bead.rings.find((x) => x.i === idx) : null;
+    if (idx < 0) return null;
     const v = r ? r.ids[part.meta.bead.K / 2] : part.v0 + idx; return [m.positions[3 * v], m.positions[3 * v + 1]];
   },
   wingScreen: (k, side = 'R') => { const m = viewModel || model, part = m.parts.find((q) => q.kind === `wing${k + 1}` && q.side === side); const L = contourLoops(m, part).reduce((a, l) => (l.length > a.length ? l : a)); let cx = 0, cy = 0; for (const [x, y] of L) { cx += x; cy += y; } return worldToScreen(cx / L.length, cy / L.length); },

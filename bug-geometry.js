@@ -19,6 +19,7 @@
 
 import { planVenation, bridgeHoles, MIN_CELL_MM_DEFAULT } from './bug-venation.js';
 import { WING_LIBRARY } from './bug-wing-library.js';
+import { junctionBlend, edt2, pointInPoly } from './bug-junction.js';
 export { WING_LIBRARY };
 export { MIN_CELL_MM_DEFAULT };
 
@@ -101,6 +102,14 @@ export const OUTLINE_BOUNDS = { u: [0, 1.2], w: [-0.9, 0.46] };   // room below 
 const MIN_POINT_GAP = 0.012;                // consecutive control points closer than this are refused
 const MIN_ROOT_CHORD = 0.03;                // root lead must sit this far ahead of root trail
 export const MIN_OUTLINE_POINTS = 4;        // two roots + two interior
+/* The WING–BODY JUNCTION BLEND (design doc §16): the closing radius's default,
+   and how the wing's buried part is laid inside the body. */
+export const JUNCTION_DEFAULT_MM = 1.0;     // the closing radius: gaps under about 2 mm between a wing and the body are filled (see §16.4 for why this value)
+export const JUNCTION_DENSIFY_MM = 0.1;     // the drawn outline is densified to this spacing for the blend to find where it leaves it
+export const BURY_FADE_MM = 2.5;            // outside the body's silhouette the wing eases from its own height to the body's mid-plane over this distance
+export const BURY_PAIR_STEP_MM = 0.3;       // inside the body each later pair lies this much below the one in front
+export const BURY_DEPTH_FRAC = 0.6;         // inside the body the wing's half-thickness is held to this fraction of the body's local half-depth (never under half the floor)
+export const JUNCTION_FUSED_FRAC = 0.5;     // blended wing material within this many floors of the body's silhouette is judged with the body (it is fused into it), not alone
 
 /* ------------------------------------------------------------------ */
 /* Parameter declaration — the ONE place a control is defined          */
@@ -173,6 +182,7 @@ export const PARAM_SPEC = [
   R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
   R('wingRootPinch', 'wings', 'Root — pinch where the wing meets the body (0: the straight root chord, 1: a neck at ROOT_NECK_AT_FULL of the drawn root)', 0, 1, 0.05, 0, '', hasWings),
   R('wingRootLength', 'wings', 'Root — length: how far out from the body the narrowing reaches (1: as derived from the wing)', 0.5, 2, 0.05, 1, '×', (p) => hasWings(p) && p.wingRootPinch > 0),
+  R('wingJunction', 'wings', 'Junction blend — fills gaps between wing and body narrower than about 2× this, and rounds the corners where they meet (0: off)', 0, 3, 0.05, JUNCTION_DEFAULT_MM, 'mm', hasWings),
 
   /* Phase 2 — venation. ONE model: the mode decides how the SAME cell record
      becomes geometry (HOLES: the cells are cut through and the veins plus the
@@ -256,7 +266,7 @@ export const LEGACY_DEFAULT_WINGS = {
 };
 /* The new controls at the ends that ARE the old code (each a branch). A design
    saved before DESIGN_VERSION 4 loads with these, so it looks as it did. */
-export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0, wingRootPinch: 0 };
+export const LEGACY_STYLE = { pointedTips: false, segmentStyle: 1, clubLength: 0, clubWidth: 1.8, clubTaper: 0.35, wingEdgeTaper: 0, wingEdgeBevel: 0, wingEdgeRound: 0, wingRootPinch: 0, wingJunction: 0 };
 /* The edges pass (design doc §10): the rounded edge became the default. A design
    saved at DESIGN_VERSION 4 carries the chamfer it was saved with and knows no
    round radius, so it loads with the round at 0 (the square wall it had). */
@@ -264,6 +274,10 @@ export const PRE_ROUND_STYLE = { wingEdgeRound: 0 };
 /* The blended root (§12.1): a design saved before DESIGN_VERSION 6 knows no root
    width and loads with it at 0 — the straight root chord it was saved with. */
 export const PRE_ROOT_STYLE = { wingRootPinch: 0 };
+/* The junction blend (§16): a design saved before DESIGN_VERSION 7 knows no
+   blend and loads with it at 0 — its drawn roots and the old root tab, by
+   branch, so it looks as saved. */
+export const PRE_JUNCTION_STYLE = { wingJunction: 0 };
 /* The Phase 1/2 default's body, legs and antennae (the values PARAM_SPEC used
    to default to). */
 export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, thoraxDepth: 4.6, abdomenLength: 15, abdomenWidth: 5, abdomenTaper: 0.5, abdomenSegments: 6,
@@ -1279,7 +1293,7 @@ function abdomenEnvelope(s, taper, segs, banding, style = 1, lenMm = 1, pointed 
 
 /* Layout of the body along y, read by the body builder AND by every part that
    attaches to it (one owner of where the thorax, head and abdomen are). */
-function bodyLayout(p) {
+export function bodyLayout(p) {
   // The thorax lengthens with each wing pair past two (THORAX_PER_PAIR), so the
   // roots spread along it instead of stacking.
   const Lt = p.thoraxLength * (1 + THORAX_PER_PAIR * Math.max(0, p.wingPairs - 2));
@@ -1341,8 +1355,9 @@ function superRing(y, rx, rz, n, z0 = 0) {
   return ring;
 }
 
-function buildBody(acc, p, L) {
-  const part = acc.begin('body', 'body', 'C');
+/* The body's stations along y — ONE owner, read by the body builder and by the
+   junction blend's silhouette (so the blend sees the body the STL carries). */
+function bodyStations(p, L) {
   const N = Math.max(24, Math.ceil((L.yMax - L.yMin) / BODY_STEP_MM));
   let stations = [];
   for (let i = 1; i < N; i++) stations.push(L.yMin + ((L.yMax - L.yMin) * i) / N);
@@ -1363,6 +1378,21 @@ function buildBody(acc, p, L) {
     stations = stations.filter((y) => gs.every((g) => Math.abs(y - g) > 0.03)).concat(gs.filter((y) => y > L.yMin && y < L.yMax));
     stations.sort((a, b) => a - b);
   }
+  return { stations, grooves };
+}
+/* The right half's top-down silhouette: the widest x of every emitted ring, an
+   open polyline from the tail apex up the right side to the head apex. */
+export function bodySilhouette(p, L) {
+  const { stations } = bodyStations(p, L);
+  const out = [[0, L.yMin]];
+  for (const y of stations) out.push([Math.max(profileAt(p, L, y)[0], 0.02), y]);
+  out.push([0, L.yMax]);
+  return out;
+}
+
+function buildBody(acc, p, L) {
+  const part = acc.begin('body', 'body', 'C');
+  const { stations, grooves } = bodyStations(p, L);
   const rings = [], ys = [];
   for (const y of stations) {
     const [rx, rz] = profileAt(p, L, y);
@@ -1406,32 +1436,8 @@ function buildBody(acc, p, L) {
 export const THIN_DEPTH_FRAC = 0.5;
 const THIN_RES = 12;  // pixel = floor/12. At floor/6 a sharp point's tip, thinner than a pixel, was never filled and read up to 0.5 mm shallow (measured against the gate's own measure); 12 halves that at ~1.7x the build time
 
-function edt1(f, n, d, v, z) {
-  let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
-  for (let q = 1; q < n; q++) {
-    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
-    k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
-  }
-  k = 0;
-  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
-}
-/* squared distance (in pixels^2) from every pixel to the nearest pixel where `src` is set */
-function edt2(src, nx, ny) {
-  const INF = 1e20, out = new Float64Array(nx * ny), m = Math.max(nx, ny);
-  const f = new Float64Array(m), d = new Float64Array(m), v = new Int32Array(m), z = new Float64Array(m + 1);
-  for (let x = 0; x < nx; x++) {
-    for (let y = 0; y < ny; y++) f[y] = src[y * nx + x] ? 0 : INF;
-    edt1(f, ny, d, v, z);
-    for (let y = 0; y < ny; y++) out[y * nx + x] = d[y];
-  }
-  for (let y = 0; y < ny; y++) {
-    for (let x = 0; x < nx; x++) f[x] = out[y * nx + x];
-    edt1(f, nx, d, v, z);
-    for (let x = 0; x < nx; x++) out[y * nx + x] = d[x];
-  }
-  return out;
-}
+/* edt1 / edt2 (the exact Euclidean distance transform) live in bug-junction.js,
+   which the junction blend shares with this measure. */
 
 export function thinAnalysis(poly, floor, opts = {}) {
   const ig = opts.ignoreXBelow ?? -Infinity;   // material at x < ig is not judged (the root tab, inside the body)
@@ -1496,15 +1502,22 @@ export function thinAnalysis(poly, floor, opts = {}) {
   const opened = new Uint8Array(nx * ny);               // material some floor-disc covers
   for (let i = 0; i < opened.length; i++) opened[i] = inside[i] && dCore[i] <= r2 ? 1 : 0;
   const dOpen = edt2(opened, nx, ny);
-  let maxDepth = 0;
-  for (let i = 0; i < inside.length; i++) if (inside[i] && !opened[i] && gx + ((i % nx) + 0.5) * h >= ig) maxDepth = Math.max(maxDepth, Math.sqrt(dOpen[i]) * h);
+  let maxDepth = 0, at = null;
+  const skip = opts.skip || null;   // (x, y) -> true: material there is not judged (the blended junction: inside the body)
+  for (let i = 0; i < inside.length; i++) {
+    if (!inside[i] || opened[i]) continue;
+    const px = gx + ((i % nx) + 0.5) * h, py = gy + (Math.floor(i / nx) + 0.5) * h;
+    if (px < ig || (skip && skip(px, py))) continue;
+    const d = Math.sqrt(dOpen[i]) * h;
+    if (d > maxDepth) { maxDepth = d; at = [px, py]; }
+  }
   const tau = THIN_DEPTH_FRAC * floor;
   const flags = new Uint8Array(poly.length);
   for (let k = 0; k < poly.length; k++) {
     const i = clamp(Math.floor((poly[k][0] - gx) / h), 0, nx - 1), j = clamp(Math.floor((poly[k][1] - gy) / h), 0, ny - 1);
-    flags[k] = poly[k][0] >= ig && Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
+    flags[k] = poly[k][0] >= ig && !(skip && skip(poly[k][0], poly[k][1])) && Math.sqrt(dOpen[j * nx + i]) * h > tau ? 1 : 0;
   }
-  return { maxDepth, thin: maxDepth > tau, flags, tau };
+  return { maxDepth, thin: maxDepth > tau, flags, tau, at };
 }
 
 /* ------------------------------------------------------------------ */
@@ -1752,7 +1765,8 @@ const ROUND_ROOT_RAMP_MM = 1.0;             // the bead grows from 0 at the root
    the inset loop would cross itself (a notch tighter than the bead) the radii
    of the stretch between the crossing edges shrink until it does not. The
    caller TRIANGULATES THE MOVED LOOPS, so no triangle can flip. */
-function insetLoops(loops, want, aAt, extraAt = null, capAt = null) {
+const INSET_FOLD_FRAC = 0.1;   // a blended outline's inset edge keeping less than this of its own edge's length, along it, is a fold
+function insetLoops(loops, want, aAt, extraAt = null, capAt = null, noFold = false) {
   const edges = [];
   loops.forEach((L, li) => { for (let i = 0; i < L.length; i++) edges.push([li, i, L[i], L[(i + 1) % L.length]]); });
   const out = loops.map((L, li) => {
@@ -1786,6 +1800,20 @@ function insetLoops(loops, want, aAt, extraAt = null, capAt = null) {
     const moved = () => L.map((q, i) => (A[i] + E[i] > 0 ? [q[0] - nrm[i][0] * (A[i] + E[i]), q[1] - nrm[i][1] * (A[i] + E[i])] : [q[0], q[1]]));
     let M = moved(), reduced = new Set();
     for (let it = 0; it < 24; it++) {
+      // (`noFold`, the blended junction's outline: an inset edge that runs
+      // BACKWARD against its own outline edge is a fold too — a convex turn
+      // tighter than the bead turns the moved loop back on itself without a
+      // proper crossing, and the rim's facets there face down; its two ends
+      // shrink exactly as a crossing's run does)
+      if (noFold) {
+        let folded = false;
+        for (let i = 0; i < n; i++) {
+          const k = (i + 1) % n, ex = L[k][0] - L[i][0], ey = L[k][1] - L[i][1];
+          if ((M[k][0] - M[i][0]) * ex + (M[k][1] - M[i][1]) * ey >= INSET_FOLD_FRAC * (ex * ex + ey * ey)) continue;
+          for (const v of [i, k]) if (A[v] > 0) { A[v] = it < 23 ? A[v] * 0.7 : 0; reduced.add(v); folded = true; }
+        }
+        if (folded) { M = moved(); continue; }
+      }
       const x = loopCrossing(M);
       if (!x) break;
       // shrink the shorter run of the loop between the two crossing edges
@@ -1886,11 +1914,18 @@ function loopCrossing(L) {
    point whose apex is itself (radius 0, the root tab) gets the same ring along
    its vertical wall, so neighbouring rings always match point for point.
    Without `apex`, the shipped square wall, verbatim. */
-function planformSlab(acc, pts, tris, half, W, part, apex = null) {
+function planformSlab(acc, pts, tris, half, W, part, apex = null, bury = null) {
   const hf = typeof half === 'function' ? half : () => half;
   const H = pts.map(([u, w]) => hf(u, w));
-  const T = pts.map(([u, w], i) => acc.v(W(u, w, +H[i])));
-  const B = pts.map(([u, w], i) => acc.v(W(u, w, -H[i])));
+  /* BURIAL (the junction blend, §16.3): point i's slab is laid at Wb(i, ...) —
+     its half-thickness scaled by bz[i][0] and the whole point moved by bz[i][1]
+     in world z, ONE pair of numbers per point, so every vertex of a bead ring
+     (keyed on its skin point) moves together and the ring stays an exact half
+     ellipse. Without it, W itself — the old slab, by branch. */
+  const bz = bury ? pts.map(([u, w], i) => bury(u, w, H[i])) : null;
+  const Wb = bz ? (i, u, w, h) => { const b = bz[i]; if (!b) return W(u, w, h); const v = W(u, w, h * b[0]); v[2] += b[1]; return v; } : (i, u, w, h) => W(u, w, h);
+  const T = pts.map(([u, w], i) => acc.v(Wb(i, u, w, +H[i])));
+  const B = pts.map(([u, w], i) => acc.v(Wb(i, u, w, -H[i])));
   const dir = new Set();
   for (const [a, b, c] of tris) {
     acc.tri(T[a], T[b], T[c]); acc.tri(B[a], B[c], B[b]);
@@ -1905,10 +1940,10 @@ function planformSlab(acc, pts, tris, half, W, part, apex = null) {
       if (r) return r;
       const [u, w] = pts[v], A = apex[v] || pts[v], du = A[0] - u, dw = A[1] - w;
       r = [T[v]];
-      for (let j = 1; j < K; j++) { const t = (Math.PI * j) / K, sn = j === K / 2 ? 1 : Math.sin(t), cs = j === K / 2 ? 0 : Math.cos(t); r.push(acc.v(W(u + sn * du, w + sn * dw, H[v] * cs))); }
+      for (let j = 1; j < K; j++) { const t = (Math.PI * j) / K, sn = j === K / 2 ? 1 : Math.sin(t), cs = j === K / 2 ? 0 : Math.cos(t); r.push(acc.v(Wb(v, u + sn * du, w + sn * dw, H[v] * cs))); }
       r.push(B[v]);
       ring.set(v, r);
-      part.meta.bead.rings.push({ i: v, ids: r, uw: [u, w], apex: [A[0], A[1]], a: Math.hypot(du, dw), H: H[v] });
+      part.meta.bead.rings.push({ i: v, ids: r, uw: [u, w], apex: [A[0], A[1]], a: Math.hypot(du, dw), H: H[v], ...(bz && bz[v] ? { bury: bz[v] } : {}) });
       return r;
     };
     for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) {
@@ -2182,11 +2217,13 @@ function drawnPlanformMm(spec) {
    tell the outline's own rim vertices from a hole's or the root tab's. */
 function edgeField(p, thick, outline, umax) {
   const taper = p.wingEdgeTaper, bevel = p.wingEdgeBevel, floor = p.minDiameter;
-  const n = outline.length;
+  // the outline: one open polyline, or (the junction blend) a list of them —
+  // the blended outline's free runs, outside the body
+  const runs = Array.isArray(outline[0][0]) ? outline : [outline];
   const dist = (u, w) => {
     let d = Infinity;
-    for (let i = 0; i + 1 < n; i++) {
-      const a = outline[i], b = outline[i + 1], ax = b[0] - a[0], ay = b[1] - a[1], L2 = ax * ax + ay * ay || 1e-30;
+    for (const run of runs) for (let i = 0, n = run.length; i + 1 < n; i++) {
+      const a = run[i], b = run[i + 1], ax = b[0] - a[0], ay = b[1] - a[1], L2 = ax * ax + ay * ay || 1e-30;
       const t = clamp(((u - a[0]) * ax + (w - a[1]) * ay) / L2, 0, 1);
       const dd = Math.hypot(u - a[0] - t * ax, w - a[1] - t * ay); if (dd < d) d = dd;
     }
@@ -2213,12 +2250,46 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
 
   // The drawn curve in world millimetres, scallops cut (one owner: drawnPlanformMm).
   const { scalloped, drawn, umax, scallopReduced, rootWarp: rootW, rootReduced, posOf, srcOf } = drawnPlanformMm(spec);
-  const edge = edgeField(p, thick, scalloped, umax), hAt = (q) => edge.h(q[0], q[1]);
+  /* THE JUNCTION BLEND (§16): when buildBug hands this pair a blended outline,
+     the slab is built over IT — the drawn outline wherever the blend left it,
+     the closing's fill and the buried attachment elsewhere — and there is no
+     root tab (the attachment is the blend's own embedment, inside the body). */
+  const J = spec.junction || null;
+  let outside = null, fusedAt = null, freeRuns = null, exactOut = null;
+  if (J) {
+    const memo = new Map();
+    outside = (u, w) => { const k = `${u},${w}`; let d = memo.get(k); if (d === undefined) { const v = W(u, w, 0); d = J.burial.dist(v[0], v[1]); memo.set(k, d); } return d; };
+    fusedAt = (u, w) => { const v = W(u, w, 0); return J.burial.exact(v[0], v[1]) <= JUNCTION_FUSED_FRAC * p.minDiameter; };
+    // the bead ramps to nothing over the last ROUND_ROOT_RAMP_MM INSIDE the
+    // body's EXACT silhouette — not the burial's smoothed one, a running
+    // maximum that stands out past a steep flank by more than the ramp:
+    // measured, a rim point 8 µm outside a thorax's back end, where it falls
+    // to the waist, read a millimetre inside and was left square (E3)
+    const memoX = new Map();
+    exactOut = (u, w) => { const k = `${u},${w}`; let d = memoX.get(k); if (d === undefined) { const v = W(u, w, 0); d = J.burial.exact(v[0], v[1]); memoX.set(k, d); } return d; };
+    // the free runs: consecutive outline points outside the body's silhouette
+    freeRuns = [];
+    const np = J.poly.length, out = J.poly.map((q) => outside(q[0], q[1]) > 0);
+    let s0 = out.indexOf(false);
+    if (s0 < 0) freeRuns.push([...J.poly, J.poly[0]]);
+    else for (let k = 0, i = s0; k < np; ) {
+      if (!out[i % np]) { k++; i++; continue; }
+      const run = [J.poly[(i + np - 1) % np]];      // from the last buried point, so the run reaches the silhouette
+      while (out[i % np] && k < np) { run.push(J.poly[i % np]); k++; i++; }
+      run.push(J.poly[i % np]);
+      freeRuns.push(run);
+    }
+  }
+  const edge = edgeField(p, thick, J ? freeRuns : scalloped, umax), hAt = (q) => edge.h(q[0], q[1]);
   // Root: the closing chord moved INTO the thorax by `embed`.
   const n0 = scalloped[0], n1 = scalloped[scalloped.length - 1];
-  let poly = [[-embed, n0[1]], ...scalloped, [-embed, n1[1]]];
-  // the curve runs clockwise in (u, w); the triangulator wants CCW
-  poly = poly.reverse();
+  let poly;
+  if (J) poly = J.poly.map((q) => q.slice());          // already CCW
+  else {
+    poly = [[-embed, n0[1]], ...scalloped, [-embed, n1[1]]];
+    // the curve runs clockwise in (u, w); the triangulator wants CCW
+    poly = poly.reverse();
+  }
   /* Phase 2 — VENATION. The cells are planned on the DRAWN planform (scallops
      and tail included, the root tab excluded), in millimetres, before the wing
      transform: the same W that places the slab places every vein and hole. */
@@ -2241,7 +2312,11 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // the root chord: the stretch inside the body is hidden, and a bead ramping
   // up through the root's fillet folded there)
   const r0 = rootW ? Math.max(0, rootW.ub - ROUND_ROOT_RAMP_MM) : 0;
-  const wantRound = (P) => P[0] > r0 + 1e-9;
+  // (with the junction blend the bead is decided by the BODY, not by u: it is
+  // whole where the edge leaves the body's silhouette and runs out to nothing
+  // over the next ROUND_ROOT_RAMP_MM INSIDE it, under the body — a bead that
+  // started at the silhouette left the last millimetre of the fill square)
+  const wantRound = J ? (P) => exactOut(P[0], P[1]) > -ROUND_ROOT_RAMP_MM : (P) => P[0] > r0 + 1e-9;
   /* A PITCHED wing is a helicoid: the transform turns each span station by its
      own angle (a' = pitch / span per mm, 0 < u < span), and the mid-surface's
      metric is diag(1 + (w a')^2, 1) — planform lengths along u stretch by up to
@@ -2261,7 +2336,30 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     if (!kPitch || x - h >= span) return h;
     return h / Math.sqrt(1 + (kPitch * (Math.abs(y) + h)) ** 2);
   };
-  const aRound = (q, P) => radius(q[0], q[1]) * clamp((P[0] - r0) / ROUND_ROOT_RAMP_MM, 0, 1);
+  /* BURIAL (§16.3): inside the body's silhouette the slab lies at the body's
+     mid-plane (each later pair a step lower, as far as the body's depth over
+     the point allows), its half-thickness held to BURY_DEPTH_FRAC of the
+     body's half-depth there (never under half the floor) — so the buried part
+     is inside the body and no plate shows over it; outside, it eases back to
+     the wing's own height and thickness over BURY_FADE_MM. A z move and a
+     thickness scale per point, never an x-y move of the planform — the
+     silhouette is the outline's. */
+  const bury = J ? (u, w, Hh) => {
+    const v = W(u, w, 0), B = J.burial, d = B.dist(v[0], v[1]);
+    if (!(d < BURY_FADE_MM)) return null;
+    const t = d <= 0 ? 1 : 1 - d / BURY_FADE_MM, beta = t * t * (3 - 2 * t);
+    // the pairs stay STACKED, front pair on the body's mid-plane and each later
+    // one BURY_PAIR_STEP_MM lower, as far as the body's depth allows (two pairs
+    // on one plane would cross where they overlap; and lower, never higher —
+    // what is under the mid-plane the body hides from above)
+    const s0 = Math.min(1, B.half(v[0], v[1]) / Hh), zT = -Math.min(B.room(v[0], v[1]), spec.index * BURY_PAIR_STEP_MM);
+    return [1 + beta * (s0 - 1), beta * (zT - v[2])];
+  } : null;
+  // (and where the burial thins the slab the bead shrinks with it: a ring's
+  // half-thickness is its skin point's scaled by the burial, and its radius is
+  // never more than that — never more than a half-round, E1)
+  const aRound = J ? (q, P) => { const b = bury(q[0], q[1], edge.h(q[0], q[1])); return radius(q[0], q[1]) * clamp(1 + exactOut(P[0], P[1]) / ROUND_ROOT_RAMP_MM, 0, 1) * (b ? b[0] : 1); }
+    : (q, P) => radius(q[0], q[1]) * clamp((P[0] - r0) / ROUND_ROOT_RAMP_MM, 0, 1);
   let tri, pts, apex = null, movedOf = null, roundReduced = 0;
   if (plan && mode === 'holes') {
     // ONE conforming triangulation: every cut cell is a ring of quads between
@@ -2269,7 +2367,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
     // vertices kept, and the root tab is three triangles through R — so the
     // frame is a single closed slab whose rim walk (planformSlab) finds the
     // hole rims by the same directed-edge rule as the outer rim.
-    ({ pts, tris: tri } = frameMesh(plan, embed, n0, n1));
+    ({ pts, tris: tri } = J ? junctionPieces(frameMesh(plan, embed, n0, n1, false), J) : frameMesh(plan, embed, n0, n1));
     tri = flipDegenerate(pts, tri);
     // under the blended root every main vein converges on the neck, so the
     // cells between them are long thin wedges and an ear clip hands back
@@ -2286,7 +2384,7 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   } else {
     let P = poly;
     if (round > 0) {
-      const [r] = insetLoops([poly], wantRound, aRound);
+      const [r] = insetLoops([poly], wantRound, aRound, null, null, !!J);
       P = r.pts; apex = r.apex; roundReduced = r.reduced;
       movedOf = new Map(poly.map((q, i) => [`${q[0]},${q[1]}`, P[i]]));
     }
@@ -2298,24 +2396,70 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // concave stretch can be a hair smaller: there the skin edge steps back
   // toward the apex until the radius is round x the half-thickness again, so
   // no bead is ever more than a half-round (measured up to 0.12% before)
+  // (with the junction's burial the half-thickness is the scaled one, so the
+  // cap is the radius the burial leaves)
+  const capR = J ? (x, y) => { const b = bury(x, y, edge.h(x, y)); return radius(x, y) * (b ? b[0] : 1); } : radius;
   if (apex) for (let i = 0; i < pts.length; i++) {
     const A = apex[i]; if (!A) continue;
     const dx = A[0] - pts[i][0], dy = A[1] - pts[i][1], a = Math.hypot(dx, dy);
     if (!(a > 0)) continue;
-    let b = Math.min(a, radius(pts[i][0], pts[i][1]));
+    let b = Math.min(a, capR(pts[i][0], pts[i][1]));
     if (b >= a) continue;
-    for (let it = 0; it < 12; it++) b = Math.min(a, radius(A[0] - (dx / a) * b, A[1] - (dy / a) * b));
+    for (let it = 0; it < 12; it++) b = Math.min(a, capR(A[0] - (dx / a) * b, A[1] - (dy / a) * b));
+    // (under the burial the cap can fall FASTER than the radius as the point
+    // steps toward its apex, and then that iteration does not converge — one
+    // bead 0.26% over a half-round at a thorax's edge, measured: random:5 with
+    // a root pinch of 1. There the radius is bisected for one the cap allows at
+    // the point it lands on; 0, at the apex itself, always is.)
+    if (J && b > capR(A[0] - (dx / a) * b, A[1] - (dy / a) * b)) {
+      let lo = 0, hi = b;
+      for (let it = 0; it < 40; it++) { const mid = 0.5 * (lo + hi); if (mid <= capR(A[0] - (dx / a) * mid, A[1] - (dy / a) * mid)) lo = mid; else hi = mid; }
+      b = lo;
+    }
     pts[i] = [A[0] - (dx / a) * b, A[1] - (dy / a) * b];
   }
+  /* and under the junction's burial the cap falls fast along the outline where
+     it ramps the bead down into the body, so neighbouring skin points step
+     back by different amounts — and three consecutive rim points a hair off
+     collinear fold the ear triangle between them (measured: random:8, :18 and
+     :37, one hindwing triangle each at the abdomen's edge, cross product -2e-5
+     to -9e-5, E6). Stepping the points back further does not unfold it (the
+     triangulation was made on the inset rim, not on the outline, and at the
+     apexes the same ear is folded); the folded ear's INTERIOR edge is flipped
+     instead, so the middle rim point joins the vertex across that edge rather
+     than its two neighbours' chord — only where both new triangles keep the
+     orientation, and the points stay where the cap put them. */
+  if (J && apex) {
+    const ar = (P, a, b, c) => (P[b][0] - P[a][0]) * (P[c][1] - P[a][1]) - (P[b][1] - P[a][1]) * (P[c][0] - P[a][0]);
+    for (let it = 0; it < 8; it++) {
+      const edgeOf = new Map();
+      tri.forEach(([a, b, c], t) => { edgeOf.set(`${a},${b}`, t); edgeOf.set(`${b},${c}`, t); edgeOf.set(`${c},${a}`, t); });
+      let flipped = 0;
+      for (let t = 0; t < tri.length; t++) {
+        const T = tri[t];
+        if (ar(pts, T[0], T[1], T[2]) > 0) continue;
+        for (let e = 0; e < 3; e++) {
+          const x = T[e], y = T[(e + 1) % 3], z = T[(e + 2) % 3], u = edgeOf.get(`${y},${x}`);
+          if (u === undefined) continue;
+          const w = tri[u].find((v) => v !== x && v !== y);
+          if (!(ar(pts, x, w, z) > 0 && ar(pts, w, y, z) > 0)) continue;
+          tri[t] = [x, w, z]; tri[u] = [w, y, z]; flipped++;
+          break;
+        }
+        if (flipped) break;
+      }
+      if (!flipped) break;
+    }
+  }
   const part = acc.begin(`wing${spec.index + 1}`, `wing${spec.index + 1}`, 'R');
-  const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part, apex);
+  const rim = planformSlab(acc, pts, tri, edge.flat ? thick / 2 : edge.h, W, part, apex, bury);
   if (round > 0) part.meta.round = { round, reduced: roundReduced };
   // the EDGE's own thickness, for the gate to measure off the emitted vertices:
   // the rim vertices ON the drawn outline, and every other rim vertex (holes,
   // the root tab)
   part.meta.edgePairs = { outline: [], other: [] };
   for (const r of rim) {
-    const q = apex ? apex[r.i] || pts[r.i] : pts[r.i], on = q[0] >= 0 && edge.dist(q[0], q[1]) < 1e-6;
+    const q = apex ? apex[r.i] || pts[r.i] : pts[r.i], on = (J || q[0] >= 0) && edge.dist(q[0], q[1]) < 1e-6;
     part.meta.edgePairs[on ? 'outline' : 'other'].push([r.top, r.bot]);
   }
   part.meta.edge = { taper: p.wingEdgeTaper, bevel: p.wingEdgeBevel, root: thick, tip: edge.tip };
@@ -2351,11 +2495,21 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   part.meta.repaired = spec.repaired;
   part.meta.scallopReduced = scallopReduced;
   part.meta.root = rootW ? { pinch: rootW.pinch, width: 2 * rootW.hr, fillet: rootW.R, ub: rootW.ub, neckU: rootW.un, blend: rootW.blend, drawnHalf: rootW.h0, centre: rootW.c0 } : null;
+  // the blend's record: the blended outline is meta.planform; src[i] is the
+  // index into the drawn outline (scalloped) of a point the blend kept, -1 for
+  // one it made; the world outline the closing traced, and how much it added
+  part.meta.junction = J ? { r: J.r, src: J.src, world: J.world, fillMm2: J.fillMm2, addedMm2: J.addedMm2, free: freeRuns, drawn: scalloped.map((q) => q.slice()) } : null;
   part.meta.rootReduced = rootReduced;
   // dense sample d of the drawn curve is planform point posOf[d] of the outline
   // (the root map inserts points near the root): consumers that index the
   // planform by control point read this, never d itself
   part.meta.denseAt = posOf;
+  // ... and the PLANFORM index of dense sample d (meta.planform's own order),
+  // -1 where the junction blend swallowed it: the one map from a control point
+  // to its emitted vertex (the page's apex probe, the gate's Q, Y and V5)
+  part.meta.denseAtPlanform = J
+    ? (() => { const at = new Map(); J.src.forEach((d, i) => { if (d >= 0 && !at.has(d)) at.set(d, i); }); return posOf.map((s) => (at.has(s) ? at.get(s) : -1)); })()
+    : posOf.map((s) => poly.length - 2 - s);
   // the drawn outline in mm BEFORE the scallop law (root map applied): the gate's smoothness clause reads it
   part.meta.drawnMm = drawn;
   part.meta.hingeY = hinge[1];
@@ -2365,10 +2519,24 @@ function buildWingPair(acc, p, L, spec, hingeInfo, isLast, N) {
   // body as the root tab, so the measure reads the polygon WITH its tab and
   // judges nothing inside the body (u < 0). Without it, the drawn polygon closed
   // on its root chord, exactly as before.
-  const thin = rootW
+  // with the junction blend: the BLENDED planform, nothing inside the body's
+  // silhouette judged (it is buried there); its flags read back onto the drawn
+  // outline through the blend's src (a drawn point the blend swallowed is no edge)
+  const thin = J
+    ? (() => {
+      // material within half a floor of the body's silhouette is FUSED into the
+      // body (a floor disc centred on the body's edge reaches it, and the
+      // burial thickens the slab there toward the body's own depth), so it is
+      // judged with the body, not as free-standing wing
+      const t = thinAnalysis(poly, p.minDiameter, { skip: fusedAt });
+      const f = new Uint8Array(scalloped.length), ns = scalloped.length;
+      J.src.forEach((d, i) => { if (d >= 0) f[d] = t.flags[i]; });
+      return { ...t, flags: f };
+    })()
+    : rootW
     ? (() => { const t = thinAnalysis([[-embed, n0[1]], ...scalloped, [-embed, n1[1]]], p.minDiameter, { ignoreXBelow: 0 }); return { ...t, flags: t.flags.slice(1, -1) }; })()
     : thinAnalysis(scalloped, p.minDiameter);
-  part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau };
+  part.meta.thin = { maxDepth: thin.maxDepth, thin: thin.thin, tau: thin.tau, at: thin.at };
   part.meta.thinFlags = Array.from(thin.flags);
   // the same flagged runs in WORLD millimetres, just above the top face — the
   // page draws them red over the 3D view (an overlay, never part of the mesh
@@ -2539,7 +2707,7 @@ function improveTriangulation(poly, tris) {
 
 /* The HOLES frame as one triangle set over one vertex pool (vertices shared by
    coordinate, so a cell edge is the same two indices in both cells). */
-function frameMesh(plan, embed, lead, trail) {
+function frameMesh(plan, embed, lead, trail, tab = true) {
   const key = new Map(), pts = [];
   const vid = (q) => { const k = `${q[0]},${q[1]}`; let i = key.get(k); if (i === undefined) { i = pts.length; pts.push([q[0], q[1]]); key.set(k, i); } return i; };
   const tris = [];
@@ -2558,12 +2726,52 @@ function frameMesh(plan, embed, lead, trail) {
       for (const [a, b, cc] of triangulateCell(c.points)) tris.push([O[a], O[b], O[cc]]);
     }
   }
+  // (the junction blend has no tab: its own pieces join the cells, junctionPieces)
+  if (!tab) return { pts, tris, vid };
   // the root tab, fanned over EVERY vertex on the root chord (the vein
   // starts), so the chord stays conforming with the cells
   const tt = vid([-embed, trail[1]]), lt = vid([-embed, lead[1]]);
   const ch = plan.rootChord.map(vid);                       // trail ... lead
   for (let i = 0; i + 1 < ch.length; i++) tris.push([tt, ch[i], ch[i + 1]]);
   tris.push([tt, ch[ch.length - 1], lt]);
+  return { pts, tris };
+}
+
+/* HOLES with the junction blend (§16): the blended planform is the cells'
+   frame plus, for every stretch the blend made, the PIECE between that new
+   stretch and the drawn outline it replaced — the drawn outline taken from the
+   cells' own boundary (so every vertex a cell carries on it, a vein's end or a
+   root-chord vein start, is in the piece too) and triangulated keeping all of
+   them, so the frame stays one conforming mesh. Throws (and the pair keeps its
+   drawn root) if a stretch's ends are not on the cells' boundary. */
+function junctionPieces(fm, J) {
+  const { pts, tris, vid } = fm;
+  const dir = new Set();
+  for (const [a, b, c] of tris) { dir.add(`${a},${b}`); dir.add(`${b},${c}`); dir.add(`${c},${a}`); }
+  const next = new Map();
+  for (const [a, b, c] of tris) for (const [p, q] of [[a, b], [b, c], [c, a]]) if (!dir.has(`${q},${p}`)) next.set(p, q);
+  const key = (q) => `${q[0]},${q[1]}`, idOf = new Map(pts.map((q, i) => [key(q), i]));
+  const P = J.poly, src = J.src, n = P.length;
+  for (let i = 0; i < n; i++) {
+    if (src[i] !== -1 || src[(i + n - 1) % n] === -1) continue;      // the start of a made stretch
+    let j = i; while (src[j % n] === -1) j++;
+    const A = P[(i + n - 1) % n], B = P[j % n];
+    const a = idOf.get(key(A)), b = idOf.get(key(B));
+    if (a === undefined || b === undefined) throw new Error('earClip: junction stretch not on the cells\' boundary');
+    // the cells' boundary from A round to B (CCW, the swallowed drawn outline)
+    const path = [];
+    for (let v = next.get(a), guard = 0; v !== b; v = next.get(v)) {
+      if (v === undefined || guard++ > pts.length) throw new Error('earClip: junction stretch not on the cells\' outer boundary');
+      path.push(pts[v]);
+    }
+    const piece = [A];
+    for (let k = i; k < j; k++) piece.push(P[k % n]);
+    piece.push(B);
+    for (let k = path.length - 1; k >= 0; k--) piece.push(path[k]);
+    if (!polygonSimple(piece)) throw new Error('earClip: junction piece not simple');
+    const ids = piece.map(vid);
+    for (const [x, y, z] of triangulateCell(piece)) { const t = [ids[x], ids[y], ids[z]]; if (t[0] !== t[1] && t[1] !== t[2] && t[0] !== t[2]) tris.push(t); }
+  }
   return { pts, tris };
 }
 
@@ -2949,7 +3157,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 6;   // 6: the blended wing root (wingRootPinch) — a v5 file loads with the pinch at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 7;   // 7: the wing–body junction blend (wingJunction) — a v6 file loads with the blend at 0, its drawn roots and root tabs, so it looks as saved; 6: the blended wing root (wingRootPinch) — a v5 file loads with the pinch at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -2963,6 +3171,7 @@ export function paramsFromDesign(doc) {
   if (!(doc.version >= 4)) for (const [k, v] of Object.entries(LEGACY_STYLE)) if (!(k in raw)) raw[k] = v;
   if (!(doc.version >= 5)) for (const [k, v] of Object.entries(PRE_ROUND_STYLE)) if (!(k in raw)) raw[k] = v;
   if (!(doc.version >= 6)) for (const [k, v] of Object.entries(PRE_ROOT_STYLE)) if (!(k in raw)) raw[k] = v;
+  if (!(doc.version >= 7)) for (const [k, v] of Object.entries(PRE_JUNCTION_STYLE)) if (!(k in raw)) raw[k] = v;
   const params = normalizeParams(raw, notes);
   return { ok: true, params, notes };
 }
@@ -2971,6 +3180,130 @@ export function paramsFromDesign(doc) {
    pitch at 0 — the page shows the wing being edited FLAT so a screen drag
    maps exactly onto its outline (editorFrame). The parameters are untouched;
    the page never exports a model built with this option. */
+/* The BURIAL's field (§16.3): how far a world point lies outside the body
+   and how deep the body is there, as SMOOTH functions. The body's own outline
+   carries the segment grooves and is piecewise linear between rings; a fade
+   read off it would ripple the wing over every groove and crease it along the
+   medial axis of a nearest-point distance. So: the right half-width rx(y) as
+   the running MAXIMUM over BURY_SMOOTH_MM either side (a groove is a dip,
+   never a peak) then a running mean over the same span, for the FADE; and the
+   distance outside is HORIZONTAL, |x| - rx(y) — a wing meets the body from the
+   side — and past either end of the body it runs on along y. The CONTAINMENT
+   (how deep the body is over a point) reads rx and rz as the running MINIMUM
+   then the mean, which never overstates the body at any y. Sampled once on a 0.05 mm table. */
+export const BURY_SMOOTH_MM = 0.5;
+const BURY_CHORD = 0.97;     // the body's rings are polygons inscribed in their superellipse: its depth between two ring vertices is under the curve's by at most this
+function burialField(p, L, outline) {
+  const st = 0.05, y0 = L.yMin - BURY_FADE_MM - 1, y1 = L.yMax + BURY_FADE_MM + 1, n = Math.ceil((y1 - y0) / st) + 1;
+  const rx = new Float64Array(n), rz = new Float64Array(n);
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const y = y0 + i * st;
+    if (y <= L.yMin || y >= L.yMax) continue;
+    while (k + 1 < outline.length - 1 && outline[k + 1][1] < y) k++;
+    const a = outline[k], b = outline[k + 1], t = clamp((y - a[1]) / ((b[1] - a[1]) || 1e-30), 0, 1);
+    rx[i] = a[0] + (b[0] - a[0]) * t;
+    rz[i] = profileAt(p, L, y)[1];
+  }
+  const w = Math.round(BURY_SMOOTH_MM / st);
+  const smooth = (f, pick) => {
+    const m = new Float64Array(n), s = new Float64Array(n);
+    for (let i = 0; i < n; i++) { let v = f[i]; for (let j = Math.max(0, i - w); j <= Math.min(n - 1, i + w); j++) v = pick(v, f[j]); m[i] = v; }
+    for (let i = 0; i < n; i++) { let v = 0, c = 0; for (let j = Math.max(0, i - w); j <= Math.min(n - 1, i + w); j++) { v += m[j]; c++; } s[i] = v / c; }
+    return s;
+  };
+  // the FADE reads the running max (a groove is a dip, never a peak); the
+  // CONTAINMENT reads the running MIN, which never exceeds the body at any y
+  // (each running min at y' within the window is at most the body at y, so
+  // their mean is too): a waist or a groove is never overstated there
+  const RX = smooth(rx, Math.max), RXm = smooth(rx, Math.min), RZm = smooth(rz, Math.min);
+  const at = (f, y) => { const u = (y - y0) / st; if (u <= 0 || u >= n - 1) return 0; const i = Math.floor(u), t = u - i; return f[i] + (f[i + 1] - f[i]) * t; };
+  const floorHalf = p.minDiameter / 2, ne = p.roundness;
+  const depthAt = (x, y) => { const a = at(RXm, y), z = at(RZm, y); if (!(a > 0 && z > 0)) return 0; const q = Math.min(1, Math.abs(x) / a); return BURY_CHORD * z * Math.pow(1 - Math.pow(q, ne), 1 / ne); };
+  // the EXACT silhouette (both halves, unsmoothed) for the floor test: a
+  // signed Euclidean distance, negative inside the body
+  const sil = [...outline, ...outline.slice(1, -1).reverse().map(([x, y]) => [-x, y])];
+  const exact = (x, y) => {
+    let d = Infinity;
+    for (let i = 0; i < sil.length; i++) {
+      const a = sil[i], b = sil[(i + 1) % sil.length], ex = b[0] - a[0], ey = b[1] - a[1], l2 = ex * ex + ey * ey || 1e-30;
+      const t = clamp(((x - a[0]) * ex + (y - a[1]) * ey) / l2, 0, 1);
+      d = Math.min(d, Math.hypot(x - a[0] - t * ex, y - a[1] - t * ey));
+    }
+    return pointInPoly(sil, x, y) ? -d : d;
+  };
+  return {
+    exact,
+    // (past either end of the body the distance runs on along y: |x| - rx(y)
+    // alone read a tail passing BEHIND the abdomen as at the body's flank)
+    dist: (x, y) => Math.max(Math.abs(x) - at(RX, y), y - L.yMax, L.yMin - y),
+    // the body's half-depth over the point (x, y): its cross-section is a
+    // superellipse of exponent `roundness`, drawn as a polygon inscribed in it
+    // (BURY_CHORD covers the sag); the buried slab's half-thickness there, and
+    // how far its mid-plane may sit below the body's while its whole thickness
+    // stays inside the body
+    depth: (x, y) => depthAt(x, y),
+    half: (x, y) => Math.max(floorHalf, BURY_DEPTH_FRAC * depthAt(x, y)),
+    room: (x, y) => { const z = depthAt(x, y); return Math.max(0, z - Math.max(floorHalf, BURY_DEPTH_FRAC * z)); },
+  };
+}
+
+/* THE JUNCTION BLEND's pass (§16): the drawn planform of every right wing in
+   world mm (mid-surface, top-down), the body's silhouette, one closing over the
+   lot (bug-junction.js), and each wing's blended outline mapped back into its
+   own planform (u, w). `specs` are the REAL pose — a flat display pair (the
+   editor's flatPair) gets the outline its real pose blends to, so flattening
+   one pair for editing cannot move any other. */
+function junctionFor(p, L, specs, hinges) {
+  const outline = bodySilhouette(p, L);
+  let rxMax = 0; for (const q of outline) rxMax = Math.max(rxMax, q[0]);
+  const burial = burialField(p, L, outline);
+  const ds = JUNCTION_DENSIFY_MM;
+  const wings = specs.map((spec) => {
+    const { scalloped } = drawnPlanformMm(spec);
+    const W = wingTransform(hinges[spec.index].hinge, spec.length, spec.sweep, spec.pitch, spec.dihedral);
+    const ccw = scalloped.slice().reverse(), ns = ccw.length;
+    const xy = ([u, w]) => { const v = W(u, w, 0); return [v[0], v[1]]; };
+    // densified IN THE PLANFORM (so every added point is exactly on a drawn
+    // edge), the root chord included; orig = the drawn (scalloped) index
+    const uw = [], orig = [];
+    for (let i = 0; i < ns; i++) {
+      const a = ccw[i], b = ccw[(i + 1) % ns];
+      uw.push(a); orig.push(ns - 1 - i);
+      const A = xy(a), B = xy(b), m = Math.ceil(Math.hypot(B[0] - A[0], B[1] - A[1]) / ds);
+      for (let t = 1; t < m; t++) { uw.push([a[0] + ((b[0] - a[0]) * t) / m, a[1] + ((b[1] - a[1]) * t) / m]); orig.push(-1); }
+    }
+    return { poly: uw.map(xy), keep: orig.map((o) => o >= 0), uw, orig, W };
+  });
+  const res = junctionBlend({ body: { outline, rxMax, yMin: L.yMin, yMax: L.yMax }, wings, r: p.wingJunction, embedMm: L.rt });
+  return wings.map((wg, k) => {
+    const Jk = res.perWing[k];
+    if (!Jk.ok) return { failed: Jk.why };
+    const poly = Jk.outline.map((q, i) => (Jk.src[i] >= 0 ? wg.uw[Jk.src[i]].slice() : planformOf(wg.W, q, wg.uw)));
+    // src: the drawn (scalloped) index of a kept drawn vertex; -2 a point on a
+    // drawn edge (a kept stretch's end); -1 a point the blend made
+    const src = Jk.src.map((d) => (d < 0 ? -1 : wg.orig[d] >= 0 ? wg.orig[d] : -2));
+    return { r: p.wingJunction, poly, src, world: Jk.outline, fillMm2: Jk.fillMm2, addedMm2: Jk.addedMm2, burial };
+  });
+}
+/* The planform point (u, w) whose mid-surface lands on world x-y `q` under the
+   wing transform W (Newton from the nearest drawn point; W is affine but for
+   the pitch, which grows along the span). */
+function planformOf(W, q, near) {
+  let bi = 0, bd = Infinity;
+  for (let i = 0; i < near.length; i++) { const v = W(near[i][0], near[i][1], 0), d = (v[0] - q[0]) ** 2 + (v[1] - q[1]) ** 2; if (d < bd) { bd = d; bi = i; } }
+  let u = near[bi][0], w = near[bi][1];
+  for (let it = 0; it < 30; it++) {
+    const v = W(u, w, 0), ex = q[0] - v[0], ey = q[1] - v[1];
+    if (Math.hypot(ex, ey) < 1e-12) break;
+    const e = 1e-4, a = W(u + e, w, 0), b = W(u, w + e, 0);
+    const j11 = (a[0] - v[0]) / e, j21 = (a[1] - v[1]) / e, j12 = (b[0] - v[0]) / e, j22 = (b[1] - v[1]) / e, det = j11 * j22 - j12 * j21;
+    if (!(Math.abs(det) > 1e-12)) break;
+    u += (j22 * ex - j12 * ey) / det; w += (-j21 * ex + j11 * ey) / det;
+  }
+  return [u, w];
+}
+
 export function buildBug(params, opts = {}) {
   const notes = [];
   const p = normalizeParams(params, notes);
@@ -2980,24 +3313,33 @@ export function buildBug(params, opts = {}) {
   if (p.legsVisible && p.legPairs > 0) buildLegs(acc, p, L);
   if (p.antennaType !== 'none') buildAntenna(acc, p, L);
   const pairs = resolveWingPairs(p);
-  if (Number.isInteger(opts.flatPair) && pairs[opts.flatPair]) { pairs[opts.flatPair] = { ...pairs[opts.flatPair], dihedral: 0, pitch: 0 }; }
   const hinges = wingHinges(p, L);
+  // the junction blend, on the REAL pose (before any display flattening)
+  const junction = p.wingJunction > 0 && pairs.length ? junctionFor(p, L, pairs, hinges) : null;
+  if (junction) junction.forEach((J, k) => { if (J && !J.failed) pairs[k].junction = J; });
+  if (Number.isInteger(opts.flatPair) && pairs[opts.flatPair]) { pairs[opts.flatPair] = { ...pairs[opts.flatPair], dihedral: 0, pitch: 0 }; }
   for (const spec of pairs) {
     // A blended root whose rounded edge cannot be inset (a hook at the root,
     // tighter than the bead, squeezed tighter by the root map) is stepped down —
     // half the fillet, no fillet, then the drawn root chord — and reported; the
     // triangulation throws before anything of the pair is emitted, so a retry
     // starts clean.
-    const tries = spec.root ? [1, 0.5, 0, null] : [undefined];
+    // (and a pair the junction blend cannot be built for — its new outline
+    // will not triangulate — keeps its drawn root, said in a note)
+    const tries = spec.root ? [1, 0.5, 0, null] : spec.junction ? [undefined, 'drawn'] : [undefined];
     for (let t = 0; t < tries.length; t++) {
-      const s2 = tries[t] === undefined ? spec : { ...spec, root: tries[t] === null ? null : { ...spec.root, filletScale: tries[t] } };
+      // (a stepped-down root is a different drawn outline: the blend traced for
+      // the first one does not fit it, so that pair keeps its drawn root)
+      const s2 = tries[t] === undefined ? spec : tries[t] === 'drawn' ? { ...spec, junction: null } : { ...spec, ...(t > 0 ? { junction: null } : {}), root: tries[t] === null ? null : { ...spec.root, filletScale: tries[t] } };
       try {
         buildWingPair(acc, p, L, s2, hinges[spec.index], spec.index === pairs.length - 1, pairs.length);
-        if (t > 0) notes.push(`pair ${spec.index + 1}: the rounded edge could not follow the blended root here, so ${tries[t] === null ? 'this pair keeps its drawn root chord' : `its fillet was reduced to ${tries[t] ? 'half' : 'none'}`}`);
+        if (t > 0 && tries[t] === 'drawn') notes.push(`pair ${spec.index + 1}: the junction blend could not be built here, so this pair keeps its drawn root`);
+        else if (t > 0) notes.push(`pair ${spec.index + 1}: the rounded edge could not follow the blended root here, so ${tries[t] === null ? 'this pair keeps its drawn root chord' : `its fillet was reduced to ${tries[t] ? 'half' : 'none'}`}`);
         break;
       } catch (e) { if (t === tries.length - 1 || !/earClip|not simple/.test(e.message)) throw e; }
     }
   }
+  if (junction) junction.forEach((J, k) => { if (J && J.failed) notes.push(`pair ${k + 1}: the junction blend could not be traced here (${J.failed}), so this pair keeps its drawn root`); });
   for (const s of pairs) if (s.tailFits === false) notes.push(`pair ${s.index + 1}: the TAIL does not fit this outline (it would cross or pinch it) and is not drawn; edit it or the outline`);
   for (const s of pairs) if (s.repaired) notes.push(`pair ${s.index + 1}: the interpolated outline crossed itself and was eased toward the nearer drawn pair (t ${s.t.toFixed(2)} -> ${s.tUsed.toFixed(2)})`);
   for (const part of acc.parts) if (part.meta.scallopReduced) notes.push(`pair ${part.meta.pair + 1}: scallop depth reduced so the outline does not cross itself`);

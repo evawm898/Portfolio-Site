@@ -149,8 +149,14 @@
    --seeds N           number of random bugs (default 40). */
 
 import * as G from '../bug-geometry.js';
+import { JUNCTION_RES } from '../bug-junction.js';
+import { makeJunctionMeasures, segDist, fillRaster } from './bug-junction-measure.mjs';
 import { polyArea as venArea } from '../bug-venation.js';
 import { HAND_OUTLINES, CROSSING_BLEND, THIN_TAIL, blendedThin, rootUnderFloor, pitchedBeadHoles } from './bug-fixtures.mjs';
+// the junction's own fixture: the hindwing-root-under-the-floor bug with the
+// blend at its default (the fixture itself pins the blend OFF, which is the
+// state it was written to refuse)
+const junctionFixture = () => ({ ...rootUnderFloor(), wingJunction: G.JUNCTION_DEFAULT_MM });
 import * as IMG from '../bug-image.js';
 import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
 import { libraryChecks, libraryRows, LIBRARY_MUTANTS, angleChecks, angleRows, ANGLE_MUTANTS } from './verify-bug-library.mjs';
@@ -165,7 +171,6 @@ const NSEEDS = seedsArg >= 0 ? +args[seedsArg + 1] : 40;
 const onlyArg = args.indexOf('--only');                   // iteration only: rows whose label matches; reported as a SUBSET, never a pass of the gate
 const ONLY = onlyArg >= 0 ? new RegExp(args[onlyArg + 1]) : null;
 
-const segDist = (p, a, b) => { const ab = [b[0] - a[0], b[1] - a[1]], L2 = ab[0] * ab[0] + ab[1] * ab[1] || 1e-18; const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / L2)); return Math.hypot(p[0] - a[0] - t * ab[0], p[1] - a[1] - t * ab[1]); };
 
 /* ---------- W: STL edge census on welded float32 bytes ---------- */
 function analyzeStl(bytes) {
@@ -313,7 +318,11 @@ function svgChecks(model) {
     // distance to the outline by its vertices (it is dense), to a hole polygon
     // by its SEGMENTS (a hole has a dozen long straight edges)
     const holes = part.meta.holeLoops || [];
-    for (const l of L) if (l !== big) for (const [x, y] of l) {
+    // (a loop wholly inside the body's own contour is drawn UNDER the body —
+    // the body is drawn last — and is no stroke anyone sees: under the
+    // junction blend the bead runs out to nothing there)
+    const bvS = part.meta.junction ? bodyView(model) : null;
+    for (const l of L) if (l !== big && !(bvS && l.every(([x, y]) => bvS.sd(x, y) < 0))) for (const [x, y] of l) {
       let d = Infinity; for (const [bx, by] of big) d = Math.min(d, Math.hypot(x - bx, y - by));
       for (const h of holes) for (let i = 0; i < h.length; i++) d = Math.min(d, segDist([x, y], h[i], h[(i + 1) % h.length]));
       stray = Math.max(stray, d);
@@ -357,25 +366,6 @@ function selfCrossings(poly) {
   }
   return n;
 }
-function fillRaster(loops, px, box) {
-  const nx = Math.ceil((box.x1 - box.x0) / px), ny = Math.ceil((box.y1 - box.y0) / px), g = new Uint8Array(nx * ny);
-  for (let j = 0; j < ny; j++) {
-    const y = box.y0 + (j + 0.5) * px, xs = [];
-    for (const L of loops) for (let i = 0; i < L.length; i++) {
-      const a = L[i], b = L[(i + 1) % L.length];
-      if ((a[1] <= y) !== (b[1] <= y)) xs.push([a[0] + ((y - a[1]) / (b[1] - a[1])) * (b[0] - a[0]), b[1] > a[1] ? 1 : -1]);
-    }
-    xs.sort((p, q) => p[0] - q[0]);
-    let w = 0;
-    for (let k = 0; k + 1 < xs.length; k++) {
-      w += xs[k][1];
-      if (w === 0) continue;
-      const i0 = Math.max(0, Math.ceil((xs[k][0] - box.x0) / px - 0.5)), i1 = Math.min(nx - 1, Math.floor((xs[k + 1][0] - box.x0) / px - 0.5));
-      for (let i = i0; i <= i1; i++) g[j * nx + i] = 1;
-    }
-  }
-  return g;
-}
 /* Leg area seen from above, and the part of it outside the body's projection. */
 function legExposure(model) {
   const body = model.parts.filter((q) => q.kind === 'body').flatMap((q) => G.contourLoops(model, q));
@@ -389,6 +379,38 @@ function legExposure(model) {
   return { area: n * px * px, outside: out * px * px };
 }
 
+/* ---------- the JUNCTION BLEND (design doc §16): the gate's view ---------- */
+/* The measures themselves (the body's emitted contour, the wing transform
+   restated from the parameters, JB1's slot, JB2's neck, JB3's burial) are
+   tools/bug-junction-measure.mjs, built on this tree's module — one owner,
+   shared with the junction sheet. */
+const { bodyView, wingXY, slotScan, neckScan, buriedScan, SLOT_DEPTH_MM, NECK_FLOORS, JB3_INSET_MM } = makeJunctionMeasures(G);
+// judged by the PARAMETER, not by the builder's record: a blend asked for and
+// never built (a dropped pass) is held to the same three clauses
+const junctionOn = (model) => model.params.wingJunction > 0 && model.parts.some((q) => /^wing\d$/.test(q.kind));
+// past this far from the body's contour the burial does nothing: its fade
+// runs BURY_FADE_MM past a silhouette smoothed over BURY_SMOOTH_MM either side
+// (a running maximum then a mean) — one smoothing span either way more is a
+// bound on how far that silhouette stands out from the emitted one
+const BURY_CLEAR = () => G.BURY_FADE_MM + 2 * G.BURY_SMOOTH_MM;
+function junctionChecks(model) {
+  const bad = [], r = model.params.wingJunction, floor = model.params.minDiameter;
+  if (!junctionOn(model)) return { bad, slot: null, necks: [], buried: [] };
+  // JB1: the closing at r fills every gap under 2r; the stated minimum is 3/4
+  // of that (1.5 mm at the default 1 mm), clear of the raster's own reading
+  const gap = 1.5 * r, sl = slotScan(model, gap);
+  // (the bar: SLOT_DEPTH_MM, or two of the blend's own raster pixels when that
+  // is coarser — at a large radius its traced boundary is read to its pixel)
+  const depthBar = Math.max(SLOT_DEPTH_MM, 2 * r * JUNCTION_RES);
+  if (sl.depth > depthBar) bad.push(`JB1: a slot narrower than ${gap.toFixed(2)} mm runs ${sl.depth.toFixed(2)} mm deep between a wing and the body (at ${sl.at.map((v) => v.toFixed(2)).join(', ')})`);
+  const necks = neckScan(model);
+  for (const nk of necks) if (!(nk.neck >= NECK_FLOORS * floor)) bad.push(`JB2: ${nk.part} hangs from the body by a ${nk.neck.toFixed(2)} mm neck, under ${NECK_FLOORS} x the ${floor} mm floor`);
+  const buried = buriedScan(model);
+  for (const bq of buried) if (bq.exposed) bad.push(`JB3: ${bq.part} ${bq.exposed} of ${bq.judged} vertices ${JB3_INSET_MM} mm or more inside the body's contour show outside its solid (worst ${bq.worst.inset.toFixed(2)} mm in, at ${bq.worst.at.map((v) => v.toFixed(2)).join(', ')})`);
+  if (!buried.some((bq) => bq.judged)) bad.push('JB3: no wing vertex lies inside the body (vacuous)');
+  return { bad, slot: sl, necks, buried };
+}
+
 /* ---------- R: wing roots, measured ---------- */
 function rootChecks(model) {
   const P = model.positions, p = model.params, bad = [];
@@ -400,7 +422,31 @@ function rootChecks(model) {
   // (An earlier version took the centroid of the vertices inside the thorax
   // ellipsoid; the stacking mutation MISSED it, because moving a wing changes
   // WHICH vertices are inside — an instrument that resamples its own subject.)
+  // Under the JUNCTION BLEND there is no tab: a wing's buried part is an AREA
+  // the closing grew (a hindwing's runs down the abdomen), so no set of its
+  // vertices says where it attaches. There the root is read at the DRAWN root
+  // chord's midpoint (meta.junction.drawn: its first and last points): the
+  // top-skin triangle of the slab's own planform layout (meta.slab.uw) that
+  // holds it, and the emitted mid-surface there by barycentric weights — so a
+  // translated wing moves its root by exactly that translation.
   for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
+    if (part.meta.junction) {
+      const dr = part.meta.junction.drawn, c = [(dr[0][0] + dr[dr.length - 1][0]) / 2, (dr[0][1] + dr[dr.length - 1][1]) / 2];
+      const S = part.meta.slab, n = S.n, I = model.indices;
+      let y = NaN;
+      for (let t = part.t0; t < part.t1 && Number.isNaN(y); t++) {
+        const a = I[3 * t] - part.v0, b = I[3 * t + 1] - part.v0, e = I[3 * t + 2] - part.v0;
+        if (!(a >= 0 && b >= 0 && e >= 0 && a < n && b < n && e < n)) continue;
+        const A = S.uw[a], B = S.uw[b], C = S.uw[e], den = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]);
+        if (!(Math.abs(den) > 1e-14)) continue;
+        const l1 = ((B[1] - C[1]) * (c[0] - C[0]) + (C[0] - B[0]) * (c[1] - C[1])) / den, l2 = ((C[1] - A[1]) * (c[0] - C[0]) + (A[0] - C[0]) * (c[1] - C[1])) / den, l3 = 1 - l1 - l2;
+        if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
+        const my = (i) => (P[3 * (part.v0 + i) + 1] + P[3 * (part.v0 + n + i) + 1]) / 2;
+        y = l1 * my(a) + l2 * my(b) + l3 * my(e);
+      }
+      roots.push(y);
+      continue;
+    }
     let xmin = Infinity;
     for (let v = part.v0; v < part.v1; v++) xmin = Math.min(xmin, P[3 * v]);
     let ys = 0, n = 0;
@@ -536,7 +582,7 @@ function smoothChecks(model) {
    polygon that was triangulated — less its two root-tab vertices (inside the
    body). Decisive only outside a band of two grid steps around the bar; the
    rows in that band are reported, not asserted. */
-function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity) {
+function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity, skip = null) {
   const h = floor / H, r = floor / 2;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const [x, y] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
@@ -553,20 +599,25 @@ function gateThinDepth(poly, floor, H = 12, ignoreXBelow = -Infinity) {
   const covM = bucket(pts.filter((_, i) => covered[i]));
   let depth = 0;
   pts.forEach((p, i) => {
-    if (covered[i] || p[0] < ignoreXBelow) return;
+    if (covered[i] || p[0] < ignoreXBelow || (skip && skip(p[0], p[1]))) return;
     let d = Infinity;
     for (let ring = 1; ring < 400 && d === Infinity; ring *= 2) for (const c of near(covM, p, ring)) d = Math.min(d, Math.hypot(p[0] - c[0], p[1] - c[1]));
     depth = Math.max(depth, d);
   });
   return { depth, h };
 }
+const fusedSkip = (model, part) => { const bv = bodyView(model), xy = wingXY(model, part.meta.pair), band = G.JUNCTION_FUSED_FRAC * model.params.minDiameter; return (u, w) => bv.sd(...xy(u, w)) <= band; };
 function floorChecks(model) {
   const bad = [], floor = model.params.minDiameter, tau = G.THIN_DEPTH_FRAC * floor;
   let worst = 0, gateThin = false, border = false;
   for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
     // with the blended root the root chord is no edge (the wing runs on into the
     // body as its tab): the whole planform, nothing inside the body judged
-    const { depth, h } = part.meta.root ? gateThinDepth(part.meta.planform, floor, 12, 0) : gateThinDepth(part.meta.planform.slice(1, -1), floor);
+    // under the junction blend: the whole BLENDED planform, with material
+    // within half a floor of the body (fused into it) not judged alone — this
+    // file's own distance to the body's emitted contour, through its own map
+    const { depth, h } = part.meta.junction ? gateThinDepth(part.meta.planform, floor, 12, -Infinity, fusedSkip(model, part))
+      : part.meta.root ? gateThinDepth(part.meta.planform, floor, 12, 0) : gateThinDepth(part.meta.planform.slice(1, -1), floor);
     worst = Math.max(worst, depth);
     const builderThin = model.floorViolations.some((v) => v.kind !== 'vein' && `wing${v.pair + 1}` === part.kind);
     if (depth > tau + 2 * h) { gateThin = true; if (!builderThin) bad.push(`${part.name}: thin by this file's measure (${depth.toFixed(2)} mm past the floor disc) and NOT reported by the builder`); }
@@ -722,8 +773,12 @@ function venationChecks(model, opts) {
       const rpart = model.parts.find((q) => q.kind === `wing${w.index + 1}` && q.side === 'R');
       const drawn = rpart.meta.planform.slice().reverse();
       const at = rpart.meta.denseAt;
-      if (!at || at.length !== dense.length || drawn.length !== at[at.length - 1] + 3) bad.push(`V5: pair ${k} drawn planform has ${drawn.length} points against ${at ? at[at.length - 1] + 3 : '?'} expected`);
-      const tailPts = tailIdx.map((d) => drawn[at[d] + 1] || scale(dense[d]));
+      // (under the junction blend the planform is the BLENDED outline, read
+      // through the builder's own map from a dense sample to its planform point)
+      const Jv = rpart.meta.junction, atJ = rpart.meta.denseAtPlanform;
+      if (Jv) { if (!atJ || atJ.length !== dense.length) bad.push(`V5: pair ${k} carries no planform index per dense sample`); }
+      else if (!at || at.length !== dense.length || drawn.length !== at[at.length - 1] + 3) bad.push(`V5: pair ${k} drawn planform has ${drawn.length} points against ${at ? at[at.length - 1] + 3 : '?'} expected`);
+      const tailPts = tailIdx.map((d) => (Jv ? rpart.meta.planform[atJ[d]] : drawn[at[d] + 1]) || scale(dense[d]));
       const tv = V.veins.find((v) => v.kind === 'main' && v.tail);
       if (!tv) bad.push(`V5: pair ${k} has a tail but no vein runs into it`);
       else { const tip = tv.points[tv.points.length - 1]; const d = Math.min(...tailPts.map((q) => Math.hypot(q[0] - tip[0], q[1] - tip[1]))); if (d > 1e-6) bad.push(`V5: pair ${k} the tail vein ends ${d.toFixed(3)} mm from any tail point of the outline`); }
@@ -765,8 +820,16 @@ function edgeChecks(model) {
     const k = +part.kind.slice(4) - 1, spec = pairFieldsFor(p, k);
     const S = part.meta.slab;
     if (!S) { bad.push(`B: ${part.name} records no slab layout`); continue; }
-    const outline = part.meta.planform.slice(1, -1).reverse();            // the drawn outline, root lead -> root trail (open: the root chord is inside the body)
+    // the drawn outline, root lead -> root trail (open: the root chord is inside
+    // the body); under the junction blend the BLENDED outline, closed (it has no
+    // root chord) — and the law is held EXACTLY only where the burial cannot
+    // reach (this file's own distance to the body's emitted contour, past the
+    // fade and past the chamfer's reach of any stretch inside the body); nearer,
+    // the burial may only thin the slab: between the floor and the taper's law
+    const J = part.meta.junction, bv = J ? bodyView(model) : null, xy = J ? wingXY(model, k) : null;
+    const outline = J ? [...part.meta.planform, part.meta.planform[0]] : part.meta.planform.slice(1, -1).reverse();
     const umax = Math.max(...outline.map((q) => q[0]));
+    const clearB = Math.max(BURY_CLEAR(), p.wingEdgeBevel + 1.5);
     const thick = Math.max(floor, spec.thickness), taper = p.wingEdgeTaper, bevel = p.wingEdgeBevel;
     const tip = Math.max(floor, thick * (1 - taper));
     const dOut = (u, w) => { let d = Infinity; for (let i = 0; i + 1 < outline.length; i++) d = Math.min(d, segDist([u, w], outline[i], outline[i + 1])); return d; };
@@ -780,8 +843,15 @@ function edgeChecks(model) {
     for (let i = 0; i < S.n; i++) {
       const a = part.v0 + i, b = part.v0 + S.n + i;
       const t = Math.hypot(P[3 * a] - P[3 * b], P[3 * a + 1] - P[3 * b + 1], P[3 * a + 2] - P[3 * b + 2]);
-      const [u, w] = S.uw[i], want = law(u, w);
-      minT = Math.min(minT, t); worst = Math.max(worst, Math.abs(t - want));
+      const [u, w] = S.uw[i];
+      minT = Math.min(minT, t);
+      if (J && bv.sd(...xy(u, w)) < clearB) {
+        const taperOnly = thick + (tip - thick) * Math.max(0, Math.min(1, u / umax));
+        if (t > taperOnly + 1e-9) worst = Math.max(worst, t - taperOnly);
+        continue;
+      }
+      const want = law(u, w);
+      worst = Math.max(worst, Math.abs(t - want));
       if (bevel > 0 && !(p.wingEdgeRound > 0) && u >= 0 && dOut(u, w) < 1e-9) { onOutline++; if (Math.abs(t - floor) > 1e-6) bad.push(`B: ${part.name} an outline vertex is ${t.toFixed(4)} mm thick, the chamfer brings the outline to the ${floor} mm floor`); }
     }
     if (worst > 1e-9) bad.push(`B: ${part.name} emitted thickness departs from the edge law by ${worst.toExponential(2)} mm (taper ${taper}, chamfer ${bevel} mm)`);
@@ -844,7 +914,10 @@ function edgeRoundChecks(model) {
     if (!B) { bad.push(`E2: ${part.name} records no bead at round ${round} (a square-walled rim)`); continue; }
     const walls = rim.filter(([a, b]) => joined(a, b)).length;
     if (walls) bad.push(`E2: ${part.name} ${walls} rim point(s) still have a square wall (top joined straight to bottom)`);
-    const outline = part.meta.planform.slice(1, -1).reverse();
+    // under the junction blend the silhouette is the BLENDED outline, closed,
+    // and "past the root" is "outside the body's emitted contour"
+    const J = part.meta.junction, bv = J ? bodyView(model) : null, xyJ = J ? wingXY(model, k) : null;
+    const outline = J ? [...part.meta.planform, part.meta.planform[0]] : part.meta.planform.slice(1, -1).reverse();
     const holes = (part.meta.venation ? part.meta.venation.cells.flatMap((c) => c.holes) : []);
     const onCurve = (q) => {
       let d = Infinity;
@@ -867,13 +940,13 @@ function edgeRoundChecks(model) {
       beads++;
       if (2 * Vn < floor - 1e-9) under++;
       if (Dn > Vn * (1 + 1e-9) + 1e-12) over++;   // the WORLD chord, on a pitched wing too: a pitched wing is a helicoid that stretches planform distances along the span, so the builder sizes the bead by its world chord (design doc §15.3); the old 1% allowance for pitch let a 1.12% bead through (#55/#27 at 0.37, holes)
-      if (r.apex[0] > rampEnd + 1e-9) { aMin = Math.min(aMin, Dn / Vn); if (!(Dn > 0)) flat++; if (Dn >= 0.98 * Vn) full++; }
+      if (J ? bv.sd(...xyJ(...r.apex)) > 0 : r.apex[0] > rampEnd + 1e-9) { aMin = Math.min(aMin, Dn / Vn); if (!(Dn > 0)) flat++; if (Dn >= 0.98 * Vn) full++; }
       if (untwisted) {
         for (let j = 0; j <= K; j++) { const t = (Math.PI * j) / K, X = V3(r.ids[j]); ellRes = Math.max(ellRes, Math.hypot(...X.map((x, d) => x - M[d] - Math.sin(t) * Dv[d] - Math.cos(t) * Vv[d]))); }
         const dot = Vv.reduce((a, x, d) => a + x * Dv[d], 0);
         if (Vn > 0 && Dn > 1e-6 && Math.abs(dot) / (Vn * Dn) > 1e-6) bad.push(`E1: ${part.name} a bead's radius is not square to the sheet (cos ${(dot / (Vn * Dn)).toExponential(2)})`);
       } else ellSkipped++;
-      if (r.apex[0] > 1e-9 && onCurve(r.apex) > 1e-9) off++;
+      if ((J || r.apex[0] > 1e-9) && onCurve(r.apex) > 1e-9) off++;
       apexKeys.add(`${r.apex[0]},${r.apex[1]}`);
     }
     if (under) bad.push(`E5: ${part.name} ${under} bead(s) lower than the ${floor} mm floor`);
@@ -909,7 +982,12 @@ function edgeRoundChecks(model) {
         // and a ring next to a much smaller one can carry the contour along its
         // 60-degree vertex, up to 0.13 a inside the outline — 0.029 mm measured
         // on the blended row): past 2 mm the silhouette IS the outline
-        const [u] = F.fromWorld(x, y); if (u * Lmm <= 2 + 1e-9) continue;
+        // (under the junction blend: 2 mm outside the body's emitted contour —
+        // the bead runs out to nothing over the millimetre inside the body's
+        // silhouette, read off a silhouette smoothed half a millimetre either
+        // way, and a ring beside a smaller one carries the contour inside the
+        // outline there, as past the drawn root's first 2 mm above)
+        if (J) { if (bv.sd(x, y) < 2) continue; } else { const [u] = F.fromWorld(x, y); if (u * Lmm <= 2 + 1e-9) continue; }
         let d = Infinity; for (let i = 0; i + 1 < wo.length; i++) d = Math.min(d, segDist([x, y], wo[i], wo[i + 1]));
         worst = Math.max(worst, d); seen++;
       }
@@ -1008,31 +1086,42 @@ function specimenChecks(model) {
   const bad = [], P = model.positions;
   const part = model.parts.find((q) => q.kind === 'wing1' && q.side === 'R');
   if (!part) return { bad: ['Y: no forewing'] };
-  const poly = part.meta.planform, outline = poly.slice(1, -1).reverse();
+  // under the junction blend the margin is read on the DRAWN planform the blend
+  // started from (meta.junction.drawn); a drawn point the blend kept is read off
+  // its emitted bead apex as before, one it swallowed (inside the body) off the
+  // wing transform restated here (the specimen wing is flat: a rigid map)
+  const Jy = part.meta.junction;
+  const poly = part.meta.planform, outline = Jy ? Jy.drawn : poly.slice(1, -1).reverse();
   let apex = 0; for (let i = 1; i < outline.length; i++) if (outline[i][0] > outline[apex][0]) apex = i;
   const rt = outline[outline.length - 1], A = outline[apex];
   let best = -1, bc = 0;
   for (let i = apex + 1; i < outline.length - 1; i++) { const c = (rt[0] - A[0]) * (outline[i][1] - A[1]) - (rt[1] - A[1]) * (outline[i][0] - A[0]); if (c > bc) { bc = c; best = i; } }
-  const toPoly = (j) => outline.length - j;                    // outline[j] is planform[outline.length - j]
+  const toPoly = Jy ? (j) => Jy.src.indexOf(j) : (j) => outline.length - j;                    // outline[j] is planform[outline.length - j]
   // with the rounded edge the skins are inset: the margin is read off the
   // BEAD's apex vertex of that planform point (it sits on the drawn outline)
   const apexOf = new Map(); if (part.meta.bead) for (const r of part.meta.bead.rings) apexOf.set(r.i, r.ids[part.meta.bead.K / 2]);
-  const vy = (i) => P[3 * (apexOf.has(i) ? apexOf.get(i) : part.v0 + i) + 1];
+  const xyY = Jy ? wingXY(model, 0) : null;
+  const vy = (i, j) => (i < 0 ? xyY(...outline[j])[1] : P[3 * (apexOf.has(i) ? apexOf.get(i) : part.v0 + i) + 1]);
   const atPoint = (i, q) => { const r = part.meta.bead ? part.meta.bead.rings.find((x) => x.i === i) : null; const at = r ? r.apex : part.meta.slab && part.meta.slab.uw[i]; return at && at[0] === q[0] && at[1] === q[1]; };
-  if (!(part.meta.slab && atPoint(toPoly(best), outline[best]) && atPoint(toPoly(outline.length - 1), outline[outline.length - 1]))) bad.push('Y: the slab does not start with the planform polygon (cannot read the margin)');
+  const atOk = (j) => (Jy && toPoly(j) < 0) || atPoint(toPoly(j), outline[j]);
+  if (!(part.meta.slab && atOk(best) && atOk(outline.length - 1))) bad.push('Y: the slab does not start with the planform polygon (cannot read the margin)');
   else {
     // the sweep the margin NEEDS, by this file's own reading of the planform.
     // Eva's ruling: the pose must SUCCEED on any wing — no clamp. The need
     // must lie inside the slider's range and the emitted margin be square.
     const need = Math.atan2(outline[best][1] - rt[1], outline[best][0] - rt[0]) * 180 / Math.PI;
     const f = G.WING_FIELDS.find((x) => x.id === 'sweep');
-    const dy = vy(toPoly(best)) - vy(toPoly(outline.length - 1));
+    const dy = vy(toPoly(best), best) - vy(toPoly(outline.length - 1), outline.length - 1);
     if (need < f.min || need > f.max) bad.push(`Y: the margin needs ${need.toFixed(1)}°, outside the slider (${f.min}–${f.max}°) — Set specimen would clamp`);
     else if (Math.abs(dy) > 1e-6) bad.push(`Y: the forewing's inner margin is not square to the body — its ends differ by ${dy.toFixed(4)} mm in y`);
   }
+  // (under the junction blend the buried part sinks to the body's mid-plane:
+  // flat means flat wherever the burial cannot reach, by this file's own
+  // distance to the body's emitted contour)
   for (const w of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
     const n = w.meta.slab.n; let z0 = Infinity, z1 = -Infinity;
-    for (let i = 0; i < n; i++) { const z = (P[3 * (w.v0 + i) + 2] + P[3 * (w.v0 + n + i) + 2]) / 2; z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const bvY = w.meta.junction ? bodyView(model) : null, xyW = bvY ? wingXY(model, w.meta.pair) : null;
+    for (let i = 0; i < n; i++) { if (bvY && bvY.sd(...xyW(...w.meta.slab.uw[i])) < BURY_CLEAR()) continue; const z = (P[3 * (w.v0 + i) + 2] + P[3 * (w.v0 + n + i) + 2]) / 2; z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     if (z1 - z0 > 1e-9) bad.push(`Y: ${w.name} is not flat (mid-surface spans ${(z1 - z0).toFixed(4)} mm in z)`);
   }
   const ant = model.parts.find((q) => q.name === 'antenna' && q.side === 'R');
@@ -1102,7 +1191,8 @@ function check(label, model, opts = {}) {
   for (const b of vn.bad) fails.push(b.startsWith('V') ? b : `V: ${b}`);
   if (opts.expectVeinThin && !gateVein(model).under) fails.push('V4: the deliberately thin-vein row is not under the floor by this file\'s reading (vacuous)');
   if (opts.expectTailVein && !model.wingPairs.some((w) => w.hasTail)) fails.push('V5: the tail-vein row has no tail (vacuous)');
-  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, ec, er, xc, gc, notes: model.notes };
+  const jb = junctionChecks(model); for (const b of jb.bad) fails.push(b);
+  return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, ec, er, xc, gc, jb, notes: model.notes };
 }
 
 function fmt(r) {
@@ -1115,6 +1205,7 @@ function fmt(r) {
     + ` edge=${r.ec.minT === null ? '—' : r.ec.minT.toFixed(3)}mm${r.ec.onOutline ? `(${r.ec.onOutline} on the outline)` : ''}`
     + (r.er.beads ? ` beads=${r.er.beads}(full ${r.er.full}, min a/H ${r.er.aMin === null ? '—' : r.er.aMin.toFixed(2)}${r.er.ellSkipped ? `, ${r.er.ellSkipped} twisted unchecked` : ''})` : '')
     + ` points=${r.xc.pts}${r.gc.seen ? ` grooves=${r.gc.seen}` : ''}`
+    + (r.jb && r.jb.slot ? ` junction=slot ${r.jb.slot.depth.toFixed(2)}mm neck ${r.jb.necks.map((q) => q.neck.toFixed(2)).join('/')}mm buried ${r.jb.buried.map((q) => `${q.judged - q.exposed}/${q.judged}`).join(' ')}` : '')
     + (r.le ? ` legsOutside=${r.le.outside.toFixed(2)}/${r.le.area.toFixed(2)}mm²` : '') + (r.notes.length ? `  notes: ${r.notes.join('; ')}` : '');
 }
 
@@ -1210,6 +1301,13 @@ function functionChecks() {
     const r4 = G.paramsFromDesign(JSON.parse(JSON.stringify(v4))), want = G.defaultParams(); want.wingEdgeRound = 0; want.wingEdgeBevel = 4;
     const b4 = G.buildBug(r4.params), bw = G.buildBug(want);
     ok(r4.ok && r4.params.wingEdgeRound === 0 && b4.positions.length === bw.positions.length && b4.positions.every((x, i) => Object.is(x, bw.positions[i])), 'D: a version-4 design (no round radius) loads with the round at 0 — the square-walled chamfer it was saved with, bit for bit'); }
+  // the junction blend (§16): a version-6 design (saved before it) loads with
+  // the blend OFF — the wings it was saved with, root tabs and all, bit for bit
+  { const v6 = G.designFromParams(G.defaultParams(), 'v6'); v6.version = 6; delete v6.params.wingJunction;
+    const r6 = G.paramsFromDesign(JSON.parse(JSON.stringify(v6))), want = G.defaultParams(); want.wingJunction = 0;
+    const b6 = G.buildBug(r6.params), bw = G.buildBug(want), bj = G.buildBug(G.defaultParams());
+    const same = (a, b) => a.positions.length === b.positions.length && a.positions.every((x, i) => Object.is(x, b.positions[i]));
+    ok(r6.ok && r6.params.wingJunction === 0 && same(b6, bw) && !same(bj, bw), 'D: a version-6 design (no junction blend) loads with the blend at 0 — the bug it was saved with, bit for bit (and the default with the blend on is a different bug: the check is not vacuous)'); }
   // the elegance pass (§9): a design saved before it loads at the OLD ends
   const v3 = G.designFromParams(G.legacyDefaultParams(), 'v3'); v3.version = 3;
   for (const k of Object.keys(G.LEGACY_STYLE)) delete v3.params[k];
@@ -1248,8 +1346,9 @@ function functionChecks() {
     for (const [name, p] of rowsN0) {
       const m = G.buildBug(p), floor = m.params.minDiameter;
       for (const part of m.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
-        const poly = part.meta.root ? part.meta.planform : part.meta.planform.slice(1, -1), ig = part.meta.root ? 0 : -Infinity;
-        const g = gateThinDepth(poly, floor, 12, ig), b = G.thinAnalysis(poly, floor, { ignoreXBelow: ig });
+        const J = part.meta.junction, skip = J ? fusedSkip(m, part) : null;
+        const poly = J || part.meta.root ? part.meta.planform : part.meta.planform.slice(1, -1), ig = !J && part.meta.root ? 0 : -Infinity;
+        const g = gateThinDepth(poly, floor, 12, ig, skip), b = G.thinAnalysis(poly, floor, { ignoreXBelow: ig, ...(skip ? { skip } : {}) });
         n++; worst = Math.max(worst, Math.abs(g.depth - b.maxDepth));
         if (Math.abs(g.depth - b.maxDepth) > g.h + 1e-9) bad.push(`${name} ${part.name}: gate ${g.depth.toFixed(3)} mm, builder ${b.maxDepth.toFixed(3)}`);
         if (name.startsWith('fixture') && part.kind === 'wing3') fx = { g: g.depth, b: b.maxDepth, viol: m.floorViolations.some((v) => v.pair === 2 && v.kind !== 'vein') };
@@ -1276,7 +1375,9 @@ function functionChecks() {
    the edited pair (every other part bit-identical to the real model). */
 function apexOfControl(model, k, i) {
   const part = model.parts.find((q) => q.kind === `wing${k + 1}` && q.side === 'R');
-  const n = part.meta.planform.length, d = part.meta.denseAt[i * G.CR_SAMPLES], idx = n - 1 - (d + 1);
+  // (under the junction blend the builder's own map from a dense sample to its
+  // blended planform point; a control point the blend swallowed has none)
+  const n = part.meta.planform.length, d = part.meta.denseAt[i * G.CR_SAMPLES], idx = part.meta.junction ? part.meta.denseAtPlanform[i * G.CR_SAMPLES] : n - 1 - (d + 1);
   const r = part.meta.bead.rings.find((x) => x.i === idx);
   const v = r.ids[part.meta.bead.K / 2], P = model.positions;
   return [P[3 * v], P[3 * v + 1], P[3 * v + 2]];
@@ -1424,6 +1525,16 @@ function rowsFor(nseeds) {
   { const p = d(); p.wings.first.dihedral = 35; p.wings.first.pitch = 20; p.wings.last.dihedral = -25; p.wings.last.pitch = -15; rows.push(['round 1, tilted and pitched pairs', p, {}]); }
   { const p = d(); p.wings.tail.on = true; p.wings.first.sweep = TAIL_ROW_SWEEP; p.venation = 'holes'; rows.push(['holes, tail ON (rounded tail rims)', p, {}]); }
   for (const name of ['falcate', 'notched', 'strap']) { const p = d(); p.venation = 'holes'; p.wingPairs = 2; p.wings.first.points = HAND_OUTLINES[name]; p.wings.first.length = 36; p.wings.first.stretch = 1.3; rows.push([`holes: drawn:${name}`, p, {}]); }
+  // JUNCTION rows (design doc §16): the blend off (the old root, bit for bit
+  // — JB is not asked of it), the radius ladder on the default, the junction
+  // fixture (a hindwing root the old code refused) at the default radius, the
+  // largest radius in HOLES, 4 pairs, and a drawn wing with a tail
+  { const p = d(); p.wingJunction = 0; rows.push(['junction 0 (blend off: the old root)', p, {}]); }
+  for (const r of [0.5, 2, 3]) { const p = d(); p.wingJunction = r; rows.push([`junction ${r} mm`, p, {}]); }
+  rows.push(['junction fixture: #20/#31 root at the default blend', junctionFixture(), {}]);
+  { const p = d(); p.venation = 'holes'; p.wingJunction = 3; rows.push(['holes, junction 3 mm', p, {}]); }
+  { const p = d(); p.wingPairs = 4; p.wingJunction = 2; rows.push(['4 pairs, junction 2 mm', p, {}]); }
+  { const p = d(); p.wings.first.points = HAND_OUTLINES.swallowtail; p.wings.first.sweep = TAIL_ROW_SWEEP; p.wings.tail.on = true; p.wingJunction = 2; rows.push(['drawn swallowtail + tail, junction 2 mm', p, {}]); }
   return rows;
 }
 
@@ -1658,6 +1769,12 @@ if (NEG) {
     const ROW_MUTANTS = [
       ['the disc test reads a pixel distance again', '  const core = new Uint8Array(nx * ny);\n  const r2 = (r / h) ** 2;\n  {', OLD_CORE, 'N', rootUnderFloor, { expectThin: true }],
       ['a pitched bead is sized in the planform', 'const kPitch = spec.pitch ? Math.abs((spec.pitch * D2R) / span) : 0;', 'const kPitch = 0;', 'E1', pitchedBeadHoles, {}],
+      // the junction blend (design doc §16): on the fixture whose hindwing root
+      // is under the floor, the blend switched off must leave a SLOT and a NECK
+      // (JB1+JB2 both fire), and its tabs show (JB3); the burial switched off
+      // alone leaves the tabs showing through the body and nothing else
+      ['the junction blend is never built', 'const junction = p.wingJunction > 0 && pairs.length ? junctionFor(p, L, pairs, hinges) : null;', 'const junction = null;', 'JB1+JB2+JB3', junctionFixture, {}],
+      ['the buried part is not buried', '  const bury = J ? (u, w, Hh) => {', '  const bury = J ? (u, w, Hh) => { return null;', 'JB3', junctionFixture, {}],
     ];
     for (const [name, from] of ROW_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
     for (const [name, , , , fx, opts] of ROW_MUTANTS) { const r = check(`${name} (clean)`, G.buildBug(fx()), opts); console.log(fmt(r)); for (const x of r.fails) console.log('     ' + x); if (r.fails.length) ok = false; }
@@ -1670,7 +1787,7 @@ if (NEG) {
       try { const M = await import(pathToFileURL(file).href); fails = check(name, M.buildBug(fx()), opts).fails; }
       catch (e) { fails = [`(threw) ${e.message}`]; }
       finally { fs.unlinkSync(file); }
-      const fired = fails.some((f) => f.startsWith(clause + ':'));
+      const fired = clause.split('+').every((c) => fails.some((f) => f.startsWith(c + ':')));
       console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${fails.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
       if (!fired) ok = false;
     }
