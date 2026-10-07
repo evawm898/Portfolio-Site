@@ -207,10 +207,17 @@ export function makeJunctionMeasures(G) {
       return zs.sort((u, v) => u - v);
     };
     const floor = model.params.minDiameter;
+    // (a vertex JB3_INSET_MM inside the contour is inside the contour's box
+    // shrunk by as much: an exact pre-filter before the distance)
+    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    for (const L of bv.loops) for (const [x, y] of L) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
+    bx0 += JB3_INSET_MM; bx1 -= JB3_INSET_MM; by0 += JB3_INSET_MM; by1 -= JB3_INSET_MM;
     for (const part of model.parts.filter((q) => /^wing\d$/.test(q.kind) && q.side === 'R')) {
       let judged = 0, exposed = 0, worst = null, thin = 0, thinOver = 0, thinWorst = null;
       for (let v = part.v0; v < part.v1; v++) {
-        const x = P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2], d = bv.sd(x, y);
+        const x = P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2];
+        if (x < bx0 || x > bx1 || y < by0 || y > by1) continue;
+        const d = bv.sd(x, y);
         if (d > -JB3_INSET_MM) continue;
         judged++;
         const zs = zsAt(x, y), above = zs.filter((q) => q > z).length;

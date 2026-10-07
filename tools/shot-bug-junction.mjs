@@ -67,7 +67,7 @@ function readModel(G, JM, m) {
   const ab0 = L.yA0 ?? null, ab1 = L.yA1 ?? null;
   const joined = Number.isFinite(yLow) && ab0 !== null ? Math.max(0, ab0 - Math.max(yLow, ab1)) : null;
   return {
-    slot: sl.depth, necks: nk.map((q) => q.neck), exposed: bu.reduce((a, q) => a + q.exposed + (q.thinOver || 0), 0),   // JB3's failures, both arms judged: bu.reduce((a, q) => a + q.judged, 0),
+    slot: sl.depth, necks: nk.map((q) => q.neck), exposed: bu.reduce((a, q) => a + q.exposed + (q.thinOver || 0), 0) /* JB3's failures, both arms */, judged: bu.reduce((a, q) => a + q.judged, 0),
     stl, tris: m.indices.length / 3, notes: m.notes.slice(), joined, abdomen: ab0 !== null ? ab0 - ab1 : null,
   };
 }
