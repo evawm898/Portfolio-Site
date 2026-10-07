@@ -1190,7 +1190,7 @@ export const SMOKE_BLOCKS = [
   {
     n: 54, title: 'the compound leaf (Oct 7, S3)',
     anchor: 'COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, 2 pairs + terminal, arch 10, cup 0.28, 12 fine teeth at 0.12',
-    /* EIGHT ROWS: the rose (every compound clause on the reference, over a
+    /* NINE ROWS: the rose (every compound clause on the reference, over a
        kinked 137.5 spiral), one pair (the layout's degenerate arm — first and
        last coincide), both stalks at 0 (a leaflet base ON the rachis — LF16's
        base-on-its-stalk with no stalk), the thick sheet (LF17: the rod law
@@ -1199,8 +1199,9 @@ export const SMOKE_BLOCKS = [
        the RACHIS's, the leaflets ride it unarched), a SPHERE head (ST9 must
        excuse the rachis and the stalks by name or a leaf near the pole reads
        as a petal in the channel), the raceme's shared node (LF14's pin arm —
-       the plan says SIMPLE and says it was pinned), and the GATED arm (LF14's
-       inertness — no leaf, so no compound field anywhere). */
+       the plan says SIMPLE and says it was pinned), and the two GATED arms
+       (LF14's inertness — SIMPLE with every hidden leaflet control at an
+       extreme, and no leaf at all). */
     rows: [
       { label: 'COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, 2 pairs + terminal, arch 10, cup 0.28, 12 fine teeth at 0.12',
         path: "LF14's two statements and the plan against the layout restated from the controls; LF15's count and build order (four laterals then the terminal, every leaflet a blade); LF16's bases on their stalks and the stalks on the rachis at the restated stations; LF17's rod radii against the area rule; LF11's compound arc on the rachis; LF7/LF9/LF10/LF12/LF13 on every leaflet; ST12's kink beside the leaves" },
@@ -1216,6 +1217,8 @@ export const SMOKE_BLOCKS = [
         path: "ST9 with a compound leaf beside a sphere's free stem — every rod the leaf emitted is excused on its own axis, a blade vertex is not" },
       { label: "COMPOUND: under a raceme's shared node (PINNED to SIMPLE, and told)",
         path: "LF14's pin arm — the registry hides the type at a shared node, the plan reports SIMPLE and typePinned; SN0-SN4 on a simple blade" },
+      { label: 'COMPOUND: GATED — SIMPLE with every leaflet control at an extreme (hidden AND inert)',
+        path: "LF14's SIMPLE arm — the plan carries no compound layout, no leaf emits a compound tree and every blade is a simple blade while every hidden leaflet control sits at an extreme; LF7/LF9/LF10 on the simple blade as it always was" },
       { label: 'COMPOUND: GATED — the type and every leaflet control at an extreme with length 0 (hidden AND inert)',
         path: "LF14's inertness — no leaf is built, so no compound plan, no leaflet and no rod is reported; LF0's absent arm" },
     ],
