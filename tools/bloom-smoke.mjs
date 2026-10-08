@@ -1189,7 +1189,7 @@ export const SMOKE_BLOCKS = [
   },
   {
     n: 54, title: 'the compound leaf (Oct 7, S3)',
-    anchor: 'COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, 2 pairs + terminal, arch 10, cup 0.28, 12 fine teeth at 0.12',
+    anchor: 'COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, the retuned defaults (2 pairs + a larger terminal, ovate, entire), arch 10, cup 0.28',
     /* NINE ROWS: the rose (every compound clause on the reference, over a
        kinked 137.5 spiral), one pair (the layout's degenerate arm — first and
        last coincide), both stalks at 0 (a leaflet base ON the rachis — LF16's
@@ -1203,24 +1203,47 @@ export const SMOKE_BLOCKS = [
        (LF14's inertness — SIMPLE with every hidden leaflet control at an
        extreme, and no leaf at all). */
     rows: [
-      { label: 'COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, 2 pairs + terminal, arch 10, cup 0.28, 12 fine teeth at 0.12',
-        path: "LF14's two statements and the plan against the layout restated from the controls; LF15's count and build order (four laterals then the terminal, every leaflet a blade); LF16's bases on their stalks and the stalks on the rachis at the restated stations; LF17's rod radii against the area rule; LF11's compound arc on the rachis; LF7/LF9/LF10/LF12/LF13 on every leaflet; ST12's kink beside the leaves" },
+      { label: 'COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, the retuned defaults (2 pairs + a larger terminal, ovate, entire), arch 10, cup 0.28',
+        path: "LF14's two statements and the plan against the layout restated from the controls; LF15's count and build order (four laterals then the terminal, every leaflet a blade); LF16's bases on their stalks and the stalks on the rachis at the restated stations; LF17's rods (the thicker petiole, its cone, the wire rachis and stalks); LF18's petiole law under its cap with the rooted end inside a kinked stem; LF11's compound arc from the rachis base found by position; LF7/LF9/LF10/LF12/LF13 on every leaflet on their OWN depth and tip; ST12's kink beside the leaves" },
       { label: 'COMPOUND: leafletPairs min (1 — first and last coincide, basal ratio inert)',
         path: "LF14's layout at one pair (the station is `first` and the ratio 1 — the hidden basal and last controls inert) and LF15's three-blade count" },
       { label: 'COMPOUND: leafletStalk min (0 — sessile laterals on the rachis)',
         path: "LF16 with a ZERO stalk — the leaflet's free base row stands on the rachis itself, the embed carried by the blade" },
-      { label: 'COMPOUND: sheetThickness 2.4 (the rods follow the petiole, floored at the wire)',
-        path: "LF17 at a sheet where the petiole is 1.2 mm in radius — the rachis and stalk radii restated from the petiole and the wire, never a typed 0.6" },
+      { label: 'COMPOUND: sheetThickness 2.4 (the wire 2.40 mm; the petiole asks 5.37 and the stem holds 4.48 — CLAMPED)',
+        path: "LF17 at a sheet where the wire is 1.2 mm in radius — the rachis and stalks restated as the wire, never a typed 0.6; LF18's clamp binding on the shipped stem" },
       { label: 'COMPOUND: arch 180 (the RACHIS arcs over; the leaflets ride it, unarched)',
         path: "LF11's compound branch — the rachis rings on the arc restated from the controls, the tip ring present, the turn built against the turn asked; LF16's stalk roots on the arced rachis" },
-      { label: 'COMPOUND: a SPHERE head with a stem (ST9 excuses the rachis and stalks by name)',
-        path: "ST9 with a compound leaf beside a sphere's free stem — every rod the leaf emitted is excused on its own axis, a blade vertex is not" },
+      { label: 'COMPOUND: a SPHERE head with a stem (ST9 excuses the thicker petiole, the rachis and stalks by name)',
+        path: "ST9 with a compound leaf beside a sphere's free stem — every rod the leaf emitted is excused on its own axis at its own radius (LF18's third arm), a blade vertex is not" },
       { label: "COMPOUND: under a raceme's shared node (PINNED to SIMPLE, and told)",
         path: "LF14's pin arm — the registry hides the type at a shared node, the plan reports SIMPLE and typePinned; SN0-SN4 on a simple blade" },
       { label: 'COMPOUND: GATED — SIMPLE with every leaflet control at an extreme (hidden AND inert)',
         path: "LF14's SIMPLE arm — the plan carries no compound layout, no leaf emits a compound tree and every blade is a simple blade while every hidden leaflet control sits at an extreme; LF7/LF9/LF10 on the simple blade as it always was" },
       { label: 'COMPOUND: GATED — the type and every leaflet control at an extreme with length 0 (hidden AND inert)',
         path: "LF14's inertness — no leaf is built, so no compound plan, no leaflet and no rod is reported; LF0's absent arm" },
+    ],
+  },
+  {
+    n: 55, title: 'the compound retune (Oct 7, Eva on #380)',
+    anchor: 'COMPOUND RETUNE: leaflet serration ON (leafletToothDepth 0.12, 12 fine teeth, tip and notch 1.6 — the 1 mm floor applies)',
+    /* FIVE ROWS: the clamp binding on the thinnest stem (LF18's law under its
+       cap, the rooted end held inside a solid stem); the cap UNDER the wire
+       (no cone — LF17's other arm, LF18's one-direction clause); the leaflets'
+       serration switched back ON through their own depth (LF7/LF13 on the
+       leaflets' own control, the 1 mm floor); and the twin controls' two
+       GATED arms (each pair's simple half hidden and inert under COMPOUND,
+       its leaflet half under SIMPLE). */
+    rows: [
+      { label: 'COMPOUND RETUNE: the petiole CLAMPED on the 3 mm solid stem (4 pairs ask 3.60 mm; the stem holds 2.98)',
+        path: "LF18 — the petiole asked by the area rule read upward, CAPPED by where the rooted end fits the stem, the record's asked/cap/built/clamped restated from the controls and the stem plan, the emitted root ring inside the stem; LF17's petiole rings at the clamped radius and the cone at 45 degrees" },
+      { label: 'COMPOUND RETUNE: sheet 2.4 x leafAngle 85 (the 1.64 mm cap is UNDER the 2.40 mm wire — the petiole stays the wire, no cone)',
+        path: "LF17's no-cone arm (the rachis base is ring 1) and LF18's thickens = false, its rooted-end clause in its one direction (the wire over the cap stands proud, told)" },
+      { label: 'COMPOUND RETUNE: leaflet serration ON (leafletToothDepth 0.12, 12 fine teeth, tip and notch 1.6 — the 1 mm floor applies)',
+        path: "LF7 and LF13 on the leaflets' OWN depth control — teeth cut on every leaflet, each relief floored at 1.00 mm, the count giving where a sinus lacks the material" },
+      { label: "COMPOUND RETUNE: GATED — COMPOUND with the simple leaf's tooth depth 1 and tip 3 (hidden AND inert under COMPOUND)",
+        path: "LF7/LF9 restated from the LEAFLETS' controls while the simple leaf's depth and tip sit at an extreme — hidden and inert under COMPOUND" },
+      { label: "COMPOUND RETUNE: GATED — SIMPLE with the leaflets' tooth depth 1 and tip 0.6 (hidden AND inert under SIMPLE)",
+        path: "LF18's SIMPLE arm (the petiole is the wire) and LF7/LF9 on the simple blade while the leaflets' own depth and tip sit at an extreme — hidden and inert under SIMPLE" },
     ],
   },
 ];

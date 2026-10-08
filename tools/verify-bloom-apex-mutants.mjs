@@ -1816,7 +1816,7 @@ const MUTANTS = [
      radius and a typed 0.6 rod is not the derived one (at the shipped sheet
      they are the same double, so the witness state is part of the claim) —
      never the assertion it names. */
-  { id: 'the-leaf-type-is-ignored', why: 'the plan never lays out a compound tree, so a COMPOUND ask builds a simple blade while the Leaflets drop-down shows — eleven controls reaching nothing',
+  { id: 'the-leaf-type-is-ignored', why: 'the plan never lays out a compound tree, so a COMPOUND ask builds a simple blade while the Leaflets drop-down shows — twelve controls reaching nothing',
     find: '  const compoundRec = leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR0, stem, angleDeg) : null;',
     into: '  const compoundRec = null;', names: ['LF14'],
     witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
@@ -1904,7 +1904,7 @@ const MUTANTS = [
         : `the mutant's cone ring stands ${gap(m.rep)} mm short of the rachis base against the clean tree's ${gap(c.rep)} — the behaviour did not move`; } },
   { id: 'the-rachis-thickens-with-the-petiole', why: "the rachis is the area rule read DOWN from the thicker petiole — tapering from 2.68 mm to the wire, where Eva ruled the rachis stays at the floor",
     find: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: compoundRodRadiusMm(wireR) });',
-    into: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: Math.max(wireR, radiusMm * Math.sqrt(carried / N)) });', names: ['LF17'],
+    into: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: Math.max(wireR, radiusMm * Math.sqrt(carried / N)) });', names: ['LF17', 'LF18'],
     witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const r0 = (x) => x.plan.compound.rachis.intervals[0].radiusMm;
