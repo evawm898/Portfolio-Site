@@ -4,13 +4,15 @@ Eva's rulings on the compound leaf, from the deploy preview of #380 (Oct 7). Bas
 `2792504` (#380's squash). Sheet: `docs/img/leaf-compound-rose.png`, made by
 `node tools/shot-bloom-leaf-compound-rose.mjs <out.png> --base <worktree of 2792504>`.
 
-**The defaults in §1 are PROPOSED, not ruled.** The other two rulings are carried out as written.
+**The defaults in §1 are RULED (Eva, Oct 8, from `docs/img/leaf-compound-rose.png`): they stand as
+merged in #381 (`13e8c80`), and the leaflets keep the shared `leafCup`.** They were proposed in #381
+and are recorded here as ruled (§1). The other two rulings were carried out as written.
 
 ## 0. What was asked, and what this PR does
 
 | ruling | what shipped |
 |---|---|
-| 1. Retune the compound defaults toward rose | New compound-only defaults (§1), shown against #380's on the sheet's second row. No SIMPLE default moved (measured, §5). |
+| 1. Retune the compound defaults toward rose | New compound-only defaults (§1), shown against #380's on the sheet's second row. No SIMPLE default moved (measured, §5). **Ruled Oct 8: they stand.** |
 | 2. Serration off on compound leaflets | Twin controls: the leaflets have their own tooth depth (default 0) and tip shape (§2). The simple leaf's two are hidden and inert under COMPOUND. |
 | 3. A thicker compound petiole | The area rule read upward, capped where the rooted end still fits inside the stem, clamped and told (§3). The rachis and stalks stay at the wire. |
 | Partition | Predeclared from the base tree's record: 44 movers moved, 1,178 holders held at 0 floats in both modes (§5). |
@@ -18,7 +20,14 @@ Eva's rulings on the compound leaf, from the deploy preview of #380 (Oct 7). Bas
 | Frozen phase | `frozen/phase57` = the 1,210 rows at `2792504` (§8). |
 | Housekeeping | #380's escaped co-author line is added to CLAUDE.md's list of known-wrong squash messages. History is not rewritten. |
 
-## 1. Ruling 1: the proposed rose defaults (for Eva to rule)
+## 1. Ruling 1: the rose defaults (proposed in #381, RULED Oct 8)
+
+**RULED (Eva, Oct 8, from `docs/img/leaf-compound-rose.png`): the proposed rose defaults STAND as
+merged in #381** — laterals 26 × 17 mm, terminal 30 × 19 mm, ovate, leaflet tip 1.60, no teeth.
+**The leaflets keep the shared `leafCup` default (`LEAF_CUP`, 0.35); there is no leaflet cup
+twin.** Nothing in the generator moves for this ruling: the table below is what `main` already
+ships at `13e8c80`, and the cup is already shared — `leafletBladeState` spreads `leafBladeState`,
+which reads `state.leafCup`, and the Cup control is visible under either leaf type.
 
 #380's leaflets read as holly. Three things did that, and only one of them was the leaflets' own:
 
@@ -55,7 +64,16 @@ The ruling's words, checked against the sheet:
 - *Two lateral pairs plus a terminal, the terminal a little larger.* 30 × 19 against the top pair's 26 × 17.
 - *Leaflets large relative to the rachis.* The terminal alone is three quarters of the 40 mm rachis.
 
-**This is Eva's to rule from the sheet.** Every value above is one constant.
+**Ruled as proposed (Oct 8).** Every value above is still one constant, should a later ruling move
+one.
+
+**Found while recording the ruling, not fixed here (this PR is docs only):** the Cup control's
+read-out quotes the margin lift at the widest point as `cup × leafWidth / 2`, and `leafWidth` is
+hidden under COMPOUND. At the defaults it equals the lateral leaflets' width (17 mm), so the 2.97 mm
+it prints is right for the top lateral pair by coincidence. The terminal (19 mm) lifts 3.32 mm and
+the basal pair (13.6 mm) 2.38 mm, and the figure does not follow `leafletWidth` when that slider
+moves. Making the read-out name the leaflets' own widths under COMPOUND is a read-out change of its
+own.
 
 ## 2. Ruling 2: serration off on compound leaflets — the mechanism is TWIN CONTROLS
 
@@ -311,7 +329,8 @@ dispatched after the merge.
 
 ## 9. What is Eva's
 
-- **The proposed rose defaults (§1).** Rule them from the sheet: row 1 is the rose on them, and
-  row 2 is #380 beside them at one camera.
+- **Nothing from this PR.** The rose defaults (§1) were ruled on Oct 8: they stand as merged, and
+  the leaflets keep the shared `leafCup` with no twin. The Cup read-out's width under COMPOUND (§1)
+  is recorded, not scheduled.
 - **Out of scope, as ruled:** the chevron (S4), stipules, the leaf apex nib, serrate skew,
   per-leaflet arch, the tooth floor itself, and the SIMPLE defaults.
