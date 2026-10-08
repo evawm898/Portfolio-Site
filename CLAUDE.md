@@ -3639,9 +3639,13 @@ LF17/LF18). **TWIN CONTROLS, NOT A SHARED DEFAULT**: `leafletToothDepth` (defaul
 move; tooth COUNT and crest/notch SHAPE stay shared; the 1 mm relief floor is untouched and applies to
 leaflets as before. The inertness is measured both ways (a compound at simple tooth 1 / tip 3 is 0 of
 1,315,080 floats off the defaults; a SIMPLE row with the leaflet controls at their extremes is a byte
-holder). **THE ROSE DEFAULTS ARE PROPOSED, NOT RULED** — leaflets 26×17, terminal 30×19, ovate
-(`LEAFLET_BASE_TAPER`/`LEAFLET_TIP_TAPER` 0.6/0.9, constants, widest at 0.40 L), tip 1.60; Eva rules
-them from `docs/img/leaf-compound-rose.png`. **THE PETIOLE**: asked `wire·sqrt(N)` (2.68 mm at the
+holder). **THE ROSE DEFAULTS ARE RULED (Eva, Oct 8, from `docs/img/leaf-compound-rose.png`): THEY STAND AS
+MERGED IN #381 (`13e8c80`)** — leaflets 26×17, terminal 30×19, ovate (`LEAFLET_BASE_TAPER`/
+`LEAFLET_TIP_TAPER` 0.6/0.9, constants, widest at 0.40 L), tip 1.60, no teeth. **THE LEAFLETS KEEP
+THE SHARED `leafCup` (default `LEAF_CUP` 0.35) — NO LEAFLET CUP TWIN, ruled**: `leafletBladeState`
+spreads `leafBladeState`, which reads `leafCup`. (Recorded, not fixed: the Cup read-out quotes its lift
+at `leafWidth`, hidden under COMPOUND and equal to the laterals' 17 mm only at the defaults — §1 of the
+outcome doc.) **THE PETIOLE**: asked `wire·sqrt(N)` (2.68 mm at the
 default five leaflets), capped by `petioleRootCapMm` — the largest radius whose rooted-end disc fits
 inside the stem's outer cylinder, closed form, two cases — built `max(wire, min(asked, cap))` when the cap
 clears the mode-free wire floor, else the wire; a 45° cone steps it down to the wire rachis; CLAMPED AND
