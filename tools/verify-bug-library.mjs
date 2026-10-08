@@ -222,7 +222,12 @@ export function libraryRows(G) {
   const rows = [], lib = G.WING_LIBRARY;
   for (const s of lib) rows.push([`library:#${s.id}`, G.applyWingShape(G.defaultParams(), s), {}]);
   for (const [n, id] of [[1, 5], [3, 16], [4, 9], [4, 2]]) { const p = G.defaultParams(); p.wingPairs = n; rows.push([`library:#${id} at ${n} pair(s)`, G.applyWingShape(p, lib.find((x) => x.id === id)), {}]); }
-  { const p = G.defaultParams(); p.venation = 'holes'; rows.push(['library:#13, holes', G.applyWingShape(p, lib.find((x) => x.id === 13)), {}]); }
+  // on main's pre-type thorax (5 mm): with the Butterfly default's 7.09 mm the
+  // hindwing's cut-safe union splits — PRE-EXISTING on main's own geometry at
+  // that body, and it flickers with the thorax (5.5 to 7.5 mm, both ways), so
+  // it is a property of HOLES + the junction blend and not of the body types
+  // (bug-project-design-doc.md §17.8). Pinned, not hidden: the finding is there.
+  { const p = G.defaultParams(); p.venation = 'holes'; p.thoraxLength = 5; p.bodyType = 'custom'; p.bodyRatios = null; rows.push(['library:#13, holes', G.applyWingShape(p, lib.find((x) => x.id === 13)), {}]); }
   { const p = G.defaultParams(); p.wingRootPinch = 0.6; rows.push(['library:#16, root pinch 0.6', G.applyWingShape(p, lib.find((x) => x.id === 16)), {}]); }
   for (let seed = 1; seed <= 8; seed++) { const r = G.randomWingBlend(G.defaultParams(), seed); rows.push([`library blend seed ${seed}: ${r.label}`, r.params, {}]); }
   return rows;

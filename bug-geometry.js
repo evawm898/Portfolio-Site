@@ -80,9 +80,25 @@ const ABD_TIP_CONE = 1.6;
 /* A tucked leg keeps this far off the midline (mm) so it never coincides with
    its own mirror image (see buildLegs). */
 const TUCK_MIDLINE_GAP = 0.08;
+/* The antenna's rise above the body before §17 was a typed 0.35 (its direction
+   [sin spread, cos spread, 0.35]): that is atan(0.35) = 19.29°, and the lift
+   control's value at exactly this double is a BRANCH back to the literal 0.35,
+   so every bug built before the control existed is bit-identical. */
+export const ANT_LIFT_LEGACY = Math.atan(0.35) / (Math.PI / 180);
+/* ELBOWED (geniculate) antennae (§17, the bee): a straight SCAPE over the first
+   ELBOW_SCAPE of the length, a bend of the flagellum outward by ELBOW_YAW_DEG
+   and down by ELBOW_DROP_DEG, drawn as an ARC over ELBOW_ARC of the length
+   (never tighter than 1.6 tube radii, so the tube cannot fold on itself). */
+export const ELBOW_SCAPE = 0.33, ELBOW_ARC = 0.12, ELBOW_YAW_DEG = 55, ELBOW_DROP_DEG = 30;
+/* §17: the two primary body sliders' ranges, and the reference span a WINGLESS
+   body is sized against (the default butterfly's own wingspan, 72 mm). */
+export const BODY_SIZE_RANGE = [0.2, 0.9];
+export const BODY_WIDTH_RANGE = [0.6, 1.6];
+export const BODY_REF_SPAN_MM = 72;
 
 /* Wings (Phase 1 revision). */
 export const MAX_WING_PAIRS = 4;
+export const DEFAULT_WING_PAIRS = 2;   // the Pairs control's default; also what a winged body type gives a wingless bug
 /* The thorax lengthens with each wing pair past two, so N roots can be spread
    along it without stacking: effective length = thoraxLength * (1 + k (N - 2)). */
 export const THORAX_PER_PAIR = 0.3;
@@ -117,9 +133,10 @@ export const JUNCTION_FUSED_FRAC = 0.5;     // blended wing material within this
 
 export const SECTIONS = [
   { id: 'plan', label: 'Body', open: true },
-  { id: 'head', label: 'Head' },
-  { id: 'thorax', label: 'Thorax' },
-  { id: 'abdomen', label: 'Abdomen' },
+  /* the FINE body controls (Eva's ruling, §17): every head / thorax / abdomen /
+     cross-section / segment control, in ONE collapsed drop-down inside Body,
+     closed by default. Editing any of them makes the body type Custom. */
+  { id: 'bodyFine', label: 'Fine controls — head, thorax, abdomen, cross-section, segments', parent: 'plan' },
   { id: 'legs', label: 'Legs' },
   { id: 'antennae', label: 'Antennae' },
   { id: 'wings', label: 'Wings', open: true },
@@ -138,45 +155,54 @@ const R = (id, section, label, min, max, step, def, unit = '', visibleWhen) =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen });
 
 export const PARAM_SPEC = [
-  { id: 'bodyParts', section: 'plan', label: 'Body parts', kind: 'choice', default: '3',
+  /* BODY TYPE + the two primary sliders (§17). The builder reads none of the
+     three: a preset is a set of PROPORTIONS that fitBody() turns into the fine
+     fields below (one owner), so a model is always built from the fine fields. */
+  { id: 'bodyType', section: 'plan', label: 'Body type', kind: 'choice', default: 'butterfly', meta: true,
+    options: [['butterfly', 'Butterfly'], ['moth', 'Moth'], ['bee', 'Bee'], ['dragonfly', 'Dragonfly'], ['spider', 'Spider'], ['custom', 'Custom']] },
+  R('bodySize', 'plan', 'Size — body length as a proportion of the wingspan', BODY_SIZE_RANGE[0], BODY_SIZE_RANGE[1], 0.01, 0.32, '× span'),
+  R('bodyWidth', 'plan', 'Width — slender ↔ stout (head, thorax and abdomen together)', BODY_WIDTH_RANGE[0], BODY_WIDTH_RANGE[1], 0.01, 1, '×'),
+
+  { id: 'bodyParts', section: 'bodyFine', label: 'Body parts', kind: 'choice', default: '3',
     options: [['3', '3 — head, thorax, abdomen'], ['2', '2 — cephalothorax, abdomen']] },
-  R('roundness', 'plan', 'Cross-section roundness', 1.5, 6, 0.1, 2.0, '', null),
-  { id: 'pointedTips', section: 'plan', label: 'Terminations pointed — abdomen, tarsi, antennae (off: rounded ends)', kind: 'bool', default: true },
+  R('roundness', 'bodyFine', 'Cross-section roundness', 1.5, 6, 0.1, 2.0, '', null),
+  { id: 'pointedTips', section: 'bodyFine', label: 'Terminations pointed — abdomen, tarsi, antennae (off: rounded ends)', kind: 'bool', default: true },
 
-  R('headSize', 'head', 'Head size', 2, 12, 0.1, 2.4, 'mm', isThree),
+  R('headSize', 'bodyFine', 'Head size', 2, 16, 0.1, 2.4, 'mm', isThree),
 
-  R('thoraxLength', 'thorax', 'Length', 3, 20, 0.1, 5, 'mm'),
-  R('thoraxWidth', 'thorax', 'Width', 2.5, 14, 0.1, 2.9, 'mm'),
-  R('thoraxDepth', 'thorax', 'Depth', 2.5, 14, 0.1, 2.9, 'mm'),
+  R('thoraxLength', 'bodyFine', 'Thorax — length', 3, 30, 0.1, 5, 'mm'),
+  R('thoraxWidth', 'bodyFine', 'Thorax — width', 2.5, 24, 0.1, 2.9, 'mm'),
+  R('thoraxDepth', 'bodyFine', 'Thorax — depth', 2.5, 24, 0.1, 2.9, 'mm'),
 
-  R('abdomenLength', 'abdomen', 'Length', 2, 70, 0.5, 15, 'mm'),
-  R('abdomenWidth', 'abdomen', 'Width', 1.5, 18, 0.1, 2.2, 'mm'),
-  R('abdomenTaper', 'abdomen', 'Taper', 0, 1, 0.01, 0.75),
-  R('abdomenSegments', 'abdomen', 'Segment count', 1, 12, 1, 7),
-  { id: 'banding', section: 'abdomen', label: 'Segments marked', kind: 'bool', default: true },
-  R('segmentStyle', 'abdomen', 'Segments — groove (incised lines) ↔ bulge (beaded)', 0, 1, 0.01, 0, '', (p) => p.banding && p.abdomenSegments > 1),
+  R('abdomenLength', 'bodyFine', 'Abdomen — length', 2, 90, 0.5, 15, 'mm'),
+  R('abdomenWidth', 'bodyFine', 'Abdomen — width', 1.5, 30, 0.1, 2.2, 'mm'),
+  R('abdomenTaper', 'bodyFine', 'Abdomen — taper', 0, 1, 0.01, 0.75),
+  R('abdomenSegments', 'bodyFine', 'Abdomen — segment count', 1, 12, 1, 7),
+  { id: 'banding', section: 'bodyFine', label: 'Abdomen — segments marked', kind: 'bool', default: true },
+  R('segmentStyle', 'bodyFine', 'Segments — groove (incised lines) ↔ bulge (beaded)', 0, 1, 0.01, 0, '', (p) => p.banding && p.abdomenSegments > 1),
 
   R('legPairs', 'legs', 'Pairs', 0, 4, 1, 3),
   { id: 'legsVisible', section: 'legs', label: 'Visible', kind: 'bool', default: true },
   R('legReach', 'legs', 'Reach — tucked under ↔ splayed out', 0, 1, 0.01, 0, '', hasLegs),
-  R('coxa', 'legs', 'Coxa', 0.5, 5, 0.1, 0.9, 'mm', hasLegs),
-  R('femur', 'legs', 'Femur', 1, 20, 0.1, 4, 'mm', hasLegs),
-  R('tibia', 'legs', 'Tibia', 1, 20, 0.1, 4.2, 'mm', hasLegs),
-  R('tarsus', 'legs', 'Tarsus', 0.5, 15, 0.1, 3.4, 'mm', hasLegs),
+  R('coxa', 'legs', 'Coxa', 0.5, 8, 0.1, 0.9, 'mm', hasLegs),
+  R('femur', 'legs', 'Femur', 1, 45, 0.1, 4, 'mm', hasLegs),
+  R('tibia', 'legs', 'Tibia', 1, 35, 0.1, 4.2, 'mm', hasLegs),
+  R('tarsus', 'legs', 'Tarsus', 0.5, 35, 0.1, 3.4, 'mm', hasLegs),
   R('legSplay', 'legs', 'Splay — fan forward / back', 0, 70, 1, 35, '°', hasLegs),
   R('legBend', 'legs', 'Joint bend', 0, 90, 1, 45, '°', hasLegs),
   R('legTaper', 'legs', 'Taper', 0, 0.9, 0.01, 0.5, '', hasLegs),
 
   { id: 'antennaType', section: 'antennae', label: 'Type', kind: 'choice', default: 'clubbed',
-    options: [['clubbed', 'Clubbed'], ['feathered', 'Feathered'], ['filiform', 'Filiform'], ['bristle', 'Bristle'], ['none', 'None']] },
-  R('antennaLength', 'antennae', 'Length', 1, 40, 0.5, 17, 'mm', hasAnt),
+    options: [['clubbed', 'Clubbed'], ['feathered', 'Feathered'], ['filiform', 'Filiform'], ['bristle', 'Bristle'], ['elbowed', 'Elbowed (geniculate)'], ['none', 'None']] },
+  R('antennaLength', 'antennae', 'Length', 1, 50, 0.5, 17, 'mm', hasAnt),
   R('antennaCurl', 'antennae', 'Curl', -120, 180, 1, 0, '°', hasAnt),
   R('antennaSpread', 'antennae', 'Spread', 0, 80, 1, 22, '°', hasAnt),
+  R('antennaLift', 'antennae', 'Lift — raised above the body', 0, 80, 0.5, ANT_LIFT_LEGACY, '°', hasAnt),
   R('clubLength', 'antennae', 'Club length — of the antenna (0: a round knob)', 0, 0.5, 0.01, 0.22, '', isClubbed),
   R('clubWidth', 'antennae', 'Club width — × the shaft', 1, 4, 0.05, 1.8, '', (p) => isClubbed(p) && p.clubLength > 0),
   R('clubTaper', 'antennae', 'Club taper — rounded end ↔ drawn back to the tip', 0, 1, 0.01, 0.35, '', (p) => isClubbed(p) && p.clubLength > 0),
 
-  R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
+  R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, DEFAULT_WING_PAIRS),
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
   R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: none)', 0, 4, 0.05, 0, 'mm', hasWings),
   R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
@@ -281,10 +307,19 @@ export const PRE_JUNCTION_STYLE = { wingJunction: 0 };
 /* The Phase 1/2 default's body, legs and antennae (the values PARAM_SPEC used
    to default to). */
 export const LEGACY_BODY = { headSize: 4.0, thoraxLength: 7, thoraxWidth: 5, thoraxDepth: 4.6, abdomenLength: 15, abdomenWidth: 5, abdomenTaper: 0.5, abdomenSegments: 6,
-  legReach: 1, coxa: 1.2, femur: 5, tibia: 5.5, tarsus: 4, antennaType: 'filiform', antennaLength: 10, antennaCurl: 10, antennaSpread: 25 };
+  legReach: 1, coxa: 1.2, femur: 5, tibia: 5.5, tarsus: 4, antennaType: 'filiform', antennaLength: 10, antennaCurl: 10, antennaSpread: 25, antennaLift: ANT_LIFT_LEGACY,
+  bodyType: 'custom', bodyRatios: null };
+/* §17: the antenna lift (new) at the end that IS the old code — a design saved
+   before DESIGN_VERSION 8 loads with it, so it looks as saved. */
+export const PRE_BODY_STYLE = { antennaLift: ANT_LIFT_LEGACY };
 
-export const DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
-DEFAULTS.wings = DEFAULT_WINGS;   // .tail filled in after STARTER_TAIL (below)
+/* Every control at its DECLARED default: the bug before a body type is applied
+   (the Phase 1/2 legacy default starts here, so it does not inherit a preset). */
+const SPEC_DEFAULTS = Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default]));
+SPEC_DEFAULTS.bodyRatios = null;
+SPEC_DEFAULTS.bodyType = 'custom';
+export const DEFAULTS = { ...SPEC_DEFAULTS };
+DEFAULTS.wings = DEFAULT_WINGS;   // .tail filled in after STARTER_TAIL (below); the BUTTERFLY body is applied at the end of the module (§17)
 
 export const defaultParams = () => clone(DEFAULTS);
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -568,7 +603,7 @@ DEFAULT_WINGS.tail = JSON.parse(JSON.stringify(STARTER_TAIL));
 LEGACY_DEFAULT_WINGS.tail = JSON.parse(JSON.stringify(STARTER_TAIL));
 /* The Phase 1/2 default bug, whole: the cute end of every control. */
 export function legacyDefaultParams() {
-  const p = clone(DEFAULTS);
+  const p = clone(SPEC_DEFAULTS);
   Object.assign(p, LEGACY_BODY, LEGACY_STYLE);
   p.wings = clone(LEGACY_DEFAULT_WINGS);
   return p;
@@ -1040,6 +1075,7 @@ export function randomParamsWithBlend(seed, opts = {}) {
   const U = ([a, b]) => a + (b - a) * r();
   const I = ([a, b]) => Math.round(U([a - 0.49, b + 0.49]));
   const p = defaultParams();
+  p.bodyType = 'custom'; p.bodyRatios = null;   // a random body is its own (§17): fixed in mm, no proportions
   const parts = r() < K.threePartChance ? '3' : '2';
   p.bodyParts = parts;
   p.roundness = U(K.roundness);
@@ -3022,16 +3058,34 @@ function buildAntenna(acc, p, L) {
     ? [0.25 * L.Rh, L.yh + 0.5 * L.Rh, 0.45 * L.Rh * HEAD_DEPTH_RATIO]
     : [0.2 * L.rt, L.Lt / 2 - 0.15 * L.Lt, 0.3 * L.dt];
   const sp = p.antennaSpread * D2R;
-  let dir = norm([Math.sin(sp), Math.cos(sp), 0.35]);
+  // the LIFT (§17): the rise above the body; at ANT_LIFT_LEGACY the old typed 0.35, by branch
+  const rise = p.antennaLift === ANT_LIFT_LEGACY ? 0.35 : Math.tan(p.antennaLift * D2R);
+  let dir = norm([Math.sin(sp), Math.cos(sp), rise]);
   const curlAxis = norm(cross(dir, [0, 0, 1]));
   const len0 = p.antennaLength;
   const teardrop = type === 'clubbed' && p.clubLength > 0;
+  const elbowed = type === 'elbowed';
   const pointed = p.pointedTips;
-  const M = teardrop ? 56 : 28;
+  const M = teardrop ? 56 : elbowed ? 40 : 28;
   const pts = [root], rad = [];
   const rTip = type === 'bristle' ? floorR : Math.max(floorR, r0 * 0.8);
   if (type === 'bristle') r0 = Math.max(floorR, r0 * 1.6);
-  for (let i = 1; i <= M; i++) {
+  if (elbowed) {
+    // the SCAPE straight along `dir`, an ARC to the flagellum's direction (out
+    // and down), then the flagellum, which alone carries the curl
+    const yaw = sp + ELBOW_YAW_DEG * D2R, pd = ELBOW_DROP_DEG * D2R;
+    const dir2 = norm([Math.sin(yaw) * Math.cos(pd), Math.cos(yaw) * Math.cos(pd), -Math.sin(pd)]);
+    const turn = Math.acos(clamp(dot(dir, dir2), -1, 1));
+    const Ls = ELBOW_SCAPE * len0, La = Math.min(0.3 * len0, Math.max(ELBOW_ARC * len0, 1.6 * Math.max(r0, floorR) * turn)), Lf = Math.max(1e-9, len0 - Ls - La);
+    const axis2 = norm(cross(dir2, [0, 0, 1]));
+    const dirAt = (t) => {
+      if (t <= Ls) return dir;
+      if (t <= Ls + La) { const f = (t - Ls) / La; return norm(add(mul(dir, Math.sin((1 - f) * turn)), mul(dir2, Math.sin(f * turn)))); }
+      const f = (t - Ls - La) / Lf;
+      return rotateAbout(dir2, axis2, -p.antennaCurl * D2R * f * f);
+    };
+    for (let i = 1; i <= M; i++) pts.push(add(pts[i - 1], mul(dirAt(((i - 0.5) / M) * len0), len0 / M)));
+  } else for (let i = 1; i <= M; i++) {
     const s = i / M;
     const ang = p.antennaCurl * D2R * s * s;            // curl grows toward the tip
     const d = rotateAbout(dir, curlAxis, -ang);
@@ -3151,6 +3205,11 @@ export function normalizeParams(p, notes = []) {
     else { v = String(v); if (!s.options.some((o) => o[0] === v)) v = s.default; }
     q[s.id] = v;
   }
+  // §17: params that carry no body type (every design saved before it, every
+  // hand-built params object) are CUSTOM with no proportions — their fine
+  // fields are the body, exactly as given, and nothing re-derives them
+  if (!('bodyType' in p)) q.bodyType = 'custom';
+  q.bodyRatios = normalizeBodyRatios(p.bodyRatios) || (q.bodyType !== 'custom' ? { ...BODY_PRESETS[q.bodyType].ratios } : null);
   const W = p.wings || {};
   q.wings = {
     first: normalizeWing(W.first, DEFAULT_WINGS.first, notes, 'first pair'),
@@ -3167,7 +3226,7 @@ export function normalizeParams(p, notes = []) {
 
 /* ---------------- designs (save / load) ---------------- */
 export const DESIGN_FORMAT = 'parametric-bug-design';
-export const DESIGN_VERSION = 7;   // 7: the wing–body junction blend (wingJunction) — a v6 file loads with the blend at 0, its drawn roots and root tabs, so it looks as saved; 6: the blended wing root (wingRootPinch) — a v5 file loads with the pinch at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
+export const DESIGN_VERSION = 8;   // 8: body types (§17) — bodyType / bodySize / bodyWidth / bodyRatios and the antenna lift; a v7 file carries none of them and loads CUSTOM with its exact fine values and the lift at the old 0.35 rise, so it builds bit for bit as saved; 7: the wing–body junction blend (wingJunction) — a v6 file loads with the blend at 0, its drawn roots and root tabs, so it looks as saved; 6: the blended wing root (wingRootPinch) — a v5 file loads with the pinch at 0, its straight root chord, so it looks as saved; 5: the edges pass (the rounded edge, wingEdgeRound) — a v4 file loads with the round at 0, so it looks as saved; 4: the elegance pass (edge profile, club shape, segment style, pointed tips) — a v1-3 file loads with LEGACY_STYLE for the new fields, so it looks as it did; 3: venation (Phase 2) — a `venation` mode and per-pair vein fields, all defaulted when absent; 2: the tail is an outline group (wings.tail); v1 files load and migrate
 export function designFromParams(p, name = '') {
   return { format: DESIGN_FORMAT, version: DESIGN_VERSION, name, params: clone(p) };
 }
@@ -3182,6 +3241,7 @@ export function paramsFromDesign(doc) {
   if (!(doc.version >= 5)) for (const [k, v] of Object.entries(PRE_ROUND_STYLE)) if (!(k in raw)) raw[k] = v;
   if (!(doc.version >= 6)) for (const [k, v] of Object.entries(PRE_ROOT_STYLE)) if (!(k in raw)) raw[k] = v;
   if (!(doc.version >= 7)) for (const [k, v] of Object.entries(PRE_JUNCTION_STYLE)) if (!(k in raw)) raw[k] = v;
+  if (!(doc.version >= 8)) for (const [k, v] of Object.entries(PRE_BODY_STYLE)) if (!(k in raw)) raw[k] = v;
   const params = normalizeParams(raw, notes);
   return { ok: true, params, notes };
 }
@@ -3858,4 +3918,216 @@ export function specimenPose(params) {
   const sp = specimenPose(DEFAULTS).params;
   DEFAULT_WINGS.first.sweep = sp.wings.first.sweep;
   Object.assign(DEFAULTS, SPECIMEN);
+}
+
+/* ------------------------------------------------------------------ */
+/* BODY TYPES (§17) — the body as a set of anatomical PROPORTIONS       */
+/* ------------------------------------------------------------------ */
+
+/* Eva's ruling: the body was too adjustable. A BODY TYPE is a set of
+   proportions taken from real anatomy (references in design doc §17.2), and two
+   primary sliders place it: SIZE (body length, head front to abdomen tip, as a
+   proportion of the wingspan; a wingless bug against BODY_REF_SPAN_MM) and
+   WIDTH (head, thorax and abdomen widths together). fitBody() is the ONE place
+   proportions become the fine fields the builder reads; the builder itself
+   knows nothing of body types, so a saved design (fine fields only) builds bit
+   for bit as it did.
+
+   `ratios` are lengths per mm of BODY LENGTH at width 1: the scaled body fields
+   (multiplied by one common factor so the drawn body is exactly SIZE x span —
+   the layout's own arithmetic, bodyLayout, is the one owner of that length),
+   the width fields (also x WIDTH), and the limbs (legs and antenna, x the body
+   length, never x WIDTH). `fields` are everything a type fixes that does not
+   scale. A type changes the BODY ONLY: Spider alone also sets the wing pairs to
+   0 (the page makes it undoable). */
+export const BODY_RATIO_IDS = ['headSize', 'thoraxLength', 'thoraxWidth', 'thoraxDepth', 'abdomenLength', 'abdomenWidth', 'coxa', 'femur', 'tibia', 'tarsus', 'antennaLength'];
+export const BODY_LENGTH_IDS = ['thoraxLength', 'abdomenLength'];
+export const BODY_WIDTH_IDS = ['headSize', 'thoraxWidth', 'thoraxDepth', 'abdomenWidth'];
+export const LIMB_IDS = ['coxa', 'femur', 'tibia', 'tarsus', 'antennaLength'];
+export const BODY_PRESETS = {
+  /* Danaus plexippus / Nymphalidae: body 25–35 mm under a 70–100 mm span; head
+     ~9% of the body, thorax ~27%, abdomen ~64%; body 3.5–5 mm wide; antenna
+     0.3–0.4 of the forewing, a gradual club (Danainae key). Legs folded under a
+     set specimen. */
+  butterfly: {
+    size: 0.32,
+    ratios: { headSize: 0.116, thoraxLength: 0.307, thoraxWidth: 0.14, thoraxDepth: 0.15, abdomenLength: 0.64, abdomenWidth: 0.10,
+      coxa: 0.042, femur: 0.19, tibia: 0.2, tarsus: 0.16, antennaLength: 0.62 },
+    fields: { bodyParts: '3', roundness: 2.0, pointedTips: true, abdomenTaper: 0.75, abdomenSegments: 7, banding: true, segmentStyle: 0,
+      legPairs: 3, legsVisible: true, legReach: 0, legSplay: 35, legBend: 45, legTaper: 0.5,
+      antennaType: 'clubbed', antennaCurl: 0, antennaSpread: 22, antennaLift: 45, clubLength: 0.3, clubWidth: 2.2, clubTaper: 0.3 },
+  },
+  /* Antheraea polyphemus (Saturniidae): body 20–30 mm, 4–7.5 mm wide, under a
+     100–150 mm span — a STOUT, furred thorax and abdomen; males carry broad
+     pectinate (feathered) antennae. Legs folded. */
+  moth: {
+    size: 0.3,
+    ratios: { headSize: 0.13, thoraxLength: 0.34, thoraxWidth: 0.24, thoraxDepth: 0.24, abdomenLength: 0.6, abdomenWidth: 0.19,
+      coxa: 0.04, femur: 0.16, tibia: 0.17, tarsus: 0.13, antennaLength: 0.45 },
+    fields: { bodyParts: '3', roundness: 2.0, pointedTips: true, abdomenTaper: 0.5, abdomenSegments: 7, banding: true, segmentStyle: 0.15,
+      legPairs: 3, legsVisible: true, legReach: 0, legSplay: 30, legBend: 45, legTaper: 0.45,
+      antennaType: 'feathered', antennaCurl: 0, antennaSpread: 30, antennaLift: 25, clubLength: 0.26, clubWidth: 2.2, clubTaper: 0.3 },
+  },
+  /* Apis mellifera worker: head ~3.2 x 3.7 mm, thorax 4.3 mm, abdomen 5.9 mm
+     (~13 mm body), forewing ~9 mm (a ~22 mm span); antenna ~3.9–4.3 mm,
+     geniculate, the scape about a third of it; six visible abdominal terga. */
+  bee: {
+    size: 0.58,
+    ratios: { headSize: 0.22, thoraxLength: 0.375, thoraxWidth: 0.3, thoraxDepth: 0.3, abdomenLength: 0.5, abdomenWidth: 0.33,
+      coxa: 0.06, femur: 0.2, tibia: 0.24, tarsus: 0.2, antennaLength: 0.32 },
+    fields: { bodyParts: '3', roundness: 2.2, pointedTips: true, abdomenTaper: 0.55, abdomenSegments: 6, banding: true, segmentStyle: 0.4,
+      legPairs: 3, legsVisible: true, legReach: 0.8, legSplay: 40, legBend: 60, legTaper: 0.35,
+      antennaType: 'elbowed', antennaCurl: 0, antennaSpread: 18, antennaLift: 40, clubLength: 0.26, clubWidth: 2.2, clubTaper: 0.3 },
+  },
+  /* Anax junius: total 68–84 mm, abdomen 46–60 mm (~70%), hindwing 45–58 mm
+     (a ~100 mm span); ten abdominal segments; short bristle antennae; legs
+     held folded forward under the thorax. */
+  dragonfly: {
+    size: 0.74,
+    ratios: { headSize: 0.1, thoraxLength: 0.227, thoraxWidth: 0.12, thoraxDepth: 0.14, abdomenLength: 0.72, abdomenWidth: 0.06,
+      coxa: 0.02, femur: 0.09, tibia: 0.1, tarsus: 0.05, antennaLength: 0.04 },
+    fields: { bodyParts: '3', roundness: 2.4, pointedTips: true, abdomenTaper: 0.35, abdomenSegments: 10, banding: true, segmentStyle: 0,
+      legPairs: 3, legsVisible: true, legReach: 0, legSplay: 45, legBend: 55, legTaper: 0.4,
+      antennaType: 'bristle', antennaCurl: 0, antennaSpread: 35, antennaLift: 30, clubLength: 0.26, clubWidth: 2.2, clubTaper: 0.3 },
+  },
+  /* Araneus diadematus female: body 10–22.5 mm, cephalothorax ~42% of it, a
+     round opisthosoma ~half the body wide; four leg pairs, leg I ~1.4x the body
+     (femur+patella / tibia / metatarsus+tarsus ~ 0.42 / 0.24 / 0.32 of the
+     leg, mapped onto the model's femur / tibia / tarsus). No antennae; the
+     model has no pedipalps. Wingless: sized against BODY_REF_SPAN_MM. */
+  spider: {
+    size: 0.25,
+    ratios: { headSize: 0.1, thoraxLength: 0.4375, thoraxWidth: 0.36, thoraxDepth: 0.24, abdomenLength: 0.58, abdomenWidth: 0.5,
+      coxa: 0.08, femur: 0.6, tibia: 0.34, tarsus: 0.45, antennaLength: 0.3 },
+    fields: { bodyParts: '2', roundness: 2.0, pointedTips: true, abdomenTaper: 0.25, abdomenSegments: 1, banding: false, segmentStyle: 0,
+      legPairs: 4, legsVisible: true, legReach: 1, legSplay: 55, legBend: 55, legTaper: 0.6,
+      antennaType: 'none', antennaCurl: 0, antennaSpread: 22, antennaLift: ANT_LIFT_LEGACY, clubLength: 0.26, clubWidth: 2.2, clubTaper: 0.3 },
+    wingPairs: 0,
+  },
+};
+export const BODY_TYPE_IDS = Object.keys(BODY_PRESETS);
+
+function normalizeBodyRatios(r) {
+  if (!r || typeof r !== 'object') return null;
+  const out = {};
+  for (const id of BODY_RATIO_IDS) { const v = Number(r[id]); if (!(Number.isFinite(v) && v > 0)) return null; out[id] = v; }
+  return out;
+}
+
+/* Body length, head front to abdomen tip, of the fine fields as given — the
+   layout's own (one owner: bodyLayout). */
+export function bodyLengthMm(p) { const L = bodyLayout(p); return L.yMax - L.yMin; }
+
+/* Each wing pair's reach in x from its own hinge, top-down, read off the drawn
+   outline through the pair's own wing transform (mid-surface): independent of
+   the body. A scallop only ever pulls the outline in and the root map acts at
+   the root, so the outermost point is the drawn one. */
+function wingReaches(p) {
+  return resolveWingPairsRaw(p).map((spec) => {
+    const W = wingTransform([0, 0, 0], spec.length, spec.sweep, spec.pitch, spec.dihedral);
+    let r = -Infinity;
+    for (const [u, w] of spec.dense) r = Math.max(r, W(u * spec.length, w * spec.length * spec.stretch, 0)[0]);
+    return r;
+  });
+}
+/* The WINGSPAN a body type is sized against: tip to tip, top-down, the hinges
+   standing where this body puts them (wingHinges: one owner) — or, wingless,
+   BODY_REF_SPAN_MM. */
+export function wingspanOf(p, reach = null) {
+  if (!(p.wingPairs > 0)) return BODY_REF_SPAN_MM;
+  reach ||= wingReaches(p);
+  const H = wingHinges(p, bodyLayout(p));
+  let x = -Infinity;
+  reach.forEach((r, k) => { x = Math.max(x, H[k].hinge[0] + r); });
+  return x > 0 ? 2 * x : BODY_REF_SPAN_MM;
+}
+
+const specOf = (id) => PARAM_SPEC.find((s) => s.id === id);
+/* The fine fields for body length B (unclamped, then clamped with a note). */
+function bodyFieldsAt(p, R, B) {
+  const w = p.bodyWidth, q = { ...p };
+  // the layout's length is linear in the scaled fields: build at unit B, measure, scale
+  for (const id of BODY_LENGTH_IDS) q[id] = R[id];
+  for (const id of BODY_WIDTH_IDS) q[id] = R[id] * w;
+  const k = B / bodyLengthMm(q), want = {};
+  for (const id of [...BODY_LENGTH_IDS, ...BODY_WIDTH_IDS]) want[id] = q[id] * k;
+  for (const id of LIMB_IDS) want[id] = R[id] * B;
+  const out = { ...p }, held = [];
+  for (const [id, v] of Object.entries(want)) {
+    const s = specOf(id), c = clamp(v, s.min, s.max);
+    out[id] = c;
+    if (c !== v && !(id === 'headSize' && p.bodyParts !== '3') && !(id === 'antennaLength' && p.antennaType === 'none')) held.push(`${s.label.toLowerCase()} held at ${c} mm (the proportions ask ${v.toFixed(2)})`);
+  }
+  return { out, held };
+}
+
+/* fitBody: the ONE place a body type's proportions become the fine fields.
+   Params with no proportions (bodyRatios null: CUSTOM as loaded or edited) are
+   returned untouched. The body length is SIZE x the wingspan, and the
+   wingspan depends (a little) on the thorax the hinges stand on, so the length
+   is the fixed point of B = SIZE x span(body(B)) — a contraction (the hinge
+   moves by a few hundredths of a mm per mm of body), iterated to 1e-12. */
+export function fitBody(params) {
+  const p = clone(params);
+  const R = normalizeBodyRatios(p.bodyRatios);
+  if (!R) return { params: p, fitted: false, notes: [], B: bodyLengthMm(p), span: wingspanOf(p) };
+  const reach = p.wingPairs > 0 ? wingReaches(p) : null;   // the wings' own reach does not depend on the body: read once
+  let B = p.bodySize * BODY_REF_SPAN_MM, f = null;
+  for (let it = 0; it < 60; it++) {
+    f = bodyFieldsAt(p, R, B);
+    const B2 = p.bodySize * wingspanOf(f.out, reach);
+    if (Math.abs(B2 - B) <= 1e-12 * B) { B = B2; break; }
+    B = B2;
+  }
+  f = bodyFieldsAt(p, R, B);
+  const notes = f.held.length ? [`body: ${f.held.join('; ')} — the body reads ${bodyLengthMm(f.out).toFixed(1)} mm where SIZE asks ${B.toFixed(1)}`] : [];
+  return { params: f.out, fitted: true, notes, B, span: wingspanOf(f.out, reach) };
+}
+
+/* Apply a body type: its fixed fields, its proportions, SIZE at the type's own
+   value and WIDTH 1, then fitted. The wing OUTLINES and every per-pair value are
+   never touched. The pair COUNT is: Spider sets it to 0 (the outlines stay
+   stored); a WINGED type (every other) applied to a bug with no wings brings
+   them back (Eva's ruling on the sheet: a moth chosen after a spider has to
+   show its wings) — at opts.wingPairs (the page passes the count the spider
+   removed) or the default's pair count; a winged bug keeps its own count. */
+export function applyBodyType(params, type, opts = {}) {
+  const T = BODY_PRESETS[type];
+  if (!T) return fitBody(params);
+  const p = clone(params);
+  Object.assign(p, T.fields);
+  p.bodyType = type; p.bodySize = T.size; p.bodyWidth = 1; p.bodyRatios = { ...T.ratios };
+  if (Number.isInteger(T.wingPairs)) p.wingPairs = T.wingPairs;
+  else if (!(p.wingPairs > 0)) p.wingPairs = Number.isInteger(opts.wingPairs) && opts.wingPairs > 0 ? Math.min(opts.wingPairs, MAX_WING_PAIRS) : DEFAULT_WING_PAIRS;
+  return fitBody(p);
+}
+
+/* CUSTOM from the fine fields as they stand: their proportions captured (so
+   SIZE and WIDTH can act on them), SIZE read off the bug, WIDTH kept. Used by
+   the page when SIZE or WIDTH moves on a body with no proportions. */
+export function captureBody(params) {
+  const p = clone(params), B = bodyLengthMm(p), w = p.bodyWidth > 0 ? p.bodyWidth : 1, R = {};
+  for (const id of BODY_LENGTH_IDS) R[id] = p[id] / B;
+  for (const id of BODY_WIDTH_IDS) R[id] = p[id] / (B * w);
+  for (const id of LIMB_IDS) R[id] = p[id] / B;
+  p.bodyRatios = R; p.bodyType = 'custom'; p.bodyWidth = w;
+  p.bodySize = clamp(B / wingspanOf(p), BODY_SIZE_RANGE[0], BODY_SIZE_RANGE[1]);
+  return p;
+}
+
+/* A limb (leg segment or antenna) edited by hand while the body has
+   proportions: its ratio becomes the value over the fitted body length, so the
+   next fit gives the value back and SIZE scales it from there. */
+export function setLimb(params, id, v) {
+  const p = clone(params);
+  p[id] = v;
+  if (p.bodyRatios && LIMB_IDS.includes(id)) p.bodyRatios = { ...p.bodyRatios, [id]: v / fitBody(p).B };
+  return p;
+}
+
+/* The DEFAULT is the BUTTERFLY body type (§17), fitted to the default wings
+   AFTER the specimen pose has set their sweep (the span depends on it). */
+{
+  const b = applyBodyType(DEFAULTS, 'butterfly').params;
+  for (const k of Object.keys(b)) if (k !== 'wings') DEFAULTS[k] = b[k];
 }

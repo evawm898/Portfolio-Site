@@ -17,6 +17,7 @@ import {
   editorFrame, contourLoops, CR_SAMPLES,
   WING_LIBRARY, applyWingShape, randomWingBlend, randomParamsWithBlend,
   wingAngleOf, setWingAngle, WING_ANGLE_RANGE,
+  applyBodyType, fitBody, captureBody, setLimb, bodyLengthMm, wingspanOf, BODY_PRESETS, LIMB_IDS, BODY_LENGTH_IDS, BODY_WIDTH_IDS,
 } from './bug-geometry.js';
 import { imageToBug, segment, traceOuter, WORK_MAX, IMPORT_DEFAULTS } from './bug-image.js';
 
@@ -185,15 +186,70 @@ function makeCtrl(s, id, onInput) {
 }
 for (const s of PARAM_SPEC) {
   const w = makeCtrl(s, s.id, (v) => {
-    params[s.id] = v;
+    if (s.id === 'bodyType') return chooseBodyType(v);
+    if (s.id === 'bodySize' || s.id === 'bodyWidth') {
+      // SIZE / WIDTH act on PROPORTIONS: a body that has none (Custom as
+      // loaded or edited) has its own captured first, so the sliders scale it
+      if (!params.bodyRatios) params = captureBody(params);
+      params[s.id] = v;
+    } else if (s.section === 'bodyFine') {
+      // any fine body control makes the body CUSTOM: its fields are the body,
+      // exactly as set, and nothing re-derives them
+      params[s.id] = v; params.bodyType = 'custom'; params.bodyRatios = null;
+      ctrlEl.bodyType.querySelector('select').value = 'custom';
+    } else if (LIMB_IDS.includes(s.id)) params = setLimb(params, s.id, v);   // the leg / antenna keeps its new length through SIZE
+    else params[s.id] = v;
     if (s.id === 'wingPairs') editPair = Math.min(editPair, Math.max(0, v - 1));
     writeOutputs(); applyVisibility(); drawPairUi(); scheduleBuild();   // drawPairUi re-reads each pair field's visibleWhen(spec, params)
   });
   const body = secEl[s.section].querySelector('.bg-sec-body');
-  // the per-pair block sits right after the Pairs slider, before the tail section
-  if (s.section === 'wings') body.insertBefore(w, body.querySelector('details'));
-  else body.appendChild(w);
+  // controls sit BEFORE a section's nested drop-downs: the wings' per-pair
+  // block after the Pairs slider, Body's type and two sliders above its fine controls
+  const sub = [...body.children].find((c) => c.tagName === 'DETAILS');
+  if (sub) body.insertBefore(w, sub); else body.appendChild(w);
   ctrlEl[s.id] = w;
+}
+/* BODY TYPE (§17): the type's proportions, SIZE and WIDTH, applied and fitted;
+   undoable (Spider also sets the wing pairs to 0). The fit and its notes are
+   told under the two sliders. */
+const bodyNote = document.createElement('p');
+bodyNote.className = 'bg-note'; bodyNote.id = 'bodyNote';
+secEl.plan.querySelector('.bg-sec-body').insertBefore(bodyNote, secEl.bodyFine);
+let bodyFitNotes = [];
+let pairsBeforeWingless = null;   // the pair count a Spider took away, given back by a winged type
+function chooseBodyType(v) {
+  if (v === 'custom' || !BODY_PRESETS[v]) { writeControls(); return; }
+  pushUndo();
+  const before = params.wingPairs;
+  if (before > 0) pairsBeforeWingless = before;
+  const r = applyBodyType(params, v, { wingPairs: pairsBeforeWingless });
+  params = normalizeParams(r.params); bodyFitNotes = r.notes;
+  editPair = Math.min(editPair, Math.max(0, params.wingPairs - 1));
+  writeControls(); scheduleBuild();
+  const name = ctrlEl.bodyType.querySelector(`option[value="${v}"]`).textContent;
+  wlMsg(before === params.wingPairs ? `${name} body applied — the wings are as they were. Undo to go back.`
+    : params.wingPairs ? `${name} body: the wings are back (${params.wingPairs} pair${params.wingPairs > 1 ? 's' : ''}, as they were stored) — Undo to go back.`
+    : `${name} body: wing pairs set to 0 (a spider has none) — choosing a winged type brings them back, or Undo.`);
+}
+/* The body follows the wingspan while it has proportions: every build first
+   fits the body (one owner, fitBody) and writes back only the body fields. */
+function syncBody() {
+  if (!params.bodyRatios) { bodyFitNotes = []; return; }
+  const r = fitBody(params);
+  bodyFitNotes = r.notes;
+  for (const id of [...BODY_LENGTH_IDS, ...BODY_WIDTH_IDS, ...LIMB_IDS]) {
+    if (params[id] === r.params[id]) continue;
+    params[id] = r.params[id];
+    const i = ctrlEl[id].querySelector('input'); i.value = params[id];
+    document.getElementById(`${id}-out`).textContent = fmtVal(PARAM_SPEC.find((q) => q.id === id), params[id]);
+  }
+}
+function writeBodyNote() {
+  const B = bodyLengthMm(params), S = wingspanOf(params), wingless = !(params.wingPairs > 0);
+  const t = params.bodyType === 'custom' ? (params.bodyRatios ? 'Custom proportions' : 'Custom') : ctrlEl.bodyType.querySelector(`option[value="${params.bodyType}"]`).textContent;
+  bodyNote.textContent = `${t}: body ${B.toFixed(1)} mm long (front to abdomen tip) = ${(B / S).toFixed(2)} × ${wingless ? `the ${S} mm reference span — this bug has no wings` : `the ${S.toFixed(1)} mm wingspan`}`
+    + (params.bodyRatios ? (wingless ? '.' : '; it follows the wingspan.') : '; fixed in mm until SIZE or WIDTH moves.')
+    + (bodyFitNotes.length ? ` ${bodyFitNotes.join(' ')}` : '');
 }
 
 /* The per-pair block: tabs, link state, and WING_FIELDS for the selected pair. */
@@ -328,15 +384,22 @@ function writePairFields() {
   }
 }
 
+/* SIZE on a body with no proportions shows what the bug IS (its own length
+   over the span), not a stored value nothing reads. */
+const shownValue = (s) => (s.id === 'bodySize' && !params.bodyRatios ? bodyLengthMm(params) / wingspanOf(params) : params[s.id]);
 function writeControls() {
   for (const s of PARAM_SPEC) {
     const input = ctrlEl[s.id].querySelector('input,select');
-    if (s.kind === 'bool') input.checked = !!params[s.id]; else input.value = params[s.id];
+    if (s.kind === 'bool') input.checked = !!params[s.id]; else input.value = shownValue(s);
   }
+  // the CUSTOM entry is offered only once the body is custom
+  ctrlEl.bodyType.querySelector('option[value="custom"]').hidden = params.bodyType !== 'custom';
   writeOutputs(); applyVisibility(); drawPairUi();
 }
 function writeOutputs() {
-  for (const s of PARAM_SPEC) if (s.kind === 'range') document.getElementById(`${s.id}-out`).textContent = fmtVal(s, params[s.id]);
+  for (const s of PARAM_SPEC) if (s.kind === 'range') document.getElementById(`${s.id}-out`).textContent = fmtVal(s, shownValue(s));
+  ctrlEl.bodyType.querySelector('option[value="custom"]').hidden = params.bodyType !== 'custom';
+  writeBodyNote();
 }
 function applyVisibility() {
   for (const s of PARAM_SPEC) ctrlEl[s.id].hidden = !!(s.visibleWhen && !s.visibleWhen(params));
@@ -1019,6 +1082,7 @@ writeImportOutputs();
 let pending = 0, idleTimer = 0;
 const stats = { buildMs: 0, mirror: null, cutRegions: null, blocked: 0 };
 function scheduleBuild() {
+  syncBody();
   if (pending) return;
   pending = requestAnimationFrame(() => { pending = 0; buildNow(false); });
 }
@@ -1029,6 +1093,7 @@ function scheduleBuild() {
 let modelStale = false;
 function realModel() { if (modelStale) { model = buildBug(params); modelStale = false; rebuildMesh(); } return model; }
 function buildNow(reframe) {
+  syncBody(); writeBodyNote();
   const t = performance.now();
   const flat = editing && svgMode() && editedIsTilted();
   if (flat) { viewModel = buildBug(params, { flatPair: editPair }); modelStale = true; if (!model) model = viewModel; }

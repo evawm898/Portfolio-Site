@@ -232,6 +232,7 @@ strength claim in this repo is still theory.
 | image | IMAGE → BUG: paste / drop / load a top-down picture, fit an editable bug to it (outline and proportions only) | **built (§11)** — waits on Eva's ruling on `docs/img/bug-image-sheet.jpg` and on her own pictures in the preview |
 | wing library, step 2 | the BLENDED ROOT (every wing narrows to its own short, filleted attachment); every fitted wing a COMPLETE shape; the smoothness clause J | **built (§12)** — waits on Eva's ruling on the exploded sheet; the library file and gallery are not built yet |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
+| body types | BODY TYPE dropdown (Butterfly, Moth, Bee, Dragonfly, Spider, Custom), SIZE and WIDTH, the fine body controls in one collapsed drop-down; antenna Lift; elbowed antennae | **built (§17)** — waits on Eva's ruling on the body-type sheet |
 | 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
 Phase 2 started after Eva's ruling on the Phase 1 revision (§6.6, #326 merged).
@@ -248,6 +249,10 @@ The first sheet (`docs/img/bug-phase1-sheet.png`, #324) was **not approved**.
 The rulings, and how each was carried out:
 
 ### 5.1 No named presets
+> **Superseded for the BODY by §17 (Eva, Oct 8)**: the body is chosen as a BODY TYPE
+> (Butterfly, Moth, Bee, Dragonfly, Spider, Custom) and placed by two sliders. Wings
+> are still never a preset — a type changes the body only.
+
 Butterfly / moth / dragonfly / spider are gone (`PRESETS` and `presetParams`
 are deleted). In their place:
 - **A neutral default bug** (`defaultParams()`): 3 parts, 3 splayed leg pairs,
@@ -2811,3 +2816,264 @@ most swept (#31, #40), the narrowest root with the blend off (#48), the deepest 
 the narrowest neck with the blend on (#55); a hand-drawn forewing (`HAND_OUTLINES.falcate`); and
 the #20/#31 blend whose STL `main` refuses. Every number under a panel is the gate's own measure
 on the model that tree built. Click a panel to see it full size.
+
+
+## 17. Body types — the body as anatomy, placed by two sliders
+
+Eva's ruling (Oct 8): **the body is too adjustable.** The BODY / HEAD / THORAX / ABDOMEN
+panels are replaced by a BODY TYPE dropdown and two primary sliders; every fine body control
+moves into ONE collapsed drop-down inside Body. §0 binds: bodies trend toward anatomical
+accuracy, wings carry the fantasy — **a body type changes the body only** (Spider alone also
+sets the wing pairs to 0, undoably, and a winged type chosen after it gives them back). Wing outlines, the library, angles and the junction blend
+are not changed. Phase 3 has not started.
+
+Files: `bug-geometry.js` (`BODY_PRESETS`, `fitBody`, `applyBodyType`, `captureBody`,
+`setLimb`, `wingspanOf`, `bodyLengthMm`, the Lift control, the elbowed antenna, the Body
+section's fine drop-down, `DESIGN_VERSION` 8), `bug.js` (the dropdown, the two sliders, the
+flip to Custom, the body following the wingspan), `bug-image.js` (a fitted body is Custom),
+`tools/verify-bug-body.mjs` (the BP family), `tools/verify-bug.mjs` (BP wired in, its rows,
+its mutants), `tools/verify-bug-image-fixtures.mjs` (the pictures keep their body),
+`tools/shot-bug-body.mjs` (the sheet).
+
+### 17.1 The model — proportions, one owner, the builder untouched
+
+A body type is a set of **proportions**, not a set of millimetres. `BODY_PRESETS[type]` holds
+`ratios` (per mm of BODY LENGTH at WIDTH 1: thorax and abdomen lengths; head, thorax and
+abdomen widths and depths; the four leg segments and the antenna) and `fields` (everything
+the type fixes that does not scale: body parts, cross-section, segment count and style, the
+pointed terminations, leg pairs, reach, splay, bend and taper, antenna type, curl, spread,
+lift and club). **`fitBody()` is the ONE place proportions become the fine fields**, and the
+builder (`buildBug`) knows nothing of body types: a model is always built from the fine
+fields, so a saved design builds bit for bit as it did (§17.6).
+
+- **BODY LENGTH** is head front to abdomen tip (a spider: cephalothorax front to abdomen
+  tip) — the layout's own arithmetic (`bodyLayout`, one owner; `bodyLengthMm`). It is linear
+  in the scaled fields, so the fit builds the type at unit size, measures it, and scales —
+  the drawn body is exactly SIZE × span, at any wing-pair count (the thorax's lengthening for
+  3–4 pairs is absorbed into the one factor).
+- **SIZE** (0.20–0.90, step 0.01) is body length as a proportion of the **wingspan**: tip to
+  tip, top-down, measured off the drawn outlines through each pair's own wing transform with
+  the hinges where this body puts them (`wingspanOf` — it equals the built model's own span to
+  the last digit on the default, 72.177669… mm both ways). The span depends a little on the
+  thorax the hinges stand on, so the length is the fixed point of B = SIZE × span(body(B)), a
+  contraction iterated to 1e-12. **A wingless bug is sized against a stated 72 mm reference
+  span** (`BODY_REF_SPAN_MM`: the default butterfly's own wingspan, 72.2 mm, rounded).
+- **WIDTH** (0.60–1.60 ×, step 0.01) scales the head, thorax and abdomen widths and depths
+  together; lengths keep their ratios to each other and the legs and antenna are never scaled
+  by it (they follow the body length).
+- **The body follows the wingspan while it has proportions**: the page fits the body before
+  every build, so a library wing, a wing length or a specimen pose that changes the span
+  re-sizes the body to keep SIZE true. It writes body fields only (BP3 checks that it never
+  writes a wing).
+- **Where a slider end asks a fine field past its own range, the field is HELD at the range's
+  end and the page says so** under the two sliders ("thorax — width held at 24 mm (the
+  proportions ask 25.94) — the body reads 71.6 mm where SIZE asks 71.6"). To make that rare,
+  the fine ranges' MAXIMA were widened (head to 16 mm, thorax length to 30, width and depth
+  to 24, abdomen length to 90, width to 30, coxa to 8, femur to 45, tibia to 35, tarsus to 35,
+  antenna to 50); the MINIMA are the old ones (a first cut lowered them too, and the thinnest
+  bodies it reached failed the roots-apart and junction-slot clauses, R and JB1 — so the
+  floor stayed where those clauses were proved). Every value a design could carry before is
+  still inside its range.
+
+### 17.2 The five types, and where each number comes from
+
+| | SIZE | head · thorax · abdomen (share of body length) | widths (× body length) | legs | antennae |
+|---|---|---|---|---|---|
+| **Butterfly** | 0.32 | 0.09 · 0.27 · 0.64 | head 0.12, thorax 0.14 × 0.15 deep, abdomen 0.10; 7 segments, incised | 3 pairs, folded under (a set specimen); femur 0.19, tibia 0.20, tarsus 0.16 | clubbed TEARDROP, 0.62 of the body, club 0.30 of the antenna × 2.2, lift 45°, a V of 22° |
+| **Moth** | 0.30 | 0.10 · 0.30 · 0.60 | head 0.13, thorax 0.24 square, abdomen 0.19 (stout); taper 0.5 | 3 pairs, folded | FEATHERED (the leaf), 0.45, spread 30°, lift 25° |
+| **Bee** | 0.58 | 0.17 · 0.33 · 0.50 | head 0.22, thorax 0.30 square, abdomen 0.33; 6 segments, half beaded | 3 pairs, out (reach 0.8, bend 60°) | ELBOWED, 0.32, lift 40° |
+| **Dragonfly** | 0.74 | 0.08 · 0.20 · 0.72 | head 0.10, thorax 0.12 × 0.14, abdomen 0.06; 10 segments | 3 pairs, folded forward under the thorax | short BRISTLE, 0.04 |
+| **Spider** | 0.25 (of 72 mm) | cephalothorax 0.42 · abdomen 0.58 | cephalothorax 0.36 × 0.24, abdomen 0.50 | 4 pairs, splayed (splay 55°, bend 55°); femur 0.60, tibia 0.34, tarsus 0.45 | none; **wing pairs 0** |
+
+The shares are VISIBLE lengths (the head overlaps the thorax, the abdomen tucks under it: the
+layout's 0.775 h, 0.88 Lt and the abdomen); the table in code is per mm of body length.
+
+**References** (consulted Oct 8; cited figures in bold, the rest is reading of the figures or
+general morphology, said as such):
+- Butterfly — *Danaus plexippus*: **body 25–35 mm, 3.5–5 mm wide, wingspan 70–100 mm**
+  (Dimensions, *Monarch Butterfly*, dimensions.com/element/monarch-butterfly-danaus-plexippus),
+  so body ≈ 0.30–0.35 × span; **antennae 0.3–0.4 × the forewing, the club gradual** (DELTA
+  key to the British Danaidae, delta-intkey.com/britin/lep/www/danaidae.htm). The 9 / 27 / 64
+  split is general lepidopteran morphology, not a cited measurement.
+- Moth — *Antheraea polyphemus*: **body 20–30 mm, 4–7.5 mm wide** (Dimensions, *Polyphemus
+  Moth*), **wingspan 10–15 cm** (Animal Diversity Web, *Antheraea polyphemus*), **broad
+  pectinate antennae in the male** (UF/IFAS EDIS, *Polyphemus moth*; Missouri Dept. of
+  Conservation field guide). A saturniid's body is ~0.2 × its span; SIZE 0.30 is set toward
+  the stouter-bodied moths (sphingids and noctuids are nearer 0.4–0.5), an estimate.
+- Bee — *Apis mellifera* worker: **head 3.19 × 3.68 mm, thorax 4.26 mm, abdomen 5.91 mm,
+  forewing 9.13 mm** (morphometrics of *A. mellifera* in the north-western Himalaya,
+  researcherslinks.com, Sarhad J. Agric. / Pakistan J. Zool. series); **antenna 3.86–4.32 mm**
+  (morphometrics of Egyptian and Carniolan workers, journals.ekb.eg article 88014); **the scape
+  rather less than half the flagellum, geniculate** (American Bee Journal, *A quick-start guide
+  to honey bee antennae*, Feb 2018). A worker's span is ~2 × 9.1 + the thorax ≈ 22 mm, so body
+  ≈ 0.6 × span.
+- Dragonfly — *Anax junius*: **total length 68–84 mm, abdomen 46–60 mm, hindwing 45–58 mm**
+  (USA National Phenology Network species page; Birds in the Hand field guide), **wingspan
+  9–10 cm** (US National Park Service, *Common Green Darner*), so abdomen ≈ 0.70 and body ≈
+  0.75 × span.
+- Spider — *Araneus diadematus* female: **body 10.0–22.5 mm** (araneae — Spiders of Europe,
+  araneae.nmbe.ch/data/206); **the first leg pair relatively long** (Animal Diversity Web,
+  *Araneus diadematus*). The cephalothorax share (0.42), the leg length (~1.4 × the body) and
+  the segment split (femur + patella 0.42 / tibia 0.24 / metatarsus + tarsus 0.32 of the leg,
+  mapped onto the model's femur / tibia / tarsus) are general araneid proportions — **no table
+  was found to cite; they are estimates**. The model's four segments cannot carry a spider's
+  seven, and every leg pair has the same lengths (§3.2's "per-pair length scaling" is still
+  not built).
+
+**Pedipalps are not supported by the model** (no part for them), so Spider has none; adding
+them is a short leg-like pair at the cephalothorax front — a new part kind, its own change.
+
+### 17.3 The page
+
+- **Body** (open): BODY TYPE · SIZE · WIDTH · a one-line read-out of the fit ("Butterfly: body
+  23.1 mm long (front to abdomen tip) = 0.32 × the 72.2 mm wingspan; it follows the
+  wingspan.", with any HELD field after it) · **Fine controls — head, thorax, abdomen,
+  cross-section, segments**, a drop-down CLOSED by default holding body parts, cross-section
+  roundness, the pointed terminations, head size, thorax length / width / depth, abdomen
+  length / width / taper / segment count / segments marked / segment style. There is no
+  Advanced section.
+- **Editing anything in the fine drop-down makes the type CUSTOM** (the option appears and is
+  selected; it is not offered before): the fine fields are then the body exactly as set and
+  nothing re-derives them ("fixed in mm until SIZE or WIDTH moves"). SIZE on such a body shows
+  what the bug IS (its length over its span). **Moving SIZE or WIDTH on a Custom body captures
+  its proportions first** (`captureBody`, lossless: BP2) and acts on them from then on.
+- **Legs and Antennae stay their own sections**, defaulting to the type's values. A leg segment
+  or the antenna length edited by hand under a type keeps its length through the fit, and SIZE
+  then scales it with the body (`setLimb`, BP5). Editing them does not make the body Custom.
+- **Choosing a type is undoable** (the library's Undo, Ctrl/⌘ Z). Spider's message says the
+  wing pairs were set to 0 and Undo brings them back; the wing outlines and every per-pair value
+  stay stored, so adding pairs back brings them as they were.
+- **A winged type chosen after Spider brings the wings back** (Eva's ruling on the first sheet:
+  "wings don't show up for moth" — she had come to Moth from Spider, and the first build left
+  the pairs at 0 while saying "the wings are as they were"). Butterfly, Moth, Bee and Dragonfly
+  applied to a bug with NO wings set the pair count back to the count the Spider took (the page
+  remembers it for the session) or, with none to remember (a wingless design loaded, or the
+  Pairs slider set to 0 by hand), the default's 2. The outlines are the stored ones, untouched;
+  a winged bug keeps its own count, as before.
+- **Default bug is the Butterfly type.** Randomize still draws a random body, which loads as
+  Custom (fixed in mm); the image fitter's body is Custom too.
+
+### 17.4 Two antenna changes
+
+- **LIFT** (Antennae, 0–80°, step 0.5): the antennae's rise above the body. Before §17 it was a
+  typed 0.35 in the direction [sin spread, cos spread, 0.35] — atan 0.35 = 19.29°. The
+  control's value at exactly `ANT_LIFT_LEGACY` (that double) is a BRANCH back to the literal
+  0.35, so every bug built before it is bit-identical (`tan(atan(0.35))` is 0.3499999999999999
+  — the branch is what makes the identity hold; its mutant is caught by BP4).
+- **ELBOWED** (geniculate) antennae, the bee's: a straight scape over the first third, an arc
+  (never tighter than 1.6 tube radii, so the tube cannot fold) turning the flagellum 55° outward
+  and 30° down, the curl on the flagellum alone. Constants `ELBOW_*` in the source.
+
+### 17.5 The front-view antenna tips — a finding, not a regression
+
+Eva saw round balls at the antenna tips in the Front view of the default. **It is neither the
+pointed-terminations toggle nor a regression**: with the toggle on the antenna is one tube
+ending in a cone and NO ball is emitted (the parts are `antenna` ×2 and nothing else), and the
+teardrop law is unchanged since §9.2. It is the VIEW: the antennae ran forward at 22° of spread
+and only 19° of rise, so from the front the 0.22-long club points almost straight at the
+camera and its round head is seen nearly end-on — a body of revolution seen down its axis is a
+disc. **The Butterfly type fixes it with its own pose**: the club 0.30 of the antenna, × 2.2 the
+shaft, and the antennae lifted 45°, so the club is seen from the side; the sheet's last row
+shows main's default beside it from the same camera.
+
+### 17.6 Saved designs
+
+`DESIGN_VERSION` 8. A design carries `bodyType`, `bodySize`, `bodyWidth`, `bodyRatios` and the
+lift. **A version-7 file carries none of them and loads CUSTOM with no proportions, every field
+exactly as saved, the lift at the old 0.35 rise** (`PRE_BODY_STYLE`), so it builds as it did:
+measured against a worktree of `main` at 9dbb8e1, **40 of 40 saved designs** (the default, the
+legacy default, 30 random bugs, 5 library shapes, feathered + curl, HOLES, a 2-part bug) build
+**bit-identically — 3,563,028 floats under `Object.is`, every index equal**. The gate holds two
+of them in CI by fingerprint (BP4). Params with no `bodyType` at all (any hand-built object)
+are Custom too: their fine fields are the body, exactly as given.
+
+### 17.7 Verification
+
+`node tools/verify-bug.mjs` carries the **BP family** (`tools/verify-bug-body.mjs`); every
+reference is restated in the gate (the slider ends, the 72 mm span, the body-length
+arithmetic, main's old default body), never read from the module under test.
+
+- **BP1** — for each type on a library wing, the BUILT body (head front to abdomen tip, read
+  off the emitted vertices) over the BUILT wingspan equals SIZE within 1e-6; a wingless type
+  against 72 mm.
+- **BP2** — at SIZE × WIDTH over both ends, every ratio the fit did not hold is the type's
+  own (WIDTH moves widths only, the limbs follow the body length); a Custom body captured at
+  WIDTH 1.3 fits back to its own fields within 1e-9.
+- **BP3** — four bases (the default, a library wing at three pairs, a random bug, four pairs with one unlinked) × every
+  type: the wings byte-identical (canonical JSON) and the pair count kept, Spider's 0 the one
+  exception; Spider then each winged type gives the pairs back (to the count handed in, or 2
+  with none) with the wings byte-identical; `fitBody` never writes a wing.
+- **BP4** — main's default and legacy default as version-7 files load CUSTOM with every field
+  exact and build to main's own position hashes (`7ba5ed3a`, `ac41cf3` — FNV-1a over the
+  Float64 positions, identical under Node 20 and 22); a Bee design round-trips.
+- **BP5** — a hand-set limb keeps its length through the fit and SIZE scales it.
+- **15 built rows** (`body: …`): each type at its own SIZE and at the two corners (0.20, 0.60)
+  and (0.90, 1.60), on rotating library wings, through every existing row clause (mirror diff
+  0, boundary 0, one connected region, the floor, the junction family) plus a row clause that
+  the built body is SIZE × the built span wherever nothing was held.
+- **10 code mutants**, each caught by the clause it names (the body ignoring the wingspan, WIDTH
+  scaling lengths, limbs scaling with WIDTH, capture forgetting the width, a type touching the
+  wings, Spider keeping its wings, a winged type leaving a wingless bug wingless, an old design
+  loading as a type, the lift losing its legacy branch, a hand-set limb not kept); every anchor
+  is checked before any runs.
+
+Measured on this box: **gate PASS, 442/442 (116 function checks + 326 built rows, 40 random)**
+in 25 m 21 s against main's 421/421 in 24 m 02 s, both runs sharing the box with other work —
+the BP functions cost 4.6 s and the 15 rows about 70 s, so the added time is ~1.3 minutes,
+about 5%. **Negative control PASS, 80 of 80 caught** (17 m 00 s). Saved designs: 40 of 40
+bit-identical to main (§17.6). The sheet is `node tools/shot-bug-body.mjs <dir> --base <a
+worktree of main>`; it drives the real page (a real click opens the fine drop-down, a real
+slider drag makes the body Custom, the dropdown's own input event chooses Spider and the page's
+Undo restores it).
+
+
+### 17.8 Decisions made without a ruling (reversible), and what is left open
+
+Each names what was rejected and how hard it is to undo.
+
+1. **SIZE runs 0.20–0.90 × span.** The brief asked for "a proportion of the wingspan" and gave
+   no range. A first cut started at 0.12; on a type's proportions that length puts the wing roots
+   on a thorax too short to hold them apart (R reads NaN), the tucked legs show past a body
+   narrower than they are (L), and the junction leaves a slot under 1.5 mm (JB1). 0.20 is the
+   lowest end at which all five types build clean on the library wings the gate pairs them with (one per type at each corner); real
+   bodies sit between the moth's ~0.2 and the dragonfly's ~0.75. *Undo:* `BODY_SIZE_RANGE`.
+2. **A wingless bug is sized against 72 mm** (the default butterfly's own span, rounded) rather
+   than against its own legs or a fixed body length, so SIZE means the same thing on every type
+   and a spider at its default is 18 mm long, a garden spider's size. *Undo:* `BODY_REF_SPAN_MM`.
+3. **The Butterfly's antennae are lifted 45° with the club 0.30 × 2.2**, chosen so the teardrop
+   reads from the front (§17.5); main's default had 19° and 0.22 × 1.8. *Undo:* three numbers in
+   `BODY_PRESETS.butterfly.fields`.
+4. **The body follows the wingspan** while it has proportions (a wing edit re-sizes it to keep
+   SIZE true). The alternative — SIZE re-measured and the body left alone — would make the
+   slider read a different number after every wing edit. *Undo:* the `syncBody()` call in
+   `scheduleBuild`.
+5. **Randomize and the image fitter produce Custom bodies** (fixed in mm). A random body is not
+   one of the five, and labelling it one would be a lie the first time a fine control was
+   compared. *Undo:* one line each in `randomParams` and `imageToBug`.
+6. **The fine ranges' maxima were widened** (§17.1) so the slider ends rarely hold a field; the
+   minima were not (item 1's clauses). Where a field is still held, the page says which and by
+   how much (the small end holds the head at its 2 mm floor on four of the five types).
+7. **No pedipalps** — the model has no part for them (§17.2).
+8. **The image fixtures keep main's pre-type body** (`tools/verify-bug-image-fixtures.mjs`), so
+   IM1–IM14 measure the importer against the pictures they were written for. Drawn from the
+   Butterfly default, the IM family fails at 6.9 mm: the longer thorax spreads the fitted roots
+   1.5 mm and the lifted feathered antennae merge with the head. That is the importer meeting a
+   body it was not tuned on — **open, its own change**.
+9. **Two venation rows keep main's 5 mm thorax**: `holes: drawn:strap` and `library:#13,
+   holes`. On the Butterfly default's 7.09 mm thorax the strap's hindwing silhouette dips 0.0039
+   mm inside its outline (E7) and #13's cut-safe union splits in two (S). **Both reproduce on
+   main's own geometry at that body** (a worktree of 9dbb8e1, the same rows: the same 0.0039 mm,
+   the same 2 regions), and both FLICKER with the thorax — swept 5.5 → 9 mm, E7 reads 0.001 to
+   0.034 mm at 5.5–7.5 and is clean at 8 and 9, the split appears at 6 and 7 and not at 5.5, 6.5
+   or 7.5. The thorax moves the hinges, the junction blend's root warp moves the venation plan,
+   and the plan moves the cells: a property of HOLES under the junction blend, which this change
+   was told not to touch. **Open, and it is reachable on main** by moving the thorax length.
+10. **The Spider body with wings put back is not a gate row**: it reads a 0.60 mm slot between a
+    wing and the 2-part body at the midline (JB1). The junction blend was not built for a 2-part
+    bug with wings; main reaches the same state by setting body parts to 2. **Open.** (A winged
+    type chosen after Spider does not reach it: it sets the body back to 3 parts as it gives the
+    wings back. Only the Pairs slider on a Spider body does.)
+11. **`tucked` is asserted at each type's own proportions only**: at WIDTH 0.60 the body
+    narrows while the legs (scaled by length, never by width) show past it from above — 0.43 of
+    10.45 mm² on the butterfly, 0.28 of 6.68 on the dragonfly. That is WIDTH doing what it says.
+

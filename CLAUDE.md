@@ -10290,6 +10290,17 @@ along the thorax, beside the abdomen its inner edge lies on the body's edge (IM1
 step 1 drops the ground, a sheet around the bug and detached marks before the symmetry
 check, and every refusal names its step (IM13, IM14). Sheet: `node tools/shot-bug-image-fixes.mjs
 <dir> --base <worktree>`.
+**§17 (body types)**: the BODY / HEAD / THORAX / ABDOMEN panels are one Body section — a BODY
+TYPE dropdown (Butterfly, Moth, Bee, Dragonfly, Spider; Custom appears once a fine control is
+edited), SIZE (body length × the wingspan, a 72 mm reference span when wingless) and WIDTH,
+with every fine body control in ONE drop-down inside Body, closed by default (there is no
+Advanced section). `fitBody()` is the one place proportions become fine fields and `buildBug`
+knows nothing of types, so a version-7 design loads Custom and builds bit-identically (BP4 holds
+main's hashes). A type never touches the wing outlines; Spider alone sets the pairs to 0, and a
+winged type chosen on a wingless bug gives them back (Eva, on the sheet). The BP family
+(`tools/verify-bug-body.mjs`) gates it. Two venation rows keep main's 5 mm thorax because HOLES
+under the junction blend flickers with the thorax on main too (§17.8, open). Sheet:
+`node tools/shot-bug-body.mjs <dir> --base <worktree>`.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

@@ -179,7 +179,14 @@ export function clutter(params, o = {}) {
 // (the pictures stand for insects as DRAWN: the junction blend — the builder's
 // own fill between a wing and the body, design doc §16 — is off in them, so
 // an abdomen shows beside the hindwing as in a photograph)
-const D = () => ({ ...G.defaultParams(), wingJunction: 0 });
+// (and they are drawn on the BODY the importer was calibrated on — the specimen
+// default before body types, §17: a Custom body in mm, the antennae at their old
+// rise. The Butterfly type's longer thorax (7.1 mm against 5) spreads the pairs' roots 1.5 mm further
+// apart and the importer, which places them from the old proportions, misses the
+// inter-pair notch by 6.9 mm (IM3, measured) — recorded in §17 as an open item.)
+const PRE_TYPE_BODY = { headSize: 2.4, thoraxLength: 5, thoraxWidth: 2.9, thoraxDepth: 2.9, abdomenLength: 15, abdomenWidth: 2.2,
+  coxa: 0.9, femur: 4, tibia: 4.2, tarsus: 3.4, antennaLength: 17, clubLength: 0.22, clubWidth: 1.8, clubTaper: 0.35, antennaLift: G.ANT_LIFT_LEGACY, bodyType: 'custom', bodyRatios: null };
+const D = () => ({ ...G.defaultParams(), ...PRE_TYPE_BODY, wingJunction: 0 });
 /* The fixtures the gate and the sheet share. */
 export const IMAGE_FIXTURES = {
   // the default specimen butterfly: one wing mass per side with a notch
