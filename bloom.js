@@ -1814,10 +1814,12 @@ function leafLine(leaf, leavesBuilt) {
         + ` · stalks ${cpd.stalkMm.toFixed(1)} mm lateral, ${cpd.terminalStalkMm.toFixed(1)} mm terminal, each reaching ${embeds.length ? `${Math.min(...embeds).toFixed(2)}–${Math.max(...embeds).toFixed(2)}` : '—'} mm on into its leaflet's beaded base`
         + (cpd.clamped ? ` — CLAMPED: ${cpd.clamped} pair${cpd.clamped === 1 ? '' : 's'} scaled under the leaf's own minimum size, built at it (told, never refused)` : '')
         + `\n     PETIOLE ${(2 * pe.radiusMm).toFixed(2)} mm across — the area rule read UP over ${cpd.count} leaflets asks ${(2 * pe.askedMm).toFixed(2)} mm (the ${(2 * cpd.wireR).toFixed(2)} mm wire x sqrt ${cpd.count})`
-        + (pe.clamped
+        + (!pe.thickens
+          ? `; this stem holds only ${(2 * pe.capMm).toFixed(2)} mm with the rooted end inside it at ${leaf.angleDeg}°, UNDER the wire, so the petiole stays the wire (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
+          : pe.clamped
           ? `; CLAMPED to ${(2 * pe.capMm).toFixed(2)} mm, the most this stem holds with the rooted end inside it at ${leaf.angleDeg}° (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
           : `, under the ${(2 * pe.capMm).toFixed(2)} mm this stem holds with the rooted end inside it at ${leaf.angleDeg}°`)
-        + (pe.thickens ? ` · a 45° cone of ${pe.coneMm.toFixed(2)} mm steps it down to the rachis` : ' · the cap is under the wire here, so the petiole stays the wire')
+        + (pe.thickens ? ` · a 45° cone of ${pe.coneMm.toFixed(2)} mm steps it down to the rachis` : '')
         + (pe.radiusMm > pe.capMm && b0 && Number.isFinite(b0.petioleRootReachMm) && b0.petioleRootReachMm > leaf.outerR
           ? ` — and its rooted end stands ${(b0.petioleRootReachMm - leaf.outerR).toFixed(2)} mm PROUD of the stem, as a simple leaf's own petiole does at this sheet and angle (told)`
           : '')

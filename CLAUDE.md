@@ -24,7 +24,10 @@ Guidance for Claude Code sessions working in this repository.
   `git log` should meet them, and the PR's own doc is the authority over its squash message:
   #288 says "four families / 16 SVGs" (12 shipped); #278 says "13 moved / 896 held" (that partition is
   not the change against `main`); #289 says "bloom-geometry.js byte-identical to main" (+211 lines);
-  #279 says "68 within-shell count moves" (67). Add to this list rather than leaving the next one to be
+  #279 says "68 within-shell count moves" (67); #380 (`2792504`) ends on an ESCAPED co-author line,
+  `Co-Authored-By: Claude Opus 5.5 &lt;noreply@anthropic.com&gt;` — the HTML entities came in through the
+  merge call's commit message; the trailer means `<noreply@anthropic.com>`, and a squash message passed
+  to the merge tool takes literal angle brackets. Add to this list rather than leaving the next one to be
   rediscovered.
 - Before making branch-history changes, rebases, force pushes, or destructive Git operations, stop and ask first.
 
@@ -3615,6 +3618,7 @@ the base by the beaded base; the arch bends the RACHIS, leaflets lie flat in its
 arch). **THE RODS' LAW COLLAPSES AT THIS TREE AND THAT IS EVA'S QUESTION**: the area rule floored at the
 wire, and the bloom's petiole IS the 1.2 mm wire (`t/2`), so every rod is the petiole at every sheet
 (`floorBinds` 7 of 7) — a fixed 1.2 mm wire or a thicker compound petiole are the alternatives, §4.
+**[Oct 8: RULED — the thicker petiole; see the retune block below. The rachis and stalks stay the wire.]**
 **A raceme's shared node pins the leaf to SIMPLE in ONE place** (`SHARED_NODE_LEAF_PINS`, told), because
 the seating offset and the floret cap are single-blade laws. ST9, its witness and the combination gate's
 leaf-stem measure excuse the builder's own `rodAxes` (petiole, rachis, stalks) BY NAME. Pairs capped at
@@ -3624,6 +3628,36 @@ leaf's root base has one owner (`leafRootBase`): the duplicate expression had di
 Eight compound mutants plus three re-anchored, each firing what it names. Block 54 (36 rows, 1,210),
 smoke block 54 (9), `frozen/phase56` = the 1,174 rows at `363aacb` (be375b0's rows; based on #379's head because
 #379 edited `bug-gate.yml` and an older base's tag would be refused). Sheet: `docs/img/leaf-compound.png`.
+
+**THE COMPOUND RETUNE: THE LEAFLETS HAVE THEIR OWN TOOTH DEPTH AND TIP, AND THE PETIOLE IS THE AREA RULE READ
+UP, CAPPED WHERE ITS ROOTED END STILL FITS THE STEM** (Eva's rulings on #380, Oct 7 — read
+`docs/bloom-leaf-compound-retune-outcome.md` before touching `leafletBladeState`, `compoundPetioleRadiusMm`,
+`petioleRootCapMm`, `compoundLeafPlan`'s `petiole`, the cone in `buildCompoundLeafInto`, or LF7/LF9/LF11/LF13/
+LF17/LF18). **TWIN CONTROLS, NOT A SHARED DEFAULT**: `leafletToothDepth` (default 0, serration OFF) and
+`leafletTipShape` (1.60) are the leaflets' own, visible only under COMPOUND; the simple leaf's
+`leafToothDepth` / `leafTipShape` are visible only under SIMPLE and their defaults (0.26 / 1.30) did not
+move; tooth COUNT and crest/notch SHAPE stay shared; the 1 mm relief floor is untouched and applies to
+leaflets as before. The inertness is measured both ways (a compound at simple tooth 1 / tip 3 is 0 of
+1,315,080 floats off the defaults; a SIMPLE row with the leaflet controls at their extremes is a byte
+holder). **THE ROSE DEFAULTS ARE PROPOSED, NOT RULED** — leaflets 26×17, terminal 30×19, ovate
+(`LEAFLET_BASE_TAPER`/`LEAFLET_TIP_TAPER` 0.6/0.9, constants, widest at 0.40 L), tip 1.60; Eva rules
+them from `docs/img/leaf-compound-rose.png`. **THE PETIOLE**: asked `wire·sqrt(N)` (2.68 mm at the
+default five leaflets), capped by `petioleRootCapMm` — the largest radius whose rooted-end disc fits
+inside the stem's outer cylinder, closed form, two cases — built `max(wire, min(asked, cap))` when the cap
+clears the mode-free wire floor, else the wire; a 45° cone steps it down to the wire rachis; CLAMPED AND
+TOLD (asked -> built). **THE CAP FALLS WITH THE ANGLE AND STOPS DEPENDING ON THE STEM PAST ~50°**: at 35°
+2.98 / 3.69 / 4.48 / 4.76 mm on 3 / 4 / 6 / 12 mm stems, but 2.14 at 70° and 1.50 at 90° on EVERY stem.
+**The ruling said "default 4 mm"; the shipped `stemDiameter` default is 6 mm** — both measured, the
+sheet's macro is at 4. **The rooted end stands 0.354 mm PROUD at sheet 2.4 × 85°**, where the cap is under
+the 2.40 mm wire — pre-existing (a simple leaf's petiole does the same), told on the read-out, and LF18(b)
+asserts containment only where the built radius is at or under the cap. **LF18 is the new family** (the
+record against `restatedPetiole`, the emitted root ring inside the stem, every `rodAxes` entry named at its
+own radius — which is how ST9's exemption covers the thicker petiole by NAME); eight new mutants, two
+re-anchored, `the-rod-floor-is-removed` retired. **Partition: 44 movers / 1,178 holders over the 1,222-row
+matrix in both modes, 0 floats moved**, predeclared by `verify-bloom-surface-bytes --movers-predicate
+compound-retune` from the BASE tree's own `leafPlan`. +24 tris a compound leaf (the cone ring). Block 55
+(12 rows, 1,222), smoke block 55 (5), `frozen/phase57` = the 1,210 rows at `2792504`. Sheet:
+`node tools/shot-bloom-leaf-compound-rose.mjs <png> --base <worktree of 2792504>`.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
