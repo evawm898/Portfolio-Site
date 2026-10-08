@@ -66,7 +66,8 @@ import { LEAF_TYPES, LEAFLET_PAIRS_RANGE, LEAFLET_PAIRS_DEFAULT, LEAFLET_FIRST_R
          LEAFLET_LAST_RANGE, LEAFLET_LAST_DEFAULT, LEAFLET_ANGLE_RANGE, LEAFLET_ANGLE_DEFAULT, LEAFLET_LENGTH_RANGE,
          LEAFLET_LENGTH_DEFAULT, LEAFLET_WIDTH_DEFAULT, LEAFLET_BASAL_RANGE, LEAFLET_BASAL_DEFAULT,
          LEAFLET_TERMINAL_LENGTH_DEFAULT, LEAFLET_TERMINAL_WIDTH_DEFAULT, LEAFLET_STALK_RANGE, LEAFLET_STALK_DEFAULT,
-         LEAFLET_TERMINAL_STALK_RANGE, LEAFLET_TERMINAL_STALK_DEFAULT } from './bloom-geometry.js';
+         LEAFLET_TERMINAL_STALK_RANGE, LEAFLET_TERMINAL_STALK_DEFAULT,
+         LEAFLET_TOOTH_DEPTH_DEFAULT, LEAFLET_TIP_SHAPE_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -525,7 +526,12 @@ export const PREDICATES = {
   leafSimpleBlade: { all: [{ ref: 'leafPresent' }, { not: { ref: 'leafCompound' } }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
-  leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
+  /* (the depth that guards it is the BLADE's own: the simple leaf's, or under
+     COMPOUND the leaflets' own — Eva's ruling on #380) */
+  leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { any: [
+    { all: [{ ref: 'leafSimpleBlade' }, { id: 'leafToothDepth', min: 0.01 }] },
+    { all: [{ ref: 'leafCompound' }, { id: 'leafletToothDepth', min: 0.01 }] },
+  ] }] },
 
   /* ===================================================================
      THE TUBE (corolla fusion, the build session) — the registry's statement
@@ -1510,6 +1516,16 @@ const saidHood = (ui) => (Math.round(Number(ui.petalCount)) % 2 === 0 ? 'the hoo
    error rather than a drift. */
 export const TIP_PER_INSTANCE_DEFAULTS = Object.freeze(['Lumps', 'Spread']);
 const tipRec = (shown, t) => (shown && shown[t.part] ? shown[t.part][t.record] : null);
+/* THE TIP SHAPE'S NAMES — one table for the simple leaf's control and the
+   leaflets' own (`leafletTipShape`), the petal's six named states; `pointed`
+   is what each control calls its own band around 1.30. */
+const leafTipName = (n, pointed) => (n <= 0.70 ? 'acute'
+  : n < 1.05 ? 'a straight point'
+  : n < 1.45 ? pointed
+  : n < 1.90 ? 'between pointed and the true ellipse'
+  : n < 2.25 ? 'the true ellipse'
+  : n < 2.80 ? 'width held, then turning'
+  : 'the held-width round tip');
 export const TIP_DESCRIPTORS = Object.freeze([
   { suffix: 'Size', kind: 'slider', min: TIP_SIZE_RANGE[0], max: TIP_SIZE_RANGE[1], step: 0.05, default: ANTHER_DIAMETER_FACTOR, label: 'Size',
     /* Q8's own reason, on the control: points are unreachable on a 1.92 mm
@@ -3957,20 +3973,16 @@ export const CONTROLS = [
     label: 'Tip shape',
     fmt: (v, ui, shown) => {
       const n = Number(v);
-      const name = n <= 0.70 ? 'acute'
-        : n < 1.05 ? 'a straight point'
-        : n < 1.45 ? 'pointed (the shipped leaf)'
-        : n < 1.90 ? 'between pointed and the true ellipse'
-        : n < 2.25 ? 'the true ellipse'
-        : n < 2.80 ? 'width held, then turning'
-        : 'the held-width round tip';
+      const name = leafTipName(n, 'pointed (the shipped leaf)');
       const cl = shown && shown.leaf && shown.leaf.tipClamp && shown.leaf.tipClamp[0];
       if (!cl) return `${n.toFixed(2)} · ${name}`;
       return `${n.toFixed(2)} · ${name} · ends ${cl.terminalMm.toFixed(2)} mm across, the print terminal, in both modes`
         + ` — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
         + (cl.fraction > 0.05 ? ` — CLAMPED: a point below ${cl.terminalMm.toFixed(2)} mm cannot be printed, and a pointier shape only LENGTHENS the stub; a WIDER leaf shortens it (the share is set by the width, never the length)` : '');
     },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+    /* A SIMPLE BLADE'S OWN (Eva's ruling on #380): under COMPOUND every
+       leaflet reads `leafletTipShape`, so this one is hidden AND inert there */
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSimpleBlade' } },
 
   /* THE LEAFLETS (leaf/stem build S3) — the compound leaf's own tree, every
      value the leaf-lab's ROSE (its §6b PINNATE_COMPOUND tree, on the
@@ -4029,6 +4041,15 @@ export const CONTROLS = [
     label: 'Terminal width',
     fmt: (v, ui) => `${v} mm across · ${(Number(ui.leafletTerminalLength) / Number(v)).toFixed(1)}:1`,
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  /* THE LEAFLETS' OWN TIP SHAPE (Eva's ruling on #380 — "a rounded-to-acute
+     tip" without moving the simple leaf's 1.30): `leafTipShape`'s law and
+     range on the leaflets' own control, every leaflet the same exponent.
+     Hidden AND inert under SIMPLE; the simple one is hidden AND inert here. */
+  { id: 'leafletTipShape', section: 'leafLeaflets', kind: 'slider',
+    min: LEAF_TIP_SHAPE_RANGE[0], max: LEAF_TIP_SHAPE_RANGE[1], step: 0.05, default: LEAFLET_TIP_SHAPE_DEFAULT,
+    label: 'Leaflet tip',
+    fmt: (v) => { const n = Number(v); return `${n.toFixed(2)} · ${leafTipName(n, 'pointed')}${n >= 1.45 && n < 1.9 ? ' (rounded to acute)' : ''} — every leaflet, the simple leaf's law`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
   { id: 'leafletStalk', section: 'leafLeaflets', kind: 'slider',
     min: LEAFLET_STALK_RANGE[0], max: LEAFLET_STALK_RANGE[1], step: 0.5, default: LEAFLET_STALK_DEFAULT,
     label: 'Lateral stalk',
@@ -4051,7 +4072,21 @@ export const CONTROLS = [
     min: 0, max: 1, step: 0.01, default: 0.26,
     label: 'Tooth depth',
     fmt: (v) => (Number(v) === 0 ? 'none — an entire margin' : `${Number(v).toFixed(2)}x the blade's own half-width`),
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+    /* the SIMPLE blade's depth — hidden AND inert under COMPOUND, where the
+       leaflets read their own (below) */
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSimpleBlade' } },
+  /* THE LEAFLETS' OWN TOOTH DEPTH (Eva's ruling on #380: "serration defaults
+     OFF on compound leaflets — teeth stay available, and the 1 mm floor still
+     applies when they're on; the simple leaf's serration defaults must NOT
+     move"). Every leaflet read the simple leaf's 0.26 before, so the compound
+     leaf carries its own depth, default 0, on the same range; the count, the
+     tooth tip and the notch are SHARED (they shape a tooth, they do not decide
+     whether there is one), and the relief floor is the blade law's own. */
+  { id: 'leafletToothDepth', section: 'leafSerration', kind: 'slider',
+    min: 0, max: 1, step: 0.01, default: LEAFLET_TOOTH_DEPTH_DEFAULT,
+    label: 'Leaflet tooth depth',
+    fmt: (v) => (Number(v) === 0 ? 'none — every leaflet an entire margin (the compound default)' : `${Number(v).toFixed(2)}x each leaflet's own half-width`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
   { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
     min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: 9,
     label: 'Teeth',
