@@ -1798,24 +1798,32 @@ function leafLine(leaf, leavesBuilt) {
   /* THE COMPOUND LEAF (leaf/stem build S3): the tree off the PLAN's own
      layout and the BUILDER's own rods — the leaflet count, where the pairs
      stand, each leaflet's built size (and which scaled leaflets the leaf's own
-     minimum clamped), and the RODS, whose radii are derived and told: the
-     area rule's asked radius beside the wire floor that binds. Rod sizing is
-     an open question for Eva and the line says so. */
+     minimum clamped), and the RODS (Eva's ruling on #380): the PETIOLE
+     thickened by the area rule read upward over its leaflets and CAPPED by the
+     stem it roots in — asked against built, told — and the rachis and stalks
+     at the wire floor. */
   const compoundLine = cpd
     ? (() => {
       const lat = cpd.lateral;
       const sz = (q) => `${q.lengthMm.toFixed(1)} x ${q.widthMm.toFixed(1)}`;
-      const ivs = cpd.rachis.intervals;
-      const asked = [...new Set(ivs.map((q) => q.askedMm.toFixed(2)))];
+      const pe = cpd.petiole;
       const embeds = b0 && b0.leaflets ? b0.leaflets.map((q) => q.embedMm) : [];
       return `\n     COMPOUND ${cpd.count} leaflets — ${cpd.pairs} pair${cpd.pairs === 1 ? '' : 's'} and a terminal — on a ${cpd.rachisMm.toFixed(1)} mm rachis`
         + ` · pairs at ${lat.map((q) => `${(100 * q.frac).toFixed(0)}%`).join(', ')} (${lat.map((q) => q.stationMm.toFixed(1)).join(', ')} mm), ${cpd.angleDeg}° off the rachis in its own plane, flat and cupped (the arch is the RACHIS's)`
         + `\n     LEAFLETS lateral ${lat.map(sz).join(' -> ')} mm${cpd.pairs > 1 ? ` (basal ratio ${cpd.basal.toFixed(2)})` : ''}, terminal ${sz(cpd.terminal)} mm`
         + ` · stalks ${cpd.stalkMm.toFixed(1)} mm lateral, ${cpd.terminalStalkMm.toFixed(1)} mm terminal, each reaching ${embeds.length ? `${Math.min(...embeds).toFixed(2)}–${Math.max(...embeds).toFixed(2)}` : '—'} mm on into its leaflet's beaded base`
         + (cpd.clamped ? ` — CLAMPED: ${cpd.clamped} pair${cpd.clamped === 1 ? '' : 's'} scaled under the leaf's own minimum size, built at it (told, never refused)` : '')
-        + `\n     RODS petiole ${(2 * cpd.petioleR).toFixed(2)} mm · rachis ${ivs.map((q) => (2 * q.radiusMm).toFixed(2)).join(' / ')} mm · stalks ${(2 * cpd.stalkR).toFixed(2)} mm — DERIVED: the area rule read down from the petiole asks ${asked.map((x) => (2 * Number(x)).toFixed(2)).join(' / ')} mm for the rachis and ${(2 * cpd.stalkAskedMm).toFixed(2)} mm for a stalk`
-        + (cpd.floorBinds ? ` and the ${(2 * cpd.wireR).toFixed(2)} mm wire floor (the petiole's own radius rule) binds on ${cpd.floorBinds} rod${cpd.floorBinds === 1 ? '' : 's'}` : '')
-        + ' — rod sizing is an OPEN QUESTION for Eva';
+        + `\n     PETIOLE ${(2 * pe.radiusMm).toFixed(2)} mm across — the area rule read UP over ${cpd.count} leaflets asks ${(2 * pe.askedMm).toFixed(2)} mm (the ${(2 * cpd.wireR).toFixed(2)} mm wire x sqrt ${cpd.count})`
+        + (!pe.thickens
+          ? `; this stem holds only ${(2 * pe.capMm).toFixed(2)} mm with the rooted end inside it at ${leaf.angleDeg}°, UNDER the wire, so the petiole stays the wire (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
+          : pe.clamped
+          ? `; CLAMPED to ${(2 * pe.capMm).toFixed(2)} mm, the most this stem holds with the rooted end inside it at ${leaf.angleDeg}° (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
+          : `, under the ${(2 * pe.capMm).toFixed(2)} mm this stem holds with the rooted end inside it at ${leaf.angleDeg}°`)
+        + (pe.thickens ? ` · a 45° cone of ${pe.coneMm.toFixed(2)} mm steps it down to the rachis` : '')
+        + (pe.radiusMm > pe.capMm && b0 && Number.isFinite(b0.petioleRootReachMm) && b0.petioleRootReachMm > leaf.outerR
+          ? ` — and its rooted end stands ${(b0.petioleRootReachMm - leaf.outerR).toFixed(2)} mm PROUD of the stem, as a simple leaf's own petiole does at this sheet and angle (told)`
+          : '')
+        + `\n     RODS rachis and stalks ${(2 * cpd.stalkR).toFixed(2)} mm — the wire floor (the leaf's own petiole rule), ruled`;
     })()
     : '';
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node${leaf.divergenceDeg !== null && leaf.divergenceDeg !== undefined ? `, ${leaf.divergenceDeg.toFixed(1)}° between nodes${leaf.divergenceDeg === 180 ? ' — distichous' : ''}` : ''})`
@@ -1834,7 +1842,7 @@ function leafLine(leaf, leavesBuilt) {
     + tipLine + sharedLine + capLine
     + compoundLine
     + (cpd
-      ? `\n     SLENDERNESS rachis ${cpd.slenderness.ld.toFixed(1)} (the longest unsupported rod on the bloom: ${(cpd.rachisMm + cpd.terminalStalkMm).toFixed(1)} mm of rachis and terminal stalk at ${cpd.slenderness.diameterMm.toFixed(2)} mm) — UNMEASURED — no coupon has been printed\n`
+      ? `\n     SLENDERNESS L/d petiole ${(leaf.petioleLenMm / (2 * leaf.petioleR)).toFixed(1)} (${leaf.petioleLenMm.toFixed(1)} mm at ${(2 * leaf.petioleR).toFixed(2)} mm) · rachis ${cpd.slenderness.ld.toFixed(1)} (the longest unsupported rod on the bloom: ${(cpd.rachisMm + cpd.terminalStalkMm).toFixed(1)} mm of rachis and terminal stalk at ${cpd.slenderness.diameterMm.toFixed(2)} mm) — UNMEASURED — no coupon has been printed\n`
       : `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`);
 }
 
@@ -2746,6 +2754,10 @@ window.__bloomMetrics = () => ({
        clauses' measured side (null per simple leaf). */
     compoundBuilt: (lastLeavesBuilt || []).map((r) => (r.compound ? {
       axisRod: r.axisRod, stalkRods: r.stalkRods, rachis: r.rachis,
+      /* the thicker petiole's measured side (Eva's ruling on #380): how far
+         its EMITTED rooted end reaches from the stem's axis, and this leaf's
+         own rods as the exemption names them */
+      petioleRootReachMm: r.petioleRootReachMm, rodAxes: r.rodAxes,
       leaflets: r.leaflets.map((q) => ({ role: q.role, k: q.k, side: q.side, lengthMm: q.lengthMm, widthMm: q.widthMm, embedMm: q.embedMm,
         root: q.root, base: q.base, D: q.D, T: q.T, N: q.N, holder: q.holder, tris: q.tris, baseAxisMm: q.rim.baseAxisMm ?? null })),
     } : null)),

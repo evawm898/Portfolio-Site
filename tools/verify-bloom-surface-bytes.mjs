@@ -262,6 +262,29 @@ const PREDICATE_MOVERS = {
     const sp = mine.stemPlan(st, fr.hub, acc);
     return !!(sp.present && sp.cut && sp.cut.made);
   },
+  /* THE COMPOUND RETUNE (Eva's rulings on #380, Oct 7: the rose-toward
+     leaflet defaults, the leaflets' own serration and tip, the thicker
+     petiole capped by the stem). A row moves iff the BASE tree's own leaf
+     plan builds a COMPOUND leaf — `leafPlan(...).compound` non-null with at
+     least one leaf placed — evaluated through the base's own footRing /
+     stemPlan / inflorescencePlan chain, so a raceme's shared-node pin (which
+     makes a compound ask SIMPLE) is the base's decision and not this
+     predicate's. Every SIMPLE and every leafless row must hold to the bit in
+     both modes: that is the ruling's "SIMPLE petioles don't move" and "the
+     simple leaf's serration defaults must NOT move", measured. Rows the base
+     matrix does not hold (the retune's own block) are classified the same
+     way — the base tree builds the state with its own defaults for controls
+     it does not know — so a GATED row asking a leaflet control under SIMPLE
+     is a HOLDER, which is the twins' inertness claim. */
+  'compound-retune': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    if (!fr.hub) return false;
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
+    return !!(lp.present && lp.compound && lp.built > 0);
+  },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* ORGANIC VARIANCE, BUILD 3 (spacing). A row moves iff the SPACING field
      exists on this tree — the geometry's own `varianceSpacingIsAbsent`, the

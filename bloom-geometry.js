@@ -14584,7 +14584,12 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      ruling — and its radius is `partRadius`'s own rule, the one every rod in
      this file already uses (the filament's and the style's). */
   const rootR = rodWallRootMm(stem);
-  const petioleR = petioleR0;
+  /* A COMPOUND LEAF'S PETIOLE IS THICKER (Eva's ruling on #380): the area
+     rule read upward from the wire over its leaflets, capped by the stem —
+     `compoundLeafPlan` is its one owner. A SIMPLE leaf's is the wire, the
+     expression it always was, by branch. */
+  const compoundRec = leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
+  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : petioleR0;
   /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null with both node amounts
      0). Two things move with them and nothing else does: every petiole roots
      on the DISPLACED axis at its own depth (`nodeOffsets`), and the clearance
@@ -14684,7 +14689,10 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
        here so LF7 can compare them against the PAGE's read-back control state,
        which is an owner this plan does not write. A leaf reading the petal's
        `lobe*` values shows up as these two disagreeing. */
-    toothDepth: Number(state.leafToothDepth), crestShape: Number(state.leafCrestShape),
+    /* (a compound leaf's leaflets read their OWN depth and tip — the
+       `leafletBladeState` twins — so the plan reports the pair the blades
+       were built from) */
+    toothDepth: compoundRec ? leafletBladeState(state, 1, 1).lobeDepth : Number(state.leafToothDepth), crestShape: Number(state.leafCrestShape),
     notchShape: Number(state.leafNotchShape), toothCount: Math.round(Number(state.leafToothCount)),
     /* THE TIP EXPONENT THE BLADE IS BUILT FROM — the LEAF's own control, read
        here so LF9 can compare it against the PAGE's read-back state, an owner
@@ -14692,7 +14700,7 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
        off the half-widths the builder actually used, because a plan that
        reports the control while the blade is built from something else is
        exactly what this field cannot see. */
-    tipShape: Number(state.leafTipShape),
+    tipShape: compoundRec ? leafletBladeState(state, 1, 1).petalTipShape : Number(state.leafTipShape),
     /* THE POSE THE BLADE IS BUILT FROM (leaf/stem build S2) — the LEAF's own
        arch and cup controls, read here for the read-out and so LF11/LF12 have
        the plan's claim beside the rows the builder reports. The clauses
@@ -14709,7 +14717,7 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
        shared node pinned a compound ask to SIMPLE. */
     type: leafIsCompound(state) ? 'COMPOUND' : 'SIMPLE',
     typePinned: askedCompound && !leafIsCompound(state),
-    compound: leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR) : null,
+    compound: compoundRec, wireR: petioleR0,
   };
 }
 
@@ -15238,9 +15246,14 @@ export function leafIsCompound(state) { return String(state.leafType) === 'COMPO
 export const SHARED_NODE_LEAF_PINS = Object.freeze({ leafType: 'SIMPLE' });
 /* THE RANGES (the lab's §6b tree on the registry's conventions: lengths in
    millimetres, the pair stations as FRACTIONS of the rachis so a length change
-   moves no pair off the rachis). The defaults are the lab's ROSE (its §6
-   values) so the type's own default IS the reference leaf the session was
-   asked to anchor on — none of them is ruled.
+   moves no pair off the rachis). THE DEFAULTS ARE RETUNED TOWARD ROSE (Eva's
+   ruling on #380, Oct 7: "ovate leaflets with a rounded-to-acute tip, 2
+   lateral pairs + a terminal, the terminal a little larger than the laterals,
+   and leaflets large relative to the rachis"): the apical pair 26 x 17 mm
+   (was the lab's 20 x 12), the terminal 30 x 19 (was 23 x 14) — about 15%
+   longer than the apical pair — on the same two pairs, stations, angle and
+   stalks. PROPOSED, not yet ruled: the sheet `docs/img/leaf-compound-rose.png`
+   shows them against S3's.
    THE PAIR COUNT STOPS AT FOUR ON COST, measured: a leaflet is one blade
    (3,000 triangles), so a leaf of `p` pairs is about `(2p + 1) x 3,000` plus
    its rods, and the worst reachable leaf corner is 24 leaves (whorled x 8).
@@ -15259,16 +15272,55 @@ export const LEAFLET_LAST_DEFAULT = 0.65;
 export const LEAFLET_ANGLE_RANGE = Object.freeze([20, 90]);
 export const LEAFLET_ANGLE_DEFAULT = 62;
 export const LEAFLET_LENGTH_RANGE = Object.freeze([4, 60]);
-export const LEAFLET_LENGTH_DEFAULT = 20;
-export const LEAFLET_WIDTH_DEFAULT = 12;
+export const LEAFLET_LENGTH_DEFAULT = 26;
+export const LEAFLET_WIDTH_DEFAULT = 17;
 export const LEAFLET_BASAL_RANGE = Object.freeze([0.4, 1.4]);
 export const LEAFLET_BASAL_DEFAULT = 0.8;
-export const LEAFLET_TERMINAL_LENGTH_DEFAULT = 23;
-export const LEAFLET_TERMINAL_WIDTH_DEFAULT = 14;
+export const LEAFLET_TERMINAL_LENGTH_DEFAULT = 30;
+export const LEAFLET_TERMINAL_WIDTH_DEFAULT = 19;
 export const LEAFLET_STALK_RANGE = Object.freeze([0, 20]);
 export const LEAFLET_STALK_DEFAULT = 2.5;
 export const LEAFLET_TERMINAL_STALK_RANGE = Object.freeze([0, 30]);
 export const LEAFLET_TERMINAL_STALK_DEFAULT = 7;
+/* THE LEAFLETS' OWN BLADE (Eva's rulings on #380, Oct 7: "as shipped the
+   leaflets read as holly or oak — spiky, deep teeth, pointed tips"). Until
+   then every leaflet read the SIMPLE leaf's tooth depth (0.26, nine teeth) and
+   its tip shape (1.30, pointed), so the compound leaf inherited a simple
+   leaf's look it was never tuned for — and the simple leaf's defaults may not
+   move. So a leaflet reads its OWN two, the sepal-twin shape one organ over:
+     `leafletToothDepth` — the serration's DEPTH for the leaflets, default 0
+       (ruling 2: serration OFF on compound leaflets). Turning it up gives the
+       leaflets teeth through the SHARED count / tip / notch controls and the
+       same 1 mm relief floor (`cap.toothReliefFloorMm`, untouched). The
+       simple leaf's `leafToothDepth` is hidden AND inert under COMPOUND, this
+       one hidden AND inert under SIMPLE — one depth per blade, never two.
+     `leafletTipShape` — the superellipse exponent over [widest point, 1] for
+       the leaflets, `leafTipShape`'s law on the leaflets' own control: 1.60
+       sits between the pointed petal and the true ellipse, "rounded to acute"
+       (1.80 read rounder and was the first cut, from the proposal sheet).
+   AND AN OVATE OUTLINE, two constants beside the simple leaf's lanceolate
+   pair (`LEAF_BASE_TAPER` / `LEAF_TIP_TAPER`, unmoved): the widest point at
+   `a / (a + b)` = 0.40 of the leaflet and a ROUNDED base — `u^a` with `a`
+   under 1 rises steeply off the base instead of running in as a wedge. Not a
+   control, for the reason the simple leaf's pair is not: no leaflet outline
+   control was asked for, and a control is one registry row the day it is. */
+export const LEAFLET_TOOTH_DEPTH_DEFAULT = 0;
+export const LEAFLET_TIP_SHAPE_DEFAULT = 1.6;
+export const LEAFLET_BASE_TAPER = 0.6, LEAFLET_TIP_TAPER = 0.9;
+/* leafletBladeState — ONE LEAFLET's blade state: the simple leaf's mapping
+   (`leafBladeState`, the decoupling from every petal control) at the
+   leaflet's own size, with the leaflet's own depth, tip and outline laid over
+   it and no arch (the arch is the RACHIS's, ruled). The one place a leaflet's
+   blade parameters are decided; the builder, the inset law and the harness's
+   witnesses all read it. */
+export function leafletBladeState(state, lengthMm, widthMm) {
+  return {
+    ...leafBladeState({ ...state, leafLength: lengthMm, leafWidth: widthMm, leafArch: 0 }),
+    lobeDepth: state.leafletToothDepth === undefined ? LEAFLET_TOOTH_DEPTH_DEFAULT : Number(state.leafletToothDepth),
+    petalTipShape: state.leafletTipShape === undefined ? LEAFLET_TIP_SHAPE_DEFAULT : Number(state.leafletTipShape),
+    petalBaseTaper: LEAFLET_BASE_TAPER, petalTipTaper: LEAFLET_TIP_TAPER,
+  };
+}
 
 /* compoundLeafLayout — THE ONE OWNER of where every leaflet is and how big,
    PURE ON THE STATE (no stem, no accumulator), so the inset law can read it
@@ -15364,49 +15416,103 @@ export function compoundLeafRiseMm(state) {
   return best;
 }
 
-/* THE RODS' RADII — DERIVED, NEVER A CONTROL (the S3 brief: "area rule from
-   the petiole, floored at the 1.2 mm wire"), and FLAGGED FOR EVA rather than
-   decided. The area rule read DOWNWARD from the petiole, the pedicel's own
-   precedent: a rod carrying `n` of the leaf's `N` leaflets asks
-   `petioleR sqrt(n / N)`, each leaflet's own stalk `petioleR / sqrt(N)` —
-   floored at the WIRE, which is the petiole's own radius rule
-   (`floorThickness(sheet) / 2`, the leaf's `partRadius`): the 1.2 mm wire on
-   the shipped sheet, in the MODE's own floor so no child rod is ever thicker
-   than its petiole in either mode.
-   WHAT THAT MEANS ON THIS TREE, said plainly because it is the finding: the
-   petiole IS the wire, so the floor binds on EVERY rod and every rod is the
-   petiole's 1.20 mm. The law is built and reported (asked against built) so
-   the day the petiole is thicker — or the wire thinner — the rachis tapers
-   without a code change; whether it SHOULD (a petiole grown by the area rule
-   upward, the lab's 2.68 mm for five leaflets) is Eva's question. */
-export function compoundRodRadiusMm(petioleR, wireR, carried, total) {
-  return Math.max(wireR, petioleR * Math.sqrt(carried / total));
+/* THE RODS' RADII — DERIVED, NEVER A CONTROL. S3 shipped the area rule read
+   DOWN from a petiole that was itself the 1.2 mm wire, so every rod came out
+   the wire and the law reached nothing. EVA'S RULING ON #380 (Oct 7): "a
+   thicker compound petiole — the petiole thickens to carry the rachis and
+   leaflets; the rachis and stalks stay at the 1.2 mm floor". Rejected: the
+   uniform 1.2 mm wire, and a fixed wire constant.
+
+   THE PETIOLE'S LAW IS THE AREA RULE READ UPWARD (`compoundPetioleRadiusMm`,
+   its one owner): the petiole's section is the sum of the sections it
+   carries — N leaflets on N wire-floor stalks — so `r = wire sqrt(N)`: 2.08 mm
+   across for three leaflets, 2.68 for five (the lab's own figure), 3.60 for
+   nine, on the shipped 1.2 mm wire. The wire is the leaf's own petiole rule
+   (`floorThickness(sheet) / 2`, the MODE's floor), so the petiole scales with
+   the material exactly as the simple petiole does.
+
+   THE RACHIS AND THE STALKS ARE THE WIRE (`compoundRodRadiusMm`), ruled — not
+   the area rule read down from the thicker petiole, which would make the
+   rachis taper from 2.68 mm to the wire. The rachis keeps its key stations
+   (base, every pair, the tip) because its arch is subdivided between them.
+
+   THE CAP THE STEM PUTS ON IT (`petioleRootCapMm`, its one owner): the
+   petiole must still ROOT THROUGH THE STEM WALL, so its rooted END — the disc
+   at `rootR - embed` along the petiole, the wall's mid-thickness less half the
+   wall — must lie inside the stem's outer cylinder; a thicker one would put
+   its end cap OUTSIDE the stem, a stub standing proud beside it. The root and
+   the embed are the wall's own (`rodWallRootMm` / `rodWallEmbedMm`, unmoved),
+   so the cap is a closed form in the stem's two radii and the leaf's angle:
+   the disc `{rEnd - b sin th, a}`, `a^2 + b^2 <= r^2`, against radius `Ro` —
+   `r = sqrt(Ro^2 - (rEnd / cos th)^2)` where the disc's widest point is
+   interior, else `r = (Ro - rEnd) / |sin th|`. MEASURED at the leaf's ruled
+   35 degrees: 2.98 mm across on the 3 mm solid floor, 3.69 at 4 mm, 4.48 on
+   the shipped 6 mm stem, 4.76 on a 12 mm hollow one — a big hollow stem roots
+   its petiole in a thin wall far from the axis, so its cap is NOT four times
+   the small stem's. It tightens with the angle (1.50 mm at 90 degrees on every
+   stem: half the wall, twice) and is never under it. CLAMPED AND TOLD — the
+   read-out prints asked against built — and floored at the wire: a petiole is
+   never thinner than the rachis it carries.
+
+   THE STEP DOWN TO THE RACHIS IS A 45-DEGREE CONE, its length the radii's own
+   difference, ending AT the rachis base so the rachis keeps its station. A
+   flat shoulder would be the one face here that faces back along the rod.
+   WHETHER THE CONE EXISTS IS DECIDED MODE-FREE (`petioleThickens`): the cap
+   is never under 0.75 mm (half the 1.5 mm wall, the 90-degree case), the
+   live wire differs from the export one only under a 1 mm sheet where both
+   are at most 0.5, so the decision reads the EXPORT wire and both modes build
+   the same rings — which rings exist is topology.
+
+   SLENDERNESS, the coupon question, is reported for the petiole and the
+   rachis both — UNMEASURED, no coupon has been printed. */
+export function compoundPetioleRadiusMm(wireR, count) {
+  return wireR * Math.sqrt(count);
 }
-export function compoundLeafPlan(state, rachisMm, petioleR) {
+export function compoundRodRadiusMm(wireR) {
+  return wireR;
+}
+export function petioleRootCapMm(wall, thRad) {
+  const Ro = wall.outerR;
+  const c = Math.abs(Math.cos(thRad)), s = Math.abs(Math.sin(thRad));
+  const rEnd = rodWallRootMm(wall) - rodWallEmbedMm(wall) * c;
+  if (c > 0) {
+    const q = rEnd / c;
+    if (q < Ro) {
+      const rA = Math.sqrt(Ro * Ro - q * q);
+      if (rA >= (rEnd * s) / (c * c)) return rA;
+    }
+  }
+  return (Ro - rEnd) / s;
+}
+export function compoundLeafPlan(state, rachisMm, wireR, wall, angleDeg) {
   const lay = compoundLeafLayout(state);
-  const wireR = petioleR;
   const N = lay.count;
+  /* the PETIOLE: the area rule upward, capped by the stem, floored at the
+     wire; the cone's existence decided on the mode-free (export) wire */
+  const askedMm = compoundPetioleRadiusMm(wireR, N);
+  const capMm = petioleRootCapMm(wall, (angleDeg * Math.PI) / 180);
+  const wireFreeR = leafNodePitchFloorMm(state.sheetThickness) / 2;
+  const thickens = capMm > wireFreeR;
+  const radiusMm = thickens ? Math.max(wireR, Math.min(askedMm, capMm)) : wireR;
+  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens, coneMm: thickens ? radiusMm - wireR : 0 };
   /* the rachis KEY stations (base, every pair, tip), each interval's carried
      count — the terminal plus every pair at or beyond the interval's END */
   const keys = [...new Set([0, ...lay.lateral.map((q) => q.stationMm), rachisMm])].sort((x, y) => x - y);
   const intervals = [];
   for (let j = 0; j + 1 < keys.length; j++) {
     const carried = 1 + 2 * lay.lateral.filter((q) => q.stationMm >= keys[j + 1]).length;
-    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, askedMm: petioleR * Math.sqrt(carried / N), radiusMm: compoundRodRadiusMm(petioleR, wireR, carried, N) });
+    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: compoundRodRadiusMm(wireR) });
   }
-  const stalkAskedMm = petioleR * Math.sqrt(1 / N);
-  const stalkR = compoundRodRadiusMm(petioleR, wireR, 1, N);
+  const stalkR = compoundRodRadiusMm(wireR);
   return {
     ...lay,
-    petioleR, wireR,
+    wireR, petiole,
     rachis: { keysMm: keys, intervals },
-    stalkR, stalkAskedMm,
-    /* WHERE THE FLOOR BINDS — every rod whose area-rule radius is under the
-       wire (reported; at the shipped sheet that is every rod). */
-    floorBinds: intervals.filter((q) => q.askedMm < wireR).length + (stalkAskedMm < wireR ? N : 0),
-    /* THE LONGEST UNSUPPORTED ROD, the coupon question: the rachis from the
-       petiole's end to the terminal's base. Reported, never a bound. */
-    slenderness: { rachisMm, diameterMm: 2 * intervals[intervals.length - 1].radiusMm, ld: (rachisMm + lay.terminalStalkMm) / (2 * intervals[intervals.length - 1].radiusMm) },
+    stalkR,
+    /* THE LONGEST UNSUPPORTED RODS, the coupon question: the rachis from the
+       petiole's end to the terminal's base, at the wire. Reported, never a
+       bound (the petiole's own L/d is the plan's, beside it). */
+    slenderness: { rachisMm, diameterMm: 2 * stalkR, ld: (rachisMm + lay.terminalStalkMm) / (2 * stalkR) },
   };
 }
 
@@ -15487,18 +15593,25 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const push = (C, N, r) => { centres.push(C); Ts.push(T); Ns.push(N); radii.push(r); };
   const N0 = frameAt(th).N;
   push([base[0] - D0[0] * plan.embedMm, base[1] - D0[1] * plan.embedMm, base[2] - D0[2] * plan.embedMm], N0, plan.petioleR);
+  /* THE THICKER PETIOLE STEPS DOWN TO THE RACHIS ON A 45-DEGREE CONE (see
+     `compoundLeafPlan`): full radius to `coneMm` short of the rachis base,
+     then the wire AT the base. `thickens` is the plan's mode-free decision,
+     so both modes emit the same rings. */
+  const PE = cp.petiole;
+  if (PE.thickens) push([bb[0] - D0[0] * PE.coneMm, bb[1] - D0[1] * PE.coneMm, bb[2] - D0[2] * PE.coneMm], N0, plan.petioleR);
+  const iBase = centres.length;
   /* the rachis stations: every key, each interval subdivided where the rachis
      ARCHES into as many pieces as the blade law's own rows would give that
      length (`LEAF_BLADE_ROWS` over the rachis) — a straight rachis needs its
      keys alone */
   const ivs = cp.rachis.intervals;
-  let rPrev = plan.petioleR;
+  let rPrev = PE.thickens ? cp.wireR : plan.petioleR;
   for (let j = 0; j < ivs.length; j++) {
     const iv = ivs[j];
     const m = arc.k === 0 ? 1 : Math.max(1, Math.ceil(((iv.toMm - iv.fromMm) / cp.rachisMm) * LEAF_BLADE_ROWS));
     const C0 = rachisAt(iv.fromMm), N0j = frameAt(arc.phiAt(iv.fromMm)).N;
     if (j === 0) push(C0, N0j, rPrev);
-    if (iv.radiusMm !== rPrev) push(C0, N0j, iv.radiusMm);   // a shoulder (never on this tree: the wire binds)
+    if (iv.radiusMm !== rPrev) push(C0, N0j, iv.radiusMm);   // a shoulder (never on this tree: every rachis interval is the wire)
     for (let q = 1; q <= m; q++) {
       const s = q === m ? iv.toMm : iv.fromMm + ((iv.toMm - iv.fromMm) * q) / m;
       push(rachisAt(s), frameAt(arc.phiAt(s)).N, iv.radiusMm);
@@ -15509,12 +15622,15 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const termEnd = cp.terminalStalkMm + term.embedMm;
   push([tipC[0] + FE.D[0] * termEnd, tipC[1] + FE.D[1] * termEnd, tipC[2] + FE.D[2] * termEnd], FE.N, cp.stalkR);
   const axisRings = rodPolylineInto(acc, centres, Ts, Ns, radii);
-  const PA = axisRings[0], PB = axisRings[1];
+  /* the petiole's two ends: its rooted end and the RACHIS BASE (past the
+     cone, where there is one) — the record every consumer reads as "the
+     petiole runs from here to there" */
+  const PA = axisRings[0], PB = axisRings[iBase];
   const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
   const rodAxes = [];
   for (let k = 0; k + 1 < axisRings.length; k++) {
     if (centres[k] === centres[k + 1] || (centres[k][0] === centres[k + 1][0] && centres[k][1] === centres[k + 1][1] && centres[k][2] === centres[k + 1][2])) continue;
-    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: Math.max(radii[k], radii[k + 1]), part: k === 0 ? 'petiole' : 'rachis' });
+    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : 'rachis' });
   }
   /* ---- the LATERAL STALKS: rooted ON THE RACHIS's AXIS at their station —
      the solid rod's own "mid-thickness", the petiole-in-the-wall rule for a
@@ -15552,7 +15668,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
      its base free ---------------------------------------------------------- */
   const leaflets = specs.map((sp, i) => {
     const F = leafletFrames[i];
-    const bs = leafBladeState({ ...state, leafLength: sp.L, leafWidth: sp.W, leafArch: 0 });
+    const bs = leafletBladeState(state, sp.L, sp.W);
     const { form, nu, prof } = leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness);
     const B0 = [F.root[0] + F.D[0] * F.stalkMm, F.root[1] + F.D[1] * F.stalkMm, F.root[2] + F.D[2] * F.stalkMm];
     const rowAt = (u) => {
@@ -15579,8 +15695,14 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const directedMismatch = leafDirectedMismatch(acc, tris0);
   const law = arc.k !== 0 ? spineLaw({ curlRad: arc.k * cp.rachisMm, bias: 0, start: 0, length: cp.rachisMm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: LEAF_BLADE_ROWS }) : null;
   const petioleAxis = { inner: ringMid(PA), outer: ringMid(PB), radiusMm: plan.petioleR };
+  /* HOW FAR THE PETIOLE'S ROOTED END REACHES FROM THE STEM'S AXIS — the
+     largest horizontal distance of any vertex of the EMITTED root ring from
+     the axis at this node (the displaced axis where the stem has nodes). The
+     cap's measured side: LF18 holds it inside the stem's outer radius. */
+  const petioleRootReachMm = PA.reduce((mx, q) => Math.max(mx, o ? Math.hypot(q[0] - o[0], q[1] - o[1]) : Math.hypot(q[0], q[1])), 0);
   return {
     compound: true,
+    petioleRootReachMm,
     directedMismatch,
     /* the shared node's reach (SN4) is a simple blade's; a compound leaf is
        pinned off the shared node, so it has none */
