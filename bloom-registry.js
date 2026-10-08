@@ -67,7 +67,7 @@ import { LEAF_TYPES, LEAFLET_PAIRS_RANGE, LEAFLET_PAIRS_DEFAULT, LEAFLET_FIRST_R
          LEAFLET_LENGTH_DEFAULT, LEAFLET_WIDTH_DEFAULT, LEAFLET_BASAL_RANGE, LEAFLET_BASAL_DEFAULT,
          LEAFLET_TERMINAL_LENGTH_DEFAULT, LEAFLET_TERMINAL_WIDTH_DEFAULT, LEAFLET_STALK_RANGE, LEAFLET_STALK_DEFAULT,
          LEAFLET_TERMINAL_STALK_RANGE, LEAFLET_TERMINAL_STALK_DEFAULT,
-         LEAFLET_TOOTH_DEPTH_DEFAULT, LEAFLET_TIP_SHAPE_DEFAULT } from './bloom-geometry.js';
+         LEAFLET_TOOTH_DEPTH_DEFAULT, LEAFLET_TIP_SHAPE_DEFAULT, compoundLeafLayout } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -3940,11 +3940,25 @@ export const CONTROLS = [
     /* The edge lift in mm at the widest point — the petal cup's own read-out
        quantity, `cup x half-width` — and the fold clamp told from the SHOWN
        build's record (the stamen spread's precedent). */
+    /* UNDER COMPOUND THE LIFT IS EACH LEAFLET'S (S3c — #382 found the read-out
+       quoting the HIDDEN simple-leaf width there): one figure per leaflet
+       size class — the basal pair, the top pair, the terminal (a pair and the
+       terminal at one pair) — from the leaflets' own sizes as the geometry's
+       `compoundLeafLayout` (their one owner) floors them. SIMPLE is the
+       sentence it always was. */
     fmt: (v, ui, shown) => {
       const c = Number(v);
-      const h = Number(ui.leafWidth) / 2;
       const cl = shown && shown.leaf && shown.leaf.cupBuilt && shown.leaf.cupBuilt[0] && shown.leaf.cupBuilt[0].clamp;
-      const base = c === 0 ? '0.00 — a flat section' : `${c.toFixed(2)} — the margins ${c > 0 ? 'lifted' : 'turned down'} ${Math.abs(c * h).toFixed(2)} mm at the widest point`;
+      const verb = c > 0 ? 'lifted' : 'turned down';
+      let base;
+      if (c === 0) base = '0.00 — a flat section';
+      else if (evalPredicate({ ref: 'leafCompound' }, ui)) {
+        const lay = compoundLeafLayout(ui);
+        const lat = lay.lateral;
+        const cls = lat.length > 1 ? [['basal pair', lat[0].widthMm], ['top pair', lat[lat.length - 1].widthMm]] : [['pair', lat[0].widthMm]];
+        cls.push(['terminal', lay.terminal.widthMm]);
+        base = `${c.toFixed(2)} — the margins ${verb} ${cls.map(([n, w]) => `${Math.abs((c * w) / 2).toFixed(2)} mm (${n}, ${w.toFixed(1)} mm wide)`).join(' · ')} at each leaflet's widest point`;
+      } else base = `${c.toFixed(2)} — the margins ${verb} ${Math.abs((c * Number(ui.leafWidth)) / 2).toFixed(2)} mm at the widest point`;
       return base + (cl && cl.u !== null ? ` · CLAMPED at u ${Number(cl.u).toFixed(3)}, where the blade narrows (the section may not fold through its own skins)` : '');
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },

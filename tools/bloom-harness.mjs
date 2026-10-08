@@ -10108,13 +10108,9 @@ function nodedChannelAssertions(positions, m, ui, NL, bad) {
      list it always did. */
   const rods = (m && m.leaf && Array.isArray(m.leaf.rodAxes) ? m.leaf.rodAxes : (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : []))
     .filter((a) => a && Array.isArray(a.inner) && Array.isArray(a.outer) && Number.isFinite(a.radiusMm) && a.radiusMm > 0);
-  const onRod = (x, y, z) => rods.some((a) => {
-    const ax = a.outer[0] - a.inner[0], ay = a.outer[1] - a.inner[1], az = a.outer[2] - a.inner[2];
-    const L2 = ax * ax + ay * ay + az * az;
-    let t = L2 > 0 ? ((x - a.inner[0]) * ax + (y - a.inner[1]) * ay + (z - a.inner[2]) * az) / L2 : 0;
-    t = t < 0 ? 0 : t > 1 ? 1 : t;
-    return Math.hypot(x - (a.inner[0] + ax * t), y - (a.inner[1] + ay * t), z - (a.inner[2] + az * t)) <= a.radiusMm + TOL;
-  });
+  /* a TAPERED rod (S3c) is named at its own per-station radii through the
+     geometry's one statement of what a rod record covers */
+  const onRod = (x, y, z) => rods.some((a) => GEOMETRY.rodAxisExcessMm(a, x, y, z) <= TOL);
   const boreR = boreExpected(NL.R);
   const dist = (x, y, z) => {
     let best = Infinity;
@@ -10285,14 +10281,12 @@ export function stemChannelAssertions(positions, row, m, ui) {
   ].filter((a) => a && Array.isArray(a.inner) && Array.isArray(a.outer) && Number.isFinite(a.radiusMm) && a.radiusMm > 0);
   const onAPetiole = (x, y, z) => {
     for (const a of rods) {
-      const ax = a.outer[0] - a.inner[0], ay = a.outer[1] - a.inner[1], az = a.outer[2] - a.inner[2];
-      const L2 = ax * ax + ay * ay + az * az;
-      let t = L2 > 0 ? ((x - a.inner[0]) * ax + (y - a.inner[1]) * ay + (z - a.inner[2]) * az) / L2 : 0;
-      t = t < 0 ? 0 : t > 1 ? 1 : t;
-      /* The rod's own vertices stand at EXACTLY `radiusMm` from this axis, so
+      /* The rod's own vertices stand at EXACTLY its radius from this axis (a
+         tapered rod's at its own per-station radius, S3c — the geometry's
+         `rodAxisExcessMm` is the one statement of what a record covers), so
          the only slack wanted is the file's own float32 quantisation — the
          same TOL the radii above use, for the same reason. */
-      if (Math.hypot(x - (a.inner[0] + ax * t), y - (a.inner[1] + ay * t), z - (a.inner[2] + az * t)) <= a.radiusMm + TOL) return true;
+      if (GEOMETRY.rodAxisExcessMm(a, x, y, z) <= TOL) return true;
     }
     return false;
   };

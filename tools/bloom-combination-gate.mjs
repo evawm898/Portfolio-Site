@@ -1413,7 +1413,7 @@ export function measureLeafStemApproachMm(G, state, exportMode) {
       for (let j = 0; j < P.length; j += 3) {
         const p0 = P[j], p1 = P[j + 1], p2 = P[j + 2];
         /* THE RODS THEMSELVES, named rather than the region widened. */
-        if (axes.some((ax) => segDist([p0, p1, p2], ax.inner, ax.outer) <= ax.radiusMm * (1 + 1e-6))) continue;
+        if (axes.some((ax) => (G.rodAxisExcessMm ? G.rodAxisExcessMm(ax, p0, p1, p2) : segDist([p0, p1, p2], ax.inner, ax.outer) - ax.radiusMm) <= ax.radiusMm * 1e-6)) continue;
         verts++;
         const d = G.freeStemDistanceMm(m.stem, p0, p1, p2);
         if (d < best) { best = d; at = { node: i, azDeg: (az * 180) / Math.PI }; }
