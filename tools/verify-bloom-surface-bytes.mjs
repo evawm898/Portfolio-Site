@@ -285,6 +285,23 @@ const PREDICATE_MOVERS = {
     const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.compound && lp.built > 0);
   },
+  /* THE LOAD-TAPERED RACHIS (S3c — docs/bloom-leaf-rachis-taper-outcome.md).
+     A row moves iff the BASE tree builds a compound leaf whose petiole
+     THICKENS (its own mode-free `thickens`): there #381 drew a cone ring to
+     the wire and a wire rachis, and the taper removes the one and thickens
+     the other. A compound leaf whose cap is UNDER the wire (sheet 2.4 at 85
+     degrees) was the wire throughout on the base and is the wire throughout
+     here — a holder, by the taper's own clamp ("never above the built
+     value"). Read off the BASE tree's own plan chain, never this tree's. */
+  'compound-taper': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    if (!fr.hub) return false;
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
+    return !!(lp.present && lp.compound && lp.built > 0 && lp.compound.petiole && lp.compound.petiole.thickens);
+  },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* ORGANIC VARIANCE, BUILD 3 (spacing). A row moves iff the SPACING field
      exists on this tree — the geometry's own `varianceSpacingIsAbsent`, the

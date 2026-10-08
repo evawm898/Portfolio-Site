@@ -104,6 +104,12 @@ own"), and they now have their own.
 
 ## 3. Ruling 3: the thicker compound petiole
 
+> **SUPERSEDED IN PART BY S3c (Eva, Oct 8; `docs/bloom-leaf-rachis-taper-outcome.md`).** The
+> petiole's law, its cap and its clamp below stand. The 45° cone and "the rachis and the stalks stay
+> the wire" do not: the brief was wrong, not the build, and the rachis now tapers by load from the
+> built petiole to the wire at the terminal. The stalks stay the wire. Kept as written so the
+> reversal is legible.
+
 ### 3a. The law and its owner
 
 - **Asked:** `r = wire × sqrt(N)` — the area rule read UPWARD. The petiole carries N leaflets, each

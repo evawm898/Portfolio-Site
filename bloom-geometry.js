@@ -15431,10 +15431,13 @@ export function compoundLeafRiseMm(state) {
    (`floorThickness(sheet) / 2`, the MODE's floor), so the petiole scales with
    the material exactly as the simple petiole does.
 
-   THE RACHIS AND THE STALKS ARE THE WIRE (`compoundRodRadiusMm`), ruled — not
-   the area rule read down from the thicker petiole, which would make the
-   rachis taper from 2.68 mm to the wire. The rachis keeps its key stations
-   (base, every pair, the tip) because its arch is subdivided between them.
+   THE STALKS ARE THE WIRE (`compoundRodRadiusMm`), ruled. THE RACHIS WAS TOO
+   (#381) and that is SUPERSEDED: see THE LOAD TAPER below — #381's brief said
+   "the rachis and stalks stay at the 1.2 mm floor", so a 45-degree cone took
+   the petiole from 2.68 mm to the wire within about 2 mm of the stem and the
+   whole leaf hung on the thinnest rod in the bloom (Eva, Oct 8: the brief was
+   wrong, not the build). The rachis keeps its key stations (base, every
+   pair, the tip) because its arch is subdivided between them.
 
    THE CAP THE STEM PUTS ON IT (`petioleRootCapMm`, its one owner): the
    petiole must still ROOT THROUGH THE STEM WALL, so its rooted END — the disc
@@ -15454,17 +15457,110 @@ export function compoundLeafRiseMm(state) {
    read-out prints asked against built — and floored at the wire: a petiole is
    never thinner than the rachis it carries.
 
-   THE STEP DOWN TO THE RACHIS IS A 45-DEGREE CONE, its length the radii's own
-   difference, ending AT the rachis base so the rachis keeps its station. A
-   flat shoulder would be the one face here that faces back along the rod.
-   WHETHER THE CONE EXISTS IS DECIDED MODE-FREE (`petioleThickens`): the cap
-   is never under 0.75 mm (half the 1.5 mm wall, the 90-degree case), the
-   live wire differs from the export one only under a 1 mm sheet where both
-   are at most 0.5, so the decision reads the EXPORT wire and both modes build
-   the same rings — which rings exist is topology.
+   THE 45-DEGREE CONE IS RETIRED (S3c): the taper below leaves the petiole at
+   its built radius and the rachis continues from it, so there is no step for
+   a cone to soften, and the cap needs none — it binds the ROOT, which the
+   petiole's own radius already respects. WHETHER THE PETIOLE THICKENS IS
+   STILL DECIDED MODE-FREE (`thickens`): the cap is never under 0.75 mm (half
+   the 1.5 mm wall, the 90-degree case), the live wire differs from the
+   export one only under a 1 mm sheet where both are at most 0.5, so the
+   decision reads the EXPORT wire and both modes take the same branch.
 
-   SLENDERNESS, the coupon question, is reported for the petiole and the
-   rachis both — UNMEASURED, no coupon has been printed. */
+   THE LOAD TAPER (S3c, Eva's ruling of Oct 8 — `compoundRachisTaper` builds
+   it, `compoundRachisRadiusMm` is THE ONE OWNER of the rod's radius at arc
+   length s, read by the builder, the read-out and the slenderness line).
+   Every point of the petiole and the rachis is sized by the area rule from
+   the leaflets it still carries BEYOND it: `wire sqrt(n)`, n = 2 for every
+   pair still to come plus 1 for the terminal. At the default five leaflets
+   that is 2.68 mm across to the first pair, 2.08 to the second, 1.20 at the
+   terminal. THE KNOTS: the rachis base at the BUILT petiole (the cap still
+   binds the root, told as before, and where it clamps the taper starts from
+   the built value and never rises above it); each pair's station at the
+   load carried UP TO it (the pair leaves there, so the section just short of
+   it still carries the pair); the rachis tip at the wire, the terminal
+   stalk's own ruled radius. THE INTERPOLATION IS LINEAR IN ARC LENGTH
+   between knots, chosen for two reasons: (1) it meets the area rule exactly
+   at every station a load leaves and is never under it between (the step
+   function the rule writes is the floor, and any continuous profile has to
+   carry some excess above it somewhere — a linear ramp spreads it evenly
+   over the stretch); (2) the mesh draws the rod as straight frustums between
+   rings, so a linear ramp IS what is drawn — the rings at the stations carry
+   the law exactly and no subdivision is added for it (an arched rachis is
+   subdivided for its arc, and those rings read the ramp too). A monotone
+   cubic would be C1 at the stations and would need extra rings to be drawn
+   at all; the corners a linear ramp leaves are where a stalk roots, and they
+   measure under two degrees on the default leaf. THE ONE STEP: a pair placed
+   ON the rachis tip (`leafletLast` 1) leaves with the terminal at one point,
+   so the rachis carries three to the tip and the terminal stalk one — the
+   rod steps to the wire there, a forward-facing shoulder among three stalk
+   roots, rather than run under the rule over the last stretch. The stalks
+   stay the wire and root on the rachis's AXIS at their station, buried by
+   exactly the station's own radius. */
+export function compoundRachisTaper(lay, wireR, builtR) {
+  const L = lay.rachisMm;
+  const knots = [{ sMm: 0, rMm: builtR, carried: lay.count }];
+  for (const q of lay.lateral) {
+    const carried = 1 + 2 * lay.lateral.filter((x) => x.stationMm >= q.stationMm).length;
+    knots.push({ sMm: q.stationMm, rMm: Math.max(wireR, Math.min(builtR, compoundPetioleRadiusMm(wireR, carried))), carried });
+  }
+  const tipStep = knots[knots.length - 1].sMm >= L;
+  if (!tipStep) knots.push({ sMm: L, rMm: wireR, carried: 1 });
+  return { knots, tipStep, rachisMm: L, wireR, builtR };
+}
+/* THE ROD'S RADIUS AT ARC LENGTH s ALONG THE RACHIS FROM ITS BASE (s <= 0 is
+   the petiole, at the built radius; s at the tip is the rachis side of it —
+   the terminal stalk beyond is the wire). Exact at every knot. */
+export function compoundRachisRadiusMm(taper, sMm) {
+  const K = taper.knots;
+  if (sMm <= K[0].sMm) return K[0].rMm;
+  for (let j = 1; j < K.length; j++) {
+    const b = K[j];
+    if (sMm === b.sMm) return b.rMm;
+    if (sMm < b.sMm) { const a = K[j - 1]; return a.rMm + ((b.rMm - a.rMm) * (sMm - a.sMm)) / (b.sMm - a.sMm); }
+  }
+  return K[K.length - 1].rMm;
+}
+/* THE STRETCHES BETWEEN LOAD DEPARTURES, for the slenderness line: from the
+   rachis base to the first pair, pair to pair, and the last pair to the
+   terminal's base (rachis and terminal stalk together); each one's L/d read
+   at its THINNEST diameter (its far end, on a falling ramp). */
+export function compoundRachisStretches(taper, terminalStalkMm, stationsMm) {
+  const L = taper.rachisMm, w = taper.wireR;
+  const ends = [0, ...stationsMm.filter((s) => s < L), ...(taper.tipStep ? [L] : []), L + terminalStalkMm];
+  const R = (s) => (s > L ? w : compoundRachisRadiusMm(taper, s));
+  const out = [];
+  for (let j = 0; j + 1 < ends.length; j++) {
+    const a = ends[j], b = ends[j + 1];
+    if (!(b > a)) continue;
+    const dMin = 2 * Math.min(R(a), b > L ? w : R(b));
+    out.push({ fromMm: a, toMm: b, lengthMm: b - a, dMinMm: dMin, ld: (b - a) / dMin });
+  }
+  return out;
+}
+/* HOW FAR A POINT LIES OUTSIDE A NAMED ROD (S3c) — the one statement of what
+   a `rodAxes` record covers, read by ST9, its Node witness and the combination
+   gate's leaf-stem measure, so "is this vertex on a rod" has one owner. A
+   record is a frustum from `inner` to `outer` at its own two radii
+   (`innerR` -> `outerR`; a record carrying only `radiusMm` — a simple
+   petiole, a pedicel, an older tree — is the uniform rod it always was),
+   capped by the balls at its two ends exactly as the uniform capsule was:
+   the radius at the point's own clamped parameter along the axis, or either
+   end's ball, whichever holds it. Returns `distance - radius` (<= 0 inside).
+   NEVER WIDENED: on a uniform record this is the capsule test verbatim. */
+export function rodAxisExcessMm(a, x, y, z) {
+  const rI = a.innerR === undefined ? a.radiusMm : a.innerR, rO = a.outerR === undefined ? a.radiusMm : a.outerR;
+  const ax = a.outer[0] - a.inner[0], ay = a.outer[1] - a.inner[1], az = a.outer[2] - a.inner[2];
+  const L2 = ax * ax + ay * ay + az * az;
+  let t = L2 > 0 ? ((x - a.inner[0]) * ax + (y - a.inner[1]) * ay + (z - a.inner[2]) * az) / L2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const onAxis = Math.hypot(x - (a.inner[0] + ax * t), y - (a.inner[1] + ay * t), z - (a.inner[2] + az * t)) - (rI + (rO - rI) * t);
+  if (rI === rO) return onAxis;
+  const dIn = Math.hypot(x - a.inner[0], y - a.inner[1], z - a.inner[2]) - rI;
+  const dOut = Math.hypot(x - a.outer[0], y - a.outer[1], z - a.outer[2]) - rO;
+  return Math.min(onAxis, dIn, dOut);
+}
+/* SLENDERNESS, the coupon question, is reported for the petiole and for every
+   stretch of the rachis — UNMEASURED, no coupon has been printed. */
 export function compoundPetioleRadiusMm(wireR, count) {
   return wireR * Math.sqrt(count);
 }
@@ -15494,25 +15590,31 @@ export function compoundLeafPlan(state, rachisMm, wireR, wall, angleDeg) {
   const wireFreeR = leafNodePitchFloorMm(state.sheetThickness) / 2;
   const thickens = capMm > wireFreeR;
   const radiusMm = thickens ? Math.max(wireR, Math.min(askedMm, capMm)) : wireR;
-  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens, coneMm: thickens ? radiusMm - wireR : 0 };
+  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens };
+  /* THE LOAD TAPER from the BUILT petiole (S3c) — its one owner beside it */
+  const taper = compoundRachisTaper(lay, wireR, radiusMm);
   /* the rachis KEY stations (base, every pair, tip), each interval's carried
-     count — the terminal plus every pair at or beyond the interval's END */
+     count — the terminal plus every pair at or beyond the interval's END —
+     and the taper's radius at each end */
   const keys = [...new Set([0, ...lay.lateral.map((q) => q.stationMm), rachisMm])].sort((x, y) => x - y);
   const intervals = [];
   for (let j = 0; j + 1 < keys.length; j++) {
     const carried = 1 + 2 * lay.lateral.filter((q) => q.stationMm >= keys[j + 1]).length;
-    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: compoundRodRadiusMm(wireR) });
+    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, fromR: compoundRachisRadiusMm(taper, keys[j]), toR: compoundRachisRadiusMm(taper, keys[j + 1]) });
   }
   const stalkR = compoundRodRadiusMm(wireR);
+  const stretches = compoundRachisStretches(taper, lay.terminalStalkMm, lay.lateral.map((q) => q.stationMm));
+  const worst = stretches.reduce((a, b) => (b.ld > a.ld ? b : a), stretches[0]);
   return {
     ...lay,
     wireR, petiole,
-    rachis: { keysMm: keys, intervals },
+    rachis: { keysMm: keys, intervals, taper },
     stalkR,
-    /* THE LONGEST UNSUPPORTED RODS, the coupon question: the rachis from the
-       petiole's end to the terminal's base, at the wire. Reported, never a
-       bound (the petiole's own L/d is the plan's, beside it). */
-    slenderness: { rachisMm, diameterMm: 2 * stalkR, ld: (rachisMm + lay.terminalStalkMm) / (2 * stalkR) },
+    /* THE UNSUPPORTED STRETCHES, the coupon question: each run of the rachis
+       between load departures (the last one carrying on through the terminal
+       stalk to the terminal's base), its L/d at its thinnest. Reported, never
+       a bound (the petiole's own L/d is the plan's, beside it). */
+    slenderness: { stretches, worst, rachisMm, diameterMm: worst.dMinMm, ld: worst.ld },
   };
 }
 
@@ -15593,32 +15695,31 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const push = (C, N, r) => { centres.push(C); Ts.push(T); Ns.push(N); radii.push(r); };
   const N0 = frameAt(th).N;
   push([base[0] - D0[0] * plan.embedMm, base[1] - D0[1] * plan.embedMm, base[2] - D0[2] * plan.embedMm], N0, plan.petioleR);
-  /* THE THICKER PETIOLE STEPS DOWN TO THE RACHIS ON A 45-DEGREE CONE (see
-     `compoundLeafPlan`): full radius to `coneMm` short of the rachis base,
-     then the wire AT the base. `thickens` is the plan's mode-free decision,
-     so both modes emit the same rings. */
-  const PE = cp.petiole;
-  if (PE.thickens) push([bb[0] - D0[0] * PE.coneMm, bb[1] - D0[1] * PE.coneMm, bb[2] - D0[2] * PE.coneMm], N0, plan.petioleR);
+  /* THE PETIOLE RUNS STRAIGHT TO THE RACHIS BASE AT ITS BUILT RADIUS AND THE
+     RACHIS TAPERS ON FROM IT (S3c): every ring reads the load taper's one
+     owner at its own arc length, so the drawn rod IS the law (linear between
+     rings). #381's 45-degree cone is gone — nothing steps down. */
+  const TP = cp.rachis.taper;
+  const rAt = (s) => compoundRachisRadiusMm(TP, s);
   const iBase = centres.length;
   /* the rachis stations: every key, each interval subdivided where the rachis
      ARCHES into as many pieces as the blade law's own rows would give that
      length (`LEAF_BLADE_ROWS` over the rachis) — a straight rachis needs its
      keys alone */
   const ivs = cp.rachis.intervals;
-  let rPrev = PE.thickens ? cp.wireR : plan.petioleR;
   for (let j = 0; j < ivs.length; j++) {
     const iv = ivs[j];
     const m = arc.k === 0 ? 1 : Math.max(1, Math.ceil(((iv.toMm - iv.fromMm) / cp.rachisMm) * LEAF_BLADE_ROWS));
-    const C0 = rachisAt(iv.fromMm), N0j = frameAt(arc.phiAt(iv.fromMm)).N;
-    if (j === 0) push(C0, N0j, rPrev);
-    if (iv.radiusMm !== rPrev) push(C0, N0j, iv.radiusMm);   // a shoulder (never on this tree: every rachis interval is the wire)
+    if (j === 0) push(rachisAt(iv.fromMm), frameAt(arc.phiAt(iv.fromMm)).N, rAt(iv.fromMm));
     for (let q = 1; q <= m; q++) {
       const s = q === m ? iv.toMm : iv.fromMm + ((iv.toMm - iv.fromMm) * q) / m;
-      push(rachisAt(s), frameAt(arc.phiAt(s)).N, iv.radiusMm);
+      push(rachisAt(s), frameAt(arc.phiAt(s)).N, rAt(s));
     }
-    rPrev = iv.radiusMm;
   }
-  if (cp.stalkR !== rPrev) push(tipC, FE.N, cp.stalkR);
+  const iTip = centres.length - 1;
+  /* THE ONE STEP: a pair ON the tip leaves with the terminal — the rachis
+     carries three to the tip, the terminal stalk one (see the taper's law) */
+  if (radii[iTip] !== cp.stalkR) push(tipC, FE.N, cp.stalkR);
   const termEnd = cp.terminalStalkMm + term.embedMm;
   push([tipC[0] + FE.D[0] * termEnd, tipC[1] + FE.D[1] * termEnd, tipC[2] + FE.D[2] * termEnd], FE.N, cp.stalkR);
   const axisRings = rodPolylineInto(acc, centres, Ts, Ns, radii);
@@ -15630,7 +15731,10 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const rodAxes = [];
   for (let k = 0; k + 1 < axisRings.length; k++) {
     if (centres[k] === centres[k + 1] || (centres[k][0] === centres[k + 1][0] && centres[k][1] === centres[k + 1][1] && centres[k][2] === centres[k + 1][2])) continue;
-    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : 'rachis' });
+    /* EACH SEGMENT NAMED AT ITS OWN TWO RADII (S3c): a tapered rod is a
+       frustum, so the exemption ST9 and the combination gate read is the
+       segment's own `innerR -> outerR`, never its larger end carried along it */
+    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), innerR: radii[k], outerR: radii[k + 1], radiusMm: Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : k < iTip ? 'rachis' : 'terminal stalk' });
   }
   /* ---- the LATERAL STALKS: rooted ON THE RACHIS's AXIS at their station —
      the solid rod's own "mid-thickness", the petiole-in-the-wall rule for a
@@ -15662,7 +15766,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
        right side's at every angle and no vertex is shared. */
     const rings = rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T], [F.N, F.N], [cp.stalkR, cp.stalkR], sp.side < 0 ? 0 : 0.5);
     stalkRings.push(rings);
-    rodAxes.push({ inner: ringMid(rings[0]), outer: ringMid(rings[1]), radiusMm: cp.stalkR, part: `stalk ${i}` });
+    rodAxes.push({ inner: ringMid(rings[0]), outer: ringMid(rings[1]), innerR: cp.stalkR, outerR: cp.stalkR, radiusMm: cp.stalkR, part: `stalk ${i}` });
   });
   /* ---- the LEAFLETS: the simple blade law, flat in the rachis's local plane,
      its base free ---------------------------------------------------------- */

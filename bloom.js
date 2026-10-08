@@ -1819,11 +1819,21 @@ function leafLine(leaf, leavesBuilt) {
           : pe.clamped
           ? `; CLAMPED to ${(2 * pe.capMm).toFixed(2)} mm, the most this stem holds with the rooted end inside it at ${leaf.angleDeg}° (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
           : `, under the ${(2 * pe.capMm).toFixed(2)} mm this stem holds with the rooted end inside it at ${leaf.angleDeg}°`)
-        + (pe.thickens ? ` · a 45° cone of ${pe.coneMm.toFixed(2)} mm steps it down to the rachis` : '')
+        + (pe.thickens ? ' · it runs straight to the rachis, which tapers on from it (below)' : '')
         + (pe.radiusMm > pe.capMm && b0 && Number.isFinite(b0.petioleRootReachMm) && b0.petioleRootReachMm > leaf.outerR
           ? ` — and its rooted end stands ${(b0.petioleRootReachMm - leaf.outerR).toFixed(2)} mm PROUD of the stem, as a simple leaf's own petiole does at this sheet and angle (told)`
           : '')
-        + `\n     RODS rachis and stalks ${(2 * cpd.stalkR).toFixed(2)} mm — the wire floor (the leaf's own petiole rule), ruled`;
+        + (() => {
+          /* THE LOAD TAPER (S3c), every figure off the plan's own taper — the
+             one owner `compoundRachisRadiusMm` is also what built the rings */
+          const TP = cpd.rachis.taper, K = TP.knots;
+          const at = K.slice(1).map((k) => `${(2 * k.rMm).toFixed(2)} at ${k.sMm.toFixed(1)} mm (${k.carried} carried)`).join(' -> ');
+          const clampedAny = K.slice(1).some((k) => k.carried > 1 && Math.sqrt(k.carried) * cpd.wireR > pe.radiusMm + 1e-12);
+          return `\n     RACHIS TAPERS BY LOAD from the ${(2 * K[0].rMm).toFixed(2)} mm petiole: ${at} — the area rule over the leaflets still carried beyond each point, linear in arc length between the pair stations, never under the rule`
+            + (clampedAny ? ` · it starts from the BUILT ${(2 * pe.radiusMm).toFixed(2)} mm, not the asked ${(2 * pe.askedMm).toFixed(2)}, and never rises above it` : '')
+            + (TP.tipStep && K[K.length - 1].rMm !== cpd.stalkR ? ` · the last pair sits ON the tip, so the rod steps to the wire there, where three leaflets leave one point` : '');
+        })()
+        + `\n     RODS stalks ${(2 * cpd.stalkR).toFixed(2)} mm — the wire floor (the leaf's own petiole rule), ruled; each roots on the rachis's axis, buried by the station's own radius`;
     })()
     : '';
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node${leaf.divergenceDeg !== null && leaf.divergenceDeg !== undefined ? `, ${leaf.divergenceDeg.toFixed(1)}° between nodes${leaf.divergenceDeg === 180 ? ' — distichous' : ''}` : ''})`
@@ -1842,7 +1852,7 @@ function leafLine(leaf, leavesBuilt) {
     + tipLine + sharedLine + capLine
     + compoundLine
     + (cpd
-      ? `\n     SLENDERNESS L/d petiole ${(leaf.petioleLenMm / (2 * leaf.petioleR)).toFixed(1)} (${leaf.petioleLenMm.toFixed(1)} mm at ${(2 * leaf.petioleR).toFixed(2)} mm) · rachis ${cpd.slenderness.ld.toFixed(1)} (the longest unsupported rod on the bloom: ${(cpd.rachisMm + cpd.terminalStalkMm).toFixed(1)} mm of rachis and terminal stalk at ${cpd.slenderness.diameterMm.toFixed(2)} mm) — UNMEASURED — no coupon has been printed\n`
+      ? `\n     SLENDERNESS L/d petiole ${(leaf.petioleLenMm / (2 * leaf.petioleR)).toFixed(1)} (${leaf.petioleLenMm.toFixed(1)} mm at ${(2 * leaf.petioleR).toFixed(2)} mm) · rachis by stretch ${cpd.slenderness.stretches.map((q) => `${q.ld.toFixed(1)} (${q.fromMm.toFixed(1)}–${q.toMm.toFixed(1)} mm at ${q.dMinMm.toFixed(2)} mm)`).join(', ')} — the most slender stretch is ${cpd.slenderness.worst.fromMm.toFixed(1)}–${cpd.slenderness.worst.toMm.toFixed(1)} mm, L/d ${cpd.slenderness.worst.ld.toFixed(1)} (each read at its thinnest end; the last runs on through the terminal stalk to the terminal's base) — UNMEASURED — no coupon has been printed\n`
       : `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`);
 }
 

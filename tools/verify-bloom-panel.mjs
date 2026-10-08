@@ -292,6 +292,15 @@
          against the panel. `(aa)` because every single letter is taken — (v)
          retired, the rest in the enumeration or in prose; three edits: this
          entry, the block, the negative control's flag list and banner.
+     (ab) THE CUP READ-OUT UNDER COMPOUND QUOTES THE LEAFLETS (S3c). #382
+         found it quoting the edge lift from the HIDDEN simple-leaf width under
+         COMPOUND. The route restates each leaflet size class's width from the
+         leaflet controls (basal pair, top pair, terminal; a pair and the
+         terminal at one pair), requires the read-out to quote `cup x
+         half-width` for each, and moves the leaflet and terminal widths so a
+         read-out deaf to them is red; under SIMPLE the sentence is the one it
+         was and names no leaflet. Seen red first on main's read-out. Three
+         edits as ever: this entry, the block, the negative control's flags.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3314,6 +3323,58 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await step('the guard OFF with roundness 1 — hidden AND inert', [{ id: 'petalInfill', value: 'NONE' }], { guard: 'NONE' });
 }
 
+/* ---------------- (ab) THE CUP READ-OUT UNDER COMPOUND QUOTES THE LEAFLETS ----------
+   #382 found the Cup control's read-out quoting the edge lift from the HIDDEN
+   simple-leaf width under COMPOUND — right for the top lateral pair at the
+   defaults by coincidence, and deaf to every leaflet width slider. The lift
+   is `cup x half-width` per leaflet size class; the widths are RESTATED here
+   from the leaflet controls (the basal pair at the basal ratio, floored at the
+   width control's own minimum; the top pair at the width; the terminal at its
+   own width) — never read off the read-out or the geometry. Under SIMPLE the
+   sentence is the one it always was and names no leaflet. Under
+   `--negative-control` the Cup value span is FROZEN at the SIMPLE state's
+   text, so a route that compared the read-out with itself would pass. */
+{
+  const tag = '[leaf cup]';
+  await openBloom(page, port);
+  const base = [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '3' }];
+  const step = async (label, sets) => {
+    const bad = await applyConfig(page, sets);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const w = document.getElementById('leafCup').closest('.bl-ctrl');
+      const v = (id) => Number(document.getElementById(id).value);
+      return { hidden: w.hidden, said: w.querySelector('.bl-val').textContent, type: document.getElementById('leafType').value,
+        cup: v('leafCup'), leafWidth: v('leafWidth'), wid: v('leafletWidth'), widMin: Number(document.getElementById('leafletWidth').min),
+        basal: v('leafletBasalRatio'), pairs: v('leafletPairs'), tWid: v('leafletTerminalWidth') };
+    });
+    const p = [];
+    if (res.hidden) p.push('the Cup control is hidden on a bloom with leaves');
+    const mm = (w) => `${Math.abs(res.cup * w / 2).toFixed(2)} mm`;
+    if (res.type === 'SIMPLE') {
+      if (!res.said.includes(`${mm(res.leafWidth)} at the widest point`)) p.push(`the SIMPLE read-out does not quote the leaf's own ${mm(res.leafWidth)} lift: "${res.said.slice(0, 160)}"`);
+      if (/leaflet|terminal|pair/i.test(res.said)) p.push(`the SIMPLE read-out names leaflets: "${res.said.slice(0, 160)}"`);
+    } else {
+      const classes = res.pairs > 1
+        ? [['basal pair', Math.max(res.widMin, res.wid * res.basal)], ['top pair', res.wid], ['terminal', res.tWid]]
+        : [['pair', res.wid], ['terminal', res.tWid]];
+      for (const [name, w] of classes) if (!res.said.includes(`${mm(w)} (${name}`)) p.push(`the COMPOUND read-out does not quote the ${name}'s ${mm(w)} lift (a ${w.toFixed(2)} mm leaflet restated from the leaflet controls): "${res.said.slice(0, 200)}"`);
+      if (res.leafWidth !== res.wid && res.leafWidth !== res.tWid && res.leafWidth !== Math.max(res.widMin, res.wid * res.basal) && res.said.includes(`${mm(res.leafWidth)} `)) p.push(`the COMPOUND read-out still quotes the hidden simple-leaf width's ${mm(res.leafWidth)} lift`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: "${res.said.slice(0, 140)}"`);
+  };
+  await step('SIMPLE leaves — the leaf’s own width, no leaflet named', base);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const span = document.getElementById('leafCup').closest('.bl-ctrl').querySelector('.bl-val'); const t0 = span.textContent; Object.defineProperty(span, 'textContent', { get: () => t0, set: () => {} }); });
+  }
+  await step('COMPOUND at the defaults — basal pair, top pair, terminal', [...base, { id: 'leafType', value: 'COMPOUND' }]);
+  await step('the leaflet width 30 — the pairs’ lifts move with it', [...base, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletWidth', value: '30' }]);
+  await step('the terminal width 10 — the terminal’s lift moves', [...base, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletWidth', value: '30' }, { id: 'leafletTerminalWidth', value: '10' }]);
+  await step('one pair — a pair and the terminal', [...base, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletPairs', value: '1' }]);
+  await step('cup -0.5 under COMPOUND — the margins turned down, the same classes', [...base, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafCup', value: '-0.5' }]);
+}
+
 await browser.close();
 server.close();
 
@@ -3388,10 +3449,12 @@ if (NEGATIVE_CONTROL) {
     const sawLevers = fail.some((f) => /^\[infill levers\] .*INFILL levers line (is absent while the builder built a field|says relaxation)/.test(f));
     /* ROUTE (aa), THE ROUNDNESS CONTROL'S TELLING, required for route (w)'s own reason. */
     const sawRound = fail.some((f) => /^\[roundness\] .*the control does not carry the builder's median roundness/.test(f));
+    /* ROUTE (ab), THE CUP READ-OUT UNDER COMPOUND, required for route (w)'s own reason. */
+    const sawLeafCup = fail.some((f) => /^\[leaf cup\] .*COMPOUND read-out does not quote the/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
-        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-ONE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-TWO ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

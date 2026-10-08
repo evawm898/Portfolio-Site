@@ -1866,7 +1866,7 @@ const MUTANTS = [
      Its place is taken by the four ways the thicker petiole could be wrong,
      the rachis taking the petiole's thickening, the exemption widened, and
      the leaflets reading the SIMPLE leaf's depth or tip. */
-  { id: 'the-rods-are-typed', why: "every rachis and stalk is a typed 0.6 mm radius whatever the sheet — the lab's own constant, invisible at the shipped sheet where the wire is the same double",
+  { id: 'the-rods-are-typed', why: "every stalk is a typed 0.6 mm radius whatever the sheet (S3c: the rachis tapers from the wire floor, so the stalks are what this reaches) — the lab's own constant, invisible at the shipped sheet where the wire is the same double",
     find: 'export function compoundRodRadiusMm(wireR) {\n  return wireR;\n}',
     into: 'export function compoundRodRadiusMm(wireR) {\n  return 0.6;\n}', names: ['LF17', 'LF18'],
     witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
@@ -1894,29 +1894,55 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.plan.compound.petiole.capMm - m.plan.outerR) < 1e-12 && c.plan.compound.petiole.capMm < c.plan.outerR - 0.1) ? null
         : `the mutant caps at ${m.plan.compound.petiole.capMm} mm against the clean tree's ${c.plan.compound.petiole.capMm} (outer ${c.plan.outerR}) — the behaviour did not move`; } },
-  { id: 'the-petiole-steps-down-flat', why: 'the cone is collapsed onto the rachis base — the thick petiole meets the wire on a flat shoulder facing back along the rod',
-    find: '  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens, coneMm: thickens ? radiusMm - wireR : 0 };',
-    into: '  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens, coneMm: 0 };', names: ['LF17'],
-    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
-      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      const gap = (r) => { const a = r.axisRod.centres; return Math.hypot(a[1][0] - a[2][0], a[1][1] - a[2][1], a[1][2] - a[2][2]); };
-      return (gap(m.rep) < 1e-12 && gap(c.rep) > 0.1) ? null
-        : `the mutant's cone ring stands ${gap(m.rep)} mm short of the rachis base against the clean tree's ${gap(c.rep)} — the behaviour did not move`; } },
-  { id: 'the-rachis-thickens-with-the-petiole', why: "the rachis is the area rule read DOWN from the thicker petiole — tapering from 2.68 mm to the wire, where Eva ruled the rachis stays at the floor",
-    find: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: compoundRodRadiusMm(wireR) });',
-    into: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: Math.max(wireR, radiusMm * Math.sqrt(carried / N)) });', names: ['LF17', 'LF18'],
-    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
-      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      const r0 = (x) => x.plan.compound.rachis.intervals[0].radiusMm;
-      return (r0(m) > r0(c) + 0.1) ? null
-        : `the mutant's first rachis interval is ${r0(m)} mm against the clean tree's ${r0(c)} — the behaviour did not move`; } },
+  /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
+     `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
+     (the petiole runs straight to the rachis and the rachis tapers on from
+     it), and `the-rachis-thickens-with-the-petiole` mutated the rachis INTO
+     an area-rule taper, which is now the law. Their places are taken by the
+     four ways the taper could be wrong, below. */
   { id: 'the-rod-exemption-is-widened', why: "every rod is reported to ST9 and the combination gate at twice its emitted radius — an exemption region wider than the rod it names",
-    find: "    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : 'rachis' });",
-    into: "    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: 2 * Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : 'rachis' });", names: ['LF18'],
+    find: "    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), innerR: radii[k], outerR: radii[k + 1], radiusMm: Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : k < iTip ? 'rachis' : 'terminal stalk' });",
+    into: "    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), innerR: 2 * radii[k], outerR: 2 * radii[k + 1], radiusMm: 2 * Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : k < iTip ? 'rachis' : 'terminal stalk' });", names: ['LF18'],
     witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (Math.abs(m.rep.rodAxes[0].radiusMm - 2 * c.rep.rodAxes[0].radiusMm) < 1e-12) ? null
-        : `the mutant names its petiole at ${m.rep.rodAxes[0].radiusMm} mm against the clean tree's ${c.rep.rodAxes[0].radiusMm} — the behaviour did not move`; } },
+      return (Math.abs(m.rep.rodAxes[0].innerR - 2 * c.rep.rodAxes[0].innerR) < 1e-12 && Math.abs(m.rep.rodAxes[0].radiusMm - 2 * c.rep.rodAxes[0].radiusMm) < 1e-12) ? null
+        : `the mutant names its petiole at ${m.rep.rodAxes[0].innerR} mm against the clean tree's ${c.rep.rodAxes[0].innerR} — the behaviour did not move`; } },
+  /* THE LOAD TAPER (S3c, Eva's ruling of Oct 8) — four ways it could be
+     wrong, each witnessed on the MUTATED module's own emitted axis rod at the
+     shipped sheet (`TAPER_WIT`, where the petiole is not clamped and the
+     taper's three knots are 2.68 / 2.08 / 1.20 mm). */
+  { id: 'the-taper-is-stepped', why: 'the rachis is the area rule as a STEP function — each stretch held at its own load\'s radius with a flat shoulder at every pair station, where Eva ruled a smooth taper',
+    find: "    if (j === 0) push(rachisAt(iv.fromMm), frameAt(arc.phiAt(iv.fromMm)).N, rAt(iv.fromMm));\n    for (let q = 1; q <= m; q++) {\n      const s = q === m ? iv.toMm : iv.fromMm + ((iv.toMm - iv.fromMm) * q) / m;\n      push(rachisAt(s), frameAt(arc.phiAt(s)).N, rAt(s));",
+    into: "    push(rachisAt(iv.fromMm), frameAt(arc.phiAt(iv.fromMm)).N, rAt(iv.toMm));\n    for (let q = 1; q <= m; q++) {\n      const s = q === m ? iv.toMm : iv.fromMm + ((iv.toMm - iv.fromMm) * q) / m;\n      push(rachisAt(s), frameAt(arc.phiAt(s)).N, rAt(iv.toMm));", names: ['LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, TAPER_WIT), c = compoundFacts(C, TAPER_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const steps = (r) => { const a = r.axisRod.centres; let n = 0; for (let k = 0; k + 1 < a.length; k++) if (Math.hypot(a[k][0] - a[k + 1][0], a[k][1] - a[k + 1][1], a[k][2] - a[k + 1][2]) < 1e-9) n++; return n; };
+      return (steps(m.rep) >= 2 && steps(c.rep) === 0) ? null
+        : `the mutant's axis rod carries ${steps(m.rep)} shoulders against the clean tree's ${steps(c.rep)} — the behaviour did not move`; } },
+  { id: 'the-taper-stops-at-the-petiole', why: "#381's shape: the petiole thick and the whole rachis the 1.2 mm wire — the leaf hanging on the thinnest rod in the bloom",
+    find: "  if (sMm <= K[0].sMm) return K[0].rMm;\n  for (let j = 1; j < K.length; j++) {",
+    into: "  if (sMm <= K[0].sMm) return K[0].rMm;\n  if (taper) return taper.wireR;\n  for (let j = 1; j < K.length; j++) {", names: ['LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, TAPER_WIT), c = compoundFacts(C, TAPER_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const r2 = (r) => r.axisRod.radii[2];
+      return (Math.abs(r2(m.rep) - m.plan.compound.wireR) < 1e-9 && r2(c.rep) > c.plan.compound.wireR + 0.5) ? null
+        : `the mutant's rachis ring at the first pair is ${r2(m.rep)} mm against the clean tree's ${r2(c.rep)} — the behaviour did not move`; } },
+  { id: 'the-taper-counts-every-leaflet', why: 'every station is sized from the leaf\'s WHOLE count rather than the leaflets still carried beyond it — the rachis as thick at its last pair as at its base',
+    find: "    knots.push({ sMm: q.stationMm, rMm: Math.max(wireR, Math.min(builtR, compoundPetioleRadiusMm(wireR, carried))), carried });",
+    into: "    knots.push({ sMm: q.stationMm, rMm: Math.max(wireR, Math.min(builtR, compoundPetioleRadiusMm(wireR, lay.count))), carried });", names: ['LF17', 'LF18'],
+    witness: (M, C) => { const m = compoundFacts(M, TAPER_WIT), c = compoundFacts(C, TAPER_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const r3 = (r) => r.axisRod.radii[3];
+      return (r3(m.rep) > r3(c.rep) + 0.1) ? null
+        : `the mutant's rachis ring at the last pair is ${r3(m.rep)} mm against the clean tree's ${r3(c.rep)} — the behaviour did not move`; } },
+  { id: 'the-stalk-roots-at-the-wire', why: "each stalk starts where a WIRE rachis's surface would be, one wire radius out along the stalk, instead of on the rachis's axis buried by the station's own radius — the #381-minded root that a thinner tapered section no longer holds",
+    find: "    const rings = rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T]",
+    into: "    const rings = rodPolylineInto(acc, [[F.root[0] + F.D[0] * cp.wireR, F.root[1] + F.D[1] * cp.wireR, F.root[2] + F.D[2] * cp.wireR], [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T]", names: ['LF16', 'LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, TAPER_WIT), c = compoundFacts(C, TAPER_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const off = (r) => { const q = r.stalkRods[2].root, t = r.leaflets[2].root; return Math.hypot(q[0] - t[0], q[1] - t[1], q[2] - t[2]); };
+      return (Math.abs(off(m.rep) - m.plan.compound.wireR) < 1e-9 && off(c.rep) < 1e-9) ? null
+        : `the mutant's second-pair stalk roots ${off(m.rep)} mm off the rachis axis against the clean tree's ${off(c.rep)} — the behaviour did not move`; } },
   { id: 'the-leaflets-read-the-simple-tooth-depth', why: "the leaflets read the SIMPLE leaf's 0.26 tooth depth again — the holly leaflets Eva ruled off, with their own depth control reaching nothing",
     find: '    lobeDepth: state.leafletToothDepth === undefined ? LEAFLET_TOOTH_DEPTH_DEFAULT : Number(state.leafletToothDepth),',
     into: '    lobeDepth: Number(state.leafToothDepth),', names: ['LF7', 'LF13'],
@@ -2248,6 +2274,12 @@ const SIMPLE_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes:
    2.14 mm — and the stem's own radius (the wrong cap) is 3.00, so the true
    cap, a typed one and no cap at all are three different petioles here. */
 const CLAMP_WIT = { stemLength: 70, stemDiameter: 3, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', leafletPairs: 4, leafAngle: 70 };
+/* THE TAPER'S WITNESS (S3c): the shipped compound defaults at the shipped
+   sheet, one node — the petiole 2.68 mm and unclamped, the rachis 2.68 to the
+   first pair, 2.08 at the second, the wire at the tip. Axis ring 2 is the
+   first pair's station, ring 3 the second's (a straight rachis has its keys
+   alone), so the witnesses read the ramp at its own knots. */
+const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND' };
 function compoundFacts(MOD, set) {
   try {
     const st = { ...REGISTRY_DEFAULTS, ...set };
@@ -2474,6 +2506,8 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'sheetThickness', value: '2.4' }] },
   { label: 'a compound leaf CLAMPED by a 3 mm stem at 70 deg (4 pairs ask 3.60 mm; the rooted end fits 2.14)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '3' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletPairs', value: '4' }, { id: 'leafAngle', value: '70' }] },
+  { label: 'a compound leaf at the shipped sheet (the load taper 2.68 -> 2.08 -> 1.20 mm, unclamped)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }] },
   { label: 'a SIMPLE leaf with the hidden leaflet controls at an extreme (pairs 4, stalk 20 — where a leak would show)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafletPairs', value: '4' }, { id: 'leafletStalk', value: '20' }] },
   { label: 'a leaf arched 90 and cupped 0.8 on a 5 mm blade whose teeth the floor reshapes (depth 0.3)',

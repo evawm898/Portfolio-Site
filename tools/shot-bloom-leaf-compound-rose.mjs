@@ -110,7 +110,11 @@ const f2 = (x) => x.toFixed(2);
 const petLines = (cp) => {
   const p = cp.petiole;
   return [`PETIOLE ASKS ${f2(2 * p.askedMm)} MM (THE WIRE x SQRT ${cp.count})`, `THE STEM HOLDS ${f2(2 * p.capMm)} MM, BUILT ${f2(2 * p.radiusMm)} MM${!p.thickens ? ' (THE WIRE)' : p.clamped ? ' CLAMPED' : ''}`,
-    p.thickens ? `A ${f2(p.coneMm)} MM 45 DEG CONE TO THE ${f2(2 * cp.wireR)} MM RACHIS` : `CAP UNDER THE WIRE: THE PETIOLE STAYS ${f2(2 * cp.wireR)} MM`];
+    /* #381's 45-degree cone is retired by S3c (the load-tapered rachis); a
+       tree that still carries one (`coneMm`, the --base worktree) says so */
+    !p.thickens ? `CAP UNDER THE WIRE: THE PETIOLE STAYS ${f2(2 * cp.wireR)} MM`
+      : p.coneMm !== undefined ? `A ${f2(p.coneMm)} MM 45 DEG CONE TO THE ${f2(2 * cp.wireR)} MM RACHIS`
+      : `THE RACHIS TAPERS BY LOAD: ${cp.rachis.taper.knots.slice(1).map((k) => f2(2 * k.rMm)).join(' -> ')} MM`];
 };
 
 /* ---- the section: a plane through `C` with normal `T`, cut out of the given
