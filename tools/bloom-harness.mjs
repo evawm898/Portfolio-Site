@@ -8292,45 +8292,82 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
     if (flat > 1e-9) bad.push(`LF16: a leaflet is ${flat.toExponential(3)} off FLAT in the rachis's own plane at ${flatAt} — a per-leaflet arch or a leaflet off its restated direction`);
     if (freeBad.length) bad.push(`LF16: ${freeBad.length} leaflet base(s) are BURIED, not free — no bead closes them: ${freeBad.slice(0, 4).join('; ')}`);
   }
-  /* LF17 — the rods, measured off the emitted rings. RE-DERIVED (Eva's ruling
-     on #380, Oct 7): the PETIOLE is the area rule read UPWARD over the
-     leaflets, capped by the stem (LF18 holds that law and its clamp), and
-     the rachis and the stalks are the WIRE — not the area rule read down from
-     a petiole that was itself the wire (S3, where every ring read the wire).
-     Seen red first on the shipped compound defaults: "a rod's emitted radius
-     is 7.416e-1 mm off the derived law ... the area rule read down from the
-     1.200 mm petiole". The rachis's base is found BY POSITION (the emitted
-     ring at the petiole's outer centroid), because a thicker petiole steps
-     down on a cone whose ring stands before it: every ring BEFORE the base is
-     the petiole's restated radius, the base and every ring after it the
-     wire, and where the petiole thickens the cone's ring stands exactly the
-     radii's difference short of the base (45 degrees). */
+  /* LF17 — the rods, measured off the emitted rings. RE-DERIVED TWICE.
+     (#381, Eva's ruling on #380) the petiole became the area rule read UPWARD
+     and capped by the stem, the rachis and stalks the wire, a 45-degree cone
+     between. (S3c, Eva's ruling of Oct 8) THE RACHIS TAPERS BY LOAD: every
+     point of the petiole and rachis is sized by the area rule from the
+     leaflets it still carries BEYOND it — `sqrt(n wire^2)`, n = 2 per pair
+     still to come plus the terminal — starting from the BUILT (capped)
+     petiole and never above it, the stalks the wire. Seen red first on the
+     #381 tree: the shipped compound defaults' rachis read the 1.20 mm wire
+     where this restatement asks 2.68 mm to the first pair.
+     THE RESTATEMENT (`restatedRachisTaper`) is written from the restated
+     layout's pair STATIONS and the leaflet COUNT — owners the taper does not
+     write — in its own expression (the load as `2 (pairs - k) + 1`, the ramp
+     as a weighted mean), never importing the geometry's owner. Each emitted
+     axis ring's arc length is read off its own POSITION (the chord from the
+     rachis base inverted on the restated arc), so a ring at the wrong
+     station is a ring at the wrong radius. Clauses:
+       (i)   no cone: the rachis base is axis ring 1, the petiole one
+             cylinder at the built radius (the ruling: "the 45-degree cone
+             goes" — the cap binds the ROOT, and the taper starts from it);
+       (ii)  every ring from the base to the rachis tip at the restated
+             taper's radius at its own arc length, every ring past the tip the
+             wire (the terminal stalk, ruled);
+       (iii) CONTINUOUS: no two consecutive rings share a centre — a step —
+             except the ONE the law declares, at the tip where the last pair
+             sits on it and three leaflets leave one point (load 3 -> 1);
+       (iv)  every stalk the wire, and ROOTED IN THE RACHIS AT THE STATION'S
+             OWN RADIUS: its root disc (the root ring's centroid's distance
+             from the restated rachis point, plus its own radius) lies inside
+             the restated local section. */
   const PR = restatedPetiole(ui, m, cpR);
+  const TR = restatedRachisTaper(cpR, PR);
   {
     const wire = PR.wire;
     let worst = 0, at = null;
-    for (let i = 0; i < L.built; i++) {
-      const bb = L.petioleAxes[i].outer, C = CB[i];
+    const note = (d, what) => { if (d > worst) { worst = d; at = what; } };
+    const archDeg = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
+    const kR = archDeg === 0 ? 0 : Math.abs(((-archDeg * Math.PI) / 180) / cpR.rachisMm);
+    const sOf = (p, bb) => { const c = Math.hypot(p[0] - bb[0], p[1] - bb[1], p[2] - bb[2]); return kR === 0 ? c : (2 * Math.asin(Math.min(1, (c * kR) / 2))) / kR; };
+    const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-9;
+    for (let i = 0; i < L.built && worst !== Infinity; i++) {
+      const { az } = builtNodes[i], bb = L.petioleAxes[i].outer, C = CB[i];
       const cs = C.axisRod.centres, rs = C.axisRod.radii;
       let baseAt = -1;
-      for (let j = 1; j < cs.length; j++) if (Math.hypot(cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]) < 1e-9) { baseAt = j; break; }
-      if (baseAt < 0) { worst = Infinity; at = `leaf ${i}: no emitted axis ring at the petiole's outer end`; break; }
-      const wantBase = PR.thickens ? 2 : 1;
-      if (baseAt !== wantBase) { worst = Infinity; at = `leaf ${i}: the rachis base is axis ring ${baseAt} where a petiole that ${PR.thickens ? 'thickens steps down on ONE cone ring (ring 2)' : 'stays the wire has no cone (ring 1)'}`; break; }
-      if (PR.thickens) {
-        const d = Math.abs(Math.hypot(cs[1][0] - bb[0], cs[1][1] - bb[1], cs[1][2] - bb[2]) - (PR.built - wire));
-        if (d > worst) { worst = d; at = `leaf ${i}: the cone's ring stands ${Math.hypot(cs[1][0] - bb[0], cs[1][1] - bb[1], cs[1][2] - bb[2]).toFixed(6)} mm short of the rachis base where 45 degrees asks the radii's difference ${(PR.built - wire).toFixed(6)}`; }
+      for (let j = 1; j < cs.length; j++) if (same(cs[j], bb)) { baseAt = j; break; }
+      if (baseAt !== 1) { worst = Infinity; at = `leaf ${i}: the rachis base is axis ring ${baseAt} where the tapered petiole runs straight to it (ring 1) — a cone or a stray ring stands before it`; break; }
+      const tip = restatedRachisAt(ui, bb, az, cpR.rachisMm).C;
+      let tipAt = -1;
+      for (let j = baseAt; j < cs.length; j++) if (same(cs[j], tip)) { tipAt = j; break; }
+      if (tipAt < 0) { worst = Infinity; at = `leaf ${i}: no axis ring at the restated rachis tip`; break; }
+      note(Math.abs(rs[0] - PR.built), `leaf ${i} axis ring 0 (the petiole's rooted end, radius ${rs[0].toFixed(6)} mm against the built ${PR.built.toFixed(6)})`);
+      for (let j = baseAt; j <= tipAt; j++) {
+        const s = sOf(cs[j], bb), want = TR.at(s);
+        note(Math.abs(rs[j] - want), `leaf ${i} axis ring ${j} at s ${s.toFixed(4)} mm (radius ${rs[j].toFixed(6)} mm against the restated taper's ${want.toFixed(6)})`);
       }
-      for (let j = 0; j < cs.length; j++) {
-        const want = j < baseAt ? PR.built : wire;
-        const d = Math.abs(rs[j] - want);
-        if (d > worst) { worst = d; at = `leaf ${i} axis ring ${j} (radius ${rs[j].toFixed(6)} mm against ${want.toFixed(6)}, the ${j < baseAt ? 'petiole' : 'rachis'})`; }
+      for (let j = tipAt + 1; j < cs.length; j++) note(Math.abs(rs[j] - wire), `leaf ${i} axis ring ${j} past the rachis tip (radius ${rs[j].toFixed(6)} mm against the ${wire.toFixed(6)} mm wire — the terminal stalk)`);
+      const stepAtTip = TR.tipStep && Math.abs(TR.at(cpR.rachisMm) - wire) > 1e-12;
+      for (let j = 0; j + 1 < cs.length; j++) {
+        if (!same(cs[j], cs[j + 1])) continue;
+        if (!(stepAtTip && j === tipAt)) { worst = Infinity; at = `leaf ${i}: axis rings ${j} and ${j + 1} share a centre — a STEP in the rod${j === tipAt ? ' at the tip where no pair sits on it' : ' inside the rachis'}; the taper is continuous`; break; }
       }
-      for (const r of C.stalkRods) for (const x of [r.radiusMm, r.endRadiusMm]) { const d = Math.abs(x - wire); if (d > worst) { worst = d; at = `leaf ${i} stalk (radius ${x.toFixed(6)} mm against the ${wire.toFixed(6)} mm wire)`; } }
+      if (stepAtTip && !(tipAt + 1 < cs.length && same(cs[tipAt + 1], tip))) { worst = Infinity; at = `leaf ${i}: the last pair sits on the rachis tip (load 3 -> 1) and no step to the wire stands there`; }
+      for (const r of C.stalkRods) for (const x of [r.radiusMm, r.endRadiusMm]) note(Math.abs(x - wire), `leaf ${i} stalk (radius ${x.toFixed(6)} mm against the ${wire.toFixed(6)} mm wire)`);
+      let si = 0;
+      for (const b of cpR.blades) {
+        if (b.role === 'terminal') continue;
+        const r = C.stalkRods[si++];
+        if (!r) { worst = Infinity; at = `leaf ${i}: no stalk rod for pair ${b.k}`; break; }
+        const F = restatedRachisAt(ui, bb, az, b.stationMm);
+        const excess = Math.hypot(r.root[0] - F.C[0], r.root[1] - F.C[1], r.root[2] - F.C[2]) + r.radiusMm - TR.at(b.stationMm);
+        note(excess, `leaf ${i} pair ${b.k}${b.side > 0 ? 'L' : 'R'}: the stalk's root disc reaches ${excess.toExponential(3)} mm past the rachis's own ${(2 * TR.at(b.stationMm)).toFixed(4)} mm section at its station — not rooted in it`);
+      }
     }
-    if (worst > 1e-9) bad.push(`LF17: a rod's emitted radius or station is ${worst === Infinity ? 'wrong' : `${worst.toExponential(3)} mm off`} the law restated from the controls (the petiole ${(2 * PR.built).toFixed(3)} mm, the rachis and stalks the ${(2 * wire).toFixed(3)} mm wire) — ${at}`);
+    if (worst > 1e-9) bad.push(`LF17: a rod's emitted radius, station or root is ${worst === Infinity ? 'wrong against' : `${worst.toExponential(3)} mm off`} the load taper restated from the controls (the petiole ${(2 * PR.built).toFixed(3)} mm; the rachis ${TR.pts.map(([s, r]) => `${(2 * r).toFixed(3)} at ${s.toFixed(2)}`).join(' -> ')} mm; the stalks the ${(2 * wire).toFixed(3)} mm wire) — ${at}`);
   }
-  bad.push(...petioleLawClauses(ui, m, L, PR, CB));
+  bad.push(...petioleLawClauses(ui, m, L, PR, CB, TR));
   return bad;
 }
 
@@ -8352,8 +8389,27 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
             `Ro - rEnd = embed (1 + cos th)` and `sqrt((Ro - q)(Ro + q))`
             rather than the geometry's two forms;
      BUILT  `max(wire, min(asked, cap))` where the cap clears the mode-free
-            (export) wire, else the wire — and the cone exists exactly then.
+            (export) wire, else the wire. (#381 stepped down to the wire on a
+            45-degree cone here; S3c's load taper retired it — see TAPER.)
    A SIMPLE leaf's petiole is the wire, in the shown mode, unconditionally.
+
+   restatedRachisTaper — THE LOAD TAPER (S3c, Eva's ruling of Oct 8: "size
+   each point along the petiole + rachis by the area rule from the leaflets it
+   still carries BEYOND that point"), restated from the restated layout's pair
+   STATIONS and the leaflet COUNT, never from the geometry's owner
+   (`compoundRachisRadiusMm`):
+     KNOTS  the rachis base at the BUILT petiole; each pair's station at the
+            load carried UP TO it, `sqrt((2 (pairs - k) + 1) wire^2)`, held at
+            or under the built radius ("the taper starts from the BUILT value
+            and never rises above it further up"); the rachis tip at the wire
+            (the terminal stalk, ruled the wire) — unless the last pair SITS on
+            the tip, when the tip carries 3 and the rod steps to the wire there,
+            the one place three leaflets leave one point;
+     RAMP   linear in arc length between knots, written as a weighted mean.
+            It meets the area rule at every station a load leaves and is never
+            under it between; the mesh draws a linear ramp between two rings
+            EXACTLY, so the law and the drawing are one curve.
+   A SIMPLE leaf has no taper.
 
    LF18 (a) the plan's petiole record — asked, cap, built, clamped, thickens —
             is the restated law, so the read-out's "asked -> built" is true;
@@ -8368,10 +8424,15 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
             SIMPLE leaf's own petiole does at that sheet and angle on main —
             seen first as this clause firing on `sheet 2.4 x leafAngle 85`
             (0.354 mm proud). That is told on the read-out, not hidden;
+        (a2) the plan's TAPER record — every knot's station, radius and
+            carried count, and whether the tip steps — is the restated taper,
+            so the read-out's per-stretch figures are the law;
         (c) THE EXEMPTION IS THE EMITTED ROD: every rod ST9 and the
-            combination gate excuse is named at the law's own radius — the
-            petiole's restated radius, the wire for the rachis and stalks — so
-            no exemption can be wider than the rod it names.
+            combination gate excuse is named at the law's own PER-STATION
+            radii (`innerR` at its inner end, `outerR` at its outer) — the
+            built petiole, the restated taper at each rachis end's own arc
+            length, the wire for the terminal stalk and the stalks — so no
+            exemption is wider than the tapered rod it names, at either end.
    DECLARED, NOT ASSERTED: the cap reads the stem as a straight cylinder at
    the node. A node kink leans the stem's axis by at most atan(0.13) across
    the disc's own height; the swelling only widens it. (b) measures what was
@@ -8396,7 +8457,25 @@ export function restatedPetiole(ui, m, cpR) {
   const built = thickens ? Math.max(wire, Math.min(asked, cap)) : wire;
   return { compound: true, wire, wireFree, asked, cap, built, thickens, clamped: asked > cap, Ro };
 }
-export function petioleLawClauses(ui, m, L, PR, CB) {
+export function restatedRachisTaper(cpR, PR) {
+  if (!cpR) return null;
+  const Lr = cpR.rachisMm, w = PR.wire, top = PR.built;
+  const pts = [[0, top, cpR.count]];
+  cpR.lateral.forEach((q, k) => { const n = 2 * (cpR.pairs - k) + 1; pts.push([q.stationMm, Math.min(top, Math.max(w, Math.sqrt(n * w * w))), n]); });
+  const tipStep = cpR.pairs > 0 && cpR.lateral[cpR.pairs - 1].stationMm === Lr;
+  if (!tipStep) pts.push([Lr, w, 1]);
+  const at = (s) => {
+    if (s <= 0) return top;
+    for (let j = 1; j < pts.length; j++) {
+      const [b, rb] = pts[j];
+      if (s <= b) { const [a, ra] = pts[j - 1]; return s === b ? rb : ((b - s) * ra + (s - a) * rb) / (b - a); }
+    }
+    return pts[pts.length - 1][1];
+  };
+  return { pts, tipStep, at, L: Lr };
+}
+const cpRCount = (L) => (L.compound ? L.compound.count : '?');
+export function petioleLawClauses(ui, m, L, PR, CB, TR = null) {
   const bad = [];
   if (!PR.compound) {
     if (!(Math.abs(Number(L.petioleR) - PR.wire) <= 1e-12)) bad.push(`LF18: a SIMPLE leaf's petiole is ${(2 * L.petioleR).toFixed(4)} mm across where its own rule is the ${(2 * PR.wire).toFixed(4)} mm wire — the compound law reached a simple petiole`);
@@ -8423,12 +8502,36 @@ export function petioleLawClauses(ui, m, L, PR, CB) {
     }
     if (worst > 1e-9) bad.push(`LF18: a compound petiole's rooted END stands ${worst === Infinity ? 'unmeasured' : `${worst.toExponential(3)} mm OUTSIDE`} the stem — it no longer roots through the wall: ${at}`);
   }
+  /* (a2) THE TAPER RECORD against the restated taper — knot for knot */
+  if (TR) {
+    const T = L.compound && L.compound.rachis && L.compound.rachis.taper;
+    let wrong = null;
+    if (!T || !Array.isArray(T.knots)) wrong = 'reports no taper record';
+    else if (T.knots.length !== TR.pts.length) wrong = `has ${T.knots.length} knots where the ${cpRCount(L)} leaflets' stations restate ${TR.pts.length}`;
+    else if (T.tipStep !== TR.tipStep) wrong = `says tipStep = ${T.tipStep} where the last pair ${TR.tipStep ? 'sits on' : 'stands below'} the rachis tip`;
+    else for (let j = 0; j < TR.pts.length; j++) {
+      const k = T.knots[j], [sR, rR, nR] = TR.pts[j];
+      if (!(Math.abs(k.sMm - sR) <= 1e-9 && Math.abs(k.rMm - rR) <= 1e-9 && k.carried === nR)) { wrong = `knot ${j} is ${k.rMm} mm carrying ${k.carried} at ${k.sMm} mm where the load restates ${rR} mm carrying ${nR} at ${sR} mm`; break; }
+    }
+    if (wrong) bad.push(`LF18: the compound rachis's taper ${wrong} — the read-out's per-stretch figures would be untrue`);
+  }
   {
     let wrong = null;
+    const archDeg = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
+    const kR = TR && archDeg !== 0 ? Math.abs(((-archDeg * Math.PI) / 180) / TR.L) : 0;
     for (let i = 0; i < CB.length && !wrong; i++) {
+      const bb = TR && L.petioleAxes && L.petioleAxes[i] ? L.petioleAxes[i].outer : null;
+      const sOf = (p) => { const c = Math.hypot(p[0] - bb[0], p[1] - bb[1], p[2] - bb[2]); return kR === 0 ? c : (2 * Math.asin(Math.min(1, (c * kR) / 2))) / kR; };
       for (const a of (CB[i] && CB[i].rodAxes) || []) {
-        const want = a.part === 'petiole' ? PR.built : PR.wire;
-        if (!(Math.abs(a.radiusMm - want) <= 1e-9)) { wrong = `leaf ${i}'s ${a.part} is excused at ${a.radiusMm} mm where its own restated radius is ${want}`; break; }
+        let wIn, wOut;
+        if (a.part === 'petiole') wIn = wOut = PR.built;
+        else if (a.part === 'rachis' && TR && bb) {
+          const s0 = sOf(a.inner), s1 = sOf(a.outer);
+          if (s0 < -1e-9 || s1 > TR.L + 1e-9) { wrong = `leaf ${i}'s rachis segment runs ${s0.toFixed(4)}..${s1.toFixed(4)} mm, outside the ${TR.L} mm rachis`; break; }
+          wIn = TR.at(s0); wOut = TR.at(s1);
+        } else wIn = wOut = PR.wire;
+        const rIn = a.innerR === undefined ? a.radiusMm : a.innerR, rOut = a.outerR === undefined ? a.radiusMm : a.outerR;
+        if (!(Math.abs(rIn - wIn) <= 1e-9 && Math.abs(rOut - wOut) <= 1e-9 && Math.abs(a.radiusMm - Math.max(rIn, rOut)) <= 1e-12)) { wrong = `leaf ${i}'s ${a.part} is excused at ${rIn} -> ${rOut} mm (named ${a.radiusMm}) where its own restated radii are ${wIn} -> ${wOut}`; break; }
       }
       if (!wrong && !((CB[i] && CB[i].rodAxes) || []).some((a) => a.part === 'petiole')) wrong = `leaf ${i} names no petiole among its rods — the thicker petiole would be excused by nothing`;
     }
