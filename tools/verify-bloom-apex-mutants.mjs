@@ -651,8 +651,10 @@ const MUTANTS = [
     } },
   { id: 'relief-target-is-not-the-widest-half-width',
     why: 'the relief target is a fraction of the FOOT\'s half-width rather than of the petal\'s widest, so every tooth is the wrong depth while the guard still holds',
-    find: '    const peakHalfMm = laminaHalf(uPk);',
-    into: '    const peakHalfMm = laminaHalf(ROOT_BLEND_END);', names: ['L5'],
+    /* (moved, leaf/stem build S4: a chevron reads its ENVELOPE's peak on a
+       branch; the petal's arm is the expression this mutates) */
+    find: '    const peakHalfMm = chev ? chev.peakHalfMm : laminaHalf(uPk);',
+    into: '    const peakHalfMm = chev ? chev.peakHalfMm : laminaHalf(ROOT_BLEND_END);', names: ['L5'],
     witness: (M, C) => {
       const set = { lobeDepth: 0.3, lobeCount: 3, lobeCoverage: 0.8 };
       const m = lobeRelief(M, set), c = lobeRelief(C, set);
@@ -749,8 +751,10 @@ const MUTANTS = [
        behaviour did not move", on `main` as much as here, by the first full
        sweep in CI (D14). `uPkRaw` is the law's own widest point and is what
        the CORE term beside it already reads. */
-    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
+    /* (moved again, leaf/stem build S4: the CORE term carries the chevron's
+       lobe factor on a branch — the anchor ends at the plain arm) */
+    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (u) => halfW * tipLaw(u) * chev.lobeAt(u) : (u) => halfW * tipLaw(u) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (u) => halfW * tipLaw(u) * chev.lobeAt(u) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -1894,6 +1898,76 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.plan.compound.petiole.capMm - m.plan.outerR) < 1e-12 && c.plan.compound.petiole.capMm < c.plan.outerR - 0.1) ? null
         : `the mutant caps at ${m.plan.compound.petiole.capMm} mm against the clean tree's ${c.plan.compound.petiole.capMm} (outer ${c.plan.outerR}) — the behaviour did not move`; } },
+  /* ===================================================================
+     THE LOBED (CHEVRON) LEAF (leaf/stem build S4) — LF19..LF24. Every
+     mutation leaves a watertight, one-piece leaf at the identical triangle
+     count (the chevron is one panel on a fixed lattice), so both STL gates
+     are blind to all of it. Each witness reads the MUTATED module's own build
+     of the matching table row, never the assertion it names. THE LAB'S C2
+     FOLD (40 teeth at depth 0.5) IS NOT REACHABLE ON THIS TREE, for two
+     independent reasons — the tooth slider tops out at 12, and the shipped
+     tooth law's resolution floor builds at most 10 teeth on the 112-row blade
+     whatever is asked — so the tooth clamp's removal is witnessed where it IS
+     reachable: the declared fold margin crossed on the emitted lattice (6 lobes
+     at depth 0.3). The TILT cap's removal reaches a true inverted cell. */
+  { id: 'the-lobed-type-is-ignored', why: 'the plan never builds a chevron, so a LOBED ask builds the simple blade while the Lobes drop-down shows — eight controls reaching nothing',
+    find: '  const lobed = leafIsLobed(state);\n  const widthMm = lobed ?',
+    into: '  const lobed = false;\n  const widthMm = lobed ?', names: ['LF19'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.type === 'SIMPLE' && c.plan.type === 'LOBED') ? null : `the mutant builds a ${m.plan.type} leaf against the clean tree's ${c.plan.type} — the behaviour did not move`; } },
+  { id: 'the-lobed-controls-leak-into-the-simple-leaf', why: 'a SIMPLE leaf turns lobed when the hidden lobes slider is at its maximum — hidden and NOT inert',
+    find: "export function leafIsLobed(state) { return String(state.leafType) === 'LOBED'; }",
+    into: "export function leafIsLobed(state) { return String(state.leafType) === 'LOBED' || Number(state.lobedLobes) >= 6; }", names: ['LF19'],
+    witness: (M, C) => { const m = compoundFacts(M, SIMPLE_LOB_WIT), c = compoundFacts(C, SIMPLE_LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.type === 'LOBED' && c.plan.type === 'SIMPLE') ? null : `on SIMPLE with 6 lobes the mutant builds ${m.plan.type} and the clean tree ${c.plan.type} — the leak did not happen`; } },
+  { id: 'a-lobe-is-dropped', why: 'the chevron law cuts one lobe FEWER than the plan declares — the record says 3, the outline carries 2, watertight and one piece',
+    find: '    const ph = ((u - from) / (to - from)) * lobes;',
+    into: '    const ph = ((u - from) / (to - from)) * (lobes - 1);', names: ['LF20'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mins = (r) => { const H = r.lobed.rowHalfLobeMm, U = r.lobed.rowU; let n = 0; for (let j = 1; j + 1 < H.length; j++) if (U[j] > 0.08 && U[j] < 0.8 && H[j] < H[j - 1] && H[j] <= H[j + 1]) n++; return n; };
+      return (m.rep.lobed.lobes === 3 && mins(c.rep) === 3 && mins(m.rep) < 3) ? null : `the mutant declares ${m.rep.lobed.lobes} lobes and draws ${mins(m.rep)} sinuses against the clean tree's ${mins(c.rep)} — the behaviour did not move`; } },
+  { id: 'the-rows-do-not-lean', why: "the emitted rows lean at HALF the tilt the record declares — every lobe pointing forward at the wrong angle, the record unmoved",
+    find: '    const tau = tauAt(u), sn = Math.sin(tau), cs = Math.cos(tau);',
+    into: '    const tau = tauAt(u), sn = Math.sin(0.5 * tau), cs = Math.cos(0.5 * tau);', names: ['LF21'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const sk = (r) => r.lobed.skin[40], d = Math.hypot(...sk(m.rep).at(-1).map((x, k) => x - sk(c.rep).at(-1)[k]));
+      return (m.rep.lobed.tiltBuiltRad === c.rep.lobed.tiltBuiltRad && d > 0.5) ? null : `the mutant's margin point moved ${d} mm with the declared tilt ${m.rep.lobed.tiltBuiltRad} against ${c.rep.lobed.tiltBuiltRad} — the behaviour did not move`; } },
+  { id: 'the-tilt-cap-is-removed', why: 'the asked lobe angle is built whatever the outline does — at 60 degrees the outer cells where the tilt eases out fold inside-out, watertight and one piece',
+    find: '  if (!(asked > 0) || ok(asked)) return { tauRad: asked, clamped: false };',
+    into: '  return { tauRad: asked, clamped: false };', names: ['LF22'],
+    witness: (M, C) => { const m = compoundFacts(M, TILT_WIT), c = compoundFacts(C, TILT_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const am = minSkinArea(m.rep, m.plan), ac = minSkinArea(c.rep, c.plan);
+      return (m.rep.lobed.tiltBuiltRad > c.rep.lobed.tiltBuiltRad + 1e-3 && am < 0 && ac > 0) ? null : `the mutant builds ${m.rep.lobed.tiltBuiltRad} rad (smallest skin cell ${am} mm^2) against the clean ${c.rep.lobed.tiltBuiltRad} (${ac}) — no fold reached`; } },
+  { id: 'the-tooth-fold-clamp-is-removed', why: "the teeth are cut at the floored ask past the fold cap — on 6 lobes at depth 0.3 the innermost cells advance under the declared margin (the lab's C2 itself is unreachable here)",
+    find: '      if (foldCapMm < reliefFlooredMm) { reliefBuiltMm = foldCapMm; foldClamped = true; }',
+    into: '      if (false) { reliefBuiltMm = foldCapMm; foldClamped = true; }', names: ['LF22', 'LF23'],
+    witness: (M, C) => { const m = compoundFacts(M, FOLD_WIT), c = compoundFacts(C, FOLD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ms = m.rep.serration, cs = c.rep.serration, am = innerAdvanceMin(m.rep);
+      return (ms.reliefBuiltMm > ms.foldCapMm + 1 && cs.reliefBuiltMm === cs.foldCapMm && am < 0.5) ? null : `the mutant cuts ${ms.reliefBuiltMm} mm on a cap of ${ms.foldCapMm} (inner advance ${am}) against the clean ${cs.reliefBuiltMm} — the behaviour did not move`; } },
+  { id: 'the-fold-clamp-is-not-told', why: 'the teeth are clamped at the fold cap and the record says they were not — the read-out prints the asked relief beside teeth built shallower',
+    find: '      if (foldCapMm < reliefFlooredMm) { reliefBuiltMm = foldCapMm; foldClamped = true; }',
+    into: '      if (foldCapMm < reliefFlooredMm) { reliefBuiltMm = foldCapMm; }', names: ['LF23'],
+    witness: (M, C) => { const m = compoundFacts(M, FOLD_WIT), c = compoundFacts(C, FOLD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.serration.foldClamped === false && c.rep.serration.foldClamped === true && m.rep.serration.reliefBuiltMm === c.rep.serration.reliefBuiltMm) ? null : `the mutant reports foldClamped ${m.rep.serration.foldClamped} at ${m.rep.serration.reliefBuiltMm} mm against the clean ${c.rep.serration.foldClamped} — the behaviour did not move`; } },
+  { id: 'no-tooth-fits-and-teeth-are-cut-anyway', why: 'where the fold cap is under the 1 mm floor the teeth are cut at the cap anyway — notches under the printable minimum, the NONE-FIT case never told',
+    find: '      if (reliefFloorMm > 0 && foldCapMm < reliefFloorMm) {',
+    into: '      if (false) {', names: ['LF23'],
+    witness: (M, C) => { const m = compoundFacts(M, NONEFIT_WIT), c = compoundFacts(C, NONEFIT_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.serration.countBuilt > 0 && m.rep.serration.reliefBuiltMm < 1 && c.rep.serration.countBuilt === 0) ? null : `the mutant cuts ${m.rep.serration.countBuilt} teeth at ${m.rep.serration.reliefBuiltMm} mm against the clean tree's ${c.rep.serration.countBuilt} — the behaviour did not move`; } },
+  { id: 'the-petiole-stops-at-the-chevron-apex-row', why: "the petiole runs into the blade by one row only, not by the first row's V depth as well — the outer columns of the first row stand off the rod",
+    find: '  const lobedEmbedMm = lobedRow0 ? lobedRow0.h * Math.sin(lobedRow0.tau) + lobedSt[1] * Lmm : 0;',
+    into: '  const lobedEmbedMm = lobedRow0 ? lobedSt[1] * Lmm : 0;', names: ['LF24'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.lobed.embedMm < c.rep.lobed.embedMm - 0.1) ? null : `the mutant runs the petiole ${m.rep.lobed.embedMm} mm into the blade against the clean ${c.rep.lobed.embedMm} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from
@@ -2280,6 +2354,42 @@ const CLAMP_WIT = { stemLength: 70, stemDiameter: 3, leafLength: 40, leafNodes: 
    first pair's station, ring 3 the second's (a straight rachis has its keys
    alone), so the witnesses read the ramp at its own knots. */
 const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND' };
+/* THE LOBED WITNESSES (leaf/stem build S4): the shipped lobed defaults on one
+   node; the lobe angle at 60 where the TILT cap binds (built 46.73); 6 lobes
+   at tooth depth 0.3 where the TOOTH fold clamp binds hardest (4.86 mm asked,
+   2.22 built); the NONE-FIT state (the fold cap 0.68 mm under the 1 mm
+   floor); and a SIMPLE leaf with every lobed control at an extreme (where a
+   leak would show). Each is a table row of the same state. */
+const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
+const TILT_WIT = { ...LOB_WIT, lobedAngle: 60 };
+const FOLD_WIT = { ...LOB_WIT, lobedLobes: 6, lobedToothDepth: 0.3 };
+const NONEFIT_WIT = { ...LOB_WIT, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, leafToothCount: 12 };
+const SIMPLE_LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedToothDepth: 1 };
+/* the inner cells' advance along the midrib, per row pair, off the leaf's own
+   emitted skin (the two columns either side of the V's apex) — LF22's measure */
+function innerAdvanceMin(rep) {
+  const L = rep && rep.lobed; if (!L || !L.skin) return null;
+  const us = L.rowU, h = rep.rowHalfMm, len = L.lengthMm, nv1 = L.skin[0].length - 1;
+  let w = Infinity;
+  for (let j = 0; j + 1 < L.skin.length; j++) {
+    const a = us[j] * len + h[j] * Math.sin(L.rowTauRad[j]) / nv1, b = us[j + 1] * len + h[j + 1] * Math.sin(L.rowTauRad[j + 1]) / nv1;
+    w = Math.min(w, (b - a) / ((us[j + 1] - us[j]) * len));
+  }
+  return w;
+}
+/* the smallest planform area of any emitted skin triangle (one node at
+   azimuth 0, no arch — the witness rows), LF22's positivity measure */
+function minSkinArea(rep, plan) {
+  const L = rep && rep.lobed; if (!L || !L.skin) return null;
+  const th = (plan.angleDeg * Math.PI) / 180, bb = rep.petioleAxis.bladeBase;
+  const pl = L.skin.map((row) => row.map((P) => [(P[0] - bb[0]) * Math.cos(th) + (P[2] - bb[2]) * Math.sin(th), P[1] - bb[1]]));
+  let w = Infinity;
+  for (let j = 0; j + 1 < pl.length; j++) for (let c = 0; c + 1 < pl[j].length; c++) {
+    const p00 = pl[j][c], p10 = pl[j + 1][c], p11 = pl[j + 1][c + 1], p01 = pl[j][c + 1];
+    for (const [a, b, d] of [[p00, p10, p11], [p00, p11, p01]]) w = Math.min(w, 0.5 * ((b[0] - a[0]) * (d[1] - a[1]) - (d[0] - a[0]) * (b[1] - a[1])));
+  }
+  return w;
+}
 function compoundFacts(MOD, set) {
   try {
     const st = { ...REGISTRY_DEFAULTS, ...set };
@@ -2508,6 +2618,17 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '3' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletPairs', value: '4' }, { id: 'leafAngle', value: '70' }] },
   { label: 'a compound leaf at the shipped sheet (the load taper 2.68 -> 2.08 -> 1.20 mm, unclamped)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }] },
+  /* THE LOBED ROWS (leaf/stem build S4): the witness sets above. */
+  { label: 'a LOBED leaf at the shipped lobed defaults (3 lobes a side, tilt 38, light teeth)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }] },
+  { label: 'a LOBED leaf at lobe angle 60 (the TILT cap binds: built 46.73)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedAngle', value: '60' }] },
+  { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3 (the TOOTH fold clamp binds hardest)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }] },
+  { label: 'a LOBED leaf where NO tooth fits (6 lobes, sinus 0.9, depth 0.3, 12 teeth — the fold cap under the floor)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '12' }] },
+  { label: 'a SIMPLE leaf with the hidden lobed controls at an extreme (6 lobes, sinus 0.9, tilt 60, depth 1 — where a leak would show)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '1' }] },
   { label: 'a SIMPLE leaf with the hidden leaflet controls at an extreme (pairs 4, stalk 20 — where a leak would show)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafletPairs', value: '4' }, { id: 'leafletStalk', value: '20' }] },
   { label: 'a leaf arched 90 and cupped 0.8 on a 5 mm blade whose teeth the floor reshapes (depth 0.3)',
