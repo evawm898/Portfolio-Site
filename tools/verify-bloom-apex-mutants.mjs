@@ -1817,8 +1817,8 @@ const MUTANTS = [
      they are the same double, so the witness state is part of the claim) —
      never the assertion it names. */
   { id: 'the-leaf-type-is-ignored', why: 'the plan never lays out a compound tree, so a COMPOUND ask builds a simple blade while the Leaflets drop-down shows — eleven controls reaching nothing',
-    find: '    compound: leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR) : null,',
-    into: '    compound: null,', names: ['LF14'],
+    find: '  const compoundRec = leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR0, stem, angleDeg) : null;',
+    into: '  const compoundRec = null;', names: ['LF14'],
     witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.compound === null && c.plan.compound && !m.rep.compound && c.rep.compound) ? null
@@ -1860,20 +1860,77 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!(m.rep.leaflets[0].rim.baseAxisMm > 0) && c.rep.leaflets[0].rim.baseAxisMm > 0) ? null
         : `the mutant's first leaflet reports a base semi-axis of ${m.rep.leaflets[0].rim.baseAxisMm} against the clean tree's ${c.rep.leaflets[0].rim.baseAxisMm} — the behaviour did not move`; } },
-  { id: 'the-rod-floor-is-removed', why: 'the rachis and stalks follow the area rule with no wire under them — rods thinner than the petiole they hang from',
-    find: '  const wireR = petioleR;',
-    into: '  const wireR = 0;', names: ['LF17'],
-    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
-      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.plan.compound.stalkR < c.plan.compound.stalkR - 1e-6) ? null
-        : `the mutant's stalk radius is ${m.plan.compound.stalkR} against the clean tree's ${c.plan.compound.stalkR} — the behaviour did not move`; } },
-  { id: 'the-rods-are-typed', why: "every rod is a typed 0.6 mm radius whatever the sheet — the lab's own constant, invisible at the shipped sheet where the petiole is the same double",
-    find: '  return Math.max(wireR, petioleR * Math.sqrt(carried / total));',
-    into: '  return 0.6;', names: ['LF17'],
+  /* THE RETUNE (Eva's rulings on #380, Oct 7): S3's `the-rod-floor-is-removed`
+     is RETIRED with the law it mutated — the rachis and stalks are the wire
+     now, not an area rule floored at it, so there is no floor left to remove.
+     Its place is taken by the four ways the thicker petiole could be wrong,
+     the rachis taking the petiole's thickening, the exemption widened, and
+     the leaflets reading the SIMPLE leaf's depth or tip. */
+  { id: 'the-rods-are-typed', why: "every rachis and stalk is a typed 0.6 mm radius whatever the sheet — the lab's own constant, invisible at the shipped sheet where the wire is the same double",
+    find: 'export function compoundRodRadiusMm(wireR) {\n  return wireR;\n}',
+    into: 'export function compoundRodRadiusMm(wireR) {\n  return 0.6;\n}', names: ['LF17', 'LF18'],
     witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.compound.stalkR === 0.6 && c.plan.compound.stalkR > 0.6 + 1e-6) ? null
         : `the mutant's stalk radius is ${m.plan.compound.stalkR} against the clean tree's ${c.plan.compound.stalkR} at sheet 2.4 — the behaviour did not move`; } },
+  { id: 'the-petiole-is-the-wire', why: 'the area rule is never read upward — the compound petiole is the 1.2 mm wire carrying five leaflets, the S3 tree Eva ruled against',
+    find: '  return wireR * Math.sqrt(count);',
+    into: '  return wireR;', names: ['LF17', 'LF18'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.petioleR < c.plan.petioleR - 0.1) ? null
+        : `the mutant's petiole is ${m.plan.petioleR} mm in radius against the clean tree's ${c.plan.petioleR} — the behaviour did not move`; } },
+  { id: 'the-petiole-clamp-is-removed', why: "the area rule's ask is built whatever the stem — on a 3 mm stem at 70 degrees a 3.60 mm petiole whose rooted end stands outside the stem it is meant to root through",
+    find: '  const radiusMm = thickens ? Math.max(wireR, Math.min(askedMm, capMm)) : wireR;',
+    into: '  const radiusMm = thickens ? Math.max(wireR, askedMm) : wireR;', names: ['LF17', 'LF18'],
+    witness: (M, C) => { const m = compoundFacts(M, CLAMP_WIT), c = compoundFacts(C, CLAMP_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.petioleR > c.plan.petioleR + 0.1 && m.rep.petioleRootReachMm > m.plan.outerR) ? null
+        : `the mutant's petiole is ${m.plan.petioleR} mm (root reach ${m.rep.petioleRootReachMm}) against the clean tree's ${c.plan.petioleR} — the behaviour did not move`; } },
+  { id: 'the-petiole-cap-is-the-outer-radius', why: "the cap is read as the stem's own radius rather than where the rooted END fits — a petiole as wide as the stem, its end standing proud at any angle but square",
+    find: 'export function petioleRootCapMm(wall, thRad) {',
+    into: 'export function petioleRootCapMm(wall, thRad) { if (wall) return wall.outerR;', names: ['LF17', 'LF18'],
+    witness: (M, C) => { const m = compoundFacts(M, CLAMP_WIT), c = compoundFacts(C, CLAMP_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.plan.compound.petiole.capMm - m.plan.outerR) < 1e-12 && c.plan.compound.petiole.capMm < c.plan.outerR - 0.1) ? null
+        : `the mutant caps at ${m.plan.compound.petiole.capMm} mm against the clean tree's ${c.plan.compound.petiole.capMm} (outer ${c.plan.outerR}) — the behaviour did not move`; } },
+  { id: 'the-petiole-steps-down-flat', why: 'the cone is collapsed onto the rachis base — the thick petiole meets the wire on a flat shoulder facing back along the rod',
+    find: '  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens, coneMm: thickens ? radiusMm - wireR : 0 };',
+    into: '  const petiole = { askedMm, capMm, radiusMm, clamped: askedMm > capMm, thickens, coneMm: 0 };', names: ['LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const gap = (r) => { const a = r.axisRod.centres; return Math.hypot(a[1][0] - a[2][0], a[1][1] - a[2][1], a[1][2] - a[2][2]); };
+      return (gap(m.rep) < 1e-12 && gap(c.rep) > 0.1) ? null
+        : `the mutant's cone ring stands ${gap(m.rep)} mm short of the rachis base against the clean tree's ${gap(c.rep)} — the behaviour did not move`; } },
+  { id: 'the-rachis-thickens-with-the-petiole', why: "the rachis is the area rule read DOWN from the thicker petiole — tapering from 2.68 mm to the wire, where Eva ruled the rachis stays at the floor",
+    find: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: compoundRodRadiusMm(wireR) });',
+    into: '    intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, radiusMm: Math.max(wireR, radiusMm * Math.sqrt(carried / N)) });', names: ['LF17'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const r0 = (x) => x.plan.compound.rachis.intervals[0].radiusMm;
+      return (r0(m) > r0(c) + 0.1) ? null
+        : `the mutant's first rachis interval is ${r0(m)} mm against the clean tree's ${r0(c)} — the behaviour did not move`; } },
+  { id: 'the-rod-exemption-is-widened', why: "every rod is reported to ST9 and the combination gate at twice its emitted radius — an exemption region wider than the rod it names",
+    find: "    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : 'rachis' });",
+    into: "    rodAxes.push({ inner: ringMid(axisRings[k]), outer: ringMid(axisRings[k + 1]), radiusMm: 2 * Math.max(radii[k], radii[k + 1]), part: k < iBase ? 'petiole' : 'rachis' });", names: ['LF18'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.rep.rodAxes[0].radiusMm - 2 * c.rep.rodAxes[0].radiusMm) < 1e-12) ? null
+        : `the mutant names its petiole at ${m.rep.rodAxes[0].radiusMm} mm against the clean tree's ${c.rep.rodAxes[0].radiusMm} — the behaviour did not move`; } },
+  { id: 'the-leaflets-read-the-simple-tooth-depth', why: "the leaflets read the SIMPLE leaf's 0.26 tooth depth again — the holly leaflets Eva ruled off, with their own depth control reaching nothing",
+    find: '    lobeDepth: state.leafletToothDepth === undefined ? LEAFLET_TOOTH_DEPTH_DEFAULT : Number(state.leafletToothDepth),',
+    into: '    lobeDepth: Number(state.leafToothDepth),', names: ['LF7', 'LF13'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.serrationBuilt > 0 && c.rep.serrationBuilt === 0) ? null
+        : `the mutant's leaflets cut ${m.rep.serrationBuilt} teeth against the clean tree's ${c.rep.serrationBuilt} at the compound defaults — the behaviour did not move`; } },
+  { id: 'the-leaflets-read-the-simple-tip', why: "the leaflets read the SIMPLE leaf's 1.30 pointed tip — their own tip control reaching nothing",
+    find: '    petalTipShape: state.leafletTipShape === undefined ? LEAFLET_TIP_SHAPE_DEFAULT : Number(state.leafletTipShape),',
+    into: '    petalTipShape: Number(state.leafTipShape),', names: ['LF9'],
+    witness: (M, C) => { const m = compoundFacts(M, CPD_WIT), c = compoundFacts(C, CPD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.tipShape === 1.3 && c.plan.tipShape === 1.6) ? null
+        : `the mutant's leaflets are built at tip ${m.plan.tipShape} against the clean tree's ${c.plan.tipShape} — the behaviour did not move`; } },
 
   /* ===================================================================
      THE SEPALS (sepals, part 1) — SP0-SP9. A family was added, so the table
@@ -2186,6 +2243,11 @@ const LEAF_POSE_SET = { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWid
    a leak would show). Both are table rows of the same state. */
 const CPD_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', sheetThickness: 2.4 };
 const SIMPLE_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafletPairs: 4, leafletStalk: 20 };
+/* THE CLAMP'S WITNESS (Eva's rulings on #380): four pairs ask a 3.60 mm
+   petiole of a 3 mm solid stem at 70 degrees, where the rooted end fits only
+   2.14 mm — and the stem's own radius (the wrong cap) is 3.00, so the true
+   cap, a typed one and no cap at all are three different petioles here. */
+const CLAMP_WIT = { stemLength: 70, stemDiameter: 3, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', leafletPairs: 4, leafAngle: 70 };
 function compoundFacts(MOD, set) {
   try {
     const st = { ...REGISTRY_DEFAULTS, ...set };
@@ -2410,6 +2472,8 @@ const ROWS = [
      one; the SIMPLE row carries the hidden leaflet controls at an extreme. */
   { label: 'a compound leaf at sheet 2.4 (2 pairs + terminal — the rods APART from a typed 0.6)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'sheetThickness', value: '2.4' }] },
+  { label: 'a compound leaf CLAMPED by a 3 mm stem at 70 deg (4 pairs ask 3.60 mm; the rooted end fits 2.14)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '3' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletPairs', value: '4' }, { id: 'leafAngle', value: '70' }] },
   { label: 'a SIMPLE leaf with the hidden leaflet controls at an extreme (pairs 4, stalk 20 — where a leak would show)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafletPairs', value: '4' }, { id: 'leafletStalk', value: '20' }] },
   { label: 'a leaf arched 90 and cupped 0.8 on a 5 mm blade whose teeth the floor reshapes (depth 0.3)',

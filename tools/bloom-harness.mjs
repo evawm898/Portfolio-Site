@@ -110,7 +110,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          /* THE APEX'S TWO MODE FLOORS, imported rather than restated: A4
             rebuilds the cap's terminal from the state and must floor it at
             the number the builder actually floors at, in the mode it built. */
-         TIP_HALF_MM, TIP_CAP_HALF_MM, ROOT_BLEND_END, LEAF_BASE_TAPER, LEAF_TIP_TAPER,
+         TIP_HALF_MM, TIP_CAP_HALF_MM, ROOT_BLEND_END, LEAF_BASE_TAPER, LEAF_TIP_TAPER, LEAFLET_BASE_TAPER, LEAFLET_TIP_TAPER,
          /* LEAF/STEM BUILD S2: the fold clamp's declared margin and the form
             onset's end, imported for LF12 for ST3's reason — they are
             DECLARATIONS the cup law is stated against, not the quantity under
@@ -797,6 +797,8 @@ for (const o of ROLE_OVERRIDES) {
     ['leafletBasalRatio', G.LEAFLET_BASAL_RANGE, G.LEAFLET_BASAL_DEFAULT], ['leafletTerminalLength', G.LEAFLET_LENGTH_RANGE, G.LEAFLET_TERMINAL_LENGTH_DEFAULT],
     ['leafletTerminalWidth', G.LEAF_WIDTH_RANGE, G.LEAFLET_TERMINAL_WIDTH_DEFAULT], ['leafletStalk', G.LEAFLET_STALK_RANGE, G.LEAFLET_STALK_DEFAULT],
     ['leafletTerminalStalk', G.LEAFLET_TERMINAL_STALK_RANGE, G.LEAFLET_TERMINAL_STALK_DEFAULT],
+    /* the leaflets' own tip (Eva's ruling on #380) — the simple leaf's range */
+    ['leafletTipShape', G.LEAF_TIP_SHAPE_RANGE, G.LEAFLET_TIP_SHAPE_DEFAULT],
   ];
   for (const [id, r, d] of ranges) {
     const c = CONTROLS.find((x) => x.id === id);
@@ -806,6 +808,21 @@ for (const o of ROLE_OVERRIDES) {
   }
   const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets');
   if (subs.length !== ranges.length) bad.push(`the Leaflets section holds ${subs.length} controls, the geometry's layout reads ${ranges.length}`);
+  /* THE LEAFLETS' OWN TOOTH DEPTH (Eva's ruling on #380) lives in the shared
+     Serration section beside the simple leaf's, on the same range, default 0 */
+  {
+    const a = CONTROLS.find((x) => x.id === 'leafletToothDepth'), b = CONTROLS.find((x) => x.id === 'leafToothDepth');
+    if (!a) bad.push('the registry declares no `leafletToothDepth` — the compound leaflets would read the simple leaf\'s depth');
+    else {
+      if (a.min !== b.min || a.max !== b.max) bad.push(`leafletToothDepth is ${a.min}..${a.max} where the simple leaf's depth is ${b.min}..${b.max}`);
+      if (a.default !== G.LEAFLET_TOOTH_DEPTH_DEFAULT) bad.push(`leafletToothDepth defaults to ${a.default} in the registry and ${G.LEAFLET_TOOTH_DEPTH_DEFAULT} in the geometry`);
+      if (a.section !== b.section) bad.push(`leafletToothDepth is in ${a.section}, the simple depth in ${b.section}`);
+    }
+  }
+  /* ONE DEPTH AND ONE TIP PER BLADE, never two: each pair's simple half is
+     shown exactly where a SIMPLE blade is built, its leaflet half exactly
+     where a compound one is (the geometry reads the other not at all) */
+  const twins = [['leafToothDepth', 'leafletToothDepth'], ['leafTipShape', 'leafletTipShape']];
   for (const leafLength of [0, 40]) for (const stemLength of [0, 120]) for (const inflorescence of ['NONE', 'RACEME']) for (const leafType of G.LEAF_TYPES) {
     const st = { ...DEFAULTS, leafLength, stemLength, inflorescence, leafType };
     const geo = G.leafIsCompound(st) && !G.leafIsAbsent(st) && G.inflorescenceIsAbsent(st);
@@ -815,6 +832,13 @@ for (const o of ROLE_OVERRIDES) {
     for (const c of subs) {
       const shown = evalPredicate(c.visibleWhen, st);
       if (shown && !geo) bad.push(`${tag}: ${c.id} is SHOWN while no compound leaf is built`);
+    }
+    for (const [simpleId, leafletId] of twins) {
+      const sc = CONTROLS.find((x) => x.id === simpleId), lc = CONTROLS.find((x) => x.id === leafletId);
+      if (!sc || !lc) continue;
+      const simpleBuilt = !G.leafIsAbsent(st) && !geo;
+      if (evalPredicate(sc.visibleWhen, st) !== simpleBuilt) bad.push(`${tag}: ${simpleId} is ${evalPredicate(sc.visibleWhen, st) ? 'shown' : 'hidden'} while ${simpleBuilt ? 'a SIMPLE blade reads it' : 'no simple blade is built'}`);
+      if (evalPredicate(lc.visibleWhen, st) !== geo) bad.push(`${tag}: ${leafletId} is ${evalPredicate(lc.visibleWhen, st) ? 'shown' : 'hidden'} while ${geo ? 'the leaflets read it' : 'no compound leaf is built'}`);
     }
     const typeShown = evalPredicate(ctl.visibleWhen, st);
     if (typeShown !== (!G.leafIsAbsent(st) && G.inflorescenceIsAbsent(st))) bad.push(`${tag}: leafType is ${typeShown ? 'shown' : 'hidden'} while the leaf's node is ${!G.leafIsAbsent(st) && G.inflorescenceIsAbsent(st) ? 'its own' : 'absent or shared'}`);
@@ -7817,9 +7841,18 @@ export async function leafAssertions(page, row) {
      petal lobes came on and vice versa, the organ-to-organ coupling session 22
      ruled against. The reference is the page's own read-back control state,
      an owner the leaf plan does not write. */
+  /* RE-DERIVED, NOT RELAXED (Eva's ruling on #380, Oct 7): a COMPOUND leaf's
+     blades are its leaflets and their depth is the leaflets' OWN control
+     (`leafletToothDepth`, default 0) — the simple leaf's `leafToothDepth` is
+     hidden AND inert there. Seen red first on the shipped compound defaults:
+     "the leaf's serration depth reads 0 where the LEAF's own control says
+     0.26" once the leaflets stopped reading the simple depth. The count, the
+     tooth tip and the notch stay SHARED. Still the page's read-back control
+     state, an owner the plan does not write. */
+  const toothDepthCtl = Number(cpR ? ui.leafletToothDepth : ui.leafToothDepth);
   if (!L.serration) bad.push('LF7: the builder reports no leaf serration record');
   else {
-    const want4 = { depth: Number(ui.leafToothDepth), count: Math.round(Number(ui.leafToothCount)), crest: Number(ui.leafCrestShape), notch: Number(ui.leafNotchShape) };
+    const want4 = { depth: toothDepthCtl, count: Math.round(Number(ui.leafToothCount)), crest: Number(ui.leafCrestShape), notch: Number(ui.leafNotchShape) };
     for (const k of ['depth', 'crest', 'notch']) {
       if (Math.abs(Number(L.serration[k]) - want4[k]) > 1e-9) { bad.push(`LF7: the leaf's serration ${k} reads ${L.serration[k]} where the LEAF's own control says ${want4[k]} — a leaf reading the petal's lobe controls is the coupling this splits`); break; }
     }
@@ -7867,7 +7900,13 @@ export async function leafAssertions(page, row) {
      under 1e-9 on the clean tree; 1e-6 leaves three decades and still fails
      the mutant that pins the exponent at the retired constant (1.30 against
      0.60, a difference of 0.7). */
-  const nWant = Number(ui.leafTipShape);
+  /* RE-DERIVED (Eva's ruling on #380): a COMPOUND leaf's leaflets are built
+     on their OWN tip control and their own ovate outline (the two
+     `LEAFLET_*_TAPER` declarations, imported as the simple leaf's are) — seen
+     red first: the shipped compound defaults read "the plan reports the blade
+     built at tip shape 1.6 where the LEAF's own control says 1.3", and the
+     rows read back 1.546 off the simple leaf's widest point. */
+  const nWant = Number(cpR ? ui.leafletTipShape : ui.leafTipShape);
   if (L.tipShape === undefined) bad.push('LF9: the plan reports no `tipShape` — which exponent the blade was built from is asserted by nothing');
   else if (Math.abs(Number(L.tipShape) - nWant) > 1e-9) bad.push(`LF9: the plan reports the blade built at tip shape ${L.tipShape} where the LEAF's own control says ${nWant}`);
   if (!Array.isArray(L.rowHalfBaseMm) || L.rowHalfBaseMm.length !== bladesR.length) {
@@ -7875,7 +7914,7 @@ export async function leafAssertions(page, row) {
   } else if (!Array.isArray(L.tipClamp) || L.tipClamp.length !== bladesR.length) {
     bad.push(`LF9: the builder reports no terminal-clamp record for the ${bladesR.length} blade(s) of ${L.built} leaves — the read-out's clamp clause would then be printed from nothing`);
   } else {
-    const a = LEAF_BASE_TAPER, b = LEAF_TIP_TAPER, uPk = a / (a + b);
+    const a = cpR ? LEAFLET_BASE_TAPER : LEAF_BASE_TAPER, b = cpR ? LEAFLET_TIP_TAPER : LEAF_TIP_TAPER, uPk = a / (a + b);
     /* each emitted BLADE's own length and width, restated (S3): the
        control's, or on a raceme its flowering node's built length (SN4 holds
        that against the cap), or a compound leaf's leaflet's */
@@ -7985,10 +8024,18 @@ export async function leafAssertions(page, row) {
         const tip = restatedRachisAt(ui, bb, az, Lr).C;
         const T = [-Math.sin(az), Math.cos(az), 0], R = [Math.cos(az), Math.sin(az), 0];
         const cs = CB[i].axisRod.centres;
-        let tipAt = -1;
-        for (let j = 1; j < cs.length; j++) { const d = Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2]); if (d < 1e-9) { tipAt = j; break; } }
-        if (tipAt < 0) { let best = Infinity; for (let j = 1; j < cs.length; j++) best = Math.min(best, Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2])); tipMiss = Math.min(tipMiss, best); at = `leaf ${i}: no emitted ring at the restated rachis tip (nearest ${best.toExponential(3)} mm)`; continue; }
-        for (let j = 1; j <= tipAt; j++) {
+        /* THE RACHIS STARTS AT THE PETIOLE'S END, FOUND BY POSITION (Eva's
+           ruling on #380): a thicker petiole steps down on a cone whose ring
+           stands BEFORE the rachis base, so "ring 1 is the petiole's end" is no
+           longer true — seen red first on the rose, the cone's ring read 1.2e-3
+           mm off the arc it was never on. The base is the emitted ring AT the
+           petiole's outer centroid, an owner the arch does not write. */
+        let baseAt = -1, tipAt = -1;
+        for (let j = 1; j < cs.length; j++) { if (Math.hypot(cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]) < 1e-9) { baseAt = j; break; } }
+        if (baseAt < 0) { tipMiss = 0; at = `leaf ${i}: no emitted axis ring at the petiole's outer end — the rachis has no base`; continue; }
+        for (let j = baseAt; j < cs.length; j++) { const d = Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2]); if (d < 1e-9) { tipAt = j; break; } }
+        if (tipAt < 0) { let best = Infinity; for (let j = baseAt; j < cs.length; j++) best = Math.min(best, Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2])); tipMiss = Math.min(tipMiss, best); at = `leaf ${i}: no emitted ring at the restated rachis tip (nearest ${best.toExponential(3)} mm)`; continue; }
+        for (let j = baseAt; j <= tipAt; j++) {
           const w = [cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]];
           const off = Math.abs(w[0] * T[0] + w[1] * T[1]), al = w[0] * R[0] + w[1] * R[1], up = w[2];
           let d;
@@ -8000,7 +8047,7 @@ export async function leafAssertions(page, row) {
         const tb = L.leafArchBuilt && L.leafArchBuilt[i];
         if (!tb || Math.abs(tb.turnRad - turn) > 1e-12) { bad.push(`LF11: compound leaf ${i} reports a built turn of ${tb && tb.turnRad} rad over its rachis where the LEAF's arch of ${archDeg} deg asks ${turn}`); break; }
       }
-      if (Number.isFinite(tipMiss)) bad.push(`LF11: the axis rod never reaches the rachis tip the controls restate (arch ${archDeg} deg over ${Lr} mm) — ${at}`);
+      if (Number.isFinite(tipMiss)) bad.push(`LF11: the axis rod never reaches the rachis tip the controls restate (arch ${archDeg} deg over ${Lr} mm), or has no ring at its base — ${at}`);
       else if (worst > 1e-9) bad.push(`LF11: the rachis is ${worst.toExponential(3)} mm off the arc restated from the controls (arch ${archDeg} deg, angle ${ui.leafAngle} deg, ${Lr} mm) at ${at}`);
     }
   } else if (!Array.isArray(L.rowCentre) || L.rowCentre.length !== L.built || !Array.isArray(L.rowNormal) || L.rowNormal.length !== L.built || !Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built || builtNodes.length !== L.built) {
@@ -8084,7 +8131,10 @@ export async function leafAssertions(page, row) {
      of headroom over the print floor, no tooth may be built; where the record
      says the count gave to the floor, the count it gave to is the built one. */
   if (Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === bladesR.length) {
-    const depth = Number(ui.leafToothDepth);
+    /* the BLADE's own depth control (the leaflets' own under COMPOUND — LF7's
+       note; seen red first: "blade 0 carries no serration record at tooth
+       depth 0.26" on the compound defaults) */
+    const depth = toothDepthCtl;
     for (let i = 0; i < bladesR.length; i++) {
       const S = L.serrationBuilt[i], halfW = bladesR[i].widthMm / 2;
       if (!(depth > 0)) { if (S) { bad.push(`LF13: blade ${i} carries a serration record at tooth depth 0 — the guard must be inert`); break; } continue; }
@@ -8108,7 +8158,7 @@ export async function leafAssertions(page, row) {
       if (S.countBuilt > S.countAsked) { bad.push(`LF13: blade ${i} builds ${S.countBuilt} teeth of ${S.countAsked} asked`); break; }
       if ((S.clampedBy === 'relief floor') !== (S.countReliefCap !== null && S.countReliefCap === S.countBuilt && S.countBuilt < Math.min(S.countAsked, S.countRowsCap, S.countFloorCap))) { bad.push(`LF13: blade ${i}'s count says CLAMPED BY ${S.clampedBy} with a relief-floor cap of ${S.countReliefCap} and ${S.countBuilt} built — the cause must be a biconditional`); break; }
     }
-  } else if (Number(ui.leafToothDepth) > 0) {
+  } else if (toothDepthCtl > 0) {
     bad.push(`LF13: the builder reports no per-leaf serration record for ${L.built} leaves — the tooth floor is then asserted by nothing`);
   }
   bad.push(...compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR));
@@ -8156,6 +8206,7 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
   const CB = Array.isArray(L.compoundBuilt) ? L.compoundBuilt : null;
   if (!CB || CB.length !== L.built) { bad.push(`LF14: the builder reports ${CB ? CB.length : 'no'} compound records for ${L.built} leaves`); return bad; }
   if (!cpR) {
+    bad.push(...petioleLawClauses(ui, m, L, restatedPetiole(ui, m, null), null));
     if (L.compound !== null) bad.push('LF14: a SIMPLE leaf carries a compound layout in its plan — the type must be inert');
     if (CB.some((c) => c !== null)) bad.push(`LF14: ${CB.filter((c) => c).length} of ${L.built} SIMPLE leaves emitted a compound tree — hidden and NOT inert`);
     if (Array.isArray(L.bladeOf) && L.bladeOf.some((b) => b.role !== 'blade')) bad.push('LF14: a SIMPLE leaf reports leaflet blades');
@@ -8241,51 +8292,147 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
     if (flat > 1e-9) bad.push(`LF16: a leaflet is ${flat.toExponential(3)} off FLAT in the rachis's own plane at ${flatAt} — a per-leaflet arch or a leaflet off its restated direction`);
     if (freeBad.length) bad.push(`LF16: ${freeBad.length} leaflet base(s) are BURIED, not free — no bead closes them: ${freeBad.slice(0, 4).join('; ')}`);
   }
-  /* LF17 — the rods, measured off the emitted rings */
+  /* LF17 — the rods, measured off the emitted rings. RE-DERIVED (Eva's ruling
+     on #380, Oct 7): the PETIOLE is the area rule read UPWARD over the
+     leaflets, capped by the stem (LF18 holds that law and its clamp), and
+     the rachis and the stalks are the WIRE — not the area rule read down from
+     a petiole that was itself the wire (S3, where every ring read the wire).
+     Seen red first on the shipped compound defaults: "a rod's emitted radius
+     is 7.416e-1 mm off the derived law ... the area rule read down from the
+     1.200 mm petiole". The rachis's base is found BY POSITION (the emitted
+     ring at the petiole's outer centroid), because a thicker petiole steps
+     down on a cone whose ring stands before it: every ring BEFORE the base is
+     the petiole's restated radius, the base and every ring after it the
+     wire, and where the petiole thickens the cone's ring stands exactly the
+     radii's difference short of the base (45 degrees). */
+  const PR = restatedPetiole(ui, m, cpR);
   {
-    const t = Number(ui.sheetThickness);
-    const rP = (m.shownMode === 'export' ? Math.max(t, MIN_FEATURE_MM) : t) / 2;
-    const N = cpR.count;
-    const law = (n) => Math.max(rP, rP * Math.sqrt(n / N));
-    const stations = cpR.lateral.map((q) => q.stationMm);
-    const carriedEnding = (s) => 1 + 2 * stations.filter((x) => x >= s - 1e-9).length;
-    const carriedStarting = (s) => 1 + 2 * stations.filter((x) => x > s + 1e-9).length;
+    const wire = PR.wire;
     let worst = 0, at = null;
     for (let i = 0; i < L.built; i++) {
-      const { az } = builtNodes[i], bb = L.petioleAxes[i].outer, C = CB[i];
-      const R = [Math.cos(az), Math.sin(az)], th = (Number(ui.leafAngle) * Math.PI) / 180;
+      const bb = L.petioleAxes[i].outer, C = CB[i];
       const cs = C.axisRod.centres, rs = C.axisRod.radii;
-      const tip = restatedRachisAt(ui, bb, az, cpR.rachisMm).C;
-      let pastTip = false;
+      let baseAt = -1;
+      for (let j = 1; j < cs.length; j++) if (Math.hypot(cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]) < 1e-9) { baseAt = j; break; }
+      if (baseAt < 0) { worst = Infinity; at = `leaf ${i}: no emitted axis ring at the petiole's outer end`; break; }
+      const wantBase = PR.thickens ? 2 : 1;
+      if (baseAt !== wantBase) { worst = Infinity; at = `leaf ${i}: the rachis base is axis ring ${baseAt} where a petiole that ${PR.thickens ? 'thickens steps down on ONE cone ring (ring 2)' : 'stays the wire has no cone (ring 1)'}`; break; }
+      if (PR.thickens) {
+        const d = Math.abs(Math.hypot(cs[1][0] - bb[0], cs[1][1] - bb[1], cs[1][2] - bb[2]) - (PR.built - wire));
+        if (d > worst) { worst = d; at = `leaf ${i}: the cone's ring stands ${Math.hypot(cs[1][0] - bb[0], cs[1][1] - bb[1], cs[1][2] - bb[2]).toFixed(6)} mm short of the rachis base where 45 degrees asks the radii's difference ${(PR.built - wire).toFixed(6)}`; }
+      }
       for (let j = 0; j < cs.length; j++) {
-        let want;
-        if (j <= 1) want = [rP];
-        else if (pastTip) want = [law(1)];
-        else {
-          /* the ring's station along the rachis, read back off its centre */
-          const w = [cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]];
-          const al = w[0] * R[0] + w[1] * R[1], up = w[2];
-          const arch = Number(ui.leafArch ?? 0);
-          let s;
-          if (arch === 0) s = al * Math.cos(th) + up * Math.sin(th);
-          else { const k = ((-arch * Math.PI) / 180) / cpR.rachisMm; const phi = Math.atan2(k * (al + Math.sin(th) / k), -k * (up - Math.cos(th) / k)); s = (phi - th) / k; }
-          want = [law(carriedEnding(s)), law(carriedStarting(s))];
-          if (Math.hypot(cs[j][0] - tip[0], cs[j][1] - tip[1], cs[j][2] - tip[2]) < 1e-9) { want.push(law(1)); pastTip = true; }
-        }
-        const d = Math.min(...want.map((x) => Math.abs(rs[j] - x)));
-        if (d > worst) { worst = d; at = `leaf ${i} axis ring ${j} (radius ${rs[j].toFixed(6)} mm against ${want.map((x) => x.toFixed(6)).join(' or ')})`; }
+        const want = j < baseAt ? PR.built : wire;
+        const d = Math.abs(rs[j] - want);
+        if (d > worst) { worst = d; at = `leaf ${i} axis ring ${j} (radius ${rs[j].toFixed(6)} mm against ${want.toFixed(6)}, the ${j < baseAt ? 'petiole' : 'rachis'})`; }
       }
-      for (const r of C.stalkRods) for (const x of [r.radiusMm, r.endRadiusMm]) { const d = Math.abs(x - law(1)); if (d > worst) { worst = d; at = `leaf ${i} stalk (radius ${x.toFixed(6)} mm against ${law(1).toFixed(6)})`; } }
+      for (const r of C.stalkRods) for (const x of [r.radiusMm, r.endRadiusMm]) { const d = Math.abs(x - wire); if (d > worst) { worst = d; at = `leaf ${i} stalk (radius ${x.toFixed(6)} mm against the ${wire.toFixed(6)} mm wire)`; } }
     }
-    if (worst > 1e-9) bad.push(`LF17: a rod's emitted radius is ${worst.toExponential(3)} mm off the derived law restated from the controls (the area rule read down from the ${(2 * rP).toFixed(3)} mm petiole over ${N} leaflets, floored at the petiole's own wire) — ${at}`);
-    const P = L.compound;
-    if (P && P.rachis && Array.isArray(P.rachis.intervals)) {
-      for (const iv of P.rachis.intervals) {
-        const ask = rP * Math.sqrt(carriedEnding(iv.toMm) / N);
-        if (Math.abs(iv.askedMm - ask) > 1e-9) { bad.push(`LF17: the read-out tells an area-rule ask of ${iv.askedMm} mm for the rachis up to ${iv.toMm} mm where the law restates ${ask}`); break; }
+    if (worst > 1e-9) bad.push(`LF17: a rod's emitted radius or station is ${worst === Infinity ? 'wrong' : `${worst.toExponential(3)} mm off`} the law restated from the controls (the petiole ${(2 * PR.built).toFixed(3)} mm, the rachis and stalks the ${(2 * wire).toFixed(3)} mm wire) — ${at}`);
+  }
+  bad.push(...petioleLawClauses(ui, m, L, PR, CB));
+  return bad;
+}
+
+/* ===================================================================
+   LF18 — THE COMPOUND PETIOLE'S LAW AND ITS CLAMP (Eva's ruling on #380,
+   Oct 7: "a thicker compound petiole. The petiole thickens to carry the
+   rachis and leaflets; the rachis and stalks stay at the 1.2 mm floor. It
+   must still root through the stem wall: find the cap the stem puts on it
+   and clamp to it, told. SIMPLE petioles don't move. ST9's rod exemption
+   covers the thicker petiole by name, never by widening the region").
+
+   restatedPetiole — the law RESTATED FROM THE CONTROLS and the STEM's own
+   plan radii (an owner the petiole law does not write), never imported:
+     ASKED  the area rule read upward, `sqrt(N wire^2)` — the petiole's
+            section is its N leaflets' wire sections summed (the geometry
+            writes `wire sqrt(N)`; one is not the other's expression);
+     CAP    the largest petiole whose ROOTED END stays inside the stem's
+            outer cylinder at the leaf's angle, written through the identity
+            `Ro - rEnd = embed (1 + cos th)` and `sqrt((Ro - q)(Ro + q))`
+            rather than the geometry's two forms;
+     BUILT  `max(wire, min(asked, cap))` where the cap clears the mode-free
+            (export) wire, else the wire — and the cone exists exactly then.
+   A SIMPLE leaf's petiole is the wire, in the shown mode, unconditionally.
+
+   LF18 (a) the plan's petiole record — asked, cap, built, clamped, thickens —
+            is the restated law, so the read-out's "asked -> built" is true;
+        (b) MEASURED: wherever the built petiole is within the cap, every
+            compound leaf's EMITTED rooted end lies inside the stem — the
+            largest horizontal reach of the root ring's vertices from the stem
+            axis at its node is at most the stem plan's outer radius. The
+            cap's reason, read off the artefact. ONE DIRECTION, on purpose:
+            where the cap is UNDER the wire (a thick sheet at a steep angle —
+            2.4 mm at 85 degrees caps at 1.64 mm) the petiole is held at the
+            wire and its end stands proud of the stem by construction, as a
+            SIMPLE leaf's own petiole does at that sheet and angle on main —
+            seen first as this clause firing on `sheet 2.4 x leafAngle 85`
+            (0.354 mm proud). That is told on the read-out, not hidden;
+        (c) THE EXEMPTION IS THE EMITTED ROD: every rod ST9 and the
+            combination gate excuse is named at the law's own radius — the
+            petiole's restated radius, the wire for the rachis and stalks — so
+            no exemption can be wider than the rod it names.
+   DECLARED, NOT ASSERTED: the cap reads the stem as a straight cylinder at
+   the node. A node kink leans the stem's axis by at most atan(0.13) across
+   the disc's own height; the swelling only widens it. (b) measures what was
+   emitted against the stem plan's radius at the node's displaced axis.
+   =================================================================== */
+export function restatedPetiole(ui, m, cpR) {
+  const t = Number(ui.sheetThickness);
+  const wire = (m.shownMode === 'export' ? Math.max(t, MIN_FEATURE_MM) : t) / 2;
+  if (!cpR) return { compound: false, wire, built: wire };
+  const wireFree = Math.max(t, MIN_FEATURE_MM) / 2;
+  const S = m.stem;
+  const Ro = S.outerR, bore = S.boreR;
+  const rootR = (bore + Ro) / 2, embed = (Ro - bore) / 2;
+  const th = (Number(ui.leafAngle) * Math.PI) / 180, c = Math.abs(Math.cos(th)), s = Math.abs(Math.sin(th));
+  const asked = Math.sqrt(cpR.count * wire * wire);
+  const rEnd = rootR - embed * c;
+  const q = c > 0 ? rootR / c - embed : Infinity;
+  let cap;
+  if (q < Ro && Math.sqrt((Ro - q) * (Ro + q)) * c * c >= rEnd * s) cap = Math.sqrt((Ro - q) * (Ro + q));
+  else cap = (embed * (1 + c)) / s;
+  const thickens = cap > wireFree;
+  const built = thickens ? Math.max(wire, Math.min(asked, cap)) : wire;
+  return { compound: true, wire, wireFree, asked, cap, built, thickens, clamped: asked > cap, Ro };
+}
+export function petioleLawClauses(ui, m, L, PR, CB) {
+  const bad = [];
+  if (!PR.compound) {
+    if (!(Math.abs(Number(L.petioleR) - PR.wire) <= 1e-12)) bad.push(`LF18: a SIMPLE leaf's petiole is ${(2 * L.petioleR).toFixed(4)} mm across where its own rule is the ${(2 * PR.wire).toFixed(4)} mm wire — the compound law reached a simple petiole`);
+    return bad;
+  }
+  const P = L.compound && L.compound.petiole;
+  if (!P) { bad.push('LF18: a COMPOUND leaf reports no petiole record — whether the petiole was thickened, and by how much, is told from nothing'); return bad; }
+  {
+    const near = (a, b) => Math.abs(Number(a) - Number(b)) <= 1e-9;
+    let wrong = null;
+    if (!near(P.askedMm, PR.asked)) wrong = `asks ${P.askedMm} mm where the area rule read upward over ${L.compound.count} leaflets restates ${PR.asked}`;
+    else if (!near(P.capMm, PR.cap)) wrong = `is capped at ${P.capMm} mm where the stem (outer ${PR.Ro} mm) at the leaf's ${ui.leafAngle} deg restates ${PR.cap}`;
+    else if (P.thickens !== PR.thickens) wrong = `says thickens = ${P.thickens} where the cap ${PR.cap.toFixed(4)} mm against the mode-free ${PR.wireFree.toFixed(4)} mm wire says ${PR.thickens}`;
+    else if (!near(P.radiusMm, PR.built) || !near(L.petioleR, PR.built)) wrong = `is built at ${P.radiusMm} mm (the plan's petiole ${L.petioleR}) where max(wire, min(asked, cap)) restates ${PR.built}`;
+    else if (P.clamped !== PR.clamped) wrong = `says clamped = ${P.clamped} on an ask of ${PR.asked.toFixed(4)} mm against a ${PR.cap.toFixed(4)} mm cap`;
+    if (wrong) bad.push(`LF18: the compound petiole ${wrong} — the read-out's "asked -> built" would be untrue`);
+  }
+  {
+    let worst = -Infinity, at = null;
+    for (let i = 0; i < CB.length && PR.built <= PR.cap; i++) {
+      const reach = CB[i] && CB[i].petioleRootReachMm;
+      if (!Number.isFinite(reach)) { worst = Infinity; at = `leaf ${i} reports no root reach`; break; }
+      if (reach - PR.Ro > worst) { worst = reach - PR.Ro; at = `leaf ${i} (its rooted end reaches ${reach.toFixed(6)} mm from the stem axis, the stem's outer radius ${PR.Ro.toFixed(6)})`; }
+    }
+    if (worst > 1e-9) bad.push(`LF18: a compound petiole's rooted END stands ${worst === Infinity ? 'unmeasured' : `${worst.toExponential(3)} mm OUTSIDE`} the stem — it no longer roots through the wall: ${at}`);
+  }
+  {
+    let wrong = null;
+    for (let i = 0; i < CB.length && !wrong; i++) {
+      for (const a of (CB[i] && CB[i].rodAxes) || []) {
+        const want = a.part === 'petiole' ? PR.built : PR.wire;
+        if (!(Math.abs(a.radiusMm - want) <= 1e-9)) { wrong = `leaf ${i}'s ${a.part} is excused at ${a.radiusMm} mm where its own restated radius is ${want}`; break; }
       }
-      if (Math.abs(P.stalkAskedMm - rP / Math.sqrt(N)) > 1e-9) bad.push(`LF17: the read-out tells a stalk ask of ${P.stalkAskedMm} mm where the law restates ${rP / Math.sqrt(N)}`);
-    } else bad.push('LF17: the plan reports no rachis intervals — the rods\' asked radii are told from nothing');
+      if (!wrong && !((CB[i] && CB[i].rodAxes) || []).some((a) => a.part === 'petiole')) wrong = `leaf ${i} names no petiole among its rods — the thicker petiole would be excused by nothing`;
+    }
+    if (wrong) bad.push(`LF18: the rod exemption is not the emitted rod — ${wrong} (ST9 and the combination gate must name each rod at its own radius, never a widened region)`);
   }
   return bad;
 }
@@ -14135,7 +14282,10 @@ export function buildMatrix() {
         and every leaflet control at an extreme with no leaf at all).
         Appended as the FINAL block, after 53. */
   const CPD = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 3, leafType: 'COMPOUND' };
-  lf('COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, 2 pairs + terminal, arch 10, cup 0.28, 12 fine teeth at 0.12', { stemLength: 120, stemDiameter: 4.5, leafLength: 40, leafType: 'COMPOUND', leafNodes: 4, leafPhyllotaxy: 'alternate', leafDivergence: 137.5, stemNodeKink: 0.8, stemNodeSwelling: 0.25, leafArch: 10, leafCup: 0.28, leafToothCount: 12, leafToothDepth: 0.12, leafCrestShape: 1.6, leafNotchShape: 1.6 });
+  /* (the ROSE was re-defined by Eva's rulings on #380: the retuned compound
+     defaults — ovate entire leaflets — rather than S3's fine teeth, which the
+     leaflets no longer read; its teeth are block 55's serration-ON row) */
+  lf('COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, the retuned defaults (2 pairs + a larger terminal, ovate, entire), arch 10, cup 0.28', { stemLength: 120, stemDiameter: 4.5, leafLength: 40, leafType: 'COMPOUND', leafNodes: 4, leafPhyllotaxy: 'alternate', leafDivergence: 137.5, stemNodeKink: 0.8, stemNodeSwelling: 0.25, leafArch: 10, leafCup: 0.28 });
   lf('COMPOUND: the shipped compound defaults (2 pairs + terminal on a 40 mm rachis, 3 alternate nodes)', { ...CPD });
   lf('COMPOUND: leafletPairs min (1 — first and last coincide, basal ratio inert)', { ...CPD, leafletPairs: 1 });
   lf('COMPOUND: leafletPairs max (4 — nine leaflets)', { ...CPD, leafletPairs: 4 });
@@ -14147,13 +14297,13 @@ export function buildMatrix() {
   lf('COMPOUND: leafletAngle max (90 — square to the rachis)', { ...CPD, leafletAngle: 90 });
   lf('COMPOUND: leafletLength min (4)', { ...CPD, leafletLength: 4 });
   lf('COMPOUND: leafletLength max (60)', { ...CPD, leafletLength: 60 });
-  lf('COMPOUND: leafletWidth min (3 — the laterals lose their teeth)', { ...CPD, leafletWidth: 3 });
+  lf('COMPOUND: leafletWidth min (3)', { ...CPD, leafletWidth: 3 });
   lf('COMPOUND: leafletWidth max (40)', { ...CPD, leafletWidth: 40 });
-  lf('COMPOUND: leafletBasalRatio min (0.4 — the basal pair at 40%, its teeth clamped)', { ...CPD, leafletBasalRatio: 0.4 });
+  lf('COMPOUND: leafletBasalRatio min (0.4 — the basal pair at 40%)', { ...CPD, leafletBasalRatio: 0.4 });
   lf('COMPOUND: leafletBasalRatio max (1.4 — the basal pair LARGER than the top)', { ...CPD, leafletBasalRatio: 1.4 });
   lf('COMPOUND: leafletTerminalLength min (4)', { ...CPD, leafletTerminalLength: 4 });
   lf('COMPOUND: leafletTerminalLength max (60 — the leaf\'s rise takes nodes off the stem)', { ...CPD, leafletTerminalLength: 60 });
-  lf('COMPOUND: leafletTerminalWidth min (3 — the terminal loses its teeth)', { ...CPD, leafletTerminalWidth: 3 });
+  lf('COMPOUND: leafletTerminalWidth min (3)', { ...CPD, leafletTerminalWidth: 3 });
   lf('COMPOUND: leafletTerminalWidth max (40)', { ...CPD, leafletTerminalWidth: 40 });
   lf('COMPOUND: leafletStalk min (0 — sessile laterals on the rachis)', { ...CPD, leafletStalk: 0 });
   lf('COMPOUND: leafletStalk max (20)', { ...CPD, leafletStalk: 20 });
@@ -14162,15 +14312,44 @@ export function buildMatrix() {
   lf('COMPOUND: arch 180 (the RACHIS arcs over; the leaflets ride it, unarched)', { ...CPD, leafArch: 180 });
   lf('COMPOUND: arch -90 (the rachis curls up)', { ...CPD, leafArch: -90 });
   lf('COMPOUND: cup 1.2 (every leaflet cupped; the fold clamp at each stub)', { ...CPD, leafCup: 1.2 });
-  lf('COMPOUND: sheetThickness 2.4 (the rods follow the petiole, floored at the wire)', { ...CPD, sheetThickness: 2.4 });
+  lf('COMPOUND: sheetThickness 2.4 (the wire 2.40 mm; the petiole asks 5.37 and the stem holds 4.48 — CLAMPED)', { ...CPD, sheetThickness: 2.4 });
   lf('COMPOUND: sheetThickness 0.6 (the export floor raises the rods with the sheet)', { ...CPD, sheetThickness: 0.6 });
-  lf('COMPOUND: leafAngle 85 (steep — the rachis leaves near the stem)', { ...CPD, leafAngle: 85 });
+  lf('COMPOUND: leafAngle 85 (steep — the rachis leaves near the stem; the petiole CLAMPED to the 1.64 mm the stem holds)', { ...CPD, leafAngle: 85 });
   lf('COMPOUND: leafAngle -60 (drooping)', { ...CPD, leafAngle: -60 });
-  lf('COMPOUND: a SPHERE head with a stem (ST9 excuses the rachis and stalks by name)', { ...CPD, placement: 'CONTINUOUS', hubShape: 'SPHERE' });
+  lf('COMPOUND: a SPHERE head with a stem (ST9 excuses the thicker petiole, the rachis and stalks by name)', { ...CPD, placement: 'CONTINUOUS', hubShape: 'SPHERE' });
   lf('COMPOUND: whorled x 8 nodes x leafletPairs 4 x arch 180 (24 leaves of nine leaflets, the rachis subdivided — the cost corner)', { stemLength: 90, stemDiameter: 6, leafLength: 45, leafNodes: 8, leafPhyllotaxy: 'whorled', leafType: 'COMPOUND', leafletPairs: 4, leafArch: 180 });
   lf('COMPOUND: under a raceme\'s shared node (PINNED to SIMPLE, and told)', { stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', leafLength: 40, leafType: 'COMPOUND' });
   lf('COMPOUND: GATED — SIMPLE with every leaflet control at an extreme (hidden AND inert)', { ...CPD, leafType: 'SIMPLE', leafletPairs: 4, leafletAngle: 90, leafletLength: 60, leafletStalk: 20, leafletTerminalStalk: 30, leafletBasalRatio: 1.4 });
   lf('COMPOUND: GATED — the type and every leaflet control at an extreme with length 0 (hidden AND inert)', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafType: 'COMPOUND', leafletPairs: 4, leafletAngle: 90, leafletStalk: 20, leafletTerminalStalk: 30, leafletBasalRatio: 1.4 });
+
+  /* 55. THE COMPOUND RETUNE (Eva's rulings on #380, Oct 7;
+        docs/bloom-leaf-compound-retune-outcome.md). Three rulings: the
+        compound defaults retuned toward ROSE (ovate leaflets, a rounded-to-
+        acute tip, a larger terminal — block 54's rows carry them, every one a
+        mover), serration OFF on the leaflets through their OWN depth control,
+        and a THICKER compound petiole — the area rule read upward over its
+        leaflets, CAPPED by the stem it roots in, the rachis and stalks at the
+        wire. This block carries what is new: the leaflets' serration switched
+        back ON (the old rose's fine teeth, now on the leaflets' own depth),
+        both ends of the two new controls, the petiole on the stems the ruling
+        named (the 3 mm solid floor where four pairs CLAMP, the 4 mm the sheet
+        photographs, a 12 mm hollow stem), the cap at a square leaf, the cap
+        on a LEANING node (the clamp under the kink — the cap reads the stem
+        straight, declared), the cap UNDER the wire on a thick sheet (no cone),
+        and the twin controls' two GATED arms. Appended as the FINAL block,
+        after 54. */
+  lf('COMPOUND RETUNE: leaflet serration ON (leafletToothDepth 0.12, 12 fine teeth, tip and notch 1.6 — the 1 mm floor applies)', { ...CPD, leafletToothDepth: 0.12, leafToothCount: 12, leafCrestShape: 1.6, leafNotchShape: 1.6 });
+  lf('COMPOUND RETUNE: leafletToothDepth max (1)', { ...CPD, leafletToothDepth: 1 });
+  lf('COMPOUND RETUNE: leafletTipShape min (0.6 — acute)', { ...CPD, leafletTipShape: 0.6 });
+  lf('COMPOUND RETUNE: leafletTipShape max (3 — the held-width round tip)', { ...CPD, leafletTipShape: 3 });
+  lf('COMPOUND RETUNE: the petiole CLAMPED on the 3 mm solid stem (4 pairs ask 3.60 mm; the stem holds 2.98)', { ...CPD, stemDiameter: 3, leafletPairs: 4 });
+  lf('COMPOUND RETUNE: the petiole on a 4 mm stem (asks 2.68 mm under a 3.69 mm cap)', { ...CPD, stemDiameter: 4 });
+  lf('COMPOUND RETUNE: the petiole on a 12 mm hollow stem x 4 pairs (asks 3.60 under a 4.76 cap — a thin wall far from the axis)', { ...CPD, stemDiameter: 12, leafletPairs: 4 });
+  lf('COMPOUND RETUNE: leafAngle 90 x 4 pairs on the 3 mm stem (the cap is the wall, 1.50 mm)', { ...CPD, stemDiameter: 3, leafletPairs: 4, leafAngle: 90 });
+  lf('COMPOUND RETUNE: the clamp under a LEANING node (kink 1 x 4 pairs x 50 deg on a 3.5 mm stem — the cap reads the stem straight, declared)', { ...CPD, stemDiameter: 3.5, leafletPairs: 4, leafAngle: 50, stemNodeKink: 1 });
+  lf('COMPOUND RETUNE: sheet 2.4 x leafAngle 85 (the 1.64 mm cap is UNDER the 2.40 mm wire — the petiole stays the wire, no cone)', { ...CPD, sheetThickness: 2.4, leafAngle: 85 });
+  lf('COMPOUND RETUNE: GATED — COMPOUND with the simple leaf\'s tooth depth 1 and tip 3 (hidden AND inert under COMPOUND)', { ...CPD, leafToothDepth: 1, leafTipShape: 3 });
+  lf('COMPOUND RETUNE: GATED — SIMPLE with the leaflets\' tooth depth 1 and tip 0.6 (hidden AND inert under SIMPLE)', { ...CPD, leafType: 'SIMPLE', leafletToothDepth: 1, leafletTipShape: 0.6 });
 
   return rows;
 }
