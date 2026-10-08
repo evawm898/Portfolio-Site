@@ -232,6 +232,7 @@ strength claim in this repo is still theory.
 | image | IMAGE → BUG: paste / drop / load a top-down picture, fit an editable bug to it (outline and proportions only) | **built (§11)** — waits on Eva's ruling on `docs/img/bug-image-sheet.jpg` and on her own pictures in the preview |
 | wing library, step 2 | the BLENDED ROOT (every wing narrows to its own short, filleted attachment); every fitted wing a COMPLETE shape; the smoothness clause J | **built (§12)** — waits on Eva's ruling on the exploded sheet; the library file and gallery are not built yet |
 | 3 | pattern (bands, spots, eyespots, negative space) | — |
+| body types | BODY TYPE dropdown (Butterfly, Moth, Bee, Dragonfly, Spider, Custom), SIZE and WIDTH, the fine body controls in one collapsed drop-down; antenna Lift; elbowed antennae | **built (§17)** — waits on Eva's ruling on the body-type sheet |
 | 4 | SVG import (roles, warps, blend) | **PARKED** (Eva, Oct 2) — built on `claude/lucid-hopper-sjgl2d`, PR #343 closed unmerged; see §3.7 |
 
 Phase 2 started after Eva's ruling on the Phase 1 revision (§6.6, #326 merged).
@@ -248,6 +249,10 @@ The first sheet (`docs/img/bug-phase1-sheet.png`, #324) was **not approved**.
 The rulings, and how each was carried out:
 
 ### 5.1 No named presets
+> **Superseded for the BODY by §17 (Eva, Oct 8)**: the body is chosen as a BODY TYPE
+> (Butterfly, Moth, Bee, Dragonfly, Spider, Custom) and placed by two sliders. Wings
+> are still never a preset — a type changes the body only.
+
 Butterfly / moth / dragonfly / spider are gone (`PRESETS` and `presetParams`
 are deleted). In their place:
 - **A neutral default bug** (`defaultParams()`): 3 parts, 3 splayed leg pairs,

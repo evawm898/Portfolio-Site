@@ -160,6 +160,7 @@ const junctionFixture = () => ({ ...rootUnderFloor(), wingJunction: G.JUNCTION_D
 import * as IMG from '../bug-image.js';
 import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
 import { libraryChecks, libraryRows, LIBRARY_MUTANTS, angleChecks, angleRows, ANGLE_MUTANTS } from './verify-bug-library.mjs';
+import { bodyChecks, bodyRows, bodyFitClause, BODY_MUTANTS } from './verify-bug-body.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -1208,6 +1209,7 @@ function check(label, model, opts = {}) {
   if (opts.expectVeinThin && !gateVein(model).under) fails.push('V4: the deliberately thin-vein row is not under the floor by this file\'s reading (vacuous)');
   if (opts.expectTailVein && !model.wingPairs.some((w) => w.hasTail)) fails.push('V5: the tail-vein row has no tail (vacuous)');
   const jb = junctionChecks(model); for (const b of jb.bad) fails.push(b);
+  if (opts.bodyFit) for (const b of bodyFitClause(G, model, opts.bodyFit)) fails.push(b);
   return { label, fails, md, stl, cn, mf, sv, rc, le, fc, vn, ec, er, xc, gc, jb, notes: model.notes };
 }
 
@@ -1540,7 +1542,12 @@ function rowsFor(nseeds) {
   { const p = d(); p.minDiameter = 2; p.wingEdgeRound = 1; rows.push(['round 1 with a 2 mm floor', p, {}]); }
   { const p = d(); p.wings.first.dihedral = 35; p.wings.first.pitch = 20; p.wings.last.dihedral = -25; p.wings.last.pitch = -15; rows.push(['round 1, tilted and pitched pairs', p, {}]); }
   { const p = d(); p.wings.tail.on = true; p.wings.first.sweep = TAIL_ROW_SWEEP; p.venation = 'holes'; rows.push(['holes, tail ON (rounded tail rims)', p, {}]); }
-  for (const name of ['falcate', 'notched', 'strap']) { const p = d(); p.venation = 'holes'; p.wingPairs = 2; p.wings.first.points = HAND_OUTLINES[name]; p.wings.first.length = 36; p.wings.first.stretch = 1.3; rows.push([`holes: drawn:${name}`, p, {}]); }
+  // the strap on main's pre-type thorax (5 mm): on the Butterfly default's
+  // 7.09 mm its hindwing silhouette dips 0.0039 mm inside the outline (E7),
+  // PRE-EXISTING on main's own geometry at that body and flickering with the
+  // thorax (0.001-0.034 mm over 5.5-7.5 mm) — HOLES + the junction blend, not
+  // the body types (bug-project-design-doc.md §17.8)
+  for (const name of ['falcate', 'notched', 'strap']) { const p = d(); p.venation = 'holes'; p.wingPairs = 2; p.wings.first.points = HAND_OUTLINES[name]; p.wings.first.length = 36; p.wings.first.stretch = 1.3; if (name === 'strap') { p.thoraxLength = 5; p.bodyType = 'custom'; p.bodyRatios = null; } rows.push([`holes: drawn:${name}`, p, {}]); }
   // JUNCTION rows (design doc §16): the blend off (the old root, bit for bit
   // — JB is not asked of it), the radius ladder on the default, the junction
   // fixture (a hindwing root the old code refused) at the default radius, the
@@ -1773,6 +1780,30 @@ if (NEG) {
       console.log(`${fired0 ? 'CAUGHT' : 'MISSED'} ${'the stored angles are zeroed'.padEnd(32)} by WA1+WA2  — ${f0.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
       if (!fired0) ok = false; }
   }
+  // BP — code mutants of bug-geometry.js (body types, §17), each a copy written
+  // beside it and imported, run through the ONE clause it names (every anchor
+  // checked FIRST; the clean module must pass every clause)
+  {
+    const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    const src = fs.readFileSync(path.join(ROOT, 'bug-geometry.js'), 'utf8');
+    for (const [name, from] of BODY_MUTANTS) { const n = src.split(from).length - 1; if (n !== 1) { console.log(`ANCHOR ${name}: "${from.slice(0, 50)}" matches ${n} times (must be exactly 1) — the mutant is disarmed`); ok = false; } }
+    const cleanBp = bodyChecks(G).filter(([c]) => !c);
+    console.log(cleanBp.length ? `BP clean run FAILED: ${cleanBp.map(([, m]) => m).join(' | ')}` : 'BP clean run: every check passes');
+    if (cleanBp.length) ok = false;
+    let k = 0;
+    for (const [name, from, to, clause] of BODY_MUTANTS) {
+      if (src.split(from).length - 1 !== 1) continue;
+      const file = path.join(ROOT, `.bug-geometry.bodymutant-${process.pid}-${k++}.mjs`);
+      fs.writeFileSync(file, src.replace(from, to));
+      let fails = [];
+      try { const M = await import(pathToFileURL(file).href); fails = bodyChecks(M, { only: clause }).filter(([c]) => !c).map(([, m]) => m); }
+      catch (e) { fails = [`(threw) ${e.message}`]; }
+      finally { fs.unlinkSync(file); }
+      const fired = fails.some((f) => f.startsWith(clause + ':'));
+      console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${name.padEnd(32)} by ${clause}  — ${fails.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
+      if (!fired) ok = false;
+    }
+  }
   // ROW mutants of bug-geometry.js (§15.2, §15.3): the builder fixes undone,
   // each a copy written beside it and imported; the fixture row is BUILT by the
   // mutated module and run through this file's own row clauses, which must name
@@ -1832,8 +1863,8 @@ if (NEG) {
 const rowsArg = args.indexOf('--rows');
 if (rowsArg >= 0) {
   let bad = 0; const list = JSON.parse(fs.readFileSync(args[rowsArg + 1], 'utf8'));
-  for (const [label, params] of list) {
-    let r; try { r = check(label, G.buildBug(params), {}); } catch (e) { r = { label, fails: [`THROW: ${e.message}`] }; }
+  for (const [label, params, opts = {}] of list) {
+    let r; try { r = check(label, G.buildBug(params), opts); } catch (e) { r = { label, fails: [`THROW: ${e.message}`] }; }
     console.log(`${r.fails.length ? 'FAIL' : 'ok  '} ${label}`); for (const f of r.fails) console.log('     ' + f);
     if (r.fails.length) bad++;
   }
@@ -1850,7 +1881,10 @@ fc.push(...im.checks);
 const lb = [...libraryChecks(G), ...angleChecks(G)];
 for (const [c, msg] of lb) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
 fc.push(...lb);
-const rows = [...rowsFor(NSEEDS), ...imageRows(im.results), ...libraryRows(G), ...angleRows(G)].filter(([label]) => !ONLY || ONLY.test(label));
+const bp = bodyChecks(G);
+for (const [c, msg] of bp) { console.log(`${c ? 'ok  ' : 'FAIL'} ${msg}`); if (!c) failed++; }
+fc.push(...bp);
+const rows = [...rowsFor(NSEEDS), ...imageRows(im.results), ...libraryRows(G), ...angleRows(G), ...bodyRows(G)].filter(([label]) => !ONLY || ONLY.test(label));
 const support = [];
 for (const [label, params, opts] of rows) {
   const model = G.buildBug(params);

@@ -993,6 +993,7 @@ function fitOnce(img, base, opts) {
     pairs.push(rec);
   }
   const notes = [];
+  p.bodyType = 'custom'; p.bodyRatios = null;   // the fitted body is the picture's, in mm (§17): nothing re-derives it
   const params = normalizeParams(p, notes);
   for (const nt of notes) res.notes.push(nt);
   if (notes.some((n) => /refused/.test(n))) return { ...res, ...stepMsg(5, `the fitted outline was refused by the model: ${notes.join('; ')}`) };
