@@ -3618,7 +3618,7 @@ the base by the beaded base; the arch bends the RACHIS, leaflets lie flat in its
 arch). **THE RODS' LAW COLLAPSES AT THIS TREE AND THAT IS EVA'S QUESTION**: the area rule floored at the
 wire, and the bloom's petiole IS the 1.2 mm wire (`t/2`), so every rod is the petiole at every sheet
 (`floorBinds` 7 of 7) — a fixed 1.2 mm wire or a thicker compound petiole are the alternatives, §4.
-**[Oct 8: RULED — the thicker petiole; see the retune block below. The rachis and stalks stay the wire.]**
+**[Oct 8: RULED — the thicker petiole; see the retune block below. The rachis and stalks stay the wire. — The RACHIS half is SUPERSEDED by S3c (Oct 8): it tapers by load; the stalks stay the wire.]**
 **A raceme's shared node pins the leaf to SIMPLE in ONE place** (`SHARED_NODE_LEAF_PINS`, told), because
 the seating offset and the floret cap are single-blade laws. ST9, its witness and the combination gate's
 leaf-stem measure excuse the builder's own `rodAxes` (petiole, rachis, stalks) BY NAME. Pairs capped at
@@ -3648,7 +3648,7 @@ at `leafWidth`, hidden under COMPOUND and equal to the laterals' 17 mm only at t
 outcome doc.) **THE PETIOLE**: asked `wire·sqrt(N)` (2.68 mm at the
 default five leaflets), capped by `petioleRootCapMm` — the largest radius whose rooted-end disc fits
 inside the stem's outer cylinder, closed form, two cases — built `max(wire, min(asked, cap))` when the cap
-clears the mode-free wire floor, else the wire; a 45° cone steps it down to the wire rachis; CLAMPED AND
+clears the mode-free wire floor, else the wire; ~~a 45° cone steps it down to the wire rachis~~ **[S3c, Oct 8: the cone is gone and the rachis tapers by load — next block]**; CLAMPED AND
 TOLD (asked -> built). **THE CAP FALLS WITH THE ANGLE AND STOPS DEPENDING ON THE STEM PAST ~50°**: at 35°
 2.98 / 3.69 / 4.48 / 4.76 mm on 3 / 4 / 6 / 12 mm stems, but 2.14 at 70° and 1.50 at 90° on EVERY stem.
 **The ruling said "default 4 mm"; the shipped `stemDiameter` default is 6 mm** — both measured, the
@@ -3662,6 +3662,29 @@ matrix in both modes, 0 floats moved**, predeclared by `verify-bloom-surface-byt
 compound-retune` from the BASE tree's own `leafPlan`. +24 tris a compound leaf (the cone ring). Block 55
 (12 rows, 1,222), smoke block 55 (5), `frozen/phase57` = the 1,210 rows at `2792504`. Sheet:
 `node tools/shot-bloom-leaf-compound-rose.mjs <png> --base <worktree of 2792504>`.
+
+**THE COMPOUND RACHIS TAPERS BY LOAD, AND #381's 45-DEGREE CONE IS GONE** (Eva's ruling, Oct 8 —
+leaf/stem build S3c; read `docs/bloom-leaf-rachis-taper-outcome.md` before touching
+`compoundRachisTaper`, `compoundRachisRadiusMm`, `compoundRachisStretches`, `rodAxisExcessMm`, the
+axis-rod loop in `buildCompoundLeafInto`, LF17, LF18 or `restatedRachisTaper`). **This supersedes
+the retune block's "the rachis and stalks stay at the wire" and its cone** — #381's brief was wrong,
+not its build. Every point of the petiole and rachis is the area rule over the leaflets still
+carried BEYOND it (`wire sqrt(n)`): 2.68 mm to the first pair, 2.08 at the second, 1.20 at the
+terminal on the default leaf; knots at each pair station at the load carried UP TO it, from the
+BUILT (capped) petiole and never above it; **linear in arc length**, because it meets the rule at
+every station a load leaves and is never under it, and because the mesh draws straight frustums
+between rings so the law IS the drawing. `compoundRachisRadiusMm` is the ONE owner (builder,
+read-out, slenderness). **The one step**: a pair ON the tip (`leafletLast` 1) — load 3 -> 1 at one
+point. Stalks stay the wire, rooted on the rachis axis. **`rodAxes` name each segment at its own
+`innerR -> outerR`** and `rodAxisExcessMm` is the one statement of what a rod record covers (ST9,
+its witness, the combination gate) — never widened. **LF17's restatement reads each ring's arc
+length by `atan2` about the arc's centre (`restatedRachisArcOf`), never by inverting the chord
+through `asin`**, which is ill-conditioned at the far end of a 180-degree arch and read an exact
+ring 2e-8 mm off. The Cup read-out under COMPOUND quotes basal pair / top pair / terminal (panel
+route (ab), TWENTY-TWO routes). Partition (`--movers-predicate compound-taper`, the base tree's own
+`thickens`): **43 movers / 1,179 holders, 0 floats**, both modes. −24 tris a thickened compound leaf
+(15,366). No frozen phase owed (no row moved); `frozen/phase57`'s bytes stop reproducing on 33 rows.
+Sheet: `node tools/shot-bloom-rachis-taper.mjs <png> --base <worktree of 9dbb8e1>`.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read

@@ -6238,6 +6238,25 @@ export function restatedRachisAt(ui, bb, az, s) {
   }
   return { C, phi, D: [Rr[0] * Math.cos(phi), Rr[1] * Math.cos(phi), Math.sin(phi)], N: [-Rr[0] * Math.sin(phi), -Rr[1] * Math.sin(phi), Math.cos(phi)], T: [-Rr[1], Rr[0], 0] };
 }
+/* THE ARC LENGTH OF A POINT ON THE RESTATED RACHIS, from its position — the
+   ANGLE it stands at about the arc's own centre (`atan2` of the sum-of-sines
+   form's two components), never the chord inverted through `asin`: at an
+   arch of 180 degrees the far end's chord is the diameter, where `asin` is
+   ill-conditioned and read the tip ring 2e-8 mm off on a ring that was
+   exact (the cost-corner row, seen first). Straight: the distance. */
+export function restatedRachisArcOf(ui, bb, az, p) {
+  const th = (Number(ui.leafAngle) * Math.PI) / 180;
+  const arch = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
+  const w = [p[0] - bb[0], p[1] - bb[1], p[2] - bb[2]];
+  if (arch === 0) return Math.hypot(w[0], w[1], w[2]);
+  const k = ((-arch * Math.PI) / 180) / Number(ui.leafLength);
+  const along = w[0] * Math.cos(az) + w[1] * Math.sin(az), up = w[2];
+  const sp = k * along + Math.sin(th), cp = Math.cos(th) - k * up;
+  const d = Math.atan2(sp * Math.cos(th) - cp * Math.sin(th), cp * Math.cos(th) + sp * Math.sin(th));
+  let s = d / k;
+  if (s < -1e-9) s += (2 * Math.PI) / Math.abs(k);
+  return s;
+}
 export function restatedLeafRiseMm(ui) {
   const L = Number(ui.leafLength), th = (Number(ui.leafAngle) * Math.PI) / 180;
   const arch = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
@@ -8190,9 +8209,10 @@ export async function leafAssertions(page, row) {
           rachis tip, and every leaflet lies FLAT along its restated direction
           in the rachis's local plane (no per-leaflet arch).
    LF17 — THE RODS: every emitted ring's radius (measured) is the derived law
-          restated — the area rule read down from the petiole, floored at the
-          wire — and the area rule's ASK the read-out tells is the restated
-          one.
+          restated — since S3c the LOAD TAPER (the area rule over the leaflets
+          still carried beyond each point, from the built petiole, linear in
+          arc length between the pair stations), the stalks the wire, each
+          stalk rooted inside the rachis's own section at its station.
    =================================================================== */
 export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
   const bad = [];
@@ -8328,9 +8348,6 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
     const wire = PR.wire;
     let worst = 0, at = null;
     const note = (d, what) => { if (d > worst) { worst = d; at = what; } };
-    const archDeg = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
-    const kR = archDeg === 0 ? 0 : Math.abs(((-archDeg * Math.PI) / 180) / cpR.rachisMm);
-    const sOf = (p, bb) => { const c = Math.hypot(p[0] - bb[0], p[1] - bb[1], p[2] - bb[2]); return kR === 0 ? c : (2 * Math.asin(Math.min(1, (c * kR) / 2))) / kR; };
     const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 1e-9;
     for (let i = 0; i < L.built && worst !== Infinity; i++) {
       const { az } = builtNodes[i], bb = L.petioleAxes[i].outer, C = CB[i];
@@ -8344,7 +8361,7 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
       if (tipAt < 0) { worst = Infinity; at = `leaf ${i}: no axis ring at the restated rachis tip`; break; }
       note(Math.abs(rs[0] - PR.built), `leaf ${i} axis ring 0 (the petiole's rooted end, radius ${rs[0].toFixed(6)} mm against the built ${PR.built.toFixed(6)})`);
       for (let j = baseAt; j <= tipAt; j++) {
-        const s = sOf(cs[j], bb), want = TR.at(s);
+        const s = restatedRachisArcOf(ui, bb, az, cs[j]), want = TR.at(s);
         note(Math.abs(rs[j] - want), `leaf ${i} axis ring ${j} at s ${s.toFixed(4)} mm (radius ${rs[j].toFixed(6)} mm against the restated taper's ${want.toFixed(6)})`);
       }
       for (let j = tipAt + 1; j < cs.length; j++) note(Math.abs(rs[j] - wire), `leaf ${i} axis ring ${j} past the rachis tip (radius ${rs[j].toFixed(6)} mm against the ${wire.toFixed(6)} mm wire — the terminal stalk)`);
@@ -8367,7 +8384,7 @@ export function compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR) {
     }
     if (worst > 1e-9) bad.push(`LF17: a rod's emitted radius, station or root is ${worst === Infinity ? 'wrong against' : `${worst.toExponential(3)} mm off`} the load taper restated from the controls (the petiole ${(2 * PR.built).toFixed(3)} mm; the rachis ${TR.pts.map(([s, r]) => `${(2 * r).toFixed(3)} at ${s.toFixed(2)}`).join(' -> ')} mm; the stalks the ${(2 * wire).toFixed(3)} mm wire) — ${at}`);
   }
-  bad.push(...petioleLawClauses(ui, m, L, PR, CB, TR));
+  bad.push(...petioleLawClauses(ui, m, L, PR, CB, TR, builtNodes));
   return bad;
 }
 
@@ -8475,7 +8492,7 @@ export function restatedRachisTaper(cpR, PR) {
   return { pts, tipStep, at, L: Lr };
 }
 const cpRCount = (L) => (L.compound ? L.compound.count : '?');
-export function petioleLawClauses(ui, m, L, PR, CB, TR = null) {
+export function petioleLawClauses(ui, m, L, PR, CB, TR = null, builtNodes = null) {
   const bad = [];
   if (!PR.compound) {
     if (!(Math.abs(Number(L.petioleR) - PR.wire) <= 1e-12)) bad.push(`LF18: a SIMPLE leaf's petiole is ${(2 * L.petioleR).toFixed(4)} mm across where its own rule is the ${(2 * PR.wire).toFixed(4)} mm wire — the compound law reached a simple petiole`);
@@ -8517,15 +8534,15 @@ export function petioleLawClauses(ui, m, L, PR, CB, TR = null) {
   }
   {
     let wrong = null;
-    const archDeg = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
-    const kR = TR && archDeg !== 0 ? Math.abs(((-archDeg * Math.PI) / 180) / TR.L) : 0;
     for (let i = 0; i < CB.length && !wrong; i++) {
       const bb = TR && L.petioleAxes && L.petioleAxes[i] ? L.petioleAxes[i].outer : null;
-      const sOf = (p) => { const c = Math.hypot(p[0] - bb[0], p[1] - bb[1], p[2] - bb[2]); return kR === 0 ? c : (2 * Math.asin(Math.min(1, (c * kR) / 2))) / kR; };
+      const az = builtNodes && builtNodes[i] ? builtNodes[i].az : null;
+      const sOf = (p) => restatedRachisArcOf(ui, bb, az, p);
       for (const a of (CB[i] && CB[i].rodAxes) || []) {
         let wIn, wOut;
         if (a.part === 'petiole') wIn = wOut = PR.built;
-        else if (a.part === 'rachis' && TR && bb) {
+        else if (a.part === 'rachis' && TR) {
+          if (!bb || az === null) { wrong = `leaf ${i} has no petiole end or azimuth to place its rachis by`; break; }
           const s0 = sOf(a.inner), s1 = sOf(a.outer);
           if (s0 < -1e-9 || s1 > TR.L + 1e-9) { wrong = `leaf ${i}'s rachis segment runs ${s0.toFixed(4)}..${s1.toFixed(4)} mm, outside the ${TR.L} mm rachis`; break; }
           wIn = TR.at(s0); wOut = TR.at(s1);
