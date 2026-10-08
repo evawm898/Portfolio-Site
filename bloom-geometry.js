@@ -4960,8 +4960,17 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     return Math.pow(Math.max(0, 1 - Math.pow(s, n)), 1 / n);
   };
 
+  /* THE CHEVRON'S LOBES (leaf/stem build S4 — the LOBED leaf). A lobed leaf's
+     BASE OUTLINE is the envelope with its lobes and sinuses as a smooth
+     modulation along the TILTED rows (`lobedChevronLaw`, the leaf-lab's B
+     PINNATIFID port): the lobes are bumps in the half-width, the sinuses dips,
+     so every term below — the teeth's stationing and headroom, the floors —
+     reads the lobed outline as the blade it cuts. A CAPABILITY declared by the
+     LOBED leaf alone and by nothing else, so every other profile takes the
+     shipped CORE expression by BRANCH, never a multiplication by 1. */
+  const chev = (cap && cap.chevron) || null;
   const terms = [
-    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (u) => halfW * tipLaw(u) * chev.lobeAt(u) : (u) => halfW * tipLaw(u) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
@@ -5383,7 +5392,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     const reliefFloorMm = cap && cap.toothReliefFloorMm ? Number(cap.toothReliefFloorMm) : 0;
     const base = { coverage, crestShape, notchShape, countAsked, depthAsked, pitchFloorMm, samplesPerLobe, reliefFloorMm };
     const noRoom = (why, extra = {}) => ({ ...base, noRoom: true, noRoomWhy: why, countBuilt: 0, rowsCapacity: 0, countRowsCap: 0, countFloorCap: 0, countCap: 0, countReliefCap: null,
-      reliefBuiltMm: 0, reliefFloored: false,
+      reliefBuiltMm: 0, reliefFloored: false, reliefFlooredMm: 0, foldCapMm: null, foldClamped: false,
       countClamped: countAsked > 0, clampedBy: why === 'region' ? 'rows' : why,
       depthBuilt: 0, depthCap: 0, depthClamped: false, pitchMm: 0, pitchBelowFloor: false,
       halfRimMm: 0, marginArcMm: 0, faceMm: 0, treatedHalfMm: 0, periods: 0, apexIsCrest: null, apexReliefMm: null,
@@ -5407,7 +5416,11 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        length mixes two parameterisations, which is measurable rather than
        theoretical — L4 re-measured the margin at 26.3258 mm against the
        record's 26.2440, the drawn/asked ratio to four figures. */
-    const table = rimArcTable((u) => [u * drawnLengthMm, laminaHalf(u), 0], breaksOf(laminaWinner), uPk, LOBE_ARC_SAMPLES);
+    /* ON A CHEVRON THE RIM IS WHERE THE TILTED ROWS END (S4): the teeth are
+       stationed on the margin the lattice actually draws, `(x + h sin tau,
+       h cos tau)`, so they are even along the lobed leaf's own edge rather
+       than along a perpendicular outline it does not have. A branch. */
+    const table = rimArcTable(chev ? (u) => chev.rimAt(u * drawnLengthMm, laminaHalf(u), u) : (u) => [u * drawnLengthMm, laminaHalf(u), 0], breaksOf(laminaWinner), uPk, LOBE_ARC_SAMPLES);
     const sRB = table.sAt(laminaStart), sTip = table.sAt(1);
     const marginArcMm = sTip - sRB;
     const faceMm = 2 * laminaHalf(1);
@@ -5454,7 +5467,10 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     for (let n = 1; n <= LOBE_COUNT_RANGE[1]; n++) { if (sumOf(demandFor(n)) <= capacity) countRowsCap = n; else break; }
     const countFloorCap = Math.max(0, Math.floor(2 * treatedHalfMm / pitchFloorMm + 1e-9) - 1);
     let countBuilt = Math.min(countAsked, countRowsCap, countFloorCap);
-    const peakHalfMm = laminaHalf(uPk);
+    /* (a chevron's widest half-width is its ENVELOPE's — the lobed outline at
+       `uPk` may sit in a sinus — so the depth means a fraction of the leaf's
+       own width, as it does on every other blade) */
+    const peakHalfMm = chev ? chev.peakHalfMm : laminaHalf(uPk);
     /* THE COUNT GIVES TO THE RELIEF FLOOR (item 2 above). A margin sinus's
        headroom is the SAME expression `headroomOf` reads below — the mode-free
        lamina less the print floor, at the sinus's own station — so a count that
@@ -5516,8 +5532,32 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     const reliefAskedMm = depthAsked * Math.max(0, peakHalfMm - TIP_HALF_MM);
     /* THE RELIEF THE CUT IS MADE AT: the asked one, raised to the floor where a
        floor is declared (item 1 above). Without a floor it IS the asked double. */
-    const reliefBuiltMm = reliefFloorMm > 0 ? Math.max(reliefAskedMm, reliefFloorMm) : reliefAskedMm;
-    const reliefFloored = reliefBuiltMm > reliefAskedMm;
+    const reliefFlooredMm = reliefFloorMm > 0 ? Math.max(reliefAskedMm, reliefFloorMm) : reliefAskedMm;
+    const reliefFloored = reliefFlooredMm > reliefAskedMm;
+    /* THE CHEVRON'S FOLD CAP ON THE TOOTH RELIEF (Eva's ruling, Oct 6: "tooth
+       depth past the midrib-fold limit: CLAMP + READ-OUT"). On the chevron the
+       innermost lattice cell spans the V's apex, and it folds where the drawn
+       half-width falls faster than `(NV - 1) / sin tau` per mm of midrib
+       (docs/bloom-leaf-stem-discovery.md §3d). The teeth are the steepest
+       thing on the margin, so the relief they are cut at is capped where that
+       limit is reached — `chev.reliefFoldCapMm` derives it from the cut's own
+       unit profile, the lobed lamina and the tilt; the slider keeps the asked
+       value and the record says asked against built. WHERE THE CAP IS UNDER
+       THE FLOOR NO TOOTH FITS: a notch the floor deep would fold the lattice
+       and a shallower one is under the printable minimum, so none is cut and
+       the record says why (NO ROOM, 'fold cap'). The two rulings meet here and
+       neither is bent: the floor sets the minimum, the fold the maximum. A
+       BRANCH: no other caller declares a chevron. */
+    let foldCapMm = null, reliefBuiltMm = reliefFlooredMm, foldClamped = false;
+    if (chev) {
+      const unitCut = (u) => (dAt(u) > treatedHalfMm ? 0 : lobeCutProfile((treatedHalfMm - dAt(u)) / pitchMm, crestShape, notchShape));
+      foldCapMm = chev.reliefFoldCapMm(unitCut, laminaHalf, u0);
+      if (foldCapMm < reliefFlooredMm) { reliefBuiltMm = foldCapMm; foldClamped = true; }
+      if (reliefFloorMm > 0 && foldCapMm < reliefFloorMm) {
+        return noRoom('fold cap', { rowsCapacity: capacity, countRowsCap, countFloorCap, countReliefCap, halfRimMm, marginArcMm, faceMm, treatedHalfMm, peakHalfMm,
+          reliefAskedMm, reliefFlooredMm, foldCapMm, foldClamped: true, askedWindowU: [u0, u1], countClamped: true, clampedBy: 'fold cap' });
+      }
+    }
     /* THE RELIEF LANDS ON A GRID, AND THAT IS ABOUT REPRODUCIBILITY RATHER
        THAN PRECISION (session 42). Each period's relief is read at a sinus
        station that a BISECTION on the arc table produces, so it carries that
@@ -5613,6 +5653,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
       halfRimMm, marginArcMm, faceMm, treatedHalfMm, periods, apexIsCrest,
       apexReliefMm: apexIsCrest ? null : reliefMm[(periods - 1) / 2],
       peakHalfMm, reliefAskedMm, reliefMm, reliefLimited, reliefBuiltMm, reliefFloored, countReliefCap,
+      reliefFlooredMm, foldCapMm, foldClamped,
       windowU: [u0, u1], askedWindowU: [u0, u1], sinusU, crestU, cutMm, u0, u1,
       angleChordMm,
       notchAngleDeg: sinusU.length ? includedAt(sinusU[Math.floor(sinusU.length / 2)]) : null,
@@ -9643,6 +9684,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     }
     top.push(ht); bot.push(hb); skinV.push(vs); skinP.push(Ps); skinN.push(Ns); skinB.push(Bs); rimClamped.push(Cl);
   }
+  /* THE EMITTED SKIN LATTICE, on request (leaf/stem build S4): the mid-surface
+     points the two skins are offset from, row by row — what the LOBED fold
+     clauses read the planform Jacobian off. Only a caller that asks gets it;
+     no petal and no other leaf does, so nothing else moves. */
+  if (rim && rim.wantSkin) rim.skin = skinP.map((r) => r.map((P) => [P[0], P[1], P[2]]));
 
   /* ---- the captured grid: the ORIGINAL span, the BODY thickness ---- */
   if (grid) {
@@ -14509,10 +14555,16 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      compound leaf's lateral leaflets are neither, so it does not compose and
      is not asked to. The spread happens ONLY for a compound ask, so a simple
      shared leaf reads the very state object it always did. */
-  const askedCompound = leafIsCompound(state);
+  /* (A LOBED ask is pinned too, leaf/stem build S4 — a decision made without a
+     ruling, one term to reverse: the leaf type is hidden on a raceme, and the
+     shared node's seating and floret cap were measured on the simple blade.) */
+  const askedCompound = leafIsCompound(state) || leafIsLobed(state);
+  const typeAsked = String(state.leafType);
   if (askedCompound && inflo && inflo.present) state = { ...state, ...SHARED_NODE_LEAF_PINS };
   const lengthMm = Number(state.leafLength);
-  const widthMm = Number(state.leafWidth);
+  /* A LOBED LEAF'S WIDTH IS ITS ENVELOPE's (`lobedWidth`, the twin) */
+  const lobed = leafIsLobed(state);
+  const widthMm = lobed ? (state.lobedWidth === undefined ? LOBED_WIDTH_DEFAULT : Number(state.lobedWidth)) : Number(state.leafWidth);
   const angleDeg = Number(state.leafAngle);
   const nodes = Math.round(Number(state.leafNodes));
   const phyllo = String(state.leafPhyllotaxy);
@@ -14692,7 +14744,7 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     /* (a compound leaf's leaflets read their OWN depth and tip — the
        `leafletBladeState` twins — so the plan reports the pair the blades
        were built from) */
-    toothDepth: compoundRec ? leafletBladeState(state, 1, 1).lobeDepth : Number(state.leafToothDepth), crestShape: Number(state.leafCrestShape),
+    toothDepth: compoundRec ? leafletBladeState(state, 1, 1).lobeDepth : lobed ? lobedBladeState(state).lobeDepth : Number(state.leafToothDepth), crestShape: Number(state.leafCrestShape),
     notchShape: Number(state.leafNotchShape), toothCount: Math.round(Number(state.leafToothCount)),
     /* THE TIP EXPONENT THE BLADE IS BUILT FROM — the LEAF's own control, read
        here so LF9 can compare it against the PAGE's read-back state, an owner
@@ -14715,8 +14767,10 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
        is and how big) and the rods' derived radii (`compoundRodRadii`). Null
        for a simple leaf — by branch — and `typePinned` says when a raceme's
        shared node pinned a compound ask to SIMPLE. */
-    type: leafIsCompound(state) ? 'COMPOUND' : 'SIMPLE',
-    typePinned: askedCompound && !leafIsCompound(state),
+    type: leafIsCompound(state) ? 'COMPOUND' : lobed ? 'LOBED' : 'SIMPLE',
+    typePinned: askedCompound && !leafIsCompound(state) && !lobed, typeAsked,
+    /* the LOBED leaf's law as asked (S4) — null otherwise */
+    lobed: lobed ? (({ lobeAt, easeAt, easeDu, ...rec }) => rec)(lobedChevronLaw(state)) : null,
     compound: compoundRec, wireR: petioleR0,
   };
 }
@@ -14839,6 +14893,9 @@ function leafRowSect(prof, form, C, T, N, u) {
   return { h, hb, sect };
 }
 export function leafSurface(acc, plan, state, nodeIndex, az) {
+  /* A LOBED LEAF'S BLADE IS THE CHEVRON (leaf/stem build S4), chosen by the
+     PLAN's type — a branch, so a simple leaf runs every line below as before. */
+  if (plan.type === 'LOBED') return lobedSurface(acc, plan, state, nodeIndex, az);
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
@@ -14914,11 +14971,16 @@ function leafDirectedMismatch(acc, tris0) {
    the BASE's treatment — false for a simple leaf, whose petiole holds row 0
    (emitPanel's buried base, today's bytes), true for a leaflet on its stalk,
    whose base is a free edge (`baseExposed`, emitPanel's own new flag). */
-function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free) {
-  const rows = [], rowHalfBaseMm = [], rowHalfMm = [], rowCentre = [], rowNormal = [], rowMarginLiftMm = [];
+function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, opts = null) {
+  /* (`opts`, leaf/stem build S4 — the LOBED chevron only: `tipProf`, the
+     ENVELOPE profile the terminal clamp is read on, and `wantSkin`, which asks
+     emitPanel for the emitted skin lattice the fold clauses read. Null for
+     every other blade, which then takes every line below as before.) */
+  const rows = [], rowHalfBaseMm = [], rowHalfMm = [], rowCentre = [], rowNormal = [], rowMarginLiftMm = [], rowMarginAcrossMm = [];
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const stations = opts && opts.stations ? opts.stations : null;
   for (let i = 0; i <= nu; i++) {
-    const row = rowAt(i / nu);
+    const row = rowAt(stations ? stations[i] : i / nu);
     rows.push(row);
     rowHalfBaseMm.push(row.hb);
     rowHalfMm.push(row.h);
@@ -14927,14 +14989,26 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free) {
     /* THE CUP AS THE SURFACE CARRIES IT — the lift of each margin's mid-surface
        point over the row's centre along the row's own normal. LF12 reads the
        cup coefficient back off these against the LEAF's own control. */
+    if (row.pointAt) {
+      /* A CHEVRON'S MARGIN POINT stands at its own station along the midrib,
+         so its lift is read in the frame AT that station — the point's own
+         centre and normal on the arch — never against the row's apex. */
+      const a = row.pointAt(-1), b = row.pointAt(1);
+      rowMarginLiftMm.push([dot3([a.P[0] - a.C[0], a.P[1] - a.C[1], a.P[2] - a.C[2]], a.N), dot3([b.P[0] - b.C[0], b.P[1] - b.C[1], b.P[2] - b.C[2]], b.N)]);
+      /* and how far ACROSS the midrib each margin point stands, measured the
+         same way — LF12's lobed branch states the cup against it */
+      rowMarginAcrossMm.push([Math.abs(dot3([a.P[0] - a.C[0], a.P[1] - a.C[1], a.P[2] - a.C[2]], a.T)), Math.abs(dot3([b.P[0] - b.C[0], b.P[1] - b.C[1], b.P[2] - b.C[2]], b.T))]);
+    } else {
     const pm = row.sect(-1).P, pp = row.sect(1).P;
     rowMarginLiftMm.push([dot3([pm[0] - row.C[0], pm[1] - row.C[1], pm[2] - row.C[2]], row.N), dot3([pp[0] - row.C[0], pp[1] - row.C[1], pp[2] - row.C[2]], row.N)]);
+    }
   }
   /* THE EDGE PROFILE'S OWN RECORD, the petal builder's shape: the narrow-span
      clamps always, the treated apexes when the accumulator captures rims (the
      edge-profile gate's E family reads them — leaves are in its subject now). */
   const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], pivotsSkipped: 0, segments: 0, drawnMaxMm: 0, tipAxisMm: null };
   if (free) rim.baseAxisMm = null;
+  if (opts && opts.wantSkin) rim.wantSkin = true;
   const panel = free
     ? { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1], baseExposed: true }
     : { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] };
@@ -14948,10 +15022,11 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free) {
      the mode floor, so the station is the same in LIVE and EXPORT (measured:
      identical to six figures at every exponent). A LENGTH derived from a
      length: the station times the leaf's own length, never a row count. */
+  const tipProf = (opts && opts.tipProf) || prof;
   const tipClamp = (() => {
-    let lo = prof.uPk, hi = 1;
-    if (!(prof.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
-    else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (prof.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
+    let lo = tipProf.uPk, hi = 1;
+    if (!(tipProf.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
+    else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (tipProf.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
     const fromU = hi;
     return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };
   })();
@@ -14967,6 +15042,10 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free) {
     countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
     depthAsked: L0.depthAsked, peakHalfMm: L0.peakHalfMm, reliefAskedMm: L0.reliefAskedMm,
     reliefFloorMm: L0.reliefFloorMm, reliefBuiltMm: L0.reliefBuiltMm, reliefFloored: !!L0.reliefFloored,
+    /* the chevron's fold cap on the relief (S4) — null on every other blade */
+    reliefFlooredMm: L0.reliefFlooredMm === undefined ? null : L0.reliefFlooredMm,
+    foldCapMm: L0.foldCapMm === undefined || L0.foldCapMm === null ? null : (Number.isFinite(L0.foldCapMm) ? L0.foldCapMm : null),
+    foldCapInfinite: L0.foldCapMm === Infinity, foldClamped: !!L0.foldClamped,
     periods: L0.periods, apexIsCrest: L0.apexIsCrest, reliefMm: (L0.reliefMm || []).slice(),
     sinusU: (L0.sinusU || []).slice(),
     sinusReliefMm: (L0.sinusU || []).map((u) => prof.halfWidthBaseAt(u) - prof.halfWidthAt(u)),
@@ -14983,13 +15062,15 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free) {
       for (let i = 0; i <= nu; i++) {
         const u = i / nu;
         if (u < lo || u > hi) continue;
-        const d = rowHalfBaseMm[i] - rowHalfMm[i];
+        /* (a chevron's tooth relief is measured from its LOBED outline, not
+           from the envelope its surface reads) */
+        const d = (rows[i].hLobe === undefined ? rowHalfBaseMm[i] : rows[i].hLobe) - rowHalfMm[i];
         if (d > best) best = d;
       }
       return best;
     }),
   };
-  return { rows, rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim, tipClamp, serration };
+  return { rows, rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
 }
 
 /* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
@@ -15066,8 +15147,22 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     const a = (2 * Math.PI * (i + 0.5)) / sides, c = Math.cos(a) * rp, d = Math.sin(a) * rp;
     return [base[0] + D0[0] * sv + T[0] * c + bi[0] * d, base[1] + D0[1] * sv + T[1] * c + bi[1] * d, base[2] + D0[2] * sv + T[2] * c + bi[2] * d];
   });
-  const PA = pring(-plan.embedMm), PB = pring(pLen);
+  /* A LOBED LEAF'S PETIOLE RUNS ON INTO ITS BLADE (S4): the chevron's first
+     row is a V whose apex is not a lattice point, so the blade starts IN FRONT
+     of the petiole's end face and would stand off it. The rod gains one ring
+     at the blade's base (`bladeBase`, LF11's anchor) and runs on by the first
+     row's own V depth plus one row — `h0 sin(tau0) + L / NU`, derived from the
+     blade's own rows. A simple leaf's rod is the two rings it always was, by
+     branch. */
+  const lobedRow0 = plan.type === 'LOBED' ? S.rowAt(0) : null;
+  const lobedSt = lobedRow0 ? lobedStations(S.chevron, nu) : null;
+  const lobedEmbedMm = lobedRow0 ? lobedRow0.h * Math.sin(lobedRow0.tau) + lobedSt[1] * Lmm : 0;
+  const PA = pring(-plan.embedMm), PB = pring(pLen + lobedEmbedMm), PM = lobedRow0 ? pring(pLen) : null;
+  if (PM) {
+    for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(PA[i], PA[j], PM[j], PM[i]); acc.quad(PM[i], PM[j], PB[j], PB[i]); }
+  } else {
   for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(PA[i], PA[j], PB[j], PB[i]); }
+  }
   for (let i = 1; i < sides - 1; i++) { acc.tri(PA[0], PA[i + 1], PA[i]); acc.tri(PB[0], PB[i], PB[i + 1]); }
   /* THE SOLID THE PETIOLE ACTUALLY CROSSES — LF3's measured side, computed
      from this builder's OWN axis rather than from the plan beside it. The rod's
@@ -15078,7 +15173,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bladeTris0 = acc.triangleCount;
-  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false);
+  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt } : null);
   const { rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim } = B;
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
      — read off the triangles this builder EMITTED (the bead included), never
@@ -15134,7 +15229,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
       return [x / ring.length, y / ring.length, z / ring.length];
     };
-    return { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
+    return PM ? { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, bladeBase: mid(PM) } : { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
   })();
   return {
     directedMismatch, emittedReachMm,
@@ -15189,6 +15284,22 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        stalk the same way, so the exemption is NAMED rods and never a wider
        region. */
     rodAxes: [petioleAxis],
+    /* THE LOBED CHEVRON AS BUILT (S4) — null on every other leaf. The law as
+       asked, the tilt and the relief as BUILT with their caps, the emitted
+       skin lattice the fold clauses read, the row tilts, and the rod's run
+       into the blade. LF19-LF23's measured side. */
+    lobed: lobedRow0 ? {
+      lobes: S.chevron.lobes, from: S.chevron.from, to: S.chevron.to, sinus: S.chevron.sinus, shape: S.chevron.shape,
+      angleAskedDeg: S.chevron.angleDeg, ease: S.chevron.ease, sinusU: S.chevron.sinusU.slice(), crestU: S.chevron.crestU.slice(),
+      tiltBuiltRad: S.tilt.tauRad, tiltClamped: S.tilt.clamped,
+      rowU: B.rows.map((r) => r.u), rowTauRad: B.rows.map((r) => r.tau), rowHalfLobeMm: B.rows.map((r) => r.hLobe), rowHalfEnvMm: B.rows.map((r) => r.hb),
+      skin: rim.skin || null, embedMm: lobedEmbedMm, rows: nu,
+      /* on the LOBED outline before the teeth: the gap is between LOBES, and a
+         tooth's own notch is the relief floor's (the teeth are reported there) */
+      rowMarginAcrossMm: B.rowMarginAcrossMm,
+      sinusGaps: lobedSinusGaps(B.rows.map((r) => r.u), B.rows.map((r) => r.hLobe), B.rows.map((r) => r.tau), Lmm, S.chevron),
+      lengthMm: Lmm, widthMm: plan.widthMm,
+    } : null,
     /* THE BUILDER'S OWN TALLY, not a formula beside it — ST1's lesson one
        family later: a computed count and an emitted one are two owners, and
        this file has already shipped a stem arm whose computed count was wrong
@@ -15239,7 +15350,7 @@ function widthProfileBlendIsDown(prof) {
    NOTHING HERE RUNS FOR A SIMPLE LEAF: the type is a CHOICE (`leafType`,
    SIMPLE by default, out of the blanket sweep by construction), the plan
    carries `compound: null`, and `buildLeafInto` branches on the plan. */
-export const LEAF_TYPES = Object.freeze(['SIMPLE', 'COMPOUND']);
+export const LEAF_TYPES = Object.freeze(['SIMPLE', 'COMPOUND', 'LOBED']);
 export function leafIsCompound(state) { return String(state.leafType) === 'COMPOUND'; }
 /* A RACEME'S SHARED-NODE LEAF NEVER INHERITS THE COMPOUND TYPE — THE ONE
    PLACE (the `PEDICEL_PINS` pattern; `leafPlan` reads it). */
@@ -15320,6 +15431,430 @@ export function leafletBladeState(state, lengthMm, widthMm) {
     petalTipShape: state.leafletTipShape === undefined ? LEAFLET_TIP_SHAPE_DEFAULT : Number(state.leafletTipShape),
     petalBaseTaper: LEAFLET_BASE_TAPER, petalTipTaper: LEAFLET_TIP_TAPER,
   };
+}
+
+/* ===================================================================
+   THE LOBED LEAF — THE CHEVRON (Eva's rulings, Oct 6 — leaf/stem build S4;
+   read docs/bloom-leaf-lobed-outcome.md).
+
+   ONE BLADE, ONE PANEL, ONE BEAD: the leaf-lab's B PINNATIFID
+   (`tools/leaf-lab-core.mjs`, `bChevron`) PORTED, not reinvented. Every row
+   of the blade is a V TILTED FORWARD by `tau(u)` from the perpendicular: row
+   u leaves the midrib at `x = u L` and runs out to `(x + h sin tau,
+   +-h cos tau)`. Forward-pointing lobes are then single-valued along the rows
+   — the lobes are bumps in the half-width `h(u)` and the sinuses dips — so the
+   whole lobed leaf is the simple leaf's ONE blade law (`widthProfile`,
+   `petalForm`, `emitPanel`'s bead, the arch, the cup, the tooth law and its
+   floor) on a lattice whose rows lean. It is a blade OUTLINE TYPE inside the
+   existing tree, a third value of `leafType`, never a separate leaf system;
+   the fused-lobe construction (the lab's approach A) stays PARKED (Eva).
+
+   THE THREE DEPARTURES FROM THE LAB, each forced and named:
+     1. THE OUTLINE IS `widthProfile`'s, not the lab's `coreLaw` product: the
+        envelope is the shipped core with the leaf's own superellipse tip
+        (`leafTipShape`, shared with the simple blade), and the lobes enter as a CAPABILITY on its CORE term
+        (`cap.chevron.lobeAt`), so the teeth (MODEL B, the relief in mm, the
+        1 mm floor) are cut by the shipped law on the lobed outline. The lab's
+        multiplicative tooth with a skew is NOT ported (serrate skew is
+        unruled; the tooth law stays symmetric).
+     2. THE SURFACE IS THE SIMPLE LEAF'S on the envelope: a point of row u at
+        `(s, y)` lies on the arch at `s` (`arcStep`, the one owner of an arc's
+        displacement) and is lifted by the leaf's own cup law
+        `ramp(u) c y^2 / hb` with `hb` the ENVELOPE's half-width at the row
+        — the session-38 principle: the lobes and teeth are a cut, and the
+        surface's laws read the outline BEFORE the cut.
+     3. THE LATTICE MAY NOT FOLD, AND TWO CAPS SAY SO (below). The lab
+        measured its presets clear and planted a fold; the shipped controls
+        reach both fold modes at stubby, wide, steeply tilted states, so the
+        built TILT and the built TOOTH RELIEF are capped there, clamped and
+        told, never refused.
+
+   THE FOLD CONDITION, DERIVED (§3d of the discovery, restated in general).
+   The planform map of a row is `(u, w) -> (uL + h w sin tau, h w cos tau)`
+   with `w = |v|`, and its Jacobian is `h (L cos tau + w h tau')` — the `h'`
+   terms cancel exactly — so the OUTER cells fold only where the tilt eases
+   faster than `L cos tau / (w h)`. But `emitPanel`'s NV = 10 columns are nine
+   intervals and no column lies on v = 0, so the INNERMOST cell spans
+   `w <= 1 / (NV - 1)` ACROSS the V's apex, and its two sides stand at
+   `x + h sin tau / (NV - 1)`: it folds where that falls, i.e. where
+   `(h sin tau)' < -(NV - 1)` per mm of midrib (at a constant tilt: `h`
+   falling faster than `(NV - 1) / sin tau` per mm, the ruling's words). The
+   gate restates the condition on the EMITTED lattice; here it is a cap.
+
+   THE PETIOLE IS THE SIMPLE LEAF'S (Eva: "a LOBED leaf is a simple leaf with
+   a short petiole, so it uses the SIMPLE petiole"): the wire, rooted as today.
+   Its ONE change is where it ENDS: a chevron's first row is a V whose apex is
+   not a lattice point, so the blade starts in front of the petiole's end face
+   — 0.055 mm on the shipped mum, a gap — and the rod runs on INTO the blade
+   by the first row's own V depth plus one row, `h0 sin(tau0) + L / NU`, a
+   length derived from the blade's own rows (the compound stalk's embed
+   precedent).
+   =================================================================== */
+export const LOBED_PER_SIDE_RANGE = Object.freeze([1, 6]);
+export const LOBED_PER_SIDE_DEFAULT = 3;
+export const LOBED_FROM_RANGE = Object.freeze([0.02, 0.4]);
+export const LOBED_FROM_DEFAULT = 0.08;
+export const LOBED_TO_RANGE = Object.freeze([0.5, 0.95]);
+export const LOBED_TO_DEFAULT = 0.8;
+export const LOBED_SINUS_RANGE = Object.freeze([0, 0.9]);
+export const LOBED_SINUS_DEFAULT = 0.62;
+/* THE LOBE SHAPE is the exponent on the lobe's raised-cosine crest (the lab's
+   `lobeShape`): below 1 a broad lobe and a narrow sinus, above 1 a narrow
+   lobe and a broad sinus. ITS FLOOR IS 0.5 BY DERIVATION, not taste: the
+   crest term near a sinus goes as `|pi d|^(2 s)`, so under s = 0.5 the sinus
+   is a CUSP with an unbounded slope — and an unbounded `h'` folds the
+   chevron's innermost cell at every tilt. At 0.5 it is a corner of finite
+   slope. */
+export const LOBED_SHAPE_RANGE = Object.freeze([0.5, 2.5]);
+export const LOBED_SHAPE_DEFAULT = 0.7;
+export const LOBED_ANGLE_RANGE = Object.freeze([0, 60]);
+export const LOBED_ANGLE_DEFAULT = 38;
+/* THE TILT EASES TO 0 OVER THE TERMINAL so the last rows are square to the
+   midrib and the tip closes on emitPanel's apex ring as every blade's does.
+   The range stops at 0.95 so the ease always spans the last few rows: an ease
+   from 1.00 would be a STEP in the tilt at the final row. */
+export const LOBED_EASE_RANGE = Object.freeze([0.5, 0.95]);
+export const LOBED_EASE_DEFAULT = 0.9;
+/* THE ENVELOPE — the lab's mum: 34 mm across, base taper 0.60 and tip taper
+   1.25 (widest at 0.32 of the blade, a rounded base). The width is a twin of
+   `leafWidth` (the simple blade's 17 mm default does not move), the tapers two
+   constants beside the simple leaf's and the leaflets' (no outline control was
+   asked for). */
+export const LOBED_WIDTH_DEFAULT = 34;
+export const LOBED_BASE_TAPER = 0.6, LOBED_TIP_TAPER = 1.25;
+/* THE TOOTH DEPTH IS A TWIN (S3b's mechanism, `leafletToothDepth`): the lobed
+   blade carries its OWN depth, visible only under LOBED, because its default
+   differs — LIGHT TEETH (the mum's "lobes themselves toothed", shallow by
+   ruling): 0.08 of the widest half-width asks 1.30 mm on the 34 mm envelope,
+   over the 1 mm floor — and the simple leaf's 0.26 may not move. Tooth COUNT
+   and crest / notch shape stay shared.
+   THE TIP SHAPE IS NOT A TWIN, MEASURED: the simple leaf's own 1.30 is the
+   lobed default too. It is the widest terminal at which the lab's ease (from
+   0.90) stays clear of the outer-cell fold on the default mum — at 1.50 the
+   terminal holds 4.65 mm of half-width at u 0.934 and the tilt cap binds
+   (38 -> 37.41 deg); at 1.30 it does not. Same control, same default, one
+   less row; a twin is one registry row the day a different default is
+   wanted. */
+export const LOBED_TOOTH_DEPTH_DEFAULT = 0.08;
+/* THE ROW COUNT — twice the leaf's own, FIXED (not derived from the lobes or
+   the teeth, because the tooth count's row cap reads it: a row count derived
+   from the count would be a fixed point). The lab drew its mum on 168 rows;
+   a lobe period at the shipped count of 56 is 13 rows on the default and 7 at
+   six lobes per side, a sinus flank of three or four chords, which reads as a
+   polygon. 112 is the apex ramp's own ceiling (`APEX_NU_ABOVE`), so no part of
+   the bloom carries more rows than a petal already can. */
+export const LOBED_BLADE_ROWS = 2 * NU_BASE;
+/* the tilt's own grid, so the cap's last bit cannot move a row (the relief
+   grid's reasoning, session 42): 2^-20 rad, a power of two */
+export const LOBED_TILT_GRID = 2 ** -20;
+/* THE LOBED BLADE'S STATIONS (S4) — a fixed count, `LOBED_BLADE_ROWS`, placed
+   in TWO stretches, and the split is a finding rather than a preference.
+   Past the lobe window (`u > to`) the chevron carries no lobe, only the
+   envelope converging on its 1.60 mm print stub, and that is where the leaf's
+   rim BEAD closes a margin turning fast toward the terminal face. At a row gap
+   half the simple leaf's the bead's own size (its inset chord is ~0.45 mm)
+   is the size of a row segment, and the census folds there — measured, 268 of
+   972 extreme corners at uniform 1/111 against 87 at 1/55. So the tip
+   stretch is stationed EXACTLY AS THE SIMPLE LEAF STATIONS IT — the stations
+   `i / LEAF_BLADE_ROWS` from the tip down to the first one at or below `to`,
+   the same doubles — and every row the count has left goes uniformly to
+   `[0, that station]`, which holds the lobes and the sinuses (finer than a
+   uniform 1/111 at every reachable `to`). The count never moves, so the
+   triangle count does not. */
+export function lobedStations(law, nu = LOBED_BLADE_ROWS) {
+  const NB = LEAF_BLADE_ROWS;
+  const m = Math.max(0, Math.min(nu - 1, Math.floor((1 - law.to) * NB)));
+  const iF = NB - m, uF = iF / NB, nF = nu - m;
+  const out = [];
+  for (let i = 0; i < nF; i++) out.push((uF * i) / nF);
+  for (let i = iF; i <= NB; i++) out.push(i / NB);
+  return out;
+}
+export function leafIsLobed(state) { return String(state.leafType) === 'LOBED'; }
+
+/* lobedChevronLaw — THE ONE OWNER of a lobed leaf's lobes and tilt as asked,
+   pure on the state. `lobeAt(u)` is the lab's modulation verbatim — `periods`
+   raised-cosine periods over [from, to], a crest at both ends (continuous with
+   the unlobed outline), a sinus at each period's middle, `1 - sinus (1 -
+   crest^shape)` — and is the exact double 1 outside the window and
+   everywhere at sinus depth 0, by branch. `easeAt(u)` is the tilt's envelope,
+   1 below `ease` and a smoothstep to 0 at the tip; `easeDu` its derivative.
+   THE COUNT IS LOBES PER SIDE = SINUSES PER SIDE: with `n` periods there are
+   `n` sinuses, `n` lateral lobes (the basal stretch below the first sinus is
+   the first) and the terminal lobe above the last. */
+export function lobedChevronLaw(state) {
+  const num = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
+  const clamp = (x, R) => Math.min(R[1], Math.max(R[0], x));
+  const lobes = Math.round(clamp(num(state.lobedLobes, LOBED_PER_SIDE_DEFAULT), LOBED_PER_SIDE_RANGE));
+  const from = clamp(num(state.lobedFrom, LOBED_FROM_DEFAULT), LOBED_FROM_RANGE);
+  const to = clamp(num(state.lobedTo, LOBED_TO_DEFAULT), LOBED_TO_RANGE);
+  const sinus = clamp(num(state.lobedSinus, LOBED_SINUS_DEFAULT), LOBED_SINUS_RANGE);
+  const shape = clamp(num(state.lobedShape, LOBED_SHAPE_DEFAULT), LOBED_SHAPE_RANGE);
+  const angleDeg = clamp(num(state.lobedAngle, LOBED_ANGLE_DEFAULT), LOBED_ANGLE_RANGE);
+  const ease = clamp(num(state.lobedEase, LOBED_EASE_DEFAULT), LOBED_EASE_RANGE);
+  const lobeAt = sinus === 0 ? () => 1 : (u) => {
+    if (u < from || u > to) return 1;
+    const ph = ((u - from) / (to - from)) * lobes;
+    const fr = ph - Math.floor(ph);
+    const crest = 0.5 * (1 + Math.cos(2 * Math.PI * fr));
+    return 1 - sinus * (1 - Math.pow(crest, shape));
+  };
+  const span = 1 - ease;
+  const easeAt = (u) => { if (u <= ease) return 1; const x = Math.min(1, (u - ease) / span); return 1 - x * x * (3 - 2 * x); };
+  const easeDu = (u) => { if (u <= ease || u >= 1) return 0; const x = (u - ease) / span; return -6 * x * (1 - x) / span; };
+  const sinusU = Array.from({ length: lobes }, (_, k) => from + ((k + 0.5) * (to - from)) / lobes);
+  const crestU = Array.from({ length: lobes + 1 }, (_, k) => from + (k * (to - from)) / lobes);
+  return { lobes, from, to, sinus, shape, angleDeg, tauAskedRad: (angleDeg * Math.PI) / 180, ease, lobeAt, easeAt, easeDu, sinusU, crestU };
+}
+
+/* lobedBladeState — the lobed blade's state for the shared laws: the simple
+   leaf's mapping (`leafBladeState`, every petal control decoupled) at the
+   envelope's own width, with the lobed blade's own tooth depth, tip shape and
+   tapers laid over it (S3b's twin shape). */
+export function lobedBladeState(state) {
+  return {
+    ...leafBladeState({ ...state, leafWidth: state.lobedWidth === undefined ? LOBED_WIDTH_DEFAULT : Number(state.lobedWidth) }),
+    lobeDepth: state.lobedToothDepth === undefined ? LOBED_TOOTH_DEPTH_DEFAULT : Number(state.lobedToothDepth),
+    petalBaseTaper: LOBED_BASE_TAPER, petalTipTaper: LOBED_TIP_TAPER,
+  };
+}
+
+/* THE TWO FOLD CAPS, derived from the fold condition above on a dense sample
+   of the blade (`LOBED_FOLD_SAMPLES` stations, derivatives by central
+   difference at a sixteenth of a sample) — continuum conditions, which is
+   what keeps the emitted cells positive at the bound: a cap that binds at a
+   POINT leaves every chord between two rows strictly inside it, so the
+   tightest emitted cell has positive area (measured, docs §4).
+     THE TILT CAP — the largest built tilt `tau_b <= asked` at which the lobed
+     outline WITHOUT teeth folds neither cell kind: the innermost
+     `L + ((lam sin tau)' ) / (NV - 1) > 0` and the outermost
+     `L cos tau + lam tau' > 0`, the innermost held at LOBED_FOLD_MARGIN of
+     its square twin. Lobes alone reach the fold on stubby, wide,
+     many-lobed, steeply tilted leaves (the lobe flank's slope scales as
+     sinus x width x lobes / length), and at sinus depth the ruling forbids a
+     clamp; the TILT is what makes folding possible at all (at tau = 0 the rows
+     are square and no cell can fold), so it is what gives. CLAMPED AND TOLD.
+     Bisected, then floored onto `LOBED_TILT_GRID`.
+     THE RELIEF CAP — on the built tilt, the largest tooth relief `R` with
+     `L (1 - m) + ((lam - R g) sin tau)' / (NV - 1) >= 0` wherever the unit cut `g`
+     rises (where it falls the teeth only help), conservatively reading the
+     `h tau'` term on the uncut lamina. Floored onto `LOBE_RELIEF_GRID`. */
+export const LOBED_FOLD_SAMPLES = 8192;
+/* THE SLACK UNDER THE FOLD LIMIT — A TYPED CONSTANT, STATED AS ONE, with its
+   reason measured rather than argued. A continuum bound that binds at a POINT
+   leaves every chord between two rows strictly inside it; one that binds over
+   an INTERVAL does not, and a lobe of shape 0.5 has a STRAIGHT sinus flank,
+   so at the exact limit every row on that flank advanced by 0 and the first
+   cut emitted inverted cells (-1.3e-4 mm^2, 4 of 1,728 swept corners: 6 lobes
+   of sinus 0.9 on a 10 mm x 34 mm leaf). So both caps hold the INNERMOST
+   cell's advance at no less than HALF its untilted twin's, `A' >= m L`. The
+   OUTER cells keep the bare condition: their only fold is the tilt's ease,
+   which is a smooth bump and binds at a point (a margin there took the
+   default mum's tilt 38 -> 26.8 deg for nothing). The gate asserts
+   only the fold itself (a positive planform Jacobian on the emitted lattice);
+   this is the cap's own slack. */
+export const LOBED_FOLD_MARGIN = 0.5;
+function lobedSampleDu(f, u, du) {
+  const a = Math.max(0, u - du), b = Math.min(1, u + du);
+  return (f(b) - f(a)) / (b - a);
+}
+export function lobedTiltCapRad(law, lam, Lmm) {
+  const nvm1 = NV - 1, Ns = LOBED_FOLD_SAMPLES, du = 1 / (16 * Ns);
+  const lamS = new Float64Array(Ns + 1), lamD = new Float64Array(Ns + 1), eS = new Float64Array(Ns + 1), eD = new Float64Array(Ns + 1);
+  for (let i = 0; i <= Ns; i++) {
+    const u = i / Ns;
+    lamS[i] = lam(u); lamD[i] = lobedSampleDu(lam, u, du); eS[i] = law.easeAt(u); eD[i] = law.easeDu(u);
+  }
+  const ok = (tb) => {
+    for (let i = 0; i <= Ns; i++) {
+      const tau = tb * eS[i], tauD = tb * eD[i], sn = Math.sin(tau), cs = Math.cos(tau);
+      if (!(Lmm * (1 - LOBED_FOLD_MARGIN) + (lamD[i] * sn + lamS[i] * cs * tauD) / nvm1 >= 0)) return false;
+      if (!(Lmm * cs + lamS[i] * tauD > 0)) return false;
+    }
+    return true;
+  };
+  const asked = law.tauAskedRad;
+  if (!(asked > 0) || ok(asked)) return { tauRad: asked, clamped: false };
+  let lo = 0, hi = asked;
+  for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+  return { tauRad: Math.floor(lo / LOBED_TILT_GRID) * LOBED_TILT_GRID, clamped: true };
+}
+export function lobedReliefFoldCapMm(unitCut, lam, u0, tauAt, tauDu, Lmm) {
+  const nvm1 = NV - 1, Ns = LOBED_FOLD_SAMPLES, du = 1 / (16 * Ns);
+  let cap = Infinity;
+  for (let i = 0; i <= Ns; i++) {
+    const u = u0 + ((1 - u0) * i) / Ns;
+    const gD = lobedSampleDu(unitCut, u, du);
+    const tau = tauAt(u), sn = Math.sin(tau);
+    if (!(gD > 0) || !(sn > 0)) continue;
+    const num = nvm1 * Lmm * (1 - LOBED_FOLD_MARGIN) + lobedSampleDu(lam, u, du) * sn + lam(u) * Math.cos(tau) * tauDu(u);
+    const r = num / (gD * sn);
+    if (r < cap) cap = r;
+  }
+  if (!Number.isFinite(cap)) return Infinity;
+  return Math.max(0, Math.floor(cap / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);
+}
+
+/* THE SINUS GAPS — REPORTED, NEVER A CLAMP (the brief: deep sinuses turn into
+   slits; "do NOT clamp sinus depth: that is unruled"). The IN-PLANE opening
+   between two neighbouring lobes, read on the LOBED margin in the planform
+   (`(x + h sin tau, h cos tau)` at every emitted row, `h` the lobed outline
+   BEFORE the teeth — a tooth's own notch is the relief floor's business — the
+   silhouette before arch and cup) and measured the lab's way: a notch
+   whose flanks are closer than `MIN_FEATURE_MM` over more than
+   `MIN_FEATURE_MM` of its length is a SLIT that fuses in print. So the GAP of
+   a sinus is the opening across it at one minimum feature along the margin
+   from its bottom (the point on one flank `MIN_FEATURE_MM` of arc from the
+   bottom, to the nearest point of the other flank, the smaller of the two
+   sides), and FUSED is how far along the margin the opening stays under the
+   floor. A V notch opens past the floor within that first millimetre and
+   reads a gap at or over it; a slit does not. Every number names its sampling:
+   the emitted rows (`LOBED_BLADE_ROWS`), the bottom being the row of least
+   drawn half-width within half a lobe period of the law's sinus station. */
+export function lobedSinusGaps(us, hs, taus, Lmm, law) {
+  const N = us.length;
+  const M = us.map((u, i) => [u * Lmm + hs[i] * Math.sin(taus[i]), hs[i] * Math.cos(taus[i])]);
+  const half = (law.to - law.from) / (2 * law.lobes);
+  const segDist = (p, a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    let t = L2 > 0 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return Math.hypot(p[0] - (a[0] + dx * t), p[1] - (a[1] + dy * t));
+  };
+  const toPoly = (p, poly) => { let d = Infinity; for (let k = 0; k + 1 < poly.length; k++) d = Math.min(d, segDist(p, poly[k], poly[k + 1])); return d; };
+  /* walk a flank from its bottom: the point at arc `a`, and the arc over which
+     the opening to the other flank stays under the floor */
+  const walk = (flank, other) => {
+    let acc = 0, gap = null, fused = 0, open = false;
+    for (let k = 0; k + 1 < flank.length; k++) {
+      const p = flank[k], q = flank[k + 1], seg = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      const steps = Math.max(1, Math.ceil(seg / 0.05));
+      for (let j = 1; j <= steps; j++) {
+        const f = j / steps, P = [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+        const a = acc + seg * f, d = toPoly(P, other);
+        if (gap === null && a >= MIN_FEATURE_MM) gap = d;
+        if (!open) { if (d < MIN_FEATURE_MM) fused = a; else open = true; }
+        if (gap !== null && open) return { gap, fused };
+      }
+      acc += seg;
+    }
+    return { gap, fused };
+  };
+  const out = [];
+  for (const su of law.sinusU) {
+    let lo = -1, hi = -1, bot = -1;
+    for (let i = 0; i < N; i++) {
+      if (us[i] < su - half || us[i] > su + half) continue;
+      if (lo < 0) lo = i;
+      hi = i;
+      if (bot < 0 || hs[i] < hs[bot]) bot = i;
+    }
+    if (bot < 0 || bot === lo || bot === hi) { out.push({ u: su, gapMm: null, fusedMm: 0, at: null }); continue; }
+    const left = M.slice(lo, bot + 1).reverse(), right = M.slice(bot, hi + 1);
+    const A = walk(left, right), B = walk(right, left);
+    const gaps = [A.gap, B.gap].filter((g) => g !== null);
+    out.push({ u: su, rowU: us[bot], gapMm: gaps.length ? Math.min(...gaps) : null, fusedMm: Math.max(A.fused, B.fused), at: M[bot].slice() });
+  }
+  const real = out.filter((g) => g.gapMm !== null);
+  return { sinuses: out, minGapMm: real.length ? Math.min(...real.map((g) => g.gapMm)) : null,
+    under: real.filter((g) => g.gapMm < MIN_FEATURE_MM).length, maxFusedMm: out.reduce((m, g) => Math.max(m, g.fusedMm), 0) };
+}
+
+/* lobedSurface — THE ONE OWNER OF WHERE A LOBED LEAF'S BLADE IS, the
+   `leafSurface` shape (and called only through it). Three profiles from the
+   one law: the ENVELOPE (no lobes, no teeth) the surface reads as `hb`; the
+   LOBED LAMINA (lobes, no teeth) the tilt cap reads; and the BUILT outline
+   (lobes and teeth, the relief capped on the built tilt) the rows are drawn
+   at. `rowAt(u)` returns the row with its own `sect(v)` on the V. */
+/* THE LAWS ARE THE LEAF'S, NOT THE NODE'S: every leaf of one plan has the one
+   length and state, so the three profiles and both caps are built once per
+   plan and accumulator mode (a WeakMap on the plan object — a build makes one
+   plan) and every node reads the same objects. A cache, never a second law. */
+const LOBED_LAWS = new WeakMap();
+function lobedLaws(acc, plan, state) {
+  const hit = LOBED_LAWS.get(plan);
+  if (hit && hit.state === state && hit.exportMode === !!acc.exportMode) return hit;
+  const Lmm = plan.lengthMm;
+  const bs = lobedBladeState(state);
+  const W = Number(bs.petalWidth), halfW = W / 2;
+  const t = acc.floorThickness(state.sheetThickness);
+  const form = petalFormIsFlat(bs) ? null : petalForm(bs, halfW, t);
+  const nu = LOBED_BLADE_ROWS;
+  const ring = { width: 0, thickness: state.sheetThickness };
+  const law = lobedChevronLaw(state);
+  const bsNoTeeth = { ...bs, lobeDepth: 0 };
+  const profE = widthProfile(bsNoTeeth, ring, halfW, { petiole: true, rowCapacity: nu }, acc, Lmm);
+  const profL = widthProfile(bsNoTeeth, ring, halfW, { petiole: true, rowCapacity: nu, chevron: { lobeAt: law.lobeAt } }, acc, Lmm);
+  const tilt = lobedTiltCapRad(law, (u) => profL.laminaHalfAt(u), Lmm);
+  const tauAt = (u) => tilt.tauRad * law.easeAt(u), tauDu = (u) => tilt.tauRad * law.easeDu(u);
+  const cap = {
+    petiole: true, rowCapacity: nu, toothReliefFloorMm: MIN_FEATURE_MM,
+    chevron: {
+      lobeAt: law.lobeAt, peakHalfMm: halfW,
+      rimAt: (x, h, u) => { const ta = tauAt(u); return [x + h * Math.sin(ta), h * Math.cos(ta), 0]; },
+      reliefFoldCapMm: (unitCut, lam, u0) => lobedReliefFoldCapMm(unitCut, lam, u0, tauAt, tauDu, Lmm),
+    },
+  };
+  const prof = widthProfile(bs, ring, halfW, cap, acc, Lmm);
+  const out = { state, exportMode: !!acc.exportMode, Lmm, bs, halfW, t, form, nu, law, profE, profL, tilt, tauAt, cap, prof };
+  LOBED_LAWS.set(plan, out);
+  return out;
+}
+function lobedSurface(acc, plan, state, nodeIndex, az) {
+  const th = (plan.angleDeg * Math.PI) / 180;
+  const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
+  const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
+  const perNode = false;
+  const { Lmm, bs, t, form, nu, law, profE, profL, tilt, tauAt, cap, prof } = lobedLaws(acc, plan, state);
+  const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
+  const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
+  const base = leafRootBase(plan, o, R, z);
+  const pLen = plan.petioleLenMm;
+  const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
+  const kC = form ? form.curlRad / Lmm : 0;
+  const sLaw = kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
+  const flatN = [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)];
+  /* THE ARC AT `s` mm along the midrib (the simple leaf's centreline law,
+     verbatim per arm, evaluated at the chevron point's own station) */
+  const at = (s) => {
+    if (kC === 0) {
+      const fr = form ? form.frameAt(R, T, th, s / Lmm) : { D: D0, T, N: flatN };
+      return { C: [bb[0] + fr.D[0] * s, bb[1] + fr.D[1] * s, bb[2] + fr.D[2] * s], fr, phi: th };
+    }
+    const phi = th + kC * s;
+    const { dAlong, dAcross } = arcStep(th, phi, s);
+    return { C: [bb[0] + R[0] * dAlong, bb[1] + R[1] * dAlong, bb[2] + dAcross], fr: form.frameAt(R, T, phi, s / Lmm), phi };
+  };
+  const hE = (u) => Math.max(profE.halfWidthBaseAt(u), TIP_HALF_MM);
+  const rowAt = (u) => {
+    const x = u * Lmm;
+    const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
+    const hb = hE(u);
+    const hLobe = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
+    const tau = tauAt(u), sn = Math.sin(tau), cs = Math.cos(tau);
+    const A = at(x);
+    /* ONE SECTION PER ROW, in the row's own local (T, N) plane: the cup law
+       at this row's u on the envelope's half-width, the leaf's sect with the
+       plain branch (`h === hb`), evaluated at the point's ACROSS distance `y`
+       and laid into the frame at the point's own station `s`. */
+    const secL = form ? form.sectAt([0, 0, 0], [1, 0, 0], [0, 1, 0], hb, u, hb) : null;
+    const point = (v) => {
+      const w = Math.abs(v), sg = v < 0 ? -1 : 1;
+      const s = x + h * w * sn, y = sg * h * w * cs;
+      const B = s === x ? A : at(s);
+      const Tt = B.fr.T, Nn = B.fr.N, C = B.C;
+      if (!secL) return { P: [C[0] + Tt[0] * y, C[1] + Tt[1] * y, C[2] + Tt[2] * y], n: Nn, C, N: Nn, T: Tt, y };
+      const q = secL(y / hb);
+      const aT = q.P[0], aN = q.P[1], nT = q.n[0], nN = q.n[1];
+      return {
+        P: [C[0] + Tt[0] * aT + Nn[0] * aN, C[1] + Tt[1] * aT + Nn[1] * aN, C[2] + Tt[2] * aT + Nn[2] * aN],
+        n: [Tt[0] * nT + Nn[0] * nN, Tt[1] * nT + Nn[1] * nN, Tt[2] * nT + Nn[2] * nN],
+        C, N: Nn, T: Tt, y,
+      };
+    };
+    return { u, h, hb, hLobe, tau, C: A.C, D: A.fr.D, T: A.fr.T, N: A.fr.N, phi: A.phi, sect: (v) => { const p = point(v); return { P: p.P, n: p.n }; }, pointAt: point };
+  };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, rowAt, chevron: law, tilt, tauAt };
 }
 
 /* compoundLeafLayout — THE ONE OWNER of where every leaflet is and how big,
