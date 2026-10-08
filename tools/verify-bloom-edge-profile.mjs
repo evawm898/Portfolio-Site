@@ -242,6 +242,36 @@ const E2_TURN_XFAIL = {
      tooth count along. */
   'INFILL: REFUSED — a FRINGE owns the same region (several panels)':
     { excessDeg: 0.000231, note: 'a tooth\'s terminal on a FOUR-tooth full terminal; the frame rotates a hair between adjacent columns. raw 45.00 deg, outline 0.00. The infill is REFUSED here and the mesh is bit-identical to the guard-off build (I2), so this is not the infill\'s' },
+  /* THE LOBED (CHEVRON) LEAF, leaf/stem build S4 — every block-56 row whose
+     leaf is built lobed exceeds the allowance, and it is ONE CLASS, PRE-EXISTING
+     IN THE SHIPPED LEAF BEAD AND DEEPENED BY THE LOBES, never widened. The
+     edge is the seam between the BOTTOM skin and the bead's last facet at the
+     margin (bot -> bot between neighbouring rows). Measured on the SIMPLE
+     leaf, whose bytes this session does not move: at its own 17 mm the seam
+     reads 42.22 deg (under the bar); at 34 mm wide it reads 51.61, and at
+     34 mm x cup 1.2 it reads 82.83 — reachable on main, carried by no smoke
+     row. The lobed blade's envelope is 34 mm by default (the mum's), so it
+     starts in that class (the degenerate chevron — tilt 0, no sinus, no teeth
+     — reads 52.53), and on every lobe FLANK the rows meet the margin
+     OBLIQUELY: sin(alpha) = L cos(tau) / |d(margin)/du|, about 12 degrees on
+     the default's flanks, so the bead's cross-section across the margin is
+     narrower than its drawn half-ellipse and the bottom skin turns into it
+     harder (74.06 at the defaults, 90.07 at 6 lobes, 114.38 at cup 1.2).
+     Making the bead's inset follow the margin's normal instead of the row is
+     a change to emitPanel's rim law for every blade — not this session's.
+     Declared at the measured magnitude on the five block-56 SMOKE rows that
+     exceed it (this gate's own row set); the other 27 lobed rows' figures are
+     in docs/bloom-leaf-lobed-outcome.md. Each note says what it adds. */
+  "LOBED: the MUM \u2014 alternate 137.5 x 4 nodes, the proposed defaults (3 lobes a side, sinus 0.62, tilt 38, light teeth), arch 25":
+    { excessDeg: 26.972835, note: 'NEW with S4 (the lobed chevron): adds 71.972835 deg' },
+  "LOBED: lobedSinus max (0.9 \u2014 the narrowest sinus gaps)":
+    { excessDeg: 34.108313, note: 'NEW with S4 (the lobed chevron): adds 79.108313 deg' },
+  "LOBED: lobedAngle max (60 \u2014 the TILT CAP binds, built under asked)":
+    { excessDeg: 27.598071, note: 'NEW with S4 (the lobed chevron): adds 72.598071 deg' },
+  "LOBED: NONE FIT \u2014 6 lobes x sinus 0.9 x depth 0.3 x 12 teeth (the fold cap under the 1 mm floor; no teeth, told)":
+    { excessDeg: 48.235885, note: 'NEW with S4 (the lobed chevron): adds 93.235885 deg' },
+  "LOBED: 6 lobes x tooth depth 0.3 (the fold clamp binds hardest \u2014 4.86 mm asked, built at the 2.22 mm cap)":
+    { excessDeg: 47.171007, note: 'NEW with S4 (the lobed chevron): adds 92.171007 deg' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE

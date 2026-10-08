@@ -386,6 +386,16 @@ const WITNESS = {
                   pre: [{ id: 'stemLength', value: '70' }, { id: 'leafLength', value: '40' }, { id: 'leafType', value: 'COMPOUND' }],
                   read: (m) => `${m.leaf && m.leaf.bladeOf && m.leaf.bladeOf.length}/${m.leaf && m.leaf.compoundBuilt && m.leaf.compoundBuilt[0] ? m.leaf.compoundBuilt[0].leaflets.length : null}`,
                   what: 'leaf.bladeOf.length/leaf.compoundBuilt[0].leaflets.length' },
+  /* THE LOBES (leaf/stem build S4) — a drop-down inside Leaves, collapsed at
+     first load and shown only on a LOBED leaf. Witnessed by the SINUSES the
+     builder measured off its own emitted rows (one gap record per sinus), a
+     quantity the slider cannot write: a lobes control that moved the slider
+     and built the same blade would read the same count twice. The row needs a
+     stem, a leaf and the LOBED type, which the driver sets first. */
+  leafLobes: { id: 'lobedLobes', value: '5',
+               pre: [{ id: 'stemLength', value: '70' }, { id: 'leafLength', value: '46' }, { id: 'leafType', value: 'LOBED' }],
+               read: (m) => `${m.leaf && m.leaf.lobedBuilt && m.leaf.lobedBuilt[0] ? m.leaf.lobedBuilt[0].sinusGaps.sinuses.length : null}`,
+               what: 'leaf.lobedBuilt[0].sinusGaps.sinuses.length' },
   /* SEPALS (part 1) — a top-level section after Center, collapsed at first
      load, holding the count and three drop-downs mirroring Petal's. Witnessed
      by the COUNT through the builder's own tally — a count that moved the
