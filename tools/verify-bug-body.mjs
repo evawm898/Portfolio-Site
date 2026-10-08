@@ -146,15 +146,20 @@ export function bodyChecks(G, opts = {}) {
         if (q.wingPairs !== pairs) bad.push(`${label} -> ${t}: wing pairs ${p0.wingPairs} -> ${q.wingPairs} (want ${pairs})`);
         for (const k of Object.keys(p0)) if (k !== 'wings' && k !== 'wingPairs' && !BODY_FIELDS.includes(k) && JSON.stringify(q[k]) !== JSON.stringify(p0[k])) bad.push(`${label} -> ${t}: ${k} changed`);
         if (t === 'spider') {
-          const r = G.applyBodyType(q, 'butterfly').params;
-          if (r.wingPairs !== 0 || JSON.stringify(r.wings) !== W) bad.push(`${label}: Spider then Butterfly brought the wings back or moved them`);
+          // Eva's ruling on the sheet: a winged type after a Spider brings the wings back,
+          // at the count the page hands it (the pairs the Spider took) or the default's 2
+          for (const w of types.filter((x) => x !== 'spider')) {
+            const r = G.applyBodyType(q, w, { wingPairs: p0.wingPairs }).params, r2 = G.applyBodyType(q, w).params;
+            if (r.wingPairs !== p0.wingPairs || JSON.stringify(r.wings) !== W) bad.push(`${label}: Spider then ${w} gave ${r.wingPairs} pairs (want ${p0.wingPairs}) or moved the wings`);
+            if (r2.wingPairs !== 2 || JSON.stringify(r2.wings) !== W) bad.push(`${label}: Spider then ${w} with no count to restore gave ${r2.wingPairs} pairs (want 2) or moved the wings`);
+          }
         }
         const fp = clone(q); for (const w of [fp.wings.first, fp.wings.last]) w.length *= 1.25;
         const fq = G.fitBody(fp).params;
         if (JSON.stringify(fq.wings) !== JSON.stringify(fp.wings) || fq.wingPairs !== fp.wingPairs) bad.push(`${label} -> ${t}: the body following the wingspan wrote a wing`);
       }
     }
-    ok(!bad.length, `BP3: a body type changes the body only — wings byte-identical and the pair count kept (Spider: 0) on four bases x every type${bad.length ? ' — ' + bad.slice(0, 3).join(' | ') : ''}`);
+    ok(!bad.length, `BP3: a body type changes the body only — wings byte-identical and the pair count kept (Spider: 0; a winged type after Spider gives the pairs back) on four bases x every type${bad.length ? ' — ' + bad.slice(0, 3).join(' | ') : ''}`);
   }
   // BP4 — saved designs
   if (run('BP4')) {
@@ -222,7 +227,8 @@ export const BODY_MUTANTS = [
   ['the limbs scale with WIDTH', 'for (const id of LIMB_IDS) want[id] = R[id] * B;', 'for (const id of LIMB_IDS) want[id] = R[id] * B * w;', 'BP2'],
   ['capture forgets the width', 'for (const id of BODY_WIDTH_IDS) R[id] = p[id] / (B * w);', 'for (const id of BODY_WIDTH_IDS) R[id] = p[id] / B;', 'BP2'],
   ['a body type touches the wings', "p.bodyType = type; p.bodySize = T.size;", "p.bodyType = type; p.wings.first.length *= 1.05; p.bodySize = T.size;", 'BP3'],
-  ['Spider keeps its wings', 'if (Number.isInteger(T.wingPairs)) p.wingPairs = T.wingPairs;', '', 'BP3'],
+  ['Spider keeps its wings', 'if (Number.isInteger(T.wingPairs)) p.wingPairs = T.wingPairs;', 'if (false) p.wingPairs = T.wingPairs;', 'BP3'],
+  ['a winged type leaves a wingless bug wingless', 'else if (!(p.wingPairs > 0)) p.wingPairs', 'else if (false) p.wingPairs', 'BP3'],
   ['an old design loads as the default type', "if (!('bodyType' in p)) q.bodyType = 'custom';", '', 'BP4'],
   ['the antenna lift loses its old branch', 'const rise = p.antennaLift === ANT_LIFT_LEGACY ? 0.35 : Math.tan(p.antennaLift * D2R);', 'const rise = Math.tan(p.antennaLift * D2R);', 'BP4'],
   ['a hand-set limb is not kept', 'if (p.bodyRatios && LIMB_IDS.includes(id)) p.bodyRatios', 'if (false) p.bodyRatios', 'BP5'],

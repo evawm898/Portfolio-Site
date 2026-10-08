@@ -98,6 +98,7 @@ export const BODY_REF_SPAN_MM = 72;
 
 /* Wings (Phase 1 revision). */
 export const MAX_WING_PAIRS = 4;
+export const DEFAULT_WING_PAIRS = 2;   // the Pairs control's default; also what a winged body type gives a wingless bug
 /* The thorax lengthens with each wing pair past two, so N roots can be spread
    along it without stacking: effective length = thoraxLength * (1 + k (N - 2)). */
 export const THORAX_PER_PAIR = 0.3;
@@ -201,7 +202,7 @@ export const PARAM_SPEC = [
   R('clubWidth', 'antennae', 'Club width — × the shaft', 1, 4, 0.05, 1.8, '', (p) => isClubbed(p) && p.clubLength > 0),
   R('clubTaper', 'antennae', 'Club taper — rounded end ↔ drawn back to the tip', 0, 1, 0.01, 0.35, '', (p) => isClubbed(p) && p.clubLength > 0),
 
-  R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, 2),
+  R('wingPairs', 'wings', 'Pairs', 0, MAX_WING_PAIRS, 1, DEFAULT_WING_PAIRS),
   R('wingEdgeTaper', 'wings', 'Edge — thickness tapers root → margin (0: even slab)', 0, 0.9, 0.01, 0.5, '', hasWings),
   R('wingEdgeBevel', 'wings', 'Edge — chamfer width to the floor at the margin (0: none)', 0, 4, 0.05, 0, 'mm', hasWings),
   R('wingEdgeRound', 'wings', 'Edge — round radius, × half the local thickness (1: full half-round bead; 0: square wall)', 0, 1, 0.01, 1, '', hasWings),
@@ -4084,16 +4085,20 @@ export function fitBody(params) {
 }
 
 /* Apply a body type: its fixed fields, its proportions, SIZE at the type's own
-   value and WIDTH 1, then fitted. The WINGS are never touched — except Spider,
-   which sets the pair count to 0 (wing outlines and every per-pair value stay
-   stored, so adding pairs back brings them as they were). */
-export function applyBodyType(params, type) {
+   value and WIDTH 1, then fitted. The wing OUTLINES and every per-pair value are
+   never touched. The pair COUNT is: Spider sets it to 0 (the outlines stay
+   stored); a WINGED type (every other) applied to a bug with no wings brings
+   them back (Eva's ruling on the sheet: a moth chosen after a spider has to
+   show its wings) — at opts.wingPairs (the page passes the count the spider
+   removed) or the default's pair count; a winged bug keeps its own count. */
+export function applyBodyType(params, type, opts = {}) {
   const T = BODY_PRESETS[type];
   if (!T) return fitBody(params);
   const p = clone(params);
   Object.assign(p, T.fields);
   p.bodyType = type; p.bodySize = T.size; p.bodyWidth = 1; p.bodyRatios = { ...T.ratios };
   if (Number.isInteger(T.wingPairs)) p.wingPairs = T.wingPairs;
+  else if (!(p.wingPairs > 0)) p.wingPairs = Number.isInteger(opts.wingPairs) && opts.wingPairs > 0 ? Math.min(opts.wingPairs, MAX_WING_PAIRS) : DEFAULT_WING_PAIRS;
   return fitBody(p);
 }
 

@@ -7,7 +7,8 @@
      types     each body type on the SAME wings (the default's): Top, 3/4, Front;
      extremes  each type at SIZE and WIDTH at both ends of their sliders (3/4);
      spider    Spider sets the wing pairs to 0 (its row above) — and Undo brings
-               them back, shot after a REAL Undo click;
+               them back, shot after a REAL Undo click; then Spider -> Moth, which
+               brings them back too;
      panel     the page's own panel: the Body section with the fine-controls
                drop-down CLOSED (as it loads) and OPEN after a real click, and
                the type reading Custom after a real drag of a fine slider;
@@ -144,7 +145,14 @@ async function shoot(p, view) {
   await page.evaluate(() => window.__bug.undo()); await page.waitForTimeout(300); await page.evaluate(() => window.__bug.setView('three')); await page.waitForTimeout(250);
   const b = await page.evaluate(() => ({ pairs: window.__bug.getParams().wingPairs, type: window.__bug.getParams().bodyType }));
   cells.push({ img: await jpg(page, await bugClip(page)), cap: `After Undo: wing pairs <b>${b.pairs}</b>, body type ${b.type} — the wings were stored all along.` });
-  sections.push({ title: 'Spider: wings off, undoable', note: '', cells, cols: 2 });
+  // Eva's ruling on the first sheet: a winged type chosen AFTER Spider brings the wings back
+  await page.evaluate(() => { const s = document.getElementById('bodyType'); s.value = 'spider'; s.dispatchEvent(new Event('input')); });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { const s = document.getElementById('bodyType'); s.value = 'moth'; s.dispatchEvent(new Event('input')); });
+  await page.waitForTimeout(500); await page.evaluate(() => window.__bug.flushBuild()); await page.evaluate(() => window.__bug.setView('top')); await page.waitForTimeout(250);
+  const c = await page.evaluate(() => ({ pairs: window.__bug.getParams().wingPairs, type: window.__bug.getParams().bodyType, msg: document.getElementById('wlMsg').textContent }));
+  cells.push({ img: await jpg(page, await bugClip(page)), cap: `Spider, then Moth (Top): wing pairs <b>${c.pairs}</b>, body type ${c.type}. The page says: “${c.msg}”` });
+  sections.push({ title: 'Spider: wings off, undoable — and a winged type brings them back', note: '', cells, cols: 3 });
 }
 
 /* ---- the antenna tips from the front ---- */

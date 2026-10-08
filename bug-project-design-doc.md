@@ -2824,7 +2824,7 @@ Eva's ruling (Oct 8): **the body is too adjustable.** The BODY / HEAD / THORAX /
 panels are replaced by a BODY TYPE dropdown and two primary sliders; every fine body control
 moves into ONE collapsed drop-down inside Body. §0 binds: bodies trend toward anatomical
 accuracy, wings carry the fantasy — **a body type changes the body only** (Spider alone also
-sets the wing pairs to 0, undoably). Wing outlines, the library, angles and the junction blend
+sets the wing pairs to 0, undoably, and a winged type chosen after it gives them back). Wing outlines, the library, angles and the junction blend
 are not changed. Phase 3 has not started.
 
 Files: `bug-geometry.js` (`BODY_PRESETS`, `fitBody`, `applyBodyType`, `captureBody`,
@@ -2942,8 +2942,14 @@ them is a short leg-like pair at the cephalothorax front — a new part kind, it
   then scales it with the body (`setLimb`, BP5). Editing them does not make the body Custom.
 - **Choosing a type is undoable** (the library's Undo, Ctrl/⌘ Z). Spider's message says the
   wing pairs were set to 0 and Undo brings them back; the wing outlines and every per-pair value
-  stay stored, so adding pairs back brings them as they were, and a type chosen after Spider
-  leaves the pairs at 0 (a type never adds wings).
+  stay stored, so adding pairs back brings them as they were.
+- **A winged type chosen after Spider brings the wings back** (Eva's ruling on the first sheet:
+  "wings don't show up for moth" — she had come to Moth from Spider, and the first build left
+  the pairs at 0 while saying "the wings are as they were"). Butterfly, Moth, Bee and Dragonfly
+  applied to a bug with NO wings set the pair count back to the count the Spider took (the page
+  remembers it for the session) or, with none to remember (a wingless design loaded, or the
+  Pairs slider set to 0 by hand), the default's 2. The outlines are the stored ones, untouched;
+  a winged bug keeps its own count, as before.
 - **Default bug is the Butterfly type.** Randomize still draws a random body, which loads as
   Custom (fixed in mm); the image fitter's body is Custom too.
 
@@ -2995,7 +3001,8 @@ arithmetic, main's old default body), never read from the module under test.
   WIDTH 1.3 fits back to its own fields within 1e-9.
 - **BP3** — four bases (the default, a library wing at three pairs, a random bug, four pairs with one unlinked) × every
   type: the wings byte-identical (canonical JSON) and the pair count kept, Spider's 0 the one
-  exception; Spider then Butterfly leaves the pairs at 0; `fitBody` never writes a wing.
+  exception; Spider then each winged type gives the pairs back (to the count handed in, or 2
+  with none) with the wings byte-identical; `fitBody` never writes a wing.
 - **BP4** — main's default and legacy default as version-7 files load CUSTOM with every field
   exact and build to main's own position hashes (`7ba5ed3a`, `ac41cf3` — FNV-1a over the
   Float64 positions, identical under Node 20 and 22); a Bee design round-trips.
@@ -3004,10 +3011,11 @@ arithmetic, main's old default body), never read from the module under test.
   and (0.90, 1.60), on rotating library wings, through every existing row clause (mirror diff
   0, boundary 0, one connected region, the floor, the junction family) plus a row clause that
   the built body is SIZE × the built span wherever nothing was held.
-- **9 code mutants**, each caught by the clause it names (the body ignoring the wingspan, WIDTH
+- **10 code mutants**, each caught by the clause it names (the body ignoring the wingspan, WIDTH
   scaling lengths, limbs scaling with WIDTH, capture forgetting the width, a type touching the
-  wings, Spider keeping its wings, an old design loading as a type, the lift losing its legacy
-  branch, a hand-set limb not kept); every anchor is checked before any runs.
+  wings, Spider keeping its wings, a winged type leaving a wingless bug wingless, an old design
+  loading as a type, the lift losing its legacy branch, a hand-set limb not kept); every anchor
+  is checked before any runs.
 
 Measured on this box: **gate PASS, 442/442 (116 function checks + 326 built rows, 40 random)**
 in 25 m 21 s against main's 421/421 in 24 m 02 s, both runs sharing the box with other work —
@@ -3062,7 +3070,9 @@ Each names what was rejected and how hard it is to undo.
    was told not to touch. **Open, and it is reachable on main** by moving the thorax length.
 10. **The Spider body with wings put back is not a gate row**: it reads a 0.60 mm slot between a
     wing and the 2-part body at the midline (JB1). The junction blend was not built for a 2-part
-    bug with wings; main reaches the same state by setting body parts to 2. **Open.**
+    bug with wings; main reaches the same state by setting body parts to 2. **Open.** (A winged
+    type chosen after Spider does not reach it: it sets the body back to 3 parts as it gives the
+    wings back. Only the Pairs slider on a Spider body does.)
 11. **`tucked` is asserted at each type's own proportions only**: at WIDTH 0.60 the body
     narrows while the legs (scaled by length, never by width) show past it from above — 0.43 of
     10.45 mm² on the butterfly, 0.28 of 6.68 on the dragonfly. That is WIDTH doing what it says.

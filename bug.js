@@ -216,15 +216,20 @@ const bodyNote = document.createElement('p');
 bodyNote.className = 'bg-note'; bodyNote.id = 'bodyNote';
 secEl.plan.querySelector('.bg-sec-body').insertBefore(bodyNote, secEl.bodyFine);
 let bodyFitNotes = [];
+let pairsBeforeWingless = null;   // the pair count a Spider took away, given back by a winged type
 function chooseBodyType(v) {
   if (v === 'custom' || !BODY_PRESETS[v]) { writeControls(); return; }
   pushUndo();
-  const before = params.wingPairs, r = applyBodyType(params, v);
+  const before = params.wingPairs;
+  if (before > 0) pairsBeforeWingless = before;
+  const r = applyBodyType(params, v, { wingPairs: pairsBeforeWingless });
   params = normalizeParams(r.params); bodyFitNotes = r.notes;
   editPair = Math.min(editPair, Math.max(0, params.wingPairs - 1));
   writeControls(); scheduleBuild();
   const name = ctrlEl.bodyType.querySelector(`option[value="${v}"]`).textContent;
-  wlMsg(before !== params.wingPairs ? `${name} body: wing pairs set to ${params.wingPairs} (a spider has none) — Undo brings them back.` : `${name} body applied — the wings are as they were. Undo to go back.`);
+  wlMsg(before === params.wingPairs ? `${name} body applied — the wings are as they were. Undo to go back.`
+    : params.wingPairs ? `${name} body: the wings are back (${params.wingPairs} pair${params.wingPairs > 1 ? 's' : ''}, as they were stored) — Undo to go back.`
+    : `${name} body: wing pairs set to 0 (a spider has none) — choosing a winged type brings them back, or Undo.`);
 }
 /* The body follows the wingspan while it has proportions: every build first
    fits the body (one owner, fitBody) and writes back only the body fields. */

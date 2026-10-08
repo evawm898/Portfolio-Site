@@ -10273,7 +10273,8 @@ edited), SIZE (body length × the wingspan, a 72 mm reference span when wingless
 with every fine body control in ONE drop-down inside Body, closed by default (there is no
 Advanced section). `fitBody()` is the one place proportions become fine fields and `buildBug`
 knows nothing of types, so a version-7 design loads Custom and builds bit-identically (BP4 holds
-main's hashes). A type never touches the wings; Spider alone sets the pairs to 0. The BP family
+main's hashes). A type never touches the wing outlines; Spider alone sets the pairs to 0, and a
+winged type chosen on a wingless bug gives them back (Eva, on the sheet). The BP family
 (`tools/verify-bug-body.mjs`) gates it. Two venation rows keep main's 5 mm thorax because HOLES
 under the junction blend flickers with the thorax on main too (§17.8, open). Sheet:
 `node tools/shot-bug-body.mjs <dir> --base <worktree>`.
