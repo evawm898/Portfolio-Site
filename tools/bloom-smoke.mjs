@@ -1246,6 +1246,30 @@ export const SMOKE_BLOCKS = [
         path: "LF18's SIMPLE arm (the petiole is the wire) and LF7/LF9 on the simple blade while the leaflets' own depth and tip sit at an extreme — hidden and inert under SIMPLE" },
     ],
   },
+  {
+    n: 56, title: 'the lobed (chevron) leaf (Oct 8, leaf/stem build S4)',
+    anchor: 'LOBED: the MUM — alternate 137.5 x 4 nodes, the proposed defaults (3 lobes a side, sinus 0.62, tilt 38, light teeth), arch 25',
+    /* SEVEN ROWS: the mum (every LOBED family on the shipped look, arched);
+       the TILT cap binding; the TOOTH fold clamp binding hardest; the NONE-FIT
+       case; the narrowest sinuses; the raceme's pin; and the GATED arm where
+       a SIMPLE leaf carries every lobed control at an extreme. */
+    rows: [
+      { label: 'LOBED: the MUM — alternate 137.5 x 4 nodes, the proposed defaults (3 lobes a side, sinus 0.62, tilt 38, light teeth), arch 25',
+        path: "LF19 (the type in both statements, the law the controls restate), LF20 (the lobed outline, the station law, the built lobe count against the control's), LF21 (the lean read off the emitted skin at the eased tilt), LF22 (no inverted skin cell, the inner cells' advance over the fold margin), LF23 (the teeth floored, unclamped), LF24 (the petiole's run into the V) on an arched lobed blade; LF9/LF11/LF12 on the lobed stations" },
+      { label: 'LOBED: lobedAngle max (60 — the TILT CAP binds, built under asked)',
+        path: "LF21's tilt biconditional (built under asked, clamped told) and LF22 at the cap — the outer cells where the tilt eases out keep a positive area" },
+      { label: 'LOBED: 6 lobes x tooth depth 0.3 (the fold clamp binds hardest — 4.86 mm asked, built at the 2.22 mm cap)',
+        path: "LF23's fold clamp (asked against built, the told flag a biconditional) and LF22's fold margin read off the lattice at the cap" },
+      { label: 'LOBED: NONE FIT — 6 lobes x sinus 0.9 x depth 0.3 x 12 teeth (the fold cap under the 1 mm floor; no teeth, told)',
+        path: "LF23's none-fit arm — the cap under the floor, no tooth cut, NO ROOM 'fold cap'" },
+      { label: 'LOBED: lobedSinus max (0.9 — the narrowest sinus gaps)',
+        path: "LF20 on the deepest sinuses — the gap read-out under the 1 mm floor, reported never clamped" },
+      { label: "LOBED: under a raceme's shared node (PINNED to SIMPLE, and told)",
+        path: "LF14's pin arm for a LOBED ask — the plan reports SIMPLE, typePinned and typeAsked LOBED; LF19's inert arm" },
+      { label: 'LOBED: GATED — SIMPLE with every lobed control at an extreme (hidden AND inert)',
+        path: "LF19's SIMPLE arm — no chevron law in the plan and none emitted while every hidden lobed control sits at an extreme" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

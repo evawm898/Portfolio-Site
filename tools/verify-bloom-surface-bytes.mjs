@@ -302,6 +302,22 @@ const PREDICATE_MOVERS = {
     const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.compound && lp.built > 0 && lp.compound.petiole && lp.compound.petiole.thickens);
   },
+  /* LEAF/STEM BUILD S4 — THE LOBED (CHEVRON) LEAF. A row moves iff THIS tree
+     builds a lobed blade on it (the plan's own type, after the raceme's pin,
+     with a leaf actually built). The base tree has no LOBED and builds such a
+     row as the simple blade, so the guard can only be read here; every SIMPLE
+     and COMPOUND row, the lobed GATED arms (a SIMPLE or COMPOUND leaf with
+     every lobed control at an extreme, a LOBED ask at length 0) and the LOBED
+     ask the raceme pins to SIMPLE must hold to the bit. */
+  'lobed': (st) => {
+    const acc = new mine.MeshBuilder({ exportMode: true });
+    const fr = mine.footRing(st, acc);
+    if (!fr.hub) return false;
+    const sp = mine.stemPlan(st, fr.hub, acc);
+    const ip = mine.inflorescencePlan(st, sp, acc);
+    const lp = mine.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
+    return !!(lp.present && lp.type === 'LOBED' && lp.built > 0);
+  },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* ORGANIC VARIANCE, BUILD 3 (spacing). A row moves iff the SPACING field
      exists on this tree — the geometry's own `varianceSpacingIsAbsent`, the
