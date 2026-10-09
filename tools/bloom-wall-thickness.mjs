@@ -610,9 +610,9 @@ const withoutBuckle = (set) => {
 async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {}, stateSet = null } = {}) {
   const G = await loadGeometry(root);
   const D = defaults || (await import(pathToFileURL(path.join(root, 'bloom-registry.js')).href)).DEFAULTS;
-  const one = (set, part = 'petal') => {
+  const one = (set, part = 'petal', opts = {}) => {
     const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
-    const m = G.buildBloomInto(acc, { ...D, ...set });
+    const m = G.buildBloomInto(acc, { ...D, ...set }, opts);
     /* A SEPAL ROW READS THE SEPALS, worst of every one the builder emitted, and
        REFUSES where none was built: a sepal row that measures the petal is the
        blindness these rows exist to remove. */
@@ -641,7 +641,12 @@ async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {}
   if (stateSet && !STATES.some((s) => s.id === stateSet.id)) throw new Error(`stateSet names "${stateSet.id}", which is not a state`);
   const states = stateSet ? STATES.map((s) => (s.id === stateSet.id ? { ...s, set: { ...s.set, ...stateSet.set } } : s)) : STATES;
   for (const st of states) {
-    const got = one(st.set, st.part);
+    /* the planted past-the-limit leg is built AS STORED: a sepal value past its
+       bound clamps silently on load (Eva's Q-S6 ruling), so without the
+       geometry's capability hook the plant would build the bound and V5 could
+       not be shown to catch it */
+    const planted = stateSet && st.id === stateSet.id;
+    const got = one(st.set, st.part, planted ? { capability: { sepalTwinsUnclamped: true } } : {});
     const control = st.buckled ? one(withoutBuckle(st.set)) : null;
     /* How many rows the grid gives this state per cycle of its own wave —
        derived from the emitted row count, never from a constant restated. */
@@ -1048,8 +1053,8 @@ const MUTANTS = [
      fired on it. */
   { id: 'sepal-roll-twin-dropped', names: ['V5'],
     why: 'sepalBladeState stops mapping sepalRoll onto the petal law, so a sepal at roll 180 builds flat — visible only on a row that reads the sepal (the all-max record moves past its band)',
-    find: 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);',
-    into: "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalRoll') s[petalId] = Number(state[sepalId]);",
+    find: 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);',
+    into: "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalRoll') s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);",
     witness: (M, C) => {
       const st = { ...DEFAULTS_FOR_WITNESS, sepalRoll: 180 };
       const got = M.sepalBladeState(st, 0).petalRoll, clean = C.sepalBladeState(st, 0).petalRoll;

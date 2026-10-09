@@ -17542,13 +17542,26 @@ export const SEPAL_TWINS = Object.freeze([
    1.00 there, while the census folds from -185 down) — so the census, not the
    gap, sets the bound, by Eva's ruling on the measured choice (Oct 9). The
    sweep is `node tools/bloom-sepal-ranges.mjs --roll`; `--control` re-proves
-   both edges. THE GEOMETRY DOES NOT CLAMP: a
-   state carrying a sepal roll past 190 builds as asked here (what a saved
-   out-of-range value should do is Eva's open question, §10.4 of that doc);
-   the bound lives on the control. */
+   both edges. A STORED VALUE PAST THE BOUND CLAMPS SILENTLY ON LOAD (Eva's
+   ruling on Q-S6, Oct 9 — §10.5 of that doc): a saved sepal roll of 330
+   builds as 180 and -330 as -180, with no read-out, no warning and no
+   migration (the id and its registry row stay). `sepalTwinValue` is the one
+   place that happens, and `sepalBladeState` is its one caller, so the page
+   (whose range input already clamps) and every Node consumer build the same
+   sepal. Inside the bound it returns `Number(v)` itself — a BRANCH, so every
+   in-range state is bit-identical to before. THE CAPABILITY HOOK
+   `{ sepalTwinsUnclamped: true }` builds the stored value as asked: no control
+   reaches it, and it exists for `tools/bloom-sepal-ranges.mjs`, which has to
+   build ONE STEP PAST the bound to prove the bound (its `--control`). */
 export const SEPAL_TWIN_BOUNDS = Object.freeze({
   sepalRoll: Object.freeze({ min: -180, max: 180 }),
 });
+export function sepalTwinValue(sepalId, v) {
+  const x = Number(v);
+  const b = SEPAL_TWIN_BOUNDS[sepalId];
+  if (!b) return x;
+  return x < b.min ? b.min : x > b.max ? b.max : x;
+}
 /* TWO STATEMENTS, one here and one in the registry (`PREDICATES.sepalsEligible`),
    checked against each other by the harness (SP0). Under SPHERE there is no
    underside ring to place a sepal on: the head is a closed shell whose
@@ -17557,7 +17570,7 @@ export const SEPAL_TWIN_BOUNDS = Object.freeze({
    androecium's own precedent — and the read-out says so. */
 export function sepalsEligible(state) { return !sphereMode(state); }
 export function sepalsAbsent(state) { return !sepalsEligible(state) || !(Number(state.sepalCount) >= 1); }
-export function sepalBladeState(state, angleDeg) {
+export function sepalBladeState(state, angleDeg, unclamped = false) {
   /* THE INFILL IS PINNED OFF (Eva's ruling 4, the Voronoi port): a sepal is
      the petal builder on a second ring, so a guard read through
      `petalStateFor` would be inherited by every sepal for free. Turning it on
@@ -17566,7 +17579,7 @@ export function sepalBladeState(state, angleDeg) {
      `verify-bloom-sepal-decoupled.mjs`, which sweeps petal-side control values
      and asserts 0 sepal floats move. */
   const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
-  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);
+  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   return s;
 }
 
@@ -17818,10 +17831,10 @@ export function rotateLamina(S, az, base0, dt) {
 /* THE TRIAL SEPAL at one angle, in one mode, at azimuth 0: the shipped
    builder into a throwaway accumulator with the lamina captured. One call per
    seam-step bucket; every other angle is a rotation of it (see the header). */
-export function sepalTrialLamina(state, sepals, angleDeg, exportMode) {
+export function sepalTrialLamina(state, sepals, angleDeg, exportMode, unclamped = false) {
   const acc = new MeshBuilder({ exportMode, captureLamina: true });
   const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };
-  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg), sepals.ring, slot, null, false);
+  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, null, false);
   return { lamina: laminaFromPanels(p.lamina), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
 }
 /* THE PETALS' LAMINAE IN THE OTHER MODE, on the same (u, v) lattice the built
@@ -19351,7 +19364,7 @@ function rimSurface(plan, hub, t) {
 /* sepalAngleLimit — THE DRAWN LIMIT. `sites` are the petals the builder
    emitted ({ p, ring, slot, cap }), with `p.grid` captured. Returns the
    record the read-out and SP8 read. */
-export function sepalAngleLimit(state, fr, acc, sites) {
+export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const sepals = fr.sepals;
   const askedDeg = Number(state.sepalAngle);
@@ -19396,12 +19409,12 @@ export function sepalAngleLimit(state, fr, acc, sites) {
     const reps = [...configOf.values()];
     configs = Math.max(configs, reps.length);
     const trials = new Map();   // seam-step bucket -> trial lamina at its representative angle
-    const sepalRows = bladeRowsFor(sepalBladeState(state, lo).petalTipShape);   // the sepal ring's own, never the head's NU
+    const sepalRows = bladeRowsFor(sepalBladeState(state, lo, unclamped).petalTipShape);   // the sepal ring's own, never the head's NU
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
       const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), state.petalLength * sepals.scale, sepalRows);
       let trial = trials.get(seamStep);
-      if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode); trials.set(seamStep, trial); }
+      if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode, unclamped); trials.set(seamStep, trial); }
       scanned++;
       for (const j of reps) {
         const S = rotateLamina(trial.lamina, sepals.azimuths[j], trial.base, (deg - trial.tilt) * D2R);
@@ -19435,7 +19448,8 @@ export function sepalAngleLimit(state, fr, acc, sites) {
 export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap = null) {
   const sepals = fr.sepals;
   if (!sepals) return null;
-  const limit = sepalAngleLimit(state, fr, acc, sites);
+  const unclamped = !!(cap && cap.sepalTwinsUnclamped);
+  const limit = sepalAngleLimit(state, fr, acc, sites, unclamped);
   /* THE CAPABILITY HOOK — `{ sepalAngleUnclamped: true }` builds the ASKED
      angle past the drawn limit. No control reaches it (the clamp is the
      point); the render sheet uses it to photograph the angle BEYOND its
@@ -19443,7 +19457,7 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
      which is what makes it a hook and not a setting. The limit's own record
      is untouched so the read-out still says where contact was drawn. */
   if (cap && cap.sepalAngleUnclamped) { limit.angleBuiltDeg = limit.askedDeg; limit.clamped = false; limit.unclamped = true; }
-  const bs = sepalBladeState(state, limit.angleBuiltDeg);
+  const bs = sepalBladeState(state, limit.angleBuiltDeg, unclamped);
   const built = [], azimuths = [];
   const tris0 = acc.triangleCount;
   buildWhorlInto({

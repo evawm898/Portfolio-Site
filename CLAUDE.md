@@ -3332,10 +3332,21 @@ bound; the registry's twin may only NARROW (it throws otherwise) and the panel g
 **The gap alone would have allowed +190; the census folds from |roll| 185 on both signs, so the
 bound is the last step clean on BOTH** (re-ruled on the numbers). **The all-max sepal stays
 DECLARED** (`sepal-form-max`, 0.001 mm): no one- or two-range trim clears it — the costed 3/4/5-range
-cuts are §10.3, not taken. The geometry does not clamp; how a saved value past the bound should load
-is OPEN (Q-S6, §10.5) — 81 frozen rows (3 in each of phase35..phase61) can no longer be replayed
-through the browser. `node tools/bloom-sepal-ranges.mjs --control` is the bound's must-fail;
+cuts are §10.3, not taken. `node tools/bloom-sepal-ranges.mjs --control` is the bound's must-fail;
 `frozen/phase61` is the 1,282 rows at `4109bb7` (first taken as phase60 at `2415048`, row-for-row #391's phase60, so dropped). Sheet: `docs/img/sepal-ranges.png`.
+**A SAVED SEPAL VALUE PAST THE BOUND CLAMPS SILENTLY ON LOAD** (Eva's ruling on Q-S6, Oct 9; read §10.5
+before touching `sepalTwinValue`, `loadedValue` or `sepalTwinsUnclamped`):
+- Past the bound, a stored value loads as the nearest bound (330 → 180, −330 → −180).
+- There is no read-out, no warning and no migration; the ids and registry rows stay.
+- `sepalTwinValue` (geometry, read only by `sepalBladeState`) is the one place it happens. Inside the
+  bound it is a branch that returns `Number(v)` itself.
+- The harness read-back expects the loaded value from a restated `RULED_SEPAL_LOAD_BOUNDS`, so the 81
+  frozen rows (3 in each of phase35..phase61) replay through the browser again.
+- **54 of those rows move bytes** (the roll min/max rows); **27 hold** (the GATED row builds no sepal).
+- An instrument that must build past the bound passes the capability hook `{ sepalTwinsUnclamped: true }`.
+- Witness: `node tools/verify-bloom-sepal-load-clamp.mjs` (`--browser`, `--control` with three mutants,
+  `--frozen --base`).
+- `frozen/phase62` is the 1,282 rows at `e008938`.
 
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
