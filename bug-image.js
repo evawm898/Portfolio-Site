@@ -79,6 +79,10 @@ export const NOTCH_MIN_FRAC = 0.06;
    be as shallow as NOTCH_LOBE_MIN_FRAC (#43's real notch is 0.058). */
 export const NOTCH_LOBE_FRAC = 0.4;
 export const NOTCH_LOBE_MIN_FRAC = 0.045;
+/* three pairs from one mass (§18): the two notches must sit this far apart in
+   bearing (radians about the attachment's middle) to be two notches rather
+   than one dent read twice */
+export const NOTCH3_MIN_SEP = 0.35;
 /* THE HIDDEN OVERLAP: what of the hindwing lies under the forewing cannot be
    seen. The guess: the hindwing's hidden leading edge is the split line moved
    FORWARD by this fraction of the wing's extent — it tucks under the forewing
@@ -794,9 +798,124 @@ function fitOnce(img, base, opts) {
     if (!lobes) loop.forEach((p, k) => { if (depthAt[k] > depth) { depth = depthAt[k]; best = k; } });
     notch = best >= 0 ? { at: loop[best], depth, frac: depth / extent } : null;
     res.lobes = lobes ? { fore: toWorld(...lobes.fore), hind: toWorld(...lobes.hind), root: toWorld(...Rm) } : null;
-    const want = o.pairs === 'auto' ? (notch && notch.frac >= (lobes ? NOTCH_LOBE_MIN_FRAC : NOTCH_MIN_FRAC) ? 2 : 1) : clamp(+o.pairs, 1, 2);
-    if (o.pairs !== 'auto' && +o.pairs > 2) res.notes.push('one wing mass can only be split into 2 pairs; 3 or 4 pairs need wings that are visibly separate in the picture');
-    if (want === 2 && notch) {
+    const want = o.pairs === 'auto' ? (notch && notch.frac >= (lobes ? NOTCH_LOBE_MIN_FRAC : NOTCH_MIN_FRAC) ? 2 : 1) : clamp(+o.pairs, 1, 3);
+    if (o.pairs !== 'auto' && +o.pairs > 3) res.notes.push('one wing mass can only be split into 3 pairs; 4 pairs need wings that are visibly separate in the picture');
+    if (want === 3) {
+      // THREE PAIRS FROM ONE MASS (design doc §18): TWO notches, found by the
+      // same lobe test as the two-pair split — each candidate pair of
+      // concavities (local maxima of the hull depth, from NOTCH_LOBE_MIN_FRAC
+      // deep) must leave a lobe AHEAD of the front notch, one BETWEEN the two
+      // and one BEHIND the back notch, each reaching NOTCH_LOBE_FRAC of the
+      // farthest point, and the two notches must be distinct (NOTCH3_MIN_SEP
+      // apart in bearing from the attachment's middle). The deepest such pair
+      // wins. Where a notch is NOT found the line for it is a DEFAULT — square
+      // to the body from a root a third of the attachment down, out to the
+      // margin at the bearing that divides the mass's sweep in thirds — and the
+      // split is reported NOT CONFIDENT: the page shows both lines as handles
+      // and refits as they move (o.splits, world mm, front line first). Each
+      // line is a WALL as in the two-pair split; a pixel's pair is the number
+      // of walls it lies behind, and the hidden band under each wall is given
+      // to the pair behind it.
+      // (the candidates are the two-pair rule's: the outline from 0.12 of the
+      // extent out — reading closer to the body was tried and admitted the
+      // dents where a hindwing's anal margin meets the abdomen, measured on
+      // the gate's fixture, while the notch it was meant to reach, between two
+      // lobes drawn OVERLAPPING, is not a notch of the silhouette at all and is
+      // the draggable line's case)
+      const depth3 = depthAt;
+      let dmax = 0; for (const p of loop) if (outerPt(p)) dmax = Math.max(dmax, dist(p));
+      const cand = [];
+      for (let k = 0; k < loop.length; k++) {
+        const d = depth3[k]; if (d < NOTCH_LOBE_MIN_FRAC * extent) continue;
+        let isMax = true; for (let m = -4; m <= 4 && isMax; m++) if (m && depth3[(k + m + loop.length) % loop.length] > d) isMax = false;
+        if (isMax) cand.push(k);
+      }
+      cand.sort((x, y) => depth3[y] - depth3[x]);
+      const top = cand.slice(0, 10);
+      const farBetween = (lo, hi) => { let F = -1; loop.forEach((p, m) => { if (!outerPt(p)) return; const b = bearing(p); if (b > lo && b <= hi && (F < 0 || dist(p) > dist(loop[F]))) F = m; }); return F; };
+      let bestPair = null;
+      for (let i = 0; i < top.length; i++) for (let j = i + 1; j < top.length; j++) {
+        let f = top[i], h = top[j]; if (bearing(loop[f]) < bearing(loop[h])) [f, h] = [h, f];
+        const bf = bearing(loop[f]), bh = bearing(loop[h]);
+        if (bf - bh < NOTCH3_MIN_SEP) continue;
+        const A = farBetween(bf, Infinity), Bm = farBetween(bh, bf), C = farBetween(-Infinity, bh);
+        if ([A, Bm, C].some((q) => q < 0 || dist(loop[q]) < NOTCH_LOBE_FRAC * dmax)) continue;
+        // and each NOTCH itself lies out along the margin — at least
+        // NOTCH_LOBE_FRAC of the farthest point from the attachment's middle:
+        // the dent where a hindwing's anal margin meets the abdomen sits at
+        // 0.17-0.32 of it where a notch between two wings sits at 0.66-0.77
+        // (measured on the gate's fixture, where the deepest-pair rule took
+        // that dent for the back notch and the bottom pair came back a 5 mm
+        // sliver). A lobe-PROMINENCE rule was tried in its place and rejected
+        // the real three-pair butterfly's middle lobe, whose notch with the
+        // forewing already lies far out. The deepest pair that passes wins.
+        if (dist(loop[f]) < NOTCH_LOBE_FRAC * dmax || dist(loop[h]) < NOTCH_LOBE_FRAC * dmax) continue;
+        if (o.debugNotch) (res.notchPairs ||= []).push({ f: +(bearing(loop[f]) * 180 / Math.PI).toFixed(1), h: +(bearing(loop[h]) * 180 / Math.PI).toFixed(1), depth: [depth3[f], depth3[h]].map((q) => +(q / extent).toFixed(3)), reach: [dist(loop[f]), dist(loop[h])].map((q) => +(q / dmax).toFixed(2)) });
+        const score = Math.min(depth3[f], depth3[h]);
+        if (!bestPair || score > bestPair.score) bestPair = { f, h, score, lobes: [loop[A], loop[Bm], loop[C]] };
+      }
+      // bearings of the mass's outer sweep, for the default lines
+      let bmin = Infinity, bmax = -Infinity; for (const p of loop) if (outerPt(p)) { const b = bearing(p); bmin = Math.min(bmin, b); bmax = Math.max(bmax, b); }
+      const atBearing = (t) => { let bk = -1, bd = Infinity; loop.forEach((p, m) => { if (!outerPt(p)) return; const d = Math.abs(bearing(p) - t); if (d < bd) { bd = d; bk = m; } }); return loop[bk]; };
+      const found = bestPair ? [loop[bestPair.f], loop[bestPair.h]] : (lobes && best >= 0 ? [loop[best], null] : [null, null]);
+      const confident = [!!found[0], !!found[1]];
+      if (!bestPair && found[0]) {
+        // one notch found: the default line goes on the side with the wider sweep
+        const b0 = bearing(found[0]);
+        if (b0 - bmin > bmax - b0) found[1] = atBearing(bmin + (b0 - bmin) / 2); else { found[1] = found[0]; found[0] = atBearing(b0 + (bmax - b0) / 2); confident.reverse(); }
+      }
+      if (!found[0] && !found[1]) { found[0] = atBearing(bmax - (bmax - bmin) / 3); found[1] = atBearing(bmax - 2 * (bmax - bmin) / 3); }
+      const walls = [0, 1].map((i) => {
+        // a FOUND notch's line runs to the attachment's MIDDLE, the two-pair
+        // split's own root (the wings overlap there, so the line lies inside
+        // the pair ahead of it); a DEFAULT line is rooted a third of the
+        // attachment down so the two defaults are two lines
+        let outer = found[i], root = [cutI, confident[i] ? Rm[1] : a0 + (a1 - a0) * (i + 1) / 3];
+        if (o.splits && o.splits[i] && o.splits[i].outer && o.splits[i].root) {
+          outer = toUpright(...o.splits[i].outer); root = toUpright(...o.splits[i].root); root[0] = cutI;
+          let bd = Infinity, bq = outer;
+          for (const q of loop) { if (q[0] < cutI + 0.12 * extent) continue; const d = hyp(q[0] - outer[0], q[1] - outer[1]); if (d < bd) { bd = d; bq = q; } }
+          outer = bq;
+        }
+        root = [cutI, clamp(root[1], a0 + 0.12 * (a1 - a0), a1 - 0.12 * (a1 - a0))];
+        const dx = outer[0] - root[0], dy = outer[1] - root[1], Ll = hyp(dx, dy) || 1;
+        let nx = -dy / Ll, ny = dx / Ll; if (ny > 0) { nx = -nx; ny = -ny; }
+        const ux = dx / Ll, uy = dy / Ll;
+        return { outer, root, Ll, ux, uy, nx, ny, confident: confident[i] && !(o.splits && o.splits[i]) };
+      });
+      walls.sort((x, y) => x.root[1] - y.root[1]);   // front line first (toward the head, smaller j)
+      const alongW = (w, i, j) => ((i + 0.5 - w.root[0]) * w.ux + (j + 0.5 - w.root[1]) * w.uy) / w.Ll;
+      const sideW = (w, i, j) => (i + 0.5 - w.root[0]) * w.nx + (j + 0.5 - w.root[1]) * w.ny;
+      const onWall = (w, i, j) => { const t = alongW(w, i, j); return t >= -0.05 && t <= 1 + 3 / w.Ll && Math.abs(sideW(w, i, j)) <= 0.9; };
+      const Mw = new Uint8Array(NX * NY);
+      for (let j = 0; j < NY; j++) for (let i = cutI; i < NX; i++) { const k = j * NX + i; if (M[k] && !walls.some((w) => onWall(w, i, j))) Mw[k] = 1; }
+      const pcs = components(Mw, NX, NY), nP = pcs.sizes.length;
+      const sideSum = walls.map(() => new Float64Array(nP)), sideAny = walls.map(() => new Float64Array(nP));
+      for (let j = 0; j < NY; j++) for (let i = cutI; i < NX; i++) {
+        const l = pcs.lab[j * NX + i]; if (l < 0) continue;
+        walls.forEach((w, wi) => { const sd = Math.sign(sideW(w, i, j)), t = alongW(w, i, j); sideAny[wi][l] += sd; if (t >= 0 && t <= 1) sideSum[wi][l] += sd; });
+      }
+      const behindOf = (l) => walls.reduce((n, w, wi) => n + ((sideSum[wi][l] || sideAny[wi][l]) < 0 ? 1 : 0), 0);
+      const band = HIDDEN_OVERLAP_FRAC * extent;
+      const masks = [0, 1, 2].map(() => new Uint8Array(NX * NY));
+      for (let j = 0; j < NY; j++) for (let i = cutI; i < NX; i++) {
+        const k = j * NX + i; if (!M[k]) continue;
+        const l = pcs.lab[k];
+        const b = l < 0 ? walls.reduce((n, w) => n + (sideW(w, i, j) < 0 ? 1 : 0), 0) : behindOf(l);
+        masks[b][k] = 1;
+        // the hidden band: just ahead of wall b (the pair in front of it), given also to the pair behind
+        if (b < 2) { const w = walls[b], t = alongW(w, i, j); if (t >= 0 && t <= 1 && sideW(w, i, j) < band * (1 - t)) masks[b + 1][k] = 1; }
+      }
+      const keepTouching = (X) => { const cc = components(X, NX, NY); const ps = pieces(cc, cutI); if (!ps.length) return null; const q = ps.reduce((a, b) => (b.size > a.size ? b : a)); return comp(q, cc); };
+      const regs = masks.map(keepTouching);
+      res.splits = walls.map((w) => ({ outer: toWorld(...w.outer), root: toWorld(...w.root), confident: w.confident }));
+      res.notchPair = bestPair ? { lobes: bestPair.lobes.map((q) => toWorld(...q)) } : null;
+      res.notchCands = top.map((k) => ({ world: toWorld(...loop[k]), depthFrac: +(depth3[k] / extent).toFixed(3), bearingDeg: +(bearing(loop[k]) * 180 / Math.PI).toFixed(1), reach: +(dist(loop[k]) / dmax).toFixed(2) }));
+      if (o.debugNotch) res.notchWalls = walls.map((w) => ({ root: [(w.root[0] - cutI) / extent, (w.root[1] - a0) / (a1 - a0)], outer: [(w.outer[0] - cutI) / extent, (w.outer[1] - a0) / (a1 - a0)], conf: w.confident, areas: masks.map((X) => { let n = 0; for (let k = 0; k < X.length; k++) n += X[k]; return n; }), kept: regs.map((R) => (R ? R.reduce((n, v) => n + v, 0) : 0)) }));
+      if (o.debugNotch) res.notchProfile = loop.map((p, k) => [+((p[0] - cutI) / extent).toFixed(3), +(bearing(p) * 180 / Math.PI).toFixed(1), +(depth3[k] / extent).toFixed(3)]);
+      if (regs.every(Boolean)) { regions = regs; split = { outer: res.splits[0].outer, root: res.splits[0].root, notchDepthFrac: notch ? notch.frac : 0 }; res.mode = 'split3'; if (!walls.every((w) => w.confident)) res.notes.push(`${walls.filter((w) => !w.confident).length === 2 ? 'no notch pair' : 'only one notch'} with a wing on each side was found — the other split line is a default; drag the pink split lines`); }
+      else { regions = [M]; res.notes.push('a split line leaves one pair empty; fitted as ONE pair — drag the split lines'); res.mode = 'single'; }
+    } else if (want === 2 && notch) {
       // the split line, upright px: from the notch inward, square to the body by
       // default — or where the page's handles put it (world mm)
       let outer = notch.at, root = [cutI, lobes ? Rm[1] : notch.at[1]];
