@@ -206,6 +206,11 @@ export function fit3(c, base, name = '') {
   const over = SPLIT_OVERRIDES[name];
   const run = (extra) => {
     let r = imageToBug(c.sil, base, extra), input = 'silhouette'; if (!r.ok) { const r2 = imageToBug(c.img, base, extra); if (r2.ok) { r = r2; input = 'source pixels'; } }
+    // a fit that came back with fewer than the three pairs asked for (the
+    // fitter fell back to one mass or a two-pair split) is a REFUSAL here, told
+    // by its mode: the record would be a two-pair one and the library's
+    // two-pair branch would be judging something this tool is not about
+    if (r.ok && extra.pairs === 3 && r.pairs.length !== 3) r = { ok: false, reason: `the fitter returned ${r.pairs.length} pair(s) (mode ${r.mode}) where three were asked for` };
     if (over && r.ok && extra.pairs === 3 && !extra.splits) {
       // the hand-placed lines, crop px -> world through this fit's own matrix; the lines not overridden stay the fitter's own
       const M = r.transform.matrix, toW = ([fx, fy]) => { const px = fx * c.img.width, py = fy * c.img.height; return [M[0] * px + M[2] * py + M[4], M[1] * px + M[3] * py + M[5]]; };
@@ -333,7 +338,37 @@ export function distinctness(rec) {
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 /* Eva's / the reviewer's reading, by candidate name, written after looking at
    the page; the automatic verdict stands where none is written */
+/* READ OFF THE RENDERED PAGE, candidate by candidate — the automatic
+   verdict says what the FIT did; these say whether the ARTWORK is a
+   three-pair design at all. Most of the attached sheets are two-pair
+   butterflies: on those the fitter finds a second notch at a tail or a
+   scallop and cuts a third "pair" off a hindwing, which is a correct cut
+   of the silhouette and not a designed third wing. Eva's list decides. */
 export const VERDICTS = {
+  '3.webp#4':  ['GOOD', 'three designed lobes per side, both notches found, every pair smooth and distinct, floor clear, junction clean'],
+  '3.webp#5':  ['GOOD', 'three lobes per side (upper, middle, lower); the lower notch was found and the upper line is a DEFAULT that lands on the drawn boundary — check the pink line on the source; floor clear, junction clean'],
+  '4.png#3':   ['GOOD', 'three lobes per side; the lower two overlap in the drawing so their boundary is a drawn edge, not a notch — the second split line is PLACED BY HAND here (as a drag on the page would); floor clear, junction clean'],
+  '4.png#6':   ['FIXABLE', 'three overlapping lobes per side, no notch in the silhouette, so BOTH split lines are defaults — they land near the drawn boundaries but want a drag on the page; the fit tolerance had to move to 0.51 mm to keep pair 2 from folding'],
+  '4.png#5':   ['FIXABLE', 'three fanned wings per side; the top pair fits as a thin stub (8 pts, x1 length but a sliver) because its lobe is mostly hidden behind the middle one — the upper line wants dragging up, or the top pair redrawn'],
+  '4.png#9':   ['FIXABLE', 'three fanned wings per side drawn overlapping, no notch, both lines default; the fit is plausible but pair 1 is 5 points — drag the lines to the drawn boundaries'],
+  '4.png#1':   ['FIXABLE', 'reads as two pairs with a bilobed hindwing; the third pair is the lower lobe cut at a default line — keep only if that lobe is meant as its own wing'],
+  '1.png#1':   ['DROP', 'a two-pair butterfly: the third pair is the hindwing cut at its tail notch, not a designed wing'],
+  '2.png#1':   ['DROP', 'a two-pair butterfly: the third pair is a scalloped lobe cut off the forewing'],
+  '2.png#2':   ['DROP', 'a two-pair butterfly: the third pair is the tail cut off the hindwing (x0.20 of the forewing)'],
+  '2.png#3':   ['DROP', 'a two-pair butterfly: the third pair is the tail cut off the hindwing'],
+  '3.webp#1':  ['DROP', 'a two-pair butterfly: the forewing is cut in two at a default line'],
+  '3.webp#2':  ['DROP', 'a two-pair butterfly with a jagged margin; under the floor at every tolerance'],
+  '3.webp#3':  ['DROP', 'a two-pair butterfly: the third pair is the hindwing cut at a scallop'],
+  '3.webp#6':  ['DROP', 'a two-pair butterfly: the third pair is the hindwing cut at a scallop'],
+  '3.webp#7':  ['DROP', 'a two-pair butterfly: the hindwing is cut in two at a default line'],
+  '3.webp#8':  ['DROP', 'a two-pair butterfly: the forewing is cut in two at a scallop'],
+  '3.webp#9':  ['DROP', 'a two-pair butterfly: the third pair is the tail cut off the hindwing'],
+  '4.png#2':   ['DROP', 'the fitter finds one mass with no notch pair at all'],
+  '4.png#4':   ['DROP', 'a two-pair design; pair 3 (a tail) is under the floor at every tolerance'],
+  '4.png#7':   ['DROP', 'refused at step 5: the third outline would cross itself'],
+  '4.png#8':   ['DROP', 'two long narrow wings per side (dragonfly-like); the third pair is a sliver under the floor'],
+  '5.png#1':   ['DROP', 'refused at step 5: the third outline would cross itself'],
+  '5.png#2':   ['DROP', 'a watermark band, not a bug'],
 };
 export function autoVerdict(c) {
   if (!c.ok) return ['DROP', `the fitter refused it: ${c.reason}`];
