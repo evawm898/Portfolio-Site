@@ -832,15 +832,21 @@ gone from the sepal.** From below at the whole-head framing (§1) the difference
   sepal GATED row asked `sepalRoll` 330 at `sepalCount` 0 (an input bounded at 180 can no longer
   hold 330, so the harness's read-back would refuse it); it asks 180 now and is **byte-identical to
   its base self and to the shipping default** in both modes (24,688 triangles).
-- **Every other row holds.** `node tools/verify-bloom-defaults-bytes.mjs --base <worktree of 2415048>
-  --mover none --pair set` pairs the two matrices by control set: **1,262 pairs, the three redefined
-  rows listed by name with no partner on either side, 1,262 of 1,262 pairs carrying deep-equal
-  states on the two trees** (the inputs half, over the whole matrix), and the 70 pairs built —
+- **Every other row holds.** `node tools/verify-bloom-defaults-bytes.mjs --base <worktree of 4109bb7>
+  --mover none --pair set --only '^(DEFAULT|SEPALS:)'` pairs the two matrices by control set:
+  **1,279 pairs, the three redefined rows listed by name with no partner on either side, 1,279 of
+  1,279 pairs carrying deep-equal states on the two trees** (the inputs half, over the whole
+  matrix; measured first against `2415048` at 1,262 of 1,262, and re-measured on the merged base
+  after #391 landed), and the 70 pairs built —
   `DEFAULT` and every paired `SEPALS:` row — **held to the bit in both modes**, the control
   (1e-9 on the default) reported. The remaining pairs hold by construction: identical states, and a
   geometry diff that only adds an export no builder reads.
-- **`frozen/phase60` is the 1,265 rows at `2415048`**, registered in both maps and proved
-  deep-equal (`--verify-frozen --phase60`). A phase is owed because the row SET changed.
+- **`frozen/phase61` is the 1,282 rows at `4109bb7`**, registered in both maps and proved
+  deep-equal (`--verify-frozen --phase61`). A phase is owed because the row SET changed. This
+  session first registered its baseline as `phase60` at `2415048`; #391 took `phase60` at
+  `2e096bf` while this PR was in CI, and the two 1,265-row matrices are **byte-identical** (#389,
+  between the two bases, moved no row), so the duplicate was dropped — the phase50 precedent — and
+  the baseline re-taken at the merged base, which carries #391's block 57.
 - **No triangle count moves anywhere.** The default bloom is 24,688, untouched.
 
 ### 10.3 All form at maximum: kept declared (Eva, Oct 9)
@@ -901,12 +907,12 @@ same magnitudes they read at roll 180 before the narrowing.
 ### 10.5 OPEN — how a saved sepal value outside the new range should load
 
 **Not decided; Eva's question.** The bloom persists no design and ships no presets, so the "saved
-designs" are the matrix sets — and **78 frozen rows** hold a sepal roll past ±180: three rows
-(`sepalRoll min (-330)`, `max (330)`, the GATED row) in each of the 26 frozen phases phase35 …
-phase60. No live row does. What happens today, with nothing built for it: **the geometry does not
+designs" are the matrix sets — and **81 frozen rows** hold a sepal roll past ±180: three rows
+(`sepalRoll min (-330)`, `max (330)`, the GATED row) in each of the 27 frozen phases phase35 …
+phase61. No live row does. What happens today, with nothing built for it: **the geometry does not
 clamp** (Node builds 330 as asked; the frozen definitions still deep-compare), **the page's range
 input clamps silently** to 180, and **the harness refuses the row** on its read-back ("a value that
-did not take"), so those 78 rows can no longer be replayed through the browser. Rendered on the
+did not take"), so those 81 rows can no longer be replayed through the browser. Rendered on the
 sheet (§3) for a saved `sepalRoll` 330:
 
 | option | builds | told | gap / census |

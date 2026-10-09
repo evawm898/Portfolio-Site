@@ -61,6 +61,10 @@ function stateOf(k) {
   for (let w = 0; w < 4; w++) rnd();
   const st = { stemLength: 200, stemDiameter: 6, leafNodes: 1, leafType: 'LOBED' };
   for (const [id, [lo, hi], step] of SPACE) st[id] = Math.min(hi, Math.max(lo, lo + Math.round(((hi - lo) * rnd()) / step) * step));
+  /* `--set id=value[,id=value]` lays fixed values over every drawn state AFTER
+     the draw, so the drawn numbers (and therefore the states) are S4b's own;
+     S4c measures the same 2,000 states at roundness 0 and at its default */
+  for (const kv of (opt('--set') || '').split(',').filter(Boolean)) { const [k, v] = kv.split('='); st[k] = v; }
   return st;
 }
 
@@ -83,6 +87,12 @@ for (let k = pk; k < N; k += pn) {
     asked: rb ? Math.min(...rb.sinuses.map((x) => (x.openingAskedMm === null ? Infinity : x.openingAskedMm))) : null,
     needed: rb ? rb.needed : 0, built: rb ? rb.built : 0, noFit: rb ? rb.noFit : 0,
     why: rb ? rb.sinuses.filter((x) => x.noFit).map((x) => x.noFitWhy) : [],
+    /* S4c: the radius shrink (stage 1) and the lobe-count yield (stage 2) */
+    shrunk: rb && rb.shrunk !== undefined ? rb.shrunk : null,
+    lobesAsked: r.lobesAsked !== undefined ? r.lobesAsked : r.lobes, lobesBuilt: r.lobes,
+    residual: r.lobeYield ? r.lobeYield.residual : null,
+    attempts: r.lobeYield ? r.lobeYield.attempts : null,
+    roundFrac: rb ? rb.sinuses.filter((x) => x.built && x.roundBuilt !== null && x.roundBuilt !== undefined).map((x) => x.roundBuilt) : [],
   });
 }
 const out = opt('--out');
@@ -106,5 +116,12 @@ function report(R) {
   console.log(`  NO FIT by reason: ${JSON.stringify(why)}`);
   const still = ws.filter((r) => r.open < 1 - 1e-9);
   console.log(`  states still under 1 mm as built: ${still.length}${still.length ? ` — ${still.filter((r) => r.noFit > 0).length} carry a told NO FIT` : ''}`);
+  if (ws[0].shrunk !== null) {
+    const sh = ws.filter((r) => r.shrunk > 0), yl = ws.filter((r) => r.lobesBuilt < r.lobesAsked), rs = ws.filter((r) => r.residual);
+    console.log(`  S4c STAGE 1 — the radius shrank toward the print minimum: ${pct(sh.length, ws.length)} (${sh.length}) of states, ${ws.reduce((s, r) => s + r.shrunk, 0)} sinuses`);
+    console.log(`  S4c STAGE 2 — the lobe count yielded: ${pct(yl.length, ws.length)} (${yl.length}); lobes given up ${JSON.stringify(yl.reduce((h, r) => { const d = r.lobesAsked - r.lobesBuilt; h[d] = (h[d] || 0) + 1; return h; }, {}))}`);
+    console.log(`  S4c RESIDUAL — no count fits, the asked count with the told V: ${pct(rs.length, ws.length)} (${rs.length})`);
+    for (const r of rs) console.log(`    k ${r.k}: opening ${r.open.toFixed(3)} mm, NO FIT ${r.noFit} (${r.why.join(', ')}), tries ${JSON.stringify(r.attempts)} — ${JSON.stringify(r.set)}`);
+  }
   for (const r of still.slice(0, 40)) console.log(`    k ${r.k}: opening ${r.open.toFixed(3)} mm, NO FIT ${r.noFit} (${r.why.join(', ')}) — ${JSON.stringify(r.set)}`);
 }
