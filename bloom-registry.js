@@ -72,7 +72,8 @@ import { LEAF_TYPES, LEAFLET_PAIRS_RANGE, LEAFLET_PAIRS_DEFAULT, LEAFLET_FIRST_R
    IMPORTED (Q6): `lobedChevronLaw` is the one owner of what each value means. */
 import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_FROM_DEFAULT, LOBED_TO_RANGE, LOBED_TO_DEFAULT,
          LOBED_SINUS_RANGE, LOBED_SINUS_DEFAULT, LOBED_SHAPE_RANGE, LOBED_SHAPE_DEFAULT, LOBED_ANGLE_RANGE, LOBED_ANGLE_DEFAULT,
-         LOBED_EASE_RANGE, LOBED_EASE_DEFAULT, LOBED_WIDTH_DEFAULT, LOBED_TOOTH_DEPTH_DEFAULT } from './bloom-geometry.js';
+         LOBED_EASE_RANGE, LOBED_EASE_DEFAULT, LOBED_WIDTH_DEFAULT, LOBED_TOOTH_DEPTH_DEFAULT,
+         LOBED_ROUND_RANGE, LOBED_ROUND_DEFAULT, LOBED_TOOTH_PER_LOBE_RANGE, LOBED_TOOTH_PER_LOBE_DEFAULT } from './bloom-geometry.js';
 import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
@@ -550,6 +551,12 @@ export const PREDICATES = {
     { all: [{ ref: 'leafCompound' }, { id: 'leafletToothDepth', min: 0.01 }] },
     { all: [{ ref: 'leafLobed' }, { id: 'lobedToothDepth', min: 0.01 }] },
   ] }] },
+  /* THE TOOTH COUNT IS TWINNED UNDER LOBED (S4c — Eva's ruling of Oct 9:
+     "LOBED gets its own tooth count"): the shared count serves SIMPLE and
+     COMPOUND and is hidden AND inert under LOBED, where `lobedToothCount`
+     (teeth PER LOBE) is the count; `lobedBladeState` is the geometry's half. */
+  leafToothedShared: { all: [{ ref: 'leafToothed' }, { not: { ref: 'leafLobed' } }] },
+  leafLobedToothed: { all: [{ ref: 'leafToothed' }, { ref: 'leafLobed' }] },
 
   /* ===================================================================
      THE TUBE (corolla fusion, the build session) — the registry's statement
@@ -4121,7 +4128,17 @@ export const CONTROLS = [
   { id: 'lobedLobes', section: 'leafLobes', kind: 'slider',
     min: LOBED_PER_SIDE_RANGE[0], max: LOBED_PER_SIDE_RANGE[1], step: 1, default: LOBED_PER_SIDE_DEFAULT,
     label: 'Lobes per side',
-    fmt: (v) => { const n = Math.round(Number(v)); return `${n} lobe${n === 1 ? '' : 's'} a side and the terminal — ${n} sinus${n === 1 ? '' : 'es'} each side`; },
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const head = `${n} lobe${n === 1 ? '' : 's'} a side and the terminal — ${n} sinus${n === 1 ? '' : 'es'} each side`;
+      const L = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0];
+      if (!L || L.lobesAsked === undefined) return head;
+      /* THE COUNT GIVES (S4c, ruling 3) where no round bottom fits even at the
+         print minimum — asked against built, told */
+      if (L.lobes < L.lobesAsked) return `${head} · BUILT ${L.lobes}: at ${L.lobesAsked} no round sinus bottom fits even at the print minimum, so the lobe count gave (told, never refused)`;
+      if (L.lobeYield && L.lobeYield.residual) return `${head} · NO lobe count fits a round bottom here — the asked count stands with the V (told)`;
+      return head;
+    },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
   { id: 'lobedFrom', section: 'leafLobes', kind: 'slider',
     min: LOBED_FROM_RANGE[0], max: LOBED_FROM_RANGE[1], step: 0.01, default: LOBED_FROM_DEFAULT,
@@ -4146,7 +4163,29 @@ export const CONTROLS = [
       const head = `${d.toFixed(2)}x the envelope cut in at every sinus`;
       if (!g || g.minGapMm === null) return head;
       return `${head} · the narrowest sinus opens ${g.minGapMm.toFixed(2)} mm one minimum feature from its bottom`
-        + (g.under ? ` — UNDER the ${'1.00'} mm print gap at ${g.under} sinus${g.under === 1 ? '' : 'es'}: a slit that fuses over up to ${g.maxFusedMm.toFixed(2)} mm (told, never clamped)` : '');
+        + (g.under ? ` — UNDER the ${'1.00'} mm print gap at ${g.under} sinus${g.under === 1 ? '' : 'es'}: a slit no round bottom fits (told, never clamped)` : '');
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  /* THE SINUS ROUNDNESS (S4c — Eva's ruling of Oct 9: the sinus bottom
+     radius as a FRACTION OF THE LOBE PITCH, floored at S4b's print minimum;
+     0 is S4b's minimum exactly). Told on the control: the radius built
+     against the radius asked where it shrank (the radius gives first), and
+     the lobe count where the print minimum itself did not fit (the count
+     gives next) — `lobedRoundBottoms` and `lobedOutline` own both. */
+  { id: 'lobedRound', section: 'leafLobes', kind: 'slider',
+    min: LOBED_ROUND_RANGE[0], max: LOBED_ROUND_RANGE[1], step: 0.01, default: LOBED_ROUND_DEFAULT,
+    label: 'Sinus roundness',
+    fmt: (v, ui, shown) => {
+      const r = Number(v);
+      const head = r === 0 ? '0 — the print minimum only: a 1 mm disc where a V would not open, the V elsewhere' : `${r.toFixed(2)}x the lobe pitch — the sinus bottom's radius`;
+      const L = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0];
+      const R = L && L.roundBottoms;
+      if (!R) return head;
+      const built = R.sinuses.filter((x) => x.built && x.radiusMm > 0);
+      const radii = built.length ? ` · built ${built.map((x) => `${x.radiusMm.toFixed(2)} mm`).join(', ')}` : '';
+      const sh = R.sinuses.filter((x) => x.shrunk);
+      const shrunk = sh.length ? ` — SHRUNK at ${sh.length} sinus${sh.length === 1 ? '' : 'es'} (asked ${sh.map((x) => `${(x.roundAsked).toFixed(2)} -> ${(x.roundBuilt || 0).toFixed(3)}`).join(', ')} of the pitch: the asked radius would not meet its flanks; told)` : '';
+      return head + radii + shrunk;
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
   { id: 'lobedShape', section: 'leafLobes', kind: 'slider',
@@ -4218,6 +4257,27 @@ export const CONTROLS = [
       return `${head} · ${S.countBuilt} teeth at ${S.reliefBuiltMm.toFixed(2)} mm` + (S.foldClamped ? ` — CLAMPED: asked ${S.reliefFlooredMm.toFixed(2)} mm, built at the fold cap ${S.foldCapMm.toFixed(2)} mm (steeper teeth fold the lattice across its midrib)` : '');
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  /* THE LOBED BLADE'S OWN TOOTH COUNT (S4c — Eva's ruling of Oct 9, the S3b
+     twin mechanism): TEETH PER LOBE, the ruling's language — the shared law
+     is asked for `perLobe x (2n + 1)` over the BUILT lobes (n a side and the
+     terminal), so the count follows the lobes when they yield. The teeth stay
+     evenly spaced along the rim; the read-out counts them lobe by lobe off
+     the built teeth. The floor, the fold cap and the rows still bind: fewer,
+     told. Visible only under LOBED; the shared count is hidden there. */
+  { id: 'lobedToothCount', section: 'leafSerration', kind: 'slider',
+    min: LOBED_TOOTH_PER_LOBE_RANGE[0], max: LOBED_TOOTH_PER_LOBE_RANGE[1], step: 1, default: LOBED_TOOTH_PER_LOBE_DEFAULT,
+    label: 'Teeth per lobe',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const L = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0];
+      const head = `${n} a lobe`;
+      if (!L || !L.teeth) return head;
+      const S = L.teeth, rim = L.toothRimAsked, lobesOnRim = 2 * L.lobes + 1;
+      const per = L.teethPerLobe ? ` — ${L.teethPerLobe.join(' / ')} on the ${lobesOnRim} lobes, base to terminal (evenly spaced along the rim, so a longer lobe carries one more)` : '';
+      if (S.noRoom) return `${head} · ${rim} asked over ${lobesOnRim} lobes, none built (${S.noRoomWhy})`;
+      return `${head} · ${rim} asked over ${lobesOnRim} lobes` + (S.countBuilt < rim ? `, ${S.countBuilt} BUILT (${S.clampedBy || 'clamped'} — fewer, told)` : `, ${S.countBuilt} built`) + per;
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobedToothed' } },
   { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
     min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: LEAF_TOOTH_COUNT_DEFAULT,
     label: 'Teeth',
@@ -4226,7 +4286,9 @@ export const CONTROLS = [
        MODEL B's count is the free-standing teeth between adjacent sinuses over
        the treated arc (session 42), so 9 is four a margin plus one at the tip. */
     fmt: (v) => `${Math.round(Number(v))} in all — both margins and the tip`,
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+    /* (hidden AND inert under LOBED, where the lobes carry their own count —
+       S4c, the twin below) */
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothedShared' } },
   { id: 'leafCrestShape', section: 'leafSerration', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
     label: 'Tooth tip',

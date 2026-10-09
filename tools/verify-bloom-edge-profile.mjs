@@ -270,21 +270,33 @@ const E2_TURN_XFAIL = {
      inset follows the row, not the margin's normal — an emitPanel change for
      every blade, out of scope). Each note keeps S4's figure. */
   "LOBED: the MUM \u2014 alternate 137.5 x 4 nodes at the lobed defaults, arch 25":
-    { excessDeg: 38.227001, note: 'S4b re-record at the mum defaults with round bottoms (S4: 26.972835 at its own defaults, row then labelled "the proposed defaults")' },
+    { excessDeg: 41.771712, note: 'S4c re-record at the ruled mum defaults: three teeth a lobe (21 over the rim against the shared 12) and the sinus roundness 0.12 (S4b: 38.227001; S4: 26.972835)' },
   "LOBED: lobedSinus max (0.9 \u2014 the narrowest sinus gaps)":
-    { excessDeg: 48.743268, note: 'S4b re-record, every sinus rounded (S4: 34.108313)' },
+    { excessDeg: 70.118997, note: 'S4c re-record: three teeth a lobe and the rounder sinus bottoms (S4b: 48.743268; S4: 34.108313)' },
   "LOBED: lobedAngle max (60 \u2014 the TILT CAP binds, built under asked)":
-    { excessDeg: 30.630533, note: 'S4b re-record, three sinuses rounded at the clamped tilt (S4: 27.598071)' },
-  "LOBED: NONE FIT \u2014 6 lobes x sinus 0.9 x depth 0.3 x 12 teeth (the fold cap under the 1 mm floor; no teeth, told)":
-    { excessDeg: 50.306301, note: "S4b re-record at S4's pinned form, six sinuses rounded (S4: 48.235885)" },
-  "LOBED: 6 lobes x tooth depth 0.3 (the fold clamp binds hardest \u2014 4.86 mm asked, built at the 2.22 mm cap)":
-    { excessDeg: 45.517769, note: "S4b re-record at S4's pinned form, six sinuses rounded — IMPROVED (S4: 47.171007)" },
+    { excessDeg: 29.902202, note: 'S4c re-record — IMPROVED (S4b: 30.630533; S4: 27.598071)' },
+  "LOBED: NONE FIT \u2014 6 lobes x sinus 0.9 x depth 0.3, 3 teeth a lobe (39 asked: the fold cap 0.08 mm, under the 1 mm floor; no teeth, told)":
+    { excessDeg: 50.178275, note: "S4c: the row asks its teeth through the LOBED count now (3 a lobe, 39 over the rim) and is relabelled; no tooth fits either way (S4b, as '... x 12 teeth': 50.306301; S4: 48.235885)" },
+  "LOBED: 6 lobes x tooth depth 0.3, 1 tooth a lobe (the fold clamp binds \u2014 4.86 mm asked, built at the 1.71 mm cap)":
+    { excessDeg: 47.328459, note: "S4c: relabelled, one tooth a lobe (13 over the rim; S4b's row read the shared 12) — the cap moves 2.22 -> 1.71 mm with the count (S4b: 45.517769; S4: 47.171007)" },
   "LOBED: S4's form (sinus 0.62, shape 0.70, angle 38, teeth 0.08 \u2014 two V's under 1 mm, both ROUNDED, told)":
-    { excessDeg: 29.002875, note: 'NEW with S4b: adds 74.002875 deg (S4\'s MUM at these four values, arched on four nodes, added 71.972835 with its V\'s)' },
-  "LOBED: NO ROUND BOTTOM FITS \u2014 5 lobes on a 36 mm blade at 40 deg (the back flank's fold limit; the V kept, told)":
-    { excessDeg: 68.802622, note: "NEW with S4b: adds 113.802622 deg — S4's own V kept (no fit) on a short, steep five-lobed blade" },
+    { excessDeg: 30.119270, note: 'S4c re-record: the roundness 0.12 rounds all three sinuses (S4b: 29.002875)' },
+  "LOBED: THE LOBE COUNT YIELDS \u2014 5 lobes asked on a 36 mm blade at 30 deg, 3 built (no round bottom fits even at the print minimum at 5 or 4; told)":
+    { excessDeg: 48.995555, note: "S4c: S4b's NO ROUND BOTTOM FITS row, redefined — the count yields 5 -> 3 and every built sinus is rounded; at S4b's 40 deg the 3-lobe tilt sits on its cap and S4b's own round bottom crosses LF22 by 2e-4 (pre-existing, measured on the base tree), so the row is at 30 deg (S4b, 40 deg, V kept: 68.802622)" },
   "LOBED: the petiole CLAMPED \u2014 no sinus on a 3 mm stem at 90 deg (asks 0.82 mm, the rooted end holds 0.75)":
-    { excessDeg: 13.371781, note: 'NEW with S4b: adds 58.371781 deg — no sinus, so the wide cupped blade\'s own class (SIMPLE at 34 mm reads 51.61)' },
+    { excessDeg: 24.185405, note: 'S4c re-record: no sinus, so the move is the tooth count alone — three a lobe over seven lobes is 21 teeth against the shared 12 (S4b: 13.371781)' },
+  "LOBED ROUNDNESS: max (0.5 \u2014 every sinus SHRINKS, told)":
+    { excessDeg: 43.956893, note: 'NEW with S4c: the largest radii the roundness reaches, every one shrunk to fit' },
+  "LOBED ROUNDNESS: 0.3 x S4\'s form (the radius shrinks at all three sinuses)":
+    { excessDeg: 32.679957, note: 'NEW with S4c: S4\'s form at roundness 0.3' },
+  "LOBED YIELD: 6 lobes asked on a 12 mm blade (the count gives 6 -> 2, where the print minimum fits; told)":
+    { excessDeg: 47.925372, note: 'NEW with S4c: a short blade yielded to two lobes' },
+  "LOBED YIELD: the RESIDUAL \u2014 3 lobes on a 24 mm blade over a 5.5 mm window at 58 deg (no count fits; the V kept, told)":
+    { excessDeg: 43.134177, note: 'NEW with S4c: the residual, its V kept' },
+  "LOBED TEETH: 2 a lobe (14 \u2014 an even count: the apex notch on the terminal face)":
+    { excessDeg: 49.830577, note: 'NEW with S4c: two teeth a lobe' },
+  "LOBED TEETH: max (6 a lobe \u2014 42 asked, the ROWS cap builds 24, told)":
+    { excessDeg: 35.310162, note: 'NEW with S4c: the per-lobe count at its maximum, the rows cap binding' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE
