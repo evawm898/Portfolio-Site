@@ -505,6 +505,27 @@ export const PAIRS = [
     cite: 'docs/bloom-combination-gate.md §4 and §5 — a guess, and the measurement that answers it; docs/bloom-leaves-outcome.md carries the leafAngle readings this grid re-reads',
     why: 'a guess: that a deeper tooth reaches the stem sooner. It does not — the teeth are on the margin and the near point is at the base',
   },
+  /* THE LOBED LEAF AGAINST THE STEM (leaf/stem build S4b). S4b's own probe:
+     every lobed control MOVES the leaf-stem approach — the envelope width by
+     up to 0.11 mm and the lobe angle by 0.07 at a 70-degree leaf, since the
+     blade's base row is the envelope's and the chevron leans it along the
+     midrib — so CG1 counts a lobed axis as reaching the measure, and the
+     brief asks for the pair then. The hazard is leafAngle's own, exactly as
+     on the SIMPLE leaf (`leafangle-x-stem`): 70 degrees reads 0.699 mm and
+     85 reads 0 whatever the lobes do. The envelope's NARROW end is the
+     second axis because it is the worse one (10 mm reads 0.587 at 70). */
+  {
+    id: 'lobedwidth-x-leafangle',
+    tier: 2,
+    label: 'leafAngle x lobedWidth — the lobed blade against the stem',
+    measure: 'leaf-stem',
+    base: { stemLength: 70, leafLength: 46, leafNodes: 3, leafType: 'LOBED' },
+    a: { id: 'leafAngle', values: [35, 50, 70, 85] },
+    b: { id: 'lobedWidth', values: [34, 10, 40] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-leaf-lobed-rulings-outcome.md (the probe) and docs/bloom-leaf-lobed-outcome.md (the chevron leaf the pair builds)',
+    why: 'the lobed envelope sets the blade base nearest the stem; the steep leaf brings it to the stem — the hazard is the angle alone',
+  },
   {
     id: 'tipend-x-fringe',
     tier: 3,
@@ -1287,6 +1308,12 @@ export const COMBINATION_XFAIL = Object.freeze({
   "gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360": { mm: 0.691, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.123 mm (clear) while `measureWall` dropped the foot rows, now 0.691 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360": { mm: 0.695, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.058 mm (clear) while `measureWall` dropped the foot rows, now 0.695 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "curl-x-twist @ petalSpineCurl=360 x petalTwist=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT. TRUE CAUSE (Eva's ruling, Oct 6): petalSpineCurl 360 ALONE reaches this — every other axis of this cell is at its default, so it is not this pair's or triple's hazard. The single-control guard is SELF_XFAIL['curl-max'] in tools/bloom-wall-thickness.mjs; this entry stays because the number appears here and removing it would redden CG2." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.6991, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=10": { mm: 0.5865, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=40": { mm: 0.6991, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=34": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=10": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=40": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedepth-x-curl @ lobeDepth=0 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT. TRUE CAUSE (Eva's ruling, Oct 6): petalSpineCurl 360 ALONE reaches this — every other axis of this cell is at its default, so it is not this pair's or triple's hazard. The single-control guard is SELF_XFAIL['curl-max'] in tools/bloom-wall-thickness.mjs; this entry stays because the number appears here and removing it would redden CG2." },
   "lobedepth-x-curl @ lobeDepth=0.3 x petalSpineCurl=360": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.221 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "lobedepth-x-curl @ lobeDepth=0.6 x petalSpineCurl=360": { mm: 0.677, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.221 mm (clear) while `measureWall` dropped the foot rows, now 0.677 mm at u 0.933. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
