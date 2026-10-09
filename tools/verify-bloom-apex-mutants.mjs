@@ -1929,7 +1929,10 @@ const MUTANTS = [
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const mins = (r) => { const H = r.lobed.rowHalfLobeMm, U = r.lobed.rowU; let n = 0; for (let j = 1; j + 1 < H.length; j++) if (U[j] > 0.08 && U[j] < 0.8 && H[j] < H[j - 1] && H[j] <= H[j + 1]) n++; return n; };
-      return (m.rep.lobed.lobes === 3 && mins(c.rep) === 3 && mins(m.rep) < 3) ? null : `the mutant declares ${m.rep.lobed.lobes} lobes and draws ${mins(m.rep)} sinuses against the clean tree's ${mins(c.rep)} — the behaviour did not move`; } },
+      /* (S4c: the mutated law's sinuses no longer sit where its round bottoms
+         look for them, so the count YIELDS — the record declares the BUILT
+         count, and the defect is that the outline carries fewer than it) */
+      return (mins(c.rep) === c.rep.lobed.lobes && mins(m.rep) < m.rep.lobed.lobes) ? null : `the mutant declares ${m.rep.lobed.lobes} lobes and draws ${mins(m.rep)} sinuses against the clean tree's ${c.rep.lobed.lobes} and ${mins(c.rep)} — the behaviour did not move`; } },
   { id: 'the-rows-do-not-lean', why: "the emitted rows lean at HALF the tilt the record declares — every lobe pointing forward at the wrong angle, the record unmoved",
     find: '    const tau = tauAt(u), sn = Math.sin(tau), cs = Math.cos(tau);',
     into: '    const tau = tauAt(u), sn = Math.sin(0.5 * tau), cs = Math.cos(0.5 * tau);', names: ['LF21'],
@@ -1977,7 +1980,7 @@ const MUTANTS = [
   { id: 'the-v-bottom-is-restored', why: 'the round bottoms are planned and recorded and never reach the outline — the sinuses are cut to their V again, under the 1 mm opening, while the record says widened',
     find: '      ...(round.roundAt ? { roundAt: round.roundAt } : {}),',
     into: '', names: ['LF25'],
-    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+    witness: (M, C) => { const m = compoundFacts(M, S4B_WIT), c = compoundFacts(C, S4B_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       /* the U keeps the depth and takes the FLANKS: the clean tree's rows sit
          under the mutant's V somewhere, and nowhere above it */
@@ -1986,16 +1989,16 @@ const MUTANTS = [
       for (let j = 0; j < H.length; j++) { taken = Math.max(taken, H[j] - Hc[j]); over = Math.max(over, Hc[j] - H[j]); }
       return (m.rep.lobed.roundBottoms.built > 0 && taken > 0.05 && over === 0) ? null : `the clean round bottoms take at most ${taken} mm off the mutant's V rows (and add ${over}) with ${m.rep.lobed.roundBottoms.built} bottoms recorded — the behaviour did not move`; } },
   { id: 'the-round-bottom-is-a-constant-radius', why: 'the U is typed at a 0.35 mm radius and never grown to the opening it exists for — a round bottom that is round and still under 1 mm',
-    find: '    let W = uAt(D / 2), o = W.U ? openingWith(W.U, su) : null;\n    if (W.U && !(o >= D)) {',
-    into: '    let W = uAt(0.35), o = W.U ? openingWith(W.U, su) : null;\n    if (false) {', names: ['LF25'],
-    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+    find: '    let W = rec.need ? uAt(D / 2) : null, o = W && W.U ? openingWith(W.U, su) : null;\n    if (W && W.U && !(o >= D)) {',
+    into: '    let W = rec.need ? uAt(0.35) : null, o = W && W.U ? openingWith(W.U, su) : null;\n    if (false) {', names: ['LF25'],
+    witness: (M, C) => { const m = compoundFacts(M, S4B_WIT), c = compoundFacts(C, S4B_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const ms = m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built), cs = c.rep.lobed.roundBottoms.sinuses.filter((r) => r.built);
       return (ms.length && ms.every((r) => r.radiusMm === 0.35) && ms.some((r) => r.openingBuiltMm < 1) && cs.every((r) => r.openingBuiltMm >= 1)) ? null : `the mutant builds radii ${ms.map((r) => r.radiusMm)} opening ${ms.map((r) => r.openingBuiltMm)} against the clean ${cs.map((r) => r.openingBuiltMm)} — the behaviour did not move`; } },
   { id: 'the-round-bottom-is-not-told', why: 'the sinus is widened and the record says it was not — the read-out prints no widening beside a bottom that was rounded',
     find: '    rec.built = true; rec.radiusMm = W.R; rec.openingBuiltMm = o;',
     into: '    rec.built = false; rec.radiusMm = W.R; rec.openingBuiltMm = o;', names: ['LF25'],
-    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+    witness: (M, C) => { const m = compoundFacts(M, S4B_WIT), c = compoundFacts(C, S4B_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const same = m.rep.lobed.rowHalfLobeMm.every((h, j) => h === c.rep.lobed.rowHalfLobeMm[j]);
       return (same && m.rep.lobed.roundBottoms.sinuses.every((r) => !r.built) && c.rep.lobed.roundBottoms.sinuses.some((r) => r.built)) ? null : `the mutant's outline is ${same ? 'the clean one' : 'MOVED'} with ${m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built).length} bottoms told — the behaviour did not move`; } },
@@ -2011,6 +2014,51 @@ const MUTANTS = [
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.lobedPetiole.areaMm2 > 1.5 * c.plan.lobedPetiole.areaMm2) ? null : `the mutant sizes on ${m.plan.lobedPetiole.areaMm2} mm^2 against the clean ${c.plan.lobedPetiole.areaMm2} — the behaviour did not move`; } },
+  /* THE S4c MUTANTS (Eva's rulings of Oct 9: the sinus roundness, the
+     lobe-count yield, the lobed tooth count). Each is witnessed on the MUTATED
+     module's own build, never on the clause it names. */
+  { id: 'the-roundness-is-ignored', why: 'the roundness control is read and recorded and every sinus is built at the print minimum anyway — S4b exactly, a slider that moves nothing',
+    find: '      const Rask = Math.floor((roundness * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;',
+    into: '      const Rask = 0 * Math.floor((roundness * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;', names: ['LF27'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const rm = Math.max(...m.rep.lobed.roundBottoms.sinuses.map((r) => r.radiusMm || 0)), rc = Math.max(...c.rep.lobed.roundBottoms.sinuses.map((r) => r.radiusMm || 0));
+      return (rm <= 0.5 + 1e-9 && rc > rm + 0.5) ? null : `the mutant's largest built radius is ${rm} mm against the clean ${rc} — the behaviour did not move`; } },
+  { id: 'the-radius-is-typed', why: 'the asked radius is a fraction of a typed 10 mm instead of the lobe pitch — every sinus asks the same radius whatever the lobes are spaced at',
+    find: '      const Rask = Math.floor((roundness * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;',
+    into: '      const Rask = Math.floor((roundness * 10) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;', names: ['LF27'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const am = m.rep.lobed.roundBottoms.sinuses.map((r) => r.radiusAskedMm), ac = c.rep.lobed.roundBottoms.sinuses.map((r) => r.radiusAskedMm);
+      return (am.every((x) => x === am[0]) && new Set(ac).size > 1) ? null : `the mutant asks radii ${am} against the clean ${ac} — the behaviour did not move`; } },
+  { id: 'the-count-yields-before-the-radius-shrinks', why: 'a count is given up wherever the ASKED radius does not fit, before the radius is let shrink toward the print minimum — lobes lost to a roundness the slider could have given up instead',
+    find: '  while (tries[tries.length - 1].round.noFit > 0 && tries[tries.length - 1].n > 1) tries.push(attempt(tries[tries.length - 1].n - 1));\n  const fitIdx = tries.findIndex((t) => t.round.noFit === 0);',
+    into: '  while ((tries[tries.length - 1].round.noFit > 0 || tries[tries.length - 1].round.shrunk > 0) && tries[tries.length - 1].n > 1) tries.push(attempt(tries[tries.length - 1].n - 1));\n  const fitIdx = tries.findIndex((t) => t.round.noFit === 0 && !(t.round.shrunk > 0));', names: ['LF28'],
+    witness: (M, C) => { const m = compoundFacts(M, SHRINK_WIT), c = compoundFacts(C, SHRINK_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ym = m.rep.lobed.lobeYield, yc = c.rep.lobed.lobeYield;
+      return (yc.built === yc.asked && c.rep.lobed.roundBottoms.shrunk > 0 && (ym.built < ym.asked || ym.residual)) ? null : `the mutant builds ${ym.built} of ${ym.asked} (residual ${ym.residual}) against the clean ${yc.built} with ${c.rep.lobed.roundBottoms.shrunk} shrunk — the behaviour did not move`; } },
+  { id: 'the-count-never-yields', why: 'where no round bottom fits even at the print minimum the asked count is built with its V kept — S4b\'s told slit, ruling 3 never applied',
+    find: '  while (tries[tries.length - 1].round.noFit > 0 && tries[tries.length - 1].n > 1) tries.push(attempt(tries[tries.length - 1].n - 1));',
+    into: '', names: ['LF28'],
+    witness: (M, C) => { const m = compoundFacts(M, YIELD_WIT), c = compoundFacts(C, YIELD_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ym = m.rep.lobed.lobeYield, yc = c.rep.lobed.lobeYield;
+      return (ym.built === ym.asked && m.rep.lobed.roundBottoms.noFit > 0 && yc.built < yc.asked) ? null : `the mutant builds ${ym.built} of ${ym.asked} (${m.rep.lobed.roundBottoms.noFit} NO FIT) against the clean ${yc.built} — the behaviour did not move`; } },
+  { id: 'the-lobed-tooth-count-reads-the-shared-one', why: "the lobed blade cuts the SIMPLE leaf's tooth count, hidden under LOBED — the per-lobe control reaches nothing and a hidden slider moves the lobed rim",
+    find: '    lobeCount: lobedToothPerLobe(state) * (2 * n + 1),',
+    into: '    lobeCount: Math.round(Number(state.leafToothCount)),', names: ['LF29'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const s = { ...REGISTRY_DEFAULTS };
+      return (m.rep.serration.countAsked === Math.round(Number(s.leafToothCount)) && c.rep.serration.countAsked === 3 * 7) ? null : `the mutant asks ${m.rep.serration.countAsked} teeth against the clean ${c.rep.serration.countAsked} — the behaviour did not move`; } },
+  { id: 'the-teeth-per-lobe-span-the-whole-rim', why: 'the per-lobe count is cut as a count for the WHOLE rim — three teeth on a seven-lobe margin, two thirds of the lobes entire, the slider reading "a lobe"',
+    find: '    lobeCount: lobedToothPerLobe(state) * (2 * n + 1),',
+    into: '    lobeCount: lobedToothPerLobe(state),', names: ['LF29'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const tm = m.rep.lobed.teethPerLobe, tc = c.rep.lobed.teethPerLobe;
+      return (m.rep.serration.countAsked === 3 && tm.some((x) => x === 0) && tc.every((x) => x > 0)) ? null : `the mutant cuts ${m.rep.serration.countAsked} teeth (per lobe ${tm}) against the clean ${c.rep.serration.countAsked} (${tc}) — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from
@@ -2409,9 +2457,21 @@ const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1,
    the 0.3 mm teeth sit under their fold cap — so the three witnesses that
    need a cap to BIND pin the form they were chosen at. */
 const LOB_S4_FORM = { lobedSinus: 0.62, lobedShape: 0.7, lobedAngle: 38, lobedToothDepth: 0.08 };
-const TILT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedAngle: 60 };
-const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedToothDepth: 0.3 };
-const NONEFIT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, leafToothCount: 12 };
+/* (S4c: at three teeth a lobe — 21 over the rim — the unclamped 60 degrees
+   folds no cell on this form; at two a lobe, 14, near S4b's shared 12, it does) */
+const TILT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedAngle: 60, lobedToothCount: 2 };
+const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedToothDepth: 0.3, lobedToothCount: 1 };
+const NONEFIT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, lobedToothCount: 3 };
+/* S4c (Eva's rulings of Oct 9): the roundness at its maximum, where the asked
+   radius fits at no sinus and every one SHRINKS; and a short, deep five-lobed
+   blade where no round bottom fits at 5 or 4 lobes even at the print minimum,
+   so the COUNT yields to 3. */
+const SHRINK_WIT = { ...LOB_WIT, lobedRound: 0.5 };
+/* S4b's own round-bottom law is the roundness-0 branch exactly, so its three
+   mutants are witnessed there (at the shipped 0.12 every sinus is rounded
+   to a radius of the pitch, and the print minimum is not what is drawn). */
+const S4B_WIT = { ...LOB_WIT, lobedRound: 0 };
+const YIELD_WIT = { ...LOB_WIT, leafLength: 36, lobedLobes: 5, lobedFrom: 0.21, lobedTo: 0.55, lobedSinus: 0.84, lobedShape: 0.9, lobedAngle: 30, lobedEase: 0.79, lobedWidth: 26, leafTipShape: 1.05 };
 const SIMPLE_LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedToothDepth: 1 };
 /* the inner cells' advance along the midrib, per row pair, off the leaf's own
    emitted skin (the two columns either side of the V's apex) — LF22's measure */
@@ -2669,12 +2729,19 @@ const ROWS = [
   /* THE LOBED ROWS (leaf/stem build S4): the witness sets above. */
   { label: 'a LOBED leaf at the shipped lobed defaults (3 lobes a side; the S4b mum form)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }] },
-  { label: 'a LOBED leaf at lobe angle 60 at S4\'s form (the TILT cap binds: built 46.73)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '0.08' }] },
-  { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3 (the TOOTH fold clamp binds hardest)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }] },
-  { label: 'a LOBED leaf where NO tooth fits (6 lobes, sinus 0.9, depth 0.3, 12 teeth — the fold cap under the floor)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '12' }] },
+  { label: 'a LOBED leaf at lobe angle 60 at S4\'s form, 2 teeth a lobe (the TILT cap binds: built 46.73)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '0.08' }, { id: 'lobedToothCount', value: '2' }] },
+  { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3, 1 tooth a lobe (the TOOTH fold clamp binds hardest)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '1' }] },
+  { label: 'a LOBED leaf where NO tooth fits (6 lobes, sinus 0.9, depth 0.3, 3 teeth a lobe — the fold cap under the floor)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '3' }] },
+  /* S4c: SHRINK_WIT and YIELD_WIT above */
+  { label: 'a LOBED leaf at sinus roundness 0 (S4b\'s print-minimum law, by branch)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedRound', value: '0' }] },
+  { label: 'a LOBED leaf at sinus roundness 0.5 (the asked radius fits nowhere: every sinus SHRINKS, told)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedRound', value: '0.5' }] },
+  { label: 'a LOBED leaf whose lobe COUNT yields (5 asked on a 36 mm blade at 30 deg, 3 built)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '36' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedLobes', value: '5' }, { id: 'lobedFrom', value: '0.21' }, { id: 'lobedTo', value: '0.55' }, { id: 'lobedSinus', value: '0.84' }, { id: 'lobedShape', value: '0.9' }, { id: 'lobedAngle', value: '30' }, { id: 'lobedEase', value: '0.79' }, { id: 'lobedWidth', value: '26' }, { id: 'leafTipShape', value: '1.05' }] },
   { label: 'a SIMPLE leaf with the hidden lobed controls at an extreme (6 lobes, sinus 0.9, tilt 60, depth 1 — where a leak would show)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '1' }] },
   { label: 'a SIMPLE leaf with the hidden leaflet controls at an extreme (pairs 4, stalk 20 — where a leak would show)',
@@ -2955,10 +3022,21 @@ if (SELECTED) {
    moves the witness states (a defaults retune), never a pass of this table,
    and its last line says so. */
 const WITNESS_ONLY = process.argv.includes('--witnesses-only');
+/* `--rows=<regex>` (S4c) runs the table over the rows whose LABEL matches —
+   an ITERATION aid for a family whose rows are a small slice of the table
+   (a full pass is every row once per mutant, hours on one box). A run under
+   it is a SUBSET of rows as well as of mutants and its last line says so: it
+   can say a family fires on these rows, never that it is silent elsewhere. */
+const ROWS_ARG = (process.argv.find((a) => a.startsWith('--rows=')) || '').slice('--rows='.length);
+const RUN_ROWS = ROWS_ARG ? ROWS.filter((r) => new RegExp(ROWS_ARG).test(r.label)) : ROWS;
+if (ROWS_ARG) {
+  if (!RUN_ROWS.length) { await browser.close(); server.close(); console.log(`--rows=${ROWS_ARG} matches no row`); process.exit(1); }
+  console.log(`ROW SUBSET: ${RUN_ROWS.length} of ${ROWS.length} rows (--rows=${ROWS_ARG}) — not a pass of this table`);
+}
 let fail = false;
 if (!WITNESS_ONLY) {
   console.log('CONTROL (unmutated tree): the family must be SILENT on every row');
-  const clean = await famsOn(ROWS);
+  const clean = await famsOn(RUN_ROWS);
   console.log(`  fired: ${clean.size ? [...clean].sort().join(', ') : '(none)'}\n`);
   fail = clean.size > 0;
 }
@@ -2996,7 +3074,7 @@ for (const mu of MUTANTS) {
     fail = true; SERVE = SRC; continue;
   }
   if (WITNESS_ONLY) { console.log(`  ${mu.id}: witness moved`); SERVE = SRC; continue; }
-  const got = await famsOn(ROWS);
+  const got = await famsOn(RUN_ROWS);
   const want = mu.names;
   const missed = want.filter((f) => !got.has(f));
   console.log(`  ${mu.id}: ${mu.why}`);
@@ -3014,6 +3092,7 @@ if (NEUTER) {
                              : `\nguard check: FAIL — "${NEUTER}" was neutered and its witness stayed silent${fail ? ' (something ELSE in the run failed, which is not this control)' : ''}.`);
   process.exit(neuterReported ? 0 : 1);
 }
+if (ROWS_ARG) console.log(`\nROW SUBSET: these results are over ${RUN_ROWS.length} of ${ROWS.length} rows only — a family silent here may fire on a row not run.`);
 if (SELECTED) {
   console.log(fail ? `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): FAILED`
                    : `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): each selected family fires on a mutation that names it, and is silent on the clean tree. THIS IS NOT A SWEEP — ${MUTANTS.length - SELECTED.length} mutants were not run.`);
