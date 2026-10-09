@@ -3310,9 +3310,16 @@ work.** A brief said sepals "have never been discussed"; they ship (#243), OFF. 
   compound).
 - **The rim family on a sepal is zero geometry, rendered** on a patched copy (byte-identical at
   depth 0; 93,870 floats move with teeth; triangles unchanged).
-- **`verify-bloom-defaults-bar.mjs`'s sepal row measures the representative PETAL** — bit-identical
-  with and without sepals. No wall or combination row reads a sepal; `sepalRoll 330` reads
-  0.876 mm self on the sepal's own grid.
+- ~~**`verify-bloom-defaults-bar.mjs`'s sepal row measures the representative PETAL**~~ — **FIXED
+  by Eva's ruling R6 (Oct 9, §9 of the doc):** `sepal-self` reads every emitted sepal's own grid in
+  the defaults bar, in 8 wall-instrument rows and in 4 combination pairs, each with a must-fail.
+  It found 3 sepal wall rows and 26 pair cells under the bar — declared with their numbers, NOT
+  fixed; they are questions for Eva.
+
+**Eva's Oct 9 rulings and the five old items as a rulings sheet are §6–§7 of the same doc**
+(`node tools/shot-bloom-sepal-rulings.mjs <png>`): around-the-hub is TWO features (the hub-top
+face is not sepals); foundation A+; default `sepalCount` 0; florets keep inheriting; sepal teeth
+take the leaf's 1.0 mm floor.
 
 Eight open questions for Eva are in §4. "Around the hub" is Q1: under the whorl (built) vs the
 hub's top face (the centre's region, the reserved corona). Sheet:

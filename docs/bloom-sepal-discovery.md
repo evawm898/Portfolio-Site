@@ -687,3 +687,82 @@ node tools/verify-bloom-export.mjs --only '<the 18-row regex in §1.7>'
 
 The sheet takes about 15 s. The tool refuses to render the prototype cell if its
 `sepalBladeState` anchor does not match exactly once.
+
+---
+
+## 9. The instrument fix (R6) — what the sepal rows found
+
+**Ruling R6, executed in its own PR with no feature change.** `bloom-geometry.js`,
+`bloom-registry.js`, `bloom.js` and `tools/bloom-harness.mjs` are untouched; what changed is
+three instruments, which now read the SEPAL's own grid wherever they claim to measure a sepal.
+One measure, three owners of nothing new: **`sepal-self`** is `measureWall(grid).self` (the wall
+instrument's own, imported) read on EVERY sepal the builder emitted (`built.sepals.built`, each
+with its captured grid), the smallest of them, and it REFUSES on a state that builds no sepal.
+
+### 9.1 The defaults bar
+
+The row `the sepals at the shipped whorl` measured `self`, which reads the representative PETAL
+(§1.7): 1.2377 mm with or without sepals. It measures `sepal-self` now and reads **1.2288 mm**
+(clears, sepal 1, u 0.97). Two new control legs:
+
+- **must-fail** — the row re-pinned to the matrix's `SEPALS: sepalRoll max (330)` reddens DB1 at
+  **0.8764 mm** on `sepal-self`, and nothing else;
+- **must-pass** — the same re-pinned row asked through the OLD measure (`self`) stays green. That
+  is the blindness stated as a check: if the representative petal ever starts seeing a sepal, the
+  leg's premise has moved and it says so.
+
+`node tools/verify-bloom-defaults-bar.mjs --control`: **5 of 5 legs behave.**
+
+### 9.2 The wall instrument — eight sepal rows
+
+Rows marked `part: 'sepal'`, each carrying `sepalCount` 5 (the shipped whorl) and one twin at its
+extreme, mirroring the petal rows. EXPORT, the shipped 56-row lattice:
+
+| row | WALL (mm) | SELF (mm) | verdict |
+|---|---|---|---|
+| the shipped whorl (size 0.60) | 1.200 | 1.229 | clears |
+| size min (0.20) | 1.200 | 1.224 | clears |
+| cup 1.2 | 1.132 | 1.152 | clears |
+| **roll 330** | 0.856 | **0.876** | **under the bar — declared** |
+| twist 180 | 0.977 | 1.005 | clears, by 0.005 mm |
+| curl 360 | 1.196 | 1.218 | clears (the petal's curl 360 reads 0.676 — a 21 mm blade's full turn does not reach its foot) |
+| **all form at maximum** | 0.013 | **0.003** | **under — declared** (the petal's `form-max` reads 0.008) |
+| **angle −90 (reflexed)** | 1.200 | **0.804** | **under — declared**: the descending seam brings the blade back over its own foot; it reads 1.230 with the foot targets dropped, exactly as `curl-max` does |
+
+The three are in `SELF_XFAIL` with their magnitudes (V5 holds them both ways). A new mutant,
+**`sepal-roll-twin-dropped`** (`sepalBladeState` stops mapping `sepalRoll`), fires **V5 and
+nothing else** — every petal row is untouched by it, so before R6 nothing in this instrument could
+have fired. The foot-dropped record leg now names both foot-dependent rows (`curl-max`,
+`sepal-reflexed`) and requires exactly those two. `--negative-control`: every mutant and record
+leg behaves.
+
+### 9.3 The combination gate — four sepal pairs
+
+Tier 2 (the petal's own mechanisms, reached through `SEPAL_TWINS`), base `sepalCount` 5, the
+petal pairs' own ladders, measure `sepal-self`:
+
+| pair | verdict | cells under 1.00 mm | worst |
+|---|---|---|---|
+| `sepalcup-x-sepalcurl` | product-only | 4 | **0.008** at cup 1.2 × curl 360 |
+| `sepalcup-x-sepalroll` | single-reaches (roll alone 0.876) | 11 | **0.009** at cup 1.2 × roll 270 / 330 |
+| `sepalcurl-x-sepaltwist` | product-only | 9 | **0.004** at curl 360 × twist 60 |
+| `sepalscale-x-sepalcurl` | product-only | 2 | 0.887 at size 1.00 × curl 270 / 360 |
+
+All 26 cells are in `COMBINATION_XFAIL` with their numbers. One new control leg: a sepal pair
+rebuilt with its measure put back to `self` (the representative petal) must make CG1 refuse both
+axes as inert — the same blindness, in this gate's own clause.
+
+### 9.4 Questions for Eva (the newly caught sub-bar sepal configurations)
+
+Nothing was fixed and no default moved; each is a question.
+
+1. **`sepalRoll` 330 alone (and 270): 0.876 mm.** The petal's own roll fold on the sepal's blade.
+   Keep the range and the declaration · narrow the sepal roll range · treat it with the petal's
+   roll-max (one decision for both)?
+2. **The sepal at every form twin's maximum: 0.003 mm** (the petal's `form-max` reads 0.008).
+   Same three choices, alongside the petal's.
+3. **Reflexed −90: 0.804 mm** — the descending fold (§7.3, Q-S3a) seen as an approach. It is
+   answered by Q-S3a.
+4. **Cup × curl, cup × roll and curl × twist on the sepal reach 0.004–0.009 mm**, and
+   **size 1.00 × curl ≥ 270 reaches 0.887**. Keep them declared (the pair gate's standing
+   treatment) · bound a range · decide them together with the petal's own declared pairs?

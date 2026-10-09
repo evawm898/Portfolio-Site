@@ -42,9 +42,10 @@
    gated; it is not a measure here and this file says so rather than
    quietly leaving it out.
 
-   --control: three must-fails, each run through the SHIPPED `verify` on a
-   copy of the table or of the geometry, each required to redden exactly
-   DB1 on the state it names and nothing else:
+   --control: four must-fails and one must-pass, each run through the SHIPPED
+   `verify` on a copy of the table or of the geometry; each must-fail is
+   required to redden exactly the clause on the state it names and nothing
+   else:
      1. the raceme's internode floor put back to the rods' own (two pedicel
         radii) in a COPY of bloom-geometry.js — the 0.676 mm default of
         build 3's Phase A, the incident the rule was written for
@@ -52,6 +53,11 @@
         the table — the leaf blade 0.289 mm from the stem
      3. a table row whose control set no longer matches its matrix anchor —
         DB0's own must-fail
+     4. the sepal row re-pinned to `sepalRoll` 330 — the sepal's own sheet
+        under the bar, which `sepal-self` must see
+     5. (MUST-PASS) the same re-pinned row through the old measure, `self`,
+        stays green — the representative petal cannot see a sepal, which is
+        the defect ruling R6 (Oct 9) fixed
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -71,7 +77,17 @@ const CONTROL = process.argv.includes('--control');
 export const SHIPPED_STATES = Object.freeze([
   { id: 'the shipped default', matrixRow: null, set: {}, measures: ['self'] },
   { id: 'the stem at its ruled middle', matrixRow: 'STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)', set: { stemLength: 60, stemDiameter: 6 }, measures: ['self'] },
-  { id: 'the sepals at the shipped whorl', matrixRow: 'SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)', set: { sepalCount: 5 }, measures: ['self'] },
+  /* THE SEPAL ROW MEASURES THE SEPAL (Eva's ruling R6, Oct 9 — docs/bloom-sepal-discovery.md
+     §1.7 and §6). It read `self` until then, and `self` reads `m.petal`, the
+     REPRESENTATIVE PETAL, which is never a sepal (`b.sepals.built.includes(b.petal)`
+     is false): 1.2377 mm with the five sepals and 1.2377 without them, bit for bit.
+     A clause whose subject excludes the thing it doubts cannot fail — this file's
+     fifth durable rule. `sepal-self` is the same `measureWall(grid).self`, read on
+     EVERY sepal the builder emitted (`built.sepals.built`, each with its own grid),
+     the smallest of them. Control leg 4 re-pins this row to `sepalRoll` 330 and
+     requires it to go red; leg 5 asks the OLD measure the same question and
+     requires it to stay green, which is the blindness stated as a must-pass. */
+  { id: 'the sepals at the shipped whorl', matrixRow: 'SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)', set: { sepalCount: 5 }, measures: ['sepal-self'] },
   { id: 'the androecium candidate', matrixRow: 'STAMENS: 6 on a RING (the six-stamen candidate)', set: { stamenCount: 6 }, measures: ['self'] },
   { id: 'the leaves at the ruled 35 deg', matrixRow: 'LEAVES: alternate x 3 nodes at the ruled 35 deg', set: { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafAngle: 35, leafNodes: 3, leafPhyllotaxy: 'alternate' }, measures: ['self', 'leaf-stem'] },
   /* THE COMPOUND LEAF (leaf/stem build S3) — the leaf type is a guarded feature,
@@ -107,8 +123,26 @@ function measureSelf(G, W, state) {
   const r = W.measureWall(m.petal.grid, { nibFromU });
   return { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1] } };
 }
+/* THE SEPAL'S OWN SHEET: `self` on every sepal the builder emitted, the
+   smallest. A state that builds no sepal REFUSES — it is a table row that no
+   longer measures what it names, never a skip. */
+export function measureSepalSelf(G, W, state) {
+  const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
+  const m = G.buildBloomInto(acc, state);
+  const built = m.sepals && m.sepals.built ? m.sepals.built.filter((p) => p && p.grid) : [];
+  if (!built.length) throw new Error('sepal-self: the build emitted no sepal with a grid — a sepal row that builds no sepal measures nothing');
+  let best = { mm: Infinity };
+  built.forEach((p, i) => {
+    const ap = p.tipCap && p.tipCap.apex;
+    const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
+    const r = W.measureWall(p.grid, { nibFromU });
+    if (r.self < best.mm) best = { mm: r.self, at: { sepal: i, u: Number(r.selfAt[0].toFixed(4)), v: Number(r.selfAt[1].toFixed(4)) } };
+  });
+  return { ...best, sepals: built.length };
+}
 function measureOne({ G, R, W }, state, measure) {
   if (measure === 'self') return measureSelf(G, W, state);
+  if (measure === 'sepal-self') return measureSepalSelf(G, W, state);
   if (measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
   if (measure === 'infill-wall') return measureInfillWallMm(G, R.DEFAULTS, state);
   return measureInfloApproachMm(G, state, measure);
@@ -202,8 +236,28 @@ async function main() {
     const bad = verify(tree, table, matrix, { quiet: true });
     expectOnly('3 a table row whose set no longer matches its matrix anchor', bad, /^DB0: "the raceme at its defaults" declares/);
   }
+  /* 4. THE SEPAL ROW PUSHED UNDER THE BAR — re-pinned to `sepalRoll` 330, the
+     petal builder's own roll fold on the sepal's shorter blade (0.876 mm in the
+     discovery). The row must now go red on `sepal-self`. */
+  const rollRow = matrix.find((r) => r.label === 'SEPALS: sepalRoll max (330)');
+  if (!rollRow) throw new Error('control 4: the matrix holds no "SEPALS: sepalRoll max (330)" row to re-pin to');
+  const rollSet = Object.fromEntries(rollRow.set.map((s) => [s.id, isNaN(Number(s.value)) ? s.value : Number(s.value)]));
+  {
+    const table = SHIPPED_STATES.map((r) => (r.id.startsWith('the sepals') ? { ...r, matrixRow: rollRow.label, set: rollSet } : r));
+    const bad = verify(tree, table, matrix, { quiet: true });
+    expectOnly('4 the sepal row re-pinned to sepalRoll 330 (the sepal\'s own roll fold)', bad, /^DB1: "the sepals at the shipped whorl" reads 0\.\d+ mm on sepal-self/);
+  }
+  /* 5. THE BLINDNESS, AS A MUST-PASS: the same re-pinned row asked through the
+     OLD measure (`self`, the representative petal) stays green — which is why
+     the row had to change. A leg that expects NO finding; it fails if `self`
+     ever starts seeing the sepal, which would mean this leg's premise moved. */
+  {
+    const table = SHIPPED_STATES.map((r) => (r.id.startsWith('the sepals') ? { ...r, matrixRow: rollRow.label, set: rollSet, measures: ['self'] } : r));
+    const bad = verify(tree, table, matrix, { quiet: true });
+    legs.push({ name: '5 the same row through the OLD measure (self, the petal) stays green — the blindness R6 fixed', ok: bad.length === 0, hit: 0, other: bad, collateral: 0 });
+  }
   for (const l of legs) console.log(`  ${l.ok ? 'ok  ' : 'FAIL'} ${l.name}: ${l.hit} finding(s) on the named clause${l.collateral ? `, ${l.collateral} named collateral` : ''}${l.other.length ? `, ${l.other.length} OTHER — ${l.other[0]}` : ''}${l.sample ? `\n        ${l.sample.slice(0, 160)}` : ''}`);
   if (legs.some((l) => !l.ok)) { console.log('defaults bar --control: FAILED'); process.exitCode = 1; return; }
-  console.log(`defaults bar --control: PASS — ${legs.length} of ${legs.length} must-fails redden exactly the clause they name`);
+  console.log(`defaults bar --control: PASS — ${legs.length} of ${legs.length} legs behave (the must-fails redden exactly the clause they name; the must-pass stays green)`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
