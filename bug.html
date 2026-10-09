@@ -123,6 +123,8 @@
   .bg-wl-grid svg path{fill:var(--paper);fill-rule:nonzero;}
   .bg-wl-grid button:hover svg path,.bg-wl-grid button.is-on svg path{fill:var(--teal);}
   .bg-wl-grid .bg-wl-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bg-wl-grid button.is-three{border-style:dashed;position:relative;}
+  .bg-wl-grid .bg-wl-tag{position:absolute;top:1px;right:2px;font-size:8px;color:var(--teal);letter-spacing:.02em;}
   .bg-library input[type=text]{width:100%;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:4px;margin:0 0 6px;}
   .bg-library input[type=text]:disabled{opacity:.45;}
   .bg-readout b.bad{color:#e5484d;}
@@ -232,7 +234,7 @@
         <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imInvert"> invert — a light bug on a dark ground</label></div>
         <div class="bg-ctrl"><label for="imSpan"><span>Wingspan, tip to tip (sets the fit's scale)</span><output id="imSpan-out"></output></label><input type="range" id="imSpan" min="20" max="130" step="0.5" value="72"></div>
         <div class="bg-ctrl"><label for="imTol"><span>Fit tolerance — fewer points ↔ closer fit</span><output id="imTol-out"></output></label><input type="range" id="imTol" min="0.1" max="3" step="0.05" value="0.6"></div>
-        <div class="bg-ctrl"><label for="imPairs"><span>Wing pairs</span></label><select id="imPairs"><option value="auto">auto — separate wings, or a notch</option><option value="1">1 pair</option><option value="2">2 pairs (split at the notch)</option></select></div>
+        <div class="bg-ctrl"><label for="imPairs"><span>Wing pairs</span></label><select id="imPairs"><option value="auto">auto — separate wings, or a notch</option><option value="1">1 pair</option><option value="2">2 pairs (split at the notch)</option><option value="3">3 pairs (split at two notches)</option></select></div>
         <div class="bg-ctrl bg-bool"><label><input type="checkbox" id="imTail" checked> find a hindwing tail (TAIL group, on)</label></div>
         <div class="bg-row"><button class="bg-btn" id="imFlip" title="The head is taken to be the end nearer the top of the picture; flip it">Flip head ↔ tail</button><button class="bg-btn" id="imErase" title="Paint over stray regions in Top → SVG to remove them">Erase brush</button><button class="bg-btn" id="imEraseClear">Clear erasing</button></div>
         <div class="bg-ctrl" id="imBrushRow" hidden><label for="imBrush"><span>Brush size</span><output id="imBrush-out"></output></label><input type="range" id="imBrush" min="2" max="40" step="1" value="10"></div>

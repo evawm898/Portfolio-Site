@@ -6,7 +6,7 @@
    hindwing and tail in the editor's own [u, w] frame), NOT a photograph. The
    traced outline is a set of control points placed ON that drawing. */
 
-import { sampleOutline, defaultParams } from '../bug-geometry.js';
+import { sampleOutline, defaultParams, wingAngleOf, turnWingFree, setWingAngle } from '../bug-geometry.js';
 
 /* The editor's drawing frame (bug.js reads the same numbers): [u, w] maps to
    x right / y up, u in [-0.08, 1.28], w in [-0.9, 0.46] (room below for a tail). */
@@ -111,3 +111,40 @@ export function swallowtailReferenceSvg(width = 680, height = 680) {
     + `<rect x="0" y="${Y(0.07).toFixed(1)}" width="${X(0).toFixed(1)}" height="${(Y(-0.08) - Y(0.07)).toFixed(1)}" fill="#1d1710"/>`
     + `<text x="12" y="28" font-family="monospace" font-size="16" fill="#3a2e1f">reference — swallowtail, schematic</text></svg>`;
 }
+
+/* A THREE-PAIR library entry (design doc §18) — the gate's fixture for the
+   N-pair form, so the LB8-LB10 clauses, the `library3:` rows and the IM15/IM16
+   picture are never vacuous while the shipped library holds no three-pair
+   entry (and stay independent of Eva's keep list once it does). Three STRAP
+   wings (the dragonfly fixture's outline, at chord stretch 1.3) fanned at
+   -15, +15 and +48 deg at 1 / 0.85 / 0.9 of the front pair's length — each
+   stored in the library's own form: the outline turned to angle 0, the angle
+   as `sweep`, a +-3 deg range held by LB8 at both ends. Straps, and fanned,
+   because a PICTURE of the fixture must show THREE LOBES with a notch between
+   each (IM15): thirty-two mixes of the library's own broad wings at their
+   found angles hid the middle lobe under the front one, and the bottom pair
+   came back a 5 mm sliver (measured). */
+const r9 = (x) => +x.toFixed(9);
+const FAN_BLADE = HAND_OUTLINES.strap;
+// made the way the library's entries and tools/bug-wing-three-pair.mjs make
+// one: the blade is POSED first (setWingAngle to the asked angle, which the
+// measure then reads within 0.01 deg), the stored angle is the posed wing's
+// own reading, and the canonical outline is that posed wing turned back by
+// it with the anchors left free (turnWingFree) — so posing the stored outline
+// at the stored angle lands on the posed wing again. Turning a canonical
+// outline by a nominal angle does NOT read as that angle (the measure drops
+// the samples inside the root ramp, r < 0.3, and a turn moves which samples
+// those are: 0.1-0.3 deg off on this blade, measured), which is why the
+// angle is read off the posed wing rather than written down.
+const strapAt = (deg, lengthRatio, stretch = 1.3) => {
+  const posed = setWingAngle(FAN_BLADE, stretch, deg);
+  if (!posed.ok) throw new Error(`fixture blade at ${deg}: ${posed.reason}`);
+  const sweep = +wingAngleOf(posed.points, posed.stretch).toFixed(2);
+  const pts = turnWingFree(posed.points, posed.stretch, -sweep).map(([u, w]) => [r9(u), r9(w)]);
+  return { stretch, lengthRatio, sweep, range: [-3, 3], points: pts };
+};
+export const THREE_PAIR_SHAPE = {
+  id: 0, name: 'fixture', source: 'fixture: three straps at -15 / +15 / +48',
+  pairs: [strapAt(-15, 1), strapAt(15, 0.85), strapAt(48, 0.9)],
+  tail: null,
+};

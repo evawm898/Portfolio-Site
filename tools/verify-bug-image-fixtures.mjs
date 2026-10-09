@@ -13,7 +13,7 @@
    { width, height, data } is exactly the shape a canvas's ImageData has. */
 
 import * as G from '../bug-geometry.js';
-import { HAND_OUTLINES } from './bug-fixtures.mjs';
+import { HAND_OUTLINES, THREE_PAIR_SHAPE } from './bug-fixtures.mjs';
 
 function rng(seed) {
   let a = seed >>> 0;
@@ -229,6 +229,9 @@ export const IMAGE_FIXTURES = {
   sheet: () => clutter(D(), { angleDeg: -7, asym: 0.02, seed: 23, sheet: true }),
   // a busy background: the butterfly over dense blobs — must be REFUSED
   busy: () => renderBug(D(), { angleDeg: 2, seed: 15, busy: 420 }),
+  // THREE PAIRS as one wing mass (§18): the gate's three-pair fixture shape on
+  // the default bug — two notches, each with a lobe either side
+  threepair: () => renderBug(G.applyWingShape(D(), THREE_PAIR_SHAPE), { angleDeg: 3, asym: 0.02, seed: 17, spots: false }),
 };
 
 /* A minimal PNG encoder (RGBA, 8-bit, no filter) — for the sheet's fixture files. */

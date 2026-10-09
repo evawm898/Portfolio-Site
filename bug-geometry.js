@@ -873,10 +873,60 @@ export function posedWing(w) {
   if (!r.ok) throw new Error(`a library wing cannot be posed at ${w.sweep} deg: ${r.reason}`);
   return r;
 }
-export const WING_SHAPE_WRITES = { first: ['points', 'stretch', 'sweep', 'scallop'], last: ['points', 'stretch', 'sweep', 'scallop', 'length'], wings: ['unlinked', 'tail'] };
+/* N-PAIR entries (design doc §18 — the three-pair shapes). A two-pair entry
+   has `fore` and `hind` and no `pairs`. An N-pair entry carries `pairs`: an
+   array of wing records FRONT TO BACK, each in the hind's own form
+   ({ stretch, lengthRatio, sweep, range, points }; lengthRatio is the pair's
+   length over the FRONT pair's, so the front pair's is 1), and every pair is
+   a drawn shape of its own — applying one never blends a middle. shapePairs()
+   reads either form, front to back, and is the ONE reader of the two forms:
+   nothing else looks at `fore` / `hind` / `pairs` directly.
+   RESERVED, NOT BUILT: a curated entry composed from existing shapes would
+   name a wing in place of points — { from: { id, wing: 'fore' | 'hind' | k },
+   sweep?, range? } — and shapePairs() would resolve it against the library;
+   today such a record is refused with a message, so the format is declared
+   here and no reader has to change when it lands. */
+export const isMultiShape = (s) => Array.isArray(s.pairs) && s.pairs.length > 2;
+export function shapePairs(shape) {
+  const pairs = isMultiShape(shape) ? shape.pairs : [shape.fore, shape.hind];
+  for (const w of pairs) if (w && w.from) throw new Error('a composed library wing ({ from }) is reserved and not resolved yet');
+  return pairs;
+}
+/* What applying may write — the two-pair form (first / last / wings), and for
+   an N-pair shape ALSO `multi`: the pair count (set to the shape's N) and the
+   middle pairs, each written UNLINKED with the shape's own outline. The gate's
+   LB2 holds every other byte against a list restated there. */
+export const WING_SHAPE_WRITES = { first: ['points', 'stretch', 'sweep', 'scallop'], last: ['points', 'stretch', 'sweep', 'scallop', 'length'], wings: ['unlinked', 'tail'], multi: ['wingPairs'] };
 export function applyWingShape(params, shape) {
   const p = clone(params);
   const W = p.wings, lf = WING_FIELDS.find((f) => f.id === 'length');
+  if (isMultiShape(shape)) {
+    // AN N-PAIR SHAPE SETS THE PAIR COUNT TO N (a three-pair entry is three
+    // designed shapes, and a bug showing two or four of them would be showing
+    // something else): first and last from its ends, every middle pair
+    // UNLINKED with its own outline, lengths as ratios of the FRONT pair's
+    // (which keeps the bug's own length), the per-pair fields below the outline
+    // (thickness, tilt, venation) interpolated by index exactly as a linked
+    // middle would carry them. With 4 pairs selected the bug goes to 3 (said
+    // on the page): the shape has no fourth pair and a blended one would be
+    // the blend this entry exists not to have.
+    const pairs = shapePairs(shape), N = Math.min(pairs.length, MAX_WING_PAIRS), posed = pairs.map(posedWing);
+    const L0 = W.first.length, first0 = clone(W.first), last0 = clone(W.last);
+    const lenOf = (k) => (k === 0 ? L0 : +clamp(L0 * (pairs[k].lengthRatio ?? 1), lf.min, lf.max).toFixed(3));
+    const fieldsAt = (k) => {
+      if (k === 0) return first0; if (k === N - 1) return last0;
+      const t = k / (N - 1), s = {};
+      for (const f of WING_FIELDS) { const v = lerp(first0[f.id], last0[f.id], t); s[f.id] = f.step >= 1 ? Math.round(v) : v; }
+      return s;
+    };
+    const wingAt = (k) => ({ ...fieldsAt(k), points: posed[k].points, stretch: posed[k].stretch, sweep: 0, scallop: 0, length: lenOf(k) });
+    p.wingPairs = N;
+    W.first = wingAt(0); W.last = wingAt(N - 1);
+    W.unlinked = {};
+    for (let k = 1; k < N - 1; k++) W.unlinked[k] = wingAt(k);
+    W.tail = shape.tail ? clone({ ...shape.tail, on: true }) : W.tail ? { ...clone(W.tail), on: false } : clone({ ...STARTER_TAIL, on: false });
+    return p;
+  }
   const fore = posedWing(shape.fore), hind = posedWing(shape.hind);
   W.first.points = fore.points; W.first.stretch = fore.stretch; W.first.sweep = 0; W.first.scallop = 0;
   W.last.points = hind.points; W.last.stretch = hind.stretch; W.last.sweep = 0; W.last.scallop = 0;
@@ -952,6 +1002,16 @@ function turnPoints(points, stretch, deg) {
 export function turnWingRaw(points, stretch, deg) {
   return turnPoints(points, stretch, deg).map(([u, b], k) => [k === 0 || k === points.length - 1 ? 0 : u, b / stretch]);
 }
+/* the same raw turn with the ROOT ANCHORS LEFT WHERE THE TURN PUTS THEM: an
+   anchor outside the ramp's inner radius (a short pair's anchors, half a
+   floor over a 15 mm length, sit at r 0.07) is moved by the ramp, and forcing
+   it back onto u = 0 makes the turn non-invertible — the N-pair entries'
+   canonical outlines are made with this (tools/bug-wing-three-pair.mjs), so
+   that posing them (rotateWingBlade, which forces u = 0 AFTER its own turn)
+   lands exactly on the fitted points */
+export function turnWingFree(points, stretch, deg) {
+  return turnPoints(points, stretch, deg).map(([u, b]) => [u, b / stretch]);
+}
 export function rotateWingBlade(points, stretch, deg, tail = null) {
   if (deg === 0) return { ok: true, points: points.map((q) => q.slice()), stretch, tail: tail ? clone(tail) : null };
   const T = turnPoints(points, stretch, deg);
@@ -1016,6 +1076,7 @@ export function blendWingShapes(a, b, t) {
 export function wingShapeProblem(params, model) {
   const p = normalizeParams(params);
   for (const role of ['first', 'last']) { const v = outlineValid(p.wings[role].points); if (!v.ok) return `the ${role} outline is refused (${v.reason})`; }
+  for (const [k, own] of Object.entries(p.wings.unlinked || {})) { const v = outlineValid(own.points); if (!v.ok) return `pair ${+k + 1}'s outline is refused (${v.reason})`; }
   const pairs = resolveWingPairsRaw(p);
   for (const s of pairs) if (s.tailFits === false) return `the tail would cross pair ${s.index + 1}'s outline`;
   const m = model || buildBug(p);
@@ -1048,7 +1109,11 @@ function drawShape(lib, seed, k, slot, not = null) {
   return best;
 }
 export function randomWingBlend(params, seed, opts = {}) {
-  const lib = opts.library || WING_LIBRARY, maxTries = opts.maxTries ?? 24, refused = [];
+  // the blend POOL is the two-pair entries: an N-pair shape has no fore / hind
+  // to mix, so it never enters a draw — and because the draw is keyed on ids,
+  // the two-pair draws are exactly what they were before any N-pair entry
+  // existed (LB7, LB9)
+  const lib = (opts.library || WING_LIBRARY).filter((s) => !isMultiShape(s)), maxTries = opts.maxTries ?? 24, refused = [];
   for (let k = 0; k < maxTries && lib.length >= 2; k++) {
     const A = drawShape(lib, seed, k, 1), B = drawShape(lib, seed, k, 2, A);
     const t = +(BLEND_T_RANGE[0] + (BLEND_T_RANGE[1] - BLEND_T_RANGE[0]) * drawHash(seed, k, 3)).toFixed(2);

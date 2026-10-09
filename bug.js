@@ -15,7 +15,7 @@ import {
   designFromParams, paramsFromDesign, MAX_WING_PAIRS,
   composeOutline, moveComposed, insertComposed, deleteComposed, FloorError, specimenPose,
   editorFrame, contourLoops, CR_SAMPLES,
-  WING_LIBRARY, applyWingShape, randomWingBlend, randomParamsWithBlend,
+  WING_LIBRARY, applyWingShape, randomWingBlend, randomParamsWithBlend, shapePairs, isMultiShape,
   wingAngleOf, setWingAngle, WING_ANGLE_RANGE,
   applyBodyType, fitBody, captureBody, setLimb, bodyLengthMm, wingspanOf, BODY_PRESETS, LIMB_IDS, BODY_LENGTH_IDS, BODY_WIDTH_IDS,
 } from './bug-geometry.js';
@@ -461,15 +461,17 @@ function applyShapeId(id) {
   const s = WING_LIBRARY.find((x) => x.id === id);
   if (!s) return false;
   pushUndo();
-  const k = editPair;
+  const k = editPair, hadPairs = params.wingPairs, multi = isMultiShape(s);
   loadParams(applyWingShape(params, s));
-  // the angle control: centred on the angle each wing was FOUND at, over its measured range (§14)
-  angleRef.first = s.fore.sweep; angleRef.last = s.hind.sweep;
-  if (s.fore.range) angleRange.first = s.fore.range; if (s.hind.range) angleRange.last = s.hind.range;
+  // the angle control: centred on the angle each wing was FOUND at, over its
+  // measured range (§14) — on a three-pair shape every pair's own (§18)
+  const pairs = shapePairs(s), N = pairs.length;
+  pairs.forEach((w, i) => { const key = i === 0 ? 'first' : i === N - 1 ? 'last' : `mid${i}`; angleRef[key] = w.sweep; if (w.range) angleRange[key] = w.range; else delete angleRange[key]; });
   editPair = Math.min(k, Math.max(0, params.wingPairs - 1)); drawPairUi(); drawMain();
   wlApplied = { id, label: `#${id}` };
   drawLibrary();
-  wlMsg(params.wingPairs ? `Applied shape #${id}${s.tail ? ' (with its tail)' : ''}. Undo to go back.` : `Shape #${id} is stored, but this bug has no wings — add a wing pair to see it.`, !params.wingPairs);
+  const count = multi ? ` Wing pairs set to ${params.wingPairs}, each pair its own outline${hadPairs > params.wingPairs ? ` (${hadPairs} pairs → ${params.wingPairs}: the shape has no ${hadPairs}th pair)` : hadPairs && hadPairs < params.wingPairs ? ` (${hadPairs} pair${hadPairs > 1 ? 's' : ''} → ${params.wingPairs})` : ''}.` : '';
+  wlMsg(params.wingPairs ? `Applied ${multi ? 'three-pair ' : ''}shape #${id}${s.tail ? ' (with its tail)' : ''}.${count} Undo to go back.` : `Shape #${id} is stored, but this bug has no wings — add a wing pair to see it.`, !params.wingPairs);
   return true;
 }
 function randomizeWings(seed) {
@@ -486,10 +488,10 @@ function randomizeWings(seed) {
 /* A thumbnail is the shape's two right wings and their mirror, placed as on the
    default bug (editorFrame — the editor's own planform -> world map), filled. */
 function shapeSilhouette(s) {
-  const base = applyWingShape(defaultParams(), s), loops = [];
-  for (const k of [0, 1]) {
+  const base = applyWingShape(defaultParams(), s), loops = [], N = base.wingPairs;   // every pair the shape has (three on a three-pair entry, §18)
+  for (let k = 0; k < N; k++) {
     const fr = editorFrame(base, k);
-    const pts = k === 1 ? composeOutline(base.wings.last.points, base.wings.tail).points : base.wings.first.points;
+    const pts = k === N - 1 ? composeOutline(base.wings.last.points, base.wings.tail).points : k === 0 ? base.wings.first.points : base.wings.unlinked[k].points;
     const L = sampleOutline(pts).map(([u, w]) => fr.toWorld(u, w));
     loops.push(L, L.map(([x, y]) => [-x, y]));
   }
@@ -505,7 +507,8 @@ function drawLibrary() {
     for (const s of WING_LIBRARY) {
       const b = document.createElement('button');
       b.type = 'button'; b.dataset.id = s.id;
-      b.innerHTML = (thumbCache[s.id] ||= shapeSilhouette(s)) + `<span class="bg-wl-name"></span>`;
+      b.innerHTML = (thumbCache[s.id] ||= shapeSilhouette(s)) + `<span class="bg-wl-name"></span>` + (isMultiShape(s) ? `<span class="bg-wl-tag">${shapePairs(s).length} pairs</span>` : '');
+      b.classList.toggle('is-three', isMultiShape(s));
       b.addEventListener('click', () => applyShapeId(s.id));
       grid.appendChild(b);
     }
@@ -513,7 +516,7 @@ function drawLibrary() {
   for (const b of grid.children) {
     const id = +b.dataset.id, nm = names[id] || '';
     b.querySelector('.bg-wl-name').textContent = nm ? `#${id} ${nm}` : `#${id}`;
-    b.title = nm ? `#${id} — ${nm}` : `shape #${id}`;
+    b.title = (nm ? `#${id} — ${nm}` : `shape #${id}`) + (b.classList.contains('is-three') ? ' — a THREE-PAIR shape: applying it sets the wing pairs to 3, each pair its own outline' : '');
     b.classList.toggle('is-on', !!(wlApplied && wlApplied.id === id));
   }
   const nameEl = document.getElementById('wlName'), id = wlApplied && wlApplied.id;
@@ -874,7 +877,7 @@ function importOpts() {
     lightOnDark: imp && imp.polarityTouched ? imEl('imInvert').checked : null,
     wingspanMm: +imEl('imSpan').value, toleranceMm: +imEl('imTol').value,
     pairs: imEl('imPairs').value, tail: imEl('imTail').checked, flip: !!(imp && imp.flip),
-    erase: imp && imp.erase, split: imp && imp.split,
+    erase: imp && imp.erase, split: imp && imp.split, splits: imp && imp.splits,
   };
 }
 async function loadPicture(file) {
@@ -889,7 +892,7 @@ async function loadPicture(file) {
   g.drawImage(img, 0, 0, c.width, c.height);
   const work = g.getImageData(0, 0, c.width, c.height);
   const base = JSON.parse(JSON.stringify(params));
-  imp = { work, href, nw, nh, f: c.width / nw, base, erase: new Uint8Array(c.width * c.height), split: null, flip: false, polarityTouched: false, erasing: false, name: file.name || 'pasted picture' };
+  imp = { work, href, nw, nh, f: c.width / nw, base, erase: new Uint8Array(c.width * c.height), split: null, splits: null, flip: false, polarityTouched: false, erasing: false, name: file.name || 'pasted picture' };
   imEl('imSpan').value = Math.min(130, Math.max(20, bugWingspan()));
   imEl('imThrAuto').checked = true;
   imEl('imCtrls').hidden = false; imEl('imClose').hidden = false; imEl('imSec').open = true;
@@ -913,7 +916,8 @@ function refit({ reframe = false, live = false } = {}) {
   writeImportOutputs();
   if (r.ok) {
     imp.Mwork = r.transform.matrix;
-    imp.split = r.split ? { outer: r.split.outer.slice(), root: r.split.root.slice() } : null;
+    imp.split = r.split && r.mode === 'split' ? { outer: r.split.outer.slice(), root: r.split.root.slice() } : null;
+    imp.splits = r.mode === 'split3' && r.splits ? r.splits.map((q) => ({ outer: q.outer.slice(), root: q.root.slice() })) : null;   // the two lines of a three-pair split (§18), front first
     imp.lastGood = r;
     const keepFrame = live && vbox;
     params = normalizeParams(r.params);
@@ -946,7 +950,8 @@ function placeImportBackdrop() {
 }
 function importSummary(r) {
   const pairs = r.pairs.map((q) => `pair ${q.pair + 1}: ${q.points} control points, the fit within ${q.maxDevMm.toFixed(2)} mm of the picture${q.tail && !q.tail.inline ? ` — a TAIL of ${q.tail.points} points (${q.tail.lengthMm.toFixed(1)} mm), TAIL on` : ''}`).join(' · ');
-  const how = r.mode === 'separate' ? `${r.pairs.length} separate wing${r.pairs.length > 1 ? 's' : ''} a side` : r.mode === 'split' ? 'one wing mass a side, split into 2 pairs at its notch (drag the pink split line in Top → SVG); the hindwing under the forewing is a GUESS — its hidden leading edge lies up to 8% of the wing ahead of the split line, tapering to nothing at the notch' : 'one pair';
+  const how = r.mode === 'separate' ? `${r.pairs.length} separate wing${r.pairs.length > 1 ? 's' : ''} a side` : r.mode === 'split' ? 'one wing mass a side, split into 2 pairs at its notch (drag the pink split line in Top → SVG); the hindwing under the forewing is a GUESS — its hidden leading edge lies up to 8% of the wing ahead of the split line, tapering to nothing at the notch'
+    : r.mode === 'split3' ? `one wing mass a side, split into 3 pairs at two notches${r.splits && r.splits.some((q) => !q.confident) ? ` — ${r.splits.filter((q) => !q.confident).length === 2 ? 'NEITHER notch' : 'ONE notch'} was found with a wing on each side, so that line is a DEFAULT` : ''} (drag the two pink split lines in Top → SVG, front line first); each pair's hidden leading edge under the pair ahead is a GUESS — up to 8% of the wing ahead of its split line, tapering to nothing at the notch` : 'one pair';
   const floor = model && model.floorViolations.length ? ' · RED: part of a fitted outline is narrower than the floor — widen it in the editor, or lower the floor in Print (the STL is blocked until then).' : '';
   const b = r.body, st = r.seg.stats, op = st.otherPolarity || {};
   const body = b.source === 'measured'
@@ -1007,11 +1012,16 @@ function importOverlay() {
 /* the SPLIT LINE between the two pairs of one wing mass: right wing solid with
    two handles, left mirrored dashed */
 function splitMarkup() {
-  if (!imp || !imp.split || !imp.result || !imp.result.ok || imp.result.mode !== 'split') return '';
-  const { outer, root } = imp.split, r = 6 / pxPerMm();
+  if (!imp || !imp.result || !imp.result.ok) return '';
+  const lines = imp.result.mode === 'split' && imp.split ? [imp.split] : imp.result.mode === 'split3' && imp.splits ? imp.splits : [];
+  if (!lines.length) return '';
+  const r = 6 / pxPerMm();
   const L = (a, b, cls) => `<line class="im-split${cls}" x1="${toV(...a)[0]}" y1="${toV(...a)[1]}" x2="${toV(...b)[0]}" y2="${toV(...b)[1]}"/>`;
-  let h = L(root, outer, '') + L([-root[0], root[1]], [-outer[0], outer[1]], ' mirror');
-  for (const [k, q] of [['outer', outer], ['root', root]]) { const [X, Y] = toV(...q); h += `<circle class="im-h" data-split="${k}" cx="${X}" cy="${Y}" r="${r}"/>`; }
+  let h = '';
+  lines.forEach(({ outer, root }, n) => {
+    h += L(root, outer, '') + L([-root[0], root[1]], [-outer[0], outer[1]], ' mirror');
+    for (const [k, q] of [['outer', outer], ['root', root]]) { const [X, Y] = toV(...q); h += `<circle class="im-h" data-split="${k}" data-line="${n}" cx="${X}" cy="${Y}" r="${r}"/>`; }
+  });
   return h;
 }
 function eraseAt(ev) {
@@ -1028,13 +1038,13 @@ let splitFrame = 0;
 function importPointerDown(ev) {
   if (!imp) return false;
   const k = ev.target.dataset?.split;
-  if (k) { splitDrag = { k, id: ev.pointerId }; msvg.setPointerCapture(ev.pointerId); return true; }
+  if (k) { splitDrag = { k, line: +(ev.target.dataset.line || 0), id: ev.pointerId }; msvg.setPointerCapture(ev.pointerId); return true; }
   if (imp.erasing) { eraseDrag = { id: ev.pointerId }; msvg.setPointerCapture(ev.pointerId); eraseAt(ev); drawMain(); return true; }
   return false;
 }
 function importPointerMove(ev) {
   if (splitDrag && ev.pointerId === splitDrag.id) {
-    imp.split[splitDrag.k] = screenToWorld(ev);
+    if (imp.splits) imp.splits[splitDrag.line][splitDrag.k] = screenToWorld(ev); else imp.split[splitDrag.k] = screenToWorld(ev);
     // a refit per animation frame: both pairs refit live from the moved line
     if (!splitFrame) splitFrame = requestAnimationFrame(() => { splitFrame = 0; refit({ live: true }); });
     else drawMain();
@@ -1062,12 +1072,12 @@ window.addEventListener('drop', (e) => {
 });
 let refitTimer = 0;
 const refitSoon = () => { clearTimeout(refitTimer); refitTimer = setTimeout(() => refit({ live: true }), 60); };
-for (const id of ['imThr', 'imSpan', 'imTol', 'imBrush']) imEl(id).addEventListener('input', () => { writeImportOutputs(); if (id === 'imThr') imEl('imThrAuto').checked = false; if (id === 'imSpan') imp && (imp.split = null); if (id !== 'imBrush') refitSoon(); });
+for (const id of ['imThr', 'imSpan', 'imTol', 'imBrush']) imEl(id).addEventListener('input', () => { writeImportOutputs(); if (id === 'imThr') imEl('imThrAuto').checked = false; if (id === 'imSpan') imp && (imp.split = null, imp.splits = null); if (id !== 'imBrush') refitSoon(); });
 imEl('imThrAuto').addEventListener('change', () => refit({ live: true }));
 imEl('imInvert').addEventListener('change', () => { if (imp) imp.polarityTouched = true; imEl('imThrAuto').checked = true; refit({ live: true }); });
-imEl('imPairs').addEventListener('change', () => { if (imp) imp.split = null; refit({ live: true }); });
+imEl('imPairs').addEventListener('change', () => { if (imp) { imp.split = null; imp.splits = null; } refit({ live: true }); });
 imEl('imTail').addEventListener('change', () => refit({ live: true }));
-imEl('imFlip').addEventListener('click', () => { if (!imp) return; imp.flip = !imp.flip; imp.split = null; refit({ reframe: true }); });
+imEl('imFlip').addEventListener('click', () => { if (!imp) return; imp.flip = !imp.flip; imp.split = null; imp.splits = null; refit({ reframe: true }); });
 imEl('imErase').addEventListener('click', () => { if (!imp) return; imp.erasing = !imp.erasing; imEl('imErase').classList.toggle('is-on', imp.erasing); imEl('imBrushRow').hidden = !imp.erasing; if (imp.erasing && editing) stopEditing(); drawMain(); });
 imEl('imEraseClear').addEventListener('click', () => { if (!imp) return; imp.erase.fill(0); imp.eraseDirty = true; refit({ live: true }); });
 imEl('imSeg').addEventListener('change', () => drawMain());
@@ -1257,8 +1267,8 @@ window.__bug = {
   backdrop: () => ({ ...backdrop, href: !!backdrop.href }),
   flushBuild: () => { if (pending) { cancelAnimationFrame(pending); pending = 0; } buildNow(false); },
   // IMAGE -> BUG
-  importState: () => (imp ? { ok: !!(imp.result && imp.result.ok), reason: imp.result && imp.result.reason, mode: imp.result && imp.result.mode, pairs: imp.result && imp.result.ok ? imp.result.pairs.map((q) => ({ points: q.points, maxDevMm: q.maxDevMm, tail: q.tail })) : null, split: imp.split, threshold: imp.result && imp.result.seg.stats.threshold, lightOnDark: imp.result && imp.result.seg.stats.lightOnDark, message: imEl('imMsg').textContent, erasing: imp.erasing, step: imp.result && imp.result.step, body: imp.result && imp.result.ok ? { source: imp.result.body.source, why: imp.result.body.why } : null, segShown: imEl('imSeg').checked, spanSlider: +imEl('imSpan').value, spanOut: imEl('imSpan-out').textContent, bugSpan: bugWingspan(), svgNote: document.getElementById('svgNote').textContent, clutterDrawn: !!document.querySelector('#mainSvg .im-clutter') } : null),
-  splitScreen: (k) => (imp && imp.split ? worldToScreen(...imp.split[k]) : null),
+  importState: () => (imp ? { ok: !!(imp.result && imp.result.ok), reason: imp.result && imp.result.reason, mode: imp.result && imp.result.mode, pairs: imp.result && imp.result.ok ? imp.result.pairs.map((q) => ({ points: q.points, maxDevMm: q.maxDevMm, tail: q.tail })) : null, split: imp.split, splits: imp.splits, threshold: imp.result && imp.result.seg.stats.threshold, lightOnDark: imp.result && imp.result.seg.stats.lightOnDark, message: imEl('imMsg').textContent, erasing: imp.erasing, step: imp.result && imp.result.step, body: imp.result && imp.result.ok ? { source: imp.result.body.source, why: imp.result.body.why } : null, segShown: imEl('imSeg').checked, spanSlider: +imEl('imSpan').value, spanOut: imEl('imSpan-out').textContent, bugSpan: bugWingspan(), svgNote: document.getElementById('svgNote').textContent, clutterDrawn: !!document.querySelector('#mainSvg .im-clutter') } : null),
+  splitScreen: (k, line = null) => (imp && line !== null && imp.splits ? worldToScreen(...imp.splits[line][k]) : imp && imp.split ? worldToScreen(...imp.split[k]) : null),
   pictureScreen: (px, py) => (imp && imp.Mwork ? worldToScreen(...bdWorld(applyAffine(imp.Mwork, px * imp.f, py * imp.f))) : null),
   pointCounts: () => (params.wingPairs ? resolveWingPairs(params).map((w) => (w.drawn || w.points || []).length) : []),
   refitNow: () => { clearTimeout(refitTimer); return !!refit({ live: true }); },

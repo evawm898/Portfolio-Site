@@ -29,6 +29,28 @@
           the SAME params, byte for byte.
      LB6  the whole-bug Randomize uses it: every random bug with wings carries a
           label, and its wing outlines are that label's blend.
+     LB8  THREE-PAIR entries (design doc §18; every shipped N-pair entry plus
+          the gate's own fixture, tools/bug-fixtures.mjs THREE_PAIR_SHAPE):
+          applied to the default bug the pair count is N, every pair is the
+          shape's own posed outline (first, every unlinked middle, last), no
+          pair crosses itself, no floor violation and no repair note; each
+          stored angle is its posed pair's measured angle; the control lands
+          at both ends of each pair's stored range; and the same holds built on
+          EVERY winged body preset (Butterfly, Moth, Bee, Dragonfly) — a bug
+          with three roots along the thorax blends at the junction with no
+          floor violation on any of them (the `library3:` rows run the J, S and
+          C clauses on the same builds).
+     LB9  applying an N-pair shape writes the pair count and the middles and
+          NOTHING else: on six bases (2, 1 and 4 pairs among them) the params
+          with the written fields removed are byte-identical, 4 pairs becomes
+          3 (the shape has no fourth), the three pairs are three DISTINCT
+          outlines (never a blended middle), the middle's per-pair fields below
+          the outline are the linked interpolation, and shapePairs() reads a
+          two-pair entry as [fore, hind] and refuses a reserved `from` record.
+     LB10 the random draws never see an N-pair entry: RANDOMIZE WINGS on the
+          library WITH the fixture appended gives byte-identical params and
+          labels to the library without it (seeds on the default and on random
+          bases), and no label names an N-pair id.
      LB7  the draws are keyed on shape IDS, not on library position (§15.1): on
           every random gate row (random:1..40, the whole-bug Randomize) and on
           RANDOMIZE WINGS seeds 1..8 on the default, the library with one shape
@@ -60,6 +82,7 @@
           run every row clause (J, S, F/N floor, C connectedness, ...) at both
           ends of the stored range on three shapes, each pair alone and both. */
 
+import { THREE_PAIR_SHAPE } from './bug-fixtures.mjs';
 // this file's own crossing count (the gate's segment test, copied: importing
 // verify-bug.mjs would run the whole gate)
 function segCross(a, b, c, d) {
@@ -104,23 +127,26 @@ export function wingProblems(G, params, model) {
 
 export function libraryChecks(G, opts = {}) {
   const out = [], ok = (c, m) => out.push([!!c, m]);
-  const lib = G.WING_LIBRARY, d = G.defaultParams();
+  // the TWO-PAIR entries carry LB1-LB7 and WA1-WA4 as before; the N-pair
+  // entries (design doc §18) are LB8-LB10's and are appended after them
+  const libAll = G.WING_LIBRARY, lib = libAll.filter((s) => !(Array.isArray(s.pairs) && s.pairs.length > 2)), libN = libAll.filter((s) => Array.isArray(s.pairs) && s.pairs.length > 2), d = G.defaultParams();
   // Eva's keep lists, RESTATED here (never read from the library): #1-#17 from
   // the step-1 sheet, #18-#57 but #34 and #50 from the wing-shape audit (§13.7),
   // less #22 (merged into #4) and #19 (merged into #10) — her ruling on the
   // wing-angle audit (§14.5, applied §15.4)
   const KEPT = [...Array.from({ length: 57 }, (_, i) => i + 1).filter((id) => ![34, 50, 22, 19].includes(id))];
-  const ids = lib.map((s) => s.id);
-  ok(ids.length === KEPT.length && KEPT.every((id, i) => ids[i] === id), `LB1: the library holds Eva's ${KEPT.length} kept shapes, ids in order (${lib.length}${ids.join(',') === KEPT.join(',') ? '' : ': ' + ids.join(',')})`);
+  const ids = lib.map((s) => s.id), idsN = libN.map((s) => s.id);
+  const nOrder = idsN.every((id, i) => id > 57 && (i === 0 || id > idsN[i - 1])) && libAll.slice(lib.length).every((s) => Array.isArray(s.pairs));
+  ok(ids.length === KEPT.length && KEPT.every((id, i) => ids[i] === id) && nOrder, `LB1: the library holds Eva's ${KEPT.length} kept two-pair shapes, ids in order (${lib.length}${ids.join(',') === KEPT.join(',') ? '' : ': ' + ids.join(',')})${libN.length ? `, then ${libN.length} three-pair entr${libN.length > 1 ? 'ies' : 'y'} (#${idsN.join(', #')})` : ''}${nOrder ? '' : ' — an N-pair entry is out of place or its id is not past the kept list'}`);
   // LB1
   const bad1 = [];
-  for (const s of lib) {
+  for (const s of libAll) {
     let q; try { q = G.applyWingShape(d, s); } catch (e) { bad1.push(`#${s.id}: ${e.message}`); continue; }   // a shape that cannot be posed is refused, not a crash
     const m = G.buildBug(q), pr = wingProblems(G, q, m);
-    const tailDrawn = !s.tail || m.wingPairs[1].hasTail;
+    const tailDrawn = !s.tail || m.wingPairs[q.wingPairs - 1].hasTail;
     if (pr.length || m.notes.length || !tailDrawn) bad1.push(`#${s.id}: ${[...pr, ...m.notes, tailDrawn ? '' : 'its tail is not drawn'].filter(Boolean).join('; ')}`);
   }
-  ok(!bad1.length, `LB1: every library shape applied to the default bug builds valid (no crossing, tail drawn, no floor violation, no repair note)${bad1.length ? ' — ' + bad1.join(' | ') : ` (${lib.length} of ${lib.length})`}`);
+  ok(!bad1.length, `LB1: every library shape applied to the default bug builds valid (no crossing, tail drawn, no floor violation, no repair note)${bad1.length ? ' — ' + bad1.join(' | ') : ` (${libAll.length} of ${libAll.length})`}`);
   // LB2
   const bases = [['default', d], ['legacy default', G.legacyDefaultParams()]];
   { const p = G.defaultParams(); p.wingPairs = 4; p.wings.unlinked[1] = { ...p.wings.first, points: p.wings.first.points.map((x) => x.slice()), sweep: 30 }; bases.push(['4 pairs, pair 2 unlinked', p]); }
@@ -181,6 +207,85 @@ export function libraryChecks(G, opts = {}) {
     if (!same(r.params.wings.first.points, sh.fore.points) || !same(r.params.wings.last.points, sh.hind.points)) bad6.push(`random:${s}: the wings are not "${r.label}"`);
   }
   ok(!bad6.length && n6 > 0, `LB6: the whole-bug Randomize draws its wings from the library blend (${n6} winged bugs of 24)${bad6.length ? ' — ' + bad6.slice(0, 3).join(' | ') : ''}`);
+  // LB8-LB10 — the three-pair entries (§18): the shipped N-pair entries plus
+  // the gate's own fixture (opts.fixture: the negative control hands a damaged one)
+  {
+    const FX = opts.fixture || THREE_PAIR_SHAPE, multi = [...libN, FX];
+    const bad8 = []; let n8 = 0;
+    const presets = G.BODY_TYPE_IDS.filter((t) => G.BODY_PRESETS[t].wingPairs !== 0);
+    for (const s of multi) {
+      const tag = s.id ? `#${s.id}` : 'fixture';
+      let q; try { q = G.applyWingShape(d, s); } catch (e) { bad8.push(`${tag}: ${e.message}`); continue; }
+      const N = s.pairs.length;
+      if (q.wingPairs !== N) bad8.push(`${tag}: ${q.wingPairs} pairs, not ${N}`);
+      const specs = [q.wings.first, ...Array.from({ length: N - 2 }, (_, i) => q.wings.unlinked[i + 1]), q.wings.last];
+      s.pairs.forEach((w, k) => {
+        const sp = specs[k]; if (!sp) { bad8.push(`${tag} pair ${k + 1}: no unlinked spec`); return; }
+        let P; try { P = G.posedWing(w); } catch (e) { bad8.push(`${tag} pair ${k + 1}: ${e.message}`); return; }
+        if (!same(sp.points, P.points) || sp.stretch !== P.stretch || sp.sweep !== 0 || sp.scallop !== 0) bad8.push(`${tag} pair ${k + 1}: not the shape's posed outline`);
+        if (selfCrossingCount(G.sampleOutline(sp.points))) bad8.push(`${tag} pair ${k + 1}: crosses itself`);
+        const a = G.wingAngleOf(P.points, P.stretch); if (!(Math.abs(a - w.sweep) <= 0.05)) bad8.push(`${tag} pair ${k + 1}: stored angle ${w.sweep}, the posed pair reads ${a.toFixed(2)}`);
+        const R = w.range; if (!Array.isArray(R) || !(R[0] <= 0 && R[1] >= 0)) { bad8.push(`${tag} pair ${k + 1}: no stored range`); return; }
+        const a0 = a, tail = k === N - 1 && s.tail ? { ...s.tail, on: true } : null;
+        for (const off of [R[0], R[1]]) { if (!off) continue; const r = G.setWingAngle(P.points, P.stretch, a0 + off, tail); if (!r.ok) { bad8.push(`${tag} pair ${k + 1} ${off}: refused inside its range (${r.reason})`); continue; } const got = G.wingAngleOf(r.points, r.stretch); if (!(Math.abs(got - a0 - off) <= 0.01)) bad8.push(`${tag} pair ${k + 1} ${off}: lands at ${(got - a0).toFixed(3)}`); }
+      });
+      // built on the default and on every winged body preset: no floor violation, no repair note (the roots blend)
+      for (const t of ['default', ...presets]) {
+        let b; try { b = t === 'default' ? q : G.applyBodyType(q, t).params; } catch (e) { bad8.push(`${tag} on ${t}: ${e.message}`); continue; }
+        if (b.wingPairs !== N) { bad8.push(`${tag} on ${t}: ${b.wingPairs} pairs`); continue; }
+        const m = G.buildBug(b); n8++;
+        if (m.floorViolations.length) bad8.push(`${tag} on ${t}: under the floor (pair ${m.floorViolations[0].pair + 1})`);
+        if (m.notes.length) bad8.push(`${tag} on ${t}: ${m.notes.join('; ')}`);
+      }
+    }
+    ok(!bad8.length && n8 >= 5, `LB8: every three-pair entry (${libN.length} shipped + the fixture) applies as N distinct posed pairs at its stored angles, the control lands at both ends of each pair's range, and it builds clean on the default and on ${presets.length} body presets (${n8} builds)${bad8.length ? ' — ' + bad8.slice(0, 4).join(' | ') : ''}`);
+    // LB9
+    const bad9 = [];
+    const stripN = (p) => { const q = JSON.parse(JSON.stringify(p)); delete q.wingPairs; for (const k of WRITES.wings) delete q.wings[k]; for (const k of WRITES.first) delete q.wings.first[k]; for (const k of WRITES.last) delete q.wings.last[k]; delete q.wings.first.length; return JSON.stringify(q); };
+    const bases9 = [['default', d], ['legacy default', G.legacyDefaultParams()]];
+    { const p = G.defaultParams(); p.wingPairs = 4; p.wings.unlinked[1] = { ...p.wings.first, points: p.wings.first.points.map((x) => x.slice()), sweep: 30 }; bases9.push(['4 pairs, pair 2 unlinked', p]); }
+    { const p = G.defaultParams(); p.wingPairs = 1; bases9.push(['1 pair', p]); }
+    for (const sd of [2, 6]) { const p = G.randomParams(sd); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } bases9.push([`random:${sd}`, p]); }
+    for (const [name, b] of bases9) for (const s of multi) {
+      const tag = s.id ? `#${s.id}` : 'fixture', before = JSON.parse(JSON.stringify(b));
+      let q; try { q = G.applyWingShape(b, s); } catch (e) { bad9.push(`${name} ${tag}: ${e.message}`); continue; }
+      const N = s.pairs.length;
+      if (!same(b, before)) bad9.push(`${name} ${tag}: the BASE params were mutated`);
+      if (stripN(q) !== stripN(b)) bad9.push(`${name} ${tag}: a non-wing setting changed`);
+      if (q.wingPairs !== N) bad9.push(`${name} ${tag}: ${q.wingPairs} pairs from a ${b.wingPairs}-pair base, not ${N}`);
+      if (q.wings.first.length !== b.wings.first.length) bad9.push(`${name} ${tag}: the front pair's length moved`);
+      const specs = [q.wings.first, ...Array.from({ length: N - 2 }, (_, i) => q.wings.unlinked[i + 1]), q.wings.last];
+      if (specs.some((x) => !x)) { bad9.push(`${name} ${tag}: a middle pair is missing`); continue; }
+      // three DISTINCT outlines: no two pairs' dense outlines (in true planform) within 0.01 of each other everywhere
+      const dense = specs.map((x) => G.sampleOutline(x.points).map(([u, w]) => [u, w * x.stretch]));
+      for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { let worst = 0; for (let k = 0; k < Math.min(dense[i].length, dense[j].length); k++) worst = Math.max(worst, Math.hypot(dense[i][k][0] - dense[j][k][0], dense[i][k][1] - dense[j][k][1])); if (worst < 0.01) bad9.push(`${name} ${tag}: pairs ${i + 1} and ${j + 1} are the same outline`); }
+      // the middle's fields below the outline: the linked interpolation of the base's first and last
+      for (let k = 1; k < N - 1; k++) for (const f of G.WING_FIELDS) {
+        if (['points', 'stretch', 'sweep', 'scallop', 'length'].includes(f.id)) continue;
+        const t = k / (N - 1), v = b.wings.first[f.id] + (b.wings.last[f.id] - b.wings.first[f.id]) * t, want = f.step >= 1 ? Math.round(v) : v;
+        if (specs[k][f.id] !== want) bad9.push(`${name} ${tag} pair ${k + 1}: ${f.id} is ${specs[k][f.id]}, not the interpolated ${want}`);
+      }
+      const lf = G.WING_FIELDS.find((f) => f.id === 'length');
+      for (let k = 1; k < N; k++) { const want = +Math.max(lf.min, Math.min(lf.max, b.wings.first.length * s.pairs[k].lengthRatio)).toFixed(3); if (specs[k].length !== want) bad9.push(`${name} ${tag} pair ${k + 1}: length ${specs[k].length}, not ${want}`); }
+    }
+    // shapePairs: the two forms, and the reserved one refused
+    const two = lib[0], sp2 = G.shapePairs(two);
+    if (!(sp2.length === 2 && sp2[0] === two.fore && sp2[1] === two.hind)) bad9.push('shapePairs() does not read a two-pair entry as [fore, hind]');
+    if (G.shapePairs(FX).length !== FX.pairs.length) bad9.push('shapePairs() does not read an N-pair entry as its pairs');
+    let refused = false; try { G.shapePairs({ pairs: [FX.pairs[0], { from: { id: 4, wing: 'hind' } }, FX.pairs[2]] }); } catch { refused = true; }
+    if (!refused) bad9.push('a reserved { from } wing record was not refused');
+    ok(!bad9.length, `LB9: applying a three-pair shape writes the pair count (${multi.map((s) => s.pairs.length).join('/')}) and the middle pairs and nothing else, on ${bases9.length} bases, as three distinct outlines${bad9.length ? ' — ' + bad9.slice(0, 4).join(' | ') : ''}`);
+    // LB10
+    const bad10 = []; let n10 = 0;
+    const withFx = [...libAll, { ...FX, id: 999 }];
+    const bases10 = [['default', d, 8]]; for (const sd of [1, 2, 3]) { const p = G.randomParams(sd); if (!p.wingPairs) { p.bodyParts = '3'; p.wingPairs = 2; } bases10.push([`random:${sd}`, p, 3]); }
+    for (const [name, b, n] of bases10) for (let seed = 1; seed <= n; seed++) {
+      let r0, r1; try { r0 = G.randomWingBlend(b, seed); r1 = G.randomWingBlend(b, seed, { library: withFx }); } catch (e) { bad10.push(`${name} seed ${seed}: ${e.message}`); continue; } n10++;
+      if (r0.label !== r1.label || !same(r0.params, r1.params) || !same(r0.blend, r1.blend)) bad10.push(`${name} seed ${seed}: the draw moved with an N-pair entry in the library ("${r0.label}" -> "${r1.label}")`);
+      if (/#999\b/.test(r1.label) || (r1.blend && (r1.blend.a === 999 || r1.blend.b === 999 || r1.blend.refused.some((x) => x.a === 999 || x.b === 999)))) bad10.push(`${name} seed ${seed}: an N-pair entry was drawn`);
+    }
+    ok(!bad10.length && n10 > 0, `LB10: the random draws never see a three-pair entry — ${n10} rolls byte-identical with the fixture appended to the library, no label names it${bad10.length ? ' — ' + bad10.slice(0, 3).join(' | ') : ''}`);
+  }
   // LB7 (opts.lb7 === false skips it: the negative control runs it only on the
   // clean module and on the mutant that names it — every other mutant names
   // another clause, and LB7's ~200 builds ten times over cost the CI job its
@@ -219,7 +324,7 @@ export function libraryChecks(G, opts = {}) {
 /* built rows: every shape on the default bug, a few at 1 / 3 / 4 pairs, and
    random blends on the default and on random bases */
 export function libraryRows(G) {
-  const rows = [], lib = G.WING_LIBRARY;
+  const rows = [], lib = G.WING_LIBRARY.filter((s) => !(Array.isArray(s.pairs) && s.pairs.length > 2));
   for (const s of lib) rows.push([`library:#${s.id}`, G.applyWingShape(G.defaultParams(), s), {}]);
   for (const [n, id] of [[1, 5], [3, 16], [4, 9], [4, 2]]) { const p = G.defaultParams(); p.wingPairs = n; rows.push([`library:#${id} at ${n} pair(s)`, G.applyWingShape(p, lib.find((x) => x.id === id)), {}]); }
   // on main's pre-type thorax (5 mm): with the Butterfly default's 7.09 mm the
@@ -230,6 +335,15 @@ export function libraryRows(G) {
   { const p = G.defaultParams(); p.venation = 'holes'; p.thoraxLength = 5; p.bodyType = 'custom'; p.bodyRatios = null; rows.push(['library:#13, holes', G.applyWingShape(p, lib.find((x) => x.id === 13)), {}]); }
   { const p = G.defaultParams(); p.wingRootPinch = 0.6; rows.push(['library:#16, root pinch 0.6', G.applyWingShape(p, lib.find((x) => x.id === 16)), {}]); }
   for (let seed = 1; seed <= 8; seed++) { const r = G.randomWingBlend(G.defaultParams(), seed); rows.push([`library blend seed ${seed}: ${r.label}`, r.params, {}]); }
+  // the THREE-PAIR entries (§18): each shipped one and the fixture on the
+  // default and on every winged body preset — three roots along the thorax
+  // through the junction blend, the J, S, C and floor clauses on each
+  const multi = [...lib.filter((s) => Array.isArray(s.pairs) && s.pairs.length > 2), THREE_PAIR_SHAPE];
+  for (const s of multi) {
+    const tag = s.id ? `#${s.id}` : 'fixture', q = G.applyWingShape(G.defaultParams(), s);
+    rows.push([`library3: ${tag}`, q, {}]);
+    for (const t of G.BODY_TYPE_IDS.filter((t) => G.BODY_PRESETS[t].wingPairs !== 0)) rows.push([`library3: ${tag} x ${t}`, G.applyBodyType(q, t).params, {}]);
+  }
   return rows;
 }
 
@@ -243,6 +357,10 @@ export const LIBRARY_MUTANTS = [
   ['the label names a t that was not used', 'const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], t));', 'const q = applyWingShape(params, blendWingShapes(lib[i], lib[j], Math.min(0.9, t + 0.05)));', 'LB5'],
   ['the whole-bug Randomize keeps its own outlines', "  const b = randomWingBlend(q, Math.floor(r() * 4294967296), opts);\n  return { params: b.params,", "  const b = randomWingBlend(q, Math.floor(r() * 4294967296), opts);\n  return { params: q,", 'LB6'],
   ['the draw picks by library POSITION again', 'const A = drawShape(lib, seed, k, 1), B = drawShape(lib, seed, k, 2, A);', 'const ia = Math.floor(drawHash(seed, k, 1) * lib.length); let ib = Math.floor(drawHash(seed, k, 2) * (lib.length - 1)); if (ib >= ia) ib++; const A = lib[ia], B = lib[ib];', 'LB7'],
+  // the three-pair form (§18)
+  ['a three-pair shape blends its middle', '    for (let k = 1; k < N - 1; k++) W.unlinked[k] = wingAt(k);\n', '', 'LB8'],
+  ['a three-pair shape keeps the pair count', '    p.wingPairs = N;\n    W.first = wingAt(0);', '    p.wingPairs = Math.max(2, Math.min(params.wingPairs, N));\n    W.first = wingAt(0);', 'LB9'],
+  ['three-pair entries enter the blend pool', ".filter((s) => !isMultiShape(s)), maxTries", ", maxTries", 'LB10'],
 ];
 
 /* ---------- WA: the wing angle (§14) ---------- */
@@ -261,7 +379,7 @@ const segD = (q, a, b) => { const ab = [b[0] - a[0], b[1] - a[1]], L2 = ab[0] * 
 const polyD = (A, B) => { let m = 0; for (const q of A) { let d = Infinity; for (let i = 0; i + 1 < B.length; i++) d = Math.min(d, segD(q, B[i], B[i + 1])); m = Math.max(m, d); } return m; };
 export function angleChecks(G) {
   const out = [], ok = (c, m) => out.push([!!c, m]);
-  const lib = G.WING_LIBRARY, d = G.defaultParams();
+  const lib = G.WING_LIBRARY.filter((s) => !(Array.isArray(s.pairs) && s.pairs.length > 2)), d = G.defaultParams();   // the two-pair entries (an N-pair entry's angles are LB8's)
   // WA1
   const bad1 = []; let worst = 0;
   for (const s of lib) {

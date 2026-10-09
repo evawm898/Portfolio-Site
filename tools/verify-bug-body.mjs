@@ -199,7 +199,9 @@ export function bodyChecks(G, opts = {}) {
    WIDTH, each on a library wing (the wings rotate through the library), built
    through every row clause; and a spider given its wings back. */
 export function bodyRows(G) {
-  const rows = [], lib = G.WING_LIBRARY;
+  // the two-pair entries only (by position, so adding an N-pair entry at the
+  // end of the library — design doc §18 — moves no body row off its shape)
+  const rows = [], lib = G.WING_LIBRARY.filter((s) => !G.isMultiShape(s));
   let k = 0;
   for (const t of G.BODY_TYPE_IDS) {
     for (const [s, w] of [[null, 1], [SIZE_ENDS[0], WIDTH_ENDS[0]], [SIZE_ENDS[1], WIDTH_ENDS[1]]]) {

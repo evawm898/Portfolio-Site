@@ -81,6 +81,7 @@ export const EXPECT = {
   sametone: { pairs: 2, mode: 'split', tail: false, body: 'estimated' },
   clutter: { pairs: 2, mode: 'split', tail: false, clutter: { ground: 1, marks: 1 } },
   sheet: { pairs: 2, mode: 'split', tail: false, clutter: { frame: 1, marks: 1 } },
+  threepair: { pairs: 3, mode: 'split3', tail: false, fit: { pairs: 3 } },   // §18: fitted at THREE pairs (the import's own option)
 };
 const TOL = 0.6;
 
@@ -196,7 +197,7 @@ export function imageChecks(I) {
   const F = fixtures();
   // a fit that THROWS is a failure of the clause that asked, never a crash of the gate
   const safe = (fn) => { try { return fn(); } catch (e) { return { ok: false, reason: `threw: ${e.message}` }; } };
-  const fitOf = (name, extra = {}) => safe(() => I.imageToBug(F[name], G.defaultParams(), { wingspanMm: F[name].truth.wingspanMm, toleranceMm: TOL, ...extra }));
+  const fitOf = (name, extra = {}) => safe(() => I.imageToBug(F[name], G.defaultParams(), { wingspanMm: F[name].truth.wingspanMm, toleranceMm: TOL, ...((EXPECT[name] || {}).fit || {}), ...extra }));
   const results = {};
   for (const [name, ex] of Object.entries(EXPECT)) {
     const img = F[name], r = fitOf(name);
@@ -278,6 +279,37 @@ export function imageChecks(I) {
     const c1 = r1.ok ? compareToKnown(F.butterfly, r1) : null;
     ok(changed && slid && r1.mode === 'split' && c1.hausMm <= boundMm(F.butterfly, TOL), `IM8: the split line moved: its outer end slid along the margin (${slid ? 'yes' : 'NO'}), both pairs refit (${changed ? 'both changed' : 'NOT both changed'}), the union still within ${c1 ? c1.hausMm.toFixed(3) : '—'} mm (bound ${boundMm(F.butterfly, TOL).toFixed(3)})`);
   } else ok(false, 'IM8: the butterfly has no split line to move');
+  // IM15 — three pairs from one mass: both split lines at FOUND notches (the
+  // lobe test), the three pairs each a wing of its own, the union within bound
+  {
+    const r = results.threepair;
+    const conf = r && r.ok && r.splits ? r.splits.map((q) => q.confident) : [];
+    const c = r && r.ok ? (() => { try { return compareToKnown(F.threepair, r); } catch (e) { return { hausMm: Infinity }; } })() : { hausMm: Infinity };
+    // and the pairs are the KNOWN bug's: the front and middle pairs' lengths
+    // within 10% of the known (the bottom pair, partly under the middle one in
+    // the picture, within 35% — reported)
+    const kp = F.threepair.truth.params, kl = [kp.wings.first.length, kp.wings.unlinked[1].length, kp.wings.last.length];
+    const fl = r && r.ok ? [r.params.wings.first.length, r.params.wings.unlinked[1] && r.params.wings.unlinked[1].length, r.params.wings.last.length] : [];
+    const lensOk = fl.length === 3 && fl.every((x, i) => Number.isFinite(x) && Math.abs(x - kl[i]) <= (i < 2 ? 0.10 : 0.35) * kl[i]);
+    ok(r && r.ok && r.mode === 'split3' && conf.length === 2 && conf.every(Boolean) && r.params.wingPairs === 3 && Object.keys(r.params.wings.unlinked).length === 1 && c.hausMm <= boundMm(F.threepair, TOL) && lensOk, `IM15: three pairs from one mass: ${r && r.ok ? `${r.mode}, split lines ${conf.map((x) => (x ? 'at a found notch' : 'DEFAULT')).join(' / ')}, ${r.params.wingPairs} pairs with ${Object.keys(r.params.wings.unlinked).length} unlinked middle, union within ${c.hausMm.toFixed(3)} mm (bound ${boundMm(F.threepair, TOL).toFixed(3)}), pair lengths ${fl.map((x) => (+x).toFixed(1)).join(' / ')} against the known ${kl.map((x) => x.toFixed(1)).join(' / ')} (${lensOk ? 'within 10 / 10 / 35%' : 'OUT of 10 / 10 / 35%'})` : `not fitted — ${r && r.reason}`}`);
+    // IM16 — the two split lines moved (as the page's handles move them): all
+    // three pairs refit, both outer ends slid along the margin, the union still within bound
+    if (r && r.ok && r.splits && r.splits.length === 2) {
+      // (moved ALONG the margin toward the head, the roots a quarter as far;
+      // a line moved OUT onto the flank of the lobe behind its notch — 1.5 mm
+      // outward on these straps, or 2 mm up on one of the two — hands the pair
+      // ahead a sliver of the pair behind, and that outline is refused with
+      // the pinch message: the fit says so and the page keeps the last good
+      // fit, as it does for a two-pair line, measured)
+      const mv = (q, dx, dy) => ({ outer: [q.outer[0] + dx, q.outer[1] + dy], root: [q.root[0], q.root[1] + dy / 4] });
+      const r1 = fitOf('threepair', { splits: [mv(r.splits[0], 0, 3), mv(r.splits[1], 0, 3)] });
+      const c1 = r1.ok ? (() => { try { return compareToKnown(F.threepair, r1); } catch (e) { return { hausMm: Infinity }; } })() : { hausMm: Infinity };
+      const pts = (x) => [x.params.wings.first.points, x.params.wings.unlinked[1] && x.params.wings.unlinked[1].points, x.params.wings.last.points].map((q) => JSON.stringify(q));
+      const changed = r1.ok && pts(r1).every((q, i) => q !== pts(r)[i]);
+      const slid = r1.ok && r1.splits && r1.splits.every((q, i) => Math.hypot(q.outer[0] - r.splits[i].outer[0], q.outer[1] - r.splits[i].outer[1]) > 0.5);
+      ok(changed && slid && r1.mode === 'split3' && c1.hausMm <= boundMm(F.threepair, TOL), `IM16: the two split lines moved: both outer ends slid along the margin (${slid ? 'yes' : 'NO'}), all three pairs refit (${changed ? 'yes' : 'NOT all'}), the union still within ${c1.hausMm.toFixed(3)} mm (bound ${boundMm(F.threepair, TOL).toFixed(3)})${r1.ok ? '' : ` — ${r1.reason}`}`);
+    } else ok(false, 'IM16: the three-pair picture has no split lines to move');
+  }
   // IM9 — the erase brush
   const st = F.stray;
   const dirty = safe(() => I.imageToBug(st, G.defaultParams(), { wingspanMm: st.truth.wingspanMm, toleranceMm: TOL }));
@@ -318,4 +350,7 @@ export const IMAGE_MUTANTS = [
   // live mutant, a gap recorded here rather than one manufactured.
   ['the ground along the edge is kept', 'if (border[id] / borderN > BORDER_TOUCH_FRAC) {', 'if (false) {', 'IM13'],
   ['a refusal does not name its step', "reason: `step ${k} of ${STEPS.length} (${STEPS[k - 1]}) failed: ${text}`", 'reason: text', 'IM14'],
+  // three pairs from one mass (§18)
+  ['the three-pair notch pair is never found', 'if (!bestPair || score > bestPair.score) bestPair =', 'if (false) bestPair =', 'IM15'],
+  ['the three-pair split lines from the page are ignored', 'if (o.splits && o.splits[i] && o.splits[i].outer && o.splits[i].root) {', 'if (false) {', 'IM16'],
 ];

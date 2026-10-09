@@ -160,6 +160,7 @@ const junctionFixture = () => ({ ...rootUnderFloor(), wingJunction: G.JUNCTION_D
 import * as IMG from '../bug-image.js';
 import { imageChecks, imageRows, IMAGE_MUTANTS } from './verify-bug-image.mjs';
 import { libraryChecks, libraryRows, LIBRARY_MUTANTS, angleChecks, angleRows, ANGLE_MUTANTS } from './verify-bug-library.mjs';
+import { THREE_PAIR_SHAPE } from './bug-fixtures.mjs';
 import { bodyChecks, bodyRows, bodyFitClause, BODY_MUTANTS } from './verify-bug-body.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -1779,6 +1780,11 @@ if (NEG) {
       const f0 = angleChecks({ ...G, WING_LIBRARY: lib0 }).filter(([c]) => !c).map(([, m]) => m), fired0 = f0.some((x) => x.startsWith('WA1:')) && f0.some((x) => x.startsWith('WA2:'));
       console.log(`${fired0 ? 'CAUGHT' : 'MISSED'} ${'the stored angles are zeroed'.padEnd(32)} by WA1+WA2  — ${f0.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
       if (!fired0) ok = false; }
+    // a three-pair entry whose MIDDLE pair's stored angle is zeroed (the fixture, damaged)
+    { const fx = JSON.parse(JSON.stringify(THREE_PAIR_SHAPE)); fx.pairs[1].sweep = 0;
+      const f1 = libraryChecks(G, { lb7: false, fixture: fx }).filter(([c]) => !c).map(([, m]) => m), fired1 = f1.some((x) => x.startsWith('LB8:'));
+      console.log(`${fired1 ? 'CAUGHT' : 'MISSED'} ${'a three-pair middle angle is zeroed'.padEnd(32)} by LB8  — ${f1.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
+      if (!fired1) ok = false; }
   }
   // BP — code mutants of bug-geometry.js (body types, §17), each a copy written
   // beside it and imported, run through the ONE clause it names (every anchor

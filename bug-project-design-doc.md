@@ -3077,3 +3077,172 @@ Each names what was rejected and how hard it is to undo.
     narrows while the legs (scaled by length, never by width) show past it from above — 0.43 of
     10.45 mm² on the butterfly, 0.28 of 6.68 on the dragonfly. That is WIDTH doing what it says.
 
+
+## 18. Three-pair wing shapes — library entries where all three pairs are designed
+
+Eva's brief (Oct 9): library entries where all THREE wing pairs are distinct designed shapes,
+not a first and a last with a blended middle. Real insects never have three pairs; this is the
+fantasy §0 reserves for the wings. The source artwork is Eva's (five pictures: a swallowtail, three
+tattoo butterflies, a sheet of nine butterflies one of which has three pairs, a sheet of five fairy
+wing pairs one of which has three, and one fairy pair) — in the gitignored
+`tools/bug-wing-sources/`, never committed. Existing shapes, angles and the junction blend are
+untouched: the 53 two-pair entries are byte-identical and WA1 still holds every one to #361's
+outlines.
+
+### 18.1 The library format — `pairs`, read by one function
+
+A two-pair entry has `fore` and `hind` and no `pairs`. An N-pair entry carries **`pairs`: an array
+of wing records FRONT TO BACK**, each in the hind's own form — `{ stretch, lengthRatio, sweep,
+range, points }`: the outline turned to angle 0 (9 decimals), the angle it was found at, its
+measured range, and its length as a ratio of the FRONT pair's (the front pair's is 1). Every pair
+is a drawn shape of its own. **`shapePairs(shape)` is the ONE reader of the two forms** (front to
+back; `isMultiShape` the predicate) — nothing else looks at `fore` / `hind` / `pairs` directly, so a
+third form costs one function. The existing 53 entries carry no new field.
+
+**RESERVED, NOT BUILT: a curated entry composed from existing shapes.** It would name a wing in
+place of points — `{ from: { id, wing: 'fore' | 'hind' | k }, sweep?, range? }` — and `shapePairs()`
+would resolve it against the library before any reader saw it. Today such a record is REFUSED with
+a message (LB9 checks that), so the format is declared where it will land and no reader changes
+the day it does.
+
+**The canonical outline is `turnWingFree`, not `turnWingRaw`.** The two-pair store turned each
+outline to angle 0 with `turnWingRaw`, which forces the root anchors back onto u = 0 after the
+ramped turn. That inverts only while the anchors sit inside the ramp's inner radius (0.06); a
+short middle pair's anchors — half a blended root over a 15–22 mm length — sit at r 0.07–0.08, and
+posing such a canonical back at its angle put the trailing anchor at u < 0 and was refused. The
+N-pair canonicals are the raw turn with the anchors left where it puts them; `rotateWingBlade`
+(posing) forces u = 0 after ITS turn, which lands exactly on the fitted points — the fit tool
+measures it (`poseErrMm`: 0 on every candidate).
+
+### 18.2 Apply — the pair count is written, the middles are unlinked, nothing else moves
+
+`applyWingShape` on an N-pair shape **sets the pair count to N** (a three-pair entry is three
+designed shapes; a bug showing two or four of them would be showing something else), writes the
+first and last pairs from its ends and every middle pair UNLINKED with its own posed outline,
+lengths as ratios of the FRONT pair's (which keeps the bug's own length, as before), and the
+per-pair fields below the outline (thickness, tilt, venation…) on a middle pair as the LINKED
+interpolation would carry them — so a three-pair entry differs from a blended middle in the
+outline only, which is the point. `WING_SHAPE_WRITES.multi` names `wingPairs`; the gate's LB9
+restates the list. The tail follows the bottom pair's rule, unchanged.
+
+**With 4 pairs selected the bug goes to 3, and the page says so** (`4 pairs → 3: the shape has no
+4th pair`). The alternatives were a blended fourth pair (the blend this entry exists not to have)
+or refusing the click; the least surprising is the count the shape has, told. With 1 or 2 pairs
+selected the bug goes to 3 likewise. The gallery draws all three pairs on a three-pair thumbnail,
+with a dashed border and a `3 pairs` tag, and the angle control carries each pair's own found angle
+and range (`mid1` beside `first` / `last`).
+
+**The random draws never see an N-pair entry.** `randomWingBlend`'s pool is the two-pair entries
+(a blend has a fore and a hind to mix; an N-pair shape has neither), and because the draw is keyed
+on ids (§15.1) the two-pair draws are what they were before any N-pair entry existed — LB10
+measures it: with the fixture appended to the library every roll is byte-identical and no label
+names it. The body-type rows (§17) draw their shapes from the two-pair entries by position for the
+same reason.
+
+### 18.3 The fitter — three pairs from one mass, two notches, two draggable lines
+
+`imageToBug(…, { pairs: 3 })` splits one wing mass into three. The two notches are found by the
+two-pair split's own LOBE TEST, generalised: every candidate pair of concavities (local maxima of
+the hull depth from `NOTCH_LOBE_MIN_FRAC` deep, among the ten deepest) must leave a lobe AHEAD of
+the front notch, one BETWEEN and one BEHIND the back notch, each reaching `NOTCH_LOBE_FRAC` of the
+farthest point, and the two notches must be `NOTCH3_MIN_SEP` (0.35 rad) apart in bearing. **Each
+NOTCH itself must lie out along the margin — at least `NOTCH_LOBE_FRAC` of the farthest point from
+the attachment's middle — and the deepest pair that passes wins.** The plain deepest-pair rule was
+tried first and took the dent where a hindwing's anal margin meets the abdomen for the back notch,
+and the bottom pair came back a 5 mm sliver on every one of 32 fixture compositions (measured): that
+dent sits at 0.17–0.32 of the reach where a notch between two wings sits at 0.66–0.77. A lobe
+PROMINENCE rule (each lobe standing proud of its notches by a fraction of the reach) was tried in
+between and REJECTED the real three-pair butterfly (3.webp #4), whose middle lobe's notch with the
+forewing already lies far out; the reach rule keeps both. Each FOUND notch's line is a WALL from the
+notch to the attachment's MIDDLE — the two-pair wall's own root, where the wings overlap, so the
+line lies inside the pair ahead of it (rooted at the thirds of the attachment instead, the front
+line ran outside the front strap's trailing edge on the fixture, cut a 2 mm tongue of the middle
+pair onto it, and that outline pinched — measured); a pixel's pair is the number of walls it lies
+behind; the hidden band ahead of each wall (`HIDDEN_OVERLAP_FRAC`, tapering to the notch) is given
+to the pair behind it, so each pair's hidden leading edge is completed as the hindwing's is now.
+**Reading candidates closer to the body than the two-pair rule's 0.12 was tried and reverted**: it
+admitted the anal-margin dents and reached nothing it was meant to. A dragged line can still hand
+the pair ahead a sliver of the pair behind (outward onto the next lobe's flank): that outline is
+refused with the pinch message, the fit says so and the page keeps the last good fit.
+
+**Where a notch is not found the line for it is a DEFAULT — square to the body from a root a third
+down, out to the margin at the bearing that divides the mass's sweep — and the split is reported
+NOT CONFIDENT** (`res.splits[i].confident`; one notch found: the default goes on the wider side).
+The page then shows BOTH lines as pink handles (`data-line` 0 / 1, front first) and refits live as
+they move, through `o.splits` — the two-pair line's own mechanism, twice; the Wing pairs select
+gains `3 pairs (split at two notches)`. `auto` still reads at most two: a scalloped hindwing offers
+extra passing notches, and the two-pair fits (IM1–IM14) do not move.
+
+**A boundary between two lobes DRAWN OVERLAPPING is not a notch of the silhouette** — the fairy
+three-pair wing's lower two lobes overlap in the drawing, so the fit found its upper notch and
+not its lower one, and the dev tool places that line by hand (`SPLIT_OVERRIDES`, in crop
+fractions, mapped through the fit's own transform exactly as the page hands over its handles) and
+says so on the review page. That is the draggable line's case, not a defect of the lobe test.
+
+### 18.4 The dev tool and the review page
+
+`node tools/bug-wing-three-pair.mjs [--sweep] [--no-3d] [--emit a,b]`: whitens each sheet above
+a per-sheet luminance (a grey ground merged neighbours at the library fit's 215), splits it into
+subjects, **pairs the left and right wings of a bodiless sheet and paints a body down the midline**
+(a capsule as wide as the narrowest gap between the inner edges, bridging to both wings where they
+come close — a dev-time convenience: the record is outlines only), fits each subject at three pairs
+on the library's root convention (the blended root, pinch 0.5, so the anchors sit half a root
+either side of the hinge), judges the result as the LIBRARY applies it (the default bug, its own
+root), records it in the N-pair form, measures each pair's angle and a quick range (every whole
+degree building with no floor violation and no repair note; `--sweep` runs every degree through
+every row clause of `verify-bug.mjs --rows`, the §14 instrument), and writes
+`out-three/review.html`: per subject the source with the three fitted outlines and each pair's
+angle line from its hinge, the exploded view, the assembled SVG, the page's 3D view at 3/4, a
+junction close-up, and a verdict — the measured facts under an automatic GOOD / FIXABLE / DROP
+with the reviewer's reading beside it (`VERDICTS`). `--emit` appends the kept candidates to
+`bug-wing-library.js`, ids on from the last; existing entries are never touched.
+
+### 18.5 Verification
+
+- **LB8** every three-pair entry (the shipped ones plus the gate's own fixture) applies as N
+  distinct posed pairs at its stored angles, the control lands at both ends of each pair's range,
+  and it builds clean — no floor violation, no repair note — on the default and on every winged
+  body preset (Butterfly, Moth, Bee, Dragonfly). **LB9** applying writes the pair count and the
+  middles and nothing else, on six bases (1, 2 and 4 pairs among them: 4 → 3), as three DISTINCT
+  outlines, the middle's lower fields the linked interpolation; `shapePairs` reads both forms and
+  refuses `from`. **LB10** the random draws are byte-identical with an N-pair entry appended and
+  never name it. The `library3:` rows build each entry on the default and on the four presets
+  through every row clause (J, S, C, the floor): three roots along the thorax under the junction
+  blend. **IM15** a picture of the fixture fitted at three pairs: `split3`, both lines at FOUND
+  notches, three pairs with one unlinked middle, the union within IM3's bound (0.53 mm against
+  1.50), the front and middle pairs' lengths within 10% of the known bug's and the bottom (partly
+  under the middle in the picture) within 35% — 39.5 / 34.0 / 25.9 against 41.0 / 34.9 / 36.9.
+  **IM16** both lines moved as the page's handles move them: both outer ends slide along the margin,
+  all three pairs refit, the union still within bound. (A line moved OUT onto the flank of the lobe
+  behind its notch hands the pair ahead a sliver of the pair behind and that outline is refused —
+  the fit says so and the page keeps the last good fit, as the two-pair line does; the clause moves
+  the lines along the margin toward the head, 3 mm, the roots a quarter as far.)
+- **The fixture is three STRAP wings fanned at −15 / +15 / +48°** (`THREE_PAIR_SHAPE`,
+  tools/bug-fixtures.mjs), stored in the library's own form with a ±3° range: a picture of it has
+  to show three lobes with a notch between each, and thirty-two mixes of the library's own broad
+  wings at their found angles hid the middle lobe under the front one. The fixture is made the way
+  the library's entries are: the strap is POSED (`setWingAngle`) and the stored angle is the posed
+  wing's own reading, with the canonical outline turned back by it (`turnWingFree`) — turning a
+  canonical outline by a nominal angle reads 0.1–0.3° off it (the measure drops the samples inside
+  the root ramp, and a turn moves which samples those are), which LB8 holds to 0.05°.
+- **Negative control**: three code mutants of bug-geometry.js (a three-pair shape blends its
+  middle → LB8; keeps the pair count → LB9; three-pair entries enter the blend pool → LB10), a DATA
+  mutant (the fixture's middle angle zeroed → LB8), and two of bug-image.js (the notch pair never
+  found → IM15; the page's two lines ignored → IM16).
+- **Cost**: LB8–LB10 add ~10 s; the `library3:` rows five builds per entry (the fixture's five
+  today); IM15/16 two fits. The gate's wall-clock is in §18.6.
+
+### 18.6 Measured, and decisions made without a ruling (reversible)
+
+1. **4 pairs → 3 on a three-pair entry** (said above). Undo: `Math.min(pairs.length, MAX_WING_PAIRS)`
+   in `applyWingShape`'s multi branch could read the base's count and blend a fourth.
+2. **The middle pair's lower fields interpolate** as a linked middle would. Undo: copy the front
+   pair's instead (one line).
+3. **`auto` stays at two pairs**; three is an explicit option. Undo: let `auto` choose 3 when a
+   notch PAIR passes the lobe test.
+4. **The default line for a missing notch** divides the mass's sweep in bearing and the attachment
+   in thirds. Undo: `found[]`'s defaults in bug-image.js.
+5. **The constant** `NOTCH3_MIN_SEP` 0.35, with its reason beside it; the notch reach bar reuses
+   `NOTCH_LOBE_FRAC` rather than adding a second typed fraction.
+6. **The painted body of a bodiless sheet** (`BODY_MIN_FRAC` 0.025 of the span, `BRIDGE_MAX_FRAC`
+   0.12): dev-time only.
