@@ -295,14 +295,19 @@ export function imageChecks(I) {
     // IM16 — the two split lines moved (as the page's handles move them): all
     // three pairs refit, both outer ends slid along the margin, the union still within bound
     if (r && r.ok && r.splits && r.splits.length === 2) {
-      // (moved ALONG the margin toward the head, the roots a quarter as far;
-      // a line moved OUT onto the flank of the lobe behind its notch — 1.5 mm
-      // outward on these straps, or 2 mm up on one of the two — hands the pair
-      // ahead a sliver of the pair behind, and that outline is refused with
+      // (each line moved 3 mm SQUARE TO ITS OWN WALL toward the head — along
+      // the margin at its notch, derived from the fit's own line rather than
+      // typed as a world axis: the first form moved both lines +3 mm in world
+      // y, which was along the strap fixture's margins and, on the leaf blade,
+      // snapped the back line onto the notch it started from (slid 0.00,
+      // measured); the roots a quarter as far. The same step toward the TAIL
+      // snaps each outer end 13 mm away onto the next lobe's far margin, and
+      // a line moved OUT along its wall onto the flank of the lobe behind its
+      // notch hands the pair ahead a sliver of the pair behind, refused with
       // the pinch message: the fit says so and the page keeps the last good
       // fit, as it does for a two-pair line, measured)
-      const mv = (q, dx, dy) => ({ outer: [q.outer[0] + dx, q.outer[1] + dy], root: [q.root[0], q.root[1] + dy / 4] });
-      const r1 = fitOf('threepair', { splits: [mv(r.splits[0], 0, 3), mv(r.splits[1], 0, 3)] });
+      const mv = (q, d) => { const dx = q.outer[0] - q.root[0], dy = q.outer[1] - q.root[1], L = Math.hypot(dx, dy) || 1; let nx = -dy / L, ny = dx / L; if (ny < 0) { nx = -nx; ny = -ny; } return { outer: [q.outer[0] + d * nx, q.outer[1] + d * ny], root: [q.root[0], q.root[1] + d * ny / 4] }; };
+      const r1 = fitOf('threepair', { splits: [mv(r.splits[0], 3), mv(r.splits[1], 3)] });
       const c1 = r1.ok ? (() => { try { return compareToKnown(F.threepair, r1); } catch (e) { return { hausMm: Infinity }; } })() : { hausMm: Infinity };
       const pts = (x) => [x.params.wings.first.points, x.params.wings.unlinked[1] && x.params.wings.unlinked[1].points, x.params.wings.last.points].map((q) => JSON.stringify(q));
       const changed = r1.ok && pts(r1).every((q, i) => q !== pts(r)[i]);

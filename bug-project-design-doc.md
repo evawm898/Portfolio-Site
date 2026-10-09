@@ -3216,7 +3216,10 @@ with the reviewer's reading beside it (`VERDICTS`). `--emit` appends the kept ca
   all three pairs refit, the union still within bound. (A line moved OUT onto the flank of the lobe
   behind its notch hands the pair ahead a sliver of the pair behind and that outline is refused —
   the fit says so and the page keeps the last good fit, as the two-pair line does; the clause moves
-  the lines along the margin toward the head, 3 mm, the roots a quarter as far.)
+  the lines along the margin toward the head, 3 mm, the roots a quarter as far — each line SQUARE
+  TO ITS OWN WALL, derived from the fit's line rather than a world axis: +3 mm in world y was along
+  the strap fixture's margins and on the leaf blade snapped the back line onto its own notch, 0.00
+  moved; the same step toward the tail lands 13 mm away on the next lobe's far margin, measured.)
 - **The fixture is three LEAF blades fanned at −15 / +15 / +48°** (`THREE_PAIR_SHAPE`,
   tools/bug-fixtures.mjs), stored in the library's own form with a ±3° range: a picture of it has
   to show three lobes with a notch between each, and thirty-two mixes of the library's own broad
