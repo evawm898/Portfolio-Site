@@ -5474,6 +5474,34 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        other caller is the petal lobes' range, as it was) */
     const countLoopMax = cap && cap.toothCountMax ? Number(cap.toothCountMax) : LOBE_COUNT_RANGE[1];
     for (let n = 1; n <= countLoopMax; n++) { if (sumOf(demandFor(n)) <= capacity) countRowsCap = n; else break; }
+    /* A LOBED BLADE'S ROWS ARE FIXED, SO ITS ROW CAP IS PER PERIOD (S4c). The
+       window total above is the petal's criterion, where the ladder is told the
+       demand and places rows into each period; a lobed leaf stations its rows
+       uniformly in `u` (`lobedStations`) while its teeth are even in ARC
+       LENGTH, so near the tip, where the outline turns, the last period can be
+       narrower than one row gap and its tooth falls BETWEEN two rows —
+       declared and never drawn. Measured on the 2,000-state sample at three
+       teeth a lobe: 15 states with a margin tooth whose whole period
+       (u 0.983-1.000) holds no row. So the count also gives until every
+       margin period the law declares holds a station strictly inside it, and
+       that is told as 'rows'. A BRANCH: only a caller handing its stations
+       declares one. */
+    if (cap && Array.isArray(cap.toothStationsU)) {
+      const SU = cap.toothStationsU;
+      const periodsHoldStations = (n) => {
+        const per = n + 1, pitch = 2 * treatedHalfMm / per;
+        for (let k = 0; k < per; k++) {
+          const ds = treatedHalfMm - (k + 0.5) * pitch;
+          if (!onMargin(ds)) continue;
+          const a = k === 0 ? u0 : uAtD(treatedHalfMm - k * pitch);
+          const dB = treatedHalfMm - (k + 1) * pitch;
+          const b = onMargin(dB) ? uAtD(dB) : 1;
+          if (!SU.some((u) => u > a && u < b)) return false;
+        }
+        return true;
+      };
+      while (countRowsCap >= 1 && !periodsHoldStations(countRowsCap)) countRowsCap--;
+    }
     const countFloorCap = Math.max(0, Math.floor(2 * treatedHalfMm / pitchFloorMm + 1e-9) - 1);
     let countBuilt = Math.min(countAsked, countRowsCap, countFloorCap);
     /* (a chevron's widest half-width is its ENVELOPE's — the lobed outline at
@@ -16316,7 +16344,7 @@ function lobedOutlineUncached(state, Lmm, exportMode) {
      bind — never a petal range it does not have. */
   const bsT = lobedBladeState(state, law.lobes);
   const cap = {
-    petiole: true, rowCapacity: nu, toothReliefFloorMm: MIN_FEATURE_MM, toothCountMax: bsT.lobeCount,
+    petiole: true, rowCapacity: nu, toothReliefFloorMm: MIN_FEATURE_MM, toothCountMax: bsT.lobeCount, toothStationsU: lobedStations(law, nu),
     chevron: {
       lobeAt: law.lobeAt, peakHalfMm: halfW,
       rimAt: (x, h, u) => { const ta = tauAt(u); return [x + h * Math.sin(ta), h * Math.cos(ta), 0]; },

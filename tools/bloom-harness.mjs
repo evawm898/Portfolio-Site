@@ -8622,8 +8622,20 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
           if (x.built) {
             const o = restatedSinusOpeningMm(Mb, wb.lo, wb.bot, wb.hi);
             if (!(o >= MIN_FEATURE_MM - 1e-9)) { fail = `sinus ${k} is ROUNDED and its emitted rows open ${o === null ? 'unmeasured' : o.toFixed(4)} mm, under the ${MIN_FEATURE_MM} mm the ruling builds it to`; break; }
-            let dense = Infinity;
-            for (let q = 0; q <= 8192; q++) { const u = a0 + ((a1 - a0) * q) / 8192; dense = Math.min(dense, Math.max(env(u) * lobe(u), TIP_HALF_MM)); }
+            /* the asked sinus's least half-width, SAMPLED THEN REFINED: a minimum
+               over 8,193 samples reads HIGH by the step squared (the true
+               minimiser sits between two of them), and the builder seats its
+               disc at the true one — so the bare sampled minimum fired at the
+               sixth decimal on five sampled states where the bottom sits
+               exactly at the asked depth. A ternary search inside the winning
+               sample's two neighbours removes the bias; it is the estimator
+               corrected, the 1e-9 bar is unchanged. */
+            const askedAt = (u) => Math.max(env(u) * lobe(u), TIP_HALF_MM);
+            let dense = Infinity, qBest = 0;
+            for (let q = 0; q <= 8192; q++) { const v = askedAt(a0 + ((a1 - a0) * q) / 8192); if (v < dense) { dense = v; qBest = q; } }
+            { let lo = a0 + ((a1 - a0) * Math.max(0, qBest - 1)) / 8192, hi = a0 + ((a1 - a0) * Math.min(8192, qBest + 1)) / 8192;
+              for (let it = 0; it < 80; it++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (askedAt(m1) < askedAt(m2)) hi = m2; else lo = m1; }
+              dense = Math.min(dense, askedAt((lo + hi) / 2)); }
             let deepest = Infinity; for (let j = wb.lo; j <= wb.hi; j++) deepest = Math.min(deepest, r.rowHalfLobeMm[j]);
             if (deepest < dense - 1e-9) { fail = `sinus ${k}'s round bottom cuts to ${deepest.toFixed(6)} mm, DEEPER than the asked sinus's own least half-width ${dense.toFixed(6)} mm — the depth was ruled untouched`; break; }
           }
@@ -15301,7 +15313,7 @@ export function buildMatrix() {
      limit on a short, steep, five-lobed blade — the V kept and told), the
      largest blade's petiole, and the petiole CLAMPED at the stem. */
   lf('LOBED: S4\'s form (sinus 0.62, shape 0.70, angle 38, teeth 0.08 — two V\'s under 1 mm, both ROUNDED, told)', { ...LOB, ...LOB_S4 });
-  lf('LOBED: THE LOBE COUNT YIELDS — 5 lobes asked on a 36 mm blade at 40 deg, 3 built (no round bottom fits even at the print minimum at 5 or 4; told)', { ...LOB, leafLength: 36, lobedLobes: 5, lobedFrom: 0.21, lobedTo: 0.55, lobedSinus: 0.84, lobedShape: 0.9, lobedAngle: 40, lobedEase: 0.79, lobedWidth: 26, leafTipShape: 1.05 });
+  lf('LOBED: THE LOBE COUNT YIELDS — 5 lobes asked on a 36 mm blade at 30 deg, 3 built (no round bottom fits even at the print minimum at 5 or 4; told)', { ...LOB, leafLength: 36, lobedLobes: 5, lobedFrom: 0.21, lobedTo: 0.55, lobedSinus: 0.84, lobedShape: 0.9, lobedAngle: 30, lobedEase: 0.79, lobedWidth: 26, leafTipShape: 1.05 });
   lf('LOBED: a 40 mm envelope with no sinus (the largest blade asks the thickest petiole)', { ...LOB, lobedWidth: 40, lobedSinus: 0 });
   lf('LOBED: the petiole CLAMPED — no sinus on a 3 mm stem at 90 deg (asks 0.82 mm, the rooted end holds 0.75)', { ...LOB, stemDiameter: 3, leafAngle: 90, lobedSinus: 0 });
   lf('LOBED: GATED — SIMPLE with every lobed control at an extreme (hidden AND inert)', { ...LOB, leafType: 'SIMPLE', lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedShape: 0.5, lobedWidth: 40, lobedToothDepth: 1 });
