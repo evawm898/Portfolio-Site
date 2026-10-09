@@ -2138,13 +2138,13 @@ const MUTANTS = [
      MUTATED module's own build, never the assertion it names.
      =================================================================== */
   { id: 'sepal-angle-clamp-removed', why: 'the whorl is built at the ASKED angle whatever the drawn limit says — the sepals clip the petals and both STL gates read a cross-shell overlap, which the export contract permits',
-    find: '  const bs = sepalBladeState(state, limit.angleBuiltDeg);',
-    into: '  const bs = sepalBladeState(state, limit.askedDeg);', names: ['SP8'],
+    find: '  const bs = sepalBladeState(state, limit.angleBuiltDeg, unclamped);',
+    into: '  const bs = sepalBladeState(state, limit.askedDeg, unclamped);', names: ['SP8'],
     witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tilt === 60 && c.tilt < 60) ? null : `the mutant built its sepals at ${m.tilt} against the clean tree's ${c.tilt} (60 asked) — the clamp did not go`; } },
   { id: 'sepal-reads-the-petals-controls', why: "the sepal blade is built from the PETAL's shape, form and curl controls while the sepal's own twins are read by nothing — hidden-and-not-inert on twenty controls at once",
-    find: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);',
+    find: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);',
     into: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[petalId]);', names: ['SP6'],
     witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;

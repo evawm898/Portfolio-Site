@@ -14,9 +14,12 @@
    instrument's `measureWall(grid).self`, through `tools/bloom-sepal-ranges.mjs`)
    and the census is the self-intersection census's within-shell pairs.
 
-   THE GEOMETRY DOES NOT CLAMP, so a cell can build a sepal roll past the new
-   bound (the OLD-MAX cells, and option (c) of the load question) through the
-   shipped builder with no patch: the bound lives on the control.
+   THE SHEET RECORDS THE QUESTION AS IT WAS ASKED. Since Eva's ruling (Q-S6,
+   option (a)) the geometry clamps a stored sepal roll past the bound to the
+   nearest bound, so every cell builds through the capability hook
+   `{ sepalTwinsUnclamped: true }` — the OLD-MAX cells and option (c) build
+   the value AS STORED, exactly as they did when this sheet was rendered; an
+   in-range cell is untouched by the hook.
 
    SECTIONS
      1  the narrowed control at its old end against its new end, both sides,
@@ -43,7 +46,7 @@ const BAR = G.MIN_FEATURE_MM;
 const S = (o) => ({ ...DEFAULTS, sepalCount: 5, ...o });
 function build(state) {
   const acc = new G.MeshBuilder({ exportMode: true });
-  const built = G.buildBloomInto(acc, state);
+  const built = G.buildBloomInto(acc, state, { capability: { sepalTwinsUnclamped: true } });
   return { acc, built, pos: acc.positions };
 }
 function sepalRange(state, b) {

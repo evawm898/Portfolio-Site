@@ -904,33 +904,72 @@ the smallest cuts along that line, not a global optimum.
 not clear on their own: they do not involve the roll. The three surviving cup × roll cells read the
 same magnitudes they read at roll 180 before the narrowing.
 
-### 10.5 OPEN — how a saved sepal value outside the new range should load
+### 10.5 RULED — a saved sepal value outside the range clamps silently on load (Q-S6, Eva, Oct 9)
 
-**Not decided; Eva's question.** The bloom persists no design and ships no presets, so the "saved
-designs" are the matrix sets — and **81 frozen rows** hold a sepal roll past ±180: three rows
-(`sepalRoll min (-330)`, `max (330)`, the GATED row) in each of the 27 frozen phases phase35 …
-phase61. No live row does. What happens today, with nothing built for it: **the geometry does not
-clamp** (Node builds 330 as asked; the frozen definitions still deep-compare), **the page's range
-input clamps silently** to 180, and **the harness refuses the row** on its read-back ("a value that
-did not take"), so those 81 rows can no longer be replayed through the browser. Rendered on the
-sheet (§3) for a saved `sepalRoll` 330:
+**Ruled (a): clamp silently.** A stored sepal roll past −180..180 loads as the NEAREST bound —
+330 as 180, −330 as −180 — with no read-out, no warning and no migration. The ids and registry
+rows stay. The bloom persists no design and ships no presets, so the "saved designs" are the
+matrix sets: **81 frozen rows** hold a sepal roll past ±180, three (`sepalRoll min (-330)`,
+`max (330)`, the GATED row) in each of the 27 frozen phases phase35 … phase61. No live row does.
+
+**What it was before the ruling:** the page's range input clamped silently, the geometry did not
+(Node built 330 as asked), and the harness refused the row on its read-back ("a value that did not
+take"), so those 81 rows could not be replayed through the browser. The options as they were put:
 
 | option | builds | told | gap / census |
 |---|---|---|---|
-| **(a) clamp silently** | 180 | nothing | 1.128 mm / 0 |
-| **(b) clamp with a read-out** (`SEPAL ROLL CLAMPED: ASKED 330, BUILT 180`, the `CUP CLAMPED` shape) | 180 | the line | 1.128 mm / 0 |
-| **(c) build as saved** | 330 — past the control | nothing | 0.876 mm / 1600 pairs |
+| **(a) clamp silently — RULED** | 180 | nothing | 1.128 mm / 0 |
+| (b) clamp with a read-out (`SEPAL ROLL CLAMPED: ASKED 330, BUILT 180`) | 180 | the line | 1.128 mm / 0 |
+| (c) build as saved | 330 — past the control | nothing | 0.876 mm / 1600 pairs |
 
-(a) and (b) are the same geometry and differ only by the read-out line. IDs and registry rows stay;
-no migration.
+**What was built (the follow-up to #392):**
 
-**Q-S6. A saved sepal value past the narrowed range loads: A clamp silently · B clamp and tell ·
-C build as saved.**
+- **`sepalTwinValue(sepalId, v)`** in `bloom-geometry.js` is the one place a stored twin becomes
+  the value the sepal is built from. Past the bound it returns the nearest bound. Inside the bound
+  it returns `Number(v)` itself — a branch, so every in-range state is bit-identical to before.
+  `sepalBladeState` is its one caller, so the page (whose input already clamped) and every Node
+  consumer build the same sepal.
+- **The harness read-back expects the loaded value.** `loadedValue` restates the bound from the
+  ruling (`RULED_SEPAL_LOAD_BOUNDS`, asserted equal to `SEPAL_TWIN_BOUNDS` at module load).
+  `applyConfig` and `fullStateDrift` now expect a stored 330 to read back as 180, so the 81 rows
+  replay again. This applies only when the served tree is this tree; another root's registry
+  carries its own bounds.
+- **The capability hook `{ sepalTwinsUnclamped: true }`** builds the value as stored. No control
+  reaches it. It exists for the instruments that must build past the bound to prove it:
+  `bloom-sepal-ranges.mjs` (its `--control` builds ±185), the wall instrument's 195 leg, and the
+  sheet's OLD-MAX and option (c) cells, which keep rendering what they rendered.
+- **The witness is `node tools/verify-bloom-sepal-load-clamp.mjs`:**
+  - SL0: the function — every twin is itself inside its bound (60 values over 15 twins), and a
+    stored 330 / −330 / 185 / −185 / 190 / −190 loads as the nearest bound.
+  - SL1: a stored ±330 emits exactly the build at ±180, every float under `Object.is`, live and
+    export.
+  - SL2: the same value through the hook differs, so SL1 is the clamp and not an inert roll.
+  - SL3: an in-range 170 is untouched.
+  - SL4 / SL5 (`--browser`): the real page takes a stored ±330 with no read-back refusal; the app
+    state and the input read ±180; the read-out is character for character a page handed ±180,
+    with only the scan's own ms timing masked.
+  - `--control`: three mutants, all caught — the clamp removed (330 loads as 330), the FAR bound
+    taken (−330 loads as 180), and the blade state bypassing the clamp.
+  - `--frozen --base <worktree>`: the movers, below.
+- **Frozen bytes, measured against a worktree of #392's head:**
+  - **54 of the 81 rows change bytes** — `sepalRoll min (-330)` and `sepalRoll max (330)` in each
+    of phase35 … phase61, now built at ∓180.
+  - **27 hold** — the GATED row, whose `sepalCount` is 0, so no sepal is built.
+  - All 81 build exactly as the bound in both modes.
+  - The definitions are untouched; `--verify-frozen` still deep-compares every phase.
+  - Per Eva's instruction a new baseline is taken the way phase61 was: **`frozen/phase62` = the 1,282
+    rows at `e008938`** (#392's merge commit, `main`'s head before this change), registered in
+    both maps.
+- **No live row moves:** none stores a value past a bound, and the clamp is an identity inside it.
+  Re-anchored on the changed line: `sepal-roll-twin-dropped` (wall instrument),
+  `sepal-reads-the-petals-controls` and `sepal-angle-clamp-removed` (apex mutant table), and the
+  sepal-decoupled control. All 148 apex anchors match exactly once.
 
 ### 10.6 Reproduce
 
 ```
 node tools/bloom-sepal-ranges.mjs --roll --control      # the bound, from both sides, both measures
+node tools/verify-bloom-sepal-load-clamp.mjs [--browser] [--control] [--frozen --base <worktree>]   # Q-S6: past the bound loads as the bound
 node tools/bloom-sepal-ranges.mjs --corners --allmax    # the all-max cuts (minutes)
 node tools/shot-bloom-sepal-ranges.mjs docs/img/sepal-ranges.png --json docs/img/sepal-ranges.json
 ```

@@ -61,11 +61,11 @@ let MUT = G;
 if (CONTROL) {
   const fs = await import('node:fs');
   const src = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
-  const from = 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);';
+  const from = 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);';
   if (src.split(from).length !== 2) { console.error(`the control's anchor matches ${src.split(from).length - 1}x — re-anchor it`); process.exit(2); }
   const out = path.join(ROOT, '.sepal-decoupled-control.mjs');
   /* The cup twin is skipped: the sepal's cup then reads the petal's. */
-  fs.writeFileSync(out, src.replace(from, "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalCup') s[petalId] = Number(state[sepalId]);"));
+  fs.writeFileSync(out, src.replace(from, "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalCup') s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);"));
   MUT = await import(pathToFileURL(out).href);
   process.on('exit', () => { try { fs.unlinkSync(out); } catch { /* nothing to clean */ } });
 }

@@ -62,7 +62,10 @@ const JSON_OUT = args.includes('--json') ? args[args.indexOf('--json') + 1] : nu
 
 export function sepalSelf(set, { withCensus = false } = {}) {
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
-  const m = G.buildBloomInto(acc, { ...DEFAULTS, sepalCount: 5, ...set });
+  /* the stored value AS ASKED: past the bound a sepal twin clamps on load
+     (Eva's Q-S6 ruling), and this tool has to build one step past it to prove
+     the bound — so it goes through the geometry's capability hook */
+  const m = G.buildBloomInto(acc, { ...DEFAULTS, sepalCount: 5, ...set }, { capability: { sepalTwinsUnclamped: true } });
   const built = m.sepals && m.sepals.built ? m.sepals.built.filter((p) => p && p.grid) : [];
   if (!built.length) throw new Error(`no sepal built for ${JSON.stringify(set)} — the measure would read nothing`);
   let best = null;
