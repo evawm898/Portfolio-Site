@@ -115,8 +115,9 @@ export function swallowtailReferenceSvg(width = 680, height = 680) {
 /* A THREE-PAIR library entry (design doc §18) — the gate's fixture for the
    N-pair form, so the LB8-LB10 clauses, the `library3:` rows and the IM15/IM16
    picture are never vacuous while the shipped library holds no three-pair
-   entry (and stay independent of Eva's keep list once it does). Three STRAP
-   wings (the dragonfly fixture's outline, at chord stretch 1.3) fanned at
+   entry (and stay independent of Eva's keep list once it does). Three LEAF
+   blades (FAN_BLADE below: a convex outline narrow at the root, widest past
+   the middle, at chord stretch 1.3) fanned at
    -15, +15 and +48 deg at 1 / 0.85 / 0.9 of the front pair's length — each
    stored in the library's own form: the outline turned to angle 0, the angle
    as `sweep`, a +-3 deg range held by LB8 at both ends. Straps, and fanned,
@@ -125,7 +126,20 @@ export function swallowtailReferenceSvg(width = 680, height = 680) {
    found angles hid the middle lobe under the front one, and the bottom pair
    came back a 5 mm sliver (measured). */
 const r9 = (x) => +x.toFixed(9);
-const FAN_BLADE = HAND_OUTLINES.strap;
+// A LEAF, not the dragonfly STRAP it was: the gate builds the fitted fixture
+// as an ordinary row through every clause, and a straight-sided strap's lower
+// margin meets the fitter's wall (rooted at the attachment's MIDDLE, design
+// doc §18) at the fan's own 15 deg, so the fitted front pair carried a wedge
+// tapering to nothing at the notch — 4.37 mm past where a floor-wide disc
+// fits, the STL refused, the middle pair's neck 1.40 mm (JB2) — at every
+// tolerance 0.35..1.3 (measured). No real wing's margin is straight into a
+// notch, and the seven kept artwork fits read no floor violation and necks of
+// 2.2-3.3 mm. A convex blade narrow at the root leaves the wall at a wide
+// angle: swept over six outlines x five fans x three length sets x three
+// stretches (270 fixtures), only this blade at this fan fits with no floor
+// violation on either body, every neck over the bar, both notches found and
+// the union within the IM3 bound (five of 270, all this blade at -15/15/48).
+const FAN_BLADE = [[0, 0.03], [0.25, 0.1], [0.5, 0.14], [0.75, 0.13], [0.95, 0.08], [1, 0], [0.95, -0.08], [0.75, -0.13], [0.5, -0.14], [0.25, -0.1], [0, -0.03]];
 // made the way the library's entries and tools/bug-wing-three-pair.mjs make
 // one: the blade is POSED first (setWingAngle to the asked angle, which the
 // measure then reads within 0.01 deg), the stored angle is the posed wing's
@@ -144,7 +158,7 @@ const strapAt = (deg, lengthRatio, stretch = 1.3) => {
   return { stretch, lengthRatio, sweep, range: [-3, 3], points: pts };
 };
 export const THREE_PAIR_SHAPE = {
-  id: 0, name: 'fixture', source: 'fixture: three straps at -15 / +15 / +48',
+  id: 0, name: 'fixture', source: 'fixture: three leaf blades at -15 / +15 / +48',
   pairs: [strapAt(-15, 1), strapAt(15, 0.85), strapAt(48, 0.9)],
   tail: null,
 };

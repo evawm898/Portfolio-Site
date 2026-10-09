@@ -3217,18 +3217,37 @@ with the reviewer's reading beside it (`VERDICTS`). `--emit` appends the kept ca
   behind its notch hands the pair ahead a sliver of the pair behind and that outline is refused —
   the fit says so and the page keeps the last good fit, as the two-pair line does; the clause moves
   the lines along the margin toward the head, 3 mm, the roots a quarter as far.)
-- **The fixture is three STRAP wings fanned at −15 / +15 / +48°** (`THREE_PAIR_SHAPE`,
+- **The fixture is three LEAF blades fanned at −15 / +15 / +48°** (`THREE_PAIR_SHAPE`,
   tools/bug-fixtures.mjs), stored in the library's own form with a ±3° range: a picture of it has
   to show three lobes with a notch between each, and thirty-two mixes of the library's own broad
-  wings at their found angles hid the middle lobe under the front one. The fixture is made the way
-  the library's entries are: the strap is POSED (`setWingAngle`) and the stored angle is the posed
+  wings at their found angles hid the middle lobe under the front one. **It was the dragonfly
+  STRAP first, and the gate's own fitted row refused it**: the fitted fixture is built as an
+  ordinary row through every clause, and a straight-sided strap's lower margin meets the wall
+  rooted at the attachment's middle at the fan's own 15°, so the fitted front pair carried a wedge
+  tapering to nothing at the notch — 4.37 mm past where a floor-wide disc fits, the STL refused,
+  the middle pair's neck 1.40 mm under JB2's 1.5 — at every tolerance from 0.35 to 1.3 (measured).
+  That is the strap's geometry, not the fitter's: no real wing's margin runs straight into a notch,
+  and the seven artwork fits Eva is ruling on read no floor violation and necks of 2.2–3.3 mm on
+  the default body. Swept over six outlines × five fans × three length sets × three stretches
+  (270 fixtures) through the fitter and both bodies' rules, five fit clean and all five are this
+  convex blade at this fan. The fixture is made the way
+  the library's entries are: the blade is POSED (`setWingAngle`) and the stored angle is the posed
   wing's own reading, with the canonical outline turned back by it (`turnWingFree`) — turning a
   canonical outline by a nominal angle reads 0.1–0.3° off it (the measure drops the samples inside
   the root ramp, and a turn moves which samples those are), which LB8 holds to 0.05°.
 - **Negative control**: three code mutants of bug-geometry.js (a three-pair shape blends its
   middle → LB8; keeps the pair count → LB9; three-pair entries enter the blend pool → LB10), a DATA
   mutant (the fixture's middle angle zeroed → LB8), and two of bug-image.js (the notch pair never
-  found → IM15; the page's two lines ignored → IM16).
+  found → IM15; the page's two lines ignored → IM16). **Two of those were MISSED on the first full run
+  and both were the clause's fault, not the mutant's**: the blend draw is a min-hash over ids, so
+  an N-pair entry admitted to the pool is drawn with chance ~1/54 per slot and 17 rolls missed it
+  (a coin flip, the fixture-is-the-clause class) — LB10 now also hands the draw a pool of ONE
+  two-pair entry beside TWO N-pair ones, where the filtered pool is a single shape and no blend can
+  be drawn at all, which an unfiltered pool cannot satisfy; and the fixture's points are stored
+  turned onto their own axis, so a ZEROED middle angle poses a pair that READS zero and the
+  "stored angle equals the posed reading" clause held with one owner on both sides — the fixture's
+  three angles are restated in the gate (`FIXTURE_SWEEPS`) and LB8 holds the fixture's posed
+  pairs to them; the shipped entries have no restatement and are held only by self-consistency.
 - **Cost**: LB8–LB10 add ~10 s; the `library3:` rows five builds per entry (the fixture's five
   today); IM15/16 two fits. The gate's wall-clock is in §18.6.
 

@@ -34,7 +34,9 @@
           applied to the default bug the pair count is N, every pair is the
           shape's own posed outline (first, every unlinked middle, last), no
           pair crosses itself, no floor violation and no repair note; each
-          stored angle is its posed pair's measured angle; the control lands
+          stored angle is its posed pair's measured angle (and the FIXTURE's
+          read the angles restated in this file, since a zeroed stored angle
+          poses a pair that reads zero); the control lands
           at both ends of each pair's stored range; and the same holds built on
           EVERY winged body preset (Butterfly, Moth, Bee, Dragonfly) — a bug
           with three roots along the thorax blends at the junction with no
@@ -50,7 +52,12 @@
      LB10 the random draws never see an N-pair entry: RANDOMIZE WINGS on the
           library WITH the fixture appended gives byte-identical params and
           labels to the library without it (seeds on the default and on random
-          bases), and no label names an N-pair id.
+          bases), and no label names an N-pair id. The draw is a min-hash over
+          ids, so that arm alone is a coin flip against a pool that admits
+          them (measured: ~half of 17 rolls never draw the appended entry); a
+          pool of ONE two-pair entry beside TWO N-pair ones must draw NO blend
+          (the filtered pool is one shape and the fallback applies it), which
+          a pool admitting them cannot satisfy.
      LB7  the draws are keyed on shape IDS, not on library position (§15.1): on
           every random gate row (random:1..40, the whole-bug Randomize) and on
           RANDOMIZE WINGS seeds 1..8 on the default, the library with one shape
@@ -83,6 +90,8 @@
           ends of the stored range on three shapes, each pair alone and both. */
 
 import { THREE_PAIR_SHAPE } from './bug-fixtures.mjs';
+// the three-pair fixture's angles, restated (LB8's reference for them — bug-fixtures.mjs is the quantity's owner)
+const FIXTURE_SWEEPS = [-15, 15, 48];
 // this file's own crossing count (the gate's segment test, copied: importing
 // verify-bug.mjs would run the whole gate)
 function segCross(a, b, c, d) {
@@ -225,6 +234,12 @@ export function libraryChecks(G, opts = {}) {
         if (!same(sp.points, P.points) || sp.stretch !== P.stretch || sp.sweep !== 0 || sp.scallop !== 0) bad8.push(`${tag} pair ${k + 1}: not the shape's posed outline`);
         if (selfCrossingCount(G.sampleOutline(sp.points))) bad8.push(`${tag} pair ${k + 1}: crosses itself`);
         const a = G.wingAngleOf(P.points, P.stretch); if (!(Math.abs(a - w.sweep) <= 0.05)) bad8.push(`${tag} pair ${k + 1}: stored angle ${w.sweep}, the posed pair reads ${a.toFixed(2)}`);
+        // the FIXTURE's angles restated HERE, not read from the fixture: its
+        // points are stored turned onto their own axis, so a zeroed stored
+        // angle poses a pair that READS zero and the clause above holds (the
+        // reference and the quantity had one owner) — the shipped entries have
+        // no such restatement and are held only by the self-consistency above
+        if (!s.id && !(Math.abs(a - FIXTURE_SWEEPS[k]) <= 0.05)) bad8.push(`${tag} pair ${k + 1}: posed at ${a.toFixed(2)}, the fixture declares ${FIXTURE_SWEEPS[k]}`);
         const R = w.range; if (!Array.isArray(R) || !(R[0] <= 0 && R[1] >= 0)) { bad8.push(`${tag} pair ${k + 1}: no stored range`); return; }
         const a0 = a, tail = k === N - 1 && s.tail ? { ...s.tail, on: true } : null;
         for (const off of [R[0], R[1]]) { if (!off) continue; const r = G.setWingAngle(P.points, P.stretch, a0 + off, tail); if (!r.ok) { bad8.push(`${tag} pair ${k + 1} ${off}: refused inside its range (${r.reason})`); continue; } const got = G.wingAngleOf(r.points, r.stretch); if (!(Math.abs(got - a0 - off) <= 0.01)) bad8.push(`${tag} pair ${k + 1} ${off}: lands at ${(got - a0).toFixed(3)}`); }
@@ -284,7 +299,19 @@ export function libraryChecks(G, opts = {}) {
       if (r0.label !== r1.label || !same(r0.params, r1.params) || !same(r0.blend, r1.blend)) bad10.push(`${name} seed ${seed}: the draw moved with an N-pair entry in the library ("${r0.label}" -> "${r1.label}")`);
       if (/#999\b/.test(r1.label) || (r1.blend && (r1.blend.a === 999 || r1.blend.b === 999 || r1.blend.refused.some((x) => x.a === 999 || x.b === 999)))) bad10.push(`${name} seed ${seed}: an N-pair entry was drawn`);
     }
-    ok(!bad10.length && n10 > 0, `LB10: the random draws never see a three-pair entry — ${n10} rolls byte-identical with the fixture appended to the library, no label names it${bad10.length ? ' — ' + bad10.slice(0, 3).join(' | ') : ''}`);
+    // the draws above are a min-hash over ids, so an N-pair entry in the pool
+    // is drawn with chance ~1/N per slot and 17 rolls MISS it about half the
+    // time (measured: the pool-filter mutant fired nothing) — a coin flip, not
+    // a witness. This arm is deterministic: a pool of ONE two-pair entry and
+    // TWO N-pair ones leaves the filtered pool a single shape, so no blend can
+    // be drawn at all and the fallback applies that one entry; with the filter
+    // gone the pool is three and every draw is a blend naming an N-pair id
+    const one = lib[0], FXb = { ...FX, id: 998 };
+    for (const seed of [1, 2, 3]) {
+      let r; try { r = G.randomWingBlend(d, seed, { library: [{ ...FX, id: 999 }, FXb, one] }); } catch (e) { bad10.push(`pool-of-one seed ${seed}: ${e.message}`); continue; } n10++;
+      if (!r.blend || r.blend.a !== one.id || r.blend.b !== one.id || r.blend.t !== 0 || !/no blend passed/.test(r.label)) bad10.push(`pool-of-one seed ${seed}: with one two-pair entry and two N-pair ones the draw should be that one entry unblended, got "${r.label}"`);
+    }
+    ok(!bad10.length && n10 > 0, `LB10: the random draws never see a three-pair entry — ${n10} rolls byte-identical with the fixture appended to the library, no label names it, and a pool of one two-pair entry beside two N-pair ones draws no blend${bad10.length ? ' — ' + bad10.slice(0, 3).join(' | ') : ''}`);
   }
   // LB7 (opts.lb7 === false skips it: the negative control runs it only on the
   // clean module and on the mutant that names it — every other mutant names

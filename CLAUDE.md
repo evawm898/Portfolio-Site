@@ -10332,7 +10332,7 @@ rejected the real three-pair butterfly — both measured and withdrawn), the fou
 attachment's middle as the two-pair wall is, with two draggable default lines where a notch is not
 found; a boundary between lobes drawn OVERLAPPING is not a silhouette notch and is the
 draggable line's case. The LB8–LB10 / IM15–IM16 families and the `library3:` rows run on the
-gate's own fixture (three fanned straps, `THREE_PAIR_SHAPE`) so they are never vacuous. Dev tool
+gate's own fixture (three fanned LEAF blades, `THREE_PAIR_SHAPE` — a strap first, and its fitted row refused the STL: a straight margin into a notch leaves the front pair a 4.37 mm wedge under the floor) so they are never vacuous. **LB10's blend-pool mutant was a coin flip on a min-hash draw and LB8's zeroed-angle mutant had one owner on both sides** — a pool of one two-pair entry beside two N-pair ones, and the fixture's angles restated in the gate, are the witnesses now (design doc §18). Dev tool
 and review page: `node tools/bug-wing-three-pair.mjs` over the gitignored sources.
 
 ## `/frame` — the Parametric Frame (pointer only)
