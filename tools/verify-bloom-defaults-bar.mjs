@@ -79,6 +79,11 @@ export const SHIPPED_STATES = Object.freeze([
      defaults are the session's, put to Eva from the sheet; when she rules them
      this row follows the ruling. */
   { id: 'the compound leaf at its shipped defaults', matrixRow: 'COMPOUND: the shipped compound defaults (2 pairs + terminal on a 40 mm rachis, 3 alternate nodes)', set: { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 3, leafType: 'COMPOUND' }, measures: ['self', 'leaf-stem'] },
+  /* THE LOBED (CHEVRON) LEAF (leaf/stem build S4) — the third leaf type, a
+     guarded feature, joins the table the day it lands on the same terms: the
+     defaults are the session's proposal toward the chrysanthemum, put to Eva
+     from the sheet; when she rules them this row follows. */
+  { id: 'the lobed leaf at its shipped defaults', matrixRow: 'LOBED: the shipped lobed defaults (a 46 mm blade, 34 mm envelope, 3 alternate nodes)', set: { stemLength: 90, stemDiameter: 6, leafLength: 46, leafNodes: 3, leafType: 'LOBED' }, measures: ['self', 'leaf-stem'] },
   { id: 'the infill at its ruled defaults', matrixRow: 'INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)', set: { petalInfill: 'VORONOI' }, measures: ['self', 'infill-wall'] },
   { id: 'the raceme at its defaults', matrixRow: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)', set: { stemLength: 120, inflorescence: 'RACEME' }, measures: ['self', 'floret-floret', 'floret-head', 'floret-stem'] },
   { id: 'the shared node — a leaf under every pedicel', matrixRow: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel', set: { stemLength: 120, inflorescence: 'RACEME', leafLength: 40 }, measures: ['leaf-floret', 'leaf-pedicel', 'floret-floret', 'floret-head', 'leaf-stem'] },

@@ -68,6 +68,11 @@ import { LEAF_TYPES, LEAFLET_PAIRS_RANGE, LEAFLET_PAIRS_DEFAULT, LEAFLET_FIRST_R
          LEAFLET_TERMINAL_LENGTH_DEFAULT, LEAFLET_TERMINAL_WIDTH_DEFAULT, LEAFLET_STALK_RANGE, LEAFLET_STALK_DEFAULT,
          LEAFLET_TERMINAL_STALK_RANGE, LEAFLET_TERMINAL_STALK_DEFAULT,
          LEAFLET_TOOTH_DEPTH_DEFAULT, LEAFLET_TIP_SHAPE_DEFAULT, compoundLeafLayout } from './bloom-geometry.js';
+/* THE LOBED LEAF (leaf/stem build S4) — the chevron's ranges and defaults,
+   IMPORTED (Q6): `lobedChevronLaw` is the one owner of what each value means. */
+import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_FROM_DEFAULT, LOBED_TO_RANGE, LOBED_TO_DEFAULT,
+         LOBED_SINUS_RANGE, LOBED_SINUS_DEFAULT, LOBED_SHAPE_RANGE, LOBED_SHAPE_DEFAULT, LOBED_ANGLE_RANGE, LOBED_ANGLE_DEFAULT,
+         LOBED_EASE_RANGE, LOBED_EASE_DEFAULT, LOBED_WIDTH_DEFAULT, LOBED_TOOTH_DEPTH_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -521,9 +526,20 @@ export const PREDICATES = {
   /* with ONE pair the pair is the apical pair, full size, at `first`: the
      last station and the basal ratio reach nothing and are hidden AND inert */
   leafCompoundPairs: { all: [{ ref: 'leafCompound' }, { id: 'leafletPairs', min: 2 }] },
-  /* A SIMPLE BLADE'S WIDTH — inert under COMPOUND, where every leaflet has
-     its own; live again on a raceme, where the shared node is SIMPLE. */
-  leafSimpleBlade: { all: [{ ref: 'leafPresent' }, { not: { ref: 'leafCompound' } }] },
+  /* THE LOBED LEAF (leaf/stem build S4): LOBED is asked AND the leaves are the
+     stem's own — a raceme's shared node pins every leaf SIMPLE in the geometry
+     (`SHARED_NODE_LEAF_PINS`), so the Lobes drop-down is hidden AND inert
+     there. LF19 compares the two statements per row. */
+  leafLobed: { all: [{ ref: 'leafNodesOwn' }, { id: 'leafType', oneOf: ['LOBED'] }] },
+  /* A SIMPLE BLADE'S WIDTH AND TOOTH DEPTH — inert under COMPOUND, where every
+     leaflet has its own, and under LOBED, where the envelope and the lobes'
+     teeth have theirs (the twins); live again on a raceme, where the shared
+     node is SIMPLE. */
+  leafSimpleBlade: { all: [{ ref: 'leafPresent' }, { not: { ref: 'leafCompound' } }, { not: { ref: 'leafLobed' } }] },
+  /* ONE BLADE ON ITS PETIOLE — SIMPLE or LOBED (S4): the tip shape is the one
+     outline value the two share (measured, the lobed default is the simple
+     leaf's own 1.30). */
+  leafOneBlade: { all: [{ ref: 'leafPresent' }, { not: { ref: 'leafCompound' } }] },
   /* The serration follows the leaf AND its own depth guard — the curl family's
      gating one level down, so the four shape rows are inert at depth 0. */
   /* (the depth that guards it is the BLADE's own: the simple leaf's, or under
@@ -531,6 +547,7 @@ export const PREDICATES = {
   leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { any: [
     { all: [{ ref: 'leafSimpleBlade' }, { id: 'leafToothDepth', min: 0.01 }] },
     { all: [{ ref: 'leafCompound' }, { id: 'leafletToothDepth', min: 0.01 }] },
+    { all: [{ ref: 'leafLobed' }, { id: 'lobedToothDepth', min: 0.01 }] },
   ] }] },
 
   /* ===================================================================
@@ -1169,6 +1186,10 @@ export const SECTIONS = [
      child of the part it belongs to. Declared BEFORE Serration because the
      leaf's structure comes before its edge; the census reads this order. */
   { id: 'leafLeaflets', label: 'Leaflets', parent: 'leaves', open: false },
+  /* LOBES (leaf/stem build S4): the lobed leaf's own chevron, a drop-down
+     inside Leaves beside Leaflets — one more child of the part it belongs to,
+     declared after Leaflets and before Serration (structure before edge). */
+  { id: 'leafLobes', label: 'Lobes', parent: 'leaves', open: false },
   { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
   /* THE INFLORESCENCE — a NEW TOP-LEVEL SECTION AFTER STEM (Eva's ruling 2,
      `docs/bloom-inflorescence-discovery.md`), holding the law enum and the
@@ -3891,10 +3912,12 @@ export const CONTROLS = [
     options: [
       { value: LEAF_TYPES[0], label: 'Simple (one blade)' },
       { value: LEAF_TYPES[1], label: 'Compound (leaflets on a rachis)' },
+      { value: LEAF_TYPES[2], label: 'Lobed (forward lobes, one blade)' },
     ],
     label: 'Leaf type',
     fmt: (v, ui) => (String(v) === 'COMPOUND'
       ? `compound · ${2 * Math.round(Number(ui.leafletPairs)) + 1} leaflets — ${Math.round(Number(ui.leafletPairs))} pair${Math.round(Number(ui.leafletPairs)) === 1 ? '' : 's'} and a terminal`
+      : String(v) === 'LOBED' ? `lobed · ${Math.round(Number(ui.lobedLobes))} lobe${Math.round(Number(ui.lobedLobes)) === 1 ? '' : 's'} a side pointing forward, and the terminal — one blade on its petiole`
       : 'simple · one blade on its petiole'),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodesOwn' } },
   { id: 'leafWidth', section: 'leaves', kind: 'slider',
@@ -3902,6 +3925,14 @@ export const CONTROLS = [
     label: 'Leaf width',
     fmt: (v, ui) => `${v} mm across at the widest point${Number(ui.leafLength) > 0 ? ` · ${(Number(ui.leafLength) / Number(v)).toFixed(1)}:1` : ''}`,
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSimpleBlade' } },
+  /* THE LOBED LEAF'S ENVELOPE WIDTH — a twin of `leafWidth` (S4): the lobes cut
+     into an envelope, and the mum's is twice the simple blade's 17 mm, which
+     may not move. The width the lobes' crests reach; the sinuses cut in. */
+  { id: 'lobedWidth', section: 'leaves', kind: 'slider',
+    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: LOBED_WIDTH_DEFAULT,
+    label: 'Envelope width',
+    fmt: (v, ui) => `${v} mm across the lobes' crests at the widest point${Number(ui.leafLength) > 0 ? ` · ${(Number(ui.leafLength) / Number(v)).toFixed(1)}:1` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
   { id: 'leafAngle', section: 'leaves', kind: 'slider',
     min: LEAF_ANGLE_RANGE[0], max: LEAF_ANGLE_RANGE[1], step: 1, default: LEAF_ANGLE_DEFAULT,
     label: 'Leaf angle',
@@ -3958,6 +3989,9 @@ export const CONTROLS = [
         const cls = lat.length > 1 ? [['basal pair', lat[0].widthMm], ['top pair', lat[lat.length - 1].widthMm]] : [['pair', lat[0].widthMm]];
         cls.push(['terminal', lay.terminal.widthMm]);
         base = `${c.toFixed(2)} — the margins ${verb} ${cls.map(([n, w]) => `${Math.abs((c * w) / 2).toFixed(2)} mm (${n}, ${w.toFixed(1)} mm wide)`).join(' · ')} at each leaflet's widest point`;
+      } else if (evalPredicate({ ref: 'leafLobed' }, ui)) {
+        /* (a lobed leaf's lift is on its ENVELOPE's widest point — S4) */
+        base = `${c.toFixed(2)} — the lobes' crests ${verb} ${Math.abs((c * Number(ui.lobedWidth)) / 2).toFixed(2)} mm at the widest point`;
       } else base = `${c.toFixed(2)} — the margins ${verb} ${Math.abs((c * Number(ui.leafWidth)) / 2).toFixed(2)} mm at the widest point`;
       return base + (cl && cl.u !== null ? ` · CLAMPED at u ${Number(cl.u).toFixed(3)}, where the blade narrows (the section may not fold through its own skins)` : '');
     },
@@ -3995,8 +4029,9 @@ export const CONTROLS = [
         + (cl.fraction > 0.05 ? ` — CLAMPED: a point below ${cl.terminalMm.toFixed(2)} mm cannot be printed, and a pointier shape only LENGTHENS the stub; a WIDER leaf shortens it (the share is set by the width, never the length)` : '');
     },
     /* A SIMPLE BLADE'S OWN (Eva's ruling on #380): under COMPOUND every
-       leaflet reads `leafletTipShape`, so this one is hidden AND inert there */
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSimpleBlade' } },
+       leaflet reads `leafletTipShape`, so this one is hidden AND inert there.
+       A LOBED blade reads it too (S4 — the terminal lobe's tip). */
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafOneBlade' } },
 
   /* THE LEAFLETS (leaf/stem build S3) — the compound leaf's own tree, every
      value the leaf-lab's ROSE (its §6b PINNATE_COMPOUND tree, on the
@@ -4075,6 +4110,67 @@ export const CONTROLS = [
     fmt: (v) => (Number(v) === 0 ? '0 mm — the terminal leaflet sits on the rachis tip' : `${v} mm from the rachis tip to the terminal leaflet`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
 
+  /* THE LOBES (leaf/stem build S4) — the lobed leaf's own chevron, every value
+     the leaf-lab's chrysanthemum (its §6b PINNATIFID tree: lobes per side,
+     lobes from u, lobes to u, sinus depth, lobe shape, row tilt, tilt eases
+     from u) on the registry's conventions. NONE OF THE DEFAULTS IS RULED —
+     proposed on the sheet. Every row is hidden AND inert unless LOBED. The
+     read-outs tell the SHOWN build's two caps and the sinus gap (the stamen
+     spread's precedent: `fmt`'s third argument is the shown build's record). */
+  { id: 'lobedLobes', section: 'leafLobes', kind: 'slider',
+    min: LOBED_PER_SIDE_RANGE[0], max: LOBED_PER_SIDE_RANGE[1], step: 1, default: LOBED_PER_SIDE_DEFAULT,
+    label: 'Lobes per side',
+    fmt: (v) => { const n = Math.round(Number(v)); return `${n} lobe${n === 1 ? '' : 's'} a side and the terminal — ${n} sinus${n === 1 ? '' : 'es'} each side`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  { id: 'lobedFrom', section: 'leafLobes', kind: 'slider',
+    min: LOBED_FROM_RANGE[0], max: LOBED_FROM_RANGE[1], step: 0.01, default: LOBED_FROM_DEFAULT,
+    label: 'Lobes from',
+    fmt: (v, ui) => `${(100 * Number(v)).toFixed(0)}% along the blade${Number(ui.leafLength) > 0 ? ` · ${(Number(v) * Number(ui.leafLength)).toFixed(1)} mm` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  { id: 'lobedTo', section: 'leafLobes', kind: 'slider',
+    min: LOBED_TO_RANGE[0], max: LOBED_TO_RANGE[1], step: 0.01, default: LOBED_TO_DEFAULT,
+    label: 'Lobes to',
+    fmt: (v, ui) => `${(100 * Number(v)).toFixed(0)}% along the blade — the terminal lobe above it${Number(ui.leafLength) > 0 ? ` · ${(Number(v) * Number(ui.leafLength)).toFixed(1)} mm` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  { id: 'lobedSinus', section: 'leafLobes', kind: 'slider',
+    min: LOBED_SINUS_RANGE[0], max: LOBED_SINUS_RANGE[1], step: 0.01, default: LOBED_SINUS_DEFAULT,
+    label: 'Sinus depth',
+    /* THE SINUS GAP IS TOLD AND NEVER CLAMPED (the brief: sinus-depth clamping
+       is unruled) — the narrowest in-plane opening between two lobes, one
+       minimum feature from the sinus bottom, from the SHOWN build's record */
+    fmt: (v, ui, shown) => {
+      const d = Number(v);
+      if (d === 0) return '0 — no lobes: an unlobed chevron';
+      const g = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0] && shown.leaf.lobed[0].sinusGaps;
+      const head = `${d.toFixed(2)}x the envelope cut in at every sinus`;
+      if (!g || g.minGapMm === null) return head;
+      return `${head} · the narrowest sinus opens ${g.minGapMm.toFixed(2)} mm one minimum feature from its bottom`
+        + (g.under ? ` — UNDER the ${'1.00'} mm print gap at ${g.under} sinus${g.under === 1 ? '' : 'es'}: a slit that fuses over up to ${g.maxFusedMm.toFixed(2)} mm (told, never clamped)` : '');
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  { id: 'lobedShape', section: 'leafLobes', kind: 'slider',
+    min: LOBED_SHAPE_RANGE[0], max: LOBED_SHAPE_RANGE[1], step: 0.05, default: LOBED_SHAPE_DEFAULT,
+    label: 'Lobe shape',
+    fmt: (v) => { const k = Number(v); return `${k.toFixed(2)} — ${k < 1 ? 'broad lobes, narrow sinuses' : k === 1 ? 'a raised cosine' : 'narrow lobes, broad sinuses'}${k <= 0.5 ? ' (a corner at the sinus)' : ''}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  { id: 'lobedAngle', section: 'leafLobes', kind: 'slider',
+    min: LOBED_ANGLE_RANGE[0], max: LOBED_ANGLE_RANGE[1], step: 1, default: LOBED_ANGLE_DEFAULT,
+    label: 'Lobe angle',
+    /* THE TILT CAP, told: where the lobes alone would fold the lattice the
+       built tilt gives, never the asked (clamped and told, never refused) */
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      const L = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0];
+      const head = `${a}° forward of square — every row a V leaning toward the tip`;
+      return L && L.tiltClamped ? `${head} · CLAMPED: built at ${L.tiltBuiltDeg.toFixed(2)}° — steeper, these lobes would fold the blade's lattice across its midrib (told, never refused)` : head;
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+  { id: 'lobedEase', section: 'leafLobes', kind: 'slider',
+    min: LOBED_EASE_RANGE[0], max: LOBED_EASE_RANGE[1], step: 0.01, default: LOBED_EASE_DEFAULT,
+    label: 'Tilt eases from',
+    fmt: (v) => `${(100 * Number(v)).toFixed(0)}% along the blade — square to the midrib at the tip`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
+
   /* THE EDGE. Serration is botanically a LEAF feature, which is what Eva ruled
      in September, and this applies it to the organ it belongs on. It shares the
      petal's CUT MACHINERY — the same `g(r)` two-exponent law, the same crest
@@ -4101,6 +4197,26 @@ export const CONTROLS = [
     label: 'Leaflet tooth depth',
     fmt: (v) => (Number(v) === 0 ? 'none — every leaflet an entire margin (the compound default)' : `${Number(v).toFixed(2)}x each leaflet's own half-width`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+  /* THE LOBED BLADE'S OWN TOOTH DEPTH (leaf/stem build S4) — the twin, LIGHT
+     by default (the mum's lobes are "themselves toothed", shallow by ruling).
+     The 1 mm relief floor applies (Eva, Oct 7) and so does the CHEVRON'S FOLD
+     CAP (Eva, Oct 6: "clamp + read-out") — the slider keeps the asked value,
+     the read-out says asked against built, and where the cap is under the
+     floor no tooth fits and it says that. */
+  { id: 'lobedToothDepth', section: 'leafSerration', kind: 'slider',
+    min: 0, max: 1, step: 0.01, default: LOBED_TOOTH_DEPTH_DEFAULT,
+    label: 'Lobe tooth depth',
+    fmt: (v, ui, shown) => {
+      const d = Number(v);
+      if (d === 0) return 'none — the lobes carry entire margins';
+      const S = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0] && shown.leaf.lobed[0].teeth;
+      const head = `${d.toFixed(2)}x the envelope's half-width`;
+      if (!S) return head;
+      if (S.noRoomWhy === 'fold cap') return `${head} · lobe teeth: NONE FIT — the fold cap is ${S.foldCapMm.toFixed(2)} mm, under the ${'1.00'} mm floor (a notch the floor deep would fold the lattice across its midrib; told, never refused)`;
+      if (S.noRoom) return `${head} · no room for teeth (${S.noRoomWhy})`;
+      return `${head} · ${S.countBuilt} teeth at ${S.reliefBuiltMm.toFixed(2)} mm` + (S.foldClamped ? ` — CLAMPED: asked ${S.reliefFlooredMm.toFixed(2)} mm, built at the fold cap ${S.foldCapMm.toFixed(2)} mm (steeper teeth fold the lattice across its midrib)` : '');
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
   { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
     min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: 9,
     label: 'Teeth',

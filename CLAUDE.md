@@ -3686,6 +3686,27 @@ route (ab), TWENTY-TWO routes). Partition (`--movers-predicate compound-taper`, 
 (15,366). No frozen phase owed (no row moved); `frozen/phase57`'s bytes stop reproducing on 33 rows.
 Sheet: `node tools/shot-bloom-rachis-taper.mjs <png> --base <worktree of 9dbb8e1>`.
 
+**A LEAF CAN BE LOBED: THE CHEVRON LATTICE, ONE PANEL, EVERY ROW A V TILTED FORWARD, LOBES AS BUMPS IN THE
+HALF-WIDTH** (Eva's rulings, Oct 8 — leaf/stem build S4; read `docs/bloom-leaf-lobed-outcome.md` before touching
+`lobedChevronLaw`, `lobedLaws`, `lobedSurface`, `lobedStations`, `lobedTiltCapRad`, `lobedReliefFoldCapMm`,
+`lobedSinusGaps`, `widthProfile`'s `chev` branch or LF19-LF24). `leafType` LOBED (a blade OUTLINE TYPE through
+`emitPanel` with S2's bead, cup and arch, on the SIMPLE wire petiole) with a Lobes drop-down (lobes a side, from,
+to, sinus, shape, angle, ease) and two twins, `lobedWidth` (34 mm envelope) and `lobedToothDepth` (0.08); the tip
+shape is SHARED (a twin at 1.5 clamped the default's tilt). **SIMPLE and COMPOUND move 0 floats**: 35 movers /
+1,226 holders over the 1,261-row matrix, both modes (`verify-bloom-surface-bytes --movers-predicate lobed`), and
+the /plot grid .glb is byte-identical on every LOBED row. **TWO CAPS, BOTH CONTINUUM CONDITIONS OF THE FOLD LAW**:
+the teeth's fold clamp (Eva: clamp + read-out; under the 1 mm floor NONE FIT, told) and a TILT cap (a decision
+made without a ruling, because sinus clamping is forbidden), with `LOBED_FOLD_MARGIN` 0.5 the declared slack —
+LF22 reads the inner cells' advance against it off the EMITTED lattice. **The lab's C2 (40 teeth) is unreachable
+here** (slider 12, the tooth law builds ≤ 10 on 112 rows); the clamp-removal mutant is witnessed at 6 lobes x
+depth 0.3. **THE TIP STRETCH IS STATIONED AS THE SIMPLE LEAF STATIONS IT** (`lobedStations`): at uniform 1/111 the
+tip bead folded on 268 of 972 extreme corners; 139 still fold (tilt > 0 on a steep round tip, no matrix row).
+**E2 IS A PRE-EXISTING BEAD CLASS ON WIDE CUPPED BLADES** (SIMPLE at 34 mm reads 51.61 deg) deepened where rows
+meet a lobe flank obliquely; five smoke rows declared. **Sinus gaps are REPORTED, never clamped**: the default
+opens 0.810 mm, 59.7% of the control space under 1 mm — Eva's question. 5,980 tris a leaf; the whorled-8 corner
+170,410 (11.4%). Block 56 (39 rows), smoke block 56 (7), `frozen/phase58` = the 1,222 rows at `89b2292`. Sheet:
+`node tools/shot-bloom-lobed.mjs <png>` -> `docs/img/leaf-lobed.png`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,

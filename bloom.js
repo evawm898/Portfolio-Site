@@ -1707,6 +1707,28 @@ function infloLine(plan, builtInflo) {
    leaf's are its leaflets, in the layout's build order (leaf/stem build S3).
    The one place the metrics hook flattens leaves into blades. */
 function leafBlades(r) { return r.compound ? r.leaflets : [r]; }
+/* THE LOBED LEAF (leaf/stem build S4): the chevron off the BUILDER's own record
+   — the lobes, the tilt asked against built (the tilt cap, told), the teeth's
+   relief asked against built (the fold cap, told, and NONE FIT where it is
+   under the 1 mm floor) and the sinus gaps against the print gap (told, never
+   clamped). Every leaf of a build shares one law, so the first is every one. */
+function lobedLine(leaf, b0) {
+  const Lb = b0 && b0.lobed;
+  if (!Lb) return '';
+  const g = Lb.sinusGaps, S = b0.serration;
+  const tilt = Lb.tiltBuiltRad * 180 / Math.PI;
+  const teeth = !S ? 'none asked'
+    : S.noRoomWhy === 'fold cap' ? `NONE FIT — the fold cap is ${S.foldCapMm.toFixed(2)} mm, under the ${MIN_FEATURE_MM.toFixed(2)} mm floor (told, never refused)`
+    : S.noRoom ? `none (${S.noRoomWhy})`
+    : `${S.countBuilt} at ${S.reliefBuiltMm.toFixed(2)} mm${S.foldClamped ? ` — FOLD CLAMPED: asked ${S.reliefFlooredMm.toFixed(2)} mm, built at the cap (steeper teeth fold the lattice across its midrib)` : ` (the fold cap is ${S.foldCapMm === null ? '—' : S.foldCapMm.toFixed(2)} mm)`}`;
+  return `
+     LOBED ${Lb.lobes} lobe${Lb.lobes === 1 ? '' : 's'} a side over ${(100 * Lb.from).toFixed(0)}–${(100 * Lb.to).toFixed(0)}% of the blade, sinus ${Lb.sinus.toFixed(2)}, shape ${Lb.shape.toFixed(2)} · ONE chevron panel of ${Lb.rows} rows, each a V leaning ${tilt.toFixed(1)}° toward the tip`
+    + (Lb.tiltClamped ? ` — TILT CLAMPED from the asked ${Lb.angleAskedDeg}°: steeper, these lobes fold the lattice (told, never refused)` : '')
+    + `, square to the midrib from ${(100 * Lb.ease).toFixed(0)}% · lobe teeth ${teeth}`
+    + (g && g.minGapMm !== null
+      ? ` · SINUS GAP narrowest ${g.minGapMm.toFixed(2)} mm one minimum feature from its bottom${g.under ? ` — UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm print gap at ${g.under} of ${g.sinuses.length} sinuses, a slit fusing over up to ${g.maxFusedMm.toFixed(2)} mm (told, never clamped)` : ''}`
+      : '');
+}
 function leafLine(leaf, leavesBuilt) {
   const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
   const over = 90 - Math.abs(leaf.angleDeg);
@@ -1838,7 +1860,7 @@ function leafLine(leaf, leavesBuilt) {
     : '';
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node${leaf.divergenceDeg !== null && leaf.divergenceDeg !== undefined ? `, ${leaf.divergenceDeg.toFixed(1)}° between nodes${leaf.divergenceDeg === 180 ? ' — distichous' : ''}` : ''})`
     + (cpd ? ` · COMPOUND, a ${leaf.lengthMm} mm rachis at ${leaf.angleDeg} deg` : ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`)
-    + (leaf.typePinned ? ' · COMPOUND asked, PINNED SIMPLE: a raceme\'s shared node carries a simple leaf (told)' : '')
+    + (leaf.typePinned ? ` · ${String(leaf.typeAsked || 'COMPOUND')} asked, PINNED SIMPLE: a raceme's shared node carries a simple leaf (told)` : '')
     + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
     + `\n     PETIOLE rooted at r = ${leaf.rootR.toFixed(2)} mm, the WALL's mid-thickness — embedded at every angle, and more so as the angle steepens`
     + ` · ${(2 * leaf.petioleR).toFixed(2)} mm across x ${leaf.petioleLenMm.toFixed(2)} mm`
@@ -1851,6 +1873,7 @@ function leafLine(leaf, leavesBuilt) {
     + archLine + edgeLine + teethLine
     + tipLine + sharedLine + capLine
     + compoundLine
+    + lobedLine(leaf, b0)
     + (cpd
       ? `\n     SLENDERNESS L/d petiole ${(leaf.petioleLenMm / (2 * leaf.petioleR)).toFixed(1)} (${leaf.petioleLenMm.toFixed(1)} mm at ${(2 * leaf.petioleR).toFixed(2)} mm) · rachis by stretch ${cpd.slenderness.stretches.map((q) => `${q.ld.toFixed(1)} (${q.fromMm.toFixed(1)}–${q.toMm.toFixed(1)} mm at ${q.dMinMm.toFixed(2)} mm)`).join(', ')} — the most slender stretch is ${cpd.slenderness.worst.fromMm.toFixed(1)}–${cpd.slenderness.worst.toMm.toFixed(1)} mm, L/d ${cpd.slenderness.worst.ld.toFixed(1)} (each read at its thinnest end; the last runs on through the terminal stalk to the terminal's base) — UNMEASURED — no coupon has been printed\n`
       : `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`);
@@ -2212,7 +2235,9 @@ function regenerate() {
                      the same key. The leaf's arch (a compound leaf's is its
                      rachis's), the first blade's cup and tip, and the plan's tree. */
                   leaf: built.leaf && built.leaf.present && built.leavesBuilt && built.leavesBuilt.length
-                    ? { archBuilt: built.leavesBuilt.map((r) => r.arch), cupBuilt: built.leavesBuilt.map((r) => r.cup), tipClamp: built.leavesBuilt.map((r) => r.tipClamp), compound: built.leaf.compound || null }
+                    ? { archBuilt: built.leavesBuilt.map((r) => r.arch), cupBuilt: built.leavesBuilt.map((r) => r.cup), tipClamp: built.leavesBuilt.map((r) => r.tipClamp), compound: built.leaf.compound || null,
+                      /* the LOBED leaf's two caps and its sinus gaps (S4) */
+                      lobed: built.leavesBuilt.map((r) => (r.lobed ? { tiltClamped: r.lobed.tiltClamped, tiltBuiltDeg: r.lobed.tiltBuiltRad * 180 / Math.PI, sinusGaps: r.lobed.sinusGaps, teeth: r.serration } : null)) }
                     : null,
                   buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
                   /* THE LOBES' two caps join the record for the same reason (session
@@ -2734,7 +2759,9 @@ window.__bloomMetrics = () => ({
        raceme's shared node pinned a compound ask, and the compound tree the
        plan laid out (null for a simple leaf). LF14 holds the plan against the
        registry's `leafCompound` and the builder's emitted blades. */
-    type: lastLeaf.type, typePinned: lastLeaf.typePinned === true,
+    type: lastLeaf.type, typePinned: lastLeaf.typePinned === true, typeAsked: lastLeaf.typeAsked,
+    /* the LOBED leaf's law AS ASKED (S4) — null on every other leaf */
+    lobed: lastLeaf.lobed ? JSON.parse(JSON.stringify(lastLeaf.lobed)) : null,
     compound: lastLeaf.compound ? JSON.parse(JSON.stringify(lastLeaf.compound)) : null,
     /* PER BLADE, NOT PER LEAF (S3): every array below that describes a BLADE
        has one entry per emitted blade — a simple leaf's one, a compound
@@ -2809,6 +2836,12 @@ window.__bloomMetrics = () => ({
     leafArchBuilt: (lastLeavesBuilt || []).map((r) => ({ ...r.arch, radiusMm: Number.isFinite(r.arch.radiusMm) ? r.arch.radiusMm : null })),
     cupBuilt: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => ({ coefficient: b.cup.coefficient, clamp: b.cup.clamp ? { ...b.cup.clamp, askedRadiusMm: Number.isFinite(b.cup.clamp.askedRadiusMm) ? b.cup.clamp.askedRadiusMm : null, drawnRadiusMm: Number.isFinite(b.cup.clamp.drawnRadiusMm) ? b.cup.clamp.drawnRadiusMm : null } : null }))),
     serrationBuilt: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.serration)),
+    /* THE LOBED CHEVRON AS BUILT (leaf/stem build S4) — LF19-LF23's measured
+       side, per leaf (null on every other leaf): the law as asked, the tilt
+       and its cap, the per-row tilt and the lobed and envelope half-widths,
+       the EMITTED skin lattice the fold clauses read the planform Jacobian
+       off, the rod's run into the blade, and the sinus gaps. */
+    lobedBuilt: (lastLeavesBuilt || []).map((r) => (r.lobed ? { ...r.lobed, petioleAxis: r.petioleAxis } : null)),
     rimClamps: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rim.clamps.length)),
   } : null,
   leafTris: lastLeafTris,
