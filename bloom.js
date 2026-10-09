@@ -1726,7 +1726,38 @@ function lobedLine(leaf, b0) {
     + (Lb.tiltClamped ? ` — TILT CLAMPED from the asked ${Lb.angleAskedDeg}°: steeper, these lobes fold the lattice (told, never refused)` : '')
     + `, square to the midrib from ${(100 * Lb.ease).toFixed(0)}% · lobe teeth ${teeth}`
     + (g && g.minGapMm !== null
-      ? ` · SINUS GAP narrowest ${g.minGapMm.toFixed(2)} mm one minimum feature from its bottom${g.under ? ` — UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm print gap at ${g.under} of ${g.sinuses.length} sinuses, a slit fusing over up to ${g.maxFusedMm.toFixed(2)} mm (told, never clamped)` : ''}`
+      ? ` · SINUS OPENING narrowest ${g.minGapMm.toFixed(2)} mm above a seated ${MIN_FEATURE_MM.toFixed(2)} mm disc's equator (the emitted rows, before the teeth)${g.under ? ` — UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm print gap at ${g.under} of ${g.sinuses.length} sinuses` : ''}`
+      : '')
+    + roundLine(Lb.roundBottoms, leaf)
+    + lobedPetioleLine(leaf, b0);
+}
+/* THE ROUND SINUS BOTTOMS (S4b, Eva's ruling of Oct 8) — TOLD WHEN THEY BIND:
+   where a round bottom widened a sinus beyond what the depth and shape asked,
+   and NO FIT where neighbouring lobes are too close for one at the asked
+   depth (the asked V then stands, told, never refused). Off the builder's own
+   record; the depth is never moved. */
+function roundLine(R, leaf) {
+  if (!R || !R.needed) return '';
+  const S = R.sinuses;
+  const at = (r) => `${(100 * r.u).toFixed(0)}%`;
+  const built = S.filter((r) => r.built), nofit = S.filter((r) => r.noFit);
+  return `\n     ROUND SINUS BOTTOMS ${built.length} of ${S.length} sinuses WIDENED beyond what the depth and shape asked`
+    + (built.length ? ` (${built.map((r) => `${at(r)}: the asked V opened ${r.openingAskedMm.toFixed(2)} mm, the round bottom holds ${r.openingBuiltMm.toFixed(2)} on a ${(2 * r.radiusMm).toFixed(2)} mm disc, taking up to ${r.takenMm.toFixed(2)} mm of flank${r.steepenedBack || r.steepenedFwd ? `, a wall steepened to meet its flank before the crest` : ''}`).join('; ')})` : '')
+    + ` — the depth untouched, the walls no steeper than the asked flanks`
+    + (nofit.length ? ` · NO ROUND BOTTOM FITS at ${nofit.map((r) => `${at(r)} (${r.noFitWhy}; the asked V opens ${r.openingAskedMm.toFixed(2)} mm)`).join(', ')} — the lobes are too close for one at the asked depth, so the V stands (told, never refused)` : '');
+}
+/* THE LOBED PETIOLE (S4b, Eva's ruling of Oct 8) — the area rule from the
+   blade, capped by the stem, asked against built, off the plan's own record. */
+function lobedPetioleLine(leaf, b0) {
+  const pe = leaf.lobedPetiole;
+  if (!pe) return '';
+  return `\n     PETIOLE ${(2 * pe.radiusMm).toFixed(2)} mm across — the area rule from the blade: ${pe.areaMm2.toFixed(0)} mm^2 of lobed blade against the ${pe.refAreaMm2.toFixed(0)} mm^2 SIMPLE default blade at this length asks ${(2 * pe.askedMm).toFixed(2)} mm (the ${(2 * pe.wireR).toFixed(2)} mm wire x sqrt ${pe.ratio.toFixed(3)})`
+    + (pe.floored ? ', under the wire, so it is the wire'
+      : !pe.thickens ? `; this stem holds only ${(2 * pe.capMm).toFixed(2)} mm with the rooted end inside it at ${leaf.angleDeg}°, UNDER the wire, so the petiole stays the wire (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
+      : pe.clamped ? `; CLAMPED to ${(2 * pe.capMm).toFixed(2)} mm, the most this stem holds with the rooted end inside it at ${leaf.angleDeg}° (asked ${(2 * pe.askedMm).toFixed(2)} -> built ${(2 * pe.radiusMm).toFixed(2)}, told, never refused)`
+      : `, under the ${(2 * pe.capMm).toFixed(2)} mm this stem holds with the rooted end inside it at ${leaf.angleDeg}°`)
+    + (pe.radiusMm > pe.capMm && b0 && Number.isFinite(b0.petioleRootReachMm) && b0.petioleRootReachMm > leaf.outerR
+      ? ` — and its rooted end stands ${(b0.petioleRootReachMm - leaf.outerR).toFixed(2)} mm PROUD of the stem, as a simple leaf's own petiole does at this sheet and angle (told)`
       : '');
 }
 function leafLine(leaf, leavesBuilt) {
@@ -2762,6 +2793,8 @@ window.__bloomMetrics = () => ({
     type: lastLeaf.type, typePinned: lastLeaf.typePinned === true, typeAsked: lastLeaf.typeAsked,
     /* the LOBED leaf's law AS ASKED (S4) — null on every other leaf */
     lobed: lastLeaf.lobed ? JSON.parse(JSON.stringify(lastLeaf.lobed)) : null,
+    /* the LOBED petiole's area law (S4b) — LF26's subject; null otherwise */
+    lobedPetiole: lastLeaf.lobedPetiole ? { ...lastLeaf.lobedPetiole } : null,
     compound: lastLeaf.compound ? JSON.parse(JSON.stringify(lastLeaf.compound)) : null,
     /* PER BLADE, NOT PER LEAF (S3): every array below that describes a BLADE
        has one entry per emitted blade — a simple leaf's one, a compound
