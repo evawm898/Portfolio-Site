@@ -433,7 +433,8 @@ Grouped by mechanism, not ranked by taste. Each item is tagged with its cost:
 
 ## 4. Open questions for Eva
 
-Each is multiple choice. None is resolved here.
+Each is multiple choice. **All eight are answered by Eva's Oct 9 rulings — §6.** The five old
+items Q8 named are §7.
 
 **Q1. "Around the hub" means:**
 
@@ -490,11 +491,197 @@ mechanism, and TUBE Q3.
 
 ---
 
-## 5. Reproduce
+## 6. Eva's rulings (Oct 9)
+
+Recorded verbatim in substance; §4's questions are answered by them as noted.
+
+| # | ruling | answers |
+|---|---|---|
+| R1 | **"Around the hub" means BOTH, as SEPARATE features.** The shipped sepals (under and behind the head, at the rim or partway down the hub-to-stem join) stay as they are. A decoration on the hub's TOP FACE is a separate future feature, **not sepals**. Not designed here. | Q1 → (c), Q2 → (a) |
+| R2 | **The foundation is A+.** Keep the current root — the petal builder on the sepal ring, the attachment solve, the drawn contact limit, the rounded tip (the nib) — and add leaf-style outlines and teeth where that is possible through the substate. **No re-root onto the leaf path.** | Q3 → (A+) |
+| R3 | **The default stays `sepalCount` 0.** No re-baseline. | Q4 → (a) |
+| R4 | **Racemes: florets KEEP inheriting the head's sepals** (ruling 10 of the inflorescence work stands; `PEDICEL_PINS` gains nothing). | Q5 → (a) |
+| R5 | **If sepal teeth ship, they use the leaf's 1.0 mm tooth floor** (`cap.toothReliefFloorMm`, `MIN_FEATURE_MM`). | Q6 → (b) |
+| R6 | **The blind defaults gate is fixed NOW, with coverage** — its own PR (§1.7's finding; the defaults-bar row, a sepal row in the wall instrument and in the two-control gate). | Q7 → (b) + (c) |
+| R7 | **The five old unruled items are ruled NOW, from a sheet.** §7 below is that sheet. | Q8 → (a) |
+
+**OPEN QUESTION, recorded for the hub-top-face feature and NOT for sepals:** that face is the
+centre's region (androecium, gynoecium), and the name **CORONA** is reserved there since session
+20 ("a flared collar between petals and stamens" — the centre-rig retirement, recorded in `CLAUDE.md`). Whether
+the hub-top decoration IS the corona, overlaps it, or must stay clear of it is that feature's own
+discovery's first question. Nothing here designs it.
+
+---
+
+## 7. The five old items — a rulings sheet
+
+![the rulings sheet](img/sepal-rulings.png)
+
+`node tools/shot-bloom-sepal-rulings.mjs docs/img/sepal-rulings.png --json docs/img/sepal-rulings.json --impact`
+(about 45 s for the sheet; `--impact` builds every live row that carries sepals and takes a few
+minutes more). Same machinery as §0's sheet: Node, the shipped `buildBloomInto`, EXPORT mode,
+the deterministic soft renderer, **no pixel delta quoted**. Sepals GREEN, a tube's ring BLUE.
+
+**PROTOTYPE CELLS are captioned in red.** Items 2 and 4 have options nothing shipped can build;
+they come from ONE patched copy of `bloom-geometry.js` in a temp directory, every patch behind a
+switch read from the state, each anchor required to match exactly once. **The tool checks before
+it renders that, with no switch set, the patched copy equals `main` on all 379,800 floats of a
+stemmed, size-varied sepal state.** Nothing in the repository is modified.
+
+**Byte impact is a PREDICTION from the builder's own record on `main` at `2e096bf`, not a byte
+diff.** Of the **1,265 live rows, 79 build sepals.** None of the options below moves the shipping
+default: `sepalCount` is 0 there (R3). A default change moves BYTES, not row definitions, so no
+frozen phase is owed by any of them; each frozen phase's sepal rows stop reproducing by the same
+predicate, which a session that takes an option names in its outcome doc.
+
+Each item is a multiple-choice question. **No option is recommended.**
+
+### 7.1 The sepal size default (`sepalScale`, 0.60)
+
+**What it is.** One factor on the sepal's length AND width together (`SEPAL_SCALE_DEFAULT` in
+`bloom-geometry.js`, the `sepalScale` row in `bloom-registry.js`; range 0.20–1.00). 0.60 was the
+sepals session's own pick from its own sheet (`docs/bloom-sepals-outcome.md` §11.1, §12i.4) and
+was never ruled. **Measured:** at the rim, on the default petals, the drawn angle limit is
+**21° at every value on the sheet** (scale does not reach it there); the triangle count is
+**3,062 a sepal at every size** (the factor scales the lattice's coordinates, not its count:
+39,998 for 5 sepals in every cell). At 1.00 and phase 0 the sepal foot IS the petal foot and the
+census reads the declared weld (§1.7) — interleaved, as here, it does not.
+
+| option | what changes | triangles | bytes |
+|---|---|---|---|
+| **A** 0.40 | sepals 40% of the petal's length and width | 0 | 72 of 79 sepal rows move (every one that does not pin `sepalScale`) |
+| **B** 0.60 (keep) | nothing | 0 | 0 |
+| **C** 0.80 | sepals 80% of the petal's length and width | 0 | the same 72 |
+| **D** 1.00 | sepals as long and as wide as the petals | 0 | the same 72 |
+| **E** another value | — | 0 | the same 72 |
+
+**Q-S1. The sepal size default is: A 0.40 · B 0.60 (keep) · C 0.80 · D 1.00 · E other ___.**
+
+### 7.2 Which measure "hub height" uses (`sepalHeight`'s extent)
+
+**What it is.** `sepalHeight` (default 0.75) is a fraction of an AXIAL extent of the hub; where
+the whorl attaches is solved in `sepalAttachment` (`bloom-geometry.js`, the one owner). Built:
+the **join** reading — from the stem end (the stem plan's `rootZ`) up to where the hub-to-stem
+join meets the head's underside (`docs/bloom-sepals-outcome.md` §12a). Two other readings were
+considered and reported, never built: the **whole body** (up to the head's TOP face, so the
+plate's own thickness counts) and **arc length** (the same fraction along the underside's
+profile rather than along z, §12b). Rendered at the default stem (60 × 6 mm, GOBLET auto) and on
+a deep GOBLET bowl (amount 0.5, length 10 mm — where §12b's largest arc difference sits):
+
+| option | default stem: where 0.75 lands | deep GOBLET | limit (default stem) | triangles | bytes |
+|---|---|---|---|---|---|
+| **A** join, axial (built) | r 5.932, z −0.929 — **0.329 mm under the head** | r 4.834, z −1.700 | 18° | 0 | 0 |
+| **B** whole body, axial (PROTOTYPE) | **inside the head's own thickness → the RIM** (z 0; §12a quotes the side face at z −0.03) — the sepals land where they sit with no stem at all | r 6.802, z −0.800 | 21° (the rim's) | 0 | 14 rows move (every row whose sepals attach on the hub) |
+| **C** join, arc length (PROTOTYPE) | r 5.936, z −0.928 — **0.004 mm from A** | r 6.511, z −0.881 — **1.867 mm from A** | 18° | 0 | 12 of those 14 (the two ANGLED rows read arc = axial, a straight face) |
+
+Every cell is 42,200 triangles. B's rim fallback is the prototype's construction: the whorl at
+z 0 rather than on the side face 0.03 mm lower.
+
+**Q-S2. Hub height is measured: A along z, stem end to where the join meets the head (keep) ·
+B along z, stem end to the head's top face · C along the underside's arc length, stem end to
+where the join meets the head.**
+
+### 7.3 The descending fold, and the cupped + curled sepal clamped at −37°
+
+**What it is — two halves.**
+
+*The fold.* The petal builder folds at its own foot-to-blade seam when the blade turns DOWN; the
+seam clearance law (`seamClearanceMm`) was derived for the top skin, so the descending case is the
+seam owner's and unscheduled (§1.7). **The "about −55°" this project quotes is the PETAL's** (a
+petal at tilt −60 reads 56 pairs). **Measured here on the shipped sepal (size 0.60), census
+within-shell pairs, EXPORT, 5 sepals: 0 at every angle from −40 to −66, then 20 pairs /
+0.0031 mm at −67, 20 / 0.0589 at −70, 20 / 0.2018 at −80 and 50 / 0.3225 at −90** — the same
+at the rim and on the default stem. So for the sepal **the onset is −67° and the last clean
+angle −66°**. One live row builds at or past −67 (`angle min (-90)`, already declared).
+
+*The wrap.* The sepal angle is clamped at the DRAWN contact limit (`sepalAngleLimit`): the last
+angle at which no sepal touches a petal. **A curled sepal reaches the petals with its TIP**: on
+§0's `CUPPED + CURLED UP` state (cup 1.2, curl 120, 90° asked) contact is "above" at 21 mm out,
+so the limit is **−37°**. The parts measured: **curl 120 alone → −36°; cup 1.2 alone → −8°;
+curl 60 alone → −6°.** So a calyx that wraps up around the corolla is unreachable — the clamp
+rotates the whole sepal DOWN until the curled tip clears. The capability hook
+`{ sepalAngleUnclamped: true }` (no control reaches it) builds the asked angle: the census reads
+**0 within-shell pairs at 0° and at 30°** (the sepal passes THROUGH the petals — a cross-shell
+overlap the export contract permits, visible on the sheet) and **25 pairs / 0.243 mm at 90°**.
+
+| option | what changes | triangles | bytes |
+|---|---|---|---|
+| **3a-A** keep the floor at −90, the fold declared (as now) | nothing | 0 | 0 |
+| **3a-B** narrow `SEPAL_ANGLE_RANGE`'s floor to −66 (the last clean angle on the shipped sepal) | the reflexed extremes go | 0 | 1 row redefined (`angle min`, −90 → −66) and its xfail retired; a frozen phase IS owed (a row definition changes) |
+| **3a-C** schedule the descending-seam clearance (the seam owner's) as its own session | the fold is fixed in geometry; the range stays | unknown until built | every row turned down past the onset at least; the seam law is shared with the petals, whose tilt floor is 0, so no petal row is predicted to move |
+| **3b-A** keep the drawn limit as a hard clamp (as now) | a wrapping calyx stays unreachable | 0 | 0 |
+| **3b-B** expose the hook as a control ("let sepals pass through petals"), default OFF | wrapping is reachable; the sepals interpenetrate the petals visibly (cross-shell, export-legal); a within-shell fold can appear (25 pairs at 90° on this state) | 0 | 0 at the default |
+| **3b-C** a different limit law that lets a curled sepal sit OUTSIDE the corolla | needs the limit to know which side of a petal the sepal is on — its own discovery | — | — |
+
+**Q-S3a. The descending fold: A keep the −90 floor, fold declared · B narrow the floor to −66 ·
+C schedule the seam fix.**
+**Q-S3b. The wrap: A keep the hard clamp · B a "pass through petals" control, default off ·
+C a discovery for a limit that allows a calyx outside the corolla.**
+
+### 7.4 How sepals would follow the petals' variance fields
+
+**What it is.** The size, form and spacing fields (organic variance builds 1–3) act on the petal
+whorl only; the sepal whorl is built at nominal azimuths with no field, by declaration (rows
+`VARIANCE: x SEPALS`, `FORM VARIANCE: x SEPALS`, `SPACING VARIANCE: 0.9 x SEPALS`). Ruling 5 of
+the variance discovery ("independent sepal amounts, defaulting to the petals'") is ruled with no
+registry mechanism to carry "defaulting to another control". **The prototype is one line**:
+`buildWhorlInto` already takes all three fields, so the sepal whorl is handed the petals' own.
+Triangle counts are unchanged (49,184 for 8 on 8 in every cell). **What the prototype does NOT
+do:** re-draw the angle limit for the moved sepals (the scan still reads the nominal azimuths).
+**A finding beside it:** at form 1.0 the NOMINAL sepals are already clamped to **−41°**, because
+the limit is drawn against the petals the field has curled.
+
+| option | what changes | triangles | bytes |
+|---|---|---|---|
+| **A** sepals stay nominal (as now) | nothing | 0 | 0 |
+| **B** sepals follow the petals' fields automatically, no new control | each sepal takes the field value at its own azimuth (between its two petals' when interleaved) | 0 | 4 rows move (every row with sepals and a variance amount) |
+| **C** three sepal amounts of their own, default 0 | three registry rows; the limit's congruence key must learn the sepals' per-slot terms | 0 | 0 at the default |
+| **D** three sepal amounts defaulting to the petals' (ruling 5 as written) | needs a new "follows another control" mechanism in the registry (none exists) | 0 | the same 4 as B |
+
+**Q-S4. Sepals and the variance fields: A stay nominal · B follow the petals', no control ·
+C own amounts, default 0 · D own amounts, defaulting to the petals' (needs a new registry
+mechanism).**
+
+### 7.5 The tube ignoring sepals
+
+**What it is.** The tube (corolla fusion) is per petal LAYER (`tubeLayerN`); the sepal ring is
+not a layer, so sepals are never fused, and **the sepal angle limit is drawn against the FREE
+petals in both modes** (TUBE open question Q3, `docs/bloom-tube-outcome.md` §8; the declared
+blindness is the ring's OPEN sinuses). **Measured, full tube (`tubeLayer1` 0, the ruled
+defaults), 5 sepals, 90° asked: the built angle is 21° with the tube and 21° without it.** To
+compare the ring against a free petal, ONE estimator on both sides (census crossing pairs from
+the sepal's blade more than 4 mm outside the rim, built past the limit with the hook): **the free
+petals are first crossed at 7°, the fused ring at 9°.** These crossings are skins overlapping near
+the root, which the drawn limit permits by design (it reads mid-surfaces with the foot and
+root-blend rows dropped); they are used here only to rank the two obstacles. So on the ruled
+full tube **ignoring the ring is the stricter choice, not the lax one** — the ring is reached 2°
+later than a free petal.
+
+| option | what changes | triangles | bytes |
+|---|---|---|---|
+| **A** keep the limit drawn against the free petals (as now) | nothing | 0 | 0 |
+| **B** draw the limit against the emitted ring and lobes | can only loosen it where the ring's sinuses are open; a second contact source in the scan | 0 | 1 row may move (the one live row with a tube and sepals) |
+| **C** a CALYX tube: the sepal ring fused by the tube mechanism | a sepal descriptor in `tubePlan` — new | new geometry | 0 at the default |
+| **D** sepals unavailable under a fused tube (hidden and inert, told) | the combination goes | −15,310 on that row | the same 1 row |
+
+**Q-S5. The tube and the sepals: A keep the free-petal limit · B draw the limit against the
+ring · C build a calyx tube (new feature) · D make sepals unavailable under a fused tube.**
+
+### 7.6 The skill
+
+The `flower-project` skill's two stale sentences (§0) are corrected: sepals are BUILT on the
+bloom and ship off, the base ornament is not built, and the hub-top decoration is a separate
+future feature (R1). The skill is a synced copy outside this repository; the edited file was
+handed over for saving, since a sync overwrites the session's local copy.
+
+---
+
+## 8. Reproduce
 
 ```
-npm i --no-save playwright-core                      # only for the export gate; the sheet tool needs nothing
+npm i --no-save playwright-core                      # only for the export gate and --impact; the sheet tools need nothing
 node tools/shot-bloom-sepal-discovery.mjs docs/img/sepal-discovery.png --json docs/img/sepal-discovery.json
+node tools/shot-bloom-sepal-rulings.mjs docs/img/sepal-rulings.png --json docs/img/sepal-rulings.json --impact
 node tools/verify-bloom-export.mjs --only '<the 18-row regex in §1.7>'
 ```
 
