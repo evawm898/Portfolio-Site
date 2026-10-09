@@ -3302,6 +3302,22 @@ rows (matrix 852), no frozen phase owed beyond phase34. The decoupling tool's PA
 <dir>` → `docs/img/sepals.png`, every cell on the default stem, the foot row framed on the GAP
 between sepal and petal.
 
+**SEPAL DISCOVERY (Oct 9, docs only) — read `docs/bloom-sepal-discovery.md` before any new sepal
+work.** A brief said sepals "have never been discussed"; they ship (#243), OFF. Three findings:
+- **A and C are one code path and B shares its blade law.** `leafSurface` and `petalSurface` both
+  end in `widthProfile` + `petalForm` + `emitPanel`, so the real fork is the ROOT (a foot on a ring
+  vs a petiole rod) and the OUTLINE FAMILY (lobes/fringe vs the leaf's tooth floor, chevron and
+  compound).
+- **The rim family on a sepal is zero geometry, rendered** on a patched copy (byte-identical at
+  depth 0; 93,870 floats move with teeth; triangles unchanged).
+- **`verify-bloom-defaults-bar.mjs`'s sepal row measures the representative PETAL** — bit-identical
+  with and without sepals. No wall or combination row reads a sepal; `sepalRoll 330` reads
+  0.876 mm self on the sepal's own grid.
+
+Eight open questions for Eva are in §4. "Around the hub" is Q1: under the whorl (built) vs the
+hub's top face (the centre's region, the reserved corona). Sheet:
+`node tools/shot-bloom-sepal-discovery.mjs <png>` → `docs/img/sepal-discovery.png`.
+
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,
