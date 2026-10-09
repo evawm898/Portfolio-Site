@@ -838,8 +838,17 @@ for (const o of ROLE_OVERRIDES) {
     ['lobedLobes', G.LOBED_PER_SIDE_RANGE, G.LOBED_PER_SIDE_DEFAULT], ['lobedFrom', G.LOBED_FROM_RANGE, G.LOBED_FROM_DEFAULT],
     ['lobedTo', G.LOBED_TO_RANGE, G.LOBED_TO_DEFAULT], ['lobedSinus', G.LOBED_SINUS_RANGE, G.LOBED_SINUS_DEFAULT],
     ['lobedShape', G.LOBED_SHAPE_RANGE, G.LOBED_SHAPE_DEFAULT], ['lobedAngle', G.LOBED_ANGLE_RANGE, G.LOBED_ANGLE_DEFAULT],
-    ['lobedEase', G.LOBED_EASE_RANGE, G.LOBED_EASE_DEFAULT], ['lobedWidth', G.LEAF_WIDTH_RANGE, G.LOBED_WIDTH_DEFAULT],
+    ['lobedEase', G.LOBED_EASE_RANGE, G.LOBED_EASE_DEFAULT],
+    /* (S4c: the sinus roundness, in the Lobes drop-down; the tooth count per
+       lobe, in Serration — checked below) */
+    ['lobedRound', G.LOBED_ROUND_RANGE, G.LOBED_ROUND_DEFAULT],
+    ['lobedWidth', G.LEAF_WIDTH_RANGE, G.LOBED_WIDTH_DEFAULT],
   ];
+  {
+    const c = CONTROLS.find((x) => x.id === 'lobedToothCount');
+    if (!c) bad.push('the registry declares no `lobedToothCount` — the lobed blade would read the shared count');
+    else if (c.min !== G.LOBED_TOOTH_PER_LOBE_RANGE[0] || c.max !== G.LOBED_TOOTH_PER_LOBE_RANGE[1] || c.default !== G.LOBED_TOOTH_PER_LOBE_DEFAULT || c.section !== 'leafSerration') bad.push(`lobedToothCount is ${c.min}..${c.max} default ${c.default} in ${c.section}, where the geometry's is ${G.LOBED_TOOTH_PER_LOBE_RANGE} default ${G.LOBED_TOOTH_PER_LOBE_DEFAULT} in leafSerration`);
+  }
   for (const [id, r, d] of lobedRanges) {
     const c = CONTROLS.find((x) => x.id === id);
     if (!c) { bad.push(`the registry declares no \`${id}\``); continue; }
@@ -860,6 +869,15 @@ for (const o of ROLE_OVERRIDES) {
     if (geoLobed !== evalPredicate({ ref: 'leafLobed' }, st)) bad.push(`leafLength ${leafLength} x stemLength ${stemLength} x ${inflorescence} x ${leafType}: geometry builds ${geoLobed ? 'a lobed leaf' : 'no lobed leaf'}, registry leafLobed says ${!geoLobed}`);
     for (const c of [...lobeSubs, CONTROLS.find((x) => x.id === 'lobedWidth'), CONTROLS.find((x) => x.id === 'lobedToothDepth')]) {
       if (c && evalPredicate(c.visibleWhen, st) !== geoLobed) bad.push(`leafLength ${leafLength} x stemLength ${stemLength} x ${inflorescence} x ${leafType}: ${c.id} is ${evalPredicate(c.visibleWhen, st) ? 'shown' : 'hidden'} while ${geoLobed ? 'the lobed blade reads it' : 'no lobed leaf is built'}`);
+    }
+    /* THE TOOTH COUNT'S TWO STATEMENTS (S4c): the lobed count shown exactly
+       where a lobed blade with teeth is built, the shared count exactly where
+       some OTHER blade with teeth is */
+    {
+      const toothed = evalPredicate({ ref: 'leafToothed' }, st);
+      const lc = CONTROLS.find((x) => x.id === 'lobedToothCount'), sc = CONTROLS.find((x) => x.id === 'leafToothCount');
+      if (lc && evalPredicate(lc.visibleWhen, st) !== (toothed && geoLobed)) bad.push(`leafLength ${leafLength} x stemLength ${stemLength} x ${inflorescence} x ${leafType}: lobedToothCount is ${evalPredicate(lc.visibleWhen, st) ? 'shown' : 'hidden'} while ${toothed && geoLobed ? 'a toothed lobed blade reads it' : 'no toothed lobed blade is built'}`);
+      if (sc && evalPredicate(sc.visibleWhen, st) !== (toothed && !geoLobed)) bad.push(`leafLength ${leafLength} x stemLength ${stemLength} x ${inflorescence} x ${leafType}: leafToothCount is ${evalPredicate(sc.visibleWhen, st) ? 'shown' : 'hidden'} while ${toothed && !geoLobed ? 'a toothed simple or compound blade reads it' : 'no blade reads the shared count'}`);
     }
     const reg = evalPredicate({ ref: 'leafCompound' }, st);
     const tag = `leafLength ${leafLength} x stemLength ${stemLength} x ${inflorescence} x ${leafType}`;
@@ -8329,6 +8347,11 @@ export function restatedSinusWindows(ui) {
 function roundedWindows(ui, r, US, len, env, lobe, ease) {
   const W = restatedSinusWindows(ui);
   if (!(Number(ui.lobedSinus) > 0)) return [];
+  /* (S4c: at a roundness above 0 EVERY sinus may carry a round bottom — the
+     radius is asked of each, not only of those whose V does not open — so
+     every half-period window is exempt; LF25(a) holds each to its told flag
+     and LF27 to its radius) */
+  if (Number(ui.lobedRound) > 0) return W.su.map((su) => [su - W.half, su + W.half]);
   const lamR = US.map((u) => Math.max(env(u) * lobe(u), TIP_HALF_MM));
   const M = US.map((u, j) => { const t = r.tiltBuiltRad * ease(u); return [u * len + lamR[j] * Math.sin(t), lamR[j] * Math.cos(t)]; });
   const out = [];
@@ -8398,8 +8421,18 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
     for (const k of Object.keys(want)) if (!(Math.abs(Number(P[k]) - want[k]) <= 1e-12)) { bad.push(`LF19: the plan's chevron reads ${k} ${P[k]} where the control says ${want[k]}`); break; }
     if (LB.some((r) => r.rows !== LOBED_BLADE_ROWS)) bad.push(`LF19: a chevron was built on ${LB.find((r) => r.rows !== LOBED_BLADE_ROWS).rows} rows where the declaration is ${LOBED_BLADE_ROWS}`);
   }
-  const env = restatedLobedEnvelope(ui), lobe = restatedLobeFactor(ui), ease = restatedLobedEase(ui);
+  /* THE LOBES AS BUILT (S4c, ruling 3: the count may YIELD). Every leaf of a
+     build shares one law, so one built count speaks for all; LF28 holds the
+     count against the ask and the told flag, LF20 against the EMITTED sinuses.
+     Every restatement below is of the BUILT law — the controls' own law at the
+     built count. */
+  const builtLobes = Math.round(Number(LB[0].lobes));
+  if (LB.some((r) => r.lobes !== LB[0].lobes)) { bad.push(`LF28: the leaves of one build were cut with different lobe counts (${LB.map((r) => r.lobes).join(', ')}) — one law, one count`); return bad; }
+  if (L.lobed && L.lobed.lobesBuilt !== builtLobes) bad.push(`LF28: the plan says ${L.lobed.lobesBuilt} lobes a side are built where the builder cut ${builtLobes}`);
+  const uiB = { ...ui, lobedLobes: builtLobes };
+  const env = restatedLobedEnvelope(ui), lobe = restatedLobeFactor(uiB), ease = restatedLobedEase(ui);
   const askedTau = (Number(ui.lobedAngle) * Math.PI) / 180;
+  const roundness = Math.min(0.5, Math.max(0, Number(ui.lobedRound)));
   const depth = Number(ui.lobedToothDepth);
   const askedRelief = depth * Math.max(0, Number(ui.lobedWidth) / 2 - TIP_HALF_MM);
   const reliefBound = depth > 0 ? Math.max(askedRelief, MIN_FEATURE_MM) : 0;
@@ -8424,7 +8457,7 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
        window what it may be is LF25's (opening, depth, the told flag). The
        DRAWN row then sits under the declared lobed outline by at most the
        teeth's own relief — the drawn and the declared cannot part company. */
-    const RW = roundedWindows(ui, r, US, len, env, lobe, ease);
+    const RW = roundedWindows(uiB, r, US, len, env, lobe, ease);
     let worst = 0, at = null, worstLobe = 0, lobeAt = null;
     for (let j = 0; j <= LOBED_BLADE_ROWS; j++) {
       const u = US[j];
@@ -8447,9 +8480,18 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
          a steeply falling envelope is still a minimum) */
       const lo = Number(ui.lobedFrom), hi = Number(ui.lobedTo);
       const F = r.rowHalfLobeMm.map((h, j) => h / Math.max(env(US[j]), TIP_HALF_MM));
-      let minima = 0;
-      for (let j = 1; j + 1 < F.length; j++) if (US[j] > lo && US[j] < hi && F[j] < F[j - 1] && F[j] <= F[j + 1]) minima++;
-      if (minima !== Math.round(Number(ui.lobedLobes))) { bad.push(`LF20: leaf ${i} emits ${minima} sinus(es) a side where the control asks ${ui.lobedLobes} lobes`); break; }
+      /* (S4c: a broad round bottom is a FLOOR between two walls, and a floor
+         read over a falling envelope can show two local minima inside ONE
+         sinus — so minima closer than half a built lobe period are one sinus.
+         A dropped lobe spaces the dips a whole period further apart, and still
+         reads one fewer.) */
+      let minima = 0, lastMin = -Infinity;
+      const halfP = (hi - lo) / (2 * builtLobes);
+      for (let j = 1; j + 1 < F.length; j++) if (US[j] > lo && US[j] < hi && F[j] < F[j - 1] && F[j] <= F[j + 1]) { if (US[j] - lastMin >= halfP) minima++; lastMin = US[j]; }
+      /* (against the BUILT count — S4c: the count may yield, and LF28 holds
+         the built count against the ask; a dropped lobe the record does not
+         declare still shows here as the emitted count disagreeing) */
+      if (minima !== builtLobes) { bad.push(`LF20: leaf ${i} emits ${minima} sinus(es) a side where the builder declares ${builtLobes} lobes built (${ui.lobedLobes} asked)`); break; }
     }
     /* LF21 — the lean, read off the emitted lattice */
     if (!(r.tiltBuiltRad <= askedTau + 1e-15) || r.tiltClamped !== (r.tiltBuiltRad < askedTau)) { bad.push(`LF21: leaf ${i}'s tilt record (built ${r.tiltBuiltRad}, clamped ${r.tiltClamped}) against the asked ${askedTau} rad — the clamp must be a biconditional and never raise the tilt`); break; }
@@ -8552,7 +8594,7 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
        bottom never told, one cut too deep, all export watertight and as one
        piece at the identical triangle count. */
     if (Number(ui.lobedSinus) > 0) {
-      const RB = r.roundBottoms, W = restatedSinusWindows(ui);
+      const RB = r.roundBottoms, W = restatedSinusWindows(uiB);
       if (!RB || !Array.isArray(RB.sinuses) || RB.sinuses.length !== W.su.length) { bad.push(`LF25: leaf ${i} reports ${RB && RB.sinuses ? RB.sinuses.length : 'no'} round-bottom records for the ${W.su.length} sinuses the controls restate — whether a sinus was rounded is told by nothing`); stopAfter = true; }
       else {
         const tauR = US.map((u) => r.tiltBuiltRad * ease(u));
@@ -8571,7 +8613,12 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
           if (vOpen !== null && Math.abs(vOpen - MIN_FEATURE_MM) > 1e-9 && !!x.need !== needR) { fail = `sinus ${k}'s asked V opens ${vOpen.toFixed(4)} mm on the restated outline, so it ${needR ? 'NEEDS' : 'does not need'} a round bottom, where the builder says need = ${x.need}`; break; }
           if (x.built && x.noFit) { fail = `sinus ${k} is declared both ROUNDED and NO FIT`; break; }
           if (x.need && !x.built && !x.noFit) { fail = `sinus ${k} needs a round bottom and is neither rounded nor told NO FIT — the slit is silent`; break; }
-          if (!x.need && (x.built || x.noFit)) { fail = `sinus ${k} does not need a round bottom and is declared ${x.built ? 'rounded' : 'NO FIT'}`; break; }
+          /* (RE-DERIVED for S4c, seen red first on the roundness: a sinus whose
+             asked V already opens is ROUNDED where the roundness asks a radius —
+             never at roundness 0, which is S4b's law exactly — and is never NO
+             FIT, because the V it keeps is printable) */
+          if (!x.need && x.noFit) { fail = `sinus ${k} does not need a round bottom and is declared NO FIT`; break; }
+          if (!x.need && x.built && !(roundness > 0)) { fail = `sinus ${k} does not need a round bottom and is declared rounded at roundness 0 — S4b's law rounds only a sinus that does not open`; break; }
           if (x.built) {
             const o = restatedSinusOpeningMm(Mb, wb.lo, wb.bot, wb.hi);
             if (!(o >= MIN_FEATURE_MM - 1e-9)) { fail = `sinus ${k} is ROUNDED and its emitted rows open ${o === null ? 'unmeasured' : o.toFixed(4)} mm, under the ${MIN_FEATURE_MM} mm the ruling builds it to`; break; }
@@ -8593,7 +8640,225 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
     }
     if (stopAfter) break;
   }
+  bad.push(...lobedRoundYieldToothClauses(ui, L, LB, US, env, ease, builtLobes, roundness, depth, builtNodes[0].len));
   bad.push(...lobedPetioleClauses(ui, m, L, LB, US, env, lobe, ease));
+  return bad;
+}
+
+/* ===================================================================
+   LF27-LF29 — THE ROUND SINUS'S ROUNDNESS, THE LOBE-COUNT YIELD AND THE
+   LOBED TOOTH COUNT (leaf/stem build S4c — Eva's rulings of Oct 9, from
+   docs/img/leaf-lobed-rulings.png; docs/bloom-leaf-lobed-roundness-outcome.md).
+   WRITTEN BEFORE THE GEOMETRY AND SEEN RED on the base tree (no roundness, no
+   yield, the shared count). Each restates its law from the page's read-back
+   CONTROLS and reads the measured side off what the builder EMITTED (the
+   declared lobed outline at the emitted stations, which LF20 ties to the drawn
+   rows; the drawn teeth) — never off the record beside it, except where the
+   clause says the record IS what is under test (a told flag). Both STL gates
+   are blind to every one: a radius that ignores the control, a count that
+   gives before the radius does, a count that never gives, and a tooth count
+   read off the simple leaf all export watertight and as one piece at the
+   identical triangle count.
+
+   LF27 — THE ROUNDNESS: (a) the record carries the control's roundness;
+          (b) the PITCH restated — the planform chord between the two crests
+          that bound each sinus, on the restated envelope at the restated
+          crest stations (from, to, the built count) and the built tilt eased —
+          and the asked radius `roundness x pitch` on the relief grid; (c) the
+          built radius is `max(asked, the print minimum)` unless it SHRANK, and
+          SHRUNK iff it is under the ask, never under the minimum (the told
+          flag a biconditional); (d) READ OFF THE EMITTED OUTLINE: the
+          tightest concave circumradius of any three consecutive emitted rows
+          in the sinus's half-period window IS the built radius — a disc of
+          radius R drawn through rows on its arc reads exactly R, and nothing
+          in a U of walls tangent to that disc curves tighter.
+   LF28 — THE LOBE-COUNT YIELD: (a) the record's ask is the control and the
+          built count is at most the ask and at least 1; (b) YIELDED iff built
+          under asked (told); (c) a yield is EARNED — at the asked count some
+          sinus's asked V, restated from the controls at the asked count's own
+          tilt, opens under MIN_FEATURE_MM; (d) THE ORDER: every count tried
+          above the built one carried a sinus NO FIT AT THE PRINT MINIMUM, and
+          the built one none, unless no count fits (the RESIDUAL: the asked
+          count with its told V, every count tried); (e) the page's yield is
+          the one the geometry gives this state in Node (asked, built,
+          residual) — the order mutant and the never-yield mutant live on the
+          page; (f) a NO FIT outside the residual is a told V the count should
+          have given for.
+   LF29 — THE LOBED TOOTH COUNT: (a) the record's per-lobe count is the
+          control's and the whole-rim ask is `perLobe x (2 n + 1)` over the
+          BUILT lobes, restated; (b) the shared law was asked for exactly that
+          (never the shared `leafToothCount`, hidden and inert here); (c) fewer
+          built only where told (clampedBy or NO ROOM); (d) the EMITTED margin
+          notches are the built count's margin sinuses; (e) the per-lobe
+          record sums, both margins and the apex, to the built count.
+   =================================================================== */
+export function lobedRoundYieldToothClauses(ui, L, LB, US, env, ease, builtLobes, roundness, depth, len) {
+  const bad = [];
+  const r = LB[0];
+  const D = MIN_FEATURE_MM, G = GEOMETRY.LOBE_RELIEF_GRID;
+  const askedLobes = Math.round(Number(ui.lobedLobes));
+  const lobe = restatedLobeFactor({ ...ui, lobedLobes: builtLobes });
+  const Y = r.lobeYield;
+  /* ---------- LF28 ---------- */
+  if (!Y || r.lobesAsked === undefined) { bad.push('LF28: the builder reports no lobe-count record — whether the count gave, and why, is told by nothing'); return bad; }
+  if (r.lobesAsked !== askedLobes || Y.asked !== askedLobes) bad.push(`LF28: the builder's ask is ${r.lobesAsked} (yield record ${Y.asked}) where the control asks ${askedLobes} lobes a side`);
+  if (!(builtLobes >= 1 && builtLobes <= askedLobes)) bad.push(`LF28: ${builtLobes} lobes built for ${askedLobes} asked — the count may give, never grow`);
+  if (Y.yielded !== (builtLobes < askedLobes) || Y.built !== builtLobes) bad.push(`LF28: the yield is told ${Y.yielded} (built ${Y.built}) where ${builtLobes} of ${askedLobes} lobes were cut — the told flag must be a biconditional`);
+  const att = Array.isArray(Y.attempts) ? Y.attempts : [];
+  if (!att.length || att[0].lobes !== askedLobes) bad.push(`LF28: the yield's first attempt is at ${att.length ? att[0].lobes : 'no'} lobes, not the ask ${askedLobes}`);
+  else if (Y.residual) {
+    if (builtLobes !== askedLobes || att.some((a) => !(a.noFit > 0)) || att[att.length - 1].lobes !== 1) bad.push(`LF28: the RESIDUAL is told (no count fits) while ${att.map((a) => `${a.lobes}: ${a.noFit} NO FIT`).join(', ')} and ${builtLobes} built — the residual is the asked count after every count down to one failed`);
+  } else {
+    const last = att[att.length - 1];
+    if (last.lobes !== builtLobes || last.noFit !== 0 || att.slice(0, -1).some((a) => !(a.noFit > 0))) bad.push(`LF28: the count gave in the wrong order — tried ${att.map((a) => `${a.lobes}: ${a.noFit} NO FIT`).join(', ')} and built ${builtLobes}; a count is given up only where a sinus does not fit even at the print minimum, and the first count that fits is built`);
+  }
+  if (Number(ui.lobedSinus) > 0 && r.roundBottoms && r.roundBottoms.noFit > 0 && !Y.residual) bad.push(`LF28: ${r.roundBottoms.noFit} sinus(es) keep a told V at ${builtLobes} lobes while the yield says a count fits — the count should have given`);
+  /* (c) the yield is earned: a restated need at the asked count */
+  if (Y.yielded) {
+    const uiA = { ...ui, lobedLobes: askedLobes };
+    const tA = Number.isFinite(att[0] && att[0].tiltRad) ? att[0].tiltRad : null;
+    if (tA === null) bad.push('LF28: the asked count\'s attempt reports no tilt — whether its sinuses needed a round bottom cannot be restated');
+    else {
+      const lobeA = restatedLobeFactor(uiA), WA = restatedSinusWindows(uiA);
+      const lamA = US.map((u) => Math.max(env(u) * lobeA(u), TIP_HALF_MM));
+      const MA = US.map((u, j) => { const t = tA * ease(u); return [u * len + lamA[j] * Math.sin(t), lamA[j] * Math.cos(t)]; });
+      let needed = 0;
+      for (let k = 0; k < WA.su.length; k++) {
+        const a0 = WA.su[k] - WA.half, a1 = WA.su[k] + WA.half;
+        let lo = -1, hi = -1, bot = -1;
+        for (let j = 0; j < US.length; j++) { if (US[j] < a0 || US[j] > a1) continue; if (lo < 0) lo = j; hi = j; if (bot < 0 || lamA[j] < lamA[bot]) bot = j; }
+        const o = restatedSinusOpeningMm(MA, lo, bot, hi);
+        if (o !== null && o < D) needed++;
+      }
+      if (!needed) bad.push(`LF28: the count gave ${askedLobes} -> ${builtLobes} where every asked V at ${askedLobes} lobes already opens to ${D} mm on the restated outline — a yield nothing earned`);
+    }
+  }
+  /* (e) the page's yield is the geometry's, rebuilt in Node from the page's own controls */
+  {
+    let ref = null;
+    try { ref = GEOMETRY.lobedOutline({ ...ui }, len, true).lobeYield; } catch (e) { bad.push(`LF28: the Node rebuild of the lobed outline threw: ${e.message}`); }
+    if (ref && (ref.asked !== Y.asked || ref.built !== Y.built || ref.residual !== Y.residual)) bad.push(`LF28: the page yields ${Y.asked} -> ${Y.built}${Y.residual ? ' (residual)' : ''} where the geometry gives this state ${ref.asked} -> ${ref.built}${ref.residual ? ' (residual)' : ''} — the order (the radius shrinks first, the count gives only at the print minimum) is not the page's`);
+  }
+  /* ---------- LF27 ---------- */
+  const RB = r.roundBottoms;
+  if (Number(ui.lobedSinus) > 0 && RB) {
+    if (!(Math.abs(Number(RB.roundness) - roundness) <= 1e-12)) bad.push(`LF27: the round bottoms were built at roundness ${RB.roundness} where the control says ${roundness}`);
+    const n = builtLobes, lo = Number(ui.lobedFrom), hi = Number(ui.lobedTo);
+    const crestU = (k) => lo + (k * (hi - lo)) / n;
+    const crestPt = (u) => { const e = Math.max(env(u), TIP_HALF_MM), t = r.tiltBuiltRad * ease(u); return [u * len + e * Math.sin(t), e * Math.cos(t)]; };
+    const M = US.map((u, j) => { const t = r.tiltBuiltRad * ease(u), h = r.rowHalfLobeMm[j]; return [u * len + h * Math.sin(t), h * Math.cos(t)]; });
+    const half = (hi - lo) / (2 * n);
+    for (let k = 0; k < (RB.sinuses || []).length; k++) {
+      const x = RB.sinuses[k], su = lo + ((k + 0.5) * (hi - lo)) / n;
+      const where = `sinus ${k} (u ${su.toFixed(4)})`;
+      if (!(roundness > 0)) {
+        if (x.radiusAskedMm !== null || x.shrunk) { bad.push(`LF27: ${where} carries a roundness record at roundness 0 — 0 is S4b's law exactly, by branch`); break; }
+      } else if (!x.noFit && (x.need || x.built || x.shrunk)) {
+        const A = crestPt(crestU(k)), B = crestPt(crestU(k + 1));
+        const pitch = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (!(Math.abs(x.pitchMm - pitch) <= 1e-7 * Math.max(1, pitch))) { bad.push(`LF27: ${where}: the pitch is ${x.pitchMm} mm where the chord between the two crests the controls restate is ${pitch.toFixed(9)} mm`); break; }
+        const askR = Math.floor((roundness * pitch) / G) * G;
+        if (!(Math.abs(x.radiusAskedMm - askR) <= G + 1e-12)) { bad.push(`LF27: ${where}: the radius asked is ${x.radiusAskedMm} mm where ${roundness} x the restated pitch ${pitch.toFixed(6)} is ${askR.toFixed(6)}`); break; }
+        const Rmin = x.need ? x.radiusMinMm : 0;
+        if (x.need && !(Rmin >= D / 2 - 1e-12)) { bad.push(`LF27: ${where} needed a round bottom and its print minimum is ${Rmin} mm, under the ${D / 2} mm disc S4b's law starts from`); break; }
+        if (!x.need && x.radiusMinMm !== 0) { bad.push(`LF27: ${where} opens as asked and carries a print minimum of ${x.radiusMinMm} mm — its floor is 0`); break; }
+        const Rb = x.built ? x.radiusMm : 0;
+        const want = Math.max(x.radiusAskedMm, Rmin);
+        if (x.shrunk !== (Rb < x.radiusAskedMm - 1e-12)) { bad.push(`LF27: ${where} is told shrunk = ${x.shrunk} with ${Rb} mm built against ${x.radiusAskedMm} mm asked — the shrink must be a biconditional with its told flag`); break; }
+        if (!x.shrunk && !(Math.abs(Rb - want) <= 1e-12 * Math.max(1, want))) { bad.push(`LF27: ${where} is built at ${Rb} mm where max(asked ${x.radiusAskedMm}, minimum ${Rmin}) is ${want} — the roundness is not the radius`); break; }
+        if (x.shrunk && x.need && !(Rb >= Rmin - 1e-12)) { bad.push(`LF27: ${where} shrank to ${Rb} mm, under its print minimum ${Rmin} — the radius may shrink only TOWARD the floor`); break; }
+        if (x.floored !== (x.radiusAskedMm < Rmin)) { bad.push(`LF27: ${where} is told floored = ${x.floored} on an ask of ${x.radiusAskedMm} mm against a minimum of ${Rmin}`); break; }
+      }
+      /* (d) THE DISC READ OFF THE EMITTED ROWS — wherever one was built. The
+         disc is restated from the asked bottom (the record's own station, the
+         restated asked outline there at the built tilt), the declared seat and
+         radius: centre `(x_b + seat, y_b + R)` in the chevron's planform. The
+         emitted outline is the notch's NEAR edge, so (i) NO emitted row stands
+         inside the disc (a sinus cut deeper than its own round bottom), and
+         (ii) some emitted row lies ON it — the drawn sinus carries the declared
+         disc. A DISTANCE, NOT A CIRCUMRADIUS, AND THE REASON IS MEASURED: a
+         small disc spans two or three rows, and three consecutive rows on its
+         arc were not there on 6 lobes (0.59 mm) or a 3 mm envelope, while
+         S4b's own floor kink reads a circumradius of 0.435 on a 0.873 disc —
+         neither says anything about the radius; one row on the circle does. */
+      if (x.built && x.radiusMm > 0 && !x.noFit) {
+        /* (THE FRAME IS THE LAW'S OWN: S4b builds the U "in the chevron's
+           planform at the sinus bottom's own tilt", every row of the window
+           laid at that one tilt — so the rows are read there too. Where the
+           tilt EASES inside a window, the rows are DRAWN at their own tilt and
+           the drawn bottom departs from the disc by up to 0.22 mm (measured,
+           the eased tip windows): S4b's declared approximation, not a radius
+           this clause can hold.) */
+        const ub = x.bottomU, tb = r.tiltBuiltRad * ease(ub), snb = Math.sin(tb), csb = Math.cos(tb);
+        const hb = Math.max(env(ub) * lobe(ub), TIP_HALF_MM);
+        const C = [ub * len + hb * snb + x.seatMm, hb * csb + x.radiusMm];
+        const Mb = US.map((u, j) => [u * len + r.rowHalfLobeMm[j] * snb, r.rowHalfLobeMm[j] * csb]);
+        const tol = 1e-6;
+        const lamR = (u) => Math.max(env(u) * lobe(u), TIP_HALF_MM);
+        let inside = null, off = null;
+        for (let j = 0; j < US.length; j++) {
+          if (US[j] < su - half || US[j] > su + half) continue;
+          const d = Math.hypot(Mb[j][0] - C[0], Mb[j][1] - C[1]) - x.radiusMm;
+          if (d < -tol && (inside === null || d < inside.d)) inside = { d, u: US[j] };
+          /* (ii) a row the round bottom CUT (under the asked outline, above
+             the print stub), between the arc's two tangent points and off
+             S4b's floor, IS on the disc — the arc's span is the record's,
+             the disc and the cut are restated */
+          const cut = r.rowHalfLobeMm[j] < lamR(US[j]) - 1e-9 && r.rowHalfLobeMm[j] > TIP_HALF_MM + 1e-9;
+          const onArc = Array.isArray(x.arcU) && US[j] > x.arcU[0] && US[j] < x.arcU[1] && !(Array.isArray(x.floorU) && US[j] >= x.floorU[0] && US[j] <= x.floorU[1]);
+          if (cut && onArc && Math.abs(d) > tol && (off === null || Math.abs(d) > Math.abs(off.d))) off = { d, u: US[j] };
+        }
+        if (inside) { bad.push(`LF27: ${where}: an emitted row (u ${inside.u.toFixed(4)}) stands ${(-inside.d).toFixed(6)} mm INSIDE the declared ${x.radiusMm.toFixed(6)} mm disc — the sinus is cut deeper than its round bottom`); break; }
+        if (off) { bad.push(`LF27: ${where}: an emitted row on the arc (u ${off.u.toFixed(4)}) stands ${off.d.toFixed(6)} mm off the declared ${x.radiusMm.toFixed(6)} mm disc — the drawn sinus is not the radius it declares`); break; }
+      }
+    }
+  }
+  /* ---------- LF29 ---------- */
+  {
+    const per = Math.round(Number(ui.lobedToothCount));
+    const rimAsked = per * (2 * builtLobes + 1);
+    if (r.toothPerLobe !== per) bad.push(`LF29: the builder cut ${r.toothPerLobe} teeth a lobe where the control asks ${per}`);
+    if (r.toothRimAsked !== rimAsked) bad.push(`LF29: the shared tooth law was asked for ${r.toothRimAsked} teeth over the rim where ${per} a lobe over ${2 * builtLobes + 1} built lobes (${builtLobes} a side and the terminal) is ${rimAsked}`);
+    if (L.lobed && L.lobed.toothRimAsked !== rimAsked) bad.push(`LF29: the plan asks ${L.lobed.toothRimAsked} teeth over the rim where ${rimAsked} is restated`);
+    const S = L.serrationBuilt && L.serrationBuilt[0];
+    if (depth > 0 && S) {
+      if (S.countAsked !== rimAsked) bad.push(`LF29: the leaf's teeth were asked as ${S.countAsked} where ${per} a lobe over ${2 * builtLobes + 1} lobes is ${rimAsked} — the lobed blade reads its own count, never the shared one`);
+      else if (!S.noRoom) {
+        if (!(S.countBuilt <= rimAsked)) bad.push(`LF29: ${S.countBuilt} teeth built for ${rimAsked} asked`);
+        if ((S.countBuilt < rimAsked) !== !!S.clampedBy) bad.push(`LF29: ${S.countBuilt} of ${rimAsked} teeth built and the clamp is told ${S.clampedBy} — fewer only where told`);
+        /* (d) EVERY DECLARED MARGIN TOOTH IS DRAWN: each margin period the
+           tooth law declares (between two of its crests, or from the last to
+           the tip) holds an emitted row the teeth cut (the declared lobed
+           outline less the drawn row, positive). A PERIOD, NOT A NOTCH COUNT,
+           AND THE REASON IS MEASURED: local maxima of the drawn cut miscount
+           in both directions on the 2,000-state sample (a notch between two
+           rows reads none, a round bottom's floor beside a notch reads two),
+           so a count of notches is a statement about the sampling. What the
+           drawn rim owes the per-lobe count is that every tooth it declares
+           is there. */
+        const hs = L.rowHalfMm && L.rowHalfMm[0];
+        if (Array.isArray(hs) && Array.isArray(S.crestU) && Array.isArray(S.sinusU)) {
+          const c = r.rowHalfLobeMm.map((h, j) => h - hs[j]);
+          /* one period per MARGIN SINUS the law declares — the crests either
+             side of it, or the last crest and the tip (an even count's apex
+             notch sits on the terminal face, cuts nothing and is told by
+             `apexIsCrest`, so it is no margin tooth) */
+          let missing = null;
+          for (const us of S.sinusU) {
+            const a = Math.max(...S.crestU.filter((x) => x <= us), 0), bs = S.crestU.filter((x) => x > us), b = bs.length ? Math.min(...bs) : 1;
+            if (!US.some((u, j) => u > a && u < b && c[j] > 1e-9)) { missing = `the margin tooth at u ${us.toFixed(4)} (its period u ${a.toFixed(4)}-${b.toFixed(4)})`; break; }
+          }
+          if (missing) bad.push(`LF29: ${missing} is declared and no emitted row in its period is cut — a tooth the per-lobe count claims is not drawn`);
+        }
+        const T = r.teethPerLobe;
+        if (!Array.isArray(T) || T.length !== builtLobes + 1) bad.push(`LF29: the per-lobe record has ${T ? T.length : 'no'} entries for ${builtLobes} lateral lobes and the terminal`);
+        else {
+          const sum = 2 * T.slice(0, -1).reduce((a, b) => a + b, 0) + T[T.length - 1];
+          if (sum !== S.countBuilt) bad.push(`LF29: the teeth per lobe ${T.join(' / ')} sum to ${sum} over both margins where ${S.countBuilt} were built`);
+        }
+      }
+    }
+  }
   return bad;
 }
 
@@ -15011,8 +15276,11 @@ export function buildMatrix() {
   lf('LOBED: lobedWidth max (40)', { ...LOB, lobedWidth: 40 });
   lf('LOBED: lobedToothDepth 0 (the lobes entire)', { ...LOB, lobedToothDepth: 0 });
   lf('LOBED: lobedToothDepth max (1 — the FOLD CLAMP binds: asked against built)', { ...LOB, lobedToothDepth: 1 });
-  lf('LOBED: NONE FIT — 6 lobes x sinus 0.9 x depth 0.3 x 12 teeth (the fold cap under the 1 mm floor; no teeth, told)', { ...LOB, ...LOB_S4, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, leafToothCount: 12 });
-  lf('LOBED: 6 lobes x tooth depth 0.3 (the fold clamp binds hardest — 4.86 mm asked, built at the 2.22 mm cap)', { ...LOB, ...LOB_S4, lobedLobes: 6, lobedToothDepth: 0.3 });
+  /* (S4c: the tooth count is the lobed blade's own now, PER LOBE, and the
+     shared `leafToothCount` is inert under LOBED — so these two rows carry
+     the lobed count, and their labels the numbers it builds) */
+  lf('LOBED: NONE FIT — 6 lobes x sinus 0.9 x depth 0.3, 3 teeth a lobe (39 asked: the fold cap 0.08 mm, under the 1 mm floor; no teeth, told)', { ...LOB, ...LOB_S4, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, lobedToothCount: 3 });
+  lf('LOBED: 6 lobes x tooth depth 0.3, 1 tooth a lobe (the fold clamp binds — 4.86 mm asked, built at the 1.71 mm cap)', { ...LOB, ...LOB_S4, lobedLobes: 6, lobedToothDepth: 0.3, lobedToothCount: 1 });
   lf('LOBED: a 10 mm envelope (the tooth count GIVES at the 1 mm floor)', { ...LOB, lobedWidth: 10 });
   lf('LOBED: leafTipShape min (0.6 — the tip law is shared with SIMPLE)', { ...LOB, leafTipShape: 0.6 });
   lf('LOBED: leafTipShape max (3)', { ...LOB, leafTipShape: 3 });
@@ -15033,12 +15301,46 @@ export function buildMatrix() {
      limit on a short, steep, five-lobed blade — the V kept and told), the
      largest blade's petiole, and the petiole CLAMPED at the stem. */
   lf('LOBED: S4\'s form (sinus 0.62, shape 0.70, angle 38, teeth 0.08 — two V\'s under 1 mm, both ROUNDED, told)', { ...LOB, ...LOB_S4 });
-  lf('LOBED: NO ROUND BOTTOM FITS — 5 lobes on a 36 mm blade at 40 deg (the back flank\'s fold limit; the V kept, told)', { ...LOB, leafLength: 36, lobedLobes: 5, lobedFrom: 0.21, lobedTo: 0.55, lobedSinus: 0.84, lobedShape: 0.9, lobedAngle: 40, lobedEase: 0.79, lobedWidth: 26, leafTipShape: 1.05 });
+  lf('LOBED: THE LOBE COUNT YIELDS — 5 lobes asked on a 36 mm blade at 40 deg, 3 built (no round bottom fits even at the print minimum at 5 or 4; told)', { ...LOB, leafLength: 36, lobedLobes: 5, lobedFrom: 0.21, lobedTo: 0.55, lobedSinus: 0.84, lobedShape: 0.9, lobedAngle: 40, lobedEase: 0.79, lobedWidth: 26, leafTipShape: 1.05 });
   lf('LOBED: a 40 mm envelope with no sinus (the largest blade asks the thickest petiole)', { ...LOB, lobedWidth: 40, lobedSinus: 0 });
   lf('LOBED: the petiole CLAMPED — no sinus on a 3 mm stem at 90 deg (asks 0.82 mm, the rooted end holds 0.75)', { ...LOB, stemDiameter: 3, leafAngle: 90, lobedSinus: 0 });
   lf('LOBED: GATED — SIMPLE with every lobed control at an extreme (hidden AND inert)', { ...LOB, leafType: 'SIMPLE', lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedShape: 0.5, lobedWidth: 40, lobedToothDepth: 1 });
   lf('LOBED: GATED — COMPOUND with every lobed control at an extreme (hidden AND inert)', { ...LOB, leafType: 'COMPOUND', lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedShape: 0.5, lobedWidth: 40, lobedToothDepth: 1 });
   lf('LOBED: GATED — LOBED and every lobed control at an extreme with length 0 (hidden AND inert)', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafType: 'LOBED', lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedShape: 0.5, lobedToothDepth: 1 });
+
+  /* 57. THE SINUS ROUNDNESS, THE LOBE-COUNT YIELD AND THE LOBED TOOTH COUNT
+        (Eva's rulings, Oct 9 — leaf/stem build S4c;
+        docs/bloom-leaf-lobed-roundness-outcome.md). `lobedRound` sets the
+        sinus bottom's radius as a fraction of the lobe pitch, floored at
+        S4b's print minimum (0 IS S4b's law, by branch); where the asked
+        radius does not fit it SHRINKS first, and only where even the minimum
+        does not fit does the lobe COUNT give (told, asked against built);
+        `lobedToothCount` is the lobed blade's own count, TEETH PER LOBE, with
+        the shared count hidden AND inert under LOBED. LF27-LF29 are the
+        witnesses; both STL gates are blind to all of it. The rows: both ends
+        of the roundness and S4b's own minimum, the shrink binding, the yield
+        binding, the residual (a lobe window too short for any count), both
+        ends of the tooth count, an even count (the apex notch on the face),
+        the rows cap binding the teeth, the shared count at its maximum under
+        LOBED (inert), and the GATED arms under SIMPLE and COMPOUND. Appended
+        as the FINAL block, after 56. */
+  lf('LOBED ROUNDNESS: 0 (S4b\'s print minimum only — the law by branch)', { ...LOB, lobedRound: 0 });
+  lf('LOBED ROUNDNESS: 0.05 (just above the minimum)', { ...LOB, lobedRound: 0.05 });
+  lf('LOBED ROUNDNESS: 0.25', { ...LOB, lobedRound: 0.25 });
+  lf('LOBED ROUNDNESS: max (0.5 — every sinus SHRINKS, told)', { ...LOB, lobedRound: 0.5 });
+  lf('LOBED ROUNDNESS: 0.3 x S4\'s form (the radius shrinks at all three sinuses)', { ...LOB, ...LOB_S4, lobedRound: 0.3 });
+  lf('LOBED ROUNDNESS: 0.25 x 6 lobes (the narrow sinuses take the shrink)', { ...LOB, lobedLobes: 6, lobedRound: 0.25 });
+  lf('LOBED ROUNDNESS: 0.5 x one lobe a side', { ...LOB, lobedLobes: 1, lobedRound: 0.5 });
+  lf('LOBED ROUNDNESS: x sinus 0.9 x shape 0.5 (the deepest, sharpest sinuses)', { ...LOB, lobedSinus: 0.9, lobedShape: 0.5 });
+  lf('LOBED YIELD: 6 lobes asked on a 12 mm blade (the count gives 6 -> 2, where the print minimum fits; told)', { ...LOB, leafLength: 12, lobedLobes: 6, lobedSinus: 0.7, lobedAngle: 30 });
+  lf('LOBED YIELD: the RESIDUAL — 3 lobes on a 24 mm blade over a 5.5 mm window at 58 deg (no count fits; the V kept, told)', { ...LOB, leafLength: 24, lobedLobes: 3, lobedFrom: 0.37, lobedTo: 0.6, lobedSinus: 0.67, lobedShape: 0.75, lobedAngle: 58, lobedEase: 0.53, lobedWidth: 15.5, leafTipShape: 2.3 });
+  lf('LOBED TEETH: 1 a lobe (7 over the rim)', { ...LOB, lobedToothCount: 1 });
+  lf('LOBED TEETH: 2 a lobe (14 — an even count: the apex notch on the terminal face)', { ...LOB, lobedToothCount: 2 });
+  lf('LOBED TEETH: max (6 a lobe — 42 asked, the ROWS cap builds 24, told)', { ...LOB, lobedToothCount: 6 });
+  lf('LOBED TEETH: 3 a lobe x 6 lobes (39 asked over 13 lobes — the rows cap, told)', { ...LOB, lobedLobes: 6 });
+  lf('LOBED TEETH: the SHARED count at its maximum under LOBED (12 — hidden AND inert)', { ...LOB, leafToothCount: 12 });
+  lf('LOBED TEETH: GATED — SIMPLE with the roundness and the lobed tooth count at their maxima (hidden AND inert)', { ...LOB, leafType: 'SIMPLE', lobedRound: 0.5, lobedToothCount: 6 });
+  lf('LOBED TEETH: GATED — COMPOUND with the roundness and the lobed tooth count at their maxima (hidden AND inert)', { ...LOB, leafType: 'COMPOUND', lobedRound: 0.5, lobedToothCount: 6 });
 
   return rows;
 }

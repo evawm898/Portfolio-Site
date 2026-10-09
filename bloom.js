@@ -2268,7 +2268,10 @@ function regenerate() {
                   leaf: built.leaf && built.leaf.present && built.leavesBuilt && built.leavesBuilt.length
                     ? { archBuilt: built.leavesBuilt.map((r) => r.arch), cupBuilt: built.leavesBuilt.map((r) => r.cup), tipClamp: built.leavesBuilt.map((r) => r.tipClamp), compound: built.leaf.compound || null,
                       /* the LOBED leaf's two caps and its sinus gaps (S4) */
-                      lobed: built.leavesBuilt.map((r) => (r.lobed ? { tiltClamped: r.lobed.tiltClamped, tiltBuiltDeg: r.lobed.tiltBuiltRad * 180 / Math.PI, sinusGaps: r.lobed.sinusGaps, teeth: r.serration } : null)) }
+                      lobed: built.leavesBuilt.map((r) => (r.lobed ? { tiltClamped: r.lobed.tiltClamped, tiltBuiltDeg: r.lobed.tiltBuiltRad * 180 / Math.PI, sinusGaps: r.lobed.sinusGaps, teeth: r.serration,
+                        /* the roundness, the lobe yield and the teeth per lobe (S4c) */
+                        roundBottoms: r.lobed.roundBottoms, lobes: r.lobed.lobes, lobesAsked: r.lobed.lobesAsked, lobeYield: r.lobed.lobeYield,
+                        toothRimAsked: r.lobed.toothRimAsked, teethPerLobe: r.lobed.teethPerLobe } : null)) }
                     : null,
                   buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
                   /* THE LOBES' two caps join the record for the same reason (session
