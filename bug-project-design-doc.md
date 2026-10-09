@@ -3268,3 +3268,20 @@ with the reviewer's reading beside it (`VERDICTS`). `--emit` appends the kept ca
    `NOTCH_LOBE_FRAC` rather than adding a second typed fraction.
 6. **The painted body of a bodiless sheet** (`BODY_MIN_FRAC` 0.025 of the span, `BRIDGE_MAX_FRAC`
    0.12): dev-time only.
+
+### 18.7 Eva's keep / drop ruling, and the four deferred to a fitter redesign
+
+Ruled from the review page (Oct 9): **KEEP #8 (`3.webp#4`), #9 (`3.webp#5`) and #16 (`4.png#3`),
+and the N-pair library format.** They ship as `three-3.webp#4`, `three-3.webp#5` and
+`three-4.png#3`, appended through `--emit 8,9,16` with ids continuing from the last two-pair
+entry. #16 carries its hand-placed SECOND line from `SPLIT_OVERRIDES` (the fitter found its upper
+notch; the lower two lobes overlap in the drawing, §18.3); #8 and #9 are the fitter's own.
+
+**NOT ruled fixable by hand: #14 (`4.png#1`), #18 (`4.png#5`), #19 (`4.png#6`) and #22
+(`4.png#9`).** Each fitted as `split3` with the notch logic landing one line short of the drawn
+lobe boundary (the FIXABLE verdicts on the review page). Eva's ruling is that a hand-placed line
+is the wrong remedy for a fitter that finds the wrong notch: **they move to a FITTER REDESIGN in
+a new session, as its test cases** — the redesign is judged on finding those four boundaries
+without a hand-placed line, and the sheet crops are the gitignored `tools/bug-wing-sources/4.png`
+subjects 1, 5, 6 and 9 (`SHEETS` in `tools/bug-wing-three-pair.mjs` cuts them). No library entry
+is written for them and `SPLIT_OVERRIDES` is not extended.
