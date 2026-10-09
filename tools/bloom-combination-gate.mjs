@@ -772,6 +772,66 @@ export const PAIRS = [
     cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the corymb solve lands every head on one level, so the heads stand side by side at one height',
     why: 'level tops put every head in one plane; a shallow angle spreads them far apart in length and a steep one stacks them close',
   },
+
+  /* ------------------------------------------- THE SEPALS (R6, Oct 9)
+     Eva's ruling R6 (docs/bloom-sepal-discovery.md §6): the sepal is measured
+     by nothing on `self` until these rows. A sepal is the petal builder on a
+     second ring with its own twins, so the petal's own tier-1 mechanisms apply
+     to it unchanged — which is the TIER 2 argument (a shared mechanism argued
+     from the source), not a cited sepal defect. Measured on `sepal-self`: the
+     same `measureWall(grid).self`, read on EVERY sepal the builder emitted
+     (`built.sepals.built`), the smallest. The base set is the defaults bar's
+     shipped whorl (`sepalCount` 5); every axis starts at the twin's own
+     registry default (CG0). The ladders are the petal pairs' own, so a sepal
+     cell can be set beside the petal cell for the same numbers. */
+  {
+    id: 'sepalcup-x-sepalcurl',
+    tier: 2,
+    label: 'sepalCup x sepalSpineCurl — the sepal fiddlehead, cupped',
+    measure: 'sepal-self',
+    base: { sepalCount: 5 },
+    a: { id: 'sepalCup', values: [0, 0.6, 0.9, 1.2] },
+    b: { id: 'sepalSpineCurl', values: [0, 180, 270, 360] },
+    verdict: 'product-only',
+    cite: "bloom-geometry.js — `sepalBladeState` maps the sepal twins onto the petal law (`SEPAL_TWINS`), so `cup-x-curl`'s mechanism is the sepal's; docs/bloom-sepal-discovery.md §1.7 and §6 (R6)",
+    why: 'the petal pair `cup-x-curl` on the sepal\'s shorter blade (0.60 of the petal): the curl brings distant stations together and the cup decides the room left between them',
+  },
+  {
+    id: 'sepalcup-x-sepalroll',
+    tier: 2,
+    label: 'sepalCup x sepalRoll — the sepal quill, cupped',
+    measure: 'sepal-self',
+    base: { sepalCount: 5 },
+    a: { id: 'sepalCup', values: [0, 0.6, 0.9, 1.2] },
+    b: { id: 'sepalRoll', values: [0, 180, 270, 330] },
+    verdict: 'single-reaches',
+    cite: "bloom-geometry.js — `sepalBladeState` and `SEPAL_TWINS` (the petal's `cup-x-roll` mechanism on the sepal ring); tools/bloom-wall-thickness.mjs `SELF_XFAIL['sepal-roll-max']` declares the roll axis's own single cell; docs/bloom-sepal-discovery.md §6 (R6)",
+    why: 'two cross-width deformations of one section: the roll curls the width into a quill and the cup lifts the margins of what is left',
+  },
+  {
+    id: 'sepalcurl-x-sepaltwist',
+    tier: 2,
+    label: 'sepalSpineCurl x sepalTwist — the sepal hoop, wrung',
+    measure: 'sepal-self',
+    base: { sepalCount: 5 },
+    a: { id: 'sepalSpineCurl', values: [0, 180, 270, 360] },
+    b: { id: 'sepalTwist', values: [0, 60, 120, 180] },
+    verdict: 'product-only',
+    cite: "bloom-geometry.js — `petalForm`'s ordering (twist rotates the curled frame), reached by the sepal through `sepalBladeState`; the petal pair `curl-x-twist`; docs/bloom-sepal-discovery.md §6 (R6)",
+    why: 'the twist a blade receives is a function of the curl it already carries; the sepal\'s twist 180 alone clears the bar by 0.005 mm on the wall instrument',
+  },
+  {
+    id: 'sepalscale-x-sepalcurl',
+    tier: 2,
+    label: 'sepalScale x sepalSpineCurl — the hoop on a shorter sepal',
+    measure: 'sepal-self',
+    base: { sepalCount: 5 },
+    a: { id: 'sepalScale', values: [0.6, 0.2, 0.4, 1] },
+    b: { id: 'sepalSpineCurl', values: [0, 180, 270, 360] },
+    verdict: 'product-only',
+    cite: "bloom-geometry.js — the whorl's `slot.scale = sepalScale` shortens the blade while the sheet thickness and the spine curvature floor stay in millimetres; docs/bloom-sepal-discovery.md §7.1 and §6 (R6)",
+    why: 'a full turn on a shorter blade is a tighter hoop against the same sheet, so the size the sepal ships at decides how much curl it can carry',
+  },
 ];
 
 /* ------------------------------------------------------------- the triples */
@@ -1336,6 +1396,36 @@ export const COMBINATION_XFAIL = Object.freeze({
   "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=270 x innerCurl=360": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=360 x innerCurl=0": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "layers-x-curl-x-innercurl @ layerCount=6 x petalSpineCurl=360 x innerCurl=360": { mm: 0.104, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.213 mm (clear) while `measureWall` dropped the foot rows, now 0.104 mm at u 0.803. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
+  /* ===== THE SEPAL PAIRS (R6, Oct 9): 26 cells under the bar, found the day
+     the sepal was first measured on `self`. Declared with their numbers so the
+     gate stays a gate (CG2/CG3 both ways); NOT fixed and NOT tuned around —
+     docs/bloom-sepal-discovery.md §9 lists them as questions for Eva. */
+  'sepalcup-x-sepalcurl @ sepalCup=0.9 x sepalSpineCurl=270': { mm: 0.972, note: "NEW (R6, Oct 9): the petal's cup x curl mechanism on the sepal's shorter blade; neither single axis reaches the bar (cup 1.2 alone 1.152, curl 360 alone 1.218). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalcurl @ sepalCup=0.9 x sepalSpineCurl=360': { mm: 0.135, note: "NEW (R6, Oct 9): the petal's cup x curl mechanism on the sepal's shorter blade; neither single axis reaches the bar (cup 1.2 alone 1.152, curl 360 alone 1.218). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalcurl @ sepalCup=1.2 x sepalSpineCurl=270': { mm: 0.403, note: "NEW (R6, Oct 9): the petal's cup x curl mechanism on the sepal's shorter blade; neither single axis reaches the bar (cup 1.2 alone 1.152, curl 360 alone 1.218). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalcurl @ sepalCup=1.2 x sepalSpineCurl=360': { mm: 0.008, note: "NEW (R6, Oct 9): the petal's cup x curl mechanism on the sepal's shorter blade; neither single axis reaches the bar (cup 1.2 alone 1.152, curl 360 alone 1.218). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0 x sepalRoll=270': { mm: 0.876, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0 x sepalRoll=330': { mm: 0.876, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0.6 x sepalRoll=180': { mm: 0.422, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0.6 x sepalRoll=270': { mm: 0.04, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0.6 x sepalRoll=330': { mm: 0.04, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0.9 x sepalRoll=180': { mm: 0.25, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0.9 x sepalRoll=270': { mm: 0.094, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=0.9 x sepalRoll=330': { mm: 0.094, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=1.2 x sepalRoll=180': { mm: 0.162, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=1.2 x sepalRoll=270': { mm: 0.009, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcup-x-sepalroll @ sepalCup=1.2 x sepalRoll=330': { mm: 0.009, note: "NEW (R6, Oct 9): the roll axis reaches the bar alone (roll 270 and 330 read 0.876 — `SELF_XFAIL['sepal-roll-max']` in the wall instrument) and the cup takes it nearly to contact. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=180 x sepalTwist=60': { mm: 0.957, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=180 x sepalTwist=120': { mm: 0.834, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=180 x sepalTwist=180': { mm: 0.511, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=270 x sepalTwist=60': { mm: 0.768, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=270 x sepalTwist=120': { mm: 0.42, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=270 x sepalTwist=180': { mm: 0.049, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=360 x sepalTwist=60': { mm: 0.004, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=360 x sepalTwist=120': { mm: 0.005, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalcurl-x-sepaltwist @ sepalSpineCurl=360 x sepalTwist=180': { mm: 0.012, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed." },
+  'sepalscale-x-sepalcurl @ sepalScale=1 x sepalSpineCurl=270': { mm: 0.887, note: 'NEW (R6, Oct 9): a sepal as long as the petal (size 1.00) curled 270 or more comes within 0.887 mm of itself; the shipped 0.60 clears at every curl (1.218 at 360). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed.' },
+  'sepalscale-x-sepalcurl @ sepalScale=1 x sepalSpineCurl=360': { mm: 0.887, note: 'NEW (R6, Oct 9): a sepal as long as the petal (size 1.00) curled 270 or more comes within 0.887 mm of itself; the shipped 0.60 clears at every curl (1.218 at 360). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed.' },
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -1485,6 +1575,23 @@ function measureState({ G, W, R }, DEFAULTS, pair, state, where, wallOpts = {}) 
   if (INFLO_MEASURES.has(pair.measure)) return measureInfloApproachMm(G, state, pair.measure);
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
   const m = G.buildBloomInto(acc, state);
+  /* `sepal-self` — THE SAME `self`, ON EVERY SEPAL THE BUILDER EMITTED (Eva's
+     ruling R6, Oct 9). `self` reads `built.petal`, the representative PETAL,
+     which is never a sepal, so on a sepal twin it is INERT by construction and
+     CG1 would refuse the axis for reading nothing; the control's sepal leg is
+     exactly that rebuild. A cell that builds no sepal REFUSES. */
+  if (pair.measure === 'sepal-self') {
+    const built = m.sepals && m.sepals.built ? m.sepals.built.filter((p) => p && p.grid) : [];
+    if (!built.length) throw new Error(`combination gate: "${pair.id}" at ${where} built NO sepal with a grid, so \`sepal-self\` has nothing to read.`);
+    let best = { mm: Infinity };
+    built.forEach((p, i) => {
+      const ap = p.tipCap && p.tipCap.apex;
+      const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
+      const r = W.measureWall(p.grid, { nibFromU, ...wallOpts });
+      if (r.self < best.mm) best = { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1], sepal: i }, rows: r.rows, columns: r.columns };
+    });
+    return { ...best, sepals: built.length };
+  }
   /* `self-every` — THE SAME `self`, ON EVERY PETAL THE BUILDER EMITTED
      (`petalsAll`, each with its own captured grid), and the smallest of them.
      `self` reads ONE petal (`built.petal`, the representative of ring 0),
@@ -1663,7 +1770,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
 
     /* ---------------------------------------------- the table, per pair */
     say(`  [tier ${pair.tier}${pair.guess ? ', a GUESS' : ''}] ${pair.label}`);
-    say(`    measure: ${pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
+    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
     say('      ' + `${pair.a.id} \\ ${pair.b.id}`.padEnd(30) + pair.b.values.map((v) => (num(v) + (Object.is(v, pair.b.values[0]) ? '*' : '')).padStart(10)).join(''));
     for (let i = 0; i < grid.length; i++) {
       const lead = num(pair.a.values[i]) + (i === 0 ? '*' : '');
@@ -2088,6 +2195,14 @@ async function control({ root = HERE } = {}) {
      the one rebuild that is its reason to exist — its measure put back to
      `self` on the representative petal, where `innerCurl` never reaches, so
      CG1 must refuse that axis. */
+  /* THE SEPAL PAIRS' LEG (R6, Oct 9): one sepal pair rebuilt with its measure
+     put back to `self` — the representative PETAL, which no sepal twin reaches —
+     so CG1 must refuse BOTH axes as inert. That is the blindness the defaults
+     bar carried until R6, stated as a must-fail of this gate's own clause. */
+  const sepalPair = PAIRS.find((p) => p.measure === 'sepal-self');
+  if (!sepalPair) { console.error('REFUSED (vacuous control): no pair uses `sepal-self`, so its CG1 witness has nothing to plant.'); return 2; }
+  legs.push([`CG1: "${sepalPair.id}" measured on the representative PETAL (the blindness R6 fixed)`, { pairs: PAIRS.map((p) => (p.id === sepalPair.id ? { ...clone(p), measure: 'self' } : p)), only: new RegExp(`^${sepalPair.id}$`) }, 'CG1', true, sepalPair.id]);
+
   const tRows = baseRun.tripleRows || [];
   if (!tRows.length) { console.error('REFUSED (vacuous control): TRIPLES carries no triple, so its clauses have nothing to plant.'); return 2; }
   const flips = { 'pair-reaches': ['triple-only', 'clears'], 'triple-only': ['pair-reaches', 'clears'], clears: ['pair-reaches', 'triple-only'] };

@@ -41,6 +41,15 @@
      - THE STATES BELOW ARE HAND-PICKED CORNERS, NOT THE MATRIX.
      - It reads ONE petal — the one grid `buildBloomInto` retains per
        descriptor — so it says nothing about petal-to-petal clearance.
+     - EXCEPT ON A ROW MARKED `part: 'sepal'` (Eva's ruling R6, Oct 9,
+       docs/bloom-sepal-discovery.md §6), which reads EVERY SEPAL the
+       builder emitted (`built.sepals.built`, each with its own captured
+       grid) and reports the worst. A sepal is the petal builder on a second
+       ring with its own twins, so its sheet can approach itself where the
+       petal's does not; until these rows existed nothing here measured it
+       (the sepal twins at their extremes were measured by nothing on SELF).
+       Like the petal rows it says nothing about sepal-to-petal clearance —
+       that is the drawn angle limit's (SP8).
 
    THE FIVE ASSERTIONS ABORT THE RUN. A self-check that reports instead of
    failing is not a self-check — and a MEASUREMENT that reports instead of
@@ -66,7 +75,8 @@
 
      V5 SELF-APPROACH — no state may bring the sheet within `MIN_FEATURE_MM`
         of another part of itself, except the pre-existing failures declared
-        individually in `SELF_XFAIL` and measured on `main` at 2a97e96. Those
+        individually in `SELF_XFAIL` and measured on `main` at 2a97e96 (and,
+        for the SEPAL rows, on `main` at 2e096bf the day those rows existed). Those
         MUST fail; one that starts passing is a loud failure, not a bonus.
 
    RUN:  node tools/bloom-wall-thickness.mjs [--controls]
@@ -441,6 +451,14 @@ export const SELF_XFAIL = Object.freeze({
   'form-max': { selfMm: 0.008, note: 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 at session 34, 0.042 on main at 7ebfb7f (2026-09-17 — IMPROVED since the string was written and nobody had re-recorded it), and 0.008 on the APEX NIB tree — WORSE, at the SAME site (u 0.11, v 1.00), which is the base of the blade and not the apex: the nib shortens the drawn blade, so every station moves and a near-contact this tight moves with them. DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.' },
   'curl-max': { selfMm: 0.676, note: 'petalSpineCurl 360 ALONE: the tip coils back onto its own FOOT (worst site u 0.93). 1.230 mm (clear) while measureWall dropped the foot rows, 0.676 once the foot is a SELF target (gate-hygiene session, Oct 6) — the instrument stopped being blind, nothing in the geometry moved. The same state is the census fold `petalSpineCurl max (360)` in SELF_INTERSECTION_XFAIL (pairs and depth, in the browser); this is the approach, in Node. Added as its own row on Eva\'s ruling so the single-control fact is not declared only under the ten combination-gate cells that reach it at their other axes\' defaults.' },
   'buckle-on-form': { selfMm: 0.300, note: 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 at session 34, 0.254 on main at 7ebfb7f (2026-09-17 — WORSE since the string was written and nobody had re-recorded it: a finding, docs/bloom-xfail-magnitudes.md), and 0.300 on the APEX NIB tree — IMPROVED, at the same site (u 0.29, v 1.00), the same reparameterisation moving every station. This is the row that established self-approach as the hazard; it fails on main WITHOUT session 34\'s controls, so it is pre-existing too.' },
+  /* THE SEPAL ROWS' OWN FINDINGS (R6, Oct 9). Found the day the sepal rows
+     existed, by an instrument that had never read a sepal; NOT fixed and NOT
+     tuned around — each is a question for Eva (docs/bloom-sepal-discovery.md
+     §9). Declared so V5 stays a gate: a new sepal self-approach reddens at
+     once, and one of these starting to pass trips it. */
+  'sepal-roll-max': { selfMm: 0.876, note: 'sepalRoll 330 on the shipped sepal (size 0.60, 5 sepals, EXPORT): 0.876 mm, wall 0.856, at u 0.21 — the petal builder\'s own roll fold (the petal\'s `roll-max` reads 0.658) on the sepal\'s shorter blade. Reproduces the discovery\'s 0.8764 (§1.7) through this instrument. Found by R6\'s coverage on Oct 9; a question for Eva, not fixed.' },
+  'sepal-form-max': { selfMm: 0.003, note: 'every sepal form twin at maximum (cup 1.2, roll 330, twist 180, curl 360, cup gradient 1.2): 0.003 mm, wall 0.013 — the sepal\'s own copy of the petal\'s `form-max` (0.008), a near-self-contact on a state the twins reach. Found by R6\'s coverage on Oct 9; a question for Eva, not fixed.' },
+  'sepal-reflexed': { selfMm: 0.804, note: 'sepalAngle -90 (reflexed straight down), every twin at its default: 0.804 mm — the DESCENDING-SEAM fold the census declares on `SEPALS: angle min (-90)` (50 pairs / 0.3225 mm), seen here as an approach. The census onset on the shipped sepal is -67 deg (docs/bloom-sepal-discovery.md §7.3). The seam owner\'s, unscheduled; found by R6\'s coverage on Oct 9, a question for Eva, not fixed.' },
 });
 for (const [id, e] of Object.entries(SELF_XFAIL)) {
   if (!e || !(Number.isFinite(e.selfMm) && e.selfMm >= 0)) throw new Error(`SELF_XFAIL: "${id}" declares no self-approach in mm (${JSON.stringify(e)}) — an entry is {selfMm[, note]}, and a declaration without a number is a label`);
@@ -472,6 +490,22 @@ export const STATES = [
   { id: 'curl-max',        label: 'SHIPPED curl 360',             set: { petalSpineCurl: 360 } },
   { id: 'form-max',        label: 'SHIPPED all form at maximum',
     set: { petalCup: 1.2, petalRoll: 330, petalTwist: 180, petalSpineCurl: 360, petalCupGradient: 1.2 } },
+  /* THE SEPAL ROWS (R6). Each reads the SEPAL's grid, never the petal's, and
+     carries `sepalCount` 5 — the defaults bar's shipped whorl — so the only
+     thing that differs from the sepal row's own control is the twin it names.
+     The twins mirror the petal rows above, which is what lets a reader set a
+     sepal figure beside the petal's for the same control. INSTRUMENT rows: not
+     in `buildMatrix()` beyond what block 35 already holds, so no frozen phase
+     is owed. */
+  { id: 'sepal-shipped',   label: 'SEPAL the shipped whorl (5, size 0.60)', part: 'sepal', set: { sepalCount: 5 } },
+  { id: 'sepal-size-min',  label: 'SEPAL size min (0.20)',      part: 'sepal', set: { sepalCount: 5, sepalScale: 0.2 } },
+  { id: 'sepal-cup-max',   label: 'SEPAL cup 1.2',              part: 'sepal', set: { sepalCount: 5, sepalCup: 1.2 } },
+  { id: 'sepal-roll-max',  label: 'SEPAL roll 330',             part: 'sepal', set: { sepalCount: 5, sepalRoll: 330 } },
+  { id: 'sepal-twist-max', label: 'SEPAL twist 180',            part: 'sepal', set: { sepalCount: 5, sepalTwist: 180 } },
+  { id: 'sepal-curl-max',  label: 'SEPAL curl 360',             part: 'sepal', set: { sepalCount: 5, sepalSpineCurl: 360 } },
+  { id: 'sepal-form-max',  label: 'SEPAL all form at maximum',  part: 'sepal',
+    set: { sepalCount: 5, sepalCup: 1.2, sepalRoll: 330, sepalTwist: 180, sepalSpineCurl: 360, sepalCupGradient: 1.2 } },
+  { id: 'sepal-reflexed',  label: 'SEPAL angle -90 (reflexed)', part: 'sepal', set: { sepalCount: 5, sepalAngle: -90 } },
   { id: 'buckle-gentle',   label: 'buckle A=0.10 x half-width · f=2', set: { buckleAmp: 0.10, buckleFreq: 2 }, buckled: true },
   { id: 'buckle-mid',      label: 'buckle A=0.20 x half-width · f=3', set: { buckleAmp: 0.20, buckleFreq: 3 }, buckled: true },
   { id: 'buckle-strong',   label: 'buckle A=0.30 x half-width · f=3', set: { buckleAmp: 0.30, buckleFreq: 3 }, buckled: true },
@@ -565,9 +599,24 @@ const withoutBuckle = (set) => {
 async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {} } = {}) {
   const G = await loadGeometry(root);
   const D = defaults || (await import(pathToFileURL(path.join(root, 'bloom-registry.js')).href)).DEFAULTS;
-  const one = (set) => {
+  const one = (set, part = 'petal') => {
     const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
     const m = G.buildBloomInto(acc, { ...D, ...set });
+    /* A SEPAL ROW READS THE SEPALS, worst of every one the builder emitted, and
+       REFUSES where none was built: a sepal row that measures the petal is the
+       blindness these rows exist to remove. */
+    if (part === 'sepal') {
+      const built = m.sepals && m.sepals.built ? m.sepals.built.filter((p) => p && p.grid) : [];
+      if (!built.length) throw new Error(`wall instrument: a SEPAL row built no sepal with a grid (${JSON.stringify(set)}) — it would measure nothing`);
+      let best = null;
+      for (const p of built) {
+        const ap = p.tipCap && p.tipCap.apex;
+        const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
+        const r = measureWall(p.grid, { nibFromU, ...wallOpts });
+        if (!best || r.self < best.self) best = r;
+      }
+      return { ...best, sepals: built.length, tris: acc.positions.length / 9, positions: acc.positions };
+    }
     /* THE NIB'S OWN CROSSING, from the BUILDER's record — see `nibFromU` in
        measureWall. Null on a tree with no apex telemetry, which is what keeps
        this instrument runnable against an older worktree. */
@@ -577,7 +626,7 @@ async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {}
   };
   const out = [];
   for (const st of STATES) {
-    const got = one(st.set);
+    const got = one(st.set, st.part);
     const control = st.buckled ? one(withoutBuckle(st.set)) : null;
     /* How many rows the grid gives this state per cycle of its own wave —
        derived from the emitted row count, never from a constant restated. */
@@ -964,6 +1013,21 @@ const MUTANTS = [
       const got = M.buckleLaw(st, ctx).w(0.5, 1, 8), want = C.buckleLaw(st, ctx).w(0.5, 1, 8) * 4;
       return Math.abs(got - want) < 1e-12 ? null : `w at the margin is ${got}, not 4x the clean ${want / 4}`;
     } },
+  /* THE SEPAL ROWS' MUTANT (R6, Oct 9): the sepal stops reading its ROLL twin,
+     so it takes the PETAL's roll (0 at the defaults). Every petal row is
+     untouched — the representative petal never reads a sepal twin — so only a
+     row that reads the SEPAL's grid can see it: `sepal-roll-max` stops failing,
+     which V5 calls the declared self-approach FIXED. Before R6 nothing here
+     could have fired on it. */
+  { id: 'sepal-roll-twin-dropped', names: ['V5'],
+    why: 'sepalBladeState stops mapping sepalRoll onto the petal law, so a sepal at roll 330 builds flat — visible only on a row that reads the sepal',
+    find: 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);',
+    into: "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalRoll') s[petalId] = Number(state[sepalId]);",
+    witness: (M, C) => {
+      const st = { ...DEFAULTS_FOR_WITNESS, sepalRoll: 330 };
+      const got = M.sepalBladeState(st, 0).petalRoll, clean = C.sepalBladeState(st, 0).petalRoll;
+      return got !== clean ? null : `the sepal substate still carries petalRoll ${got}`;
+    } },
   { id: 'guard-needs-both-zero', names: ['V3'],
     why: 'the guard asks for BOTH factors to be zero rather than either, so a frequency alone engages the field at amplitude 0 and the gated state stops being inert',
     find: 'export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }',
@@ -1163,16 +1227,24 @@ if (IS_MAIN) {
         ['V4 record stale, worse',  { v4: { id: 'buckle-on-form', ownDeficitMm: 0.3 } }, 'V4 xfail magnitude'],
         ['V4 record stale, better', { v4: { id: 'buckle-on-form', ownDeficitMm: 0.9 } }, 'V4 xfail magnitude'],
         /* THE OLD INSTRUMENT, PLANTED (gate-hygiene, Oct 6): the foot rows
-           dropped again. `curl-max` is the one row whose reading depends on
-           the foot, so it must read 1.230 and trip "now clears the bar" —
-           on its OWN witness and on no other row. */
-        ['foot dropped (curl-max)', { wallOpts: { footTargets: false } }, 'V5 xfail: "SHIPPED curl 360" now clears the bar'],
+           dropped again. The rows whose reading depends on the foot must
+           read 1.230 and trip "now clears the bar" — on their OWN witnesses
+           and on no other row. `curl-max` was the one such row; the SEPAL
+           rows (R6, Oct 9) add `sepal-reflexed`, whose 0.804 mm is the
+           descending seam bringing the blade back over its own foot —
+           measured: with the foot dropped it reads 1.230 exactly as
+           `curl-max` does. A leg may name several witnesses; it must fire
+           every one of them, once, and nothing else. */
+        ['foot dropped (curl-max, sepal-reflexed)', { wallOpts: { footTargets: false } }, ['V5 xfail: "SHIPPED curl 360" now clears the bar', 'V5 xfail: "SEPAL angle -90 (reflexed)" now clears the bar']],
       ];
-      for (const [name, perturb, want] of legs) {
+      for (const [name, perturb, want0] of legs) {
+        const wants = Array.isArray(want0) ? want0 : [want0];
+        const want = wants.join(' + ');
         const { fails } = await verify({ quiet: true, perturb });
-        const hit = fails.filter((f) => f.startsWith(want));
-        const other = fails.filter((f) => !f.startsWith(want));
-        const ok = hit.length === 1 && other.length === 0;
+        const hits = wants.map((w) => fails.filter((f) => f.startsWith(w)).length);
+        const hit = fails.filter((f) => wants.some((w) => f.startsWith(w)));
+        const other = fails.filter((f) => !wants.some((w) => f.startsWith(w)));
+        const ok = hits.every((n) => n === 1) && other.length === 0;
         console.log(`  ${ok ? 'ok  ' : 'FAIL'} record control: ${name.padEnd(24)} ${hit.length ? 'fired ' + want : 'did NOT fire ' + want}${other.length ? ' (and ' + other.length + ' other clause(s) fired, which a record perturbation must not cause)' : ''}`);
         if (!ok) bad++;
       }
