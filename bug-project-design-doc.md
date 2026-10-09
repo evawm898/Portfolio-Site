@@ -3285,3 +3285,15 @@ a new session, as its test cases** — the redesign is judged on finding those f
 without a hand-placed line, and the sheet crops are the gitignored `tools/bug-wing-sources/4.png`
 subjects 1, 5, 6 and 9 (`SHEETS` in `tools/bug-wing-three-pair.mjs` cuts them). No library entry
 is written for them and `SPLIT_OVERRIDES` is not extended.
+
+### 18.8 Source images are not stored
+
+The source artwork for the library is **not stored anywhere** — not in this repository, not in a
+separate one. `tools/bug-wing-sources/` is gitignored and lives only in the session that fitted
+from it, so it does not survive that session. **The library shapes live in the code**
+(`bug-wing-library.js`): an entry is control points, pairs and an angle, and nothing about a
+shipped shape needs its picture again. **A fitting session needs images only for NEW fits, and
+they are attached in that session**; the dev tools (`tools/bug-wing-three-pair.mjs` and its
+siblings) read whatever is placed in `tools/bug-wing-sources/` for that run. The fitter redesign
+in §18.7 is such a session: its four test cases are `4.png` subjects 1, 5, 6 and 9, and that
+sheet has to be attached again when the session opens.

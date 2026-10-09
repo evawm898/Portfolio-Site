@@ -1776,7 +1776,7 @@ if (NEG) {
     console.log(`${fired ? 'CAUGHT' : 'MISSED'} ${'a library shape crosses itself'.padEnd(32)} by LB1  — ${fails.slice(0, 1).join(' | ').slice(0, 300) || 'nothing fired'}`);
     if (!fired) ok = false;
     // the stored wing angles ZEROED (a library that forgot where its wings were found)
-    { const lib0 = JSON.parse(JSON.stringify(G.WING_LIBRARY)); for (const s of lib0) { s.fore.sweep = 0; s.hind.sweep = 0; }
+    { const lib0 = JSON.parse(JSON.stringify(G.WING_LIBRARY)); for (const s of lib0) for (const w of (s.pairs || [s.fore, s.hind])) w.sweep = 0;   // both forms: an N-pair entry has no fore/hind (its angles are LB8's, below)
       const f0 = angleChecks({ ...G, WING_LIBRARY: lib0 }).filter(([c]) => !c).map(([, m]) => m), fired0 = f0.some((x) => x.startsWith('WA1:')) && f0.some((x) => x.startsWith('WA2:'));
       console.log(`${fired0 ? 'CAUGHT' : 'MISSED'} ${'the stored angles are zeroed'.padEnd(32)} by WA1+WA2  — ${f0.slice(0, 2).join(' | ').slice(0, 300) || 'nothing fired'}`);
       if (!fired0) ok = false; }
