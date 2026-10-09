@@ -526,6 +526,27 @@ export const PAIRS = [
     cite: 'docs/bloom-leaf-lobed-rulings-outcome.md (the probe) and docs/bloom-leaf-lobed-outcome.md (the chevron leaf the pair builds)',
     why: 'the lobed envelope sets the blade base nearest the stem; the steep leaf brings it to the stem — the hazard is the angle alone',
   },
+  /* THE ROUND SINUS BOTTOM AGAINST THE STEM (leaf/stem build S4c). The brief
+     asks for this pair if CG1 says the roundness reaches a measure, and it
+     does: the first sinus sits near the blade's base, so the rounder bottom
+     moves the base margin — 0.045 mm at sinus 0.55 between roundness 0 and
+     0.12, measured. The only measure that reads a lobed leaf is the blade
+     against the stem; at the shipped 35 degrees the grid CLEARS (worst 3.455
+     mm), and at 70 degrees every cell is under the bar from the angle alone
+     (0.586-0.699, the `lobedwidth-x-leafangle` class), so the shipped angle is
+     the base and the verdict says the product is not a hazard. */
+  {
+    id: 'lobedround-x-sinus',
+    tier: 2,
+    label: 'lobedRound x lobedSinus — the round sinus bottom against the stem',
+    measure: 'leaf-stem',
+    base: { stemLength: 70, leafLength: 46, leafNodes: 3, leafType: 'LOBED' },
+    a: { id: 'lobedRound', values: [0.12, 0, 0.5] },
+    b: { id: 'lobedSinus', values: [0.55, 0, 0.9] },
+    verdict: 'clears',
+    cite: 'docs/bloom-leaf-lobed-roundness-outcome.md (the probe) and docs/bloom-leaf-lobed-rulings-outcome.md (the round bottom the roundness widens)',
+    why: 'a rounder, deeper sinus near the base moves the blade margin toward the stem; at the shipped angle it never comes within the bar',
+  },
   {
     id: 'tipend-x-fringe',
     tier: 3,
@@ -1308,7 +1329,7 @@ export const COMBINATION_XFAIL = Object.freeze({
   "gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360": { mm: 0.691, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.123 mm (clear) while `measureWall` dropped the foot rows, now 0.691 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360": { mm: 0.695, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.058 mm (clear) while `measureWall` dropped the foot rows, now 0.695 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "curl-x-twist @ petalSpineCurl=360 x petalTwist=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT. TRUE CAUSE (Eva's ruling, Oct 6): petalSpineCurl 360 ALONE reaches this — every other axis of this cell is at its default, so it is not this pair's or triple's hazard. The single-control guard is SELF_XFAIL['curl-max'] in tools/bloom-wall-thickness.mjs; this entry stays because the number appears here and removing it would redden CG2." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.6991, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.6544, note: "S4c re-record, WORSE by 0.0447 mm: the shipped sinus roundness 0.12 widens the first sinus, which sits near the blade base the stem approaches (S4b: 0.6991 at roundness 0, which still reads 0.699 — `lobedround-x-sinus`'s own grid at 70 degrees). leafAngle 70 ALONE reaches this class (the SIMPLE leaf's own `leafangle-x-stem`). Measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=10": { mm: 0.5865, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=40": { mm: 0.6991, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=34": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
