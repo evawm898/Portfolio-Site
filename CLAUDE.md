@@ -3746,6 +3746,35 @@ LOBED count twin (open). 5,980 tris a leaf, unchanged. Byte partition by `verify
 --mover lobed --pair set` (both new): 33 movers / every holder held. `frozen/phase59` = the 1,261 rows at
 `ee91b94`; block 56 is 43 rows (1,265). Sheet: `node tools/shot-bloom-lobed-rulings.mjs <png> --base <worktree>`.
 
+**THE LOBED SINUS HAS A ROUNDNESS, ON NO FIT THE LOBE COUNT YIELDS, AND LOBED TEETH ARE COUNTED PER LOBE**
+(Eva's rulings on S4b, Oct 9 — leaf/stem build S4c; read `docs/bloom-leaf-lobed-roundness-outcome.md` before
+touching `lobedRoundBottoms`' roundness block, the yield loop in `lobedOutlineUncached`, `lobedBladeState`'s
+`lobeCount`, `cap.toothStationsU` or LF27-LF29).
+- **S4b's four defaults are RULED** (sinus 0.55, shape 0.55, angle 22, tooth depth 0.22).
+- **`lobedRound` (0-0.5, default 0.12, PROPOSED)** sets the radius `max(floor_G(r x pitch), R_min)`: the pitch
+  is the crest-to-crest chord, and `R_min` is S4b's print minimum.
+  - It is S4b's construction at that radius; a broad disc keeps the floor's seat, because the axis seat leaves
+    a V crevice.
+  - Roundness 0 is S4b by branch: 40 of 41 base LOBED rows are bit-identical with teeth off; the one mover is
+    the yield.
+  - Dead travel above about 0.3 on the mum is told, not trimmed.
+- **The order:** the radius SHRINKS first (told). Only where `R_min` does not fit is the count tried one lobe
+  fewer, down to one. Where none fits, the RESIDUAL keeps S4b's told V.
+  - Sample: 3.2 % shrink, 11.8 % yield, 0.9 % residual (all back flank on a 1-6 mm window).
+  - S4b's base measures 13.0 % NO FIT, not its published 10.2 %.
+- **`lobedToothCount` (1-6, default 3, PROPOSED)** is TEETH PER BUILT LOBE: the rim asks `per x (2n + 1)`.
+  `leafToothCount` is hidden and inert under LOBED.
+  - "Per lobe" is an AVERAGE along MODEL B's even-arc rim (2 / 3 / 3 / 5 on the mum).
+  - A lobed blade's count also gives until every margin period holds a station (`cap.toothStationsU`, told
+    `rows`). Uniform-in-u rows put a tip tooth between two rows on 15 sampled states.
+- **Partition:** 36 movers / 1,226 holders, 0 floats on the holders, both modes. Cost: 5,980 tris a leaf and
+  the 170,410 corner, both unchanged.
+- **A PRE-EXISTING S4b DEFECT:** on a tilt-CAPPED blade, S4b's round-bottom back wall crosses LF22 by 2e-4. The
+  yield row sits at 30 degrees for that reason; open for Eva.
+- **Matrix:** block 57 (17 rows, 1,282); smoke block 57; `frozen/phase60` = the 1,265 rows at `2e096bf`.
+- **Gates:** six mutants. The apex table gained `--rows=<regex>`, a row subset that says so.
+- Sheet: `node tools/shot-bloom-lobed-roundness.mjs <png> --base <worktree>`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
