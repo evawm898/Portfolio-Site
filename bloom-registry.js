@@ -73,6 +73,7 @@ import { LEAF_TYPES, LEAFLET_PAIRS_RANGE, LEAFLET_PAIRS_DEFAULT, LEAFLET_FIRST_R
 import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_FROM_DEFAULT, LOBED_TO_RANGE, LOBED_TO_DEFAULT,
          LOBED_SINUS_RANGE, LOBED_SINUS_DEFAULT, LOBED_SHAPE_RANGE, LOBED_SHAPE_DEFAULT, LOBED_ANGLE_RANGE, LOBED_ANGLE_DEFAULT,
          LOBED_EASE_RANGE, LOBED_EASE_DEFAULT, LOBED_WIDTH_DEFAULT, LOBED_TOOTH_DEPTH_DEFAULT } from './bloom-geometry.js';
+import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 
@@ -3921,7 +3922,7 @@ export const CONTROLS = [
       : 'simple · one blade on its petiole'),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodesOwn' } },
   { id: 'leafWidth', section: 'leaves', kind: 'slider',
-    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: 17,
+    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: LEAF_WIDTH_DEFAULT,
     label: 'Leaf width',
     fmt: (v, ui) => `${v} mm across at the widest point${Number(ui.leafLength) > 0 ? ` · ${(Number(ui.leafLength) / Number(v)).toFixed(1)}:1` : ''}`,
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSimpleBlade' } },
@@ -4179,7 +4180,7 @@ export const CONTROLS = [
      organ-to-organ coupling session 22 ruled against when it refused to let a
      style's presence move every stamen. LF7 is the witness for the split. */
   { id: 'leafToothDepth', section: 'leafSerration', kind: 'slider',
-    min: 0, max: 1, step: 0.01, default: 0.26,
+    min: 0, max: 1, step: 0.01, default: LEAF_TOOTH_DEPTH_DEFAULT,
     label: 'Tooth depth',
     fmt: (v) => (Number(v) === 0 ? 'none — an entire margin' : `${Number(v).toFixed(2)}x the blade's own half-width`),
     /* the SIMPLE blade's depth — hidden AND inert under COMPOUND, where the
@@ -4218,7 +4219,7 @@ export const CONTROLS = [
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
   { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
-    min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: 9,
+    min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: LEAF_TOOTH_COUNT_DEFAULT,
     label: 'Teeth',
     /* THE COUNT IS TEETH OVER THE WHOLE RIM — both margins and the apex — and
        not "along each margin", which this label said until leaf/stem build S2:

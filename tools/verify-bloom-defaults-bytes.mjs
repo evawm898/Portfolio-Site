@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-defaults-bytes.mjs — THE BYTE PARTITION OF A DEFAULTS MOVE.
 
-     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control]
+     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed] [--pair index|set]
      node tools/verify-bloom-defaults-bytes.mjs --merge <file> <file> ...
 
    WHY IT EXISTS. `verify-bloom-surface-bytes.mjs` builds BOTH trees from THIS
@@ -48,6 +48,7 @@ if (argv[0] === '--merge') {
   console.log(`  movers that moved: ${movers.filter((r) => r.moved).length} of ${movers.length}; holders that held: ${holders.filter((r) => !r.moved).length} of ${holders.length}`);
   console.log(`  compared: ${sum('floats').toLocaleString('en-US')} export floats, ${sum('gridValues').toLocaleString('en-US')} captured-grid values`);
   if (parts.some((p) => p.control)) console.log(`  control: ${parts.filter((p) => p.control).map((p) => p.control).join('; ')}`);
+  if (parts[0].pair === 'set') console.log(`  paired by control set: ${(parts[0].unpairedBase || []).length} base row(s) and ${(parts[0].unpairedHead || []).length} head row(s) with no partner — ${[...(parts[0].unpairedBase || []).map((l) => 'base: ' + l), ...(parts[0].unpairedHead || []).map((l) => 'head: ' + l)].join(' | ')}`);
   for (const f of fails) console.log(`  FAIL ${f}`);
   console.log(fails.length ? `FAIL — ${fails.length} finding(s)` : 'PASS — the partition closes exactly as predeclared.');
   process.exit(fails.length ? 1 : 0);
@@ -94,9 +95,38 @@ function build(Gm, state, row, exportMode) {
 }
 const sameArr = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 
-const headRows = H.buildMatrix(), baseRows = BH.buildMatrix();
+/* `--mover <name>` (S4b): WHICH base-tree record predeclares a mover.
+   `infill` (the default, the ruled-defaults session's own): some built petal
+   carries an unrefused infill plan. `lobed` (leaf/stem build S4b, the mum
+   retune of the LOBED-only defaults): the base builds a LOBED leaf on the row
+   — the plan's own type after the raceme's pin, a leaf actually built — so
+   every SIMPLE, COMPOUND and leafless row is a holder. */
+const MOVER = arg('--mover') || 'infill';
+const MOVER_OF = {
+  infill: (b) => (b.built.petalsAll || []).some((p) => p && p.infill && !p.infill.refused),
+  lobed: (b) => !!(b.built.leaf && b.built.leaf.present && b.built.leaf.type === 'LOBED' && b.built.leaf.built > 0),
+};
+if (!MOVER_OF[MOVER]) { console.error(`--mover ${MOVER}: no such predicate (${Object.keys(MOVER_OF).join(', ')})`); process.exit(2); }
+/* `--pair set` (S4b): pair the two matrices by CONTROL SET (and capability)
+   rather than by index, in order within one set, for a change that INSERTS
+   rows inside a block or redefines one; a base row with no partner and a head
+   row with no partner are each LISTED BY NAME (never silently dropped) and
+   the run reports how many of each. By index is still the default. */
+const PAIR = arg('--pair') || 'index';
+const headRows0 = H.buildMatrix(), baseRows0 = BH.buildMatrix();
 const fails = [], out = [];
-if (headRows.length !== baseRows.length) fails.push(`the two matrices differ in length (${headRows.length} here, ${baseRows.length} on the base) — pairing by index is not available`);
+let headRows = headRows0, baseRows = baseRows0, unpairedBase = [], unpairedHead = [];
+if (PAIR === 'set') {
+  const key = (r) => JSON.stringify([r.set, r.capability || null]);
+  const pool = new Map();
+  headRows0.forEach((r) => { const k = key(r); if (!pool.has(k)) pool.set(k, []); pool.get(k).push(r); });
+  headRows = []; baseRows = [];
+  for (const br of baseRows0) { const q = pool.get(key(br)); if (q && q.length) { baseRows.push(br); headRows.push(q.shift()); } else unpairedBase.push(br.label); }
+  for (const q of pool.values()) for (const r of q) unpairedHead.push(r.label);
+  console.error(`pairing by control set: ${baseRows.length} pairs; ${unpairedBase.length} base row(s) and ${unpairedHead.length} head row(s) with no partner`);
+  for (const l of unpairedBase) console.error(`  base only: ${l}`);
+  for (const l of unpairedHead) console.error(`  head only: ${l}`);
+} else if (headRows.length !== baseRows.length) fails.push(`the two matrices differ in length (${headRows.length} here, ${baseRows.length} on the base) — pairing by index is not available`);
 let control = null;
 /* THE CONTROL'S HOLDER, BY NAME (gate-hygiene session, Oct 6). It was the
    FIRST holder of whatever shard ran, and it retired the LAST "a HOLDER moved"
@@ -118,7 +148,7 @@ for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
   let mover = null, moved = false, floats = 0, gridValues = 0;
   for (const exportMode of [true, false]) {
     const b = build(BG, bs, br, exportMode), h = build(G, hs, hr, exportMode);
-    if (exportMode) mover = (b.built.petalsAll || []).some((p) => p && p.infill && !p.infill.refused);
+    if (exportMode) mover = MOVER_OF[MOVER](b);
     if (CONTROL && exportMode && hr.label === CONTROL_HOLDER) {
       if (mover) { fails.push(`control: the named holder "${CONTROL_HOLDER}" is a predeclared MOVER on the base tree, so it cannot carry the holder control — name a row this change holds`); }
       else { h.pos[0] += 1e-9; control = `perturbed "${hr.label}" by 1e-9`; }
@@ -139,7 +169,7 @@ if (CONTROL) {
   else if (j < 0) fails.push(`control: ${control} and the holder clause did NOT report it`);
   else { control += ' — the holder clause reported it'; fails.splice(j, 1); }
 }
-const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control };
+const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control, mover: MOVER, pair: PAIR, unpairedBase, unpairedHead };
 if (arg('--out')) fs.writeFileSync(arg('--out'), JSON.stringify(res));
 console.log(`shard ${K}/${N}: ${out.length} rows, ${out.filter((r) => r.mover).length} movers, ${fails.length} finding(s)${control ? ` · control: ${control}` : ''}`);
 process.exit(fails.length ? 1 : 0);

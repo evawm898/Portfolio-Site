@@ -752,9 +752,10 @@ const MUTANTS = [
        sweep in CI (D14). `uPkRaw` is the law's own widest point and is what
        the CORE term beside it already reads. */
     /* (moved again, leaf/stem build S4: the CORE term carries the chevron's
-       lobe factor on a branch — the anchor ends at the plain arm) */
-    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (u) => halfW * tipLaw(u) * chev.lobeAt(u) : (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (u) => halfW * tipLaw(u) * chev.lobeAt(u) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
+       lobe factor on a branch — the anchor ends at the plain arm; and again
+       in S4b, where the chevron arm caps at the round sinus bottoms) */
+    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -1968,6 +1969,48 @@ const MUTANTS = [
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.rep.lobed.embedMm < c.rep.lobed.embedMm - 0.1) ? null : `the mutant runs the petiole ${m.rep.lobed.embedMm} mm into the blade against the clean ${c.rep.lobed.embedMm} — the behaviour did not move`; } },
+  /* THE S4b MUTANTS (Eva's rulings of Oct 8: round the sinus bottom; scale
+     the lobed petiole by blade area). Each is witnessed on the MUTATED
+     module's own build of `LOB_WIT` — the shipped lobed leaf, whose first two
+     sinuses ask a V narrower than 1 mm and are rounded — never on the clause
+     it names. */
+  { id: 'the-v-bottom-is-restored', why: 'the round bottoms are planned and recorded and never reach the outline — the sinuses are cut to their V again, under the 1 mm opening, while the record says widened',
+    find: '      ...(round.roundAt ? { roundAt: round.roundAt } : {}),',
+    into: '', names: ['LF25'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* the U keeps the depth and takes the FLANKS: the clean tree's rows sit
+         under the mutant's V somewhere, and nowhere above it */
+      const H = m.rep.lobed.rowHalfLobeMm, Hc = c.rep.lobed.rowHalfLobeMm;
+      let taken = 0, over = 0;
+      for (let j = 0; j < H.length; j++) { taken = Math.max(taken, H[j] - Hc[j]); over = Math.max(over, Hc[j] - H[j]); }
+      return (m.rep.lobed.roundBottoms.built > 0 && taken > 0.05 && over === 0) ? null : `the clean round bottoms take at most ${taken} mm off the mutant's V rows (and add ${over}) with ${m.rep.lobed.roundBottoms.built} bottoms recorded — the behaviour did not move`; } },
+  { id: 'the-round-bottom-is-a-constant-radius', why: 'the U is typed at a 0.35 mm radius and never grown to the opening it exists for — a round bottom that is round and still under 1 mm',
+    find: '    let W = uAt(D / 2), o = W.U ? openingWith(W.U, su) : null;\n    if (W.U && !(o >= D)) {',
+    into: '    let W = uAt(0.35), o = W.U ? openingWith(W.U, su) : null;\n    if (false) {', names: ['LF25'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ms = m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built), cs = c.rep.lobed.roundBottoms.sinuses.filter((r) => r.built);
+      return (ms.length && ms.every((r) => r.radiusMm === 0.35) && ms.some((r) => r.openingBuiltMm < 1) && cs.every((r) => r.openingBuiltMm >= 1)) ? null : `the mutant builds radii ${ms.map((r) => r.radiusMm)} opening ${ms.map((r) => r.openingBuiltMm)} against the clean ${cs.map((r) => r.openingBuiltMm)} — the behaviour did not move`; } },
+  { id: 'the-round-bottom-is-not-told', why: 'the sinus is widened and the record says it was not — the read-out prints no widening beside a bottom that was rounded',
+    find: '    rec.built = true; rec.radiusMm = W.R; rec.openingBuiltMm = o;',
+    into: '    rec.built = false; rec.radiusMm = W.R; rec.openingBuiltMm = o;', names: ['LF25'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const same = m.rep.lobed.rowHalfLobeMm.every((h, j) => h === c.rep.lobed.rowHalfLobeMm[j]);
+      return (same && m.rep.lobed.roundBottoms.sinuses.every((r) => !r.built) && c.rep.lobed.roundBottoms.sinuses.some((r) => r.built)) ? null : `the mutant's outline is ${same ? 'the clean one' : 'MOVED'} with ${m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built).length} bottoms told — the behaviour did not move`; } },
+  { id: 'the-lobed-petiole-is-the-wire', why: 'the area law is computed and recorded and the rod is built at the wire anyway — the read-out says asked -> built on a petiole that was never thickened',
+    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
+    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : petioleR0;', names: ['LF26'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.petioleR === m.plan.lobedPetiole.wireR && c.plan.petioleR > c.plan.lobedPetiole.wireR) ? null : `the mutant builds the petiole at ${m.plan.petioleR} mm against the clean ${c.plan.petioleR} — the behaviour did not move`; } },
+  { id: 'the-petiole-is-sized-from-the-envelope-box', why: "the petiole reads the envelope's bounding box (its width times its length) rather than the blade's own area — the sinuses' missing area thickens the rod",
+    find: '  const areaMm2 = lobedBladeAreaMm2(lobedOutline(state, Lmm, true), Lmm);',
+    into: '  const areaMm2 = Number(lobedBladeState(state).petalWidth) * Lmm;', names: ['LF26'],
+    witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.lobedPetiole.areaMm2 > 1.5 * c.plan.lobedPetiole.areaMm2) ? null : `the mutant sizes on ${m.plan.lobedPetiole.areaMm2} mm^2 against the clean ${c.plan.lobedPetiole.areaMm2} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from
@@ -2361,9 +2404,14 @@ const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 
    floor); and a SIMPLE leaf with every lobed control at an extreme (where a
    leak would show). Each is a table row of the same state. */
 const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
-const TILT_WIT = { ...LOB_WIT, lobedAngle: 60 };
-const FOLD_WIT = { ...LOB_WIT, lobedLobes: 6, lobedToothDepth: 0.3 };
-const NONEFIT_WIT = { ...LOB_WIT, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, leafToothCount: 12 };
+/* S4's own lobed form (S4b): the mum retune moved the four lobed defaults,
+   and at its rounder, less tilted lobes the unclamped tilt folds no cell and
+   the 0.3 mm teeth sit under their fold cap — so the three witnesses that
+   need a cap to BIND pin the form they were chosen at. */
+const LOB_S4_FORM = { lobedSinus: 0.62, lobedShape: 0.7, lobedAngle: 38, lobedToothDepth: 0.08 };
+const TILT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedAngle: 60 };
+const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedToothDepth: 0.3 };
+const NONEFIT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, leafToothCount: 12 };
 const SIMPLE_LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, lobedLobes: 6, lobedSinus: 0.9, lobedAngle: 60, lobedToothDepth: 1 };
 /* the inner cells' advance along the midrib, per row pair, off the leaf's own
    emitted skin (the two columns either side of the V's apex) — LF22's measure */
@@ -2619,14 +2667,14 @@ const ROWS = [
   { label: 'a compound leaf at the shipped sheet (the load taper 2.68 -> 2.08 -> 1.20 mm, unclamped)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }] },
   /* THE LOBED ROWS (leaf/stem build S4): the witness sets above. */
-  { label: 'a LOBED leaf at the shipped lobed defaults (3 lobes a side, tilt 38, light teeth)',
+  { label: 'a LOBED leaf at the shipped lobed defaults (3 lobes a side; the S4b mum form)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }] },
-  { label: 'a LOBED leaf at lobe angle 60 (the TILT cap binds: built 46.73)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedAngle', value: '60' }] },
+  { label: 'a LOBED leaf at lobe angle 60 at S4\'s form (the TILT cap binds: built 46.73)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '0.08' }] },
   { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3 (the TOOTH fold clamp binds hardest)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }] },
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }] },
   { label: 'a LOBED leaf where NO tooth fits (6 lobes, sinus 0.9, depth 0.3, 12 teeth — the fold cap under the floor)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '12' }] },
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '12' }] },
   { label: 'a SIMPLE leaf with the hidden lobed controls at an extreme (6 lobes, sinus 0.9, tilt 60, depth 1 — where a leak would show)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '1' }] },
   { label: 'a SIMPLE leaf with the hidden leaflet controls at an extreme (pairs 4, stalk 20 — where a leak would show)',
@@ -2900,10 +2948,20 @@ if (SELECTED) {
   if (unknown.length) { await browser.close(); server.close(); console.log(`--only names no such mutant: ${unknown.join(', ')}`); process.exit(1); }
 }
 
-console.log('CONTROL (unmutated tree): the family must be SILENT on every row');
-const clean = await famsOn(ROWS);
-console.log(`  fired: ${clean.size ? [...clean].sort().join(', ') : '(none)'}\n`);
-let fail = clean.size > 0;
+/* `--witnesses-only` (S4b): every selected mutant's WITNESS on the mutated
+   module, in Node, and nothing else — no clean control, no browser row, no
+   family asked. It answers "did the edit move the behaviour" in seconds and
+   NEVER "does the family fire": it is an iteration aid for a change that
+   moves the witness states (a defaults retune), never a pass of this table,
+   and its last line says so. */
+const WITNESS_ONLY = process.argv.includes('--witnesses-only');
+let fail = false;
+if (!WITNESS_ONLY) {
+  console.log('CONTROL (unmutated tree): the family must be SILENT on every row');
+  const clean = await famsOn(ROWS);
+  console.log(`  fired: ${clean.size ? [...clean].sort().join(', ') : '(none)'}\n`);
+  fail = clean.size > 0;
+}
 
 /* `--neuter=<id>` makes ONE edit APPLY while changing nothing: the source
    differs, so the match count is satisfied, and only the witness can see that
@@ -2937,6 +2995,7 @@ for (const mu of MUTANTS) {
     if (NEUTER === mu.id) neuterReported = true;
     fail = true; SERVE = SRC; continue;
   }
+  if (WITNESS_ONLY) { console.log(`  ${mu.id}: witness moved`); SERVE = SRC; continue; }
   const got = await famsOn(ROWS);
   const want = mu.names;
   const missed = want.filter((f) => !got.has(f));
@@ -2946,6 +3005,10 @@ for (const mu of MUTANTS) {
   SERVE = SRC;
 }
 await browser.close(); server.close();
+if (WITNESS_ONLY) {
+  console.log(fail ? '\nWITNESSES ONLY: FAILED — a selected mutant did not move its behaviour' : '\nWITNESSES ONLY: every selected mutant moved its behaviour. NO FAMILY WAS ASKED — this is not a pass of the mutant table.');
+  process.exit(fail ? 1 : 0);
+}
 if (NEUTER) {
   console.log(neuterReported ? `\nguard check: the sweep REPORTED the neutered mutant "${NEUTER}" — its witness clause fires.`
                              : `\nguard check: FAIL — "${NEUTER}" was neutered and its witness stayed silent${fail ? ' (something ELSE in the run failed, which is not this control)' : ''}.`);

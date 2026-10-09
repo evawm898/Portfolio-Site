@@ -259,19 +259,32 @@ const E2_TURN_XFAIL = {
      harder (74.06 at the defaults, 90.07 at 6 lobes, 114.38 at cup 1.2).
      Making the bead's inset follow the margin's normal instead of the row is
      a change to emitPanel's rim law for every blade — not this session's.
-     Declared at the measured magnitude on the five block-56 SMOKE rows that
+     Declared at the measured magnitude on the block-56 SMOKE rows that
      exceed it (this gate's own row set); the other 27 lobed rows' figures are
      in docs/bloom-leaf-lobed-outcome.md. Each note says what it adds. */
-  "LOBED: the MUM \u2014 alternate 137.5 x 4 nodes, the proposed defaults (3 lobes a side, sinus 0.62, tilt 38, light teeth), arch 25":
-    { excessDeg: 26.972835, note: 'NEW with S4 (the lobed chevron): adds 71.972835 deg' },
+  /* RE-MEASURED FOR S4b (the round sinus bottoms and the mum retune), never
+     widened: the U's walls run at the flank's own pitch over a whole stretch
+     where the V only touched it at a point, so more rows meet the margin as
+     obliquely as the V's steepest point did — four rows read WORSE and one
+     better; three S4b smoke rows are new. Same class as S4's (the bead's
+     inset follows the row, not the margin's normal — an emitPanel change for
+     every blade, out of scope). Each note keeps S4's figure. */
+  "LOBED: the MUM \u2014 alternate 137.5 x 4 nodes at the lobed defaults, arch 25":
+    { excessDeg: 38.227001, note: 'S4b re-record at the mum defaults with round bottoms (S4: 26.972835 at its own defaults, row then labelled "the proposed defaults")' },
   "LOBED: lobedSinus max (0.9 \u2014 the narrowest sinus gaps)":
-    { excessDeg: 34.108313, note: 'NEW with S4 (the lobed chevron): adds 79.108313 deg' },
+    { excessDeg: 48.743268, note: 'S4b re-record, every sinus rounded (S4: 34.108313)' },
   "LOBED: lobedAngle max (60 \u2014 the TILT CAP binds, built under asked)":
-    { excessDeg: 27.598071, note: 'NEW with S4 (the lobed chevron): adds 72.598071 deg' },
+    { excessDeg: 30.630533, note: 'S4b re-record, three sinuses rounded at the clamped tilt (S4: 27.598071)' },
   "LOBED: NONE FIT \u2014 6 lobes x sinus 0.9 x depth 0.3 x 12 teeth (the fold cap under the 1 mm floor; no teeth, told)":
-    { excessDeg: 48.235885, note: 'NEW with S4 (the lobed chevron): adds 93.235885 deg' },
+    { excessDeg: 50.306301, note: "S4b re-record at S4's pinned form, six sinuses rounded (S4: 48.235885)" },
   "LOBED: 6 lobes x tooth depth 0.3 (the fold clamp binds hardest \u2014 4.86 mm asked, built at the 2.22 mm cap)":
-    { excessDeg: 47.171007, note: 'NEW with S4 (the lobed chevron): adds 92.171007 deg' },
+    { excessDeg: 45.517769, note: "S4b re-record at S4's pinned form, six sinuses rounded — IMPROVED (S4: 47.171007)" },
+  "LOBED: S4's form (sinus 0.62, shape 0.70, angle 38, teeth 0.08 \u2014 two V's under 1 mm, both ROUNDED, told)":
+    { excessDeg: 29.002875, note: 'NEW with S4b: adds 74.002875 deg (S4\'s MUM at these four values, arched on four nodes, added 71.972835 with its V\'s)' },
+  "LOBED: NO ROUND BOTTOM FITS \u2014 5 lobes on a 36 mm blade at 40 deg (the back flank's fold limit; the V kept, told)":
+    { excessDeg: 68.802622, note: "NEW with S4b: adds 113.802622 deg — S4's own V kept (no fit) on a short, steep five-lobed blade" },
+  "LOBED: the petiole CLAMPED \u2014 no sinus on a 3 mm stem at 90 deg (asks 0.82 mm, the rooted end holds 0.75)":
+    { excessDeg: 13.371781, note: 'NEW with S4b: adds 58.371781 deg — no sinus, so the wide cupped blade\'s own class (SIMPLE at 34 mm reads 51.61)' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE

@@ -3723,6 +3723,29 @@ opens 0.810 mm, 59.7% of the control space under 1 mm — Eva's question. 5,980 
 170,410 (11.4%). Block 56 (39 rows), smoke block 56 (7), `frozen/phase58` = the 1,222 rows at `89b2292`. Sheet:
 `node tools/shot-bloom-lobed.mjs <png>` -> `docs/img/leaf-lobed.png`.
 
+**THE LOBED SINUS HAS A ROUND BOTTOM, THE LOBED PETIOLE IS THE AREA RULE, AND THE MUM DEFAULTS ARE
+PROPOSED** (Eva's rulings, Oct 8 — leaf/stem build S4b; read `docs/bloom-leaf-lobed-rulings-outcome.md`
+before touching `lobedRoundBottoms`, `lobedSinusOpeningMm`, `chev.roundAt`, `lobedPetiolePlan`,
+`petioleClampMm`, `lobedBladeAreaMm2`, LF20/LF25/LF26 or the LOBED defaults). **S4's gap measure is capped
+at 1 mm by construction** (a chord is never longer than its arc), so the round bottom is built to a
+RE-DERIVED measure, the OPENING: the least distance between the flanks above a seated `MIN_FEATURE_MM`
+disc's equator; S4's is kept as `arcGapMm`. `lobedRoundBottoms` is its one owner: a disc grown from D/2
+seated on the depth line (**depth untouched**), walls tangent at the flank's own pitch, built iff the asked
+V opens under 1 mm on the emitted rows, **NO FIT told and the V kept** where no wall fits. **THE BACK WALL
+CARRIES NO SLOPE THE V's OWN ROWS DO NOT** — at the flank's steepest pitch every wall row sat on the fold
+limit and the emitted skin read 0.4976 against 0.5 (LF22, on NONE FIT at S4's form); the V touches that
+pitch at one point only. **NO FIT IS REACHABLE: 10.2 % of 2,000 sampled states, every one told** (S4's
+59.7 % was its capped measure; 24.6 % of asked V's open under 1 mm); the trade (lobe count / width / told)
+is Eva's. `tools/bloom-lobed-sinus-sample.mjs` is the sampler, committed. The petiole is `wire √(A/A_simple)`
+(planform, before teeth, with round bottoms; the reference the SIMPLE default blade at the same length),
+floored at the wire, capped through `petioleClampMm` — the compound clamp extracted verbatim, ONE rod law;
+1.476 mm at the proposed defaults. **LF20's exemption is decided from the controls, never from the
+`built` flag** (the flag is what LF25(a) checks). Mum defaults proposed: sinus 0.55, shape 0.55, angle 22,
+tooth depth 0.22; tip SHARED. **The shared tooth count puts ~1 tooth on a lobe** — toothed lobes need a
+LOBED count twin (open). 5,980 tris a leaf, unchanged. Byte partition by `verify-bloom-defaults-bytes
+--mover lobed --pair set` (both new): 33 movers / every holder held. `frozen/phase59` = the 1,261 rows at
+`ee91b94`; block 56 is 43 rows (1,265). Sheet: `node tools/shot-bloom-lobed-rulings.mjs <png> --base <worktree>`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,

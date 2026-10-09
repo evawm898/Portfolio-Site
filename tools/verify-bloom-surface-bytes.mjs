@@ -318,6 +318,23 @@ const PREDICATE_MOVERS = {
     const lp = mine.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.type === 'LOBED' && lp.built > 0);
   },
+  /* LEAF/STEM BUILD S4b — THE LOBED-LEAF RULINGS (round sinus bottoms, the
+     mum defaults, the area-scaled petiole; docs/bloom-leaf-lobed-rulings-
+     outcome.md). PREDECLARED FROM THE BASE TREE'S OWN RECORD: a row moves iff
+     the BASE builds a lobed blade on it (its plan's own type after the
+     raceme's pin, a leaf actually built) — the retune moves every lobed
+     outline and the area law every lobed petiole. Every SIMPLE and COMPOUND
+     row, every leafless row, the lobed GATED arms and the LOBED ask the
+     raceme pins to SIMPLE must hold to the bit. */
+  'lobed-rulings': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    if (!fr.hub) return false;
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
+    return !!(lp.present && lp.type === 'LOBED' && lp.built > 0);
+  },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* ORGANIC VARIANCE, BUILD 3 (spacing). A row moves iff the SPACING field
      exists on this tree — the geometry's own `varianceSpacingIsAbsent`, the
