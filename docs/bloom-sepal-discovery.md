@@ -754,7 +754,7 @@ axes as inert — the same blindness, in this gate's own clause.
 
 ### 9.4 Questions for Eva (the newly caught sub-bar sepal configurations)
 
-Nothing was fixed and no default moved; each is a question.
+Nothing was fixed and no default moved; each is a question. **Ruled Oct 9 — §9.5, executed in §10.**
 
 1. **`sepalRoll` 330 alone (and 270): 0.876 mm.** The petal's own roll fold on the sepal's blade.
    Keep the range and the declaration · narrow the sepal roll range · treat it with the petal's
@@ -766,3 +766,171 @@ Nothing was fixed and no default moved; each is a question.
 4. **Cup × curl, cup × roll and curl × twist on the sepal reach 0.004–0.009 mm**, and
    **size 1.00 × curl ≥ 270 reaches 0.887**. Keep them declared (the pair gate's standing
    treatment) · bound a range · decide them together with the petal's own declared pairs?
+
+### 9.5 Eva's rulings on §9.4 (Oct 9)
+
+| # | ruling | what it became |
+|---|---|---|
+| §9.1 | **Narrow the SEPAL roll range so roll alone never goes under the 1.00 mm gap.** Sepal-only; the petal's roll range is unchanged. | `sepalRoll` is **−180..180** (the petal's stays −330..330). Measured, and then ruled again on the measurement: the gap alone allows +190, the census does not (§10.1). |
+| §9.2 | **Narrow the sepal ranges so the all-max state clears 1.00 mm.** Sepal-only. | **Not done — ruled "roll only; all-max stays declared"** once the measurement said no one- or two-range trim can do it (§10.3). `SELF_XFAIL['sepal-form-max']` stays, re-recorded. |
+| §9.3 | The −90° fold is NOT ruled here; it follows Q-S3a (§7.3). | Untouched. `sepal-reflexed` stays declared at 0.804 mm. |
+| §9.4 | The near-zero pairs (cup × curl, cup × roll, curl × twist): treat them the way the petal's recorded pairs are treated; re-measure after the narrowing. | The petal's recorded pairs are DECLARED MAGNITUDES in `COMBINATION_XFAIL`, held both ways by CG3 (`tools/bloom-combination-gate.mjs` — the petal's `cup-x-curl`, `cup-x-roll` and `curl-x-twist` carry 22 such cells; `docs/bloom-combination-gate.md`, the CG table). The sepal cells keep exactly that treatment and their notes say so (§10.4). |
+| §9.4 | Size 1.00 × curl ≥ 270 (0.887 mm) is a KNOWN EXCEPTION. | Recorded on both cells' notes; still declared, still held by CG3. |
+
+---
+
+## 10. The narrowing (Eva's §9 rulings, executed)
+
+![the sepal ranges sheet](img/sepal-ranges.png)
+
+`node tools/shot-bloom-sepal-ranges.mjs docs/img/sepal-ranges.png --json docs/img/sepal-ranges.json`
+(about 50 s). The #386 machinery: Node, the shipped `buildBloomInto`, EXPORT mode, the deterministic
+soft renderer, sepals GREEN, **no pixel delta quoted**. Every caption carries the two measures read
+on that cell: the GAP (`sepal-self`, the wall instrument's `measureWall(grid).self`, smallest over
+every emitted sepal) and the self-intersection CENSUS (within-shell pairs / worst span). Old range
+ends are captioned in RED. The measurements are `node tools/bloom-sepal-ranges.mjs` (`--roll`,
+`--corners`, `--allmax`, `--control`), all on the shipped whorl: `sepalCount` 5, size 0.60,
+interleaved, angle 0, the default petals.
+
+### 10.1 Sepal roll: −330..330 → −180..180
+
+Roll ALONE, 5° steps over the petal's whole range (`--roll`):
+
+| roll | gap (mm) | census (pairs / mm) |
+|---|---|---|
+| 0 | 1.229 | 0 |
+| ±90 | 1.218 / 1.192 | 0 |
+| **+180** | **1.128** | **0** |
+| +185 | 1.081 | **470 / 0.411** |
+| +190 | **1.010** | 600 / 0.461 |
+| +195 | 0.963 (under) | 700 / 0.363 |
+| +230 … +330 | 0.876 (under, saturated) | 1600 / 0.661 |
+| **−180** | **1.136** | **0** |
+| −185 | 1.128 | **470 / 0.411** |
+| −230 … −330 | 1.077 (never under) | 1590 / 0.661 |
+
+**The two measures disagree, and that is why the bound is 180 and not 190.** By the ruled measure
+alone the last clear step is **+190** (1.0102 mm; 0.9886 at 192), and the negative side never goes
+under the gap at all. But the census folds from **|roll| 185 on both signs**: the sheet passes
+through itself while its mid-surface stays more than a millimetre from itself (CLAUDE.md, the
+combination gate: "`self` IS NOT THE CENSUS"). **Put to Eva with the numbers and ruled −180..180**,
+the last step clean on BOTH measures on both sides (Oct 9). `SEPAL_TWIN_BOUNDS` in
+`bloom-geometry.js` is the one owner; the registry's twin reads it and may only narrow (it throws
+otherwise); the panel gate restates −180..180 and refuses anything else.
+
+**The look lost** (§1B of the sheet, one sepal end-on from its tip): at ±330 the two margins curl
+round until they MEET — a closed quill, a ring in cross-section — and that is exactly where the
+census folds. At ±180 the margins curl in and stop short, an open quill. **The closed quill is
+gone from the sepal.** From below at the whole-head framing (§1) the difference is small.
+
+### 10.2 What changed, and what moved
+
+- **Two live rows redefined** (the blanket sweep reads the registry): `SEPALS: sepalRoll max (330)`
+  → `max (180)`, `min (-330)` → `min (-180)`. Both read **0 within-shell pairs** now, so their
+  census entries (1600 / 0.6614 and 1590 / 0.6614) are **removed** from `SELF_INTERSECTION_XFAIL`.
+  Both export at 39,998 triangles, as before. **A third row is redefined with no byte move**: the
+  sepal GATED row asked `sepalRoll` 330 at `sepalCount` 0 (an input bounded at 180 can no longer
+  hold 330, so the harness's read-back would refuse it); it asks 180 now and is **byte-identical to
+  its base self and to the shipping default** in both modes (24,688 triangles).
+- **Every other row holds.** `node tools/verify-bloom-defaults-bytes.mjs --base <worktree of 4109bb7>
+  --mover none --pair set --only '^(DEFAULT|SEPALS:)'` pairs the two matrices by control set:
+  **1,279 pairs, the three redefined rows listed by name with no partner on either side, 1,279 of
+  1,279 pairs carrying deep-equal states on the two trees** (the inputs half, over the whole
+  matrix; measured first against `2415048` at 1,262 of 1,262, and re-measured on the merged base
+  after #391 landed), and the 70 pairs built —
+  `DEFAULT` and every paired `SEPALS:` row — **held to the bit in both modes**, the control
+  (1e-9 on the default) reported. The remaining pairs hold by construction: identical states, and a
+  geometry diff that only adds an export no builder reads.
+- **`frozen/phase61` is the 1,282 rows at `4109bb7`**, registered in both maps and proved
+  deep-equal (`--verify-frozen --phase61`). A phase is owed because the row SET changed. This
+  session first registered its baseline as `phase60` at `2415048`; #391 took `phase60` at
+  `2e096bf` while this PR was in CI, and the two 1,265-row matrices are **byte-identical** (#389,
+  between the two bases, moved no row), so the duplicate was dropped — the phase50 precedent — and
+  the baseline re-taken at the merged base, which carries #391's block 57.
+- **No triangle count moves anywhere.** The default bloom is 24,688, untouched.
+
+### 10.3 All form at maximum: kept declared (Eva, Oct 9)
+
+§9.2 asked for narrowed ranges so the all-max sepal clears 1.00 mm. **It cannot be done by
+trimming one or two ranges**, measured over the 26 multi-control corners of the five form maxima
+(cup 1.2, cup gradient 1.2, roll, curl 360, twist 180; `--corners`): with roll at 190 only two
+PAIRS of maxima clear together (cup × gradient 1.152, gradient × twist 1.091) and no triple does;
+at the shipped 180 a third pair clears (roll × twist 1.107) and still no triple. So at least three
+ranges must move, and far. The smallest cuts along one common fraction (`--allmax`, at the shipped
+bound):
+
+| option | ranges cut | maxima | all-max gap |
+|---|---|---|---|
+| **B** | 3 (cup, gradient kept) | roll 25, curl 55, twist 25 | 1.045 mm |
+| **C** | 4 (gradient kept) | cup 0.28, roll 40, curl 85, twist 40 | 1.029 mm |
+| **D** | all 5 | cup 0.32, gradient 0.32, roll 45, curl 95, twist 45 | 1.035 mm |
+
+Each costs 75–90 % of the travel it touches. **Eva ruled: roll only; the all-max state stays
+declared** (put to her with the table above at roll 190). `SELF_XFAIL['sepal-form-max']` is
+re-recorded at roll 180: **0.0007 mm** (was 0.003 at 330 — the narrowing does not help this state,
+it moves the contact); the census reads 3530 pairs there. B/C/D are on the sheet (§2) as costed
+cuts NOT TAKEN. A one-dimensional fraction is one line through a five-dimensional box, so these are
+the smallest cuts along that line, not a global optimum.
+
+### 10.4 The three instruments, re-run
+
+- **Defaults bar** (`verify-bloom-defaults-bar.mjs`): PASS, 10 shipped states; the sepal row reads
+  1.2288 mm, unchanged. Control leg 4 re-pinned to `SEPALS: angle min (-90 — reflexed straight
+  down)` (0.8035 mm on `sepal-self`), because the roll-max row it used now clears; `--control`
+  5 of 5.
+- **Wall instrument** (`bloom-wall-thickness.mjs`): the roll row sits AT the bound now — `SEPAL roll
+  at its max (180)` 1.128 mm — with a new `SEPAL roll at its min (-180)` row at 1.136; V0 holds both
+  rows to `SEPAL_TWIN_BOUNDS`. `SELF_XFAIL['sepal-roll-max']` is **removed** (it was 0.876 at 330);
+  `sepal-form-max` re-recorded (0.001). V1–V5 clean.
+  **The negative control past the new limit**: a record-control leg hands the roll row **195** and
+  requires V5 to call it a new self-approach (0.963 mm) and nothing else — it does. **195, not 185,
+  because this instrument is the gap**: 185 and 190 are past the bound and still clear the gap; what
+  catches them is the census, re-proved by `node tools/bloom-sepal-ranges.mjs --control` (7 of 7:
+  at ±180 the gap clears and the census reads 0; at ±185 the census folds, 470 pairs; at +195 the
+  gap is under). `sepal-roll-twin-dropped` now fires V5 through `sepal-form-max`'s magnitude moving.
+  `--negative-control`: every mutant and record leg behaves.
+- **Combination gate**: `sepalcup-x-sepalroll`'s roll ladder is `[0, 60, 120, 180]` (was the
+  petal's `[0, 180, 270, 330]`); roll alone clears, so its verdict is **single-reaches →
+  product-only**.
+
+| sepal pair | cells under the bar before | after | which cleared |
+|---|---|---|---|
+| `sepalcup-x-sepalcurl` | 4 (worst 0.008) | 4 (unchanged) | none — kept declared (§9.5) |
+| `sepalcup-x-sepalroll` | 11 (worst 0.009) | **3** (worst 0.162, at roll 180) | the **8** cells at roll 270 and 330, including both near-zero 0.009 cells — gone with the range, not by geometry |
+| `sepalcurl-x-sepaltwist` | 9 (worst 0.004) | 9 (unchanged) | none — kept declared (§9.5) |
+| `sepalscale-x-sepalcurl` | 2 (0.887) | 2 (unchanged) | none — the known exception |
+
+**26 → 18 sub-bar sepal cells, all declared.** The near-zero cup × curl and curl × twist cells do
+not clear on their own: they do not involve the roll. The three surviving cup × roll cells read the
+same magnitudes they read at roll 180 before the narrowing.
+
+### 10.5 OPEN — how a saved sepal value outside the new range should load
+
+**Not decided; Eva's question.** The bloom persists no design and ships no presets, so the "saved
+designs" are the matrix sets — and **81 frozen rows** hold a sepal roll past ±180: three rows
+(`sepalRoll min (-330)`, `max (330)`, the GATED row) in each of the 27 frozen phases phase35 …
+phase61. No live row does. What happens today, with nothing built for it: **the geometry does not
+clamp** (Node builds 330 as asked; the frozen definitions still deep-compare), **the page's range
+input clamps silently** to 180, and **the harness refuses the row** on its read-back ("a value that
+did not take"), so those 81 rows can no longer be replayed through the browser. Rendered on the
+sheet (§3) for a saved `sepalRoll` 330:
+
+| option | builds | told | gap / census |
+|---|---|---|---|
+| **(a) clamp silently** | 180 | nothing | 1.128 mm / 0 |
+| **(b) clamp with a read-out** (`SEPAL ROLL CLAMPED: ASKED 330, BUILT 180`, the `CUP CLAMPED` shape) | 180 | the line | 1.128 mm / 0 |
+| **(c) build as saved** | 330 — past the control | nothing | 0.876 mm / 1600 pairs |
+
+(a) and (b) are the same geometry and differ only by the read-out line. IDs and registry rows stay;
+no migration.
+
+**Q-S6. A saved sepal value past the narrowed range loads: A clamp silently · B clamp and tell ·
+C build as saved.**
+
+### 10.6 Reproduce
+
+```
+node tools/bloom-sepal-ranges.mjs --roll --control      # the bound, from both sides, both measures
+node tools/bloom-sepal-ranges.mjs --corners --allmax    # the all-max cuts (minutes)
+node tools/shot-bloom-sepal-ranges.mjs docs/img/sepal-ranges.png --json docs/img/sepal-ranges.json
+```

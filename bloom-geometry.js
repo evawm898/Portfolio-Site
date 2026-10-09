@@ -17528,6 +17528,27 @@ export const SEPAL_TWINS = Object.freeze([
   ['petalApexSweep', 'sepalApexSweep'], ['petalRoll', 'sepalRoll'], ['petalRollTaper', 'sepalRollTaper'],
   ['petalSpineCurl', 'sepalSpineCurl'], ['curlBias', 'sepalCurlBias'], ['curlStart', 'sepalCurlStart'], ['petalTwist', 'sepalTwist'],
 ]);
+/* THE SEPAL-ONLY BOUNDS (Eva's ruling §9.1, Oct 9 — docs/bloom-sepal-discovery.md
+   §10). A twin shares its petal's range EXCEPT where this table narrows it, and
+   it may only NARROW (the panel gate restates every entry and refuses one that
+   is not inside the petal's own range). The petal's range is untouched.
+   `sepalRoll` is -180..180, DERIVED BY MEASUREMENT, not typed — the last
+   5-degree step on each side where the shipped sepal (5, size 0.60, EXPORT) is
+   clean on BOTH measures: the 1.00 mm gap (`sepal-self` against
+   `MIN_FEATURE_MM`: 1.1277 mm at +180, 1.1362 at -180) AND the
+   self-intersection census (0 within-shell pairs; 470 at +185 and at -185,
+   600 at +190, 1600 at +330, 1590 at -330). The gap ALONE would allow +190
+   (1.0102 mm; 0.9633 at 195) and the whole negative side (it never reads under
+   1.00 there, while the census folds from -185 down) — so the census, not the
+   gap, sets the bound, by Eva's ruling on the measured choice (Oct 9). The
+   sweep is `node tools/bloom-sepal-ranges.mjs --roll`; `--control` re-proves
+   both edges. THE GEOMETRY DOES NOT CLAMP: a
+   state carrying a sepal roll past 190 builds as asked here (what a saved
+   out-of-range value should do is Eva's open question, §10.4 of that doc);
+   the bound lives on the control. */
+export const SEPAL_TWIN_BOUNDS = Object.freeze({
+  sepalRoll: Object.freeze({ min: -180, max: 180 }),
+});
 /* TWO STATEMENTS, one here and one in the registry (`PREDICATES.sepalsEligible`),
    checked against each other by the harness (SP0). Under SPHERE there is no
    underside ring to place a sepal on: the head is a closed shell whose

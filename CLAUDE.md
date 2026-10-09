@@ -3325,6 +3325,18 @@ Eight open questions for Eva are in §4. "Around the hub" is Q1: under the whorl
 hub's top face (the centre's region, the reserved corona). Sheet:
 `node tools/shot-bloom-sepal-discovery.mjs <png>` → `docs/img/sepal-discovery.png`.
 
+**THE SEPAL ROLL IS −180..180; THE PETAL'S STAYS −330..330** (Eva's §9 rulings, Oct 9 — read §9.5 and
+§10 of `docs/bloom-sepal-discovery.md` before touching `SEPAL_TWIN_BOUNDS`, the twin generator's
+bounds or the sepal roll rows). `SEPAL_TWIN_BOUNDS` (geometry) is the one owner of a sepal-only
+bound; the registry's twin may only NARROW (it throws otherwise) and the panel gate restates it.
+**The gap alone would have allowed +190; the census folds from |roll| 185 on both signs, so the
+bound is the last step clean on BOTH** (re-ruled on the numbers). **The all-max sepal stays
+DECLARED** (`sepal-form-max`, 0.001 mm): no one- or two-range trim clears it — the costed 3/4/5-range
+cuts are §10.3, not taken. The geometry does not clamp; how a saved value past the bound should load
+is OPEN (Q-S6, §10.5) — 81 frozen rows (3 in each of phase35..phase61) can no longer be replayed
+through the browser. `node tools/bloom-sepal-ranges.mjs --control` is the bound's must-fail;
+`frozen/phase61` is the 1,282 rows at `4109bb7` (first taken as phase60 at `2415048`, row-for-row #391's phase60, so dropped). Sheet: `docs/img/sepal-ranges.png`.
+
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,

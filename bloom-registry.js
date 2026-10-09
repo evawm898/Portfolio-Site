@@ -43,7 +43,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
-import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
@@ -4581,14 +4581,20 @@ const sepalShown = (shown) => (shown ? { ...shown, buckle: shown.sepals && !show
 export function sepalTwinControls(rows) {
   const map = new Map(SEPAL_TWINS);
   const sectionOf = { shape: 'sepalShape', form: 'sepalForm', curl: 'sepalCurl' };
+  for (const id of Object.keys(SEPAL_TWIN_BOUNDS)) if (![...map.values()].includes(id)) throw new Error(`SEPAL_TWIN_BOUNDS names ${id}, which is not a sepal twin`);
   return SEPAL_TWINS.map(([petalId, sepalId]) => {
     const p = rows.find((c) => c.id === petalId);
     if (!p) throw new Error(`SEPAL_TWINS names ${petalId}, which is not a control`);
     if (!sectionOf[p.section]) throw new Error(`SEPAL_TWINS names ${petalId} in section ${p.section}, which has no sepal twin section`);
     const own = twinPredicate(p.visibleWhen, map);
     const guarded = own && own.all && own.all.length === 0;
+    /* A sepal-only bound (SEPAL_TWIN_BOUNDS, Eva's §9.1) NARROWS the petal's
+       range on the twin alone; everything else is the petal's own spec. */
+    const bounds = SEPAL_TWIN_BOUNDS[sepalId] || {};
+    const min = bounds.min ?? p.min, max = bounds.max ?? p.max;
+    if (min < p.min || max > p.max || !(min <= p.default && p.default <= max)) throw new Error(`SEPAL_TWIN_BOUNDS widens ${sepalId} or puts its default outside it — a sepal bound may only narrow`);
     return {
-      id: sepalId, section: sectionOf[p.section], kind: p.kind, min: p.min, max: p.max, step: p.step, default: p.default,
+      id: sepalId, section: sectionOf[p.section], kind: p.kind, min, max, step: p.step, default: p.default,
       label: p.label.startsWith('Petal ') ? p.label.slice(6, 7).toUpperCase() + p.label.slice(7) : p.label,
       fmt: (v, ui, shown) => p.fmt(v, sepalView(ui), sepalShown(shown)),
       ...(typeof p.cap === 'function' ? { cap: (shown) => p.cap(sepalShown(shown)) } : {}),

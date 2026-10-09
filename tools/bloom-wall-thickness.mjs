@@ -456,8 +456,13 @@ export const SELF_XFAIL = Object.freeze({
      tuned around — each is a question for Eva (docs/bloom-sepal-discovery.md
      §9). Declared so V5 stays a gate: a new sepal self-approach reddens at
      once, and one of these starting to pass trips it. */
-  'sepal-roll-max': { selfMm: 0.876, note: 'sepalRoll 330 on the shipped sepal (size 0.60, 5 sepals, EXPORT): 0.876 mm, wall 0.856, at u 0.21 — the petal builder\'s own roll fold (the petal\'s `roll-max` reads 0.658) on the sepal\'s shorter blade. Reproduces the discovery\'s 0.8764 (§1.7) through this instrument. Found by R6\'s coverage on Oct 9; a question for Eva, not fixed.' },
-  'sepal-form-max': { selfMm: 0.003, note: 'every sepal form twin at maximum (cup 1.2, roll 330, twist 180, curl 360, cup gradient 1.2): 0.003 mm, wall 0.013 — the sepal\'s own copy of the petal\'s `form-max` (0.008), a near-self-contact on a state the twins reach. Found by R6\'s coverage on Oct 9; a question for Eva, not fixed.' },
+  /* `sepal-roll-max` CAME OFF (Eva's §9.1, Oct 9): the sepal roll is bounded at
+     -180..180 (SEPAL_TWIN_BOUNDS), where roll alone reads 1.128 / 1.136 mm — it
+     was 0.876 at 330. `sepal-form-max` STAYS DECLARED by Eva's ruling on §9.2 (roll only;
+     the all-max state cannot be cleared by trimming one or two ranges —
+     docs/bloom-sepal-discovery.md §10.3 has the measured cuts) and is
+     re-recorded at the narrowed roll. */
+  'sepal-form-max': { selfMm: 0.001, note: 'every sepal form twin at its maximum (cup 1.2, roll 180 — the narrowed sepal max, §9.1 — twist 180, curl 360, cup gradient 1.2): 0.001 mm, wall 0.002 (it read 0.003 / 0.013 at roll 330: the narrowing does not help this state, it moves the contact). The sepal\'s own copy of the petal\'s `form-max` (0.008). KEPT DECLARED by Eva\'s ruling (Oct 9, on §9.2): no one- or two-range trim clears it (only two PAIRS of the five maxima clear together and no triple does), and the three-, four- and five-range cuts that would are 75-90% of the travel they touch — docs/bloom-sepal-discovery.md §10.3.' },
   'sepal-reflexed': { selfMm: 0.804, note: 'sepalAngle -90 (reflexed straight down), every twin at its default: 0.804 mm — the DESCENDING-SEAM fold the census declares on `SEPALS: angle min (-90)` (50 pairs / 0.3225 mm), seen here as an approach. The census onset on the shipped sepal is -67 deg (docs/bloom-sepal-discovery.md §7.3). The seam owner\'s, unscheduled; found by R6\'s coverage on Oct 9, a question for Eva, not fixed.' },
 });
 for (const [id, e] of Object.entries(SELF_XFAIL)) {
@@ -500,11 +505,17 @@ export const STATES = [
   { id: 'sepal-shipped',   label: 'SEPAL the shipped whorl (5, size 0.60)', part: 'sepal', set: { sepalCount: 5 } },
   { id: 'sepal-size-min',  label: 'SEPAL size min (0.20)',      part: 'sepal', set: { sepalCount: 5, sepalScale: 0.2 } },
   { id: 'sepal-cup-max',   label: 'SEPAL cup 1.2',              part: 'sepal', set: { sepalCount: 5, sepalCup: 1.2 } },
-  { id: 'sepal-roll-max',  label: 'SEPAL roll 330',             part: 'sepal', set: { sepalCount: 5, sepalRoll: 330 } },
+  /* AT THE SEPAL'S OWN ROLL BOUNDS (Eva's §9.1, Oct 9): -180..180, typed here
+     and held to the geometry's SEPAL_TWIN_BOUNDS by V0 in `verify()`, so a bound
+     that moves reddens this instrument until the rows follow it. The max row was
+     330 and an xfail at 0.876 mm; at 180 it reads 1.128 and must clear, the min
+     row -180 reads 1.136. */
+  { id: 'sepal-roll-max',  label: 'SEPAL roll at its max (180)', part: 'sepal', set: { sepalCount: 5, sepalRoll: 180 } },
+  { id: 'sepal-roll-min',  label: 'SEPAL roll at its min (-180)', part: 'sepal', set: { sepalCount: 5, sepalRoll: -180 } },
   { id: 'sepal-twist-max', label: 'SEPAL twist 180',            part: 'sepal', set: { sepalCount: 5, sepalTwist: 180 } },
   { id: 'sepal-curl-max',  label: 'SEPAL curl 360',             part: 'sepal', set: { sepalCount: 5, sepalSpineCurl: 360 } },
   { id: 'sepal-form-max',  label: 'SEPAL all form at maximum',  part: 'sepal',
-    set: { sepalCount: 5, sepalCup: 1.2, sepalRoll: 330, sepalTwist: 180, sepalSpineCurl: 360, sepalCupGradient: 1.2 } },
+    set: { sepalCount: 5, sepalCup: 1.2, sepalRoll: 180, sepalTwist: 180, sepalSpineCurl: 360, sepalCupGradient: 1.2 } },
   { id: 'sepal-reflexed',  label: 'SEPAL angle -90 (reflexed)', part: 'sepal', set: { sepalCount: 5, sepalAngle: -90 } },
   { id: 'buckle-gentle',   label: 'buckle A=0.10 x half-width · f=2', set: { buckleAmp: 0.10, buckleFreq: 2 }, buckled: true },
   { id: 'buckle-mid',      label: 'buckle A=0.20 x half-width · f=3', set: { buckleAmp: 0.20, buckleFreq: 3 }, buckled: true },
@@ -596,7 +607,7 @@ const withoutBuckle = (set) => {
   return o;
 };
 
-async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {} } = {}) {
+async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {}, stateSet = null } = {}) {
   const G = await loadGeometry(root);
   const D = defaults || (await import(pathToFileURL(path.join(root, 'bloom-registry.js')).href)).DEFAULTS;
   const one = (set, part = 'petal') => {
@@ -625,7 +636,11 @@ async function run({ root = ROOT, defaults = null, label = 'head', wallOpts = {}
     return { ...measureWall(m.petal.grid, { nibFromU, ...wallOpts }), tris: acc.positions.length / 9, positions: acc.positions };
   };
   const out = [];
-  for (const st of STATES) {
+  /* `stateSet` (the record control's PAST-THE-LIMIT leg) swaps ONE row's
+     controls for a state the panel can no longer reach, to show V5 catches it. */
+  if (stateSet && !STATES.some((s) => s.id === stateSet.id)) throw new Error(`stateSet names "${stateSet.id}", which is not a state`);
+  const states = stateSet ? STATES.map((s) => (s.id === stateSet.id ? { ...s, set: { ...s.set, ...stateSet.set } } : s)) : STATES;
+  for (const st of states) {
     const got = one(st.set, st.part);
     const control = st.buckled ? one(withoutBuckle(st.set)) : null;
     /* How many rows the grid gives this state per cycle of its own wave —
@@ -650,7 +665,17 @@ function floatDiff(a, b) {
 export async function verify({ root = ROOT, quiet = false, perturb = null } = {}) {
   const fails = [];
   const say = (...a) => { if (!quiet) console.log(...a); };
-  const { G, D, rows } = await run({ root, wallOpts: (perturb && perturb.wallOpts) || {} });
+  const { G, D, rows } = await run({ root, wallOpts: (perturb && perturb.wallOpts) || {}, stateSet: (perturb && perturb.stateSet) || null });
+  /* V0 THE SEPAL ROLL ROW SITS AT THE SHIPPED SEPAL MAXIMUM (§9.1). The bound
+     is the geometry's; the row types it, and the two must agree — unless the
+     record control is deliberately reading a state past it. */
+  if (G.SEPAL_TWIN_BOUNDS && !(perturb && perturb.stateSet)) {
+    const b = G.SEPAL_TWIN_BOUNDS.sepalRoll || {};
+    for (const [id, want, end] of [['sepal-roll-max', b.max, 'maximum'], ['sepal-roll-min', b.min, 'minimum']]) {
+      const row = STATES.find((s) => s.id === id);
+      if (row.set.sepalRoll !== want) fails.push(`V0 sepal roll row: "${row.label}" asks sepalRoll ${row.set.sepalRoll} and the geometry's SEPAL_TWIN_BOUNDS says the sepal ${end} is ${want} — the row must measure the shipped limit`);
+    }
+  }
   /* THE RECORD CONTROL. `perturb` swaps ONE declared magnitude for a wrong
      one — { selfXfail: { id, selfMm } } or { v4: { ownDeficitMm } } — so the
      magnitude clauses below can be seen to fire without a geometry mutation.
@@ -1016,15 +1041,17 @@ const MUTANTS = [
   /* THE SEPAL ROWS' MUTANT (R6, Oct 9): the sepal stops reading its ROLL twin,
      so it takes the PETAL's roll (0 at the defaults). Every petal row is
      untouched — the representative petal never reads a sepal twin — so only a
-     row that reads the SEPAL's grid can see it: `sepal-roll-max` stops failing,
-     which V5 calls the declared self-approach FIXED. Before R6 nothing here
-     could have fired on it. */
+     row that reads the SEPAL's grid can see it. Before §9.1 it fired as
+     `sepal-roll-max` going clear; with that row now clear at the narrowed 180
+     on its own, it fires as `sepal-form-max`'s declared magnitude moving (roll
+     dropped out of the all-max state). Before R6 nothing here could have
+     fired on it. */
   { id: 'sepal-roll-twin-dropped', names: ['V5'],
-    why: 'sepalBladeState stops mapping sepalRoll onto the petal law, so a sepal at roll 330 builds flat — visible only on a row that reads the sepal',
+    why: 'sepalBladeState stops mapping sepalRoll onto the petal law, so a sepal at roll 180 builds flat — visible only on a row that reads the sepal (the all-max record moves past its band)',
     find: 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);',
     into: "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalRoll') s[petalId] = Number(state[sepalId]);",
     witness: (M, C) => {
-      const st = { ...DEFAULTS_FOR_WITNESS, sepalRoll: 330 };
+      const st = { ...DEFAULTS_FOR_WITNESS, sepalRoll: 180 };
       const got = M.sepalBladeState(st, 0).petalRoll, clean = C.sepalBladeState(st, 0).petalRoll;
       return got !== clean ? null : `the sepal substate still carries petalRoll ${got}`;
     } },
@@ -1235,6 +1262,16 @@ if (IS_MAIN) {
            measured: with the foot dropped it reads 1.230 exactly as
            `curl-max` does. A leg may name several witnesses; it must fire
            every one of them, once, and nothing else. */
+        /* PAST THE NEW LIMIT (Eva's §9.1, Oct 9): the sepal roll row handed 195,
+           beyond the narrowed 180 — a value the slider can no longer reach. V5
+           must call it a NEW self-approach (0.963 mm), and nothing else may
+           fire. 195 and not 185 BECAUSE THIS INSTRUMENT IS THE GAP: 185 and 190
+           are past the bound and still clear the gap (1.081 / 1.010 mm) — what
+           sees them is the self-intersection census (470 / 600 pairs), which is
+           why the bound is 180; `node tools/bloom-sepal-ranges.mjs --control`
+           re-proves that half. Nothing here can see past the MIN either: the
+           gap never goes under on the negative side, the census folds from -185. */
+        ['sepal roll past its limit (195)', { stateSet: { id: 'sepal-roll-max', set: { sepalRoll: 195 } } }, 'V5 self-approach: "SEPAL roll at its max (180)"'],
         ['foot dropped (curl-max, sepal-reflexed)', { wallOpts: { footTargets: false } }, ['V5 xfail: "SHIPPED curl 360" now clears the bar', 'V5 xfail: "SEPAL angle -90 (reflexed)" now clears the bar']],
       ];
       for (const [name, perturb, want0] of legs) {

@@ -53,8 +53,10 @@
         the table — the leaf blade 0.289 mm from the stem
      3. a table row whose control set no longer matches its matrix anchor —
         DB0's own must-fail
-     4. the sepal row re-pinned to `sepalRoll` 330 — the sepal's own sheet
-        under the bar, which `sepal-self` must see
+     4. the sepal row re-pinned to `sepalAngle` -90 (reflexed) — the sepal's
+        own sheet under the bar, which `sepal-self` must see (it re-pinned to
+        `sepalRoll` 330 until Eva's §9.1 bounded the sepal roll at -180..180,
+        where roll alone clears)
      5. (MUST-PASS) the same re-pinned row through the old measure, `self`,
         stays green — the representative petal cannot see a sepal, which is
         the defect ruling R6 (Oct 9) fixed
@@ -84,7 +86,7 @@ export const SHIPPED_STATES = Object.freeze([
      A clause whose subject excludes the thing it doubts cannot fail — this file's
      fifth durable rule. `sepal-self` is the same `measureWall(grid).self`, read on
      EVERY sepal the builder emitted (`built.sepals.built`, each with its own grid),
-     the smallest of them. Control leg 4 re-pins this row to `sepalRoll` 330 and
+     the smallest of them. Control leg 4 re-pins this row to `sepalAngle` -90 and
      requires it to go red; leg 5 asks the OLD measure the same question and
      requires it to stay green, which is the blindness stated as a must-pass. */
   { id: 'the sepals at the shipped whorl', matrixRow: 'SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)', set: { sepalCount: 5 }, measures: ['sepal-self'] },
@@ -236,16 +238,20 @@ async function main() {
     const bad = verify(tree, table, matrix, { quiet: true });
     expectOnly('3 a table row whose set no longer matches its matrix anchor', bad, /^DB0: "the raceme at its defaults" declares/);
   }
-  /* 4. THE SEPAL ROW PUSHED UNDER THE BAR — re-pinned to `sepalRoll` 330, the
-     petal builder's own roll fold on the sepal's shorter blade (0.876 mm in the
-     discovery). The row must now go red on `sepal-self`. */
-  const rollRow = matrix.find((r) => r.label === 'SEPALS: sepalRoll max (330)');
-  if (!rollRow) throw new Error('control 4: the matrix holds no "SEPALS: sepalRoll max (330)" row to re-pin to');
+  /* 4. THE SEPAL ROW PUSHED UNDER THE BAR — re-pinned to `sepalAngle` -90, the
+     descending seam bringing the reflexed blade back over its own foot (0.804
+     mm; docs/bloom-sepal-discovery.md §9.2). It re-pinned to `sepalRoll` 330
+     until Eva's §9.1 (Oct 9) bounded the sepal roll at -180..180, where the
+     matrix's roll rows CLEAR (1.128 / 1.136 mm) and could no longer be a must-fail. The row
+     must go red on `sepal-self`. */
+  const ROLL_ROW = 'SEPALS: angle min (-90 — reflexed straight down)';
+  const rollRow = matrix.find((r) => r.label === ROLL_ROW);
+  if (!rollRow) throw new Error(`control 4: the matrix holds no "${ROLL_ROW}" row to re-pin to`);
   const rollSet = Object.fromEntries(rollRow.set.map((s) => [s.id, isNaN(Number(s.value)) ? s.value : Number(s.value)]));
   {
     const table = SHIPPED_STATES.map((r) => (r.id.startsWith('the sepals') ? { ...r, matrixRow: rollRow.label, set: rollSet } : r));
     const bad = verify(tree, table, matrix, { quiet: true });
-    expectOnly('4 the sepal row re-pinned to sepalRoll 330 (the sepal\'s own roll fold)', bad, /^DB1: "the sepals at the shipped whorl" reads 0\.\d+ mm on sepal-self/);
+    expectOnly('4 the sepal row re-pinned to sepalAngle -90 (the reflexed sepal over its own foot)', bad, /^DB1: "the sepals at the shipped whorl" reads 0\.\d+ mm on sepal-self/);
   }
   /* 5. THE BLINDNESS, AS A MUST-PASS: the same re-pinned row asked through the
      OLD measure (`self`, the representative petal) stays green — which is why
