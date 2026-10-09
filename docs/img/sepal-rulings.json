@@ -1,0 +1,1027 @@
+{
+  "tool": "shot-bloom-sepal-rulings.mjs",
+  "mode": "EXPORT",
+  "cells": [
+    {
+      "section": 1,
+      "label": "A  0.40",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalScale": 0.4
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "B  0.60 (SHIPPED)",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "C  0.80",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalScale": 0.8
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "D  1.00",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalScale": 1
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "A  0.40 SIDE",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalScale": 0.4
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "B  0.60 SIDE",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "C  0.80 SIDE",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalScale": 0.8
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 1,
+      "label": "D  1.00 SIDE",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalScale": 1
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "A  JOIN (BUILT)",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60
+      },
+      "capability": null,
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 18,
+        "contactDeg": 19,
+        "contactKind": "crossing",
+        "attachment": "HUB",
+        "why": null,
+        "zAttach": -0.929,
+        "rAttach": 5.932,
+        "belowHeadMm": 0.329,
+        "extentMm": 1.316,
+        "arcDeltaMm": 0.004
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "B  WHOLE BODY",
+      "prototype": true,
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "protoHubReading": "whole"
+      },
+      "capability": null,
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "PROTO whole-body reading: the point lands inside the head's own thickness, so the whorl sits at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 2.516,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "C  ARC LENGTH",
+      "prototype": true,
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "protoHubReading": "arc"
+      },
+      "capability": null,
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 18,
+        "contactDeg": 19,
+        "contactKind": "crossing",
+        "attachment": "HUB",
+        "why": null,
+        "zAttach": -0.928,
+        "rAttach": 5.936,
+        "belowHeadMm": 0.328,
+        "extentMm": 1.316,
+        "arcDeltaMm": 0
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "NO SEPALS, SAME HUB",
+      "prototype": false,
+      "set": {
+        "stemLength": 60
+      },
+      "capability": null,
+      "exportTris": 26890,
+      "sepals": null,
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "A  DEEP HUB, JOIN",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "hubStyle": "GOBLET",
+        "hubShapeAmount": 0.5,
+        "hubLength": 10
+      },
+      "capability": null,
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 20,
+        "contactDeg": 21,
+        "contactKind": "above",
+        "attachment": "HUB",
+        "why": null,
+        "zAttach": -1.7,
+        "rAttach": 4.834,
+        "belowHeadMm": 1.1,
+        "extentMm": 4.4,
+        "arcDeltaMm": 1.867
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "B  DEEP, WHOLE BODY",
+      "prototype": true,
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "hubStyle": "GOBLET",
+        "hubShapeAmount": 0.5,
+        "hubLength": 10,
+        "protoHubReading": "whole"
+      },
+      "capability": null,
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 19,
+        "contactDeg": 20,
+        "contactKind": "above",
+        "attachment": "HUB",
+        "why": null,
+        "zAttach": -0.8,
+        "rAttach": 6.802,
+        "belowHeadMm": 0.2,
+        "extentMm": 5.6,
+        "arcDeltaMm": 0.302
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "C  DEEP, ARC LENGTH",
+      "prototype": true,
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "hubStyle": "GOBLET",
+        "hubShapeAmount": 0.5,
+        "hubLength": 10,
+        "protoHubReading": "arc"
+      },
+      "capability": null,
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 19,
+        "contactDeg": 20,
+        "contactKind": "above",
+        "attachment": "HUB",
+        "why": null,
+        "zAttach": -0.881,
+        "rAttach": 6.511,
+        "belowHeadMm": 0.281,
+        "extentMm": 4.4,
+        "arcDeltaMm": 0
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 2,
+      "label": "NO SEPALS, DEEP HUB",
+      "prototype": false,
+      "set": {
+        "stemLength": 60,
+        "hubStyle": "GOBLET",
+        "hubShapeAmount": 0.5,
+        "hubLength": 10
+      },
+      "capability": null,
+      "exportTris": 26890,
+      "sepals": null,
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "-60 CLEAN",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": -60
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": -60,
+        "angleBuilt": -60,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 0,
+        "worstSpanMm": 0
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "-66 LAST CLEAN",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": -66
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": -66,
+        "angleBuilt": -66,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 0,
+        "worstSpanMm": 0
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "-67 FIRST FOLD",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": -67
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": -67,
+        "angleBuilt": -67,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 20,
+        "worstSpanMm": 0.0031
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "-90 THE FLOOR",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": -90
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": -90,
+        "angleBuilt": -90,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 50,
+        "worstSpanMm": 0.3225
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "CUP+CURL, 90 ASKED",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalCup": 1.2,
+        "sepalSpineCurl": 120,
+        "sepalAngle": 90
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 90,
+        "angleBuilt": -37,
+        "limit": -37,
+        "contactDeg": -36,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 0,
+        "worstSpanMm": 0
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "SAME, UNCLAMPED 0",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalCup": 1.2,
+        "sepalSpineCurl": 120,
+        "sepalAngle": 0
+      },
+      "capability": {
+        "sepalAngleUnclamped": true
+      },
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": -37,
+        "contactDeg": -36,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 0,
+        "worstSpanMm": 0
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "SAME, UNCLAMPED 30",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalCup": 1.2,
+        "sepalSpineCurl": 120,
+        "sepalAngle": 30
+      },
+      "capability": {
+        "sepalAngleUnclamped": true
+      },
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 30,
+        "angleBuilt": 30,
+        "limit": -37,
+        "contactDeg": -36,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 0,
+        "worstSpanMm": 0
+      },
+      "ringTris": null
+    },
+    {
+      "section": 3,
+      "label": "SAME, UNCLAMPED 90",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalCup": 1.2,
+        "sepalSpineCurl": 120,
+        "sepalAngle": 90
+      },
+      "capability": {
+        "sepalAngleUnclamped": true
+      },
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 90,
+        "angleBuilt": 90,
+        "limit": -37,
+        "contactDeg": -36,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": {
+        "within": 25,
+        "worstSpanMm": 0.2426
+      },
+      "ringTris": null
+    },
+    {
+      "section": 4,
+      "label": "SIZE 0.5: NOMINAL",
+      "prototype": false,
+      "set": {
+        "sepalCount": 8,
+        "varianceSize": 0.5
+      },
+      "capability": null,
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 4,
+      "label": "SIZE 0.5: FOLLOW",
+      "prototype": true,
+      "set": {
+        "sepalCount": 8,
+        "varianceSize": 0.5,
+        "protoSepalFollow": true
+      },
+      "capability": null,
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 4,
+      "label": "FORM 1.0: NOMINAL",
+      "prototype": false,
+      "set": {
+        "sepalCount": 8,
+        "varianceForm": 1
+      },
+      "capability": null,
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": -41,
+        "limit": -41,
+        "contactDeg": -40,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 4,
+      "label": "FORM 1.0: FOLLOW",
+      "prototype": true,
+      "set": {
+        "sepalCount": 8,
+        "varianceForm": 1,
+        "protoSepalFollow": true
+      },
+      "capability": null,
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": -41,
+        "limit": -41,
+        "contactDeg": -40,
+        "contactKind": "above",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 4,
+      "label": "SPACING 0.9: NOMINAL",
+      "prototype": false,
+      "set": {
+        "sepalCount": 8,
+        "varianceSpacing": 0.9
+      },
+      "capability": null,
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 4,
+      "label": "SPACING 0.9: FOLLOW",
+      "prototype": true,
+      "set": {
+        "sepalCount": 8,
+        "varianceSpacing": 0.9,
+        "protoSepalFollow": true
+      },
+      "capability": null,
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 5,
+      "label": "NO TUBE, 90 ASKED",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": 90
+      },
+      "capability": null,
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 90,
+        "angleBuilt": 21,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": null
+    },
+    {
+      "section": 5,
+      "label": "TUBE, 90 ASKED",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": 90,
+        "tubeLayer1": 0
+      },
+      "capability": null,
+      "exportTris": 39982,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 90,
+        "angleBuilt": 21,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": 4224
+    },
+    {
+      "section": 5,
+      "label": "TUBE, SIDE",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "sepalAngle": 90,
+        "tubeLayer1": 0
+      },
+      "capability": null,
+      "exportTris": 39982,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 90,
+        "angleBuilt": 21,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": 4224
+    },
+    {
+      "section": 5,
+      "label": "TUBE, SEPALS AT 0",
+      "prototype": false,
+      "set": {
+        "sepalCount": 5,
+        "tubeLayer1": 0
+      },
+      "capability": null,
+      "exportTris": 39982,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "contactDeg": 22,
+        "contactKind": "crossing",
+        "attachment": "RIM",
+        "why": "no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim",
+        "zAttach": null,
+        "rAttach": null,
+        "belowHeadMm": 0,
+        "extentMm": 0,
+        "arcDeltaMm": null
+      },
+      "census": null,
+      "ringTris": 4224
+    }
+  ],
+  "impact": {
+    "liveRows": 1265,
+    "sepalRows": 79,
+    "scaleUnpinned": 72,
+    "hubMode": 14,
+    "hubArcMoves": 12,
+    "belowFoldOnset": 1,
+    "varianceWithSepals": 4,
+    "tubeWithSepals": 1
+  }
+}
