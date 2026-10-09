@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-defaults-bytes.mjs — THE BYTE PARTITION OF A DEFAULTS MOVE.
 
-     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed] [--pair index|set]
+     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed|none] [--pair index|set] [--only <regex>]
      node tools/verify-bloom-defaults-bytes.mjs --merge <file> <file> ...
 
    WHY IT EXISTS. `verify-bloom-surface-bytes.mjs` builds BOTH trees from THIS
@@ -105,6 +105,10 @@ const MOVER = arg('--mover') || 'infill';
 const MOVER_OF = {
   infill: (b) => (b.built.petalsAll || []).some((p) => p && p.infill && !p.infill.refused),
   lobed: (b) => !!(b.built.leaf && b.built.leaf.present && b.built.leaf.type === 'LOBED' && b.built.leaf.built > 0),
+  /* `none` (the sepal ranges session, Oct 9): a change that moves NO row it can
+     pair — a bound narrowed on a control, whose only movers are the rows the
+     narrowing REDEFINES (and so cannot pair by set: they are listed by name). */
+  none: () => false,
 };
 if (!MOVER_OF[MOVER]) { console.error(`--mover ${MOVER}: no such predicate (${Object.keys(MOVER_OF).join(', ')})`); process.exit(2); }
 /* `--pair set` (S4b): pair the two matrices by CONTROL SET (and capability)
@@ -140,8 +144,21 @@ if (CONTROL) {
   if (ci < 0) { console.error(`REFUSED: the named control holder "${CONTROL_HOLDER}" is not in the matrix.`); process.exit(2); }
   if (ci % N !== K) { console.error(`REFUSED: the named control holder "${CONTROL_HOLDER}" is row ${ci}, which shard ${K}/${N} does not build — run --control on shard ${ci % N}/${N}.`); process.exit(2); }
 }
+/* `--only <regex>` (the sepal ranges session): build only the pairs whose
+   HEAD label matches — a subset, reported as one, never as the matrix. */
+const ONLY = arg('--only') ? new RegExp(arg('--only')) : null;
+/* Before any build: every pair's two STATES (each tree's own DEFAULTS plus
+   the row's set) must be deep-equal, over the WHOLE pairing whatever --only
+   says — the inputs half of the byte claim, which costs nothing. */
+let statesEqual = 0;
+for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
+  const hs = stateOf(H, R.DEFAULTS, headRows[i]), bs = stateOf(BH, BR.DEFAULTS, baseRows[i]);
+  if (JSON.stringify(hs) === JSON.stringify(bs)) statesEqual++;
+}
+console.error(`inputs: ${statesEqual} of ${Math.min(headRows.length, baseRows.length)} pairs carry deep-equal states on the two trees`);
 for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
   if (i % N !== K) continue;
+  if (ONLY && !ONLY.test(headRows[i].label)) continue;
   const hr = headRows[i], br = baseRows[i];
   if (JSON.stringify(hr.set) !== JSON.stringify(br.set) || JSON.stringify(hr.capability || null) !== JSON.stringify(br.capability || null)) { fails.push(`row ${i}: the control sets differ ("${hr.label}" / "${br.label}") — not the same row`); continue; }
   const hs = stateOf(H, R.DEFAULTS, hr), bs = stateOf(BH, BR.DEFAULTS, br);
@@ -169,7 +186,7 @@ if (CONTROL) {
   else if (j < 0) fails.push(`control: ${control} and the holder clause did NOT report it`);
   else { control += ' — the holder clause reported it'; fails.splice(j, 1); }
 }
-const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control, mover: MOVER, pair: PAIR, unpairedBase, unpairedHead };
+const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control, mover: MOVER, pair: PAIR, unpairedBase, unpairedHead, statesEqual, only: ONLY ? String(ONLY) : null };
 if (arg('--out')) fs.writeFileSync(arg('--out'), JSON.stringify(res));
 console.log(`shard ${K}/${N}: ${out.length} rows, ${out.filter((r) => r.mover).length} movers, ${fails.length} finding(s)${control ? ` · control: ${control}` : ''}`);
 process.exit(fails.length ? 1 : 0);

@@ -764,7 +764,14 @@ const INSTANCED_FAMILIES = [
      the table — a check that read the registry's own generator would be
      checking it against itself. */
   { what: 'the sepal twins (sepals part 1, sepal* from SEPAL_TWINS)',
-    id: /^(?:petal|sepal|buckle|sepalBuckle|curl|sepalCurl)(BaseTaper|TipShape|TipTaper|CupGradient|Cup|Amp|Freq|Env|ApexSweep|RollTaper|Roll|SpineCurl|Bias|Start|Twist)$/, instances: 2, perInstanceDefault: new Set(), perInstanceLabelAndRole: true },
+    id: /^(?:petal|sepal|buckle|sepalBuckle|curl|sepalCurl)(BaseTaper|TipShape|TipTaper|CupGradient|Cup|Amp|Freq|Env|ApexSweep|RollTaper|Roll|SpineCurl|Bias|Start|Twist)$/, instances: 2, perInstanceDefault: new Set(), perInstanceLabelAndRole: true,
+    /* THE SEPAL-ONLY BOUNDS (Eva's §9.1, Oct 9): the sepal's roll is -180..180
+       where the petal's runs -330..330. STATED HERE, not read from the geometry's
+       SEPAL_TWIN_BOUNDS — a check that read the table would be checking the
+       generator against itself. Each named instance must carry EXACTLY the
+       stated bound, must sit INSIDE its sibling's range (a sepal bound only
+       narrows), and every other field of the suffix stays shared. */
+    perInstanceBounds: { Roll: { sepalRoll: { min: -180, max: 180 } } } },
 ];
 /* NEGATIVE CONTROL for the tip family: drift ONE instance on a shared field
    (the stigma's size range) in a COPY of the rows and require the clause to
@@ -773,6 +780,9 @@ const INSTANCED_FAMILIES = [
 const familyRows = (fam) => {
   const rows = CONTROLS.map((c) => ({ c: { ...c }, m: fam.id.exec(c.id) })).filter((x) => x.m);
   if (NEGATIVE_CONTROL && /stigma/.test(String(fam.id))) { const r = rows.find((x) => x.c.id === 'stigmaSize'); if (r) r.c.max = r.c.max + 1; }
+  /* ...and for the sepal-only bound (§9.1): put sepalRoll's maximum back to
+     the petal's 330 in a COPY — the narrowing silently undone must fire. */
+  if (NEGATIVE_CONTROL && fam.perInstanceBounds) { const r = rows.find((x) => x.c.id === 'sepalRoll'); if (r) r.c.max = 330; }
   return rows;
 };
 for (const fam of INSTANCED_FAMILIES) {
@@ -784,20 +794,35 @@ for (const fam of INSTANCED_FAMILIES) {
     if (!bySuffix.has(suffix)) bySuffix.set(suffix, []);
     bySuffix.get(suffix).push(c);
   }
-  const spec = (c, suffix) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, fam.perInstanceLabelAndRole ? '(per-instance)' : c.label, c.tier, fam.perInstanceLabelAndRole ? '(per-instance)' : c.role,
+  const boundsOwn = (suffix) => fam.perInstanceBounds && fam.perInstanceBounds[suffix];
+  const spec = (c, suffix) => JSON.stringify([c.kind, boundsOwn(suffix) ? '(per-instance)' : c.min ?? null, boundsOwn(suffix) ? '(per-instance)' : c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, fam.perInstanceLabelAndRole ? '(per-instance)' : c.label, c.tier, fam.perInstanceLabelAndRole ? '(per-instance)' : c.role,
     (c.options || []).map((o) => [o.value, o.label])]);
   const drifted = [];
   for (const [suffix, cs] of bySuffix) {
     if (cs.length !== fam.instances) drifted.push(`"${suffix}" has ${cs.length} instances, the family declares ${fam.instances}`);
     /* A per-instance default is still BOUNDED by the shared range. */
     for (const c of cs) if (fam.perInstanceDefault.has(suffix) && (c.default < c.min || c.default > c.max)) drifted.push(`${c.id} defaults to ${c.default}, outside its own ${c.min}..${c.max}`);
+    /* A per-instance BOUND: the named instance carries exactly the stated
+       bound, every unnamed one the family's widest, and the named one sits
+       inside it. */
+    if (boundsOwn(suffix)) {
+      const stated = boundsOwn(suffix);
+      const named = cs.filter((c) => stated[c.id]), rest = cs.filter((c) => !stated[c.id]);
+      if (named.length !== Object.keys(stated).length) drifted.push(`"${suffix}" states a per-instance bound for ${Object.keys(stated).join('/')} and ${named.length} of them exist`);
+      for (const c of named) {
+        const want = stated[c.id];
+        if (c.min !== want.min || c.max !== want.max) drifted.push(`${c.id} spans ${c.min}..${c.max}, the gate states ${want.min}..${want.max}`);
+        for (const o of rest) if (c.min < o.min || c.max > o.max) drifted.push(`${c.id} (${c.min}..${c.max}) is not inside ${o.id} (${o.min}..${o.max}) — a per-instance bound may only narrow`);
+      }
+    }
     const distinct = new Map();
     for (const c of cs) { const k = spec(c, suffix); if (!distinct.has(k)) distinct.set(k, []); distinct.get(k).push(c.id); }
     if (distinct.size > 1) drifted.push(`"${suffix}" has ${distinct.size} distinct specs across its ${cs.length} instances — ${[...distinct.values()].map((ids) => ids.join('/')).join(' vs ')}`);
   }
-  if (drifted.length) { if (NEGATIVE_CONTROL && /stigma/.test(String(fam.id))) ok.push(`NEGATIVE CONTROL: the instanced-family clause fired on a drifted stigmaSize range — ${drifted.join('; ')}`); else note(`instanced descriptors have DRIFTED in ${fam.what}: ${drifted.join('; ')}`); }
-  else if (NEGATIVE_CONTROL && /stigma/.test(String(fam.id))) note(`NEGATIVE CONTROL: stigmaSize's range was drifted in a copy of the rows and the instanced-family clause did NOT fire — the anti-drift witness measures nothing`);
-  else ok.push(`instanced descriptors agree: ${fam.what} — ${bySuffix.size} descriptors x ${[...bySuffix.values()][0].length} instances = ${rows.length} controls, one spec each (bounds, step, default${fam.perInstanceDefault.size ? ` except ${[...fam.perInstanceDefault].join('/')}, per-instance by declaration` : ''}, label, tier, role; fmt / section / visibleWhen are per-instance by design and are not compared)`);
+  const planted = NEGATIVE_CONTROL && (/stigma/.test(String(fam.id)) ? 'stigmaSize\'s range was drifted' : fam.perInstanceBounds ? 'sepalRoll\'s narrowed maximum was put back to 330' : null);
+  if (drifted.length) { if (planted) ok.push(`NEGATIVE CONTROL: the instanced-family clause fired when ${planted} — ${drifted.join('; ')}`); else note(`instanced descriptors have DRIFTED in ${fam.what}: ${drifted.join('; ')}`); }
+  else if (planted) note(`NEGATIVE CONTROL: ${planted} in a copy of the rows and the instanced-family clause did NOT fire — the anti-drift witness measures nothing`);
+  else ok.push(`instanced descriptors agree: ${fam.what} — ${bySuffix.size} descriptors x ${[...bySuffix.values()][0].length} instances = ${rows.length} controls, one spec each (bounds${fam.perInstanceBounds ? ` except ${Object.values(fam.perInstanceBounds).flatMap((o) => Object.entries(o).map(([id, b]) => `${id} ${b.min}..${b.max}`)).join(', ')}, per-instance by declaration` : ''}, step, default${fam.perInstanceDefault.size ? ` except ${[...fam.perInstanceDefault].join('/')}, per-instance by declaration` : ''}, label, tier, role; fmt / section / visibleWhen are per-instance by design and are not compared)`);
 }
 
 /* ---------------- (s) THE NESTING RELATION, AT ANY DEPTH ----------------

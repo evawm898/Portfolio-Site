@@ -1,0 +1,286 @@
+{
+  "tool": "shot-bloom-sepal-ranges.mjs",
+  "mode": "EXPORT",
+  "bound": [
+    -180,
+    180
+  ],
+  "cells": [
+    {
+      "id": "roll-old-max",
+      "label": "ROLL 330: OLD MAX",
+      "set": {
+        "sepalRoll": 330
+      },
+      "gapMm": 0.8764,
+      "censusPairs": 1600,
+      "censusSpanMm": 0.6614,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "roll-new-max",
+      "label": "ROLL 180: NEW MAX",
+      "set": {
+        "sepalRoll": 180
+      },
+      "gapMm": 1.1277,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "roll-past",
+      "label": "ROLL 185: ONE STEP PAST",
+      "set": {
+        "sepalRoll": 185
+      },
+      "gapMm": 1.0814,
+      "censusPairs": 470,
+      "censusSpanMm": 0.4109,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "roll-old-min",
+      "label": "ROLL -330: OLD MIN",
+      "set": {
+        "sepalRoll": -330
+      },
+      "gapMm": 1.0772,
+      "censusPairs": 1590,
+      "censusSpanMm": 0.6614,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "roll-new-min",
+      "label": "ROLL -180: NEW MIN",
+      "set": {
+        "sepalRoll": -180
+      },
+      "gapMm": 1.1362,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "roll-zero",
+      "label": "ROLL 0: THE DEFAULT",
+      "set": {},
+      "gapMm": 1.2288,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "m-old-max",
+      "label": "ROLL 330 (OLD MAX)",
+      "set": {
+        "sepalRoll": 330
+      },
+      "gapMm": 0.8764,
+      "censusPairs": 1600,
+      "censusSpanMm": 0.6614,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "m-new-max",
+      "label": "ROLL 180 (NEW MAX)",
+      "set": {
+        "sepalRoll": 180
+      },
+      "gapMm": 1.1277,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "m-mid",
+      "label": "ROLL 90",
+      "set": {
+        "sepalRoll": 90
+      },
+      "gapMm": 1.2179,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "m-old-min",
+      "label": "ROLL -330 (OLD MIN)",
+      "set": {
+        "sepalRoll": -330
+      },
+      "gapMm": 1.0772,
+      "censusPairs": 1590,
+      "censusSpanMm": 0.6614,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "m-new-min",
+      "label": "ROLL -180 (NEW MIN)",
+      "set": {
+        "sepalRoll": -180
+      },
+      "gapMm": 1.1362,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "m-zero",
+      "label": "ROLL 0",
+      "set": {},
+      "gapMm": 1.2288,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "allmax-old",
+      "label": "ALL MAX, ROLL 330 (WAS)",
+      "set": {
+        "sepalCup": 1.2,
+        "sepalCupGradient": 1.2,
+        "sepalRoll": 330,
+        "sepalSpineCurl": 360,
+        "sepalTwist": 180
+      },
+      "gapMm": 0.0029,
+      "censusPairs": 5670,
+      "censusSpanMm": 1.8259,
+      "exportTris": 39998,
+      "angleBuilt": -90,
+      "told": null
+    },
+    {
+      "id": "allmax-now",
+      "label": "ALL MAX, ROLL 180 (NOW)",
+      "set": {
+        "sepalCup": 1.2,
+        "sepalCupGradient": 1.2,
+        "sepalRoll": 180,
+        "sepalSpineCurl": 360,
+        "sepalTwist": 180
+      },
+      "gapMm": 0.0007,
+      "censusPairs": 3530,
+      "censusSpanMm": 2.1902,
+      "exportTris": 39998,
+      "angleBuilt": -90,
+      "told": null
+    },
+    {
+      "id": "opt-B",
+      "label": "B: 3 CUT (NOT TAKEN)",
+      "set": {
+        "sepalCup": 1.2,
+        "sepalCupGradient": 1.2,
+        "sepalRoll": 25,
+        "sepalSpineCurl": 55,
+        "sepalTwist": 25
+      },
+      "gapMm": 1.045,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": -44,
+      "told": null
+    },
+    {
+      "id": "opt-C",
+      "label": "C: 4 CUT (NOT TAKEN)",
+      "set": {
+        "sepalCup": 0.28,
+        "sepalCupGradient": 1.2,
+        "sepalRoll": 40,
+        "sepalSpineCurl": 85,
+        "sepalTwist": 40
+      },
+      "gapMm": 1.0286,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": -35,
+      "told": null
+    },
+    {
+      "id": "opt-D",
+      "label": "D: 5 CUT (NOT TAKEN)",
+      "set": {
+        "sepalCup": 0.32,
+        "sepalCupGradient": 0.32,
+        "sepalRoll": 45,
+        "sepalSpineCurl": 95,
+        "sepalTwist": 45
+      },
+      "gapMm": 1.0346,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": -29,
+      "told": null
+    },
+    {
+      "id": "load-a",
+      "label": "(A) CLAMP SILENTLY",
+      "set": {
+        "sepalRoll": 180
+      },
+      "gapMm": 1.1277,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    },
+    {
+      "id": "load-b",
+      "label": "(B) CLAMP AND TELL",
+      "set": {
+        "sepalRoll": 180
+      },
+      "gapMm": 1.1277,
+      "censusPairs": 0,
+      "censusSpanMm": 0,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": "SEPAL ROLL CLAMPED: ASKED 330, BUILT 180"
+    },
+    {
+      "id": "load-c",
+      "label": "(C) BUILD AS SAVED",
+      "set": {
+        "sepalRoll": 330
+      },
+      "gapMm": 0.8764,
+      "censusPairs": 1600,
+      "censusSpanMm": 0.6614,
+      "exportTris": 39998,
+      "angleBuilt": 0,
+      "told": null
+    }
+  ]
+}
