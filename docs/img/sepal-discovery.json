@@ -1,0 +1,441 @@
+{
+  "tool": "shot-bloom-sepal-discovery.mjs",
+  "mode": "EXPORT",
+  "cells": [
+    {
+      "id": "P1-default",
+      "label": "SHIPPING DEFAULT",
+      "prototype": false,
+      "note": "sepalCount 0: no sepal whorl is built. From below the head is petals and hub only.",
+      "set": {},
+      "exportTris": 24688,
+      "sepals": null,
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        15.7
+      ]
+    },
+    {
+      "id": "P1-five-rim",
+      "label": "5 SEPALS, NO STEM",
+      "prototype": false,
+      "note": "sepalCount 5, every other sepal control at its default: interleaved, size 0.60, angle 0. No stem, so the whorl is AT THE RIM (attachment RIM).",
+      "set": {
+        "sepalCount": 5
+      },
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        15.7
+      ]
+    },
+    {
+      "id": "P1-five-rim-side",
+      "label": "SAME, SIDE",
+      "prototype": false,
+      "note": "The same state in profile: the sepals leave the rim flat (angle 0) while the petals leave at the 25 degree tilt.",
+      "set": {
+        "sepalCount": 5
+      },
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 21,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        15.7
+      ]
+    },
+    {
+      "id": "P1-five-stem",
+      "label": "5 SEPALS, STEM 60X6",
+      "prototype": false,
+      "note": "With the shipped 6 mm stem the whorl attaches partway DOWN the hub-to-stem join (sepalHeight 0.75), 0.33 mm under the head.",
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60
+      },
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 18,
+        "attachment": "HUB",
+        "chordDeg": 18.21
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        17
+      ]
+    },
+    {
+      "id": "P1-aligned1",
+      "label": "8 ALIGNED SIZE 1",
+      "prototype": false,
+      "note": "8 on 8, aligned, size 1.00: the sepal foot IS the petal foot (the census welds them, declared).",
+      "set": {
+        "sepalCount": 8,
+        "sepalScale": 1,
+        "sepalPhase": 0
+      },
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 24,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        87.9,
+        87.9,
+        15.7
+      ]
+    },
+    {
+      "id": "P1-reflex",
+      "label": "ANGLE -90 REFLEXED",
+      "prototype": false,
+      "note": "Reflexed straight down. Past about -55 the petal builder folds at its own seam (a declared xfail on this row).",
+      "set": {
+        "sepalCount": 8,
+        "sepalAngle": -90
+      },
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": -90,
+        "angleBuilt": -90,
+        "limit": 21,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        36.2
+      ]
+    },
+    {
+      "id": "P1-up",
+      "label": "ANGLE 90 ASKED",
+      "prototype": false,
+      "note": "Asked 90; built at the DRAWN contact limit (the last angle clear of the petals). The read-out tells it.",
+      "set": {
+        "sepalCount": 8,
+        "sepalAngle": 90
+      },
+      "exportTris": 49184,
+      "sepals": {
+        "built": 8,
+        "tris": 24496,
+        "angleAsked": 90,
+        "angleBuilt": 21,
+        "limit": 21,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        15.7
+      ]
+    },
+    {
+      "id": "P1-cupped",
+      "label": "CUPPED + CURLED UP",
+      "prototype": false,
+      "note": "sepalCup 1.2, sepalSpineCurl 120, angle 90 asked (clamped at the drawn limit).",
+      "set": {
+        "sepalCount": 5,
+        "sepalCup": 1.2,
+        "sepalSpineCurl": 120,
+        "sepalAngle": 90
+      },
+      "exportTris": 39998,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 90,
+        "angleBuilt": -37,
+        "limit": -37,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        17.6
+      ]
+    },
+    {
+      "id": "P1-40",
+      "label": "40 ON 40",
+      "prototype": false,
+      "note": "The count ceiling is the outer whorl's petal count; 40 interleaved sepals on 40 petals.",
+      "set": {
+        "sepalCount": 40,
+        "petalCount": 40
+      },
+      "exportTris": 245152,
+      "sepals": {
+        "built": 40,
+        "tris": 122480,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 22,
+        "attachment": "RIM",
+        "chordDeg": 0
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        103.3,
+        103.3,
+        15.7
+      ]
+    },
+    {
+      "id": "P1-raceme",
+      "label": "RACEME: FLORETS TOO",
+      "prototype": false,
+      "note": "A raceme: every floret is a whole bloom and builds the head's sepal whorl too (only the head's sepals are tinted).",
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 120,
+        "inflorescence": "RACEME"
+      },
+      "exportTris": 173112,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 18,
+        "attachment": "HUB",
+        "chordDeg": 18.21
+      },
+      "inflorescence": {
+        "florets": 4,
+        "unitTris": 32728
+      },
+      "bboxMm": [
+        81.4,
+        81.4,
+        137
+      ]
+    },
+    {
+      "id": "P2-A",
+      "label": "A: SHIPPED SEPAL",
+      "prototype": false,
+      "note": "Foundation A as it ships: the petal builder on a second ring, the sepal twins at their defaults (the petal's own defaults).",
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60
+      },
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 18,
+        "attachment": "HUB",
+        "chordDeg": 18.21
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        17
+      ]
+    },
+    {
+      "id": "P2-A-leafy",
+      "label": "A: LEAF OUTLINE",
+      "prototype": false,
+      "note": "Still foundation A, through shipped sliders only: the sepal twins set to the LEAF's own outline constants (base 0.85, tip 1.15, tip shape 1.30, cup 0.35). The leaf outline is reachable today.",
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "sepalBaseTaper": 0.85,
+        "sepalTipTaper": 1.15,
+        "sepalTipShape": 1.3,
+        "sepalCup": 0.35
+      },
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 14,
+        "attachment": "HUB",
+        "chordDeg": 18.21
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        17
+      ]
+    },
+    {
+      "id": "P2-B-teeth",
+      "label": "PROTO: TOOTHED SEPAL",
+      "prototype": true,
+      "note": "PROTOTYPE, NOT SHIPPED: a patched copy in which sepalBladeState passes a tooth cut (depth 0.26, 6 teeth, coverage 1) instead of zeroing lobeDepth — the rim family part 2 costed in bloom-sepals-outcome.md section 10. The leaf's 1 mm tooth-relief FLOOR is NOT applied (it is a leaf cap, not a petal one).",
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60,
+        "sepalBaseTaper": 0.85,
+        "sepalTipTaper": 1.15,
+        "sepalTipShape": 1.3,
+        "sepalCup": 0.35,
+        "protoSepalToothDepth": 0.26,
+        "protoSepalToothCount": 6
+      },
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 14,
+        "attachment": "HUB",
+        "chordDeg": 18.21
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        17
+      ]
+    },
+    {
+      "id": "P2-C-layers",
+      "label": "C: A 2ND PETAL LAYER",
+      "prototype": false,
+      "note": "For comparison: a second PETAL WHORL (layerCount 2). Petal layers step INWARD and smaller; nothing in the layer system places a whorl outside or below the outer petals. A sepal ring is that whorl.",
+      "set": {
+        "layerCount": 2
+      },
+      "exportTris": 49184,
+      "sepals": null,
+      "inflorescence": null,
+      "bboxMm": [
+        86.9,
+        86.9,
+        16
+      ]
+    },
+    {
+      "id": "P2-tube",
+      "label": "TUBE ON PETALS",
+      "prototype": false,
+      "note": "The fused-collar mechanism that exists: tubeLayer1 0 fuses the PETAL whorl into a closed ring. It is per petal LAYER; the sepal ring is not a layer and is not wired to it.",
+      "set": {
+        "tubeLayer1": 0
+      },
+      "exportTris": 24672,
+      "sepals": null,
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        15.7
+      ]
+    },
+    {
+      "id": "P3-face-top",
+      "label": "HUB FACE, FROM ABOVE",
+      "prototype": false,
+      "note": "The shipping default from directly above. The hub face is the bare disc inside the petal roots — the centre's region (androecium, gynoecium, the reserved CORONA).",
+      "set": {},
+      "exportTris": 24688,
+      "sepals": null,
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        15.7
+      ]
+    },
+    {
+      "id": "P3-face-centre",
+      "label": "FACE WITH A CENTRE",
+      "prototype": false,
+      "note": "What already decorates the hub face when asked: 30 stamens and a style, zoomed to the centre.",
+      "set": {
+        "stamenCount": 30,
+        "gynoecium": "STYLE"
+      },
+      "exportTris": 42448,
+      "sepals": null,
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        29.4
+      ]
+    },
+    {
+      "id": "P3-under",
+      "label": "UNDER THE HEAD, STEM",
+      "prototype": false,
+      "note": "Zoomed under the head: the 5 sepals at sepalHeight 0.75 on the hub-to-stem join. This is the botanical calyx position.",
+      "set": {
+        "sepalCount": 5,
+        "stemLength": 60
+      },
+      "exportTris": 42200,
+      "sepals": {
+        "built": 5,
+        "tris": 15310,
+        "angleAsked": 0,
+        "angleBuilt": 0,
+        "limit": 18,
+        "attachment": "HUB",
+        "chordDeg": 18.21
+      },
+      "inflorescence": null,
+      "bboxMm": [
+        81.4,
+        81.4,
+        17
+      ]
+    }
+  ]
+}
