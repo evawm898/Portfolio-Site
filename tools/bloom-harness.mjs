@@ -8709,12 +8709,13 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
        reaches the lobed outline or its teeth at its registry default, a 46
        mm blade): each leaf asks 28 teeth and builds 28, 3 / 4 / 4 / 6 base to
        terminal, 6,916 triangles a leaf, and the roundness saturates at
-       0.1754 of the pitch (ruling 3's measured point);
+       0.1737 of the pitch (ruling 3's measured point, re-measured
+       when the shoulder tangents were held clear of the crest — was 0.1754);
      * on the WHORLED-8 COST CORNER (block 56's row: 8 whorled nodes, arch
        180, cup 1.2, on the 90 mm stem): 192,874 triangles, 12.9% of
        `EXPORT_TRI_BUDGET`. */
 export const LOBED_RULED_PINS = Object.freeze({ rows: 130, perLobe: 4, roundness: 0.12, teethAsked: 28, teethBuilt: 28, split: Object.freeze([3, 4, 4, 6]),
-  leafTris: 6916, saturatesAt: 0.1754, cornerTris: 192874, cornerBudgetPct: 12.9 });
+  leafTris: 6916, saturatesAt: 0.1737, cornerTris: 192874, cornerBudgetPct: 12.9 });
 if (GEOMETRY.LOBED_BLADE_ROWS !== LOBED_RULED_PINS.rows) throw new Error(`LF31: LOBED_BLADE_ROWS is ${GEOMETRY.LOBED_BLADE_ROWS}, the ruled ${LOBED_RULED_PINS.rows} (Eva, Oct 9) — a row change moves the ruled 28 of 28 teeth; re-rule it, then re-pin`);
 if (Number(DEFAULTS.lobedToothCount) !== LOBED_RULED_PINS.perLobe) throw new Error(`LF31: the lobed tooth default is ${DEFAULTS.lobedToothCount} a lobe, the ruled ${LOBED_RULED_PINS.perLobe}`);
 if (Number(DEFAULTS.lobedRound) !== LOBED_RULED_PINS.roundness) throw new Error(`LF31: the sinus roundness default is ${DEFAULTS.lobedRound}, the ruled ${LOBED_RULED_PINS.roundness}`);
@@ -12129,6 +12130,10 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'APEX NIB: MIXED — 6 layers x layerSize min (three rings nibbed, three whose blade never clears the floor)': { pairs: 10232, worstMm: 0.2421,
     note: '(NEW ROW, and PRE-EXISTING: the census reads 10232 pairs / 0.2421 mm on this control set on a worktree of the base commit 2464d50 as well, to the pair and to four decimals, at an identical 146,400 triangles — so the apex nib moves nothing here and the fold is the six-deep whorl\'s own. It is a COMPOSITION: `layerCount 6` alone reads 0 and `layerSize 0.35` alone reads 0, and the matrix varies one control at a time, so no row on main could see it. The row is here for AN0\'s second inert arm — three of its six rings carry a nib and three have a blade that never clears the print floor — which is the only state where a clause reading ring 0 and stopping says something false)' },
   "APEX NIB: x cup 1.2 x roll 330 (the nib under the form maximum)": { pairs: 5776, worstMm: 0.7742, note: "(NEW ROW, and PRE-EXISTING IN KIND: the same control set on a worktree of the base commit 2464d50 reads 6344 pairs / 0.7107 mm, so the fold is the composition's and this tree moves its magnitude by -568 pairs and +0.064 mm of span. THE PAIR COUNT IS THE FOLD CLAMP'S AND THE SPAN IS THE NIB'S: at 84e641d, before the clamp, this row read 6616 / 0.7742 -- +272 pairs on the base -- and the clamp's cap on the cup's section radius took the count to 5776 while leaving the worst span untouched to four decimals, which is a relief in the number of contacts and not in how deep the deepest one is. Both singles fold on their own — `petalRoll 330` reads 13584 / 1.3335 here and 15280 / 1.5539 on the base, `petalCup 1.2` reads 1088 / 0.3904 here and 80 / 0.0239 — and BOTH are already declared rows of this list, so this is a third reading of a hazard the combination gate names as the widest failing region it has (`petalCup x petalRoll`, eleven cells under the bar). Recorded at the branch's own figures because that is what this tree measures; the base's are here so the move is attributable rather than silent)" },
+  /* ===== TWO LOBED ROWS THE RULED 4 TEETH A LOBE FOLD AT THE TIP (S4c follow-up,
+     Oct 10) — each 0 on main; declared, not clamped (the ruling is unclamped). */
+  "LOBED: lobedEase max (0.95)": { pairs: 18, worstMm: 0.0026, note: "NEW WITH THE RULED 4 TEETH A LOBE (S4c follow-up, Eva's ruling (a), Oct 10): 18 pairs / 0.0026 mm at 47638 triangles, every pair AT THE LEAF TIP on every leaf (half-width ~1.1-1.2 mm, the last rows before the beaded stub). The same control set reads 0 pairs at 44830 triangles on main (f9ebcaf, 3 teeth a lobe at 112 rows), and 18 pairs on this tree with the rows put back to 112 — so it is the TOOTH COUNT, not the rows and not the shoulder fillets: a fourth tooth a lobe reaches into the converging tip. It is the lobed TIP, which S4 already records folding on 139 of 972 extreme corners with no matrix row (CLAUDE.md's lobed block); these are the first matrix rows to reach a fold there. The ruling is 4 a lobe UNCLAMPED, so it is declared with its number and named for Eva rather than clamped. Measured in Node, EXPORT, through tools/bloom-census-sweep.mjs." },
+  "LOBED YIELD: 6 lobes asked on a 12 mm blade (the count gives 6 -> 2, where the print minimum fits; told)": { pairs: 21, worstMm: 0.0892, note: "NEW WITH THE RULED 4 TEETH A LOBE (S4c follow-up, Eva's ruling (a), Oct 10): 21 pairs / 0.0892 mm at 47638 triangles, every pair AT THE LEAF TIP on every leaf (half-width ~1.1-1.2 mm, the last rows before the beaded stub). The same control set reads 0 pairs at 44830 triangles on main (f9ebcaf, 3 teeth a lobe at 112 rows), and 21 pairs on this tree with the rows put back to 112 — so it is the TOOTH COUNT, not the rows and not the shoulder fillets: a fourth tooth a lobe reaches into the converging tip. It is the lobed TIP, which S4 already records folding on 139 of 972 extreme corners with no matrix row (CLAUDE.md's lobed block); these are the first matrix rows to reach a fold there. The ruling is 4 a lobe UNCLAMPED, so it is declared with its number and named for Eva rather than clamped. Measured in Node, EXPORT, through tools/bloom-census-sweep.mjs." },
 });
 
 /* THE MAGNITUDE IS GATED (#213, closed — docs/bloom-xfail-magnitudes.md has
@@ -15521,7 +15526,7 @@ export function buildMatrix() {
         130 rows and the ruled default four teeth a lobe, built unclamped (28
         of 28, 3 / 4 / 4 / 6 — LF31 pins it on every row that builds the ruled
         leaf, block 56's shipped defaults and the MUM among them); the
-        roundness saturates at 0.1754 on that leaf and the travel above is
+        roundness saturates at 0.1737 on that leaf and the travel above is
         hatched (the panel gate's route (ac) measures it); every round
         bottom's two shoulders are filleted, tangent (LF30), or told a corner.
         The rows: the rejected three a lobe, both sides of the saturation, and
@@ -15529,7 +15534,7 @@ export function buildMatrix() {
         than any disc that meets it tangentially). Appended as the FINAL
         block, after 57. */
   lf('LOBED RULINGS: 3 a lobe (S4c\'s proposal, ruled against — 21 over the rim, 2 / 3 / 3 / 5)', { ...LOB, lobedToothCount: 3 });
-  lf('LOBED RULINGS: roundness 0.17 (the last LIVE step on the ruled leaf — it saturates at 0.1754)', { ...LOB, lobedRound: 0.17 });
+  lf('LOBED RULINGS: roundness 0.17 (the last LIVE step on the ruled leaf — it saturates at 0.1737)', { ...LOB, lobedRound: 0.17 });
   lf('LOBED RULINGS: roundness 0.18 (the first DEAD step — SATURATED, the same leaf as 0.5; told and hatched)', { ...LOB, lobedRound: 0.18 });
   lf('LOBED RULINGS: a told shoulder CORNER — the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)', { ...LOB, stemLength: 120, leafLength: 58, lobedLobes: 5, lobedFrom: 0.27, lobedTo: 0.57, lobedSinus: 0.63, lobedShape: 1.5, lobedAngle: 39, lobedEase: 0.77, lobedWidth: 17, lobedToothDepth: 0.27, leafTipShape: 0.7 });
 
