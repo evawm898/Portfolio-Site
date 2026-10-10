@@ -3813,7 +3813,7 @@ FILLETED** (read §8 of `docs/bloom-leaf-lobed-roundness-outcome.md` before touc
   (`LOBED_RULED_PINS`, and a module-load refusal on the three constants) — moving rows or teeth is a ruling.
 - **"Per lobe" is an AVERAGE** and the label says so ("Teeth per lobe (average)").
 - **THE DEAD TRAVEL IS MEASURED**: `radiusFitMm`, the largest radius whose bottom fits with smooth shoulders,
-  bisected on a FIXED bracket so every roundness above it builds BIT-IDENTICALLY. The mum saturates at 0.1754
+  bisected on a FIXED bracket so every roundness above it builds BIT-IDENTICALLY. The mum saturates at 0.1750
   (dead from 0.18); told (`SATURATED`) and hatched through the registry `cap` + `applyCaps`. Panel route (ac)
   finds the dead step by REBUILDING and holds the mark both ways, with two mutants (cap halved, cap removed);
   adding it was three edits (header, block, flags + banner — TWENTY-THREE routes).
@@ -3821,7 +3821,16 @@ FILLETED** (read §8 of `docs/bloom-leaf-lobed-roundness-outcome.md` before touc
   shoulder is now a tangent fillet (`shoulder()`, in the leaf's (along, across) mm plane; the tilt is affine,
   so C1 there is C1 on the planform); a radius fits only if both fillets are at least `min(R, MIN_FEATURE_MM/2,
   the floor's own fillet)`. Told corners carry `disc` / `crest` / `no room`. LF30 holds the turn at both
-  fillet ends under 0.1 deg (620 joins on 52 rows, worst 0.0028); `the-shoulder-is-a-corner-again` is its mutant.
+  fillet ends under 0.1 deg (666 joins on 54 rows, worst 0.0024); `the-shoulder-is-a-corner-again` is its mutant.
+- **THE FILLET'S SLOPE IS READ CLEAR OF EVERY KINK, AND A FILLET'S TANGENT STANDS CLEAR OF THE CREST** (found by
+  X0 before CI): a 1e-7 central difference turned the lamina's 7e-15 cross-engine noise into 2.5e-10 mm of fillet
+  and 36 float32 straddles a row, worst where a fillet that GIVES lands its tangent ON a cusp crest. Fourth-order
+  stencil at `half / LOBED_SLOPE_STEPS_PER_HALF`, capped at an eighth of the distance to the law's crests/sinuses
+  and the envelope's declared `laminaSlopeBreaks`; tangent kept `half / LOBED_CREST_CLEAR_PER_HALF` off the crest.
+  Measured across the engines: 1.3e-12 / 1.5e-11 mm, 0 straddles; a quarter-step clearance
+  left a 0.02 mm stub of flank below the crest that turned the mum's bead 99.7 deg (E2). An adaptive step was tried and is worse.
+- **TWO ROWS FOLD AT THE LEAF TIP WITH 4 TEETH A LOBE** (`lobedEase max` 18 / 0.0026, the 6 -> 2 yield 21 /
+  0.0892; 0 on main; the tooth count, not the rows) — declared, not clamped, Eva's to rule (§8.6).
 - **CONSEQUENCE, MEASURED**: broad sinuses (asked V already opens) are no longer rounded where the radius
   would leave a cornered shoulder — 151 per 300 sampled states that the base tree rounded, 150 of them with a
   corner (median 23.6 deg). 336 of 500 sampled leaves have the slider entirely dead, hatched and told.
