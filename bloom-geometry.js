@@ -15359,7 +15359,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
          does NOT FIT (and why), its radius, the opening asked and built on the
          emitted rows, the walls' pitches against the flank's own, and how much
          flank it took. The read-out's told flag and the gates' witness. */
-      roundBottoms: S.round ? { built: S.round.built, noFit: S.round.noFit, needed: S.round.needed, shrunk: S.round.shrunk, roundness: S.round.roundness, sinuses: S.round.sinuses.map((r) => ({ ...r })) } : null,
+      roundBottoms: S.round ? { built: S.round.built, noFit: S.round.noFit, needed: S.round.needed, shrunk: S.round.shrunk, roundness: S.round.roundness, saturatesAt: S.round.saturatesAt, saturated: S.round.saturated, sinuses: S.round.sinuses.map((r) => ({ ...r, shoulders: r.shoulders ? r.shoulders.map((x) => ({ ...x })) : null })) } : null,
       /* THE LOBE COUNT ASKED AGAINST BUILT (S4c, ruling 3): the yield and
          every count it tried, with what did not fit at each — the read-out's
          told flag and LF28's measured side */
@@ -15635,8 +15635,9 @@ export const LOBED_TOOTH_DEPTH_DEFAULT = 0.22;
    the margin chord between the two crests that bound a sinus
    (`lobedRoundBottoms`, its one owner). The range stops at one half: there a
    disc's DIAMETER is the whole pitch and the walls have nowhere to stand, so
-   the radius already shrinks (told) well before it. The default is PROPOSED
-   from the sheet, Eva's to rule (docs/bloom-leaf-lobed-roundness-outcome.md). */
+   the radius already shrinks (told) well before it. THE DEFAULT 0.12 IS
+   RULED (Eva, Oct 9, from docs/img/leaf-lobed-roundness.png; rejected: 0.18)
+   — docs/bloom-leaf-lobed-roundness-outcome.md. */
 export const LOBED_ROUND_RANGE = Object.freeze([0, 0.5]);
 export const LOBED_ROUND_DEFAULT = 0.12;
 /* THE LOBED BLADE'S OWN TOOTH COUNT (S4c — Eva's ruling of Oct 9: "LOBED gets
@@ -15649,17 +15650,29 @@ export const LOBED_ROUND_DEFAULT = 0.12;
    with more margin than the mean carries one more and a short one one fewer:
    the read-out counts them per lobe off the built teeth. The shared floor,
    fold cap, row and pitch caps still bind and where they do fewer are built,
-   told (S2's rule). The default is PROPOSED, Eva's to rule. */
+   told (S2's rule). THE DEFAULT IS RULED (Eva, Oct 9): FOUR A LOBE, BUILT
+   UNCLAMPED — 28 of 28 over the default mum's rim (3 / 4 / 4 / 6 base to
+   terminal; "per lobe" stays an AVERAGE along the rim, ruled). Rejected: 3
+   (the proposal), and 4 told-clamped by the rows (24 of 28 at 112 rows). */
 export const LOBED_TOOTH_PER_LOBE_RANGE = Object.freeze([1, 6]);
-export const LOBED_TOOTH_PER_LOBE_DEFAULT = 3;
+export const LOBED_TOOTH_PER_LOBE_DEFAULT = 4;
 /* THE ROW COUNT — twice the leaf's own, FIXED (not derived from the lobes or
    the teeth, because the tooth count's row cap reads it: a row count derived
    from the count would be a fixed point). The lab drew its mum on 168 rows;
    a lobe period at the shipped count of 56 is 13 rows on the default and 7 at
    six lobes per side, a sinus flank of three or four chords, which reads as a
-   polygon. 112 is the apex ramp's own ceiling (`APEX_NU_ABOVE`), so no part of
-   the bloom carries more rows than a petal already can. */
-export const LOBED_BLADE_ROWS = 2 * NU_BASE;
+   polygon. It WAS 112, the apex ramp's own ceiling (`APEX_NU_ABOVE`); it is
+   130 BY EVA'S RULING (a) of Oct 9: the least count at which the RULED tooth
+   default — four a lobe — is built UNCLAMPED on the default mum leaf (28 of
+   28). Measured by sweeping the count on that leaf: 112 builds 24 (the
+   window-total row cap binds), 120 builds 25, 128 and 129 build 27, 130
+   builds 28, and it holds 28 above. Cost, ruled with it: 6,916 triangles a
+   leaf against 5,980 (+936) and the whorled-8 cost corner at 192,874 (12.9%
+   of the budget). Rejected: shipping four told-clamped at 112, and keeping
+   three. A lobed blade is therefore the one part of the bloom carrying more
+   rows than a petal's apex ramp can — named here rather than discovered.
+   (Six a lobe unclamped would need 192.) */
+export const LOBED_BLADE_ROWS = 130;
 /* the tilt's own grid, so the cap's last bit cannot move a row (the relief
    grid's reasoning, session 42): 2^-20 rad, a power of two */
 export const LOBED_TILT_GRID = 2 ** -20;
@@ -16035,14 +16048,16 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
     const rec = { u: su, bottomU: ubt, depthHalfMm: hb, need: false, built: false, noFit: false, noFitWhy: null,
       openingAskedMm: openingWith(null, su), openingBuiltMm: null, radiusMm: null,
       flankPitchBack: flankBack / Lmm, flankPitchFwd: flankFwd / Lmm, pitchBack: null, pitchFwd: null,
-      steepenedBack: false, steepenedFwd: false, backU: null, fwdU: null, takenMm: 0,
-      roundAsked: roundness, alreadyRound: false, seatMm: null, arcU: null, floorU: null, pitchMm: null, radiusAskedMm: null, radiusMinMm: null, roundBuilt: null, shrunk: false, floored: false };
+      steepenedBack: false, steepenedFwd: false, backU: null, fwdU: null, takenMm: 0, shoulders: null,
+      roundAsked: roundness, alreadyRound: false, seatMm: null, arcU: null, floorU: null, pitchMm: null, radiusAskedMm: null, radiusMinMm: null, roundBuilt: null, shrunk: false, floored: false,
+      radiusFitMm: null, saturatesAt: null, saturated: false };
     sinuses.push(rec);
     if (rec.openingAskedMm === null) continue;
     rec.need = rec.openingAskedMm < D;
     /* AT ROUNDNESS 0 THIS IS S4b's LAW EXACTLY, BY BRANCH: a sinus whose asked
-       V already opens is left alone (S4c's roundness rounds every sinus) */
-    if (!rec.need && !(roundness > 0)) continue;
+       V already opens is left alone (S4c's roundness rounds every sinus) —
+       decided below, after its saturation is measured (ruling 3: the
+       read-out describes the control at every setting, 0 included) */
     /* the planform margin of the asked outline, at the rows' own tilt, for the axis */
     const B = [ubt * Lmm + hb * sn, hb * cs];
     const flankDir = (dir, reach) => {
@@ -16083,7 +16098,7 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
        So a radius above the floor keeps the FLOOR'S OWN seat: the offset S4b
        solved at the print minimum, 0 where no minimum was needed. At the
        floor the two are the same disc, so the law is continuous in R.) */
-    const uAt = (R, seat) => {
+    const uAt = (R, seat, probe) => {
       const a1 = flankDir(-1, 2 * R), a2 = flankDir(1, 2 * R);
       let bx = a1[0] + a2[0], by = a1[1] + a2[1];
       const bn = Math.hypot(bx, by); bx /= bn; by /= bn;
@@ -16129,9 +16144,89 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
       }
       const WB = wall(sB), WF = wall(sF);
       const fa = Math.min(ubt, uT), fb = Math.max(ubt, uT);
+      /* THE SHOULDERS (S4c follow-up — Eva's ruling 4 of Oct 9: "a step where
+         the round bottom meets the flank … fix it in the round-bottom law").
+         MEASURED FIRST, on the emitted outline in export mode: the disc meets
+         each wall TANGENTIALLY (0.01 deg at 1e-6 u either side — the wall
+         leaves the disc on the disc's own tangent, closed form) and each wall
+         meets its flank at a CORNER — 49 deg at the back and 17 at the front
+         of the default mum's second sinus at roundness 0.12, up to 84 deg on
+         its first. A straight wall at the flank's own steepest pitch runs
+         parallel to the flank's steepest stretch and so can only meet it
+         where the flank has already turned toward its crest: `min(flank,
+         wall)` there is a corner by construction, at every roundness (0 too).
+         So each wall/flank corner is rounded by a FILLET OF THE BOTTOM'S OWN
+         RADIUS — the circle of radius `R` tangent to the wall and to the
+         flank, under both, its upper arc the outline between its two tangent
+         points. Derived, never typed: the radius is the disc's, the tangent
+         points are solved. Under both curves, so it only takes material
+         (the cap stays a cap: depth untouched, the opening only widens); its
+         slopes run between the flank's and the wall's, so it carries no
+         slope the wall did not (the fold argument above holds), and the
+         discrete fold check below sees it. WHERE `R` DOES NOT FIT — the
+         flank's tangent point past the half-period's crest, or the wall's
+         past the disc — the fillet's radius gives, to the largest that fits
+         floored onto `LOBE_RELIEF_GRID`, recorded; where nothing fits (a
+         wall steepened to meet its flank AT the crest) the corner is kept and
+         recorded with radius 0. Worked in millimetres (`x = u L`, `y = h`):
+         the rows' tilt is an affine map of that plane at any one station and
+         smooth along it, so a C1 join here is a C1 join on the planform. */
+      /* A SHOULDER IS TANGENT where it carries a fillet at all (any radius
+         over 0 meets both curves on their own tangents) and a CORNER where
+         none fits (told, with why: the DISC meets the flank, the wall cuts
+         the CREST, or NO ROOM for even the smallest fillet). How large a
+         fillet a radius must leave is the ROUNDNESS's question and is asked
+         in `fits` below: a probe (`probe`, the two sides' bars) needs only
+         whether a fillet of at least the bar exists. */
+      const xyOf = (u) => [u * Lmm, lam(u)];
+      const slopeOf = (u) => { const e = 1e-7; return (lam(u + e) - lam(u - e)) / (2 * e * Lmm); };
+      const shoulder = (Wl, dir) => {
+        /* dir -1: the back wall (its crest at ua), +1: the front (its crest at ub) */
+        const uW = Wl.uQ, uE = dir < 0 ? ua : ub;
+        const g = (u) => lam(u) - Wl.at(u);
+        /* (where the flank is already under the wall at the disc's own
+           tangent point, the DISC meets the flank — a corner this law does
+           not fillet; where the wall is still under the flank at the crest,
+           the wall cuts the crest — no shoulder fits. Both told.) */
+        if (!(g(uW) > 0)) return { radiusMm: 0, why: 'disc' };
+        if (g(uE) > 0) return { radiusMm: 0, why: 'crest' };
+        let a = uE, b = uW;
+        for (let k = 0; k < 60; k++) { const m = (a + b) / 2; if (g(m) > 0) b = m; else a = m; }
+        const uc = (a + b) / 2;
+        const m = Wl.s / Lmm, kL = Math.hypot(1, m), xQ = Wl.uQ * Lmm, yQ = Wl.hQ;
+        const below = (c) => ((yQ + m * (c[0] - xQ)) - c[1]) / kL;
+        const centre = (u, rho) => { const [x, y] = xyOf(u), f = slopeOf(u), kF = Math.hypot(1, f); return [x + (rho * f) / kF, y - rho / kF]; };
+        const solve = (rho) => {
+          const phi = (u) => below(centre(u, rho)) - rho;
+          if (!(phi(uE) >= 0)) return null;
+          let lo = uE, hi = uc;
+          for (let k = 0; k < 60; k++) { const mm = (lo + hi) / 2; if (phi(mm) >= 0) lo = mm; else hi = mm; }
+          const ut = (lo + hi) / 2, c = centre(ut, rho);
+          const uf = (c[0] - (rho * m) / kL) / Lmm;
+          if (dir < 0 ? !(uf >= uc && uf <= uW) : !(uf <= uc && uf >= uW)) return null;
+          const u0 = Math.min(ut, uf), u1 = Math.max(ut, uf);
+          return { radiusMm: rho, flankU: ut, wallU: uf, cornerU: uc, u0, u1,
+            at: (u) => { const dx = u * Lmm - c[0]; return c[1] + Math.sqrt(Math.max(0, rho * rho - dx * dx)); } };
+        };
+        let F = solve(R);
+        /* (a PROBE — a fit test — needs only whether a SMOOTH shoulder
+           exists: the radius itself, else the smooth bar; the radius is
+           bisected only once a round bottom is chosen) */
+        if (!F && probe) { const bar = probe[dir < 0 ? 0 : 1]; F = solve(bar > 0 ? bar : LOBE_RELIEF_GRID); if (F) F.gave = true; }
+        else if (!F) {
+          let lo = 0, hi = R;
+          for (let k = 0; k < 40; k++) { const mm = (lo + hi) / 2; if (solve(mm)) lo = mm; else hi = mm; }
+          const rg = Math.floor(lo / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
+          F = rg > 0 ? solve(rg) : null;
+          if (F) F.gave = true;
+        }
+        return F || { radiusMm: 0, why: 'no room', cornerU: uc };
+      };
+      const SB = shoulder(WB, -1), SF = shoulder(WF, 1);
       const U = (u) => {
         if (u < ua || u > ub) return Infinity;
-        let w = u <= WB.uQ ? WB.at(u) : u >= WF.uQ ? WF.at(u) : ent(u);
+        let w = u <= WB.uQ ? (SB.at && u >= SB.u0 && u <= SB.u1 ? SB.at(u) : WB.at(u))
+          : u >= WF.uQ ? (SF.at && u >= SF.u0 && u <= SF.u1 ? SF.at(u) : WF.at(u)) : ent(u);
         if (u >= fa && u <= fb) w = Math.min(w, hb);
         return w;
       };
@@ -16157,7 +16252,9 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
         const advV = (du + (stH[i + 1] * Math.sin(stTau[i + 1]) - stH[i] * Math.sin(stTau[i])) * w1) / du;
         if (adv < LOBED_FOLD_MARGIN && adv < advV) return { why: 'back flank' };
       }
-      return { U, R, sB, sF, stB, stF, seat: off, arcU: [WB.uQ, WF.uQ], floorU: [fa, fb] };
+      const sh = (F) => ({ radiusMm: F.radiusMm, flankU: F.flankU === undefined ? null : F.flankU, wallU: F.wallU === undefined ? null : F.wallU,
+        cornerU: F.cornerU === undefined ? null : F.cornerU, gave: !!F.gave, why: F.why || null, tangent: F.radiusMm > 0 });
+      return { U, R, sB, sF, stB, stF, seat: off, arcU: [WB.uQ, WF.uQ], floorU: [fa, fb], shoulders: [sh(SB), sh(SF)] };
     };
     let W = rec.need ? uAt(D / 2) : null, o = W && W.U ? openingWith(W.U, su) : null;
     if (W && W.U && !(o >= D)) {
@@ -16197,30 +16294,94 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
        roundness). Only where even the floor does not fit — S4b's own NO FIT,
        above — does anything else give, and that is the lobe COUNT, decided by
        `lobedOutline`, not here. */
-    if (roundness > 0) {
+    /* THE SATURATION (S4c follow-up — Eva's ruling 3 of Oct 9: "above about
+       0.2 the radius saturates … find the REAL saturation point"). Every
+       sinus has a LARGEST SMOOTH RADIUS, `radiusFitMm`: the largest radius
+       (from the print minimum up to the range's own top, the roundness 0.5
+       times the pitch) whose round bottom still fits — both walls meeting
+       their flanks inside the half-period, both shoulders smooth, the
+       opening held. It is bisected over that FIXED BRACKET, floored onto
+       `LOBE_RELIEF_GRID` and kept at a radius that fits, so it does not
+       depend on the roundness asked: every roundness at or above
+       `radiusFitMm / pitch` builds this sinus at exactly `radiusFitMm`, and
+       when every sinus of the leaf is there the slider moves nothing — that
+       is the dead travel, and `saturatesAt` (the largest over the sinuses,
+       `lobedOutline` reports it) is where it starts. Computed at EVERY
+       roundness, 0 included, because the read-out and the hatch describe the
+       control, not the setting it is at; at roundness 0 it builds nothing
+       (S4b's law by branch). Where even the range's top fits, the sinus
+       never saturates (`saturatesAt` null). */
+    {
       const cA = law.crestU[law.sinusU.indexOf(su)], cB = law.crestU[law.sinusU.indexOf(su) + 1];
       const crestPt = (u) => { const e = envAt(u), t = tauAt(u); return [u * Lmm + e * Math.sin(t), e * Math.cos(t)]; };
       const PA = crestPt(cA), PB = crestPt(cB);
       rec.pitchMm = Math.hypot(PB[0] - PA[0], PB[1] - PA[1]);
-      const Rmin = W ? W.R : 0;
+    }
+    const Rmin = W ? W.R : 0, seat = W ? W.seat : 0;
+    /* (S4c follow-up, ruling 4: A RADIUS FITS ONLY WHERE NEITHER SHOULDER IS
+       SHARPER THAN IT HAS TO BE — each carries a fillet (tangent) of at least
+       `min(R, MIN_FEATURE_MM / 2, the print minimum's own fillet on that
+       side)`: a printable rounding where the room allows one, and never
+       sharper than the bottom S4b's law already builds. A broad disc whose
+       wall cuts the crest, or whose disc meets the flank at a corner, or
+       whose fillet the crest pinches thinner than the floor's, is a radius
+       too large — so the radius gives (the ruled order) and the shoulders
+       stay tangent wherever any larger radius is built. Without the third
+       term a leaf whose print-minimum shoulders the crest already pinches
+       could never round at all; with it, a larger radius is built exactly
+       as far as it costs the shoulders nothing.) */
+    const floorRho = W && W.shoulders ? W.shoulders.map((x) => x.radiusMm) : [Infinity, Infinity];
+    const barsAt = (R) => floorRho.map((f) => Math.min(R, D / 2, f));
+    const fits = (R) => {
+      const bars = barsAt(R), V = uAt(R, seat, bars);
+      if (!V.U || !V.shoulders.every((x, i) => x.radiusMm > 0 && x.radiusMm >= bars[i] * (1 - 1e-9))) return null;
+      const oo = openingWith(V.U, su); return oo >= D ? { V, oo } : null;
+    };
+    /* the chosen radius rebuilt with its shoulders solved in full (a probe
+       keeps the bar where the radius did not fit; the full solve takes the
+       largest fillet up to R — it only takes material, so the opening the
+       probe measured can only widen) */
+    const full = (F) => (F ? { V: uAt(F.V.R, seat), oo: openingWith(uAt(F.V.R, seat).U, su) } : null);
+    const Rtop = Math.floor((LOBED_ROUND_RANGE[1] * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
+    let fit = Rtop > Rmin ? fits(Rtop) : null, Rfit = Rtop;
+    if (!fit) {
+      let lo = Rmin, hi = Rtop;
+      for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
+      const g = Math.floor(lo / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
+      fit = g > Rmin ? fits(g) : null;
+      Rfit = fit ? g : Rmin;
+    }
+    rec.radiusFitMm = Rfit;
+    /* (a sinus whose largest smooth radius IS its floor is dead along the
+       whole travel — every roundness builds the floor — so it saturates at 0) */
+    rec.saturatesAt = Rfit < Rtop || !fit ? (Rfit > Rmin ? Rfit / rec.pitchMm : 0) : null;
+    rec.saturated = rec.saturatesAt !== null && Math.max(roundness > 0 ? Math.floor((roundness * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID : 0, Rmin) >= Rfit;
+    if (roundness > 0) {
       const Rask = Math.floor((roundness * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
-      rec.radiusAskedMm = Rask; rec.radiusMinMm = Rmin;
+      rec.radiusAskedMm = Rask; rec.radiusMinMm = Rmin; rec.seatMm = seat;
       if (Rask <= Rmin) rec.floored = Rask < Rmin;
-      else {
-        const seat = W ? W.seat : 0;
-        rec.seatMm = seat;
-        const fits = (R) => { const V = uAt(R, seat); if (!V.U) return null; const oo = openingWith(V.U, su); return oo >= D ? { V, oo } : null; };
-        const f = fits(Rask);
+      else if (Rask >= Rfit) {
+        /* SATURATED: the largest smooth radius, whatever more was asked */
+        rec.shrunk = Rask > Rfit;
+        if (fit) { const F = full(fit); W = F.V; o = F.oo; }
+      } else {
+        const f = full(fits(Rask));
         if (f) { W = f.V; o = f.oo; }
         else {
+          /* (a radius under the largest smooth one that does not itself fit
+             — the fit is not monotone everywhere — shrinks to the largest
+             that does under it, the S4c bisection) */
           let lo = Rmin, hi = Rask, best = W ? { V: W, oo: o } : null;
           for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2, ff = fits(m); if (ff) { lo = m; best = ff; } else hi = m; }
           const g = Math.floor(lo / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
           if (g > Rmin) { const fg = fits(g); if (fg) best = fg; }
           rec.shrunk = true;
+          if (best && best.V !== W) best = full(best);
           W = best ? best.V : null; o = best ? best.oo : null;
         }
       }
+    } else if (!rec.need) continue;
+    if (roundness > 0) {
       /* a sinus that did not need a round bottom and fits none at any radius
          keeps its V — printable already — and says so (built 0) */
       if (!W) { rec.radiusMm = 0; rec.roundBuilt = 0; continue; }
@@ -16237,6 +16398,7 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
       }
     }
     rec.built = true; rec.radiusMm = W.R; rec.openingBuiltMm = o; rec.seatMm = W.seat; rec.arcU = W.arcU.slice(); rec.floorU = W.floorU.slice();
+    rec.shoulders = W.shoulders.map((x) => ({ ...x }));
     rec.pitchBack = W.sB / Lmm; rec.pitchFwd = W.sF / Lmm; rec.steepenedBack = W.stB; rec.steepenedFwd = W.stF;
     let back = ubt, fwd = ubt;
     for (let i = 0; i <= NS; i++) {
@@ -16250,8 +16412,15 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
     for (const z of zones) if (u >= z.ua && u <= z.ub) return z.U(u);
     return Infinity;
   } : null;
+  /* THE LEAF'S SATURATION (ruling 3): over the sinuses whose largest smooth
+     radius was measured, the roundness above which none of them moves — null
+     where one never saturates inside the range (no dead travel) or none was
+     measured; `saturated` is true when this build is in the dead travel. */
+  const measured = sinuses.filter((r) => r.radiusFitMm !== null);
+  const saturatesAt = !measured.length || measured.some((r) => r.saturatesAt === null) ? null : Math.max(...measured.map((r) => r.saturatesAt));
   return { sinuses, built: zones.length, noFit: sinuses.filter((r) => r.noFit).length, needed: sinuses.filter((r) => r.need).length,
-    shrunk: sinuses.filter((r) => r.shrunk).length, roundness, roundAt };
+    shrunk: sinuses.filter((r) => r.shrunk).length, roundness, roundAt,
+    saturatesAt, saturated: saturatesAt !== null && measured.every((r) => r.saturated) };
 }
 
 /* lobedSurface — THE ONE OWNER OF WHERE A LOBED LEAF'S BLADE IS, the

@@ -4171,7 +4171,8 @@ export const CONTROLS = [
      0 is S4b's minimum exactly). Told on the control: the radius built
      against the radius asked where it shrank (the radius gives first), and
      the lobe count where the print minimum itself did not fit (the count
-     gives next) — `lobedRoundBottoms` and `lobedOutline` own both. */
+     gives next) — `lobedRoundBottoms` and `lobedOutline` own both.
+     THE DEFAULT 0.12 IS RULED (Eva, Oct 9; rejected: 0.18). */
   { id: 'lobedRound', section: 'leafLobes', kind: 'slider',
     min: LOBED_ROUND_RANGE[0], max: LOBED_ROUND_RANGE[1], step: 0.01, default: LOBED_ROUND_DEFAULT,
     label: 'Sinus roundness',
@@ -4184,8 +4185,22 @@ export const CONTROLS = [
       const built = R.sinuses.filter((x) => x.built && x.radiusMm > 0);
       const radii = built.length ? ` · built ${built.map((x) => `${x.radiusMm.toFixed(2)} mm`).join(', ')}` : '';
       const sh = R.sinuses.filter((x) => x.shrunk);
-      const shrunk = sh.length ? ` — SHRUNK at ${sh.length} sinus${sh.length === 1 ? '' : 'es'} (asked ${sh.map((x) => `${(x.roundAsked).toFixed(2)} -> ${(x.roundBuilt || 0).toFixed(3)}`).join(', ')} of the pitch: the asked radius would not meet its flanks; told)` : '';
-      return head + radii + shrunk;
+      const shrunk = sh.length ? ` — SHRUNK at ${sh.length} sinus${sh.length === 1 ? '' : 'es'} (asked ${sh.map((x) => `${(x.roundAsked).toFixed(2)} -> ${(x.roundBuilt || 0).toFixed(3)}`).join(', ')} of the pitch: the asked radius would not meet its flanks with smooth shoulders; told)` : '';
+      /* THE DEAD TRAVEL, TOLD (Eva's ruling 3 of Oct 9, the stamenSpread
+         precedent): the roundness above which no sinus of THIS leaf moves —
+         each at its largest radius whose walls and shoulders still fit — is
+         `saturatesAt`, measured per build from the leaf's own pitches; the
+         track above it is hatched (`cap`, `applyCaps`). The range is not
+         narrowed and the max is not adaptive. */
+      const at = R.saturatesAt;
+      const dead = at === null || at === undefined ? ' · no dead travel: a larger roundness still moves a sinus up to the top of the range'
+        : R.saturated ? ` · SATURATED — from ${at.toFixed(3)} up every sinus is at its largest smooth radius, so the travel above ${at.toFixed(3)} builds the same leaf (hatched)`
+          : ` · saturates at ${at.toFixed(3)}: above it no sinus moves (the hatched travel)`;
+      return head + radii + shrunk + dead;
+    },
+    cap: (shown) => {
+      const R = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0] && shown.leaf.lobed[0].roundBottoms;
+      return R && R.saturatesAt !== null && R.saturatesAt !== undefined ? R.saturatesAt : null;
     },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafLobed' } },
   { id: 'lobedShape', section: 'leafLobes', kind: 'slider',
@@ -4263,14 +4278,20 @@ export const CONTROLS = [
      terminal), so the count follows the lobes when they yield. The teeth stay
      evenly spaced along the rim; the read-out counts them lobe by lobe off
      the built teeth. The floor, the fold cap and the rows still bind: fewer,
-     told. Visible only under LOBED; the shared count is hidden there. */
+     told. Visible only under LOBED; the shared count is hidden there.
+     THE DEFAULT IS RULED, FOUR (Eva, Oct 9, built unclamped at 130 rows), and
+     "PER LOBE" IS AN AVERAGE ALONG THE RIM, RULED AS SUCH — so the LABEL says
+     so, and the read-out leads with it: a reader taking "4" as an exact count
+     on every lobe would be reading the slider wrong (the default mum carries
+     3 / 4 / 4 / 6). There is no tooltip mechanism in this panel; the label
+     and the read-out are the two places a control can speak. */
   { id: 'lobedToothCount', section: 'leafSerration', kind: 'slider',
     min: LOBED_TOOTH_PER_LOBE_RANGE[0], max: LOBED_TOOTH_PER_LOBE_RANGE[1], step: 1, default: LOBED_TOOTH_PER_LOBE_DEFAULT,
-    label: 'Teeth per lobe',
+    label: 'Teeth per lobe (average)',
     fmt: (v, ui, shown) => {
       const n = Math.round(Number(v));
       const L = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0];
-      const head = `${n} a lobe`;
+      const head = `${n} a lobe ON AVERAGE along the rim, not on every lobe`;
       if (!L || !L.teeth) return head;
       const S = L.teeth, rim = L.toothRimAsked, lobesOnRim = 2 * L.lobes + 1;
       const per = L.teethPerLobe ? ` — ${L.teethPerLobe.join(' / ')} on the ${lobesOnRim} lobes, base to terminal (evenly spaced along the rim, so a longer lobe carries one more)` : '';
