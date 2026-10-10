@@ -16020,6 +16020,12 @@ export function lobedSinusGaps(us, hs, taus, Lmm, law) {
    kept at the satisfying bracket end, so the page's V8 and Node's land on the
    same rows. */
 export const LOBED_ROUND_SAMPLES = 4096;
+/* the flank-slope stencil's step, as a fraction of the lobe half-period (S4c
+   follow-up; see `slopeOf` in `lobedRoundBottoms`) */
+export const LOBED_SLOPE_STEPS_PER_HALF = 64;
+/* how far a shoulder fillet's flank tangent stands clear of the crest, as a
+   fraction of the half-period (a quarter of a stencil step; see `shoulder`) */
+export const LOBED_CREST_CLEAR_PER_HALF = 256;
 export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
   const roundness = opts.roundness > 0 ? Number(opts.roundness) : 0;
   const envAt = opts.envAt || lam;
@@ -16027,6 +16033,9 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
   if (!(law.sinus > 0)) return none;
   const half = (law.to - law.from) / (2 * law.lobes), NS = LOBED_ROUND_SAMPLES;
   const stH = stations.map(lam), stTau = stations.map(tauAt);
+  /* every kink the lamina has: the law's crests and sinuses, and the envelope's
+     declared tangent breaks (the flank-slope stencil stands clear of them) */
+  const kinks = [...law.crestU, ...law.sinusU, ...(opts.breaks || [])];
   const zones = [], sinuses = [];
   const openingWith = (U, su) => {
     const hs = stations.map((u, i) => (U ? Math.min(stH[i], U(u)) : stH[i]));
@@ -16179,7 +16188,32 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
          in `fits` below: a probe (`probe`, the two sides' bars) needs only
          whether a fillet of at least the bar exists. */
       const xyOf = (u) => [u * Lmm, lam(u)];
-      const slopeOf = (u) => { const e = 1e-7; return (lam(u + e) - lam(u - e)) / (2 * e * Lmm); };
+      /* THE FLANK'S SLOPE — a FOURTH-ORDER central difference at the WIDEST
+         step the flank allows. NOT a 1e-7 step (the first cut): a difference
+         that narrow divides the lamina's own last-bit noise by 1e-7 of the
+         leaf, and the lamina's transcendentals are not correctly rounded, so
+         Chromium's V8 and Node's read it ~3e-15 apart — the fillet centre then
+         moved by up to 2.5e-10 mm and the outline by 2.8e-9 between the page's
+         build and the Node rebuild (X0 read 36 float32 straddles on a row;
+         LF30's page-against-law clause 1.3e-9). The step is a fraction of the
+         half-period (a length from a length) and stands clear of EVERY KINK
+         THE LAMINA HAS — the lobe law's crests and sinuses (a local power under
+         1 makes the slope unbounded there) and the envelope's own declared
+         tangent breaks (`breaks`: a tip shape under 1 puts a corner at the
+         widest point, 7e-4 in u from a shoulder on the told-corner row, where
+         a stencil across it read 2.7 deg off): never more than an eighth of
+         the distance to the nearest, the old 1e-7 step the floor. Measured
+         across the two engines over the 59 LOBED rows: shoulders identical
+         to the bit, 0 float32 straddles in the outline (the outcome doc). An
+         ADAPTIVE step (halve until two stencils agree) was tried and is worse:
+         it ends small on most rows and the outline's noise came back to 1e-10. */
+      const slopeStep = half / LOBED_SLOPE_STEPS_PER_HALF;
+      const slopeOf = (u) => {
+        let end = Infinity;
+        for (const k of kinks) end = Math.min(end, Math.abs(u - k));
+        const e = Math.max(1e-7, Math.min(slopeStep, end / 8));
+        return (lam(u - 2 * e) - 8 * lam(u - e) + 8 * lam(u + e) - lam(u + 2 * e)) / (12 * e * Lmm);
+      };
       const shoulder = (Wl, dir) => {
         /* dir -1: the back wall (its crest at ua), +1: the front (its crest at ub) */
         const uW = Wl.uQ, uE = dir < 0 ? ua : ub;
@@ -16196,10 +16230,25 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
         const m = Wl.s / Lmm, kL = Math.hypot(1, m), xQ = Wl.uQ * Lmm, yQ = Wl.hQ;
         const below = (c) => ((yQ + m * (c[0] - xQ)) - c[1]) / kL;
         const centre = (u, rho) => { const [x, y] = xyOf(u), f = slopeOf(u), kF = Math.hypot(1, f); return [x + (rho * f) / kF, y - rho / kF]; };
+        /* THE TANGENT STANDS CLEAR OF THE CREST by one stencil step: a fillet
+           is tangent to the FLANK, and at a crest whose local power is under 1
+           the flank's slope is unbounded, so a fillet "tangent" there is
+           tangent to nothing the two engines can agree on (the largest fillet
+           that fits — every one that GIVES — otherwise lands its tangent ON
+           the crest, 4e-7 in u from it on the shipped leaf, and the page's
+           build and the Node rebuild then read its centre ~1e-10 mm apart).
+           A QUARTER of a stencil step: measured over the 59 LOBED rows across
+           the two engines, a full step leaves 5.6e-14 / 2.4e-12 mm (shoulder /
+           outline) and moves the shipped leaf's saturation 0.1754 -> 0.1687; a
+           quarter 1.7e-13 / 5.8e-12 and 0.1737; a sixty-fourth 8.9e-13 /
+           7.7e-11 and 0.1753 — 0 float32 straddles in 236,059 samples on all
+           three, where the crest-tangent law read 2.5e-10 / 2.8e-9 and 3. */
+        const uLim = uE - dir * (half / LOBED_CREST_CLEAR_PER_HALF);
         const solve = (rho) => {
           const phi = (u) => below(centre(u, rho)) - rho;
-          if (!(phi(uE) >= 0)) return null;
-          let lo = uE, hi = uc;
+          if (dir < 0 ? !(uc > uLim) : !(uc < uLim)) return null;
+          if (!(phi(uLim) >= 0)) return null;
+          let lo = uLim, hi = uc;
           for (let k = 0; k < 60; k++) { const mm = (lo + hi) / 2; if (phi(mm) >= 0) lo = mm; else hi = mm; }
           const ut = (lo + hi) / 2, c = centre(ut, rho);
           const uf = (c[0] - (rho * m) / kL) / Lmm;
@@ -16488,7 +16537,7 @@ function lobedOutlineUncached(state, Lmm, exportMode) {
     const profL = widthProfile(bsNoTeeth, ring, halfW, { petiole: true, rowCapacity: nu, chevron: { lobeAt: law.lobeAt } }, acc, Lmm);
     const tilt = lobedTiltCapRad(law, (u) => profL.laminaHalfAt(u), Lmm);
     const tauAt = (u) => tilt.tauRad * law.easeAt(u), tauDu = (u) => tilt.tauRad * law.easeDu(u);
-    const round = lobedRoundBottoms(law, (u) => profL.laminaHalfAt(u), tauAt, Lmm, lobedStations(law, nu), { roundness, envAt: (u) => profE.laminaHalfAt(u) });
+    const round = lobedRoundBottoms(law, (u) => profL.laminaHalfAt(u), tauAt, Lmm, lobedStations(law, nu), { roundness, envAt: (u) => profE.laminaHalfAt(u), breaks: profL.laminaSlopeBreaks().map((b) => b.u) });
     return { n, law, profL, tilt, tauAt, tauDu, round };
   };
   const tries = [attempt(law0.lobes)];
