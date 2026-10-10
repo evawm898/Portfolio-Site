@@ -301,6 +301,16 @@
          read-out deaf to them is red; under SIMPLE the sentence is the one it
          was and names no leaflet. Seen red first on main's read-out. Three
          edits as ever: this entry, the block, the negative control's flags.
+     (ac) THE ROUNDNESS'S DEAD TRAVEL IS HATCHED WHERE, AND ONLY WHERE, THE
+         SLIDER IS DEAD (Eva's ruling 3 of Oct 9, the stamenSpread
+         precedent). The dead travel is MEASURED by rebuilding the leaf at the
+         slider's steps and comparing the emitted outline with the range top's
+         — never read off the builder — and the cap mark must start exactly
+         at the first dead step (a hatch over live travel is red; dead travel
+         left unhatched is red), with the read-out SATURATED on exactly the
+         dead steps. Two mutants under --negative-control, one per direction
+         (the cap halved; the cap removed), each by its own sentence. Three
+         edits: this entry, the block, the negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3410,6 +3420,97 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await step('cup -0.5 under COMPOUND — the margins turned down, the same classes', [...base, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafCup', value: '-0.5' }]);
 }
 
+/* ---------------- (ac) THE ROUNDNESS'S DEAD TRAVEL IS HATCHED WHERE, AND ONLY WHERE, THE SLIDER IS DEAD ----------
+   Eva's ruling 3 of Oct 9 (the stamenSpread precedent): above the leaf's own
+   saturation no sinus moves, and the track is hatched there. THE DEAD TRAVEL
+   IS MEASURED HERE, NEVER READ: the route rebuilds the leaf at slider steps
+   and compares the EMITTED outline (every blade's drawn half-widths and its
+   lobed half-widths, row by row, exactly) against the outline at the range's
+   top, finding the FIRST step from which every step builds that same leaf (a
+   bisection on the steps — the dead travel is an upper run, the law's own
+   structure — and the route then checks the step below it moves and the step
+   above it does not). The cap mark is required BOTH WAYS: present iff that
+   run is longer than the top step alone, starting exactly there (the first
+   slider step at or above the mark is the first dead step), its `--bl-cap`
+   the track fraction of the mark; and the read-out says SATURATED exactly on
+   a dead step. A hatch over live travel and dead travel left unhatched are
+   each red. Under `--negative-control` the route re-serves the registry
+   twice with the cap MUTATED — halved (the hatch starts in live travel) and
+   removed (the dead travel unhatched) — and each must fail by its own
+   sentence. */
+{
+  const tag = '[roundness dead travel]';
+  const MUM = [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafType', value: 'LOBED' },
+    { id: 'leafNodes', value: '4' }, { id: 'leafPhyllotaxy', value: 'alternate' }, { id: 'leafDivergence', value: '137.5' }, { id: 'leafArch', value: '25' }];
+  const run = async (pg, label, sets, want) => {
+    const ctl = CONTROLS.find((c) => c.id === 'lobedRound');
+    const steps = []; for (let k = 0; ctl.min + k * ctl.step <= ctl.max + 1e-9; k++) steps.push(Number((ctl.min + k * ctl.step).toFixed(2)));
+    const at = async (v) => {
+      const bad = await applyConfig(pg, [...sets, { id: 'lobedRound', value: String(v) }]);
+      if (bad.length) return { bad };
+      return pg.evaluate(() => {
+        const m = window.__bloomMetrics(), L = m.leaf, w = document.getElementById('lobedRound').closest('.bl-ctrl');
+        const R0 = L && L.lobedBuilt && L.lobedBuilt[0] && L.lobedBuilt[0].roundBottoms;
+        return { key: L ? JSON.stringify([L.rowHalfMm, (L.lobedBuilt || []).map((r) => r && r.rowHalfLobeMm)]) : null,
+          sat: R0 ? R0.saturatesAt : undefined,
+          said: w.querySelector('.bl-val').textContent, hidden: w.hidden,
+          capClass: w.classList.contains('bl-ctrl--capped'), capData: w.dataset.cap ?? null, capVar: w.style.getPropertyValue('--bl-cap') || null };
+      });
+    };
+    const top = await at(ctl.max);
+    if (top.bad) { note(`${tag} ${label}: config did not take: ${top.bad.join('; ')}`); return; }
+    if (top.hidden || top.key === null) { note(`${tag} ${label}: the roundness control is ${top.hidden ? 'hidden' : 'shown'} with ${top.key === null ? 'no leaf built' : 'a leaf'} — the route needs a lobed leaf`); return; }
+    const memo = new Map([[steps.length - 1, top]]);
+    const get = async (i) => { if (!memo.has(i)) memo.set(i, await at(steps[i])); return memo.get(i); };
+    let lo = -1, hi = steps.length - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if ((await get(mid)).key === top.key) hi = mid; else lo = mid; }
+    const firstDead = hi;
+    const p = [];
+    if (firstDead > 0 && (await get(firstDead - 1)).key === top.key) p.push(`the step below the measured dead travel (${steps[firstDead - 1]}) builds the same leaf too — the bisection's premise failed`);
+    if (firstDead + 1 < steps.length && (await get(firstDead + 1)).key !== top.key) p.push(`${steps[firstDead + 1]} builds a different leaf from the top while ${steps[firstDead]} does not — deadness is not an upper run here`);
+    const dead = firstDead < steps.length - 1;
+    const r = await get(firstDead), live = firstDead > 0 ? await get(firstDead - 1) : null;
+    /* THE HATCH, BOTH WAYS — read where applyCaps last ran: on the top build */
+    const topNow = await at(ctl.max);
+    if (topNow.capClass !== dead || (topNow.capData !== null) !== dead || (topNow.capVar !== null) !== dead) p.push(dead
+      ? `the dead travel from ${steps[firstDead]} to ${ctl.max} (the same leaf, measured) carries no cap mark (class ${topNow.capClass}, data-cap ${topNow.capData}) — dead travel left unhatched`
+      : `the cap mark is drawn (data-cap ${topNow.capData}) while every step below the top builds a different leaf — a hatch over live travel`);
+    if (dead && topNow.capData !== null) {
+      const mark = Number(topNow.capData), firstAtOrAbove = steps.findIndex((v) => v >= mark - 0.005);
+      if (firstAtOrAbove !== firstDead) p.push(`the cap mark sits at ${topNow.capData} (the hatch starts at step ${steps[firstAtOrAbove]}) where the measured dead travel starts at ${steps[firstDead]} — ${firstAtOrAbove < firstDead ? 'a hatch over live travel' : 'dead travel left unhatched'}`);
+      const frac = (mark - ctl.min) / (ctl.max - ctl.min);
+      /* (data-cap is printed to two decimals, so it stands within half a
+         hundredth of the mark: that, over the range's width, is the bar) */
+      if (Math.abs(Number(topNow.capVar) - frac) > 0.005 / (ctl.max - ctl.min) + 1e-6) p.push(`the cap mark sits at ${topNow.capVar} of the track where ${topNow.capData} is ${frac.toFixed(4)} of it`);
+    }
+    /* THE READ-OUT: SATURATED exactly on a dead step */
+    if (dead && !/SATURATED/.test(r.said)) p.push(`the first dead step ${steps[firstDead]} reads "${r.said.slice(0, 160)}" — no SATURATED`);
+    if (live && /SATURATED/.test(live.said)) p.push(`the live step ${steps[firstDead - 1]} reads SATURATED: "${live.said.slice(0, 160)}"`);
+    if (!dead && !/no dead travel/.test(top.said)) p.push(`the top reads "${top.said.slice(0, 160)}" where no travel is dead`);
+    if (want !== undefined && dead !== want) p.push(`this state is expected to ${want ? 'have' : 'have no'} dead travel; measured first dead step ${steps[firstDead]}`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${dead ? `dead from ${steps[firstDead]} (the mark at ${topNow.capData}, the builder's ${topNow.sat === null ? 'null' : Number(topNow.sat).toFixed(4)})` : 'no dead travel, no mark'} — ${memo.size + 1} builds`);
+  };
+  await openBloom(page, port);
+  await run(page, 'the mum at the ruled defaults', MUM, true);
+  await run(page, 'S4 form (sinus 0.62, shape 0.70, angle 38)', [...MUM, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }]);
+  if (NEGATIVE_CONTROL) {
+    /* THE TWO MUTANTS, served to a fresh page: the registry's own cap read
+       mutated in the source — halved, then removed */
+    const src = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const anchor = 'return R && R.saturatesAt !== null && R.saturatesAt !== undefined ? R.saturatesAt : null;';
+    if (src.split(anchor).length !== 2) note(`${tag} NEGATIVE CONTROL: the cap's anchor does not match exactly once in bloom-registry.js — the mutants cannot be applied`);
+    for (const [name, to] of [['the cap halved', anchor.replace('? R.saturatesAt : null', '? R.saturatesAt / 2 : null')], ['the cap removed', 'return null;']]) {
+      /* (a page of its own: launchPage registers the CDN routes on the page) */
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom-registry.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: src.replace(anchor, to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${name}): the mum`, MUM, true);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -3486,10 +3587,13 @@ if (NEGATIVE_CONTROL) {
     const sawRound = fail.some((f) => /^\[roundness\] .*the control does not carry the builder's median roundness/.test(f));
     /* ROUTE (ab), THE CUP READ-OUT UNDER COMPOUND, required for route (w)'s own reason. */
     const sawLeafCup = fail.some((f) => /^\[leaf cup\] .*COMPOUND read-out does not quote the/.test(f));
+    /* ROUTE (ac), THE ROUNDNESS'S DEAD TRAVEL, BOTH DIRECTIONS — each mutant by its own sentence */
+    const sawHatchLive = fail.some((f) => /^\[roundness dead travel\] MUTANT \(the cap halved\).*a hatch over live travel/.test(f));
+    const sawDeadUnhatched = fail.some((f) => /^\[roundness dead travel\] MUTANT \(the cap removed\).*dead travel left unhatched/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
-        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-TWO ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-THREE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

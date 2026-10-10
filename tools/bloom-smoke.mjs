@@ -1257,7 +1257,7 @@ export const SMOKE_BLOCKS = [
        lobed control at an extreme. */
     rows: [
       { label: 'LOBED: the MUM — alternate 137.5 x 4 nodes at the lobed defaults, arch 25',
-        path: "LF19 (the type in both statements, the law the controls restate), LF20 (the lobed outline, the station law, the built lobe count against the control's), LF21 (the lean read off the emitted skin at the eased tilt), LF22 (no inverted skin cell, the inner cells' advance over the fold margin), LF23 (the teeth floored, unclamped), LF24 (the petiole's run into the V), LF25 (the round bottoms on the shipped sinuses), LF26 (the area-scaled petiole) on an arched lobed blade; LF9/LF11/LF12 on the lobed stations" },
+        path: "LF19 (the type in both statements, the law the controls restate), LF20 (the lobed outline, the station law, the built lobe count against the control's), LF21 (the lean read off the emitted skin at the eased tilt), LF22 (no inverted skin cell, the inner cells' advance over the fold margin), LF23 (the teeth floored, unclamped), LF24 (the petiole's run into the V), LF25 (the round bottoms on the shipped sinuses), LF26 (the area-scaled petiole) on an arched lobed blade; LF9/LF11/LF12 on the lobed stations; LF31 (the ruled tooth default pinned — 28 asked and 28 built on every leaf, 3 / 4 / 4 / 6, 6,916 triangles a leaf, the roundness saturating at 0.1754)" },
       { label: 'LOBED: lobedAngle max (60 — the TILT CAP binds, built under asked)',
         path: "LF21's tilt biconditional (built under asked, clamped told) and LF22 at the cap — the outer cells where the tilt eases out keep a positive area" },
       { label: 'LOBED: 6 lobes x tooth depth 0.3, 1 tooth a lobe (the fold clamp binds — 4.86 mm asked, built at the 1.71 mm cap)',
@@ -1280,14 +1280,14 @@ export const SMOKE_BLOCKS = [
   },
   {
     n: 57, title: 'the sinus roundness, the lobe-count yield and the lobed tooth count (Oct 9, leaf/stem build S4c)',
-    anchor: 'LOBED ROUNDNESS: max (0.5 — every sinus SHRINKS, told)',
+    anchor: 'LOBED ROUNDNESS: max (0.5 — SATURATED from 0.18: every sinus at its largest smooth radius, told and hatched)',
     /* SEVEN ROWS: the roundness at its maximum (every sinus's radius shrinks,
        told) and on S4's form; the count yielding to the print minimum; the
        RESIDUAL (no count fits, the V kept, told); the per-lobe tooth count at
        its maximum (the rows cap) and at an even count; and the gated arm where
        a SIMPLE leaf carries the two new controls at their maxima. */
     rows: [
-      { label: 'LOBED ROUNDNESS: max (0.5 — every sinus SHRINKS, told)',
+      { label: 'LOBED ROUNDNESS: max (0.5 — SATURATED from 0.18: every sinus at its largest smooth radius, told and hatched)',
         path: "LF27 (the radius restated from the pitch and the print minimum, read off the emitted rows on the declared disc, the shrink a biconditional with its told flag) and LF25 on every rounded sinus" },
       { label: 'LOBED ROUNDNESS: 0.3 x S4\'s form (the radius shrinks at all three sinuses)',
         path: "LF27's shrink at a sinus that NEEDS a round bottom and at one that does not — the asked radius, the built one, the floor between" },
@@ -1295,12 +1295,26 @@ export const SMOKE_BLOCKS = [
         path: "LF28's yield order (the radius at its minimum first, the count only where even that does not fit), the attempts restated, LF20 on the built count" },
       { label: 'LOBED YIELD: the RESIDUAL — 3 lobes on a 24 mm blade over a 5.5 mm window at 58 deg (no count fits; the V kept, told)',
         path: "LF28's residual arm — every count down to one has a sinus no bottom fits, the asked count built with its V's kept and told, LF25's NO FIT arm" },
-      { label: 'LOBED TEETH: max (6 a lobe — 42 asked, the ROWS cap builds 24, told)',
+      { label: 'LOBED TEETH: max (6 a lobe — 42 asked, the ROWS cap builds 28 at 130 rows, told)',
         path: "LF29 (the per-lobe count over the built lobes, the rim's ask, every declared margin tooth drawn on an emitted row, the per-lobe tally summing to the built count, the rows cap told)" },
       { label: 'LOBED TEETH: 2 a lobe (14 — an even count: the apex notch on the terminal face)',
         path: "LF29 at an even rim count — the apex notch on the face cuts nothing and is no margin tooth" },
       { label: 'LOBED TEETH: GATED — SIMPLE with the roundness and the lobed tooth count at their maxima (hidden AND inert)',
         path: "LF19's SIMPLE arm with the two new controls at an extreme — neither shown, neither read" },
+    ],
+  },
+  {
+    n: 58, title: 'the ruled tooth default, the roundness dead travel and the tangent shoulders (Oct 9, the S4c follow-up)',
+    anchor: 'LOBED RULINGS: 3 a lobe (S4c\'s proposal, ruled against — 21 over the rim, 2 / 3 / 3 / 5)',
+    /* TWO ROWS: the first dead step of the roundness on the ruled leaf
+       (SATURATED, every shoulder filleted) and a told shoulder corner (the
+       disc meets the flank). LF31's pins ride on block 56's MUM row, which
+       builds the ruled default leaf. */
+    rows: [
+      { label: 'LOBED RULINGS: roundness 0.18 (the first DEAD step — SATURATED, the same leaf as 0.5; told and hatched)',
+        path: "LF30 (every shoulder of every rounded sinus filleted and tangent on the law, the page's rows on the law's fillet, the page's shoulder record the law's) and LF27 at the largest smooth radius" },
+      { label: 'LOBED RULINGS: a told shoulder CORNER — the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)',
+        path: "LF30's told-corner arm — a shoulder with no fillet carries its reason (the disc meets the flank), and the filleted ones beside it stay tangent" },
     ],
   },
 ];

@@ -2051,14 +2051,36 @@ const MUTANTS = [
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const s = { ...REGISTRY_DEFAULTS };
-      return (m.rep.serration.countAsked === Math.round(Number(s.leafToothCount)) && c.rep.serration.countAsked === 3 * 7) ? null : `the mutant asks ${m.rep.serration.countAsked} teeth against the clean ${c.rep.serration.countAsked} — the behaviour did not move`; } },
+      return (m.rep.serration.countAsked === Math.round(Number(s.leafToothCount)) && c.rep.serration.countAsked === Number(s.lobedToothCount) * 7) ? null : `the mutant asks ${m.rep.serration.countAsked} teeth against the clean ${c.rep.serration.countAsked} — the behaviour did not move`; } },
   { id: 'the-teeth-per-lobe-span-the-whole-rim', why: 'the per-lobe count is cut as a count for the WHOLE rim — three teeth on a seven-lobe margin, two thirds of the lobes entire, the slider reading "a lobe"',
     find: '    lobeCount: lobedToothPerLobe(state) * (2 * n + 1),',
     into: '    lobeCount: lobedToothPerLobe(state),', names: ['LF29'],
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const tm = m.rep.lobed.teethPerLobe, tc = c.rep.lobed.teethPerLobe;
-      return (m.rep.serration.countAsked === 3 && tm.some((x) => x === 0) && tc.every((x) => x > 0)) ? null : `the mutant cuts ${m.rep.serration.countAsked} teeth (per lobe ${tm}) against the clean ${c.rep.serration.countAsked} (${tc}) — the behaviour did not move`; } },
+      return (m.rep.serration.countAsked === Number(REGISTRY_DEFAULTS.lobedToothCount) && tm.some((x) => x === 0) && tc.every((x) => x > 0)) ? null : `the mutant cuts ${m.rep.serration.countAsked} teeth (per lobe ${tm}) against the clean ${c.rep.serration.countAsked} (${tc}) — the behaviour did not move`; } },
+  /* THE S4c FOLLOW-UP MUTANT (Eva's ruling 4 of Oct 9: the round bottom's
+     shoulders are tangent). The shoulders' records are still solved and
+     reported; only the outline stops using them, so the wall meets each
+     flank at the corner it met on the base tree. Witnessed on the MUTATED
+     module's own export outline: the turn at each shoulder's corner station. */
+  { id: 'the-shoulder-is-a-corner-again', why: 'the round bottom\'s walls meet their flanks at a corner again — the fillets are solved and reported and the outline does not draw them: the ledge Eva saw at 0.12',
+    find: '        let w = u <= WB.uQ ? (SB.at && u >= SB.u0 && u <= SB.u1 ? SB.at(u) : WB.at(u))\n          : u >= WF.uQ ? (SF.at && u >= SF.u0 && u <= SF.u1 ? SF.at(u) : WF.at(u)) : ent(u);',
+    into: '        let w = u <= WB.uQ ? WB.at(u) : u >= WF.uQ ? WF.at(u) : ent(u);', names: ['LF30'],
+    witness: (M, C) => {
+      const worst = (G) => {
+        const st = { ...REGISTRY_DEFAULTS, ...LOB_WIT }, len = Number(st.leafLength), O = G.lobedOutline(st, len, true);
+        const h = (u) => Math.max(O.prof.halfWidthBaseAt(u), G.TIP_HALF_MM), P = (u) => { const t = O.tauAt(u), x = h(u); return [u * len + x * Math.sin(t), x * Math.cos(t)]; };
+        const dir = (a, b) => { const p = P(a), q = P(b); return Math.atan2(q[1] - p[1], q[0] - p[0]); };
+        let w = 0;
+        for (const s2 of O.round.sinuses) for (const x of (s2.built ? s2.shoulders : [])) if (x.cornerU !== null) {
+          let t = dir(x.cornerU, x.cornerU + 1e-6) - dir(x.cornerU - 1e-6, x.cornerU); while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI;
+          w = Math.max(w, Math.abs(t) * 180 / Math.PI);
+        }
+        return w;
+      };
+      let wm, wc; try { wm = worst(M); wc = worst(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (wm > 5 && wc < 1) ? null : `the mutant turns ${wm.toFixed(3)} deg at its worst shoulder corner against the clean ${wc.toFixed(3)} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from

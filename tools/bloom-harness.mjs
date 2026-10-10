@@ -8689,7 +8689,131 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
     if (stopAfter) break;
   }
   bad.push(...lobedRoundYieldToothClauses(ui, L, LB, US, env, ease, builtLobes, roundness, depth, builtNodes[0].len));
+  bad.push(...lobedShoulderClauses(ui, LB, US, builtNodes[0].len));
+  bad.push(...lobedRuledPinClauses(ui, m, L, LB));
   bad.push(...lobedPetioleClauses(ui, m, L, LB, US, env, lobe, ease));
+  return bad;
+}
+
+/* ===================================================================
+   LF31 — THE RULED TOOTH DEFAULT, PINNED (Eva's ruling (a) of Oct 9: "raise
+   LOBED_BLADE_ROWS from 112 to 130 and ship lobedToothCount = 4 a lobe,
+   unclamped … Pin all of those numbers in the gate so a later change to rows
+   or teeth can't move them quietly"). The numbers are WRITTEN HERE, from the
+   ruling — never read from the geometry or the registry, which are the
+   things a later change would move:
+     * at MODULE LOAD: the row count is 130, the tooth default 4 a lobe and
+       the roundness default 0.12 (ruling 1) — every gate that imports this
+       file stops at once if one moves;
+     * on every row that builds the RULED DEFAULT LEAF (every control that
+       reaches the lobed outline or its teeth at its registry default, a 46
+       mm blade): each leaf asks 28 teeth and builds 28, 3 / 4 / 4 / 6 base to
+       terminal, 6,916 triangles a leaf, and the roundness saturates at
+       0.1754 of the pitch (ruling 3's measured point);
+     * on the WHORLED-8 COST CORNER (block 56's row: 8 whorled nodes, arch
+       180, cup 1.2, on the 90 mm stem): 192,874 triangles, 12.9% of
+       `EXPORT_TRI_BUDGET`. */
+export const LOBED_RULED_PINS = Object.freeze({ rows: 130, perLobe: 4, roundness: 0.12, teethAsked: 28, teethBuilt: 28, split: Object.freeze([3, 4, 4, 6]),
+  leafTris: 6916, saturatesAt: 0.1754, cornerTris: 192874, cornerBudgetPct: 12.9 });
+if (GEOMETRY.LOBED_BLADE_ROWS !== LOBED_RULED_PINS.rows) throw new Error(`LF31: LOBED_BLADE_ROWS is ${GEOMETRY.LOBED_BLADE_ROWS}, the ruled ${LOBED_RULED_PINS.rows} (Eva, Oct 9) — a row change moves the ruled 28 of 28 teeth; re-rule it, then re-pin`);
+if (Number(DEFAULTS.lobedToothCount) !== LOBED_RULED_PINS.perLobe) throw new Error(`LF31: the lobed tooth default is ${DEFAULTS.lobedToothCount} a lobe, the ruled ${LOBED_RULED_PINS.perLobe}`);
+if (Number(DEFAULTS.lobedRound) !== LOBED_RULED_PINS.roundness) throw new Error(`LF31: the sinus roundness default is ${DEFAULTS.lobedRound}, the ruled ${LOBED_RULED_PINS.roundness}`);
+const LOBED_PIN_IDS = ['lobedLobes', 'lobedFrom', 'lobedTo', 'lobedSinus', 'lobedShape', 'lobedAngle', 'lobedEase', 'lobedWidth', 'lobedToothDepth', 'lobedToothCount',
+  'lobedRound', 'leafCrestShape', 'leafNotchShape', 'leafTipShape', 'sheetThickness'];
+export function lobedRuledPinClauses(ui, m, L, LB) {
+  const bad = [];
+  if (String(ui.leafType) !== 'LOBED' || Number(ui.leafLength) !== 46 || !LOBED_PIN_IDS.every((id) => Number(ui[id]) === Number(DEFAULTS[id]))) return bad;
+  const P = LOBED_RULED_PINS, S = L.serrationBuilt || [];
+  for (let i = 0; i < LB.length; i++) {
+    const s = S[i], split = LB[i] && LB[i].teethPerLobe;
+    if (!s || s.countAsked !== P.teethAsked || s.countBuilt !== P.teethBuilt) { bad.push(`LF31: leaf ${i} of the ruled default asks ${s ? s.countAsked : 'no'} teeth and builds ${s ? s.countBuilt : 'none'} (${s && s.clampedBy ? `clamped by ${s.clampedBy}` : 'unclamped'}) — ruled: ${P.teethAsked} of ${P.teethBuilt}, unclamped`); break; }
+    if (!Array.isArray(split) || split.join('/') !== P.split.join('/')) { bad.push(`LF31: leaf ${i} of the ruled default carries ${split ? split.join(' / ') : 'no'} teeth per lobe — ruled: ${P.split.join(' / ')}`); break; }
+  }
+  if (m.leafTris !== LB.length * P.leafTris) bad.push(`LF31: the ruled default's ${LB.length} leaves are ${m.leafTris} triangles — ruled: ${P.leafTris} a leaf (${LB.length * P.leafTris})`);
+  const sat = LB[0] && LB[0].roundBottoms ? LB[0].roundBottoms.saturatesAt : undefined;
+  if (!(Number.isFinite(sat) && Math.abs(sat - P.saturatesAt) < 5e-5)) bad.push(`LF31: the ruled default leaf's roundness saturates at ${sat} — measured and told at ${P.saturatesAt} (ruling 3)`);
+  const corner = Number(ui.leafNodes) === 8 && String(ui.leafPhyllotaxy) === 'whorled' && Number(ui.leafArch) === 180 && Number(ui.leafCup) === 1.2 && Number(ui.stemLength) === 90 && Number(ui.stemDiameter) === 6;
+  if (corner && m.liveTris !== null && m.liveTris !== undefined) {
+    if (m.liveTris !== P.cornerTris) bad.push(`LF31: the whorled-8 cost corner builds ${m.liveTris} triangles — ruled: ${P.cornerTris}`);
+    const pct = (100 * m.liveTris) / GEOMETRY.EXPORT_TRI_BUDGET;
+    if (Math.abs(pct - P.cornerBudgetPct) >= 0.05) bad.push(`LF31: the cost corner is ${pct.toFixed(2)}% of the export budget — ruled: ${P.cornerBudgetPct}%`);
+  }
+  return bad;
+}
+
+/* ===================================================================
+   LF30 — THE ROUND BOTTOM'S SHOULDERS ARE TANGENT (leaf/stem build S4c
+   follow-up — Eva's ruling 4 of Oct 9: "a step where the round bottom meets
+   the flank … check whether the round bottom is TANGENT to both flanks at
+   the joins (measure the turn angle there, emitted outline, export mode)").
+   WRITTEN BEFORE THE FIX AND SEEN RED on the base tree: there the builder
+   reports no shoulder at all, and the wall met each flank at a corner of 49
+   degrees at the back and 17 at the front of the default mum's second sinus,
+   up to 84 elsewhere. Three claims:
+     (a) TANGENT, MEASURED ON THE LAW: for every rounded sinus the export-mode
+         lobed outline (the Node rebuild of this state — the outline the rows
+         are drawn at, before the teeth) is evaluated at BOTH joins of each
+         filleted shoulder — where the fillet leaves the flank and where it
+         meets the wall — and the one-sided tangents either side (second
+         order, at a step a thousandth of the fillet's own radius) differ by
+         under `SHOULDER_TURN_BAR_DEG`. The bar separates two measured
+         populations rather than fitting one: the 620 filleted joins of the
+         matrix's 52 rounded lobed rows read at most 0.0028 degrees, and the
+         corners the fix removed read 7.1 to 84 degrees on the base tree's
+         mum (roundness 0 and 0.12, both shoulders of all three sinuses). A shoulder with NO fillet must say why (the
+         disc meets the flank, the wall cuts the crest, no room) — told,
+         counted, never silent.
+     (b) THE PAGE DRAWS THE LAW: every emitted row inside a filleted shoulder
+         carries the rebuild's own half-width there to 1e-9 mm. The mutant
+         table serves its mutation to the PAGE alone, so (a), which reads a
+         Node rebuild, cannot see a page whose shoulders went back to corners
+         — this is the half that can (session 41's L7 lesson).
+     (c) THE RECORD IS THE LAW'S: the page's shoulder records (radius and both
+         joins) equal the rebuild's, so the read-out's told corners are the
+         geometry's. */
+export const SHOULDER_TURN_BAR_DEG = 0.1;
+export function lobedShoulderClauses(ui, LB, US, len) {
+  const bad = [];
+  if (!(Number(ui.lobedSinus) > 0)) return bad;
+  const r = LB[0], RB = r && r.roundBottoms;
+  if (!RB || !Array.isArray(RB.sinuses)) return bad;
+  let O;
+  try { O = GEOMETRY.lobedOutline({ ...ui }, len, true); } catch (e) { bad.push(`LF30: the Node rebuild of the lobed outline threw: ${e.message}`); return bad; }
+  const h = (u) => Math.max(O.prof.halfWidthBaseAt(u), TIP_HALF_MM);
+  const P = (u) => { const t = O.tauAt(u), x = h(u); return [u * len + x * Math.sin(t), x * Math.cos(t)]; };
+  const side = (u0, dir, e) => { const a = P(u0), b = P(u0 + dir * e), c = P(u0 + 2 * dir * e); return Math.atan2((-3 * a[1] + 4 * b[1] - c[1]) * dir, (-3 * a[0] + 4 * b[0] - c[0]) * dir); };
+  const turnDeg = (u0, e) => { let t = side(u0, 1, e) - side(u0, -1, e); while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI; return Math.abs(t) * 180 / Math.PI; };
+  const NR = O.round.sinuses;
+  if (NR.length !== RB.sinuses.length) { bad.push(`LF30: the page reports ${RB.sinuses.length} round-bottom records where the rebuilt law has ${NR.length}`); return bad; }
+  for (let k = 0; k < NR.length; k++) {
+    const x = RB.sinuses[k], n = NR[k], where = `sinus ${k} (u ${n.u.toFixed(4)})`;
+    if (!!x.built !== !!n.built) { bad.push(`LF30: ${where} is ${x.built ? '' : 'not '}rounded on the page and ${n.built ? '' : 'not '}in the rebuilt law`); continue; }
+    if (!n.built) continue;
+    if (!Array.isArray(x.shoulders) || x.shoulders.length !== 2 || !Array.isArray(n.shoulders) || n.shoulders.length !== 2) { bad.push(`LF30: ${where} is rounded and reports ${x.shoulders ? x.shoulders.length : 'no'} shoulder records — whether its round bottom meets its flanks tangentially is told by nothing`); continue; }
+    for (let s2 = 0; s2 < 2; s2++) {
+      const a = x.shoulders[s2], b = n.shoulders[s2], nm = `${where} ${s2 ? 'front' : 'back'} shoulder`;
+      /* (c) */
+      const same = (p, q) => (p === null && q === null) || (Number.isFinite(p) && Number.isFinite(q) && Math.abs(p - q) <= 1e-9);
+      if (!same(a.radiusMm, b.radiusMm) || !same(a.flankU, b.flankU) || !same(a.wallU, b.wallU) || a.why !== b.why) { bad.push(`LF30: ${nm}: the page records a fillet of ${a.radiusMm} mm from u ${a.flankU} to ${a.wallU}${a.why ? ` (${a.why})` : ''} where the rebuilt law has ${b.radiusMm} mm from u ${b.flankU} to ${b.wallU}${b.why ? ` (${b.why})` : ''}`); continue; }
+      if (!(b.radiusMm > 0)) {
+        if (!['disc', 'crest', 'no room'].includes(b.why)) bad.push(`LF30: ${nm} carries no fillet and no reason (${b.why}) — a corner kept must be told`);
+        continue;
+      }
+      /* (a) */
+      const e = Math.min(1e-6, (1e-3 * b.radiusMm) / len);
+      for (const [jn, u] of [['flank', b.flankU], ['wall', b.wallU]]) {
+        const t = turnDeg(u, e);
+        if (!(t < SHOULDER_TURN_BAR_DEG)) bad.push(`LF30: ${nm} turns ${t.toFixed(4)} deg where its ${b.radiusMm.toFixed(4)} mm fillet meets the ${jn} at u ${u.toFixed(6)} (export, the outline before the teeth; bar ${SHOULDER_TURN_BAR_DEG} deg) — a step at the join, not a tangent`);
+      }
+      /* (b) */
+      const u0 = Math.min(b.flankU, b.wallU), u1 = Math.max(b.flankU, b.wallU);
+      for (let j = 0; j < US.length; j++) {
+        if (US[j] < u0 || US[j] > u1) continue;
+        const want = h(US[j]), got = r.rowHalfLobeMm[j];
+        if (!(Math.abs(got - want) <= 1e-9)) { bad.push(`LF30: ${nm}: row ${j} (u ${US[j].toFixed(5)}) is drawn at ${got.toFixed(9)} mm inside the fillet where the law's fillet stands at ${want.toFixed(9)} — the page does not draw the shoulder the law defines`); break; }
+      }
+    }
+  }
   return bad;
 }
 
@@ -15376,7 +15500,7 @@ export function buildMatrix() {
   lf('LOBED ROUNDNESS: 0 (S4b\'s print minimum only — the law by branch)', { ...LOB, lobedRound: 0 });
   lf('LOBED ROUNDNESS: 0.05 (just above the minimum)', { ...LOB, lobedRound: 0.05 });
   lf('LOBED ROUNDNESS: 0.25', { ...LOB, lobedRound: 0.25 });
-  lf('LOBED ROUNDNESS: max (0.5 — every sinus SHRINKS, told)', { ...LOB, lobedRound: 0.5 });
+  lf('LOBED ROUNDNESS: max (0.5 — SATURATED from 0.18: every sinus at its largest smooth radius, told and hatched)', { ...LOB, lobedRound: 0.5 });
   lf('LOBED ROUNDNESS: 0.3 x S4\'s form (the radius shrinks at all three sinuses)', { ...LOB, ...LOB_S4, lobedRound: 0.3 });
   lf('LOBED ROUNDNESS: 0.25 x 6 lobes (the narrow sinuses take the shrink)', { ...LOB, lobedLobes: 6, lobedRound: 0.25 });
   lf('LOBED ROUNDNESS: 0.5 x one lobe a side', { ...LOB, lobedLobes: 1, lobedRound: 0.5 });
@@ -15385,11 +15509,29 @@ export function buildMatrix() {
   lf('LOBED YIELD: the RESIDUAL — 3 lobes on a 24 mm blade over a 5.5 mm window at 58 deg (no count fits; the V kept, told)', { ...LOB, leafLength: 24, lobedLobes: 3, lobedFrom: 0.37, lobedTo: 0.6, lobedSinus: 0.67, lobedShape: 0.75, lobedAngle: 58, lobedEase: 0.53, lobedWidth: 15.5, leafTipShape: 2.3 });
   lf('LOBED TEETH: 1 a lobe (7 over the rim)', { ...LOB, lobedToothCount: 1 });
   lf('LOBED TEETH: 2 a lobe (14 — an even count: the apex notch on the terminal face)', { ...LOB, lobedToothCount: 2 });
-  lf('LOBED TEETH: max (6 a lobe — 42 asked, the ROWS cap builds 24, told)', { ...LOB, lobedToothCount: 6 });
-  lf('LOBED TEETH: 3 a lobe x 6 lobes (39 asked over 13 lobes — the rows cap, told)', { ...LOB, lobedLobes: 6 });
+  lf('LOBED TEETH: max (6 a lobe — 42 asked, the ROWS cap builds 28 at 130 rows, told)', { ...LOB, lobedToothCount: 6 });
+  lf('LOBED TEETH: the ruled 4 a lobe x 6 lobes (52 asked over 13 lobes — the rows cap builds 28, told)', { ...LOB, lobedLobes: 6 });
   lf('LOBED TEETH: the SHARED count at its maximum under LOBED (12 — hidden AND inert)', { ...LOB, leafToothCount: 12 });
   lf('LOBED TEETH: GATED — SIMPLE with the roundness and the lobed tooth count at their maxima (hidden AND inert)', { ...LOB, leafType: 'SIMPLE', lobedRound: 0.5, lobedToothCount: 6 });
   lf('LOBED TEETH: GATED — COMPOUND with the roundness and the lobed tooth count at their maxima (hidden AND inert)', { ...LOB, leafType: 'COMPOUND', lobedRound: 0.5, lobedToothCount: 6 });
+
+  /* 58. THE RULED TOOTH DEFAULT, THE ROUNDNESS'S DEAD TRAVEL AND THE TANGENT
+        SHOULDERS (Eva's rulings of Oct 9 on S4c — the follow-up;
+        docs/bloom-leaf-lobed-roundness-outcome.md §15). The lobed blade is
+        130 rows and the ruled default four teeth a lobe, built unclamped (28
+        of 28, 3 / 4 / 4 / 6 — LF31 pins it on every row that builds the ruled
+        leaf, block 56's shipped defaults and the MUM among them); the
+        roundness saturates at 0.1754 on that leaf and the travel above is
+        hatched (the panel gate's route (ac) measures it); every round
+        bottom's two shoulders are filleted, tangent (LF30), or told a corner.
+        The rows: the rejected three a lobe, both sides of the saturation, and
+        a told shoulder corner (the disc meets the flank — a sinus broader
+        than any disc that meets it tangentially). Appended as the FINAL
+        block, after 57. */
+  lf('LOBED RULINGS: 3 a lobe (S4c\'s proposal, ruled against — 21 over the rim, 2 / 3 / 3 / 5)', { ...LOB, lobedToothCount: 3 });
+  lf('LOBED RULINGS: roundness 0.17 (the last LIVE step on the ruled leaf — it saturates at 0.1754)', { ...LOB, lobedRound: 0.17 });
+  lf('LOBED RULINGS: roundness 0.18 (the first DEAD step — SATURATED, the same leaf as 0.5; told and hatched)', { ...LOB, lobedRound: 0.18 });
+  lf('LOBED RULINGS: a told shoulder CORNER — the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)', { ...LOB, stemLength: 120, leafLength: 58, lobedLobes: 5, lobedFrom: 0.27, lobedTo: 0.57, lobedSinus: 0.63, lobedShape: 1.5, lobedAngle: 39, lobedEase: 0.77, lobedWidth: 17, lobedToothDepth: 0.27, leafTipShape: 0.7 });
 
   return rows;
 }
