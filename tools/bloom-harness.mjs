@@ -8709,13 +8709,13 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
        reaches the lobed outline or its teeth at its registry default, a 46
        mm blade): each leaf asks 28 teeth and builds 28, 3 / 4 / 4 / 6 base to
        terminal, 6,916 triangles a leaf, and the roundness saturates at
-       0.1737 of the pitch (ruling 3's measured point, re-measured
+       0.1750 of the pitch (ruling 3's measured point, re-measured
        when the shoulder tangents were held clear of the crest — was 0.1754);
      * on the WHORLED-8 COST CORNER (block 56's row: 8 whorled nodes, arch
        180, cup 1.2, on the 90 mm stem): 192,874 triangles, 12.9% of
        `EXPORT_TRI_BUDGET`. */
 export const LOBED_RULED_PINS = Object.freeze({ rows: 130, perLobe: 4, roundness: 0.12, teethAsked: 28, teethBuilt: 28, split: Object.freeze([3, 4, 4, 6]),
-  leafTris: 6916, saturatesAt: 0.1737, cornerTris: 192874, cornerBudgetPct: 12.9 });
+  leafTris: 6916, saturatesAt: 0.1750, cornerTris: 192874, cornerBudgetPct: 12.9 });
 if (GEOMETRY.LOBED_BLADE_ROWS !== LOBED_RULED_PINS.rows) throw new Error(`LF31: LOBED_BLADE_ROWS is ${GEOMETRY.LOBED_BLADE_ROWS}, the ruled ${LOBED_RULED_PINS.rows} (Eva, Oct 9) — a row change moves the ruled 28 of 28 teeth; re-rule it, then re-pin`);
 if (Number(DEFAULTS.lobedToothCount) !== LOBED_RULED_PINS.perLobe) throw new Error(`LF31: the lobed tooth default is ${DEFAULTS.lobedToothCount} a lobe, the ruled ${LOBED_RULED_PINS.perLobe}`);
 if (Number(DEFAULTS.lobedRound) !== LOBED_RULED_PINS.roundness) throw new Error(`LF31: the sinus roundness default is ${DEFAULTS.lobedRound}, the ruled ${LOBED_RULED_PINS.roundness}`);
@@ -15526,7 +15526,7 @@ export function buildMatrix() {
         130 rows and the ruled default four teeth a lobe, built unclamped (28
         of 28, 3 / 4 / 4 / 6 — LF31 pins it on every row that builds the ruled
         leaf, block 56's shipped defaults and the MUM among them); the
-        roundness saturates at 0.1737 on that leaf and the travel above is
+        roundness saturates at 0.1750 on that leaf and the travel above is
         hatched (the panel gate's route (ac) measures it); every round
         bottom's two shoulders are filleted, tangent (LF30), or told a corner.
         The rows: the rejected three a lobe, both sides of the saturation, and
@@ -15534,7 +15534,7 @@ export function buildMatrix() {
         than any disc that meets it tangentially). Appended as the FINAL
         block, after 57. */
   lf('LOBED RULINGS: 3 a lobe (S4c\'s proposal, ruled against — 21 over the rim, 2 / 3 / 3 / 5)', { ...LOB, lobedToothCount: 3 });
-  lf('LOBED RULINGS: roundness 0.17 (the last LIVE step on the ruled leaf — it saturates at 0.1737)', { ...LOB, lobedRound: 0.17 });
+  lf('LOBED RULINGS: roundness 0.17 (the last LIVE step on the ruled leaf — it saturates at 0.1750)', { ...LOB, lobedRound: 0.17 });
   lf('LOBED RULINGS: roundness 0.18 (the first DEAD step — SATURATED, the same leaf as 0.5; told and hatched)', { ...LOB, lobedRound: 0.18 });
   lf('LOBED RULINGS: a told shoulder CORNER — the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)', { ...LOB, stemLength: 120, leafLength: 58, lobedLobes: 5, lobedFrom: 0.27, lobedTo: 0.57, lobedSinus: 0.63, lobedShape: 1.5, lobedAngle: 39, lobedEase: 0.77, lobedWidth: 17, lobedToothDepth: 0.27, leafTipShape: 0.7 });
 

@@ -278,37 +278,39 @@ const E2_TURN_XFAIL = {
      lobe), each where the extra rows land on a steep short flank. The two
      relabelled rows (the roundness max, the tooth max) and the two new
      block-58 rows are declared at their measured figures. Each note keeps the
-     previous figure. */
+     previous figure. THEN THE X0 FIX (the fillet's flank tangent held a
+     sixteenth of a stencil step clear of the crest) moved eleven of them by
+     at most 0.26 deg, re-recorded with the figure before it; and the 6 -> 2
+     yield row is OFF this list because it is a declared SELF-INTERSECTOR now
+     (its tip folds with four teeth a lobe), which E2 exempts. */
   "LOBED: the MUM \u2014 alternate 137.5 x 4 nodes at the lobed defaults, arch 25":
-    { excessDeg: 32.720329, note: 'S4c follow-up: IMPROVED at the ruled four a lobe on 130 rows with tangent shoulders (S4c: 41.771712; S4b: 38.227001; S4: 26.972835)' },
+    { excessDeg: 32.875913, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 32.720329; earlier: S4c follow-up: IMPROVED at the ruled four a lobe on 130 rows with tangent shoulders (S4c: 41.771712; S4b: 38.227001; S4: 26.972835)' },
   "LOBED: lobedSinus max (0.9 \u2014 the narrowest sinus gaps)":
-    { excessDeg: 64.971444, note: 'S4c follow-up: IMPROVED (S4c: 70.118997; S4b: 48.743268; S4: 34.108313)' },
+    { excessDeg: 64.836813, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 64.971444; earlier: S4c follow-up: IMPROVED (S4c: 70.118997; S4b: 48.743268; S4: 34.108313)' },
   "LOBED: lobedAngle max (60 \u2014 the TILT CAP binds, built under asked)":
-    { excessDeg: 23.104974, note: 'S4c follow-up: IMPROVED (S4c: 29.902202; S4b: 30.630533; S4: 27.598071)' },
+    { excessDeg: 23.137342, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 23.104974; earlier: S4c follow-up: IMPROVED (S4c: 29.902202; S4b: 30.630533; S4: 27.598071)' },
   "LOBED: NONE FIT \u2014 6 lobes x sinus 0.9 x depth 0.3, 3 teeth a lobe (39 asked: the fold cap 0.08 mm, under the 1 mm floor; no teeth, told)":
     { excessDeg: 53.575426, note: "S4c follow-up: WORSE by 3.40 deg — no tooth fits either way; the 130 rows land on the six short flanks (S4c: 50.178275; S4b, as '... x 12 teeth': 50.306301; S4: 48.235885)" },
   "LOBED: 6 lobes x tooth depth 0.3, 1 tooth a lobe (the fold clamp binds \u2014 4.86 mm asked, built at the 1.71 mm cap)":
-    { excessDeg: 45.588366, note: 'S4c follow-up: IMPROVED (S4c: 47.328459; S4b: 45.517769; S4: 47.171007)' },
+    { excessDeg: 45.583532, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 45.588366; earlier: S4c follow-up: IMPROVED (S4c: 47.328459; S4b: 45.517769; S4: 47.171007)' },
   "LOBED: S4's form (sinus 0.62, shape 0.70, angle 38, teeth 0.08 \u2014 two V's under 1 mm, both ROUNDED, told)":
-    { excessDeg: 26.696014, note: 'S4c follow-up: IMPROVED (S4c: 30.119270; S4b: 29.002875)' },
+    { excessDeg: 26.924157, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 26.696014; earlier: S4c follow-up: IMPROVED (S4c: 30.119270; S4b: 29.002875)' },
   "LOBED: THE LOBE COUNT YIELDS \u2014 5 lobes asked on a 36 mm blade at 30 deg, 3 built (no round bottom fits even at the print minimum at 5 or 4; told)":
     { excessDeg: 45.557069, note: 'S4c follow-up: IMPROVED (S4c: 48.995555)' },
   "LOBED: the petiole CLAMPED \u2014 no sinus on a 3 mm stem at 90 deg (asks 0.82 mm, the rooted end holds 0.75)":
     { excessDeg: 2.507365, note: 'S4c follow-up: IMPROVED — no sinus, so the move is the rows and the tooth count alone, four a lobe on 130 rows (S4c: 24.185405; S4b: 13.371781)' },
   "LOBED ROUNDNESS: max (0.5 \u2014 SATURATED from 0.18: every sinus at its largest smooth radius, told and hatched)":
-    { excessDeg: 37.432361, note: "S4c follow-up: relabelled (was 'max (0.5 — every sinus SHRINKS, told)', 43.956893); the largest smooth radii, bit-identical to roundness 0.18 (block 58)" },
+    { excessDeg: 37.320181, note: "the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 37.432361; earlier: S4c follow-up: relabelled (was 'max (0.5 — every sinus SHRINKS, told)', 43.956893); the largest smooth radii, bit-identical to roundness 0.18 (block 58)" },
   "LOBED ROUNDNESS: 0.3 x S4\'s form (the radius shrinks at all three sinuses)":
-    { excessDeg: 32.293320, note: 'S4c follow-up: IMPROVED (S4c: 32.679957)' },
-  "LOBED YIELD: 6 lobes asked on a 12 mm blade (the count gives 6 -> 2, where the print minimum fits; told)":
-    { excessDeg: 64.890522, note: 'S4c follow-up: WORSE by 16.97 deg — a 12 mm blade on 130 rows puts four times the rows on each of its two short flanks (S4c: 47.925372)' },
+    { excessDeg: 32.034003, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 32.29332; earlier: S4c follow-up: IMPROVED (S4c: 32.679957)' },
   "LOBED YIELD: the RESIDUAL \u2014 3 lobes on a 24 mm blade over a 5.5 mm window at 58 deg (no count fits; the V kept, told)":
-    { excessDeg: 20.913176, note: 'S4c follow-up: IMPROVED (S4c: 43.134177)' },
+    { excessDeg: 20.912930, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 20.913176; earlier: S4c follow-up: IMPROVED (S4c: 43.134177)' },
   "LOBED TEETH: 2 a lobe (14 \u2014 an even count: the apex notch on the terminal face)":
-    { excessDeg: 51.820781, note: 'S4c follow-up: WORSE by 1.99 deg (S4c: 49.830577)' },
+    { excessDeg: 51.829243, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 51.820781; earlier: S4c follow-up: WORSE by 1.99 deg (S4c: 49.830577)' },
   "LOBED TEETH: max (6 a lobe \u2014 42 asked, the ROWS cap builds 28 at 130 rows, told)":
-    { excessDeg: 33.548650, note: "S4c follow-up: relabelled (was '... the ROWS cap builds 24, told)', 35.310162); 28 built on 130 rows" },
+    { excessDeg: 33.699198, note: "the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 33.54865; earlier: S4c follow-up: relabelled (was '... the ROWS cap builds 24, told)', 35.310162); 28 built on 130 rows" },
   "LOBED RULINGS: roundness 0.18 (the first DEAD step \u2014 SATURATED, the same leaf as 0.5; told and hatched)":
-    { excessDeg: 37.432361, note: 'NEW with the S4c follow-up: the first dead step, the same leaf (and the same figure) as roundness 0.5' },
+    { excessDeg: 37.320181, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 37.432361; earlier: NEW with the S4c follow-up: the first dead step, the same leaf (and the same figure) as roundness 0.5' },
   "LOBED RULINGS: a told shoulder CORNER \u2014 the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)":
     { excessDeg: 28.346182, note: 'NEW with the S4c follow-up: a told shoulder corner on a broad-sinus blade' },
 };
