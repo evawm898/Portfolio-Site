@@ -3781,18 +3781,18 @@ LOBED count twin (open). 5,980 tris a leaf, unchanged. Byte partition by `verify
 touching `lobedRoundBottoms`' roundness block, the yield loop in `lobedOutlineUncached`, `lobedBladeState`'s
 `lobeCount`, `cap.toothStationsU` or LF27-LF29).
 - **S4b's four defaults are RULED** (sinus 0.55, shape 0.55, angle 22, tooth depth 0.22).
-- **`lobedRound` (0-0.5, default 0.12, PROPOSED)** sets the radius `max(floor_G(r x pitch), R_min)`: the pitch
+- **`lobedRound` (0-0.5, default 0.12, RULED Oct 10)** sets the radius `max(floor_G(r x pitch), R_min)`: the pitch
   is the crest-to-crest chord, and `R_min` is S4b's print minimum.
   - It is S4b's construction at that radius; a broad disc keeps the floor's seat, because the axis seat leaves
     a V crevice.
   - Roundness 0 is S4b by branch: 40 of 41 base LOBED rows are bit-identical with teeth off; the one mover is
     the yield.
-  - Dead travel above about 0.3 on the mum is told, not trimmed.
+  - Dead travel above about 0.3 on the mum was told, not trimmed (superseded Oct 10: measured, hatched — below).
 - **The order:** the radius SHRINKS first (told). Only where `R_min` does not fit is the count tried one lobe
   fewer, down to one. Where none fits, the RESIDUAL keeps S4b's told V.
   - Sample: 3.2 % shrink, 11.8 % yield, 0.9 % residual (all back flank on a 1-6 mm window).
   - S4b's base measures 13.0 % NO FIT, not its published 10.2 %.
-- **`lobedToothCount` (1-6, default 3, PROPOSED)** is TEETH PER BUILT LOBE: the rim asks `per x (2n + 1)`.
+- **`lobedToothCount` (1-6, default 3 then — 4 since Oct 10)** is TEETH PER BUILT LOBE: the rim asks `per x (2n + 1)`.
   `leafToothCount` is hidden and inert under LOBED.
   - "Per lobe" is an AVERAGE along MODEL B's even-arc rim (2 / 3 / 3 / 5 on the mum).
   - A lobed blade's count also gives until every margin period holds a station (`cap.toothStationsU`, told
@@ -3804,6 +3804,30 @@ touching `lobedRoundBottoms`' roundness block, the yield loop in `lobedOutlineUn
 - **Matrix:** block 57 (17 rows, 1,282); smoke block 57; `frozen/phase60` = the 1,265 rows at `2e096bf`.
 - **Gates:** six mutants. The apex table gained `--rows=<regex>`, a row subset that says so.
 - Sheet: `node tools/shot-bloom-lobed-roundness.mjs <png> --base <worktree>`.
+
+**S4c RULED (Eva, Oct 10): ROUNDNESS 0.12, 4 TEETH A LOBE AT 130 ROWS, THE DEAD TRAVEL HATCHED, THE SHOULDER
+FILLETED** (read §8 of `docs/bloom-leaf-lobed-roundness-outcome.md` before touching `LOBED_BLADE_ROWS`,
+`shoulder()` in `lobedRoundBottoms`, `radiusFitMm`/`saturatesAt`, the `lobedRound` cap, LF30, LF31 or route (ac)).
+- **`LOBED_BLADE_ROWS` 112 -> 130 and `lobedToothCount` 3 -> 4, unclamped**: the mum leaf builds 28 of 28
+  (3 / 4 / 4 / 6), 6,916 tris a leaf, the whorled-8 corner 192,874 (12.9 %). **LF31 PINS ALL OF IT**
+  (`LOBED_RULED_PINS`, and a module-load refusal on the three constants) — moving rows or teeth is a ruling.
+- **"Per lobe" is an AVERAGE** and the label says so ("Teeth per lobe (average)").
+- **THE DEAD TRAVEL IS MEASURED**: `radiusFitMm`, the largest radius whose bottom fits with smooth shoulders,
+  bisected on a FIXED bracket so every roundness above it builds BIT-IDENTICALLY. The mum saturates at 0.1754
+  (dead from 0.18); told (`SATURATED`) and hatched through the registry `cap` + `applyCaps`. Panel route (ac)
+  finds the dead step by REBUILDING and holds the mark both ways, with two mutants (cap halved, cap removed);
+  adding it was three edits (header, block, flags + banner — TWENTY-THREE routes).
+- **THE LEDGE WAS THE WALL MEETING THE FLANK AT A CORNER (-48.98 / -17.27 deg on the mum), NOT A TOOTH.** Each
+  shoulder is now a tangent fillet (`shoulder()`, in the leaf's (along, across) mm plane; the tilt is affine,
+  so C1 there is C1 on the planform); a radius fits only if both fillets are at least `min(R, MIN_FEATURE_MM/2,
+  the floor's own fillet)`. Told corners carry `disc` / `crest` / `no room`. LF30 holds the turn at both
+  fillet ends under 0.1 deg (620 joins on 52 rows, worst 0.0028); `the-shoulder-is-a-corner-again` is its mutant.
+- **CONSEQUENCE, MEASURED**: broad sinuses (asked V already opens) are no longer rounded where the radius
+  would leave a cornered shoulder — 151 per 300 sampled states that the base tree rounded, 150 of them with a
+  corner (median 23.6 deg). 336 of 500 sampled leaves have the slider entirely dead, hatched and told.
+- A 14.6 um step at the sinus bottom (seat offset vs floor clamp, both trees) is sub-resolution, reported.
+- Partition 54 / 1,228, no non-LOBED mover; block 58 (4 rows, 1,286); no frozen phase (the base IS phase62).
+  Sheet: `node tools/shot-bloom-lobed-follow-up.mjs <png> --base <worktree>`.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
