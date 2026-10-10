@@ -16024,8 +16024,8 @@ export const LOBED_ROUND_SAMPLES = 4096;
    follow-up; see `slopeOf` in `lobedRoundBottoms`) */
 export const LOBED_SLOPE_STEPS_PER_HALF = 64;
 /* how far a shoulder fillet's flank tangent stands clear of the crest, as a
-   fraction of the half-period (a quarter of a stencil step; see `shoulder`) */
-export const LOBED_CREST_CLEAR_PER_HALF = 256;
+   fraction of the half-period (a sixteenth of a stencil step; see `shoulder`) */
+export const LOBED_CREST_CLEAR_PER_HALF = 1024;
 export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
   const roundness = opts.roundness > 0 ? Number(opts.roundness) : 0;
   const envAt = opts.envAt || lam;
@@ -16237,12 +16237,18 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
            that fits — every one that GIVES — otherwise lands its tangent ON
            the crest, 4e-7 in u from it on the shipped leaf, and the page's
            build and the Node rebuild then read its centre ~1e-10 mm apart).
-           A QUARTER of a stencil step: measured over the 59 LOBED rows across
-           the two engines, a full step leaves 5.6e-14 / 2.4e-12 mm (shoulder /
-           outline) and moves the shipped leaf's saturation 0.1754 -> 0.1687; a
-           quarter 1.7e-13 / 5.8e-12 and 0.1737; a sixty-fourth 8.9e-13 /
-           7.7e-11 and 0.1753 — 0 float32 straddles in 236,059 samples on all
-           three, where the crest-tangent law read 2.5e-10 / 2.8e-9 and 3. */
+           A SIXTEENTH of a stencil step. The clearance leaves a stub of raw
+           flank between the crest and the fillet, and a stub much shorter than
+           the bead turns the bead hard: at a QUARTER step (0.02 mm on the
+           shipped leaf) the edge-profile gate's E2 read the mum's worst face
+           turn 99.7 deg against 82.0 before; at a sixteenth, 82.1. Measured
+           over the 59 LOBED rows across the two engines (shoulder / outline):
+           a full step 5.6e-14 / 2.4e-12 mm, a quarter 1.7e-13 / 5.8e-12, a
+           sixteenth 1.3e-12 / 1.5e-11, a sixty-fourth 8.9e-13 / 7.7e-11 — 0
+           float32 straddles in 236,059 samples on all four, where the
+           crest-tangent law read 2.5e-10 / 2.8e-9 and 3. The shipped leaf's
+           saturation reads 0.1687 / 0.1737 / 0.1750 / 0.1753 across them
+           (0.1754 before). */
         const uLim = uE - dir * (half / LOBED_CREST_CLEAR_PER_HALF);
         const solve = (rho) => {
           const phi = (u) => below(centre(u, rho)) - rho;
