@@ -2857,7 +2857,9 @@ window.__bloomMetrics = () => ({
          own rods as the exemption names them */
       petioleRootReachMm: r.petioleRootReachMm, rodAxes: r.rodAxes,
       leaflets: r.leaflets.map((q) => ({ role: q.role, k: q.k, side: q.side, lengthMm: q.lengthMm, widthMm: q.widthMm, embedMm: q.embedMm,
-        root: q.root, base: q.base, D: q.D, T: q.T, N: q.N, holder: q.holder, tris: q.tris, baseAxisMm: q.rim.baseAxisMm ?? null })),
+        root: q.root, base: q.base, D: q.D, T: q.T, N: q.N, holder: q.holder, tris: q.tris, baseAxisMm: q.rim.baseAxisMm ?? null,
+        /* the leaflet's own nib record: where its arc rows start (LF16 restates its stations from it, S5) */
+        tipClamp: q.tipClamp ? { nib: q.tipClamp.nib, arcU: q.tipClamp.arcU } : null })),
     } : null)),
     /* LF8's measured side — the builder's own DIRECTED-edge census, which both
        STL gates are blind to because theirs keys on a sorted pair. */

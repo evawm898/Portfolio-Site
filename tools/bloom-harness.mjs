@@ -9100,7 +9100,15 @@ export function lobedRoundYieldToothClauses(ui, L, LB, US, env, ease, builtLobes
         if (!(Math.abs(x.radiusAskedMm - askR) <= G + 1e-12)) { bad.push(`LF27: ${where}: the radius asked is ${x.radiusAskedMm} mm where ${roundness} x the restated pitch ${pitch.toFixed(6)} is ${askR.toFixed(6)}`); break; }
         const Rmin = x.need ? x.radiusMinMm : 0;
         if (x.need && !(Rmin >= D / 2 - 1e-12)) { bad.push(`LF27: ${where} needed a round bottom and its print minimum is ${Rmin} mm, under the ${D / 2} mm disc S4b's law starts from`); break; }
-        if (!x.need && x.radiusMinMm !== 0) { bad.push(`LF27: ${where} opens as asked and carries a print minimum of ${x.radiusMinMm} mm — its floor is 0`); break; }
+        /* (S5, Eva's Oct 10 ruling: a BROAD sinus — its asked V opens — is
+           filleted at the V point, floored at the print minimum's own half
+           disc on the relief grid; its radius law, tangency and drawing are
+           LF34's. Before S5 this arm read "its floor is 0".) */
+        const floorF = Math.floor(D / 2 / GEOMETRY.LOBE_RELIEF_GRID) * GEOMETRY.LOBE_RELIEF_GRID;
+        if (!x.need) {
+          if (x.radiusMinMm !== floorF) { bad.push(`LF27: ${where} opens as asked and carries a fillet floor of ${x.radiusMinMm} mm where the print minimum's half disc on the relief grid is ${floorF}`); break; }
+          continue;
+        }
         const Rb = x.built ? x.radiusMm : 0;
         const want = Math.max(x.radiusAskedMm, Rmin);
         if (x.shrunk !== (Rb < x.radiusAskedMm - 1e-12)) { bad.push(`LF27: ${where} is told shrunk = ${x.shrunk} with ${Rb} mm built against ${x.radiusAskedMm} mm asked — the shrink must be a biconditional with its told flag`); break; }
