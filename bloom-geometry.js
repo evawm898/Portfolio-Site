@@ -3980,20 +3980,15 @@ const APEX_FLOOR_EPS = 1e-12;
    (`petalTipEnd`, #229 — a fringe is only cut when its terminal clears the
    floor, so a live fringe implies an inert nib and every fringe row is
    bit-identical); and a law arriving with no slope to carry on. */
-export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm, petiole = false) {
+export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm) {
   const inert = { active: false, uLaw: 1, xLawMm: lengthMm, drawnLength: lengthMm,
                   slope: 0, radiusMm: 0, capMm: 0, arcMm: 0, endHalfMm: 0, why: null };
   const lam = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
   if (!(lengthMm > 0)) return { ...inert, why: 'no length' };
-  /* A LEAF IS EXCLUDED, DECLARED RATHER THAN OVERLOOKED. `cap.petiole` is the
-     leaf's own declaration and the only thing that sets it. A leaf's blade has
-     exactly the same squared stub — `buildLeafInto` floors at `TIP_HALF_MM` in
-     both modes, so a 0.60 tip shape spends 21.3% of the leaf on a 1.60 mm flat
-     — and the nib would fix it and shorten every leaf with it. `leafLength` is
-     a different control with its own read-out, its own LF family and its own
-     declared magnitudes, so that is a second partition and a second ruling;
-     it is scheduled in this session's outcome doc, not taken here. */
-  if (petiole) return { ...inert, why: 'a leaf — excluded by declaration, see the outcome doc' };
+  /* A LEAF WAS EXCLUDED HERE BY DECLARATION until S5 (Eva's ruling of Oct
+     10, the apex-nib session's §11 backlog closed): a leaf does not read this
+     plan, it reads `leafNibPlan` below — the same construction with its START
+     solved so the leaf keeps its own length. docs/bloom-leaf-tip-broad-sinus-outcome.md. */
   if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };
   if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };
   let lo = uPk, hi = 1;
@@ -4025,6 +4020,123 @@ export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm, petiole = fal
     /* WHERE THE ARC BEGINS, in the drawn parameterisation — the ladder's
        resolution demand is exactly this window and nothing else. */
     arcU: drawnLength > 0 ? gridFloor(xFaceMm / drawnLength) : 1,
+  };
+}
+/* leafNibPlan — A LEAF'S NIB (S5): the petal's construction — a straight
+   flank, an arc centred ON THE AXIS tangent to it, the 0.10 mm mini-face —
+   with ONE free parameter solved so the blade ends EXACTLY at the leaf's own
+   length, and the outline BELOW THE NIB LEFT AS IT WAS, to the bit.
+
+   WHY NOT THE PETAL'S OWN RULE. A petal keeps `petalLength` as the LAW's
+   length and reports the overshoot (Eva's ruling on the petal), which
+   reparameterises the whole blade by drawn / asked. A leaf's length is read
+   by the inset law, the floret cap, the seat, SN4's reach and the slenderness
+   line, so it must stay the drawn length — and solving the LAW's length for
+   it (this function's first version, `leafNibLawLength`) stretched every
+   leaf's outline by its drawn / law ratio, 0.11 % on the default lobed mum,
+   which moved its ruled roundness saturation 0.17502 -> 0.17512, outside
+   LF31's pin. Measured, not argued: the same move appears whichever length is
+   held, because ANY reparameterisation slides the envelope under the lobes.
+   So the reparameterisation is refused and the nib's START is solved instead.
+
+   TWO REGIMES, CONTINUOUS AT THEIR BOUNDARY (no jump at a slider step):
+     * TANGENT — where the petal's nib (flank from the law's crossing of the
+       1.60 mm print floor, on its own tangent) would close PAST the leaf's
+       length, the flank leaves the law EARLIER, on the law's own tangent at
+       the station `uLaw` whose nib closes exactly at `lengthMm`. C1 there.
+       Every shipped default is here (tip 1.30 leaf, 1.60 leaflet).
+     * FLOOR — where it would close SHORT (the law's tail is long and thin,
+       tip shapes under about 1.2), the flank leaves at the floor's crossing on
+       a slope SHALLOWER than the law's, solved so it still closes at
+       `lengthMm`. A corner there, of `kinkDeg`, and always smaller than the
+       one the pre-S5 stub turned (the law against a flat floor). Reported.
+   At the boundary the two meet: the tangent station IS the crossing and the
+   shallower slope IS the tangent. Both solves are bisections on the side that
+   closes AT OR SHORT of `lengthMm`, and the slope is floored onto
+   `APEX_GRID`, so the arc reaches its mini-face at most a grid step before
+   the blade's end and the last row is the mini-face exactly. */
+export function leafNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm) {
+  const inert = { active: false, uLaw: 1, xLawMm: lengthMm, drawnLength: lengthMm,
+                  slope: 0, radiusMm: 0, capMm: 0, arcMm: 0, endHalfMm: 0, why: null, regime: null, kinkDeg: 0 };
+  const lam = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
+  if (!(lengthMm > 0)) return { ...inert, why: 'no length' };
+  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };
+  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };
+  let lo = uPk, hi = 1;
+  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > TIP_HALF_MM + APEX_FLOOR_EPS) lo = m; else hi = m; }
+  const uCross = hi;
+  const L = lengthMm, a = APEX_HALF_MM, e = APEX_END_HALF_MM;
+  /* the law WITHOUT the print floor, which is what the nib leaves from once
+     it starts under the floor */
+  const law = (u) => Math.max(shapeBaseAt(u), rootBlend(u));
+  const tangentAt = (u) => {
+    const d1 = APEX_TANGENT_DU, d2 = d1 / 2;
+    const s1 = (law(u) - law(u - d1)) / (d1 * L), s2 = (law(u) - law(u - d2)) / (d2 * L);
+    return gridFloor(Math.abs(2 * s2 - s1));
+  };
+  /* where the nib closes, from a start (x0, h0) on a slope m */
+  const close = (x0, h0, m) => {
+    const xFace = x0 + (h0 - a) / m, r = a * Math.sqrt(1 + m * m), c = xFace - a * m;
+    return { xFace, r, c, end: c + Math.sqrt(Math.max(0, r * r - e * e)) };
+  };
+  const mCross = tangentAt(uCross);
+  if (!(mCross > APEX_MIN_SLOPE)) return { ...inert, why: 'the law arrives with no slope to carry on' };
+  /* the latest start the flank can have: where the law itself is APEX_HALF */
+  let ua0 = uCross, ua1 = 1;
+  for (let i = 0; i < 90; i++) { const m = (ua0 + ua1) / 2; if (law(m) > a) ua0 = m; else ua1 = m; }
+  const uApex = ua0;
+  const endAt = (u) => { const m = tangentAt(u); return m > APEX_MIN_SLOPE ? close(u * L, law(u), m).end : Infinity; };
+  let uLaw, h0, slope, regime;
+  if (close(uCross * L, TIP_HALF_MM, mCross).end <= L) {
+    /* FLOOR: the crossing, on the steepest grid slope that still reaches L —
+       a shallower flank closes later */
+    regime = 'floor';
+    uLaw = uCross; h0 = TIP_HALF_MM;
+    let lo2 = 0, hi2 = mCross;
+    for (let i = 0; i < 90; i++) { const m = (lo2 + hi2) / 2; if (m > 0 && close(uCross * L, h0, m).end >= L) lo2 = m; else hi2 = m; }
+    slope = Math.min(mCross, Math.ceil(hi2 / APEX_GRID) * APEX_GRID);
+    while (slope < mCross && close(uCross * L, h0, slope).end > L) slope += APEX_GRID;
+  } else if (endAt(uApex) <= L) {
+    /* TANGENT: a later start is lower and steeper, so it closes sooner;
+       bisected on the side that closes at or short of L */
+    regime = 'tangent';
+    let a0 = uCross, b0 = uApex;
+    for (let i = 0; i < 90; i++) { const m = (a0 + b0) / 2; if (endAt(m) > L) a0 = m; else b0 = m; }
+    uLaw = b0; h0 = law(uLaw); slope = tangentAt(uLaw);
+  } else {
+    /* STEEP: even a flank from where the law is APEX_HALF closes past L —
+       the arc then leaves the law there on the steepest slope that reaches L */
+    regime = 'steep';
+    uLaw = uApex; h0 = law(uLaw);
+    let lo2 = tangentAt(uLaw), hi2 = lo2;
+    while (close(uLaw * L, h0, hi2).end > L && hi2 < 1e6) hi2 *= 2;
+    for (let i = 0; i < 90; i++) { const m = (lo2 + hi2) / 2; if (close(uLaw * L, h0, m).end > L) lo2 = m; else hi2 = m; }
+    slope = Math.ceil(hi2 / APEX_GRID) * APEX_GRID;
+  }
+  const xLawMm = uLaw * L, cl = close(xLawMm, h0, slope);
+  const kinkDeg = regime === 'tangent' ? 0 : (Math.abs(Math.atan(tangentAt(uLaw)) - Math.atan(slope)) * 180) / Math.PI;
+  return {
+    active: true, uLaw, xLawMm, xFaceMm: cl.xFace, centreMm: cl.c, radiusMm: cl.r, slope, drawnLength: L,
+    capMm: L - xLawMm, arcMm: L - cl.xFace, endHalfMm: e, why: null, regime, kinkDeg, startHalfMm: h0, uCross,
+    toLaw: (v) => v,
+    /* the nib OWNS everything from the floor crossing on: between the
+       crossing and a later start (the TANGENT and STEEP regimes) it is the law
+       itself, under the floor — handing back null there would let the mode's
+       floor win and step the outline down at the flank's start */
+    halfAt: (v) => {
+      const x = v * L;
+      if (x <= uCross * L) return null;
+      if (x <= xLawMm) return law(v);
+      if (x <= cl.xFace) return h0 - slope * (x - xLawMm);
+      /* the blade's last row IS the face, by BRANCH: on a round law's
+         near-vertical end (tip shape 2.5-3, the STEEP regime) the solved slope
+         reaches the thousands, `r` the metres, and the arc's computed end
+         lands within ~1e-12 of the blade's end on either side — the circle
+         evaluated there reads up to 1e-6 over the face */
+      if (v >= 1 || x >= cl.end) return e;
+      return Math.max(e, Math.sqrt(Math.max(0, cl.r * cl.r - (x - cl.c) * (x - cl.c))));
+    },
+    arcU: gridFloor(cl.xFace / L),
   };
 }
 /* Where the foot's width stops floor-ing the blade. Frozen at the
@@ -4976,7 +5088,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      with no rounded sinus declares no `roundAt`. */
   const chev = (cap && cap.chevron) || null;
   const terms = [
-    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
@@ -5100,7 +5212,21 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      drawn curve is the shipped curve, not an approximation of it — and the
      peak moves in `u` only because the blade it sits on is shorter.
      =================================================================== */
-  const apex = apexNibPlan(shapeBaseRaw, rootBlendRaw, uPkRaw, length, petiole);
+  /* A LEAF'S NIB (S5 — Eva's ruling of Oct 10: "the tip should close as a
+     smooth point ... no neck and no bulb"). The same plan, the same three
+     constants, the same tangent flank and arc: ONE tip law for petals and for
+     every leaf blade (the simple leaf, each compound leaflet, the lobed
+     envelope). What differs is which length is the CONTROL's. A petal keeps
+     `petalLength` as the LAW's length and reports the overshoot (Eva's ruling
+     on the petal); a leaf's length is read by the inset law, the floret cap,
+     the seat, SN4's reach and the slenderness line, so the leaf keeps
+     `leafLength` as the DRAWN length and the nib's START is solved for it
+     (`leafNibPlan`), so the outline below the nib is the one it was, to the
+     bit. On a lobed blade the nib is planned on the ENVELOPE
+     (no lobes), so all three of its profiles share one nib and one length. */
+  const apex = petiole
+    ? leafNibPlan(chev ? (u) => halfW * tipLaw(u) : shapeBaseRaw, rootBlendRaw, uPkRaw, length)
+    : apexNibPlan(shapeBaseRaw, rootBlendRaw, uPkRaw, length);
   const toLaw = apex.active ? apex.toLaw : (v) => v;
   const uPk = apex.active ? Math.min(1, (uPkRaw * length) / apex.drawnLength) : uPkRaw;
   /* THE BLADE'S OWN PHYSICAL EXTENT, which is what every millimetre below is
@@ -5426,10 +5552,20 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        stationed on the margin the lattice actually draws, `(x + h sin tau,
        h cos tau)`, so they are even along the lobed leaf's own edge rather
        than along a perpendicular outline it does not have. A branch. */
-    const table = rimArcTable(chev ? (u) => chev.rimAt(u * drawnLengthMm, laminaHalf(u), u) : (u) => [u * drawnLengthMm, laminaHalf(u), 0], breaksOf(laminaWinner), uPk, LOBE_ARC_SAMPLES);
+    /* A LEAF'S TEETH ARE LAID ON THE PRINT-FLOORED RIM (S5). The nib closes
+       a leaf's outline below the floor, and the teeth do not follow it there:
+       they are stationed on the rim the blade has at the floor — its 1.60 mm
+       terminal face included — exactly as before the nib existed, so the
+       count, the parity and every crest a leaf asked for are what they were
+       (the ruled mum's 28 of 28, 3 / 4 / 4 / 6, among them). Laid on the
+       nib's 0.10 mm face the apex period stops being the face's and needs a
+       station of its own; measured, the mum then builds 27 (3 / 4 / 3 / 7).
+       A petal's nib is untouched (`laminaHalf`, by branch). */
+    const toothLam = petiole && apex.active ? (u) => Math.max(laminaHalf(u), TIP_HALF_MM) : laminaHalf;
+    const table = rimArcTable(chev ? (u) => chev.rimAt(u * drawnLengthMm, toothLam(u), u) : (u) => [u * drawnLengthMm, toothLam(u), 0], breaksOf(laminaWinner), uPk, LOBE_ARC_SAMPLES);
     const sRB = table.sAt(laminaStart), sTip = table.sAt(1);
     const marginArcMm = sTip - sRB;
-    const faceMm = 2 * laminaHalf(1);
+    const faceMm = 2 * toothLam(1);
     const halfRimMm = marginArcMm + faceMm / 2;
     /* MODEL A's 'region' NO ROOM — `uCap` at or below the root blend's end,
        the parallel-stub corner — is GONE with the window's upper end: the
@@ -5514,21 +5650,34 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        passes here cuts every margin notch at least `reliefFloorMm` deep there:
        `min(max(R, floor), headroom) >= floor`, and the relief grid floors onto a
        power of two that the floor (1.0) is itself on. */
-    let countReliefCap = null;
+    let countReliefCap = null, tipYield = null;
     if (reliefFloorMm > 0 && countBuilt >= 1) {
+      let failU = null;
       const sinusesFit = (n) => {
         const per = n + 1, pitch = 2 * treatedHalfMm / per;
         for (let k = 0; k < per; k++) {
           const a = Math.abs(treatedHalfMm - (k + 0.5) * pitch);
           if (!onMargin(a)) continue;
-          if (Math.max(0, laminaHalf(uAtD(a)) - TIP_HALF_MM) < reliefFloorMm) return false;
+          if (Math.max(0, laminaHalf(uAtD(a)) - TIP_HALF_MM) < reliefFloorMm) { failU = uAtD(a); return false; }
         }
         return true;
       };
-      let n = countBuilt;
-      while (n >= 1 && !sinusesFit(n)) n--;
+      const n0 = countBuilt;
+      let n = countBuilt, firstFailU = null;
+      while (n >= 1 && !sinusesFit(n)) { if (firstFailU === null) firstFailU = failU; n--; }
       countReliefCap = n;
       countBuilt = n;
+      /* THE TIP GIVES ITS TOOTH UP (S5 — Eva's ruling of Oct 10: "where a
+         tooth would fold in the converging tip, the tip gives that tooth up").
+         Before S5 a notch reaching the 1.60 mm stub folded against the stub's
+         bead (two matrix rows declared, 18 and 21 pairs); with the nib the
+         lamina past the floor crossing IS under the floor, so a sinus landing
+         there has no material at all and this very loop gives its tooth up —
+         the relief floor's own rule. Told as the TIP's where the sinus that
+         first failed lies past the blade's widest point, converging; the
+         count and its cause (`clampedBy`) are unchanged, so every clause on
+         the relief floor reads as it did. */
+      if (n < n0 && firstFailU !== null && firstFailU > uPk) tipYield = { given: n0 - n, atU: firstFailU };
     }
     if (countBuilt < 1) return noRoom(countRowsCap < 1 ? 'rows' : countFloorCap < 1 ? 'pitch' : 'relief floor',
       { rowsCapacity: capacity, countRowsCap, countFloorCap, countReliefCap, halfRimMm, marginArcMm, faceMm, treatedHalfMm, peakHalfMm, askedWindowU: [u0, u1] });
@@ -5689,7 +5838,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
       countClamped, clampedBy, depthBuilt, depthCap, depthClamped, pitchMm, pitchBelowFloor,
       halfRimMm, marginArcMm, faceMm, treatedHalfMm, periods, apexIsCrest,
       apexReliefMm: apexIsCrest ? null : reliefMm[(periods - 1) / 2],
-      peakHalfMm, reliefAskedMm, reliefMm, reliefLimited, reliefBuiltMm, reliefFloored, countReliefCap,
+      peakHalfMm, reliefAskedMm, reliefMm, reliefLimited, reliefBuiltMm, reliefFloored, countReliefCap, tipYield,
       reliefFlooredMm, foldCapMm, foldClamped,
       windowU: [u0, u1], askedWindowU: [u0, u1], sinusU, crestU, cutMm, u0, u1,
       angleChordMm,
@@ -14940,11 +15089,33 @@ function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
 }
 /* ONE ROW's half-widths and cross-section on a given frame — the leaf row's
    own expressions, extracted verbatim for the same reason. */
+/* THE LEAF'S OWN FLOOR, ONE OWNER (S5): the print floor `TIP_HALF_MM` in
+   BOTH modes (the constant, never the mode's floor, so live and export draw
+   one leaf), and inside the nib the nib's own half-width, which converges
+   below that floor by design (the petal's authored exception, read by every
+   leaf blade now). Off the nib these are `max(prof.…, TIP_HALF_MM)` term for
+   term, the expressions they replace.
+   NO TOOTH CUTS THE NIB (S5 — "where a tooth would fold in the converging
+   tip, the tip gives that tooth up"): the DRAWN half-width inside the nib is
+   the nib's own BASE outline, never the toothed one. Before S5 the floor
+   under every drawn row stopped a tooth's cut at 0.80 mm; the nib takes that
+   floor away inside itself, and a tooth whose period ran past the crossing
+   then dug the converging tip down to the 0.05 mm face (measured: a compound
+   leaflet at tip 0.60 read 0.05 mm drawn against 0.80 base at u 0.86). Just
+   before the crossing the drawn row is `max(cut, floor)` and the base is
+   falling to the floor, so the two meet at the crossing: continuous. */
+export function leafHalfAt(prof, u) { return prof.onNib(u) ? prof.halfWidthBaseAt(u) : Math.max(prof.halfWidthAt(u), TIP_HALF_MM); }
+export function leafHalfBaseAt(prof, u) { return prof.onNib(u) ? prof.halfWidthBaseAt(u) : Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM); }
 function leafRowSect(prof, form, C, T, N, u) {
-  const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
-  const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
+  const h = leafHalfAt(prof, u);
+  const hb = leafHalfBaseAt(prof, u);
   const sect = form
-    ? form.sectAt(C, T, N, h, u, hb)
+    /* (the petal nib's own cup scale, S5: on the nib the cup's curvature is
+       held at the value it had at the crossing, so the converging tip's
+       skins do not invert — the petal's apex-nib fix, which the leaf's nib
+       folded without: 13 pairs at u 0.988 on a 60-degree chevron under
+       cup 1.2. Exactly 1 off the nib, so every row below it is unchanged.) */
+    ? form.sectAt(C, T, N, h, u, hb, prof.onNib(u) ? hb / TIP_HALF_MM : 1)
     : (v) => ({ P: [C[0] + T[0] * h * v, C[1] + T[1] * h * v, C[2] + T[2] * h * v], n: N });
   return { h, hb, sect };
 }
@@ -15069,22 +15240,30 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
     ? { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1], baseExposed: true }
     : { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] };
   emitPanel(acc, rows, panel, () => t, rim);
-  /* THE TERMINAL CLAMP, TOLD (the leaf tip-shape session). The half-width
-     above is `max(profile, TIP_HALF_MM)`, so the blade ends 2 x TIP_HALF_MM
-     across at every exponent and in both modes; where the outline MEETS that
-     floor is the one number that says how much of the leaf is the stub. Found
-     on the profile's own base outline by bisection over [widest point, 1] —
-     the outline is monotone there, and the floor is the constant rather than
-     the mode floor, so the station is the same in LIVE and EXPORT (measured:
-     identical to six figures at every exponent). A LENGTH derived from a
-     length: the station times the leaf's own length, never a row count. */
+  /* THE TIP, TOLD (the leaf tip-shape session; S5). Before S5 the half-width
+     was `max(profile, TIP_HALF_MM)` to the end, so the blade ended on a
+     2 x TIP_HALF_MM stub and this said how much of the leaf it was. Since S5
+     the blade closes on the petal's NIB construction (`leafNibPlan`): a
+     straight flank leaving the law at `startU` and an arc to a
+     2 x APEX_END_HALF_MM face, everything at or past where the outline met
+     the print floor (`fromU`, bisected on the base outline exactly as the
+     stub's station was). The record keeps the stub's fields under the same
+     names — the station, its share of the length, the terminal across, its
+     share of the width — and adds the nib's own numbers (its start, its
+     regime, the corner where it has one); where the nib is inert (a blade that never
+     clears the floor) it is the stub's record term for term. A LENGTH derived
+     from a length: the station times the leaf's own length. */
   const tipProf = (opts && opts.tipProf) || prof;
   const tipClamp = (() => {
     let lo = tipProf.uPk, hi = 1;
     if (!(tipProf.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
     else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (tipProf.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
-    const fromU = hi;
-    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };
+    const fromU = hi, ap = tipProf.apex;
+    const nib = !!(ap && ap.active);
+    const terminalMm = nib ? 2 * ap.endHalfMm : 2 * TIP_HALF_MM;
+    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm, ofWidth: terminalMm / widthMm,
+      nib, startU: nib ? ap.uLaw : null, startHalfMm: nib ? ap.startHalfMm : null, regime: nib ? ap.regime : null, kinkDeg: nib ? ap.kinkDeg : null,
+      arcU: nib ? ap.arcU : null, radiusMm: nib ? ap.radiusMm : null, slope: nib ? ap.slope : null };
   })();
   /* THE SERRATION AS BUILT — the lobe record the outline was cut from, with
      the relief the OUTLINE carries at every margin sinus (base minus drawn
@@ -15096,6 +15275,7 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
     noRoom: !!L0.noRoom, noRoomWhy: L0.noRoomWhy || null,
     countAsked: L0.countAsked, countBuilt: L0.countBuilt, clampedBy: L0.clampedBy || null,
     countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
+    tipYield: L0.tipYield ? { ...L0.tipYield } : null,
     depthAsked: L0.depthAsked, peakHalfMm: L0.peakHalfMm, reliefAskedMm: L0.reliefAskedMm,
     reliefFloorMm: L0.reliefFloorMm, reliefBuiltMm: L0.reliefBuiltMm, reliefFloored: !!L0.reliefFloored,
     /* the chevron's fold cap on the relief (S4) — null on every other blade */
@@ -15116,7 +15296,7 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
       const lo = L0.crestU[k] === undefined ? 0 : L0.crestU[k], hi = L0.crestU[k + 1] === undefined ? 1 : L0.crestU[k + 1];
       let best = 0;
       for (let i = 0; i <= nu; i++) {
-        const u = i / nu;
+        const u = rows[i].u;
         if (u < lo || u > hi) continue;
         /* (a chevron's tooth relief is measured from its LOBED outline, not
            from the envelope its surface reads) */
@@ -15126,7 +15306,7 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
       return best;
     }),
   };
-  return { rows, rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
+  return { rows, rowU: rows.map((r) => r.u), rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
 }
 
 /* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
@@ -15211,7 +15391,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      blade's own rows. A simple leaf's rod is the two rings it always was, by
      branch. */
   const lobedRow0 = plan.type === 'LOBED' ? S.rowAt(0) : null;
-  const lobedSt = lobedRow0 ? lobedStations(S.chevron, nu) : null;
+  const lobedSt = lobedRow0 ? lobedStations(S.chevron, nu, S.profE.apex) : null;
   const lobedEmbedMm = lobedRow0 ? lobedRow0.h * Math.sin(lobedRow0.tau) + lobedSt[1] * Lmm : 0;
   const PA = pring(-plan.embedMm), PB = pring(pLen + lobedEmbedMm), PM = lobedRow0 ? pring(pLen) : null;
   if (PM) {
@@ -15229,7 +15409,8 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   const crossesSolidMm = rodWallCrossingMm(plan, th, pLen, plan.embedMm);
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bladeTris0 = acc.triangleCount;
-  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt } : null);
+  const leafSt = lobedRow0 ? null : leafBladeStations(prof, nu);
+  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt } : leafSt ? { stations: leafSt } : null);
   const { rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim } = B;
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
      — read off the triangles this builder EMITTED (the bead included), never
@@ -15294,6 +15475,10 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        reads the tip exponent back off these, so a plan reporting one exponent
        while the blade is built from another shows as the two disagreeing. */
     rowHalfBaseMm,
+    /* the STATION each of those rows was built at (S5: a leaf with a nib
+       spends LEAF_ARC_ROWS of them on its arc, so `i / nu` is no longer the
+       answer and nothing may assume it) */
+    rowU: B.rowU,
     /* and the DRAWN half-width (after the cut), the centre and frame normal
        each row was built on, and each margin's cup lift — LF11 (the arch) and
        LF12 (the cup) read these against laws restated from the controls. */
@@ -15359,7 +15544,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
          does NOT FIT (and why), its radius, the opening asked and built on the
          emitted rows, the walls' pitches against the flank's own, and how much
          flank it took. The read-out's told flag and the gates' witness. */
-      roundBottoms: S.round ? { built: S.round.built, noFit: S.round.noFit, needed: S.round.needed, shrunk: S.round.shrunk, roundness: S.round.roundness, saturatesAt: S.round.saturatesAt, saturated: S.round.saturated, sinuses: S.round.sinuses.map((r) => ({ ...r, shoulders: r.shoulders ? r.shoulders.map((x) => ({ ...x })) : null })) } : null,
+      roundBottoms: S.round ? { built: S.round.built, filleted: S.round.filleted || 0, noFit: S.round.noFit, needed: S.round.needed, shrunk: S.round.shrunk, roundness: S.round.roundness, saturatesAt: S.round.saturatesAt, saturated: S.round.saturated, sinuses: S.round.sinuses.map((r) => ({ ...r, shoulders: r.shoulders ? r.shoulders.map((x) => ({ ...x })) : null })) } : null,
       /* THE LOBE COUNT ASKED AGAINST BUILT (S4c, ruling 3): the yield and
          every count it tried, with what did not fit at each — the read-out's
          told flag and LF28's measured side */
@@ -15690,13 +15875,73 @@ export const LOBED_TILT_GRID = 2 ** -20;
    `[0, that station]`, which holds the lobes and the sinuses (finer than a
    uniform 1/111 at every reachable `to`). The count never moves, so the
    triangle count does not. */
-export function lobedStations(law, nu = LOBED_BLADE_ROWS) {
+/* THE NIB'S ROWS ON A LEAF (S5): `LEAF_ARC_ROWS`, three, not the petal's six.
+   A leaf runs no ladder, so its count is FIXED and every row the arc takes is
+   a row another stretch gives. Measured on the 972-corner sweep
+   (`tools/bloom-lobed-tip-corners.mjs`, EXPORT): with SIX arc rows the lobed
+   base stretch gives six and two 60-degree corners fold IN THE LOBE WINDOW
+   (46 and 132 pairs, 0 on the base tree); with THREE, no corner of the 972
+   folds that did not fold on the base tree, and the simple leaf's bead at the
+   0.10 mm face — which folds with NO arc row (4 pairs, 0.0002 mm, the shipped
+   simple leaf) — reads 0. */
+export const LEAF_ARC_ROWS = 3;
+/* THE NIB'S ROWS (S5). With the leaf's nib active (`apex` its plan) the
+   last LEAF_ARC_ROWS stations go to the nib's ARC, `(arcU, 1]`, and `arcU`
+   itself (the straight flank's end) is a station. THE TIP STRETCH KEEPS ITS `i / LEAF_BLADE_ROWS` SPACING
+   below `arcU`: that spacing is S4's measured answer to the bead folding at
+   the tip, and taking the arc's rows out of it coarsened the last gap and
+   folded the 60-degree corners (measured, the corner sweep). So the BASE
+   stretch gives the arc its rows — `LEAF_ARC_ROWS` fewer, evenly over
+   `[0, uF)`, about 3 % coarser on the shipped leaf. The count never moves. No
+   nib, no change: the stations are the pre-S5 doubles by branch. */
+export function lobedStations(law, nu = LOBED_BLADE_ROWS, apex = null) {
   const NB = LEAF_BLADE_ROWS;
   const m = Math.max(0, Math.min(nu - 1, Math.floor((1 - law.to) * NB)));
-  const iF = NB - m, uF = iF / NB, nF = nu - m;
+  const iF = NB - m, uF = iF / NB;
   const out = [];
-  for (let i = 0; i < nF; i++) out.push((uF * i) / nF);
-  for (let i = iF; i <= NB; i++) out.push(i / NB);
+  if (!(apex && apex.active)) {
+    const nF = nu - m;
+    for (let i = 0; i < nF; i++) out.push((uF * i) / nF);
+    for (let i = iF; i <= NB; i++) out.push(i / NB);
+    return out;
+  }
+  /* WITH A NIB (S5) the arc gets LEAF_ARC_ROWS stations of its own after
+     `arcU`, the tip stretch keeps its stations `i / NB` short of the arc, and
+     the UNIFORM STRETCH below pays for the rows — every station of the lobe
+     window moves by under 3 % of a gap. Measured against the other way
+     (the tip stretch paying, so the lobe window keeps its pre-S5 doubles) on
+     the 972-corner sweep: tip-paid read 7 corners WORSE than main (a coarser
+     tip stretch next to a nib folds a wide 60-degree chevron, up to 136
+     pairs), uniform-paid 1 (4 pairs at a narrow sinus, u 0.75) and 43
+     better. The mum's ruled figures are identical under both. */
+  const K = LEAF_ARC_ROWS, uA = apex.arcU;
+  const tip = [];
+  for (let i = iF; i < NB && i / NB < uA; i++) tip.push(i / NB);
+  tip.push(uA);
+  for (let j = 1; j <= K; j++) tip.push(uA + ((1 - uA) * j) / K);
+  /* (`tip[0]` is `uF` wherever the arc starts past `lobedTo`; on a blade
+     whose nib starts before it the arc's own start is the top of the stretch
+     below, which keeps the stations increasing) */
+  const nF = nu + 1 - tip.length, top = tip[0];
+  for (let i = 0; i < nF; i++) out.push((top * i) / nF);
+  return out.concat(tip);
+}
+/* THE SIMPLE LEAF'S AND THE LEAFLET'S STATIONS (S5) — uniform, `i / nu`, as
+   they always were, at the base: the first `RIM_TIP_ROWS + 1` stations are
+   the pre-S5 doubles, so a leaflet's beaded base — and the stalk that reaches
+   `RIM_TIP_ROWS` of them into it — do not move. With the nib active the last
+   LEAF_ARC_ROWS stations go to its arc `(arcU, 1]` and the rest are spread
+   evenly over `[RIM_TIP_ROWS / nu, arcU]` (6 % coarser on a 56-row blade,
+   evenly, rather than all of it at the tip, where the bead folds). Null where
+   there is no nib: the caller takes `i / nu`, the pre-S5 doubles. */
+export function leafBladeStations(prof, nu) {
+  const apex = prof.apex;
+  if (!(apex && apex.active)) return null;
+  const K = LEAF_ARC_ROWS, uA = apex.arcU, out = [];
+  const i0 = RIM_TIP_ROWS, c = nu - K - i0;
+  for (let i = 0; i < i0; i++) out.push(i / nu);
+  for (let j = 0; j <= c; j++) out.push(i0 / nu + ((uA - i0 / nu) * j) / c);
+  for (let j = 1; j <= K; j++) out.push(uA + ((1 - uA) * j) / K);
   return out;
 }
 export function leafIsLobed(state) { return String(state.leafType) === 'LOBED'; }
@@ -16029,14 +16274,14 @@ export const LOBED_CREST_CLEAR_PER_HALF = 1024;
 export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
   const roundness = opts.roundness > 0 ? Number(opts.roundness) : 0;
   const envAt = opts.envAt || lam;
-  const D = MIN_FEATURE_MM, none = { sinuses: [], built: 0, noFit: 0, needed: 0, shrunk: 0, roundness, roundAt: null };
+  const D = MIN_FEATURE_MM, none = { sinuses: [], built: 0, noFit: 0, needed: 0, shrunk: 0, roundness, roundAt: null, fillAt: null, filleted: 0 };
   if (!(law.sinus > 0)) return none;
   const half = (law.to - law.from) / (2 * law.lobes), NS = LOBED_ROUND_SAMPLES;
   const stH = stations.map(lam), stTau = stations.map(tauAt);
   /* every kink the lamina has: the law's crests and sinuses, and the envelope's
      declared tangent breaks (the flank-slope stencil stands clear of them) */
   const kinks = [...law.crestU, ...law.sinusU, ...(opts.breaks || [])];
-  const zones = [], sinuses = [];
+  const zones = [], sinuses = [], fills = [];
   const openingWith = (U, su) => {
     const hs = stations.map((u, i) => (U ? Math.min(stH[i], U(u)) : stH[i]));
     const { lo, hi, bot } = lobedSinusWindow(stations, hs, su, half);
@@ -16372,6 +16617,146 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
       const PA = crestPt(cA), PB = crestPt(cB);
       rec.pitchMm = Math.hypot(PB[0] - PA[0], PB[1] - PA[1]);
     }
+    /* A BROAD SINUS GETS A PLAIN FILLET AT ITS V POINT (S5 — Eva's ruling of
+       Oct 10: "a broad sinus gets a plain fillet at the V point, a circle
+       tangent to both arms. Its radius is lobedRound x pitch, shrunk to the
+       largest that fits with tangent joins and floored at the print minimum.
+       Keep the U-bottom for narrow sinuses, exactly as built"). A BROAD sinus
+       is one whose asked V already opens past MIN_FEATURE_MM (`need` false),
+       so S4b's U — a cut, for a gap that does not print — was never its law,
+       and S4c's shoulders then left 336 of 500 sampled leaves with the slider
+       dead (docs/bloom-leaf-lobed-roundness-outcome.md §8.4). The fillet is
+       the other direction: a circle in the EMPTY notch, tangent to the back
+       arm and to the front arm, whose lower arc between its two tangent
+       points becomes the outline — it ADDS material (the notch's point is
+       rounded and a little shallower), so it enters the lobed outline as a
+       FLOOR on the CORE term (`chev.fillAt`) where the U enters as a cap.
+       Worked in the shoulders' own plane (`x = u L`, `y = h`), whose map to
+       the planform is affine at any one station, so a tangent join here is a
+       tangent join on the leaf. THE FLOOR is MIN_FEATURE_MM / 2, the
+       shoulders' own smooth bar; THE TOP the range's (0.5 of the pitch);
+       the radius asked is `roundness x pitch` on LOBE_RELIEF_GRID, clamped
+       into [floor, the largest that fits]. A fillet FITS when both tangent
+       points stand on their own arm inside the half-period (clear of the
+       crests by the shoulders' own clearance), no other point of the window
+       comes inside the circle, and the rows still advance past the fold
+       margin (the U's own discrete check, with the floor in place of the
+       cap). Its largest fitting radius is bisected on the FIXED bracket, so
+       every roundness above it builds the same fillet — the dead travel the
+       hatch marks, re-measured here. A NARROW sinus never reaches this
+       branch: its bytes are the U's, unchanged. */
+    if (!rec.need) {
+      const xy = (i) => [us[i] * Lmm, hs[i]];
+      const clear = half / LOBED_CREST_CLEAR_PER_HALF;
+      const step = half / LOBED_SLOPE_STEPS_PER_HALF;
+      const slopeAt = (u) => {
+        let end = Infinity;
+        for (const k of kinks) end = Math.min(end, Math.abs(u - k));
+        const e = Math.max(1e-7, Math.min(step, end / 8));
+        return (lam(u - 2 * e) - 8 * lam(u - e) + 8 * lam(u + e) - lam(u + 2 * e)) / (12 * e * Lmm);
+      };
+      /* the nearest point of the sampled lamina, over samples [i0, i1], to C */
+      const nearest = (C, i0, i1) => {
+        let best = Infinity, bu = null, bi = i0;
+        for (let i = i0; i < i1; i++) {
+          const [x0, y0] = xy(i), [x1, y1] = xy(i + 1), dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy;
+          const t = L2 > 0 ? Math.max(0, Math.min(1, ((C[0] - x0) * dx + (C[1] - y0) * dy) / L2)) : 0;
+          const d = Math.hypot(C[0] - (x0 + t * dx), C[1] - (y0 + t * dy));
+          if (d < best) { best = d; bu = us[i] + t * (us[i + 1] - us[i]); bi = i; }
+        }
+        return { d: best, u: bu, i: bi };
+      };
+      /* the nearest point of the LAMINA ITSELF near a polyline answer: the
+         station where `C - P(u)` is normal to the curve, bisected on the
+         curve's own tangent over the samples either side. The polyline is
+         tangent to the chords, not the curve — 0.16 degrees off at a fillet's
+         front arm on the shipped broad leaf, against LF34's 0.1 bar. */
+      const nearestExact = (C, i0, i1) => {
+        const P0 = nearest(C, i0, i1);
+        const g = (u) => (C[0] - u * Lmm) + (C[1] - lam(u)) * slopeAt(u);
+        let a = us[Math.max(i0, P0.i - 1)], b = us[Math.min(i1, P0.i + 2)];
+        if (!(g(a) > 0 && g(b) < 0)) return P0;
+        for (let k = 0; k < 50; k++) { const m = (a + b) / 2; if (g(m) > 0) a = m; else b = m; }
+        const u = (a + b) / 2;
+        return { d: Math.hypot(C[0] - u * Lmm, C[1] - lam(u)), u, i: P0.i };
+      };
+      const filletAt = (rho, exact = false) => {
+        const centre = (u) => { const f = slopeAt(u), k = Math.hypot(1, f); return [u * Lmm - (rho * f) / k, lam(u) + rho / k]; };
+        const phi = (u) => nearest(centre(u), ib, NS).d - rho;
+        const uLo = ua + clear;
+        if (!(phi(uLo) >= 0) || !(phi(ubt) < 0)) return null;
+        let lo = uLo, hi = ubt;
+        for (let k = 0; k < 60; k++) { const m = (lo + hi) / 2; if (phi(m) >= 0) lo = m; else hi = m; }
+        if (exact) {
+          /* the built fillet: the same bisection against the exact lamina, in
+             a bracket of a few samples about the polyline's answer */
+          const phiX = (u) => nearestExact(centre(u), ib, NS).d - rho, dU = 8 * (us[1] - us[0]);
+          let a = Math.max(uLo, lo - dU), b = Math.min(ubt, lo + dU);
+          if (phiX(a) >= 0 && phiX(b) < 0) { for (let k = 0; k < 60; k++) { const m = (a + b) / 2; if (phiX(m) >= 0) a = m; else b = m; } lo = a; }
+        }
+        const uB = lo, C = centre(uB), F = exact ? nearestExact(C, ib, NS) : nearest(C, ib, NS), uF = F.u;
+        if (!(uF > ubt && uF < ub - clear)) return null;
+        /* nothing else in the window inside the circle (the arms' own
+           tangency is at rho; a crest or a second dip must not cut it) */
+        if (nearest(C, 0, NS).d < rho * (1 - 1e-6)) return null;
+        const at = (u) => { const dx = u * Lmm - C[0]; return C[1] - Math.sqrt(Math.max(0, rho * rho - dx * dx)); };
+        const F2 = (u) => (u >= uB && u <= uF ? at(u) : -Infinity);
+        /* the fold condition on the rows, the U's own, with the floor in */
+        for (let i = 0; i + 1 < stations.length; i++) {
+          const u0 = stations[i], u1 = stations[i + 1];
+          if (u1 < ua || u0 > ub) continue;
+          const du = (u1 - u0) * Lmm;
+          if (!(du > 0)) continue;
+          const h0 = Math.max(stH[i], F2(u0)), h1 = Math.max(stH[i + 1], F2(u1));
+          const adv = (du + (h1 * Math.sin(stTau[i + 1]) - h0 * Math.sin(stTau[i])) * w1F) / du;
+          const advV = (du + (stH[i + 1] * Math.sin(stTau[i + 1]) - stH[i] * Math.sin(stTau[i])) * w1F) / du;
+          if (adv < LOBED_FOLD_MARGIN && adv < advV) return null;
+        }
+        return { rho, C, uB, uF, at: F2 };
+      };
+      const w1F = 1 / (NV - 1);
+      const floorF = Math.floor(D / 2 / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
+      const RtopF = Math.floor((LOBED_ROUND_RANGE[1] * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID;
+      let RfitF = null, fitF = null;
+      if (RtopF > floorF && (fitF = filletAt(RtopF))) RfitF = RtopF;
+      else if (filletAt(floorF)) {
+        let lo = floorF, hi = Math.max(floorF, RtopF);
+        for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (filletAt(m)) lo = m; else hi = m; }
+        RfitF = Math.max(floorF, Math.floor(lo / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);
+        if (!filletAt(RfitF)) RfitF = floorF;
+      }
+      rec.radiusFitMm = RfitF === null ? floorF : RfitF;
+      rec.radiusMinMm = floorF;
+      /* (no fillet fits even at the floor: the travel is dead along its whole
+         length and the V is kept, told — NO ROOM. And a sinus whose bottom
+         is already rounder than its LARGEST fitting fillet — the circle only
+         kisses the bottom, adding material on no row the blade is drawn on —
+         is dead along the whole travel too: every roundness builds the same
+         V. Measured: a lobe shape 1.8 sinus on a 112 mm blade fits fillets to
+         11.4 mm and every one of them touches no row; reporting its fit as a
+         saturation of 0.43 told a dead slider as live.) */
+      const touches = (F) => !!F && stations.some((u, i) => F.at(u) > stH[i] + 1e-9);
+      rec.filletDead = RfitF !== null && !touches(RfitF >= RtopF && fitF ? fitF : filletAt(RfitF));
+      rec.saturatesAt = RfitF === null || rec.filletDead ? 0 : RfitF >= RtopF ? null : RfitF > floorF ? RfitF / rec.pitchMm : 0;
+      rec.filletNoRoom = RfitF === null;
+      const RaskF = roundness > 0 ? Math.floor((roundness * rec.pitchMm) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID : 0;
+      rec.saturated = rec.saturatesAt !== null && roundness > 0 && Math.max(RaskF, floorF) >= rec.radiusFitMm;
+      if (!(roundness > 0) || RfitF === null) continue;
+      const R = Math.min(Math.max(RaskF, floorF), RfitF);
+      const Fb = filletAt(R, true);
+      if (!Fb) continue;
+      rec.radiusAskedMm = RaskF; rec.shrunk = RaskF > RfitF; rec.floored = RaskF < floorF;
+      rec.roundBuilt = R / rec.pitchMm;
+      /* a fillet that touches no row the blade is drawn on is told as such,
+         never as built (the drawn rows are what LF34 reads) */
+      if (!touches(Fb)) { rec.alreadyRound = true; rec.radiusMm = 0; rec.roundBuilt = 0; continue; }
+      rec.fillet = true; rec.radiusMm = R; rec.filletU = [Fb.uB, Fb.uF]; rec.filletCentre = Fb.C.slice();
+      let added = 0;
+      for (let i = 0; i <= NS; i++) added = Math.max(added, Fb.at(us[i]) - hs[i]);
+      rec.addedMm = added;
+      fills.push({ ua, ub, F: Fb.at });
+      continue;
+    }
     const Rmin = W ? W.R : 0, seat = W ? W.seat : 0;
     /* (S4c follow-up, ruling 4: A RADIUS FITS ONLY WHERE NEITHER SHOULDER IS
        SHARPER THAN IT HAS TO BE — each carries a fillet (tangent) of at least
@@ -16467,6 +16852,12 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
     for (const z of zones) if (u >= z.ua && u <= z.ub) return z.U(u);
     return Infinity;
   } : null;
+  /* the broad sinuses' fillets, a FLOOR on the lobed outline (S5); null — by
+     branch, so the CORE term is the shipped expression — where none is built */
+  const fillAt = fills.length ? (u) => {
+    for (const z of fills) if (u >= z.ua && u <= z.ub) return z.F(u);
+    return -Infinity;
+  } : null;
   /* THE LEAF'S SATURATION (ruling 3): over the sinuses whose largest smooth
      radius was measured, the roundness above which none of them moves — null
      where one never saturates inside the range (no dead travel) or none was
@@ -16474,7 +16865,7 @@ export function lobedRoundBottoms(law, lam, tauAt, Lmm, stations, opts = {}) {
   const measured = sinuses.filter((r) => r.radiusFitMm !== null);
   const saturatesAt = !measured.length || measured.some((r) => r.saturatesAt === null) ? null : Math.max(...measured.map((r) => r.saturatesAt));
   return { sinuses, built: zones.length, noFit: sinuses.filter((r) => r.noFit).length, needed: sinuses.filter((r) => r.need).length,
-    shrunk: sinuses.filter((r) => r.shrunk).length, roundness, roundAt,
+    shrunk: sinuses.filter((r) => r.shrunk).length, roundness, roundAt, fillAt, filleted: fills.length,
     saturatesAt, saturated: saturatesAt !== null && measured.every((r) => r.saturated) };
 }
 
@@ -16543,7 +16934,7 @@ function lobedOutlineUncached(state, Lmm, exportMode) {
     const profL = widthProfile(bsNoTeeth, ring, halfW, { petiole: true, rowCapacity: nu, chevron: { lobeAt: law.lobeAt } }, acc, Lmm);
     const tilt = lobedTiltCapRad(law, (u) => profL.laminaHalfAt(u), Lmm);
     const tauAt = (u) => tilt.tauRad * law.easeAt(u), tauDu = (u) => tilt.tauRad * law.easeDu(u);
-    const round = lobedRoundBottoms(law, (u) => profL.laminaHalfAt(u), tauAt, Lmm, lobedStations(law, nu), { roundness, envAt: (u) => profE.laminaHalfAt(u), breaks: profL.laminaSlopeBreaks().map((b) => b.u) });
+    const round = lobedRoundBottoms(law, (u) => profL.laminaHalfAt(u), tauAt, Lmm, lobedStations(law, nu, profE.apex), { roundness, envAt: (u) => profE.laminaHalfAt(u), breaks: profL.laminaSlopeBreaks().map((b) => b.u) });
     return { n, law, profL, tilt, tauAt, tauDu, round };
   };
   const tries = [attempt(law0.lobes)];
@@ -16568,12 +16959,13 @@ function lobedOutlineUncached(state, Lmm, exportMode) {
      bind — never a petal range it does not have. */
   const bsT = lobedBladeState(state, law.lobes);
   const cap = {
-    petiole: true, rowCapacity: nu, toothReliefFloorMm: MIN_FEATURE_MM, toothCountMax: bsT.lobeCount, toothStationsU: lobedStations(law, nu),
+    petiole: true, rowCapacity: nu, toothReliefFloorMm: MIN_FEATURE_MM, toothCountMax: bsT.lobeCount, toothStationsU: lobedStations(law, nu, profE.apex),
     chevron: {
       lobeAt: law.lobeAt, peakHalfMm: halfW,
       rimAt: (x, h, u) => { const ta = tauAt(u); return [x + h * Math.sin(ta), h * Math.cos(ta), 0]; },
       reliefFoldCapMm: (unitCut, lam, u0) => lobedReliefFoldCapMm(unitCut, lam, u0, tauAt, tauDu, Lmm),
       ...(round.roundAt ? { roundAt: round.roundAt } : {}),
+      ...(round.fillAt ? { fillAt: round.fillAt } : {}),
     },
   };
   const prof = widthProfile(bsT, ring, halfW, cap, acc, Lmm);
@@ -16618,6 +17010,9 @@ export function lobedBladeAreaMm2(outline, Lmm) {
   /* the lobed outline BEFORE its teeth, with its round bottoms — the very
      half-width the rows draw as `hLobe` (`halfWidthBaseAt`, print-stub
      floored); `laminaHalfAt` here would be the TOOTHED lamina */
+  /* (the S4b PLANFORM law, held on purpose through S5: an area that sizes a
+     petiole by the blade it carries, not the drawn tip — reading the nib
+     moved the shipped lobed petiole 0.6 um for a 0.12 % smaller area) */
   const h = (u) => Math.max(outline.prof.halfWidthBaseAt(u), TIP_HALF_MM);
   let sum = 0, prev = null;
   for (let i = 0; i <= N; i++) {
@@ -16634,7 +17029,7 @@ export function simpleDefaultBladeAreaMm2(state, Lmm) {
   const N = LOBED_FOLD_SAMPLES;
   let sum = 0, prev = null;
   for (let i = 0; i <= N; i++) {
-    const f = 2 * prof.laminaHalfAt(i / N) * Lmm;
+    const f = 2 * Math.max(prof.laminaHalfAt(i / N), TIP_HALF_MM) * Lmm;  // (the S4b planform law: the nib's under-floor lamina is floored, S5)
     if (prev !== null) sum += (prev + f) / (2 * N);
     prev = f;
   }
@@ -16689,19 +17084,19 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
     const { dAlong, dAcross } = arcStep(th, phi, s);
     return { C: [bb[0] + R[0] * dAlong, bb[1] + R[1] * dAlong, bb[2] + dAcross], fr: form.frameAt(R, T, phi, s / Lmm), phi };
   };
-  const hE = (u) => Math.max(profE.halfWidthBaseAt(u), TIP_HALF_MM);
+  const hE = (u) => leafHalfBaseAt(profE, u);
   const rowAt = (u) => {
     const x = u * Lmm;
-    const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
+    const h = leafHalfAt(prof, u);
     const hb = hE(u);
-    const hLobe = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
+    const hLobe = leafHalfBaseAt(prof, u);
     const tau = tauAt(u), sn = Math.sin(tau), cs = Math.cos(tau);
     const A = at(x);
     /* ONE SECTION PER ROW, in the row's own local (T, N) plane: the cup law
        at this row's u on the envelope's half-width, the leaf's sect with the
        plain branch (`h === hb`), evaluated at the point's ACROSS distance `y`
        and laid into the frame at the point's own station `s`. */
-    const secL = form ? form.sectAt([0, 0, 0], [1, 0, 0], [0, 1, 0], hb, u, hb) : null;
+    const secL = form ? form.sectAt([0, 0, 0], [1, 0, 0], [0, 1, 0], hb, u, hb, profE.onNib(u) ? hb / TIP_HALF_MM : 1) : null;
     const point = (v) => {
       const w = Math.abs(v), sg = v < 0 ? -1 : 1;
       const s = x + h * w * sn, y = sg * h * w * cs;
@@ -17177,13 +17572,14 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
       return { u, h, hb, C, D: F.D, T: F.T, N: F.N, phi: 0, sect };
     };
     const tb = acc.triangleCount;
-    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true);
+    const lSt = leafBladeStations(prof, nu);
+    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, lSt ? { stations: lSt } : null);
     return {
       role: sp.role, k: sp.k, side: sp.side, lengthMm: sp.L, widthMm: sp.W, embedMm: sp.embedMm,
       root: F.root, base: B0, D: F.D, T: F.T, N: F.N,
       /* which rod holds it: the axis rod for the terminal, its own stalk else */
       holder: sp.role === 'terminal' ? 'axis' : `stalk ${i}`,
-      rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
+      rowU: Bl.rowU, rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
       rim: Bl.rim, tipClamp: Bl.tipClamp, serration: Bl.serration,
       cup: { coefficient: bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
       arch: { turnRad: form ? form.curlRad : 0, radiusMm: Infinity, underFloor: false },
