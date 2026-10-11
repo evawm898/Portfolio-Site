@@ -67,8 +67,8 @@ export function corners() {
 function report(rows) {
   const n = rows.length, folded = rows.filter((r) => r.within > 0), tip = rows.filter((r) => r.tipPairs > 0);
   const thr = rows.filter((r) => r.threw);
-  console.log(`LOBED TIP CORNERS: ${n} corners (${thr.length} threw)`);
-  console.log(`  any within-shell pair: ${folded.length}; AT THE TIP (u >= lobedTo): ${tip.length}; elsewhere only: ${folded.length - tip.length}`);
+  console.log(`${TYPE} TIP CORNERS: ${n} corners (${thr.length} threw)`);
+  console.log(`  any within-shell pair: ${folded.length}; AT THE TIP (${TYPE === 'LOBED' ? 'u >= lobedTo' : TYPE === 'SIMPLE' ? 'the last 10% of the blade' : 'within 2 mm of a leaflet end'}): ${tip.length}; elsewhere only: ${folded.length - tip.length}`);
   const by = {};
   for (const r of tip) for (const [id] of AXES) { const k = `${id}=${r.set[id]}`; by[k] = (by[k] || 0) + 1; }
   console.log(`  tip folds by axis value: ${JSON.stringify(by)}`);

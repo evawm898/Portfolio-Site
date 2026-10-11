@@ -9270,7 +9270,13 @@ export function lobedPetioleClauses(ui, m, L, LB, US, env, lobe, ease) {
   {
     const r = LB[0], e = Number(ui.lobedEase);
     const tauD = (u) => { if (u <= e || u >= 1) return 0; const x = (u - e) / (1 - e); return (-6 * x * (1 - x)) / (1 - e) * r.tiltBuiltRad; };
-    const f = US.map((u, j) => { const h = r.rowHalfLobeMm[j], t = r.tiltBuiltRad * ease(u); return 2 * h * len * Math.cos(t) + h * h * tauD(u); });
+    /* (S5) the area law reads the planform FLOORED at the print floor, as it
+       did before the nib (that is what holds every lobed petiole where it
+       was); the emitted rows dip under the floor through the nib, so the
+       measured side is floored the same way — still the emitted rows. Seen
+       red first on the mutant table's yielding-count row: 370.333 against
+       369.415 mm^2, a band of 0.504. */
+    const f = US.map((u, j) => { const h = Math.max(r.rowHalfLobeMm[j], TIP_HALF_MM), t = r.tiltBuiltRad * ease(u); return 2 * h * len * Math.cos(t) + h * h * tauD(u); });
     const seg = (i, k) => ((f[i] + f[k]) / 2) * (US[k] - US[i]);
     /* the trapezoid at every emitted row, and at half density on EACH of
        the two interleaved sub-lattices (the odd one closes its two end

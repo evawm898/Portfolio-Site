@@ -3019,6 +3019,9 @@ async function famsOn(rows) {
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {
       const mm = /^(LF\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      /* `--why` prints each leaf message beside its row (S5: the control fired
+         LF26 on one row of 68 and the table names families, never rows) */
+      if (process.argv.includes('--why')) console.log(`      [${row.label}] ${msg.slice(0, 260)}`);
     }
     /* THE SEPAL FAMILY (sepals, part 1) — the rule again. */
     for (const msg of await sepalAssertions(page, row)) {
