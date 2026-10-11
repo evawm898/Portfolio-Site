@@ -3804,6 +3804,13 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
    squared-off end. The exponent family already wants to reach zero; the floor
    truncated it and then capped the truncation. */
 export const TIP_HALF_MM = 0.8;
+/* THE TIP-NECK RULE'S TWO CONSTANTS (S5b; the lobe block's own header):
+   a leaf's tip-most notch that cuts PAST HALFWAY TO THE MIDRIB parts the
+   blade rather than toothing it, so the tip gives that pair up. The half is
+   the definition of the criterion, not a tuned bar; the sample count is the
+   period's own resolution (a sampled maximum reads LOW, so it is fine). */
+export const LEAF_NECK_FRACTION = 0.5;
+export const LEAF_NECK_SAMPLES = 512;
 
 /* THE CARNATION FRINGE'S THREE RANGES, exported so the registry IMPORTS them
    rather than restating them (Q6 — the harness fails at module load if a
@@ -5537,7 +5544,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     const base = { coverage, crestShape, notchShape, countAsked, depthAsked, pitchFloorMm, samplesPerLobe, reliefFloorMm };
     const noRoom = (why, extra = {}) => ({ ...base, noRoom: true, noRoomWhy: why, countBuilt: 0, rowsCapacity: 0, countRowsCap: 0, countFloorCap: 0, countCap: 0, countReliefCap: null,
       reliefBuiltMm: 0, reliefFloored: false, reliefFlooredMm: 0, foldCapMm: null, foldClamped: false,
-      countClamped: countAsked > 0, clampedBy: why === 'region' ? 'rows' : why,
+      tipNeck: null, countClamped: countAsked > 0, clampedBy: why === 'region' ? 'rows' : why,
       depthBuilt: 0, depthCap: 0, depthClamped: false, pitchMm: 0, pitchBelowFloor: false,
       halfRimMm: 0, marginArcMm: 0, faceMm: 0, treatedHalfMm: 0, periods: 0, apexIsCrest: null, apexReliefMm: null,
       peakHalfMm: 0, reliefAskedMm: 0, reliefMm: [], reliefLimited: 0,
@@ -5774,6 +5781,114 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        2^-16 mm is 1.5e-5, four orders under the 0.8 mm floor and eleven
        above the divergence it removes. */
     const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefBuiltMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);
+    /* THE TIP GIVES UP THE PAIR THAT NECKS IT (S5b — Eva's ruling of Oct 11:
+       "where a tooth pair would neck the converging tip, the tip gives that
+       pair up"). A LEAF only (`reliefFloorMm`, the leaf cap's flag): petal
+       lobes are untouched.
+
+       THE NECK, BY MEASUREMENT. The relief is constant in millimetres along
+       the margin (session 42's law) while the blade converges to its nib, so
+       the tip-most notch takes most of what is left of the tip: on the ruled
+       mum the notch at u 0.902 takes 81 % of the way to the midrib (the
+       drawn half-width falls to 0.80 mm where the base outline is 4.2 mm) and
+       the terminal crest above it stands 2.3 mm wide — a stalk and a knob; on
+       the SIMPLE default the notch at u 0.917 wants 77 % and the print floor
+       holds the rest flat — the parallel shaft. Every OTHER notch on those
+       blades takes at most 46 % (mum) and 36 % (SIMPLE) — measured, the
+       outcome doc's §1 table. A notch that cuts PAST HALFWAY TO THE MIDRIB
+       is no longer a tooth on a margin: it parts the blade, and what stands
+       above it reads as a separate body. That is the criterion, and its
+       half is the definition, not a tuned bar (`LEAF_NECK_FRACTION`).
+
+       THE MEASURE is the notch's own law, never the floored outline: in each
+       margin period, off the nib (where no tooth is drawn), the cut against
+       the base outline it is cut from, `cut / base`, at its worst. The floor
+       is not in it, so a cut the print floor holds up (the shaft) reads what
+       it asked for. Mode-free: the base and the cut are the lamina's.
+
+       THE RULE IS APPLIED FROM THE APEX DOWN, ONE PAIR AT A TIME, AND STOPS
+       AT THE FIRST PAIR THAT IS NOT A NECK — "if dropping one pair leaves a
+       new, smaller neck one pair down, the rule applies again". A pair given
+       up keeps its STATION (the teeth below are NOT re-spaced): its two
+       mirror periods are simply cut at relief 0, exactly as the even count's
+       apex notch on the terminal face already is. Re-spacing was measured and
+       REFUSED: with a constant relief every count puts its tip-most notch in
+       the closing tip, so a count yield cascades the mum from 28 teeth to
+       none (the outcome doc's §1.2). Only periods whose sinus lies past the
+       blade's widest point are tested: the rule is about the converging tip.
+
+       TOLD, the other yields' way: the record carries `tipNeck` — the pairs
+       given, the teeth they took (a crest is a tooth while either of its two
+       flanking notches is cut, so a pair given up on an apex-notch blade
+       takes the two terminal crests and on an apex-crest blade the apex
+       crest), the teeth DRAWN, and every tested pair's fraction. The slider
+       keeps its asked value; `countBuilt` stays the LAYOUT's count (the
+       periods every station and clause is laid out on). */
+    let tipNeck = null;
+    if (reliefFloorMm > 0) {
+      const toothCount = () => { let n = 0; for (let k = 1; k < periods; k++) if (reliefMm[k - 1] > 0 || reliefMm[k] > 0) n++; return n; };
+      const before = toothCount();
+      const given = [], tested = [];
+      const fracOf = (p) => {
+        const us = uAtD(sinusD[p]);
+        const a = p === 0 ? u0 : uAtD(crestD[p]);
+        const b = onMargin(crestD[p + 1]) ? uAtD(crestD[p + 1]) : 1;
+        let frac = 0, atU = us;
+        for (let i = 0; i <= LEAF_NECK_SAMPLES; i++) {
+          const u = a + ((b - a) * i) / LEAF_NECK_SAMPLES;
+          if (apex.active && apex.halfAt(u) !== null) continue;
+          const base = shapeBaseAt(u);
+          if (!(base > 0)) continue;
+          const cut = reliefMm[p] * lobeCutProfile((treatedHalfMm - dAt(u)) / pitchMm, crestShape, notchShape);
+          const f = cut / base;
+          if (f > frac) { frac = f; atU = u; }
+        }
+        return { us, a, b, frac, atU };
+      };
+      /* THE BODY'S OWN TEETH — the deepest fraction any margin notch takes
+         whose sinus lies at or below the blade's widest point, the FIRST
+         period excepted (it runs from the treated arc's root end, where the
+         blade narrows into its stalk and every notch reads deep). A tip notch
+         is a NECK only where it parts the blade MORE than the blade's own
+         teeth do: measured, at the maximum tooth depth every body notch
+         already cuts to the floor, and giving the tip's teeth up there leaves
+         the whole upper blade standing on the deepest notch below its widest
+         point — a bigger knob than the one removed (the outcome doc's §1.3).
+         Where the body's teeth cut less than half (every shipped default) the
+         bar is the half. */
+      let bodyFraction = 0;
+      for (let p = 1; p <= Math.floor((periods - 1) / 2); p++) {
+        const dd = sinusD[p];
+        if (!(dd > 0) || !onMargin(dd) || !(reliefMm[p] > 0)) continue;
+        if (uAtD(dd) > uPk) break;
+        bodyFraction = Math.max(bodyFraction, fracOf(p).frac);
+      }
+      const bar = Math.max(LEAF_NECK_FRACTION, bodyFraction);
+      for (let p = Math.floor((periods - 1) / 2); p >= 0; p--) {
+        const dd = sinusD[p];
+        if (!(dd > 0) || !onMargin(dd) || !(reliefMm[p] > 0)) continue;
+        if (!(uAtD(dd) > uPk)) break;
+        const { us, a, b, frac, atU } = fracOf(p);
+        const neck = frac > bar;
+        tested.push({ sinusU: us, spanU: [a, b], fraction: frac, atU, reliefMm: reliefMm[p], neck });
+        if (!neck) break;
+        given.push(us);
+        reliefMm[p] = 0; reliefMm[periods - 1 - p] = 0;
+      }
+      const after = toothCount();
+      /* the crests the given pairs took, ON THE MARGIN (each is mirrored on
+         the other margin), and whether the apex crest went with them */
+      const droppedCrestU = [];
+      let apexCrestDropped = false;
+      if (given.length) {
+        for (let k = 1; k < periods; k++) {
+          if (reliefMm[k - 1] > 0 || reliefMm[k] > 0) continue;
+          if (crestD[k] > 0 && onMargin(crestD[k])) droppedCrestU.push(uAtD(crestD[k]));
+          else if (2 * k === periods) apexCrestDropped = true;
+        }
+      }
+      tipNeck = { pairsGiven: given.length, teethGiven: before - after, teethDrawn: after, sinusU: given, droppedCrestU, apexCrestDropped, bodyFraction, bar, tested };
+    }
     /* THE APEX NOTCH IS ITS OWN FACT AND NOT A CLAMP. At an EVEN count a
        sinus sits at d = 0, on the terminal mini-face, where the base outline
        is already at the print floor — so its headroom is exactly 0 and its
@@ -5850,7 +5965,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
       countClamped, clampedBy, depthBuilt, depthCap, depthClamped, pitchMm, pitchBelowFloor,
       halfRimMm, marginArcMm, faceMm, treatedHalfMm, periods, apexIsCrest,
       apexReliefMm: apexIsCrest ? null : reliefMm[(periods - 1) / 2],
-      peakHalfMm, reliefAskedMm, reliefMm, reliefLimited, reliefBuiltMm, reliefFloored, countReliefCap, tipYield,
+      peakHalfMm, reliefAskedMm, reliefMm, reliefLimited, reliefBuiltMm, reliefFloored, countReliefCap, tipYield, tipNeck,
       reliefFlooredMm, foldCapMm, foldClamped,
       windowU: [u0, u1], askedWindowU: [u0, u1], sinusU, crestU, cutMm, u0, u1,
       angleChordMm,
@@ -15288,6 +15403,10 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
     countAsked: L0.countAsked, countBuilt: L0.countBuilt, clampedBy: L0.clampedBy || null,
     countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
     tipYield: L0.tipYield ? { ...L0.tipYield } : null,
+    /* THE TIP-NECK YIELD (S5b): the pairs the converging tip gave up, the
+       teeth they took, the teeth DRAWN, and every pair it tested — the
+       read-out's told flag and LF35's record side */
+    tipNeck: L0.tipNeck ? { ...L0.tipNeck, sinusU: L0.tipNeck.sinusU.slice(), tested: L0.tipNeck.tested.map((x) => ({ ...x, spanU: x.spanU.slice() })) } : null,
     depthAsked: L0.depthAsked, peakHalfMm: L0.peakHalfMm, reliefAskedMm: L0.reliefAskedMm,
     reliefFloorMm: L0.reliefFloorMm, reliefBuiltMm: L0.reliefBuiltMm, reliefFloored: !!L0.reliefFloored,
     /* the chevron's fold cap on the relief (S4) — null on every other blade */
@@ -15573,10 +15692,13 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       teethPerLobe: (() => {
         const L0 = prof.lobes;
         if (!L0 || L0.noRoom) return null;
-        const su = S.chevron.sinusU, cr = L0.crestU.slice(1), out = su.map(() => 0);
+        /* (S5b: a crest the converging tip gave up with its pair is not a
+           tooth — it is not counted, nor the apex crest if it went too) */
+        const TN = L0.tipNeck, gone = TN ? TN.droppedCrestU : [];
+        const su = S.chevron.sinusU, cr = L0.crestU.slice(1).filter((u) => !gone.includes(u)), out = su.map(() => 0);
         let term = 0;
         for (const u of cr) { const k = su.findIndex((x) => u <= x); if (k < 0) term += 2; else out[k]++; }
-        return [...out, term + (L0.apexIsCrest ? 1 : 0)];
+        return [...out, term + (L0.apexIsCrest && !(TN && TN.apexCrestDropped) ? 1 : 0)];
       })(),
       lengthMm: Lmm, widthMm: plan.widthMm,
     } : null,

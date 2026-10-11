@@ -59,6 +59,7 @@
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
+import { tipNeckOf } from './bloom-leaf-tip-neck.mjs';
 
 const argv = process.argv.slice(2);
 const argOf = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i + 1]; };
@@ -353,6 +354,16 @@ const PREDICATE_MOVERS = {
     const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.built > 0);
   },
+  /* S5b, JOB 1 — THE TIP GIVES UP THE PAIR THAT NECKS IT (Eva's ruling of
+     Oct 11; docs/bloom-leaf-tip-neck-outcome.md). PREDECLARED FROM THE BASE
+     TREE: a row moves iff the restated rule (`tools/bloom-leaf-tip-neck.mjs`,
+     run on the BASE tree's own profiles and lobe layout — a tree with no
+     give-up at all) gives at least one pair up on some leaf blade of it.
+     Every other row — leafless, entire, or toothed with no neck (the body
+     parting the blade as deeply, the tip's notch under half) — must hold to
+     the bit. The base tree has no `tipNeck`, so the prediction's owner is not
+     the quantity under test. */
+  'tip-neck': (st) => tipNeckOf(base, st).given > 0,
   /* S5, JOB 2 — THE BROAD SINUS'S FILLET, measured against a JOB-1-ONLY tree
      (`--base` is the head with the fillet branch stripped, so the nib is on
      both sides). A row moves iff THIS tree's build fillets at least one broad

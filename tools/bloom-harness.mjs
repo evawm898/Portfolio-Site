@@ -8142,6 +8142,91 @@ export async function leafAssertions(page, row) {
       if (neck) { bad.push(`LF32: blade ${i}'s tip does not close as a point — ${neck} (a neck or a bulb)`); break; }
     }
   }
+  /* LF35 — THE CONVERGING TIP KEEPS NO NECK (S5b, Eva's ruling of Oct 11:
+     "where a tooth pair would neck the converging tip, the tip gives that
+     pair up"). The neck, by measurement: a notch that cuts PAST HALFWAY TO
+     THE MIDRIB parts the blade, and what stands above it reads as a separate
+     body (a knob over a stalk, or — where the print floor holds the cut up —
+     a parallel shaft). The half is RESTATED here (`NECK_HALF`), never
+     imported from the geometry's `LEAF_NECK_FRACTION`, so a mutated
+     constant cannot move both sides.
+     (a) MEASURED, ON THE EMITTED ROWS: from the restated widest point tip-ward
+         (LF32's own restatement), the TIP-MOST run of rows the teeth cut
+         (drawn under the tooth's base outline, off the nib) — the notch the
+         tip kept — leaves every row at least half its base outline. A neck
+         the rule failed to give up is that run, and the shaft's rows read
+         drawn 0.80 mm against a base of 1.8-2.2.
+     (b) THE RECORD: the rule ran on every toothed leaf blade; every pair it
+         gave up reads past half and the pair it stopped at does not; the
+         given pairs carry relief 0 on BOTH margins; the teeth it says are
+         DRAWN are the crests with a cut flank, restated from the relief
+         record. The slack on (a) is the sampled maximum's own bias bound
+         (the rule samples each period 512 times, so its maximum reads low
+         by at most ~5e-7 of the base; 1e-5 is twenty times that). */
+  if (Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === bladesR.length && Array.isArray(L.rowHalfMm) && L.rowHalfMm.length === bladesR.length) {
+    const NECK_HALF = 1 / 2, SLACK = 1e-5;
+    const ta = cpR ? LEAFLET_BASE_TAPER : lobedR ? LOBED_BASE_TAPER : LEAF_BASE_TAPER, tb = cpR ? LEAFLET_TIP_TAPER : lobedR ? LOBED_TIP_TAPER : LEAF_TIP_TAPER;
+    const uPkR = ta / (ta + tb);
+    for (let i = 0; i < bladesR.length; i++) {
+      const Sv = L.serrationBuilt[i];
+      if (!Sv || Sv.noRoom) continue;
+      const TN = Sv.tipNeck;
+      if (!TN) { bad.push(`LF35: blade ${i} cuts ${Sv.countBuilt} teeth and carries no tip-neck record — whether the converging tip is necked is then asserted by nothing`); break; }
+      const tested = TN.tested || [];
+      /* the bar: half, or the blade's own body teeth where those part it
+         deeper (the record's measure of them; (a) below re-reads the body off
+         the emitted rows) */
+      const barR = Math.max(NECK_HALF, Number(TN.bodyFraction) || 0);
+      if (!(Math.abs(TN.bar - barR) <= 0)) { bad.push(`LF35: blade ${i}'s neck bar reads ${TN.bar} where max(1/2, its body's ${TN.bodyFraction}) is ${barR}`); break; }
+      const stop = tested.findIndex((x) => !(x.fraction > barR));
+      const giveN = stop < 0 ? tested.length : stop;
+      if (TN.pairsGiven !== giveN || TN.sinusU.length !== giveN || tested.slice(0, giveN).some((x, k) => x.sinusU !== TN.sinusU[k])) {
+        bad.push(`LF35: blade ${i} gave ${TN.pairsGiven} pair(s) up where its own tested fractions (${tested.map((x) => x.fraction.toFixed(4)).join(', ')}) put ${giveN} past half — the yield is not the criterion`); break;
+      }
+      const sIdx = (u) => Sv.sinusU.indexOf(u);
+      let relOk = true;
+      for (const u of TN.sinusU) { const k = sIdx(u); if (k < 0 || Sv.reliefMm[k] !== 0 || Sv.reliefMm[Sv.periods - 1 - k] !== 0) relOk = false; }
+      if (!relOk) { bad.push(`LF35: blade ${i} says it gave the pair(s) at u ${TN.sinusU.map((u) => u.toFixed(4)).join(', ')} up and still cuts them on one margin or both`); break; }
+      let drawnN = 0;
+      for (let k = 1; k < Sv.periods; k++) if (Sv.reliefMm[k - 1] > 0 || Sv.reliefMm[k] > 0) drawnN++;
+      if (drawnN !== TN.teethDrawn) { bad.push(`LF35: blade ${i} says ${TN.teethDrawn} teeth are drawn where ${drawnN} crests have a cut flank in its relief record`); break; }
+      const hs = L.rowHalfMm[i], RUi = Array.isArray(L.rowU) ? L.rowU[i] : null;
+      const LBi = lobedR && Array.isArray(L.lobedBuilt) ? L.lobedBuilt[i] : null;
+      const hT = LBi ? LBi.rowHalfLobeMm : (Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm[i] : null);
+      if (!Array.isArray(hs) || !Array.isArray(hT) || !RUi || hT.length !== hs.length || RUi.length !== hs.length) { bad.push(`LF35: blade ${i} reports no tooth-base and drawn rows with their stations — the tip cannot be read`); break; }
+      /* THE NOTCH THE TIP KEPT, bracketed by the tooth law's own LAYOUT
+         (its crests and sinuses — the stations, never the give-up decision),
+         measured on the rows: walking down from the apex, the first margin
+         period any emitted row of which is cut. Rows alone cannot find the
+         sinus where the print floor holds a cut flat (measured: the shaft's
+         deepest fraction sits at the widest point, not at its sinus). */
+      const cutRow = (q) => hT[q] >= TIP_HALF_MM && hs[q] < hT[q] - 1e-9;
+      const spanK = (k) => [Sv.crestU[k] === undefined ? 0 : Sv.crestU[k], Sv.crestU[k + 1] === undefined ? 1 : Sv.crestU[k + 1]];
+      /* THE BODY'S OWN TEETH, ON THE ROWS: the deepest fraction any emitted
+         row of a margin period below the widest point takes, the root-most
+         period excepted — the rows sample the cut, so this reads at or under
+         the law's own body (the slack below covers the difference) */
+      let bodyRows = 0;
+      for (let k = 1; k < Sv.sinusU.length && !(Sv.sinusU[k] > uPkR); k++) {
+        const [a, b] = spanK(k);
+        for (let q = 0; q < hs.length; q++) if (RUi[q] > a && RUi[q] < b && cutRow(q)) bodyRows = Math.max(bodyRows, (hT[q] - hs[q]) / hT[q]);
+      }
+      const barRows = Math.max(NECK_HALF, bodyRows) + SLACK;
+      let worst = null;
+      for (let k = Sv.sinusU.length - 1; k >= 0; k--) {
+        const a = Sv.crestU[k] === undefined ? 0 : Sv.crestU[k], b = Sv.crestU[k + 1] === undefined ? 1 : Sv.crestU[k + 1];
+        const rowsK = [];
+        for (let q = 0; q < hs.length; q++) if (RUi[q] > a && RUi[q] < b && cutRow(q)) rowsK.push(q);
+        if (!rowsK.length) continue;
+        if (Sv.sinusU[k] > uPkR) for (const q of rowsK) {
+          const f = (hT[q] - hs[q]) / hT[q];
+          if (f > barRows && (!worst || f > worst.f)) worst = { j: q, f };
+        }
+        break;
+      }
+      if (worst) { bad.push(`LF35: blade ${i}'s tip-most notch NECKS the tip — row ${worst.j} (u ${RUi[worst.j].toFixed(4)}) is drawn ${hs[worst.j].toFixed(4)} mm where the tooth's base outline is ${hT[worst.j].toFixed(4)} mm: ${(100 * worst.f).toFixed(1)}% of the way to the midrib, past half and past the body's own deepest tooth on the rows (${(100 * bodyRows).toFixed(1)}%) — the tip must give that pair up`); break; }
+    }
+  }
   /* LF10 — THE BLADE'S LATTICE IS THE LEAF'S OWN, WHATEVER THE PETALS DID.
      A leaf has no apex ramp, so its blade is BLADE_ROWS rows — the geometry's
      STATIC, module-load row count, a different owner from the per-build `NU`
@@ -8351,10 +8436,14 @@ export async function leafAssertions(page, row) {
          the floored ask is the most it may be, and exactly it where unclamped) */
       const built = lobedR && S.foldClamped ? S.foldCapMm : Math.max(asked, MIN_FEATURE_MM);
       if (Math.abs(S.reliefBuiltMm - built) > 1e-9 || S.reliefFloored !== (asked < MIN_FEATURE_MM)) { bad.push(`LF13: blade ${i} cuts at a relief of ${S.reliefBuiltMm} mm (floored: ${S.reliefFloored}) where max(${asked.toFixed(4)}, ${MIN_FEATURE_MM}) is ${built}`); break; }
-      const margin = S.reliefMm.filter((r, k) => S.apexIsCrest || k !== (S.periods - 1) / 2);
+      /* (S5b: a pair the converging tip gave up is cut at relief 0 BY THE
+         RULE, not under the floor — LF35 holds the give-up itself) */
+      const gaveK = new Set();
+      for (const u of (S.tipNeck ? S.tipNeck.sinusU : [])) { const k = S.sinusU.indexOf(u); if (k >= 0) { gaveK.add(k); gaveK.add(S.periods - 1 - k); } }
+      const margin = S.reliefMm.filter((r, k) => (S.apexIsCrest || k !== (S.periods - 1) / 2) && !gaveK.has(k));
       const under = margin.filter((r) => !(r >= MIN_FEATURE_MM));
       if (under.length) { bad.push(`LF13: blade ${i} cuts ${under.length} margin notch(es) under the ${MIN_FEATURE_MM} mm floor (shallowest ${Math.min(...under).toFixed(4)} mm in the record)`); break; }
-      const drawn = (S.sinusReliefMm || []).filter((r) => !(r >= MIN_FEATURE_MM - 1e-6));
+      const drawn = (S.sinusReliefMm || []).filter((r, k) => !(S.tipNeck && S.tipNeck.sinusU.includes(S.sinusU[k])) && !(r >= MIN_FEATURE_MM - 1e-6));
       if (!S.sinusReliefMm || !S.sinusReliefMm.length || drawn.length) { bad.push(`LF13: blade ${i}'s OUTLINE carries ${drawn.length ? `a notch of ${Math.min(...drawn).toFixed(4)} mm at a margin sinus` : 'no margin sinus at all'} — the floor is in the record and not in the cut`); break; }
       if (S.countBuilt > S.countAsked) { bad.push(`LF13: blade ${i} builds ${S.countBuilt} teeth of ${S.countAsked} asked`); break; }
       if ((S.clampedBy === 'relief floor') !== (S.countReliefCap !== null && S.countReliefCap === S.countBuilt && S.countBuilt < Math.min(S.countAsked, S.countRowsCap, S.countFloorCap))) { bad.push(`LF13: blade ${i}'s count says CLAMPED BY ${S.clampedBy} with a relief-floor cap of ${S.countReliefCap} and ${S.countBuilt} built — the cause must be a biconditional`); break; }
@@ -8831,14 +8920,17 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
        file stops at once if one moves;
      * on every row that builds the RULED DEFAULT LEAF (every control that
        reaches the lobed outline or its teeth at its registry default, a 46
-       mm blade): each leaf asks 28 teeth and builds 28, 3 / 4 / 4 / 6 base to
-       terminal, 6,916 triangles a leaf, and the roundness saturates at
+       mm blade): each leaf asks 28 teeth and lays out 28, DRAWS 26 — 3 / 4 /
+       4 / 4 base to terminal (RE-PINNED, S5b: the converging tip gives up
+       the terminal pair, whose notch cut 81 % of the way to the midrib — Eva
+       accepted the pins moving for that reason and no other; it was 28 drawn,
+       3 / 4 / 4 / 6), 6,916 triangles a leaf, and the roundness saturates at
        0.1750 of the pitch (ruling 3's measured point, re-measured
        when the shoulder tangents were held clear of the crest — was 0.1754);
      * on the WHORLED-8 COST CORNER (block 56's row: 8 whorled nodes, arch
        180, cup 1.2, on the 90 mm stem): 192,874 triangles, 12.9% of
        `EXPORT_TRI_BUDGET`. */
-export const LOBED_RULED_PINS = Object.freeze({ rows: 130, perLobe: 4, roundness: 0.12, teethAsked: 28, teethBuilt: 28, split: Object.freeze([3, 4, 4, 6]),
+export const LOBED_RULED_PINS = Object.freeze({ rows: 130, perLobe: 4, roundness: 0.12, teethAsked: 28, teethBuilt: 28, teethDrawn: 26, split: Object.freeze([3, 4, 4, 4]),
   leafTris: 6916, saturatesAt: 0.1750, cornerTris: 192874, cornerBudgetPct: 12.9 });
 if (GEOMETRY.LOBED_BLADE_ROWS !== LOBED_RULED_PINS.rows) throw new Error(`LF31: LOBED_BLADE_ROWS is ${GEOMETRY.LOBED_BLADE_ROWS}, the ruled ${LOBED_RULED_PINS.rows} (Eva, Oct 9) — a row change moves the ruled 28 of 28 teeth; re-rule it, then re-pin`);
 if (Number(DEFAULTS.lobedToothCount) !== LOBED_RULED_PINS.perLobe) throw new Error(`LF31: the lobed tooth default is ${DEFAULTS.lobedToothCount} a lobe, the ruled ${LOBED_RULED_PINS.perLobe}`);
@@ -8851,7 +8943,9 @@ export function lobedRuledPinClauses(ui, m, L, LB) {
   const P = LOBED_RULED_PINS, S = L.serrationBuilt || [];
   for (let i = 0; i < LB.length; i++) {
     const s = S[i], split = LB[i] && LB[i].teethPerLobe;
-    if (!s || s.countAsked !== P.teethAsked || s.countBuilt !== P.teethBuilt) { bad.push(`LF31: leaf ${i} of the ruled default asks ${s ? s.countAsked : 'no'} teeth and builds ${s ? s.countBuilt : 'none'} (${s && s.clampedBy ? `clamped by ${s.clampedBy}` : 'unclamped'}) — ruled: ${P.teethAsked} of ${P.teethBuilt}, unclamped`); break; }
+    if (!s || s.countAsked !== P.teethAsked || s.countBuilt !== P.teethBuilt) { bad.push(`LF31: leaf ${i} of the ruled default asks ${s ? s.countAsked : 'no'} teeth and lays out ${s ? s.countBuilt : 'none'} (${s && s.clampedBy ? `clamped by ${s.clampedBy}` : 'unclamped'}) — ruled: ${P.teethAsked} of ${P.teethBuilt}, unclamped`); break; }
+    const drawn = s.tipNeck ? s.tipNeck.teethDrawn : s.countBuilt;
+    if (drawn !== P.teethDrawn) { bad.push(`LF31: leaf ${i} of the ruled default DRAWS ${drawn} teeth (the converging tip gave ${s.tipNeck ? s.tipNeck.pairsGiven : 0} pair(s) up) — pinned: ${P.teethDrawn} (S5b, one pair given up)`); break; }
     if (!Array.isArray(split) || split.join('/') !== P.split.join('/')) { bad.push(`LF31: leaf ${i} of the ruled default carries ${split ? split.join(' / ') : 'no'} teeth per lobe — ruled: ${P.split.join(' / ')}`); break; }
   }
   if (m.leafTris !== LB.length * P.leafTris) bad.push(`LF31: the ruled default's ${LB.length} leaves are ${m.leafTris} triangles — ruled: ${P.leafTris} a leaf (${LB.length * P.leafTris})`);
@@ -9208,18 +9302,26 @@ export function lobedRoundYieldToothClauses(ui, L, LB, US, env, ease, builtLobes
              side of it, or the last crest and the tip (an even count's apex
              notch sits on the terminal face, cuts nothing and is told by
              `apexIsCrest`, so it is no margin tooth) */
-          let missing = null;
+          /* (S5b: a pair the converging tip GAVE UP is declared by the layout
+             and drawn by nobody — both directions: it is not missing, and no
+             row of its period may be cut) */
+          const gave = S.tipNeck ? S.tipNeck.sinusU : [];
+          let missing = null, drawnGiven = null;
           for (const us of S.sinusU) {
             const a = Math.max(...S.crestU.filter((x) => x <= us), 0), bs = S.crestU.filter((x) => x > us), b = bs.length ? Math.min(...bs) : 1;
-            if (!US.some((u, j) => u > a && u < b && c[j] > 1e-9)) { missing = `the margin tooth at u ${us.toFixed(4)} (its period u ${a.toFixed(4)}-${b.toFixed(4)})`; break; }
+            const cutHere = US.some((u, j) => u > a && u < b && c[j] > 1e-9);
+            if (gave.includes(us)) { if (cutHere && !drawnGiven) drawnGiven = `the margin tooth at u ${us.toFixed(4)} (its period u ${a.toFixed(4)}-${b.toFixed(4)})`; continue; }
+            if (!cutHere) { missing = `the margin tooth at u ${us.toFixed(4)} (its period u ${a.toFixed(4)}-${b.toFixed(4)})`; break; }
           }
           if (missing) bad.push(`LF29: ${missing} is declared and no emitted row in its period is cut — a tooth the per-lobe count claims is not drawn`);
+          if (drawnGiven) bad.push(`LF29: ${drawnGiven} was given up by the converging tip and an emitted row in its period is still cut`);
         }
         const T = r.teethPerLobe;
         if (!Array.isArray(T) || T.length !== builtLobes + 1) bad.push(`LF29: the per-lobe record has ${T ? T.length : 'no'} entries for ${builtLobes} lateral lobes and the terminal`);
         else {
           const sum = 2 * T.slice(0, -1).reduce((a, b) => a + b, 0) + T[T.length - 1];
-          if (sum !== S.countBuilt) bad.push(`LF29: the teeth per lobe ${T.join(' / ')} sum to ${sum} over both margins where ${S.countBuilt} were built`);
+          const drawnN = S.tipNeck ? S.tipNeck.teethDrawn : S.countBuilt;
+          if (sum !== drawnN) bad.push(`LF29: the teeth per lobe ${T.join(' / ')} sum to ${sum} over both margins where ${drawnN} are drawn (${S.countBuilt} laid out)`);
         }
       }
     }
@@ -15771,6 +15873,21 @@ export function buildMatrix() {
   const SAT = { stemLength: 120, stemDiameter: 6, leafNodes: 1, leafType: 'LOBED', lobedLobes: 2, lobedFrom: 0.26, lobedTo: 0.6, lobedSinus: 0.2, lobedShape: 2.35, lobedAngle: 18, lobedEase: 0.54, lobedWidth: 17, leafLength: 44, lobedToothDepth: 0.95, leafToothCount: 6, leafTipShape: 2.85 };
   lf('BROAD SINUS: roundness 0.49 (the last LIVE step on a fillet that saturates at 0.4928)', { ...SAT, lobedRound: 0.49 });
   lf('BROAD SINUS: roundness 0.50 (the first DEAD step — SATURATED, told and hatched)', { ...SAT, lobedRound: 0.5 });
+  /* 60. THE TIP GIVES UP THE PAIR THAT NECKS IT (Eva's ruling of Oct 11 —
+        leaf/stem build S5b; docs/bloom-leaf-tip-neck-outcome.md). A tip-ward
+        notch that cuts past halfway to the midrib AND deeper than the blade's
+        own body teeth is a neck, and the converging tip gives that pair up,
+        from the apex down, keeping every station (LF35). The rows: the
+        simple default leaf alone (one pair), two pairs given, the bar raised
+        to the body's own deepest tooth, a body that parts the blade as deeply
+        as the tip (nothing given), and the rose's leaflets toothed. Appended
+        as the FINAL block, after 59. */
+  const NECK = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1 };
+  lf('TIP NECK: SIMPLE, the default leaf alone (its terminal notch cuts 77% of the way to the midrib — the pair given up, told)', { ...NECK });
+  lf('TIP NECK: two pairs given up (SIMPLE depth 0.5 x 9 teeth — 77% and 68%; the third pair, 48%, stops the walk)', { ...NECK, leafToothDepth: 0.5, leafToothCount: 9 });
+  lf('TIP NECK: the bar is the BODY\'s (SIMPLE depth 0.5 x 12 — its body tooth parts 52%: 82% and 59% given, 46% kept)', { ...NECK, leafToothDepth: 0.5, leafToothCount: 12 });
+  lf('TIP NECK: the body parts the blade as deeply (SIMPLE depth 0.8 x 9 — the body 80%, the tip 77%: no neck, nothing given)', { ...NECK, leafToothDepth: 0.8, leafToothCount: 9 });
+  lf('TIP NECK: the ROSE, its leaflets toothed at 0.26 (each leaflet gives its terminal pair up)', { stemLength: 90, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', leafletToothDepth: 0.26 });
 
   return rows;
 }

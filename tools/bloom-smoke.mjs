@@ -1333,6 +1333,22 @@ export const SMOKE_BLOCKS = [
         path: "LF34 (a broad sinus's fillet tangent to both arms on the law, the page's rows on the law's fillet, the record the law's, the radius law) and LF20's ADD window" },
     ],
   },
+  {
+    n: 60, title: 'the tip gives up the pair that necks it (Oct 11, S5b)',
+    anchor: 'TIP NECK: SIMPLE, the default leaf alone (its terminal notch cuts 77% of the way to the midrib — the pair given up, told)',
+    /* THREE ROWS: two pairs given (the walk applies again one pair down), the
+       bar raised to the body's own teeth (nothing given: the deep-serration
+       arm), and the rose's toothed leaflets. LF35 rides on every toothed
+       leaf blade in the subset; these are the rows that exercise its arms. */
+    rows: [
+      { label: 'TIP NECK: two pairs given up (SIMPLE depth 0.5 x 9 teeth — 77% and 68%; the third pair, 48%, stops the walk)',
+        path: "LF35 (the record's two give-ups past the bar and the third under it, both margins at relief 0, the teeth drawn restated; the kept notch on the emitted rows under the bar) and LF13 with the given pairs exempt" },
+      { label: 'TIP NECK: the body parts the blade as deeply (SIMPLE depth 0.8 x 9 — the body 80%, the tip 77%: no neck, nothing given)',
+        path: "LF35's BODY arm — the bar is the body's own deepest tooth, read on the rows as well as in the record, and a tip parted no deeper keeps its teeth" },
+      { label: 'TIP NECK: the ROSE, its leaflets toothed at 0.26 (each leaflet gives its terminal pair up)',
+        path: 'LF35 on every leaflet (each its own blade, its own body and bar) and LF16' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

@@ -2132,6 +2132,31 @@ const MUTANTS = [
         return { told: O.round.sinuses.filter((x) => x.fillet).length, drawn: O.round.filleted }; };
       let m, c; try { m = filled(M); c = filled(C); } catch (e) { return `the witness threw: ${e.message}`; }
       return (m.told > 0 && m.drawn === 0 && c.drawn === c.told && c.told > 0) ? null : `the mutant tells ${m.told} fillets and draws ${m.drawn}, the clean tree ${c.told} / ${c.drawn} — the behaviour did not move`; } },
+  /* S5b — THE TIP GIVES UP THE PAIR THAT NECKS IT. Two mutants, because LF35
+     has two halves and a mutant that keeps the record honest must not be the
+     only one: the first moves the DECISION (the record then reads a pair past
+     half that was kept), the second leaves the decision and the record right
+     and the OUTLINE wrong (a pair told given up, still cut) — which only the
+     measured half and LF29 can see. Witnessed on the MUTATED module's own
+     shipped lobed defaults (LOB_WIT, a table row). */
+  { id: 'the-tip-keeps-its-neck', why: "the neck bar is doubled, so no pair is ever past it — the converging tip keeps the notch that cuts 81 % of the way to the midrib (the stalk-and-knob the ruling removed)",
+    find: "        const neck = frac > bar;",
+    into: '        const neck = frac > 2 * bar;', names: ['LF35'],
+    witness: (M, C) => {
+      const given = (G) => { const f = compoundFacts(G, LOB_WIT); if (f.threw) throw new Error(f.threw); const t = f.rep.serration.tipNeck; return t ? t.pairsGiven : -1; };
+      let gm, gc; try { gm = given(M); gc = given(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (gm === 0 && gc >= 1) ? null : `the mutant gives ${gm} pair(s) up against the clean tree's ${gc} on the lobed defaults — the behaviour did not move`; } },
+  { id: 'the-given-pair-is-told-and-still-cut', why: "the pair is recorded as given up (relief 0 in the record) and the outline is still cut from the relief it had — the read-out says the neck is gone over a tip that still has it",
+    find: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));',
+    into: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : (reliefMm[periodOf(u)] || (tipNeck && tipNeck.pairsGiven && Math.abs(treatedHalfMm - (periodOf(u) + 0.5) * pitchMm) > faceMm / 2 ? reliefBuiltMm : 0)) * lobeCutProfile(phaseAt(u), crestShape, notchShape));', names: ['LF35'],
+    witness: (M, C) => {
+      const deepest = (G) => { const f = compoundFacts(G, LOB_WIT); if (f.threw) throw new Error(f.threw);
+        const r = f.rep, S = r.serration, t = S.tipNeck, us = r.lobed.rowU, hL = r.lobed.rowHalfLobeMm, hs = r.rowHalfMm;
+        if (!t || !t.sinusU.length) return { told: 0, cut: 0 };
+        const k = S.sinusU.indexOf(t.sinusU[0]), a = S.crestU[k], b = S.crestU[k + 1] === undefined ? 1 : S.crestU[k + 1];
+        let w = 0; for (let j = 0; j < us.length; j++) if (us[j] > a && us[j] < b) w = Math.max(w, hL[j] - hs[j]); return { told: t.pairsGiven, cut: w }; };
+      let m, c; try { m = deepest(M); c = deepest(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (m.told >= 1 && m.cut > 1 && c.told >= 1 && c.cut === 0) ? null : `the mutant tells ${m.told} pair(s) given and cuts ${m.cut} mm in the given period, the clean tree ${c.told} / ${c.cut} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from
