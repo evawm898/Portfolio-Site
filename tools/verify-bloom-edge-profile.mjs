@@ -1120,8 +1120,11 @@ else {
   console.log(`edge-profile: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   if (fails.length) {
     console.log(`\nedge-profile: FAILED — ${fails.length} findings`);
-    for (const f of fails.slice(0, 40)) console.log('  ' + f);
-    if (fails.length > 40) console.log(`  ... and ${fails.length - 40} more`);
+    /* `--all-fails` lists every finding rather than the first 40 (S5: a sweep
+       over 190 rows had to be compared row by row against the base tree) */
+    const LIM = process.argv.includes('--all-fails') ? Infinity : 40;
+    for (const f of fails.slice(0, LIM)) console.log('  ' + f);
+    if (fails.length > LIM) console.log(`  ... and ${fails.length - LIM} more`);
     process.exit(1);
   }
   console.log('edge-profile: PASS — E0-E6 clean.');
