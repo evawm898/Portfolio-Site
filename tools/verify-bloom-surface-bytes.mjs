@@ -335,6 +335,36 @@ const PREDICATE_MOVERS = {
     const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.type === 'LOBED' && lp.built > 0);
   },
+  /* LEAF/STEM BUILD S5, JOB 1 — THE LEAF'S APEX NIB (Eva's Oct 10 ruling;
+     docs/bloom-leaf-tip-broad-sinus-outcome.md). Every leaf blade — SIMPLE,
+     a COMPOUND leaflet, LOBED — closes on the nib now where it ended on the
+     beaded 1.60 mm stub, so a row moves iff the BASE tree builds at least one
+     leaf on it (its own plan chain, after the raceme's pin and the flowering
+     node's cap). Read off the BASE tree, never this one, so the prediction's
+     owner is not the quantity under test. Every leafless row holds to the
+     bit — the petals' own nib read `nibCrossing` through a refactor and must
+     not move a float. */
+  'leaf-tip': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    if (!fr.hub) return false;
+    const sp = base.stemPlan(st, fr.hub, acc);
+    const ip = base.inflorescencePlan(st, sp, acc);
+    const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
+    return !!(lp.present && lp.built > 0);
+  },
+  /* S5, JOB 2 — THE BROAD SINUS'S FILLET, measured against a JOB-1-ONLY tree
+     (`--base` is the head with the fillet branch stripped, so the nib is on
+     both sides). A row moves iff THIS tree's build fillets at least one broad
+     sinus (`roundBottoms.filleted`, the fillet that touches a drawn row). The
+     narrow sinuses' U bottoms and every other row must hold to the bit — the
+     ruling's "narrow-sinus bytes must not move", measured. The base tree has
+     no fillet branch, so the guard can only be read here. */
+  'broad-fillet': (st) => {
+    if (mine.leafIsAbsent(st)) return false;
+    const b = mine.buildBloomInto(new mine.MeshBuilder({ exportMode: true }), st);
+    return (b.leavesBuilt || []).some((r) => r && r.lobed && r.lobed.roundBottoms && r.lobed.roundBottoms.filleted > 0);
+  },
   'variance-form': (st) => !mine.varianceFormIsAbsent(st),
   /* ORGANIC VARIANCE, BUILD 3 (spacing). A row moves iff the SPACING field
      exists on this tree — the geometry's own `varianceSpacingIsAbsent`, the

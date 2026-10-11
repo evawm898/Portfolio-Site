@@ -754,8 +754,10 @@ const MUTANTS = [
     /* (moved again, leaf/stem build S4: the CORE term carries the chevron's
        lobe factor on a branch — the anchor ends at the plain arm; and again
        in S4b, where the chevron arm caps at the round sinus bottoms) */
-    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
+    /* (and in S5, where the chevron arm takes the broad-sinus fillet's floor
+       on a branch) */
+    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -1763,8 +1765,9 @@ const MUTANTS = [
     /* RE-ANCHORED (leaf/stem build S3): the clamp record moved into
        `emitLeafBladeInto`, which reads the blade's own `widthMm` (a leaflet's,
        or the simple leaf's `plan.widthMm`). */
-    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };',
-    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };', names: ['LF9'],
+    /* (re-anchored S5: the record gained the nib's own fields) */
+    find: '    const fromU = hi, ap = tipProf.apex;',
+    into: '    const fromU = tipProf.uPk, ap = tipProf.apex;', names: ['LF9'],
     witness: (M, C) => { const m = leafFacts(M, 1.3), c = leafFacts(C, 1.3);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.clamp.fromU < c.clamp.fromU - 0.1 && !m.rowsDiffer(c)) ? null
@@ -2081,6 +2084,54 @@ const MUTANTS = [
       };
       let wm, wc; try { wm = worst(M); wc = worst(C); } catch (e) { return `the witness threw: ${e.message}`; }
       return (wm > 5 && wc < 1) ? null : `the mutant turns ${wm.toFixed(3)} deg at its worst shoulder corner against the clean ${wc.toFixed(3)} — the behaviour did not move`; } },
+  /* S5 — THE LEAF NIB, THE TIP'S TOOTH AND THE BROAD SINUS'S FILLET. Each
+     witnessed on the MUTATED module's own build, never on the clause it names. */
+  { id: 'the-leaf-nib-bulges', why: "the leaf nib's arc is centred PAST its flank's end, so the tip swells into a bulb before it closes — the neck-and-bulb the ruling removed",
+    find: '    const xFace = x0 + (h0 - a) / m, r = a * Math.sqrt(1 + m * m), c = xFace - a * m;',
+    into: '    const xFace = x0 + (h0 - a) / m, r = a * Math.sqrt(1 + m * m), c = xFace + a * m;', names: ['LF32'],
+    witness: (M, C) => {
+      const rise = (G) => { const f = compoundFacts(G, { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 1 }); if (f.threw) throw new Error(f.threw);
+        /* the rise over the rows past the law's own floor crossing (the
+           record's `fromU`): a bulb can be the blade's WIDEST row, so a rise
+           read past the widest row sees nothing (the first version of this
+           witness did exactly that — the bulb measured 293 mm) */
+        const hb = f.rep.rowHalfBaseMm, uR = f.rep.rowU, u0 = f.rep.tipClamp.fromU;
+        let r = 0; for (let j = 1; j < hb.length; j++) if (uR[j - 1] >= u0) r = Math.max(r, hb[j] - hb[j - 1]); return r; };
+      let rm, rc; try { rm = rise(M); rc = rise(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (rm > 1e-6 && rc === 0) ? null : `the mutant's tip rises ${rm} mm past its widest row against the clean ${rc} — the behaviour did not move`; } },
+  { id: 'a-tooth-cuts-the-nib', why: 'inside the nib the drawn row is the TOOTHED outline again — a tooth whose period runs past the floor crossing digs the converging tip toward the face, where it folds',
+    find: 'export function leafHalfAt(prof, u) { return prof.onNib(u) ? prof.halfWidthBaseAt(u) : Math.max(prof.halfWidthAt(u), TIP_HALF_MM); }',
+    into: 'export function leafHalfAt(prof, u) { return prof.onNib(u) ? prof.halfWidthAt(u) : Math.max(prof.halfWidthAt(u), TIP_HALF_MM); }', names: ['LF33'],
+    witness: (M, C) => {
+      const dig = (G) => { const f = compoundFacts(G, NIB_TOOTH_WIT); if (f.threw) throw new Error(f.threw);
+        let d = 0; for (const B of f.rep.leaflets || []) for (let j = 0; j < B.rowHalfMm.length; j++) if (B.rowHalfBaseMm[j] < G.TIP_HALF_MM) d = Math.max(d, B.rowHalfBaseMm[j] - B.rowHalfMm[j]); return d; };
+      let dm, dc; try { dm = dig(M); dc = dig(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (dm > 0.01 && dc === 0) ? null : `the mutant cuts ${dm} mm into its leaflets' nibs against the clean ${dc} — the behaviour did not move`; } },
+  { id: 'the-broad-fillet-is-a-chord', why: "a broad sinus's fillet is drawn as the CHORD between its two tangent points — corners at both arms, the V point flattened rather than rounded",
+    find: "        const at = (u) => { const dx = u * Lmm - C[0]; return C[1] - Math.sqrt(Math.max(0, rho * rho - dx * dx)); };",
+    into: "        const at = (u) => lam(uB) + ((lam(uF) - lam(uB)) * (u - uB)) / (uF - uB);", names: ['LF34'],
+    witness: (M, C) => {
+      const worst = (G) => {
+        const st = { ...REGISTRY_DEFAULTS, ...FILLET_WIT }, len = Number(st.leafLength), O = G.lobedOutline(st, len, true);
+        const h = (u) => Math.max(O.prof.halfWidthBaseAt(u), G.TIP_HALF_MM), P = (u) => { const t = O.tauAt(u), x = h(u); return [u * len + x * Math.sin(t), x * Math.cos(t)]; };
+        const dir = (a, b) => { const p = P(a), q = P(b); return Math.atan2(q[1] - p[1], q[0] - p[0]); };
+        let w = 0, n = 0;
+        for (const s2 of O.round.sinuses) if (s2.fillet) for (const u of s2.filletU) { n++;
+          let t = dir(u, u + 1e-6) - dir(u - 1e-6, u); while (t > Math.PI) t -= 2 * Math.PI; while (t < -Math.PI) t += 2 * Math.PI;
+          w = Math.max(w, Math.abs(t) * 180 / Math.PI); }
+        if (!n) throw new Error('no sinus is filleted on the witness state');
+        return w;
+      };
+      let wm, wc; try { wm = worst(M); wc = worst(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (wm > 5 && wc < 1) ? null : `the mutant turns ${wm.toFixed(3)} deg at its worst fillet join against the clean ${wc.toFixed(3)} — the behaviour did not move`; } },
+  { id: 'the-broad-fillet-is-told-and-not-drawn', why: "the fillet is solved and recorded and never reaches the outline — the read-out says rounded over a V point",
+    find: '      fills.push({ ua, ub, F: Fb.at });',
+    into: '      void Fb;', names: ['LF34'],
+    witness: (M, C) => {
+      const filled = (G) => { const st = { ...REGISTRY_DEFAULTS, ...FILLET_WIT }, O = G.lobedOutline(st, Number(st.leafLength), true);
+        return { told: O.round.sinuses.filter((x) => x.fillet).length, drawn: O.round.filleted }; };
+      let m, c; try { m = filled(M); c = filled(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (m.told > 0 && m.drawn === 0 && c.drawn === c.told && c.told > 0) ? null : `the mutant tells ${m.told} fillets and draws ${m.drawn}, the clean tree ${c.told} / ${c.drawn} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from
@@ -2242,14 +2293,16 @@ const MUTANTS = [
      EVERY WITNESS READS THE PLAN THE MUTATED MODULE DERIVES, never the
      assertion the mutant names. */
   { id: 'the-nib-is-never-cut', why: 'the blade never clears the print floor, always — the guard refuses every nib and the outline runs out FLAT to the mode floor as it did before this session',
-    find: "  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };",
-    into: "  if (true) return { ...inert, why: 'the blade never clears the print floor' };", names: ['AN0'],
+    /* RE-ANCHORED (S5): the guards moved into `nibCrossing`, the ONE owner
+       the petal's and the leaf's nib both read, so this mutates both */
+    find: "  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { why: 'the blade never clears the print floor' };",
+    into: "  if (true) return { why: 'the blade never clears the print floor' };", names: ['AN0'],
     witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.active && c.active && m.terminal > c.terminal) ? null
         : `the mutant's plan is ${m.active ? 'ACTIVE' : 'inert'} ending on ${m.terminal} mm against the clean tree's ${c.active ? 'ACTIVE' : 'inert'} ${c.terminal} — the nib still closes the blade`; } },
   { id: 'the-squared-terminal-no-longer-stands-the-nib-down', why: 'the nib is cut even where a squared terminal holds the outline above the print floor, so petalTipEnd stops deciding how wide the petal ends — the guard’s other arm, and #229’s fringe terminal with it',
-    find: "  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };",
+    find: "  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { why: 'a squared terminal holds the outline above the floor' };",
     into: '  /* the squared terminal no longer stands the nib down */', names: ['AN0'],
     /* THE WITNESS ASKS WHICH GUARD REFUSED, NOT WHETHER ONE DID — and the
        first version asking the latter reported "the behaviour did not move"
@@ -2474,6 +2527,9 @@ const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 
    floor); and a SIMPLE leaf with every lobed control at an extreme (where a
    leak would show). Each is a table row of the same state. */
 const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
+/* S5's witness states — the two rows above, as control sets */
+const NIB_TOOTH_WIT = { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.6, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.3, leafToothCount: 3 };
+const FILLET_WIT = { ...LOB_WIT, lobedShape: 2.5 };
 /* S4's own lobed form (S4b): the mum retune moved the four lobed defaults,
    and at its rounder, less tilted lobes the unclamped tilt folds no cell and
    the 0.3 mm teeth sit under their fold cap — so the three witnesses that
@@ -2751,6 +2807,13 @@ const ROWS = [
   /* THE LOBED ROWS (leaf/stem build S4): the witness sets above. */
   { label: 'a LOBED leaf at the shipped lobed defaults (3 lobes a side; the S4b mum form)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }] },
+  /* S5 ROWS: a compound leaflet whose last tooth's period runs past the nib's
+     crossing (LF33's state — the tooth would dig the tip to the face), and a
+     LOBED leaf whose three sinuses are all BROAD and filleted (LF34's). */
+  { label: 'a compound leaf whose leaflet tooth reaches the converging tip (leaflet tip 0.60, width 40, tooth depth 0.3)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletTipShape', value: '0.6' }, { id: 'leafletWidth', value: '40' }, { id: 'leafletLength', value: '46' }, { id: 'leafletToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '3' }] },
+  { label: 'a LOBED leaf whose sinuses are BROAD and filleted (lobe shape 2.5, sinus 0.55, roundness 0.12)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '2.5' }] },
   { label: 'a LOBED leaf at lobe angle 60 at S4\'s form, 2 teeth a lobe (the TILT cap binds: built 46.73)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '0.08' }, { id: 'lobedToothCount', value: '2' }] },
   { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3, 1 tooth a lobe (the TOOTH fold clamp binds hardest)',
@@ -2956,6 +3019,9 @@ async function famsOn(rows) {
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {
       const mm = /^(LF\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      /* `--why` prints each leaf message beside its row (S5: the control fired
+         LF26 on one row of 68 and the table names families, never rows) */
+      if (process.argv.includes('--why')) console.log(`      [${row.label}] ${msg.slice(0, 260)}`);
     }
     /* THE SEPAL FAMILY (sepals, part 1) — the rule again. */
     for (const msg of await sepalAssertions(page, row)) {

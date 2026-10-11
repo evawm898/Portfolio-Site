@@ -1737,11 +1737,22 @@ function lobedLine(leaf, b0) {
    depth (the asked V then stands, told, never refused). Off the builder's own
    record; the depth is never moved. */
 function roundLine(R, leaf) {
-  if (!R || !R.needed) return '';
+  if (!R) return '';
   const S = R.sinuses;
   const at = (r) => `${(100 * r.u).toFixed(0)}%`;
+  /* S5: a BROAD sinus (its asked V already opens past the print minimum) is
+     FILLETED at its V point — a circle tangent to both arms, adding material
+     — and a broad sinus with no room for even the floor's fillet keeps its V,
+     told. Said on its own line, beside the narrow sinuses' round bottoms. */
+  const fil = S.filter((r) => r.fillet), filNo = S.filter((r) => r.filletNoRoom);
+  const filletLine = fil.length || filNo.length
+    ? `\n     BROAD SINUSES FILLETED ${fil.length} of ${S.filter((r) => r.openingAskedMm !== null && !r.need).length} at the V point (a circle tangent to both arms)`
+      + (fil.length ? ` (${fil.map((r) => `${at(r)}: a ${r.radiusMm.toFixed(2)} mm fillet, adding up to ${r.addedMm.toFixed(2)} mm${r.shrunk ? `, SHRUNK from ${r.radiusAskedMm.toFixed(2)} to the largest that meets both arms tangentially` : r.floored ? `, FLOORED up to the ${r.radiusMinMm.toFixed(2)} mm print minimum` : ''}`).join('; ')})` : '')
+      + (filNo.length ? ` · NO FILLET FITS at ${filNo.map(at).join(', ')} — not even the ${MIN_FEATURE_MM / 2} mm floor meets both arms inside the half-period, so the V stands (told, never refused)` : '')
+    : '';
+  if (!R.needed) return filletLine;
   const built = S.filter((r) => r.built), nofit = S.filter((r) => r.noFit);
-  return `\n     ROUND SINUS BOTTOMS ${built.length} of ${S.length} sinuses WIDENED beyond what the depth and shape asked`
+  return filletLine + `\n     ROUND SINUS BOTTOMS ${built.length} of ${S.length} sinuses WIDENED beyond what the depth and shape asked`
     + (built.length ? ` (${built.map((r) => `${at(r)}: the asked V opened ${r.openingAskedMm.toFixed(2)} mm, the round bottom holds ${r.openingBuiltMm.toFixed(2)} on a ${(2 * r.radiusMm).toFixed(2)} mm disc, taking up to ${r.takenMm.toFixed(2)} mm of flank${r.steepenedBack || r.steepenedFwd ? `, a wall steepened to meet its flank before the crest` : ''}`).join('; ')})` : '')
     + ` — the depth untouched, the walls no steeper than the asked flanks`
     + (nofit.length ? ` · NO ROUND BOTTOM FITS at ${nofit.map((r) => `${at(r)} (${r.noFitWhy}; the asked V opens ${r.openingAskedMm.toFixed(2)} mm)`).join(', ')} — the lobes are too close for one at the asked depth, so the V stands (told, never refused)` : '');
@@ -1766,10 +1777,21 @@ function leafLine(leaf, leavesBuilt) {
   /* THE TIP, CLAMPED AND TOLD — the BUILDER's own clamp record (every leaf on
      a build shares one profile, so the first built leaf's is every leaf's). */
   const cl = leavesBuilt && leavesBuilt[0] && leavesBuilt[0].tipClamp;
-  const tipLine = cl
-    ? `\n     TIP shape ${Number(leaf.tipShape).toFixed(2)} · ends ${cl.terminalMm.toFixed(2)} mm across (the print terminal, both modes) — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
-      + (cl.fraction > 0.05 ? ` — CLAMPED: a pointier shape LENGTHENS the stub and a wider leaf shortens it; the share is set by the width, never the length` : '')
-    : '';
+  /* S5: the blade closes on the petal's own NIB construction — a straight
+     flank, then an arc to a 0.10 mm face — started where the leaf keeps its
+     own length (`leafNibPlan`), so the line says what the tip IS and how it
+     leaves the outline. Where the nib is inert the stub line is kept. */
+  const nibMm = cl && cl.nib && cl.fraction > 0 ? ((1 - cl.startU) * cl.mm) / cl.fraction : 0;
+  const nibHow = !(cl && cl.nib) ? ''
+    : cl.regime === 'tangent' ? `leaves the outline on its own tangent where the blade is ${(2 * cl.startHalfMm).toFixed(2)} mm across, past the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor`
+    : cl.regime === 'floor' ? `leaves where the outline meets the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor on a flank ${cl.kinkDeg.toFixed(1)}° SHALLOWER than the outline (a corner: the outline's own tangent would close short of the leaf's length)`
+    : `leaves the outline where it is ${(2 * cl.startHalfMm).toFixed(2)} mm across on a flank ${cl.kinkDeg.toFixed(1)}° STEEPER than it (a corner: the outline's own tangent would close past the leaf's length)`;
+  const tipLine = cl && cl.nib
+    ? `\n     TIP shape ${Number(leaf.tipShape).toFixed(2)} · closes on the NIB: the last ${nibMm.toFixed(2)} mm ${nibHow}, rounded on a ${cl.radiusMm.toFixed(3)} mm arc to a ${cl.terminalMm.toFixed(2)} mm face (the petal's nib, both modes; the leaf keeps its length)`
+    : cl
+      ? `\n     TIP shape ${Number(leaf.tipShape).toFixed(2)} · ends ${cl.terminalMm.toFixed(2)} mm across (the print terminal, both modes) — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
+        + (cl.fraction > 0.05 ? ` — CLAMPED: a pointier shape LENGTHENS the stub and a wider leaf shortens it; the share is set by the width, never the length` : '')
+      : '';
   /* THE SHARED NODE (ruling 5): on a raceme the leaves are the PEDICELS'
      — one under each, at its azimuth, seated a derived offset below — so the
      node and arrangement the leaf's own two controls would set are told as
@@ -1841,7 +1863,7 @@ function leafLine(leaf, leavesBuilt) {
   } else if (Sr) {
     const margin = Sr.reliefMm.filter((r, i) => Sr.apexIsCrest || i !== (Sr.periods - 1) / 2);
     const perLeaflet = cpd && b0 && b0.leaflets ? b0.leaflets.map((q) => (q.serration && !q.serration.noRoom ? q.serration.countBuilt : 0)) : null;
-    teethLine = `\n     TEETH ${Sr.countBuilt} built${perLeaflet ? ` on the first leaflet (each leaflet its own blade: ${perLeaflet.join(' / ')} of ${Sr.countAsked} asked — the relief floor gives on the small ones, the ruled behaviour)` : ''}${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : ''}`
+    teethLine = `\n     TEETH ${Sr.countBuilt} built${perLeaflet ? ` on the first leaflet (each leaflet its own blade: ${perLeaflet.join(' / ')} of ${Sr.countAsked} asked — the relief floor gives on the small ones, the ruled behaviour)` : ''}${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give${Sr.tipYield ? ` — the converging TIP gave the first up (its notch at u ${Sr.tipYield.atU.toFixed(3)} has no ${Sr.reliefFloorMm.toFixed(2)} mm of material where the blade closes on its nib; a tooth there would fold)` : ''}` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : ''}`
       + (margin.length ? ` · relief ${Math.min(...margin).toFixed(2)}${Math.max(...margin) > Math.min(...margin) ? `–${Math.max(...margin).toFixed(2)}` : ''} mm at the sinuses` : '')
       + (Sr.reliefFloored ? ` (asked ${Sr.reliefAskedMm.toFixed(2)} mm, FLOORED at the ${Sr.reliefFloorMm.toFixed(2)} mm minimum feature — design view included; the slider keeps its value)` : ` (the floor is ${Sr.reliefFloorMm.toFixed(2)} mm)`)
       + (Sr.rowReliefMm && Sr.rowReliefMm.length ? ` · the rows draw ${Math.min(...Sr.rowReliefMm).toFixed(2)}–${Math.max(...Sr.rowReliefMm).toFixed(2)} mm of it (they sample the cut between stations)` : '')
@@ -2809,6 +2831,9 @@ window.__bloomMetrics = () => ({
       ? { leaf: i, role: b.role, k: b.k, side: b.side, lengthMm: b.lengthMm, widthMm: b.widthMm }
       : { leaf: i, role: 'blade', k: 0, side: 0, lengthMm: null, widthMm: null }))),
     rowHalfBaseMm: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowHalfBaseMm)),
+    /* the station each of those rows was built at, per blade (S5: a nib takes
+       rows for its arc, so `i / nu` is no longer the answer) */
+    rowU: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowU)),
     tipClamp: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.tipClamp)),
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
@@ -2832,7 +2857,9 @@ window.__bloomMetrics = () => ({
          own rods as the exemption names them */
       petioleRootReachMm: r.petioleRootReachMm, rodAxes: r.rodAxes,
       leaflets: r.leaflets.map((q) => ({ role: q.role, k: q.k, side: q.side, lengthMm: q.lengthMm, widthMm: q.widthMm, embedMm: q.embedMm,
-        root: q.root, base: q.base, D: q.D, T: q.T, N: q.N, holder: q.holder, tris: q.tris, baseAxisMm: q.rim.baseAxisMm ?? null })),
+        root: q.root, base: q.base, D: q.D, T: q.T, N: q.N, holder: q.holder, tris: q.tris, baseAxisMm: q.rim.baseAxisMm ?? null,
+        /* the leaflet's own nib record: where its arc rows start (LF16 restates its stations from it, S5) */
+        tipClamp: q.tipClamp ? { nib: q.tipClamp.nib, arcU: q.tipClamp.arcU } : null })),
     } : null)),
     /* LF8's measured side — the builder's own DIRECTED-edge census, which both
        STL gates are blind to because theirs keys on a sorted pair. */

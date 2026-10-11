@@ -93,6 +93,11 @@ for (let k = pk; k < N; k += pn) {
     residual: r.lobeYield ? r.lobeYield.residual : null,
     attempts: r.lobeYield ? r.lobeYield.attempts : null,
     roundFrac: rb ? rb.sinuses.filter((x) => x.built && x.roundBuilt !== null && x.roundBuilt !== undefined).map((x) => x.roundBuilt) : [],
+    /* S5: the slider's own dead travel (`saturatesAt`, the hatch) and, per
+       sinus, whether it was NARROW (a round bottom needed), broad, or broad
+       and filleted (S5's plain fillet at the V point) */
+    sat: rb && rb.saturatesAt !== undefined ? rb.saturatesAt : undefined,
+    kinds: rb ? rb.sinuses.map((x) => (x.openingAskedMm === null ? 'none' : x.need ? 'narrow' : x.fillet ? 'fillet' : x.alreadyRound ? 'already' : 'broad')) : [],
   });
 }
 const out = opt('--out');
@@ -122,6 +127,20 @@ function report(R) {
     console.log(`  S4c STAGE 2 — the lobe count yielded: ${pct(yl.length, ws.length)} (${yl.length}); lobes given up ${JSON.stringify(yl.reduce((h, r) => { const d = r.lobesAsked - r.lobesBuilt; h[d] = (h[d] || 0) + 1; return h; }, {}))}`);
     console.log(`  S4c RESIDUAL — no count fits, the asked count with the told V: ${pct(rs.length, ws.length)} (${rs.length})`);
     for (const r of rs) console.log(`    k ${r.k}: opening ${r.open.toFixed(3)} mm, NO FIT ${r.noFit} (${r.why.join(', ')}), tries ${JSON.stringify(r.attempts)} — ${JSON.stringify(r.set)}`);
+  }
+  if (ws[0].sat !== undefined) {
+    /* THE SLIDER — S4c §8.4's table, measured the same way: a leaf with no
+       sinus to round; no dead travel (`saturatesAt` null); dead part-way
+       (saturating above 0); entirely dead (saturating at 0) */
+    const none = R.filter((r) => !r.threw && !r.noLeaf && !r.sinus), live = ws.filter((r) => r.sat === null);
+    const part = ws.filter((r) => r.sat !== null && r.sat > 0), dead = ws.filter((r) => r.sat === 0);
+    const med = (a) => (a.length ? q(a, 0.5).toFixed(3) : '-');
+    console.log(`  THE SLIDER: no sinus ${none.length}; no dead travel ${live.length}; dead part-way ${part.length} (saturating ${part.length ? Math.min(...part.map((r) => r.sat)).toFixed(3) : '-'}..${part.length ? Math.max(...part.map((r) => r.sat)).toFixed(3) : '-'}, median ${med(part.map((r) => r.sat))}); ENTIRELY DEAD ${dead.length}`);
+    const why = {};
+    for (const r of dead) { const k = [...new Set(r.kinds)].sort().join('+'); why[k] = (why[k] || 0) + 1; }
+    console.log(`  entirely dead, by the kinds of sinus the leaf carries: ${JSON.stringify(why)}`);
+    const kindN = {}; for (const r of ws) for (const k of r.kinds) kindN[k] = (kindN[k] || 0) + 1;
+    console.log(`  sinuses by kind: ${JSON.stringify(kindN)}`);
   }
   for (const r of still.slice(0, 40)) console.log(`    k ${r.k}: opening ${r.open.toFixed(3)} mm, NO FIT ${r.noFit} (${r.why.join(', ')}) — ${JSON.stringify(r.set)}`);
 }

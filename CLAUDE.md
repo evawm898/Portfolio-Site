@@ -3838,6 +3838,35 @@ FILLETED** (read §8 of `docs/bloom-leaf-lobed-roundness-outcome.md` before touc
 - Partition 54 / 1,228, no non-LOBED mover; block 58 (4 rows, 1,286); no frozen phase (the base IS phase62).
   Sheet: `node tools/shot-bloom-lobed-follow-up.mjs <png> --base <worktree>`.
 
+**THE LEAF TIP CLOSES ON THE NIB, A TOOTH IN THE TIP IS GIVEN UP, AND A BROAD SINUS IS FILLETED** (Eva's
+rulings, Oct 10 — leaf/stem build S5; read `docs/bloom-leaf-tip-broad-sinus-outcome.md` before touching
+`leafNibPlan`, `nibCrossing`, `leafHalfAt`, `LEAF_ARC_ROWS`, `leafBladeStations`, `lobedStations`, the fillet
+branch of `lobedRoundBottoms` (`chev.fillAt`), `tipYield` or LF32-LF34).
+- **Every leaf blade (SIMPLE, COMPOUND leaflet, LOBED) closes on the petal's nib construction**, not on the
+  beaded 1.60 mm stub (the neck and the bulb). `leafNibPlan` SOLVES THE START so the leaf keeps `leafLength`
+  exactly — any reparameterisation of the length moved the mum's saturation off LF31's pin. Three regimes,
+  told: TANGENT (C1), FLOOR (a told corner, up to 24-27 deg on a 3 x 6 mm acute leaf), STEEP (a round law end).
+- **`nibCrossing` is the ONE owner of the crossing and its two guards** for the petal and the leaf. A second
+  copy disarmed three petal mutants (anchors matched twice).
+- **No tooth cuts the nib** (`leafHalfAt` draws the base there; LF33). A sinus in the converging tip is given
+  up through the relief-floor count yield, told as `tipYield` (asked vs built, the reason); the slider keeps
+  the asked value.
+- **#394's two "tooth" tip folds were never a tooth's**: on the base tree they fold identically with the teeth
+  OFF (18 / 21 pairs) — the beaded stub. The nib clears both with every tooth built; both XFAIL entries are off.
+- **`LEAF_ARC_ROWS` = 3**, the count fixed: SIMPLE/leaflets spread the rest evenly above `RIM_TIP_ROWS`, LOBED
+  takes them from the uniform stretch (the tip stretch paying was measured 7 corners worse). Every station
+  moves by a fraction of a gap, so E2 moves MID-BLADE in both directions (none at the nib): 19 smoke entries
+  re-recorded with the before figure, 9 declared; never widened.
+- **A BROAD sinus (its asked V opens) gets a fillet at the V point**: tangent to both arms, `lobedRound x pitch`,
+  shrunk to fit, floored at 0.5 mm; a FLOOR on the CORE term by branch. Narrow sinuses keep the U exactly
+  (partition-held). A fillet touching no drawn row is told ALREADY ROUND (saturation 0).
+- **Measured**: tip folds on the reconstructed corner grids (`tools/bloom-lobed-tip-corners.mjs`) LOBED 50 -> 20
+  (tip 46 -> 16, the rest the 60-deg chevron x cup class), SIMPLE 6 -> 0, COMPOUND 13 -> 0. The 500-leaf
+  sampler at 0.12: ENTIRELY DEAD 336 -> 111 (31 narrow-only, 20 broad no-room, 60 already round).
+- **Pinned and unmoved**: the mum 28 of 28 (3/4/4/6), 6,916 tris, radii and saturation 0.175018 to every digit.
+- Block 59 (10 rows, 1,296), smoke block 59, four mutants; `frozen/phase63` = the 1,286 rows at `d6d2ab4`.
+  Sheet: `node tools/shot-bloom-leaf-tip-broad-sinus.mjs <png> --base <worktree>`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
