@@ -2179,6 +2179,19 @@ const MUTANTS = [
         const u = f.rep.rowU, nu = u.length - 1; let k = 0; while (k < u.length && u[k] === k / nu) k++; return k; };
       let km, kc; try { km = kept(M); kc = kept(C); } catch (e) { return `the witness threw: ${e.message}`; }
       return (km <= 6 && kc > 20) ? null : `the mutant keeps ${km} uniform stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
+  /* S5b — ALREADY ROUND. The flag that turns the read-out into "already
+     rounder than this slider can make it" set on a sinus a fillet DOES
+     round (every broad sinus, the touch test removed): the page draws its
+     fillets and tells them impossible. Witnessed on the MUTATED module's own
+     broad-sinus leaf (FILLET_WIT), never on LF36. */
+  { id: 'a-v-is-told-already-round', why: "the largest fitting fillet's touch test is dropped, so every broad sinus is told ALREADY ROUND — the read-out says no roundness can round a sinus the slider does round",
+    find: '      rec.filletDead = RfitF !== null && !touches(RfitF >= RtopF && fitF ? fitF : filletAt(RfitF));',
+    into: '      rec.filletDead = RfitF !== null;', names: ['LF36'],
+    witness: (M, C) => {
+      const dead = (G) => { const st = { ...REGISTRY_DEFAULTS, ...FILLET_WIT }, O = G.lobedOutline(st, Number(st.leafLength), true);
+        return { dead: O.round.sinuses.filter((x) => x.filletDead).length, broad: O.round.sinuses.filter((x) => !x.need && x.openingAskedMm !== null).length }; };
+      let m, c; try { m = dead(M); c = dead(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (m.dead > 0 && m.dead === m.broad && c.dead === 0) ? null : `the mutant tells ${m.dead} of ${m.broad} broad sinuses already round, the clean tree ${c.dead} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from

@@ -1347,6 +1347,8 @@ export const SMOKE_BLOCKS = [
         path: "LF35's BODY arm — the bar is the body's own deepest tooth, read on the rows as well as in the record, and a tip parted no deeper keeps its teeth" },
       { label: 'TIP NECK: the ROSE, its leaflets toothed at 0.26 (each leaflet gives its terminal pair up)',
         path: 'LF35 on every leaflet (each its own blade, its own body and bar) and LF16' },
+      { label: 'ALREADY ROUND: every broad sinus rounder than the largest fillet its arms take (5 lobes, shape 2.1, sinus 0.17 — the roundness slider dead along its whole travel, told plainly)',
+        path: "LF36 (each sinus told already round: the law's own bottom radius against the largest fillet, and that fillet adding under a relief-grid step anywhere on the law) and LF34's branch" },
     ],
   },
 ];

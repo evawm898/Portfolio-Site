@@ -4193,10 +4193,23 @@ export const CONTROLS = [
          track above it is hatched (`cap`, `applyCaps`). The range is not
          narrowed and the max is not adaptive. */
       const at = R.saturatesAt;
+      /* ALREADY ROUND, SAID PLAINLY (S5b, Eva's ruling of Oct 11): a broad
+         sinus whose own bottom is rounder than the largest fillet its arms
+         take — so that fillet only rests on the bottom and adds nothing on
+         any row, and a smaller one adds nothing either — is named, with the
+         largest fillet, and where every sinus that saturates is one, the
+         whole travel is said to build the same leaf (LF36 measures it on the
+         law: round, not a V that is round between rows). */
+      const round = R.sinuses.filter((x) => x.filletDead);
+      const roundWords = round.length
+        ? ` · ALREADY ROUND at ${round.length === 1 ? `its sinus at ${(100 * round[0].u).toFixed(0)}%` : `${round.length} sinuses (${round.map((x) => `${(100 * x.u).toFixed(0)}%`).join(', ')})`}: ${round.length === 1 ? 'the bottom' : 'each bottom'} is rounder than the largest fillet its arms take (${round.map((x) => `${x.radiusFitMm.toFixed(2)} mm`).join(', ')}), which only rests on it — this slider cannot round ${round.length === 1 ? 'it' : 'them'} further`
+        : '';
+      const allRound = round.length && R.sinuses.filter((x) => x.radiusFitMm !== null && x.saturatesAt === 0).every((x) => x.filletDead);
       const dead = at === null || at === undefined ? ' · no dead travel: a larger roundness still moves a sinus up to the top of the range'
+        : at === 0 && allRound ? ', so the whole travel builds the same leaf (hatched)'
         : R.saturated ? ` · SATURATED — from ${at.toFixed(3)} up every sinus is at its largest smooth radius, so the travel above ${at.toFixed(3)} builds the same leaf (hatched)`
           : ` · saturates at ${at.toFixed(3)}: above it no sinus moves (the hatched travel)`;
-      return head + radii + shrunk + dead;
+      return head + radii + shrunk + roundWords + dead;
     },
     cap: (shown) => {
       const R = shown && shown.leaf && shown.leaf.lobed && shown.leaf.lobed[0] && shown.leaf.lobed[0].roundBottoms;

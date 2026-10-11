@@ -9080,6 +9080,37 @@ export function lobedFilletClauses(ui, LB, US, len) {
     if (n.fillet && n.need) { bad.push(`LF34: ${where} is NARROW (its asked V opens under ${MIN_FEATURE_MM} mm) and carries a fillet — a narrow sinus keeps the U`); continue; }
     if (n.built && !n.need) { bad.push(`LF34: ${where} is BROAD and carries a U bottom — a broad sinus is filleted, never cut`); continue; }
     if (!!x.fillet !== !!n.fillet) { bad.push(`LF34: ${where} is ${x.fillet ? '' : 'not '}filleted on the page and ${n.fillet ? '' : 'not '}in the rebuilt law`); continue; }
+    /* LF36 (S5b, Eva's ruling of Oct 11) — A SINUS TOLD ALREADY ROUND IS
+       ROUND ON THE LAW, NOT A V THAT IS ROUND BETWEEN THE ROWS, AND THE
+       CONVERSE. The page's record says the largest fillet a broad sinus's
+       arms take touches no drawn row (`filletDead`), and the read-out then
+       says the sinus is already rounder than the slider can make it. That is
+       measured here on the NODE REBUILD's lamina (an owner the page's flag
+       does not write; the mutant table serves its mutation to the page
+       alone): a circle of that largest radius resting on the lamina's own
+       bottom (the least half-width over the half-period, 4,096 samples) — a
+       circle that would rest on the arms above a V — enters the lamina,
+       over the half-period at 8,192 samples, by under `NEAR_ROUND_MM`, a
+       hundredth of the minimum feature, wherever the page told it already
+       round. Measured on the 500-state sample (roundness 0.12, EXPORT): 184
+       told round enter by 2.2e-16 (median) to 4.0e-3 mm, 210 filleted enter
+       by 3.3e-2 to several mm — a V round only between the rows would enter
+       by its fillet's whole sagitta. ONE DIRECTION, BY MEASUREMENT: of the
+       859 broad sinuses that sample tells LIVE, 16 have a largest fillet
+       entering by 9.6e-5 to 9.8e-3 mm and the rest run on continuously from
+       1.08e-2 — no empty band on that side, so no converse: those fillets
+       touch a drawn row and do move the leaf, by under ten microns. True,
+       and reported rather than asserted against. */
+    if (x.filletDead && !n.need && n.radiusFitMm !== null) {
+      const NEAR_ROUND_MM = MIN_FEATURE_MM / 100;
+      const Rf = x.radiusFitMm, half = (O.law.to - O.law.from) / (2 * O.law.lobes), lamL = (u) => O.profL.laminaHalfAt(u);
+      let ub = n.u, hb = Infinity;
+      for (let i = 0; i <= 4096; i++) { const u = n.u - half + (2 * half * i) / 4096, hv = lamL(u); if (hv < hb) { hb = hv; ub = u; } }
+      let enters = 0;
+      for (let i = 0; i <= 8192; i++) { const u = n.u - half + (2 * half * i) / 8192, dx = (u - ub) * len; if (Math.abs(dx) >= Rf) continue; enters = Math.max(enters, lamL(u) - (hb + Rf - Math.sqrt(Rf * Rf - dx * dx))); }
+      const round = enters <= NEAR_ROUND_MM;
+      if (!round) bad.push(`LF36: ${where} is told ALREADY ROUND, but its largest fillet (${Rf.toFixed(4)} mm) resting on the law's own bottom (u ${ub.toFixed(5)}) enters the lamina by ${enters.toExponential(3)} mm (bar ${NEAR_ROUND_MM} mm) — a V round only between the rows`);
+    }
     if (!n.fillet) continue;
     const same = (p, q) => Number.isFinite(p) && Number.isFinite(q) && Math.abs(p - q) <= 1e-9;
     /* (c) */
@@ -15896,6 +15927,7 @@ export function buildMatrix() {
   lf('TIP NECK: the bar is the BODY\'s (SIMPLE depth 0.5 x 12 — its body tooth parts 52%: 82% and 59% given, 46% kept)', { ...NECK, leafToothDepth: 0.5, leafToothCount: 12 });
   lf('TIP NECK: the body parts the blade as deeply (SIMPLE depth 0.8 x 9 — the body 80%, the tip 77%: no neck, nothing given)', { ...NECK, leafToothDepth: 0.8, leafToothCount: 9 });
   lf('TIP NECK: the ROSE, its leaflets toothed at 0.26 (each leaflet gives its terminal pair up)', { stemLength: 90, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', leafletToothDepth: 0.26 });
+  lf('ALREADY ROUND: every broad sinus rounder than the largest fillet its arms take (5 lobes, shape 2.1, sinus 0.17 — the roundness slider dead along its whole travel, told plainly)', { stemLength: 70, stemDiameter: 6, leafLength: 108, leafNodes: 1, leafType: 'LOBED', lobedLobes: 5, lobedFrom: 0.35, lobedTo: 0.91, lobedSinus: 0.17, lobedShape: 2.1, lobedAngle: 42, lobedEase: 0.64, lobedWidth: 16, lobedToothDepth: 0, leafTipShape: 1.4 });
 
   return rows;
 }
