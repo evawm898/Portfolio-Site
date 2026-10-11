@@ -754,8 +754,10 @@ const MUTANTS = [
     /* (moved again, leaf/stem build S4: the CORE term carries the chevron's
        lobe factor on a branch — the anchor ends at the plain arm; and again
        in S4b, where the chevron arm caps at the round sinus bottoms) */
-    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
+    /* (and in S5, where the chevron arm takes the broad-sinus fillet's floor
+       on a branch) */
+    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -1763,8 +1765,9 @@ const MUTANTS = [
     /* RE-ANCHORED (leaf/stem build S3): the clamp record moved into
        `emitLeafBladeInto`, which reads the blade's own `widthMm` (a leaflet's,
        or the simple leaf's `plan.widthMm`). */
-    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };',
-    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / widthMm };', names: ['LF9'],
+    /* (re-anchored S5: the record gained the nib's own fields) */
+    find: '    const fromU = hi, ap = tipProf.apex;',
+    into: '    const fromU = tipProf.uPk, ap = tipProf.apex;', names: ['LF9'],
     witness: (M, C) => { const m = leafFacts(M, 1.3), c = leafFacts(C, 1.3);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.clamp.fromU < c.clamp.fromU - 0.1 && !m.rowsDiffer(c)) ? null
@@ -2088,8 +2091,12 @@ const MUTANTS = [
     into: '    const xFace = x0 + (h0 - a) / m, r = a * Math.sqrt(1 + m * m), c = xFace + a * m;', names: ['LF32'],
     witness: (M, C) => {
       const rise = (G) => { const f = compoundFacts(G, { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 1 }); if (f.threw) throw new Error(f.threw);
-        const hb = f.rep.rowHalfBaseMm; let pk = 0; for (let j = 1; j < hb.length; j++) if (hb[j] > hb[pk]) pk = j;
-        let r = 0; for (let j = pk + 1; j < hb.length; j++) r = Math.max(r, hb[j] - hb[j - 1]); return r; };
+        /* the rise over the rows past the law's own floor crossing (the
+           record's `fromU`): a bulb can be the blade's WIDEST row, so a rise
+           read past the widest row sees nothing (the first version of this
+           witness did exactly that — the bulb measured 293 mm) */
+        const hb = f.rep.rowHalfBaseMm, uR = f.rep.rowU, u0 = f.rep.tipClamp.fromU;
+        let r = 0; for (let j = 1; j < hb.length; j++) if (uR[j - 1] >= u0) r = Math.max(r, hb[j] - hb[j - 1]); return r; };
       let rm, rc; try { rm = rise(M); rc = rise(C); } catch (e) { return `the witness threw: ${e.message}`; }
       return (rm > 1e-6 && rc === 0) ? null : `the mutant's tip rises ${rm} mm past its widest row against the clean ${rc} — the behaviour did not move`; } },
   { id: 'a-tooth-cuts-the-nib', why: 'inside the nib the drawn row is the TOOTHED outline again — a tooth whose period runs past the floor crossing digs the converging tip toward the face, where it folds',
@@ -2286,14 +2293,16 @@ const MUTANTS = [
      EVERY WITNESS READS THE PLAN THE MUTATED MODULE DERIVES, never the
      assertion the mutant names. */
   { id: 'the-nib-is-never-cut', why: 'the blade never clears the print floor, always — the guard refuses every nib and the outline runs out FLAT to the mode floor as it did before this session',
-    find: "  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };",
-    into: "  if (true) return { ...inert, why: 'the blade never clears the print floor' };", names: ['AN0'],
+    /* RE-ANCHORED (S5): the guards moved into `nibCrossing`, the ONE owner
+       the petal's and the leaf's nib both read, so this mutates both */
+    find: "  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { why: 'the blade never clears the print floor' };",
+    into: "  if (true) return { why: 'the blade never clears the print floor' };", names: ['AN0'],
     witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.active && c.active && m.terminal > c.terminal) ? null
         : `the mutant's plan is ${m.active ? 'ACTIVE' : 'inert'} ending on ${m.terminal} mm against the clean tree's ${c.active ? 'ACTIVE' : 'inert'} ${c.terminal} — the nib still closes the blade`; } },
   { id: 'the-squared-terminal-no-longer-stands-the-nib-down', why: 'the nib is cut even where a squared terminal holds the outline above the print floor, so petalTipEnd stops deciding how wide the petal ends — the guard’s other arm, and #229’s fringe terminal with it',
-    find: "  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };",
+    find: "  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { why: 'a squared terminal holds the outline above the floor' };",
     into: '  /* the squared terminal no longer stands the nib down */', names: ['AN0'],
     /* THE WITNESS ASKS WHICH GUARD REFUSED, NOT WHETHER ONE DID — and the
        first version asking the latter reported "the behaviour did not move"

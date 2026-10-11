@@ -8119,11 +8119,24 @@ export async function leafAssertions(page, row) {
       for (let j = 0; j < hb.length; j++) if (hb[j] < TIP_HALF_MM && hs[j] !== hb[j]) { cutAt = j; break; }
       if (cutAt !== null) { bad.push(`LF33: blade ${i}'s row ${cutAt} is cut to ${hs[cutAt].toFixed(5)} mm where its base outline is ${hb[cutAt].toFixed(5)} mm, under the ${TIP_HALF_MM} mm print floor — a tooth is cut into the converging tip, where it folds; the tip must give it up`); break; }
       if (!(cl && cl.nib)) continue;
+      /* FROM THE RESTATED WIDEST POINT, never from the widest ROW: a bulb
+         big enough is itself the widest row, and a clause starting there sees
+         nothing past it — the mutant table's `the-leaf-nib-bulges` (a 293 mm
+         swell) went silent here on exactly that. The widest point is rebuilt
+         from the blade type's two taper declarations (LF9's own restatement)
+         and the rows' stations are the builder's (`rowU`). */
+      const ta = cpR ? LEAFLET_BASE_TAPER : lobedR ? LOBED_BASE_TAPER : LEAF_BASE_TAPER, tb = cpR ? LEAFLET_TIP_TAPER : lobedR ? LOBED_TIP_TAPER : LEAF_TIP_TAPER;
+      const uPkR = ta / (ta + tb), RUi = Array.isArray(L.rowU) ? L.rowU[i] : null;
+      if (!RUi || RUi.length !== hb.length) { bad.push(`LF32: blade ${i} reports no row stations — where its widest point is cannot be read`); break; }
       let pk = 0;
-      for (let j = 1; j < hb.length; j++) if (hb[j] > hb[pk]) pk = j;
+      while (pk + 1 < hb.length && RUi[pk] < uPkR) pk++;
+      /* a LOBED blade's base outline carries its lobes past the widest point
+         (crests rise by design), so there the no-rise half starts at the first
+         row under the print floor — the converging tip, where no lobe is */
+      if (lobedR) { while (pk + 1 < hb.length && !(hb[pk] < TIP_HALF_MM)) pk++; }
       let neck = null;
       for (let j = pk + 1; j < hb.length; j++) {
-        if (hb[j] > hb[j - 1]) { neck = `row ${j} rises ${(hb[j] - hb[j - 1]).toExponential(3)} mm over row ${j - 1} (${hb[j - 1].toFixed(5)} -> ${hb[j].toFixed(5)} mm) past the widest row ${pk}`; break; }
+        if (hb[j] > hb[j - 1]) { neck = `row ${j} rises ${(hb[j] - hb[j - 1]).toExponential(3)} mm over row ${j - 1} (${hb[j - 1].toFixed(5)} -> ${hb[j].toFixed(5)} mm) past row ${pk} (the restated widest point${lobedR ? ', or for a lobed blade the first row under the floor' : ''})`; break; }
         if (hb[j - 1] < TIP_HALF_MM && !(hb[j] < hb[j - 1])) { neck = `row ${j} holds ${hb[j].toFixed(5)} mm under the print floor where the tip must keep closing`; break; }
       }
       if (neck) { bad.push(`LF32: blade ${i}'s tip does not close as a point — ${neck} (a neck or a bulb)`); break; }

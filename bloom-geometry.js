@@ -3980,6 +3980,20 @@ const APEX_FLOOR_EPS = 1e-12;
    (`petalTipEnd`, #229 — a fringe is only cut when its terminal clears the
    floor, so a live fringe implies an inert nib and every fringe row is
    bit-identical); and a law arriving with no slope to carry on. */
+/* THE NIB'S CROSSING — ONE OWNER for the petal's `apexNibPlan` and the
+   leaf's `leafNibPlan` (S5): the two guards (a blade that never clears the
+   print floor; a squared terminal holding it above) and the law's own
+   crossing of TIP_HALF_MM. Written once because a second copy is a second
+   producer of one boundary — and the mutant table's anchors on these lines
+   matched twice the day the leaf's copy existed (CLAUDE.md §9b(i)'s class). */
+function nibCrossing(lam, uPk) {
+  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { why: 'the blade never clears the print floor' };
+  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { why: 'a squared terminal holds the outline above the floor' };
+  let lo = uPk, hi = 1;
+  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > TIP_HALF_MM + APEX_FLOOR_EPS) lo = m; else hi = m; }
+  return { why: null, uCross: hi };
+}
+
 export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm) {
   const inert = { active: false, uLaw: 1, xLawMm: lengthMm, drawnLength: lengthMm,
                   slope: 0, radiusMm: 0, capMm: 0, arcMm: 0, endHalfMm: 0, why: null };
@@ -3989,10 +4003,9 @@ export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm) {
      10, the apex-nib session's §11 backlog closed): a leaf does not read this
      plan, it reads `leafNibPlan` below — the same construction with its START
      solved so the leaf keeps its own length. docs/bloom-leaf-tip-broad-sinus-outcome.md. */
-  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };
-  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };
-  let lo = uPk, hi = 1;
-  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > TIP_HALF_MM + APEX_FLOOR_EPS) lo = m; else hi = m; }
+  const X = nibCrossing(lam, uPk);
+  if (X.why) return { ...inert, why: X.why };
+  const hi = X.uCross;
   const uLaw = hi, xLawMm = uLaw * lengthMm;
   const d1 = APEX_TANGENT_DU, d2 = d1 / 2;
   const s1 = (lam(uLaw) - lam(uLaw - d1)) / (d1 * lengthMm);
@@ -4060,10 +4073,9 @@ export function leafNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm) {
                   slope: 0, radiusMm: 0, capMm: 0, arcMm: 0, endHalfMm: 0, why: null, regime: null, kinkDeg: 0 };
   const lam = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
   if (!(lengthMm > 0)) return { ...inert, why: 'no length' };
-  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };
-  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };
-  let lo = uPk, hi = 1;
-  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > TIP_HALF_MM + APEX_FLOOR_EPS) lo = m; else hi = m; }
+  const X = nibCrossing(lam, uPk);
+  if (X.why) return { ...inert, why: X.why };
+  const hi = X.uCross;
   const uCross = hi;
   const L = lengthMm, a = APEX_HALF_MM, e = APEX_END_HALF_MM;
   /* the law WITHOUT the print floor, which is what the nib leaves from once
