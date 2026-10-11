@@ -393,3 +393,14 @@ control, and the frozen-matrix replay beyond `--verify-frozen` (CI's).
    re-recorded: the new state reads 43.69 deg, under the 45 deg allowance.
    **I had run this session's five new mutants and the ones over the code it
    touched, but not S5's four**, which is where the miss came from.
+12. **A second stale witness, the same mechanism from the other side: `the-tooth-fold-clamp-is-removed`**
+   (apex mutant sweep 3 on `432d93d`: *"the mutant cuts 4.86 mm on a cap of 1.6848 (inner advance 0.6236)
+   against the clean 1.6848 — the behaviour did not move"*). Its witness state was 6 lobes × 1 tooth at
+   depth 0.3. With the fold clamp removed, the teeth there are so deep that the tip-neck walk gives up the
+   inner ones, so the mutant's minimum inner advance is 0.624, higher than the clean tree's 0.504. That
+   is never under LF22's 0.5 margin. **The neck walk partly undoes the mutation it is supposed to expose.**
+   Swept (4–6 lobes × depth 0.3–0.5 × 1–2 teeth): at **5 lobes × 2 teeth × depth 0.3** the mutant cuts
+   4.86 mm against a 1.72 mm cap and its advance reads **0.222**, against the clean tree's clamped teeth at
+   **0.534**. The witness and the mutant table's own row move there; no matrix row carried the old state.
+   Both fold-clamp mutants (this one and `the-fold-clamp-is-not-told`, which shares the witness) were
+   re-run on that row.

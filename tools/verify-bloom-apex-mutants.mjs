@@ -1950,7 +1950,7 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const am = minSkinArea(m.rep, m.plan), ac = minSkinArea(c.rep, c.plan);
       return (m.rep.lobed.tiltBuiltRad > c.rep.lobed.tiltBuiltRad + 1e-3 && am < 0 && ac > 0) ? null : `the mutant builds ${m.rep.lobed.tiltBuiltRad} rad (smallest skin cell ${am} mm^2) against the clean ${c.rep.lobed.tiltBuiltRad} (${ac}) — no fold reached`; } },
-  { id: 'the-tooth-fold-clamp-is-removed', why: "the teeth are cut at the floored ask past the fold cap — on 6 lobes at depth 0.3 the innermost cells advance under the declared margin (the lab's C2 itself is unreachable here)",
+  { id: 'the-tooth-fold-clamp-is-removed', why: "the teeth are cut at the floored ask past the fold cap — on 5 lobes x 2 teeth at depth 0.3 the innermost cells advance under the declared margin (the lab's C2 itself is unreachable here)",
     find: '      if (foldCapMm < reliefFlooredMm) { reliefBuiltMm = foldCapMm; foldClamped = true; }',
     into: '      if (false) { reliefBuiltMm = foldCapMm; foldClamped = true; }', names: ['LF22', 'LF23'],
     witness: (M, C) => { const m = compoundFacts(M, FOLD_WIT), c = compoundFacts(C, FOLD_WIT);
@@ -2583,7 +2583,7 @@ const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 
 /* THE LOBED WITNESSES (leaf/stem build S4): the shipped lobed defaults on one
    node; the lobe angle at 60 where the TILT cap binds (built 46.73); 6 lobes
    at tooth depth 0.3 where the TOOTH fold clamp binds hardest (4.86 mm asked,
-   2.22 built); the NONE-FIT state (the fold cap 0.68 mm under the 1 mm
+   2.22 built — 5 lobes x 2 teeth since S5b, 1.72 built); the NONE-FIT state (the fold cap 0.68 mm under the 1 mm
    floor); and a SIMPLE leaf with every lobed control at an extreme (where a
    leak would show). Each is a table row of the same state. */
 const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
@@ -2598,7 +2598,11 @@ const LOB_S4_FORM = { lobedSinus: 0.62, lobedShape: 0.7, lobedAngle: 38, lobedTo
 /* (S4c: at three teeth a lobe — 21 over the rim — the unclamped 60 degrees
    folds no cell on this form; at two a lobe, 14, near S4b's shared 12, it does) */
 const TILT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedAngle: 60, lobedToothCount: 2 };
-const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedToothDepth: 0.3, lobedToothCount: 1 };
+/* S5b moved this from 6 lobes x 1 tooth: there the unclamped teeth are so deep
+   the tip-neck walk gives the inner ones up, and the mutant's inner advance
+   read 0.624, never under LF22's 0.5 margin. At 5 lobes x 2 teeth it reads
+   0.222 against the clean tree's 0.534, the relief 4.86 against a 1.72 cap. */
+const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 5, lobedToothDepth: 0.3, lobedToothCount: 2 };
 const NONEFIT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, lobedToothCount: 3 };
 /* S4c (Eva's rulings of Oct 9): the roundness at its maximum, where the asked
    radius fits at no sinus and every one SHRINKS; and a short, deep five-lobed
@@ -2876,8 +2880,8 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '2.5' }] },
   { label: 'a LOBED leaf at lobe angle 60 at S4\'s form, 2 teeth a lobe (the TILT cap binds: built 46.73)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '0.08' }, { id: 'lobedToothCount', value: '2' }] },
-  { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3, 1 tooth a lobe (the TOOTH fold clamp binds hardest)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '1' }] },
+  { label: 'a LOBED leaf, 5 lobes at tooth depth 0.3, 2 teeth a lobe (the TOOTH fold clamp binds: 4.86 mm asked, 1.72 built)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '5' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '2' }] },
   { label: 'a LOBED leaf where NO tooth fits (6 lobes, sinus 0.9, depth 0.3, 3 teeth a lobe — the fold cap under the floor)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '3' }] },
   /* S4c: SHRINK_WIT and YIELD_WIT above */
