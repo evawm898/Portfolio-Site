@@ -16019,15 +16019,43 @@ export const LOBED_TILT_GRID = 2 ** -20;
    0.10 mm face — which folds with NO arc row (4 pairs, 0.0002 mm, the shipped
    simple leaf) — reads 0. */
 export const LEAF_ARC_ROWS = 3;
-/* THE NIB'S ROWS (S5). With the leaf's nib active (`apex` its plan) the
-   last LEAF_ARC_ROWS stations go to the nib's ARC, `(arcU, 1]`, and `arcU`
-   itself (the straight flank's end) is a station. THE TIP STRETCH KEEPS ITS `i / LEAF_BLADE_ROWS` SPACING
-   below `arcU`: that spacing is S4's measured answer to the bead folding at
-   the tip, and taking the arc's rows out of it coarsened the last gap and
-   folded the 60-degree corners (measured, the corner sweep). So the BASE
-   stretch gives the arc its rows — `LEAF_ARC_ROWS` fewer, evenly over
-   `[0, uF)`, about 3 % coarser on the shipped leaf. The count never moves. No
-   nib, no change: the stations are the pre-S5 doubles by branch. */
+/* WHERE THE ARC'S ROWS COME FROM (S5b — Eva's ruling of Oct 11 on S5's E2
+   churn: "keep the base stations in the lobe/tooth window and take the arc
+   rows only from near the tip"). S5 spread the arc's three rows over the whole
+   blade (a whole-blade re-faceting: every station moved by a fraction of a
+   gap), and that is what moved the edge profile's E2 mid-blade — the mum
+   39.63 deg over the allowance against its pre-S5 32.88, five shared-node
+   rows newly over. Taking them from the stations nearest the arc instead
+   keeps every station below the donors at its pre-S5 double. HOW MANY donate
+   is MEASURED, per type, over the leaf smoke rows' E2 and the tip-corner
+   censuses (docs/bloom-leaf-tip-neck-outcome.md §3, the variant table):
+     LOBED 6 — every lobed smoke row's E2 back to its d6d2ab4 figure exactly
+       (the mum 32.876), 14 tip folds of 972 against S5's 16 with none new;
+       the whole tip stretch donating reads the same E2 and 15 folds (3 new),
+       12 donors 23 folds (7 new);
+     SIMPLE and LEAFLETS 24 — the five shared-node rows clean again and 0
+       folds at the tip on both 243-corner grids; 6 / 12 / 18 donors coarsen
+       the stretch next to the nib enough to put `arch 180 x cup 1.2` over the
+       allowance (17.3 / 4.6 / 0.9 deg), 30 leaves it at -0.13 (a knife
+       edge), and donating the whole stretch from the last tooth crest puts
+       three rows over (one by 32 deg).
+   A count, never a length: it is a share of a FIXED row budget (the leaf runs
+   no ladder), and it is the census and E2 that bound it, not a millimetre. */
+export const LOBED_ARC_DONOR_ROWS = 6;
+export const LEAF_ARC_DONOR_ROWS = 24;
+/* THE NIB'S ROWS (S5; their donors S5b's). With the leaf's nib active (`apex`
+   its plan) the last LEAF_ARC_ROWS stations go to the nib's ARC, `(arcU, 1]`,
+   and `arcU` itself (the straight flank's end) is a station. S5 took the
+   arc's rows from the WHOLE base stretch below `uF` (about 3 % coarser,
+   evenly), which re-faceted every lobe and sinus and moved E2 mid-blade; S5b
+   takes them from the LOBED_ARC_DONOR_ROWS stations nearest `arcU` instead
+   (measured: see that constant). S5's reason for not taking them from the
+   tip stretch — "a coarser tip stretch next to a nib folds a wide 60-degree
+   chevron, 7 corners worse" — does NOT reproduce on this tree: the whole tip
+   stretch donating reads 15 tip folds of 972 against the base stretch's 16,
+   and it reads the same 16 / 15 with the nib-cut fix undone, so that figure
+   is not explained by the fix either (docs/bloom-leaf-tip-neck-outcome.md §3).
+   No nib, no change: the stations are the pre-S5 doubles by branch. */
 export function lobedStations(law, nu = LOBED_BLADE_ROWS, apex = null) {
   const NB = LEAF_BLADE_ROWS;
   const m = Math.max(0, Math.min(nu - 1, Math.floor((1 - law.to) * NB)));
@@ -16039,42 +16067,41 @@ export function lobedStations(law, nu = LOBED_BLADE_ROWS, apex = null) {
     for (let i = iF; i <= NB; i++) out.push(i / NB);
     return out;
   }
-  /* WITH A NIB (S5) the arc gets LEAF_ARC_ROWS stations of its own after
-     `arcU`, the tip stretch keeps its stations `i / NB` short of the arc, and
-     the UNIFORM STRETCH below pays for the rows — every station of the lobe
-     window moves by under 3 % of a gap. Measured against the other way
-     (the tip stretch paying, so the lobe window keeps its pre-S5 doubles) on
-     the 972-corner sweep: tip-paid read 7 corners WORSE than main (a coarser
-     tip stretch next to a nib folds a wide 60-degree chevron, up to 136
-     pairs), uniform-paid 1 (4 pairs at a narrow sinus, u 0.75) and 43
-     better. The mum's ruled figures are identical under both. */
+  /* WITH A NIB (S5, its donors re-measured in S5b): the arc gets
+     LEAF_ARC_ROWS stations of its own after `arcU`, and the rows it takes
+     come from NEAR THE TIP ONLY — the LOBED_ARC_DONOR_ROWS stations nearest
+     `arcU` (the tip stretch first, the lobe window's own top stations where
+     the tip stretch is shorter) are re-spread evenly from the first of them
+     to `arcU`. Every station below them is the pre-S5 double, so the lobe
+     window and its sinuses keep the rows they were measured on. */
   const K = LEAF_ARC_ROWS, uA = apex.arcU;
-  const tip = [];
-  for (let i = iF; i < NB && i / NB < uA; i++) tip.push(i / NB);
-  tip.push(uA);
-  for (let j = 1; j <= K; j++) tip.push(uA + ((1 - uA) * j) / K);
-  /* (`tip[0]` is `uF` wherever the arc starts past `lobedTo`; on a blade
-     whose nib starts before it the arc's own start is the top of the stretch
-     below, which keeps the stations increasing) */
-  const nF = nu + 1 - tip.length, top = tip[0];
-  for (let i = 0; i < nF; i++) out.push((top * i) / nF);
-  return out.concat(tip);
+  const P = [];
+  { const nF = nu - m; for (let i = 0; i < nF; i++) P.push((uF * i) / nF); for (let i = iF; i <= NB; i++) P.push(i / NB); }
+  let idx = 0;
+  while (idx + 1 < P.length && P[idx + 1] < uA) idx++;
+  const s0 = Math.min(idx, Math.max(1, idx + 1 - LOBED_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = P[s0];
+  for (let i = 0; i < s0; i++) out.push(P[i]);
+  for (let j = 0; j < nMid; j++) out.push(a0 + ((uA - a0) * j) / (nMid - 1));
+  for (let j = 1; j <= K; j++) out.push(uA + ((1 - uA) * j) / K);
+  return out;
 }
-/* THE SIMPLE LEAF'S AND THE LEAFLET'S STATIONS (S5) — uniform, `i / nu`, as
-   they always were, at the base: the first `RIM_TIP_ROWS + 1` stations are
-   the pre-S5 doubles, so a leaflet's beaded base — and the stalk that reaches
-   `RIM_TIP_ROWS` of them into it — do not move. With the nib active the last
-   LEAF_ARC_ROWS stations go to its arc `(arcU, 1]` and the rest are spread
-   evenly over `[RIM_TIP_ROWS / nu, arcU]` (6 % coarser on a 56-row blade,
-   evenly, rather than all of it at the tip, where the bead folds). Null where
-   there is no nib: the caller takes `i / nu`, the pre-S5 doubles. */
+/* THE SIMPLE LEAF'S AND THE LEAFLET'S STATIONS (S5; donors re-measured in
+   S5b) — uniform, `i / nu`, as they always were. With the nib active the last
+   LEAF_ARC_ROWS stations go to its arc `(arcU, 1]` and the rows they take
+   come from the LEAF_ARC_DONOR_ROWS stations nearest `arcU`, re-spread evenly
+   from the first of them to `arcU` (never below `RIM_TIP_ROWS`, so a
+   leaflet's beaded base and its stalk's reach keep their stations). Every
+   station below them is the pre-S5 double. Null where there is no nib: the
+   caller takes `i / nu`. */
 export function leafBladeStations(prof, nu) {
   const apex = prof.apex;
   if (!(apex && apex.active)) return null;
   const K = LEAF_ARC_ROWS, uA = apex.arcU, out = [];
-  const i0 = RIM_TIP_ROWS, c = nu - K - i0;
-  for (let i = 0; i < i0; i++) out.push(i / nu);
-  for (let j = 0; j <= c; j++) out.push(i0 / nu + ((uA - i0 / nu) * j) / c);
+  let idx = 0;
+  while (idx + 1 <= nu && (idx + 1) / nu < uA) idx++;
+  const s0 = Math.min(idx, Math.max(RIM_TIP_ROWS, idx + 1 - LEAF_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = s0 / nu;
+  for (let i = 0; i < s0; i++) out.push(i / nu);
+  for (let j = 0; j < nMid; j++) out.push(a0 + ((uA - a0) * j) / (nMid - 1));
   for (let j = 1; j <= K; j++) out.push(uA + ((1 - uA) * j) / K);
   return out;
 }

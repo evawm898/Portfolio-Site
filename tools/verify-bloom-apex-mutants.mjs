@@ -2157,6 +2157,28 @@ const MUTANTS = [
         let w = 0; for (let j = 0; j < us.length; j++) if (us[j] > a && us[j] < b) w = Math.max(w, hL[j] - hs[j]); return { told: t.pairsGiven, cut: w }; };
       let m, c; try { m = deepest(M); c = deepest(C); } catch (e) { return `the witness threw: ${e.message}`; }
       return (m.told >= 1 && m.cut > 1 && c.told >= 1 && c.cut === 0) ? null : `the mutant tells ${m.told} pair(s) given and cuts ${m.cut} mm in the given period, the clean tree ${c.told} / ${c.cut} — the behaviour did not move`; } },
+  /* S5b — WHERE THE NIB'S ROWS COME FROM. Each reverts one blade type to
+     S5's whole-blade re-spread, so every station of the lobe window (or of
+     the simple blade above its beaded base) moves by a fraction of a gap —
+     the E2 churn the ruling removed. Witnessed on the MUTATED module's own
+     station law: how many stations below the donors keep the no-nib value. */
+  { id: 'the-lobed-arc-rows-come-from-the-whole-window', why: "the lobed arc's three rows are taken from the whole blade again (S5's law): every lobe and sinus station moves, the mum's E2 back to 39.63 deg",
+    find: '  const s0 = Math.min(idx, Math.max(1, idx + 1 - LOBED_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = P[s0];',
+    into: '  const s0 = Math.min(idx, 1), nMid = nu + 1 - K - s0, a0 = P[s0];', names: ['LF20'],
+    witness: (M, C) => {
+      const kept = (G) => { const st = { ...REGISTRY_DEFAULTS, ...LOB_WIT }, O = G.lobedOutline(st, Number(st.leafLength), true);
+        const nib = G.lobedStations(O.law, G.LOBED_BLADE_ROWS, O.profE.apex), plain = G.lobedStations(O.law, G.LOBED_BLADE_ROWS, null);
+        let k = 0; while (k < nib.length && Object.is(nib[k], plain[k])) k++; return k; };
+      let km, kc; try { km = kept(M); kc = kept(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (km <= 1 && kc > 100) ? null : `the mutant keeps ${km} no-nib stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
+  { id: 'the-leaf-arc-rows-come-from-the-whole-blade', why: "the simple leaf's and the leaflets' arc rows are taken from the whole blade above the beaded base again (S5's law): every station above it moves",
+    find: '  const s0 = Math.min(idx, Math.max(RIM_TIP_ROWS, idx + 1 - LEAF_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = s0 / nu;',
+    into: '  const s0 = Math.min(idx, RIM_TIP_ROWS), nMid = nu + 1 - K - s0, a0 = s0 / nu;', names: ['LF12'],
+    witness: (M, C) => {
+      const kept = (G) => { const f = compoundFacts(G, { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1 }); if (f.threw) throw new Error(f.threw);
+        const u = f.rep.rowU, nu = u.length - 1; let k = 0; while (k < u.length && u[k] === k / nu) k++; return k; };
+      let km, kc; try { km = kept(M); kc = kept(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (km <= 6 && kc > 20) ? null : `the mutant keeps ${km} uniform stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from

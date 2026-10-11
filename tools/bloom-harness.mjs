@@ -8519,33 +8519,41 @@ export function restatedLobedEase(ui) {
 /* THE STATIONS, restated from the control (`lobedTo`) and the SIMPLE leaf's own
    row count — the tip stretch on the simple leaf's stations `k / NB`, the rest
    uniform below — written as its own expression, never the geometry's.
-   S5: WITH A NIB (`arcU`, the arc's start, read off the NIB's own record —
-   an owner the station law does not write) the tip stretch stops short of
-   the arc, the arc gets LEAF_ARC_ROWS stations of its own, and the uniform
-   stretch below gives them up. */
+   WITH A NIB (`arcU`, the arc's start, read off the NIB's own record — an
+   owner the station law does not write) the arc gets LEAF_ARC_ROWS stations
+   of its own and (S5b) the rows come from the LOBED_ARC_DONOR_ROWS stations
+   nearest it, re-spread from the first of them to `arcU`; every station below
+   keeps the no-nib value. */
 export function restatedLobedStations(ui, arcU = null) {
   const NB = GEOMETRY.LEAF_BLADE_ROWS, nu = LOBED_BLADE_ROWS;
   const first = Math.ceil(Number(ui.lobedTo) * NB - 1e-9);
   const tip = [];
-  if (arcU === null) { for (let k = first; k <= NB; k++) tip.push(k / NB); }
-  else {
-    for (let k = first; k < NB && k / NB < arcU; k++) tip.push(k / NB);
-    tip.push(arcU);
-    for (let j = 1; j <= GEOMETRY.LEAF_ARC_ROWS; j++) tip.push(arcU + ((1 - arcU) * j) / GEOMETRY.LEAF_ARC_ROWS);
-  }
+  for (let k = first; k <= NB; k++) tip.push(k / NB);
   const below = nu + 1 - tip.length, top = tip[0];
-  const out = []; for (let j = 0; j < below; j++) out.push((top * j) / below);
-  return out.concat(tip);
+  const pre = []; for (let j = 0; j < below; j++) pre.push((top * j) / below);
+  const all = pre.concat(tip);
+  if (arcU === null) return all;
+  let last = -1;
+  all.forEach((u, k) => { if (u < arcU) last = k; });
+  const keep = Math.min(last, Math.max(1, last + 1 - GEOMETRY.LOBED_ARC_DONOR_ROWS)), K = GEOMETRY.LEAF_ARC_ROWS, n = nu + 1 - K - keep;
+  const out = all.slice(0, keep);
+  for (let j = 0; j < n; j++) out.push(all[keep] + ((arcU - all[keep]) * j) / (n - 1));
+  for (let j = 1; j <= K; j++) out.push(arcU + ((1 - arcU) * j) / K);
+  return out;
 }
-/* THE SIMPLE LEAF'S AND THE LEAFLET'S STATIONS (S5), restated: `i / nu`, as
-   they always were, without a nib; with one the first RIM_TIP_ROWS stay
-   (the beaded base and the stalk's reach do not move), LEAF_ARC_ROWS go to
-   the arc after `arcU`, and the rest spread evenly between. */
+/* THE SIMPLE LEAF'S AND THE LEAFLET'S STATIONS, restated: `i / nu`, as they
+   always were, without a nib; with one LEAF_ARC_ROWS go to the arc after
+   `arcU` and (S5b) the LEAF_ARC_DONOR_ROWS stations nearest it give them up,
+   re-spread from the first of them (never below RIM_TIP_ROWS: the beaded base
+   and the stalk's reach do not move) to `arcU`. */
 export function restatedLeafStations(nu, arcU = null) {
-  if (arcU === null) return Array.from({ length: nu + 1 }, (_, i) => i / nu);
-  const K = GEOMETRY.LEAF_ARC_ROWS, i0 = GEOMETRY.RIM_TIP_ROWS, c = nu - K - i0, out = [];
-  for (let i = 0; i < i0; i++) out.push(i / nu);
-  for (let j = 0; j <= c; j++) out.push(i0 / nu + ((arcU - i0 / nu) * j) / c);
+  const all = Array.from({ length: nu + 1 }, (_, i) => i / nu);
+  if (arcU === null) return all;
+  let last = -1;
+  all.forEach((u, k) => { if (u < arcU) last = k; });
+  const keep = Math.min(last, Math.max(GEOMETRY.RIM_TIP_ROWS, last + 1 - GEOMETRY.LEAF_ARC_DONOR_ROWS)), K = GEOMETRY.LEAF_ARC_ROWS, n = nu + 1 - K - keep;
+  const out = all.slice(0, keep);
+  for (let j = 0; j < n; j++) out.push(all[keep] + ((arcU - all[keep]) * j) / (n - 1));
   for (let j = 1; j <= K; j++) out.push(arcU + ((1 - arcU) * j) / K);
   return out;
 }

@@ -364,6 +364,26 @@ const PREDICATE_MOVERS = {
      the bit. The base tree has no `tipNeck`, so the prediction's owner is not
      the quantity under test. */
   'tip-neck': (st) => tipNeckOf(base, st).given > 0,
+  /* S5b, JOB 3 — WHERE THE NIB'S ROWS COME FROM (Eva's ruling of Oct 11 on
+     S5's E2 churn). PREDECLARED FROM THE BASE TREE'S OWN EMITTED STATIONS: a
+     row moves iff some leaf blade the base builds stands on stations other
+     than the new law gives it — the law RESTATED in the harness
+     (`restatedLeafStations` / `restatedLobedStations`, its own expression)
+     and fed the base blade's own nib record (`arcU`). Every leafless row and
+     every blade with no nib holds to the bit. */
+  'arc-donors': (st) => {
+    let b;
+    try { b = base.buildBloomInto(new base.MeshBuilder({ exportMode: true }), st); } catch (e) { return false; }
+    for (const L of b.leavesBuilt || []) {
+      const blades = L.leaflets ? L.leaflets.map((q) => [q, false]) : [[L, !!L.lobed]];
+      for (const [B, lobed] of blades) {
+        if (!Array.isArray(B.rowU) || !B.tipClamp || !B.tipClamp.nib) continue;
+        const want = lobed ? harness.restatedLobedStations(st, B.tipClamp.arcU) : harness.restatedLeafStations(B.rowU.length - 1, B.tipClamp.arcU);
+        if (want.length !== B.rowU.length || want.some((u, j) => !Object.is(u, B.rowU[j]))) return true;
+      }
+    }
+    return false;
+  },
   /* S5, JOB 2 — THE BROAD SINUS'S FILLET, measured against a JOB-1-ONLY tree
      (`--base` is the head with the fillet branch stripped, so the nib is on
      both sides). A row moves iff THIS tree's build fillets at least one broad
