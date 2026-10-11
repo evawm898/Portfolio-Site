@@ -3867,6 +3867,35 @@ branch of `lobedRoundBottoms` (`chev.fillAt`), `tipYield` or LF32-LF34).
 - Block 59 (10 rows, 1,296), smoke block 59, four mutants; `frozen/phase63` = the 1,286 rows at `d6d2ab4`.
   Sheet: `node tools/shot-bloom-leaf-tip-broad-sinus.mjs <png> --base <worktree>`.
 
+**THE TIP GIVES UP THE PAIR THAT NECKS IT, THE NIB'S ROWS COME FROM NEAR THE TIP, AND AN ALREADY-ROUND
+SINUS IS SAID PLAINLY** (Eva's rulings, Oct 11 — leaf/stem build S5b; read
+`docs/bloom-leaf-tip-neck-outcome.md` before touching `widthProfile`'s tip-neck block, `tipNeck`,
+`LEAF_NECK_FRACTION`, `lobedStations` / `leafBladeStations`, `LOBED_ARC_DONOR_ROWS` / `LEAF_ARC_DONOR_ROWS`,
+the roundness read-out's ALREADY ROUND words, or LF35 / LF36).
+- **The neck**: a constant relief against a converging tip makes the tip-most notch take most of the
+  blade (the mum 80.9 %, the default SIMPLE leaf 76.9 %, the toothed rose leaflet 85.9 % of the way to
+  the midrib). Walking from the apex, a pair whose sinus is past the widest point and whose worst
+  fraction is past `max(1/2, the body's own deepest tooth)` is GIVEN UP — its stations kept, both
+  margins at relief 0 — and the walk goes on; told asked vs drawn on the teeth line. **The brief's
+  literal test flags every tooth and re-spacing cascades to zero teeth** — do not re-propose either.
+- **The mum's LF31 pins moved for this alone**: 28 laid out, **26 drawn**, split **3/4/4/4** (was
+  3/4/4/6); 6,916 tris and saturation 0.175018 unmoved. Its 0.702 sinus (67.1 %) stays — the walk
+  stops below the given pair; Eva's to rule.
+- **The arc's rows come from the stations nearest it**: 6 on a lobed blade, 24 on a simple blade or
+  leaflet (never below `RIM_TIP_ROWS`); every station below is the pre-S5 double. Every lobed smoke
+  row's E2 is back to its d6d2ab4 figure (the mum 32.876), 0 rows newly over, tip folds LOBED 14 /
+  SIMPLE 0 / COMPOUND 0. **BROAD SINUS gives back 17.43 -> 44.82** (the pre-S5 stations' figure).
+  The variant table is §2 of the doc.
+- **S5's "tip-paid reads 7 corners worse" does not reproduce, with or without the nib-cut fix**
+  (15 against 16 on both trees).
+- **The ~60 already-round leaves are round, measured**: the law's bottom radius is 1.6-11x the largest
+  fillet that fits, which adds at most 3.9e-7 mm anywhere. The read-out names them; LF36 holds it on the
+  law (one direction — 16 live fillets move the leaf by under ten microns). No geometry moved.
+- **OPEN, Eva's to rule (finding 10 of the doc)**: S5's broad-sinus fillet can close a sinus's drawn
+  opening under 1 mm with no NO FIT told — 3 of 500 sampled states (0.955-0.981 mm). Recorded, not fixed.
+- Block 60 (6 rows, 1,302), smoke block 60, five standing mutants, `frozen/phase64` = the 1,296 rows at
+  `d92a0c6`. Sheet: `node tools/shot-bloom-leaf-tip-neck.mjs <png> --base <worktree>`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
