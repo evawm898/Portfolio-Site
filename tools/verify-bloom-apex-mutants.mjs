@@ -2870,8 +2870,8 @@ const ROWS = [
   /* S5 ROWS: a compound leaflet whose last tooth's period runs past the nib's
      crossing (LF33's state — the tooth would dig the tip to the face), and a
      LOBED leaf whose three sinuses are all BROAD and filleted (LF34's). */
-  { label: 'a compound leaf whose leaflet tooth reaches the converging tip (leaflet tip 0.60, width 40, tooth depth 0.3)',
-    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletTipShape', value: '0.6' }, { id: 'leafletWidth', value: '40' }, { id: 'leafletLength', value: '46' }, { id: 'leafletToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '3' }] },
+  { label: 'a compound leaf whose leaflet tooth reaches the converging tip (leaflet tip 0.80, width 40, tooth depth 0.1)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletTipShape', value: '0.8' }, { id: 'leafletWidth', value: '40' }, { id: 'leafletLength', value: '46' }, { id: 'leafletToothDepth', value: '0.1' }, { id: 'leafToothCount', value: '3' }] },
   { label: 'a LOBED leaf whose sinuses are BROAD and filleted (lobe shape 2.5, sinus 0.55, roundness 0.12)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '2.5' }] },
   { label: 'a LOBED leaf at lobe angle 60 at S4\'s form, 2 teeth a lobe (the TILT cap binds: built 46.73)',
