@@ -190,6 +190,64 @@ for (const c of CONTROLS) {
   inputs[c.id] = input; valSpans[c.id] = val; wrappers[c.id] = wrap;
 }
 
+/* CLICK-TO-TYPE (F5) — ONE delegated handler for every slider read-out, so a
+   slider added later gets it with no edit here. UI only: it touches nothing
+   but the slider's own `.value` and the two events a drag fires, and it never
+   calls the rebuild path — the listeners registered below do, exactly as for a
+   drag. Nothing is styled at rest: no hover, cursor, underline or border.
+
+   Rulings: out-of-range clamps SILENTLY and a between-step value snaps — both
+   by the range input's own value sanitisation, i.e. the very same rule a drag
+   is subject to, not a second implementation. A number is the first one found
+   in the typed text ("12 mm", "35°", "60%"); text with none cancels silently.
+   Enter commits, Escape cancels, and CLICKING AWAY CANCELS (default, Eva to
+   rule). Only the asked value is set; a built-count read-out is whatever
+   refreshLabels() prints after the rebuild, as today. Choices and toggles are
+   skipped: only a control whose input is a range gets here. */
+panelRoot.addEventListener('click', (e) => {
+  const span = e.target.closest && e.target.closest('.bl-val');
+  if (!span || !panelRoot.contains(span)) return;
+  const input = span.closest('.bl-ctrl')?.querySelector('input[type="range"]');
+  if (!input) return;
+  /* The span sits inside the control's <label>: stop the click being forwarded
+     to the slider, and stop a second click (placing the caret) re-entering. */
+  e.preventDefault();
+  if (span.dataset.editing) return;
+  const before = span.textContent;
+  span.dataset.editing = '1';
+  try { span.contentEditable = 'plaintext-only'; } catch (_) { /* fall through */ }
+  if (span.contentEditable !== 'plaintext-only') span.contentEditable = 'true';
+  span.focus();
+  const range = document.createRange();
+  range.selectNodeContents(span);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+  const finish = (commit) => {
+    if (!span.dataset.editing) return;
+    const typed = span.textContent;
+    delete span.dataset.editing;
+    span.removeEventListener('keydown', onKey);
+    span.removeEventListener('blur', onBlur);
+    span.removeAttribute('contenteditable');
+    span.textContent = before;
+    if (!commit) return;
+    const m = /[-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/i.exec(typed);
+    if (!m) return;
+    const was = input.value;
+    input.value = m[0];
+    if (input.value === was) return;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+  const onKey = (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+  };
+  const onBlur = () => finish(false);
+  span.addEventListener('keydown', onKey);
+  span.addEventListener('blur', onBlur);
+});
+
 /* Coercion is the REGISTRY's rule, imported — not re-decided here. A slider
    is a number and a choice is a string; a local `Number(...)` would turn
    `placement` into NaN, which reads back as a legitimate-looking value and is
@@ -221,7 +279,8 @@ window.__bloomUIState = () => readUI();
    just built, never the export handler's, so a span can never carry an
    export number under a live label. null at module load, before any build. */
 function refreshLabels(ui, shown = null) {
-  for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui, shown);
+  /* A read-out being typed into is the visitor's, not ours, until it ends. */
+  for (const c of CONTROLS) if (!valSpans[c.id].dataset.editing) valSpans[c.id].textContent = c.fmt(ui[c.id], ui, shown);
   /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
      rosette's hood group is "Petal N" where N is the last orbit's number,
      which moves with petalCount. Same snapshot, same pass, same owner
