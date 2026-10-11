@@ -258,7 +258,7 @@ closed with `--merge`.
   petal's nib reads `nibCrossing` through a refactor. **PASS: 187 of 187 predeclared movers moved (SIMPLE 76, COMPOUND 47, LOBED 64 — each counted by the base tree's own plan type) and 0 floats moved on the 1,109 holders**, over 1,587,100,788 export floats / 176,344,532 triangles and 84,048,024 captured-grid values, the whole 1,296-row matrix in both modes.
 - **Job 2 (`broad-fillet`, against the head with the fillet branch stripped).** A row
   moves iff this tree fillets a broad sinus on it. Every other row holds to the bit,
-  narrow-sinus lobed leaves included. PARTITION_JOB2
+  narrow-sinus lobed leaves included. **PASS: 10 of 10 predeclared movers moved and 0 floats moved on the 1,286 holders** — among them **54 of the 64 lobed rows**, every one whose sinuses are narrow or whose broad fillet touches no drawn row (the mum included). The ten movers: the four block-59 `BROAD SINUS` rows, `LOBED: lobedLobes min`, `lobedShape max`, `a 10 mm envelope`, `leafTipShape min`, `LOBED ROUNDNESS: 0.5 x one lobe a side` and S4c's told shoulder corner. Over the same 1,587,100,788 floats and 84,048,024 grid values, both modes.
 
 ---
 
