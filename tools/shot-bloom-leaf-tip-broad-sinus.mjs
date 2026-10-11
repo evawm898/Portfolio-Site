@@ -222,16 +222,20 @@ for (const [over, title] of [[EASE, 'FORMER FOLD: LOBEDEASE 0.95'], [YIELD6, 'FO
       `SINUSES ${rb.sinuses.map((s) => (s.fillet ? `FILLET ${f3(s.radiusMm)}` : s.built ? `U ${f3(s.radiusMm)}` : 'V')).join(' / ')}`,
       `SATURATES AT ${rb.saturatesAt === null ? 'NONE (THE RANGE TOP FITS)' : f4(rb.saturatesAt)}`, `${x.rep.tris} TRIS, ${mmpx(cam)} MM/PX`]));
   }
-  /* the macro: ONE camera on sinus 1 of the after tree, both trees */
-  const xa = xs[1][0], s = xa.rep.lobed.roundBottoms.sinuses.find((q) => q.fillet) || xa.rep.lobed.roundBottoms.sinuses[0];
+  /* the macro: ONE camera on the fillet of the after tree, both trees, the
+     TEETH OFF — at the default depth a tooth cuts through the sinus and the
+     fillet's 0.08 mm is lost under it */
+  const xsT = [[flat({ ...BROAD, lobedToothDepth: 0 }, BG, BR), 'BEFORE (D6D2AB4)'], [flat({ ...BROAD, lobedToothDepth: 0 }), 'AFTER']];
+  const xa = xsT[1][0], s = xa.rep.lobed.roundBottoms.sinuses.find((q) => q.fillet) || xa.rep.lobed.roundBottoms.sinuses[0];
   const Lmm = Number(xa.bl.st.leafLength), O = G.lobedOutline(xa.bl.st, Lmm, true);
   const P2 = (u) => { const t = O.tauAt(u), h = Math.max(O.prof.halfWidthBaseAt(u), G.TIP_HALF_MM); return [u * Lmm + h * Math.sin(t), h * Math.cos(t)]; };
   const on = (q) => add(add(baseOf(xa.rep), xa.lp.D, q[0]), xa.lp.T, q[1]);
   const fu = s.filletU || [s.u - 0.01, s.u + 0.01], mid = P2((fu[0] + fu[1]) / 2);
-  const camz = { dir: xa.lp.N, up: xa.lp.D, center: on(mid), halfHeight: Math.max(2.2, 1.6 * (s.radiusMm || 1)) };
-  for (const [x, word] of xs) {
+  const chord = s.filletU ? Math.hypot(...[0, 1].map((c) => P2(fu[1])[c] - P2(fu[0])[c])) : 2;
+  const camz = { dir: xa.lp.N, up: xa.lp.D, center: on(mid), halfHeight: Math.max(0.6, 0.8 * chord) };
+  for (const [x, word] of xsT) {
     const q = x.rep.lobed.roundBottoms.sinuses[xa.rep.lobed.roundBottoms.sinuses.indexOf(s)];
-    cells.push(cell(x.l.P, x.l.N, camz, [`THE SINUS MACRO ${word}, ONE CAMERA`,
+    cells.push(cell(x.l.P, x.l.N, camz, [`THE SINUS MACRO ${word}, ONE CAMERA, TEETH OFF`,
       q.fillet ? `FILLET ${f3(q.radiusMm)} MM (ASKED ${f3(q.radiusAskedMm)}, PITCH ${f3(q.pitchMm)}), TANGENT AT BOTH ARMS` : 'THE V POINT: NO FILLET',
       ...(q.fillet ? [`FROM U ${f4(q.filletU[0])} TO ${f4(q.filletU[1])}, ADDS ${f3(q.addedMm)} MM AT THE V`] : []),
       `AMBER: THE FILLETS TWO TANGENT POINTS, ${mmpx(camz)} MM/PX`], s.filletU ? s.filletU.map((u) => [on(P2(u)), AMBER]) : []));

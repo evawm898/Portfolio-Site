@@ -8760,7 +8760,12 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
           const x = RB.sinuses[k], a0 = W.su[k] - W.half, a1 = W.su[k] + W.half;
           const win = (arr) => { let lo = -1, hi = -1, bot = -1; for (let j = 0; j < US.length; j++) { if (US[j] < a0 || US[j] > a1) continue; if (lo < 0) lo = j; hi = j; if (bot < 0 || arr[j] < arr[bot]) bot = j; } return { lo, hi, bot }; };
           const wv = win(lamR), wb = win(r.rowHalfLobeMm);
-          const took = US.some((u, j) => u >= a0 && u <= a1 && r.rowHalfLobeMm[j] < lamR[j] - 1e-9);
+          /* (S5) the rows the leaf's NIB owns — past its floor crossing — sit
+             under the floored asked outline by the nib's design, not by a cut:
+             LF20's own exclusion. Seen red in CI on `LOBED: lobedWidth min (3)`,
+             a 3 mm envelope whose nib starts at u 0.68, inside sinus 2's window. */
+          const nibRow = (u) => !!(clI && clI.nib && u >= clI.fromU);
+          const took = US.some((u, j) => u >= a0 && u <= a1 && !nibRow(u) && r.rowHalfLobeMm[j] < lamR[j] - 1e-9);
           if (!!x.built !== took) { fail = `sinus ${k} (u ${W.su[k].toFixed(4)}) is declared ${x.built ? 'ROUNDED' : 'not rounded'} while its window ${took ? 'carries rows cut under the asked outline' : 'is the asked outline on every row'}`; break; }
           const vOpen = restatedSinusOpeningMm(Mv, wv.lo, wv.bot, wv.hi);
           const needR = vOpen !== null && vOpen < MIN_FEATURE_MM;
@@ -8790,7 +8795,7 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
             { let lo = a0 + ((a1 - a0) * Math.max(0, qBest - 1)) / 8192, hi = a0 + ((a1 - a0) * Math.min(8192, qBest + 1)) / 8192;
               for (let it = 0; it < 80; it++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (askedAt(m1) < askedAt(m2)) hi = m2; else lo = m1; }
               dense = Math.min(dense, askedAt((lo + hi) / 2)); }
-            let deepest = Infinity; for (let j = wb.lo; j <= wb.hi; j++) deepest = Math.min(deepest, r.rowHalfLobeMm[j]);
+            let deepest = Infinity; for (let j = wb.lo; j <= wb.hi; j++) if (!nibRow(US[j])) deepest = Math.min(deepest, r.rowHalfLobeMm[j]);
             if (deepest < dense - 1e-9) { fail = `sinus ${k}'s round bottom cuts to ${deepest.toFixed(6)} mm, DEEPER than the asked sinus's own least half-width ${dense.toFixed(6)} mm — the depth was ruled untouched`; break; }
           }
         }
