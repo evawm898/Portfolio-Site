@@ -2588,7 +2588,7 @@ const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 
    leak would show). Each is a table row of the same state. */
 const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
 /* S5's witness states — the two rows above, as control sets */
-const NIB_TOOTH_WIT = { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.6, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.3, leafToothCount: 3 };
+const NIB_TOOTH_WIT = { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.8, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.1, leafToothCount: 3 };
 const FILLET_WIT = { ...LOB_WIT, lobedShape: 2.5 };
 /* S4's own lobed form (S4b): the mum retune moved the four lobed defaults,
    and at its rounder, less tilted lobes the unclamped tilt folds no cell and

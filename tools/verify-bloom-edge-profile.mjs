@@ -161,7 +161,13 @@ const E2_TURN_BAND_DEG = 5e-5;
    Declared at the measured magnitude with the previous figure kept, never
    widened — a row that reads WORSE than its record is a finding for the
    change that moved it (#283 and #289), and this is where it is named. The
-   ruling on whether a nibbed bead may turn past the allowance is Eva's. */
+   ruling on whether a nibbed bead may turn past the allowance is Eva's.
+   S5b's CI run REDEFINED one row: `LEAF TIP: COMPOUND, a leaflet tooth
+   reaching the converging tip` was tip 0.60 / depth 0.3, where the tip-neck
+   walk now gives up the tooth that reached the nib, so the row stopped
+   exercising LF33's branch. At tip 0.80 / depth 0.1 a tooth still reaches the
+   nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
+   state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
   /* LEAF/STEM BUILD S5 (the leaf nib, the tip yield, the broad-sinus fillet —
      docs/bloom-leaf-tip-broad-sinus-outcome.md): nine smoke rows newly over
@@ -169,8 +175,6 @@ const E2_TURN_XFAIL = {
      never widened. */
   'LOBED YIELD: 6 lobes asked on a 12 mm blade (the count gives 6 -> 2, where the print minimum fits; told)':
     { excessDeg: 64.684789, note: 'adds 119.471415 deg; face-to-face 123.06, outline 3.59 — measured for the FIRST time at S5: until S5 this row was a declared self-intersector (21 pairs at the tip stub), which E2 exempts; the nib clears the fold and E2 now reads it, mid-blade at u 0.457, not at the tip; RE-RECORDED at S5b from 74.471415 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
-  'LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.60, width 40, depth 0.3 — no notch inside the nib)':
-    { excessDeg: 2.184653, note: 'adds 48.431753 deg; face-to-face 48.84, outline 0.41 — NEW at S5: in the nib\'s FLAT FLANK on an acute (FLOOR-regime) blade, a blade 1.6 mm across closing toward the 0.10 mm face: the narrow-span clamp class, as `LEAVES: tip shape ACUTE` and the petal nib\'s own declared rows; RE-RECORDED at S5b from 3.431753 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
   'LEAF TIP: the tip gives its tooth up (SIMPLE, width 10, 12 teeth at depth 1, tip 0.60 — the first given up at the tip, told)':
     { excessDeg: 1.707137, note: 'adds 46.550106 deg; face-to-face 46.65, outline 0.10 — NEW at S5: in the nib\'s FLAT FLANK on an acute (FLOOR-regime) blade, a blade 1.6 mm across closing toward the 0.10 mm face: the narrow-span clamp class, as `LEAVES: tip shape ACUTE` and the petal nib\'s own declared rows; RE-RECORDED at S5b from 1.550106 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
   'TIP NECK: the body parts the blade as deeply (SIMPLE depth 0.8 x 9 — the body 80%, the tip 77%: no neck, nothing given)':

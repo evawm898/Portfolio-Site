@@ -1325,7 +1325,7 @@ export const SMOKE_BLOCKS = [
        broad fillet. LF32 rides on every nibbed blade in the subset (every
        leaf row), LF34 on every lobed one. */
     rows: [
-      { label: 'LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.60, width 40, depth 0.3 — no notch inside the nib)',
+      { label: 'LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.80, width 40, depth 0.1 — no notch inside the nib)',
         path: 'LF33 (no row under the print floor carries a cut — the tooth whose period runs past the crossing gives that part up) and LF32 on every leaflet' },
       { label: 'LEAF TIP: the tip gives its tooth up (SIMPLE, width 10, 12 teeth at depth 1, tip 0.60 — the first given up at the tip, told)',
         path: 'LF13 (the relief-floor count, its cause a biconditional) with the tip yield told beside it, LF32 in the FLOOR regime' },

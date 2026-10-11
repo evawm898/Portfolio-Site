@@ -377,3 +377,19 @@ control, and the frozen-matrix replay beyond `--verify-frozen` (CI's).
    ten microns** — a slider that is technically live and visibly dead (§3.2).
 10. **S5's broad fillet can close a sinus's drawn opening under 1 mm** with no NO FIT
    told — 1 sampled state on S5's tree, 3 on S5b's (§3.3).
+11. **CI found a stale witness that the neck walk made: S5's `a-tooth-cuts-the-nib`
+   moved nothing** (apex mutant sweep 0 on `4e6a563`: *"the mutant cuts 0 mm into
+   its leaflets' nibs against the clean 0"*). Its witness state, and the block-59
+   row it copies (`LEAF TIP: COMPOUND, a leaflet tooth reaching the converging
+   tip`, leaflet tip 0.60, tooth depth 0.3), had a tooth reaching the nib only
+   because nothing gave it up. The neck walk now gives that pair up, so the row
+   stopped exercising LF33's branch and the mutation had nothing to cut. The
+   second durable rule, arriving from this session's own change. Swept on a
+   mutated copy (leaflet tip 0.6–1.6 × depth 0.1–0.5 × 2–8 teeth): six states
+   still reach the nib, and the deepest cut is at **tip 0.80, depth 0.1, 3 teeth
+   (0.243 mm)**. The row and the witness are redefined to that state; the label
+   carries the new numbers, and the frozen phase64 copy keeps the old one
+   verbatim. Its E2 entry (2.184653 deg over the allowance) is **OFF**, not
+   re-recorded: the new state reads 43.69 deg, under the 45 deg allowance.
+   **I had run this session's five new mutants and the ones over the code it
+   touched, but not S5's four**, which is where the miss came from.

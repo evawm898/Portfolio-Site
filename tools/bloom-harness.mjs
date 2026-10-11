@@ -15900,7 +15900,7 @@ export function buildMatrix() {
   const LEAFT = { stemLength: 90, stemDiameter: 6, leafLength: 46, leafNodes: 3 };
   lf('LEAF TIP: SIMPLE at tip shape 0.60 — the nib\'s FLOOR regime (the flank shallower than the outline, a told corner)', { ...LEAFT, leafTipShape: 0.6 });
   lf('LEAF TIP: SIMPLE at tip shape 3.00 — the nib\'s STEEP regime (the law\'s own round end)', { ...LEAFT, leafTipShape: 3 });
-  lf('LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.60, width 40, depth 0.3 — no notch inside the nib)', { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.6, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.3, leafToothCount: 3 });
+  lf('LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.80, width 40, depth 0.1 — no notch inside the nib)', { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.8, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.1, leafToothCount: 3 });
   lf('LEAF TIP: the tip gives its tooth up (SIMPLE, width 10, 12 teeth at depth 1, tip 0.60 — the first given up at the tip, told)', { ...LEAFT, leafWidth: 10, leafToothCount: 12, leafToothDepth: 1, leafTipShape: 0.6 });
   lf('LEAF TIP: LOBED at lobedTo 0.95 (the tip stretch at its shortest, the arc rows from the uniform stretch)', { ...LOB, lobedTo: 0.95 });
   lf('BROAD SINUS: filleted at roundness 0.12 (lobe shape 2.5 — every sinus broad)', { ...LOB, lobedShape: 2.5 });
