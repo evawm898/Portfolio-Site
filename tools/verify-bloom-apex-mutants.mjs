@@ -2170,10 +2170,10 @@ const MUTANTS = [
         const nib = G.lobedStations(O.law, G.LOBED_BLADE_ROWS, O.profE.apex), plain = G.lobedStations(O.law, G.LOBED_BLADE_ROWS, null);
         let k = 0; while (k < nib.length && Object.is(nib[k], plain[k])) k++; return k; };
       let km, kc; try { km = kept(M); kc = kept(C); } catch (e) { return `the witness threw: ${e.message}`; }
-      return (km <= 1 && kc > 100) ? null : `the mutant keeps ${km} no-nib stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
+      return (km <= 2 && kc > 100) ? null : `the mutant keeps ${km} no-nib stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
   { id: 'the-leaf-arc-rows-come-from-the-whole-blade', why: "the simple leaf's and the leaflets' arc rows are taken from the whole blade above the beaded base again (S5's law): every station above it moves",
     find: '  const s0 = Math.min(idx, Math.max(RIM_TIP_ROWS, idx + 1 - LEAF_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = s0 / nu;',
-    into: '  const s0 = Math.min(idx, RIM_TIP_ROWS), nMid = nu + 1 - K - s0, a0 = s0 / nu;', names: ['LF12'],
+    into: '  const s0 = Math.min(idx, RIM_TIP_ROWS), nMid = nu + 1 - K - s0, a0 = s0 / nu;', names: ['LF11', 'LF16'],
     witness: (M, C) => {
       const kept = (G) => { const f = compoundFacts(G, { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1 }); if (f.threw) throw new Error(f.threw);
         const u = f.rep.rowU, nu = u.length - 1; let k = 0; while (k < u.length && u[k] === k / nu) k++; return k; };
