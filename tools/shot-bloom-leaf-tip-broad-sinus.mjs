@@ -142,6 +142,10 @@ const tipWords = (rep) => {
   return c.nib ? `NIB (${String(c.regime).toUpperCase()}${c.kinkDeg > 0.05 ? `, A TOLD ${f2(c.kinkDeg)} DEG CORNER` : ''}): FACE ${f2(c.terminalMm)} MM, ARC R ${f3(c.radiusMm)} MM`
     : `STUB: ${f2(c.terminalMm)} MM FACE, ${f2(c.mm)} MM LONG (${(100 * c.fraction).toFixed(1)}% OF THE LENGTH)`;
 };
+/* the blade's base and tip, from the builder's own row centres (`bladeBase`
+   is reported only where the petiole carries a seat row) */
+const baseOf = (rep) => (rep.petioleAxis && rep.petioleAxis.bladeBase) || rep.rowCentre[0];
+const tipOf = (rep) => rep.rowCentre[rep.rowCentre.length - 1];
 const cells = [];
 
 /* ---- 1. THE MUM ---- */
@@ -190,11 +194,11 @@ function tipPair(over, title, pick) {
       `${mmpx(cam)} MM/PX, THE BLADES OWN PLANE`]));
   });
 }
-const simplePick = (x) => { const L = Number(x.bl.st.leafLength); return { D: x.lp.D, N: x.lp.N, tip: add(x.rep.petioleAxis.bladeBase, x.lp.D, L), back: 5, words: tipWords(x.rep) }; };
+const simplePick = (x) => ({ D: x.lp.D, N: x.lp.N, tip: tipOf(x.rep), back: 5, words: tipWords(x.rep) });
 tipPair(SIMPLE, 'SIMPLE', simplePick);
 tipPair(ROSE, 'ROSE LEAFLET', (x) => {
   const q = x.rep.leaflets.find((r) => r.role === 'terminal');
-  return { D: q.D, N: q.N, tip: add(q.base, q.D, q.lengthMm), back: 4, words: tipWords(q) };
+  return { D: q.D, N: q.N, tip: q.rowCentre ? q.rowCentre[q.rowCentre.length - 1] : add(q.base, q.D, q.lengthMm), back: 4, words: tipWords(q) };
 });
 tipPair(LOBED1, 'LOBED', simplePick);
 /* ---- 10-14. the two former fold rows, and the tip yield ---- */
@@ -202,7 +206,7 @@ for (const [over, title] of [[EASE, 'FORMER FOLD: LOBEDEASE 0.95'], [YIELD6, 'FO
   for (const [Gm, Rm, word] of [[BG, BR, 'BEFORE'], [G, R, 'AFTER']]) {
     const x = flat(over, Gm, Rm), c = leafCensus(x.bl), off = leafCensus(build({ ...over, lobedToothDepth: 0 }, Gm, Rm));
     const S = x.rep.serration, L = Number(x.bl.st.leafLength);
-    const tip = add(x.rep.petioleAxis.bladeBase, x.lp.D, L), back = Math.min(6, L / 3);
+    const tip = tipOf(x.rep), back = Math.min(6, L / 3);
     const cam = { dir: x.lp.N, up: x.lp.D, center: add(tip, x.lp.D, -back / 2), halfHeight: back / 2 + 0.6 };
     cells.push(cell(x.l.P, x.l.N, cam, [`${title} ${word}`, `CENSUS: ${c.pairs} PAIRS${c.pairs ? ` WORST ${f4(c.worst)} MM` : ''}; TEETH OFF: ${off.pairs} PAIRS`,
       `TEETH ${S.countBuilt} OF ${S.countAsked} BUILT${S.tipYield ? `, ${S.tipYield.given} GIVEN UP AT THE TIP` : ''}`, tipWords(x.rep), `${mmpx(cam)} MM/PX`]));
@@ -222,7 +226,7 @@ for (const [over, title] of [[EASE, 'FORMER FOLD: LOBEDEASE 0.95'], [YIELD6, 'FO
   const xa = xs[1][0], s = xa.rep.lobed.roundBottoms.sinuses.find((q) => q.fillet) || xa.rep.lobed.roundBottoms.sinuses[0];
   const Lmm = Number(xa.bl.st.leafLength), O = G.lobedOutline(xa.bl.st, Lmm, true);
   const P2 = (u) => { const t = O.tauAt(u), h = Math.max(O.prof.halfWidthBaseAt(u), G.TIP_HALF_MM); return [u * Lmm + h * Math.sin(t), h * Math.cos(t)]; };
-  const on = (q) => add(add(xa.rep.petioleAxis.bladeBase, xa.lp.D, q[0]), xa.lp.T, q[1]);
+  const on = (q) => add(add(baseOf(xa.rep), xa.lp.D, q[0]), xa.lp.T, q[1]);
   const fu = s.filletU || [s.u - 0.01, s.u + 0.01], mid = P2((fu[0] + fu[1]) / 2);
   const camz = { dir: xa.lp.N, up: xa.lp.D, center: on(mid), halfHeight: Math.max(2.2, 1.6 * (s.radiusMm || 1)) };
   for (const [x, word] of xs) {
@@ -263,7 +267,7 @@ let yieldLine = null, nibLine = null;
 }
 {
   const x = flat(TIPYIELD), S = x.rep.serration, L = Number(x.bl.st.leafLength);
-  const tip = add(x.rep.petioleAxis.bladeBase, x.lp.D, L);
+  const tip = tipOf(x.rep);
   const cam = { dir: x.lp.N, up: x.lp.D, center: add(tip, x.lp.D, -6), halfHeight: 7 };
   cells.push(cell(x.l.P, x.l.N, cam, ['THE TIP GIVES A TOOTH UP (MATRIX BLOCK 59)', `TEETH ${S.countBuilt} OF ${S.countAsked} BUILT, ${S.tipYield ? S.tipYield.given : 0} GIVEN UP AT THE TIP${S.tipYield ? ` (U ${f4(S.tipYield.atU)})` : ''}`,
     `THE SLIDER KEEPS ${x.bl.st.leafToothCount}. THE READ-OUT SAYS:`, yieldLine ? yieldLine.slice(0, 200) : '(NO TIP-YIELD LINE ON THE READ-OUT)', `${mmpx(cam)} MM/PX`]));
