@@ -710,6 +710,12 @@ export const PETAL_ROLE_ORDER =
    it in a three.js BufferGeometry, the exporter reads it directly). Rewritten
    from the flower's MeshAccumulator idea: the one behavior that matters here
    is the export-mode thickness floor. */
+/* THROWAWAY (F7 phase 1 preview branch, never merged): candidate B's
+   bead-off switch, module-level so nested builds (florets, tube passes,
+   sepal trials) see it too. bloom.js sets it around a light drag build only. */
+let PROTO_NO_BEAD = false;
+export function __protoSetNoBead(v) { PROTO_NO_BEAD = !!v; }
+
 export class MeshBuilder {
   constructor({ exportMode = false, captureGrid = false, captureLamina = false, captureRim = false, captureNormals = false } = {}) {
     this.exportMode = !!exportMode;
@@ -9926,7 +9932,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   let drawnMax = 0, sheetMax = 0;
   for (let i = skinFrom; i <= skinTo; i++) {
     const k = i - rowFrom, row = rows[i], tBody = tBodyOf[k];
-    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);
+    const r = PROTO_NO_BEAD ? 0 : Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);
     /* THE RAMP. Zero at every buried end and full RIM_TAPER_MM of surface
        away from it, by the same smootherstep the taper uses. It scales the
        inset AND the taper's depth together, so at a buried end the panel

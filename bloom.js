@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, __protoSetNoBead } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -535,7 +535,19 @@ let shownSummary = '';   // the read-out for whatever geometry is on screen, in 
    `shownMode`. A second reading of the checkbox anywhere would be a second
    owner of the one boundary this control is about. */
 const printPreviewInput = document.getElementById('printPreview');
-function shownMode() { return printPreviewInput && printPreviewInput.checked ? 'export' : 'live'; }
+/* THROWAWAY F7 PHASE-1 PROTOTYPE (never merged): print preview pinned ON and
+   hidden; while a slider is held, the LIGHT candidate picked in the VIEW box
+   builds instead; release (pointerup / change) builds full print geometry.
+   A: print minus infill cells. B: print minus infill and bead. C: today's
+   non-print (live) view. FULL: no light build at all (control). */
+if (printPreviewInput) { printPreviewInput.checked = true; printPreviewInput.closest('.bl-toggle').hidden = true; }
+const dragPreviewSelect = document.getElementById('dragPreview');
+let protoDragging = false;
+let protoKind = 'full';           // the kind of the build on screen
+let protoLast = { kind: 'full', ms: 0, buildMs: 0, normalsMs: 0, tris: 0 };
+function protoCandidate() { return dragPreviewSelect ? dragPreviewSelect.value : 'A'; }
+function protoWantKind() { return protoDragging ? protoCandidate() : 'full'; }
+function shownMode() { return protoKind === 'C' ? 'live' : 'export'; }
 let lastShownMode = 'live';
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
@@ -709,10 +721,15 @@ let capability = null;
    the seam's real fold untouched. 60 degrees sits in the middle of that
    15-70 degree margin on both sides. */
 const SMOOTH_SHADING_CREASE_DEG = 60;
-function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false }) {
+function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null, noBead = false }) {
   const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
-  const uiForBuild = readUI();
-  const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
+  const uiForBuild = override ? { ...readUI(), ...override } : readUI();
+  const tb0 = performance.now();
+  let built;
+  __protoSetNoBead(noBead);
+  try { built = buildBloomInto(acc, uiForBuild, { below: null, capability }); }
+  finally { __protoSetNoBead(false); }
+  protoLast.buildMs = performance.now() - tb0;   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
     lastShownMode = exportMode ? 'export' : 'live';
     lastPlacement = uiForBuild.placement;
@@ -782,6 +799,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        ramp-eligible at all, which the read-out treats as "nothing to say". */
     lastTipRowBudget = built.tipRowBudget || null;
   }
+  const tn0 = performance.now();
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
   /* THE BUILDER'S NORMALS WHERE IT HAS THEM, AND computeVertexNormals() WHERE
@@ -821,6 +839,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        and therefore the STL export are untouched regardless of this branch. */
     toCreasedNormals(geo, SMOOTH_SHADING_CREASE_DEG * Math.PI / 180);
   }
+  protoLast.normalsMs = performance.now() - tn0;
   /* `built` is returned as well as cached, so the export path can summarise
      the geometry IT built rather than reading the live cache — the two are
      different geometry whenever a floor binds, and a summary that mixes them
@@ -2325,15 +2344,18 @@ let buildCount = 0;
    the session, which is what clearing it first was defending against. */
 window.__bloomBuildState = () => ({ count: buildCount, pending: regenQueued });
 
-function regenerate() {
+function regenerate(forceKind = null) {
   buildCount++;
+  const t0 = performance.now();
+  protoKind = forceKind || protoWantKind();
   const ui = readUI();
   const wasPlacement = lastPlacement;   // captured before buildGeometry() below overwrites it
   /* THE MODE ON SCREEN, decided once per build by the one owner. `record`
      marks this as the build the telemetry describes; the export handler's
      build never carries it. */
   const mode = shownMode();
-  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true });
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true,
+    override: protoKind === 'A' || protoKind === 'B' ? { petalInfill: 'NONE' } : null, noBead: protoKind === 'B' });
   /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
      used to be refreshed before it, which was the same thing while no span
      read a built number. One of them does now (the stamen spread's cap, an
@@ -2432,7 +2454,11 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
+  protoLast = { ...protoLast, kind: protoKind, ms: performance.now() - t0, tris: acc.triangleCount };
+  const KN = { full: 'FULL print geometry', A: 'LIGHT A — print minus infill cells', B: 'LIGHT B — print minus infill and bead', C: 'LIGHT C — the non-print (live) view' };
+  const protoLine = `F7 PROTOTYPE: on screen ${KN[protoKind]} · rebuild ${protoLast.ms.toFixed(0)} ms (build ${protoLast.buildMs.toFixed(0)} · normals ${protoLast.normalsMs.toFixed(0)}) · ${acc.triangleCount.toLocaleString()} tris\n`;
+  const fb = document.getElementById('f7Status'); if (fb) fb.textContent = protoLine;
+  shownSummary = protoLine + showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -2452,6 +2478,23 @@ for (const c of CONTROLS) {
    registry control uses — no visibility pass, because it is not a control
    and no predicate reads it. */
 if (printPreviewInput) printPreviewInput.addEventListener('change', scheduleRegen);
+/* THROWAWAY F7: the drag/release split. A drag is pointerdown on a range
+   input until pointerup anywhere; keyboard and typed values never set it,
+   so they build full. Release and 'change' both rebuild full. */
+document.addEventListener('pointerdown', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === 'range') protoDragging = true;
+}, true);
+const protoRelease = () => { if (protoDragging) { protoDragging = false; scheduleRegen(); } };
+window.addEventListener('pointerup', protoRelease, true);
+window.addEventListener('pointercancel', protoRelease, true);
+document.addEventListener('change', (e) => { if (e.target instanceof HTMLInputElement && e.target.type === 'range') protoRelease(); }, true);
+if (dragPreviewSelect) dragPreviewSelect.addEventListener('change', () => scheduleRegen());
+/* the measuring hook: rebuild synchronously as one kind and report */
+window.__f7 = {
+  rebuildAs(kind) { regenerate(kind); return { ...protoLast }; },
+  last: () => ({ ...protoLast }),
+  dragging: () => protoDragging,
+};
 
 /* ---------------------------------------------------
    VIEW PRESETS — the VIEW box's dropdown. Pure camera chrome: reads

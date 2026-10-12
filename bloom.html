@@ -67,6 +67,18 @@
     <label for="printPreview" title="Render the geometry as it will PRINT: the 1.00 mm export floor applied to the sheet, tip and foot, and the ring re-derived from the floored feet. Never changes the STL.">Print preview</label>
     <input type="checkbox" id="printPreview">
   </div>
+  <!-- THROWAWAY F7 PHASE-1 PROTOTYPE: which light geometry shows while a
+       slider is held. Print preview is pinned on and hidden. -->
+  <div class="bl-toggle" style="flex-wrap:wrap">
+    <label for="dragPreview">While dragging</label>
+    <select id="dragPreview">
+      <option value="A">A — print minus infill</option>
+      <option value="B">B — print minus infill + bead</option>
+      <option value="C">C — non-print (live) view</option>
+      <option value="full">FULL — no light build</option>
+    </select>
+    <div id="f7Status" style="flex-basis:100%;font-size:10px;line-height:1.3;opacity:.8;margin-top:4px"></div>
+  </div>
 </aside>
 
 <header class="bl-header">
