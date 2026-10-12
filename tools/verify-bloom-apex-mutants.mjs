@@ -1950,7 +1950,7 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const am = minSkinArea(m.rep, m.plan), ac = minSkinArea(c.rep, c.plan);
       return (m.rep.lobed.tiltBuiltRad > c.rep.lobed.tiltBuiltRad + 1e-3 && am < 0 && ac > 0) ? null : `the mutant builds ${m.rep.lobed.tiltBuiltRad} rad (smallest skin cell ${am} mm^2) against the clean ${c.rep.lobed.tiltBuiltRad} (${ac}) — no fold reached`; } },
-  { id: 'the-tooth-fold-clamp-is-removed', why: "the teeth are cut at the floored ask past the fold cap — on 6 lobes at depth 0.3 the innermost cells advance under the declared margin (the lab's C2 itself is unreachable here)",
+  { id: 'the-tooth-fold-clamp-is-removed', why: "the teeth are cut at the floored ask past the fold cap — on 5 lobes x 2 teeth at depth 0.3 the innermost cells advance under the declared margin (the lab's C2 itself is unreachable here)",
     find: '      if (foldCapMm < reliefFlooredMm) { reliefBuiltMm = foldCapMm; foldClamped = true; }',
     into: '      if (false) { reliefBuiltMm = foldCapMm; foldClamped = true; }', names: ['LF22', 'LF23'],
     witness: (M, C) => { const m = compoundFacts(M, FOLD_WIT), c = compoundFacts(C, FOLD_WIT);
@@ -2132,6 +2132,66 @@ const MUTANTS = [
         return { told: O.round.sinuses.filter((x) => x.fillet).length, drawn: O.round.filleted }; };
       let m, c; try { m = filled(M); c = filled(C); } catch (e) { return `the witness threw: ${e.message}`; }
       return (m.told > 0 && m.drawn === 0 && c.drawn === c.told && c.told > 0) ? null : `the mutant tells ${m.told} fillets and draws ${m.drawn}, the clean tree ${c.told} / ${c.drawn} — the behaviour did not move`; } },
+  /* S5b — THE TIP GIVES UP THE PAIR THAT NECKS IT. Two mutants, because LF35
+     has two halves and a mutant that keeps the record honest must not be the
+     only one: the first moves the DECISION (the record then reads a pair past
+     half that was kept), the second leaves the decision and the record right
+     and the OUTLINE wrong (a pair told given up, still cut) — which only the
+     measured half and LF29 can see. Witnessed on the MUTATED module's own
+     shipped lobed defaults (LOB_WIT, a table row). */
+  { id: 'the-tip-keeps-its-neck', why: "the neck bar is doubled, so no pair is ever past it — the converging tip keeps the notch that cuts 81 % of the way to the midrib (the stalk-and-knob the ruling removed)",
+    find: "        const neck = frac > bar;",
+    into: '        const neck = frac > 2 * bar;', names: ['LF35'],
+    witness: (M, C) => {
+      const given = (G) => { const f = compoundFacts(G, LOB_WIT); if (f.threw) throw new Error(f.threw); const t = f.rep.serration.tipNeck; return t ? t.pairsGiven : -1; };
+      let gm, gc; try { gm = given(M); gc = given(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (gm === 0 && gc >= 1) ? null : `the mutant gives ${gm} pair(s) up against the clean tree's ${gc} on the lobed defaults — the behaviour did not move`; } },
+  { id: 'the-given-pair-is-told-and-still-cut', why: "the pair is recorded as given up (relief 0 in the record) and the outline is still cut from the relief it had — the read-out says the neck is gone over a tip that still has it",
+    find: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));',
+    into: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : (reliefMm[periodOf(u)] || (tipNeck && tipNeck.pairsGiven && Math.abs(treatedHalfMm - (periodOf(u) + 0.5) * pitchMm) > faceMm / 2 ? reliefBuiltMm : 0)) * lobeCutProfile(phaseAt(u), crestShape, notchShape));', names: ['LF35'],
+    witness: (M, C) => {
+      const deepest = (G) => { const f = compoundFacts(G, LOB_WIT); if (f.threw) throw new Error(f.threw);
+        const r = f.rep, S = r.serration, t = S.tipNeck, us = r.lobed.rowU, hL = r.lobed.rowHalfLobeMm, hs = r.rowHalfMm;
+        if (!t || !t.sinusU.length) return { told: 0, cut: 0 };
+        const k = S.sinusU.indexOf(t.sinusU[0]), a = S.crestU[k], b = S.crestU[k + 1] === undefined ? 1 : S.crestU[k + 1];
+        let w = 0; for (let j = 0; j < us.length; j++) if (us[j] > a && us[j] < b) w = Math.max(w, hL[j] - hs[j]); return { told: t.pairsGiven, cut: w }; };
+      let m, c; try { m = deepest(M); c = deepest(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (m.told >= 1 && m.cut > 1 && c.told >= 1 && c.cut === 0) ? null : `the mutant tells ${m.told} pair(s) given and cuts ${m.cut} mm in the given period, the clean tree ${c.told} / ${c.cut} — the behaviour did not move`; } },
+  /* S5b — WHERE THE NIB'S ROWS COME FROM. Each reverts one blade type to
+     S5's whole-blade re-spread, so every station of the lobe window (or of
+     the simple blade above its beaded base) moves by a fraction of a gap —
+     the E2 churn the ruling removed. Witnessed on the MUTATED module's own
+     station law: how many stations below the donors keep the no-nib value. */
+  { id: 'the-lobed-arc-rows-come-from-the-whole-window', why: "the lobed arc's three rows are taken from the whole blade again (S5's law): every lobe and sinus station moves, the mum's E2 back to 39.63 deg",
+    find: '  const s0 = Math.min(idx, Math.max(1, idx + 1 - LOBED_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = P[s0];',
+    into: '  const s0 = Math.min(idx, 1), nMid = nu + 1 - K - s0, a0 = P[s0];', names: ['LF20'],
+    witness: (M, C) => {
+      const kept = (G) => { const st = { ...REGISTRY_DEFAULTS, ...LOB_WIT }, O = G.lobedOutline(st, Number(st.leafLength), true);
+        const nib = G.lobedStations(O.law, G.LOBED_BLADE_ROWS, O.profE.apex), plain = G.lobedStations(O.law, G.LOBED_BLADE_ROWS, null);
+        let k = 0; while (k < nib.length && Object.is(nib[k], plain[k])) k++; return k; };
+      let km, kc; try { km = kept(M); kc = kept(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (km <= 2 && kc > 100) ? null : `the mutant keeps ${km} no-nib stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
+  { id: 'the-leaf-arc-rows-come-from-the-whole-blade', why: "the simple leaf's and the leaflets' arc rows are taken from the whole blade above the beaded base again (S5's law): every station above it moves",
+    find: '  const s0 = Math.min(idx, Math.max(RIM_TIP_ROWS, idx + 1 - LEAF_ARC_DONOR_ROWS)), nMid = nu + 1 - K - s0, a0 = s0 / nu;',
+    into: '  const s0 = Math.min(idx, RIM_TIP_ROWS), nMid = nu + 1 - K - s0, a0 = s0 / nu;', names: ['LF11', 'LF16'],
+    witness: (M, C) => {
+      const kept = (G) => { const f = compoundFacts(G, { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1 }); if (f.threw) throw new Error(f.threw);
+        const u = f.rep.rowU, nu = u.length - 1; let k = 0; while (k < u.length && u[k] === k / nu) k++; return k; };
+      let km, kc; try { km = kept(M); kc = kept(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (km <= 6 && kc > 20) ? null : `the mutant keeps ${km} uniform stations at the base against the clean tree's ${kc} — the behaviour did not move`; } },
+  /* S5b — ALREADY ROUND. The flag that turns the read-out into "already
+     rounder than this slider can make it" set on a sinus a fillet DOES
+     round (every broad sinus, the touch test removed): the page draws its
+     fillets and tells them impossible. Witnessed on the MUTATED module's own
+     broad-sinus leaf (FILLET_WIT), never on LF36. */
+  { id: 'a-v-is-told-already-round', why: "the largest fitting fillet's touch test is dropped, so every broad sinus is told ALREADY ROUND — the read-out says no roundness can round a sinus the slider does round",
+    find: '      rec.filletDead = RfitF !== null && !touches(RfitF >= RtopF && fitF ? fitF : filletAt(RfitF));',
+    into: '      rec.filletDead = RfitF !== null;', names: ['LF36'],
+    witness: (M, C) => {
+      const dead = (G) => { const st = { ...REGISTRY_DEFAULTS, ...FILLET_WIT }, O = G.lobedOutline(st, Number(st.leafLength), true);
+        return { dead: O.round.sinuses.filter((x) => x.filletDead).length, broad: O.round.sinuses.filter((x) => !x.need && x.openingAskedMm !== null).length }; };
+      let m, c; try { m = dead(M); c = dead(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (m.dead > 0 && m.dead === m.broad && c.dead === 0) ? null : `the mutant tells ${m.dead} of ${m.broad} broad sinuses already round, the clean tree ${c.dead} — the behaviour did not move`; } },
   /* RETIRED BY S3c (Eva's ruling of Oct 8, the load-tapered rachis):
      `the-petiole-steps-down-flat` mutated the 45-degree cone, which is gone
      (the petiole runs straight to the rachis and the rachis tapers on from
@@ -2523,12 +2583,12 @@ const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 
 /* THE LOBED WITNESSES (leaf/stem build S4): the shipped lobed defaults on one
    node; the lobe angle at 60 where the TILT cap binds (built 46.73); 6 lobes
    at tooth depth 0.3 where the TOOTH fold clamp binds hardest (4.86 mm asked,
-   2.22 built); the NONE-FIT state (the fold cap 0.68 mm under the 1 mm
+   2.22 built — 5 lobes x 2 teeth since S5b, 1.72 built); the NONE-FIT state (the fold cap 0.68 mm under the 1 mm
    floor); and a SIMPLE leaf with every lobed control at an extreme (where a
    leak would show). Each is a table row of the same state. */
 const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
 /* S5's witness states — the two rows above, as control sets */
-const NIB_TOOTH_WIT = { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.6, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.3, leafToothCount: 3 };
+const NIB_TOOTH_WIT = { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.8, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.1, leafToothCount: 3 };
 const FILLET_WIT = { ...LOB_WIT, lobedShape: 2.5 };
 /* S4's own lobed form (S4b): the mum retune moved the four lobed defaults,
    and at its rounder, less tilted lobes the unclamped tilt folds no cell and
@@ -2538,7 +2598,11 @@ const LOB_S4_FORM = { lobedSinus: 0.62, lobedShape: 0.7, lobedAngle: 38, lobedTo
 /* (S4c: at three teeth a lobe — 21 over the rim — the unclamped 60 degrees
    folds no cell on this form; at two a lobe, 14, near S4b's shared 12, it does) */
 const TILT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedAngle: 60, lobedToothCount: 2 };
-const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedToothDepth: 0.3, lobedToothCount: 1 };
+/* S5b moved this from 6 lobes x 1 tooth: there the unclamped teeth are so deep
+   the tip-neck walk gives the inner ones up, and the mutant's inner advance
+   read 0.624, never under LF22's 0.5 margin. At 5 lobes x 2 teeth it reads
+   0.222 against the clean tree's 0.534, the relief 4.86 against a 1.72 cap. */
+const FOLD_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 5, lobedToothDepth: 0.3, lobedToothCount: 2 };
 const NONEFIT_WIT = { ...LOB_WIT, ...LOB_S4_FORM, lobedLobes: 6, lobedSinus: 0.9, lobedToothDepth: 0.3, lobedToothCount: 3 };
 /* S4c (Eva's rulings of Oct 9): the roundness at its maximum, where the asked
    radius fits at no sinus and every one SHRINKS; and a short, deep five-lobed
@@ -2810,14 +2874,14 @@ const ROWS = [
   /* S5 ROWS: a compound leaflet whose last tooth's period runs past the nib's
      crossing (LF33's state — the tooth would dig the tip to the face), and a
      LOBED leaf whose three sinuses are all BROAD and filleted (LF34's). */
-  { label: 'a compound leaf whose leaflet tooth reaches the converging tip (leaflet tip 0.60, width 40, tooth depth 0.3)',
-    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletTipShape', value: '0.6' }, { id: 'leafletWidth', value: '40' }, { id: 'leafletLength', value: '46' }, { id: 'leafletToothDepth', value: '0.3' }, { id: 'leafToothCount', value: '3' }] },
+  { label: 'a compound leaf whose leaflet tooth reaches the converging tip (leaflet tip 0.80, width 40, tooth depth 0.1)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'COMPOUND' }, { id: 'leafletTipShape', value: '0.8' }, { id: 'leafletWidth', value: '40' }, { id: 'leafletLength', value: '46' }, { id: 'leafletToothDepth', value: '0.1' }, { id: 'leafToothCount', value: '3' }] },
   { label: 'a LOBED leaf whose sinuses are BROAD and filleted (lobe shape 2.5, sinus 0.55, roundness 0.12)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '2.5' }] },
   { label: 'a LOBED leaf at lobe angle 60 at S4\'s form, 2 teeth a lobe (the TILT cap binds: built 46.73)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '60' }, { id: 'lobedToothDepth', value: '0.08' }, { id: 'lobedToothCount', value: '2' }] },
-  { label: 'a LOBED leaf, 6 lobes at tooth depth 0.3, 1 tooth a lobe (the TOOTH fold clamp binds hardest)',
-    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '1' }] },
+  { label: 'a LOBED leaf, 5 lobes at tooth depth 0.3, 2 teeth a lobe (the TOOTH fold clamp binds: 4.86 mm asked, 1.72 built)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedSinus', value: '0.62' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '5' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '2' }] },
   { label: 'a LOBED leaf where NO tooth fits (6 lobes, sinus 0.9, depth 0.3, 3 teeth a lobe — the fold cap under the floor)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '46' }, { id: 'leafNodes', value: '1' }, { id: 'leafType', value: 'LOBED' }, { id: 'lobedShape', value: '0.7' }, { id: 'lobedAngle', value: '38' }, { id: 'lobedLobes', value: '6' }, { id: 'lobedSinus', value: '0.9' }, { id: 'lobedToothDepth', value: '0.3' }, { id: 'lobedToothCount', value: '3' }] },
   /* S4c: SHRINK_WIT and YIELD_WIT above */

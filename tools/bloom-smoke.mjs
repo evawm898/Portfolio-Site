@@ -1325,12 +1325,30 @@ export const SMOKE_BLOCKS = [
        broad fillet. LF32 rides on every nibbed blade in the subset (every
        leaf row), LF34 on every lobed one. */
     rows: [
-      { label: 'LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.60, width 40, depth 0.3 — no notch inside the nib)',
+      { label: 'LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.80, width 40, depth 0.1 — no notch inside the nib)',
         path: 'LF33 (no row under the print floor carries a cut — the tooth whose period runs past the crossing gives that part up) and LF32 on every leaflet' },
       { label: 'LEAF TIP: the tip gives its tooth up (SIMPLE, width 10, 12 teeth at depth 1, tip 0.60 — the first given up at the tip, told)',
         path: 'LF13 (the relief-floor count, its cause a biconditional) with the tip yield told beside it, LF32 in the FLOOR regime' },
       { label: 'BROAD SINUS: filleted at roundness 0.12 (lobe shape 2.5 — every sinus broad)',
         path: "LF34 (a broad sinus's fillet tangent to both arms on the law, the page's rows on the law's fillet, the record the law's, the radius law) and LF20's ADD window" },
+    ],
+  },
+  {
+    n: 60, title: 'the tip gives up the pair that necks it (Oct 11, S5b)',
+    anchor: 'TIP NECK: SIMPLE, the default leaf alone (its terminal notch cuts 77% of the way to the midrib — the pair given up, told)',
+    /* THREE ROWS: two pairs given (the walk applies again one pair down), the
+       bar raised to the body's own teeth (nothing given: the deep-serration
+       arm), and the rose's toothed leaflets. LF35 rides on every toothed
+       leaf blade in the subset; these are the rows that exercise its arms. */
+    rows: [
+      { label: 'TIP NECK: two pairs given up (SIMPLE depth 0.5 x 9 teeth — 77% and 68%; the third pair, 48%, stops the walk)',
+        path: "LF35 (the record's two give-ups past the bar and the third under it, both margins at relief 0, the teeth drawn restated; the kept notch on the emitted rows under the bar) and LF13 with the given pairs exempt" },
+      { label: 'TIP NECK: the body parts the blade as deeply (SIMPLE depth 0.8 x 9 — the body 80%, the tip 77%: no neck, nothing given)',
+        path: "LF35's BODY arm — the bar is the body's own deepest tooth, read on the rows as well as in the record, and a tip parted no deeper keeps its teeth" },
+      { label: 'TIP NECK: the ROSE, its leaflets toothed at 0.26 (each leaflet gives its terminal pair up)',
+        path: 'LF35 on every leaflet (each its own blade, its own body and bar) and LF16' },
+      { label: 'ALREADY ROUND: every broad sinus rounder than the largest fillet its arms take (5 lobes, shape 2.1, sinus 0.17 — the roundness slider dead along its whole travel, told plainly)',
+        path: "LF36 (each sinus told already round: the law's own bottom radius against the largest fillet, and that fillet adding under a relief-grid step anywhere on the law) and LF34's branch" },
     ],
   },
 ];

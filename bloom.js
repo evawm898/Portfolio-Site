@@ -1779,7 +1779,7 @@ function lobedLine(leaf, b0) {
   const teeth = !S ? 'none asked'
     : S.noRoomWhy === 'fold cap' ? `NONE FIT — the fold cap is ${S.foldCapMm.toFixed(2)} mm, under the ${MIN_FEATURE_MM.toFixed(2)} mm floor (told, never refused)`
     : S.noRoom ? `none (${S.noRoomWhy})`
-    : `${S.countBuilt} at ${S.reliefBuiltMm.toFixed(2)} mm${S.foldClamped ? ` — FOLD CLAMPED: asked ${S.reliefFlooredMm.toFixed(2)} mm, built at the cap (steeper teeth fold the lattice across its midrib)` : ` (the fold cap is ${S.foldCapMm === null ? '—' : S.foldCapMm.toFixed(2)} mm)`}`;
+    : `${S.tipNeck ? S.tipNeck.teethDrawn : S.countBuilt} at ${S.reliefBuiltMm.toFixed(2)} mm${S.foldClamped ? ` — FOLD CLAMPED: asked ${S.reliefFlooredMm.toFixed(2)} mm, built at the cap (steeper teeth fold the lattice across its midrib)` : ` (the fold cap is ${S.foldCapMm === null ? '—' : S.foldCapMm.toFixed(2)} mm)`}`;
   return `
      LOBED ${Lb.lobes} lobe${Lb.lobes === 1 ? '' : 's'} a side over ${(100 * Lb.from).toFixed(0)}–${(100 * Lb.to).toFixed(0)}% of the blade, sinus ${Lb.sinus.toFixed(2)}, shape ${Lb.shape.toFixed(2)} · ONE chevron panel of ${Lb.rows} rows, each a V leaning ${tilt.toFixed(1)}° toward the tip`
     + (Lb.tiltClamped ? ` — TILT CLAMPED from the asked ${Lb.angleAskedDeg}°: steeper, these lobes fold the lattice (told, never refused)` : '')
@@ -1920,12 +1920,20 @@ function leafLine(leaf, leavesBuilt) {
         ? `no margin sinus has ${Sr.reliefFloorMm.toFixed(2)} mm of material for a notch (the widest half-width ${Sr.peakHalfMm.toFixed(2)} mm less the ${TIP_HALF_MM.toFixed(2)} mm print floor) — the relief floor, told, never refused`
         : `NO ROOM (${Sr.noRoomWhy}), told`);
   } else if (Sr) {
-    const margin = Sr.reliefMm.filter((r, i) => Sr.apexIsCrest || i !== (Sr.periods - 1) / 2);
-    const perLeaflet = cpd && b0 && b0.leaflets ? b0.leaflets.map((q) => (q.serration && !q.serration.noRoom ? q.serration.countBuilt : 0)) : null;
-    teethLine = `\n     TEETH ${Sr.countBuilt} built${perLeaflet ? ` on the first leaflet (each leaflet its own blade: ${perLeaflet.join(' / ')} of ${Sr.countAsked} asked — the relief floor gives on the small ones, the ruled behaviour)` : ''}${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give${Sr.tipYield ? ` — the converging TIP gave the first up (its notch at u ${Sr.tipYield.atU.toFixed(3)} has no ${Sr.reliefFloorMm.toFixed(2)} mm of material where the blade closes on its nib; a tooth there would fold)` : ''}` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : ''}`
+    /* (S5b: a pair the converging tip gave up is cut at relief 0 and is not
+       a tooth; the relief and the rows are quoted over the notches CUT) */
+    const TN = Sr.tipNeck, drawnOf = (q) => (q.tipNeck ? q.tipNeck.teethDrawn : q.countBuilt);
+    const keptSinus = (i) => !(TN && TN.sinusU.includes(Sr.sinusU[i]));
+    const margin = Sr.reliefMm.filter((r, i) => (Sr.apexIsCrest || i !== (Sr.periods - 1) / 2) && r > 0);
+    const rowRel = (Sr.rowReliefMm || []).filter((r, i) => keptSinus(i));
+    const perLeaflet = cpd && b0 && b0.leaflets ? b0.leaflets.map((q) => (q.serration && !q.serration.noRoom ? drawnOf(q.serration) : 0)) : null;
+    const neckWords = TN && TN.pairsGiven > 0
+      ? ` — the converging TIP gave ${TN.pairsGiven} pair${TN.pairsGiven > 1 ? 's' : ''} up (${TN.teethGiven} teeth of the ${Sr.countBuilt} laid out): its notch at u ${TN.tested[0].sinusU.toFixed(3)} would cut ${(100 * TN.tested[0].fraction).toFixed(0)}% of the way to the midrib, and past halfway a notch parts the blade — a neck; the pair below takes ${TN.tested[TN.tested.length - 1].neck ? 'too much as well' : `${(100 * TN.tested[TN.tested.length - 1].fraction).toFixed(0)}%`}, and the slider keeps its value`
+      : '';
+    teethLine = `\n     TEETH ${drawnOf(Sr)} built${perLeaflet ? ` on the first leaflet (each leaflet its own blade: ${perLeaflet.join(' / ')} of ${Sr.countAsked} asked — the relief floor gives on the small ones, the ruled behaviour)` : ''}${Sr.countBuilt < Sr.countAsked ? ` of ${Sr.countAsked} asked — CLAMPED by ${Sr.clampedBy === 'relief floor' ? `the relief floor: a ${Sr.reliefFloorMm.toFixed(2)} mm notch fits at no more margin sinuses than ${Sr.countBuilt} teeth give${Sr.tipYield ? ` — the converging TIP gave the first up (its notch at u ${Sr.tipYield.atU.toFixed(3)} has no ${Sr.reliefFloorMm.toFixed(2)} mm of material where the blade closes on its nib; a tooth there would fold)` : ''}` : Sr.clampedBy === 'pitch' ? 'the pitch floor' : 'the rows the blade has'}` : (drawnOf(Sr) < Sr.countAsked ? ` of ${Sr.countAsked} asked` : '')}${neckWords}`
       + (margin.length ? ` · relief ${Math.min(...margin).toFixed(2)}${Math.max(...margin) > Math.min(...margin) ? `–${Math.max(...margin).toFixed(2)}` : ''} mm at the sinuses` : '')
       + (Sr.reliefFloored ? ` (asked ${Sr.reliefAskedMm.toFixed(2)} mm, FLOORED at the ${Sr.reliefFloorMm.toFixed(2)} mm minimum feature — design view included; the slider keeps its value)` : ` (the floor is ${Sr.reliefFloorMm.toFixed(2)} mm)`)
-      + (Sr.rowReliefMm && Sr.rowReliefMm.length ? ` · the rows draw ${Math.min(...Sr.rowReliefMm).toFixed(2)}–${Math.max(...Sr.rowReliefMm).toFixed(2)} mm of it (they sample the cut between stations)` : '')
+      + (rowRel.length ? ` · the rows draw ${Math.min(...rowRel).toFixed(2)}–${Math.max(...rowRel).toFixed(2)} mm of it (they sample the cut between stations)` : '')
       + (Sr.apexIsCrest === false ? ' · an even count puts its apex notch on the terminal face, where it cuts nothing' : '');
   }
   if (sn && !leaf.nodeDepthsMm.length) return `\n     LEAVES none built${sharedLine}\n`;

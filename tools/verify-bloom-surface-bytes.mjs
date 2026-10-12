@@ -59,6 +59,7 @@
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { existsSync } from 'node:fs';
+import { tipNeckOf } from './bloom-leaf-tip-neck.mjs';
 
 const argv = process.argv.slice(2);
 const argOf = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i + 1]; };
@@ -352,6 +353,36 @@ const PREDICATE_MOVERS = {
     const ip = base.inflorescencePlan(st, sp, acc);
     const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.built > 0);
+  },
+  /* S5b, JOB 1 — THE TIP GIVES UP THE PAIR THAT NECKS IT (Eva's ruling of
+     Oct 11; docs/bloom-leaf-tip-neck-outcome.md). PREDECLARED FROM THE BASE
+     TREE: a row moves iff the restated rule (`tools/bloom-leaf-tip-neck.mjs`,
+     run on the BASE tree's own profiles and lobe layout — a tree with no
+     give-up at all) gives at least one pair up on some leaf blade of it.
+     Every other row — leafless, entire, or toothed with no neck (the body
+     parting the blade as deeply, the tip's notch under half) — must hold to
+     the bit. The base tree has no `tipNeck`, so the prediction's owner is not
+     the quantity under test. */
+  'tip-neck': (st) => tipNeckOf(base, st).given > 0,
+  /* S5b, JOB 3 — WHERE THE NIB'S ROWS COME FROM (Eva's ruling of Oct 11 on
+     S5's E2 churn). PREDECLARED FROM THE BASE TREE'S OWN EMITTED STATIONS: a
+     row moves iff some leaf blade the base builds stands on stations other
+     than the new law gives it — the law RESTATED in the harness
+     (`restatedLeafStations` / `restatedLobedStations`, its own expression)
+     and fed the base blade's own nib record (`arcU`). Every leafless row and
+     every blade with no nib holds to the bit. */
+  'arc-donors': (st) => {
+    let b;
+    try { b = base.buildBloomInto(new base.MeshBuilder({ exportMode: true }), st); } catch (e) { return false; }
+    for (const L of b.leavesBuilt || []) {
+      const blades = L.leaflets ? L.leaflets.map((q) => [q, false]) : [[L, !!L.lobed]];
+      for (const [B, lobed] of blades) {
+        if (!Array.isArray(B.rowU) || !B.tipClamp || !B.tipClamp.nib) continue;
+        const want = lobed ? harness.restatedLobedStations(st, B.tipClamp.arcU) : harness.restatedLeafStations(B.rowU.length - 1, B.tipClamp.arcU);
+        if (want.length !== B.rowU.length || want.some((u, j) => !Object.is(u, B.rowU[j]))) return true;
+      }
+    }
+    return false;
   },
   /* S5, JOB 2 — THE BROAD SINUS'S FILLET, measured against a JOB-1-ONLY tree
      (`--base` is the head with the fillet branch stripped, so the nib is on
