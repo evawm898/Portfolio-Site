@@ -139,8 +139,10 @@
            A FOOT line can never appear — and requires this run to FAIL on
            all eight. A check nobody has seen fail is a hope.
 
-     (i) THE PRINT-PREVIEW TOGGLE (Sep 3). View chrome, not a registry
-         control, so route (a)'s census would fail it as a stray input if it
+     (i) THE PRINT-PREVIEW TOGGLE (Sep 3; ALWAYS ON since F7 — the page is
+         opened AS SHIPPED and the box must be CHECKED and HIDDEN with
+         export geometry on screen, then driven OFF and back ON). View
+         chrome, not a registry control, so route (a)'s census would fail it as a stray input if it
          ever landed inside the panel — that is asserted. Then the box is
          flipped through its real 'change' event on a configuration where
          the export floor BINDS (ALL THIN), and the app must switch
@@ -1910,23 +1912,35 @@ for (const [placement, count, depth] of [
 }
 
 /* ---------------- (i) THE PRINT-PREVIEW TOGGLE ---------------- */
+/* ALWAYS ON SINCE F7 (Eva's ruling): the page is opened AS SHIPPED (no
+   harness flip), and the box must be CHECKED, its wrapper HIDDEN, and the
+   viewport on EXPORT geometry at load. Then the hidden box is still driven
+   both ways through its own 'change' event, because it is hidden and not
+   deleted — the gates' own route to LIVE geometry goes through it — and the
+   load-bearing claim is unchanged: the STL is byte-identical either side. */
 {
   const tag = '[preview]';
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-panel-preview-'));
   const THIN = [{ id: 'sheetThickness', value: '0.6' }, { id: 'tipThinning', value: '0.8' }, { id: 'footDelicacy', value: '0.25' }];
-  await openBloom(page, port);
+  await openBloom(page, port, { asShipped: true });
   const where = await page.evaluate(() => {
     const el = document.getElementById('printPreview');
-    return { present: !!el, inPanel: !!(el && el.closest('#panelControls')), inView: !!(el && el.closest('.bl-viewpanel')), checked: el ? el.checked : null };
+    const wrap = el && el.closest('.bl-toggle');
+    return { present: !!el, inPanel: !!(el && el.closest('#panelControls')), inView: !!(el && el.closest('.bl-viewpanel')), checked: el ? el.checked : null,
+      wrapHidden: !!(wrap && wrap.hidden && getComputedStyle(wrap).display === 'none'), rendered: el ? el.getClientRects().length > 0 : null,
+      mode: window.__bloomMetrics().shownMode, first: document.getElementById('readout').textContent.split('\n')[0] };
   });
-  if (!where.present) note(`${tag}: no #printPreview box in the page`);
+  if (!where.present) note(`${tag}: no #printPreview box in the page — F7 hides it, it must not be deleted`);
   else {
     if (where.inPanel || !where.inView) note(`${tag}: the box is ${where.inPanel ? 'inside #panelControls' : 'outside the VIEW box'} — it is view chrome and belongs beside Auto-rotate, not among the registry's controls`);
-    if (where.checked !== false) note(`${tag}: the box is checked at first load — the page must open on LIVE geometry`);
+    if (where.checked !== true) note(`${tag}: the box is NOT checked at first load — print preview is always on (F7)`);
+    if (!where.wrapHidden || where.rendered) note(`${tag}: the box is visible at first load (wrapper hidden: ${where.wrapHidden}, box rendered: ${where.rendered}) — F7 hides it`);
+    if (where.mode !== 'export') note(`${tag}: the page opens on "${where.mode}" geometry — print preview is always on, it must open on EXPORT`);
+    if (!/PRINT PREVIEW/.test(where.first)) note(`${tag}: the read-out's first line at load reads "${where.first}" and does not name PRINT PREVIEW`);
     const bad = await applyConfig(page, THIN);
     if (bad.length) note(`${tag}: ALL THIN did not take: ${bad.join('; ')}`);
-    const before = await page.evaluate(() => { const m = window.__bloomMetrics(); return { shownMode: m.shownMode, liveTris: m.liveTris, shownTris: m.shownTris, hub: m.hubRadius, builds: window.__bloomBuildState().count, first: document.getElementById('readout').textContent.split('\n')[0] }; });
-    const offBuf = await exportStl(page, tmp);
+    const on = await page.evaluate(() => { const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; return { shownMode: m.shownMode, liveTris: m.liveTris, shownTris: m.shownTris, hub: m.hubRadius, builds: window.__bloomBuildState().count, first: txt.split('\n')[0], printedMarked: /PRINTED[^\n]*← on screen/.test(txt), liveMarked: /LIVE[^\n]*← on screen/.test(txt) }; });
+    const onBuf = await exportStl(page, tmp);
     const owner = await page.evaluate(async () => {
       const mod = await import('/bloom-geometry.js');
       const ui = window.__bloomUIState();
@@ -1940,35 +1954,36 @@ for (const [placement, count, depth] of [
            defect, pointed at view chrome. */
         const clone = el.cloneNode(true); el.replaceWith(clone); el = clone;
       }
-      el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true }));
     }, { breakIt: NEGATIVE_CONTROL });
     await settleBuild(page);
     await page.waitForTimeout(80);
-    const on = await page.evaluate(() => { const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; return { shownMode: m.shownMode, liveTris: m.liveTris, shownTris: m.shownTris, hub: m.hubRadius, builds: window.__bloomBuildState().count, first: txt.split('\n')[0], printedMarked: /PRINTED \(export floor [0-9.]+ mm\): .*← on screen/.test(txt), liveMarked: /← live, on screen/.test(txt) }; });
-    const onBuf = await exportStl(page, tmp);
+    const off = await page.evaluate(() => { const m = window.__bloomMetrics(); return { shownMode: m.shownMode, liveTris: m.liveTris, hub: m.hubRadius, builds: window.__bloomBuildState().count, first: document.getElementById('readout').textContent.split('\n')[0] }; });
+    const offBuf = await exportStl(page, tmp);
     const drift = await fullStateDrift(page, THIN);
-    await page.evaluate(() => { const el = document.getElementById('printPreview'); el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await page.evaluate(() => { const el = document.getElementById('printPreview'); el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
     await settleBuild(page);
     await page.waitForTimeout(80);
-    const off = await page.evaluate(() => { const m = window.__bloomMetrics(); return { shownMode: m.shownMode, liveTris: m.liveTris, hub: m.hubRadius, first: document.getElementById('readout').textContent.split('\n')[0] }; });
+    const back = await page.evaluate(() => ({ shownMode: window.__bloomMetrics().shownMode, hub: window.__bloomMetrics().hubRadius }));
     const problems = [];
-    if (!(on.builds > before.builds)) problems.push(`flipping the box did not rebuild (build count ${before.builds} -> ${on.builds})`);
-    if (on.shownMode !== 'export') problems.push(`shownMode reads "${on.shownMode}" with the box ON, expected "export"`);
+    if (on.shownMode !== 'export') problems.push(`shownMode reads "${on.shownMode}" with the box ON (as shipped), expected "export"`);
     if (on.liveTris !== null) problems.push(`liveTris reads ${on.liveTris} with the preview ON — an export-mode count under a live label; it must be null`);
     if (on.hub !== owner.exportHub) problems.push(`hub radius ${on.hub} with the preview ON is not footRing()'s export answer ${owner.exportHub}`);
     if (owner.exportHub === owner.liveHub) problems.push(`the floor does not bind on this row (live and export hub both ${owner.liveHub}) — the route is measuring nothing`);
     if (!/PRINT PREVIEW/.test(on.first)) problems.push(`the read-out's first line with the box ON reads "${on.first}" and does not name PRINT PREVIEW`);
     if (!on.printedMarked) problems.push('the PRINTED line does not carry the "← on screen" marker with the box ON');
     if (on.liveMarked) problems.push('the live line still says "on screen" with the box ON');
-    if (drift.length) problems.push(`registry state moved with the box: ${drift.join('; ')}`);
-    if (!offBuf || !onBuf) problems.push('an export did not download');
-    else if (!offBuf.equals(onBuf)) problems.push(`the STL exported with the box ON differs from the one with it OFF (${onBuf.length} vs ${offBuf.length} bytes) — the toggle reached the export path`);
+    if (!(off.builds > on.builds)) problems.push(`flipping the box did not rebuild (build count ${on.builds} -> ${off.builds})`);
     if (off.shownMode !== 'live') problems.push(`shownMode reads "${off.shownMode}" after turning the box OFF, expected "live"`);
     if (off.hub !== owner.liveHub) problems.push(`hub radius ${off.hub} after OFF is not footRing()'s live answer ${owner.liveHub}`);
     if (typeof off.liveTris !== 'number') problems.push(`liveTris reads ${off.liveTris} after OFF`);
     if (!/LIVE/.test(off.first)) problems.push(`the read-out's first line after OFF reads "${off.first}" and does not name LIVE`);
+    if (drift.length) problems.push(`registry state moved with the box: ${drift.join('; ')}`);
+    if (!offBuf || !onBuf) problems.push('an export did not download');
+    else if (!offBuf.equals(onBuf)) problems.push(`the STL exported with the box ON differs from the one with it OFF (${onBuf.length} vs ${offBuf.length} bytes) — the toggle reached the export path`);
+    if (back.shownMode !== 'export' || back.hub !== owner.exportHub) problems.push(`turning the box back ON did not restore export geometry (shownMode ${back.shownMode}, hub ${back.hub})`);
     if (problems.length) note(`${tag}: ${problems.join('; ')}`);
-    else ok.push(`${tag}: the box sits in the VIEW box, unchecked at load; ON on ALL THIN rebuilt (${before.builds} -> ${on.builds}), shownMode export, liveTris null, hub ${before.hub.toFixed(3)} -> ${on.hub.toFixed(3)} mm (= footRing's export answer), read-out "${on.first.slice(0, 40)}…", PRINTED line marked, 0 registry controls moved, STL ON == STL OFF byte for byte (${onBuf.length} bytes); OFF restored live (hub ${off.hub.toFixed(3)} mm)`);
+    else ok.push(`${tag}: the box sits in the VIEW box, CHECKED and HIDDEN at load with export geometry on screen; on ALL THIN OFF rebuilt (${on.builds} -> ${off.builds}), shownMode live, hub ${on.hub.toFixed(3)} -> ${off.hub.toFixed(3)}, and back ON restores export; the STL is byte-identical either side (${onBuf.length} bytes)`);
   }
   fs.rmSync(tmp, { recursive: true, force: true });
 }

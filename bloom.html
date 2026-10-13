@@ -62,10 +62,14 @@
        between a render with visible gaps and a print with none. The Get STL
        button never reads it: the export builds from readUI() alone, so the
        bytes cannot move with this box. `shownMode()` in bloom.js is the ONE
-       owner of which geometry is on screen; the read-out names it. -->
-  <div class="bl-toggle">
+       owner of which geometry is on screen; the read-out names it.
+       ALWAYS ON SINCE F7 (Eva's ruling): the box is CHECKED and its wrapper
+       HIDDEN — not deleted. Its id and every reader stay, so it can be unhidden
+       later, and the gate harness can still switch it off to keep measuring
+       LIVE geometry. Nothing saves it: it was never a registry row. -->
+  <div class="bl-toggle" id="printPreviewToggle" hidden>
     <label for="printPreview" title="Render the geometry as it will PRINT: the 1.00 mm export floor applied to the sheet, tip and foot, and the ring re-derived from the floored feet. Never changes the STL.">Print preview</label>
-    <input type="checkbox" id="printPreview">
+    <input type="checkbox" id="printPreview" checked>
   </div>
 </aside>
 

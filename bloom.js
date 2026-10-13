@@ -534,9 +534,44 @@ let shownSummary = '';   // the read-out for whatever geometry is on screen, in 
    line, the print-truth pair's on-screen marker, and __bloomMetrics()'s
    `shownMode`. A second reading of the checkbox anywhere would be a second
    owner of the one boundary this control is about. */
+/* ALWAYS ON SINCE F7 (Eva's ruling; docs/bloom-print-preview-always-on.md).
+   The box is CHECKED and HIDDEN in bloom.html — not deleted — so this
+   function and every reader above are unchanged, the box can be unhidden
+   later, and the gate harness unchecks it at page load so the gates that
+   measure LIVE geometry keep measuring it. No saved design carries it: it was
+   never a registry row and the bloom persists no design. */
 const printPreviewInput = document.getElementById('printPreview');
 function shownMode() { return printPreviewInput && printPreviewInput.checked ? 'export' : 'live'; }
 let lastShownMode = 'live';
+
+/* THE DRAG PREVIEW (F7, Eva's ruling: candidate A). While a slider is HELD,
+   the viewport builds the same geometry WITHOUT THE INFILL CELLS — the one
+   cost a drag can shed, measured at 12.3 s -> 1.0 s on the infill cost
+   corner and nothing worth having anywhere else — and on release it builds
+   the full geometry again. Exports never see any of this: both export
+   handlers build from readUI() alone.
+
+   THREE RULES, and each is load-bearing:
+   - A DRAG IS A POINTERDOWN ON A RANGE INPUT, UNTIL POINTERUP / POINTERCANCEL
+     / A 'change' ON A RANGE / THE WINDOW LOSING FOCUS. A typed value (F5) and
+     a keyboard nudge fire input+change with no pointerdown on the slider, so
+     they can never enter the drag state: they build full, directly.
+   - THE KIND OF A BUILD IS DECIDED WHEN IT RUNS, NOT WHEN IT WAS QUEUED.
+     regenerate() reads `dragActive` itself, so a queued build that a drag
+     overtakes builds light, and a queued light build that a release
+     overtakes builds full. A build cannot be interrupted once running (one
+     thread), so "supersede the queued build and read the controls at run
+     time" is the guarantee, ruled acceptable in place of cancellation.
+   - A LIGHT BUILD IS NEVER LEFT ON SCREEN. Release schedules a rebuild
+     whenever a light build is on screen or one is queued; the queued one
+     reads `dragActive === false` and builds full.
+   A design with no infill has nothing to shed, so its drag build IS the full
+   build: `dragLight()` is false there and nothing about it changes. */
+let dragActive = false;
+let lightOnScreen = false;
+let lightBuildCount = 0;   // how many light builds this page has made — the drag-preview gate's witness
+const DRAG_LIGHT_OVERRIDE = Object.freeze({ petalInfill: 'NONE' });
+function dragLight() { return dragActive && !infillIsAbsent(readUI()); }
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
@@ -709,9 +744,12 @@ let capability = null;
    the seam's real fold untouched. 60 degrees sits in the middle of that
    15-70 degree margin on both sides. */
 const SMOOTH_SHADING_CREASE_DEG = 60;
-function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false }) {
+/* `override` (F7) — fields laid over readUI() for THIS build only; the drag
+   preview's DRAG_LIGHT_OVERRIDE is its one caller. The export handlers never
+   pass it. */
+function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null }) {
   const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
-  const uiForBuild = readUI();
+  const uiForBuild = override ? { ...readUI(), ...override } : readUI();
   const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
     lastShownMode = exportMode ? 'export' : 'live';
@@ -895,6 +933,8 @@ function materialLines(ui, mode) {
    live mode too, because a state that is only ever implied is a state the
    reader has to infer, and the toggle's whole reason to exist is that live
    and printed are different objects now. Reads shownMode(); owns nothing. */
+const DRAG_LINE = 'on screen while dragging: the infill cells are dropped — full print geometry rebuilds on release\n';
+let lastFullShownInfill = null;
 function showingLine(mode) {
   return mode === 'export'
     ? `on screen: PRINT PREVIEW — export floor ${MIN_FEATURE_MM.toFixed(2)} mm applied to sheet, tip and foot, ring re-derived from the floored feet\n`
@@ -2333,7 +2373,11 @@ function regenerate() {
      marks this as the build the telemetry describes; the export handler's
      build never carries it. */
   const mode = shownMode();
-  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true });
+  /* THE DRAG PREVIEW'S KIND, decided HERE, at run time (see dragLight). */
+  const light = dragLight();
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true, override: light ? DRAG_LIGHT_OVERRIDE : null });
+  lightOnScreen = light;
+  if (light) lightBuildCount++;
   /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
      used to be refreshed before it, which was the same thing while no span
      read a built number. One of them does now (the stamen spread's cap, an
@@ -2390,7 +2434,7 @@ function regenerate() {
                      channel's own case, and `stamenSpread`'s before it. Taken off
                      the first BUILT petal because the plan is a property of a
                      blade; null where no blade carries one. */
-                  infill: (built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null,
+                  infill: light ? lastFullShownInfill : ((built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null),
                   /* THE SEPALS' record: the count ceiling and the angle limit are
                      the OWNER's numbers (footRing's and the builder's own scan),
                      printed on the two controls and hatched on their tracks; the
@@ -2400,6 +2444,9 @@ function regenerate() {
                      going silent. */
                   sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
                     : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null) };
+  /* A LIGHT BUILD CARRIES NO INFILL PLAN, so the infill controls keep the
+     last FULL build's numbers through a drag rather than flickering to none. */
+  if (!light) lastFullShownInfill = shown.infill;
   refreshLabels(ui, shown);
   applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
@@ -2432,7 +2479,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
+  shownSummary = (light ? DRAG_LINE : '') + showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -2452,6 +2499,39 @@ for (const c of CONTROLS) {
    registry control uses — no visibility pass, because it is not a control
    and no predicate reads it. */
 if (printPreviewInput) printPreviewInput.addEventListener('change', scheduleRegen);
+
+/* THE DRAG / RELEASE SPLIT (F7) — see dragLight() for the three rules. All
+   capture-phase on the document or window, so they run BEFORE the control's
+   own listeners: a 'change' ends the drag before that same event queues its
+   rebuild. */
+const isSlider = (t) => t instanceof HTMLInputElement && t.type === 'range';
+function endDrag() {
+  if (!dragActive) return;
+  dragActive = false;
+  if (lightOnScreen || regenQueued) scheduleRegen();
+}
+document.addEventListener('pointerdown', (e) => { if (isSlider(e.target)) dragActive = true; }, true);
+window.addEventListener('pointerup', endDrag, true);
+window.addEventListener('pointercancel', endDrag, true);
+window.addEventListener('blur', endDrag);
+document.addEventListener('change', (e) => { if (isSlider(e.target)) endDrag(); }, true);
+/* For the drag-preview gate: whether a slider is held, and whether the build
+   on screen is the light one. */
+window.__bloomDragState = () => ({ dragging: dragActive, lightOnScreen, lightBuilds: lightBuildCount });
+/* What is ON SCREEN, as a digest of the viewport mesh's own positions — the
+   drag-preview gate compares it with the exported STL's. Negative zeros are
+   folded to +0 first: the STL exporter's identity transform turns -0 into +0
+   and that is not a geometric difference. FNV-1a over the float32 bytes. */
+window.__bloomShownDigest = () => {
+  if (!mesh) return null;
+  const src = mesh.geometry.getAttribute('position').array;
+  const f = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) f[i] = src[i] === 0 ? 0 : src[i];
+  const b = new Uint8Array(f.buffer);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193) >>> 0; }
+  return { tris: src.length / 9, fnv: h };
+};
 
 /* ---------------------------------------------------
    VIEW PRESETS — the VIEW box's dropdown. Pure camera chrome: reads
@@ -2672,6 +2752,9 @@ window.__bloomMetrics = () => ({
      gates assert `shownMode === 'live'` on every row; a sheet that toggles
      captions from `shownTris` and `shownMode`. */
   shownMode: lastShownMode,
+  /* F7: whether the build on screen is the drag preview (infill cells
+     dropped). False at rest, always — the drag-preview gate holds that. */
+  shownLight: lightOnScreen,
   shownTris: lastTris,
   liveTris: lastShownMode === 'live' ? lastTris : null,
   maxDimMm: lastMaxDim,

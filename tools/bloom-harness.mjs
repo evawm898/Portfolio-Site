@@ -993,12 +993,34 @@ export async function launchPage({ viewport = { width: 1000, height: 800 }, devi
 /* A FRESH PAGE PER ROW is the caller's job (call this once per row): the
    flower's connectedness gate proved a reused page with a hand-kept clear
    list leaks state between rows, and a reload cannot rot. */
-export async function openBloom(page, port) {
+/* PRINT PREVIEW SHIPS ON SINCE F7 (Eva's ruling), and this is where the
+   gates keep measuring LIVE geometry: the box is hidden, not deleted, so
+   after load it is UNCHECKED here through its own 'change' event, the
+   rebuild is waited for, and the mode is READ BACK — every "(live)" label a
+   gate prints depends on it, and a box that silently stayed on would have
+   every row measuring export geometry under a live label. `asShipped: true`
+   leaves the page exactly as a visitor gets it (the panel gate's route (i)
+   and the drag-preview gate). A tree that predates the box, or predates F7
+   (box unchecked at load), is left alone: unchecking an unchecked box is a
+   no-op and fires nothing. */
+export async function openBloom(page, port, { asShipped = false } = {}) {
   await page.goto(`http://127.0.0.1:${port}/bloom.html`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => {
     const el = document.getElementById('readout');
     return el && /tris/.test(el.textContent);
   }, { timeout: 60000 });
+  if (asShipped) return;
+  const flipped = await page.evaluate(() => {
+    const el = document.getElementById('printPreview');
+    if (!el || !el.checked) return false;
+    el.checked = false;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  });
+  if (!flipped) return;
+  await settleBuild(page);
+  const mode = await page.evaluate(() => window.__bloomMetrics().shownMode);
+  if (mode !== 'live') throw new Error(`openBloom: unchecked the print-preview box and the page still shows "${mode}" geometry — every live-labelled number would be wrong`);
 }
 
 /* WAIT FOR THE MODEL TO BE BUILT — the REAL SIGNAL, never a sleep.
@@ -1028,7 +1050,7 @@ export async function openBloom(page, port) {
    a caller has to remember is not a safety net. Waiting on `pending` handles
    the empty-set row (the DEFAULT row queues nothing and returns at once)
    without a special case. */
-export async function settleBuild(page) {
+export async function settleBuild(page, timeoutMs = 30000) {
   await page.waitForFunction(() => {
     const st = window.__bloomBuildState;
     /* A tree without the hook cannot be waited on, and pretending otherwise
@@ -1039,16 +1061,19 @@ export async function settleBuild(page) {
        happened. */
     if (typeof st !== 'function') return true;
     return st().pending === false;
-  }, null, { timeout: 30000 });
+  }, null, { timeout: timeoutMs });
 }
 
 /* READ-BACK: set each value through the real input, fire the real events,
    and compare what the element now holds, THEN wait for the rebuild the
    events queued. Returns failure strings; the caller must treat any as fatal
    for the row. */
-export async function applyConfig(page, sets, kinds = null) {
+/* `settleMs` (F7): a caller that must reach the rows a gate cannot hold in 30 s
+   — `ALL MAX`, ~24 s a build on a dev box — may wait longer. Every gate keeps
+   the default; the 30 s is THEIR bound and it is not loosened here. */
+export async function applyConfig(page, sets, kinds = null, { settleMs = 30000 } = {}) {
   const bad = await applyConfigRaw(page, migrateForServedTree(sets, kinds), kinds);
-  await settleBuild(page);
+  await settleBuild(page, settleMs);
   return bad;
 }
 /* A STORED SET NAMING A RETIRED ID WITH AN EXACT MIGRATION is replayed through

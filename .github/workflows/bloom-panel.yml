@@ -26,6 +26,7 @@ on:
       - bloom-registry.js
       - bloom-geometry.js
       - tools/verify-bloom-panel.mjs
+      - tools/verify-bloom-drag-preview.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
       - .github/workflows/bloom-panel.yml
@@ -38,6 +39,7 @@ on:
       - bloom-registry.js
       - bloom-geometry.js
       - tools/verify-bloom-panel.mjs
+      - tools/verify-bloom-drag-preview.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
@@ -83,3 +85,11 @@ jobs:
       # requires BOTH routes to observe their own failure.
       - name: The gate must fail when the panel is broken on purpose
         run: node tools/verify-bloom-panel.mjs --negative-control
+      # F7: print preview is always on and a held slider drops only the infill
+      # cells. What is on screen at REST must be the full print geometry — read
+      # off the exported STL, a different owner — after a pointerup, a
+      # 'change', a typed value and the keyboard. No other gate drives a pointer.
+      - name: At rest the viewport is the full print geometry (drag preview)
+        run: node tools/verify-bloom-drag-preview.mjs
+      - name: The drag-preview gate must fail on six broken copies of bloom.js
+        run: node tools/verify-bloom-drag-preview.mjs --negative-control

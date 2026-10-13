@@ -653,6 +653,28 @@ fail the run if a row is measured with the preview on. Every canvas sheet's
 caption carries `modeTag(m)` from the harness, read from the app's own
 `shownMode`; a sheet that toggles captions from `shownTris`.
 
+**PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
+rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
+`endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
+- **The box is CHECKED and HIDDEN, never deleted.** Its id, `shownMode()` and every reader
+  are unchanged. It was never a registry row and the bloom saves no design, so nothing
+  migrates. "Get grid" follows it, so a grid now exports `bloom-grid-export.glb`.
+- **The gates still measure LIVE.** `openBloom` unchecks the hidden box after load and reads
+  the mode back; `{ asShipped: true }` skips that (route (i), the drag gate). Route (i) now
+  asserts checked + hidden + export at load, then flips the box both ways.
+- **The drag build is candidate A** (`DRAG_LIGHT_OVERRIDE`, `petalInfill: 'NONE'`, no builder
+  change). A drag is a pointerdown on a range input until pointerup / pointercancel / a range
+  `change` / window blur. Typed values (F5) and arrow keys never enter it. The kind is decided
+  when a build RUNS, so a queued build is superseded; a running one cannot be interrupted.
+- **A design with no infill has nothing to shed:** its drag build IS the full build.
+- **Measured** (one rebuild, this box): the infill corner 12.3 s → 1.0 s while dragging. Tube,
+  layers, inflorescence and leaves barely move under ANY candidate; the non-print view was
+  slower than print everywhere (its smoothing pass).
+- **The gate is `node tools/verify-bloom-drag-preview.mjs`** (D0–D9: on screen at rest is
+  byte-for-byte the exported STL's positions after pointerup, `change`, a typed value and
+  arrows). `--negative-control` runs six mutants of bloom.js, every anchor checked first.
+  It rides in `bloom-panel.yml`.
+
 **DEPTH IS SIX, WITHOUT A CLAMP** (Eva, Sep 3). The ring-versus-foot-floor
 formula the brief expected to cap depth does not hold (ring₀ grows with depth
 through the area rule) and the collision it names is not a buildability limit
