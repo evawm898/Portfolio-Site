@@ -39,8 +39,15 @@
          RETIRED id with an exact migration lands on every replacement and is
          told; a retired id with no migration is told and not applied; a file
          naming a retired id AND its replacement applies neither; an entry in
-         an overrides / curves container is told as not applied; a missing
-         container is told.
+         a curves container is told as not applied, a well-formed overrides
+         entry is read (Scoping-a), a tier entry kept and told, a malformed one
+         dropped and told; a missing container is told.
+     F6  THE SCOPE MODEL'S OWN GATE, tools/verify-bloom-scopes.mjs, is SPAWNED
+         here (and its --negative-control under ours) so it rides in CI through
+         this workflow step — the file's overrides containers are that model's
+         file shape, and adding a workflow step would cost every frozen tag
+         dispatched afterwards from an older base (CLAUDE.md, "WHEN A FROZEN
+         TAG PUBLISHES") while another session is in flight on one.
      F5  THE PAGE (browser): Save and Load render in the panel; the page's own
          save carries EXACTLY the registry's ids under `controls`; a load
          through the page's own hook of its own save reports NOTHING and moves
@@ -244,8 +251,16 @@ async function nodeClauses(F, rec) {
     { const o = base(); o.controls['centerStyle'] = 'DISC'; const r = F.readDoc(o);
       if (!r.ok || !r.notes.some((n) => n.kind === 'retired' && /centerStyle.*not applied/.test(n.text)) || 'centerStyle' in r.doc.controls) p.push(`retired without migration: ${r.ok ? texts(r) : r.error}`); }
     // an entry in a container: told as not applied
-    { const o = base(); o.overrides.layers = [{ layer: 1, petalLength: 3 }]; o.curves.spine = [[0, 0]]; const r = F.readDoc(o);
-      if (!r.ok || !r.notes.some((n) => n.kind === 'not-applied' && /overrides\.layers holds 1 entry/.test(n.text)) || !r.notes.some((n) => n.kind === 'not-applied' && /curves\.spine holds 1 entry/.test(n.text))) p.push(`container entries: ${r.ok ? texts(r) : r.error}`); }
+    /* a curves entry is told not applied; an overrides entry is READ now
+       (Scoping-a) — a well-formed layer entry reads clean and is kept, a tier
+       entry is kept and told, a malformed one is dropped and told; the model's
+       own gate (tools/verify-bloom-scopes.mjs, spawned below) carries the rest */
+    { const o = base(); o.overrides.layers = [{ layer: 1, offsets: { petalLength: 3 } }]; o.overrides.tiers = [{ tier: 0, offsets: { sepalCup: 0.2 } }]; o.overrides.petals = [{ layer: 1, petalLength: 3 }]; o.curves.spine = [[0, 0]]; const r = F.readDoc(o);
+      if (!r.ok || !r.notes.some((n) => n.kind === 'not-applied' && /curves\.spine holds 1 entry/.test(n.text))
+        || !r.notes.some((n) => n.kind === 'not-applied' && /overrides\.tiers holds 1 entry — kept/.test(n.text))
+        || !r.notes.some((n) => n.kind === 'invalid' && /overrides\.petals\[0\]\.slot/.test(n.text))
+        || r.notes.some((n) => /overrides\.layers/.test(n.text))
+        || JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: [{ layer: 1, offsets: { petalLength: 3 } }], petals: [], tiers: [{ tier: 0, offsets: { sepalCup: 0.2 } }] })) p.push(`container entries: ${r.ok ? texts(r) + ' | ' + JSON.stringify(r.doc.overrides) : r.error}`); }
     // a missing container, a missing scope, a scope that is not a list, an unknown scope
     { const o = base(); delete o.curves; delete o.overrides.tiers; o.overrides.petals = 5; o.overrides.flowers = []; const r = F.readDoc(o);
       const want = [['missing', /^curves is missing/], ['missing', /overrides\.tiers is missing/], ['invalid', /overrides\.petals is not a list/], ['unknown', /overrides\.flowers/]];
@@ -456,6 +471,17 @@ async function runAll(F, port, override) {
   return results;
 }
 const print = (results) => { for (const r of results) console.log(`  ${r.ok ? 'ok  ' : 'FAIL'} ${r.clause}: ${r.detail}`); };
+
+/* F6 — the scope model's gate, as its own process with its own verdict line,
+   before anything else runs: a model whose gate is red has no business in a
+   round trip. `--mutant=` scopes OUR mutants, so the spawn is skipped then. */
+if (!ONLY.length) {
+  const { spawnSync } = await import('node:child_process');
+  const args = [path.join(ROOT, 'tools/verify-bloom-scopes.mjs'), ...(NEGATIVE ? ['--negative-control'] : NO_BROWSER ? [] : ['--browser'])];
+  console.log(`F6 — spawning node ${args.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
+  const r = spawnSync(process.execPath, args, { stdio: 'inherit' });
+  if (r.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F6: the scope model's gate exited ${r.status}`); process.exit(1); }
+}
 
 let server = null, port = null;
 if (!NO_BROWSER) ({ server, port } = await H.serveRepo());

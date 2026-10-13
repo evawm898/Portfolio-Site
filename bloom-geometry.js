@@ -1429,6 +1429,118 @@ export const OVERRIDE_BOUNDS = (() => {
 })();
 
 /* ===================================================================
+   PARAMETER SCOPING — THE STATE MODEL (Scoping-a; feature map §3 and §11,
+   Eva's rulings Q3.1–Q3.9). ZERO CONTROLS reach any of this; it is reached by
+   the design file's `overrides` containers and by the page's `__bloomScopes`
+   hook, and NOTHING here runs on the shipped path (every branch below is
+   taken only when a `scopes` object is handed in).
+
+   THE SHAPE — the design file's own containers, verbatim:
+
+     scopes = {
+       layers: [ { layer: k,          offsets: { <controlId>: <delta>, ... } } ],
+       petals: [ { layer: k, slot: i, offsets: { ... } } ],       // under CONTINUOUS k is the TURN and i the slot within it
+       tiers:  [ { tier: t,           offsets: { ... } } ],      // stored, validated, NOT applied: no tier is built yet
+       bounds: { <controlId>: { min, max } },                    // the REGISTRY's own ranges, handed down by the caller
+     }
+
+   THE LAW (Q3.2, a DEFAULT ruled as a default): a per-scope value is an
+   OFFSET on the global value. A petal's effective state is
+
+     global  ->  the role table (today's ALL / INNER / slot / per-petal rows)
+             ->  + its layer's offsets          (scope: layer k)
+             ->  + its own petal's offsets      (scope: petal (k, i), one scope per MIRROR PAIR)
+             ->  + the variance field's slot term, headroom-scaled
+             ->  the ONE clamp into the base control's own range,
+
+   resolved in ONE place, `resolveRoleOverrides` — the scope term is a fourth
+   stage of the composition that function already owns, never a second
+   resolver beside it. `scopeOffsetsFor` below is the ONE owner of "which
+   entries reach slot i of layer k" (the pairing law included); it builds the
+   SUM the resolver adds and knows nothing about the controls' laws.
+
+   A MIRROR PAIR IS ONE SCOPE (Q3.7). Under RADIAL and FAN — the two placements
+   that declare a mirror plane (`mirrorFor`) — an entry naming slot i reaches
+   slot i AND `mirrorPartner(i)`, and an entry naming the partner reaches the
+   same two; both are keyed on the pair's CANONICAL slot `min(i, partner)`,
+   which is `petalRoleForSlot`'s own key. SPIRAL and CONTINUOUS have no plane,
+   so a slot is its own scope there. Two entries for one pair (one per member)
+   are summed, so the file cannot hold two answers for one scope.
+
+   SHEET THICKNESS IS NEVER SCOPED (Q3.6) — `SCOPE_UNSCOPED` names it and
+   `scopeOffsetsFor` THROWS on an entry carrying it, rather than ignoring it:
+   an offset silently dropped is a file that lies about what it draws. The
+   design file's reader refuses the key with a note before it ever gets here.
+
+   EVERYTHING ELSE MAY BE. A base the role table does not reach (petalTipShape,
+   petalWidth alone, the lobe and fringe and infill sliders ...) has no entry
+   in `composedBoundsOf`, so the resolver clamps it into `scopes.bounds[base]`
+   — the registry's range, which bloom-geometry.js cannot import and so is
+   HANDED DOWN by the caller (bloom-file.js's `scopesForBuild`); a scoped base
+   with no range anywhere is a THROW, never an unclamped value.
+
+   Q3.5 — PER-LAYER SIZE AND TILT WIN OVER `layerSize` / `layerTilt` — is
+   EXPRESSED by this model and NOT YET WIRED: a layer entry carrying an offset
+   on `petalLength` / `petalWidth` / `petalTilt` is "per-layer on" for that
+   quantity, and the wiring session makes footRing() read that layer's ramp
+   term (`ring.scale`, `ring.tiltExtra`) as the identity where the layer owns
+   the quantity. TODAY the offset is ADDED on top of the ramp. Said here, in
+   the outcome doc and in the gate (SO6 measures today's additive behaviour so
+   the wiring session sees the clause it has to move).
+
+   WHAT TODAY'S ROLES MAP ONTO (the migration table the retirement session
+   will use — docs/bloom-scoping-model.md §4): ALL deltas are layer-0 offsets
+   on a one-whorl bloom; INNER deltas are offsets on every layer k >= 1; the
+   labellum's and hood's rows are petal offsets on the slots `roleForSlot`
+   assigns, the mirror pair being one scope exactly as it is one role today;
+   `petalN*` rows are petal offsets on every slot of orbit N-1. A `mul` row
+   (size) becomes `global * (mul - 1)`, a delta that is the same petal at the
+   global it was migrated at and a different one if the global later moves —
+   the one semantic loss of the OFFSETS default, recorded. */
+export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);
+export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
+
+/* THE CANONICAL SLOT OF A PETAL SCOPE — the pair's lower index where the
+   placement has a mirror plane, the slot itself where it has not. */
+export function scopeSlotKey(slot, n, state) {
+  if (!SCOPE_PAIRED_PLACEMENTS.includes(state.placement)) return slot;
+  return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));
+}
+
+function addScopeOffsets(into, offsets, where) {
+  for (const k of Object.keys(offsets)) {
+    if (SCOPE_UNSCOPED.includes(k)) throw new Error(`scopes: ${where} carries an offset on ${k}, which is never scoped (Q3.6)`);
+    const d = offsets[k];
+    if (typeof d !== 'number' || !Number.isFinite(d)) throw new Error(`scopes: ${where}.${k} is ${JSON.stringify(d)}, not a finite offset`);
+    into[k] = (k in into ? into[k] : 0) + d;
+  }
+  return into;
+}
+
+/* THE ENTRIES THAT REACH SLOT `slot` OF LAYER `layer`, summed into one
+   `{ base: delta }` term, with the bounds the resolver clamps against. Returns
+   null when nothing reaches the petal, so the caller's BRANCH on it is the
+   whole guard: with no scopes the slot carries `scopeTerm: null` and
+   petalSurface takes the call it has always taken. `n` is the whorl's slot
+   count (footRing's `slotCount`), the same n `petalRoleForSlot` is given. */
+export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
+  if (!scopes) return null;
+  const key = scopeSlotKey(slot, n, state);
+  const sum = {};
+  let any = false;
+  for (const e of scopes.layers || []) {
+    if (e.layer !== layer) continue;
+    addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;
+  }
+  for (const e of scopes.petals || []) {
+    if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;
+    addScopeOffsets(sum, e.offsets || {}, `petals[${e.layer},${e.slot}]`); any = true;
+  }
+  if (!any) return null;
+  return { offsets: sum, bounds: scopes.bounds || {}, key: { layer, slot: key } };
+}
+
+/* ===================================================================
    THE TWO INVOLUTIONS — session 10, and BOTH WERE ALREADY WRITTEN DOWN before
    the fan existed to need one. Session B corrected session A's SPIRAL premise
    and, in doing so, derived the OTHER pairing: a golden-angle whorl is exactly
@@ -1788,7 +1900,7 @@ export function roleForLayer(layerIndex, continuousMode) {
    petalStateFor() then returns the caller's own state OBJECT. That is why
    byte-identity at the defaults is a construction rather than an argument,
    and why it survived gaining a second law. */
-export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null, scaledOut = null) {
+export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null, scaledOut = null, scopeTerm = null) {
   let out = null;
   for (const o of ROLE_OVERRIDES) {
     if (!roles.includes(o.role)) continue;
@@ -1810,6 +1922,17 @@ export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm =
     if (!(v !== LAW_IDENTITY[o.law])) continue;
     const from = (out && o.base in out) ? out[o.base] : state[o.base];
     (out || (out = {}))[o.base] = o.law === 'mul' ? from * v : from + v;
+  }
+  /* THE SCOPE TERM (Scoping-a) — AFTER every role row and BEFORE the variance
+     slot term and the clamp: a layer's offsets and the petal's own, already
+     summed by scopeOffsetsFor, added to the composed base. Null on every
+     build with no scopes, so this loop never runs on the shipped path. */
+  if (scopeTerm !== null) {
+    for (const base of Object.keys(scopeTerm.offsets)) {
+      if (SCOPE_UNSCOPED.includes(base)) throw new Error(`scopes: an offset on ${base} reached the resolver — it is never scoped (Q3.6)`);
+      const from = (out && base in out) ? out[base] : Number(state[base]);
+      (out || (out = {}))[base] = from + scopeTerm.offsets[base];
+    }
   }
   /* THE SLOT TERM (organic variance, build 2) — LAST, after every table row,
      so the composition law is base, then the whorl's groups, then the slot,
@@ -1861,7 +1984,8 @@ export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm =
      table reaches the apex since session 32 retired the tip deltas, so the
      clamp's job is now entirely the size, tilt, cup and curl bases. */
   for (const base of Object.keys(out)) {
-    const b = composedBoundsOf(base);
+    const b = composedBoundsOf(base) ?? (scopeTerm !== null && scopeTerm.bounds[base]) ?? null;
+    if (!b || !Number.isFinite(b.min) || !Number.isFinite(b.max)) throw new Error(`scopes: ${base} was offset and no range is known for it — the caller must hand down the registry's bounds`);
     const composed = out[base];
     out[base] = clamp(composed, b.min, b.max);
     /* WHICH BASES THE CLAMP ACTUALLY BIT, reported through an out-parameter
@@ -1904,8 +2028,8 @@ export function ringRoles(ring) {
    carries a term, so `petalStateFor` above stays the whole shipped path.
    `clampedOut` collects which composed bases the clamp bit, as the ring's own
    `overrideClamped` does. */
-export function petalStateForSlot(state, ring, slotTerm, clampedOut = null, scaledOut = null) {
-  const out = resolveRoleOverrides(state, ringRoles(ring), clampedOut, slotTerm, scaledOut);
+export function petalStateForSlot(state, ring, slotTerm, clampedOut = null, scaledOut = null, scopeTerm = null) {
+  const out = resolveRoleOverrides(state, ringRoles(ring), clampedOut, slotTerm, scaledOut, scopeTerm);
   return { ...state, ...out };
 }
 
@@ -8015,7 +8139,11 @@ export function petalSurface(state, ring, slot, cap, acc) {
      which is the defect this project repeats most. One object, one petal. */
   const formClamped = slot.formTerm ? [] : null;
   const formScaled = slot.formTerm ? [] : null;
-  const ps = slot.formTerm ? petalStateForSlot(state, ring, slot.formTerm, formClamped, formScaled) : petalStateFor(state, ring);
+  /* THE SCOPE TERM (Scoping-a) rides the slot payload beside `formTerm`, and
+     is a BRANCH exactly as that is: absent (null) on every build with no
+     scopes, so the shipped path is the call it was. */
+  const scopeTerm = slot.scopeTerm ?? null;
+  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, ring, slot.formTerm || null, formClamped, formScaled, scopeTerm) : petalStateFor(state, ring);
   /* THE APEX ROW RAMP IS SET HERE, PER PETAL, FROM ITS OWN EFFECTIVE
      `petalTipShape` — `ps` is the first point in this function where that
      effective value exists (a sepal's own tip-shape twin, or a per-slot
@@ -9207,6 +9335,9 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        headroom on its own side; `formScaled` names the bases whose term that
        headroom shortened (asked, got) — null with no field. */
     formTerm: slot.formTerm ?? null,
+    /* THE SCOPE TERM this petal was built under (Scoping-a) — the summed
+       offsets and the pair key — or null. The scopes gate reads it back. */
+    scopeTerm: slot.scopeTerm ?? null,
     formClamped,
     formScaled,
     overridden: !!ring.overrides,
@@ -20184,7 +20315,7 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
          of distinct neighbourhoods — found by SP8 on the first form row. With
          no field every site's suffix is the same `null:null`, so the grouping,
          the representatives and their order are what they were. */
-      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? FORM_VARIANCE_BASES.map((b) => s.slot.formTerm[b.base]).join(',') : null}`).sort().join('|');
+      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? FORM_VARIANCE_BASES.map((b) => s.slot.formTerm[b.base]).join(',') : null}${s.slot.scopeTerm ? ':' + JSON.stringify(s.slot.scopeTerm.offsets) : ''}`).sort().join('|');
       if (!configOf.has(key)) configOf.set(key, j);
     }
     const reps = [...configOf.values()];
@@ -20940,7 +21071,7 @@ export function buildBloomInto(acc, state, opts = {}) {
   }
 }
 
-function buildBloomBody(acc, state, { below = null, capability = null } = {}, tube = null) {
+function buildBloomBody(acc, state, { below = null, capability = null, scopes = null } = {}, tube = null) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
@@ -21110,6 +21241,10 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
         azOf[slot.index] = slot.azimuth;
         if (fOf) fOf[slot.index] = slot.sizeFactor;
         if (omission && omission.omittedSet.has(slot.index)) { petals.push(null); return; }
+        /* THE SCOPE TERM (Scoping-a) under CONTINUOUS: a "layer" is a TURN
+           (`floor(lambda)`, exact — lambda is k / petalCount) and the slot is
+           the index within that turn; no plane, so no pairing. */
+        if (scopes) { const turn = Math.floor(fr.rings[slot.index].lambda); slot.scopeTerm = scopeOffsetsFor(scopes, { layer: turn, slot: slot.index - turn * fr.slotCount, n: fr.slotCount, state }); }
         /* THE REPRESENTATIVE IS THE FIRST SLOT ACTUALLY BUILT. On every row
            that has ever shipped that is slot 0, so this is the shipped
            argument; under the stem channel slot 0 can be one the stem passes
@@ -21163,6 +21298,10 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
         azOf[slot.index] = slot.azimuth;
         const d = slotsFor[slot.index];
         if (fOf) fOf[slot.index] = slot.sizeFactor;
+        /* THE SCOPE TERM (Scoping-a): which layer and petal offsets reach this
+           slot, decided by the one owner and written onto the slot payload the
+           way the whorl primitive writes `formTerm`. A BRANCH on `scopes`. */
+        if (scopes) slot.scopeTerm = scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state });
         /* A FUSED WHORL'S PETALS carry the tube's lobe hook (and only they —
            the sepals, the omission probe and the sepal scan's rebuilds keep
            the caller's own capability, so nothing outside the petal whorl
@@ -21336,7 +21475,10 @@ function buildBloomBody(acc, state, { below = null, capability = null } = {}, tu
   /* THE TOLD FLAG, after every solid is emitted (it reads records and moves
      no byte): assembled here so its feet list can carry the sepals'. */
   const neighbour = neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
-  return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths,
+  /* THE SCOPES THIS BUILD WAS HANDED (Scoping-a), summarised for the read-out
+     and the gate — null on every build with none, which is every shipped one. */
+  const scopesBuilt = scopes ? { layers: (scopes.layers || []).length, petals: (scopes.petals || []).length, tiers: (scopes.tiers || []).length, petalsScoped: petalsAll.filter((p) => p && p.scopeTerm).length } : null;
+  return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is
        left off (a function does not survive the metrics hook's clone); what a

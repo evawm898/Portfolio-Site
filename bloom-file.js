@@ -48,7 +48,10 @@
 // unknown key, so there is no key to delete.
 //
 // THE ROOT IS SHAPED FOR SCOPING (feature map §11, Q3.2 / Q3.9), AND THAT IS WHY
-// THIS SHIPS FIRST. Per-layer, per-petal and per-tier values arrive as OFFSETS on
+// THIS SHIPPED FIRST. SCOPING-a FILLED THE `overrides` CONTAINERS (see "THE
+// SCOPE CONTAINERS' REAL SHAPE" below); the paragraph that follows is the
+// design-file session's forward statement, kept because it is what the shape
+// was derived from. Per-layer, per-petal and per-tier values arrive as OFFSETS on
 // the global value, and the spine and outline curves as lists of control points.
 // Those land as ADDED FIELDS inside containers this version already writes EMPTY:
 //
@@ -68,6 +71,38 @@
 // a different bloom from the one the file describes.
 
 import { CONTROLS, RETIRED_IDS } from './bloom-registry.js';
+import { SCOPE_UNSCOPED, ROLE_OVERRIDES } from './bloom-geometry.js';
+
+// THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
+// model; bloom-geometry.js's PARAMETER SCOPING block is the law, this is the
+// file). ZERO controls reach it: entries arrive through the page's
+// `__bloomScopes` hook (no control) and through a loaded file.
+//
+//   overrides.layers: [ { layer: <int >= 0>,               offsets: { <sliderId>: <number>, ... } } ]
+//   overrides.petals: [ { layer: <int >= 0>, slot: <int>, offsets: { ... } } ]
+//   overrides.tiers:  [ { tier:  <int >= 0>,               offsets: { ... } } ]   // read, kept, NOT applied — told
+//
+// An offset is a DELTA on the global value (Q3.2), verbatim — never clamped
+// here, because what it composes to is per petal and the geometry's one clamp
+// owns that (rule 2's spirit: this file holds no range). The reader VALIDATES
+// the shape and refuses, with a note, every entry it cannot apply: a missing
+// or non-integer index, an `offsets` that is not an object, a key that is not
+// a SLIDER control (a choice has no delta), a key that is RETIRED or unknown,
+// a non-finite value, and `sheetThickness` BY NAME — it is never scoped (Q3.6),
+// and a reader that dropped it silently would load a file as a bloom it does
+// not describe. A refused ENTRY is dropped whole and told; a refused KEY is
+// dropped from its entry and told. The `tiers` list is validated and KEPT so
+// a save after a load carries it, and reported `not-applied` because no sepal
+// tier exists to receive it. The VERSION DID NOT MOVE: a v1 file with empty
+// containers reads here exactly as it did, and a v1 file with filled ones read
+// by the previous page is told "not applied" by that page's own reader — which
+// is the shape the containers were written empty to make possible.
+//
+// `scopesForBuild(overrides)` is the ONE place the file's containers become the
+// geometry's `scopes` argument: the three lists plus `bounds`, the REGISTRY's
+// own min/max for every scopeable control, handed down because the geometry
+// cannot import the registry and must clamp a base the role table does not
+// reach (rule 2 again: one owner of a range, read at the moment of building).
 
 export const FORMAT = 'bloom-design';
 export const VERSION = 1;
@@ -101,11 +136,15 @@ const retiredOf = new Map(RETIRED_IDS.map((r) => [r.id, r]));
    control the snapshot lacks is written as `undefined` and so OMITTED by
    JSON, which the reader then reports as missing; nothing is defaulted on the
    way out either. */
-export function composeDoc(state, { savedAt } = {}) {
+export function composeDoc(state, { savedAt, scopes = null } = {}) {
   const controls = {};
   for (const f of CONTROL_FIELDS) controls[f.key] = state ? state[f.control] : undefined;
+  /* THE SCOPES THE PAGE HOLDS, verbatim and in order — an entry is written as
+     the page holds it (its index, its slot, its offsets with every key the
+     page kept, a 0 included), so a save after a load is the loaded file's own
+     entries. Nothing is normalised on the way out (rule 2). */
   const overrides = {};
-  for (const k of SCOPE_CONTAINERS) overrides[k] = [];
+  for (const k of SCOPE_CONTAINERS) overrides[k] = (scopes && Array.isArray(scopes[k])) ? scopes[k].map((e) => ({ ...e, offsets: { ...(e.offsets || {}) } })) : [];
   const curves = {};
   for (const k of CURVE_CONTAINERS) curves[k] = [];
   return { format: FORMAT, version: VERSION, app: APP, savedAt: savedAt || new Date().toISOString(), controls, overrides, curves };
@@ -186,8 +225,64 @@ function readControls(src, notes) {
   return out;
 }
 
-/* A container of lists: every named list must be present and a list; an entry
-   inside one is REPORTED AND NOT APPLIED — this version reads nothing from them. */
+/* ---- the scope containers ------------------------------------------------ */
+
+/* WHICH CONTROLS MAY CARRY AN OFFSET: every PETAL-ROLE SLIDER the registry
+   holds ("everything else may be", Q3.6 — a petal quantity is what a petal
+   scope offsets), less three named sets, each with its reason:
+     SCOPE_UNSCOPED      sheet thickness — never scoped, Q3.6 (the geometry's own owner);
+     ROLE_OVERRIDES      today's ALL / INNER / slot / per-petal DELTA controls — they ARE
+                         the scoping this model replaces (Q3.4 retires them), and an
+                         offset on a delta is a scope on a scope;
+     SCOPE_WHORL_LEVEL   sliders the registry files under the petal role that describe
+                         the WHORL, not a petal — a count, and the tube's per-whorl
+                         ring values (already one row per layer).
+   A choice has no delta and is excluded by kind. The gate restates this
+   derivation from the registry and the role table (SO0). */
+export const SCOPE_WHORL_LEVEL = Object.freeze(['petalCount', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend']);
+const roleOverrideIds = new Set(ROLE_OVERRIDES.map((o) => o.control));
+export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !SCOPE_UNSCOPED.includes(c.id) && !roleOverrideIds.has(c.id) && !SCOPE_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
+/* A TIER is a SEPAL scope (Q1.1: each tier owns the full sepal control set),
+   so its keys are the sepal-role sliders less the whorl-level count. Stored and
+   validated here; applied by no tier yet. */
+export const SCOPE_TIER_WHORL_LEVEL = Object.freeze(['sepalCount']);
+export const SCOPEABLE_TIER_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'sepal' && !SCOPE_UNSCOPED.includes(c.id) && !SCOPE_TIER_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
+const scopeable = new Set(SCOPEABLE_IDS);
+const scopeableTier = new Set(SCOPEABLE_TIER_IDS);
+const isIndex = (v) => Number.isInteger(v) && v >= 0;
+
+/* ONE scope entry, validated. Returns the entry to keep (indices and the
+   offsets this page can apply) or null when the entry is refused whole. */
+function readScopeEntry(k, e, i, notes) {
+  const where = `overrides.${k}[${i}]`;
+  if (!e || typeof e !== 'object' || Array.isArray(e)) { notes.push(note('invalid', `${where} is not an entry — dropped`)); return null; }
+  const out = {};
+  const need = k === 'tiers' ? ['tier'] : k === 'petals' ? ['layer', 'slot'] : ['layer'];
+  for (const f of need) {
+    if (!isIndex(e[f])) { notes.push(note('invalid', `${where}.${f} is ${JSON.stringify(e[f] ?? null)}, not a whole number — the entry is dropped`)); return null; }
+    out[f] = e[f];
+  }
+  if (!e.offsets || typeof e.offsets !== 'object' || Array.isArray(e.offsets)) { notes.push(note('invalid', `${where}.offsets is not an object — the entry is dropped`)); return null; }
+  out.offsets = {};
+  for (const id of Object.keys(e.offsets)) {
+    const v = e.offsets[id];
+    if (SCOPE_UNSCOPED.includes(id)) { notes.push(note('invalid', `${where}.offsets.${id}: ${id} is never scoped (Q3.6) — the offset ${JSON.stringify(v)} is not applied`)); continue; }
+    if (retiredOf.has(id)) { notes.push(note('retired', `${where}.offsets.${id} names a retired control — the offset ${JSON.stringify(v)} is not applied`)); continue; }
+    const c = controlOf.get(id);
+    if (!c) { notes.push(note('unknown', `${where}.offsets.${id} is not a control this page knows — not applied`)); continue; }
+    const ok = k === 'tiers' ? scopeableTier.has(id) : scopeable.has(id);
+    if (!ok) { notes.push(note('invalid', `${where}.offsets.${id}: ${c.kind !== 'slider' ? `a ${c.kind} has no offset` : roleOverrideIds.has(id) ? 'a role delta is not a petal quantity (it is the scoping this model replaces)' : SCOPE_WHORL_LEVEL.includes(id) || SCOPE_TIER_WHORL_LEVEL.includes(id) ? 'a whorl-level value has no per-petal meaning' : k === 'tiers' ? `${c.role} controls are not sepal (tier) scopes` : `${c.role} controls are not petal scopes`} — not applied`)); continue; }
+    if (typeof v !== 'number' || !Number.isFinite(v)) { notes.push(note('invalid', `${where}.offsets.${id} is ${JSON.stringify(v)}, not a number — not applied`)); continue; }
+    out.offsets[id] = v;
+  }
+  for (const f of Object.keys(e)) if (!need.includes(f) && f !== 'offsets') notes.push(note('unknown', `${where}.${f} is not a field this page knows`));
+  return out;
+}
+
+/* A container of lists: every named list must be present and a list. An
+   `overrides` entry is VALIDATED and kept (tiers: kept, told not applied); a
+   `curves` entry is REPORTED AND NOT APPLIED — this version reads nothing from
+   those. */
 function readContainer(src, name, lists, notes) {
   const out = {};
   for (const k of lists) out[k] = [];
@@ -195,7 +290,12 @@ function readContainer(src, name, lists, notes) {
   for (const k of lists) {
     if (!Object.prototype.hasOwnProperty.call(src, k)) { notes.push(note('missing', `${name}.${k} is missing`)); continue; }
     if (!Array.isArray(src[k])) { notes.push(note('invalid', `${name}.${k} is not a list`)); continue; }
-    if (src[k].length) notes.push(note('not-applied', `${name}.${k} holds ${src[k].length} entr${src[k].length === 1 ? 'y' : 'ies'} — this page cannot read ${name === 'overrides' ? 'per-' + k.replace(/s$/, '') + ' overrides' : 'the ' + k + ' curve'} yet, so they are not applied`));
+    if (name === 'overrides') {
+      out[k] = src[k].map((e, i) => readScopeEntry(k, e, i, notes)).filter((e) => e !== null);
+      if (k === 'tiers' && out[k].length) notes.push(note('not-applied', `overrides.tiers holds ${out[k].length} entr${out[k].length === 1 ? 'y' : 'ies'} — kept for the next save, not applied: no sepal tier is built yet`));
+      continue;
+    }
+    if (src[k].length) notes.push(note('not-applied', `${name}.${k} holds ${src[k].length} entr${src[k].length === 1 ? 'y' : 'ies'} — this page cannot read the ${k} curve yet, so they are not applied`));
     out[k] = src[k].slice();
   }
   for (const k of Object.keys(src)) if (!lists.includes(k)) notes.push(note('unknown', `${name}.${k} is not a field this page knows`));
@@ -220,6 +320,25 @@ export function readDoc(obj) {
   for (const k of Object.keys(obj)) if (!TOP_LEVEL_KEYS.includes(k)) notes.push(note('unknown', `${k} is not a field this page knows`));
   return { ok: true, doc, notes };
 }
+
+/* THE GEOMETRY'S `scopes` ARGUMENT from a read `overrides` record — the three
+   lists plus the registry's bounds for every scopeable control. Null when every
+   layer and petal list is empty (tiers alone build nothing), so the caller's
+   branch on it is the shipped path. */
+export function scopeBounds() {
+  const out = {};
+  for (const id of SCOPEABLE_IDS) { const c = controlOf.get(id); out[id] = { min: c.min, max: c.max }; }
+  return out;
+}
+export function scopesForBuild(overrides) {
+  if (!overrides) return null;
+  const layers = Array.isArray(overrides.layers) ? overrides.layers : [];
+  const petals = Array.isArray(overrides.petals) ? overrides.petals : [];
+  const tiers = Array.isArray(overrides.tiers) ? overrides.tiers : [];
+  if (!layers.length && !petals.length) return null;
+  return { layers, petals, tiers, bounds: scopeBounds() };
+}
+export const scopesAreEmpty = (o) => !o || SCOPE_CONTAINERS.every((k) => !Array.isArray(o[k]) || o[k].length === 0);
 
 /* A design file is told by its name, never by sniffing bytes (the /plot rule). */
 export const isDesignFile = (f) => /\.json$/i.test((f && f.name) || '') || (f && f.type === 'application/json');
