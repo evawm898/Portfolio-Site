@@ -9,8 +9,13 @@
 #
 # THREE TRIGGERS, THREE COSTS:
 #   pull_request on the table itself and on this file — the full sweep, sharded
-#     four ways by table index (`--shard k/4`, ~60 min a shard), because an
-#     edit to the table is exactly when its claims must be re-proved;
+#     SIX ways by table index (`--shard k/6`), because an edit to the table is
+#     exactly when its claims must be re-proved. It was four: at 162 mutants
+#     over 70 rows a shard of 41 ran 2h05-2h25 on main's own weekly runs and
+#     F1.2's shard 1 (#402) was CANCELLED by the 150-minute cap at 38 of 41,
+#     every one of the 38 ok — runner pace on a shard with no headroom, not a
+#     red mutant. The cap is kept; the shard shrinks to 27. Size a wait off
+#     `actions_list`, never off the "~60 min" the first version quoted here.
 #   schedule, weekly — the same sweep on `main`, because the geometry and the
 #     harness change under the table every session and their own workflows do
 #     not run it (listing the table in the export gate's path filter was
@@ -67,9 +72,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5]
     env:
-      SHARDS: 4
+      SHARDS: 6
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
