@@ -107,3 +107,16 @@ required equal). Print preview on, JS0–JS8 asserted before every shutter, no p
 `frozen/phase65` is the **1302 rows at `c1fc595`**, registered in `FROZEN_MATRICES` and
 `FROZEN_BASE_COMMITS` (65 was the newest number on `main` at registration; the parallel design-file
 session adds no rows). Owed because block 23 grows by five rows and two of its row definitions move.
+
+**The tag dispatch, read back (run 38441209204, from `main` at `50fafc9`, after the merge):**
+56 tags published and correct, 7 missing but declared, and **`frozen/phase65` REFUSED** —
+`refusing to allow a GitHub App to create or update workflow .github/workflows/bloom-panel.yml`.
+The design-file session (#403) edited that file after `c1fc595` and merged while #402 was in CI,
+so the base's `bloom-panel.yml` differs from `main` HEAD's and the rule of thumb in `CLAUDE.md`
+applies. Two sessions in flight against one base make a refusal nobody could declare in advance;
+it is declared in `TAG_PUSH_XFAIL` now, by the follow-up PR. The registration is the load-bearing
+half: `bloom-frozen-matrices` proves phase65 deep-equal on every push, and `c1fc595` is on `main`.
+
+**And the mutant sweep's shard 1 was cancelled by the 150-minute job cap at 38 of 41 mutants,
+every one `ok`** — 3.9 min a mutant against shard 0's 3.05 on the same table; the re-run passed
+in 2h12m. The workflow goes to six shards in the follow-up PR. Nothing in the geometry.
