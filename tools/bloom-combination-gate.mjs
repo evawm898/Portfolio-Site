@@ -35,6 +35,16 @@
                 V5's own quantity, read through V5's own function: a
                 second implementation here would agree with a broken one
                 by being broken alongside it.
+     stamen-stamen  (F1.2) the nearest approach between any two STAMENS —
+                every rod segment and every anther, read as the builder's
+                OWN emitted ring-centre stations and tip-to-apex segments
+                with the owner's own radii, segment against segment, less
+                the two radii. The long-rod corner (120 mm filaments at the
+                curl ceiling, or 120 of them on the disc) is where
+                filaments and anthers approach one another; a FUSED pair
+                of roots is the ROOTS FUSE flag's and is excluded by
+                starting at the outer root. Overlapping closed rods export
+                watertight, so both STL gates are blind to it.
      leaf-stem  every LEAF BLADE vertex against the free stem solid,
                 through the geometry's own `freeStemDistanceMm`. The
                 PETIOLE is excluded by the leaf builder's OWN reported
@@ -472,6 +482,41 @@ export const PAIRS = [
     why: 'the arch turns the blade about its own base, so the tip of a leaf curled UP (negative arch) travels toward the stem it hangs off, and a steeper leaf starts nearer it',
   },
 
+  /* ------------------------------------------------------------ F1.2 */
+  /* THE STAMEN LENGTH CEILING (Eva, Oct 12: a fixed 120 mm) x THE CURL and
+     x THE COUNT — the brief's two combination checks, through a measure of
+     their own because `self` reads ONE petal's sheet and `stamenCount` is
+     the must-fail's own plant for an axis that cannot reach it. The first
+     value of each axis is its registry default (CG0): the count axis
+     therefore opens at 0 stamens, where the measure has nothing to read
+     and says so (an infinite cell), and the spread from that cell to any
+     built one is what CG1 reads as reach. Tier 3 — a guess from the
+     geometry (a 120 mm rod at 180 degrees of curl is a 38 mm radius hoop
+     over a 35 mm petal), measured here rather than argued. */
+  {
+    id: 'stamenlength-x-curl',
+    tier: 3, guess: true,
+    label: 'stamenLength x stamenCurl — six long filaments bent over the centre',
+    measure: 'stamen-stamen',
+    base: { stamenCount: 6 },
+    a: { id: 'stamenLength', values: [20, 60, 120] },
+    b: { id: 'stamenCurl', values: [0, 90, 180, -180] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-stamen-length-variance-outcome.md §5 — the long-rod corner measured on six',
+    why: 'MEASURED, and the guess was wrong the other way: six filaments at a positive curl all bend in over the centre and CROSS at the axis region, at every length from 20 to 120 — the curl alone reaches the bar (0.000 mm, the rods interpenetrating; -1.200 unfloored) and the length moves the figure by 1.3e-15 mm (declared inert)',
+  },
+  {
+    id: 'stamenlength-x-count',
+    tier: 3, guess: true,
+    label: 'stamenLength x stamenCount — long filaments on a crowded disc',
+    measure: 'stamen-stamen',
+    base: { stamenLayout: 'DISC' },
+    a: { id: 'stamenLength', values: [20, 60, 120] },
+    b: { id: 'stamenCount', values: [0, 6, 30, 120] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-stamen-length-variance-outcome.md §5 — the dense disc measured at three lengths',
+    why: 'MEASURED: on the disc the roots already stand within a filament diameter of each other (the ROOTS FUSE flag) and the straight rods keep that spacing to the tip, so the count alone reaches the bar at every length and the length moves the figure by exactly 0 (declared inert)',
+  },
   /* ------------------------------------------------------------ TIER 3
      GUESSES, SAID PLAINLY. No citation on the pair itself and no shared
      term — only "it seems like it might interact". Every one carries
@@ -1443,6 +1488,24 @@ export const COMBINATION_XFAIL = Object.freeze({
   'sepalcurl-x-sepaltwist @ sepalSpineCurl=360 x sepalTwist=180': { mm: 0.012, note: "NEW (R6, Oct 9): the petal's curl x twist mechanism on the sepal; twist 180 alone clears by 0.005 mm (1.005) and curl 360 alone reads 1.218. Measured on main at 2e096bf, Node 22. A question for Eva, not fixed. RULED (Eva, Oct 9, §9.4): kept declared, the treatment the petal's own recorded pairs carry (the petal `curl-x-twist` cells in this list, held both ways by CG3; docs/bloom-combination-gate.md). Unmoved by §9.1, which narrows only the roll." },
   'sepalscale-x-sepalcurl @ sepalScale=1 x sepalSpineCurl=270': { mm: 0.887, note: 'NEW (R6, Oct 9): a sepal as long as the petal (size 1.00) curled 270 or more comes within 0.887 mm of itself; the shipped 0.60 clears at every curl (1.218 at 360). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed. RULED A KNOWN EXCEPTION (Eva, Oct 9, §9.4): size 1.00 x curl 270 or more at 0.887 mm is recorded as an exception, not a defect to fix; the declaration and the both-ways hold of CG3 stand. Unmoved by §9.1.' },
   'sepalscale-x-sepalcurl @ sepalScale=1 x sepalSpineCurl=360': { mm: 0.887, note: 'NEW (R6, Oct 9): a sepal as long as the petal (size 1.00) curled 270 or more comes within 0.887 mm of itself; the shipped 0.60 clears at every curl (1.218 at 360). Measured on main at 2e096bf, Node 22. A question for Eva, not fixed. RULED A KNOWN EXCEPTION (Eva, Oct 9, §9.4): size 1.00 x curl 270 or more at 0.887 mm is recorded as an exception, not a defect to fix; the declaration and the both-ways hold of CG3 stand. Unmoved by §9.1.' },
+  /* ===== THE STAMEN LENGTH CEILING (F1.2, Oct 12): fifteen cells, all
+     single-axis hazards of the curl and the count, declared by value; the
+     length axis is inert on both pairs and is in COMBINATION_INERT. */
+  'stamenlength-x-curl @ stamenLength=20 x stamenCurl=90': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: SIX FILAMENTS ON ONE RING AT A POSITIVE CURL CROSS EACH OTHER OVER THE CENTRE at EVERY length — the hoop of each rod passes through the axis region, so two rods overlap outright (0.000 mm — the rods interpenetrate; unfloored the figure is -1.200, minus two filament radii), and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at 1.3e-15 mm). A single-axis hazard (stamenCurl's, the GYNOECIUM block's `the filaments cross the axis` row says the same from the style's side); the ceiling adds nothing to it. Measured on this tree through `node tools/bloom-combination-gate.mjs --only stamenlength`." },
+  'stamenlength-x-curl @ stamenLength=20 x stamenCurl=180': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: SIX FILAMENTS ON ONE RING AT A POSITIVE CURL CROSS EACH OTHER OVER THE CENTRE at EVERY length — the hoop of each rod passes through the axis region, so two rods overlap outright (0.000 mm — the rods interpenetrate; unfloored the figure is -1.200, minus two filament radii), and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at 1.3e-15 mm). A single-axis hazard (stamenCurl's, the GYNOECIUM block's `the filaments cross the axis` row says the same from the style's side); the ceiling adds nothing to it. Measured on this tree through `node tools/bloom-combination-gate.mjs --only stamenlength`." },
+  'stamenlength-x-curl @ stamenLength=60 x stamenCurl=90': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: SIX FILAMENTS ON ONE RING AT A POSITIVE CURL CROSS EACH OTHER OVER THE CENTRE at EVERY length — the hoop of each rod passes through the axis region, so two rods overlap outright (0.000 mm — the rods interpenetrate; unfloored the figure is -1.200, minus two filament radii), and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at 1.3e-15 mm). A single-axis hazard (stamenCurl's, the GYNOECIUM block's `the filaments cross the axis` row says the same from the style's side); the ceiling adds nothing to it. Measured on this tree through `node tools/bloom-combination-gate.mjs --only stamenlength`." },
+  'stamenlength-x-curl @ stamenLength=60 x stamenCurl=180': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: SIX FILAMENTS ON ONE RING AT A POSITIVE CURL CROSS EACH OTHER OVER THE CENTRE at EVERY length — the hoop of each rod passes through the axis region, so two rods overlap outright (0.000 mm — the rods interpenetrate; unfloored the figure is -1.200, minus two filament radii), and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at 1.3e-15 mm). A single-axis hazard (stamenCurl's, the GYNOECIUM block's `the filaments cross the axis` row says the same from the style's side); the ceiling adds nothing to it. Measured on this tree through `node tools/bloom-combination-gate.mjs --only stamenlength`." },
+  'stamenlength-x-curl @ stamenLength=120 x stamenCurl=90': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: SIX FILAMENTS ON ONE RING AT A POSITIVE CURL CROSS EACH OTHER OVER THE CENTRE at EVERY length — the hoop of each rod passes through the axis region, so two rods overlap outright (0.000 mm — the rods interpenetrate; unfloored the figure is -1.200, minus two filament radii), and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at 1.3e-15 mm). A single-axis hazard (stamenCurl's, the GYNOECIUM block's `the filaments cross the axis` row says the same from the style's side); the ceiling adds nothing to it. Measured on this tree through `node tools/bloom-combination-gate.mjs --only stamenlength`." },
+  'stamenlength-x-curl @ stamenLength=120 x stamenCurl=180': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: SIX FILAMENTS ON ONE RING AT A POSITIVE CURL CROSS EACH OTHER OVER THE CENTRE at EVERY length — the hoop of each rod passes through the axis region, so two rods overlap outright (0.000 mm — the rods interpenetrate; unfloored the figure is -1.200, minus two filament radii), and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at 1.3e-15 mm). A single-axis hazard (stamenCurl's, the GYNOECIUM block's `the filaments cross the axis` row says the same from the style's side); the ceiling adds nothing to it. Measured on this tree through `node tools/bloom-combination-gate.mjs --only stamenlength`." },
+  'stamenlength-x-count @ stamenLength=20 x stamenCount=6': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=20 x stamenCount=30': { mm: 0.017, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=20 x stamenCount=120': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=60 x stamenCount=6': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=60 x stamenCount=30': { mm: 0.017, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=60 x stamenCount=120': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=120 x stamenCount=6': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=120 x stamenCount=30': { mm: 0.017, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
+  'stamenlength-x-count @ stamenLength=120 x stamenCount=120': { mm: 0, note: "F1.2 (Oct 12), the long-rod check: ON THE DISC THE APPROACH IS SET AT THE ROOTS AND THE STRAIGHT RODS KEEP IT TO THE TIP, so the COUNT alone reaches the bar (six on the disc 0.000 — unfloored -0.118 —, thirty 0.017, the 120 cushion 0.000 — unfloored -0.687, the ROOTS FUSE flag's own state) and the LENGTH IS INERT for this measure (declared in COMBINATION_INERT at exactly 0 mm). A single-axis hazard, told on the read-out as ROOTS FUSE / ANTHERS TOUCH; the ceiling adds nothing to it." },
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -1489,6 +1552,19 @@ export const COMBINATION_INERT = Object.freeze({
   'leafangle-x-tooth @ leafToothDepth': {
     maxMoveMm: 0,
     note: "the teeth are cut into the leaf's MARGIN and the nearest blade point to the stem is at its BASE, so the serration moves this measure by exactly 0.000e+0 at all four angles — bit-identically, not merely under the band. The leaf's own emitted vertex stream DOES move with the tooth depth, so the control is wired and reaching the leaf; it does not reach this measure. Measured 2026-09-19 on c29a8b5.",
+  },
+  /* F1.2 (Oct 12) — THE LENGTH IS INERT FOR THE STAMEN-AGAINST-STAMEN
+     MEASURE ON BOTH PAIRS, and that is the finding the brief's two checks
+     return: a straight rod keeps its root spacing to the tip whatever its
+     length, and a curled one crosses the axis whatever its length. The
+     hazard is the curl's and the count's alone. Measured on this tree. */
+  'stamenlength-x-curl @ stamenLength': {
+    maxMoveMm: 0,
+    note: 'measured 1.33e-15 mm across stamenLength 20..120 at every curl — the approach is the anther-to-anther or rod-crossing figure, set by the ring and the curl, never by how far the rods run',
+  },
+  'stamenlength-x-count @ stamenLength': {
+    maxMoveMm: 0,
+    note: 'measured exactly 0 mm across stamenLength 20..120 at every count — the approach is at the roots on a disc, set by the count alone',
   },
 });
 for (const [k, e] of Object.entries(COMBINATION_INERT)) {
@@ -1559,6 +1635,59 @@ export function measureLeafStemApproachMm(G, state, exportMode) {
   return { mm: best, at, leaves, verts };
 }
 
+
+/* STAMEN AGAINST STAMEN (F1.2). Every rod is the builder's own `stations`
+   (ring centres: inner root, outer root, STAMEN_ROWS free stations) with the
+   owner's filament radius, and every anther its tip-to-apex segment with the
+   anther's radius; the approach is the smallest segment-to-segment distance
+   between two DIFFERENT stamens less the two radii. The inner-root segment
+   is skipped (it lies inside the slab, where two stamens' fusing is the
+   ROOTS FUSE flag's and told already). Infinite with fewer than two stamens,
+   and says why. */
+function segSegDist(p1, q1, p2, q2) {
+  const d1 = [q1[0] - p1[0], q1[1] - p1[1], q1[2] - p1[2]], d2 = [q2[0] - p2[0], q2[1] - p2[1], q2[2] - p2[2]], r = [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
+  const a = d1[0] * d1[0] + d1[1] * d1[1] + d1[2] * d1[2], e = d2[0] * d2[0] + d2[1] * d2[1] + d2[2] * d2[2], f = d2[0] * r[0] + d2[1] * r[1] + d2[2] * r[2];
+  let s = 0, t = 0;
+  if (a <= 1e-18 && e <= 1e-18) { s = 0; t = 0; }
+  else if (a <= 1e-18) { s = 0; t = Math.max(0, Math.min(1, f / e)); }
+  else {
+    const c = d1[0] * r[0] + d1[1] * r[1] + d1[2] * r[2];
+    if (e <= 1e-18) { t = 0; s = Math.max(0, Math.min(1, -c / a)); }
+    else {
+      const b = d1[0] * d2[0] + d1[1] * d2[1] + d1[2] * d2[2], denom = a * e - b * b;
+      s = denom !== 0 ? Math.max(0, Math.min(1, (b * f - c * e) / denom)) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) { t = 0; s = Math.max(0, Math.min(1, -c / a)); }
+      else if (t > 1) { t = 1; s = Math.max(0, Math.min(1, (b - c) / a)); }
+    }
+  }
+  return Math.hypot(p1[0] + d1[0] * s - p2[0] - d2[0] * t, p1[1] + d1[1] * s - p2[1] - d2[1] * t, p1[2] + d1[2] * s - p2[2] - d2[2] * t);
+}
+export function measureStamenStamenApproachMm(G, state) {
+  const acc = new G.MeshBuilder({ exportMode: true });
+  const m = G.buildBloomInto(acc, state);
+  const A = m.androecium;
+  if (!A || !m.stamens || m.stamens.length < 2) return { mm: Infinity, why: `${m.stamens ? m.stamens.length : 0} stamen(s) built — nothing to approach` };
+  const rF = A.rFil, rA = A.anther.diameter / 2;
+  const parts = m.stamens.map((s) => {
+    const segs = [];
+    for (let k = 1; k + 1 < s.stations.length; k++) segs.push({ a: s.stations[k], b: s.stations[k + 1], r: rF });
+    for (const l of s.lumps) segs.push({ a: s.tip, b: l.apex, r: rA });
+    return segs;
+  });
+  let best = Infinity, at = null;
+  for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) {
+    for (const u of parts[i]) for (const v of parts[j]) {
+      /* FLOORED AT 0: two rods that overlap are a gap of nothing, the way a
+         blade inside the stem reads 0 on `leaf-stem` — a negative figure
+         would be a depth of interpenetration, a different quantity. */
+      const d = Math.max(0, segSegDist(u.a, u.b, v.a, v.b) - u.r - v.r);
+      if (d < best) { best = d; at = { i, j }; }
+    }
+  }
+  return { mm: best, at, stamens: m.stamens.length };
+}
+
 /* ------------------------------------------------------------------ driver */
 
 async function loadTree(root) {
@@ -1582,6 +1711,7 @@ function measureCell(tree, DEFAULTS, pair, va, vb, wallOpts = {}) {
    shipped run never passes it. */
 function measureState({ G, W, R }, DEFAULTS, pair, state, where, wallOpts = {}) {
   if (pair.measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
+  if (pair.measure === 'stamen-stamen') return measureStamenStamenApproachMm(G, state);
   /* THE INFILL'S OWN MEASURE — the in-sheet wall between two holes on the
      SHIPPED plan (tools/bloom-infill-wall.mjs), because `self` is
      bit-identically inert in the density (its header has the numbers). */
@@ -1787,7 +1917,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
 
     /* ---------------------------------------------- the table, per pair */
     say(`  [tier ${pair.tier}${pair.guess ? ', a GUESS' : ''}] ${pair.label}`);
-    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
+    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : pair.measure === 'stamen-stamen' ? 'STAMEN against STAMEN — every rod segment and anther of one stamen against every one of another, the builder\'s own stations and the owner\'s radii (F1.2)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
     say('      ' + `${pair.a.id} \\ ${pair.b.id}`.padEnd(30) + pair.b.values.map((v) => (num(v) + (Object.is(v, pair.b.values[0]) ? '*' : '')).padStart(10)).join(''));
     for (let i = 0; i < grid.length; i++) {
       const lead = num(pair.a.values[i]) + (i === 0 ? '*' : '');

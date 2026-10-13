@@ -226,6 +226,50 @@ export const ANTHER_LENGTH_FACTOR = 2.5;
    tip ring, STAMEN_ROWS stations along the free filament, TIP_CAP_RINGS per
    hemisphere of the tip. 560 triangles per stamen, 67,200 at 120. */
 export const STAMEN_SIDES = 10;
+/* THE FILAMENT LENGTH RANGE AND ITS VARIANCE (F1.2 — Eva's rulings of Oct 12,
+   docs/reference-flower-feature-map.md §11, Q2.1 / Q2.2). The ceiling is a
+   FIXED 120 mm (was a registry bound of 40); the floor stays 5. Both are
+   DECLARED here and IMPORTED by the registry (session 29's Q6 shape), so the
+   slider and the clamp cannot drift apart.
+
+   THE VARIANCE IS RANDOM PER STAMEN, SEEDED FROM THE STAMEN'S OWN INDEX —
+   never the shared variance wave (ruled), never a control (a design must
+   reproduce from its controls alone, the buckle-phase precedent). The seed
+   law is INTEGER arithmetic end to end (`Math.imul`, `>>>`): exact in every
+   engine, so the page's V8 and Node's hand every stamen the SAME unit and X0
+   has no last bit to disagree on — a transcendental hash (`fract(sin(i))`)
+   would put session 38 §B10.7's engine divergence on a LENGTH, which is a
+   station count's worth of geometry. `stamenVarianceUnit(i)` is a double in
+   [-1, 1]; `stamenLengthFor()` below is the ONE owner of a stamen's built
+   length and footRing() stamps it on each stamen's own record, which the
+   builder READS (it computes nothing). At an amount of exactly 0 the built
+   length IS the control's own double, by BRANCH — no product is formed — so
+   the shipping default (0) and every pre-existing row are byte-identical
+   by construction, and the harness's JS8 restates the law from the controls
+   and the index against the EMITTED rods rather than reading this record. */
+export const STAMEN_LENGTH_RANGE = Object.freeze([5, 120]);
+export const STAMEN_LENGTH_VARIANCE_RANGE = Object.freeze([0, 1]);
+export function stamenVarianceUnit(i) {
+  /* Every step ends in `>>> 0`: `^` yields a SIGNED int32, and the first
+     cut's last XOR handed back negatives — units below -1, every length on
+     the floor. Found by the Node probe before any gate ran. */
+  let h = Math.imul((i | 0) + 1, 0x9E3779B1) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0; h = Math.imul(h, 0x85EBCA6B) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xC2B2AE35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return (h / 0xFFFFFFFF) * 2 - 1;
+}
+/* `lengthMm` the control, `amount` the variance (0..1 of the length). The
+   asked length is `L (1 + amount u_i)`; the built one is that CLAMPED to the
+   range, told (`clamped`), never silent — a variance may not push a filament
+   past the 120 mm ceiling or under the 5 mm floor (ruled). */
+export function stamenLengthFor(i, lengthMm, amount) {
+  const L = Number(lengthMm);      // a matrix row hands a string; the page a number — one double either way
+  if (amount === 0) return { askedMm: L, builtMm: L, clamped: false, unit: stamenVarianceUnit(i) };
+  const askedMm = L * (1 + amount * stamenVarianceUnit(i));
+  const builtMm = Math.min(STAMEN_LENGTH_RANGE[1], Math.max(STAMEN_LENGTH_RANGE[0], askedMm));
+  return { askedMm, builtMm, clamped: builtMm !== askedMm, unit: stamenVarianceUnit(i) };
+}
 export const STAMEN_ROWS = 16;
 export function androeciumEligible(state) { return !sphereMode(state); }
 
@@ -2704,12 +2748,26 @@ export function footRing(state, acc) {
     const innerLimit = partRadius + partRadius;       // a filament radius plus a style radius — the flag's own threshold
     const innerUsed = disc ? Math.min(innerLimit, radius) : null;
     const noRoom = disc ? radius <= innerLimit : null;
+    /* THE LENGTH VARIANCE (F1.2): the control's length is the reference, and
+       each stamen's BUILT length is `stamenLengthFor()`'s — the ONE owner —
+       stamped on its record for the builder to read. The amount is coerced
+       (a matrix row's values are strings, and `'0' === 0` is false — this
+       file's own trap), so a row at a string zero takes the identity branch
+       exactly as the page does. */
+    const lengthVariance = Number(state.stamenLengthVariance) || 0;
+    if (!(lengthVariance >= STAMEN_LENGTH_VARIANCE_RANGE[0] && lengthVariance <= STAMEN_LENGTH_VARIANCE_RANGE[1])) throw new Error(`stamenLengthVariance ${JSON.stringify(state.stamenLengthVariance)} is outside ${STAMEN_LENGTH_VARIANCE_RANGE.join('..')} — the registry and the builder have diverged`);
     const stamens = [];
+    let lengthsClamped = 0, lengthMinMm = Infinity, lengthMaxMm = -Infinity;
     for (let i = 0; i < count; i++) {
       const r = disc ? Math.sqrt(innerUsed * innerUsed + ((i + 0.5) * (radius * radius - innerUsed * innerUsed)) / count) : radius;
       const s = surfaceAt(r, null);
       const inPetalRootAnnulus = rings.some((rg) => r + rFil > rg.radius - rg.overhang && r - rFil < rg.radius);
-      stamens.push({ index: i, radius: r, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief, inPetalRootAnnulus });
+      const L = stamenLengthFor(i, state.stamenLength, lengthVariance);
+      if (L.clamped) lengthsClamped++;
+      if (L.builtMm < lengthMinMm) lengthMinMm = L.builtMm;
+      if (L.builtMm > lengthMaxMm) lengthMaxMm = L.builtMm;
+      stamens.push({ index: i, radius: r, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief, inPetalRootAnnulus,
+                     lengthMm: L.builtMm, lengthAskedMm: L.askedMm, lengthClamped: L.clamped, lengthUnit: L.unit });
     }
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
@@ -2729,10 +2787,17 @@ export function footRing(state, acc) {
       saturation: derivedRadius > 0 ? limit / derivedRadius : 0,
       stamens,
       inPetalRootAnnulus: stamens.filter((s) => s.inPetalRootAnnulus).length,
+      /* THE LENGTH VARIANCE'S OWN RECORD (F1.2): the amount, how many of the
+         built lengths the range CLAMPED (told, never silent), and the built
+         extremes. At amount 0 both extremes are the control's own double. */
+      lengthVariance, lengthsClamped, lengthMinMm, lengthMaxMm, lengthRange: STAMEN_LENGTH_RANGE,
       /* SLENDERNESS — free length over the FLOORED diameter, telemetry only
          (Q7). UNMEASURED — no coupon has been printed: the six-stamen
-         candidate at L/d 18.3 is past anything this family has printed. */
-      slenderness: state.stamenLength / diameter,
+         candidate at L/d 18.3 is past anything this family has printed.
+         THE LONGEST BUILT FILAMENT'S (F1.2): at the 120 mm ceiling on the
+         shipping sheet it reads 100, and under a variance the longest is the
+         one a coupon would have to answer for. Reported, never clamped on. */
+      slenderness: lengthMaxMm / diameter,
     };
   })();
 
@@ -18101,7 +18166,10 @@ function tipInto(acc, C, rod, aim, tip) {
 }
 
 export function buildStamenInto(acc, andro, s, slot) {
-  const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: andro.length, floorRadius: andro.diameter }, s, slot.azimuth);
+  /* THE LENGTH IS THE STAMEN'S OWN RECORD (F1.2) — `s.lengthMm`, stamped by
+     footRing()'s one owner; this builder computes nothing about it. */
+  const lengthMm = s.lengthMm;
+  const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
   /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
      direction at azimuths a whole turn apart — the TRIFID's own law, one
      statement for both owners (session 29). At the shipping default the count
@@ -18116,7 +18184,7 @@ export function buildStamenInto(acc, andro, s, slot) {
      piece. Refusing it would mean a spread with a non-zero minimum, and 0 at
      one lump is the shipping default. */
   const tip = rod.stations[rod.stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
-  const D = rod.at(andro.length).D;
+  const D = rod.at(lengthMm).D;
   const lumpRecs = [];
   for (let k = 0; k < andro.anther.lumps; k++) {
     const l = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: andro.anther.spreadRad, psi: (k * TAU) / andro.anther.lumps }, { a, Lc, shape: andro.anther.shape });
@@ -18139,6 +18207,7 @@ export function buildStamenInto(acc, andro, s, slot) {
      flag stays on the first (said on the line itself when the count is
      above one, rather than left for a reader to assume). */
   return { index: slot.index, azimuth: slot.azimuth, root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, apex: lump.apex, tris: acc.triangleCount - rod.before,
+           lengthMm,
            lumps: lumpRecs,
            stations: rod.stations.map((st) => st.C),
            law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };

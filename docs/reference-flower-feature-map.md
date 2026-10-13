@@ -105,6 +105,10 @@ branch", it means the next leaf session will be editing the same function.
 
 ## 2. F1.2 / F1.3 — Stamen length variance, higher ceiling, helical filaments
 
+**F1.2 SHIPPED (Oct 13) — `docs/bloom-stamen-length-variance-outcome.md`.** The variance is random per
+stamen and seeded from the index (Q2.1), the ceiling a fixed 120 mm (Q2.2); the per-stamen length is
+footRing()'s record, JS8 the witness. "What is missing" below is left as written for F1.3's reading.
+
 **What exists**
 - `stamenCount` 0–120, `stamenLayout` RING/DISC, `stamenSpread` 0.6–max, **`stamenLength` 5–40 mm
   (default 20)** and `stamenCurl` −180..180 (R:3517–3571), all in the `androecium` section under
