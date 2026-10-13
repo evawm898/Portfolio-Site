@@ -44,6 +44,9 @@ body {
   border-radius: 10px; padding: 12px 14px; backdrop-filter: blur(6px);
 }
 .bl-toggle { display: flex; align-items: center; gap: 8px; }
+/* a hidden toggle stays hidden: the display rule above would otherwise beat
+   the `hidden` attribute (F7 — the print-preview box is pinned on and hidden) */
+.bl-toggle[hidden] { display: none; }
 .bl-toggle label { color: var(--bl-dim); font-size: 11px; }
 
 .bl-panel {
