@@ -653,6 +653,28 @@ fail the run if a row is measured with the preview on. Every canvas sheet's
 caption carries `modeTag(m)` from the harness, read from the app's own
 `shownMode`; a sheet that toggles captions from `shownTris`.
 
+**THE BLOOM HAS A DESIGN FILE — SAVE AND LOAD, ON /plot'S FOUR RULES, AND ITS ROOT IS SHAPED
+FOR SCOPING** (the design-file session, Oct 13; feature map §11 Q3.9 — read
+`docs/bloom-design-file.md` and `bloom-file.js`'s header before touching `composeDoc`, `readDoc`,
+`CONTROL_FIELDS`, the two containers or the F family).
+- `bloom-design` v1: `controls` (every registry control, verbatim, through ONE table derived from
+  CONTROLS), `overrides: {layers, petals, tiers}` and `curves: {spine, outline}` written EMPTY — the
+  per-scope OFFSETS and the curve-editor points land as added fields, no migration. The version is
+  written once; the next sessions only add. An entry found in a container is told `not applied`.
+- A missing field is REPORTED and the page keeps its value (never defaulted); unknown fields are
+  told; a newer version is refused whole; a slider past its registry bounds is clamped and told.
+- A retired id loads through `RETIRED_IDS`' own `migrateTo` and is told (`stemNodeProminence` →
+  swelling AND kink); one without a migration is told and not applied; a file naming a retired id
+  AND its replacement applies neither. Nothing retired is ever re-saved, which is how the
+  registry's "the first persisting feature owes every entry a delete" is discharged.
+- Save / Load (a file input and a drop anywhere on the page) sit under the action buttons;
+  `#designStatus` prints every note, and a clean load SAYS it reported nothing.
+- Gate: `node tools/verify-bloom-design-file.mjs` (F0–F5; `--negative-control` six mutants of
+  bloom-file.js, `--no-browser`, `--smoke`/`--full` for the byte rows) in `bloom-panel.yml`; panel
+  route (ad) is the every-control-is-a-field check with the REGISTRY as the census.
+- Measured: 1,302 of 1,302 live matrix rows round-trip clean and identical; 0 matrix rows added;
+  `bloom-geometry.js` untouched (sha-identical to `main`).
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

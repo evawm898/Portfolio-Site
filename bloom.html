@@ -96,6 +96,18 @@
     <button id="exportGrid" class="bl-btn" type="button"
             title="Download the per-petal surface grid as glTF (.glb, millimetres) — line strips along and across each petal, plus each petal's attachment point. Not printable geometry.">Get grid &darr;</button>
   </div>
+  <!-- THE DESIGN FILE (bloom-file.js). Save downloads every registry control
+       verbatim as JSON; Load (the file input, or a .json dropped anywhere on
+       the page) reads one back through the same field table and REPORTS
+       every departure from a clean read in #designStatus — a missing field
+       keeps the page's value, never a default. -->
+  <div class="bl-actions bl-actions--design">
+    <button id="saveDesign" class="bl-btn" type="button"
+            title="Download this design as JSON (every control, verbatim)">Save design &darr;</button>
+    <label class="bl-btn bl-btn--file" for="designFile" title="Load a design saved from this page (or drop the .json anywhere on the page)">Load design &uarr;
+      <input type="file" id="designFile" accept=".json,application/json"></label>
+  </div>
+  <div id="designStatus" class="bl-readout bl-design-status" aria-live="polite" hidden></div>
   <div id="readout" class="bl-readout" aria-live="polite"></div>
 </aside>
 

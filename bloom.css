@@ -186,6 +186,10 @@ body {
 .bl-btn:hover { border-color: var(--bl-accent); color: var(--bl-accent); }
 .bl-btn--primary { border-color: var(--bl-accent); color: var(--bl-accent); }
 .bl-btn--primary:hover { background: rgba(143, 214, 184, .12); }
+.bl-actions--design { margin-top: 0; }
+.bl-btn--file { text-align: center; display: inline-block; }
+.bl-btn--file input { display: none; }
+.bl-design-status { border-top: 0; padding-top: 0; margin-bottom: 8px; }
 
 .bl-readout {
   font-size: 10.5px; color: var(--bl-dim); border-top: 1px solid var(--bl-line);

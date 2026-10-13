@@ -25,8 +25,10 @@ on:
       - bloom.js
       - bloom-registry.js
       - bloom-geometry.js
+      - bloom-file.js
       - tools/verify-bloom-panel.mjs
       - tools/verify-bloom-drag-preview.mjs
+      - tools/verify-bloom-design-file.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
       - .github/workflows/bloom-panel.yml
@@ -38,8 +40,10 @@ on:
       - bloom.js
       - bloom-registry.js
       - bloom-geometry.js
+      - bloom-file.js
       - tools/verify-bloom-panel.mjs
       - tools/verify-bloom-drag-preview.mjs
+      - tools/verify-bloom-design-file.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
@@ -93,3 +97,14 @@ jobs:
         run: node tools/verify-bloom-drag-preview.mjs
       - name: The drag-preview gate must fail on six broken copies of bloom.js
         run: node tools/verify-bloom-drag-preview.mjs --negative-control
+      # THE DESIGN FILE (bloom-file.js): every registry control is a field of
+      # the file or a named exception (the REGISTRY is the census — the writer
+      # and the reader walk one table and agree about a row that is gone),
+      # every live matrix row round-trips clean and identical, a missing field
+      # is reported and never defaulted, a newer version is refused, a retired
+      # id migrates, and the page's real file input, drop and Save button
+      # work with the STL byte-identical across save -> reset -> load.
+      - name: The design file round-trips every control and reports every departure
+        run: node tools/verify-bloom-design-file.mjs
+      - name: The design-file gate must fail on six broken copies of bloom-file.js
+        run: node tools/verify-bloom-design-file.mjs --negative-control

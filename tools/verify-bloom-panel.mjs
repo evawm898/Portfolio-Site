@@ -313,6 +313,19 @@
          dead steps. Two mutants under --negative-control, one per direction
          (the cap halved; the cap removed), each by its own sentence. Three
          edits: this entry, the block, the negative control's flags and banner.
+     (ad) THE DESIGN FILE'S CONTROLS RENDER AND THE SAVE CARRIES EVERY
+         REGISTRY CONTROL (bloom-file.js, the save/load session). Save, the
+         Load file input and the status line render in the panel's action
+         rows and NOT inside #panelControls (so route (a)'s census stays a
+         census of registry controls); the page's own save, parsed, holds
+         under `controls` EXACTLY the registry's ids in order and nothing
+         else — the every-control-is-a-field check, with the REGISTRY as the
+         census (the writer and the reader walk one table and agree about a
+         row that is gone). One mutant under --negative-control: bloom-file.js
+         served with a table row removed, which must fail by its own sentence.
+         The format's full gate is tools/verify-bloom-design-file.mjs; this
+         route is the panel's own half. Three edits: this entry, the block,
+         the negative control's flag and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3526,6 +3539,52 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ad) THE DESIGN FILE'S CONTROLS RENDER AND THE SAVE CARRIES EVERY REGISTRY CONTROL ----------
+   See the header. The census is the REGISTRY (CONTROLS' ids, in order),
+   never the module under test; a save whose keys differ from it in either
+   direction is red, and so is a save button or file input that is inside
+   #panelControls or absent. */
+{
+  const tag = '[design file]';
+  const run = async (pg, label) => {
+    const p = [];
+    const r = await pg.evaluate(() => {
+      const q = (sel) => document.querySelector(sel);
+      let save = null, err = null;
+      try { save = window.__bloomDesign ? window.__bloomDesign.save() : null; } catch (e) { err = String(e); }
+      return { hasSave: !!q('.bl-panel #saveDesign'), hasFile: !!q('.bl-panel #designFile'), hasLabel: !!q('.bl-panel label[for="designFile"]'), hasStatus: !!q('.bl-panel #designStatus'),
+        inControls: !!q('#panelControls #saveDesign') || !!q('#panelControls #designFile'), save, err };
+    });
+    if (!r.hasSave || !r.hasFile || !r.hasLabel || !r.hasStatus) p.push(`the design file's controls do not all render (save ${r.hasSave}, file ${r.hasFile}, label ${r.hasLabel}, status ${r.hasStatus})`);
+    if (r.inControls) p.push('a design-file control is inside #panelControls, among the registry controls');
+    if (r.err || !r.save) p.push(`the page's save hook failed: ${r.err || 'no text'}`);
+    else {
+      let obj = null; try { obj = JSON.parse(r.save); } catch (e) { p.push(`the save is not JSON: ${e.message}`); }
+      if (obj) {
+        const keys = Object.keys(obj.controls || {});
+        const ids = CONTROLS.map((c) => c.id);
+        const missing = ids.filter((id) => !keys.includes(id)), extra = keys.filter((k) => !ids.includes(k));
+        if (missing.length || extra.length) p.push(`the save's controls are not every registry control: missing ${missing.length ? missing.join(', ') : 'none'}; not a registry control: ${extra.length ? extra.join(', ') : 'none'}`);
+        else if (JSON.stringify(keys) !== JSON.stringify(ids)) p.push('the save carries every registry control but not in the registry\'s order');
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: Save, Load and the status line render outside the registry\'s controls; the save carries exactly the ${CONTROLS.length} registry ids in order`);
+  };
+  await openBloom(page, port);
+  await run(page, 'the shipped page');
+  if (NEGATIVE_CONTROL) {
+    const src = fs.readFileSync(new URL('../bloom-file.js', import.meta.url), 'utf8');
+    const anchor = 'export const CONTROL_FIELDS = Object.freeze(CONTROLS.map(';
+    if (src.split(anchor).length !== 2) note(`${tag} NEGATIVE CONTROL: the table's anchor does not match exactly once in bloom-file.js — the mutant cannot be applied`);
+    const { browser: b2, page: pg } = await launchPage();
+    await pg.route('**/bloom-file.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: src.replace(anchor, "export const CONTROL_FIELDS = Object.freeze(CONTROLS.filter((c) => c.id !== 'petalCount').map(") }));
+    await openBloom(pg, port);
+    await run(pg, 'MUTANT (a table row removed)');
+    await b2.close();
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -3605,10 +3664,12 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (ac), THE ROUNDNESS'S DEAD TRAVEL, BOTH DIRECTIONS — each mutant by its own sentence */
     const sawHatchLive = fail.some((f) => /^\[roundness dead travel\] MUTANT \(the cap halved\).*a hatch over live travel/.test(f));
     const sawDeadUnhatched = fail.some((f) => /^\[roundness dead travel\] MUTANT \(the cap removed\).*dead travel left unhatched/.test(f));
+    /* ROUTE (ad), THE DESIGN FILE: the table row removed must read as a save missing petalCount */
+    const sawDesign = fail.some((f) => /^\[design file\] MUTANT \(a table row removed\).*missing petalCount/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
-        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-THREE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

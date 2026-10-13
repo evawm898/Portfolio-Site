@@ -16,6 +16,7 @@ import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
+import { composeDoc, readDoc, toText, isDesignFile } from './bloom-file.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -3606,6 +3607,94 @@ window.__bloomStemlessHub = () => {
     slotAzimuths: built.slotAzimuths.map((row) => [...row]),
     ringCount: built.rings.length,
   };
+};
+
+/* ---------------- the design file (save / load) ----------------
+   bloom-file.js owns the FORMAT (the field table, the reader, the forward
+   shape); this block owns only the page: a save is readUI() through
+   composeDoc, a load is readDoc's `doc.controls` written into the inputs
+   with the SAME real events the reset button fires, so every reader of the
+   panel (labels, visibility, caps, the rebuild) sees a load exactly as it
+   sees a hand on a slider. NOTHING IS APPLIED THAT THE READER DID NOT HAND
+   BACK — a missing field is absent from `doc.controls` and the input keeps
+   its value (rule 3); a refusal applies nothing at all. Every note the
+   reader produced is printed, and a clean load SAYS it reported nothing,
+   because "nothing to report" is itself a claim the status should make.
+   `lastDesign` is the record the gate reads (`__bloomDesign.last()`). */
+const designStatus = document.getElementById('designStatus');
+let lastDesign = null;
+function writeDesignStatus() {
+  const d = lastDesign;
+  if (!d) { designStatus.textContent = ''; designStatus.hidden = true; return; }
+  designStatus.hidden = false;
+  if (d.action === 'saved') { designStatus.textContent = `saved ${d.name} — ${d.count} controls, version ${d.version}`; return; }
+  if (d.action === 'refused') { designStatus.innerHTML = `<span class="bl-err">could not load ${esc(d.name)}: ${esc(d.error)}</span>`; return; }
+  const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set`;
+  if (!d.notes.length) { designStatus.textContent = `${head}; every field read clean, nothing to report`; return; }
+  designStatus.innerHTML = `${esc(head)}; ${d.notes.length} note${d.notes.length === 1 ? '' : 's'}:\n`
+    + d.notes.map((n) => `<span class="${n.kind === 'invalid' || n.kind === 'retired' ? 'bl-err' : ''}">[${esc(n.kind)}] ${esc(n.text)}</span>`).join('\n');
+}
+function esc(s) { return String(s).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch])); }
+function saveDesignText() { return toText(composeDoc(readUI())); }
+function saveDesign() {
+  const text = saveDesignText();
+  const name = 'bloom-design.json';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  lastDesign = { action: 'saved', name, count: Object.keys(JSON.parse(text).controls).length, version: JSON.parse(text).version };
+  writeDesignStatus();
+  return text;
+}
+function applyDesign(text, name = '(inline)') {
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) {
+    lastDesign = { action: 'refused', name, error: `it is not JSON — ${(e && e.message) || e}`, notes: [] };
+    writeDesignStatus(); return lastDesign;
+  }
+  const r = readDoc(obj);
+  if (!r.ok) { lastDesign = { action: 'refused', name, error: r.error, notes: [] }; writeDesignStatus(); return lastDesign; }
+  let applied = 0;
+  for (const c of CONTROLS) {
+    if (!Object.prototype.hasOwnProperty.call(r.doc.controls, c.id)) continue;
+    inputs[c.id].value = r.doc.controls[c.id];
+    inputs[c.id].dispatchEvent(new Event('input', { bubbles: true }));
+    inputs[c.id].dispatchEvent(new Event('change', { bubbles: true }));
+    applied++;
+  }
+  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes: r.notes.slice() };
+  writeDesignStatus();
+  return lastDesign;
+}
+async function loadDesignFile(file) {
+  try { applyDesign(await file.text(), file.name); } catch (e) {
+    lastDesign = { action: 'refused', name: file.name, error: `could not read the file — ${(e && e.message) || e}`, notes: [] };
+    writeDesignStatus();
+  }
+}
+document.getElementById('saveDesign').addEventListener('click', () => { saveDesign(); });
+document.getElementById('designFile').addEventListener('change', (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (f) loadDesignFile(f);
+  ev.target.value = '';   // so the SAME file chosen twice still fires `change`
+});
+/* Drag-drop anywhere on the page: a .json is a design; anything else is left
+   to the browser, which would otherwise navigate away from the bloom. */
+window.addEventListener('dragover', (ev) => { ev.preventDefault(); });
+window.addEventListener('drop', (ev) => {
+  ev.preventDefault();
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (f && isDesignFile(f)) loadDesignFile(f);
+});
+/* Harness hooks — the page's own functions, never a second path. */
+window.__bloomDesign = {
+  save: () => saveDesignText(),
+  load: (text, name = '(inline)') => applyDesign(text, name),
+  last: () => lastDesign,
 };
 
 /* ---------------- go ---------------- */
