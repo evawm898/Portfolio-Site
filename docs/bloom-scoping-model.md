@@ -152,6 +152,13 @@ built.
   petal's own cap is not swept.
 - **The blanket sweep and `ALL MAX`** know nothing of scopes, by construction (no control).
 
+- **One apex mutant was DISARMED by this change and re-anchored, and CI is what said so.**
+  `form-field-never-reaches-the-blade` anchors on `petalSurface`'s `ps` line, which this
+  session rewrote to carry the scope term; the export preflight's anchor pre-check read
+  `157 of 158 matching exactly once` on `4857577`. Re-anchored to the shipped line, run alone:
+  it fires FV2 (collateral ID9/ID10 as before), silent on the clean tree, 158 of 158 anchors.
+  A refactor disarms a mutant by moving its `from` — this file's own class, one more instance.
+
 ## 7. Where the gate rides, and why no workflow was edited
 
 `tools/verify-bloom-scopes.mjs` is spawned by `tools/verify-bloom-design-file.mjs` (clause F6, both
