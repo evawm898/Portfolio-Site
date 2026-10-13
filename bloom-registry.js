@@ -123,13 +123,20 @@ if (TIP_INSTANCES.map((t) => t.prefix).join() !== TIP_PREFIXES.join()) {
 
    EACH ENTRY: the id, the SESSION it retired in, and one line on why. The
    flower keys `retiredAt` to the SCHEMA VERSION whose migration deletes the
-   key; the bloom persists no design yet and has no CURRENT_SCHEMA, so
+   key; the bloom had no persisting feature when this was written, so
    `schema: null` says so explicitly rather than borrowing a number that
    would mean something else. THE FIRST FEATURE THAT PERSISTS A DESIGN OWES
    every entry here a migration that DELETES the key — the flower's
    migrateDesign() preserves unknown keys verbatim on re-save, so without the
    delete a retired value rides along forever under the very mechanism meant
    to protect forward compatibility.
+   THAT FEATURE EXISTS NOW — the DESIGN FILE (bloom-file.js, Oct 13) — AND THE
+   DELETE IS DISCHARGED BY CONSTRUCTION RATHER THAN BY A MIGRATION PER ENTRY:
+   its save writes exactly the live CONTROLS and its reader REPORTS and DROPS
+   every key it does not know (a retired id with an exact `migrateTo` lands on
+   its replacements; one without is told and not applied), so no retired key
+   can ever be carried into a re-save. `schema` therefore stays null — the
+   file's version lives in bloom-file.js (`VERSION`) and is not this number.
 
    THE OPTION VALUES `DOME`, `DISC`, `RING` ARE NOT RESERVED, on the flower's
    own precedent for `reliefMode`'s values: they were only ever meaningful as
