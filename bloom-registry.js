@@ -43,6 +43,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
+import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
@@ -3570,8 +3571,34 @@ export const CONTROLS = [
     },
     cap: (shown) => (shown && shown.androecium ? shown.androecium.saturation : null),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
-  { id: 'stamenLength', section: 'androecium', kind: 'slider', min: 5, max: 40, step: 1, default: 20,
+  /* THE CEILING IS A FIXED 120 mm (F1.2 — Eva's ruling Q2.2, Oct 12; was a
+     registry bound of 40) and BOTH ends are IMPORTED from the geometry's
+     `STAMEN_LENGTH_RANGE`, which is also the clamp the variance below is
+     held to: the slider's end and the clamp are one declaration. */
+  { id: 'stamenLength', section: 'androecium', kind: 'slider', min: STAMEN_LENGTH_RANGE[0], max: STAMEN_LENGTH_RANGE[1], step: 1, default: 20,
     label: 'Filament length', fmt: (v) => `${v} mm free, above the hub`,
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  /* THE LENGTH VARIANCE (F1.2 — Eva's ruling Q2.1): RANDOM per stamen,
+     SEEDED from the stamen's own index (never a control, never the shared
+     variance wave), so a design reproduces from its controls. The amount is
+     a fraction of the length: each filament is built at
+     `length x (1 + amount x u_i)`, u_i in [-1, 1] from the geometry's own
+     seed law, CLAMPED to the 5..120 mm range and TOLD here from the SHOWN
+     build's record (the third `fmt` argument), never re-derived. Default 0
+     is byte-identical by BRANCH in the geometry. Hidden and inert with no
+     androecium; a visible slider whose predicate reaches `stamenCount`, so
+     the harness's derived STAMEN_SUBS keeps it out of the blanket sweep and
+     `ALL MAX` never carries it (its filaments stay one length). */
+  { id: 'stamenLengthVariance', section: 'androecium', kind: 'slider', min: STAMEN_LENGTH_VARIANCE_RANGE[0], max: STAMEN_LENGTH_VARIANCE_RANGE[1], step: 0.05, default: 0,
+    label: 'Length variance',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      if (a === 0) return 'none — every filament at the length above (seeded per stamen when raised; a design reproduces)';
+      const A = shown && shown.androecium;
+      const head = `±${Math.round(a * 100)}% of the length, random per stamen from its own index (seeded — the same design builds the same filaments)`;
+      if (!A) return head;
+      return `${head} → ${A.lengthMinMm.toFixed(1)}–${A.lengthMaxMm.toFixed(1)} mm built (${shown.mode})${A.lengthsClamped ? ` — ${A.lengthsClamped} of ${A.count} CLAMPED to the ${A.lengthRange[0]}–${A.lengthRange[1]} mm range, told` : ''}`;
+    },
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
   { id: 'stamenCurl', section: 'androecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Filament curl', fmt: (v) => (Number(v) === 0 ? 'straight, along the surface normal' : `${v}° — ${Number(v) > 0 ? 'bends in over the centre' : 'reflexes outward'}`),

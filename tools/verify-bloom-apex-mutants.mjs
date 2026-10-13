@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -563,6 +563,21 @@ function lobeRelief(M, set) {
   });
 }
 
+
+/* ===== THE STAMEN LENGTH VARIANCE (F1.2) ===== */
+/* Every built length the mutated module's OWN descriptor stamps, on a given
+   state — the witness reads the record the law writes, never JS8 (which is
+   the assertion these mutants name; asking the gate whether the gate fired is
+   the circularity the witness clause exists to avoid). */
+function stamenLengths(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    return fr.androecium ? fr.androecium.stamens.map((s) => s.lengthMm) : [];
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const VARIED_SIX = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenLengthVariance: 0.5 });
+const VARIED_120 = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenLength: 120, stamenLengthVariance: 1 });
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -2536,6 +2551,42 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (m.tris !== c.tris) return `the triangle count moved ${c.tris} -> ${m.tris}; this mutant's whole point is that it does not`;
       return (c.voidBelowPlaneMm < -1 && m.voidBelowPlaneMm > 1) ? null : `the mutant's void floor stands ${m.voidBelowPlaneMm} mm BELOW the cut plane at the bore's far edge against the clean tree's ${c.voidBelowPlaneMm} — the bore did not open through the face`; } },
+
+  /* ===== THE STAMEN LENGTH VARIANCE (F1.2 — Eva's rulings of Oct 12) =====
+     Four mutations of the ONE owner `stamenLengthFor()`, each witnessed on
+     the mutated module's own stamp before JS8 is consulted. JS8 restates the
+     law from the controls and the index and reads the EMITTED rod chords, so
+     each of these moves a chord the restatement does not. */
+  { id: 'the-length-variance-is-ignored', why: 'the identity branch is taken at EVERY amount — the slider is a dead control: every filament the length above, at a count the read-out still prints as varied',
+    find: '  if (amount === 0) return { askedMm: L, builtMm: L, clamped: false, unit: stamenVarianceUnit(i) };',
+    into: '  if (amount >= 0) return { askedMm: L, builtMm: L, clamped: false, unit: stamenVarianceUnit(i) };', names: ['JS8'],
+    witness: (M, C) => { const m = stamenLengths(M, VARIED_SIX()), c = stamenLengths(C, VARIED_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const distinct = (a) => new Set(a).size;
+      return (distinct(c) > 1 && distinct(m) === 1 && m[0] === 20) ? null : `the mutant builds ${distinct(m)} distinct lengths (${m.join(', ')}) against the clean tree's ${distinct(c)} — the variance still reaches the rods`; } },
+  { id: 'the-variance-is-the-same-for-every-stamen', why: 'every stamen draws stamen 0\'s unit — one length again, merely a different one, and the sheet reads as a uniform androecium at 104% of the slider',
+    find: '  const askedMm = L * (1 + amount * stamenVarianceUnit(i));',
+    into: '  const askedMm = L * (1 + amount * stamenVarianceUnit(0));', names: ['JS8'],
+    witness: (M, C) => { const m = stamenLengths(M, VARIED_SIX()), c = stamenLengths(C, VARIED_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const distinct = (a) => new Set(a).size;
+      return (distinct(c) > 1 && distinct(m) === 1 && m[0] !== 20) ? null : `the mutant builds ${distinct(m)} distinct lengths (${m.join(', ')}) against the clean tree's ${distinct(c)}`; } },
+  { id: 'the-seed-is-not-the-index', why: 'the unit is drawn from Math.random(): a design no longer reproduces — two builds of one control set differ, which the ruling (seeded, derived, never a control) forbids',
+    find: '  const askedMm = L * (1 + amount * stamenVarianceUnit(i));',
+    into: '  const askedMm = L * (1 + amount * (Math.random() * 2 - 1));', names: ['JS8'],
+    witness: (M, C) => { const m1 = stamenLengths(M, VARIED_SIX()), m2 = stamenLengths(M, VARIED_SIX()), c1 = stamenLengths(C, VARIED_SIX()), c2 = stamenLengths(C, VARIED_SIX());
+      if (m1.threw || c1.threw) return `the witness threw: ${m1.threw || c1.threw}`;
+      const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+      return (same(c1, c2) && !same(m1, m2)) ? null : `two builds of the mutant ${same(m1, m2) ? 'AGREE' : 'differ'} and two of the clean tree ${same(c1, c2) ? 'agree' : 'DIFFER'} — the seed did not stop being the index`; } },
+  { id: 'the-ceiling-is-unclamped', why: 'a long draw is built past Eva\'s fixed 120 mm ceiling — a 240 mm filament on a slider whose end says 120, told as unclamped',
+    find: '  const builtMm = Math.min(STAMEN_LENGTH_RANGE[1], Math.max(STAMEN_LENGTH_RANGE[0], askedMm));',
+    into: '  const builtMm = Math.max(STAMEN_LENGTH_RANGE[0], askedMm);', names: ['JS8'],
+    /* PROBED AT length 120 x variance 1, where half the draws ask past the
+       ceiling; on the varied-six row at 20 mm nothing reaches it and the
+       mutation is inert there by construction (`bore-is-not-evas-rule`). */
+    witness: (M, C) => { const m = stamenLengths(M, VARIED_120()), c = stamenLengths(C, VARIED_120());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.max(...c) === 120 && Math.max(...m) > 120) ? null : `the mutant's longest filament is ${Math.max(...m)} mm against the clean tree's ${Math.max(...c)} — nothing passed the ceiling`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3030,6 +3081,14 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '0' }, { id: 'inflorescence', value: 'RACEME' },
           { id: 'floretNodes', value: '12' }, { id: 'pedicelLength', value: '60' }] },
 
+  /* THE STAMEN LENGTH VARIANCE (F1.2): six on a ring with the variance at
+     0.5, where the law moves every rod; and the 120 mm ceiling with the
+     variance at its maximum, the one state where the clamp mutation can
+     move anything. */
+  { label: 'six stamens with the length variance at 0.5 (random per stamen, seeded)',
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenLengthVariance', value: '0.5' }] },
+  { label: 'six stamens at the 120 mm ceiling with the variance at its maximum (the clamp binds)',
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenLength', value: '120' }, { id: 'stamenLengthVariance', value: '1' }] },
 ];
 
 const { server, port } = await serveRepo();
@@ -3110,6 +3169,16 @@ async function famsOn(rows) {
        silent on a bloom whose amount is 0, which is every other row here. */
     for (const msg of await varianceAssertions(page, row)) {
       const mm = /^(VS\d+|FV\d+|SV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE ANDROECIUM (F1.2) — the table never ran stamenAssertions before
+       the length variance's four mutants named JS8, so every JS clause was
+       invisible here BY CONSTRUCTION (a mutant naming one would have read
+       MISSED, indistinguishable from a blind clause). `JS\d+` and not
+       `J\d+`: the junction family's own capture is anchored on a digit after
+       the J, so `JS8:` reaches neither by accident — the prefix hazard this
+       file records, avoided by construction. */
+    for (const msg of await stamenAssertions(page, row)) {
+      const mm = /^(JS\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE APEX NIB (the apex-nib session) — the rule once more, and note the
        code is `AN\d+` and NOT `A\d+`: the A family's own capture above is

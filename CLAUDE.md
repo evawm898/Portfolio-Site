@@ -890,6 +890,28 @@ is JS3/JS4's. `phase16Matrix()` is the 481 rows at `a65d16d`, the first post-ret
 baseline (a plain capture per tree closes the next session). An independent stamen SPLAY is
 proposed and costed for B2b in the outcome doc; today Head rise is the only splay.
 
+**THE FILAMENT LENGTH VARIES PER STAMEN AT RANDOM, SEEDED FROM THE INDEX, AND THE CEILING IS A
+FIXED 120 mm** (Eva's rulings Q2.1 / Q2.2, Oct 12 — F1.2; read
+`docs/bloom-stamen-length-variance-outcome.md` before touching `stamenLengthFor`,
+`stamenVarianceUnit`, `STAMEN_LENGTH_RANGE` or JS8). `stamenLengthVariance` (Androecium, 0–1, default
+0, hidden and inert with no androecium): each filament is `length × (1 + amount × u_i)` with `u_i` an
+INTEGER-ARITHMETIC hash of the stamen's index (exact in every engine — a transcendental seed would put
+session 38 §B10.7's divergence on a length), CLAMPED to 5..120 mm and TOLD on the control, the STAMENS
+line and the SLENDERNESS line, which reads the LONGEST built filament (L/d 100 at 120 mm on the shipping
+sheet, UNMEASURED verbatim, never clamped on). `stamenLengthFor()` is the ONE owner; the builder reads
+`s.lengthMm` and computes nothing; amount 0 is the control's own double BY BRANCH. **JS8 restates the
+law from the controls and the index** — the hash written a second time in the harness on purpose — and
+reads each rod's outer-root-to-tip chord (`L_i sinc(c/2)`) off the EMITTED rings, never the record.
+**The mutant table never ran `stamenAssertions` until this session**; it does now, with four witnessed
+mutants. **The first cut's hash returned SIGNED units** (a bare `^`) and put half the filaments on the
+floor — found by the Node probe before a gate ran; every step ends in `>>> 0`. **`ALL MAX` is a holder:
+`stamenLength` was never in the blanket sweep** (a STAMEN_SUB, the brief's premise checked and false),
+and the variance joins it. **THE LONG-ROD COMBINATION CHECK FOUND THE LENGTH INERT**: a new
+`stamen-stamen` measure on `stamenlength-x-curl` / `-x-count` moves by 1.3e-15 / 0 mm across 20..120 —
+six filaments at a positive curl cross the axis at ANY length, and the disc's approach is set at the
+roots — fifteen cells declared by value, both length axes in `COMBINATION_INERT`, nothing clamped.
+`frozen/phase65` is the 1302 rows at `c1fc595`; block 23 is 1307 rows.
+
 **THE GYNOECIUM IS BUILT AND SHIPS ABSENT; THE CENTRE IS COMPLETE** (Eva's rulings,
 session 22, phase 2 B3). `gynoecium` (GYNOECIUM section, a CHOICE: NONE / STYLE, default NONE
 — one style or none, never a count) with `styleLength` (5–40 mm, default 25) and `styleCurl`

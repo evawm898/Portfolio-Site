@@ -497,6 +497,27 @@ const PREDICATE_MOVERS = {
     const lp = base.leafPlan(st, sp, acc, ip);
     return !!(lp.present && lp.shared && lp.built > 0);
   },
+  /* THE STAMEN LENGTH VARIANCE (F1.2 — docs/bloom-stamen-length-variance-
+     outcome.md). A row moves iff a stamen's BUILT length changes: the BASE
+     tree's own footRing() builds an androecium on it (the base's record, so
+     SPHERE and count-0 rows are holders by the base's own guard), the row
+     asks a variance above 0, and the law — restated here from the controls
+     and the index, NEVER imported from this tree's geometry — hands at least
+     one stamen a length other than the control's. The 120 mm ceiling alone
+     moves nothing: both trees build the state they are handed, and a row at
+     length 120 is 120 on each. `ALL MAX` is a holder by construction (the
+     variance is a STAMEN_SUB, out of the blanket sweep), measured here. */
+  'stamen-length': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    if (!fr.androecium) return false;
+    const amount = Number(st.stamenLengthVariance) || 0;
+    if (amount === 0) return false;
+    const L = Number(st.stamenLength);
+    const unit = (i) => { let h = Math.imul((i | 0) + 1, 0x9E3779B1) >>> 0; h = (h ^ (h >>> 15)) >>> 0; h = Math.imul(h, 0x85EBCA6B) >>> 0; h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xC2B2AE35) >>> 0; h = (h ^ (h >>> 16)) >>> 0; return (h / 0xFFFFFFFF) * 2 - 1; };
+    for (let i = 0; i < fr.androecium.count; i++) { const b = Math.min(120, Math.max(5, L * (1 + amount * unit(i)))); if (b !== L) return true; }
+    return false;
+  },
 };
 if (MOVERS_PRED && !PREDICATE_MOVERS[MOVERS_PRED]) { console.error(`--movers-predicate ${MOVERS_PRED}: no such predicate (${Object.keys(PREDICATE_MOVERS).join(', ')})`); process.exit(2); }
 if (MOVERS_PRED && MOVERS) { console.error('--movers and --movers-predicate are two declarations of one partition; give one'); process.exit(2); }

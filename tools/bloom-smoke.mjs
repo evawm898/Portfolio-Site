@@ -403,6 +403,13 @@ export const SMOKE_BLOCKS = [
         path: 'the DISC layout at the count ceiling, CLAMPED at the hub, 86 roots in the petal-root annulus, on a CAP — JS1 on the cap\'s normal, JS5\'s annulus law and equal-area clause, the two distance flags' },
       { label: 'STAMENS: 6 x curl max (180) — bent in over the centre',
         path: 'spineLaw() at tilt 0 with a curl engaged — the filament off its normal beyond the outer face while the root stays on it' },
+      /* F1.2 (Oct 12): the length variance and the 120 mm ceiling — JS8's
+         restated length law against the emitted rods on a varied ring, and
+         the CLAMPED arm at the new ceiling. */
+      { label: 'STAMENS: 6 x length variance 0.5 (random per stamen, seeded from the index)',
+        path: 'the length variance engaged on the six-stamen ring — JS8 (each rod\'s outer-root-to-tip chord against the length law restated from the controls and the stamen index, the per-stamen clamp flags, the built extremes and SLENDERNESS as the longest filament\'s)' },
+      { label: 'STAMENS: 6 x length max (120) x variance max (1) — the ceiling CLAMPS the long draws, told',
+        path: 'the 120 mm ceiling with the variance at its maximum — JS8\'s CLAMPED arm in both directions (the draws past 120 built AT the ceiling and counted, the rest unclamped and not counted) and the ceiling itself pinned at Eva\'s fixed 120' },
       { label: 'STAMENS: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)',
         path: 'the other direction — hidden AND inert under SPHERE: no descriptor, no stamen emitted, no free end tallied, and JS0 in its ABSENT arm (the registry\'s androeciumEligible against the geometry\'s on this state, the owner declaring none while every control is at maximum, and the distance flags reading absent)' },
     ],
