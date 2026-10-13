@@ -51,7 +51,7 @@ int32, so half the units fell below −1 and six filaments at `20 mm × 0.5` rea
 
 ### §3a The mutant table
 
-(filled at close — see the session report)
+`node tools/verify-bloom-apex-mutants.mjs --only=<the four> --rows='stamen|shipping default'`: **4 of 4 fire JS8 and the clean tree is silent on every row; 162 anchors, 162 matching their find-string exactly once.** A row subset (3 of 70 rows), not a sweep of the table; the full table runs in CI (`bloom-apex-mutants`).
 
 ## §4 The byte partition
 
@@ -62,7 +62,7 @@ alone moves nothing (both trees build the state they are handed). Predeclared: t
 rows minus the plain `length max (120)` one, i.e. **4 movers**; `ALL MAX` a holder (the variance is a
 STAMEN_SUB, out of the blanket sweep).
 
-(measured partition filled at close)
+**MEASURED, PASS: 4 of 4 predeclared movers MOVED and 0 floats moved on the 1,303 holders, positionally under `Object.is`, over the whole 1,307-row matrix in both modes — 1,594,298,592 export floats over 177,144,288 triangles and 84,145,484 captured-grid values** (four `--range` chunks closed by `--merge`, each chunk against a worktree of `c1fc595`). The four movers are block 23's `length variance 0.5`, `120 DISC x length variance max`, `length max (120) x variance max` and `length min (5) x variance max`; the two length-max rows at 120, the long-rod corner and `ALL MAX` are holders. `--control` perturbs one coordinate by 1e-9 and fires both clauses (export stream and captured grid).
 
 ## §5 The combination check — the long-rod corner
 
@@ -88,11 +88,11 @@ this tree and was checked), and so is the variance. Census through `bloom-xfail-
 --include-refused`: **93,107 pairs / 13.6547 mm, reproducing its recorded entry exactly**. Refusal
 entry 2,716,406 triangles.
 
-(triangle counts on both trees in both modes filled at close)
+Triangle count, measured in Node on both trees: **2,716,406 in EXPORT and in LIVE on `c1fc595` and on this tree alike**, with `stamenLength` 20 and the variance 0 (absent on the base) on the row's own coerced control set. The refusal entry is untouched.
 
 ## §7 Census
 
-(the export gate over every STAMENS row — filled at close)
+`node tools/verify-bloom-export.mjs --only '^STAMENS: '`: **29 of 29 attempted rows reached the results and export watertight**; 26 of 29 free of within-shell self-intersection and the 3 declared ones (`120 DISC x Head rise 1`, the APEX CORNER, the INCURVE-sphere GATED row) still failing at their recorded magnitudes (X1). **Every new row reads 0 pairs**, so no entry is added. The two new smoke rows read `components=1 stray=0` through the connectedness gate (a first `bloom-smoke --conn` went red on a 30 s settle timeout while the byte partition saturated the box; re-run alone, green).
 
 ## §8 The sheet
 
@@ -107,3 +107,16 @@ required equal). Print preview on, JS0–JS8 asserted before every shutter, no p
 `frozen/phase65` is the **1302 rows at `c1fc595`**, registered in `FROZEN_MATRICES` and
 `FROZEN_BASE_COMMITS` (65 was the newest number on `main` at registration; the parallel design-file
 session adds no rows). Owed because block 23 grows by five rows and two of its row definitions move.
+
+**The tag dispatch, read back (run 38441209204, from `main` at `50fafc9`, after the merge):**
+56 tags published and correct, 7 missing but declared, and **`frozen/phase65` REFUSED** —
+`refusing to allow a GitHub App to create or update workflow .github/workflows/bloom-panel.yml`.
+The design-file session (#403) edited that file after `c1fc595` and merged while #402 was in CI,
+so the base's `bloom-panel.yml` differs from `main` HEAD's and the rule of thumb in `CLAUDE.md`
+applies. Two sessions in flight against one base make a refusal nobody could declare in advance;
+it is declared in `TAG_PUSH_XFAIL` now, by the follow-up PR. The registration is the load-bearing
+half: `bloom-frozen-matrices` proves phase65 deep-equal on every push, and `c1fc595` is on `main`.
+
+**And the mutant sweep's shard 1 was cancelled by the 150-minute job cap at 38 of 41 mutants,
+every one `ok`** — 3.9 min a mutant against shard 0's 3.05 on the same table; the re-run passed
+in 2h12m. The workflow goes to six shards in the follow-up PR. Nothing in the geometry.

@@ -125,6 +125,7 @@ declare -A TAG_PUSH_XFAIL=(
   [phase43]='DECLARED IN ADVANCE: the margin-bead session edits .github/workflows/bloom-export-watertight.yml after 2457d12, the shape GitHub refused for phase42; declared before the dispatch so an absence is expected, and a publish is called out as stale'
   [phase45]='DECLARED IN ADVANCE: the stem-node session edits .github/workflows/bloom-export-watertight.yml after c170500 (the ST12 must-fail step), the shape GitHub refused for phase42; an absence is expected and a publish is called out as stale'
   [phase49]='DECLARED IN ADVANCE: the TUBE build session edits .github/workflows/bloom-export-watertight.yml after f266606 (the TU0-TU6 preflight step), the shape GitHub refused for phase42; an absence is expected and a publish is called out as stale'
+  [phase65]='GITHUB_TOKEN refused: .github/workflows/bloom-panel.yml (run 38441209204; #403, the design file, edited that file after c1fc595 and merged while #402 was in CI — the two sessions in flight against one base, so the refusal was not declarable in advance)'
 )
 
 CHECK_ONLY=0

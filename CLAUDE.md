@@ -1986,7 +1986,7 @@ from a base that predates the edit.** That is exactly the `phase42/43/45` shape.
 session-side push is still a flat 403 on every tag ref (measured again Sep 29, on a tag at a
 commit already on `main`), so the dispatch is the only route, and it is the session's to fire
 after its own merge (the ruling above). `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh`
-declares them by name with the file GitHub named (SEVEN since #339 added `phase49` on Oct 1); a declared entry that starts publishing is
+declares them by name with the file GitHub named (EIGHT since F1.2 added `phase65` on Oct 13 — refused on `bloom-panel.yml`, which the parallel design-file session #403 edited and merged while #402 was in CI: two sessions in flight against one base make a refusal nobody could declare in advance); a declared entry that starts publishing is
 called out as stale, and a re-dispatch after `main`'s workflow files have moved again does not
 recover one — the rule says why.
 
