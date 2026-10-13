@@ -549,23 +549,28 @@ The spine of the order:
 |---|---|---|---|
 | 1 | F1.2 stamen length variance + ceiling | **parallel** (stamen code only) | — |
 | 2 | F1.1-a sepal tier descriptor + N-tier attachment (tier 1 byte-identical) | **parallel** (sepal code; reads `stemPlan` only) | — |
-| 3 | Scoping-a: state model global → layer → petal, `ps` resolution, zero controls, byte-identical | **parallel** (petal resolution; leaves use `leafBladeState`) | — |
+| 2b | QA.1 sepal own length and width (may exceed the petal's) — new, independent, early (§11) | **parallel** (sepal twins only) | — |
+| 3a | Q3.9 bloom design file — ships BEFORE scoping (§11, DEFAULT) | **parallel** (persistence only) | — |
+| 3 | Scoping-a: state model global → layer → petal, `ps` resolution, zero controls, byte-identical | **parallel** (petal resolution; leaves use `leafBladeState`) | 3a |
 | 4 | Curve editor widget (new registry kind + panel route) | **parallel** (UI only) | — |
 | 5 | F3-global: spine curve feeding `spineLaw`'s Phi via a law *beside* it | **parallel** if it does not edit `spineLaw` itself | 4 |
 | 6 | F1.3 independent helical filament (new 3D rod law beside `spineLaw`) | **parallel** | 1 |
 | 7 | F1.1-b tier-vs-tier contact + panel + sheet | parallel | 2 |
 | 8 | Scoping-b: panel selection-view chrome | parallel | 3 |
 | 9 | F4 per-layer (RADIAL) | parallel | 3, 8 |
-| 10 | F2 per-petal (FAN) + mirror links / unlink | parallel | 3, 8 |
+| 10 | F2 per-petal (FAN) + mirror links (pairs stay linked — §11 Q3.7; no unlink) | parallel | 3, 8 |
 | 11 | F3 per-scope curves | parallel | 5, 9/10 |
 | 12 | F6 symmetric outline curve (new CORE arm in `widthProfile`) | **wait**: same function as the leaf series | 4, leaf merged |
 | 13 | F1.3 braided mode | parallel | 6, Q2.4 |
 | 14 | F6 asymmetric (two-margin cross-section, bead, ladder, infill) | **wait** | 12, leaf merged |
 | 15 | F6 per-scope + mirror-linked outlines | wait | 10, 14 |
-| 16 | F7 pin + hide, then light drag path | **wait** (leaf sheets toggle the box) | leaf merged; Q7.1 |
+| ~~16~~ | ~~F7 pin + hide, then light drag path~~ — **DONE, merged as `b4ad9ba` (#400); §11** | — | — |
 
-Roughly **16–19 sessions** in all. The four marked "parallel" at the top (1–4) have no dependency
-between them.
+Roughly **16–19 sessions** in all (one fewer since F7 shipped). The rows marked "parallel" at the top
+(1, 2, 2b, 3a, 4) have no dependency between them; 3 now waits on 3a.
+
+*Order amended Oct 12 only where a §11 ruling changes it: F7 done; the design file before scoping;
+sepal own length/width as a new, independent, early item.*
 
 ---
 
@@ -637,3 +642,67 @@ between them.
 - QA.1 Should a sepal get its own length and width (or an aspect) so its proportion can differ from
   the petal's? Should it be allowed longer than the petal?
 - QB.1 Rename spine-curl signs, or document "arch"? Leaf arch and petal curl run in opposite senses.
+
+---
+
+## 11. Rulings (Eva, Oct 12)
+
+Recorded as given. Nothing below is re-litigated, interpreted further or resolved: an item marked
+**DEFAULT** is a default the build session proposes from measurement and Eva confirms, not a ruling.
+
+**F1.1 — sepal tiers**
+- Q1.1: each tier owns the FULL sepal control set.
+- Q1.2: tiers past the first need a stem; without one they are hidden and inert, told.
+- Q1.3 / Q1.4: tiers stay in height order; tier-on-tier contact is clamped and told (like the petal
+  angle limit).
+- Q1.5: **DEFAULT** — count ceiling per tier proposed by the build session from measurement.
+- Sepals join independence PER TIER only; sepals within a tier match.
+
+**F1.2 / F1.3 — stamens**
+- Q2.1: length variance is RANDOM per stamen (seeded), not the shared variance wave.
+- Q2.2: the `stamenLength` ceiling is a fixed 120 mm.
+- Q2.3: **DEFAULT** — coil curvature floored like the spine's, inert at radius 0; the build session
+  confirms.
+- Q2.4: braided = ONE bundle — every stamen winds around a shared axis.
+- Q2.5: the anther follows the coil's end tangent.
+
+**F2 / F4 — scoping**
+- Q3.1: select-and-edit — pick a petal / layer / tier, the normal panel edits just it. No instanced
+  rows.
+- Q3.2: **DEFAULT** — per-scope values are OFFSETS on the global value.
+- Q3.3: **DEFAULT** — per-petal width does not reach the foot (Z6 stands).
+- Q3.4: the existing slot roles, per-petal groups and ALL / INNER deltas RETIRE (ids kept per
+  `RETIRED_IDS`).
+- Q3.5: per-layer size and tilt WIN under F4; `layerSize` / `layerTilt` hide when per-layer is on.
+- Q3.6: sheet thickness is never scoped. Everything else may be.
+- Q3.7: orchid mirror pairs STAY LINKED — no unlink. (Supersedes the Oct 11 "mirror-linked,
+  unlinkable".)
+- Q3.9: **DEFAULT** — a bloom design file ships BEFORE scoping.
+
+**F3 — spine curve**
+- Q4.1: points draw the spine's SHAPE; curvature is derived.
+- Q4.2: in curve mode `curlBias`, `curlStart`, the curl deltas and the variance curl term HIDE.
+- Q4.4: a drag past printable curvature is REFUSED (the point does not move there), not clamped.
+- Q4.3 / Q4.5: sepals AND leaves get curve mode.
+
+**F6 — outline curve**
+- Q6.1: drawn length always equals the length slider; the curve's points are fractions of it.
+- Q6.2: the curve starts above the root blend; the foot stays the hub's.
+- Q6.3 / Q6.4: the curve shapes the outline down to the existing 1.6 mm tip width, then the existing
+  round nib closes it.
+- Q6.5: the first asymmetric session REQUIRES both the edge bead and infill on asymmetric outlines.
+- Q6.6: "LACE" was a brief error (it is /flower's); drop it.
+- Q6.7: petals, sepals AND leaves get outline curves.
+
+**F7 — print preview — SHIPPED as `b4ad9ba` (#400).** Recorded as built:
+- a drag drops infill cells only (candidate A); full print geometry on release.
+- the always-on view shows print normals.
+- "Get grid" follows the view (print-mode grids).
+- the gates keep measuring LIVE: the harness unchecks the hidden box at load.
+
+**Sheets**
+- QA.1: sepals get their OWN length and width, and may be longer than the petals.
+- QB.1: document the opposite arch / curl signs; no renaming, no sign flip.
+
+§9's order is amended only where a ruling changes it: F7 done; the design file before scoping; sepal
+own length / width as a new, independent, early item.
