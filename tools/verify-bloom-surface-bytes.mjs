@@ -518,6 +518,19 @@ const PREDICATE_MOVERS = {
     for (let i = 0; i < fr.androecium.count; i++) { const b = Math.min(120, Math.max(5, L * (1 + amount * unit(i)))); if (b !== L) return true; }
     return false;
   },
+  /* THE INDEPENDENT COIL (F1.3a — docs/bloom-stamen-coil-outcome.md): a row
+     moves iff the BASE tree's own footRing() builds an androecium on it (so
+     SPHERE and count 0 are holders by the base's own record) AND the row asks
+     for an INDEPENDENT coil at a radius above 0 — the plain rod is the branch
+     at NONE and at radius 0, so those rows HOLD. The base tree has no coil
+     control at all, so the predicate's second half is the controls' and the
+     first half is the base's: the prediction never reads this tree's geometry. */
+  'stamen-coil': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    if (!fr.androecium) return false;
+    return st.stamenCoil === 'INDEPENDENT' && Number(st.stamenCoilRadius) > 0;
+  },
 };
 if (MOVERS_PRED && !PREDICATE_MOVERS[MOVERS_PRED]) { console.error(`--movers-predicate ${MOVERS_PRED}: no such predicate (${Object.keys(PREDICATE_MOVERS).join(', ')})`); process.exit(2); }
 if (MOVERS_PRED && MOVERS) { console.error('--movers and --movers-predicate are two declarations of one partition; give one'); process.exit(2); }
