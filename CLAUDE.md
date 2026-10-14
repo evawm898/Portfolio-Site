@@ -782,7 +782,17 @@ SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection
   `composeControls` / `readControls` / `fieldFor` are exported walkers. "Add the row" was read as the
   KIND's row, since no live control is a curve (a reading, not a ruling). The `curves` container's
   future is F3's call.
-- **Gates:** panel route (af) via `__bloomCurveTest` with five mutants (TWENTY-SIX routes); design-file F7
+- **THE DOUBLE PRESS ON A HANDLE IS THE BROWSER'S OWN `dblclick`, AND THE 450 ms WALL-CLOCK WINDOW
+  THAT SHIPPED INSTEAD WAS MAIN'S RED ON `d576262`** (the route (af) fix session, Oct 14 — §"two
+  measured findings" of the doc carries the retraction). The window's premise ("a prevented pointerdown
+  delivers no dblclick") was false: what swallowed the click was `render()` rebuilding every handle
+  circle on press and release, and Chromium delivers no click when the pressed node leaves the
+  document. The window itself stayed ARMED by a press released without a move (step 3's refused
+  drag), so a fast runner reached step 4's double-click inside it: the first press removed the added
+  point and the browser's dblclick re-inserted one. Same tree green on `main`'s push run, red twice on
+  #411 — a wall-clock decision, green on the slow side. Fixed by reconciling the handles in place and
+  preventing only `mousedown`; route (af) drives the fast side over raw CDP, with a sixth mutant.
+- **Gates:** panel route (af) via `__bloomCurveTest` with six mutants (TWENTY-SIX routes); design-file F7
   plus F0's kinds census and a seventh mutant. `a-dropped-field-on-write` was RE-ANCHORED onto the moved
   writer loop.
 - **`bloom-curve.js` IS IN NO WORKFLOW'S PATH FILTER** (workflows were off-limits), so a change to it
