@@ -11,12 +11,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
+import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
-import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty } from './bloom-file.js';
+import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, scopeExclusionReason } from './bloom-file.js';
+import { scopeOffsetsFor, scopeSlotKey, resolveRoleOverrides, scopeLayersLive, scopePetalsLive, petalGroupCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -253,9 +254,14 @@ panelRoot.addEventListener('click', (e) => {
    is a number and a choice is a string; a local `Number(...)` would turn
    `placement` into NaN, which reads back as a legitimate-looking value and is
    how a gate ends up measuring a design other than the one it names. */
+/* WHILE A SCOPE IS PICKED (Scoping-b) the scopeable sliders DISPLAY the
+   scope's effective value, and the GLOBAL value lives in `scopeGlobals` — so
+   readUI() keeps returning the whole-bloom state to every reader it has (the
+   build, the export, the save, the drag guard and every gate's read-back),
+   and nothing downstream of it can learn that a scope is on screen. */
 function readUI() {
   const out = {};
-  for (const c of CONTROLS) out[c.id] = coerceValue(c, inputs[c.id].value);
+  for (const c of CONTROLS) out[c.id] = coerceValue(c, scopeGlobals.has(c.id) ? scopeGlobals.get(c.id) : inputs[c.id].value);
   return out;
 }
 /* Harness hook: gates read the app's own state snapshot rather than keeping a
@@ -336,7 +342,14 @@ function applyCaps(shown) {
    `open` attribute is the visitor's, and this function never touches it. */
 function applyVisibility() {
   const ui = readUI();
-  for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);
+  /* A SCOPEABLE CONTROL IS DECIDED ON THE PICKED SCOPE'S OWN STATE (Scoping-b):
+     its sub-controls' guards (fringe depth on the count, the lobe shape on the
+     depth, the buckle's frequency on its amplitude, curl bias on the curl) are
+     read by the geometry on that petal's resolved state, so a layer whose own
+     buckle is on shows its frequency while the whole bloom's buckle is 0. Every
+     other control is the whole bloom's and is decided on the whole bloom. */
+  const vui = scopeView ? viewUi(ui) : ui;
+  for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && SCOPE_IDS.has(c.id) ? vui : ui);
   /* CHILDREN BEFORE PARENTS — ONE PASS, AT ANY DEPTH. A section's answer
      READS its children's, so every child must have settled before its parent
      is reached. verifySections() refuses a section declared before its parent,
@@ -377,12 +390,301 @@ function applyVisibility() {
 }
 
 document.getElementById('resetBtn').addEventListener('click', () => {
+  /* RESET IS A FRESH PAGE (Scoping-b, a decision made without a ruling): the
+     pick ends first — it writes nothing — and the scopes record goes with the
+     controls, so turning a toggle back on after a reset cannot bring back
+     offsets the visitor no longer sees anywhere. Before Scoping-b the record
+     was reachable only through a file or a hook and Reset never touched it. */
+  selectScope(null);
+  scopes = null;
   for (const c of CONTROLS) {
     inputs[c.id].value = DEFAULTS[c.id];
     inputs[c.id].dispatchEvent(new Event('input', { bubbles: true }));
     inputs[c.id].dispatchEvent(new Event('change', { bubbles: true }));
   }
 });
+
+/* ===================================================================
+   THE SCOPE VIEW (Scoping-b, Eva's rulings — read docs/bloom-scoping-selection.md
+   before touching any of it). "Select-and-edit: pick a layer (RADIAL) or a
+   petal (FAN); the normal panel now edits just that scope. No instanced rows."
+
+   THE MODEL IS /plot's, ONE LEVEL DOWN ("A WARP BELONGS TO ITS PETAL"): the
+   panel is a VIEW onto the picked scope's entry, and PICKING LOADS AND NEVER
+   APPLIES — selecting writes nothing to `scopes`, rebuilds nothing, and the
+   picked scope's sliders simply show its effective values; DESELECTING WRITES
+   NOTHING either — the offsets stay on their scope. Only a hand moving a
+   control (a drag, a typed value, an arrow key — every one arrives as the
+   control's own `input` / `change`) writes an offset, and only onto the picked
+   scope's own entry. The selection itself is VIEW STATE: not a registry
+   control, not in the design file, gone on reload. The two toggles that make
+   a picker appear ARE registry controls and are saved, because they decide
+   what builds (see the geometry's SCOPE_TOGGLE_VALUES block).
+
+   WHAT A PICKED SCOPE'S SLIDER SHOWS is `clamp(global + offset)`, computed by
+   the GEOMETRY'S OWN OWNERS — `scopeOffsetsFor` (which entries reach this
+   scope, the pairing law and the toggle gate included) and `resolveRoleOverrides`
+   (the composition and the one clamp) — never re-derived here, so the panel
+   and the builder cannot disagree about a scope's value. The role table is
+   inert while a toggle is live, so the resolver is handed no roles; the
+   variance field and the layer ramps are told in the status line, not folded
+   into a number they are not part of.
+
+   A MIRROR PAIR IS ONE SCOPE (Q3.7): a FAN petal scope is keyed on the pair's
+   canonical slot (`scopeSlotKey`), the picker lists pairs, and picking either
+   member binds the pair.
+   =================================================================== */
+const SCOPE_IDS = new Set(SCOPEABLE_IDS);
+let scopeView = null;              // { kind: 'layer' | 'petal', layer, slot } — the picked scope; null = the whole bloom
+const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
+let lastShown = null;              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
+const scopeBar = document.getElementById('scopeBar');
+const scopePick = document.getElementById('scopePick');
+const scopeStatus = document.getElementById('scopeStatus');
+
+/* WHICH TOGGLE IS LIVE ON THE WHOLE-BLOOM STATE — the geometry's own predicates. */
+function scopeMode(ui) { return scopeLayersLive(ui) ? 'layer' : scopePetalsLive(ui) ? 'petal' : null; }
+const scopeValue = (v) => (v ? `${v.kind}:${v.layer}:${v.slot}` : '');
+/* THE SCOPES THIS ARRANGEMENT HAS, from footRing()'s own answers on the build
+   on screen (`lastFoot`): its layer count, its slot count and its plane — so
+   the picker never counts orbits for itself. */
+function scopeOptions(ui) {
+  const mode = scopeMode(ui);
+  if (!mode) return [];
+  const layers = Math.max(1, Math.round(Number(lastFoot.layerCount) || 1));
+  const sc = lastScopes;
+  const out = [];
+  if (mode === 'layer') {
+    for (let k = 0; k < layers; k++) {
+      const own = sc && sc.scopedLayers && sc.scopedLayers.includes(k);
+      const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ' — the outer whorl' : k === layers - 1 ? ' — the innermost whorl' : '';
+      out.push({ kind: 'layer', layer: k, slot: 0, label: `Layer ${k + 1}${where}${own ? ' · own values' : ''}` });
+    }
+    return out;
+  }
+  const n = lastFoot.slotCount;
+  const groups = petalGroupCount(n, lastFoot.mirror);
+  for (let k = 0; k < layers; k++) {
+    for (let o = 0; o < groups; o++) {
+      const own = sc && sc.scopedPetals && sc.scopedPetals.some((p) => p.layer === k && p.slot === o);
+      out.push({ kind: 'petal', layer: k, slot: o, label: `${layers > 1 ? `Layer ${k + 1} · ` : ''}Petal ${o + 1} — ${fanGroupSaid(o + 1, ui)}${own ? ' · own values' : ''}` });
+    }
+  }
+  return out;
+}
+/* A PICK, CANONICALISED: a petal pick names either member of a pair and binds
+   the pair's canonical slot — the key every entry for the pair is summed on. */
+function canonicalScope(sel, ui) {
+  if (!sel) return null;
+  const mode = scopeMode(ui);
+  if (!mode) return null;
+  const layer = Math.round(Number(sel.layer) || 0);
+  if (mode === 'layer') return { kind: 'layer', layer, slot: 0 };
+  return { kind: 'petal', layer, slot: scopeSlotKey(Math.round(Number(sel.slot) || 0), lastFoot.slotCount, ui) };
+}
+function scopeIsValid(v, ui) {
+  return !!v && scopeOptions(ui).some((o) => o.kind === v.kind && o.layer === v.layer && o.slot === v.slot);
+}
+/* THE ENTRIES THAT REACH THE PICKED SCOPE, summed, and the scope's effective
+   values — through the geometry's owners (see the block header). */
+function scopeTermFor(v, ui) {
+  const sb = scopesForBuild(scopes);
+  return sb ? scopeOffsetsFor(sb, { layer: v.layer, slot: v.slot, n: lastFoot.slotCount, state: ui }) : null;
+}
+function scopeEffective(v, ui) {
+  const term = scopeTermFor(v, ui);
+  const out = term ? resolveRoleOverrides(ui, [], null, null, null, term) : null;
+  const eff = {};
+  for (const id of SCOPEABLE_IDS) eff[id] = out && id in out ? out[id] : ui[id];
+  return { eff, term };
+}
+function viewUi(ui) { return scopeView ? { ...ui, ...scopeEffective(scopeView, ui).eff } : ui; }
+/* THE PICKED SCOPE'S OWN PETAL RECORD for the read-outs that print a built
+   number (the buckle's clamp, the lobes' caps, the fringe's ceiling, the
+   infill's achieved count): the first emitted petal of that layer / pair, so a
+   scope's controls quote that scope's petal rather than ring 0's. */
+function scopeShown(shown) {
+  if (!scopeView || !shown) return shown;
+  const ui = readUI();
+  const n = lastFoot.slotCount;
+  const p = lastPetalsAll.find((q) => q && Math.round(q.whorl) === scopeView.layer
+    && (scopeView.kind === 'layer' || scopeSlotKey(q.slotIndex, n, ui) === scopeView.slot));
+  if (!p) return shown;
+  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null,
+    infill: lightOnScreen ? shown.infill : (p.infill || null) };
+}
+
+/* BIND / UNBIND — state and the inputs' DISPLAYED values only; no event, no
+   rebuild, no write to `scopes`. Unbinding puts the global values back into
+   the inputs exactly as they were taken out. */
+function bindScope(next) {
+  if (scopeView) { for (const [id, v] of scopeGlobals) inputs[id].value = v; scopeGlobals.clear(); }
+  scopeView = next;
+  if (!next) return;
+  for (const id of SCOPEABLE_IDS) scopeGlobals.set(id, inputs[id].value);
+  const { eff } = scopeEffective(next, readUI());
+  for (const id of SCOPEABLE_IDS) inputs[id].value = String(eff[id]);
+}
+/* SELECT — LOADS, NEVER APPLIES. The read-out spans' SECOND writer (the first
+   is regenerate(), which the panel gate's path route reads "a changed span" as
+   proof of): a pick moves no geometry, so it must not rebuild, and a span that
+   kept the whole bloom's text under a picked scope would be a panel that lies.
+   Route (b) never picks, so its witness is untouched. */
+function selectScope(sel) {
+  const ui = readUI();
+  const next = canonicalScope(sel, ui);
+  bindScope(next && scopeIsValid(next, ui) ? next : null);
+  relabelView();
+}
+function relabelView() {
+  const ui = readUI();
+  syncScopeBar(ui);
+  applyVisibility();
+  refreshLabels(viewUi(ui), scopeShown(lastShown));
+  applyCaps(scopeShown(lastShown));
+  refreshScopeNotes(ui);
+}
+
+/* AN EDIT LANDS ON THE PICKED SCOPE ONLY. A capture listener on the panel runs
+   before the control's own `input` / `change` listeners (which then rebuild as
+   they always have), so a drag, a typed value (F5 dispatches the same two
+   events) and an arrow key all arrive here. The offset written is the one that
+   makes the scope's effective value the slider's: `desired - global - (every
+   OTHER entry already reaching this scope)`, onto the scope's own canonical
+   entry, float noise cut at twelve significant digits (`0.35 - 0.3` is
+   0.04999999999999993); an offset that returns to 0 is REMOVED, an entry left
+   empty is removed, and a record left with nothing in it is null — so editing
+   a value back to the whole bloom's restores the shipped path exactly. */
+function commitScopeOffset(id, desired) {
+  const ui = readUI();
+  const v = scopeView;
+  const n = lastFoot.slotCount;
+  if (!scopes) scopes = { layers: [], petals: [], tiers: [] };
+  const list = v.kind === 'layer' ? scopes.layers : scopes.petals;
+  const reaches = (e) => e.layer === v.layer && (v.kind === 'layer' || scopeSlotKey(e.slot, n, ui) === v.slot);
+  let own = list.find((e) => reaches(e) && (v.kind === 'layer' || e.slot === v.slot)) || null;
+  let others = 0;
+  for (const e of list) if (e !== own && reaches(e)) others += Number((e.offsets || {})[id]) || 0;
+  let d = desired - Number(ui[id]) - others;
+  d = Math.abs(d) < 1e-12 ? 0 : +d.toPrecision(12);
+  if (d === 0) {
+    if (own && own.offsets && id in own.offsets) {
+      delete own.offsets[id];
+      if (!Object.keys(own.offsets).length) list.splice(list.indexOf(own), 1);
+    }
+  } else {
+    if (!own) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
+    own.offsets[id] = d;
+  }
+  if (scopesAreEmpty(scopes)) scopes = null;
+}
+function onScopedEdit(e) {
+  if (!scopeView) return;
+  const t = e.target;
+  if (!(t instanceof HTMLInputElement) || !SCOPE_IDS.has(t.id)) return;
+  commitScopeOffset(t.id, Number(t.value));
+}
+panelRoot.addEventListener('input', onScopedEdit, true);
+panelRoot.addEventListener('change', onScopedEdit, true);
+
+/* THE SCOPE BAR — page chrome OUTSIDE #panelControls (the panel gate's census
+   root holds registry controls and nothing else). Shown iff a toggle is live;
+   its option list is rebuilt from the build on screen; a pick that no longer
+   names a scope of this arrangement (the layer count fell, the fan lost a
+   pair, the toggle went off) ends — writing nothing — and says so by being
+   gone. Returns whether the binding changed. */
+function syncScopeBar(ui) {
+  const mode = scopeMode(ui);
+  scopeBar.hidden = !mode;
+  let changed = false;
+  if (scopeView && !scopeIsValid(scopeView, ui)) { bindScope(null); changed = true; }
+  const opts = scopeOptions(ui);
+  const want = [{ value: '', label: mode === 'petal' ? 'Whole bloom (every petal)' : 'Whole bloom (every layer)' },
+    ...opts.map((o) => ({ value: scopeValue(o), label: o.label }))];
+  const have = Array.from(scopePick.options).map((o) => `${o.value}|${o.textContent}`).join('\n');
+  if (have !== want.map((o) => `${o.value}|${o.label}`).join('\n')) {
+    scopePick.replaceChildren(...want.map((o) => { const el = document.createElement('option'); el.value = o.value; el.textContent = o.label; return el; }));
+  }
+  scopePick.value = scopeValue(scopeView);
+  scopeStatus.textContent = scopeStatusText(ui, mode);
+  return changed;
+}
+function scopeStatusText(ui, mode) {
+  if (!mode) return '';
+  if (!scopeView) {
+    return mode === 'layer'
+      ? 'Pick a layer and the panel edits just that layer: its petal controls then set the layer\'s own values, kept as offsets on the whole-bloom value.'
+      : 'Pick a petal and the panel edits just that petal and its mirror partner: its petal controls then set the pair\'s own values, kept as offsets on the whole-bloom value.';
+  }
+  const opt = scopeOptions(ui).find((o) => o.kind === scopeView.kind && o.layer === scopeView.layer && o.slot === scopeView.slot);
+  const name = opt ? opt.label.replace(/ · own values$/, '') : '';
+  const n = lastFoot.slotCount;
+  const members = scopeView.kind === 'petal' ? Array.from({ length: n }, (_, i) => i).filter((i) => scopeSlotKey(i, n, ui) === scopeView.slot) : [];
+  const parts = [`Editing ${name}.`,
+    scopeView.kind === 'petal' && members.length === 2 ? 'Both petals of the pair move together.' : '',
+    'The marked controls set its own values; unmarked ones still edit the whole bloom.',
+    scopeView.kind === 'layer' && Math.round(Number(ui.layerCount)) >= 2 ? 'Layer size and Tilt step still apply on top of its length, width and tilt.' : '',
+    Math.abs(Number(ui.varianceForm) || 0) >= 0.005 ? 'The form field still moves each petal\'s curl, cup and twist around these values.' : '',
+    'Whole bloom ends the pick; nothing is lost.'];
+  return parts.filter(Boolean).join(' ');
+}
+scopePick.addEventListener('change', () => {
+  const val = scopePick.value;
+  if (!val) { selectScope(null); return; }
+  const [kind, layer, slot] = val.split(':');
+  selectScope({ kind, layer: Number(layer), slot: Number(slot) });
+});
+
+/* THE NOTE UNDER A CONTROL WHILE A SCOPE IS PICKED — the global value and the
+   offset told beside the scope's effective one (which the slider and its
+   read-out show), and a whole-bloom petal control saying it is one and why
+   (bloom-file.js's `scopeExclusionReason`, the reader's own words). Not a
+   <label>, not a .bl-val: the panel gate counts exactly one of each per
+   control. Created on first use; hidden whenever there is nothing to say. */
+const scopeNotes = {};
+const stepDecimals = (c) => { const s = String(c.step); return s.includes('.') ? s.split('.')[1].length : 0; };
+function refreshScopeNotes(ui) {
+  const term = scopeView ? scopeTermFor(scopeView, ui) : null;
+  const eff = scopeView ? scopeEffective(scopeView, ui).eff : null;
+  const name = scopeView ? (scopeView.kind === 'layer' ? `Layer ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
+  for (const c of CONTROLS) {
+    const wrap = wrappers[c.id];
+    let text = '';
+    let cls = null;
+    if (scopeView && SCOPE_IDS.has(c.id)) {
+      cls = 'scoped';
+      const off = term && term.offsets && c.id in term.offsets ? term.offsets[c.id] : 0;
+      if (off !== 0) {
+        const dp = stepDecimals(c);
+        const g = Number(ui[c.id]);
+        const asked = g + off;
+        text = `${name}: whole bloom ${g.toFixed(dp)} ${off >= 0 ? '+' : '−'} ${Math.abs(off).toFixed(dp)} offset = ${Number(eff[c.id]).toFixed(dp)}${eff[c.id] !== asked ? ` (clamped from ${asked.toFixed(dp)})` : ''}`;
+      }
+    } else if (scopeView) {
+      const why = scopeExclusionReason(c.id);
+      if (why) { cls = 'global'; text = `whole bloom — ${why}`; }
+    }
+    wrap.classList.toggle('bl-ctrl--scoped', cls === 'scoped');
+    wrap.classList.toggle('bl-ctrl--global', cls === 'global');
+    let el = scopeNotes[c.id];
+    if (!el && text) { el = document.createElement('p'); el.className = 'bl-scope-note'; wrap.append(el); scopeNotes[c.id] = el; }
+    if (el) { el.textContent = text; el.hidden = !text; }
+  }
+}
+
+/* THE HOOK the gates and the sheet read and drive — the same two functions the
+   picker calls, never a second path. `select` takes a layer and a slot (either
+   member of a pair) or a picker value; `effective` is what the picked scope's
+   sliders show, by the geometry's owners. */
+window.__bloomScopeView = {
+  options: () => scopeOptions(readUI()).map((o) => ({ ...o, value: scopeValue(o) })),
+  select: (sel) => { if (typeof sel === 'string') { const [kind, layer, slot] = sel.split(':'); sel = { kind, layer: Number(layer), slot: Number(slot) }; } selectScope(sel); return scopeView ? { ...scopeView } : null; },
+  deselect: () => { selectScope(null); return null; },
+  bound: () => (scopeView ? { ...scopeView } : null),
+  globals: () => Object.fromEntries(scopeGlobals),
+  effective: () => (scopeView ? scopeEffective(scopeView, readUI()).eff : null),
+  bar: () => ({ hidden: scopeBar.hidden, value: scopePick.value, options: Array.from(scopePick.options).map((o) => ({ value: o.value, label: o.textContent })), status: scopeStatus.textContent }),
+};
 
 /* ---------------- scene ---------------- */
 const canvas = document.getElementById('bloom-canvas');
@@ -2451,12 +2753,24 @@ function regenerate() {
                      with sepals asked the record says UNAVAILABLE rather than
                      going silent. */
                   sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
-                    : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null) };
+                    : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null),
+                  /* THE SCOPES the builder was handed (Scoping-b): its own summary —
+                     which layers and pairs carry an offset, and whether each
+                     container's toggle was live — for the two toggles' read-outs. */
+                  scopes: built.scopes || null };
   /* A LIGHT BUILD CARRIES NO INFILL PLAN, so the infill controls keep the
      last FULL build's numbers through a drag rather than flickering to none. */
   if (!light) lastFullShownInfill = shown.infill;
-  refreshLabels(ui, shown);
-  applyCaps(shown);
+  /* THE SCOPE VIEW (Scoping-b): the bar is re-synced against the build just
+     made (a pick that no longer names a scope of this arrangement ends,
+     writing nothing), and while a scope is picked the spans, the caps and the
+     notes describe THAT scope — its effective values and its own petal's
+     record — rather than the whole bloom. Unpicked, this is the call it was. */
+  lastShown = shown;
+  if (syncScopeBar(ui)) applyVisibility();
+  refreshLabels(viewUi(ui), scopeShown(shown));
+  applyCaps(scopeShown(shown));
+  refreshScopeNotes(ui);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
   else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
   /* The bounding SPHERE is the framing quantity (the accumulator's bounding
@@ -3249,7 +3563,11 @@ window.__bloomMetrics = () => ({
   petalSlotForms: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
     roles: { role: p.role ?? null, allRole: p.allRole ?? null, slotRole: p.slotRole ?? null, petalRole: p.petalRole ?? null }, formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
     formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null,
-    formScaled: p.formScaled ? p.formScaled.map((c) => ({ ...c })) : null })),
+    formScaled: p.formScaled ? p.formScaled.map((c) => ({ ...c })) : null,
+    /* the SCOPE TERM this petal was built with (Scoping-b) — the builder's own
+       record of which offsets reached it, keyed on its scope; the panel gate
+       reads an edit's landing off THIS, never off the record the page wrote */
+    scope: p.scopeTerm ? { key: { ...p.scopeTerm.key }, offsets: { ...p.scopeTerm.offsets } } : null })),
   /* THE VORONOI INFILL (I0-I7, and route (z)'s own subject): the BUILDER's own
      plan record — the density asked, the count ACHIEVED, the refusal word if
      there is one — so a gate holds the read-out's two tellings to the number
@@ -3529,6 +3847,9 @@ window.__bloomMetrics = () => ({
      relation is measured rather than commented. */
   perPetalEligible: lastFoot.perPetalEligible,
   allPetalsEligible: lastFoot.allPetalsEligible,
+  /* the scope toggles' own answers on the build on screen (Scoping-b; Z5) */
+  scopeLayersLive: lastFoot.scopeLayersLive,
+  scopePetalsLive: lastFoot.scopePetalsLive,
   petalRoleCensus: lastFoot.petalRoleCensus ? { ...lastFoot.petalRoleCensus } : null,
   petalGroupCount: lastFoot.petalGroupCount,
   slotRolesSplit: lastFoot.slotRolesSplit,
@@ -3596,6 +3917,7 @@ window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); 
    through the file's own reader so a hand-built record is validated exactly
    as a loaded one is — and rebuilds. No control reaches this. */
 window.__bloomScopes = (overrides) => {
+  selectScope(null);   // Scoping-b: a replaced record ends the pick first (it writes nothing)
   if (!overrides) { scopes = null; regenerate(); return null; }
   const r = readDoc({ ...composeDoc(readUI()), overrides });
   if (!r.ok) throw new Error(r.error);
@@ -3683,6 +4005,10 @@ function applyDesign(text, name = '(inline)') {
   }
   const r = readDoc(obj);
   if (!r.ok) { lastDesign = { action: 'refused', name, error: r.error, notes: [] }; writeDesignStatus(); return lastDesign; }
+  /* A LOAD ENDS THE PICK FIRST (Scoping-b): the controls below are written
+     through their own events, which under a picked scope would land as that
+     scope's offsets. Ending a pick writes nothing. */
+  selectScope(null);
   let applied = 0;
   for (const c of CONTROLS) {
     if (!Object.prototype.hasOwnProperty.call(r.doc.controls, c.id)) continue;

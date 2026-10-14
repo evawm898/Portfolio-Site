@@ -113,9 +113,12 @@ if (MERGE) {
   console.log(`partition     : ${sum('moversMoved')} of ${sum('moversSeen')} predeclared movers MOVED (every one must), ${sum('holdersSeen')} holders compared to the bit`);
   console.log(`export stream : ${sum('floats').toLocaleString()} floats over ${sum('tris').toLocaleString()} triangles`);
   console.log(`captured grid : ${sum('gridFloats').toLocaleString()} values over ${sum('panels').toLocaleString()} panels (live)`);
-  if (!sum('moversSeen')) fails.push('VACUOUS: no mover in the matrix');
+  /* A MERGE WITH NO PARTITION DECLARED is the all-hold claim (Scoping-b: the
+     toggles OFF must move nothing anywhere), and "no mover" is then the claim
+     rather than a vacuity; with a partition declared it still refuses. */
+  if (!sum('moversSeen') && parts[0].predicate) fails.push('VACUOUS: no mover in the matrix');
   if (fails.length) { console.log(`\nFAIL — ${fails.length} finding(s):`); for (const f of fails.slice(0, 60)) console.log('  ' + f); process.exit(1); }
-  console.log(`\nPASS — 0 floats moved on the ${sum('holdersSeen')} holders, positionally, under Object.is; all ${sum('moversSeen')} predeclared movers moved.`);
+  console.log(parts[0].predicate ? `\nPASS — 0 floats moved on the ${sum('holdersSeen')} holders, positionally, under Object.is; all ${sum('moversSeen')} predeclared movers moved.` : `\nPASS — 0 floats moved on all ${sum('holdersSeen')} rows x 2 modes, positionally, under Object.is (no partition declared: every row holds).`);
   process.exit(0);
 }
 if (!BASE || !existsSync(path.join(BASE, 'bloom-geometry.js'))) {

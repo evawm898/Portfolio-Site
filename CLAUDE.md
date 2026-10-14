@@ -702,6 +702,43 @@ FOR SCOPING** (the design-file session, Oct 13; feature map §11 Q3.9 — read
   `bloom-panel.yml` with no workflow edit — a workflow edit costs the frozen tag of the session in
   flight beside this one.
 
+**PARAMETER SCOPING HAS A SELECTION VIEW: TWO TOGGLES, A PICKER, AND THE PANEL EDITS THE PICKED
+SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection.md` before touching
+`scopeLayers` / `scopePetals`, `scopeLayersLive` / `scopePetalsLive` / `scopesOwnRoles` (both files),
+`scopeOffsetsFor`'s toggle gate, `resolveRoleOverrides`' role-table skip, bloom.js's SCOPE VIEW block,
+`scopeExclusionReason`, SO10–SO12 or panel route (ae)).
+- **The toggles.** `scopeLayers` is RADIAL only and `scopePetals` is FAN only. Both are registry
+  CHOICES, default OFF, and saved.
+  - OFF is today's bloom and today's panel.
+  - A record whose toggle is not live is KEPT and INERT (SO10). The gate is in `scopeOffsetsFor`,
+    so the panel's displayed value and the builder cannot disagree.
+- **A live toggle makes the WHOLE role table hidden AND inert.** That covers ALL, INNER, the
+  labellum and hood, and the per-petal groups: one owner on screen.
+  - The resolver's blanket skip keeps the geometry inert on its own. So an eligibility function
+    that forgets the toggle moves no float, and SO11's STAMP and footRing-FLAG clauses are that
+    arm's only witnesses.
+  - Per-layer and the tube are exclusive.
+- **The picker** is `#scopeBar`: page chrome outside `#panelControls`, never saved.
+  - A pick LOADS and never applies.
+  - Deselect writes nothing.
+  - An edit writes `desired − global − others` onto the picked scope's own entry, through a capture
+    listener, and is pruned at 0.
+  - While a scope is picked, `readUI()` reads the shadow globals, so builds, saves and gates see the
+    whole bloom.
+  - A mirror pair is one scope: the picker lists pairs, and picking either member binds the pair.
+- **Notes under each control:** `whole bloom g ± offset = effective (clamped from …)`, or
+  `whole bloom — <reason>` for the petal controls a scope cannot reach (sheet thickness, Q3.6).
+- **FINDING: the RADIAL labellum and hood are UNREPRESENTABLE as scopes** under "per-petal is FAN
+  only" (SO7, measured). The retirement session (Q3.4) inherits that choice.
+- **`footDelicacy` is whole-whorl now.** It moved 0 floats under a scope (its reader is footRing's).
+  `SCOPEABLE_IDS` is 33, and SO12 holds every one to moving a scoped petal.
+- **Gates.** SO10–SO12 plus six new scopes mutants; panel route (ae) plus four mutants, making
+  TWENTY-FIVE routes; seven toggle rows in route (f); the export preflight's anchors unchanged.
+- **Not in CI:** `tools/verify-bloom-scope-panel-identity.mjs --base <worktree>`, the panel
+  identity with the toggles OFF. The byte tool's `--merge` now closes an all-hold partition.
+- **0 matrix rows, no frozen phase.** Sheet: `node tools/shot-bloom-scopes.mjs` →
+  `docs/img/scope-selection.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

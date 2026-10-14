@@ -81,6 +81,16 @@
 
 <aside class="bl-panel" aria-label="Bloom controls">
   <div class="bl-eyebrow">Bloom</div>
+  <!-- THE SCOPE BAR (Scoping-b): shown only while Per-layer values (RADIAL) or
+       Per-petal values (FAN) is on. Picking a layer or a petal makes the panel
+       below edit just that scope; the pick is view state — never saved, never
+       a registry control, and outside #panelControls on purpose (that census
+       holds registry controls and nothing else). -->
+  <div id="scopeBar" class="bl-scope" hidden>
+    <label class="bl-scope-label" for="scopePick">Editing</label>
+    <select id="scopePick"></select>
+    <p id="scopeStatus" class="bl-scope-status"></p>
+  </div>
   <!-- The panel is GENERATED from bloom-registry.js by bloom.js. No control
        markup lives in this file, ever — the registry is the only list. -->
   <div id="panelControls"></div>

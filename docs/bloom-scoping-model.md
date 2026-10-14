@@ -31,7 +31,9 @@ scopes = {
   import the registry and must clamp a base the role table does not reach.
 - An offset is a DELTA on the global value (Q3.2, a DEFAULT ruled as a default — recorded as such).
   Nothing is a multiplier. The one semantic consequence is in §4.
-- **Which controls may carry an offset** (`SCOPEABLE_IDS`, 34): the registry's PETAL-role sliders
+- **Which controls may carry an offset** (`SCOPEABLE_IDS`, 34 at this session; **33 since Scoping-b**,
+  which measured `footDelicacy` moving 0 floats under a scope and moved it to `SCOPE_WHORL_LEVEL` —
+  `docs/bloom-scoping-selection.md` §4): the registry's PETAL-role sliders
   less three named sets, each with its reason — `sheetThickness` (never scoped, Q3.6, the
   geometry's own `SCOPE_UNSCOPED`); the ROLE_OVERRIDES delta controls (`allCurl`, `innerCup`,
   `labellumSize`, `petal3Tilt` … — they ARE the scoping this model replaces, Q3.4 retires them, and
@@ -97,6 +99,14 @@ gate now (the L7 lesson, one family later).
 
 ## 4. The migration table — today's roles as scopes (measured, SO7)
 
+> **Scoping-b changed what this table can reach.** Eva's rulings put per-layer values on RADIAL only
+> and per-petal values on FAN only, each behind a toggle, so a petal entry is live on a FAN alone.
+> The ALL, INNER and FAN per-petal rows below re-measure EXACT under the toggles (SO7 now builds
+> each through the toggle that makes its entries live). **The RADIAL labellum and hood rows are
+> UNREPRESENTABLE**: a RADIAL petal entry is inert even with per-petal ON (measured, bit-identical
+> to none), and a layer entry reaches its whole layer. That choice is the retirement session's
+> (Q3.4) — `docs/bloom-scoping-selection.md` §6.
+
 Every row below was built through its role controls and again through the equivalent scope entries
 with the role controls at identity; `applied` is EXACT and every petal's lamina BIT-IDENTICAL.
 
@@ -137,7 +147,9 @@ built.
 
 - **The stem omission probe is unscoped.** `stemOmission` builds the probe petals from the state
   without a scope term, so on a SPHERE with a stem a scoped petal's clearance is measured on its
-  unscoped twin. A wiring item; told here.
+  unscoped twin. A wiring item; told here. **Unreachable since Scoping-b:** the omission runs only
+  on a SPHERE, which is CONTINUOUS, and neither toggle can be live there, so no scope reaches a
+  sphere's petals.
 - **The sepal angle scan** keys congruence on the scope term (so two scoped neighbourhoods are not
   collapsed into one trial) but the scan's trial sepals read the scoped SITES' slots as built, which
   is right; sepal tiers themselves are not applied.

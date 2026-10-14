@@ -175,6 +175,13 @@ footRing()'s record, JS8 the witness. "What is missing" below is left as written
 > size list below is done: `scopes` (the file's `overrides` containers, offsets on the global, one
 > scope per mirror pair) resolved in `resolveRoleOverrides`, zero controls, zero rows, zero bytes;
 > §4 of that doc is the migration table for Q3.4. The panel chrome (session 2) is next.
+>
+> **Scoping-b SHIPPED the selection view (Oct 14)** — `docs/bloom-scoping-selection.md`. Session 2:
+> a Per-layer values toggle (RADIAL) and a Per-petal values toggle (FAN), a scope picker above the
+> controls, and the normal panel rebinding to the picked scope (offsets, the pair as one scope,
+> thickness global, pick loads / deselect writes nothing). A live toggle hides and stills the whole
+> role table; the roles are not retired. Finding for Q3.4: the RADIAL labellum and hood are not
+> representable as scopes under "per-petal is FAN only".
 
 ### 3.1 What per-petal editing exists today
 

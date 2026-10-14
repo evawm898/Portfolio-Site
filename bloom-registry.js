@@ -78,6 +78,7 @@ import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_F
 import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
+import { SCOPE_TOGGLE_VALUES } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -296,7 +297,25 @@ export const PREDICATES = {
        exactly the reachable value 0 and nothing else. */
     { id: 'layerCount', min: 2 },
     { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
+    /* NOT WHILE PER-LAYER VALUES OWN THE ROSETTE (Scoping-b) — the twin of
+       the geometry's `if (scopeLayersLive(state)) return false;`. */
+    { not: { ref: 'scopeLayersLive' } },
   ] },
+
+  /* ===================================================================
+     THE TWO SCOPE TOGGLES (Scoping-b, Eva's rulings: "Per-layer independence
+     is RADIAL only; per-petal is FAN only. Each is a toggle; off = today's
+     panel exactly.") — the registry's statement of bloom-geometry.js's
+     `scopeLayersLive` / `scopePetalsLive` / `scopesOwnRoles`, same names,
+     checked against them at harness load and per row (Z5). LIVE means ON
+     under the toggle's own placement: a stored ON under another placement is
+     hidden AND inert, the `layerPhase` treatment. While either is live the
+     whole role table (ALL, INNER, Petal 1 / Petal N, the per-petal groups)
+     is hidden AND inert — one owner on screen — and per-layer and the tube
+     are exclusive; see the geometry's SCOPE_TOGGLE_VALUES block. */
+  scopeLayersLive: { all: [{ id: 'placement', oneOf: ['RADIAL'] }, { id: 'scopeLayers', oneOf: ['ON'] }] },
+  scopePetalsLive: { all: [{ id: 'placement', oneOf: ['FAN'] }, { id: 'scopePetals', oneOf: ['ON'] }] },
+  scopesOwnRoles: { any: [{ ref: 'scopeLayersLive' }, { ref: 'scopePetalsLive' }] },
 
   /* ===================================================================
      WHERE THE ALL-PETALS GROUP APPLIES — one whorl, every placement (Eva's
@@ -307,8 +326,10 @@ export const PREDICATES = {
      for the inner whorl, and this predicate is the twin of
      bloom-geometry.js's `allPetalsEligible()`: the registry HIDES above one
      whorl, the geometry makes INERT there, and Z5 checks the two agree on
-     every row. `not min 2` is "below 2", i.e. exactly one. */
-  allPetalsEligible: { not: { id: 'layerCount', min: 2 } },
+     every row. `not min 2` is "below 2", i.e. exactly one. And not while a
+     scope toggle owns the petals (Scoping-b) — the twin of the geometry's
+     `&& !scopesOwnRoles(state)`. */
+  allPetalsEligible: { all: [{ not: { id: 'layerCount', min: 2 } }, { not: { ref: 'scopesOwnRoles' } }] },
 
   /* ===================================================================
      THE FULL-SPHERE HEAD (session 18, Eva Sep 5) — the twin of
@@ -341,8 +362,9 @@ export const PREDICATES = {
      — the registry HIDES the controls, the geometry makes them INERT. Two
      statements of one boundary is a registration risk, so both gates assert
      the two agree on every matrix row (Z5), exactly as they already do for
-     the slot-role twin. */
-  perPetalEligible: { id: 'placement', oneOf: ['FAN'] },
+     the slot-role twin. And not while per-petal values own the fan
+     (Scoping-b) — the twin of the geometry's `&& !scopePetalsLive(state)`. */
+  perPetalEligible: { all: [{ id: 'placement', oneOf: ['FAN'] }, { not: { ref: 'scopePetalsLive' } }] },
   /* LOBES ENGAGED (session 38, PR 2) — the registry's statement of the
      geometry's `lobesEngaged()`: the count, the coverage and the lobe tip
      shape are hidden AND inert at depth 0, the curl family's own rule (a
@@ -577,6 +599,9 @@ export const PREDICATES = {
      is half a slider step so it admits exactly the reachable rest value. */
   tubeEligible: { all: [
     { id: 'placement', oneOf: ['RADIAL'] },
+    /* per-layer values and the tube are exclusive (Scoping-b) — the twin of the
+       geometry's `if (scopeLayersLive(state)) return false;` */
+    { not: { ref: 'scopeLayersLive' } },
     { not: { ref: 'sphereMode' } },
     { not: { ref: 'variancePresent' } },
     { not: { ref: 'varianceFormPresent' } },
@@ -817,6 +842,10 @@ const SLOT_ROLES_BEHIND_OFFSET = {
     { id: 'placement', oneOf: ['RADIAL'] },
     { id: 'layerCount', min: 2 },
     { id: 'layerPhase', awayFrom: 0, by: 0.005 },
+    /* not while per-layer values hide them (Scoping-b): the advice "set Layer
+       offset to 0.00" would be false there — the toggle is what hides them,
+       and ROLES_OWNED_BY_SCOPES below says so instead. */
+    { not: { ref: 'scopeLayersLive' } },
   ] },
   text: (ui) => {
     const offset = CONTROLS.find((c) => c.id === 'layerPhase').label;
@@ -834,6 +863,7 @@ const TUBE_UNAVAILABLE = {
   text: (ui) => {
     const why = [];
     if (String(ui.placement) !== 'RADIAL') why.push(`the placement is ${ui.placement} (Tube is RADIAL only)`);
+    if (String(ui.placement) === 'RADIAL' && String(ui.scopeLayers) === 'ON') why.push('per-layer values are on, and a layer\'s own buckle, fringe or infill would build under a tube that never saw it');
     if (Math.abs(Number(ui.varianceSize)) >= 0.005 || Math.abs(Number(ui.varianceForm)) >= 0.005) why.push('a variance field gives every petal its own shape');
     if (Math.abs(Number(ui.varianceSpacing)) >= 0.005) why.push('spacing variance moves the petals off uniform azimuths');
     if (Math.abs(Number(ui.buckleAmp)) >= 0.005) why.push('the margin buckle differs petal to petal');
@@ -843,6 +873,17 @@ const TUBE_UNAVAILABLE = {
     if (!why.length) why.push('a petal role (Petal 1 / Petal N) gives one whorl several petal shapes');
     return `Tube needs one RADIAL whorl of identical petals — ${why.join('; ')}.`;
   },
+};
+/* WHY PETAL ROLES WENT AWAY (Scoping-b): under a live scope toggle every role
+   control is hidden AND inert ("where they and the new scopes would both reach
+   one petal, the new toggle hides the old controls (one owner on screen)"),
+   so the whole section hides itself by derivation and this says why, in the
+   Petal drop-down where the section was. The values are KEPT. */
+const ROLES_OWNED_BY_SCOPES = {
+  when: { ref: 'scopesOwnRoles' },
+  text: (ui) => (String(ui.placement) === 'FAN'
+    ? 'Petal roles are off while Per-petal values is on: each petal (a mirror pair) is edited on its own — pick it above the panel. Their values are kept and return when it is off.'
+    : 'Petal roles are off while Per-layer values is on: each layer is edited on its own — pick it above the panel. Their values are kept and return when it is off.'),
 };
 const TUBE_ALL_FREE = {
   when: { all: [{ ref: 'tubeEligible' }, { not: { ref: 'tubeAnyFused' } }] },
@@ -938,7 +979,7 @@ export const SECTIONS = [
      already nine controls, and session A recorded that the pair wanted a home
      of its own once slot roles arrived. Moving `inner*` here is presentation
      only — `section` is never persisted and no geometry reads it. */
-  { id: 'roles', label: 'Petal roles', open: false, parent: 'petal' },
+  { id: 'roles', label: 'Petal roles', open: false, parent: 'petal', hiddenReason: ROLES_OWNED_BY_SCOPES },
   /* ===================================================================
      THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
      from the deploy preview): "the names like petal 1 -2 -3 etc should apply
@@ -1524,6 +1565,42 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
    and need no reinterpretation. Three copies of this ternary would be three
    places for the two modes to drift apart in wording alone. */
 const perDepth = (ui) => (String(ui.placement) === 'CONTINUOUS' ? 'turn' : 'layer');
+
+/* WHAT FAN GROUP k IS RIGHT NOW, in the visitor's words — ONE owner, read by
+   the four read-outs of each per-petal group below AND by the page's scope
+   picker (Scoping-b), which names a FAN petal scope by the same number and
+   the same membership so the picker and the groups it replaces cannot end up
+   with two wordings. With a mirror-line petal group 1 is that single petal
+   and group k>1 is the pair k-1 steps out; without one, group k is the pair
+   k out. (Was a closure inside the per-petal block; moved, not reworded.) */
+export function fanGroupSaid(k, ui) {
+  const centre = String(ui.fanCenterPetal) === 'ON';
+  if (centre && k === 1) return 'the mirror-line petal';
+  const out = centre ? k - 1 : k;
+  return out === 1 ? 'the inner pair' : `the pair ${out} out from the line`;
+}
+
+/* THE SCOPE TOGGLES' READ-OUTS (Scoping-b) — what the builder was handed and
+   what it built from it, never what the panel thinks: `shown.scopes` is
+   buildBloomInto's own summary (the layers and pairs that carry an offset,
+   and whether the toggle that lets each container reach a petal was live). A
+   record kept while its toggle is OFF is said to be kept — the "a part off
+   keeps its settings" rule — because a visitor who switches the toggle back
+   on gets it back. */
+const scopeNames = (list, name) => list.map(name).join(', ');
+const scopeToggleFmt = (kind) => (v, ui, shown) => {
+  const sc = shown && shown.scopes;
+  const list = sc ? (kind === 'layers' ? sc.scopedLayers : sc.scopedPetals) : [];
+  const name = kind === 'layers'
+    ? (k) => `Layer ${k + 1}`
+    : (p) => `Petal ${p.slot + 1}${p.layer > 0 ? ` of layer ${p.layer + 1}` : ''}`;
+  const n = list.length;
+  const what = kind === 'layers' ? (n === 1 ? 'layer' : 'layers') : (n === 1 ? 'petal' : 'petals');
+  const pick = kind === 'layers' ? 'a layer' : 'a petal (its mirror pair comes with it)';
+  if (String(v) !== 'ON') return n ? `off — own values kept for ${scopeNames(list, name)}; they return when this is on` : `off — every ${kind === 'layers' ? 'layer' : 'petal'} takes the petal controls`;
+  return n ? `on — ${n} ${what} ${n === 1 ? 'carries its' : 'carry their'} own values (${scopeNames(list, name)}); pick ${pick} above the panel to edit it`
+    : `on — pick ${pick} above the panel; the petal controls then set its own values`;
+};
 
 /* THE TOP OF THE STAMEN SPREAD RANGE — one owner for the slider's `max` and
    for its read-out's "is the cap within reach" test (session 23). Not
@@ -3022,6 +3099,23 @@ export const CONTROLS = [
     tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
 
+  /* PER-PETAL VALUES (Scoping-b) — the FAN's toggle. ON, the page's scope bar
+     lists the fan's petals (a mirror pair is one petal there, Q3.7: selecting
+     one selects the pair) and the normal panel edits the picked one's OWN
+     values, stored as offsets on the whole-bloom value (Q3.2); the per-petal
+     groups and the ALL / INNER deltas are hidden AND inert while it is on.
+     OFF is today's panel exactly, and a stored record is kept and inert. A
+     CHOICE for the reason `fanCenterPetal` is one; the values are IMPORTED
+     from the geometry (`SCOPE_TOGGLE_VALUES`), the `pedicelCorymb` precedent. */
+  { id: 'scopePetals', section: 'arrangement', kind: 'choice', default: SCOPE_TOGGLE_VALUES[0],
+    options: [
+      { value: SCOPE_TOGGLE_VALUES[0], label: 'Off — every petal shares the petal controls' },
+      { value: SCOPE_TOGGLE_VALUES[1], label: 'On — pick a petal to give it its own values' },
+    ],
+    label: 'Per-petal values', fmt: scopeToggleFmt('petals'),
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
+
   /* ===================================================================
      LAYERS — multiple whorls, the shape the registry predicted for this
      (see ROOM TO GROW above): a layer-count control in THIS section with
@@ -3137,6 +3231,24 @@ export const CONTROLS = [
   { id: 'layerTilt', section: 'arrangement', kind: 'slider', min: 0, max: 30, step: 1, default: 12,
     label: 'Tilt step', fmt: (v, ui) => `+${v}° per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'layerCount', min: 2 } },
+
+  /* PER-LAYER VALUES (Scoping-b) — the RADIAL rosette's toggle, the twin of
+     `scopePetals` above: ON, the scope bar lists the layers and the panel edits
+     the picked layer's own values; the role table is hidden AND inert, and the
+     tube is unavailable (its terms read the global buckle, fringe and infill).
+     Visible at ONE layer too — the predicate must not drive on `layerCount`
+     (block 8 of buildMatrix iterates every control whose predicate reads it,
+     choices included, and would add rows), and one layer is a legal, if plain,
+     scope. Layer size and Layer tilt still apply on top of a layer's own
+     length, width and tilt: Q3.5 (they WIN under F4) is the next session's. */
+  { id: 'scopeLayers', section: 'arrangement', kind: 'choice', default: SCOPE_TOGGLE_VALUES[0],
+    options: [
+      { value: SCOPE_TOGGLE_VALUES[0], label: 'Off — every layer shares the petal controls' },
+      { value: SCOPE_TOGGLE_VALUES[1], label: 'On — pick a layer to give it its own values' },
+    ],
+    label: 'Per-layer values', fmt: scopeToggleFmt('layers'),
+    tier: 'standard', role: 'arrangement',
+    visibleWhen: { id: 'placement', oneOf: ['RADIAL'] } },
 
   /* ===================================================================
      ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (Eva's rulings, §9 of
@@ -3327,12 +3439,12 @@ export const CONTROLS = [
   { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
     tier: 'standard', role: 'petal',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }, { not: { ref: 'scopesOwnRoles' } }] } },
 
   { id: 'innerCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
     label: 'Inner cup', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
     tier: 'standard', role: 'petal',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }, { not: { ref: 'scopesOwnRoles' } }] } },
 
   /* ===================================================================
      SLOT ROLES — THE ORCHID (session B, Sep 2). Eight controls, all Standard,
@@ -3454,12 +3566,7 @@ export const CONTROLS = [
        static label cannot: with a mirror-line petal group 1 is that single
        petal and group k>1 is the pair k-1 steps out; without one, group k is
        the pair k out. */
-    const said = (ui) => {
-      const centre = String(ui.fanCenterPetal) === 'ON';
-      if (centre && k === 1) return 'the mirror-line petal';
-      const out = centre ? k - 1 : k;
-      return out === 1 ? 'the inner pair' : `the pair ${out} out from the line`;
-    };
+    const said = (ui) => fanGroupSaid(k, ui);
     const seen = {
       all: [
         { ref: 'perPetalEligible' },

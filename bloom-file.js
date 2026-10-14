@@ -236,10 +236,15 @@ function readControls(src, notes) {
                          offset on a delta is a scope on a scope;
      SCOPE_WHORL_LEVEL   sliders the registry files under the petal role that describe
                          the WHORL, not a petal — a count, and the tube's per-whorl
-                         ring values (already one row per layer).
+                         ring values (already one row per layer) — and `footDelicacy`,
+                         which Scoping-b MOVED here by measurement: its only readers
+                         are footRing()'s, which read the GLOBAL (the foot is the
+                         whorl's, Q3.3), so a layer offset on it moved 0 floats on a
+                         live scope (SO12) — a slider that would sit dead under a
+                         selection, and an entry a file could carry that draws nothing.
    A choice has no delta and is excluded by kind. The gate restates this
    derivation from the registry and the role table (SO0). */
-export const SCOPE_WHORL_LEVEL = Object.freeze(['petalCount', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend']);
+export const SCOPE_WHORL_LEVEL = Object.freeze(['petalCount', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend', 'footDelicacy']);
 const roleOverrideIds = new Set(ROLE_OVERRIDES.map((o) => o.control));
 export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !SCOPE_UNSCOPED.includes(c.id) && !roleOverrideIds.has(c.id) && !SCOPE_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
 /* A TIER is a SEPAL scope (Q1.1: each tier owns the full sepal control set),
@@ -248,6 +253,24 @@ export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'sl
 export const SCOPE_TIER_WHORL_LEVEL = Object.freeze(['sepalCount']);
 export const SCOPEABLE_TIER_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'sepal' && !SCOPE_UNSCOPED.includes(c.id) && !SCOPE_TIER_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
 const scopeable = new Set(SCOPEABLE_IDS);
+/* WHY A PETAL CONTROL IS NOT A SCOPE'S (Scoping-b) — the page prints this
+   beside every petal-role control that stays whole-bloom while a scope is
+   picked ("sheet thickness ... stays global and shows so while a scope is
+   selected"), in the reader's own words so the two cannot disagree. null for a
+   scopeable control and for every control that is not a petal's at all (an
+   arrangement or centre control is whole-bloom by what it is, and saying so on
+   every row would bury the four that need it). The role deltas are hidden
+   while a toggle is live, so they never need the sentence. */
+export function scopeExclusionReason(id) {
+  const c = controlOf.get(id);
+  if (!c || c.role !== 'petal' || scopeable.has(id)) return null;
+  if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
+  if (c.kind !== 'slider') return 'a choice has no per-petal value';
+  if (roleOverrideIds.has(id)) return 'a role delta — hidden while a scope toggle is on';
+  if (id === 'footDelicacy') return 'the foot is the whorl\'s (Q3.3)';
+  if (SCOPE_WHORL_LEVEL.includes(id)) return 'a whorl-level value has no per-petal meaning';
+  return 'not a petal scope';
+}
 const scopeableTier = new Set(SCOPEABLE_TIER_IDS);
 const isIndex = (v) => Number.isInteger(v) && v >= 0;
 

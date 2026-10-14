@@ -1544,6 +1544,66 @@ export const OVERRIDE_BOUNDS = (() => {
 export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);
 export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
 
+/* ===================================================================
+   THE TWO TOGGLES (Scoping-b, Eva's rulings — read docs/bloom-scoping-selection.md
+   before touching any of this). "Per-layer independence is RADIAL only;
+   per-petal is FAN only. Each is a toggle; off = today's panel exactly."
+
+   `scopeLayers` / `scopePetals` are registry CHOICES ('OFF' | 'ON', default
+   'OFF'); a choice and not a 0/1 slider because a slider would join the
+   blanket sweep and `ALL MAX`, and a stored value must be a design state the
+   file carries (they decide what builds, so they are SAVED — the selection is
+   not). The registry states the same three predicates under the same names
+   (`scopeLayersLive`, `scopePetalsLive`, `scopesOwnRoles`); neither file can
+   read the other's answer and both must act on it, so the harness checks the
+   two agree at module load and both STL gates per row (Z5) — the
+   `slotRolesEligible` remedy, a fourth time.
+
+   WHAT A TOGGLE DOES TO THE GEOMETRY, and nothing else:
+     1. A LIVE toggle is what lets the matching entries reach a petal at all:
+        layer entries need `scopeLayersLive`, petal entries `scopePetalsLive`
+        (scopeOffsetsFor, below). With the toggle OFF — or ON under the wrong
+        placement — the record is KEPT and INERT: the panel tells the visitor
+        it is kept and returns when the toggle is on (the "a part off keeps its
+        settings" rule), and nothing of it is built. So an offset only ever
+        shapes a petal while the panel can show it, which is what makes "off =
+        today's panel exactly" true of the GEOMETRY as well as the panel.
+     2. A live toggle makes the WHOLE ROLE TABLE INERT (ALL, INNER, the
+        labellum and hood, the per-petal groups) — "where they and the new
+        scopes would both reach one petal, the new toggle hides the old
+        controls (one owner on screen)". A layer scope reaches every petal of
+        its layer and a petal scope every petal of its pair, so every role row
+        overlaps one and the rule hides them all. Hidden AND inert, never
+        hidden-and-live: a hidden control still shaping the bloom is a panel
+        that lies. ALL, the slot roles and the per-petal groups go through
+        their eligibility functions (no stamp, no census, no split — the
+        collapse needs no second mechanism); INNER has no eligibility function
+        and its stamp is what Z1 counts, so it is gated where the rows are
+        composed (resolveRoleOverrides). The values are KEPT and return when
+        the toggle is off.
+     3. The tube is unavailable while per-layer is live (tubeEligible): the
+        tube refuses the buckle, the fringe and the infill on the GLOBAL
+        values, and a layer offset on any of them would build under a tube
+        that never saw it. A registry predicate cannot read the scopes, so the
+        two are exclusive rather than one of them reading what the other
+        cannot.
+
+   OFF IS THE IDENTITY BY BRANCH: every predicate below is false on every
+   state that has never set a toggle (`undefined !== 'ON'`), so no role row is
+   skipped, no tube term moves and no entry is even consulted — the shipped
+   path is the path it was, character for character, and the full-matrix byte
+   partition is the measurement of that rather than the argument. */
+export const SCOPE_TOGGLE_VALUES = Object.freeze(['OFF', 'ON']);
+export function scopeLayersLive(state) {
+  return state.placement === 'RADIAL' && state.scopeLayers === 'ON';
+}
+export function scopePetalsLive(state) {
+  return state.placement === 'FAN' && state.scopePetals === 'ON';
+}
+export function scopesOwnRoles(state) {
+  return scopeLayersLive(state) || scopePetalsLive(state);
+}
+
 /* THE CANONICAL SLOT OF A PETAL SCOPE — the pair's lower index where the
    placement has a mirror plane, the slot itself where it has not. */
 export function scopeSlotKey(slot, n, state) {
@@ -1560,6 +1620,11 @@ function addScopeOffsets(into, offsets, where) {
   }
   return into;
 }
+/* AN ENTRY THE TOGGLE KEEPS INERT IS STILL VALIDATED (Scoping-b): a record
+   carrying a thickness offset is refused whether or not a toggle would let it
+   reach a petal, so "the geometry throws on a scopes object carrying it" does
+   not start depending on a panel setting. Same two refusals, nothing summed. */
+function checkScopeOffsets(offsets, where) { addScopeOffsets({}, offsets, where); }
 
 /* THE ENTRIES THAT REACH SLOT `slot` OF LAYER `layer`, summed into one
    `{ base: delta }` term, with the bounds the resolver clamps against. Returns
@@ -1567,16 +1632,27 @@ function addScopeOffsets(into, offsets, where) {
    whole guard: with no scopes the slot carries `scopeTerm: null` and
    petalSurface takes the call it has always taken. `n` is the whorl's slot
    count (footRing's `slotCount`), the same n `petalRoleForSlot` is given. */
+/* THE TOGGLE GATE (Scoping-b) LIVES HERE, in the one owner of "which entries
+   reach this petal", rather than at the call site: the page computes a
+   selected scope's displayed value through THIS function, so the panel and
+   the builder cannot disagree about whether an entry is live. A layer entry
+   reaches a petal only while `scopeLayersLive(state)`, a petal entry only
+   while `scopePetalsLive(state)`; an entry the toggle keeps inert is still
+   validated (checkScopeOffsets) and contributes nothing. */
 export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
   if (!scopes) return null;
   const key = scopeSlotKey(slot, n, state);
+  const layersLive = scopeLayersLive(state);
+  const petalsLive = scopePetalsLive(state);
   const sum = {};
   let any = false;
   for (const e of scopes.layers || []) {
+    if (!layersLive) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); continue; }
     if (e.layer !== layer) continue;
     addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;
   }
   for (const e of scopes.petals || []) {
+    if (!petalsLive) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); continue; }
     if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;
     addScopeOffsets(sum, e.offsets || {}, `petals[${e.layer},${e.slot}]`); any = true;
   }
@@ -1802,9 +1878,13 @@ export function petalRoleForSlot(i, n, mirror) {
    A FAN AT ANY DEPTH, on the same consequence that admitted slot roles there:
    `layerPhase` is hidden under FAN and `phase` is exactly 0 on every
    descriptor by construction, so every whorl shares the one plane with no
-   value the visitor could leave wrong. */
+   value the visitor could leave wrong.
+
+   AND NOT WHILE PER-PETAL INDEPENDENCE OWNS THE FAN (Scoping-b): a live
+   `scopePetals` hands every petal to its pair's own scope, so the groups are
+   hidden AND inert — see SCOPE_TOGGLE_VALUES' block. */
 export function perPetalEligible(state) {
-  return state.placement === 'FAN';
+  return state.placement === 'FAN' && !scopePetalsLive(state);
 }
 
 /* WHETHER SLOT ROLES APPLY AT ALL — the gating, expressed HERE as well as in
@@ -1891,6 +1971,10 @@ export function slotRolesEligible(state) {
      are bit-identical to those counterparts on this tree — see the charter's
      session-11 entry.
      =================================================================== */
+  /* NOT WHILE PER-LAYER INDEPENDENCE OWNS THE ROSETTE (Scoping-b): a layer
+     scope reaches every petal of its layer, Petal 1 and Petal N among them,
+     so the slot roles are hidden AND inert — SCOPE_TOGGLE_VALUES' block. */
+  if (scopeLayersLive(state)) return false;
   if (state.placement !== 'RADIAL') return false;
   return Math.round(state.layerCount) >= 2 && state.layerPhase === 0;
 }
@@ -1902,9 +1986,13 @@ export function slotRolesEligible(state) {
    returns false, which makes the three `all*` controls INERT there exactly as
    the registry HIDES them — two statements of one boundary, checked against
    each other by Z5 on every row rather than trusted. `layerCount` is rounded
-   as everywhere else it is read. */
+   as everywhere else it is read.
+
+   AND NOT WHILE A SCOPE TOGGLE OWNS THE PETALS (Scoping-b): at one whorl the
+   group is every petal, which is exactly what a layer scope (RADIAL) or the
+   pair scopes together (FAN) reach — SCOPE_TOGGLE_VALUES' block. */
 export function allPetalsEligible(state) {
-  return Math.round(state.layerCount) === 1;
+  return Math.round(state.layerCount) === 1 && !scopesOwnRoles(state);
 }
 
 /* THE SLOT -> ROLE ASSIGNMENT, and it has exactly ONE owner. footRing() calls
@@ -1946,8 +2034,17 @@ export function roleForLayer(layerIndex, continuousMode) {
    and why it survived gaining a second law. */
 export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null, scaledOut = null, scopeTerm = null) {
   let out = null;
+  /* THE ROLE TABLE IS INERT WHILE A SCOPE TOGGLE OWNS THE PETALS (Scoping-b).
+     ALL, the slot roles and the per-petal groups never reach here then (their
+     eligibility functions stamp nothing); INNER is stamped on every layer
+     >= 1 whatever the toggle — Z1 counts that stamp — so this is where it goes
+     inert, on every route a role reaches a petal by (the ring's own record,
+     the per-slot recomposition, the collapse guard's probe). False on every
+     state that never set a toggle, so no row is skipped on the shipped path. */
+  const roleTableInert = scopesOwnRoles(state);
   for (const o of ROLE_OVERRIDES) {
     if (!roles.includes(o.role)) continue;
+    if (roleTableInert) continue;
     const v = state[o.control];
     /* A ROW AT ITS LAW'S IDENTITY IS SKIPPED, which is the whole guard.
        THE OLD COMMENT HERE SAID "identity and NaN alike take the shipped
@@ -3201,6 +3298,11 @@ export function footRing(state, acc) {
        registration risk; checking them is what makes it one owner. */
     perPetalEligible: !continuousMode && perPetalEligible(state),
     allPetalsEligible: allRole !== null,
+    /* WHICH SCOPE TOGGLE IS LIVE (Scoping-b) — the geometry's own answer, which
+       Z5 cross-checks against the registry's predicates of the same names and
+       the page's scope bar reads to decide whether it shows at all. */
+    scopeLayersLive: scopeLayersLive(state),
+    scopePetalsLive: scopePetalsLive(state),
     /* WHETHER A WHORL ACTUALLY SPLIT. One flag for both axes, because the
        question it answers — "is the area rule summing the whole whorl or a
        partition of it" — is the same question whichever axis did it, and it
@@ -20603,6 +20705,11 @@ export function tubeSnap(asked, n) {
    own and does not inherit); never a full sphere. */
 export function tubeEligible(state) {
   if (state.placement !== 'RADIAL') return false;
+  /* PER-LAYER INDEPENDENCE AND THE TUBE ARE EXCLUSIVE (Scoping-b): the terms
+     below read the GLOBAL buckle, fringe and infill, and a layer offset on any
+     of them would build under a tube that never saw it — see
+     SCOPE_TOGGLE_VALUES' block. */
+  if (scopeLayersLive(state)) return false;
   if (sphereMode(state)) return false;
   if (Math.abs(Number(state.varianceSize) || 0) >= 0.005) return false;
   if (Math.abs(Number(state.varianceForm) || 0) >= 0.005) return false;
@@ -21546,7 +21653,24 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   const neighbour = neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
   /* THE SCOPES THIS BUILD WAS HANDED (Scoping-a), summarised for the read-out
      and the gate — null on every build with none, which is every shipped one. */
-  const scopesBuilt = scopes ? { layers: (scopes.layers || []).length, petals: (scopes.petals || []).length, tiers: (scopes.tiers || []).length, petalsScoped: petalsAll.filter((p) => p && p.scopeTerm).length } : null;
+  /* `layersLive` / `petalsLive` (Scoping-b): whether the toggle that lets each
+     container reach a petal was live on this build — a record handed in with
+     its toggle OFF is counted here (it is kept) and reaches nothing. */
+  /* `scopedLayers` / `scopedPetals` (Scoping-b): WHICH layers and which pairs
+     carry at least one offset, by the pairing law's own key — the toggles'
+     read-outs name them ("kept", or "carry their own values"). Counted from the
+     record handed in whatever the toggle, because a kept record is still the
+     visitor's. */
+  const offsetCount = (e) => Object.keys(e.offsets || {}).length;
+  const scopedPetalKeys = new Map();
+  for (const e of (scopes && scopes.petals) || []) {
+    if (!offsetCount(e)) continue;
+    const k = scopeSlotKey(e.slot, fr.slotCount, state);
+    scopedPetalKeys.set(`${e.layer}:${k}`, { layer: e.layer, slot: k });
+  }
+  const scopesBuilt = scopes ? { layers: (scopes.layers || []).length, petals: (scopes.petals || []).length, tiers: (scopes.tiers || []).length, petalsScoped: petalsAll.filter((p) => p && p.scopeTerm).length, layersLive: scopeLayersLive(state), petalsLive: scopePetalsLive(state),
+    scopedLayers: [...new Set((scopes.layers || []).filter(offsetCount).map((e) => e.layer))].sort((a, b) => a - b),
+    scopedPetals: [...scopedPetalKeys.values()].sort((a, b) => a.layer - b.layer || a.slot - b.slot) } : null;
   return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is

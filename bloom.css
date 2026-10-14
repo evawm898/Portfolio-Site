@@ -177,6 +177,32 @@ body {
 .bl-ctrl select:hover, .bl-ctrl select:focus { border-color: var(--bl-accent); outline: none; }
 .bl-ctrl select option { background: #121614; color: var(--bl-ink); }
 
+/* THE SCOPE VIEW (Scoping-b). The bar sits above the panel's sections while a
+   toggle is live; a picked scope MARKS the controls that edit it (a rule down
+   the left in the accent) and TELLS, under any control carrying an offset, the
+   whole-bloom value and the offset; a petal control that stays whole-bloom
+   says so in the dim ink. The mark is a box-shadow, not ::after — `::after`
+   on .bl-ctrl is the cap hatch's. */
+.bl-scope {
+  margin: 0 0 10px; padding: 8px 9px 7px;
+  border: 1px solid color-mix(in srgb, var(--bl-accent) 45%, transparent); border-radius: 8px;
+  background: color-mix(in srgb, var(--bl-accent) 6%, transparent);
+}
+.bl-scope[hidden] { display: none; }
+.bl-scope-label { display: block; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--bl-accent); margin-bottom: 5px; }
+.bl-scope select {
+  width: 100%; font: inherit; font-size: 11px; letter-spacing: .04em;
+  color: var(--bl-ink); background: rgba(255, 255, 255, .04);
+  border: 1px solid var(--bl-line); border-radius: 7px; padding: 5px 7px; cursor: pointer; appearance: none;
+}
+.bl-scope select:hover, .bl-scope select:focus { border-color: var(--bl-accent); outline: none; }
+.bl-scope select option { background: #121614; color: var(--bl-ink); }
+.bl-scope-status { margin: 6px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--bl-dim); }
+.bl-ctrl--scoped { box-shadow: -7px 0 0 -5px var(--bl-accent); }
+.bl-scope-note { margin: 3px 0 0; font-size: 10px; line-height: 1.4; color: var(--bl-accent); letter-spacing: .02em; }
+.bl-scope-note[hidden] { display: none; }
+.bl-ctrl--global .bl-scope-note { color: var(--bl-dim); }
+
 .bl-actions { display: flex; gap: 8px; margin: 14px 0 10px; }
 .bl-btn {
   flex: 1; font: inherit; font-size: 11px; letter-spacing: .06em;
