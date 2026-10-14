@@ -80,7 +80,7 @@
           one — a scopeable id that moves nothing is a control the panel would
           rebind to no effect.
 
-   --negative-control serves ELEVEN broken copies of bloom-geometry.js (with a
+   --negative-control serves THIRTEEN broken copies of bloom-geometry.js (with a
    bloom-file.js copy importing each), every anchor checked before any runs,
    and requires each to redden exactly the clauses it names AND to move its own
    witness — a direct call on the MUTATED module proving the behaviour changed,
@@ -202,32 +202,41 @@ async function nodeClauses(G, F, rec) {
     }
     rec('SO1', p, `${n} row-modes over ${rows.length} rows: ${floats.toLocaleString()} floats identical under Object.is with empty scopes, every scopeTerm null`);
   }
-  /* SO2 — a layer offset moves only its layer (per-layer values live: RADIAL + scopeLayers ON) */
+  /* SO2 — a layer offset moves only its layer (per-layer values live: RADIAL + scopeLayers ON).
+     WHICH PETALS ARE ON THE LAYER is read off each petal's OWN WHORL (`whorl`,
+     its ring's lambda — an owner the scope path does not write), never off the
+     term the builder attached: the first version called "the petals carrying a
+     term" layer 1 and checked the term's key, so a builder handing the call the
+     wrong layer number passed it — the expected and the measured side were one
+     owner (the fourth durable rule; the review's finding). And the layer is the
+     INNERMOST of three, not the middle one, which is the fixed point of a layer
+     order reversed. */
   {
     const p = [];
+    const LAYER = 2;
     const st = S({ layerCount: 3, scopeLayers: 'ON' });
     const base = build(G, F, st, undefined);
-    const sc = build(G, F, st, withBounds(F, { layers: [{ layer: 1, offsets: { petalCup: 0.4 } }] }));
+    const sc = build(G, F, st, withBounds(F, { layers: [{ layer: LAYER, offsets: { petalCup: 0.4 } }] }));
     if (base.petals.length !== sc.petals.length) p.push(`petal counts differ ${base.petals.length} / ${sc.petals.length}`);
     let moved = 0, held = 0;
     sc.petals.forEach((q, i) => {
       const o = base.petals[i];
-      const L = sc.built.foot.rings[0] && q.scopeTerm ? q.scopeTerm.key.layer : null;
-      const onLayer1 = q.scopeTerm !== null;
+      const whorl = Math.round(o.whorl);
       const same = sameNumbers(numbersOf(o.lamina), numbersOf(q.lamina));
-      if (onLayer1) {
-        if (L !== 1) p.push(`petal ${i} carries a term keyed on layer ${L}`);
-        if (q.applied.petalCup !== st.petalCup + 0.4) p.push(`layer-1 petal ${i}: applied cup ${q.applied.petalCup}, expected ${st.petalCup + 0.4}`);
-        if (same) p.push(`layer-1 petal ${i}: the lamina did not move`);
+      if (whorl === LAYER) {
+        if (!q.scopeTerm || q.scopeTerm.key.layer !== LAYER) p.push(`whorl-${LAYER} petal ${i} carries ${q.scopeTerm ? `a term keyed on layer ${q.scopeTerm.key.layer}` : 'no term'}`);
+        if (q.applied.petalCup !== st.petalCup + 0.4) p.push(`whorl-${LAYER} petal ${i}: applied cup ${q.applied.petalCup}, expected ${st.petalCup + 0.4}`);
+        if (same) p.push(`whorl-${LAYER} petal ${i}: the lamina did not move`);
         moved++;
       } else {
-        if (!same) p.push(`a petal off layer 1 (${i}) MOVED`);
-        if (q.applied.petalCup !== o.applied.petalCup) p.push(`a petal off layer 1 (${i}) changed its applied cup`);
+        if (q.scopeTerm) p.push(`a whorl-${whorl} petal (${i}) carries a term`);
+        if (!same) p.push(`a whorl-${whorl} petal (${i}) MOVED`);
+        if (q.applied.petalCup !== o.applied.petalCup) p.push(`a whorl-${whorl} petal (${i}) changed its applied cup`);
         held++;
       }
     });
     if (moved !== 8 || held !== 16) p.push(`expected 8 moved / 16 held, read ${moved} / ${held}`);
-    rec('SO2', p, `RADIAL 3 layers x 8, per-layer values ON: a layer-1 cup offset of +0.4 moves 8 petals by exactly 0.4 and holds the other 16 bit-identical`);
+    rec('SO2', p, `RADIAL 3 layers x 8, per-layer values ON: a cup offset of +0.4 on Layer ${LAYER + 1} (the innermost) moves exactly its whorl's 8 petals by 0.4 — read off each petal's own whorl — and holds the other 16 bit-identical`);
   }
   /* SO3 — a petal offset moves only that petal and its mirror partner (per-petal values live: FAN + scopePetals ON) */
   {
@@ -256,13 +265,41 @@ async function nodeClauses(G, F, rec) {
           if (q.applied.petalCup !== st.petalCup + 0.4) p.push(`${c.label}: slot ${q.slot.index} applied ${q.applied.petalCup}`);
         } else if (!same) p.push(`${c.label}: slot ${q.slot.index} moved and is not slot ${c.slot} or its partner ${expect}`);
       });
-      /* an entry naming the PARTNER builds the identical bloom */
+      /* AN ENTRY NAMING THE PARTNER — a MEMBER index, not the pair's canonical
+         one — is KEPT and INERT, bit-identical to no entry (Scoping-b, the
+         review's fold): a member index names a different pair the moment the
+         count changes, so re-keying it at today's count is what let an outer
+         pair's values land on an inner one. Was "naming the partner builds the
+         identical bloom" in Scoping-a, which is precisely the fold. */
       if (expect !== c.slot) {
         const sc2 = build(G, F, st, withBounds(F, { petals: [{ layer: 0, slot: expect, offsets: { petalCup: 0.4 } }] }));
-        if (!sameNumbers([...sc.acc.positions], [...sc2.acc.positions])) p.push(`${c.label}: naming slot ${expect} builds a different bloom from naming slot ${c.slot}`);
+        if (!sameNumbers([...base.acc.positions], [...sc2.acc.positions])) p.push(`${c.label}: an entry naming the member slot ${expect} (not the pair's canonical ${c.slot}) moved the bloom — it should be kept and inert`);
+        if (sc2.petals.some((q) => q.scopeTerm)) p.push(`${c.label}: an entry naming the member slot ${expect} gave a petal a term`);
       }
-      summary.push(`${c.label}: slot ${c.slot}${expect !== c.slot ? ` + partner ${expect}` : ' alone'} (${movedSlots.length} of ${n} moved)`);
+      summary.push(`${c.label}: slot ${c.slot}${expect !== c.slot ? ` + partner ${expect}; naming member ${expect} is inert` : ' alone'} (${movedSlots.length} of ${n} moved)`);
     }
+    /* THE COUNT CHANGES UNDER A STORED PAIR (the review's fold, both mirrors):
+       an entry for the pair four out at four petals a side is KEPT and INERT at
+       two a side — bit-identical to no entry, no term on any petal, told as
+       kept by the build's summary — and returns on its own pair at four. */
+    for (const centre of ['ON', 'OFF']) {
+      const outer = 3 + (centre === 'ON' ? 1 : 0);   // the canonical slot of the outermost pair at 4 a side
+      const rec4 = withBounds(F, { petals: [{ layer: 0, slot: outer, offsets: { petalCup: 0.6 } }] });
+      const st2 = S({ placement: 'FAN', fanCenterPetal: centre, fanPerSide: 2, scopePetals: 'ON' });
+      const plain2 = build(G, F, st2, undefined, { lamina: false });
+      const kept2 = build(G, F, st2, rec4, { lamina: false });
+      if (!sameNumbers([...plain2.acc.positions], [...kept2.acc.positions])) p.push(`centre ${centre}: the pair-${outer} entry moved the bloom at 2 a side, where that pair is not built (it folded onto another pair)`);
+      if (kept2.petals.some((q) => q.scopeTerm)) p.push(`centre ${centre}: at 2 a side a petal carries the pair-${outer} entry's term`);
+      const sum2 = kept2.built.scopes;
+      if (!sum2 || sum2.scopedPetals.length !== 0 || JSON.stringify(sum2.keptPetals) !== JSON.stringify([{ layer: 0, slot: outer }])) p.push(`centre ${centre}: at 2 a side the summary reads scoped ${JSON.stringify(sum2 && sum2.scopedPetals)} / kept ${JSON.stringify(sum2 && sum2.keptPetals)}`);
+      const st4 = S({ placement: 'FAN', fanCenterPetal: centre, fanPerSide: 4, scopePetals: 'ON' });
+      const back4 = build(G, F, st4, rec4, { lamina: false });
+      const n4 = back4.built.foot.slotCount;
+      const want4 = new Set([outer, centre === 'ON' ? (n4 - outer) % n4 : n4 - 1 - outer]);
+      const got4 = new Set(back4.petals.filter((q) => q.scopeTerm).map((q) => q.slot.index));
+      if (got4.size !== 2 || [...want4].some((x) => !got4.has(x))) p.push(`centre ${centre}: back at 4 a side the term is on slots ${[...got4].join(',')}, not the outer pair ${[...want4].join(',')}`);
+    }
+    summary.push('a stored outer pair is kept and inert at 2 a side and returns at 4, both mirrors');
     rec('SO3', p, summary.join('; '));
   }
   /* SO4 — the clamp, after composition; under a live toggle a role delta does not stack */
@@ -304,7 +341,7 @@ async function nodeClauses(G, F, rec) {
     const r = F.readDoc(JSON.parse(JSON.stringify(doc)));
     if (!r.ok) p.push(`the reader refused the whole file: ${r.error}`);
     else {
-      if (!r.notes.some((n) => n.kind === 'invalid' && /sheetThickness is never scoped/.test(n.text))) p.push(`the reader did not refuse the thickness offset: ${r.notes.map((n) => n.text).join(' | ') || '(no notes)'}`);
+      if (!r.notes.some((n) => n.kind === 'invalid' && /sheetThickness: never scoped/.test(n.text))) p.push(`the reader did not refuse the thickness offset: ${r.notes.map((n) => n.text).join(' | ') || '(no notes)'}`);
       const e = r.doc.overrides.layers[0];
       if (!e || 'sheetThickness' in e.offsets) p.push('the thickness offset survived the read');
       if (!e || e.offsets.petalCup !== 0.1) p.push('the rest of the entry did not survive the refusal of one key');
@@ -312,6 +349,17 @@ async function nodeClauses(G, F, rec) {
     let threw = false;
     try { build(G, F, REG.DEFAULTS, { layers: [{ layer: 0, offsets: { sheetThickness: 0.5 } }], petals: [], tiers: [] }, { lamina: false }); } catch (e) { threw = /never scoped/.test(e.message); }
     if (!threw) p.push('the geometry built a bloom from a scopes object carrying sheetThickness');
+    /* AND WHATEVER THE TOGGLE AND WHICHEVER LAYERS ARE BUILT: an entry for a
+       layer this bloom does not build is validated too, toggle ON as OFF (the
+       first cut skipped it while the toggle was live — the review's finding) */
+    for (const tog of ['OFF', 'ON']) {
+      let t2 = false;
+      try { build(G, F, S({ layerCount: 2, scopeLayers: tog }), { layers: [{ layer: 3, offsets: { sheetThickness: 0.5 } }], petals: [], tiers: [] }, { lamina: false }); } catch (e) { t2 = /never scoped/.test(e.message); }
+      if (!t2) p.push(`per-layer ${tog}: a thickness offset on a layer the bloom does not build did not throw`);
+      let t3 = false;
+      try { build(G, F, S({ placement: 'FAN', scopePetals: tog }), { layers: [], petals: [{ layer: 0, slot: 9, offsets: { sheetThickness: 0.5 } }], tiers: [] }, { lamina: false }); } catch (e) { t3 = /never scoped/.test(e.message); }
+      if (!t3) p.push(`per-petal ${tog}: a thickness offset on a pair the bloom does not build did not throw`);
+    }
     /* every scopeable control offset at once leaves every ring's thickness alone */
     const offsets = Object.fromEntries(F.SCOPEABLE_IDS.map((id) => { const c = kindOf.get(id); return [id, c.step || 0.01]; }));
     const st = S({ layerCount: 2, scopeLayers: 'ON' });
@@ -319,7 +367,7 @@ async function nodeClauses(G, F, rec) {
     const sc = build(G, F, st, withBounds(F, { layers: [{ layer: 0, offsets }, { layer: 1, offsets }] }), { lamina: false });
     base.built.foot.rings.forEach((rg, i) => { if (!Object.is(rg.thickness, sc.built.foot.rings[i].thickness)) p.push(`ring ${i} thickness moved ${rg.thickness} -> ${sc.built.foot.rings[i].thickness}`); });
     if (!sc.petals.every((q) => q.scopeTerm && !('sheetThickness' in q.scopeTerm.offsets))) p.push('a petal term carries sheetThickness');
-    rec('SO5', p, `the reader refuses a thickness offset by name and keeps the entry; the geometry throws on one; offsetting all ${F.SCOPEABLE_IDS.length} scopeable controls leaves every ring's thickness what it was`);
+    rec('SO5', p, `the reader refuses a thickness offset by name and keeps the entry; the geometry throws on one — on an entry it builds and on one it does not, toggles ON and OFF; offsetting all ${F.SCOPEABLE_IDS.length} scopeable controls leaves every ring's thickness what it was`);
   }
   /* SO6 — Q3.5 as it stands today */
   {
@@ -588,18 +636,22 @@ async function nodeClauses(G, F, rec) {
          lattice and the lamina does not carry it — the first version read the
          lamina alone and called all six infill controls dead) */
       const print = (q) => numbersOf({ lamina: q.lamina, tris: q.tris, holes: q.infill ? q.infill.emittedLoops : null });
+      /* WHICH PETALS ARE ON LAYER 1 is each petal's OWN WHORL, not whether it
+         carries a term: a defect that sends the offset to another whorl gives
+         that whorl's petals a term too, which took them out of the checked set
+         (the fifth durable rule — the review's finding). */
       let moved = 0, termed = 0;
       b.petals.forEach((q, i) => {
         const s = sameNumbers(print(a.petals[i]), print(q));
-        if (q.scopeTerm) { termed++; if (!s) moved++; } else if (!s) leaked.push(`${id} (slot ${q.slot.index})`);
+        if (Math.round(a.petals[i].whorl) === 1) { termed++; if (!s) moved++; } else if (!s || q.scopeTerm) leaked.push(`${id} (whorl ${Math.round(a.petals[i].whorl)}, slot ${q.slot.index})`);
       });
-      if (!termed) p.push(`${id}: no petal carries the layer-1 term`);
+      if (!termed) p.push(`${id}: no petal is on whorl 1`);
       else if (!moved) dead.push(id);
       else if (moved !== termed) p.push(`${id}: ${moved} of ${termed} layer-1 petals moved — a layer offset reaches every petal of its layer alike`);
     }
     if (dead.length) p.push(`a layer-1 offset moved NO layer-1 petal for ${dead.length} scopeable id(s): ${dead.join(', ')}`);
     if (leaked.length) p.push(`a layer-1 offset moved a layer-0 petal: ${leaked.slice(0, 6).join(', ')}${leaked.length > 6 ? ` (+${leaked.length - 6})` : ''}`);
-    rec('SO12', p, `all ${F.SCOPEABLE_IDS.length} scopeable controls move a layer-1 petal through a layer-1 offset with their guard live, and none moves a layer-0 petal`);
+    rec('SO12', p, `all ${F.SCOPEABLE_IDS.length} scopeable controls move every whorl-1 petal through a layer-1 offset with their guard live, and none moves (or gives a term to) a petal on another whorl — read off each petal's own whorl`);
   }
 }
 
@@ -681,9 +733,21 @@ const MUTANTS = [
      petal entry reaches every petal of its layer. The witness is a FAN under
      per-petal values (the only place a petal entry is live now). */
   { id: 'a-petal-offset-leaks-to-every-petal', breaks: ['SO3', 'SO4', 'SO7'],
-    from: '    if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;',
-    to: '    if (e.layer !== layer) continue;',
+    from: '      if (e.layer !== layer || e.slot !== key) continue;',
+    to: '      if (e.layer !== layer) continue;',
     witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 1, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 3, n: 7, state: FAN_PETALS_ON() }) !== null },
+  /* The review's fold, restored: a petal entry re-keyed through the pairing law
+     at today's count, so a member index — or a canonical one the fan no longer
+     builds — lands on whichever pair that number names now. */
+  { id: 'a-member-index-is-re-keyed', breaks: ['SO3'],
+    from: '      if (e.layer !== layer || e.slot !== key) continue;',
+    to: '      if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;',
+    witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 4, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 1, n: 5, state: { ...FAN_PETALS_ON(), fanPerSide: 2 } }) !== null },
+  /* Validation back on the kept entries only — the first cut's shape. */
+  { id: 'unreached-entries-are-not-validated', breaks: ['SO5'],
+    from: '  for (const e of scopes.layers || []) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);\n  for (const e of scopes.petals || []) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);',
+    to: '  for (const e of scopes.layers || []) if (!layersLive) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);\n  for (const e of scopes.petals || []) if (!petalsLive) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);',
+    witness: (G) => { try { G.scopeOffsetsFor({ layers: [{ layer: 3, offsets: { sheetThickness: 0.5 } }] }, { layer: 0, slot: 0, n: 8, state: { ...REG.DEFAULTS, scopeLayers: 'ON' } }); return true; } catch (e) { return false; } } },
   { id: 'a-mirror-pair-is-split', breaks: ['SO3', 'SO4', 'SO7'],
     from: '  if (!SCOPE_PAIRED_PLACEMENTS.includes(state.placement)) return slot;\n  return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));',
     to: '  return slot;',

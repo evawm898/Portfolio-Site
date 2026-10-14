@@ -25,12 +25,15 @@ own owners. The rulings, not re-litigated:
   `scopeOffsetsFor`; the role-table skip in `resolveRoleOverrides`; the four eligibility functions;
   `tubeEligible`; the builder's scopes summary.
 - `bloom-registry.js`: the two controls, three predicates and the roles caption.
-- `bloom-file.js`: `footDelicacy` and `scopeExclusionReason`.
+- `bloom-file.js`: `footDelicacy`, `scopeExclusionReason` and `scopeOffsetRefusal` (the one owner of
+  why a control carries no offset, read by the reader and the page alike).
 - `bloom.js`: the SCOPE VIEW block.
 - `bloom.html` / `bloom.css`: the scope bar.
 - Gates:
-  - `tools/verify-bloom-scopes.mjs`: SO2–SO7 re-derived, SO10–SO12 new, six new mutants.
-  - `tools/verify-bloom-panel.mjs`: route (ae) and four mutants; route (f) gains seven toggle rows.
+  - `tools/verify-bloom-scopes.mjs`: SO2–SO7 re-derived, SO10–SO12 new, eight new mutants
+    (thirteen in all).
+  - `tools/verify-bloom-panel.mjs`: route (ae) and eleven mutants; route (f) gains seven toggle
+    rows.
   - `tools/bloom-harness.mjs`: the two-statement checks.
   - `tools/verify-bloom-scope-panel-identity.mjs`: new.
   - `tools/verify-bloom-surface-bytes.mjs`: an all-hold merge.
@@ -51,13 +54,18 @@ own owners. The rulings, not re-litigated:
     "Petal k — <who it is>" in the per-petal groups' own words). Scopes with their own values are
     marked.
   - Below the list is a status line saying what is being edited. It also says what still applies
-    on top: the `layerSize` / `layerTilt` ramps, and the form field.
+    on top: the Shrink / Tilt step ramps (named by the registry's own labels) on any layer past the
+    outer one, for a layer or a pair alike, and the form field.
 - **Picking a scope** binds the panel to it. The scopeable controls then show the scope's
   EFFECTIVE values, and each carries a note: `Layer 2: whole bloom 0.00 + 0.60 offset = 0.60`.
   - The note says `(clamped from …)` where the clamp bit.
   - Every other petal control is marked "whole bloom" with the reason a scope cannot reach it.
     For sheet thickness that reason is "never scoped — it is the material (Q3.6)". The reasons are
-    `scopeExclusionReason`, the file reader's own words.
+    `scopeOffsetRefusal`'s, the same function the file reader words its refusals with (until the
+    review they were two tables that already disagreed on four reasons).
+  - Every OTHER control keeps the whole bloom's read-out: Foot delicacy and Sepal size are built from
+    the global petal width and length, so they quote it under a pick (they once quoted the picked
+    layer's).
 - **Petal roles hides while a toggle is live.** Its caption says why, and says that the role values
   are kept and come back when the toggle is off.
 
@@ -161,6 +169,18 @@ because `undefined !== 'ON'`. Measured: §5.
 
 - **The matrix is unchanged.** `buildMatrix()` is 1,307 rows on both trees with the same sha256, so
   NO frozen phase is owed. The toggles are choices, so the blanket sweep does not add rows.
+- **AND AFTER MERGING `main` (the sepal own-size session, #406, `037a4a8`)** the matrix is 1,316 on
+  both trees (#406's block 61 appended nine rows) and this PR still adds none. #406 added two sepal
+  sliders, so SO0 now reads **22** tier-scopeable sepal sliders (it derives the list; nothing is
+  typed). What was re-measured on the merged tree, against a worktree of `037a4a8`:
+  - **Bytes, toggles OFF, on the region the two changes share:** every row whose label names a sepal
+    (block 35, block 61 and the sepal range and load rows) plus `DEFAULTS`, `ALL MAX` and `ALL MIN` —
+    **92 rows in both modes, 0 floats moved** over 139,855,716 export floats and 1,338,324
+    captured-grid values. This is a SUBSET, chosen as the rows #406 changes; the whole-matrix claim
+    above is against `3e46d0b`.
+  - **The panel identity tool:** PASS on all 13 states against `037a4a8`.
+  - The scopes gate (12 clauses), the design-file gate (14) and `bloom-smoke --check` (225 rows over
+    57 blocks, 180 families) all pass, and so does the panel gate (below).
 - **Byte identity with the toggles OFF.** `node tools/verify-bloom-surface-bytes.mjs --base
   <worktree of 3e46d0b>` was run in 36 `--range` chunks and closed with `--merge`. It reads **PASS:
   0 floats moved on all 1,307 rows in both modes**, positionally under `Object.is`.
@@ -207,19 +227,97 @@ because `undefined !== 'ON'`. Measured: §5.
   - The roles are NOT retired here. They hide while per-layer is on and work as before while it is
     off.
 - **Q3.5 is still expressed, not wired.** A layer's length, width and tilt offsets add on top of the
-  `layerSize` / `layerTilt` ramps (SO6 measures it). The status line says so whenever a layer is
-  picked at two or more layers.
+  `layerSize` / `layerTilt` ramps (SO6 measures it). The status line says so whenever the picked
+  scope is on a layer past the outer one (the ramps leave the outer whorl alone).
 - **Florets inherit the toggles but not the scopes.** Under a raceme, a floret built from the head's
   state with a toggle ON has its role table inert too, and takes no layer offsets. The head's
   scopes are the head's. Told here; the inflorescence owns the floret's state.
 - **Scoping-a's stem-omission gap is unreachable now.** The omission probe builds unscoped petals,
   but it only runs on a SPHERE, which is CONTINUOUS. Neither toggle can be live there.
-- **The infill's density-cap sweep is still representative-only.** A picked scope's Infill read-out
-  quotes that scope's own petal record (achieved count, solid fraction). The cap tick is the
-  representative petal's.
+- **The infill's density-cap sweep runs on a ring's representative petal (slot 0) only.** A picked
+  scope's Infill read-out quotes that scope's own petal record (achieved count, solid fraction),
+  and it keeps doing so through a drag (it once jumped to layer 1's numbers while a slider was held).
+  The cap tick and its dead-travel clause follow that record. Under a per-layer pick, each layer's
+  slot-0 petal is a representative, so the tick is that layer's own. Under a per-petal pick, only
+  the pair holding slot 0 has a tick; every other pair shows none. That is the sweep's scope, told
+  here rather than faked with another petal's number. (The first version of this paragraph said "the
+  cap tick is the representative petal's", which was false both ways.)
 - **Click-to-pick on the canvas is not built.** That is the brief's later session.
 
-## 7. Where the gates ride, and why no workflow was edited
+## 7. The adversarial review, and what it changed
+
+Before the merge, six reviewers read the diff, one dimension each: the scope view, the
+geometry and registry, the gate clauses, the file format, panel visibility, and the docs' claims.
+Three independent verifiers then tried to refute each finding, with a reproduction wherever one was
+possible. There were 25 findings, three rated major. Every one is fixed or corrected here, and each
+behaviour fix has a check that fails without it.
+
+- **MAJOR — a stored pair folded onto another pair when the fan's count changed.** A petal entry was
+  re-keyed through the pairing law at the CURRENT count. So "the pair four out" (slot 4 at nine
+  petals) became the partner of slot 1 at five, and the inner pair built the outer pair's values.
+  An edit to that inner pair then wrote a compensating offset that landed on it for good. A pick
+  that survived the count change also kept stale thumbs, which is the scope-view half of the same
+  defect.
+  - **The rule now:** a petal entry names its pair by the CANONICAL slot, which is the pair's
+    distance from the mirror plane and the same pair at every count. It is matched on that number
+    EXACTLY: `scopeEntryNamesPair` in the geometry, read by the builder, the summary and the page.
+  - **A DECISION MADE WITHOUT A RULING.** An entry naming a MEMBER index (the higher of a pair) is
+    now kept and inert, where Scoping-a's SO3 said "naming the partner builds the identical bloom".
+    That property IS the fold: index 4 is legitimately a member of the inner pair at five petals. So
+    no rule can both accept member indices and survive a count change. The page only ever writes
+    canonical slots.
+  - Undo: one comparison in `scopeOffsetsFor` and one in `commitScopeOffset`.
+  - Witnesses: SO3 (member inert; a stored outer pair inert at two a side and back at four, both
+    mirrors), route (ae)'s count-change walk, and the mutant `a-member-index-is-re-keyed` in both
+    gates.
+- **MAJOR — whole-bloom read-outs quoted the picked scope.** Every control's read-out was handed the
+  scope's effective state, so Foot delicacy and Sepal size printed the picked layer's width and
+  length beside a note saying they are the whole bloom's. Now only the scopeable controls read the
+  scope; route (ae) checks both read-outs, with a mutant.
+- **The thickness refusal depended on a toggle.** An entry for a layer the bloom does not build
+  skipped validation while per-layer was ON. Every entry is validated now (SO5 checks both toggles
+  and both containers; mutant `unreached-entries-are-not-validated`).
+- **The toggle read-out named a layer the bloom does not build** as "carrying its own values" and
+  told the visitor to pick it. The summary now splits `scopedLayers` / `scopedPetals` (scopes this
+  arrangement has) from `keptLayers` / `keptPetals`, and the read-out says the latter are kept.
+- **Mid-drag, a picked scope's Infill read-out showed layer 1's plan.** It now keeps the scope's own
+  last full plan through a drag.
+- **The twelve-digit cut missed the slider's double in about a third of on-grid edits.** For
+  example, global 1.70 and desired 0.90 built 0.8999999999999999, and the infill law has a
+  `gamma === 1` branch. The written offset is now the one that lands the build on the slider's own
+  double where one does; route (ae) checks it on that exact case, with a mutant.
+- **The status line named a "Layer size" control** that the panel calls Shrink. It omitted the ramps
+  for a pair picked on an inner layer, and claimed them for the outer layer. It now reads the
+  registry's labels and says it for any layer past the outer one.
+- **No gate checked that a load or a Reset ends the pick.** Without either guard, a load under a pick
+  kept the old values and a Reset wrote an offset. Route (ae) checks both, each with a mutant.
+- **A design saved before the toggles existed, loaded onto a page with one live,** applied its role
+  values into hidden, inert controls with only two generic "missing" notes. That case is now told,
+  with what to do (and not told when the toggle is off). The file is not defaulted: rule 3 stands.
+- **A file with no `overrides` erased the page's offsets.** It now keeps them (rule 3), through the
+  reader's `missing` list.
+- **An entry left with no offset** (a Scoping-a `footDelicacy`-only entry) was kept, counted and
+  re-saved forever. It is now dropped and told.
+- **"The reader's own words" was false.** The page and the reader had two tables that disagreed on
+  four reasons. They now share one function (`scopeOffsetRefusal`).
+- **SO12's no-leak clause only looked at petals with no term,** so an offset leaking to every layer
+  passed it (the fifth durable rule). SO2 checked the builder's own key (the fourth). And both SO2
+  and route (ae) edited the MIDDLE of three layers, the fixed point of a reversed layer order. All
+  three now read each petal's own whorl, and the edited layer is an end layer.
+- **`--merge`'s all-hold path accepted chunks that compared nothing.** It now refuses a chunk that
+  did fewer rows than its range or compared no floats. A chunk that selected rows (`--only`,
+  `--rows`, `--from`) makes the merge a SUBSET, said so in the verdict. The full partition in §5
+  re-merges clean under it.
+- **`tipCap.shapeN` read the caller's state, not the petal's,** so under a scope A6 would have read
+  the emitted apex against the whole bloom's exponent. It reads `ps` now (no byte; no role override
+  touches the tip shape).
+- **Docs:** CLAUDE.md's Scoping-a block and the model doc's §2, SO3, SO5 and migration-table
+  sentences, which Scoping-b had made false, are annotated in place. So is this doc's own infill-cap
+  paragraph (§6).
+
+The review's gates: ⟨REVIEW-GATES⟩
+
+## 8. Where the gates ride, and why no workflow was edited
 
 - **The scopes gate** is spawned by `tools/verify-bloom-design-file.mjs` (F6), which
   `bloom-panel.yml` runs.
@@ -229,7 +327,7 @@ because `undefined !== 'ON'`. Measured: §5.
 - **No file under `.github/workflows/` changed** (the brief). Editing one costs every frozen tag
   dispatched afterwards from an older base (CLAUDE.md, "WHEN A FROZEN TAG PUBLISHES").
 
-## 8. Not done, by the brief
+## 9. Not done, by the brief
 
 - Click-to-pick on the canvas.
 - The retirement of the role table (Q3.4).

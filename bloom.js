@@ -285,9 +285,20 @@ window.__bloomUIState = () => readUI();
    stamen spread's cap) rather than re-derive it. It is the record regenerate()
    just built, never the export handler's, so a span can never carry an
    export number under a live label. null at module load, before any build. */
-function refreshLabels(ui, shown = null) {
-  /* A read-out being typed into is the visitor's, not ours, until it ends. */
-  for (const c of CONTROLS) if (!valSpans[c.id].dataset.editing) valSpans[c.id].textContent = c.fmt(ui[c.id], ui, shown);
+function refreshLabels(ui, shown = null, scopedUi = null) {
+  /* A read-out being typed into is the visitor's, not ours, until it ends.
+     WHILE A SCOPE IS PICKED (Scoping-b) only the SCOPEABLE controls read the
+     scope's effective values (`scopedUi`); every whole-bloom control keeps the
+     whole bloom's, because its geometry is built from the global — the first
+     cut handed the scoped state to every control, so Foot delicacy and Sepal
+     size quoted the picked layer's petal width and length beside a note saying
+     they are the whole bloom's (the review's finding). Sections and captions
+     describe the whole bloom too. */
+  for (const c of CONTROLS) {
+    if (valSpans[c.id].dataset.editing) continue;
+    const u = scopedUi && SCOPE_IDS.has(c.id) ? scopedUi : ui;
+    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown);
+  }
   /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
      rosette's hood group is "Petal N" where N is the last orbit's number,
      which moves with petalCount. Same snapshot, same pass, same owner
@@ -503,6 +514,12 @@ function viewUi(ui) { return scopeView ? { ...ui, ...scopeEffective(scopeView, u
    number (the buckle's clamp, the lobes' caps, the fringe's ceiling, the
    infill's achieved count): the first emitted petal of that layer / pair, so a
    scope's controls quote that scope's petal rather than ring 0's. */
+/* A LIGHT (drag) BUILD CARRIES NO INFILL PLAN, so while a slider is held the
+   scope's own last FULL plan is quoted — never `shown.infill`, which is the
+   whole bloom's representative (ring 0, slot 0) and so another layer's or
+   pair's numbers under a pick (the review's finding: the Cells read-out and
+   the cap mark jumped to layer 1's figures for the length of every drag). */
+let scopeLastInfill = null;   // { key, infill } — the picked scope's own plan off its last full build
 function scopeShown(shown) {
   if (!scopeView || !shown) return shown;
   const ui = readUI();
@@ -510,8 +527,10 @@ function scopeShown(shown) {
   const p = lastPetalsAll.find((q) => q && Math.round(q.whorl) === scopeView.layer
     && (scopeView.kind === 'layer' || scopeSlotKey(q.slotIndex, n, ui) === scopeView.slot));
   if (!p) return shown;
-  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null,
-    infill: lightOnScreen ? shown.infill : (p.infill || null) };
+  const key = scopeValue(scopeView);
+  if (!lightOnScreen) scopeLastInfill = { key, infill: p.infill || null };
+  const infill = lightOnScreen ? (scopeLastInfill && scopeLastInfill.key === key ? scopeLastInfill.infill : null) : (p.infill || null);
+  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null, infill };
 }
 
 /* BIND / UNBIND — state and the inputs' DISPLAYED values only; no event, no
@@ -540,7 +559,7 @@ function relabelView() {
   const ui = readUI();
   syncScopeBar(ui);
   applyVisibility();
-  refreshLabels(viewUi(ui), scopeShown(lastShown));
+  refreshLabels(ui, scopeShown(lastShown), scopeView ? viewUi(ui) : null);
   applyCaps(scopeShown(lastShown));
   refreshScopeNotes(ui);
 }
@@ -558,15 +577,32 @@ function relabelView() {
 function commitScopeOffset(id, desired) {
   const ui = readUI();
   const v = scopeView;
-  const n = lastFoot.slotCount;
   if (!scopes) scopes = { layers: [], petals: [], tiers: [] };
   const list = v.kind === 'layer' ? scopes.layers : scopes.petals;
-  const reaches = (e) => e.layer === v.layer && (v.kind === 'layer' || scopeSlotKey(e.slot, n, ui) === v.slot);
-  let own = list.find((e) => reaches(e) && (v.kind === 'layer' || e.slot === v.slot)) || null;
+  /* THE ENTRIES THAT REACH THIS SCOPE, by the geometry's own rule
+     (`scopeOffsetsFor`): a layer by its index, a pair by its CANONICAL slot,
+     matched exactly — never re-keyed at today's count (see the geometry's
+     `scopeEntryNamesPair`). */
+  const reaches = (e) => e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot);
+  let own = list.find(reaches) || null;
   let others = 0;
   for (const e of list) if (e !== own && reaches(e)) others += Number((e.offsets || {})[id]) || 0;
   let d = desired - Number(ui[id]) - others;
   d = Math.abs(d) < 1e-12 ? 0 : +d.toPrecision(12);
+  /* THE TWELVE-DIGIT CUT KEEPS THE FILE TIDY (`0.35 - 0.3` is
+     0.04999999999999993) and does not always land the build on the slider's
+     own double — global + 0.3 is 0.8999999999999999 against a slider's 0.9 (the
+     review measured a third of on-grid edits off by an ulp, one of them a
+     knife-edge branch: the infill law's `gamma === 1`). So the cut offset is
+     tried in the resolver's own expression (`global + offset`, the scope stage
+     of resolveRoleOverrides) first and the raw difference second, and whichever
+     makes the scope's effective value the slider's double is written; where
+     neither does (duplicate entries for one scope), the tidy one. Route (ae)
+     reads the built exponent back off the builder's record. */
+  if (d !== 0 && others === 0) {
+    const g = Number(ui[id]);
+    if (g + d !== desired && g + (desired - g) === desired) d = desired - g;
+  }
   if (d === 0) {
     if (own && own.offsets && id in own.offsets) {
       delete own.offsets[id];
@@ -609,6 +645,10 @@ function syncScopeBar(ui) {
   scopeStatus.textContent = scopeStatusText(ui, mode);
   return changed;
 }
+/* A control's name as the panel prints it — the registry's own label, so the
+   status line cannot name a control the panel calls something else (the first
+   cut said "Layer size", which the panel labels "Shrink"). */
+function controlLabel(id) { const c = CONTROLS.find((x) => x.id === id); return c ? `"${c.label}"` : id; }
 function scopeStatusText(ui, mode) {
   if (!mode) return '';
   if (!scopeView) {
@@ -623,7 +663,7 @@ function scopeStatusText(ui, mode) {
   const parts = [`Editing ${name}.`,
     scopeView.kind === 'petal' && members.length === 2 ? 'Both petals of the pair move together.' : '',
     'The marked controls set its own values; unmarked ones still edit the whole bloom.',
-    scopeView.kind === 'layer' && Math.round(Number(ui.layerCount)) >= 2 ? 'Layer size and Tilt step still apply on top of its length, width and tilt.' : '',
+    scopeView.layer >= 1 ? `${controlLabel('layerSize')} and ${controlLabel('layerTilt')} (Arrangement) still apply on top of its length, width and tilt — they ramp every layer past the outer one.` : '',
     Math.abs(Number(ui.varianceForm) || 0) >= 0.005 ? 'The form field still moves each petal\'s curl, cup and twist around these values.' : '',
     'Whole bloom ends the pick; nothing is lost.'];
   return parts.filter(Boolean).join(' ');
@@ -2773,7 +2813,7 @@ function regenerate() {
      record — rather than the whole bloom. Unpicked, this is the call it was. */
   lastShown = shown;
   if (syncScopeBar(ui)) applyVisibility();
-  refreshLabels(viewUi(ui), scopeShown(shown));
+  refreshLabels(ui, scopeShown(shown), scopeView ? viewUi(ui) : null);
   applyCaps(scopeShown(shown));
   refreshScopeNotes(ui);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
@@ -3567,6 +3607,7 @@ window.__bloomMetrics = () => ({
   varianceSpacingAbsent: lastSpacingAbsent,
   petalSlotForms: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
     roles: { role: p.role ?? null, allRole: p.allRole ?? null, slotRole: p.slotRole ?? null, petalRole: p.petalRole ?? null }, formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
+    tipShape: p.tipCap ? p.tipCap.shapeN : null,   // the exponent the apex law was handed (the builder's own record — the scope view's exactness clause reads it)
     formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null,
     formScaled: p.formScaled ? p.formScaled.map((c) => ({ ...c })) : null,
     /* the SCOPE TERM this petal was built with (Scoping-b) — the builder's own
@@ -4026,10 +4067,30 @@ function applyDesign(text, name = '(inline)') {
   /* THE SCOPES THE FILE CARRIES replace the page's (an empty set of containers
      is "no scopes", so a plain file clears a hook-set record), then ONE
      rebuild carries both the controls and the offsets. */
+  /* A LIST THE FILE DOES NOT CARRY IS THE PAGE'S (rule 3: a missing field is
+     reported and the page keeps what it has) — the reader names them in
+     `overrides.missing`; a list the file carries, empty or not, replaces the
+     page's. */
   const had = scopes;
-  scopes = scopesAreEmpty(r.doc.overrides) ? null : r.doc.overrides;
+  const missing = r.doc.overrides.missing || [];
+  const next = {};
+  for (const k of ['layers', 'petals', 'tiers']) next[k] = missing.includes(k) ? ((had && had[k]) || []).map((e) => ({ ...e, offsets: { ...e.offsets } })) : r.doc.overrides[k];
+  scopes = scopesAreEmpty(next) ? null : next;
   if (had !== null || scopes !== null) regenerate();   // a plain file onto a plain page rebuilt through the input events already
-  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes: r.notes.slice(), scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length } : null };
+  const notes = r.notes.slice();
+  /* A FILE SAVED BEFORE THE SCOPE TOGGLES EXISTED, onto a page with one live:
+     the toggles are missing from it and the page keeps its own (rule 3), so the
+     file's role values — ALL, INNER, the labellum and hood, the per-petal groups
+     — land in controls that are hidden and inert. That is said, with what to do
+     about it, rather than left as two generic "missing" lines (the review's
+     finding). */
+  const ui = readUI();
+  for (const [id, live, what] of [['scopeLayers', scopeLayersLive(ui), 'Per-layer values'], ['scopePetals', scopePetalsLive(ui), 'Per-petal values']]) {
+    if (live && notes.some((x) => x.kind === 'missing' && x.text.startsWith(`controls.${id} is missing`))) {
+      notes.push({ kind: 'not-applied', text: `this file was saved without "${what}" and the page keeps it ON, so the file's petal-role values (All petals, Inner petals, the labellum and hood, the per-petal groups) are hidden and do not apply — turn "${what}" off to draw the file as it was saved` });
+    }
+  }
+  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes, scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length } : null };
   writeDesignStatus();
   return lastDesign;
 }

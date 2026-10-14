@@ -1611,6 +1611,30 @@ export function scopeSlotKey(slot, n, state) {
   return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));
 }
 
+/* WHICH SCOPE AN ENTRY NAMES — the one owner of "does this entry reach that
+   scope", read by `scopeOffsetsFor`, by the build's summary and by the page's
+   picker, so the three cannot keep different answers.
+   A PETAL ENTRY NAMES A PAIR BY ITS CANONICAL SLOT AND IS MATCHED ON THAT
+   NUMBER EXACTLY, never re-keyed at the current count (Scoping-b, found by the
+   review's adversarial pass). On a fan the canonical slot is the pair's
+   distance from the mirror plane, which means the same pair at every petal
+   count; a MEMBER index does not — slot 4 is "the pair four out" at nine petals
+   and the partner of slot 1 at five — so re-keying an entry through
+   `scopeSlotKey` at today's count folded an outer pair's values onto an inner
+   one the moment Petals per side went down, and an edit to that inner pair
+   then wrote a compensating offset that landed on it for good. An entry naming
+   no scope this arrangement has (a member index, a pair the fan no longer
+   builds, a layer past the layer count) is KEPT and INERT, as the per-petal
+   groups it replaces are hidden and inert past Petals per side. The page only
+   ever writes canonical slots (`canonicalScope`). */
+export function scopeEntryNamesLayer(e, layerCount) {
+  return Number.isInteger(e.layer) && e.layer >= 0 && e.layer < layerCount;
+}
+export function scopeEntryNamesPair(e, layerCount, n, state) {
+  return scopeEntryNamesLayer(e, layerCount) && Number.isInteger(e.slot) && e.slot >= 0 && e.slot < n
+    && scopeSlotKey(e.slot, n, state) === e.slot;
+}
+
 function addScopeOffsets(into, offsets, where) {
   for (const k of Object.keys(offsets)) {
     if (SCOPE_UNSCOPED.includes(k)) throw new Error(`scopes: ${where} carries an offset on ${k}, which is never scoped (Q3.6)`);
@@ -1620,10 +1644,13 @@ function addScopeOffsets(into, offsets, where) {
   }
   return into;
 }
-/* AN ENTRY THE TOGGLE KEEPS INERT IS STILL VALIDATED (Scoping-b): a record
-   carrying a thickness offset is refused whether or not a toggle would let it
-   reach a petal, so "the geometry throws on a scopes object carrying it" does
-   not start depending on a panel setting. Same two refusals, nothing summed. */
+/* EVERY ENTRY IS VALIDATED, WHETHER OR NOT IT REACHES THIS PETAL (Scoping-b):
+   a record carrying a thickness offset is refused whatever the toggles say and
+   whichever layers and pairs this bloom builds, so "the geometry throws on a
+   scopes object carrying it" does not depend on a panel setting. (The first
+   cut validated only the entries a toggle kept, so a per-layer entry for a
+   layer the bloom does not build skipped the check while its toggle was ON —
+   the review's finding.) Same two refusals, nothing summed. */
 function checkScopeOffsets(offsets, where) { addScopeOffsets({}, offsets, where); }
 
 /* THE ENTRIES THAT REACH SLOT `slot` OF LAYER `layer`, summed into one
@@ -1646,15 +1673,19 @@ export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
   const petalsLive = scopePetalsLive(state);
   const sum = {};
   let any = false;
-  for (const e of scopes.layers || []) {
-    if (!layersLive) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); continue; }
-    if (e.layer !== layer) continue;
-    addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;
+  for (const e of scopes.layers || []) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);
+  for (const e of scopes.petals || []) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);
+  if (layersLive) {
+    for (const e of scopes.layers || []) {
+      if (e.layer !== layer) continue;
+      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;
+    }
   }
-  for (const e of scopes.petals || []) {
-    if (!petalsLive) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); continue; }
-    if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;
-    addScopeOffsets(sum, e.offsets || {}, `petals[${e.layer},${e.slot}]`); any = true;
+  if (petalsLive) {
+    for (const e of scopes.petals || []) {
+      if (e.layer !== layer || e.slot !== key) continue;
+      addScopeOffsets(sum, e.offsets || {}, `petals[${e.layer},${e.slot}]`); any = true;
+    }
   }
   if (!any) return null;
   return { offsets: sum, bounds: scopes.bounds || {}, key: { layer, slot: key } };
@@ -9280,7 +9311,14 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       /* THE LAW'S OWN TWO NUMBERS, so a gate can read the exponent back off
          the emitted rows instead of re-deriving where the apex starts. */
       uPk: profile.uPk,
-      shapeN: state.petalTipShape,
+      /* the exponent the LAW was handed — `ps`, the petal's resolved state,
+         never the caller's: under a scope term (Scoping-b) a layer or a pair
+         carries its own tip shape, and A6 reads the emitted apex against THIS
+         number, so a `state` read would report the whole bloom's exponent
+         beside a petal drawn at its scope's (found by the review's gate work;
+         identical on every build with no scope term — no role override
+         touches the tip shape — so no byte or record moves) */
+      shapeN: ps.petalTipShape,
       /* THE PEAK THE LAW IS NORMALISED AGAINST, declared rather than left to
          be estimated as the largest emitted row. Those are different numbers
          the moment the ladder stops putting a row near uPk: measured on the
@@ -18534,10 +18572,9 @@ export function buildStyleInto(acc, G) {
    (2), fringeEngaged (1), thicknessIsUniform / thicknessProfile (1 each) and
    its own six inline reads — so a spread substate reaches the whole outline,
    form and curl machinery through the one door it already has. The census is
-   in docs/bloom-sepals-outcome.md; the one field that reads `state` rather
-   than `ps` is buildPetalInto's `shapeN` telemetry, which on every ring that
-   carries no override record is the same value, and on the sepal ring (which
-   never carries one) is the sepal's own.
+   in docs/bloom-sepals-outcome.md; `shapeN` telemetry, which once read `state`
+   rather than `ps`, reads `ps` since Scoping-b (a scope term gives a petal its
+   own tip shape).
 
    THE SUBSTATE IS `sepalBladeState`: the caller's state with the SEPAL's own
    copy of every shape, form and curl control mapped onto the names the laws
@@ -21719,20 +21756,25 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      container reach a petal was live on this build — a record handed in with
      its toggle OFF is counted here (it is kept) and reaches nothing. */
   /* `scopedLayers` / `scopedPetals` (Scoping-b): WHICH layers and which pairs
-     carry at least one offset, by the pairing law's own key — the toggles'
-     read-outs name them ("kept", or "carry their own values"). Counted from the
-     record handed in whatever the toggle, because a kept record is still the
-     visitor's. */
+     OF THIS ARRANGEMENT carry at least one offset — through
+     `scopeEntryNamesLayer` / `scopeEntryNamesPair`, the same owner the builder
+     matched on — and `keptLayers` / `keptPetals` the entries that name a layer
+     or a pair this bloom does not build (kept and inert; they return with the
+     layer or the pair). The toggles' read-outs name both ("kept", "carry their
+     own values"). Counted from the record handed in whatever the toggle,
+     because a kept record is still the visitor's. */
   const offsetCount = (e) => Object.keys(e.offsets || {}).length;
-  const scopedPetalKeys = new Map();
-  for (const e of (scopes && scopes.petals) || []) {
-    if (!offsetCount(e)) continue;
-    const k = scopeSlotKey(e.slot, fr.slotCount, state);
-    scopedPetalKeys.set(`${e.layer}:${k}`, { layer: e.layer, slot: k });
-  }
+  const layerCountBuilt = Math.max(1, Math.round(Number(fr.layerCount) || 1));
+  const uniqLayers = (list) => [...new Set(list.map((e) => e.layer))].sort((a, b) => a - b);
+  const uniqPairs = (list) => [...new Map(list.map((e) => [`${e.layer}:${e.slot}`, { layer: e.layer, slot: e.slot }])).values()].sort((a, b) => a.layer - b.layer || a.slot - b.slot);
+  const layerEntries = ((scopes && scopes.layers) || []).filter(offsetCount);
+  const petalEntries = ((scopes && scopes.petals) || []).filter(offsetCount);
+  const namesPair = (e) => scopeEntryNamesPair(e, layerCountBuilt, fr.slotCount, state);
   const scopesBuilt = scopes ? { layers: (scopes.layers || []).length, petals: (scopes.petals || []).length, tiers: (scopes.tiers || []).length, petalsScoped: petalsAll.filter((p) => p && p.scopeTerm).length, layersLive: scopeLayersLive(state), petalsLive: scopePetalsLive(state),
-    scopedLayers: [...new Set((scopes.layers || []).filter(offsetCount).map((e) => e.layer))].sort((a, b) => a - b),
-    scopedPetals: [...scopedPetalKeys.values()].sort((a, b) => a.layer - b.layer || a.slot - b.slot) } : null;
+    scopedLayers: uniqLayers(layerEntries.filter((e) => scopeEntryNamesLayer(e, layerCountBuilt))),
+    keptLayers: uniqLayers(layerEntries.filter((e) => !scopeEntryNamesLayer(e, layerCountBuilt))),
+    scopedPetals: uniqPairs(petalEntries.filter(namesPair)),
+    keptPetals: uniqPairs(petalEntries.filter((e) => !namesPair(e))) } : null;
   return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is

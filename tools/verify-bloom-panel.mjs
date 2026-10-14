@@ -337,11 +337,25 @@
          sheet thickness is told global and an edit of it writes no offset;
          DESELECT WRITES NOTHING; per-layer OFF keeps the record and builds the
          unscoped bloom; on the fan, picking either member binds the pair and
-         an edit moves both. Four mutants under --negative-control, each by its
-         own sentence: a pick stamps the panel onto the picked scope, an edit
-         lands on every scope, deselect drops the offsets (bloom.js), and a
-         mirror pair is split (bloom-geometry.js). Three edits: this entry,
-         the block, the negative control's flags and banner.
+         an edit moves both. The edited layer is the OUTER one, never the
+         middle of three (the fixed point of a reversed layer order). AROUND
+         THE PICK (the review's findings): whole-bloom read-outs (Foot
+         delicacy, Sepal size) stay the whole bloom's under a picked width; the
+         build lands on the slider's own double (global 1.70, desired 0.90); a
+         load and a Reset each end the pick before they write; a file saved
+         without the toggles onto a page with one live is told its roles do
+         not apply (and not when the toggle is off); a file with no
+         `overrides` keeps the page's offsets. THE COUNT CHANGES UNDER A PICK:
+         a stored outer pair is kept and inert at three a side and returns on
+         its own pair at four. Eleven mutants under --negative-control, each by
+         its own sentence: a pick stamps the panel onto the picked scope, an
+         edit lands on every scope, deselect drops the offsets, whole-bloom
+         read-outs read the picked scope, the offset is the twelve-digit cut
+         alone, a load / a reset does not end the pick, a pre-toggle file is
+         not told, a missing overrides list drops the page offsets (bloom.js),
+         and a mirror pair is split, a member index is re-keyed
+         (bloom-geometry.js). Three edits: this entry, the block, the negative
+         control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3634,8 +3648,10 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       count: window.__bloomBuildState().count, digest: JSON.stringify(window.__bloomShownDigest()), rec: JSON.stringify(window.__bloomDesign.scopes()),
       ui: window.__bloomUIState(), bound: window.__bloomScopeView.bound(), bar: window.__bloomScopeView.bar(),
       summary: m.scopes, slotCount: m.slotCount ?? null,
-      forms: m.petalSlotForms.map((f) => ({ index: f.index, whorl: f.whorl, cup: f.applied.petalCup, curl: f.applied.petalSpineCurl, scope: f.scope })),
+      forms: m.petalSlotForms.map((f) => ({ index: f.index, whorl: f.whorl, cup: f.applied.petalCup, curl: f.applied.petalSpineCurl, tip: f.tipShape, scope: f.scope })),
       shown: { petalCup: document.getElementById('petalCup').value, petalSpineCurl: document.getElementById('petalSpineCurl').value },
+      said: Object.fromEntries(['footDelicacy', 'sepalScale', 'petalWidth'].map((id) => [id, document.getElementById(id).closest('.bl-ctrl').querySelector('.bl-val').textContent])),
+      eff: window.__bloomScopeView.effective(), design: window.__bloomDesign.last(),
       cup: wrapNote('petalCup'), thick: wrapNote('sheetThickness'),
     };
   });
@@ -3658,33 +3674,38 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (on.bar.hidden) p.push('the scope bar is hidden with per-layer values ON');
     if (on.bar.options.length !== 4) p.push(`the picker lists ${on.bar.options.length} entries at three layers — expected the whole bloom and three layers`);
     const global = DEFAULTS.petalCup;
+    /* THE EDITED LAYER IS THE OUTER ONE (index 0), never the middle of three:
+       the middle is the fixed point of a layer order reversed, so a picker or a
+       builder numbering layers inner-first would pass a check made there (the
+       review's finding). The petal's whorl is the BUILDER's record. */
+    const L = 0, L2 = 2;
     /* 1. a pick LOADS: nothing rebuilds, nothing moves, nothing is written */
     const b1 = await snap(pg);
-    const got = await pick(pg, { kind: 'layer', layer: 1, slot: 0 });
+    const got = await pick(pg, { kind: 'layer', layer: L, slot: 0 });
     const a1 = await snap(pg);
-    if (!got || got.kind !== 'layer' || got.layer !== 1) p.push(`picking layer 2 bound ${JSON.stringify(got)}`);
-    if (!sameView(b1, a1)) p.push(`picking layer 2 was not a pure load: ${what(b1, a1)}`);
+    if (!got || got.kind !== 'layer' || got.layer !== L) p.push(`picking layer ${L + 1} bound ${JSON.stringify(got)}`);
+    if (!sameView(b1, a1)) p.push(`picking layer ${L + 1} was not a pure load: ${what(b1, a1)}`);
     /* 2. an edit lands on the picked layer only — read off the BUILDER's record */
     bad = await applyConfig(pg, [{ id: 'petalCup', value: '0.6' }]);
     if (bad.length) p.push(`the cup edit did not take: ${bad.join('; ')}`);
     const e = await snap(pg);
     const recE = JSON.parse(e.rec);
-    if (!recE || recE.layers.length !== 1 || recE.layers[0].layer !== 1 || recE.layers[0].offsets.petalCup !== 0.6 - global || recE.petals.length) p.push(`after the edit the record holds ${e.rec} — expected exactly one entry, layer 2's cup offset ${0.6 - global}`);
+    if (!recE || recE.layers.length !== 1 || recE.layers[0].layer !== L || recE.layers[0].offsets.petalCup !== 0.6 - global || recE.petals.length) p.push(`after the edit the record holds ${e.rec} — expected exactly one entry, layer ${L + 1}'s cup offset ${0.6 - global}`);
     if (e.ui.petalCup !== global) p.push(`the edit moved the WHOLE-BLOOM cup to ${e.ui.petalCup}`);
-    const strays = e.forms.filter((f) => f.whorl !== 1 && (f.scope !== null || (f.cup ?? global) !== global));
-    const missed = e.forms.filter((f) => f.whorl === 1 && (!f.scope || f.cup !== 0.6));
+    const strays = e.forms.filter((f) => f.whorl !== L && (f.scope !== null || (f.cup ?? global) !== global));
+    const missed = e.forms.filter((f) => f.whorl === L && (!f.scope || f.cup !== 0.6));
     if (strays.length) p.push(`the edit reached ${strays.length} petal(s) outside the picked layer (whorls ${[...new Set(strays.map((f) => f.whorl + 1))].join(', ')})`);
-    if (missed.length || !e.forms.some((f) => f.whorl === 1)) p.push(`${missed.length} layer-2 petal(s) did not take the cup`);
+    if (missed.length || !e.forms.some((f) => f.whorl === L)) p.push(`${missed.length} layer-${L + 1} petal(s) did not take the cup`);
     if (!/whole bloom 0\.00 \+ 0\.60 offset = 0\.60/.test(e.cup.note)) p.push(`the cup control does not tell the global and the offset: "${e.cup.note}"`);
     /* 3. another layer's pick loads ITS values and writes nothing (the /plot defect, one level up) */
     const b3 = await snap(pg);
-    await pick(pg, { kind: 'layer', layer: 2, slot: 0 });
+    await pick(pg, { kind: 'layer', layer: L2, slot: 0 });
     const a3 = await snap(pg);
-    if (!sameView(b3, a3)) p.push(`a pick WROTE to the record or moved the bloom (layer 2 -> layer 3): ${what(b3, a3)}`);
-    if (Number(a3.shown.petalCup) !== global) p.push(`layer 3's cup slider shows ${a3.shown.petalCup}, not its own effective value ${global}`);
-    await pick(pg, { kind: 'layer', layer: 1, slot: 0 });
+    if (!sameView(b3, a3)) p.push(`a pick WROTE to the record or moved the bloom (layer ${L + 1} -> layer ${L2 + 1}): ${what(b3, a3)}`);
+    if (Number(a3.shown.petalCup) !== global) p.push(`layer ${L2 + 1}'s cup slider shows ${a3.shown.petalCup}, not its own effective value ${global}`);
+    await pick(pg, { kind: 'layer', layer: L, slot: 0 });
     const back = await snap(pg);
-    if (Number(back.shown.petalCup) !== 0.6) p.push(`back on layer 2 the cup slider shows ${back.shown.petalCup}, not its own 0.6`);
+    if (Number(back.shown.petalCup) !== 0.6) p.push(`back on layer ${L + 1} the cup slider shows ${back.shown.petalCup}, not its own 0.6`);
     /* 4. sheet thickness is never scoped: told global, an edit moves the whole bloom and writes no offset */
     if (!back.thick.global || !/never scoped/.test(back.thick.note)) p.push(`sheet thickness is not told global while a scope is picked: "${back.thick.note}"`);
     if (back.thick.scoped) p.push('sheet thickness is marked as a scoped control');
@@ -3709,7 +3730,118 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (!z.bar.hidden) p.push('the scope bar still shows with per-layer OFF');
     if (z.forms.some((f) => f.scope !== null)) p.push('a petal carries a scope term with per-layer OFF');
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: RADIAL 3 layers — per-layer ON alone moves nothing; a pick is a pure load (no rebuild, the digest and the record unchanged); a cup edit on layer 2 lands on its 8 petals only and is told "whole bloom + offset"; layer 3 loads its own value and writes nothing; sheet thickness stays global; deselect writes nothing; OFF keeps the record and builds the unscoped bloom`);
+    else ok.push(`${tag} ${label}: RADIAL 3 layers — per-layer ON alone moves nothing; a pick is a pure load (no rebuild, the digest and the record unchanged); a cup edit on layer 1 (the outer whorl) lands on its 8 petals only — read off the builder's whorl — and is told "whole bloom + offset"; layer 3 loads its own value and writes nothing; sheet thickness stays global; deselect writes nothing; OFF keeps the record and builds the unscoped bloom`);
+  };
+
+  /* THE PICK'S LIFE AROUND IT (the review's findings, each a check with its own
+     mutant): whole-bloom read-outs stay the whole bloom's under a pick; the
+     build lands on the slider's own double; a load and a Reset end the pick
+     before they write; a file without the toggles onto a page with one live is
+     told; a file without `overrides` keeps the page's offsets. */
+  const runLifecycle = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'layerCount', value: '3' }, { id: 'sepalCount', value: '5' }, { id: 'scopeLayers', value: 'ON' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const plain = await snap(pg);
+    /* 1. whole-bloom read-outs are the whole bloom's (Foot delicacy and Sepal size read the petal width) */
+    await pick(pg, { kind: 'layer', layer: 0, slot: 0 });
+    bad = await applyConfig(pg, [{ id: 'petalWidth', value: '25' }]);
+    if (bad.length) p.push(`the width edit did not take: ${bad.join('; ')}`);
+    const w = await snap(pg);
+    for (const id of ['footDelicacy', 'sepalScale']) if (w.said[id] !== plain.said[id]) p.push(`under a picked layer with its own width, the whole-bloom ${id} read-out changed: "${plain.said[id]}" -> "${w.said[id]}"`);
+    if (!/25/.test(w.said.petalWidth)) p.push(`the picked layer's width read-out does not show its own 25: "${w.said.petalWidth}"`);
+    /* 2. the build lands on the slider's own double — global 1.70, desired 0.90 is the case the cut alone misses */
+    bad = await applyConfig(pg, [{ id: 'petalTipShape', value: '0.9' }]);
+    if (bad.length) p.push(`the tip-shape edit did not take: ${bad.join('; ')}`);
+    const t = await snap(pg);
+    const tips = t.forms.filter((f) => f.whorl === 0).map((f) => f.tip);
+    if (!tips.length || tips.some((x) => !Object.is(x, 0.9))) p.push(`the picked layer's petals were built at tip shape ${[...new Set(tips)].join(' / ')} against the slider's 0.9`);
+    if (!Object.is(t.eff && t.eff.petalTipShape, 0.9)) p.push(`the scope's effective tip shape is ${t.eff && t.eff.petalTipShape}, not the slider's 0.9`);
+    /* 3. a LOAD ends the pick before it writes: the file's values are the whole bloom's */
+    await unpick(pg);
+    const fileObj = JSON.parse(await pg.evaluate(() => window.__bloomDesign.save()));
+    await pick(pg, { kind: 'layer', layer: 1, slot: 0 });
+    fileObj.controls.petalCup = 0.5; fileObj.controls.petalLength = 50;
+    fileObj.overrides = { layers: [], petals: [], tiers: [] };
+    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'lifecycle.json'), JSON.stringify(fileObj));
+    await settle(pg);
+    const ld = await snap(pg);
+    if (ld.bound !== null) p.push(`a load left a scope bound: ${JSON.stringify(ld.bound)}`);
+    if (ld.ui.petalCup !== 0.5 || ld.ui.petalLength !== 50) p.push(`after a load under a picked layer the whole bloom reads cup ${ld.ui.petalCup}, length ${ld.ui.petalLength} — not the file's 0.5 / 50`);
+    if (ld.rec !== 'null') p.push(`after loading a file with no offsets the record is ${ld.rec}`);
+    /* 4. a RESET ends the pick before it writes */
+    await pick(pg, { kind: 'layer', layer: 1, slot: 0 });
+    bad = await applyConfig(pg, [{ id: 'petalLength', value: '45' }]);
+    if (bad.length) p.push(`the length edit did not take: ${bad.join('; ')}`);
+    await pg.click('#resetBtn');
+    await settle(pg);
+    const rs = await snap(pg);
+    if (rs.bound !== null) p.push(`Reset left a scope bound: ${JSON.stringify(rs.bound)}`);
+    if (rs.ui.petalLength !== DEFAULTS.petalLength) p.push(`after Reset under a picked layer the length reads ${rs.ui.petalLength}, not the default ${DEFAULTS.petalLength}`);
+    if (rs.rec !== 'null') p.push(`after Reset the record is ${rs.rec}`);
+    /* 5. a file saved WITHOUT the toggles onto a page with per-layer ON is TOLD its roles do not apply; onto a page with it OFF, not */
+    bad = await applyConfig(pg, [{ id: 'layerCount', value: '3' }, { id: 'scopeLayers', value: 'ON' }]);
+    if (bad.length) p.push(`the re-config did not take: ${bad.join('; ')}`);
+    const old = JSON.parse(await pg.evaluate(() => window.__bloomDesign.save()));
+    delete old.controls.scopeLayers; delete old.controls.scopePetals; old.controls.innerCurl = 90;
+    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'pre-toggle.json'), JSON.stringify(old));
+    await settle(pg);
+    const told = await snap(pg);
+    if (!(told.design && told.design.notes.some((n) => n.kind === 'not-applied' && /saved without "Per-layer values"/.test(n.text)))) p.push(`a pre-toggle file onto a page with per-layer ON is not told its roles do not apply: ${JSON.stringify(told.design && told.design.notes.map((n) => n.text))}`);
+    await applyConfig(pg, [{ id: 'scopeLayers', value: 'OFF' }]);
+    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'pre-toggle.json'), JSON.stringify(old));
+    await settle(pg);
+    const quiet = await snap(pg);
+    if (quiet.design && quiet.design.notes.some((n) => /saved without "Per-layer values"/.test(n.text))) p.push('a pre-toggle file onto a page with per-layer OFF was told its roles do not apply — they do');
+    /* 6. a file with no `overrides` keeps the page's offsets (rule 3) */
+    await applyConfig(pg, [{ id: 'scopeLayers', value: 'ON' }]);
+    await pick(pg, { kind: 'layer', layer: 1, slot: 0 });
+    await applyConfig(pg, [{ id: 'petalCup', value: '0.3' }]);
+    await unpick(pg);
+    const keep = await snap(pg);
+    const noOv = JSON.parse(await pg.evaluate(() => window.__bloomDesign.save()));
+    delete noOv.overrides;
+    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'no-overrides.json'), JSON.stringify(noOv));
+    await settle(pg);
+    const kept = await snap(pg);
+    if (keep.rec === 'null') p.push('the offset to keep was never written');
+    if (kept.rec !== keep.rec) p.push(`a file with no "overrides" replaced the page's offsets: ${keep.rec} -> ${kept.rec}`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: under a picked layer Foot delicacy and Sepal size keep the whole bloom's read-outs; the build lands on the slider's own 0.9 (global 1.70); a load and a Reset each end the pick before writing; a pre-toggle file onto per-layer ON is told its roles do not apply (and not when OFF); a file with no "overrides" keeps the page's offsets`);
+  };
+
+  /* THE COUNT CHANGES UNDER A PICK (the review's fold): FAN, four a side, the
+     outermost pair given its own cup, the pair inside it picked; at three a
+     side the outer pair is not built — its entry KEPT and INERT, no petal
+     taking its cup, the picked pair's thumbs still its own effective value —
+     and at four again it returns on its own pair. */
+  const runFold = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'placement', value: 'FAN' }, { id: 'fanCenterPetal', value: 'ON' }, { id: 'fanPerSide', value: '4' }, { id: 'scopePetals', value: 'ON' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const global = DEFAULTS.petalCup;
+    await pick(pg, { kind: 'petal', layer: 0, slot: 4 });
+    bad = await applyConfig(pg, [{ id: 'petalCup', value: '0.6' }]);
+    if (bad.length) p.push(`the cup edit did not take: ${bad.join('; ')}`);
+    await pick(pg, { kind: 'petal', layer: 0, slot: 3 });
+    bad = await applyConfig(pg, [{ id: 'fanPerSide', value: '3' }]);
+    if (bad.length) p.push(`the count change did not take: ${bad.join('; ')}`);
+    const f3 = await snap(pg);
+    if (!f3.bound || f3.bound.slot !== 3) p.push(`at three a side the pick of pair 3 did not survive: ${JSON.stringify(f3.bound)}`);
+    const took = f3.forms.filter((f) => f.scope !== null || (f.cup ?? global) !== global);
+    if (took.length) p.push(`at three a side, where the outer pair is not built, ${took.length} petal(s) took its cup (slots ${took.map((f) => f.index).join(', ')}) — the entry folded onto another pair`);
+    if (f3.eff && Number(f3.shown.petalCup) !== f3.eff.petalCup) p.push(`the picked pair's cup thumb shows ${f3.shown.petalCup} while its effective value is ${f3.eff.petalCup}`);
+    if (!f3.summary || JSON.stringify(f3.summary.keptPetals) !== JSON.stringify([{ layer: 0, slot: 4 }])) p.push(`at three a side the build's summary keeps ${JSON.stringify(f3.summary && f3.summary.keptPetals)}, not the outer pair`);
+    bad = await applyConfig(pg, [{ id: 'fanPerSide', value: '4' }]);
+    const f4 = await snap(pg);
+    const n4 = f4.forms.length;
+    const outer = new Set([4, (n4 - 4) % n4]);
+    for (const f of f4.forms) {
+      if (outer.has(f.index)) { if (f.cup !== 0.6) p.push(`back at four a side, outer slot ${f.index} reads cup ${f.cup}, not its own 0.6`); }
+      else if ((f.cup ?? global) !== global) p.push(`back at four a side, slot ${f.index} reads cup ${f.cup}`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: FAN four a side, the outer pair's own cup kept and inert at three a side (no petal takes it, the picked pair's thumb is its own effective value, the summary keeps it) and back on its own pair at four`);
   };
 
   /* FAN: per-petal values, a mirror pair is one scope */
@@ -3758,6 +3890,10 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await runLayers(page, 'per-layer');
   await openBloom(page, port);
   await runPetals(page, 'per-petal');
+  await openBloom(page, port);
+  await runLifecycle(page, 'around the pick');
+  await openBloom(page, port);
+  await runFold(page, 'the count changes under a pick');
   if (NEGATIVE_CONTROL) {
     const jsSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
     const geoSrc = fs.readFileSync(new URL('../bloom-geometry.js', import.meta.url), 'utf8');
@@ -3774,6 +3910,28 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       { name: 'a mirror pair is split', file: 'bloom-geometry.js', src: geoSrc, run: runPetals,
         from: '  if (!SCOPE_PAIRED_PLACEMENTS.includes(state.placement)) return slot;\n  return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));',
         to: '  return slot;' },
+      /* the review's findings, each restored */
+      { name: 'whole-bloom read-outs read the picked scope', file: 'bloom.js', src: jsSrc, run: runLifecycle,
+        from: '  refreshLabels(ui, scopeShown(shown), scopeView ? viewUi(ui) : null);',
+        to: '  refreshLabels(viewUi(ui), scopeShown(shown), scopeView ? viewUi(ui) : null);' },
+      { name: 'the offset is the twelve-digit cut alone', file: 'bloom.js', src: jsSrc, run: runLifecycle,
+        from: '    if (g + d !== desired && g + (desired - g) === desired) d = desired - g;',
+        to: '    void g;' },
+      { name: 'a load does not end the pick', file: 'bloom.js', src: jsSrc, run: runLifecycle,
+        from: "     scope's offsets. Ending a pick writes nothing. */\n  selectScope(null);\n  let applied = 0;",
+        to: "     scope's offsets. Ending a pick writes nothing. */\n  let applied = 0;" },
+      { name: 'a reset does not end the pick', file: 'bloom.js', src: jsSrc, run: runLifecycle,
+        from: '     was reachable only through a file or a hook and Reset never touched it. */\n  selectScope(null);\n  scopes = null;',
+        to: '     was reachable only through a file or a hook and Reset never touched it. */\n  scopes = null;' },
+      { name: 'a pre-toggle file is not told', file: 'bloom.js', src: jsSrc, run: runLifecycle,
+        from: "    if (live && notes.some((x) => x.kind === 'missing'",
+        to: "    if (false && live && notes.some((x) => x.kind === 'missing'" },
+      { name: 'a missing overrides list drops the page offsets', file: 'bloom.js', src: jsSrc, run: runLifecycle,
+        from: "  for (const k of ['layers', 'petals', 'tiers']) next[k] = missing.includes(k) ?",
+        to: "  for (const k of ['layers', 'petals', 'tiers']) next[k] = false ?" },
+      { name: 'a member index is re-keyed', file: 'bloom-geometry.js', src: geoSrc, run: runFold,
+        from: '      if (e.layer !== layer || e.slot !== key) continue;',
+        to: '      if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;' },
     ];
     for (const m of MUTANTS) if (m.src.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in ${m.file} — the mutant cannot be applied`);
     for (const m of MUTANTS) {
@@ -3872,11 +4030,23 @@ if (NEGATIVE_CONTROL) {
     const sawScopeEvery = fail.some((f) => /^\[scope selection\] MUTANT \(an edit lands on every scope\).*outside the picked layer/.test(f));
     const sawScopeDeselect = fail.some((f) => /^\[scope selection\] MUTANT \(deselect drops the offsets\).*deselecting changed the record/.test(f));
     const sawScopePair = fail.some((f) => /^\[scope selection\] MUTANT \(a mirror pair is split\).*mirror partner\) did not move with the pair/.test(f));
+    /* the review's findings — one flag per restored defect, each on the clause written for it */
+    const sawScopeLabels = fail.some((f) => /^\[scope selection\] MUTANT \(whole-bloom read-outs read the picked scope\).*whole-bloom (footDelicacy|sepalScale) read-out changed/.test(f));
+    const sawScopeExact = fail.some((f) => /^\[scope selection\] MUTANT \(the offset is the twelve-digit cut alone\).*built at tip shape/.test(f));
+    const sawScopeLoad = fail.some((f) => /^\[scope selection\] MUTANT \(a load does not end the pick\).*a load left a scope bound/.test(f));
+    /* under this mutant the pick DOES end — Reset writes the toggle back to its
+       default OFF and the bar drops the pick — but only after the controls'
+       events have landed as offsets on it, so what fires is the stray offset */
+    const sawScopeReset = fail.some((f) => /^\[scope selection\] MUTANT \(a reset does not end the pick\).*(Reset left a scope bound|after Reset the record is|after Reset under a picked layer the length reads)/.test(f));
+    const sawScopeTold = fail.some((f) => /^\[scope selection\] MUTANT \(a pre-toggle file is not told\).*is not told its roles do not apply/.test(f));
+    const sawScopeKeep = fail.some((f) => /^\[scope selection\] MUTANT \(a missing overrides list drops the page offsets\).*replaced the page's offsets/.test(f));
+    const sawScopeFold = fail.some((f) => /^\[scope selection\] MUTANT \(a member index is re-keyed\).*folded onto another pair/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
+        && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FIVE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-toggle file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

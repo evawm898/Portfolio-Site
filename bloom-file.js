@@ -253,23 +253,36 @@ export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'sl
 export const SCOPE_TIER_WHORL_LEVEL = Object.freeze(['sepalCount']);
 export const SCOPEABLE_TIER_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'sepal' && !SCOPE_UNSCOPED.includes(c.id) && !SCOPE_TIER_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
 const scopeable = new Set(SCOPEABLE_IDS);
+/* WHY A CONTROL CANNOT CARRY AN OFFSET IN A CONTAINER — the ONE owner of the
+   sentence, read by the file reader (a refused offset's note) and by the page
+   (the note beside a whole-bloom petal control while a scope is picked), so
+   the two say the same thing. (The first cut had the page call this function
+   and the reader keep its own wording, and the comment claimed they could not
+   disagree while four of the reasons already did — the review's finding.) null
+   when the control may carry one there. `container` is 'layers' / 'petals' /
+   'tiers'. */
+export function scopeOffsetRefusal(id, container) {
+  const c = controlOf.get(id);
+  if (!c) return 'not a control this page knows';
+  if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
+  if (container === 'tiers' ? scopeableTier.has(id) : scopeable.has(id)) return null;
+  if (c.kind !== 'slider') return `a ${c.kind} has no offset`;
+  if (roleOverrideIds.has(id)) return 'a role delta — the role table is the scoping this model replaces (hidden while a scope toggle is on)';
+  if (id === 'footDelicacy') return 'a whorl-level value — the foot is the whorl\'s (Q3.3)';
+  if (SCOPE_WHORL_LEVEL.includes(id) || SCOPE_TIER_WHORL_LEVEL.includes(id)) return 'a whorl-level value has no per-petal meaning';
+  return container === 'tiers' ? `${c.role} controls are not sepal (tier) scopes` : `${c.role} controls are not petal scopes`;
+}
 /* WHY A PETAL CONTROL IS NOT A SCOPE'S (Scoping-b) — the page prints this
    beside every petal-role control that stays whole-bloom while a scope is
    picked ("sheet thickness ... stays global and shows so while a scope is
-   selected"), in the reader's own words so the two cannot disagree. null for a
-   scopeable control and for every control that is not a petal's at all (an
-   arrangement or centre control is whole-bloom by what it is, and saying so on
-   every row would bury the four that need it). The role deltas are hidden
-   while a toggle is live, so they never need the sentence. */
+   selected"): `scopeOffsetRefusal`'s own sentence for a layer / petal
+   container. null for a scopeable control and for every control that is not a
+   petal's at all (an arrangement or centre control is whole-bloom by what it
+   is, and saying so on every row would bury the four that need it). */
 export function scopeExclusionReason(id) {
   const c = controlOf.get(id);
   if (!c || c.role !== 'petal' || scopeable.has(id)) return null;
-  if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
-  if (c.kind !== 'slider') return 'a choice has no per-petal value';
-  if (roleOverrideIds.has(id)) return 'a role delta — hidden while a scope toggle is on';
-  if (id === 'footDelicacy') return 'the foot is the whorl\'s (Q3.3)';
-  if (SCOPE_WHORL_LEVEL.includes(id)) return 'a whorl-level value has no per-petal meaning';
-  return 'not a petal scope';
+  return scopeOffsetRefusal(id, 'petals');
 }
 const scopeableTier = new Set(SCOPEABLE_TIER_IDS);
 const isIndex = (v) => Number.isInteger(v) && v >= 0;
@@ -289,16 +302,19 @@ function readScopeEntry(k, e, i, notes) {
   out.offsets = {};
   for (const id of Object.keys(e.offsets)) {
     const v = e.offsets[id];
-    if (SCOPE_UNSCOPED.includes(id)) { notes.push(note('invalid', `${where}.offsets.${id}: ${id} is never scoped (Q3.6) — the offset ${JSON.stringify(v)} is not applied`)); continue; }
-    if (retiredOf.has(id)) { notes.push(note('retired', `${where}.offsets.${id} names a retired control — the offset ${JSON.stringify(v)} is not applied`)); continue; }
-    const c = controlOf.get(id);
-    if (!c) { notes.push(note('unknown', `${where}.offsets.${id} is not a control this page knows — not applied`)); continue; }
-    const ok = k === 'tiers' ? scopeableTier.has(id) : scopeable.has(id);
-    if (!ok) { notes.push(note('invalid', `${where}.offsets.${id}: ${c.kind !== 'slider' ? `a ${c.kind} has no offset` : roleOverrideIds.has(id) ? 'a role delta is not a petal quantity (it is the scoping this model replaces)' : SCOPE_WHORL_LEVEL.includes(id) || SCOPE_TIER_WHORL_LEVEL.includes(id) ? 'a whorl-level value has no per-petal meaning' : k === 'tiers' ? `${c.role} controls are not sepal (tier) scopes` : `${c.role} controls are not petal scopes`} — not applied`)); continue; }
+    if (retiredOf.has(id) && !controlOf.has(id)) { notes.push(note('retired', `${where}.offsets.${id} names a retired control — the offset ${JSON.stringify(v)} is not applied`)); continue; }
+    if (!controlOf.has(id)) { notes.push(note('unknown', `${where}.offsets.${id} is not a control this page knows — not applied`)); continue; }
+    const why = scopeOffsetRefusal(id, k);
+    if (why) { notes.push(note('invalid', `${where}.offsets.${id}: ${why} — the offset ${JSON.stringify(v)} is not applied`)); continue; }
     if (typeof v !== 'number' || !Number.isFinite(v)) { notes.push(note('invalid', `${where}.offsets.${id} is ${JSON.stringify(v)}, not a number — not applied`)); continue; }
     out.offsets[id] = v;
   }
   for (const f of Object.keys(e)) if (!need.includes(f) && f !== 'offsets') notes.push(note('unknown', `${where}.${f} is not a field this page knows`));
+  /* AN ENTRY WITH NO OFFSET LEFT DRAWS NOTHING, so it is dropped and told rather
+     than kept: kept, it was counted on the load status, gave every petal of its
+     scope an empty term and was written into every later save (the review's
+     finding — a Scoping-a entry whose one offset was `footDelicacy`). */
+  if (!Object.keys(out.offsets).length) { notes.push(note('invalid', `${where} has no offset this page can apply — the entry is dropped`)); return null; }
   return out;
 }
 
@@ -306,12 +322,20 @@ function readScopeEntry(k, e, i, notes) {
    `overrides` entry is VALIDATED and kept (tiers: kept, told not applied); a
    `curves` entry is REPORTED AND NOT APPLIED — this version reads nothing from
    those. */
+/* A MISSING list (or a missing container) is reported and named in `missing`
+   on the result — a non-enumerable field, so the document's own shape is
+   unchanged — and the PAGE KEEPS WHAT IT HAS for it (rule 3): the first cut
+   turned a missing `overrides` into empty lists and the page then dropped every
+   offset the visitor had set through the picker (the review's finding). */
 function readContainer(src, name, lists, notes) {
   const out = {};
   for (const k of lists) out[k] = [];
-  if (!src || typeof src !== 'object' || Array.isArray(src)) { notes.push(note('missing', `${name} is missing`)); return out; }
+  const missing = [];
+  Object.defineProperty(out, 'missing', { value: missing, enumerable: false });
+  const keeps = name === 'overrides' ? ' — the page keeps the offsets it has' : '';
+  if (!src || typeof src !== 'object' || Array.isArray(src)) { notes.push(note('missing', `${name} is missing${keeps}`)); missing.push(...lists); return out; }
   for (const k of lists) {
-    if (!Object.prototype.hasOwnProperty.call(src, k)) { notes.push(note('missing', `${name}.${k} is missing`)); continue; }
+    if (!Object.prototype.hasOwnProperty.call(src, k)) { notes.push(note('missing', `${name}.${k} is missing${keeps}`)); missing.push(k); continue; }
     if (!Array.isArray(src[k])) { notes.push(note('invalid', `${name}.${k} is not a list`)); continue; }
     if (name === 'overrides') {
       out[k] = src[k].map((e, i) => readScopeEntry(k, e, i, notes)).filter((e) => e !== null);

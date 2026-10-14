@@ -1593,18 +1593,29 @@ export function fanGroupSaid(k, ui) {
    keeps its settings" rule — because a visitor who switches the toggle back
    on gets it back. */
 const scopeNames = (list, name) => list.map(name).join(', ');
+/* An entry naming a layer or a pair this bloom does not build (`keptLayers` /
+   `keptPetals` — the layer count fell, the fan lost a pair) is KEPT and inert:
+   said as kept, never as "carries its own values", because the picker cannot
+   list it (the review's finding: the first cut named such a layer and told the
+   visitor to pick it). */
 const scopeToggleFmt = (kind) => (v, ui, shown) => {
   const sc = shown && shown.scopes;
-  const list = sc ? (kind === 'layers' ? sc.scopedLayers : sc.scopedPetals) : [];
+  const list = sc ? ((kind === 'layers' ? sc.scopedLayers : sc.scopedPetals) || []) : [];
+  const kept = sc ? ((kind === 'layers' ? sc.keptLayers : sc.keptPetals) || []) : [];
   const name = kind === 'layers'
     ? (k) => `Layer ${k + 1}`
     : (p) => `Petal ${p.slot + 1}${p.layer > 0 ? ` of layer ${p.layer + 1}` : ''}`;
   const n = list.length;
   const what = kind === 'layers' ? (n === 1 ? 'layer' : 'layers') : (n === 1 ? 'petal' : 'petals');
   const pick = kind === 'layers' ? 'a layer' : 'a petal (its mirror pair comes with it)';
-  if (String(v) !== 'ON') return n ? `off — own values kept for ${scopeNames(list, name)}; they return when this is on` : `off — every ${kind === 'layers' ? 'layer' : 'petal'} takes the petal controls`;
-  return n ? `on — ${n} ${what} ${n === 1 ? 'carries its' : 'carry their'} own values (${scopeNames(list, name)}); pick ${pick} above the panel to edit it`
-    : `on — pick ${pick} above the panel; the petal controls then set its own values`;
+  const absent = kind === 'layers' ? 'a layer this bloom does not build' : 'a pair this bloom does not build';
+  if (String(v) !== 'ON') {
+    const all = [...list, ...kept];
+    return all.length ? `off — own values kept for ${scopeNames(all, name)}; they return when this is on` : `off — every ${kind === 'layers' ? 'layer' : 'petal'} takes the petal controls`;
+  }
+  const keptSaid = kept.length ? `; own values kept for ${scopeNames(kept, name)} (${absent}) — they return with it` : '';
+  return (n ? `on — ${n} ${what} ${n === 1 ? 'carries its' : 'carry their'} own values (${scopeNames(list, name)}); pick ${pick} above the panel to edit it`
+    : `on — pick ${pick} above the panel; the petal controls then set its own values`) + keptSaid;
 };
 
 /* THE TOP OF THE STAMEN SPREAD RANGE — one owner for the slider's `max` and
