@@ -127,11 +127,16 @@ because `undefined !== 'ON'`. Measured: §5.
   control's own listeners, which then rebuild as always. A drag, a typed value and an arrow key all
   arrive as the control's own `input` / `change`.
   - The offset written is `desired − global − (every other entry already reaching this scope)`,
-    onto the scope's own canonical entry, cut at twelve significant digits.
+    onto the scope's own canonical entry, cut at twelve significant digits. Where no other entry
+    reaches the scope and a double exists that lands the build on the slider's own value, that
+    double is written instead (the review's finding: the cut alone built 0.8999999999999999 for a
+    slider at 0.90, §7).
   - An offset that returns to 0 is removed, an empty entry is removed, and an empty record becomes
     null. So editing a value back to the whole bloom's restores the shipped path exactly.
 - **Deselect writes nothing.** The inputs get the global values back exactly as they were taken
   out.
+- **A load and a Reset each end the pick before they write**, so a loaded design is read into the
+  whole bloom and a Reset writes no offset (route (ae) checks both, each with a mutant).
 - **A pair is one scope.** The picker lists canonical slots (`petalGroupCount` / `scopeSlotKey`,
   footRing's own answers). A pick naming either member binds the pair (`canonicalScope`).
 - **A pick that stops naming a scope ends, writing nothing.** This happens when the layer count
@@ -164,6 +169,14 @@ because `undefined !== 'ON'`. Measured: §5.
 6. **The per-layer toggle shows at one layer too.** One layer is a legitimate scope (the whole
    whorl), so the row is not hidden by depth.
 7. **Visibility of the scopeable controls is decided on the scope's effective state** (§3).
+8. **A petal entry names its pair by the canonical slot, matched exactly** (the review's major
+   finding, §7). A member index, or a pair the fan no longer builds, is kept and inert.
+   - *Rejected:* re-keying at the current count, which is what folded an outer pair onto an inner
+     one when the count fell.
+   - *Undo:* one comparison in `scopeOffsetsFor` and one in `commitScopeOffset`.
+9. **A design saved before the toggles existed, loaded with a toggle live, is told** that its role
+   values do not apply, with what to do. The toggle is not defaulted (rule 3).
+   - *Undo:* the one note in `applyDesign`.
 
 ## 5. Measured
 
@@ -177,8 +190,23 @@ because `undefined !== 'ON'`. Measured: §5.
     (block 35, block 61 and the sepal range and load rows) plus `DEFAULTS`, `ALL MAX` and `ALL MIN` —
     **92 rows in both modes, 0 floats moved** over 139,855,716 export floats and 1,338,324
     captured-grid values. This is a SUBSET, chosen as the rows #406 changes; the whole-matrix claim
-    above is against `3e46d0b`.
-  - **The panel identity tool:** PASS on all 13 states against `037a4a8`.
+    above is against `3e46d0b`. It was measured again on the FINAL tree (after the review's fixes,
+    §7), where the merge's stricter check (§7) accepted it as a SUBSET, and read the same figures.
+  - **Bytes, toggles OFF, on the rows the role resolver and the variance fields run on** (every
+    ORCHID, ZYGO, FAN, PER-PETAL, SLOT, INNER, ALL PETALS, IRIS and VARIANCE row, and every row
+    naming a labellum, hood, per-petal, ALL or INNER control), on the final tree against `037a4a8`:
+    **287 rows in both modes, 0 floats moved** over 232,331,184 export floats and 9,593,870
+    captured-grid values (1,100 panels). Also a SUBSET, and the merge says so.
+  - **Why the whole matrix was not re-run after the review.** The review changed two things in
+    `bloom-geometry.js`, and neither can reach an unscoped build:
+    - `scopeOffsetsFor` is called only when a scopes object is handed in, and with empty lists it
+      returns `null` exactly as before.
+    - `tipCap.shapeN` is telemetry: no emitted float reads it (only A6, SP6 and the scope view do),
+      and with no scope term `ps.petalTipShape` is `state.petalTipShape` (no role row reaches the
+      tip shape, and a sepal ring's `state` IS its substate).
+    That is an argument, so the two subsets above are the measurement of it on the regions those
+    two things touch. They are a subset and are quoted as one.
+  - **The panel identity tool:** PASS on all 13 states against `037a4a8`, run on the final tree.
   - The scopes gate (12 clauses), the design-file gate (14) and `bloom-smoke --check` (225 rows over
     57 blocks, 180 families) all pass, and so does the panel gate (below).
 - **Byte identity with the toggles OFF.** `node tools/verify-bloom-surface-bytes.mjs --base
@@ -198,21 +226,29 @@ because `undefined !== 'ON'`. Measured: §5.
   - `--control` removes one ordinary control and the run fails on it.
 - **The scopes gate** (`node tools/verify-bloom-scopes.mjs`): **PASS, 12 clauses in Node**, and
   13 with `--browser` (SO9, run by the design-file gate's F6).
-  - `--negative-control`: **11 of 11 mutants** each moved their witness on the mutated module and
-    reddened exactly the clauses they name. They ran as two subsets against the final gate (3 and
-    8), with all 11 anchors matching exactly once.
+  - `--negative-control`: **13 of 13 mutants** each moved their witness on the mutated module and
+    reddened exactly the clauses they name, in one run on the final tree (2,157 s), with all 13
+    anchors matching exactly once.
   - The new mutants: `the-toggle-gate-is-removed` (SO7, SO10),
     `the-role-table-stays-live-under-a-toggle`, `all-petals-forget-the-toggles`,
     `the-groups-forget-per-petal`, `the-slot-roles-forget-per-layer` and
-    `the-tube-ignores-per-layer` (SO11 each).
-- **The panel gate** (`node tools/verify-bloom-panel.mjs`): **PASS**, with route (ae)'s per-layer
-  and per-petal walks and route (f)'s seven new toggle rows all agreeing.
-  - `--negative-control`: **ALL TWENTY-FIVE ROUTES … OBSERVED THE FAILURE**, exit 0. Route (ae)'s
-    four mutants are a pick that stamps, an edit that lands on every scope, a deselect that drops
-    the offsets and a split mirror pair.
-- **Also green:** the design-file gate (14 clauses), the drag-preview gate (10 clauses), the export
-  gate `--only` on 9 role rows (9 of 9), `bloom-smoke --check` (220 rows over 56 blocks, 178
-  families) and the apex table's anchor pre-check (162 of 162).
+    `the-tube-ignores-per-layer` (SO11 each), and the review's two:
+    `a-member-index-is-re-keyed` (SO3) and `unreached-entries-are-not-validated` (SO5).
+    `a-petal-offset-leaks-to-every-petal` was re-anchored onto the canonical-slot match.
+- **The panel gate** (`node tools/verify-bloom-panel.mjs`): **PASS, 431 checks (614 s) on the
+  final tree**, with route (ae)'s per-layer, per-petal, around-the-pick and count-change walks and
+  route (f)'s seven new toggle rows all agreeing.
+  - Route (ae) carries **eleven mutants**. Its first four are a pick that stamps, an edit that lands
+    on every scope, a deselect that drops the offsets and a split mirror pair. Seven are for the
+    review's findings: a whole-bloom read-out quoting the scope, the twelve-digit cut, a load that
+    keeps the pick, a Reset that writes an offset, a pre-toggle file not told, a missing
+    `overrides` erasing the page's offsets, and a member index re-keyed at a lower count.
+  - `--negative-control` on the final tree: **ALL TWENTY-FIVE ROUTES … OBSERVED THE FAILURE**,
+    exit 0 (822 s), with all eleven of route (ae)'s flags required.
+- **Also green before the merge:** the design-file gate (14 clauses), the drag-preview gate (10
+  clauses), the export gate `--only` on 9 role rows (9 of 9), `bloom-smoke --check` (220 rows over
+  56 blocks, 178 families) and the apex table's anchor pre-check (162 of 162). The design-file and
+  drag-preview gates were run again on the final tree (14 and 10 clauses).
 
 ## 6. Findings, for Eva
 
@@ -326,7 +362,17 @@ possible. There were 25 findings, three rated major.
   sentences, which Scoping-b had made false, are annotated in place. So is this doc's own infill-cap
   paragraph (§6).
 
-The review's gates: ⟨REVIEW-GATES⟩
+**The gates the fixes were checked against**, all on the final tree:
+- the scopes gate, 12 clauses, with its negative control at **13 of 13**;
+- the panel gate, 431 checks, with route (ae)'s eleven mutants, and its full negative control:
+  all twenty-five routes observed the failure;
+- the design-file gate (14) and the drag-preview gate (10);
+- the panel identity tool against `037a4a8`, with its `--control` failing as it should;
+- two byte subsets against `037a4a8` (92 sepal rows and 287 role and variance rows, 0 floats on
+  each, §5).
+
+The whole-matrix byte partition is the pre-review run against `3e46d0b`. §5 says why the review's
+geometry changes cannot reach it and which rows measure that.
 
 ## 8. Where the gates ride, and why no workflow was edited
 
