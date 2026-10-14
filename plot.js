@@ -98,13 +98,20 @@ import {
 } from './plot-polarity.js';
 import {
   RASTER_SCALE, mmPerPixel, stripToPaths, svgDocument, punchEllipse, exportName,
+  polygonsData,
 } from './plot-export.js';
 import {
   FORMAT, VERSION, FRAME_FIELDS, DRAW_FIELDS, VIEW_FIELDS, STEM_FIELDS,
   TRANSFORM_FIELDS,
+  SHAPE_FIELDS,
   composeDoc, readDoc, toText, gridIdentity, compareIdentity, resolvePetals,
   IDENTITY_TRANSFORM,
 } from './plot-file.js';
+import {
+  SHAPE_KINDS, SHAPE_TONES, SHAPE_FILLS, MAX_SHAPES, newShape, shapeMarks,
+  marksToTriangles, toneRegime, toneColor, knockoutPasses, oppositeOf, TONE_STENCIL,
+  shapePlacement,
+} from './plot-shapes.js';
 import {
   newTransform, cloneTransform, transformMatrix, applyMatrixToPoint, placeStrips,
   meanScale, scaleIsUniform, placementFor, placedExtent, unionExtent,
@@ -237,7 +244,38 @@ const overlayScene = new THREE.Scene();
 const overlayCamera = new THREE.OrthographicCamera(0, 1, 0, 1, -1, 1);
 let frameObj = null;
 
-const materials = [material, selMaterial, frameMaterial];
+/* The picked shape's outline: the frame's own chrome, quieter and dashed by
+   nothing but its opacity. In `materials` for the reason every LineMaterial
+   here is. */
+const shapeSelMaterial = new LineMaterial({
+  color: FRAME_COLOR, linewidth: 1.0, blending: THREE.NormalBlending,
+  transparent: true, opacity: 0.55, depthTest: false, depthWrite: false, fog: false,
+});
+const materials = [material, selMaterial, frameMaterial, shapeSelMaterial];
+
+/* ---- background shapes ---------------------------------------------------
+   THEIR OWN SCENE, IN THE PICTURE PLANE, DRAWN BEFORE THE INK — see
+   plot-shapes.js's header for the three findings this answers. The scene is
+   rendered through the overlay's own orthographic camera (CSS pixels, y down),
+   which is what puts a shape in FRAME space: nothing about the perspective
+   camera reaches it, so an orbit moves the drawing and leaves every panel where
+   the layout put it.
+
+   EACH SHAPE WRITES THE STENCIL AS IT PAINTS — the value its TONE names, by
+   REPLACE, in list order — so the stencil ends up holding the tone of whichever
+   shape painted each pixel last, which is exactly the z-order rule. The two ink
+   passes then read it: the ground's pass where it is 0, the panel's pass where
+   it is 1. That is the inverse clip, with no depth anywhere in it. */
+const shapeScene = new THREE.Scene();
+let shapeObjs = [];             // one Mesh per shape, in list order
+let shapes = [];                // the composition's shapes, bottom first
+let selShape = -1;              // which one the SHAPES panel edits, or -1
+/* THE KNOCKOUT LAYER. Every LINE object is on it as well as on layer 0; the
+   handles are not. The panel's pass renders this layer alone, so the drawing
+   reverses inside a panel and the editor's handles are drawn once, by the
+   ground's pass, over both. */
+const KNOCK_LAYER = 1;
+let lastKnock = null;           // what the last frame actually drew, for the read-out
 
 /* ---- the composition's own state — everything that is not one bloom ------ */
 let objects = { u: null, v: null, other: null, stem: null, sel: null };
@@ -465,6 +503,22 @@ const fout = {
 };
 const frameInfoEl = document.getElementById('plot-frameinfo');
 
+/* THE SHAPE CONTROLS, keyed by the FILE's own field names — `SHAPE_FIELDS` is
+   the one table the panel, the writer and the reader all walk. */
+const shui = {};
+for (const f of SHAPE_FIELDS) shui[f.key] = document.getElementById(f.control);
+const shout = {};
+for (const f of SHAPE_FIELDS) shout[f.key] = document.getElementById(`${f.control}Out`);
+const shapePickEl = document.getElementById('shapePick');
+const shapePickOut = document.getElementById('shapePickOut');
+const shapeAddBtn = document.getElementById('shapeAdd');
+const shapeRemoveBtn = document.getElementById('shapeRemove');
+const shapeRaiseBtn = document.getElementById('shapeRaise');
+const shapeLowerBtn = document.getElementById('shapeLower');
+const shapePrevBtn = document.getElementById('shapePrev');
+const shapeNextBtn = document.getElementById('shapeNext');
+const shapeStateEl = document.getElementById('plot-shapestate');
+
 /* THE RATIO OPTIONS ARE WRITTEN FROM `FRAME_RATIOS`, not listed in the markup —
    the file reader checks a saved ratio against that same array, and two lists of
    ratios is one of them being wrong. Done here rather than in the boot sequence
@@ -688,6 +742,7 @@ function resize() {
   overlayCamera.top = 0; overlayCamera.bottom = h;
   overlayCamera.updateProjectionMatrix();
   buildFrameOverlay();
+  buildShapes();
   dirty = true;
 }
 window.addEventListener('resize', resize);
@@ -742,6 +797,9 @@ function buildFamily(kind, mine, mat = material) {
   geom.setPositions(positions);
   const obj = new LineSegments2(geom, mat);
   obj.name = `plot_${kind}`;
+  // EVERY LINE OBJECT REVERSES, whatever it is — a family, the stem, the
+  // highlighted petal. A line left off this layer would vanish inside a panel.
+  obj.layers.enable(KNOCK_LAYER);
   obj.frustumCulled = false;      // two objects; culling buys nothing and a
                                   // line geometry's bounds are a nuisance
   container.add(obj);
@@ -776,6 +834,206 @@ function buildFrameOverlay() {
   frameObj.frustumCulled = false;
   overlayScene.add(frameObj);
 }
+
+/* ---- the shapes' geometry ------------------------------------------------
+   WHERE A SHAPE LIVES: the frame's own box, or the whole viewport when the
+   frame is off — `exportBox()`, which is also what both exports crop to, so a
+   shape is in the same place on screen, in the PNG and in the SVG. It reads
+   the canvas and the frame controls and nothing else: NOT the camera and NOT
+   the drawing's extent, which is the whole of "frame space". */
+const shapeSpace = () => exportBox();
+
+let shapeStats = [];            // per shape: marks, triangles, dropped, clamped
+function buildShapes() {
+  for (const o of shapeObjs) {
+    shapeScene.remove(o);
+    o.geometry.dispose();
+    o.material.dispose();
+  }
+  shapeObjs = [];
+  shapeStats = [];
+  const space = shapeSpace();
+  shapes.forEach((sh, k) => {
+    const m = shapeMarks(sh, space);
+    const tris = marksToTriangles(m.marks);
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(tris, 3));
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, side: THREE.DoubleSide,
+      depthTest: false, depthWrite: false, fog: false,
+      stencilWrite: true, stencilFunc: THREE.AlwaysStencilFunc,
+      stencilRef: TONE_STENCIL[sh.tone], stencilWriteMask: 0xff,
+      stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp,
+      stencilZPass: THREE.ReplaceStencilOp,
+    });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.name = `plot_shape_${k}`;
+    // Z-ORDER AMONG SHAPES IS LIST ORDER AND NOTHING ELSE — an ORDER, not a
+    // depth, so it cannot interleave with anything the drawing does.
+    mesh.renderOrder = k;
+    mesh.frustumCulled = false;
+    mesh.userData.shape = sh;
+    shapeScene.add(mesh);
+    shapeObjs.push(mesh);
+    shapeStats.push({ marks: m.marks.length, triangles: tris.length / 9,
+                      dropped: m.dropped, clamped: !!m.clamped,
+                      widthPx: m.widthPx, askedPx: m.askedPx });
+  });
+  buildShapeSelOverlay();
+  dirty = true;
+}
+
+/* THE PICKED SHAPE'S OUTLINE, AS CHROME. A striped or halftone panel has no
+   drawn edge of its own, so without this there is nothing on the canvas saying
+   which shape the panel is editing. It lives in the overlay scene beside the
+   frame's boundary, so neither export ever sees it. */
+let shapeSelObj = null;
+function buildShapeSelOverlay() {
+  if (shapeSelObj) {
+    overlayScene.remove(shapeSelObj);
+    shapeSelObj.geometry.dispose();
+    shapeSelObj = null;
+  }
+  if (selShape < 0 || !shapes[selShape]) return;
+  const m = shapeMarks(shapes[selShape], shapeSpace(), 0);
+  const o = m.outline;
+  const pts = new Float32Array(o.length / 2 * 3 + 3);
+  for (let i = 0; i < o.length / 2; i++) { pts[i * 3] = o[i * 2]; pts[i * 3 + 1] = o[i * 2 + 1]; }
+  pts[pts.length - 3] = o[0]; pts[pts.length - 2] = o[1];
+  const n = pts.length / 3;
+  const { positions } = stripsToSegments([{ count: n, segments: n - 1, points: pts }]);
+  const geom = new LineSegmentsGeometry();
+  geom.setPositions(positions);
+  shapeSelObj = new LineSegments2(geom, shapeSelMaterial);
+  shapeSelObj.name = 'plot_shape_selected';
+  shapeSelObj.frustumCulled = false;
+  overlayScene.add(shapeSelObj);
+}
+
+/* ---- the shapes' list -------------------------------------------------- */
+function rebuildShapeOptions() {
+  shapePickEl.innerHTML = '';
+  const none = document.createElement('option');
+  none.value = '-1'; none.textContent = 'none';
+  shapePickEl.appendChild(none);
+  shapes.forEach((sh, k) => {
+    const o = document.createElement('option');
+    o.value = String(k);
+    o.textContent = `${k + 1} · ${sh.tone} ${sh.kind === 'ellipse' ? 'ellipse' : 'rect'} · ${sh.fill}`;
+    shapePickEl.appendChild(o);
+  });
+  shapePickEl.value = String(selShape);
+}
+
+/* PICKING LOADS AND NEVER APPLIES — the ownership rule the bloom and the petal
+   pickers already follow, one panel over. */
+function loadShapeControls() {
+  const sh = shapes[selShape];
+  for (const f of SHAPE_FIELDS) {
+    const el = shui[f.key];
+    el.disabled = !sh;
+    if (sh) el.value = String(sh[f.key]);
+  }
+  shapeRemoveBtn.disabled = !sh;
+  shapeRaiseBtn.disabled = !sh || selShape >= shapes.length - 1;
+  shapeLowerBtn.disabled = !sh || selShape <= 0;
+  shapeAddBtn.disabled = shapes.length >= MAX_SHAPES;
+  writeShapeOutputs();
+}
+
+function setSelectedShape(k) {
+  selShape = (k >= 0 && k < shapes.length) ? k : -1;
+  shapePickEl.value = String(selShape);
+  loadShapeControls();
+  buildShapeSelOverlay();
+  writeShapeState();
+  dirty = true;
+}
+function stepShape(d) {
+  if (!shapes.length) return;
+  const n = shapes.length;
+  setSelectedShape(selShape < 0 ? (d > 0 ? 0 : n - 1) : (selShape + d + n) % n);
+}
+
+/* A NEW SHAPE GOES ON TOP and is picked, so the controls describe the thing
+   that just appeared. */
+function addShape(o = {}) {
+  if (shapes.length >= MAX_SHAPES) return -1;
+  shapes.push(newShape(o));
+  afterShapeListChange(shapes.length - 1);
+  return shapes.length - 1;
+}
+function removeShape() {
+  if (selShape < 0) return;
+  shapes.splice(selShape, 1);
+  afterShapeListChange(Math.min(selShape, shapes.length - 1));
+}
+/* RAISE AND LOWER ARE A SWAP IN THE LIST, because the list IS the z-order. */
+function moveShape(d) {
+  const k = selShape, j = k + d;
+  if (k < 0 || j < 0 || j >= shapes.length) return;
+  [shapes[k], shapes[j]] = [shapes[j], shapes[k]];
+  afterShapeListChange(j);
+}
+function afterShapeListChange(pick) {
+  selShape = pick;
+  rebuildShapeOptions();
+  loadShapeControls();
+  buildShapes();
+  writeShapeState();
+  writeFrameInfo();
+}
+
+const SHAPE_WORDS = { rect: 'rectangle', ellipse: 'ellipse' };
+/* HOW EACH FIELD READS, keyed like the table — the read-outs are walked off
+   SHAPE_FIELDS like everything else here, so a row cannot have a control and
+   no read-out, or a read-out and no row. */
+const SHAPE_OUT = {
+  kind: sh => SHAPE_WORDS[sh.kind] || sh.kind, tone: sh => sh.tone, fill: sh => sh.fill,
+  x: sh => `${sh.x}%`, y: sh => `${sh.y}%`, w: sh => `${sh.w}%`, h: sh => `${sh.h}%`,
+  rotationDeg: sh => `${sh.rotationDeg}°`, angleDeg: sh => `${sh.angleDeg}°`,
+  spacing: sh => `${sh.spacing}%`, weight: sh => `${sh.weight}%`,
+};
+function writeShapeOutputs() {
+  const sh = shapes[selShape];
+  shapePickOut.textContent = `${selShape < 0 ? 'none' : selShape + 1} of ${shapes.length}`;
+  for (const f of SHAPE_FIELDS) {
+    if (shout[f.key]) shout[f.key].textContent = sh ? SHAPE_OUT[f.key](sh) : '—';
+  }
+}
+
+/* WHAT THE SHAPES ARE DOING, IN WORDS THAT FOLLOW THE POLARITY. The two tones
+   are named by the colour they actually are on this page right now, and the
+   rule is printed beside them, so "opposite" is never a word with no picture. */
+function shapeText() {
+  const s = readUI();
+  const pol = polarityOf(s.polarity);
+  const opp = polarityOf(oppositeOf(s.polarity));
+  const lines = [];
+  lines.push(`ground is <b>${pol.groundWord}</b> (${pol.label}) · an opposite panel is `
+    + `<b>${opp.groundWord}</b>, and the drawing inside it is ${opp.label}`);
+  if (!shapes.length) {
+    lines.push('no shapes — <b>add</b> puts a panel across the lower half of the frame');
+    return lines.join('\n');
+  }
+  const space = shapeSpace();
+  lines.push(`${shapes.length} of ${MAX_SHAPES} · in frame space `
+    + `(${Math.round(space.width)} x ${Math.round(space.height)} px) — they hold still when the camera turns`);
+  shapes.forEach((sh, k) => {
+    const st = shapeStats[k] || { marks: 0, triangles: 0, dropped: 0 };
+    const regime = polarityOf(toneRegime(s.polarity, sh.tone));
+    const mark = k === selShape ? '▸' : ' ';
+    let line = `${mark}${k + 1} ${sh.tone} ${SHAPE_WORDS[sh.kind]} ${sh.fill} · `
+      + `${regime.groundWord} · ${st.marks} mark${st.marks === 1 ? '' : 's'}`;
+    if (st.dropped) line += ` <span class="warn">· ${st.dropped} over the budget, not drawn</span>`;
+    if (st.clamped) line += ` <span class="warn">· outline ${st.askedPx.toFixed(1)} px asked, `
+      + `${st.widthPx.toFixed(1)} px fits</span>`;
+    lines.push(line);
+  });
+  lines.push('last in the list is on top · the drawing is always in front of every shape');
+  return lines.join('\n');
+}
+function writeShapeState() { shapeStateEl.innerHTML = shapeText(); }
 
 /* THE STEM IS BUILT FROM THE U-LINES THAT ARE ACTUALLY DRAWN. It is not a
    separate curve stroked beside them; it is their continuation, so the ones
@@ -1320,7 +1578,6 @@ function applyStyle() {
      both regimes: the two framebuffer values sum to 255 at every position of
      the control. See plot-polarity.js for why a shared RAW value would have
      been four times off instead. */
-  material.color.setRGB(...inkRGB(pol.id, s.brightness));
   // THE HIGHLIGHT TRACKS THE DRAWING, differing in hue and in nothing else:
   // same weight, same exposure, so selecting a petal cannot make it read nearer
   // or further than it is.
@@ -1334,10 +1591,41 @@ function applyStyle() {
      space each polarity's invariant is stated in: the brightest CHANNEL on
      screen, the strongest ABSORPTION in print. The accent arrives linear
      because that is what a hex is once three has read it. */
-  tealLinear.setHex(SELECT_COLOR);
-  selMaterial.color.setRGB(...hueRGB(pol.id, [tealLinear.r, tealLinear.g, tealLinear.b],
-                                     s.brightness));
+  applyInkRegime(pol.id, s.brightness);
   dirty = true;
+}
+
+/* THE DRAWING'S INK IN ONE REGIME — blend, ink colour, highlight hue and the
+   fog it fades into — at the page's own level. The active polarity's regime is
+   what `applyStyle` leaves on the materials; the KNOCKOUT pass sets the other
+   regime for the length of its render and puts this one back. One function, so
+   the panel's ink cannot be assembled from a different rule than the page's:
+   inside an opposite panel the drawing IS the other polarity, at the same
+   slider value, through the same transfer — which is what makes one line land
+   at the same contrast against the panel as against the ground. */
+function applyInkRegime(id, level) {
+  const pol = polarityOf(id);
+  const blend = BLEND[pol.blend];
+  material.blending = blend;
+  selMaterial.blending = blend;
+  material.color.setRGB(...inkRGB(pol.id, level));
+  tealLinear.setHex(SELECT_COLOR);
+  selMaterial.color.setRGB(...hueRGB(pol.id, [tealLinear.r, tealLinear.g, tealLinear.b], level));
+  if (scene.fog) scene.fog.color.setHex(pol.ground);
+}
+
+/* A STENCIL CLIP ON THE TWO INK MATERIALS, or none. `null` turns the stencil
+   test off entirely, which is the page with no shapes exactly as it shipped. */
+function setInkStencil(ref) {
+  for (const m of [material, selMaterial]) {
+    if (ref === null) { m.stencilWrite = false; continue; }
+    m.stencilWrite = true;
+    m.stencilFunc = THREE.EqualStencilFunc;
+    m.stencilRef = ref;
+    m.stencilFuncMask = 0xff;
+    m.stencilWriteMask = 0x00;     // read, never write
+    m.stencilFail = m.stencilZFail = m.stencilZPass = THREE.KeepStencilOp;
+  }
 }
 
 
@@ -2292,15 +2580,84 @@ function updateFog() {
 // from outside: the wheel fix works by dirtying a frame, and a page that simply
 // rendered every tick would satisfy it while giving up the skip.
 let renderCount = 0;
-function render() {
+
+/* THE PICTURE — shapes, then the ink in two stencil-clipped passes — and the
+   ONE place it is drawn, so the screen and the PNG export cannot disagree about
+   what a knockout is.
+
+   WITH NO SHAPES THIS IS THE RENDER /plot SHIPPED: one pass, no stencil test,
+   the active regime. With shapes:
+     1. the shape scene is drawn with the clear (colour to the page's ground,
+        stencil to 0), each shape painting its tone's colour and writing its
+        tone's stencil value;
+     2. the PANEL's pass: the other polarity's regime, the knockout layer only,
+        where the stencil holds 1;
+     3. the GROUND's pass: the page's own regime, everything on layer 0
+        (handles included, so they sit over both), where the stencil holds 0.
+   Passes 2 and 3 cover complementary pixels, so their order is free and is
+   chosen for the handles. Neither is drawn and then covered.
+
+   `isolate` IS TEST CHROME, like `setView`: it draws the shapes (so the stencil
+   is what it always is), then clears the COLOUR ONLY to the isolated pass's own
+   ground and draws that pass alone. No control reaches it. It is the only way
+   to measure that BOTH passes are clipped: the ground's ink is invisible on the
+   panel's colour by construction (additive white on white, multiply black on
+   black), so in the composited picture an unclipped ground pass looks exactly
+   like a clipped one. */
+function drawPicture({ isolate = null } = {}) {
+  const s = readUI();
+  updateFog();
+  if (!shapeObjs.length) {
+    setInkStencil(null);
+    renderer.render(scene, camera);
+    lastKnock = null;
+    return;
+  }
+  for (const o of shapeObjs) {
+    const tone = o.userData.shape.tone;
+    o.material.color.setHex(toneColor(s.polarity, tone));
+    o.material.stencilRef = TONE_STENCIL[tone];
+  }
+  renderer.render(shapeScene, overlayCamera);
+  const passes = knockoutPasses(s.polarity);
+  const prevAuto = renderer.autoClear;
+  const prevClear = renderer.getClearColor(new THREE.Color()).getHex();
+  renderer.autoClear = false;
+  try {
+    if (isolate) {
+      renderer.setClearColor(polarityOf(toneRegime(s.polarity, isolate)).ground, 1);
+      renderer.clear(true, false, false);
+    }
+    for (const p of passes) {
+      if (isolate && p.tone !== isolate) continue;
+      applyInkRegime(p.regime, s.brightness);
+      setInkStencil(p.stencil);
+      // An isolated pass is the INK alone, so the handles (layer 0 only, and
+      // deliberately unclipped chrome) stay out of the measurement.
+      camera.layers.set(p.tone === 'ground' && !isolate ? 0 : KNOCK_LAYER);
+      renderer.render(scene, camera);
+    }
+  } finally {
+    camera.layers.set(0);
+    applyInkRegime(s.polarity, s.brightness);
+    setInkStencil(null);
+    renderer.setClearColor(prevClear, 1);
+    renderer.autoClear = prevAuto;
+  }
+  lastKnock = { passes: passes.map(p => ({ ...p })), shapes: shapeObjs.length, isolate };
+}
+
+function render({ isolate = null } = {}) {
   renderCount++;
   const t0 = performance.now();
-  updateFog();
-  renderer.render(scene, camera);
+  drawPicture({ isolate });
   // THE FRAME IS A SECOND PASS OVER THE SAME BUFFER, with `autoClear` off so
   // the drawing survives it — /print's overlay discipline, for the same reason:
   // the boundary belongs to the picture plane rather than to the model's space.
-  if (frameObj) {
+  // The picked shape's outline is chrome of the same kind and rides here too.
+  // AN ISOLATED PASS IS THE INK ALONE, so the overlay is not drawn over it: a
+  // teal outline is exactly what a check counting coloured ink would count.
+  if ((frameObj || shapeSelObj) && !isolate) {
     renderer.autoClear = false;
     renderer.render(overlayScene, overlayCamera);
     renderer.autoClear = true;
@@ -2982,8 +3339,9 @@ function renderRaster(scale) {
       m.linewidth *= S / prevRatio;
     }
     return withInkOnly(() => {
-      updateFog();
-      renderer.render(scene, camera);
+      // THE SAME PICTURE THE SCREEN DRAWS — shapes, then both ink passes —
+      // through the one function that owns it.
+      drawPicture();
       const gl = renderer.getContext();
       const bw = gl.drawingBufferWidth, bh = gl.drawingBufferHeight;
       const buf = new Uint8Array(bw * bh * 4);
@@ -3147,7 +3505,24 @@ function svgExport() {
      opens it, and the panel says which of those two is which. */
   const strokeMm = s.weight / renderer.getPixelRatio() * mmPerPx;
   const unit = exportUnits();
+  /* THE SHAPES, IN THE SAME MILLIMETRES AS THE STROKES. Their marks are
+     computed in the very box the SVG is cropped to — `shapeSpace()` IS
+     `exportBox()` — so a panel lands in the file exactly where it sits inside
+     the frame on screen. Each regime's INK is full strength, like the strokes
+     always were: white or black, by which ground it sits on. */
+  const toMm = poly => poly.map((v, i) => +(((i % 2 ? v - box.y : v - box.x) * mmPerPx).toFixed(3)));
+  const space = shapeSpace();
+  const knockShapes = shapes.map(sh => ({
+    tone: sh.tone, fill: toneColor(s.polarity, sh.tone),
+    d: polygonsData(shapeMarks(sh, space).marks.map(toMm)),
+  })).filter(m => m.d.length);
+  const inkOf = regime => (polarityOf(regime).groundIsWhite ? 0x000000 : 0xffffff);
   const text = svgDocument({
+    knockout: knockShapes.length ? {
+      shapes: knockShapes,
+      inks: { ground: inkOf(toneRegime(s.polarity, 'ground')),
+              opposite: inkOf(toneRegime(s.polarity, 'opposite')) },
+    } : null,
     paths,
     widthMm: box.width * mmPerPx, heightMm: box.height * mmPerPx,
     shape, strokeMm,
@@ -3162,6 +3537,7 @@ function svgExport() {
       + `${f.on ? f.ratio : 'viewport'}`,
   });
   return { text, paths: paths.length, strips: stripCount, points, dropped, shape,
+           shapes: knockShapes.length,
            polarity: pol.id, unit,
            widthMm: box.width * mmPerPx, heightMm: box.height * mmPerPx,
            strokeMm, mmPerPx,
@@ -3229,6 +3605,10 @@ function exportText() {
     + ' — a plotter takes its width from the pen');
   lines.push('  <span class="warn">flat strokes, no glow</span> — SVG has no additive or multiply,'
     + ' so the crossings do not survive; depth comes from line density');
+  if (shapes.length) {
+    lines.push(`  ${shapes.length} shape${shapes.length === 1 ? '' : 's'}: every path is drawn twice, `
+      + 'in each tone\'s ink under complementary masks — a plotter that ignores masks draws both');
+  }
   if (lastExport) lines.push(`saved ${lastExport.kind}: ${esc(lastExport.name)} — ${esc(lastExport.detail)}`);
   return lines.join('\n');
 }
@@ -3333,7 +3713,14 @@ function compositionDoc() {
               fov: camera.fov },
     // ONE CURSOR, BOTH HALVES. `selection.instance` has been in the file since
     // it was written and was always 0; it is the live value now.
-    selection: { instance: selInstance, petal: selected },
+    selection: { instance: selInstance, petal: selected, shape: selShape },
+    // THE SHAPES, THROUGH THEIR TABLE, bottom first — the list order IS the
+    // z-order, so it is written exactly as the page holds it.
+    shapes: shapes.map(sh => {
+      const o = {};
+      for (const f of SHAPE_FIELDS) o[f.key] = sh[f.key];
+      return o;
+    }),
     instances: instances.map(inst => ({
       id: inst.id,
       grid: identityOf(inst),
@@ -3515,6 +3902,28 @@ function applyComposition(text, name) {
     rebuildPetalOptions();
   }
   loadTransformControls();
+
+  /* THE SHAPES ARE THE WHOLE LIST OR NOTHING. A file that carries `shapes`
+     replaces the page's list — an empty list included, which is a composition
+     with no panels and is real state — and a file that does not (every v2 file)
+     leaves the page's shapes alone, the reader having already said so. The
+     cursor follows, and a cursor naming a shape the list does not have picks
+     nothing and says so. */
+  if (doc.shapes) {
+    shapes = doc.shapes.map(sh => ({ ...sh }));
+    const want = doc.selection ? doc.selection.shape : null;
+    if (want === null || want === undefined) selShape = Math.min(selShape, shapes.length - 1);
+    else if (want >= -1 && want < shapes.length) selShape = want;
+    else {
+      notes.push({ kind: 'dropped', text: `the saved selection was shape ${want + 1}, `
+        + `and the file holds ${shapes.length} — no shape is picked` });
+      selShape = -1;
+    }
+  }
+  rebuildShapeOptions();
+  loadShapeControls();
+  buildShapes();
+  writeShapeState();
 
   rebuild();
   loadPetalControls();
@@ -3796,6 +4205,9 @@ for (const [id, el] of Object.entries(ui)) {
     // which its own read-out reports.
     writePetalState();
     writePetalOutputs();
+    // The shapes' read-out names the two tones by the colour they are, and the
+    // polarity is what decides that.
+    if (id === 'polarity') writeShapeState();
   });
 }
 /* THE FRAME'S DISPATCH DOES THE LEAST OF ANY OF THEM, and the two things it
@@ -3809,10 +4221,43 @@ for (const el of Object.values(fui)) {
   el.addEventListener('input', () => {
     buildFrameOverlay();
     writeFrameOutputs();
+    // The shapes live in the frame's box, so a frame control moves them WITH
+    // the frame — which is what "frame space" means — and still never moves
+    // the camera.
+    buildShapes();
     writeFrameInfo();
+    writeShapeState();
     dirty = true;
   });
 }
+
+/* THE SHAPE CONTROLS ARE A VIEW OF THE PICKED SHAPE — `commitShape` writes the
+   ONE field the hand moved into that shape's own record, and `loadShapeControls`
+   writes every field FROM the record when the pick changes. Picking applies
+   nothing; with nothing picked the controls are disabled rather than showing
+   numbers that belong to no shape. Committing one field and not all eleven is
+   the transform's lesson: a range input holds its value at its own step, so
+   reading every slider back on every input would quietly snap fields nobody
+   touched. */
+for (const f of SHAPE_FIELDS) {
+  const el = shui[f.key];
+  el.addEventListener('input', () => {
+    const sh = shapes[selShape];
+    if (!sh) return;
+    sh[f.key] = (f.kind === 'number' || f.kind === 'int') ? +el.value : el.value;
+    buildShapes();
+    writeShapeOutputs();
+    writeShapeState();
+    writeFrameInfo();
+  });
+}
+shapeAddBtn.addEventListener('click', () => addShape());
+shapeRemoveBtn.addEventListener('click', () => removeShape());
+shapeRaiseBtn.addEventListener('click', () => moveShape(1));
+shapeLowerBtn.addEventListener('click', () => moveShape(-1));
+shapePrevBtn.addEventListener('click', () => stepShape(-1));
+shapeNextBtn.addEventListener('click', () => stepShape(1));
+shapePickEl.addEventListener('input', () => setSelectedShape(+shapePickEl.value));
 
 /* The stem's controls get their own dispatch: every one of them changes what
    the strips ARE, so all six go through the same rebuild — there is no cheap
@@ -4570,6 +5015,66 @@ window.__plot = {
     '#plot-left input, #plot-left select, #plot-side input, #plot-side select')]
     .map(el => ({ id: el.id, tag: el.tagName.toLowerCase(), type: el.type })),
 
+  /* ---- shapes and knockout ---- */
+  shapes: () => ({ list: shapes.map(sh => ({ ...sh })), selected: selShape,
+                   stats: shapeStats.map(st => ({ ...st })) }),
+  shapeSpace: () => { const b = shapeSpace(); return { x: b.x, y: b.y, width: b.width, height: b.height }; },
+  shapeText: () => shapeStateEl.textContent,
+  /* THE SHAPE GEOMETRY AS UPLOADED — the triangle positions each mesh carries,
+     in CSS pixels. Geometry, not a framebuffer, so an equality across a camera
+     move is a statement about the arrays and not about the renderer. */
+  shapeGeometry: () => shapeObjs.map(o => Array.from(o.geometry.getAttribute('position').array)),
+  knock: () => lastKnock && JSON.parse(JSON.stringify(lastKnock)),
+  /* THE FRAMEBUFFER, ONE BYTE A PIXEL (the brightest channel), TOP ROW FIRST,
+     as base64 — so the gate can measure a REGION rather than a summary.
+     `isolate` draws one ink pass alone over its own ground, the test chrome
+     `drawPicture` documents. */
+  readBuffer: (opts = {}) => {
+    dirty = true; render({ isolate: opts.isolate || null });
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const buf = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    const out = new Uint8Array(w * h);
+    let notGrey = 0;
+    for (let y = 0; y < h; y++) {
+      const src = (h - 1 - y) * w * 4, dst = y * w;
+      for (let x = 0; x < w; x++) {
+        const i = src + x * 4;
+        const r = buf[i], g = buf[i + 1], b = buf[i + 2];
+        if (r !== g || g !== b) notGrey++;
+        out[dst + x] = Math.max(r, g, b);
+      }
+    }
+    // Back to the real picture, so a later read is not of an isolated pass.
+    if (opts.isolate) { dirty = true; render(); }
+    let bin = '';
+    for (let i = 0; i < out.length; i += 0x8000) bin += String.fromCharCode.apply(null, out.subarray(i, i + 0x8000));
+    const { w: cssW, h: cssH } = canvasSize();
+    return { w, h, cssW, cssH, notGrey, data: btoa(bin) };
+  },
+  /* WHERE EACH LINE SET LANDS ON SCREEN, in CSS pixels — so a check can put a
+     panel over the stem alone, or across the head's edge, from the drawing's
+     own projection rather than from a guess. */
+  screenBoxes: () => {
+    container.updateMatrixWorld(true);
+    const M = container.matrixWorld;
+    const { w, h } = canvasSize();
+    const v = new THREE.Vector3();
+    const boxOf = list => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, n = 0;
+      for (const t of list) {
+        for (let i = 0; i < t.count; i++) {
+          v.set(t.points[i * 3], t.points[i * 3 + 1], t.points[i * 3 + 2]).applyMatrix4(M).project(camera);
+          if (!(v.z > -1 && v.z < 1)) continue;
+          const x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * h;
+          if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; n++;
+        }
+      }
+      return n ? { x0, y0, x1, y1, n } : null;
+    };
+    return { grid: boxOf(drawnStrips), stem: boxOf(stemStrips) };
+  },
   controlsEnabled: () => controls.enabled,
   cameraInfo: () => ({
     position: camera.position.toArray(),
@@ -4648,5 +5153,9 @@ writePetalState();
 writeFrameInfo();
 writeCompState();
 buildFrameOverlay();
+rebuildShapeOptions();
+loadShapeControls();
+buildShapes();
+writeShapeState();
 syncHandles();
 loadDefault();

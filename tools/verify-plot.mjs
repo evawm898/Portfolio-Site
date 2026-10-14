@@ -84,6 +84,206 @@ const LOW_VIEW = [0.92, 0.14, 1];      // a low angle, where the whorls overlap 
 // MUTANTS. `file` is the module the edit lands in; part one imports the broken
 // copy and part two is served it.
 const MUTANTS = [
+  /* ---- shapes and knockout ----------------------------------------------
+     EACH ONE IS A KNOCKOUT THAT LOOKS PLAUSIBLE AND IS WRONG — the failure the
+     brief named — or an ownership slip in the panel or the file. Three study
+     findings each get the mutant that reproduces them: a shape drawn over the
+     drawing, an ink pass left unclipped (draw-and-cover), and z-order taken
+     from anything but the list.
+     A DEFECT IN THE KNOCKOUT PATH ITSELF REDDENS EVERY CHECK THAT MEASURES INK
+     INSIDE A PANEL — the families, the stem, the edge, the fills, the overlap
+     — and the lists below say so, measured: each of those is a true statement
+     about the mutation, and a narrow list would be the one that was wrong. */
+  {
+    /* FINDING 1: a shape drawn OVER the drawing. Repaints the shapes after each
+       ink pass, so a panel swallows every line inside it. */
+    id: 'a-shape-is-drawn-over-the-drawing', file: 'plot.js',
+    from: '      renderer.render(scene, camera);\n    }\n  } finally {',
+    to: '      renderer.render(scene, camera);\n      renderer.render(shapeScene, overlayCamera);\n    }\n  } finally {',
+    breaks: ['knockout/a-shape-never-occludes-the-drawing',
+             'knockout/a-stroke-crossing-the-edge-changes-ink-at-the-edge',
+             'knockout/both-ink-passes-are-clipped-to-their-own-tone',
+             'knockout/the-two-tones-come-from-the-active-polarity',
+             'knockout/both-line-families-reverse',
+             'knockout/the-stem-reverses-too',
+             'shapes/overlapping-shapes-stack-in-list-order',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
+  },
+  {
+    /* FINDING 2, the ground's half: its pass drawn everywhere. It is drawn
+       LAST, so its additive white lands on the panel's dark ink too. */
+    id: 'the-ground-pass-is-not-clipped', file: 'plot.js',
+    from: '      setInkStencil(p.stencil);',
+    to: "      setInkStencil(p.tone === 'ground' ? null : p.stencil);",
+    breaks: ['knockout/a-shape-never-occludes-the-drawing',
+             'knockout/a-stroke-crossing-the-edge-changes-ink-at-the-edge',
+             'knockout/both-ink-passes-are-clipped-to-their-own-tone',
+             'knockout/both-line-families-reverse',
+             'knockout/the-stem-reverses-too',
+             'shapes/overlapping-shapes-stack-in-list-order',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
+  },
+  {
+    /* FINDING 2, the panel's half — and the one the composited picture cannot
+       show at all: multiply-dark ink on a black ground is black. Only the
+       isolated pass sees it. */
+    id: 'the-panel-pass-is-not-clipped', file: 'plot.js',
+    from: '      setInkStencil(p.stencil);',
+    to: "      setInkStencil(p.tone === 'opposite' ? null : p.stencil);",
+    breaks: ['knockout/both-ink-passes-are-clipped-to-their-own-tone'],
+  },
+  {
+    /* THE HARDCODED BLACK RECTANGLE the brief warned against: right in print,
+       and on screen a black panel on a black ground. */
+    id: 'the-panel-is-a-constant-black', file: 'plot.js',
+    from: '    o.material.color.setHex(toneColor(s.polarity, tone));',
+    to: "    o.material.color.setHex(tone === 'opposite' ? 0x000000 : toneColor(s.polarity, tone));",
+    breaks: ['knockout/the-two-tones-come-from-the-active-polarity',
+             'export/the-png-carries-the-panel-and-stays-grey',
+             'shapes/they-hold-still-in-frame-space-when-the-camera-orbits',
+             'shapes/overlapping-shapes-stack-in-list-order',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
+  },
+  {
+    // The same constant, one module down, where the page's tone is derived.
+    id: 'the-panel-tone-is-a-constant-in-the-law', file: 'plot-shapes.js',
+    from: 'export const toneColor = (polarity, tone) => POLARITY[toneRegime(polarity, tone)].ground;',
+    to: "export const toneColor = (polarity, tone) => (tone === 'opposite' ? 0x000000 : POLARITY[toneRegime(polarity, tone)].ground);",
+    breaks: ['knockout/the-panel-tone-is-derived-from-the-polarity',
+             'knockout/the-two-tones-come-from-the-active-polarity',
+             'export/the-png-carries-the-panel-and-stays-grey',
+             'shapes/they-hold-still-in-frame-space-when-the-camera-orbits',
+             'shapes/overlapping-shapes-stack-in-list-order',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
+  },
+  {
+    /* A MARK THAT FAILS TO REVERSE: the panel's pass drawn in the page's own
+       regime — additive white lines on a white panel, gone. */
+    id: 'the-ink-does-not-reverse-inside-a-panel', file: 'plot.js',
+    from: '      applyInkRegime(p.regime, s.brightness);',
+    to: '      applyInkRegime(s.polarity, s.brightness);',
+    breaks: ['knockout/a-shape-never-occludes-the-drawing',
+             'knockout/a-stroke-crossing-the-edge-changes-ink-at-the-edge',
+             'knockout/both-ink-passes-are-clipped-to-their-own-tone',
+             'knockout/the-two-tones-come-from-the-active-polarity',
+             'knockout/both-line-families-reverse',
+             'knockout/the-stem-reverses-too',
+             'shapes/overlapping-shapes-stack-in-list-order',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
+  },
+  {
+    /* THE STEMS, which the study found were the first thing draw-and-cover got
+       wrong: left off the knockout layer, they vanish inside a panel and every
+       check measured on the head is still green. */
+    id: 'the-stem-is-left-out-of-the-knockout', file: 'plot.js',
+    from: '  obj.layers.enable(KNOCK_LAYER);',
+    to: "  if (kind !== 'stem') obj.layers.enable(KNOCK_LAYER);",
+    breaks: ['knockout/the-stem-reverses-too'],
+  },
+  {
+    id: 'the-highlight-is-left-out-of-the-knockout', file: 'plot.js',
+    from: '  obj.layers.enable(KNOCK_LAYER);',
+    to: "  if (kind !== 'sel') obj.layers.enable(KNOCK_LAYER);",
+    breaks: ['knockout/the-highlighted-petal-reverses-in-its-own-hue'],
+  },
+  {
+    /* NOT FRAME SPACE: the shape pass picks up the camera's height, so a panel
+       drifts as the view turns. Every knockout check still passes at a single
+       camera — and the shapes' UPLOADED GEOMETRY is identical before and after
+       the orbit, so only the pixel half of the frame-space check can see it.
+       (A first version mutated `shapeSpace` and was inert: the shapes are
+       rebuilt on shape, frame and resize events, never on an orbit, so a space
+       computed from the camera at build time never saw the camera move.) */
+    id: 'the-shapes-follow-the-camera', file: 'plot.js',
+    from: '  renderer.render(shapeScene, overlayCamera);',
+    to: '  shapeScene.position.y = (camera.position.y - controls.target.y) * 0.5;\n  renderer.render(shapeScene, overlayCamera);',
+    breaks: ['shapes/they-hold-still-in-frame-space-when-the-camera-orbits'],
+  },
+  {
+    // FINDING 3's shape on the page: z-order taken from anything but the list.
+    id: 'the-shape-z-order-is-reversed', file: 'plot.js',
+    from: '    mesh.renderOrder = k;',
+    to: '    mesh.renderOrder = -k;',
+    breaks: ['shapes/overlapping-shapes-stack-in-list-order'],
+  },
+  {
+    /* A GROUND SHAPE PAINTS ITS COLOUR BUT WRITES THE PANEL'S STENCIL: the hole
+       is drawn, and the drawing inside it is the panel's ink on the ground —
+       invisible. Its colour is right, which is why only the ink in it can say. */
+    id: 'a-ground-shape-cannot-cut-the-knockout', file: 'plot.js',
+    from: '    o.material.stencilRef = TONE_STENCIL[tone];',
+    to: '    o.material.stencilRef = TONE_STENCIL.opposite;',
+    breaks: ['shapes/overlapping-shapes-stack-in-list-order'],
+  },
+  {
+    // THE OWNERSHIP RULE, one panel over: picking writes the panel into the shape.
+    id: 'picking-a-shape-applies-the-panel', file: 'plot.js',
+    from: '  selShape = (k >= 0 && k < shapes.length) ? k : -1;',
+    to: "  selShape = (k >= 0 && k < shapes.length) ? k : -1;\n  if (shapes[selShape]) for (const f of SHAPE_FIELDS) shapes[selShape][f.key] = (f.kind === 'number') ? +shui[f.key].value : shui[f.key].value;",
+    breaks: ['shapes/picking-a-shape-loads-its-values-and-applies-nothing',
+             'shapes/a-control-edits-the-picked-shape-and-no-other',
+             'save/shapes-are-saved-and-restored-with-their-order-and-the-pick'],
+  },
+  {
+    id: 'a-shape-control-edits-every-shape', file: 'plot.js',
+    from: "    sh[f.key] = (f.kind === 'number' || f.kind === 'int') ? +el.value : el.value;",
+    to: "    for (const o of shapes) o[f.key] = (f.kind === 'number' || f.kind === 'int') ? +el.value : el.value;",
+    breaks: ['shapes/a-control-edits-the-picked-shape-and-no-other',
+             'shapes/overlapping-shapes-stack-in-list-order'],
+  },
+  {
+    /* A MISSING FIELD IS TREATED AS EMPTY: every v2 file would wipe the page's
+       panels on restore, silently, since "no shapes" is a real state. */
+    id: 'a-file-without-shapes-clears-them', file: 'plot.js',
+    from: '  if (doc.shapes) {',
+    to: '  if (!doc.shapes) doc.shapes = [];\n  if (doc.shapes) {',
+    breaks: ['restore/a-file-without-shapes-leaves-the-shapes-alone-and-says-so'],
+  },
+  {
+    id: 'only-the-first-shape-is-saved', file: 'plot-file.js',
+    from: '    shapes: (state.shapes || []).map(sh => pick(SHAPE_FIELDS, sh)),',
+    to: '    shapes: (state.shapes || []).slice(0, 1).map(sh => pick(SHAPE_FIELDS, sh)),',
+    breaks: ['file/every-field-round-trips-through-the-writer-and-the-reader',
+             'save/shapes-are-saved-and-restored-with-their-order-and-the-pick'],
+  },
+  {
+    /* THE ROW THAT VANISHES — the writer and the reader agree perfectly about a
+       field that is gone, so only the written-down census and the control
+       census can see it. */
+    id: 'the-shape-field-table-loses-a-row', file: 'plot-file.js',
+    from: "  { key: 'rotationDeg', control: 'shapeRot',     kind: 'number' },\n",
+    to: '',
+    breaks: ['file/the-document-carries-exactly-these-fields',
+             'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
+  },
+  {
+    /* DRAW-AND-COVER IN THE FILE: the ground's ink unmasked, so it is drawn
+       everywhere and the panel's ink covers it — leaving its antialiased
+       fringe round every reversed stroke. */
+    id: 'the-svg-ground-ink-is-not-masked', file: 'plot-export.js',
+    from: "  const defs = maskOf('plot-knock-ground', '#ffffff', t => (t === 'opposite' ? '#000000' : '#ffffff'))",
+    to: "  const defs = maskOf('plot-knock-ground', '#ffffff', t => '#ffffff')",
+    breaks: ['export/the-svg-draws-every-path-twice-under-complementary-masks'],
+  },
+  {
+    // Stripes phased on the PAGE's origin rather than the shape's centre.
+    id: 'stripes-are-phased-on-the-page', file: 'plot-shapes.js',
+    from: '  const c0 = P.cx * nx + P.cy * ny;',
+    to: '  const c0 = 0;',
+    breaks: ['shapes/stripes-cover-their-weight-and-are-phased-on-the-centre'],
+  },
+  {
+    id: 'the-halftone-has-no-ramp', file: 'plot-shapes.js',
+    from: '    const t = span > 0 ? Math.min(1, Math.max(0, (a - along.lo) / span)) : 1;',
+    to: '    const t = 1;',
+    breaks: ['shapes/halftone-is-dense-at-the-end-the-angle-points-to'],
+  },
+  {
+    id: 'the-outline-is-drawn-outside-the-boundary', file: 'plot-shapes.js',
+    from: '    const hw = P.hw - w, hh = P.hh - w;',
+    to: '    const hw = P.hw + w, hh = P.hh + w;',
+    breaks: ['shapes/an-outline-is-a-ring-inside-the-boundary'],
+  },
   /* ---- rebuilding only the bloom that changed ----------------------------
      Three, and what they are between them is the two directions plus the thing
      that makes the routing safe. An OVER-eager rebuild is only slow, so its
@@ -1654,6 +1854,7 @@ async function run({ mutant = null } = {}) {
   const PL = await loadModule('plot-polarity.js', mutant);
   const EX = await loadModule('plot-export.js', mutant);
   const IN = await loadModule('plot-instance.js', mutant);
+  const SH = await loadModule('plot-shapes.js', mutant);
   const {
     densityToEvery, everyLabel, keepsIndex, readGridScene, selectStrips,
     stripsToSegments, boundsOf, dimToFog, fogFactor, MIN_DENSITY, MAX_DENSITY,
@@ -2422,6 +2623,145 @@ async function run({ mutant = null } = {}) {
   // =========================================================================
   // THE COMPOSITION FILE. Every claim here is about the ROUND TRIP, because a
   // restore that silently drops a field looks exactly like one that did not.
+  { // its own block, for the same reason
+  /* ---- shapes and knockout: the arithmetic --------------------------------
+     DRIVEN ON SHAPES WHOSE ANSWER CAN BE WRITTEN DOWN, because on the real
+     drawing a stripe phased against the wrong origin, a hole cut by the wrong
+     shape or a halftone ramp running backwards all still make a plausible
+     picture. Every expected number below is written here, never read out of
+     plot-shapes.js. */
+  log('\n--- part one: plot-shapes.js, on shapes whose answer is written down ---');
+
+  check('shapes/the-two-kinds-are-the-frames-own',
+    JSON.stringify(SH.SHAPE_KINDS) === JSON.stringify(FR.FRAME_SHAPES)
+    && JSON.stringify(SH.SHAPE_KINDS) === '["rect","ellipse"]',
+    `shape kinds ${JSON.stringify(SH.SHAPE_KINDS)} against the frame's ${JSON.stringify(FR.FRAME_SHAPES)}`);
+
+  /* THE PANEL IS THE OTHER POLARITY'S GROUND, IN BOTH DIRECTIONS — written down
+     here as hex, and the regimes the two passes draw in with it. A constant
+     black panel is right in print and invisible on screen, so both are asked. */
+  const toneTable = ['screen', 'print'].map(p => ({
+    p, opp: SH.toneColor(p, 'opposite'), gnd: SH.toneColor(p, 'ground'),
+    passes: SH.knockoutPasses(p).map(x => `${x.tone}:${x.stencil}:${x.regime}`).join(' '),
+  }));
+  check('knockout/the-panel-tone-is-derived-from-the-polarity',
+    toneTable[0].opp === 0xffffff && toneTable[0].gnd === 0x000000
+    && toneTable[1].opp === 0x000000 && toneTable[1].gnd === 0xffffff
+    && toneTable[0].passes === 'opposite:1:print ground:0:screen'
+    && toneTable[1].passes === 'opposite:1:screen ground:0:print'
+    && SH.oppositeOf('screen') === 'print' && SH.oppositeOf('print') === 'screen',
+    toneTable.map(t => `${t.p}: panel #${t.opp.toString(16).padStart(6, '0')} on `
+      + `#${t.gnd.toString(16).padStart(6, '0')}, passes ${t.passes}`).join(' · '));
+
+  // A box written down: 400 x 600 at (100, 50).
+  const SPACE = { x: 100, y: 50, width: 400, height: 600 };
+  const pl = SH.shapePlacement({ x: 25, y: 50, w: 50, h: 20, rotationDeg: 0, spacing: 5, weight: 50 }, SPACE);
+  const pl2 = SH.shapePlacement({ x: 25, y: 50, w: 50, h: 20, rotationDeg: 0, spacing: 5, weight: 50 },
+    { x: 200, y: 100, width: 800, height: 1200 });
+  check('shapes/a-shape-is-placed-in-the-frame-box-and-scales-with-it',
+    pl.cx === 200 && pl.cy === 350 && pl.hw === 100 && pl.hh === 60 && pl.pitch === 20
+    && pl2.cx === 400 && pl2.cy === 700 && pl2.hw === 200 && pl2.hh === 120 && pl2.pitch === 40,
+    `centre (${pl.cx}, ${pl.cy}), half ${pl.hw} x ${pl.hh}, pitch ${pl.pitch} px in a 400 x 600 box; `
+    + `twice the box gives (${pl2.cx}, ${pl2.cy}), ${pl2.hw} x ${pl2.hh}, ${pl2.pitch}`);
+
+  // Sutherland–Hodgman on two squares: [0,2]² against [1,3]² is [1,2]², area 1,
+  // and handing the clip over clockwise must not hand back the complement.
+  const sqA = [0, 0, 2, 0, 2, 2, 0, 2], sqB = [1, 1, 3, 1, 3, 3, 1, 3];
+  const sqBcw = [1, 1, 1, 3, 3, 3, 3, 1];
+  const cA = SH.clipConvex(sqA, sqB), cB = SH.clipConvex(sqA, sqBcw);
+  check('shapes/clipping-is-exact-on-written-down-squares',
+    cA && cB && Math.abs(Math.abs(SH.polygonArea(cA)) - 1) < 1e-12
+    && Math.abs(Math.abs(SH.polygonArea(cB)) - 1) < 1e-12
+    && SH.clipConvex(sqA, [5, 5, 6, 5, 6, 6, 5, 6]) === null,
+    `overlap ${cA ? Math.abs(SH.polygonArea(cA)) : 'null'} (ccw clip) and `
+    + `${cB ? Math.abs(SH.polygonArea(cB)) : 'null'} (cw clip); disjoint -> null`);
+
+  /* STRIPES: a 400 x 200 rect at pitch 20 px, weight 30%, running along x. The
+     bands are centred on the shape's centre, so across 200 px there are nine
+     whole bands and two halves at the edges: exactly 30% of the area, and
+     every band spans the full 400 px.
+     THE BOX IS OFFSET 7 px DOWN ON PURPOSE. With the centre at y = 200 and a
+     20 px pitch, bands phased on the PAGE's origin would land on exactly the
+     same rows as bands phased on the shape — the fixture would be a coin flip
+     that a phase bug wins. At y = 207 they cannot agree. */
+  const stripeSpace = { x: 0, y: 7, width: 400, height: 400 };
+  const stripe = { kind: 'rect', x: 50, y: 50, w: 100, h: 50, rotationDeg: 0, tone: 'opposite',
+                   fill: 'stripes', angleDeg: 0, spacing: 5, weight: 30 };
+  const sm = SH.shapeMarks(stripe, stripeSpace);
+  const smArea = SH.marksArea(sm.marks);
+  const bandW = sm.marks.map(m => { const xs = m.filter((_, i) => i % 2 === 0); return Math.max(...xs) - Math.min(...xs); });
+  const bandH = sm.marks.map(m => { const ys = m.filter((_, i) => i % 2 === 1); return Math.max(...ys) - Math.min(...ys); });
+  const centreBand = sm.marks.some(m => SH.pointInConvex(200, 207, m));
+  check('shapes/stripes-cover-their-weight-and-are-phased-on-the-centre',
+    Math.abs(smArea / (400 * 200) - 0.30) < 1e-9 && sm.marks.length === 11
+    && bandW.every(w => Math.abs(w - 400) < 1e-9)
+    && bandH.filter(h => Math.abs(h - 6) < 1e-9).length === 9
+    && bandH.filter(h => Math.abs(h - 3) < 1e-9).length === 2 && centreBand,
+    `${sm.marks.length} bands cover ${(smArea / 800).toFixed(4)}% of the shape — `
+    + `${bandH.filter(h => Math.abs(h - 6) < 1e-9).length} whole 6 px bands and two 3 px halves, `
+    + `each ${bandW[0]} px long, one through the centre`);
+
+  /* HALFTONE: the ramp runs toward the angle, so at 0° the right half carries
+     more ink than the left and at 180° the left more than the right — both,
+     because a ramp that ignored the angle would pass either one alone. */
+  const ht = a => SH.shapeMarks({ ...stripe, fill: 'halftone', angleDeg: a, weight: 100 }, stripeSpace).marks;
+  const halfInk = (marks, right) => SH.marksArea(marks.filter(m => {
+    const xs = m.filter((_, i) => i % 2 === 0); const c = (Math.max(...xs) + Math.min(...xs)) / 2;
+    return right ? c > 200 : c < 200;
+  }));
+  const ht0 = ht(0), ht180 = ht(180);
+  const r0 = halfInk(ht0, true) / Math.max(1e-9, halfInk(ht0, false));
+  const r180 = halfInk(ht180, false) / Math.max(1e-9, halfInk(ht180, true));
+  const htMaxD = Math.max(...ht0.map(m => { const xs = m.filter((_, i) => i % 2 === 0); return Math.max(...xs) - Math.min(...xs); }));
+  check('shapes/halftone-is-dense-at-the-end-the-angle-points-to',
+    r0 > 2 && r180 > 2 && htMaxD <= 20 + 1e-9 && htMaxD > 18 && ht0.length > 100,
+    `${ht0.length} dots; at 0° right:left ink ${r0.toFixed(2)}, at 180° left:right ${r180.toFixed(2)}; `
+    + `the densest dot is ${htMaxD.toFixed(2)} px across at a 20 px pitch and 100% weight`);
+
+  /* OUTLINE: a ring INSIDE the boundary, weight 50% of a 20 px pitch = 10 px.
+     400 x 200 less 380 x 180 is 11,600 px² — and the middle is not painted. */
+  const ol = SH.shapeMarks({ ...stripe, fill: 'outline', weight: 50 }, stripeSpace);
+  const olArea = SH.marksArea(ol.marks);
+  check('shapes/an-outline-is-a-ring-inside-the-boundary',
+    Math.abs(olArea - 11600) < 1e-6 && !ol.clamped
+    && SH.toneAt([{ ...stripe, fill: 'outline' }], stripeSpace, 200, 207) === 'ground'
+    && SH.toneAt([{ ...stripe, fill: 'outline' }], stripeSpace, 5, 207) === 'opposite'
+    && SH.toneAt([{ ...stripe, fill: 'outline' }], stripeSpace, 200, 111) === 'opposite'
+    && SH.toneAt([{ ...stripe, fill: 'outline' }], stripeSpace, 200, 124) === 'ground'
+    && SH.toneAt([{ ...stripe, fill: 'outline' }], stripeSpace, 200, 103) === 'ground',
+    `ring area ${olArea.toFixed(3)} px² against 400·200 − 380·180 = 11600; the ring is the 10 px `
+    + 'inside the edge and the middle is unpainted');
+
+  /* Z-ORDER IS LIST ORDER: an opposite panel with a ground ellipse on top has a
+     hole; the same two the other way round have none. And a stripe's GAP shows
+     what is beneath it. */
+  const panel = { ...stripe, fill: 'solid' };
+  const hole = { kind: 'ellipse', x: 50, y: 50, w: 30, h: 20, rotationDeg: 0, tone: 'ground',
+                 fill: 'solid', angleDeg: 0, spacing: 5, weight: 50 };
+  const stripesGround = { ...stripe, tone: 'ground', y: 50, h: 50, weight: 30 };
+  check('shapes/z-order-is-list-order-and-a-gap-shows-what-is-beneath',
+    SH.toneAt([panel, hole], stripeSpace, 200, 207) === 'ground'
+    && SH.toneAt([hole, panel], stripeSpace, 200, 207) === 'opposite'
+    && SH.toneAt([panel, hole], stripeSpace, 20, 207) === 'opposite'
+    && SH.toneAt([panel, stripesGround], stripeSpace, 30, 207) === 'ground'     // on a ground band
+    && SH.toneAt([panel, stripesGround], stripeSpace, 30, 217) === 'opposite'   // in its gap
+    && SH.toneAt([panel], stripeSpace, 200, 20) === 'ground',
+    'panel+hole: a hole at the centre; hole+panel: none; a ground stripe over the panel '
+    + 'paints ground on its band and shows the panel through its gap');
+
+  /* A TURNED SHAPE TURNS ABOUT ITS CENTRE, CLOCKWISE ON SCREEN: a 200 x 20 bar
+     at 90° stands 200 tall and 20 wide. */
+  const bar = SH.shapeOutline({ kind: 'rect', x: 50, y: 50, w: 50, h: 5, rotationDeg: 90 }, stripeSpace);
+  const bxs = bar.filter((_, i) => i % 2 === 0), bys = bar.filter((_, i) => i % 2 === 1);
+  check('shapes/a-turn-is-about-the-centre',
+    Math.abs(Math.max(...bxs) - Math.min(...bxs) - 20) < 1e-9
+    && Math.abs(Math.max(...bys) - Math.min(...bys) - 200) < 1e-9
+    && Math.abs((Math.max(...bxs) + Math.min(...bxs)) / 2 - 200) < 1e-9,
+    `a 200 x 20 bar at 90° spans ${(Math.max(...bxs) - Math.min(...bxs)).toFixed(3)} x `
+    + `${(Math.max(...bys) - Math.min(...bys)).toFixed(3)} about (200, 207)`);
+
+  }
+
   log('\n--- part one: plot-file.js, round-tripped over a state written down ---');
 
   // The bounds a control would supply. Written down rather than read off the
@@ -2436,6 +2776,10 @@ async function run({ mutant = null } = {}) {
     stemNeck: { min: 1, max: 300, step: 1 },
     petalAlong: { min: 0.25, max: 2.5, step: 0.05 },
     petalAcross: { min: 0.25, max: 2.5, step: 0.05 },
+    shapeX: { min: -50, max: 150, step: 0.5 }, shapeY: { min: -50, max: 150, step: 0.5 },
+    shapeW: { min: 1, max: 200, step: 0.5 }, shapeH: { min: 1, max: 200, step: 0.5 },
+    shapeRot: { min: -180, max: 180, step: 1 }, shapeAngle: { min: -180, max: 180, step: 1 },
+    shapeSpacing: { min: 0.5, max: 12, step: 0.1 }, shapeWeight: { min: 5, max: 140, step: 1 },
   };
   const FILE_OPTS = { boundsOf: id => FILE_BOUNDS[id] || null,
                  limits: { stemBends: 8, petalBends: 6 } };
@@ -2445,7 +2789,16 @@ async function run({ mutant = null } = {}) {
             brightness: 62, depthDim: 20 },
     view: { stemHandles: false, petalHandles: true },
     camera: { position: [11, 22, 33], target: [1, 2, 3], fov: 38 },
-    selection: { instance: 0, petal: 7 },
+    selection: { instance: 0, petal: 7, shape: 1 },
+    // TWO SHAPES, OVERLAPPING, IN AN ORDER THAT MATTERS — a ground-tone hole on
+    // top of an opposite panel — so a writer that re-sorted the list would be
+    // a different composition and not a reformatting.
+    shapes: [
+      { kind: 'rect', tone: 'opposite', fill: 'stripes', x: 50, y: 70, w: 100, h: 60,
+        rotationDeg: -12, angleDeg: 30, spacing: 2.5, weight: 40 },
+      { kind: 'ellipse', tone: 'ground', fill: 'halftone', x: 40.5, y: 66, w: 35, h: 22,
+        rotationDeg: 0, angleDeg: 90, spacing: 1.2, weight: 110 },
+    ],
     instances: [{
       id: 'bloom-0',
       grid: { name: 'g.glb', mode: 'live', petals: 28, u: 280, v: 812, other: 0,
@@ -2551,13 +2904,16 @@ async function run({ mutant = null } = {}) {
     && fieldKeysOf(FL.VIEW_FIELDS) === 'stemHandles,petalHandles'
     && fieldKeysOf(FL.STEM_FIELDS) === 'on,bundle,join,length,droopDeg,neck'
     && fieldKeysOf(FL.PETAL_FIELDS) === 'along,across'
+    && fieldKeysOf(FL.SHAPE_FIELDS)
+       === 'kind,tone,fill,x,y,w,h,rotationDeg,angleDeg,spacing,weight'
     && transformCensus === 'bloomX->position[0],bloomY->position[1],bloomZ->position[2],'
        + 'bloomRotX->rotationDeg[0],bloomRotY->rotationDeg[1],bloomRotZ->rotationDeg[2],'
        + 'bloomScale->scale[-1]'
-    && FL.VERSION === 2,
+    && FL.VERSION === 3,
     `frame(${fieldKeysOf(FL.FRAME_FIELDS)}) draw(${fieldKeysOf(FL.DRAW_FIELDS)}) `
     + `view(${fieldKeysOf(FL.VIEW_FIELDS)}) stem(${fieldKeysOf(FL.STEM_FIELDS)}) `
-    + `petal(${fieldKeysOf(FL.PETAL_FIELDS)}) transform(${transformCensus}) at v${FL.VERSION}`);
+    + `petal(${fieldKeysOf(FL.PETAL_FIELDS)}) shape(${fieldKeysOf(FL.SHAPE_FIELDS)}) `
+    + `transform(${transformCensus}) at v${FL.VERSION}`);
 
   const rt = roundTrip(FILE_STATE);
   const rtDiff = [];
@@ -2579,6 +2935,12 @@ async function run({ mutant = null } = {}) {
     }
     if (JSON.stringify(rt.doc.camera) !== JSON.stringify(FILE_STATE.camera)) rtDiff.push('camera');
     if (JSON.stringify(rt.doc.selection) !== JSON.stringify(FILE_STATE.selection)) rtDiff.push('selection');
+    FILE_STATE.shapes.forEach((sh, k) => {
+      for (const f of FL.SHAPE_FIELDS) {
+        if (!rt.doc.shapes || !rt.doc.shapes[k] || rt.doc.shapes[k][f.key] !== sh[f.key]) rtDiff.push(`shapes[${k}].${f.key}`);
+      }
+    });
+    if (!rt.doc.shapes || rt.doc.shapes.length !== FILE_STATE.shapes.length) rtDiff.push('shapes.length');
   } else rtDiff.push(`refused: ${rt.error}`);
   check('file/every-field-round-trips-through-the-writer-and-the-reader',
     rt.ok && rtDiff.length === 0 && rt.notes.length === 0,
@@ -2634,7 +2996,7 @@ async function run({ mutant = null } = {}) {
     && three[2].transform.position[1] === 30 && three[2].stem.on === 'off'
     && three[1].stem.droopDeg === 40 && three[0].stem.droopDeg === THREE_STATE.instances[0].stem.droopDeg
     && three[1].petals.length === 1 && three[2].petals.length === 0
-    && rt3.doc.selection.instance === 2 && rt3.doc.version === 2,
+    && rt3.doc.selection.instance === 2 && rt3.doc.version === FL.VERSION,
     rt3.ok ? `three instances round-trip at v${rt3.doc.version} with ${rt3.notes.length} notes — `
       + `own transforms (${three.map(i => i.transform.position[0]).join(' / ')} mm), own stems `
       + `(droop ${three.map(i => i.stem.droopDeg).join(' / ')}°) and own petal entries `
@@ -6215,11 +6577,12 @@ async function run({ mutant = null } = {}) {
     compositionFile: 'a file input — it is how a composition gets here',
     petalPick: 'the selection, which the file carries at the top level as one cursor',
     bloomPick: 'the other half of that cursor — selection.instance in the file',
+    shapePick: 'the shape cursor — selection.shape in the file',
   };
   const pageControls = await q(() => window.__plot.pageControls());
   const covered = new Set([...FL.FRAME_FIELDS, ...FL.DRAW_FIELDS, ...FL.VIEW_FIELDS,
                            ...FL.STEM_FIELDS, ...FL.PETAL_FIELDS,
-                           ...FL.TRANSFORM_FIELDS].map(f => f.control));
+                           ...FL.TRANSFORM_FIELDS, ...FL.SHAPE_FIELDS].map(f => f.control));
   const uncovered = pageControls.filter(c => !covered.has(c.id) && !(c.id in EXEMPT));
   check('save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception',
     uncovered.length === 0 && pageControls.length === covered.size + Object.keys(EXEMPT).length,
@@ -6233,9 +6596,9 @@ async function run({ mutant = null } = {}) {
   const panels = await q(() => [...document.querySelectorAll('details.panel')]
     .map(d => ({ id: d.id, summary: d.querySelector('summary').textContent.trim(), open: d.open })));
   check('panels/every-panel-is-present-and-is-a-details',
-    panels.length === 8 && panels.every(p => p.open)
+    panels.length === 9 && panels.every(p => p.open)
     && panels.map(p => p.summary).join('|')
-       === 'ADD GRID|COMPOSITION|GRID|FRAME|DRAW|BLOOM|PETAL|STEM',
+       === 'ADD GRID|COMPOSITION|GRID|FRAME|SHAPES|DRAW|BLOOM|PETAL|STEM',
     panels.map(p => `${p.summary}(${p.id})`).join(' · '));
 
   // Driven through `brightness`, which no mutation in this file touches, so
@@ -6256,6 +6619,422 @@ async function run({ mutant = null } = {}) {
     && pixCollapseAfter.hash !== pixCollapseBefore.hash,
     `brightness ${beforeCollapse.colorLinear} -> ${whileCollapsed.colorLinear} with DRAW shut, `
     + 'and the framebuffer changed');
+
+  { // its own block: these names must not collide with the rest of run()
+  /* ---- SHAPES AND KNOCKOUT ------------------------------------------------
+     MEASURED ON THE FRAMEBUFFER, REGION BY REGION, against the same drawing
+     with no shape — and never asked to come back to the bit. A drawing with no
+     shape is read first, at one settled camera; the shape is added (which moves
+     no camera); the drawing is read again. Inside the panel every pixel the
+     bare drawing inked must still be ink, now on the other side of the panel's
+     tone; outside it must be ink as before. That is a COVERAGE comparison with
+     a bar, not an equality, because damping never reaches exactly zero here.
+
+     THE FAILURE THIS IS BUILT AGAINST IS A KNOCKOUT THAT LOOKS PLAUSIBLE AND IS
+     WRONG — a region that did not reverse, a line set left out, a panel that
+     is a constant black on a black ground — every one of which reads as fine
+     at a glance. Each has a measurement of its own below.
+
+     THE GROUND PASS IS INVISIBLE ON THE PANEL BY CONSTRUCTION (additive white
+     on white, multiply black on black), so an unclipped pass leaves the
+     composited picture unchanged. `readBuffer({ isolate })` draws one pass
+     alone over its own ground; it is the only instrument that can see whether
+     BOTH passes are clipped. */
+  log('\n--- shapes and knockout ---');
+  const SHC = Object.fromEntries(FL.SHAPE_FIELDS.map(f => [f.key, f.control]));
+  const b64 = str => new Uint8Array(Buffer.from(str, 'base64'));
+  const readBuf = async (isolate = null) => {
+    const r = await page.evaluate(o => { window.__plot.settle(); return window.__plot.readBuffer(o); },
+                                  { isolate });
+    return { ...r, px: b64(r.data), s: r.w / r.cssW };
+  };
+  const clearShapes = () => page.evaluate(() => {
+    let n = 0;
+    while (window.__plot.shapes().list.length && n++ < 20) {
+      const pk = document.getElementById('shapePick');
+      pk.value = '0'; pk.dispatchEvent(new Event('input', { bubbles: true }));
+      document.getElementById('shapeRemove').click();
+    }
+    return window.__plot.shapes().list.length;
+  });
+  const addShape = async (o = {}) => {
+    await page.evaluate(() => document.getElementById('shapeAdd').click());
+    const w = {};
+    for (const [k, v] of Object.entries(o)) w[SHC[k]] = v;
+    if (Object.keys(w).length) await set(w);
+    const st = await q(() => window.__plot.shapes());
+    return st.list[st.selected];
+  };
+  const pickShape = k => page.evaluate(k => {
+    const pk = document.getElementById('shapePick');
+    pk.value = String(k); pk.dispatchEvent(new Event('input', { bubbles: true }));
+  }, k);
+  const spaceNow = () => q(() => window.__plot.shapeSpace());
+  // Rows of a horizontal panel, in device px, from a shape record and the box.
+  const panelRows = (sh, sp, s) => ({
+    top: (sp.y + (sh.y - sh.h / 2) / 100 * sp.height) * s,
+    bottom: (sp.y + (sh.y + sh.h / 2) / 100 * sp.height) * s,
+    left: (sp.x + (sh.x - sh.w / 2) / 100 * sp.width) * s,
+    right: (sp.x + (sh.x + sh.w / 2) / 100 * sp.width) * s,
+  });
+  /* THE COVERAGE MEASURE. Over a region, of the pixels the BARE drawing inked,
+     how many are ink in the picture under test — `inkB` says what "ink" means
+     there, because inside a light panel ink is DARK. */
+  const regionStats = (A, B, inReg, inkA, inkB, extra = () => true) => {
+    let base = 0, kept = 0, stray = 0, quiet = 0, quietTone = new Map();
+    for (let y = 0; y < A.h; y++) {
+      for (let x = 0; x < A.w; x++) {
+        if (!inReg(x, y) || !extra(x, y)) continue;
+        const i = y * A.w + x;
+        const a = A.px[i], b = B.px[i];
+        if (inkA(a)) { base++; if (inkB(b)) kept++; }
+        else if (inkB(b)) stray++;
+        // A pixel the bare drawing left EMPTY, with empty neighbours: the
+        // panel's or the ground's own tone shows there and nothing else.
+        if (a === A.ground && x > 0 && y > 0 && x < A.w - 1 && y < A.h - 1
+            && A.px[i - 1] === A.ground && A.px[i + 1] === A.ground
+            && A.px[i - A.w] === A.ground && A.px[i + A.w] === A.ground) {
+          quiet++; quietTone.set(b, (quietTone.get(b) || 0) + 1);
+        }
+      }
+    }
+    const top = [...quietTone.entries()].sort((p, q2) => q2[1] - p[1])[0] || [null, 0];
+    return { base, kept, recall: base ? kept / base : 0, stray, quiet,
+             tone: top[0], toneShare: quiet ? top[1] / quiet : 0 };
+  };
+  const SCREEN_INK = v => v > 8, PRINT_INK = v => v < 247;
+
+  await clearShapes();
+  await reset();
+  const gb = (await q(() => window.__plot.screenBoxes())).grid;
+  const sp0 = await spaceNow();
+  const bare = await readBuf(); bare.ground = 0;
+  /* THE PANEL'S TOP EDGE RUNS THROUGH THE MIDDLE OF THE HEAD, so the bloom
+     crosses it: the lower half of the frame, opposite tone, solid. Snapped to
+     the controls' own half-percent step. */
+  const edgePct = Math.round(((gb.y0 + gb.y1) / 2 - sp0.y) / sp0.height * 200) / 2;
+  const panelSh = await addShape({ y: (edgePct + 100) / 2, h: 100 - edgePct + 0.5, x: 50, w: 102 });
+  const withPanel = await readBuf();
+  const PR = panelRows(panelSh, sp0, bare.s);
+  const E = 4 * bare.s;                         // keep 4 px clear of the edge
+  const inPanel = (x, y) => y > PR.top + E && y < PR.bottom - E && x > E && x < bare.w - E;
+  const abovePanel = (x, y) => y < PR.top - E && x > E && x < bare.w - E;
+  const scIn = regionStats(bare, withPanel, inPanel, SCREEN_INK, PRINT_INK);
+  const scOut = regionStats(bare, withPanel, abovePanel, SCREEN_INK, SCREEN_INK);
+  check('knockout/a-shape-never-occludes-the-drawing',
+    scIn.base > 1500 && scIn.recall >= 0.92,
+    `inside the panel ${scIn.kept} of the ${scIn.base} pixels the bare drawing inked are still ink `
+    + `(${(scIn.recall * 100).toFixed(1)}%), now dark on the panel — the drawing is in front of it`);
+  check('knockout/outside-a-panel-the-drawing-is-untouched',
+    scOut.base > 1500 && scOut.recall >= 0.97 && scOut.stray <= 0.02 * scOut.base,
+    `above the edge ${(scOut.recall * 100).toFixed(1)}% of ${scOut.base} inked pixels are ink as before, `
+    + `${scOut.stray} new`);
+
+  /* A STROKE CROSSING THE EDGE CHANGES INK THERE AND NOWHERE ELSE: in every
+     column where the bare drawing has ink just above AND just below the edge,
+     the panel picture has bright ink above and dark ink below. */
+  const rowUp = Math.round(PR.top - 6 * bare.s), rowDn = Math.round(PR.top + 6 * bare.s);
+  let crossings = 0, twoInks = 0;
+  for (let x = Math.ceil(E); x < bare.w - E; x++) {
+    if (!SCREEN_INK(bare.px[rowUp * bare.w + x]) || !SCREEN_INK(bare.px[rowDn * bare.w + x])) continue;
+    crossings++;
+    if (SCREEN_INK(withPanel.px[rowUp * bare.w + x]) && PRINT_INK(withPanel.px[rowDn * bare.w + x])) twoInks++;
+  }
+  check('knockout/a-stroke-crossing-the-edge-changes-ink-at-the-edge',
+    crossings >= 15 && twoInks / crossings >= 0.85,
+    `${crossings} columns carry a stroke across the panel's edge; in ${twoInks} of them the stroke `
+    + 'is bright ink on the ground above it and dark ink on the panel below it');
+
+  // --- both passes clipped, measured one pass at a time ------------------------
+  const isoG = await readBuf('ground'); isoG.ground = 0;
+  const isoO = await readBuf('opposite');
+  const gIn = regionStats(bare, isoG, inPanel, SCREEN_INK, SCREEN_INK);
+  const gOut = regionStats(bare, isoG, abovePanel, SCREEN_INK, SCREEN_INK);
+  const oIn = regionStats(bare, isoO, inPanel, SCREEN_INK, PRINT_INK);
+  const oOut = regionStats(bare, isoO, abovePanel, SCREEN_INK, PRINT_INK);
+  check('knockout/both-ink-passes-are-clipped-to-their-own-tone',
+    gIn.kept + gIn.stray <= 0.01 * Math.max(1, gIn.base) && gOut.recall >= 0.97
+    && oOut.kept + oOut.stray <= 0.01 * Math.max(1, oOut.base) && oIn.recall >= 0.92,
+    `the ground's pass alone: ${gIn.kept + gIn.stray} ink px inside the panel, `
+    + `${(gOut.recall * 100).toFixed(1)}% above it · the panel's pass alone: `
+    + `${oOut.kept + oOut.stray} ink px above the edge, ${(oIn.recall * 100).toFixed(1)}% inside — `
+    + 'an inverse clip, neither drawn and then covered');
+
+  // --- the two tones, from the active polarity ---------------------------------
+  await set({ polarity: 'print', brightness: 16 });
+  const bareP0 = await clearShapes() === 0 ? await readBuf() : null;
+  if (bareP0) bareP0.ground = 255;
+  await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
+  const withPanelP = await readBuf();
+  const prIn = bareP0 ? regionStats(bareP0, withPanelP, inPanel, PRINT_INK, SCREEN_INK) : null;
+  const prOut = bareP0 ? regionStats(bareP0, withPanelP, abovePanel, PRINT_INK, PRINT_INK) : null;
+  const scInT = scIn, scOutT = scOut;
+  check('knockout/the-two-tones-come-from-the-active-polarity',
+    scInT.tone === 255 && scInT.toneShare >= 0.99 && scOutT.tone === 0 && scOutT.toneShare >= 0.99
+    && !!prIn && prIn.tone === 0 && prIn.toneShare >= 0.99 && prOut.tone === 255
+    && prOut.toneShare >= 0.99 && prIn.recall >= 0.92 && prOut.recall >= 0.97,
+    `screen: panel ${scInT.tone} on ground ${scOutT.tone}, the drawing dark inside · print: panel `
+    + `${prIn ? prIn.tone : '—'} on ground ${prOut ? prOut.tone : '—'}, the drawing bright inside `
+    + `(${prIn ? (prIn.recall * 100).toFixed(1) : '—'}% of its ink)`);
+  await clearShapes();
+  await reset();
+
+  // --- every line object reverses: the families, the stem, the highlight -------
+  const famRecall = {};
+  for (const fam of ['u', 'v']) {
+    await clearShapes();
+    await reset({ families: fam });
+    const b0 = await readBuf(); b0.ground = 0;
+    await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
+    const b1 = await readBuf();
+    famRecall[fam] = regionStats(b0, b1, inPanel, SCREEN_INK, PRINT_INK);
+  }
+  check('knockout/both-line-families-reverse',
+    famRecall.u.base > 500 && famRecall.v.base > 500
+    && famRecall.u.recall >= 0.92 && famRecall.v.recall >= 0.92,
+    `u only ${(famRecall.u.recall * 100).toFixed(1)}% of ${famRecall.u.base} · v only `
+    + `${(famRecall.v.recall * 100).toFixed(1)}% of ${famRecall.v.base} inked pixels reversed inside the panel`);
+
+  /* THE STEM, ALONE: a panel over the stretch of stem below the head, where the
+     stem is the only ink there is. */
+  await clearShapes();
+  await reset({ stem: 'on' });
+  const boxes = await q(() => window.__plot.screenBoxes());
+  const bareS = await readBuf(); bareS.ground = 0;
+  const stTop = boxes.grid.y1 + 6, stBot = Math.min(boxes.stem ? boxes.stem.y1 : 0, sp0.y + sp0.height) - 4;
+  const stemSh = await addShape({ x: 50, w: 102,
+    y: Math.round(((stTop + stBot) / 2 - sp0.y) / sp0.height * 200) / 2,
+    h: Math.max(1, Math.round((stBot - stTop) / sp0.height * 200) / 2) });
+  const withStemPanel = await readBuf();
+  const SR = panelRows(stemSh, sp0, bareS.s);
+  const inStemPanel = (x, y) => y > SR.top + E && y < SR.bottom - E && x > E && x < bareS.w - E;
+  const stemStats = regionStats(bareS, withStemPanel, inStemPanel, SCREEN_INK, PRINT_INK);
+  check('knockout/the-stem-reverses-too',
+    !!boxes.stem && stemStats.base > 300 && stemStats.recall >= 0.9,
+    `a panel over the stem below the head (rows ${Math.round(SR.top)}–${Math.round(SR.bottom)}): `
+    + `${(stemStats.recall * 100).toFixed(1)}% of the stem's ${stemStats.base} inked pixels are ink `
+    + 'on the panel');
+
+  /* THE HIGHLIGHTED PETAL REVERSES IN ITS OWN HUE: with the lowest petal picked
+     and the panel across it, the panel's pass drawn alone carries colour. */
+  await clearShapes();
+  await reset();
+  const petalBoxes = [];
+  for (let k = 0; k < 28; k++) {
+    const pb = await page.evaluate(k => window.__plot.petalScreenBox(k), k);
+    if (pb) petalBoxes.push({ k, ...pb });
+  }
+  const lowest = petalBoxes.sort((a, b) => (b.y + b.height) - (a.y + a.height))[0];
+  await set({ petalPick: lowest ? lowest.k : 0 });
+  await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
+  const isoHi = await readBuf('opposite');
+  const isoHiG = await readBuf('ground');
+  check('knockout/the-highlighted-petal-reverses-in-its-own-hue',
+    isoHi.notGrey > 100,
+    `petal ${lowest ? lowest.k : '—'} picked, the panel across it: the panel's pass alone holds `
+    + `${isoHi.notGrey} coloured pixels (the ground's pass ${isoHiG.notGrey})`);
+  await set({ petalPick: -1 });
+
+  // --- the SVG: the same paths twice, under complementary masks ----------------
+  await clearShapes();
+  await reset();
+  const svgBare = await q(() => window.__plot.exportSvg());
+  await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
+  const svgK = await q(() => window.__plot.exportSvg());
+  const grp = (text, id) => {
+    const m = new RegExp(`<g id="${id}" mask="url\\(#([\\w-]+)\\)"[^>]*stroke="(#[0-9a-f]{6})"[^>]*>([\\s\\S]*?)</g>`).exec(text);
+    return m ? { mask: m[1], ink: m[2], paths: m[3].match(/<path d="[^"]*"\/>/g) || [] } : null;
+  };
+  const gG = grp(svgK.text, 'plot-ink-ground'), gP = grp(svgK.text, 'plot-ink-panel');
+  const maskBody = id => { const m = new RegExp(`<mask id="${id}"[^>]*>([\\s\\S]*?)</mask>`).exec(svgK.text); return m ? m[1] : ''; };
+  const fillsOf = body => (body.match(/fill="(#[0-9a-f]{6})"/g) || []).map(f => f.slice(6, 13));
+  const mG = fillsOf(maskBody('plot-knock-ground')), mP = fillsOf(maskBody('plot-knock-panel'));
+  const complementary = mG.length === mP.length && mG.length >= 2
+    && mG.every((f, i) => (f === '#ffffff') === (mP[i] === '#000000'));
+  check('export/the-svg-draws-every-path-twice-under-complementary-masks',
+    !!gG && !!gP && gG.paths.length === svgBare.paths && gP.paths.length === svgBare.paths
+    && gG.paths.join('') === gP.paths.join('') && gG.ink === '#ffffff' && gP.ink === '#000000'
+    && gG.mask === 'plot-knock-ground' && gP.mask === 'plot-knock-panel' && complementary
+    && svgK.text.includes('fill="#ffffff"') && /<g id="plot-shapes">/.test(svgK.text),
+    gG && gP ? `${gG.paths.length} paths in the ground's ink (${gG.ink}) and ${gP.paths.length} in `
+      + `the panel's (${gP.ink}), identical, against ${svgBare.paths} with no shape; masks `
+      + `${mG.join('/')} and ${mP.join('/')}` : 'the two ink groups are not both there');
+
+  // --- the PNG carries the panel, and is still grey ----------------------------
+  const pngK = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  const pngShare = pngK.stats.ink / pngK.stats.pixels;
+  const wantShare = Math.min(1, Math.max(0, (100 - edgePct) / 100));
+  check('export/the-png-carries-the-panel-and-stays-grey',
+    pngK.stats.notGrey === 0 && pngShare >= wantShare * 0.95,
+    `${(pngShare * 100).toFixed(1)}% of the PNG is off the ground (the panel covers about `
+    + `${(wantShare * 100).toFixed(1)}%), ${pngK.stats.notGrey} non-grey pixels`);
+
+  // --- frame space: the shapes hold still when the camera turns -----------------
+  await clearShapes();
+  await reset();
+  await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
+  const geo1 = await q(() => window.__plot.shapeGeometry());
+  const cam1 = await q(() => window.__plot.cameraInfo());
+  const fb1 = await readBuf();
+  await view(LOW_VIEW);
+  const geo2 = await q(() => window.__plot.shapeGeometry());
+  const cam2 = await q(() => window.__plot.cameraInfo());
+  const fb2 = await readBuf();
+  /* THE EDGE, READ OFF THE PIXELS AT BOTH CAMERAS: in columns where neither
+     picture has ink near the edge, the row where the tone crosses half way. A
+     column with no ink is MONOTONE from the ground to the panel across the
+     window (the edge row itself is antialiased, so it is not asked to be 0 or
+     255); ink above or below breaks that, so such a column is skipped. */
+  const y0w = Math.max(0, Math.floor(PR.top - 15)), y1w = Math.min(fb1.h, Math.ceil(PR.top + 15));
+  const edgeRowAt = (fb, x) => {
+    for (let y = y0w; y < y1w; y++) if (fb.px[y * fb.w + x] >= 128) return y;
+    return -1;
+  };
+  const quietCol = x => [fb1, fb2].every(fb => {
+    if (fb.px[y0w * fb.w + x] !== 0 || fb.px[(y1w - 1) * fb.w + x] !== 255) return false;
+    for (let y = y0w + 1; y < y1w; y++) if (fb.px[y * fb.w + x] < fb.px[(y - 1) * fb.w + x]) return false;
+    return true;
+  });
+  const edgeRows = [];
+  for (let x = 10; x < fb1.w - 10; x += 7) {
+    if (!quietCol(x)) continue;
+    edgeRows.push([edgeRowAt(fb1, x), edgeRowAt(fb2, x)]);
+  }
+  const camMoved = Math.hypot(...cam1.position.map((v, i) => v - cam2.position[i]));
+  check('shapes/they-hold-still-in-frame-space-when-the-camera-orbits',
+    camMoved > 1 && JSON.stringify(geo1) === JSON.stringify(geo2) && edgeRows.length >= 10
+    && edgeRows.every(([a, b]) => a === b && Math.abs(a - PR.top) <= 1.5),
+    `the camera moved ${camMoved.toFixed(1)} units; the shape's geometry is identical and its edge `
+    + `reads row ${edgeRows.length ? edgeRows[0][0] : '—'} in ${edgeRows.length} quiet columns at `
+    + `both cameras (the box puts it at ${PR.top.toFixed(1)})`);
+  await view(VIEW);
+
+  // --- two shapes overlapping: list order is the z-order -------------------------
+  await clearShapes();
+  await reset();
+  const bareZ = await readBuf(); bareZ.ground = 0;
+  await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
+  // Just under the panel's edge, inside the head, where there is ink to judge.
+  const holeSh = await addShape({ kind: 'ellipse', tone: 'ground', x: 50,
+    y: edgePct + 9, w: 45, h: 12 });
+  const zTop = await readBuf();
+  // The hole's interior, eroded, and inside the panel.
+  const HC = { x: (sp0.x + holeSh.x / 100 * sp0.width) * bareZ.s, y: (sp0.y + holeSh.y / 100 * sp0.height) * bareZ.s,
+               a: holeSh.w / 200 * sp0.width * bareZ.s - E, b: holeSh.h / 200 * sp0.height * bareZ.s - E };
+  const inHole = (x, y) => ((x - HC.x) / HC.a) ** 2 + ((y - HC.y) / HC.b) ** 2 < 1 && inPanel(x, y);
+  const hTop = regionStats(bareZ, zTop, inHole, SCREEN_INK, SCREEN_INK);
+  await page.evaluate(() => document.getElementById('shapeLower').click());
+  const order = (await q(() => window.__plot.shapes())).list.map(x => x.tone).join(',');
+  const zBot = await readBuf();
+  const hBot = regionStats(bareZ, zBot, inHole, SCREEN_INK, PRINT_INK);
+  check('shapes/overlapping-shapes-stack-in-list-order',
+    hTop.quiet > 200 && hTop.tone === 0 && hTop.toneShare >= 0.99 && hTop.base > 100
+    && hTop.recall >= 0.9 && order === 'ground,opposite'
+    && hBot.tone === 255 && hBot.toneShare >= 0.99 && hBot.recall >= 0.9,
+    `a ground ellipse on top of the panel cuts a hole: its interior reads ${hTop.tone} with the `
+    + `drawing bright in it (${(hTop.recall * 100).toFixed(1)}% of ${hTop.base}); lowered beneath the `
+    + `panel (${order}) the same pixels read ${hBot.tone} with the drawing dark `
+    + `(${(hBot.recall * 100).toFixed(1)}%)`);
+
+  /* ---- each fill paints its marks and the knockout follows them, pixel by pixel.
+     The expected tone at a pixel comes from plot-shapes.js's own `toneAt` over
+     the page's own record and box; only pixels whose tone is the same two
+     pixels away on every side are judged, so a mark's antialiased edge is
+     never asked a question it cannot answer exactly. */
+  const fillResults = [];
+  for (const fill of ['stripes', 'halftone', 'outline']) {
+    await clearShapes();
+    await reset();
+    const b0 = await readBuf(); b0.ground = 0;
+    const sh = await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 92, fill,
+      spacing: fill === 'outline' ? 8 : 3, weight: fill === 'halftone' ? 120 : 50, angleDeg: fill === 'stripes' ? 20 : 90 });
+    const b1 = await readBuf();
+    const sp = await spaceNow();
+    const cache = [SH.shapeMarks(sh, sp)];
+    const tAt = (x, y) => SH.toneAt([sh], sp, x / b0.s, y / b0.s, cache);
+    let emptyN = 0, emptyOk = 0, inkN = 0, inkOk = 0, opp = 0;
+    for (let y = Math.ceil(PR.top) + 3; y < b0.h - 3; y += 3) {
+      for (let x = 3; x < b0.w - 3; x += 3) {
+        const t = tAt(x, y);
+        if (tAt(x - 2, y) !== t || tAt(x + 2, y) !== t || tAt(x, y - 2) !== t || tAt(x, y + 2) !== t) continue;
+        const toneV = t === 'opposite' ? 255 : 0;
+        if (t === 'opposite') opp++;
+        const i = y * b0.w + x, a = b0.px[i], b = b1.px[i];
+        const quietA = a === 0 && b0.px[i - 1] === 0 && b0.px[i + 1] === 0
+          && b0.px[i - b0.w] === 0 && b0.px[i + b0.w] === 0;
+        if (quietA) { emptyN++; if (b === toneV) emptyOk++; }
+        else if (a >= 40) { inkN++; if (Math.abs(b - toneV) >= 20) inkOk++; }
+      }
+    }
+    fillResults.push({ fill, opp, emptyN, emptyOk, inkN, inkOk });
+  }
+  check('shapes/each-fill-paints-its-marks-and-the-knockout-follows-them',
+    fillResults.every(r => r.opp > 200 && r.emptyN > 500 && r.emptyOk / r.emptyN >= 0.99
+                         && r.inkN > 100 && r.inkOk / r.inkN >= 0.85),
+    fillResults.map(r => `${r.fill}: ${r.opp} panel samples; empty ${r.emptyOk}/${r.emptyN} on `
+      + `their tone, ink ${r.inkOk}/${r.inkN} off it`).join(' · '));
+
+  // --- the panel edits the picked shape and nothing else ------------------------
+  await clearShapes();
+  await reset();
+  await addShape({ y: 80, h: 30, rotationDeg: 12, fill: 'stripes' });
+  await addShape({ kind: 'ellipse', tone: 'ground', x: 30, y: 40, w: 20, h: 10, fill: 'halftone' });
+  const before2 = (await q(() => window.__plot.shapes())).list;
+  await pickShape(0);
+  const afterPick = (await q(() => window.__plot.shapes())).list;
+  const shown = await page.evaluate(ids => ids.map(id => document.getElementById(id).value),
+    FL.SHAPE_FIELDS.map(f => f.control));
+  const wantShown = FL.SHAPE_FIELDS.map(f => String(before2[0][f.key]));
+  check('shapes/picking-a-shape-loads-its-values-and-applies-nothing',
+    JSON.stringify(before2) === JSON.stringify(afterPick)
+    && JSON.stringify(shown) === JSON.stringify(wantShown),
+    `picking shape 1 changed ${JSON.stringify(before2) === JSON.stringify(afterPick) ? 'no' : 'a'} `
+    + `record and loaded ${shown.join('/')} into the panel`);
+  await set({ [SHC.x]: 62 });
+  const afterEdit = (await q(() => window.__plot.shapes())).list;
+  check('shapes/a-control-edits-the-picked-shape-and-no-other',
+    afterEdit[0].x === 62 && JSON.stringify(afterEdit[1]) === JSON.stringify(before2[1])
+    && afterEdit[0].y === before2[0].y,
+    `x on shape 1 went ${before2[0].x} -> ${afterEdit[0].x}; shape 2 ${JSON.stringify(afterEdit[1]) === JSON.stringify(before2[1]) ? 'untouched' : 'MOVED'}`);
+
+  // --- saved and restored on the page -------------------------------------------
+  await pickShape(1);
+  const savedShapes = (await q(() => window.__plot.shapes()));
+  const geoSaved = await q(() => window.__plot.shapeGeometry());
+  const compText = await q(() => window.__plot.compositionText());
+  await clearShapes();
+  await page.evaluate(t => window.__plot.loadComposition(t, 'shapes.json'), compText);
+  const restored = await q(() => window.__plot.shapes());
+  const geoRestored = await q(() => window.__plot.shapeGeometry());
+  const restState = await q(() => window.__plot.compositionState());
+  const shownR = await page.evaluate(ids => ids.map(id => document.getElementById(id).value),
+    FL.SHAPE_FIELDS.map(f => f.control));
+  check('save/shapes-are-saved-and-restored-with-their-order-and-the-pick',
+    restored.list.length === 2 && JSON.stringify(restored.list) === JSON.stringify(savedShapes.list)
+    && restored.selected === 1 && JSON.stringify(geoRestored) === JSON.stringify(geoSaved)
+    && !!restState && restState.action === 'restored' && restState.notes.length === 0
+    && JSON.stringify(shownR) === JSON.stringify(FL.SHAPE_FIELDS.map(f => String(savedShapes.list[1][f.key]))),
+    `${restored.list.length} shapes back in order (${restored.list.map(x => `${x.tone} ${x.kind} ${x.fill}`).join(', ')}), `
+    + `shape ${restored.selected + 1} picked, geometry identical, ${restState ? restState.notes.length : '—'} notes`);
+
+  /* AND A FILE WITHOUT SHAPES — every v2 file — LEAVES THE PAGE'S SHAPES ALONE
+     and says so, rather than clearing them: a missing field keeps the page's
+     value, the format's rule 3. */
+  const v2 = JSON.parse(compText); delete v2.shapes; delete v2.selection.shape; v2.version = 2;
+  await page.evaluate(t => window.__plot.loadComposition(t, 'old.json'), JSON.stringify(v2));
+  const afterV2 = await q(() => window.__plot.shapes());
+  const v2State = await q(() => window.__plot.compositionState());
+  check('restore/a-file-without-shapes-leaves-the-shapes-alone-and-says-so',
+    afterV2.list.length === 2 && JSON.stringify(afterV2.list) === JSON.stringify(savedShapes.list)
+    && !!v2State && v2State.action === 'restored'
+    && v2State.notes.some(n => n.kind === 'missing' && /shapes/.test(n.text)),
+    `a v2 file restored over two shapes: ${afterV2.list.length} remain, and the panel says `
+    + `"${v2State ? (v2State.notes.find(n => /shapes/.test(n.text)) || {}).text : '—'}"`);
+
+  await clearShapes();
+  await set({ ...DEFAULTS });
+
+  }
 
   // --- cost ----------------------------------------------------------------
   await reset({ families: 'both', uDensity: 12, vDensity: 12 });

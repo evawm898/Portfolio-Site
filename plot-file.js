@@ -55,6 +55,7 @@
 import { MIN_DENSITY, MAX_DENSITY } from './plot-grid.js';
 import { FRAME_RATIOS, FRAME_SHAPES, isListedRatio } from './plot-frame.js';
 import { POLARITIES } from './plot-polarity.js';
+import { SHAPE_KINDS, SHAPE_TONES, SHAPE_FILLS, SHAPE_DEFAULTS, MAX_SHAPES } from './plot-shapes.js';
 
 export const FORMAT = 'plot-composition';
 /* VERSION 2 ADDS `draw.polarity`, AND THE BUMP IS THE POINT OF HAVING A VERSION.
@@ -64,7 +65,12 @@ export const FORMAT = 'plot-composition';
    written before this session and a file written after it would carry the same
    number and different fields, and a later reader would have no way to tell
    which it was holding. Old files still load; they say what they are missing. */
-export const VERSION = 2;
+/* VERSION 3 ADDS `shapes` (and `selection.shape`), and bumps for the same
+   reason 2 did: a file carrying shapes and one written before them must not
+   share a number. A v2 file still loads and says what it is missing — the page
+   keeps the shapes it has, which is rule 3 — and a v3 file is refused by a v2
+   reader rather than read without its panels. */
+export const VERSION = 3;
 
 /* ---- the field tables --------------------------------------------------- */
 /* `key` is the name in the file, `control` the id of the element that owns the
@@ -134,6 +140,26 @@ export const TRANSFORM_FIELDS = [
   { key: 'scale',       axis: -1, control: 'bloomScale' },
 ];
 
+/* ONE SHAPE. A list entry at the TOP LEVEL, not inside an instance: a shape is
+   laid out against the page, not against a bloom, so it belongs to the
+   composition the way the frame does. Every value is its control's own, in the
+   control's own units (shares of the frame's box), and the kinds come from
+   plot-shapes.js — which takes its two boundary types from plot-frame.js — so
+   there is one list of each. */
+export const SHAPE_FIELDS = [
+  { key: 'kind',        control: 'shapeKind',    kind: 'enum', values: SHAPE_KINDS },
+  { key: 'tone',        control: 'shapeTone',    kind: 'enum', values: SHAPE_TONES },
+  { key: 'fill',        control: 'shapeFill',    kind: 'enum', values: SHAPE_FILLS },
+  { key: 'x',           control: 'shapeX',       kind: 'number' },
+  { key: 'y',           control: 'shapeY',       kind: 'number' },
+  { key: 'w',           control: 'shapeW',       kind: 'number' },
+  { key: 'h',           control: 'shapeH',       kind: 'number' },
+  { key: 'rotationDeg', control: 'shapeRot',     kind: 'number' },
+  { key: 'angleDeg',    control: 'shapeAngle',   kind: 'number' },
+  { key: 'spacing',     control: 'shapeSpacing', kind: 'number' },
+  { key: 'weight',      control: 'shapeWeight',  kind: 'number' },
+];
+
 export const PETAL_FIELDS = [
   { key: 'along',  control: 'petalAlong',  kind: 'number' },
   { key: 'across', control: 'petalAcross', kind: 'number' },
@@ -151,7 +177,7 @@ export const IDENTITY_TRANSFORM = Object.freeze({
 });
 
 const TOP_LEVEL_KEYS = ['format', 'version', 'app', 'savedAt',
-                        'frame', 'draw', 'view', 'camera', 'selection', 'instances'];
+                        'frame', 'draw', 'view', 'camera', 'selection', 'shapes', 'instances'];
 const INSTANCE_KEYS = ['id', 'grid', 'transform', 'stem', 'petals'];
 
 /* ---- writing ------------------------------------------------------------ */
@@ -217,7 +243,10 @@ export function composeDoc(state) {
     // bloom at a time, so the selection is a property of the composition and
     // not a remembered value on each instance — two instances each holding
     // their own "selected petal" would be two selections.
-    selection: { instance: state.selection.instance | 0, petal: state.selection.petal | 0 },
+    selection: { instance: state.selection.instance | 0, petal: state.selection.petal | 0,
+                 shape: Number.isInteger(state.selection.shape) ? state.selection.shape : -1 },
+    // BOTTOM FIRST: the list's order IS the z-order, so it is written as held.
+    shapes: (state.shapes || []).map(sh => pick(SHAPE_FIELDS, sh)),
     instances: state.instances.map(composeInstance),
   };
 }
@@ -463,7 +492,16 @@ export function readDoc(obj, opts = {}) {
     else notes.push(note('invalid', `selection.instance ${JSON.stringify(s.instance)} is not an index`));
     if (Number.isInteger(s.petal)) doc.selection.petal = s.petal;
     else notes.push(note('invalid', `selection.petal ${JSON.stringify(s.petal)} is not an index`));
+    // The shape cursor arrived with v3; a v2 file cannot carry one and the
+    // missing `shapes` note below already says so, once.
+    doc.selection.shape = null;
+    if (Number.isInteger(s.shape)) doc.selection.shape = s.shape;
+    else if (s.shape !== undefined || v >= 3)
+      notes.push(note(s.shape === undefined ? 'missing' : 'invalid',
+        `selection.shape ${JSON.stringify(s.shape ?? null)} is not an index — the page keeps the shape it has picked`));
   }
+
+  doc.shapes = readShapes(obj.shapes, notes, opts);
 
   if (!Array.isArray(obj.instances) || obj.instances.length === 0)
     return { ok: false, error: 'this file carries no instances — a composition holds at least one bloom' };
@@ -479,6 +517,34 @@ export function readDoc(obj, opts = {}) {
     if (!TOP_LEVEL_KEYS.includes(k)) notes.push(note('unknown', `${k} is not a field this page knows`));
   }
   return { ok: true, doc, notes };
+}
+
+/* THE SHAPE LIST. Missing means the page keeps the shapes it has (rule 3, and
+   what a v2 file reads as); present means it is the WHOLE list, read entry by
+   entry through SHAPE_FIELDS. A field missing inside an entry reads as the new
+   shape's own default and is reported — an entry has no page value to leave
+   alone, the per-petal entries' rule. Over the cap, the tail is dropped and
+   counted, never folded. */
+function readShapes(raw, notes, opts) {
+  if (raw === undefined) {
+    notes.push(note('missing', 'shapes is missing — the page keeps the shapes it has'));
+    return null;
+  }
+  if (!Array.isArray(raw)) { notes.push(note('invalid', 'shapes is not a list')); return null; }
+  const out = [];
+  raw.forEach((e, i) => {
+    const where = `shapes[${i}]`;
+    if (!e || typeof e !== 'object' || Array.isArray(e)) {
+      notes.push(note('invalid', `${where} is not a shape`)); return;
+    }
+    const vals = readGroup(SHAPE_FIELDS, e, where, notes, opts.boundsOf);
+    out.push({ ...SHAPE_DEFAULTS, ...vals });
+  });
+  if (out.length > MAX_SHAPES) {
+    notes.push(note('dropped', `shapes holds ${out.length} and this page draws at most ${MAX_SHAPES} — the top ${out.length - MAX_SHAPES} were dropped`));
+    out.length = MAX_SHAPES;
+  }
+  return out;
 }
 
 /* WHICH SAVED WARPS THE LOADED GRID CAN ACTUALLY TAKE. Pure, so the rule is

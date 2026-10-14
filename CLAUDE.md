@@ -8535,7 +8535,8 @@ embedded directly, so opening the sheet IS opening the files. The PNGs sit on a 
 so the ellipse's alpha is visible instead of reading as a white fill.
 
 **OUT OF SCOPE HERE ON PURPOSE, and none of it foreclosed:** background shapes, cut-and-pull,
-lock view, and MULTIPLE BLOOM INSTANCES. The export path walks `drawnLineSets()` — a LIST of
+lock view, and MULTIPLE BLOOM INSTANCES. **[Oct 14: background shapes and multiple instances
+have since shipped — see their sections; the export walks the shapes' marks too.]** The export path walks `drawnLineSets()` — a LIST of
 line sets, today `grid` and `stem` — rather than naming two, so a second instance is another
 entry there and not a change to how an export is built.
 
@@ -8946,6 +8947,60 @@ the export (the grey identity, with nothing added for it), and every field read
 back on every slider input. **WHICH MUTANTS WERE RUN IS IN THE SESSION'S REPORT AND
 NOT HERE**, because a count implies a sweep.
 
+**BACKGROUND SHAPES AND THE KNOCKOUT ARE BUILT, AND KNOCKOUT IS NOT POLARITY** (session of
+Oct 14 — read `plot-shapes.js`'s header before touching `drawPicture`, `buildShapes`, the
+stencil, `knockoutPasses`, `SHAPE_FIELDS` or the SVG masks). Polarity is the page-wide
+render mode and is untouched; knockout is local: **a panel is the opposite tone to the
+ground, and the drawing reverses inside it.** Inside an opposite-tone shape the drawing IS
+the other polarity — its ground is the panel's colour, its blend, its ink transfer at the
+SAME `brightness` value and its fog — so neither tone is a constant: `toneRegime()` is the
+one place a tone becomes a regime, and a hardcoded black panel (invisible on the screen's
+black ground) is a mutant.
+- **Shapes live in FRAME SPACE**: every number is a share of `exportBox()` (the frame's box,
+  or the viewport when the frame is off — the box both exports crop to), drawn through the
+  overlay's orthographic camera. The camera never reaches them; a frame control moves them
+  WITH the frame. Two kinds, imported from `FRAME_SHAPES`. Fills: solid, stripes (phased on
+  the shape's centre), halftone (a dot lattice whose diameter ramps across the shape toward
+  `angleDeg`), outline (a ring INSIDE the boundary, clamped where the inward parallel would
+  invert, told). A shape paints only its marks; list order is the z-order; a ground-tone
+  shape over an opposite one cuts a hole. No sparkles, by the brief's rule (ornament is a
+  material or structural device, never a motif).
+- **The three study findings are answered by construction, not by tuning.** (1) The drawing
+  is always in front: the shapes are their OWN PASS, drawn before the ink with depth testing
+  off — an order, not a depth. (2) An inverse clip, never draw-and-cover: each shape writes
+  its tone into the STENCIL as it paints (REPLACE, list order), and the ink is drawn twice —
+  the panels' regime where the stencil is 1 (knockout layer only), the page's where it is 0
+  (handles included, so they sit over both). (3) No fixed z: shapes and drawing share no
+  depth range at all.
+- **THE GROUND'S INK IS INVISIBLE ON THE PANEL BY CONSTRUCTION** (additive white on white,
+  multiply black on black), so an unclipped pass leaves the composited picture unchanged —
+  measured: under the `the-panel-pass-is-not-clipped` mutant not one check on the
+  composited picture goes red, only the isolated-pass one. The only
+  instrument that sees both clips is `__plot.readBuffer({ isolate })`, which draws one pass
+  alone over its own ground (test chrome; the INK alone, handles excluded).
+- **Every LINE object is on `KNOCK_LAYER`** — families, stem, highlight. A line left off it
+  vanishes inside a panel while every head-only check stays green; the stem and the
+  highlight each have a check and a mutant for exactly that.
+- **With no shapes the page and the SVG are what /plot shipped**: one pass, stencil test off,
+  and the no-shape SVG byte-identical to `main`'s (one template; the knockout adds two masks
+  to the defs and puts two ink groups — the SAME paths, under COMPLEMENTARY masks — where the
+  one stood). Masks are luminance and plotter software may ignore them, as it may the clip.
+- **`plot-composition` v3** adds top-level `shapes` (bottom first, through `SHAPE_FIELDS`)
+  and `selection.shape`. A v2 file has no `shapes`: the page KEEPS its shapes and says so
+  (rule 3); a present list replaces the page's, an empty one included. A missing field
+  inside an entry reads as the shape default and is reported. Cap `MAX_SHAPES` 8, tail
+  dropped and counted.
+- **No shape ships by default**, so the page opens as it did. The defaults a new shape takes
+  (a band across the lower half, opposite, solid, spacing 3%, weight 50%) are NOT a ruling.
+- **Lock view stayed out, as the brief preferred**: shapes in frame space are coherent
+  whether the camera moves or not, and no case was found where a moving camera made them
+  incoherent.
+- Gate: `knockout/*` and `shapes/*` in `tools/verify-plot.mjs` measure the framebuffer
+  REGION BY REGION against the same drawing with no shape (coverage with a bar, never a
+  framebuffer equality); twenty mutants, among them all three study findings. Sheet:
+  `node tools/shot-plot-shapes.mjs <dir>` (both polarities across an edge, each fill both
+  ways, overlap both orders, save → reload → restore, and the PNG/SVG artefacts).
+
 **A known limitation that is NOT the viewer's to fix:** a splayed bloom (the
 shipped sample is spread 0.60, tilt 25°) reads flatter than a cupped reference
 form. That is a bloom parameter. The sheet photographs it and the viewer does
@@ -8958,7 +9013,9 @@ leaves follows from it. RASTER AND SVG EXPORT are no longer out of scope
 either — see the polarity and export section above; nor are MULTIPLE BLOOM
 INSTANCES, composition and arrangement — see the multi-bloom section above.) Also out of scope and named
 so it is not mistaken for an omission: **LOCK VIEW, background SHAPES and
-cut-and-pull**. TWIST was named in the petal
+cut-and-pull**. **[Oct 14: background SHAPES have shipped (the shapes-and-knockout block
+above); lock view stayed out by the brief's own preference and was not needed — shapes in
+frame space are coherent whether or not the camera moves.]** TWIST was named in the petal
 session's brief as the thing to drop if the session grew, and it was: bend and
 stretch shipped, twist did not. (PETAL SELECTION AND PER-PETAL WARP are no
 longer out of scope — see the petal section above; nor are THE FRAME and SAVE —
@@ -9013,7 +9070,8 @@ strand modes) is in that doc so it is not re-derived.
    section above): that needed no migration and no version bump, which is what
    the shape was for. What is inherited by the NEXT sessions rather than decided
    by them: **lock state, background shapes and cut-and-pull state are added as
-   FIELDS** — neither needs a migration. Anything that changes the root's
+   FIELDS** — neither needs a migration. **[Oct 14: shapes landed exactly that way —
+   top-level `shapes` and `selection.shape`, v3, no migration.]** Anything that changes the root's
    cardinality does.
 1d. **THE ANCHOR DRAG IS DONE** — see the anchor section above. What it leaves: the
    sliders' `input` stream still pays the exact tail (one branch, gated on the
