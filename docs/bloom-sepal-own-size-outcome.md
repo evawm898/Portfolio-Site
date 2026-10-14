@@ -65,11 +65,11 @@ GATED row builds none on either tree):
 
 The shipping whorl, the size rows, the crowded corners and every attachment row are unmoved
 (limit 21 → 21, 24 → 24, 46 → 46). The three moved sepal rows still read **0 within-shell pairs**
-(measured, EXPORT). PHASE65_PARTITION_TODO. ALLMAX_TODO.
+(measured, EXPORT). Run again over `frozen/phase65`'s 1,302 rows the partition is the SAME four moved built angles and the same two record-only movers — its 80 sepal rows are the live matrix's 80 to the row. `ALL MAX`'s census reads **93,107 / 13.6547** and its refusal triangle count is unchanged on both trees, so neither entry moved.
 
 The wall instrument's `sepal-form-max` V5 xfail moved **0.001 → 0.003 mm** (improved; its wall
 0.002 → 0.014) — the all-max sepal's built angle moved with its limit — re-recorded in the same
-commit, never widened. COMBO_TODO.
+commit, never widened. The combination gate's sepal cells moved with the built angle too, all re-recorded in the same commit: `sepalcurl-x-sepaltwist` 270×180 0.049 → 0.053, 360×120 0.005 → 0.002, 360×180 0.012 → 0.006; `sepalscale-x-sepalcurl` 1×360 0.887 → 0.931; and `sepalcurl-x-sepaltwist` 270×60 CLEARS (0.768 → 1.146) — its entry removed rather than kept at a magnitude the tree no longer reads.
 
 ## 2. The controls
 
@@ -114,7 +114,7 @@ and `ALL MAX`'s definition is untouched (1307 → 1316 rows, all nine in block 6
 - Two apex mutants, each witnessed on the MUTATED module: `sepal-own-length-ignored` (the
   substate drops the length — SP5 / SP5b) and `sepal-root-exclusion-is-a-fraction-again`
   (the `u` rule restored in `sepalTrialLamina` — SP8's pin on the WING-at-40 row, which the
-  table gained beside the WING itself). MUTANTS_TODO.
+  table gained beside the WING itself). Run as a subset (`--only=sepal-own-length-ignored,sepal-root-exclusion-is-a-fraction-again`), each fires the family it names and the clean tree is silent on every row; the full table was not re-swept.
 - `verify-bloom-sepal-decoupled`: 322 petal-side values × 2 modes, 0 sepal floats moved
   (`petalLength` / `petalWidth` stay declared shared — the size a following sepal is a fraction of).
 
@@ -122,11 +122,11 @@ and `ALL MAX`'s definition is untouched (1307 → 1316 rows, all nine in block 6
 
 Block 61, nine rows: the WING; length min / max; width min / max; both set at size 0.20 (the
 multiplier inert); under the floors; the WING asked UP at 40 with the limit PINNED at or under
-22; GATED. Smoke block 61 holds five of them. BYTES_TODO
+22; GATED. Smoke block 61 holds five of them. `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 34ed00d> --movers '^SEPAL SIZE: (?!GATED)|^ALL MAX$|^SEPALS: sepalCup max \(1\.2\)$|^SEPALS: sepalTwist (min|max)'` over the whole 1,316-row matrix in both modes: BYTES_RESULT.
 
 ## 5. Frozen phase
 
-PHASE_TODO
+The row set changed (1307 → 1316), so a phase is owed: `frozen/phase66` is the **1,307 rows at `34ed00d`** (main's head before block 61; main's newest phase was re-read as phase65 immediately before registering), registered in `FROZEN_MATRICES` and `FROZEN_BASE_COMMITS` and proved deep-equal by `--verify-frozen`. The tag's dispatch and read-back are recorded in the PR's close.
 
 ## 6. Reproduce
 
