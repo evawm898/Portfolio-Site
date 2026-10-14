@@ -79,6 +79,22 @@ import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT 
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 import { SCOPE_TOGGLE_VALUES } from './bloom-geometry.js';
+/* THE CURVE KIND (the curve-editor session, Oct 14) — its value shape, its
+   shape rule and its equality are bloom-curve.js's, the one owner every reader
+   of a curve value imports (the panel, the design file, F3's and F6's
+   geometry). bloom-curve.js imports nothing, so no cycle is possible. */
+import { cloneCurve, curveEquals, curveSpecProblems } from './bloom-curve.js';
+
+/* THE CONTROL KINDS, ONE LIST. A row's `kind` must be one of these (checked
+   at module load by verifySections), and every reader that branches on a
+   kind — coerceValue / valuesEqual here, makeInput in bloom.js, the design
+   file's FIELD_KINDS — must have an arm for each; the design-file gate holds
+   FIELD_KINDS to this list (F0), so a fourth kind cannot be added to the
+   registry without the file learning to read it. 'curve' is the third: a
+   point editor whose value is `{ mode, points[, right] }` (bloom-curve.js).
+   NO LIVE CONTROL IS A CURVE YET — the kind ships with its widget and its
+   gate route ahead of its first consumer (F3, the spine). */
+export const CONTROL_KINDS = Object.freeze(['slider', 'choice', 'curve']);
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -699,15 +715,21 @@ export function evalPredicate(pred, state) {
 export function coerceValue(c, raw) {
   if (c.kind === 'slider') return Number(raw);
   if (c.kind === 'choice') return String(raw);
+  /* A curve's value is an object, never a string: the editor holds it as
+     the value and hands it over whole. A COPY, so a reader that keeps the
+     state snapshot can never be edited in place by the next drag. */
+  if (c.kind === 'curve') return cloneCurve(raw);
   throw new Error(`coerceValue: unhandled control kind "${c.kind}" for ${c.id}`);
 }
 
 /* Equality in the control's own kind. Sliders compare numerically with a
    tolerance (the DOM round-trips them through decimal strings); choices
-   compare as strings. */
+   compare as strings; curves coordinate by coordinate, exactly (a curve is
+   never a decimal string, so it has nothing to round). */
 export function valuesEqual(c, a, b) {
   if (c.kind === 'slider') return Math.abs(Number(a) - Number(b)) < 1e-9;
   if (c.kind === 'choice') return String(a) === String(b);
+  if (c.kind === 'curve') return curveEquals(a, b);
   throw new Error(`valuesEqual: unhandled control kind "${c.kind}" for ${c.id}`);
 }
 
@@ -1443,6 +1465,19 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
        red check, never a crash. The sentinel also says the absence is
        DELIBERATE, which an omitted field cannot. */
     if (c.visibleWhen === undefined) bad.push(`control "${c.id}" declares no \`visibleWhen\` — a control that is never gated declares the \`{ all: [] }\` sentinel, which is what every other ungated control carries; an omitted field is indistinguishable from a forgotten one`);
+    /* THE KIND IS ONE OF THE THREE, and a CURVE carries a spec its own default
+       satisfies and an owning length that is a live slider (the curve-editor
+       session). Checked here, at module load, because a kind no reader has an
+       arm for throws at panel build, and a curve whose default the shape rule
+       refuses would load a page whose first edit is refused for a reason the
+       visitor never caused. */
+    if (!CONTROL_KINDS.includes(c.kind)) bad.push(`control "${c.id}" has kind "${c.kind}" — not one of ${CONTROL_KINDS.join(' / ')}`);
+    if (c.kind === 'curve') {
+      for (const p of curveSpecProblems(c.curve, c.default)) bad.push(`curve control "${c.id}" ${p}`);
+      const own = c.curve && controls.find((o) => o.id === c.curve.owner);
+      if (c.curve && (!own || own.kind !== 'slider')) bad.push(`curve control "${c.id}" names owner "${c.curve.owner}", which is not a slider here — its points are fractions of a LENGTH control`);
+      if (c.validate !== undefined && typeof c.validate !== 'function') bad.push(`curve control "${c.id}"'s \`validate\` must be a function (candidate, ui) => null | reason`);
+    }
   }
   /* An EMPTY section is a failure, not a tidy placeholder for later work: it
      renders as a header that opens onto nothing, and the reason it is empty is

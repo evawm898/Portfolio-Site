@@ -706,6 +706,10 @@ Recorded as given. Nothing below is re-litigated, interpreted further or resolve
 - Q4.4: a drag past printable curvature is REFUSED (the point does not move there), not clamped.
 - Q4.3 / Q4.5: sepals AND leaves get curve mode.
 
+**F2 + F3 + F6 — the curve editor widget — SHIPPED (Oct 14):** the panel's `curve` control kind, its value
+`{ mode, points[, right] }` in fractions of the owning length, the refusal (Q4.4) and the mirror switch, with
+zero consumers and zero live controls — `docs/bloom-curve-editor.md`. F3 and F6 call its sampler.
+
 **F6 — outline curve**
 - Q6.1: drawn length always equals the length slider; the curve's points are fractions of it.
 - Q6.2: the curve starts above the root blend; the foot stays the hub's.

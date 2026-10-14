@@ -16,7 +16,8 @@ import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
-import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, scopeExclusionReason } from './bloom-file.js';
+import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, scopeExclusionReason, composeControls, readControls, fieldFor } from './bloom-file.js';
+import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
 import { scopeOffsetsFor, scopeSlotKey, resolveRoleOverrides, scopeLayersLive, scopePetalsLive, petalGroupCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
@@ -57,7 +58,318 @@ function makeInput(c) {
     }
     return sel;
   }
+  if (c.kind === 'curve') {
+    return makeCurveInput(c, {
+      validate: (cand) => (typeof c.validate === 'function' ? c.validate(cand, readUI()) : null),
+      ownerLength: () => Number(inputs[c.curve.owner].value),
+      ownerLabel: (CONTROLS.find((o) => o.id === c.curve.owner) || {}).label || c.curve.owner,
+    });
+  }
   throw new Error(`unhandled control kind "${c.kind}" for ${c.id}`);
+}
+
+/* ===================================================================
+   THE CURVE EDITOR — the panel widget for a `kind: 'curve'` control (the
+   curve-editor session, Oct 14; read docs/bloom-curve-editor.md). NO LIVE
+   CONTROL USES IT YET: F3 (the spine) and F6 (the outline) wire into it in
+   their own sessions, and until then it is reached through the capability
+   hook `__bloomCurveTest` below and nothing else.
+
+   THE ELEMENT BEHAVES LIKE AN INPUT, so every path in this file that treats a
+   control as one — the generator, readUI(), Reset, a design-file load, a
+   scope's load — needs no curve arm: `.value` reads a COPY of the curve and
+   writes one (a write, like an input's, fires nothing), and a hand's edit
+   fires `input` (during a drag) and `change` (when it ends). The editor holds
+   NOTHING but the value, a drag in progress and a focused point — a curve is
+   a value the design file and a scope can hold, never page state (Eva).
+
+   EVERY EDIT GOES THROUGH bloom-curve.js's `proposeEdit` — a drag step, an
+   add, a remove, a nudge, a mode switch — and a refused edit LEAVES THE VALUE
+   AS IT WAS: the point stays where it last was, the status line says why, and
+   nothing is clamped, projected or bisected toward the boundary (Eva's Q4.4:
+   "a drag past printable curvature is REFUSED — the point does not move
+   there"). The refusal is the CONSUMER's (`validate`) or the value's own
+   shape rule's; the widget adds none of its own and decides none itself.
+
+   THE GESTURES. Drag a point. Double-click ON THE CURVE to add a point there
+   (within 8 px of the drawn curve); double-click a point, or right-click it,
+   to remove it. With the editor focused: [ and ] (or Home / End) pick the
+   previous / next point, the arrow keys nudge it by 0.005 of the owning
+   length (Shift: 0.05), + (or Insert) adds a point on the curve after it,
+   Delete / Backspace removes it. In 'symmetric' the mirror is drawn dashed
+   and is not a handle; 'two-sided' draws both sides as handles, the left
+   above the axis and the right below it; the mode select switches, and
+   two-sided -> symmetric keeps the LEFT side (bloom-curve.js `switchMode`).
+
+   EVERY STORED NUMBER IS A FRACTION OF THE OWNING LENGTH. The pointer is read
+   in the SVG's own viewBox, which IS the fraction box (one viewBox unit = the
+   owning length), quantised to bloom-curve.js's grid, and stored — never
+   multiplied by the owner. The owner's millimetres appear only in the caption
+   under the editor, which is the one place a reader of the panel sees mm.
+   =================================================================== */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/* every mounted editor's render — refreshLabels() re-renders each after a
+   rebuild, so the millimetre caption follows the owning length live */
+const liveCurveEditors = new Set();
+const CURVE_NUDGE = 0.005;
+const CURVE_HANDLE_PX = 5;
+const CURVE_PICK_PX = 8;
+function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
+  const spec = c.curve;
+  let cur = cloneCurve(c.default);
+  let drag = null;            // { side, i, pointerId, moved }
+  let focus = { side: 'left', i: 0 };
+  let refusal = null;         // { reason, side, i } — the last refused edit, until an edit is accepted
+  let lastPress = null;       // the last press on a handle, for the double press that removes it
+  let lastOp = null;          // the last edit proposed (accepted or refused) — the gate reads the pointer's conversion off it
+  const counts = { input: 0, change: 0, refused: 0 };
+  const mirrored = () => cur.mode !== 'single';
+
+  const host = document.createElement('div');
+  host.className = 'bl-curve';
+  host.dataset.curve = c.id;
+  const bar = document.createElement('div');
+  bar.className = 'bl-curve-bar';
+  let modeSel = null;
+  if (spec.modes.length > 1) {
+    modeSel = document.createElement('select');
+    modeSel.className = 'bl-curve-mode';
+    modeSel.setAttribute('aria-label', `${c.label}: mode`);
+    for (const m of spec.modes) { const o = document.createElement('option'); o.value = m; o.textContent = m; modeSel.append(o); }
+    bar.append(modeSel);
+  }
+  const dims = document.createElement('span');
+  dims.className = 'bl-curve-dims';
+  bar.append(dims);
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'bl-curve-svg');
+  svg.setAttribute('tabindex', '0');
+  svg.setAttribute('role', 'application');
+  svg.setAttribute('aria-label', `${c.label}: drag a point; double-click the curve to add one, a point to remove it; arrows nudge, [ ] pick, + adds, Delete removes`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const status = document.createElement('p');
+  status.className = 'bl-curve-status';
+  status.hidden = true;
+  host.append(bar, svg, status);
+
+  /* THE FRACTION BOX AS A VIEWBOX: x along, y across; a mirrored mode puts the
+     left side above the axis (svg y = -y) and the right below (svg y = +y). */
+  const pad = 0.04 * (spec.x[1] - spec.x[0]);
+  const box = () => {
+    const x0 = spec.x[0] - pad, w = spec.x[1] - spec.x[0] + 2 * pad;
+    if (mirrored()) { const top = Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])); return { x0, y0: -top - pad, w, h: 2 * top + 2 * pad }; }
+    return { x0, y0: -spec.y[1] - pad, w, h: spec.y[1] - spec.y[0] + 2 * pad };
+  };
+  const svgY = (side, y) => (mirrored() && side === 'right' ? y : -y);
+  const fracY = (side, vy) => (mirrored() && side === 'right' ? vy : -vy);
+  const toVb = (clientX, clientY) => { const p = svg.createSVGPoint(); p.x = clientX; p.y = clientY; const m = svg.getScreenCTM(); return m ? p.matrixTransform(m.inverse()) : null; };
+  const toClient = (side, xy) => { const p = svg.createSVGPoint(); p.x = xy[0]; p.y = svgY(side, xy[1]); const m = svg.getScreenCTM(); const q = p.matrixTransform(m); return { x: q.x, y: q.y }; };
+  const unitsPerPx = () => { const b = box(); const wpx = svg.getBoundingClientRect().width || 218; return b.w / wpx; };
+  const path = (pts, side) => pts.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(5)} ${svgY(side, p[1]).toFixed(5)}`).join(' ');
+  const el = (tag, attrs) => { const e = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+
+  function render() {
+    const b = box();
+    svg.setAttribute('viewBox', `${b.x0} ${b.y0} ${b.w} ${b.h}`);
+    svg.style.aspectRatio = `${b.w} / ${b.h}`;
+    const upp = unitsPerPx();
+    svg.replaceChildren();
+    svg.append(el('rect', { class: 'bl-curve-frame', x: spec.x[0], y: mirrored() ? -Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])) : -spec.y[1], width: spec.x[1] - spec.x[0], height: mirrored() ? 2 * Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])) : spec.y[1] - spec.y[0] }));
+    if (mirrored() || (spec.y[0] < 0 && spec.y[1] > 0)) svg.append(el('line', { class: 'bl-curve-axis', x1: spec.x[0], y1: 0, x2: spec.x[1], y2: 0 }));
+    const s = curveSamples(cur, spec);
+    if (cur.mode === 'symmetric') svg.append(el('path', { class: 'bl-curve-ghost', d: path(s.right, 'right') }));
+    if (cur.mode === 'two-sided') svg.append(el('path', { class: 'bl-curve-line', 'data-side': 'right', d: path(s.right, 'right') }));
+    svg.append(el('path', { class: 'bl-curve-line', 'data-side': 'left', d: path(s.left, 'left') }));
+    for (const side of cur.mode === 'two-sided' ? ['left', 'right'] : ['left']) {
+      pointsOf(cur, side).forEach((p, i) => {
+        const cls = ['bl-curve-pt'];
+        if (focus.side === side && focus.i === i) cls.push('is-focus');
+        if (refusal && drag && refusal.side === side && refusal.i === i) cls.push('is-refused');
+        svg.append(el('circle', { class: cls.join(' '), 'data-side': side, 'data-i': i, cx: p[0], cy: svgY(side, p[1]), r: CURVE_HANDLE_PX * upp }));
+      });
+    }
+    if (modeSel) modeSel.value = cur.mode;
+    const L = ownerLength();
+    const mm = (f) => (f * L).toFixed(1);
+    dims.textContent = Number.isFinite(L) ? `box ${mm(spec.x[1] - spec.x[0])} × ${mm(spec.y[1] - spec.y[0])} mm of ${ownerLabel} ${mm(1)} mm` : '';
+    status.hidden = !refusal;
+    status.textContent = refusal ? `refused — ${refusal.reason}` : '';
+  }
+  const fire = (type) => { counts[type]++; host.dispatchEvent(new Event(type, { bubbles: true })); };
+  /* THE ONE PATH AN EDIT TAKES. Returns whether it was accepted. */
+  function edit(op, { during = false } = {}) {
+    lastOp = { ...op, xy: op.xy ? [op.xy[0], op.xy[1]] : undefined };
+    const r = proposeEdit(cur, spec, validate, op);
+    if (!r.accepted) {
+      refusal = { reason: r.reason, side: op.side, i: op.i };
+      counts.refused++;
+      render();
+      return false;
+    }
+    if (r.unchanged) return true;
+    cur = r.value;
+    refusal = null;
+    render();
+    fire('input');
+    if (!during) fire('change');
+    return true;
+  }
+  const quantised = (xy) => [quantise(xy[0]), quantise(xy[1])];
+  /* WHICH HANDLE IS UNDER THE POINTER — by distance on screen, never by the
+     event's target: the editor re-renders on pointerdown, so the second click
+     of a double-click lands on a NEW circle, and the target of the dblclick
+     is the svg (measured — the first cut removed nothing on a double-click). */
+  const handleAt = (clientX, clientY) => {
+    let best = null;
+    for (const side of cur.mode === 'two-sided' ? ['left', 'right'] : ['left']) {
+      pointsOf(cur, side).forEach((p, i) => {
+        const q = toClient(side, p), d = Math.hypot(q.x - clientX, q.y - clientY);
+        if (d <= CURVE_HANDLE_PX + 3 && (!best || d < best.d)) best = { side, i, d };
+      });
+    }
+    return best;
+  };
+
+  svg.addEventListener('pointerdown', (ev) => {
+    const h = ev.button === 0 ? handleAt(ev.clientX, ev.clientY) : null;
+    if (!h) return;
+    ev.preventDefault();
+    const { side, i } = h;
+    /* A DOUBLE PRESS ON A HANDLE REMOVES IT. Detected here rather than by a
+       `dblclick` listener: a pointerdown whose default is prevented and which
+       captures the pointer is followed by NO click or dblclick in Chromium
+       (measured — the events reach the svg as pointerdown / pointerup only),
+       so the browser's own double-click never arrives on a handle. */
+    const now = ev.timeStamp;
+    if (lastPress && now - lastPress.t < 450 && lastPress.side === side && lastPress.i === i) {
+      lastPress = null;
+      edit({ op: 'remove', side, i });
+      return;
+    }
+    lastPress = { t: now, side, i };
+    focus = { side, i };
+    drag = { side, i, pointerId: ev.pointerId, moved: false };
+    svg.setPointerCapture(ev.pointerId);
+    svg.dataset.pointer = '1';   // a pointer's focus draws no ring (bloom.css); a key press clears it
+    svg.focus({ preventScroll: true });
+    render();
+  });
+  svg.addEventListener('pointermove', (ev) => {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
+    const vb = toVb(ev.clientX, ev.clientY);
+    if (!vb) return;
+    const xy = quantised([vb.x, fracY(drag.side, vb.y)]);
+    if (edit({ op: 'move', side: drag.side, i: drag.i, xy }, { during: true })) drag.moved = true;
+  });
+  const endDrag = (ev) => {
+    if (!drag || (ev && ev.pointerId !== drag.pointerId)) return;
+    const moved = drag.moved;
+    drag = null;
+    render();
+    if (moved) { fire('change'); lastPress = null; }
+  };
+  svg.addEventListener('pointerup', endDrag);
+  svg.addEventListener('pointercancel', endDrag);
+  svg.addEventListener('dblclick', (ev) => {
+    ev.preventDefault();
+    const h = handleAt(ev.clientX, ev.clientY);
+    if (h) { edit({ op: 'remove', side: h.side, i: h.i }); return; }
+    const vb = toVb(ev.clientX, ev.clientY);
+    if (!vb) return;
+    const upp = unitsPerPx();
+    let best = null;
+    for (const side of cur.mode === 'two-sided' ? ['left', 'right'] : ['left']) {
+      const n = nearestOnCurve(cur, spec, side, [vb.x, fracY(side, vb.y)], [1 / upp, 1 / upp]);
+      if (n && (!best || n.d < best.d)) best = { ...n, side };
+    }
+    if (!best || best.d > CURVE_PICK_PX) return;
+    if (edit({ op: 'insert', side: best.side, after: best.span, xy: quantised(best.at) })) focus = { side: best.side, i: best.span + 1 };
+    render();
+  });
+  svg.addEventListener('contextmenu', (ev) => {
+    const h = handleAt(ev.clientX, ev.clientY);
+    if (!h) return;
+    ev.preventDefault();
+    edit({ op: 'remove', side: h.side, i: h.i });
+  });
+  svg.addEventListener('keydown', (ev) => {
+    delete svg.dataset.pointer;
+    const pts = pointsOf(cur, focus.side);
+    const step = ev.shiftKey ? 10 * CURVE_NUDGE : CURVE_NUDGE;
+    const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[ev.key];
+    if (dir) {
+      ev.preventDefault();
+      const p = pts[focus.i];
+      const dy = mirrored() && focus.side === 'right' ? -dir[1] : dir[1];   // up on screen is outward on the right side's own y
+      edit({ op: 'move', side: focus.side, i: focus.i, xy: quantised([p[0] + dir[0] * step, p[1] + dy * step]) });
+      return;
+    }
+    const sides = cur.mode === 'two-sided' ? ['left', 'right'] : ['left'];
+    if (ev.key === '[' || ev.key === ']' || ev.key === 'Home' || ev.key === 'End') {
+      ev.preventDefault();
+      const all = sides.flatMap((s) => pointsOf(cur, s).map((_, i) => ({ side: s, i })));
+      const at = all.findIndex((f) => f.side === focus.side && f.i === focus.i);
+      const k = ev.key === 'Home' ? 0 : ev.key === 'End' ? all.length - 1 : (at + (ev.key === ']' ? 1 : -1) + all.length) % all.length;
+      focus = all[k];
+      render();
+      return;
+    }
+    if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      ev.preventDefault();
+      if (edit({ op: 'remove', side: focus.side, i: focus.i })) focus = { side: focus.side, i: Math.max(0, Math.min(focus.i, pointsOf(cur, focus.side).length - 1)) };
+      render();
+      return;
+    }
+    if (ev.key === '+' || ev.key === '=' || ev.key === 'Insert') {
+      ev.preventDefault();
+      const after = Math.min(focus.i, pts.length - 2);
+      const { pts: sm, span } = sampleCurve(pts, spec);
+      const onSpan = sm.filter((_, k) => span[k] === after && k > 0);
+      const mid = onSpan[Math.floor((onSpan.length - 1) / 2)];
+      if (mid && edit({ op: 'insert', side: focus.side, after, xy: quantised(mid) })) focus = { side: focus.side, i: after + 1 };
+      render();
+    }
+  });
+  if (modeSel) modeSel.addEventListener('change', () => {
+    if (!edit({ op: 'mode', mode: modeSel.value })) modeSel.value = cur.mode;
+    if (cur.mode !== 'two-sided' && focus.side === 'right') focus = { side: 'left', i: 0 };
+    render();
+  });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => render()).observe(svg);
+
+  Object.defineProperty(host, 'value', {
+    get: () => cloneCurve(cur),
+    /* A WRITE IS A LOAD: the value is taken whole, as an input takes `.value`,
+       and fires nothing (the caller dispatches, as Reset and a design-file load
+       already do). A value the control cannot hold is refused here too —
+       the file reader has already refused it on the way in, so reaching this
+       means a caller bypassed the reader, and the page keeps its curve. */
+    set: (v) => {
+      const why = curveShapeRefusal(v, spec);
+      if (why) { console.warn(`${c.id}: not a curve this control can hold — ${why}`); return; }
+      cur = cloneCurve(v);
+      refusal = null;
+      if (focus.side === 'right' && cur.mode !== 'two-sided') focus = { side: 'left', i: 0 };
+      if (focus.i >= pointsOf(cur, focus.side).length) focus = { side: focus.side, i: 0 };
+      render();
+    },
+  });
+  /* the gate's handles onto THIS editor (read by __bloomCurveTest) */
+  host.curveEditor = {
+    spec,
+    counts: () => ({ ...counts }),
+    refusal: () => (refusal ? { ...refusal } : null),
+    lastOp: () => (lastOp ? { ...lastOp } : null),
+    focus: () => ({ ...focus }),
+    pointClient: (side, i) => { const p = pointsOf(cur, side)[i]; return p ? toClient(side, p) : null; },
+    fracClient: (side, xy) => toClient(side, xy),
+    unitsPerPx,
+    render,
+  };
+  liveCurveEditors.add(render);
+  host.curveEditor.dispose = () => liveCurveEditors.delete(render);
+  render();
+  return host;
 }
 
 /* SECTIONS FIRST, in the registry's order, then each control into the section
@@ -306,6 +618,7 @@ function refreshLabels(ui, shown = null, scopedUi = null) {
      itself, which is cheaper than a second list of which sections vary. */
   for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
   for (const [reason, w] of whyEls) w.el.textContent = reason.text(ui);
+  for (const r of liveCurveEditors) r();
 }
 
 /* THE CAP MARK (Eva, Sep 6, session 23) — where a slider's travel goes DEAD
@@ -3976,6 +4289,78 @@ window.__bloomScopes = (overrides) => {
   return scopes;
 };
 let lastScopesNotes = [];
+
+/* THE CURVE EDITOR'S TEST MOUNT (the curve-editor session). No live registry
+   control is a curve yet, so this is the ONLY way the widget reaches a page:
+   it mounts ONE editor, built by the same `makeCurveInput` a registry row
+   would get, on a value and a validator the caller supplies (a validator is a
+   real function — page.evaluate defines it IN the page), in its own block
+   OUTSIDE #panelControls so the panel gate's census of registry controls is
+   untouched. Not a control, never saved by the page's own Save, invisible to
+   readUI() and every whole-state read-back. `saveText` / `loadText` walk the
+   design file's SHIPPED writer and reader (bloom-file.js `composeControls` /
+   `readControls`) over a one-row field table for this descriptor, so the
+   curve's field-kind row is exercised exactly as a registry curve's would be.
+   Called by the gates alone. */
+let curveTest = null;
+window.__bloomCurveTest = {
+  mount({ id = 'curveTest', label = 'Test curve', spec, value, validate = null } = {}) {
+    if (curveTest) { curveTest.input.curveEditor.dispose(); curveTest.wrap.remove(); }
+    const problems = curveSpecProblems(spec, value);
+    if (problems.length) throw new Error(`__bloomCurveTest.mount: ${problems.join('; ')}`);
+    if (!inputs[spec.owner]) throw new Error(`__bloomCurveTest.mount: owner ${spec.owner} is not a control on this page`);
+    const desc = { id, label, kind: 'curve', curve: spec, default: value };
+    const wrap = document.createElement('section');
+    wrap.className = 'bl-ctrl bl-curve-test';
+    wrap.dataset.curveTest = id;
+    const lab = document.createElement('label');
+    lab.htmlFor = id;
+    lab.append(label);
+    const val = document.createElement('span');
+    val.className = 'bl-val';
+    lab.append(val);
+    const input = makeCurveInput(desc, {
+      validate: typeof validate === 'function' ? (cand) => validate(cand, readUI()) : null,
+      ownerLength: () => Number(inputs[spec.owner].value),
+      ownerLabel: (CONTROLS.find((o) => o.id === spec.owner) || {}).label || spec.owner,
+    });
+    input.id = id;
+    wrap.append(lab, input);
+    panelRoot.parentElement.insertBefore(wrap, panelRoot);
+    const said = () => { const v = input.value; val.textContent = `${v.mode} · ${v.points.length}${v.mode === 'two-sided' ? ` + ${v.right.length}` : ''} points`; };
+    input.addEventListener('input', said);
+    input.addEventListener('change', said);
+    said();
+    curveTest = { desc, field: fieldFor(desc), wrap, input };
+    return { id };
+  },
+  unmount() { if (curveTest) { curveTest.input.curveEditor.dispose(); curveTest.wrap.remove(); curveTest = null; } },
+  value: () => (curveTest ? curveTest.input.value : null),
+  /* a programmatic write, then the two events — Reset's and a load's own shape */
+  set(v) { curveTest.input.value = v; curveTest.input.dispatchEvent(new Event('input', { bubbles: true })); curveTest.input.dispatchEvent(new Event('change', { bubbles: true })); return curveTest.input.value; },
+  pointClient: (side, i) => curveTest.input.curveEditor.pointClient(side, i),
+  fracClient: (side, xy) => curveTest.input.curveEditor.fracClient(side, xy),
+  unitsPerPx: () => curveTest.input.curveEditor.unitsPerPx(),
+  refusal: () => curveTest.input.curveEditor.refusal(),
+  lastOp: () => curveTest.input.curveEditor.lastOp(),
+  counts: () => curveTest.input.curveEditor.counts(),
+  focus: () => curveTest.input.curveEditor.focus(),
+  said: () => curveTest.wrap.querySelector('.bl-val').textContent,
+  dims: () => curveTest.wrap.querySelector('.bl-curve-dims').textContent,
+  status: () => { const s = curveTest.wrap.querySelector('.bl-curve-status'); return s.hidden ? '' : s.textContent; },
+  render: () => curveTest.input.curveEditor.render(),
+  saveText: () => JSON.stringify({ controls: composeControls({ [curveTest.desc.id]: curveTest.input.value }, [curveTest.field]) }),
+  loadText(text) {
+    const obj = JSON.parse(text);
+    const notes = [];
+    const out = readControls(obj.controls, notes, [curveTest.field]);
+    const applied = Object.prototype.hasOwnProperty.call(out, curveTest.desc.id);
+    if (applied) this.set(out[curveTest.desc.id]);
+    return { notes, applied };
+  },
+  /* the law, for a validator written in the page */
+  law: { curveSamples, curveEquals, curveShapeRefusal, switchMode, sampleCurve },
+};
 /* ST6'S REFERENCE — A STEMLESS BUILD OF THE SAME STATE, made here on the same
    page and thrown away (session 43). It is the only owner in this file that the
    stem code does not write at all, which is exactly what Eva's fourth durable

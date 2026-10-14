@@ -1140,6 +1140,9 @@ async function negativeControl({ disarm = null, neuter = null } = {}) {
     fs.mkdirSync(mdir, { recursive: true });
     fs.writeFileSync(path.join(mdir, 'bloom-geometry.js'), mutated);
     fs.writeFileSync(path.join(mdir, 'bloom-registry.js'), reg);
+    /* the registry imports bloom-curve.js (the curve-editor session); without it
+       beside the copy, `verify({ root: mdir })` throws at the registry's import */
+    fs.copyFileSync(path.join(ROOT, 'bloom-curve.js'), path.join(mdir, 'bloom-curve.js'));
     /* THE WITNESS, before the assertions are consulted at all. An edit that
        landed on the right line and changed no behaviour makes a green `names`
        line evidence of nothing, and that is the failure this clause exists
