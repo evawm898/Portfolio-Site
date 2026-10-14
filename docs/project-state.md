@@ -6,7 +6,7 @@ the repo won; the disagreements found are called out inline. Three worth knowing
 `CLAUDE.md`'s bloom-composition notes say `MAX_INSTANCES` is 8, the live constant in
 `plot.js` is 12; `CLAUDE.md` quotes several different, smaller `verify-plot.mjs` check/mutant
 totals at different points in its own history (its session-by-session trail, not a live
-count) — the file itself holds 233 checks / 93 mutants right now; and flower.js's public
+count) — the file itself holds 233 checks / 93 mutants right now **[Oct 14: 259 / 113 since background shapes]**; and flower.js's public
 "shared designs" gallery (a Netlify Function + Blobs, unauthenticated but rate-limited)
 isn't mentioned anywhere in `CLAUDE.md` at all.*
 
@@ -49,11 +49,16 @@ petal and per bloom even when deselected. A rectangular/elliptical crop frame de
 millimetre-accurate SVG export. The whole composition saves/loads as JSON, reporting rather
 than silently dropping anything it can't restore.
 
-**Confirmed absent** (grepped against current source): twist on petals, leaves, background
-shapes, lock view, cut-and-pull, any infill/direction concept (`/plot` shares no code with
-`/print`).
+**Background shapes and knockout (Oct 14):** rectangles and ellipses in frame space with a
+tone and a fill (solid, stripes, halftone, outline); where the drawing crosses an
+opposite-tone shape it reverses, drawn there in the other polarity's regime. Saved in
+`plot-composition` v3. None ships by default. See `plot-shapes.js` and CLAUDE.md's /plot
+section.
 
-**Gate:** `verify-plot.mjs` — 233 checks, 93 mutants, counted directly from the file. Zero CI
+**Confirmed absent** (grepped against current source): twist on petals, leaves, lock view,
+cut-and-pull, sparkles, any infill/direction concept (`/plot` shares no code with `/print`).
+
+**Gate:** `verify-plot.mjs` — 259 checks, 113 mutants, counted directly from the file. Zero CI
 (no workflow mentions "plot").
 
 ## 3. What the bloom generator can do today
@@ -90,16 +95,16 @@ a counted call-site total.
 | **`verify-bloom-apex-mutants.mjs`** (the one true bloom mutant table) | 14 witnesses / 8 rows | **14** | **no** |
 | 8 bloom byte/refactor-proof gates | 2–6 clauses each | 0 (single perturbation each) | no (1 explicitly "by design") |
 | Flower core (export, connectedness, junction, quality, tier-vis, registry-sync) | 114 / 41 / 3 / 4 / **10,956** / 46 | 0 (config-matrix style, not mutation) | **yes**, all 6 |
-| `/plot` + `/print` family (plot, scaffold, tone, axis, fan, infill) | ~232/73/65/43/46/49 | **93/17/5/6/7/0 = 149 total** | **no**, none |
+| `/plot` + `/print` family (plot, scaffold, tone, axis, fan, infill) | ~259/73/65/43/46/49 | **113/17/5/6/7/0 = 169 total** | **no**, none |
 | `/cards` (fonts, svg-glyphs) | ~97/~12 | 0 (2 hand-run, documented in prose) | no |
 | Field-note pages + tracker (color-change, stretch-sim, trace-sim, tracker-drawer) | ~38/36/31/**246** | 0 | no, "by design" |
 | shape-editor impact check | data-dependent | 0 | no |
 
 **Least covered, ranked:**
-1. **The `/plot` + `/print` family** — 149 declared mutants across 5 files, **zero CI**, and
+1. **The `/plot` + `/print` family** — 169 declared mutants **[Oct 14: was 149]** across 5 files, **zero CI**, and
    every one of the five defaults to running **none** of its mutants unless a human also
    remembers an extra flag (`verify-plot.mjs` prints "(negative control not run...)" by
-   default). `verify-plot.mjs` alone accounts for 93 of the 149.
+   default). `verify-plot.mjs` alone accounts for 113 of the 169.
 2. **`verify-bloom-apex-mutants.mjs`** — 14 mutants, the sole positive-control proof that the
    bloom apex assertions can fire at all, never runs automatically; its own header calls
    re-running it an obligation, enforced by nothing.
@@ -178,7 +183,7 @@ individually verified. **Unclear**, not guessed.
 3. **Triage the six dormant PRs** — close what's superseded, say if anything should be
    revived. Minutes each; unblocks an accurate picture of open work.
 4. **Wire the `/plot`+`/print` mutant family into CI**, or at minimum make `--negative-control`
-   the default rather than opt-in — 149 mutants that silently never run is the single largest
+   the default rather than opt-in — 169 mutants that silently never run is the single largest
    verification gap found here. Plumbing only, the tools exist.
 5. **Build the self-approach combination gate.** The one-control-at-a-time matrix is
    structurally blind to compound hazards already known to occur. A session's worth of work;

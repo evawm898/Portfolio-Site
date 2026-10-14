@@ -9022,7 +9022,16 @@ black ground) is a mutant.
   incoherent.
 - Gate: `knockout/*` and `shapes/*` in `tools/verify-plot.mjs` measure the framebuffer
   REGION BY REGION against the same drawing with no shape (coverage with a bar, never a
-  framebuffer equality); twenty mutants, among them all three study findings. Sheet:
+  framebuffer equality) — 26 new checks, 259 in all; twenty new mutants, 113 in all,
+  among them all three study findings. THREE INSTRUMENT DEFECTS THE MUTANTS FOUND, all
+  the gate's own: the isolated read still drew the overlay, so the highlight check was
+  counting the picked shape's TEAL OUTLINE (the overlay is skipped under `isolate` now);
+  the gate drove the shape controls through `SHAPE_FIELDS`, so the table-row mutant made it
+  THROW instead of going red (the control map is written down in the gate now); and a
+  camera mutant on `shapeSpace` was inert, because shapes rebuild on shape, frame and resize
+  events and never on an orbit. And one blindness, recorded: `a-shape-never-occludes` stays
+  green on a wrong-coloured panel (on black, every pixel passes "dark ink") — the tones
+  check is the witness for that. Sheet:
   `node tools/shot-plot-shapes.mjs <dir>` (both polarities across an edge, each fill both
   ways, overlap both orders, save → reload → restore, and the PNG/SVG artefacts).
 
