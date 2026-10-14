@@ -2813,7 +2813,12 @@ for (const [label, sets, wantDome, wantClamp] of [
       wrap.classList.add = () => {}; wrap.classList.remove = () => {};
     });
   }
-  const SUBS = CONTROLS.filter((c) => c.section === 'androecium' && c.id !== 'stamenCount').map((c) => c.id);
+  /* THE COIL'S TWO SUB-CONTROLS (F1.3a) sit behind their own nested gates —
+     the radius once a coil MODE is chosen, the turns once a coil is BUILT (a
+     radius of exactly 0 is the plain rod by branch) — so they are held to
+     those gates below, both ways, rather than to "present". */
+  const COIL_SUBS = ['stamenCoilRadius', 'stamenCoilTurns'];
+  const SUBS = CONTROLS.filter((c) => c.section === 'androecium' && c.id !== 'stamenCount' && !COIL_SUBS.includes(c.id)).map((c) => c.id);
   const step = async (label, sets, want = {}) => {
     const bad = sets.length ? await applyConfig(page, sets) : [];
     if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
@@ -2824,6 +2829,8 @@ for (const [label, sets, wantDome, wantClamp] of [
       const centerSec = document.getElementById('sec-center');
       const spreadWrap = document.getElementById('stamenSpread').closest('.bl-ctrl');
       return { count: Math.round(Number(ui.stamenCount)), sphere: m.sphereMode === true,
+               coilMode: ui.stamenCoil, coilRadius: Number(ui.stamenCoilRadius), coilRHidden: hid('stamenCoilRadius'), coilNHidden: hid('stamenCoilTurns'),
+               coilBuilt: !!(m.androecium && m.androecium.coil), coilSaid: /· COILED \(independent\)/.test(txt),
                sectionHidden: sec ? sec.hidden : null, countHidden: hid('stamenCount'), subsHidden: subs.map((id) => hid(id)),
                /* session 23: the container, the kept clause, the cap mark, the flag */
                center: centerSec ? centerSec.hidden : null,
@@ -2842,7 +2849,7 @@ for (const [label, sets, wantDome, wantClamp] of [
                fuse: !!(m.stamenNearest && m.androecium && m.stamenNearest.root.mm < m.androecium.diameter),
                lineSaid: (txt.match(/^STAMENS (\d+) on /m) || [])[1], clampSaid: /\(CLAMPED at the hub radius/.test(txt),
                annulusSaid: /STAND INSIDE THE PETAL-ROOT ANNULUS/.test(txt), fuseSaid: /\(ROOTS FUSE\)/.test(txt),
-               slenderSaid: /^SLENDERNESS L\/d (?:style [\d.]+ · )?filament [\d.]+(?: · style [\d.]+)? \((live|export)\) — UNMEASURED — no coupon has been printed$/m.test(txt) && /^SLENDERNESS L\/d (?:[^\n]* · )?filament [\d.]+/m.test(txt) };
+               slenderSaid: /^SLENDERNESS L\/d (?:style [\d.]+ · )?filament [\d.]+(?: \([^()]*\))?(?: · style [\d.]+)? \((live|export)\) — UNMEASURED — no coupon has been printed$/m.test(txt) && /^SLENDERNESS L\/d (?:[^\n]* · )?filament [\d.]+/m.test(txt) };
     }, SUBS);
     const p = [];
     const wantPresent = !res.sphere && res.count >= 1;
@@ -2850,6 +2857,14 @@ for (const [label, sets, wantDome, wantClamp] of [
     else if (res.sectionHidden !== res.sphere) p.push(`the Androecium section is ${res.sectionHidden ? 'hidden' : 'shown'} while the head ${res.sphere ? 'is a SPHERE (hidden and inert)' : 'is a cap'}`);
     if (res.countHidden !== res.sphere) p.push(`stamenCount is ${res.countHidden ? 'hidden' : 'shown'} under a ${res.sphere ? 'sphere' : 'cap'}`);
     res.subsHidden.forEach((h, i) => { if (h !== !wantPresent) p.push(`${SUBS[i]} is ${h ? 'hidden' : 'shown'} while the androecium is ${wantPresent ? 'present' : 'absent'}`); });
+    {
+      const rWant = wantPresent && res.coilMode === 'INDEPENDENT', nWant = rWant && res.coilRadius !== 0;
+      if (res.coilRHidden !== !rWant) p.push(`stamenCoilRadius is ${res.coilRHidden ? 'hidden' : 'shown'} while the coil mode is ${res.coilMode} on ${wantPresent ? 'a present' : 'an absent'} androecium`);
+      if (res.coilNHidden !== !nWant) p.push(`stamenCoilTurns is ${res.coilNHidden ? 'hidden' : 'shown'} while ${nWant ? 'a coil is built' : 'no coil is built'} (mode ${res.coilMode}, radius ${res.coilRadius})`);
+      if (res.coilBuilt !== nWant) p.push(`the owner ${res.coilBuilt ? 'declares a coil' : 'declares none'} while the controls ${nWant ? 'build one' : 'build none'}`);
+      if (res.coilSaid !== nWant) p.push(`the STAMENS line's COILED clause is ${res.coilSaid ? 'shown' : 'absent'} while ${nWant ? 'a coil is built' : 'no coil is built'}`);
+      if (want.coil !== undefined && want.coil !== nWant) p.push(`this step was meant to ${want.coil ? 'build' : 'not build'} a coil`);
+    }
     if (res.has !== wantPresent) p.push(`the owner ${res.has ? 'declares an androecium' : 'declares none'} while the state says ${wantPresent ? 'present' : 'absent'}`);
     if (res.emitted !== (wantPresent ? res.count : 0) || res.freeEnds !== (wantPresent ? res.count : 0)) p.push(`${res.emitted} stamens emitted / ${res.freeEnds} free ends for ${wantPresent ? res.count : 0} expected`);
     if ((res.lineSaid !== undefined) !== wantPresent) p.push(`the STAMENS line is ${res.lineSaid !== undefined ? 'SHOWN' : 'ABSENT'} while the owner ${wantPresent ? 'declares an androecium' : 'declares none'}`);
@@ -2919,6 +2934,12 @@ for (const [label, sets, wantDome, wantClamp] of [
   await step('1 stamen on a RING (the multiplier saturates past the range top on this hub: no cap mark)', [{ id: 'stamenCount', value: '1' }], { cap: false, clamped: false });
   await step('120 on the DISC (CLAMPED at the hub; the petal-root annulus flag; the cap mark low on the track)', [{ id: 'stamenLayout', value: 'DISC' }, { id: 'stamenCount', value: '120' }], { clamped: true, annulusFlag: true, cap: true });
   await step('6 on a RING x spread 0.60 (the roots fuse — a flag)', [{ id: 'stamenLayout', value: 'RING' }, { id: 'stamenCount', value: '6' }, { id: 'stamenSpread', value: '0.6' }], { clamped: false, fuse: true, cap: true });
+  /* F1.3a: the coil's nested gates, both directions — the radius and the
+     turns APPEAR with an independent coil, the turns HIDE at a radius of 0
+     (the plain rod by branch), and both hide again at NONE. */
+  await step('6 COILED (independent: the radius and the turns appear, the COILED clause on the STAMENS line)', [{ id: 'stamenSpread', value: '2' }, { id: 'stamenCoil', value: 'INDEPENDENT' }], { coil: true });
+  await step('6 COILED x radius 0 (the plain rod by branch: the turns hide, the radius stays)', [{ id: 'stamenCoilRadius', value: '0' }], { coil: false });
+  await step('back to the coil NONE (both hide)', [{ id: 'stamenCoilRadius', value: '1.5' }, { id: 'stamenCoil', value: 'NONE' }], { coil: false });
   const bare = await step('CONTINUOUS x SPHERE x count 0 (the section hides whole)', [{ id: 'stamenSpread', value: '2' }, { id: 'stamenCount', value: '0' }, { id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }]);
   if (bare) await step('6 stamens asked for under SPHERE (hidden AND inert: the build must not move)', [{ id: 'stamenCount', value: '6' }], { tris: bare.shownTris });
   await step('back to CAP (the section and the six stamens return)', [{ id: 'hubShape', value: 'CAP' }]);

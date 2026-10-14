@@ -578,6 +578,19 @@ function stamenLengths(M, state) {
 }
 const VARIED_SIX = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenLengthVariance: 0.5 });
 const VARIED_120 = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenLength: 120, stamenLengthVariance: 1 });
+/* ===== THE INDEPENDENT COIL (F1.3a) ===== */
+/* The mutated module's OWN builder records on a coiled state — the emitted
+   stamens (station centres, end direction) and the owner's per-stamen coil
+   records — never JS9, which is what these mutants name. */
+function coiledStamens(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, state);
+    return { stamens: b.stamens || [], A: b.androecium };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const COILED_SIX = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenCoilRadius: 1.5, stamenCoilTurns: 3 });
+const COILED_TIGHT = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenCoilRadius: 1.5, stamenCoilTurns: 12 });
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -2600,6 +2613,40 @@ const MUTANTS = [
     witness: (M, C) => { const m = stamenLengths(M, VARIED_120()), c = stamenLengths(C, VARIED_120());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.max(...c) === 120 && Math.max(...m) > 120) ? null : `the mutant's longest filament is ${Math.max(...m)} mm against the clean tree's ${Math.max(...c)} — nothing passed the ceiling`; } },
+  /* ===================================================================
+     THE INDEPENDENT COIL (F1.3a) — JS9's own four, each witnessed on the
+     MUTATED module's own builder records (station centres, end direction,
+     the owner's per-stamen coil record) before JS9 is consulted. JS9 restates
+     the helix from the controls and the index against the EMITTED rings, so
+     each moves a station, a direction or a count the restatement does not. */
+  { id: 'the-coil-is-ignored', why: 'the rod never takes its coiled arm: a plain filament on a panel that says COILED, every read-out line still describing a helix',
+    find: '  if (coil === null) {\n    for (let k = 1; k <= STAMEN_ROWS; k++) {',
+    into: '  if (true) {\n    for (let k = 1; k <= STAMEN_ROWS; k++) {', names: ['JS9'],
+    witness: (M, C) => { const m = coiledStamens(M, COILED_SIX()), c = coiledStamens(C, COILED_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const nm = m.stamens[0].stations.length, nc = c.stamens[0].stations.length;
+      return (nc === 2 + c.A.coil.rows && nm === 18) ? null : `the mutant's rod carries ${nm} ring centres against the clean tree's ${nc} — the coil still reaches the rod`; } },
+  { id: 'every-stamen-coils-at-the-same-phase', why: 'every stamen draws stamen 0\'s phase: the androecium coils in lockstep, a machined spring set rather than a flower — the ruling derives a phase PER STAMEN',
+    find: '  const phaseUnit = stamenCoilPhaseUnit(i);',
+    into: '  const phaseUnit = stamenCoilPhaseUnit(0);', names: ['JS9'],
+    witness: (M, C) => { const m = coiledStamens(M, COILED_SIX()), c = coiledStamens(C, COILED_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ph = (r) => new Set(r.A.stamens.map((s) => s.coil.phaseRad)).size;
+      return (ph(c) === 6 && ph(m) === 1) ? null : `the mutant draws ${ph(m)} distinct phases against the clean tree's ${ph(c)}`; } },
+  { id: 'the-anther-stands-upright-on-the-coil', why: 'the anther is aimed along the PLAIN filament\'s end direction instead of the coil\'s end tangent (Q2.5): it sits askew on the wire, at the angle of the helix',
+    find: '  const D = rod.coil ? rod.end.D : rod.at(lengthMm).D;\n  const rodT = rod.coil ? rod.end.T : rod.T;',
+    into: '  const D = rod.at(lengthMm).D;\n  const rodT = rod.T;', names: ['JS9'],
+    witness: (M, C) => { const m = coiledStamens(M, COILED_SIX()), c = coiledStamens(C, COILED_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* The angle between the rod's reported end direction and its last emitted segment. */
+      const off = (r) => Math.max(...r.stamens.map((s) => { const a = s.stations[s.stations.length - 2], b = s.stations[s.stations.length - 1], v = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], n = Math.hypot(...v); return Math.acos(Math.min(1, (v[0] * s.dir[0] + v[1] * s.dir[1] + v[2] * s.dir[2]) / n)) * 180 / Math.PI; }));
+      return (off(c) < 15 && off(m) > 30) ? null : `the mutant's anther leaves its wire at ${off(m).toFixed(1)} deg against the clean tree's ${off(c).toFixed(1)} deg`; } },
+  { id: 'the-coil-curvature-is-unfloored', why: 'the turns are never clamped: twelve turns on a 20 mm filament draw a coil tighter than one sheet thickness of radius — the floor Q2.3 rules — told as unclamped',
+    find: '  const turnsClamped = !ok(n);',
+    into: '  const turnsClamped = false;', names: ['JS9'],
+    witness: (M, C) => { const m = coiledStamens(M, COILED_TIGHT()), c = coiledStamens(C, COILED_TIGHT());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.A.coil.turnsMax < 12 && m.A.coil.turnsMax === 12) ? null : `the mutant builds ${m.A.coil.turnsMax} turns against the clean tree's ${c.A.coil.turnsMax}`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3110,6 +3157,13 @@ const ROWS = [
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenLengthVariance', value: '0.5' }] },
   { label: 'six stamens at the 120 mm ceiling with the variance at its maximum (the clamp binds)',
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenLength', value: '120' }, { id: 'stamenLengthVariance', value: '1' }] },
+  /* THE INDEPENDENT COIL (F1.3a): the shipping coil on six, where every
+     coil mutant moves the rods; and twelve turns on 20 mm, the one state
+     where the floor binds (the unfloored mutant is inert elsewhere). */
+  { label: 'six stamens coiled (independent, r 1.5 mm x 3 turns)',
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'INDEPENDENT' }] },
+  { label: 'six stamens coiled at twelve turns (the curvature floor clamps the turns)',
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'INDEPENDENT' }, { id: 'stamenCoilTurns', value: '12' }] },
 ];
 
 const { server, port } = await serveRepo();

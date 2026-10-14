@@ -43,7 +43,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
-import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE } from './bloom-geometry.js';
+import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
@@ -425,6 +425,12 @@ export const PREDICATES = {
      sub-controls' own gate: nothing to spread, lengthen or curl at count 0. */
   androeciumEligible: { not: { ref: 'sphereMode' } },
   androeciumPresent: { all: [{ ref: 'androeciumEligible' }, { id: 'stamenCount', min: 1 }] },
+  /* THE COIL (F1.3a): its radius shows once a coil mode is chosen, its turns
+     once the radius is above 0 — at radius 0 the rod is the plain rod by
+     BRANCH in the geometry (`stamenCoilBuilt`, the twin the harness holds
+     this to), so the turns would be a dead slider there. */
+  stamenCoilOn: { all: [{ ref: 'androeciumPresent' }, { id: 'stamenCoil', oneOf: ['INDEPENDENT'] }] },
+  stamenCoilBuilt: { all: [{ ref: 'stamenCoilOn' }, { not: { id: 'stamenCoilRadius', oneOf: ['0'] } }] },
 
   /* ===================================================================
      WHERE THE GYNOECIUM APPLIES (session 22, phase 2 B3) — the androecium's
@@ -3761,6 +3767,54 @@ export const CONTROLS = [
   { id: 'stamenCurl', section: 'androecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Filament curl', fmt: (v) => (Number(v) === 0 ? 'straight, along the surface normal' : `${v}° — ${Number(v) > 0 ? 'bends in over the centre' : 'reflexes outward'}`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  /* THE HELICAL FILAMENT (F1.3a — Eva's rulings Q2.3 / Q2.5, Oct 12): a
+     CHOICE of coil mode. NONE is the plain rod by branch (the default, so
+     every stored design builds the bytes it did); INDEPENDENT coils each
+     filament along its own length about the curled centreline above, at its
+     own phase DERIVED from the stamen's index (never a control — the length
+     variance's seed precedent). BRAIDED (Q2.4, one bundle about a shared
+     axis) is its own session and is deliberately NOT an option here: an
+     option in a choice is reachable, and it is not built. */
+  { id: 'stamenCoil', section: 'androecium', kind: 'choice', default: 'NONE',
+    options: [
+      { value: 'NONE', label: 'None (a plain filament)' },
+      { value: 'INDEPENDENT', label: 'Independent coil' },
+    ],
+    label: 'Coil',
+    fmt: (v, ui, shown) => {
+      if (v !== 'INDEPENDENT') return 'a plain filament along its curl';
+      const C = shown && shown.androecium && shown.androecium.coil;
+      if (Number(ui.stamenCoilRadius) === 0) return 'each filament its own coil — at a radius of 0 it is the plain filament';
+      if (!C) return 'each filament coils along its own length, at its own phase (seeded from its index)';
+      return `each filament coils along its own length, at its own phase (seeded from its index) — ${C.arcMaxMm.toFixed(1)} mm of wire at the longest (${shown.mode})`;
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  /* THE RADIUS AND THE TURNS — both ranges are the geometry's own
+     declarations, imported (session 29's Q6 shape). The floor (Q2.3, one
+     sheet thickness of radius of curvature) CLAMPS the turns, and on a filament
+     too short for its own ramp the radius, and both are TOLD here from the
+     SHOWN build's record — never re-derived. */
+  { id: 'stamenCoilRadius', section: 'androecium', kind: 'slider', min: STAMEN_COIL_RADIUS_RANGE[0], max: STAMEN_COIL_RADIUS_RANGE[1], step: 0.1, default: STAMEN_COIL_RADIUS_DEFAULT,
+    label: 'Coil radius',
+    fmt: (v, ui, shown) => {
+      const r = Number(v);
+      if (r === 0) return '0 — no coil: the plain filament, byte for byte';
+      const C = shown && shown.androecium && shown.androecium.coil;
+      const head = `${r.toFixed(1)} mm from the filament's axis to the wire`;
+      if (!C || !C.radiusClampedCount) return head;
+      return `${head} — ${C.radiusClampedCount} of ${shown.androecium.count} CLAMPED to ${C.radiusMinMm.toFixed(2)} mm at the narrowest (${shown.mode}): too short a filament to ramp a coil that wide in under one sheet thickness of curvature, told`;
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'stamenCoilOn' } },
+  { id: 'stamenCoilTurns', section: 'androecium', kind: 'slider', min: STAMEN_COIL_TURNS_RANGE[0], max: STAMEN_COIL_TURNS_RANGE[1], step: 0.25, default: STAMEN_COIL_TURNS_DEFAULT,
+    label: 'Coil turns',
+    fmt: (v, ui, shown) => {
+      const n = Number(v);
+      const C = shown && shown.androecium && shown.androecium.coil;
+      const head = `${n} turn${n === 1 ? '' : 's'} over each filament's length (right-handed)`;
+      if (!C || !C.turnsClampedCount) return head;
+      return `${head} — ${C.turnsClampedCount} of ${shown.androecium.count} CLAMPED by the curvature floor (one sheet thickness of radius) to ${C.turnsMin.toFixed(2)}–${C.turnsMax.toFixed(2)} turns built (${shown.mode}), told`;
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'stamenCoilBuilt' } },
 
   /* ===================================================================
      THE TIP'S SEVEN, INSTANCED (session 30 — Eva's Q7, the generator that

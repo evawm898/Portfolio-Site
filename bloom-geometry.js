@@ -271,6 +271,201 @@ export function stamenLengthFor(i, lengthMm, amount) {
   return { askedMm, builtMm, clamped: builtMm !== askedMm, unit: stamenVarianceUnit(i) };
 }
 export const STAMEN_ROWS = 16;
+/* ===================================================================
+   THE HELICAL FILAMENT — F1.3a, the INDEPENDENT coil (Eva's rulings of
+   Oct 12, docs/reference-flower-feature-map.md §11, Q2.3 / Q2.5; read
+   docs/bloom-stamen-coil-outcome.md before touching any of it).
+
+   THE MODE IS A CHOICE — NONE / INDEPENDENT here; BRAIDED (Q2.4, one bundle
+   about a shared axis) is its own session and is NOT an option yet, because
+   an option in a choice is reachable by definition. NONE is the plain rod by
+   BRANCH, and so is INDEPENDENT at a coil radius of exactly 0: no law is
+   built, no station is added, and every byte is the plain rod's.
+
+   THE LAW IS BESIDE spineLaw, NEVER A SECOND ONE. spineLaw() keeps drawing
+   the rod's own centreline (the filament curl, uniform, in the foot's
+   (Up, -Rs) plane) and the coil is an OFFSET about it:
+
+     C(s) = B(s) + rho(s) (cos th(s) N1(s) + sin th(s) T)
+
+   where B and its tangent D come from spineLaw at arc length s along the
+   BASE (the filament length is the length of the axis the coil winds round —
+   `stamenLength` and its variance keep their meaning), N1 = dD/dphi is the
+   in-plane normal and T the azimuthal tangent, which is EXACTLY the
+   rotation-minimising frame of a planar curve (its binormal is constant).
+   th = phase_i + 2 pi n s / L — `n` turns over the stamen's own length, so
+   the pitch follows the length variance. rho ramps in (smootherstep, over
+   `rampMm` — see the floor) so the filament LEAVES ITS ROOT ALONG THE
+   NORMAL with a continuous tangent and curvature (rho = rho' = rho'' = 0 at
+   the root) — JS1 and JS3 hold the root unchanged.
+
+   THE PHASE IS DERIVED FROM THE INDEX (the length-variance seed precedent):
+   an integer mix, exact in every engine, with its own constants so it is not
+   the length's draw. Never a control.
+
+   THE FLOOR (Q2.3, ruled as a default): the coil's curvature is held to one
+   sheet thickness of radius, the spine's own floor. The bound is on the
+   COMPOSITE, not on the helix alone — measured first: a closed-form helix
+   clamp (pitch >= pi t) left a 0.3 mm coil at a 1.05 mm radius of curvature
+   in its ramp and a 10 mm coil on a 5 mm filament at 0.10 mm. On a straight
+   axis, in the frame (D, u, v) that turns with the coil, C' = (1, a, b) and
+   C'' = (0, c, d) with a = rho', b = rho w, c = rho'' - rho w^2, d = 2 rho' w
+   (w = 2 pi n / L), so the curvature is EXACTLY
+
+     kappa = sqrt((a d - b c)^2 + c^2 + d^2) / q sqrt(q),   q = 1 + a^2 + b^2
+
+   — ARITHMETIC ONLY (the ramp is a polynomial, pi a constant, sqrt correctly
+   rounded; `Math.pow` is not, so it is not used), so evaluating it is
+   bit-identical in every engine and a decision on it is not a decision on a
+   transcendental. Two clamps, both TOLD:
+     * the RAMP gets half the budget on its own — `rampMm` is the longer of one
+       asked pitch and sqrt(2 F2 R t) (F2 = max |smootherstep''| = 10/sqrt 3),
+       capped at half the length; where the cap binds the RADIUS is reduced
+       to (L/2)^2 / (2 F2 t), by branch (an unclamped radius is the control's
+       own double);
+     * the TURNS are the largest the curvature admits on a fixed lattice of
+       the ramp (and the plateau) — bisected, by branch when the asked turns
+       already pass.
+   A first cut used the upper bound |C''| / |C'|^2 instead and clamped a
+   1.5 mm x 12-turn x 20 mm coil to 2.27 turns where the exact law admits
+   3.77; the bound was 40% conservative there and is retired. Measured over
+   624 states (radius 0.05..10 mm x turns 0.5..12 x length 5..120 mm) at
+   sheets 1.0 / 1.2 / 2.4, an independent 8,000-chord walk reads the tightest
+   radius of curvature as 1.0000 / 1.2000 / 2.4000 mm — the floor HOLDS on the
+   straight axis, met with equality where it binds, and is inert at radius 0
+   (no coil). The FILAMENT CURL is not in the bound
+   (the plain rod's uniform arc is never clamped either — told, the spine's
+   precedent): the composite is MEASURED on every stamen and reported
+   (`peakRadiusMm`, `underFloor`).
+
+   THE STATION COUNT IS A FUNCTION OF THE ASKED TURNS — a control — so it is
+   the same in live and in export (topology is mode-free; the floor's t is
+   not) and the same for every stamen whatever the clamp or the variance
+   did. COIL_ROWS_PER_TURN stations a turn ON TOP OF the plain rod's
+   STAMEN_ROWS. */
+export const STAMEN_COIL_MODES = Object.freeze(['NONE', 'INDEPENDENT']);
+export const STAMEN_COIL_RADIUS_RANGE = Object.freeze([0, 10]);
+export const STAMEN_COIL_TURNS_RANGE = Object.freeze([0.5, 12]);
+export const STAMEN_COIL_RADIUS_DEFAULT = 1.5;
+export const STAMEN_COIL_TURNS_DEFAULT = 3;
+export const COIL_ROWS_PER_TURN = 16;
+/* Samples per turn (and on the plain stretch) of the arc-length and
+   curvature TELEMETRY — four times the mesh's own, so the reported peak is
+   the law's and not the lattice's. Never reaches a station. */
+export const COIL_PROBE_PER_TURN = 64;
+/* THE GEOMETRY'S STATEMENT of "a coil is built" — the registry's
+   `stamenCoilBuilt` is the twin that HIDES the turns; the harness holds the
+   two equal per row (JS9). */
+export function stamenCoilBuilt(state) {
+  return androeciumEligible(state) && Math.round(Number(state.stamenCount)) >= 1 && state.stamenCoil === 'INDEPENDENT' && Number(state.stamenCoilRadius) > 0;
+}
+export function stamenCoilRows(turnsAsked) { return STAMEN_ROWS + Math.ceil(Number(turnsAsked) * COIL_ROWS_PER_TURN); }
+export function stamenCoilPhaseUnit(i) {
+  /* [0, 1), its own constants so it is not the length variance's draw. */
+  let h = Math.imul((i | 0) + 1, 0x632BE5AB) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0; h = Math.imul(h, 0x7FEB352D) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0; h = Math.imul(h, 0x846CA68B) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967296;
+}
+/* THE RAMP — smootherstep, C2 at both ends (rho'' = 0 at the root and where
+   the coil reaches full radius), and its two derivatives. Polynomials only. */
+const coilRampF = (x) => x * x * x * (x * (6 * x - 15) + 10);
+const coilRampF1 = (x) => 30 * x * x * (x - 1) * (x - 1);
+const coilRampF2 = (x) => 60 * x * (x - 1) * (2 * x - 1);
+export const COIL_RAMP_F2 = 10 / Math.sqrt(3);      // max |smootherstep''|, at x = (3 +- sqrt 3) / 6
+export const COIL_BOUND_SAMPLES = 512;
+export const COIL_BISECT_STEPS = 52;
+/* THE CURVATURE above, maximised over the ramp's fixed lattice (and the
+   plateau, x = 1). Arithmetic only. */
+/* A LATTICE IS NOT A MAXIMUM, and JS9 said so on its first run: a 512-point
+   lattice read the coil's peak low by up to 1.2e-5 of itself between samples,
+   so a clamp that held on the lattice built a coil a hair under the floor.
+   Every lattice LOCAL maximum is therefore refined by a ternary search over
+   its two neighbouring cells (COIL_REFINE_STEPS, arithmetic only — the
+   decision stays bit-identical across engines). */
+export const COIL_REFINE_STEPS = 64;
+function coilKappa(R, w, rampMm, x) {
+  const rho = R * coilRampF(x);
+  const a = (R * coilRampF1(x)) / rampMm, b = rho * w, c = (R * coilRampF2(x)) / (rampMm * rampMm) - rho * w * w, d = 2 * a * w;
+  const q = 1 + a * a + b * b, e = a * d - b * c;
+  return Math.sqrt(e * e + c * c + d * d) / (q * Math.sqrt(q));
+}
+export function coilCurvatureMax(R, w, rampMm) {
+  const N = COIL_BOUND_SAMPLES, k = new Float64Array(N + 1);
+  for (let j = 0; j <= N; j++) k[j] = coilKappa(R, w, rampMm, j / N);
+  let m = 0;
+  for (let j = 0; j <= N; j++) {
+    if (k[j] > m) m = k[j];
+    if ((j > 0 && k[j] < k[j - 1]) || (j < N && k[j] < k[j + 1])) continue;
+    let lo = j > 0 ? (j - 1) / N : 0, hi = j < N ? (j + 1) / N : 1;
+    for (let it = 0; it < COIL_REFINE_STEPS; it++) {
+      const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      if (coilKappa(R, w, rampMm, m1) < coilKappa(R, w, rampMm, m2)) lo = m1; else hi = m2;
+    }
+    const kk = coilKappa(R, w, rampMm, (lo + hi) / 2);
+    if (kk > m) m = kk;
+  }
+  return m;
+}
+/* THE ONE OWNER OF A STAMEN'S COIL: its index, its BUILT length, the coil
+   radius and asked turns (controls) and the floor (one sheet thickness). */
+export function stamenCoilFor(i, lengthMm, radiusMm, turnsAsked, floorRadius) {
+  const L = Number(lengthMm), R = Number(radiusMm), n = Number(turnsAsked), t = floorRadius;
+  const rampNeed = Math.sqrt(2 * COIL_RAMP_F2 * R * t);
+  const rampMm = Math.min(L / 2, Math.max(L / n, rampNeed));
+  const radiusClamped = rampNeed > L / 2;
+  const Rb = radiusClamped ? (L / 2) * (L / 2) / (2 * COIL_RAMP_F2 * t) : R;
+  const ok = (nn) => coilCurvatureMax(Rb, (TAU * nn) / L, rampMm) * t <= 1;
+  let turns = n;
+  const turnsClamped = !ok(n);
+  if (turnsClamped) {
+    let lo = 0, hi = n;
+    for (let k = 0; k < COIL_BISECT_STEPS; k++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; }
+    turns = lo;
+  }
+  const phaseUnit = stamenCoilPhaseUnit(i);
+  return { radiusAskedMm: R, radiusMm: Rb, radiusClamped, turnsAsked: n, turns, turnsClamped, clamped: radiusClamped || turnsClamped,
+           phaseUnit, phaseRad: TAU * phaseUnit, rampMm, rows: stamenCoilRows(n) };
+}
+/* THE COIL LAW, beside spineLaw: `base` is spineLaw's own law on the same
+   rod (arc length -> dR, dZ, phi in the foot's (Up, -Rs) plane), `k` its
+   curvature (uniform on every rod — bias 0, start 0, never clamped), and the
+   coil record above. Returns local (Up, -Rs, T) coordinates of the coiled
+   centreline and its UNIT tangent at base arc length s. */
+export function coilLaw({ base, length, k, coil }) {
+  const R = coil.radiusMm, w = (TAU * coil.turns) / length, ph = coil.phaseRad, sr = coil.rampMm;
+  const at = (s) => {
+    const q = base.at(s), cp = Math.cos(q.phi), sp = Math.sin(q.phi);
+    const x = s >= sr ? 1 : s / sr;
+    const rho = R * coilRampF(x), drho = s >= sr ? 0 : (R * coilRampF1(x)) / sr;
+    const th = ph + w * s, ct = Math.cos(th), st = Math.sin(th);
+    /* D = (cp, sp, 0), N1 = (-sp, cp, 0), T = (0, 0, 1). */
+    const a = q.dR - sp * rho * ct, b = q.dZ + cp * rho * ct, c = rho * st;
+    const fD = 1 - k * rho * ct, fN = drho * ct - rho * w * st, fT = drho * st + rho * w * ct;
+    const ta = cp * fD - sp * fN, tb = sp * fD + cp * fN, tc = fT;
+    const tn = Math.hypot(ta, tb, tc);
+    return { a, b, c, ta: ta / tn, tb: tb / tn, tc: tc / tn, speed: tn };
+  };
+  return { at };
+}
+/* TELEMETRY over the law above, on a fixed probe lattice (never a station):
+   the ARC LENGTH (Simpson on |C'|) and the PEAK CURVATURE (the turn of the
+   unit tangent over each probe step, divided by the arc the step covers). */
+export function coilTelemetry(law, length, turns, floorRadius) {
+  const n = 2 * Math.ceil((turns + 1) * COIL_PROBE_PER_TURN / 2), h = length / n;
+  let arc = 0, peakK = 0, prev = law.at(0);
+  for (let j = 1; j <= n; j++) {
+    const cur = law.at(j * h);
+    if (j % 2 === 1) { const nx = law.at((j + 1) * h); arc += (h / 3) * (prev.speed + 4 * cur.speed + nx.speed); }
+    const dot = Math.max(-1, Math.min(1, prev.ta * cur.ta + prev.tb * cur.tb + prev.tc * cur.tc));
+    const ds = h * (prev.speed + cur.speed) / 2;
+    const kk = Math.acos(dot) / ds;
+    if (kk > peakK) peakK = kk;
+    prev = cur;
+  }
+  return { arcMm: arc, peakRadiusMm: peakK === 0 ? Infinity : 1 / peakK, underFloor: peakK * floorRadius > 1 };
+}
 export function androeciumEligible(state) { return !sphereMode(state); }
 
 /* ===================================================================
@@ -567,8 +762,11 @@ export function tipSides(shape) {
    anything failing. JS4 and JG4 both compare an EMITTED count (the
    accumulator's own delta) against this ONE owner, each called with the
    count its own owner declares. */
-export function tippedRodTris(lumps, sides = STAMEN_SIDES) {
-  return ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + lumps * ((2 * TIP_CAP_RINGS - 1) * sides * 2 + 2 * sides);
+/* `rows` (F1.3a): the free stations a rod carries — STAMEN_ROWS on the plain
+   rod, stamenCoilRows(turns asked) on a coiled one. A function of a CONTROL,
+   never of the clamp, so live and export agree. */
+export function tippedRodTris(lumps, sides = STAMEN_SIDES, rows = STAMEN_ROWS) {
+  return ((rows + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + lumps * ((2 * TIP_CAP_RINGS - 1) * sides * 2 + 2 * sides);
 }
 /* THE OUTLINE, evaluated ONCE per tip and indexed by SIDE — the same factor
    applies at every ring, which is what makes the tip a scaled radial graph
@@ -3008,8 +3206,19 @@ export function footRing(state, acc) {
        exactly as the page does. */
     const lengthVariance = Number(state.stamenLengthVariance) || 0;
     if (!(lengthVariance >= STAMEN_LENGTH_VARIANCE_RANGE[0] && lengthVariance <= STAMEN_LENGTH_VARIANCE_RANGE[1])) throw new Error(`stamenLengthVariance ${JSON.stringify(state.stamenLengthVariance)} is outside ${STAMEN_LENGTH_VARIANCE_RANGE.join('..')} — the registry and the builder have diverged`);
+    /* THE COIL (F1.3a) — see stamenCoilFor's header. A CHOICE; INDEPENDENT at
+       a radius of exactly 0 is the plain rod by BRANCH (no record, no law,
+       no station added), the "inert at radius 0" of Q2.3. Coerced like the
+       variance (a matrix row's values are strings). */
+    const coilMode = state.stamenCoil === undefined ? 'NONE' : state.stamenCoil;
+    if (!STAMEN_COIL_MODES.includes(coilMode)) throw new Error(`unknown stamenCoil ${JSON.stringify(state.stamenCoil)} — the registry and the builder have diverged`);
+    const coilRadius = coilMode === 'NONE' ? 0 : Number(state.stamenCoilRadius) || 0;
+    const coilTurns = coilMode === 'NONE' ? null : Number(state.stamenCoilTurns);
+    const coilOn = stamenCoilBuilt(state);
+    if (coilOn && !(coilRadius <= STAMEN_COIL_RADIUS_RANGE[1] && coilTurns >= STAMEN_COIL_TURNS_RANGE[0] && coilTurns <= STAMEN_COIL_TURNS_RANGE[1])) throw new Error(`stamen coil radius ${coilRadius} / turns ${coilTurns} outside the geometry's ranges — the registry and the builder have diverged`);
     const stamens = [];
     let lengthsClamped = 0, lengthMinMm = Infinity, lengthMaxMm = -Infinity;
+    let coilsClamped = 0, coilsRadiusClamped = 0, coilsTurnsClamped = 0, coilRadiusMinMm = Infinity, coilTurnsMin = Infinity, coilTurnsMax = -Infinity, coilArcMaxMm = -Infinity, coilPeakRadiusMm = Infinity, coilsUnderFloor = 0;
     for (let i = 0; i < count; i++) {
       const r = disc ? Math.sqrt(innerUsed * innerUsed + ((i + 0.5) * (radius * radius - innerUsed * innerUsed)) / count) : radius;
       const s = surfaceAt(r, null);
@@ -3018,8 +3227,25 @@ export function footRing(state, acc) {
       if (L.clamped) lengthsClamped++;
       if (L.builtMm < lengthMinMm) lengthMinMm = L.builtMm;
       if (L.builtMm > lengthMaxMm) lengthMaxMm = L.builtMm;
+      let coil = null;
+      if (coilOn) {
+        coil = stamenCoilFor(i, L.builtMm, coilRadius, coilTurns, diameter);
+        /* The telemetry runs the SAME two laws the builder will (spineLaw
+           and coilLaw on this stamen's own numbers) on a probe lattice — it
+           reports, it never places a station. */
+        const base = spineLaw({ curlRad: state.stamenCurl * D2R, bias: 0, start: 0, length: L.builtMm, tilt: 0, floorRadius: diameter, rows: ROD_SPINE_ROWS });
+        const tel = coilTelemetry(coilLaw({ base, length: L.builtMm, k: (state.stamenCurl * D2R) / L.builtMm, coil }), L.builtMm, coil.turns, diameter);
+        coil = { ...coil, arcMm: tel.arcMm, peakRadiusMm: tel.peakRadiusMm, underFloor: tel.underFloor };
+        if (coil.clamped) coilsClamped++;
+        if (coil.radiusClamped) coilsRadiusClamped++;
+        if (coil.turnsClamped) coilsTurnsClamped++;
+        coilRadiusMinMm = Math.min(coilRadiusMinMm, coil.radiusMm);
+        if (coil.underFloor) coilsUnderFloor++;
+        coilTurnsMin = Math.min(coilTurnsMin, coil.turns); coilTurnsMax = Math.max(coilTurnsMax, coil.turns);
+        coilArcMaxMm = Math.max(coilArcMaxMm, coil.arcMm); coilPeakRadiusMm = Math.min(coilPeakRadiusMm, coil.peakRadiusMm);
+      }
       stamens.push({ index: i, radius: r, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief, inPetalRootAnnulus,
-                     lengthMm: L.builtMm, lengthAskedMm: L.askedMm, lengthClamped: L.clamped, lengthUnit: L.unit });
+                     lengthMm: L.builtMm, lengthAskedMm: L.askedMm, lengthClamped: L.clamped, lengthUnit: L.unit, coil });
     }
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
@@ -3049,7 +3275,16 @@ export function footRing(state, acc) {
          THE LONGEST BUILT FILAMENT'S (F1.2): at the 120 mm ceiling on the
          shipping sheet it reads 100, and under a variance the longest is the
          one a coupon would have to answer for. Reported, never clamped on. */
-      slenderness: lengthMaxMm / diameter,
+      slenderness: coilOn ? coilArcMaxMm / diameter : lengthMaxMm / diameter,
+      /* THE COIL'S OWN RECORD (F1.3a): the mode, the radius and the turns as
+         asked, the free stations every rod carries, how many turn counts the
+         floor CLAMPED (told), the built extremes, the longest ARC (which is
+         what SLENDERNESS reads under a coil — the wire's own length, not its
+         axis) and the tightest measured radius of curvature with how many
+         stamens sit under the floor on the composite (told, never clamped). */
+      coil: coilOn ? { mode: coilMode, radiusMm: coilRadius, turnsAsked: coilTurns, rows: stamenCoilRows(coilTurns), clampedCount: coilsClamped, radiusClampedCount: coilsRadiusClamped, turnsClampedCount: coilsTurnsClamped, radiusMinMm: coilRadiusMinMm, turnsMin: coilTurnsMin, turnsMax: coilTurnsMax,
+                       arcMaxMm: coilArcMaxMm, peakRadiusMm: coilPeakRadiusMm, underFloorCount: coilsUnderFloor, floorRadius: diameter } : null,
+      coilMode,
     };
   })();
 
@@ -18358,7 +18593,7 @@ function revolveInto(acc, rings, south, north, outline = null) {
    exactly the bytes it took in session 21; the block-23 live partition on
    both trees is what MEASURES that, not this sentence. `s` is the owner's
    surface record (radius, slope, z); `r` the rod's radius; `t` the slab. */
-function rodInto(acc, { t, r, curlRad, length, floorRadius }, s, azimuth) {
+function rodInto(acc, { t, r, curlRad, length, floorRadius, coil = null }, s, azimuth) {
   const cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
   const R = [cosA, sinA, 0], T = [-sinA, cosA, 0];
   /* The foot's own frame on the cap — buildPetalInto's (Rs, Up), verbatim. */
@@ -18375,10 +18610,44 @@ function rodInto(acc, { t, r, curlRad, length, floorRadius }, s, azimuth) {
   };
   const ring = (C, D, rr) => ({ C, e1: T, e2: [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]], r: rr });
   const stations = [ring(inner, Up, r), ring(outer, Up, r)];
-  for (let k = 1; k <= STAMEN_ROWS; k++) { const q = at((k / STAMEN_ROWS) * length); stations.push(ring(q.C, q.D, r)); }
+  if (coil === null) {
+    for (let k = 1; k <= STAMEN_ROWS; k++) { const q = at((k / STAMEN_ROWS) * length); stations.push(ring(q.C, q.D, r)); }
+    const before = acc.triangleCount;
+    const tubePts = revolveInto(acc, stations, inner, stations[stations.length - 1].C);
+    return { P, Up, T, inner, outer, stations, tubePts, at, law, before, coil: null };
+  }
+  /* THE COILED ARM (F1.3a) — the coil law about spineLaw's own centreline
+     (see its header), the tube carried on a ROTATION-MINIMISING frame by
+     double reflection (Wang et al. 2008: arithmetic only, no trigonometry, no
+     normalisation of a zero vector), started from the plain rod's own `T` at
+     the outer root so the two root rings are the plain rod's, term for term. */
+  const cl = coilLaw({ base: law, length, k: curlRad / length, coil });
+  const world = (q) => [outer[0] + Up[0] * q.a - Rs[0] * q.b + T[0] * q.c, outer[1] + Up[1] * q.a - Rs[1] * q.b + T[1] * q.c, outer[2] + Up[2] * q.a - Rs[2] * q.b + T[2] * q.c];
+  const worldDir = (q) => [Up[0] * q.ta - Rs[0] * q.tb + T[0] * q.tc, Up[1] * q.ta - Rs[1] * q.tb + T[1] * q.tc, Up[2] * q.ta - Rs[2] * q.tb + T[2] * q.tc];
+  let x0 = outer, t0 = Up, r0 = T;
+  const dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const cross = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  for (let k = 1; k <= coil.rows; k++) {
+    const q = cl.at((k / coil.rows) * length), x1 = world(q), t1 = worldDir(q);
+    const v1 = [x1[0] - x0[0], x1[1] - x0[1], x1[2] - x0[2]], c1 = dot(v1, v1);
+    const f1 = c1 === 0 ? 0 : 2 / c1;
+    const rL = [r0[0] - f1 * dot(v1, r0) * v1[0], r0[1] - f1 * dot(v1, r0) * v1[1], r0[2] - f1 * dot(v1, r0) * v1[2]];
+    const tL = [t0[0] - f1 * dot(v1, t0) * v1[0], t0[1] - f1 * dot(v1, t0) * v1[1], t0[2] - f1 * dot(v1, t0) * v1[2]];
+    const v2 = [t1[0] - tL[0], t1[1] - tL[1], t1[2] - tL[2]], c2 = dot(v2, v2);
+    const f2 = c2 === 0 ? 0 : 2 / c2;
+    const r1 = [rL[0] - f2 * dot(v2, rL) * v2[0], rL[1] - f2 * dot(v2, rL) * v2[1], rL[2] - f2 * dot(v2, rL) * v2[2]];
+    stations.push({ C: x1, e1: r1, e2: cross(t1, r1), r });
+    x0 = x1; t0 = t1; r0 = r1;
+  }
+  /* THE END FRAME the anther is carried on (Q2.5: it follows the coil's END
+     TANGENT): `D` the law's own tangent at the far end, `T` the propagated
+     ring vector with its residual along D removed and renormalised, so the
+     tip's Rodrigues frame gets an exact (D, T) pair. */
+  const pr = dot(r0, t0), rr = [r0[0] - pr * t0[0], r0[1] - pr * t0[1], r0[2] - pr * t0[2]], rn = Math.hypot(rr[0], rr[1], rr[2]);
+  const end = { C: x0, D: t0, T: [rr[0] / rn, rr[1] / rn, rr[2] / rn] };
   const before = acc.triangleCount;
   const tubePts = revolveInto(acc, stations, inner, stations[stations.length - 1].C);
-  return { P, Up, T, inner, outer, stations, tubePts, at, law, before };
+  return { P, Up, T, inner, outer, stations, tubePts, at, law, before, coil: cl, end };
 }
 
 /* THE TIP (session 26) — an anther, or ONE LOBE of the trifid stigma: ONE
@@ -18448,7 +18717,11 @@ export function buildStamenInto(acc, andro, s, slot) {
   /* THE LENGTH IS THE STAMEN'S OWN RECORD (F1.2) — `s.lengthMm`, stamped by
      footRing()'s one owner; this builder computes nothing about it. */
   const lengthMm = s.lengthMm;
-  const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
+  /* THE COIL IS THE STAMEN'S OWN RECORD TOO (F1.3a) — `s.coil`, stamped by
+     footRing() through stamenCoilFor(); null is the plain rod by branch. */
+  const rod = s.coil
+    ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
+    : rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
   /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
      direction at azimuths a whole turn apart — the TRIFID's own law, one
      statement for both owners (session 29). At the shipping default the count
@@ -18463,10 +18736,13 @@ export function buildStamenInto(acc, andro, s, slot) {
      piece. Refusing it would mean a spread with a non-zero minimum, and 0 at
      one lump is the shipping default. */
   const tip = rod.stations[rod.stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
-  const D = rod.at(lengthMm).D;
+  /* Q2.5: on a coiled rod the anther follows the coil's END TANGENT, carried
+     on the rod's own end frame; the plain rod's expressions are untouched. */
+  const D = rod.coil ? rod.end.D : rod.at(lengthMm).D;
+  const rodT = rod.coil ? rod.end.T : rod.T;
   const lumpRecs = [];
   for (let k = 0; k < andro.anther.lumps; k++) {
-    const l = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: andro.anther.spreadRad, psi: (k * TAU) / andro.anther.lumps }, { a, Lc, shape: andro.anther.shape });
+    const l = tipInto(acc, tip.C, { D, T: rodT }, { spreadRad: andro.anther.spreadRad, psi: (k * TAU) / andro.anther.lumps }, { a, Lc, shape: andro.anther.shape });
     lumpRecs.push({ index: k, axis: l.L, e1: l.e1, outline: l.outline, apex: l.apex });
   }
   const lump = lumpRecs[0];
@@ -18489,6 +18765,10 @@ export function buildStamenInto(acc, andro, s, slot) {
            lengthMm,
            lumps: lumpRecs,
            stations: rod.stations.map((st) => st.C),
+           /* THE COIL AS EMITTED (F1.3a), for JS9: the rod frame the tip was
+              carried on, the free station count and the LAST ring's points
+              (its ring vector is readable off them). Null on a plain rod. */
+           coil: rod.coil ? { rows: s.coil.rows, endT: rod.end.T, endRing: rod.tubePts[rod.tubePts.length - 1] } : null,
            law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };
 }
 

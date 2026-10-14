@@ -1026,6 +1026,24 @@ six filaments at a positive curl cross the axis at ANY length, and the disc's ap
 roots — fifteen cells declared by value, both length axes in `COMBINATION_INERT`, nothing clamped.
 `frozen/phase65` is the 1302 rows at `c1fc595`; block 23 is 1307 rows.
 
+**A FILAMENT CAN COIL — INDEPENDENT, ITS OWN PHASE FROM THE INDEX, THE ANTHER ON THE END TANGENT, THE
+CURVATURE FLOORED ON THE COMPOSITE** (Eva's rulings Q2.3 / Q2.5, Oct 14 — F1.3a; read
+`docs/bloom-stamen-coil-outcome.md` before touching `coilLaw`, `stamenCoilFor`, `coilCurvatureMax`,
+`rodInto`'s coiled arm, `restatedCoil` or JS9).
+- `stamenCoil` NONE / INDEPENDENT (default NONE, the plain rod by branch; radius 0 is too). BRAIDED is
+  NOT an option until its session — an option in a choice is reachable.
+- `coilLaw` is an OFFSET about spineLaw's centreline, never a second spineLaw; `rodInto` stays the one
+  emitter (plain arm verbatim, coiled arm on a double-reflection rotation-minimising frame).
+- The station count is the ASKED turns' (`STAMEN_ROWS + ceil(turns x 16)`), so live = export.
+- The floor is the EXACT composite curvature on a straight axis, arithmetic only, bisected on the
+  turns (and the radius where the ramp cannot fit). A helix-only clamp and an upper bound were both
+  measured wrong first; a 512-point lattice maximum read low until refined (JS9 found it).
+- JS9 restates the helix from the controls and the index against the EMITTED rings; JS4/JS6/JS8 are
+  re-derived for the coil. A coil never approaches itself under the bar; coils against neighbours and
+  the style do — 29 combination cells declared by value, nothing clamped.
+- Worst corner 120 x 12 turns x 120 mm: 552,688 export tris (36.8%). `frozen/phase67` is the 1316 rows
+  at `037a4a8`; block 23 is 1331 rows. Sheet: `node tools/shot-bloom-stamen-coil.mjs <dir>`.
+
 **THE GYNOECIUM IS BUILT AND SHIPS ABSENT; THE CENTRE IS COMPLETE** (Eva's rulings,
 session 22, phase 2 B3). `gynoecium` (GYNOECIUM section, a CHOICE: NONE / STYLE, default NONE
 — one style or none, never a count) with `styleLength` (5–40 mm, default 25) and `styleCurl`

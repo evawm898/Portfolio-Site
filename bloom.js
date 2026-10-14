@@ -2314,7 +2314,7 @@ function stamenLine(fr, stamens, near, mode, fs = null) {
            ? ` · NO ROOM FOR THE INNER LIMIT: the disc, ${A.radius.toFixed(2)} mm, is inside the ${A.innerLimit.toFixed(2)} mm limit, so every stamen stands on the rim (told, never refused)`
            : ` · the disc runs from ${A.innerUsed.toFixed(2)} mm out — a filament radius plus a style radius, where a filament's tube clears a style's — in equal-area annuli`)
          : '')
-       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.lengthVariance > 0 ? ` ±${Math.round(A.lengthVariance * 100)}% random per stamen (seeded from its index) → ${A.lengthMinMm.toFixed(1)}–${A.lengthMaxMm.toFixed(1)} mm built${A.lengthsClamped ? `, ${A.lengthsClamped} of ${A.count} CLAMPED to the ${A.lengthRange[0]}–${A.lengthRange[1]} mm range (told, never silent)` : ''}` : ''}${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'} · anther ${A.anther.lumps === 1 ? 'PILL' : `${A.anther.lumps} LOBES`} ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
+       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.lengthVariance > 0 ? ` ±${Math.round(A.lengthVariance * 100)}% random per stamen (seeded from its index) → ${A.lengthMinMm.toFixed(1)}–${A.lengthMaxMm.toFixed(1)} mm built${A.lengthsClamped ? `, ${A.lengthsClamped} of ${A.count} CLAMPED to the ${A.lengthRange[0]}–${A.lengthRange[1]} mm range (told, never silent)` : ''}` : ''}${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'}${A.coil ? ` · COILED (independent) r ${A.coil.radiusMm} mm × ${A.coil.turnsAsked} turns asked, each at its own phase (seeded from its index), ${A.coil.rows} stations a rod${A.coil.turnsClampedCount ? `, ${A.coil.turnsClampedCount} of ${A.count} CLAMPED to ${A.coil.turnsMin.toFixed(2)}–${A.coil.turnsMax.toFixed(2)} turns by the curvature floor (one sheet thickness of radius)` : ''}${A.coil.radiusClampedCount ? `, ${A.coil.radiusClampedCount} with the radius CLAMPED to ${A.coil.radiusMinMm.toFixed(2)} mm (too short to ramp it in)` : ''} — tightest radius of curvature ${A.coil.peakRadiusMm.toFixed(3)} mm${A.coil.underFloorCount ? `, ${A.coil.underFloorCount} UNDER ONE SHEET THICKNESS with the filament curl (told, never clamped)` : ''}` : ''} · anther ${A.anther.lumps === 1 ? 'PILL' : `${A.anther.lumps} LOBES`} ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
        + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
        + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}${A.anther.lumps > 1 ? ', on each anther\'s first lobe' : ''}` : '')
        + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
@@ -2922,7 +2922,9 @@ function styleLine(fr, styles, stamens, mode) {
    Absent when neither part is. */
 function slendernessLine(fr, mode) {
   const parts = [];
-  if (fr.androecium) parts.push(`filament ${fr.androecium.slenderness.toFixed(1)}${fr.androecium.lengthVariance > 0 ? ` (the longest, ${fr.androecium.lengthMaxMm.toFixed(1)} mm)` : ''}`);
+  if (fr.androecium) parts.push(fr.androecium.coil
+    ? `filament ${fr.androecium.slenderness.toFixed(1)} (arc length over diameter — the longest coiled wire, ${fr.androecium.coil.arcMaxMm.toFixed(1)} mm)`
+    : `filament ${fr.androecium.slenderness.toFixed(1)}${fr.androecium.lengthVariance > 0 ? ` (the longest, ${fr.androecium.lengthMaxMm.toFixed(1)} mm)` : ''}`);
   if (fr.gynoecium) parts.push(`style ${fr.gynoecium.slenderness.toFixed(1)}`);
   return parts.length ? `SLENDERNESS L/d ${parts.join(' · ')} (${mode}) — UNMEASURED — no coupon has been printed\n` : '';
 }

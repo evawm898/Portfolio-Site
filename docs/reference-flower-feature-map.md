@@ -109,6 +109,11 @@ branch", it means the next leaf session will be editing the same function.
 stamen and seeded from the index (Q2.1), the ceiling a fixed 120 mm (Q2.2); the per-stamen length is
 footRing()'s record, JS8 the witness. "What is missing" below is left as written for F1.3's reading.
 
+**F1.3a SHIPPED (Oct 14) — `docs/bloom-stamen-coil-outcome.md`.** The INDEPENDENT coil: a choice
+NONE / INDEPENDENT, radius and turns, a per-stamen phase from the index, the anther on the end tangent
+(Q2.5), the curvature floored on the composite (Q2.3, confirmed by measurement); JS9 the witness.
+BRAIDED (Q2.4) remains.
+
 **What exists**
 - `stamenCount` 0–120, `stamenLayout` RING/DISC, `stamenSpread` 0.6–max, **`stamenLength` 5–40 mm
   (default 20)** and `stamenCurl` −180..180 (R:3517–3571), all in the `androecium` section under

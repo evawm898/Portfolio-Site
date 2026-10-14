@@ -517,6 +517,64 @@ export const PAIRS = [
     cite: 'docs/bloom-stamen-length-variance-outcome.md §5 — the dense disc measured at three lengths',
     why: 'MEASURED: on the disc the roots already stand within a filament diameter of each other (the ROOTS FUSE flag) and the straight rods keep that spacing to the tip, so the count alone reaches the bar at every length and the length moves the figure by exactly 0 (declared inert)',
   },
+  /* THE INDEPENDENT COIL (F1.3a — docs/bloom-stamen-coil-outcome.md §5).
+     Tier 2: the shared mechanism is argued from bloom-geometry.js — the coil
+     widens each filament's envelope by its radius, so it closes the gaps the
+     plain rods keep to their neighbours and to the style, and its pitch and
+     radius set how close a coil comes back to itself. Measured: a coil NEVER
+     approaches itself under the bar anywhere on the reachable grid (the floor
+     keeps adjacent turns at least pi t apart), so nothing is clamped for it;
+     coils against coils and against the style DO, and those cells are
+     declared by value (overlapping closed shells — the export contract's own
+     case; both STL gates are blind to it). */
+  {
+    id: 'coilradius-x-turns',
+    tier: 2,
+    label: 'stamenCoilRadius x stamenCoilTurns — a coil against ITSELF (six on a ring)',
+    measure: 'stamen-self',
+    base: { stamenCount: 6, stamenCoil: 'INDEPENDENT' },
+    a: { id: 'stamenCoilRadius', values: [1.5, 0.3, 3, 10] },
+    b: { id: 'stamenCoilTurns', values: [3, 6, 12] },
+    verdict: 'clears',
+    cite: 'docs/bloom-stamen-coil-outcome.md §5 — a coil against itself, measured over radius x turns',
+    why: 'MEASURED: the tightest self-approach is 1.722 mm (radius 1.5 x 12 turns asked, clamped to 3.77) — the curvature floor holds the pitch open, so a single coil never comes back within the printable gap of itself; kept so the day a change breaks that, the gate says so',
+  },
+  {
+    id: 'coilradius-x-curl',
+    tier: 2,
+    label: 'stamenCoilRadius x stamenCurl — a long coil bent over (120 mm, six on a ring)',
+    measure: 'stamen-self',
+    base: { stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenLength: 120 },
+    a: { id: 'stamenCoilRadius', values: [1.5, 0.3, 3, 10] },
+    b: { id: 'stamenCurl', values: [0, 90, 180, -180] },
+    verdict: 'clears',
+    cite: 'docs/bloom-stamen-coil-outcome.md §5 — the long coiled filament, the corner checked first',
+    why: 'MEASURED: the long coiled filament at every curl clears itself by 2.56 mm or more — the curl bends the axis the coil winds round, and the coil does not fold across its own bend',
+  },
+  {
+    id: 'coilradius-x-count',
+    tier: 2,
+    label: 'stamenCoilRadius x stamenCount — coils against their NEIGHBOURS (a ring)',
+    measure: 'stamen-stamen',
+    base: { stamenCoil: 'INDEPENDENT' },
+    a: { id: 'stamenCoilRadius', values: [1.5, 0, 0.3, 3, 10] },
+    b: { id: 'stamenCount', values: [0, 3, 6, 30, 120] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-stamen-coil-outcome.md §5 — coils against their neighbours, measured over radius x count',
+    why: 'MEASURED: at the coil\'s own default radius the count alone reaches 0 — three coils on the shipping hub already interpenetrate (each envelope is 2 x (1.5 + 0.6) mm across against a 2.08 mm ring); the plain rod (radius 0) clears to six. Declared by value, never clamped: overlapping closed shells are the export contract\'s own case',
+  },
+  {
+    id: 'coilradius-x-style',
+    tier: 2,
+    label: 'stamenCoilRadius x stamenCount — coils against the STYLE',
+    measure: 'stamen-style',
+    base: { stamenCoil: 'INDEPENDENT', gynoecium: 'STYLE' },
+    a: { id: 'stamenCoilRadius', values: [1.5, 0, 0.3, 3, 10] },
+    b: { id: 'stamenCount', values: [0, 3, 6, 30, 120] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-stamen-coil-outcome.md §5 — coils against the style, measured over radius x count',
+    why: 'MEASURED: a sparse ring stands close to the axis, so at the default radius three or six coils reach the style (0.000 mm) where the plain rods keep 0.445 / 1.150 mm; the dense ring stands further out and clears until the radius passes 3 mm',
+  },
   /* ------------------------------------------------------------ TIER 3
      GUESSES, SAID PLAINLY. No citation on the pair itself and no shared
      term — only "it seems like it might interact". Every one carries
@@ -1073,6 +1131,36 @@ export const tripleKey = (t, vals) => `${t.id} @ ${t.axes.map((ax, i) => `${ax.i
    The module REFUSES TO LOAD on an entry without one: a declaration with
    no number is a label, and this project has cleaned that up four times. */
 export const COMBINATION_XFAIL = Object.freeze({
+  "coilradius-x-count @ stamenCoilRadius=1.5 x stamenCount=3": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=1.5 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=1.5 x stamenCount=30": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=1.5 x stamenCount=120": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=0 x stamenCount=30": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=0 x stamenCount=120": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=0.3 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=0.3 x stamenCount=30": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=0.3 x stamenCount=120": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=3 x stamenCount=3": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=3 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=3 x stamenCount=30": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=3 x stamenCount=120": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=10 x stamenCount=3": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=10 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=10 x stamenCount=30": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-count @ stamenCoilRadius=10 x stamenCount=120": { mm: 0, note: "F1.3a: COILS AGAINST THEIR NEIGHBOURS on a ring — each coil widens its filament's envelope by the coil radius, closing the gap the plain rods keep (the plain rod, radius 0, clears to six). Overlapping closed shells, the export contract's own case; declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=1.5 x stamenCount=3": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=1.5 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=0 x stamenCount=3": { mm: 0.4451, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=0.3 x stamenCount=3": { mm: 0.5002, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=0.3 x stamenCount=6": { mm: 0.5483, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=3 x stamenCount=3": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=3 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=3 x stamenCount=30": { mm: 0.3114, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=10 x stamenCount=3": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=10 x stamenCount=6": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=10 x stamenCount=30": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+  "coilradius-x-style @ stamenCoilRadius=10 x stamenCount=120": { mm: 0, note: "F1.3a: COILS AGAINST THE STYLE — the coil widens each filament's envelope toward the axis the style stands on; the sparse ring stands closest. Overlapping closed shells, declared by value, never clamped (docs/bloom-stamen-coil-outcome.md §5)." },
+
   /* ================================================== TIER 1 (#263) */
 
   /* ===== FIVE CELLS THE APEX NIB TAKES UNDER THE BAR, EVERY ONE OF THEM
@@ -1688,6 +1776,60 @@ export function measureStamenStamenApproachMm(G, state) {
   return { mm: best, at, stamens: m.stamens.length };
 }
 
+/* THE COIL AGAINST ITSELF (F1.3a). One stamen's own rod segments against
+   each other, the builder's own stations with the owner's radius, less two
+   radii, floored at 0 — but only pairs of segments at least `pi t` apart
+   ALONG the rod (`t` the floor, one sheet thickness): a curve whose radius of
+   curvature is never under `t` cannot come back toward itself within half a
+   turn of that radius, so a closer pair is the tube's own neighbourhood and
+   not an approach. A LENGTH, derived from the floor the coil is held to, never
+   a station count. The arc runs along the emitted polyline. Infinite with no
+   stamen built. */
+export function measureStamenSelfApproachMm(G, state) {
+  const acc = new G.MeshBuilder({ exportMode: true });
+  const m = G.buildBloomInto(acc, state);
+  const A = m.androecium;
+  if (!A || !m.stamens || !m.stamens.length) return { mm: Infinity, why: 'no stamen built — nothing to approach itself' };
+  const rF = A.rFil, gap = Math.PI * A.diameter;
+  let best = Infinity, at = null;
+  m.stamens.forEach((s, si) => {
+    const P = s.stations.slice(1), arc = [0];
+    for (let k = 1; k < P.length; k++) arc.push(arc[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1], P[k][2] - P[k - 1][2]));
+    for (let a = 0; a + 1 < P.length; a++) for (let b = a + 1; b + 1 < P.length; b++) {
+      if (arc[b] - arc[a + 1] < gap) continue;
+      const d = Math.max(0, segSegDist(P[a], P[a + 1], P[b], P[b + 1]) - 2 * rF);
+      if (d < best) { best = d; at = { stamen: si, arcA: arc[a], arcB: arc[b] }; }
+    }
+  });
+  return { mm: best, at, stamens: m.stamens.length };
+}
+/* THE STAMENS AGAINST THE STYLE (F1.3a). Every stamen's free rod segments and
+   anther segments against the style's own free stations and its stigma lobes,
+   the owners' radii, less the two radii, floored at 0. The roots are skipped on
+   both sides (the inner-root segment lies in the slab). Infinite with no style
+   or no stamen. */
+export function measureStamenStyleApproachMm(G, state) {
+  const acc = new G.MeshBuilder({ exportMode: true });
+  const m = G.buildBloomInto(acc, state);
+  const A = m.androecium, Gy = m.gynoecium, sty = m.styles && m.styles[0];
+  if (!A || !m.stamens || !m.stamens.length || !Gy || !sty) return { mm: Infinity, why: `${m.stamens ? m.stamens.length : 0} stamen(s) and ${sty ? 'a' : 'no'} style built — nothing to approach` };
+  const rF = A.rFil, rA = A.anther.diameter / 2, rS = Gy.rSty, rL = Gy.lobe.diameter / 2;
+  const styleSegs = [];
+  for (let k = 1; k + 1 < sty.stations.length; k++) styleSegs.push({ a: sty.stations[k], b: sty.stations[k + 1], r: rS });
+  for (const l of sty.lobes) styleSegs.push({ a: sty.tip, b: l.apex, r: rL });
+  let best = Infinity, at = null;
+  m.stamens.forEach((s, si) => {
+    const segs = [];
+    for (let k = 1; k + 1 < s.stations.length; k++) segs.push({ a: s.stations[k], b: s.stations[k + 1], r: rF });
+    for (const l of s.lumps) segs.push({ a: s.tip, b: l.apex, r: rA });
+    for (const u of segs) for (const v of styleSegs) {
+      const d = Math.max(0, segSegDist(u.a, u.b, v.a, v.b) - u.r - v.r);
+      if (d < best) { best = d; at = { stamen: si }; }
+    }
+  });
+  return { mm: best, at, stamens: m.stamens.length };
+}
+
 /* ------------------------------------------------------------------ driver */
 
 async function loadTree(root) {
@@ -1712,6 +1854,8 @@ function measureCell(tree, DEFAULTS, pair, va, vb, wallOpts = {}) {
 function measureState({ G, W, R }, DEFAULTS, pair, state, where, wallOpts = {}) {
   if (pair.measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
   if (pair.measure === 'stamen-stamen') return measureStamenStamenApproachMm(G, state);
+  if (pair.measure === 'stamen-self') return measureStamenSelfApproachMm(G, state);
+  if (pair.measure === 'stamen-style') return measureStamenStyleApproachMm(G, state);
   /* THE INFILL'S OWN MEASURE — the in-sheet wall between two holes on the
      SHIPPED plan (tools/bloom-infill-wall.mjs), because `self` is
      bit-identically inert in the density (its header has the numbers). */
@@ -1917,7 +2061,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
 
     /* ---------------------------------------------- the table, per pair */
     say(`  [tier ${pair.tier}${pair.guess ? ', a GUESS' : ''}] ${pair.label}`);
-    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : pair.measure === 'stamen-stamen' ? 'STAMEN against STAMEN — every rod segment and anther of one stamen against every one of another, the builder\'s own stations and the owner\'s radii (F1.2)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
+    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : pair.measure === 'stamen-stamen' ? 'STAMEN against STAMEN — every rod segment and anther of one stamen against every one of another, the builder\'s own stations and the owner\'s radii (F1.2)' : pair.measure === 'stamen-self' ? 'A STAMEN against ITSELF — one rod\'s own segments at least pi t apart along it, the builder\'s own stations (F1.3a, the coil)' : pair.measure === 'stamen-style' ? 'the STAMENS against the STYLE — every rod and anther segment against the style\'s stations and stigma lobes (F1.3a)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
     say('      ' + `${pair.a.id} \\ ${pair.b.id}`.padEnd(30) + pair.b.values.map((v) => (num(v) + (Object.is(v, pair.b.values[0]) ? '*' : '')).padStart(10)).join(''));
     for (let i = 0; i < grid.length; i++) {
       const lead = num(pair.a.values[i]) + (i === 0 ? '*' : '');
