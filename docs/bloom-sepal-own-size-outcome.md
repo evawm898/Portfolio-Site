@@ -122,7 +122,7 @@ and `ALL MAX`'s definition is untouched (1307 → 1316 rows, all nine in block 6
 
 Block 61, nine rows: the WING; length min / max; width min / max; both set at size 0.20 (the
 multiplier inert); under the floors; the WING asked UP at 40 with the limit PINNED at or under
-22; GATED. Smoke block 61 holds five of them. `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 34ed00d> --movers '^SEPAL SIZE: (?!GATED)|^ALL MAX$|^SEPALS: sepalCup max \(1\.2\)$|^SEPALS: sepalTwist (min|max)'` over the whole 1,316-row matrix in both modes: BYTES_RESULT.
+22; GATED. Smoke block 61 holds five of them. `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 34ed00d> --movers '^SEPAL SIZE: (?!GATED)|^ALL MAX$|^SEPALS: sepalCup max \(1\.2\)$|^SEPALS: sepalTwist (min|max)'` over the whole 1,316-row matrix in both modes: **PASS — 12 of 12 predeclared movers moved and 0 floats moved on the 1,304 holders**, positionally under `Object.is`, over **1,600,502,688 export floats / 177,833,632 triangles and 84,225,224 captured-grid values** (9,699 panels). The movers are the eight live block-61 rows, `ALL MAX`, and the three `SEPALS:` rows whose built angle moved under step 1; the shipping default and every other sepal row hold by branch. Re-run on the tree MERGED with `main` at `3e46d0b` (Scoping-a, which touched `petalSurface`'s substate line) over the 87 sepal and `ALL MAX` rows against the same base: PASS, the same 12 movers, 0 floats on the 75 holders over 135,232,740 export floats — the composition of the two changes moves nothing the sepal change did not move alone.
 
 ## 5. Frozen phase
 
