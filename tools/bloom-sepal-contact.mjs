@@ -74,11 +74,13 @@ let failures = 0;
 const fail = (m) => { failures++; console.log(`  FAIL ${m}`); };
 
 /* ---- the dense drawing ------------------------------------------------ */
-function denseRows(surface, panelRows) {
+function denseRows(surface, panelRows, allBladeRows = false) {
   /* the builder's own stations plus three quarter-points between each pair,
-     restricted to the lamina (u >= ROOT_BLEND_END), each row at DENSE x the
-     builder's columns, through the surface's front door */
-  const us = panelRows.map((r) => r.u).filter((u) => u >= G.ROOT_BLEND_END);
+     restricted to the lamina (u >= ROOT_BLEND_END for a PETAL; for the SEPAL
+     every blade row u > 0 is drawn and the ROOT EXCLUSION IN MILLIMETRES is
+     applied afterwards by laminaFromPanels, the geometry's own rule), each
+     row at DENSE x the builder's columns, through the surface's front door */
+  const us = panelRows.map((r) => r.u).filter((u) => (allBladeRows ? u > 0 : u >= G.ROOT_BLEND_END));
   const cols = panelRows[0].v.length * DENSE;
   const vs = Array.from({ length: cols }, (_, j) => -1 + (2 * j) / (cols - 1));
   const rows = [];
@@ -100,7 +102,7 @@ function denseSepal(state, sepals, deg, mode, panelRows) {
   const acc = new G.MeshBuilder({ exportMode: mode });
   const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };   // at the whorl's own height (the attachment), never 0: the first re-run of this section drew the dense sepal at the rim's height against a whorl built 0.93 mm lower and reported 44 disagreements that were the tool's
   const surface = G.petalSurface(G.sepalBladeState(state, deg), sepals.ring, slot, null, acc);
-  return { lamina: G.laminaFromPanels([{ rows: denseRows(surface, panelRows) }]), base: surface.base, tilt: deg };
+  return { lamina: G.laminaFromPanels([{ rows: denseRows(surface, panelRows, true) }], { rootExclusion: { origin: surface.base, mm: G.sepalRootExclusionMm(state) } }), base: surface.base, tilt: deg };
 }
 /* the dense limit, scanned at a quarter step from (builder's limit - 2 steps)
    upward; returns the last clear angle and the first contact */

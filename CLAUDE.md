@@ -3478,6 +3478,28 @@ before touching `sepalTwinValue`, `loadedValue` or `sepalTwinsUnclamped`):
   `--frozen --base`).
 - `frozen/phase62` is the 1,282 rows at `e008938`.
 
+**A SEPAL HAS ITS OWN LENGTH AND WIDTH IN MILLIMETRES, THE MULTIPLIER STAYS AND HIDES, AND THE
+ANGLE LIMIT'S ROOT EXCLUSION IS A LENGTH** (Eva's rulings, Oct 13 — QA.1 / §8A; read
+`docs/bloom-sepal-own-size-outcome.md` before touching `sepalOwnSize`, `bladeAskedLengthMm`,
+`sepalRootExclusionMm`, `laminaFromPanels`' `rootExclusion`, the foot's `footScale`, SP0b / SP5b or
+block 61).
+- `sepalLength` (5–120 mm) and `sepalWidth` (3–30 mm) are OWN rows (a twin may only narrow the
+  petal's range, and a sepal may be longer than the petal). The slider's 0 is "the petal's × size":
+  a BRANCH, so every stored set and saved design builds as before. A set row WINS for its axis;
+  `sepalScale` hides when both are set (`sepalScaleLive` / `sepalScaleInert`, two statements, SP0b).
+  Under the floor is floored and told. The foot follows the width's owner.
+- **THE DRAWN LIMIT READ HIGHER THE LONGER THE SEPAL** (+17 at 21 mm, +24 at 120, "no contact" at
+  150 × 5 while the sepals stood through the petals): the scan dropped `u < 0.30` of the SEPAL'S
+  OWN length — a fraction standing for the petals' root region. It is `ROOT_BLEND_END × petalLength`
+  in MILLIMETRES from the sepal's ring point now (the third durable rule); the harness's own contact
+  test restates it; SP8 refuses any other record and a row may pin the limit from above. Six rows'
+  limits move (live and phase65 alike): `ALL MAX` −40 → −38, cup max −8 → −4, twist ±180 −1 → 0
+  move bytes; roll-taper max and curl min move the record alone.
+- The second producer of the sepal's length (the scan's seam step) reads the substate now.
+- SP5b reads the EMITTED blade (the lamina's outermost columns and centre line), never the record.
+- Block 61 (nine rows; the WING at 120 × 5, both range ends, the inert multiplier, the floors, the
+  pinned limit, GATED); `frozen/phase66` is the 1,307 rows at `34ed00d`.
+
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,

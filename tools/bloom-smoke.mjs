@@ -1358,6 +1358,30 @@ export const SMOKE_BLOCKS = [
         path: "LF36 (each sinus told already round: the law's own bottom radius against the largest fillet, and that fillet adding under a relief-grid step anywhere on the law) and LF34's branch" },
     ],
   },
+  {
+    n: 61, title: "the sepal's own length and width (Oct 13, QA.1)",
+    anchor: "SEPAL SIZE: the WING — 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60 (the sepals three times the 35 mm petals' length)",
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       the own-size arm of `bladeAskedLengthMm` / `bladeAskedWidthMm` (a set
+       row wins), the foot's width-ratio arm, the floor on a sub-floor value,
+       the multiplier's inert state, and the ROOT EXCLUSION IN MILLIMETRES
+       on a sepal long enough to tell it from the old fraction (the pinned
+       row). The anchor is the wing: both own rows set on a curled,
+       near-horizontal blade three times the petals' length. Cheapest row per
+       path; the gated row is bit-identical to the default by branch. */
+    rows: [
+      { label: "SEPAL SIZE: the WING — 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60 (the sepals three times the 35 mm petals' length)",
+        path: "SP0b (the multiplier hidden exactly where both own rows are set — the registry's sepalScaleLive, the geometry's own.scaleInert and the harness's restatement agreeing), SP3 (the foot x own width / petal width x breadth), SP5 (the size law restated from the controls against the asked record) and SP5b (the EMITTED blade: the outer-column chord at the widest row at or under the law's width, the centre line at least half the asked length), SP8 (the limit record's exclusion is the petals' root blend in mm)" },
+      { label: "SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal's length read +24 here)",
+        path: "SP8's pin: the drawn limit on a long sepal at or under 22 degrees, and the harness's own contact test — its trial sepal keeping every blade row from the restated mm exclusion outward — finding the built angle clear and the step above clipping" },
+      { label: "SEPAL SIZE: width max (30 mm — wider than the petal; the foot follows the width ratio and clamps at its ceiling, told)",
+        path: "SP3's width-ratio arm with the foot ceiling binding (clamped, told), SP5b's flat-blade EXACT width (a sepal wider than its petal, the length still the petal's x size)" },
+      { label: "SEPAL SIZE: under the floors (2 mm long, 1 mm wide asked — FLOORED at 5 x 3, told)",
+        path: "SP5's floored arm (both flags, the floored sizes in the record and on the emitted blade)" },
+      { label: "SEPAL SIZE: GATED — count 0 with both set (hidden and inert; bit-identical to the default)",
+        path: "SP0 / SP0b with no sepals (the multiplier's predicate false on a count of 0, the geometry building nothing) and SP7" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
