@@ -93,10 +93,30 @@ the validator's own words, and the refused point is ringed while the drag lasts.
 
 **Two measured findings shaped the gesture code:**
 
-- **A double-click on a handle never arrives as `dblclick`.** After a pointerdown whose default is
+- ~~**A double-click on a handle never arrives as `dblclick`.** After a pointerdown whose default is
   prevented and which captures the pointer, Chromium delivers no click or dblclick. The events reach
   the svg as pointerdown / pointerup only. So a double press is detected inside pointerdown (two presses
-  within 450 ms on one handle). The first cut removed nothing.
+  within 450 ms on one handle). The first cut removed nothing.~~ **WRONG ABOUT THE MECHANISM, AND THE
+  WINDOW IT JUSTIFIED WAS MAIN'S RED ON `d576262`** (the route (af) fix session, Oct 14). Measured on a
+  blank page: a prevented pointerdown with pointer capture still delivers click and dblclick. What
+  swallowed them in the editor was `render()` — it rebuilt every handle circle on pointerdown and on
+  pointerup, and Chromium delivers NO click (so no dblclick) when the node a press landed on leaves
+  the document before the release. The 450 ms window was a workaround for that misread, and it had a
+  defect of its own: a press released without a move (a refused drag) left it ARMED, so a re-grab of
+  the same handle index inside 450 ms was read as the second half of a double press. Route (af)'s
+  step 3 is exactly such a press; on a GitHub runner the gate reached step 4's double-click inside the
+  window (Playwright's round trips are milliseconds there, hundreds of milliseconds on a dev box), the
+  FIRST press of the double-click removed the added point, the second press found no handle, went
+  unprevented, and the browser's own dblclick re-inserted a point on the curve — four points,
+  `[0.25, 0.2181]`, the value CI printed, twice. The same tree was green on `main`'s push run minutes
+  earlier: a wall-clock decision, green on the slow side and red on the fast one. Now: `render()`
+  keeps a `<g>` of handles RECONCILED in place (a circle is created or removed only when the point
+  count changes), the only default prevented is `mousedown`'s (selection and focus-on-click; click and
+  dblclick survive it, measured), and the double click is the browser's own `dblclick`, ignored when
+  either of the last two presses dragged. Route (af) now drives the fast side over raw CDP (every press
+  written to the socket before any is acknowledged, a click count on each) — two back-to-back single
+  presses remove nothing, and the CI sequence leaves the curve before the add — and the mutant
+  `the double press is a wall-clock window` restores the old block and must fire.
 - **Handles are hit-tested by screen distance, never by the event's target.** The editor re-renders on
   pointerdown, so the second click lands on a new element.
 

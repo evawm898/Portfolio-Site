@@ -120,7 +120,7 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
   let drag = null;            // { side, i, pointerId, moved }
   let focus = { side: 'left', i: 0 };
   let refusal = null;         // { reason, side, i } — the last refused edit, until an edit is accepted
-  let lastPress = null;       // the last press on a handle, for the double press that removes it
+  let pressMoved = [false, false]; // did each of the last two presses on a handle drag it? (a dblclick after a drag is not a remove)
   let lastOp = null;          // the last edit proposed (accepted or refused) — the gate reads the pointer's conversion off it
   const counts = { input: 0, change: 0, refused: 0 };
   const mirrored = () => cur.mode !== 'single';
@@ -168,26 +168,45 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
   const path = (pts, side) => pts.map((p, k) => `${k ? 'L' : 'M'}${p[0].toFixed(5)} ${svgY(side, p[1]).toFixed(5)}`).join(' ');
   const el = (tag, attrs) => { const e = document.createElementNS(SVG_NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
 
+  /* TWO GROUPS: the drawing (frame, axis, curves) is REBUILT on every render;
+     the handles are RECONCILED in place — a circle is created or removed only
+     when the point count changes, and otherwise keeps its identity across a
+     render. That is not tidiness: Chromium delivers NO click, and so no
+     dblclick, when the node a press landed on leaves the document before the
+     release (measured, on a press and on a release alike), and a render that
+     rebuilt every circle on pointerdown and pointerup is why the first cut
+     never saw a double click on a handle — and then judged one itself by a
+     wall-clock window, which is the defect recorded above the press handler. */
+  const layers = el('g', { class: 'bl-curve-layers' });
+  const marks = el('g', { class: 'bl-curve-marks' });
+  svg.append(layers, marks);
   function render() {
     const b = box();
     svg.setAttribute('viewBox', `${b.x0} ${b.y0} ${b.w} ${b.h}`);
     svg.style.aspectRatio = `${b.w} / ${b.h}`;
     const upp = unitsPerPx();
-    svg.replaceChildren();
-    svg.append(el('rect', { class: 'bl-curve-frame', x: spec.x[0], y: mirrored() ? -Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])) : -spec.y[1], width: spec.x[1] - spec.x[0], height: mirrored() ? 2 * Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])) : spec.y[1] - spec.y[0] }));
-    if (mirrored() || (spec.y[0] < 0 && spec.y[1] > 0)) svg.append(el('line', { class: 'bl-curve-axis', x1: spec.x[0], y1: 0, x2: spec.x[1], y2: 0 }));
+    layers.replaceChildren();
+    layers.append(el('rect', { class: 'bl-curve-frame', x: spec.x[0], y: mirrored() ? -Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])) : -spec.y[1], width: spec.x[1] - spec.x[0], height: mirrored() ? 2 * Math.max(Math.abs(spec.y[0]), Math.abs(spec.y[1])) : spec.y[1] - spec.y[0] }));
+    if (mirrored() || (spec.y[0] < 0 && spec.y[1] > 0)) layers.append(el('line', { class: 'bl-curve-axis', x1: spec.x[0], y1: 0, x2: spec.x[1], y2: 0 }));
     const s = curveSamples(cur, spec);
-    if (cur.mode === 'symmetric') svg.append(el('path', { class: 'bl-curve-ghost', d: path(s.right, 'right') }));
-    if (cur.mode === 'two-sided') svg.append(el('path', { class: 'bl-curve-line', 'data-side': 'right', d: path(s.right, 'right') }));
-    svg.append(el('path', { class: 'bl-curve-line', 'data-side': 'left', d: path(s.left, 'left') }));
+    if (cur.mode === 'symmetric') layers.append(el('path', { class: 'bl-curve-ghost', d: path(s.right, 'right') }));
+    if (cur.mode === 'two-sided') layers.append(el('path', { class: 'bl-curve-line', 'data-side': 'right', d: path(s.right, 'right') }));
+    layers.append(el('path', { class: 'bl-curve-line', 'data-side': 'left', d: path(s.left, 'left') }));
+    const want = [];
     for (const side of cur.mode === 'two-sided' ? ['left', 'right'] : ['left']) {
       pointsOf(cur, side).forEach((p, i) => {
         const cls = ['bl-curve-pt'];
         if (focus.side === side && focus.i === i) cls.push('is-focus');
         if (refusal && drag && refusal.side === side && refusal.i === i) cls.push('is-refused');
-        svg.append(el('circle', { class: cls.join(' '), 'data-side': side, 'data-i': i, cx: p[0], cy: svgY(side, p[1]), r: CURVE_HANDLE_PX * upp }));
+        want.push({ class: cls.join(' '), 'data-side': side, 'data-i': i, cx: p[0], cy: svgY(side, p[1]), r: CURVE_HANDLE_PX * upp });
       });
     }
+    const have = [...marks.children];
+    want.forEach((attrs, k) => {
+      const c = have[k] || marks.appendChild(document.createElementNS(SVG_NS, 'circle'));
+      for (const [key, v] of Object.entries(attrs)) if (c.getAttribute(key) !== String(v)) c.setAttribute(key, v);
+    });
+    for (let k = want.length; k < have.length; k++) have[k].remove();
     if (modeSel) modeSel.value = cur.mode;
     const L = ownerLength();
     const mm = (f) => (f * L).toFixed(1);
@@ -216,9 +235,8 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
   }
   const quantised = (xy) => [quantise(xy[0]), quantise(xy[1])];
   /* WHICH HANDLE IS UNDER THE POINTER — by distance on screen, never by the
-     event's target: the editor re-renders on pointerdown, so the second click
-     of a double-click lands on a NEW circle, and the target of the dblclick
-     is the svg (measured — the first cut removed nothing on a double-click). */
+     event's target: the svg captures the pointer, so a release and the click
+     that follows it are retargeted to the svg whatever circle was pressed. */
   const handleAt = (clientX, clientY) => {
     let best = null;
     for (const side of cur.mode === 'two-sided' ? ['left', 'right'] : ['left']) {
@@ -230,23 +248,27 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
     return best;
   };
 
+  /* A PRESS ON A HANDLE STARTS A DRAG, AND ITS DEFAULT IS LEFT ALONE — ON
+     PURPOSE. A pointerdown whose default is prevented is followed by NO
+     mousedown, click or dblclick in Chromium, so the first cut judged a double
+     press ITSELF, by a 450 ms wall-clock window between two pointerdowns on one
+     handle. That window stayed ARMED by any press released without a move (a
+     refused drag ends exactly so), and a re-grab of the same handle index inside
+     it was read as the second half of a double press: the point was removed on
+     the FIRST press of a real double-click, the second press then found no
+     handle, returned unprevented, and the browser's own dblclick re-inserted a
+     point on the curve — four points where there were three. Green on a slow
+     box, red on a fast CI runner (the stretch between two gate gestures ran
+     under 450 ms there and over it here): a discrete decision on the wall
+     clock, this project's own named class. The browser already owns the click
+     count, so the double click is its `dblclick` (the listener below) and the
+     only default prevented is `mousedown`'s — selection and focus-on-click —
+     which leaves click and dblclick intact (measured). */
+  svg.addEventListener('mousedown', (ev) => { if (ev.button === 0 && handleAt(ev.clientX, ev.clientY)) ev.preventDefault(); });
   svg.addEventListener('pointerdown', (ev) => {
     const h = ev.button === 0 ? handleAt(ev.clientX, ev.clientY) : null;
     if (!h) return;
-    ev.preventDefault();
     const { side, i } = h;
-    /* A DOUBLE PRESS ON A HANDLE REMOVES IT. Detected here rather than by a
-       `dblclick` listener: a pointerdown whose default is prevented and which
-       captures the pointer is followed by NO click or dblclick in Chromium
-       (measured — the events reach the svg as pointerdown / pointerup only),
-       so the browser's own double-click never arrives on a handle. */
-    const now = ev.timeStamp;
-    if (lastPress && now - lastPress.t < 450 && lastPress.side === side && lastPress.i === i) {
-      lastPress = null;
-      edit({ op: 'remove', side, i });
-      return;
-    }
-    lastPress = { t: now, side, i };
     focus = { side, i };
     drag = { side, i, pointerId: ev.pointerId, moved: false };
     svg.setPointerCapture(ev.pointerId);
@@ -265,15 +287,21 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
     if (!drag || (ev && ev.pointerId !== drag.pointerId)) return;
     const moved = drag.moved;
     drag = null;
+    pressMoved = [pressMoved[1], moved];
     render();
-    if (moved) { fire('change'); lastPress = null; }
+    if (moved) fire('change');
   };
   svg.addEventListener('pointerup', endDrag);
   svg.addEventListener('pointercancel', endDrag);
+  /* A DOUBLE CLICK ON A HANDLE REMOVES IT; ON THE CURVE IT ADDS A POINT. The
+     handle is found by distance, never by the event's target (the editor
+     re-renders on every press, so the second click lands on a NEW circle and
+     the dblclick's target is the svg). A double click whose presses dragged the
+     handle is a nudge the browser happened to count, not a remove. */
   svg.addEventListener('dblclick', (ev) => {
     ev.preventDefault();
     const h = handleAt(ev.clientX, ev.clientY);
-    if (h) { edit({ op: 'remove', side: h.side, i: h.i }); return; }
+    if (h) { if (!pressMoved[0] && !pressMoved[1]) edit({ op: 'remove', side: h.side, i: h.i }); return; }
     const vb = toVb(ev.clientX, ev.clientY);
     if (!vb) return;
     const upp = unitsPerPx();

@@ -373,12 +373,24 @@
          that cannot be removed; two-sided starts as the left's copy and
          two-sided -> symmetric keeps the LEFT side; the design file's own
          walkers round-trip the curve clean and refuse one outside the box
-         whole. Five mutants under --negative-control, each by its own
-         sentence: the validator ignored (bloom-curve.js), a refused drag that
-         clamps (bloom.js), the mirror keeping the right side (bloom-curve.js),
-         points stored in absolute units (bloom.js), the design file dropping
-         the curve (bloom-file.js). Three edits: this entry, the block, the
-         negative control's flags and banner.
+         whole. THE DOUBLE PRESS IS THE BROWSER'S CLICK COUNT, NEVER A
+         WALL-CLOCK WINDOW (main's red on d576262 — #408's editor judged a
+         double press by 450 ms between two pointerdowns, a press released
+         without a move left the window armed, and a fast runner reached the
+         next gesture inside it: the first press of a real double-click removed
+         the added point and the browser's own dblclick put one back; green on
+         every slow box, including this one): two back-to-back single presses
+         remove nothing and the CI sequence leaves the curve before the add,
+         both driven over raw CDP so the gap between gestures is microseconds on
+         any box — the fast side, which Playwright's per-command round trips
+         cannot reach here. The editor's keys move no registry control (the
+         whole UI state before and after). Six mutants under
+         --negative-control, each by its own sentence: the validator ignored
+         (bloom-curve.js), a refused drag that clamps (bloom.js), the mirror
+         keeping the right side (bloom-curve.js), the wall-clock double press
+         restored (bloom.js), points stored in absolute units (bloom.js), the
+         design file dropping the curve (bloom-file.js). Three edits: this
+         entry, the block, the negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4104,6 +4116,50 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       const removed = await T(pg, 'value');
       if (J(removed) !== J(base)) p.push(`a double press on the added point left ${J(removed.points)}, not the curve before the add ${J(base.points)}`);
     }
+    /* 4b. THE DOUBLE PRESS IS THE BROWSER'S OWN CLICK COUNT, NOT A WALL-CLOCK
+       WINDOW — main's red on d576262 (#408's editor, green on a slow box and
+       red twice on a fast runner). The first cut judged a double press itself,
+       by 450 ms between two pointerdowns on one handle index; a press released
+       without a move (step 3's refused drag) left that window ARMED, so on a
+       runner fast enough to reach step 4 inside it the FIRST press of the
+       double-click above removed the added point, the second found no handle,
+       went unprevented, and the browser's own dblclick put a point back on the
+       curve: four points, the exact value CI printed. Driven over raw CDP so
+       every press is written to the socket before any is acknowledged — the
+       stretch between gestures is then microseconds on ANY box, the fast side
+       the window broke on, where Playwright's per-command round trips make it
+       hundreds of milliseconds here and would let the defect pass. (i) two
+       single presses on one handle, back to back, remove nothing (the browser
+       counts two clicks; a window reads a double press); (ii) the CI sequence
+       itself — a single press on point 2, the add at x 0.25, the double-click
+       on the added point — leaves the curve before the add, exactly. A click
+       count comes with each CDP press, so neither depends on a timer. */
+    const cdp = await pg.context().newCDPSession(pg);
+    const me = (type, x, y, clickCount) => cdp.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount });
+    const press = (pt, n) => [me('mousePressed', pt.x, pt.y, n), me('mouseReleased', pt.x, pt.y, n)];
+    /* the browser's dblclick is dispatched after the second release; waiting on
+       the editor's own counts cannot see an ABSENT event, so the only honest
+       wait for "nothing happened" is a bounded one, after the batch is acked */
+    const settleClicks = () => pg.waitForTimeout(300);
+    /* each clause is read against the value IMMEDIATELY before its own presses,
+       never against `base`: a broken editor can leave step 4 one point long,
+       and a stale double press would then take it back to `base` by removing
+       exactly that point — the defect passing the clause written for it */
+    const h1 = await T(pg, 'pointClient', 'left', 1);
+    const preTwice = await T(pg, 'value');
+    await Promise.all([me('mouseMoved', h1.x, h1.y, 0), ...press(h1, 1), ...press(h1, 1)]);
+    await settleClicks();
+    const twice = await T(pg, 'value');
+    if (J(twice) !== J(preTwice)) p.push(`two single presses on point 2, back to back, took ${J(preTwice.points)} to ${J(twice.points)} — a double press is being judged by a wall-clock window rather than the browser's click count`);
+    const preFast = await T(pg, 'value');
+    await Promise.all([me('mouseMoved', h1.x, h1.y, 0), ...press(h1, 1), me('mouseMoved', on.x, on.y, 0), ...press(on, 1), ...press(on, 2), ...press(on, 1), ...press(on, 2)]);
+    await settleClicks();
+    const fast = await T(pg, 'value');
+    if (J(fast) !== J(preFast)) p.push(`a single press on point 2, then the add at x 0.25 and the double press on the added point, all back to back, took ${J(preFast.points)} to ${J(fast.points)} — an earlier press armed a stale double press (its first press removed the added point and the browser's own dblclick put one back)`);
+    await cdp.detach();
+    /* 4c. THE KEYBOARD. The editor's keys act on the editor's value and reach no
+       registry control: the page's whole UI state is read before and after. */
+    const uiBefore = await pg.evaluate(() => JSON.stringify(window.__bloomUIState()));
     await pg.focus('.bl-curve-test svg');
     await pg.keyboard.press('Home'); await pg.keyboard.press(']'); await pg.keyboard.press('ArrowUp');
     const nudged = await T(pg, 'value');
@@ -4117,6 +4173,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     /* removing an END is refused by the shape rule (the curve spans the length) */
     await pg.keyboard.press('Home'); await pg.keyboard.press('Delete');
     if (J(await T(pg, 'value')) !== J(del)) p.push('Delete on the first point removed it — the curve no longer spans its length');
+    const uiAfter = await pg.evaluate(() => JSON.stringify(window.__bloomUIState()));
+    if (uiAfter !== uiBefore) p.push(`the editor's keys (Home ] ArrowUp + Delete) moved a registry control: the page's UI state changed`);
     /* 5. THE MIRROR SWITCH KEEPS THE LEFT SIDE. symmetric -> two-sided starts
        the right side as the left's copy; the right side is then dragged to its
        own shape; two-sided -> symmetric must leave EXACTLY the left side. */
@@ -4150,7 +4208,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (ref.applied || !ref.notes.some((n) => n.kind === 'invalid' && /outside the box/.test(n.text)) || J(await T(pg, 'value')) !== J(want)) p.push(`a file curve outside the box was not refused whole and told: ${J(ref)}`);
     await T(pg, 'unmount');
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: mounted once outside #panelControls (no registry control is a curve: ${curveRows}); a drag stored the fraction under the pointer (${q}) with ${c1.input - c0.input} inputs and one change, and the owning length 35 -> 60 mm moved the caption and no stored number; a one-step drag to y 0.36 was refused with the validator's reason and the value stayed EXACTLY; add on the curve / double-press remove / ] ArrowUp / + / Delete each did what they say, and an end cannot be removed; two-sided starts as the left's copy and back to symmetric keeps the LEFT side; the file round trip is clean and a curve outside the box is refused whole`);
+    else ok.push(`${tag} ${label}: mounted once outside #panelControls (no registry control is a curve: ${curveRows}); a drag stored the fraction under the pointer (${q}) with ${c1.input - c0.input} inputs and one change, and the owning length 35 -> 60 mm moved the caption and no stored number; a one-step drag to y 0.36 was refused with the validator's reason and the value stayed EXACTLY; add on the curve / double-press remove / ] ArrowUp / + / Delete each did what they say, the double press is the browser's click count (two back-to-back single presses remove nothing, and the CI sequence over raw CDP leaves the curve before the add), the keys reach no registry control, and an end cannot be removed; two-sided starts as the left's copy and back to symmetric keeps the LEFT side; the file round trip is clean and a curve outside the box is refused whole`);
   };
   await openBloom(page, port);
   await run(page, 'the test outline');
@@ -4169,6 +4227,9 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       { name: 'the mirror keeps the right side', file: 'bloom-curve.js',
         from: '  const out = { mode, points: v.points.map((p) => [p[0], p[1]]) };',
         to: "  const out = { mode, points: (mode !== 'two-sided' && v.mode === 'two-sided' ? v.right : v.points).map((p) => [p[0], p[1]]) };" },
+      { name: 'the double press is a wall-clock window', file: 'bloom.js',
+        from: "    if (!h) return;\n    const { side, i } = h;\n    focus = { side, i };\n    drag = { side, i, pointerId: ev.pointerId, moved: false };",
+        to: "    if (!h) return;\n    const { side, i } = h;\n    ev.preventDefault(); const lp = svg.__lastPress; if (lp && ev.timeStamp - lp.t < 450 && lp.side === side && lp.i === i) { svg.__lastPress = null; edit({ op: 'remove', side, i }); return; } svg.__lastPress = { t: ev.timeStamp, side, i };\n    focus = { side, i };\n    drag = { side, i, pointerId: ev.pointerId, moved: false };" },
       { name: 'points are stored in absolute units', file: 'bloom.js',
         from: '    const xy = quantised([vb.x, fracY(drag.side, vb.y)]);',
         to: '    const xy = quantised([vb.x * ownerLength(), fracY(drag.side, vb.y) * ownerLength()]);' },
@@ -4287,15 +4348,16 @@ if (NEGATIVE_CONTROL) {
     const sawCurveValidator = fail.some((f) => /^\[curve editor\] MUTANT \(the validator is ignored\).*the validator was never asked/.test(f));
     const sawCurveClamp = fail.some((f) => /^\[curve editor\] MUTANT \(a refused drag clamps\).*the drag was clamped, not refused/.test(f));
     const sawCurveMirror = fail.some((f) => /^\[curve editor\] MUTANT \(the mirror keeps the right side\).*kept the RIGHT side/.test(f));
+    const sawCurveWindow = fail.some((f) => /^\[curve editor\] MUTANT \(the double press is a wall-clock window\).*rather than the browser's click count/.test(f));
     const sawCurveUnits = fail.some((f) => /^\[curve editor\] MUTANT \(points are stored in absolute units\).*not written in fractions of it/.test(f));
     const sawCurveFile = fail.some((f) => /^\[curve editor\] MUTANT \(the design file drops the curve\).*the design file did not carry the curve/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
-        && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveUnits && sawCurveFile
+        && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-toggle file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-toggle file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
