@@ -1114,7 +1114,13 @@ const MUTANTS = [
              'restore/every-field-comes-back',
              'restore/a-clean-round-trip-reports-nothing-missing',
              'restore/a-field-the-file-does-not-carry-leaves-the-page-alone-and-is-named',
-             'restore/a-composition-dropped-on-the-page-is-loaded'],
+             'restore/a-composition-dropped-on-the-page-is-loaded',
+             // every round trip that asserts 0 notes reads the dropped field's
+             // own "missing" note — true of a writer that drops a field
+             'file/the-list-carries-several-blooms-with-no-migration',
+             'file/a-placement-is-read-verbatim-and-is-not-a-departure',
+             'file/a-second-bloom-is-an-entry-and-not-a-departure',
+             'save/shapes-are-saved-and-restored-with-their-order-and-the-pick'],
   },
   {
     // A ROW OF THE TABLE VANISHES, which is the one way a field can be lost
