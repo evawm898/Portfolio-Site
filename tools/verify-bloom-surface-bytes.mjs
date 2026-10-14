@@ -107,15 +107,36 @@ if (MERGE) {
     if (p.predicate !== parts[0].predicate || p.base !== parts[0].base) bad.push(`chunk ${p.from}:${p.to} ran a different predicate or base`);
   }
   if (at !== total) bad.push(`the chunks end at row ${at} of ${total}`);
+  /* EACH CHUNK MUST HAVE COMPARED WHAT IT CLAIMS (the review's finding: a chunk's
+     JSON is written before its own vacuity checks, and the merge tiled the
+     ranges without asking whether the rows inside them were compared — so a
+     chunk taken with `--rows 1`, or with an `--only` left over from iteration,
+     closed "all N rows" having compared one or none). A chunk that SELECTED
+     rows (`--only` / `--rows`, recorded since this check exists) makes the
+     merge a SUBSET, said so in the verdict; one that did not must have done
+     every row of its range. A chunk written before the fields existed is
+     held to the full-range rule. */
+  const selected = (p) => [p.only, p.limit, p.skip].some((x) => x !== undefined && x !== null);
+  const subset = parts.some(selected);
+  if (subset && !parts.every((p) => selected(p) && p.only === parts[0].only && p.limit === parts[0].limit && p.skip === parts[0].skip)) bad.push('the chunks selected rows differently (--only / --rows / --from) — a merge mixes one selection or none');
+  for (const p of parts) {
+    if (!selected(p) && p.rowsDone !== p.to - p.from) bad.push(`chunk ${p.from}:${p.to} compared ${p.rowsDone} of its ${p.to - p.from} rows`);
+    if (p.rowsDone && (!p.floats || !p.gridFloats || !p.panels)) bad.push(`chunk ${p.from}:${p.to} did ${p.rowsDone} rows and compared ${p.floats} floats / ${p.gridFloats} grid values over ${p.panels} panels — a vacuous chunk`);
+  }
   const sum = (k) => parts.reduce((n, p) => n + p[k], 0);
+  if (!sum('rowsDone') || !sum('floats') || !sum('gridFloats')) bad.push(`VACUOUS: the chunks compared ${sum('rowsDone')} rows, ${sum('floats')} floats, ${sum('gridFloats')} grid values`);
   const fails = [...bad, ...parts.flatMap((p) => p.fails)];
-  console.log(`MERGED ${parts.length} chunks over ${total} rows x 2 modes, predicate ${parts[0].predicate}, base ${parts[0].base}`);
+  console.log(`MERGED ${parts.length} chunks over ${total} rows x 2 modes, predicate ${parts[0].predicate}, base ${parts[0].base}${subset ? ` — a SUBSET: ${sum('rowsDone')} rows selected by ${parts[0].only ? `--only ${parts[0].only}` : ''}${parts[0].limit ? ` --rows ${parts[0].limit}` : ''}` : ''}`);
   console.log(`partition     : ${sum('moversMoved')} of ${sum('moversSeen')} predeclared movers MOVED (every one must), ${sum('holdersSeen')} holders compared to the bit`);
   console.log(`export stream : ${sum('floats').toLocaleString()} floats over ${sum('tris').toLocaleString()} triangles`);
   console.log(`captured grid : ${sum('gridFloats').toLocaleString()} values over ${sum('panels').toLocaleString()} panels (live)`);
-  if (!sum('moversSeen')) fails.push('VACUOUS: no mover in the matrix');
+  /* A MERGE WITH NO PARTITION DECLARED is the all-hold claim (Scoping-b: the
+     toggles OFF must move nothing anywhere), and "no mover" is then the claim
+     rather than a vacuity; with a partition declared it still refuses. */
+  if (!sum('moversSeen') && parts[0].predicate) fails.push('VACUOUS: no mover in the matrix');
   if (fails.length) { console.log(`\nFAIL — ${fails.length} finding(s):`); for (const f of fails.slice(0, 60)) console.log('  ' + f); process.exit(1); }
-  console.log(`\nPASS — 0 floats moved on the ${sum('holdersSeen')} holders, positionally, under Object.is; all ${sum('moversSeen')} predeclared movers moved.`);
+  const scope = subset ? `the ${sum('rowsDone')} SELECTED rows (a subset, not the matrix)` : `all ${sum('holdersSeen')} rows`;
+  console.log(parts[0].predicate ? `\nPASS — 0 floats moved on the ${sum('holdersSeen')} holders${subset ? ' of a SUBSET' : ''}, positionally, under Object.is; all ${sum('moversSeen')} predeclared movers moved.` : `\nPASS — 0 floats moved on ${scope} x 2 modes, positionally, under Object.is (no partition declared: every row holds).`);
   process.exit(0);
 }
 if (!BASE || !existsSync(path.join(BASE, 'bloom-geometry.js'))) {
@@ -624,6 +645,7 @@ const fails = allFails;
 if (JSON_OUT) {
   const fs = await import('node:fs');
   fs.writeFileSync(JSON_OUT, JSON.stringify({ from: RFROM, to: Math.min(RTO, MATRIX.length), matrixRows: MATRIX.length, predicate: MOVERS_PRED || (MOVERS ? String(MOVERS) : null), base: BASE,
+    only: ONLY ? String(ONLY) : null, limit: Number.isFinite(LIMIT) ? LIMIT : null, skip: FROM || null,
     moversSeen, moversMoved, holdersSeen, floats, tris, gridFloats, panels, rowsDone, fails: allFails.slice() }));
 }
 if ((MOVERS || MOVERS_PRED) && !moversSeen && !JSON_OUT) fails.push(`VACUOUS: --movers ${MOVERS} matched no row of the matrix`);
