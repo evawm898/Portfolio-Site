@@ -4141,15 +4141,21 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
        the editor's own counts cannot see an ABSENT event, so the only honest
        wait for "nothing happened" is a bounded one, after the batch is acked */
     const settleClicks = () => pg.waitForTimeout(300);
+    /* each clause is read against the value IMMEDIATELY before its own presses,
+       never against `base`: a broken editor can leave step 4 one point long,
+       and a stale double press would then take it back to `base` by removing
+       exactly that point — the defect passing the clause written for it */
     const h1 = await T(pg, 'pointClient', 'left', 1);
+    const preTwice = await T(pg, 'value');
     await Promise.all([me('mouseMoved', h1.x, h1.y, 0), ...press(h1, 1), ...press(h1, 1)]);
     await settleClicks();
     const twice = await T(pg, 'value');
-    if (J(twice) !== J(base)) p.push(`two single presses on point 2, back to back, left ${J(twice.points)} — a double press is being judged by a wall-clock window rather than the browser's click count`);
+    if (J(twice) !== J(preTwice)) p.push(`two single presses on point 2, back to back, took ${J(preTwice.points)} to ${J(twice.points)} — a double press is being judged by a wall-clock window rather than the browser's click count`);
+    const preFast = await T(pg, 'value');
     await Promise.all([me('mouseMoved', h1.x, h1.y, 0), ...press(h1, 1), me('mouseMoved', on.x, on.y, 0), ...press(on, 1), ...press(on, 2), ...press(on, 1), ...press(on, 2)]);
     await settleClicks();
     const fast = await T(pg, 'value');
-    if (J(fast) !== J(base)) p.push(`a single press on point 2, then the add at x 0.25 and the double press on the added point, all back to back, left ${J(fast.points)} — an earlier press armed a stale double press (its first press removed the added point and the browser's own dblclick put one back)`);
+    if (J(fast) !== J(preFast)) p.push(`a single press on point 2, then the add at x 0.25 and the double press on the added point, all back to back, took ${J(preFast.points)} to ${J(fast.points)} — an earlier press armed a stale double press (its first press removed the added point and the browser's own dblclick put one back)`);
     await cdp.detach();
     /* 4c. THE KEYBOARD. The editor's keys act on the editor's value and reach no
        registry control: the page's whole UI state is read before and after. */
