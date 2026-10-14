@@ -1,5 +1,5 @@
-import * as G from './tree/bloom-geometry.js';
-import { DEFAULTS } from './tree/bloom-registry.js';
+import * as G from '/home/user/Portfolio-Site/bloom-geometry.js';
+import { DEFAULTS } from '/home/user/Portfolio-Site/bloom-registry.js';
 import { census } from '/home/user/Portfolio-Site/tools/bloom-self-intersection.mjs';
 const WING = { sepalCount: 5, sepalScale: 1, sepalAngle: -10, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6 };
 for (const W of [2, 2.5, 3, 4, 5, 6, 8]) {

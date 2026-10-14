@@ -1,9 +1,9 @@
 import fs from 'node:fs';
-import * as G from './tree/bloom-geometry.js';
-import { DEFAULTS } from './tree/bloom-registry.js';
+import * as G from '/home/user/Portfolio-Site/bloom-geometry.js';
+import { DEFAULTS } from '/home/user/Portfolio-Site/bloom-registry.js';
 import { render, writePng, text, blit } from '/home/user/Portfolio-Site/tools/bloom-soft-render.mjs';
 import { cell as measure } from './measure.mjs';
-const WING = { sepalCount: 5, sepalScale: 1, sepalAngle: -10, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6 };
+const WING = { sepalCount: 5, sepalAngle: -10, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6 };
 const OUT = process.argv[2] || 'sepal-own-size.png';
 function build(state) { const acc = new G.MeshBuilder({ exportMode: true }); const built = G.buildBloomInto(acc, state); return { acc, built, pos: acc.positions }; }
 function sepalRange(state, b) { const z = build({ ...state, sepalCount: 0 }); const A = b.pos, B = z.pos, n = Math.min(A.length, B.length); let f = 0; while (f < n && A[f] === B[f]) f++; const t0 = Math.floor(f / 9); return [t0, t0 + b.built.sepals.tris]; }
@@ -20,7 +20,7 @@ function camFor(pos, view, zoom = 1) {
 }
 const CREAM = [214, 206, 190], GREEN = [118, 176, 104];
 const CELL = 300, CAP = 70;
-const mm = (L, W) => ({ sepalLengthMm: L, sepalWidthMm: W, sepalFootBreadth: Math.min(1.5, Math.max(0.25, W / 16)) });
+const mm = (L, W) => ({ sepalLength: L, sepalWidth: W, sepalFootBreadth: 0.5 });
 const CELLS = [
   { sec: 1, label: 'TODAY: DEFAULT SIZE 0.60 (21 x 9.6 MM)', state: { sepalScale: 0.6 }, old: true },
   { sec: 1, label: 'TODAY CEILING: SIZE 1.00 (35 x 16 MM)', state: { sepalScale: 1 }, old: true },
@@ -34,7 +34,7 @@ const CELLS = [
   { sec: 2, label: '90 x 5 MM AT ANGLE 0', state: { ...mm(90, 5), sepalAngle: 0 } },
   { sec: 2, label: '90 x 5 MM AT ANGLE -25', state: { ...mm(90, 5), sepalAngle: -25 } },
   { sec: 2, label: '90 x 5 MM, CURL 180 (TIP UP)', state: { ...mm(90, 5), sepalSpineCurl: 180 } },
-  { sec: 3, label: '150 x 5 MM (PAST THE PROPOSED CEILING)', state: mm(150, 5), old: true },
+  { sec: 3, label: '120 x 5 MM AT ANGLE +40 ASKED (LIMIT IN MM)', state: { ...mm(120, 5), sepalAngle: 40 } },
   { sec: 3, label: '120 x 5 MM, 8 SEPALS (EVERY PETAL)', state: { ...mm(120, 5), sepalCount: 8 } },
   { sec: 3, label: '120 x 12 MM, ANGLE +15 (AT THE LIMIT)', state: { ...mm(120, 12), sepalAngle: 15 } },
   { sec: 3, label: '120 x 12 MM, ANGLE +40 ASKED (CLAMPED)', state: { ...mm(120, 12), sepalAngle: 40 } },
@@ -54,7 +54,7 @@ for (const c of CELLS) {
 }
 const COLS = 3, SEC_H = 26, CW = CELL * 2;
 const SECS = [1, 2, 3];
-const TITLES = { 1: '1  THE WING CASE: TODAY (RED CAPTIONS) AGAINST OWN LENGTH AND WIDTH IN MM. PRINT PREVIEW ON (EXPORT). SEPALS GREEN. SIDE | FROM BELOW', 2: '2  WIDTH, ANGLE AND CURL AT 90 MM', 3: '3  THE CEILINGS: PAST THE PROPOSED LENGTH, EVERY PETAL, THE LIMIT, A STEM' };
+const TITLES = { 1: '1  THE WING CASE: TODAY (RED CAPTIONS) AGAINST OWN LENGTH AND WIDTH IN MM. PRINT PREVIEW ON (EXPORT). SEPALS GREEN. SIDE | FROM BELOW', 2: '2  WIDTH, ANGLE AND CURL AT 90 MM', 3: '3  THE LIMIT IN MM ON A LONG SEPAL ASKED UP, EVERY PETAL, THE CLAMP, A STEM' };
 const rowsOf = (s) => Math.ceil(cells.filter((x) => x.c.sec === s).length / COLS);
 const W = COLS * CW, H = SECS.reduce((h, s) => h + SEC_H + rowsOf(s) * (CELL + CAP), 0);
 const sheet = Buffer.alloc(W * H * 3, 18);

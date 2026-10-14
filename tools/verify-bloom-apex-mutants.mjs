@@ -2343,6 +2343,19 @@ const MUTANTS = [
     witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.length > c.length + 5) ? null : `the mutant's sepal is ${m.length} mm long against the clean tree's ${c.length} — the size still applies`; } },
+  { id: 'sepal-own-length-ignored', why: "the sepal's own length never reaches the blade — a 90 mm sepalLength builds the petal's 35 x size, the record still saying 90 where the substate is read; SP5 (the asked record) and SP5b (the emitted centre line under half the asked length) are the witnesses",
+    find: '  s.bladeLengthMm = own.lengthMm; s.bladeWidthMm = own.widthMm;',
+    into: '  s.bladeLengthMm = null; s.bladeWidthMm = own.widthMm;', names: ['SP5'],
+    witness: (M, C) => { const m = sepalFacts(M, { sepalLength: 90, sepalAngle: 0 }), c = sepalFacts(C, { sepalLength: 90, sepalAngle: 0 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.length > 60 && m.length < 40) ? null : `the mutant's sepal is ${m.length} mm long against the clean tree's ${c.length} at sepalLength 90 — the own length still reaches the blade`; } },
+  { id: 'sepal-root-exclusion-is-a-fraction-again', why: "the angle scan drops u < ROOT_BLEND_END of the SEPAL'S OWN length again (a fraction standing for a physical region): on a 120 x 5 mm sepal it throws away the 36 mm where the sepal meets the petals, reads the limit +24 against +21, and at 150 mm reads no contact at all while the sepals stand through the petals",
+    find: '  return { lamina: laminaFromPanels(p.lamina, { rootExclusion: { origin: p.base, mm: sepalRootExclusionMm(state) } }), base: p.base, seamStep: p.seamStep, tilt: angleDeg };',
+    into: '  return { lamina: laminaFromPanels(p.lamina), base: p.base, seamStep: p.seamStep, tilt: angleDeg };', names: ['SP8'],
+    witness: (M, C) => { const W = { sepalLength: 120, sepalWidth: 5, sepalAngle: 40, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6, sepalCup: 0, sepalFootBreadth: 0.5 };
+      const m = sepalFacts(M, W), c = sepalFacts(C, W);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.limit > c.limit) ? null : `the mutant's limit is ${m.limit} against the clean tree's ${c.limit} on the 120 x 5 wing at 40 asked — the exclusion is not reading as a fraction`; } },
   { id: 'sepal-foot-floor-removed', why: 'the sepal foot is whatever breadth asks with no print floor — 0.96 mm across at breadth 0.25, under the 1.60 mm foot floor every petal ring is held to',
     find: '    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);',
     into: '    const footMm = footAskedMm;', names: ['SP3'],
@@ -2983,6 +2996,14 @@ const ROWS = [
     set: [{ id: 'sepalCount', value: '40' }, { id: 'sepalAngle', value: '60' }, { id: 'sepalFootBreadth', value: '0.25' }, { id: 'sepalCup', value: '0.6' }] },
   { label: 'sepals asked on a SPHERE (8 asked on a closed head — none built, told)',
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'sepalCount', value: '8' }] },
+  /* THE SEPAL'S OWN LENGTH AND WIDTH (Oct 13): the wing — both own rows set on
+     a long narrow curled blade — and the same wing asked UP at 40, whose
+     drawn limit is PINNED (the row object carries `sepalLimitMaxDeg`, which
+     SP8 reads) so the fraction-of-length exclusion has a row it fires on. */
+  { label: 'the WING: own size 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60',
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalLength', value: '120' }, { id: 'sepalWidth', value: '5' }, { id: 'sepalAngle', value: '-10' }, { id: 'sepalSpineCurl', value: '120' }, { id: 'sepalCurlBias', value: '0.9' }, { id: 'sepalCurlStart', value: '0.6' }, { id: 'sepalBaseTaper', value: '3' }, { id: 'sepalTipTaper', value: '4' }, { id: 'sepalTipShape', value: '0.6' }, { id: 'sepalFootBreadth', value: '0.5' }] },
+  { label: 'the WING asked UP at 40 (the limit pinned at or under 22 — drawn with the root exclusion in mm)', sepalLimitMaxDeg: 22,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalLength', value: '120' }, { id: 'sepalWidth', value: '5' }, { id: 'sepalAngle', value: '40' }, { id: 'sepalSpineCurl', value: '120' }, { id: 'sepalCurlBias', value: '0.9' }, { id: 'sepalCurlStart', value: '0.6' }, { id: 'sepalBaseTaper', value: '3' }, { id: 'sepalTipTaper', value: '4' }, { id: 'sepalTipShape', value: '0.6' }, { id: 'sepalFootBreadth', value: '0.5' }] },
   /* THE ATTACHMENT (the second-round ruling): a whorl on the hub's FLARE — the
      deepest GOBLET, so the foot sits 19.4 mm down it and a limit drawn at the
      rim is a different number from one drawn at the foot. 90 asked so the

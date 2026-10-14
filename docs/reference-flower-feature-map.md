@@ -705,7 +705,7 @@ Recorded as given. Nothing below is re-litigated, interpreted further or resolve
 - the gates keep measuring LIVE: the harness unchecks the hidden box at load.
 
 **Sheets**
-- QA.1: sepals get their OWN length and width, and may be longer than the petals.
+- QA.1: sepals get their OWN length and width, and may be longer than the petals. **SHIPPED (Oct 13–14): `sepalLength` 5–120 mm / `sepalWidth` 3–30 mm as own rows, 0 = the petal's × size, `sepalScale` kept and hiding when both are set — `docs/bloom-sepal-own-size-outcome.md`.**
 - QB.1: document the opposite arch / curl signs; no renaming, no sign flip.
 
 §9's order is amended only where a ruling changes it: F7 done; the design file before scoping; sepal

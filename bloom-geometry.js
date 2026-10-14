@@ -2995,7 +2995,14 @@ export function footRing(state, acc) {
     const pitchRad = fanMode ? fan.step : TAU / n;
     const phaseRad = phaseFrac * pitchRad;
     const outer = rings[0];
-    const footAskedMm = outer.width * scale * breadth;
+    /* THE FOOT follows the WIDTH's owner: the petal foot x size while the
+       width follows the petal, x (own width / petal width) once the sepal has
+       its own width — so a hidden `sepalScale` never reaches the foot of a
+       sepal whose width it no longer sets. A branch: the first arm is the
+       expression it always was. */
+    const own = sepalOwnSize(state);
+    const footScale = own.widthMm !== null ? own.widthMm / Number(state.petalWidth) : scale;
+    const footAskedMm = outer.width * footScale * breadth;
     const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     /* WHERE THE WHORL SITS (the attachment-height ruling — `sepalAttachment`
        below the sepal block owns the solve): partway down the hub's flare at
@@ -3032,7 +3039,8 @@ export function footRing(state, acc) {
       scale, breadth, phaseFrac, pitchRad, pitchDeg: (pitchRad * 180) / Math.PI, phaseRad, phaseDeg: (phaseRad * 180) / Math.PI,
       phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
       startAzimuth, azimuths, placement, mirrorSymmetric,
-      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM,
+      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM, footScale,
+      own: { lengthMm: own.lengthMm, widthMm: own.widthMm, lengthFloored: own.lengthFloored, widthFloored: own.widthFloored, scaleInert: sepalScaleInert(state) },
       /* THE ATTACHMENT — the whorl's height (the `height` the whorl primitive
          is handed; 0 at the rim, where the flat arm reads `slot.z` as the
          plate's mid-plane) and the solve's own record. */
@@ -8096,7 +8104,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
      REPORTS both and C1 reads the report rather than assuming they are equal.
      The profile is built once at the asked length — the nib's plan is
      computed inside it, from the law, and the drawn length comes back out. */
-  const askedLength = ps.petalLength * slot.scale;
+  const askedLength = bladeAskedLengthMm(ps, slot.scale);   // the substate's own mm where a sepal set one, else the petal's x the slot's scale
   /* THE AFFINE ANGLE, PLUS THE DOME'S OWN LEAN (Sep 4) — three terms, read
      from three owners: `ps.petalTilt` the base control, `slot.tiltExtra` the
      layered ramp footRing() computed per this descriptor, `ring.domeLean`
@@ -8107,7 +8115,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
      construction `ring.slope` already is, so this line is byte-identical to
      its pre-Sep-4 form whenever headRise is 0. */
   const tilt = ((ps.petalTilt + slot.tiltExtra + ring.domeLean) * Math.PI) / 180;
-  const halfW = (ps.petalWidth * slot.scale) / 2;
+  const halfW = bladeAskedWidthMm(ps, slot.scale) / 2;
   const footHalf = ring.width / 2;
 
   const profile = widthProfile(ps, ring, halfW, cap, acc, askedLength);
@@ -18363,6 +18371,38 @@ export const SEPAL_ANGLE_STEP = 1;
 export const SEPAL_ANGLE_DEFAULT = 0;
 export const SEPAL_FOOT_BREADTH_RANGE = Object.freeze([0.25, 1.5]);
 export const SEPAL_FOOT_BREADTH_DEFAULT = 1;
+/* THE SEPAL'S OWN LENGTH AND WIDTH, IN MILLIMETRES (Eva's rulings, the own-size
+   session, Oct 13 — docs/bloom-sepal-own-size-outcome.md; feature map §8A /
+   §11 QA.1). A sepal has its own length and width and may be LONGER than the
+   petals. Today's `sepalScale` stays LIVE: the two mm rows DEFAULT TO 0,
+   which means "the petal's x size" — a BRANCH, so every stored set and every
+   saved design that never set them builds through the expression it built
+   through before, to the bit. When a row is SET it WINS for its axis and
+   `sepalScale` hides (Q3.5's shape: the finer control wins, the global
+   hides; `sepalScaleInert` and the registry's `sepalScaleLive` are the two
+   statements, checked against each other by SP0b). No retirement, no
+   migrateTo. The RANGES are RULED from measurement (5..120 x 3..30): over
+   21..150 mm x 3..16 mm at the wing pose the 1.00 mm gap reads 1.24-1.27 on
+   every cell and the census 0, so neither hazard sets a ceiling — the box
+   does (120 x 5 lands at 175 mm against the 180 mm the skill records for
+   dyed PA12; the leaf's and the stem's own ceiling is 120), 3 mm is the
+   leaf's own width floor and the narrowest blade that still reads as one,
+   5 mm keeps today's 0.2 x 20 = 4 mm floor within a step and is the stamen's
+   own floor. THE SLIDER'S 0 IS THE SENTINEL and 1..4 mm / 1..2 mm are FLOORED
+   to the ruled minimum and told (`sepalOwnSize` is the one owner of both).
+   `bladeAskedLengthMm` / `bladeAskedWidthMm` are the ONE place the substate's
+   own size or the slot's scale becomes the blade's asked size — read by
+   `petalSurface` and by the angle scan's seam step alike. */
+export const SEPAL_LENGTH_RANGE = Object.freeze([5, 120]);   // mm; the slider's 0 is "the petal's x size"
+export const SEPAL_WIDTH_RANGE = Object.freeze([3, 30]);
+export function sepalOwnSize(state) {
+  const own = (v, range) => { const x = Number(v) || 0; if (!(x > 0)) return { mm: null, floored: false }; return x < range[0] ? { mm: range[0], floored: true } : { mm: x, floored: false }; };
+  const L = own(state.sepalLength, SEPAL_LENGTH_RANGE), W = own(state.sepalWidth, SEPAL_WIDTH_RANGE);
+  return { lengthMm: L.mm, widthMm: W.mm, lengthFloored: L.floored, widthFloored: W.floored };
+}
+export function sepalScaleInert(state) { const o = sepalOwnSize(state); return o.lengthMm !== null && o.widthMm !== null; }
+export function bladeAskedLengthMm(ps, slotScale) { return ps.bladeLengthMm > 0 ? ps.bladeLengthMm : ps.petalLength * slotScale; }
+export function bladeAskedWidthMm(ps, slotScale) { return ps.bladeWidthMm > 0 ? ps.bladeWidthMm : ps.petalWidth * slotScale; }
 /* THE ONE TABLE. Each row is [the petal control the law reads, the sepal
    control that stands in for it]. The registry instances its `sepal*` rows
    from this table and `sepalBladeState` maps the values back through it, so
@@ -18430,6 +18470,9 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
      and asserts 0 sepal floats move. */
   const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
+  /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
+  const own = sepalOwnSize(state);
+  s.bladeLengthMm = own.lengthMm; s.bladeWidthMm = own.widthMm;
   return s;
 }
 
@@ -20281,7 +20324,7 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
       /* the SUBSTATE's length (one owner — `state.petalLength * sepals.scale` here was a second producer of the sepal's length, found by the own-size session) */
-      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), sepalBladeState(state, deg, unclamped).petalLength * sepals.scale, sepalRows);
+      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), bladeAskedLengthMm(sepalBladeState(state, deg, unclamped), sepals.scale), sepalRows);
       let trial = trials.get(seamStep);
       if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode, unclamped); trials.set(seamStep, trial); }
       scanned++;

@@ -1,8 +1,8 @@
-import * as G from './tree/bloom-geometry.js';
-import { DEFAULTS } from './tree/bloom-registry.js';
+import * as G from '/home/user/Portfolio-Site/bloom-geometry.js';
+import { DEFAULTS } from '/home/user/Portfolio-Site/bloom-registry.js';
 import { measureWall } from '/home/user/Portfolio-Site/tools/bloom-wall-thickness.mjs';
 import { census } from '/home/user/Portfolio-Site/tools/bloom-self-intersection.mjs';
-const WING = { sepalCount: 5, sepalScale: 1, sepalAngle: -10, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6 };
+const WING = { sepalCount: 5, sepalAngle: -10, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6 };
 export function cell(set, { tag = '' } = {}) {
   const st = { ...DEFAULTS, ...WING, ...set };
   const t0 = Date.now();
@@ -30,13 +30,13 @@ const run = process.argv[2];
 const out = (r) => console.log(JSON.stringify(r));
 if (run === 'grid') {
   for (const Lmm of [21, 35, 45, 60, 75, 90, 120, 150]) for (const Wmm of [3, 4, 5, 6, 8, 12, 16])
-    out(cell({ sepalLengthMm: Lmm, sepalWidthMm: Wmm, sepalFootBreadth: Math.min(1.5, Math.max(0.25, Wmm / 16)) }, { tag: `L${Lmm} W${Wmm}` }));
+    out(cell({ sepalLength: Lmm, sepalWidth: Wmm, sepalFootBreadth: 0.5 }, { tag: `L${Lmm} W${Wmm}` }));
 } else if (run === 'angles') {
-  for (const a of [0, -10, -20, -30]) for (const Lmm of [21, 60, 90, 120]) out(cell({ sepalLengthMm: Lmm, sepalWidthMm: 5, sepalFootBreadth: 5/16, sepalAngle: a }, { tag: `A${a} L${Lmm}` }));
+  for (const a of [0, -10, -20, -30]) for (const Lmm of [21, 60, 90, 120]) out(cell({ sepalLength: Lmm, sepalWidth: 5, sepalFootBreadth: 0.5, sepalAngle: a }, { tag: `A${a} L${Lmm}` }));
 } else if (run === 'today') {
   out(cell({ sepalScale: 0.6, sepalCount: 5 }, { tag: 'today default size' }));
   out(cell({ sepalScale: 1, sepalCount: 5 }, { tag: 'today ceiling scale 1' }));
   out(cell({ sepalScale: 1, petalLength: 60, petalWidth: 8, sepalCount: 5 }, { tag: 'A9 petals 60x8' }));
 } else if (run === 'corner') {
-  for (const Lmm of [60, 90, 120, 150]) out(cell({ petalCount: 40, sepalCount: 40, sepalLengthMm: Lmm, sepalWidthMm: 30, sepalFootBreadth: 1.5, sepalPhase: 0, sepalAngle: 90, stemLength: 60, sepalSpineCurl: 360, sepalCup: 1.2, sepalTwist: 180, sepalRoll: 180, sepalBuckleAmp: 0.6, sepalTipShape: 3, sepalCurlBias: 0, sepalCurlStart: 0, sepalBaseTaper: 1, sepalTipTaper: 1.8 }, { tag: `ALLMAX-ish 40x40 L${Lmm} W30` }));
+  for (const Lmm of [60, 90, 120, 150]) out(cell({ petalCount: 40, sepalCount: 40, sepalLength: Lmm, sepalWidth: 30, sepalFootBreadth: 1.5, sepalPhase: 0, sepalAngle: 90, stemLength: 60, sepalSpineCurl: 360, sepalCup: 1.2, sepalTwist: 180, sepalRoll: 180, sepalBuckleAmp: 0.6, sepalTipShape: 3, sepalCurlBias: 0, sepalCurlStart: 0, sepalBaseTaper: 1, sepalTipTaper: 1.8 }, { tag: `ALLMAX-ish 40x40 L${Lmm} W30` }));
 }

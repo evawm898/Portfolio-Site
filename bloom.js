@@ -2076,7 +2076,12 @@ function sepalLine(ui, built, mode) {
     : `buried in the rim on the same footing as the petal foot · the underside FALLS ${B.undersideChordDeg.toFixed(2)}° over the first ${B.undersideChordMm.toFixed(2)} mm in from the rim (the chord a print meets; tangent at the rim ${B.footTangentDeg.toFixed(2)}°)`;
   return `     SEPALS ${B.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
     + ` · offset ${S.phaseFrac.toFixed(2)} of ${S.phaseAgainst} = ${S.phaseDeg.toFixed(2)}° of ${S.pitchDeg.toFixed(2)}°` + (S.mirrorSymmetric === false ? ' — NOT mirror-symmetric on this fan (told)' : '')
-    + ` · size ${S.scale.toFixed(2)}x` + (first ? ` (${first.length.toFixed(1)} mm)` : '')
+    + (S.own && S.own.scaleInert ? ` · size: the sepal's OWN ${S.own.lengthMm} x ${S.own.widthMm} mm (the multiplier is inert and hidden)`
+      : S.own && S.own.lengthMm !== null ? ` · size: own length ${S.own.lengthMm} mm, width ${S.scale.toFixed(2)}x the petal's`
+      : S.own && S.own.widthMm !== null ? ` · size: own width ${S.own.widthMm} mm, length ${S.scale.toFixed(2)}x the petal's`
+      : ` · size ${S.scale.toFixed(2)}x`)
+    + (S.own && (S.own.lengthFloored || S.own.widthFloored) ? ' — FLOORED at the ruled minimum (told)' : '')
+    + (first ? (Math.abs(first.length - first.askedLength) > 0.05 ? ` (${first.askedLength.toFixed(1)} mm asked, DRAWN ${first.length.toFixed(1)} mm — ${first.length < first.askedLength ? 'the tip floor shortens a narrow blade' : 'the apex nib runs past the asked length'})` : ` (${first.length.toFixed(1)} mm)`) : '')
     + `\n     SEPAL FOOT ${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
     + ` · ${footSurface}`
     + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
@@ -2443,7 +2448,7 @@ function regenerate() {
                      see where the petal's fmt reads `shown.buckle`. Under SPHERE
                      with sepals asked the record says UNAVAILABLE rather than
                      going silent. */
-                  sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
+                  sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, drawnLengthMm: built.sepals.built[0] ? built.sepals.built[0].length : null, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
                     : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null) };
   /* A LIGHT BUILD CARRIES NO INFILL PLAN, so the infill controls keep the
      last FULL build's numbers through a drag rather than flickering to none. */
@@ -3292,6 +3297,7 @@ window.__bloomMetrics = () => ({
     scale: lastSepals.scale, breadth: lastSepals.breadth, phaseFrac: lastSepals.phaseFrac, pitchRad: lastSepals.pitchRad, phaseRad: lastSepals.phaseRad, phaseDeg: lastSepals.phaseDeg, pitchDeg: lastSepals.pitchDeg,
     startAzimuth: lastSepals.startAzimuth, azimuths: lastSepals.azimuths.slice(), placement: lastSepals.placement, mirrorSymmetric: lastSepals.mirrorSymmetric,
     footAskedMm: lastSepals.footAskedMm, footMm: lastSepals.footMm, footClamped: lastSepals.footClamped, footFloorMm: lastSepals.footFloorMm, footCeilingMm: lastSepals.footCeilingMm,
+    footScale: lastSepals.footScale, own: lastSepals.own ? { ...lastSepals.own } : null,   // the own-size session: the width's owner at the foot, and the sepal's own mm (SP0b, SP3, SP5)
     ring: { radius: lastSepals.ring.radius, width: lastSepals.ring.width, thickness: lastSepals.ring.thickness, overhang: lastSepals.ring.overhang, z: lastSepals.ring.z, slope: lastSepals.ring.slope, domeLean: lastSepals.ring.domeLean, onDome: lastSepals.ring.dome !== null },
     /* THE ATTACHMENT (SP3): the whorl's height and the descriptor's own solve —
        mode, the extent's two ends, the point the foot landed on, the arc

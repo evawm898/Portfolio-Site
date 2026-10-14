@@ -1,6 +1,6 @@
-import * as A from './tree/bloom-geometry.js';
-import * as B from './tree2/bloom-geometry.js';
-import { DEFAULTS } from './tree/bloom-registry.js';
+import * as A from '/home/user/Portfolio-Site/bloom-geometry.js';
+import * as B from './tree2/bloom-geometry.js'; // the PROBE copy (root rows kept); see the proposal doc
+import { DEFAULTS } from '/home/user/Portfolio-Site/bloom-registry.js';
 const WING = { sepalCount: 5, sepalScale: 1, sepalAngle: -10, sepalSpineCurl: 120, sepalCurlBias: 0.9, sepalCurlStart: 0.6, sepalBaseTaper: 3, sepalTipTaper: 4, sepalTipShape: 0.6 };
 console.log('L x 5 mm: limit with the shipped exclusion (u >= 0.30 of the SEPAL) | with only the foot rows dropped');
 for (const L of [21, 35, 60, 90, 120, 150]) {
