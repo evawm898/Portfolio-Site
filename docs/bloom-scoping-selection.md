@@ -369,7 +369,11 @@ possible. There were 25 findings, three rated major.
 - the design-file gate (14) and the drag-preview gate (10);
 - the panel identity tool against `037a4a8`, with its `--control` failing as it should;
 - two byte subsets against `037a4a8` (92 sepal rows and 287 role and variance rows, 0 floats on
-  each, §5).
+  each, §5);
+- the smoke subset through the real export gate: **224 of 225 rows PASS, every one watertight,
+  no validity block** (4,000 s). The 225th is `ALL MAX`, which overruns the harness's 30 s settle
+  on this box. It does so on a worktree of `037a4a8` too (36 s against this tree's 38 s, the same
+  `settleBuild` timeout), so it is the box and not the change, and CI is its gate.
 
 The whole-matrix byte partition is the pre-review run against `3e46d0b`. §5 says why the review's
 geometry changes cannot reach it and which rows measure that.
