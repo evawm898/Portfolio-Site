@@ -140,7 +140,18 @@ Live equals export on every row. The worst corner exports a 27 MB STL.
   export, the one declared row (the STYLE's own 272-pair overlap) at its recorded magnitude.
 - Connectedness, the 15 coil rows: **PASS, 15 of 15** one connected piece (`components=1 stray=0`), the
   552,688-triangle cost corner included.
-- PENDING-BYTES
+- **The byte partition** — predicate `stamen-coil` in `tools/verify-bloom-surface-bytes.mjs`: a row moves iff
+  the BASE tree's own `footRing()` builds an androecium AND the row asks for an INDEPENDENT coil at a radius
+  above 0 (the base has no coil control, so the second half is the controls' and the first the base's).
+  Predeclared: the 15 new block-23 rows less radius 0 and the three GATED rows — **11 movers**; `ALL MAX` a
+  holder (the coil is a choice, out of the blanket sweep). **MEASURED, PASS: 11 of 11 predeclared movers
+  MOVED and 0 floats moved on the 1,320 holders, positionally under `Object.is`, over the whole 1,331-row
+  matrix in both modes — 1,602,518,688 export floats over 178,057,632 triangles and 84,420,144
+  captured-grid values** (five `--range` chunks against a worktree of `037a4a8`, closed by `--merge`).
+  `--control` fires both clauses on a 1e-9 perturbation. The first chunk ran on the branch before `main`'s
+  Scoping-b (#407) was merged in and the other four after; Scoping-b records 0 floats moved on every row,
+  and the merged tree against the pre-merge commit reads **0 floats moved over block 23's 44 rows** (55.9 M
+  export floats, both modes, the coil rows included).
 - **The mutant table** (`node tools/verify-bloom-apex-mutants.mjs --only=<the four> --rows='stamen|shipping
   default'`): **4 of 4 fire JS9 and the clean tree is silent on every row; 168 anchors, 168 matching their
   find-string exactly once** (no existing mutant disarmed). Each is witnessed on the MUTATED module's own
