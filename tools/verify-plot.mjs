@@ -106,6 +106,7 @@ const MUTANTS = [
              'knockout/the-two-tones-come-from-the-active-polarity',
              'knockout/both-line-families-reverse',
              'knockout/the-stem-reverses-too',
+             'knockout/the-highlighted-petal-reverses-in-its-own-hue',
              'shapes/overlapping-shapes-stack-in-list-order',
              'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
   },
@@ -6886,6 +6887,12 @@ async function run({ mutant = null } = {}) {
   // --- frame space: the shapes hold still when the camera turns -----------------
   await clearShapes();
   await reset();
+  // the drawing with NO shape at both cameras: a column is only read where it
+  // has no ink near the edge, so the reader can never take a stroke for it
+  const bare1 = await readBuf();
+  await view(LOW_VIEW);
+  const bare2 = await readBuf();
+  await view(VIEW);
   await addShape({ y: panelSh.y, h: panelSh.h, x: 50, w: 102 });
   const geo1 = await q(() => window.__plot.shapeGeometry());
   const cam1 = await q(() => window.__plot.cameraInfo());
@@ -6896,17 +6903,31 @@ async function run({ mutant = null } = {}) {
   const fb2 = await readBuf();
   /* THE EDGE, READ OFF THE PIXELS AT BOTH CAMERAS: in columns where neither
      picture has ink near the edge, the row where the tone crosses half way. A
-     column with no ink is MONOTONE from the ground to the panel across the
-     window (the edge row itself is antialiased, so it is not asked to be 0 or
-     255); ink above or below breaks that, so such a column is skipped. */
+     QUIET column is exactly the ground above the edge and exactly the panel
+     below it, outside the two antialiased rows either side. (A first version
+     asked only for a monotone column, and a stroke ENDING just above the edge
+     — bright ink, then the panel — is monotone too; the edge reader then read
+     the ink. It never showed on a correct tree, where that stroke continues
+     dark into the panel, and the shape-over-the-drawing mutant found it.)
+     And exactness outside the two rows was still not enough: a stroke ENDING
+     AT the edge reads as the edge one row early, so under the same mutant the
+     check went red on a shape that had not moved — the reader, not the shape.
+     A quiet column is now also one where the drawing WITHOUT the shape has no
+     ink in the window, at both cameras: an owner the shapes do not write. */
   const y0w = Math.max(0, Math.floor(PR.top - 15)), y1w = Math.min(fb1.h, Math.ceil(PR.top + 15));
   const edgeRowAt = (fb, x) => {
     for (let y = y0w; y < y1w; y++) if (fb.px[y * fb.w + x] >= 128) return y;
     return -1;
   };
-  const quietCol = x => [fb1, fb2].every(fb => {
-    if (fb.px[y0w * fb.w + x] !== 0 || fb.px[(y1w - 1) * fb.w + x] !== 255) return false;
-    for (let y = y0w + 1; y < y1w; y++) if (fb.px[y * fb.w + x] < fb.px[(y - 1) * fb.w + x]) return false;
+  const quietCol = x => [bare1, bare2].every(fb => {
+    for (let y = Math.max(0, y0w - 3); y < Math.min(fb.h, y1w + 3); y++) if (fb.px[y * fb.w + x] !== 0) return false;
+    return true;
+  }) && [fb1, fb2].every(fb => {
+    for (let y = y0w; y < y1w; y++) {
+      const v = fb.px[y * fb.w + x];
+      if (y < PR.top - 2 && v !== 0) return false;
+      if (y > PR.top + 2 && v !== 255) return false;
+    }
     return true;
   });
   const edgeRows = [];
