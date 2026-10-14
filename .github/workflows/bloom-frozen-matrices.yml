@@ -20,6 +20,7 @@ on:
   pull_request:
     paths:
       - bloom-registry.js
+      - bloom-curve.js
       - bloom-geometry.js
       - tools/bloom-harness.mjs
       - tools/diff-bloom-bytes.mjs
@@ -29,6 +30,7 @@ on:
     branches: [main]
     paths:
       - bloom-registry.js
+      - bloom-curve.js
       - bloom-geometry.js
       - tools/bloom-harness.mjs
       - tools/diff-bloom-bytes.mjs

@@ -13,6 +13,7 @@ on:
       - bloom.js
       - bloom-geometry.js
       - bloom-registry.js
+      - bloom-curve.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-export-shards.mjs
       - tools/bloom-wall-thickness.mjs
@@ -75,6 +76,7 @@ on:
       - bloom.js
       - bloom-geometry.js
       - bloom-registry.js
+      - bloom-curve.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-export-shards.mjs
       - tools/bloom-wall-thickness.mjs

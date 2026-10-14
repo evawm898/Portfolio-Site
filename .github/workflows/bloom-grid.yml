@@ -26,6 +26,7 @@ on:
     paths:
       - bloom-geometry.js
       - bloom-registry.js
+      - bloom-curve.js
       - bloom-grid-gltf.js
       - tools/verify-bloom-grid.mjs
       - .github/workflows/bloom-grid.yml
@@ -34,6 +35,7 @@ on:
     paths:
       - bloom-geometry.js
       - bloom-registry.js
+      - bloom-curve.js
       - bloom-grid-gltf.js
       - tools/verify-bloom-grid.mjs
   workflow_dispatch: {}

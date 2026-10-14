@@ -24,6 +24,7 @@ on:
       - bloom.css
       - bloom.js
       - bloom-registry.js
+      - bloom-curve.js
       - bloom-geometry.js
       - bloom-file.js
       - tools/verify-bloom-panel.mjs
@@ -39,6 +40,7 @@ on:
       - bloom.css
       - bloom.js
       - bloom-registry.js
+      - bloom-curve.js
       - bloom-geometry.js
       - bloom-file.js
       - tools/verify-bloom-panel.mjs
