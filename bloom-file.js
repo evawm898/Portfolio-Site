@@ -310,11 +310,6 @@ function readScopeEntry(k, e, i, notes) {
     out.offsets[id] = v;
   }
   for (const f of Object.keys(e)) if (!need.includes(f) && f !== 'offsets') notes.push(note('unknown', `${where}.${f} is not a field this page knows`));
-  /* AN ENTRY WITH NO OFFSET LEFT DRAWS NOTHING, so it is dropped and told rather
-     than kept: kept, it was counted on the load status, gave every petal of its
-     scope an empty term and was written into every later save (the review's
-     finding — a Scoping-a entry whose one offset was `footDelicacy`). */
-  if (!Object.keys(out.offsets).length) { notes.push(note('invalid', `${where} has no offset this page can apply — the entry is dropped`)); return null; }
   return out;
 }
 

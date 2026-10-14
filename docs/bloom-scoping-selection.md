@@ -249,8 +249,17 @@ because `undefined !== 'ON'`. Measured: §5.
 Before the merge, six reviewers read the diff, one dimension each: the scope view, the
 geometry and registry, the gate clauses, the file format, panel visibility, and the docs' claims.
 Three independent verifiers then tried to refute each finding, with a reproduction wherever one was
-possible. There were 25 findings, three rated major. Every one is fixed or corrected here, and each
-behaviour fix has a check that fails without it.
+possible. There were 25 findings, three rated major.
+- **The verification was stopped part-way, and that is said rather than rounded up.** This box ran
+  two verifiers at a time and they were competing with the gates. 14 findings were verified: 11
+  CONFIRMED (2 or 3 of 3 votes) and 3 REFUTED (0 of 3).
+- The other 11 (the docs, panel-visibility and remaining gate-clause dimensions) were checked by
+  reading the code and fixed or corrected on that reading. The ones that are behaviour carry a check
+  of their own.
+- Of the 3 refuted: the empty-entry finding is NOT changed (below). The load/Reset finding was right
+  that no gate checked the guards, which is coverage rather than a defect, and the checks are added.
+  The pre-toggle-file finding describes rule 3 working as ruled; an additive note telling its
+  consequence is added and is a decision made without a ruling.
 
 - **MAJOR — a stored pair folded onto another pair when the fan's count changed.** A petal entry was
   re-keyed through the pairing law at the CURRENT count. So "the pair four out" (slot 4 at nine
@@ -296,8 +305,10 @@ behaviour fix has a check that fails without it.
   with what to do (and not told when the toggle is off). The file is not defaulted: rule 3 stands.
 - **A file with no `overrides` erased the page's offsets.** It now keeps them (rule 3), through the
   reader's `missing` list.
-- **An entry left with no offset** (a Scoping-a `footDelicacy`-only entry) was kept, counted and
-  re-saved forever. It is now dropped and told.
+- **An entry left with no offset** (a Scoping-a `footDelicacy`-only entry) is kept, counted and
+  re-saved. That is NOT changed. All three verifiers refuted it as pre-existing and deliberate: the
+  reader keeps an all-refused entry as written, as it already does for a thickness-only one, and
+  it draws nothing.
 - **"The reader's own words" was false.** The page and the reader had two tables that disagreed on
   four reasons. They now share one function (`scopeOffsetRefusal`).
 - **SO12's no-leak clause only looked at petals with no term,** so an offset leaking to every layer
