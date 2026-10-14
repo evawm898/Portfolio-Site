@@ -1163,7 +1163,10 @@ const MUTANTS = [
 ];
 
 async function negativeControl() {
-  const SRC = ['bloom-geometry.js', 'bloom-grid-gltf.js', 'bloom-registry.js'];
+  /* bloom-curve.js because the registry imports it (the curve-editor session):
+     every module the copied registry reaches must be copied beside it, or each
+     mutant throws at import and the control reports nothing about its clause */
+  const SRC = ['bloom-geometry.js', 'bloom-grid-gltf.js', 'bloom-registry.js', 'bloom-curve.js'];
   const problems = [];
 
   /* THE ANCHOR PRE-CHECK, OVER EVERY MUTANT, BEFORE ANY OF THEM RUNS.

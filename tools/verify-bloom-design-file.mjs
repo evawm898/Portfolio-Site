@@ -5,7 +5,7 @@
    restore something is invisible — a field dropped by the writer, skipped by
    the reader, or defaulted instead of reported leaves a page that looks
    restored. Every clause below names the failure it exists for, and
-   `--negative-control` serves six broken copies of bloom-file.js and requires
+   `--negative-control` serves seven broken copies of bloom-file.js and requires
    each to redden exactly the clauses it names.
 
    THE CLAUSES
@@ -42,6 +42,11 @@
          a curves container is told as not applied, a well-formed overrides
          entry is read (Scoping-a), a tier entry kept and told, a malformed one
          dropped and told; a missing container is told.
+     F7  THE CURVE KIND (the curve-editor session): the shipped walkers
+         (`composeControls` / `readControls`) over a fixture curve descriptor
+         write a curve verbatim and read it back identical with no note, and
+         refuse a curve the spec cannot hold WHOLE, told. F0 also holds the
+         field kinds to the registry's CONTROL_KINDS, both directions.
      F6  THE SCOPE MODEL'S OWN GATE, tools/verify-bloom-scopes.mjs, is SPAWNED
          here (and its --negative-control under ours) so it rides in CI through
          this workflow step — the file's overrides containers are that model's
@@ -135,6 +140,12 @@ async function nodeClauses(F, rec) {
     if (!eq(F.SCOPE_CONTAINERS, CENSUS.scopes)) p.push(`overrides scopes ${JSON.stringify([...F.SCOPE_CONTAINERS])} differ from the census ${JSON.stringify(CENSUS.scopes)}`);
     if (!eq(F.CURVE_CONTAINERS, CENSUS.curves)) p.push(`curve containers ${JSON.stringify([...F.CURVE_CONTAINERS])} differ from the census ${JSON.stringify(CENSUS.curves)}`);
     if (F.FORMAT !== CENSUS.format || F.VERSION !== CENSUS.version) p.push(`format/version ${F.FORMAT}/${F.VERSION} differ from the census ${CENSUS.format}/${CENSUS.version}`);
+    /* EVERY KIND THE REGISTRY KNOWS HAS A FIELD-KIND ROW, both directions —
+       the registry's CONTROL_KINDS is the census (the curve-editor session) */
+    const fk = Object.keys(F.FIELD_KINDS || {}), rk = [...REG.CONTROL_KINDS];
+    for (const k of rk) if (!fk.includes(k)) p.push(`registry kind ${k} has no field-kind row — a control of that kind could not be saved`);
+    for (const k of fk) if (!rk.includes(k)) p.push(`field-kind row ${k} names no registry kind`);
+    for (const c of REG.CONTROLS) if (!rk.includes(c.kind)) p.push(`control ${c.id} has kind ${c.kind}, not one of the registry's kinds`);
     rec('F0', p, `${F.CONTROL_FIELDS.length} table rows over ${ids.size} registry controls, ${F.CONTROL_EXCEPTIONS.length} exceptions; top ${CENSUS.top.length} keys, scopes ${CENSUS.scopes.join('/')}, curves ${CENSUS.curves.join('/')}`);
   }
   /* F1 */
@@ -269,6 +280,43 @@ async function nodeClauses(F, rec) {
     { const o = base(); delete o.controls; const r = F.readDoc(o);
       if (!r.ok || Object.keys(r.doc.controls).length || !r.notes.some((n) => n.kind === 'missing' && /^controls is missing/.test(n.text))) p.push(`no controls group: ${r.ok ? `${Object.keys(r.doc.controls).length} applied; ${texts(r)}` : r.error}`); }
     rec('F4', p, 'fourteen written-down reader fixtures behave');
+  }
+  /* F7 — THE CURVE KIND (the curve-editor session). No registry control is a
+     curve yet, so F1/F2 cannot see the curve row; this walks the SHIPPED
+     writer and reader (`composeControls` / `readControls`) over a one-row
+     table for a FIXTURE curve descriptor (`fieldFor`), with values written
+     down here. A value is written VERBATIM (an off-grid coordinate survives to
+     the bit) and read back identical with no note; a value the spec cannot
+     hold is refused WHOLE, absent from the result, and told — never clamped
+     point by point. The spec is the test outline's: x 0..1 with both ends
+     x-locked, y 0..0.4, a function curve, 2..12 points. */
+  {
+    const p = [];
+    const SPEC = { modes: ['symmetric', 'two-sided'], x: [0, 1], y: [0, 0.4], lock: { first: 'x', last: 'x' }, monotoneX: true, points: [2, 12], owner: 'petalLength' };
+    const fx = { id: 'fxCurve', kind: 'curve', curve: SPEC, default: { mode: 'symmetric', points: [[0, 0.1], [1, 0.05]] } };
+    const table = [F.fieldFor(fx)];
+    const sameCurve = (a, b) => !!a && !!b && a.mode === b.mode && ['points', 'right'].every((k) => (a[k] === undefined && b[k] === undefined) || (Array.isArray(a[k]) && Array.isArray(b[k]) && a[k].length === b[k].length && a[k].every((q, i) => Object.is(q[0], b[k][i][0]) && Object.is(q[1], b[k][i][1]))));
+    const trip = (value) => { const txt = JSON.stringify({ controls: F.composeControls({ fxCurve: value }, table) }); const notes = []; const out = F.readControls(JSON.parse(txt).controls, notes, table); return { txt, notes, out }; };
+    for (const [what, v] of [
+      ['symmetric, an off-grid coordinate', { mode: 'symmetric', points: [[0, 0.08], [0.4512345678901, 0.2234567891], [1, 0.03]] }],
+      ['two-sided, its own right side', { mode: 'two-sided', points: [[0, 0.08], [0.5, 0.26], [1, 0.03]], right: [[0, 0.08], [0.62, 0.12], [0.8, 0.1], [1, 0.03]] }],
+    ]) {
+      const r = trip(v);
+      if (r.notes.length) p.push(`${what}: a clean round trip reported ${r.notes.map((n) => n.text).join(' | ')}`);
+      if (!sameCurve(r.out.fxCurve, v)) p.push(`${what}: wrote ${r.txt.slice(0, 120)} and read back ${JSON.stringify(r.out.fxCurve)} — not the value, verbatim`);
+    }
+    const refuse = (what, raw, re) => {
+      const notes = []; const out = F.readControls({ fxCurve: raw }, notes, table);
+      if ('fxCurve' in out || !notes.some((n) => n.kind === 'invalid' && /not a curve this control can hold/.test(n.text) && re.test(n.text))) p.push(`${what}: not refused whole and told (result ${'fxCurve' in out ? JSON.stringify(out.fxCurve) : 'absent'}; notes ${notes.map((n) => n.text).join(' | ')})`);
+    };
+    refuse('a point outside the box', { mode: 'symmetric', points: [[0, 0.1], [0.5, 0.9], [1, 0.1]] }, /outside the box/);
+    refuse('a mode the spec does not offer', { mode: 'single', points: [[0, 0.1], [1, 0.1]] }, /not offered here/);
+    refuse('two-sided with no right side', { mode: 'two-sided', points: [[0, 0.1], [1, 0.1]] }, /no right side/);
+    refuse('an unlocked end', { mode: 'symmetric', points: [[0.1, 0.1], [1, 0.1]] }, /must sit at x 0/);
+    refuse('points out of order along the length', { mode: 'symmetric', points: [[0, 0.1], [0.6, 0.2], [0.4, 0.2], [1, 0.1]] }, /not past point/);
+    refuse('a field that is not a curve\'s', { mode: 'symmetric', points: [[0, 0.1], [1, 0.1]], tension: 0.5 }, /"tension" is not a field/);
+    refuse('a string', 'M0 0 L1 1', /not a curve value/);
+    rec('F7', p, 'the curve kind: two values round-trip verbatim (an off-grid coordinate to the bit, a two-sided right side whole) with no note, and seven a spec cannot hold are refused whole and told');
   }
 }
 
@@ -438,8 +486,11 @@ const MUTANTS = [
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
   { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes'],
-    from: 'for (const f of CONTROL_FIELDS) controls[f.key] = state ? state[f.control] : undefined;',
-    to: "for (const f of CONTROL_FIELDS) if (f.key !== 'petalCount') controls[f.key] = state ? state[f.control] : undefined;" },
+    /* re-anchored by the curve-editor session: the writer's loop moved into
+       `composeControls` (one walker for the registry's table and a test
+       table) — the same mutation, on the line that now does the writing */
+    from: '    controls[f.key] = state && k ? k.write(state[f.control]) : undefined;',
+    to: "    if (f.key !== 'petalCount') controls[f.key] = state && k ? k.write(state[f.control]) : undefined;" },
   { id: 'a-skipped-field-on-read', breaks: ['F1', 'F2', 'F3', 'F4', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 input+drop', 'F5 bytes'],
     from: "    if (!has(f.key)) { notes.push(note('missing', `controls.${f.key} is missing — the page keeps the value it has`)); continue; }",
     to: "    if (f.key === 'petalCount') continue;\n    if (!has(f.key)) { notes.push(note('missing', `controls.${f.key} is missing — the page keeps the value it has`)); continue; }" },
@@ -455,6 +506,12 @@ const MUTANTS = [
   { id: 'a-table-row-is-removed', breaks: ['F0', 'F1', 'F2', 'F3', 'F4', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 input+drop', 'F5 bytes'],
     from: 'export const CONTROL_FIELDS = Object.freeze(CONTROLS.map(',
     to: "export const CONTROL_FIELDS = Object.freeze(CONTROLS.filter((c) => c.id !== 'petalCount').map(" },
+  /* THE CURVE KIND'S ROW (the curve-editor session): a writer that drops a
+     curve value. No registry control is a curve yet, so only F7's fixture
+     can see it — which is why F7 exists. */
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7'],
+    from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
+    to: '    write: () => undefined,' },
 ];
 function mutate(src, m) {
   const n = src.split(m.from).length - 1;

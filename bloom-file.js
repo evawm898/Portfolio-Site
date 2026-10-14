@@ -70,8 +70,18 @@
 // dropping the offsets — which is a correct refusal, since the globals alone draw
 // a different bloom from the one the file describes.
 
+// A CURVE IS A CONTROL VALUE, NOT A CONTAINER ENTRY (the curve-editor session,
+// Oct 14). The forward statement above put "the spine and outline curves" in
+// a `curves` container as lists of points; the ruling that a curve is a VALUE
+// the scoping model and the design file can each hold (one curve per layer /
+// petal / tier under scoping) makes a curve control's value live under
+// `controls` like every other control's, through FIELD_KINDS' curve row. The
+// `curves` container is still WRITTEN EMPTY and its entries still told "not
+// applied" — nothing reads it, and whether it is retired or given a meaning is
+// F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS } from './bloom-registry.js';
 import { SCOPE_UNSCOPED, ROLE_OVERRIDES } from './bloom-geometry.js';
+import { readCurveValue, cloneCurve } from './bloom-curve.js';
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
 // model; bloom-geometry.js's PARAMETER SCOPING block is the law, this is the
@@ -136,9 +146,49 @@ const retiredOf = new Map(RETIRED_IDS.map((r) => [r.id, r]));
    control the snapshot lacks is written as `undefined` and so OMITTED by
    JSON, which the reader then reports as missing; nothing is defaulted on the
    way out either. */
-export function composeDoc(state, { savedAt, scopes = null } = {}) {
+/* THE FIELD KINDS — one row per registry control kind (CONTROL_KINDS), and the
+   only place a kind's value crosses the file boundary in either direction:
+   `write` is what the file holds for the control's value, `read` turns a file's
+   raw value back into one (`{ ok, value, kind, note }`). The curve-editor
+   session added the third row: a CURVE is written as the editor's value object
+   verbatim (`{ mode, points[, right] }`, every coordinate a fraction of the
+   owning length) and read through bloom-curve.js's own shape rule — a value the
+   control cannot hold is REFUSED WHOLE and told, never clamped point by point
+   (clamping one point of a shape can make it a shape the rule refuses, and a
+   curve is one value). The design-file gate holds these rows to the registry's
+   CONTROL_KINDS (F0), so a kind the registry learns is a kind the file must. */
+export const FIELD_KINDS = Object.freeze({
+  slider: Object.freeze({ write: (v) => v, read: (c, raw) => readSlider(c, raw) }),
+  choice: Object.freeze({ write: (v) => v, read: (c, raw) => readChoice(c, raw) }),
+  curve: Object.freeze({
+    write: (v) => (v === undefined ? undefined : cloneCurve(v)),
+    read: (c, raw) => {
+      const r = readCurveValue(raw, c.curve);
+      return r.ok ? { ok: true, value: r.value } : { ok: false, kind: 'invalid', note: `not a curve this control can hold — ${r.note}; the page keeps its curve` };
+    },
+  }),
+});
+
+/* A field-table row for a descriptor that is NOT a registry control — the
+   capability hook's test curve (bloom.js `__bloomCurveTest`) and the gates'
+   fixtures. The row carries its descriptor (`def`), so the SAME walkers below
+   read and write it; CONTROL_FIELDS' rows carry none and resolve through the
+   registry. */
+export const fieldFor = (d) => Object.freeze({ key: d.id, control: d.id, kind: d.kind, def: d });
+const descriptorOf = (f) => f.def || controlOf.get(f.control);
+
+/* THE WRITER over a field table — `composeDoc` walks CONTROL_FIELDS with it. */
+export function composeControls(state, fields = CONTROL_FIELDS) {
   const controls = {};
-  for (const f of CONTROL_FIELDS) controls[f.key] = state ? state[f.control] : undefined;
+  for (const f of fields) {
+    const k = FIELD_KINDS[f.kind];
+    controls[f.key] = state && k ? k.write(state[f.control]) : undefined;
+  }
+  return controls;
+}
+
+export function composeDoc(state, { savedAt, scopes = null } = {}) {
+  const controls = composeControls(state);
   /* THE SCOPES THE PAGE HOLDS, verbatim and in order — an entry is written as
      the page holds it (its index, its slot, its offsets with every key the
      page kept, a 0 included), so a save after a load is the loaded file's own
@@ -170,38 +220,43 @@ function snap(v, c) {
    `{ ok, value, kind, note }` — `kind`/`note` set when the value was changed on
    the way in (clamped, snapped) or refused (invalid). */
 export function coerceField(c, raw) {
-  if (c.kind === 'slider') {
-    if (typeof raw !== 'number' || !Number.isFinite(raw)) return { ok: false, kind: 'invalid', note: `${JSON.stringify(raw)} is not a number` };
-    let v = raw, msg = '';
-    const lo = Number.isFinite(c.min) ? c.min : -Infinity, hi = Number.isFinite(c.max) ? c.max : Infinity;
-    const cl = Math.min(hi, Math.max(lo, v));
-    if (cl !== v) { msg = `clamped ${raw} to ${cl} (the control runs ${lo}..${hi})`; v = cl; }
-    const s = snap(v, c);
-    if (s !== v) { msg = `${raw} is off the control's ${c.step} step — snapped to ${s}`; v = s; }
-    return { ok: true, value: v, kind: msg ? 'clamped' : '', note: msg };
-  }
-  if (c.kind === 'choice') {
-    const values = c.options.map((o) => o.value);
-    if (typeof raw !== 'string' || !values.includes(raw)) return { ok: false, kind: 'invalid', note: `${JSON.stringify(raw)} is not one of ${values.join(' / ')}` };
-    return { ok: true, value: raw };
-  }
-  return { ok: false, kind: 'invalid', note: `no rule for control kind ${c.kind}` };
+  const k = FIELD_KINDS[c.kind];
+  if (!k) return { ok: false, kind: 'invalid', note: `no rule for control kind ${c.kind}` };
+  return k.read(c, raw);
+}
+function readSlider(c, raw) {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return { ok: false, kind: 'invalid', note: `${JSON.stringify(raw)} is not a number` };
+  let v = raw, msg = '';
+  const lo = Number.isFinite(c.min) ? c.min : -Infinity, hi = Number.isFinite(c.max) ? c.max : Infinity;
+  const cl = Math.min(hi, Math.max(lo, v));
+  if (cl !== v) { msg = `clamped ${raw} to ${cl} (the control runs ${lo}..${hi})`; v = cl; }
+  const s = snap(v, c);
+  if (s !== v) { msg = `${raw} is off the control's ${c.step} step — snapped to ${s}`; v = s; }
+  return { ok: true, value: v, kind: msg ? 'clamped' : '', note: msg };
+}
+function readChoice(c, raw) {
+  const values = c.options.map((o) => o.value);
+  if (typeof raw !== 'string' || !values.includes(raw)) return { ok: false, kind: 'invalid', note: `${JSON.stringify(raw)} is not one of ${values.join(' / ')}` };
+  return { ok: true, value: raw };
 }
 
-function readControls(src, notes) {
+/* THE READER over a field table — `readDoc` walks CONTROL_FIELDS with it (and
+   then the retired-id migrations below, which belong to the registry's table
+   and to no other). A test table (`fieldFor` rows) is walked by the SAME loop. */
+export function readControls(src, notes, fields = CONTROL_FIELDS) {
   const out = {};
   if (!src || typeof src !== 'object' || Array.isArray(src)) { notes.push(note('missing', 'controls is missing — no control is changed')); return out; }
   const has = (k) => Object.prototype.hasOwnProperty.call(src, k);
-  for (const f of CONTROL_FIELDS) {
+  for (const f of fields) {
     if (!has(f.key)) { notes.push(note('missing', `controls.${f.key} is missing — the page keeps the value it has`)); continue; }
-    const r = coerceField(controlOf.get(f.control), src[f.key]);
+    const r = coerceField(descriptorOf(f), src[f.key]);
     if (r.note) notes.push(note(r.kind || 'invalid', `controls.${f.key}: ${r.note}`));
     if (r.ok) out[f.key] = r.value;
   }
   /* Keys the table does not name: a RETIRED id migrates or is refused by name;
      anything else is unknown. */
   for (const k of Object.keys(src)) {
-    if (CONTROL_FIELDS.some((f) => f.key === k)) continue;
+    if (fields.some((f) => f.key === k)) continue;
     const r = retiredOf.get(k);
     if (!r) { notes.push(note('unknown', `controls.${k} is not a control this page knows — not applied`)); continue; }
     if (!Array.isArray(r.migrateTo)) { notes.push(note('retired', `controls.${k} is a retired control with no exact migration — its value ${JSON.stringify(src[k])} is not applied`)); continue; }
