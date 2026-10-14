@@ -161,7 +161,13 @@ because `undefined !== 'ON'`. Measured: §5.
 
 - **The matrix is unchanged.** `buildMatrix()` is 1,307 rows on both trees with the same sha256, so
   NO frozen phase is owed. The toggles are choices, so the blanket sweep does not add rows.
-- **Byte identity with the toggles OFF** — ⟨BYTES⟩
+- **Byte identity with the toggles OFF.** `node tools/verify-bloom-surface-bytes.mjs --base
+  <worktree of 3e46d0b>` was run in 36 `--range` chunks and closed with `--merge`. It reads **PASS:
+  0 floats moved on all 1,307 rows in both modes**, positionally under `Object.is`.
+  - That covers **1,594,298,592 export floats over 177,144,288 triangles**, and **84,145,484
+    captured-grid values over 9,690 panels**.
+  - No partition is declared: every row holds. The tool's `--merge` now closes an all-hold run
+    (before this, its VACUOUS guard refused a merge with no predicate).
 - **The panel with the toggles OFF.** `node tools/verify-bloom-scope-panel-identity.mjs --base
   <worktree of 3e46d0b>` passes on 13 states (the role-shape states and the common families).
   - What is compared: the whole `.bl-panel` serialised, every attribute, label and read-out span,
@@ -170,8 +176,23 @@ because `undefined !== 'ON'`. Measured: §5.
   - It is identical but for the two toggle rows, the hidden scope bar and the hidden roles caption.
     That caption is excluded ONLY while it is hidden.
   - `--control` removes one ordinary control and the run fails on it.
-- **The scopes gate** (`node tools/verify-bloom-scopes.mjs`): ⟨SO⟩
-- **The panel gate:** ⟨PANEL⟩
+- **The scopes gate** (`node tools/verify-bloom-scopes.mjs`): **PASS, 12 clauses in Node**, and
+  13 with `--browser` (SO9, run by the design-file gate's F6).
+  - `--negative-control`: **11 of 11 mutants** each moved their witness on the mutated module and
+    reddened exactly the clauses they name. They ran as two subsets against the final gate (3 and
+    8), with all 11 anchors matching exactly once.
+  - The new mutants: `the-toggle-gate-is-removed` (SO7, SO10),
+    `the-role-table-stays-live-under-a-toggle`, `all-petals-forget-the-toggles`,
+    `the-groups-forget-per-petal`, `the-slot-roles-forget-per-layer` and
+    `the-tube-ignores-per-layer` (SO11 each).
+- **The panel gate** (`node tools/verify-bloom-panel.mjs`): **PASS**, with route (ae)'s per-layer
+  and per-petal walks and route (f)'s seven new toggle rows all agreeing.
+  - `--negative-control`: **ALL TWENTY-FIVE ROUTES … OBSERVED THE FAILURE**, exit 0. Route (ae)'s
+    four mutants are a pick that stamps, an edit that lands on every scope, a deselect that drops
+    the offsets and a split mirror pair.
+- **Also green:** the design-file gate (14 clauses), the drag-preview gate (10 clauses), the export
+  gate `--only` on 9 role rows (9 of 9), `bloom-smoke --check` (220 rows over 56 blocks, 178
+  families) and the apex table's anchor pre-check (162 of 162).
 
 ## 6. Findings, for Eva
 
