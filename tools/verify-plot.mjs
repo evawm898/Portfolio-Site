@@ -169,6 +169,9 @@ const MUTANTS = [
              'knockout/the-two-tones-come-from-the-active-polarity',
              'knockout/both-line-families-reverse',
              'knockout/the-stem-reverses-too',
+             // the highlighted petal is drawn in the same pass, so it does
+             // not reverse either — true of the mutation, not collateral
+             'knockout/the-highlighted-petal-reverses-in-its-own-hue',
              'shapes/overlapping-shapes-stack-in-list-order',
              'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
   },
