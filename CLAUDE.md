@@ -675,6 +675,33 @@ FOR SCOPING** (the design-file session, Oct 13; feature map §11 Q3.9 — read
 - Measured: 1,302 of 1,302 live matrix rows round-trip clean and identical; 0 matrix rows added;
   `bloom-geometry.js` untouched (sha-identical to `main`).
 
+**PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
+(Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read
+`docs/bloom-scoping-model.md` and the PARAMETER SCOPING block in `bloom-geometry.js` before touching
+`scopeOffsetsFor`, `scopeSlotKey`, `resolveRoleOverrides`' scope stage, `slot.scopeTerm`,
+`bloom-file.js`'s `readScopeEntry` / `scopesForBuild`, the page's `__bloomScopes` hook or SO0–SO9).
+- The shape is the design file's own containers: `overrides.layers [{layer, offsets}]`,
+  `petals [{layer, slot, offsets}]`, `tiers [{tier, offsets}]` (tiers stored and told, not applied);
+  an offset is a DELTA on the global (Q3.2, a default). `scopesForBuild` adds the registry's bounds.
+- A petal's effective state is global → role table → + layer offsets → + petal offsets → + the
+  variance slot term → the ONE clamp, resolved in `resolveRoleOverrides` as a fourth stage. A mirror
+  pair is ONE scope under RADIAL and FAN (Q3.7); under CONTINUOUS a "layer" is a turn.
+- Empty scopes are the identity by branch (`scopeTerm: null` takes the old call): **0 of
+  1,590,625,152 export floats and 0 of 84,101,184 grid values moved** over the whole 1,302-row live
+  matrix in both modes against `57f64f7`; no row added, no phase owed.
+- `sheetThickness` is never scoped (Q3.6): the reader refuses it by name, the geometry throws.
+  Scopeable = petal-role sliders less sheet thickness, the ROLE_OVERRIDES deltas and the whorl-level
+  rows (34); tiers take the sepal-role sliders less the count (20).
+- Today's ALL / INNER / labellum / hood / petalN rows are REPRESENTABLE as scopes, measured
+  bit-identical on every petal for every delta row (SO7); a `mul` size row becomes
+  `global × (mul − 1)`, the offsets default's one semantic loss. The migration table is §4 of the doc.
+- Q3.5 (per-layer size/tilt WIN) is EXPRESSED, not wired: today the offset is added on top of the
+  `layerTilt` ramp (SO6 measures that; the wiring session moves it).
+- Gate: `node tools/verify-bloom-scopes.mjs` (`--browser` adds SO9, `--negative-control` five
+  geometry mutants each with a witness), SPAWNED by `verify-bloom-design-file.mjs` (F6) so it rides in
+  `bloom-panel.yml` with no workflow edit — a workflow edit costs the frozen tag of the session in
+  flight beside this one.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
