@@ -197,7 +197,12 @@ const MUTANTS = [
     id: 'the-shapes-follow-the-camera', file: 'plot.js',
     from: '  renderer.render(shapeScene, overlayCamera);',
     to: '  shapeScene.position.y = (camera.position.y - controls.target.y) * 0.5;\n  renderer.render(shapeScene, overlayCamera);',
-    breaks: ['shapes/they-hold-still-in-frame-space-when-the-camera-orbits'],
+    breaks: ['shapes/they-hold-still-in-frame-space-when-the-camera-orbits',
+             'knockout/both-ink-passes-are-clipped-to-their-own-tone',
+             'knockout/the-two-tones-come-from-the-active-polarity',
+             'knockout/the-stem-reverses-too',
+             'shapes/overlapping-shapes-stack-in-list-order',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
   },
   {
     // FINDING 3's shape on the page: z-order taken from anything but the list.
@@ -244,7 +249,8 @@ const MUTANTS = [
     from: '    shapes: (state.shapes || []).map(sh => pick(SHAPE_FIELDS, sh)),',
     to: '    shapes: (state.shapes || []).slice(0, 1).map(sh => pick(SHAPE_FIELDS, sh)),',
     breaks: ['file/every-field-round-trips-through-the-writer-and-the-reader',
-             'save/shapes-are-saved-and-restored-with-their-order-and-the-pick'],
+             'save/shapes-are-saved-and-restored-with-their-order-and-the-pick',
+             'restore/a-file-without-shapes-leaves-the-shapes-alone-and-says-so'],
   },
   {
     /* THE ROW THAT VANISHES — the writer and the reader agree perfectly about a
@@ -270,7 +276,8 @@ const MUTANTS = [
     id: 'stripes-are-phased-on-the-page', file: 'plot-shapes.js',
     from: '  const c0 = P.cx * nx + P.cy * ny;',
     to: '  const c0 = 0;',
-    breaks: ['shapes/stripes-cover-their-weight-and-are-phased-on-the-centre'],
+    breaks: ['shapes/stripes-cover-their-weight-and-are-phased-on-the-centre',
+             'shapes/z-order-is-list-order-and-a-gap-shows-what-is-beneath'],
   },
   {
     id: 'the-halftone-has-no-ramp', file: 'plot-shapes.js',
@@ -282,7 +289,8 @@ const MUTANTS = [
     id: 'the-outline-is-drawn-outside-the-boundary', file: 'plot-shapes.js',
     from: '    const hw = P.hw - w, hh = P.hh - w;',
     to: '    const hw = P.hw + w, hh = P.hh + w;',
-    breaks: ['shapes/an-outline-is-a-ring-inside-the-boundary'],
+    breaks: ['shapes/an-outline-is-a-ring-inside-the-boundary',
+             'shapes/each-fill-paints-its-marks-and-the-knockout-follows-them'],
   },
   /* ---- rebuilding only the bloom that changed ----------------------------
      Three, and what they are between them is the two directions plus the thing
@@ -6641,7 +6649,13 @@ async function run({ mutant = null } = {}) {
      alone over its own ground; it is the only instrument that can see whether
      BOTH passes are clipped. */
   log('\n--- shapes and knockout ---');
-  const SHC = Object.fromEntries(FL.SHAPE_FIELDS.map(f => [f.key, f.control]));
+  /* THE CONTROL MAP IS WRITTEN DOWN HERE, NOT READ OFF `SHAPE_FIELDS` — a check
+     that drives the page through the very table a mutant damages cannot answer;
+     it throws. (Measured: a first version did exactly that, and the table-row
+     mutant took the whole run down instead of going red.) */
+  const SHC = { kind: 'shapeKind', tone: 'shapeTone', fill: 'shapeFill', x: 'shapeX', y: 'shapeY',
+                w: 'shapeW', h: 'shapeH', rotationDeg: 'shapeRot', angleDeg: 'shapeAngle',
+                spacing: 'shapeSpacing', weight: 'shapeWeight' };
   const b64 = str => new Uint8Array(Buffer.from(str, 'base64'));
   const readBuf = async (isolate = null) => {
     const r = await page.evaluate(o => { window.__plot.settle(); return window.__plot.readBuffer(o); },
