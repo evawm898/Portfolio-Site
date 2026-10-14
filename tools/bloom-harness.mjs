@@ -66,6 +66,11 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, PREDICATES, valuesEqua
 const GEOMETRY = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 /* THE SEPALS' OWN CONSTANTS, imported and never restated (SP3, SP6, SP8). */
 const { SEPAL_TWINS, SEPAL_ANGLE_RANGE } = GEOMETRY;
+/* THE SEPAL'S ROOT EXCLUSION IS A LENGTH (the third durable rule, the own-size
+   session): the petals' root blend in millimetres from the sepal's ring point,
+   restated here for SP8's own contact test — never the geometry's
+   `sepalRootExclusionMm`, which is what the test is for. */
+const restatedSepalExclusionMm = (ui) => GEOMETRY.ROOT_BLEND_END * Number(ui.petalLength);
 /* A STORED SEPAL VALUE PAST ITS BOUND LOADS AS THE NEAREST BOUND, SILENTLY
    (Eva's ruling on Q-S6, Oct 9 — docs/bloom-sepal-discovery.md §10.5). Every
    frozen phase from phase35 to phase61 stores `sepalRoll` at -330 and 330;
@@ -10258,6 +10263,10 @@ export async function sepalAssertions(page, row) {
   if (L.clamped !== (wantBuilt < askedDeg)) bad.push(`SP8: clamped reads ${L.clamped} where the arithmetic says ${wantBuilt < askedDeg}`);
   if (L.everywhere !== (L.limitDeg === null)) bad.push('SP8: `everywhere` and a null limit disagree');
   if (L.limitDeg !== null && (L.limitDeg < SEPAL_ANGLE_RANGE[0] || L.limitDeg > SEPAL_ANGLE_RANGE[1])) bad.push(`SP8: limit ${L.limitDeg}° is outside the control's range`);
+  /* THE EXCLUSION IS A LENGTH, restated (the own-size session): the record
+     declares it and it must be the petals' root blend in mm, never a
+     fraction of the sepal's own length. */
+  if (Math.abs((L.exclusionMm ?? NaN) - restatedSepalExclusionMm(ui)) > 1e-9) bad.push(`SP8: the limit record's root exclusion ${L.exclusionMm} mm is not ROOT_BLEND_END x petal length = ${restatedSepalExclusionMm(ui)} mm`);
   if (L.contactDeg !== null && L.limitDeg !== null && L.contactDeg !== L.limitDeg + L.stepDeg) bad.push(`SP8: contact at ${L.contactDeg}° with a limit of ${L.limitDeg}° — the limit is not one step under the first contact`);
   const lim = (x) => (x.limitDeg === null ? -Infinity : x.limitDeg);
   if (L.limitDeg !== null && L.limitDeg !== Math.min(lim(L.perMode.live), lim(L.perMode.export))) bad.push(`SP8: the limit ${L.limitDeg}° is not the smaller of live ${L.perMode.live.limitDeg} and export ${L.perMode.export.limitDeg} — the clamp is not the union of the modes`);
@@ -11327,7 +11336,7 @@ export function sepalContactCheck(ui, row, L) {
       const lam = [];
       GEOMETRY.buildWhorlInto({ count: fr.sepals.count, radius: fr.sepals.ring.radius, height: fr.sepals.height, sizeRamp: () => fr.sepals.scale, angleRamp: () => 0, phase: fr.sepals.startAzimuth,
         placement: fr.sepals.placement, fan: null, azimuths: fr.sepals.placement === 'LIST' ? fr.sepals.azimuths : null,
-        blade: (slot) => { lam.push(harnessLamina(GEOMETRY.buildPetalInto(a2, GEOMETRY.sepalBladeState(st, deg), fr.sepals.ring, slot, null, false).lamina)); } });
+        blade: (slot) => { const p = GEOMETRY.buildPetalInto(a2, GEOMETRY.sepalBladeState(st, deg), fr.sepals.ring, slot, null, false); lam.push(harnessLamina(p.lamina, { origin: p.base, mm: restatedSepalExclusionMm(st) })); } });
       return lam;
     };
     const test = (deg) => { for (const S of trial(deg)) { const h = harnessContact(S, petals, t); if (h) return h; } return null; };
@@ -11336,9 +11345,14 @@ export function sepalContactCheck(ui, row, L) {
   }
   return out;
 }
-function harnessLamina(panels) {
+/* THE SEPAL'S ROWS ARE KEPT FROM A LENGTH, THE PETALS' FROM THEIR OWN BLEND:
+   with `rootExclusion` (the sepal) every blade row whose centre is at least
+   that many mm from the ring point is kept; without it (a petal) the rows at
+   u >= ROOT_BLEND_END of its own outline, as before. */
+function harnessLamina(panels, rootExclusion = null) {
   const rows = [];
-  for (const panel of panels) for (const r of panel.rows) if (r.u >= GEOMETRY.ROOT_BLEND_END) rows.push({ mid: r.mid, n: r.normal, panel });
+  const centreDist = (r) => { const n = r.mid.length; let c = [0, 0, 0]; for (const P of r.mid) { c[0] += P[0]; c[1] += P[1]; c[2] += P[2]; } return Math.hypot(c[0] / n - rootExclusion.origin[0], c[1] / n - rootExclusion.origin[1], c[2] / n - rootExclusion.origin[2]); };
+  for (const panel of panels) for (const r of panel.rows) if (rootExclusion ? (r.u > 0 && centreDist(r) >= rootExclusion.mm) : r.u >= GEOMETRY.ROOT_BLEND_END) rows.push({ mid: r.mid, n: r.normal, panel });
   const pts = [], nrm = [], tris = [], segs = [], edge = [];
   const byPanel = new Map();
   for (const r of rows) { if (!byPanel.has(r.panel)) byPanel.set(r.panel, []); byPanel.get(r.panel).push(r); }

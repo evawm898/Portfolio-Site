@@ -18446,11 +18446,29 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
    its edges lie on the lamina's boundary (the first blade row, the tip row and
    the two margins of every panel) so a nearest-point query can say whether a
    point projects INTO the lamina or onto its edge. */
-export function laminaFromPanels(panels) {
+/* THE SEPAL'S ROOT EXCLUSION IS A LENGTH, NOT A ROW FRACTION (Eva's ruling,
+   the own-size session — the third durable rule: a constant standing for a
+   PHYSICAL region is derived from a length, never from a row count or a
+   station fraction). The sepal lamina used to drop its rows at
+   u < ROOT_BLEND_END OF THE SEPAL'S OWN LENGTH: 6.3 mm of a 21 mm sepal and
+   45 mm of a 150 mm one — so the longer the sepal, the more of the stretch
+   where it actually meets the petals was thrown away, and the drawn limit
+   READ HIGHER WITH LENGTH (+17 at 21 mm, +24 at 120, "no contact" at 150 x 5
+   while the sepals stood through the petals). The region the exclusion is
+   FOR is the petals' own root-exit stacking at the ring, whose extent is the
+   PETALS' root blend: ROOT_BLEND_END of the outer whorl's asked blade length,
+   in millimetres, measured from the sepal's own ring point. That is the same
+   10.5 mm on the shipping petals whatever the sepal's size. The petals'
+   laminae keep the u rule: their blend IS that region, on their own outline. */
+export function sepalRootExclusionMm(state) { return ROOT_BLEND_END * Number(state.petalLength); }
+export function laminaFromPanels(panels, { rootExclusion = null } = {}) {
   const pts = [], nrm = [], bnd = [], tris = [], segs = [];
   let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  const centreDist = (r, o) => { const n = r.mid.length; let c = [0, 0, 0]; for (const P of r.mid) { c[0] += P[0]; c[1] += P[1]; c[2] += P[2]; } return Math.hypot(c[0] / n - o[0], c[1] / n - o[1], c[2] / n - o[2]); };
   for (const panel of panels) {
-    const rows = panel.rows.filter((r) => r.u >= ROOT_BLEND_END);
+    const rows = rootExclusion
+      ? panel.rows.filter((r) => r.u > 0 && centreDist(r, rootExclusion.origin) >= rootExclusion.mm)
+      : panel.rows.filter((r) => r.u >= ROOT_BLEND_END);
     if (rows.length < 2) continue;
     const base = pts.length, C = rows[0].mid.length, R = rows.length;
     for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) {
@@ -18685,7 +18703,7 @@ export function sepalTrialLamina(state, sepals, angleDeg, exportMode, unclamped 
   const acc = new MeshBuilder({ exportMode, captureLamina: true });
   const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };
   const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, null, false);
-  return { lamina: laminaFromPanels(p.lamina), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
+  return { lamina: laminaFromPanels(p.lamina, { rootExclusion: { origin: p.base, mm: sepalRootExclusionMm(state) } }), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
 }
 /* THE PETALS' LAMINAE IN THE OTHER MODE, on the same (u, v) lattice the built
    mode emitted, through the surface's own front door. The ladder is mode-free
@@ -20262,7 +20280,8 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
     const sepalRows = bladeRowsFor(sepalBladeState(state, lo, unclamped).petalTipShape);   // the sepal ring's own, never the head's NU
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
-      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), state.petalLength * sepals.scale, sepalRows);
+      /* the SUBSTATE's length (one owner — `state.petalLength * sepals.scale` here was a second producer of the sepal's length, found by the own-size session) */
+      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), sepalBladeState(state, deg, unclamped).petalLength * sepals.scale, sepalRows);
       let trial = trials.get(seamStep);
       if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode, unclamped); trials.set(seamStep, trial); }
       scanned++;
@@ -20284,7 +20303,7 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
   const angleBuiltDeg = limitDeg === null ? lo : Math.min(askedDeg, limitDeg);
   const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return {
-    askedDeg, limitDeg, angleBuiltDeg, clamped: angleBuiltDeg < askedDeg, everywhere: limitDeg === null,
+    askedDeg, limitDeg, angleBuiltDeg, clamped: angleBuiltDeg < askedDeg, everywhere: limitDeg === null, exclusionMm: sepalRootExclusionMm(state),
     contactDeg: perMode[bound].contactDeg, kind: perMode[bound].kind, petal: perMode[bound].petal, sepal: perMode[bound].sepal, at: perMode[bound].at,
     boundBy: bound, perMode, scanned, configs, costMs: t1 - t0, stepDeg: step, rangeDeg: [lo, hi], modeBuilt: acc.exportMode ? 'export' : 'live',
   };
