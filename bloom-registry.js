@@ -44,7 +44,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE } from './bloom-geometry.js';
-import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS } from './bloom-geometry.js';
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
@@ -456,6 +456,11 @@ export const PREDICATES = {
      GUARD — every other sepal control follows it, hidden and inert. */
   sepalsEligible: { not: { ref: 'sphereMode' } },
   sepalsPresent: { all: [{ ref: 'sepalsEligible' }, { id: 'sepalCount', min: 1 }] },
+  /* THE SIZE MULTIPLIER IS LIVE UNTIL BOTH OWN-SIZE ROWS ARE SET (Eva's own-size
+     ruling, Oct 13): a set row wins for its axis, and once both axes are the
+     sepal's own the multiplier moves nothing and hides. The geometry's
+     statement is `sepalScaleInert`; SP0b checks the two agree. */
+  sepalScaleLive: { all: [{ ref: 'sepalsPresent' }, { not: { all: [{ id: 'sepalLength', min: 0.5 }, { id: 'sepalWidth', min: 0.5 }] } }] },
   stemPresent: { id: 'stemLength', min: 1 },
   /* THE FLORIST'S CUT (Eva's ruling 7, stem session 3). The registry's
      statement of the geometry's `stemCutAbsent`: the control is live wherever
@@ -3700,7 +3705,43 @@ export const CONTROLS = [
   { id: 'sepalScale', section: 'sepals', kind: 'slider',
     min: SEPAL_SCALE_RANGE[0], max: SEPAL_SCALE_RANGE[1], step: 0.05, default: SEPAL_SCALE_DEFAULT,
     label: 'Sepal size',
-    fmt: (v, ui) => { const k = Number(v); return `${k.toFixed(2)}x the petal — ${(k * Number(ui.petalLength)).toFixed(1)} mm long, ${(k * Number(ui.petalWidth)).toFixed(1)} mm wide (the width follows the length)`; },
+    fmt: (v, ui) => {
+      const k = Number(v), L = Number(ui.sepalLength) > 0, W = Number(ui.sepalWidth) > 0;
+      if (L && W) return `${k.toFixed(2)}x — INERT: the sepal has its own length and width`;
+      if (L) return `${k.toFixed(2)}x the petal's WIDTH — ${(k * Number(ui.petalWidth)).toFixed(1)} mm wide (the length is the sepal's own)`;
+      if (W) return `${k.toFixed(2)}x the petal's LENGTH — ${(k * Number(ui.petalLength)).toFixed(1)} mm long (the width is the sepal's own)`;
+      return `${k.toFixed(2)}x the petal — ${(k * Number(ui.petalLength)).toFixed(1)} mm long, ${(k * Number(ui.petalWidth)).toFixed(1)} mm wide (the width follows the length; set a length or width below to give the sepal its own)`;
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalScaleLive' } },
+  /* THE SEPAL'S OWN LENGTH AND WIDTH (Eva's rulings, Oct 13 — the geometry's
+     SEPAL_LENGTH_RANGE / SEPAL_WIDTH_RANGE block has the derivation). 0 is the
+     sentinel: the petal's x size. A set value WINS for its axis. The ruled
+     floor (5 mm / 3 mm) is applied by the geometry below the sentinel and
+     told here; the DRAWN length is printed beside the asked one when the tip
+     floor shortens a narrow blade (ruling 4). Own rows, NOT twins: a twin may
+     only narrow the petal's range, and a sepal may be longer than the petal. */
+  { id: 'sepalLength', section: 'sepals', kind: 'slider',
+    min: 0, max: SEPAL_LENGTH_RANGE[1], step: 1, default: 0,
+    label: 'Sepal length',
+    fmt: (v, ui, shown) => {
+      const x = Number(v);
+      if (!(x > 0)) return `the petal's x size — ${(Number(ui.sepalScale) * Number(ui.petalLength)).toFixed(1)} mm (0 = follow the petal; ${SEPAL_LENGTH_RANGE[0]}..${SEPAL_LENGTH_RANGE[1]} mm is the sepal's own)`;
+      const asked = Math.max(x, SEPAL_LENGTH_RANGE[0]);
+      let s = `${asked.toFixed(0)} mm` + (x < SEPAL_LENGTH_RANGE[0] ? ` — ${x} asked, FLOORED at ${SEPAL_LENGTH_RANGE[0]} mm (told)` : '');
+      const S = shown && shown.sepals && !shown.sepals.unavailable ? shown.sepals : null;
+      if (S && typeof S.drawnLengthMm === 'number' && Math.abs(S.drawnLengthMm - asked) > 0.05) s += ` asked · DRAWN ${S.drawnLengthMm.toFixed(1)} mm (${S.drawnLengthMm < asked ? 'the tip floor shortens a narrow blade' : 'the apex nib carries the blade past the asked length'})`;
+      return s;
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalWidth', section: 'sepals', kind: 'slider',
+    min: 0, max: SEPAL_WIDTH_RANGE[1], step: 0.5, default: 0,
+    label: 'Sepal width',
+    fmt: (v, ui) => {
+      const x = Number(v);
+      if (!(x > 0)) return `the petal's x size — ${(Number(ui.sepalScale) * Number(ui.petalWidth)).toFixed(1)} mm (0 = follow the petal; ${SEPAL_WIDTH_RANGE[0]}..${SEPAL_WIDTH_RANGE[1]} mm is the sepal's own)`;
+      const asked = Math.max(x, SEPAL_WIDTH_RANGE[0]);
+      return `${asked.toFixed(1)} mm` + (x < SEPAL_WIDTH_RANGE[0] ? ` — ${x} asked, FLOORED at ${SEPAL_WIDTH_RANGE[0]} mm (told)` : '') + ' (the foot follows: petal foot x own width / petal width x breadth)';
+    },
     tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
   { id: 'sepalHeight', section: 'sepals', kind: 'slider',
     min: SEPAL_HEIGHT_RANGE[0], max: SEPAL_HEIGHT_RANGE[1], step: 0.05, default: SEPAL_HEIGHT_DEFAULT,

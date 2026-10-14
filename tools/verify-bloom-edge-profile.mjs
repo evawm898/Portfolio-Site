@@ -169,6 +169,14 @@ const E2_TURN_BAND_DEG = 5e-5;
    nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
    state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
+  /* SEPAL OWN SIZE (docs/bloom-sepal-own-size-outcome.md): the two WING rows — a
+     120 x 5 mm sepal blade, so every rim bead sits under #278's narrow-span clamp
+     at the 1.00 mm wall (the class already declared for narrow leaves above);
+     0.000151 deg over the allowance on both, at the blade's margin, never widened. */
+  'SEPAL SIZE: the WING — 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60 (the sepals three times the 35 mm petals\' length)':
+    { excessDeg: 0.000151, note: 'adds 45.000151 deg at [16.423, 5.990, -1.520] — the narrow-span bead clamp on a 5 mm blade, found by CI on 8255893' },
+  'SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal\'s length read +24 here)':
+    { excessDeg: 0.000151, note: 'adds 45.000151 deg at [-2.550, 22.830, 5.418] — the same 5 mm blade at the other angle, the same clamp' },
   /* LEAF/STEM BUILD S5 (the leaf nib, the tip yield, the broad-sinus fillet —
      docs/bloom-leaf-tip-broad-sinus-outcome.md): nine smoke rows newly over
      the allowance, each declared at its measured magnitude with its reason;
