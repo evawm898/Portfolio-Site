@@ -171,6 +171,11 @@ footRing()'s record, JS8 the witness. "What is missing" below is left as written
 
 ## 3. F2 / F4 — Parameter scoping (global → layer → petal)
 
+> **Scoping-a SHIPPED the state model (Oct 13)** — `docs/bloom-scoping-model.md`. Session 1 of the
+> size list below is done: `scopes` (the file's `overrides` containers, offsets on the global, one
+> scope per mirror pair) resolved in `resolveRoleOverrides`, zero controls, zero rows, zero bytes;
+> §4 of that doc is the migration table for Q3.4. The panel chrome (session 2) is next.
+
 ### 3.1 What per-petal editing exists today
 
 `ROLE_OVERRIDES` (G:1311–1400), composed by `resolveRoleOverrides` (G:1791) and clamped once into

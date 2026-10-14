@@ -16,7 +16,7 @@ import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
-import { composeDoc, readDoc, toText, isDesignFile } from './bloom-file.js';
+import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty } from './bloom-file.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -576,6 +576,7 @@ function dragLight() { return dragActive && !infillIsAbsent(readUI()); }
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
+let lastScopes = null;                            // the scopes the build on screen was handed (Scoping-a), the builder's own summary
 let lastHub = { radius: 0, thickness: 0 };
 let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false, sphereMode: false };
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
@@ -691,6 +692,11 @@ let lastInfill = null, lastInfillAbsent = true;
    against DEFAULTS + set, and this is invisible to it — which is why the
    capability rows carry their OWN read-back assertion. */
 let capability = null;
+/* THE SCOPES (Scoping-a) — the design file's `overrides` record as loaded, or
+   as the `__bloomScopes` hook set it; null on every shipped state. NO CONTROL
+   WRITES IT. It reaches the builder as `scopes` (bloom-file.js's scopesForBuild
+   adds the registry's bounds) and the next save writes it back verbatim. */
+let scopes = null;
 
 /* `record` — whether this build is THE ONE ON SCREEN, and therefore the one
    the telemetry cache, the read-out and __bloomMetrics() describe. Until the
@@ -751,11 +757,12 @@ const SMOOTH_SHADING_CREASE_DEG = 60;
 function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null }) {
   const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
   const uiForBuild = override ? { ...readUI(), ...override } : readUI();
-  const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
+  const built = buildBloomInto(acc, uiForBuild, { below: null, capability, scopes: scopesForBuild(scopes) });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
     lastShownMode = exportMode ? 'export' : 'live';
     lastPlacement = uiForBuild.placement;
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
+    lastScopes = built.scopes ?? null;
     lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
     lastTube = built.tube || null;
@@ -2767,6 +2774,9 @@ window.__bloomMetrics = () => ({
   fitRadius: lastFitRadius,
   fitCenter: [...lastFitCenter],
   capability: capability ? capability.label : null,
+  /* THE SCOPES the build on screen was handed (Scoping-a), the builder's own
+     summary — null on every shipped state. */
+  scopes: lastScopes,
   /* THE PETAL'S OWN MEASUREMENTS, from the builder that made it. The
      capability assertions and the single-petal framing read these rather
      than re-deriving a profile or a projection — a consumer inventing its
@@ -3587,6 +3597,20 @@ window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) =>
    through the rAF coalescer so a caller can read __bloomMetrics back on the
    next line and get the design it just asked for. Pass null to clear. */
 window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); return capability; };
+/* THE ONLY OTHER WRITER of `scopes` besides a loaded design file (Scoping-a).
+   Hands the page an `overrides`-shaped record — the file's own shape, run
+   through the file's own reader so a hand-built record is validated exactly
+   as a loaded one is — and rebuilds. No control reaches this. */
+window.__bloomScopes = (overrides) => {
+  if (!overrides) { scopes = null; regenerate(); return null; }
+  const r = readDoc({ ...composeDoc(readUI()), overrides });
+  if (!r.ok) throw new Error(r.error);
+  scopes = scopesAreEmpty(r.doc.overrides) ? null : r.doc.overrides;
+  lastScopesNotes = r.notes.filter((n) => /^overrides\./.test(n.text));
+  regenerate();
+  return scopes;
+};
+let lastScopesNotes = [];
 /* ST6'S REFERENCE — A STEMLESS BUILD OF THE SAME STATE, made here on the same
    page and thrown away (session 43). It is the only owner in this file that the
    stem code does not write at all, which is exactly what Eva's fourth durable
@@ -3597,7 +3621,7 @@ window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); 
 window.__bloomStemlessHub = () => {
   const ui = { ...readUI(), stemLength: 0 };
   const acc = new MeshBuilder({ exportMode: shownMode() === 'export' });
-  const built = buildBloomInto(acc, ui, { below: null, capability });
+  const built = buildBloomInto(acc, ui, { below: null, capability, scopes: scopesForBuild(scopes) });
   return {
     hubRadius: built.hub.radius,
     hubThickness: built.hub.thickness,
@@ -3635,13 +3659,14 @@ function writeDesignStatus() {
   designStatus.hidden = false;
   if (d.action === 'saved') { designStatus.textContent = `saved ${d.name} — ${d.count} controls, version ${d.version}`; return; }
   if (d.action === 'refused') { designStatus.innerHTML = `<span class="bl-err">could not load ${esc(d.name)}: ${esc(d.error)}</span>`; return; }
-  const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set`;
+  const sc = d.scopes ? ` and ${d.scopes.layers} layer / ${d.scopes.petals} petal offset entr${d.scopes.layers + d.scopes.petals === 1 ? 'y' : 'ies'}${d.scopes.tiers ? ` (${d.scopes.tiers} tier entr${d.scopes.tiers === 1 ? 'y' : 'ies'} kept, not applied)` : ''}` : '';
+  const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set${sc}`;
   if (!d.notes.length) { designStatus.textContent = `${head}; every field read clean, nothing to report`; return; }
   designStatus.innerHTML = `${esc(head)}; ${d.notes.length} note${d.notes.length === 1 ? '' : 's'}:\n`
     + d.notes.map((n) => `<span class="${n.kind === 'invalid' || n.kind === 'retired' ? 'bl-err' : ''}">[${esc(n.kind)}] ${esc(n.text)}</span>`).join('\n');
 }
 function esc(s) { return String(s).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch])); }
-function saveDesignText() { return toText(composeDoc(readUI())); }
+function saveDesignText() { return toText(composeDoc(readUI(), { scopes })); }
 function saveDesign() {
   const text = saveDesignText();
   const name = 'bloom-design.json';
@@ -3672,7 +3697,13 @@ function applyDesign(text, name = '(inline)') {
     inputs[c.id].dispatchEvent(new Event('change', { bubbles: true }));
     applied++;
   }
-  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes: r.notes.slice() };
+  /* THE SCOPES THE FILE CARRIES replace the page's (an empty set of containers
+     is "no scopes", so a plain file clears a hook-set record), then ONE
+     rebuild carries both the controls and the offsets. */
+  const had = scopes;
+  scopes = scopesAreEmpty(r.doc.overrides) ? null : r.doc.overrides;
+  if (had !== null || scopes !== null) regenerate();   // a plain file onto a plain page rebuilt through the input events already
+  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes: r.notes.slice(), scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length } : null };
   writeDesignStatus();
   return lastDesign;
 }
@@ -3701,6 +3732,10 @@ window.__bloomDesign = {
   save: () => saveDesignText(),
   load: (text, name = '(inline)') => applyDesign(text, name),
   last: () => lastDesign,
+  /* THE SCOPES RECORD the page holds (Scoping-a) and the notes its last
+     hook-set record produced — read by the scopes gate. */
+  scopes: () => scopes,
+  scopesNotes: () => lastScopesNotes,
 };
 
 /* ---------------- go ---------------- */
