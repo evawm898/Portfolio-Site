@@ -356,6 +356,29 @@
          and a mirror pair is split, a member index is re-keyed
          (bloom-geometry.js). Three edits: this entry, the block, the negative
          control's flags and banner.
+     (af) THE CURVE EDITOR (the curve-editor session, Oct 14 — read
+         docs/bloom-curve-editor.md). No live registry control is a curve yet,
+         so the editor is mounted through the page's capability hook
+         (`__bloomCurveTest`) on a test outline with a TEST VALIDATOR the route
+         writes (refuse a drawn half-width past 0.30 of the length — a stand-in
+         for F3's printable curvature). Real pointer and keyboard events at the
+         points the editor itself projects; every claim read off the VALUE.
+         The editor renders once, outside #panelControls; a drag stores the
+         FRACTION under the pointer (the editor's own proposed edit is read, so
+         a value written in millimetres is named as that) and the owning length
+         moves the caption and no stored number; a one-step drag to a refused
+         position leaves the value EXACTLY as it was and tells the validator's
+         reason — at the refused position is "never asked", anywhere else is
+         "clamped"; add on the curve, double-press remove, the keyboard, an end
+         that cannot be removed; two-sided starts as the left's copy and
+         two-sided -> symmetric keeps the LEFT side; the design file's own
+         walkers round-trip the curve clean and refuse one outside the box
+         whole. Five mutants under --negative-control, each by its own
+         sentence: the validator ignored (bloom-curve.js), a refused drag that
+         clamps (bloom.js), the mirror keeping the right side (bloom-curve.js),
+         points stored in absolute units (bloom.js), the design file dropping
+         the curve (bloom-file.js). Three edits: this entry, the block, the
+         negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3945,6 +3968,204 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (af) THE CURVE EDITOR: A DRAG MOVES THE VALUE, A REFUSED DRAG DOES NOT ----------
+   See the header. No live registry control is a curve yet, so the editor is
+   mounted through the page's capability hook (`__bloomCurveTest`) on a test
+   outline — a function curve, symmetric / two-sided, three points — with a
+   TEST VALIDATOR written here and defined in the page: it refuses any curve
+   whose drawn half-width passes 0.30 of the owning length. Every pointer
+   gesture is a REAL mouse event at a point the editor itself projects (its own
+   `fracClient`), and every claim is read off the editor's VALUE — the object
+   the design file and a scope hold — never off the drawing. The expected
+   positions are written down here (fractions of the owning length), never
+   read from the module under test. */
+{
+  const tag = '[curve editor]';
+  const SPEC = { modes: ['symmetric', 'two-sided'], x: [0, 1], y: [0, 0.4], lock: { first: 'x', last: 'x' }, monotoneX: true, points: [2, 12], owner: 'petalLength' };
+  const START = { mode: 'symmetric', points: [[0, 0.08], [0.45, 0.22], [1, 0.03]] };
+  const LIMIT = 0.30;
+  const mount = (pg) => pg.evaluate(([spec, value, limit]) => window.__bloomCurveTest.mount({
+    label: 'Test outline', spec, value,
+    validate: (cand) => {
+      const s = window.__bloomCurveTest.law.curveSamples(cand, spec);
+      const m = Math.max(...s.left.map((q) => q[1]), ...(s.right || []).map((q) => q[1]));
+      return m > limit ? `the drawn half-width ${m.toFixed(3)} passes the test limit ${limit} (a stand-in for the spine's printable curvature)` : null;
+    },
+  }), [SPEC, START, LIMIT]);
+  const T = (pg, fn, ...a) => pg.evaluate(([f, args]) => window.__bloomCurveTest[f](...args), [fn, a]);
+  const J = (v) => JSON.stringify(v);
+  /* a real drag: press on the handle the editor projects, move in `steps`, release */
+  const drag = async (pg, side, i, to, steps = 6, release = true) => {
+    const from = await T(pg, 'pointClient', side, i);
+    const at = await T(pg, 'fracClient', side, to);
+    await pg.mouse.move(from.x, from.y);
+    await pg.mouse.down();
+    await pg.mouse.move(at.x, at.y, { steps });
+    if (release) await pg.mouse.up();
+  };
+  const run = async (pg, label) => {
+    const p = [];
+    await mount(pg);
+    /* 1. RENDERS ONCE: one mount, one editor, one label, one read-out, three
+       handles, none of it inside #panelControls, and no registry control of
+       the kind (the claim this route rests on: the hook is the only reach). */
+    const dom = await pg.evaluate(() => ({
+      mounts: document.querySelectorAll('.bl-curve-test').length, editors: document.querySelectorAll('.bl-curve').length,
+      inControls: document.querySelectorAll('#panelControls .bl-curve').length, labels: document.querySelectorAll('.bl-curve-test label[for="curveTest"]').length,
+      vals: document.querySelectorAll('.bl-curve-test .bl-val').length, svgs: document.querySelectorAll('.bl-curve-test svg').length,
+      handles: document.querySelectorAll('.bl-curve-test .bl-curve-pt').length, modes: [...document.querySelectorAll('.bl-curve-test select option')].map((o) => o.value),
+    }));
+    const curveRows = CONTROLS.filter((c) => c.kind === 'curve').length;
+    if (dom.mounts !== 1 || dom.editors !== 1 || dom.labels !== 1 || dom.vals !== 1 || dom.svgs !== 1) p.push(`the editor does not render exactly once (mounts ${dom.mounts}, editors ${dom.editors}, labels ${dom.labels}, read-outs ${dom.vals}, svgs ${dom.svgs})`);
+    if (dom.inControls !== curveRows) p.push(`#panelControls holds ${dom.inControls} curve editor(s) for ${curveRows} registry curve control(s)`);
+    if (dom.handles !== START.points.length) p.push(`the editor draws ${dom.handles} handles for ${START.points.length} points`);
+    if (J(dom.modes) !== J(SPEC.modes)) p.push(`the mode select offers ${J(dom.modes)}, not the spec's ${J(SPEC.modes)}`);
+    if (J(await T(pg, 'value')) !== J(START)) p.push(`the mounted value is ${J(await T(pg, 'value'))}, not the value handed in`);
+    /* 2. A DRAG MOVES THE VALUE, TO THE FRACTION UNDER THE POINTER. The
+       stored point must be the target fraction to one pixel of the editor
+       (its own units-per-pixel) and to the 1e-4 grid; the ends stay put. */
+    const upp = await T(pg, 'unitsPerPx');
+    const c0 = await T(pg, 'counts');
+    await drag(pg, 'left', 1, [0.5, 0.26]);
+    const v1 = await T(pg, 'value'), c1 = await T(pg, 'counts'), lop = await T(pg, 'lastOp');
+    const q = v1.points[1];
+    /* what the editor PROPOSED for the pointer's last position — its own
+       conversion, read before the outcome, so a value written in the wrong
+       units is named as that rather than as a drag that went nowhere */
+    if (!lop || lop.op !== 'move' || !lop.xy || !(Math.abs(lop.xy[0] - 0.5) <= upp + 1e-4 && Math.abs(lop.xy[1] - 0.26) <= upp + 1e-4)) p.push(`the editor proposed (${lop && lop.xy}) for the pointer at the fraction (0.5, 0.26) of the owning length — the value is not written in fractions of it`);
+    if (J(v1) === J(START)) p.push('a drag on point 2 did not move the value');
+    else if (!(Math.abs(q[0] - 0.5) <= upp + 1e-4 && Math.abs(q[1] - 0.26) <= upp + 1e-4)) p.push(`the stored point is (${q[0]}, ${q[1]}) — not the fraction under the pointer (0.5, 0.26) of the owning length, to one pixel (${upp.toFixed(5)})`);
+    if (q.some((x) => Math.abs(x * 1e4 - Math.round(x * 1e4)) > 1e-6)) p.push(`the stored point (${q[0]}, ${q[1]}) is off the 1e-4 grid a hand's edit is quantised to`);
+    if (J(v1.points[0]) !== J(START.points[0]) || J(v1.points[2]) !== J(START.points[2])) p.push('the drag moved an end point');
+    if (!(c1.input > c0.input) || c1.change !== c0.change + 1) p.push(`a drag fired ${c1.input - c0.input} input and ${c1.change - c0.change} change event(s) — expected inputs during it and exactly one change at its end`);
+    /* the owning length moves the millimetres and NO stored number */
+    const dimsA = await T(pg, 'dims');
+    let bad = await applyConfig(pg, [{ id: 'petalLength', value: '60' }]);
+    if (bad.length) p.push(`the owning length did not take: ${bad.join('; ')}`);
+    const v1b = await T(pg, 'value');
+    const dimsB = await T(pg, 'dims');
+    if (J(v1b) !== J(v1)) p.push(`changing the owning length 35 -> 60 mm changed the stored curve: ${J(v1)} -> ${J(v1b)} — the points are not fractions of it`);
+    if (!/60\.0 mm/.test(dimsB) || dimsB === dimsA) p.push(`the editor's millimetre caption did not follow the owning length: "${dimsA}" -> "${dimsB}"`);
+    bad = await applyConfig(pg, [{ id: 'petalLength', value: String(DEFAULTS.petalLength) }]);
+    /* 3. A REFUSED DRAG DOES NOT MOVE: one step from the accepted position
+       straight to a refused one (0.36 > the 0.30 limit). The value must be the
+       accepted one EXACTLY, the editor must say why, and the reason must be
+       the validator's own sentence. The two wrong answers are told apart by
+       where the point went: AT the refused position is a validator never
+       asked; anywhere else is a point moved toward it — a clamp. */
+    const before = J(v1);
+    await drag(pg, 'left', 1, [0.5, 0.36], 1, false);
+    const mid = { v: await T(pg, 'value'), status: await T(pg, 'status'), refusal: await T(pg, 'refusal') };
+    await pg.mouse.up();
+    const after = await T(pg, 'value');
+    if (J(after) !== before) {
+      const y = after.points[1] && after.points[1][1];
+      if (Math.abs(y - 0.36) <= upp + 1e-4) p.push(`a drag reached (0.5, ${y}) — the position the validator refuses: the validator was never asked`);
+      else p.push(`a refused drag moved the point toward the refused position, to (${after.points[1]}) — the drag was clamped, not refused`);
+    }
+    if (!mid.refusal || !/passes the test limit/.test(mid.refusal.reason) || !/^refused — .*passes the test limit/.test(mid.status)) p.push(`a refused drag is not told with the validator's reason (status "${mid.status}", refusal ${J(mid.refusal)})`);
+    /* 4. ADD ON THE CURVE, REMOVE, AND THE KEYBOARD. A double-click on the
+       drawn curve at x 0.25 adds a point ON it (the shape is unchanged to the
+       grid there); a double press on that point removes it and the value is the
+       one before the add, exactly; ] then ArrowUp nudges the next point by
+       0.005; + adds a point after it, Delete removes the point it focused. */
+    const base = await T(pg, 'value');
+    const yOn = await pg.evaluate(([v, spec]) => { const s = window.__bloomCurveTest.law.sampleCurve(v.points, spec).pts; let b = s[0]; for (const r of s) if (Math.abs(r[0] - 0.25) < Math.abs(b[0] - 0.25)) b = r; return b; }, [base, SPEC]);
+    const on = await T(pg, 'fracClient', 'left', yOn);
+    await pg.mouse.dblclick(on.x, on.y);
+    const added = await T(pg, 'value');
+    const k = added.points.findIndex((r) => Math.abs(r[0] - yOn[0]) <= upp + 1e-4);
+    if (added.points.length !== base.points.length + 1 || k !== 1) p.push(`a double-click on the curve at x ${yOn[0].toFixed(3)} gave ${J(added.points)} — not one point added there`);
+    else if (Math.abs(added.points[k][1] - yOn[1]) > upp + 1e-4) p.push(`the added point (${added.points[k]}) is not on the drawn curve (y ${yOn[1].toFixed(4)})`);
+    if (k === 1) {
+      const h = await T(pg, 'pointClient', 'left', 1);
+      await pg.mouse.dblclick(h.x, h.y);
+      const removed = await T(pg, 'value');
+      if (J(removed) !== J(base)) p.push(`a double press on the added point left ${J(removed.points)}, not the curve before the add ${J(base.points)}`);
+    }
+    await pg.focus('.bl-curve-test svg');
+    await pg.keyboard.press('Home'); await pg.keyboard.press(']'); await pg.keyboard.press('ArrowUp');
+    const nudged = await T(pg, 'value');
+    if (!(Math.abs(nudged.points[1][1] - (base.points[1][1] + 0.005)) < 1e-9) || nudged.points[1][0] !== base.points[1][0]) p.push(`Home, ] and ArrowUp moved point 2 from (${base.points[1]}) to (${nudged.points[1]}) — not up by 0.005`);
+    await pg.keyboard.press('+');
+    const plus = await T(pg, 'value');
+    if (plus.points.length !== nudged.points.length + 1) p.push(`+ did not add a point (${nudged.points.length} -> ${plus.points.length})`);
+    await pg.keyboard.press('Delete');
+    const del = await T(pg, 'value');
+    if (J(del) !== J(nudged)) p.push(`Delete after + did not remove the added point: ${J(del.points)} against ${J(nudged.points)}`);
+    /* removing an END is refused by the shape rule (the curve spans the length) */
+    await pg.keyboard.press('Home'); await pg.keyboard.press('Delete');
+    if (J(await T(pg, 'value')) !== J(del)) p.push('Delete on the first point removed it — the curve no longer spans its length');
+    /* 5. THE MIRROR SWITCH KEEPS THE LEFT SIDE. symmetric -> two-sided starts
+       the right side as the left's copy; the right side is then dragged to its
+       own shape; two-sided -> symmetric must leave EXACTLY the left side. */
+    await pg.selectOption('.bl-curve-test select', 'two-sided');
+    const two = await T(pg, 'value');
+    if (two.mode !== 'two-sided' || J(two.right) !== J(two.points) || J(two.points) !== J(del.points)) p.push(`symmetric -> two-sided gave ${J(two)} — the right side does not start as the left's copy`);
+    await drag(pg, 'right', 1, [0.62, 0.12]);
+    const two2 = await T(pg, 'value');
+    if (J(two2.right) === J(two2.points)) p.push('a drag on the right side did not give it its own shape');
+    if (J(two2.points) !== J(two.points)) p.push('a drag on the right side moved the left side');
+    await pg.selectOption('.bl-curve-test select', 'symmetric');
+    const sym = await T(pg, 'value');
+    if (sym.mode !== 'symmetric' || sym.right !== undefined) p.push(`two-sided -> symmetric gave ${J(sym)}`);
+    else if (J(sym.points) !== J(two2.points)) p.push(J(sym.points) === J(two2.right)
+      ? `switching to symmetric kept the RIGHT side ${J(sym.points)} — the ruling is the LEFT side ${J(two2.points)}`
+      : `switching to symmetric left ${J(sym.points)}, not the left side ${J(two2.points)}`);
+    /* 6. THE DESIGN FILE: the page's own field-table walkers write the value
+       verbatim and read it back clean; a curve the control cannot hold is
+       refused whole and the page keeps its curve. */
+    const want = await T(pg, 'value');
+    const text = await T(pg, 'saveText');
+    let saved = null; try { saved = JSON.parse(text).controls.curveTest; } catch (e) { /* reported below */ }
+    if (!saved) p.push(`the design file did not carry the curve: ${text.slice(0, 160)}`);
+    else if (J(saved) !== J(want)) p.push(`the design file wrote ${J(saved)}, not the value ${J(want)}`);
+    await T(pg, 'set', START);
+    const back = await T(pg, 'loadText', text);
+    const got = await T(pg, 'value');
+    if (!back.applied || back.notes.length || J(got) !== J(want)) p.push(`the design file did not carry the curve back clean: applied ${back.applied}, notes ${J(back.notes.map((n) => n.text))}, value ${J(got)} against ${J(want)}`);
+    const outside = JSON.stringify({ controls: { curveTest: { mode: 'symmetric', points: [[0, 0.1], [0.5, 0.9], [1, 0.1]] } } });
+    const ref = await T(pg, 'loadText', outside);
+    if (ref.applied || !ref.notes.some((n) => n.kind === 'invalid' && /outside the box/.test(n.text)) || J(await T(pg, 'value')) !== J(want)) p.push(`a file curve outside the box was not refused whole and told: ${J(ref)}`);
+    await T(pg, 'unmount');
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: mounted once outside #panelControls (no registry control is a curve: ${curveRows}); a drag stored the fraction under the pointer (${q}) with ${c1.input - c0.input} inputs and one change, and the owning length 35 -> 60 mm moved the caption and no stored number; a one-step drag to y 0.36 was refused with the validator's reason and the value stayed EXACTLY; add on the curve / double-press remove / ] ArrowUp / + / Delete each did what they say, and an end cannot be removed; two-sided starts as the left's copy and back to symmetric keeps the LEFT side; the file round trip is clean and a curve outside the box is refused whole`);
+  };
+  await openBloom(page, port);
+  await run(page, 'the test outline');
+  if (NEGATIVE_CONTROL) {
+    const src = {
+      'bloom.js': fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8'),
+      'bloom-curve.js': fs.readFileSync(new URL('../bloom-curve.js', import.meta.url), 'utf8'),
+      'bloom-file.js': fs.readFileSync(new URL('../bloom-file.js', import.meta.url), 'utf8'),
+    };
+    const MUTANTS = [
+      { name: 'the validator is ignored', file: 'bloom-curve.js',
+        from: "  if (typeof validate === 'function') {\n    let r;", to: "  if (false && typeof validate === 'function') {\n    let r;" },
+      { name: 'a refused drag clamps', file: 'bloom.js',
+        from: '    if (edit({ op: \'move\', side: drag.side, i: drag.i, xy }, { during: true })) drag.moved = true;',
+        to: '    if (edit({ op: \'move\', side: drag.side, i: drag.i, xy }, { during: true })) drag.moved = true;\n    else { const f = pointsOf(cur, drag.side)[drag.i]; let lo = 0, hi = 1; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (proposeEdit(cur, spec, validate, { op: \'move\', side: drag.side, i: drag.i, xy: [f[0] + (xy[0] - f[0]) * m, f[1] + (xy[1] - f[1]) * m] }).accepted) lo = m; else hi = m; } if (lo > 0 && edit({ op: \'move\', side: drag.side, i: drag.i, xy: quantised([f[0] + (xy[0] - f[0]) * lo, f[1] + (xy[1] - f[1]) * lo]) }, { during: true })) drag.moved = true; }' },
+      { name: 'the mirror keeps the right side', file: 'bloom-curve.js',
+        from: '  const out = { mode, points: v.points.map((p) => [p[0], p[1]]) };',
+        to: "  const out = { mode, points: (mode !== 'two-sided' && v.mode === 'two-sided' ? v.right : v.points).map((p) => [p[0], p[1]]) };" },
+      { name: 'points are stored in absolute units', file: 'bloom.js',
+        from: '    const xy = quantised([vb.x, fracY(drag.side, vb.y)]);',
+        to: '    const xy = quantised([vb.x * ownerLength(), fracY(drag.side, vb.y) * ownerLength()]);' },
+      { name: 'the design file drops the curve', file: 'bloom-file.js',
+        from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),', to: '    write: () => undefined,' },
+    ];
+    for (const m of MUTANTS) if (src[m.file].split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in ${m.file} — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (src[m.file].split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route(`**/${m.file}`, (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: src[m.file].replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4041,12 +4262,19 @@ if (NEGATIVE_CONTROL) {
     const sawScopeTold = fail.some((f) => /^\[scope selection\] MUTANT \(a pre-toggle file is not told\).*is not told its roles do not apply/.test(f));
     const sawScopeKeep = fail.some((f) => /^\[scope selection\] MUTANT \(a missing overrides list drops the page offsets\).*replaced the page's offsets/.test(f));
     const sawScopeFold = fail.some((f) => /^\[scope selection\] MUTANT \(a member index is re-keyed\).*folded onto another pair/.test(f));
+    /* ROUTE (af), THE CURVE EDITOR — one flag per mutant, each on the sentence written for it */
+    const sawCurveValidator = fail.some((f) => /^\[curve editor\] MUTANT \(the validator is ignored\).*the validator was never asked/.test(f));
+    const sawCurveClamp = fail.some((f) => /^\[curve editor\] MUTANT \(a refused drag clamps\).*the drag was clamped, not refused/.test(f));
+    const sawCurveMirror = fail.some((f) => /^\[curve editor\] MUTANT \(the mirror keeps the right side\).*kept the RIGHT side/.test(f));
+    const sawCurveUnits = fail.some((f) => /^\[curve editor\] MUTANT \(points are stored in absolute units\).*not written in fractions of it/.test(f));
+    const sawCurveFile = fail.some((f) => /^\[curve editor\] MUTANT \(the design file drops the curve\).*the design file did not carry the curve/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FIVE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-toggle file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveUnits && sawCurveFile
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-toggle file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
