@@ -728,6 +728,61 @@ for (const o of ROLE_OVERRIDES) {
   }
 }
 
+/* THE SCOPE TOGGLES (Scoping-b) — TWO STATEMENTS, CHECKED HERE OVER EVERY STATE
+   THAT DECIDES THEM, because no matrix row sets a toggle (no row can carry the
+   scopes a toggle exists for, and "add no matrix rows" was the brief) and the
+   STL gates' per-row Z5 would therefore never see one ON. Swept over placement
+   x depth x layer offset x both toggles x the fan's centre petal:
+     - the registry's `scopeLayers` / `scopePetals` offer exactly the geometry's
+       SCOPE_TOGGLE_VALUES and default to OFF (OFF is today's panel, and the
+       byte claim rests on it);
+     - `scopeLayersLive`, `scopePetalsLive`, `scopesOwnRoles` agree between the
+       files, and so do the three role eligibilities and the tube that each
+       learned a toggle term (a control the registry HIDES while the geometry
+       still lets it move, or the reverse);
+     - INNER, which has no eligibility function, is checked by what it DOES:
+       `innerCurl` is shown iff the geometry would let a non-zero inner delta
+       reach an INNER ring (resolveRoleOverrides returns a record), on every
+       state where the depth admits one. */
+{
+  const bad = [];
+  for (const id of ['scopeLayers', 'scopePetals']) {
+    const c = CONTROLS.find((x) => x.id === id);
+    if (!c) { bad.push(`the registry declares no \`${id}\` toggle`); continue; }
+    const vals = c.options.map((o) => String(o.value));
+    if (vals.join() !== GEOMETRY.SCOPE_TOGGLE_VALUES.join()) bad.push(`registry ${id} offers [${vals.join(', ')}], the geometry's own is [${GEOMETRY.SCOPE_TOGGLE_VALUES.join(', ')}]`);
+    if (c.default !== 'OFF') bad.push(`registry ${id} defaults to ${c.default}, not OFF — OFF is today's panel exactly and the byte claim rests on it`);
+  }
+  const PRED = ['scopeLayersLive', 'scopePetalsLive', 'scopesOwnRoles', 'slotRolesEligible', 'perPetalEligible', 'allPetalsEligible', 'tubeEligible'];
+  const innerC = CONTROLS.find((x) => x.id === 'innerCurl');
+  for (const placement of ['RADIAL', 'SPIRAL', 'CONTINUOUS', 'FAN']) {
+    for (const layerCount of [1, 2, 3]) {
+      for (const layerPhase of [0, 0.5]) {
+        for (const scopeLayers of GEOMETRY.SCOPE_TOGGLE_VALUES) {
+          for (const scopePetals of GEOMETRY.SCOPE_TOGGLE_VALUES) {
+            for (const fanCenterPetal of ['ON', 'OFF']) {
+              const st = { ...DEFAULTS, placement, layerCount, layerPhase, scopeLayers, scopePetals, fanCenterPetal };
+              const at = `${placement} x ${layerCount} layers x phase ${layerPhase} x scopeLayers ${scopeLayers} x scopePetals ${scopePetals} x centre ${fanCenterPetal}`;
+              for (const name of PRED) {
+                const geo = Boolean(GEOMETRY[name](st));
+                const reg = evalPredicate({ ref: name }, st);
+                if (geo !== reg) bad.push(`${at}: ${name} — geometry says ${geo}, registry says ${reg}`);
+              }
+              const live = GEOMETRY.resolveRoleOverrides({ ...st, innerCurl: 90 }, [ROLE_INNER]) !== null;
+              const shown = evalPredicate(innerC.visibleWhen, st);
+              const depthAdmits = layerCount >= 2 && placement !== 'CONTINUOUS';
+              if (depthAdmits && shown !== live) bad.push(`${at}: innerCurl is ${shown ? 'shown' : 'hidden'} while the geometry ${live ? 'still applies' : 'ignores'} an inner delta`);
+            }
+          }
+        }
+      }
+    }
+  }
+  if (bad.length) {
+    throw new Error(`the two statements of the scope toggles disagree (Scoping-b):\n  ${bad.slice(0, 40).join('\n  ')}${bad.length > 40 ? `\n  ... and ${bad.length - 40} more` : ''}`);
+  }
+}
+
 /* THE SAME TWO-STATEMENT CHECK FOR THE FULL SPHERE (session 18): the
    registry's `sphereMode` predicate HIDES `headRise` (and shows `hubShape`
    only under CONTINUOUS); bloom-geometry.js's `sphereMode()` makes the head a
@@ -4438,8 +4493,17 @@ const positionRoleOf = (r) => (r.slotRole !== null ? r.slotRole : (r.petalRole ?
 /* WHETHER A DESCRIPTOR SHOULD CARRY A RECORD, derived from the registry
    state rather than from footRing()'s answer — which is the whole point:
    comparing footRing() against itself cannot fail. */
+/* THE ROLE TABLE IS INERT WHILE A SCOPE TOGGLE OWNS THE PETALS (Scoping-b) —
+   RESTATED here from the controls, never imported: the geometry's
+   `scopesOwnRoles` and the registry's predicate of that name are the two
+   statements the module-load sweep checks against each other, and this is a
+   third, written down, so a clause below cannot inherit a defect in either.
+   Per-layer is RADIAL's toggle and per-petal FAN's; a stored ON under another
+   placement owns nothing. */
+const scopeTogglesOwnRoles = (ui) => (String(ui.placement) === 'RADIAL' && String(ui.scopeLayers) === 'ON')
+  || (String(ui.placement) === 'FAN' && String(ui.scopePetals) === 'ON');
 const wantsRecord = (r, ui) =>
-  ROLE_OVERRIDES.some((o) => rolesOf(r).includes(o.role) && Number(ui[o.control]) !== LAW_IDENTITY[o.law]);
+  !scopeTogglesOwnRoles(ui) && ROLE_OVERRIDES.some((o) => rolesOf(r).includes(o.role) && Number(ui[o.control]) !== LAW_IDENTITY[o.law]);
 
 /* ===================================================================
    ORGANIC VARIANCE, BUILD 1 — THE SIZE FIELD (VS0-VS5). What BOTH STL GATES
@@ -4599,6 +4663,7 @@ export async function varianceAssertions(page, row) {
 function composeRestated(ui, roles, base) {
   let v = Number(ui[base]);
   let hit = false;
+  if (scopeTogglesOwnRoles(ui)) return { v, hit };   // Scoping-b: the role table is inert under a live toggle
   for (const o of ROLE_OVERRIDES) {
     if (o.base !== base || !roles.includes(o.role)) continue;
     const d = Number(ui[o.control]);
@@ -5337,9 +5402,11 @@ export async function zygoAssertions(page, row) {
      the one-whorl "adjust petals as a group", so its membership is the whole
      whorl and the biconditional collapses to eligibility itself. */
   {
-    const oneWhorl = m.layerCount === 1;
+    /* ... and not while a scope toggle owns the petals (Scoping-b): the
+       group is then hidden AND inert, its one owner on screen being the scope. */
+    const oneWhorl = m.layerCount === 1 && !scopeTogglesOwnRoles(ui);
     if (Boolean(m.allPetalsEligible) !== oneWhorl) {
-      bad.push(`Z1: ${m.layerCount} whorl(s) and the build reports allPetalsEligible=${m.allPetalsEligible} — the all-petals group is the ONE-WHORL group and no other depth's`);
+      bad.push(`Z1: ${m.layerCount} whorl(s)${scopeTogglesOwnRoles(ui) ? ' under a live scope toggle' : ''} and the build reports allPetalsEligible=${m.allPetalsEligible} — the all-petals group is the ONE-WHORL group, no other depth's, and never while a scope toggle owns the petals`);
     }
     const stamped = rings.filter((r) => r.allRole === ROLE_ALL).length;
     if (m.allPetalsEligible && stamped !== rings.length) bad.push(`Z1: all-petals eligible, yet only ${stamped} of ${rings.length} descriptors carry ${ROLE_ALL} — a one-whorl group that misses a descriptor is a control that moves some petals and not others`);
@@ -5465,6 +5532,13 @@ export async function zygoAssertions(page, row) {
     const regSaysAll = evalPredicate({ ref: 'allPetalsEligible' }, ui);
     if (Boolean(m.allPetalsEligible) !== regSaysAll) {
       bad.push(`Z5: the geometry says the all-petals group is ${m.allPetalsEligible ? '' : 'not '}eligible here and the registry predicate says ${regSaysAll ? '' : 'not '}eligible — one of them is hiding a control the other still lets move geometry, or showing one that can do nothing`);
+    }
+    /* THE SCOPE TOGGLES (Scoping-b): the same relation for the two predicates
+       that decide whether a container of offsets reaches a petal at all. */
+    for (const name of ['scopeLayersLive', 'scopePetalsLive']) {
+      if (m[name] === undefined) { bad.push(`Z5: the metrics hook reports no \`${name}\` — the geometry states nothing about whether its scope toggle is live`); continue; }
+      const reg = evalPredicate({ ref: name }, ui);
+      if (Boolean(m[name]) !== reg) bad.push(`Z5: the geometry says ${name} is ${m[name]} here and the registry predicate says ${reg} — the panel would show a scope picker the builder ignores, or hide one it obeys`);
     }
   }
 
@@ -5650,12 +5724,13 @@ export async function zygoAssertions(page, row) {
     if (m.slotRolesEligible && m.layerCount < 2) {
       bad.push(`Z9: slot roles report eligible on a ${m.layerCount}-whorl bloom — the one-whorl orchid was retired (Eva, Sep 3): Petal 1 / Petal N are hidden there and a labellum or hood record must not reach the geometry`);
     }
-    if (!cont && m.placement === 'RADIAL' && m.layerCount >= 2 && Number(ui.layerPhase) === 0 && !m.slotRolesEligible) {
+    if (!cont && m.placement === 'RADIAL' && m.layerCount >= 2 && Number(ui.layerPhase) === 0 && !scopeTogglesOwnRoles(ui) && !m.slotRolesEligible) {
       bad.push(`Z9: a RADIAL bloom of ${m.layerCount} whorls in step reports slot roles NOT eligible — that is exactly the state the ruling keeps the orchid alive in`);
     }
     const fan = m.placement === 'FAN';
-    if (fan !== Boolean(m.perPetalEligible) && !cont) {
-      bad.push(`Z9: placement is ${m.placement} and per-petal roles report ${m.perPetalEligible ? '' : 'not '}eligible — per-petal is the FAN's axis and no other placement's`);
+    /* per-petal is the FAN's axis — unless per-petal VALUES own the fan (Scoping-b) */
+    if ((fan && !scopeTogglesOwnRoles(ui)) !== Boolean(m.perPetalEligible) && !cont) {
+      bad.push(`Z9: placement is ${m.placement}${scopeTogglesOwnRoles(ui) ? ' under a live scope toggle' : ''} and per-petal roles report ${m.perPetalEligible ? '' : 'not '}eligible — per-petal is the FAN's axis and no other placement's, and never while per-petal values own the fan`);
     }
     if (fan && rings.some((r) => r.slotRole !== null)) {
       bad.push('Z9: a FAN row carries a slot-role descriptor — slot roles are superseded there, so a labellum or hood group reaching the geometry means the ruling is not in force and two axes are driving one petal');

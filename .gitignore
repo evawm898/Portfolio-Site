@@ -42,3 +42,11 @@ tools/bug-wing-sources/
 # into .tile-mutant-<pid>-<k>/ at the repo root (they import ../bug-geometry.js) and
 # removes them in a finally; ignored so a crashed run cannot dirty the tree.
 .tile-mutant-*/
+
+# tools/verify-bloom-scopes.mjs --negative-control writes each mutated
+# bloom-geometry.js (and a bloom-file.js importing it) beside the originals,
+# because the modules import each other by relative path; it unlinks them in a
+# finally. Ignored so a running or crashed sweep cannot dirty the tree or be
+# committed by accident (Scoping-b did exactly that once, caught before a push).
+bloom-geometry.__mutant_*.js
+bloom-file.__mutant_*.js

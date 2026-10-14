@@ -685,22 +685,84 @@ FOR SCOPING** (the design-file session, Oct 13; feature map §11 Q3.9 — read
   an offset is a DELTA on the global (Q3.2, a default). `scopesForBuild` adds the registry's bounds.
 - A petal's effective state is global → role table → + layer offsets → + petal offsets → + the
   variance slot term → the ONE clamp, resolved in `resolveRoleOverrides` as a fourth stage. A mirror
-  pair is ONE scope under RADIAL and FAN (Q3.7); under CONTINUOUS a "layer" is a turn.
+  pair is ONE scope under RADIAL and FAN (Q3.7); under CONTINUOUS a "layer" is a turn. **[Oct 14,
+  Scoping-b: a layer entry reaches a petal only under RADIAL with `scopeLayers` ON and a petal entry
+  only under FAN with `scopePetals` ON — every other entry is kept and inert — and a petal entry is
+  matched on the pair's CANONICAL slot EXACTLY (a member index, or a pair the fan no longer builds,
+  is inert; re-keying folded an outer pair onto an inner one when Petals per side fell).]**
 - Empty scopes are the identity by branch (`scopeTerm: null` takes the old call): **0 of
   1,590,625,152 export floats and 0 of 84,101,184 grid values moved** over the whole 1,302-row live
   matrix in both modes against `57f64f7`; no row added, no phase owed.
 - `sheetThickness` is never scoped (Q3.6): the reader refuses it by name, the geometry throws.
   Scopeable = petal-role sliders less sheet thickness, the ROLE_OVERRIDES deltas and the whorl-level
-  rows (34); tiers take the sepal-role sliders less the count (20).
+  rows (34); tiers take the sepal-role sliders less the count (20). **[Oct 14: 22 since the sepal
+  own-size session (#406) added `sepalLength` / `sepalWidth`; and Scoping-b took `footDelicacy` to
+  whole-whorl, so the petal-side list is 33 — SO0 prints both from the shipped tables.]**
 - Today's ALL / INNER / labellum / hood / petalN rows are REPRESENTABLE as scopes, measured
   bit-identical on every petal for every delta row (SO7); a `mul` size row becomes
   `global × (mul − 1)`, the offsets default's one semantic loss. The migration table is §4 of the doc.
+  **[Oct 14, SUPERSEDED IN PART by Scoping-b: under the toggles the RADIAL labellum and hood are
+  UNREPRESENTABLE (per-petal is FAN only), and on a FAN, ALL and INNER map to per-pair PETAL entries,
+  not layer entries — SO7 measures the table as it now stands; read §4 of the model doc with its
+  Scoping-b notes before migrating anything.]**
 - Q3.5 (per-layer size/tilt WIN) is EXPRESSED, not wired: today the offset is added on top of the
   `layerTilt` ramp (SO6 measures that; the wiring session moves it).
 - Gate: `node tools/verify-bloom-scopes.mjs` (`--browser` adds SO9, `--negative-control` five
-  geometry mutants each with a witness), SPAWNED by `verify-bloom-design-file.mjs` (F6) so it rides in
+  geometry mutants each with a witness — **thirteen since Scoping-b**), SPAWNED by `verify-bloom-design-file.mjs` (F6) so it rides in
   `bloom-panel.yml` with no workflow edit — a workflow edit costs the frozen tag of the session in
   flight beside this one.
+
+**PARAMETER SCOPING HAS A SELECTION VIEW: TWO TOGGLES, A PICKER, AND THE PANEL EDITS THE PICKED
+SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection.md` before touching
+`scopeLayers` / `scopePetals`, `scopeLayersLive` / `scopePetalsLive` / `scopesOwnRoles` (both files),
+`scopeOffsetsFor`'s toggle gate, `resolveRoleOverrides`' role-table skip, bloom.js's SCOPE VIEW block,
+`scopeExclusionReason`, SO10–SO12 or panel route (ae)).
+- **The toggles.** `scopeLayers` is RADIAL only and `scopePetals` is FAN only. Both are registry
+  CHOICES, default OFF, and saved.
+  - OFF is today's bloom and today's panel.
+  - A record whose toggle is not live is KEPT and INERT (SO10). The gate is in `scopeOffsetsFor`,
+    so the panel's displayed value and the builder cannot disagree.
+- **A live toggle makes the WHOLE role table hidden AND inert.** That covers ALL, INNER, the
+  labellum and hood, and the per-petal groups: one owner on screen.
+  - The resolver's blanket skip keeps the geometry inert on its own. So an eligibility function
+    that forgets the toggle moves no float, and SO11's STAMP and footRing-FLAG clauses are that
+    arm's only witnesses.
+  - Per-layer and the tube are exclusive.
+- **The picker** is `#scopeBar`: page chrome outside `#panelControls`, never saved.
+  - A pick LOADS and never applies.
+  - Deselect writes nothing.
+  - An edit writes `desired − global − others` onto the picked scope's own entry, through a capture
+    listener, and is pruned at 0.
+  - While a scope is picked, `readUI()` reads the shadow globals, so builds, saves and gates see the
+    whole bloom.
+  - A mirror pair is one scope: the picker lists pairs, and picking either member binds the pair.
+  - **A petal entry names its pair by the CANONICAL slot — the pair's distance from the mirror plane,
+    the same pair at every count — and is matched on it EXACTLY** (`scopeEntryNamesPair`, one owner
+    for the builder, the summary and the page). The first cut re-keyed it through the pairing law at
+    today's count, so lowering Petals per side folded an outer pair's values onto an inner one and an
+    edit then wrote a compensating offset that stuck (found by the review). A member index, or a pair
+    the fan no longer builds, is kept and inert, and the toggle's read-out names it as kept.
+  - Whole-bloom controls' read-outs read the GLOBAL under a pick (Foot delicacy and Sepal size once
+    quoted the picked layer's width); a load and Reset end the pick first; the offset written makes
+    the build land on the slider's own double where the twelve-digit cut alone would not.
+- **Notes under each control:** `whole bloom g ± offset = effective (clamped from …)`, or
+  `whole bloom — <reason>` for the petal controls a scope cannot reach (sheet thickness, Q3.6).
+- **FINDING: the RADIAL labellum and hood are UNREPRESENTABLE as scopes** under "per-petal is FAN
+  only" (SO7, measured). The retirement session (Q3.4) inherits that choice.
+- **`footDelicacy` is whole-whorl now.** It moved 0 floats under a scope (its reader is footRing's).
+  `SCOPEABLE_IDS` is 33, and SO12 holds every one to moving a scoped petal.
+- **Gates.** SO10–SO12 plus eight new scopes mutants (thirteen in all); panel route (ae), making
+  TWENTY-FIVE routes, with eleven mutants (its own four and seven for the review's findings — each a
+  flag the negative control requires); seven toggle rows in route (f); the export preflight's anchors
+  unchanged. SO2 and SO12 read each petal's OWN WHORL, never the term the builder attached, and edit
+  an END layer — the middle of three is the fixed point of a reversed layer order.
+- **`tipCap.shapeN` reads the petal's resolved `ps` now**, not the caller's state: under a scope a
+  layer carries its own tip shape and A6 reads the emitted apex against that number (no byte moves —
+  no role override touches the tip shape).
+- **Not in CI:** `tools/verify-bloom-scope-panel-identity.mjs --base <worktree>`, the panel
+  identity with the toggles OFF. The byte tool's `--merge` now closes an all-hold partition.
+- **0 matrix rows, no frozen phase.** Sheet: `node tools/shot-bloom-scopes.mjs` →
+  `docs/img/scope-selection.png`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

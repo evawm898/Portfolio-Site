@@ -24,31 +24,37 @@
           subset; `--full`: every row), and every petal records `scopeTerm:
           null`. The whole-matrix claim against the BASE tree is
           verify-bloom-surface-bytes', run at the close.
-     SO2  A LAYER OFFSET MOVES ONLY THAT LAYER: on a three-layer bloom an offset
-          on layer 1 moves every layer-1 petal's `applied` by exactly the offset
-          and leaves every other layer's petal BIT-IDENTICAL (its captured
-          lamina) to the unscoped build's.
-     SO3  A PETAL OFFSET MOVES ONLY THAT PETAL AND ITS MIRROR PARTNER: under
-          RADIAL, FAN (both plane positions) the offset reaches slot i and
-          `mirrorPartner(i)` and no other slot, an entry naming the partner
-          builds the identical bloom, and under SPIRAL / CONTINUOUS it reaches
-          slot i alone.
-     SO4  OFFSETS COMPOSE WITH THE EXISTING CLAMP, BEFORE IT: an offset past the
-          base's range lands ON the range end (never past it); a petal offset
-          stacks on a role delta (base + role + offset, then clamped); under the
-          variance field every composed value stays inside the base's range.
+     SO2  A LAYER OFFSET MOVES ONLY THAT LAYER (per-layer values live —
+          RADIAL + `scopeLayers` ON, Scoping-b): on a three-layer bloom an
+          offset on layer 1 moves every layer-1 petal's `applied` by exactly
+          the offset and leaves every other layer's petal BIT-IDENTICAL (its
+          captured lamina) to the unscoped build's.
+     SO3  A PETAL OFFSET MOVES ONLY THAT PETAL AND ITS MIRROR PARTNER
+          (per-petal values live — FAN + `scopePetals` ON): through a slot and
+          through the gap, the offset reaches slot i and its partner (restated
+          from the fan's own involution) and no other slot; an entry naming
+          the partner builds the identical bloom; the mirror-line petal is a
+          pair of one.
+     SO4  OFFSETS COMPOSE WITH THE EXISTING CLAMP, BEFORE IT, AND UNDER A LIVE
+          TOGGLE A ROLE DELTA DOES NOT STACK: an offset past the base's range
+          lands ON the range end; a RADIAL labellum delta under per-layer and a
+          FAN group delta under per-petal are inert (base + offset, exactly two
+          petals carry a pair's term); under the variance field every composed
+          value stays inside the base's range.
      SO5  SHEET THICKNESS IGNORES ANY OFFSET: the file's reader REFUSES the key
           with a note and keeps the rest of the entry; the geometry THROWS on a
-          scopes object carrying it; a build offsetting every scopeable control
-          leaves every ring's thickness what it was.
+          scopes object carrying it, live or kept; a build offsetting every
+          scopeable control leaves every ring's thickness what it was.
      SO6  Q3.5 AS IT STANDS TODAY (reported, for the wiring session): a layer
           offset on tilt is ADDED to the layer's `tiltExtra` ramp — the ramp is
           unchanged on every slot. The wiring session moves this clause.
-     SO7  TODAY'S ROLES ARE REPRESENTABLE (the migration table, measured): ALL,
-          INNER, the labellum and hood, and a FAN per-petal group, each built
-          through its role controls and again through the equivalent scope
-          entries with the role controls at identity — `applied` EXACT and the
-          laminae bit-identical on every petal for every DELTA row.
+     SO7  TODAY'S ROLES RE-EXPRESSED UNDER THE TOGGLES (the migration table,
+          measured): ALL (RADIAL and FAN), INNER (RADIAL and FAN) and a FAN
+          per-petal group, each built through its role controls and again
+          through the equivalent entries with the matching toggle ON —
+          `applied` EXACT and the laminae bit-identical on every petal; the
+          size `mul` row as a delta; and the RADIAL labellum and hood measured
+          UNREPRESENTABLE (a RADIAL petal entry is inert with per-petal ON).
      SO8  THE FILE: compose(state, scopes) reads back the same record with no
           note on every live matrix row; the reader's refusals on written-down
           fixtures (a bad index, a non-object offsets, a choice, a retired id,
@@ -56,9 +62,25 @@
      SO9  THE PAGE (--browser): `__bloomScopes` sets a record and the build on
           screen carries it; the page's own save writes it under `overrides`;
           a load of that save hands back the same record and the same build;
-          a plain save clears it.
+          switching per-layer OFF keeps the record and builds the unscoped STL,
+          ON again the scoped one; a plain save clears it.
+     SO10 THE TOGGLE GATE: a record whose toggle is OFF, or ON under the wrong
+          placement (per-layer under FAN, per-petal under RADIAL, either under
+          SPIRAL / CONTINUOUS), is KEPT and INERT — bit-identical to no record,
+          both modes, every term null.
+     SO11 ONE OWNER: a toggle alone moves nothing; under a live toggle the role
+          table is inert (ALL, INNER, labellum + hood under per-layer; ALL,
+          INNER, the per-petal groups under per-petal), each shown live with
+          the toggle OFF first, and no emitted petal carries an ALL, slot-role
+          or group STAMP (the eligibility arm's only witness — the resolver's
+          blanket skip makes it invisible in the geometry); per-layer makes
+          the tube unavailable.
+     SO12 EVERY SCOPEABLE CONTROL REACHES A PETAL: a layer-1 offset on each,
+          with its own guard live, moves every layer-1 petal and no layer-0
+          one — a scopeable id that moves nothing is a control the panel would
+          rebind to no effect.
 
-   --negative-control serves FIVE broken copies of bloom-geometry.js (with a
+   --negative-control serves THIRTEEN broken copies of bloom-geometry.js (with a
    bloom-file.js copy importing each), every anchor checked before any runs,
    and requires each to redden exactly the clauses it names AND to move its own
    witness — a direct call on the MUTATED module proving the behaviour changed,
@@ -145,7 +167,7 @@ async function nodeClauses(G, F, rec) {
     const p = [];
     if (JSON.stringify([...G.SCOPE_UNSCOPED]) !== JSON.stringify(['sheetThickness'])) p.push(`SCOPE_UNSCOPED is ${JSON.stringify(G.SCOPE_UNSCOPED)}`);
     const deltas = new Set(G.ROLE_OVERRIDES.map((o) => o.control));
-    const whorl = ['petalCount', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend'];
+    const whorl = ['petalCount', 'footDelicacy', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend'];
     const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && c.id !== 'sheetThickness' && !deltas.has(c.id) && !whorl.includes(c.id)).map((c) => c.id);
     if (JSON.stringify([...F.SCOPEABLE_IDS]) !== JSON.stringify(want)) p.push(`SCOPEABLE_IDS (${F.SCOPEABLE_IDS.length}) differ from the restated census (${want.length}): ${want.filter((x) => !F.SCOPEABLE_IDS.includes(x)).concat(F.SCOPEABLE_IDS.filter((x) => !want.includes(x))).join(', ')}`);
     if (F.SCOPEABLE_IDS.includes('sheetThickness')) p.push('sheetThickness is scopeable');
@@ -180,50 +202,57 @@ async function nodeClauses(G, F, rec) {
     }
     rec('SO1', p, `${n} row-modes over ${rows.length} rows: ${floats.toLocaleString()} floats identical under Object.is with empty scopes, every scopeTerm null`);
   }
-  /* SO2 — a layer offset moves only its layer */
+  /* SO2 — a layer offset moves only its layer (per-layer values live: RADIAL + scopeLayers ON).
+     WHICH PETALS ARE ON THE LAYER is read off each petal's OWN WHORL (`whorl`,
+     its ring's lambda — an owner the scope path does not write), never off the
+     term the builder attached: the first version called "the petals carrying a
+     term" layer 1 and checked the term's key, so a builder handing the call the
+     wrong layer number passed it — the expected and the measured side were one
+     owner (the fourth durable rule; the review's finding). And the layer is the
+     INNERMOST of three, not the middle one, which is the fixed point of a layer
+     order reversed. */
   {
     const p = [];
-    const st = S({ layerCount: 3 });
+    const LAYER = 2;
+    const st = S({ layerCount: 3, scopeLayers: 'ON' });
     const base = build(G, F, st, undefined);
-    const sc = build(G, F, st, withBounds(F, { layers: [{ layer: 1, offsets: { petalCup: 0.4 } }] }));
+    const sc = build(G, F, st, withBounds(F, { layers: [{ layer: LAYER, offsets: { petalCup: 0.4 } }] }));
     if (base.petals.length !== sc.petals.length) p.push(`petal counts differ ${base.petals.length} / ${sc.petals.length}`);
     let moved = 0, held = 0;
     sc.petals.forEach((q, i) => {
       const o = base.petals[i];
-      const L = sc.built.foot.rings[0] && q.scopeTerm ? q.scopeTerm.key.layer : null;
-      const onLayer1 = q.scopeTerm !== null;
+      const whorl = Math.round(o.whorl);
       const same = sameNumbers(numbersOf(o.lamina), numbersOf(q.lamina));
-      if (onLayer1) {
-        if (L !== 1) p.push(`petal ${i} carries a term keyed on layer ${L}`);
-        if (q.applied.petalCup !== st.petalCup + 0.4) p.push(`layer-1 petal ${i}: applied cup ${q.applied.petalCup}, expected ${st.petalCup + 0.4}`);
-        if (same) p.push(`layer-1 petal ${i}: the lamina did not move`);
+      if (whorl === LAYER) {
+        if (!q.scopeTerm || q.scopeTerm.key.layer !== LAYER) p.push(`whorl-${LAYER} petal ${i} carries ${q.scopeTerm ? `a term keyed on layer ${q.scopeTerm.key.layer}` : 'no term'}`);
+        if (q.applied.petalCup !== st.petalCup + 0.4) p.push(`whorl-${LAYER} petal ${i}: applied cup ${q.applied.petalCup}, expected ${st.petalCup + 0.4}`);
+        if (same) p.push(`whorl-${LAYER} petal ${i}: the lamina did not move`);
         moved++;
       } else {
-        if (!same) p.push(`a petal off layer 1 (${i}) MOVED`);
-        if (q.applied.petalCup !== o.applied.petalCup) p.push(`a petal off layer 1 (${i}) changed its applied cup`);
+        if (q.scopeTerm) p.push(`a whorl-${whorl} petal (${i}) carries a term`);
+        if (!same) p.push(`a whorl-${whorl} petal (${i}) MOVED`);
+        if (q.applied.petalCup !== o.applied.petalCup) p.push(`a whorl-${whorl} petal (${i}) changed its applied cup`);
         held++;
       }
     });
     if (moved !== 8 || held !== 16) p.push(`expected 8 moved / 16 held, read ${moved} / ${held}`);
-    rec('SO2', p, `3 layers x 8: a layer-1 cup offset of +0.4 moves 8 petals by exactly 0.4 and holds the other 16 bit-identical`);
+    rec('SO2', p, `RADIAL 3 layers x 8, per-layer values ON: a cup offset of +0.4 on Layer ${LAYER + 1} (the innermost) moves exactly its whorl's 8 petals by 0.4 — read off each petal's own whorl — and holds the other 16 bit-identical`);
   }
-  /* SO3 — a petal offset moves only that petal and its mirror partner */
+  /* SO3 — a petal offset moves only that petal and its mirror partner (per-petal values live: FAN + scopePetals ON) */
   {
     const p = [];
     const cases = [
-      { label: 'RADIAL 8', set: {}, slot: 1, partner: 7 },
-      { label: 'FAN toggle ON (through a slot)', set: { placement: 'FAN', fanCenterPetal: 'ON' }, slot: 1, partner: null },
-      { label: 'FAN toggle OFF (through the gap)', set: { placement: 'FAN', fanCenterPetal: 'OFF' }, slot: 1, partner: null },
-      { label: 'SPIRAL (no plane)', set: { placement: 'SPIRAL' }, slot: 1, partner: 1 },
-      { label: 'CONTINUOUS (no plane)', set: { placement: 'CONTINUOUS' }, slot: 1, partner: 1 },
+      { label: 'FAN centre ON (through a slot)', set: { placement: 'FAN', fanCenterPetal: 'ON', scopePetals: 'ON' }, slot: 1 },
+      { label: 'FAN centre OFF (through the gap)', set: { placement: 'FAN', fanCenterPetal: 'OFF', scopePetals: 'ON' }, slot: 1 },
+      { label: 'FAN centre ON, the mirror-line petal alone', set: { placement: 'FAN', fanCenterPetal: 'ON', scopePetals: 'ON' }, slot: 0 },
     ];
     const summary = [];
     for (const c of cases) {
       const st = S(c.set);
       const base = build(G, F, st, undefined);
       const n = base.built.foot.slotCount ?? base.petals.length;
-      const mirror = G.mirrorFor(st);
-      const expect = c.partner === null ? G.mirrorPartner(c.slot, n, mirror) : c.partner;
+      /* the partner RESTATED from the involution's own law — never read off the module under test */
+      const expect = c.set.fanCenterPetal === 'ON' ? (n - c.slot) % n : n - 1 - c.slot;
       const want = new Set([c.slot, expect]);
       const sc = build(G, F, st, withBounds(F, { petals: [{ layer: 0, slot: c.slot, offsets: { petalCup: 0.4 } }] }));
       const movedSlots = [];
@@ -236,48 +265,74 @@ async function nodeClauses(G, F, rec) {
           if (q.applied.petalCup !== st.petalCup + 0.4) p.push(`${c.label}: slot ${q.slot.index} applied ${q.applied.petalCup}`);
         } else if (!same) p.push(`${c.label}: slot ${q.slot.index} moved and is not slot ${c.slot} or its partner ${expect}`);
       });
-      /* an entry naming the PARTNER builds the identical bloom under a plane */
+      /* AN ENTRY NAMING THE PARTNER — a MEMBER index, not the pair's canonical
+         one — is KEPT and INERT, bit-identical to no entry (Scoping-b, the
+         review's fold): a member index names a different pair the moment the
+         count changes, so re-keying it at today's count is what let an outer
+         pair's values land on an inner one. Was "naming the partner builds the
+         identical bloom" in Scoping-a, which is precisely the fold. */
       if (expect !== c.slot) {
         const sc2 = build(G, F, st, withBounds(F, { petals: [{ layer: 0, slot: expect, offsets: { petalCup: 0.4 } }] }));
-        if (!sameNumbers([...sc.acc.positions], [...sc2.acc.positions])) p.push(`${c.label}: naming slot ${expect} builds a different bloom from naming slot ${c.slot}`);
+        if (!sameNumbers([...base.acc.positions], [...sc2.acc.positions])) p.push(`${c.label}: an entry naming the member slot ${expect} (not the pair's canonical ${c.slot}) moved the bloom — it should be kept and inert`);
+        if (sc2.petals.some((q) => q.scopeTerm)) p.push(`${c.label}: an entry naming the member slot ${expect} gave a petal a term`);
       }
-      summary.push(`${c.label}: slot ${c.slot}${expect !== c.slot ? ` + partner ${expect}` : ' alone'} (${movedSlots.length} of ${n} moved)`);
+      summary.push(`${c.label}: slot ${c.slot}${expect !== c.slot ? ` + partner ${expect}; naming member ${expect} is inert` : ' alone'} (${movedSlots.length} of ${n} moved)`);
     }
+    /* THE COUNT CHANGES UNDER A STORED PAIR (the review's fold, both mirrors):
+       an entry for the pair four out at four petals a side is KEPT and INERT at
+       two a side — bit-identical to no entry, no term on any petal, told as
+       kept by the build's summary — and returns on its own pair at four. */
+    for (const centre of ['ON', 'OFF']) {
+      const outer = 3 + (centre === 'ON' ? 1 : 0);   // the canonical slot of the outermost pair at 4 a side
+      const rec4 = withBounds(F, { petals: [{ layer: 0, slot: outer, offsets: { petalCup: 0.6 } }] });
+      const st2 = S({ placement: 'FAN', fanCenterPetal: centre, fanPerSide: 2, scopePetals: 'ON' });
+      const plain2 = build(G, F, st2, undefined, { lamina: false });
+      const kept2 = build(G, F, st2, rec4, { lamina: false });
+      if (!sameNumbers([...plain2.acc.positions], [...kept2.acc.positions])) p.push(`centre ${centre}: the pair-${outer} entry moved the bloom at 2 a side, where that pair is not built (it folded onto another pair)`);
+      if (kept2.petals.some((q) => q.scopeTerm)) p.push(`centre ${centre}: at 2 a side a petal carries the pair-${outer} entry's term`);
+      const sum2 = kept2.built.scopes;
+      if (!sum2 || sum2.scopedPetals.length !== 0 || JSON.stringify(sum2.keptPetals) !== JSON.stringify([{ layer: 0, slot: outer }])) p.push(`centre ${centre}: at 2 a side the summary reads scoped ${JSON.stringify(sum2 && sum2.scopedPetals)} / kept ${JSON.stringify(sum2 && sum2.keptPetals)}`);
+      const st4 = S({ placement: 'FAN', fanCenterPetal: centre, fanPerSide: 4, scopePetals: 'ON' });
+      const back4 = build(G, F, st4, rec4, { lamina: false });
+      const n4 = back4.built.foot.slotCount;
+      const want4 = new Set([outer, centre === 'ON' ? (n4 - outer) % n4 : n4 - 1 - outer]);
+      const got4 = new Set(back4.petals.filter((q) => q.scopeTerm).map((q) => q.slot.index));
+      if (got4.size !== 2 || [...want4].some((x) => !got4.has(x))) p.push(`centre ${centre}: back at 4 a side the term is on slots ${[...got4].join(',')}, not the outer pair ${[...want4].join(',')}`);
+    }
+    summary.push('a stored outer pair is kept and inert at 2 a side and returns at 4, both mirrors');
     rec('SO3', p, summary.join('; '));
   }
-  /* SO4 — the clamp, after composition */
+  /* SO4 — the clamp, after composition; under a live toggle a role delta does not stack */
   {
     const p = [];
     const b = G.composedBoundsOf('petalCup');
-    const st = S({ layerCount: 3 });
+    const st = S({ layerCount: 3, scopeLayers: 'ON' });
     const sc = build(G, F, st, withBounds(F, { layers: [{ layer: 1, offsets: { petalCup: 5 } }] }), { lamina: false });
     const l1 = sc.petals.filter((q) => q.scopeTerm);
     if (!l1.length) p.push('no layer-1 petal built');
     for (const q of l1) if (q.applied.petalCup !== b.max) p.push(`cup ${st.petalCup} + 5 landed on ${q.applied.petalCup}, not the range end ${b.max}`);
-    /* stacking on a role delta, clamped once */
-    const st2 = S({ layerCount: 2, layerPhase: 0, labellumCup: 0.5 });
-    const roles = build(G, F, st2, undefined, { lamina: false });
-    const lab = roles.built.foot.slotRings.flatMap((r) => r).find((d) => d.slotRole === G.SLOT_LABELLUM);
-    if (!lab) p.push('no labellum descriptor on the orchid state');
-    else {
-      const slot = lab.slots[0];
-      const sc2 = build(G, F, st2, withBounds(F, { petals: [{ layer: lab.lambda, slot, offsets: { petalCup: 0.3 } }] }), { lamina: false });
-      const q = sc2.petals.find((x) => x.scopeTerm && x.slot.index === slot && x.scopeTerm.key.layer === lab.lambda);
-      const want = Math.min(b.max, st2.petalCup + 0.5 + 0.3);
-      if (!q) p.push('the labellum petal carries no scope term');
-      else if (q.applied.petalCup !== want) p.push(`labellum: base ${st2.petalCup} + role 0.5 + offset 0.3 -> ${q.applied.petalCup}, expected ${want}`);
-      const sc3 = build(G, F, st2, withBounds(F, { petals: [{ layer: lab.lambda, slot, offsets: { petalCup: 5 } }] }), { lamina: false });
-      const q3 = sc3.petals.find((x) => x.scopeTerm && x.slot.index === slot && x.scopeTerm.key.layer === lab.lambda);
-      if (q3 && q3.applied.petalCup !== b.max) p.push(`labellum + 5: ${q3.applied.petalCup} is not the range end ${b.max} — the offset was applied AFTER the clamp`);
-    }
+    /* ONE OWNER: under per-layer values the labellum's role delta is INERT, so a
+       layer offset reads base + offset (never base + role + offset); under
+       per-petal values a group's delta is inert the same way. Was "a petal
+       offset stacks on a role delta" in Scoping-a — unreachable under the
+       toggles, and replaced by the claim that is. */
+    const st2 = S({ layerCount: 2, layerPhase: 0, labellumCup: 0.5, scopeLayers: 'ON' });
+    const sc2 = build(G, F, st2, withBounds(F, { layers: [{ layer: 0, offsets: { petalCup: 0.3 } }] }), { lamina: false });
+    for (const q of sc2.petals.filter((x) => x.scopeTerm)) if (q.applied.petalCup !== st2.petalCup + 0.3) p.push(`RADIAL in step, labellumCup 0.5, per-layer ON: slot ${q.slot.index} reads ${q.applied.petalCup}, expected base ${st2.petalCup} + offset 0.3 — the role delta is not inert`);
+    const st3 = S({ placement: 'FAN', petal2Cup: 0.5, scopePetals: 'ON' });
+    const sc3 = build(G, F, st3, withBounds(F, { petals: [{ layer: 0, slot: 1, offsets: { petalCup: 0.3 } }] }), { lamina: false });
+    const pair = sc3.petals.filter((x) => x.scopeTerm);
+    if (pair.length !== 2) p.push(`FAN per-petal ON: ${pair.length} petals carry the pair's term, expected 2`);
+    for (const q of pair) if (q.applied.petalCup !== st3.petalCup + 0.3) p.push(`FAN, petal2Cup 0.5, per-petal ON: slot ${q.slot.index} reads ${q.applied.petalCup}, expected base + offset 0.3 — the group delta is not inert`);
     /* under the variance field every composed value stays in range */
-    const st3 = S({ varianceForm: 1, petalCup: 1.0 });
-    const sc4 = build(G, F, st3, withBounds(F, { layers: [{ layer: 0, offsets: { petalCup: 0.5, petalSpineCurl: 200 } }] }), { lamina: false });
+    const st4 = S({ varianceForm: 1, petalCup: 1.0, scopeLayers: 'ON' });
+    const sc4 = build(G, F, st4, withBounds(F, { layers: [{ layer: 0, offsets: { petalCup: 0.5, petalSpineCurl: 200 } }] }), { lamina: false });
+    if (!sc4.petals.some((q) => q.scopeTerm)) p.push('variance x offsets: no petal carries the term');
     for (const q of sc4.petals) for (const base of ['petalCup', 'petalSpineCurl']) {
       const bb = G.composedBoundsOf(base);
       if (!(q.applied[base] >= bb.min && q.applied[base] <= bb.max)) p.push(`variance x offsets: slot ${q.slot.index} ${base} = ${q.applied[base]} outside ${bb.min}..${bb.max}`);
     }
-    rec('SO4', p, `cup ${st.petalCup} + 5 lands on ${b.max}; a labellum reads base + role + offset then one clamp; under the variance field every composed value is in range`);
+    rec('SO4', p, `cup ${st.petalCup} + 5 lands on ${b.max}; under a live toggle a role delta is inert (base + offset, RADIAL labellum and FAN group alike); under the variance field every composed value is in range`);
   }
   /* SO5 — sheet thickness ignores any offset */
   {
@@ -286,7 +341,7 @@ async function nodeClauses(G, F, rec) {
     const r = F.readDoc(JSON.parse(JSON.stringify(doc)));
     if (!r.ok) p.push(`the reader refused the whole file: ${r.error}`);
     else {
-      if (!r.notes.some((n) => n.kind === 'invalid' && /sheetThickness is never scoped/.test(n.text))) p.push(`the reader did not refuse the thickness offset: ${r.notes.map((n) => n.text).join(' | ') || '(no notes)'}`);
+      if (!r.notes.some((n) => n.kind === 'invalid' && /sheetThickness: never scoped/.test(n.text))) p.push(`the reader did not refuse the thickness offset: ${r.notes.map((n) => n.text).join(' | ') || '(no notes)'}`);
       const e = r.doc.overrides.layers[0];
       if (!e || 'sheetThickness' in e.offsets) p.push('the thickness offset survived the read');
       if (!e || e.offsets.petalCup !== 0.1) p.push('the rest of the entry did not survive the refusal of one key');
@@ -294,19 +349,30 @@ async function nodeClauses(G, F, rec) {
     let threw = false;
     try { build(G, F, REG.DEFAULTS, { layers: [{ layer: 0, offsets: { sheetThickness: 0.5 } }], petals: [], tiers: [] }, { lamina: false }); } catch (e) { threw = /never scoped/.test(e.message); }
     if (!threw) p.push('the geometry built a bloom from a scopes object carrying sheetThickness');
+    /* AND WHATEVER THE TOGGLE AND WHICHEVER LAYERS ARE BUILT: an entry for a
+       layer this bloom does not build is validated too, toggle ON as OFF (the
+       first cut skipped it while the toggle was live — the review's finding) */
+    for (const tog of ['OFF', 'ON']) {
+      let t2 = false;
+      try { build(G, F, S({ layerCount: 2, scopeLayers: tog }), { layers: [{ layer: 3, offsets: { sheetThickness: 0.5 } }], petals: [], tiers: [] }, { lamina: false }); } catch (e) { t2 = /never scoped/.test(e.message); }
+      if (!t2) p.push(`per-layer ${tog}: a thickness offset on a layer the bloom does not build did not throw`);
+      let t3 = false;
+      try { build(G, F, S({ placement: 'FAN', scopePetals: tog }), { layers: [], petals: [{ layer: 0, slot: 9, offsets: { sheetThickness: 0.5 } }], tiers: [] }, { lamina: false }); } catch (e) { t3 = /never scoped/.test(e.message); }
+      if (!t3) p.push(`per-petal ${tog}: a thickness offset on a pair the bloom does not build did not throw`);
+    }
     /* every scopeable control offset at once leaves every ring's thickness alone */
     const offsets = Object.fromEntries(F.SCOPEABLE_IDS.map((id) => { const c = kindOf.get(id); return [id, c.step || 0.01]; }));
-    const st = S({ layerCount: 2 });
+    const st = S({ layerCount: 2, scopeLayers: 'ON' });
     const base = build(G, F, st, undefined, { lamina: false });
     const sc = build(G, F, st, withBounds(F, { layers: [{ layer: 0, offsets }, { layer: 1, offsets }] }), { lamina: false });
     base.built.foot.rings.forEach((rg, i) => { if (!Object.is(rg.thickness, sc.built.foot.rings[i].thickness)) p.push(`ring ${i} thickness moved ${rg.thickness} -> ${sc.built.foot.rings[i].thickness}`); });
     if (!sc.petals.every((q) => q.scopeTerm && !('sheetThickness' in q.scopeTerm.offsets))) p.push('a petal term carries sheetThickness');
-    rec('SO5', p, `the reader refuses a thickness offset by name and keeps the entry; the geometry throws on one; offsetting all ${F.SCOPEABLE_IDS.length} scopeable controls leaves every ring's thickness what it was`);
+    rec('SO5', p, `the reader refuses a thickness offset by name and keeps the entry; the geometry throws on one — on an entry it builds and on one it does not, toggles ON and OFF; offsetting all ${F.SCOPEABLE_IDS.length} scopeable controls leaves every ring's thickness what it was`);
   }
   /* SO6 — Q3.5 as it stands today */
   {
     const p = [];
-    const st = S({ layerCount: 3, layerTilt: 12 });
+    const st = S({ layerCount: 3, layerTilt: 12, scopeLayers: 'ON' });
     const base = build(G, F, st, undefined, { lamina: false });
     const sc = build(G, F, st, withBounds(F, { layers: [{ layer: 1, offsets: { petalTilt: 10 } }] }), { lamina: false });
     sc.petals.forEach((q, i) => {
@@ -315,41 +381,53 @@ async function nodeClauses(G, F, rec) {
     });
     rec('SO6', p, 'TODAY a layer tilt offset is ADDED on top of the layerTilt ramp (tiltExtra unchanged on every slot) — Q3.5\'s "per-layer wins" is EXPRESSED by the model and NOT yet wired; the wiring session moves this clause');
   }
-  /* SO7 — today's roles are representable as scopes (the migration table, measured) */
+  /* SO7 — today's roles, re-expressed as scopes UNDER THE TOGGLES (the
+     migration table, measured). Scoping-a measured every role as REPRESENTABLE
+     with no toggle in the model; Scoping-b's rulings put per-layer on RADIAL
+     only and per-petal on FAN only, so each row is now built through its role
+     controls (toggles OFF) and again through the equivalent entries with the
+     role controls at identity and the toggle that makes them live ON. And the
+     labellum and hood (RADIAL) became UNREPRESENTABLE — measured below, not
+     argued — which is the retirement session's to rule on (Q3.4). */
   {
     const p = [];
     const rows = [
-      { label: 'ALL (one whorl)', set: { allCurl: 45, allCup: 0.2 }, role: G.ROLE_ALL, offsets: { petalSpineCurl: 45, petalCup: 0.2 }, scope: 'layer' },
-      { label: 'INNER (3 layers)', set: { layerCount: 3, innerCurl: 90, innerCup: 0.3 }, role: G.ROLE_INNER, offsets: { petalSpineCurl: 90, petalCup: 0.3 }, scope: 'layer' },
-      { label: 'LABELLUM (RADIAL, 2 whorls in step)', set: { layerCount: 2, layerPhase: 0, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60 }, role: G.SLOT_LABELLUM, offsets: { petalTilt: -25, petalCup: 0.5, petalSpineCurl: -60 }, scope: 'petal' },
-      { label: 'HOOD (RADIAL, 2 whorls in step, the pair)', set: { layerCount: 2, layerPhase: 0, hoodTilt: 20, hoodCup: 0.3 }, role: G.SLOT_HOOD, offsets: { petalTilt: 20, petalCup: 0.3 }, scope: 'petal' },
-      { label: 'PER-PETAL group 2 (FAN)', set: { placement: 'FAN', petal2Tilt: 45, petal2Cup: 0.5, petal2Curl: 60 }, role: G.PETAL_ROLE_ORDER[1], offsets: { petalTilt: 45, petalCup: 0.5, petalSpineCurl: 60 }, scope: 'petal' },
+      { label: 'ALL (RADIAL, one whorl) -> one layer entry', set: { allCurl: 45, allCup: 0.2 }, role: G.ROLE_ALL, offsets: { petalSpineCurl: 45, petalCup: 0.2 }, scope: 'layer', toggle: { scopeLayers: 'ON' } },
+      { label: 'ALL (FAN, one whorl) -> an entry on every pair', set: { placement: 'FAN', allCurl: 45, allCup: 0.2 }, role: G.ROLE_ALL, offsets: { petalSpineCurl: 45, petalCup: 0.2 }, scope: 'petal', toggle: { scopePetals: 'ON' } },
+      { label: 'INNER (RADIAL, 3 layers) -> layers 1 and 2', set: { layerCount: 3, innerCurl: 90, innerCup: 0.3 }, role: G.ROLE_INNER, offsets: { petalSpineCurl: 90, petalCup: 0.3 }, scope: 'layer', toggle: { scopeLayers: 'ON' } },
+      { label: 'INNER (FAN, 2 layers) -> every pair of layer 1', set: { placement: 'FAN', layerCount: 2, innerCurl: 90, innerCup: 0.3 }, role: G.ROLE_INNER, offsets: { petalSpineCurl: 90, petalCup: 0.3 }, scope: 'petal', toggle: { scopePetals: 'ON' } },
+      { label: 'PER-PETAL group 2 (FAN) -> its pair', set: { placement: 'FAN', petal2Tilt: 45, petal2Cup: 0.5, petal2Curl: 60 }, role: G.PETAL_ROLE_ORDER[1], offsets: { petalTilt: 45, petalCup: 0.5, petalSpineCurl: 60 }, scope: 'petal', toggle: { scopePetals: 'ON' } },
     ];
+    /* THE PAIRING RESTATED HERE, never read off the module under test: under
+       the toggles a petal scope exists on a FAN only, and its canonical slot is
+       the pair's lower index by the fan's own involution (through a slot:
+       (n - i) mod n; through the gap: n - 1 - i). The first version called the
+       geometry's own `scopeSlotKey`, and the mirror-split mutant then handed
+       this clause one entry per member and passed it (Scoping-a). */
+    const keyOf = (st, n) => (slot) => {
+      if (st.placement !== 'FAN') throw new Error('SO7: a petal-scope row that is not a FAN');
+      const partner = st.fanCenterPetal === 'OFF' ? n - 1 - slot : (n - slot) % n;
+      return Math.min(slot, partner);
+    };
     const summary = [];
     for (const r of rows) {
       const st = S(r.set);
       const viaRoles = build(G, F, st, undefined);
-      const identity = { ...st };
+      const identity = { ...st, ...r.toggle };
       for (const id of Object.keys(r.set)) if (G.ROLE_OVERRIDES.some((o) => o.control === id)) identity[id] = REG.DEFAULTS[id];
       const fr = viaRoles.built.foot;
       const descriptors = fr.slotRings ? fr.slotRings.flatMap((x) => x) : fr.rings;
       const carries = (d) => d.role === r.role || d.allRole === r.role || d.slotRole === r.role || d.petalRole === r.role;
       const n = fr.slotCount;
-      /* THE PAIRING RESTATED HERE, never read off the module under test: a
-         scope's canonical slot is the pair's lower index where the placement
-         has a plane (RADIAL, FAN), the slot itself elsewhere. The first version
-         called the geometry's own `scopeSlotKey`, and the mirror-split mutant
-         then handed this clause one entry per member and passed it. */
-      const keyOf = (slot) => (st.placement === 'RADIAL' || st.placement === 'FAN') ? Math.min(slot, G.mirrorPartner(slot, n, G.mirrorFor(st))) : slot;
       const layers = [], petals = [];
       if (r.scope === 'layer') {
         for (const L of new Set(descriptors.filter(carries).map((d) => d.lambda))) layers.push({ layer: L, offsets: { ...r.offsets } });
       } else {
-        const seen = new Set();
-        for (const d of descriptors.filter(carries)) for (const slot of d.slots) {
-          const key = `${d.lambda}:${keyOf(slot)}`;
-          if (seen.has(key)) continue; seen.add(key);
-          petals.push({ layer: d.lambda, slot: keyOf(slot), offsets: { ...r.offsets } });
+        const key = keyOf(st, n), seen = new Set();
+        for (const d of descriptors.filter(carries)) for (const slot of (d.slots || Array.from({ length: n }, (_, i) => i))) {
+          const k = `${d.lambda}:${key(slot)}`;
+          if (seen.has(k)) continue; seen.add(k);
+          petals.push({ layer: d.lambda, slot: key(slot), offsets: { ...r.offsets } });
         }
       }
       if (!layers.length && !petals.length) { p.push(`${r.label}: no descriptor carries the role`); continue; }
@@ -358,25 +436,45 @@ async function nodeClauses(G, F, rec) {
       let exact = 0;
       viaRoles.petals.forEach((a, i) => {
         const b = viaScopes.petals[i];
-        for (const base of Object.keys(a.applied)) if (!Object.is(a.applied[base], b.applied[base])) p.push(`${r.label}: slot ${a.slot.index} ${base} ${a.applied[base]} via roles, ${b.applied[base]} via scopes`);
+        for (const base of Object.keys(a.applied || {})) if (!Object.is(a.applied[base], (b.applied || {})[base])) p.push(`${r.label}: slot ${a.slot.index} ${base} ${a.applied[base]} via roles, ${(b.applied || {})[base]} via scopes`);
         if (!sameNumbers(numbersOf(a.lamina), numbersOf(b.lamina))) p.push(`${r.label}: slot ${a.slot.index} lamina differs between the role build and the scope build`);
         else exact++;
       });
       if (!sameNumbers([...viaRoles.acc.positions], [...viaScopes.acc.positions])) p.push(`${r.label}: the two export streams differ`);
-      summary.push(`${r.label}: ${layers.length} layer / ${petals.length} petal entr${layers.length + petals.length === 1 ? 'y' : 'ies'}, ${exact} petals bit-identical`);
+      summary.push(`${r.label}: ${layers.length + petals.length} entr${layers.length + petals.length === 1 ? 'y' : 'ies'}, ${exact} petals bit-identical`);
     }
     /* the one semantic loss: a mul row (size) as a delta at the migrated global */
     {
-      const st = S({ layerCount: 2, layerPhase: 0, labellumSize: 1.3 });
+      const st = S({ placement: 'FAN', petal2Size: 1.3 });
       const viaRoles = build(G, F, st, undefined, { lamina: false });
-      const lab = viaRoles.built.foot.slotRings.flatMap((x) => x).find((d) => d.slotRole === G.SLOT_LABELLUM);
-      const nn = viaRoles.built.foot.slotCount;
-      const slot = Math.min(lab.slots[0], G.mirrorPartner(lab.slots[0], nn, G.mirrorFor(st)));
-      const viaScopes = build(G, F, { ...st, labellumSize: 1 }, withBounds(F, { petals: [{ layer: lab.lambda, slot, offsets: { petalLength: st.petalLength * 0.3, petalWidth: st.petalWidth * 0.3 } }] }), { lamina: false });
-      const a = viaRoles.petals.find((q) => q.slot.index === lab.slots[0] && q.overridden), b = viaScopes.petals.find((q) => q.scopeTerm && q.slot.index === lab.slots[0]);
-      const dL = Math.abs(a.applied.petalLength - b.applied.petalLength), dW = Math.abs(a.applied.petalWidth - b.applied.petalWidth);
-      if (dL > 1e-9 || dW > 1e-9) p.push(`labellumSize 1.3 as a delta: length off by ${dL}, width by ${dW}`);
-      summary.push(`labellumSize x1.3 as delta global*(0.3): length within ${dL.toExponential(1)}, width within ${dW.toExponential(1)} (a mul is not a delta to the bit; the OFFSETS default's one semantic loss)`);
+      const descriptors = viaRoles.built.foot.slotRings ? viaRoles.built.foot.slotRings.flatMap((x) => x) : viaRoles.built.foot.rings;
+      const grp = descriptors.find((d) => d.petalRole === G.PETAL_ROLE_ORDER[1]);
+      if (!grp) p.push('size row: no descriptor carries group 2');
+      else {
+        const nn = viaRoles.built.foot.slotCount;
+        const slot = keyOf(st, nn)(grp.slots[0]);
+        const viaScopes = build(G, F, { ...st, petal2Size: 1, scopePetals: 'ON' }, withBounds(F, { petals: [{ layer: 0, slot, offsets: { petalLength: st.petalLength * 0.3, petalWidth: st.petalWidth * 0.3 } }] }), { lamina: false });
+        const a = viaRoles.petals.find((q) => q.slot.index === grp.slots[0] && q.overridden), b = viaScopes.petals.find((q) => q.scopeTerm && q.slot.index === grp.slots[0]);
+        if (!a || !b) p.push(`size row: the role petal ${a ? 'was' : 'was NOT'} found, the scoped petal ${b ? 'was' : 'was NOT'}`);
+        else {
+          const dL = Math.abs(a.applied.petalLength - b.applied.petalLength), dW = Math.abs(a.applied.petalWidth - b.applied.petalWidth);
+          if (dL > 1e-9 || dW > 1e-9) p.push(`petal2Size 1.3 as a delta: length off by ${dL}, width by ${dW}`);
+          summary.push(`petal2Size x1.3 as delta global*(0.3): length within ${dL.toExponential(1)}, width within ${dW.toExponential(1)} (${dL === 0 && dW === 0 ? 'exact on this state; ' : ''}a mul is a delta only at the global it was migrated at — the OFFSETS default's one semantic loss)`);
+        }
+      }
+    }
+    /* THE LABELLUM AND HOOD (RADIAL) ARE UNREPRESENTABLE under the rulings:
+       per-petal is FAN only, so a RADIAL petal entry is INERT even with the
+       per-petal toggle ON (measured: bit-identical to no scopes, every term
+       null), and a layer entry reaches every petal of its layer (SO2). The role
+       controls stay (not retired) and are hidden while per-layer is on. */
+    {
+      const st = S({ layerCount: 2, layerPhase: 0, scopePetals: 'ON' });
+      const plain = build(G, F, st, undefined, { lamina: false });
+      const scoped = build(G, F, st, withBounds(F, { petals: [{ layer: 0, slot: 0, offsets: { petalCup: 0.5, petalTilt: -25 } }] }), { lamina: false });
+      if (!sameNumbers([...plain.acc.positions], [...scoped.acc.positions])) p.push('LABELLUM (RADIAL): a petal entry with scopePetals ON moved the bloom — a RADIAL petal scope is live');
+      if (scoped.petals.some((q) => q.scopeTerm !== null)) p.push('LABELLUM (RADIAL): a petal carries a scope term');
+      summary.push('LABELLUM / HOOD (RADIAL): UNREPRESENTABLE — a RADIAL petal entry builds bit-identically to none even with per-petal ON, a layer entry reaches all of its layer (SO2); the roles stay, hidden while per-layer is on');
     }
     rec('SO7', p, summary.join('; '));
   }
@@ -419,6 +517,142 @@ async function nodeClauses(G, F, rec) {
     { const sc = F.scopesForBuild(fixture); if (!sc || sc.layers.length !== 1 || sc.petals.length !== 2 || !sc.bounds.petalCup) p.push('scopesForBuild did not carry the lists and the bounds'); }
     rec('SO8', p, `${rows} live rows round-trip a two-layer / two-petal / one-tier record with no note but the tier's; every written-down refusal fires by name`);
   }
+  /* SO10 — THE TOGGLE GATE: an entry reaches a petal only while its toggle is
+     LIVE (Scoping-b, "each is a toggle; off = today's panel exactly"). Every
+     case below hands the builder a record whose entries cannot be live, and
+     each must build the unscoped bloom to the float with every term null —
+     the record KEPT (the summary still counts it) and INERT. */
+  {
+    const p = [];
+    const layer = { layers: [{ layer: 0, offsets: { petalCup: 0.4, petalSpineCurl: 60 } }, { layer: 1, offsets: { petalTilt: 20 } }] };
+    const petal = { petals: [{ layer: 0, slot: 1, offsets: { petalCup: 0.4, petalSpineCurl: 60 } }] };
+    const cases = [
+      { label: 'RADIAL, per-layer OFF, a layer record', set: { layerCount: 2 }, rec: layer },
+      { label: 'RADIAL, per-petal ON (FAN only), a petal record', set: { layerCount: 2, scopePetals: 'ON' }, rec: petal },
+      { label: 'FAN, per-petal OFF, a petal record', set: { placement: 'FAN' }, rec: petal },
+      { label: 'FAN, per-layer ON (RADIAL only), a layer record', set: { placement: 'FAN', layerCount: 2, scopeLayers: 'ON' }, rec: layer },
+      { label: 'SPIRAL, both ON, both records', set: { placement: 'SPIRAL', layerCount: 2, scopeLayers: 'ON', scopePetals: 'ON' }, rec: { ...layer, ...petal } },
+      { label: 'CONTINUOUS, both ON, both records', set: { placement: 'CONTINUOUS', scopeLayers: 'ON', scopePetals: 'ON' }, rec: { ...layer, ...petal } },
+    ];
+    let n = 0;
+    for (const c of cases) {
+      const st = S(c.set);
+      for (const exportMode of [false, true]) {
+        const a = build(G, F, st, undefined, { exportMode, lamina: false });
+        const b = build(G, F, st, withBounds(F, c.rec), { exportMode, lamina: false });
+        const pa = a.acc.positions, pb = b.acc.positions;
+        let moved = pa.length !== pb.length ? Infinity : 0;
+        if (moved === 0) for (let i = 0; i < pa.length; i++) if (!Object.is(pa[i], pb[i])) moved++;
+        if (moved) p.push(`${c.label} [${exportMode ? 'export' : 'live'}]: ${moved} floats moved — an entry reached a petal with its toggle not live`);
+        if (b.petals.some((q) => q.scopeTerm !== null)) p.push(`${c.label}: a petal carries a scope term`);
+        if (!b.built.scopes || b.built.scopes.layersLive || b.built.scopes.petalsLive) p.push(`${c.label}: the summary reads ${JSON.stringify(b.built.scopes)}`);
+        n++;
+      }
+    }
+    rec('SO10', p, `${cases.length} cases x 2 modes (${n} builds): a record whose toggle is off, or on under the wrong placement, is kept and inert — bit-identical to no record, every term null`);
+  }
+  /* SO11 — ONE OWNER ON SCREEN, AND IN THE GEOMETRY: a toggle ALONE moves
+     nothing; while it is live the role table it hides is INERT (ALL, INNER,
+     the labellum and hood under per-layer; ALL, INNER and the per-petal groups
+     under per-petal), each shown live with the toggle OFF so no clause is
+     vacuous; and per-layer and the tube are exclusive. */
+  {
+    const p = [];
+    const same = (a, b) => sameNumbers([...a.acc.positions], [...b.acc.positions]);
+    const B = (set) => build(G, F, S(set), undefined, { lamina: false });
+    /* the toggle alone */
+    for (const set of [{}, { layerCount: 3 }, { placement: 'FAN' }, { placement: 'FAN', layerCount: 2 }]) {
+      const t = set.placement === 'FAN' ? { scopePetals: 'ON' } : { scopeLayers: 'ON' };
+      if (!same(B(set), B({ ...set, ...t }))) p.push(`${JSON.stringify(set)}: switching ${Object.keys(t)[0]} ON with no record moved the bloom`);
+    }
+    /* each role: live with the toggle OFF, inert with it ON */
+    const roles = [
+      { label: 'ALL (RADIAL)', on: { scopeLayers: 'ON' }, base: {}, role: { allCurl: 60, allCup: 0.3 } },
+      { label: 'INNER (RADIAL, 3 layers)', on: { scopeLayers: 'ON' }, base: { layerCount: 3 }, role: { innerCurl: 90, innerCup: 0.3 } },
+      { label: 'LABELLUM + HOOD (RADIAL, 2 in step)', on: { scopeLayers: 'ON' }, base: { layerCount: 2, layerPhase: 0 }, role: { labellumCup: 0.5, hoodTilt: 20 } },
+      { label: 'ALL (FAN)', on: { scopePetals: 'ON' }, base: { placement: 'FAN' }, role: { allCurl: 60, allCup: 0.3 } },
+      { label: 'INNER (FAN, 2 layers)', on: { scopePetals: 'ON' }, base: { placement: 'FAN', layerCount: 2 }, role: { innerCurl: 90 } },
+      { label: 'PER-PETAL group 2 (FAN)', on: { scopePetals: 'ON' }, base: { placement: 'FAN' }, role: { petal2Cup: 0.5, petal2Tilt: 30 } },
+    ];
+    /* AND NO STAMP: ALL, the slot roles and the per-petal groups go inert
+       through their eligibility functions (no stamp, no census, no split) AND
+       through the resolver's blanket skip — so the geometry cannot tell the
+       eligibility arm is gone (measured: `all-petals-forget-the-toggles` moved
+       no float). What can is the STAMP each emitted petal carries: under a
+       live toggle no petal is stamped ALL, a slot role or a per-petal group,
+       and with the toggle OFF the same state stamps them (anti-vacuity).
+       INNER is the exception by design — it is stamped on every layer >= 1
+       whatever the toggle (Z1 counts it) and goes inert in the resolver. */
+    /* the stamps AND footRing's own eligibility flags: a per-petal group at a
+       collapsed split stamps nothing either way (the collapse guard probes the
+       resolver, which the blanket skip makes inert), so the flag the builder
+       reports is the per-petal arm's only witness here — measured, the
+       `the-groups-forget-per-petal` mutant moved neither a float nor a stamp */
+    const stamps = (set) => { const b = B(set); const f = b.built.foot; return { all: b.petals.filter((q) => q.allRole).length, slot: b.petals.filter((q) => q.slotRole).length, group: b.petals.filter((q) => q.petalRole).length,
+      flags: ['allPetalsEligible', 'slotRolesEligible', 'perPetalEligible'].filter((k) => f[k]) }; };
+    for (const r of roles) {
+      if (same(B(r.base), B({ ...r.base, ...r.role }))) p.push(`${r.label}: the role does not move the bloom with the toggle OFF — the inertness claim below would be vacuous`);
+      if (!same(B({ ...r.base, ...r.on }), B({ ...r.base, ...r.on, ...r.role }))) p.push(`${r.label}: the role MOVED the bloom with ${Object.keys(r.on)[0]} ON — two owners on one petal`);
+      const offS = stamps({ ...r.base, ...r.role }), onS = stamps({ ...r.base, ...r.on, ...r.role });
+      if (onS.all || onS.slot || onS.group) p.push(`${r.label}: with ${Object.keys(r.on)[0]} ON ${onS.all} petal(s) are stamped ALL, ${onS.slot} a slot role, ${onS.group} a per-petal group — the eligibility does not know the toggle`);
+      if (onS.flags.length) p.push(`${r.label}: with ${Object.keys(r.on)[0]} ON footRing reports ${onS.flags.join(', ')} — the eligibility does not know the toggle`);
+      if (!/INNER/.test(r.label) && !(offS.all || offS.slot || offS.group)) p.push(`${r.label}: with the toggle OFF no petal carries the role's stamp — the stamp clause would be vacuous`);
+      if (!/INNER/.test(r.label) && !offS.flags.length) p.push(`${r.label}: with the toggle OFF footRing reports no role eligible — the flag clause would be vacuous`);
+    }
+    /* the tube */
+    const tubeRow = byLabel.get('TUBE: 8 petals x k 2 (2 panels)');
+    if (!tubeRow) p.push('the TUBE row is not in the live matrix — re-point it');
+    else {
+      const tube = stateOf(tubeRow);
+      if (!G.tubeEligible(tube)) p.push('the TUBE row is not tube-eligible with the toggle OFF — the exclusion below would be vacuous');
+      if (G.tubeEligible({ ...tube, scopeLayers: 'ON' })) p.push('the tube is still eligible with per-layer values ON');
+      const noTube = { ...tube }; for (const id of Object.keys(noTube)) if (/^tube/.test(id)) noTube[id] = REG.DEFAULTS[id];
+      if (!same(build(G, F, { ...tube, scopeLayers: 'ON' }, undefined, { lamina: false }), build(G, F, { ...noTube, scopeLayers: 'ON' }, undefined, { lamina: false }))) p.push('with per-layer ON the tube controls still move the bloom');
+    }
+    rec('SO11', p, `a toggle alone moves nothing on 4 states; ${roles.length} role sets each move the bloom with the toggle OFF and NOTHING with it ON, and no petal carries an ALL / slot-role / group stamp (nor footRing an eligibility flag) under the toggle; per-layer ON makes the tube unavailable (its controls inert)`);
+  }
+  /* SO12 — EVERY SCOPEABLE CONTROL REACHES A PETAL THROUGH A LAYER SCOPE, with
+     its own guard live: an offset on layer 1 moves every layer-1 petal's
+     lamina and leaves every layer-0 petal bit-identical. A scopeable id no
+     offset can move is a control the panel would rebind to no effect — which
+     is how `footDelicacy` was found (its only reader is footRing's, which
+     reads the global: whorl-level, Q3.3) and moved to SCOPE_WHORL_LEVEL. */
+  {
+    const p = [];
+    const GUARDS = { fringeDepth: { fringeCount: 4, petalTipEnd: 1 }, fringeCount: { petalTipEnd: 1 }, lobeCount: { lobeDepth: 0.3 }, lobeCoverage: { lobeDepth: 0.3 }, lobeCrestShape: { lobeDepth: 0.3 }, lobeNotchShape: { lobeDepth: 0.3 },
+      infillDensity: { petalInfill: 'VORONOI' }, infillRelax: { petalInfill: 'VORONOI' }, infillLaw: { petalInfill: 'VORONOI' }, infillAniso: { petalInfill: 'VORONOI' }, infillRound: { petalInfill: 'VORONOI' }, infillBase: { petalInfill: 'VORONOI' },
+      buckleFreq: { buckleAmp: 0.3 }, buckleEnv: { buckleAmp: 0.3 }, curlBias: { petalSpineCurl: 90 }, curlStart: { petalSpineCurl: 90 }, petalRollTaper: { petalRoll: 120 }, petalApexSweep: { petalCup: 0.6 } };
+    const dead = [], leaked = [];
+    for (const id of F.SCOPEABLE_IDS) {
+      const c = kindOf.get(id);
+      const st = S({ layerCount: 2, scopeLayers: 'ON', ...(GUARDS[id] || {}) });
+      const g = Number(st[id]), span = c.max - c.min;
+      let d = (g + span / 2 <= c.max) ? span / 2 : -span / 2;
+      if (c.step >= 1) d = Math.round(d / c.step) * c.step;
+      const a = build(G, F, st, undefined), b = build(G, F, st, withBounds(F, { layers: [{ layer: 1, offsets: { [id]: d } }] }));
+      if (a.petals.length !== b.petals.length) { p.push(`${id}: petal counts ${a.petals.length} / ${b.petals.length}`); continue; }
+      /* a petal's own fingerprint: its captured lamina, its triangle count and
+         the hole loops its infill emitted (the infill is drawn over the
+         lattice and the lamina does not carry it — the first version read the
+         lamina alone and called all six infill controls dead) */
+      const print = (q) => numbersOf({ lamina: q.lamina, tris: q.tris, holes: q.infill ? q.infill.emittedLoops : null });
+      /* WHICH PETALS ARE ON LAYER 1 is each petal's OWN WHORL, not whether it
+         carries a term: a defect that sends the offset to another whorl gives
+         that whorl's petals a term too, which took them out of the checked set
+         (the fifth durable rule — the review's finding). */
+      let moved = 0, termed = 0;
+      b.petals.forEach((q, i) => {
+        const s = sameNumbers(print(a.petals[i]), print(q));
+        if (Math.round(a.petals[i].whorl) === 1) { termed++; if (!s) moved++; } else if (!s || q.scopeTerm) leaked.push(`${id} (whorl ${Math.round(a.petals[i].whorl)}, slot ${q.slot.index})`);
+      });
+      if (!termed) p.push(`${id}: no petal is on whorl 1`);
+      else if (!moved) dead.push(id);
+      else if (moved !== termed) p.push(`${id}: ${moved} of ${termed} layer-1 petals moved — a layer offset reaches every petal of its layer alike`);
+    }
+    if (dead.length) p.push(`a layer-1 offset moved NO layer-1 petal for ${dead.length} scopeable id(s): ${dead.join(', ')}`);
+    if (leaked.length) p.push(`a layer-1 offset moved a layer-0 petal: ${leaked.slice(0, 6).join(', ')}${leaked.length > 6 ? ` (+${leaked.length - 6})` : ''}`);
+    rec('SO12', p, `all ${F.SCOPEABLE_IDS.length} scopeable controls move every whorl-1 petal through a layer-1 offset with their guard live, and none moves (or gives a term to) a petal on another whorl — read off each petal's own whorl`);
+  }
 }
 
 /* ---------------- the browser clause ---------------- */
@@ -433,6 +667,11 @@ async function browserClauses(port, rec) {
     const rec0 = { layers: [{ layer: 0, offsets: { petalCup: 0.3 } }], petals: [{ layer: 0, slot: 1, offsets: { petalTipShape: 0.5 } }], tiers: [] };
     const before = await page.evaluate(() => window.__bloomMetrics().scopes);
     if (before !== null) p.push(`the page opened with scopes ${JSON.stringify(before)}`);
+    /* per-layer values ON first (Scoping-b): a layer entry reaches a petal only
+       while its toggle is live; the petal entry stays KEPT and INERT on this
+       RADIAL page (per-petal is FAN only), which `petalsScoped` 8 says */
+    const badT = await H.applyConfig(page, [{ id: 'scopeLayers', value: 'ON' }]);
+    if (badT && badT.length) p.push(`the toggle did not apply: ${JSON.stringify(badT)}`);
     const got = await page.evaluate((r) => window.__bloomScopes(r), rec0);
     if (JSON.stringify(got) !== JSON.stringify(rec0)) p.push(`the hook handed back ${JSON.stringify(got)}`);
     const m1 = await page.evaluate(() => window.__bloomMetrics().scopes);
@@ -451,6 +690,18 @@ async function browserClauses(port, rec) {
     if (JSON.stringify(back) !== JSON.stringify(rec0)) p.push(`after the load the page holds ${JSON.stringify(back)}`);
     const stl2 = await H.exportStl(page, tmp);
     if (Buffer.compare(stl1, stl2) !== 0) p.push(`the STL after save -> clear -> load differs from the scoped export (${stl1.length} / ${stl2.length} bytes)`);
+    /* the toggle OFF keeps the record and builds the unscoped bloom; ON again
+       builds the scoped one — "off = today's panel exactly", in the file */
+    await H.applyConfig(page, [{ id: 'scopeLayers', value: 'OFF' }]);
+    const kept = await page.evaluate(() => window.__bloomDesign.scopes());
+    if (JSON.stringify(kept) !== JSON.stringify(rec0)) p.push(`switching per-layer OFF changed the record to ${JSON.stringify(kept)}`);
+    const mOff = await page.evaluate(() => window.__bloomMetrics().scopes);
+    if (!mOff || mOff.layersLive !== false || mOff.petalsScoped !== 0) p.push(`with per-layer OFF the build reports ${JSON.stringify(mOff)} — expected the record kept, no petal scoped`);
+    const stlOff = await H.exportStl(page, tmp);
+    if (Buffer.compare(stl0, stlOff) !== 0) p.push('with per-layer OFF the export is not the unscoped one — a kept record reached the build');
+    await H.applyConfig(page, [{ id: 'scopeLayers', value: 'ON' }]);
+    const stlOn = await H.exportStl(page, tmp);
+    if (Buffer.compare(stl1, stlOn) !== 0) p.push('per-layer ON again does not build the scoped export');
     const status = await page.evaluate(() => document.getElementById('designStatus').textContent);
     if (!/1 layer \/ 1 petal offset entries/.test(status)) p.push(`the status line reads "${status}"`);
     /* a plain save (no overrides) clears the record */
@@ -460,7 +711,7 @@ async function browserClauses(port, rec) {
     const stl3 = await H.exportStl(page, tmp);
     if (Buffer.compare(stl0, stl3) !== 0) p.push('after a plain load the export is not the unscoped one');
     if (errors.length) p.push(`page errors: ${errors.slice(0, 3).join(' | ')}`);
-    rec('SO9', p, `__bloomScopes sets a record the build carries (8 of 8 petals scoped), the save writes it, a load of that save restores it and the same STL (${stl1.length} bytes against ${stl0.length} unscoped), a plain file clears it`);
+    rec('SO9', p, `__bloomScopes sets a record the build carries (8 of 8 petals scoped), the save writes it, a load of that save restores it and the same STL (${stl1.length} bytes against ${stl0.length} unscoped), per-layer OFF keeps the record and exports the unscoped STL and ON again the scoped one, a plain file clears it`);
   } finally {
     await browser.close();
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -468,22 +719,39 @@ async function browserClauses(port, rec) {
 }
 
 /* ---------------- the mutants (bloom-geometry.js copies) ---------------- */
+const FAN_PETALS_ON = () => ({ ...REG.DEFAULTS, placement: 'FAN', scopePetals: 'ON' });
+const TUBE_STATE = () => { const r = byLabel.get('TUBE: 8 petals x k 2 (2 panels)'); if (!r) throw new Error('the TUBE row is not in the live matrix — re-point the tube mutant'); return stateOf(r); };
 const MUTANTS = [
   /* SO5 stays GREEN here and that is correct: ignoring every offset leaves the
      thickness exactly what it was, which is what SO5 asserts. */
-  { id: 'offsets-are-ignored', breaks: ['SO2', 'SO3', 'SO4', 'SO6', 'SO7'],
+  { id: 'offsets-are-ignored', breaks: ['SO2', 'SO3', 'SO4', 'SO6', 'SO7', 'SO12'],
     from: '  if (scopeTerm !== null) {\n    for (const base of Object.keys(scopeTerm.offsets)) {',
     to: '  if (scopeTerm !== null && false) {\n    for (const base of Object.keys(scopeTerm.offsets)) {',
     /* a direct call: the resolver handed a layer term must move the base */
     witness: (G) => G.resolveRoleOverrides({ ...REG.DEFAULTS }, [], null, null, null, { offsets: { petalCup: 0.4 }, bounds: {} }) === null },
-  { id: 'a-petal-offset-leaks-to-every-petal', breaks: ['SO3', 'SO7'],
-    from: '    if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;',
-    to: '    if (e.layer !== layer) continue;',
-    witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 1, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 3, n: 8, state: REG.DEFAULTS }) !== null },
-  { id: 'a-mirror-pair-is-split', breaks: ['SO3', 'SO7'],
+  /* Scoping-b: "an edit lands on every scope" in the model's own terms — a
+     petal entry reaches every petal of its layer. The witness is a FAN under
+     per-petal values (the only place a petal entry is live now). */
+  { id: 'a-petal-offset-leaks-to-every-petal', breaks: ['SO3', 'SO4', 'SO7'],
+    from: '      if (e.layer !== layer || e.slot !== key) continue;',
+    to: '      if (e.layer !== layer) continue;',
+    witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 1, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 3, n: 7, state: FAN_PETALS_ON() }) !== null },
+  /* The review's fold, restored: a petal entry re-keyed through the pairing law
+     at today's count, so a member index — or a canonical one the fan no longer
+     builds — lands on whichever pair that number names now. */
+  { id: 'a-member-index-is-re-keyed', breaks: ['SO3'],
+    from: '      if (e.layer !== layer || e.slot !== key) continue;',
+    to: '      if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;',
+    witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 4, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 1, n: 5, state: { ...FAN_PETALS_ON(), fanPerSide: 2 } }) !== null },
+  /* Validation back on the kept entries only — the first cut's shape. */
+  { id: 'unreached-entries-are-not-validated', breaks: ['SO5'],
+    from: '  for (const e of scopes.layers || []) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);\n  for (const e of scopes.petals || []) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);',
+    to: '  for (const e of scopes.layers || []) if (!layersLive) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);\n  for (const e of scopes.petals || []) if (!petalsLive) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);',
+    witness: (G) => { try { G.scopeOffsetsFor({ layers: [{ layer: 3, offsets: { sheetThickness: 0.5 } }] }, { layer: 0, slot: 0, n: 8, state: { ...REG.DEFAULTS, scopeLayers: 'ON' } }); return true; } catch (e) { return false; } } },
+  { id: 'a-mirror-pair-is-split', breaks: ['SO3', 'SO4', 'SO7'],
     from: '  if (!SCOPE_PAIRED_PLACEMENTS.includes(state.placement)) return slot;\n  return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));',
     to: '  return slot;',
-    witness: (G) => G.scopeSlotKey(7, 8, REG.DEFAULTS) === 7 },
+    witness: (G) => G.scopeSlotKey(6, 7, FAN_PETALS_ON()) === 6 },
   { id: 'offsets-are-applied-after-the-clamp', breaks: ['SO4'],
     from: '    out[base] = clamp(composed, b.min, b.max);\n    /* WHICH BASES THE CLAMP ACTUALLY BIT',
     to: '    { const so = scopeTerm !== null && base in scopeTerm.offsets ? scopeTerm.offsets[base] : 0; out[base] = clamp(composed - so, b.min, b.max) + so; }\n    /* WHICH BASES THE CLAMP ACTUALLY BIT',
@@ -492,6 +760,33 @@ const MUTANTS = [
     from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);",
     to: 'export const SCOPE_UNSCOPED = Object.freeze([]);',
     witness: (G) => G.SCOPE_UNSCOPED.length === 0 },
+  /* ---- Scoping-b: the toggles ---- */
+  { id: 'the-toggle-gate-is-removed', breaks: ['SO7', 'SO10'],
+    from: '  const layersLive = scopeLayersLive(state);\n  const petalsLive = scopePetalsLive(state);',
+    to: '  const layersLive = true;\n  const petalsLive = true;',
+    witness: (G) => G.scopeOffsetsFor({ layers: [{ layer: 0, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 0, n: 8, state: { ...REG.DEFAULTS } }) !== null },
+  { id: 'the-role-table-stays-live-under-a-toggle', breaks: ['SO11'],
+    from: '    if (roleTableInert) continue;',
+    to: '    if (false) continue;',
+    witness: (G) => G.resolveRoleOverrides({ ...REG.DEFAULTS, scopeLayers: 'ON', innerCurl: 90 }, [G.ROLE_INNER]) !== null },
+  { id: 'all-petals-forget-the-toggles', breaks: ['SO11'],
+    from: '  return Math.round(state.layerCount) === 1 && !scopesOwnRoles(state);',
+    to: '  return Math.round(state.layerCount) === 1;',
+    witness: (G) => G.allPetalsEligible({ ...REG.DEFAULTS, scopeLayers: 'ON' }) === true },
+  /* The eligibility mutants change NO geometry (the resolver's blanket skip
+     keeps every role inert) — SO11's stamp clause is what sees them. */
+  { id: 'the-groups-forget-per-petal', breaks: ['SO11'],
+    from: "  return state.placement === 'FAN' && !scopePetalsLive(state);",
+    to: "  return state.placement === 'FAN';",
+    witness: (G) => G.perPetalEligible(FAN_PETALS_ON()) === true },
+  { id: 'the-slot-roles-forget-per-layer', breaks: ['SO11'],
+    from: "  if (scopeLayersLive(state)) return false;\n  if (state.placement !== 'RADIAL') return false;",
+    to: "  if (state.placement !== 'RADIAL') return false;",
+    witness: (G) => G.slotRolesEligible({ ...REG.DEFAULTS, layerCount: 2, layerPhase: 0, scopeLayers: 'ON' }) === true },
+  { id: 'the-tube-ignores-per-layer', breaks: ['SO11'],
+    from: '  if (scopeLayersLive(state)) return false;\n  if (sphereMode(state)) return false;',
+    to: '  if (sphereMode(state)) return false;',
+    witness: (G) => G.tubeEligible({ ...TUBE_STATE(), scopeLayers: 'ON' }) === true },
 ];
 function mutate(src, m) {
   const n = src.split(m.from).length - 1;

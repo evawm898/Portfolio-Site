@@ -31,7 +31,9 @@ scopes = {
   import the registry and must clamp a base the role table does not reach.
 - An offset is a DELTA on the global value (Q3.2, a DEFAULT ruled as a default — recorded as such).
   Nothing is a multiplier. The one semantic consequence is in §4.
-- **Which controls may carry an offset** (`SCOPEABLE_IDS`, 34): the registry's PETAL-role sliders
+- **Which controls may carry an offset** (`SCOPEABLE_IDS`, 34 at this session; **33 since Scoping-b**,
+  which measured `footDelicacy` moving 0 floats under a scope and moved it to `SCOPE_WHORL_LEVEL` —
+  `docs/bloom-scoping-selection.md` §4): the registry's PETAL-role sliders
   less three named sets, each with its reason — `sheetThickness` (never scoped, Q3.6, the
   geometry's own `SCOPE_UNSCOPED`); the ROLE_OVERRIDES delta controls (`allCurl`, `innerCup`,
   `labellumSize`, `petal3Tilt` … — they ARE the scoping this model replaces, Q3.4 retires them, and
@@ -63,6 +65,13 @@ and calls `petalStateForSlot(…, scopeTerm)`.
   `mirrorFor`) an entry naming slot i reaches i and `mirrorPartner(i)`; both are keyed on the
   pair's canonical slot `min(i, partner)` — `petalRoleForSlot`'s own key. SPIRAL and CONTINUOUS
   have no plane, so a slot is its own scope. Two entries for one pair SUM.
+  > **Scoping-b changed both halves of this.** (1) An entry reaches a petal only under its toggle:
+  > a layer entry under RADIAL with `scopeLayers` ON, a petal entry under FAN with `scopePetals` ON;
+  > every other entry is kept and inert. (2) A petal entry is matched on the pair's CANONICAL slot
+  > EXACTLY and is never re-keyed through `mirrorPartner` at the current count: a member index, or a
+  > pair the fan no longer builds, is inert. Re-keying is what folded an outer pair's values onto an
+  > inner one when Petals per side fell (`docs/bloom-scoping-selection.md` §7). So "naming slot 7
+  > builds the identical bloom" below is no longer true: naming a member index is inert.
 - **Offsets go in BEFORE the clamp** and the clamp is the existing one: `composedBoundsOf(base)`
   for the role bases, `scopes.bounds[base]` for every other scopeable base, a THROW if neither.
 - **Sheet thickness is never scoped (Q3.6)**: the reader refuses the key by name with a note and
@@ -78,9 +87,9 @@ and calls `petalStateForSlot(…, scopeTerm)`.
 |---|---|
 | SO1 | 12 named rows × 2 modes (`--smoke` / `--full` widen it): **10,087,416 floats identical under `Object.is`** between a build with no scopes and one with empty containers; every petal `scopeTerm: null`. |
 | SO2 | 3 layers × 8: a layer-1 cup offset of +0.4 moves exactly the 8 layer-1 petals by exactly 0.4 (`applied`) and holds the other 16 bit-identical (captured lamina). |
-| SO3 | RADIAL 8: slot 1 and slot 7 move, nothing else; naming slot 7 builds the identical bloom. FAN through-slot and through-gap: slot 1 and its own partner. SPIRAL, CONTINUOUS: slot 1 alone. |
+| SO3 | RADIAL 8: slot 1 and slot 7 move, nothing else; naming slot 7 builds the identical bloom. FAN through-slot and through-gap: slot 1 and its own partner. SPIRAL, CONTINUOUS: slot 1 alone. **[Scoping-b: SO3 now runs on FAN only, where a petal entry is live. Naming the member index is inert, and a stored outer pair is inert at a smaller count and returns at its own.]** |
 | SO4 | cup 0 + 5 lands ON 1.2 (the range end), never past it; a labellum reads base + role 0.5 + offset 0.3 then one clamp; under `varianceForm` 1 every composed value is inside its base's range (headroom reads the offset base). |
-| SO5 | the reader refuses a thickness offset by name and keeps the entry; the geometry throws; offsetting all 34 scopeable controls at one step leaves every ring's thickness what it was. |
+| SO5 | the reader refuses a thickness offset by name and keeps the entry; the geometry throws; offsetting all 34 scopeable controls at one step leaves every ring's thickness what it was. **[Scoping-b: 33 scopeable, since `footDelicacy` is whole-whorl. The geometry throws on every entry whether or not it reaches a petal, toggles ON and OFF.]** |
 | SO6 | Q3.5 as it stands: a layer tilt offset is ADDED on top of the `layerTilt` ramp — `tiltExtra` unchanged on every slot (see §5). |
 | SO7 | today's roles, rebuilt as scopes: see §4. |
 | SO8 | 1,302 live rows round-trip a two-layer / two-petal / one-tier record with no note but the tier's; every written-down refusal fires by name. |
@@ -96,6 +105,20 @@ mirror-split mutant handed it one entry per pair member and passed; the pairing 
 gate now (the L7 lesson, one family later).
 
 ## 4. The migration table — today's roles as scopes (measured, SO7)
+
+> **Scoping-b changed what this table can reach.** Eva's rulings put per-layer values on RADIAL only
+> and per-petal values on FAN only, each behind a toggle, so a petal entry is live on a FAN alone.
+> **Scoping-b: the table below is the Scoping-a measurement, and three of its rows changed under
+> the toggles.** SO7 now builds each row through the toggle that makes its entries live, and measures:
+> - **ALL and INNER on RADIAL** map to layer entries as written, exact.
+> - **ALL and INNER on a FAN** do NOT map to layer entries: a layer entry is inert on a FAN. ALL
+>   becomes a petal entry on EVERY pair of its layer (4 entries, 7 of 7 petals exact). INNER becomes
+>   every pair of each layer ≥ 1 (4 entries on 2 layers, 14 of 14 exact).
+> - **The RADIAL labellum and hood are UNREPRESENTABLE**: a RADIAL petal entry is inert even with
+>   per-petal ON (measured, bit-identical to none), and a layer entry reaches its whole layer.
+> - **The `mul` row** is measured on `petal2Size` on a FAN, since the labellum is unrepresentable.
+>
+> That choice is the retirement session's (Q3.4) — `docs/bloom-scoping-selection.md` §6.
 
 Every row below was built through its role controls and again through the equivalent scope entries
 with the role controls at identity; `applied` is EXACT and every petal's lamina BIT-IDENTICAL.
@@ -137,7 +160,9 @@ built.
 
 - **The stem omission probe is unscoped.** `stemOmission` builds the probe petals from the state
   without a scope term, so on a SPHERE with a stem a scoped petal's clearance is measured on its
-  unscoped twin. A wiring item; told here.
+  unscoped twin. A wiring item; told here. **Unreachable since Scoping-b:** the omission runs only
+  on a SPHERE, which is CONTINUOUS, and neither toggle can be live there, so no scope reaches a
+  sphere's petals.
 - **The sepal angle scan** keys congruence on the scope term (so two scoped neighbourhoods are not
   collapsed into one trial) but the scan's trial sepals read the scoped SITES' slots as built, which
   is right; sepal tiers themselves are not applied.
