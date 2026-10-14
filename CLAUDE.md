@@ -764,6 +764,31 @@ SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection
 - **0 matrix rows, no frozen phase.** Sheet: `node tools/shot-bloom-scopes.mjs` →
   `docs/img/scope-selection.png`.
 
+**THE PANEL HAS A `curve` CONTROL KIND — A POINT EDITOR WITH ZERO CONSUMERS AND ZERO LIVE CONTROLS**
+(the curve-editor session, Oct 14; feature map §4–§6, §11 Q4.1 / Q4.4 / Q6.1 — read
+`docs/bloom-curve-editor.md` before touching `bloom-curve.js`, `makeCurveInput`, `FIELD_KINDS`,
+`CONTROL_KINDS`, `__bloomCurveTest` or route (af)). F3 (spine) and F6 (outline) wire into it.
+- **`bloom-curve.js` is the one owner** of the value `{ mode, points[, right] }`, the sampler and
+  `proposeEdit`. `points` is always the LEFT side. Every coordinate is a FRACTION of `spec.owner`'s
+  length. The modes are `symmetric` / `two-sided` / `single` (`single` is for the spine, made without a
+  ruling).
+- **THE SAMPLER HAS TWO ARMS AND THE SPEC CHOOSES:** centripetal Catmull-Rom (/bug's law, ported) for a
+  2D shape, PCHIP for a `monotoneX` function curve. Catmull-Rom was MEASURED folding back in x on 6,176
+  of 20,000 function-shaped point sets; PCHIP on 0. Consumers call `curveSamples`, never the law.
+- **A refused edit leaves the value UNCHANGED** — no clamp, no bisection, the reason told (Q4.4). A row's
+  `validate(candidate, ui)` returns a reason string to refuse. Two-sided -> symmetric keeps the LEFT side.
+- **The design file:** `FIELD_KINDS` (one `{write, read}` row per kind) replaced `coerceField`'s
+  branches. A curve is written verbatim and refused WHOLE when the spec cannot hold it.
+  `composeControls` / `readControls` / `fieldFor` are exported walkers. "Add the row" was read as the
+  KIND's row, since no live control is a curve (a reading, not a ruling). The `curves` container's
+  future is F3's call.
+- **Gates:** panel route (af) via `__bloomCurveTest` with five mutants (TWENTY-SIX routes); design-file F7
+  plus F0's kinds census and a seventh mutant. `a-dropped-field-on-write` was RE-ANCHORED onto the moved
+  writer loop.
+- **`bloom-curve.js` IS IN NO WORKFLOW'S PATH FILTER** (workflows were off-limits), so a change to it
+  alone runs no gate. Sheet: `node tools/shot-bloom-curve-editor.mjs <dir>` → `docs/img/curve-editor.png`.
+  0 rows, `bloom-geometry.js` untouched.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
