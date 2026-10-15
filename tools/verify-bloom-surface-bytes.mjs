@@ -315,6 +315,13 @@ const PREDICATE_MOVERS = {
      degrees) was the wire throughout on the base and is the wire throughout
      here — a holder, by the taper's own clamp ("never above the built
      value"). Read off the BASE tree's own plan chain, never this tree's. */
+  /* THE SPINE CURVE (F3-global). A row moves iff THIS tree builds it in CURVE
+     mode — the geometry's own `curlIsCurve` on the row's coerced state (the
+     base tree has no `petalCurlMode` and builds every row as SLIDER, so the
+     guard can only be read here). Every SLIDER row, the GATED row with a curve
+     stored included, must hold to the bit in both modes: that is the
+     "byte-identical by branch" claim, measured. */
+  'curve': (st) => mine.curlIsCurve(st),
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);

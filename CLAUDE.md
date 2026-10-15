@@ -799,6 +799,42 @@ SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection
   alone runs no gate. Sheet: `node tools/shot-bloom-curve-editor.mjs <dir>` → `docs/img/curve-editor.png`.
   0 rows, `bloom-geometry.js` untouched.
 
+**THE SPINE CURVE SHIPS ON THE PETALS: A CURL MODE, THE POINTS DRAW THE SPINE'S SHAPE, CURVATURE IS
+DERIVED, AND THE REFUSAL AND THE CLAMP ARE ONE DECISION** (F3-global, Oct 15; Eva's rulings Q4.1 / Q4.2 /
+Q4.4 — read `docs/bloom-spine-curve-outcome.md` before touching `curlIsCurve`, `spineCurveLaw`,
+`spineCurveRefusal`, `spineLaw`'s `curve` arm, `petalForm`'s curl read, `SPINE_CURVE_SPEC`, C1's curve
+clauses, J8's curve arm or block 62).
+- `petalCurlMode` (Petal curl, a CHOICE: SLIDER / CURVE, default SLIDER — byte-identical by branch) and
+  `petalSpineCurve` (the first LIVE `curve` control: `single` mode, the first point pinned at the origin,
+  fractions of Petal length). In CURVE mode `petalSpineCurl`, `curlBias`, `curlStart`, every curl delta
+  (ALL / INNER / labellum / per-petal) and the variance curl term are HIDDEN (`curlFromSlider`) and INERT by
+  ONE read (`petalForm`'s `curlRad = 0`). Sepals and leaves PIN SLIDER (Q4.3 / Q4.5 are later sessions).
+- **The curve is an arm BESIDE spineLaw's laws**: its per-node curvature (the turning angle between adjacent
+  chords of the sampler's own polyline, over their mean length) is added to the slider law's substep mean;
+  in CURVE mode the slider law is handed 0 so the spine IS the curve. **The spine is the drawn curve scaled
+  so its ARC LENGTH is the petal's ASKED length** (mode-free), **laid with its first chord along the blade**
+  (J8's contract — the drawn start angle is reported and told, never a tilt).
+- **The validator and the build read ONE set of doubles**: `spineCurveRefusal` is `peakKmm > 1 / floor` on
+  the same per-node curvatures `spineLaw` clamps at `|kRaw| > kMax`, the floor `spineLaw`'s own one sheet
+  thickness at the EXPORT floor (the stricter mode), asked at EVERY asked length the build on screen drew
+  (an inner whorl is shorter and tighter). A drag the validator accepts never builds a clamped spine — C1 (d)
+  holds it against the PAGE module's own recorded answer, not a Node import. A curve a FILE loaded, or a
+  later slider made too tight (more whorls), is CLAMPED AND TOLD, the modifiers' own treatment — never
+  refused retroactively.
+- **C1's curve arm RESTATES curve → curvature** from the control's points through `bloom-curve.js`'s sampler
+  (never `spineCurveLaw`) and lands `spineLaw` on the emitted rows to 1e-9 mm; the mode has two statements
+  (record and control, both ways); the hidden family reads 0 in the record. Z1 excludes a group's curl delta
+  in CURVE mode and asserts it hidden. The apex mutant table runs `curlAssertions` now (it never had), with
+  five witnessed mutants: the curve ignored, a refused drag that clamps, the slider taken in CURVE mode, the
+  hidden family still applied, the validator on a different floor.
+- **The drag rides F7's path** (a pointerdown on the editor's svg arms the light build; the slider lines the
+  drag gate's mutants anchor on are untouched). The harness knows the curve kind: `applyConfig` compares
+  canonical JSON, `fullStateDrift` parses the row's text, `cloneCurve` takes either spelling.
+- Block 62 (twelve rows, 1331 → 1343), smoke block 62 (four), F8 in the design-file gate,
+  `--movers-predicate curve` in the byte tool. `frozen/phase68` is the 1331 rows at `b51182a`. Sheet:
+  `node tools/shot-bloom-spine-curve.mjs <dir>` → `docs/img/spine-curve.png`; drag cost:
+  `node tools/bloom-spine-curve-drag-cost.mjs`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

@@ -28,6 +28,10 @@
    replaces the guess with a number (charter, "Standing gaps"). Applied only
    in export mode, like the flower's floor. */
 export const MIN_FEATURE_MM = 1.0;
+/* THE CURVE VALUE'S ONE SAMPLER (F3-global, the spine curve). bloom-curve.js is
+   pure and owns the drawn curve; the spine curve law below derives curvature
+   from its samples and never restates the law. */
+import { curveSamples } from './bloom-curve.js';
 
 /* THE DEFAULT sheet thickness, in mm. Until the thickness layer this was the
    thickness — one constant read at both call sites, so foot, blade and tip
@@ -7841,7 +7845,11 @@ export function petalFormIsFlat(state) {
          buckle wired only inside sectAt would be a dead slider — measured on
          the discovery rig, which built the field, saw an identical triangle
          count and an identical byte, and was right to. */
-      && buckleIsFlat(state);
+      && buckleIsFlat(state)
+      /* THE SPINE CURVE (F3-global): CURVE mode constructs the form whatever
+         the slider says, because the spine is the curve's and a curve is not a
+         zero. The harness's FORM_IDS twin carries the same arm. */
+      && !curlIsCurve(state);
 }
 
 /* ===================================================================
@@ -7968,7 +7976,7 @@ const SPINE_WIRED = true;
 export const CURL_START_MIN = 1 / NU;
 export function curlIsUniform(state) { return state.curlBias === 0 && state.curlStart === 0; }
 export function curlStartFloored(start, startFloor = CURL_START_MIN) { return start === 0 ? 0 : Math.max(start, CURL_START_MIN, startFloor); }
-export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN, rows = NU }) {
+export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN, rows = NU, curve = null }) {
   const p = CURL_BIAS_POWER * bias;
   const s0 = curlStartFloored(start, startFloor);
   const remap = (u) => (s0 === 0 ? u : Math.max(0, (u - s0) / (1 - s0)));
@@ -7991,7 +7999,20 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
      UNDER ONE SHEET THICKNESS clause) and never applied. The claim that the
      uniform arc never reaches the floor was true of one whorl and false of
      six, and the gate found it before this sentence did. */
-  const uniform = bias === 0 && s0 === 0;
+  /* THE CURVE ARM (F3-global, the spine curve — docs/bloom-spine-curve-outcome.md).
+     `curve` is a `spineCurveLaw()` record: the drawn curve's own curvature,
+     piecewise constant along ITS arc, read at each substep's midpoint and
+     ADDED to the slider law's mean curvature over that substep. BESIDE the
+     existing laws, never a second owner: in CURVE mode the builder hands this
+     function curlRad 0, bias 0, start 0 (the hidden family is inert by that
+     call, not by a guard here), so `Phi` is exactly 0 and the spine IS the
+     curve; a mutant that lets the slider through adds to the curve, which C1's
+     restatement sees. THE CURVE IS NEVER UNIFORM: it takes the modifiers'
+     floor (one sheet thickness of radius) and is clamped and told exactly as
+     bias and start are — and the refusal the editor's validator applies is
+     `spineCurveRefusal`, which asks THIS clamp (the same `kMax`, the same
+     per-node curvatures `kappaAtMm` serves here) rather than restating it. */
+  const uniform = bias === 0 && s0 === 0 && curve === null;
   const kMax = uniform ? Infinity : 1 / floorRadius;
   const N = rows * SPINE_SUBSTEPS, ds = length / N;
   const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
@@ -7999,14 +8020,15 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
   let peakK = 0, clamped = false;
   for (let i = 0; i < N; i++) {
     const u1 = (i + 1) / N;
-    const kRaw = (Phi(u1) - Phi(i / N)) / ds;
+    const kRaw = (Phi(u1) - Phi(i / N)) / ds + (curve === null ? 0 : curve.kappaAtMm((i + 0.5) * ds));
     const over = Math.abs(kRaw) > kMax;
     const k = over ? Math.sign(kRaw) * kMax : kRaw;
     if (over) clamped = true;
     if (Math.abs(k) > peakK) peakK = Math.abs(k);
     const p0 = phi[i];
-    /* Exact where nothing has clamped yet, accumulated once something has. */
-    const p1 = clamped ? p0 + k * ds : tilt + Phi(u1);
+    /* Exact where nothing has clamped yet, accumulated once something has
+       (and always accumulated under a curve, whose turn has no closed form). */
+    const p1 = clamped || curve !== null ? p0 + k * ds : tilt + Phi(u1);
     phi[i + 1] = p1;
     if (k === 0) { dR[i + 1] = dR[i] + Math.cos(p0) * ds; dZ[i + 1] = dZ[i] + Math.sin(p0) * ds; }
     else {
@@ -8053,7 +8075,127 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
     turnAsked: curlRad,
     startFloored: s0,
     startFloor,
+    curve: curve === null ? null : { peakKmm: curve.peakKmm, arcFrac: curve.arcFrac, startDeg: curve.startDeg, nodes: curve.nodes },
   };
+}
+
+/* ===================================================================
+   THE SPINE CURVE (F3-global, Oct 15 — Eva's rulings Q4.1 / Q4.2 / Q4.4,
+   feature map §11; read docs/bloom-spine-curve-outcome.md before touching
+   any of it). A `petalCurlMode` of CURVE replaces the slider family with the
+   points of `petalSpineCurve`, which DRAW THE SPINE'S SHAPE in the curl plane
+   (Q4.1): curvature is DERIVED from the drawn shape and handed to spineLaw as
+   its curve arm, above.
+
+   WHAT THE POINTS MEAN. Every coordinate is a fraction of the petal's ASKED
+   length (`bladeAskedLengthMm`, mode-free), x along the blade and y across it
+   in the curl plane. The drawn curve is sampled by bloom-curve.js's own
+   sampler (centripetal Catmull-Rom, the 2D-shape arm — a fiddlehead is not a
+   function of x), and THE SPINE IS THAT CURVE SCALED SO ITS ARC LENGTH IS THE
+   PETAL'S: the shape the hand drew, at the size the length slider says,
+   whatever its drawn arc happens to be. So `arcFrac` (the drawn arc in
+   fraction units) is the scale, and a curvature in fraction units becomes
+   `kappa * arcFrac / askedLengthMm` in 1/mm. A drawn curve of arc 1.0 along
+   the box is the blade at scale 1; a hook that doubles back has a longer arc
+   and is drawn smaller, the length slider still being the length.
+
+   THE START DIRECTION IS THE BLADE'S. The spine leaves the foot at the petal's
+   tilt — J8 asserts the root chord at the tilt and `curl moves the TIP, never
+   the attachment` is the family's own contract — so the drawn curve is placed
+   with its FIRST CHORD along the blade direction, i.e. rotated by minus its
+   own start angle, which is reported (`startDeg`) and told on the read-out.
+   The editor's x axis therefore reads as "along the blade as tilted".
+
+   CURVATURE IS PER NODE, PIECEWISE CONSTANT, AND IT IS THE ONE SET OF NUMBERS
+   THE VALIDATOR AND THE BUILD BOTH READ. At each interior sample the turning
+   angle between the two adjacent chords over their mean length is that node's
+   curvature; it holds on the interval between the two chord midpoints; the
+   first and last half-chords take their neighbour's. `kappaAtMm(s)` returns
+   exactly one of those doubles at any arc position (past the drawn arc — the
+   drawn blade may run a nib's width past the asked length — the last one), and
+   `peakKmm` is their maximum. spineLaw's substep check is `|kRaw| > kMax` on
+   those same doubles, so the refusal's `peakKmm > 1 / floorRadius` and the
+   build's clamp are ONE decision on ONE set of values: a curve the validator
+   accepts cannot build a clamped spine at the length and floor it was asked
+   about, and that is asserted (C1), never argued. A sampled polyline's
+   curvature is a property of the sampling; the sampler's density is
+   bloom-curve.js's own and both sides use it.
+   =================================================================== */
+export const CURL_MODES = Object.freeze(['SLIDER', 'CURVE']);
+export function curlIsCurve(state) { return state.petalCurlMode === 'CURVE'; }
+/* A matrix row or a file carries the curve as JSON text; the page's control
+   hands over the object. One reader, so no consumer parses twice. */
+export function spineCurveOf(state) {
+  const v = state.petalSpineCurve;
+  return typeof v === 'string' ? JSON.parse(v) : v;
+}
+/* THE SPINE CURVE'S DEFAULT SPEC — the registry imports it (Q6-style: a
+   bound a control imports rather than restates). `single`: one curve, signed
+   y, no mirror. The first point is pinned at the origin (the foot); the last is
+   free, so a hook can end anywhere in the box. */
+export const SPINE_CURVE_SPEC = Object.freeze({ modes: ['single'], x: [0, 1], y: [-1, 1], lock: { first: 'xy', last: null }, points: [2, 12], owner: 'petalLength' });
+export const SPINE_CURVE_DEFAULT = Object.freeze({ mode: 'single', points: [[0, 0], [0.5, 0.08], [1, 0.3]] });
+export function spineCurveLaw(curve, askedLengthMm) {
+  const v = typeof curve === 'string' ? JSON.parse(curve) : curve;
+  const pts = curveSamples(v, SPINE_CURVE_SPEC).left;
+  const n = pts.length;
+  /* chord lengths and directions, in fraction units */
+  const len = new Float64Array(n - 1), ang = new Float64Array(n - 1);
+  let arc = 0;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1][0] - pts[i][0], dy = pts[i + 1][1] - pts[i][1];
+    len[i] = Math.hypot(dx, dy); ang[i] = Math.atan2(dy, dx); arc += len[i];
+  }
+  const scale = askedLengthMm / arc;                 // mm per fraction unit along the arc
+  /* per-node curvature in 1/mm, and the arc position (mm) where each node's
+     interval ENDS: node j's interval runs from the midpoint of chord j-1 to the
+     midpoint of chord j */
+  const kappa = new Float64Array(Math.max(1, n - 2)), endMm = new Float64Array(Math.max(1, n - 2));
+  let s = 0, peak = 0;
+  for (let j = 1; j < n - 1; j++) {
+    let d = ang[j] - ang[j - 1];
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    const k = d / (0.5 * (len[j - 1] + len[j]) * scale);
+    kappa[j - 1] = k;
+    s += (j === 1 ? len[0] + 0.5 * len[1] : 0.5 * (len[j - 1] + len[j])) * scale;
+    endMm[j - 1] = s;
+    if (Math.abs(k) > peak) peak = Math.abs(k);
+  }
+  if (n < 3) { kappa[0] = 0; endMm[0] = arc * scale; }
+  const nodes = kappa.length;
+  return {
+    arcFrac: arc, askedLengthMm, startDeg: ang[0] / D2R, nodes, peakKmm: peak,
+    /* the curvature at arc position s (mm along the spine); past the last
+       interval the last node's — exactly one of the per-node doubles */
+    kappaAtMm(sMm) {
+      let j = 0;
+      while (j < nodes - 1 && sMm > endMm[j]) j++;
+      return kappa[j];
+    },
+  };
+}
+/* THE FLOOR THE VALIDATOR ASKS ABOUT IS THE STRICTER MODE'S — EXPORT's, where
+   the sheet is floored at MIN_FEATURE_MM. Live's floor radius is never larger,
+   so a curve clear of this one is clear in both modes at the lengths given. One
+   expression of the floor, spineLaw's own: `ROLL_MIN_RADIUS_FACTOR * t`. */
+export function spineCurveFloorRadiusMm(state) { return ROLL_MIN_RADIUS_FACTOR * Math.max(Number(state.sheetThickness), MIN_FEATURE_MM); }
+/* THE REFUSAL (Q4.4): null when the drawn curve is printable at EVERY asked
+   length handed in — the lengths the build on screen actually drew (inner
+   whorls are shorter, and the same shape at a shorter length is tighter) —
+   else the reason, naming the tightest radius against the floor. It asks the
+   spine law's own clamp: `peakKmm > 1 / floorRadius` is spineLaw's `|kRaw| >
+   kMax` on the same per-node doubles, so accepted here means unclamped there. */
+export function spineCurveRefusal(curve, state, askedLengthsMm) {
+  const floorR = spineCurveFloorRadiusMm(state);
+  const Ls = (askedLengthsMm && askedLengthsMm.length ? askedLengthsMm : [Number(state.petalLength)]).filter((L) => L > 0);
+  let worst = null;
+  for (const L of Ls) {
+    const law = spineCurveLaw(curve, L);
+    if (law.peakKmm > 1 / floorR && (!worst || law.peakKmm > worst.peakKmm)) worst = { ...law, L };
+  }
+  if (!worst) return null;
+  return `the spine would bend to a ${(1 / worst.peakKmm).toFixed(2)} mm radius on a ${worst.L.toFixed(1)} mm petal — under the printable floor of ${floorR.toFixed(2)} mm (one sheet thickness); the sheet's inner face would invert`;
 }
 
 /* ===================================================================
@@ -8204,7 +8346,13 @@ function blendStart(halfWidthAt, R, steps = 2048) {
    floor would protect a wall nothing has. */
 export function petalForm(state, halfW, t, buckleCtx = null) {
   const cup = state.petalCup;
-  const curlRad = state.petalSpineCurl * D2R;
+  /* THE SPINE CURVE (F3-global): in CURVE mode the whole slider family —
+     petalSpineCurl, the curl deltas the resolver composed into it, the
+     variance curl term, curl bias and curl start — is INERT: the spine is the
+     curve's and nothing of the slider reaches it. Inert by this one read, so a
+     delta or a field term that landed on ps.petalSpineCurl lands on nothing. */
+  const spineCurve = curlIsCurve(state) ? spineCurveOf(state) : null;
+  const curlRad = spineCurve !== null ? 0 : state.petalSpineCurl * D2R;
   const twistRad = state.petalTwist * D2R;
 
   /* Roll: the control asks for a WRAP ANGLE at the nominal half-width, and
@@ -8393,6 +8541,7 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
 
   return {
     curlRad, twistRad, kappa, frameAt, sectAt, curlUniform, buckle,
+    spineCurve,
     cupClamp,
     /* WHAT THE EXPORT CANNOT SHOW. Watertightness and connectedness are
        measured on the STL; these are the properties a pure-displacement
@@ -8813,8 +8962,16 @@ export function petalSurface(state, ring, slot, cap, acc) {
      avoid); what moves is the floor the LAW applies, which the read-out
      already prints. Relaxing instead would have made J8's clause SKIP those
      rows rather than fail them, which is coverage lost silently. */
-  const law = form && kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: ps.curlBias, start: ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU }) : null;
-  const generalSpine = SPINE_WIRED && law !== null && !form.curlUniform;
+  /* THE SPINE CURVE (F3-global): in CURVE mode the law is handed the curve's
+     own curvature record, scaled on the ASKED length (mode-free), and curl 0 /
+     bias 0 / start 0 — the curl is `petalForm`'s `curlRad`, which is 0 in CURVE
+     mode by that function's ONE read (not re-zeroed here: a second owner of the
+     inertness made the mutant that restores the slider read a no-op); the bias
+     and start are zeroed here because `petalForm` never reads them. The curve is
+     never uniform, so the general arm below builds it. */
+  const curveLaw = form && form.spineCurve !== null ? spineCurveLaw(form.spineCurve, askedLength) : null;
+  const law = form && (kC !== 0 || curveLaw !== null) ? spineLaw({ curlRad: form.curlRad, bias: curveLaw ? 0 : ps.curlBias, start: curveLaw ? 0 : ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU, curve: curveLaw }) : null;
+  const generalSpine = SPINE_WIRED && law !== null && (curveLaw !== null || !form.curlUniform);
   const spineAt = generalSpine
     ? (s) => {
       const q = law.at(s);
@@ -8931,6 +9088,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
        that derived them instead of re-deriving any of them. */
     t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
+    curveLaw, askedLength,
     floorRadius, uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
     formClamped, formScaled,
@@ -9132,6 +9290,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
   const {
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
+    curveLaw, askedLength,
     uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped, formScaled,
   } = surface;
@@ -9456,8 +9615,10 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     rows: spineRows,
     rowU: spineRowU,
     tiltRad: tilt, length, curlRad: form ? form.curlRad : 0,
-    bias: ps.curlBias, start: ps.curlStart, floorRadius,
-    uniform: form ? form.curlUniform : true,
+    /* what the LAW was handed — in CURVE mode the slider family is inert and
+       the record says 0, whatever the hidden sliders hold */
+    bias: curveLaw ? 0 : ps.curlBias, start: curveLaw ? 0 : ps.curlStart, floorRadius,
+    uniform: curveLaw ? false : form ? form.curlUniform : true,
     peakRadiusMm: law ? law.peakRadius : Infinity,
     clamped: law ? law.clamped : false,
     underFloor: law ? law.underFloor : false,
@@ -9467,6 +9628,18 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     startFloor: law ? law.startFloor : CURL_START_MIN,
     integrationResidual,
     clearance,
+    /* THE SPINE CURVE (F3-global): the mode, the curve the law consumed (the
+       control's own value, verbatim), the asked length it was scaled on, the
+       law's own record (arc, start direction, node count, peak curvature) and
+       THE VALIDATOR'S ANSWER for this petal at this length — the same
+       `spineCurveRefusal` the editor asks, computed here by the module that
+       built the spine, so a gate can hold "accepted => not clamped" against the
+       one owner rather than against a Node import the page never ran. */
+    curveMode: curveLaw !== null,
+    curve: curveLaw !== null ? form.spineCurve : null,
+    askedLengthMm: askedLength,
+    curveLaw: law && law.curve ? law.curve : null,
+    curveRefusal: curveLaw !== null ? spineCurveRefusal(form.spineCurve, ps, [askedLength]) : null,
   };
 
   const midS = 0.5 * length;
@@ -15744,6 +15917,7 @@ export function leafBladeState(state) {
     petalCupGradient: 0, petalTwist: 0, petalRoll: 0, petalRollTaper: 0,
     petalSpineCurl: state.leafArch === undefined || Number(state.leafArch) === 0 ? 0 : -Number(state.leafArch),
     curlBias: 0, curlStart: 0, buckleAmp: 0,
+    petalCurlMode: 'SLIDER',   // the spine curve is the PETALS' (F3-global); leaves get curve mode in their own session (Q4.5)
     petalTilt: 0, tipThinning: 0,
   };
 }
@@ -19018,7 +19192,10 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
      list the rim family already carries. The witness is
      `verify-bloom-sepal-decoupled.mjs`, which sweeps petal-side control values
      and asserts 0 sepal floats move. */
-  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
+  /* THE SPINE CURVE IS PINNED TO THE SLIDER FAMILY ON A SEPAL (F3-global): the
+     sepal's curl is its own twins' (sepalSpineCurl, bias, start) whatever the
+     petals' mode; a sepal curve is the sepal session's (Q4.3). */
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE', petalCurlMode: 'SLIDER' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
   const own = sepalOwnSize(state);

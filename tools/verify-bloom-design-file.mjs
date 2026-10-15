@@ -47,6 +47,10 @@
          write a curve verbatim and read it back identical with no note, and
          refuse a curve the spec cannot hold WHOLE, told. F0 also holds the
          field kinds to the registry's CONTROL_KINDS, both directions.
+     F8  THE LIVE SPINE CURVE (F3-global): the first registry curve control
+         round-trips a hooked spine in CURVE mode verbatim through the shipped
+         document walkers, an out-of-box spine is refused whole and told, and
+         the control is a curve field of the file.
      F6  THE SCOPE MODEL'S OWN GATE, tools/verify-bloom-scopes.mjs, is SPAWNED
          here (and its --negative-control under ours) so it rides in CI through
          this workflow step — the file's overrides containers are that model's
@@ -122,7 +126,9 @@ function stateOf(row) {
   }
   return s;
 }
-const same = (c, a, b) => (c.kind === 'slider' ? Object.is(a, b) : a === b);
+/* a CURVE is compared coordinate by coordinate under Object.is (its own
+   `curveEquals` — a matrix row's JSON text and the page's object are one value) */
+const same = (c, a, b) => (c.kind === 'slider' ? Object.is(a, b) : c.kind === 'curve' ? REG.valuesEqual(c, typeof a === 'string' ? JSON.parse(a) : a, typeof b === 'string' ? JSON.parse(b) : b) : a === b);
 
 /* ---------------- the Node clauses, over a (possibly mutated) module ---------------- */
 async function nodeClauses(F, rec) {
@@ -317,6 +323,41 @@ async function nodeClauses(F, rec) {
     refuse('a field that is not a curve\'s', { mode: 'symmetric', points: [[0, 0.1], [1, 0.1]], tension: 0.5 }, /"tension" is not a field/);
     refuse('a string', 'M0 0 L1 1', /not a curve value/);
     rec('F7', p, 'the curve kind: two values round-trip verbatim (an off-grid coordinate to the bit, a two-sided right side whole) with no note, and seven a spec cannot hold are refused whole and told');
+  }
+  /* F8 — THE LIVE CURVE CONTROL (F3-global, the spine curve). `petalSpineCurve`
+     is the first registry row of kind curve, so the SHIPPED document walkers
+     (`composeDoc` / `readDoc`, over CONTROL_FIELDS) now carry a curve: a hooked
+     spine in CURVE mode round-trips verbatim with no note (every coordinate to
+     the bit, the mode with it), a curve outside the spine's box is refused
+     WHOLE and told with the page keeping its curve, and the control is a field
+     of the file (F0's census would say otherwise, but this says it by name). */
+  {
+    const p = [];
+    const c = REG.CONTROLS.find((x) => x.id === 'petalSpineCurve');
+    if (!c || c.kind !== 'curve') p.push(`petalSpineCurve is ${c ? `of kind ${c.kind}` : 'not a registry control'}`);
+    else {
+      const hook = { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] };
+      const st = { ...REG.DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: hook };
+      const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x' }))));
+      if (!r.ok) p.push(`the hooked spine's document did not read: ${JSON.stringify(r.notes)}`);
+      else {
+        if (r.notes.length) p.push(`a clean round trip of the hooked spine reported ${r.notes.map((n) => n.text).join(' | ')}`);
+        const back = r.doc.controls.petalSpineCurve;
+        const same = back && back.mode === hook.mode && back.points.length === hook.points.length && back.points.every((q, i) => Object.is(q[0], hook.points[i][0]) && Object.is(q[1], hook.points[i][1])) && back.right === undefined;
+        if (!same) p.push(`the hooked spine read back as ${JSON.stringify(back)}`);
+        if (r.doc.controls.petalCurlMode !== 'CURVE') p.push(`the curl mode read back as ${JSON.stringify(r.doc.controls.petalCurlMode)}`);
+      }
+      const doc = JSON.parse(F.toText(F.composeDoc(REG.DEFAULTS, { savedAt: 'x' })));
+      doc.controls.petalSpineCurve = { mode: 'single', points: [[0, 0], [0.5, 1.4], [1, 0.2]] };
+      const r2 = F.readDoc(doc);
+      if (!r2.ok) p.push(`a document with an out-of-box spine did not read at all: ${JSON.stringify(r2.notes)}`);
+      else {
+        if ('petalSpineCurve' in r2.doc.controls) p.push(`an out-of-box spine was applied as ${JSON.stringify(r2.doc.controls.petalSpineCurve)} rather than refused whole`);
+        if (!r2.notes.some((n) => n.kind === 'invalid' && /petalSpineCurve.*not a curve this control can hold.*outside the box/.test(n.text))) p.push(`the refusal was not told: ${r2.notes.map((n) => n.text).join(' | ')}`);
+      }
+      if (!F.CONTROL_FIELDS.some((f) => f.control === 'petalSpineCurve' && f.kind === 'curve')) p.push('petalSpineCurve is not a curve field of the file');
+    }
+    rec('F8', p, 'the live spine curve: a hooked spine in CURVE mode round-trips verbatim through the shipped document walkers with no note; an out-of-box spine is refused whole and told; the control is a curve field of the file');
   }
 }
 

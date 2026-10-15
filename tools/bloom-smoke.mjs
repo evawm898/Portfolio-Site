@@ -1388,6 +1388,27 @@ export const SMOKE_BLOCKS = [
         path: "SP0 / SP0b with no sepals (the multiplier's predicate false on a count of 0, the geometry building nothing) and SP7" },
     ],
   },
+  {
+    n: 62, title: 'the spine curve (Oct 15, F3-global)',
+    anchor: 'SPINE CURVE: a HOOKED tip (the spine doubles back — not a function of x)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       spineLaw's curve arm (the hook, where the shape is not a function of x
+       and the sampler's 2D arm is what draws it), the clamp on a curve a file
+       loaded under the floor (the refusal and the clamp as one decision, told),
+       the inert slider family, and the GATED row's branch (SLIDER mode with a
+       curve stored, bit-identical to the default). The anchor is the hook:
+       the one shape the slider family cannot draw. */
+    rows: [
+      { label: 'SPINE CURVE: a HOOKED tip (the spine doubles back — not a function of x)',
+        path: "C1's curve arm (the mode's two statements, the hidden family inert in the record, curve -> curvature restated from the control's points against the emitted rows, the validator accepting and the build not clamping), J8 (the root chord at the tilt — the drawn curve's start laid along the blade), the self-contact flag" },
+      { label: 'SPINE CURVE: a LOADED curve UNDER the floor (a file can hold one — CLAMPED and told; the editor refuses such a drag)',
+        path: "C1's refusal clause (the validator REFUSES at this length, the build CLAMPS, and in export the two agree), the SPINE CURVE read-out's CLAMPED clause" },
+      { label: 'SPINE CURVE: the hidden slider family set (curl 150, bias 1, start 0.5, all-curl 90 — INERT; bit-identical to the default-curve row)',
+        path: "C1's inertness clause (curl, bias and start handed to the law read 0) and the restated law landing on the emitted rows while the hidden family holds non-zero values" },
+      { label: 'SPINE CURVE: GATED — SLIDER mode with a hooked curve stored (hidden and inert; bit-identical to the default)',
+        path: "C1's slider arm on a straight petal (the mode's two statements both SLIDER; the curve stored and read by nothing), petalFormIsFlat and FORM_IDS agreeing the row is flat" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

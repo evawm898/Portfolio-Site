@@ -1062,10 +1062,12 @@ const census = await page.evaluate(({ controls, sections, retired, breakIt }) =>
   }
   /* Nothing in the panel that the registry does not declare. */
   const known = new Set(controls.map((c) => c.id));
-  for (const el of root.querySelectorAll('input, select')) if (!known.has(el.id)) out.strayInputs.push(el.id || '(no id)');
+  /* A CURVE control's element is its `.bl-curve` host (F3-global): the inputs
+     INSIDE it (its mode select) are the editor's own, not registry controls. */
+  for (const el of root.querySelectorAll('input, select, .bl-curve')) if (!el.closest('.bl-curve') || el.classList.contains('bl-curve')) if (!known.has(el.id)) out.strayInputs.push(el.id || '(no id)');
   for (const sp of root.querySelectorAll('.bl-val')) {
     const w = sp.closest('.bl-ctrl');
-    const id = w ? w.querySelector('input, select')?.id : null;
+    const id = w ? w.querySelector('input, select, .bl-curve')?.id : null;
     if (!id || !known.has(id)) out.straySpans.push(id || '(orphan)');
   }
   out.retiredPresent = retired.filter((id) => !!document.getElementById(id));
@@ -1394,7 +1396,7 @@ if (!shutBad.length && !shutDrift.length && stillShut === 0) {
   await openBloom(page, port);
   const seen = await page.evaluate(() => ({
     sections: [...document.querySelectorAll('#panelControls details')].map((d) => ({ id: d.id.replace(/^sec-/, ''), hidden: d.hidden, open: d.open })),
-    shown: [...document.querySelectorAll('.bl-ctrl')].filter((w) => !w.hidden).map((w) => w.querySelector('input, select').id),
+    shown: [...document.querySelectorAll('.bl-ctrl')].filter((w) => !w.hidden).map((w) => w.querySelector('input, select, .bl-curve').id),
   }));
   const wantShown = CONTROLS.filter((c) => evalPredicate(c.visibleWhen, DEFAULTS)).map((c) => c.id);
   const wantHidden = CONTROLS.filter((c) => !evalPredicate(c.visibleWhen, DEFAULTS)).map((c) => c.id);
@@ -1581,7 +1583,7 @@ for (const [driverId, dependents] of drivers) {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const seen = {};
       for (const w of document.querySelectorAll('.bl-ctrl')) {
-        const input = w.querySelector('input,select');
+        const input = w.querySelector('input, select, .bl-curve');
         if (input) seen[input.id] = w.hidden;
       }
       /* The summaries a visitor can currently SEE — a section hidden by its
@@ -1787,7 +1789,7 @@ for (const [driverId, dependents] of drivers) {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const seen = {};
       for (const w of document.querySelectorAll('.bl-ctrl')) {
-        const input = w.querySelector('input,select');
+        const input = w.querySelector('input, select, .bl-curve');
         if (input) seen[input.id] = w.hidden;
       }
       const cap = document.querySelector('#sec-roles > .bl-why');
@@ -2608,7 +2610,7 @@ for (const [label, sets, wantDome, wantClamp] of [
     return {
       rendered: ids.filter((id) => document.getElementById(id) !== null),
       centerMissing: document.getElementById('sec-center') === null,
-      centerOwnControls: [...(document.getElementById('sec-center')?.querySelectorAll(':scope > .bl-ctrl') || [])].map((w) => w.querySelector('input, select')?.id || '(no id)'),
+      centerOwnControls: [...(document.getElementById('sec-center')?.querySelectorAll(':scope > .bl-ctrl') || [])].map((w) => w.querySelector('input, select, .bl-curve')?.id || '(no id)'),
       /* THE SUMMARY LINE is the one that begins `petals` — the read-out's
          first line is the on-screen MODE line (session 13), so line 0 would
          be the wrong line to read. */

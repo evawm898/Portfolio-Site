@@ -84,6 +84,7 @@ import { SCOPE_TOGGLE_VALUES } from './bloom-geometry.js';
    of a curve value imports (the panel, the design file, F3's and F6's
    geometry). bloom-curve.js imports nothing, so no cycle is possible. */
 import { cloneCurve, curveEquals, curveSpecProblems } from './bloom-curve.js';
+import { CURL_MODES, SPINE_CURVE_SPEC, SPINE_CURVE_DEFAULT, spineCurveRefusal, spineCurveLaw, spineCurveFloorRadiusMm } from './bloom-geometry.js';
 
 /* THE CONTROL KINDS, ONE LIST. A row's `kind` must be one of these (checked
    at module load by verifySections), and every reader that branches on a
@@ -505,6 +506,12 @@ export const PREDICATES = {
      sepal's own the multiplier moves nothing and hides. The geometry's
      statement is `sepalScaleInert`; SP0b checks the two agree. */
   sepalScaleLive: { all: [{ ref: 'sepalsPresent' }, { not: { all: [{ id: 'sepalLength', min: 0.5 }, { id: 'sepalWidth', min: 0.5 }] } }] },
+  /* THE SPINE CURVE (F3-global, Eva's Q4.2): CURVE mode hides the whole
+     slider family — spine curl, curl bias, curl start, every curl delta — and
+     the geometry makes them inert by one read in petalForm. Two statements,
+     checked against each other by the harness. */
+  curlFromSlider: { id: 'petalCurlMode', oneOf: ['SLIDER'] },
+  curlFromCurve: { id: 'petalCurlMode', oneOf: ['CURVE'] },
   stemPresent: { id: 'stemLength', min: 1 },
   /* THE FLORIST'S CUT (Eva's ruling 7, stem session 3). The registry's
      statement of the geometry's `stemCutAbsent`: the control is live wherever
@@ -2617,6 +2624,43 @@ export const CONTROLS = [
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
+  /* ===================================================================
+     THE SPINE CURVE (F3-global, Oct 15 — Eva's rulings Q4.1 / Q4.2 / Q4.4;
+     read docs/bloom-spine-curve-outcome.md). A curl MODE: SLIDER is today,
+     the default, byte-identical by branch; CURVE draws the spine's SHAPE in
+     the curl plane with the points of `petalSpineCurve` and hides the whole
+     slider family (Q4.2). The spec and the default are the GEOMETRY's
+     (imported, never restated), the points are fractions of Petal length
+     (the editor's own rule), and the validator is the geometry's own refusal:
+     a drag past the printable floor (one sheet thickness of spine radius,
+     spineLaw's own) is REFUSED and the point does not move (Q4.4). The
+     validator reads the lengths the build on screen actually drew (`ctx`,
+     handed in by bloom.js from the last build), because an inner whorl is
+     shorter and the same shape at a shorter length is tighter. Petals only,
+     one global curve: sepals and leaves pin SLIDER (Q4.3 / Q4.5 are later). */
+  { id: 'petalCurlMode', section: 'curl', kind: 'choice', default: CURL_MODES[0],
+    options: [
+      { value: 'SLIDER', label: 'Slider — one turn, bias and start' },
+      { value: 'CURVE', label: 'Curve — draw the spine' },
+    ],
+    label: 'Curl from', tier: 'standard', role: 'petal',
+    fmt: (v) => (v === 'CURVE' ? 'the drawn curve below (the slider family is hidden and inert)' : 'the Spine curl slider, with bias and start'),
+    visibleWhen: { all: [] } },
+  { id: 'petalSpineCurve', section: 'curl', kind: 'curve', curve: SPINE_CURVE_SPEC, default: SPINE_CURVE_DEFAULT,
+    label: 'Spine curve', tier: 'standard', role: 'petal',
+    /* the LAW's own numbers for the whole-bloom petal: the drawn arc, the
+       start direction rotated onto the blade, and the tightest radius against
+       the floor — all from `spineCurveLaw`, never re-derived */
+    fmt: (v, ui) => {
+      const L = Number(ui.petalLength);
+      const law = spineCurveLaw(v, L);
+      const r = law.peakKmm > 0 ? 1 / law.peakKmm : Infinity;
+      const floor = spineCurveFloorRadiusMm(ui);
+      return `${v.points.length} points · drawn arc ${law.arcFrac.toFixed(2)} of the length, scaled to ${L.toFixed(1)} mm · start ${law.startDeg >= 0 ? '+' : ''}${law.startDeg.toFixed(1)}° laid along the blade · tightest radius ${isFinite(r) ? r.toFixed(2) + ' mm' : 'straight'} against a ${floor.toFixed(2)} mm floor${law.peakKmm > 1 / floor ? ' (UNDER THE FLOOR — a loaded curve; clamped and told)' : ''}`;
+    },
+    validate: (cand, ui, ctx) => spineCurveRefusal(cand, ui, ctx && ctx.askedLengthsMm),
+    visibleWhen: { ref: 'curlFromCurve' } },
+
   { id: 'petalSpineCurl', section: 'curl', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Spine curl', tier: 'standard', role: 'petal',
     /* Prints the DERIVED spine radius, which is the quantity that tells a
@@ -2630,7 +2674,7 @@ export const CONTROLS = [
       const L = ui ? Number(ui.petalLength) : 35;
       return `${d > 0 ? '+' : ''}${d}° · spine radius ${(L / Math.abs(d * Math.PI / 180)).toFixed(1)} mm`;
     },
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'curlFromSlider' } },
 
   /* ===================================================================
      THE CURL FAMILY (session 16, Eva Sep 4) — curl bias and curl start are
@@ -2666,7 +2710,7 @@ export const CONTROLS = [
       const b = Number(v);
       return b === 0 ? 'uniform · a hoop' : `${b.toFixed(2)} toward the tip${b === 1 ? ' · a crozier' : ''}`;
     },
-    visibleWhen: { id: 'petalSpineCurl', awayFrom: 0, by: 2.5 } },
+    visibleWhen: { all: [{ ref: 'curlFromSlider' }, { id: 'petalSpineCurl', awayFrom: 0, by: 2.5 }] } },
   { id: 'curlStart', section: 'curl', kind: 'slider', min: 0, max: 0.95, step: 0.01, default: 0,
     label: 'Curl start', tier: 'standard', role: 'petal',
     /* 0 = the whole petal curls (the shipped law); higher = only the outer
@@ -2681,7 +2725,7 @@ export const CONTROLS = [
       const eff = floored ? CURL_START_MIN : s;
       return `outer ${((1 - eff) * 100).toFixed(0)}% curls${floored ? ' (floored to the first blade row)' : ''}`;
     },
-    visibleWhen: { id: 'petalSpineCurl', awayFrom: 0, by: 2.5 } },
+    visibleWhen: { all: [{ ref: 'curlFromSlider' }, { id: 'petalSpineCurl', awayFrom: 0, by: 2.5 }] } },
 
   { id: 'petalRoll', section: 'form', kind: 'slider', min: -330, max: 330, step: 5, default: 0,
     label: 'Cross-section roll', tier: 'standard', role: 'petal',
@@ -3487,7 +3531,7 @@ export const CONTROLS = [
      does not do that work twice. */
   { id: 'allCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'All curl', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${v}° on Spine curl`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
+    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'allPetalsEligible' }, { ref: 'curlFromSlider' }] } },
 
   { id: 'allCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
     label: 'All cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
@@ -3496,7 +3540,7 @@ export const CONTROLS = [
   { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
     tier: 'standard', role: 'petal',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }, { not: { ref: 'scopesOwnRoles' } }] } },
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }, { not: { ref: 'scopesOwnRoles' } }, { ref: 'curlFromSlider' }] } },
 
   { id: 'innerCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
     label: 'Inner cup', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
@@ -3571,7 +3615,7 @@ export const CONTROLS = [
 
   { id: 'labellumCurl', section: 'labellumGroup', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Spine curl', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${saidLabellum(ui)}`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
+    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { ref: 'curlFromSlider' }] } },
 
   { id: 'hoodSize', section: 'hoodGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
     label: 'Size',
@@ -3659,6 +3703,8 @@ export const CONTROLS = [
       row('Curl', {
         min: -180, max: 360, step: 5, default: 0, label: 'Spine curl',
         fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${said(ui)}`),
+        /* hidden with the rest of the slider family in CURVE mode (Q4.2) */
+        visibleWhen: { all: [seen, { ref: 'curlFromSlider' }] },
       }),
     ];
   }).flat(),
