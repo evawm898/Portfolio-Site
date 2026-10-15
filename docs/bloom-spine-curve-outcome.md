@@ -121,7 +121,12 @@ Every figure here is from a run on this tree at the commits named in the PR; the
 
 - **The byte partition, PREDECLARED from the base tree** (`b51182a`, the newest `main` at the time) with
   `--movers-predicate curve` — a row moves iff THIS tree builds it in CURVE mode, every SLIDER row holds:
-  [[PARTITION]]
+  **11 MOVED / 1,332 HELD over the whole 1,343-row live matrix in BOTH modes — PASS**
+  (`verify-bloom-surface-bytes --base <worktree of b51182a> --movers-predicate curve`, run as two
+  `--range` shards and closed with `--merge`): **1,627,229,052 export floats over 180,803,228 triangles and
+  84,561,904 captured-grid values, 0 floats moved on any holder, positionally under `Object.is`, all 11
+  predeclared movers moved.** The eleven are block 62's CURVE rows; every one of `main`'s 1,331 rows holds,
+  which is the brief's "every SLIDER row 0 floats" measured rather than argued.
   Block 62's own twelve rows, re-measured after the one-owner curlRad edit (§2): 11 of 11 predeclared movers
   moved, the one SLIDER row (`GATED — SLIDER mode with a hooked curve stored`) held to the bit over 7,371,900
   export floats and 141,760 grid values. The shipping default is byte-identical BY BRANCH (`curlIsCurve` false

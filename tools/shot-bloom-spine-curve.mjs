@@ -148,9 +148,12 @@ const limit = await cell({ label: 'CURVE: at the printable limit (tightest radiu
   await page.waitForTimeout(150);
   const ed = () => page.evaluate(() => { const h = document.getElementById('petalSpineCurve'); return { value: h.value, refusal: h.curveEditor.refusal(), status: (h.closest('.bl-ctrl').querySelector('.bl-curve-status') || {}).textContent || '' }; });
   const before = JSON.stringify((await ed()).value);
-  /* point 3 (the bend's far corner) dragged inward — a tighter bend than one sheet thickness */
+  /* point 3 (the bend's far corner) dragged BACK toward point 4 — a tighter
+     bend than one sheet thickness (the law in Node reads 0.65 mm there against
+     the limit curve's own 1.34; the first target, [0.62, 0.5], LOOSENED the
+     bend to 1.71 mm and the validator was right to accept it) */
   const from = await page.evaluate(() => document.getElementById('petalSpineCurve').curveEditor.pointClient('left', 3));
-  const to = await page.evaluate(() => document.getElementById('petalSpineCurve').curveEditor.fracClient('left', [0.62, 0.5]));
+  const to = await page.evaluate(() => document.getElementById('petalSpineCurve').curveEditor.fracClient('left', [0.45, 0.52]));
   await page.mouse.move(from.x, from.y); await page.mouse.down(); await page.mouse.move(to.x, to.y, { steps: 2 });
   await page.waitForTimeout(150);
   const mid = await ed();
