@@ -553,7 +553,7 @@ const MUTANTS = [
   /* F3-global: with a LIVE curve control in the registry, dropping the kind's
      writer also reddens the round trip (F1/F2) and the spine-curve rows (F8),
      not only the kinds census. */
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8'],
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];
