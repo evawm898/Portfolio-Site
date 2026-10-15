@@ -17,12 +17,20 @@ import { serveRepo, launchPage, openBloom, applyConfig, settleBuild } from './bl
 const { server, port } = await serveRepo();
 const { browser, page } = await launchPage({ viewport: { width: 1100, height: 800 } });
 const HOOK = { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] };
+/* THE HEAVY CONFIG'S CURVE IS GENTLE ON PURPOSE: three whorls make the inner
+   petals SHORTER, the same drawn shape is tighter there, and the validator
+   REFUSES a hook's drag on them (the first run of this tool waited two
+   minutes for a build the editor correctly never asked for). A refused drag
+   fires no input and costs no build; the cost under measure is an ACCEPTED
+   drag's, so each row names the point it drags and where to. */
+const BEND = { mode: 'single', points: [[0, 0], [0.5, 0.04], [1, 0.14]] };
 const set = (o) => Object.entries(o).map(([id, value]) => ({ id, value: typeof value === 'string' ? value : JSON.stringify(value) }));
 const waitBuilds = async (n) => { await page.waitForFunction((k) => window.__bloomBuildState().count >= k && !window.__bloomBuildState().pending, n, { timeout: 120000 }); };
 
-for (const [name, sets] of [
-  ['the shipping petal, CURVE mode', { petalCurlMode: 'CURVE', petalSpineCurve: HOOK }],
-  ['the infill corner — VORONOI on 40 petals x 3 whorls, CURVE mode', { petalCurlMode: 'CURVE', petalSpineCurve: HOOK, petalInfill: 'VORONOI', petalCount: 40, layerCount: 3 }],
+for (const [name, sets, pt, dest] of [
+  ['the shipping petal, CURVE mode (no infill: nothing to shed, the drag build IS the full build)', { petalCurlMode: 'CURVE', petalSpineCurve: HOOK }, 2, [0.7, 0.4]],
+  ['the infilled shipping petal — VORONOI, CURVE mode', { petalCurlMode: 'CURVE', petalSpineCurve: HOOK, petalInfill: 'VORONOI' }, 2, [0.7, 0.4]],
+  ['the infill corner — VORONOI on 40 petals x 3 whorls, CURVE mode, a gentle bend', { petalCurlMode: 'CURVE', petalSpineCurve: BEND, petalInfill: 'VORONOI', petalCount: 40, layerCount: 3 }, 1, [0.5, 0.1]],
 ]) {
   await openBloom(page, port, { asShipped: true });
   const bad = await applyConfig(page, set(sets), null, { settleMs: 120000 });
@@ -35,8 +43,8 @@ for (const [name, sets] of [
   await waitBuilds(c0 + 1);
   const fullMs = Date.now() - t0;
   /* a real drag on point 2 of the hook, ten steps, each step waiting for its build */
-  const from = await page.evaluate(() => document.getElementById('petalSpineCurve').curveEditor.pointClient('left', 2));
-  const to = await page.evaluate(() => document.getElementById('petalSpineCurve').curveEditor.fracClient('left', [0.7, 0.4]));
+  const from = await page.evaluate((i) => document.getElementById('petalSpineCurve').curveEditor.pointClient('left', i), pt);
+  const to = await page.evaluate((d) => document.getElementById('petalSpineCurve').curveEditor.fracClient('left', d), dest);
   await page.mouse.move(from.x, from.y); await page.mouse.down();
   const lightBefore = (await page.evaluate(() => window.__bloomDragState())).lightBuilds;
   const steps = 8, stepMs = [];
@@ -44,6 +52,10 @@ for (const [name, sets] of [
     const c = await page.evaluate(() => window.__bloomBuildState().count);
     const t = Date.now();
     await page.mouse.move(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps);
+    /* an accepted drag asks for a build; a refused one is told and asks for
+       none, and this tool then measures nothing — say so rather than time out */
+    const asked = await page.waitForFunction((k) => window.__bloomBuildState().count >= k, c + 1, { timeout: 20000 }).then(() => true, () => false);
+    if (!asked) throw new Error(`${name}: step ${i} fired no build — the drag was refused? (${await page.evaluate(() => document.getElementById('petalSpineCurve').curveEditor.status || document.getElementById('petalSpineCurve').closest('.bl-ctrl').textContent.slice(0, 200))})`);
     await waitBuilds(c + 1);
     stepMs.push(Date.now() - t);
   }

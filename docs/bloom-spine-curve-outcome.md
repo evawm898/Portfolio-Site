@@ -117,7 +117,43 @@ whatever the petals' mode; a leaf arch is a slider curl. Q4.3 / Q4.5 are their o
 
 ## 5. Measured
 
-[[MEASURED]]
+Every figure here is from a run on this tree at the commits named in the PR; the gates are the instruments.
+
+- **The byte partition, PREDECLARED from the base tree** (`b51182a`, the newest `main` at the time) with
+  `--movers-predicate curve` — a row moves iff THIS tree builds it in CURVE mode, every SLIDER row holds:
+  [[PARTITION]]
+  Block 62's own twelve rows, re-measured after the one-owner curlRad edit (§2): 11 of 11 predeclared movers
+  moved, the one SLIDER row (`GATED — SLIDER mode with a hooked curve stored`) held to the bit over 7,371,900
+  export floats and 141,760 grid values. The shipping default is byte-identical BY BRANCH (`curlIsCurve` false
+  → `spineLaw` is handed `null` and forms the expressions it did), and measured.
+- **The twelve block-62 rows through the real export gate** (`verify-bloom-export.mjs --only '^SPINE CURVE'`):
+  12 of 12 reach the results and export watertight; 11 read 0 within-shell pairs; ONE is declared —
+  `SPINE CURVE: x the form field 0.5 (the curl term INERT, cup and twist still varied)` at **270 pairs /
+  0.5315 mm** (the form field's cup and twist at amount 0.5 over a hooked spine; the curl term is inert there
+  by the ruling), held by X1 at that magnitude, and re-run through the browser after being recorded.
+  Through the connectedness gate: 12 of 12 one connected body (`components=1 stray=0`), the GATED row and the
+  default at **24,688 tris in export** — the default's own count: ZERO triangles added, the curve changes where
+  the rows go and never how many.
+- **The apex mutant table**: 173 of 173 anchors match exactly once; the five curve mutants
+  (`--only=` the five, `--rows='spine curve'`) each fire C1 on a row that names it, each witness MOVED on the
+  mutated module's own spine record, the clean tree silent. The table now runs `curlAssertions`, which it had
+  never run.
+- **The smoke census**: 231 rows over 58 blocks of the 1,343-row matrix, 181 families asserted and 181 claimed
+  both ways (block 62 appears in the count, which is the check CLAUDE.md asks for); `--negative-control`
+  fires both directions.
+- **The panel gate**: PASS, every registry control rendered once and reachable from a collapsed section;
+  `--negative-control` PASS with ALL TWENTY-SIX ROUTES observing their failure. Route (af)'s census learned that
+  the page carries a registry curve editor now (one mount's editor plus the registry's, the latter asserted
+  exactly inside `#panelControls`). One row of the collapsed route (`floretPetals -> 3`) went red on ONE run
+  while two byte shards loaded the box and passed on the re-run and on the run before — a load flake of a route
+  that waits two animation frames, recorded as such and not touched.
+- **The design-file gate**: PASS (`--no-browser`), F8 round-tripping a hooked spine verbatim and refusing an
+  out-of-box one whole; `--negative-control` PASS, 7 design-file mutants and the 13 scopes mutants it spawns.
+  Two claim lists widened because a live curve control makes them true (`a-dropped-field-on-write` and
+  `the-curve-kind-is-not-written` now redden F1/F2/F8 as well), the checks untouched.
+- **`--verify-frozen --phase68`** deep-equal: the 1,331 rows at `b51182a`, registered in both maps.
+- **Sheet**: `docs/img/spine-curve.png` (§7's tool beside it), rendered through
+  `node tools/shot-bloom-spine-curve.mjs`.
 
 ## 6. Decisions made without a ruling (each named, each one place to undo)
 
@@ -132,7 +168,26 @@ whatever the petals' mode; a leaf arch is a slider curl. Q4.3 / Q4.5 are their o
 
 ## 7. Drag cost
 
-[[DRAG]]
+`node tools/bloom-spine-curve-drag-cost.mjs` drives a REAL pointer drag on a handle of the live editor,
+eight steps, each step waiting for the build it asked for, reading the page's own build counters. Measured on
+this box (headless Chromium, software GL, **with a byte-partition shard running beside it at nice 5**, so
+every figure is a loaded box's and the RATIO is what travels):
+
+| configuration | full build at rest | per drag step (median of 8) | release | light builds in the drag |
+|---|---|---|---|---|
+| the shipping petal, CURVE mode | 652 ms | 810 ms | 502 ms | 0 — no infill, nothing to shed: the drag build IS the full build |
+| the infilled shipping petal (VORONOI) | 7,130 ms | **782 ms** (9.1x) | 7,394 ms | 8 of 8 |
+| the infill corner, VORONOI on 40 petals x 3 whorls, a gentle bend | 71,704 ms | **6,254 ms** (11.5x) | 75,646 ms | 8 of 8 |
+
+`dragging` reads true and `lightOnScreen` true through every step on the two infilled rows and false after
+the release, which paid the full build — F7's own contract on a drag that no slider started.
+
+**The heavy row drags a GENTLE bend and the reason is the validator.** The first run of this tool dragged
+the sheet's hook on the 40 x 3 corner and waited two minutes for a build the editor never asked for: three
+whorls make the inner petals SHORTER, the same drawn shape is tighter there, and the drag was REFUSED on
+them — correctly, and told. A refused drag fires no `input` and costs no build, so the tool now names the
+point it drags and where to, and fails with the editor's own status rather than timing out when a step
+asks for nothing.
 
 ## 8. Recorded, not fixed
 
