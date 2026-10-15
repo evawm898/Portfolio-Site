@@ -4051,7 +4051,10 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       handles: document.querySelectorAll('.bl-curve-test .bl-curve-pt').length, modes: [...document.querySelectorAll('.bl-curve-test select option')].map((o) => o.value),
     }));
     const curveRows = CONTROLS.filter((c) => c.kind === 'curve').length;
-    if (dom.mounts !== 1 || dom.editors !== 1 || dom.labels !== 1 || dom.vals !== 1 || dom.svgs !== 1) p.push(`the editor does not render exactly once (mounts ${dom.mounts}, editors ${dom.editors}, labels ${dom.labels}, read-outs ${dom.vals}, svgs ${dom.svgs})`);
+    /* F3-global: the page now carries registry curve controls too, so the
+       editor count is the mount's one PLUS the registry's (asserted exactly
+       below, in #panelControls). */
+    if (dom.mounts !== 1 || dom.editors !== 1 + curveRows || dom.labels !== 1 || dom.vals !== 1 || dom.svgs !== 1) p.push(`the editor does not render exactly once (mounts ${dom.mounts}, editors ${dom.editors} for 1 + ${curveRows} registry, labels ${dom.labels}, read-outs ${dom.vals}, svgs ${dom.svgs})`);
     if (dom.inControls !== curveRows) p.push(`#panelControls holds ${dom.inControls} curve editor(s) for ${curveRows} registry curve control(s)`);
     if (dom.handles !== START.points.length) p.push(`the editor draws ${dom.handles} handles for ${START.points.length} points`);
     if (J(dom.modes) !== J(SPEC.modes)) p.push(`the mode select offers ${J(dom.modes)}, not the spec's ${J(SPEC.modes)}`);
