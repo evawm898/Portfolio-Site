@@ -187,6 +187,7 @@ const stateOf = (set) => ({ ...DEFAULTS, placement: 'CONTINUOUS', hubShape: 'SPH
 
 async function moduleOf(tag, src) {
   const d = path.join(WDIR, tag); fs.mkdirSync(d, { recursive: true });
+  fs.copyFileSync(path.join(WDIR, 'bloom-curve.js'), path.join(d, 'bloom-curve.js'));   // the geometry imports ./bloom-curve.js (F3-global)
   fs.writeFileSync(path.join(d, 'bloom-geometry.js'), src);
   return import(pathToFileURL(path.join(d, 'bloom-geometry.js')).href);
 }
