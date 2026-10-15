@@ -156,6 +156,12 @@ Every figure here is from a run on this tree at the commits named in the PR; the
   out-of-box one whole; `--negative-control` PASS, 7 design-file mutants and the 13 scopes mutants it spawns.
   Two claim lists widened because a live curve control makes them true (`a-dropped-field-on-write` and
   `the-curve-kind-is-not-written` now redden F1/F2/F8 as well), the checks untouched.
+- **CI's first run found one disarmed mutant this session had not run**: the export preflight's wall
+  instrument (`bloom-wall-thickness.mjs --negative-control`) reported `unguarded-form: its anchor matches 0
+  time(s)` — its edit was anchored on `&& buckleIsFlat(state);\n}`, the END of `petalFormIsFlat`, and the
+  `!curlIsCurve` arm now follows the buckle's. Re-anchored on the buckle clause as it stands; the mutant fires
+  V2 (and V4) again. A refactor disarms a mutant by moving its anchor, and the only thing that says so is
+  running the control — every preflight step was then run locally before the fix was pushed.
 - **`--verify-frozen --phase68`** deep-equal: the 1,331 rows at `b51182a`, registered in both maps.
 - **Sheet**: `docs/img/spine-curve.png` (§7's tool beside it), rendered through
   `node tools/shot-bloom-spine-curve.mjs`.
