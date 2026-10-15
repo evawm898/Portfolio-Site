@@ -43,6 +43,11 @@ branch", it means the next leaf session will be editing the same function.
 
 ## 1. F1.1 — Stacked sepal whorls
 
+**[Oct 15: BUILT — F1.1a, `docs/bloom-sepal-tiers-outcome.md`. `sepalTiers` 1–4, the height law
+`h·(N−k)/N`, ordering floored one gap under the tier above, contact clamped per tier against the
+tiers above, each tier a TIER scope of offsets; tier 1 byte-identical by branch. Q1.5 default:
+the petal count per tier; the tier ceiling 4 is the budget's (72 % at the corner).]**
+
 **What exists**
 - There is one sepal whorl, end to end. `footRing` builds a single `fr.sepals` descriptor
   (G:2922–2983): count ceiling = petal count or fan count, phase, foot width, `ring` with
@@ -677,6 +682,7 @@ Recorded as given. Nothing below is re-litigated, interpreted further or resolve
 - Q1.3 / Q1.4: tiers stay in height order; tier-on-tier contact is clamped and told (like the petal
   angle limit).
 - Q1.5: **DEFAULT** — count ceiling per tier proposed by the build session from measurement.
+  **[Oct 15, built: the petal count per tier (unchanged); the TIER ceiling is 4, from the budget corner.]**
 - Sepals join independence PER TIER only; sepals within a tier match.
 
 **F1.2 / F1.3 — stamens**
