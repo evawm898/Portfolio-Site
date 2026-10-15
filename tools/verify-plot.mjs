@@ -1636,6 +1636,9 @@ const MUTANTS = [
     breaks: ['file/the-document-carries-exactly-these-fields',
              'restore/every-field-comes-back',
              'restore/the-polarity-comes-back-as-a-blend-mode-and-not-only-as-a-value',
+             // with no polarity in the file the page stays in screen, so the
+             // print composition's level comes back on the wrong renderer
+             'restore/a-restored-level-is-not-replaced-by-the-polarity-default',
              'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
   },
 
