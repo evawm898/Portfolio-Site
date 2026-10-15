@@ -96,6 +96,24 @@ bloom with a real hub.
 - `frozen/phase69` is the 1343 rows at `19ecb99`, registered in both maps and proved
   deep-equal (`--verify-frozen --phase69`).
 
+### 4a. The mutant sweep hit its cap, and the tier rows are scoped now (found by CI)
+
+The first push's `bloom-apex-mutants` run cancelled five of six shards at the 150-minute
+job timeout (run 38727602126; shard 4 finished at 112 min). Main's last green run
+(38683961988) had shards at 90 / 134 / 136 / 136 / 136 / 139 min, so the sweep was
+already within a few minutes of its cap, and this PR's four rows on 76 (+5 %) and five
+mutants on 173 (+3 %) are what tipped it. The workflow is out of this session's reach, so
+the cost came out of the table instead: a row may carry `for: /mutant ids/` and a mutant
+`rows: /row labels/` (`rowsFor()`), the four `SEPAL TIERS:` rows run under the five tier
+mutants alone and the five tier mutants run over those four rows alone. The clean control
+still runs every row, so a family firing on the clean tree is reported whatever scoped it;
+what a scoped mutant gives up is collateral it never had to report. Cost to the sweep
+against main: four extra rows in each shard's clean control and five four-row mutants —
+about a minute a shard where the first push cost about ten. Re-run on this tree: anchors
+178 of 178, the five tier mutants fire what they name, and the neuter control on
+`tiers-cross` reports. The 134–139 min of main's own shards is the sweep owner's and is
+left as found.
+
 ## 5. The byte partition
 
 Predeclared from the BASE tree's own record (`verify-bloom-surface-bytes --movers-predicate

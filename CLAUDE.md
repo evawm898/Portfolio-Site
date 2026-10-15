@@ -3634,6 +3634,11 @@ SP10–SP13 or block 63).
 - SP10–SP13; five mutants on the mutated module's own tier records; apex-table rows may carry
   `scopes`. **SP12 and SP13 each read their reference off the quantity under test on the first cut
   and only the mutants said so** — the row's own scopes and the PAGE's built angle are the owners now.
+- **The apex sweep sat at 134–139 min of its 150-min shard cap before this session, and the four
+  tier rows tipped five shards over it** — so a table row may carry `for: /mutant ids/` and a
+  mutant `rows: /row labels/` (`rowsFor()`); the tier rows and mutants are scoped to each other and
+  the clean control still runs every row. A session that adds rows should scope them or expect
+  the cancel (outcome doc §4a).
 - Block 63 (11 rows, 1354), smoke block 63; `frozen/phase69` = the 1343 rows at `19ecb99`. Sheet:
   `node tools/shot-bloom-sepal-tiers.mjs` → `docs/img/sepal-tiers.png`.
 
