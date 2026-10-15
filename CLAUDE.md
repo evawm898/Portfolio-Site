@@ -9035,7 +9035,14 @@ black ground) is a mutant.
   with NO shape has no ink near the edge, at both cameras — an owner the shapes do not
   write). And one blindness, recorded: `a-shape-never-occludes` stays
   green on a wrong-coloured panel (on black, every pixel passes "dark ink") — the tones
-  check is the witness for that. Sheet:
+  check is the witness for that. **47 of the 113 mutants were run after the change** (all
+  20 new, plus the 27 old ones over the file, export, render loop and composition code it
+  touched): 44 behaved first time, and three OLD lists were short in the honest direction —
+  `the-ink-does-not-reverse-inside-a-panel` (the highlight reverses in the same pass),
+  `the-saved-document-drops-a-draw-field` (every 0-notes round trip, three of them from the
+  multi-bloom session, reads the dropped field's own note) and
+  `the-polarity-is-not-in-the-file` (the level-default check needs the print renderer back).
+  Widened, never loosened. The other 66 (stem, petal, anchor, grid) were not run. Sheet:
   `node tools/shot-plot-shapes.mjs <dir>` (both polarities across an edge, each fill both
   ways, overlap both orders, save → reload → restore, and the PNG/SVG artefacts).
 
