@@ -116,6 +116,8 @@ const H1_XFAIL = Object.freeze({
 async function loadGeometry(src) {
   if (!src) return import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hole-rim-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
   const f = path.join(dir, 'bloom-geometry.mjs');
   fs.writeFileSync(f, src);
   return import(pathToFileURL(f).href);

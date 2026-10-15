@@ -353,6 +353,8 @@ async function control() {
   let bad = 0;
   for (const m of MUTANTS) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tube-mut-'));
+    /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+    fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
     const f = path.join(dir, 'bloom-geometry.mjs');
     fs.writeFileSync(f, src.replace(m.from, () => m.to));
     const G = await import(pathToFileURL(f).href);

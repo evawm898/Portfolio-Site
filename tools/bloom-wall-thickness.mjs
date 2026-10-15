@@ -1012,8 +1012,10 @@ const MUTANTS = [
       : 'buckleIsFlat still reports a buckled state as buckled') },
   { id: 'unguarded-form', names: ['V2'],
     why: 'petalFormIsFlat stops naming the buckle, so petalForm() is never constructed and the field is a dead slider — session 16\'s failure, repeated',
-    find: '      && buckleIsFlat(state);\n}',
-    into: '      && true;\n}',
+    /* re-anchored by F3-global: the predicate gained a `!curlIsCurve` arm after
+       the buckle's, so the buckle clause no longer ends the function */
+    find: '      && buckleIsFlat(state)\n      /* THE SPINE CURVE',
+    into: '      && true\n      /* THE SPINE CURVE',
     witness: (M) => (M.petalFormIsFlat({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0,
                                          petalCupGradient: 0, buckleAmp: 0.3, buckleFreq: 3 }) === true ? null
       : 'petalFormIsFlat still reports a buckled row as non-flat') },

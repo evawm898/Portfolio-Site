@@ -943,6 +943,8 @@ async function s4NegativeControl() {
   }
   if (fails) return fails;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-s4-mutant-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
   for (const m of S4_MUTANTS) {
     const file = path.join(dir, `${m.id}.js`);
     fs.writeFileSync(file, src.replace(m.from, m.to));

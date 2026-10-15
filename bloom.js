@@ -60,7 +60,12 @@ function makeInput(c) {
   }
   if (c.kind === 'curve') {
     return makeCurveInput(c, {
-      validate: (cand) => (typeof c.validate === 'function' ? c.validate(cand, readUI()) : null),
+      /* THE VALIDATOR'S CONTEXT (F3-global): the asked lengths of every petal
+         the build on screen drew, from the builder's own record — the same
+         shape at a shorter inner whorl is tighter, and the refusal has to ask
+         about the petals that exist rather than re-derive them from the
+         sliders (a second producer of the whorl's size law). */
+      validate: (cand) => (typeof c.validate === 'function' ? c.validate(cand, readUI(), { askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine).map((p) => p.spine.askedLengthMm))] }) : null),
       ownerLength: () => Number(inputs[c.curve.owner].value),
       ownerLabel: (CONTROLS.find((o) => o.id === c.curve.owner) || {}).label || c.curve.owner,
     });
@@ -372,7 +377,10 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
        already do). A value the control cannot hold is refused here too —
        the file reader has already refused it on the way in, so reaching this
        means a caller bypassed the reader, and the page keeps its curve. */
-    set: (v) => {
+    set: (raw) => {
+      /* a matrix row, a gate or a file hands the curve as JSON text; the page's
+         own callers hand the object — one setter, two spellings */
+      const v = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return raw; } })() : raw;
       const why = curveShapeRefusal(v, spec);
       if (why) { console.warn(`${c.id}: not a curve this control can hold — ${why}`); return; }
       cur = cloneCurve(v);
@@ -1839,8 +1847,23 @@ function cupClampLine(petals, sepals) {
 }
 
 function spineLine(petals) {
-  const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && sp.curlRad !== 0);
+  const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && (sp.curlRad !== 0 || sp.curveMode));
   if (!sps.length) return '';
+  /* THE SPINE CURVE (F3-global): the law's own record on the whole-bloom petal
+     and the worst ring's radius; a curve that a file loaded past the floor is
+     CLAMPED and told exactly as the slider's modifiers are. */
+  if (sps[0].curveMode) {
+    const sp0 = sps[0], cl = sp0.curveLaw;
+    const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp0);
+    const clamped = sps.filter((s) => s.clamped), contact = sps.filter((s) => s.clearance.selfContact);
+    const near = sps.reduce((a, s) => Math.min(a, s.clearance.minMm, s.clearance.minToFootMm), Infinity);
+    const of = (arr) => `${arr.length} of ${sps.length} ring${sps.length === 1 ? '' : 's'}`;
+    return `SPINE CURVE: ${sp0.curve.points.length} points, drawn arc ${cl.arcFrac.toFixed(3)} of the length scaled to ${sp0.askedLengthMm.toFixed(1)} mm · start ${cl.startDeg >= 0 ? '+' : ''}${cl.startDeg.toFixed(1)}° laid along the blade · ${sp0.turnBuiltDeg.toFixed(1)}° built · the slider family (spine curl, bias, start, the curl deltas, the variance curl term) is INERT`
+         + ` · tightest spine radius ${tight.peakRadiusMm.toFixed(2)} mm`
+         + (clamped.length ? ` (CLAMPED at one sheet thickness, ${tight.floorRadius.toFixed(2)} mm, on ${of(clamped)} — a loaded curve asks under the floor; the editor refuses such a drag)` : ` against a ${tight.floorRadius.toFixed(2)} mm floor`)
+         + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp0.clearance.sheetT.toFixed(2)} mm sheet`
+         + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
+  }
   /* EVERY RING'S PETAL, because the floor binds and the flags fire on the
      SHRUNK inner whorls first: the line names the worst ring, not slot 0's. */
   const sp0 = sps[0];
@@ -2250,7 +2273,8 @@ function formVarianceLine(v, petalsAll) {
     ? (v.fan ? 'a ramp outward from the mirror line' : `a ramp round the flower with its seam at ${v.phaseDeg.toFixed(0)}°`)
     : (v.fan ? `${cyc} per turn, even about the mirror line (phase inert)` : `${cyc} round the flower, phase ${v.phaseDeg.toFixed(0)}°`);
   const nyq = Number.isInteger(v.nyquist) ? `${v.nyquist}` : v.nyquist.toFixed(1);
-  return `FORM VARIANCE ${(v.amount * 100).toFixed(0)}%: over the ${ps.length} petal${ps.length === 1 ? '' : 's'} built, curl ${span('petalSpineCurl', 0)}°, cup ${span('petalCup', 2)}, twist ${span('petalTwist', 0)}° — ${law}, cup / curl / twist offset 0° / 120° / 240° along it, on ${v.n} slots`
+  const curveMode = ps.length && ps[0].spine && ps[0].spine.curveMode;
+  return `FORM VARIANCE ${(v.amount * 100).toFixed(0)}%: over the ${ps.length} petal${ps.length === 1 ? '' : 's'} built, curl ${curveMode ? 'INERT (the spine is the drawn curve)' : span('petalSpineCurl', 0) + '°'}, cup ${span('petalCup', 2)}, twist ${span('petalTwist', 0)}° — ${law}, cup / curl / twist offset 0° / 120° / 240° along it, on ${v.n} slots`
        + (scaled ? ` — ${scaled} petal${scaled === 1 ? '' : 's'} held inside a control's range by the headroom on that side` : '')
        + (clamped ? ` — ${clamped} petal${clamped === 1 ? '' : 's'} CLAMPED to a control's own range` : '')
        + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
@@ -3221,6 +3245,17 @@ function endDrag() {
   if (lightOnScreen || regenQueued) scheduleRegen();
 }
 document.addEventListener('pointerdown', (e) => { if (isSlider(e.target)) dragActive = true; }, true);
+/* THE CURVE EDITOR'S DRAG RIDES F7's PATH (F3-global): a press on a handle of
+   a live curve control is a drag until the editor's own `change` (fired at the
+   release that moved a point) or a release that moved nothing, so a hand
+   drawing the spine sees the drag-light build (infill cells dropped) and the
+   full build on release — the slider's own bargain. A press that moves nothing
+   fires no change, so pointerup ends it too. The three slider lines above and
+   below stay verbatim: the drag gate's mutants are anchored on them. */
+const isCurveHandle = (t) => !!(t && t.closest && t.closest('#panelControls .bl-curve svg'));
+document.addEventListener('pointerdown', (e) => { if (isCurveHandle(e.target)) dragActive = true; }, true);
+document.addEventListener('pointerup', (e) => { if (isCurveHandle(e.target)) setTimeout(endDrag, 0); }, true);
+document.addEventListener('pointercancel', (e) => { if (isCurveHandle(e.target)) setTimeout(endDrag, 0); }, true);
 window.addEventListener('pointerup', endDrag, true);
 window.addEventListener('pointercancel', endDrag, true);
 window.addEventListener('blur', endDrag);

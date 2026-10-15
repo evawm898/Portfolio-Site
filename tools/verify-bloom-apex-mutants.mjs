@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -60,6 +60,9 @@ async function mutatedModule(id, source) {
   const d = path.join(WDIR, id);
   fs.mkdirSync(d, { recursive: true });
   fs.writeFileSync(path.join(d, 'bloom-geometry.js'), source);
+  /* the geometry imports the curve sampler by relative path; the sampler is never
+     mutated here, so the shipped copy sits beside every mutated geometry */
+  fs.copyFileSync(path.join(ROOT, 'bloom-curve.js'), path.join(d, 'bloom-curve.js'));
   return import(pathToFileURL(path.join(d, 'bloom-geometry.js')).href);
 }
 /* THE WITNESS ASKS THE BUILDER, NEVER A PROFILE ASSEMBLED HERE.
@@ -591,6 +594,20 @@ function coiledStamens(M, state) {
 }
 const COILED_SIX = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenCoilRadius: 1.5, stamenCoilTurns: 3 });
 const COILED_TIGHT = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenCoilRadius: 1.5, stamenCoilTurns: 12 });
+/* ===== THE SPINE CURVE (F3-global) ===== */
+/* The mutated module's OWN spine record on a curve-mode state — the mode it
+   says it built, the curl it was handed, the turn it built, the clamp and the
+   validator's answer. Never C1, which is what these mutants name. */
+function curveSpine(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, state);
+    const sp = b.petal.spine;
+    return { curveMode: !!sp.curveMode, curlRad: sp.curlRad, turnBuiltDeg: sp.turnBuiltDeg, clamped: sp.clamped, curveRefusal: sp.curveRefusal === undefined ? null : sp.curveRefusal };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const CURVE_HOOK = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] }, petalSpineCurl: 150, curlBias: 1, curlStart: 0.5 });
+const CURVE_UNDER = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] } });
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -2647,6 +2664,42 @@ const MUTANTS = [
     witness: (M, C) => { const m = coiledStamens(M, COILED_TIGHT()), c = coiledStamens(C, COILED_TIGHT());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (c.A.coil.turnsMax < 12 && m.A.coil.turnsMax === 12) ? null : `the mutant builds ${m.A.coil.turnsMax} turns against the clean tree's ${c.A.coil.turnsMax}`; } },
+  /* ===== THE SPINE CURVE (F3-global — docs/bloom-spine-curve-outcome.md).
+     Five mutants, each witnessed on the MUTATED module's own spine record or
+     refusal on a curve-mode state, never on C1 (the clause they all name).
+     ===== */
+  { id: 'the-curve-is-ignored', why: 'spineLaw drops the curve arm, so a CURVE-mode spine is built STRAIGHT (curl 0, the hidden family inert) while the record still says curve mode — watertight, one piece, the same triangle count, the read-out quoting a law nothing followed',
+    find: '    const kRaw = (Phi(u1) - Phi(i / N)) / ds + (curve === null ? 0 : curve.kappaAtMm((i + 0.5) * ds));',
+    into: '    const kRaw = (Phi(u1) - Phi(i / N)) / ds;', names: ['C1'],
+    witness: (M, C) => { const m = curveSpine(M, CURVE_HOOK()), c = curveSpine(C, CURVE_HOOK());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.turnBuiltDeg) < 1e-9 && Math.abs(c.turnBuiltDeg) > 10) ? null : `the mutant built a turn of ${m.turnBuiltDeg}° against the clean tree's ${c.turnBuiltDeg}°`; } },
+  { id: 'a-refused-drag-clamps', why: 'the validator never refuses, so a drag past the printable floor is ACCEPTED and the build CLAMPS it — clamp-and-tell where Q4.4 ruled refusal; the point moves, the spine does not follow it, and every STL gate is green',
+    find: '  if (!worst) return null;',
+    into: '  return null;', names: ['C1'],
+    witness: (M, C) => { const m = curveSpine(M, CURVE_UNDER()), c = curveSpine(C, CURVE_UNDER());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (!c.clamped || c.curveRefusal === null) return `the clean tree does not clamp and refuse the under-floor curve (clamped ${c.clamped}, refusal ${JSON.stringify(c.curveRefusal)}) — the probe state is outside the mutant\'s subject`;
+      return (m.clamped && m.curveRefusal === null) ? null : `the mutant\'s validator still answers ${JSON.stringify(m.curveRefusal)} on a curve the build clamps (${m.clamped})`; } },
+  { id: 'curvature-taken-from-the-slider-in-curve-mode', why: 'the mode predicate is always SLIDER, so CURVE mode builds the slider family and ignores the drawn curve — the control shows a curve, the geometry draws the slider; a hidden slider doing something and a visible curve doing nothing',
+    find: "export function curlIsCurve(state) { return state.petalCurlMode === 'CURVE'; }",
+    into: 'export function curlIsCurve(state) { return false; }', names: ['C1'],
+    witness: (M, C) => { const m = curveSpine(M, CURVE_HOOK()), c = curveSpine(C, CURVE_HOOK());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.curveMode && c.curveMode && m.curlRad !== 0) ? null : `the mutant\'s record reads curve mode ${m.curveMode} / curl ${m.curlRad} rad against the clean tree\'s ${c.curveMode} / ${c.curlRad}`; } },
+  { id: 'the-hidden-curl-controls-still-applied', why: 'petalForm reads the Spine curl slider in CURVE mode too, so the hidden family (and every curl delta and the variance curl term composed into it) is ADDED to the drawn curve — a hidden control moving the geometry, the dead-slider defect inverted',
+    find: '  const curlRad = spineCurve !== null ? 0 : state.petalSpineCurl * D2R;',
+    into: '  const curlRad = state.petalSpineCurl * D2R;', names: ['C1'],
+    witness: (M, C) => { const m = curveSpine(M, CURVE_HOOK()), c = curveSpine(C, CURVE_HOOK());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.turnBuiltDeg - c.turnBuiltDeg) > 1) ? null : `the mutant\'s built turn ${m.turnBuiltDeg}° is the clean tree\'s ${c.turnBuiltDeg}° — the slider at 150 did not reach the curve-mode spine`; } },
+  { id: 'the-validator-and-the-build-disagree-on-the-floor', why: 'the refusal asks HALF the floor (a radius of half a sheet thickness), so a drag the editor accepts builds a clamped spine — the one thing the ruling\'s refusal exists to make impossible, invisible to every STL gate',
+    find: '    if (law.peakKmm > 1 / floorR && (!worst || law.peakKmm > worst.peakKmm)) worst = { ...law, L };',
+    into: '    if (law.peakKmm > 2 / floorR && (!worst || law.peakKmm > worst.peakKmm)) worst = { ...law, L };', names: ['C1'],
+    witness: (M, C) => { const m = curveSpine(M, CURVE_UNDER()), c = curveSpine(C, CURVE_UNDER());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (c.curveRefusal === null) return 'the clean tree accepts the under-floor curve — the probe is outside the mutant\'s subject';
+      return (m.curveRefusal === null && m.clamped) ? null : `the mutant still refuses (${JSON.stringify(m.curveRefusal)}) a curve at 0.69 mm against a 0.60 mm half-floor, or did not clamp (${m.clamped})`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3164,6 +3217,16 @@ const ROWS = [
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'INDEPENDENT' }] },
   { label: 'six stamens coiled at twelve turns (the curvature floor clamps the turns)',
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'INDEPENDENT' }, { id: 'stamenCoilTurns', value: '12' }] },
+  /* THE SPINE CURVE (F3-global): a hooked curve in CURVE mode with the HIDDEN
+     slider family set (so a leak of the slider is observable — on a slider at
+     0 the leak mutant is a no-op by construction), and a LOADED curve under
+     the floor (the one state where the refusal fires and the build clamps, so
+     a validator that stops refusing, or asks a different floor, is seen). */
+  { label: 'a hooked spine curve with the hidden slider family set (curl 150, bias 1, start 0.5)',
+    set: [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify({ mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] }) },
+          { id: 'petalSpineCurl', value: '150' }, { id: 'curlBias', value: '1' }, { id: 'curlStart', value: '0.5' }] },
+  { label: 'a loaded spine curve UNDER the floor (0.69 mm radius against 1.20 — refused by the validator, clamped by the build)',
+    set: [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify({ mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] }) }] },
 ];
 
 const { server, port } = await serveRepo();
@@ -3262,6 +3325,13 @@ async function famsOn(rows) {
        already records, avoided by construction rather than by luck. */
     for (const msg of await apexNibAssertions(page, row)) {
       const mm = /^(AN\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE CURL FAMILY (F3-global, the spine curve) — the rule once more: the
+       table never ran curlAssertions until the curve's five mutants named C1.
+       `C\d+` and not `C`: the cut family's `SC` is captured above on its own
+       anchor, and a bare `C` would read `CA`/`CG` messages nobody pushes here. */
+    for (const msg of await curlAssertions(page, row)) {
+      const mm = /^(C\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

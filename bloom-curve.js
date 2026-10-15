@@ -87,7 +87,11 @@ export const quantise = (v) => { const q = +(Math.round(v / CURVE_GRID) * CURVE_
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isPt = (p) => Array.isArray(p) && p.length === 2 && isNum(p[0]) && isNum(p[1]);
 
-export const cloneCurve = (v) => {
+/* A curve arrives as the editor's object or, from a matrix row or a file's
+   text, as JSON — one reader for the two spellings, so no consumer parses
+   twice. The shape rule still refuses a string (a string is not a value). */
+export const cloneCurve = (raw) => {
+  const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
   const out = { mode: v.mode, points: v.points.map((p) => [p[0], p[1]]) };
   if (v.mode === 'two-sided') out.right = v.right.map((p) => [p[0], p[1]]);
   return out;
