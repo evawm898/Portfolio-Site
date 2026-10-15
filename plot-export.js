@@ -127,9 +127,56 @@ const hex = n => '#' + (n >>> 0 & 0xffffff).toString(16).padStart(6, '0');
    function does no geometry — everything it could get wrong is a property of
    the file rather than of the picture, which is what lets the gate drive it
    over polylines whose answer is written down. */
+/* A CONVEX POLYGON LIST AS ONE PATH'S `d` — each polygon a closed subpath. In
+   the same millimetre space as the strokes. */
+export function polygonsData(polys) {
+  let d = '';
+  for (const p of polys) {
+    d += `M${p[0]} ${p[1]}`;
+    for (let i = 2; i < p.length; i += 2) d += `L${p[i]} ${p[i + 1]}`;
+    d += 'Z';
+  }
+  return d;
+}
+
+/* THE KNOCKOUT, IN A FILE THAT HAS NO BLENDING. Two masks, built from ONE list
+   of the shapes' marks in z-order, and complementary by construction: the
+   panel's mask starts black and each mark paints white where its tone is the
+   opposite one and black where it is the ground; the ground's mask is the same
+   walk with the colours swapped. The drawing is then emitted TWICE — the SAME
+   paths, in the same order, once in each ink under each mask — so a stroke that
+   crosses a panel's edge is one continuous path in both groups and changes ink
+   only because a mask says so. Drawing the ground's ink everywhere and covering
+   it inside the panel would leave its antialiased fringe round every reversed
+   stroke; masking BOTH is the inverse clip, here as on the page.
+   A MASK IS LUMINANCE, and plotter software may ignore it exactly as it may
+   ignore the frame's clip — the caveat this file already carries for the clip
+   holds for the masks too, and is said in the document's own <desc>. */
+function knockoutBody({ W, H, knockout, body, strokeMm, mask }) {
+  const marks = knockout.shapes;
+  const fills = marks.map(m => `    <path d="${m.d}" fill="${hex(m.fill)}"/>`).join('\n');
+  const maskOf = (id, base, colourOf) => `<mask id="${id}" maskUnits="userSpaceOnUse" `
+    + `x="${-W}" y="${-H}" width="${3 * W}" height="${3 * H}">`
+    + `<rect x="${-W}" y="${-H}" width="${3 * W}" height="${3 * H}" fill="${base}"/>`
+    + marks.map(m => `<path d="${m.d}" fill="${colourOf(m.tone)}"/>`).join('')
+    + '</mask>';
+  const defs = maskOf('plot-knock-ground', '#ffffff', t => (t === 'opposite' ? '#000000' : '#ffffff'))
+    + maskOf('plot-knock-panel', '#000000', t => (t === 'opposite' ? '#ffffff' : '#000000'));
+  const group = (id, maskId, ink) => `    <g id="${id}" mask="url(#${maskId})" fill="none" stroke="${hex(ink)}"
+       stroke-width="${round(strokeMm, 4)}" stroke-linecap="round" stroke-linejoin="round">
+${body}
+    </g>`;
+  return { defs, content: `
+    <g id="plot-shapes">
+${fills}
+    </g>
+${group('plot-ink-ground', 'plot-knock-ground', knockout.inks.ground)}
+${group('plot-ink-panel', 'plot-knock-panel', knockout.inks.opposite)}` };
+}
+
 export function svgDocument({
   paths, widthMm, heightMm, shape, strokeMm, ink, ground, drawGround,
-  title = '', unitLabel = 'mm',
+  title = '', unitLabel = 'mm', knockout = null,
 }) {
   const W = round(widthMm), H = round(heightMm);
   const clip = shape === 'ellipse'
@@ -148,6 +195,17 @@ export function svgDocument({
      so it is cropped by the same clip the picture is. */
   const groundRect = drawGround
     ? `\n    <rect x="0" y="0" width="${W}" height="${H}" fill="${hex(ground)}"/>` : '';
+  /* WITH NO SHAPES THE DOCUMENT IS THE ONE /plot SHIPPED, byte for byte: the
+     knockout is an addition inside the same template — its masks join the defs
+     and its two ink groups take the one ink group's place — never a second
+     copy of the document. */
+  const k = knockout && knockout.shapes.length
+    ? knockoutBody({ W, H, knockout, body, strokeMm }) : null;
+  const inkGroup = k ? k.content : `
+    <g fill="none" stroke="${hex(ink)}"
+       stroke-width="${round(strokeMm, 4)}" stroke-linecap="round" stroke-linejoin="round">
+${body}
+    </g>`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="${SVG_NS}" version="1.1"
      width="${W}${unitLabel}" height="${H}${unitLabel}"
@@ -155,13 +213,11 @@ export function svgDocument({
   <title>${esc(title)}</title>
   <desc>${esc(`Flat strokes, no blending: SVG has neither additive nor multiply, `
     + `so the crossings that carry the screen picture are not here. Depth comes `
-    + `from line density. One path per line strip. 1 user unit = 1 ${unitLabel}.`)}</desc>
-  <defs><clipPath id="plot-frame">${clip}</clipPath></defs>
-  <g clip-path="url(#plot-frame)">${groundRect}
-    <g fill="none" stroke="${hex(ink)}"
-       stroke-width="${round(strokeMm, 4)}" stroke-linecap="round" stroke-linejoin="round">
-${body}
-    </g>
+    + `from line density. One path per line strip${k ? ', emitted twice: once in the '
+      + "ground's ink under one mask, once in the panels' ink under its complement "
+      + '(the knockout)' : ''}. 1 user unit = 1 ${unitLabel}.`)}</desc>
+  <defs><clipPath id="plot-frame">${clip}</clipPath>${k ? k.defs : ''}</defs>
+  <g clip-path="url(#plot-frame)">${groundRect}${inkGroup}
   </g>
 </svg>
 `;

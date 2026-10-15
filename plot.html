@@ -157,6 +157,117 @@
   <pre id="plot-frameinfo"></pre>
 </details>
 
+<!-- SHAPES. Background panels in FRAME SPACE — they are laid out against the
+     page, so they hold still when the camera orbits, and every number below is
+     a share of the frame's own box (the whole viewport when the frame is off).
+
+     KNOCKOUT IS NOT POLARITY. Polarity, in DRAW, is the page-wide render mode.
+     A shape whose tone is OPPOSITE is a panel of the other polarity's ground,
+     and the drawing reverses inside it — drawn there in the other polarity's
+     own regime. A GROUND shape paints the page's own ground, so laid over an
+     opposite one it cuts a hole. The drawing is ALWAYS in front: a shape
+     changes which ink a line is drawn in and never whether it is drawn.
+
+     The controls are a view of the PICKED shape: picking one loads its values
+     and applies nothing, the same ownership rule the bloom and the petal
+     pickers follow. Shapes stack in list order, last on top. -->
+<details id="plot-shapes" class="panel" open>
+  <summary>SHAPES</summary>
+
+  <div class="plot-row">
+    <label for="shapePick">shape</label>
+    <span class="plot-pick">
+      <button type="button" id="shapePrev" title="the shape below this one">&#9664;</button>
+      <select id="shapePick"><option value="-1">none</option></select>
+      <button type="button" id="shapeNext" title="the shape above this one">&#9654;</button>
+    </span>
+    <output id="shapePickOut">0 of 0</output>
+  </div>
+
+  <div class="plot-file-row">
+    <button type="button" id="shapeAdd" title="add a shape on top of the others">add</button>
+    <button type="button" id="shapeRemove" title="remove the picked shape">remove</button>
+    <button type="button" id="shapeLower" title="move the picked shape one step back">lower</button>
+    <button type="button" id="shapeRaise" title="move the picked shape one step forward">raise</button>
+  </div>
+
+  <div class="plot-row">
+    <label for="shapeKind">kind</label>
+    <select id="shapeKind">
+      <option value="rect" selected>rectangle</option>
+      <option value="ellipse">ellipse</option>
+    </select>
+    <output id="shapeKindOut"></output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeTone">tone</label>
+    <select id="shapeTone">
+      <option value="opposite" selected>opposite (knockout)</option>
+      <option value="ground">ground</option>
+    </select>
+    <output id="shapeToneOut"></output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeFill">fill</label>
+    <select id="shapeFill">
+      <option value="solid" selected>solid</option>
+      <option value="stripes">stripes</option>
+      <option value="halftone">halftone</option>
+      <option value="outline">outline only</option>
+    </select>
+    <output id="shapeFillOut"></output>
+  </div>
+
+  <div class="plot-row">
+    <label for="shapeX">x</label>
+    <input type="range" id="shapeX" min="-50" max="150" step="0.5" value="50">
+    <output id="shapeXOut">50%</output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeY">y</label>
+    <input type="range" id="shapeY" min="-50" max="150" step="0.5" value="75">
+    <output id="shapeYOut">75%</output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeW">width</label>
+    <input type="range" id="shapeW" min="1" max="200" step="0.5" value="100">
+    <output id="shapeWOut">100%</output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeH">height</label>
+    <input type="range" id="shapeH" min="1" max="200" step="0.5" value="50">
+    <output id="shapeHOut">50%</output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeRot">turn</label>
+    <input type="range" id="shapeRot" min="-180" max="180" step="1" value="0">
+    <output id="shapeRotOut">0&deg;</output>
+  </div>
+
+  <!-- THE PATTERN. `angle` is the stripes' own direction and the halftone's
+       ramp direction (dense end); `spacing` is the pattern's period as a share
+       of the frame's shorter side; `weight` is a stripe's share of its period,
+       a dot's diameter at the dense end as a share of the dot pitch, or an
+       outline's width as a share of the spacing. Solid reads none of them. -->
+  <div class="plot-row">
+    <label for="shapeAngle">angle</label>
+    <input type="range" id="shapeAngle" min="-180" max="180" step="1" value="0">
+    <output id="shapeAngleOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeSpacing">spacing</label>
+    <input type="range" id="shapeSpacing" min="0.5" max="12" step="0.1" value="3">
+    <output id="shapeSpacingOut">3%</output>
+  </div>
+  <div class="plot-row">
+    <label for="shapeWeight">weight</label>
+    <input type="range" id="shapeWeight" min="5" max="140" step="1" value="50">
+    <output id="shapeWeightOut">50%</output>
+  </div>
+
+  <pre id="plot-shapestate"></pre>
+</details>
+
 <!-- DRAW. Every control is live — nothing here is a re-export. The two density
      sliders run the same way round (right = every line) and thin the grid out
      as they travel left; `densityToEvery()` in plot-grid.js is their one owner

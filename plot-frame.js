@@ -35,6 +35,10 @@
 //     than at the viewport — which means the boundary stops being an overlay
 //     and becomes a clip region that other things read.
 // None of that is built. This session draws the boundary and saves it.
+// [Oct 14: the export half was built since. Shapes landed in this box (see
+// plot-shapes.js) and are NOT clipped at it on screen — like the ink, they are
+// drawn across the canvas and the two exports apply the crop, so the boundary
+// stayed an overlay and nothing reads it as a clip.]
 
 // The shapes, and the ratios the control offers. Ratios are stored and read as
 // their own `w:h` string: self-describing in a saved file, exact at 1:1, and
