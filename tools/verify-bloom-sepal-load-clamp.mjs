@@ -134,6 +134,8 @@ async function control() {
     if (n !== 1) { console.log(`REFUSED: mutant ${m.id}'s anchor matches ${n} times, not once`); process.exit(1); }
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sepal-load-clamp-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
   let good = true;
   for (const m of MUTANTS) {
     const f = path.join(dir, `${m.id}.mjs`);

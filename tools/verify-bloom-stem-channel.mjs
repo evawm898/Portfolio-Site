@@ -148,6 +148,8 @@ const TABLE = fs.readFileSync(TABLE_AT, 'utf8');
 const { DEFAULTS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 const CONTROL = process.argv.includes('--control');
 const WDIR = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-st9-'));
+/* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(WDIR, 'bloom-curve.js'));
 const bad = [];
 
 /* The two routes agree to this, and the number is ST9's own z grid rather than

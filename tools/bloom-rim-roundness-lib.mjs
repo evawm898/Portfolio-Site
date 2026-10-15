@@ -23,6 +23,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
 const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-rim-roundness-'));
+/* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a patched copy written beside it needs the sampler too */
+fs.copyFileSync(path.join(ROOT, 'bloom-curve.js'), path.join(SCRATCH, 'bloom-curve.js'));
 
 function replaceOnce(src, from, to) {
   const n = src.split(from).length - 1;

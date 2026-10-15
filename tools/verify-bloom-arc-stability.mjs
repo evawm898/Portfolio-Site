@@ -156,6 +156,8 @@ async function geometryFor(tag) {
     process.exit(2);
   }
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-arc-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(d, 'bloom-curve.js'));
   fs.writeFileSync(path.join(d, 'bloom-geometry.js'), SRC.replace(FIND, INTO));
   return import(pathToFileURL(path.join(d, 'bloom-geometry.js')).href);
 }

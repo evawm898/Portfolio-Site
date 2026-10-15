@@ -352,6 +352,8 @@ async function control(which) {
     src = src.replace(m.find, m.into);
   }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-order-control-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
   const file = path.join(dir, 'bloom-geometry.js'); fs.writeFileSync(file, src);
   const G = await loadGeometry(file, true);
   /* VACUITY: the plant must move a victim built after a setter. */
@@ -411,6 +413,8 @@ async function decoupledModule() {
   let src = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
   for (const d of DECOUPLE) { const n = src.split(d.find).length - 1; if (n !== 1) throw new Error(`--coupling: the anchor for "${d.what}" matches ${n} times, not once`); src = src.replace(d.find, d.into); }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-order-decoupled-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
   const file = path.join(dir, 'bloom-geometry.js'); fs.writeFileSync(file, src);
   const M = await loadGeometry(file, true);
   fs.rmSync(dir, { recursive: true, force: true });

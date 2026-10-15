@@ -1025,6 +1025,8 @@ const EXTRA = {
 async function control() {
   const src = fs.readFileSync(path.join(HERE, 'bloom-geometry.js'), 'utf8');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-edge-'));
+  /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
+  fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(dir, 'bloom-curve.js'));
   /* THE ANCHOR PRE-CHECK, over EVERY mutation, before any of them runs. A
      refactor disarms a mutant either by moving its `from` or by making it
      match twice, and the one nobody sees is inside a mutant a subset skips. */
