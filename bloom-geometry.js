@@ -2407,8 +2407,12 @@ export function petalStateForSlot(state, ring, slotTerm, clampedOut = null, scal
   return { ...state, ...out };
 }
 
-export function footRing(state, acc) {
+export function footRing(state, acc, opts = {}) {
   const thickness = acc.floorThickness(state.sheetThickness);
+  /* THE SCOPES (sepal tiers, F1.1a): a tier's own offsets reach its descriptor
+     through `sepalTierState` below; every other caller hands none and builds
+     every tier at the global sepal values. */
+  const tierScopes = (opts && opts.scopes) || null;
   const layerCount = Math.round(state.layerCount);
   if (!(layerCount >= 1 && layerCount <= MAX_LAYERS)) {
     throw new Error(`layerCount ${JSON.stringify(state.layerCount)} is outside 1..${MAX_LAYERS} — the registry and the builder have diverged`);
@@ -3475,14 +3479,25 @@ export function footRing(state, acc) {
      lattice shifted by the phase — the `count` positions nearest the mirror
      line, positive side first on a tie — and whether that set is mirror-
      symmetric is reported rather than assumed. */
-  const sepals = (() => {
-    if (!sepalsEligible(state)) return null;
-    const asked = Math.round(Number(state.sepalCount) || 0);
+  /* ===================================================================
+     SEPAL TIERS (F1.1a, Eva's rulings Q1.1–Q1.5 — docs/bloom-sepal-tiers-
+     outcome.md). N whorls of sepals along the hub-to-stem join, tier 1 the
+     whorl above (byte-identical by branch at one tier), each lower tier the
+     SAME construction on ITS OWN state: the global sepal values plus that
+     tier's offsets (a TIER SCOPE of the scoping model, Q3.8), so sepals within
+     a tier always match and tiers differ only by their offsets. The
+     descriptor below is now a FUNCTION of the tier's state and its station;
+     the loop after it is the one owner of WHERE each tier sits (the height
+     law, the ordering clamp, the NO ROOM drop) and of why a tier was not
+     built. `fr.sepals` is tier 1's descriptor, as it always was. */
+  const sepalDescriptorFor = (st, tier) => {
+    if (!sepalsEligible(st)) return null;
+    const asked = Math.round(Number(st.sepalCount) || 0);
     if (!(asked >= 1)) return null;
     const ceiling = fanMode ? fanCount : n;
     const ceilingOf = fanMode ? `the fan's ${fanCount} slots` : continuousMode ? `${n} petals a turn` : `the outer whorl's ${n} petals`;
     const count = Math.min(asked, ceiling);
-    const scale = Number(state.sepalScale), breadth = Number(state.sepalFootBreadth), phaseFrac = Number(state.sepalPhase);
+    const scale = Number(st.sepalScale), breadth = Number(st.sepalFootBreadth), phaseFrac = Number(st.sepalPhase);
     const pitchRad = fanMode ? fan.step : TAU / n;
     const phaseRad = phaseFrac * pitchRad;
     const outer = rings[0];
@@ -3491,8 +3506,8 @@ export function footRing(state, acc) {
        its own width — so a hidden `sepalScale` never reaches the foot of a
        sepal whose width it no longer sets. A branch: the first arm is the
        expression it always was. */
-    const own = sepalOwnSize(state);
-    const footScale = own.widthMm !== null ? own.widthMm / Number(state.petalWidth) : scale;
+    const own = sepalOwnSize(st);
+    const footScale = own.widthMm !== null ? own.widthMm / Number(st.petalWidth) : scale;
     const footAskedMm = outer.width * footScale * breadth;
     const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     /* WHERE THE WHORL SITS (the attachment-height ruling — `sepalAttachment`
@@ -3502,7 +3517,9 @@ export function footRing(state, acc) {
        the flare the ring is FLAT (the petal builder's flat arm, handed the
        height through the whorl primitive's `height`), its row `t/2` above
        the attachment point so the foot's bottom skin passes through it. */
-    const attachment = sepalAttachment(state, hub, acc);
+    /* TIER 1 IS THE SOLVE AS IT ALWAYS WAS; a lower tier is the same solve at
+       the station the tier loop below decided (the height law, order-clamped). */
+    const attachment = tier.k === 0 ? sepalAttachment(st, hub, acc) : sepalAttachment(st, hub, acc, { frac: tier.frac });
     const onHub = attachment.mode === 'HUB';
     const radius = onHub ? attachment.rAttach : hub.radius;
     const surf = surfaceAt(radius, null);
@@ -3526,12 +3543,14 @@ export function footRing(state, acc) {
       azimuths = Array.from({ length: count }, (_, i) => startAzimuth + (i * TAU) / count);
     }
     return {
+      present: true, tier: tier.k, tiers: tier.N, term: tier.term, state: st,
+      order: tier.k === 0 ? { tier: 0, heightEffective: attachment.frac, fracLaw: attachment.frac, fracCeiling: null, fracBuilt: attachment.frac, orderClamped: false, gapFrac: null, gapMm: null, aboveTier: null } : tier.order,
       asked, count, ceiling, ceilingOf, countClamped: asked > ceiling,
       scale, breadth, phaseFrac, pitchRad, pitchDeg: (pitchRad * 180) / Math.PI, phaseRad, phaseDeg: (phaseRad * 180) / Math.PI,
       phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
       startAzimuth, azimuths, placement, mirrorSymmetric,
       footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM, footScale,
-      own: { lengthMm: own.lengthMm, widthMm: own.widthMm, lengthFloored: own.lengthFloored, widthFloored: own.widthFloored, scaleInert: sepalScaleInert(state) },
+      own: { lengthMm: own.lengthMm, widthMm: own.widthMm, lengthFloored: own.lengthFloored, widthFloored: own.widthFloored, scaleInert: sepalScaleInert(st) },
       /* THE ATTACHMENT — the whorl's height (the `height` the whorl primitive
          is handed; 0 at the rim, where the flat arm reads `slot.z` as the
          plate's mid-plane) and the solve's own record. */
@@ -3544,7 +3563,50 @@ export function footRing(state, acc) {
         z, slope, arc, relief, dome: onHub ? null : dome, underFootFloor: radius < FOOT_MIN_WIDTH_MM, crossesAxis: overhang > radius, clamped: [],
       },
     };
-  })();
+  };
+  /* THE TIER LOOP — the one owner of each tier's station. Tier k (0-based) at
+     `sepalTierHeightLaw(h_k, k, N)` of the join's extent, h_k the tier's own
+     effective `sepalHeight` (global + offset, clamped): tier 0 is h_0 itself
+     (the branch), the lower tiers spread evenly toward the stem end. ORDER IS
+     A CLAMP: tier k sits at least one sheet (`seamHalfThicknessMm x 2`, a
+     LENGTH, mode-free) below the last BUILT tier above it, told; a tier whose
+     clamped station falls below the stem end has NO ROOM and is not built,
+     told. Tiers past the first need the HUB arm of tier 1's attachment (a stem
+     with a live join and an upright extent): without it they are inert, told
+     with tier 1's own reason. */
+  const sepalTiersAsked = sepalTierCount(state);
+  const sepalTiersEligibleHere = sepalTiersEligible(state);
+  const sepalTiers = [];
+  {
+    let above = null;
+    for (let k = 0; k < sepalTiersAsked; k++) {
+      const { state: st, term } = sepalTierState(state, tierScopes, k);
+      if (k === 0) {
+        const d = sepalDescriptorFor(st, { k: 0, N: sepalTiersAsked, term });
+        if (!d) break;
+        sepalTiers.push(d); above = d; continue;
+      }
+      const A0 = sepalTiers[0].attachment;
+      if (!sepalTiersEligibleHere || A0.mode !== 'HUB') {
+        sepalTiers.push({ present: false, tier: k, tiers: sepalTiersAsked, term, state: st, order: null, why: !sepalTiersEligibleHere ? 'tiers past the first need a stem — no stem, so this tier is not built (hidden and inert, told)' : `tiers past the first need the hub's flare to attach on, and tier 1 sits at the rim: ${A0.why}` });
+        continue;
+      }
+      const h = clamp(st.sepalHeight === undefined ? SEPAL_HEIGHT_DEFAULT : Number(st.sepalHeight), SEPAL_HEIGHT_RANGE[0], SEPAL_HEIGHT_RANGE[1]);
+      const fracLaw = sepalTierHeightLaw(h, k, sepalTiersAsked);
+      const gapMm = seamHalfThicknessMm(Number(state.sheetThickness)) * 2;
+      const gapFrac = gapMm / A0.extentMm;
+      const fracCeiling = above.attachment.frac - gapFrac;
+      const fracBuilt = Math.min(fracLaw, fracCeiling);
+      const order = { tier: k, heightEffective: h, fracLaw, fracCeiling, fracBuilt, orderClamped: fracLaw > fracCeiling, gapFrac, gapMm, aboveTier: above.tier };
+      if (!(fracBuilt >= 0)) {
+        sepalTiers.push({ present: false, tier: k, tiers: sepalTiersAsked, term, state: st, order, why: `NO ROOM — one sheet (${gapMm.toFixed(2)} mm) below tier ${above.tier + 1} is ${(fracBuilt * A0.extentMm).toFixed(2)} mm under the stem end on a join ${A0.extentMm.toFixed(2)} mm long` });
+        continue;
+      }
+      const d = sepalDescriptorFor(st, { k, N: sepalTiersAsked, term, frac: fracBuilt, order });
+      sepalTiers.push(d); above = d;
+    }
+  }
+  const sepals = sepalTiers.length ? sepalTiers[0] : null;
   return {
     rings, hub, derivedRadius, guardResidual, layerCount,
     /* THE DOME, footRing()'s own — null under the guard. */
@@ -3552,6 +3614,10 @@ export function footRing(state, acc) {
     /* THE SEPAL RING, this owner's fourth kind — null when absent or under
        SPHERE (sepals, part 1). */
     sepals,
+    /* THE SEPAL TIERS (F1.1a): every tier asked, in height order — tier 1's
+       descriptor first (the same object as `sepals`), then each lower tier's
+       descriptor or, where it was not built, a record saying why. */
+    sepalTiers, sepalTiersAsked, sepalTiersEligible: sepalTiersEligibleHere,
     /* THE ANDROECIUM, this owner's second kind — null when absent or under
        SPHERE (session 21). */
     androecium,
@@ -4025,7 +4091,7 @@ export function footList(built) {
   /* THE SEPAL FEET (sepals, part 1) stack on the same base as the petal feet —
      counted from the descriptor's ring and the azimuths the builder's own
      whorl placed. */
-  if (built.sepals) built.sepals.azimuths.forEach((az, k) => feet.push(rec({ ...fr.sepals.ring, index: -1 }, az, 'sepal', k)));
+  if (built.sepals) for (const T of (built.sepals.tiers || [built.sepals])) { if (T.present === false) continue; const ring = T.ring || fr.sepals.ring; T.azimuths.forEach((az, k) => feet.push(rec({ ...ring, index: -1 }, az, 'sepal', k))); }
   return feet;
 }
 /* All-pairs nearest neighbour — centre to centre, in mean foot widths — and
@@ -19184,6 +19250,91 @@ export function sepalTwinValue(sepalId, v) {
    androecium's own precedent — and the read-out says so. */
 export function sepalsEligible(state) { return !sphereMode(state); }
 export function sepalsAbsent(state) { return !sepalsEligible(state) || !(Number(state.sepalCount) >= 1); }
+/* ===================================================================
+   SEPAL TIERS (F1.1a — feature map §1 and §11, Eva's rulings Q1.1–Q1.5; read
+   docs/bloom-sepal-tiers-outcome.md before touching any of it).
+
+   `sepalTiers` (1..SEPAL_TIER_RANGE[1], default 1) asks for N whorls of
+   sepals stepping down the hub-to-stem join. TIER 1 IS TODAY'S WHORL — the
+   tier loop in footRing takes the one-tier branch and the descriptor is the
+   expression it always was, so a one-tier bloom is byte-identical by branch.
+   EACH TIER OWNS THE FULL SEPAL CONTROL SET THROUGH THE SCOPING MODEL (Q1.1 /
+   Q3.8): a tier's state is the global sepal values plus that tier's own
+   offsets (`scopes.tiers`, the design file's own container, applied here for
+   the first time), clamped into the registry's bounds the caller hands down;
+   sepals within a tier always match. TIERS PAST THE FIRST NEED A STEM (Q1.2):
+   `sepalTiersEligible` is the geometry's statement and the registry's
+   `sepalTiersLive` the other (SP10 checks them against each other); without
+   the hub's flare to attach on they are inert and told. THE HEIGHT LAW is
+   derived, never a control: tier k of N sits at h_k x (N - k) / N of the
+   join's extent, h_k the tier's own effective height — tier 1 at its height
+   itself, the lower tiers spreading evenly toward the stem end. ORDER (Q1.3)
+   and CONTACT (Q1.4) are two clamps, both told: a tier sits at least one sheet
+   below the built tier above it (a length, never a row count), and its angle
+   is drawn against the petals AND every built tier above it by the same scan
+   `sepalAngleLimit` already runs against the petals.
+
+   THE CEILING OF FOUR TIERS IS A PROPOSED DEFAULT (Q1.5), FROM MEASUREMENT:
+   the budget corner — 40 petals x 40 sepals x 120 x 30 mm sepals at tip shape
+   3.00 x four tiers on a 120 mm stem — reads 238,960 export triangles a tier,
+   1.08 M for the bloom at four tiers (72 % of EXPORT_TRI_BUDGET), 88 % at
+   five and a refusal at six; the reference lantern needs three. The join's
+   own length is the other bound and it is told, not typed: at the shipping
+   6 mm stem the join hangs 1.32 mm, which holds ONE tier (a second has no
+   room under the one-sheet gap), while a 40 mm GOBLET hub hangs 77.6 mm.
+   =================================================================== */
+export const SEPAL_TIER_RANGE = Object.freeze([1, 4]);
+export const SEPAL_TIER_DEFAULT = 1;
+/* the whorl-level sepal values no tier may offset (the count is the whorl's;
+   the tier count names the tiers themselves) */
+export const SCOPE_TIER_WHORL_LEVEL_IDS = Object.freeze(['sepalCount', 'sepalTiers']);
+export function sepalTierCount(state) {
+  const n = Math.round(Number(state.sepalTiers));
+  return Number.isFinite(n) ? clamp(n, SEPAL_TIER_RANGE[0], SEPAL_TIER_RANGE[1]) : SEPAL_TIER_DEFAULT;
+}
+/* TWO STATEMENTS (Q1.2): this one and the registry's `sepalTiersLive`. */
+export function sepalTiersEligible(state) { return !sepalsAbsent(state) && !stemIsAbsent(state); }
+/* THE HEIGHT LAW — tier 0 is the height itself BY BRANCH (the one-tier
+   bloom's own double), a lower tier its share of the way to the stem end. */
+export function sepalTierHeightLaw(frac, k, N) { return k === 0 ? frac : frac * (N - k) / N; }
+/* THE ENTRIES THAT REACH TIER k, summed into one `{ id: delta }` term — the
+   `scopeOffsetsFor` shape for the tiers container: every entry validated
+   whether or not it reaches this tier (sheet thickness refused by the shared
+   rule, a whorl-level sepal value refused here), null when nothing reaches
+   it so the caller's branch is the whole guard. */
+export function tierOffsetsFor(scopes, k) {
+  if (!scopes) return null;
+  const list = scopes.tiers || [];
+  for (const e of list) {
+    const where = `tiers[${e.tier}]`;
+    for (const id of Object.keys(e.offsets || {})) if (SCOPE_TIER_WHORL_LEVEL_IDS.includes(id)) throw new Error(`scopes: ${where} carries an offset on ${id}, a whorl-level sepal value with no per-tier meaning`);
+    checkScopeOffsets(e.offsets || {}, where);
+  }
+  const sum = {};
+  let any = false;
+  for (const e of list) { if (e.tier !== k) continue; addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true; }
+  return any ? { offsets: sum, bounds: scopes.bounds || {}, key: { tier: k } } : null;
+}
+/* A TIER'S OWN STATE: the global state with each offset control moved by the
+   tier's summed offset and clamped into the registry's own range (the bounds
+   the caller handed down with the scopes; a control with no bound handed down
+   is moved unclamped and the record says so). The global state ITSELF is
+   returned where nothing reaches the tier — the branch. */
+export function sepalTierState(state, scopes, k) {
+  const term = tierOffsetsFor(scopes, k);
+  if (!term) return { state, term: null };
+  const st = { ...state };
+  const effective = {}, clamped = [];
+  for (const id of Object.keys(term.offsets)) {
+    const g = Number(state[id]);
+    const asked = g + term.offsets[id];
+    const b = term.bounds[id];
+    st[id] = b ? clamp(asked, b.min, b.max) : asked;
+    effective[id] = st[id];
+    if (st[id] !== asked) clamped.push(id);
+  }
+  return { state: st, term: { ...term, effective, clamped } };
+}
 export function sepalBladeState(state, angleDeg, unclamped = false) {
   /* THE INFILL IS PINNED OFF (Eva's ruling 4, the Voronoi port): a sepal is
      the petal builder on a second ring, so a guard read through
@@ -19492,7 +19643,15 @@ export function sepalTrialLamina(state, sepals, angleDeg, exportMode, unclamped 
    builder's own lattice exactly as it shipped.) */
 function petalLaminaInMode(site, state, exportMode) {
   const acc = new MeshBuilder({ exportMode });
-  const surface = petalSurface(state, site.ring, site.slot, site.cap, acc);
+  /* A SEPAL SITE (a tier above, F1.1a) is rebuilt from the blade state it was
+     built from, its rows kept by the sepal's own root exclusion in mm. */
+  const surface = petalSurface(site.state || state, site.ring, site.slot, site.cap, acc);
+  if (site.sepal) {
+    const panels = site.p.lamina.map((panel) => ({
+      rows: panel.rows.filter((r) => r.u > 0).map((r) => { const row = surface.rowAt(r.u); const q = r.v.map((v) => row.sect(v)); return { u: r.u, mid: q.map((x) => x.P), normal: q.map((x) => x.n) }; }),
+    }));
+    return laminaFromPanels(panels, { rootExclusion: { origin: site.p.base, mm: sepalRootExclusionMm(state) } });
+  }
   /* A FUSED PETAL'S emitted lamina is its lobe alone; the sepal scan reads the
      petal AS FREE, so its rows are the petal's whole ladder (the tube's own
      record of it) at the lattice's own columns */
@@ -20848,8 +21007,11 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
 export const SEPAL_HEIGHT_RANGE = Object.freeze([0, 1]);          // 0 the stem end · 1 where the hub meets the head
 export const SEPAL_HEIGHT_DEFAULT = 0.75;
 const ATTACH_PROFILE_SAMPLES = 512;
-export function sepalAttachment(state, hub, acc) {
-  const frac = clamp(state.sepalHeight === undefined ? SEPAL_HEIGHT_DEFAULT : Number(state.sepalHeight), SEPAL_HEIGHT_RANGE[0], SEPAL_HEIGHT_RANGE[1]);
+export function sepalAttachment(state, hub, acc, opts = {}) {
+  /* A LOWER TIER HANDS ITS STATION IN (F1.1a): the tier loop in footRing owns
+     the height law and the ordering clamp, so the solve is asked at a fraction
+     it already decided; tier 1 reads the control, as it always did. */
+  const frac = typeof opts.frac === 'number' ? opts.frac : clamp(state.sepalHeight === undefined ? SEPAL_HEIGHT_DEFAULT : Number(state.sepalHeight), SEPAL_HEIGHT_RANGE[0], SEPAL_HEIGHT_RANGE[1]);
   const t = acc.floorThickness(hub.thickness);
   const plan = stemPlan(state, hub, acc);
   const dome = hub.dome;
@@ -21002,9 +21164,15 @@ function rimSurface(plan, hub, t) {
 /* sepalAngleLimit — THE DRAWN LIMIT. `sites` are the petals the builder
    emitted ({ p, ring, slot, cap }), with `p.grid` captured. Returns the
    record the read-out and SP8 read. */
-export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
+export function sepalAngleLimit(state, fr, acc, sites, unclamped = false, desc = fr.sepals) {
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  const sepals = fr.sepals;
+  /* THE TIER UNDER TEST (F1.1a): tier 1's descriptor by default — the call
+     as it always was — or a lower tier's, whose `state` carries that tier's
+     own offsets. `sites` may then hold the BUILT SEPALS OF THE TIERS ABOVE
+     (`sepal: true`, with the blade state each was built from), read exactly
+     as the petals are: the tier-on-tier contact clamp is the same scan. */
+  const sepals = desc;
+  const siteName = (i) => (sites[i] && sites[i].sepal ? `tier ${sites[i].tier + 1} sepal ${sites[i].slot.index}` : `petal ${i}`);
   const askedDeg = Number(state.sepalAngle);
   const [lo, hi] = SEPAL_ANGLE_RANGE, step = SEPAL_ANGLE_STEP;
   const modes = [acc.exportMode, !acc.exportMode];
@@ -21024,7 +21192,9 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
        the petals' own bases already cover it); drawing the limit against the
        ring itself is parked for Eva. */
     const tubeOn = tubePlan(state, fr.layerCount, fr.slotCount).active;
-    const petals = sites.map((s) => (exportMode === acc.exportMode && !tubeOn ? laminaFromPanels(s.p.lamina) : petalLaminaInMode(s, state, exportMode)));
+    const petals = sites.map((s) => (s.sepal
+      ? (exportMode === acc.exportMode ? laminaFromPanels(s.p.lamina, { rootExclusion: { origin: s.p.base, mm: sepalRootExclusionMm(state) } }) : petalLaminaInMode(s, state, exportMode))
+      : (exportMode === acc.exportMode && !tubeOn ? laminaFromPanels(s.p.lamina) : petalLaminaInMode(s, state, exportMode))));
     if (!petals.length) { perMode[name] = { limitDeg: hi, contactDeg: null, kind: null, petal: null, sepal: null, at: null }; continue; }
     const G = laminaGrid(petals, t);
     /* the distinct sepal configurations: a slot's neighbourhood is the set of
@@ -21041,7 +21211,7 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
          of distinct neighbourhoods — found by SP8 on the first form row. With
          no field every site's suffix is the same `null:null`, so the grouping,
          the representatives and their order are what they were. */
-      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? FORM_VARIANCE_BASES.map((b) => s.slot.formTerm[b.base]).join(',') : null}${s.slot.scopeTerm ? ':' + JSON.stringify(s.slot.scopeTerm.offsets) : ''}`).sort().join('|');
+      const key = sites.map((s) => `${s.ringKey !== undefined ? s.ringKey : fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}:${s.slot.sizeFactor ?? null}:${s.slot.formTerm ? FORM_VARIANCE_BASES.map((b) => s.slot.formTerm[b.base]).join(',') : null}${s.slot.scopeTerm ? ':' + JSON.stringify(s.slot.scopeTerm.offsets) : ''}`).sort().join('|');
       if (!configOf.has(key)) configOf.set(key, j);
     }
     const reps = [...configOf.values()];
@@ -21062,8 +21232,8 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
       }
     }
     perMode[name] = found
-      ? { limitDeg: found.deg - step < lo ? null : found.deg - step, contactDeg: found.deg, kind: found.kind, petal: found.petal, sepal: found.sepal, at: found.at, mm: found.mm }
-      : { limitDeg: hi, contactDeg: null, kind: null, petal: null, sepal: null, at: null, mm: null };
+      ? { limitDeg: found.deg - step < lo ? null : found.deg - step, contactDeg: found.deg, kind: found.kind, petal: found.petal, against: siteName(found.petal), againstTier: sites[found.petal] && sites[found.petal].sepal ? sites[found.petal].tier : null, sepal: found.sepal, at: found.at, mm: found.mm }
+      : { limitDeg: hi, contactDeg: null, kind: null, petal: null, against: null, againstTier: null, sepal: null, at: null, mm: null };
   }
   /* THE UNION: the smaller limit of the two modes, so one state builds one
      angle in both. `null` means contact at the very floor of the range. */
@@ -21074,7 +21244,7 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
   const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return {
     askedDeg, limitDeg, angleBuiltDeg, clamped: angleBuiltDeg < askedDeg, everywhere: limitDeg === null, exclusionMm: sepalRootExclusionMm(state),
-    contactDeg: perMode[bound].contactDeg, kind: perMode[bound].kind, petal: perMode[bound].petal, sepal: perMode[bound].sepal, at: perMode[bound].at,
+    contactDeg: perMode[bound].contactDeg, kind: perMode[bound].kind, petal: perMode[bound].petal, against: perMode[bound].against, againstTier: perMode[bound].againstTier, sepal: perMode[bound].sepal, at: perMode[bound].at, tier: sepals.tier,
     boundBy: bound, perMode, scanned, configs, costMs: t1 - t0, stepDeg: step, rangeDeg: [lo, hi], modeBuilt: acc.exportMode ? 'export' : 'live',
   };
 }
@@ -21085,10 +21255,41 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false) {
    bloom so the base tree's stream is a prefix of this one on every mover
    (the byte tool's clause 2). Returns what it emitted. */
 export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap = null) {
-  const sepals = fr.sepals;
-  if (!sepals) return null;
+  if (!fr.sepals) return null;
   const unclamped = !!(cap && cap.sepalTwinsUnclamped);
-  const limit = sepalAngleLimit(state, fr, acc, sites, unclamped);
+  /* THE TIERS (F1.1a): tier 1 first, exactly as it always was, then each lower
+     tier that footRing placed — its angle drawn against the petals AND the
+     built sepals of every tier above it (the same scan, handed those blades as
+     sites), its blades built from ITS OWN state. Emitted in tier order, so a
+     one-tier bloom is a prefix of a two-tier one on the same state. */
+  const tiers = [];
+  const upper = [];
+  /* THE BUILT SEPALS' LAMINAE ARE CAPTURED WHILE A LOWER TIER WILL READ THEM
+     (the petals' own capture rule — the capture moves no byte, verify-bloom-
+     grid's clause 1 — and is a BRANCH: a one-tier bloom captures as before). */
+  const laminaWas = acc.captureLamina;
+  if (fr.sepalTiers.filter((d) => d.present).length > 1) acc.captureLamina = true;
+  for (const desc of fr.sepalTiers) {
+    if (!desc.present) { tiers.push({ tier: desc.tier, present: false, why: desc.why, order: desc.order, term: desc.term, built: [], azimuths: [], tris: 0, count: 0, limit: null, attachment: null, ring: null }); continue; }
+    const T = buildSepalTierInto(acc, desc.state, fr, desc, sites.concat(upper), stemPlanned, cap, unclamped);
+    T.built.forEach((p, i) => { p.tier = desc.tier; upper.push({ p, ring: desc.ring, slot: T.slots[i], cap: null, state: T.bladeState, sepal: true, tier: desc.tier, ringKey: `T${desc.tier}` }); });
+    tiers.push(T);
+  }
+  acc.captureLamina = laminaWas;
+  const first = tiers[0];
+  return {
+    ...first,
+    tiers,
+    count: tiers.reduce((n, T) => n + T.count, 0),
+    tris: tiers.reduce((n, T) => n + T.tris, 0),
+    tiersAsked: fr.sepalTiersAsked, tiersBuilt: tiers.filter((T) => T.present).length, tiersEligible: fr.sepalTiersEligible,
+    tiersNotBuilt: tiers.filter((T) => !T.present).map((T) => ({ tier: T.tier, why: T.why })),
+  };
+}
+/* ONE TIER — the whorl as `buildSepalsInto` built it before tiers existed,
+   on the descriptor `sepals` and the state `state` (the tier's own). */
+function buildSepalTierInto(acc, state, fr, sepals, sites, stemPlanned, cap, unclamped) {
+  const limit = sepalAngleLimit(state, fr, acc, sites, unclamped, sepals);
   /* THE CAPABILITY HOOK — `{ sepalAngleUnclamped: true }` builds the ASKED
      angle past the drawn limit. No control reaches it (the clamp is the
      point); the render sheet uses it to photograph the angle BEYOND its
@@ -21097,7 +21298,7 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
      is untouched so the read-out still says where contact was drawn. */
   if (cap && cap.sepalAngleUnclamped) { limit.angleBuiltDeg = limit.askedDeg; limit.clamped = false; limit.unclamped = true; }
   const bs = sepalBladeState(state, limit.angleBuiltDeg, unclamped);
-  const built = [], azimuths = [];
+  const built = [], azimuths = [], slots = [];
   const tris0 = acc.triangleCount;
   buildWhorlInto({
     count: sepals.count, radius: sepals.ring.radius, height: sepals.height,
@@ -21105,6 +21306,7 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
     placement: sepals.placement, fan: null, azimuths: sepals.placement === 'LIST' ? sepals.azimuths : null,
     blade: (slot) => {
       azimuths[slot.index] = slot.azimuth;
+      slots[slot.index] = slot;
       const p = buildPetalInto(acc, bs, sepals.ring, slot, null, built.length === 0);
       /* THE STATE THIS BLADE WAS BUILT FROM, keyed by the petal name the law
          reads — SP6 compares it against the page's own sepal* read-back, an
@@ -21131,7 +21333,9 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
     footBuriedMm = Math.max(0, hubJoinThicknessAt(Math.max(stemPlanned.outerR, R0 - sepals.ring.overhang), P) - t);
     blendReachesFoot = stemPlanned.blendR > R0 - sepals.ring.overhang;
   }
-  return { built, azimuths, tris: acc.triangleCount - tris0, limit, count: built.length, attachment: A,
+  return { present: true, tier: sepals.tier, order: sepals.order, term: sepals.term, ring: sepals.ring, slots, bladeState: bs,
+           effective: Object.fromEntries(Object.keys(state).filter((k) => /^sepal/.test(k) && k !== 'sepalCount' && k !== 'sepalTiers').map((k) => [k, state[k]])),
+           built, azimuths, tris: acc.triangleCount - tris0, limit, count: built.length, attachment: A,
            footTangentDeg: A.undersideTangentDeg, undersideSlopeDeg: A.undersideTangentDeg, shoulderDeg: A.shoulderDeg, undersideChordDeg: A.undersideChordDeg, undersideChordMm: A.undersideChordMm,
            footBuriedMm, blendReachesFoot, blendReachesRim: A.blendReachesRim, blendGapMm: A.blendGapMm };
 }
@@ -21735,7 +21939,9 @@ export function buildBloomInto(acc, state, opts = {}) {
   }
   const petalTip = Number(state.petalTipShape);
   const sepalEligible = Number(state.sepalCount) > 0;
-  const sepalTip = sepalEligible ? Number(state.sepalTipShape) : null;
+  /* THE LARGEST TIP SHAPE ANY TIER ASKS FOR (F1.1a): a tier's offset may ramp
+     its own rows past the global's, and the prediction must never under-read. */
+  const sepalTip = sepalEligible ? Math.max(...Array.from({ length: sepalTierCount(state) }, (_, k) => Number(sepalTierState(state, (opts && opts.scopes) || null, k).state.sepalTipShape))) : null;
   const petalSteps = bladeRowsFor(petalTip) - NU_BASE;
   const sepalSteps = sepalEligible ? bladeRowsFor(sepalTip) - NU_BASE : 0;
   const steps = Math.max(petalSteps, sepalSteps);
@@ -21809,7 +22015,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   }
   if (below !== null) throw new Error(`below='${below}' is phase-2+ work; only null is built today`);
 
-  const fr = footRing(state, acc);
+  const fr = footRing(state, acc, { scopes });
   /* ONE WHORL PER LAYER — layers are instances of the arrangement primitive,
      which is what its full signature has been for since session 1. Every
      per-layer quantity is read off the layer descriptor footRing() produced;
@@ -22227,7 +22433,14 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   const layerEntries = ((scopes && scopes.layers) || []).filter(offsetCount);
   const petalEntries = ((scopes && scopes.petals) || []).filter(offsetCount);
   const namesPair = (e) => scopeEntryNamesPair(e, layerCountBuilt, fr.slotCount, state);
+  const tierEntries = ((scopes && scopes.tiers) || []).filter(offsetCount);
+  const tiersBuiltList = (fr.sepalTiers || []).filter((d) => d.present);
   const scopesBuilt = scopes ? { layers: (scopes.layers || []).length, petals: (scopes.petals || []).length, tiers: (scopes.tiers || []).length, petalsScoped: petalsAll.filter((p) => p && p.scopeTerm).length, layersLive: scopeLayersLive(state), petalsLive: scopePetalsLive(state),
+    /* THE TIERS (F1.1a): a tier entry reaches a BUILT tier of that index; one
+       naming a tier past the count, or a tier not built, is kept and inert. */
+    tiersLive: sepalTiersEligible(state), tiersScoped: tiersBuiltList.filter((d) => d.term).length,
+    scopedTiers: [...new Set(tierEntries.filter((e) => tiersBuiltList.some((d) => d.tier === e.tier)).map((e) => e.tier))].sort((a, b) => a - b),
+    keptTiers: [...new Set(tierEntries.filter((e) => !tiersBuiltList.some((d) => d.tier === e.tier)).map((e) => e.tier))].sort((a, b) => a - b),
     scopedLayers: uniqLayers(layerEntries.filter((e) => scopeEntryNamesLayer(e, layerCountBuilt))),
     keptLayers: uniqLayers(layerEntries.filter((e) => !scopeEntryNamesLayer(e, layerCountBuilt))),
     scopedPetals: uniqPairs(petalEntries.filter(namesPair)),

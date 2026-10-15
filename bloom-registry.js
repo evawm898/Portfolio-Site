@@ -44,7 +44,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
-import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE } from './bloom-geometry.js';
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
@@ -506,6 +506,10 @@ export const PREDICATES = {
      sepal's own the multiplier moves nothing and hides. The geometry's
      statement is `sepalScaleInert`; SP0b checks the two agree. */
   sepalScaleLive: { all: [{ ref: 'sepalsPresent' }, { not: { all: [{ id: 'sepalLength', min: 0.5 }, { id: 'sepalWidth', min: 0.5 }] } }] },
+  /* THE SEPAL TIERS (F1.1a, Q1.2): tiers past the first need a stem — without
+     one the tier count is hidden AND inert. The geometry's statement is
+     `sepalTiersEligible`; SP10 checks the two agree. */
+  sepalTiersLive: { all: [{ ref: 'sepalsPresent' }, { ref: 'stemPresent' }] },
   /* THE SPINE CURVE (F3-global, Eva's Q4.2): CURVE mode hides the whole
      slider family — spine curl, curl bias, curl start, every curl delta — and
      the geometry makes them inert by one read in petalForm. Two statements,
@@ -3955,6 +3959,27 @@ export const CONTROLS = [
     },
     cap: (shown) => (shown && shown.sepals && !shown.sepals.unavailable ? shown.sepals.ceiling : null),
     tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsEligible' } },
+  /* THE TIER COUNT (F1.1a — feature map §1 / §11 Q1.1–Q1.5; the geometry's
+     SEPAL TIERS block has the derivation and the proposed ceiling). N whorls
+     of sepals down the hub-to-stem join; 1 is today's whorl by branch. A
+     WHORL-LEVEL value: out of the blanket sweep (its guard is the count), never
+     a tier's own offset. Told from the builder's own record: how many were
+     built, where each sits, and why one was not (no stem, no room, inert). */
+  { id: 'sepalTiers', section: 'sepals', kind: 'slider',
+    min: SEPAL_TIER_RANGE[0], max: SEPAL_TIER_RANGE[1], step: 1, default: SEPAL_TIER_DEFAULT,
+    label: 'Sepal tiers',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      if (n <= 1) return 'one — the whorl above; more step down the hub-to-stem join (needs a stem)';
+      const S = shown && shown.sepals;
+      if (!S || S.unavailable) return `${n} asked`;
+      const tiers = S.tiers || [];
+      const built = tiers.filter((T) => T.present);
+      const notBuilt = tiers.filter((T) => !T.present);
+      const where = built.map((T) => `tier ${T.tier + 1} at ${T.attachment.frac.toFixed(2)}${T.order && T.order.orderClamped ? ' (ORDER-CLAMPED under the tier above)' : ''}`).join(', ');
+      return `${built.length} of ${n} built — ${where}` + (notBuilt.length ? `; tier${notBuilt.length === 1 ? '' : 's'} ${notBuilt.map((T) => T.tier + 1).join(', ')} NOT built: ${notBuilt[0].why}` : '') + '; pick a tier above the panel to give it its own values';
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalTiersLive' } },
   { id: 'sepalScale', section: 'sepals', kind: 'slider',
     min: SEPAL_SCALE_RANGE[0], max: SEPAL_SCALE_RANGE[1], step: 0.05, default: SEPAL_SCALE_DEFAULT,
     label: 'Sepal size',
