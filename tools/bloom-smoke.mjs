@@ -1409,6 +1409,34 @@ export const SMOKE_BLOCKS = [
         path: "C1's slider arm on a straight petal (the mode's two statements both SLIDER; the curve stored and read by nothing), petalFormIsFlat and FORM_IDS agreeing the row is flat" },
     ],
   },
+  {
+    n: 63, title: 'the sepal tiers (Oct 15, F1.1a)',
+    anchor: 'SEPAL TIERS: three tiers on a 40 mm GOBLET hub — the LANTERN frame (5 sepals a tier, at 0.75 / 0.50 / 0.25 of the join)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       footRing's tier loop (the height law, the ordering clamp, the NO ROOM
+       drop, the inert arm with no stem), sepalAngleLimit's upper-tier sites
+       (the contact clamp against a tier above) and buildSepalsInto's tier
+       loop. The anchor is the lantern frame — three tiers at the height law's
+       own stations, nothing clamped; the contact row is where a lower tier is
+       clamped against the tier above rather than the petals, which is the
+       clamp SP13's own contact test exists for. --conn is REQUIRED (a new
+       geometry mode: whorls attached partway down the join, below the first). */
+    conn: true,
+    rows: [
+      { label: 'SEPAL TIERS: three tiers on a 40 mm GOBLET hub — the LANTERN frame (5 sepals a tier, at 0.75 / 0.50 / 0.25 of the join)',
+        path: "SP10 (the two statements, three asked and three built), SP11 (each tier's station the height law's — 0.75 / 0.50 / 0.25 — unclamped, its foot rows on its own attachment one sheet below the tier above), SP12 (every tier built from the whole-bloom sepal values, sepals within a tier matching, the phase law per tier); --conn is the witness that three whorls down the flare are one piece with it" },
+      { label: 'SEPAL TIERS: three tiers asked UP at 60 on a 10 mm hub — tiers 2 and 3 CLAMPED against the tier above (the contact clamp)',
+        path: "SP13 (tiers 2 and 3 CLAMPED against the tier above: the arithmetic, and the harness's own contact test clear at the built angle and clipping one step above the limit), SP12 (the tilt each tier was built at is its own clamp's)" },
+      { label: 'SEPAL TIERS: four tiers on a 6 mm hub at the THICK sheet (2.40 mm) — the gap a LENGTH: tiers 2 and 3 order-clamped 2.40 mm apart, tier 4 NO ROOM',
+        path: 'SP11 (the ORDER clamp as a biconditional against the tier above less one sheet restated from the sheet thickness — 2.40 mm, a length — and NO ROOM as a biconditional, told), SP10 (three built of four, the fourth told)' },
+      { label: 'SEPAL TIERS: two tiers on the DEFAULT join (1.32 mm) — tier 2 has NO ROOM under the one-sheet gap, not built and told',
+        path: 'SP11 (NO ROOM on the shipping join: the second tier\'s clamped station under the stem end, not built, the reason on the record), SP10 (one built of two)' },
+      { label: 'SEPAL TIERS: three tiers on a DOME (rise 0.5) with a 60 mm stem — the extent INVERTED, tiers past the first inert and told',
+        path: "SP10's rim arm (tier 1 at the rim with its reason, tiers 2 and 3 inert and told with it) — the stem present, so the control shows and the geometry still builds one" },
+      { label: 'SEPAL TIERS: GATED — four tiers asked with NO stem (hidden and inert; bit-identical to the one-tier whorl)',
+        path: "SP10's two statements (the registry hides the tier count exactly where the geometry builds nothing below the first), and the byte tool's partition (a holder)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

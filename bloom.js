@@ -16,9 +16,9 @@ import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
-import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, scopeExclusionReason, composeControls, readControls, fieldFor } from './bloom-file.js';
+import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
-import { scopeOffsetsFor, scopeSlotKey, resolveRoleOverrides, scopeLayersLive, scopePetalsLive, petalGroupCount } from './bloom-geometry.js';
+import { scopeOffsetsFor, scopeSlotKey, resolveRoleOverrides, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -709,7 +709,7 @@ function applyVisibility() {
      buckle is on shows its frequency while the whole bloom's buckle is 0. Every
      other control is the whole bloom's and is decided on the whole bloom. */
   const vui = scopeView ? viewUi(ui) : ui;
-  for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && SCOPE_IDS.has(c.id) ? vui : ui);
+  for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && idsFor(scopeView).has(c.id) ? vui : ui);
   /* CHILDREN BEFORE PARENTS — ONE PASS, AT ANY DEPTH. A section's answer
      READS its children's, so every child must have settled before its parent
      is reached. verifySections() refuses a section declared before its parent,
@@ -795,7 +795,12 @@ document.getElementById('resetBtn').addEventListener('click', () => {
    member binds the pair.
    =================================================================== */
 const SCOPE_IDS = new Set(SCOPEABLE_IDS);
-let scopeView = null;              // { kind: 'layer' | 'petal', layer, slot } — the picked scope; null = the whole bloom
+/* A SEPAL TIER IS A SCOPE TOO (F1.1a, Q3.8): picking one binds the SEPAL
+   controls — the tier-scopeable set the file reader owns — and the Sepals
+   section edits that tier. `{ kind: 'tier', layer: k, slot: 0 }`, k 0-based. */
+const TIER_IDS = new Set(SCOPEABLE_TIER_IDS);
+const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : SCOPE_IDS);
+let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier', layer, slot } — the picked scope; null = the whole bloom
 const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
 let lastShown = null;              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
 const scopeBar = document.getElementById('scopeBar');
@@ -804,30 +809,45 @@ const scopeStatus = document.getElementById('scopeStatus');
 
 /* WHICH TOGGLE IS LIVE ON THE WHOLE-BLOOM STATE — the geometry's own predicates. */
 function scopeMode(ui) { return scopeLayersLive(ui) ? 'layer' : scopePetalsLive(ui) ? 'petal' : null; }
+/* THE TIERS NEED NO TOGGLE: a tier count above one IS the ask (F1.1a). */
+function tiersMode(ui) { return sepalTiersEligible(ui) && sepalTierCount(ui) > 1; }
 const scopeValue = (v) => (v ? `${v.kind}:${v.layer}:${v.slot}` : '');
 /* THE SCOPES THIS ARRANGEMENT HAS, from footRing()'s own answers on the build
    on screen (`lastFoot`): its layer count, its slot count and its plane — so
    the picker never counts orbits for itself. */
 function scopeOptions(ui) {
   const mode = scopeMode(ui);
-  if (!mode) return [];
-  const layers = Math.max(1, Math.round(Number(lastFoot.layerCount) || 1));
-  const sc = lastScopes;
   const out = [];
-  if (mode === 'layer') {
-    for (let k = 0; k < layers; k++) {
-      const own = sc && sc.scopedLayers && sc.scopedLayers.includes(k);
-      const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ' — the outer whorl' : k === layers - 1 ? ' — the innermost whorl' : '';
-      out.push({ kind: 'layer', layer: k, slot: 0, label: `Layer ${k + 1}${where}${own ? ' · own values' : ''}` });
+  const sc = lastScopes;
+  if (mode) {
+    const layers = Math.max(1, Math.round(Number(lastFoot.layerCount) || 1));
+    if (mode === 'layer') {
+      for (let k = 0; k < layers; k++) {
+        const own = sc && sc.scopedLayers && sc.scopedLayers.includes(k);
+        const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ' — the outer whorl' : k === layers - 1 ? ' — the innermost whorl' : '';
+        out.push({ kind: 'layer', layer: k, slot: 0, label: `Layer ${k + 1}${where}${own ? ' · own values' : ''}` });
+      }
+    } else {
+      const n = lastFoot.slotCount;
+      const groups = petalGroupCount(n, lastFoot.mirror);
+      for (let k = 0; k < layers; k++) {
+        for (let o = 0; o < groups; o++) {
+          const own = sc && sc.scopedPetals && sc.scopedPetals.some((p) => p.layer === k && p.slot === o);
+          out.push({ kind: 'petal', layer: k, slot: o, label: `${layers > 1 ? `Layer ${k + 1} · ` : ''}Petal ${o + 1} — ${fanGroupSaid(o + 1, ui)}${own ? ' · own values' : ''}` });
+        }
+      }
     }
-    return out;
   }
-  const n = lastFoot.slotCount;
-  const groups = petalGroupCount(n, lastFoot.mirror);
-  for (let k = 0; k < layers; k++) {
-    for (let o = 0; o < groups; o++) {
-      const own = sc && sc.scopedPetals && sc.scopedPetals.some((p) => p.layer === k && p.slot === o);
-      out.push({ kind: 'petal', layer: k, slot: o, label: `${layers > 1 ? `Layer ${k + 1} · ` : ''}Petal ${o + 1} — ${fanGroupSaid(o + 1, ui)}${own ? ' · own values' : ''}` });
+  /* THE SEPAL TIERS (F1.1a) — the BUILT tiers, from the builder's own record
+     on the build on screen; a tier that was not built (no room, inert) is not
+     a scope one can pick, and the Sepal tiers read-out says why. */
+  if (tiersMode(ui) && lastSepalsBuilt && lastSepalsBuilt.tiers) {
+    const asked = lastSepalsBuilt.tiersAsked;
+    for (const T of lastSepalsBuilt.tiers) {
+      if (!T.present) continue;
+      const own = sc && sc.scopedTiers && sc.scopedTiers.includes(T.tier);
+      const where = T.tier === 0 ? ' — the top tier, the whorl above' : T.tier === asked - 1 ? ' — the lowest tier' : '';
+      out.push({ kind: 'tier', layer: T.tier, slot: 0, label: `Sepal tier ${T.tier + 1}${where}${own ? ' · own values' : ''}` });
     }
   }
   return out;
@@ -836,6 +856,7 @@ function scopeOptions(ui) {
    the pair's canonical slot — the key every entry for the pair is summed on. */
 function canonicalScope(sel, ui) {
   if (!sel) return null;
+  if (sel.kind === 'tier') return tiersMode(ui) ? { kind: 'tier', layer: Math.round(Number(sel.layer) || 0), slot: 0 } : null;
   const mode = scopeMode(ui);
   if (!mode) return null;
   const layer = Math.round(Number(sel.layer) || 0);
@@ -849,12 +870,23 @@ function scopeIsValid(v, ui) {
    values — through the geometry's owners (see the block header). */
 function scopeTermFor(v, ui) {
   const sb = scopesForBuild(scopes);
-  return sb ? scopeOffsetsFor(sb, { layer: v.layer, slot: v.slot, n: lastFoot.slotCount, state: ui }) : null;
+  if (!sb) return null;
+  if (v.kind === 'tier') return sepalTierState(ui, sb, v.layer).term;
+  return scopeOffsetsFor(sb, { layer: v.layer, slot: v.slot, n: lastFoot.slotCount, state: ui });
 }
 function scopeEffective(v, ui) {
+  const eff = {};
+  if (v.kind === 'tier') {
+    /* through the geometry's own owner of a tier's state (`sepalTierState`):
+       the global sepal value plus the tier's offset, clamped into the
+       registry's bound the file reader hands down */
+    const sb = scopesForBuild(scopes);
+    const r = sepalTierState(ui, sb, v.layer);
+    for (const id of SCOPEABLE_TIER_IDS) eff[id] = r.state[id];
+    return { eff, term: r.term };
+  }
   const term = scopeTermFor(v, ui);
   const out = term ? resolveRoleOverrides(ui, [], null, null, null, term) : null;
-  const eff = {};
   for (const id of SCOPEABLE_IDS) eff[id] = out && id in out ? out[id] : ui[id];
   return { eff, term };
 }
@@ -871,6 +903,15 @@ function viewUi(ui) { return scopeView ? { ...ui, ...scopeEffective(scopeView, u
 let scopeLastInfill = null;   // { key, infill } — the picked scope's own plan off its last full build
 function scopeShown(shown) {
   if (!scopeView || !shown) return shown;
+  if (scopeView.kind === 'tier') {
+    /* THE PICKED TIER'S OWN RECORD under `sepals`, so every sepal read-out
+       (the count's ceiling, the angle's limit, the foot, the size) quotes the
+       tier the panel is editing rather than tier 1's. */
+    const T = lastSepalsBuilt && lastSepalsBuilt.tiers ? lastSepalsBuilt.tiers.find((x) => x.present && x.tier === scopeView.layer) : null;
+    const D = lastFoot.sepalTiers ? lastFoot.sepalTiers[scopeView.layer] : null;
+    if (!T || !D || !shown.sepals) return shown;
+    return { ...shown, sepals: { ...shown.sepals, ...D, limit: T.limit, attachment: T.attachment, drawnLengthMm: T.built[0] ? T.built[0].length : null, buckle: (T.built[0] && T.built[0].form && T.built[0].form.buckle) || null, unavailable: false, pickedTier: T.tier } };
+  }
   const ui = readUI();
   const n = lastFoot.slotCount;
   const p = lastPetalsAll.find((q) => q && Math.round(q.whorl) === scopeView.layer
@@ -889,9 +930,10 @@ function bindScope(next) {
   if (scopeView) { for (const [id, v] of scopeGlobals) inputs[id].value = v; scopeGlobals.clear(); }
   scopeView = next;
   if (!next) return;
-  for (const id of SCOPEABLE_IDS) scopeGlobals.set(id, inputs[id].value);
+  const ids = idsFor(next);
+  for (const id of ids) scopeGlobals.set(id, inputs[id].value);
   const { eff } = scopeEffective(next, readUI());
-  for (const id of SCOPEABLE_IDS) inputs[id].value = String(eff[id]);
+  for (const id of ids) inputs[id].value = String(eff[id]);
 }
 /* SELECT — LOADS, NEVER APPLIES. The read-out spans' SECOND writer (the first
    is regenerate(), which the panel gate's path route reads "a changed span" as
@@ -927,12 +969,12 @@ function commitScopeOffset(id, desired) {
   const ui = readUI();
   const v = scopeView;
   if (!scopes) scopes = { layers: [], petals: [], tiers: [] };
-  const list = v.kind === 'layer' ? scopes.layers : scopes.petals;
+  const list = v.kind === 'layer' ? scopes.layers : v.kind === 'tier' ? scopes.tiers : scopes.petals;
   /* THE ENTRIES THAT REACH THIS SCOPE, by the geometry's own rule
-     (`scopeOffsetsFor`): a layer by its index, a pair by its CANONICAL slot,
-     matched exactly — never re-keyed at today's count (see the geometry's
-     `scopeEntryNamesPair`). */
-  const reaches = (e) => e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot);
+     (`scopeOffsetsFor`, `tierOffsetsFor`): a layer by its index, a tier by its
+     index, a pair by its CANONICAL slot, matched exactly — never re-keyed at
+     today's count (see the geometry's `scopeEntryNamesPair`). */
+  const reaches = (e) => (v.kind === 'tier' ? e.tier === v.layer : e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot));
   let own = list.find(reaches) || null;
   let others = 0;
   for (const e of list) if (e !== own && reaches(e)) others += Number((e.offsets || {})[id]) || 0;
@@ -958,7 +1000,7 @@ function commitScopeOffset(id, desired) {
       if (!Object.keys(own.offsets).length) list.splice(list.indexOf(own), 1);
     }
   } else {
-    if (!own) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
+    if (!own) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : v.kind === 'tier' ? { tier: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
     own.offsets[id] = d;
   }
   if (scopesAreEmpty(scopes)) scopes = null;
@@ -966,7 +1008,7 @@ function commitScopeOffset(id, desired) {
 function onScopedEdit(e) {
   if (!scopeView) return;
   const t = e.target;
-  if (!(t instanceof HTMLInputElement) || !SCOPE_IDS.has(t.id)) return;
+  if (!(t instanceof HTMLInputElement) || !idsFor(scopeView).has(t.id)) return;
   commitScopeOffset(t.id, Number(t.value));
 }
 panelRoot.addEventListener('input', onScopedEdit, true);
@@ -980,18 +1022,19 @@ panelRoot.addEventListener('change', onScopedEdit, true);
    gone. Returns whether the binding changed. */
 function syncScopeBar(ui) {
   const mode = scopeMode(ui);
-  scopeBar.hidden = !mode;
+  const tiers = tiersMode(ui);
+  scopeBar.hidden = !mode && !tiers;
   let changed = false;
   if (scopeView && !scopeIsValid(scopeView, ui)) { bindScope(null); changed = true; }
   const opts = scopeOptions(ui);
-  const want = [{ value: '', label: mode === 'petal' ? 'Whole bloom (every petal)' : 'Whole bloom (every layer)' },
+  const want = [{ value: '', label: mode === 'petal' ? `Whole bloom (every petal${tiers ? ' and tier' : ''})` : mode === 'layer' ? `Whole bloom (every layer${tiers ? ' and tier' : ''})` : 'Whole bloom (every sepal tier)' },
     ...opts.map((o) => ({ value: scopeValue(o), label: o.label }))];
   const have = Array.from(scopePick.options).map((o) => `${o.value}|${o.textContent}`).join('\n');
   if (have !== want.map((o) => `${o.value}|${o.label}`).join('\n')) {
     scopePick.replaceChildren(...want.map((o) => { const el = document.createElement('option'); el.value = o.value; el.textContent = o.label; return el; }));
   }
   scopePick.value = scopeValue(scopeView);
-  scopeStatus.textContent = scopeStatusText(ui, mode);
+  scopeStatus.textContent = scopeStatusText(ui, mode || (tiers ? 'tier' : null));
   return changed;
 }
 /* A control's name as the panel prints it — the registry's own label, so the
@@ -1000,13 +1043,22 @@ function syncScopeBar(ui) {
 function controlLabel(id) { const c = CONTROLS.find((x) => x.id === id); return c ? `"${c.label}"` : id; }
 function scopeStatusText(ui, mode) {
   if (!mode) return '';
+  const tiersToo = mode !== 'tier' && tiersMode(ui) ? ' Pick a sepal tier and the Sepals section edits just that tier.' : '';
   if (!scopeView) {
-    return mode === 'layer'
+    return (mode === 'layer'
       ? 'Pick a layer and the panel edits just that layer: its petal controls then set the layer\'s own values, kept as offsets on the whole-bloom value.'
-      : 'Pick a petal and the panel edits just that petal and its mirror partner: its petal controls then set the pair\'s own values, kept as offsets on the whole-bloom value.';
+      : mode === 'petal' ? 'Pick a petal and the panel edits just that petal and its mirror partner: its petal controls then set the pair\'s own values, kept as offsets on the whole-bloom value.'
+      : 'Pick a sepal tier and the Sepals section edits just that tier: its sepal controls then set the tier\'s own values, kept as offsets on the whole-bloom value; sepals within a tier always match.') + tiersToo;
   }
   const opt = scopeOptions(ui).find((o) => o.kind === scopeView.kind && o.layer === scopeView.layer && o.slot === scopeView.slot);
   const name = opt ? opt.label.replace(/ · own values$/, '') : '';
+  if (scopeView.kind === 'tier') {
+    const T = lastSepalsBuilt && lastSepalsBuilt.tiers ? lastSepalsBuilt.tiers.find((x) => x.present && x.tier === scopeView.layer) : null;
+    return [`Editing ${name}.`, 'The marked sepal controls set its own values; every other control still edits the whole bloom.',
+      T && T.order && T.order.orderClamped ? `Its height is ORDER-CLAMPED one sheet under tier ${T.order.aboveTier + 1}.` : '',
+      T && T.limit && T.limit.clamped ? `Its angle is CLAMPED at ${T.limit.angleBuiltDeg}° against ${T.limit.against}.` : '',
+      'Whole bloom ends the pick; nothing is lost.'].filter(Boolean).join(' ');
+  }
   const n = lastFoot.slotCount;
   const members = scopeView.kind === 'petal' ? Array.from({ length: n }, (_, i) => i).filter((i) => scopeSlotKey(i, n, ui) === scopeView.slot) : [];
   const parts = [`Editing ${name}.`,
@@ -1035,12 +1087,13 @@ const stepDecimals = (c) => { const s = String(c.step); return s.includes('.') ?
 function refreshScopeNotes(ui) {
   const term = scopeView ? scopeTermFor(scopeView, ui) : null;
   const eff = scopeView ? scopeEffective(scopeView, ui).eff : null;
-  const name = scopeView ? (scopeView.kind === 'layer' ? `Layer ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
+  const name = scopeView ? (scopeView.kind === 'layer' ? `Layer ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
+  const ids = idsFor(scopeView);
   for (const c of CONTROLS) {
     const wrap = wrappers[c.id];
     let text = '';
     let cls = null;
-    if (scopeView && SCOPE_IDS.has(c.id)) {
+    if (scopeView && ids.has(c.id)) {
       cls = 'scoped';
       const off = term && term.offsets && c.id in term.offsets ? term.offsets[c.id] : 0;
       if (off !== 0) {
@@ -1049,6 +1102,11 @@ function refreshScopeNotes(ui) {
         const asked = g + off;
         text = `${name}: whole bloom ${g.toFixed(dp)} ${off >= 0 ? '+' : '−'} ${Math.abs(off).toFixed(dp)} offset = ${Number(eff[c.id]).toFixed(dp)}${eff[c.id] !== asked ? ` (clamped from ${asked.toFixed(dp)})` : ''}`;
       }
+    } else if (scopeView && scopeView.kind === 'tier') {
+      /* under a picked tier the whole-bloom SEPAL values (the count, the tier
+         count) say so with the file reader's own reason */
+      const why = c.role === 'sepal' ? scopeOffsetRefusal(c.id, 'tiers') : null;
+      if (why) { cls = 'global'; text = `whole bloom — ${why}`; }
     } else if (scopeView) {
       const why = scopeExclusionReason(c.id);
       if (why) { cls = 'global'; text = `whole bloom — ${why}`; }
@@ -1278,7 +1336,7 @@ let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris
 /* THE SEPALS (part 1) — footRing()'s descriptor (the ring, the count and its
    ceiling, the phase, the foot), the builder's own emitted whorl and the angle
    limit it drew. SP0-SP9 read these; the read-out prints them. */
-let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepalTris = 0, lastSepalsAskedUnderSphere = 0;
+let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepalTris = 0, lastSepalsAskedUnderSphere = 0, lastSepalTiersEligible = false;
 /* THE INFLORESCENCE (this session) — the PLAN and what the BUILDER emitted,
    the leaf's own pairing. `inflorescence` is NULL and not absent where there
    is none: ID1 distinguishes "the builder says there are none" from "the
@@ -1505,6 +1563,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastSepalsBuilt = built.sepals || null;
     lastSepalTris = built.sepals ? built.sepals.tris : 0;
     lastSepalsAbsent = sepalsAbsent(uiForBuild);
+    lastSepalTiersEligible = sepalTiersEligible(uiForBuild);
     lastSepalsAskedUnderSphere = built.foot.sphereMode ? Math.round(Number(uiForBuild.sepalCount) || 0) : 0;
     lastInflo = built.inflorescence && built.inflorescence.present ? built.inflorescence : null;
     lastInfloBuilt = built.inflorescenceBuilt || null;
@@ -2766,12 +2825,30 @@ function sepalLine(ui, built, mode) {
   if (built.foot.sphereMode && asked >= 1) return `     SEPALS ${asked} asked — UNAVAILABLE under SPHERE: a closed head has no underside ring to place them on (told, none built)\n`;
   const S = built.foot.sepals, B = built.sepals;
   if (!S || !B) return '';
+  return sepalTierLine(S, B.tiers ? B.tiers[0] : B, B.built[0], mode) + sepalTiersLines(ui, built, mode);
+}
+/* THE TIERS' LINES (F1.1a): one SEPAL TIERS line naming every tier asked —
+   built at its station (the height law, the ordering clamp) or not built and
+   why — then each lower tier's own SEPALS line through the same function tier
+   1's goes through, on that tier's own descriptor and record. */
+function sepalTiersLines(ui, built, mode) {
+  const B = built.sepals;
+  if (!B || !B.tiers || sepalTierCount(ui) <= 1) return '';
+  const tiers = built.foot.sepalTiers;
+  const said = B.tiers.map((T) => T.present
+    ? `tier ${T.tier + 1} at ${T.attachment.frac.toFixed(3)} of the join (law ${T.order.fracLaw.toFixed(3)}${T.order.orderClamped ? `, ORDER-CLAMPED one sheet (${T.order.gapMm.toFixed(2)} mm) under tier ${T.order.aboveTier + 1}` : ''}; ${T.count} sepals, ${T.term ? 'own values' : 'the whole-bloom values'})`
+    : `tier ${T.tier + 1} NOT BUILT — ${T.why}`).join(' · ');
+  let out = `     SEPAL TIERS ${B.tiersBuilt} of ${B.tiersAsked} built${B.tiersEligible ? '' : ' — tiers past the first need a stem (hidden and inert, told)'}: ${said}\n`;
+  for (let k = 1; k < B.tiers.length; k++) if (B.tiers[k].present) out += sepalTierLine(tiers[k], B.tiers[k], B.tiers[k].built[0], mode, `TIER ${k + 1} `);
+  return out;
+}
+function sepalTierLine(S, B, first, mode, tag = '') {
   const L = B.limit;
-  const first = B.built[0];
-  const angleWord = L.unclamped ? `${L.angleBuiltDeg}° — UNCLAMPED by the capability hook past the drawn limit of ${L.limitDeg}° (at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}; no control reaches this)`
-    : L.everywhere ? `CLAMPED to ${L.angleBuiltDeg}° — the sepals clip the petals at every angle in the range (${L.kind} on petal ${L.petal})`
-    : L.clamped ? `${L.askedDeg}° asked, CLAMPED to ${L.angleBuiltDeg}°: at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`
-    : `${L.angleBuiltDeg}° (clear up to ${L.limitDeg}°${L.contactDeg === null ? ', no contact in the range' : `; at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`})`;
+  const against = L.against || 'the petals';
+  const angleWord = L.unclamped ? `${L.angleBuiltDeg}° — UNCLAMPED by the capability hook past the drawn limit of ${L.limitDeg}° (at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} ${against}; no control reaches this)`
+    : L.everywhere ? `CLAMPED to ${L.angleBuiltDeg}° — the sepals clip the petals at every angle in the range (${L.kind} on ${against})`
+    : L.clamped ? `${L.askedDeg}° asked, CLAMPED to ${L.angleBuiltDeg}°: at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} ${against}`
+    : `${L.angleBuiltDeg}° (clear up to ${L.limitDeg}°${L.contactDeg === null ? ', no contact in the range' : `; at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} ${against}`})`;
   /* WHERE THE FOOT IS, from the descriptor's own attachment record: on the
      hub's flare at the height asked, or at the rim with the reason. THE FOOT
      LINE LEADS WITH THE CHORD AND KEEPS THE TANGENT BESIDE IT, LABELLED
@@ -2788,7 +2865,7 @@ function sepalLine(ui, built, mode) {
   const footSurface = onHub
     ? `foot on the flare, bottom skin through the attachment point (mid-surface ${(S.height).toFixed(2)} mm) · the underside RISES ${A.undersideChordDeg.toFixed(2)}° over the first ${A.undersideChordMm.toFixed(2)} mm outward from the foot (the chord a print meets; tangent there ${A.undersideTangentDeg.toFixed(2)}°${A.onCone ? " — ANGLED's straight face, the chord IS the tangent and the shoulder is not under the foot" : ''})` + (A.footBuriedMm < 0 ? ` · the foot's inner rows POKE OUT ${(-A.footBuriedMm).toFixed(2)} mm below the flare (told)` : ` · inner rows buried ${A.footBuriedMm.toFixed(2)} mm`)
     : `buried in the rim on the same footing as the petal foot · the underside FALLS ${B.undersideChordDeg.toFixed(2)}° over the first ${B.undersideChordMm.toFixed(2)} mm in from the rim (the chord a print meets; tangent at the rim ${B.footTangentDeg.toFixed(2)}°)`;
-  return `     SEPALS ${B.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
+  return `     SEPALS ${tag}${B.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
     + ` · offset ${S.phaseFrac.toFixed(2)} of ${S.phaseAgainst} = ${S.phaseDeg.toFixed(2)}° of ${S.pitchDeg.toFixed(2)}°` + (S.mirrorSymmetric === false ? ' — NOT mirror-symmetric on this fan (told)' : '')
     + (S.own && S.own.scaleInert ? ` · size: the sepal's OWN ${S.own.lengthMm} x ${S.own.widthMm} mm (the multiplier is inert and hidden)`
       : S.own && S.own.lengthMm !== null ? ` · size: own length ${S.own.lengthMm} mm, width ${S.scale.toFixed(2)}x the petal's`
@@ -2796,7 +2873,7 @@ function sepalLine(ui, built, mode) {
       : ` · size ${S.scale.toFixed(2)}x`)
     + (S.own && (S.own.lengthFloored || S.own.widthFloored) ? ' — FLOORED at the ruled minimum (told)' : '')
     + (first ? (Math.abs(first.length - first.askedLength) > 0.05 ? ` (${first.askedLength.toFixed(1)} mm asked, DRAWN ${first.length.toFixed(1)} mm — ${first.length < first.askedLength ? 'the tip floor shortens a narrow blade' : 'the apex nib runs past the asked length'})` : ` (${first.length.toFixed(1)} mm)`) : '')
-    + `\n     SEPAL FOOT ${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
+    + `\n     SEPAL FOOT ${tag}${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
     + ` · ${footSurface}`
     + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
 }
@@ -3164,7 +3241,9 @@ function regenerate() {
                      see where the petal's fmt reads `shown.buckle`. Under SPHERE
                      with sepals asked the record says UNAVAILABLE rather than
                      going silent. */
-                  sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, drawnLengthMm: built.sepals.built[0] ? built.sepals.built[0].length : null, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
+                  sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, drawnLengthMm: built.sepals.built[0] ? built.sepals.built[0].length : null, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false,
+                    /* THE TIERS (F1.1a): every tier asked — built, with its station and clamps, or not and why */
+                    tiers: built.sepals.tiers || null, tiersAsked: built.sepals.tiersAsked, tiersBuilt: built.sepals.tiersBuilt, tiersEligible: built.sepals.tiersEligible }
                     : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null),
                   /* THE SCOPES the builder was handed (Scoping-b): its own summary —
                      which layers and pairs carry an offset, and whether each
@@ -4051,9 +4130,29 @@ window.__bloomMetrics = () => ({
        reading beside it, and the surface figures where the foot meets. */
     height: lastSepals.height,
     attachment: JSON.parse(JSON.stringify(lastSepals.attachment)),
-    built: lastSepalsBuilt ? lastSepalsBuilt.count : 0,
+    built: lastSepalsBuilt ? lastSepalsBuilt.built.length : 0,
     builtAzimuths: lastSepalsBuilt ? lastSepalsBuilt.azimuths.slice() : [],
     tris: lastSepalTris,
+    /* THE TIERS (F1.1a, SP10–SP13): the builder's own per-tier records — the
+       station each tier was placed at (the height law, the ceiling the tier
+       above sets, the ordering clamp, NO ROOM), the angle limit drawn against
+       the petals and the tiers above, the state each blade was built from
+       (`effective`, the tier's own sepal values), and the blades as emitted. */
+    tiersAsked: lastSepalsBuilt ? lastSepalsBuilt.tiersAsked : 1,
+    tiersBuilt: lastSepalsBuilt ? lastSepalsBuilt.tiersBuilt : 0,
+    tiersEligible: lastSepalsBuilt ? lastSepalsBuilt.tiersEligible : false,
+    tiers: lastSepalsBuilt && lastSepalsBuilt.tiers ? lastSepalsBuilt.tiers.map((T) => ({
+      tier: T.tier, present: T.present, why: T.why || null, order: T.order ? JSON.parse(JSON.stringify(T.order)) : null,
+      term: T.term ? { offsets: { ...T.term.offsets }, effective: { ...T.term.effective }, clamped: T.term.clamped.slice() } : null,
+      effective: T.effective ? { ...T.effective } : null,
+      count: T.count, tris: T.tris, azimuths: T.azimuths.slice(),
+      attachment: T.attachment ? JSON.parse(JSON.stringify(T.attachment)) : null,
+      height: T.present && lastFoot.sepalTiers ? lastFoot.sepalTiers[T.tier].height : null,
+      ring: T.ring ? { radius: T.ring.radius, width: T.ring.width, thickness: T.ring.thickness, overhang: T.ring.overhang, z: T.ring.z, domeLean: T.ring.domeLean, onDome: T.ring.dome !== null } : null,
+      descriptor: T.present && lastFoot.sepalTiers ? (({ asked, count, ceiling, countClamped, scale, breadth, phaseFrac, phaseRad, pitchRad, startAzimuth, azimuths, footMm, footAskedMm, footClamped, footScale, own }) => ({ asked, count, ceiling, countClamped, scale, breadth, phaseFrac, phaseRad, pitchRad, startAzimuth, azimuths: azimuths.slice(), footMm, footAskedMm, footClamped, footScale, own: own ? { ...own } : null }))(lastFoot.sepalTiers[T.tier]) : null,
+      limit: T.limit ? JSON.parse(JSON.stringify(T.limit)) : null,
+      petals: T.built.map((p) => ({ length: p.length, askedLength: p.askedLength, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris, footFrames: p.footFrames, rootRow: p.rootRow, tipCap: p.tipCap, form: p.form, builtFrom: p.builtFrom })),
+    })) : [],
     limit: lastSepalsBuilt ? JSON.parse(JSON.stringify(lastSepalsBuilt.limit)) : null,
     footTangentDeg: lastSepalsBuilt ? lastSepalsBuilt.footTangentDeg : undefined,
     undersideSlopeDeg: lastSepalsBuilt ? lastSepalsBuilt.undersideSlopeDeg : undefined,
@@ -4073,6 +4172,9 @@ window.__bloomMetrics = () => ({
   } : null,
   sepalTris: lastSepalTris,
   sepalsAbsent: lastSepalsAbsent,
+  /* THE TIERS' TWO STATEMENTS (SP10): the geometry's own `sepalTiersEligible`
+     through the page, against the registry's `sepalTiersLive`. */
+  sepalTiersEligible: lastSepalTiersEligible,
   sepalsAskedUnderSphere: lastSepalsAskedUnderSphere,
   /* THE SPHERE'S STEM CHANNEL — ST7's and ST8's measured side, and the
      read-out's. The per-mode approach arrays ride too, because "the two modes
@@ -4472,7 +4574,7 @@ function writeDesignStatus() {
   designStatus.hidden = false;
   if (d.action === 'saved') { designStatus.textContent = `saved ${d.name} — ${d.count} controls, version ${d.version}`; return; }
   if (d.action === 'refused') { designStatus.innerHTML = `<span class="bl-err">could not load ${esc(d.name)}: ${esc(d.error)}</span>`; return; }
-  const sc = d.scopes ? ` and ${d.scopes.layers} layer / ${d.scopes.petals} petal offset entr${d.scopes.layers + d.scopes.petals === 1 ? 'y' : 'ies'}${d.scopes.tiers ? ` (${d.scopes.tiers} tier entr${d.scopes.tiers === 1 ? 'y' : 'ies'} kept, not applied)` : ''}` : '';
+  const sc = d.scopes ? ` and ${d.scopes.layers} layer / ${d.scopes.petals} petal offset entr${d.scopes.layers + d.scopes.petals === 1 ? 'y' : 'ies'}${d.scopes.tiers ? ` and ${d.scopes.tiers} sepal tier entr${d.scopes.tiers === 1 ? 'y' : 'ies'}` : ''}` : '';
   const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set${sc}`;
   if (!d.notes.length) { designStatus.textContent = `${head}; every field read clean, nothing to report`; return; }
   designStatus.innerHTML = `${esc(head)}; ${d.notes.length} note${d.notes.length === 1 ? '' : 's'}:\n`

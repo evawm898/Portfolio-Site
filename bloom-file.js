@@ -80,7 +80,7 @@
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, ROLE_OVERRIDES } from './bloom-geometry.js';
+import { SCOPE_UNSCOPED, ROLE_OVERRIDES, SCOPE_TIER_WHORL_LEVEL_IDS } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
@@ -101,9 +101,10 @@ import { readCurveValue, cloneCurve } from './bloom-curve.js';
 // a non-finite value, and `sheetThickness` BY NAME — it is never scoped (Q3.6),
 // and a reader that dropped it silently would load a file as a bloom it does
 // not describe. A refused ENTRY is dropped whole and told; a refused KEY is
-// dropped from its entry and told. The `tiers` list is validated and KEPT so
-// a save after a load carries it, and reported `not-applied` because no sepal
-// tier exists to receive it. The VERSION DID NOT MOVE: a v1 file with empty
+// dropped from its entry and told. The `tiers` list is validated and APPLIED
+// since F1.1a (sepal tiers): an entry names a tier by its 0-based index and the
+// geometry's tier loop reads it; one naming a tier past the count is kept and
+// inert (the layers' own rule). THE VERSION DID NOT MOVE: a v1 file with empty
 // containers reads here exactly as it did, and a v1 file with filled ones read
 // by the previous page is told "not applied" by that page's own reader — which
 // is the shape the containers were written empty to make possible.
@@ -303,9 +304,11 @@ export const SCOPE_WHORL_LEVEL = Object.freeze(['petalCount', 'tubeLayer1', 'tub
 const roleOverrideIds = new Set(ROLE_OVERRIDES.map((o) => o.control));
 export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !SCOPE_UNSCOPED.includes(c.id) && !roleOverrideIds.has(c.id) && !SCOPE_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
 /* A TIER is a SEPAL scope (Q1.1: each tier owns the full sepal control set),
-   so its keys are the sepal-role sliders less the whorl-level count. Stored and
-   validated here; applied by no tier yet. */
-export const SCOPE_TIER_WHORL_LEVEL = Object.freeze(['sepalCount']);
+   so its keys are the sepal-role sliders less the two whorl-level values —
+   the count and the tier count — which the GEOMETRY names (one owner, F1.1a:
+   `footRing`'s tier loop applies these entries, so the list of what it refuses
+   lives beside it). */
+export const SCOPE_TIER_WHORL_LEVEL = SCOPE_TIER_WHORL_LEVEL_IDS;
 export const SCOPEABLE_TIER_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'sepal' && !SCOPE_UNSCOPED.includes(c.id) && !SCOPE_TIER_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
 const scopeable = new Set(SCOPEABLE_IDS);
 /* WHY A CONTROL CANNOT CARRY AN OFFSET IN A CONTAINER — the ONE owner of the
@@ -369,9 +372,8 @@ function readScopeEntry(k, e, i, notes) {
 }
 
 /* A container of lists: every named list must be present and a list. An
-   `overrides` entry is VALIDATED and kept (tiers: kept, told not applied); a
-   `curves` entry is REPORTED AND NOT APPLIED — this version reads nothing from
-   those. */
+   `overrides` entry is VALIDATED and kept; a `curves` entry is REPORTED AND
+   NOT APPLIED — this version reads nothing from those. */
 /* A MISSING list (or a missing container) is reported and named in `missing`
    on the result — a non-enumerable field, so the document's own shape is
    unchanged — and the PAGE KEEPS WHAT IT HAS for it (rule 3): the first cut
@@ -389,7 +391,6 @@ function readContainer(src, name, lists, notes) {
     if (!Array.isArray(src[k])) { notes.push(note('invalid', `${name}.${k} is not a list`)); continue; }
     if (name === 'overrides') {
       out[k] = src[k].map((e, i) => readScopeEntry(k, e, i, notes)).filter((e) => e !== null);
-      if (k === 'tiers' && out[k].length) notes.push(note('not-applied', `overrides.tiers holds ${out[k].length} entr${out[k].length === 1 ? 'y' : 'ies'} — kept for the next save, not applied: no sepal tier is built yet`));
       continue;
     }
     if (src[k].length) notes.push(note('not-applied', `${name}.${k} holds ${src[k].length} entr${src[k].length === 1 ? 'y' : 'ies'} — this page cannot read the ${k} curve yet, so they are not applied`));
@@ -424,15 +425,17 @@ export function readDoc(obj) {
    branch on it is the shipped path. */
 export function scopeBounds() {
   const out = {};
-  for (const id of SCOPEABLE_IDS) { const c = controlOf.get(id); out[id] = { min: c.min, max: c.max }; }
+  for (const id of [...SCOPEABLE_IDS, ...SCOPEABLE_TIER_IDS]) { const c = controlOf.get(id); out[id] = { min: c.min, max: c.max }; }
   return out;
 }
+/* Null when every list is empty — a tier entry builds a tier (F1.1a), so
+   the tiers list counts now. */
 export function scopesForBuild(overrides) {
   if (!overrides) return null;
   const layers = Array.isArray(overrides.layers) ? overrides.layers : [];
   const petals = Array.isArray(overrides.petals) ? overrides.petals : [];
   const tiers = Array.isArray(overrides.tiers) ? overrides.tiers : [];
-  if (!layers.length && !petals.length) return null;
+  if (!layers.length && !petals.length && !tiers.length) return null;
   return { layers, petals, tiers, bounds: scopeBounds() };
 }
 export const scopesAreEmpty = (o) => !o || SCOPE_CONTAINERS.every((k) => !Array.isArray(o[k]) || o[k].length === 0);

@@ -3614,6 +3614,34 @@ block 61).
 - Block 61 (nine rows; the WING at 120 × 5, both range ends, the inert multiplier, the floors, the
   pinned limit, GATED); `frozen/phase66` is the 1,307 rows at `34ed00d`.
 
+**SEPALS STACK IN TIERS DOWN THE HUB-TO-STEM JOIN, EACH TIER A SCOPE OF OFFSETS, TIER 1 TODAY'S
+WHORL BY BRANCH** (F1.1a, Oct 15 — Eva's rulings Q1.1–Q1.5; read `docs/bloom-sepal-tiers-outcome.md`
+before touching `footRing`'s tier loop, `sepalDescriptorFor`, `sepalTierHeightLaw`, `sepalTierState`,
+`tierOffsetsFor`, `buildSepalTierInto`, `sepalAngleLimit`'s tier sites, the page's tier scope arms,
+SP10–SP13 or block 63).
+- `sepalTiers` (Sepals, 1–4, default 1 — the guard, out of the sweep via `SEPAL_SUBS`). Tier k sits at
+  `sepalHeight · (N − k) / N` of the join, floored ONE GAP (two sheet half-thicknesses, a length) under
+  the tier above: ORDER-CLAMPED told, NO ROOM told and not built. The default 6 mm stem's join is
+  1.32 mm, so tier 2 has no room there; a 40 mm GOBLET gives 77.6 mm.
+- Tiers past the first need a STEM (`sepalTiersEligible` / `sepalTiersLive`, two statements); on a rim
+  fallback (no stem, a dome's inverted join) they are told, not built.
+- Each lower tier's angle limit is DRAWN against the petals AND the tiers above (the record names what
+  it met); laminae are captured while more than one tier is present.
+- A tier's values are `scopes.tiers[{tier, offsets}]` — the design file's third container, applied now;
+  the picker lists built tiers and the Sepals section edits the picked one. Whorl-level ids
+  (`sepalCount`, `sepalTiers`) are refused as offsets. Sepals within a tier match.
+- The ceiling 4 is the BUDGET's: 40 wings × 4 tiers × 120 mm stem reads 72.0 % (238,960 tris a tier).
+- SP10–SP13; five mutants on the mutated module's own tier records; apex-table rows may carry
+  `scopes`. **SP12 and SP13 each read their reference off the quantity under test on the first cut
+  and only the mutants said so** — the row's own scopes and the PAGE's built angle are the owners now.
+- **The apex sweep sat at 134–139 min of its 150-min shard cap before this session, and the four
+  tier rows tipped five shards over it** — so a table row may carry `for: /mutant ids/` and a
+  mutant `rows: /row labels/` (`rowsFor()`); the tier rows and mutants are scoped to each other and
+  the clean control still runs every row. A session that adds rows should scope them or expect
+  the cancel (outcome doc §4a).
+- Block 63 (11 rows, 1354), smoke block 63; `frozen/phase69` = the 1343 rows at `19ecb99`. Sheet:
+  `node tools/shot-bloom-sepal-tiers.mjs` → `docs/img/sepal-tiers.png`.
+
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,

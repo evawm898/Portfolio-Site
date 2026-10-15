@@ -270,11 +270,12 @@ async function nodeClauses(F, rec) {
     // an entry in a container: told as not applied
     /* a curves entry is told not applied; an overrides entry is READ now
        (Scoping-a) — a well-formed layer entry reads clean and is kept, a tier
-       entry is kept and told, a malformed one is dropped and told; the model's
-       own gate (tools/verify-bloom-scopes.mjs, spawned below) carries the rest */
+       entry reads clean and is APPLIED (F1.1a: a sepal tier is built from it),
+       a malformed one is dropped and told; the model's own gate
+       (tools/verify-bloom-scopes.mjs, spawned below) carries the rest */
     { const o = base(); o.overrides.layers = [{ layer: 1, offsets: { petalLength: 3 } }]; o.overrides.tiers = [{ tier: 0, offsets: { sepalCup: 0.2 } }]; o.overrides.petals = [{ layer: 1, petalLength: 3 }]; o.curves.spine = [[0, 0]]; const r = F.readDoc(o);
       if (!r.ok || !r.notes.some((n) => n.kind === 'not-applied' && /curves\.spine holds 1 entry/.test(n.text))
-        || !r.notes.some((n) => n.kind === 'not-applied' && /overrides\.tiers holds 1 entry — kept/.test(n.text))
+        || r.notes.some((n) => /overrides\.tiers/.test(n.text))
         || !r.notes.some((n) => n.kind === 'invalid' && /overrides\.petals\[0\]\.slot/.test(n.text))
         || r.notes.some((n) => /overrides\.layers/.test(n.text))
         || JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: [{ layer: 1, offsets: { petalLength: 3 } }], petals: [], tiers: [{ tier: 0, offsets: { sepalCup: 0.2 } }] })) p.push(`container entries: ${r.ok ? texts(r) + ' | ' + JSON.stringify(r.doc.overrides) : r.error}`); }

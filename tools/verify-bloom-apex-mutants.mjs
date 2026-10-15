@@ -608,6 +608,10 @@ function curveSpine(M, state) {
 }
 const CURVE_HOOK = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] }, petalSpineCurl: 150, curlBias: 1, curlStart: 0.5 });
 const CURVE_UNDER = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] } });
+/* The tier rows run under the tier mutants alone (`rowsFor` below), and the
+   tier mutants run over the rows that name them. */
+const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
+const TIER_ROWS = /^SEPAL TIERS:/;
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -2356,8 +2360,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.limit !== c.limit) ? null : `the mutant drew the limit at ${m.limit} and the clean tree at ${c.limit} (90 asked, the foot 19.4 mm down the flare) — the scan's height did not move`; } },
   { id: 'sepal-count-unclamped', why: 'the count builds what was asked, past the petal count — 40 sepals on 8 petals, five to a pitch, watertight and one piece',
-    find: '    const count = Math.min(asked, ceiling);\n    const scale = Number(state.sepalScale)',
-    into: '    const count = asked;\n    const scale = Number(state.sepalScale)', names: ['SP2'],
+    find: '    const count = Math.min(asked, ceiling);\n    const scale = Number(st.sepalScale)',
+    into: '    const count = asked;\n    const scale = Number(st.sepalScale)', names: ['SP2'],
     witness: (M, C) => { const m = sepalFacts(M, { sepalCount: 40 }), c = sepalFacts(C, { sepalCount: 40 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.count === 40 && c.count === 8) ? null : `the mutant built ${m.count} sepals against the clean tree's ${c.count} (40 asked on 8) — the ceiling still binds`; } },
@@ -2392,6 +2396,50 @@ const MUTANTS = [
     witness: (M, C) => { const m = sepalFacts(M, { sepalFootBreadth: 0.25 }), c = sepalFacts(C, { sepalFootBreadth: 0.25 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.footH < 0.6 && c.footH >= 0.79) ? null : `the mutant's foot half-width is ${m.footH} against the clean tree's ${c.footH} at breadth 0.25 — the floor still binds`; } },
+  /* THE SEPAL TIERS (F1.1a) — five, each the defect the brief names, each
+     witnessed on the mutated module's own tier records (never on SP10-SP13). */
+  { id: 'every-tier-at-the-same-height', rows: TIER_ROWS, why: 'the height law hands every tier the first tier\'s own fraction — three whorls stacked on ONE attachment, each sepal through the one above, watertight and one connected piece',
+    find: 'export function sepalTierHeightLaw(frac, k, N) { return k === 0 ? frac : frac * (N - k) / N; }',
+    into: 'export function sepalTierHeightLaw(frac, k, N) { return frac; }', names: ['SP11'],
+    witness: (M, C) => { const m = tierFacts(M), c = tierFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mf = m.tiers.map((t) => t.order ? t.order.fracLaw : t.frac), cf = c.tiers.map((t) => t.order ? t.order.fracLaw : t.frac);
+      return (mf[1] === mf[0] && cf[1] < cf[0]) ? null : `the mutant's tier fractions (law) read ${mf.join(' / ')} against the clean tree's ${cf.join(' / ')} — the law still steps down`; } },
+  { id: 'tiers-cross', rows: TIER_ROWS, why: 'the ordering ceiling is dropped: a tier is attached where its own height law says whatever the tier above sits at, so a scoped height offset puts tier 2 ABOVE tier 1 — two whorls through each other, no clause of the first session can see it',
+    find: '      const fracBuilt = Math.min(fracLaw, fracCeiling);',
+    into: '      const fracBuilt = fracLaw;', names: ['SP11'],
+    witness: (M, C) => { const sc = { tiers: [{ tier: 0, offsets: { sepalHeight: -0.5 } }] };
+      const m = tierFacts(M, {}, sc), c = tierFacts(C, {}, sc);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mt = m.tiers, ct = c.tiers;
+      if (!(mt[1] && mt[1].present && ct[1] && ct[1].present)) return `tier 2 not built (mutant ${JSON.stringify(mt[1])}, clean ${JSON.stringify(ct[1])})`;
+      return (mt[1].frac > mt[0].frac && ct[1].frac < ct[0].frac) ? null : `tier 2 sits at ${mt[1].frac} against tier 1 at ${mt[0].frac} on the mutant (clean ${ct[1].frac} / ${ct[0].frac}) — the ordering still holds`; } },
+  { id: 'tier-contact-unclamped', rows: TIER_ROWS, why: 'a lower tier\'s angle scan is drawn against the petals ALONE — the tier above is not among its sites, so a tier asked up stands through the whorl above it at its petal-drawn limit; both STL gates read a cross-shell overlap',
+    find: '    const T = buildSepalTierInto(acc, desc.state, fr, desc, sites.concat(upper), stemPlanned, cap, unclamped);',
+    into: '    const T = buildSepalTierInto(acc, desc.state, fr, desc, sites, stemPlanned, cap, unclamped);', names: ['SP13'],
+    witness: (M, C) => { const ex = { hubLength: 10, sepalAngle: 60 };
+      const m = tierFacts(M, ex), c = tierFacts(C, ex);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mt = m.tiers[1], ct = c.tiers[1];
+      if (!(mt && mt.present && ct && ct.present)) return `tier 2 not built`;
+      return (ct.limit < 60 && /tier 1/.test(ct.against || '') && !/tier 1/.test(mt.against || '') && mt.limit > ct.limit) ? null
+        : `tier 2's limit reads ${mt.limit} against ${mt.against} on the mutant and ${ct.limit} against ${ct.against} clean — the tier above still clamps it`; } },
+  { id: 'tier-offsets-leak', rows: TIER_ROWS, why: 'a tier scope\'s offsets reach EVERY tier — an entry for tier 2 alone lengthens tier 1 and tier 3 with it, the picker editing one tier and the build moving three',
+    find: "  for (const e of list) { if (e.tier !== k) continue; addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true; }",
+    into: "  for (const e of list) { addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true; }", names: ['SP12'],
+    witness: (M, C) => { const sc = { tiers: [{ tier: 1, offsets: { sepalLength: 30 } }] };
+      const m = tierFacts(M, {}, sc), c = tierFacts(C, {}, sc);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ml = m.tiers.map((t) => t.length), cl = c.tiers.map((t) => t.length);
+      return (ml[0] > cl[0] + 1 && Math.abs(cl[1] - ml[1]) < 1e-9 && cl[0] < cl[1]) ? null : `tier lengths read ${ml.join(' / ')} on the mutant against ${cl.join(' / ')} clean — tier 2's offset stayed on tier 2`; } },
+  { id: 'tiers-built-with-no-stem', rows: TIER_ROWS, why: "the geometry's eligibility says tiers past the first are live on a bloom with NO stem while the registry hides the control there — hidden and NOT inert on the one state the brief rules out (the second tier then has no join to attach on, and is refused for the wrong reason)",
+    find: 'export function sepalTiersEligible(state) { return !sepalsAbsent(state) && !stemIsAbsent(state); }',
+    into: 'export function sepalTiersEligible(state) { return !sepalsAbsent(state); }', names: ['SP10'],
+    witness: (M, C) => { const ex = { stemLength: 0, hubStyle: 'FLAT', hubLength: 0, sepalTiers: 4 };
+      const m = tierFacts(M, ex), c = tierFacts(C, ex);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.eligible === true && c.eligible === false && !/need a stem/.test(m.tiers[1] ? m.tiers[1].why || '' : '') && /need a stem/.test(c.tiers[1] ? c.tiers[1].why || '' : '')) ? null
+        : `eligible reads ${m.eligible} on the mutant against ${c.eligible} clean (tier 2: "${m.tiers[1] && m.tiers[1].why}" / "${c.tiers[1] && c.tiers[1].why}") — the stem still gates it`; } },
   { id: 'sepals-built-under-sphere', why: 'the geometry builds a sepal whorl on a closed SPHERE while the registry hides every sepal control there — hidden and NOT inert, and the whorl sits on the equator of a head that has no underside',
     find: 'export function sepalsEligible(state) { return !sphereMode(state); }',
     into: 'export function sepalsEligible(state) { return true; }', names: ['SP0', 'SP9'],
@@ -2715,6 +2763,27 @@ function sepalFacts(MOD, extra = {}) {
     const p = S.built[0];
     return { count: S.count, tilt: p.builtFrom.petalTilt, form: p.form, rimR: Math.hypot(p.footFrames[2].C[0], p.footFrames[2].C[1]), az0: S.azimuths[0], length: p.length, footH: p.footFrames[2].h,
       attachZ: S.attachment.mode === 'HUB' ? S.attachment.zAttach : null, limit: S.limit.limitDeg };
+  } catch (e) { return { threw: e.message }; }
+}
+
+/* THE SEPAL TIER WITNESS (F1.1a) — the module's own build of the LANTERN
+   frame (a 40 mm GOBLET, 5 sepals a tier, three tiers at 0.75 / 0.50 / 0.25
+   of the join) with whatever scopes the mutant needs, read off the tier
+   records the builder hands back: present, the attachment fraction and z,
+   the drawn limit and what it was drawn against, the effective length. A
+   mutant is judged on what the MUTATED module emits, never on the clause it
+   names (the second durable rule). */
+const TIER_SET = { stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40, sepalCount: 5, sepalTiers: 3 };
+function tierFacts(MOD, extra = {}, scopes = null) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, ...TIER_SET, ...extra };
+    const acc = new MOD.MeshBuilder({ exportMode: true });
+    const b = MOD.buildBloomInto(acc, st, scopes ? { scopes } : {});
+    const S = b.sepals;
+    const tiers = (S && S.tiers ? S.tiers : []).map((T) => ({ present: !!T.present, frac: T.present ? T.attachment.frac : null, z: T.present ? T.attachment.zAttach : null,
+      limit: T.present && T.limit ? T.limit.limitDeg : null, against: T.present && T.limit ? T.limit.against : null, clamped: T.present && T.limit ? !!T.limit.clamped : null,
+      length: T.present ? T.built[0].length : null, why: T.why || null, order: T.order ? { fracLaw: T.order.fracLaw, fracBuilt: T.order.fracBuilt, orderClamped: T.order.orderClamped } : null }));
+    return { tiers, eligible: MOD.sepalTiersEligible(st), count: S ? S.count : 0 };
   } catch (e) { return { threw: e.message }; }
 }
 
@@ -3110,6 +3179,19 @@ const ROWS = [
      clamp binds. */
   { label: "a sepal whorl on the hub's flare (5 on a 60 x 6 stem, GOBLET at MAX amount x MAX length, 90 asked)",
     set: [{ id: 'sepalCount', value: '5' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }, { id: 'sepalAngle', value: '90' }] },
+  /* THE SEPAL TIERS (F1.1a): the LANTERN frame (three tiers stepping down the
+     join of a 40 mm GOBLET) and the CONTACT row (three tiers asked up at 60
+     on a 10 mm hub, where tiers 2 and 3 are clamped by the tier above). The
+     no-stem state SP10 speaks on is the GATED row below. */
+  { label: 'SEPAL TIERS: three tiers on a 40 mm GOBLET hub — the LANTERN frame', for: TIER_MUTANTS,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '3' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }] },
+  { label: 'SEPAL TIERS: three tiers asked UP at 60 on a 10 mm hub — tiers 2 and 3 clamped by the tier above', for: TIER_MUTANTS,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '3' }, { id: 'sepalAngle', value: '60' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '10' }] },
+  { label: 'SEPAL TIERS: the LANTERN with tier 2 scoped (+30 mm length, +0.25 height) and tier 1 lowered (-0.5 height — the ordering clamp binds on tier 2)', for: TIER_MUTANTS,
+    scopes: { layers: [], petals: [], tiers: [{ tier: 0, offsets: { sepalHeight: -0.5 } }, { tier: 1, offsets: { sepalLength: 30, sepalHeight: 0.25 } }] },
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '3' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }] },
+  { label: 'SEPAL TIERS: GATED — four tiers asked with NO stem (hidden and inert, told)', for: TIER_MUTANTS,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '4' }] },
   /* THE INFLORESCENCE ROWS (the raceme session). Three, and each exists for a
      statement the other two cannot make.
 
@@ -3241,6 +3323,12 @@ async function famsOn(rows) {
     await stillFrame(page);
     const bad = await applyConfig(page, row.set);
     if (bad.length) { console.log(`    (row "${row.label}" refused: ${bad[0]})`); continue; }
+    /* A ROW MAY CARRY SCOPES (F1.1a): the tier offsets reach the page through
+       the `__bloomScopes` hook (the scopes gate's own route) and the harness's
+       Node rebuilds through `row.scopes`, so a leak between tiers has a row it
+       can show on — with no entry every tier is built from the globals and a
+       leak is invisible by construction. Cleared on every openBloom. */
+    if (row.scopes) { await page.evaluate((r) => window.__bloomScopes(r), row.scopes); await stillFrame(page); }
     await page.waitForTimeout(300);
     /* BOTH FAMILIES. The apex table was A-only; session 41 added L7, whose
        witness is the emitted outline's local powers, and "re-run the mutant
@@ -3399,6 +3487,22 @@ if (ROWS_ARG) {
   if (!RUN_ROWS.length) { await browser.close(); server.close(); console.log(`--rows=${ROWS_ARG} matches no row`); process.exit(1); }
   console.log(`ROW SUBSET: ${RUN_ROWS.length} of ${ROWS.length} rows (--rows=${ROWS_ARG}) — not a pass of this table`);
 }
+/* A ROW MAY BE SCOPED TO THE MUTANTS IT EXISTS FOR, AND A MUTANT TO ITS ROWS
+   (F1.1a, found by CI): a sweep is every mutant over every row, and on the
+   weekly shards that product sat at 134-139 min of a 150-min cap BEFORE the
+   tier work. Four tier rows on 76 (+5 %) and five mutants on 173 (+3 %) took
+   five of six shards over it. So a row may carry `for: /regex on mutant id/`
+   and a mutant `rows: /regex on row label/`; the CLEAN CONTROL still runs
+   EVERY row (a family firing on the clean tree is reported whatever scoped
+   it), and a mutant runs over the rows it names AND the rows that name it.
+   What a scoped mutant gives up is COLLATERAL: it cannot report a family it
+   also reddens on a row it did not run, which this table never required. A
+   scope that leaves a mutant no row at all is a defect and is refused. */
+function rowsFor(mu, rows) {
+  const out = rows.filter((r) => (!mu.rows || mu.rows.test(r.label)) && (!r.for || r.for.test(mu.id)));
+  if (!out.length) throw new Error(`${mu.id}: its row scope leaves it no row to run on`);
+  return out;
+}
 let fail = false;
 if (!WITNESS_ONLY) {
   console.log('CONTROL (unmutated tree): the family must be SILENT on every row');
@@ -3440,7 +3544,7 @@ for (const mu of MUTANTS) {
     fail = true; SERVE = SRC; continue;
   }
   if (WITNESS_ONLY) { console.log(`  ${mu.id}: witness moved`); SERVE = SRC; continue; }
-  const got = await famsOn(RUN_ROWS);
+  const got = await famsOn(rowsFor(mu, RUN_ROWS));
   const want = mu.names;
   const missed = want.filter((f) => !got.has(f));
   console.log(`  ${mu.id}: ${mu.why}`);
