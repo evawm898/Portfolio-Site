@@ -171,11 +171,12 @@ async function nodeClauses(G, F, rec) {
     const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && c.id !== 'sheetThickness' && !deltas.has(c.id) && !whorl.includes(c.id)).map((c) => c.id);
     if (JSON.stringify([...F.SCOPEABLE_IDS]) !== JSON.stringify(want)) p.push(`SCOPEABLE_IDS (${F.SCOPEABLE_IDS.length}) differ from the restated census (${want.length}): ${want.filter((x) => !F.SCOPEABLE_IDS.includes(x)).concat(F.SCOPEABLE_IDS.filter((x) => !want.includes(x))).join(', ')}`);
     if (F.SCOPEABLE_IDS.includes('sheetThickness')) p.push('sheetThickness is scopeable');
-    const wantTier = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'sepal' && c.id !== 'sepalCount').map((c) => c.id);
-    if (JSON.stringify([...F.SCOPEABLE_TIER_IDS]) !== JSON.stringify(wantTier)) p.push(`SCOPEABLE_TIER_IDS differ from the restated census (sepal-role sliders less sepalCount)`);
+    /* the two whorl-level sepal values (F1.1a): the count, and the tier count */
+    const wantTier = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'sepal' && c.id !== 'sepalCount' && c.id !== 'sepalTiers').map((c) => c.id);
+    if (JSON.stringify([...F.SCOPEABLE_TIER_IDS]) !== JSON.stringify(wantTier)) p.push(`SCOPEABLE_TIER_IDS differ from the restated census (sepal-role sliders less sepalCount and sepalTiers)`);
     const b = F.scopeBounds();
-    for (const id of F.SCOPEABLE_IDS) { const c = kindOf.get(id); if (!b[id] || b[id].min !== c.min || b[id].max !== c.max) p.push(`scopeBounds.${id} is ${JSON.stringify(b[id])}, the registry says ${c.min}..${c.max}`); }
-    if (Object.keys(b).length !== F.SCOPEABLE_IDS.length) p.push(`scopeBounds has ${Object.keys(b).length} entries for ${F.SCOPEABLE_IDS.length} scopeable ids`);
+    for (const id of [...F.SCOPEABLE_IDS, ...F.SCOPEABLE_TIER_IDS]) { const c = kindOf.get(id); if (!b[id] || b[id].min !== c.min || b[id].max !== c.max) p.push(`scopeBounds.${id} is ${JSON.stringify(b[id])}, the registry says ${c.min}..${c.max}`); }
+    if (Object.keys(b).length !== F.SCOPEABLE_IDS.length + F.SCOPEABLE_TIER_IDS.length) p.push(`scopeBounds has ${Object.keys(b).length} entries for ${F.SCOPEABLE_IDS.length} + ${F.SCOPEABLE_TIER_IDS.length} scopeable ids`);
     rec('SO0', p, `sheet thickness is the one unscoped control; ${F.SCOPEABLE_IDS.length} petal sliders are scopeable (layers / petals) and ${F.SCOPEABLE_TIER_IDS.length} sepal sliders (tiers), with the registry's own bounds`);
   }
   /* SO1 — the identity by branch */
@@ -491,12 +492,12 @@ async function nodeClauses(G, F, rec) {
       const st = stateOf(row);
       const r = F.readDoc(JSON.parse(JSON.stringify(F.composeDoc(st, { scopes: fixture }))));
       if (!r.ok) { p.push(`${row.label}: refused — ${r.error}`); continue; }
-      const notes = r.notes.filter((n) => !(n.kind === 'not-applied' && /overrides\.tiers/.test(n.text)));
-      const own = r.notes.filter((n) => /^overrides\./.test(n.text) && !/overrides\.tiers holds/.test(n.text));
+      /* a tier entry reads CLEAN since F1.1a (sepal tiers): it is applied, so
+         there is nothing to tell */
+      const own = r.notes.filter((n) => /^overrides\./.test(n.text));
       if (own.length) p.push(`${row.label}: ${own.map((n) => n.text).join(' | ')}`);
       if (JSON.stringify(r.doc.overrides) !== JSON.stringify(fixture)) p.push(`${row.label}: the record did not round-trip`);
-      if (!r.notes.some((n) => n.kind === 'not-applied' && /overrides\.tiers holds 1 entry/.test(n.text))) p.push(`${row.label}: the tier entry was not told`);
-      void notes; rows++;
+      rows++;
     }
     /* the reader's refusals on written-down fixtures */
     const base = () => F.composeDoc(REG.DEFAULTS);
@@ -512,10 +513,14 @@ async function nodeClauses(G, F, rec) {
     { const o = base(); o.overrides.layers = [{ layer: 0, offsets: { placement: 1, petalInfill: 2, petalCount: 1, allCup: 0.1, 'petalTipBreadth': 0.2, nonsense: 3, petalCup: 'x', petalCupGradient: 0.3 }, extra: 1 }];
       const r = expect('bad keys', o, [['invalid', /placement: a choice has no offset/], ['invalid', /petalCount: a whorl-level value/], ['invalid', /allCup: a role delta/], ['retired', /petalTipBreadth names a retired control/], ['unknown', /offsets\.nonsense is not a control/], ['invalid', /petalCup is "x", not a number/], ['unknown', /layers\[0\]\.extra is not a field/]]);
       if (r.ok && JSON.stringify(r.doc.overrides.layers[0]) !== JSON.stringify({ layer: 0, offsets: { petalCupGradient: 0.3 } })) p.push(`bad keys: the kept entry is ${JSON.stringify(r.doc.overrides.layers[0])}`); }
-    { const o = base(); o.overrides.tiers = [{ tier: 0, offsets: { sepalCup: 0.1 } }]; const r = expect('a tier entry', o, [['not-applied', /tiers holds 1 entry — kept/]]); if (r.ok && r.doc.overrides.tiers.length !== 1) p.push('the tier entry was dropped'); }
+    { const o = base(); o.overrides.tiers = [{ tier: 0, offsets: { sepalCup: 0.1 } }]; const r = expect('a tier entry', o, []); if (r.ok && (r.doc.overrides.tiers.length !== 1 || r.notes.length)) p.push(`a tier entry: ${r.notes.length ? texts(r) : 'the entry was dropped'}`); }
+    /* the two whorl-level sepal values are refused in a tier entry by name (F1.1a) */
+    { const o = base(); o.overrides.tiers = [{ tier: 1, offsets: { sepalCount: 2, sepalTiers: 1, sepalHeight: -0.1 } }]; const r = expect('tier whorl-level keys', o, [['invalid', /sepalCount: a whorl-level value/], ['invalid', /sepalTiers: a whorl-level value/]]);
+      if (r.ok && JSON.stringify(r.doc.overrides.tiers[0]) !== JSON.stringify({ tier: 1, offsets: { sepalHeight: -0.1 } })) p.push(`tier whorl-level keys: the kept entry is ${JSON.stringify(r.doc.overrides.tiers[0])}`); }
     { const r = F.readDoc(base()); if (r.notes.length) p.push(`a plain compose(DEFAULTS) reports ${texts(r)}`); if (!F.scopesAreEmpty(r.doc.overrides) || F.scopesForBuild(r.doc.overrides) !== null) p.push('empty containers do not read as no scopes'); }
-    { const sc = F.scopesForBuild(fixture); if (!sc || sc.layers.length !== 1 || sc.petals.length !== 2 || !sc.bounds.petalCup) p.push('scopesForBuild did not carry the lists and the bounds'); }
-    rec('SO8', p, `${rows} live rows round-trip a two-layer / two-petal / one-tier record with no note but the tier's; every written-down refusal fires by name`);
+    { const sc = F.scopesForBuild(fixture); if (!sc || sc.layers.length !== 1 || sc.petals.length !== 2 || sc.tiers.length !== 1 || !sc.bounds.petalCup || !sc.bounds.sepalCup) p.push('scopesForBuild did not carry the three lists and the bounds (the tier ids included)'); }
+    { const sc = F.scopesForBuild({ layers: [], petals: [], tiers: [{ tier: 0, offsets: { sepalCup: 0.1 } }] }); if (!sc || sc.tiers.length !== 1) p.push('a tiers-only record builds nothing — scopesForBuild returned null (F1.1a: a tier entry builds a tier)'); }
+    rec('SO8', p, `${rows} live rows round-trip a two-layer / two-petal / one-tier record with no note; every written-down refusal fires by name; a tiers-only record reaches the build`);
   }
   /* SO10 — THE TOGGLE GATE: an entry reaches a petal only while its toggle is
      LIVE (Scoping-b, "each is a toggle; off = today's panel exactly"). Every

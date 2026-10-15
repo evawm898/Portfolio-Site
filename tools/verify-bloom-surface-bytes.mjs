@@ -331,6 +331,24 @@ const PREDICATE_MOVERS = {
     const lp = base.leafPlan(st, sp, acc, ip, ip && ip.present ? ip.unitMemo : null);
     return !!(lp.present && lp.compound && lp.built > 0 && lp.compound.petiole && lp.compound.petiole.thickens);
   },
+  /* F1.1a — STACKED SEPAL TIERS (docs/bloom-sepal-tiers-outcome.md).
+     PREDECLARED FROM THE BASE TREE'S OWN RECORD: a row moves iff it asks for
+     more than one tier (`sepalTiers`, a control the base does not know, so it
+     is read off the coerced state) AND the base builds a sepal whorl on the
+     HUB-to-stem join (tier 1 is today's whorl; a RIM fallback, a sphere, or
+     count 0 has no join for a second tier to sit on) AND the join's extent
+     holds at least one gap (two sheet half-thicknesses) below tier 1 — the
+     NO-ROOM arm builds no second tier and is a holder by branch. Every
+     one-tier row holds to the bit in both modes. */
+  'sepal-tiers': (st) => {
+    if (!(Number(st.sepalTiers) > 1)) return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const S = fr.sepals;
+    if (!S || !(S.count > 0) || !S.attachment || S.attachment.mode !== 'HUB') return false;
+    const gap = base.seamHalfThicknessMm(Number(st.sheetThickness)) * 2;
+    return S.attachment.frac * S.attachment.extentMm > gap;
+  },
   /* LEAF/STEM BUILD S4 — THE LOBED (CHEVRON) LEAF. A row moves iff THIS tree
      builds a lobed blade on it (the plan's own type, after the raceme's pin,
      with a leaf actually built). The base tree has no LOBED and builds such a
