@@ -23,6 +23,7 @@ on:
       - bloom.js
       - bloom-geometry.js
       - bloom-registry.js
+      - bloom-curve.js
       - tools/verify-bloom-connectedness.mjs
       - tools/bloom-connectedness-shards.mjs
       - tools/bloom-export-shards.mjs
@@ -41,6 +42,7 @@ on:
       - bloom.js
       - bloom-geometry.js
       - bloom-registry.js
+      - bloom-curve.js
       - tools/verify-bloom-connectedness.mjs
       - tools/bloom-connectedness-shards.mjs
       - tools/bloom-export-shards.mjs
