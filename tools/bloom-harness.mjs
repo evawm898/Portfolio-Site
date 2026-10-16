@@ -5150,7 +5150,19 @@ export async function zygoAssertions(page, row) {
      where it does, and the ring `R0 x layerSize^L` or `R0 x min(1, own /
      petalWidth)` (ring 1 IS the rim, J2) — never footRing()'s own `ownWidth`,
      which is read only to be checked. Both STL gates are blind to a foot that
-     kept the ramp: the blade still lands on a foot that overlaps the hub. */
+     kept the ramp: the blade still lands on a foot that overlaps the hub.
+     BOUNDED IN ULP, NOT EXACT: the restatement runs in NODE and the ring in the
+     PAGE's Chromium V8, and `Math.pow` is not correctly rounded, so the two
+     engines disagree in the last bit (the smoke subset found it on `6 layers x
+     layerSize min`, ring 4 one ULP off; the same law swept in Node over all
+     2,334 ringed ring-sets of the live matrix, both modes, reads 0 ULP) —
+     session 38 §B10.7's class, and the exact-equality-across-two-routes one.
+     So each value is held within Z3_ULPS ulp of the magnitude it was scaled
+     FROM (the petal width for a foot, R0 for a ring), never its own. Every
+     defect this clause exists for moves a foot or ring by a fraction of a
+     millimetre, ~10^13 of that bar. */
+  const Z3_ULPS = 8;
+  const near = (got, want, from) => Math.abs(got - want) <= Z3_ULPS * Number.EPSILON * Math.max(1, Math.abs(from));
   if (!cont && !m.sphereMode) {
     const W = Number(ui.petalWidth), del = Number(ui.footDelicacy), ls = Number(ui.layerSize);
     const bw = new Map(OVERRIDE_BOUNDS).get('petalWidth') || CONTROLS.find((c) => c.id === 'petalWidth');
@@ -5160,11 +5172,11 @@ export async function zygoAssertions(page, row) {
       const ownW = t && t.owns && t.owns.petalWidth ? Math.min(bw.max, Math.max(bw.min, W + t.offsets.petalWidth)) : null;
       const scale = Math.pow(ls, L);
       const wantW = Math.min(FOOT_MAX_WIDTH_MM, Math.max(FOOT_MIN_WIDTH_MM, ownW === null ? W * scale * 0.4 * del : ownW * 0.4 * del));
-      if (!Object.is(r.width, wantW)) bad.push(`Z3: ring ${L}'s foot is ${r.width} mm across, restated ${wantW} from ${ownW === null ? `the ramp (Petal width ${W} x ${scale})` : `the layer's own width ${ownW}`} x 0.4 x Foot delicacy ${del} — the foot did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
+      if (!near(r.width, wantW, ownW ?? W)) bad.push(`Z3: ring ${L}'s foot is ${r.width} mm across, restated ${wantW} from ${ownW === null ? `the ramp (Petal width ${W} x ${scale})` : `the layer's own width ${ownW}`} x 0.4 x Foot delicacy ${del} — the foot did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
       if ((r.ownWidth ?? null) !== ownW) bad.push(`Z3: ring ${L} reports its own width ${JSON.stringify(r.ownWidth ?? null)}, the row's entries say ${JSON.stringify(ownW)}`);
       if (L === 0) return;
       const f = ownW === null ? scale : Math.min(1, ownW / W);
-      if (!Object.is(r.radius, R0 * f)) bad.push(`Z3: ring ${L} sits at ${r.radius} mm, restated R0 ${R0} x ${f} = ${R0 * f} — the ring did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
+      if (!near(r.radius, R0 * f, R0)) bad.push(`Z3: ring ${L} sits at ${r.radius} mm, restated R0 ${R0} x ${f} = ${R0 * f} — the ring did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
       if (Boolean(r.ringClamped) !== (ownW !== null && ownW / W > 1)) bad.push(`Z3: ring ${L} reports ringClamped ${r.ringClamped}, but its own width ${ownW} against Petal width ${W} says ${ownW !== null && ownW / W > 1}`);
     });
   }
