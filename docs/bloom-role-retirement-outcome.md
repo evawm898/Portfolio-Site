@@ -218,5 +218,6 @@ phase2–phase6 hold entirely.
 
 - `verify-bloom-role-retirement.mjs` (needs a worktree) and the sheet run by hand.
 - `verify-bloom-scope-panel-identity.mjs` (not in CI already) asserts panel identity with the
-  toggles OFF against a base tree. Against `f95b244` it now fails by design: the panel lost the role
-  sections.
+  toggles OFF against a base tree. Against `f95b244` that claim no longer holds by design, because
+  the panel lost the role sections. Its role rows are quoted data now, and it was NOT run this
+  session.
