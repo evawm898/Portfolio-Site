@@ -325,3 +325,30 @@ The first push (`2a7c483`) ran two gates red. Both were in tools, not the geomet
   tools, `bloom-census-attribute` and `verify-bloom-build-order` are among them. They are not
   patched here. Each is correct on a row with no `@scopes` (every row the retirement did not
   migrate), and must be patched before it is trusted on one that has them.
+
+## 10. What CI found on `51854f4`
+
+The edge-profile gate draws its rows from the smoke subset, so block 64 reached it for the first
+time in CI. **E2 fired on one row**: `PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the
+outer whorl's`. The treatment adds **48.783426°** of turn within 2 mm of a rim, against the 45°
+allowance.
+
+- **It is the blade's, not the foot-follows change.** With the foot and ring put back on their
+  pre-ruling law (a scratch copy), the row reads **48.783426° to six decimals**.
+- **Where it is:** at u 0.973 on the INNERMOST ring. That ring's length is still ramped (0.373 x,
+  about 13 mm) while its width is owned at 19 mm. Q3.5 drops the ramp only from the value a layer
+  owns. The result is a short, wide blade closing on the apex nib, which is the nib class already
+  declared (for example `APEX NIB: tip shape 3.00 x 20 mm`).
+- **Controls**, measured in the same instrument:
+
+  | state | worst added turn |
+  |---|---|
+  | the plain 4-layer bloom | 43.69° |
+  | a global 19 mm width | 43.39° |
+  | layer 3 owning the same +3 | 43.69° |
+  | layer 4 owning +2 | 47.81° |
+  | layer 4 owning +3 (the row) | 48.78° |
+
+- **Declared, not widened.** The row is in `E2_TURN_XFAIL` at an excess of 3.783426°, with the
+  mechanism in the note. Whether an owned width may outrun its layer's ramped length is the same
+  question as §7.5, from the blade's side.
