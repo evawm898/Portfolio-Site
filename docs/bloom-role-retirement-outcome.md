@@ -221,3 +221,23 @@ phase2–phase6 hold entirely.
   toggles OFF against a base tree. Against `f95b244` that claim no longer holds by design, because
   the panel lost the role sections. Its role rows are quoted data now, and it was NOT run this
   session.
+
+## 9. What CI found on the first pushed head
+
+The first push (`2a7c483`) ran two gates red. Both were in tools, not the geometry.
+
+- **The off-station gate** called `petalStateFor`, which is retired. With no role table a petal's
+  state is the state, so its seam clause builds the width profile from that directly.
+- **The apex mutant table** had one anchor that no longer applied
+  (`form-field-never-reaches-the-blade`, which still named the old resolver signature). It is
+  re-pointed at the shipped line and drops only the FORM term. Run alone it fires FV2.
+- **The edge-profile gate built every stored row without its `@scopes`.** Its `stateFor` accepts
+  an unknown id rather than refusing it. So every migrated role row was measured as the plain
+  bloom, and nothing said so. The declared E2 row `FAN x PER-PETAL: petal 1 extreme x toggle OFF`
+  read 43.69° against its 48.20° record. That was the only visible symptom of a coverage hole over
+  every migrated row it draws. It now skips the entry and builds with `H.rowScopesForBuild(row)`,
+  and the row reads 48.20° again.
+- **The same gap is OPEN in about twenty session-time Node tools that are not in CI.** The byte
+  tools, `bloom-census-attribute` and `verify-bloom-build-order` are among them. They are not
+  patched here. Each is correct on a row with no `@scopes` (every row the retirement did not
+  migrate), and must be patched before it is trusted on one that has them.

@@ -780,8 +780,14 @@ WIRED** (the role retirement, Oct 16 — Eva's rulings Q3.4 / Q3.5 and her Oct 1
   labellum and hood are DROPPED and told. An offset LANDS exactly (`landOffset`).
   - An absent scope toggle is read as the design predating it (OFF), never defaulted.
 - **A stored matrix row is migrated at the end of `buildMatrix` (`storedRow`); its scopes travel as
-  the reserved `@scopes` set entry.** A Node walker with its own `stateOf` refuses it by name unless
-  it hands the build `H.rowScopesForBuild(row)`.
+  the reserved `@scopes` set entry.** A Node walker with its own `stateOf` must skip that entry and
+  hand the build `H.rowScopesForBuild(row)`.
+  - **A walker that throws on an unknown id refuses the row by name, and one that accepts unknown ids
+    builds it WITHOUT its scopes, SILENTLY.** `verify-bloom-edge-profile` did, and CI caught it as a
+    declared E2 row reading 43.69° against its 48.20° record.
+  - **Not yet patched:** about twenty session-time Node tools build matrix rows with no scopes. The
+    byte tools, census-attribute and build-order are among them. Each is fine on a row with no
+    `@scopes`; patch one before trusting it on a row that has them.
   - **A two-tree tool must pass the BASE tree's kinds to `applyConfig`.** Otherwise the base page is
       handed an already-migrated set (the sheet's first run drew the AFTER bloom in the BEFORE cell).
 - **Q3.5:** a layer entry naming `petalLength` / `petalWidth` / `petalTilt` OWNS it, and its BLADE

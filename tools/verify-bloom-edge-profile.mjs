@@ -395,12 +395,18 @@ const H = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-harness.mjs
 const stateFor = (row) => {
   const st = { ...DEFAULTS };
   for (const { id, value } of (row.set || [])) {
+    /* the row's own overrides record (the role retirement, Q3.4): never a
+       control, so it never enters the state — `scopesFor(row)` hands it to the
+       build instead. Read as a state key it built the row WITHOUT its scope
+       offsets, silently: every migrated role row measured as the plain bloom. */
+    if (id === H.SCOPES_SET_ID) continue;
     if (!(id in DEFAULTS)) { st[id] = value; continue; }
     const d = DEFAULTS[id];
     st[id] = typeof d === 'number' ? Number(value) : typeof d === 'boolean' ? (value === true || value === 'true') : value;
   }
   return st;
 };
+const scopesFor = (row) => H.rowScopesForBuild(row);
 
 /* A ROW WHOSE SURFACE IS DECLARED TO PASS THROUGH ITSELF CANNOT BE HELD TO A
    SMOOTHNESS BAR, and that is not a carve-out for this change: two faces of a
@@ -652,7 +658,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       let acc, built;
       try {
         acc = new G.MeshBuilder({ exportMode, captureRim: true });
-        built = G.buildBloomInto(acc, st, { below: null, capability: row.capability || null });
+        built = G.buildBloomInto(acc, st, { below: null, capability: row.capability || null, scopes: scopesFor(row) });
       } catch (e) { check('E0', false, `${row.label} [${exportMode ? 'export' : 'live'}]: build threw — ${e.message}`); continue; }
       const mesh = meshOf(acc.positions);
       const rim = [], rimE2 = [];
@@ -1084,7 +1090,7 @@ async function control() {
     for (const [l, ok, what] of arm) {
       const row = rows.find((r) => r.label === l);
       const acc = new G0.MeshBuilder({ exportMode: true });
-      const b = G0.buildBloomInto(acc, stateFor(row), { below: null, capability: row.capability || null });
+      const b = G0.buildBloomInto(acc, stateFor(row), { below: null, capability: row.capability || null, scopes: scopesFor(row) });
       if (!b.petal || !ok(b.petal, b)) lost.push(`"${l.slice(0, 60)}" no longer has ${what}`);
     }
     if (lost.length) { console.error(`edge-profile control: a named control row stopped exercising its arm — ${lost.join('; ')}`); process.exit(1); }
