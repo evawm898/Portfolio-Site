@@ -67,18 +67,17 @@
          paid for checking only one direction: Advanced silently stopped
          showing 25 controls while every gate passed.
 
-     (f) ROLES ELIGIBILITY, COMBINED (Eva, Sep 2 amendment). Route (d) moves
-         one driver at a time off DEFAULTS; `slotRolesEligible` reads THREE
-         drivers at once (placement, layerCount, layerPhase), so a state that
-         moves two of them together — SPIRAL at layerCount 3, FAN at a
-         non-zero layerPhase — is never reached by route (d) at all. This
-         route drives those combined states through the real UI and checks
-         THREE-WAY agreement: the DOM wrapper's `hidden`, the registry
-         predicate, and bloom-geometry.js's OWN `slotRolesEligible(state)`
-         (exposed via `__bloomMetrics()`) — because a control that is visible
-         but whose role the geometry never applies is "showing where it
-         drives nothing" even when the DOM and the registry agree with each
-         other.
+     (f), (g) AND (h) ARE RETIRED WITH THE ROLE MACHINERY (Q3.4, the role-
+         retirement session). (f) drove the slot / per-petal / all-petals
+         eligibility through combined states; (g) read the rosette's hood
+         group's derived "Petal N" label back against the builder's hood slots;
+         (h) walked the depth transitions of the three role groups and their
+         hiddenReason caption. Every one of those groups is gone: their ids are
+         in RETIRED_IDS (route (n) asserts they never render), FAN petals are
+         per-pair SCOPES (route (ae)) and the ALL / INNER deltas are a global
+         and per-layer offsets. The three letters are not reused. Retiring
+         each was three edits: this entry, the block, and the negative
+         control's flag (sawLabel, sawDepth) and banner.
 
      (e) THE LOW-COUNT SPIRAL FLAG, BOTH DIRECTIONS. The flag is the entire
          handling of golden-angle placement below eight petals (there is no
@@ -343,16 +342,16 @@
          delicacy, Sepal size) stay the whole bloom's under a picked width; the
          build lands on the slider's own double (global 1.70, desired 0.90); a
          load and a Reset each end the pick before they write; a file saved
-         without the toggles onto a page with one live is told its roles do
-         not apply (and not when the toggle is off); a file with no
+         BEFORE THE ROLE RETIREMENT is migrated and told — its inner delta a
+         per-layer offset, its radial labellum dropped (Q3.4); a file with no
          `overrides` keeps the page's offsets. THE COUNT CHANGES UNDER A PICK:
          a stored outer pair is kept and inert at three a side and returns on
          its own pair at four. Eleven mutants under --negative-control, each by
          its own sentence: a pick stamps the panel onto the picked scope, an
          edit lands on every scope, deselect drops the offsets, whole-bloom
          read-outs read the picked scope, the offset is the twelve-digit cut
-         alone, a load / a reset does not end the pick, a pre-toggle file is
-         not told, a missing overrides list drops the page offsets (bloom.js),
+         alone, a load / a reset does not end the pick, a pre-retirement file
+         is migrated silently (bloom-file.js), a missing overrides list drops the page offsets (bloom.js),
          and a mirror pair is split, a member index is re-keyed
          (bloom-geometry.js). Three edits: this entry, the block, the negative
          control's flags and banner.
@@ -397,7 +396,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
-         SPIRAL_LEGIBLE_COUNT, MAX_FAN_GROUPS, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
+         SPIRAL_LEGIBLE_COUNT, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM } from './bloom-harness.mjs';
 import { sectionLabel } from '../bloom-registry.js';
 import { mirrorPartner } from '../bloom-geometry.js';
 
@@ -690,108 +689,11 @@ const WITNESS = {
      executable bloom source still references a retired id. A section that
      ships collapsed and is not in this table fails the path route by name,
      so a resurrected `center` section could not pass quietly either. */
-  /* PETAL ROLES — witnessed by the labellum's SIZE, and the witness needed NO
-     PRECONDITION, which is worth recording because session A predicted it
-     would. Session A reasoned that a "whorl differences" section would ship
-     with every control hidden at the default (its three `inner*` deltas need
-     layerCount >= 2), so the path route would have to set up its own
-     precondition first — and warned that a witness which must arrange its own
-     preconditions is a witness that can quietly measure nothing.
-
-     The layerPhase gating ruling changed that before it was built. Slot roles
-     apply at layerCount 1, so `slotRolesEligible` is TRUE at the shipping
-     default: this section RENDERS at first load with its eight slot controls
-     visible and session A's three hidden, and one of them moves geometry from
-     a clean page. Evaluated, not assumed — the declaration route asserts that
-     exact first-load state in both directions below.
-
-     THE WITNESS REACHES PAST THE CONTROL'S OWN VALUE, like `shape` and
-     `thickness` above: a labellum size multiplier splits the whorl into three
-     descriptors and changes the effective petalLength the BUILDER reports
-     using. Triangle count could not be the witness — a role override moves
-     vertices on a fixed-topology grid and costs exactly zero triangles, which
-     would have made this assertion a passing no-op. */
-  /* "PETAL ROLES" ITSELF NOW HOLDS ONLY SESSION A'S THREE LAYER DELTAS as
-     controls of its own (Eva's ruling A, Sep 3, moved the eight slot-role
-     sliders into the two rosette drop-downs below), and all three need a
-     second whorl — so this witness carries the precondition session A
-     predicted for exactly this section, and the anti-vacuity clause below
-     refuses to drive a control that is still hidden after it. The `before`
-     is read AFTER layerCount is 2, so the delta belongs to innerCup. */
-  /* SINCE EVA'S RULING OF SEP 3 "PETAL ROLES" HOLDS THE ALL-PETALS TRIO AT THE
-     SHIPPING DEPTH, so the section is witnessed by one of them with NO
-     precondition again (the innerCup-with-layerCount-2 witness this replaced
-     is kept in the git record); the delta must reach the one whorl's blade. */
-  roles: { id: 'allCurl', value: '180',
-           read: (m) => {
-             const a = m.petalRingApplied[0];
-             return `${m.rings.length}/${m.allPetalsEligible}/${a ? a.applied.petalSpineCurl : 'no descriptor'}`;
-           },
-           what: 'descriptor count / all-petals eligibility / the spine curl the builder used on the one whorl' },
-  /* THE ROSETTE'S TWO GROUPS — the labellum's witness is the one "roles"
-     carried until ruling A (no precondition: slot roles are eligible at the
-     shipping default), and the hood's is its twin read from the HOOD
-     descriptor, which exists only once the override splits the whorl. */
-  /* BOTH ROSETTE GROUPS NEED TWO WHORLS IN STEP NOW (Eva, Sep 3: the one-whorl
-     orchid is retired), so both carry that precondition and the anti-vacuity
-     clause refuses to drive a control still hidden after it. */
-  labellumGroup: { id: 'labellumSize', value: '1.6',
-           pre: [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }],
-           read: (m) => `${m.rings.length}/${m.slotRolesSplit}/${m.petalRingApplied[0] && m.petalRingApplied[0].applied.petalLength}`,
-           what: 'descriptor count / split / the labellum petalLength the builder used' },
-  hoodGroup: { id: 'hoodSize', value: '1.6',
-           pre: [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }],
-           read: (m) => {
-             const idx = m.rings.findIndex((r) => r.slotRole === 'HOOD');
-             const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalLength : 'no descriptor';
-             return `${m.rings.length}/${m.slotRolesSplit}/${idx}/${applied}`;
-           },
-           what: 'descriptor count / split / index and effective petalLength of the HOOD descriptor' },
-  /* ===================================================================
-     THE PER-PETAL SECTIONS — nine of them, and they are the case SESSION A
-     PREDICTED THIS GATE WOULD ONE DAY HAVE TO HANDLE and session B escaped.
-
-     Session A's note: "a witness that has to set up its own precondition
-     before it can move anything is a witness that can quietly measure
-     nothing", recorded when it expected a "Whorl differences" section to ship
-     with every control hidden. The `layerPhase` ruling spared session B — slot
-     roles apply at layerCount 1, so `roles` renders at first load. Per-petal
-     roles are FAN-only and the shipping placement is RADIAL, so these nine
-     sections ship BOTH collapsed and HIDDEN, and driving `petal3Cup` from a
-     clean page would move exactly nothing while reporting a pass.
-
-     SO THE PRECONDITION IS DECLARED AND THEN ASSERTED. `pre` is applied first,
-     through the same real-events path (never by clicking), and the gate then
-     requires the witness control to be VISIBLE before it is driven — which is
-     what stops the mechanism from becoming the very thing session A warned
-     about. The `before` metrics are read AFTER the precondition, so the delta
-     is attributable to the witness control and not to the placement change
-     that made it reachable.
-
-     8 PER SIDE WITH A MIRROR-LINE PETAL, because that is the only arrangement
-     in which ALL NINE groups have members — a witness for group 7 at the
-     default three per side would be driving a control for a group that does
-     not exist, which is the same vacuity one level down.
-
-     THE WITNESS REACHES PAST THE CONTROL'S OWN VALUE, like every other entry
-     here: triangle count is ZERO-delta for an override by construction, so
-     what moves is the descriptor count, the split flag, and the effective
-     petalCup THAT GROUP's petal was built with — read from the builder's own
-     record, which is the only thing that can see a value that never arrives. */
-  ...Object.fromEntries(Array.from({ length: MAX_FAN_GROUPS }, (_, i) => {
-    const k = i + 1;
-    return [`petal${k}`, {
-      id: `petal${k}Cup`, value: '0.6',
-      pre: [{ id: 'placement', value: 'FAN' }, { id: 'fanCenterPetal', value: 'ON' }, { id: 'fanPerSide', value: '8' }],
-      read: (m) => {
-        const idx = m.rings.findIndex((r) => r.petalRole === `PETAL_${k}`);
-        const applied = idx >= 0 && m.petalRingApplied[idx] ? m.petalRingApplied[idx].applied.petalCup : 'no descriptor';
-        return `${m.rings.length}/${m.slotRolesSplit}/${idx}/${applied}`;
-      },
-      what: `descriptor count / split / index and effective petalCup of group ${k}'s own petal`,
-    }];
-  })),
-
+  /* NO `roles`, `labellumGroup`, `hoodGroup` OR `petal1`..`petal9` ENTRY (the
+     role retirement, Q3.4): those sections are retired with their controls.
+     Their witnesses read the descriptor split and the role records, which no
+     longer exist; the per-pair scope's own witness is route (ae), which edits
+     a FAN pair through the picker and reads the builder's per-petal record. */
   thickness: { id: 'sheetThickness', value: '2.4',
               /* footRing()'s area rule reads the thickness the solids are
                  actually built at, so a thicker sheet moves the RING RADIUS —
@@ -816,9 +718,9 @@ ok.push(`registry: ${SECTIONS.length} sections, ${CONTROLS.length} controls, ${R
    A control set that is AUTHORED ONCE AND INSTANCED N TIMES cannot drift
    while it stays generated — but nothing said so, and nothing would notice if
    a tenth row were hand-written beside nine generated ones with a range that
-   was nearly the same. The per-petal groups are that shape today (four
-   descriptors, nine instances, 36 controls); the parametric tip's two tips
-   are that shape next (Eva's Q7, session 24 — seven descriptors, instanced
+   was nearly the same. The per-petal groups were that shape until the role
+   retirement (four descriptors, nine instances, 36 controls); the parametric
+   tip's two tips are that shape (Eva's Q7, session 24 — seven descriptors, instanced
    twice with an antherTip / stigmaTip prefix, "so the two tips cannot
    drift"). This clause is the guard THAT sentence needs, and it is added in
    session 3a rather than in 3b for one reason: today it has an instance to
@@ -836,8 +738,9 @@ ok.push(`registry: ${SECTIONS.length} sections, ${CONTROLS.length} controls, ${R
    a pattern list that silently matches nothing is this project's
    label-naming-a-computation-nobody-performed defect. */
 const INSTANCED_FAMILIES = [
-  { what: 'the per-petal groups (session 11, generated from MAX_FAN_GROUPS)',
-    id: /^petal(\d+)(Size|Tilt|Cup|Curl)$/, instances: MAX_FAN_GROUPS, perInstanceDefault: new Set() },
+  /* (the per-petal groups were this clause's first family; they are retired
+     with the role machinery, Q3.4, so the row is gone and the tip family is
+     the clause's oldest instance) */
   /* THE TIP'S SEVEN, INSTANCED TWICE (session 30 — Eva's Q7 landed). The
      partition is STATED HERE, not read from the registry's own table: the
      shared fields are every field but `default` on Lumps and Spread (a count
@@ -1418,12 +1321,8 @@ if (!shutBad.length && !shutDrift.length && stillShut === 0) {
     }
   }
   if (!missing.length && !leaked.length) {
-    const roles = seen.sections.find((x) => x.id === 'roles');
-    const rolesShown = CONTROLS.filter((c) => c.section === 'roles' && seen.shown.includes(c.id)).map((c) => c.id);
-    const rolesHidden = CONTROLS.filter((c) => c.section === 'roles' && !seen.shown.includes(c.id)).map((c) => c.id);
-    const kidsShown = seen.sections.filter((x) => SECTIONS.find((k) => k.id === x.id)?.parent === 'roles' && !x.hidden).map((x) => x.id);
     ok.push(`first load: ${seen.shown.length} of ${CONTROLS.length} controls visible, ${wantHidden.length} hidden, every section hidden iff empty of visible controls and child sections`);
-    ok.push(`first load: section "roles" is ${roles.hidden ? 'HIDDEN' : 'SHOWN'} and ${roles.open ? 'open' : 'collapsed'} — own controls visible: [${rolesShown.join(', ') || 'none'}]; hidden: [${rolesHidden.join(', ')}]; child drop-downs visible: [${kidsShown.join(', ') || 'none'}]`);
+    /* (the "Petal roles" first-load line went with the section, Q3.4) */
   }
 }
 
@@ -1648,317 +1547,10 @@ for (const [driverId, dependents] of drivers) {
   }
 }
 
-/* ---------------- (g) THE DERIVED SECTION LABEL — the rosette's hood group ----------------
-
-   THE FIRST SECTION WHOSE NAME MOVES (Eva's ruling A, Sep 3): the labellum is
-   "Petal 1" at every count, and the hood is "Petal N" where N is the LAST
-   orbit's number — 2 at three petals, 5 at eight, 21 at forty. The registry
-   derives that through `labelFrom(ui)`; the app rewrites the summary on every
-   rebuild. Two things are asserted, and the second is the one that matters:
-
-     1. THE DOM SAYS WHAT THE OWNER SAYS — the summary text equals
-        sectionLabel(section, state) at the state the row drove. This is the
-        reactivity half: a generator that wrote the label once and never
-        refreshed it passes at the default and fails here.
-     2. THE NUMBER IS THE ONE THE BUILDER USED — read from the EMITTED hood
-        descriptor's slot indices, never from the same function that wrote
-        the label. With `hoodSize` off identity the whorl splits and every
-        petal the builder built for the hood carries its slot index; its
-        orbit is `min(i, partner(i))`, its petal number is that plus one, and
-        all hood slots must agree on it. sectionLabel() and this check share
-        NOTHING but the state, so a label that hard-codes the wrong plane, or
-        a count that is not the count the geometry built, is a red row rather
-        than a matching pair of wrong answers. (The Z8 doctrine one level up:
-        numbering is read from what was emitted.)
-
-   THE ROWS are the control's minimum, the shipping default, an odd count
-   (whose hood is a PAIR — the read-out says so, and both slots must still
-   agree on one number) and the maximum. The default-count row reads the same
-   label before and after by construction, so it cannot see a frozen summary
-   and is there for statement 2 alone; the other three carry statement 1, and
-   the negative control is seen to fire on exactly those three. */
-{
-  const hoodSec = SECTIONS.find((x) => x.id === 'hoodGroup');
-  const pc = CONTROLS.find((c) => c.id === 'petalCount');
-  if (!hoodSec || typeof hoodSec.labelFrom !== 'function') note('[label] section "hoodGroup" no longer declares a derived labelFrom — the derived-label route has nothing to measure');
-  else for (const n of [pc.min, DEFAULTS.petalCount, 13, pc.max]) {
-    await openBloom(page, port);
-    const tag = `[label] hoodGroup at ${n} petals`;
-    const res = await page.evaluate(async ({ n, breakIt }) => {
-      const sum = document.querySelector('#sec-hoodGroup > summary');
-      const before = sum.textContent;
-      if (breakIt) {
-        /* NEGATIVE CONTROL, route (g): the label is written once at build and
-           never refreshed — which is exactly what a static-label generator
-           does, and what this route exists to see. */
-        Object.defineProperty(sum, 'textContent', { get: () => before, set: () => {}, configurable: true });
-      }
-      /* TWO WHORLS IN STEP FIRST (Eva, Sep 3) — the group is hidden at one
-         whorl, and a label nobody can see is not the label under test. */
-      for (const [id, value] of [['layerCount', '2'], ['layerPhase', '0'], ['petalCount', String(n)], ['hoodSize', '1.6']]) {
-        const el = document.getElementById(id);
-        el.value = value;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const m = window.__bloomMetrics();
-      return {
-        before, after: sum.textContent, state: window.__bloomUIState(),
-        hidden: document.getElementById('sec-hoodGroup').hidden,
-        slotCount: m.slotCount, mirror: m.mirror,
-        hoodSlots: (m.petalRingApplied || []).filter((p) => p && p.slotRole === 'HOOD').map((p) => p.slotIndex),
-      };
-    }, { n, breakIt: NEGATIVE_CONTROL });
-    if (Number(res.state.petalCount) !== n) { note(`${tag}: petalCount reads ${res.state.petalCount} after being driven`); continue; }
-    if (res.hidden) { note(`${tag}: the hood group is hidden at a rosette of ${n} — the row would be asserting the name of a section nobody can see`); continue; }
-    if (!res.hoodSlots.length) { note(`${tag}: no HOOD petal in the builder's record with hoodSize at 1.6 — the whorl did not split, so there is no emitted numbering to read`); continue; }
-    const want = sectionLabel(hoodSec, res.state);
-    const numbers = [...new Set(res.hoodSlots.map((i) => Math.min(i, mirrorPartner(i, res.slotCount, res.mirror)) + 1))];
-    const said = Number((/Petal (\d+)/.exec(res.after) || [])[1]);
-    const bad = [];
-    if (res.after !== want) bad.push(`summary reads "${res.after}", sectionLabel() says "${want}" (it read "${res.before}" before the count moved)`);
-    if (numbers.length !== 1) bad.push(`the builder's hood slots [${res.hoodSlots.join(', ')}] fall in ${numbers.length} orbits (${numbers.join(', ')}) — a group must be one orbit`);
-    else if (said !== numbers[0]) bad.push(`the label says petal ${said}, but the builder's hood slots [${res.hoodSlots.join(', ')}] of ${res.slotCount} (plane ${res.mirror}) are orbit ${numbers[0]}`);
-    if (bad.length) note(`${tag}: ${bad.join('; ')}`);
-    else ok.push(`${tag}: summary "${res.before}" -> "${res.after}", and the builder's hood slots [${res.hoodSlots.join(', ')}] of ${res.slotCount} are orbit ${numbers[0]} — the label's number is the emitted one`);
-  }
-}
-
-/* ---------------- (h) THE DEPTH TRANSITIONS, BOTH DIRECTIONS, AND THE CAPTION ----------------
-
-   EVA'S RULING OF SEP 3, PHOTOGRAPHED BY A GATE: "Petal roles" is the
-   adjust-petals-as-a-group section at every depth — the ALL-PETALS trio at
-   one whorl, the INNER trio above it — and Petal 1 / Petal N are hidden at
-   one whorl, reachable at two or more whorls with Layer offset 0, and in
-   between (two or more whorls, offset away from 0) the panel SAYS WHY THEY
-   ARE MISSING through the registry's hiddenReason caption.
-
-   ONE PAGE, REAL EVENTS, BOTH DIRECTIONS: one whorl -> two whorls (offset at
-   its default, away from 0) -> offset 0 -> back to one whorl. At every step
-   every wrapper is checked against its own predicate (the general property),
-   AND the ruling's own statements are asserted by name (the specific one) —
-   a route that only checked predicates would pass a registry that quietly
-   moved the trio to the wrong depth, because the DOM would agree with it.
-   The caption is asserted in both directions too: shown exactly at the
-   "behind the offset" step, its text the registry's own text(ui), and absent
-   at every other step — a caption stuck on is a lie in the panel. */
-{
-  const steps = [
-    { name: 'one whorl (the shipping default)', set: [],
-      want: { all: true, inner: false, slot: false, caption: false } },
-    { name: 'two whorls, Layer offset at its default (away from 0)', set: [['layerCount', '2']],
-      want: { all: false, inner: true, slot: false, caption: true } },
-    { name: 'two whorls in step (Layer offset 0)', set: [['layerPhase', '0']],
-      want: { all: false, inner: true, slot: true, caption: false } },
-    { name: 'three whorls, still in step', set: [['layerCount', '3']],
-      want: { all: false, inner: true, slot: true, caption: false } },
-    { name: 'offset away from 0 again at three whorls', set: [['layerPhase', '0.25']],
-      want: { all: false, inner: true, slot: false, caption: true } },
-    { name: 'back to one whorl (offset still 0.25 — must not matter)', set: [['layerCount', '1']],
-      want: { all: true, inner: false, slot: false, caption: false } },
-  ];
-  const groups = {
-    all: ['allCurl', 'allCup'],
-    inner: ['innerCurl', 'innerCup'],
-    slot: ['labellumSize', 'labellumTilt', 'labellumCup', 'labellumCurl', 'hoodSize', 'hoodTilt', 'hoodCup'],
-  };
-  const captions = captionsOf('roles');
-  if (captions.length !== 1) note(`[depth] expected exactly one hiddenReason caption under "roles", the registry declares ${captions.length}`);
-  await openBloom(page, port);
-  const frozen = await page.evaluate((breakIt) => {
-    const el = document.querySelector('#sec-roles > .bl-why');
-    if (!el) return 'no caption element';
-    if (breakIt) {
-      /* NEGATIVE CONTROL, route (h): the caption's `hidden` stops moving —
-         the panel keeps or loses its explanation regardless of state. */
-      const v = el.hidden;
-      Object.defineProperty(el, 'hidden', { get: () => v, set: () => {}, configurable: true });
-    }
-    return null;
-  }, NEGATIVE_CONTROL);
-  if (frozen) note(`[depth] ${frozen} — the hiddenReason caption is not rendered inside "Petal roles"`);
-  for (const step of steps) {
-    const res = await page.evaluate(async ({ set }) => {
-      for (const [id, value] of set) {
-        const el = document.getElementById(id);
-        el.value = value;
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const seen = {};
-      for (const w of document.querySelectorAll('.bl-ctrl')) {
-        const input = w.querySelector('input, select, .bl-curve');
-        if (input) seen[input.id] = w.hidden;
-      }
-      const cap = document.querySelector('#sec-roles > .bl-why');
-      const secs = {};
-      for (const d of document.querySelectorAll('#panelControls details')) secs[d.dataset.section] = d.hidden;
-      return { state: window.__bloomUIState(), seen, secs, caption: cap ? { hidden: cap.hidden, text: cap.textContent, why: cap.dataset.why } : null, m: (() => { const x = window.__bloomMetrics(); return { slot: x.slotRolesEligible, all: x.allPetalsEligible, layers: x.layerCount }; })() };
-    }, { set: step.set });
-    const tag = `[depth] ${step.name}`;
-    const bad = [];
-    for (const c of CONTROLS) {
-      const want = !evalPredicate(c.visibleWhen, res.state);
-      if (res.seen[c.id] !== want) bad.push(`"${c.id}" hidden=${res.seen[c.id]}, its predicate says ${want}`);
-    }
-    for (const [axis, ids] of Object.entries(groups)) {
-      const shown = ids.filter((id) => res.seen[id] === false);
-      const wantShown = step.want[axis];
-      if (wantShown && shown.length !== ids.length) bad.push(`${axis} trio: ${shown.length} of ${ids.length} visible, the ruling says all`);
-      if (!wantShown && shown.length) bad.push(`${axis}: ${shown.join(', ')} visible, the ruling says none`);
-    }
-    if (res.secs.labellumGroup !== !step.want.slot || res.secs.hoodGroup !== !step.want.slot) bad.push(`Petal 1 / Petal N drop-downs hidden=${res.secs.labellumGroup}/${res.secs.hoodGroup}, the ruling says ${step.want.slot ? 'shown' : 'hidden'}`);
-    if (Boolean(res.m.slot) !== step.want.slot) bad.push(`the geometry says slot roles ${res.m.slot ? '' : 'not '}eligible, the ruling says ${step.want.slot}`);
-    if (Boolean(res.m.all) !== step.want.all) bad.push(`the geometry says the all-petals group ${res.m.all ? '' : 'not '}eligible, the ruling says ${step.want.all}`);
-    if (!res.caption) bad.push('no caption element under "Petal roles"');
-    else {
-      if (res.caption.hidden !== !step.want.caption) bad.push(`the hiddenReason caption is ${res.caption.hidden ? 'HIDDEN' : 'SHOWN'}, the ruling says ${step.want.caption ? 'shown' : 'hidden'}`);
-      if (!res.caption.hidden) {
-        const wantText = captions[0] ? captions[0].reason.text(res.state) : '';
-        if (res.caption.text !== wantText) bad.push(`caption reads "${res.caption.text}", the registry's text(ui) says "${wantText}"`);
-        if (!/Petal 1 and Petal \d+/.test(res.caption.text)) bad.push(`caption "${res.caption.text}" does not name the two drop-downs it stands for`);
-      }
-      const wantWhy = captions[0] ? captions[0].sections.join(' ') : '';
-      if (res.caption.why !== wantWhy) bad.push(`caption stands for [${res.caption.why}], the registry says [${wantWhy}]`);
-    }
-    if (bad.length) note(`${tag}: ${bad.join('; ')}`);
-    else ok.push(`${tag}: all-petals ${step.want.all ? 'shown' : 'hidden'}, Inner ${step.want.inner ? 'shown' : 'hidden'}, Petal 1 / Petal N ${step.want.slot ? 'shown' : 'hidden'}, caption ${step.want.caption ? `SHOWN — "${res.caption.text}"` : 'hidden'}; every wrapper agrees with its predicate`);
-  }
-}
-
-/* ---------------- (f) ROLES ELIGIBILITY, COMBINED — Eva's Sep 2 amendment ---------------- */
-/* THE GAP ROUTE (d) LEAVES, stated so it is not re-discovered as a mystery.
-   Route (d) drives ONE driver away from DEFAULTS at a time — `placement` to
-   RADIAL/SPIRAL/CONTINUOUS/FAN with `layerCount`/`layerPhase` left at their
-   OWN defaults (1 / 0), and `layerCount`/`layerPhase` likewise with
-   `placement` left at RADIAL. `slotRolesEligible` reads all three AT ONCE
-   (RADIAL needs layerCount 1 OR layerPhase 0; FAN is unconditional; SPIRAL
-   and CONTINUOUS are always false), so a state that moves TWO of them off
-   DEFAULTS together — SPIRAL with layerCount 3, FAN with layerPhase away
-   from 0 — is never reached by route (d) at all. That is exactly the shape
-   of gap Eva's amendment asked to close: "verify which placements actually
-   show the section today... if it shows where the zygomorphy sessions ruled
-   it hidden, that's a defect to report."
-
-   THREE-WAY AGREEMENT, not two. Each row checks the DOM wrapper's `hidden`
-   against the REGISTRY predicate (the same thing route (d) checks) AND
-   against bloom-geometry.js's OWN `slotRolesEligible(state)` — exposed as
-   `__bloomMetrics().slotRolesEligible` — because a control that is VISIBLE
-   but whose role the geometry never applies is "hide it exactly where it
-   drives nothing" (Eva's words) even if the registry predicate and the DOM
-   happen to agree with EACH OTHER. Both files keep their own copy of this
-   condition (bloom-geometry.js imports nothing, so it cannot import the
-   registry's), and the existing Z5 assertion already checks the two agree
-   on every buildMatrix() row — this route checks it on COMBINED states that
-   row set does not happen to cover. */
-/* EACH COMBO NOW DECLARES BOTH POSITION AXES (session 11), because the thing
-   that has to hold is a statement about the PAIR: per-petal SUPERSEDES slot
-   roles on the fan (Eva's ruling 4, Sep 3), so exactly one axis is eligible at
-   any state and neither is eligible where the placement has no plane. Checking
-   only `slotRolesEligible` — which is what this route did — would have gone on
-   asserting one half of a relation whose other half is the whole ruling.
-
-   THE FAN ROWS FLIPPED, AND THAT IS THE RULING RATHER THAN A REGRESSION. They
-   said `slot: true` because session 10 composed the labellum onto the fan;
-   CI failed them on the first run of this branch with DOM, registry AND
-   GEOMETRY all agreeing on `false` and only this table disagreeing — a stale
-   expectation, which is the same shape as the nine matrix rows whose claim
-   this ruling inverted. */
-const ROLES_COMBOS = [
-  // RADIAL: layerCount 1 shows regardless of layerPhase (the "nothing above
-  // the outermost whorl to fall out of step" arm) — a stale/non-zero
-  // layerPhase must not leak through. Per-petal is never eligible here.
-  // RADIAL at ONE WHORL: the one-whorl orchid is retired (Eva, Sep 3) — slot
-  // roles NOWHERE at depth 1, phase 0 included, and the ALL-PETALS group is
-  // the group there.
-  ['RADIAL', 1, 0, { slot: false, perPetal: false, all: true }], ['RADIAL', 1, 1, { slot: false, perPetal: false, all: true }],
-  // RADIAL: layerCount >= 2 needs layerPhase exactly 0; the all-petals group
-  // is never eligible above one whorl.
-  ['RADIAL', 2, 0, { slot: true, perPetal: false, all: false }],
-  ['RADIAL', 3, 0, { slot: true, perPetal: false, all: false }],
-  ['RADIAL', 3, 0.5, { slot: false, perPetal: false, all: false }],
-  ['RADIAL', 2, 1, { slot: false, perPetal: false, all: false }],
-  // SPIRAL: NEITHER position axis, INCLUDING away from the layerCount/layerPhase
-  // defaults — route (d) only ever tried SPIRAL at layerCount 1, layerPhase 0.
-  ['SPIRAL', 1, 0, { slot: false, perPetal: false, all: true }], ['SPIRAL', 3, 0, { slot: false, perPetal: false, all: false }],
-  // CONTINUOUS: same claim, same reason; one turn is one whorl.
-  ['CONTINUOUS', 1, 1, { slot: false, perPetal: false, all: true }], ['CONTINUOUS', 3, 0, { slot: false, perPetal: false, all: false }],
-  // FAN: PER-PETAL at every depth, unconditionally, and slot roles NOWHERE.
-  // At one whorl the all-petals group COMPOSES with per-petal ("the group,
-  // then the petal") — the one state where two axes are both eligible, by
-  // design. `layerPhase` is hidden and irrelevant under FAN, but its stale
-  // DOM value must not leak into any answer — which is why these rows carry
-  // awkward depths and phases rather than the defaults.
-  ['FAN', 1, 1, { slot: false, perPetal: true, all: true }], ['FAN', 3, 0.5, { slot: false, perPetal: true, all: false }],
-  ['FAN', 1, 0, { slot: false, perPetal: true, all: true }],
-  // THE SCOPE TOGGLES (Scoping-b): a LIVE toggle owns every petal, so all
-  // three role axes are hidden AND inert ("one owner on screen"); a toggle
-  // under the wrong placement is not live and the row reads exactly as
-  // today's — per-layer is RADIAL only, per-petal FAN only.
-  ['RADIAL', 1, 0, { slot: false, perPetal: false, all: false }, { scopeLayers: 'ON' }],
-  ['RADIAL', 2, 0, { slot: false, perPetal: false, all: false }, { scopeLayers: 'ON' }],
-  ['RADIAL', 2, 0, { slot: true, perPetal: false, all: false }, { scopePetals: 'ON' }],
-  ['FAN', 1, 0, { slot: false, perPetal: false, all: false }, { scopePetals: 'ON' }],
-  ['FAN', 3, 0.5, { slot: false, perPetal: false, all: false }, { scopePetals: 'ON' }],
-  ['FAN', 1, 0, { slot: false, perPetal: true, all: true }, { scopeLayers: 'ON' }],
-  ['SPIRAL', 1, 0, { slot: false, perPetal: false, all: true }, { scopeLayers: 'ON', scopePetals: 'ON' }],
-];
-for (const [placement, layerCount, layerPhase, want, toggles = {}] of ROLES_COMBOS) {
-  await openBloom(page, port);
-  const set = [{ id: 'placement', value: placement }, { id: 'layerCount', value: String(layerCount) }, { id: 'layerPhase', value: String(layerPhase) },
-    ...Object.entries(toggles).map(([id, value]) => ({ id, value }))];
-  const bad = await applyConfig(page, set);
-  /* the toggle that is LIVE here, restated from the ruling (per-layer RADIAL
-     only, per-petal FAN only) rather than read off either module */
-  const toggleLive = (placement === 'RADIAL' && toggles.scopeLayers === 'ON') || (placement === 'FAN' && toggles.scopePetals === 'ON');
-  const tag = `[roles combined] ${placement} layerCount=${layerCount} layerPhase=${layerPhase}${Object.keys(toggles).length ? ` ${Object.entries(toggles).map(([k, v]) => `${k}=${v}`).join(' ')}` : ''}`;
-  if (bad.length) { note(`${tag}: read-back failed: ${bad.join('; ')}`); continue; }
-  const res = await page.evaluate(() => {
-    const wrapOf = (id) => { const el = document.getElementById(id); return el ? el.closest('.bl-ctrl').hidden : null; };
-    const m = window.__bloomMetrics();
-    return {
-      slotHidden: wrapOf('labellumSize'), perPetalHidden: wrapOf('petal1Size'), allHidden: wrapOf('allCurl'),
-      geomSlot: m.slotRolesEligible, geomPerPetal: m.perPetalEligible, geomAll: m.allPetalsEligible,
-      state: window.__bloomUIState(),
-    };
-  });
-  if (res.slotHidden === null) { note(`${tag}: #labellumSize wrapper missing from the DOM`); continue; }
-  if (res.perPetalHidden === null) { note(`${tag}: #petal1Size wrapper missing from the DOM`); continue; }
-  if (res.allHidden === null) { note(`${tag}: #allCurl wrapper missing from the DOM`); continue; }
-  const bad2 = [];
-  /* THE THREE STATEMENTS OF ONE BOUNDARY, per axis: the DOM (what a visitor
-     can reach), the registry predicate (what is declared), and the geometry's
-     own eligibility (what can move a vertex). Three, because two agreeing
-     tells you nothing about which is right. */
-  for (const [axis, ref, domHidden, geom, expect] of [
-    ['slot roles', 'slotRolesEligible', res.slotHidden, res.geomSlot, want.slot],
-    ['per-petal', 'perPetalEligible', res.perPetalHidden, res.geomPerPetal, want.perPetal],
-    ['all-petals', 'allPetalsEligible', res.allHidden, res.geomAll, want.all],
-  ]) {
-    const reg = evalPredicate({ ref }, res.state);
-    if (domHidden !== !expect) bad2.push(`${axis}: DOM hidden=${domHidden}, expected ${!expect}`);
-    if (reg !== expect) bad2.push(`${axis}: registry predicate says eligible=${reg}, expected ${expect}`);
-    if (Boolean(geom) !== expect) bad2.push(`${axis}: the geometry's own eligibility says ${Boolean(geom)}, expected ${expect}`);
-  }
-  /* AND THE SUPERSESSION ITSELF, as a property of the pair rather than of
-     either row: never both, which is what makes "one per-position axis" a
-     measurement instead of a sentence in a charter. */
-  if (res.geomSlot && res.geomPerPetal) {
-    bad2.push('BOTH position axes report eligible — per-petal supersedes slot roles on the fan, so a bloom has at most one');
-  }
-  /* AND THE DEPTH RULE (Eva, Sep 3): slot roles need two or more whorls in
-     step, the all-petals group is the one-whorl group — never both. */
-  if (res.geomSlot && res.geomAll) {
-    bad2.push('slot roles AND the all-petals group report eligible — slot roles need two or more whorls and the all-petals group is the one-whorl group');
-  }
-  if (Boolean(res.geomAll) !== (layerCount === 1 && !toggleLive)) {
-    bad2.push(`the all-petals group reports ${res.geomAll ? '' : 'not '}eligible at ${layerCount} whorl(s)${toggleLive ? ' under a live scope toggle' : ''} — it is the one-whorl group and no other depth's, and no group at all while a toggle owns the petals`);
-  }
-  if (bad2.length) note(`${tag}: ${bad2.join('; ')}`);
-  else ok.push(`${tag}: DOM/registry/geometry agree on all three axes — slot=${want.slot}, per-petal=${want.perPetal}, all-petals=${want.all}`);
-}
+/* ---------------- (f), (g), (h) ARE RETIRED (the role retirement, Q3.4) ----------------
+   See the header. The derived-label machinery (`labelFrom`, `sectionLabel`) is
+   kept — it is the registry's, not the roles' — and has no user today; a
+   section that declares one again owes a route here. */
 
 /* ---------------- (e) the LOW-COUNT SPIRAL FLAG, both directions ---------- */
 /* The flag is the ENTIRE handling of golden-angle placement below eight
@@ -3837,20 +3429,23 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (rs.bound !== null) p.push(`Reset left a scope bound: ${JSON.stringify(rs.bound)}`);
     if (rs.ui.petalLength !== DEFAULTS.petalLength) p.push(`after Reset under a picked layer the length reads ${rs.ui.petalLength}, not the default ${DEFAULTS.petalLength}`);
     if (rs.rec !== 'null') p.push(`after Reset the record is ${rs.rec}`);
-    /* 5. a file saved WITHOUT the toggles onto a page with per-layer ON is TOLD its roles do not apply; onto a page with it OFF, not */
-    bad = await applyConfig(pg, [{ id: 'layerCount', value: '3' }, { id: 'scopeLayers', value: 'ON' }]);
+    /* 5. a file saved BEFORE THE ROLE RETIREMENT (Q3.4) — no toggles, an INNER
+       curl delta and a RADIAL labellum, two whorls in step — is MIGRATED AND
+       TOLD: the inner delta becomes one per-layer offset (scopeLayers ON) and
+       the labellum is DROPPED by ruling, each named in the status, never
+       silent. */
+    bad = await applyConfig(pg, [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }, { id: 'scopeLayers', value: 'OFF' }]);
     if (bad.length) p.push(`the re-config did not take: ${bad.join('; ')}`);
     const old = JSON.parse(await pg.evaluate(() => window.__bloomDesign.save()));
-    delete old.controls.scopeLayers; delete old.controls.scopePetals; old.controls.innerCurl = 90;
-    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'pre-toggle.json'), JSON.stringify(old));
+    delete old.controls.scopeLayers; delete old.controls.scopePetals; old.controls['innerCurl'] = 90; old.controls['labellumSize'] = 1.6;
+    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'pre-retirement.json'), JSON.stringify(old));
     await settle(pg);
     const told = await snap(pg);
-    if (!(told.design && told.design.notes.some((n) => n.kind === 'not-applied' && /saved without "Per-layer values"/.test(n.text)))) p.push(`a pre-toggle file onto a page with per-layer ON is not told its roles do not apply: ${JSON.stringify(told.design && told.design.notes.map((n) => n.text))}`);
-    await applyConfig(pg, [{ id: 'scopeLayers', value: 'OFF' }]);
-    await pg.evaluate((t2) => window.__bloomDesign.load(t2, 'pre-toggle.json'), JSON.stringify(old));
-    await settle(pg);
-    const quiet = await snap(pg);
-    if (quiet.design && quiet.design.notes.some((n) => /saved without "Per-layer values"/.test(n.text))) p.push('a pre-toggle file onto a page with per-layer OFF was told its roles do not apply — they do');
+    const notesOf = (d) => (d && d.notes) || [];
+    if (!notesOf(told.design).some((n) => n.kind === 'migrated' && /innerCurl/.test(n.text))) p.push(`a pre-retirement file's inner delta is not told as migrated: ${JSON.stringify(notesOf(told.design).map((n) => `[${n.kind}] ${n.text}`))}`);
+    if (!notesOf(told.design).some((n) => n.kind === 'retired' && /labellumSize/.test(n.text))) p.push(`a pre-retirement file's RADIAL labellum is not told as dropped: ${JSON.stringify(notesOf(told.design).map((n) => `[${n.kind}] ${n.text}`))}`);
+    const recT = JSON.parse(told.rec || 'null');
+    if (told.ui.scopeLayers !== 'ON' || !recT || !(recT.layers || []).some((e) => e.layer === 1 && e.offsets && e.offsets.petalSpineCurl === 90)) p.push(`a pre-retirement file's inner delta did not land as a per-layer offset with per-layer ON: scopeLayers ${told.ui.scopeLayers}, record ${told.rec}`);
     /* 6. a file with no `overrides` keeps the page's offsets (rule 3) */
     await applyConfig(pg, [{ id: 'scopeLayers', value: 'ON' }]);
     await pick(pg, { kind: 'layer', layer: 1, slot: 0 });
@@ -3865,7 +3460,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (keep.rec === 'null') p.push('the offset to keep was never written');
     if (kept.rec !== keep.rec) p.push(`a file with no "overrides" replaced the page's offsets: ${keep.rec} -> ${kept.rec}`);
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: under a picked layer Foot delicacy and Sepal size keep the whole bloom's read-outs; the build lands on the slider's own 0.9 (global 1.70); a load and a Reset each end the pick before writing; a pre-toggle file onto per-layer ON is told its roles do not apply (and not when OFF); a file with no "overrides" keeps the page's offsets`);
+    else ok.push(`${tag} ${label}: under a picked layer Foot delicacy and Sepal size keep the whole bloom's read-outs; the build lands on the slider's own 0.9 (global 1.70); a load and a Reset each end the pick before writing; a pre-retirement file is migrated and told (the inner delta a per-layer offset, the radial labellum dropped); a file with no "overrides" keeps the page's offsets`);
   };
 
   /* THE COUNT CHANGES UNDER A PICK (the review's fold): FAN, four a side, the
@@ -3955,6 +3550,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   if (NEGATIVE_CONTROL) {
     const jsSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
     const geoSrc = fs.readFileSync(new URL('../bloom-geometry.js', import.meta.url), 'utf8');
+    const fileSrc = fs.readFileSync(new URL('../bloom-file.js', import.meta.url), 'utf8');
     const MUTANTS = [
       { name: 'a pick stamps the panel onto the picked scope', file: 'bloom.js', src: jsSrc, run: runLayers,
         from: '  const next = canonicalScope(sel, ui);\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  relabelView();',
@@ -3981,9 +3577,9 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       { name: 'a reset does not end the pick', file: 'bloom.js', src: jsSrc, run: runLifecycle,
         from: '     was reachable only through a file or a hook and Reset never touched it. */\n  selectScope(null);\n  scopes = null;',
         to: '     was reachable only through a file or a hook and Reset never touched it. */\n  scopes = null;' },
-      { name: 'a pre-toggle file is not told', file: 'bloom.js', src: jsSrc, run: runLifecycle,
-        from: "    if (live && notes.some((x) => x.kind === 'missing'",
-        to: "    if (false && live && notes.some((x) => x.kind === 'missing'" },
+      { name: 'a pre-retirement file is migrated silently', file: 'bloom-file.js', src: fileSrc, run: runLifecycle,
+        from: "  for (const n of m.notes) notes.push(note(kindOf[n.kind] || 'retired', n.id ? `controls.${n.id}: ${n.text}` : `controls: ${n.text}`));",
+        to: "  void kindOf;" },
       { name: 'a missing overrides list drops the page offsets', file: 'bloom.js', src: jsSrc, run: runLifecycle,
         from: "  for (const k of ['layers', 'petals', 'tiers']) next[k] = missing.includes(k) ?",
         to: "  for (const k of ['layers', 'petals', 'tiers']) next[k] = false ?" },
@@ -4271,8 +3867,6 @@ if (NEGATIVE_CONTROL) {
     const sawPath = fail.some((f) => /did not change|did not move|state snapshot says/.test(f));
     const sawAccordion = fail.some((f) => /^accordion A[23]:/.test(f));
     const sawVisibility = fail.some((f) => /^\[visibility\]/.test(f));
-    const sawLabel = fail.some((f) => /^\[label\] .* summary reads/.test(f));
-    const sawDepth = fail.some((f) => /^\[depth\] .*hiddenReason caption is/.test(f));
     const sawPreview = fail.some((f) => /^\[preview\]: .*did not rebuild/.test(f));
     const sawInner = fail.some((f) => /^\[inner rings\] .*line is ABSENT while the owner reports a ring under the floor/.test(f));
     const sawDome = fail.some((f) => /^\[dome\] .*HEAD RISE line is ABSENT while the owner declares a dome/.test(f));
@@ -4346,7 +3940,7 @@ if (NEGATIVE_CONTROL) {
        default OFF and the bar drops the pick — but only after the controls'
        events have landed as offsets on it, so what fires is the stray offset */
     const sawScopeReset = fail.some((f) => /^\[scope selection\] MUTANT \(a reset does not end the pick\).*(Reset left a scope bound|after Reset the record is|after Reset under a picked layer the length reads)/.test(f));
-    const sawScopeTold = fail.some((f) => /^\[scope selection\] MUTANT \(a pre-toggle file is not told\).*is not told its roles do not apply/.test(f));
+    const sawScopeTold = fail.some((f) => /^\[scope selection\] MUTANT \(a pre-retirement file is migrated silently\).*is not told as (migrated|dropped)/.test(f));
     const sawScopeKeep = fail.some((f) => /^\[scope selection\] MUTANT \(a missing overrides list drops the page offsets\).*replaced the page's offsets/.test(f));
     const sawScopeFold = fail.some((f) => /^\[scope selection\] MUTANT \(a member index is re-keyed\).*folded onto another pair/.test(f));
     /* ROUTE (af), THE CURVE EDITOR — one flag per mutant, each on the sentence written for it */
@@ -4356,16 +3950,16 @@ if (NEGATIVE_CONTROL) {
     const sawCurveWindow = fail.some((f) => /^\[curve editor\] MUTANT \(the double press is a wall-clock window\).*rather than the browser's click count/.test(f));
     const sawCurveUnits = fail.some((f) => /^\[curve editor\] MUTANT \(points are stored in absolute units\).*not written in fractions of it/.test(f));
     const sawCurveFile = fail.some((f) => /^\[curve editor\] MUTANT \(the design file drops the curve\).*the design file did not carry the curve/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-toggle file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-THREE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 

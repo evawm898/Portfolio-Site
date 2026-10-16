@@ -308,7 +308,8 @@ export function buildGridGltf(built, { mode, state, generator = 'bloom-grid-gltf
         petalIndex: pi,
         slotIndex: p.slotIndex,
         azimuthDeg: round((p.azimuth * 180) / Math.PI, 4),
-        role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole,
+        /* (the petal's role, slot role, group and ALL stamps went with the
+           role table, Q3.4 — a scoped petal's offsets are the design file's) */
         panels: panelMeta,
         footRowsDropped: FOOT_ROWS_DROPPED,
         /* THE CROSS-WIDTH METRIC — the reason a consumer cannot space lines

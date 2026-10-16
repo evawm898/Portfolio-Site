@@ -94,7 +94,11 @@ async function cell({ label, set = [], note = '', expectFan = true }) {
      every fan cell while every cell still rendered: a line drawn at a fixed
      place with nothing checking it, which is the defect this block exists to
      prevent, reintroduced by a predicate moving two files away. */
-  if ((m.slotRolesEligible || m.perPetalEligible) && Array.isArray(m.slotAzimuths) && m.slotAzimuths.length) {
+  /* (Since the role retirement, Q3.4, neither predicate exists: the builder
+     reports `slotAzimuths` on every build, so the measurement runs on every
+     cell rather than on the ones a role happened to split.) */
+  if (Array.isArray(m.slotAzimuths) && m.slotAzimuths.length) {
+
     const row = m.slotAzimuths[0];
     const n = row.length;
     /* THE PLANE FROM THE MIRROR PAIRS, which is the same property Z4b
@@ -131,10 +135,10 @@ async function cell({ label, set = [], note = '', expectFan = true }) {
   /* WHICHEVER POSITION AXIS SPLIT THE WHORL (session 11) — slot roles under
      RADIAL, per-petal under FAN. Reading only `slotRole` would have printed
      "no slot roles engaged" under every differentiated fan on this sheet. */
-  const posRole = (r) => (r.slotRole !== null ? r.slotRole.toLowerCase() : (r.petalRole ? r.petalRole.replace('PETAL_', 'petal ') : null));
-  const roleLine = m.rings.filter((r) => posRole(r) !== null)
-    .filter((r, i, a) => a.findIndex((x) => posRole(x) === posRole(r)) === i)
-    .map((r) => `${posRole(r)} ${r.slots.length === 1 ? `slot ${r.slots[0]}` : `slots ${r.slots.join('+')}`}`).join(' · ');
+  /* Since the role retirement (Q3.4) a differentiated fan is a PER-PETAL
+     SCOPE: the line names each scoped pair the builder attached a term to. */
+  const roleLine = [...new Set((m.petalRingApplied || []).filter((x) => x && x.scope)
+    .map((x) => `pair ${x.scope.key.slot} on layer ${x.scope.key.layer + 1}`))].join(' · ');
 
   /* ===================================================================
      FRAMING, AND IT IS ASSERTED FROM THE PIXELS RATHER THAN TRUSTED.
@@ -214,7 +218,7 @@ const FAN = { placement: 'FAN' };
    `petalTipBreadth` (session 32) rather than superseded, because the per-petal set ships
    without a tip-breadth row (Eva's ruling 2) — the one capability the
    supersession costs the fan, stated here as an absence a reader can see. */
-const P1 = { petal1Size: '1.6', petal1Tilt: '-25', petal1Cup: '0.5', petal1Curl: '-60' };
+const P1 = { 'petal1Size': '1.6', 'petal1Tilt': '-25', 'petal1Cup': '0.5', 'petal1Curl': '-60' };
 
 const cells = [];
 cells.push(await cell({ label: 'CONTROL — a radial bloom, unmoved', set: [], expectFan: false,

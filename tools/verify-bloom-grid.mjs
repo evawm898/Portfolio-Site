@@ -220,7 +220,11 @@ const ROWS = [
   { label: 'SPIRAL', state: { placement: 'SPIRAL' } },
   { label: 'FAN', state: { placement: 'FAN' } },
   { label: '3 layers', state: { layerCount: 3 } },
-  { label: '3 layers + zygomorphy', state: { layerCount: 3, innerCup: 0.5, innerCurl: 60 } },
+  /* (was `innerCup 0.5, innerCurl 60` — the INNER deltas retired into
+     per-layer offsets at the role retirement, Q3.4; this is that design as it
+     now loads, so the row still sees whorls whose cross-sections differ) */
+  { label: '3 layers + per-layer values (the zygomorphy, migrated)', state: { layerCount: 3, scopeLayers: 'ON' },
+    scopes: { layers: [1, 2].map((layer) => ({ layer, offsets: { petalCup: 0.5, petalSpineCurl: 60 } })), petals: [], tiers: [], bounds: { petalCup: { min: -0.8, max: 1.2 }, petalSpineCurl: { min: -180, max: 360 } } } },
   { label: 'layerSize 0.90 x 6', state: { layerCount: 6, layerSize: 0.90 } },
 ];
 
@@ -503,9 +507,10 @@ async function run(geomUrl, gltfUrl, registryUrl) {
 
     /* ---- clause 1: the capture moves no byte ---- */
     const accOff = new MeshBuilder({ exportMode });
-    buildBloomInto(accOff, state);
+    const opts = row.scopes ? { scopes: row.scopes } : undefined;
+    buildBloomInto(accOff, state, opts);
     const accOn = new MeshBuilder({ exportMode, captureGrid: true });
-    const built = buildBloomInto(accOn, state);
+    const built = buildBloomInto(accOn, state, opts);
 
     let moved = -1;
     if (accOff.positions.length !== accOn.positions.length) {

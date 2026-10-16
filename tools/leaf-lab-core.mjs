@@ -987,7 +987,7 @@ export function gridBuilt(leaves) {
     const sp = lf.leaf.map;
     const rows = Array.from({ length: 21 }, (_, k) => sp.frame((lf.leaf.lengthMm * k) / 20).S);
     return {
-      grid: panels, footRows: 1, slotIndex: i, azimuth: 0, role: 'leaf', slotRole: null, petalRole: null, allRole: null,
+      grid: panels, footRows: 1, slotIndex: i, azimuth: 0, role: 'leaf',
       attachment: { point: [0, 0, 0], dir: [1, 0, 0], normal: [0, 0, 1], tangent: [0, 1, 0], footNormal: [0, 0, 1], tiltRad: 0, azimuth: 0, ringRadius: 0, ringZ: 0 },
       form: null,
       spine: { length: lf.leaf.lengthMm, tiltRad: 0, turnAskedDeg: 0, turnBuiltDeg: 0, clamped: false, rows },

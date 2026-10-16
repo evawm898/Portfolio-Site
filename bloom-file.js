@@ -79,8 +79,8 @@
 // `curves` container is still WRITTEN EMPTY and its entries still told "not
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
-import { CONTROLS, RETIRED_IDS } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, ROLE_OVERRIDES, SCOPE_TIER_WHORL_LEVEL_IDS } from './bloom-geometry.js';
+import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
+import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
@@ -112,8 +112,18 @@ import { readCurveValue, cloneCurve } from './bloom-curve.js';
 // `scopesForBuild(overrides)` is the ONE place the file's containers become the
 // geometry's `scopes` argument: the three lists plus `bounds`, the REGISTRY's
 // own min/max for every scopeable control, handed down because the geometry
-// cannot import the registry and must clamp a base the role table does not
-// reach (rule 2 again: one owner of a range, read at the moment of building).
+// cannot import the registry (rule 2 again: one owner of a range, read at the
+// moment of building).
+//
+// A FILE SAVED BEFORE THE ROLE RETIREMENT (Q3.4) names the forty-seven retired
+// petal-role controls (every v1 file wrote every control). They are read aside
+// and handed, with the file's own controls, to the registry's ONE migration
+// (`migrateRoles`): an ALL delta folds into the global, INNER and the per-petal
+// groups become scope entries APPENDED to `overrides` with the toggle that lets
+// them reach a petal, the RADIAL labellum and hood are dropped by ruling — and
+// EVERY id off its identity comes back as a note saying which of those it was.
+// Never silent: a clean v1 file reports one line, that its role controls were
+// all at their identity.
 
 export const FORMAT = 'bloom-design';
 export const VERSION = 1;
@@ -246,6 +256,10 @@ function readChoice(c, raw) {
    and to no other). A test table (`fieldFor` rows) is walked by the SAME loop. */
 export function readControls(src, notes, fields = CONTROL_FIELDS) {
   const out = {};
+  /* THE RETIRED ROLE VALUES, aside — non-enumerable, so the controls record's
+     own shape is unchanged; readDoc hands them to the migration. */
+  const roleRaw = {};
+  Object.defineProperty(out, 'retiredRoles', { value: roleRaw, enumerable: false });
   if (!src || typeof src !== 'object' || Array.isArray(src)) { notes.push(note('missing', 'controls is missing — no control is changed')); return out; }
   const has = (k) => Object.prototype.hasOwnProperty.call(src, k);
   for (const f of fields) {
@@ -260,6 +274,8 @@ export function readControls(src, notes, fields = CONTROL_FIELDS) {
     if (fields.some((f) => f.key === k)) continue;
     const r = retiredOf.get(k);
     if (!r) { notes.push(note('unknown', `controls.${k} is not a control this page knows — not applied`)); continue; }
+    /* a retired PETAL-ROLE id: read aside, migrated whole by readDoc */
+    if (r.migrateBy === 'migrateRoles') { roleRaw[k] = src[k]; continue; }
     if (!Array.isArray(r.migrateTo)) { notes.push(note('retired', `controls.${k} is a retired control with no exact migration — its value ${JSON.stringify(src[k])} is not applied`)); continue; }
     const clash = r.migrateTo.filter((t) => has(t));
     if (clash.length) {
@@ -285,11 +301,9 @@ export function readControls(src, notes, fields = CONTROL_FIELDS) {
 
 /* WHICH CONTROLS MAY CARRY AN OFFSET: every PETAL-ROLE SLIDER the registry
    holds ("everything else may be", Q3.6 — a petal quantity is what a petal
-   scope offsets), less three named sets, each with its reason:
+   scope offsets), less two named sets, each with its reason (a third, the ROLE_OVERRIDES delta controls,
+   left with their retirement, Q3.4 — they are not controls any more):
      SCOPE_UNSCOPED      sheet thickness — never scoped, Q3.6 (the geometry's own owner);
-     ROLE_OVERRIDES      today's ALL / INNER / slot / per-petal DELTA controls — they ARE
-                         the scoping this model replaces (Q3.4 retires them), and an
-                         offset on a delta is a scope on a scope;
      SCOPE_WHORL_LEVEL   sliders the registry files under the petal role that describe
                          the WHORL, not a petal — a count, and the tube's per-whorl
                          ring values (already one row per layer) — and `footDelicacy`,
@@ -299,10 +313,9 @@ export function readControls(src, notes, fields = CONTROL_FIELDS) {
                          live scope (SO12) — a slider that would sit dead under a
                          selection, and an entry a file could carry that draws nothing.
    A choice has no delta and is excluded by kind. The gate restates this
-   derivation from the registry and the role table (SO0). */
+   derivation from the registry (SO0). */
 export const SCOPE_WHORL_LEVEL = Object.freeze(['petalCount', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend', 'footDelicacy']);
-const roleOverrideIds = new Set(ROLE_OVERRIDES.map((o) => o.control));
-export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !SCOPE_UNSCOPED.includes(c.id) && !roleOverrideIds.has(c.id) && !SCOPE_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
+export const SCOPEABLE_IDS = Object.freeze(CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !SCOPE_UNSCOPED.includes(c.id) && !SCOPE_WHORL_LEVEL.includes(c.id)).map((c) => c.id));
 /* A TIER is a SEPAL scope (Q1.1: each tier owns the full sepal control set),
    so its keys are the sepal-role sliders less the two whorl-level values —
    the count and the tier count — which the GEOMETRY names (one owner, F1.1a:
@@ -325,7 +338,6 @@ export function scopeOffsetRefusal(id, container) {
   if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
   if (container === 'tiers' ? scopeableTier.has(id) : scopeable.has(id)) return null;
   if (c.kind !== 'slider') return `a ${c.kind} has no offset`;
-  if (roleOverrideIds.has(id)) return 'a role delta — the role table is the scoping this model replaces (hidden while a scope toggle is on)';
   if (id === 'footDelicacy') return 'a whorl-level value — the foot is the whorl\'s (Q3.3)';
   if (SCOPE_WHORL_LEVEL.includes(id) || SCOPE_TIER_WHORL_LEVEL.includes(id)) return 'a whorl-level value has no per-petal meaning';
   return container === 'tiers' ? `${c.role} controls are not sepal (tier) scopes` : `${c.role} controls are not petal scopes`;
@@ -414,9 +426,46 @@ export function readDoc(obj) {
   const doc = { format: FORMAT, version: v, app: obj.app ?? null, savedAt: obj.savedAt ?? null };
   doc.controls = readControls(obj.controls, notes);
   doc.overrides = readContainer(obj.overrides, 'overrides', SCOPE_CONTAINERS, notes);
+  migrateRetiredRoles(doc, notes);
   doc.curves = readContainer(obj.curves, 'curves', CURVE_CONTAINERS, notes);
   for (const k of Object.keys(obj)) if (!TOP_LEVEL_KEYS.includes(k)) notes.push(note('unknown', `${k} is not a field this page knows`));
   return { ok: true, doc, notes };
+}
+
+/* THE ROLE RETIREMENT, ON LOAD (Q3.4). The file's retired role values and its
+   own controls are handed to the registry's `migrateRoles` (the one owner),
+   which needs the whole arrangement — so a file missing a value it reads is
+   told and nothing of its roles is applied (rule 3). What it returns lands as
+   changed controls (a folded global, a scope toggle) and as entries APPENDED
+   to `overrides` — and if the file carried a container that went missing, the
+   migrated entries are what it now holds, told. */
+function migrateRetiredRoles(doc, notes) {
+  const raw = doc.controls.retiredRoles || {};
+  const ids = Object.keys(raw);
+  if (!ids.length) return;
+  const whole = { ...doc.controls, ...raw };
+  const m = migrateRoles(whole);
+  const kindOf = { migrated: 'migrated', dropped: 'retired', inert: 'retired', identity: 'migrated' };
+  for (const n of m.notes) notes.push(note(kindOf[n.kind] || 'retired', n.id ? `controls.${n.id}: ${n.text}` : `controls: ${n.text}`));
+  const controls = {};
+  for (const [k, v] of Object.entries(m.state)) if (!ids.includes(k)) controls[k] = v;
+  for (const k of Object.keys(doc.controls)) if (!(k in controls)) delete doc.controls[k];
+  Object.assign(doc.controls, controls);
+  /* a scope toggle the file did not carry (it predates Scoping-b) and the
+     migration has now SET is no longer missing: the migration supplies it */
+  for (const t of ['scopeLayers', 'scopePetals']) {
+    if (!(t in controls)) continue;
+    const i = notes.findIndex((n) => n.kind === 'missing' && n.text.startsWith(`controls.${t} is missing`));
+    if (i >= 0) { notes.splice(i, 1); notes.push(note('migrated', `controls.${t} was not in the file (it predates the toggle) — the role migration set it ${controls[t]}`)); }
+  }
+  if (m.scopes) {
+    for (const k of ['layers', 'petals']) {
+      if (!m.scopes[k].length) continue;
+      const at = doc.overrides.missing.indexOf(k);
+      if (at >= 0) { doc.overrides.missing.splice(at, 1); notes.push(note('migrated', `overrides.${k} was missing — it now holds only the ${m.scopes[k].length} entr${m.scopes[k].length === 1 ? 'y' : 'ies'} the role migration carried`)); }
+      doc.overrides[k] = [...doc.overrides[k], ...m.scopes[k]];
+    }
+  }
 }
 
 /* THE GEOMETRY'S `scopes` ARGUMENT from a read `overrides` record — the three

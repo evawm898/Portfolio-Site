@@ -19,7 +19,7 @@
 
    The two STL gates run the SAME per-row assertion set — formAssertions,
    curlAssertions (C1-C3), thicknessAssertions, junctionAssertions (J1-J9),
-   zygoAssertions (Z1-Z9), exportFloorAssertion, applyCapability,
+   zygoAssertions (Z0, Z1, Z2, Z4b, Z4c), exportFloorAssertion, applyCapability,
    shownModeAssertion, footCrowding (R1-R5). The export gate adds the edge
    census, the degenerate count and plan coverage; the connectedness gate
    adds ONE thing the export gate does not have: the voxel flood fill.
@@ -256,15 +256,15 @@ export const SMOKE_BLOCKS = [
     anchor: 'ZYGO: THE IRIS (falls curl down, standards rise)',
     rows: [
       { label: 'ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)',
-        path: 'layer roles (roleForLayer) — Z1, Z2, Z3 and Z6, one role spanning more than one whorl (spelled out: written as a range, this line named Z1 and Z3 and hid Z2 from every reader and from the census)' },
+        path: 'a stored INNER design loaded through the role migration (Q3.4) — two per-layer offsets with scopeLayers ON: Z0 (no role field survives), Z1 (one descriptor per whorl) and Z2 (each inner layer is built with exactly the offset the row names, restated from its own @scopes entry)' },
     ],
   },
   {
     n: 12,
-    anchor: 'SLOT: labellumSize min (0.5) x 2 whorls in step',
+    anchor: 'ORCHID x the IRIS (both role axes, one bloom)',
     rows: [
-      { label: 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step',
-        path: 'slot roles and the mirror plane (roleForSlot) — Z4a, Z4b and Z5\'s conditional collapse' },
+      { label: 'ORCHID x the IRIS (both role axes, one bloom)',
+        path: 'the RADIAL labellum and hood DROPPED by ruling while the INNER half beside them migrates to a per-layer offset — Z0 and Z2 (the inner layer carries exactly the migrated offset and nothing of the orchid)' },
     ],
   },
   {
@@ -272,7 +272,7 @@ export const SMOKE_BLOCKS = [
     anchor: 'FAN: defaults (3/side, a mirror-line petal, 45deg)',
     rows: [
       { label: 'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)',
-        path: 'the FAN arm and the per-petal orbits on the fixed-point-free involution — J7 (the arc and the notch), Z7, Z8, Z9' },
+        path: 'the FAN arm and a per-PAIR scope on the fixed-point-free involution (a stored per-petal design, migrated) — J7 (the arc and the notch), Z4b (one plane from the emitted azimuths), Z4c (a mirror pair is ONE scope: both members built from one state) and Z2 (the inner pair carries the migrated offset)' },
     ],
   },
   {
@@ -872,7 +872,7 @@ export const SMOKE_BLOCKS = [
       { label: "VARIANCE: GATED — frequency and phase at MAXIMUM with the amount 0 (hidden AND inert)",
         path: "the GUARD's other arm — VS0 and VS1's inertness clauses (no record, no factor on any slot, every slot's scale its descriptor's own) with the frequency and phase at their extremes, which is the only thing that can see a hidden control that still moves a petal" },
       { label: "VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)",
-        path: "the FAN — VS3 (every mirror pair carries the same factor to the bit, not vacuously) and VS1's phaseInert arm, beside Z4a/Z4b/Z8 and J7 which an uneven field would break" },
+        path: "the FAN — VS3 (every mirror pair carries the same factor to the bit, not vacuously) and VS1's phaseInert arm, beside Z4b/Z4c and J7 which an uneven field would break" },
       { label: "VARIANCE: x a SPHERE with a stem (the channel probes each slot at its OWN size)",
         path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build, the exported file's own clearance) on petals whose sizes the field moved, beside S1-S4 and VS1's golden-angle azimuth on the sphere's sequence" },
       { label: "VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)",
@@ -993,7 +993,7 @@ export const SMOKE_BLOCKS = [
       { label: 'FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)',
         path: "the LAW — FV0 (the registry's varianceFormPresent against the geometry's guard through the page), FV1 (every petal's term restated from the controls and its emitted azimuth), FV2 (the clamped role composition plus the term scaled by the headroom on its own side is what the blade was built with) and FV4 (one aliasing judgement for the shared wave)" },
       { label: 'FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)',
-        path: 'the FAN — FV3 (mirror petals carry identical terms, not vacuously), beside Z4a/Z4b/Z8 and J7' },
+        path: 'the FAN — FV3 (mirror petals carry identical terms, not vacuously), beside Z4b/Z4c and J7' },
       { label: 'FORM VARIANCE: x 3 whorls with innerCurl 360 on curl 180 (the ONE clamp — past 360 before the slot term)',
         path: "FV2's HEADROOM arm — the inner whorls' group curl is past 360 before the slot term, so the room is read from the CLAMPED composition; reading it from the unclamped 540 flips the field's sign on every inner whorl" },
       { label: 'FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)',
@@ -1147,7 +1147,7 @@ export const SMOKE_BLOCKS = [
       { label: 'SPACING VARIANCE: 0.9 at 5 cycles on 8 slots (ALIASED past n/2 — scatter, told and not capped)',
         path: "SV3 where neighbouring slots read near-opposite crests — the pitch law still keeps every pair at least 1 - A apart, which a DIRECT offset (the circular reading) does not — and SV4's aliased arm" },
       { label: 'SPACING VARIANCE: 0.9 x FAN, phase 90 (even about the mirror line, the phase INERT, the span held by renormalising)',
-        path: "the FAN — SV2's renormalised map, SV3's held span (the outermost slots exactly at the nominal outermost azimuths) and odd map (mirror slots exact negations), the floor (1 - A) / (1 + A); J7, Z4b and Z8 beside it" },
+        path: "the FAN — SV2's renormalised map, SV3's held span (the outermost slots exactly at the nominal outermost azimuths) and odd map (mirror slots exact negations), the floor (1 - A) / (1 + A); J7 and Z4b beside it" },
       { label: 'SPACING VARIANCE: 0.9 x 3 whorls at layer offset 0.5 (one circle map — the whorls keep their mutual order)',
         path: "SV2 with the layer phase restated per whorl and SV3 per whorl; VS5's told pitch under the floor" },
       { label: 'SPACING VARIANCE: GATED — frequency and phase at MAXIMUM with every amount 0 (hidden AND inert)',

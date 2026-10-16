@@ -214,8 +214,8 @@ const E2_TURN_XFAIL = {
   /* 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)' was declared at
      excessDeg 0.005430 and reads 43.585233 deg since #283 — UNDER the allowance by 1.41 deg; entry
      removed, the gate's own STALE clause is what said so. */
-  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step':
-    { excessDeg: 1.152165, note: 'NEW at #283: adds 46.152165 deg; face-to-face 61.05, outline 14.90. 0 excess before the nib' },
+  /* 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step' (1.152165) left
+     with its row: a RADIAL labellum-and-hood design, DROPPED BY RULING at the role retirement (Q3.4). */
   'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)':
     { excessDeg: 3.204461, note: 'NEW at #283: adds 48.204461 deg; face-to-face 66.54, outline 18.33. 0 excess before the nib' },
   'GRADIENT: cup gradient max x cup max x widest petal (the metric reaches 2.6 at the tip)':
@@ -1103,7 +1103,9 @@ async function control() {
      row whose declared excess the RIM LAW moves; which row that is is a
      property, not an ordering, so it is named here and fails loudly if it
      goes missing or stops being declared. */
-  const DECLARED = 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step';
+  /* (It was the RADIAL orchid row until the role retirement removed it, Q3.4; the FAN per-petal
+     extreme is the same class — a scoped petal's curl folding its margin — and declared beside it.) */
+  const DECLARED = 'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)';
   const declaredRow = MATRIX.find((r) => r.label === DECLARED);
   if (!declaredRow || !Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, DECLARED)) { console.error(`edge-profile control: "${DECLARED}" is missing from the matrix or from E2_TURN_XFAIL — E2's magnitude clause would be exercised by nothing`); process.exit(1); }
   if (!rows.some((r) => r.label === declaredRow.label)) rows.push(declaredRow);

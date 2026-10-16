@@ -722,7 +722,8 @@ SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection
   - OFF is today's bloom and today's panel.
   - A record whose toggle is not live is KEPT and INERT (SO10). The gate is in `scopeOffsetsFor`,
     so the panel's displayed value and the builder cannot disagree.
-- **A live toggle makes the WHOLE role table hidden AND inert.** That covers ALL, INNER, the
+- **[Oct 16: SUPERSEDED — the role table is RETIRED, see the role-retirement block below; this bullet
+  describes the tree before it.]** **A live toggle makes the WHOLE role table hidden AND inert.** That covers ALL, INNER, the
   labellum and hood, and the per-petal groups: one owner on screen.
   - The resolver's blanket skip keeps the geometry inert on its own. So an eligibility function
     that forgets the toggle moves no float, and SO11's STAMP and footRing-FLAG clauses are that
@@ -763,6 +764,44 @@ SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection
   identity with the toggles OFF. The byte tool's `--merge` now closes an all-hold partition.
 - **0 matrix rows, no frozen phase.** Sheet: `node tools/shot-bloom-scopes.mjs` →
   `docs/img/scope-selection.png`.
+
+**THE ROLE TABLE IS RETIRED INTO SCOPING, THE RADIAL LABELLUM AND HOOD ARE DROPPED, AND Q3.5 IS
+WIRED** (the role retirement, Oct 16 — Eva's rulings Q3.4 / Q3.5 and her Oct 14 ruling; read
+`docs/bloom-role-retirement-outcome.md` before touching `migrateRoles`, `RETIRED_ROLE_ROWS`,
+`landOffset`, `SCOPES_SET_ID`, `storedRow`, `migrateForServedTree`, `resolvePetalTerms`,
+`SCOPE_LAYER_OWNED` or SO0 / SO6 / SO7 / SO11).
+- **47 ids retired** (`labellum*`, `hood*`, `petalN*`, `allCurl/Cup`, `innerCurl/Cup`), each with
+  `migrateBy: 'migrateRoles'`. The table, its resolver, the descriptor split, the eligibility
+  predicates and the role stamps are gone. A petal is `global → scope offsets → variance → one clamp`.
+  The panel lost 47 controls and 12 sections.
+- **The migration is computed, not copied.** `migrateTo` copies a value, and a delta onto an offset
+  depends on the arrangement. ALL folds into the global (on the slider's grid). INNER becomes layer
+  entries (RADIAL) or every-pair entries (FAN). Group k goes on pair k − 1 of every layer. The RADIAL
+  labellum and hood are DROPPED and told. An offset LANDS exactly (`landOffset`).
+  - An absent scope toggle is read as the design predating it (OFF), never defaulted.
+- **A stored matrix row is migrated at the end of `buildMatrix` (`storedRow`); its scopes travel as
+  the reserved `@scopes` set entry.** A Node walker with its own `stateOf` refuses it by name unless
+  it hands the build `H.rowScopesForBuild(row)`.
+  - **A two-tree tool must pass the BASE tree's kinds to `applyConfig`.** Otherwise the base page is
+      handed an already-migrated set (the sheet's first run drew the AFTER bloom in the BEFORE cell).
+- **Q3.5:** a layer entry naming `petalLength` / `petalWidth` / `petalTilt` OWNS it, and its BLADE
+  drops the ramp's term. `layerSize` / `layerTilt` hide under Per-layer values. **The ring and foot
+  still take the ramps** — open, Eva's.
+- **Partition (`node tools/verify-bloom-role-retirement.mjs --base <worktree>`):** 1,651 distinct
+  sets (live + 69 frozen phases); 225 base-side exclusions; 1,426 built in both modes (2.11 G export
+  floats). **1,390 holders at 0 floats; 36 movers, all predicted from the BASE tree's footRing
+  records:**
+  - **(a) 33** RADIAL labellum/hood rows;
+  - **(b) 1** SPIRAL INNER, dropped because no scope carries a spiral's inner whorl (30.26 mm, open,
+    Eva's);
+  - **(b) 2** FAN 3-layer rows whose hub radius moves one ULP (the area rule summed per whorl, 7.1e-15
+    mm).
+- **Matrix and frozen tags.** 63 rows left the live matrix (1,354 → 1,291).
+  - `frozen/phase70` is the 1,354 rows at `f95b244`.
+  - Bytes stop reproducing on 36 rows of every phase from 22 on (fewer before; phase2–6 hold).
+- **Sheet:** `node tools/shot-bloom-role-retirement.mjs <dir> --base <worktree>` →
+  `docs/img/role-retirement.png`. The orchid, zygomorphy and per-petal sheets refuse, with a worktree
+  command.
 
 **THE PANEL HAS A `curve` CONTROL KIND — A POINT EDITOR WITH ZERO CONSUMERS AND ZERO LIVE CONTROLS**
 (the curve-editor session, Oct 14; feature map §4–§6, §11 Q4.1 / Q4.4 / Q6.1 — read
@@ -5272,7 +5311,7 @@ RETAINED, never deleted, and CI's `--verify-frozen` still proves every one deep-
 every push — only their routine byte re-export is demoted. Full reasoning, and what it
 gives up, in the charter's "Verification retention" section.
 
-**PER-PETAL ROLES SUPERSEDE SLOT ROLES ON THE FAN, AND NOTHING IS RETIRED**
+**PER-PETAL ROLES SUPERSEDE SLOT ROLES ON THE FAN, AND NOTHING IS RETIRED** **[Oct 16: SUPERSEDED — every role id is retired into scoping and the RADIAL labellum and hood are dropped; `docs/bloom-role-retirement-outcome.md`.]**
 (Eva, Sep 3). `labellum*` / `hood*` are hidden AND inert under FAN and stay
 fully live under RADIAL, so `RETIRED_IDS` does not apply and no migration is
 owed. The two position axes are DISJOINT BY PLACEMENT and `Z9` asserts that in

@@ -121,6 +121,7 @@ const kindOf = new Map(REG.CONTROLS.map((c) => [c.id, c]));
 function stateOf(row) {
   const s = { ...REG.DEFAULTS };
   for (const w of row.set || []) {
+    if (w.id === REG.SCOPES_SET_ID) continue;   // the row's overrides record — read by H.rowScopes, written as the file's overrides
     const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`);
     s[w.id] = c.kind === 'slider' ? Number(w.value) : w.value;
   }
@@ -178,10 +179,14 @@ async function nodeClauses(F, rec) {
     const p = []; let clean = 0;
     for (const row of MATRIX) {
       const st = stateOf(row);
-      const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x' }))));
+      /* a row that carries a scope record (a stored role design, migrated —
+         Q3.4) saves it as the file's overrides and must read it back */
+      const rec0 = H.rowScopes(row);
+      const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x', ...(rec0 ? { scopes: rec0 } : {}) }))));
       if (!r.ok) { p.push(`${row.label}: refused — ${r.error}`); continue; }
       const bad = [];
       if (r.notes.length) bad.push(`${r.notes.length} note(s): ${r.notes.slice(0, 2).map((n) => n.text).join(' | ')}`);
+      if (rec0 && JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: rec0.layers || [], petals: rec0.petals || [], tiers: rec0.tiers || [] })) bad.push(`the overrides did not round-trip: ${JSON.stringify(r.doc.overrides)}`);
       for (const c of REG.CONTROLS) if (!(c.id in r.doc.controls) || !same(c, r.doc.controls[c.id], st[c.id])) { bad.push(`${c.id} ${JSON.stringify(st[c.id])} -> ${JSON.stringify(r.doc.controls[c.id])}`); break; }
       if (bad.length) p.push(`${row.label}: ${bad.join('; ')}`); else clean++;
     }
@@ -205,12 +210,14 @@ async function nodeClauses(F, rec) {
     for (const row of rows) {
       if (/ALL MAX$/.test(row.label) && !FULL) continue;   // minutes a build; CI's own export gate covers it
       const st = stateOf(row);
-      const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x' }))));
+      const rec0 = H.rowScopes(row);
+      const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x', ...(rec0 ? { scopes: rec0 } : {}) }))));
       const back = { ...REG.DEFAULTS, ...(r.ok ? r.doc.controls : {}) };
+      const scA = rec0 ? F.scopesForBuild(rec0) : null, scB = r.ok ? F.scopesForBuild(r.doc.overrides) : null;
       for (const exportMode of [false, true]) {
-        const build = (s) => { const acc = new GEO.MeshBuilder({ exportMode }); GEO.buildBloomInto(acc, s, { below: null, capability: row.capability || null }); return acc; };
+        const build = (s, scopes) => { const acc = new GEO.MeshBuilder({ exportMode }); GEO.buildBloomInto(acc, s, { below: null, capability: row.capability || null, scopes }); return acc; };
         let A, B;
-        try { A = build(st); B = build(back); } catch (e) { p.push(`${row.label} (${exportMode ? 'export' : 'live'}): build threw — ${e.message}`); continue; }
+        try { A = build(st, scA); B = build(back, scB); } catch (e) { p.push(`${row.label} (${exportMode ? 'export' : 'live'}): build threw — ${e.message}`); continue; }
         if (A.triangleCount !== B.triangleCount) { p.push(`${row.label} (${exportMode ? 'export' : 'live'}): ${A.triangleCount} tris from the state, ${B.triangleCount} from the round trip`); continue; }
         const pa = A.positions, pb = B.positions;
         let moved = 0; const L = Math.min(pa.length, pb.length);

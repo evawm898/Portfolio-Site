@@ -179,7 +179,7 @@ export const HUB_DOME_RINGS = 18;
 /* THE FULL SPHERE (session 18, Eva Sep 5) — the twin of the registry's
    `PREDICATES.sphereMode`: the registry HIDES `headRise` and the `hubShape`
    control on this condition, this makes them INERT, and the harness asserts
-   the two statements agree at module load (the slotRolesEligible precedent).
+   the two statements agree at module load (the two-statement precedent).
    CONTINUOUS only: the sphere is the continuous spiral re-keyed on polar
    angle; under any other placement a stored SPHERE is hidden and inert and
    the head is the cap `headRise` builds. */
@@ -936,21 +936,10 @@ export const FAN_ARC_LIMIT_DEG = 170;
    against today's 788 px worst case, where the same nine as headings inside
    one section reach 2,411 px. So the ceiling still does not transfer, for a
    reason that is now about the panel's shape rather than about an absence.
-   MAX_FAN_GROUPS below is derived from this constant, never restated. */
+   (The nine per-petal GROUPS that ceiling generated retired into parameter
+   scoping, Q3.4; a fan's pairs are scopes now, `petalGroupCount` below.) */
 export const MAX_FAN_PER_SIDE = 8;
 
-/* HOW MANY PER-PETAL GROUPS THE FAN CAN REACH — DERIVED from the per-side
-   ceiling, never restated. `2*P + 1` slots give `P + 1` orbits and `2*P` give
-   `P`, so the maximum is `MAX_FAN_PER_SIDE + 1`. The registry generates
-   exactly this many control groups and the harness asserts the two agree (the
-   MAX_LAYERS and SHEET_THICKNESS_MM precedent). */
-export const MAX_FAN_GROUPS = MAX_FAN_PER_SIDE + 1;
-
-/* THE ROLE IDS, in group order. Ordering fixes the order the area rule sums
-   the groups in, so a reordering is a byte event made on purpose rather than
-   by an object-key accident — the SLOT_ROLE_ORDER precedent, one axis over. */
-export const PETAL_ROLE_ORDER =
-  Array.from({ length: MAX_FAN_GROUPS }, (_, k) => `PETAL_${k + 1}`);
 
 /* MeshBuilder — flat triangle-soup accumulator (positions only; the app wraps
    it in a three.js BufferGeometry, the exporter reads it directly). Rewritten
@@ -1337,342 +1326,33 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
    119 feet in between. See junctionAssertions() in tools/bloom-harness.mjs. */
 
 /* ===================================================================
-   ZYGOMORPHY — petals that differ by POSITION. Session A of two: the override
-   architecture plus PER-LAYER roles (the iris). Session B derives roles from a
-   mirror plane and gives one slot in a whorl its own record (the orchid's
-   labellum and hood). Charter: docs/bloom-charter.md, "Zygomorphy".
+   THE COMPOSED-BASE ENVELOPE — what is left of ZYGOMORPHY'S ROLE TABLE, which
+   is RETIRED (Q3.4, Eva's ruling of Oct 12, and her Oct 14 ruling on the
+   RADIAL labellum and hood; docs/bloom-role-retirement-outcome.md). The ALL /
+   INNER deltas, the RADIAL labellum and hood and the fan's per-petal groups
+   were rows of `ROLE_OVERRIDES`, composed per descriptor and clamped once; the
+   per-scope OFFSETS of parameter scoping (the PARAMETER SCOPING block below)
+   replace them, and `migrateRoles` in bloom-registry.js carries every stored
+   value that can be carried. Nothing here reads a role, and no descriptor is
+   split by position any more — so the area rule sums every whorl as ONE group
+   (`footCount * rFoot^2`), which is the shipped arithmetic at every state no
+   role engaged (the a*(b+c) trap's whole reason for keeping it so).
 
-   A ROLE IS A GROUP OF SLOTS THAT SHARE ONE OVERRIDE RECORD — not a slot and
-   not a layer. That the group is the unit is the whole design, and it is
-   MEASURED rather than preferred:
-
-     grouped `n * r^2`  vs  a per-foot `SUM r^2` at the same values
-       n = 8    19.556959407132098  ==  identical
-       n = 40   97.784797035660489  vs  97.784797035660574   = 6.00 ULP
-       n = 40 (petalWidth 30, sheet 2.40)                    = 2.00 ULP
-
-   Had "per-slot overrides" been built as PER-SLOT GROUPING — the obvious
-   reading — the ringed area-rule sum would have had to be regrouped per foot
-   and EVERY 40-petal export would have moved by 6 ULP for nothing. That is
-   the flower's `a*(b+c)` vs `a*b + a*c` trap, which has now fired twice in
-   this project family. Grouping by ROLE keeps the loop shape, so at one role
-   per layer `roleCount === petalCount` and the sum is bit-identical — which
-   `zygoGuardResidual` below asserts as an EQUALITY, not a bound. Grouping by
-   role is therefore LOAD-BEARING, not stylistic. Do not regroup it.
-
-   SESSION A'S ROLE DERIVATION IS DELIBERATELY COARSE: two roles, OUTER (the
-   outermost whorl) and INNER (every whorl above it). At layerCount 2 that is
-   exactly the iris — falls at OUTER, standards at INNER — which is the form
-   the session was opened on. It is a DERIVATION, and session B changes only
-   the derivation and which descriptors exist; the override MECHANISM below is
-   unchanged by it. That is the seam, stated so session B starts from a
-   boundary rather than re-deriving one.
-
-   ROLES ARE A RINGED-ARM FEATURE. Under CONTINUOUS there are no layers to
-   differentiate — that is precisely what J5 asserts — so every ring is OUTER
-   and the override controls are hidden by their own registry predicates.
-   Reinterpreting a layer role as a turn role would be a label naming
-   something else, which is `layerPhase`'s precedent exactly. Slot roles
-   (session B) are additionally RADIAL-only: reflecting a SPIRAL arrangement
-   about any plane leaves the best mirror pairing off by up to 20.062 deg at
-   n=8 — 45% of a slot gap, measured — so a "mirror" control there would be a
-   symmetry label sitting on a measured asymmetry. This project does not ship
-   labels that lie about a computation; it is gated, with named rows asserting
-   hidden-and-bit-identical, because a gated state is coverage.
-   =================================================================== */
-export const ROLE_OUTER = 'OUTER';
-export const ROLE_INNER = 'INNER';
-/* THE WHOLE-WHORL ROLE AT ONE WHORL (Eva's ruling, Sep 3, from the deploy
-   preview): "Petal roles is the 'adjust petals as a group' section at EVERY
-   depth. At 2+ layers that group is the inner whorl; at depth 1 the group is
-   ALL petals." So a single-whorl bloom carries this role on every descriptor
-   and a layered one on none — `allPetalsEligible()` is the one statement of
-   that boundary here, `PREDICATES.allPetalsEligible` its twin in the
-   registry, and Z5 checks the two agree on every row. It composes exactly as
-   INNER does: three DELTA rows in ROLE_OVERRIDES riding on the base sliders
-   in Petal form / Petal shape, identity 0, skipped at identity, clamped once
-   into the base's own range. Nothing owns a number twice — the base slider
-   owns the number and this owns a delta on it, which is the same relation
-   `innerCurl` has had to `petalSpineCurl` since session A. */
-export const ROLE_ALL = 'ALL';
-
-/* ===================================================================
-   SESSION B — SLOT ROLES, THE MIRROR PLANE, AND THE ORCHID.
-
-   A LAYER role says WHICH WHORL a petal is in; a SLOT role says WHERE IN ITS
-   WHORL it sits. They are independent axes and a descriptor is one
-   (layer x slotRole) cell — which is the whole of what session B changes, per
-   the seam. The override MECHANISM below is session A's, multiplied.
-
-   THE MIRROR PLANE IS DERIVED AND IS NEVER A CONTROL: it contains the axis
-   and slot 0's radial direction. An orientation slider would rotate WHICH
-   slots are the labellum on an arrangement that is otherwise radially
-   symmetric — an invisible rigid rotation of the whole bloom under a label
-   naming a symmetry, which is `layerPhase`'s recorded trap exactly. Face-on
-   framing is the shot tool's camera, not this file's azimuths, so no byte
-   moves to put the labellum at the bottom of a picture.
-
-   THE ASSIGNMENT IS EXACT INTEGER ARITHMETIC — no angular comparison, no tie
-   tolerance, no epsilon. The plane pairs slot i with slot n-i (mod n), and
-   the slots that lie ON it are that involution's FIXED POINTS: slot 0 always,
-   and slot n/2 when n is even. So the roles that can be singular are exactly
-   the fixed points, which is a fact about the mirror rather than a choice:
-
-     n even   LABELLUM {0}   HOOD {n/2}              LATERAL n-2 slots
-     n odd    LABELLUM {0}   HOOD {(n-1)/2, (n+1)/2} LATERAL n-3 slots
-
-   AT ODD n THE ANTIPODE FALLS IN A GAP, so no single slot can be the hood and
-   the two slots straddling it take the role together (Eva, Sep 2). They are a
-   mirror pair, so nothing about the symmetry claim weakens — a two-lobed
-   upper lip is the ordinary bilabiate form. THE EMPTY GROUP IS PUSHED ONTO
-   LATERAL DELIBERATELY, and that is the deciding argument rather than a
-   detail: LATERAL carries no controls, so an empty LATERAL strands nothing,
-   whereas an empty HOOD would leave three hood controls naming a group with
-   no members — which is what Z1 already fails INNER on. At petalCount 3 that
-   is LABELLUM {0}, HOOD {1,2}, LATERAL {} — one of three IS the labellum, and
-   it is the orchid.
-
-   SLOT ROLES ARE RADIAL-ONLY, AND THE CHARTER'S OWN GROUND FOR THAT WAS
-   CORRECTED BEFORE IT WAS BUILT ON (session B, Sep 2). Session A's four
-   numbers are REAL and reproduce exactly — 32.461 deg at n=5, 20.062 at n=8,
-   12.399 at n=13, 4.736 at n=40 — but they measure THIS rule (reflect about
-   slot 0's plane, distance from each image to the nearest slot) applied to a
-   golden-angle whorl. The charter states them as "reflecting a golden-angle
-   arrangement about ANY plane", and that quantifier is FALSE: a golden-angle
-   whorl is an arithmetic progression on a circle, so reversing it gives the
-   same set and it IS exactly mirror-symmetric — about the plane at
-   (n-1)*GOLDEN_ANGLE/2, pairing i <-> n-1-i, measured at <= 8.14e-13 deg at
-   every count. The RULING STANDS, on the corrected and stronger ground: under
-   SPIRAL the plane is elsewhere and the pairing is a different involution, so
-   sharing ONE derivation across placements produces precisely session A's
-   measured asymmetry. A correct-for-SPIRAL derivation is RECORDED, NOT BUILT
-   — it needs its own evidence and its own ruling. (Rationale is a premise;
-   only the instruction binds. The doctrine caught a charter entry this time.)
-
-   AND IT NEEDS layerPhase 0 ABOVE ONE WHORL, which is a second measurement
-   rather than caution. The plane is the BLOOM's, so every whorl's slots must
-   be symmetric about it; ring L is offset by L*layerPhase slots, and the
-   assignment is by index, so all whorls share the plane only at layerPhase 0.
-   Measured, worst pairing error over the best SHARED plane:
-
-     2 layers  phase 0.25   30.000 deg at n=3, 11.250 at n=8, 2.250 at n=40
-     3 layers  phase 0.33   39.600 deg at n=3, 14.850 at n=8, 2.970 at n=40
-     any depth phase 0                                  0.000 at every count
-
-   RECORDED, NOT BUILT: at phase 0.50 the ARRANGEMENT is exactly symmetric
-   (0.000, measured) because two slots tie for the plane — but expressing that
-   costs a float tie-comparison inside a derivation that is otherwise exact
-   integer arithmetic, so it is a refinement with its own ruling, not an
-   omission.
-   =================================================================== */
-export const SLOT_LABELLUM = 'LABELLUM';
-export const SLOT_HOOD = 'HOOD';
-export const SLOT_LATERAL = 'LATERAL';
-
-/* THE GROUP ORDER, declared once. It fixes the order the area rule sums the
-   role groups in, so a reordering is a byte event that has to be made on
-   purpose rather than by an object-key accident. */
-export const SLOT_ROLE_ORDER = [SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL];
-
-/* WHAT A ROLE MAY OVERRIDE, AND BY WHAT LAW — one owner, one table.
-
-   EVERY ENTRY IS A DELTA ON A BASE CONTROL, defaulting to 0, so byte-identity
-   at the shipping default is a CONSTRUCTION and not an argument: a zero delta
-   is skipped outright (see resolveRoleOverrides), which leaves the guard
-   below returning the caller's own `state` object and every consumer taking
-   the pre-zygomorphy call character for character. Absolute values were
-   rejected: they need a per-control "use base / override" flag, which is the
-   flower's CUSTOM problem and makes byte-identity an argument.
-
-   THE SET IS TRIMMED, AND THE ASYMMETRY IS WHY (Eva, Sep 1). Adding a control
-   later is one registry row and always will be; retiring one becomes a schema
-   bump plus a migration the day anything persists a design. So this starts
-   minimal and grows on evidence from real use. RECORDED, NOT BUILT: roll and
-   twist deltas, a per-layer tip-taper/base-taper delta, and a per-layer
-   `tipThinning` delta — all mechanically identical to the three below, none
-   asked for by either target form. A request for "roll on the standards" is
-   one row in this table plus one in the registry.
-
-   SIZE AND TILT ARE ABSENT ON PURPOSE (Eva's Q5 ruling). `layerSize` and
-   `layerTilt` are lambda-RAMPS that already own per-layer size and tilt, and
-   they are the only depth controls that survive CONTINUOUS. A per-layer role
-   override of either would be a second owner of one quantity. So layer roles
-   override exactly what the ramps do not. Two prefixes, two laws: `layer*` is
-   a ramp, `inner*` is a role override.
-
-   THE BOUNDS ARE DECLARED HERE AND ASSERTED AGAINST THE REGISTRY by both
-   gates (the SHEET_THICKNESS_MM precedent). bloom-geometry.js imports nothing,
-   so it cannot read the registry's ranges; restating them without a check
-   would be a second owner, and the check is what makes it one. A composed
-   value is clamped into the BASE control's own range so it is always a value
-   the base control could itself hold — which keeps every downstream
-   invariant, and every gate row's reasoning, inside the proven envelope.
-   NO ROW IN THIS TABLE REACHES THE APEX ANY MORE. The tip's three role deltas
-   went with `petalTipBreadth` (session 32); the apex is one unconditional cap
-   with no control of its own until the superellipse lands, so a role cannot
-   differentiate it. The clamp still matters for every remaining base.
-
-   TWO LAWS NOW, AND THE KEY WAS RENAMED WITH THEM. Session A's rows carried
-   the control id under a key called `delta`, which was honest while every row
-   WAS one; a multiplier row under that key would be a stored label-lie, this
-   project's most repeated defect. So the id lives under `control` and the law
-   is named in `law`. Nothing persists these (they are code, not a design), so
-   the rename is free and no retirement is owed.
-
-     law 'delta'  composed = base + value      identity 0
-     law 'mul'    composed = base * value      identity 1
-
-   BOTH IDENTITIES ARE SKIPPED OUTRIGHT rather than applied (see
-   resolveOverrides), so neither `x + 0` nor `x * 1` is ever evaluated on the
-   shipped path — the guard is object identity, exactly as session A built it,
-   and it did not need extending so much as re-pointing.
-
-   ONE CONTROL MAY DRIVE SEVERAL BASES: `labellumSize` scales petalLength AND
-   petalWidth, because "size" is both. Two rows sharing one control id is the
-   explicit form; a row naming a list of bases would hide the per-base clamp
-   ranges, which genuinely differ.
-
-   SIZE x NEVER REACHES THE RING, and that is structural rather than careful.
-   footRing() reads `state.petalWidth` for the foot's authored width; only
-   buildPetalInto reads `ps.petalLength` / `ps.petalWidth`. So a size
-   multiplier moves the BLADE and cannot move rFoot, the area-rule sum, R0 or
-   hub.radius — which is why J2's containment stays an EQUALITY rather than
-   acquiring a tolerance, and why pointing those two footRing lines at `ps` is
-   a positive control (M4) with J2 and Z6 as its witnesses.
-
-   SIZE x SATURATES, and the read-out says so. A composed value is clamped
-   into the BASE control's own range (session A's envelope rule), so at the
-   default 35 mm x 16 mm a x2.00 labellum asks for 70 x 32 and gets 60 x 30 —
-   the multiplier stops moving before its slider does. That is the roll
-   floor's "(clamped)" discipline, arriving on a multiplier.
-
-   TILT IS OVERRIDABLE AT SLOT LEVEL AND NOT AT LAYER LEVEL, which is not an
-   inconsistency: `layerTilt` is the lambda-ramp that owns per-LAYER tilt, so a
-   layer-role tilt override would be a second owner of one quantity (Eva's Q5
-   ruling). No ramp owns per-SLOT tilt, so there is no second owner here.
-   petalTilt's own range starts at 0, so a labellum tilt delta reaches
-   HORIZONTAL and never drooping — which is why the labellum also gets a CURL
-   delta (Eva, Sep 2): spine curl is what makes a lip hang and reflex, and it
-   is the one control that can. */
-export const ROLE_OVERRIDES = [
-  /* ALL PETALS AT ONE WHORL — first in the table on purpose. Row order is the
-     composition order (see resolveRoleOverrides), so a petal that is also a
-     labellum or a per-petal group reads base, then the whole-whorl delta,
-     then its own: "the group, then the petal". Same bases, same laws, same
-     bounds as the INNER trio below; only the role differs. */
-  { role: ROLE_ALL, base: 'petalSpineCurl',  control: 'allCurl',       law: 'delta', min: -180, max: 360 },
-  { role: ROLE_ALL, base: 'petalCup',        control: 'allCup',        law: 'delta', min: -0.8, max: 1.2 },
-  /* LAYER ROLES — session A's three, unchanged in law, range and effect. */
-  { role: ROLE_INNER, base: 'petalSpineCurl',  control: 'innerCurl',       law: 'delta', min: -180, max: 360 },
-  { role: ROLE_INNER, base: 'petalCup',        control: 'innerCup',        law: 'delta', min: -0.8, max: 1.2 },
-
-  /* THE `petalTilt` ENVELOPE IS 0..120 (Eva's re-issued ruling, Sep 19), AND
-     IT MOVED BECAUSE THE RANGE DID — one number in two files. Every bound in
-     this table IS the base control's own min/max; bloom-geometry.js cannot
-     import the registry, so tools/bloom-harness.mjs throws at module load if
-     the restatement and the registry disagree, which is what keeps this from
-     becoming a second owner. 120 is DERIVED (the seam window closes at
-     |cos th| = 1/2 exactly) and the FLOOR STAYS AT 0 (the descending fold
-     fires from -8 degrees); both derivations live at the `petalTilt` row in
-     bloom-registry.js, which is the control that owns the range.
-
-     HOLDING THIS NARROWER THAN THE RANGE IS WRONG, NOT MERELY REFUSED. The
-     composed value is clamped ONCE after composition, so a +5 delta on a base
-     of 120 would land at 125 and come back as 75 — a petal 45 degrees BELOW
-     its own whorl. Saturation is this project's ruled behaviour; a composed
-     value landing below its own base is a discontinuity in a shipped slider.
-     THE DELTA CONTROLS' OWN RANGES DID NOT MOVE: -75..75 is inside the
-     clamp's usable reach (-120..120), and the harness's dead-zone check
-     refuses a delta WIDER than the reach, never a narrower one. */
-  /* SLOT ROLES — the orchid. Labellum 5, hood 3 (Eva, Sep 2). */
-  { role: SLOT_LABELLUM, base: 'petalLength',     control: 'labellumSize',       law: 'mul',   min: 20,   max: 60 },
-  { role: SLOT_LABELLUM, base: 'petalWidth',      control: 'labellumSize',       law: 'mul',   min: 8,    max: 30 },
-  { role: SLOT_LABELLUM, base: 'petalTilt',       control: 'labellumTilt',       law: 'delta', min: 0,    max: 120 },
-  { role: SLOT_LABELLUM, base: 'petalCup',        control: 'labellumCup',        law: 'delta', min: -0.8, max: 1.2 },
-  { role: SLOT_LABELLUM, base: 'petalSpineCurl',  control: 'labellumCurl',       law: 'delta', min: -180, max: 360 },
-
-  { role: SLOT_HOOD, base: 'petalLength', control: 'hoodSize', law: 'mul',   min: 20,   max: 60 },
-  { role: SLOT_HOOD, base: 'petalWidth',  control: 'hoodSize', law: 'mul',   min: 8,    max: 30 },
-  { role: SLOT_HOOD, base: 'petalTilt',   control: 'hoodTilt', law: 'delta', min: 0,    max: 120 },
-  { role: SLOT_HOOD, base: 'petalCup',    control: 'hoodCup',  law: 'delta', min: -0.8, max: 1.2 },
-
-  /* ===================================================================
-     PER-PETAL ROLES — session 11, the fan's own per-position axis, GENERATED
-     from one declaration rather than typed out nine times.
-
-     WHY GENERATED, when every other row here is a literal. Nine groups times
-     five rows is forty-five, and the alternative is forty-five places for a
-     typo in a table whose whole job is to be the one answer to "what may a
-     role override". The generated form has ONE declaration of the set and ONE
-     of the bounds, and the registry generates its matching control rows from
-     the same shape in the same order — so the two cannot drift into two
-     lists, which is the failure this table exists to prevent. The ids are
-     still ordinary ids (`petal3Cup` is a real registry row with a real DOM
-     input); only the typing is saved. A grep for one of them finds this
-     comment, which names the pattern.
-
-     THE SET IS FOUR CONTROLS (Eva's ruling 2, Sep 3): size x, tilt delta, cup
-     delta, curl delta. It is the labellum's five MINUS TIP BREADTH, and the
-     swap was argued rather than inherited — at fan scale the tip silhouette is
-     the least legible per-petal difference, while spine curl is, in this
-     charter's own words about the labellum, "what makes a lip hang and reflex,
-     and it is the one control that can". That is the defining fan gesture and
-     the one the outer groups need.
-
-     THE TIP IS DELIBERATELY ABSENT PER-PETAL, recorded so it reads as a
-     decision rather than an oversight: it is ONE ROW IN THIS TABLE AND ONE IN
-     THE REGISTRY the day Eva wants it. It is also the control whose absence
-     the supersession ruling cost the fan outright was the labellum's TIP
-     delta — and that row is gone entirely now, retired with
-     `petalTipBreadth` (session 32), so no placement can vary the apex per
-     position. It returns as one row here plus one in the registry the day the
-     apex has a control again.
-
-     SIZE IS TWO ROWS PER GROUP, exactly as `labellumSize` is: one control
-     scaling petalLength AND petalWidth, because "size" is both, with the
-     per-base clamp ranges stated separately because they genuinely differ.
-     Every bound below is an EXISTING base's, so OVERRIDE_BOUNDS gains no
-     entry and the load-time agreement check has nothing new to reconcile. */
-  ...PETAL_ROLE_ORDER.flatMap((role, k) => {
-    const c = (suffix) => `petal${k + 1}${suffix}`;
-    return [
-      { role, base: 'petalLength',    control: c('Size'), law: 'mul',   min: 20,   max: 60 },
-      { role, base: 'petalWidth',     control: c('Size'), law: 'mul',   min: 8,    max: 30 },
-      { role, base: 'petalTilt',      control: c('Tilt'), law: 'delta', min: 0,    max: 120 },
-      { role, base: 'petalCup',       control: c('Cup'),  law: 'delta', min: -0.8, max: 1.2 },
-      { role, base: 'petalSpineCurl', control: c('Curl'), law: 'delta', min: -180, max: 360 },
-    ];
-  }),
-];
-
-/* THE LAW'S IDENTITY VALUE — one owner, because three places ask "is this
-   control at its identity": the resolver's skip, the registry's defaults, and
-   both gates. A second copy is how a `mul` row would eventually get tested
-   against 0. */
-export const LAW_IDENTITY = { delta: 0, mul: 1 };
-
-/* THE CLAMP RANGE PER BASE, derived from the table rather than restated, and
-   CHECKED at module load. Several rows may name one base (petalCup is reached
-   by innerCup, labellumCup and hoodCup); they must agree, because the composed
-   value is clamped ONCE at the end and a per-row range would then be three
-   answers to one question. Throws loudly: a disagreement here is a bug that
-   would otherwise show up as a silently different clamp on one role. */
-/* THE BASES A PETAL REPORTS AS `applied` — the role table's, plus the one the
-   form field varies that no role row reaches (twist). Declared after both
-   tables; see FORM_VARIANCE_BASES. */
+   WHAT REMAINS IS THE CLAMP: a base a scope offset or the variance FORM field
+   composes onto is clamped ONCE into the base control's own range, so every
+   composed value is one the control could itself hold. bloom-geometry.js
+   cannot import the registry, so the five ranges are RESTATED and the harness
+   throws at module load if they disagree with the registry — what keeps a
+   restatement from becoming a second owner. Key order is the retired table's
+   (it orders the `applied` record a petal reports). */
 let APPLIED_BASES = null;
-export const OVERRIDE_BOUNDS = (() => {
-  const out = new Map();
-  for (const o of ROLE_OVERRIDES) {
-    if (!(o.law in LAW_IDENTITY)) throw new Error(`ROLE_OVERRIDES: ${o.control} declares unknown law "${o.law}"`);
-    const prev = out.get(o.base);
-    if (!prev) { out.set(o.base, { min: o.min, max: o.max }); continue; }
-    if (prev.min !== o.min || prev.max !== o.max) {
-      throw new Error(`ROLE_OVERRIDES: base "${o.base}" is clamped to ${prev.min}..${prev.max} by one row and ${o.min}..${o.max} by ${o.control} — one base, one range`);
-    }
-  }
-  return out;
-})();
+export const OVERRIDE_BOUNDS = new Map([
+  ['petalSpineCurl', { min: -180, max: 360 }],
+  ['petalCup', { min: -0.8, max: 1.2 }],
+  ['petalLength', { min: 20, max: 60 }],
+  ['petalWidth', { min: 8, max: 30 }],
+  ['petalTilt', { min: 0, max: 120 }],
+]);
 
 /* ===================================================================
    PARAMETER SCOPING — THE STATE MODEL (Scoping-a; feature map §3 and §11,
@@ -1693,15 +1373,13 @@ export const OVERRIDE_BOUNDS = (() => {
    THE LAW (Q3.2, a DEFAULT ruled as a default): a per-scope value is an
    OFFSET on the global value. A petal's effective state is
 
-     global  ->  the role table (today's ALL / INNER / slot / per-petal rows)
-             ->  + its layer's offsets          (scope: layer k)
+     global  ->  + its layer's offsets          (scope: layer k)
              ->  + its own petal's offsets      (scope: petal (k, i), one scope per MIRROR PAIR)
              ->  + the variance field's slot term, headroom-scaled
              ->  the ONE clamp into the base control's own range,
 
-   resolved in ONE place, `resolveRoleOverrides` — the scope term is a fourth
-   stage of the composition that function already owns, never a second
-   resolver beside it. `scopeOffsetsFor` below is the ONE owner of "which
+   resolved in ONE place, `resolvePetalTerms` (the role table that was its first
+   stage is retired, Q3.4). `scopeOffsetsFor` below is the ONE owner of "which
    entries reach slot i of layer k" (the pairing law included); it builds the
    SUM the resolver adds and knows nothing about the controls' laws.
 
@@ -1709,7 +1387,7 @@ export const OVERRIDE_BOUNDS = (() => {
    that declare a mirror plane (`mirrorFor`) — an entry naming slot i reaches
    slot i AND `mirrorPartner(i)`, and an entry naming the partner reaches the
    same two; both are keyed on the pair's CANONICAL slot `min(i, partner)`,
-   which is `petalRoleForSlot`'s own key. SPIRAL and CONTINUOUS have no plane,
+   the orbit index of the pairing law. SPIRAL and CONTINUOUS have no plane,
    so a slot is its own scope there. Two entries for one pair (one per member)
    are summed, so the file cannot hold two answers for one scope.
 
@@ -1725,26 +1403,28 @@ export const OVERRIDE_BOUNDS = (() => {
    HANDED DOWN by the caller (bloom-file.js's `scopesForBuild`); a scoped base
    with no range anywhere is a THROW, never an unclamped value.
 
-   Q3.5 — PER-LAYER SIZE AND TILT WIN OVER `layerSize` / `layerTilt` — is
-   EXPRESSED by this model and NOT YET WIRED: a layer entry carrying an offset
-   on `petalLength` / `petalWidth` / `petalTilt` is "per-layer on" for that
-   quantity, and the wiring session makes footRing() read that layer's ramp
-   term (`ring.scale`, `ring.tiltExtra`) as the identity where the layer owns
-   the quantity. TODAY the offset is ADDED on top of the ramp. Said here, in
-   the outcome doc and in the gate (SO6 measures today's additive behaviour so
-   the wiring session sees the clause it has to move).
+   Q3.5 — PER-LAYER SIZE AND TILT WIN OVER `layerSize` / `layerTilt` — IS WIRED
+   (the role retirement): a LAYER entry carrying an offset on `petalLength`,
+   `petalWidth` or `petalTilt` OWNS that quantity for its layer, and the blade
+   is built from the layer's own value with the ramp's term left out (the
+   size factor of `ring.scale`, the tilt of `ring.tiltExtra`) — `owns` on the
+   term this function returns, read by petalSurface. The ramps keep placing
+   every whorl's RING and FOOT (the foot is the whorl's, Q3.3) and keep giving
+   a layer with no own value its size and tilt; `layerSize` / `layerTilt` hide
+   while per-layer values are live (the registry). The reading is the model
+   doc's own (§5, "where a layer owns the quantity"), and the alternative it
+   rules out — every ramp inert under the toggle — would collapse every whorl
+   onto one ring radius, since one `scale` places the ring, the foot and the
+   blade together.
 
-   WHAT TODAY'S ROLES MAP ONTO (the migration table the retirement session
-   will use — docs/bloom-scoping-model.md §4): ALL deltas are layer-0 offsets
-   on a one-whorl bloom; INNER deltas are offsets on every layer k >= 1; the
-   labellum's and hood's rows are petal offsets on the slots `roleForSlot`
-   assigns, the mirror pair being one scope exactly as it is one role today;
-   `petalN*` rows are petal offsets on every slot of orbit N-1. A `mul` row
-   (size) becomes `global * (mul - 1)`, a delta that is the same petal at the
-   global it was migrated at and a different one if the global later moves —
-   the one semantic loss of the OFFSETS default, recorded. */
+   WHAT THE RETIRED ROLES BECAME is `migrateRoles` in bloom-registry.js (the
+   ALL deltas into the global, INNER into layer or pair entries, the per-petal
+   groups into pair entries, the RADIAL labellum and hood dropped by ruling). */
 export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);
 export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
+/* THE BASES A LAYER ENTRY OWNS (Q3.5) — the ramps' two quantities, size (both
+   of its dimensions) and tilt. */
+export const SCOPE_LAYER_OWNED = Object.freeze(['petalLength', 'petalWidth', 'petalTilt']);
 
 /* ===================================================================
    THE TWO TOGGLES (Scoping-b, Eva's rulings — read docs/bloom-scoping-selection.md
@@ -1756,10 +1436,10 @@ export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
    blanket sweep and `ALL MAX`, and a stored value must be a design state the
    file carries (they decide what builds, so they are SAVED — the selection is
    not). The registry states the same three predicates under the same names
-   (`scopeLayersLive`, `scopePetalsLive`, `scopesOwnRoles`); neither file can
+   (`scopeLayersLive`, `scopePetalsLive`); neither file can
    read the other's answer and both must act on it, so the harness checks the
    two agree at module load and both STL gates per row (Z5) — the
-   `slotRolesEligible` remedy, a fourth time.
+   two-statement remedy, a fourth time.
 
    WHAT A TOGGLE DOES TO THE GEOMETRY, and nothing else:
      1. A LIVE toggle is what lets the matching entries reach a petal at all:
@@ -1770,19 +1450,7 @@ export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
         settings" rule), and nothing of it is built. So an offset only ever
         shapes a petal while the panel can show it, which is what makes "off =
         today's panel exactly" true of the GEOMETRY as well as the panel.
-     2. A live toggle makes the WHOLE ROLE TABLE INERT (ALL, INNER, the
-        labellum and hood, the per-petal groups) — "where they and the new
-        scopes would both reach one petal, the new toggle hides the old
-        controls (one owner on screen)". A layer scope reaches every petal of
-        its layer and a petal scope every petal of its pair, so every role row
-        overlaps one and the rule hides them all. Hidden AND inert, never
-        hidden-and-live: a hidden control still shaping the bloom is a panel
-        that lies. ALL, the slot roles and the per-petal groups go through
-        their eligibility functions (no stamp, no census, no split — the
-        collapse needs no second mechanism); INNER has no eligibility function
-        and its stamp is what Z1 counts, so it is gated where the rows are
-        composed (resolveRoleOverrides). The values are KEPT and return when
-        the toggle is off.
+     2. (A live toggle made the whole ROLE TABLE inert — the table is retired, Q3.4.)
      3. The tube is unavailable while per-layer is live (tubeEligible): the
         tube refuses the buckle, the fringe and the infill on the GLOBAL
         values, and a layer offset on any of them would build under a tube
@@ -1801,9 +1469,6 @@ export function scopeLayersLive(state) {
 }
 export function scopePetalsLive(state) {
   return state.placement === 'FAN' && state.scopePetals === 'ON';
-}
-export function scopesOwnRoles(state) {
-  return scopeLayersLive(state) || scopePetalsLive(state);
 }
 
 /* THE CANONICAL SLOT OF A PETAL SCOPE — the pair's lower index where the
@@ -1860,7 +1525,7 @@ function checkScopeOffsets(offsets, where) { addScopeOffsets({}, offsets, where)
    null when nothing reaches the petal, so the caller's BRANCH on it is the
    whole guard: with no scopes the slot carries `scopeTerm: null` and
    petalSurface takes the call it has always taken. `n` is the whorl's slot
-   count (footRing's `slotCount`), the same n `petalRoleForSlot` is given. */
+   count (footRing's `slotCount`), the whorl primitive's own n. */
 /* THE TOGGLE GATE (Scoping-b) LIVES HERE, in the one owner of "which entries
    reach this petal", rather than at the call site: the page computes a
    selected scope's displayed value through THIS function, so the panel and
@@ -1875,12 +1540,15 @@ export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
   const petalsLive = scopePetalsLive(state);
   const sum = {};
   let any = false;
+  let owns = null;
   for (const e of scopes.layers || []) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);
   for (const e of scopes.petals || []) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);
   if (layersLive) {
     for (const e of scopes.layers || []) {
       if (e.layer !== layer) continue;
       addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;
+      /* Q3.5: a layer entry naming a size or tilt base OWNS it for this layer */
+      for (const k of SCOPE_LAYER_OWNED) if (k in (e.offsets || {})) (owns || (owns = {}))[k] = true;
     }
   }
   if (petalsLive) {
@@ -1890,7 +1558,7 @@ export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
     }
   }
   if (!any) return null;
-  return { offsets: sum, bounds: scopes.bounds || {}, key: { layer, slot: key } };
+  return { offsets: sum, bounds: scopes.bounds || {}, key: { layer, slot: key }, owns };
 }
 
 /* ===================================================================
@@ -1929,7 +1597,7 @@ export function mirrorPartner(i, n, mirror) {
 }
 
 /* WHICH PLANE THIS STATE'S ARRANGEMENT HAS. Derived from the placement and
-   the toggle, in one place, so `roleForSlot`, the read-out's phrasing and
+   the toggle, in one place, so the scope pairing, the read-out's phrasing and
    both gates cannot keep three answers. */
 export function mirrorFor(state) {
   return (state.placement === 'FAN' && state.fanCenterPetal === 'OFF')
@@ -1937,367 +1605,29 @@ export function mirrorFor(state) {
     : MIRROR_THROUGH_SLOT;
 }
 
-/* THE SLOT -> ROLE ASSIGNMENT. Exact integer arithmetic; see the block above
-   for the derivation and for why the odd-n hood is a pair. ONE OWNER:
-   footRing() calls this and stamps the answer onto each descriptor, and
-   buildBloomInto looks a descriptor up by slot index and computes nothing.
 
-   THE SECOND ARM IS THE FAN'S (session 10), and its shape follows from the
-   pairing rather than from taste. With no fixed point every role is a PAIR:
-   the pair CLOSEST to the plane is the LABELLUM — Eva's ruling, "the inner
-   pair when the toggle is off" — and the pair FARTHEST from it is the HOOD,
-   which is the same relation the through-slot arm has (labellum at the plane,
-   hood at its far end) with singletons replaced by pairs.
-
-   AT TWO PETALS THE TWO PAIRS ARE THE SAME PAIR, AND LABELLUM WINS (Eva,
-   Sep 2). One per side with no mirror-line petal is n = 2, where the inner
-   pair IS the outer pair, and a slot cannot carry two slot roles — a
-   descriptor is one (layer x slotRole) cell and two would break the partition
-   Z1 checks. So the tie breaks toward the labellum, which is the fan's
-   defining petal ("the petal on the mirror line is petal number one, and it
-   has its own sliders" — Eva's original fan principle), and the HOOD comes
-   out EMPTY.
-
-   AN EMPTY HOOD IS NOT LEFT DANGLING, and this is where the edge case turned
-   into a rule. Session B pushed the empty group onto LATERAL precisely because
-   LATERAL carries no controls, so an empty LATERAL strands nothing while an
-   empty HOOD would leave three sliders naming a group with no members. Here
-   the empty group CANNOT be moved to LATERAL — the collision is between two
-   control-bearing roles — so the other half of that argument is discharged
-   instead: the hood's controls HIDE when the hood is empty
-   (PREDICATES.hoodEmpty in bloom-registry.js), and Z1 asserts, in both
-   directions, that a role's controls are visible IFF the role is non-empty.
-   Membership and visibility became ONE statement with one owner rather than
-   two rules that could drift apart. */
-export function roleForSlot(i, n, mirror = MIRROR_THROUGH_SLOT) {
-  if (mirror === MIRROR_THROUGH_GAP) {
-    /* n is even here by construction (2 * perSide), so n/2 is exact. The
-       labellum test runs FIRST, which is the whole of the n = 2 tie-break. */
-    if (i === 0 || i === n - 1) return SLOT_LABELLUM;
-    return (i === n / 2 - 1 || i === n / 2) ? SLOT_HOOD : SLOT_LATERAL;
-  }
-  if (i === 0) return SLOT_LABELLUM;
-  if (n % 2 === 0) return i === n / 2 ? SLOT_HOOD : SLOT_LATERAL;
-  return (i === (n - 1) / 2 || i === (n + 1) / 2) ? SLOT_HOOD : SLOT_LATERAL;
-}
-
-/* ===================================================================
-   PER-PETAL ROLES — session 11, and THE WHOLE FINDING IS THAT THEY ALREADY
-   EXISTED, UNNAMED.
-
-   Eva's founding fan principle is "the petal on the mirror line is petal
-   number one, and it has its own sliders". Measured from the EMITTED azimuths
-   before any of this was written — never from the derivation, on the Z4b
-   doctrine — the orbits of the involution this bloom declares are exactly the
-   mirror pairs, ordered by distance from the plane:
-
-     perSide 3  centre ON   n=7   THROUGH_SLOT
-        P1{0}@0.0  P2{1,6}@45.0  P3{2,5}@90.0  P4{3,4}@135.0
-     perSide 3  centre OFF  n=6   THROUGH_GAP
-        P1{0,5}@22.5  P2{1,4}@67.5  P3{2,3}@112.5
-     perSide 8  centre ON   n=17  THROUGH_SLOT
-        P1{0}@0.0  P2@21.3 ... P8@148.8  P9{8,9}@170.0
-
-   So with the toggle ON, P1 IS the singleton mirror-line petal at 0.0 deg —
-   Eva's principle, measured rather than asserted. And in EVERY arm
-   LABELLUM = P1, HOOD = P_last, LATERAL = everything between: per-petal roles
-   are session B's slot-role partition REFINED, from three coarse groups to
-   `perSide + (a mirror-line petal ? 1 : 0)` fine ones. Every group is a mirror
-   orbit by construction, which is what keeps Z4a true without a new clause.
-
-   THE ROLE IS THE ORBIT, AND THE INDEX IS THE DISTANCE FROM THE PLANE IN
-   STEPS — exact integer arithmetic, no angle and no tie tolerance, exactly as
-   `roleForSlot` is. Under THROUGH_SLOT slot i and slot n-i are the pair at
-   +-i steps, so the orbit index is `min(i, n-i)`; under THROUGH_GAP slot i and
-   slot n-1-i are the pair at +-(i+0.5) steps, so it is `min(i, n-1-i)`. Both
-   are `min(i, mirrorPartner(i))`, which is why this reads the partner from its
-   ONE owner instead of writing either expression out.
-
-   Z8 ASSERTS THIS AGAINST THE AZIMUTHS rather than against this function, for
-   the reason Z4b exists: an instrument that recomputed the orbit derivation
-   would agree with a mutated one by mutating alongside it. A numbering that is
-   total, disjoint, mirror-symmetric, correctly sized and correctly visible can
-   STILL label the petals in the wrong order, and that is precisely what "petal
-   one is the mirror-line petal" is a claim about.
-
-   PER-PETAL IS PER PAIR, NEVER PER PETAL-INSTANCE, and the reason is
-   structural rather than aesthetic. The flower does the same — buildLayerInto
-   builds ONE `over(k)` object and pushes it to both sides, commented "shares
-   seed + controls -> exact mirror" — but the binding argument here is that Z4a
-   already asserts the role assignment is mirror-symmetric under the declared
-   involution, in both gates, on every row. Independent left and right would
-   require WEAKENING a shipped assertion, and it would make false the one
-   property the arrangement is defined by. It stays available as its own
-   feature with its own ruling and its own symmetry story; nothing here
-   anticipates it.
-
-   WHERE EVA'S RULING DIVERGES FROM THE FLOWER, recorded as chosen rather than
-   copied: the flower gives its centre petal PETAL 1's controls
-   (`if (bilCenter) placements.push({az: 0, ..., over: over(1)})`, hinted
-   "applies to the centre petal too, if on"), so its group 1 is the inner PAIR
-   plus the mirror-line petal riding along. Eva ruled the mirror-line petal
-   gets sliders ALL OF ITS OWN, so here it is its own group. Same standing as
-   `fanCenterPetal` defaulting ON against the flower's OFF: consistency with
-   the older page lost to the idea the newer one is for.
-
-   THE NUMBERING SHIFTS WITH THE TOGGLE, AND THAT IS THE RULED COST (Eva's
-   ruling (i), Sep 3). Measured at 3 per side: ON gives four groups with P1 the
-   mirror-line petal and P2 the inner pair at 45 deg; OFF gives three, with P1
-   the inner pair at 22.5 deg. So turning the toggle off drops the group count
-   by one and moves "the inner pair" from slider group 2 to slider group 1.
-   The alternative — reserving group 1 for the mirror-line petal and hiding it
-   when the toggle is off, so the pairs keep their numbers — was costed and
-   ruled against: it shows a numbering that visibly starts at 2.
-   NOTHING PERSISTS A DESIGN YET (`RETIRED_IDS` is empty and there is no
-   CURRENT_SCHEMA), so no migration is owed. THE DAY SOMETHING DOES, this
-   becomes RETIRED_IDS material: a saved `petal2Cup` names a different petal on
-   either side of the toggle, which is a stored label-lie on a persisted key —
-   exactly what that list exists for. Recorded now rather than discovered then.
-   =================================================================== */
-
-/* The role ids and the group ceiling are declared beside MAX_FAN_PER_SIDE,
-   which they derive from — `const` hoists WITHOUT initialising, and
-   ROLE_OVERRIDES spreads PETAL_ROLE_ORDER at module load, so declaring them
-   here would be the "Cannot access X before initialization" trap this project
-   has already met once (the charter records it collapsing
-   diff-bloom-bytes.mjs's four phase lists into one). Caught locally this time
-   rather than in CI. */
-
-/* HOW MANY GROUPS THIS ARRANGEMENT ACTUALLY HAS. One owner: footRing() stamps
-   the answer onto each descriptor, the registry's per-group predicates are
-   asserted against it by Z1's biconditional, and no consumer counts orbits for
-   itself. Derived from the slot count and the plane, which is what makes it
-   true in both toggle positions without naming the toggle.
-
-   THE THROUGH-SLOT ARM WAS WRONG FOR EVEN n, AND IT WAS UNREACHABLE — found
-   Sep 3, by enumerating the orbits and comparing rather than by reading the
-   expression. It said `(n + 1) >> 1`, which counts the orbits of
-   `i <-> (n-i) mod n` correctly only when that involution has ONE fixed point.
-   It has TWO at even n: slot 0 AND slot n/2. So the count is short by one on
-   every even n — measured, 20 disagreements across n = 2..40.
-
-   WHY NOTHING SAW IT. Under FAN the two arms are paired with a parity: a
-   mirror-line petal gives `n = 2*perSide + 1`, always ODD, and that is the
-   only way the through-slot arm is reached; the toggle-off arm is
-   through-GAP, where `n / 2` is right. So every reachable state was correct
-   and a general-looking function was wrong everywhere else — which is this
-   project's label-lie shape, in arithmetic. `Math.floor(n/2) + 1` is the
-   orbit count for the through-slot arm at BOTH parities (fixed points plus
-   pairs, `(n + fixedPoints) / 2`), and it agrees with the old expression on
-   every state the fan can reach, so nothing shipped moves.
-
-   IT IS ASSERTED AGAINST THE CENSUS NOW rather than trusted: footRing()'s
-   `slotRoleCensus`/`petalRoleCensus` are built by an unconditional loop over
-   the slots, so comparing this closed form against that count is a comparison
-   between two separate computations. See Z8's group-count clause. */
+/* HOW MANY MIRROR PAIRS (scopes) A FAN HAS — the orbits of the involution its
+   arrangement declares: `n / 2` through the gap, `floor(n/2) + 1` through a
+   slot (the slot-0 fixed point, the pairs, and slot n/2 at even n). Exact
+   integer arithmetic. Born as the per-petal GROUP count (session 11, whose
+   groups retired into scoping, Q3.4); the scope picker lists this many pairs
+   and `migrateRoles` places a retired group k on canonical slot k-1. */
 export function petalGroupCount(n, mirror) {
   return mirror === MIRROR_THROUGH_GAP ? n / 2 : Math.floor(n / 2) + 1;
 }
 
-/* THE SLOT -> PER-PETAL-ROLE ASSIGNMENT, and it has exactly ONE owner.
-   `min(i, partner)` is the orbit's index and the orbit's distance from the
-   plane at the same time, in both arms — see the block above. */
-export function petalRoleForSlot(i, n, mirror) {
-  const k = Math.min(i, mirrorPartner(i, n, mirror));
-  return PETAL_ROLE_ORDER[k];
-}
-
-/* WHETHER PER-PETAL ROLES APPLY AT ALL — FAN only, and the counterpart of
-   `slotRolesEligible` below. Stated HERE as well as in the registry for the
-   reason that function's header gives: neither file can read the other's
-   answer and both must act on it, so the relation is CHECKED (Z5) rather than
-   commented.
-
-   A FAN AT ANY DEPTH, on the same consequence that admitted slot roles there:
-   `layerPhase` is hidden under FAN and `phase` is exactly 0 on every
-   descriptor by construction, so every whorl shares the one plane with no
-   value the visitor could leave wrong.
-
-   AND NOT WHILE PER-PETAL INDEPENDENCE OWNS THE FAN (Scoping-b): a live
-   `scopePetals` hands every petal to its pair's own scope, so the groups are
-   hidden AND inert — see SCOPE_TOGGLE_VALUES' block. */
-export function perPetalEligible(state) {
-  return state.placement === 'FAN' && !scopePetalsLive(state);
-}
-
-/* WHETHER SLOT ROLES APPLY AT ALL — the gating, expressed HERE as well as in
-   the registry because neither file can read the other's answer and both must
-   act on it (the SHEET_THICKNESS_MM precedent). The registry HIDES the
-   controls; this makes them INERT, so a hidden slider cannot move geometry —
-   which is exactly what the named GATED rows assert. Two statements of one
-   boundary is a registration risk, so both gates assert this function agrees
-   with the registry's `slotRolesEligible` predicate on EVERY matrix row.
-
-   The gating lives in the DERIVATION rather than in a separate flag: when it
-   does not hold every slot is LATERAL, LATERAL carries no controls, so no
-   record resolves and the descriptor list collapses on its own. That is
-   session A's pattern for CONTINUOUS one level down. */
-export function slotRolesEligible(state) {
-  /* ===================================================================
-     THE FAN ARM IS GONE — PER-PETAL ROLES SUPERSEDE SLOT ROLES THERE (Eva's
-     ruling 4, Sep 3), AGAINST THE SESSION'S OWN RECOMMENDATION AND WITH THE
-     COST STATED TO HER AND ACCEPTED.
-
-     Session 10 admitted the fan here, and it was right for what it was ruling
-     on: slot roles were then the ONLY per-position axis, so composing them
-     onto the fan was the difference between a fan that could have a labellum
-     and one that could not. Per-petal roles are a per-position axis too, and
-     they REFINE this one exactly — LABELLUM is P1, HOOD is P_last, LATERAL is
-     everything between (see petalRoleForSlot's header for the measurement). So
-     on a fan the two axes are not orthogonal, and the session proposed they
-     COMPOSE, with `labellumCup` and `petal1Cup` both reaching slot 0 through
-     the one resolver. Eva ruled the other way: per-petal is the ONLY
-     per-position axis on the fan.
-
-     WHAT IT COSTS, RULED AND ACCEPTED RATHER THAN OVERLOOKED. The fan loses
-     labellum TIP BREADTH entirely, because the per-petal set ships without a
-     tip-breadth row (Eva's ruling 2 — spine curl earned that slot instead) and
-     the labellum's TIP delta no longer exists at all. Nothing else is lost: size,
-     tilt, cup and curl all exist per group. It is one row in this table and
-     one in the registry the day she wants it back.
-
-     NOTHING IS RETIRED, AND THAT IS THE SHAPE OF THE RULING. Slot roles stay
-     FULLY LIVE under RADIAL — same controls, same ids, same laws, same gate
-     rows. This is a VISIBILITY plus APPLICABILITY change, so `RETIRED_IDS`
-     does not apply and no migration is owed. COMPOSITION (the session's option
-     B) REMAINS THE RECOVERABLE ALTERNATIVE if Eva ever wants the labellum
-     vocabulary back on the fan: it is this one arm plus the matching arm of
-     the registry's `slotRolesEligible` predicate, and nothing else was written
-     to depend on their absence.
-
-     TWO THINGS THE RULING MAKES UNREACHABLE, KEPT ON PURPOSE AND ASSERTED
-     RATHER THAN CLAIMED. `roleForSlot`'s THROUGH_GAP arm assigns LABELLUM and
-     HOOD under the fixed-point-free involution — written for the fan with the
-     toggle off, which no longer has slot roles — and `PREDICATES.hoodEmpty` is
-     never true, since all three of its terms are FAN terms and under RADIAL
-     the hood is non-empty at every reachable count. Deleting either would make
-     recovery a rewrite instead of a predicate arm, which is exactly what Eva
-     ruled against; leaving them SILENT would be the dead-label defect this
-     project retires ids over. So they stay, and **Z9 asserts their
-     unreachability on every row, in both directions** — which is the
-     "never-true predicate with a reason, over a boolean flag" pattern arriving
-     on a pair of never-true code paths.
-     =================================================================== */
-  /* ===================================================================
-     THE ONE-WHORL ARM IS GONE TOO — THE SINGLE-LAYER ORCHID IS RETIRED (Eva's
-     ruling, Sep 3, from the deploy preview, WITH THE COST STATED TO HER AND
-     ACCEPTED). Session B built the labellum and hood on the one-whorl rosette
-     and this function admitted it with "nothing above the outermost whorl to
-     fall out of step". Eva ruled that at one whorl "Petal roles" is the
-     ALL-PETALS group (ROLE_ALL, above) and Petal 1 / Petal N are HIDDEN there
-     — and hidden means INERT, so a labellum or hood record must not reach the
-     geometry at one whorl. What survives: the orchid on RADIAL at two or more
-     whorls with Layer offset 0, and the fan's per-petal groups at every
-     depth. What is given up: the one-whorl radial orchid, deliberately.
-
-     RECOVERABLE, NOT RETIRED IN THE `RETIRED_IDS` SENSE: the controls, their
-     ids, laws and gate rows are unchanged and fully live above one whorl.
-     Recovery is this one `>= 2` back to `=== 1 ||` plus the matching arm of
-     the registry's predicate — nothing else was written to depend on it.
-
-     MEASURED, NOT ASSUMED: of the 33 matrix rows with a labellum or hood
-     control engaged at one whorl on RADIAL (33 in each of phase10, phase9 and
-     phase8; none in any earlier baseline) exactly 30 moved and 3 did not, on
-     all three identically, and nothing outside them moved. The three are
-     rows whose override clamps back to the base's own value, already
-     identical to their no-override counterparts before the change. All 33
-     are bit-identical to those counterparts on this tree — see the charter's
-     session-11 entry.
-     =================================================================== */
-  /* NOT WHILE PER-LAYER INDEPENDENCE OWNS THE ROSETTE (Scoping-b): a layer
-     scope reaches every petal of its layer, Petal 1 and Petal N among them,
-     so the slot roles are hidden AND inert — SCOPE_TOGGLE_VALUES' block. */
-  if (scopeLayersLive(state)) return false;
-  if (state.placement !== 'RADIAL') return false;
-  return Math.round(state.layerCount) >= 2 && state.layerPhase === 0;
-}
-
-/* WHERE THE ALL-PETALS GROUP APPLIES — one whorl, every placement. At one
-   whorl "all petals" is well-defined everywhere: the rosette's one ring, the
-   spiral's one sequence, the continuous mode's one turn, the fan's one arc.
-   Above one whorl the group is the INNER whorl (session A's trio) and this
-   returns false, which makes the three `all*` controls INERT there exactly as
-   the registry HIDES them — two statements of one boundary, checked against
-   each other by Z5 on every row rather than trusted. `layerCount` is rounded
-   as everywhere else it is read.
-
-   AND NOT WHILE A SCOPE TOGGLE OWNS THE PETALS (Scoping-b): at one whorl the
-   group is every petal, which is exactly what a layer scope (RADIAL) or the
-   pair scopes together (FAN) reach — SCOPE_TOGGLE_VALUES' block. */
-export function allPetalsEligible(state) {
-  return Math.round(state.layerCount) === 1 && !scopesOwnRoles(state);
-}
-
-/* THE SLOT -> ROLE ASSIGNMENT, and it has exactly ONE owner. footRing() calls
-   it and stamps the answer onto each descriptor; buildPetalInto READS
-   `ring.role` and computes nothing. That is the same relation `scale`,
-   `phase` and `tiltExtra` have carried since layers shipped. */
-export function roleForLayer(layerIndex, continuousMode) {
-  return (continuousMode || layerIndex === 0) ? ROLE_OUTER : ROLE_INNER;
-}
-
-/* THE RESOLVED RECORD, or null. Null is the guard's whole mechanism: an OUTER
-   ring, or an INNER ring with every delta at 0, carries no record at all, and
-   petalStateFor() then hands the builder the caller's own state OBJECT.
-
-   A zero delta is SKIPPED rather than added. `x + 0` is exact for every
-   finite x and the clamp would be a no-op, so the skip is not needed for the
-   arithmetic — it is needed so that "no overrides" produces `null` and the
-   identity guard has something to test. Resting the layer on `-0 + 0` being
-   `+0` is the case analysis the form layer deliberately declined to rest on;
-   this does not need it. */
-/* SESSION B COMPOSES TWO ROLE AXES, and the composition law is stated rather
-   than left to argument. For each base, start from `state[base]`, apply every
-   matching row IN TABLE ORDER (layer rows first, then slot rows — a whorl's
-   character, then how one slot differs within it), and clamp ONCE at the end
-   into the base's own range. Clamping per row instead would let an
-   intermediate clip eat the second row's reach, silently.
-
-   `roles` is the list of roles this descriptor carries — [layerRole] under
-   session A's shape, [layerRole, slotRole] once a whorl is split. Passing a
-   LIST rather than two arguments is what keeps this one loop: adding a third
-   axis later is a longer list, not a rewritten resolver.
-
-   THE ZERO/ONE SKIP IS THE WHOLE GUARD, unchanged from session A in mechanism
-   and merely re-pointed at the law's own identity. A row at its identity is
-   SKIPPED, never applied, so `x + 0` and `x * 1` are not evaluated at all on
-   the shipped path; with every row skipped `out` stays null, and
-   petalStateFor() then returns the caller's own state OBJECT. That is why
-   byte-identity at the defaults is a construction rather than an argument,
-   and why it survived gaining a second law. */
-export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm = null, scaledOut = null, scopeTerm = null) {
+/* THE PER-SLOT COMPOSITION — a petal's effective value of every base a scope
+   offset or the variance FORM field reaches, clamped once into the base's own
+   range; null when neither reaches it, which is the whole guard (the caller
+   then builds from its own state object). Two stages, in order: the SCOPE term
+   (a layer's offsets and the petal's own, already summed by scopeOffsetsFor),
+   then the FORM field's slot term, headroom-scaled. The role table that used
+   to be the first stage is retired (Q3.4); with every role at its identity it
+   added nothing, so every state that engaged no role composes the doubles it
+   always did. */
+export function resolvePetalTerms(state, clampedOut = null, slotTerm = null, scaledOut = null, scopeTerm = null) {
   let out = null;
-  /* THE ROLE TABLE IS INERT WHILE A SCOPE TOGGLE OWNS THE PETALS (Scoping-b).
-     ALL, the slot roles and the per-petal groups never reach here then (their
-     eligibility functions stamp nothing); INNER is stamped on every layer
-     >= 1 whatever the toggle — Z1 counts that stamp — so this is where it goes
-     inert, on every route a role reaches a petal by (the ring's own record,
-     the per-slot recomposition, the collapse guard's probe). False on every
-     state that never set a toggle, so no row is skipped on the shipped path. */
-  const roleTableInert = scopesOwnRoles(state);
-  for (const o of ROLE_OVERRIDES) {
-    if (!roles.includes(o.role)) continue;
-    if (roleTableInert) continue;
-    const v = state[o.control];
-    /* A ROW AT ITS LAW'S IDENTITY IS SKIPPED, which is the whole guard.
-       THE OLD COMMENT HERE SAID "identity and NaN alike take the shipped
-       path" AND THAT WAS FALSE — measured, Sep 3, while checking this
-       expression for a third axis: `!(NaN !== 0)` is `!(true)` is `false`, so
-       a NaN never skipped; it composed to NaN and the clamp carried it
-       through. A label naming a computation nobody performed, in the guard.
-       WHAT IS ACTUALLY TRUE, and it is a reachability argument rather than a
-       handler: every control here is a `kind: 'slider'`, `coerceValue` reads
-       it with `Number(...)` from an `<input type="range">`, and a range
-       input's value is always a numeric string — so NaN cannot arrive through
-       the registry at all. The expression is left exactly as it was (nothing
-       reachable behaves differently either way, and changing a guard on the
-       strength of an unreachable case is how a byte moves for nothing); only
-       the claim is corrected. */
-    if (!(v !== LAW_IDENTITY[o.law])) continue;
-    const from = (out && o.base in out) ? out[o.base] : state[o.base];
-    (out || (out = {}))[o.base] = o.law === 'mul' ? from * v : from + v;
-  }
-  /* THE SCOPE TERM (Scoping-a) — AFTER every role row and BEFORE the variance
+  /* THE SCOPE TERM (Scoping-a) — FIRST, before the variance
      slot term and the clamp: a layer's offsets and the petal's own, already
      summed by scopeOffsetsFor, added to the composed base. Null on every
      build with no scopes, so this loop never runs on the shipped path. */
@@ -2375,35 +1705,11 @@ export function resolveRoleOverrides(state, roles, clampedOut = null, slotTerm =
   return out;
 }
 
-/* THE GUARD, AND IT IS OBJECT IDENTITY — the cheapest one available and the
-   strongest. With no record this returns the SAME OBJECT it was handed, so
-   widthProfile, petalForm, thicknessProfile and the three inline reads in
-   buildPetalInto take the pre-zygomorphy call on the pre-zygomorphy object.
-   There is no expression to have got subtly wrong, which is why this is
-   stated as a construction rather than measured as a residual — and the byte
-   report is still what confirms it, on 598 frozen rows plus the live matrix.
-
-   NOT ALLOWED TO BE SOMEWHERE A BUG SITS UNEXERCISED (formGuardResidual's
-   doctrine): the gates assert, on every row, that a ring with no record makes
-   the builder report EXACTLY the base state's values (Z2), so the guarded
-   path is measured rather than assumed to be taken. */
-export function petalStateFor(state, ring) {
-  if (!ring.overrides) return state;
-  return { ...state, ...ring.overrides };
-}
-
-/* THE ROLES A DESCRIPTOR CARRIES, in the order footRing() composed them. */
-export function ringRoles(ring) {
-  return [ring.role, ring.allRole, ring.slotRole, ring.petalRole].filter((r) => r !== null && r !== undefined);
-}
-/* THE PER-SLOT STATE (organic variance, build 2): the descriptor's roles
-   RE-COMPOSED with the slot's form term and clamped once — never the ring's
-   already-clamped record plus a second clamp. Called only where the slot
-   carries a term, so `petalStateFor` above stays the whole shipped path.
-   `clampedOut` collects which composed bases the clamp bit, as the ring's own
-   `overrideClamped` does. */
-export function petalStateForSlot(state, ring, slotTerm, clampedOut = null, scaledOut = null, scopeTerm = null) {
-  const out = resolveRoleOverrides(state, ringRoles(ring), clampedOut, slotTerm, scaledOut, scopeTerm);
+/* THE PER-SLOT STATE: the caller's state with the scope and form terms
+   composed onto it. Called only where a slot carries one of them, so a petal
+   that carries neither is built from the caller's own state OBJECT. */
+export function petalStateForSlot(state, slotTerm, clampedOut = null, scaledOut = null, scopeTerm = null) {
+  const out = resolvePetalTerms(state, clampedOut, slotTerm, scaledOut, scopeTerm);
   return { ...state, ...out };
 }
 
@@ -2427,10 +1733,6 @@ export function footRing(state, acc, opts = {}) {
     throw new Error(`unknown placement ${JSON.stringify(state.placement)} — the registry and the builder have diverged`);
   }
   const continuousMode = state.placement === 'CONTINUOUS';
-  /* THE ALL-PETALS ROLE, stamped on every descriptor of a one-whorl bloom and
-     on none of a layered one — decided once here, read by the resolver and
-     reported to the read-out and the gates, exactly as `role` is. */
-  const allRole = allPetalsEligible(state) ? ROLE_ALL : null;
   /* ===================================================================
      THE FAN'S OWN DERIVED QUANTITIES, owned HERE (session 10) — the step, the
      span, the notch and whether the arc limit bit. They live in footRing()
@@ -2559,130 +1861,18 @@ export function footRing(state, acc, opts = {}) {
      on the same doubles as the pre-layer code. The single-layer default is
      byte-identical here BY CONSTRUCTION; the byte report confirms it. */
   const raw = [];
-  /* THE AREA-RULE TOTAL, GROUPED BY ROLE — the shipped sum from here on, and
-     the reason the grouping is by role rather than by slot is measured in the
-     ZYGOMORPHY block above (per-slot grouping moves every 40-petal export by
-     6 ULP). At one role per ring `roleCount` is exactly the group size the
-     pre-role expression used, so both arms are bit-identical here today; that
-     is asserted, not asserted-by-comment, by `zygoGuardResidual` below.
-     WHAT THE AREA RULE SUMS IS UNCHANGED IN DEFINITION: r_ring^2 = SUM of
-     r_foot^2 over every foot that feeds the hub. Only the grouping is named. */
+  /* THE AREA-RULE TOTAL, ONE GROUP PER WHORL — `footCount * rFoot^2`, the
+     whole whorl's count times one foot's area, never regrouped per foot (that
+     moves every 40-petal export by 6 ULP: the a*(b+c) trap). Zygomorphy split a
+     whorl into role groups here; the roles are retired (Q3.4), so the whorl is
+     always one group, which is the arithmetic every state that engaged no
+     role always had. WHAT THE AREA RULE SUMS: r_ring^2 = SUM of r_foot^2 over
+     every foot that feeds the hub. */
   let sumSq = 0;
-  /* THE PRE-ROLE EXPRESSION, VERBATIM, carried alongside purely to be
-     compared against — the guardResidual doctrine one layer up. It is the
-     ringed `state.petalCount * rFoot * rFoot` and the continuous
-     `rFoot * rFoot` character for character, so the comparison is between two
-     genuinely different groupings rather than between an expression and a
-     restatement of itself. Nothing geometric reads it. */
-  let preRoleSumSq = 0;
-  /* ===================================================================
-     THE COLLAPSE GUARD — null means "one descriptor per layer, exactly as
-     session A", and it is LOAD-BEARING RATHER THAN TIDINESS. MEASURED before
-     it was written: splitting a whorl's `n * rFoot^2` into
-     `1*r^2 + h*r^2 + l*r^2` moves the derived ring radius on 46 of 264
-     (config x mode) rows — worst 0.99 ULP, 3.553e-15 on a 17.26 mm radius at
-     n=39 x petalWidth 30 x sheet 2.40 — and it moves at n=3 as readily as at
-     n=40. So an UNCONDITIONAL split would move those exports for nothing.
-     That is the flower's `a*(b+c)` vs `a*b + a*c` trap, and this is its
-     FOURTH appearance in this project family (it fired on a real row when
-     layers were written, would have fired on per-slot grouping in session A,
-     is why the continuous arm is a branch rather than a reformulation, and
-     would have fired here). Prevented at design time again, by measurement.
-
-     SO THE SPLIT IS CONDITIONAL ON A RECORD EXISTING, never on a flag: the
-     partition is dropped entirely unless some slot role actually resolves an
-     override. Ineligible placement or depth makes every slot LATERAL, LATERAL
-     carries no rows in ROLE_OVERRIDES, so nothing resolves and this returns
-     null on its own — the gating needs no second mechanism. Z5 asserts the
-     collapse in BOTH directions, so the guard is never somewhere a bug sits
-     unexercised (formGuardResidual's doctrine, one level up). */
   /* WHICH PLANE THIS ARRANGEMENT HAS — one owner (mirrorFor), read once and
-     passed down, so the role derivation, the read-out's phrasing and the
-     gates cannot end up with three answers to one question. */
+     passed down, so the scope pairing, the read-out's phrasing and the gates
+     cannot end up with three answers to one question. */
   const mirror = mirrorFor(state);
-  /* ===================================================================
-     THE SLOT-ROLE CENSUS — WHO IS IN EACH GROUP, computed whenever slot roles
-     are ELIGIBLE and independently of whether a whorl actually SPLIT.
-
-     WHY IT IS SEPARATE FROM `positionGroups` (session 10): the split is
-     conditional on a control being off its identity (the collapse guard), but
-     the QUESTION "does the hood have any members" is about the arrangement
-     alone and has an answer at every eligible state — including the shipping
-     default, where nothing is overridden and nothing splits. The hood's
-     controls hide on that answer and Z1 asserts visibility against it in both
-     directions, so it has to exist without a split. Telemetry plus the
-     collapse guard's input; nothing geometric reads the counts. */
-  /* ONE CENSUS PER POSITION AXIS, from the SAME expression — a `roleAt`
-     function and a loop over the slots. Writing it once and passing the
-     assignment in is what keeps the two arms from becoming two loops that
-     could drift; the arms differ in WHICH assignment they pass, which is the
-     only thing that actually differs. */
-  const censusOf = (roleAt) => {
-    const bySlot = new Map();
-    for (let i = 0; i < n; i++) {
-      const r = roleAt(i, n, mirror);
-      if (!bySlot.has(r)) bySlot.set(r, []);
-      bySlot.get(r).push(i);
-    }
-    return bySlot;
-  };
-  const slotRoleCensus = (continuousMode || !slotRolesEligible(state)) ? null : censusOf(roleForSlot);
-  /* ===================================================================
-     THE PER-PETAL CENSUS — session 11's own, and MUTUALLY EXCLUSIVE with the
-     slot one by RULING rather than by accident (Eva's ruling 4, Sep 3).
-
-     Per-petal roles are FAN-only and slot roles are RADIAL-only, so at most
-     one position axis is ever eligible and there is never a join to compute.
-     That is what makes this a BRANCH beside the slot arm rather than a
-     generalisation of it, and it is why the RADIAL path below is character for
-     character what it was — the standing rule that kept the continuous, the
-     fan and the slot arms bit-identical, applied a fourth time. **Z9 asserts
-     the exclusivity in both directions**, so it is a measurement rather than a
-     property of how this file happens to be written today. */
-  const petalRoleCensus = (continuousMode || !perPetalEligible(state)) ? null : censusOf(petalRoleForSlot);
-
-  /* ===================================================================
-     THE POSITION PARTITION, AND IT IS CONDITIONAL — THE SIXTH PREVENTION OF
-     THE REGROUPING TRAP, measured before a line of it was written.
-
-     Every foot in a whorl shares one `rFoot`, so each grouping is a different
-     PARTITION OF n multiplying the same `r^2` — the `a*(b+c)` vs `a*b + a*c`
-     trap in its purest form. Measured across 6,912 (centre x perSide x width x
-     sheet x delicacy x layerSize x depth x mode) rows BEFORE this was built:
-
-       per-ORBIT vs the whole whorl        moved 1,119 / 6,912   worst 2.00 ULP
-       per-ORBIT vs the 3-role slot split  moved   889 / 6,912   worst 2.00 ULP
-
-     (8.882e-16 on R = 3.2422007466, at centre ON x perSide 2 x petalWidth 8.)
-     So a split taken whenever the fan is merely ELIGIBLE would move exports on
-     every fan row for nothing — invisibly to both STL gates, at an identical
-     triangle count and an identical STL byte length. It is conditional on a
-     control being off its identity, exactly as session B's is, and **Z7
-     asserts the partition is the COARSEST that serves the engaged axes**, in
-     both directions, so the guard is never somewhere a bug sits unexercised.
-
-     THE COLLAPSE STILL NEEDS NO SECOND MECHANISM. An ineligible state produces
-     no census; a census whose roles resolve nothing returns null; and null
-     means "session A's descriptor list", on session A's arithmetic, character
-     for character. */
-  const positionGroups = (() => {
-    const census = slotRoleCensus !== null ? slotRoleCensus : petalRoleCensus;
-    if (census === null) return null;
-    const order = slotRoleCensus !== null ? SLOT_ROLE_ORDER : PETAL_ROLE_ORDER;
-    const roles = order.filter((r) => census.has(r));
-    if (!roles.some((r) => resolveRoleOverrides(state, [r]) !== null)) return null;
-    /* THE DESCRIPTOR CARRIES THE AXIS IT CAME FROM, and the other reads null.
-       "This whorl was split by position" and "this group is a slot role" are
-       different claims, and a reader must not have to infer which axis a value
-       came from — the same reason `slotRole` is null rather than LATERAL on an
-       unsplit descriptor. */
-    const isSlot = slotRoleCensus !== null;
-    return roles.map((r) => ({
-      slotRole: isSlot ? r : null,
-      petalRole: isSlot ? null : r,
-      slots: census.get(r),
-    }));
-  })();
   if (continuousMode) {
     /* THE CONTINUOUS ARM — one ring per PETAL, `lambda` a real number.
 
@@ -2707,14 +1897,11 @@ export function footRing(state, acc, opts = {}) {
       const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
       const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
       const rFoot = Math.sqrt((width * thickness) / Math.PI);
-      /* A CONTINUOUS RING CARRIES EXACTLY ONE PETAL, so its role group is one
-         slot. `1 * x * x` is `x * x` exactly in IEEE-754 (multiplication by
-         1.0 is exact for every finite x), which the residual measures rather
-         than assumes. */
-      const roleCount = 1;
-      sumSq += roleCount * rFoot * rFoot;
-      preRoleSumSq += rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot, roleCount, role: roleForLayer(k, true), allRole, slotRole: null, petalRole: null, slots: null, clamped: [] });
+      /* A CONTINUOUS RING CARRIES EXACTLY ONE PETAL. `1 * x * x` is `x * x`
+         exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
+      const footCount = 1;
+      sumSq += footCount * rFoot * rFoot;
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
@@ -2722,28 +1909,13 @@ export function footRing(state, acc, opts = {}) {
     const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
     const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
-    const layerRole = roleForLayer(L, false);
-    preRoleSumSq += slotCount * rFoot * rFoot;
-    if (positionGroups === null) {
-      /* THE COLLAPSED ARM — SESSION A'S, CHARACTER FOR CHARACTER, and it is
-         the shipped path at every default. The group is the whole whorl and
-         `roleCount` is `state.petalCount` — the SAME DOUBLE the pre-role
-         expression multiplied by, deliberately read unrounded exactly as that
-         expression read it. */
-      const roleCount = slotCount;
-      sumSq += roleCount * rFoot * rFoot;
-      raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, allRole, slotRole: null, petalRole: null, slots: null, clamped: [] });
-    } else {
-      /* THE SPLIT ARM — one descriptor per (layer x slot role), in
-         SLOT_ROLE_ORDER. The sum stays GROUPED BY ROLE and is never regrouped
-         per foot; see the collapse note above for why the split itself has to
-         be conditional. */
-      for (const g of positionGroups) {
-        const roleCount = g.slots.length;
-        sumSq += roleCount * rFoot * rFoot;
-        raw.push({ lambda: L, scale, authoredWidth, width, rFoot, roleCount, role: layerRole, allRole, slotRole: g.slotRole, petalRole: g.petalRole, slots: g.slots, clamped: [] });
-      }
-    }
+    /* The group is the whole whorl and `footCount` is `state.petalCount` (or
+       the fan's derived count) — the SAME DOUBLE the pre-role expression
+       multiplied by, deliberately read unrounded exactly as that expression
+       read it. */
+    const footCount = slotCount;
+    sumSq += footCount * rFoot * rFoot;
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount });
   }
   }
 
@@ -2905,7 +2077,7 @@ export function footRing(state, acc, opts = {}) {
          that is a rigid rotation of the inner fan OFF the mirror line, which
          destroys the one plane the whole arrangement is about. So it is
          HIDDEN there by its own registry predicate and inert here — and that
-         is exactly what lets slotRolesEligible() admit a fan at any depth. */
+         is what lets a fan carry pair scopes at any depth. */
       phase: (continuousMode || fanMode) ? 0 : (p.lambda * state.layerPhase * TAU) / state.petalCount,
       /* ===================================================================
          DOME LEAN (Sep 4, the crown-coverage session) — a boost DERIVED FROM
@@ -2979,49 +2151,13 @@ export function footRing(state, acc, opts = {}) {
       /* TELEMETRY ONLY, like derivedRadius: what the clamps did, so the
          read-out and the gates can say WHERE a floor started binding instead
          of a slider silently going quiet. Nothing geometric may read these. */
-      /* THE ROLE AND ITS GROUP SIZE, owned here so no consumer derives them.
-         buildPetalInto READS `role` and `overrides`; it computes neither. */
-      /* THE LAYER THIS DESCRIPTOR BELONGS TO. `index` is the descriptor's
-         position in `rings`, which stopped being the layer index the moment a
-         whorl could split; `lambda` is the layer (an integer under the ringed
-         arm, the real depth under the continuous one) and is what `phase` and
-         `tiltExtra` are keyed off. Two names because they are two numbers. */
+      /* THE LAYER THIS DESCRIPTOR BELONGS TO — the integer layer under the
+         ringed arm, the real depth under the continuous one; what `phase` and
+         `tiltExtra` are keyed off. */
       lambda: p.lambda,
-      role: p.role,
-      roleCount: p.roleCount,
-      /* THE SLOT ROLE AND THE SLOTS THAT CARRY IT. `slotRole` is null on a
-         COLLAPSED descriptor — which is session A's shape and every shipped
-         default — and never LATERAL there, because "this whorl was not split"
-         and "this group is the laterals" are different claims and a reader
-         must not have to guess which one a value means. `slots` is the
-         descriptor's own slot indices, owned here so buildBloomInto can look
-         a descriptor up by slot index and compute nothing. */
-      slotRole: p.slotRole,
-      /* THE PER-PETAL ROLE — this descriptor's mirror ORBIT, counted outward
-         from the plane, or null. Never both this and `slotRole`: the two
-         position axes are mutually exclusive by placement (Eva's ruling 4),
-         and Z9 asserts that rather than trusting it. */
-      petalRole: p.petalRole,
-      /* THE ALL-PETALS STAMP TRAVELS WITH THE OTHER ROLES — the probe that
-         found it missing here is why Z1 reads it back from the metrics. */
-      allRole: p.allRole,
-      slots: p.slots,
-      /* THE RESOLVED OVERRIDE RECORD, or null. Null on every descriptor whose
-         roles carry no non-identity control — every OUTER-and-unsplit ring,
-         every LATERAL, and any INNER ring whose deltas are all 0 — which is
-         what makes petalStateFor() an identity guard rather than a merge. */
-      /* THE ROLES THIS DESCRIPTOR CARRIES — layer, then position. A THIRD
-         AXIS IS A LONGER LIST, NOT A REWRITTEN RESOLVER, which is what the
-         seam session A wrote said it would be; `resolveRoleOverrides` walks
-         the TABLE and tests membership in this list, so precedence is
-         declared by where a row sits in ROLE_OVERRIDES and by nothing else.
-         Per-petal rows sit last, so per-petal has the last word, and the
-         composed value is clamped ONCE at the end into the base's own
-         range. */
-      overrides: resolveRoleOverrides(state, [p.role, p.allRole, p.slotRole, p.petalRole].filter((r) => r !== null), p.clamped),
-      /* TELEMETRY ONLY — which composed values the envelope clamp bit, for
-         the read-out and for the gates. Nothing geometric reads it. */
-      overrideClamped: p.clamped,
+      /* HOW MANY FEET THIS DESCRIPTOR CARRIES — the whole whorl (ringed) or one
+         (continuous); the area rule's group, and J's accounting check. */
+      footCount: p.footCount,
       authoredWidth: p.authoredWidth,
       widthClamped: p.authoredWidth < FOOT_MIN_WIDTH_MM,
       /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the
@@ -3393,63 +2529,13 @@ export function footRing(state, acc, opts = {}) {
     }
   }
 
-  /* ===================================================================
-     THE ROLE-GROUPING RESIDUAL — an EQUALITY, deliberately not a bound, and
-     the reason it can be one is the measurement in the ZYGOMORPHY block:
-     grouping by ROLE preserves the pre-role loop shape, so at one role per
-     ring the two sums are the same double. Grouping by SLOT would not have
-     been, at 6 ULP on a real 40-petal row, and stating that here is what
-     stops a later session "simplifying" the grouping away.
-
-     ASSERTED ON EVERY BUILD THAT CAN MAKE THE CLAIM, so the guard is never
-     somewhere a bug sits unexercised. The claim is only available while every
-     ring's role group is the pre-role expression's own group — the whole
-     whorl under the ringed arm, the single petal under the continuous one.
-     Session B splits a whorl into LABELLUM / HOOD / LATERAL, at which point
-     the two groupings legitimately differ and there is no law to compare
-     against: it reports null there, never a passing 0. That is the same
-     shape as guardResidual above and for the same reason — a claim nothing
-     can make must read as absent. */
-  const preRoleGroup = continuousMode ? 1 : slotCount;
-  /* SESSION B REACHES THIS. A split whorl carries LABELLUM / HOOD / LATERAL
-     groups whose sizes are not the pre-role group, so there is no pre-role
-     grouping to compare against and the residual is ABSENT rather than a
-     passing 0 — exactly as session A wrote this line to behave. */
-  const oneRolePerRing = rings.every((r) => r.roleCount === preRoleGroup);
-  const zygoGuardResidual = oneRolePerRing
-    ? Math.abs(Math.sqrt(sumSq) - Math.sqrt(preRoleSumSq))
-    : null;
-
-  /* THE SLOT -> DESCRIPTOR MAP, owned here because footRing() owns the ring
-     list and a consumer that decided for itself which descriptor a slot
-     belongs to would be a second copy of the role derivation.
-
-     `slotRings[L][i]` is the descriptor for slot i of whorl L. WHEN THE
-     WHORL IS UNSPLIT EVERY ENTRY IS THE SAME OBJECT — literally `rings[L]`,
-     the object session A passed — so buildPetalInto receives an identical
-     `ring` reference on the shipped path and the byte argument needs no
-     further clause. Null under CONTINUOUS, where a ring IS a petal and
-     buildBloomInto indexes the ring list directly.
-
-     `slotsPerRing` RETIRED WITH THIS (Sep 2). It was a scalar answering "how
-     many petals does a ring carry", which stops being one number the moment a
-     whorl splits — 1 labellum, 1 hood, n-2 laterals. Keeping it would have
-     been a name for a thing that is no longer the thing, on a value J1 does
-     arithmetic with. Its one real consumer was J1's accounting check, which
-     now sums each descriptor's own `roleCount`; nothing persists it, so the
-     retirement is free and no RETIRED_IDS entry is owed (that list is for
-     CONTROL ids, which reach saved designs). */
+  /* THE SLOT -> DESCRIPTOR MAP: `slotRings[L][i]` is the descriptor for slot i
+     of whorl L — literally `rings[L]` for every slot (a whorl is one descriptor
+     now that no role splits it). Null under CONTINUOUS, where a ring IS a petal
+     and buildBloomInto indexes the ring list directly. */
   const slotRings = continuousMode ? null : (() => {
     const byLayer = [];
-    for (let L = 0; L < layerCount; L++) {
-      const forLayer = rings.filter((r) => r.lambda === L);
-      const row = new Array(n);
-      for (const d of forLayer) {
-        if (d.slots === null) { row.fill(d); break; }
-        for (const i of d.slots) row[i] = d;
-      }
-      byLayer.push(row);
-    }
+    for (let L = 0; L < layerCount; L++) byLayer.push(new Array(n).fill(rings.find((r) => r.lambda === L)));
     return byLayer;
   })();
 
@@ -3558,9 +2644,8 @@ export function footRing(state, acc, opts = {}) {
       ring: {
         index: -1, radius, derivedRadius, width: footMm, thickness, overhang,
         scale: 1, phase: startAzimuth, domeLean: !onHub && dome && !sphere ? (slope * 180) / Math.PI : 0, tiltExtra: 0, lambda: 0,
-        role: 'SEPAL', roleCount: count, slotRole: null, petalRole: null, allRole: null,
-        slots: Array.from({ length: count }, (_, i) => i), overrides: null, roles: ['SEPAL'],
-        z, slope, arc, relief, dome: onHub ? null : dome, underFootFloor: radius < FOOT_MIN_WIDTH_MM, crossesAxis: overhang > radius, clamped: [],
+        footCount: count,
+        z, slope, arc, relief, dome: onHub ? null : dome, underFootFloor: radius < FOOT_MIN_WIDTH_MM, crossesAxis: overhang > radius,
       },
     };
   };
@@ -3628,45 +2713,16 @@ export function footRing(state, acc, opts = {}) {
        answer, cross-checked against the registry's `sphereMode` predicate by
        the harness on every row. */
     sphereMode: sphere,
-    continuousMode, sequenceLength, quantizerResiduals, zygoGuardResidual,
+    continuousMode, sequenceLength, quantizerResiduals,
     slotRings,
-    /* WHETHER SLOT ROLES APPLY IN THIS STATE, and whether a whorl actually
-       split. Two different claims: the first is the gating (placement and
-       depth), the second additionally needs a control off its identity. Both
-       are reported so Z5 can assert the collapse in both directions and the
-       gates can cross-check the first against the registry's own predicate. */
-    slotRolesEligible: !continuousMode && slotRolesEligible(state),
-    /* WHETHER PER-PETAL ROLES APPLY, the counterpart flag — cross-checked
-       against the registry's own `perPetalEligible` predicate by both gates,
-       exactly as its slot-role twin is. Two statements of one boundary is a
-       registration risk; checking them is what makes it one owner. */
-    perPetalEligible: !continuousMode && perPetalEligible(state),
-    allPetalsEligible: allRole !== null,
     /* WHICH SCOPE TOGGLE IS LIVE (Scoping-b) — the geometry's own answer, which
        Z5 cross-checks against the registry's predicates of the same names and
        the page's scope bar reads to decide whether it shows at all. */
     scopeLayersLive: scopeLayersLive(state),
     scopePetalsLive: scopePetalsLive(state),
-    /* WHETHER A WHORL ACTUALLY SPLIT. One flag for both axes, because the
-       question it answers — "is the area rule summing the whole whorl or a
-       partition of it" — is the same question whichever axis did it, and it
-       is the question Z7 is about. WHICH axis split is readable from any
-       descriptor's own `slotRole` / `petalRole`, which is where that claim
-       belongs. */
-    slotRolesSplit: positionGroups !== null,
-    /* GROUP SIZES PER PER-PETAL ROLE, whenever per-petal roles are eligible —
-       the answer each group's visibility predicate is about, and what Z1's
-       biconditional checks it against. Computed independently of whether a
-       whorl actually SPLIT, for the reason its slot-role twin is: "does group
-       5 have any members" is a question about the ARRANGEMENT and has an
-       answer at the shipping fan default, where nothing is overridden and
-       nothing splits. */
-    petalRoleCensus: petalRoleCensus === null ? null
-      : Object.fromEntries(PETAL_ROLE_ORDER.map((r) => [r, (petalRoleCensus.get(r) || []).length])),
-    /* HOW MANY GROUPS THIS ARRANGEMENT HAS — footRing()'s own answer, so no
-       consumer counts orbits for itself. null where per-petal does not apply,
-       because a claim nothing can make must read as absent. */
-    petalGroupCount: petalRoleCensus === null ? null : petalGroupCount(n, mirror),
+    /* HOW MANY MIRROR PAIRS A FAN HAS — the scope picker's list length;
+       null off a fan. */
+    petalGroupCount: fanMode ? petalGroupCount(n, mirror) : null,
     /* THE FAN'S DERIVED LAW AND ITS CONSEQUENCES — null under every other
        placement, because a claim nothing can make must read as absent rather
        than as a passing zero (guardResidual's doctrine, and quantizerResiduals'
@@ -3679,12 +2735,6 @@ export function footRing(state, acc, opts = {}) {
        primitive and the read-out names the plane from `mirror`. */
     mirror,
     slotCount,
-    /* GROUP SIZES PER SLOT ROLE, whenever slot roles are eligible — the
-       answer the hood's visibility predicate and Z1's amended clause are
-       both about. A Map does not survive structuredClone through the metrics
-       hook, so it is flattened to a plain object here, by the owner. */
-    slotRoleCensus: slotRoleCensus === null ? null
-      : Object.fromEntries(SLOT_ROLE_ORDER.map((r) => [r, (slotRoleCensus.get(r) || []).length])),
   };
 }
 
@@ -3836,7 +2886,7 @@ export function sizeVarianceField(state, fr) {
    three controls with three units. That reading is a decision made without a
    ruling and is recorded as one.
 
-   COMPOSITION, CLAMPED ONCE: the slot term joins `resolveRoleOverrides` AFTER
+   COMPOSITION, CLAMPED ONCE: the slot term joins `resolvePetalTerms` AFTER
    every table row — base, then the whorl's group rows, then the slot — and the
    composed value is clamped ONCE into the base's own range. Clamping the group
    value first and the slot term again would let an intermediate clip eat the
@@ -8799,7 +7849,16 @@ export function petalSurface(state, ring, slot, cap, acc) {
      is a BRANCH exactly as that is: absent (null) on every build with no
      scopes, so the shipped path is the call it was. */
   const scopeTerm = slot.scopeTerm ?? null;
-  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, ring, slot.formTerm || null, formClamped, formScaled, scopeTerm) : petalStateFor(state, ring);
+  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;
+  /* Q3.5 — A LAYER THAT OWNS ITS SIZE OR TILT (a layer entry carrying an offset
+     on petalLength / petalWidth / petalTilt) builds its blade from its own
+     value with the ramp's term left out: the size factor `ring.scale` the
+     slot's scale carries and the tilt `slot.tiltExtra`. Null on every build
+     with no such entry, so these are the expressions they always were. */
+  const owns = scopeTerm ? scopeTerm.owns : null;
+  const lengthScale = owns && owns.petalLength ? (slot.sizeFactor ?? 1) : slot.scale;
+  const widthScale = owns && owns.petalWidth ? (slot.sizeFactor ?? 1) : slot.scale;
+  const tiltExtra = owns && owns.petalTilt ? 0 : slot.tiltExtra;
   /* THE APEX ROW RAMP IS SET HERE, PER PETAL, FROM ITS OWN EFFECTIVE
      `petalTipShape` — `ps` is the first point in this function where that
      effective value exists (a sepal's own tip-shape twin, or a per-slot
@@ -8815,7 +7874,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
      REPORTS both and C1 reads the report rather than assuming they are equal.
      The profile is built once at the asked length — the nib's plan is
      computed inside it, from the law, and the drawn length comes back out. */
-  const askedLength = bladeAskedLengthMm(ps, slot.scale);   // the substate's own mm where a sepal set one, else the petal's x the slot's scale
+  const askedLength = bladeAskedLengthMm(ps, lengthScale);   // the substate's own mm where a sepal set one, else the petal's x the slot's scale
   /* THE AFFINE ANGLE, PLUS THE DOME'S OWN LEAN (Sep 4) — three terms, read
      from three owners: `ps.petalTilt` the base control, `slot.tiltExtra` the
      layered ramp footRing() computed per this descriptor, `ring.domeLean`
@@ -8825,8 +7884,8 @@ export function petalSurface(state, ring, slot, cap, acc) {
      term's own shape). `ring.domeLean` is 0 at every flat build by the same
      construction `ring.slope` already is, so this line is byte-identical to
      its pre-Sep-4 form whenever headRise is 0. */
-  const tilt = ((ps.petalTilt + slot.tiltExtra + ring.domeLean) * Math.PI) / 180;
-  const halfW = bladeAskedWidthMm(ps, slot.scale) / 2;
+  const tilt = ((ps.petalTilt + tiltExtra + ring.domeLean) * Math.PI) / 180;
+  const halfW = bladeAskedWidthMm(ps, widthScale) / 2;
   const footHalf = ring.width / 2;
 
   const profile = widthProfile(ps, ring, halfW, cap, acc, askedLength);
@@ -9962,24 +9021,6 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
          anything (session 42). Null when the demand named no splits. */
       placedSub: ladderReport.placedSub || null,
     },
-    /* ZYGOMORPHY TELEMETRY — READ FROM THE EFFECTIVE STATE THE BUILDER
-       ACTUALLY USED, which is the whole point of reporting it here rather
-       than from the resolver. A ring can carry a perfectly correct override
-       record that never reaches the blade (petalStateFor short-circuiting
-       unconditionally is a one-word mutation), and that failure exports
-       watertight, exports as ONE piece, has an identical triangle count and
-       passes J1-J6 and the record-side assertions alike. This array is the
-       only thing that sees it — Z2's third clause. Every key in
-       ROLE_OVERRIDES appears, whether or not it was overridden, so "the
-       override did not arrive" and "there was no override" are distinguished
-       rather than both rendering as the base value with nothing to compare. */
-    role: ring.role,
-    slotRole: ring.slotRole,
-    /* THE PER-PETAL ROLE THE BUILDER ACTUALLY READ (session 11) — reported
-       beside `slotRole` for the same reason it is: Z2 compares the builder's
-       own answer against footRing()'s, and a descriptor looked up under the
-       wrong axis would otherwise be indistinguishable from a correct one. */
-    petalRole: ring.petalRole, allRole: ring.allRole ?? null,
     slotIndex: slot.index,
     /* THE BLADE'S OWN LENGTH IN MILLIMETRES, as built — the control times the
        slot's scale (a sepal is a petal at `sepalScale`, an inner whorl at its
@@ -10009,11 +9050,10 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        tool or an assertion deriving it from the controls would be a second
        owner of the azimuth law, and under FAN that law has two arms. */
     azimuth: slot.azimuth,
-    /* KEYED BY UNIQUE BASE, from OVERRIDE_BOUNDS rather than by walking
-       ROLE_OVERRIDES — several rows now name one base (petalCup is reached by
-       innerCup, labellumCup and hoodCup), and building the object from the
-       row list would write the same key three times and quietly depend on
-       which write landed last. */
+    /* THE EFFECTIVE VALUE OF EVERY COMPOSABLE BASE, read from the state the
+       builder actually used (`ps`) — the only thing that sees a scope or form
+       term that was recorded and never reached the blade. Keyed by
+       OVERRIDE_BOUNDS' bases plus twist. */
     applied: Object.fromEntries(APPLIED_BASES.map((b) => [b, ps[b]])),
     /* THE FORM FIELD'S SLOT TERM (build 2) as the whorl primitive handed it,
        and which composed bases the one clamp bit — null with no field. FV1
@@ -10027,7 +9067,6 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     scopeTerm: slot.scopeTerm ?? null,
     formClamped,
     formScaled,
-    overridden: !!ring.overrides,
     footRows: footS.length,
     panels: panels.map((p) => p.label),
     tipSpans: panels.filter((p) => p.rowTo === rows.length - 1).length,
@@ -19087,7 +18126,7 @@ export function buildStyleInto(acc, G) {
    `buildPetalInto` invoked a second time, against a SECOND PARAMETER SET on a
    SECOND RING. That was reachable without restructuring the builder because
    the builder already is a function of the state it is handed: `petalSurface`
-   resolves `ps = petalStateFor(state, ring)` and hands `ps` to every law —
+   resolves `ps` (the slot's scope and form terms, or the state itself) and hands `ps` to every law —
    widthProfile (12 reads), petalForm (9), petalFormIsFlat (5), buckleIsFlat
    (2), fringeEngaged (1), thicknessIsUniform / thicknessProfile (1 each) and
    its own six inline reads — so a spread substate reaches the whole outline,
@@ -20455,7 +19494,7 @@ export function inflorescencePlan(state, stem, acc) {
    the head's shared `varianceFrequency` / `variancePhase` here would drive a
    floret's shape off two controls the panel HIDES whenever the head's own
    amounts are 0 — a hidden control must be inert, so the node wave has no
-   knob. The term goes through `resolveRoleOverrides` as a slot term does
+   knob. The term goes through `resolvePetalTerms` as a slot term does
    (headroom-scaled on the side it moves, clamped once), so the floret's
    BASE controls are moved before its own petals are built; inside the
    floret the head's slot field then composes on top of the moved base,
@@ -20521,7 +19560,7 @@ export function floretNodeOverrides(state, plan, az) {
   const out = {};
   const term = nodeVarianceTerm(state, az);
   if (term) {
-    const moved = resolveRoleOverrides(state, [], null, term);
+    const moved = resolvePetalTerms(state, null, term);
     if (moved) Object.assign(out, moved);
   }
   const phi = floretPhaseDeg(state, az, plan.angleDeg);
@@ -21478,20 +20517,7 @@ export function tubeEligible(state) {
   if (Number(state.fringeCount) >= 1) return false;
   if (state.petalInfill === 'VORONOI') return false;
   if (Number(state.stemLength) >= 1 && state.inflorescence === 'RACEME') return false;
-  if (slotRolesOverridden(state)) return false;
   return true;
-}
-/* The slot-role overrides are per-SLOT (labellum / hood), so where they are
-   live AND non-zero a whorl carries several ladders. Read from ROLE_OVERRIDES,
-   never a hand list. */
-function slotRolesOverridden(state) {
-  if (!slotRolesEligible(state)) return false;
-  for (const o of ROLE_OVERRIDES) {
-    if (o.role !== SLOT_LABELLUM && o.role !== SLOT_HOOD) continue;
-    const v = Number(state[o.control]);
-    if (o.law === 'mul' ? v !== 1 : Math.abs(v || 0) > 0) return true;
-  }
-  return false;
 }
 /* THE PLAN: per layer, the asked k, the built k and whether it fuses. */
 export function tubePlan(state, layerCount, n) {
@@ -22206,7 +21232,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      `radius`, `sizeRamp`, `angleRamp` and `phase` stay PER-WHORL constants
      and are read off the layer's first descriptor, because every descriptor
      in a layer shares them — a size override scales the BLADE and never the
-     ring (see ROLE_OVERRIDES), which is what keeps that true and what Z6
+     ring, which is what keeps that true and what Z6
      asserts rather than assumes. */
   for (let L = 0; L < fr.layerCount; L++) {
     const slotsFor = fr.slotRings[L];
