@@ -39,6 +39,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import crypto from 'node:crypto';
+import { shardOf } from './bloom-export-shards.mjs';
 import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -3311,6 +3313,133 @@ const ROWS = [
     set: [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify({ mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] }) }] },
 ];
 
+/* ===================================================================
+   THE SHARD CENSUS (the shard-headroom session, Oct 16) — the sweep's
+   coverage PROVED rather than assumed, the export gate's own construction
+   (tools/bloom-export-shards.mjs) applied to the mutant table.
+
+   Before this, "every mutant is in exactly one shard" was a property of
+   `i % n === k` and of nothing else: a workflow whose matrix listed eleven
+   shards under `SHARDS: 12`, or a selector edited off by one, would run a
+   green sweep that checked less than it says, and no job would notice. So:
+     1. ONE OWNER OF MEMBERSHIP: `shardOf(index, n)`, IMPORTED from the export
+        gate's shard module — a mutant's shard is a pure function of its TABLE
+        INDEX, never of its id.
+     2. EVERY SHARD WRITES A CENSUS (`--census=<file>`): the table it saw (the
+        mutant count and a hash of every id in order), the mutants it ACTUALLY
+        REACHED in its loop (not the ones its selector named), any row subset,
+        and `complete: true` LAST. A shard that crashed, timed out or never
+        started leaves no census, and that is a finding.
+     3. THE RECONCILIATION (`--reconcile=<dir> --shards=N`) rebuilds the
+        expected set from ITS OWN `MUTANTS` — an owner no shard writes (the
+        fourth durable rule: a clause that took the count from the shards
+        would agree with a shard that lost one). Every mutant must be reached
+        by EXACTLY ONE shard, every shard 0..N-1 must report, and each shard
+        must have reached every mutant its own selector owes it.
+     4. `--census-control` builds censuses from the SHIPPED selector with no
+        browser, then breaks them, and requires the shipped reconcile to FAIL
+        on every break and PASS on the unbroken set.
+   WHAT IT DOES NOT COVER: whether a shard's mutants FIRED — that is each
+   shard's own exit status, exactly as unsharded. This proves only that the
+   union of what the shards reached is the table, once.
+   Both modes exit BEFORE the browser launches (the harness import still
+   needs the playwright package, never a Chromium binary). The import of
+   `shardOf` makes bloom-export-shards.mjs a load-time dependency of this
+   table; an edit there runs bloom-export-watertight, whose `gates` job runs
+   `--anchors` here, so a load-time break is red the day it lands.
+   =================================================================== */
+const CENSUS_VERSION = 1;
+function tableHash(ids) { return crypto.createHash('sha256').update(JSON.stringify(ids)).digest('hex'); }
+function reconcileCensuses(censuses, { n, ids }) {
+  const bad = [];
+  const hash = tableHash(ids);
+  const byK = new Map();
+  for (const c of censuses) {
+    const tag = `shard ${c && c.shard ? `${c.shard.k}/${c.shard.n}` : '?'}`;
+    if (!c || c.version !== CENSUS_VERSION) { bad.push(`${tag}: census version ${c && c.version} is not ${CENSUS_VERSION}`); continue; }
+    if (c.complete !== true) { bad.push(`${tag}: census is INCOMPLETE — the shard did not finish`); continue; }
+    if (!c.shard || c.shard.n !== n) { bad.push(`${tag}: ran as one of ${c.shard && c.shard.n} shards, the reconciliation expects ${n}`); continue; }
+    if (!Number.isInteger(c.shard.k) || c.shard.k < 0 || c.shard.k >= n) { bad.push(`${tag}: shard index outside 0..${n - 1}`); continue; }
+    if (byK.has(c.shard.k)) { bad.push(`${tag}: TWO censuses claim this shard`); continue; }
+    byK.set(c.shard.k, c);
+    if (c.table.count !== ids.length) bad.push(`${tag}: saw a ${c.table.count}-mutant table, the reconciliation's own has ${ids.length}`);
+    if (c.table.hash !== hash) bad.push(`${tag}: saw a DIFFERENT table (id hash ${String(c.table.hash).slice(0, 12)} against ${hash.slice(0, 12)})`);
+    if (c.rows) bad.push(`${tag}: ran a ROW SUBSET (--rows=${c.rows}) — not a sweep`);
+    if (c.witnessesOnly) bad.push(`${tag}: ran --witnesses-only — no family was asked, not a sweep`);
+    if (c.neuter) bad.push(`${tag}: ran with --neuter=${c.neuter} — a control run, not a sweep`);
+  }
+  for (let k = 0; k < n; k++) if (!byK.has(k)) bad.push(`shard ${k}/${n}: NO CENSUS — the shard crashed, timed out, never ran, or its artifact was lost. Its mutants were run by nobody.`);
+  const seen = new Map();
+  for (const [k, c] of byK) {
+    const mine = new Set();
+    for (const a of c.reached) {
+      if (!Number.isInteger(a.index) || a.index < 0 || a.index >= ids.length) { bad.push(`shard ${k}/${n}: reached index ${a.index}, outside the ${ids.length}-mutant table`); continue; }
+      if (ids[a.index] !== a.id) bad.push(`shard ${k}/${n}: mutant ${a.index} is "${a.id}" in its census and "${ids[a.index]}" in the table`);
+      if (seen.has(a.index)) bad.push(`mutant ${a.index} ("${ids[a.index]}") was reached by shard ${seen.get(a.index)} AND shard ${k} — run twice`);
+      else seen.set(a.index, k);
+      mine.add(a.index);
+    }
+    const owed = ids.map((_, i) => i).filter((i) => shardOf(i, n) === k);
+    const missing = owed.filter((i) => !mine.has(i));
+    if (missing.length) bad.push(`shard ${k}/${n}: its selector owes ${owed.length} mutant(s) and it reached ${mine.size}; missing ${missing.map((i) => `${i} "${ids[i]}"`).join(', ')}`);
+  }
+  const none = ids.map((_, i) => i).filter((i) => !seen.has(i));
+  if (none.length) bad.push(`${none.length} of the ${ids.length} mutants were reached by NO shard: ${none.map((i) => `${i} "${ids[i]}"`).join(', ')}`);
+  return bad;
+}
+function censusFor(k, n, ids, select = shardOf) {
+  return { version: CENSUS_VERSION, shard: { k, n }, table: { count: ids.length, hash: tableHash(ids) }, rows: null, witnessesOnly: false, neuter: null,
+           reached: ids.map((id, index) => ({ index, id })).filter((a) => select(a.index, n) === k), complete: true };
+}
+{
+  const ids = MUTANTS.map((m) => m.id);
+  const nArg = (process.argv.find((a) => a.startsWith('--shards=')) || '').split('=')[1];
+  const RECONCILE = (process.argv.find((a) => a.startsWith('--reconcile=')) || '').split('=')[1];
+  if (RECONCILE || process.argv.includes('--census-control')) {
+    const n = +nArg;
+    if (!Number.isInteger(n) || n < 1) { console.log(`--shards=N is required (a positive integer), got "${nArg}"`); process.exit(1); }
+    if (new Set(ids).size !== ids.length) { console.log('the table has duplicate mutant ids — a census keyed on them is ambiguous'); process.exit(1); }
+    if (RECONCILE) {
+      const files = fs.existsSync(RECONCILE) ? fs.readdirSync(RECONCILE).filter((f) => f.endsWith('.json')).sort() : [];
+      const censuses = files.map((f) => JSON.parse(fs.readFileSync(path.join(RECONCILE, f), 'utf8')));
+      const bad = reconcileCensuses(censuses, { n, ids });
+      for (const c of censuses) if (c && c.shard) console.log(`  shard ${c.shard.k}/${c.shard.n}: ${c.reached ? c.reached.length : '?'} mutant(s) reached${c.complete === true ? '' : ' (INCOMPLETE)'}`);
+      for (const b of bad) console.log(`  *** ${b}`);
+      console.log(bad.length ? `\nSHARD CENSUS: FAILED — ${bad.length} finding(s) over ${censuses.length} census file(s)`
+                             : `\nSHARD CENSUS: every one of the ${ids.length} mutants was reached by exactly one of the ${n} shards`);
+      process.exit(bad.length ? 1 : 0);
+    }
+    /* THE MUST-FAIL. Each break is a copy of the unbroken set. */
+    const base = () => Array.from({ length: n }, (_, k) => censusFor(k, n, ids));
+    const legs = [
+      ['the unbroken set', base(), false],
+      ['a shard with no census (the matrix lists one fewer job than SHARDS)', base().slice(0, n - 1), true],
+      ['a selector off by one (every shard runs i % (n + 1))', Array.from({ length: n }, (_, k) => censusFor(k, n, ids, (i, m) => i % (m + 1))), true],
+      ['one mutant dropped from a middle shard', (() => { const b = base(); const m = b[Math.floor(n / 2)]; m.reached = m.reached.slice(1); return b; })(), true],
+      ['one mutant run by two shards', (() => { const b = base(); b[1].reached.push({ ...b[0].reached[0] }); return b; })(), true],
+      ['two censuses claiming one shard', (() => { const b = base(); b.push(censusFor(0, n, ids)); return b; })(), true],
+      ['a shard that ran as one of n - 1', (() => { const b = base(); b[0] = censusFor(0, n - 1, ids); return b; })(), true],
+      ['an incomplete census', (() => { const b = base(); b[n - 1].complete = false; return b; })(), true],
+      ['a census of a different table', (() => { const b = base(); b[0].table.hash = tableHash([...ids].reverse()); return b; })(), true],
+      ['a row-subset shard', (() => { const b = base(); b[0].rows = 'LOBES'; return b; })(), true],
+      ['a witnesses-only shard', (() => { const b = base(); b[0].witnessesOnly = true; return b; })(), true],
+      ['a neutered-control shard', (() => { const b = base(); b[0].neuter = ids[0]; return b; })(), true],
+    ];
+    let ok = true;
+    for (const [what, set, mustFail] of legs) {
+      const bad = reconcileCensuses(set, { n, ids });
+      const good = mustFail ? bad.length > 0 : bad.length === 0;
+      if (!good) ok = false;
+      console.log(`  ${good ? 'ok  ' : 'BAD '} ${what}: ${bad.length ? `${bad.length} finding(s) — ${bad[0]}` : 'reconciles clean'}`);
+    }
+    const sizes = base().map((c) => c.reached.length);
+    console.log(`  per-shard mutant counts at ${n} shards: ${sizes.join(' ')} (max ${Math.max(...sizes)})`);
+    console.log(ok ? `\nCENSUS CONTROL: the reconciliation passes the unbroken set and FAILS on every one of ${legs.length - 1} breaks`
+                   : '\nCENSUS CONTROL: FAILED');
+    process.exit(ok ? 0 : 1);
+  }
+}
+
 const { server, port } = await serveRepo();
 const { browser, page } = await launchPage({ viewport: { width: 700, height: 700 } });
 let SERVE = SRC;
@@ -3450,8 +3579,8 @@ async function famsOn(rows) {
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1];
 let SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
 /* `--shard=k/n` (the gate-coverage session, D14): the k-th of n slices of the
-   table BY INDEX — `MUTANTS[i]` for `i % n === k`, the export gate's own
-   `shardOf` rule — so a weekly CI sweep can run the whole table across n
+   table BY INDEX — `MUTANTS[i]` for `shardOf(i, n) === k`, the export gate's
+   own `shardOf`, IMPORTED (one owner; see THE SHARD CENSUS above) — so a weekly CI sweep can run the whole table across n
    parallel jobs at ~3 min a mutant (measured 182 s for one on this box: 79
    mutants is four hours in one job, 60 minutes in four). A shard reports as a
    SUBSET, never as a sweep; the anchor pre-check above runs over ALL of them
@@ -3461,7 +3590,7 @@ if (SHARD_ARG) {
   const m = /^(\d+)\/(\d+)$/.exec(SHARD_ARG);
   if (!m || +m[2] < 1 || +m[1] >= +m[2]) { await browser.close(); server.close(); console.log(`--shard wants k/n with 0 <= k < n, got "${SHARD_ARG}"`); process.exit(1); }
   if (SELECTED) { await browser.close(); server.close(); console.log('--shard and --only do not combine'); process.exit(1); }
-  SELECTED = MUTANTS.filter((mu, i) => i % +m[2] === +m[1]).map((mu) => mu.id);
+  SELECTED = MUTANTS.filter((mu, i) => shardOf(i, +m[2]) === +m[1]).map((mu) => mu.id);
   console.log(`SHARD ${m[1]}/${m[2]}: ${SELECTED.length} of ${MUTANTS.length} mutants (by table index)`);
 }
 if (SELECTED) {
@@ -3528,8 +3657,10 @@ if (NEUTER && SELECTED && !SELECTED.includes(NEUTER)) { await browser.close(); s
 let neuterReported = false;
 REGISTRY_DEFAULTS = (await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href)).DEFAULTS;
 const CLEAN = await mutatedModule('__clean', SRC);
-for (const mu of MUTANTS) {
+const REACHED = [];
+for (const [index, mu] of MUTANTS.entries()) {
   if (SELECTED && !SELECTED.includes(mu.id)) continue;
+  REACHED.push({ index, id: mu.id });
   const n = SRC.split(mu.find).length - 1;
   if (n !== 1) { console.log(`  ${mu.id}: MUTATION DID NOT APPLY (matched ${n}x) — ${mu.why}`); fail = true; continue; }
   const into = NEUTER === mu.id ? mu.find + ' /* neutered */' : mu.into;
@@ -3553,6 +3684,21 @@ for (const mu of MUTANTS) {
   SERVE = SRC;
 }
 await browser.close(); server.close();
+/* THE CENSUS is written whatever this shard's verdict — its red is its own
+   exit status; the census says only which mutants it REACHED, and is written
+   only by a run that got here (a crash or a timeout leaves none). */
+{
+  const CENSUS = (process.argv.find((a) => a.startsWith('--census=')) || '').split('=')[1];
+  if (CENSUS) {
+    const sm = /^(\d+)\/(\d+)$/.exec(SHARD_ARG || '');
+    if (!sm) { console.log('--census needs --shard=k/n'); process.exit(1); }
+    const ids = MUTANTS.map((m) => m.id);
+    fs.mkdirSync(path.dirname(path.resolve(CENSUS)), { recursive: true });
+    fs.writeFileSync(CENSUS, JSON.stringify({ version: CENSUS_VERSION, shard: { k: +sm[1], n: +sm[2] }, table: { count: ids.length, hash: tableHash(ids) },
+      rows: ROWS_ARG || null, witnessesOnly: WITNESS_ONLY, neuter: NEUTER, reached: REACHED, complete: true }));
+    console.log(`census: ${REACHED.length} mutant(s) reached, written to ${CENSUS}`);
+  }
+}
 if (WITNESS_ONLY) {
   console.log(fail ? '\nWITNESSES ONLY: FAILED — a selected mutant did not move its behaviour' : '\nWITNESSES ONLY: every selected mutant moved its behaviour. NO FAMILY WAS ASKED — this is not a pass of the mutant table.');
   process.exit(fail ? 1 : 0);
