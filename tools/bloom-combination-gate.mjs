@@ -1095,7 +1095,13 @@ export const TRIPLES = [
          minimum can read worse there. */
       { id: 'layerCount', values: [1, 3, 6] },
       { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
-      { id: 'innerCurl', values: [0, 360] },
+      /* A STORED-DESIGN AXIS (the role retirement, Q3.4): `innerCurl` is a
+         RETIRED id, so the axis is a value a saved design carries — first
+         value its identity, range the retired control's own — and the cell is
+         built through the registry's `migrateRoles` (measureState), which
+         makes it a per-layer offset on every inner whorl with per-layer values
+         on. The INNER migration is exact, so every cell is the bloom it was. */
+      { id: 'innerCurl', values: [0, 360], stored: { identity: 0, min: -180, max: 360 } },
     ],
     /* THIS TRIPLE COULD NOT SEE THE COMPOSED STATE'S FOLD, AND NOW IT CAN
        (Eva's ruling on the headroom follow-up, docs/bloom-organic-variance-form-
@@ -1865,7 +1871,16 @@ function measureState({ G, W, R }, DEFAULTS, pair, state, where, wallOpts = {}) 
      and why. */
   if (INFLO_MEASURES.has(pair.measure)) return measureInfloApproachMm(G, state, pair.measure);
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
-  const m = G.buildBloomInto(acc, state);
+  /* A CELL CARRYING A RETIRED ROLE ID (a stored-design axis, Q3.4) is
+     migrated through the registry's own `migrateRoles` and built with the
+     scopes it carries — the path a saved design takes on load. */
+  let scopes = null;
+  if (Object.keys(state).some((k) => R.RETIRED_ROLE_IDS.includes(k))) {
+    const mig = R.migrateRoles(state);
+    state = mig.state;
+    if (mig.scopes) { const bounds = {}; for (const c of R.CONTROLS) if (c.kind === 'slider') bounds[c.id] = { min: c.min, max: c.max }; scopes = { ...mig.scopes, bounds }; }
+  }
+  const m = scopes ? G.buildBloomInto(acc, state, { scopes }) : G.buildBloomInto(acc, state);
   /* `sepal-self` — THE SAME `self`, ON EVERY SEPAL THE BUILDER EMITTED (Eva's
      ruling R6, Oct 9). `self` reads `built.petal`, the representative PETAL,
      which is never a sepal, so on a sepal twin it is INERT by construction and
@@ -2184,6 +2199,15 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
      of those and some all-three cell under it. */
   for (const { triple: t, cells } of (tripleRows || [])) {
     for (const ax of t.axes) {
+      /* a STORED-DESIGN axis names a RETIRED role id: its first value is the
+         role's identity and its range the retired control's own (Q3.4) */
+      if (ax.stored) {
+        if (!R.RETIRED_ROLE_IDS.includes(ax.id)) fails.push(`CG0 grid: "${t.id}" declares ${ax.id} a stored-design axis and it is not a retired role id`);
+        if (!Object.is(ax.values[0], ax.stored.identity)) fails.push(`CG0 grid: "${t.id}" starts the stored axis ${ax.id} at ${num(ax.values[0])}, not its identity ${ax.stored.identity}`);
+        for (const v of ax.values) if (!(v >= ax.stored.min && v <= ax.stored.max)) fails.push(`CG0 grid: "${t.id}" asks the stored axis ${ax.id} = ${num(v)}, outside the retired control's ${ax.stored.min}..${ax.stored.max}`);
+        if (ax.values.length < 2) fails.push(`CG0 grid: "${t.id}" gives ${ax.id} ${ax.values.length} value(s)`);
+        continue;
+      }
       const c = byControl.get(ax.id);
       if (!c) { fails.push(`CG0 grid: "${t.id}" names ${ax.id}, which the registry does not declare`); continue; }
       if (ax.values.length < 2) fails.push(`CG0 grid: "${t.id}" gives ${ax.id} ${ax.values.length} value(s) — an axis of one value is not an axis`);

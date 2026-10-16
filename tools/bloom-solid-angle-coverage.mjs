@@ -298,6 +298,11 @@ export async function measure(page, { capability = null, wantMask = false, mutat
   await installKernel(page);
   return page.evaluate(async ({ capability, wantMask, mutate, plan, mapped: wantMapped, suppressR0 }) => {
     const mod = await import('/bloom-geometry.js');
+    /* THE PAGE'S OWN SCOPES (the role retirement, Q3.4): a scoped row's petals
+       carry per-layer / per-pair offsets, so the census builds — and re-emits —
+       with the very record the page drew, through the file reader's own
+       `scopesForBuild`. Null on every unscoped row. */
+    const scopes = window.__bloomDesign ? (await import('/bloom-file.js')).scopesForBuild(window.__bloomDesign.scopes()) : null;
     const ui = window.__bloomUIState();
     const bad = [];
     const t0 = performance.now();
@@ -344,10 +349,10 @@ export async function measure(page, { capability = null, wantMask = false, mutat
 
     /* ---------------- THE BUILD, AND THE CENTRE ---------------- */
     const accFull = new mod.MeshBuilder({ exportMode: true });
-    const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability });
+    const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability, scopes });
     const hub = builtFull.hub;
     const accHC = new mod.MeshBuilder({ exportMode: true });
-    const frHC = mod.footRing(ui, accHC);
+    const frHC = mod.footRing(ui, accHC, { scopes });
     mod.buildHubInto(accHC, ui, frHC.hub);
     /* THE ANDROECIUM (session 21) — a third accumulator, counted in R1 and
        never rasterised (plan-coverage's own construction, verbatim): the
@@ -401,7 +406,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        the head's own disc, and a floret 20 mm out on a pedicel is no more
        "covering the crown" than a stamen over the centre is. */
     mod.buildInflorescenceInto(accST, ui, inPlan);
-    const fr = mod.footRing(ui, accFull);
+    const fr = mod.footRing(ui, accFull, { scopes });
 
     /* A FLAT hub is skipped — but AFTER the capture and R5 below, so the
        parallel-ray identity is asserted on EVERY row the gate runs, centre
@@ -420,11 +425,6 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        bloom. The tube's own instrument is tools/verify-bloom-tube.mjs
        (TU0-TU6). */
     if (builtFull.tube && builtFull.tube.active) return { bad, r: null, skipped: 'TUBE: a fused whorl — this raster re-emits each petal FREE and cannot rebuild the petals the ring reshapes; the fusion is tools/verify-bloom-tube.mjs\'s (TU0-TU6) — RECORDED, NOT BUILT' };
-    if (!fr.continuousMode) {
-      const split = [];
-      for (let L = 0; L < fr.layerCount; L++) { const s = fr.slotRings[L]; if (!s.every((d) => d === s[0])) split.push(L); }
-      if (split.length) return { bad, r: null, skipped: `split whorl (layer${split.length > 1 ? 's' : ''} ${split.join(', ')} carry slot-role or per-petal records): R3 identifies slots by rigid rotation and cannot check a split whorl — the plan raster's own skip, mirrored` };
-    }
 
     /* ---------------- THE CAPTURE (plan-coverage's wiring, verbatim) ---------------- */
     const petalAccs = [], petalSites = [];
@@ -467,6 +467,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
           if (omittedHere.has(slot.index)) return;
           petalsBuilt++;
           const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
+          if (scopes) { const turn = Math.floor(fr.rings[slot.index].lambda); slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: turn, slot: slot.index - turn * fr.slotCount, n: fr.slotCount, state: ui }); }
           const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capability, petalsBuilt === 1);
           petalAccs.push(acc); petalSites.push({ p, ring: fr.rings[slot.index], slot, cap: capability });
           const ref = builtFull.petals[slot.index];
@@ -487,6 +488,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
             petalsBuilt++;
             const d = slotsFor[slot.index];
             const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
+            if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state: ui });
             const p = mod.buildPetalInto(acc, ui, d, slot, capability);
             petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capability });
             if (slot.index === 0) {
@@ -494,7 +496,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
               const idx = fr.rings.indexOf(d);
               const ref = builtFull.petals[idx];
               if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) bad.push(`solid R3: layer ${L} slot 0's captured petal does not bit-match builtFull.petals[${idx}]`);
-            } else if (sizeField || formField) {
+            } else if (sizeField || formField || scopes) {
               /* under the size field a slot is its own size, not slot 0 rotated:
                  bit-match the builder's own record for it instead (plan-coverage's
                  arm, verbatim) */

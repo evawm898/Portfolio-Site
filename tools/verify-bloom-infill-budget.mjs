@@ -45,7 +45,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NEG = process.argv.includes('--negative-control');
 const H = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-harness.mjs')).href);
 const kindOf = new Map(H.CONTROLS.map((c) => [c.id, c]));
-const stateOf = (row) => { const s = { ...H.DEFAULTS }; for (const w of row.set || []) { const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`); s[w.id] = c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value; } return s; };
+const stateOf = (row) => { const s = { ...H.DEFAULTS }; for (const w of row.set || []) { if (w.id === '@scopes') continue; const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`); s[w.id] = c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value; } return s; };
 
 async function loadGeometry(src) {
   if (!src) return import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
@@ -66,7 +66,7 @@ function run(G, only = null, quiet = false) {
     const n = {};
     for (const exportMode of [true, false]) {
       const acc = new G.MeshBuilder({ exportMode });
-      const built = G.buildBloomInto(acc, st, { below: null, capability: r.capability || null });
+      const built = G.buildBloomInto(acc, st, { below: null, capability: r.capability || null, scopes: H.rowScopesForBuild(r) });
       const mode = exportMode ? 'export' : 'live';
       add('B0', acc.positions.length === acc.triangleCount * 9, `${r.label} ${mode}: triangleCount ${acc.triangleCount} does not match the ${acc.positions.length / 9} triangles the accumulator holds`);
       const F = built.petalsAll && built.petalsAll.find((p) => p && p.infill);

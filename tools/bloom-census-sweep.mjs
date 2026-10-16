@@ -157,6 +157,7 @@ const kindOf = new Map(H.CONTROLS.map((c) => [c.id, c]));
 const stateOf = (row) => {
   const s = { ...R.DEFAULTS };
   for (const w of row.set || []) {
+    if (w.id === '@scopes') continue;   // the row's own scope record (a stored role design, Q3.4) — handed to the build below
     const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`);
     s[w.id] = c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value;
   }
@@ -186,7 +187,7 @@ for (const row of rows) {
   let rec;
   try {
     const acc = new G.MeshBuilder({ exportMode: true });
-    G.buildBloomInto(acc, stateOf(row), { below: null, capability: row.capability || null });
+    G.buildBloomInto(acc, stateOf(row), { below: null, capability: row.capability || null, scopes: H.rowScopesForBuild(row) });
     const pos = new Float64Array(acc.positions);
     const tris = pos.length / 9;
     if (tris > MAXTRI) { emit({ label: row.label, skipped: 'over maxtri', tris }); continue; }

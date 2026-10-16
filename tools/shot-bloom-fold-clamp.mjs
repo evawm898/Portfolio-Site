@@ -50,7 +50,8 @@ const SIX = [
   ['cupgrad',  'petalCupGradient max (1.2)'],
   ['gradthin', 'GRADIENT: cup gradient max x ALL THIN x spread min'],
   ['sepalcup', 'SEPALS: sepalCup min (-0.8)'],
-  ['slotmin',  'SLOT: ALL MIN x 2 whorls in step'],
+  /* ['slotmin', 'SLOT: ALL MIN x 2 whorls in step'] left with its row: a RADIAL labellum-and-hood
+     design, DROPPED BY RULING at the role retirement (Q3.4); frozen/phase70 keeps it. */
   ['fanpetal', 'FAN x PER-PETAL: petal 1 x 3 layers x inner*'],
   ['lobes666', 'LOBES: x cup 1.2'],
 ];

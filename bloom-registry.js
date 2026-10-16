@@ -47,7 +47,7 @@ import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_R
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
-         GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
+         GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, petalGroupCount, CURL_START_MIN,
          ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_PINCH_DEFAULT, TIP_ROUNDEDNESS,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, TIP_PREFIXES,
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_PINCH_RANGE, TIP_ROUNDEDNESS_RANGE,
@@ -78,7 +78,7 @@ import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_F
 import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
-import { SCOPE_TOGGLE_VALUES } from './bloom-geometry.js';
+import { SCOPE_TOGGLE_VALUES, SCOPE_LAYER_PLACEMENTS, mirrorFor } from './bloom-geometry.js';
 /* THE CURVE KIND (the curve-editor session, Oct 14) — its value shape, its
    shape rule and its equality are bloom-curve.js's, the one owner every reader
    of a curve value imports (the panel, the design file, F3's and F6's
@@ -195,6 +195,103 @@ export const RETIRED_IDS = [
   { id: 'stemNodeProminence', retiredAt: 54, session: 'leaf/stem build S1 (numbered by the frozen phase it registers; sessions stopped carrying numbers after 43)', schema: null,
     migrateTo: ['stemNodeSwelling', 'stemNodeKink'],
     why: 'The stem node\'s ONE control (0..1, default 0), driving the Gaussian swelling (0.6 x prominence over 3.27 stem radii) AND the kink (atan(0.13 x prominence)) together — #299\'s ruling "the swelling and the kink as one control". Retired on Eva\'s ruling (Oct 6, leaf/stem build S1), which superseded #299: the carnation\'s node is a swelling with no kink and the rose\'s a few degrees of zig-zag with almost no swelling, and one control can draw neither. Replaced by stemNodeSwelling and stemNodeKink, each the same 0..1 scale and the same law term. The id could NOT be kept as either half: a stored 0.48 under this name drew a swelling AND a kink, and read as the swelling alone it would silently drop the kink — so the name is retired and the value MIGRATES into both, which reproduces the old look to the byte (measured over every stored control set, both modes).' },
+  /* THE ROLE RETIREMENT (Q3.4) — forty-seven ids, every one carried or dropped by
+     `migrateRoles` below (`migrateBy` names it; `migrateTo` cannot express a delta
+     on a set of petals the arrangement names — see that function's header). */
+  { id: 'allCurl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The whole-whorl DELTA on Spine curl at one whorl (role ALL, the first rows of the retired ROLE_OVERRIDES). Retired on Eva's ruling Q3.4 (Oct 12): the slot roles, the per-petal groups and the ALL / INNER deltas retire into parameter scoping. At one whorl 'all petals' IS the whole bloom, so the value migrates INTO THE GLOBAL (Spine curl + delta, clamped and on the slider's step) through migrateRoles." },
+  { id: 'allCup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The whole-whorl DELTA on Cup at one whorl (role ALL, the first rows of the retired ROLE_OVERRIDES). Retired on Eva's ruling Q3.4 (Oct 12): the slot roles, the per-petal groups and the ALL / INNER deltas retire into parameter scoping. At one whorl 'all petals' IS the whole bloom, so the value migrates INTO THE GLOBAL (Cup + delta, clamped and on the slider's step) through migrateRoles." },
+  { id: 'innerCurl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The inner whorls' DELTA on Spine curl (role INNER, session A). Retired on Eva's ruling Q3.4 (Oct 12). Migrates through migrateRoles: on RADIAL and on a layered SPIRAL (Eva's ruling, Oct 16: a spiral's turns are layer scopes) to Per-layer values with one layer entry per inner layer, the offset landing on the old composed value (the entry carries no size or tilt, so the Shrink and Tilt step ramps still place those whorls); on a FAN to one petal entry per inner mirror pair." },
+  { id: 'innerCup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The inner whorls' DELTA on Cup (role INNER, session A). Retired on Eva's ruling Q3.4 (Oct 12). Migrates through migrateRoles: on RADIAL and on a layered SPIRAL (Eva's ruling, Oct 16: a spiral's turns are layer scopes) to Per-layer values with one layer entry per inner layer, the offset landing on the old composed value (the entry carries no size or tilt, so the Shrink and Tilt step ramps still place those whorls); on a FAN to one petal entry per inner mirror pair." },
+  { id: 'labellumSize', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL labellum's size multiplier (length and width together) (slot role LABELLUM, session B — the orchid). Retired on Eva's rulings Q3.4 (Oct 12) and of Oct 14: the RADIAL labellum and hood are DROPPED, not migrated — a radial orchid is no longer reachable and per-petal values are FAN only. migrateRoles drops it and says so; a stored value under this name must never be read again." },
+  { id: 'labellumTilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL labellum's tilt delta (slot role LABELLUM, session B — the orchid). Retired on Eva's rulings Q3.4 (Oct 12) and of Oct 14: the RADIAL labellum and hood are DROPPED, not migrated — a radial orchid is no longer reachable and per-petal values are FAN only. migrateRoles drops it and says so; a stored value under this name must never be read again." },
+  { id: 'labellumCup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL labellum's cup delta (slot role LABELLUM, session B — the orchid). Retired on Eva's rulings Q3.4 (Oct 12) and of Oct 14: the RADIAL labellum and hood are DROPPED, not migrated — a radial orchid is no longer reachable and per-petal values are FAN only. migrateRoles drops it and says so; a stored value under this name must never be read again." },
+  { id: 'labellumCurl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL labellum's spine-curl delta (slot role LABELLUM, session B — the orchid). Retired on Eva's rulings Q3.4 (Oct 12) and of Oct 14: the RADIAL labellum and hood are DROPPED, not migrated — a radial orchid is no longer reachable and per-petal values are FAN only. migrateRoles drops it and says so; a stored value under this name must never be read again." },
+  { id: 'hoodSize', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL hood's size multiplier (length and width together) (slot role HOOD, session B). Retired with the labellum on Eva's rulings Q3.4 and of Oct 14: dropped, not migrated (a radial orchid is no longer reachable)." },
+  { id: 'hoodTilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL hood's tilt delta (slot role HOOD, session B). Retired with the labellum on Eva's rulings Q3.4 and of Oct 14: dropped, not migrated (a radial orchid is no longer reachable)." },
+  { id: 'hoodCup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "The RADIAL hood's cup delta (slot role HOOD, session B). Retired with the labellum on Eva's rulings Q3.4 and of Oct 14: dropped, not migrated (a radial orchid is no longer reachable)." },
+  { id: 'petal1Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 1's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 1 (canonical slot 0), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal1* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal1Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 1's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 1 (canonical slot 0), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal1* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal1Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 1's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 1 (canonical slot 0), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal1* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal1Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 1's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 1 (canonical slot 0), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal1* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal2Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 2's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 2 (canonical slot 1), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal2* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal2Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 2's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 2 (canonical slot 1), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal2* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal2Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 2's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 2 (canonical slot 1), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal2* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal2Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 2's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 2 (canonical slot 1), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal2* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal3Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 3's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 3 (canonical slot 2), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal3* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal3Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 3's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 3 (canonical slot 2), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal3* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal3Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 3's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 3 (canonical slot 2), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal3* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal3Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 3's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 3 (canonical slot 2), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal3* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal4Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 4's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 4 (canonical slot 3), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal4* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal4Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 4's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 4 (canonical slot 3), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal4* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal4Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 4's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 4 (canonical slot 3), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal4* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal4Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 4's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 4 (canonical slot 3), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal4* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal5Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 5's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 5 (canonical slot 4), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal5* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal5Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 5's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 5 (canonical slot 4), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal5* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal5Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 5's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 5 (canonical slot 4), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal5* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal5Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 5's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 5 (canonical slot 4), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal5* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal6Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 6's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 6 (canonical slot 5), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal6* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal6Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 6's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 6 (canonical slot 5), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal6* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal6Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 6's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 6 (canonical slot 5), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal6* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal6Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 6's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 6 (canonical slot 5), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal6* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal7Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 7's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 7 (canonical slot 6), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal7* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal7Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 7's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 7 (canonical slot 6), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal7* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal7Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 7's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 7 (canonical slot 6), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal7* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal7Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 7's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 7 (canonical slot 6), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal7* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal8Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 8's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 8 (canonical slot 7), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal8* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal8Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 8's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 8 (canonical slot 7), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal8* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal8Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 8's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 8 (canonical slot 7), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal8* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal8Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 8's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 8 (canonical slot 7), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal8* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal9Size', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 9's size multiplier (length and width together) (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 9 (canonical slot 8), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal9* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal9Tilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 9's tilt delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 9 (canonical slot 8), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal9* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal9Cup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 9's cup delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 9 (canonical slot 8), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal9* names a FAN position and nothing else, so the name may never come back." },
+  { id: 'petal9Curl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
+    why: "Fan group 9's spine-curl delta (the per-petal groups, session 11). Retired on Eva's ruling Q3.4 (Oct 12): migrates through migrateRoles to Per-petal values — one petal entry per layer on mirror pair 9 (canonical slot 8), the pair one scope (Q3.7); a size multiplier becomes an offset global x (mul - 1) that lands on the old double at the global it was migrated at. A stored petal9* names a FAN position and nothing else, so the name may never come back." },
 ];
 
 /* migrateControls / migrateSet — THE ONE OWNER of replaying a control set
@@ -207,7 +304,7 @@ export const RETIRED_IDS = [
    project's file formats are built against. Pure; never mutates its input. */
 const MIGRATING = () => RETIRED_IDS.filter((r) => Array.isArray(r.migrateTo));
 const migratedFrom = (r, v) => Object.fromEntries(r.migrateTo.map((k) => [k, v]));
-export function migrateControls(state) {
+export function migrateControls(state, report = null) {
   if (!state || typeof state !== 'object') return state;
   let out = state;
   for (const r of MIGRATING()) {
@@ -218,9 +315,15 @@ export function migrateControls(state) {
     for (const [k, v] of Object.entries(out)) { if (k === r.id) Object.assign(next, add); else next[k] = v; }
     out = next;
   }
-  return out;
+  /* THE ROLE IDS (Q3.4) — computed, not copied; `state` must be a WHOLE stored
+     state, since the migration reads the arrangement. The scope entries it
+     carries come back through `report.scopes`, its notes through
+     `report.notes`. */
+  const roles = migrateRoles(out);
+  if (report) { report.scopes = roles.scopes; report.notes = roles.notes; }
+  return roles.state;
 }
-export function migrateSet(set) {
+export function migrateSet(set, report = null, defaults = DEFAULTS) {
   if (!Array.isArray(set)) return set;
   let out = set;
   for (const r of MIGRATING()) {
@@ -230,8 +333,322 @@ export function migrateSet(set) {
     for (const k of Object.keys(add)) if (out.some((w) => w && w.id === k)) throw new Error(`migrateSet: the set names the retired "${r.id}" AND its replacement "${k}" — no set stored before the retirement carries both`);
     out = [...out.slice(0, at), ...Object.entries(add).map(([id, value]) => ({ id, value })), ...out.slice(at + 1)];
   }
-  return out;
+  /* THE ROLE IDS (Q3.4): a stored SET is a delta over DEFAULTS, so the
+     migration reads the whole state it stands for; what it changes (a folded
+     global, a scope toggle) comes back as set entries, and the entries it
+     carries as ONE `@scopes` entry, merged into any the set already holds. */
+  if (!out.some((w) => w && RETIRED_ROLE_IDS.includes(w.id))) return out;
+  const whole = { ...defaults };
+  for (const w of out) if (w && w.id !== SCOPES_SET_ID) whole[w.id] = w.value;
+  const roles = migrateRoles(whole);
+  let next = out.filter((w) => !(w && RETIRED_ROLE_IDS.includes(w.id)));
+  for (const k of Object.keys(roles.state)) {
+    if (Object.is(roles.state[k], whole[k])) continue;
+    const at = next.findIndex((w) => w && w.id === k);
+    if (at >= 0) next[at] = { id: k, value: roles.state[k] }; else next.push({ id: k, value: roles.state[k] });
+  }
+  if (roles.scopes) {
+    const had = scopesOfSet(next);
+    const merged = had
+      ? { layers: [...(had.layers || []), ...roles.scopes.layers], petals: [...(had.petals || []), ...roles.scopes.petals], tiers: [...(had.tiers || [])] }
+      : roles.scopes;
+    next = next.filter((w) => !(w && w.id === SCOPES_SET_ID));
+    next.push({ id: SCOPES_SET_ID, value: merged });
+  }
+  if (report) { report.scopes = roles.scopes; report.notes = roles.notes; }
+  return next;
 }
+
+/* ===================================================================
+   THE ROLE RETIREMENT'S COMPUTED MIGRATION (Q3.4, Eva's Oct 12 ruling and her
+   Oct 14 ruling on the RADIAL labellum and hood — read
+   docs/bloom-role-retirement-outcome.md before touching any of it).
+
+   WHY `migrateTo` CANNOT EXPRESS IT. `migrateTo` is DATA that COPIES one stored
+   value into named controls, verbatim. A role delta is not a value of any live
+   control: it is a DELTA ON a global, applied to a SET OF PETALS that only the
+   arrangement can name. Carrying `innerCurl 90` needs the placement (RADIAL
+   gives a layer entry, FAN one entry per mirror pair), the depth (which layers
+   are inner), the fan's count and mirror (which pairs exist) and the global
+   itself (a size multiplier becomes `global x (mul - 1)` as an OFFSET). So the
+   migration is a FUNCTION of the whole stored state, and it produces two
+   things a copy cannot: scope entries for the design file's `overrides`
+   containers, and the scope toggle that lets them reach a petal. It is still
+   ONE owner — `migrateRoles` below — called by `migrateControls` /
+   `migrateSet` (the harness replaying a frozen row) and by the design file's
+   reader (a pre-retirement file), so the three cannot drift.
+
+   THE RETIRED TABLE IS RESTATED HERE, as data, because the geometry no longer
+   has it. `RETIRED_ROLE_ROWS` is the deleted `ROLE_OVERRIDES` (the role, the
+   base, the law), IN ITS OWN ORDER: ALL, INNER, LABELLUM, HOOD, PETAL_1..9.
+   The order is the old composition order — a base read `state[base]`, then
+   every matching row in table order, then one clamp — and the migration
+   rebuilds exactly that sum so it can land an offset on the very double the
+   old resolver produced.
+
+   WHAT EACH ROLE BECOMES (the rulings; nothing here is a reading of them):
+     ALL (one whorl, every placement)  folded INTO THE GLOBAL — `g + all`,
+                                        clamped to the base's range and put on
+                                        the slider's own step, which is what a
+                                        range input holds after the value is
+                                        written. Where the sum is off the step
+                                        the global lands one step-rounding away
+                                        and the note says so (the one place the
+                                        ALL fold is not exact).
+     INNER, RADIAL or SPIRAL, 2+       `scopeLayers` ON and one LAYER entry per
+       layers                          inner layer (a spiral's turn is its layer,
+                                        Eva's ruling of Oct 16). The entry carries
+                                        cup and curl only, so it OWNS no size or
+                                        tilt (Q3.5) and the Shrink and Tilt step
+                                        ramps still place those whorls — their
+                                        sliders hide under Per-layer values, and
+                                        keep applying until a layer is given its
+                                        own size or tilt; the note says so.
+     INNER, FAN, 2+ layers             `scopePetals` ON and one PETAL entry per
+                                        (inner layer, mirror pair).
+     INNER, CONTINUOUS                 was never stamped there; inert.
+     LABELLUM / HOOD, RADIAL in step   DROPPED BY RULING (Oct 14): a radial
+                                        orchid is no longer reachable; per-petal
+                                        is FAN only.
+     PETAL_k, FAN                      `scopePetals` ON and one PETAL entry per
+                                        (layer, pair k-1) — the group's
+                                        canonical slot IS its index.
+     anything the old rules left inert DROPPED, said as inert (it drew nothing).
+
+   THE OFFSET LANDS ON THE OLD DOUBLE. An entry's offset is chosen so
+   `global + offset` is EXACTLY the old composition `((g + all) + inner) +
+   petal` or `g x mul` — `landOffset` tries `target - from` and its neighbours
+   and reports the rare case none lands. For a multiplier in 0.5..2 the
+   difference `fl(g x mul) - g` is exact (Sterbenz: the product lies within a
+   factor of two of g), so a size group lands on the old double at the global
+   it was migrated at, and drifts from it if the global later moves — the one
+   semantic loss of the OFFSETS default (Q3.2), recorded in Scoping-a's table.
+
+   A DESIGN WHOSE SCOPE TOGGLE WAS ALREADY LIVE had its whole role table inert
+   (Scoping-b), so its role values are dropped as inert. A design missing a
+   value the migration must read is told and nothing of its roles is applied,
+   rule 3 of the design file — never defaulted. */
+const ROLE_ALL_ = 'ALL';
+const ROLE_INNER_ = 'INNER';
+const ROLE_LABELLUM_ = 'LABELLUM';
+const ROLE_HOOD_ = 'HOOD';
+const RETIRED_FAN_GROUPS = 9;   // the per-petal ceiling the retired controls were generated to (MAX_FAN_PER_SIDE + 1)
+export const RETIRED_ROLE_ROWS = Object.freeze([
+  { id: 'allCurl', role: ROLE_ALL_, base: 'petalSpineCurl', law: 'delta' },
+  { id: 'allCup', role: ROLE_ALL_, base: 'petalCup', law: 'delta' },
+  { id: 'innerCurl', role: ROLE_INNER_, base: 'petalSpineCurl', law: 'delta' },
+  { id: 'innerCup', role: ROLE_INNER_, base: 'petalCup', law: 'delta' },
+  { id: 'labellumSize', role: ROLE_LABELLUM_, base: 'petalLength', law: 'mul' },
+  { id: 'labellumSize', role: ROLE_LABELLUM_, base: 'petalWidth', law: 'mul' },
+  { id: 'labellumTilt', role: ROLE_LABELLUM_, base: 'petalTilt', law: 'delta' },
+  { id: 'labellumCup', role: ROLE_LABELLUM_, base: 'petalCup', law: 'delta' },
+  { id: 'labellumCurl', role: ROLE_LABELLUM_, base: 'petalSpineCurl', law: 'delta' },
+  { id: 'hoodSize', role: ROLE_HOOD_, base: 'petalLength', law: 'mul' },
+  { id: 'hoodSize', role: ROLE_HOOD_, base: 'petalWidth', law: 'mul' },
+  { id: 'hoodTilt', role: ROLE_HOOD_, base: 'petalTilt', law: 'delta' },
+  { id: 'hoodCup', role: ROLE_HOOD_, base: 'petalCup', law: 'delta' },
+  ...Array.from({ length: RETIRED_FAN_GROUPS }, (_, k) => {
+    const role = `PETAL_${k + 1}`;
+    const c = (s) => `petal${k + 1}${s}`;
+    return [
+      { id: c('Size'), role, group: k + 1, base: 'petalLength', law: 'mul' },
+      { id: c('Size'), role, group: k + 1, base: 'petalWidth', law: 'mul' },
+      { id: c('Tilt'), role, group: k + 1, base: 'petalTilt', law: 'delta' },
+      { id: c('Cup'), role, group: k + 1, base: 'petalCup', law: 'delta' },
+      { id: c('Curl'), role, group: k + 1, base: 'petalSpineCurl', law: 'delta' },
+    ];
+  }).flat(),
+]);
+export const RETIRED_ROLE_IDS = Object.freeze([...new Set(RETIRED_ROLE_ROWS.map((r) => r.id))]);
+const ROLE_LAW_IDENTITY = { delta: 0, mul: 1 };
+const lawOf = (id) => RETIRED_ROLE_ROWS.find((r) => r.id === id).law;
+/* What the migration must read off the stored state, every one a live
+   control: the arrangement that names the petals and the five bases. */
+const ROLE_CONTEXT = ['placement', 'layerCount', 'layerPhase', 'petalCount', 'fanPerSide', 'fanCenterPetal',
+  'petalLength', 'petalWidth', 'petalTilt', 'petalCup', 'petalSpineCurl'];
+/* THE TWO SCOPE TOGGLES ARE READ AND NOT REQUIRED: a design saved between the
+   design file (57f64f7, Oct 13) and Scoping-b (Oct 14) carries role values and
+   no toggle, because neither toggle existed — and in that tree the role table
+   was live, which is exactly what a toggle reading OFF means. So an ABSENT
+   toggle is read as the design's own fact (it predates the toggle), never as a
+   default chosen for it; a PRESENT one is read as stored. */
+const ROLE_TOGGLES = ['scopeLayers', 'scopePetals'];
+
+/* THE SET-ENTRY THAT CARRIES A ROW'S SCOPES. A matrix row (or a frozen row
+   replayed through the migration) names its `overrides` record as ONE entry
+   of its `set` under this id, which no control can have: every tool that
+   builds a row from its set with its own `stateOf` then REFUSES it ("no
+   control @scopes") rather than quietly building the bloom without its
+   scopes — a silent wrong design is the failure this project's read-back
+   exists against. The harness's `applyConfig` hands the entry to the page
+   through `__bloomScopes`; a Node tool that understands it reads it through
+   `scopesOfSet`. */
+export const SCOPES_SET_ID = '@scopes';
+export function scopesOfSet(set) {
+  const e = Array.isArray(set) ? set.find((w) => w && w.id === SCOPES_SET_ID) : null;
+  return e ? e.value : null;
+}
+
+/* The double a range input holds once `v` is written into it: clamped to the
+   control's range and put on its step, counted from `min` (the HTML step base
+   of a range input). `(m + k s)` is formed over exact integers and divided
+   once, so the result is the double nearest the decimal the browser keeps. */
+function onSliderGrid(c, v) {
+  const x = Math.min(c.max, Math.max(c.min, v));
+  const dp = (String(c.step).split('.')[1] || '').length;
+  const p = 10 ** dp;
+  const k = Math.round((x - c.min) / c.step);
+  return (Math.round(c.min * p) + k * Math.round(c.step * p)) / p;
+}
+const f64 = new Float64Array(1);
+const i64 = new BigInt64Array(f64.buffer);
+function nextDouble(x, dir) {
+  if (x === 0) return dir > 0 ? Number.MIN_VALUE : -Number.MIN_VALUE;
+  f64[0] = x;
+  i64[0] += ((x > 0) === (dir > 0)) ? 1n : -1n;
+  return f64[0];
+}
+/* The offset `d` with `from + d === target`, EXACTLY where one exists. */
+export function landOffset(from, target) {
+  const d0 = target - from;
+  if (from + d0 === target) return { d: d0, exact: true };
+  for (const dir of [1, -1]) {
+    let d = d0;
+    for (let s = 0; s < 8; s++) { d = nextDouble(d, dir); if (from + d === target) return { d, exact: true }; }
+  }
+  return { d: d0, exact: false };
+}
+
+/* THE MIGRATION. `input` is a WHOLE stored control state (a matrix row over
+   DEFAULTS, or a design file's own controls). Returns
+     { state, scopes, notes }
+   `state` the controls with every retired role id removed (a folded global, a
+   scope toggle set), `scopes` an `overrides` record of the entries carried
+   (null when none), `notes` one entry per retired id that was off its identity
+   ({ id, kind: 'migrated' | 'dropped' | 'inert' | 'identity', text }). Pure. */
+export function migrateRoles(input) {
+  if (!input || typeof input !== 'object') return { state: input, scopes: null, notes: [] };
+  const own = (k) => Object.prototype.hasOwnProperty.call(input, k);
+  const present = RETIRED_ROLE_IDS.filter(own);
+  if (!present.length) return { state: input, scopes: null, notes: [] };
+  const state = {};
+  for (const [k, v] of Object.entries(input)) if (!present.includes(k)) state[k] = v;
+  const notes = [];
+  const val = (id) => Number(input[id]);
+  const active = present.filter((id) => val(id) !== ROLE_LAW_IDENTITY[lawOf(id)]);
+  if (present.length > active.length) {
+    notes.push({ id: null, kind: 'identity', text: `${present.length - active.length} retired petal-role control${present.length - active.length === 1 ? ' was' : 's were'} at ${present.length - active.length === 1 ? 'its' : 'their'} identity — nothing to carry` });
+  }
+  if (!active.length) return { state, scopes: null, notes };
+  const missing = ROLE_CONTEXT.filter((k) => !own(k));
+  if (missing.length) {
+    for (const id of active) notes.push({ id, kind: 'dropped', text: `${id} ${input[id]} is retired and NOT carried: the design does not hold ${missing.join(', ')}, which the migration must read to place it` });
+    return { state, scopes: null, notes };
+  }
+  const placement = String(input.placement);
+  const L = Math.round(Number(input.layerCount));
+  const fan = placement === 'FAN';
+  const radial = placement === 'RADIAL';
+  const spiral = placement === 'SPIRAL';
+  const cont = placement === 'CONTINUOUS';
+  const toggleOf = (k) => (ROLE_TOGGLES.includes(k) && !own(k) ? 'OFF' : String(input[k]));   // absent: the design predates the toggle
+  const toggleLive = (radial && toggleOf('scopeLayers') === 'ON') || (fan && toggleOf('scopePetals') === 'ON');
+  if (toggleLive) {
+    for (const id of active) notes.push({ id, kind: 'inert', text: `${id} ${input[id]} was inert in this design (${fan ? 'Per-petal' : 'Per-layer'} values was on, which stills the whole role table) — dropped` });
+    return { state, scopes: null, notes };
+  }
+  const n = fan ? 2 * Math.round(Number(input.fanPerSide)) + (String(input.fanCenterPetal) === 'ON' ? 1 : 0) : Math.round(Number(input.petalCount));
+  const mirror = mirrorFor(input);
+  const groups = fan ? petalGroupCount(n, mirror) : 0;
+  const slotEligible = radial && L >= 2 && Number(input.layerPhase) === 0;
+  const allLive = L === 1;
+  const innerLive = !cont && L >= 2;
+  const rowsOf = (id) => RETIRED_ROLE_ROWS.filter((r) => r.id === id);
+  const carried = new Set();
+  /* Each active id: is it live on this arrangement, and if not, why not. */
+  for (const id of active) {
+    const r = rowsOf(id)[0];
+    const v = input[id];
+    if (r.role === ROLE_ALL_) {
+      if (!allLive) notes.push({ id, kind: 'inert', text: `${id} ${v} was inert (All petals applies at one whorl; this design has ${L}) — dropped` });
+      else carried.add(id);
+    } else if (r.role === ROLE_INNER_) {
+      if (!innerLive) notes.push({ id, kind: 'inert', text: `${id} ${v} was inert (${cont ? 'a continuous spiral has no inner whorl' : 'the bloom has one whorl'}) — dropped` });
+      else carried.add(id);
+    } else if (r.role === ROLE_LABELLUM_ || r.role === ROLE_HOOD_) {
+      const who = r.role === ROLE_LABELLUM_ ? 'the labellum' : 'the hood';
+      if (slotEligible) notes.push({ id, kind: 'dropped', text: `${id} ${v} is DROPPED BY RULING (Oct 14): ${who} of a RADIAL bloom is retired with no migration — a radial orchid is no longer reachable; per-petal values are FAN only` });
+      else notes.push({ id, kind: 'inert', text: `${id} ${v} was inert (${who} applies to a RADIAL bloom of 2+ whorls in step) — dropped` });
+    } else {
+      if (!fan) notes.push({ id, kind: 'inert', text: `${id} ${v} was inert (the per-petal groups apply to a FAN) — dropped` });
+      else if (r.group > groups) notes.push({ id, kind: 'inert', text: `${id} ${v} was inert (this fan has ${groups} group${groups === 1 ? '' : 's'}) — dropped` });
+      else carried.add(id);
+    }
+  }
+  const ctrl = (id) => CONTROLS.find((c) => c.id === id);
+  const g = (base) => Number(input[base]);
+  /* ALL — into the global. */
+  for (const id of carried) {
+    const r = rowsOf(id)[0];
+    if (r.role !== ROLE_ALL_) continue;
+    const sum = g(r.base) + Number(input[id]);
+    const folded = onSliderGrid(ctrl(r.base), sum);
+    state[r.base] = folded;
+    notes.push({ id, kind: 'migrated', text: `${id} ${input[id]} → ${ctrl(r.base).label} ${input[r.base]} → ${folded} (folded into the whole bloom's own value${folded !== sum ? `; the sum ${sum} lands on the slider at ${folded}` : ''})` });
+  }
+  /* The old composition of `base` for a petal on `layer` in fan group `group`
+     (0 for none), and whether any role beyond ALL reaches it. */
+  const composed = (base, layer, group) => {
+    let x = g(base);
+    let beyondAll = false;
+    for (const r of RETIRED_ROLE_ROWS) {
+      if (r.base !== base || !carried.has(r.id)) continue;
+      if (r.role === ROLE_INNER_ && layer < 1) continue;
+      if (r.group !== undefined && r.group !== group) continue;
+      const v = Number(input[r.id]);
+      x = r.law === 'mul' ? x * v : x + v;
+      if (r.role !== ROLE_ALL_) beyondAll = true;
+    }
+    return { x, beyondAll };
+  };
+  const BASES = ['petalLength', 'petalWidth', 'petalTilt', 'petalCup', 'petalSpineCurl'];
+  const layers = [];
+  const petals = [];
+  const inexact = [];
+  const entryFor = (layer, group) => {
+    const offsets = {};
+    for (const base of BASES) {
+      const { x, beyondAll } = composed(base, layer, group);
+      if (!beyondAll) continue;
+      const from = Number(state[base]);
+      const { d, exact } = landOffset(from, x);
+      if (!exact) inexact.push(`${base} on layer ${layer + 1}${group ? ` pair ${group}` : ''}`);
+      offsets[base] = d;
+    }
+    return Object.keys(offsets).length ? offsets : null;
+  };
+  if (radial || spiral) {
+    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }
+  } else if (fan) {
+    for (let k = 0; k < L; k++) {
+      for (let c = 0; c < groups; c++) { const o = entryFor(k, c + 1); if (o) petals.push({ layer: k, slot: c, offsets: o }); }
+    }
+  }
+  if (layers.length) state.scopeLayers = 'ON';
+  if (petals.length) state.scopePetals = 'ON';
+  for (const id of carried) {
+    const r = rowsOf(id)[0];
+    if (r.role === ROLE_ALL_) continue;
+    const where = r.role === ROLE_INNER_
+      ? (fan ? `an offset on every mirror pair of layers 2..${L} (Per-petal values on)` : `an offset on ${spiral ? 'turns' : 'layers'} 2..${L} (Per-layer values on — Shrink and Tilt step hide under it and still place those whorls, since the entry gives them no size or tilt of their own)`)
+      : `an offset on pair ${r.group} of every layer (Per-petal values on)`;
+    notes.push({ id, kind: 'migrated', text: `${id} ${input[id]} → ${where}` });
+  }
+  if (inexact.length) notes.push({ id: null, kind: 'migrated', text: `no offset lands exactly on the old composed value for ${inexact.join('; ')} — the nearest is used` });
+  const scopes = (layers.length || petals.length) ? { layers, petals, tiers: [] } : null;
+  return { state, scopes, notes };
+}
+
 
 /* VISIBILITY PREDICATES — the condition itself, never a name for one.
    Same structured grammar as the flower registry (kept introspectable rather
@@ -268,57 +685,7 @@ export function migrateSet(set) {
    relation between two controls that no constant-comparing leaf can state.
    It reads two drivers and both are reported. Recorded as a parked question
    rather than taken silently. */
-/* SLOT ROLES ARE RADIAL-ONLY AND NEED ONE SHARED MIRROR PLANE — declared once
-   here, under a name, because eight controls share it and eight copies of one
-   condition is what drifts. See bloom-geometry.js's SESSION B block for both
-   measurements behind it: the corrected SPIRAL ground, and the layerPhase
-   table (30.000 deg off at 2 layers x phase 0.25 x n=3, 0.000 at phase 0).
-
-   THE SECOND STATEMENT OF THIS BOUNDARY is `slotRolesEligible()` in
-   bloom-geometry.js, which makes the controls INERT where this one makes them
-   HIDDEN — neither file can read the other's answer and both must act on it.
-   That is the SHEET_THICKNESS_MM situation exactly, so it gets the same
-   remedy: both gates assert the two agree on EVERY matrix row, rather than a
-   comment claiming they do. */
 export const PREDICATES = {
-  /* THE FAN ARM IS GONE (Eva's ruling 4, Sep 3) — per-petal roles SUPERSEDE
-     slot roles there, so this is RADIAL-only again and `perPetalEligible`
-     below is the fan's own gate. Session 10 admitted the fan here on a real
-     consequence (a fan has no whorl-to-whorl offset to be out of, so the
-     shared plane held unconditionally); that consequence is still TRUE and is
-     now simply not what decides it.
-
-     WHAT THIS HIDES, so it reads as a ruling rather than as a regression: on a
-     FAN the eight `labellum*` / `hood*` controls disappear and the fan loses
-     labellum TIP BREADTH outright, because the per-petal set ships without a
-     tip-breadth row. Nothing is RETIRED — slot roles stay fully live under
-     RADIAL, same ids, same laws, same rows — so this is a visibility plus
-     applicability change and RETIRED_IDS does not apply. Restoring COMPOSITION
-     is this one arm plus the matching arm in bloom-geometry.js's
-     `slotRolesEligible()`, and nothing was written to depend on their absence.
-
-     THE PANEL GATE COVERS THE TRANSITION IN BOTH DIRECTIONS, because a
-     control that stops appearing is exactly as much a claim as one that
-     starts: `predicateDrivers` reports `placement` here, so the
-     visibility-transition route drives RADIAL -> FAN -> RADIAL and re-checks
-     every control's `hidden` against its own predicate at each state. */
-  slotRolesEligible: { all: [
-    { id: 'placement', oneOf: ['RADIAL'] },
-    /* TWO OR MORE WHORLS, ALL IN STEP (Eva's ruling, Sep 3, from the deploy
-       preview — the ONE-WHORL ARM IS GONE and the single-layer orchid with it,
-       with the cost stated to her and accepted; bloom-geometry.js's
-       `slotRolesEligible` carries the full record). At one whorl "Petal
-       roles" is the ALL-PETALS group instead (`allPetalsEligible` below) and
-       Petal 1 / Petal N are hidden AND inert. `not awayFrom 0` is "is 0" —
-       the tolerance is half of layerPhase's own 0.01 step, so it admits
-       exactly the reachable value 0 and nothing else. */
-    { id: 'layerCount', min: 2 },
-    { not: { id: 'layerPhase', awayFrom: 0, by: 0.005 } },
-    /* NOT WHILE PER-LAYER VALUES OWN THE ROSETTE (Scoping-b) — the twin of
-       the geometry's `if (scopeLayersLive(state)) return false;`. */
-    { not: { ref: 'scopeLayersLive' } },
-  ] },
-
   /* ===================================================================
      THE TWO SCOPE TOGGLES (Scoping-b, Eva's rulings: "Per-layer independence
      is RADIAL only; per-petal is FAN only. Each is a toggle; off = today's
@@ -326,27 +693,13 @@ export const PREDICATES = {
      `scopeLayersLive` / `scopePetalsLive` / `scopesOwnRoles`, same names,
      checked against them at harness load and per row (Z5). LIVE means ON
      under the toggle's own placement: a stored ON under another placement is
-     hidden AND inert, the `layerPhase` treatment. While either is live the
-     whole role table (ALL, INNER, Petal 1 / Petal N, the per-petal groups)
-     is hidden AND inert — one owner on screen — and per-layer and the tube
-     are exclusive; see the geometry's SCOPE_TOGGLE_VALUES block. */
-  scopeLayersLive: { all: [{ id: 'placement', oneOf: ['RADIAL'] }, { id: 'scopeLayers', oneOf: ['ON'] }] },
+     hidden AND inert, the `layerPhase` treatment. Per-layer and the tube are
+     exclusive, and under per-layer values the Shrink and Tilt step ramps are
+     hidden AND inert (Q3.5 — each layer's own size and tilt win); see the
+     geometry's SCOPE_TOGGLE_VALUES block. (`scopesOwnRoles` named the role
+     table these toggles stilled; the table is retired, Q3.4.) */
+  scopeLayersLive: { all: [{ id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] }, { id: 'scopeLayers', oneOf: ['ON'] }] },
   scopePetalsLive: { all: [{ id: 'placement', oneOf: ['FAN'] }, { id: 'scopePetals', oneOf: ['ON'] }] },
-  scopesOwnRoles: { any: [{ ref: 'scopeLayersLive' }, { ref: 'scopePetalsLive' }] },
-
-  /* ===================================================================
-     WHERE THE ALL-PETALS GROUP APPLIES — one whorl, every placement (Eva's
-     ruling, Sep 3): "Petal roles is the 'adjust petals as a group' section at
-     every depth; at 2+ layers that group is the inner whorl, at depth 1 it is
-     ALL petals." The three `all*` controls ride on the base sliders in Petal
-     form / Petal shape as deltas, exactly as the `inner*` trio rides on them
-     for the inner whorl, and this predicate is the twin of
-     bloom-geometry.js's `allPetalsEligible()`: the registry HIDES above one
-     whorl, the geometry makes INERT there, and Z5 checks the two agree on
-     every row. `not min 2` is "below 2", i.e. exactly one. And not while a
-     scope toggle owns the petals (Scoping-b) — the twin of the geometry's
-     `&& !scopesOwnRoles(state)`. */
-  allPetalsEligible: { all: [{ not: { id: 'layerCount', min: 2 } }, { not: { ref: 'scopesOwnRoles' } }] },
 
   /* ===================================================================
      THE FULL-SPHERE HEAD (session 18, Eva Sep 5) — the twin of
@@ -368,20 +721,6 @@ export const PREDICATES = {
     { id: 'hubShape', oneOf: ['SPHERE'] },
   ] },
 
-  /* ===================================================================
-     WHERE PER-PETAL ROLES APPLY — the fan, and only the fan (Eva's ruling 4,
-     Sep 3). The counterpart of `slotRolesEligible` above, and MUTUALLY
-     EXCLUSIVE with it: per-petal SUPERSEDES slot roles on the fan, so a fan
-     has exactly one per-position axis and a rosette has the other.
-
-     bloom-geometry.js states the same boundary in `perPetalEligible()`,
-     because neither file can read the other's answer and both must act on it
-     — the registry HIDES the controls, the geometry makes them INERT. Two
-     statements of one boundary is a registration risk, so both gates assert
-     the two agree on every matrix row (Z5), exactly as they already do for
-     the slot-role twin. And not while per-petal values own the fan
-     (Scoping-b) — the twin of the geometry's `&& !scopePetalsLive(state)`. */
-  perPetalEligible: { all: [{ id: 'placement', oneOf: ['FAN'] }, { not: { ref: 'scopePetalsLive' } }] },
   /* LOBES ENGAGED (session 38, PR 2) — the registry's statement of the
      geometry's `lobesEngaged()`: the count, the coverage and the lobe tip
      shape are hidden AND inert at depth 0, the curl family's own rule (a
@@ -631,8 +970,7 @@ export const PREDICATES = {
      of the geometry's `tubeEligible()`; TU0 compares the two per row and the
      harness at load. A ring is drawn through every midrib of ONE whorl that
      shares ONE row ladder at uniform azimuths, so it is unavailable off
-     RADIAL, under any per-slot field (size or form variance, a live slot-role
-     override), under the buckle, the fringe or the infill, under an
+     RADIAL, under any per-slot field (size or form variance), under the buckle, the fringe or the infill, under an
      inflorescence (a floret does not inherit) and on a full sphere. Each term
      is half a slider step so it admits exactly the reachable rest value. */
   tubeEligible: { all: [
@@ -648,12 +986,6 @@ export const PREDICATES = {
     { id: 'fringeCount', oneOf: ['0'] },
     { not: { ref: 'infillPresent' } },
     { not: { ref: 'inflorescencePresent' } },
-    { not: { all: [{ ref: 'slotRolesEligible' }, { any: [
-      { id: 'labellumSize', awayFrom: 1, by: 0.025 }, { id: 'labellumTilt', awayFrom: 0, by: 0.5 },
-      { id: 'labellumCup', awayFrom: 0, by: 0.005 }, { id: 'labellumCurl', awayFrom: 0, by: 2.5 },
-      { id: 'hoodSize', awayFrom: 1, by: 0.025 }, { id: 'hoodTilt', awayFrom: 0, by: 0.5 },
-      { id: 'hoodCup', awayFrom: 0, by: 0.005 },
-    ] }] } },
   ] },
   /* SOME WHORL IS FUSED — h and BLEND appear only then (Eva's ruling). Layer
      N's slider counts only while the bloom has N layers. */
@@ -661,35 +993,6 @@ export const PREDICATES = {
     ? { id: 'tubeLayer1', snapsBelow: 'petalCount' }
     : { all: [{ id: 'layerCount', min: i + 1 }, { id: `tubeLayer${i + 1}`, snapsBelow: 'petalCount' }] })) }] },
 
-  /* ===================================================================
-     WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
-     it is a predicate rather than a special case (Eva, Sep 2).
-
-     One petal per side with NO mirror-line petal is a two-petal fan, where
-     the mirror runs through the gap and the involution `i <-> n-1-i` pairs
-     the two slots with each other. The pair CLOSEST to the plane and the pair
-     FARTHEST from it are then the SAME pair, and a slot cannot carry two slot
-     roles. The tie breaks toward the LABELLUM (see roleForSlot's second arm),
-     which leaves the HOOD empty — and three hood sliders naming a group with
-     no members is exactly what session B's own non-empty check exists to
-     catch. Session B's remedy, pushing the empty group onto LATERAL, is
-     unavailable here because the collision is between two CONTROL-BEARING
-     roles. So the other half of the argument is discharged instead: the hood
-     controls hide.
-
-     AND THE TWO STATEMENTS WERE TIED TOGETHER RATHER THAN LEFT TO AGREE.
-     Z1's clause was "every control-bearing role is non-empty at every
-     reachable count"; it is now "a role's controls are VISIBLE if and only if
-     that role is NON-EMPTY", asserted in both directions against
-     footRing()'s own `slotRoleCensus`. Membership and visibility became ONE
-     statement with one owner — this predicate is checked against the
-     geometry's census rather than against a second copy of the derivation,
-     which is stronger than what it replaces and cannot drift from it. */
-  hoodEmpty: { all: [
-    { id: 'placement', oneOf: ['FAN'] },
-    { id: 'fanCenterPetal', oneOf: ['OFF'] },
-    { not: { id: 'fanPerSide', min: 2 } },
-  ] },
 };
 
 export function evalPredicate(pred, state) {
@@ -861,42 +1164,6 @@ export function predicateDrivers(pred, out = new Set()) {
    needs a condition of its own, that is a stop-and-raise, not a field to
    add quietly.
    =================================================================== */
-/* WHY A SECTION IS HIDDEN, SAID IN THE PANEL — `hiddenReason` (Eva, Sep 3).
-   A control or section that disappears for a reason a visitor could undo is a
-   control the visitor cannot find; the panel therefore carries ONE caption
-   where Petal 1 / Petal N would be, exactly while they are hidden for THIS
-   reason: a RADIAL bloom of two or more whorls whose Layer offset is not
-   zero. `when` is a registry predicate like any `visibleWhen` (evaluated by
-   the app and asserted by the panel gate in both directions), `text(ui)` is
-   derived so the hood's petal number is the real one, and the caption reads
-   the Layer offset control's OWN label so a rename cannot leave it naming a
-   slider that no longer exists.
-
-   DECLARED ONCE AND REFERENCED TWICE, on purpose: both groups hide for the
-   same reason and the visitor should read it once. The app renders one
-   caption per DISTINCT reason object inside a parent, so sharing the object
-   is what makes the caption single — two literals with the same text would
-   be two captions, and two owners of one sentence.
-
-   NOT SAID AT ONE WHORL: there Petal 1 / Petal N are retired by ruling rather
-   than hidden behind a slider, and the section holds the all-petals group
-   instead; the caption is for the state a visitor can undo. */
-const SLOT_ROLES_BEHIND_OFFSET = {
-  when: { all: [
-    { id: 'placement', oneOf: ['RADIAL'] },
-    { id: 'layerCount', min: 2 },
-    { id: 'layerPhase', awayFrom: 0, by: 0.005 },
-    /* not while per-layer values hide them (Scoping-b): the advice "set Layer
-       offset to 0.00" would be false there — the toggle is what hides them,
-       and ROLES_OWNED_BY_SCOPES below says so instead. */
-    { not: { ref: 'scopeLayersLive' } },
-  ] },
-  text: (ui) => {
-    const offset = CONTROLS.find((c) => c.id === 'layerPhase').label;
-    const last = petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT);
-    return `Petal 1 and Petal ${last} need the whorls in step — set ${offset} to 0.00 to bring them back.`;
-  },
-};
 
 /* THE TUBE'S TWO CAPTIONS (corolla fusion). The first says which term of
    `tubeEligible` stands in the way, derived from the state so it names the
@@ -914,20 +1181,8 @@ const TUBE_UNAVAILABLE = {
     if (Number(ui.fringeCount) >= 1) why.push('a fringe splits the blade into panels');
     if (String(ui.petalInfill) === 'VORONOI') why.push('the petals are infilled');
     if (Number(ui.stemLength) >= 1 && String(ui.inflorescence) === 'RACEME') why.push('the bloom is an inflorescence');
-    if (!why.length) why.push('a petal role (Petal 1 / Petal N) gives one whorl several petal shapes');
     return `Tube needs one RADIAL whorl of identical petals — ${why.join('; ')}.`;
   },
-};
-/* WHY PETAL ROLES WENT AWAY (Scoping-b): under a live scope toggle every role
-   control is hidden AND inert ("where they and the new scopes would both reach
-   one petal, the new toggle hides the old controls (one owner on screen)"),
-   so the whole section hides itself by derivation and this says why, in the
-   Petal drop-down where the section was. The values are KEPT. */
-const ROLES_OWNED_BY_SCOPES = {
-  when: { ref: 'scopesOwnRoles' },
-  text: (ui) => (String(ui.placement) === 'FAN'
-    ? 'Petal roles are off while Per-petal values is on: each petal (a mirror pair) is edited on its own — pick it above the panel. Their values are kept and return when it is off.'
-    : 'Petal roles are off while Per-layer values is on: each layer is edited on its own — pick it above the panel. Their values are kept and return when it is off.'),
 };
 const TUBE_ALL_FREE = {
   when: { all: [{ ref: 'tubeEligible' }, { not: { ref: 'tubeAnyFused' } }] },
@@ -1008,133 +1263,12 @@ export const SECTIONS = [
      roll taper. Presentation only — `section` is never persisted, no role
      changed, zero geometry, asserted by the retention run. */
   { id: 'curl', label: 'Petal curl', open: false, parent: 'petal' },
-  /* PETAL ROLES — which petals differ from the others, and how (Eva's name,
-     Sep 2). It holds two independent axes: session A's LAYER roles (whorl vs
-     whorl) and session B's SLOT roles (where a petal sits within its whorl).
-
-     WHY NOT "Whorl differences", which is what session A predicted this
-     section would be called: slot roles differentiate WITHIN a whorl, so that
-     name would be wrong for seven of the ten controls in it — a label naming
-     a thing that is not the thing, which is what this project retires ids
-     over. "Zygomorphy" is exact and is the charter's own word, and was passed
-     over as jargon on a visitor-facing panel.
-
-     AND WHY NOT Arrangement, where session A's three landed: Arrangement is
-     already nine controls, and session A recorded that the pair wanted a home
-     of its own once slot roles arrived. Moving `inner*` here is presentation
-     only — `section` is never persisted and no geometry reads it. */
-  { id: 'roles', label: 'Petal roles', open: false, parent: 'petal', hiddenReason: ROLES_OWNED_BY_SCOPES },
-  /* ===================================================================
-     THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
-     from the deploy preview): "the names like petal 1 -2 -3 etc should apply
-     to the radial option as well." The labellum's five sliders and the hood's
-     three keep their ids, their laws and their predicates and move into two
-     drop-downs inside "Petal roles", exactly as the fan's groups did — the
-     SAME element, the same accordion rule, the same indent.
-
-     THE NUMBERS ARE THE ORBITS', NOT A SECOND NUMBERING. Under RADIAL the
-     plane is the through-slot involution (`mirrorFor`), whose orbits are the
-     per-petal groups ordered by distance from it: slot 0 is orbit 0, so the
-     labellum is PETAL 1 at every count; the hood is the orbit FARTHEST from
-     the plane, which is the LAST group — `petalGroupCount(n, THROUGH_SLOT)`,
-     2 at three petals, 5 at eight, 21 at forty. Measured through
-     `petalRoleForSlot` at nine counts before this was written (charter,
-     session 11), not read off the derivation: the same `HOOD = P_last`
-     relation the fan already carried, so the rosette gets no rule of its own.
-
-     WHAT WAS DECLINED, so the gaps read as the ruling rather than a defect
-     (option B, offered and refused): extending the fan's full per-orbit set to
-     the rosette would have retired the labellum and hood NAMES, retired the
-     labellum's tip breadth with them, and put nineteen empty-by-default groups
-     under a forty-petal rosette. A's cost is stated instead: the panel reads
-     "Petal 1, Petal 5" with nothing between, because the laterals carry no
-     controls — which the read-outs say in words, and which is the truth.
-
-     ONE LABEL IS A LITERAL AND THE OTHER IS DERIVED, and that asymmetry is the
-     relation itself. "Petal 1" is a constant because orbit 0 exists at every
-     reachable count and is always the labellum — a `labelFrom` there would
-     tell a reader it might vary. The hood's number moves with `petalCount`,
-     so its summary is the FIRST derived section label in this panel:
-     `labelFrom(ui)` is refreshed by the app on every rebuild through the same
-     `refreshLabels()` path the read-outs use, and `sectionLabel()` below is
-     the one owner of "what does this summary say" for the app, the panel gate
-     and the panel sheet alike. verifySections() requires exactly one of
-     `label` / `labelFrom`: a literal beside a derivation would be a stored
-     label-lie waiting for a reader to believe it.
-
-     NOTHING IS RETIRED. The control ids are unchanged (`labellumSize`,
-     `hoodCup`, ...), `section` is never persisted, and the two new section ids
-     name the ROLE each group holds because that is what the code's vocabulary
-     is for; the visitor's vocabulary — the number — is the label. Under FAN
-     both groups are hidden with their controls, by the same predicate the
-     controls carry (Eva's ruling 4): the fan's `petal1` section and this
-     "Petal 1" share a name and never share a screen, which the panel gate
-     asserts on every visibility state it drives.
-
-     `open: false` ON BOTH — ARRANGEMENT holds the one first-load `open`. */
-  { id: 'labellumGroup', label: 'Petal 1', open: false, parent: 'roles', hiddenReason: SLOT_ROLES_BEHIND_OFFSET },
-  { id: 'hoodGroup', open: false, parent: 'roles', hiddenReason: SLOT_ROLES_BEHIND_OFFSET,
-    labelFrom: (ui) => `Petal ${petalGroupCount(Math.round(Number(ui.petalCount)), MIRROR_THROUGH_SLOT)}` },
-
-  /* ===================================================================
-     ONE SECTION PER PER-PETAL GROUP (Eva's ruling 1, Sep 3) — the accordion
-     doing exactly what it was built for, and the ruling was made from
-     measured heights rather than from a preference.
-
-     The alternative on the table was the flower's own form, which Eva likes
-     and which this session's brief pointed at: ONE "Per-petal" section with
-     `PETAL 1 — INNER` sub-headings inside it. Measured with real control rows
-     cloned into the real page:
-
-                                   4 groups (the shipping fan)   9 groups
-       one section, sub-headings   section 904 px, panel 1,314   2,001 / 2,411
-       one section per group       section 216 px, panel   719     216 /   874
-       (today, for scale: tallest section 417 px, panel 788 px)
-
-     The sub-heading form is already past the 1,241 px FLAT panel the accordion
-     was built to replace, at the shipping default. One section per group is
-     BELOW today's worst case at the default and 86 px above it at the extreme,
-     and it needs no cap, no new collapse mechanism and no new hiding rule: a
-     section is hidden when and only when every control in it is hidden, which
-     applyVisibility() already derives, so groups beyond `fanPerSide` and every
-     group under a non-FAN placement disappear for free.
-
-     THE LABELS ARE STATIC AND THE READ-OUTS ARE NOT, which is the split
-     `placement` and `layerCount` have carried since they shipped: a label
-     naming one toggle position lies in the other. Group 1 is the mirror-line
-     petal with the toggle ON and the inner PAIR with it OFF, so the section
-     says "Petal 1" and each control's read-out says which it currently is.
-
-     GENERATED, LIKE THE CONTROLS THEY HOLD, from the one ceiling
-     (MAX_FAN_GROUPS, derived in bloom-geometry.js from MAX_FAN_PER_SIDE and
-     imported rather than restated). Nine hand-written rows would be nine
-     places for the count to drift from the geometry's own.
-
-     `open: false` ON EVERY ONE. verifySections() enforces at most one
-     `open: true` across the whole array, and ARRANGEMENT already holds it. */
-  ...Array.from({ length: MAX_FAN_GROUPS }, (_, k) => ({
-    id: `petal${k + 1}`, label: `Petal ${k + 1}`, open: false,
-    /* NESTED INSIDE "Petal roles" (Eva, Sep 3, from the deploy preview): "have
-       the roles be its own drop down which then enables all the other petals
-       and their roles to be drop downs."
-
-       WHY IT IS A `parent` FIELD AND NOT A SECOND LIST. Membership sits on the
-       CHILD, exactly as a control's `section` sits on the control — a parent
-       naming its children would be two lists to keep in step in the file that
-       exists to state the registration rule, and the panel would silently drop
-       whichever an edit missed. `verifySections()` checks the relation at
-       module load, so the app, both gates and every shot tool get it for free.
-
-       AND THE ACCORDION NEEDED NO SECOND MECHANISM. Its one capture listener
-       used to close every OTHER top-level section; it now closes a
-       drop-down's SIBLINGS, which is the same rule stated one level more
-       generally — at the top level the siblings ARE the sections, so the
-       shipped behaviour is unchanged, and nesting falls out of it. One owner,
-       one listener, one rule; a nested accordion with its own handler would
-       have been the N-copies-of-one-rule defect this panel was built to
-       avoid. */
-    parent: 'roles',
-  })),
+  /* PETAL ROLES WAS HERE — a drop-down inside Petal holding the ALL / INNER deltas,
+     the RADIAL labellum and hood ("Petal 1" / "Petal N") and the fan's nine
+     per-petal groups (`roles`, `labellumGroup`, `hoodGroup`, `petal1`..`petal9`).
+     RETIRED into parameter scoping (Q3.4): its controls are in RETIRED_IDS and
+     migrate through `migrateRoles`; a section id is never persisted, so the
+     eleven section ids need no reservation. */
   /* THE INFILL — a drop-down inside Petal, and the petal's INTERIOR, which is
      the fourth layer of the order of operations and the one nothing in the
      bloom had: shape, form and curl say what the sheet IS, and this says what
@@ -1674,17 +1808,6 @@ const scopeToggleFmt = (kind) => (v, ui, shown) => {
    for its read-out's "is the cap within reach" test (session 23). Not
    narrowed, not adaptive; see the row. */
 const STAMEN_SPREAD_MAX = 6;
-
-/* WHAT THE ROSETTE'S TWO SLOT-ROLE GROUPS CURRENTLY ARE — one owner per group,
-   read by every read-out in the group, the fan's `said(ui)` precedent (Eva's
-   ruling A, Sep 3: the labels say "Petal 1" / "Petal N", so the read-out is
-   where the word "labellum" now lives). Written for the states in which the
-   controls are VISIBLE: slot roles are RADIAL-only, so the plane is the
-   through-slot involution, the labellum is slot 0 — its fixed point, one
-   petal at every count — and the hood is `roleForSlot`'s far end: one petal
-   opposite the line at an even count, the far pair at an odd one. */
-const saidLabellum = () => 'the labellum, on the line';
-const saidHood = (ui) => (Math.round(Number(ui.petalCount)) % 2 === 0 ? 'the hood, opposite the line' : 'the hood pair, opposite the line');
 
 /* ===================================================================
    THE TIP DESCRIPTORS — seven, authored ONCE (session 30). Each row is the
@@ -3199,8 +3322,8 @@ export const CONTROLS = [
     ],
     label: 'Petal on mirror line',
     fmt: (v, ui) => (String(v) === 'ON'
-      ? 'a centre petal is bisected by the line — it is the labellum'
-      : `the line runs between the two inner petals — they are the labellum pair${Math.round(Number(ui.fanPerSide)) < 2 ? ', and there is no hood' : ''}`),
+      ? 'a centre petal is bisected by the line — it is petal 1, a scope of its own'
+      : 'the line runs between the two inner petals — they are petal 1, one mirror pair'),
     tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
 
@@ -3277,7 +3400,8 @@ export const CONTROLS = [
      depth. The read-out carries the unit. */
   { id: 'layerSize', section: 'arrangement', kind: 'slider', min: 0.35, max: 0.9, step: 0.01, default: 0.72,
     label: 'Shrink', fmt: (v, ui) => `${Number(v).toFixed(2)}x per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'layerCount', min: 2 } },
+    /* hidden under Per-layer values (Q3.5): a layer given its own size owns it (blade, foot and ring, Oct 16); a layer with none still takes the shrink */
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { ref: 'scopeLayersLive' } }] } },
 
   /* THE ALTERNATION, in slots. Default 0.50 — half a slot, which is the
      botanically universal alternation of successive whorls. Eva's ruling
@@ -3335,17 +3459,20 @@ export const CONTROLS = [
      as its evidence; do not cap it on the strength of reading this note. */
   { id: 'layerTilt', section: 'arrangement', kind: 'slider', min: 0, max: 30, step: 1, default: 12,
     label: 'Tilt step', fmt: (v, ui) => `+${v}° per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'layerCount', min: 2 } },
+    /* hidden under Per-layer values (Q3.5): a layer given its own tilt owns it; a layer with none still takes the step */
+    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { ref: 'scopeLayersLive' } }] } },
 
-  /* PER-LAYER VALUES (Scoping-b) — the RADIAL rosette's toggle, the twin of
-     `scopePetals` above: ON, the scope bar lists the layers and the panel edits
-     the picked layer's own values; the role table is hidden AND inert, and the
-     tube is unavailable (its terms read the global buckle, fringe and infill).
-     Visible at ONE layer too — the predicate must not drive on `layerCount`
-     (block 8 of buildMatrix iterates every control whose predicate reads it,
-     choices included, and would add rows), and one layer is a legal, if plain,
-     scope. Layer size and Layer tilt still apply on top of a layer's own
-     length, width and tilt: Q3.5 (they WIN under F4) is the next session's. */
+  /* PER-LAYER VALUES (Scoping-b) — the toggle for RADIAL and, since Eva's
+     ruling of Oct 16, the LAYERED SPIRAL (a spiral's turns are its layers —
+     the geometry's SCOPE_LAYER_PLACEMENTS), the twin of `scopePetals` above:
+     ON, the scope bar lists the layers and the panel edits the picked layer's
+     own values, and the tube is unavailable (its terms read the global
+     buckle, fringe and infill). Visible at ONE layer too — the predicate must
+     not drive on `layerCount` (block 8 of buildMatrix iterates every control
+     whose predicate reads it, choices included, and would add rows), and one
+     layer is a legal, if plain, scope. A layer given its own length, width or
+     tilt OWNS it (Q3.5) — the blade, and for the width the foot and the ring
+     too (Oct 16) — and Shrink / Tilt step hide while this is on. */
   { id: 'scopeLayers', section: 'arrangement', kind: 'choice', default: SCOPE_TOGGLE_VALUES[0],
     options: [
       { value: SCOPE_TOGGLE_VALUES[0], label: 'Off — every layer shares the petal controls' },
@@ -3353,7 +3480,7 @@ export const CONTROLS = [
     ],
     label: 'Per-layer values', fmt: scopeToggleFmt('layers'),
     tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'placement', oneOf: ['RADIAL'] } },
+    visibleWhen: { id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] } },
 
   /* ===================================================================
      ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (Eva's rulings, §9 of
@@ -3448,270 +3575,9 @@ export const CONTROLS = [
     },
     visibleWhen: { ref: 'varianceAnyPresent' } },
 
-  /* ===================================================================
-     ZYGOMORPHY — THE INNER WHORLS' OWN FORM. Session A of two: per-LAYER
-     roles, which is the iris (falls at the outer whorl, standards above it).
-     Session B derives roles from a mirror plane and gives ONE SLOT its own
-     record — the orchid's labellum and hood. Charter: "Zygomorphy".
-
-     WHY THEY LIVE IN ARRANGEMENT AND NOT IN PETAL FORM, and it is not a
-     preference: the charter's own ROOM TO GROW note predicted this shape
-     exactly — "a layer-count control in that section with per-layer
-     sub-controls gated on it by visibleWhen, the centerStyle pattern one
-     level up, not a section per layer". `layerSize`, `layerPhase` and
-     `layerTilt` already sit here under that pattern and these are its next
-     three. It also keeps the panel gate honest: ARRANGEMENT ships OPEN, so
-     the path route does not need a WITNESS for a section whose every control
-     is hidden at the shipping default — a witness that has to set up its own
-     precondition before it can move anything is a witness that can quietly
-     measure nothing. When session B's slot roles arrive, a "Whorl
-     differences" SECTION is the right home for the pair, and it will need
-     that precondition mechanism; recorded so it is designed rather than
-     discovered.
-
-     TWO PREFIXES, TWO LAWS, and the distinction is load-bearing. `layer*` is
-     a lambda-RAMP: the quantity is `lambda * value`, defined at every real
-     depth, which is exactly why size and tilt survive CONTINUOUS. `inner*` is
-     a ROLE OVERRIDE: a delta applied to whichever whorls carry the INNER
-     role, with no lambda in it at all. Conflating them would put a ramp's
-     label on an override's law.
-
-     SIZE AND TILT ARE ABSENT ON PURPOSE (Eva's ruling, Sep 1). `layerSize`
-     and `layerTilt` already own per-layer size and tilt; a role override of
-     either would be a second owner of one quantity, and it would strand
-     CONTINUOUS, whose only depth controls those are. So the role overrides
-     cover exactly what the ramps do not.
-
-     THE SET IS TRIMMED, AND THE ASYMMETRY DECIDED IT (Eva, Sep 1): adding a
-     control later is one registry row and one row in ROLE_OVERRIDES, forever;
-     retiring one becomes a schema bump plus a migration the day anything
-     persists a design. RECORDED, NOT BUILT: `innerRoll`, `innerTwist`,
-     per-layer taper deltas and a per-layer `tipThinning` delta — mechanically
-     identical, none needed by the iris. Grow on evidence from real use.
-
-     ALL THREE ARE HIDDEN UNDER CONTINUOUS, and that is a ruling with a
-     measurement behind it rather than caution. Continuous placement has no
-     layers to differentiate — J5 asserts precisely that — so an INNER role
-     there would be a label for a group that does not exist. Reinterpreting it
-     as "the inner turns" would be `layerPhase`'s trap: a second meaning under
-     a name that already means something else. Named gate rows assert the
-     controls are hidden AND that the export is bit-identical to the same
-     design without them; a gated state is coverage, not the absence of it.
-
-     DEFAULT 0 ON ALL THREE, so the shipping bloom is unmoved by construction:
-     resolveRoleOverrides() SKIPS a zero delta outright, which leaves the ring
-     carrying no record and petalStateFor() handing the builder the caller's
-     own state object. The identity is object identity, not `x + 0`.
-
-     THE RANGES ARE THE BASE CONTROLS' OWN, MIRRORED — and both gates assert
-     that against ROLE_OVERRIDES rather than trusting this comment, because
-     bloom-geometry.js cannot import the registry and clamps composed values
-     into bounds it has to restate. Each delta spans the base control's full
-     range in the direction that reaches its form: curl runs the whole signed
-     span so standards can rise while falls hang, cup likewise, and tip
-     breadth runs upward only because the base already starts at 0. */
-  /* ===================================================================
-     THE ALL-PETALS GROUP — one whorl's "adjust petals as a group" (Eva's
-     ruling, Sep 3, from the deploy preview; she overruled the session's
-     "nothing to build" after seeing the panel). Three DELTAS riding on the
-     base sliders in Petal form (Spine curl, Cup) and Petal shape (Tip
-     breadth), identity 0, hidden and inert above one whorl where the INNER
-     trio below is the group instead. Same bases, laws and bounds as that trio
-     — see ROLE_OVERRIDES in bloom-geometry.js, where these are the first
-     three rows.
-
-     THE LABELS SAY WHAT THEY ARE AND THE READ-OUTS SAY WHAT THEY RIDE ON, on
-     the same split every label in this panel keeps: "All curl" beside "Inner
-     curl", and a read-out that at identity names the slider that owns the
-     number ("as Petal form sets it") and off identity names the delta and its
-     base ("+50° on Spine curl"). Nothing here claims to BE the curl; the base
-     slider is, and the app's read-out prints what was built.
-
-     "ALL", NOT "ALL-PETALS" — EVA'S RULING (Sep 3), FOR PANEL HEIGHT, NOT
-     TASTE. The session proposed "All-petals curl"; in a 250 px panel that
-     wraps to two lines, and this PR already grows the panel's worst case from
-     933 to 1,113 px on its own, which is exactly the scrolling she had ruled
-     on once. The delta semantics are carried by the read-outs, so the label
-     does not do that work twice. */
-  { id: 'allCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
-    label: 'All curl', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${v}° on Spine curl`),
-    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'allPetalsEligible' }, { ref: 'curlFromSlider' }] } },
-
-  { id: 'allCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'All cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
-
-  { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
-    label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
-    tier: 'standard', role: 'petal',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }, { not: { ref: 'scopesOwnRoles' } }, { ref: 'curlFromSlider' }] } },
-
-  { id: 'innerCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Inner cup', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
-    tier: 'standard', role: 'petal',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }, { not: { ref: 'scopesOwnRoles' } }] } },
-
-  /* ===================================================================
-     SLOT ROLES — THE ORCHID (session B, Sep 2). Eight controls, all Standard,
-     all `role: 'petal'`, all in PETAL ROLES, all at their law's IDENTITY by
-     default so the shipping bloom is unmoved by construction.
-
-     TWO LAWS, AND THE SUFFIX SAYS WHICH. `*Size` is a MULTIPLIER (identity
-     1.00); everything else is a DELTA (identity 0). ROLE_OVERRIDES is the one
-     table that states this, and both gates assert these ranges against it —
-     bloom-geometry.js cannot import the registry, so it restates the base
-     control's bounds and the check is what makes it one owner rather than two.
-
-     THE SET IS EVA'S, RULED IN SESSION (Sep 2): labellum gets size, tip
-     breadth, tilt, cup and CURL; hood gets size, tilt and cup. The curl delta
-     was added to the originally-ruled four for a measured reason —
-     `petalTilt`'s own range starts at 0, so a tilt delta reaches HORIZONTAL
-     and can never droop, and spine curl is the only control that makes a lip
-     hang and reflex. LATERAL deliberately has NO controls: it is the residue,
-     it is what the labellum and hood are read against, and it is the group
-     that may legitimately be empty (at petalCount 3 there are no laterals at
-     all). RECORDED, NOT BUILT, on session A's asymmetry argument — adding a
-     control later is one registry row plus one ROLE_OVERRIDES row forever,
-     while retiring one becomes a schema bump plus a migration the day
-     anything persists a design: a lateral role override, a labellum roll or
-     twist delta, and a per-role thickness delta (which `sheetThickness` may
-     never have — see session A's never-overridable table, J4a).
-
-     ALL EIGHT SHARE ONE PREDICATE, by ref rather than by eight copies. It is
-     TRUE at the shipping default (RADIAL, layerCount 1), so their two
-     drop-downs RENDER at first load with these eight visible and session A's
-     three hidden — which is also what lets the panel gate witness them with
-     no precondition.
-
-     THEY LIVE IN TWO DROP-DOWNS NAMED BY PETAL NUMBER (Eva's ruling A, Sep 3;
-     see the two `labellumGroup` / `hoodGroup` rows in SECTIONS), and the
-     LABELS ARE THE FAN'S — "Size", "Tip", "Tilt", "Cup", "Spine curl" — so a
-     visitor who has learned one placement's groups has learned the other's.
-     The word "labellum" left the label and moved into the READ-OUT, on the
-     split every static label in this panel keeps: the label names the slot in
-     the panel, the read-out names what is in it right now. `said*` below is
-     the one owner of that phrase per group, the fan's `said(ui)` precedent,
-     and it is written for the states these controls are VISIBLE in — RADIAL,
-     hence the through-slot plane, hence a labellum that is always the single
-     petal on the line and a hood that is one petal at an even count and a
-     pair at an odd one. Under FAN they are hidden and inert (ruling 4), so no
-     phrase is evaluated where it could be read wrong. */
-
-  { id: 'labellumSize', section: 'labellumGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
-    label: 'Size',
-    /* SATURATION IS TOLD, on the "(clamped)" discipline the roll floor, the
-       tip floor and both foot clamps already carry: a composed value is
-       clamped into the base control's own range, so at a long petal the
-       multiplier stops moving before its slider does. The read-out cannot see
-       the clamp itself (fmt has only the UI state), so it prints the ASKED-FOR
-       millimetres and the app's read-out prints what was actually built. */
-    fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidLabellum(ui)}`
-      : `x${Number(v).toFixed(2)} — ${saidLabellum(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
-
-  { id: 'labellumTilt', section: 'labellumGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
-    label: 'Tilt', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${saidLabellum(ui)}`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
-
-  { id: 'labellumCup', section: 'labellumGroup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Cup', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${saidLabellum(ui)}`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
-
-  { id: 'labellumCurl', section: 'labellumGroup', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
-    label: 'Spine curl', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${saidLabellum(ui)}`),
-    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { ref: 'curlFromSlider' }] } },
-
-  { id: 'hoodSize', section: 'hoodGroup', kind: 'slider', min: 0.5, max: 2, step: 0.05, default: 1,
-    label: 'Size',
-    fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidHood(ui)}`
-      : `x${Number(v).toFixed(2)} — ${saidHood(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
-    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
-
-  { id: 'hoodTilt', section: 'hoodGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,
-    label: 'Tilt', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidHood(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${saidHood(ui)}`),
-    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
-
-  { id: 'hoodCup', section: 'hoodGroup', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
-    label: 'Cup', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidHood(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${saidHood(ui)}`),
-    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'slotRolesEligible' }, { not: { ref: 'hoodEmpty' } }] } },
-
-  /* ===================================================================
-     PER-PETAL CONTROLS — session 11, four per group, GENERATED from one
-     declaration in the same order and from the same ceiling as the matching
-     rows in ROLE_OVERRIDES, so the two tables cannot drift into two lists.
-     Every id is an ordinary id with an ordinary DOM input; only the typing is
-     saved. A grep for `petal3Cup` lands here, which names the pattern.
-
-     THE SET (Eva's ruling 2, Sep 3): size x, tilt delta, cup delta, curl
-     delta — the labellum's five MINUS tip breadth, with spine curl taking its
-     place because curl is what makes a petal hang and reflex and it is the
-     one control that can. TIP BREADTH IS DELIBERATELY ABSENT and is one row
-     here plus one in ROLE_OVERRIDES the day Eva wants it; see that table's
-     header, and see bloom-geometry.js's `slotRolesEligible` for the cost the
-     supersession ruling attaches to its absence.
-
-     RANGES ARE THE LABELLUM'S, deliberately: the same base clamps, so
-     OVERRIDE_BOUNDS gains no entry, and the harness's per-law dead-zone check
-     passes unchanged (a delta's range must sit inside baseMin-baseMax ..
-     baseMax-baseMin; a multiplier must be able to reach the clamp both ways).
-
-     VISIBILITY IS THE GROUP'S OWN EXISTENCE, and it is the numbering's guard
-     as well as its presentation. Group k exists iff the fan has at least k
-     orbits: `perSide + 1` of them with a mirror-line petal, `perSide` without.
-     Z1's biconditional asserts these predicates against footRing()'s OWN
-     census in BOTH directions — a group with members whose sliders are hidden
-     is "shipped means reachable" violated silently, and a group with no
-     members whose sliders show is a control naming something that does not
-     exist. That is what catches a numbering that fails to follow the toggle. */
-  ...Array.from({ length: MAX_FAN_GROUPS }, (_, i) => {
-    const k = i + 1;
-    /* ONE OWNER FOR "WHAT IS THIS GROUP RIGHT NOW", shared by all four
-       read-outs of the group so they cannot end up with four wordings — the
-       `perDepth(ui)` precedent. It names MEMBERSHIP, which is the thing the
-       static label cannot: with a mirror-line petal group 1 is that single
-       petal and group k>1 is the pair k-1 steps out; without one, group k is
-       the pair k out. */
-    const said = (ui) => fanGroupSaid(k, ui);
-    const seen = {
-      all: [
-        { ref: 'perPetalEligible' },
-        { any: [
-          { all: [{ id: 'fanCenterPetal', oneOf: ['ON'] },  { id: 'fanPerSide', min: k - 1 }] },
-          { all: [{ id: 'fanCenterPetal', oneOf: ['OFF'] }, { id: 'fanPerSide', min: k }] },
-        ] },
-      ],
-    };
-    const row = (suffix, extra) => ({
-      id: `petal${k}${suffix}`, section: `petal${k}`, kind: 'slider',
-      tier: 'standard', role: 'petal', visibleWhen: seen, ...extra,
-    });
-    return [
-      row('Size', {
-        min: 0.5, max: 2, step: 0.05, default: 1, label: 'Size',
-        /* The asked-for millimetres, on the labellum's own discipline: the
-           composed value is clamped into the base control's range, so a
-           multiplier saturates before its slider does. This prints what was
-           ASKED; the app's read-out prints what was BUILT, from footRing()'s
-           out-parameter rather than re-derived. */
-        fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${said(ui)}`
-          : `x${Number(v).toFixed(2)} — ${said(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
-      }),
-      row('Tilt', {
-        min: -75, max: 75, step: 1, default: 0, label: 'Tilt',
-        fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${v}deg tilt — ${said(ui)}`),
-      }),
-      row('Cup', {
-        min: -0.8, max: 1.2, step: 0.01, default: 0, label: 'Cup',
-        fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup — ${said(ui)}`),
-      }),
-      row('Curl', {
-        min: -180, max: 360, step: 5, default: 0, label: 'Spine curl',
-        fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${said(ui)}` : `${v > 0 ? '+' : ''}${v}deg spine curl — ${said(ui)}`),
-        /* hidden with the rest of the slider family in CURVE mode (Q4.2) */
-        visibleWhen: { all: [seen, { ref: 'curlFromSlider' }] },
-      }),
-    ];
-  }).flat(),
+  /* ZYGOMORPHY'S CONTROLS WERE HERE — the ALL / INNER deltas, the RADIAL labellum
+     and hood, and the fan's per-petal groups. RETIRED into parameter scoping
+     (Q3.4): see RETIRED_IDS and `migrateRoles` at the top of this file. */
 
   /* THE CENTER ROWS WERE HERE (the A/B rig: centerStyle and its four
      sub-sliders) and are RETIRED — see RETIRED_IDS at the top of this file

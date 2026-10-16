@@ -147,15 +147,20 @@ export const CONFIGS = [
 export async function measure(page, { capability = null, wantMask = false } = {}) {
   return page.evaluate(async ({ capability, wantMask }) => {
     const mod = await import('/bloom-geometry.js');
+    /* THE PAGE'S OWN SCOPES (the role retirement, Q3.4): a scoped row's petals
+       carry per-layer / per-pair offsets, so the census builds — and re-emits —
+       with the very record the page drew, through the file reader's own
+       `scopesForBuild`. Null on every unscoped row. */
+    const scopes = window.__bloomDesign ? (await import('/bloom-file.js')).scopesForBuild(window.__bloomDesign.scopes()) : null;
     const ui = window.__bloomUIState();
     const bad = [];
 
     const accFull = new mod.MeshBuilder({ exportMode: true });
-    const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability });
+    const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability, scopes });
     const hub = builtFull.hub;
 
     const accHC = new mod.MeshBuilder({ exportMode: true });
-    const frHC = mod.footRing(ui, accHC);
+    const frHC = mod.footRing(ui, accHC, { scopes });
     mod.buildHubInto(accHC, ui, frHC.hub);
     /* THE ANDROECIUM (session 21) — a THIRD accumulator, counted in R1 and
        never rasterised: the anthers are not the petal canopy this raster is
@@ -210,7 +215,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        "covering the crown" than a stamen over the centre is. */
     mod.buildInflorescenceInto(accST, ui, inPlan);
 
-    const fr = mod.footRing(ui, accFull);
+    const fr = mod.footRing(ui, accFull, { scopes });
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
        requirement). A plan raster cannot read a sphere AT ALL: the far
        hemisphere projects into the same disc from below, so a top-down pass
@@ -234,11 +239,6 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        bloom. The tube's own instrument is tools/verify-bloom-tube.mjs
        (TU0-TU6). */
     if (builtFull.tube && builtFull.tube.active) return { bad, r: null, skipped: 'TUBE: a fused whorl — this raster re-emits each petal FREE and cannot rebuild the petals the ring reshapes; the fusion is tools/verify-bloom-tube.mjs\'s (TU0-TU6) — RECORDED, NOT BUILT' };
-    if (!fr.continuousMode) {
-      const split = [];
-      for (let L = 0; L < fr.layerCount; L++) { const s = fr.slotRings[L]; if (!s.every((d) => d === s[0])) split.push(L); }
-      if (split.length) return { bad, r: null, skipped: `split whorl (layer${split.length > 1 ? 's' : ''} ${split.join(', ')} carry slot-role or per-petal records): the plan raster's R3 identifies slots by rigid rotation and cannot check a split whorl — RECORDED, NOT BUILT` };
-    }
     const petalAccs = [], petalSites = [];
     let petalsBuilt = 0;
     /* THE SIZE FIELD (organic variance, build 1), asked of its one owner and
@@ -270,6 +270,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
         blade: (slot) => {
           petalsBuilt++;
           const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
+          if (scopes) { const turn = Math.floor(fr.rings[slot.index].lambda); slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: turn, slot: slot.index - turn * fr.slotCount, n: fr.slotCount, state: ui }); }
           const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capability);
           petalAccs.push(acc); petalSites.push({ p, ring: fr.rings[slot.index], slot, cap: capability });
           const ref = builtFull.petals[slot.index];
@@ -299,6 +300,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
             petalsBuilt++;
             const d = slotsFor[slot.index];
             const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
+            if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state: ui });
             const p = mod.buildPetalInto(acc, ui, d, slot, capability);
             petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capability });
             if (!unsplit) {
@@ -312,7 +314,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
               if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) {
                 bad.push(`coverage R3: layer ${L} slot 0's captured petal does not bit-match builtFull.petals[${idx}]`);
               }
-            } else if (sizeField || formField) {
+            } else if (sizeField || formField || scopes) {
               /* UNDER THE SIZE FIELD a slot is NOT slot 0 rotated — its blade
                  is its own size — so the rotation identity below cannot hold and
                  the stronger claim is made instead: this slot's captured petal

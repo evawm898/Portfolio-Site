@@ -198,8 +198,10 @@ const ELIGIBILITY = [
   { set: { varianceSize: 0.1 }, want: false }, { set: { varianceForm: 0.1 }, want: false },
   { set: { buckleAmp: 0.2 }, want: false }, { set: { fringeCount: 4, petalTipEnd: 1 }, want: false },
   { set: { petalInfill: 'VORONOI' }, want: false }, { set: { stemLength: 60, inflorescence: 'RACEME' }, want: false },
-  { set: { stemLength: 60 }, want: true }, { set: { layerCount: 2, layerPhase: 0, labellumCup: 0.4 }, want: false },
-  { set: { layerCount: 2, layerPhase: 0 }, want: true }, { set: { layerCount: 2, layerPhase: 0.5, labellumCup: 0.4 }, want: true },
+  /* (the slot-role term went with the role table, Q3.4; per-layer values are
+     the term that replaced it, either side of the toggle) */
+  { set: { stemLength: 60 }, want: true }, { set: { layerCount: 2, layerPhase: 0, scopeLayers: 'ON' }, want: false },
+  { set: { layerCount: 2, layerPhase: 0 }, want: true }, { set: { layerCount: 2, scopeLayers: 'OFF' }, want: true },
   { set: { sepalCount: 5 }, want: true }, { set: { lobeDepth: 0.3 }, want: true },
 ];
 

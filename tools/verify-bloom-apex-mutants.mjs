@@ -292,16 +292,16 @@ function varFacts(M, over = {}) {
 const varPair = (M, C, over = {}) => [varFacts(M, over), varFacts(C, over)];
 /* THE FORM FIELD'S FACTS (build 2): the builder's own per-petal slot term and
    the composed values it built with, off a build of the MUTATED module. */
-function formFacts(M, over = {}) {
+function formFacts(M, over = {}, scopes = null) {
   try {
     const st = { ...REGISTRY_DEFAULTS, varianceForm: 1, varianceFrequency: 1, variancePhase: 0, ...over };
     const acc = new M.MeshBuilder({ exportMode: true });
-    const b = M.buildBloomInto(acc, st);
+    const b = scopes ? M.buildBloomInto(acc, st, { scopes }) : M.buildBloomInto(acc, st);
     const petals = b.petalsAll.map((p) => ({ index: p.slotIndex, term: p.formTerm ?? null, curl: p.applied.petalSpineCurl, cup: p.applied.petalCup, twist: p.applied.petalTwist }));
     return { petals, record: b.formVariance ?? null, absent: M.varianceFormIsAbsent(st), baseCurl: Number(st.petalSpineCurl) };
   } catch (e) { return { threw: e.message }; }
 }
-const formPair = (M, C, over = {}) => [formFacts(M, over), formFacts(C, over)];
+const formPair = (M, C, over = {}, scopes = null) => [formFacts(M, over, scopes), formFacts(C, over, scopes)];
 /* THE SPACING FIELD'S FACTS (build 3): the azimuths the whorl primitive
    EMITTED on a build of the MUTATED module, the record, and the cyclic order —
    never the SV clause the mutant names. */
@@ -1197,8 +1197,11 @@ const MUTANTS = [
      mutation must separate the two trees, never on the FV clause it names. */
   { id: 'form-field-never-reaches-the-blade',
     why: "the slot's form term rides on the payload and into the record while `petalSurface` builds from the descriptor's state: every petal is its whorl's, the record says otherwise, and nothing that reads the STL can tell — FV2 is the only witness",
-    find: '  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, ring, slot.formTerm || null, formClamped, formScaled, scopeTerm) : petalStateFor(state, ring);',
-    into: '  const ps = petalStateFor(state, ring);', names: ['FV2'],
+    /* re-anchored with the role retirement (Q3.4): the resolver takes no ring
+       and the no-term arm IS the state; the mutation drops the FORM term only,
+       so a scoped row keeps its scope and the mutant names one thing */
+    find: '  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;',
+    into: '  const ps = scopeTerm ? petalStateForSlot(state, null, formClamped, formScaled, scopeTerm) : state;', names: ['FV2'],
     witness: (M, C) => {
       const [m, c] = formPair(M, C, { varianceForm: 1 });
       const t = bothBuilt(m, c); if (t) return t;
@@ -1236,12 +1239,16 @@ const MUTANTS = [
         : `${pinned(m)} petal(s) sit at curl -180 on the mutant and ${pinned(c)} on the clean tree — the old clamp did not come back`;
     } },
   { id: 'the-headroom-reads-the-unclamped-composition',
-    why: "the room is measured from the role table's composition BEFORE it is clamped: a curl-180 + innerCurl-360 inner petal composes to 540, so its room ABOVE reads -180 and every petal whose wave points up is pushed DOWN — the field's sign flipped on exactly the whorls a role row has already pushed past the range. FV2 restates the room from the CLAMPED composition, which this mutation does not touch",
+    why: "the room is measured from the composition BEFORE it is clamped (the scope term since the role retirement, Q3.4): a curl-180 + per-layer-360 inner petal composes to 540, so its room ABOVE reads -180 and every petal whose wave points up is pushed DOWN — the field's sign flipped on exactly the whorls a role row has already pushed past the range. FV2 restates the room from the CLAMPED composition, which this mutation does not touch",
     find: "      const at = clamp(from, b.min, b.max);",
     into: "      const at = from;", names: ['FV2'],
     witness: (M, C) => {
-      const over = { layerCount: 3, petalSpineCurl: 180, innerCurl: 360, varianceForm: 1 };
-      const [m, c] = formPair(M, C, over);
+      /* the composition the room is measured from is the SCOPE term now (the
+         role table is retired, Q3.4): curl 180 + a per-layer +360 on the two
+         inner whorls — the migrated INNER — composes to 540 */
+      const over = { layerCount: 3, petalSpineCurl: 180, scopeLayers: 'ON', varianceForm: 1 };
+      const scopes = { layers: [1, 2].map((layer) => ({ layer, offsets: { petalSpineCurl: 360 } })), petals: [], tiers: [], bounds: { petalSpineCurl: { min: -180, max: 360 } } };
+      const [m, c] = formPair(M, C, over, scopes);
       const t = bothBuilt(m, c); if (t) return t;
       let diff = 0;
       for (let i = 0; i < m.petals.length; i++) if (m.petals[i].curl !== c.petals[i].curl) diff++;

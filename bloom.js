@@ -12,13 +12,13 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
-import { scopeOffsetsFor, scopeSlotKey, resolveRoleOverrides, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
+import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -436,9 +436,8 @@ for (const s of SECTIONS) {
   det.open = s.open;
   const sum = document.createElement('summary');
   /* Through the registry's one owner of the summary text, at the DEFAULTS the
-     page loads with — a derived label (the rosette's hood group, whose petal
-     number moves with petalCount) is right from the first paint rather than
-     after the first rebuild corrects it. */
+     page loads with — a derived label is right from the first paint rather
+     than after the first rebuild corrects it. */
   sum.textContent = sectionLabel(s, DEFAULTS);
   det.append(sum);
   summaryEls[s.id] = sum;
@@ -647,9 +646,8 @@ function refreshLabels(ui, shown = null, scopedUi = null) {
     const u = scopedUi && SCOPE_IDS.has(c.id) ? scopedUi : ui;
     valSpans[c.id].textContent = c.fmt(u[c.id], u, shown);
   }
-  /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
-     rosette's hood group is "Petal N" where N is the last orbit's number,
-     which moves with petalCount. Same snapshot, same pass, same owner
+  /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3; its first
+     user, the rosette's hood group, was retired with the roles). Same snapshot, same pass, same owner
      (sectionLabel) as the generator used — a static label is rewritten with
      itself, which is cheaper than a second list of which sections vary. */
   for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
@@ -768,6 +766,8 @@ document.getElementById('resetBtn').addEventListener('click', () => {
    THE SCOPE VIEW (Scoping-b, Eva's rulings — read docs/bloom-scoping-selection.md
    before touching any of it). "Select-and-edit: pick a layer (RADIAL) or a
    petal (FAN); the normal panel now edits just that scope. No instanced rows."
+   A layered SPIRAL picks layers too since Eva's ruling of Oct 16 — named as
+   TURNS on the picker, the descriptor's own depth.
 
    THE MODEL IS /plot's, ONE LEVEL DOWN ("A WARP BELONGS TO ITS PETAL"): the
    panel is a VIEW onto the picked scope's entry, and PICKING LOADS AND NEVER
@@ -783,12 +783,19 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 
    WHAT A PICKED SCOPE'S SLIDER SHOWS is `clamp(global + offset)`, computed by
    the GEOMETRY'S OWN OWNERS — `scopeOffsetsFor` (which entries reach this
-   scope, the pairing law and the toggle gate included) and `resolveRoleOverrides`
+   scope, the pairing law and the toggle gate included) and `resolvePetalTerms`
    (the composition and the one clamp) — never re-derived here, so the panel
-   and the builder cannot disagree about a scope's value. The role table is
-   inert while a toggle is live, so the resolver is handed no roles; the
-   variance field and the layer ramps are told in the status line, not folded
-   into a number they are not part of.
+   and the builder cannot disagree about a scope's value. The variance field is
+   told in the status line, not folded into a number it is not part of.
+
+   A PICKED LAYER OWNS ITS SIZE AND TILT (Q3.5, the role-retirement session):
+   once its entry carries an offset on petalLength / petalWidth / petalTilt,
+   the blade takes that value and the layer ramps (layerSize / layerTilt) no
+   longer apply to it (`SCOPE_LAYER_OWNED`, the geometry's `owns`). Until it
+   does, the layer's slider shows the RAMPED value the blade is built with, so
+   the number on screen is the number built either way; and an owned offset is
+   KEPT at 0 rather than pruned, because pruning it would hand the layer back
+   to the ramp under a slider that still reads the whole-bloom value.
 
    A MIRROR PAIR IS ONE SCOPE (Q3.7): a FAN petal scope is keyed on the pair's
    canonical slot (`scopeSlotKey`), the picker lists pairs, and picking either
@@ -824,8 +831,12 @@ function scopeOptions(ui) {
     if (mode === 'layer') {
       for (let k = 0; k < layers; k++) {
         const own = sc && sc.scopedLayers && sc.scopedLayers.includes(k);
-        const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ' — the outer whorl' : k === layers - 1 ? ' — the innermost whorl' : '';
-        out.push({ kind: 'layer', layer: k, slot: 0, label: `Layer ${k + 1}${where}${own ? ' · own values' : ''}` });
+        /* UNDER A LAYERED SPIRAL A LAYER IS ONE TURN (Eva's ruling, Oct 16): one
+           whorl of petals on its own golden-angle sequence, the descriptor's
+           own depth — the picker names it so. */
+        const spiral = String(ui.placement) === 'SPIRAL';
+        const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ` — the outer ${spiral ? 'turn' : 'whorl'}` : k === layers - 1 ? ` — the innermost ${spiral ? 'turn' : 'whorl'}` : '';
+        out.push({ kind: 'layer', layer: k, slot: 0, label: `${spiral ? 'Turn' : 'Layer'} ${k + 1}${where}${own ? ' · own values' : ''}` });
       }
     } else {
       const n = lastFoot.slotCount;
@@ -886,8 +897,20 @@ function scopeEffective(v, ui) {
     return { eff, term: r.term };
   }
   const term = scopeTermFor(v, ui);
-  const out = term ? resolveRoleOverrides(ui, [], null, null, null, term) : null;
+  const out = term ? resolvePetalTerms(ui, null, null, null, term) : null;
   for (const id of SCOPEABLE_IDS) eff[id] = out && id in out ? out[id] : ui[id];
+  /* A LAYER'S UN-OWNED SIZE AND TILT READ AS BUILT — the global through the
+     layer ramp (footRing()'s own `scale` / `tiltExtra` on the build on
+     screen), so the slider never shows a number the blade is not built with. */
+  if (v.kind === 'layer') {
+    const r = (lastRings || []).find((x) => Math.round(x.lambda) === v.layer);
+    const owns = (term && term.owns) || {};
+    if (r) {
+      if (!owns.petalLength) eff.petalLength = Number(ui.petalLength) * r.scale;
+      if (!owns.petalWidth) eff.petalWidth = Number(ui.petalWidth) * r.scale;
+      if (!owns.petalTilt) eff.petalTilt = Number(ui.petalTilt) + r.tiltExtra;
+    }
+  }
   return { eff, term };
 }
 function viewUi(ui) { return scopeView ? { ...ui, ...scopeEffective(scopeView, ui).eff } : ui; }
@@ -980,6 +1003,9 @@ function commitScopeOffset(id, desired) {
   for (const e of list) if (e !== own && reaches(e)) others += Number((e.offsets || {})[id]) || 0;
   let d = desired - Number(ui[id]) - others;
   d = Math.abs(d) < 1e-12 ? 0 : +d.toPrecision(12);
+  /* AN OWNED LAYER QUANTITY IS KEPT AT 0, never pruned (Q3.5 — see the block
+     header): the entry's key IS the ownership. */
+  const keepZero = v.kind === 'layer' && SCOPE_LAYER_OWNED.includes(id);
   /* THE TWELVE-DIGIT CUT KEEPS THE FILE TIDY (`0.35 - 0.3` is
      0.04999999999999993) and does not always land the build on the slider's
      own double — global + 0.3 is 0.8999999999999999 against a slider's 0.9 (the
@@ -994,7 +1020,7 @@ function commitScopeOffset(id, desired) {
     const g = Number(ui[id]);
     if (g + d !== desired && g + (desired - g) === desired) d = desired - g;
   }
-  if (d === 0) {
+  if (d === 0 && !keepZero) {
     if (own && own.offsets && id in own.offsets) {
       delete own.offsets[id];
       if (!Object.keys(own.offsets).length) list.splice(list.indexOf(own), 1);
@@ -1046,7 +1072,9 @@ function scopeStatusText(ui, mode) {
   const tiersToo = mode !== 'tier' && tiersMode(ui) ? ' Pick a sepal tier and the Sepals section edits just that tier.' : '';
   if (!scopeView) {
     return (mode === 'layer'
-      ? 'Pick a layer and the panel edits just that layer: its petal controls then set the layer\'s own values, kept as offsets on the whole-bloom value.'
+      ? (String(ui.placement) === 'SPIRAL'
+        ? 'Pick a turn and the panel edits just that turn of the spiral (one whorl on its own golden-angle sequence): its petal controls then set the turn\'s own values, kept as offsets on the whole-bloom value.'
+        : 'Pick a layer and the panel edits just that layer: its petal controls then set the layer\'s own values, kept as offsets on the whole-bloom value.')
       : mode === 'petal' ? 'Pick a petal and the panel edits just that petal and its mirror partner: its petal controls then set the pair\'s own values, kept as offsets on the whole-bloom value.'
       : 'Pick a sepal tier and the Sepals section edits just that tier: its sepal controls then set the tier\'s own values, kept as offsets on the whole-bloom value; sepals within a tier always match.') + tiersToo;
   }
@@ -1064,7 +1092,7 @@ function scopeStatusText(ui, mode) {
   const parts = [`Editing ${name}.`,
     scopeView.kind === 'petal' && members.length === 2 ? 'Both petals of the pair move together.' : '',
     'The marked controls set its own values; unmarked ones still edit the whole bloom.',
-    scopeView.layer >= 1 ? `${controlLabel('layerSize')} and ${controlLabel('layerTilt')} (Arrangement) still apply on top of its length, width and tilt — they ramp every layer past the outer one.` : '',
+    scopeView.kind === 'layer' && scopeView.layer >= 1 ? `Its length, width and tilt read as built through the layer ramps until you set them; once set they are this ${String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer'}'s own — the blade, and for the width its foot and ring too — and ${controlLabel('layerSize')} and ${controlLabel('layerTilt')} no longer apply to it.` : '',
     Math.abs(Number(ui.varianceForm) || 0) >= 0.005 ? 'The form field still moves each petal\'s curl, cup and twist around these values.' : '',
     'Whole bloom ends the pick; nothing is lost.'];
   return parts.filter(Boolean).join(' ');
@@ -1087,7 +1115,7 @@ const stepDecimals = (c) => { const s = String(c.step); return s.includes('.') ?
 function refreshScopeNotes(ui) {
   const term = scopeView ? scopeTermFor(scopeView, ui) : null;
   const eff = scopeView ? scopeEffective(scopeView, ui).eff : null;
-  const name = scopeView ? (scopeView.kind === 'layer' ? `Layer ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
+  const name = scopeView ? (scopeView.kind === 'layer' ? `${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
   const ids = idsFor(scopeView);
   for (const c of CONTROLS) {
     const wrap = wrappers[c.id];
@@ -1327,7 +1355,7 @@ let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-l
 let lastRings = [];                               // every ring, in build order
 let lastScopes = null;                            // the scopes the build on screen was handed (Scoping-a), the builder's own summary
 let lastHub = { radius: 0, thickness: 0 };
-let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false, sphereMode: false };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, fan: null, mirror: null, slotCount: 0, petalGroupCount: null, sphereMode: false };
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
@@ -1671,10 +1699,14 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
 function materialLines(ui, mode) {
   /* Ring 0 — the outermost, which is the ring this line has always reported
      and the one the hub is built on (hub.radius IS rings[0].radius in every
-     placement). The inner rings' radii are on the arrangement line, where the
+     placement, unless the hub grew for an owned ring — told on its own line). The inner rings' radii are on the arrangement line, where the
      depth that produced them is also visible. */
-  const live = footRing(ui, new MeshBuilder({ exportMode: false })).rings[0];
-  const printed = footRing(ui, new MeshBuilder({ exportMode: true })).rings[0];
+  /* With the build's own scopes (the role retirement, Oct 16): a layer that owns
+     its width builds its own foot and ring, and through the area rule that moves
+     ring 0 too, so a read-out built without them would quote another bloom. */
+  const sc = scopesForBuild(scopes);
+  const live = footRing(ui, new MeshBuilder({ exportMode: false }), { scopes: sc }).rings[0];
+  const printed = footRing(ui, new MeshBuilder({ exportMode: true }), { scopes: sc }).rings[0];
   const say = (r) => {
     const tip = thicknessProfile(r, ui).at(1);
     const tipShown = r === printed ? Math.max(tip, MIN_FEATURE_MM) : tip;
@@ -1829,6 +1861,17 @@ function sphereLine(rings, fr, mode) {
        + ` · RESERVED POLE clear: nearest foot ${d.reserved.mm.toFixed(2)} mm (${d.reserved.deg.toFixed(2)}°) from it, ring ${d.reserved.ring} at ${(near.slope * 180 / Math.PI).toFixed(2)}° — blades converge over it, feet run the other way`
        + ` · face pole: nearest foot end ${d.faceReach.mm.toFixed(2)} mm along the meridian${d.faceReach.crossing ? ` (${d.faceReach.crossing} of ${rings.length} feet cross it)` : ''}`
        + (d.clamped ? ` · (CLAMPED: the area rule's ${fr.derivedRadius.toFixed(2)} mm ring is under one sheet, the sphere is held at ${d.floorRadius.toFixed(2)} mm — the shell's inner face would invert)` : '') + `\n`;
+}
+
+/* THE HUB GREW FOR AN OWNED RING (Eva's ruling, Oct 16, replacing the rim
+   hold): a layer under Per-layer values that owns a width past Petal width asks
+   for a ring past layer 1's, and the hub's rim moves out to it rather than the
+   ring being held. footRing()'s own record, `hub.growth`, never re-derived:
+   which layer, by how much, from what. Empty where the hub is the area rule's. */
+function hubGrowthLine(fr, mode) {
+  const g = fr.hub && fr.hub.growth;
+  if (!g) return '';
+  return `HUB GROWN (${mode}) ${g.fromMm.toFixed(2)} -> ${g.toMm.toFixed(2)} mm (+${g.byMm.toFixed(2)} mm, ${g.factor.toFixed(3)}x) to fit layer ${g.layer + 1}'s ring — it owns a width past Petal width, so its ring sits ON the grown rim and every other layer keeps its own place\n`;
 }
 
 function domeLine(rings, fr, mode) {
@@ -2197,70 +2240,9 @@ function infillLine(petals) {
    to maintain. Do not re-add either. The panel gate's route (v), which
    asserted this line in both directions, went with it. */
 
-/* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
-   envelope clamp bit. Two things a visitor cannot otherwise see: WHICH slots
-   the labellum and hood came out as (the derivation is exact but it is not
-   obvious that an odd count gives a hood PAIR), and that a size multiplier has
-   SATURATED. The second is the "(CLAMPED)" discipline the roll floor, the tip
-   floor and both foot clamps already carry: a slider that has stopped moving
-   must say so rather than read as broken.
-
-   The asked-for values come from footRing()'s own out-parameter, never
-   recomputed here — a read-out re-deriving "what was asked for" would be a
-   second copy of the composition law, and the second copy is the one that
-   drifts. Returns '' when no whorl split, so the line is simply absent rather
-   than saying "none". */
-/* WHICH PLANE, IN WORDS — one owner for the phrasing, because the fan gave
-   the bloom a SECOND mirror and a line that says "through slot 0" on an
-   arrangement whose plane runs through a GAP is a label naming something that
-   is not the thing. The involution is footRing()'s answer; this only names
-   it. */
-function mirrorPhrase(mirror) {
-  return mirror === MIRROR_THROUGH_GAP
-    ? 'mirror plane through the gap between slots 0 and n-1 (pairs i with n-1-i)'
-    : 'mirror plane through slot 0 (pairs i with n-i)';
-}
-
-/* ONE LINE FOR BOTH POSITION AXES (session 11), because the thing a visitor
-   needs to see is the same in both: WHICH slots each group came out as. The
-   axes are mutually exclusive by placement — slot roles under RADIAL,
-   per-petal under FAN (Eva's ruling 4) — so this reads whichever one split
-   rather than printing two lines that can never both apply. Naming the group
-   from the descriptor's own `slotRole ?? petalRole` keeps footRing() the one
-   owner of which axis this bloom has; a line deriving it from `placement`
-   would be a second copy of that branch.
-
-   PER-PETAL GROUPS PRINT AS "petal 3", not "PETAL_3": the role id is an
-   internal key and the visitor's word for it is the panel's own. */
-/* THE ALL-PETALS LINE — what the one-whorl group was actually BUILT with,
-   printed from the descriptor's own record (base + delta, clamped once) so a
-   visitor reads the number the blade got rather than the delta the slider
-   shows. Absent when the group is not engaged, absent above one whorl. */
-function allPetalsLine(rings, fr) {
-  if (!fr.allPetalsEligible) return '';
-  const r = rings.find((x) => x.allRole !== null && x.allRole !== undefined && x.overrides);
-  if (!r) return '';
-  const said = [];
-  if ('petalSpineCurl' in r.overrides) said.push(`spine curl ${r.overrides.petalSpineCurl.toFixed(0)}°`);
-  if ('petalCup' in r.overrides) said.push(`cup ${r.overrides.petalCup.toFixed(2)}`);
-  return said.length ? `all petals as a group · ${said.join(' · ')}\n` : '';
-}
-
-function slotRoleLine(rings, fr) {
-  const split = rings.filter((r) => r.slotRole !== null || r.petalRole !== null);
-  if (!split.length) return '';
-  const said = (r) => (r.slotRole !== null ? r.slotRole.toLowerCase() : r.petalRole.replace('PETAL_', 'petal '));
-  const seen = new Map();
-  for (const r of split) if (!seen.has(said(r))) seen.set(said(r), r.slots);
-  const groups = [...seen].map(([role, slots]) =>
-    `${role} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
-  const clamps = new Map();
-  for (const r of split) for (const c of r.overrideClamped || []) clamps.set(c.base, c);
-  const clampLine = [...clamps.values()]
-    .map((c) => `${c.base} asked ${c.asked.toFixed(2)}, CLAMPED to ${c.got.toFixed(2)}`).join(' · ');
-  return `${mirrorPhrase(fr.mirror)} — ${groups}\n`
-       + (clampLine ? `ROLE VALUE CLAMPED to the base control's own range: ${clampLine}\n` : '');
-}
+/* THE SLOT-ROLE AND ALL-PETALS LINES ARE RETIRED with the role machinery
+   (the role-retirement session, Q3.4): a scope's values are told on the
+   control it edits (the scope notes), not on the read-out. */
 
 /* ===================================================================
    THE FAN LINE — the arrangement's derived shape, and the arc limit's
@@ -3115,6 +3097,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built ? spacingVarianceLine(built.spacingVariance, built.neighbour) : '')
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
+       + hubGrowthLine(fr, mode)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
@@ -3131,7 +3114,6 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built && built.leaf && built.leaf.present ? leafLine(built.leaf, built.leavesBuilt) : '')
        + (built && built.inflorescence && built.inflorescence.present ? infloLine(built.inflorescence, built.inflorescenceBuilt) : '')
        + (built ? sepalLine(ui, built, mode) : '')
-       + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + (built && built.neighbour ? neighbourLine(built.neighbour, mode) : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -3674,6 +3656,8 @@ window.__bloomMetrics = () => ({
      multi-layer is over-determined and the gate cannot tell a correct hub
      from an incorrect one. J3 below is the assertion that can. */
   hubRadius: lastHub.radius,
+  /* THE HUB'S GROWTH FOR AN OWNED RING (Oct 16) — footRing()'s record, or null. */
+  hubGrowth: lastHub.growth ? { ...lastHub.growth } : null,
   hubThickness: lastHub.thickness,
   /* THE STEM AND THE HUB-TO-STEM JOIN (session 43) — ST0-ST6's measured side.
      `stem` is NULL and not absent when there is no stem: ST1 distinguishes "the
@@ -4063,7 +4047,7 @@ window.__bloomMetrics = () => ({
   spacingVariance: lastSpacingVariance ? { ...lastSpacingVariance } : null,
   varianceSpacingAbsent: lastSpacingAbsent,
   petalSlotForms: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
-    roles: { role: p.role ?? null, allRole: p.allRole ?? null, slotRole: p.slotRole ?? null, petalRole: p.petalRole ?? null }, formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
+    formTerm: p.formTerm ? { ...p.formTerm } : null, applied: { ...p.applied },
     tipShape: p.tipCap ? p.tipCap.shapeN : null,   // the exponent the apex law was handed (the builder's own record — the scope view's exactness clause reads it)
     formClamped: p.formClamped ? p.formClamped.map((c) => ({ ...c })) : null,
     formScaled: p.formScaled ? p.formScaled.map((c) => ({ ...c })) : null,
@@ -4162,12 +4146,14 @@ window.__bloomMetrics = () => ({
     footBuriedMm: lastSepalsBuilt ? lastSepalsBuilt.footBuriedMm : undefined,
     petals: lastSepalsBuilt ? lastSepalsBuilt.built.map((p) => ({
       length: p.length, askedLength: p.askedLength, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris,
-      footFrames: p.footFrames, rootRow: p.rootRow, tip: p.tip, applied: p.applied, overridden: p.overridden,
+      footFrames: p.footFrames, rootRow: p.rootRow, tip: p.tip, applied: p.applied,
       profile: p.profile, profileU: p.profileU, tipCap: p.tipCap, form: p.form, seamStep: p.seamStep,
       /* THE STATE THE BLADE WAS BUILT FROM, keyed by the PETAL name the law
          reads (SP6 compares it against the page's own sepal* read-back, an
          owner the builder does not write) */
       builtFrom: p.builtFrom,
+      /* a layer or petal SCOPE never reaches a sepal (SP6) — its tier is its own */
+      scopeTerm: p.scopeTerm ?? null,
     })) : [],
   } : null,
   sepalTris: lastSepalTris,
@@ -4232,9 +4218,9 @@ window.__bloomMetrics = () => ({
   petalRingRootRows: lastPetals.map((p) => (p ? { C: p.rootRow.C, N: p.rootRow.N, flat: p.rootRow.flat, tiltRad: p.rootRow.tiltRad, u: p.rootRow.u, curlRad: p.rootRow.curlRad, ringC: p.rootRow.ringC, azimuth: p.azimuth,
     /* THE EFFECTIVE petalTilt this petal was actually built from (Sep 4,
        J9's own input) — read from `p.applied`, never the base UI control:
-       petalTilt is itself overridable per role (labellumTilt/hoodTilt) and
-       per petal (petalNTilt), so a check reconstructing "expected tilt" from
-       the raw slider would false-fire on any orchid or fan-per-petal row. */
+       petalTilt can carry a scope offset (per layer or per petal), so a check
+       reconstructing "expected tilt" from the raw slider would false-fire on
+       any scoped row. */
     petalTiltApplied: p.applied.petalTilt } : null)),
   /* RENAMED FROM `ringLayers` WITH THE CONTINUOUS ARM, because under it a
      descriptor is not a layer — it is a ring carrying exactly one petal, and
@@ -4258,6 +4244,11 @@ window.__bloomMetrics = () => ({
        derivation. */
     domeLean: r.domeLean,
     authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
+    /* A LAYER'S OWN WIDTH (Oct 16) — the value its foot and ring were built
+       from where it owns one (null where the ramp placed them) and the ring's
+       factor on R0 (past 1 the hub grows to it — `hubGrowth` below):
+       footRing()'s own record, read by panel route (ag). */
+    ownWidth: r.ownWidth ?? null, ringFactor: r.ringFactor ?? null,
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing
@@ -4272,29 +4263,11 @@ window.__bloomMetrics = () => ({
        apex and the local relief factor, footRing()'s own. 0 / 0 / radius / 1
        when flat. */
     z: r.z, slope: r.slope, arc: r.arc, relief: r.relief,
-    /* THE ROLE AND ITS RECORD, footRing()'s OWN answer. Z1 reads roleCount to
-       check the partition; Z2 reads role and overrides against what the
-       builder reported it actually used. A gate deriving either from
-       layerCount would be a second copy of the derivation it exists to
-       police. */
-    role: r.role, roleCount: r.roleCount,
-    /* THE LAYER, SEPARATELY FROM THE DESCRIPTOR INDEX (session B). `index` is
-       the position in `rings`, which stopped being the layer the moment a
-       whorl could split into LABELLUM / HOOD / LATERAL descriptors. */
-    lambda: r.lambda,
-    /* THE SLOT ROLE AND ITS SLOTS. `slotRole` is null on an UNSPLIT
-       descriptor and never LATERAL there — "this whorl was not split" and
-       "this group is the laterals" are different claims. Z4 reads `slots` to
-       assert the assignment is mirror-symmetric. */
-    slotRole: r.slotRole,
-    allRole: r.allRole ?? null,
-    /* THE PER-PETAL ROLE (session 11) — the descriptor's mirror ORBIT counted
-       outward from the plane, or null. Z8 compares these against the emitted
-       azimuths; Z9 asserts this and `slotRole` are never both non-null. */
-    petalRole: r.petalRole,
-    slots: r.slots ? [...r.slots] : null,
-    overrideClamped: (r.overrideClamped || []).map((c) => ({ ...c })),
-    overrides: r.overrides ? { ...r.overrides } : null,
+    /* THE LAYER and HOW MANY FEET THIS DESCRIPTOR CARRIES — footRing()'s own
+       answers. A descriptor is one whorl (ringed) or one petal (continuous);
+       the role split is retired with the role machinery (Q3.4), so `footCount`
+       is the whole of the area rule's grouping and Z1 reads it. */
+    lambda: r.lambda, footCount: r.footCount,
   })),
   /* Every ring's foot rows as EMITTED — J1's input. The pre-layer hook
      exposed slot 0 of the one whorl; reporting only that would have silently
@@ -4317,7 +4290,7 @@ window.__bloomMetrics = () => ({
   petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
   /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
      `continuousMode` is what every assertion branches on, `sequenceLength` is
-     what the legibility flag counts, and each descriptor's own `roleCount`
+     what the legibility flag counts, and each descriptor's own `footCount`
      sums to the bloom's petal count in both modes. A gate deriving any of these from
      `placement` would be a second copy of the branch. */
   continuousMode: lastFoot.continuousMode,
@@ -4345,41 +4318,20 @@ window.__bloomMetrics = () => ({
      recomputed the law would agree with a mutated law by mutating alongside
      it. `fan` is footRing()'s derived law (null elsewhere, so a claim nothing
      can make reads as absent rather than as a passing zero); `mirror` is
-     which involution this arrangement has; `slotRoleCensus` is how many slots
-     each role got, which is what Z1's amended clause checks the hood's
-     visibility against. */
+     which involution this arrangement has. */
   slotAzimuths: lastSlotAzimuths.map((row) => [...row]),
   placement: lastPlacement,
   fan: lastFoot.fan ? { ...lastFoot.fan } : null,
   mirror: lastFoot.mirror,
   slotCount: lastFoot.slotCount,
-  slotRoleCensus: lastFoot.slotRoleCensus ? { ...lastFoot.slotRoleCensus } : null,
-  /* WHETHER SLOT ROLES APPLY, AND WHETHER A WHORL ACTUALLY SPLIT — two
-     different claims, so two flags. The first is the gating (placement and
-     depth) and is cross-checked against the registry's own
-     `slotRolesEligible` predicate by both gates; the second additionally
-     needs a control off its identity, and Z5 asserts it in both directions
-     against the descriptor count. `slotsPerRing` was RETIRED here (Sep 2):
-     it answered "how many petals does a ring carry" with one number, which a
-     split whorl does not have. */
-  slotRolesEligible: lastFoot.slotRolesEligible,
   /* THE FULL SPHERE (session 18) — footRing()'s own answer, cross-checked
      against the registry's `sphereMode` predicate by both gates on every
      row, exactly as the two eligibility flags beside it are. */
   sphereMode: lastFoot.sphereMode === true,
-  /* THE FAN'S OWN POSITION AXIS (session 11). Cross-checked against the
-     registry's `perPetalEligible` predicate by both gates, exactly as its
-     slot-role twin is: bloom-geometry.js makes the controls INERT and the
-     registry makes them HIDDEN, neither file can read the other, so the
-     relation is measured rather than commented. */
-  perPetalEligible: lastFoot.perPetalEligible,
-  allPetalsEligible: lastFoot.allPetalsEligible,
   /* the scope toggles' own answers on the build on screen (Scoping-b; Z5) */
   scopeLayersLive: lastFoot.scopeLayersLive,
   scopePetalsLive: lastFoot.scopePetalsLive,
-  petalRoleCensus: lastFoot.petalRoleCensus ? { ...lastFoot.petalRoleCensus } : null,
   petalGroupCount: lastFoot.petalGroupCount,
-  slotRolesSplit: lastFoot.slotRolesSplit,
   /* THE QUANTIZER IDENTITY'S RESIDUALS — the continuous arm's answer to
      `ringGuardResidual`, and an EQUALITY rather than a bound (footRing's
      header says why). null under the ringed arm: there is no second law
@@ -4391,19 +4343,13 @@ window.__bloomMetrics = () => ({
      compare against — a claim nothing can make is reported absent, never as a
      passing 0. */
   ringGuardResidual: lastFoot.guardResidual,
-  /* THE ROLE-GROUPING RESIDUAL - an EQUALITY, not a bound, and footRing()'s
-     header says why: grouping by ROLE preserves the pre-role loop shape,
-     while grouping by SLOT would have moved every 40-petal export by 6 ULP.
-     null once a whorl carries more than one role, which is session B - a
-     claim nothing can make must read as absent, never as a passing 0. */
-  zygoGuardResidual: lastFoot.zygoGuardResidual,
   petalsBuilt: lastPetalsBuilt,
   /* WHAT EACH RING'S PETAL WAS ACTUALLY BUILT WITH, read from the builder's
-     own effective state and never from the resolver. This is the only thing
-     in the codebase that can see an override record that never reached the
-     blade - a failure invisible to both STL gates, to the triangle count and
-     to J1-J6 alike. Z2's third clause. */
-  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole ?? null, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied, formTerm: p.formTerm ?? null } : null)),
+     own effective state and never from the resolver, with the scope term it
+     was handed. This is the only thing in the codebase that can see a scope
+     offset that never reached the blade - a failure invisible to both STL
+     gates, to the triangle count and to J1-J6 alike. Z2. */
+  petalRingApplied: lastPetals.map((p) => (p ? { slotIndex: p.slotIndex, whorl: p.whorl, applied: p.applied, formTerm: p.formTerm ?? null, scope: p.scopeTerm ? { key: { ...p.scopeTerm.key }, offsets: { ...p.scopeTerm.offsets }, owns: p.scopeTerm.owns ? { ...p.scopeTerm.owns } : null } : null } : null)),
   layerCount: lastFoot.layerCount,
   /* THICKNESS TELEMETRY and its guard residual — the properties both STL
      gates are structurally blind to, for the same reason they are blind to
@@ -4578,7 +4524,7 @@ function writeDesignStatus() {
   const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set${sc}`;
   if (!d.notes.length) { designStatus.textContent = `${head}; every field read clean, nothing to report`; return; }
   designStatus.innerHTML = `${esc(head)}; ${d.notes.length} note${d.notes.length === 1 ? '' : 's'}:\n`
-    + d.notes.map((n) => `<span class="${n.kind === 'invalid' || n.kind === 'retired' ? 'bl-err' : ''}">[${esc(n.kind)}] ${esc(n.text)}</span>`).join('\n');
+    + d.notes.map((n) => `<span class="${n.kind === 'invalid' || n.kind === 'retired' || n.kind === 'dropped' ? 'bl-err' : ''}">[${esc(n.kind)}] ${esc(n.text)}</span>`).join('\n');
 }
 function esc(s) { return String(s).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch])); }
 function saveDesignText() { return toText(composeDoc(readUI(), { scopes })); }
@@ -4630,18 +4576,11 @@ function applyDesign(text, name = '(inline)') {
   scopes = scopesAreEmpty(next) ? null : next;
   if (had !== null || scopes !== null) regenerate();   // a plain file onto a plain page rebuilt through the input events already
   const notes = r.notes.slice();
-  /* A FILE SAVED BEFORE THE SCOPE TOGGLES EXISTED, onto a page with one live:
-     the toggles are missing from it and the page keeps its own (rule 3), so the
-     file's role values — ALL, INNER, the labellum and hood, the per-petal groups
-     — land in controls that are hidden and inert. That is said, with what to do
-     about it, rather than left as two generic "missing" lines (the review's
-     finding). */
-  const ui = readUI();
-  for (const [id, live, what] of [['scopeLayers', scopeLayersLive(ui), 'Per-layer values'], ['scopePetals', scopePetalsLive(ui), 'Per-petal values']]) {
-    if (live && notes.some((x) => x.kind === 'missing' && x.text.startsWith(`controls.${id} is missing`))) {
-      notes.push({ kind: 'not-applied', text: `this file was saved without "${what}" and the page keeps it ON, so the file's petal-role values (All petals, Inner petals, the labellum and hood, the per-petal groups) are hidden and do not apply — turn "${what}" off to draw the file as it was saved` });
-    }
-  }
+  /* A FILE SAVED BEFORE THE ROLE RETIREMENT (Q3.4) is migrated by the reader
+     (bloom-file.js's `migrateRetiredRoles`): every retired role value is
+     either carried into a scope offset or a global, or DROPPED, and each one
+     arrives here as a `migrated` / `retired` note — printed below like every
+     other note, never silent. */
   lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes, scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length } : null };
   writeDesignStatus();
   return lastDesign;

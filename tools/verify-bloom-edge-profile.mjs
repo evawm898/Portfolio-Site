@@ -214,8 +214,8 @@ const E2_TURN_XFAIL = {
   /* 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)' was declared at
      excessDeg 0.005430 and reads 43.585233 deg since #283 — UNDER the allowance by 1.41 deg; entry
      removed, the gate's own STALE clause is what said so. */
-  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step':
-    { excessDeg: 1.152165, note: 'NEW at #283: adds 46.152165 deg; face-to-face 61.05, outline 14.90. 0 excess before the nib' },
+  /* 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step' (1.152165) left
+     with its row: a RADIAL labellum-and-hood design, DROPPED BY RULING at the role retirement (Q3.4). */
   'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)':
     { excessDeg: 3.204461, note: 'NEW at #283: adds 48.204461 deg; face-to-face 66.54, outline 18.33. 0 excess before the nib' },
   'GRADIENT: cup gradient max x cup max x widest petal (the metric reaches 2.6 at the tip)':
@@ -224,6 +224,8 @@ const E2_TURN_XFAIL = {
     { excessDeg: 35.478378, note: 'NEW at #289: adds 80.478378 deg; face-to-face 90.52, outline 10.04. Clean at #283, red from the row ramp on' },
   'APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest — a 0.003 mm arc)':
     { excessDeg: 2.968831, note: 'NEW at #289: adds 47.968831 deg; face-to-face 55.73, outline 7.76. Clean at #283, red from the row ramp on' },
+  'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (the HUB GROWS to its ring, told)':
+    { excessDeg: 3.783426, note: 'NEW with the role retirement\'s block 64 (Q3.5): adds 48.783426 deg; face-to-face 53.44, outline 4.66 — at u 0.973 on the INNERMOST ring, whose length is still ramped (0.373 x, ~13 mm) while its width is owned at 19 mm (Q3.5 drops the ramp from an owned value only): a short wide blade closing on the apex nib, the nib class of `APEX NIB: tip shape 3.00 x 20 mm`. THE BLADE\'S, NOT THE FOOT\'S — 48.783426 to six decimals with the foot and ring put back on their pre-ruling law; layer 3 owning the same +3 reads 43.69, a global 19 mm width 43.39, +2 on layer 4 47.81' },
   'APEX NIB: INERT — a squared terminal holds the outline above the print floor':
     { excessDeg: 6.872304, note: 'NEW at #283: adds 51.872304 deg at the squared terminal\'s corners; face-to-face 51.87, outline 0.00 — the carnation terminal\'s class (a tooth\'s corner), with the nib inert by declaration' },
   'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth':
@@ -395,12 +397,18 @@ const H = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-harness.mjs
 const stateFor = (row) => {
   const st = { ...DEFAULTS };
   for (const { id, value } of (row.set || [])) {
+    /* the row's own overrides record (the role retirement, Q3.4): never a
+       control, so it never enters the state — `scopesFor(row)` hands it to the
+       build instead. Read as a state key it built the row WITHOUT its scope
+       offsets, silently: every migrated role row measured as the plain bloom. */
+    if (id === H.SCOPES_SET_ID) continue;
     if (!(id in DEFAULTS)) { st[id] = value; continue; }
     const d = DEFAULTS[id];
     st[id] = typeof d === 'number' ? Number(value) : typeof d === 'boolean' ? (value === true || value === 'true') : value;
   }
   return st;
 };
+const scopesFor = (row) => H.rowScopesForBuild(row);
 
 /* A ROW WHOSE SURFACE IS DECLARED TO PASS THROUGH ITSELF CANNOT BE HELD TO A
    SMOOTHNESS BAR, and that is not a carve-out for this change: two faces of a
@@ -652,7 +660,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       let acc, built;
       try {
         acc = new G.MeshBuilder({ exportMode, captureRim: true });
-        built = G.buildBloomInto(acc, st, { below: null, capability: row.capability || null });
+        built = G.buildBloomInto(acc, st, { below: null, capability: row.capability || null, scopes: scopesFor(row) });
       } catch (e) { check('E0', false, `${row.label} [${exportMode ? 'export' : 'live'}]: build threw — ${e.message}`); continue; }
       const mesh = meshOf(acc.positions);
       const rim = [], rimE2 = [];
@@ -1084,7 +1092,7 @@ async function control() {
     for (const [l, ok, what] of arm) {
       const row = rows.find((r) => r.label === l);
       const acc = new G0.MeshBuilder({ exportMode: true });
-      const b = G0.buildBloomInto(acc, stateFor(row), { below: null, capability: row.capability || null });
+      const b = G0.buildBloomInto(acc, stateFor(row), { below: null, capability: row.capability || null, scopes: scopesFor(row) });
       if (!b.petal || !ok(b.petal, b)) lost.push(`"${l.slice(0, 60)}" no longer has ${what}`);
     }
     if (lost.length) { console.error(`edge-profile control: a named control row stopped exercising its arm — ${lost.join('; ')}`); process.exit(1); }
@@ -1103,7 +1111,9 @@ async function control() {
      row whose declared excess the RIM LAW moves; which row that is is a
      property, not an ordering, so it is named here and fails loudly if it
      goes missing or stops being declared. */
-  const DECLARED = 'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step';
+  /* (It was the RADIAL orchid row until the role retirement removed it, Q3.4; the FAN per-petal
+     extreme is the same class — a scoped petal's curl folding its margin — and declared beside it.) */
+  const DECLARED = 'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)';
   const declaredRow = MATRIX.find((r) => r.label === DECLARED);
   if (!declaredRow || !Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, DECLARED)) { console.error(`edge-profile control: "${DECLARED}" is missing from the matrix or from E2_TURN_XFAIL — E2's magnitude clause would be exercised by nothing`); process.exit(1); }
   if (!rows.some((r) => r.label === declaredRow.label)) rows.push(declaredRow);

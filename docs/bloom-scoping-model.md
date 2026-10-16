@@ -106,6 +106,14 @@ gate now (the L7 lesson, one family later).
 
 ## 4. The migration table — today's roles as scopes (measured, SO7)
 
+> **Oct 16, the role retirement: this table is now a MIGRATION, not a representation.** The role
+> ids are retired and `migrateRoles` (bloom-registry.js) carries a stored design onto scopes. The
+> RADIAL labellum and hood are DROPPED by Eva's Oct 14 ruling, and so is INNER on a SPIRAL (no scope
+> reaches it). SO7 measures the migration against the old law. Read
+> `docs/bloom-role-retirement-outcome.md`.
+
+> **[Oct 16: per-layer values reach SPIRAL too (a spiral's turns are layer scopes), so INNER on a
+> SPIRAL maps to turn entries exactly — `docs/bloom-role-retirement-outcome.md` §1b.]**
 > **Scoping-b changed what this table can reach.** Eva's rulings put per-layer values on RADIAL only
 > and per-petal values on FAN only, each behind a toggle, so a petal entry is live on a FAN alone.
 > **Scoping-b: the table below is the Scoping-a measurement, and three of its rows changed under
@@ -146,6 +154,11 @@ count to place the entries), which is a different shape from every `migrateTo` t
 migration kind. The variance FORM field is not a scope (it is a field over the slots) and stays.
 
 ## 5. Q3.5 — per-layer size and tilt WIN — expressed, not wired
+
+> **Oct 16: WIRED on the blade** (the role retirement): an owned base drops the ramp's term in
+> `petalSurface`, and `layerSize` / `layerTilt` hide under Per-layer values. footRing still places the
+> ring and the foot with the ramps, and that is open. SO6 asserts the new law. Read
+> `docs/bloom-role-retirement-outcome.md` §1 and §7.
 
 The model expresses "per-layer on" for a quantity as a layer entry carrying an offset on
 `petalLength` / `petalWidth` / `petalTilt`. The ruling is that where a layer owns the quantity,
