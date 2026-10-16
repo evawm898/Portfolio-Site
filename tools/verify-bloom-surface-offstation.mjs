@@ -403,7 +403,7 @@ const seamState = { ...DEFAULTS };
 const seamAcc = new G.MeshBuilder({ exportMode: false });
 const { ring: sRing, slot: sSlot } = firstSlot(seamState, seamAcc);
 const sSurf = G.petalSurface(seamState, sRing, sSlot, null, seamAcc);
-const prof = G.widthProfile(G.petalStateFor(seamState, sRing), sRing, (seamState.petalWidth * sSlot.scale) / 2, null, seamAcc);
+const prof = G.widthProfile(seamState, sRing, (seamState.petalWidth * sSlot.scale) / 2, null, seamAcc);
 
 /* FIND the seams rather than assert them, and LOCATE each one rather than
    sampling for it. A slope break at u* only shows as "the one-sided

@@ -1197,8 +1197,11 @@ const MUTANTS = [
      mutation must separate the two trees, never on the FV clause it names. */
   { id: 'form-field-never-reaches-the-blade',
     why: "the slot's form term rides on the payload and into the record while `petalSurface` builds from the descriptor's state: every petal is its whorl's, the record says otherwise, and nothing that reads the STL can tell — FV2 is the only witness",
-    find: '  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, ring, slot.formTerm || null, formClamped, formScaled, scopeTerm) : petalStateFor(state, ring);',
-    into: '  const ps = petalStateFor(state, ring);', names: ['FV2'],
+    /* re-anchored with the role retirement (Q3.4): the resolver takes no ring
+       and the no-term arm IS the state; the mutation drops the FORM term only,
+       so a scoped row keeps its scope and the mutant names one thing */
+    find: '  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;',
+    into: '  const ps = scopeTerm ? petalStateForSlot(state, null, formClamped, formScaled, scopeTerm) : state;', names: ['FV2'],
     witness: (M, C) => {
       const [m, c] = formPair(M, C, { varianceForm: 1 });
       const t = bothBuilt(m, c); if (t) return t;

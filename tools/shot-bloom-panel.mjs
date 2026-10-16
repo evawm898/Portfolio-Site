@@ -19,7 +19,10 @@
 
                   A SECTION THAT IS HIDDEN AT FIRST LOAD IS PHOTOGRAPHED WHERE
                   IT EXISTS, and the caption says what was set to get there.
-                  The fan's nine per-petal groups only exist under FAN (Eva's
+                  [Oct 16: the per-petal groups this paragraph names are
+                  RETIRED into scoping (Q3.4) and REACH is empty; the rule
+                  stands for any section a future arrangement hides.]
+                  The fan's nine per-petal groups only existed under FAN (Eva's
                   ruling 4, Sep 3), so their cells set placement to FAN with a
                   mirror-line petal and eight per side — the one arrangement in
                   which all nine have members — through real events, never
@@ -93,7 +96,7 @@
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, settleBuild, CONTROLS, SECTIONS, DEFAULTS, MAX_FAN_GROUPS } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, settleBuild, CONTROLS, SECTIONS, DEFAULTS } from './bloom-harness.mjs';
 import { sectionLabel } from '../bloom-registry.js';
 import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
@@ -142,14 +145,8 @@ const cells = { firstLoad: [], perSection: [], numbering: [], accordion: [], rea
    gate are different tools with different tables; the anti-vacuity check in
    reachSection() is what keeps the two from drifting silently. */
 const REACH = {
-  ...Object.fromEntries(Array.from({ length: MAX_FAN_GROUPS }, (_, i) => [`petal${i + 1}`, {
-    set: [{ id: 'placement', value: 'FAN' }, { id: 'fanCenterPetal', value: 'ON' }, { id: 'fanPerSide', value: '8' }],
-    said: 'FAN, mirror-line petal ON, 8 per side — the one arrangement in which all nine groups have members',
-  }])),
-  /* PETAL 1 / PETAL N NEED TWO WHORLS IN STEP since Sep 3 (Eva's ruling from
-     the deploy preview: the one-whorl orchid is retired, hidden and inert). */
-  labellumGroup: { set: [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }], said: 'two whorls with Layer offset 0 — where Petal 1 / Petal N live since Sep 3' },
-  hoodGroup: { set: [{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }], said: 'two whorls with Layer offset 0 — where Petal 1 / Petal N live since Sep 3' },
+  /* (the nine per-petal groups, Petal 1 and Petal N went with the role table,
+     Q3.4; no section is hidden at first load for want of an arrangement now) */
 };
 
 /* Set controls THROUGH REAL EVENTS — never clicks — and wait for the rebuild. */
@@ -246,33 +243,8 @@ for (const sec of SECTIONS) {
     + (via ? ` Reached by setting ${via}.` : '')));
 }
 
-/* ---- the numbering: the derived label at three counts, and the fan beside it ---- */
-/* AT TWO WHORLS IN STEP, since Sep 3 — the rosette's Petal 1 / Petal N live
-   there now; at one whorl "Petal roles" is the all-petals group (its own
-   cells follow). */
-for (const n of [3, 8, 40]) {
-  await openBloom(page, port);
-  await drive([{ id: 'layerCount', value: '2' }, { id: 'layerPhase', value: '0' }, { id: 'petalCount', value: String(n) }]);
-  await openSection('hoodGroup');
-  const got = await page.evaluate(() => ({
-    kids: [...document.querySelectorAll('#sec-roles > details')].filter((d) => !d.hidden).map((d) => d.querySelector(':scope > summary').textContent).join(', '),
-    hood: document.querySelector('#sec-hoodGroup > summary').textContent,
-    said: document.querySelector('#hoodSize').closest('.bl-ctrl').querySelector('.bl-val').textContent,
-  }));
-  cells.numbering.push(await shoot(`ROSETTE · ${n} petals · 2 whorls in step · drop-downs: ${got.kids}`,
-    `layerCount 2, Layer offset 0 and petalCount ${n} driven through real events; Petal roles opened, then its last drop-down. The hood group is "${got.hood}" — the last orbit's number — and its read-out says "${got.said}". Nothing between Petal 1 and it: the laterals carry no controls, which is the gap ruling A accepted.`));
-}
-{
-  await openBloom(page, port);
-  await drive([{ id: 'placement', value: 'FAN' }, { id: 'fanCenterPetal', value: 'ON' }, { id: 'fanPerSide', value: '3' }]);
-  await openSection('petal1');
-  const got = await page.evaluate(() => ({
-    kids: [...document.querySelectorAll('#sec-roles > details')].filter((d) => !d.hidden).map((d) => d.querySelector(':scope > summary').textContent).join(', '),
-    said: document.querySelector('#petal1Size').closest('.bl-ctrl').querySelector('.bl-val').textContent,
-  }));
-  cells.numbering.push(await shoot(`FAN · 3 per side, mirror-line petal · drop-downs: ${got.kids}`,
-    `The comparison the ruling was made from: under FAN every orbit has its own group and there is no gap. Petal 1 open; its read-out says "${got.said}".`));
-}
+/* ---- the numbering (Petal 1 / Petal N, the fan's groups) went with the role
+   table (Q3.4, Oct 16): per-petal values are a SCOPE now, picked from #scopeBar. ---- */
 /* ---- PETAL CURL (session 16): the modifiers appear with a curl, and the read-out tells the floor ---- */
 {
   await openBloom(page, port);
@@ -293,39 +265,8 @@ for (const n of [3, 8, 40]) {
   cells.numbering.push(await shoot('PETAL CURL · start 0.95 on a 20 mm blade, 0.60 mm sheet · the spine floor binds',
     `Curl start reads "${got2.start}". The floor (one sheet thickness of spine radius) binds and the read-out says so, with the turn asked beside the turn built: "${got2.line}". Full range, clamped, told (Eva, Sep 4).`));
 }
-/* ---- one whorl: Petal roles IS the all-petals group; two whorls out of step: the caption ---- */
-{
-  await openBloom(page, port);
-  await openSection('roles');
-  const got = await page.evaluate(() => ({
-    rows: [...document.querySelectorAll('#sec-roles > .bl-ctrl')].filter((w) => !w.hidden).map((w) => w.querySelector('label').firstChild.textContent).join(', '),
-    kids: [...document.querySelectorAll('#sec-roles > details')].filter((d) => !d.hidden).length,
-    said: document.querySelector('#allCurl').closest('.bl-ctrl').querySelector('.bl-val').textContent,
-  }));
-  cells.numbering.push(await shoot(`ONE WHORL · Petal roles = the all-petals group · ${got.rows}`,
-    `The shipping depth, Petal roles opened. At one whorl the section holds the ALL-PETALS trio (${got.rows}) — deltas riding on Petal form's Spine curl and Cup and Petal shape's Tip breadth, defaulting to zero; the read-out at zero says "${got.said}". ${got.kids} drop-downs visible: Petal 1 / Petal N are hidden and inert here (Eva's ruling, Sep 3 — the one-whorl orchid given up).`));
-  await drive([{ id: 'allCurl', value: '120' }, { id: 'allCup', value: '0.5' }]);
-  const got2 = await page.evaluate(() => ({
-    curl: document.querySelector('#allCurl').closest('.bl-ctrl').querySelector('.bl-val').textContent,
-    cup: document.querySelector('#allCup').closest('.bl-ctrl').querySelector('.bl-val').textContent,
-  }));
-  cells.numbering.push(await shoot('ONE WHORL · all-petals curl +120°, cup +0.50',
-    `The same section with two of the three driven: the read-outs say "${got2.curl}" and "${got2.cup}", naming the base slider each rides on, and the readout below the buttons prints what the whole whorl was built with.`));
-}
-{
-  await openBloom(page, port);
-  await drive([{ id: 'layerCount', value: '2' }]);
-  await openSection('roles');
-  const got = await page.evaluate(() => ({
-    rows: [...document.querySelectorAll('#sec-roles > .bl-ctrl')].filter((w) => !w.hidden).map((w) => w.querySelector('label').firstChild.textContent).join(', '),
-    caption: (document.querySelector('#sec-roles > .bl-why') || {}).textContent || '(no caption)',
-    captionHidden: (document.querySelector('#sec-roles > .bl-why') || {}).hidden,
-    kids: [...document.querySelectorAll('#sec-roles > details')].filter((d) => !d.hidden).length,
-  }));
-  if (got.captionHidden !== false) await die('the hiddenReason caption is not shown at two whorls with Layer offset at its default — this cell would photograph the wrong claim');
-  cells.numbering.push(await shoot('TWO WHORLS · Layer offset 0.50 · the caption says why Petal 1 / Petal N are missing',
-    `layerCount 2 with Layer offset at its default (0.50). Petal roles holds the Inner trio (${got.rows}) and ${got.kids} drop-downs; where Petal 1 / Petal N would be, the registry's hiddenReason caption reads: "${got.caption}"`));
-}
+/* (the one-whorl all-petals cells and the two-whorl caption went with the
+   role table, Q3.4.) */
 
 /* ---- the accordion as a sequence ---- */
 await openBloom(page, port);
@@ -448,11 +389,11 @@ const b2 = await chromium.launch({ executablePath: findChromium(), args: ['--no-
 const written = [];
 for (const [name, title, note, list, perRow] of [
   ['panel-grouping', 'Bloom panel — the grouping',
-   `First cell: the panel as a visitor first finds it — the accordion holds one section open, the one the registry declares. Then one cell per section, each opened by a real click on its summary (a drop-down inside Petal roles by a click on its parent first), which is how a visitor reaches it and is why there is no "all expanded" cell: under an accordion that state does not exist. Together the ${cells.perSection.length} cells show every control in the panel; the nine per-petal groups only exist under FAN, so those cells say what was set to reach them. Tallest reachable panel — the worst scroll — is ${Math.max(...heights)}px against ${/panel (\d+)px/.exec(cells.firstLoad[0].caption)[1]}px at first load. No geometry changed for this sheet.`,
+   `First cell: the panel as a visitor first finds it — the accordion holds one section open, the one the registry declares. Then one cell per section, each opened by a real click on its summary (a nested drop-down by a click on its parent first), which is how a visitor reaches it and is why there is no "all expanded" cell: under an accordion that state does not exist. Together the ${cells.perSection.length} cells show every control in the panel. Tallest reachable panel — the worst scroll — is ${Math.max(...heights)}px against ${/panel (\d+)px/.exec(cells.firstLoad[0].caption)[1]}px at first load. No geometry changed for this sheet.`,
    [...cells.firstLoad, ...cells.perSection], 3],
-  ['panel-numbering', 'Bloom panel — petal numbers on the rosette (ruling A), the all-petals group, and the caption',
-   'Petal roles is the "adjust petals as a group" section at every depth (Eva, Sep 3). At two or more whorls IN STEP the rosette\'s two slot-role groups are drop-downs named by petal number, the fan\'s way: the labellum is always Petal 1 (slot 0, the plane\'s fixed point), and the hood is Petal N where N is the LAST orbit\'s number, which moves with the count — 2 at three petals, 5 at eight, 21 at forty. The gap between them is the ruling\'s accepted cost: the laterals carry no controls. The fan cell is the comparison, where every orbit has a group. Then the two states the Sep 3 ruling from the preview added: at ONE WHORL the section holds the all-petals trio (curl / cup / tip as deltas on Petal form and Petal shape) and Petal 1 / Petal N are hidden and inert — the one-whorl orchid is given up; and at two whorls with Layer offset away from 0 the registry\'s hiddenReason caption says why the two drop-downs are missing.',
-   cells.numbering, 4],
+  ['panel-curl', 'Bloom panel — the curl modifiers and the spine floor',
+   'The two Petal curl cells: Curl bias and Curl start appear only with a spine curl, and the read-out tells the floor when it binds. (This sheet used to carry the role table\'s numbering cells; the role table is retired into scoping, Q3.4, Oct 16.)',
+   cells.numbering, 2],
   ['panel-accordion', 'Bloom panel — the accordion',
    'Opening a section closes the others. Four frames, each reached by one real click: first load, open Petal shape (Arrangement shuts itself), open Part thickness (Petal shape shuts in turn), close it (zero open, and nothing springs open in its place). The tradeoff is stated and accepted: tweaking across two sections costs a reopen click, and the layers-are-sections structure makes single-focus the normal case.',
    cells.accordion, 4],
