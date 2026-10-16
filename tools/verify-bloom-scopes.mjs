@@ -27,7 +27,8 @@
           null`. The whole-matrix claim against the BASE tree is
           verify-bloom-surface-bytes', run at the close.
      SO2  A LAYER OFFSET MOVES ONLY THAT LAYER (per-layer values live —
-          RADIAL + `scopeLayers` ON, Scoping-b): on a three-layer bloom an
+          RADIAL or a layered SPIRAL + `scopeLayers` ON, Scoping-b and Eva's
+          ruling of Oct 16, a spiral's turn its layer): on a three-layer bloom an
           offset on layer 1 moves every layer-1 petal's `applied` by exactly
           the offset and leaves every other layer's petal BIT-IDENTICAL (its
           captured lamina) to the unscoped build's.
@@ -74,9 +75,9 @@
           switching per-layer OFF keeps the record and builds the unscoped STL,
           ON again the scoped one; a plain save clears it.
      SO10 THE TOGGLE GATE: a record whose toggle is OFF, or ON under the wrong
-          placement (per-layer under FAN, per-petal under RADIAL, either under
-          SPIRAL / CONTINUOUS), is KEPT and INERT — bit-identical to no record,
-          both modes, every term null.
+          placement (per-layer under FAN, per-petal under RADIAL or SPIRAL,
+          either under CONTINUOUS), is KEPT and INERT — bit-identical to no
+          record, both modes, every term null.
      SO11 THE RETIRED IDS ARE INERT AND A TOGGLE ALONE MOVES NOTHING: a state
           carrying every retired role id at a non-identity value, handed
           straight to the geometry UNMIGRATED, builds bit-identically to the
@@ -86,7 +87,21 @@
      SO12 EVERY SCOPEABLE CONTROL REACHES A PETAL: a layer-1 offset on each,
           with its own guard live, moves every layer-1 petal and no layer-0
           one — a scopeable id that moves nothing is a control the panel would
-          rebind to no effect.
+          rebind to no effect. The one exception is the WIDTH, and it is
+          checked: an owned width moves its layer's foot, the area rule moves
+          the hub, and every layer-0 petal is carried out radially by exactly
+          the rim's shift with every normal the same double (Oct 16).
+     SO13 THE FOOT AND THE RING FOLLOW AN OWNED WIDTH (Eva's ruling, Oct 16:
+          "a layer's own size and tilt drive the WHOLE petal — foot and ring as
+          well as blade"), RADIAL and SPIRAL: each ring's foot width, the hub
+          radius (the area rule over every foot) and each ring's radius are
+          RESTATED here from the controls and the row's entries — an owned
+          width gives the foot `own x 0.4 x delicacy` and a ring past the first
+          `R0 x min(1, own / petalWidth)` (held at the rim, told, past 1); ring
+          1 IS the rim — and compared against footRing()'s rings and the feet
+          the builder EMITTED (their half-width). An owned LENGTH or TILT moves
+          no foot float and no ring (the foot reads neither), measured on the
+          emitted foot rows; the un-owning layers keep the ramp.
 
    --negative-control serves broken copies of bloom-geometry.js OR
    bloom-registry.js (with a bloom-file.js copy importing each), every anchor
@@ -234,7 +249,11 @@ async function nodeClauses(G, F, R, rec) {
   {
     const p = [];
     const LAYER = 2;
-    const st = S({ layerCount: 3, scopeLayers: 'ON' });
+    const said = [];
+    /* RADIAL, and the LAYERED SPIRAL since Eva's ruling of Oct 16 — a turn is
+       the spiral descriptor's own depth, so the same whorl index reaches it */
+    for (const placement of ['RADIAL', 'SPIRAL']) {
+    const st = S({ layerCount: 3, scopeLayers: 'ON', placement });
     const base = build(G, F, st, undefined);
     const sc = build(G, F, st, withBounds(F, { layers: [{ layer: LAYER, offsets: { petalCup: 0.4 } }] }));
     if (base.petals.length !== sc.petals.length) p.push(`petal counts differ ${base.petals.length} / ${sc.petals.length}`);
@@ -255,8 +274,10 @@ async function nodeClauses(G, F, R, rec) {
         held++;
       }
     });
-    if (moved !== 8 || held !== 16) p.push(`expected 8 moved / 16 held, read ${moved} / ${held}`);
-    rec('SO2', p, `RADIAL 3 layers x 8, per-layer values ON: a cup offset of +0.4 on Layer ${LAYER + 1} (the innermost) moves exactly its whorl's 8 petals by 0.4 — read off each petal's own whorl — and holds the other 16 bit-identical`);
+    if (moved !== 8 || held !== 16) p.push(`${placement}: expected 8 moved / 16 held, read ${moved} / ${held}`);
+    said.push(`${placement} ${moved} moved / ${held} held`);
+    }
+    rec('SO2', p, `3 layers x 8, per-layer values ON, RADIAL and SPIRAL: a cup offset of +0.4 on Layer ${LAYER + 1} (the innermost; on a spiral, its innermost turn) moves exactly its whorl's 8 petals by 0.4 — read off each petal's own whorl — and holds the other 16 bit-identical (${said.join('; ')})`);
   }
   /* SO3 — a petal offset moves only that petal and its mirror partner (per-petal values live: FAN + scopePetals ON) */
   {
@@ -423,6 +444,70 @@ async function nodeClauses(G, F, R, rec) {
     for (const q of plain.petals) { const r = ringOf(Math.round(q.whorl)); if (r && !Object.is(q.rootRow.tiltRad, ((Number(st.petalTilt) + r.tiltExtra + 0) * Math.PI) / 180)) p.push(`per-layer ON with no record: slot ${q.slot.index} on whorl ${Math.round(q.whorl)} does not carry its ramp`); }
     rec('SO6', p, `Q3.5: under per-layer values a layer entry naming tilt and length builds its 8 blades at global + offset (${Number(st.petalTilt) + 10} deg, ${st.petalLength} mm) with the ramp's 12 deg and x0.70 left out; a layer naming neither keeps the ramp (24 deg, x0.49), as does per-layer with no record`);
   }
+  /* SO13 — THE FOOT AND THE RING FOLLOW AN OWNED WIDTH (Eva's ruling, Oct 16).
+     EXPECTED, restated here from the CONTROLS and the row's own entries: the
+     foot width (the clamp the declarations name), the area rule over every
+     foot, and the ring radius — never footRing()'s own answer, which is the
+     quantity under test; the measured side is footRing()'s rings AND the feet
+     the builder emitted (each foot row's half-width), which no declaration can
+     lie about. Ring thickness is footRing()'s (not under test here). */
+  {
+    const p = [];
+    const said = [];
+    const clampW = (w) => Math.min(G.FOOT_MAX_WIDTH_MM, Math.max(G.FOOT_MIN_WIDTH_MM, w));
+    for (const placement of ['RADIAL', 'SPIRAL']) {
+      /* layer 1 owns a narrower width (its foot only — its ring IS the rim),
+         layer 2 owns a width (foot AND ring), layer 3 owns length and tilt
+         (no foot, no ring), layer 4 owns a width wider than the outer whorl's
+         (its ring is held at the rim, told) */
+      const st = S({ placement, layerCount: 4, layerSize: 0.7, scopeLayers: 'ON' });
+      const rec0 = { layers: [
+        { layer: 0, offsets: { petalWidth: -2 } },
+        { layer: 1, offsets: { petalWidth: -4 } },
+        { layer: 2, offsets: { petalLength: 5, petalTilt: 8 } },
+        { layer: 3, offsets: { petalWidth: 3 } },
+      ] };
+      const sc = build(G, F, st, withBounds(F, rec0), { lamina: false });
+      const rings = sc.built.foot.rings;
+      const n = sc.built.foot.slotCount;
+      const ownW = (L) => { const e = rec0.layers.find((x) => x.layer === L); return e && 'petalWidth' in e.offsets ? Number(st.petalWidth) + e.offsets.petalWidth : null; };
+      const want = [];
+      let sumSq = 0;
+      for (let L = 0; L < 4; L++) {
+        const scale = Math.pow(Number(st.layerSize), L);
+        const w = ownW(L);
+        const width = clampW(w === null ? Number(st.petalWidth) * scale * 0.4 * Number(st.footDelicacy) : w * 0.4 * Number(st.footDelicacy));
+        const t = rings[L].thickness;
+        const rFoot = Math.sqrt((width * t) / Math.PI);
+        sumSq += n * rFoot * rFoot;
+        const asked = w === null || L === 0 ? null : w / Number(st.petalWidth);
+        want.push({ width, factor: w === null ? scale : L === 0 ? 1 : Math.min(1, asked), clamped: asked !== null && asked > 1 });
+      }
+      const R0 = Math.sqrt(sumSq) * Number(st.spread);
+      for (let L = 0; L < 4; L++) {
+        const r = rings[L], w = want[L];
+        if (!Object.is(r.width, w.width)) p.push(`${placement} layer ${L + 1}: foot width ${r.width}, restated ${w.width}`);
+        if (!Object.is(r.radius, R0 * w.factor)) p.push(`${placement} layer ${L + 1}: ring radius ${r.radius}, restated R0 ${R0} x ${w.factor} = ${R0 * w.factor}`);
+        if (Boolean(r.ringClamped) !== w.clamped) p.push(`${placement} layer ${L + 1}: ringClamped ${r.ringClamped}, restated ${w.clamped}`);
+        const feet = sc.petals.filter((q) => Math.round(q.whorl) === L);
+        if (!feet.length) p.push(`${placement} layer ${L + 1}: no petal was built`);
+        for (const q of feet) for (const f of q.footFrames) if (!Object.is(f.h, w.width / 2)) p.push(`${placement} layer ${L + 1} slot ${q.slot.index}: an emitted foot row is ${2 * f.h} mm across, restated ${w.width}`);
+      }
+      if (!want[3].clamped) p.push(`${placement}: the over-wide layer did not ask past the rim — the clamp arm would be vacuous`);
+      if (Object.is(rings[1].radius, R0 * Math.pow(Number(st.layerSize), 1))) p.push(`${placement}: layer 2's ring sits where the ramp would put it — ownership would be vacuous`);
+      /* AN OWNED LENGTH OR TILT MOVES NO FOOT AND NO RING: the same state with
+         layer 3's entry removed builds every ring and every emitted foot row of
+         layer 3 to the bit */
+      const sc2 = build(G, F, st, withBounds(F, { layers: rec0.layers.filter((e) => e.layer !== 2) }), { lamina: false });
+      for (const k of ['radius', 'width', 'overhang']) if (!Object.is(sc.built.foot.rings[2][k], sc2.built.foot.rings[2][k])) p.push(`${placement} layer 3: an owned length/tilt moved the ring's ${k} ${sc2.built.foot.rings[2][k]} -> ${sc.built.foot.rings[2][k]}`);
+      const fa = sc.petals.filter((q) => Math.round(q.whorl) === 2), fb = sc2.petals.filter((q) => Math.round(q.whorl) === 2);
+      const flat = (qs) => qs.flatMap((q) => q.footFrames.flatMap((f) => [...f.C, ...f.N, ...f.T, f.h, f.t]));
+      if (!sameNumbers(flat(fa), flat(fb))) p.push(`${placement} layer 3: an owned length/tilt moved an emitted foot row`);
+      if (sameNumbers(fa.map((q) => q.askedLength), fb.map((q) => q.askedLength))) p.push(`${placement} layer 3: the owned length did not reach the blade — the length/tilt half would be vacuous`);
+      said.push(`${placement}: rings ${rings.map((r) => r.radius.toFixed(3)).join(' / ')} mm on R0 ${R0.toFixed(3)}, feet ${rings.map((r) => r.width.toFixed(3)).join(' / ')} mm`);
+    }
+    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring stays the rim, an over-wide layer is held there and told; an owned length / tilt moves no foot row and no ring`);
+  }
   /* SO7 — THE MIGRATION LANDS ON THE OLD COMPOSITION. A written-down state
      carrying retired role ids is migrated by the registry's `migrateRoles`
      (the module under test) and built; every petal's `applied` is compared
@@ -463,6 +548,10 @@ async function nodeClauses(G, F, R, rec) {
       { label: 'ALL (FAN, one whorl)', set: { placement: 'FAN' }, roles: { 'allCurl': 45, 'allCup': 0.2 } },
       { label: 'INNER (RADIAL, 3 layers)', set: { layerCount: 3 }, roles: { 'innerCurl': 90, 'innerCup': 0.3 } },
       { label: 'INNER (FAN, 2 layers)', set: { placement: 'FAN', layerCount: 2 }, roles: { 'innerCurl': 90, 'innerCup': 0.3 } },
+      /* THE IRIS ON A SPIRAL — Eva's ruling of Oct 16: a spiral's turns are
+         layer scopes, so INNER lands on turn entries exactly as on RADIAL */
+      { label: 'INNER (SPIRAL, 2 turns — the iris)', set: { placement: 'SPIRAL', layerCount: 2, petalSpineCurl: -90, layerTilt: 30, petalTilt: 40 }, roles: { 'innerCurl': 180, 'innerCup': 0.4 } },
+      { label: 'INNER (SPIRAL, 3 turns)', set: { placement: 'SPIRAL', layerCount: 3 }, roles: { 'innerCurl': 90, 'innerCup': 0.3 } },
       { label: 'PER-PETAL group 2 (FAN)', set: { placement: 'FAN' }, roles: { 'petal2Tilt': 45, 'petal2Cup': 0.5, 'petal2Curl': 60 } },
       { label: 'PER-PETAL group 1 through the gap (FAN, centre OFF)', set: { placement: 'FAN', fanCenterPetal: 'OFF' }, roles: { 'petal1Cup': 0.4, 'petal1Curl': -60 } },
       { label: 'a size multiplier, group 3 (FAN)', set: { placement: 'FAN' }, roles: { 'petal3Size': 1.3 } },
@@ -587,8 +676,12 @@ async function nodeClauses(G, F, R, rec) {
       { label: 'RADIAL, per-layer OFF, a layer record', set: { layerCount: 2 }, rec: layer },
       { label: 'RADIAL, per-petal ON (FAN only), a petal record', set: { layerCount: 2, scopePetals: 'ON' }, rec: petal },
       { label: 'FAN, per-petal OFF, a petal record', set: { placement: 'FAN' }, rec: petal },
-      { label: 'FAN, per-layer ON (RADIAL only), a layer record', set: { placement: 'FAN', layerCount: 2, scopeLayers: 'ON' }, rec: layer },
-      { label: 'SPIRAL, both ON, both records', set: { placement: 'SPIRAL', layerCount: 2, scopeLayers: 'ON', scopePetals: 'ON' }, rec: { ...layer, ...petal } },
+      { label: 'FAN, per-layer ON (RADIAL and SPIRAL only), a layer record', set: { placement: 'FAN', layerCount: 2, scopeLayers: 'ON' }, rec: layer },
+      /* a SPIRAL's LAYER entries are live since Oct 16 (SO2); its petal
+         entries are not — per-petal is FAN only — and with per-layer OFF its
+         layer entries are kept and inert like RADIAL's */
+      { label: 'SPIRAL, per-petal ON (FAN only), a petal record', set: { placement: 'SPIRAL', layerCount: 2, scopePetals: 'ON' }, rec: petal },
+      { label: 'SPIRAL, per-layer OFF, a layer record', set: { placement: 'SPIRAL', layerCount: 2 }, rec: layer },
       { label: 'CONTINUOUS, both ON, both records', set: { placement: 'CONTINUOUS', scopeLayers: 'ON', scopePetals: 'ON' }, rec: { ...layer, ...petal } },
     ];
     let n = 0;
@@ -619,7 +712,7 @@ async function nodeClauses(G, F, R, rec) {
     const same = (a, b) => sameNumbers([...a.acc.positions], [...b.acc.positions]);
     const B = (set, exportMode = false) => build(G, F, S(set), undefined, { lamina: false, exportMode });
     /* the toggle alone */
-    for (const set of [{}, { layerCount: 3 }, { placement: 'FAN' }, { placement: 'FAN', layerCount: 2 }]) {
+    for (const set of [{}, { layerCount: 3 }, { placement: 'SPIRAL', layerCount: 3 }, { placement: 'FAN' }, { placement: 'FAN', layerCount: 2 }]) {
       const t = set.placement === 'FAN' ? { scopePetals: 'ON' } : { scopeLayers: 'ON' };
       if (!same(B(set), B({ ...set, ...t }))) p.push(`${JSON.stringify(set)}: switching ${Object.keys(t)[0]} ON with no record moved the bloom`);
     }
@@ -658,6 +751,7 @@ async function nodeClauses(G, F, R, rec) {
       infillDensity: { petalInfill: 'VORONOI' }, infillRelax: { petalInfill: 'VORONOI' }, infillLaw: { petalInfill: 'VORONOI' }, infillAniso: { petalInfill: 'VORONOI' }, infillRound: { petalInfill: 'VORONOI' }, infillBase: { petalInfill: 'VORONOI' },
       buckleFreq: { buckleAmp: 0.3 }, buckleEnv: { buckleAmp: 0.3 }, curlBias: { petalSpineCurl: 90 }, curlStart: { petalSpineCurl: 90 }, petalRollTaper: { petalRoll: 120 }, petalApexSweep: { petalCup: 0.6 } };
     const dead = [], leaked = [];
+    let hubSaid = '';
     for (const id of F.SCOPEABLE_IDS) {
       const c = kindOf.get(id);
       const st = S({ layerCount: 2, scopeLayers: 'ON', ...(GUARDS[id] || {}) });
@@ -675,18 +769,54 @@ async function nodeClauses(G, F, R, rec) {
          carries a term: a defect that sends the offset to another whorl gives
          that whorl's petals a term too, which took them out of the checked set
          (the fifth durable rule — the review's finding). */
-      let moved = 0, termed = 0;
+      /* AN OWNED WIDTH MOVES THE HUB (Eva's ruling, Oct 16): layer 1's foot
+         follows its own width, the area rule sums every foot into R0, and ring
+         0 IS the rim — so a layer-1 petalWidth offset moves every layer-0 petal
+         by exactly the rim's radial shift and by nothing else. That is checked
+         rather than excused: the hub must have moved, the petal must carry no
+         term, every BLADE point must be the base point carried out along the
+         petal's own azimuth by that shift (to 1e-9 mm; measured 5e-15), every
+         normal the same double, and the foot rows' half-width unchanged. */
+      const ring0 = (x) => x.built.foot.rings.find((r) => Math.round(r.lambda) === 0);
+      const dR = ring0(b).radius - ring0(a).radius;
+      const hubShifted = (o, q) => {
+        if (q.scopeTerm || id !== 'petalWidth' || dR === 0) return false;
+        const ca = Math.cos(q.slot.azimuth), sa = Math.sin(q.slot.azimuth);
+        const pa = o.lamina, pb = q.lamina;
+        if (!pa || !pb || pa.length !== pb.length) return false;
+        for (let k = 0; k < pa.length; k++) {
+          const ra = pa[k].rows, rb = pb[k].rows;
+          if (ra.length !== rb.length) return false;
+          for (let r = 0; r < ra.length; r++) {
+            /* the FOOT rows (u 0) sit at the rim less the overhang, and the
+               overhang is 0.4 of the rim, so they move by that too — they are
+               footRing()'s descriptor and J1's subject; checked below on their
+               half-width, which ring 0's own width sets */
+            if (ra[r].u === 0) continue;
+            for (let j = 0; j < ra[r].mid.length; j++) {
+              const A = ra[r].mid[j], B = rb[r].mid[j];
+              if (Math.abs(B[0] - A[0] - dR * ca) > 1e-9 || Math.abs(B[1] - A[1] - dR * sa) > 1e-9 || Math.abs(B[2] - A[2]) > 1e-9) return false;
+              if (!sameNumbers(ra[r].normal[j], rb[r].normal[j])) return false;
+            }
+          }
+        }
+        return o.footFrames.length === q.footFrames.length && o.footFrames.every((f, k) => Object.is(f.h, q.footFrames[k].h));
+      };
+      let moved = 0, termed = 0, shifted = 0;
       b.petals.forEach((q, i) => {
         const s = sameNumbers(print(a.petals[i]), print(q));
-        if (Math.round(a.petals[i].whorl) === 1) { termed++; if (!s) moved++; } else if (!s || q.scopeTerm) leaked.push(`${id} (whorl ${Math.round(a.petals[i].whorl)}, slot ${q.slot.index})`);
+        if (Math.round(a.petals[i].whorl) === 1) { termed++; if (!s) moved++; }
+        else if (!s && hubShifted(a.petals[i], q)) shifted++;
+        else if (!s || q.scopeTerm) leaked.push(`${id} (whorl ${Math.round(a.petals[i].whorl)}, slot ${q.slot.index})`);
       });
+      if (id === 'petalWidth') { if (!shifted) p.push('petalWidth: the layer-1 width moved no layer-0 petal through the hub — the area rule over its own foot did not reach R0 (Oct 16)'); else hubSaid = `petalWidth carries the ${shifted} layer-0 petals out by the hub's ${dR.toFixed(4)} mm (its own foot, the area rule)`; }
       if (!termed) p.push(`${id}: no petal is on whorl 1`);
       else if (!moved) dead.push(id);
       else if (moved !== termed) p.push(`${id}: ${moved} of ${termed} layer-1 petals moved — a layer offset reaches every petal of its layer alike`);
     }
     if (dead.length) p.push(`a layer-1 offset moved NO layer-1 petal for ${dead.length} scopeable id(s): ${dead.join(', ')}`);
     if (leaked.length) p.push(`a layer-1 offset moved a layer-0 petal: ${leaked.slice(0, 6).join(', ')}${leaked.length > 6 ? ` (+${leaked.length - 6})` : ''}`);
-    rec('SO12', p, `all ${F.SCOPEABLE_IDS.length} scopeable controls move every whorl-1 petal through a layer-1 offset with their guard live, and none moves (or gives a term to) a petal on another whorl — read off each petal's own whorl`);
+    rec('SO12', p, `all ${F.SCOPEABLE_IDS.length} scopeable controls move every whorl-1 petal through a layer-1 offset with their guard live, and none moves (or gives a term to) a petal on another whorl — read off each petal's own whorl — but ${hubSaid}`);
   }
 }
 
@@ -764,6 +894,17 @@ const Q35_PROBE = (G) => {
   const b = G.buildBloomInto(acc, st, { below: null, capability: null, scopes: { layers: [{ layer: 1, offsets: { petalTilt: 10, petalLength: 0 } }], petals: [], tiers: [], bounds } });
   const q = b.petalsAll.find((x) => x && Math.round(x.whorl) === 1);
   return { tiltDeg: Math.round(q.rootRow.tiltRad * 180 / Math.PI * 1e6) / 1e6, asked: q.askedLength };
+};
+/* layer 2 of three owns a width of 12 (of the global 16): its ring's foot
+   width, radius factor and ramp scale off the MUTATED module's own footRing;
+   `null` hands no record (the ramp's answer) */
+const OWN_WIDTH_PROBE = (G, offset = -4) => {
+  const st = { ...REG.DEFAULTS, layerCount: 3, layerSize: 0.7, scopeLayers: 'ON' };
+  const c = kindOf.get('petalWidth');
+  const scopes = offset === null ? null : { layers: [{ layer: 1, offsets: { petalWidth: offset } }], petals: [], tiers: [], bounds: { petalWidth: { min: c.min, max: c.max } } };
+  const fr = G.footRing(st, new G.MeshBuilder({ exportMode: false }), { scopes });
+  const r = fr.rings[1];
+  return { width: r.width, factor: r.radius / fr.rings[0].radius, scale: r.scale };
 };
 const TUBE_STATE = () => { const r = byLabel.get('TUBE: 8 petals x k 2 (2 panels)'); if (!r) throw new Error('the TUBE row is not in the live matrix — re-point the tube mutant'); return stateOf(r); };
 const MUTANTS = [
@@ -847,6 +988,24 @@ const MUTANTS = [
     from: '      if (!beyondAll) continue;',
     to: "      if (!beyondAll || base === 'petalCup') continue;",
     witness: (G, R) => { const m = R.migrateRoles({ ...REG.DEFAULTS, layerCount: 3, ['innerCup']: 0.3 }); return !m.scopes || m.scopes.layers.some((e) => !('petalCup' in e.offsets)); } },
+  /* ---- Eva's rulings of Oct 16: a spiral's turns are layer scopes; an owned
+     width drives the foot and the ring ---- */
+  { id: 'per-layer-values-stay-radial-only', breaks: ['SO2', 'SO7', 'SO13'],
+    from: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL', 'SPIRAL']);",
+    to: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL']);",
+    witness: (G) => G.scopeLayersLive({ ...REG.DEFAULTS, placement: 'SPIRAL', scopeLayers: 'ON' }) === false },
+  { id: 'the-foot-keeps-the-ramp', breaks: ['SO12', 'SO13'],
+    from: '    const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;',
+    to: '    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;',
+    witness: (G) => OWN_WIDTH_PROBE(G).width === OWN_WIDTH_PROBE(G, null).width },
+  { id: 'the-ring-keeps-the-ramp', breaks: ['SO13'],
+    from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ringAsked);',
+    to: '    const ringFactor = scale;',
+    witness: (G) => { const r = OWN_WIDTH_PROBE(G); return r.factor === r.scale; } },
+  { id: 'a-spiral-inner-is-dropped', file: 'registry', breaks: ['SO7'],
+    from: '  if (radial || spiral) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',
+    to: '  if (radial) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',
+    witness: (G, R) => R.migrateRoles({ ...REG.DEFAULTS, placement: 'SPIRAL', layerCount: 2, ['innerCup']: 0.4 }).scopes === null },
   { id: 'the-tube-ignores-per-layer', breaks: ['SO11'],
     from: '  if (scopeLayersLive(state)) return false;\n  if (sphereMode(state)) return false;',
     to: '  if (sphereMode(state)) return false;',

@@ -16,15 +16,29 @@
      (a)  a-radial-orchid  a RADIAL whorl SPLIT by slot role (some descriptor
                            carries `slotRole`): a labellum or hood resolved,
                            and the ruling (Oct 14) drops it.
-     (b1) b-spiral-inner   a SPIRAL descriptor whose INNER role resolved a
-                           record: no scope carries a spiral's inner whorls.
-     (b2) b-area-rule      a FAN whorl split by per-petal role at 2+ layers
+     (b)  b-foot-follows   per-layer values LIVE on the base state (RADIAL, or
+                           the toggle stored ON under a SPIRAL) with a stored
+                           layer entry carrying `petalWidth` (Eva's ruling of
+                           Oct 16: a layer's own width drives its foot and ring
+                           as well as its blade). Read off the base row's own
+                           `scopes` record.
+     (c1) c-area-rule      a FAN whorl split by per-petal role at 2+ layers
                            whose split area-rule sum is not the one-group sum
                            (restated here from the base descriptors' own widths
                            and thickness): R0 moves by the regrouping's ULPs.
-     (b3) b-all-on-grid    an ALL role whose composed value is not the double a
+     (c2) c-all-on-grid    an ALL role whose composed value is not the double a
                            slider holds after the fold (restated grid law) — the
                            one place the ALL fold cannot be exact.
+     (c3) c-spiral-layers  the toggle stored ON under a SPIRAL with stored layer
+                           entries: INERT on the base (per-layer values were
+                           RADIAL only) and LIVE here (Oct 16).
+   AND ONE CLASS THAT MUST HOLD, named so it cannot be vacuous:
+     (h)  h-spiral-inner   a SPIRAL descriptor whose INNER role resolved a
+                           record. Eva's ruling of Oct 16 makes a spiral's turns
+                           layer scopes, so the INNER delta migrates onto turn
+                           entries and the bloom must build to the bit — the
+                           iris among them. Counted, and the merge fails if
+                           none is in the population.
    Every other set is a HOLDER and must hold to the bit in both modes. A mover
    that holds is a finding (the class names a change that did not happen), and
    so is an unpredicted mover.
@@ -39,7 +53,7 @@
             [--checkpoint c.jsonl]           one line per set built, so a killed run
                                               resumes where it stopped
           node tools/verify-bloom-role-retirement.mjs --merge a.json b.json ...
-            [--expect a=N,b1=N,b2=N,b3=N]
+            [--expect a=N,b=N,c1=N,c2=N,c3=N,h=N]
           --control  perturbs one holder float and requires the run to FAIL on it */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,7 +62,8 @@ import { pathToFileURL } from 'node:url';
 const argv = process.argv.slice(2);
 const argOf = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const CLASSES = ['a-radial-orchid', 'b-spiral-inner', 'b-area-rule', 'b-all-on-grid'];
+const CLASSES = ['a-radial-orchid', 'b-foot-follows', 'c-area-rule', 'c-all-on-grid', 'c-spiral-layers'];
+const HOLD_CLASSES = ['h-spiral-inner'];
 
 if (argv.includes('--merge')) {
   const files = argv.slice(argv.indexOf('--merge') + 1).filter((f) => !f.startsWith('--'));
@@ -67,14 +82,17 @@ if (argv.includes('--merge')) {
   console.log(`export      : ${sum('floats').toLocaleString()} floats over ${sum('tris').toLocaleString()} triangles; grid ${sum('gridFloats').toLocaleString()} values (live)`);
   console.log(`holders     : ${sum('holders')} — 0 floats may move on any`);
   for (const c of CLASSES) console.log(`movers (${c}) : ${byClass[c].length} predicted, ${byClass[c].filter((m) => m.moved).length} moved`);
+  const held = Object.fromEntries(HOLD_CLASSES.map((c) => [c, parts.flatMap((p) => (p.held || []).filter((m) => m.cls === c))]));
+  for (const c of HOLD_CLASSES) console.log(`must hold (${c}) : ${held[c].length} predicted, ${held[c].filter((m) => !m.moved).length} held to the bit`);
   const fails = [...bad, ...parts.flatMap((p) => p.fails)];
+  for (const c of HOLD_CLASSES) if (!held[c].length) fails.push(`${c}: the population holds no such set — the claim would be vacuous`);
   const exp = argOf('--expect');
   if (exp) {
     const want = Object.fromEntries(exp.split(',').map((kv) => kv.split('=')));
-    const key = { a: 'a-radial-orchid', b1: 'b-spiral-inner', b2: 'b-area-rule', b3: 'b-all-on-grid' };
-    for (const [k, v] of Object.entries(want)) if (byClass[key[k]].length !== Number(v)) fails.push(`--expect ${k}=${v}: the base records predict ${byClass[key[k]].length}`);
+    const key = { a: 'a-radial-orchid', b: 'b-foot-follows', c1: 'c-area-rule', c2: 'c-all-on-grid', c3: 'c-spiral-layers', h: 'h-spiral-inner' };
+    for (const [k, v] of Object.entries(want)) { const got = (byClass[key[k]] || held[key[k]]).length; if (got !== Number(v)) fails.push(`--expect ${k}=${v}: the base records predict ${got}`); }
   }
-  if (argv.includes('--list')) for (const c of CLASSES) { console.log(`\n${c}:`); for (const m of byClass[c]) console.log(`  ${m.moved ? 'MOVED' : 'HELD '} ${m.tag} :: ${m.label}${m.detail ? ` — ${m.detail}` : ''}`); }
+  if (argv.includes('--list')) for (const c of [...CLASSES, ...HOLD_CLASSES]) { console.log(`\n${c}:`); for (const m of (byClass[c] || held[c])) console.log(`  ${m.moved ? 'MOVED' : 'HELD '} ${m.tag} :: ${m.label}${m.detail ? ` — ${m.detail}` : ''}`); }
   if (fails.length) { console.log(`\nFAIL — ${fails.length} finding(s):`); for (const f of fails.slice(0, 80)) console.log('  ' + f); process.exit(1); }
   console.log(`\nPASS — every holder held to the bit in both modes; every predicted mover moved.`);
   process.exit(0);
@@ -83,16 +101,16 @@ if (argv.includes('--merge')) {
 const BASE = argOf('--base');
 if (!BASE || !fs.existsSync(path.join(BASE, 'bloom-geometry.js'))) { console.error('usage: --base <worktree of the base commit>'); process.exit(2); }
 const load = (dir, f) => import(pathToFileURL(path.join(dir, f)).href);
-const [G, R, F, BG, BH] = await Promise.all([
+const [G, R, F, BG, BH, BF] = await Promise.all([
   load(ROOT, 'bloom-geometry.js'), load(ROOT, 'bloom-registry.js'), load(ROOT, 'bloom-file.js'),
-  load(BASE, 'bloom-geometry.js'), load(BASE, 'tools/bloom-harness.mjs'),
+  load(BASE, 'bloom-geometry.js'), load(BASE, 'tools/bloom-harness.mjs'), load(BASE, 'bloom-file.js'),
 ]);
 const [K, N] = (argOf('--shard') || '0/1').split('/').map(Number);
 const CONTROL = argv.includes('--control');
 
 /* THE POPULATION — first occurrence of each (set, capability), live first. */
 const seen = new Map();
-const add = (tag, r) => { const k = JSON.stringify([r.set, r.capability ?? null]); if (!seen.has(k)) seen.set(k, { tag, label: r.label, set: r.set, capability: r.capability ?? null }); };
+const add = (tag, r) => { const k = JSON.stringify([r.set, r.capability ?? null, r.scopes ?? null]); if (!seen.has(k)) seen.set(k, { tag, label: r.label, set: r.set, capability: r.capability ?? null, scopes: r.scopes ?? null }); };
 for (const r of BH.buildMatrix()) add('live', r);
 for (const [ph, f] of Object.entries(BH.FROZEN_MATRICES)) for (const r of (typeof f === 'function' ? f() : f)) add(ph, r);
 const POP = [...seen.values()];
@@ -121,7 +139,7 @@ const onGrid = (c, v) => {
 const baseCtl = new Map(BH.CONTROLS.map((c) => [c.id, c]));
 const ALL_IDS = { 'allCurl': 'petalSpineCurl', 'allCup': 'petalCup' };
 
-function predict(st) {
+function predict(st, rowScopes) {
   const fr = BG.footRing(st, new BG.MeshBuilder({ exportMode: false }));
   const rs = fr.rings || [];
   /* WHAT THE HEAD DRAWS DIFFERENTLY, read off the BASE tree's own records:
@@ -147,14 +165,18 @@ function predict(st) {
     if (v || rad) return { cls: 'a-radial-orchid', detail: `split ${[...new Set(rs.map((r) => r.slotRole).filter(Boolean))].join('/')}${v ? '' : ` — every role value clamped onto the base, the radius alone moves (${rad})`}` };
     return null;
   }
-  if (st.placement === 'SPIRAL' && rs.some((r) => r.role === 'INNER' && valueMoves(r))) return { cls: 'b-spiral-inner', detail: 'INNER record on a spiral (per-layer values are RADIAL only)' };
-  if (rs.some((r) => r.petalRole)) { const rad = radiusMoves(); if (rad) return { cls: 'b-area-rule', detail: rad }; }
+  /* (b) and (c3), from the base state and the base row's OWN stored scopes */
+  const stored = rowScopes && Array.isArray(rowScopes.layers) ? rowScopes.layers : [];
+  if (String(st.scopeLayers) === 'ON' && (st.placement === 'RADIAL' || st.placement === 'SPIRAL') && stored.some((e) => e.offsets && 'petalWidth' in e.offsets)) return { cls: 'b-foot-follows', detail: `a stored layer entry owns petalWidth under per-layer values (${st.placement})` };
+  if (String(st.scopeLayers) === 'ON' && st.placement === 'SPIRAL' && stored.length) return { cls: 'c-spiral-layers', detail: 'stored layer entries, inert on the base (RADIAL only), live under a spiral now' };
+  if (st.placement === 'SPIRAL' && rs.some((r) => r.role === 'INNER' && valueMoves(r))) return { cls: 'h-spiral-inner', hold: true, detail: 'INNER record on a spiral — migrates onto turn entries (Oct 16) and must build to the bit' };
+  if (rs.some((r) => r.petalRole)) { const rad = radiusMoves(); if (rad) return { cls: 'c-area-rule', detail: rad }; }
   if (rs.some((r) => r.allRole && r.overrides)) {
     for (const [id, base] of Object.entries(ALL_IDS)) {
       if (Number(st[id] ?? 0) === 0) continue;
       const composed = rs[0].overrides[base];
       const folded = onGrid(baseCtl.get(base), Number(st[base]) + Number(st[id]));
-      if (!Object.is(composed, folded) && !rs.some((r) => r.petalRole)) return { cls: 'b-all-on-grid', detail: `${base} ${composed} -> ${folded}` };
+      if (!Object.is(composed, folded) && !rs.some((r) => r.petalRole)) return { cls: 'c-all-on-grid', detail: `${base} ${composed} -> ${folded}` };
     }
   }
   return null;
@@ -183,7 +205,15 @@ function gridOf(petals) {
 }
 const firstDiff = (a, b) => { if (a.length !== b.length) return `length ${a.length} against ${b.length}`; let n = 0, f = -1; for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) { n++; if (f < 0) f = i; } return n ? `${n} of ${a.length} differ, first at ${f}: ${a[f]} against ${b[f]}` : null; };
 
-const out = { shard: K, shards: N, population: POP.length, base: BASE, built: 0, holders: 0, floats: 0, tris: 0, gridFloats: 0, movers: [], excluded: [], fails: [], complete: false };
+const out = { shard: K, shards: N, population: POP.length, base: BASE, built: 0, holders: 0, floats: 0, tris: 0, gridFloats: 0, movers: [], held: [], excluded: [], fails: [], complete: false };
+/* ONE PLACE A PREDICTION IS ACCOUNTED: a mover class is a mover, a hold class
+   is a holder that is also counted by name, nothing is a plain holder. */
+function account(e, pred, diffs) {
+  if (pred && !pred.hold) { out.movers.push({ tag: e.tag, label: e.label, cls: pred.cls, detail: pred.detail, moved: diffs.length > 0, diffs: diffs.slice(0, 2) }); return; }
+  out.holders++;
+  if (pred) out.held.push({ tag: e.tag, label: e.label, cls: pred.cls, detail: pred.detail, moved: diffs.length > 0 });
+  if (diffs.length) out.fails.push(`HOLDER MOVED${pred ? ` (${pred.cls})` : ''} ${e.tag} :: ${e.label} — ${diffs.join('; ')}`);
+}
 let controlled = false;
 /* THE CHECKPOINT: one JSON line per set, keyed on its position in the
    population; a resumed run replays the lines it finds and builds the rest. */
@@ -199,18 +229,19 @@ for (const e of mine) {
     out.built++; out.floats += had.floats; out.tris += had.tris; out.gridFloats += had.gridFloats;
     /* the PREDICTION is re-taken on replay (a footRing, no build), so a
        refined predictor is judged against the bytes already measured */
-    had.pred = predict(coerce(BH.CONTROLS, BH.DEFAULTS, BH.migrateSet(e.set), e.label).st);
-    if (had.pred) out.movers.push({ tag: e.tag, label: e.label, cls: had.pred.cls, detail: had.pred.detail, moved: had.diffs.length > 0, diffs: had.diffs.slice(0, 2) });
-    else { out.holders++; if (had.diffs.length) out.fails.push(`HOLDER MOVED ${e.tag} :: ${e.label} — ${had.diffs.join('; ')}`); }
+    had.pred = predict(coerce(BH.CONTROLS, BH.DEFAULTS, BH.migrateSet(e.set), e.label).st, e.scopes);
+    account(e, had.pred, had.diffs);
     continue;
   }
   const b = coerce(BH.CONTROLS, BH.DEFAULTS, BH.migrateSet(e.set), e.label);
   if (!b.st) { const x = { tag: e.tag, label: e.label, why: `base: ${b.why}` }; out.excluded.push(x); record({ at, excluded: x }); continue; }
   const m = coerce(R.CONTROLS, R.DEFAULTS, R.migrateSet(e.set), e.label);
   if (!m.st) { const x = { tag: e.tag, label: e.label, why: `head: ${m.why}` }; out.excluded.push(x); record({ at, excluded: x }); continue; }
-  const pred = predict(b.st);
-  const optsB = { below: null, capability: e.capability };
-  const optsH = { below: null, capability: e.capability, scopes: F.scopesForBuild(m.scopes) };
+  const pred = predict(b.st, e.scopes);
+  /* a row's own `scopes` (the base matrix's tier rows) reaches both trees */
+  const optsB = { below: null, capability: e.capability, ...(e.scopes ? { scopes: BF.scopesForBuild(e.scopes) } : {}) };
+  const headScopes = m.scopes || e.scopes ? F.scopesForBuild(m.scopes || e.scopes) : null;
+  const optsH = { below: null, capability: e.capability, scopes: headScopes };
   const diffs = [];
   let fl = 0, tr = 0, gf = 0;
   for (const exportMode of [false, true]) {
@@ -229,11 +260,7 @@ for (const e of mine) {
   }
   out.built++; out.floats += fl; out.tris += tr; out.gridFloats += gf;
   record({ at, pred, diffs, floats: fl, tris: tr, gridFloats: gf });
-  if (pred) out.movers.push({ tag: e.tag, label: e.label, cls: pred.cls, detail: pred.detail, moved: diffs.length > 0, diffs: diffs.slice(0, 2) });
-  else {
-    out.holders++;
-    if (diffs.length) out.fails.push(`HOLDER MOVED ${e.tag} :: ${e.label} — ${diffs.join('; ')}`);
-  }
+  account(e, pred, diffs);
   if (out.built % 50 === 0) process.stderr.write(`  shard ${K}/${N}: ${out.built}/${mine.length}\n`);
 }
 for (const mv of out.movers) if (!mv.moved) out.fails.push(`PREDICTED MOVER HELD (${mv.cls}) ${mv.tag} :: ${mv.label} — the class names a change that did not happen`);

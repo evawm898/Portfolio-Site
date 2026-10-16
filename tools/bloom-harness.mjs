@@ -4479,7 +4479,7 @@ export const ZYGO_SCOPE =
    =================================================================== */
 /* THE SCOPE OFFSETS A PETAL OUGHT TO CARRY, RESTATED (Q3.4): from the ROW's
    own `@scopes` entry (what the file / matrix stored), gated by the toggles as
-   the controls state them — a layer entry under RADIAL with scopeLayers ON,
+   the controls state them — a layer entry under RADIAL or SPIRAL with scopeLayers ON,
    a petal entry under FAN with scopePetals ON, matched on the pair's
    CANONICAL slot exactly — and summed in the reader's own order (layers, then
    petals). Written a second time on purpose: the geometry's `scopeOffsetsFor`
@@ -4487,7 +4487,9 @@ export const ZYGO_SCOPE =
 export function scopeOffsetsRestated(row, ui, m, whorl, slot) {
   const rec = scopesOfSet(migrateForServedTree(row.set || [], null));
   if (!rec) return null;
-  const layersLive = String(ui.placement) === 'RADIAL' && String(ui.scopeLayers) === 'ON';
+  /* RADIAL and the layered SPIRAL (Eva's ruling, Oct 16), restated as the
+     two placements rather than imported, so this side has its own owner */
+  const layersLive = (String(ui.placement) === 'RADIAL' || String(ui.placement) === 'SPIRAL') && String(ui.scopeLayers) === 'ON';
   const petalsLive = String(ui.placement) === 'FAN' && String(ui.scopePetals) === 'ON';
   const n = m.slotCount;
   const key = String(ui.placement) === 'FAN' || String(ui.placement) === 'RADIAL' ? Math.min(slot, mirrorPartner(slot, n, m.mirror)) : slot;
@@ -5131,6 +5133,35 @@ export async function zygoAssertions(page, row) {
       if (!(gotV >= b.min - 1e-12 && gotV <= b.max + 1e-12)) bad.push(`Z2: descriptor ${i} was built with ${base} = ${gotV}, outside the base control's own ${b.min}..${b.max}`);
     }
   });
+
+  /* Z3 — THE FOOT AND THE RING FOLLOW AN OWNED WIDTH (Eva's ruling, Oct 16: "a
+     layer's own size and tilt drive the WHOLE petal — foot and ring as well as
+     blade"). (The letter's first meaning, the role split's area-rule equality,
+     retired with the roles, Q3.4.) Every ringed, non-sphere row: each ring's
+     foot width and each deeper ring's radius RESTATED here from the controls and
+     the row's own `@scopes` entry — the ramp's `petalWidth x layerSize^L x 0.4 x
+     footDelicacy` where the layer owns no width, `own x 0.4 x footDelicacy`
+     where it does, and the ring `R0 x layerSize^L` or `R0 x min(1, own /
+     petalWidth)` (ring 1 IS the rim, J2) — never footRing()'s own `ownWidth`,
+     which is read only to be checked. Both STL gates are blind to a foot that
+     kept the ramp: the blade still lands on a foot that overlaps the hub. */
+  if (!cont && !m.sphereMode) {
+    const W = Number(ui.petalWidth), del = Number(ui.footDelicacy), ls = Number(ui.layerSize);
+    const bw = new Map(OVERRIDE_BOUNDS).get('petalWidth') || CONTROLS.find((c) => c.id === 'petalWidth');
+    const R0 = rings[0].radius;
+    rings.forEach((r, L) => {
+      const t = scopeOffsetsRestated(row, ui, m, L, 0);
+      const ownW = t && t.owns && t.owns.petalWidth ? Math.min(bw.max, Math.max(bw.min, W + t.offsets.petalWidth)) : null;
+      const scale = Math.pow(ls, L);
+      const wantW = Math.min(FOOT_MAX_WIDTH_MM, Math.max(FOOT_MIN_WIDTH_MM, ownW === null ? W * scale * 0.4 * del : ownW * 0.4 * del));
+      if (!Object.is(r.width, wantW)) bad.push(`Z3: ring ${L}'s foot is ${r.width} mm across, restated ${wantW} from ${ownW === null ? `the ramp (Petal width ${W} x ${scale})` : `the layer's own width ${ownW}`} x 0.4 x Foot delicacy ${del} — the foot did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
+      if ((r.ownWidth ?? null) !== ownW) bad.push(`Z3: ring ${L} reports its own width ${JSON.stringify(r.ownWidth ?? null)}, the row's entries say ${JSON.stringify(ownW)}`);
+      if (L === 0) return;
+      const f = ownW === null ? scale : Math.min(1, ownW / W);
+      if (!Object.is(r.radius, R0 * f)) bad.push(`Z3: ring ${L} sits at ${r.radius} mm, restated R0 ${R0} x ${f} = ${R0 * f} — the ring did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
+      if (Boolean(r.ringClamped) !== (ownW !== null && ownW / W > 1)) bad.push(`Z3: ring ${L} reports ringClamped ${r.ringClamped}, but its own width ${ownW} against Petal width ${W} says ${ownW !== null && ownW / W > 1}`);
+    });
+  }
 
   /* Z4 — THE MIRROR, on the FAN (the only placement whose scopes are pairs).
      Z4b: the pairing is a bijection about ONE plane, read from the emitted
@@ -16021,6 +16052,29 @@ export function buildMatrix() {
     ['SEPAL TIERS: GATED — four tiers asked with NO stem (hidden and inert; bit-identical to the one-tier whorl)', { sepalCount: 5, sepalTiers: 4 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
+  /* 64. PER-LAYER VALUES ON A SPIRAL, AND AN OWNED WIDTH DRIVES ITS FOOT AND
+        RING (Eva's rulings of Oct 16 on the role retirement — docs/bloom-role-
+        retirement-outcome.md). A layered SPIRAL's turns are layer scopes (the
+        descriptor's own depth, `lambda = floor(k / petalCount)`); a layer that
+        owns its width builds its foot from it and sits on a ring in proportion
+        to it (`R0 x own / petalWidth`, held at the rim past 1, told), the area
+        rule summing its own foot into the hub; an owned length or tilt moves
+        no foot and no ring. Z2 reads every row's scope terms and Z3 restates
+        every ring's foot and radius; the GATED row carries a layer record under
+        CONTINUOUS, kept and inert. Each row carries its record as the reserved
+        `@scopes` set entry, which `applyConfig` hands the page through
+        `__bloomScopes`. Appended as the FINAL block, after 63. */
+  const scoped = (sets, layers) => [...Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })), { id: SCOPES_SET_ID, value: { layers, petals: [], tiers: [] } }];
+  for (const [name, sets, layers] of [
+    ['PER-LAYER: SPIRAL x 3 turns — a cup offset on turn 3 (a spiral\'s turn is its layer scope)', { placement: 'SPIRAL', layerCount: 3, scopeLayers: 'ON' }, [{ layer: 2, offsets: { petalCup: 0.4 } }]],
+    ['PER-LAYER: RADIAL x 3 layers — layer 2 owns a 12 mm width, layer 1 a 14 mm one (the foot and the ring follow; layer 1\'s ring stays the rim)', { layerCount: 3, scopeLayers: 'ON' }, [{ layer: 0, offsets: { petalWidth: -2 } }, { layer: 1, offsets: { petalWidth: -4 } }]],
+    ['PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt (no foot, no ring)', { placement: 'SPIRAL', layerCount: 3, scopeLayers: 'ON' }, [{ layer: 1, offsets: { petalWidth: -4 } }, { layer: 2, offsets: { petalLength: 5, petalTilt: 8 } }]],
+    ['PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (its ring HELD at the rim, told)', { layerCount: 4, scopeLayers: 'ON' }, [{ layer: 3, offsets: { petalWidth: 3 } }]],
+    ['PER-LAYER: GATED — CONTINUOUS x 3 turns with per-layer ON and a layer record (kept and inert)', { placement: 'CONTINUOUS', layerCount: 3, scopeLayers: 'ON' }, [{ layer: 1, offsets: { petalCup: 0.4, petalWidth: -4 } }]],
+  ]) {
+    rows.push({ label: name, set: scoped(sets, layers) });
   }
 
   return rows.map(storedRow);

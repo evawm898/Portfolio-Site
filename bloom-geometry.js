@@ -1408,14 +1408,16 @@ export const OVERRIDE_BOUNDS = new Map([
    `petalWidth` or `petalTilt` OWNS that quantity for its layer, and the blade
    is built from the layer's own value with the ramp's term left out (the
    size factor of `ring.scale`, the tilt of `ring.tiltExtra`) — `owns` on the
-   term this function returns, read by petalSurface. The ramps keep placing
-   every whorl's RING and FOOT (the foot is the whorl's, Q3.3) and keep giving
-   a layer with no own value its size and tilt; `layerSize` / `layerTilt` hide
-   while per-layer values are live (the registry). The reading is the model
-   doc's own (§5, "where a layer owns the quantity"), and the alternative it
-   rules out — every ramp inert under the toggle — would collapse every whorl
-   onto one ring radius, since one `scale` places the ring, the foot and the
-   blade together.
+   term this function returns, read by petalSurface. AND THE WHOLE PETAL
+   FOLLOWS (Eva's ruling, Oct 16): an owned WIDTH also sets the layer's foot
+   and its ring radius (`layerOwnedValues`, read by footRing()), and an owned
+   tilt already reaches every part of the petal that reads a tilt (the blade
+   and the seam's turn; the foot rows lie in the hub's plane at any tilt). The
+   ramps keep placing a layer with no own value; `layerSize` / `layerTilt`
+   hide while per-layer values are live (the registry). The alternative the
+   model doc rules out — every ramp inert under the toggle — would collapse
+   every whorl onto one ring radius, since one `scale` places the ring, the
+   foot and the blade together; owning is per layer and per quantity.
 
    WHAT THE RETIRED ROLES BECAME is `migrateRoles` in bloom-registry.js (the
    ALL deltas into the global, INNER into layer or pair entries, the per-petal
@@ -1464,8 +1466,19 @@ export const SCOPE_LAYER_OWNED = Object.freeze(['petalLength', 'petalWidth', 'pe
    path is the path it was, character for character, and the full-matrix byte
    partition is the measurement of that rather than the argument. */
 export const SCOPE_TOGGLE_VALUES = Object.freeze(['OFF', 'ON']);
+/* WHERE PER-LAYER INDEPENDENCE EXISTS (Eva's ruling, Oct 16, on the role
+   retirement): RADIAL and the LAYERED SPIRAL. A spiral's "turn" is its
+   descriptor's own depth — footRing()'s RINGED arm, `lambda = floor(k /
+   petalCount)`, the same integer whorl index a radial bloom's layers carry:
+   each turn is one whorl of `petalCount` petals on its own golden-angle
+   sequence, counted from the outside (turn 1 the outer, largest whorl). So a
+   spiral's layer entry reaches exactly the petals RADIAL's would, by the very
+   index (`d.lambda`) buildBloomInto already hands `scopeOffsetsFor`. A spiral
+   has no mirror plane, so it carries LAYER entries only. CONTINUOUS stays
+   out: its lambda is a real number and no petal shares a whorl with another. */
+export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL', 'SPIRAL']);
 export function scopeLayersLive(state) {
-  return state.placement === 'RADIAL' && state.scopeLayers === 'ON';
+  return SCOPE_LAYER_PLACEMENTS.includes(state.placement) && state.scopeLayers === 'ON';
 }
 export function scopePetalsLive(state) {
   return state.placement === 'FAN' && state.scopePetals === 'ON';
@@ -1559,6 +1572,23 @@ export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
   }
   if (!any) return null;
   return { offsets: sum, bounds: scopes.bounds || {}, key: { layer, slot: key }, owns };
+}
+
+/* WHAT A LAYER OWNS, AS VALUES — the effective (composed, clamped) value of
+   each SCOPE_LAYER_OWNED base a LAYER entry gives layer `layer`, through the
+   resolver's own composition and clamp; null where per-layer values are not
+   live or the layer owns none. footRing() reads it for the foot and ring
+   (Eva's Oct 16 ruling: a layer's own size and tilt drive the WHOLE petal).
+   Petal entries are never live where layer entries are, so this is the layer
+   entries' term alone. */
+export function layerOwnedValues(scopes, layer, n, state) {
+  if (!scopes || !scopeLayersLive(state)) return null;
+  const term = scopeOffsetsFor(scopes, { layer, slot: 0, n, state });
+  if (!term || !term.owns) return null;
+  const out = resolvePetalTerms(state, null, null, null, term);
+  const own = {};
+  for (const k of SCOPE_LAYER_OWNED) if (term.owns[k]) own[k] = out[k];
+  return own;
 }
 
 /* ===================================================================
@@ -1715,9 +1745,10 @@ export function petalStateForSlot(state, slotTerm, clampedOut = null, scaledOut 
 
 export function footRing(state, acc, opts = {}) {
   const thickness = acc.floorThickness(state.sheetThickness);
-  /* THE SCOPES (sepal tiers, F1.1a): a tier's own offsets reach its descriptor
-     through `sepalTierState` below; every other caller hands none and builds
-     every tier at the global sepal values. */
+  /* THE SCOPES: a sepal tier's own offsets reach its descriptor through
+     `sepalTierState` below (F1.1a), and a LAYER's owned width reaches its foot
+     and ring (`layerOwnedValues`, Oct 16); a caller that hands none builds
+     every tier at the global sepal values and every layer on the ramps. */
   const tierScopes = (opts && opts.scopes) || null;
   const layerCount = Math.round(state.layerCount);
   if (!(layerCount >= 1 && layerCount <= MAX_LAYERS)) {
@@ -1901,21 +1932,53 @@ export function footRing(state, acc, opts = {}) {
          exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
       const footCount = 1;
       sumSq += footCount * rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount });
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale, ringClamped: false });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
     const scale = Math.pow(state.layerSize, L);
-    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
+    /* A LAYER THAT OWNS ITS WIDTH DRIVES ITS FOOT AND ITS RING (Eva's ruling,
+       Oct 16: "a layer's own size and tilt drive the WHOLE petal — foot and
+       ring as well as blade"). The layer ramp's `scale` does three jobs here —
+       the foot's width, the ring's radius (R0 * scale) and, through the slot,
+       the blade's size — and a layer entry carrying `petalWidth` replaces it
+       in the first two exactly as Q3.5 already replaced it in the third:
+         FOOT   the layer's own width, `ownWidth * 0.4 * footDelicacy` — the
+                foot is a fraction of the blade it feeds, whatever set that
+                blade's width (the expression above with the ramp's product
+                `petalWidth * scale` replaced by the width it stood for);
+         RING   `R0 * ownWidth / petalWidth` — the ramp's own law, ring radius
+                in proportion to the petal's width (under the ramp both are
+                `scale` times the outer whorl's), with the owned width in
+                place of the ramped one. Layer 1's ring IS the hub's rim (J2's
+                identity: one quantity), so it stays there and only its foot
+                follows; a deeper layer asking for a ring wider than the rim is
+                HELD at the rim and told (`ringClamped`), because a foot outside
+                the hub is joined to nothing (J2 / J3).
+       THE WIDTH AND NOT THE LENGTH places the ring because both are width
+       questions — the ring is where n feet sit side by side, and the foot is a
+       fraction of the blade's width; nothing in the foot or the ring is a
+       length. AND NOTHING HERE READS A TILT: the three foot rows lie in the
+       hub's plane (or on the cap) at any tilt, and the seam's turn is the
+       petal's own tilt, which petalSurface already takes from the layer that
+       owns it — so an owned tilt already drives the whole petal, measured as
+       0 floats in the foot moving when it does. With no owned width this is
+       the ramp's expression character for character (`ringFactor` is `scale`,
+       the same double). */
+    const own = layerOwnedValues(tierScopes, L, slotCount, state);
+    const ownWidth = own && 'petalWidth' in own ? own.petalWidth : null;
+    const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;
     const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
+    const ringAsked = ownWidth === null || L === 0 ? null : ownWidth / state.petalWidth;
+    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ringAsked);
     /* The group is the whole whorl and `footCount` is `state.petalCount` (or
        the fan's derived count) — the SAME DOUBLE the pre-role expression
        multiplied by, deliberately read unrounded exactly as that expression
        read it. */
     const footCount = slotCount;
     sumSq += footCount * rFoot * rFoot;
-    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount });
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor, ringClamped: ringAsked !== null && ringAsked > 1 });
   }
   }
 
@@ -2036,7 +2099,7 @@ export function footRing(state, acc, opts = {}) {
        injective past the equator, which is exactly why the cap's key cannot
        be continued there and this arm exists. Cap and flat: verbatim. */
     const polar = sphere ? phiAt(L) : null;
-    const radius = sphere ? dome.Rd * Math.sin(polar) : R0 * p.scale;
+    const radius = sphere ? dome.Rd * Math.sin(polar) : R0 * p.ringFactor;
     /* WHERE ON THE DOME THIS RING LANDS — from the one surface law above.
        Containment (J2) is what makes radius <= Rd: Rd >= R0 by AM-GM. */
     const { slope, z, arc, relief } = surfaceAt(radius, polar);
@@ -2158,6 +2221,11 @@ export function footRing(state, acc, opts = {}) {
       /* HOW MANY FEET THIS DESCRIPTOR CARRIES — the whole whorl (ringed) or one
          (continuous); the area rule's group, and J's accounting check. */
       footCount: p.footCount,
+      /* A LAYER'S OWN WIDTH, WHERE IT OWNS ONE (Oct 16) — the value its foot
+         and ring were built from, null where the ramp placed them; and the
+         ring's factor on R0 (the ramp's `scale` where nothing is owned), and
+         whether a deeper layer's ring was held at the hub's rim. */
+      ownWidth: p.ownWidth, ringFactor: p.ringFactor, ringClamped: p.ringClamped,
       authoredWidth: p.authoredWidth,
       widthClamped: p.authoredWidth < FOOT_MIN_WIDTH_MM,
       /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the

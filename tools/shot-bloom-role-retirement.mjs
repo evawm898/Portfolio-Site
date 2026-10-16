@@ -11,10 +11,18 @@
    in (the harness's applyConfig does it for the served tree) — the RADIAL
    labellum and hood dropped and told, everything else carried as scope
    offsets. The rows are the class-(a) movers the partition predicted from
-   the BASE tree's own records (tools/verify-bloom-role-retirement.mjs), the
-   one class-(b) mover with a visible move (the iris on a SPIRAL, whose INNER
-   record no scope can carry), and a FAN per-petal row as the CONTROL that
-   must not move (the exact migration).
+   the BASE tree's own records (tools/verify-bloom-role-retirement.mjs); THE
+   IRIS ON A SPIRAL, which since Eva's ruling of Oct 16 (a spiral's turns are
+   layer scopes) migrates onto a turn entry and must NOT move — its caption
+   carries the Node byte comparison of the two trees' export streams, both
+   modes; class (b), the FOOT FOLLOWS (her second ruling of Oct 16), drawn
+   from this tree's block 64 — no stored row of the base owns a width under
+   per-layer values, so these sets are handed to BOTH pages as a scope record
+   (`__bloomScopes`, which the base tree has had since Scoping-a): BEFORE the
+   offset rides on top of the ramp with the foot and ring on the ramp (and a
+   SPIRAL's layer entry is inert there), AFTER the layer's own width builds
+   its foot and ring; and a FAN per-petal row as the CONTROL that must not
+   move (the exact migration).
 
    PRINT PREVIEW IS ON in every cell — the app's own `shownMode` is asserted
    to read 'export' and `liveTris` null. The camera is FACE-ON (down the axis,
@@ -46,6 +54,30 @@ fs.mkdirSync(outDir, { recursive: true });
 /* the rows' sets come from the BASE tree's own matrix — the rows as they were */
 const BH = await import(pathToFileURL(path.join(path.resolve(BASE), 'tools/bloom-harness.mjs')).href);
 const BASE_ROWS = new Map(BH.buildMatrix().map((r) => [r.label, r]));
+/* class (b)'s rows are THIS tree's (block 64): the base matrix holds none */
+const HH = await import('./bloom-harness.mjs');
+const HEAD_ROWS = new Map(HH.buildMatrix().map((r) => [r.label, r]));
+/* THE BYTE COMPARISON a must-hold pair carries in its caption: the base row
+   built on the base geometry as stored, and on this geometry after this
+   registry's migration, every export float compared under Object.is, both
+   modes (the partition tool's own comparison, for the one row on the sheet) */
+const BG = await import(pathToFileURL(path.join(path.resolve(BASE), 'bloom-geometry.js')).href);
+const HG = await import('../bloom-geometry.js');
+const HR = await import('../bloom-registry.js');
+const HF = await import('../bloom-file.js');
+function bytesSame(row) {
+  const coerce = (C, D, set) => { const k = new Map(C.map((c) => [c.id, c.kind])); const st = { ...D }; let sc = null; for (const w of set) { if (w.id === HR.SCOPES_SET_ID) { sc = w.value; continue; } st[w.id] = k.get(w.id) === 'slider' ? Number(w.value) : w.value; } return { st, sc }; };
+  const b = coerce(BH.CONTROLS, BH.DEFAULTS, BH.migrateSet(row.set)), h = coerce(HR.CONTROLS, HR.DEFAULTS, HR.migrateSet(row.set));
+  let floats = 0, differ = 0;
+  for (const exportMode of [false, true]) {
+    const A = new BG.MeshBuilder({ exportMode }); BG.buildBloomInto(A, { ...b.st }, { below: null, capability: row.capability || null });
+    const B = new HG.MeshBuilder({ exportMode }); HG.buildBloomInto(B, { ...h.st }, { below: null, capability: row.capability || null, scopes: HF.scopesForBuild(h.sc) });
+    floats += A.positions.length;
+    if (A.positions.length !== B.positions.length) differ += Math.max(A.positions.length, B.positions.length);
+    else for (let i = 0; i < A.positions.length; i++) if (!Object.is(A.positions[i], B.positions[i])) differ++;
+  }
+  return { floats, differ };
+}
 /* THE BASE TREE'S OWN CONTROL KINDS, handed to applyConfig for every BEFORE
    cell: without them the harness migrates against THIS tree's registry and
    the base page is handed a set with its labellum already dropped — a
@@ -115,21 +147,31 @@ const PAIRS = [
   { cls: 'a', label: 'DOME: rise 1 x ORCHID at two whorls in step', title: 'the orchid on a hemisphere' },
   { cls: 'a', label: 'SLOT: ALL MAX x 2 whorls in step', title: 'every slot-role slider at its maximum' },
   { cls: 'a', label: 'CURL: ORCHID x labellum curl x bias max (the modifier rides the COMPOSED curl)', title: 'the labellum curl with the curl bias' },
-  { cls: 'b', label: 'ZYGO: the iris x SPIRAL (roles exist, azimuth differs)', title: 'class (b): the iris on a SPIRAL — no scope carries a spiral\'s inner whorls' },
+  { cls: 'hold', label: 'ZYGO: the iris x SPIRAL (roles exist, azimuth differs)', title: 'MUST HOLD: the iris on a SPIRAL — its INNER carried onto turn 2 (a spiral\'s turns are layer scopes, Oct 16)', bytes: true },
+  { cls: 'b', head: true, label: 'PER-LAYER: RADIAL x 3 layers — layer 2 owns a 12 mm width, layer 1 a 14 mm one (the foot and the ring follow; layer 1\'s ring stays the rim)', title: 'class (b): an owned width drives the foot and the ring (RADIAL)' },
+  { cls: 'b', head: true, label: 'PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt (no foot, no ring)', title: 'class (b): the same on a SPIRAL — inert on the base, where per-layer values were RADIAL only' },
+  { cls: 'b', head: true, label: 'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (its ring HELD at the rim, told)', title: 'class (b): a ring that asks past the rim is held there' },
   { cls: 'control', label: 'FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no controls)', title: 'CONTROL: a FAN group, migrated EXACTLY to a pair scope' },
 ];
 const chosen = ONLY ? PAIRS.filter((p) => ONLY.test(p.label)) : PAIRS;
 const kindOf = new Map(CONTROLS.map((c) => [c.id, c.kind]));
 const shots = [];
 for (const p of chosen) {
-  const row = BASE_ROWS.get(p.label);
-  if (!row) await die(`"${p.label}" is not a row of the BASE matrix`);
+  const row = p.head ? HEAD_ROWS.get(p.label) : BASE_ROWS.get(p.label);
+  if (!row) await die(`"${p.label}" is not a row of the ${p.head ? "THIS tree's" : 'BASE'} matrix`);
   const before = await cell(row, 'base', null);
   const after = await cell(row, 'here', before.r);
   /* the migration's own notes, from THIS tree's registry — what the design file would tell */
   const whole = { ...DEFAULTS };
   for (const w of row.set) whole[w.id] = kindOf.get(w.id) === 'slider' ? Number(w.value) : (kindOf.has(w.id) ? w.value : Number(w.value));
   const notes = migrateRoles(whole).notes.filter((n) => n.kind !== 'identity').map((n) => `[${n.kind}] ${n.text}`);
+  const same = p.bytes ? bytesSame(row) : null;
+  if (same) { notes.push(`[measured] ${same.differ} of ${same.floats.toLocaleString()} export floats differ between the two trees, live and export, under Object.is`); if (same.differ) await die(`${p.label}: a must-hold pair moved ${same.differ} floats`); }
+  if (p.head) {
+    const rings = after.m.rings || [];
+    notes.push(`[after] rings ${rings.map((r) => `${r.radius.toFixed(2)} mm${r.ownWidth !== null && r.ownWidth !== undefined ? ` (own ${r.ownWidth} mm, foot ${r.width.toFixed(2)}${r.ringClamped ? ', HELD at the rim' : ''})` : ''}`).join(' / ')}`);
+    notes.push(`[before] rings ${(before.m.rings || []).map((r) => `${r.radius.toFixed(2)} mm (foot ${r.width.toFixed(2)})`).join(' / ')}`);
+  }
   shots.push({ ...p, row, before, after, notes });
   console.log(`${p.cls}  ${p.label}\n    before ${modeTag(before.m)} · ${before.m.shownTris} tris · r ${before.r.toFixed(1)} mm\n    after  ${modeTag(after.m)} · ${after.m.shownTris} tris · scopes ${JSON.stringify(after.scopes)}\n    ${notes.join('\n    ')}`);
 }
@@ -142,7 +184,7 @@ const scopeLine = (s) => !s ? 'no scope record' : [
   ...(s.layers || []).map((e) => `layer ${e.layer + 1}: ${Object.entries(e.offsets).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${+v.toFixed(3)}`).join(', ')}`),
   ...(s.petals || []).map((e) => `layer ${e.layer + 1} pair ${e.slot}: ${Object.entries(e.offsets).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${+v.toFixed(3)}`).join(', ')}`)].join(' · ') || 'an empty record';
 const pairHtml = (s) => `<div class="pair">
-  <h3>${s.cls === 'a' ? '(a) ' : s.cls === 'b' ? '(b) ' : ''}${esc(s.title)}</h3>
+  <h3>${s.cls === 'a' ? '(a) ' : ''}${esc(s.title)}</h3>
   <p class="lbl">${esc(s.label)}</p>
   <div class="grid">
     <figure><img src="${dataUri(s.before.buf)}"><figcaption><b>BEFORE</b> — f95b244, the role controls live · ${tris(s.before.m)} tris · ${esc(modeTag(s.before.m))}</figcaption></figure>
@@ -162,7 +204,7 @@ const html = `<style>
   .notes{color:#a8a8a8;font-size:11px;margin:6px 0 0;max-width:1080px;line-height:1.4}
   b{color:#e8e8e8}
 </style>
-<h1>The role retirement — the RADIAL labellum and hood dropped, before and after</h1>
+<h1>The role retirement — (a) the RADIAL labellum and hood dropped, (b) the foot follows an owned width, and the iris held</h1>
 <p class="sub">Each pair is ONE matrix row on two trees, FACE-ON (slot 0 — the labellum's — at the bottom), print preview ON (<code>shownMode</code> 'export' asserted), the AFTER cell on the BEFORE cell's own camera. BEFORE is a real render of f95b244 served from its own worktree; AFTER is this tree with the stored set migrated by <code>migrateRoles</code>. The notes under each pair are the migration's own words, what a design file loading that set is told. No pixel delta is quoted: two trees, two servers, two page sessions.</p>
 ${shots.map(pairHtml).join('\n')}`;
 await page.setViewportSize({ width: 1130, height: 1100 });

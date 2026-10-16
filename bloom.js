@@ -766,6 +766,8 @@ document.getElementById('resetBtn').addEventListener('click', () => {
    THE SCOPE VIEW (Scoping-b, Eva's rulings — read docs/bloom-scoping-selection.md
    before touching any of it). "Select-and-edit: pick a layer (RADIAL) or a
    petal (FAN); the normal panel now edits just that scope. No instanced rows."
+   A layered SPIRAL picks layers too since Eva's ruling of Oct 16 — named as
+   TURNS on the picker, the descriptor's own depth.
 
    THE MODEL IS /plot's, ONE LEVEL DOWN ("A WARP BELONGS TO ITS PETAL"): the
    panel is a VIEW onto the picked scope's entry, and PICKING LOADS AND NEVER
@@ -829,8 +831,12 @@ function scopeOptions(ui) {
     if (mode === 'layer') {
       for (let k = 0; k < layers; k++) {
         const own = sc && sc.scopedLayers && sc.scopedLayers.includes(k);
-        const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ' — the outer whorl' : k === layers - 1 ? ' — the innermost whorl' : '';
-        out.push({ kind: 'layer', layer: k, slot: 0, label: `Layer ${k + 1}${where}${own ? ' · own values' : ''}` });
+        /* UNDER A LAYERED SPIRAL A LAYER IS ONE TURN (Eva's ruling, Oct 16): one
+           whorl of petals on its own golden-angle sequence, the descriptor's
+           own depth — the picker names it so. */
+        const spiral = String(ui.placement) === 'SPIRAL';
+        const where = layers === 1 ? ' — the whole whorl' : k === 0 ? ` — the outer ${spiral ? 'turn' : 'whorl'}` : k === layers - 1 ? ` — the innermost ${spiral ? 'turn' : 'whorl'}` : '';
+        out.push({ kind: 'layer', layer: k, slot: 0, label: `${spiral ? 'Turn' : 'Layer'} ${k + 1}${where}${own ? ' · own values' : ''}` });
       }
     } else {
       const n = lastFoot.slotCount;
@@ -1066,7 +1072,9 @@ function scopeStatusText(ui, mode) {
   const tiersToo = mode !== 'tier' && tiersMode(ui) ? ' Pick a sepal tier and the Sepals section edits just that tier.' : '';
   if (!scopeView) {
     return (mode === 'layer'
-      ? 'Pick a layer and the panel edits just that layer: its petal controls then set the layer\'s own values, kept as offsets on the whole-bloom value.'
+      ? (String(ui.placement) === 'SPIRAL'
+        ? 'Pick a turn and the panel edits just that turn of the spiral (one whorl on its own golden-angle sequence): its petal controls then set the turn\'s own values, kept as offsets on the whole-bloom value.'
+        : 'Pick a layer and the panel edits just that layer: its petal controls then set the layer\'s own values, kept as offsets on the whole-bloom value.')
       : mode === 'petal' ? 'Pick a petal and the panel edits just that petal and its mirror partner: its petal controls then set the pair\'s own values, kept as offsets on the whole-bloom value.'
       : 'Pick a sepal tier and the Sepals section edits just that tier: its sepal controls then set the tier\'s own values, kept as offsets on the whole-bloom value; sepals within a tier always match.') + tiersToo;
   }
@@ -1084,7 +1092,7 @@ function scopeStatusText(ui, mode) {
   const parts = [`Editing ${name}.`,
     scopeView.kind === 'petal' && members.length === 2 ? 'Both petals of the pair move together.' : '',
     'The marked controls set its own values; unmarked ones still edit the whole bloom.',
-    scopeView.kind === 'layer' && scopeView.layer >= 1 ? `Its length, width and tilt read as built through the layer ramps until you set them; once set they are this layer's own, and ${controlLabel('layerSize')} and ${controlLabel('layerTilt')} no longer apply to it.` : '',
+    scopeView.kind === 'layer' && scopeView.layer >= 1 ? `Its length, width and tilt read as built through the layer ramps until you set them; once set they are this ${String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer'}'s own — the blade, and for the width its foot and ring too — and ${controlLabel('layerSize')} and ${controlLabel('layerTilt')} no longer apply to it.` : '',
     Math.abs(Number(ui.varianceForm) || 0) >= 0.005 ? 'The form field still moves each petal\'s curl, cup and twist around these values.' : '',
     'Whole bloom ends the pick; nothing is lost.'];
   return parts.filter(Boolean).join(' ');
@@ -1107,7 +1115,7 @@ const stepDecimals = (c) => { const s = String(c.step); return s.includes('.') ?
 function refreshScopeNotes(ui) {
   const term = scopeView ? scopeTermFor(scopeView, ui) : null;
   const eff = scopeView ? scopeEffective(scopeView, ui).eff : null;
-  const name = scopeView ? (scopeView.kind === 'layer' ? `Layer ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
+  const name = scopeView ? (scopeView.kind === 'layer' ? `${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
   const ids = idsFor(scopeView);
   for (const c of CONTROLS) {
     const wrap = wrappers[c.id];
@@ -4218,6 +4226,11 @@ window.__bloomMetrics = () => ({
        derivation. */
     domeLean: r.domeLean,
     authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
+    /* A LAYER'S OWN WIDTH (Oct 16) — the value its foot and ring were built
+       from where it owns one (null where the ramp placed them), the ring's
+       factor on the hub radius, and whether a deeper ring was held at the rim:
+       footRing()'s own record, read by panel route (ag). */
+    ownWidth: r.ownWidth ?? null, ringFactor: r.ringFactor ?? null, ringClamped: !!r.ringClamped,
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing

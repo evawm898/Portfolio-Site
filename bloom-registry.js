@@ -78,7 +78,7 @@ import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_F
 import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
-import { SCOPE_TOGGLE_VALUES, mirrorFor } from './bloom-geometry.js';
+import { SCOPE_TOGGLE_VALUES, SCOPE_LAYER_PLACEMENTS, mirrorFor } from './bloom-geometry.js';
 /* THE CURVE KIND (the curve-editor session, Oct 14) — its value shape, its
    shape rule and its equality are bloom-curve.js's, the one owner every reader
    of a curve value imports (the panel, the design file, F3's and F6's
@@ -203,9 +203,9 @@ export const RETIRED_IDS = [
   { id: 'allCup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
     why: "The whole-whorl DELTA on Cup at one whorl (role ALL, the first rows of the retired ROLE_OVERRIDES). Retired on Eva's ruling Q3.4 (Oct 12): the slot roles, the per-petal groups and the ALL / INNER deltas retire into parameter scoping. At one whorl 'all petals' IS the whole bloom, so the value migrates INTO THE GLOBAL (Cup + delta, clamped and on the slider's step) through migrateRoles." },
   { id: 'innerCurl', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
-    why: "The inner whorls' DELTA on Spine curl (role INNER, session A). Retired on Eva's ruling Q3.4 (Oct 12). Migrates through migrateRoles: on RADIAL to Per-layer values with one layer entry per inner layer (under which the Shrink and Tilt step ramps stop applying, Q3.5), on a FAN to one petal entry per inner mirror pair; a SPIRAL bloom's inner whorls have no scope and the value is dropped, told." },
+    why: "The inner whorls' DELTA on Spine curl (role INNER, session A). Retired on Eva's ruling Q3.4 (Oct 12). Migrates through migrateRoles: on RADIAL and on a layered SPIRAL (Eva's ruling, Oct 16: a spiral's turns are layer scopes) to Per-layer values with one layer entry per inner layer, the offset landing on the old composed value (the entry carries no size or tilt, so the Shrink and Tilt step ramps still place those whorls); on a FAN to one petal entry per inner mirror pair." },
   { id: 'innerCup', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
-    why: "The inner whorls' DELTA on Cup (role INNER, session A). Retired on Eva's ruling Q3.4 (Oct 12). Migrates through migrateRoles: on RADIAL to Per-layer values with one layer entry per inner layer (under which the Shrink and Tilt step ramps stop applying, Q3.5), on a FAN to one petal entry per inner mirror pair; a SPIRAL bloom's inner whorls have no scope and the value is dropped, told." },
+    why: "The inner whorls' DELTA on Cup (role INNER, session A). Retired on Eva's ruling Q3.4 (Oct 12). Migrates through migrateRoles: on RADIAL and on a layered SPIRAL (Eva's ruling, Oct 16: a spiral's turns are layer scopes) to Per-layer values with one layer entry per inner layer, the offset landing on the old composed value (the entry carries no size or tilt, so the Shrink and Tilt step ramps still place those whorls); on a FAN to one petal entry per inner mirror pair." },
   { id: 'labellumSize', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
     why: "The RADIAL labellum's size multiplier (length and width together) (slot role LABELLUM, session B — the orchid). Retired on Eva's rulings Q3.4 (Oct 12) and of Oct 14: the RADIAL labellum and hood are DROPPED, not migrated — a radial orchid is no longer reachable and per-petal values are FAN only. migrateRoles drops it and says so; a stored value under this name must never be read again." },
   { id: 'labellumTilt', retiredAt: 70, session: 'the role retirement (Q3.4; numbered by the frozen phase it registers)', schema: null, migrateBy: 'migrateRoles',
@@ -395,16 +395,17 @@ export function migrateSet(set, report = null, defaults = DEFAULTS) {
                                         the global lands one step-rounding away
                                         and the note says so (the one place the
                                         ALL fold is not exact).
-     INNER, RADIAL, 2+ layers          `scopeLayers` ON and one LAYER entry per
-                                        inner layer. UNDER PER-LAYER VALUES THE
-                                        SHRINK AND TILT STEP RAMPS STOP APPLYING
-                                        (Q3.5), so a migrated INNER design draws
-                                        its inner whorls at the global size and
-                                        tilt — said in the note, never silent.
+     INNER, RADIAL or SPIRAL, 2+       `scopeLayers` ON and one LAYER entry per
+       layers                          inner layer (a spiral's turn is its layer,
+                                        Eva's ruling of Oct 16). The entry carries
+                                        cup and curl only, so it OWNS no size or
+                                        tilt (Q3.5) and the Shrink and Tilt step
+                                        ramps still place those whorls — their
+                                        sliders hide under Per-layer values, and
+                                        keep applying until a layer is given its
+                                        own size or tilt; the note says so.
      INNER, FAN, 2+ layers             `scopePetals` ON and one PETAL entry per
                                         (inner layer, mirror pair).
-     INNER, SPIRAL, 2+ layers          DROPPED: no scope carries a spiral's inner
-                                        whorl (per-layer values are RADIAL only).
      INNER, CONTINUOUS                 was never stamped there; inert.
      LABELLUM / HOOD, RADIAL in step   DROPPED BY RULING (Oct 14): a radial
                                         orchid is no longer reachable; per-petal
@@ -548,6 +549,7 @@ export function migrateRoles(input) {
   const L = Math.round(Number(input.layerCount));
   const fan = placement === 'FAN';
   const radial = placement === 'RADIAL';
+  const spiral = placement === 'SPIRAL';
   const cont = placement === 'CONTINUOUS';
   const toggleOf = (k) => (ROLE_TOGGLES.includes(k) && !own(k) ? 'OFF' : String(input[k]));   // absent: the design predates the toggle
   const toggleLive = (radial && toggleOf('scopeLayers') === 'ON') || (fan && toggleOf('scopePetals') === 'ON');
@@ -572,7 +574,6 @@ export function migrateRoles(input) {
       else carried.add(id);
     } else if (r.role === ROLE_INNER_) {
       if (!innerLive) notes.push({ id, kind: 'inert', text: `${id} ${v} was inert (${cont ? 'a continuous spiral has no inner whorl' : 'the bloom has one whorl'}) — dropped` });
-      else if (!radial && !fan) notes.push({ id, kind: 'dropped', text: `${id} ${v} is DROPPED: no scope carries a ${placement} bloom's inner whorls (per-layer values are RADIAL only, per-petal values FAN only)` });
       else carried.add(id);
     } else if (r.role === ROLE_LABELLUM_ || r.role === ROLE_HOOD_) {
       const who = r.role === ROLE_LABELLUM_ ? 'the labellum' : 'the hood';
@@ -626,7 +627,7 @@ export function migrateRoles(input) {
     }
     return Object.keys(offsets).length ? offsets : null;
   };
-  if (radial) {
+  if (radial || spiral) {
     for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }
   } else if (fan) {
     for (let k = 0; k < L; k++) {
@@ -639,7 +640,7 @@ export function migrateRoles(input) {
     const r = rowsOf(id)[0];
     if (r.role === ROLE_ALL_) continue;
     const where = r.role === ROLE_INNER_
-      ? (fan ? `an offset on every mirror pair of layers 2..${L} (Per-petal values on)` : `an offset on layers 2..${L} (Per-layer values on — the Shrink and Tilt step ramps no longer apply under it, Q3.5)`)
+      ? (fan ? `an offset on every mirror pair of layers 2..${L} (Per-petal values on)` : `an offset on ${spiral ? 'turns' : 'layers'} 2..${L} (Per-layer values on — Shrink and Tilt step hide under it and still place those whorls, since the entry gives them no size or tilt of their own)`)
       : `an offset on pair ${r.group} of every layer (Per-petal values on)`;
     notes.push({ id, kind: 'migrated', text: `${id} ${input[id]} → ${where}` });
   }
@@ -697,7 +698,7 @@ export const PREDICATES = {
      hidden AND inert (Q3.5 — each layer's own size and tilt win); see the
      geometry's SCOPE_TOGGLE_VALUES block. (`scopesOwnRoles` named the role
      table these toggles stilled; the table is retired, Q3.4.) */
-  scopeLayersLive: { all: [{ id: 'placement', oneOf: ['RADIAL'] }, { id: 'scopeLayers', oneOf: ['ON'] }] },
+  scopeLayersLive: { all: [{ id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] }, { id: 'scopeLayers', oneOf: ['ON'] }] },
   scopePetalsLive: { all: [{ id: 'placement', oneOf: ['FAN'] }, { id: 'scopePetals', oneOf: ['ON'] }] },
 
   /* ===================================================================
@@ -3399,7 +3400,7 @@ export const CONTROLS = [
      depth. The read-out carries the unit. */
   { id: 'layerSize', section: 'arrangement', kind: 'slider', min: 0.35, max: 0.9, step: 0.01, default: 0.72,
     label: 'Shrink', fmt: (v, ui) => `${Number(v).toFixed(2)}x per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
-    /* hidden AND inert under Per-layer values (Q3.5): each layer's own size wins */
+    /* hidden under Per-layer values (Q3.5): a layer given its own size owns it (blade, foot and ring, Oct 16); a layer with none still takes the shrink */
     visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { ref: 'scopeLayersLive' } }] } },
 
   /* THE ALTERNATION, in slots. Default 0.50 — half a slot, which is the
@@ -3458,18 +3459,20 @@ export const CONTROLS = [
      as its evidence; do not cap it on the strength of reading this note. */
   { id: 'layerTilt', section: 'arrangement', kind: 'slider', min: 0, max: 30, step: 1, default: 12,
     label: 'Tilt step', fmt: (v, ui) => `+${v}° per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
-    /* hidden AND inert under Per-layer values (Q3.5): each layer's own tilt wins */
+    /* hidden under Per-layer values (Q3.5): a layer given its own tilt owns it; a layer with none still takes the step */
     visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { ref: 'scopeLayersLive' } }] } },
 
-  /* PER-LAYER VALUES (Scoping-b) — the RADIAL rosette's toggle, the twin of
-     `scopePetals` above: ON, the scope bar lists the layers and the panel edits
-     the picked layer's own values; the role table is hidden AND inert, and the
-     tube is unavailable (its terms read the global buckle, fringe and infill).
-     Visible at ONE layer too — the predicate must not drive on `layerCount`
-     (block 8 of buildMatrix iterates every control whose predicate reads it,
-     choices included, and would add rows), and one layer is a legal, if plain,
-     scope. Layer size and Layer tilt still apply on top of a layer's own
-     length, width and tilt: Q3.5 (they WIN under F4) is the next session's. */
+  /* PER-LAYER VALUES (Scoping-b) — the toggle for RADIAL and, since Eva's
+     ruling of Oct 16, the LAYERED SPIRAL (a spiral's turns are its layers —
+     the geometry's SCOPE_LAYER_PLACEMENTS), the twin of `scopePetals` above:
+     ON, the scope bar lists the layers and the panel edits the picked layer's
+     own values, and the tube is unavailable (its terms read the global
+     buckle, fringe and infill). Visible at ONE layer too — the predicate must
+     not drive on `layerCount` (block 8 of buildMatrix iterates every control
+     whose predicate reads it, choices included, and would add rows), and one
+     layer is a legal, if plain, scope. A layer given its own length, width or
+     tilt OWNS it (Q3.5) — the blade, and for the width the foot and the ring
+     too (Oct 16) — and Shrink / Tilt step hide while this is on. */
   { id: 'scopeLayers', section: 'arrangement', kind: 'choice', default: SCOPE_TOGGLE_VALUES[0],
     options: [
       { value: SCOPE_TOGGLE_VALUES[0], label: 'Off — every layer shares the petal controls' },
@@ -3477,7 +3480,7 @@ export const CONTROLS = [
     ],
     label: 'Per-layer values', fmt: scopeToggleFmt('layers'),
     tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'placement', oneOf: ['RADIAL'] } },
+    visibleWhen: { id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] } },
 
   /* ===================================================================
      ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (Eva's rulings, §9 of
