@@ -112,6 +112,8 @@ gate now (the L7 lesson, one family later).
 > reaches it). SO7 measures the migration against the old law. Read
 > `docs/bloom-role-retirement-outcome.md`.
 
+> **[Oct 16: per-layer values reach SPIRAL too (a spiral's turns are layer scopes), so INNER on a
+> SPIRAL maps to turn entries exactly — `docs/bloom-role-retirement-outcome.md` §1b.]**
 > **Scoping-b changed what this table can reach.** Eva's rulings put per-layer values on RADIAL only
 > and per-petal values on FAN only, each behind a toggle, so a petal entry is live on a FAN alone.
 > **Scoping-b: the table below is the Scoping-a measurement, and three of its rows changed under

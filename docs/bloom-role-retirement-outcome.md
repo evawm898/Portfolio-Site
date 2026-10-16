@@ -1,6 +1,7 @@
 # The role retirement — the role table retired into scoping
 
-Feature map §11 Q3.4 and Q3.5, and Eva's Oct 14 ruling on the RADIAL labellum and hood. The base is
+Feature map §11 Q3.4 and Q3.5, Eva's Oct 14 ruling on the RADIAL labellum and hood, and her two Oct 16
+rulings on this PR (SPIRAL per-layer independence; the foot follows — §1b). The base is
 `main` at `f95b244`. Read `docs/bloom-scoping-model.md` (the model) and
 `docs/bloom-scoping-selection.md` (the toggles) first. This doc says what changed, what it costs
 and what is still Eva's.
@@ -23,15 +24,60 @@ and what is still Eva's.
   - The mirror pair stays one scope, as it already is in the model.
 - **ALL becomes the global; INNER becomes per-layer offsets.**
   - ALL folds into the whole bloom's own value, put on the slider's grid.
-  - INNER becomes an offset on every layer ≥ 2 with Per-layer values ON (RADIAL), or on every
-    pair of every layer ≥ 2 with Per-petal values ON (FAN).
+  - INNER becomes an offset on every layer ≥ 2 with Per-layer values ON (RADIAL and, since Oct 16,
+    SPIRAL), or on every pair of every layer ≥ 2 with Per-petal values ON (FAN).
 - **The RADIAL labellum and hood are DROPPED, not migrated.** No scope is written and each id is
   told: *"DROPPED BY RULING (Oct 14): … a radial orchid is no longer reachable; per-petal values are
   FAN only"*.
 - **Q3.5 is wired.** Under Per-layer values, a layer entry naming `petalLength`, `petalWidth` or
   `petalTilt` OWNS that base for its layer. Its blade is built from global + offset, and the
   ramp's term (layerSize's scale, layerTilt's tiltExtra) is left out for it. `layerSize` and
-  `layerTilt` hide while Per-layer values is live (`{not: {ref: 'scopeLayersLive'}}`).
+  `layerTilt` hide while Per-layer values is live (`{not: {ref: 'scopeLayersLive'}}`). Since Oct 16
+  an owned width drives the foot and ring too (§1b).
+
+## 1b. Eva's Oct 16 rulings, as built
+
+**1. A SPIRAL's turns are layer scopes.**
+- **What a turn is.** It is defined the way the spiral's own descriptor counts depth. SPIRAL takes
+  footRing's RINGED arm, the same one as RADIAL. Slot `k` of the sequence sits on whorl
+  `lambda = floor(k / petalCount)`, counted from the outside. So a turn is one whorl of
+  `petalCount` petals on its own golden-angle run, and turn `k` is layer `k − 1`, the same index
+  `scopeOffsetsFor` already reads (`d.lambda`).
+- **No geometry branch was needed.** `SCOPE_LAYER_PLACEMENTS` (`['RADIAL', 'SPIRAL']`) is the one
+  owner of where Per-layer values lives. The geometry's `scopeLayersLive`, the registry's predicate
+  and the toggle's `visibleWhen` all read it. CONTINUOUS stays out (its "layer" is a turn of one
+  continuous sequence, and the arm that builds it reads no ring index). SPIRAL has no mirror pairing,
+  so Per-petal values stays FAN only.
+- **The page.** The toggle shows on SPIRAL. The picker lists turns as `Turn k — the outer turn` /
+  `… the innermost turn`. The read-out and status sentences say "turn" under SPIRAL.
+- **INNER on a SPIRAL now migrates like RADIAL's**, onto every turn ≥ 2 with Per-layer values ON.
+  The iris goes to `layers: [{layer: 1, offsets: {petalCup: 0.4, petalSpineCurl: 180}}]`.
+- **Proved byte-identical.** Only one distinct SPIRAL set in the live matrix and all 70 frozen
+  matrices carries an INNER value: `ZYGO: the iris x SPIRAL (roles exist, azimuth differs)`. It is
+  the partition's MUST-HOLD class (h), and it holds in both modes against `f95b244` (§3). It is back
+  in the live matrix as the standing witness. **Nothing is inexact.** SPIRAL INNER needs no list.
+
+**2. Under per-layer independence, a layer's own size drives the WHOLE petal.**
+- **The law** (footRing's ringed loop, `layerOwnedValues`). A layer whose entry owns `petalWidth`:
+  - builds its foot as `ownWidth × 0.4 × footDelicacy`, clamped to `FOOT_MIN/MAX_WIDTH_MM`, in
+    place of the ramp's `petalWidth × scale × 0.4 × footDelicacy`;
+  - places its ring at `R0 × ownWidth / petalWidth` in place of `R0 × scale`. The ring is held at
+    the rim (`min(1, …)`, so a ring never stands outside the hub) and that is told as
+    `ringClamped`. Layer 0's ring is always `R0` (J2's identity).
+  `ownWidth` is the clamped owned value, the same double the blade is built from.
+- **Owned length and tilt move no foot and no ring, by construction.** The foot rows are flat and
+  their length is the ring's overhang, which no length enters. The seam's turn already uses the
+  owned tilt (Q3.5). So "size and tilt drive the whole petal" needs code only for the width.
+- **What it moves beyond the owning layer: the area rule.** The hub radius `R0` is the area rule
+  over every foot, so an owned width changes `R0`. Every other layer's ring moves with it, and its
+  petals are carried out by a pure radial translation (measured, every blade point within 5e-15 mm
+  of `dR × the radial unit`, normals identical). That is ruling 2 acting through the hub, not a
+  leak, and SO12 asserts it in exactly those terms.
+- **Only designs with per-layer independence on move.** The predeclaration from the BASE tree's
+  rows: a row moves through (b) iff it carries Per-layer values ON with a layer entry owning
+  `petalWidth`. **No base row does** (no stored row carried a layer scope before the retirement,
+  and the migration writes only cup and curl offsets). So (b) is **0 stored rows**. The law's own
+  rows are block 64, which is new.
 
 ## 2. The migration — `migrateRoles`, one owner
 
@@ -197,22 +243,21 @@ phase2–phase6 hold entirely.
 
 ## 7. Open — Eva's to rule
 
-1. **SPIRAL INNER (the one real (b) change).** INNER on a SPIRAL cannot be carried, because
-   Scoping-b put per-layer values on RADIAL only. It is dropped and told, and the spiral iris loses
-   its inner curl. The alternatives are to let per-layer values live on SPIRAL too (a change to
-   Scoping-b's ruling) or to accept the drop.
-2. **Q3.5 reaches the blade, not the ring.** An owned layer's blade drops the ramp, but footRing
-   still places the ring and the foot with `layerSize`'s scale. A per-layer width therefore does not
-   reach the foot. Under Per-layer values, `layerSize` / `layerTilt` are HIDDEN and still LIVE for:
-   - every layer that owns nothing;
-   - the ring placement of every layer.
-   The alternatives are wiring footRing too (it moves rows a migration does not touch only if a
-   design owns a size) or showing the two controls when no layer owns a base.
+1. ~~**SPIRAL INNER.**~~ **RULED (Oct 16): Per-layer values reach SPIRAL and INNER migrates** (§1b).
+   The spiral iris holds byte-identically.
+2. ~~**Q3.5 reaches the blade, not the ring.**~~ **RULED (Oct 16): an owned width drives the foot and
+   ring** (§1b). Under Per-layer values `layerSize` / `layerTilt` stay hidden. They still place every
+   layer that owns nothing, which is what they did before the toggle, and the toggle's read-out says
+   so.
 3. **An owned zero offset is kept, not pruned.** Writing 0 on a layer's size or tilt means "this
    layer is the global, not the ramp", which is not the same as no entry. The page keeps it; every
    other base prunes at 0.
 4. **The orchid at one whorl and the RADIAL face are gone by ruling.** The sheet shows what that
    means on the shipped rows.
+5. **New, recorded rather than decided.** An owned width wider than the global would put that
+   layer's ring OUTSIDE the hub's rim. The ring is held at the rim and told (`ringClamped`, Z3, and the block-64
+   row `PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl's`) rather than refused. The foot still takes the
+   owned width.
 
 ## 8. Not in CI, said so
 

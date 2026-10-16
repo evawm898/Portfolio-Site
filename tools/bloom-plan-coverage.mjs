@@ -160,7 +160,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     const hub = builtFull.hub;
 
     const accHC = new mod.MeshBuilder({ exportMode: true });
-    const frHC = mod.footRing(ui, accHC);
+    const frHC = mod.footRing(ui, accHC, { scopes });
     mod.buildHubInto(accHC, ui, frHC.hub);
     /* THE ANDROECIUM (session 21) — a THIRD accumulator, counted in R1 and
        never rasterised: the anthers are not the petal canopy this raster is
@@ -215,7 +215,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        "covering the crown" than a stamen over the centre is. */
     mod.buildInflorescenceInto(accST, ui, inPlan);
 
-    const fr = mod.footRing(ui, accFull);
+    const fr = mod.footRing(ui, accFull, { scopes });
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
        requirement). A plan raster cannot read a sphere AT ALL: the far
        hemisphere projects into the same disc from below, so a top-down pass

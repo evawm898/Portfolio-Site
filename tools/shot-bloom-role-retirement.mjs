@@ -187,7 +187,7 @@ const pairHtml = (s) => `<div class="pair">
   <h3>${s.cls === 'a' ? '(a) ' : ''}${esc(s.title)}</h3>
   <p class="lbl">${esc(s.label)}</p>
   <div class="grid">
-    <figure><img src="${dataUri(s.before.buf)}"><figcaption><b>BEFORE</b> — f95b244, the role controls live · ${tris(s.before.m)} tris · ${esc(modeTag(s.before.m))}</figcaption></figure>
+    <figure><img src="${dataUri(s.before.buf)}"><figcaption><b>BEFORE</b> — f95b244, ${s.head ? 'the same scope record (an offset on top of the ramp, the foot and ring the ramp\'s)' : 'the role controls live'} · ${tris(s.before.m)} tris · ${esc(modeTag(s.before.m))}</figcaption></figure>
     <figure><img src="${dataUri(s.after.buf)}"><figcaption><b>AFTER</b> — this tree, the stored set migrated · ${tris(s.after.m)} tris · ${esc(modeTag(s.after.m))}<br>${esc(scopeLine(s.after.scopes))}</figcaption></figure>
   </div>
   <p class="notes">${s.notes.map(esc).join('<br>') || '(nothing to migrate)'}</p>

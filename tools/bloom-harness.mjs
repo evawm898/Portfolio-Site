@@ -5024,9 +5024,15 @@ function sizeVarianceAssertions(m, ui, row) {
      would make this clause fire on every row while saying nothing about the
      size field. The two are the same double wherever the nib is inert, and
      whether the DRAWN one is right is AN2's. */
+  /* AND A LAYER THAT OWNS ITS LENGTH (Q3.5, Per-layer values) drops the ramp's
+     scale, so its blade is the nominal times the size FACTOR alone — the
+     ownership restated from the row's own scopes (`layerOwnsRestated`, C1's
+     owner), never read off the builder. */
   for (const s of sizes) {
     const asked = typeof s.askedLength === 'number' ? s.askedLength : s.length;
-    if (asked !== s.nominalLength * s.scale) bad.push(`VS2: petal ${s.whorl}/${s.index}'s asked length ${asked} is not its nominal ${s.nominalLength} times its slot scale ${s.scale}`);
+    const owned = !m.continuousMode && layerOwnsRestated(row, ui, m, s.whorl, 'petalLength');
+    const k = owned ? (s.sizeFactor ?? 1) : s.scale;
+    if (asked !== s.nominalLength * k) bad.push(`VS2: petal ${s.whorl}/${s.index}'s asked length ${asked} is not its nominal ${s.nominalLength} times ${owned ? `its size factor ${k} (its layer OWNS petalLength, so the ramp's scale is dropped)` : `its slot scale ${k}`}`);
   }
 
   /* VS5 — the told flag */
@@ -13381,6 +13387,10 @@ export function buildMatrix() {
     ['ZYGO: curl clamp binds (base 360 + delta 360 -> 360)', { layerCount: 2, petalSpineCurl: 360, 'innerCurl': 360 }],
     ['ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)', { layerCount: 2, petalCup: 1.2, 'innerCup': 1.2 }],
     ['ZYGO: curl clamp binds downward (base -180 + delta -180 -> -180)', { layerCount: 2, petalSpineCurl: -180, 'innerCurl': -180 }],
+    /* Back in the live matrix (Eva, Oct 16): a SPIRAL's turns are layer scopes now, so the
+       iris's INNER curl and cup migrate into turn-2 offsets and the row builds byte-identically
+       to f95b244 in both modes — the witness that SPIRAL INNER is carried, not dropped. */
+    ['ZYGO: the iris x SPIRAL (roles exist, azimuth differs)', { ...IRIS, placement: 'SPIRAL' }],
     ['ZYGO: the foot UPPER clamp (petalWidth 30 — ring frozen at 11.06 mm)', { layerCount: 2, petalWidth: 30, ...ALL_INNER_MAX }],
   ];
   for (const [name, sets] of zygoCorners) {

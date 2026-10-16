@@ -11,7 +11,9 @@ own owners. The rulings, not re-litigated:
 - **Sheet thickness is never scoped.** It stays global and the panel says so while a scope is picked.
 - **Orchid mirror pairs stay linked.** Selecting one petal selects the pair.
 - **Per-layer independence is RADIAL only and per-petal is FAN only.** Each is a toggle, and off is
-  today's panel exactly.
+  today's panel exactly. **[Oct 16, the role retirement: per-layer independence reaches SPIRAL too —
+  a spiral's turn is its layer scope — and an owned width drives the foot and ring;
+  `docs/bloom-role-retirement-outcome.md` §1b.]**
 - **Selection LOADS a scope's values and never applies them, and deselecting writes nothing.** This
   is the /plot petal-ownership lesson.
 - **Selection is view state and is not saved.** Offsets are saved, in Scoping-a's containers.

@@ -766,17 +766,18 @@ SCOPE** (Scoping-b, Oct 14; Eva's rulings — read `docs/bloom-scoping-selection
   `docs/img/scope-selection.png`.
 
 **THE ROLE TABLE IS RETIRED INTO SCOPING, THE RADIAL LABELLUM AND HOOD ARE DROPPED, AND Q3.5 IS
-WIRED** (the role retirement, Oct 16 — Eva's rulings Q3.4 / Q3.5 and her Oct 14 ruling; read
+WIRED** (the role retirement, Oct 16 — Eva's rulings Q3.4 / Q3.5, her Oct 14 ruling and her two Oct 16
+rulings on the PR; read
 `docs/bloom-role-retirement-outcome.md` before touching `migrateRoles`, `RETIRED_ROLE_ROWS`,
 `landOffset`, `SCOPES_SET_ID`, `storedRow`, `migrateForServedTree`, `resolvePetalTerms`,
-`SCOPE_LAYER_OWNED` or SO0 / SO6 / SO7 / SO11).
+`SCOPE_LAYER_OWNED`, `SCOPE_LAYER_PLACEMENTS`, `layerOwnedValues`, Z3 or SO0 / SO6 / SO7 / SO11 / SO13).
 - **47 ids retired** (`labellum*`, `hood*`, `petalN*`, `allCurl/Cup`, `innerCurl/Cup`), each with
   `migrateBy: 'migrateRoles'`. The table, its resolver, the descriptor split, the eligibility
   predicates and the role stamps are gone. A petal is `global → scope offsets → variance → one clamp`.
   The panel lost 47 controls and 12 sections.
 - **The migration is computed, not copied.** `migrateTo` copies a value, and a delta onto an offset
   depends on the arrangement. ALL folds into the global (on the slider's grid). INNER becomes layer
-  entries (RADIAL) or every-pair entries (FAN). Group k goes on pair k − 1 of every layer. The RADIAL
+  entries (RADIAL and SPIRAL) or every-pair entries (FAN). Group k goes on pair k − 1 of every layer. The RADIAL
   labellum and hood are DROPPED and told. An offset LANDS exactly (`landOffset`).
   - An absent scope toggle is read as the design predating it (OFF), never defaulted.
 - **A stored matrix row is migrated at the end of `buildMatrix` (`storedRow`); its scopes travel as
@@ -791,8 +792,26 @@ WIRED** (the role retirement, Oct 16 — Eva's rulings Q3.4 / Q3.5 and her Oct 1
   - **A two-tree tool must pass the BASE tree's kinds to `applyConfig`.** Otherwise the base page is
       handed an already-migrated set (the sheet's first run drew the AFTER bloom in the BEFORE cell).
 - **Q3.5:** a layer entry naming `petalLength` / `petalWidth` / `petalTilt` OWNS it, and its BLADE
-  drops the ramp's term. `layerSize` / `layerTilt` hide under Per-layer values. **The ring and foot
-  still take the ramps** — open, Eva's.
+  drops the ramp's term. `layerSize` / `layerTilt` hide under Per-layer values.
+- **A SPIRAL'S TURNS ARE LAYER SCOPES (Eva, Oct 16).** SPIRAL takes footRing's RINGED arm, so a turn is
+  `lambda = floor(k / petalCount)` — one whorl of `petalCount` on its own golden-angle run, counted from
+  the outside. `SCOPE_LAYER_PLACEMENTS` (`['RADIAL', 'SPIRAL']`) is the one owner, read by the
+  geometry, the registry predicate and the toggle; the picker says "Turn k". CONTINUOUS stays out, and
+  Per-petal values stays FAN only (a spiral has no mirror pairing). SPIRAL INNER migrates like RADIAL's,
+  and the iris holds BYTE-IDENTICALLY (the only SPIRAL+INNER set across live + 70 phases; back in the
+  live matrix as the witness).
+- **AN OWNED WIDTH DRIVES THE FOOT AND THE RING (Eva, Oct 16).** In footRing's ringed loop
+  (`layerOwnedValues`): the foot is `ownWidth × 0.4 × footDelicacy` (clamped to the foot floors), and
+  the ring is `R0 × ownWidth / petalWidth`, HELD at the rim and told `ringClamped`; layer 0's ring is
+  `R0` (J2). Owned length and tilt move no foot and no ring, by construction (the foot rows are flat,
+  the seam already reads the owned tilt). **Through the area rule an owned width moves `R0`, so every
+  other layer is carried out by a pure radial translation** — SO12 asserts that, not "no other layer
+  moves". **Z3** restates foot and ring from the controls and the row's `@scopes`; **SO13** in the
+  scopes gate; panel route **(ag)** covers the toggle, the picker and the foot on SPIRAL (TWENTY-FOUR
+  routes). Block 64 is the law's rows (five, 1,291 → 1,297 with the iris).
+  - **Two in-page instruments did not know a layer can own its size** and dropped block-64 rows: the
+    crowding raster rebuilt without the page's scopes (fixed — plan coverage's route), and VS2 assumed
+    `length = nominal × ramp scale` (now restates ownership through `layerOwnsRestated`).
 - **Partition (`node tools/verify-bloom-role-retirement.mjs --base <worktree>`):** 1,651 distinct
   sets (live + 69 frozen phases); 225 base-side exclusions; 1,426 built in both modes (2.11 G export
   floats). **1,390 holders at 0 floats; 36 movers, all predicted from the BASE tree's footRing

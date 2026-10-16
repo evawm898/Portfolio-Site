@@ -1701,8 +1701,12 @@ function materialLines(ui, mode) {
      and the one the hub is built on (hub.radius IS rings[0].radius in every
      placement). The inner rings' radii are on the arrangement line, where the
      depth that produced them is also visible. */
-  const live = footRing(ui, new MeshBuilder({ exportMode: false })).rings[0];
-  const printed = footRing(ui, new MeshBuilder({ exportMode: true })).rings[0];
+  /* With the build's own scopes (the role retirement, Oct 16): a layer that owns
+     its width builds its own foot and ring, and through the area rule that moves
+     ring 0 too, so a read-out built without them would quote another bloom. */
+  const sc = scopesForBuild(scopes);
+  const live = footRing(ui, new MeshBuilder({ exportMode: false }), { scopes: sc }).rings[0];
+  const printed = footRing(ui, new MeshBuilder({ exportMode: true }), { scopes: sc }).rings[0];
   const say = (r) => {
     const tip = thicknessProfile(r, ui).at(1);
     const tipShown = r === printed ? Math.max(tip, MIN_FEATURE_MM) : tip;

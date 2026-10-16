@@ -492,10 +492,16 @@ export async function readFeet(page, capability = null) {
   return page.evaluate(async (cap) => {
     const mod = await import('/bloom-geometry.js');
     const ui = window.__bloomUIState();
+    /* THE PAGE'S OWN SCOPES (the role retirement, Oct 16): a layer that owns its
+       width builds its own foot and ring, so the hub's area rule moves with the
+       row's scope record. Read the record the page builds from, through the
+       file's own `scopesForBuild` — plan coverage's own route. Null on every
+       unscoped row, which is every row before block 64. */
+    const scopes = window.__bloomDesign ? (await import('/bloom-file.js')).scopesForBuild(window.__bloomDesign.scopes()) : null;
     const out = {};
     for (const mode of ['live', 'export']) {
       const acc = new mod.MeshBuilder({ exportMode: mode === 'export' });
-      const built = mod.buildBloomInto(acc, ui, { below: null, capability: cap });
+      const built = mod.buildBloomInto(acc, ui, { below: null, capability: cap, scopes });
       const fr = built.foot;
       /* THE FEET FROM THE OWNER — `footList` in bloom-geometry.js (moved there
          with `nearestFeet` for the page's told flag, organic variance build 1):

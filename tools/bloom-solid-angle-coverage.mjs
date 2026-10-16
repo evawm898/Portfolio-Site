@@ -352,7 +352,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability, scopes });
     const hub = builtFull.hub;
     const accHC = new mod.MeshBuilder({ exportMode: true });
-    const frHC = mod.footRing(ui, accHC);
+    const frHC = mod.footRing(ui, accHC, { scopes });
     mod.buildHubInto(accHC, ui, frHC.hub);
     /* THE ANDROECIUM (session 21) — a third accumulator, counted in R1 and
        never rasterised (plan-coverage's own construction, verbatim): the
@@ -406,7 +406,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        the head's own disc, and a floret 20 mm out on a pedicel is no more
        "covering the crown" than a stamen over the centre is. */
     mod.buildInflorescenceInto(accST, ui, inPlan);
-    const fr = mod.footRing(ui, accFull);
+    const fr = mod.footRing(ui, accFull, { scopes });
 
     /* A FLAT hub is skipped — but AFTER the capture and R5 below, so the
        parallel-ray identity is asserted on EVERY row the gate runs, centre
