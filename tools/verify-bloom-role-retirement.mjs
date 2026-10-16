@@ -66,7 +66,7 @@ const CLASSES = ['a-radial-orchid', 'b-foot-follows', 'c-area-rule', 'c-all-on-g
 const HOLD_CLASSES = ['h-spiral-inner'];
 
 if (argv.includes('--merge')) {
-  const files = argv.slice(argv.indexOf('--merge') + 1).filter((f) => !f.startsWith('--'));
+  const files = argv.slice(argv.indexOf('--merge') + 1).filter((f, i, a) => !f.startsWith('--') && a[i - 1] !== '--expect');   // a flag's own value is not a shard file
   const parts = files.map((f) => JSON.parse(fs.readFileSync(f, 'utf8')));
   const bad = [];
   const n = parts[0].shards;

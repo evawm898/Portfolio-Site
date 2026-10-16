@@ -123,31 +123,30 @@ and what is still Eva's.
 - **1,426 sets are built on both trees in both modes.** That is 2,111,195,016 export floats over
   234,577,224 triangles, plus 133,056,127 captured-grid values (live), compared positionally under
   `Object.is`.
-- **The mover set is predeclared from the BASE tree's own footRing records**, never from labels. A
-  row moves iff:
-  - (a) a RADIAL descriptor carries a slot role whose composed value or whose ring radius differs
-    from the plain build — the drop; or
-  - (b) one of three other mechanisms, below.
-- **Result: PASS.** 1,390 holders, 0 floats moved on any. 36 predicted movers, all 36 moved.
+- **The mover set is predeclared from the BASE tree's own footRing records and stored rows**,
+  never from labels. Re-run after Eva's Oct 16 rulings, with the classes split as she asked:
+  - (a) a RADIAL descriptor carries a slot role whose composed value or ring radius differs from the
+    plain build — the drop;
+  - (b) the foot-follows change — per-layer values ON under RADIAL or SPIRAL with a stored layer
+    entry owning `petalWidth`;
+  - (c) anything else: the FAN area-rule regrouping, ALL off the slider grid, and stored layer
+    entries on a SPIRAL (inert on the base, live now);
+  - (h) MUST HOLD — a SPIRAL descriptor whose INNER role moved a value: the iris.
+- **Result: PASS** (`--merge … --expect a=33,b=0,c1=2,c2=0,c3=0,h=1`). 1,391 holders, 0 floats
+  moved on any. 35 predicted movers, all 35 moved. The 1 must-hold set held to the bit.
 
 | class | rows | what |
 |---|---|---|
 | (a) the RADIAL labellum / hood drop | **33** | every RADIAL slot-role row at 2+ whorls in step (the `SLOT:` block, the `ORCHID:` rows, `DOME: rise 1 x ORCHID`, `CURL: ORCHID x labellum curl x bias max`, `ALL PETALS: GATED — max x 3 layers x phase 0 x ORCHID`, `ORCHID x the IRIS`) |
-| (b) SPIRAL INNER | **1** | `ZYGO: the iris x SPIRAL (roles exist, azimuth differs)` |
-| (b) the area rule regrouped per whorl | **2** | `FAN x PER-PETAL: petal 1 x 3 layers x inner*`, `FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers` |
-| (b) ALL off the slider grid | 0 | predicted none, measured none |
+| (b) the foot follows an owned width | **0** | no stored set — live or frozen — carries per-layer values with an owned width (the migration writes cup and curl only). The law's own rows are block 64, which is new and has no base to compare against |
+| (c) the area rule regrouped per whorl | **2** | `FAN x PER-PETAL: petal 1 x 3 layers x inner*`, `FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers` |
+| (c) ALL off the slider grid | 0 | predicted none, measured none |
+| (c) stored layer entries on a SPIRAL | 0 | no base row stores one |
+| **(h) MUST HOLD: SPIRAL INNER** | **1 held** | `ZYGO: the iris x SPIRAL (roles exist, azimuth differs)` — 0 of 885,312 export floats differ, live and export, `Object.is` |
 
-**(b) explained, each one:**
+**(c) explained:**
 
-1. **SPIRAL INNER is dropped, because no scope can carry it.**
-   - The old table applied INNER to a SPIRAL's inner whorls. Per-layer values are RADIAL only and
-     per-petal values FAN only (Scoping-b's rulings), so no entry can reach a spiral's inner whorl.
-   - The migration tells it as *"DROPPED: no scope carries a SPIRAL bloom's inner whorls"*.
-   - The inner whorls lose curl +180 and cup +0.4: max |d| **30.26 mm**, both modes, triangle
-     count unchanged (49,184).
-   - **This is the one (b) item that is a real geometry change, and Eva has not ruled on it.** See
-     §7, question 1.
-2. **The FAN area-rule rows move by one ULP.** The hub radius is
+1. **The FAN area-rule rows move by one ULP.** The hub radius is
    `sqrt(Σ footCount · rFoot² / …)`.
    - On the base tree the sum ran one term per DESCRIPTOR, and a FAN split by per-petal groups had
      several descriptors per whorl.
@@ -157,9 +156,13 @@ and what is still Eva's.
    - Arithmetic, not geometry. The census and every gate read these rows at their recorded
      magnitudes (`FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers` 23,023 / 1.0987, unmoved).
 
+**Superseded:** the first partition (before Oct 16) dropped SPIRAL INNER as a (b) mover with a
+max |d| of 30.26 mm. Under ruling 1 it migrates and holds; the row is back in the live matrix.
+
 **Where the rows are:**
-- **63 rows left the live matrix (1,354 → 1,291).** They are:
-  - **33 movers:** 32 of the 33 (a) rows (not the one kept, below) and the SPIRAL iris;
+- **62 rows left the live matrix (1,354 → 1,292), then block 64 added five (1,297).** They are:
+  - **32 movers:** 32 of the 33 (a) rows (not the one kept, below). The SPIRAL iris left with
+    them and came back on Oct 16, now a holder;
   - **30 holders:** 24 GATED rows, whose only claim was a role being "hidden and inert" (that
     claim went with the table), and 6 rows whose role values were already inert or clamped onto
     the base (`6 layers x allCurl/allCup min/max`, `SLOT: size x2.00 saturating`, `SLOT: curl
@@ -174,13 +177,14 @@ only, the session-24 rule:
 
 | phases | rows |
 |---|---|
-| phase7–phase9 | 1 each (b) |
-| phase10 | 3 (b) |
-| phase11–phase13 | 19 (16 a, 3 b) |
-| phase14–phase21 | 20 (17 a, 3 b) |
-| phase22–phase69 | 36 (33 a, 3 b) |
+| phase10 | 2 (c) |
+| phase11–phase13 | 18 (16 a, 2 c) |
+| phase14–phase21 | 19 (17 a, 2 c) |
+| phase22–phase69, and phase70 (the base's own live matrix) | 35 (33 a, 2 c) |
 
-phase2–phase6 hold entirely.
+phase2–phase9 hold entirely. That is measured: the 35 moved sets are mapped back onto every base
+matrix by their (set, capability, scopes) key. phase7–phase9 held only the SPIRAL iris, which holds
+now.
 
 ## 4. What else moved
 
@@ -197,6 +201,34 @@ phase2–phase6 hold entirely.
   moves: the drop is a resize and a re-angle on a fixed lattice.
 
 ## 5. The gates
+
+**Added for the Oct 16 rulings:**
+- **Z3** (both STL gates, every ringed row): each ring's foot width and radius restated from the
+  controls and the row's `@scopes`, plus `ownWidth` and `ringClamped`.
+- **SO13** in the scopes gate: foot and ring restated on RADIAL and SPIRAL at four layers.
+  - SO2 runs on both placements.
+  - SO7 has the iris and a three-turn SPIRAL.
+  - SO12 is re-derived for `petalWidth`: the other layers' petals are carried by the hub's radial
+    shift, exactly.
+  - Four new mutants, all behaving: `per-layer-values-stay-radial-only` → SO2/SO7/SO13;
+    `the-foot-keeps-the-ramp` → SO12/SO13; `the-ring-keeps-the-ramp` → SO13;
+    `a-spiral-inner-is-dropped` → SO7.
+- **Panel route (ag)**, three edits (header, block, the negative control's flags and banner,
+  TWENTY-FOUR routes). It checks the toggle hidden under CONTINUOUS and shown on a SPIRAL, the picker
+  naming Turn 1..3, a cup edit landing on its turn only, and a width edit's foot and ring restated. It
+  has three mutants, all seen; the full negative control reads ALL TWENTY-FOUR ROUTES.
+- **Matrix block 64** (five `PER-LAYER:` rows, smoke block 64). They export watertight, census-clean
+  and one piece.
+- **Their first export run DROPPED three of them, on instruments that did not know a layer can own
+  its size:**
+  - the crowding raster and both coverage instruments rebuilt `footRing` without the page's
+    scopes;
+  - VS2 restated length as nominal × ramp scale;
+  - the material read-out quoted an unscoped ring.
+  Each reads the scopes now (plan coverage's route), or restates ownership through
+  `layerOwnsRestated`.
+
+**From the first round:**
 
 - **The harness (both STL gates)**, Z family:
   - re-derived onto the scope law: Z0, Z1, Z2, Z4b, Z4c;
@@ -231,8 +263,15 @@ phase2–phase6 hold entirely.
 
 ## 6. The sheet
 
-`docs/img/role-retirement.png` holds the (a) rows (the orchid at two whorls in step, three layers,
-40 petals, on a hemisphere, ALL MAX, the curl bias), the iris on a spiral, and a FAN control.
+`docs/img/role-retirement.png` holds:
+- the (a) rows: the orchid at two whorls in step, three layers, 40 petals, on a hemisphere, ALL MAX,
+  the curl bias;
+- **the iris on a SPIRAL as a MUST-HOLD pair.** The sheet compares its export floats across the two
+  trees in Node and refuses if any moves: 0 of 885,312;
+- three class-(b) pairs from block 64, each with its rings and feet printed before and after. The
+  BEFORE cell is the base page given the same scope record, where the offset rides on the ramp and the
+  foot and ring are the ramp's;
+- a FAN control.
 
 - Each pair is one matrix row on two trees, face-on, print preview ON (`shownMode` asserted), the
   AFTER cell on the BEFORE cell's own camera.

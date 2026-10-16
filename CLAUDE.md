@@ -808,22 +808,22 @@ rulings on the PR; read
   other layer is carried out by a pure radial translation** — SO12 asserts that, not "no other layer
   moves". **Z3** restates foot and ring from the controls and the row's `@scopes`; **SO13** in the
   scopes gate; panel route **(ag)** covers the toggle, the picker and the foot on SPIRAL (TWENTY-FOUR
-  routes). Block 64 is the law's rows (five, 1,291 → 1,297 with the iris).
+  routes). Block 64 is the law's rows (five), and the iris is back in the ZYGO block.
   - **Two in-page instruments did not know a layer can own its size** and dropped block-64 rows: the
     crowding raster rebuilt without the page's scopes (fixed — plan coverage's route), and VS2 assumed
     `length = nominal × ramp scale` (now restates ownership through `layerOwnsRestated`).
-- **Partition (`node tools/verify-bloom-role-retirement.mjs --base <worktree>`):** 1,651 distinct
-  sets (live + 69 frozen phases); 225 base-side exclusions; 1,426 built in both modes (2.11 G export
-  floats). **1,390 holders at 0 floats; 36 movers, all predicted from the BASE tree's footRing
-  records:**
+- **Partition (`node tools/verify-bloom-role-retirement.mjs --base <worktree>`, re-run after the Oct
+  16 rulings):** 1,651 distinct sets (live + 69 frozen phases); 225 base-side exclusions; 1,426 built
+  in both modes (2.11 G export floats). **1,391 holders at 0 floats; 35 movers, all predicted from the
+  BASE tree's footRing records and stored rows:**
   - **(a) 33** RADIAL labellum/hood rows;
-  - **(b) 1** SPIRAL INNER, dropped because no scope carries a spiral's inner whorl (30.26 mm, open,
-    Eva's);
-  - **(b) 2** FAN 3-layer rows whose hub radius moves one ULP (the area rule summed per whorl, 7.1e-15
-    mm).
-- **Matrix and frozen tags.** 63 rows left the live matrix (1,354 → 1,291).
+  - **(b) 0** foot-follows — no stored set carries per-layer values with an owned width;
+  - **(c) 2** FAN 3-layer rows whose hub radius moves one ULP (the area rule summed per whorl, 7.1e-15
+    mm);
+  - **(h) MUST HOLD, 1 held:** the SPIRAL iris, 0 of 885,312 floats.
+- **Matrix and frozen tags.** 62 rows left the live matrix (1,354 → 1,292); block 64 adds five (1,297).
   - `frozen/phase70` is the 1,354 rows at `f95b244`.
-  - Bytes stop reproducing on 36 rows of every phase from 22 on (fewer before; phase2–6 hold).
+  - Bytes stop reproducing on 35 rows of every phase from 22 on (fewer before; phase2–9 hold).
 - **Sheet:** `node tools/shot-bloom-role-retirement.mjs <dir> --base <worktree>` →
   `docs/img/role-retirement.png`. The orchid, zygomorphy and per-petal sheets refuse, with a worktree
   command.
