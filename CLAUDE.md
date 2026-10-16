@@ -802,13 +802,15 @@ rulings on the PR; read
   live matrix as the witness).
 - **AN OWNED WIDTH DRIVES THE FOOT AND THE RING (Eva, Oct 16).** In footRing's ringed loop
   (`layerOwnedValues`): the foot is `ownWidth × 0.4 × footDelicacy` (clamped to the foot floors), and
-  the ring is `R0 × ownWidth / petalWidth`, HELD at the rim and told `ringClamped`; layer 0's ring is
-  `R0` (J2). Owned length and tilt move no foot and no ring, by construction (the foot rows are flat,
+  the ring is `R0 × ownWidth / petalWidth`; layer 0's ring is `R0`. **A ring past `R0` GROWS THE HUB
+  to it (Eva's third Oct 16 ruling, replacing the rim hold):** `hub.growth` names the ring, it sits ON
+  the grown rim as layer 0's does, the dome and every `hub.radius` reader follow, and the read-out's
+  `HUB GROWN` line says by how much; J2's ring-0 identity moves to that ring. Owned length and tilt move no foot and no ring, by construction (the foot rows are flat,
   the seam already reads the owned tilt). **Through the area rule an owned width moves `R0`, so every
   other layer is carried out by a pure radial translation** — SO12 asserts that, not "no other layer
   moves". **Z3** restates foot and ring from the controls and the row's `@scopes`; **SO13** in the
   scopes gate; panel route **(ag)** covers the toggle, the picker and the foot on SPIRAL (TWENTY-FOUR
-  routes). Block 64 is the law's rows (five), and the iris is back in the ZYGO block.
+  routes). Block 64 is the law's rows (seven, one declared: an owned turn on a rise-0.5 rim is past 90), and the iris is back in the ZYGO block.
   - **Two in-page instruments did not know a layer can own its size** and dropped block-64 rows: the
     crowding raster rebuilt without the page's scopes (fixed — plan coverage's route), and VS2 assumed
     `length = nominal × ramp scale` (now restates ownership through `layerOwnsRestated`).
@@ -821,7 +823,7 @@ rulings on the PR; read
   - **(c) 2** FAN 3-layer rows whose hub radius moves one ULP (the area rule summed per whorl, 7.1e-15
     mm);
   - **(h) MUST HOLD, 1 held:** the SPIRAL iris, 0 of 885,312 floats.
-- **Matrix and frozen tags.** 62 rows left the live matrix (1,354 → 1,292); block 64 adds five (1,297).
+- **Matrix and frozen tags.** 62 rows left the live matrix (1,354 → 1,292); block 64 adds seven (1,299).
   - `frozen/phase70` is the 1,354 rows at `f95b244`.
   - Bytes stop reproducing on 35 rows of every phase from 22 on (fewer before; phase2–9 hold).
 - **Sheet:** `node tools/shot-bloom-role-retirement.mjs <dir> --base <worktree>` →

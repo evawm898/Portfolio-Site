@@ -150,7 +150,7 @@ const PAIRS = [
   { cls: 'hold', label: 'ZYGO: the iris x SPIRAL (roles exist, azimuth differs)', title: 'MUST HOLD: the iris on a SPIRAL — its INNER carried onto turn 2 (a spiral\'s turns are layer scopes, Oct 16)', bytes: true },
   { cls: 'b', head: true, label: 'PER-LAYER: RADIAL x 3 layers — layer 2 owns a 12 mm width, layer 1 a 14 mm one (the foot and the ring follow; layer 1\'s ring stays the rim)', title: 'class (b): an owned width drives the foot and the ring (RADIAL)' },
   { cls: 'b', head: true, label: 'PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt (no foot, no ring)', title: 'class (b): the same on a SPIRAL — inert on the base, where per-layer values were RADIAL only' },
-  { cls: 'b', head: true, label: 'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (its ring HELD at the rim, told)', title: 'class (b): a ring that asks past the rim is held there' },
+  { cls: 'b', head: true, label: 'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (the HUB GROWS to its ring, told)', title: 'class (b): a ring that asks past the rim GROWS THE HUB to it (Oct 16)' },
   { cls: 'control', label: 'FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no controls)', title: 'CONTROL: a FAN group, migrated EXACTLY to a pair scope' },
 ];
 const chosen = ONLY ? PAIRS.filter((p) => ONLY.test(p.label)) : PAIRS;
@@ -169,8 +169,8 @@ for (const p of chosen) {
   if (same) { notes.push(`[measured] ${same.differ} of ${same.floats.toLocaleString()} export floats differ between the two trees, live and export, under Object.is`); if (same.differ) await die(`${p.label}: a must-hold pair moved ${same.differ} floats`); }
   if (p.head) {
     const rings = after.m.rings || [];
-    notes.push(`[after] rings ${rings.map((r) => `${r.radius.toFixed(2)} mm${r.ownWidth !== null && r.ownWidth !== undefined ? ` (own ${r.ownWidth} mm, foot ${r.width.toFixed(2)}${r.ringClamped ? ', HELD at the rim' : ''})` : ''}`).join(' / ')}`);
-    notes.push(`[before] rings ${(before.m.rings || []).map((r) => `${r.radius.toFixed(2)} mm (foot ${r.width.toFixed(2)})`).join(' / ')}`);
+    notes.push(`[after] rings ${rings.map((r) => `${r.radius.toFixed(2)} mm${r.ownWidth !== null && r.ownWidth !== undefined ? ` (own ${r.ownWidth} mm, foot ${r.width.toFixed(2)})` : ''}`).join(' / ')} · hub ${Number(after.m.hubRadius).toFixed(2)} mm${after.m.hubGrowth ? ` (GROWN +${after.m.hubGrowth.byMm.toFixed(2)} mm for layer ${after.m.hubGrowth.layer + 1})` : ''}`);
+    notes.push(`[before] rings ${(before.m.rings || []).map((r) => `${r.radius.toFixed(2)} mm (foot ${r.width.toFixed(2)})`).join(' / ')} · hub ${Number(before.m.hubRadius).toFixed(2)} mm`);
   }
   shots.push({ ...p, row, before, after, notes });
   console.log(`${p.cls}  ${p.label}\n    before ${modeTag(before.m)} · ${before.m.shownTris} tris · r ${before.r.toFixed(1)} mm\n    after  ${modeTag(after.m)} · ${after.m.shownTris} tris · scopes ${JSON.stringify(after.scopes)}\n    ${notes.join('\n    ')}`);

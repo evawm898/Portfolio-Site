@@ -3970,8 +3970,21 @@ export async function junctionAssertions(page, row) {
     /* ON THE SPHERE ring 0 is the first foot beside the RESERVED pole, not
        the equator, so the identity is with the sphere's radius (S4 above)
        and every ring's plan radius sits under it by construction. */
-    if (L === 0 && !sphere && r.radius !== hub.radius) {
+    /* UNLESS THE HUB GREW (Eva's ruling, Oct 16): a layer owning a width past
+       Petal width puts its ring past ring 0's and the rim moves out to it, so
+       the identity is then with THAT ring — still one quantity, named by
+       footRing()'s own `hub.growth.layer` — and ring 0 sits strictly inside.
+       Which ring grew it is Z3's to restate; this asserts the identity holds
+       with the ring the record names and with no other. */
+    const grownBy = m.hubGrowth || null;
+    if (L === 0 && !sphere && !grownBy && r.radius !== hub.radius) {
       bad.push(`J2: ring 0 radius ${r.radius} is not the hub radius ${hub.radius} — they are one quantity and something has produced a second`);
+    }
+    if (!sphere && grownBy && L === grownBy.layer && r.radius !== hub.radius) {
+      bad.push(`J2: the hub grew for ring ${L} (to ${grownBy.toMm} mm) but that ring sits at ${r.radius} and the hub at ${hub.radius} — two owners for the rim`);
+    }
+    if (!sphere && grownBy && L === 0 && !(r.radius < hub.radius)) {
+      bad.push(`J2: the hub reports growing for ring ${grownBy.layer}, yet ring 0 is at ${r.radius} against a hub of ${hub.radius} — nothing grew`);
     }
     /* J3 — THE FOOT REACHES THE HUB. THIS IS THE ONE THE VOXEL GATE CANNOT
        MAKE. Feet land ON their ring and run INWARD by overhang, so the foot
@@ -5147,8 +5160,8 @@ export async function zygoAssertions(page, row) {
      foot width and each deeper ring's radius RESTATED here from the controls and
      the row's own `@scopes` entry — the ramp's `petalWidth x layerSize^L x 0.4 x
      footDelicacy` where the layer owns no width, `own x 0.4 x footDelicacy`
-     where it does, and the ring `R0 x layerSize^L` or `R0 x min(1, own /
-     petalWidth)` (ring 1 IS the rim, J2) — never footRing()'s own `ownWidth`,
+     where it does, and the ring `R0 x layerSize^L` or `R0 x own / petalWidth`
+     (past 1 the hub grows to it, below) — never footRing()'s own `ownWidth`,
      which is read only to be checked. Both STL gates are blind to a foot that
      kept the ramp: the blade still lands on a foot that overlaps the hub.
      BOUNDED IN ULP, NOT EXACT: the restatement runs in NODE and the ring in the
@@ -5167,6 +5180,7 @@ export async function zygoAssertions(page, row) {
     const W = Number(ui.petalWidth), del = Number(ui.footDelicacy), ls = Number(ui.layerSize);
     const bw = new Map(OVERRIDE_BOUNDS).get('petalWidth') || CONTROLS.find((c) => c.id === 'petalWidth');
     const R0 = rings[0].radius;
+    let grow = { f: 1, L: -1 };
     rings.forEach((r, L) => {
       const t = scopeOffsetsRestated(row, ui, m, L, 0);
       const ownW = t && t.owns && t.owns.petalWidth ? Math.min(bw.max, Math.max(bw.min, W + t.offsets.petalWidth)) : null;
@@ -5175,10 +5189,21 @@ export async function zygoAssertions(page, row) {
       if (!near(r.width, wantW, ownW ?? W)) bad.push(`Z3: ring ${L}'s foot is ${r.width} mm across, restated ${wantW} from ${ownW === null ? `the ramp (Petal width ${W} x ${scale})` : `the layer's own width ${ownW}`} x 0.4 x Foot delicacy ${del} — the foot did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
       if ((r.ownWidth ?? null) !== ownW) bad.push(`Z3: ring ${L} reports its own width ${JSON.stringify(r.ownWidth ?? null)}, the row's entries say ${JSON.stringify(ownW)}`);
       if (L === 0) return;
-      const f = ownW === null ? scale : Math.min(1, ownW / W);
+      const f = ownW === null ? scale : ownW / W;
       if (!near(r.radius, R0 * f, R0)) bad.push(`Z3: ring ${L} sits at ${r.radius} mm, restated R0 ${R0} x ${f} = ${R0 * f} — the ring did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
-      if (Boolean(r.ringClamped) !== (ownW !== null && ownW / W > 1)) bad.push(`Z3: ring ${L} reports ringClamped ${r.ringClamped}, but its own width ${ownW} against Petal width ${W} says ${ownW !== null && ownW / W > 1}`);
+      if (ownW !== null && f > grow.f) grow = { f, L };
     });
+    /* THE HUB GROWS TO THE WIDEST OWNED RING PAST RING 0 (Eva's ruling, Oct 16:
+       "grow the hub instead of holding the ring at the rim"), restated from the
+       same controls and entries: the hub is R0 x that ring's factor, and the
+       record names that layer — a biconditional, so a hub that grew with no
+       owned ring past the rim, or held the ring instead of growing, both fire.
+       R0 here is ring 0, which the area rule places and J2 pins. */
+    const wantHub = grow.L >= 0 ? R0 * grow.f : R0;
+    if (!near(m.hubRadius, wantHub, R0)) bad.push(`Z3: the hub's radius is ${m.hubRadius} mm, restated ${wantHub} (${grow.L >= 0 ? `R0 ${R0} x layer ${grow.L + 1}'s own ${grow.f}` : 'R0, no owned ring past it'}) — ${grow.L >= 0 ? 'the hub did not grow to the widest owned ring' : 'the hub moved with no owned ring past the rim'}`);
+    const g = m.hubGrowth || null;
+    if ((g !== null) !== (grow.L >= 0)) bad.push(`Z3: the hub reports ${g ? `growing for layer ${g.layer + 1}` : 'no growth'}, but the row's own widths say ${grow.L >= 0 ? `layer ${grow.L + 1} owns ${grow.f}x Petal width` : 'no layer owns a width past Petal width'}`);
+    else if (g && g.layer !== grow.L) bad.push(`Z3: the hub grew for layer ${g.layer + 1}, the widest owned ring is layer ${grow.L + 1}'s`);
   }
 
   /* Z4 — THE MIRROR, on the FAN (the only placement whose scopes are pairs).
@@ -12234,6 +12259,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'TUBE: k 0 x curl 270 x fusion height 0.58 (strong curl in the blend)': { pairs: 400, worstMm: 0.1985, note: 'DECLARED by ruling (the TUBE build session): at h 0.58 the midrib is already curling toward the axis, and the blend lays the petal\'s own section onto a ring that curls with it — the prototype\'s §B6 case (the curl axis fold moved out of the ring and into the blend). Identical untrimmed and trimmed (400 / 0.198), so it is not the trim\'s' },
   'petalRoll min (-330)': { pairs: 13568, worstMm: 1.3335, note: 'RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 18776 -> 15280 pairs, 1.3837 -> 1.5539 mm'  + ' — RE-RECORDED BY THE APEX NIB (the tip law is truncated at the print floor and closed on a rounded nib, so the outline moves on every row whose blade clears that floor): was 15280 pairs / 1.5539 mm' },
   'petalRoll max (330)': { pairs: 13584, worstMm: 1.3335, note: 'RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 18776 -> 15280 pairs, 1.3837 -> 1.5539 mm'  + ' — RE-RECORDED BY THE APEX NIB (the tip law is truncated at the print floor and closed on a rounded nib, so the outline moves on every row whose blade clears that floor): was 15280 pairs / 1.5539 mm' },
+  'PER-LAYER: SPIRAL x 3 turns x rise 0.5 — turn 3 owns a 20 mm width (its ring on the grown rim at an effective tilt of 102: the past-90 class, declared)': { pairs: 176, worstMm: 0.6758, note: '(EFFECTIVE TILT PAST 90 — 102.1 degrees on the owned turn: petalTilt 25 + the inner turn\'s ramp 24 + the rim\'s dome lean 53.1. NEW with the role retirement\'s block 64 (Oct 16): an inner turn that owns a width at or past Petal width is placed ON the rim (the foot-follows ruling) while keeping its layer-tilt ramp, and the cap is steepest there. NOT THE HUB GROWTH: the same state owning exactly Petal width (+0, no growth, its ring at the rim) reads 176 / 0.5355; at rise 0.25 the same +4 reads 0 (effective 77.1); the plain spiral at rise 0.5 reads 0. Measured in Node by the census on the export build)' },
   'headRise max (1)': { pairs: 248, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it) — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 216 -> 248 pairs, 0.4176 -> 0.4262 mm' },
   /* ORGANIC VARIANCE, BUILD 1 (the size field) — three block-38 rows fold where
      their base row does not, or folds more: the field composes with the form
@@ -16081,7 +16107,7 @@ export function buildMatrix() {
         retirement-outcome.md). A layered SPIRAL's turns are layer scopes (the
         descriptor's own depth, `lambda = floor(k / petalCount)`); a layer that
         owns its width builds its foot from it and sits on a ring in proportion
-        to it (`R0 x own / petalWidth`, held at the rim past 1, told), the area
+        to it (`R0 x own / petalWidth`; past 1 the HUB GROWS to it, told), the area
         rule summing its own foot into the hub; an owned length or tilt moves
         no foot and no ring. Z2 reads every row's scope terms and Z3 restates
         every ring's foot and radius; the GATED row carries a layer record under
@@ -16093,7 +16119,9 @@ export function buildMatrix() {
     ['PER-LAYER: SPIRAL x 3 turns — a cup offset on turn 3 (a spiral\'s turn is its layer scope)', { placement: 'SPIRAL', layerCount: 3, scopeLayers: 'ON' }, [{ layer: 2, offsets: { petalCup: 0.4 } }]],
     ['PER-LAYER: RADIAL x 3 layers — layer 2 owns a 12 mm width, layer 1 a 14 mm one (the foot and the ring follow; layer 1\'s ring stays the rim)', { layerCount: 3, scopeLayers: 'ON' }, [{ layer: 0, offsets: { petalWidth: -2 } }, { layer: 1, offsets: { petalWidth: -4 } }]],
     ['PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt (no foot, no ring)', { placement: 'SPIRAL', layerCount: 3, scopeLayers: 'ON' }, [{ layer: 1, offsets: { petalWidth: -4 } }, { layer: 2, offsets: { petalLength: 5, petalTilt: 8 } }]],
-    ['PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (its ring HELD at the rim, told)', { layerCount: 4, scopeLayers: 'ON' }, [{ layer: 3, offsets: { petalWidth: 3 } }]],
+    ['PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (the HUB GROWS to its ring, told)', { layerCount: 4, scopeLayers: 'ON' }, [{ layer: 3, offsets: { petalWidth: 3 } }]],
+    ['PER-LAYER: SPIRAL x 3 turns x rise 0.25 — turn 3 owns a 20 mm width (the HUB GROWS to its ring and the dome follows the grown rim)', { placement: 'SPIRAL', layerCount: 3, scopeLayers: 'ON', headRise: 0.25 }, [{ layer: 2, offsets: { petalWidth: 4 } }]],
+    ['PER-LAYER: SPIRAL x 3 turns x rise 0.5 — turn 3 owns a 20 mm width (its ring on the grown rim at an effective tilt of 102: the past-90 class, declared)', { placement: 'SPIRAL', layerCount: 3, scopeLayers: 'ON', headRise: 0.5 }, [{ layer: 2, offsets: { petalWidth: 4 } }]],
     ['PER-LAYER: GATED — CONTINUOUS x 3 turns with per-layer ON and a layer record (kept and inert)', { placement: 'CONTINUOUS', layerCount: 3, scopeLayers: 'ON' }, [{ layer: 1, offsets: { petalCup: 0.4, petalWidth: -4 } }]],
   ]) {
     rows.push({ label: name, set: scoped(sets, layers) });

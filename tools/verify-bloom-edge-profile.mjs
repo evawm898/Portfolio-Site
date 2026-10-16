@@ -224,7 +224,7 @@ const E2_TURN_XFAIL = {
     { excessDeg: 35.478378, note: 'NEW at #289: adds 80.478378 deg; face-to-face 90.52, outline 10.04. Clean at #283, red from the row ramp on' },
   'APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest — a 0.003 mm arc)':
     { excessDeg: 2.968831, note: 'NEW at #289: adds 47.968831 deg; face-to-face 55.73, outline 7.76. Clean at #283, red from the row ramp on' },
-  'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (its ring HELD at the rim, told)':
+  'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (the HUB GROWS to its ring, told)':
     { excessDeg: 3.783426, note: 'NEW with the role retirement\'s block 64 (Q3.5): adds 48.783426 deg; face-to-face 53.44, outline 4.66 — at u 0.973 on the INNERMOST ring, whose length is still ramped (0.373 x, ~13 mm) while its width is owned at 19 mm (Q3.5 drops the ramp from an owned value only): a short wide blade closing on the apex nib, the nib class of `APEX NIB: tip shape 3.00 x 20 mm`. THE BLADE\'S, NOT THE FOOT\'S — 48.783426 to six decimals with the foot and ring put back on their pre-ruling law; layer 3 owning the same +3 reads 43.69, a global 19 mm width 43.39, +2 on layer 4 47.81' },
   'APEX NIB: INERT — a squared terminal holds the outline above the print floor':
     { excessDeg: 6.872304, note: 'NEW at #283: adds 51.872304 deg at the squared terminal\'s corners; face-to-face 51.87, outline 0.00 — the carnation terminal\'s class (a tooth\'s corner), with the nib inert by declaration' },

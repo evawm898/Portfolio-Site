@@ -97,8 +97,9 @@
           radius (the area rule over every foot) and each ring's radius are
           RESTATED here from the controls and the row's entries — an owned
           width gives the foot `own x 0.4 x delicacy` and a ring past the first
-          `R0 x min(1, own / petalWidth)` (held at the rim, told, past 1); ring
-          1 IS the rim — and compared against footRing()'s rings and the feet
+          `R0 x own / petalWidth`; past 1 the HUB GROWS to the widest such ring
+          (Eva's ruling, Oct 16, replacing the rim hold) and the record says
+          which and by how much; ring 1 is the rim otherwise — and compared against footRing()'s rings and the feet
           the builder EMITTED (their half-width). An owned LENGTH or TILT moves
           no foot float and no ring (the foot reads neither), measured on the
           emitted foot rows; the un-owning layers keep the ramp.
@@ -459,7 +460,7 @@ async function nodeClauses(G, F, R, rec) {
       /* layer 1 owns a narrower width (its foot only — its ring IS the rim),
          layer 2 owns a width (foot AND ring), layer 3 owns length and tilt
          (no foot, no ring), layer 4 owns a width wider than the outer whorl's
-         (its ring is held at the rim, told) */
+         (the hub grows to its ring, told) */
       const st = S({ placement, layerCount: 4, layerSize: 0.7, scopeLayers: 'ON' });
       const rec0 = { layers: [
         { layer: 0, offsets: { petalWidth: -2 } },
@@ -480,20 +481,26 @@ async function nodeClauses(G, F, R, rec) {
         const t = rings[L].thickness;
         const rFoot = Math.sqrt((width * t) / Math.PI);
         sumSq += n * rFoot * rFoot;
-        const asked = w === null || L === 0 ? null : w / Number(st.petalWidth);
-        want.push({ width, factor: w === null ? scale : L === 0 ? 1 : Math.min(1, asked), clamped: asked !== null && asked > 1 });
+        want.push({ width, factor: w === null ? scale : L === 0 ? 1 : w / Number(st.petalWidth), owned: w !== null });
       }
       const R0 = Math.sqrt(sumSq) * Number(st.spread);
       for (let L = 0; L < 4; L++) {
         const r = rings[L], w = want[L];
         if (!Object.is(r.width, w.width)) p.push(`${placement} layer ${L + 1}: foot width ${r.width}, restated ${w.width}`);
         if (!Object.is(r.radius, R0 * w.factor)) p.push(`${placement} layer ${L + 1}: ring radius ${r.radius}, restated R0 ${R0} x ${w.factor} = ${R0 * w.factor}`);
-        if (Boolean(r.ringClamped) !== w.clamped) p.push(`${placement} layer ${L + 1}: ringClamped ${r.ringClamped}, restated ${w.clamped}`);
         const feet = sc.petals.filter((q) => Math.round(q.whorl) === L);
         if (!feet.length) p.push(`${placement} layer ${L + 1}: no petal was built`);
         for (const q of feet) for (const f of q.footFrames) if (!Object.is(f.h, w.width / 2)) p.push(`${placement} layer ${L + 1} slot ${q.slot.index}: an emitted foot row is ${2 * f.h} mm across, restated ${w.width}`);
       }
-      if (!want[3].clamped) p.push(`${placement}: the over-wide layer did not ask past the rim — the clamp arm would be vacuous`);
+      /* THE HUB GROWS TO THE WIDEST OWNED RING PAST THE RIM: restated, the layer
+         and the radius, and it must have grown here or this arm is vacuous */
+      let gf = 1, gl = -1;
+      for (let L = 1; L < 4; L++) if (want[L].owned && want[L].factor > gf) { gf = want[L].factor; gl = L; }
+      if (gl < 0) p.push(`${placement}: no owned ring asked past the rim — the growth arm would be vacuous`);
+      const hubR = sc.built.hub.radius, gr = sc.built.hub.growth;
+      if (!Object.is(hubR, gl >= 0 ? R0 * gf : R0)) p.push(`${placement}: the hub's radius is ${hubR}, restated ${gl >= 0 ? `R0 ${R0} x ${gf}` : R0}`);
+      if (!gr || gr.layer !== gl) p.push(`${placement}: the hub reports growth ${JSON.stringify(gr)}, restated for layer ${gl + 1}`);
+      if (gl >= 0 && !Object.is(rings[gl].radius, hubR)) p.push(`${placement}: the widest owned ring ${rings[gl].radius} is not ON the grown rim ${hubR}`);
       if (Object.is(rings[1].radius, R0 * Math.pow(Number(st.layerSize), 1))) p.push(`${placement}: layer 2's ring sits where the ramp would put it — ownership would be vacuous`);
       /* AN OWNED LENGTH OR TILT MOVES NO FOOT AND NO RING: the same state with
          layer 3's entry removed builds every ring and every emitted foot row of
@@ -506,7 +513,7 @@ async function nodeClauses(G, F, R, rec) {
       if (sameNumbers(fa.map((q) => q.askedLength), fb.map((q) => q.askedLength))) p.push(`${placement} layer 3: the owned length did not reach the blade — the length/tilt half would be vacuous`);
       said.push(`${placement}: rings ${rings.map((r) => r.radius.toFixed(3)).join(' / ')} mm on R0 ${R0.toFixed(3)}, feet ${rings.map((r) => r.width.toFixed(3)).join(' / ')} mm`);
     }
-    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring stays the rim, an over-wide layer is held there and told; an owned length / tilt moves no foot row and no ring`);
+    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring is the rim unless an over-wide layer grows the hub to its own ring (told); an owned length / tilt moves no foot row and no ring`);
   }
   /* SO7 — THE MIGRATION LANDS ON THE OLD COMPOSITION. A written-down state
      carrying retired role ids is migrated by the registry's `migrateRoles`
@@ -912,7 +919,9 @@ const MUTANTS = [
      thickness exactly what it was, which is what SO5 asserts. */
   /* and SO11's anti-vacuity half — the retired values MIGRATED must move the
      bloom, which they cannot when no offset lands */
-  { id: 'offsets-are-ignored', breaks: ['SO2', 'SO3', 'SO4', 'SO6', 'SO7', 'SO11', 'SO12'],
+  /* SO13 too: with no offset reaching the resolver no layer owns its width, so
+     no foot follows and no hub grows — `layerOwnedValues` reads the global. */
+  { id: 'offsets-are-ignored', breaks: ['SO2', 'SO3', 'SO4', 'SO6', 'SO7', 'SO11', 'SO12', 'SO13'],
     from: '  if (scopeTerm !== null) {\n    for (const base of Object.keys(scopeTerm.offsets)) {',
     to: '  if (scopeTerm !== null && false) {\n    for (const base of Object.keys(scopeTerm.offsets)) {',
     /* a direct call: the resolver handed a layer term must move the base */
@@ -999,9 +1008,22 @@ const MUTANTS = [
     to: '    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;',
     witness: (G) => OWN_WIDTH_PROBE(G).width === OWN_WIDTH_PROBE(G, null).width },
   { id: 'the-ring-keeps-the-ramp', breaks: ['SO13'],
-    from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ringAsked);',
+    from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;',
     to: '    const ringFactor = scale;',
     witness: (G) => { const r = OWN_WIDTH_PROBE(G); return r.factor === r.scale; } },
+  /* Eva's Oct 16 ruling on the rim hold: "grow the hub instead of holding the
+     ring at the rim". The hold put back — the ring capped at R0, so nothing
+     ever asks past the rim and the hub never grows. */
+  { id: 'the-ring-is-held-at-the-rim-again', breaks: ['SO13'],
+    from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;',
+    to: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);',
+    witness: (G) => { const r = OWN_WIDTH_PROBE(G, 3); return r.factor === 1; } },
+  /* ... and the hub grown from something other than the widest owned ring —
+     the rim moved to the FIRST owned ring past it instead of the widest. */
+  { id: 'the-hub-grows-for-the-wrong-ring', breaks: ['SO13'],
+    from: '  for (let k = 0; k < raw.length; k++) if (raw[k].ownWidth !== null && raw[k].ringFactor > growFactor) { growFactor = raw[k].ringFactor; growLayer = k; }',
+    to: '  for (let k = 0; k < raw.length; k++) if (raw[k].ownWidth !== null && raw[k].ringFactor > 1) { growFactor = raw[k].ringFactor * 0.999; growLayer = k; }',
+    witness: (G) => { const st = { ...REG.DEFAULTS, layerCount: 3, scopeLayers: 'ON' }; const c = kindOf.get('petalWidth'); const fr = G.footRing(st, new G.MeshBuilder({ exportMode: false }), { scopes: { layers: [{ layer: 2, offsets: { petalWidth: 3 } }], petals: [], tiers: [], bounds: { petalWidth: { min: c.min, max: c.max } } } }); return fr.hub.radius !== fr.rings[2].radius; } },
   { id: 'a-spiral-inner-is-dropped', file: 'registry', breaks: ['SO7'],
     from: '  if (radial || spiral) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',
     to: '  if (radial) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',

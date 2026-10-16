@@ -1442,7 +1442,7 @@ export const SMOKE_BLOCKS = [
     anchor: 'PER-LAYER: RADIAL x 3 layers — layer 2 owns a 12 mm width, layer 1 a 14 mm one (the foot and the ring follow; layer 1\'s ring stays the rim)',
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
        footRing's owned-width arm (the foot from its own width, the ring at
-       R0 x own / petalWidth, held at the rim past 1), `layerOwnedValues`, and
+       R0 x own / petalWidth; past 1 the hub grows to it), `layerOwnedValues`, and
        scopeOffsetsFor's per-layer gate under SPIRAL. The anchor owns widths on
        two layers (ring 1 foot-only, ring 2 foot and ring); the spiral row is
        the gate's only SPIRAL row with a live layer entry; the held-at-the-rim
@@ -1453,8 +1453,8 @@ export const SMOKE_BLOCKS = [
         path: "Z3 (each ring's foot width and each deeper ring's radius restated from the controls and the row's entries — ring 2 at R0 x 12/16, ring 1 at the rim with its own 14 mm foot), Z2 (the width offsets reach those whorls' blades), J2/J3 (the ring inside the hub disc, its foot reaching it); --conn is the witness that a ring placed by the owned width is one piece with the hub" },
       { label: 'PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt (no foot, no ring)',
         path: "Z2 (a SPIRAL's layer entries reach its turns' blades, Oct 16), Z3 (turn 2's foot and ring from its own width; turn 3's on the ramp although it owns length and tilt), C1 (turn 3's blade at its own length)" },
-      { label: 'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (its ring HELD at the rim, told)',
-        path: "Z3's clamp arm (the ring held at the rim, ringClamped true as a biconditional against own / petalWidth > 1), J2 (the held ring still inside the hub disc)" },
+      { label: 'PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl\'s (the HUB GROWS to its ring, told)',
+        path: "Z3's growth arm (the hub grows to the widest owned ring, hubGrowth a biconditional against own / petalWidth > 1, the hub's radius restated), J2 (the identity moves to that ring, ring 0 strictly inside)" },
       { label: 'PER-LAYER: GATED — CONTINUOUS x 3 turns with per-layer ON and a layer record (kept and inert)',
         path: "Z2's inert arm (no descriptor carries a scope term under CONTINUOUS), and the byte tool's partition (a holder)" },
     ],

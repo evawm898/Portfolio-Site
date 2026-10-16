@@ -400,10 +400,14 @@
          turn 2 gives that ring the foot `own x 0.4 x Foot delicacy` and the
          radius `R0 x own / Petal width`, RESTATED here from the controls and
          read off footRing()'s rings (`__bloomMetrics().rings`), with turn 3
-         still on the Shrink ramp; deselect and OFF keep the record, and OFF
-         builds the unscoped bloom. Three mutants under --negative-control,
+         still on the Shrink ramp; a width of 19 on turn 3 (past the outer
+         whorl's) GROWS THE HUB to that ring (Eva's ruling, Oct 16, replacing
+         the rim hold) and the read-out's HUB GROWN line says so with the
+         amount, restated here; deselect and OFF keep the record, and OFF
+         builds the unscoped bloom. Four mutants under --negative-control,
          each by its own sentence: per-layer values left RADIAL only, the foot
-         keeping the ramp, the ring keeping the ramp (all bloom-geometry.js).
+         keeping the ramp, the ring keeping the ramp, the ring held at the rim
+         again (all bloom-geometry.js).
          Three edits: this entry, the block, the negative control's flags and
          banner.
    =================================================================== */
@@ -3880,7 +3884,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       bar: window.__bloomScopeView.bar(), rec: JSON.stringify(window.__bloomDesign.scopes()), digest: JSON.stringify(window.__bloomShownDigest()),
       ui: window.__bloomUIState(),
       forms: m.petalSlotForms.map((f) => ({ whorl: f.whorl, cup: f.applied.petalCup, scope: f.scope })),
-      rings: m.rings.map((r) => ({ radius: r.radius, width: r.width, ownWidth: r.ownWidth, ringClamped: r.ringClamped })),
+      rings: m.rings.map((r) => ({ radius: r.radius, width: r.width, ownWidth: r.ownWidth })),
+      hubR: m.hubRadius, hubGrowth: m.hubGrowth, grownLine: (document.getElementById('readout').textContent.match(/HUB GROWN[^\n]*/) || [null])[0],
       hidden: { scopeLayers: hid('scopeLayers'), layerSize: hid('layerSize'), layerTilt: hid('layerTilt') },
     };
   });
@@ -3927,6 +3932,21 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (!r1 || Math.abs(r1.radius / r0.radius - 12 / Number(DEFAULTS.petalWidth)) > 1e-12) p.push(`the owned turn's ring sits at ${r1 && (r1.radius / r0.radius).toFixed(6)} of the rim, restated ${(12 / Number(DEFAULTS.petalWidth)).toFixed(6)} — the ring did not follow its own width`);
     if (!r2 || Math.abs(r2.radius / r0.radius - Math.pow(Number(DEFAULTS.layerSize), 2)) > 1e-12) p.push(`turn 3 (no own width) sits at ${r2 && (r2.radius / r0.radius).toFixed(6)} of the rim, not the Shrink ramp's ${Math.pow(Number(DEFAULTS.layerSize), 2).toFixed(6)}`);
     if (w.ui.petalWidth !== DEFAULTS.petalWidth) p.push(`a width edit on turn 2 moved the WHOLE-BLOOM width to ${w.ui.petalWidth}`);
+    if (w.hubGrowth || w.grownLine) p.push(`a width of 12 on turn 2 (narrower than the outer whorl's) grew the hub: ${JSON.stringify(w.hubGrowth)} / ${w.grownLine}`);
+    /* A WIDTH PAST THE OUTER WHORL'S GROWS THE HUB (Eva's ruling, Oct 16, replacing
+       the rim hold): turn 3 at 19 mm puts its ring at 19/16 of R0, the rim moves
+       out to it, and the read-out SAYS so with the amount — restated here */
+    await pick(pg, 2);
+    bad = await applyConfig(pg, [{ id: 'petalWidth', value: '19' }]);
+    if (bad.length) p.push(`the over-wide edit did not take: ${bad.join('; ')}`);
+    const gw = await snap(pg);
+    const g0 = gw.rings[0], g2 = gw.rings[2];
+    const wantHub = g0 && g0.radius * 19 / Number(DEFAULTS.petalWidth);
+    if (!g2 || Math.abs(g2.radius - wantHub) > 1e-9) p.push(`the over-wide turn's ring sits at ${g2 && g2.radius}, restated R0 x 19/${DEFAULTS.petalWidth} = ${wantHub} — it was held, not placed`);
+    if (Math.abs(gw.hubR - wantHub) > 1e-9) p.push(`the hub is ${gw.hubR} mm, restated ${wantHub} — the hub did not grow to the widest owned ring`);
+    if (!gw.hubGrowth || gw.hubGrowth.layer !== 2) p.push(`the build reports hub growth ${JSON.stringify(gw.hubGrowth)}, restated for turn 3`);
+    const byWant = wantHub - (g0 ? g0.radius : NaN);
+    if (!gw.grownLine || !gw.grownLine.includes(`+${byWant.toFixed(2)} mm`) || !/layer 3/.test(gw.grownLine)) p.push(`the read-out's HUB GROWN line is ${JSON.stringify(gw.grownLine)} — it must say the hub grew for layer 3 and by +${byWant.toFixed(2)} mm`);
     /* deselect and OFF keep the record; OFF builds the unscoped bloom */
     const before = await snap(pg);
     await unpick(pg);
@@ -3937,7 +3957,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (z.rec !== after.rec) p.push(`switching per-layer OFF changed the record to ${z.rec}`);
     if (z.digest !== off.digest) p.push('with per-layer OFF the spiral is not the unscoped one — a kept record reached the build');
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: Per-layer values hidden under CONTINUOUS and shown under a 3-turn SPIRAL; ON alone moves nothing and hides Shrink / Tilt step; the picker lists Turn 1..3; a cup edit on turn 1 lands on its whorl only; a width of 12 on turn 2 gives its foot ${wantFoot.toFixed(3)} mm and its ring ${(12 / Number(DEFAULTS.petalWidth)).toFixed(4)} of the rim (restated), turn 3 still on the ramp; deselect and OFF keep the record, OFF builds the unscoped bloom`);
+    else ok.push(`${tag} ${label}: Per-layer values hidden under CONTINUOUS and shown under a 3-turn SPIRAL; ON alone moves nothing and hides Shrink / Tilt step; the picker lists Turn 1..3; a cup edit on turn 1 lands on its whorl only; a width of 12 on turn 2 gives its foot ${wantFoot.toFixed(3)} mm and its ring ${(12 / Number(DEFAULTS.petalWidth)).toFixed(4)} of the rim (restated), turn 3 still on the ramp; 19 on turn 3 grows the hub to its ring, told on the read-out; deselect and OFF keep the record, OFF builds the unscoped bloom`);
   };
   await openBloom(page, port);
   await run(page, 'per-layer on a spiral');
@@ -3946,7 +3966,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const MUTANTS = [
       { name: 'per-layer values stay RADIAL only', from: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL', 'SPIRAL']);", to: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL']);" },
       { name: 'the foot keeps the ramp', from: '    const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;', to: '    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;' },
-      { name: 'the ring keeps the ramp', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ringAsked);', to: '    const ringFactor = scale;' },
+      { name: 'the ring keeps the ramp', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const ringFactor = scale;' },
+      { name: 'the ring is held at the rim again', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);' },
     ];
     for (const m of MUTANTS) if (geoSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-geometry.js — the mutant cannot be applied`);
     for (const m of MUTANTS) {
@@ -4065,14 +4086,15 @@ if (NEGATIVE_CONTROL) {
     const sawSpiralRadialOnly = fail.some((f) => /^\[spiral layers\] MUTANT \(per-layer values stay RADIAL only\).*hidden under a layered SPIRAL/.test(f));
     const sawSpiralFoot = fail.some((f) => /^\[spiral layers\] MUTANT \(the foot keeps the ramp\).*the foot did not follow its own width/.test(f));
     const sawSpiralRing = fail.some((f) => /^\[spiral layers\] MUTANT \(the ring keeps the ramp\).*the ring did not follow its own width/.test(f));
+    const sawSpiralHold = fail.some((f) => /^\[spiral layers\] MUTANT \(the ring is held at the rim again\).*the hub did not grow to the widest owned ring/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
-        && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing
+        && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
         && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

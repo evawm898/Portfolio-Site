@@ -61,9 +61,9 @@ and what is still Eva's.
 - **The law** (footRing's ringed loop, `layerOwnedValues`). A layer whose entry owns `petalWidth`:
   - builds its foot as `ownWidth × 0.4 × footDelicacy`, clamped to `FOOT_MIN/MAX_WIDTH_MM`, in
     place of the ramp's `petalWidth × scale × 0.4 × footDelicacy`;
-  - places its ring at `R0 × ownWidth / petalWidth` in place of `R0 × scale`. The ring is held at
-    the rim (`min(1, …)`, so a ring never stands outside the hub) and that is told as
-    `ringClamped`. Layer 0's ring is always `R0` (J2's identity).
+  - places its ring at `R0 × ownWidth / petalWidth` in place of `R0 × scale`. Layer 0's ring is
+    always `R0`. **A ring past `R0` GROWS THE HUB to it** (Eva's third Oct 16 ruling, which
+    replaced the rim hold this PR first shipped; §1c).
   `ownWidth` is the clamped owned value, the same double the blade is built from.
 - **Owned length and tilt move no foot and no ring, by construction.** The foot rows are flat and
   their length is the ring's overhang, which no length enters. The seam's turn already uses the
@@ -78,6 +78,50 @@ and what is still Eva's.
   `petalWidth`. **No base row does** (no stored row carried a layer scope before the retirement,
   and the migration writes only cup and curl offsets). So (b) is **0 stored rows**. The law's own
   rows are block 64, which is new.
+
+## 1c. Eva's third Oct 16 ruling, as built — the hub grows
+
+> "A layer whose own width would put its ring outside the hub: GROW THE HUB instead of holding the
+> ring at the rim. The hub's radius becomes whatever fits the widest owned ring (with the foot's own
+> clearance); every other layer is carried outward by the same pure radial shift the scopes gate
+> already asserts. Remove the rim hold and its read-out; tell on the read-out when the hub has grown
+> for this reason, and by how much."
+
+- **The law** (footRing, `hubGrowth`). A ring past layer 1's is placed by its own law,
+  `R0 × own / petalWidth`, never held. The hub's radius `Rhub` is that ring's radius: the widest
+  such ring sits ON the rim exactly as layer 1's ring does. With no such ring, `Rhub` is `R0` by
+  branch (the same double, no product formed).
+- **"The foot's own clearance", as read.** A foot lands on its ring and runs INWARD by its overhang
+  (J3), so a ring on the rim is exactly how layer 1's foot already meets the hub. The grown rim
+  therefore asks no extra margin past the ring. This is a reading, not a ruling; the alternative
+  (the rim at the foot's outer chord corners, `hypot(r, w/2)`) jumps discontinuously the moment a
+  width passes Petal width, which is why it was not taken.
+- **Every other layer keeps its own ring.** The area rule already carries them out radially (SO12),
+  and the grown hub moves nothing else. Layer 1's ring stays at `R0`, strictly inside the grown rim.
+- **What reads the grown radius:** the hub builder, the dome (a cap is drawn through the rim, so
+  `Rhub` replaces `R0` in it), the sepals' rim ring, the stem's join and the androecium's clamp —
+  everything that already read `hub.radius`.
+- **Told:** the read-out's `HUB GROWN … -> … mm (+… mm, …x) to fit layer k's ring` line, from
+  footRing()'s own `hub.growth` record. The rim hold's `ringClamped` record is deleted.
+- **On a DOMED head the grown rim re-seats every ring on a larger cap.** A cap is drawn through
+  the rim with `H = headRise × Rhub`, so a grown hub is a wider, taller cap and every other layer's
+  slope and height change with it. Only on a flat head is "every other layer carried by the same
+  pure radial shift" exact. This is a reading (the cap through the rim, its rise a fraction of the
+  rim) and is said so; the alternative, a cap through `R0` with a flat apron out to the grown rim,
+  would put a crease in the hub where a cap meets a disc.
+- **The census on the grown-hub rows** (block 64, both modes): the flat RADIAL x 4 row and a
+  SPIRAL x 3 at rise 0.25 read **0 pairs** and one piece. **A SPIRAL x 3 at rise 0.5 folds — 176
+  pairs / 0.6758 mm — and it is NOT the growth:** the owned turn sits on the rim, where the cap's
+  lean is 53.1°, and keeps the inner turn's tilt ramp (+24), so its effective tilt is **102.1°**,
+  the declared EFFECTIVE TILT PAST 90 class. The same state owning exactly Petal width (+0, no
+  growth, the ring already on the rim) reads 176 / 0.5355; the plain spiral at rise 0.5 reads 0;
+  rise 0.25 reads 0 (effective 77.1°). Declared in `SELF_INTERSECTION_XFAIL` with that mechanism,
+  Chromium agreeing at 176 / 0.6758. It is the foot-follows ruling composed with a dome and the tilt
+  ramp, and is Eva's to rule on if an owned width should also own its tilt.
+- **Gates:** Z3's growth arm (hub radius and record restated); J2's identity moves to the named
+  ring; SO13 restates the grown hub; panel route (ag) sets 19 mm on turn 3 and reads the HUB GROWN
+  line with its amount; two new scopes mutants (`the-ring-is-held-at-the-rim-again`,
+  `the-hub-grows-for-the-wrong-ring`) and a fourth route-(ag) mutant.
 
 ## 2. The migration — `migrateRoles`, one owner
 
@@ -132,7 +176,10 @@ and what is still Eva's.
   - (c) anything else: the FAN area-rule regrouping, ALL off the slider grid, and stored layer
     entries on a SPIRAL (inert on the base, live now);
   - (h) MUST HOLD — a SPIRAL descriptor whose INNER role moved a value: the iris.
-- **Result: PASS** (`--merge … --expect a=33,b=0,c1=2,c2=0,c3=0,h=1`). 1,391 holders, 0 floats
+  - (b2) the hub-growth ruling — the subset of (b) whose stored layer entry past layer 1 owns a width
+    past Petal width (re-run after that ruling: 0, as predicted — no stored set owns any width);
+- **Result: PASS** (`--merge … --expect a=33,b2=0,b=0,c1=2,c2=0,c3=0,h=1`, re-run after the hub-growth
+  ruling over the same 1,426 sets with the same result). 1,391 holders, 0 floats
   moved on any. 35 predicted movers, all 35 moved. The 1 must-hold set held to the bit.
 
 | class | rows | what |
@@ -160,7 +207,7 @@ and what is still Eva's.
 max |d| of 30.26 mm. Under ruling 1 it migrates and holds; the row is back in the live matrix.
 
 **Where the rows are:**
-- **62 rows left the live matrix (1,354 → 1,292), then block 64 added five (1,297).** They are:
+- **62 rows left the live matrix (1,354 → 1,292), then block 64 added seven (1,299; two of them with the hub-growth ruling, §1c).** They are:
   - **32 movers:** 32 of the 33 (a) rows (not the one kept, below). The SPIRAL iris left with
     them and came back on Oct 16, now a holder;
   - **30 holders:** 24 GATED rows, whose only claim was a role being "hidden and inert" (that
@@ -204,7 +251,9 @@ now.
 
 **Added for the Oct 16 rulings:**
 - **Z3** (both STL gates, every ringed row): each ring's foot width and radius restated from the
-  controls and the row's `@scopes`, plus `ownWidth` and `ringClamped`.
+  controls and the row's `@scopes`, plus `ownWidth`, the hub's radius and its `growth` record
+  (a biconditional against an owned width past Petal width). J2's ring-0 identity moves to the ring
+  the hub grew for.
 - **SO13** in the scopes gate: foot and ring restated on RADIAL and SPIRAL at four layers.
   - SO2 runs on both placements.
   - SO7 has the iris and a three-turn SPIRAL.
@@ -216,9 +265,9 @@ now.
 - **Panel route (ag)**, three edits (header, block, the negative control's flags and banner,
   TWENTY-FOUR routes). It checks the toggle hidden under CONTINUOUS and shown on a SPIRAL, the picker
   naming Turn 1..3, a cup edit landing on its turn only, and a width edit's foot and ring restated. It
-  has three mutants, all seen; the full negative control reads ALL TWENTY-FOUR ROUTES.
-- **Matrix block 64** (five `PER-LAYER:` rows, smoke block 64). They export watertight, census-clean
-  and one piece.
+  has four mutants (the fourth, the rim hold put back, with the hub-growth ruling), all seen.
+- **Matrix block 64** (seven `PER-LAYER:` rows, smoke block 64). They export watertight and one piece;
+  six are census-clean and one is declared (§1c).
 - **Their first export run DROPPED three of them, on instruments that did not know a layer can own
   its size:**
   - the crowding raster and both coverage instruments rebuilt `footRing` without the page's
@@ -293,10 +342,8 @@ now.
    other base prunes at 0.
 4. **The orchid at one whorl and the RADIAL face are gone by ruling.** The sheet shows what that
    means on the shipped rows.
-5. **New, recorded rather than decided.** An owned width wider than the global would put that
-   layer's ring OUTSIDE the hub's rim. The ring is held at the rim and told (`ringClamped`, Z3, and the block-64
-   row `PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl's`) rather than refused. The foot still takes the
-   owned width.
+5. ~~**An owned width past the outer whorl's.**~~ **RULED (Oct 16): grow the hub** (§1c). The rim
+   hold and its record are gone.
 
 ## 8. Not in CI, said so
 
@@ -330,7 +377,7 @@ The first push (`2a7c483`) ran two gates red. Both were in tools, not the geomet
 
 The edge-profile gate draws its rows from the smoke subset, so block 64 reached it for the first
 time in CI. **E2 fired on one row**: `PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the
-outer whorl's`. The treatment adds **48.783426°** of turn within 2 mm of a rim, against the 45°
+outer whorl's`. (then labelled “its ring HELD at the rim”; since the hub-growth ruling, “the HUB GROWS to its ring”). The treatment adds **48.783426°** of turn within 2 mm of a rim, against the 45°
 allowance.
 
 - **It is the blade's, not the foot-follows change.** With the foot and ring put back on their

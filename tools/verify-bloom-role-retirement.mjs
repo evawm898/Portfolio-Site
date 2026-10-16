@@ -22,6 +22,11 @@
                            Oct 16: a layer's own width drives its foot and ring
                            as well as its blade). Read off the base row's own
                            `scopes` record.
+     (b2) b-hub-grows      the subset of (b) whose stored layer entry (past
+                           layer 1) owns a WIDER width than Petal width — Eva's
+                           second Oct 16 ruling: the hub grows to that ring
+                           instead of holding it at the rim. Its own class so
+                           the prediction is said separately.
      (c1) c-area-rule      a FAN whorl split by per-petal role at 2+ layers
                            whose split area-rule sum is not the one-group sum
                            (restated here from the base descriptors' own widths
@@ -53,7 +58,7 @@
             [--checkpoint c.jsonl]           one line per set built, so a killed run
                                               resumes where it stopped
           node tools/verify-bloom-role-retirement.mjs --merge a.json b.json ...
-            [--expect a=N,b=N,c1=N,c2=N,c3=N,h=N]
+            [--expect a=N,b2=N,b=N,c1=N,c2=N,c3=N,h=N]
           --control  perturbs one holder float and requires the run to FAIL on it */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -62,7 +67,7 @@ import { pathToFileURL } from 'node:url';
 const argv = process.argv.slice(2);
 const argOf = (k) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : null; };
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-const CLASSES = ['a-radial-orchid', 'b-foot-follows', 'c-area-rule', 'c-all-on-grid', 'c-spiral-layers'];
+const CLASSES = ['a-radial-orchid', 'b-hub-grows', 'b-foot-follows', 'c-area-rule', 'c-all-on-grid', 'c-spiral-layers'];
 const HOLD_CLASSES = ['h-spiral-inner'];
 
 if (argv.includes('--merge')) {
@@ -89,7 +94,7 @@ if (argv.includes('--merge')) {
   const exp = argOf('--expect');
   if (exp) {
     const want = Object.fromEntries(exp.split(',').map((kv) => kv.split('=')));
-    const key = { a: 'a-radial-orchid', b: 'b-foot-follows', c1: 'c-area-rule', c2: 'c-all-on-grid', c3: 'c-spiral-layers', h: 'h-spiral-inner' };
+    const key = { a: 'a-radial-orchid', b2: 'b-hub-grows', b: 'b-foot-follows', c1: 'c-area-rule', c2: 'c-all-on-grid', c3: 'c-spiral-layers', h: 'h-spiral-inner' };
     for (const [k, v] of Object.entries(want)) { const got = (byClass[key[k]] || held[key[k]]).length; if (got !== Number(v)) fails.push(`--expect ${k}=${v}: the base records predict ${got}`); }
   }
   if (argv.includes('--list')) for (const c of [...CLASSES, ...HOLD_CLASSES]) { console.log(`\n${c}:`); for (const m of (byClass[c] || held[c])) console.log(`  ${m.moved ? 'MOVED' : 'HELD '} ${m.tag} :: ${m.label}${m.detail ? ` — ${m.detail}` : ''}`); }
@@ -167,6 +172,7 @@ function predict(st, rowScopes) {
   }
   /* (b) and (c3), from the base state and the base row's OWN stored scopes */
   const stored = rowScopes && Array.isArray(rowScopes.layers) ? rowScopes.layers : [];
+  if (String(st.scopeLayers) === 'ON' && (st.placement === 'RADIAL' || st.placement === 'SPIRAL') && stored.some((e) => e.layer > 0 && e.offsets && Number(e.offsets.petalWidth) > 0)) return { cls: 'b-hub-grows', detail: `a stored layer entry past layer 1 owns a width past Petal width (${st.placement}) — the hub grows to its ring` };
   if (String(st.scopeLayers) === 'ON' && (st.placement === 'RADIAL' || st.placement === 'SPIRAL') && stored.some((e) => e.offsets && 'petalWidth' in e.offsets)) return { cls: 'b-foot-follows', detail: `a stored layer entry owns petalWidth under per-layer values (${st.placement})` };
   if (String(st.scopeLayers) === 'ON' && st.placement === 'SPIRAL' && stored.length) return { cls: 'c-spiral-layers', detail: 'stored layer entries, inert on the base (RADIAL only), live under a spiral now' };
   if (st.placement === 'SPIRAL' && rs.some((r) => r.role === 'INNER' && valueMoves(r))) return { cls: 'h-spiral-inner', hold: true, detail: 'INNER record on a spiral — migrates onto turn entries (Oct 16) and must build to the bit' };

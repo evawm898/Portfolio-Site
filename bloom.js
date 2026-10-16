@@ -1699,7 +1699,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
 function materialLines(ui, mode) {
   /* Ring 0 — the outermost, which is the ring this line has always reported
      and the one the hub is built on (hub.radius IS rings[0].radius in every
-     placement). The inner rings' radii are on the arrangement line, where the
+     placement, unless the hub grew for an owned ring — told on its own line). The inner rings' radii are on the arrangement line, where the
      depth that produced them is also visible. */
   /* With the build's own scopes (the role retirement, Oct 16): a layer that owns
      its width builds its own foot and ring, and through the area rule that moves
@@ -1861,6 +1861,17 @@ function sphereLine(rings, fr, mode) {
        + ` · RESERVED POLE clear: nearest foot ${d.reserved.mm.toFixed(2)} mm (${d.reserved.deg.toFixed(2)}°) from it, ring ${d.reserved.ring} at ${(near.slope * 180 / Math.PI).toFixed(2)}° — blades converge over it, feet run the other way`
        + ` · face pole: nearest foot end ${d.faceReach.mm.toFixed(2)} mm along the meridian${d.faceReach.crossing ? ` (${d.faceReach.crossing} of ${rings.length} feet cross it)` : ''}`
        + (d.clamped ? ` · (CLAMPED: the area rule's ${fr.derivedRadius.toFixed(2)} mm ring is under one sheet, the sphere is held at ${d.floorRadius.toFixed(2)} mm — the shell's inner face would invert)` : '') + `\n`;
+}
+
+/* THE HUB GREW FOR AN OWNED RING (Eva's ruling, Oct 16, replacing the rim
+   hold): a layer under Per-layer values that owns a width past Petal width asks
+   for a ring past layer 1's, and the hub's rim moves out to it rather than the
+   ring being held. footRing()'s own record, `hub.growth`, never re-derived:
+   which layer, by how much, from what. Empty where the hub is the area rule's. */
+function hubGrowthLine(fr, mode) {
+  const g = fr.hub && fr.hub.growth;
+  if (!g) return '';
+  return `HUB GROWN (${mode}) ${g.fromMm.toFixed(2)} -> ${g.toMm.toFixed(2)} mm (+${g.byMm.toFixed(2)} mm, ${g.factor.toFixed(3)}x) to fit layer ${g.layer + 1}'s ring — it owns a width past Petal width, so its ring sits ON the grown rim and every other layer keeps its own place\n`;
 }
 
 function domeLine(rings, fr, mode) {
@@ -3086,6 +3097,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built ? spacingVarianceLine(built.spacingVariance, built.neighbour) : '')
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
+       + hubGrowthLine(fr, mode)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
@@ -3644,6 +3656,8 @@ window.__bloomMetrics = () => ({
      multi-layer is over-determined and the gate cannot tell a correct hub
      from an incorrect one. J3 below is the assertion that can. */
   hubRadius: lastHub.radius,
+  /* THE HUB'S GROWTH FOR AN OWNED RING (Oct 16) — footRing()'s record, or null. */
+  hubGrowth: lastHub.growth ? { ...lastHub.growth } : null,
   hubThickness: lastHub.thickness,
   /* THE STEM AND THE HUB-TO-STEM JOIN (session 43) — ST0-ST6's measured side.
      `stem` is NULL and not absent when there is no stem: ST1 distinguishes "the
@@ -4231,10 +4245,10 @@ window.__bloomMetrics = () => ({
     domeLean: r.domeLean,
     authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
     /* A LAYER'S OWN WIDTH (Oct 16) — the value its foot and ring were built
-       from where it owns one (null where the ramp placed them), the ring's
-       factor on the hub radius, and whether a deeper ring was held at the rim:
+       from where it owns one (null where the ramp placed them) and the ring's
+       factor on R0 (past 1 the hub grows to it — `hubGrowth` below):
        footRing()'s own record, read by panel route (ag). */
-    ownWidth: r.ownWidth ?? null, ringFactor: r.ringFactor ?? null, ringClamped: !!r.ringClamped,
+    ownWidth: r.ownWidth ?? null, ringFactor: r.ringFactor ?? null,
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing

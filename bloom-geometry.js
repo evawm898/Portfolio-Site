@@ -1586,8 +1586,13 @@ export function layerOwnedValues(scopes, layer, n, state) {
   const term = scopeOffsetsFor(scopes, { layer, slot: 0, n, state });
   if (!term || !term.owns) return null;
   const out = resolvePetalTerms(state, null, null, null, term);
+  /* `out === null` is the resolver's own word for "nothing moved" — the petal
+     takes the state as it is — so an owned value then IS the state's. Never
+     reached on the shipped path (an owned base always rides in the offsets the
+     resolver adds); a mutant that drops the scope stage reaches it, and must
+     read as the global rather than throw. */
   const own = {};
-  for (const k of SCOPE_LAYER_OWNED) if (term.owns[k]) own[k] = out[k];
+  for (const k of SCOPE_LAYER_OWNED) if (term.owns[k]) own[k] = out !== null && k in out ? out[k] : Number(state[k]);
   return own;
 }
 
@@ -1932,7 +1937,7 @@ export function footRing(state, acc, opts = {}) {
          exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
       const footCount = 1;
       sumSq += footCount * rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale, ringClamped: false });
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
@@ -1950,11 +1955,12 @@ export function footRing(state, acc, opts = {}) {
          RING   `R0 * ownWidth / petalWidth` — the ramp's own law, ring radius
                 in proportion to the petal's width (under the ramp both are
                 `scale` times the outer whorl's), with the owned width in
-                place of the ramped one. Layer 1's ring IS the hub's rim (J2's
-                identity: one quantity), so it stays there and only its foot
-                follows; a deeper layer asking for a ring wider than the rim is
-                HELD at the rim and told (`ringClamped`), because a foot outside
-                the hub is joined to nothing (J2 / J3).
+                place of the ramped one. Layer 1's ring stays R0 (only its foot follows);
+                a deeper layer asking for a ring wider than R0 is NOT held:
+                the HUB GROWS to the widest such ring (Eva's ruling, Oct 16 —
+                "grow the hub instead of holding the ring at the rim"), so that
+                ring sits ON the rim exactly as layer 1's does and its foot runs
+                inward by its own overhang (J3); see `hubGrowth` below.
        THE WIDTH AND NOT THE LENGTH places the ring because both are width
        questions — the ring is where n feet sit side by side, and the foot is a
        fraction of the blade's width; nothing in the foot or the ring is a
@@ -1970,15 +1976,14 @@ export function footRing(state, acc, opts = {}) {
     const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;
     const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
-    const ringAsked = ownWidth === null || L === 0 ? null : ownWidth / state.petalWidth;
-    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ringAsked);
+    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;
     /* The group is the whole whorl and `footCount` is `state.petalCount` (or
        the fan's derived count) — the SAME DOUBLE the pre-role expression
        multiplied by, deliberately read unrounded exactly as that expression
        read it. */
     const footCount = slotCount;
     sumSq += footCount * rFoot * rFoot;
-    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor, ringClamped: ringAsked !== null && ringAsked > 1 });
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor });
   }
   }
 
@@ -2022,9 +2027,24 @@ export function footRing(state, acc, opts = {}) {
   const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
   const R0 = derivedRadius * state.spread;         // the ONLY use of spread
+  /* THE HUB GROWS TO THE WIDEST OWNED RING (Eva's ruling, Oct 16, replacing the
+     rim hold). A layer that owns a width wider than Petal width asks for a ring
+     at `R0 x own / petalWidth`, past layer 1's; the hub's rim moves out to the
+     widest such ring, which then sits ON the rim exactly as layer 1's ring does
+     (its feet run inward by their own overhang — the clearance J3 asserts —
+     and nothing pokes past the rim that layer 1's feet do not). Every ring is
+     still placed by its own law, so every other layer keeps the pure radial
+     shift the area rule gives it (SO12) and moves no further. `Rhub` is the one
+     radius the rim, the dome and the hub read; with no layer past the outer
+     whorl it is R0 itself, BY BRANCH (the same double, no product formed). */
+  let growFactor = 1, growLayer = -1;
+  for (let k = 0; k < raw.length; k++) if (raw[k].ownWidth !== null && raw[k].ringFactor > growFactor) { growFactor = raw[k].ringFactor; growLayer = k; }
+  const Rhub = growLayer >= 0 ? R0 * growFactor : R0;
+  const hubGrowth = growLayer >= 0 ? { layer: growLayer, factor: growFactor, fromMm: R0, toMm: Rhub, byMm: Rhub - R0 } : null;
   /* ===================================================================
-     THE DOME (Sep 4) — a spherical cap through the rim (R0, z = 0) rising
-     H = headRise * R0 at the axis: Rd = (R0^2 + H^2) / 2H, centre on the axis
+     THE DOME (Sep 4) — a spherical cap through the rim (Rhub, z = 0 — R0
+     itself unless the hub grew for an owned ring) rising H = headRise * Rhub
+     at the axis: Rd = (R0^2 + H^2) / 2H, centre on the axis
      at H - Rd. ONE OWNER: every ring's height, slope and arc from the apex
      are stamped here; the petal builder, the hub builder and the centre read
      them and compute nothing. Null under the guard, so the flat path below is
@@ -2064,16 +2084,16 @@ export function footRing(state, acc, opts = {}) {
   })() : domeIsFlat(state) ? null : (() => {
     const rise = state.headRise;
     const floor = HEAD_RISE_MIN_RADIUS_FACTOR * thickness;
-    let H = rise * R0;
+    let H = rise * Rhub;
     /* AT RISE 1 THE CAP IS A HEMISPHERE AND Rd IS R0 EXACTLY — written so,
        not left to (2 R0^2) / (2 R0), which rounds a ULP either side of R0
        and puts the rim ring's height at sqrt(a rounding residue) instead of
        0: a 2e-7 mm "height" that made the gate's arc position of the rim
        row disagree with the owner's by 4e-9 (measured on the orchid row). */
-    let Rd = rise === 1 ? R0 : (R0 * R0 + H * H) / (2 * H);
+    let Rd = rise === 1 ? Rhub : (Rhub * Rhub + H * H) / (2 * H);
     let clamped = false;
-    if (Rd < floor) { clamped = true; Rd = floor; H = floor - Math.sqrt(floor * floor - R0 * R0); }
-    return { rise, riseBuilt: H / R0, H, Rd, centreZ: H - Rd, clamped, floorRadius: floor, surfaceToPlan: null };
+    if (Rd < floor) { clamped = true; Rd = floor; H = floor - Math.sqrt(floor * floor - Rhub * Rhub); }
+    return { rise, riseBuilt: H / Rhub, H, Rd, centreZ: H - Rd, clamped, floorRadius: floor, surfaceToPlan: null };
   })();
   /* THE SURFACE LAW, ONE HELPER FOR BOTH DESCRIPTOR KINDS (session 21): where
      a plan radius (or, on the sphere, a polar angle) lands on the head the
@@ -2223,9 +2243,9 @@ export function footRing(state, acc, opts = {}) {
       footCount: p.footCount,
       /* A LAYER'S OWN WIDTH, WHERE IT OWNS ONE (Oct 16) — the value its foot
          and ring were built from, null where the ramp placed them; and the
-         ring's factor on R0 (the ramp's `scale` where nothing is owned), and
-         whether a deeper layer's ring was held at the hub's rim. */
-      ownWidth: p.ownWidth, ringFactor: p.ringFactor, ringClamped: p.ringClamped,
+         ring's factor on R0 (the ramp's `scale` where nothing is owned; past
+         1 the hub grows to it — `hub.growth`). */
+      ownWidth: p.ownWidth, ringFactor: p.ringFactor,
       authoredWidth: p.authoredWidth,
       widthClamped: p.authoredWidth < FOOT_MIN_WIDTH_MM,
       /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the
@@ -2286,20 +2306,22 @@ export function footRing(state, acc, opts = {}) {
      only; nothing geometric reads it. */
   if (dome && !sphere) {
     const rIn = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
-    const plan = Math.PI * (R0 * R0 - rIn * rIn);
-    const surf = 2 * Math.PI * dome.Rd * (Math.sqrt(dome.Rd * dome.Rd - rIn * rIn) - Math.sqrt(Math.max(0, dome.Rd * dome.Rd - R0 * R0)));
+    const plan = Math.PI * (Rhub * Rhub - rIn * rIn);
+    const surf = 2 * Math.PI * dome.Rd * (Math.sqrt(dome.Rd * dome.Rd - rIn * rIn) - Math.sqrt(Math.max(0, dome.Rd * dome.Rd - Rhub * Rhub)));
     dome.surfaceToPlan = plan > 0 ? surf / plan : 1;
   }
 
-  /* THE HUB the junction is built on. Its radius is R0, which is
+  /* THE HUB the junction is built on. Its radius is Rhub: R0, which is
      layers[0].radius exactly — not a `Math.max` over the layers, because a max
      would be a SECOND derivation that merely happens to agree, and the
-     one-owner rule is about which is which. Containment is asserted (J2/J3)
-     rather than achieved by picking the largest. */
+     one-owner rule is about which is which — EXCEPT where a layer owns a width
+     past the outer whorl's, where it is that layer's ring (`hubGrowth` above,
+     which names the ring it grew for, so it is still one owner and not a max
+     over everything). Containment is asserted (J2/J3) rather than achieved. */
   /* ON THE SPHERE THE HUB'S RADIUS IS THE SPHERE'S — the equator, which
      every ring's plan radius is under by construction (Rd sin phi <= Rd).
      Cap and flat: R0, verbatim. */
-  const hub = { radius: sphere ? dome.Rd : R0, thickness, derivedRadius, dome };
+  const hub = { radius: sphere ? dome.Rd : Rhub, thickness, derivedRadius, dome, growth: hubGrowth };
 
   /* THE REPRODUCTIVE PARTS' OWN RADIUS — ONE OWNER (session 24). A filament
      and a style are each ONE SHEET THICK (Part thickness owns the material
