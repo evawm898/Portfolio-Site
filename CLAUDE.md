@@ -901,6 +901,35 @@ clauses, J8's curve arm or block 62).
   `node tools/shot-bloom-spine-curve.mjs <dir>` → `docs/img/spine-curve.png`; drag cost:
   `node tools/bloom-spine-curve-drag-cost.mjs`.
 
+**THE PETAL OUTLINE CAN BE DRAWN: A CURVE ARM INSIDE `widthProfile`'s CORE TERM, THE LEAF'S NIB CLOSING IT
+AT EXACTLY THE ASKED LENGTH, AND THE WIDTH FLOOR ONE PREDICATE FOR THE EDITOR AND THE BUILD** (F6-sym, Oct 17
+— Eva's rulings Q6.1–Q6.4; read `docs/bloom-outline-curve-outcome.md` before touching `outlineCurvePlan`,
+`outlineCurveRefusal`, `OUTLINE_CURVE_SPEC`, `curveFunction`, widthProfile's `outline` arm, OC0–OC2 or block 65).
+- `petalOutlineMode` (Petal shape, a CHOICE: LAW / CURVE, default LAW — byte-identical by branch) and
+  `petalOutlineCurve` (kind `curve`, `symmetric` only, PCHIP, fractions of `petalLength`). CURVE replaces the
+  whole boundary law: the tip/base taper and tip shape and end are hidden and inert, and lobes and fringe are
+  ineligible (`fringeEngaged` / `lobesEligible` gain `!outlineIsCurve`, both files). The root blend and foot
+  stay the hub's (a separate term `max`-ed under the curve).
+- **The nib is `leafNibPlan`, NOT `apexNibPlan`**: it solves its start so the drawn length IS the slider
+  (Q6.1), where the petal's own plan overshoots. The last point is held at (1, 0); the nib takes over where
+  the curve crosses `TIP_HALF_MM`. All five sheet shapes land in the FLOOR regime, corners 0.3–4.8°.
+- **The floor is one predicate**: `outlineCurvePlan` lifts every non-last point at or under `TIP_HALF_MM` to
+  the floor + `OUTLINE_LIFT_MM` (2^-10) and records it; `outlineCurveRefusal` is the editor's validator over
+  the same records at every asked length the build drew. PCHIP cannot dip between two cleared points, so
+  the floor is crossed once, in the last span (the nib's). OC2 asserts an accepted curve is never lifted.
+- `bloom-curve.js` gained `curveFunction` (the exact PCHIP; the sampler is bit-identical to main) — the
+  ONE law; OC1 restates the outline from the CONTROL's points through it against `petalRingProfileBase`
+  (worst difference 0).
+- Decisions without a ruling: `petalWidth` sets only the foot in CURVE mode; the tube is ineligible; `NU`
+  is `NU_BASE`; sepals and leaves are pinned LAW (Q6.7 is their session).
+- **Infill works on every shape, the waisted spoon included — no refusal needed.** The ladder concentrates
+  on a sharp curve (diamond apex 0.0150 vs 0.0806 uniform) but the 1.40 gap bound limits it at a
+  sub-mm crest (a third job for `LADDER_MAX_GAP_FACTOR`; retake if that arm moves).
+- `verify-bloom-surface-bytes.mjs` now hands the build each row's `@scopes` (it built scoped rows without
+  them) and carries `--movers-predicate outline`.
+- Block 65 (16 rows, 1315), smoke block 65 (5); five witnessed mutants; `frozen/phase71` = the 1,299 rows at
+  `8d8fba1`. Sheet: `node tools/shot-bloom-outline-curve.mjs <dir>` → `docs/img/outline-curve.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

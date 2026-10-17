@@ -91,11 +91,32 @@ const lightRef = (page) => page.evaluate(async () => {
 const same = (a, b) => !!a && !!b && a.tris === b.tris && a.fnv === b.fnv;
 const fmtD = (d) => (d ? `${d.tris} tris #${d.fnv.toString(16)}` : 'none');
 
+/* THE SLIDER'S BOX, TAKEN ONLY ONCE THE LAYOUT HAS STOPPED MOVING AND THE
+   SLIDER IS WHAT SITS UNDER ITS OWN CENTRE. Opening every section and the
+   export click both re-flow the panel for a few frames, and a box measured
+   mid-reflow sends the press to whatever moved under it. AND THE PANEL IS AN
+   ACCORDION, so opening EVERY section in document order lets a later top-level
+   section close the slider's own — measured: after the export, Petal and Petal
+   shape read open=false and the "Part thickness" summary sat where the box had
+   been taken, so no drag began and D1/D2 read a drag that never happened. Only
+   the slider's own ancestors are opened now. A press point that is not the
+   slider is a harness failure and THROWS, never a quiet miss. */
 async function sliderBox(page) {
-  await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
+  await page.evaluate((id) => {
+    for (let d = document.getElementById(id).closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true;
+  }, SLIDER);
   const s = page.locator(`#${SLIDER}`);
-  await s.scrollIntoViewIfNeeded();
-  return s.boundingBox();
+  let prev = null;
+  for (let i = 0; i < 40; i++) {
+    await s.scrollIntoViewIfNeeded();
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const b = await s.boundingBox();
+    const hit = b && await page.evaluate(([id, x, y]) => document.elementFromPoint(x, y) === document.getElementById(id),
+      [SLIDER, b.x + b.width * 0.5, b.y + b.height / 2]);
+    if (b && hit && prev && b.x === prev.x && b.y === prev.y && b.width === prev.width) return b;
+    prev = b;
+  }
+  throw new Error(`#${SLIDER} never settled under its own centre (last box ${JSON.stringify(prev)})`);
 }
 
 /* ---------------- one full run of the clauses ---------------- */
@@ -146,13 +167,19 @@ async function runClauses(port, bloomJsOverride = null) {
   /* D1 + D2 — a real mouse drag, released by pointerup ALONE */
   await guard(async () => {
     const { browser, page } = await fresh(INFILL);
-    const b = await sliderBox(page);
-    const x0 = b.x + b.width * 0.3, y = b.y + b.height / 2;
+    let b = await sliderBox(page);
+    const x0 = b.x + b.width * 0.3;
+    let y = b.y + b.height / 2;
     /* put the thumb under x0 first (a click jumps it there and builds full),
        so the measured drag below can come back to the value it began on */
     await page.mouse.click(x0, y);
     await settleBuild(page);
     const full0 = await fullRef(page);
+    /* the export CLICKS #exportStl, which can scroll and re-flow the panel, so
+       the slider's box is taken again after it; the thumb's x is a fraction of
+       the track and does not move with a vertical scroll */
+    b = await sliderBox(page);
+    y = b.y + b.height / 2;
     /* D2 is the release that ONLY pointerup can see: the drag returns to its
        starting value, so the browser fires no 'change' on release and the
        slider's own change listener queues nothing. A drag that ends on a new
