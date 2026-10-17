@@ -188,7 +188,16 @@ note, and an out-of-order outline is refused whole and told.
 Predeclared from the build's own predicate (`--movers-predicate outline`: a row moves iff
 `outlineIsCurve`). Measured over the whole live matrix in both modes against a worktree of `8d8fba1`:
 
-PARTITION_RESULT
+**PASS — 15 MOVED / 1,300 HELD over the 1,315-row live matrix, in both modes, positionally under
+`Object.is`.** 0 floats moved on any holder, over 1,612,173,924 export floats (179,130,436 triangles) and
+79,417,516 captured-grid values. Every one of the 15 predeclared movers moved.
+
+- **The 15 movers are block 65's CURVE rows**, exactly as the predicate predeclares.
+- **The 1,300 holders are all 1,299 of main's rows, plus block 65's GATED row** (LAW mode with a spoon
+  stored, so the curve is hidden and inert). That row reads bit-identical to the default through the base
+  tree, whose geometry has never heard of the field.
+- So every LAW row moves 0 floats in both modes. The partition was run as three range shards closed by
+  `--merge`.
 
 `verify-bloom-surface-bytes.mjs` gained two things, both needed before it could build this matrix at all:
 
