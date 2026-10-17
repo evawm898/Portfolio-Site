@@ -949,6 +949,10 @@ bloom.js's `onWidthEdit` / `curveValidatorCtx` or OC3).
 - **The seam is C0, not C1** — no step on any measured state (0 to 8.9e-16 mm), but the slope turns up to 58°
   where a whole-petal curve's narrow start meets the tube's width (inside the 8 mm fusion blend). Matching the
   slope is not built. No row piles at the throat.
+- **The BLEND notch is drawn 23-36% deeper than asked on a CURVE lobe** (1.232 / 1.357 drawn-over-asked at h 0.58
+  / 0.70, against LAW's 0.996 / 1.010): `tubeDippedCurves` turns millimetres into rows at the top four rows' spacing,
+  and a near-vertical lobe margin stretches those rows. Recorded, not fixed (a fix moves LAW notches by up to 1%);
+  TU2's window samples below the drawn notch.
 - **Found and fixed:** under #417 the SEPAL twins of the tapers and tip shape hid whenever the PETAL outline was
   CURVE while the pinned-LAW sepal still read them (`twinPredicate` now drops the petal's outline refs).
   `LAYER_SUBS` requires hidden-at-defaults (identical on main, 10 of 10) so those controls stay in the sweep.

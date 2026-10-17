@@ -152,7 +152,16 @@ PARTITION-RESULT
 - **Five mutants**, each witnessed on the mutated module's own petal record, scoped to four F6-sym-2 rows of the
   apex table:
 
-MUTANT-RESULT
+  | mutant | names | fired |
+  |---|---|---|
+  | `the-outline-width-scale-is-ignored` | OC3, OC1 | AN1, OC1, OC2, OC3 |
+  | `the-width-scale-moves-the-positions` | OC1 | AN1, OC1, OC2 |
+  | `the-curve-starts-below-the-throat` | OC1 | AN1, OC1, OC2 |
+  | `the-throat-width-is-not-pinned` | OC3 | OC1, OC3 |
+  | `the-validator-and-the-build-disagree-on-the-scaled-floor` | OC2 | OC2 |
+
+  Run as a SUBSET (`--only=` these five plus the three #417 outline mutants and `plateau-returns`, 8 of 188 — not a
+  sweep): the clean tree is silent on every row, and every mutant fires every family it names.
 
   Two #417 anchors moved with the change and were re-anchored (`the-outline-curve-is-ignored`, the validator floor
   mutant), as was `plateau-returns`; `--anchors` reads 188 of 188.

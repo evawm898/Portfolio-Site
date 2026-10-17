@@ -40,7 +40,9 @@ const slug = (s) => s.replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 60);
 const sha = (buf) => crypto.createHash('sha1').update(buf).digest('hex').slice(0, 12);
 
 const VIEWS = {
-  top: (f) => ({ r: f.fit * 0.95, at: [0, 0, 0], dir: [0, -0.18, 0.98] }),
+  /* a tubular bloom stands up off the hub, so its top view looks at the bowl's
+     middle from further out (the first render framed the bell's hub corner) */
+  top: (f) => (f.throat ? { r: f.fit * 1.35, at: [0, 0, f.L * 0.3], dir: [0, -0.18, 0.98] } : { r: f.fit * 0.95, at: [0, 0, 0], dir: [0, -0.18, 0.98] }),
   profile: (f) => ({ r: f.fit * 1.05, at: [0, 0, f.L * 0.25], dir: [0.1, -0.94, 0.34] }),
   /* the throat of petal 0, from the tube's own report (the ring's top row at
      that petal's midrib), seen from outside and a little above */
