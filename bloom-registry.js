@@ -85,7 +85,7 @@ import { SCOPE_TOGGLE_VALUES, SCOPE_LAYER_PLACEMENTS, mirrorFor } from './bloom-
    geometry). bloom-curve.js imports nothing, so no cycle is possible. */
 import { cloneCurve, curveEquals, curveSpecProblems } from './bloom-curve.js';
 import { CURL_MODES, SPINE_CURVE_SPEC, SPINE_CURVE_DEFAULT, spineCurveRefusal, spineCurveLaw, spineCurveFloorRadiusMm } from './bloom-geometry.js';
-import { OUTLINE_MODES, OUTLINE_CURVE_SPEC, OUTLINE_CURVE_DEFAULT, outlineCurveRefusal, outlineCurvePlan } from './bloom-geometry.js';
+import { OUTLINE_MODES, OUTLINE_CURVE_SPEC, OUTLINE_CURVE_DEFAULT, OUTLINE_WIDTH_REF_MM, outlineCurveRefusal, outlineCurvePlan, outlineWidthScale } from './bloom-geometry.js';
 
 /* THE CONTROL KINDS, ONE LIST. A row's `kind` must be one of these (checked
    at module load by verifySections), and every reader that branches on a
@@ -862,6 +862,13 @@ export const PREDICATES = {
      hidden AND inert; the harness checks the two statements agree (OC0). */
   outlineFromLaw: { id: 'petalOutlineMode', oneOf: ['LAW'] },
   outlineFromCurve: { id: 'petalOutlineMode', oneOf: ['CURVE'] },
+  /* WHERE THE LAW'S SHAPE CONTROLS ARE LIVE (F6-sym-2): in LAW mode, and in
+     CURVE mode on a tubular flower, where the tube keeps its own law BELOW the
+     throat (Eva's ruling) — the two tapers and the tip shape draw it there, so
+     they show (a control that moves geometry is never hidden). The squared
+     end stays LAW-only: it is the fringe's partner and the curve stands both
+     down. The geometry's half is widthProfile's `tubeLaw`; OC0 compares. */
+  outlineLawShapes: { any: [{ ref: 'outlineFromLaw' }, { all: [{ ref: 'outlineFromCurve' }, { ref: 'tubeAnyFused' }] }] },
   stemPresent: { id: 'stemLength', min: 1 },
   /* THE FLORIST'S CUT (Eva's ruling 7, stem session 3). The registry's
      statement of the geometry's `stemCutAbsent`: the control is live wherever
@@ -991,9 +998,8 @@ export const PREDICATES = {
     { not: { ref: 'varianceSpacingPresent' } },
     { not: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
     { id: 'fringeCount', oneOf: ['0'] },
-    /* the outline curve is its own petal (F6-sym) — the twin of the geometry's
-       `if (outlineIsCurve(state)) return false;` */
-    { ref: 'outlineFromLaw' },
+    /* (F6-sym-2: the outline curve WORKS on a tube — #417's `outlineFromLaw`
+       term is withdrawn here and in the geometry's twin, Eva's ruling) */
     { not: { ref: 'infillPresent' } },
     { not: { ref: 'inflorescencePresent' } },
   ] },
@@ -1948,8 +1954,15 @@ export const CONTROLS = [
   { id: 'petalLength', section: 'shape', kind: 'slider', min: 20, max: 60, step: 1, default: 35,
     label: 'Petal length', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
-  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 30, step: 1, default: 16,
-    label: 'Petal width', fmt: (v, ui) => (ui && ui.petalOutlineMode === 'CURVE' ? `${v} mm — sets the FOOT only (the hub's); the blade's width is the drawn outline's` : `${v} mm`), tier: 'standard', role: 'petal',
+  /* THE WIDTH IN CURVE MODE SCALES THE DRAWN CURVE (F6-sym-2, Eva's ruling):
+     every point's width times `petalWidth / 16` (the default, which is the
+     geometry's OUTLINE_WIDTH_REF_MM — imported, one owner), the lengthwise
+     positions untouched; at the default the outline is #417's to the bit. A
+     width drag that would put a scaled point under the print floor is REFUSED
+     by the outline's own validator (bloom.js) and the editor's status says
+     which point. It still sets the foot, as in LAW mode. */
+  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 30, step: 1, default: OUTLINE_WIDTH_REF_MM,
+    label: 'Petal width', fmt: (v, ui) => (ui && ui.petalOutlineMode === 'CURVE' ? `${v} mm — scales the drawn outline's widths ${outlineWidthScale({ petalWidth: v }).toFixed(3)}x (against ${OUTLINE_WIDTH_REF_MM} mm), and sets the foot` : `${v} mm`), tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
   /* ===================================================================
@@ -1982,11 +1995,12 @@ export const CONTROLS = [
        re-derived */
     fmt: (v, ui) => {
       const L = Number(ui.petalLength);
-      const pl = outlineCurvePlan(v, L);
-      const narrow = Math.min(...v.points.slice(0, -1).map((p) => p[1] * L));
-      return `${v.points.length} points · widest ${(2 * pl.peakHalfMm).toFixed(1)} mm at ${(pl.uPk * 100).toFixed(0)}% of ${L.toFixed(0)} mm · narrowest point ${(2 * narrow).toFixed(2)} mm across against a 1.60 mm floor${pl.lifted.length ? ` (${pl.lifted.length} point${pl.lifted.length === 1 ? '' : 's'} LIFTED — a loaded curve; the editor refuses such a drag)` : ''}`;
+      const scale = outlineWidthScale(ui);
+      const pl = outlineCurvePlan(v, L, { scale });
+      const narrow = Math.min(...v.points.slice(0, -1).map((p) => p[1] * scale * L));
+      return `${v.points.length} points${scale === 1 ? '' : ` at ${scale.toFixed(3)}x width`} · widest ${(2 * pl.peakHalfMm).toFixed(1)} mm at ${(pl.uPk * 100).toFixed(0)}% of ${L.toFixed(0)} mm · narrowest point ${(2 * narrow).toFixed(2)} mm across against a 1.60 mm floor${pl.lifted.length ? ` (${pl.lifted.length} point${pl.lifted.length === 1 ? '' : 's'} LIFTED — a loaded curve; the editor refuses such a drag)` : ''}`;
     },
-    validate: (cand, ui, ctx) => outlineCurveRefusal(cand, ui, ctx && ctx.askedLengthsMm),
+    validate: (cand, ui, ctx) => outlineCurveRefusal(cand, ui, ctx && (ctx.outlinePetals || ctx.askedLengthsMm)),
     visibleWhen: { ref: 'outlineFromCurve' } },
 
   /* SILHOUETTE (Eva, Aug 31 — phase 3). All Standard: geometry and
@@ -2029,7 +2043,7 @@ export const CONTROLS = [
   { id: 'petalBaseTaper', section: 'shape', kind: 'slider', min: 0.3, max: 3, step: 0.05, default: 1,
     label: 'Base taper', tier: 'standard', role: 'petal',
     fmt: (v) => `${Number(v).toFixed(2)}${Number(v) < 0.7 ? ' (broad base)' : Number(v) > 1.6 ? ' (narrow base)' : ''}`,
-    visibleWhen: { ref: 'outlineFromLaw' } },
+    visibleWhen: { ref: 'outlineLawShapes' } },
 
   /* THE PETAL TIP LAW'S ONE CONTROL (Eva, session 32, ruled from the rendered
      sheet). It REPARAMETERISES the tip taper over [widest point, 1] rather
@@ -2067,7 +2081,7 @@ export const CONTROLS = [
         : 'the held-width round tip';
       return `${n.toFixed(2)} · ${name}`;
     },
-    visibleWhen: { ref: 'outlineFromLaw' } },
+    visibleWhen: { ref: 'outlineLawShapes' } },
   { id: 'petalTipTaper', section: 'shape', kind: 'slider', min: 0.6, max: 4, step: 0.05, default: 1.8,
     label: 'Tip taper', tier: 'standard', role: 'petal',
     /* Prints the DERIVED widest point. One owner: the geometry computes
@@ -2078,7 +2092,7 @@ export const CONTROLS = [
       const a = ui ? Number(ui.petalBaseTaper) : 1;
       return `${b.toFixed(2)} · widest at ${(a / (a + b)).toFixed(2)}`;
     },
-    visibleWhen: { ref: 'outlineFromLaw' } },
+    visibleWhen: { ref: 'outlineLawShapes' } },
 
   /* ===================================================================
      LOBES ON THE RIM (session 38, PR 2 — read bloom-geometry.js's LOBES block
@@ -4857,8 +4871,15 @@ export const CONTROLS = [
    because the twins READ the petal rows and an array literal cannot read
    itself. Order within a section is registry order, and the sepal sections
    sit between Center and Stem, so the rows go there. */
+/* A SEPAL IS PINNED LAW (`sepalBladeState`), so the PETAL's outline mode is
+   not a sepal's: a twin of a law control drops the petal's outline-mode refs
+   (F6-sym-2 — found while extending them: under #417 the sepal's tapers and
+   tip shape HID whenever the petal outline was CURVE, while the pinned-LAW
+   sepal still read every one of them — hidden and live). */
+const PETAL_OUTLINE_REFS = new Set(['outlineFromLaw', 'outlineLawShapes']);
 function twinPredicate(pred, map) {
   if (Array.isArray(pred)) return pred.map((p) => twinPredicate(p, map));
+  if (pred && typeof pred === 'object' && PETAL_OUTLINE_REFS.has(pred.ref)) return { all: [] };
   if (pred && typeof pred === 'object') {
     const out = {};
     for (const [k, val] of Object.entries(pred)) {

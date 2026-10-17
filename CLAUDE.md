@@ -920,7 +920,8 @@ AT EXACTLY THE ASKED LENGTH, AND THE WIDTH FLOOR ONE PREDICATE FOR THE EDITOR AN
 - `bloom-curve.js` gained `curveFunction` (the exact PCHIP; the sampler is bit-identical to main) — the
   ONE law; OC1 restates the outline from the CONTROL's points through it against `petalRingProfileBase`
   (worst difference 0).
-- Decisions without a ruling: `petalWidth` sets only the foot in CURVE mode; the tube is ineligible; `NU`
+- Decisions without a ruling: ~~`petalWidth` sets only the foot in CURVE mode; the tube is ineligible~~ **[Oct 17:
+  both RULED and SUPERSEDED by F6-sym-2 — the width scales the curve, CURVE works on a tube; see the block below]**; `NU`
   is `NU_BASE`; sepals and leaves are pinned LAW (Q6.7 is their session).
 - **Infill works on every shape, the waisted spoon included — no refusal needed.** The ladder concentrates
   on a sharp curve (diamond apex 0.0150 vs 0.0806 uniform) but the 1.40 gap bound limits it at a
@@ -929,6 +930,31 @@ AT EXACTLY THE ASKED LENGTH, AND THE WIDTH FLOOR ONE PREDICATE FOR THE EDITOR AN
   them) and carries `--movers-predicate outline`.
 - Block 65 (16 rows, 1315), smoke block 65 (5); five witnessed mutants; `frozen/phase71` = the 1,299 rows at
   `8d8fba1`. Sheet: `node tools/shot-bloom-outline-curve.mjs <dir>` → `docs/img/outline-curve.png`.
+
+**IN CURVE MODE PETAL WIDTH SCALES THE DRAWN CURVE, AND CURVE WORKS ON A TUBE — THE CURVE ON THE FREE LOBE,
+ITS FIRST WIDTH PINNED TO THE TUBE'S OWN LAW AT THE THROAT** (F6-sym-2, Oct 17 — Eva's two rulings; read
+`docs/bloom-outline-curve-2-outcome.md` before touching `outlineWidthScale`, `OUTLINE_WIDTH_REF_MM`,
+`outlineCurvePlan`'s `scale` / `throat`, widthProfile's `tubeLaw` / `OUTLINE_LOBE` term, `outlineLawShapes`,
+bloom.js's `onWidthEdit` / `curveValidatorCtx` or OC3).
+- **The scale** is `ps.petalWidth / 16` on every point's y, never its x, a BRANCH at 16 (#417's bytes). The
+  registry imports the 16 as the slider's default; the harness restates it (`OUTLINE_WIDTH_REF_RULED_MM`) and
+  refuses to load if the default moves. A width drag that would put a scaled point under the floor is REFUSED
+  by the outline's own validator (a window capture listener: the slider goes back, the editor says which point).
+  **A design saved since `1bb7c35` with CURVE and a width other than 16 reshapes on load — no migration.**
+- **The tube:** `tubeEligible` no longer refuses CURVE (both files). On a fused whorl (`cap.tubeLobe`) the
+  outline below the DECLARED fusion height `tubeHeight` is the LAW (CORE, to the throat), the curve above it is
+  its own term `OUTLINE_LOBE` (so the hand-over is a TERM_CHANGE the breaks name) with x laid over the lobe and
+  the first point PINNED to the law's half-width there — never refused, never lifted, recorded as `pinned`.
+  The tapers and tip shape therefore SHOW on a tubular CURVE flower (`outlineLawShapes`); the squared end does not.
+- **The seam is C0, not C1** — no step on any measured state (0 to 8.9e-16 mm), but the slope turns up to 58°
+  where a whole-petal curve's narrow start meets the tube's width (inside the 8 mm fusion blend). Matching the
+  slope is not built. No row piles at the throat.
+- **Found and fixed:** under #417 the SEPAL twins of the tapers and tip shape hid whenever the PETAL outline was
+  CURVE while the pinned-LAW sepal still read them (`twinPredicate` now drops the petal's outline refs).
+  `LAYER_SUBS` requires hidden-at-defaults (identical on main, 10 of 10) so those controls stay in the sweep.
+- OC3 (scale and throat against the controls), OC1/OC2/AN restated with both; five witnessed mutants; seven CURVE
+  states in `verify-bloom-tube.mjs`. Block 66 (19 rows, 1334), smoke block 66 (6); `frozen/phase72` = the 1315
+  rows at `1bb7c35`. Sheet: `node tools/shot-bloom-outline-curve-2.mjs <dir>` → `docs/img/outline-curve-2.png`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

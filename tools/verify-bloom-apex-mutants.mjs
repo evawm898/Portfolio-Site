@@ -629,6 +629,18 @@ const OUTLINE_UNDER_PTS = { mode: 'symmetric', points: [[0, 0.05], [0.2, 0.015],
 const OUTLINE_LAWSET = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_SPOON, petalTipShape: 3, petalBaseTaper: 3, petalTipTaper: 4, petalTipEnd: 1, lobeDepth: 0.3 });
 const OUTLINE_UNDER = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_UNDER_PTS });
 const OUTLINE_MUTANTS = /^(the-outline-curve-is-ignored|teeth-still-cut-in-curve-mode|the-outline-curve-reaches-the-foot|the-outline-length-is-not-fitted|the-outline-validator-and-the-build-disagree-on-the-floor)$/;
+/* F6-sym-2: the width scale and the throat. The witness states: the default
+   curve at 24 mm and at 12 mm (a scale either side of 1), the long tail at
+   10 mm (its narrow run under the floor ONLY at the scaled width — the clean
+   validator refuses and the build lifts), and the default curve on a fused
+   five-petal tube. */
+const OUTLINE_DEF_PTS = { mode: 'symmetric', points: [[0, 0.05], [0.15, 0.16], [0.36, 0.2286], [0.7, 0.178], [0.9, 0.1], [1, 0]] };
+const OUTLINE_TAIL_PTS = { mode: 'symmetric', points: [[0, 0.06], [0.15, 0.14], [0.3, 0.12], [0.5, 0.05], [0.85, 0.03], [1, 0]] };
+const OUTLINE_W = (w, pts = OUTLINE_DEF_PTS) => () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: pts, petalWidth: w });
+const OUTLINE_TUBE = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_DEF_PTS, petalCount: 5, tubeLayer1: 0, tubeHeight: 0.4 });
+const blandDiff = (m, c) => Math.max(...m.base.map((h, i) => (Number.isFinite(h) && Number.isFinite(c.base[i]) ? Math.abs(h - c.base[i]) : 0)));
+const OUTLINE2_MUTANTS = /^(the-outline-width-scale-is-ignored|the-width-scale-moves-the-positions|the-curve-starts-below-the-throat|the-throat-width-is-not-pinned|the-validator-and-the-build-disagree-on-the-scaled-floor)$/;
+const OUTLINE2_ROWS = /^a scaled outline curve|^a tubular outline curve/;
 const OUTLINE_ROWS = /^an outline curve|^a loaded outline curve/;
 /* The tier rows run under the tier mutants alone (`rowsFor` below), and the
    tier mutants run over the rows that name them. */
@@ -828,8 +840,8 @@ const MUTANTS = [
     /* (and in S5, where the chevron arm takes the broad-sinus fillet's floor
        on a branch; and in F6-sym, where an outline curve takes the term on a
        branch ahead of the chevron) */
-    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
+    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: tubeLaw ? tubeLaw.u : 1, at: tubeLaw ? tubeLaw.at : outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: tubeLaw ? tubeLaw.u : 1, at: tubeLaw ? tubeLaw.at : outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -2783,7 +2795,7 @@ const MUTANTS = [
      triangle count, each witnessed on the MUTATED module's own petal record.
      Scoped to the two outline rows (and they to these), the tier precedent. */
   { id: 'the-outline-curve-is-ignored', why: 'the CORE term keeps the law in CURVE mode, so the petal is drawn from the hidden tapers and tip shape while the editor shows a curve — a visible control doing nothing and hidden ones doing everything',
-    find: 'at: outline ? outline.halfAtMm : chev ?', into: 'at: chev ?', names: ['OC1'], rows: OUTLINE_ROWS,
+    find: 'at: tubeLaw ? tubeLaw.at : outline ? outline.halfAtMm : chev ?', into: 'at: tubeLaw ? tubeLaw.at : chev ?', names: ['OC1'], rows: OUTLINE_ROWS,
     witness: (M, C) => { const m = outlinePetal(M, OUTLINE_LAWSET()), c = outlinePetal(C, OUTLINE_LAWSET());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       /* the foot rows carry no base half-width (undefined) — compare the blade's */
@@ -2807,11 +2819,45 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.length - m.asked) > 1e-6 && c.length === c.asked) ? null : `the mutant drew ${m.length} mm of ${m.asked} asked; the clean tree ${c.length} of ${c.asked}`; } },
   { id: 'the-outline-validator-and-the-build-disagree-on-the-floor', why: 'the validator asks the LIVE mesh floor (0.15 mm) while the build lifts at the print floor (0.80), so a drag the editor accepts builds a lifted outline — the one thing the refusal exists to make impossible',
-    find: '      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L };',
-    into: '      else if (f.askedMm <= TIP_CAP_HALF_MM && (!worst || f.askedMm < worst.askedMm)) worst = { ...f, L };', names: ['OC2'], rows: OUTLINE_ROWS,
+    find: '      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L: a.lengthMm, scale: a.scale };',
+    into: '      else if (f.askedMm <= TIP_CAP_HALF_MM && (!worst || f.askedMm < worst.askedMm)) worst = { ...f, L: a.lengthMm, scale: a.scale };', names: ['OC2'], rows: OUTLINE_ROWS,
     witness: (M, C) => { const m = outlinePetal(M, OUTLINE_UNDER()), c = outlinePetal(C, OUTLINE_UNDER());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (c.refusal == null || !c.lifted) return `the clean tree does not refuse and lift the under-floor outline (refusal ${JSON.stringify(c.refusal)}, lifted ${c.lifted}) — the probe is outside the mutant's subject`;
+      return (m.refusal == null && m.lifted > 0) ? null : `the mutant's validator still answers ${JSON.stringify(m.refusal)} on an outline the build lifts (${m.lifted})`; } },
+  /* ===== THE OUTLINE CURVE'S FOLLOW-UPS (F6-sym-2 — docs/bloom-outline-curve-2-
+     outcome.md). Five plausible wrong answers to Eva's two rulings, each
+     watertight and one piece at the same triangle count, each witnessed on the
+     MUTATED module's own petal record. Scoped to the four F6-sym-2 rows. */
+  { id: 'the-outline-width-scale-is-ignored', why: 'Petal width keeps setting only the foot in CURVE mode (#417\'s behaviour), so a 24 mm petal draws the 16 mm curve — Eva ruled the width SCALES the drawn widths',
+    find: '      const scale = outlineWidthScale(state);\n      const pl = outlineCurvePlan(', into: '      const scale = 1;\n      const pl = outlineCurvePlan(', names: ['OC3', 'OC1'], rows: OUTLINE2_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_W(24)()), c = outlinePetal(C, OUTLINE_W(24)());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const d = blandDiff(m, c);
+      return d > 0.5 ? null : `the mutant's 24 mm outline is within ${d} mm of the clean tree's — the scale still applies`; } },
+  { id: 'the-width-scale-moves-the-positions', why: 'the width scale is applied to the points\' x as well as y, so a narrower petal also moves its widest point toward the base — the ruling scales WIDTHS, the lengthwise positions are fractions of the length and stay',
+    find: '    return [p[0], y];\n  });\n  const fn = curveFunction(built, OUTLINE_CURVE_SPEC);', into: '    return [p[0] * Math.min(1, scale), y];\n  });\n  const fn = curveFunction(built, OUTLINE_CURVE_SPEC);', names: ['OC1'], rows: OUTLINE2_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_W(12)()), c = outlinePetal(C, OUTLINE_W(12)());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const d = blandDiff(m, c);
+      return d > 0.1 ? null : `the mutant's 12 mm outline is within ${d} mm of the clean tree's — the positions did not move`; } },
+  { id: 'the-curve-starts-below-the-throat', why: 'on a tube the curve is still laid over the WHOLE blade and read from the throat up, so the lobe shows the curve\'s middle rather than its start — Eva\'s call puts the curve\'s first point AT the throat',
+    find: '  const u0 = throat ? throat.u : 0;', into: '  const u0 = 0;', names: ['OC1'], rows: OUTLINE2_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_TUBE()), c = outlinePetal(C, OUTLINE_TUBE());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const d = blandDiff(m, c);
+      return d > 0.5 ? null : `the mutant's tubular outline is within ${d} mm of the clean tree's — the lobe map did not move`; } },
+  { id: 'the-throat-width-is-not-pinned', why: 'on a tube the curve\'s first point keeps the hand\'s width, so the lobe steps off the tube\'s own width at the throat — watertight on a fixed lattice, a visible ledge',
+    find: '    if (i === 0 && throat) {', into: '    if (false && i === 0 && throat) {', names: ['OC3'], rows: OUTLINE2_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_TUBE()), c = outlinePetal(C, OUTLINE_TUBE());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const i = c.u.findIndex((u) => u >= 0.4);
+      return Math.abs(m.base[i] - c.base[i]) > 0.5 ? null : `the mutant's first row above the throat is ${m.base[i]} mm against the clean tree's ${c.base[i]} — no step`; } },
+  { id: 'the-validator-and-the-build-disagree-on-the-scaled-floor', why: 'the validator asks about the UNSCALED points while the build lifts the scaled ones, so a narrow Petal width the editor accepts builds a lifted outline — the refusal and the lift are one decision',
+    find: '    for (const f of outlineCurvePlan(curve, a.lengthMm, { scale: a.scale, throat }).lifted) {', into: '    for (const f of outlineCurvePlan(curve, a.lengthMm, { scale: 1, throat }).lifted) {', names: ['OC2'], rows: OUTLINE2_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_W(10, OUTLINE_TAIL_PTS)()), c = outlinePetal(C, OUTLINE_W(10, OUTLINE_TAIL_PTS)());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (c.refusal == null || !c.lifted) return `the clean tree does not refuse and lift the tail at 10 mm (refusal ${JSON.stringify(c.refusal)}, lifted ${c.lifted}) — the probe is outside the mutant's subject`;
       return (m.refusal == null && m.lifted > 0) ? null : `the mutant's validator still answers ${JSON.stringify(m.refusal)} on an outline the build lifts (${m.lifted})`; } },
 ];
 
@@ -3384,6 +3430,16 @@ const ROWS = [
           { id: 'petalTipShape', value: '3' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipEnd', value: '1' }, { id: 'lobeDepth', value: '0.3' }] },
   { label: 'a loaded outline curve with a point UNDER the print floor (0.525 mm half-width against 0.80 — refused by the validator, lifted by the build)', for: OUTLINE_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_UNDER_PTS) }] },
+  /* F6-sym-2: the width scale either side of 1, the scaled floor, and the
+     throat on a fused tube. Scoped to the F6-sym-2 mutants. */
+  { label: 'a scaled outline curve at petalWidth 24 (the widths x1.5)', for: OUTLINE2_MUTANTS,
+    set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_DEF_PTS) }, { id: 'petalWidth', value: '24' }] },
+  { label: 'a scaled outline curve at petalWidth 12 (the widths x0.75)', for: OUTLINE2_MUTANTS,
+    set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_DEF_PTS) }, { id: 'petalWidth', value: '12' }] },
+  { label: 'a scaled outline curve at petalWidth 10 set in LAW first (the long tail under the floor only at the scaled width — refused and lifted)', for: OUTLINE2_MUTANTS,
+    set: [{ id: 'petalWidth', value: '10' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_TAIL_PTS) }] },
+  { label: 'a tubular outline curve (5 petals, k 0 at fusion height 0.40, the default curve on the lobe)', for: OUTLINE2_MUTANTS,
+    set: [{ id: 'petalCount', value: '5' }, { id: 'tubeLayer1', value: '0' }, { id: 'tubeHeight', value: '0.4' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_DEF_PTS) }] },
 ];
 
 /* ===================================================================

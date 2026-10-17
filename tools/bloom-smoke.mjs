@@ -1485,6 +1485,33 @@ export const SMOKE_BLOCKS = [
         path: "OC0's LAW arm (the mode's two statements both LAW; the curve stored and read by nothing), A5 / A6 on the law, and the byte tool's partition (a holder)" },
     ],
   },
+  {
+    n: 66, title: 'the outline curve\'s follow-ups — width scales the curve, CURVE on a tube (Oct 17, F6-sym-2)',
+    anchor: 'OUTLINE CURVE 2: the default curve x petalWidth 24 (the widths x1.5, the positions unmoved)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       plan's WIDTH SCALE (every point's y times the Petal width over 16, a
+       branch at 16), the THROAT arm (on a fused whorl the curve laid over the
+       lobe, its first point pinned to the tube law's half-width, the law's own
+       CORE term below the throat and an OUTLINE_LOBE term above it), and the
+       tube's eligibility no longer refusing a CURVE petal. The anchor is the
+       first row (a block's range starts at its anchor), the width scale's plain case; the bell, a ring with a tilt past 70 and a cup, carries the throat.
+       --conn is REQUIRED (the throat seam is new geometry). */
+    conn: true,
+    rows: [
+      { label: 'OUTLINE CURVE 2: the BELL with a drawn lobe',
+        path: "OC3 (the throat at the control's fusion height, the first point pinned to the tube law restated from the ring's own tapers and tip shape, the scale 1), OC1 (below the throat the restated LAW, above it the restated curve laid over the lobe), OC2, AN1/AN2's curve arm on the lobe, TU0/TU1 (the tube available under CURVE); --conn witnesses the throat seam is one piece" },
+      { label: 'OUTLINE CURVE 2: the default curve x petalWidth 24 (the widths x1.5, the positions unmoved)',
+        path: "OC3's scale arm (1.5 from the ring's own width over the ruled 16 mm), OC1 on the scaled curve (the widths scaled, the stations not), OC2's peak at the scaled width" },
+      { label: 'OUTLINE CURVE 2: petalWidth 10 set in LAW, then the long tail (its narrow run under the floor at 0.625x — LIFTED and told, never a refused drag)',
+        path: "OC2's refusal arm at a SCALED width (the validator and the build refuse and lift the same scaled points), OC3's scale arm below 1" },
+      { label: 'OUTLINE CURVE 2: TUBE — a lobe curve x 6 petals x k 2 (slit — the edge petals keep their outer halves from the foot)',
+        path: "OC1 on a slit whorl (the edge petals' own outer halves read the law below the throat and the curve above), TU0/TU1 on a slit k" },
+      { label: 'OUTLINE CURVE 2: TUBE — a lobe curve x 3 whorls, only the first fused (k 0 / FREE / FREE)',
+        path: "OC3's free arm (the inner whorls carry NO throat; the outer one does), OC1 per ring on both arms" },
+      { label: 'OUTLINE CURVE 2: the TRUMPET with a drawn lobe',
+        path: "OC3 at the long fusion height (0.58), OC1 with a curl reaching the blend, AN2 (the drawn length is the slider's on the lobe)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
