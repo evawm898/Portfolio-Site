@@ -2010,6 +2010,28 @@ function spineLine(petals) {
    what say the record is right. Every ring, because an inner whorl's blade
    can be too narrow to clear the floor at all and then only that ring is
    inert. */
+/* THE OUTLINE CURVE (F6-sym): the plan's own record on every ring — the
+   widest point, the narrowest drawn point against the floor, any point the
+   build LIFTED (a loaded curve; the editor refuses such a drag), and how the
+   nib closed it at exactly the asked length (the regime `leafNibPlan` took
+   and the corner it turned). Reads the builder's record and re-derives none
+   of it; OC0-OC2 are what say the record is right. */
+function outlineLine(petals) {
+  const ps = (petals || []).filter((p) => p && p.tipCap && p.tipCap.outline);
+  if (!ps.length) return '';
+  const o0 = ps[0].tipCap.outline, ap0 = ps[0].tipCap.apex;
+  const lifted = ps.filter((p) => p.tipCap.outline.lifted.length);
+  const of = (arr) => `${arr.length} of ${ps.length} ring${ps.length === 1 ? '' : 's'}`;
+  const narrow = Math.min(...ps.map((p) => Math.min(...p.tipCap.outline.built.slice(0, -1).map((q) => q[1] * p.tipCap.outline.lengthMm))));
+  const kink = Math.max(...ps.map((p) => p.tipCap.apex.kinkDeg || 0));
+  return `OUTLINE CURVE: ${o0.points.length} points, widest ${(2 * o0.peakHalfMm).toFixed(2)} mm at u ${o0.uPk.toFixed(3)}`
+       + ` · narrowest drawn point ${(2 * narrow).toFixed(2)} mm across against the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor`
+       + (lifted.length ? ` (LIFTED to the floor on ${of(lifted)} — a loaded curve asks under it; the editor refuses such a drag)` : '')
+       + ` · the tapers, tip shape, squared end, lobes and fringe are INERT`
+       + (ap0 && ap0.active ? ` · the nib closes it at exactly ${ap0.drawnLengthMm.toFixed(3)} mm (${ap0.regime} regime, leaving the curve ${(2 * ap0.startHalfMm).toFixed(2)} mm across${kink > 0 ? `, a ${kink.toFixed(2)}° corner at the join` : ', tangent'})` : ` · NIB INERT (${ap0 ? ap0.why : 'no record'})`)
+       + `\n`;
+}
+
 function apexLine(petals) {
   const ps = (petals || []).filter((p) => p && p.tipCap && p.tipCap.apex);
   if (!ps.length) return '';
@@ -3104,6 +3126,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + spineLine(petals)
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
+       + outlineLine(petals)
        + apexLine(petals)
        + tipRowBudgetLine(lastTipRowBudget)
        + infillLine(petals)
@@ -4288,6 +4311,9 @@ window.__bloomMetrics = () => ({
      clause that is about a RING may not read it. */
   petalRingTipCap: lastPetals.map((p) => (p ? p.tipCap : null)),
   petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
+  /* EVERY RING'S BASE OUTLINE (F6-sym): OC1 restates the outline curve on
+     every ring's own emitted rows, not the last petal's alone. */
+  petalRingProfileBase: lastPetals.map((p) => (p ? p.profileBase : null)),
   /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
      `continuousMode` is what every assertion branches on, `sequenceLength` is
      what the legibility flag counts, and each descriptor's own `footCount`

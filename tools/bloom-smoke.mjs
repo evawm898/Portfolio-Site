@@ -1459,6 +1459,32 @@ export const SMOKE_BLOCKS = [
         path: "Z2's inert arm (no descriptor carries a scope term under CONTINUOUS), and the byte tool's partition (a holder)" },
     ],
   },
+  {
+    n: 65, title: 'the outline curve (Oct 17, F6-sym)',
+    anchor: 'OUTLINE CURVE: a SPOON on a claw (spatulate — narrow, then wide near the tip: a waisted, non-convex blade)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       widthProfile's CURVE arm (the CORE term read off the drawn half-curve,
+       the squared end, the lobes and the fringe standing down), the fitted nib
+       (`leafNibPlan` on a petal, so the drawn length is the slider's), the
+       LIFT of a point a file loaded under the floor (the refusal and the lift
+       one decision), the base row count in CURVE mode, and the GATED row's
+       branch (LAW mode with a curve stored). The anchor is the spoon: the one
+       shape the law cannot draw at all (a waist, then a wide end). --conn is
+       REQUIRED (a new outline law). */
+    conn: true,
+    rows: [
+      { label: 'OUTLINE CURVE: a SPOON on a claw (spatulate — narrow, then wide near the tip: a waisted, non-convex blade)',
+        path: "OC1 (every row below the nib on the curve restated from the control's points, the foot's own blend under it), OC0 (the mode's two statements, the base row count, no lobe or fringe record), OC2 (accepted and not lifted), AN1/AN2's curve arm (the fitted nib rebuilt on the restated curve, the drawn length the slider's exactly), C1 (the spine at the asked length), A4 (the terminal the nib's face); --conn is the witness that a drawn outline is one piece" },
+      { label: 'OUTLINE CURVE: a LOADED curve with a point UNDER the print floor (a file can hold one — LIFTED and told; the editor refuses such a drag)',
+        path: "OC2's refusal arm (the validator REFUSES at this length, the build LIFTS exactly the refused point, the bar restated), OC1 on the lifted curve, the OUTLINE CURVE read-out's LIFTED clause" },
+      { label: 'OUTLINE CURVE: the hidden law family set (tip shape 3, tapers 3 / 4, squared end 1, lobes 0.3, fringe 4 — INERT; bit-identical to the default-curve row)',
+        path: "OC0's inert arm (no lobe or fringe record, the base row count although the tip shape asks the apex ramp), A4's terminal with the squared end inert, L0 / FR0's two statements standing the rim family down" },
+      { label: 'OUTLINE CURVE: the spoon x the Voronoi infill (cells on a waisted, non-convex blade)',
+        path: "the infill family on a drawn outline (I0-I12 over the curve's own lamina), OC1 under the cells' basal panel" },
+      { label: 'OUTLINE CURVE: GATED — LAW mode with a spoon stored (hidden and inert; bit-identical to the default)',
+        path: "OC0's LAW arm (the mode's two statements both LAW; the curve stored and read by nothing), A5 / A6 on the law, and the byte tool's partition (a holder)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

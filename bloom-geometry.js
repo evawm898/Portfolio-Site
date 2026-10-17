@@ -31,7 +31,7 @@ export const MIN_FEATURE_MM = 1.0;
 /* THE CURVE VALUE'S ONE SAMPLER (F3-global, the spine curve). bloom-curve.js is
    pure and owns the drawn curve; the spine curve law below derives curvature
    from its samples and never restates the law. */
-import { curveSamples } from './bloom-curve.js';
+import { curveSamples, curveFunction } from './bloom-curve.js';
 
 /* THE DEFAULT sheet thickness, in mm. Until the thickness layer this was the
    thickness — one constant read at both call sites, so foot, blade and tip
@@ -4837,7 +4837,20 @@ const PANEL_OVERLAP_ROWS = 1;
 export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   const a = state.petalBaseTaper;
   const b = state.petalTipTaper;
-  const uPkRaw = a / (a + b);                                     // the derived widest point
+  /* THE OUTLINE CURVE (F6-sym): in CURVE mode the CORE term is the drawn
+     half-curve and nothing of the boundary law below is read — the taper, the
+     tip shape, the squared terminal, the lobes and the fringe are hidden AND
+     inert. A PETAL's outline only: a leaf, a leaflet, a claw's stalk and a
+     lobed chevron each declare their own cap and keep their own law (their
+     states pin LAW anyway). Null on every LAW build, so every expression below
+     is the one it was, by branch. */
+  const outline = outlineIsCurve(state) && !(cap && (cap.petiole || cap.chevron || cap.stalk))
+    ? (() => {
+      if (!(length > 0)) throw new Error('widthProfile: an outline curve needs the blade LENGTH in mm — its points are fractions of it');
+      return outlineCurvePlan(outlineCurveOf(state), length);
+    })()
+    : null;
+  const uPkRaw = outline ? outline.uPk : a / (a + b);             // the derived widest point (the curve's own, in CURVE mode)
   const gPk = Math.pow(uPkRaw, a) * Math.pow(1 - uPkRaw, b);         // normalise the peak to 1
   const core = (u) => (Math.pow(u, a) * Math.pow(1 - u, b)) / gPk;
   const footHalf = ring.width / 2;
@@ -4882,7 +4895,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      with no rounded sinus declares no `roundAt`. */
   const chev = (cap && cap.chevron) || null;
   const terms = [
-    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
@@ -4945,7 +4958,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      narrowed and the maximum is not adaptive. `stamenSpread`'s ruling
      exactly: the read-out prints the number and the panel hatches the
      track. =================================================================== */
-  const tipEnd = clamp(Number(state.petalTipEnd) || 0, TIP_END_RANGE[0], TIP_END_RANGE[1]);
+  const tipEnd = outline ? 0 : clamp(Number(state.petalTipEnd) || 0, TIP_END_RANGE[0], TIP_END_RANGE[1]);
   const terminalHalf = tipEnd * halfW;
   if (terminalHalf > 0) terms.push({ name: 'TERMINAL', from: uPkRaw, to: 1, at: () => terminalHalf });
 
@@ -5018,7 +5031,12 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      (`leafNibPlan`), so the outline below the nib is the one it was, to the
      bit. On a lobed blade the nib is planned on the ENVELOPE
      (no lobes), so all three of its profiles share one nib and one length. */
-  const apex = petiole
+  /* AN OUTLINE CURVE CLOSES ON THE LEAF'S CONSTRUCTION TOO (F6-sym, Q6.1):
+     the drawn length is ALWAYS the slider's, so the nib's start is solved to
+     end the blade at exactly `length` and the curve below it is drawn to the
+     bit — never the petal's reparameterisation, which would report a length
+     the slider did not ask for. */
+  const apex = (petiole || outline)
     ? leafNibPlan(chev ? (u) => halfW * tipLaw(u) : shapeBaseRaw, rootBlendRaw, uPkRaw, length)
     : apexNibPlan(shapeBaseRaw, rootBlendRaw, uPkRaw, length);
   const toLaw = apex.active ? apex.toLaw : (v) => v;
@@ -5822,7 +5840,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   const laminaHalfAt = laminaHalf;
   const fringe = (() => {
     const asked = Math.round(clamp(Number(state.fringeCount) || 0, FRINGE_COUNT_RANGE[0], FRINGE_COUNT_RANGE[1]));
-    if (asked < 1) return null;
+    if (asked < 1 || !fringeEngaged(state)) return null;   // an outline curve stands the fringe down (F6-sym)
     /* NO ROOM — A FRINGE NEEDS AN END TO CUT TEETH INTO, and this is where
        "one feature" stops being a sentence in a doc and becomes a branch.
        A terminal that does not clear the print floor leaves the petal
@@ -5932,6 +5950,16 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
 
   return {
     uPk, terms, footHalf, uCap, tipFloor,
+    /* THE OUTLINE CURVE'S PLAN (F6-sym) — null on every LAW build. The points
+       the control holds, the points the build drew (a refused point LIFTED and
+       told), the curve's own widest point, and the page module's validator
+       answer at this petal's length, so OC2 can hold "accepted => not lifted"
+       against the one owner rather than a Node import the page never ran. */
+    outline: outline ? {
+      points: outline.points, built: outline.built, lifted: outline.lifted, uPk: outline.uPk,
+      peakHalfMm: outline.peakHalfMm, lengthMm: outline.lengthMm,
+      refusal: outlineCurveRefusal(outlineCurveOf(state), state, [length]),
+    } : null,
     /* THE NIB'S PLAN — the ONE owner of the drawn length and of the terminal
        half-width, reported so C1 and A2 can read what the builder actually
        drew instead of assuming it equals the control and the mode floor. */
@@ -6704,8 +6732,11 @@ export function lobesEngaged(state) { return !!state.lobeDepth; }
    FRINGE WINS (Eva, Sep 13). Neither file can read the other's answer and
    both must act on it, which is why there are two statements and why the
    harness asserts they agree at module load and on every row (FR0). */
-export function fringeEngaged(state) { return Math.round(Number(state.fringeCount) || 0) >= 1; }
-export function lobesEligible(state) { return !fringeEngaged(state); }
+export function fringeEngaged(state) { return !outlineIsCurve(state) && Math.round(Number(state.fringeCount) || 0) >= 1; }
+/* AN OUTLINE CURVE STANDS THE WHOLE RIM FAMILY DOWN (F6-sym: "teeth, lobes
+   and fringe are disabled and hidden while it is on") — the registry's twins
+   carry the same arm (`outlineFromLaw`). */
+export function lobesEligible(state) { return !outlineIsCurve(state) && !fringeEngaged(state); }
 /* THE LADDER'S CAPACITY FOR A WINDOW — how many of its free rows it can
    place inside [u0, u1] without the rows OUTSIDE breaking its own widest-gap
    bound (LADDER_MAX_GAP_FACTOR / NU in u, or uniform at the buckle's
@@ -7405,6 +7436,117 @@ export function spineCurveRefusal(curve, state, askedLengthsMm) {
 }
 
 /* ===================================================================
+   THE OUTLINE CURVE (F6-sym, Oct 17 — Eva's rulings Q6.1-Q6.4, feature map
+   §5 and §11; read docs/bloom-outline-curve-outcome.md before touching any
+   of it). A `petalOutlineMode` of CURVE replaces the WHOLE boundary law — the
+   width and the apex shape — with the points of `petalOutlineCurve`, ONE
+   half-curve mirrored about the midrib (symmetric mode; two-sided is a later
+   session). LAW is today, the default, and byte-identical by BRANCH: nothing
+   below is read unless the mode says CURVE.
+
+   WHAT THE POINTS MEAN. x along the blade and y the HALF-width, both as
+   FRACTIONS OF THE PETAL'S ASKED LENGTH (the editor's own rule, Q6.1), so the
+   half-width at blade station u is `y(u) * L`. The curve is a FUNCTION of x
+   (`monotoneX`) and is read through bloom-curve.js's exact PCHIP evaluator
+   (`curveFunction` — the same Hermite on the same tangents as the editor's
+   sampler), never Catmull-Rom and never a polyline: the outline is evaluated
+   at every row, bisection and 4096-grid probe, and a polyline would hand the
+   turning ladder a kink at every sample. PCHIP is C1 everywhere, so the curve
+   adds NO tangent break to `slopeBreaks`; the breaks it has are the hand-overs
+   to the root blend and to the nib, which the term list already names.
+
+   IT IS A TERM INSIDE `widthProfile`, the CORE term's CURVE arm — so the nib,
+   the edge bead, the ladder, the rim arc table, the lamina and the infill all
+   read the curved outline through the one owner, unchanged (the feature
+   map's own requirement). The ROOT BLEND stays a separate term max-ed under
+   it exactly as today (Q6.2: the curve starts above the root blend; the foot
+   is the hub's), and so do the print floors.
+
+   THE ENDS. The first point sits at x 0 with a free width; the last is held
+   at (1, 0) — the curve runs out to nothing at the blade's end, and the
+   EXISTING ROUND NIB closes it from where it meets the 1.60 mm tip width
+   (Q6.3 / Q6.4). The nib is `leafNibPlan` — the petal's own construction with
+   its START solved so the blade ends at EXACTLY the asked length (Q6.1: "the
+   drawn length always equals the length slider — fit, never report a
+   difference"; the leaf's precedent, S5). The outline below the nib is the
+   curve to the bit; above it, the flank and the arc.
+
+   THE WIDTH FLOOR (Q4.4's refusal, the spine's precedent): every point but
+   the last must stand STRICTLY above the print floor's half-width
+   (TIP_HALF_MM, mode-free) at every asked length the build drew. Between two
+   such points PCHIP cannot dip under the lower of them (it is
+   shape-preserving), so the curve crosses the floor ONCE, in its last span —
+   which is exactly the run-out the nib owns. `outlineCurveRefusal` is the
+   editor's validator; the build reads the SAME predicate on the same
+   doubles (`outlineCurvePlan`) and, for a curve a FILE loaded or a later
+   slider made too narrow (a shorter inner whorl), LIFTS each refused point to
+   the floor plus `OUTLINE_LIFT_MM` and tells it — the modifiers' own treatment.
+   So a curve the validator accepts is never lifted at the length it was asked
+   about, and that is asserted (OC2), never argued.
+   =================================================================== */
+export const OUTLINE_MODES = Object.freeze(['LAW', 'CURVE']);
+export function outlineIsCurve(state) { return state.petalOutlineMode === 'CURVE'; }
+export function outlineCurveOf(state) {
+  const v = state.petalOutlineCurve;
+  return typeof v === 'string' ? JSON.parse(v) : v;
+}
+/* THE SPEC — the registry imports it. `symmetric` only: two-sided is a later
+   session, and a mode a spec lists is a mode a hand can reach. y up to half
+   the length (a blade as wide as it is long). */
+export const OUTLINE_CURVE_SPEC = Object.freeze({ modes: ['symmetric'], x: [0, 1], y: [0, 0.5], lock: { first: 'x', last: 'xy' }, monotoneX: true, points: [2, 12], owner: 'petalLength' });
+/* THE DEFAULT is the shipping LAW petal read off at six stations (35 x 16 mm,
+   base 1.00, tip taper 1.80, tip shape 1.70: its widest point 0.357, half-width
+   0.2286 of the length there), so switching the mode on reshapes the default
+   petal by a hair rather than by a jump. A default, not a ruling. */
+export const OUTLINE_CURVE_DEFAULT = Object.freeze({ mode: 'symmetric', points: [[0, 0.05], [0.15, 0.16], [0.36, 0.2286], [0.7, 0.178], [0.9, 0.1], [1, 0]] });
+/* What a refused point is lifted TO in the build: strictly above the floor, so
+   the nib's crossing stays unique and in the last span. A power of two (exact
+   in IEEE-754), a thousandth of a millimetre. */
+export const OUTLINE_LIFT_MM = 2 ** -10;
+/* THE PLAN at one asked length — the ONE owner of which points the build
+   draws, read by the validator and the build alike. */
+export function outlineCurvePlan(curve, lengthMm) {
+  const v = typeof curve === 'string' ? JSON.parse(curve) : curve;
+  const pts = v.points, last = pts.length - 1;
+  const lifted = [];
+  const built = pts.map((p, i) => {
+    if (i === last) {
+      if (p[1] !== 0) lifted.push({ point: i + 1, askedMm: p[1] * lengthMm, builtMm: 0, why: 'the last point is held at 0' });
+      return [p[0], 0];
+    }
+    if (p[1] * lengthMm <= TIP_HALF_MM) {
+      const builtY = (TIP_HALF_MM + OUTLINE_LIFT_MM) / lengthMm;
+      lifted.push({ point: i + 1, askedMm: p[1] * lengthMm, builtMm: builtY * lengthMm, why: 'under the print floor' });
+      return [p[0], builtY];
+    }
+    return [p[0], p[1]];
+  });
+  const fn = curveFunction(built, OUTLINE_CURVE_SPEC);
+  /* the widest point, off the editor's own sampler (the declared peak A6 and
+     the nib read) */
+  let uPk = 0, yPk = -Infinity;
+  for (const [x, y] of curveSamples({ mode: 'symmetric', points: built }, OUTLINE_CURVE_SPEC).left) if (y > yPk) { yPk = y; uPk = x; }
+  return { points: v.points, built, lifted, fn, uPk, peakHalfMm: yPk * lengthMm, lengthMm,
+    halfAtMm: (u) => { const y = fn(Math.min(1, Math.max(0, u))); return y * lengthMm; } };
+}
+/* THE REFUSAL (Q4.4 for the outline): null when every point but the last
+   stands strictly above the print floor at EVERY asked length handed in (the
+   lengths the build on screen drew), and the last is at 0 — else the reason. */
+export function outlineCurveRefusal(curve, state, askedLengthsMm) {
+  const Ls = (askedLengthsMm && askedLengthsMm.length ? askedLengthsMm : [Number(state.petalLength)]).filter((L) => L > 0);
+  let worst = null, lastOff = false;
+  for (const L of Ls) {
+    for (const f of outlineCurvePlan(curve, L).lifted) {
+      if (f.why !== 'under the print floor') lastOff = true;
+      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L };
+    }
+  }
+  if (lastOff) return `the curve's last point must sit at (1, 0) — the blade runs out to nothing and the round nib closes it`;
+  if (worst === null) return null;
+  return `point ${worst.point} would be ${(2 * worst.askedMm).toFixed(2)} mm across on a ${worst.L.toFixed(1)} mm petal — under the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor (only the run-out to the tip may go under it; the nib closes it)`;
+}
+
+/* ===================================================================
    apexScale — THE ONE OWNER of how far the cup and the buckle reach around
    the APEX (session 35).
 
@@ -7956,7 +8098,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
      the top-level control). `NU` is module-scoped and builds are synchronous
      and single-threaded, so it is safe to set here and read by everything
      `widthProfile`/`bladeStations` call for the rest of this petal's build. */
-  NU = bladeRowsFor(ps.petalTipShape);
+  NU = outlineIsCurve(ps) ? NU_BASE : bladeRowsFor(ps.petalTipShape);   // in CURVE mode the tip shape is inert, its apex row ramp with it
   /* THE ASKED LENGTH AND THE DRAWN ONE ARE TWO QUANTITIES (Eva's ruling).
      `petalLength` keeps meaning the length ASKED FOR; the apex nib ends the
      blade where the law meets the print floor and carries a cap on from
@@ -7975,10 +8117,15 @@ export function petalSurface(state, ring, slot, cap, acc) {
      construction `ring.slope` already is, so this line is byte-identical to
      its pre-Sep-4 form whenever headRise is 0. */
   const tilt = ((ps.petalTilt + tiltExtra + ring.domeLean) * Math.PI) / 180;
-  const halfW = bladeAskedWidthMm(ps, widthScale) / 2;
+  const halfWAsked = bladeAskedWidthMm(ps, widthScale) / 2;
   const footHalf = ring.width / 2;
 
-  const profile = widthProfile(ps, ring, halfW, cap, acc, askedLength);
+  const profile = widthProfile(ps, ring, halfWAsked, cap, acc, askedLength);
+  /* THE BLADE'S PEAK HALF-WIDTH: the width slider's in LAW mode; the CURVE's own
+     widest point in CURVE mode (F6-sym), where `petalWidth` sets only the foot
+     (the hub's) — so the roll's wrap angle and every form law scaled by the
+     nominal half-width read the blade that is drawn. */
+  const halfW = profile.outline ? profile.outline.peakHalfMm : halfWAsked;
   /* EVERY DOWNSTREAM READER TAKES THE DRAWN LENGTH — the seam's lattice step,
      the form's own frame, the spine and the stations alike. A seam clearance
      is a length in millimetres, so a shorter blade legitimately spends a
@@ -8978,7 +9125,19 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
            the nib is active, and C1 reads the drawn one. */
         askedLengthMm: profile.askedLength,
         drawnLengthMm: profile.drawnLength,
+        /* THE FITTED NIB'S OWN NUMBERS (F6-sym): an outline curve closes on
+           `leafNibPlan`, whose start is SOLVED so the blade ends at the asked
+           length — which regime it took, the half-width it left the curve at,
+           the curve's own crossing of the floor and the corner (0 in the
+           tangent regime). Null on the petal's own plan, which has none. */
+        regime: profile.apex.regime ?? null,
+        kinkDeg: profile.apex.kinkDeg ?? null,
+        startHalfMm: profile.apex.startHalfMm ?? null,
+        uCross: profile.apex.uCross ?? null,
       },
+      /* THE OUTLINE CURVE'S PLAN (F6-sym), the profile's own record — null on
+         every LAW build. Plain numbers only, for the page boundary. */
+      outline: profile.outline,
     },
     /* THE CARNATION FRINGE AND ITS SQUARED TERMINAL — the plan's own numbers
        plus what the EMITTED rows did with them. Everything derived is
@@ -15113,6 +15272,7 @@ export function leafBladeState(state) {
     petalSpineCurl: state.leafArch === undefined || Number(state.leafArch) === 0 ? 0 : -Number(state.leafArch),
     curlBias: 0, curlStart: 0, buckleAmp: 0,
     petalCurlMode: 'SLIDER',   // the spine curve is the PETALS' (F3-global); leaves get curve mode in their own session (Q4.5)
+    petalOutlineMode: 'LAW',   // the outline curve is the PETALS' (F6-sym); leaves get outline curves in their own session (Q6.7)
     petalTilt: 0, tipThinning: 0,
   };
 }
@@ -18475,7 +18635,7 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
   /* THE SPINE CURVE IS PINNED TO THE SLIDER FAMILY ON A SEPAL (F3-global): the
      sepal's curl is its own twins' (sepalSpineCurl, bias, start) whatever the
      petals' mode; a sepal curve is the sepal session's (Q4.3). */
-  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE', petalCurlMode: 'SLIDER' };
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE', petalCurlMode: 'SLIDER', petalOutlineMode: 'LAW' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
   const own = sepalOwnSize(state);
@@ -20605,6 +20765,10 @@ export function tubeEligible(state) {
   if (Math.abs(Number(state.varianceSpacing) || 0) >= 0.005) return false;
   if (Math.abs(Number(state.buckleAmp) || 0) > 0) return false;
   if (Number(state.fringeCount) >= 1) return false;
+  /* an outline curve is its own petal; the tube's sinus law is the LAW's
+     (F6-sym, a decision made without a ruling — one line here and one in the
+     registry's twin) */
+  if (outlineIsCurve(state)) return false;
   if (state.petalInfill === 'VORONOI') return false;
   if (Number(state.stemLength) >= 1 && state.inflorescence === 'RACEME') return false;
   return true;

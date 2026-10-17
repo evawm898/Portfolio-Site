@@ -51,6 +51,9 @@
          round-trips a hooked spine in CURVE mode verbatim through the shipped
          document walkers, an out-of-box spine is refused whole and told, and
          the control is a curve field of the file.
+     F9  THE OUTLINE CURVE (F6-sym): the second registry curve control
+         round-trips a spoon outline in CURVE mode verbatim, an out-of-order
+         outline is refused whole and told, and it is a curve field of the file.
      F6  THE SCOPE MODEL'S OWN GATE, tools/verify-bloom-scopes.mjs, is SPAWNED
          here (and its --negative-control under ours) so it rides in CI through
          this workflow step — the file's overrides containers are that model's
@@ -367,6 +370,39 @@ async function nodeClauses(F, rec) {
     }
     rec('F8', p, 'the live spine curve: a hooked spine in CURVE mode round-trips verbatim through the shipped document walkers with no note; an out-of-box spine is refused whole and told; the control is a curve field of the file');
   }
+  /* F9 — THE OUTLINE CURVE (F6-sym). `petalOutlineCurve` is the second
+     registry curve: a spoon-shaped outline in CURVE mode round-trips verbatim
+     (every coordinate to the bit, the mode with it) with no note; an outline
+     whose points go back along the length is refused WHOLE and told, the page
+     keeping its curve; and the control is a curve field of the file. */
+  {
+    const p = [];
+    const c = REG.CONTROLS.find((x) => x.id === 'petalOutlineCurve');
+    if (!c || c.kind !== 'curve') p.push(`petalOutlineCurve is ${c ? `of kind ${c.kind}` : 'not a registry control'}`);
+    else {
+      const spoon = { mode: 'symmetric', points: [[0, 0.03], [0.35, 0.05123], [0.65, 0.2], [0.85, 0.22], [0.96, 0.12], [1, 0]] };
+      const st = { ...REG.DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: spoon };
+      const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x' }))));
+      if (!r.ok) p.push(`the spoon outline's document did not read: ${JSON.stringify(r.notes)}`);
+      else {
+        if (r.notes.length) p.push(`a clean round trip of the spoon outline reported ${r.notes.map((n) => n.text).join(' | ')}`);
+        const back = r.doc.controls.petalOutlineCurve;
+        const same = back && back.mode === spoon.mode && back.points.length === spoon.points.length && back.points.every((q, i) => Object.is(q[0], spoon.points[i][0]) && Object.is(q[1], spoon.points[i][1])) && back.right === undefined;
+        if (!same) p.push(`the spoon outline read back as ${JSON.stringify(back)}`);
+        if (r.doc.controls.petalOutlineMode !== 'CURVE') p.push(`the outline mode read back as ${JSON.stringify(r.doc.controls.petalOutlineMode)}`);
+      }
+      const doc = JSON.parse(F.toText(F.composeDoc(REG.DEFAULTS, { savedAt: 'x' })));
+      doc.controls.petalOutlineCurve = { mode: 'symmetric', points: [[0, 0.1], [0.6, 0.2], [0.4, 0.15], [1, 0]] };
+      const r2 = F.readDoc(doc);
+      if (!r2.ok) p.push(`a document with an out-of-order outline did not read at all: ${JSON.stringify(r2.notes)}`);
+      else {
+        if ('petalOutlineCurve' in r2.doc.controls) p.push(`an out-of-order outline was applied as ${JSON.stringify(r2.doc.controls.petalOutlineCurve)} rather than refused whole`);
+        if (!r2.notes.some((n) => n.kind === 'invalid' && /petalOutlineCurve.*not a curve this control can hold.*not past point/.test(n.text))) p.push(`the refusal was not told: ${r2.notes.map((n) => n.text).join(' | ')}`);
+      }
+      if (!F.CONTROL_FIELDS.some((f) => f.control === 'petalOutlineCurve' && f.kind === 'curve')) p.push('petalOutlineCurve is not a curve field of the file');
+    }
+    rec('F9', p, 'the outline curve: a spoon outline in CURVE mode round-trips verbatim through the shipped document walkers with no note; an out-of-order outline is refused whole and told; the control is a curve field of the file');
+  }
 }
 
 /* ---------------- the browser clauses ---------------- */
@@ -534,7 +570,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
@@ -561,7 +597,7 @@ const MUTANTS = [
   /* F3-global: with a LIVE curve control in the registry, dropping the kind's
      writer also reddens the round trip (F1/F2) and the spine-curve rows (F8),
      not only the kinds census. */
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];

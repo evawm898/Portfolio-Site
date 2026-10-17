@@ -334,7 +334,7 @@ export async function adversary(G, file, { log = console.log, only = null, onlyS
 const PLANTS = {
   /* NU is set only when the petal's own tip shape ramps — so a below-band
      build inherits whatever the last ramped petal left. */
-  'nu-sticky': { find: '  NU = bladeRowsFor(ps.petalTipShape);', into: '  if (Number(ps.petalTipShape) > APEX_NU_BAND[0]) NU = bladeRowsFor(ps.petalTipShape);' },
+  'nu-sticky': { find: '  NU = outlineIsCurve(ps) ? NU_BASE : bladeRowsFor(ps.petalTipShape);', into: '  if (Number(ps.petalTipShape) > APEX_NU_BAND[0]) NU = outlineIsCurve(ps) ? NU_BASE : bladeRowsFor(ps.petalTipShape);' },   // re-anchored (F6-sym: an outline curve takes the base row count)
   /* RAMP_FORCE_BASE is cleared only on the path that goes on to a probe, and
      not in the `finally` — so a build the BUDGET HOLDS (the early return)
      leaves it set, and the next ramp-eligible build is pinned at NU_BASE.
