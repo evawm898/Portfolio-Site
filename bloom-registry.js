@@ -85,6 +85,7 @@ import { SCOPE_TOGGLE_VALUES, SCOPE_LAYER_PLACEMENTS, mirrorFor } from './bloom-
    geometry). bloom-curve.js imports nothing, so no cycle is possible. */
 import { cloneCurve, curveEquals, curveSpecProblems } from './bloom-curve.js';
 import { CURL_MODES, SPINE_CURVE_SPEC, SPINE_CURVE_DEFAULT, spineCurveRefusal, spineCurveLaw, spineCurveFloorRadiusMm } from './bloom-geometry.js';
+import { OUTLINE_MODES, OUTLINE_CURVE_SPEC, OUTLINE_CURVE_DEFAULT, outlineCurveRefusal, outlineCurvePlan } from './bloom-geometry.js';
 
 /* THE CONTROL KINDS, ONE LIST. A row's `kind` must be one of these (checked
    at module load by verifySections), and every reader that branches on a
@@ -736,7 +737,7 @@ export const PREDICATES = {
      non-zero count is at least 1 away from 0 and the two statements agree on
      every reachable state; the harness checks that at load and on every row
      (FR0). */
-  fringeEngaged: { id: 'fringeCount', min: 1 },
+  fringeEngaged: { all: [{ ref: 'outlineFromLaw' }, { id: 'fringeCount', min: 1 }] },
   /* LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE, AND THE FRINGE WINS (Eva's
      ruling, Sep 13). Both own the apex — the coverage arc is centred on it
      by construction — and composing them was MEASURED to narrow every finger
@@ -751,7 +752,7 @@ export const PREDICATES = {
      neither file can read the other's answer and both must act on it. The
      read-out says which one is standing down. Recovery is one predicate in
      two files. */
-  lobesEligible: { all: [{ id: 'fringeCount', oneOf: ['0'] }] },
+  lobesEligible: { all: [{ ref: 'outlineFromLaw' }, { id: 'fringeCount', oneOf: ['0'] }] },
 
   /* ===================================================================
      WHERE THE ANDROECIUM APPLIES (session 21, phase 2 B2) — everywhere but
@@ -855,6 +856,12 @@ export const PREDICATES = {
      checked against each other by the harness. */
   curlFromSlider: { id: 'petalCurlMode', oneOf: ['SLIDER'] },
   curlFromCurve: { id: 'petalCurlMode', oneOf: ['CURVE'] },
+  /* THE OUTLINE CURVE (F6-sym) — the registry's statement of the geometry's
+     `outlineIsCurve()`. In CURVE mode the whole boundary law (the two tapers,
+     the tip shape, the squared end) and the rim family (lobes, fringe) are
+     hidden AND inert; the harness checks the two statements agree (OC0). */
+  outlineFromLaw: { id: 'petalOutlineMode', oneOf: ['LAW'] },
+  outlineFromCurve: { id: 'petalOutlineMode', oneOf: ['CURVE'] },
   stemPresent: { id: 'stemLength', min: 1 },
   /* THE FLORIST'S CUT (Eva's ruling 7, stem session 3). The registry's
      statement of the geometry's `stemCutAbsent`: the control is live wherever
@@ -984,6 +991,9 @@ export const PREDICATES = {
     { not: { ref: 'varianceSpacingPresent' } },
     { not: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
     { id: 'fringeCount', oneOf: ['0'] },
+    /* the outline curve is its own petal (F6-sym) — the twin of the geometry's
+       `if (outlineIsCurve(state)) return false;` */
+    { ref: 'outlineFromLaw' },
     { not: { ref: 'infillPresent' } },
     { not: { ref: 'inflorescencePresent' } },
   ] },
@@ -1939,8 +1949,45 @@ export const CONTROLS = [
     label: 'Petal length', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
   { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 30, step: 1, default: 16,
-    label: 'Petal width', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
+    label: 'Petal width', fmt: (v, ui) => (ui && ui.petalOutlineMode === 'CURVE' ? `${v} mm — sets the FOOT only (the hub's); the blade's width is the drawn outline's` : `${v} mm`), tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
+
+  /* ===================================================================
+     THE OUTLINE CURVE (F6-sym, Oct 17 — Eva's rulings Q6.1-Q6.4; read
+     docs/bloom-outline-curve-outcome.md). An outline MODE: LAW is today, the
+     default, byte-identical by branch; CURVE draws the petal's HALF-WIDTH
+     along its length with the points of `petalOutlineCurve`, one half-curve
+     mirrored about the midrib, and replaces the WHOLE boundary law — the two
+     tapers, the tip shape and the squared end hide, and so do the lobes and
+     the fringe (Q6-ruling: "teeth, lobes and fringe are disabled and hidden
+     while it is on"). Petal width STAYS: it sets the foot, which is the hub's
+     (Q6.2). The spec, the default and the refusal are the GEOMETRY's
+     (imported); the points are fractions of Petal length, the drawn length is
+     the slider's exactly (the nib's start is solved for it, Q6.1), and a point
+     narrower than the 1.60 mm print floor is REFUSED at every length the
+     build drew (the run-out to the tip excepted — the round nib closes it).
+     Petals only: sepals and leaves pin LAW (Q6.7 is later). */
+  { id: 'petalOutlineMode', section: 'shape', kind: 'choice', default: OUTLINE_MODES[0],
+    options: [
+      { value: 'LAW', label: 'Law — tapers and tip shape' },
+      { value: 'CURVE', label: 'Curve — draw the outline' },
+    ],
+    label: 'Outline from', tier: 'standard', role: 'petal',
+    fmt: (v) => (v === 'CURVE' ? 'the drawn outline below (the tapers, tip shape, squared end, lobes and fringe are hidden and inert)' : 'the tapers and the tip shape'),
+    visibleWhen: { all: [] } },
+  { id: 'petalOutlineCurve', section: 'shape', kind: 'curve', curve: OUTLINE_CURVE_SPEC, default: OUTLINE_CURVE_DEFAULT,
+    label: 'Outline curve', tier: 'standard', role: 'petal',
+    /* the plan's own numbers for the whole-bloom petal: the widest point and
+       the narrowest point against the floor — from `outlineCurvePlan`, never
+       re-derived */
+    fmt: (v, ui) => {
+      const L = Number(ui.petalLength);
+      const pl = outlineCurvePlan(v, L);
+      const narrow = Math.min(...v.points.slice(0, -1).map((p) => p[1] * L));
+      return `${v.points.length} points · widest ${(2 * pl.peakHalfMm).toFixed(1)} mm at ${(pl.uPk * 100).toFixed(0)}% of ${L.toFixed(0)} mm · narrowest point ${(2 * narrow).toFixed(2)} mm across against a 1.60 mm floor${pl.lifted.length ? ` (${pl.lifted.length} point${pl.lifted.length === 1 ? '' : 's'} LIFTED — a loaded curve; the editor refuses such a drag)` : ''}`;
+    },
+    validate: (cand, ui, ctx) => outlineCurveRefusal(cand, ui, ctx && ctx.askedLengthsMm),
+    visibleWhen: { ref: 'outlineFromCurve' } },
 
   /* SILHOUETTE (Eva, Aug 31 — phase 3). All Standard: geometry and
      silhouette controls are a DESIGN tier, never calibration, and the flower
@@ -1982,7 +2029,7 @@ export const CONTROLS = [
   { id: 'petalBaseTaper', section: 'shape', kind: 'slider', min: 0.3, max: 3, step: 0.05, default: 1,
     label: 'Base taper', tier: 'standard', role: 'petal',
     fmt: (v) => `${Number(v).toFixed(2)}${Number(v) < 0.7 ? ' (broad base)' : Number(v) > 1.6 ? ' (narrow base)' : ''}`,
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'outlineFromLaw' } },
 
   /* THE PETAL TIP LAW'S ONE CONTROL (Eva, session 32, ruled from the rendered
      sheet). It REPARAMETERISES the tip taper over [widest point, 1] rather
@@ -2020,7 +2067,7 @@ export const CONTROLS = [
         : 'the held-width round tip';
       return `${n.toFixed(2)} · ${name}`;
     },
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'outlineFromLaw' } },
   { id: 'petalTipTaper', section: 'shape', kind: 'slider', min: 0.6, max: 4, step: 0.05, default: 1.8,
     label: 'Tip taper', tier: 'standard', role: 'petal',
     /* Prints the DERIVED widest point. One owner: the geometry computes
@@ -2031,7 +2078,7 @@ export const CONTROLS = [
       const a = ui ? Number(ui.petalBaseTaper) : 1;
       return `${b.toFixed(2)} · widest at ${(a / (a + b)).toFixed(2)}`;
     },
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'outlineFromLaw' } },
 
   /* ===================================================================
      LOBES ON THE RIM (session 38, PR 2 — read bloom-geometry.js's LOBES block
@@ -2101,7 +2148,7 @@ export const CONTROLS = [
        track is left alone until there is a low-end hatch to draw it with —
        one field and one CSS rule, mirroring `.bl-ctrl--capped`, the day it is
        wanted. */
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'outlineFromLaw' } },
   { id: 'fringeCount', section: 'fringe', kind: 'slider',
     min: FRINGE_COUNT_RANGE[0], max: FRINGE_COUNT_RANGE[1], step: 1, default: 0,
     label: 'Teeth', tier: 'standard', role: 'petal',
@@ -2126,7 +2173,7 @@ export const CONTROLS = [
            + (F.count > 1 ? ` · the gaps run ${F.gapSplitMm.toFixed(2)} mm to ${F.gapTipMm.toFixed(2)} mm` : ' · no gaps — one tooth is the whole end')
            + ` · the ceiling here is ${F.ceiling}`;
     },
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'outlineFromLaw' } },
   { id: 'fringeDepth', section: 'fringe', kind: 'slider',
     min: FRINGE_DEPTH_RANGE[0], max: FRINGE_DEPTH_RANGE[1], step: 0.01, default: FRINGE_DEPTH_DEFAULT,
     label: 'Tooth depth', tier: 'standard', role: 'petal',

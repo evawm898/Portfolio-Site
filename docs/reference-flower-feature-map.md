@@ -731,6 +731,12 @@ zero consumers and zero live controls — `docs/bloom-curve-editor.md`. F3 and F
 - Q6.6: "LACE" was a brief error (it is /flower's); drop it.
 - Q6.7: petals, sepals AND leaves get outline curves.
 
+**F6-sym — the symmetric petal outline curve — SHIPPED (Oct 17):** `petalOutlineMode` LAW / CURVE and
+`petalOutlineCurve`, a CORE-term arm in `widthProfile` closed by the leaf's nib at exactly the asked length
+(Q6.1), starting above the root blend (Q6.2), run out to the 1.6 mm tip width (Q6.3 / Q6.4), lobes and
+fringe ineligible — `docs/bloom-outline-curve-outcome.md`. Two-sided, per-scope, sepals and leaves are later
+sessions.
+
 **F7 — print preview — SHIPPED as `b4ad9ba` (#400).** Recorded as built:
 - a drag drops infill cells only (candidate A); full print geometry on release.
 - the always-on view shows print normals.

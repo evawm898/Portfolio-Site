@@ -610,6 +610,26 @@ function curveSpine(M, state) {
 }
 const CURVE_HOOK = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] }, petalSpineCurl: 150, curlBias: 1, curlStart: 0.5 });
 const CURVE_UNDER = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] } });
+/* ===== THE OUTLINE CURVE (F6-sym) ===== */
+/* The mutated module's OWN petal record on an outline-curve state — the
+   half-widths it emitted, the length it drew against the length asked, the
+   lobe record, and the validator's answer beside what the build lifted. Never
+   OC/AN/C1, which is what these mutants name. */
+function outlinePetal(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const p = M.buildBloomInto(acc, state).petal;
+    const o = p.tipCap && p.tipCap.outline;
+    return { base: [...p.profileBase], u: [...p.profileU], length: p.length, asked: p.askedLength, lobes: p.lobes ?? null,
+             refusal: o ? o.refusal : undefined, lifted: o ? o.lifted.length : undefined };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const OUTLINE_SPOON = { mode: 'symmetric', points: [[0, 0.03], [0.35, 0.05], [0.65, 0.2], [0.85, 0.22], [0.96, 0.12], [1, 0]] };
+const OUTLINE_UNDER_PTS = { mode: 'symmetric', points: [[0, 0.05], [0.2, 0.015], [0.4, 0.2], [0.8, 0.12], [1, 0]] };
+const OUTLINE_LAWSET = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_SPOON, petalTipShape: 3, petalBaseTaper: 3, petalTipTaper: 4, petalTipEnd: 1, lobeDepth: 0.3 });
+const OUTLINE_UNDER = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_UNDER_PTS });
+const OUTLINE_MUTANTS = /^(the-outline-curve-is-ignored|teeth-still-cut-in-curve-mode|the-outline-curve-reaches-the-foot|the-outline-length-is-not-fitted|the-outline-validator-and-the-build-disagree-on-the-floor)$/;
+const OUTLINE_ROWS = /^an outline curve|^a loaded outline curve/;
 /* The tier rows run under the tier mutants alone (`rowsFor` below), and the
    tier mutants run over the rows that name them. */
 const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
@@ -806,9 +826,10 @@ const MUTANTS = [
        lobe factor on a branch — the anchor ends at the plain arm; and again
        in S4b, where the chevron arm caps at the round sinus bottoms) */
     /* (and in S5, where the chevron arm takes the broad-sinus fillet's floor
-       on a branch) */
-    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
-    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
+       on a branch; and in F6-sym, where an outline curve takes the term on a
+       branch ahead of the chevron) */
+    find: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },",
+    into: "    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },\n    { name: 'MUTANT_PLATEAU', from: 0, to: 1, at: (u) => 0.6 * halfW * clamp((u - uPkRaw) / (1 - uPkRaw), 0, 1) },",
     names: ['A5'],
     witness: (M, C) => {
       const w = outlineMoved(M, C);
@@ -2757,6 +2778,41 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (c.curveRefusal === null) return 'the clean tree accepts the under-floor curve — the probe is outside the mutant\'s subject';
       return (m.curveRefusal === null && m.clamped) ? null : `the mutant still refuses (${JSON.stringify(m.curveRefusal)}) a curve at 0.69 mm against a 0.60 mm half-floor, or did not clamp (${m.clamped})`; } },
+  /* ===== THE OUTLINE CURVE (F6-sym — docs/bloom-outline-curve-outcome.md).
+     Five plausible wrong outlines, each watertight and one piece at the same
+     triangle count, each witnessed on the MUTATED module's own petal record.
+     Scoped to the two outline rows (and they to these), the tier precedent. */
+  { id: 'the-outline-curve-is-ignored', why: 'the CORE term keeps the law in CURVE mode, so the petal is drawn from the hidden tapers and tip shape while the editor shows a curve — a visible control doing nothing and hidden ones doing everything',
+    find: 'at: outline ? outline.halfAtMm : chev ?', into: 'at: chev ?', names: ['OC1'], rows: OUTLINE_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_LAWSET()), c = outlinePetal(C, OUTLINE_LAWSET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* the foot rows carry no base half-width (undefined) — compare the blade's */
+      const d = Math.max(...m.base.map((h, i) => (Number.isFinite(h) && Number.isFinite(c.base[i]) ? Math.abs(h - c.base[i]) : 0)));
+      return d > 0.5 ? null : `the mutant's emitted outline is within ${d} mm of the clean tree's — the law did not replace the curve`; } },
+  { id: 'teeth-still-cut-in-curve-mode', why: 'lobesEligible forgets the outline curve, so the hidden lobe depth cuts teeth into a drawn outline — a hidden control moving the geometry; the registry still hides it',
+    find: 'export function lobesEligible(state) { return !outlineIsCurve(state) && !fringeEngaged(state); }',
+    into: 'export function lobesEligible(state) { return !fringeEngaged(state); }', names: ['OC0'], rows: OUTLINE_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_LAWSET()), c = outlinePetal(C, OUTLINE_LAWSET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.lobes !== null && c.lobes === null) ? null : `the mutant's lobe record is ${JSON.stringify(m.lobes && m.lobes.count)} against the clean tree's ${JSON.stringify(c.lobes)}`; } },
+  { id: 'the-outline-curve-reaches-the-foot', why: 'in CURVE mode the foot\'s own blend is dropped, so the curve owns the base and the blade leaves the hub narrower than its foot (Q6.2: the foot stays the hub\'s) — watertight, and only a restatement of the blend from the ring sees it',
+    find: 'const rootBlendRaw = (stalk || petiole) ? () => 0 :', into: 'const rootBlendRaw = (stalk || petiole || outline) ? () => 0 :', names: ['OC1'], rows: OUTLINE_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_LAWSET()), c = outlinePetal(C, OUTLINE_LAWSET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const i = m.u.findIndex((u) => u > 0);
+      return (c.base[i] - m.base[i] > 0.5) ? null : `the mutant's first blade row is ${m.base[i]} mm against the clean tree's ${c.base[i]} — the foot's blend still floors it`; } },
+  { id: 'the-outline-length-is-not-fitted', why: 'an outline curve closes on the PETAL\'s nib, which reparameterises and reports a drawn length off the slider — Q6.1 ruled the drawn length always equals the slider, fitted and never reported as a difference',
+    find: 'const apex = (petiole || outline)', into: 'const apex = petiole', names: ['AN2', 'C1'], rows: OUTLINE_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_LAWSET()), c = outlinePetal(C, OUTLINE_LAWSET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.length - m.asked) > 1e-6 && c.length === c.asked) ? null : `the mutant drew ${m.length} mm of ${m.asked} asked; the clean tree ${c.length} of ${c.asked}`; } },
+  { id: 'the-outline-validator-and-the-build-disagree-on-the-floor', why: 'the validator asks the LIVE mesh floor (0.15 mm) while the build lifts at the print floor (0.80), so a drag the editor accepts builds a lifted outline — the one thing the refusal exists to make impossible',
+    find: '      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L };',
+    into: '      else if (f.askedMm <= TIP_CAP_HALF_MM && (!worst || f.askedMm < worst.askedMm)) worst = { ...f, L };', names: ['OC2'], rows: OUTLINE_ROWS,
+    witness: (M, C) => { const m = outlinePetal(M, OUTLINE_UNDER()), c = outlinePetal(C, OUTLINE_UNDER());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (c.refusal == null || !c.lifted) return `the clean tree does not refuse and lift the under-floor outline (refusal ${JSON.stringify(c.refusal)}, lifted ${c.lifted}) — the probe is outside the mutant's subject`;
+      return (m.refusal == null && m.lifted > 0) ? null : `the mutant's validator still answers ${JSON.stringify(m.refusal)} on an outline the build lifts (${m.lifted})`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3318,6 +3374,16 @@ const ROWS = [
           { id: 'petalSpineCurl', value: '150' }, { id: 'curlBias', value: '1' }, { id: 'curlStart', value: '0.5' }] },
   { label: 'a loaded spine curve UNDER the floor (0.69 mm radius against 1.20 — refused by the validator, clamped by the build)',
     set: [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify({ mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] }) }] },
+  /* THE OUTLINE CURVE (F6-sym): a spoon with the HIDDEN law family set (so a
+     leak of the law, or of the lobes, is observable — at their defaults the
+     law leak is still large, the lobe leak a no-op by construction), and a
+     LOADED outline with a point under the print floor (the one state where the
+     validator refuses and the build lifts). Scoped to the outline mutants. */
+  { label: 'an outline curve (a spoon) with the hidden law family set (tip shape 3, tapers 3 / 4, squared end 1, lobes 0.3)', for: OUTLINE_MUTANTS,
+    set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_SPOON) },
+          { id: 'petalTipShape', value: '3' }, { id: 'petalBaseTaper', value: '3' }, { id: 'petalTipTaper', value: '4' }, { id: 'petalTipEnd', value: '1' }, { id: 'lobeDepth', value: '0.3' }] },
+  { label: 'a loaded outline curve with a point UNDER the print floor (0.525 mm half-width against 0.80 — refused by the validator, lifted by the build)', for: OUTLINE_MUTANTS,
+    set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_UNDER_PTS) }] },
 ];
 
 /* ===================================================================
@@ -3548,7 +3614,7 @@ async function famsOn(rows) {
        neither pattern by accident. That is the prefix hazard this file
        already records, avoided by construction rather than by luck. */
     for (const msg of await apexNibAssertions(page, row)) {
-      const mm = /^(AN\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(AN\d+|OC\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE CURL FAMILY (F3-global, the spine curve) — the rule once more: the
        table never ran curlAssertions until the curve's five mutants named C1.

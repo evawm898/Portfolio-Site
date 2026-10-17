@@ -158,6 +158,22 @@ export function sampleCurve(points, spec = null, per = CURVE_SAMPLES_PER_SPAN) {
 function samplePchip(points, per) {
   const n = points.length;
   if (n < 2) return { pts: points.map((p) => [p[0], p[1]]), span: points.map(() => 0) };
+  const { h, m } = pchipTangents(points);
+  const pts = [[points[0][0], points[0][1]]], span = [0];
+  for (let k = 0; k < n - 1; k++) {
+    const x0 = points[k][0], y0 = points[k][1], y1 = points[k + 1][1];
+    for (let j = 1; j <= per; j++) {
+      span.push(k);
+      if (j === per) { pts.push([points[k + 1][0], y1]); break; }
+      pts.push([x0 + (j / per) * h[k], pchipHermite(j / per, y0, y1, h[k], m[k], m[k + 1])]);
+    }
+  }
+  return { pts, span };
+}
+/* The Fritsch-Carlson tangents — ONE computation for the sampler and the
+   evaluator below, so the two cannot be two laws. */
+function pchipTangents(points) {
+  const n = points.length;
   const h = [], d = [];
   for (let k = 0; k < n - 1; k++) { h.push(points[k + 1][0] - points[k][0]); d.push((points[k + 1][1] - points[k][1]) / h[k]); }
   const m = new Array(n).fill(0);
@@ -177,18 +193,38 @@ function samplePchip(points, per) {
     m[0] = end(h[0], h[1], d[0], d[1]);
     m[n - 1] = end(h[n - 2], h[n - 3], d[n - 2], d[n - 3]);
   }
-  const pts = [[points[0][0], points[0][1]]], span = [0];
-  for (let k = 0; k < n - 1; k++) {
-    const x0 = points[k][0], y0 = points[k][1], y1 = points[k + 1][1];
-    for (let j = 1; j <= per; j++) {
-      span.push(k);
-      if (j === per) { pts.push([points[k + 1][0], y1]); break; }
-      const s = j / per, s2 = s * s, s3 = s2 * s;
-      const y = (2 * s3 - 3 * s2 + 1) * y0 + (s3 - 2 * s2 + s) * h[k] * m[k] + (-2 * s3 + 3 * s2) * y1 + (s3 - s2) * h[k] * m[k + 1];
-      pts.push([x0 + s * h[k], y]);
-    }
-  }
-  return { pts, span };
+  return { h, m };
+}
+/* The cubic Hermite on one span at s in [0, 1], in the sampler's own
+   operation order (the samples it draws are unchanged to the bit). */
+function pchipHermite(s, y0, y1, hk, m0, m1) {
+  const s2 = s * s, s3 = s2 * s;
+  return (2 * s3 - 3 * s2 + 1) * y0 + (s3 - 2 * s2 + s) * hk * m0 + (-2 * s3 + 3 * s2) * y1 + (s3 - s2) * hk * m1;
+}
+
+/* A FUNCTION CURVE'S y AT ANY x, EXACTLY ON THE LAW — the outline's front
+   door (F6). `curveSamples` draws the curve as a polyline for the eye and the
+   editor; a consumer that needs the half-width BETWEEN samples (an outline is
+   evaluated at every row, every bisection and every 4096-grid probe) reads
+   this instead, which is the same Hermite on the same tangents, so the
+   sampler's points lie on it and the outline carries no polyline kinks a
+   turning measure would count. `monotoneX` specs only: a 2D shape has no y at
+   x. Outside [x_first, x_last] it returns null, never an extrapolation. At a
+   control point's own x it returns that point's y, exactly. */
+export function curveFunction(points, spec) {
+  if (!spec || !spec.monotoneX) throw new Error('curveFunction: only a function curve (monotoneX) has a y at every x');
+  const n = points.length;
+  const xs = points.map((p) => p[0]), ys = points.map((p) => p[1]);
+  const { h, m } = n >= 2 ? pchipTangents(points) : { h: [], m: [0] };
+  return (x) => {
+    if (!(x >= xs[0] && x <= xs[n - 1])) return null;
+    if (n === 1) return ys[0];
+    let lo = 0, hi = n - 1;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (xs[mid] <= x) lo = mid; else hi = mid; }
+    if (x === xs[lo]) return ys[lo];
+    if (x === xs[hi]) return ys[hi];
+    return pchipHermite((x - xs[lo]) / h[lo], ys[lo], ys[hi], h[lo], m[lo], m[hi]);
+  };
 }
 
 function sampleCatmullRom(points, per) {

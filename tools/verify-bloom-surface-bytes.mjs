@@ -155,6 +155,11 @@ const kindOf = new Map(harness.CONTROLS.map((c) => [c.id, c]));
 function stateOf(row) {
   const s = { ...harness.DEFAULTS };
   for (const w of row.set || []) {
+    /* THE RESERVED `@scopes` ENTRY (the role retirement) is not a control: the
+       row's scopes ride to the build through `rowScopesForBuild` below, never
+       into the state. (Patched F6-sym: CLAUDE.md names this tool among those
+       that refused or dropped a scoped row.) */
+    if (w.id === harness.SCOPES_SET_ID) continue;
     const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`);
     s[w.id] = c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value;
   }
@@ -322,6 +327,12 @@ const PREDICATE_MOVERS = {
      stored included, must hold to the bit in both modes: that is the
      "byte-identical by branch" claim, measured. */
   'curve': (st) => mine.curlIsCurve(st),
+  /* THE OUTLINE CURVE (F6-sym). A row moves iff THIS tree builds it in CURVE
+     mode — the geometry's own `outlineIsCurve` on the row's coerced state (the
+     base tree has no `petalOutlineMode` and builds every row on the law, so the
+     guard can only be read here). Every LAW row, the GATED row with a curve
+     stored included, must hold to the bit in both modes. */
+  'outline': (st) => mine.outlineIsCurve(st),
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);
@@ -627,7 +638,7 @@ function gridFloatsOf(petals) {
 let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {
   const st = stateOf(row);
-  const opts = { below: null, capability: row.capability ?? null };
+  const opts = { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) };
   const mover = MOVERS ? MOVERS.test(row.label) : MOVERS_PRED ? PREDICATE_MOVERS[MOVERS_PRED](st) : false;
   if (mover) moversSeen++; else holdersSeen++;
   const rowFails = [];
