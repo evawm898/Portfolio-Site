@@ -113,7 +113,12 @@ function petalFrame(m) {
   /* the narrow (right) half's bead, at 0.6 of the blade */
   const b = MS[Math.floor(MS.length * 0.6)];
   const out = norm(sub(b.R, b.C));
-  return { petalAt: at, petalDir: dir, petalR: Lm * 0.72, beadAt: b.R, beadDir: norm(add(add(out, b.N, 0.9), D, -0.2)), beadR: 2.2 };
+  /* framed on the whole narrow half — midrib to beaded margin — looking along
+     the blade from the tip end so the margin's round cross-section is the
+     silhouette, not a featureless edge */
+  const halfMid = add(b.C, sub(b.R, b.C), 0.6);
+  const beadR = Math.max(2.5, 1.4 * Math.hypot(...sub(b.R, b.C)));
+  return { petalAt: at, petalDir: dir, petalR: Lm * 0.72, beadAt: halfMid, beadDir: norm(add(add(D, b.N, 0.55), out, 0.25)), beadR };
 }
 
 async function cell({ label, set: sets = [], views = ['top'], ruling = '', frame = null, editor = false }) {

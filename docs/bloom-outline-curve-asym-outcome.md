@@ -156,7 +156,25 @@ half on the nib, a clamped bead). The allowance is not raised.
 
 ## 9. Measured
 
-(filled in at close)
+- **Byte partition** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of f663973>
+  --movers-predicate asym`, the whole 1,359-row matrix in both modes, closed in 140 chunks through the
+  tool's own `--merge`: **PASS — 23 of 23 predeclared movers moved and 0 floats moved on the 1,336
+  holders**, positionally under `Object.is`, over **1,637,363,988 export floats (181,929,332 triangles)
+  and 80,094,516 captured-grid values**. The 23 are block 67 less its EQUAL and GATED rows; every LAW
+  row and every Symmetric CURVE row holds. `--control` fires both clauses.
+- **Equal halves** (§4): 75 CURVE states, 0 of 50,314,104 export floats and 0 of 5,847,084 grid values.
+- **The export gate over block 67** (`verify-bloom-export.mjs --only '^ASYM OUTLINE'`): **25 of 25
+  watertight, 0 degenerate, live = export triangle counts on all 25, 0 within-shell self-intersection
+  pairs on all 25** (no new fold; the census is the verdict), every shell outward (O1/O2).
+- **Cost: zero triangles.** Every asymmetric single-whorl row reads 24,688 (the default's own count);
+  the infill rows 63,520–74,720 against the symmetric infill's own range. Two halves are a boundary
+  change on the fixed row-and-column lattice.
+- **The edge gate** (E0–E7) over block 67 and the reference rows: E7 clean after §5's fix; E2 as §6.
+- **The infill gate** (I0–I12, `--negative-control`): PASS, the asymmetric wall state included; the
+  mirrored-outline mutant fires I11 with its witness moved.
+- **The apex table** (the four asymmetric mutants over the two asymmetric rows, a SUBSET): each fires
+  the family it names and the clean tree is silent on both rows.
+- **The design-file gate** (`--no-browser`): F11 and F12 PASS.
 
 ## 10. Not done, and named
 
