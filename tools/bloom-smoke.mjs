@@ -1483,6 +1483,11 @@ export const SMOKE_BLOCKS = [
         path: "the infill family on a drawn outline (I0-I12 over the curve's own lamina), OC1 under the cells' basal panel" },
       { label: 'OUTLINE CURVE: GATED — LAW mode with a spoon stored (hidden and inert; bit-identical to the default)',
         path: "OC0's LAW arm (the mode's two statements both LAW; the curve stored and read by nothing), A5 / A6 on the law, and the byte tool's partition (a holder)" },
+      /* F6-spoon (Oct 18, docs/bloom-spoon-rim-turn-outcome.md): in the subset
+         so the edge-profile gate's E2 HOLDS its declared turn — E2 draws from
+         this subset and refuses a declaration naming a row it did not run. */
+      { label: 'OUTLINE CURVE: the spoon x cup 0.6 (the form laws read the drawn half-width)',
+        path: "E2's declared magnitude (71.99 deg at the first nib-arc row — the blunt end's last ladder gap under a cup, the LAW spatulate's class), OC1/OC2 under a cup, AN1/AN2's curve arm, the form laws reading the drawn half-width" },
     ],
   },
   {
@@ -1510,6 +1515,10 @@ export const SMOKE_BLOCKS = [
         path: "OC3's free arm (the inner whorls carry NO throat; the outer one does), OC1 per ring on both arms" },
       { label: 'OUTLINE CURVE 2: the TRUMPET with a drawn lobe',
         path: "OC3 at the long fusion height (0.58), OC1 with a curl reaching the blend, AN2 (the drawn length is the slider's on the lobe)" },
+      /* F6-spoon (Oct 18, docs/bloom-spoon-rim-turn-outcome.md): E2 holds its
+         declared turn here, as above. */
+      { label: 'OUTLINE CURVE 2: the spoon x petalWidth 30',
+        path: "E2's declared magnitude (49.20 deg on the spatulate head's steep fall into the nib, x1.875), OC3's scale arm at the widest, OC1 on a scaled waisted curve" },
     ],
   },
 ];

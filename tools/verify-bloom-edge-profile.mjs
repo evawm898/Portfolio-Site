@@ -69,6 +69,12 @@ const CONTROL = argv.includes('--control');
 const ALL = argv.includes('--all');
 const PROGRESS = argv.includes('--progress');
 const ONLY = (() => { const i = argv.indexOf('--only'); return i >= 0 ? new RegExp(argv[i + 1]) : null; })();
+/* `--rows-file <json>` (F6-spoon) runs a written-down row set — `[{label, set:
+   [{id, value}]}]`, the matrix's own row shape — instead of the matrix: the
+   sweep instrument for states no matrix row carries (tools/bloom-spoon-rim-
+   turn.mjs drives it). A report, like `--only`: never the full set, so the
+   stray-declaration clause does not run. */
+const ROWS_FILE = (() => { const i = argv.indexOf('--rows-file'); return i >= 0 ? argv[i + 1] : null; })();
 /* `--dump-e2 <file>` (S5b) writes every row's measured E2 turn (EXPORT, the
    treatment's own turn in degrees, declared or not) as JSON, so two trees or
    two station laws are compared row by row rather than through the gate's
@@ -213,6 +219,22 @@ const E2_TURN_XFAIL = {
      same height on the same state — worse — and is not a smoke row, so only the
      CURVE row reaches this gate. A tilt-85, curl -45, 50 mm trumpet: the tube's
      own class. Declared, never widened. */
+  /* F6-spoon (Oct 18, docs/bloom-spoon-rim-turn-outcome.md): the two spoon rows,
+     in the smoke subset so this gate HOLDS them. Neither is the waist's and
+     neither is CURVE's: both sit on a BLUNT end's last ladder gap before the
+     nib, where the half-width falls ~2.4 mm -> 0.2 mm in one row step (rows
+     51 -> 52 of 58, 0.66 mm along the blade, every blunt end alike) — the
+     near-rectangle (not waisted) reads 89.84 at cup 0.6 and the LAW spatulate
+     (base 3 / tip taper 0.6 / tip shape 1.7, main's geometry) 81.33. The cup
+     row climbs smoothly with the cup (44.53 / 50.20 / 68.69 / 71.99 / 74.57 at
+     0 / 0.2 / 0.4 / 0.6 / 0.8); the width row is the spatulate head's steeper
+     fall at x1.875 (LAW spatulate tip shape 2.5 at 30 mm reads 46.51). No fold
+     (0 within-shell pairs), no inward shell, the rim at the hot profile is the
+     nib's own clamp (0.363 mm, 0.359 at cup 0). Declared, never widened. */
+  'OUTLINE CURVE: the spoon x cup 0.6 (the form laws read the drawn half-width)':
+    { excessDeg: 26.986507, note: 'adds 71.986507 deg at [-27.655, -28.812, 15.309]; face-to-face 89.96, outline 17.98 — row 52/58 (u 0.9992, the first nib-arc row, a clamped bead, room 0.402) on the blunt end\'s last ladder gap; identical on a worktree of 1bb7c35 (#417)' },
+  'OUTLINE CURVE 2: the spoon x petalWidth 30':
+    { excessDeg: 4.198688, note: 'adds 49.198688 deg at [25.592, -33.329, 14.808]; face-to-face 51.92, outline 2.72 — row 51/58 (u 0.9806, h 4.47, unclamped), the spatulate head\'s steep fall into the nib at x1.875; the same spoon at 16 mm reads 44.53 (at the claw)' },
   'OUTLINE CURVE 2: the TRUMPET with a drawn lobe':
     { excessDeg: 0.523018, note: 'NEW with F6-sym-2 block 66: adds 45.523018 deg at [-8.088, -18.185, 30.843]; face-to-face 51.24, outline 5.72 — the LAW twin reads 46.253052 at [-17.815, 4.836, 30.310] on main\'s bytes, so the trumpet\'s, not the curve\'s; found by CI on ab757de' },
   'TUBE: GATED — the buckle (unavailable, inert)':
@@ -440,6 +462,7 @@ const MATRIX = H.buildMatrix();
 const SMOKE = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-smoke.mjs')).href);
 const SMOKE_LABELS = new Set(SMOKE.SMOKE_BLOCKS.flatMap((b) => b.rows.map((r) => r.label)));
 const pickRows = () => {
+  if (ROWS_FILE) return JSON.parse(fs.readFileSync(ROWS_FILE, 'utf8'));
   if (ONLY) return MATRIX.filter((r) => ONLY.test(r.label));
   if (ALL) return MATRIX;
   return MATRIX.filter((r) => SMOKE_LABELS.has(r.label));
@@ -1170,7 +1193,7 @@ else {
   const rows = pickRows();
   const fails = [], notes = [];
   const t0 = Date.now();
-  await runRows(G0, rows, fails, notes, !ONLY);
+  await runRows(G0, rows, fails, notes, !ONLY && !ROWS_FILE);
   for (const n of notes) console.log('edge-profile: ' + n);
   console.log(`edge-profile: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   if (DUMP_E2) { (await import('node:fs')).writeFileSync(DUMP_E2, JSON.stringify(E2_DUMP, null, 1)); console.log(`edge-profile: E2 turns of ${Object.keys(E2_DUMP).length} rows written to ${DUMP_E2}`); }
