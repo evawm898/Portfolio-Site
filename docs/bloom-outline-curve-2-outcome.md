@@ -129,7 +129,7 @@ trumpet LAW twins included. No xfail entry was needed.
 Predeclared from this tree's guards (`--movers-predicate outline2`: a row moves iff CURVE AND (width scale ≠ 1 OR a
 whorl actually fuses)), every row of the live matrix in both modes against a worktree of `1bb7c35`:
 
-PARTITION-RESULT
+**MEASURED, PASS** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 1bb7c35> --movers-predicate outline2`, closed in 36 `--range` chunks and `--merge`d over the whole 1,334-row matrix in both modes: **16 of 16 predeclared movers MOVED and 0 floats moved on the 1,318 holders**, positionally under `Object.is`, over 1,619,937,612 export floats (179,993,068 triangles) and 79,499,366 captured-grid values (9,174 panels). The predicate names the movers before the comparison runs:
 
 - every LAW row, every CURVE row at 16 mm (all of #417's block 65), the GATED row, and the infill × tube × CURVE
   row (the tube refused, a free blade on both trees) hold to the bit;
