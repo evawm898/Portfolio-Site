@@ -10469,9 +10469,12 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          exists to avoid. */
       /* F6-asym: a two-sided row's `halfWidth` is its LEFT (v > 0) half and
          `halfWidthRight` the right — present only on such a row */
-      grid.push(rows[i].h === null
-        ? { row: i, u: rows[i].u, halfWidth: rows[i].hL, halfWidthRight: rows[i].hR, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL }
-        : { row: i, u: rows[i].u, halfWidth: rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL });
+      /* ONE literal, so the row's capture has one site (verify-bloom-grid's
+         mutant table anchors on it); readers take the field by name */
+      const twoSidedRow = rows[i].h === null;
+      const gridRow = { row: i, u: rows[i].u, halfWidth: twoSidedRow ? rows[i].hL : rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL };
+      if (twoSidedRow) gridRow.halfWidthRight = rows[i].hR;
+      grid.push(gridRow);
     }
   }
 
