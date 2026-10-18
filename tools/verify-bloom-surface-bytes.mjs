@@ -333,6 +333,18 @@ const PREDICATE_MOVERS = {
      guard can only be read here). Every LAW row, the GATED row with a curve
      stored included, must hold to the bit in both modes. */
   'outline': (st) => mine.outlineIsCurve(st),
+  /* THE OUTLINE CURVE'S FOLLOW-UPS (F6-sym-2). A row moves iff THIS tree builds
+     it in CURVE mode AND either its width scale is not 1 (Petal width off the
+     16 mm default — the base tree drew the 16 mm curve whatever the width) or a
+     whorl actually FUSES (the base tree refused the tube under CURVE and drew a
+     free blade). Read on this tree's own guards because the base tree has
+     neither; every LAW row, every CURVE row at 16 mm, and a CURVE row whose
+     tube the infill refuses (a free blade on both trees) must hold to the bit. */
+  'outline2': (st) => {
+    if (!mine.outlineIsCurve(st)) return false;
+    if (mine.outlineWidthScale(st) !== 1) return true;
+    return mine.tubePlan(st, Math.round(Number(st.layerCount) || 1), Math.round(Number(st.petalCount))).active;
+  },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);

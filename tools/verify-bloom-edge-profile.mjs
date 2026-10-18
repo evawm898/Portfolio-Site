@@ -207,6 +207,14 @@ const E2_TURN_XFAIL = {
     { excessDeg: 3.821279, note: 'NEW with S2: adds 45.446864 deg; face-to-face 45.78, outline 0.34 — a floored sinus on a 5 mm blade (h 1.06 mm at u 0.848, v 0.95), the narrow-span clamp; RE-RECORDED at S5 from 0.446864 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 4.122391 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
   'TOOTH FLOOR: a 3.5 mm blade (NO ROOM — the widest point has 0.95 mm over the print floor)':
     { excessDeg: 3.142874, note: 'NEW with S2: adds 46.321726 deg; face-to-face 46.73, outline 0.41 — a 3.5 mm blade near its base (h 1.43 mm at u 0.224, v -0.95), the narrow-span clamp; RE-RECORDED at S5 from 1.321726 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 2.85791 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
+  /* F6-sym-2 (docs/bloom-outline-curve-2-outcome.md): smoke block 66's trumpet.
+     NOT the curve's: its LAW twin (`OUTLINE CURVE 2: the TRUMPET in LAW …`, a
+     byte HOLDER against 1bb7c35, so main's own geometry) reads 46.253052 at the
+     same height on the same state — worse — and is not a smoke row, so only the
+     CURVE row reaches this gate. A tilt-85, curl -45, 50 mm trumpet: the tube's
+     own class. Declared, never widened. */
+  'OUTLINE CURVE 2: the TRUMPET with a drawn lobe':
+    { excessDeg: 0.523018, note: 'NEW with F6-sym-2 block 66: adds 45.523018 deg at [-8.088, -18.185, 30.843]; face-to-face 51.24, outline 5.72 — the LAW twin reads 46.253052 at [-17.815, 4.836, 30.310] on main\'s bytes, so the trumpet\'s, not the curve\'s; found by CI on ab757de' },
   'TUBE: GATED — the buckle (unavailable, inert)':
     { excessDeg: 3.295065, note: 'NEW with the tube PR\'s smoke block 45: adds 48.295065 deg; face-to-face 56.43, outline 8.14 — the BUCKLE\'s out-of-plane class (the tube is unavailable and inert on this row, so this is the buckle alone)' },
   'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)':

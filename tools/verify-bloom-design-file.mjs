@@ -54,6 +54,9 @@
      F9  THE OUTLINE CURVE (F6-sym): the second registry curve control
          round-trips a spoon outline in CURVE mode verbatim, an out-of-order
          outline is refused whole and told, and it is a curve field of the file.
+     F10 THE OUTLINE WIDTH GATE (F6-sym-2), tools/verify-bloom-outline-width.mjs,
+         is SPAWNED here for F6's reason: the Petal width drag in CURVE mode
+         asks the outline's validator, a narrowing drag is refused and told.
      F6  THE SCOPE MODEL'S OWN GATE, tools/verify-bloom-scopes.mjs, is SPAWNED
          here (and its --negative-control under ours) so it rides in CI through
          this workflow step — the file's overrides containers are that model's
@@ -626,6 +629,15 @@ if (!ONLY.length) {
   console.log(`F6 — spawning node ${args.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
   const r = spawnSync(process.execPath, args, { stdio: 'inherit' });
   if (r.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F6: the scope model's gate exited ${r.status}`); process.exit(1); }
+  /* F10 — THE OUTLINE WIDTH GATE (F6-sym-2), spawned for F6's reason: a
+     browser witness that the Petal width drag asks the outline's validator
+     (tools/verify-bloom-outline-width.mjs, WD0-WD2 and its must-fails). */
+  if (!NO_BROWSER) {
+    const a10 = [path.join(ROOT, 'tools/verify-bloom-outline-width.mjs'), ...(NEGATIVE ? ['--negative-control'] : [])];
+    console.log(`F10 — spawning node ${a10.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
+    const r10 = spawnSync(process.execPath, a10, { stdio: 'inherit' });
+    if (r10.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F10: the outline width gate exited ${r10.status}`); process.exit(1); }
+  }
 }
 
 let server = null, port = null;

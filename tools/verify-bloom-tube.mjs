@@ -189,11 +189,20 @@ function buildStates() {
      cuts in one mode and not the other (found by search; see the doc) */
   S.push({ label: 'thin sheet 0.6, 7 petals, k 0 h 0.40 (the modes split at the bar)', set: tubeSet({ sheetThickness: 0.6, petalCount: 7 }, 0, 0.40, 1) });
   S.push({ label: '5 petals k 0 h 0.40 (a notch is cut)', set: tubeSet({ petalCount: 5 }, 0, 0.40, 1) });
-  return QUICK ? S.filter((_, i) => i % 4 === 0 || /thin|snap|whorls|notch/.test(S[i].label)) : S;
+  /* THE OUTLINE CURVE ON A TUBE (F6-sym-2, Eva's ruling): the curve shapes the
+     free lobe above the throat, its first width pinned to the tube law's — the
+     throat seam must be closed below h, open at a slit, and one piece, across
+     the tube's length and its flare, exactly as the LAW lobe's is */
+  const CURVE = { petalOutlineMode: 'CURVE', petalOutlineCurve: JSON.stringify({ mode: 'symmetric', points: [[0, 0.1], [0.35, 0.22], [0.75, 0.16], [1, 0]] }) };
+  for (const h of [0.10, 0.40, 0.70]) for (const b of [0, 1]) S.push({ label: `CURVE lobe: n 5 k 0 h ${h} BLEND ${b}`, set: tubeSet({ ...CURVE, petalCount: 5 }, 0, h, b) });
+  S.push({ label: 'CURVE lobe: n 6 k 2 h 0.25 BLEND 1 (slit)', set: tubeSet({ ...CURVE, petalCount: 6 }, 2, 0.25, 1) });
+  S.push({ label: 'CURVE lobe: the bell (n 5 k 0 h 0.40, tilt 75, cup 0.6)', set: tubeSet({ ...CURVE, petalCount: 5, petalTilt: 75, petalCup: 0.6 }, 0, 0.40, 1) });
+  S.push({ label: 'CURVE lobe: petalWidth 22 x n 8 k 0 h 0.25', set: tubeSet({ ...CURVE, petalWidth: 22 }, 0, 0.25, 1) });
+  return QUICK ? S.filter((_, i) => i % 4 === 0 || /thin|snap|whorls|notch|CURVE/.test(S[i].label)) : S;
 }
 /* TU0's states: either side of every term of the predicate */
 const ELIGIBILITY = [
-  { set: {}, want: true }, { set: { placement: 'FAN' }, want: false }, { set: { placement: 'SPIRAL' }, want: false },
+  { set: {}, want: true }, { set: { petalOutlineMode: 'CURVE' }, want: true /* F6-sym-2: an outline curve works on a tube */ }, { set: { placement: 'FAN' }, want: false }, { set: { placement: 'SPIRAL' }, want: false },
   { set: { placement: 'CONTINUOUS' }, want: false }, { set: { placement: 'CONTINUOUS', hubShape: 'SPHERE' }, want: false },
   { set: { varianceSize: 0.1 }, want: false }, { set: { varianceForm: 0.1 }, want: false },
   { set: { buckleAmp: 0.2 }, want: false }, { set: { fringeCount: 4, petalTipEnd: 1 }, want: false },
@@ -249,7 +258,15 @@ async function run(G, { log = true } = {}) {
         const ringGrid = gridOf(P, [[r.triFrom, r.triTo]], 1.0);
         const L = r.layer, k = snapRestated(Math.round(st[`tubeLayer${L + 1}`]), n), m = k === 0 ? n : n / k;
         const ps = fb.petalsAll.slice(L * n, (L + 1) * n).map((p) => p.tubeRows);
-        const top = Math.max(4, Math.floor(r.rows * RING_SAMPLE));
+        /* BELOW THE NOTCH, read off the dip law's own row (F6-sym-2): the U is
+           drawn by lowering the ring's top row by depth / spacing rows, so the
+           seam is open above that row by design. RING_SAMPLE assumed the notch
+           never reached 0.6 of the ring — true of every LAW state, false of a
+           CURVE lobe that leaves the throat nearly vertical on a long tube
+           (h 0.70: the U's bottom at row 20.2 of 37). On every LAW state the
+           window is RING_SAMPLE's, unchanged. */
+        const notchRows = r.notch && r.notch.on ? Math.max(0, ...r.notch.sinuses.map((x) => x.depthMm)) / r.notch.spacingMm : 0;
+        const top = Math.max(4, Math.min(Math.floor(r.rows * RING_SAMPLE), Math.floor(r.rows - 1 - notchRows) - 1));
         let closedProbes = 0, openProbes = 0;
         for (let p = 0; p < n; p++) {
           const q = (p + 1) % n;

@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -42,6 +42,26 @@ const summaryEls = {}; // section id -> its <summary>, for the derived labels re
    that hides for it, so identity is what makes the caption single. */
 const whyEls = new Map(); // reason object -> { el, parent, sections: [ids] }
 
+/* THE CURVE VALIDATORS' CONTEXT, from the build on screen: every drawn
+   petal's asked length (the spine's), and every outline-curved petal's own
+   record — its length, the width scale it was built at and whether its first
+   point is pinned to a throat (F6-sym-2) — so the refusal asks about the
+   petals that exist. `widthDelta` is a candidate Petal width's change: the
+   width drag asks the outline's validator with every petal's scale moved by
+   it (one predicate for the slider and the point drag). */
+function curveValidatorCtx({ widthDelta = 0 } = {}) {
+  const outlined = lastPetalsAll.filter((p) => p && p.tipCap && p.tipCap.outline).map((p) => p.tipCap.outline);
+  const seen = new Set(), outlinePetals = [];
+  for (const o of outlined) {
+    const e = { lengthMm: o.lengthMm, scale: outlineWidthScale({ petalWidth: o.widthMm + widthDelta }), pinnedFirst: !!o.throat };
+    const k = `${e.lengthMm}|${e.scale}|${e.pinnedFirst}`;
+    if (!seen.has(k)) { seen.add(k); outlinePetals.push(e); }
+  }
+  return {
+    askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine).map((p) => p.spine.askedLengthMm))],
+    outlinePetals: outlinePetals.length ? outlinePetals : null,
+  };
+}
 function makeInput(c) {
   if (c.kind === 'slider') {
     const input = document.createElement('input');
@@ -65,7 +85,7 @@ function makeInput(c) {
          shape at a shorter inner whorl is tighter, and the refusal has to ask
          about the petals that exist rather than re-derive them from the
          sliders (a second producer of the whorl's size law). */
-      validate: (cand) => (typeof c.validate === 'function' ? c.validate(cand, readUI(), { askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine).map((p) => p.spine.askedLengthMm))] }) : null),
+      validate: (cand) => (typeof c.validate === 'function' ? c.validate(cand, readUI(), curveValidatorCtx()) : null),
       ownerLength: () => Number(inputs[c.curve.owner].value),
       ownerLabel: (CONTROLS.find((o) => o.id === c.curve.owner) || {}).label || c.curve.owner,
     });
@@ -401,6 +421,11 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
     fracClient: (side, xy) => toClient(side, xy),
     unitsPerPx,
     render,
+    /* A REFUSAL FROM OUTSIDE THE EDITOR (F6-sym-2): a control the curve's
+       validator also answers for (the Petal width, which scales the drawn
+       outline) shows its refusal on THIS status line, so the hand reads why
+       in the one place a curve refusal is ever said. `null` clears it. */
+    showRefusal: (reason) => { refusal = reason ? { reason, side: null, i: null } : null; render(); },
   };
   liveCurveEditors.add(render);
   host.curveEditor.dispose = () => liveCurveEditors.delete(render);
@@ -1564,6 +1589,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfill = (built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null;
     lastInfillAbsent = infillIsAbsent(uiForBuild);
     lastPetalsAll = built.petalsAll || [];
+    builtPetalWidth = Number(uiForBuild.petalWidth);   // what a refused width drag goes back to (F6-sym-2)
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastGynoecium = built.gynoecium; lastStyles = built.styles;
     lastFilamentStyle = built.filamentStyle;
@@ -2022,12 +2048,17 @@ function outlineLine(petals) {
   const o0 = ps[0].tipCap.outline, ap0 = ps[0].tipCap.apex;
   const lifted = ps.filter((p) => p.tipCap.outline.lifted.length);
   const of = (arr) => `${arr.length} of ${ps.length} ring${ps.length === 1 ? '' : 's'}`;
-  const narrow = Math.min(...ps.map((p) => Math.min(...p.tipCap.outline.built.slice(0, -1).map((q) => q[1] * p.tipCap.outline.lengthMm))));
+  /* the narrowest point the HAND set — a point pinned to a throat is the
+     tube law's, never the hand's (F6-sym-2) */
+  const narrow = Math.min(...ps.map((p) => Math.min(...p.tipCap.outline.built.slice(p.tipCap.outline.pinned ? 1 : 0, -1).map((q) => q[1] * p.tipCap.outline.lengthMm))));
   const kink = Math.max(...ps.map((p) => p.tipCap.apex.kinkDeg || 0));
+  const lobed = ps.filter((p) => p.tipCap.outline.throat);
   return `OUTLINE CURVE: ${o0.points.length} points, widest ${(2 * o0.peakHalfMm).toFixed(2)} mm at u ${o0.uPk.toFixed(3)}`
+       + (o0.scale !== 1 ? ` · widths scaled ${o0.scale.toFixed(3)}x by the ${o0.widthMm} mm Petal width` : '')
        + ` · narrowest drawn point ${(2 * narrow).toFixed(2)} mm across against the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor`
        + (lifted.length ? ` (LIFTED to the floor on ${of(lifted)} — a loaded curve asks under it; the editor refuses such a drag)` : '')
-       + ` · the tapers, tip shape, squared end, lobes and fringe are INERT`
+       + (lobed.length ? ` · on ${of(lobed)} the curve shapes the FREE LOBE above the tube's throat (u ${lobed[0].tipCap.outline.throat.u.toFixed(2)}), its first point pinned to the tube law's ${(2 * lobed[0].tipCap.outline.pinned.builtMm).toFixed(2)} mm there — below it the tapers and tip shape draw the tube; the squared end, lobes and fringe are INERT`
+         : ` · the tapers, tip shape, squared end, lobes and fringe are INERT`)
        + (ap0 && ap0.active ? ` · the nib closes it at exactly ${ap0.drawnLengthMm.toFixed(3)} mm (${ap0.regime} regime, leaving the curve ${(2 * ap0.startHalfMm).toFixed(2)} mm across${kink > 0 ? `, a ${kink.toFixed(2)}° corner at the join` : ', tangent'})` : ` · NIB INERT (${ap0 ? ap0.why : 'no record'})`)
        + `\n`;
 }
@@ -3309,6 +3340,34 @@ function scheduleRegen() {
   requestAnimationFrame(() => { try { regenerate(); } finally { regenQueued = false; } });
 }
 
+/* THE WIDTH DRAG IS REFUSED THROUGH THE OUTLINE'S VALIDATOR (F6-sym-2, Eva's
+   ruling: in CURVE mode the width scales the drawn curve, and a width that
+   would put a scaled point under the print floor is refused — Q4.4's
+   refuse-not-clamp rule, the point drags' own). A CAPTURE listener on the
+   window, so it runs before every other listener (the scope view's capture
+   on the panel included) and a refused width writes nothing anywhere: the
+   slider goes back to the width the build on screen drew, the event stops,
+   and the outline editor's status line says which point. In LAW mode, or
+   with no petal built from the curve yet, it never refuses. */
+let builtPetalWidth = null;
+function onWidthEdit(e) {
+  const w = inputs.petalWidth;
+  if (e.target !== w || !w || builtPetalWidth === null) return;
+  const oc = inputs.petalOutlineCurve, ctl = CONTROLS.find((c) => c.id === 'petalOutlineCurve');
+  if (!oc || !ctl || inputs.petalOutlineMode.value !== 'CURVE') return;
+  /* the drag's own `change` (or a step back to the built width) asks nothing
+     new — and must not clear the refusal it is the tail of */
+  if (Number(w.value) === Number(builtPetalWidth)) return;
+  const ctx = curveValidatorCtx({ widthDelta: Number(w.value) - Number(builtPetalWidth) });
+  if (!ctx.outlinePetals) return;
+  const reason = ctl.validate(oc.value, readUI(), ctx);
+  if (oc.curveEditor) oc.curveEditor.showRefusal(reason ? `Petal width ${w.value} mm: ${reason}` : null);
+  if (!reason) return;
+  w.value = builtPetalWidth;
+  e.stopImmediatePropagation();
+}
+window.addEventListener('input', onWidthEdit, true);
+window.addEventListener('change', onWidthEdit, true);
 for (const c of CONTROLS) {
   inputs[c.id].addEventListener('input', () => { applyVisibility(); scheduleRegen(); });
   inputs[c.id].addEventListener('change', () => { applyVisibility(); scheduleRegen(); });

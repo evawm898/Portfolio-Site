@@ -4844,10 +4844,35 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      lobed chevron each declare their own cap and keep their own law (their
      states pin LAW anyway). Null on every LAW build, so every expression below
      is the one it was, by branch. */
-  const outline = outlineIsCurve(state) && !(cap && (cap.petiole || cap.chevron || cap.stalk))
+  /* THE TUBE'S OWN LAW BELOW THE THROAT (F6-sym-2): on a petal of a FUSED
+     whorl (`cap.tubeLobe`, set on exactly those petals in the collect and the
+     build passes) the outline below the fusion height is the LAW — the two
+     tapers and the tip shape, as a LAW build of this petal draws it — and the
+     curve shapes the free lobe above it, its first width pinned to this law's
+     own half-width at the throat. The throat is the DECLARED fusion height
+     `tubeHeight`, never the ring's top row, which the ladder decides and the
+     ladder reads this profile (a circle a declared station breaks). The LAW is
+     written out here rather than read off the closures below, because in
+     CURVE mode `uPkRaw` is the curve's peak and the LAW's own is a / (a + b). */
+  const curveOn = outlineIsCurve(state) && !(cap && (cap.petiole || cap.chevron || cap.stalk));
+  const tubeLaw = curveOn && cap && cap.tubeLobe ? (() => {
+    const uPkL = a / (a + b), gPkL = Math.pow(uPkL, a) * Math.pow(1 - uPkL, b), nL = state.petalTipShape;
+    const at = (u) => {
+      if (u <= uPkL) return halfW * (Math.pow(u, a) * Math.pow(1 - u, b)) / gPkL;
+      const s = (u - uPkL) / (1 - uPkL);
+      return halfW * Math.pow(Math.max(0, 1 - Math.pow(s, nL)), 1 / nL);
+    };
+    const u = Number(state.tubeHeight ?? TUBE_HEIGHT_DEFAULT);
+    return { u, at, uPk: uPkL, halfMm: at(u) };
+  })() : null;
+  const outline = curveOn
     ? (() => {
       if (!(length > 0)) throw new Error('widthProfile: an outline curve needs the blade LENGTH in mm — its points are fractions of it');
-      return outlineCurvePlan(outlineCurveOf(state), length);
+      const scale = outlineWidthScale(state);
+      const pl = outlineCurvePlan(outlineCurveOf(state), length, scale === 1 && !tubeLaw ? undefined : { scale, throat: tubeLaw ? { u: tubeLaw.u, halfMm: tubeLaw.halfMm } : null });
+      if (!tubeLaw || !(tubeLaw.uPk < tubeLaw.u) || !(halfW > pl.peakHalfMm)) return pl;
+      /* the blade's widest point is the LAW's, below the throat */
+      return { ...pl, uPk: tubeLaw.uPk, peakHalfMm: halfW };
     })()
     : null;
   const uPkRaw = outline ? outline.uPk : a / (a + b);             // the derived widest point (the curve's own, in CURVE mode)
@@ -4895,9 +4920,13 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      with no rounded sinus declares no `roundAt`. */
   const chev = (cap && cap.chevron) || null;
   const terms = [
-    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: tubeLaw ? tubeLaw.u : 1, at: tubeLaw ? tubeLaw.at : outline ? outline.halfAtMm : chev ? (chev.fillAt ? (chev.roundAt ? (u) => Math.max(Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)), chev.fillAt(u)) : (u) => Math.max(halfW * tipLaw(u) * chev.lobeAt(u), chev.fillAt(u))) : chev.roundAt ? (u) => Math.min(halfW * tipLaw(u) * chev.lobeAt(u), chev.roundAt(u)) : (u) => halfW * tipLaw(u) * chev.lobeAt(u)) : (u) => halfW * tipLaw(u) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
+  /* THE LOBE ABOVE THE THROAT (F6-sym-2): its own term, so the hand-over at
+     the throat is a TERM_CHANGE `slopeBreaks` names (the two meet in width,
+     pinned, and not in slope) rather than a kink hidden inside one term. */
+  if (tubeLaw) terms.push({ name: 'OUTLINE_LOBE', from: tubeLaw.u, to: 1, at: outline.halfAtMm });
 
   /* ===================================================================
      THE SQUARED TERMINAL — `petalTipEnd`, session 32's deferred "terminal
@@ -5958,7 +5987,12 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     outline: outline ? {
       points: outline.points, built: outline.built, lifted: outline.lifted, uPk: outline.uPk,
       peakHalfMm: outline.peakHalfMm, lengthMm: outline.lengthMm,
-      refusal: outlineCurveRefusal(outlineCurveOf(state), state, [length]),
+      /* F6-sym-2: the width scale the points were built at, the petal's own
+         width it came from, and — on a fused whorl — the throat and the pinned
+         first point (null elsewhere) */
+      scale: outline.scale, widthMm: Number(state.petalWidth),
+      throat: outline.throat, pinned: outline.pinned,
+      refusal: outlineCurveRefusal(outlineCurveOf(state), state, [{ lengthMm: length, scale: outline.scale, pinnedFirst: !!outline.throat }]),
     } : null,
     /* THE NIB'S PLAN — the ONE owner of the drawn length and of the terminal
        half-width, reported so C1 and A2 can read what the builder actually
@@ -7503,47 +7537,99 @@ export const OUTLINE_CURVE_DEFAULT = Object.freeze({ mode: 'symmetric', points: 
    the nib's crossing stays unique and in the last span. A power of two (exact
    in IEEE-754), a thousandth of a millimetre. */
 export const OUTLINE_LIFT_MM = 2 ** -10;
+/* THE WIDTH SCALE (F6-sym-2, Eva's ruling of Oct 17: "Petal width in CURVE mode
+   SCALES the drawn curve's widths, multiplicative against the slider's
+   default"). The scale is the petal's OWN width over this reference — the
+   width slider's registry default, which the registry IMPORTS from here so the
+   two cannot drift — and it multiplies every point's y, never its x (the
+   lengthwise positions stay fractions of the length). At the default it is
+   exactly 1 and the plan takes the #417 expressions BY BRANCH, never a
+   multiplication by 1. The width read is the resolved substate's
+   (`ps.petalWidth`, scope offsets included), so a layer that owns its width
+   scales its own curve. */
+export const OUTLINE_WIDTH_REF_MM = 16;
+export function outlineWidthScale(state) {
+  const w = Number(state.petalWidth);
+  return w === OUTLINE_WIDTH_REF_MM ? 1 : w / OUTLINE_WIDTH_REF_MM;
+}
 /* THE PLAN at one asked length — the ONE owner of which points the build
-   draws, read by the validator and the build alike. */
-export function outlineCurvePlan(curve, lengthMm) {
+   draws, read by the validator and the build alike.
+
+   `scale` (the width scale above) multiplies the y of every point before the
+   floor is asked, so the floor is asked about the width that is BUILT.
+
+   `throat` (F6-sym-2, Eva's ruling: CURVE works on tubular flowers, the curve
+   shapes the free lobe above the throat and the tube keeps its own law below
+   it) is `{ u, halfMm }` on a petal of a FUSED whorl, else null: the curve's x
+   is laid over the LOBE, `u = throat.u + x (1 - throat.u)`, and its FIRST
+   POINT'S WIDTH IS PINNED to the tube law's own half-width at the throat
+   (`halfMm`), mirroring how the curve starts above the root blend on a flat
+   petal — so the lobe and the tube meet with no step. The pinned point is
+   recorded (`pinned`), never refused and never lifted: its width is the
+   law's, not the hand's. */
+export function outlineCurvePlan(curve, lengthMm, { scale = 1, throat = null } = {}) {
   const v = typeof curve === 'string' ? JSON.parse(curve) : curve;
   const pts = v.points, last = pts.length - 1;
   const lifted = [];
+  let pinned = null;
   const built = pts.map((p, i) => {
+    const y = scale === 1 ? p[1] : p[1] * scale;
     if (i === last) {
-      if (p[1] !== 0) lifted.push({ point: i + 1, askedMm: p[1] * lengthMm, builtMm: 0, why: 'the last point is held at 0' });
+      if (p[1] !== 0) lifted.push({ point: i + 1, askedMm: y * lengthMm, builtMm: 0, why: 'the last point is held at 0' });
       return [p[0], 0];
     }
-    if (p[1] * lengthMm <= TIP_HALF_MM) {
+    if (i === 0 && throat) {
+      const yt = throat.halfMm / lengthMm;
+      pinned = { point: 1, askedMm: y * lengthMm, builtMm: throat.halfMm, throatU: throat.u };
+      return [p[0], yt];
+    }
+    if (y * lengthMm <= TIP_HALF_MM) {
       const builtY = (TIP_HALF_MM + OUTLINE_LIFT_MM) / lengthMm;
-      lifted.push({ point: i + 1, askedMm: p[1] * lengthMm, builtMm: builtY * lengthMm, why: 'under the print floor' });
+      lifted.push({ point: i + 1, askedMm: y * lengthMm, builtMm: builtY * lengthMm, why: 'under the print floor' });
       return [p[0], builtY];
     }
-    return [p[0], p[1]];
+    return [p[0], y];
   });
   const fn = curveFunction(built, OUTLINE_CURVE_SPEC);
   /* the widest point, off the editor's own sampler (the declared peak A6 and
-     the nib read) */
+     the nib read), in BLADE u (the lobe's map on a fused petal) */
+  const u0 = throat ? throat.u : 0;
+  const toU = throat ? (x) => u0 + x * (1 - u0) : (x) => x;
   let uPk = 0, yPk = -Infinity;
-  for (const [x, y] of curveSamples({ mode: 'symmetric', points: built }, OUTLINE_CURVE_SPEC).left) if (y > yPk) { yPk = y; uPk = x; }
-  return { points: v.points, built, lifted, fn, uPk, peakHalfMm: yPk * lengthMm, lengthMm,
-    halfAtMm: (u) => { const y = fn(Math.min(1, Math.max(0, u))); return y * lengthMm; } };
+  for (const [x, y] of curveSamples({ mode: 'symmetric', points: built }, OUTLINE_CURVE_SPEC).left) if (y > yPk) { yPk = y; uPk = toU(x); }
+  /* on the lobe the curve is defined over [throat.u, 1] only; below it the
+     tube's law owns the outline (widthProfile's CORE term), so the plan
+     answers null there and the caller never asks */
+  const halfAtMm = throat
+    ? (u) => (u < u0 ? null : fn(Math.min(1, (u - u0) / (1 - u0))) * lengthMm)
+    : (u) => { const y = fn(Math.min(1, Math.max(0, u))); return y * lengthMm; };
+  return { points: v.points, built, lifted, pinned, scale, throat, fn, uPk, peakHalfMm: yPk * lengthMm, lengthMm, halfAtMm };
 }
 /* THE REFUSAL (Q4.4 for the outline): null when every point but the last
-   stands strictly above the print floor at EVERY asked length handed in (the
-   lengths the build on screen drew), and the last is at 0 — else the reason. */
+   stands strictly above the print floor at EVERY asked petal handed in (the
+   petals the build on screen drew), and the last is at 0 — else the reason.
+   Each asked entry is a length in mm (the scale read off `state`, the first
+   point checked) or `{ lengthMm, scale, pinnedFirst }` from a built petal's
+   own record — a petal of a fused whorl has its first point PINNED to the
+   throat, which is never the hand's to refuse. A WIDTH drag asks this with the
+   candidate width's scale (bloom.js), so the slider and the point drag share
+   one predicate. */
 export function outlineCurveRefusal(curve, state, askedLengthsMm) {
-  const Ls = (askedLengthsMm && askedLengthsMm.length ? askedLengthsMm : [Number(state.petalLength)]).filter((L) => L > 0);
+  const asked = (askedLengthsMm && askedLengthsMm.length ? askedLengthsMm : [Number(state.petalLength)])
+    .map((a) => (typeof a === 'number' ? { lengthMm: a, scale: outlineWidthScale(state), pinnedFirst: false } : a))
+    .filter((a) => a.lengthMm > 0);
   let worst = null, lastOff = false;
-  for (const L of Ls) {
-    for (const f of outlineCurvePlan(curve, L).lifted) {
+  for (const a of asked) {
+    const throat = a.pinnedFirst ? { u: 0, halfMm: 2 * TIP_HALF_MM } : null;
+    for (const f of outlineCurvePlan(curve, a.lengthMm, { scale: a.scale, throat }).lifted) {
       if (f.why !== 'under the print floor') lastOff = true;
-      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L };
+      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L: a.lengthMm, scale: a.scale };
     }
   }
   if (lastOff) return `the curve's last point must sit at (1, 0) — the blade runs out to nothing and the round nib closes it`;
   if (worst === null) return null;
-  return `point ${worst.point} would be ${(2 * worst.askedMm).toFixed(2)} mm across on a ${worst.L.toFixed(1)} mm petal — under the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor (only the run-out to the tip may go under it; the nib closes it)`;
+  const sc = worst.scale === 1 ? '' : ` (the width scale ${worst.scale.toFixed(3)}x)`;
+  return `point ${worst.point} would be ${(2 * worst.askedMm).toFixed(2)} mm across on a ${worst.L.toFixed(1)} mm petal${sc} — under the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor (only the run-out to the tip may go under it; the nib closes it)`;
 }
 
 /* ===================================================================
@@ -20765,10 +20851,11 @@ export function tubeEligible(state) {
   if (Math.abs(Number(state.varianceSpacing) || 0) >= 0.005) return false;
   if (Math.abs(Number(state.buckleAmp) || 0) > 0) return false;
   if (Number(state.fringeCount) >= 1) return false;
-  /* an outline curve is its own petal; the tube's sinus law is the LAW's
-     (F6-sym, a decision made without a ruling — one line here and one in the
-     registry's twin) */
-  if (outlineIsCurve(state)) return false;
+  /* an outline curve WORKS on a tube (F6-sym-2, Eva's ruling of Oct 17 —
+     #417's exclusion is withdrawn): the curve shapes the free lobe above the
+     throat and the tube keeps its own law below it (widthProfile's
+     `tubeLaw`), so the ring, the sinus and the slit edges read the LAW
+     outline they always read. */
   if (state.petalInfill === 'VORONOI') return false;
   if (Number(state.stemLength) >= 1 && state.inflorescence === 'RACEME') return false;
   return true;

@@ -73,16 +73,19 @@ curve the validator accepts is never lifted.
 
 Each is reversible and named so it can be overruled.
 
-1. **`petalWidth` stays visible in CURVE mode and sets the FOOT only** (the foot width through
-   `footDelicacy`, the ring through the area rule). Its read-out says so. The blade's width is the curve's.
-   Hiding it would have made the foot unreachable; making the curve set the foot would have contradicted
-   Q6.2. *Undo:* the `petalWidth` row's fmt.
-2. **The tube is unavailable in CURVE mode** (`tubeEligible` gains `outlineFromLaw`). Its sinus law reads
-   the LAW's apex. Wiring it to a drawn outline is the tube's own change. *Undo:* one predicate term in two
-   files.
+1. ~~**`petalWidth` stays visible in CURVE mode and sets the FOOT only**~~ — **RULED (Eva, Oct 17):
+   Petal width in CURVE mode SCALES the drawn curve's widths**, multiplicatively against the slider's
+   16 mm default; the lengthwise positions are untouched and at 16 mm the outline is this session's to
+   the bit. It still sets the foot. A width drag that would put a scaled point under the floor is
+   refused through this outline's own validator. Shipped by F6-sym-2 —
+   `docs/bloom-outline-curve-2-outcome.md`. **A design saved since `1bb7c35` with CURVE and a width
+   other than 16 mm reshapes on load; there is no migration.**
+2. ~~**The tube is unavailable in CURVE mode**~~ — **RULED (Eva, Oct 17): CURVE is available on tubular
+   flowers.** The curve shapes the free lobe above the throat and the tube keeps its own law below it.
+   Shipped by F6-sym-2 (the `tubeEligible` term is withdrawn in both files).
 3. **`NU` is `NU_BASE` (56) in CURVE mode.** The apex row ramp (`bladeRowsFor`) keys on `petalTipShape`,
    which is inert here. A curved apex is placed by the turning ladder like any other stretch.
-4. **The default curve is the shipping LAW petal read off at six stations**: `[0, 0.05]`, `[0.15, 0.16]`,
+4. **The default curve is the shipping LAW petal read off at six stations** (kept unchanged by Eva's Oct 17 rulings, with the 56-row count and sepals / leaves pinned LAW): `[0, 0.05]`, `[0.15, 0.16]`,
    `[0.36, 0.2286]`, `[0.7, 0.178]`, `[0.9, 0.1]`, `[1, 0]`. Switching the mode on therefore reshapes the
    default petal by a hair, not a jump.
 5. **The spec's y box is 0 to 0.5 of the length** (a blade as wide as it is long), with 2 to 12 points.
