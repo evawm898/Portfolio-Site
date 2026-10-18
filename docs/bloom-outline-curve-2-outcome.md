@@ -124,6 +124,24 @@ main's on all 1315 common rows** (measured: 0 rows differing), plus block 66.
 **The census.** `bloom-census-sweep` over block 66 in EXPORT: **0 within-shell pairs on all 19 rows**, the bell and
 trumpet LAW twins included. No xfail entry was needed.
 
+**One E2 declaration, and it is the trumpet's, not the curve's (found by CI on `ab757de`).** The edge-profile
+gate's E2 reads `OUTLINE CURVE 2: the TRUMPET with a drawn lobe` (a smoke row) at **45.523018 deg** against the
+45 deg allowance (face-to-face 51.24, outline 5.72). Its LAW twin — a byte HOLDER in §5, so main's own geometry —
+reads **46.253052 deg** on the same state at the same height, i.e. worse; it is not a smoke row, so the gate never
+reached it. A tilt-85, curl -45, 50 mm trumpet is the tube's own class. Declared in `E2_TURN_XFAIL` at 0.523018,
+never widened. The bell reads 42.62 (LAW) and 43.39 (CURVE), under the allowance.
+
+**And two rows past the allowance that the gate cannot see, recorded rather than declared.** E2 runs over the smoke
+subset and REFUSES a declaration naming a row it did not run, so a non-smoke row cannot carry an entry.
+`node tools/verify-bloom-edge-profile.mjs --only '<label>'` measures them, EXPORT:
+- `OUTLINE CURVE 2: the spoon x petalWidth 30` (this PR's) **49.198688 deg** at [25.59, -33.33, 14.81] (face-to-face 51.92, outline 2.72) —
+  the spatulate head 1.875x wide. The default curve at 30 mm reads 41.83 and the spoon at 16 mm 44.53, so it is the
+  spoon's wide head and not the scale law.
+- `OUTLINE CURVE: the spoon x cup 0.6` (#417's) **71.986507 deg**, read **identically on a worktree of `1bb7c35`** —
+  pre-existing on main, the same wide-spatula class under a cup.
+Neither is a fold (the census reads 0 on both). Whether a spoon row belongs in the smoke subset so E2 can hold it is
+Eva's; adding one would declare it at these numbers.
+
 ## 5. The byte partition
 
 Predeclared from this tree's guards (`--movers-predicate outline2`: a row moves iff CURVE AND (width scale ≠ 1 OR a
