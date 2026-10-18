@@ -160,7 +160,7 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
     modeSel = document.createElement('select');
     modeSel.className = 'bl-curve-mode';
     modeSel.setAttribute('aria-label', `${c.label}: mode`);
-    for (const m of spec.modes) { const o = document.createElement('option'); o.value = m; o.textContent = m; modeSel.append(o); }
+    for (const m of spec.modes) { const o = document.createElement('option'); o.value = m; o.textContent = (spec.modeLabels && spec.modeLabels[m]) || m; modeSel.append(o); }
     bar.append(modeSel);
   }
   const dims = document.createElement('span');
@@ -235,7 +235,10 @@ function makeCurveInput(c, { validate, ownerLength, ownerLabel }) {
     if (modeSel) modeSel.value = cur.mode;
     const L = ownerLength();
     const mm = (f) => (f * L).toFixed(1);
-    dims.textContent = Number.isFinite(L) ? `box ${mm(spec.x[1] - spec.x[0])} × ${mm(spec.y[1] - spec.y[0])} mm of ${ownerLabel} ${mm(1)} mm` : '';
+    dims.textContent = (Number.isFinite(L) ? `box ${mm(spec.x[1] - spec.x[0])} × ${mm(spec.y[1] - spec.y[0])} mm of ${ownerLabel} ${mm(1)} mm` : '')
+      /* the spec's own statement of which side is which (F6-asym: the outline's
+         LEFT half is the one above the axis) */
+      + (cur.mode === 'two-sided' && spec.sideCaption ? ` · ${spec.sideCaption}` : '');
     status.hidden = !refusal;
     status.textContent = refusal ? `refused — ${refusal.reason}` : '';
   }
@@ -2045,6 +2048,7 @@ function spineLine(petals) {
 function outlineLine(petals) {
   const ps = (petals || []).filter((p) => p && p.tipCap && p.tipCap.outline);
   if (!ps.length) return '';
+  if (ps[0].tipCap.twoSided) return outlineLineTwoSided(ps);
   const o0 = ps[0].tipCap.outline, ap0 = ps[0].tipCap.apex;
   const lifted = ps.filter((p) => p.tipCap.outline.lifted.length);
   const of = (arr) => `${arr.length} of ${ps.length} ring${ps.length === 1 ? '' : 's'}`;
@@ -2063,8 +2067,30 @@ function outlineLine(petals) {
        + `\n`;
 }
 
+/* F6-asym — AN ASYMMETRIC OUTLINE, told half by half from each half's own
+   record (`tipCap.sides`), with the handedness stated where it is read. */
+function outlineLineTwoSided(ps) {
+  const t0 = ps[0].tipCap, o0 = t0.outline;
+  const half = (side) => {
+    const o = o0.sides[side], ap = t0.sides[side].apex;
+    const narrow = Math.min(...ps.map((p) => { const q = p.tipCap.outline.sides[side]; return Math.min(...q.built.slice(q.pinned ? 1 : 0, -1).map((b) => b[1] * q.lengthMm)); }));
+    return `${side.toUpperCase()} half ${o.points.length} points, ${o.peakHalfMm.toFixed(2)} mm out at u ${o.uPk.toFixed(3)}, narrowest ${narrow.toFixed(2)} mm out against the ${TIP_HALF_MM.toFixed(2)} mm half-floor`
+      + (ap && ap.active ? `, nib ${ap.regime}${ap.kinkDeg > 0 ? ` (${ap.kinkDeg.toFixed(2)}° corner)` : ''}` : `, NIB INERT (${ap ? ap.why : 'no record'})`);
+  };
+  const lifted = ps.filter((p) => p.tipCap.outline.lifted.length);
+  return `OUTLINE CURVE: ASYMMETRIC — two half-curves about the midrib (left = the upper curve: the petal seen from its upper face, base down; every petal the same hand, so a whorl is a pinwheel)`
+       + (o0.scale !== 1 ? ` · widths scaled ${o0.scale.toFixed(3)}x by the ${o0.widthMm} mm Petal width` : '')
+       + `\n     ${half('left')}\n     ${half('right')}`
+       + (lifted.length ? `\n     LIFTED to the floor on ${lifted.length} of ${ps.length} ring(s) — a loaded curve asks under it; the editor refuses such a drag` : '')
+       + (o0.throat ? `\n     on a fused whorl both halves shape the FREE LOBE above the throat (u ${o0.throat.u.toFixed(2)}), each first point pinned to the tube law's width there` : '')
+       + `\n     both halves close on their own nib at exactly ${t0.apex.drawnLengthMm.toFixed(3)} mm, on a ${(2 * t0.apex.endHalfMm).toFixed(2)} mm face · the tapers, tip shape, squared end, lobes and fringe are INERT\n`;
+}
+
 function apexLine(petals) {
-  const ps = (petals || []).filter((p) => p && p.tipCap && p.tipCap.apex);
+  /* F6-asym: a two-sided petal's nib is two plans, one per half — each is a
+     ring's worth of record here, carrying its petal's stations */
+  const ps = (petals || []).filter((p) => p && p.tipCap && p.tipCap.apex)
+    .flatMap((p) => (p.tipCap.twoSided ? [{ ...p, tipCap: p.tipCap.sides.left }, { ...p, tipCap: p.tipCap.sides.right }] : [p]));
   if (!ps.length) return '';
   const aps = ps.map((p) => p.tipCap.apex);
   const live = aps.filter((a) => a.active);
@@ -3663,6 +3689,8 @@ window.__bloomMetrics = () => ({
      connectedness are measured on the export; the structural claims are
      measured here. */
   petalProfile: lastPetal ? lastPetal.profile : null,
+  /* F6-asym: the last petal's two halves, null on a one-sided petal */
+  petalProfileSides: lastPetal && lastPetal.profileL ? { left: lastPetal.profileL, right: lastPetal.profileR, baseLeft: lastPetal.profileBaseL, baseRight: lastPetal.profileBaseR } : null,
   /* EACH ROW'S OWN STATION, beside its half-width. A5 and A6 both need to know
      WHERE a row is, and both were wrong reconstructing it from the array index
      — `profile` leads with the foot rows, so the offset is however many of
@@ -4373,6 +4401,11 @@ window.__bloomMetrics = () => ({
   /* EVERY RING'S BASE OUTLINE (F6-sym): OC1 restates the outline curve on
      every ring's own emitted rows, not the last petal's alone. */
   petalRingProfileBase: lastPetals.map((p) => (p ? p.profileBase : null)),
+  /* F6-asym: each ring's TWO halves' emitted half-widths (and base), null on a
+     one-sided ring — the asymmetric clauses restate each half against these */
+  petalRingProfileSides: lastPetals.map((p) => (p && p.profileL ? { left: p.profileL, right: p.profileR, baseLeft: p.profileBaseL, baseRight: p.profileBaseR } : null)),
+  /* F6-asym: the emitted margins per row of each ring's representative petal (OC4) */
+  petalRingMarginSides: lastPetals.map((p) => (p && p.marginSides ? p.marginSides : null)),
   /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
      `continuousMode` is what every assertion branches on, `sequenceLength` is
      what the legibility flag counts, and each descriptor's own `footCount`

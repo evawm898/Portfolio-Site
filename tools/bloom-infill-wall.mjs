@@ -85,7 +85,13 @@ export function infillPlanFor(G, DEFAULTS, set, exportMode = true, opts = null) 
 /* THE IN-SHEET LENGTH of the plan segment A->B, on the surface. */
 export function inSheetLenMm(surface, A, B, n = IN_SHEET_STEPS) {
   const L = surface.length;
-  const at = (x, y) => { const u = Math.min(1, Math.max(0, x / L)); const hh = surface.profile.laminaHalfAt(u); const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0)); return surface.at(u, v).P; };
+  /* F6-asym: a two-sided outline's plan is in millimetres across the midrib,
+     y > 0 the LEFT half — each half read on its OWN lamina, straight off the
+     profile (never through the infill's own `infillLamina`, which is part of
+     what this instrument is measuring) */
+  const P = surface.profile;
+  const halfAt = P.twoSided ? (u, y) => P.side(y > 0 ? 1 : -1).laminaHalfAt(u) : (u) => P.laminaHalfAt(u);
+  const at = (x, y) => { const u = Math.min(1, Math.max(0, x / L)); const hh = halfAt(u, y); const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0)); return surface.at(u, v).P; };
   let s = 0, prev = at(A.x, A.y);
   for (let k = 1; k <= n; k++) { const p = at(A.x + (B.x - A.x) * k / n, A.y + (B.y - A.y) * k / n); s += Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]); prev = p; }
   return s;

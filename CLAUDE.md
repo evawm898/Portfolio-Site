@@ -971,6 +971,33 @@ nib resolution demand in the ladder for LAW and CURVE alike — its own byte par
 tools/bloom-spoon-rim-turn.mjs` reproduces every figure (via the gate's new `--rows-file`); sheet `node
 tools/shot-bloom-spoon-nib.mjs <dir>` → `docs/img/spoon-rim-turn.png`.
 
+**THE PETAL OUTLINE CAN BE ASYMMETRIC: TWO HALF-CURVES ABOUT THE MIDRIB, AND "LEFT" IS DEFINED HERE,
+ONCE** (F6-asym, Oct 18 — Eva's rulings; read `docs/bloom-outline-curve-asym-outcome.md` before touching
+`twoSidedProfile`, `widthProfileOne`'s `side`, `twoRowAt`, `sideOfV`, `infillLamina`, `emitPanel`'s per-half
+room, `outlineHalfOf`, OC4 or E7).
+- **LEFT is the half on the viewer's left when the petal is seen from its upper (adaxial) face with its base
+  at the bottom** — `v > 0` of the section (`sideOfV`), the row frame's `+T`; `points` in the value, the
+  UPPER curve in the editor. Every petal of a whorl has the same hand (a pinwheel); FAN pairs are not
+  mirrored (a placement made without a ruling).
+- CURVE mode's Symmetric / Asymmetric toggle is `bloom-curve.js`'s own `two-sided` mode. Asym → Sym keeps
+  the LEFT half; Sym → Asym starts both halves as the curve. #417 / #418's rulings hold per half; both halves
+  close on their own `leafNibPlan` at exactly the slider's length.
+- **`widthProfile` stays the one owner and its two-sided profile THROWS on a one-sided question**
+  (`halfWidthAt`, `laminaHalfAt`, …) naming `side(±1)`: a missed reader fails loudly. Every ±halfWidth
+  site and what it reads is §3 of the doc. Equal halves are the symmetric outline TO THE BIT
+  (`node tools/verify-bloom-outline-asym-equal.mjs --control`: 50.3 M floats, 0 differ).
+- **The bead's room is per half** (`room × 2 h_side / (hL + hR)`, exactly the room on equal halves): the
+  whole-span room let a narrow half's bead reach past the midrib. **E7** (edge gate) measures where each
+  side's skin stops off the emitted vertices and found it.
+- **OC4** reads the handedness on the emitted margins (`N × D` from the spine centres and the normal);
+  OC0–OC3 / AN0–AN3 run once per half against each half restated from the control. Mutants: four in the
+  apex table, the one-sided bead in the edge gate, the mirrored infill in the infill gate (I11), and
+  Asym → Sym keeping the right half is route (af)'s, pre-existing.
+- E2 on asymmetric rows is at or below the worse symmetric twin on every measured row (the spoon's
+  blunt-nib-under-a-cup class); the one smoke row over the allowance is declared, never widened.
+- Block 67 (25 rows, 1,359), smoke block 67 (8); `frozen/phase73` = the 1,334 rows at `f663973`. Sheet:
+  `node tools/shot-bloom-outline-asym.mjs <dir>` → `docs/img/outline-asym.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

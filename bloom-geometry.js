@@ -4339,42 +4339,60 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
      `ladderHalfAt` in widthProfile(). Row positions are topology; the export
      floor may not move them. ASKED, never re-derived: widthProfile() is the
      one owner of which term wins, and this is its one caller. */
-  const at = (u) => profile.ladderHalfAt(u);
-  const active = (u) => profile.ladderLawActiveAt(u);
-  const tangent = (f, u) => {
-    const h = 1e-6, lo = Math.max(u0, u - h), hi = Math.min(1, u + h);
-    return Math.atan2(f(hi) - f(lo), (hi - lo) * length);
-  };
-  /* THE MARGIN WAVE IS PART OF WHAT IS EMITTED, so its turning buys its own
-     rows. Weighting by the outline alone would place rows for the apex and
-     leave the buckle to be sampled by whatever fell out — which is how an
-     unbounded ladder made the wave worse. Along the margin the field is
-     `A * h(u) * ramp(u) * cos(2 pi f u + phase)`; the envelope is exactly 1
-     at v = +/-1 whatever the reach exponent is, which is why this does not
-     read `p` at all — the same reason buckleAmpCap does not. */
-  const wave = buckle && buckle.A
-    ? (u) => buckle.A * at(u) * Math.min(1, u / FORM_ONSET_END)
-        * Math.cos(2 * Math.PI * buckle.f * u + (buckle.phaseRad || 0))
-    : null;
+  /* THE MEASURE, PER OUTLINE. A two-sided outline (F6-asym) has two margins
+     and each turns on its own, so the ladder's measure is the MEAN of the two
+     halves' increments, sample by sample — every row a side needs is bought by
+     that side's own turning, and with equal halves `(x + x) / 2` is `x` to the
+     bit, so the ladder is the symmetric one. A one-sided profile is measured
+     once, by the same code. */
+  const measureOf = (sideProf) => {
+    const at = (u) => sideProf.ladderHalfAt(u);
+    const active = (u) => sideProf.ladderLawActiveAt(u);
+    const tangent = (f, u) => {
+      const h = 1e-6, lo = Math.max(u0, u - h), hi = Math.min(1, u + h);
+      return Math.atan2(f(hi) - f(lo), (hi - lo) * length);
+    };
+    /* THE MARGIN WAVE IS PART OF WHAT IS EMITTED, so its turning buys its own
+       rows. Weighting by the outline alone would place rows for the apex and
+       leave the buckle to be sampled by whatever fell out — which is how an
+       unbounded ladder made the wave worse. Along the margin the field is
+       `A * h(u) * ramp(u) * cos(2 pi f u + phase)`; the envelope is exactly 1
+       at v = +/-1 whatever the reach exponent is, which is why this does not
+       read `p` at all — the same reason buckleAmpCap does not. */
+    const wave = buckle && buckle.A
+      ? (u) => buckle.A * at(u) * Math.min(1, u / FORM_ONSET_END)
+          * Math.cos(2 * Math.PI * buckle.f * u + (buckle.phaseRad || 0))
+      : null;
 
-  const dT = [], dA = [];
-  let turn = 0, arc = 0, pT = tangent(at, u0 + 1e-9), pX = u0 * length, pY = at(u0);
-  let pW = wave ? tangent(wave, u0 + 1e-9) : 0;
-  for (let i = 1; i <= LADDER_SAMPLES; i++) {
-    const u = u0 + (1 - u0) * i / LADDER_SAMPLES;
-    const t = tangent(at, u), x = u * length, y = at(u);
-    let d = Math.abs(t - pT);
-    if (d > Math.PI) d = 2 * Math.PI - d;
-    if (!(active(u) && active(u0 + (1 - u0) * (i - 1) / LADDER_SAMPLES))) d = 0;
-    if (wave) {
-      const tw = tangent(wave, u);
-      let dw = Math.abs(tw - pW);
-      if (dw > Math.PI) dw = 2 * Math.PI - dw;
-      d += dw; pW = tw;
+    const dT = [], dA = [];
+    let turn = 0, arc = 0, pT = tangent(at, u0 + 1e-9), pX = u0 * length, pY = at(u0);
+    let pW = wave ? tangent(wave, u0 + 1e-9) : 0;
+    for (let i = 1; i <= LADDER_SAMPLES; i++) {
+      const u = u0 + (1 - u0) * i / LADDER_SAMPLES;
+      const t = tangent(at, u), x = u * length, y = at(u);
+      let d = Math.abs(t - pT);
+      if (d > Math.PI) d = 2 * Math.PI - d;
+      if (!(active(u) && active(u0 + (1 - u0) * (i - 1) / LADDER_SAMPLES))) d = 0;
+      if (wave) {
+        const tw = tangent(wave, u);
+        let dw = Math.abs(tw - pW);
+        if (dw > Math.PI) dw = 2 * Math.PI - dw;
+        d += dw; pW = tw;
+      }
+      const s = Math.hypot(x - pX, y - pY);
+      dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
     }
-    const s = Math.hypot(x - pX, y - pY);
-    dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
-  }
+    return { dT, dA, turn, arc };
+  };
+  let dT, dA, turn, arc;
+  if (profile.twoSided) {
+    const mL = measureOf(profile.side(1)), mR = measureOf(profile.side(-1));
+    dT = []; dA = []; turn = 0; arc = 0;
+    for (let i = 0; i < mL.dT.length; i++) {
+      const d = (mL.dT[i] + mR.dT[i]) / 2, s = (mL.dA[i] + mR.dA[i]) / 2;
+      dT.push(d); dA.push(s); turn += d; arc += s;
+    }
+  } else ({ dT, dA, turn, arc } = measureOf(profile));
   /* THE DEGENERATE PATHS MUST STILL CLEAR THE SEAM (session 38). If the
      measure is empty there is nothing to redistribute, but returning the
      UNIFORM ladder would put the first blade rows back under the clearance
@@ -4835,6 +4853,109 @@ const PANEL_OVERLAP_ROWS = 1;
      TIP_HALF_MM   the blunt-tip floor.
    =================================================================== */
 export function widthProfile(state, ring, halfW, cap, acc, length = null) {
+  if (!outlineTwoSidedFor(state, cap)) return widthProfileOne(state, ring, halfW, cap, acc, length, null);
+  return twoSidedProfile(
+    widthProfileOne(state, ring, halfW, cap, acc, length, 'left'),
+    widthProfileOne(state, ring, halfW, cap, acc, length, 'right'));
+}
+
+/* ===================================================================
+   THE TWO-SIDED (ASYMMETRIC) OUTLINE — F6-asym (Eva's rulings, Oct 18; read
+   docs/bloom-outline-curve-asym-outcome.md before touching it).
+
+   An Asymmetric CURVE outline is two independent half-curves about the
+   UNCHANGED midrib. `widthProfile` stays the one owner of the outline: it
+   builds the profile ONCE PER SIDE — `widthProfileOne` with the side's own
+   points, which is the symmetric profile's code verbatim, each side closed on
+   its own `leafNibPlan` at exactly the asked length (both halves run out to
+   TIP_HALF_MM and both nibs end on APEX_END_HALF_MM at u = 1, so the mini-face
+   is symmetric) — and hands back a profile that answers BY SIDE.
+
+   LEFT IS DEFINED ONCE, HERE: viewed from the petal's upper (adaxial) face,
+   base at the bottom, LEFT is the +T side of the row frame, i.e. v > 0. The
+   frame's right-hand direction is D x N = -T (D along the blade, N the upper
+   face's normal), so the left half is the curve's `points` and the right half
+   its `right`. Every petal of a whorl carries the same handedness, so a RADIAL
+   or SPIRAL flower of lopsided petals is a pinwheel — chiral by construction.
+
+   EVERY HALF-WIDTH IS ASKED OF A SIDE. The single-valued methods of a
+   one-sided profile THROW here rather than answering for one side: a reader
+   that forgot the outline has two halves fails loudly instead of drawing the
+   left half on both margins. What has ONE answer for the blade is answered
+   once — the lengths (both sides end at exactly the asked length; asserted),
+   the widest point (the wider side's), the breaks (the union), the ladder's
+   arc demand (the window that covers both nibs). With equal halves every
+   combination below returns the side's own double (max(x, x), min(x, x) and
+   a deduplicated union of one list are the identity), which is what makes an
+   asymmetric curve with equal halves build the symmetric curve's bytes.
+   =================================================================== */
+export function outlineTwoSided(state) {
+  if (!outlineIsCurve(state)) return false;
+  const v = outlineCurveOf(state);
+  return !!v && v.mode === 'two-sided';
+}
+function outlineTwoSidedFor(state, cap) {
+  return outlineTwoSided(state) && !(cap && (cap.petiole || cap.chevron || cap.stalk));
+}
+/* v > 0 is LEFT (see above). The one statement of the side convention. */
+export const sideOfV = (v) => (v > 0 ? 'left' : 'right');
+function twoSidedProfile(L, R) {
+  if (!(L.drawnLength === R.drawnLength && L.askedLength === R.askedLength)) throw new Error(`widthProfile: the two halves of an outline must end at one length (left ${L.drawnLength}, right ${R.drawnLength})`);
+  const side = (s) => (s > 0 ? L : R);
+  const ask = (name) => () => { throw new Error(`widthProfile: an asymmetric outline has two half-widths — ask profile.side(±1).${name}, never the blade`); };
+  const wide = R.outline.peakHalfMm > L.outline.peakHalfMm ? R : L;
+  /* the union of two break lists, one entry per station (equal halves: the list itself) */
+  const unionBreaks = (a, b) => {
+    const out = a.slice();
+    for (const x of b) if (!out.some((y) => y.u === x.u && y.kind === x.kind)) out.push(x);
+    out.sort((p, q) => p.u - q.u);
+    return out;
+  };
+  const apexSides = { left: L.apex, right: R.apex };
+  return {
+    twoSided: true,
+    side, sides: { left: L, right: R },
+    uPk: wide.uPk, terms: null, footHalf: L.footHalf, tipFloor: L.tipFloor,
+    uCap: Math.min(L.uCap, R.uCap),
+    outline: {
+      twoSided: true, sides: { left: L.outline, right: R.outline },
+      uPk: wide.outline.uPk, peakHalfMm: wide.outline.peakHalfMm, lengthMm: L.outline.lengthMm,
+      scale: L.outline.scale, widthMm: L.outline.widthMm, throat: L.outline.throat,
+      lifted: [...L.outline.lifted.map((f) => ({ ...f, side: 'left' })), ...R.outline.lifted.map((f) => ({ ...f, side: 'right' }))],
+      refusal: L.outline.refusal,
+    },
+    /* the nib, BY SIDE — the blade-level fields are the ones both sides share
+       by construction (active, length, the end mini-face), the arc window the
+       one covering both arcs */
+    apex: {
+      twoSided: true, sides: apexSides,
+      active: L.apex.active && R.apex.active, why: L.apex.why ?? R.apex.why,
+      drawnLength: L.apex.drawnLength, endHalfMm: L.apex.endHalfMm,
+      arcU: Math.min(L.apex.arcU, R.apex.arcU),
+      toLaw: (v) => v,
+      halfAt: ask('apex.halfAt'),
+    },
+    askedLength: L.askedLength, drawnLength: L.drawnLength,
+    terminalHalfMm: L.terminalHalfMm,
+    terminalHalf: 0, tipEnd: 0, fringe: null, lobes: null,
+    capEntryHalf: Math.max(L.capEntryHalf, R.capEntryHalf),
+    capTerminalHalf: Math.max(L.capTerminalHalf, R.capTerminalHalf),
+    /* the ladder's arc demand: one window from the lower of the two arcs */
+    ladderDemand() {
+      const a = L.ladderDemand(), b = R.ladderDemand();
+      if (a === null || b === null) return a === null ? b : a;
+      return a.u0 <= b.u0 ? a : b;
+    },
+    slopeBreaks: (grid = 4096) => unionBreaks(L.slopeBreaks(grid), R.slopeBreaks(grid)),
+    laminaSlopeBreaks: (grid = 4096) => unionBreaks(L.laminaSlopeBreaks(grid), R.laminaSlopeBreaks(grid)),
+    shapeAt: ask('shapeAt'), lawIsActiveAt: ask('lawIsActiveAt'),
+    ladderHalfAt: ask('ladderHalfAt'), ladderLawActiveAt: ask('ladderLawActiveAt'),
+    onNib: ask('onNib'), halfWidthBaseAt: ask('halfWidthBaseAt'), halfWidthAt: ask('halfWidthAt'),
+    winnerAt: ask('winnerAt'), laminaHalfAt: ask('laminaHalfAt'),
+  };
+}
+
+function widthProfileOne(state, ring, halfW, cap, acc, length = null, outlineSide = null) {
   const a = state.petalBaseTaper;
   const b = state.petalTipTaper;
   /* THE OUTLINE CURVE (F6-sym): in CURVE mode the CORE term is the drawn
@@ -4869,7 +4990,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     ? (() => {
       if (!(length > 0)) throw new Error('widthProfile: an outline curve needs the blade LENGTH in mm — its points are fractions of it');
       const scale = outlineWidthScale(state);
-      const pl = outlineCurvePlan(outlineCurveOf(state), length, scale === 1 && !tubeLaw ? undefined : { scale, throat: tubeLaw ? { u: tubeLaw.u, halfMm: tubeLaw.halfMm } : null });
+      const pl = outlineCurvePlan(outlineCurveOf(state), length, scale === 1 && !tubeLaw ? (outlineSide ? { side: outlineSide } : undefined) : { scale, throat: tubeLaw ? { u: tubeLaw.u, halfMm: tubeLaw.halfMm } : null, side: outlineSide });
       if (!tubeLaw || !(tubeLaw.uPk < tubeLaw.u) || !(halfW > pl.peakHalfMm)) return pl;
       /* the blade's widest point is the LAW's, below the throat */
       return { ...pl, uPk: tubeLaw.uPk, peakHalfMm: halfW };
@@ -7524,10 +7645,15 @@ export function outlineCurveOf(state) {
   const v = state.petalOutlineCurve;
   return typeof v === 'string' ? JSON.parse(v) : v;
 }
-/* THE SPEC — the registry imports it. `symmetric` only: two-sided is a later
-   session, and a mode a spec lists is a mode a hand can reach. y up to half
-   the length (a blade as wide as it is long). */
-export const OUTLINE_CURVE_SPEC = Object.freeze({ modes: ['symmetric'], x: [0, 1], y: [0, 0.5], lock: { first: 'x', last: 'xy' }, monotoneX: true, points: [2, 12], owner: 'petalLength' });
+/* THE SPEC — the registry imports it. `symmetric` (one half mirrored) and,
+   since F6-asym, `two-sided` (the panel's "Asymmetric": `points` the LEFT half,
+   `right` the right, each a function of x with its own last point at (1, 0)).
+   y up to half the length (a blade as wide as it is long). */
+export const OUTLINE_CURVE_SPEC = Object.freeze({ modes: ['symmetric', 'two-sided'], x: [0, 1], y: [0, 0.5], lock: { first: 'x', last: 'xy' }, monotoneX: true, points: [2, 12], owner: 'petalLength',
+  /* the panel's words for the two modes, and its one statement of handedness —
+     the same definition as `sideOfV` (the upper curve is `points`, v > 0) */
+  modeLabels: Object.freeze({ symmetric: 'Symmetric', 'two-sided': 'Asymmetric' }),
+  sideCaption: 'upper curve = LEFT half, lower = RIGHT, seen from the petal\'s upper face with its base at the bottom' });
 /* THE DEFAULT is the shipping LAW petal read off at six stations (35 x 16 mm,
    base 1.00, tip taper 1.80, tip shape 1.70: its widest point 0.357, half-width
    0.2286 of the length there), so switching the mode on reshapes the default
@@ -7567,9 +7693,12 @@ export function outlineWidthScale(state) {
    petal — so the lobe and the tube meet with no step. The pinned point is
    recorded (`pinned`), never refused and never lifted: its width is the
    law's, not the hand's. */
-export function outlineCurvePlan(curve, lengthMm, { scale = 1, throat = null } = {}) {
+export function outlineCurvePlan(curve, lengthMm, { scale = 1, throat = null, side = null } = {}) {
   const v = typeof curve === 'string' ? JSON.parse(curve) : curve;
-  const pts = v.points, last = pts.length - 1;
+  /* F6-asym: a two-sided curve's RIGHT half is `right`; the left half, and
+     every symmetric curve, is `points` — the one statement of which list a
+     side reads */
+  const pts = side === 'right' ? v.right : v.points, last = pts.length - 1;
   const lifted = [];
   let pinned = null;
   const built = pts.map((p, i) => {
@@ -7603,7 +7732,7 @@ export function outlineCurvePlan(curve, lengthMm, { scale = 1, throat = null } =
   const halfAtMm = throat
     ? (u) => (u < u0 ? null : fn(Math.min(1, (u - u0) / (1 - u0))) * lengthMm)
     : (u) => { const y = fn(Math.min(1, Math.max(0, u))); return y * lengthMm; };
-  return { points: v.points, built, lifted, pinned, scale, throat, fn, uPk, peakHalfMm: yPk * lengthMm, lengthMm, halfAtMm };
+  return { points: pts, side, built, lifted, pinned, scale, throat, fn, uPk, peakHalfMm: yPk * lengthMm, lengthMm, halfAtMm };
 }
 /* THE REFUSAL (Q4.4 for the outline): null when every point but the last
    stands strictly above the print floor at EVERY asked petal handed in (the
@@ -7619,17 +7748,22 @@ export function outlineCurveRefusal(curve, state, askedLengthsMm) {
     .map((a) => (typeof a === 'number' ? { lengthMm: a, scale: outlineWidthScale(state), pinnedFirst: false } : a))
     .filter((a) => a.lengthMm > 0);
   let worst = null, lastOff = false;
-  for (const a of asked) {
-    const throat = a.pinnedFirst ? { u: 0, halfMm: 2 * TIP_HALF_MM } : null;
-    for (const f of outlineCurvePlan(curve, a.lengthMm, { scale: a.scale, throat }).lifted) {
-      if (f.why !== 'under the print floor') lastOff = true;
-      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L: a.lengthMm, scale: a.scale };
+  /* F6-asym: EACH HALF is asked, by the same predicate on its own points */
+  const cv = typeof curve === 'string' ? JSON.parse(curve) : curve;
+  const sides = cv && cv.mode === 'two-sided' ? ['left', 'right'] : [null];
+  for (const side of sides) {
+    for (const a of asked) {
+      const throat = a.pinnedFirst ? { u: 0, halfMm: 2 * TIP_HALF_MM } : null;
+      for (const f of outlineCurvePlan(cv, a.lengthMm, side ? { scale: a.scale, throat, side } : { scale: a.scale, throat }).lifted) {
+        if (f.why !== 'under the print floor') lastOff = true;
+        else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L: a.lengthMm, scale: a.scale, side };
+      }
     }
   }
   if (lastOff) return `the curve's last point must sit at (1, 0) — the blade runs out to nothing and the round nib closes it`;
   if (worst === null) return null;
   const sc = worst.scale === 1 ? '' : ` (the width scale ${worst.scale.toFixed(3)}x)`;
-  return `point ${worst.point} would be ${(2 * worst.askedMm).toFixed(2)} mm across on a ${worst.L.toFixed(1)} mm petal${sc} — under the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor (only the run-out to the tip may go under it; the nib closes it)`;
+  return `${worst.side ? `the ${worst.side} half's ` : ''}point ${worst.point} would be ${(2 * worst.askedMm).toFixed(2)} mm across on a ${worst.L.toFixed(1)} mm petal${sc} — under the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor (only the run-out to the tip may go under it; the nib closes it)`;
 }
 
 /* ===================================================================
@@ -7830,8 +7964,16 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      0 with no buckle there is nothing for it to multiply, so it cannot decide
      flatness. The curl family's own rule (frequency and reach are inert at
      amplitude 0), and the reason it is absent from FORM_IDS too. */
-  const apex = buckleCtx && buckleCtx.profile
+  const apex = buckleCtx && buckleCtx.profile && !buckleCtx.profile.twoSided
     ? apexScale(buckleCtx.profile, buckleCtx.length, state.petalApexSweep) : null;
+  /* F6-asym: on a two-sided outline the apex sweep is each HALF's own — its
+     inscribed radius and blend start read off that half's outline — and a
+     cross-section is handed the side it is drawing (`sectAt`'s `side`). On
+     every one-sided profile both names are the one scale above. */
+  const apexTwo = buckleCtx && buckleCtx.profile && buckleCtx.profile.twoSided;
+  const apexL = apexTwo ? apexScale(buckleCtx.profile.side(1), buckleCtx.length, state.petalApexSweep) : apex;
+  const apexR = apexTwo ? apexScale(buckleCtx.profile.side(-1), buckleCtx.length, state.petalApexSweep) : apex;
+  const apexOf = (side) => (side < 0 ? apexR : apexL);
   const curlUniform = curlIsUniform(state);
   const smoother = (x) => x * x * x * (x * (x * 6 - 15) + 10);
   const rollEnv = (u) => 1 - Math.abs(rollTaper) * smoother(rollTaper > 0 ? u : 1 - u);
@@ -7886,7 +8028,8 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      sectAt, read by buildPetalInto, printed by the read-out. A clamp nobody
      is told about is a control that silently means something else. */
   const cupClamp = { u: null, askedRadiusMm: Infinity, drawnRadiusMm: Infinity, rows: 0 };
-  const sectAt = (C, T1, N1, h, u, hb = h, cupScale = 1) => {
+  const sectAt = (C, T1, N1, h, u, hb = h, cupScale = 1, side = 1) => {
+    const apex = apexOf(side);
     const r = ramp(u);
     const k = kAt(u, r);
     /* THE CUP'S CURVATURE IS `2c/hb`, SO IT BLOWS UP AS THE NIB CONVERGES,
@@ -7993,10 +8136,14 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
            buckle before session 35 — so a scale wired only into `sectAt`
            would leave the metric telemetry reporting the UNSWEPT stretch on
            every swept row, which is the same defect one layer down. */
-        const kS = apex === null ? null : apex.kAt(row.u, row.h);
+        /* F6-asym: a two-sided row carries one half-width per side */
+        const two = row.h === null;
+        const kS0 = apexL === null ? null : apexL.kAt(row.u, two ? row.hL : row.h);
+        const kS1 = two ? (apexR === null ? null : apexR.kAt(row.u, row.hR)) : kS0;
         for (let j = 0; j < NV; j++) {
           const v = -1 + (2 * j) / (NV - 1);
-          const a = row.h * v;
+          const kS = v > 0 ? kS0 : kS1;
+          const a = (two ? (v > 0 ? row.hL : row.hR) : row.h) * v;
           const dT = k === 0 ? 1 : Math.cos(k * a);
           const dN = (k === 0 ? 0 : Math.sin(k * a)) + (kS === null ? 2 * c * v : 2 * c * v * kS);
           const g = Math.hypot(dT, dN);              // |dP/dv| / h — the RATIO
@@ -8019,12 +8166,15 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
         const rr = ramp(row.u);
         const k = kAt(row.u, rr), c = cAt(row.u, rr);
         /* And a THIRD copy, of the cross-section POINT. Same reason. */
-        const kS = apex === null ? null : apex.kAt(row.u, row.h);
+        const two = row.h === null;
+        const kS0 = apexL === null ? null : apexL.kAt(row.u, two ? row.hL : row.h);
+        const kS1 = two ? (apexR === null ? null : apexR.kAt(row.u, row.hR)) : kS0;
         const pt = (v) => {
-          const a = row.h * v;
+          const kS = v > 0 ? kS0 : kS1, hh = two ? (v > 0 ? row.hL : row.hR) : row.h;
+          const a = hh * v;
           return [k === 0 ? a : Math.sin(k * a) / k,
                   (k === 0 ? 0 : (1 - Math.cos(k * a)) / k)
-                    + (kS === null ? c * row.h * v * v : c * row.h * v * v * kS)];
+                    + (kS === null ? c * hh * v * v : c * hh * v * v * kS)];
         };
         let chord = 0, prev = pt(-1);
         for (let j = 1; j < NV; j++) {
@@ -8032,7 +8182,7 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
           chord += Math.hypot(q[0] - prev[0], q[1] - prev[1]);
           prev = q;
         }
-        const ratio = chord / (2 * row.h);
+        const ratio = chord / (row.h === null ? row.hL + row.hR : 2 * row.h);
         if (ratio < pMin) pMin = ratio;
         if (ratio > pMax) pMax = ratio;
       }
@@ -8451,7 +8601,31 @@ export function petalSurface(state, ring, slot, cap, acc) {
      single return path AND `form.frameAt` is still never called on a flat
      build — the guard doctrine the whole builder rests on.
      =================================================================== */
-  const rowAt = (u) => {
+  /* F6-asym — A TWO-SIDED ROW. Each half carries its own half-width, base
+     half-width and nib cup scale, read off its own side of the profile, and
+     the row's cross-section is the side's own section: v > 0 the LEFT half
+     (`sideOfV`), v < 0 the right, about the unchanged midrib (v = 0 is the
+     spine centre C on both). Every law in `sectAt` is a function of the
+     millimetres from the midrib, so each half is the section a symmetric
+     petal of that half's width would draw — cup, buckle, apex sweep and roll
+     included. `h` is null on such a row: a reader that assumes one
+     half-width must ask for `hL` / `hR` by name. */
+  const twoRowAt = (u) => {
+    const s = u * length;
+    const PL = profile.side(1), PR = profile.side(-1);
+    const hL = PL.halfWidthAt(u), hR = PR.halfWidthAt(u);
+    const hbL = PL.halfWidthBaseAt(u), hbR = PR.halfWidthBaseAt(u);
+    const { C, phi } = spineAt(s);
+    const f = form ? form.frameAt(Rs, T, phi, u, dome === null ? null : Up) : null;
+    const cupL = PL.onNib(u) ? hbL / TIP_HALF_MM : 1, cupR = PR.onNib(u) ? hbR / TIP_HALF_MM : 1;
+    const sL = f === null ? flatSect(C, nrm, hL) : form.sectAt(C, f.T, f.N, hL, u, hbL, cupL, 1);
+    const sR = f === null ? flatSect(C, nrm, hR) : form.sectAt(C, f.T, f.N, hR, u, hbR, cupR, -1);
+    const sect = (v) => (v > 0 ? sL(v) : sR(v));
+    return f === null
+      ? { C, N: nrm, T, h: null, hL, hR, hb: null, hbL, hbR, u, sect }
+      : { C, N: f.N, T: f.T, D: f.D, h: null, hL, hR, hb: null, hbL, hbR, u, sect };
+  };
+  const rowAt = profile.twoSided ? twoRowAt : (u) => {
     const s = u * length;
     const h = profile.halfWidthAt(u);
     /* THE SURFACE'S OWN WIDTH SCALE (session 38): the base outline's, so a
@@ -8972,10 +9146,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       const row = rows[i];
       const zf = zero.frameAt(Rs, T, tilt, row.u, dome === null ? null : Up);
       dev(zf.T, T); dev(zf.N, nrm);
-      const zs = zero.sectAt(row.C, row.T, row.N, row.h, row.u);
+      /* F6-asym: a two-sided row is checked side by side */
+      const zs = zero.sectAt(row.C, row.T, row.N, row.h === null ? row.hL : row.h, row.u);
+      const zsR = row.h === null ? zero.sectAt(row.C, row.T, row.N, row.hR, row.u) : zs;
       for (let j = 0; j < NV; j++) {
         const v = -1 + (2 * j) / (NV - 1);
-        const A = (row.ownSect || row.sect)(v), B = zs(v);
+        const A = (row.ownSect || row.sect)(v), B = (v > 0 ? zs : zsR)(v);
         dev(A.P, B.P); dev(A.n, B.n);
       }
     }
@@ -9132,6 +9308,29 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     /* Row half-widths, FOOT ROWS INCLUDED — a claw is narrower than both
        its foot and its blade, so the foot rows are part of the evidence. */
     profile: rows.map((r) => r.h),
+    /* F6-asym: each HALF's row half-widths (foot rows: the foot's, on both) —
+       null on a one-sided petal, whose `profile` is the whole story */
+    profileL: profile.twoSided ? rows.map((r) => (r.h === null ? r.hL : r.h)) : null,
+    profileR: profile.twoSided ? rows.map((r) => (r.h === null ? r.hR : r.h)) : null,
+    profileBaseL: profile.twoSided ? rows.map((r) => (r.hb === null ? r.hbL : r.hb)) : null,
+    profileBaseR: profile.twoSided ? rows.map((r) => (r.hb === null ? r.hbR : r.hb)) : null,
+    /* F6-asym — THE HANDEDNESS, READ OFF THE EMITTED MARGINS. Per blade row
+       the spine centre, the row's own normal and the two margin points the
+       section puts at v = +1 (LEFT) and v = -1 (RIGHT) — the very `sect` the
+       panel is emitted through. OC4 builds "left" from the CENTRES' own run
+       and the normal (N x D, the viewer's left looking down onto the upper
+       face, base at the bottom) and asks which side each margin is on, so a
+       build that drew the halves on the wrong sides is red even though every
+       half-width record is right. Null on a one-sided petal. */
+    marginSides: profile.twoSided ? rows.filter((r) => r.h === null).map((r) => {
+      /* the sides are read a tenth of the way out (a rolled section can carry
+         its margin round past the midrib's own plane; the first tenth leaves
+         along the row's own direction under any reachable roll) and the
+         widths at the margins themselves, where the section is flat and not
+         a tube's (a fused row is wrapped by the tube's own law) */
+      return { u: r.u, C: r.C, N: r.N, L: r.sect(1).P, R: r.sect(-1).P, l: r.sect(0.1).P, r: r.sect(-0.1).P,
+        hL: r.hL, hR: r.hR, flat: !r.D && !(cap && cap.tubeLobe) };
+    }) : null,
     /* AND EACH ROW'S OWN STATION, because half-widths alone cannot say where
        a row IS. The apex clauses A5 and A6 both need that, and both got it
        wrong first by reconstructing `u` from the array index — which is off by
@@ -9153,78 +9352,96 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        word in an output is a defect this project has a rule about; here it
        would also have silently shadowed the position, since a later key wins
        in an object literal. */
-    tipCap: {
-      /* NO `pointed` KEY. The cap is unconditional since session 32, so a
-         boolean naming a family that no longer exists would be a label for a
-         computation nobody performs — and both gates read this object. */
-      uCap: profile.uCap,
-      entryHalf: profile.capEntryHalf,
-      terminalHalf: profile.capTerminalHalf,
-      /* What the LAST ROW actually came out at — the emitted number, not the
-         intended one, for the same reason row.tUsed exists. */
-      lastRowHalf: rows[rows.length - 1].h,
-      exportMode: acc.exportMode,
-      /* THE LAW'S OWN TWO NUMBERS, so a gate can read the exponent back off
-         the emitted rows instead of re-deriving where the apex starts. */
-      uPk: profile.uPk,
-      /* the exponent the LAW was handed — `ps`, the petal's resolved state,
-         never the caller's: under a scope term (Scoping-b) a layer or a pair
-         carries its own tip shape, and A6 reads the emitted apex against THIS
-         number, so a `state` read would report the whole bloom's exponent
-         beside a petal drawn at its scope's (found by the review's gate work;
-         identical on every build with no scope term — no role override
-         touches the tip shape — so no byte or record moves) */
-      shapeN: ps.petalTipShape,
-      /* THE PEAK THE LAW IS NORMALISED AGAINST, declared rather than left to
-         be estimated as the largest emitted row. Those are different numbers
-         the moment the ladder stops putting a row near uPk: measured on the
-         saturated ladder the largest emitted row is 7.9936 mm against a true
-         8.0000, and a fit that takes the emitted maximum as the peak absorbs
-         that into the exponent and reads 1.5014 for an asked 1.50. Reading
-         the sampling as if it were the geometry — this project's own most
-         repeated defect. */
-      peakHalf: profile.halfWidthBaseAt(profile.uPk),
-      /* THE NIB'S OWN PLAN — scalars only, because this object crosses a
-         `page.evaluate` boundary and a function would be dropped in silence.
-         Reported so the AN family reads what the builder DECLARED and checks
-         it against what the builder EMITTED, rather than re-deriving the
-         crossing, the tangent or the arc: a second producer of any of the
-         three would agree with a broken first one by being broken alongside
-         it (session 43's ST2, session 41's L7). `why` is null iff `active`,
-         asserted both ways, so an inert row states its reason rather than
-         being indistinguishable from a row nobody looked at. */
-      apex: {
-        active: profile.apex.active,
-        why: profile.apex.why,
-        uLaw: profile.apex.uLaw,
-        xLawMm: profile.apex.xLawMm,
-        xFaceMm: profile.apex.active ? profile.apex.xFaceMm : null,
-        centreMm: profile.apex.active ? profile.apex.centreMm : null,
-        radiusMm: profile.apex.radiusMm,
-        slope: profile.apex.slope,
-        capMm: profile.apex.capMm,
-        arcMm: profile.apex.arcMm,
-        endHalfMm: profile.apex.endHalfMm,
-        arcU: profile.apex.active ? profile.apex.arcU : null,
-        /* THE LENGTH CLAIM, both halves. `petalLength` keeps meaning the
-           ASKED length (Eva's ruling); the petal is drawn shorter wherever
-           the nib is active, and C1 reads the drawn one. */
-        askedLengthMm: profile.askedLength,
-        drawnLengthMm: profile.drawnLength,
-        /* THE FITTED NIB'S OWN NUMBERS (F6-sym): an outline curve closes on
-           `leafNibPlan`, whose start is SOLVED so the blade ends at the asked
-           length — which regime it took, the half-width it left the curve at,
-           the curve's own crossing of the floor and the corner (0 in the
-           tangent regime). Null on the petal's own plan, which has none. */
-        regime: profile.apex.regime ?? null,
-        kinkDeg: profile.apex.kinkDeg ?? null,
-        startHalfMm: profile.apex.startHalfMm ?? null,
-        uCross: profile.apex.uCross ?? null,
-      },
-      /* THE OUTLINE CURVE'S PLAN (F6-sym), the profile's own record — null on
-         every LAW build. Plain numbers only, for the page boundary. */
-      outline: profile.outline,
-    },
+    /* F6-asym: a TWO-SIDED petal's cap is TWO records, one per half, each
+       its own side's numbers exactly as a one-sided petal's; the blade-level
+       fields (the lengths, the outline, whether a nib closed it) beside them,
+       and every per-side field at the top level NULL — a clause that reads
+       one half-width off a two-sided petal reads nothing rather than the left
+       half for both. */
+    tipCap: (() => {
+      const capFor = (profile, lastRowHalf) => ({
+        /* NO `pointed` KEY. The cap is unconditional since session 32, so a
+           boolean naming a family that no longer exists would be a label for a
+           computation nobody performs — and both gates read this object. */
+        uCap: profile.uCap,
+        entryHalf: profile.capEntryHalf,
+        terminalHalf: profile.capTerminalHalf,
+        /* What the LAST ROW actually came out at — the emitted number, not the
+           intended one, for the same reason row.tUsed exists. */
+        lastRowHalf,
+        exportMode: acc.exportMode,
+        /* THE LAW'S OWN TWO NUMBERS, so a gate can read the exponent back off
+           the emitted rows instead of re-deriving where the apex starts. */
+        uPk: profile.uPk,
+        /* the exponent the LAW was handed — `ps`, the petal's resolved state,
+           never the caller's: under a scope term (Scoping-b) a layer or a pair
+           carries its own tip shape, and A6 reads the emitted apex against THIS
+           number, so a `state` read would report the whole bloom's exponent
+           beside a petal drawn at its scope's (found by the review's gate work;
+           identical on every build with no scope term — no role override
+           touches the tip shape — so no byte or record moves) */
+        shapeN: ps.petalTipShape,
+        /* THE PEAK THE LAW IS NORMALISED AGAINST, declared rather than left to
+           be estimated as the largest emitted row. Those are different numbers
+           the moment the ladder stops putting a row near uPk: measured on the
+           saturated ladder the largest emitted row is 7.9936 mm against a true
+           8.0000, and a fit that takes the emitted maximum as the peak absorbs
+           that into the exponent and reads 1.5014 for an asked 1.50. Reading
+           the sampling as if it were the geometry — this project's own most
+           repeated defect. */
+        peakHalf: profile.halfWidthBaseAt(profile.uPk),
+        /* THE NIB'S OWN PLAN — scalars only, because this object crosses a
+           `page.evaluate` boundary and a function would be dropped in silence.
+           Reported so the AN family reads what the builder DECLARED and checks
+           it against what the builder EMITTED, rather than re-deriving the
+           crossing, the tangent or the arc: a second producer of any of the
+           three would agree with a broken first one by being broken alongside
+           it (session 43's ST2, session 41's L7). `why` is null iff `active`,
+           asserted both ways, so an inert row states its reason rather than
+           being indistinguishable from a row nobody looked at. */
+        apex: {
+          active: profile.apex.active,
+          why: profile.apex.why,
+          uLaw: profile.apex.uLaw,
+          xLawMm: profile.apex.xLawMm,
+          xFaceMm: profile.apex.active ? profile.apex.xFaceMm : null,
+          centreMm: profile.apex.active ? profile.apex.centreMm : null,
+          radiusMm: profile.apex.radiusMm,
+          slope: profile.apex.slope,
+          capMm: profile.apex.capMm,
+          arcMm: profile.apex.arcMm,
+          endHalfMm: profile.apex.endHalfMm,
+          arcU: profile.apex.active ? profile.apex.arcU : null,
+          /* THE LENGTH CLAIM, both halves. `petalLength` keeps meaning the
+             ASKED length (Eva's ruling); the petal is drawn shorter wherever
+             the nib is active, and C1 reads the drawn one. */
+          askedLengthMm: profile.askedLength,
+          drawnLengthMm: profile.drawnLength,
+          /* THE FITTED NIB'S OWN NUMBERS (F6-sym): an outline curve closes on
+             `leafNibPlan`, whose start is SOLVED so the blade ends at the asked
+             length — which regime it took, the half-width it left the curve at,
+             the curve's own crossing of the floor and the corner (0 in the
+             tangent regime). Null on the petal's own plan, which has none. */
+          regime: profile.apex.regime ?? null,
+          kinkDeg: profile.apex.kinkDeg ?? null,
+          startHalfMm: profile.apex.startHalfMm ?? null,
+          uCross: profile.apex.uCross ?? null,
+        },
+        /* THE OUTLINE CURVE'S PLAN (F6-sym), the profile's own record — null on
+           every LAW build. Plain numbers only, for the page boundary. */
+        outline: profile.outline,
+      });
+      if (!profile.twoSided) return capFor(profile, rows[rows.length - 1].h);
+      const last = rows[rows.length - 1];
+      const sides = { left: capFor(profile.side(1), last.hL), right: capFor(profile.side(-1), last.hR) };
+      return {
+        twoSided: true, sides, exportMode: acc.exportMode, shapeN: ps.petalTipShape,
+        uCap: null, entryHalf: null, terminalHalf: null, lastRowHalf: null, uPk: null, peakHalf: null,
+        apex: { twoSided: true, active: profile.apex.active, why: profile.apex.why, arcU: profile.apex.active ? profile.apex.arcU : null,
+                endHalfMm: profile.apex.endHalfMm, askedLengthMm: profile.askedLength, drawnLengthMm: profile.drawnLength },
+        outline: profile.outline,
+      };
+    })(),
     /* THE CARNATION FRINGE AND ITS SQUARED TERMINAL — the plan's own numbers
        plus what the EMITTED rows did with them. Everything derived is
        derived here, once, and the read-out, the panel caps and the FR family
@@ -9238,7 +9455,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        unrelated control silently move the fringe's depth. */
     fringe: (() => {
       const F = profile.fringe;
-      const peakHalfMm = profile.halfWidthBaseAt(profile.uPk);
+      const peakHalfMm = profile.twoSided ? profile.outline.peakHalfMm : profile.halfWidthBaseAt(profile.uPk);   // F6-asym: the wider half's peak
       const tipHalfMm = TIP_HALF_MM;
       const floorMm = MIN_FEATURE_MM;
       /* THE DEAD TRAVEL, from the lengths it is about: below this fraction
@@ -10114,11 +10331,33 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   /* ---- per row: the drawn radius, the ramp, the inset, the skin ---- */
   const sBase = sMargin[baseEnd - rowFrom], sTip = sMargin[NROW - 1];
   const top = [], bot = [], skinV = [], skinP = [], skinN = [], skinB = [];
+  const insetOf = new Map();
+  const roomSide = [];
   const rimClamped = [];
   let drawnMax = 0, sheetMax = 0;
   for (let i = skinFrom; i <= skinTo; i++) {
     const k = i - rowFrom, row = rows[i], tBody = tBodyOf[k];
     const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);
+    /* F6-asym — ON A TWO-SIDED ROW EACH HALF'S BEAD FITS ITS OWN HALF. The
+       room is the span across the whole section, and Eva's fraction of it is
+       a fraction of TWO halves; on an asymmetric outline the narrow half can
+       be narrower than that, and its bead would then reach past the midrib
+       (the inset pins at the midrib and the drawn radius is not the one the
+       record states — E7 measured it, 0.15 mm off on the lateral). So each
+       half takes the room the whole span would have if both halves were it:
+       `room x 2 h_side / (hL + hR)`, the same rule read per half. Equal
+       halves give `2h / (h + h)`, exactly 1, so the room, the radius and every
+       byte below are the symmetric ones by arithmetic. The sides are named by
+       the section's own parameter: index 0 is v = -1, the RIGHT half. */
+    let rLo = r, rHi = r, roomLo = roomMm[k], roomHi = roomMm[k];
+    if (row.h === null && !per) {
+      const hs = row.hL + row.hR;
+      if (hs > 0) {
+        roomLo = roomMm[k] * ((2 * row.hR) / hs); roomHi = roomMm[k] * ((2 * row.hL) / hs);
+        rLo = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomLo);
+        rHi = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomHi);
+      }
+    }
     /* THE RAMP. Zero at every buried end and full RIM_TAPER_MM of surface
        away from it, by the same smootherstep the taper uses. It scales the
        inset AND the taper's depth together, so at a buried end the panel
@@ -10147,12 +10386,29 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        gate more often. Alone this floor cleared DEPTH and made SPHERE worse
        (56 -> 138); with the fan gated, the two compose. */
     const a = g * r > 0 ? Math.max(g * r, RIM_BEAD_RADIUS_MM / 512) : 0;
+    const aLo = rLo === r ? a : g * rLo > 0 ? Math.max(g * rLo, RIM_BEAD_RADIUS_MM / 512) : 0;
+    const aHi = rHi === r ? a : g * rHi > 0 ? Math.max(g * rHi, RIM_BEAD_RADIUS_MM / 512) : 0;
     if (a > drawnMax) drawnMax = a;
+    if (aLo > drawnMax) drawnMax = aLo;
+    if (aHi > drawnMax) drawnMax = aHi;
     if (tBody > sheetMax) sheetMax = tBody;
     const vLo = oV[k][0], vHi = oV[k][NVp - 1], vMid = (vLo + vHi) / 2;
     const side = a > 0 && !per;
-    const inLo = side ? rimInsetV(row.sect, vLo, vMid, a) : vLo;
-    const inHi = side ? rimInsetV(row.sect, vHi, vMid, a) : vHi;
+    const inLo = side ? rimInsetV(row.sect, vLo, vMid, aLo) : vLo;
+    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;
+    /* THE INSET'S OWN CLAIM, for the edge gate's E7 (F6-asym): on each side
+       the skin stops `a` millimetres of chord inside the boundary point, read
+       on THAT side's own section — and the bisection's own bracket, in mm, is
+       the bound. Records only, and only when the rim is captured. */
+    if (rim && acc.captureRim && side) {
+      /* the bisection's bracket runs from the edge to the midrib in v, and
+         twelve halvings leave 1/4096 of it — in mm, of the half's own ARC
+         (a rolled section's chord under-reads it) */
+      const Pm = row.sect(vMid).P, half = NVp >> 1;
+      let arcLo = rimDist(oP[k][half - 1], Pm), arcHi = rimDist(oP[k][half], Pm);
+      for (let j = 1; j < half; j++) { arcLo += rimDist(oP[k][j - 1], oP[k][j]); arcHi += rimDist(oP[k][NVp - j], oP[k][NVp - 1 - j]); }
+      insetOf.set(i, { aLo, aHi, chordLo: rimDist(oP[k][0], Pm), chordHi: rimDist(oP[k][NVp - 1], Pm), tolLo: arcLo / 4096, tolHi: arcHi / 4096 });
+    }
     const vs = [], Ps = [], Ns = [], Bs = [], ht = [], hb = [], Cl = [];
     for (let j = 0; j < NVp; j++) {
       const v = side ? inLo + ((inHi - inLo) * j) / (NVp - 1) : oV[k][j];
@@ -10169,11 +10425,17 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     const dEdge = a;
     const dTipRow = tipExposed ? (sTip - sMargin[k]) : Infinity;
     const dBaseRow = baseExposed ? (sMargin[k] - sBase) : Infinity;
+    /* each half's distance from ITS edge, and each column's radius its own
+       half's (one radius, `a` and `r`, on every one-sided row and on equal
+       halves — the old expressions term for term) */
+    const twoR = rLo !== rHi || aLo !== aHi;
     for (let j = 0; j < NVp; j++) {
+      const dLo = (twoR ? aLo : dEdge) + arc[j], dHi = (twoR ? aHi : dEdge) + (arc[NVp - 1] - arc[j]);
       const d = per ? dTipRow
-        : baseExposed ? Math.min(dEdge + arc[j], dEdge + (arc[NVp - 1] - arc[j]), dTipRow, dBaseRow)
-          : Math.min(dEdge + arc[j], dEdge + (arc[NVp - 1] - arc[j]), dTipRow);
-      const b0 = tBody / 2 + g * (r - tBody / 2) * (1 - rimEase(d / RIM_TAPER_MM));
+        : baseExposed ? Math.min(dLo, dHi, dTipRow, dBaseRow)
+          : Math.min(dLo, dHi, dTipRow);
+      const rj = !twoR ? r : vs[j] < 0 ? rLo : rHi;
+      const b0 = tBody / 2 + g * (rj - tBody / 2) * (1 - rimEase(d / RIM_TAPER_MM));
       /* a panel that declares `thinAt` (the tube's ring, and nothing else) is
          trimmed where another shell lies on it; every other panel takes b0 */
       const b = panel.thinAt ? b0 * panel.thinAt(i, vs[j]) : b0;
@@ -10184,10 +10446,10 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;
       Cl.push(wasClamped);
       if (rim && wasClamped) {
-        rim.clamps.push({ panel: panel.label, row: i, u: row.u, col: j, thicknessMm: 2 * b, bodyMm: tBody, roomMm: roomMm[k] });
+        rim.clamps.push({ panel: panel.label, row: i, u: row.u, col: j, thicknessMm: 2 * b, bodyMm: tBody, roomMm: !twoR ? roomMm[k] : vs[j] < 0 ? roomLo : roomHi });
       }
     }
-    top.push(ht); bot.push(hb); skinV.push(vs); skinP.push(Ps); skinN.push(Ns); skinB.push(Bs); rimClamped.push(Cl);
+    top.push(ht); bot.push(hb); skinV.push(vs); skinP.push(Ps); skinN.push(Ns); skinB.push(Bs); rimClamped.push(Cl); roomSide.push(twoR ? { lo: roomLo, hi: roomHi } : null);
   }
   /* THE EMITTED SKIN LATTICE, on request (leaf/stem build S4): the mid-surface
      points the two skins are offset from, row by row — what the LOBED fold
@@ -10205,7 +10467,14 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          row so a reader can rely on it rather than test for it — an absent
          mask read as "all material" is the same silent default the honest form
          exists to avoid. */
-      grid.push({ row: i, u: rows[i].u, halfWidth: rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL });
+      /* F6-asym: a two-sided row's `halfWidth` is its LEFT (v > 0) half and
+         `halfWidthRight` the right — present only on such a row */
+      /* ONE literal, so the row's capture has one site (verify-bloom-grid's
+         mutant table anchors on it); readers take the field by name */
+      const twoSidedRow = rows[i].h === null;
+      const gridRow = { row: i, u: rows[i].u, halfWidth: twoSidedRow ? rows[i].hL : rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL };
+      if (twoSidedRow) gridRow.halfWidthRight = rows[i].hR;
+      grid.push(gridRow);
     }
   }
 
@@ -10362,7 +10631,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
            before it measures anything with them, so this points at the
            artefact rather than standing in for it: the rim's thickness is
            |top - bot| between two vertices the mesh demonstrably has. */
-        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk + sOff], clamped: rimClamped[sk][j], roomMm: roomMm[sk + sOff], outlineTurnDeg: turnAt(k) });
+        if (!rimSameP(apex, skinP[sk][j])) {
+          const ins = insetOf.get(i);
+          rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk + sOff], clamped: rimClamped[sk][j], roomMm: roomSide[sk] ? (skinV[sk][j] < 0 ? roomSide[sk].lo : roomSide[sk].hi) : roomMm[sk + sOff], outlineTurnDeg: turnAt(k),
+            inset: ins && i >= skinFrom && i <= skinTo && (j === 0 || j === NVp - 1) ? { mm: j === 0 ? ins.aLo : ins.aHi, chordToMidribMm: j === 0 ? ins.chordLo : ins.chordHi, tolMm: j === 0 ? ins.tolLo : ins.tolHi } : null });
+        }
         /* AND THE PERIMETER THE TREATMENT DID NOT REACH — the buried stretch,
            which is a flat wall at ninety degrees BY DESIGN on this tree and on
            main. The dihedral clause needs it so it can attribute an edge to
@@ -10713,7 +10986,7 @@ function infillFillet(poly, r, perArc = 5, radii = null) {
    trigonometry). On a flat plan there is no field and nothing here runs. */
 function infillLocalFrame(field, c) {
   const { NU, NV: NV2, L } = field;
-  const u = Math.min(1, Math.max(0, c.x / L)); const h = field.hAt(u);
+  const u = Math.min(1, Math.max(0, c.x / L)); const h = field.hY ? field.hY(u, c.y) : field.hAt(u);
   const v = Math.max(-1, Math.min(1, h > 1e-9 ? c.y / h : 0));
   const i = Math.min(NU, Math.max(0, Math.round(u * NU))), j = Math.min(NV2, Math.max(0, Math.round(((v + 1) / 2) * NV2)));
   const k = i * (NV2 + 1) + j;
@@ -10801,6 +11074,19 @@ function infillOpen(poly, R) {
 export const INFILL_METRIC_NU = 256;     // rows: 0.137 mm on the shipping 35 mm blade
 export const INFILL_METRIC_NV = 96;      // columns: 0.167 mm at mid-blade
 export const INFILL_LATTICE_STEP_SHARE = 0.5;
+/* F6-asym — THE PLAN'S LAMINA, BY SIDE. The infill's plan is in millimetres
+   across the midrib, `y = v * h` on the side of `v`, so on a two-sided outline
+   every reading of the lamina takes the side of its OWN y (y > 0 is the left
+   half, `sideOfV`) — the outline polygon, the seeds, the basal V, the metric,
+   the margin bead's band. `env` is the wider half (what a "how wide is the
+   blade" question reads); on a one-sided profile all three are `laminaHalfAt`
+   itself, and the plan is the symmetric plan's arithmetic by BRANCH. */
+export function infillLamina(profile) {
+  if (!profile.twoSided) { const f = (u) => profile.laminaHalfAt(u); return { two: false, side: (u, y) => f(u), env: f, left: f, right: f }; }
+  const PL = profile.side(1), PR = profile.side(-1);
+  const fl = (u) => PL.laminaHalfAt(u), fr = (u) => PR.laminaHalfAt(u);
+  return { two: true, side: (u, y) => (y > 0 ? fl(u) : fr(u)), env: (u) => Math.max(fl(u), fr(u)), left: fl, right: fr };
+}
 export function infillPlanIsFlat(surface) { return surface.form === null && surface.kC === 0; }
 export function infillMetricField(surface) {
   if (surface.__infillMetric) return surface.__infillMetric;
@@ -10809,9 +11095,46 @@ export function infillMetricField(surface) {
   const n = (NU + 1) * (NV2 + 1);
   const E = new Float64Array(n), F = new Float64Array(n), Gm = new Float64Array(n);
   const rows = new Array(NU + 1), hs = new Float64Array(NU + 1);
-  for (let i = 0; i <= NU; i++) { const u = i / NU; rows[i] = surface.rowAt(u); hs[i] = prof.laminaHalfAt(u); }
+  const lam = infillLamina(prof);
   const Pat = (i, j) => rows[i].sect(-1 + (2 * j) / NV2).P;
   const sub = (a, b, s) => [(a[0] - b[0]) * s, (a[1] - b[1]) * s, (a[2] - b[2]) * s];
+  if (lam.two) {
+    /* F6-asym: the plan map is y = v * h_side(u), C1 in y across the midrib
+       (every law in the section is a function of the millimetres from it).
+       Each column is the symmetric field's own arithmetic on ITS half's width
+       and slope; the midrib column (v = 0, whose stencil spans one column of
+       each half) divides by the mean of the two widths — the y-span of that
+       stencil is (dv / 2)(hL + hR). With equal halves every expression is the
+       symmetric one's, operation for operation. */
+    const hl = new Float64Array(NU + 1), hr = new Float64Array(NU + 1);
+    for (let i = 0; i <= NU; i++) { const u = i / NU; rows[i] = surface.rowAt(u); hl[i] = lam.left(u); hr[i] = lam.right(u); }
+    for (let i = 0; i <= NU; i++) {
+      const i0 = Math.max(0, i - 1), i1 = Math.min(NU, i + 1);
+      const du = (i1 - i0) / NU;
+      const hpL = (hl[i1] - hl[i0]) / du, hpR = (hr[i1] - hr[i0]) / du;
+      const hMid = (hl[i] + hr[i]) / 2;
+      for (let j = 0; j <= NV2; j++) {
+        const v = -1 + (2 * j) / NV2;
+        const h = v > 0 ? hl[i] : v < 0 ? hr[i] : hMid, hp = v > 0 ? hpL : hpR;
+        const j0 = Math.max(0, j - 1), j1 = Math.min(NV2, j + 1);
+        const dv = (2 * (j1 - j0)) / NV2;
+        const Pu = sub(Pat(i1, j), Pat(i0, j), 1 / du);
+        const Pv = sub(rows[i].sect(-1 + (2 * j1) / NV2).P, rows[i].sect(-1 + (2 * j0) / NV2).P, 1 / dv);
+        const c = h > 1e-9 ? (v * hp) / h : 0;
+        const Px = [(Pu[0] - c * Pv[0]) / L, (Pu[1] - c * Pv[1]) / L, (Pu[2] - c * Pv[2]) / L];
+        const hh = h > 1e-9 ? h : 1e-9;
+        const Py = [Pv[0] / hh, Pv[1] / hh, Pv[2] / hh];
+        const k = i * (NV2 + 1) + j;
+        E[k] = Px[0] * Px[0] + Px[1] * Px[1] + Px[2] * Px[2];
+        F[k] = Px[0] * Py[0] + Px[1] * Py[1] + Px[2] * Py[2];
+        Gm[k] = Py[0] * Py[0] + Py[1] * Py[1] + Py[2] * Py[2];
+      }
+    }
+    const field = { E, F, G: Gm, NU, NV: NV2, L, hAt: lam.env, hY: lam.side, hMin: (u) => Math.min(lam.left(u), lam.right(u)) };
+    Object.defineProperty(surface, '__infillMetric', { value: field, enumerable: false });
+    return field;
+  }
+  for (let i = 0; i <= NU; i++) { const u = i / NU; rows[i] = surface.rowAt(u); hs[i] = prof.laminaHalfAt(u); }
   for (let i = 0; i <= NU; i++) {
     const i0 = Math.max(0, i - 1), i1 = Math.min(NU, i + 1);
     const du = (i1 - i0) / NU, h = hs[i];
@@ -10832,13 +11155,13 @@ export function infillMetricField(surface) {
       Gm[k] = Py[0] * Py[0] + Py[1] * Py[1] + Py[2] * Py[2];
     }
   }
-  const field = { E, F, G: Gm, NU, NV: NV2, L, hAt: (u) => prof.laminaHalfAt(u) };
+  const field = { E, F, G: Gm, NU, NV: NV2, L, hAt: (u) => prof.laminaHalfAt(u), hY: null, hMin: null };
   Object.defineProperty(surface, '__infillMetric', { value: field, enumerable: false });
   return field;
 }
 function infillLatticeStep(field, x) {
   const u = Math.min(1, Math.max(0, x / field.L));
-  return Math.min(field.L / field.NU, (2 * field.hAt(u)) / field.NV) * INFILL_LATTICE_STEP_SHARE;
+  return Math.min(field.L / field.NU, (2 * (field.hMin ? field.hMin(u) : field.hAt(u))) / field.NV) * INFILL_LATTICE_STEP_SHARE;
 }
 /* THE LOOKUP IS THE WORST CORNER OF THE ENCLOSING LATTICE CELL, NOT AN
    INTERPOLATION. Interpolating M and then forming kappa smooths a local
@@ -10850,7 +11173,7 @@ function infillLatticeStep(field, x) {
 export function infillKappaAt(field, x, y, tx, ty, mode) {
   const { NU, NV: NV2, L } = field;
   const u = Math.min(1, Math.max(0, x / L));
-  const h = field.hAt(u);
+  const h = field.hY ? field.hY(u, y) : field.hAt(u);   // F6-asym: the half on y's side
   const v = Math.max(-1, Math.min(1, h > 1e-9 ? y / h : 0));
   const fi = Math.min(NU - 1e-9, Math.max(0, u * NU)), fj = Math.min(NV2 - 1e-9, Math.max(0, ((v + 1) / 2) * NV2));
   const i0 = Math.min(NU - 1, Math.floor(fi)), j0 = Math.min(NV2 - 1, Math.floor(fj));
@@ -10955,11 +11278,16 @@ function infillMarch(field, A, B, opts) {
        on a thin foot and nowhere else. Scanned UPWARD FROM THE WAIST because
        `h` is not monotone below it. */
 export function infillLaminaFloorU(surface) {
+  /* F6-asym: each half has its own waist, and the floor is above BOTH */
+  if (surface.profile.twoSided) return Math.max(...[1, -1].map((sg) => { const b = surface.profile.side(sg).laminaSlopeBreaks().find((x) => x.from === 'ROOT_BLEND'); return b ? b.u : 0; }));
   const b = surface.profile.laminaSlopeBreaks().find((x) => x.from === 'ROOT_BLEND');
   return b ? b.u : 0;
 }
 export function infillWallFloorU(surface, wall = INFILL_WALL_MM) {
-  const hAt = (u) => surface.profile.laminaHalfAt(u);
+  /* F6-asym: two walls and a hole across the WHOLE width, hL + hR, read as the
+     mean half so a one-sided blade's `h >= need` is the expression it was */
+  const lam = infillLamina(surface.profile);
+  const hAt = lam.two ? (u) => (lam.left(u) + lam.right(u)) / 2 : (u) => surface.profile.laminaHalfAt(u);
   const need = wall + MIN_FEATURE_MM / 2;
   const from = infillLaminaFloorU(surface);
   const N = 4096;
@@ -10991,6 +11319,8 @@ function infillFloorRow(rows, rowFrom, rowTo, floorU) {
 function infillSeedField(hAt, L, xB, N, seed, outline, law = null) {
   const a = law && law.aniso !== undefined ? law.aniso : INFILL_ANISO;
   const gamma = law && law.gamma !== undefined ? law.gamma : INFILL_TIP_GAMMA;
+  const sides = law && law.sides ? law.sides : null;                       // F6-asym
+  const partnerOf = sides ? (x) => { const l = sides.left(x); return l > 1e-9 ? sides.right(x) / l : 1; } : null;
   let hMax = 0; for (let i = 0; i <= 200; i++) hMax = Math.max(hMax, hAt(xB + (L - xB) * i / 200));
   const spacing = (x) => {
     /* `Math.pow` IS NOT CORRECTLY ROUNDED EITHER, and the spacing law feeds the
@@ -11022,12 +11352,21 @@ function infillSeedField(hAt, L, xB, N, seed, outline, law = null) {
   while (pairs.length < target && guard < 8000) {
     let best = null, bestD = -1;
     for (let c = 0; c < 14; c++) {
-      guard++; const x = xB + (L - xB) * rng(); const hh = hAt(x); if (hh < 0.3) continue;
+      guard++; const x = xB + (L - xB) * rng(); const hh = sides ? sides.left(x) : hAt(x); if (hh < 0.3) continue;
       const y = hh * 0.95 * rng(); if (!infillPointInPoly(x, y, outline)) continue;
       let d = 1e9;
+      if (sides) {
+        /* F6-asym: a pair is MIRRORED IN v — the partner sits at the same
+           fraction of its own half's width — so the field is symmetric about
+           the midrib in the outline's own parameter on an asymmetric blade */
+        for (const s of pairs) d = Math.min(d, d2(s, { x, y }), d2({ x: s.x, y: -s.y * partnerOf(s.x) }, { x, y }));
+        for (const s of axis) d = Math.min(d, d2(s, { x, y }));
+        d = Math.min(d, (y + y * partnerOf(x)) ** 2);
+      } else {
       for (const s of pairs) d = Math.min(d, d2(s, { x, y }), d2({ x: s.x, y: -s.y }, { x, y }));
       for (const s of axis) d = Math.min(d, d2(s, { x, y }));
       d = Math.min(d, (2 * y) ** 2);
+      }
       const score = d / (spacing(x) ** 2);
       if (score > bestD) { bestD = score; best = { x, y }; }
     }
@@ -11040,10 +11379,10 @@ function infillSeedField(hAt, L, xB, N, seed, outline, law = null) {
      the eye would find it. Dropping by GROUP keeps it an identity. */
   const seeds = [];
   axis.forEach((s, i) => seeds.push({ x: s.x, y: 0, group: `a${i}`, axis: true }));
-  pairs.forEach((s, i) => { seeds.push({ x: s.x, y: s.y, group: `p${i}`, axis: false }); seeds.push({ x: s.x, y: -s.y, group: `p${i}`, axis: false }); });
+  pairs.forEach((s, i) => { seeds.push({ x: s.x, y: s.y, group: `p${i}`, axis: false }); seeds.push({ x: s.x, y: sides ? -s.y * partnerOf(s.x) : -s.y, group: `p${i}`, axis: false }); });
   return { seeds, outline, spacing, nAxis };
 }
-function infillRelax(seeds, outline, spacing, passes, a = INFILL_ANISO) {
+function infillRelax(seeds, outline, spacing, passes, a = INFILL_ANISO, sides = null) {
   const rho = (x) => 1 / (spacing(x) ** 2);
   const wCentroid = (c) => {
     const g = infillCentroid(c); let W = 0, X = 0, Y = 0;
@@ -11067,7 +11406,18 @@ function infillRelax(seeds, outline, spacing, passes, a = INFILL_ANISO) {
     for (let i = 0; i < all.length; i++) if (all[i].axis) all[i] = { ...all[i], y: 0 };
     for (let i = 0; i + 1 < all.length; i++) {
       if (all[i].axis || all[i].group !== all[i + 1].group) continue;
-      const A = all[i], B = all[i + 1]; const x = (A.x + B.x) / 2, y = (A.y - B.y) / 2;
+      const A = all[i], B = all[i + 1]; const x = (A.x + B.x) / 2;
+      if (sides) {
+        /* F6-asym: the mirror is re-imposed IN v at the pair's own x — the
+           right seed sits at r = hR / hL of the left one's distance, and the
+           pair is averaged in the left half's measure (r = 1 exactly with
+           equal halves, where this is the symmetric expression to the bit) */
+        const l = sides.left(x), r = l > 1e-9 ? sides.right(x) / l : 1;
+        const y = (A.y - B.y / r) / 2;
+        all[i] = { ...A, x, y }; all[i + 1] = { ...B, x, y: -y * r }; i++;
+        continue;
+      }
+      const y = (A.y - B.y) / 2;
       all[i] = { ...A, x, y }; all[i + 1] = { ...B, x, y: -y }; i++;
     }
   }
@@ -11128,6 +11478,10 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      below — where the cells start, where the seeds go, which cells keep a
      hole — is TOPOLOGY, and topology may not differ live from export. */
   const hAt = (x) => surface.profile.laminaHalfAt(Math.min(1, Math.max(0, x / L)));
+  /* F6-asym: the half on the side of y (one-sided: `hAt` itself, by branch) */
+  const lamI = infillLamina(surface.profile);
+  const hAtY = lamI.two ? (x, y) => lamI.side(Math.min(1, Math.max(0, x / L)), y) : (x) => hAt(x);
+  const hEnv = lamI.two ? (x) => lamI.env(Math.min(1, Math.max(0, x / L))) : hAt;
   /* S4'S FOUR LEVERS, each read off `opts` with the S3 constant as its
      default so the shipped defaults are the same doubles by construction. */
   const passes = opts.passes ?? INFILL_LLOYD_PASSES;
@@ -11191,12 +11545,14 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
 
   /* THE BASAL V — the solid zone reaches higher at the margins, so the pattern
      tapers into the solid base instead of ending on a line. */
-  const hB = hAt(xB); const Lc = INFILL_CONVERGE * L;
-  const vAt = (y) => xB + Lc * (() => { const t = Math.min(1, Math.abs(y) / Math.max(1e-9, hB)); return t * Math.sqrt(t); })();
+  const hB = lamI.two ? null : hAt(xB); const Lc = INFILL_CONVERGE * L;
+  /* F6-asym: the V reaches each margin of its own half */
+  const hBy = lamI.two ? ((hl, hr) => (y) => (y > 0 ? hl : hr))(hAtY(xB, 1), hAtY(xB, -1)) : () => hB;
+  const vAt = (y) => xB + Lc * (() => { const t = Math.min(1, Math.abs(y) / Math.max(1e-9, hBy(y))); return t * Math.sqrt(t); })();
   const vClip = (poly) => {
     let out = poly;
     for (let k = -12; k <= 12 && out && out.length >= 3; k++) {
-      const y0 = (k / 12) * hB; const dy = 1e-4;
+      const y0 = (k / 12) * hBy(k); const dy = 1e-4;
       const slope = (vAt(y0 + dy) - vAt(y0 - dy)) / (2 * dy);
       out = infillClipHalfPlane(out, -1, slope, vAt(y0) - slope * y0);
     }
@@ -11238,12 +11594,14 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      lattice draws. The terminal face's INTERIOR columns are in it because
      `emitPanel` emits them and clause 2a asks about them: without them the
      tip's mini-face is 64 captured points the mesh does not carry. */
-  for (const i of outlineRows) { const sp = spanOf(i); outline.push({ x: gq(rows[i].u * L), y: gq(sp[1] * surface.profile.laminaHalfAt(rows[i].u)), row: i, col: NV - 1, v: sp[1] }); }
+  /* F6-asym: `lamV(u, v)` is the half on v's side (one-sided: laminaHalfAt) */
+  const lamV = lamI.two ? (u, v) => lamI.side(u, v) : (u) => surface.profile.laminaHalfAt(u);
+  for (const i of outlineRows) { const sp = spanOf(i); outline.push({ x: gq(rows[i].u * L), y: gq(sp[1] * lamV(rows[i].u, sp[1])), row: i, col: NV - 1, v: sp[1] }); }
   {
-    const i = panel.rowTo, sp = spanOf(i), hh = surface.profile.laminaHalfAt(rows[i].u);
-    for (let j = NV - 2; j >= 1; j--) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * hh), row: i, col: j, v }); }
+    const i = panel.rowTo, sp = spanOf(i);
+    for (let j = NV - 2; j >= 1; j--) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * lamV(rows[i].u, v)), row: i, col: j, v }); }
   }
-  for (let k = outlineRows.length - 1; k >= 0; k--) { const i = outlineRows[k]; const sp = spanOf(i); outline.push({ x: gq(rows[i].u * L), y: gq(sp[0] * surface.profile.laminaHalfAt(rows[i].u)), row: i, col: 0, v: sp[0] }); }
+  for (let k = outlineRows.length - 1; k >= 0; k--) { const i = outlineRows[k]; const sp = spanOf(i); outline.push({ x: gq(rows[i].u * L), y: gq(sp[0] * lamV(rows[i].u, sp[0])), row: i, col: 0, v: sp[0] }); }
   /* AND BACK ACROSS THE SEAM, THROUGH THE LATTICE'S OWN COLUMNS — the same
      clause the terminal face already has, at the other end, and it is what
      stops the seam being a T-JUNCTION. The basal panel's top edge is NV
@@ -11255,14 +11613,14 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      so a vertex put here survives into whichever cell reaches the seam, and
      the two sides then meet corner to corner. */
   {
-    const i = outlineRows[0], sp = spanOf(i), hh = surface.profile.laminaHalfAt(rows[i].u);
-    for (let j = 1; j <= NV - 2; j++) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * hh), row: i, col: j, v }); }
+    const i = outlineRows[0], sp = spanOf(i);
+    for (let j = 1; j <= NV - 2; j++) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * lamV(rows[i].u, v)), row: i, col: j, v }); }
   }
-  const { seeds, spacing } = infillSeedField(hAt, L, xB, density, opts.seed ?? INFILL_SEED, outline, { aniso, gamma });
+  const { seeds, spacing } = infillSeedField(hEnv, L, xB, density, opts.seed ?? INFILL_SEED, outline, lamI.two ? { aniso, gamma, sides: { left: (x) => hAtY(x, 1), right: (x) => hAtY(x, -1) } } : { aniso, gamma });
   if (!seeds.length) return { ...base, refused: 'room' };
   const diam = (poly) => { let d = 0; for (let i = 0; i < poly.length; i++) for (let j = i + 1; j < poly.length; j++) d = Math.max(d, infillLen(poly[i].x - poly[j].x, poly[i].y - poly[j].y)); return d; };
 
-  let live = infillRelax(seeds, outline, spacing, passes, aniso);
+  let live = infillRelax(seeds, outline, spacing, passes, aniso, lamI.two ? { left: (x) => hAtY(x, 1), right: (x) => hAtY(x, -1) } : null);
   let cells = null, holes = null, widths = null, caps = null, isOutlineEdge = null, passesUsed = 0;
   const cap = opts.dropPasses ?? INFILL_DROP_PASSES;
   /* THE SEAM IS THE LATTICE'S, AND A CELL VERTEX ON IT IS SNAPPED TO A LATTICE
@@ -11842,13 +12200,17 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   const surface = plan.surface;
   const Lm = surface.length;
   const hAt = (x) => surface.profile.laminaHalfAt(Math.min(1, Math.max(0, x / Lm)));
+  /* F6-asym: the half on y's side — every plan point maps through ITS half's
+     width (one-sided: `hAt`, by branch) */
+  const lamE = infillLamina(surface.profile);
+  const hY = lamE.two ? (x, y) => lamE.side(Math.min(1, Math.max(0, x / Lm)), y) : (x) => hAt(x);
   /* THE PLAN -> SKIN MAP, one owner, read by the emitter, by the tolerance and
      by the gate. `u = x / L` and `v = y / h(u)` is `mapPt`, which is
      `surface.at` — the SAME front door `emitPanel`'s rows come through, so a
      cell vertex and a lattice vertex at one (u, v) are the same double. */
   const mapPlan = (x, y) => {
     const u = Math.min(1, Math.max(0, x / Lm));
-    const hh = hAt(x);
+    const hh = hY(x, y);
     const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0));
     const q = surface.at(u, v);
     return { P: q.P, n: q.n, u };
@@ -11888,7 +12250,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
      and are laid by `footRowsAt`, not by `at`. */
   let latDev = 0, latMinEdge = Infinity, latMaxEdge = 0;
   {
-    const planOf = (i, j) => { const u = rows[i].u; const hh = surface.profile.laminaHalfAt(u); const sp = panel.spanAt(i); const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); return { x: u * Lm, y: v * hh }; };
+    const planOf = (i, j) => { const u = rows[i].u; const sp = panel.spanAt(i); const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); const hh = lamE.two ? lamE.side(u, v) : surface.profile.laminaHalfAt(u); return { x: u * Lm, y: v * hh }; };
     const seg = (a, b) => { const l = infillLen(b.x - a.x, b.y - a.y); if (l > 1e-9 && l < latMinEdge) latMinEdge = l; if (l > latMaxEdge) latMaxEdge = l; };
     for (let i = Math.max(panel.rowFrom, mSplit - 1); i < panel.rowTo; i++) {
       for (let j = 0; j < NV - 1; j++) {
@@ -11992,19 +12354,26 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   const BAND = plan.wall - rEdge;
   const sideRun = plan.outline.filter((q) => q.row !== undefined && q.col === NV - 1).sort((A, B) => A.x - B.x);
   const xT = sideRun.length ? sideRun[sideRun.length - 1].x : Lm;
-  const sideS = [0];
-  for (let i = 1; i < sideRun.length; i++) sideS.push(sideS[i - 1] + infillLen(sideRun[i].x - sideRun[i - 1].x, sideRun[i].y - sideRun[i - 1].y));
-  const gAt = (x) => {
-    if (!(x > plan.xB)) return 0;
-    let i = 1; while (i < sideRun.length - 1 && sideRun[i].x < x) i++;
-    const A = sideRun[i - 1], B = sideRun[i];
-    const f = B && B.x > A.x ? Math.min(1, Math.max(0, (x - A.x) / (B.x - A.x))) : 1;
-    return rimEase((sideS[i - 1] + (sideS[i] - sideS[i - 1]) * f) / RIM_TAPER_MM);
+  const runG = (run) => {
+    const sS = [0];
+    for (let i = 1; i < run.length; i++) sS.push(sS[i - 1] + infillLen(run[i].x - run[i - 1].x, run[i].y - run[i - 1].y));
+    return (x) => {
+      if (!(x > plan.xB)) return 0;
+      let i = 1; while (i < run.length - 1 && run[i].x < x) i++;
+      const A = run[i - 1], B = run[i];
+      const f = B && B.x > A.x ? Math.min(1, Math.max(0, (x - A.x) / (B.x - A.x))) : 1;
+      return rimEase((sS[i - 1] + (sS[i] - sS[i - 1]) * f) / RIM_TAPER_MM);
+    };
   };
+  /* F6-asym: each margin's ramp is measured along ITS OWN margin (col NV-1 the
+     left, col 0 the right); one-sided, both read the left run, as before */
+  const gLeft = runG(sideRun);
+  const gRight = lamE.two ? runG(plan.outline.filter((q) => q.row !== undefined && q.col === 0).sort((A, B) => A.x - B.x)) : gLeft;
+  const gAt = (x, sgn = 1) => (sgn < 0 ? gRight(x) : gLeft(x));
   /* the drawn inset at plan x, and which arm bounded it — the floor at
      RIM_BEAD_RADIUS_MM / 512 is `emitPanel`'s own, for its reason (a bead of
      1e-5 mm is numerically absent and its strips degenerate) */
-  const edgeArm = (x) => { const w = RIM_ROOM_FRACTION * 2 * hAt(x); return w < rEdge ? { r: w, arm: 'width' } : { r: rEdge, arm: rEdge < RIM_BEAD_RADIUS_MM ? 'wall' : 'none' }; };
+  const edgeArm = (x) => { const w = RIM_ROOM_FRACTION * (lamE.two ? hY(x, 1) + hY(x, -1) : 2 * hAt(x)); return w < rEdge ? { r: w, arm: 'width' } : { r: rEdge, arm: rEdge < RIM_BEAD_RADIUS_MM ? 'wall' : 'none' }; };
   /* ON A CURVED PLAN A PLAN LENGTH IS NOT A SURFACE LENGTH, and the band's
      whole guarantee is a SURFACE one (a hole is laid out a surface wall in from
      the outline). Measured before this: `ALL FORM MAX` moved 381 hole-rim
@@ -12026,7 +12395,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     if (flatEdge || !(want > 0)) return want;
     const k = `${f6(x)},${sgn},${want},${alongX ? 1 : 0}`; let v = chordMemo.get(k);
     if (v !== undefined) return v;
-    const h = hAt(x);
+    const h = hY(x, sgn);
     const at = (d) => (alongX ? mapPlan(x - d, 0).P : mapPlan(x, sgn * (h - d)).P);
     const P0 = at(0);
     const chord = (d) => rimDist(at(d), P0);
@@ -12042,7 +12411,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     if (flatEdge || !(want > 0)) return want;
     const k = `a${f6(x)},${sgn},${want},${alongX ? 1 : 0}`; let v = chordMemo.get(k);
     if (v !== undefined) return v;
-    const h = hAt(x), STEPS = 64, dd = want / 16;
+    const h = hY(x, sgn), STEPS = 64, dd = want / 16;
     const at = (d) => (alongX ? mapPlan(x - d, 0).P : mapPlan(x, sgn * Math.max(0, h - d)).P);
     let prev = at(0), acc2 = 0; v = want;
     for (let i = 1; i <= STEPS * 4; i++) {
@@ -12054,11 +12423,11 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     return v;
   };
   const aSideAt = (x, sgn) => {
-    const g = gAt(x), arm = edgeArm(x);
+    const g = gAt(x, sgn), arm = edgeArm(x);
     const a = g > 0 ? Math.min(planFor(x, sgn, g * rEdge, false), g * arm.r) : 0;
     return a > 0 ? Math.max(a, RIM_BEAD_RADIUS_MM / 512) : 0;
   };
-  const aT = planFor(xT, 1, gAt(xT) * rEdge, true);
+  const aT = planFor(xT, 1, (lamE.two ? Math.min(gAt(xT, 1), gAt(xT, -1)) : gAt(xT)) * rEdge, true);
   /* THE TIP'S BAND IS AS LONG AS THE HOLES ALLOW, NOT THE SIDES' 0.55 mm.
      Squeezing the last 0.55 mm of blade into 0.10 mm made the inset boundary
      turn far harder than the outline does there — the margin gate read the
@@ -12078,7 +12447,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
        — replacing it with `h - aS` collapsed nine tip points onto two, and
        MB2 caught it on every state. */
     if (aS > 0) {
-      const h = hAt(q.x), beta = Math.min(Math.max(arcFor(q.x, sgn, BAND, false), aS / 0.9), h), ds = Math.max(0, h - Math.abs(q.y));
+      const h = hY(q.x, sgn), beta = Math.min(Math.max(arcFor(q.x, sgn, BAND, false), aS / 0.9), h), ds = Math.max(0, h - Math.abs(q.y));
       if (ds < beta) y = sgn * (h - (aS + (ds * (beta - aS)) / beta));
     }
     if (aTip > 0) { const dt = Math.max(0, xT - q.x); if (dt < bandT) x = xT - (aTip + (dt * (bandT - aTip)) / bandT); }
@@ -12289,7 +12658,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
        call. The RAMP is the owner: where `gAt` is exactly zero the treatment has
        not started, the design puts the skin on the apex, and `!(x > plan.xB)` is
        a comparison of plan quantities. */
-    const onOutline = gAt(ap.x) === 0 || (q.x === ap.x && q.y === ap.y);
+    const onOutline = gAt(ap.x, ap.y < 0 ? -1 : 1) === 0 || (q.x === ap.x && q.y === ap.y);
     pr = rimProfile(acc, K, onOutline ? apex : o.C, o.n, o.b, apex, o.T, o.B);
     edgeProfs.set(k, pr);
     marginPoints++;
@@ -12313,7 +12682,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
       marginSkipped += sk;
       const xOf = (pp) => { const s0 = Math.floor(pp), t = pp - s0, A = OL[wrap(s0)], B = OL[wrap(s0 + 1)]; return A.x + (B.x - A.x) * t; };
       const xa = xOf(prmOf(ps[i])), xb = xOf(prmOf(ps[i + 1]));
-      marginRanges.push([t0, acc.triangleCount, sk, Math.min(gAt(xa), gAt(xb)), Math.min(xa, xb), wrap(prmOf(ps[i]))]);
+      marginRanges.push([t0, acc.triangleCount, sk, Math.min(gAt(xa, ps[i].y < 0 ? -1 : 1), gAt(xb, ps[i + 1].y < 0 ? -1 : 1)), Math.min(xa, xb), wrap(prmOf(ps[i]))]);
     }
   };
   /* THE CELL'S RIM: the plan cell's outline edges as walls where the margin is
@@ -12790,11 +13159,12 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     for (let i = mSplit + 1; i <= panel.rowTo; i++) {
       const row = rows[i];
       const sp = panel.spanAt(i);
-      const hh = surface.profile.laminaHalfAt(row.u);        // the mask's plan point is a PLAN point
+      const hh0 = lamE.two ? null : surface.profile.laminaHalfAt(row.u);        // the mask's plan point is a PLAN point
       const vs = [], Ps = [], Ns = [], mat = [];
       const tb = row.tUsed;
       for (let j = 0; j < NV; j++) {
         const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1);
+        const hh = lamE.two ? lamE.side(row.u, v) : hh0;   // F6-asym: the half on v's side
         const q = row.sect(v);
         vs.push(v); Ps.push(q.P); Ns.push(q.n);
         /* IS THERE MATERIAL UNDER THIS SAMPLE? The lattice station's own plan
@@ -12807,7 +13177,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
         if (inside && !(cap && cap.infillMaskAllMaterial)) { for (let ci = 0; ci < plan.cells.length; ci++) { if (plan.cellOpen[ci] && infillPointInPoly(x, y, plan.holes[ci])) { inside = false; break; } } }
         mat.push(inside);
       }
-      grid.push({ row: i, u: row.u, halfWidth: row.h, thickness: tb, v: vs, mid: Ps, normal: Ns, material: mat });
+      grid.push(row.h === null ? { row: i, u: row.u, halfWidth: row.hL, halfWidthRight: row.hR, thickness: tb, v: vs, mid: Ps, normal: Ns, material: mat } : { row: i, u: row.u, halfWidth: row.h, thickness: tb, v: vs, mid: Ps, normal: Ns, material: mat });
     }
   }
   plan.emittedTriRange = [triFrom, acc.triangleCount];

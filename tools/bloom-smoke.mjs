@@ -1521,6 +1521,39 @@ export const SMOKE_BLOCKS = [
         path: "E2's declared magnitude (49.20 deg on the spatulate head's steep fall into the nib, x1.875), OC3's scale arm at the widest, OC1 on a scaled waisted curve" },
     ],
   },
+  {
+    n: 67, title: 'the asymmetric outline — two half-curves about the midrib (Oct 18, F6-asym)',
+    anchor: 'ASYM OUTLINE: EQUAL halves (two-sided, left = right — bit-identical to the symmetric default-curve row)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       TWO-SIDED PROFILE (each half its own widthProfile, answering per side),
+       the per-side section (each half's cup, buckle and apex sweep on its own
+       width), the ladder's AVERAGED measure, the per-side cap and nib (OC0-OC3
+       and AN0-AN3 run once a half), and the infill on two half-widths (the
+       plan in mm across the midrib, the seeds mirrored by the halves' ratio,
+       the metric field per side). The anchor is the equal-halves row, the
+       identity case; the lateral carries the narrowest half, the pinwheel the
+       whole-flower handedness, the tube the throat on each half.
+       --conn is REQUIRED (the per-side bead and infill are new geometry). */
+    conn: true,
+    rows: [
+      { label: 'ASYM OUTLINE: EQUAL halves (two-sided, left = right — bit-identical to the symmetric default-curve row)',
+        path: "OC0's two-sided arm (the control's mode against the cap's, both halves' points), OC1 per half (each restated from its own points), AN0-AN3 per half, the halves' one drawn length" },
+      { label: 'ASYM OUTLINE: a LOPSIDED blade (the right half narrower)',
+        path: "OC4 (the handedness on the emitted margins — the left half on the viewer's left, N x D, each flat margin at its own half's width), OC1/OC2 per half on two different curves (each half's own peak and widest point), AN1/AN2 per half (each half's own nib on its own law), AN3 per half on the emitted rows" },
+      { label: 'ASYM OUTLINE: the lateral x cup 1.2 (the fold clamp on each half)',
+        path: "the form laws on each half's own width (the fold clamp reading the narrow half's radius), OC1 under a cup, E2 on the narrow half's bead" },
+      { label: 'ASYM OUTLINE: a periwinkle-like PINWHEEL x 5 petals (every petal the same hand)',
+        path: "OC4 per ring (every petal of the whorl the same hand), OC1 per ring per half on a pinwheel, J/C on a two-sided petal, the shipping arrangement with every petal one hand" },
+      { label: 'ASYM OUTLINE: the lateral x the Voronoi infill (cells on a one-sided blade)',
+        path: "the infill family (I0-I12) on two half-widths — the plan in mm across the midrib, the seeds mirrored by the halves' ratio, the bead on every hole and on both margins" },
+      { label: 'ASYM OUTLINE: the pinwheel x TUBE (each half pinned to the throat)',
+        path: "OC3 per half (each half's first point pinned to the tube law at the throat), TU0/TU1 under an asymmetric lobe; --conn witnesses the throat seam on both halves" },
+      { label: 'ASYM OUTLINE: a LOADED curve with its RIGHT half under the print floor (lifted and told)',
+        path: "OC2's refusal arm on ONE half (the validator refuses the curve, the right half lifts its own points and the left lifts none)" },
+      { label: 'ASYM OUTLINE: GATED — LAW mode with an asymmetric curve stored (hidden and inert; bit-identical to the default)',
+        path: "OC0's LAW arm with a two-sided curve stored (no cap is two-sided), the byte tool's partition (a holder)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

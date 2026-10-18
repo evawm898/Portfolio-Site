@@ -888,7 +888,11 @@ export function s4Clauses(M, only) {
   const p0 = s4Plan(M, { infillRelax: 0 }).plan, p12 = s4Plan(M, { infillRelax: 12 }).plan;
   add('I11', cv(p12) < cv(p0), `twelve Lloyd passes leave the cell areas MORE uneven (cv ${cv(p12).toFixed(3)}) than none (${cv(p0).toFixed(3)}) — the relaxation does not even the lattice`);
   const wallBar = M.INFILL_WALL_MM - 2 * M.INFILL_PLAN_GRID;
-  for (const [n, set] of [['default', {}], ['density 40', { infillDensity: 40 }], ['cup 1.2 x curl 360', { petalCup: 1.2, petalSpineCurl: 360 }], ['the four at their far ends', { infillRelax: 12, infillLaw: 0, infillAniso: 3, infillBase: 1 }]]) {
+  for (const [n, set] of [['default', {}], ['density 40', { infillDensity: 40 }], ['cup 1.2 x curl 360', { petalCup: 1.2, petalSpineCurl: 360 }], ['the four at their far ends', { infillRelax: 12, infillLaw: 0, infillAniso: 3, infillBase: 1 }],
+    /* F6-asym: an ASYMMETRIC outline, a wide left half and a 3 mm right one —
+       the wall measured on each half's own lamina, so cells tiled on a
+       mirrored outline (the narrow half planned as wide) read under the bar */
+    ['an asymmetric lateral (left wide, right 3 mm)', ASYM_LATERAL_SET]]) {
     const r = s4Plan(M, set);
     const w = infillWallSurfaceMm(r.surface, r.plan);
     add('I11', !!w && w.mm >= wallBar, `${n}: the narrowest in-sheet wall between holes reads ${w ? w.mm.toFixed(6) : 'none'} mm against INFILL_WALL_MM ${M.INFILL_WALL_MM} less two grid quanta (${wallBar.toFixed(6)})`);
@@ -917,7 +921,19 @@ const I12_MUTANTS = [
   { id: 'the-record-calls-every-hole-rounded', from: 'rounded: Ru > rrMax, held });', to: 'rounded: true, held });', breaks: ['I12'],
     witness: (M) => { const P = s4Plan(M, { infillRound: 0.6 }).plan; return P.roundShape.rounded === P.achieved; } },
 ];
+/* F6-asym: the orchid lateral of block 67 — the right half 3 mm across */
+const ASYM_LATERAL_SET = { petalOutlineMode: 'CURVE', petalOutlineCurve: JSON.stringify({ mode: 'two-sided', points: [[0, 0.05], [0.2, 0.2], [0.5, 0.3], [0.8, 0.2], [1, 0]], right: [[0, 0.04], [0.3, 0.06], [0.7, 0.05], [1, 0]] }) };
 const S4_MUTANTS = [
+  /* F6-asym: THE INFILL TILING A MIRRORED OUTLINE — the right half's lamina
+     read as the left's, so the cells are planned as though the narrow half
+     were as wide as the wide one. The emitter maps by the same mutated lamina,
+     so the solid stays watertight and its margin stays on the true outline;
+     what goes is the WALL on the narrow half (the plan's millimetres are not
+     the sheet's). Witnessed on the mutated plan's own outline, which runs past
+     the true right half. */
+  { id: 'the-infill-tiles-a-mirrored-outline', from: 'const fl = (u) => PL.laminaHalfAt(u), fr = (u) => PR.laminaHalfAt(u);', to: 'const fl = (u) => PL.laminaHalfAt(u), fr = (u) => PL.laminaHalfAt(u);', breaks: ['I11'],
+    witness: (M) => { const r = s4Plan(M, ASYM_LATERAL_SET); const L = r.surface.length, PR = r.surface.profile.side(-1);
+      return r.plan.outline.some((q) => q.y < 0 && -q.y > PR.laminaHalfAt(Math.min(1, Math.max(0, q.x / L))) + 1e-6); } },
   { id: 'the-relaxation-count-is-not-read', from: 'const passes = opts.passes ?? INFILL_LLOYD_PASSES;', to: 'const passes = INFILL_LLOYD_PASSES;', breaks: ['I8'],
     witness: (M) => s4Plan(M, { infillRelax: 12 }).plan.passes !== 12 },
   { id: 'the-law-is-not-read', from: 'const gamma = opts.gamma ?? INFILL_TIP_GAMMA;', to: 'const gamma = INFILL_TIP_GAMMA;', breaks: ['I8', 'I10'],
@@ -933,7 +949,7 @@ const S4_MUTANTS = [
 ];
 async function s4NegativeControl() {
   console.log('');
-  console.log('--- S4 NEGATIVE CONTROL: six mutations of a COPY of bloom-geometry.js, each with a witness on the mutated module ---');
+  console.log(`--- S4 NEGATIVE CONTROL: ${S4_MUTANTS.length} mutations of a COPY of bloom-geometry.js, each with a witness on the mutated module ---`);
   const here = path.dirname(fileURLToPath(import.meta.url));
   const src = fs.readFileSync(path.join(here, '..', 'bloom-geometry.js'), 'utf8');
   let fails = 0;

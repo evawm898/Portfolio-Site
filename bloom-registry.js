@@ -1996,6 +1996,16 @@ export const CONTROLS = [
     fmt: (v, ui) => {
       const L = Number(ui.petalLength);
       const scale = outlineWidthScale(ui);
+      if (v.mode === 'two-sided') {
+        /* F6-asym: each half from its own plan — a half-WIDTH, so it is told
+           as the half it is, never doubled into a width it does not have */
+        const half = (side, pts) => {
+          const pl = outlineCurvePlan(v, L, { scale, side });
+          const narrow = Math.min(...pts.slice(0, -1).map((p) => p[1] * scale * L));
+          return `${side} ${pts.length} points, widest ${pl.peakHalfMm.toFixed(1)} mm out at ${(pl.uPk * 100).toFixed(0)}%, narrowest ${narrow.toFixed(2)} mm out (floor 0.80)${pl.lifted.length ? `, ${pl.lifted.length} LIFTED` : ''}`;
+        };
+        return `ASYMMETRIC${scale === 1 ? '' : ` at ${scale.toFixed(3)}x width`} — ${half('left', v.points)} · ${half('right', v.right)} · of ${L.toFixed(0)} mm (left = the upper curve, seen from the upper face, base down)`;
+      }
       const pl = outlineCurvePlan(v, L, { scale });
       const narrow = Math.min(...v.points.slice(0, -1).map((p) => p[1] * scale * L));
       return `${v.points.length} points${scale === 1 ? '' : ` at ${scale.toFixed(3)}x width`} · widest ${(2 * pl.peakHalfMm).toFixed(1)} mm at ${(pl.uPk * 100).toFixed(0)}% of ${L.toFixed(0)} mm · narrowest point ${(2 * narrow).toFixed(2)} mm across against a 1.60 mm floor${pl.lifted.length ? ` (${pl.lifted.length} point${pl.lifted.length === 1 ? '' : 's'} LIFTED — a loaded curve; the editor refuses such a drag)` : ''}`;

@@ -333,6 +333,18 @@ const PREDICATE_MOVERS = {
      guard can only be read here). Every LAW row, the GATED row with a curve
      stored included, must hold to the bit in both modes. */
   'outline': (st) => mine.outlineIsCurve(st),
+  /* THE ASYMMETRIC OUTLINE (F6-asym). A row moves iff THIS tree builds it in
+     CURVE mode with a TWO-SIDED curve whose right half differs from its left
+     (the base tree reads only `points` — the left half — and draws it
+     mirrored). Every LAW row, every Symmetric row, an Asymmetric curve with
+     EQUAL halves and the GATED row (a two-sided curve stored under LAW) must
+     hold to the bit: the equal-halves identity, measured across trees. Read
+     off the CONTROL's value, never the plan. */
+  'asym': (st) => {
+    if (!mine.outlineIsCurve(st)) return false;
+    const v = typeof st.petalOutlineCurve === 'string' ? JSON.parse(st.petalOutlineCurve) : st.petalOutlineCurve;
+    return !!v && v.mode === 'two-sided' && JSON.stringify(v.right) !== JSON.stringify(v.points);
+  },
   /* THE OUTLINE CURVE'S FOLLOW-UPS (F6-sym-2). A row moves iff THIS tree builds
      it in CURVE mode AND either its width scale is not 1 (Petal width off the
      16 mm default — the base tree drew the 16 mm curve whatever the width) or a

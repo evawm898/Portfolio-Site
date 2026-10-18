@@ -54,6 +54,13 @@
      F9  THE OUTLINE CURVE (F6-sym): the second registry curve control
          round-trips a spoon outline in CURVE mode verbatim, an out-of-order
          outline is refused whole and told, and it is a curve field of the file.
+     F11 THE ASYMMETRIC OUTLINE (F6-asym): mode and both halves round-trip
+         verbatim; a #417 symmetric file loads unchanged; a bad right half is
+         refused whole.
+     F12 THE ASYMMETRIC MODE'S EQUAL-HALVES IDENTITY (F6-asym),
+         tools/verify-bloom-outline-asym-equal.mjs, SPAWNED here for F6's
+         reason: an Asymmetric outline with equal halves IS the Symmetric one,
+         every export float and grid value, both modes.
      F10 THE OUTLINE WIDTH GATE (F6-sym-2), tools/verify-bloom-outline-width.mjs,
          is SPAWNED here for F6's reason: the Petal width drag in CURVE mode
          asks the outline's validator, a narrowing drag is refused and told.
@@ -406,6 +413,42 @@ async function nodeClauses(F, rec) {
     }
     rec('F9', p, 'the outline curve: a spoon outline in CURVE mode round-trips verbatim through the shipped document walkers with no note; an out-of-order outline is refused whole and told; the control is a curve field of the file');
   }
+  /* F11 — THE ASYMMETRIC OUTLINE (F6-asym). The file carries the mode and BOTH
+     halves: a two-sided outline round-trips verbatim (mode, left, right, every
+     coordinate to the bit) with no note; a #417 / #418 symmetric outline —
+     written exactly as those trees wrote it, with no `right` key — loads as
+     SYMMETRIC, unchanged and untold; and a two-sided outline whose RIGHT half
+     goes back along the length is refused whole and told (the right half is
+     held to the same shape rule as the left). */
+  {
+    const p = [];
+    const sameSide = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((q, i) => Object.is(q[0], b[i][0]) && Object.is(q[1], b[i][1]));
+    const asym = { mode: 'two-sided', points: [[0, 0.05], [0.15, 0.16], [0.36, 0.2286], [0.7, 0.178], [0.9, 0.1], [1, 0]], right: [[0, 0.05], [0.2, 0.09123], [0.5, 0.12], [0.8, 0.08], [1, 0]] };
+    const r = F.readDoc(JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: asym }, { savedAt: 'x' }))));
+    if (!r.ok) p.push(`the asymmetric outline's document did not read: ${JSON.stringify(r.notes)}`);
+    else {
+      if (r.notes.length) p.push(`a clean round trip of the asymmetric outline reported ${r.notes.map((n) => n.text).join(' | ')}`);
+      const back = r.doc.controls.petalOutlineCurve;
+      if (!(back && back.mode === 'two-sided' && sameSide(back.points, asym.points) && sameSide(back.right, asym.right))) p.push(`the asymmetric outline read back as ${JSON.stringify(back)}`);
+    }
+    const old = JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, petalOutlineMode: 'CURVE' }, { savedAt: 'x' })));
+    old.controls.petalOutlineCurve = { mode: 'symmetric', points: [[0, 0.03], [0.35, 0.05], [0.65, 0.2], [0.85, 0.22], [0.96, 0.12], [1, 0]] };
+    const r1 = F.readDoc(old);
+    if (!r1.ok || r1.notes.length) p.push(`a #417-shaped symmetric outline did not load clean: ${JSON.stringify(r1.notes)}`);
+    else {
+      const b1 = r1.doc.controls.petalOutlineCurve;
+      if (!(b1 && b1.mode === 'symmetric' && b1.right === undefined && sameSide(b1.points, old.controls.petalOutlineCurve.points))) p.push(`a #417-shaped symmetric outline loaded as ${JSON.stringify(b1)}`);
+    }
+    const bad = JSON.parse(F.toText(F.composeDoc(REG.DEFAULTS, { savedAt: 'x' })));
+    bad.controls.petalOutlineCurve = { mode: 'two-sided', points: asym.points, right: [[0, 0.05], [0.6, 0.1], [0.4, 0.12], [1, 0]] };
+    const r2 = F.readDoc(bad);
+    if (!r2.ok) p.push(`a document with a bad right half did not read at all: ${JSON.stringify(r2.notes)}`);
+    else {
+      if ('petalOutlineCurve' in r2.doc.controls) p.push(`a bad right half was applied as ${JSON.stringify(r2.doc.controls.petalOutlineCurve)} rather than refused whole`);
+      if (!r2.notes.some((n) => n.kind === 'invalid' && /petalOutlineCurve.*right side.*not past point/.test(n.text))) p.push(`the bad right half was not told: ${r2.notes.map((n) => n.text).join(' | ')}`);
+    }
+    rec('F11', p, 'the asymmetric outline: mode and both halves round-trip verbatim with no note; a #417 symmetric outline loads unchanged as symmetric; a bad right half is refused whole and told');
+  }
 }
 
 /* ---------------- the browser clauses ---------------- */
@@ -573,7 +616,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
@@ -599,8 +642,10 @@ const MUTANTS = [
      can see it — which is why F7 exists. */
   /* F3-global: with a LIVE curve control in the registry, dropping the kind's
      writer also reddens the round trip (F1/F2) and the spine-curve rows (F8),
-     not only the kinds census. */
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+     not only the kinds census. F6-asym: and F11, the asymmetric outline's own
+     round trip, for the same reason (this mutant and the dropped-field one above
+     were run in CI before F11 had them listed — the first thing the sweep said). */
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];
@@ -637,6 +682,17 @@ if (!ONLY.length) {
     console.log(`F10 — spawning node ${a10.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
     const r10 = spawnSync(process.execPath, a10, { stdio: 'inherit' });
     if (r10.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F10: the outline width gate exited ${r10.status}`); process.exit(1); }
+  }
+  /* F12 — THE ASYMMETRIC MODE'S EQUAL-HALVES IDENTITY (F6-asym), spawned for
+     F6's reason: a file saved Asymmetric with equal halves must build the
+     Symmetric bloom to the bit, in both modes (tools/verify-bloom-outline-asym-
+     equal.mjs; its --control is part of the run). Node only, so it runs under
+     --no-browser too; the negative control has its own mutants and skips it. */
+  if (!NEGATIVE) {
+    const a12 = [path.join(ROOT, 'tools/verify-bloom-outline-asym-equal.mjs'), '--control'];
+    console.log(`F12 — spawning node ${a12.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
+    const r12 = spawnSync(process.execPath, a12, { stdio: 'inherit' });
+    if (r12.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F12: the equal-halves identity exited ${r12.status}`); process.exit(1); }
   }
 }
 
