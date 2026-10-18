@@ -960,6 +960,17 @@ bloom.js's `onWidthEdit` / `curveValidatorCtx` or OC3).
   states in `verify-bloom-tube.mjs`. Block 66 (19 rows, 1334), smoke block 66 (6); `frozen/phase72` = the 1315
   rows at `1bb7c35`. Sheet: `node tools/shot-bloom-outline-curve-2.mjs <dir>` → `docs/img/outline-curve-2.png`.
 
+**THE SPOON'S 72° RIM TURN IS A BLUNT NIB UNDER A CUP, NOT THE WAIST AND NOT THE CURVE — DECLARED, NO
+GEOMETRY CHANGE** (F6-spoon, Oct 18 — read `docs/bloom-spoon-rim-turn-outcome.md` before touching the two spoon
+rows' `E2_TURN_XFAIL` entries). E2 sits at the FIRST NIB-ARC ROW (u 0.9992): on a blunt end the last ladder gap
+before the nib spans half-width ~2.4 → 0.2 mm in one step and the cup's lift falls with it. The near-rectangle
+(89.84°) and the LAW spatulate on main's law (81.33°; 140.47° at tip shape 3.0) read worse at the same cup; pointed
+ends stay under 44°. 0 within-shell pairs, 0 inward shells, the rim at the site is the nib's own clamp (0.36 mm at
+cup 0 too). Both spoon rows are smoke rows now, declared at 71.986507 / 49.198688. The remedy, if wanted, is a
+nib resolution demand in the ladder for LAW and CURVE alike — its own byte partition. `node
+tools/bloom-spoon-rim-turn.mjs` reproduces every figure (via the gate's new `--rows-file`); sheet `node
+tools/shot-bloom-spoon-nib.mjs <dir>` → `docs/img/spoon-rim-turn.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
