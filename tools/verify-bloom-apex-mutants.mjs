@@ -642,6 +642,23 @@ const blandDiff = (m, c) => Math.max(...m.base.map((h, i) => (Number.isFinite(h)
 const OUTLINE2_MUTANTS = /^(the-outline-width-scale-is-ignored|the-width-scale-moves-the-positions|the-curve-starts-below-the-throat|the-throat-width-is-not-pinned|the-validator-and-the-build-disagree-on-the-scaled-floor)$/;
 const OUTLINE2_ROWS = /^a scaled outline curve|^a tubular outline curve/;
 const OUTLINE_ROWS = /^an outline curve|^a loaded outline curve/;
+/* ===== THE ASYMMETRIC OUTLINE (F6-asym) =====
+   The mutated module's OWN two-sided petal record — each half's emitted
+   half-widths and the emitted margins (OC4's own record). Never OC/AN, which
+   is what these mutants name. The witness state is block 67's LOPSIDED blade:
+   the default curve on the left, a narrower right half. */
+const ASYM_LOPSIDED = { mode: 'two-sided', points: OUTLINE_DEF_PTS.points, right: [[0, 0.05], [0.2, 0.09], [0.5, 0.12], [0.8, 0.08], [1, 0]] };
+const ASYM_SET = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: ASYM_LOPSIDED });
+function asymPetal(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const p = M.buildBloomInto(acc, state).petal;
+    if (!p.profileL || !p.marginSides) return { threw: 'the build is not two-sided' };
+    return { L: [...p.profileL], R: [...p.profileR], u: [...p.profileU], margins: p.marginSides, apexR: p.tipCap.sides.right.apex };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const ASYM_MUTANTS = /^(the-right-half-is-the-left-mirrored|the-halves-are-swapped|the-right-nib-reads-the-left-width|a-flat-section-reads-one-half-width)$/;
+const ASYM_ROWS = /^an asymmetric outline curve/;
 /* The tier rows run under the tier mutants alone (`rowsFor` below), and the
    tier mutants run over the rows that name them. */
 const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
@@ -2819,8 +2836,9 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.length - m.asked) > 1e-6 && c.length === c.asked) ? null : `the mutant drew ${m.length} mm of ${m.asked} asked; the clean tree ${c.length} of ${c.asked}`; } },
   { id: 'the-outline-validator-and-the-build-disagree-on-the-floor', why: 'the validator asks the LIVE mesh floor (0.15 mm) while the build lifts at the print floor (0.80), so a drag the editor accepts builds a lifted outline — the one thing the refusal exists to make impossible',
-    find: '      else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L: a.lengthMm, scale: a.scale };',
-    into: '      else if (f.askedMm <= TIP_CAP_HALF_MM && (!worst || f.askedMm < worst.askedMm)) worst = { ...f, L: a.lengthMm, scale: a.scale };', names: ['OC2'], rows: OUTLINE_ROWS,
+    /* re-anchored F6-asym: the validator now asks each half of a two-sided curve */
+    find: '        else if (!worst || f.askedMm < worst.askedMm) worst = { ...f, L: a.lengthMm, scale: a.scale, side };',
+    into: '        else if (f.askedMm <= TIP_CAP_HALF_MM && (!worst || f.askedMm < worst.askedMm)) worst = { ...f, L: a.lengthMm, scale: a.scale, side };', names: ['OC2'], rows: OUTLINE_ROWS,
     witness: (M, C) => { const m = outlinePetal(M, OUTLINE_UNDER()), c = outlinePetal(C, OUTLINE_UNDER());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (c.refusal == null || !c.lifted) return `the clean tree does not refuse and lift the under-floor outline (refusal ${JSON.stringify(c.refusal)}, lifted ${c.lifted}) — the probe is outside the mutant's subject`;
@@ -2854,11 +2872,46 @@ const MUTANTS = [
       const i = c.u.findIndex((u) => u >= 0.4);
       return Math.abs(m.base[i] - c.base[i]) > 0.5 ? null : `the mutant's first row above the throat is ${m.base[i]} mm against the clean tree's ${c.base[i]} — no step`; } },
   { id: 'the-validator-and-the-build-disagree-on-the-scaled-floor', why: 'the validator asks about the UNSCALED points while the build lifts the scaled ones, so a narrow Petal width the editor accepts builds a lifted outline — the refusal and the lift are one decision',
-    find: '    for (const f of outlineCurvePlan(curve, a.lengthMm, { scale: a.scale, throat }).lifted) {', into: '    for (const f of outlineCurvePlan(curve, a.lengthMm, { scale: 1, throat }).lifted) {', names: ['OC2'], rows: OUTLINE2_ROWS,
+    /* re-anchored F6-asym: the validator now asks each half of a two-sided curve */
+    find: '      for (const f of outlineCurvePlan(cv, a.lengthMm, side ? { scale: a.scale, throat, side } : { scale: a.scale, throat }).lifted) {', into: '      for (const f of outlineCurvePlan(cv, a.lengthMm, side ? { scale: 1, throat, side } : { scale: 1, throat }).lifted) {', names: ['OC2'], rows: OUTLINE2_ROWS,
     witness: (M, C) => { const m = outlinePetal(M, OUTLINE_W(10, OUTLINE_TAIL_PTS)()), c = outlinePetal(C, OUTLINE_W(10, OUTLINE_TAIL_PTS)());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (c.refusal == null || !c.lifted) return `the clean tree does not refuse and lift the tail at 10 mm (refusal ${JSON.stringify(c.refusal)}, lifted ${c.lifted}) — the probe is outside the mutant's subject`;
       return (m.refusal == null && m.lifted > 0) ? null : `the mutant's validator still answers ${JSON.stringify(m.refusal)} on an outline the build lifts (${m.lifted})`; } },
+  /* ===== THE ASYMMETRIC OUTLINE (F6-asym — docs/bloom-outline-curve-asym-
+     outcome.md). Four plausible wrong two-sided outlines, each watertight and
+     one piece at the same triangle count, each witnessed on the MUTATED
+     module's own record. The other three the session owes live where their
+     clauses do: the bead following one side only is the edge gate's (E7), the
+     infill tiling a mirrored outline the infill gate's (I11), and Asym->Sym
+     keeping the right half the panel gate's route (af). Scoped to the two
+     asymmetric rows (and they to these). */
+  { id: 'the-right-half-is-the-left-mirrored', why: 'the right half of an Asymmetric outline is built from the LEFT half\'s points, so the petal is the symmetric one whatever the right curve says — the editor shows two halves and the print carries one',
+    find: "    widthProfileOne(state, ring, halfW, cap, acc, length, 'right'));", into: "    widthProfileOne(state, ring, halfW, cap, acc, length, 'left'));", names: ['OC0', 'OC1'], rows: ASYM_ROWS,
+    witness: (M, C) => { const m = asymPetal(M, ASYM_SET()), c = asymPetal(C, ASYM_SET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const dm = Math.max(...m.L.map((h, i) => Math.abs(h - m.R[i]))), dc = Math.max(...c.L.map((h, i) => Math.abs(h - c.R[i])));
+      return (dm === 0 && dc > 1) ? null : `the mutant's halves differ by ${dm} mm (the clean tree's by ${dc})`; } },
+  { id: 'the-halves-are-swapped', why: 'the section draws the RIGHT half on the viewer\'s left and the left half on the right — every half-width record still reads right, so the petal is the mirror image of the one drawn in the editor',
+    find: '    const sect = (v) => (v > 0 ? sL(v) : sR(v));', into: '    const sect = (v) => (v > 0 ? sR(v) : sL(v));', names: ['OC4'], rows: ASYM_ROWS,
+    witness: (M, C) => { const m = asymPetal(M, ASYM_SET()), c = asymPetal(C, ASYM_SET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* the emitted left margin's distance from the centre on a flat row, against the record's left half */
+      const off = (P) => Math.max(...P.margins.filter((r) => r.flat && r.hL > 1e-6).map((r) => Math.abs(Math.hypot(r.L[0] - r.C[0], r.L[1] - r.C[1], r.L[2] - r.C[2]) - r.hL)));
+      return (off(m) > 0.5 && off(c) < 1e-9) ? null : `the mutant's left margin stands ${off(m)} mm off the left half (the clean tree's ${off(c)})`; } },
+  { id: 'the-right-nib-reads-the-left-width', why: 'on the nib the right half is drawn at the LEFT half\'s width, so the narrow half closes on the wide half\'s arc — one nib, two halves; the round end is no longer either half\'s own',
+    find: '    const hL = PL.halfWidthAt(u), hR = PR.halfWidthAt(u);', into: '    const hL = PL.halfWidthAt(u), hR = PR.onNib(u) ? PL.halfWidthAt(u) : PR.halfWidthAt(u);', names: ['AN3'], rows: ASYM_ROWS,
+    witness: (M, C) => { const m = asymPetal(M, ASYM_SET()), c = asymPetal(C, ASYM_SET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const onNib = m.u.map((u, i) => i).filter((i) => m.u[i] * c.apexR.drawnLengthMm > c.apexR.drawnLengthMm * (c.apexR.arcU ?? 1) - 1e-9 && m.u[i] > 0);
+      const d = onNib.length ? Math.max(...onNib.map((i) => Math.abs(m.R[i] - c.R[i]))) : 0;
+      return d > 1e-6 ? null : `the mutant's right half on the nib is within ${d} mm of the clean tree's (${onNib.length} nib rows)`; } },
+  { id: 'a-flat-section-reads-one-half-width', why: 'a ±halfWidth site left symmetric: the flat cross-section draws BOTH halves at the left half\'s width, while every record reads two — the print is the symmetric petal',
+    find: '    const sR = f === null ? flatSect(C, nrm, hR) :', into: '    const sR = f === null ? flatSect(C, nrm, hL) :', names: ['OC4'], rows: ASYM_ROWS,
+    witness: (M, C) => { const m = asymPetal(M, ASYM_SET()), c = asymPetal(C, ASYM_SET());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const off = (P) => Math.max(...P.margins.filter((r) => r.flat && r.hR > 1e-6).map((r) => Math.abs(Math.hypot(r.R[0] - r.C[0], r.R[1] - r.C[1], r.R[2] - r.C[2]) - r.hR)));
+      return (off(m) > 0.5 && off(c) < 1e-9) ? null : `the mutant's right margin stands ${off(m)} mm off the right half (the clean tree's ${off(c)})`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3440,6 +3493,13 @@ const ROWS = [
     set: [{ id: 'petalWidth', value: '10' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_TAIL_PTS) }] },
   { label: 'a tubular outline curve (5 petals, k 0 at fusion height 0.40, the default curve on the lobe)', for: OUTLINE2_MUTANTS,
     set: [{ id: 'petalCount', value: '5' }, { id: 'tubeLayer1', value: '0' }, { id: 'tubeHeight', value: '0.4' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(OUTLINE_DEF_PTS) }] },
+  /* F6-asym: the lopsided blade (the default curve on the left, a narrower
+     right half) and the pinwheel at five petals. Scoped to the asymmetric
+     mutants. */
+  { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
+    set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
+  { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,
+    set: [{ id: 'petalCount', value: '5' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify({ mode: 'two-sided', points: [[0, 0.05], [0.3, 0.15], [0.6, 0.26], [0.85, 0.24], [1, 0]], right: [[0, 0.05], [0.3, 0.08], [0.6, 0.12], [0.85, 0.1], [1, 0]] }) }] },
 ];
 
 /* ===================================================================

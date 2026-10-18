@@ -256,6 +256,10 @@ export function buildGridGltf(built, { mode, state, generator = 'bloom-grid-gltf
         u: rows.map((r) => round(r.u)),
         v: rows[0].v.map((v) => round(v)),
         halfWidthMm: rows.map((r) => round(r.halfWidth, 5)),
+        /* F6-asym: a two-sided petal's halfWidthMm is its LEFT (v > 0) half and
+           this its right; absent on every one-sided petal, so their files do
+           not move a byte */
+        ...(rows.some((r) => r.halfWidthRight !== undefined) ? { halfWidthRightMm: rows.map((r) => round(r.halfWidthRight ?? r.halfWidth, 5)) } : {}),
         thicknessMm: rows.map((r) => round(r.thickness, 5)),
         material: rows.map((r) => materialRow(r, nCols, panel.label)),
       });

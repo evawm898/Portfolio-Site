@@ -171,7 +171,12 @@ export async function measure(page, row, opts = {}) {
   if (shown === null) return { skipped: 'the app reports no shownMode — the mode this profile was built in cannot be established' };
   const exportMode = shown === 'export';
   const m = await page.evaluate(() => window.__bloomMetrics());
-  const prof = m.petalProfile, us = m.petalProfileU;
+  /* F6-asym: a TWO-SIDED outline has no single half-width per row (the
+     builder reports `petalProfile` null there); each half is measured on its
+     own profile against its own emitted rows, and the worse half is reported
+     with the side named. */
+  const PS = m.petalProfileSides;
+  const prof = PS ? PS.left : m.petalProfile, us = m.petalProfileU;
   if (!Array.isArray(prof) || !Array.isArray(us) || prof.length !== us.length || prof.length < 3) {
     return { skipped: 'the builder emitted no per-row profile (petalProfile / petalProfileU)' };
   }
@@ -184,28 +189,36 @@ export async function measure(page, row, opts = {}) {
   } catch (e) {
     return { skipped: `the profile could not be rebuilt for this row (${e.message.slice(0, 60)})` };
   }
-  const at = (u) => profile.halfWidthAt(u);
-
-  /* THE TIE-BACK. Blade rows only: the FOOT rows are emitted before any curve
-     exists and are not widthProfile()'s to answer for. */
-  let tie = 0, tied = 0;
-  for (let i = 0; i < us.length; i++) {
-    if (!(us[i] > 0)) continue;                       // foot rows carry u = 0
-    tie = Math.max(tie, Math.abs(at(us[i]) - prof[i])); tied++;
+  const halves = profile.twoSided
+    ? (PS && Array.isArray(PS.right) && PS.right.length === us.length
+      ? [['left', (u) => profile.side(1).halfWidthAt(u), PS.left], ['right', (u) => profile.side(-1).halfWidthAt(u), PS.right]]
+      : null)
+    : [[null, (u) => profile.halfWidthAt(u), prof]];
+  if (!halves) return { skipped: 'a two-sided outline whose per-side rows the builder did not report' };
+  let best = null;
+  for (const [side, at, pr] of halves) {
+    /* THE TIE-BACK. Blade rows only: the FOOT rows are emitted before any curve
+       exists and are not widthProfile()'s to answer for. */
+    let tie = 0, tied = 0;
+    for (let i = 0; i < us.length; i++) {
+      if (!(us[i] > 0)) continue;                       // foot rows carry u = 0
+      tie = Math.max(tie, Math.abs(at(us[i]) - pr[i])); tied++;
+    }
+    if (tied < 3) return { skipped: 'fewer than three blade rows carried a station' };
+    if (!(tie <= TIE_TOL)) {
+      return { skipped: `the rebuilt profile is not the builder's${side ? ` (${side} half)` : ''} (max ${tie.toExponential(2)} mm over ${tied} rows) — a role override or a state this reconstruction does not model` };
+    }
+    const stations = us.filter((u) => u > 0);
+    const r = { ...sagittaOf(at, state.petalLength, stations), tie, tied, mode: shown, side };
+    if (!best || r.worst.d > best.worst.d) best = { ...r, tie: Math.max(tie, best ? best.tie : 0) };
   }
-  if (tied < 3) return { skipped: 'fewer than three blade rows carried a station' };
-  if (!(tie <= TIE_TOL)) {
-    return { skipped: `the rebuilt profile is not the builder's (max ${tie.toExponential(2)} mm over ${tied} rows) — a role override or a state this reconstruction does not model` };
-  }
-  const stations = us.filter((u) => u > 0);
-  const r = sagittaOf(at, state.petalLength, stations);
-  return { ...r, tie, tied, mode: shown };
+  return best;
 }
 
 export function sagittaLine(r) {
   if (r.skipped) return `SAGITTA: SKIPPED — ${r.skipped}`;
   const f = (x) => (x < 0 ? '  --  ' : x.toFixed(4));
-  return `SAGITTA: worst ${f(r.worst.d)} mm at u=${r.worst.u.toFixed(3)} (${r.worst.zone})`
+  return `SAGITTA: worst ${f(r.worst.d)} mm at u=${r.worst.u.toFixed(3)} (${r.worst.zone})${r.side ? ` on the ${r.side} half` : ''}`
     + ` | base ${f(r.zone.base)} middle ${f(r.zone.middle)} apex ${f(r.zone.apex)}`
     + ` | ${r.chords} chords from the builder's own stations (${r.mode}), tie-back ${r.tie.toExponential(1)} mm`
     + ` | the worst is BASE-driven root blend, NOT the redistribution's target`;

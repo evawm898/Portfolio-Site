@@ -235,6 +235,13 @@ const E2_TURN_XFAIL = {
     { excessDeg: 26.986507, note: 'adds 71.986507 deg at [-27.655, -28.812, 15.309]; face-to-face 89.96, outline 17.98 — row 52/58 (u 0.9992, the first nib-arc row, a clamped bead, room 0.402) on the blunt end\'s last ladder gap; identical on a worktree of 1bb7c35 (#417)' },
   'OUTLINE CURVE 2: the spoon x petalWidth 30':
     { excessDeg: 4.198688, note: 'adds 49.198688 deg at [25.592, -33.329, 14.808]; face-to-face 51.92, outline 2.72 — row 51/58 (u 0.9806, h 4.47, unclamped), the spatulate head\'s steep fall into the nib at x1.875; the same spoon at 16 mm reads 44.53 (at the claw)' },
+  /* F6-asym (Oct 18, docs/bloom-outline-curve-asym-outcome.md): the one
+     asymmetric smoke row over the allowance. Its two symmetric TWINS (each half
+     mirrored) read 47.256717 (left) and 52.266642 (right) through this same
+     clause, so the asymmetric petal adds no turn its halves do not already
+     have — the blunt-nib-under-a-cup class #419 declared on the spoon. */
+  'ASYM OUTLINE: the lateral x cup 1.2 (the fold clamp on each half)':
+    { excessDeg: 1.961139, note: 'NEW with F6-asym block 67: adds 46.961139 deg at [28.355, -27.879, 15.092]; face-to-face 70.57, outline 23.61 — row 52/59 (u 0.9954, the LEFT half on the nib, hL 0.294 / hR 0.200, a clamped bead, room 0.600); the twins read 47.256717 (left mirrored) and 52.266642 (right mirrored)' },
   'OUTLINE CURVE 2: the TRUMPET with a drawn lobe':
     { excessDeg: 0.523018, note: 'NEW with F6-sym-2 block 66: adds 45.523018 deg at [-8.088, -18.185, 30.843]; face-to-face 51.24, outline 5.72 — the LAW twin reads 46.253052 at [-17.815, 4.836, 30.310] on main\'s bytes, so the trumpet\'s, not the curve\'s; found by CI on ab757de' },
   'TUBE: GATED — the buckle (unavailable, inert)':
@@ -680,7 +687,7 @@ function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm, r
 
 async function runRows(G, rows, fails, notes, fullSet = false) {
   const check = (clause, ok, msg) => { if (!ok) fails.push(`${clause}: ${msg}`); return ok; };
-  let profiles = 0, worstTurn = 0, worstCorner = 0, worstRamp = 0, minRim = Infinity, clamps = 0, leafRows = 0, leafApexAll = 0;
+  let insetChecked = 0, profiles = 0, worstTurn = 0, worstCorner = 0, worstRamp = 0, minRim = Infinity, clamps = 0, leafRows = 0, leafApexAll = 0;
   let done = 0;
   const declaredSeen = new Set();
   for (const row of rows) {
@@ -774,6 +781,33 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
         }
       }
       check('E4', missing === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${missing} of ${apexRecs.length * 3} declared rim vertices are not in the emitted stream (first: ${firstMiss})`);
+
+      /* ---- E7: each side's bead stops at its OWN drawn radius (F6-asym) ----
+         The skin stops `a` mm of chord inside the boundary point, solved on
+         the side's own section (`rimInsetV`). Measured here on the EMITTED
+         vertices — the apex and the midpoint of the two skin corners, which is
+         the skin point the bead leaves from — against the drawn radius the
+         builder declares (or the half's own chord to the midrib, where that is
+         shorter and the inset stops at the midrib), within the bisection's own
+         bracket in mm of the half's arc. A bead
+         that solved one side and mirrored the inset to the other (in the
+         section parameter) is right on a symmetric petal and wrong by the
+         halves' ratio on an asymmetric one; nothing else here measures where
+         the skin stops, so a mirrored inset exports watertight with every
+         other clause green. */
+      let insetN = 0, insetBad = 0, insetWorst = null;
+      for (const r of apexRecs) {
+        if (!r.inset) continue;
+        insetN++;
+        const mid = [(r.top[0] + r.bot[0]) / 2, (r.top[1] + r.bot[1]) / 2, (r.top[2] + r.bot[2]) / 2];
+        /* where the half's own chord to the midrib is shorter than the radius
+           (a narrow half under a deep cup) the inset stops AT the midrib —
+           the inset law's own bound, the same on both halves */
+        const d = Math.abs(dist(r.apex, mid) - Math.min(r.inset.mm, r.inset.chordToMidribMm));
+        if (d > r.inset.tolMm + 1e-9) { insetBad++; if (!insetWorst || d > insetWorst.d) insetWorst = { d, r }; }
+      }
+      insetChecked += insetN;
+      check('E7', insetBad === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${insetBad} of ${insetN} side profiles stop ${insetWorst && insetWorst.d.toFixed(4)} mm off their own drawn radius ${insetWorst && insetWorst.r.inset.mm.toFixed(4)} mm (panel ${insetWorst && insetWorst.r.panel} row ${insetWorst && insetWorst.r.row} col ${insetWorst && insetWorst.r.col}) — the bead's inset was not solved on this side's own section`);
 
       /* ---- E1: the rim floor, with the clamp as a BICONDITIONAL ----
          THE BAR IS `min(RIM_FLOOR_MM, the body's own thickness)`, and that is
@@ -877,6 +911,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
     }
   }
   check('E0', profiles > 0, `no treated rim profile was found on any row — the run is vacuous`);
+  check('E7', insetChecked > 0, `no side profile carried an inset claim — E7 asserted nothing`);
   /* A DECLARATION NAMING A ROW THE GATE NEVER RAN IS A DECLARATION NOBODY CAN
      CHECK — the combination gate's CG5, one instrument later. ONLY on a run
      over the FULL row set, and the caller says so rather than this reading
@@ -890,7 +925,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
     }
   }
   notes.push(`declared surface-turn rows ${declaredSeen.size} of ${Object.keys(E2_TURN_XFAIL).length} · rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn the treatment ADDS ${worstTurn.toFixed(2)} deg (allowance ${DIH_BAR}, over and above the outline's own) · worst EXCESS at an outline corner ${worstCorner.toFixed(2)} deg · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default) · leaf row-modes ${leafRows}, leaf treated profiles ${leafApexAll}`);
-  return { profiles, worstTurn, worstCorner, minRim, clamps };
+  return { profiles, worstTurn, worstCorner, minRim, clamps, insetChecked };
 }
 
 /* ======================= THE MUST-FAIL ==================================
@@ -1035,6 +1070,18 @@ const MUTATIONS = [
      43.686211 deg under it, UNDER the allowance, so the both-directions
      clause fires its STALE arm. Named as collateral, the bead-apex mutant's
      precedent above. */
+  /* F6-asym: THE BEAD FOLLOWING ONE SIDE ONLY. The right half's inset is the
+     left half's mirrored in the section parameter — exactly right on a
+     symmetric petal (the section is its own mirror there) and wrong by the
+     halves' ratio on an asymmetric one, where the narrow half's bead then stops
+     at the WIDE half's parameter. Watertight, one piece, the apex still on the
+     boundary; E7 is the only clause that measures where the skin stops. The
+     asymmetric control row is what makes it observable at all. E2 as well,
+     and true of it: a bead stopped at the wrong place is a different surface,
+     and on the lateral's narrow half that surface turns past the allowance. */
+  { id: 'the-bead-follows-one-side-only', breaks: ['E7', 'E2'],
+    from: '    const inLo = side ? rimInsetV(row.sect, vLo, vMid, aLo) : vLo;\n    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;',
+    to:   '    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;\n    const inLo = side ? (vLo === -vHi ? -inHi : rimInsetV(row.sect, vLo, vMid, aLo)) : vLo;' },
   { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5', 'E6', 'E2'],
     from: '  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
     to:   '  const skinTo = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
@@ -1102,6 +1149,7 @@ async function control() {
     'LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', // a lobed margin
     'THIN: ALL THIN',                                                           // a thin sheet
     'LEAVES: alternate x 3 nodes at the ruled 35 deg',                          // a leaf's margin (S2)
+    'ASYM OUTLINE: an orchid LATERAL — one-sided (a wide left half, a 3 mm right half)', // two halves of different widths (F6-asym)
   ];
   const missingRows = CONTROL_ROWS.filter((l) => !MATRIX.some((r) => r.label === l));
   if (missingRows.length) { console.error(`edge-profile control: the named control row(s) ${missingRows.map((l) => `"${l}"`).join(', ')} are not in the matrix — an arm of the rim law would be exercised by nothing`); process.exit(1); }
@@ -1118,6 +1166,7 @@ async function control() {
       ['LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', (p) => !!(p.lobes && p.lobes.countBuilt > 0 && !p.lobes.noRoom), 'lobes cut'],
       ['THIN: ALL THIN', (p) => !!(p.thickness && p.thickness.floorBinds), 'the export floor binding on the sheet'],
       ['LEAVES: alternate x 3 nodes at the ruled 35 deg', (p, b) => b.leavesBuilt.length > 0, 'leaves built'],
+      ['ASYM OUTLINE: an orchid LATERAL — one-sided (a wide left half, a 3 mm right half)', (p) => !!(p.tipCap && p.tipCap.twoSided), 'a two-sided outline'],
     ];
     const lost = [];
     for (const [l, ok, what] of arm) {
@@ -1206,5 +1255,5 @@ else {
     if (fails.length > LIM) console.log(`  ... and ${fails.length - LIM} more`);
     process.exit(1);
   }
-  console.log('edge-profile: PASS — E0-E6 clean.');
+  console.log('edge-profile: PASS — E0-E7 clean.');
 }
