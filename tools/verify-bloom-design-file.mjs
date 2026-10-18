@@ -449,6 +449,53 @@ async function nodeClauses(F, rec) {
     }
     rec('F11', p, 'the asymmetric outline: mode and both halves round-trip verbatim with no note; a #417 symmetric outline loads unchanged as symmetric; a bad right half is refused whole and told');
   }
+  /* F13 — PER-SCOPE OUTLINES (F6-scope). A layer entry and a petal entry each
+     OWNING an outline (`values`: the mode, an asymmetric curve) round-trip
+     verbatim — every coordinate to the bit, the ownership (which keys each
+     entry carries) intact, offsets beside them untouched — with no note; a
+     file written before the field (#417-#420: entries with offsets only, the
+     outline under `controls`) loads with no note and no `values` invented; a
+     value this control cannot hold, a value for a non-value control and one for
+     sheet thickness are each refused and told, and a tier's values are told
+     not applied. */
+  {
+    const p = [];
+    const sameSide = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((q, i) => Object.is(q[0], b[i][0]) && Object.is(q[1], b[i][1]));
+    const asym = { mode: 'two-sided', points: [[0, 0.05], [0.2, 0.2], [0.5, 0.3], [0.8, 0.2], [1, 0]], right: [[0, 0.04], [0.3, 0.06], [0.7, 0.05123], [1, 0]] };
+    const sym = { mode: 'symmetric', points: [[0, 0.03], [0.4, 0.22], [0.45, 0.25], [0.5, 0.22], [1, 0]] };
+    const scopes = {
+      layers: [{ layer: 1, offsets: { petalCup: 0.4 }, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: sym } }],
+      petals: [{ layer: 0, slot: 2, offsets: {}, values: { petalOutlineCurve: asym } }],
+      tiers: [],
+    };
+    const r = F.readDoc(JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, petalOutlineMode: 'LAW' }, { savedAt: 'x', scopes }))));
+    if (!r.ok) p.push(`a per-scope outline document did not read: ${JSON.stringify(r.notes)}`);
+    else {
+      if (r.notes.length) p.push(`a clean round trip of per-scope outlines reported ${r.notes.map((n) => n.text).join(' | ')}`);
+      const L = r.doc.overrides.layers[0], P = r.doc.overrides.petals[0];
+      if (!L || L.layer !== 1 || L.offsets.petalCup !== 0.4 || !L.values || Object.keys(L.values).join() !== 'petalOutlineMode,petalOutlineCurve' || L.values.petalOutlineMode !== 'CURVE'
+        || !(L.values.petalOutlineCurve && L.values.petalOutlineCurve.mode === 'symmetric' && sameSide(L.values.petalOutlineCurve.points, sym.points) && L.values.petalOutlineCurve.right === undefined)) p.push(`the layer's owned outline read back as ${JSON.stringify(L)}`);
+      if (!P || P.layer !== 0 || P.slot !== 2 || !P.values || Object.keys(P.values).join() !== 'petalOutlineCurve'
+        || !(P.values.petalOutlineCurve && P.values.petalOutlineCurve.mode === 'two-sided' && sameSide(P.values.petalOutlineCurve.points, asym.points) && sameSide(P.values.petalOutlineCurve.right, asym.right))) p.push(`the pair's owned curve read back as ${JSON.stringify(P)}`);
+      if (r.doc.controls.petalOutlineMode !== 'LAW') p.push(`the whole bloom's mode read back as ${r.doc.controls.petalOutlineMode} — a scope's value leaked into the global`);
+    }
+    /* a #417-#420 file: offsets only, the outline under controls */
+    const old = JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, petalOutlineMode: 'CURVE', petalOutlineCurve: asym, scopeLayers: 'ON', layerCount: 3 }, { savedAt: 'x', scopes: { layers: [{ layer: 2, offsets: { petalCup: 0.4 } }], petals: [], tiers: [] } })));
+    if (old.overrides.layers.some((e) => 'values' in e)) p.push('the writer invented a `values` key for an entry that owns none');
+    const r1 = F.readDoc(old);
+    if (!r1.ok || r1.notes.length) p.push(`a #420-shaped file did not load clean: ${JSON.stringify(r1.ok ? r1.notes : r1.error)}`);
+    else if (r1.doc.overrides.layers.some((e) => 'values' in e)) p.push(`a #420-shaped file's entries came back with values: ${JSON.stringify(r1.doc.overrides.layers)}`);
+    const bad = JSON.parse(F.toText(F.composeDoc(REG.DEFAULTS, { savedAt: 'x' })));
+    bad.overrides = { layers: [{ layer: 0, offsets: {}, values: { petalOutlineMode: 'BOGUS', petalCup: 1, sheetThickness: 2, petalOutlineCurve: { mode: 'symmetric', points: [[0, 0.1], [0.6, 0.2], [0.4, 0.15], [1, 0]] } } }], petals: [], tiers: [{ tier: 0, offsets: {}, values: { petalOutlineMode: 'CURVE' } }] };
+    const r2 = F.readDoc(bad);
+    if (!r2.ok) p.push(`a document with bad scope values did not read: ${r2.error}`);
+    else {
+      if (r2.doc.overrides.layers[0] && r2.doc.overrides.layers[0].values) p.push(`bad scope values were applied: ${JSON.stringify(r2.doc.overrides.layers[0].values)}`);
+      for (const re of [/values\.petalOutlineMode.*not one of/, /values\.petalCup.*only petalOutlineMode/, /values\.sheetThickness.*never scoped/, /values\.petalOutlineCurve.*not a curve/, /tiers\[0\]\.values.*not applied/])
+        if (!r2.notes.some((n) => re.test(n.text))) p.push(`not told: ${re} — ${r2.notes.map((n) => n.text).join(' | ')}`);
+    }
+    rec('F13', p, 'per-scope outlines: a layer and a pair owning a mode and curves round-trip verbatim, ownership and offsets intact, with no note; a #417-#420 file loads clean with no values invented; bad values (a bad choice, a non-value control, sheet thickness, a bad curve) are refused and told, a tier\'s told not applied');
+  }
 }
 
 /* ---------------- the browser clauses ---------------- */
@@ -645,7 +692,14 @@ const MUTANTS = [
      not only the kinds census. F6-asym: and F11, the asymmetric outline's own
      round trip, for the same reason (this mutant and the dropped-field one above
      were run in CI before F11 had them listed — the first thing the sweep said). */
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+  /* F6-scope: an owned value dropped on the way out, and one dropped on the way in */
+  { id: 'scope-values-are-not-written', breaks: ['F13'],
+    from: '    if (e.values && Object.keys(e.values).length) {\n      out.values = {};',
+    to: '    if (false) {\n      out.values = {};' },
+  { id: 'scope-values-are-not-read', breaks: ['F13'],
+    from: '      if (Object.keys(vals).length) out.values = vals;',
+    to: '      if (false) out.values = vals;' },
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];

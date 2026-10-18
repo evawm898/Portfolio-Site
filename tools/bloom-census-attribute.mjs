@@ -65,6 +65,7 @@ const kindOf = new Map(H.CONTROLS.map((c) => [c.id, c]));
 const stateOf = (row) => {
   const s = { ...R.DEFAULTS };
   for (const w of row.set || []) {
+    if (w.id === '@scopes') continue;   // the row's own scope record — handed to the build below
     const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`);
     s[w.id] = c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value;
   }
@@ -127,7 +128,7 @@ const report = [];
 for (const row of rows) {
   const t0 = Date.now();
   const acc = new G.MeshBuilder({ exportMode: true, captureLamina: true });
-  const built = G.buildBloomInto(acc, stateOf(row), { below: null, capability: row.capability || null });
+  const built = G.buildBloomInto(acc, stateOf(row), { below: null, capability: row.capability || null, scopes: H.rowScopesForBuild(row) });
   const pos = new Float64Array(acc.positions);
   const r = SI.census(pos, { collect: true });
   const { pts, omitted } = laminaPoints(built);

@@ -198,6 +198,9 @@ body {
 .bl-scope select:hover, .bl-scope select:focus { border-color: var(--bl-accent); outline: none; }
 .bl-scope select option { background: #121614; color: var(--bl-ink); }
 .bl-scope-status { margin: 6px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--bl-dim); }
+.bl-scope-reset { margin-top: 6px; background: none; border: 1px solid var(--bl-accent); color: var(--bl-accent); font: inherit; font-size: 10.5px; padding: 3px 8px; cursor: pointer; }
+.bl-scope-reset:hover, .bl-scope-reset:focus { background: rgba(255,255,255,0.05); outline: none; }
+.bl-scope-reset[hidden] { display: none; }
 .bl-ctrl--scoped { box-shadow: -7px 0 0 -5px var(--bl-accent); }
 .bl-scope-note { margin: 3px 0 0; font-size: 10px; line-height: 1.4; color: var(--bl-accent); letter-spacing: .02em; }
 .bl-scope-note[hidden] { display: none; }

@@ -978,7 +978,8 @@ room, `outlineHalfOf`, OC4 or E7).
 - **LEFT is the half on the viewer's left when the petal is seen from its upper (adaxial) face with its base
   at the bottom** — `v > 0` of the section (`sideOfV`), the row frame's `+T`; `points` in the value, the
   UPPER curve in the editor. Every petal of a whorl has the same hand (a pinwheel); FAN pairs are not
-  mirrored (a placement made without a ruling).
+  mirrored (a placement made without a ruling). **[Oct 18: SUPERSEDED — a FAN pair is two mirror images, Eva's
+  ruling; see the F6-scope block below.]**
 - CURVE mode's Symmetric / Asymmetric toggle is `bloom-curve.js`'s own `two-sided` mode. Asym → Sym keeps
   the LEFT half; Sym → Asym starts both halves as the curve. #417 / #418's rulings hold per half; both halves
   close on their own `leafNibPlan` at exactly the slider's length.
@@ -997,6 +998,33 @@ room, `outlineHalfOf`, OC4 or E7).
   blunt-nib-under-a-cup class); the one smoke row over the allowance is declared, never widened.
 - Block 67 (25 rows, 1,359), smoke block 67 (8); `frozen/phase73` = the 1,334 rows at `f663973`. Sheet:
   `node tools/shot-bloom-outline-asym.mjs <dir>` → `docs/img/outline-asym.png`.
+
+**THE OUTLINE IS SCOPABLE: A SCOPE OWNS ITS MODE AND CURVE AS VALUES THAT REPLACE, AN UNOWNED SCOPE
+INHERITS LIVE, AND A FAN PAIR IS TWO MIRROR IMAGES** (F6-scope, Oct 18 — Eva's rulings; read
+`docs/bloom-outline-curve-scope-outcome.md` before touching `SCOPE_VALUE_IDS`, `checkScopeValues`,
+`resolvePetalOutline`, `mirrorOutlineCurve`, `fanSlotMirrored`, a scope entry's `values`, bloom.js's
+`commitScopeValue` / `resetScopeOutline` / `outlineEditReaches`, `outlineRestated` or OC5).
+- A scope entry carries `values: { petalOutlineMode?, petalOutlineCurve? }` beside `offsets` — the ONLY ids a
+  scope may own (`SCOPE_VALUE_IDS`; anything else refused by name). The Symmetric / Asymmetric toggle is the
+  curve value's own `mode`. A petal is global → offsets → **values** → variance → one clamp, resolved in
+  `petalSurface` by `resolvePetalOutline`; `widthProfile` reads `ps` and stays the one outline owner.
+- **Placements made without a ruling (Eva: "my call")**: an owned value REPLACES the inherited one outright;
+  an unowned scope inherits its parent's LIVE (layer, then petal); "Outline: reset to inherited" in the scope
+  bar; an edit equal to the inherited value is pruned (no ownership); the editor under a pair pick shows the
+  canonical member unmirrored.
+- **FAN mirror (Eva, Oct 18)**: the non-canonical member of each pair draws `points` / `right` swapped.
+  `fanSlotMirrored` is the ONE owner, read by `buildBloomInto` AND the two coverage instruments that re-emit a
+  whorl — coverage R1 caught them building un-mirrored partners. A symmetric curve or the LAW is unchanged;
+  RADIAL / SPIRAL keep the pinwheel. Supersedes F6-asym §1's "FAN pairs are not mirrored".
+- Empty values and non-FAN slots are the identity by branch. Byte partition: `verify-bloom-surface-bytes
+  --movers-predicate scope-outline` (predeclared from the restated outline vs the whole bloom's).
+- Gates: OC0-OC4 / AN / C1 / A2 / FR2 per ring against `outlineRestated` (controls + the row's `@scopes`,
+  never the resolver); **OC5** per petal (mode, sidedness, the partner's half-widths swapped EXACTLY); five
+  apex mutants; panel route (ah) with three mutants (TWENTY-FIVE routes); design-file F13 with two.
+- **Found**: RADIAL x 3 whorls x infill folds at any outline (736 pairs on the LAW, unscoped, no matrix
+  row); the scoped mix reads one span-0 tangency, declared. `bloom-census-attribute.mjs` now passes scopes.
+- Block 68 (15 rows, 1,374), smoke block 68 (6); `frozen/phase74` = the 1,359 rows at `f63235e`. Sheet:
+  `node tools/shot-bloom-outline-scope.mjs <dir> --base <worktree>` → `docs/img/outline-scope.png`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

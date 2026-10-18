@@ -737,6 +737,13 @@ zero consumers and zero live controls — `docs/bloom-curve-editor.md`. F3 and F
 fringe ineligible — `docs/bloom-outline-curve-outcome.md`. Two-sided, per-scope, sepals and leaves are later
 sessions.
 
+**F6-sym-2, F6-asym and F6-scope — SHIPPED (Oct 17–18):** the width scales the curve and CURVE works on a tube
+(`docs/bloom-outline-curve-2-outcome.md`); two half-curves about the midrib (`docs/bloom-outline-curve-asym-outcome.md`);
+and the outline under scoping (`docs/bloom-outline-curve-scope-outcome.md`) — the mode, the Symmetric / Asymmetric
+toggle and the curve are owned per layer (RADIAL, SPIRAL) or per pair (FAN), an owned curve REPLACES the inherited
+one and an unowned scope inherits live, and a FAN mirror pair draws mirror images (Eva, Oct 18). Sepals and
+leaves (Q6.7) are the next session.
+
 **F7 — print preview — SHIPPED as `b4ad9ba` (#400).** Recorded as built:
 - a drag drops infill cells only (candidate A); full print geometry on release.
 - the always-on view shows print normals.

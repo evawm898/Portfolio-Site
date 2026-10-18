@@ -345,6 +345,25 @@ const PREDICATE_MOVERS = {
     const v = typeof st.petalOutlineCurve === 'string' ? JSON.parse(st.petalOutlineCurve) : st.petalOutlineCurve;
     return !!v && v.mode === 'two-sided' && JSON.stringify(v.right) !== JSON.stringify(v.points);
   },
+  /* THE OUTLINE UNDER SCOPING (F6-scope). A row moves iff SOME built petal's
+     outline — RESTATED by the harness's `outlineRestated` from the controls,
+     the row's own `@scopes` and the pairing law, never read off the resolver
+     under test — differs from the whole bloom's mode and curve, which is all
+     the base tree reads (it has no owned values and no FAN mirror). So a FAN
+     partner of a two-sided curve whose halves differ moves, a petal under a
+     scope owning a different mode or curve moves, and the GATED rows (a record
+     whose toggle is off; a curve owned under LAW everywhere) hold. The petals
+     enumerated are THIS tree's build's (which slots exist, never what they
+     drew). */
+  'scope-outline': (st, row) => {
+    const acc = new mine.MeshBuilder({ exportMode: true });
+    const b = mine.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    const m = { slotCount: b.foot.slotCount, mirror: mine.mirrorFor(st), continuousMode: !!b.foot.continuousMode };
+    const ui = { ...st };
+    const key = (o) => (o.mode === 'CURVE' ? JSON.stringify(o.curve) : 'LAW');
+    const whole = String(st.petalOutlineMode) === 'CURVE' ? JSON.stringify(typeof st.petalOutlineCurve === 'string' ? JSON.parse(st.petalOutlineCurve) : st.petalOutlineCurve) : 'LAW';
+    return b.petalsAll.some((p) => p && key(harness.outlineRestated(row, ui, m, m.continuousMode ? 0 : Math.round(p.whorl), m.continuousMode ? 0 : p.slotIndex)) !== whole);
+  },
   /* THE OUTLINE CURVE'S FOLLOW-UPS (F6-sym-2). A row moves iff THIS tree builds
      it in CURVE mode AND either its width scale is not 1 (Petal width off the
      16 mm default — the base tree drew the 16 mm curve whatever the width) or a
@@ -663,7 +682,7 @@ let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {
   const st = stateOf(row);
   const opts = { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) };
-  const mover = MOVERS ? MOVERS.test(row.label) : MOVERS_PRED ? PREDICATE_MOVERS[MOVERS_PRED](st) : false;
+  const mover = MOVERS ? MOVERS.test(row.label) : MOVERS_PRED ? PREDICATE_MOVERS[MOVERS_PRED](st, row) : false;
   if (mover) moversSeen++; else holdersSeen++;
   const rowFails = [];
   const fails = mover ? rowFails : allFails;

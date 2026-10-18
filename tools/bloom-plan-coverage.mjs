@@ -301,6 +301,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
             const d = slotsFor[slot.index];
             const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
             if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state: ui });
+            if (mod.fanSlotMirrored(slot.index, fr.slotCount, ui)) slot.fanMirrored = true;
             const p = mod.buildPetalInto(acc, ui, d, slot, capability);
             petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capability });
             if (!unsplit) {

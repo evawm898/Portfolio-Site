@@ -23,6 +23,11 @@ The FAN's mirror pairs are NOT mirrored either: the pairing there is azimuthal, 
 one curve. That is a placement made without a ruling (the ruling named RADIAL and SPIRAL) and is
 one branch to change if Eva wants mirror-image pairs.
 
+**[Oct 18, F6-scope: SUPERSEDED by Eva's ruling — a FAN mirror pair is two MIRROR IMAGES: the
+pair's non-canonical member draws the outline with its left and right halves swapped
+(`resolvePetalOutline`, `fanSlotMirrored`). RADIAL and SPIRAL keep the pinwheel. See
+`docs/bloom-outline-curve-scope-outcome.md` §2.]**
+
 ## 2. The construction
 
 `widthProfile` stays the ONE outline owner. Under Asymmetric it builds each half as its own
@@ -178,5 +183,5 @@ half on the nib, a clamped bead). The allowance is not raised.
 
 ## 10. Not done, and named
 
-- Per-scope asymmetric outlines, sepals and leaves (later sessions, by the brief).
-- Mirror-image FAN pairs (§1) — a placement made without a ruling.
+- Per-scope asymmetric outlines, sepals and leaves (later sessions, by the brief). **[Oct 18: per-scope outlines built by F6-scope; sepals and leaves are the next session.]**
+- Mirror-image FAN pairs (§1) — a placement made without a ruling. **[Oct 18: RULED and built by F6-scope.]**
