@@ -616,7 +616,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
@@ -642,8 +642,10 @@ const MUTANTS = [
      can see it — which is why F7 exists. */
   /* F3-global: with a LIVE curve control in the registry, dropping the kind's
      writer also reddens the round trip (F1/F2) and the spine-curve rows (F8),
-     not only the kinds census. */
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+     not only the kinds census. F6-asym: and F11, the asymmetric outline's own
+     round trip, for the same reason (this mutant and the dropped-field one above
+     were run in CI before F11 had them listed — the first thing the sweep said). */
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];
