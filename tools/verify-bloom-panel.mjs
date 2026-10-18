@@ -3590,7 +3590,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const MUTANTS = [
       { name: 'a pick stamps the panel onto the picked scope', file: 'bloom.js', src: jsSrc, run: runLayers,
         from: '  const next = canonicalScope(sel, ui);\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  relabelView();',
-        to: '  const next = canonicalScope(sel, ui);\n  const shownBefore = Object.fromEntries([...SCOPE_IDS].map((id) => [id, Number(inputs[id].value)]));\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView) { for (const id of SCOPE_IDS) commitScopeOffset(id, shownBefore[id]); scheduleRegen(); }\n  relabelView();' },
+        to: '  const next = canonicalScope(sel, ui);\n  const shownBefore = Object.fromEntries([...SCOPE_IDS].filter((id) => !SCOPE_VALUE_SET.has(id)).map((id) => [id, Number(inputs[id].value)]));\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView) { for (const id of Object.keys(shownBefore)) commitScopeOffset(id, shownBefore[id]); scheduleRegen(); }\n  relabelView();' },
       { name: 'an edit lands on every scope', file: 'bloom.js', src: jsSrc, run: runLayers,
         from: '    own.offsets[id] = d;\n  }\n  if (scopesAreEmpty(scopes)) scopes = null;',
         to: '    own.offsets[id] = d;\n    for (const o of scopeOptions(ui)) { if (o.layer === v.layer && o.slot === v.slot) continue; let x = list.find((q) => q.layer === o.layer && (v.kind === \'layer\' || q.slot === o.slot)); if (!x) { x = v.kind === \'layer\' ? { layer: o.layer, offsets: {} } : { layer: o.layer, slot: o.slot, offsets: {} }; list.push(x); } x.offsets[id] = d; }\n  }\n  if (scopesAreEmpty(scopes)) scopes = null;' },
