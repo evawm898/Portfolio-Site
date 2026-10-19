@@ -376,6 +376,33 @@ const PREDICATE_MOVERS = {
     if (mine.outlineWidthScale(st) !== 1) return true;
     return mine.tubePlan(st, Math.round(Number(st.layerCount) || 1), Math.round(Number(st.petalCount))).active;
   },
+  /* THE INFILL'S SEAM IS ONE DOUBLE (the infill-whorls session). A row moves
+     iff the BASE tree builds a petal carrying an infill plan that cut cells
+     (not refused, not absent) AND whose raw seam station is off the plan
+     grid: `xB` is quantised onto the grid now, so such a plan's seam, snap,
+     ramp and seed field read a value up to half a grid step from the raw
+     station. PREDECLARED FROM THE BASE TREE'S OWN
+     RECORD, never from the label; every row with the guard off, and every
+     refused plan (a fringe, a lobed blade), must hold to the bit. */
+  'infill-seam': (st, row) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    /* A row moves iff the BASE tree builds an infilled petal whose seam
+       station is NOT already on the plan grid: the change is exactly
+       `xB -> infillSnap(xB)`, so a petal whose raw `rows[mSplit].u * L` is a
+       grid point (every petal of the five drawn-curve rows whose outline
+       hands the split row a dyadic station — measured, 8 of 8 petals at a
+       residue of exactly 0) builds bit-identically. Read off the base
+       builder's own records — the petal's per-row `profileU` at the plan's
+       `mSplit`, times its drawn `length`, which is the plan's `xB` (the blade
+       rows the plan indexes ARE the rows `profileU` reports); the snap is
+       RESTATED here because the geometry does not export it, with the tie
+       slack at X0's own 8 ULP as `infillTieSlack` states it. */
+    const G = base.INFILL_PLAN_GRID;
+    const snap = (v, L) => { const slack = (8 * Math.abs(L) * Number.EPSILON) / G; const t = v / G, n = Math.floor(t); return (t - n >= 0.5 - slack ? n + 1 : n) * G; };
+    return (b.petalsAll || []).some((p) => p && p.infill && !p.infill.refused && p.infill.cells > 0
+      && p.infill.mSplit >= 0 && p.profileU && (() => { const x = p.profileU[p.infill.mSplit] * p.length; return Number.isFinite(x) && !Object.is(snap(x, p.length), x); })());
+  },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);

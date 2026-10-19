@@ -201,5 +201,9 @@ each petal carries, as every infilled row has since F6-sym.
 
 - Sepals and leaves: outline and spine curves (the next session, by the brief).
 - Tiers (sepal tier scopes) carry no outline values — a tier's `values` are told `not applied`.
-- The panel's lobe / fringe / taper VISIBILITY follows the global mode, not the picked scope's.
-- The RADIAL 3-whorl infill fold (736 pairs at the shipping LAW) has no matrix row of its own.
+- The panel's lobe / fringe / taper VISIBILITY follows the global mode, not the picked scope's. **[Oct 19: MEASURED
+  FALSE on this tree — the twelve outline-gated controls already follow the picked scope's mode (a RADIAL layer, a FAN
+  pair, a SPIRAL turn; owned and inherited). Panel route (ai) now holds it; docs/bloom-infill-whorls-outcome.md §5.]**
+- The RADIAL 3-whorl infill fold (736 pairs at the shipping LAW) has no matrix row of its own. **[Oct 19: FIXED —
+  the whorls were a proxy for a short petal and the pairs the infill seam's T-junctions (its `xB` carried two
+  doubles); block 69 holds the product at 0 pairs, and the mixed flower's declaration is removed. Same doc.]**
