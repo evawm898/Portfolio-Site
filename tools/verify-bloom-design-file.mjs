@@ -663,7 +663,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
@@ -692,11 +692,14 @@ const MUTANTS = [
      not only the kinds census. F6-asym: and F11, the asymmetric outline's own
      round trip, for the same reason (this mutant and the dropped-field one above
      were run in CI before F11 had them listed — the first thing the sweep said). */
-  /* F6-scope: an owned value dropped on the way out, and one dropped on the way in */
-  { id: 'scope-values-are-not-written', breaks: ['F13'],
+  /* F6-scope: an owned value dropped on the way out, and one dropped on the way in.
+     F2 too: block 68's live rows carry owned values in their @scopes, so the
+     1374-row round trip loses them (and F13's controls round trip loses
+     petalCount under the dropped-field mutant above) — the first CI sweep said so. */
+  { id: 'scope-values-are-not-written', breaks: ['F13', 'F2'],
     from: '    if (e.values && Object.keys(e.values).length) {\n      out.values = {};',
     to: '    if (false) {\n      out.values = {};' },
-  { id: 'scope-values-are-not-read', breaks: ['F13'],
+  { id: 'scope-values-are-not-read', breaks: ['F13', 'F2'],
     from: '      if (Object.keys(vals).length) out.values = vals;',
     to: '      if (false) out.values = vals;' },
   { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
