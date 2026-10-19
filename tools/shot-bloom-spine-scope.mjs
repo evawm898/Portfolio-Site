@@ -80,7 +80,7 @@ async function cell(label, { title = '' } = {}) {
   const stl = analyzeStl(buf);
   if (stl.boundary !== 0 || stl.degenerate !== 0) await die(`${label}: the export has ${stl.boundary} boundary edges and ${stl.degenerate} degenerate triangles`);
   await page.evaluate(() => { const el = document.getElementById('printPreview'); el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
-  await settleBuild(page);
+  await settleBuild(page, 300000); /* the infill cell's export rebuild runs well past the 30 s default on a loaded box */
   if ((await shownModeOf(page)) !== 'export') await die(`${label}: print preview ON asked for, the app reports another mode`);
   const still = await stillFrame(page);
   if (still.length) await die(`${label}: ${still.join('; ')}`);

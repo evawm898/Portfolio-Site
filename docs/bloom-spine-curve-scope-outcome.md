@@ -95,37 +95,37 @@ its mirror, and that is asserted rather than argued:
 ## 4. Verification
 
 - **The byte partition** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 971155c>
-  --movers-predicate scope-spine`, the whole 1,396-row matrix in both modes: **{BYTES}**. The predicate
+  --movers-predicate scope-spine`, the whole 1,396-row matrix in both modes: **PASS — 14 predeclared MOVERS / 1,382 HOLDERS, 0 floats moved on any holder, positionally under `Object.is`, over 1,683,700,848 export floats (187,077,872 triangles) and 80,750,156 captured-grid values**. The run was three `--range` shards (0:466, 466:932, 932:1396), every one PASS. The 14 movers are block 70's rows less its two GATED rows, and those two hold BIT-IDENTICALLY, measured: a record kept inert behind its toggle, and a spine curve owned under every-SLIDER mode. All 1,380 of `main`'s rows are holders. The predicate
   decides a mover from the harness's RESTATED spine against the whole bloom's; every row of `main`'s 1,380
   owns no spine value. The tool learned one thing: the base tree REFUSES a value id it does not list (its
   `checkScopeValues`), and its page tells such a value "not applied"; so the base is handed the record with
   the values it cannot own dropped (`baseScopes`), which is that file on the base page. A record whose
   values the base knows is handed unchanged.
 - **The export gate** over blocks 62, 68 and 70 (`--only '^(SCOPED SPINE|SPINE CURVE|SCOPED OUTLINE)'`):
-  **{EXPORT}**.
-- **Census:** **{CENSUS}**.
+  **43 rows, every one watertight, 0 degenerate, live and export triangle counts equal; 42 free of within-shell self-intersection and ONE new fold**, on `SCOPED SPINE: both curves per layer x cup 0.6` — 248 pairs / 0.1713 mm on layer 2 (the spoon on the S), mid-blade at the margin. The fold is NOT caused by the scoping, and the control is main's own geometry: the SAME composition with no scope at all (one layer, spoon + S + cup 0.6) reads **248 pairs on 971155c and on this tree alike**. LAW + S + cup 0.6 reads 344. Spoon + S at cup 0 reads 0, and spoon + cup 0.6 on the sliders reads 0. Scoped, layer 2 owning only the S reads 376, and owning only the spoon reads 0. So it is the drawn S spine × cup product: a two-control composition the one-control-at-a-time matrix cannot see. This row reached it because it was written to put a cup on every scoped spine. It is declared in `SELF_INTERSECTION_XFAIL` with those controls in its note, never tuned around. The browser then confirmed it at exactly its record (`--only`, X1: still failing at that magnitude).
+- **Census:** **no fold the scoping makes.** The one new entry above is the drawn-spine × cup composition, which main already makes unscoped. The other fifteen block-70 rows read 0 within-shell pairs, and every declared row in blocks 62 and 68 reproduces its record (X1).
 - **C4** is new (smoke census: 188 families, both ways); **C1 / J8** read each ring's own spine;
   `formAssertions` reads the representative petal's.
 - **Apex mutant table — five witnessed mutants** (`--only=` the five, `--rows='^a scoped spine'`):
   `a-scoped-spine-is-ignored`, `a-scoped-spine-leaks-to-sibling-layers`, `a-scoped-spine-leaks-to-sibling-
-  pairs`, `the-spine-resolved-through-a-second-chain`, `the-fan-partner-spine-is-flipped`. **{MUTANTS}**
+  pairs`, `the-spine-resolved-through-a-second-chain`, `the-fan-partner-spine-is-flipped`. **6 of 6 behave** (the five, plus `a-scoped-outline-is-ignored` re-anchored), each firing what it names on the mutated module, with the clean tree silent on all seven rows. A subset, not a sweep: 196 mutants were not run.
   `a-scoped-outline-is-ignored` was re-anchored (the resolver's rename); 202 of 202 anchors match once.
 - **Panel route (aj)** — the spine under scoping, five bloom.js mutants (a pick that writes the spine; the
   spine reset leaving the owned curve; an inherited spine frozen at copy time; the spine reset dropping the
   outline; curl visibility reading the whole bloom's mode). Route (ah)'s two mutants re-anchored onto the
-  per-group reset and `isCurveId`. TWENTY-SEVEN routes. **{PANEL}**
+  per-group reset and `isCurveId`. TWENTY-SEVEN routes. The panel gate passes. **`--negative-control`: ALL TWENTY-SEVEN ROUTES observed the failure they exist to catch**, including each of (aj)'s five, each reported by its own sentence.
 - **Design file F14**: per-scope spines (a layer owning mode, spine and outline; a pair owning a spine)
   round-trip verbatim with no note; a #421-shaped file loads clean with no spine invented; a bad curl mode,
   an out-of-box spine and a two-sided spine are refused and told; a tier's told not applied. `--no-browser`
   PASS (11 clauses; F2: 1,396 of 1,396 live rows round-trip clean). The three value mutants claim F14.
 - **Matrix:** block 70, sixteen rows (1,380 → 1,396); smoke block 70, six rows, `--conn`.
   `frozen/phase76` = the 1,380 rows at `971155c`, registered in both maps, `--verify-frozen` PASS.
-- **Sheet:** `node tools/shot-bloom-spine-scope.mjs <dir> --png docs/img/spine-scope.png`. {SHEET}
+- **Sheet:** `node tools/shot-bloom-spine-scope.mjs <dir> --png docs/img/spine-scope.png`. Four cells, print preview ON, three-quarter view, each asserting J and C1-C4 and exporting watertight: the RADIAL inner layer cupped by the incurve beside an outer layer on curl 45 (49,184 tris); the SPIRAL's two turns on the reflex and the incurve (49,184); the orchid pair bent on one hook, partners unflipped (21,626); the both-curves flower with the infill (184,336). The cells' print-preview wait had to be 300 s, because the infill cell's export rebuild passed the harness's 30 s default on a loaded box. No pixel delta is quoted. ![the spine under scoping](img/spine-scope.png)
 
 ## 5. Cost
 
 Zero triangles on every row with no spine value, and the spine changes where rows go, never how many — a
-drawn spine is the same lattice bent. {COST}
+drawn spine is the same lattice bent. Measured, EXPORT and LIVE equal on every block-70 row: the two-layer rows 49,184 tris (2,402 KiB), the three-layer rows 73,680 (3,598 KiB), the FAN rows 21,626 (1,056 KiB, 18,564 through the gap). Each count is the same as its unscoped twin's at the same layer count, because a spine bends the lattice and does not add to it. The costliest row is the both-curves flower with the infill, **184,336 tris (9,001 KiB), 12.3% of the export budget**. The shipping default is untouched at 24,688.
 
 ## 6. Not done, and named
 

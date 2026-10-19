@@ -1054,6 +1054,9 @@ DRAWS ONE SPINE BECAUSE THE SPINE IS PLANAR** (F3-scope, Oct 19 — Eva's ruling
   mutants; panel route (aj) with five mutants (TWENTY-SEVEN routes); design-file F14. The byte tool hands the
   BASE tree only the value ids it lists (`baseScopes` — what its page does with a newer file) and has
   `--movers-predicate scope-spine`.
+- **Bytes: 14 movers / 1,382 holders, 0 floats on any holder** over the whole matrix in both modes. **One new
+  declared fold, NOT the scoping's**: `SCOPED SPINE: both curves per layer x cup 0.6` reads 248 / 0.1713, and main
+  folds the same S-spine × cup 0.6 composition UNSCOPED at 248 pairs on both trees.
 - Block 70 (16 rows, 1,396), smoke block 70 (6); `frozen/phase76` = the 1,380 rows at `971155c`. Sheet:
   `node tools/shot-bloom-spine-scope.mjs <dir>` → `docs/img/spine-scope.png`.
 
