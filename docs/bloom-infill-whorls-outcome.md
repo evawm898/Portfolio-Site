@@ -123,7 +123,11 @@ trees. **Calibration first: all 22 declarations on those rows reproduce EXACTLY 
   snap now fires and moves a basal cell's bottom edge onto a lattice column, which can lift its capacity
   over the bar: `petalLength 24` 75,920 → 82,960 (13 → 15 holes), `the four at their far ends` 66,512 →
   74,128 (10 → 12).
-- **The pattern:** HOLES_TBD
+- **The pattern:** over every infilled matrix row (49, both trees, EXPORT), **32 of 568 infilled petals change
+  their hole count and 4 rows change their total** — `petalLength 24` 104 → 120 and `the four at their far ends`
+  80 → 96 gain, `solid base 1` 128 → 120 and `petalTipShape 0.60` 80 → 72 lose; 7,752 → 7,768 holes in all.
+  **The shipped infilled default's pattern is unchanged** (20 holes, 20 achieved). Where it moves, it is the
+  snap S3 designed doing its job for the first time: a basal cell's bottom edge moves at most half a column.
 - **The default bloom (no infill): 24,688, unmoved.**
 
 ## 5. Problem 2 — the panel's visibility under a pick: the premise was stale
@@ -150,15 +154,45 @@ ignores the pick*. The banner says TWENTY-SIX routes.
   between the basal panel and the cell region on nine seam states (35/24/28/32/60 mm, petalWidth 30,
   footDelicacy 0.25, tipShape 3, the buckle). The subject is the seam's pairs; a cell-vs-cell fold is the
   petal's own and declared. Mutant `the-seam-is-the-raw-station` restores the raw station in a copy of the
-  module (with `bloom-curve.js` beside it): I13_NC_TBD
+  module (with `bloom-curve.js` beside it): witness MOVED, I13 red — e.g. *default (35 mm): 10 of 10 seam
+  column(s) are not at plan.xB (worst 4.207e-7 mm)*, *petalLength 28: … (worst 3.683e-7 mm)*. The full gate:
+  **PASS — I0..I13 over 18 states x 2 modes**, I13 18 of 18, and every older mutant still behaves.
 - **Block 69** (six rows, 1,374 → 1,380): RADIAL x 2 and 3 whorls x infill on the LAW, x 3 on the lopsided
   curve, x 2 on the diamond, and one whorl at 28 and 24 mm — reading **320 / 736 / 321 / 352 / 1600 / 896
   pairs on `169fd5b` and 0 here**. With the fix reverted they are what X2 fires on; the scoped mixed flower
   is block 68's own row (declaration removed). **Smoke block 69** (two rows, `--conn`): 270 rows over 65
   blocks, 187 families both ways.
 - **`frozen/phase75`** = the 1,374 rows at `169fd5b`, registered in both maps, `--verify-frozen` PASS.
-- **Byte partition:** BYTES_TBD
-- GATES_TBD
+- **Byte partition — PASS, 42 movers / 1,338 holders over the whole 1,380-row matrix in both modes**
+  (`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 169fd5b> --movers-predicate infill-seam`,
+  twelve `--range` chunks closed by `--merge`): **0 floats moved on the 1,338 holders**, positionally under
+  `Object.is`, over **1,574,936,424 export floats / 174,992,936 triangles and 80,457,776 captured-grid
+  values**; every one of the 42 predeclared movers moved. Every row with the guard off — every LAW row
+  without infill among them — holds to the bit. **The predicate is the BASE tree's own record and it was
+  sharpened by the run, not before it:** the first cut ("any petal that cut cells") predeclared 47, and
+  five held — `OUTLINE CURVE: x the Voronoi infill`, `OUTLINE CURVE 2: TUBE x the Voronoi infill` and the
+  three `ASYM OUTLINE` infill rows — because on each of them every petal's raw station `rows[mSplit].u * L`
+  is ALREADY a grid point (8 of 8 petals at a residue of exactly 0; the drawn outline hands the split row a
+  dyadic station), so `infillSnap` is the identity there. The predicate now reads "some petal with cells
+  whose raw seam station is off the grid", from each petal's own `profileU[mSplit] * length`; restated over
+  all 49 infilled rows it differs from the first cut on exactly those five and on no row of the first eleven
+  chunks, so those chunks stand and the last was re-run.
+- **The browser confirms the Node records** (`node tools/verify-bloom-export.mjs --only` the 22 declared
+  infill rows and block 69, Chromium's doubles): **28 of 28 reached the results, every one watertight; 23 free
+  of within-shell pairs** (all 17 removals and all six new rows) **and the 5 declared rows each "still failing
+  at that magnitude"** — X1 holds the re-records exactly.
+- **The defaults bar needed I11's own bound for `infill-wall`.** The shipped infilled default's narrowest
+  in-sheet wall reads **0.99999970 mm** here against 1.00000068 on `169fd5b` — a wall laid out at exactly
+  1.00 mm on a plan quantised to 2^-20 mm, so a strict `>= 1.0` was passing on the SIGN of a quantum. DB1 now
+  bars `infill-wall` at `MIN_FEATURE_MM` less two `INFILL_PLAN_GRID` quanta — the bound I11 already used for
+  the same measure — read from the BAR's owner, never `INFILL_WALL_MM` (a first draft read the wall's own
+  constant, and the new control leg would have moved its bar with it). `--control` gains leg 6, a copy of the
+  geometry laying the wall at 0.9 mm: it reddens DB1 on `infill-wall` and nothing else; 6 of 6 legs behave.
+- **Every other gate this touches, run locally and green:** the panel gate with `--negative-control` (all
+  twenty-six routes), the wall instrument, the combination gate (CG0-CG7; 251 cells under the bar, all
+  declared), the tube gate, rim-owner (+NC), hole-rim (H0-H3), margin bead (MB0-MB2), infill budget (+NC;
+  worst 1,121,152 tris, 74.7%), conform, metric, census adjacency, the edge-profile gate over the 270-row smoke
+  subset (E0-E7, block 69 included), the grid gate, `bloom-smoke --check` and `--verify-frozen --phase75`.
 
 ## 7. Sheet
 

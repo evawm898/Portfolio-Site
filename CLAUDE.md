@@ -6015,6 +6015,12 @@ infill-whorls session, Oct 19 — read `docs/bloom-infill-whorls-outcome.md` bef
 - **Problem 2's premise was stale:** the outline-gated controls ALREADY follow the picked scope's mode
   (layer, pair, turn; owned and inherited). Panel route **(ai)** now holds it, with two mutants (TWENTY-SIX
   routes). I13 in the infill gate holds the seam (its mutant restores the raw station).
+- **The defaults bar bars `infill-wall` at `MIN_FEATURE_MM` less two `INFILL_PLAN_GRID` quanta (I11's bound):**
+  a wall laid out AT 1.00 mm on a quantised plan read 1.00000068 on main and 0.99999970 here. The bar is read
+  from `MIN_FEATURE_MM`, never `INFILL_WALL_MM`; control leg 6 (the wall at 0.9 mm) must redden it.
+- **Bytes: 42 movers / 1,338 holders, 0 floats on the holders** (`verify-bloom-surface-bytes --movers-predicate
+  infill-seam`). A row moves iff a base petal with cells has its raw seam station OFF the grid — five drawn-curve
+  infill rows sit on it already (residue exactly 0) and hold; the first predicate missed that and the run said so.
 - Block 69 (6 rows, 1,380), smoke block 69 (2); `frozen/phase75` = the 1,374 rows at `169fd5b`. Sheet:
   `node tools/shot-bloom-infill-whorls.mjs <png> --base <worktree>` → `docs/img/infill-whorls.png`.
 

@@ -42,7 +42,7 @@
    gated; it is not a measure here and this file says so rather than
    quietly leaving it out.
 
-   --control: four must-fails and one must-pass, each run through the SHIPPED
+   --control: five must-fails and one must-pass, each run through the SHIPPED
    `verify` on a copy of the table or of the geometry; each must-fail is
    required to redden exactly the clause on the state it names and nothing
    else:
@@ -172,9 +172,21 @@ export function verify(tree, table, matrix, { quiet = false } = {}) {
       let r;
       try { r = measureOne(tree, state, measure); } catch (e) { bad.push(`DB1: "${row.id}" / ${measure}: ${e.message}`); continue; }
       const mm = Number(r.mm);
-      say(`  ${mm >= bar ? 'ok  ' : 'FAIL'} ${row.id.padEnd(46)} ${measure.padEnd(14)} ${Number.isFinite(mm) ? mm.toFixed(4).padStart(8) + ' mm' : '   (inf)  '}${r.why ? ` — ${r.why}` : ''}${r.at ? ` at ${JSON.stringify(r.at)}` : ''}`);
+      /* THE IN-SHEET WALL IS LAID OUT AT THE BAR, ON A QUANTISED PLAN, so its
+         own resolution is the bar's: the plan rounds every cell vertex onto
+         INFILL_PLAN_GRID (2^-20 mm) and a wall designed at exactly
+         INFILL_WALL_MM reads within a quantum either side. Measured on the
+         shipping default: 1.00000068 mm on 169fd5b, 0.99999970 here (the
+         infill-whorls session moved the seam onto the grid) — a strict
+         `>= 1.0` there was passing by the SIGN of a quantum. The bound is I11's
+         own (verify-bloom-infill.mjs: INFILL_WALL_MM less two grid quanta),
+         one owner for one measure, and applies to `infill-wall` alone. Its reference
+         is MIN_FEATURE_MM, never INFILL_WALL_MM: a wall laid out short would
+         move a bar read from the wall with it (the fourth durable rule). */
+      const barFor = measure === 'infill-wall' ? bar - 2 * G.INFILL_PLAN_GRID : bar;   // the BAR's owner, never INFILL_WALL_MM (the quantity a defect would move; control 6)
+      say(`  ${mm >= barFor ? 'ok  ' : 'FAIL'} ${row.id.padEnd(46)} ${measure.padEnd(14)} ${Number.isFinite(mm) ? mm.toFixed(4).padStart(8) + ' mm' : '   (inf)  '}${r.why ? ` — ${r.why}` : ''}${r.at ? ` at ${JSON.stringify(r.at)}` : ''}`);
       /* DB1 — the bar, every measure, every state */
-      if (!(mm >= bar)) bad.push(`DB1: "${row.id}" reads ${mm.toFixed(4)} mm on ${measure} — a SHIPPED DEFAULT under the ${bar} mm printable bar${r.at ? ` (${JSON.stringify(r.at)})` : ''}`);
+      if (!(mm >= barFor)) bad.push(`DB1: "${row.id}" reads ${mm.toFixed(4)} mm on ${measure} — a SHIPPED DEFAULT under the ${barFor} mm printable bar${r.at ? ` (${JSON.stringify(r.at)})` : ''}`);
     }
   }
   /* DB2 — coverage, REPORTED: which registry controls that gate other
@@ -263,6 +275,22 @@ async function main() {
     const table = SHIPPED_STATES.map((r) => (r.id.startsWith('the sepals') ? { ...r, matrixRow: rollRow.label, set: rollSet, measures: ['self'] } : r));
     const bad = verify(tree, table, matrix, { quiet: true });
     legs.push({ name: '5 the same row through the OLD measure (self, the petal) stays green — the blindness R6 fixed', ok: bad.length === 0, hit: 0, other: bad, collateral: 0 });
+  }
+  /* 6. THE IN-SHEET WALL'S BOUND IS NOT A LOOSENING (the infill-whorls
+     session gave `infill-wall` I11's own bound, the wall less two plan-grid
+     quanta): a copy of the geometry whose wall is laid out at 0.9 mm reads
+     ~0.9 and must redden DB1 on `infill-wall`, and nothing else. */
+  {
+    const src = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
+    const from = 'export const INFILL_WALL_MM = MIN_FEATURE_MM;';
+    if (src.split(from).length !== 2) throw new Error(`control 6: anchor matched ${src.split(from).length - 1} times — re-anchor`);
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-db-'));
+    fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(d, 'bloom-curve.js'));
+    fs.writeFileSync(path.join(d, 'bloom-geometry.js'), src.replace(from, 'export const INFILL_WALL_MM = 0.9;'));
+    const G2 = await import(pathToFileURL(path.join(d, 'bloom-geometry.js')).href);
+    const table = SHIPPED_STATES.filter((r) => r.id.startsWith('the infill'));
+    const bad = verify({ ...tree, G: G2 }, table, matrix, { quiet: true });
+    expectOnly('6 the infill wall laid out at 0.9 mm (the in-sheet wall under its own bound)', bad, /^DB1: "the infill at its ruled defaults" reads 0\.\d+ mm on infill-wall/);
   }
   for (const l of legs) console.log(`  ${l.ok ? 'ok  ' : 'FAIL'} ${l.name}: ${l.hit} finding(s) on the named clause${l.collateral ? `, ${l.collateral} named collateral` : ''}${l.other.length ? `, ${l.other.length} OTHER — ${l.other[0]}` : ''}${l.sample ? `\n        ${l.sample.slice(0, 160)}` : ''}`);
   if (legs.some((l) => !l.ok)) { console.log('defaults bar --control: FAILED'); process.exitCode = 1; return; }
