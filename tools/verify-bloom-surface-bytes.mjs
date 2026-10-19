@@ -364,6 +364,22 @@ const PREDICATE_MOVERS = {
     const whole = String(st.petalOutlineMode) === 'CURVE' ? JSON.stringify(typeof st.petalOutlineCurve === 'string' ? JSON.parse(st.petalOutlineCurve) : st.petalOutlineCurve) : 'LAW';
     return b.petalsAll.some((p) => p && key(harness.outlineRestated(row, ui, m, m.continuousMode ? 0 : Math.round(p.whorl), m.continuousMode ? 0 : p.slotIndex)) !== whole);
   },
+  /* THE SPINE UNDER SCOPING (F3-scope). A row moves iff some built petal's
+     spine RESTATED from the controls and the row's own scopes (the harness's
+     `spineRestated`, written apart from the geometry's resolver) differs from
+     the whole bloom's: a different curl mode, or under CURVE a different curve.
+     NO MIRROR ARM: the spine is planar in the midrib plane, so a FAN partner
+     draws its pair's spine unchanged and a FAN of one spine is a holder. Every
+     row whose scopes own no spine — every one of the base's 1380 — holds. */
+  'scope-spine': (st, row) => {
+    const acc = new mine.MeshBuilder({ exportMode: true });
+    const b = mine.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    const m = { slotCount: b.foot.slotCount, mirror: mine.mirrorFor(st), continuousMode: !!b.foot.continuousMode };
+    const ui = { ...st };
+    const key = (o) => (o.mode === 'CURVE' ? JSON.stringify(o.curve) : 'SLIDER');
+    const whole = String(st.petalCurlMode) === 'CURVE' ? JSON.stringify(typeof st.petalSpineCurve === 'string' ? JSON.parse(st.petalSpineCurve) : st.petalSpineCurve) : 'SLIDER';
+    return b.petalsAll.some((p) => p && key(harness.spineRestated(row, ui, m, m.continuousMode ? 0 : Math.round(p.whorl), m.continuousMode ? 0 : p.slotIndex)) !== whole);
+  },
   /* THE OUTLINE CURVE'S FOLLOW-UPS (F6-sym-2). A row moves iff THIS tree builds
      it in CURVE mode AND either its width scale is not 1 (Petal width off the
      16 mm default — the base tree drew the 16 mm curve whatever the width) or a
@@ -705,10 +721,32 @@ function gridFloatsOf(petals) {
   return out;
 }
 
+/* THE BASE TREE IS HANDED THE SCOPE VALUES IT CAN OWN, AND NO OTHERS
+   (F3-scope). A value id the base's own geometry does not list
+   (`base.SCOPE_VALUE_IDS`) is one the base would REFUSE BY NAME — and its page,
+   reading such a file, tells it "not applied" and builds without it. So the
+   base build of a row carrying a newer value is that file on the base page:
+   the record with the unknown values dropped. Every row whose values the base
+   already knows is handed the very same record, so a holder's two builds are
+   the same call on the same input. */
+const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
+function baseScopes(sc) {
+  if (!sc) return sc;
+  const strip = (e) => {
+    if (!e.values) return e;
+    const v = Object.fromEntries(Object.entries(e.values).filter(([k]) => BASE_VALUE_IDS.has(k)));
+    if (Object.keys(v).length === Object.keys(e.values).length) return e;
+    const out = { ...e }; if (Object.keys(v).length) out.values = v; else delete out.values; return out;
+  };
+  const layers = (sc.layers || []).map(strip), petals = (sc.petals || []).map(strip);
+  if (layers.every((e, i) => e === sc.layers[i]) && petals.every((e, i) => e === sc.petals[i])) return sc;
+  return { ...sc, layers, petals };
+}
 let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {
   const st = stateOf(row);
   const opts = { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) };
+  const optsBase = { ...opts, scopes: baseScopes(opts.scopes) };
   const mover = MOVERS ? MOVERS.test(row.label) : MOVERS_PRED ? PREDICATE_MOVERS[MOVERS_PRED](st, row) : false;
   if (mover) moversSeen++; else holdersSeen++;
   const rowFails = [];
@@ -718,7 +756,7 @@ for (const row of rows) {
 
     /* 1. THE EXPORT STREAM, positionally. */
     const A = new mine.MeshBuilder({ exportMode }), B = new base.MeshBuilder({ exportMode });
-    mine.buildBloomInto(A, { ...st }, opts); base.buildBloomInto(B, { ...st }, opts);
+    mine.buildBloomInto(A, { ...st }, opts); base.buildBloomInto(B, { ...st }, optsBase);
     const pa = A.positions, pb = B.positions;
     if (CONTROL && rowsDone === 0 && !exportMode) { pa[0] += 1e-9; controlFired++; }
     if (pa.length !== pb.length) {
@@ -742,7 +780,7 @@ for (const row of rows) {
       const k = ga.findIndex((x) => typeof x === 'number');
       if (k >= 0) { ga[k] += 1e-9; controlFired++; }
     }
-    const gb = gridFloatsOf(base.buildBloomInto(GB, { ...st }, opts).petals);
+    const gb = gridFloatsOf(base.buildBloomInto(GB, { ...st }, optsBase).petals);
     if (ga.length !== gb.length) {
       fails.push(`${tag}: grid shape moved — ${ga.length} captured values against ${gb.length}`);
     } else {

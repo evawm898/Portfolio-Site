@@ -1559,7 +1559,7 @@ export const SMOKE_BLOCKS = [
     anchor: 'SCOPED OUTLINE: a MIXED flower — RADIAL x 3 layers, layer 1 on the LAW, layer 2 owns the spoon, layer 3 the lopsided asymmetric curve',
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
        the scope's OWNED outline VALUES (mode and curve, replacing what the
-       petal inherits — resolvePetalOutline's values arm), the FAN MIRROR (the
+       petal inherits — resolvePetalOutline's values arm, now resolvePetalValues), the FAN MIRROR (the
        non-canonical member's halves swapped — its mirrored arm), and every
        per-ring and per-petal reader of the outline handed the petal's own
        effective outline instead of the global control (OC0-OC4, AN, C1, A2,
@@ -1603,6 +1603,36 @@ export const SMOKE_BLOCKS = [
         path: "X2 on the seam of three whorls of infilled petals (0 pairs; 736 on main), I0-I12 per petal, coverage R1 over 24 infilled petals" },
       { label: 'INFILL WHORLS: ONE whorl x petalLength 28 x the infill (the length the whorls stand for)',
         path: "X2 on one short infilled petal's seam (0 pairs; 1,600 on main, where the quantisation residue had the other sign)" },
+    ],
+  },
+  {
+    n: 70, title: 'the spine curve under scoping (Oct 19, F3-scope)',
+    anchor: 'SCOPED SPINE: BOTH CURVES per layer — layer 1 LAW on the sliders, layer 2 the spoon on the S, layer 3 the lopsided on the incurve',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       scope's OWNED spine VALUES (the curl mode and the spine curve, through
+       the one resolver's values arm beside the outline's), every per-ring
+       reader of the spine handed the ring's own (C1 and J8 through
+       ringSpineRestated), and the per-petal census (C4: the mode and curve
+       per petal, the spine planar in the midrib plane, a FAN pair one spine).
+       The anchor is the both-curves flower, where a SLIDER layer, two CURVE
+       layers and three outlines sit together; the SPIRAL row carries the
+       per-turn arm, the FAN row the pair's shared spine, the infill row the
+       cells on a scoped spine, and the GATED row the inert-by-toggle branch.
+       --conn is REQUIRED (a scoped spine bends a whole layer's blades). */
+    conn: true,
+    rows: [
+      { label: 'SCOPED SPINE: BOTH CURVES per layer — layer 1 LAW on the sliders, layer 2 the spoon on the S, layer 3 the lopsided on the incurve',
+        path: "C1/C2/C3 per ring on its own spine (the slider arm on layer 1, the curve arm on layers 2 and 3, restated from the row's scopes), C4 per petal, OC0-OC5 on the same flower's per-layer outlines — the two values resolved through one chain" },
+      { label: 'SCOPED SPINE: both curves per layer x the Voronoi infill (each petal\'s cells on its own outline and spine)',
+        path: "the infill family (I0-I12) on petals bent by three different spines and cut by three outlines, C4 per petal, coverage R1" },
+      { label: 'SCOPED SPINE: SPIRAL x 2 turns on two different spines (turn 1 the reflex, turn 2 the incurve)',
+        path: "the per-turn arm (a turn is a layer scope on SPIRAL), C1 per turn on two different owned spines, J8's root chord on each" },
+      { label: 'SCOPED SPINE: FAN — pair 2 owns the incurve on a slider fan (its partner the SAME spine, unflipped)',
+        path: "C4(d): the partner's emitted spine in its own midrib plane is the canonical member's to 1e-9 mm, with the same law (no flip — the spine is planar); a petal-scope owned spine on a fan" },
+      { label: 'SCOPED SPINE: the hook owned by the inner layer of three (CLAMPED there and told; the outer layers on the default curve)',
+        path: "C1(d) on a scoped curve the validator refuses at its own layer's length (clamped <=> refused in EXPORT, the build's own record), the outer layers accepted and unclamped" },
+      { label: 'SCOPED SPINE: GATED — a layer owning a drawn spine with per-layer values OFF (kept and inert; the whole bloom on the sliders)',
+        path: "C1/C4 with an owned spine kept and inert (scopeLayers OFF), the byte tool's partition (a holder)" },
     ],
   },
 ];

@@ -1436,10 +1436,34 @@ export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);
    down, so a later edit to the whole bloom's curve reaches every scope that
    does not own one. The chain is global -> layer -> petal (`scopeOffsetsFor`
    collects layer entries, then petal entries, the more specific winning), and
-   the ONE resolver of a petal's effective outline is `resolvePetalOutline`
+   the ONE resolver of a petal's effective outline is `resolvePetalValues` (born `resolvePetalOutline`)
    below, called once per petal in petalSurface; widthProfile reads only its
-   answer (`ps`). Sheet thickness is still never scoped, offset or value. */
-export const SCOPE_VALUE_IDS = Object.freeze(['petalOutlineMode', 'petalOutlineCurve']);
+   answer (`ps`). Sheet thickness is still never scoped, offset or value.
+
+   AND THE SPINE (F3-scope, Oct 19 — read docs/bloom-spine-curve-scope-outcome.md):
+   the curl mode (SLIDER / CURVE) and the spine curve are owned the same way,
+   by the same chain and the SAME resolver — `resolvePetalValues`, which is
+   #421's `resolvePetalOutline` extended rather than a second one beside it.
+   A value is one of two GROUPS (`SCOPE_VALUE_GROUPS`), so the page can reset
+   one ("Spine: reset to inherited") without touching the other; the chain,
+   the precedence and the live inheritance are one for both. THE SPINE IS
+   PLANAR IN THE MIDRIB PLANE — `spineAt` lays every point on the foot's own
+   (Rs, Up) plane, the curve's y is the curl plane's and nothing in the law
+   has a lateral term (twist turns the cross-section about the spine, never
+   the spine) — so a FAN mirror pair's partner draws its pair's spine
+   UNCHANGED: the mirror is the identity on a planar curve, by construction,
+   and C4 asserts it on the emitted rows rather than leaving it argued. */
+export const SCOPE_VALUE_GROUPS = Object.freeze({
+  outline: Object.freeze(['petalOutlineMode', 'petalOutlineCurve']),
+  spine: Object.freeze(['petalCurlMode', 'petalSpineCurve']),
+});
+export const SCOPE_VALUE_IDS = Object.freeze([...SCOPE_VALUE_GROUPS.outline, ...SCOPE_VALUE_GROUPS.spine]);
+/* which group an owned value id belongs to — one owner, read by the page's
+   reset and the petal record's split of its sources */
+export function scopeValueGroup(id) {
+  for (const g of Object.keys(SCOPE_VALUE_GROUPS)) if (SCOPE_VALUE_GROUPS[g].includes(id)) return g;
+  return null;
+}
 export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
 /* THE BASES A LAYER ENTRY OWNS (Q3.5) — the ramps' two quantities, size (both
    of its dimensions) and tilt. */
@@ -1823,7 +1847,13 @@ export function fanSlotMirrored(slotIndex, slotCount, state) {
   return state.placement === 'FAN' && scopeSlotKey(slotIndex, slotCount, state) !== slotIndex;
 }
 
-export function resolvePetalOutline(state, values, mirrored, valueFrom = null) {
+/* THE ONE RESOLVER OF A PETAL'S OWNED VALUES — the outline's (F6-scope) AND
+   the spine's (F3-scope): every id of SCOPE_VALUE_IDS a scope owns replaces the
+   inherited one; then the FAN mirror swaps a two-sided OUTLINE's halves. The
+   spine has no mirror arm, and that is a measurement of the law rather than
+   an omission: the spine curve is planar in the midrib plane (see
+   SCOPE_VALUE_GROUPS), so its mirror image is itself. */
+export function resolvePetalValues(state, values, mirrored, valueFrom = null) {
   let out = null;
   if (values) {
     for (const k of SCOPE_VALUE_IDS) if (k in values) (out || (out = {}))[k] = values[k];
@@ -1837,6 +1867,15 @@ export function resolvePetalOutline(state, values, mirrored, valueFrom = null) {
   }
   if (!out) return null;
   return { state: out, mirrored: didMirror, from: valueFrom };
+}
+
+/* a resolver answer's `from`, cut to one value group — null when no id of the
+   group is owned (so a petal owning only its outline reports no spine source) */
+function scopedFrom(res, group) {
+  if (!res || !res.from) return null;
+  let out = null;
+  for (const k of SCOPE_VALUE_GROUPS[group]) if (k in res.from) (out || (out = {}))[k] = res.from[k];
+  return out;
 }
 
 export function footRing(state, acc, opts = {}) {
@@ -8409,13 +8448,17 @@ export function petalSurface(state, ring, slot, cap, acc) {
      scopes, so the shipped path is the call it was. */
   const scopeTerm = slot.scopeTerm ?? null;
   let ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;
-  /* THE PETAL'S OUTLINE (F6-scope) — resolved ONCE, here, by its one owner:
-     the scope's owned mode and curve, then the FAN partner's mirror. A BRANCH
+  /* THE PETAL'S OUTLINE (F6-scope) AND SPINE (F3-scope) — resolved ONCE, here,
+     by their one owner: the scope's owned outline mode and curve and its owned
+     curl mode and spine curve, then the FAN partner's mirror (the outline's
+     halves; the planar spine is its own mirror image). The spine's readers —
+     petalFormIsFlat, petalForm's curl read, the builder's spineCurveLaw and
+     its refusal — all read `ps` below, so a petal's spine is its scope's. A BRANCH
      on both: with no owned value and no mirrored slot this is not entered and
      `ps` is the object it was. Everything below — the apex row ramp, the
      profile, the cap, the refusal, the ladder, the infill — reads `ps`. */
   const outlineRes = (scopeTerm && scopeTerm.values) || slot.fanMirrored
-    ? resolvePetalOutline(ps, scopeTerm ? scopeTerm.values || null : null, !!slot.fanMirrored, scopeTerm ? scopeTerm.valueFrom || null : null)
+    ? resolvePetalValues(ps, scopeTerm ? scopeTerm.values || null : null, !!slot.fanMirrored, scopeTerm ? scopeTerm.valueFrom || null : null)
     : null;
   if (outlineRes) ps = { ...ps, ...outlineRes.state };
   /* Q3.5 — A LAYER THAT OWNS ITS SIZE OR TILT (a layer entry carrying an offset
@@ -9410,8 +9453,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        a FAN partner drawing its pair's curve mirrored. Telemetry for the
        read-out and the scope view — the gates restate the outline from the
        controls and the row's scopes, never from this. */
-    outlineFrom: outlineRes && outlineRes.from ? { ...outlineRes.from } : null,
+    outlineFrom: scopedFrom(outlineRes, 'outline'),
     outlineMirrored: !!(outlineRes && outlineRes.mirrored),
+    /* AND THE SPINE'S (F3-scope): which scope owns the curl mode and the spine
+       curve, absent = the whole bloom; the mode the petal was built in is the
+       spine record's own `curveMode` */
+    spineFrom: scopedFrom(outlineRes, 'spine'),
     /* the petal's own effective outline mode, as its state resolved it */
     outlineMode: ps.petalOutlineMode === 'CURVE' ? 'CURVE' : 'LAW',
     /* and the curve it was drawn from (a FAN partner's already mirrored) — what
@@ -22108,7 +22155,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
         if (scopes) slot.scopeTerm = scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state });
         /* THE FAN'S MIRROR PAIRS ARE MIRROR IMAGES (Eva, Oct 18): the member
            that is not its pair's canonical slot draws the pair's outline with
-           its halves swapped (`resolvePetalOutline`). FAN only, so RADIAL's
+           its halves swapped (`resolvePetalValues`). FAN only, so RADIAL's
            pairs keep one hand; set only where true, so every other slot payload
            is the object it was. */
         if (fanSlotMirrored(slot.index, fr.slotCount, state)) slot.fanMirrored = true;
@@ -22313,6 +22360,8 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     /* F6-scope: the built petals whose outline a scope owns (mode or curve), and
        the FAN partners drawn mirrored */
     petalsOutlineOwned: petalsAll.filter((p) => p && p.outlineFrom).length, petalsOutlineMirrored: petalsAll.filter((p) => p && p.outlineMirrored).length,
+    /* F3-scope: the built petals whose curl mode or spine curve a scope owns */
+    petalsSpineOwned: petalsAll.filter((p) => p && p.spineFrom).length,
     layersLive: scopeLayersLive(state), petalsLive: scopePetalsLive(state),
     /* THE TIERS (F1.1a): a tier entry reaches a BUILT tier of that index; one
        naming a tier past the count, or a tier not built, is kept and inert. */
