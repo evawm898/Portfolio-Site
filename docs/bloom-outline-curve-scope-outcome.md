@@ -155,6 +155,17 @@ selection applying values, inherited curve frozen at copy time → panel route (
   Declared in `SELF_INTERSECTION_XFAIL` at 1 / 0.0000 with both controls in its note, confirmed in the
   browser (X1 "still failing at that magnitude"). A span-0 count is a knife edge. **No other block-68
   row reads a within-shell pair.**
+- **The edge gate's E2 (the bead's added turn) on block 68: two rows over the 45° allowance, neither the
+  scoping's**, both measured against unscoped twins through the gate's own `--rows-file`:
+  - `SCOPED OUTLINE: SPIRAL x 2 turns on two different curves` reads **45.000168°**; the same SPIRAL with
+    every petal on the near-rectangle reads **45.000180** (all on the diamond 41.394) — the near-rectangle's
+    blunt nib (#419's class). A smoke row, so CI's edge gate reads it: declared in `E2_TURN_XFAIL` with both
+    numbers, never widened. CI found it (the gate draws from the smoke subset, which this session's local
+    runs had not put through the edge gate).
+  - `SCOPED OUTLINE: the mixed flower x cup 0.6` reads **71.828843°**, under its all-spoon twin's
+    **71.986507** (exactly #419's declared spoon-under-a-cup figure; all-lopsided 59.65, all-LAW 51.996 — the
+    3-layer LAW flower under cup 0.6 is over the allowance on main too). Not a smoke row, so the edge gate
+    never draws it and no declaration is owed; recorded here.
 - **The byte partition: PASS** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of
   f63235e> --movers-predicate scope-outline`, the whole 1,374-row matrix in both modes in twelve
   `--range` chunks closed by `--merge`: **14 of 14 predeclared movers moved and 0 floats moved on the
