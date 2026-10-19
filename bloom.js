@@ -18,7 +18,7 @@ import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
-import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalOutline, SCOPE_VALUE_IDS, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
+import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -60,7 +60,17 @@ function outlineEditReaches(p) {
   if (scopeView && scopeView.kind !== 'tier') return petalInScope(p, scopeView);
   return !(p.outlineFrom && p.outlineFrom.petalOutlineCurve);
 }
-function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEditReaches } = {}) {
+/* F3-SCOPE — THE SAME QUESTION FOR THE SPINE CURVE: with a layer or pair
+   picked, that scope's petals (an edit makes the curve theirs); with none,
+   every petal whose spine curve no scope owns. The refusal then asks about
+   the lengths of exactly the petals the drag would bend — an inner layer that
+   owns its own (tighter) curve does not refuse the whole bloom's edit, and a
+   picked inner layer's drag is refused at ITS length. */
+function spineEditReaches(p) {
+  if (scopeView && scopeView.kind !== 'tier') return petalInScope(p, scopeView);
+  return !(p.spineFrom && p.spineFrom.petalSpineCurve);
+}
+function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEditReaches, spineReaches = spineEditReaches } = {}) {
   const outlined = lastPetalsAll.filter((p) => p && p.tipCap && p.tipCap.outline && reaches(p)).map((p) => p.tipCap.outline);
   const seen = new Set(), outlinePetals = [];
   for (const o of outlined) {
@@ -69,7 +79,7 @@ function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEd
     if (!seen.has(k)) { seen.add(k); outlinePetals.push(e); }
   }
   return {
-    askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine).map((p) => p.spine.askedLengthMm))],
+    askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine && spineReaches(p)).map((p) => p.spine.askedLengthMm))],
     outlinePetals: outlinePetals.length ? outlinePetals : null,
   };
 }
@@ -857,6 +867,7 @@ const scopeBar = document.getElementById('scopeBar');
 const scopePick = document.getElementById('scopePick');
 const scopeStatus = document.getElementById('scopeStatus');
 const scopeOutlineReset = document.getElementById('scopeOutlineReset');
+const scopeSpineReset = document.getElementById('scopeSpineReset');
 
 /* WHICH TOGGLE IS LIVE ON THE WHOLE-BLOOM STATE — the geometry's own predicates. */
 function scopeMode(ui) { return scopeLayersLive(ui) ? 'layer' : scopePetalsLive(ui) ? 'petal' : null; }
@@ -947,7 +958,7 @@ function scopeEffective(v, ui) {
      the one it inherits — LIVE, read through the chain at this moment. Shown
      UNMIRRORED: the panel shows the pair's canonical petal (the lower slot),
      whose partner draws it with its halves swapped. */
-  const res = resolvePetalOutline(ui, term && term.values ? term.values : null, false);
+  const res = resolvePetalValues(ui, term && term.values ? term.values : null, false);
   for (const id of SCOPE_VALUE_IDS) eff[id] = res && id in res.state ? res.state[id] : ui[id];
   /* A LAYER'S UN-OWNED SIZE AND TILT READ AS BUILT — the global through the
      layer ramp (footRing()'s own `scale` / `tiltExtra` on the build on
@@ -1089,18 +1100,21 @@ function commitScopeOffset(id, desired) {
    value equal to what the scope would inherit is removed instead, exactly as
    an offset back to 0 is — the scope then inherits again, live. */
 function outlineValuesSame(id, a, b) {
-  if (id === 'petalOutlineCurve') {
+  if (isCurveId(id)) {
     const pa = typeof a === 'string' ? JSON.parse(a) : a, pb = typeof b === 'string' ? JSON.parse(b) : b;
     return curveEquals(pa, pb);
   }
   return String(a) === String(b);
 }
+/* a curve value (the outline's or the spine's) — by the registry row's kind,
+   never by a list of names */
+function isCurveId(id) { const c = CONTROLS.find((x) => x.id === id); return !!c && c.kind === 'curve'; }
 function inheritedOutlineValue(v, id, ui, own) {
   const listKey = v.kind === 'layer' ? 'layers' : 'petals';
   const without = scopes ? { ...scopes, [listKey]: (scopes[listKey] || []).map((e) => (e === own ? { ...e, values: undefined } : e)) } : null;
   const sb = without ? scopesForBuild(without) : null;
   const term = sb ? scopeOffsetsFor(sb, { layer: v.layer, slot: v.slot, n: lastFoot.slotCount, state: ui }) : null;
-  const res = resolvePetalOutline(ui, term && term.values ? term.values : null, false);
+  const res = resolvePetalValues(ui, term && term.values ? term.values : null, false);
   return res && id in res.state ? res.state[id] : ui[id];
 }
 function scopeOwnEntry(v, create) {
@@ -1128,23 +1142,31 @@ function commitScopeValue(id, value) {
     return;
   }
   own = scopeOwnEntry(v, true);
-  (own.values || (own.values = {}))[id] = id === 'petalOutlineCurve' ? cloneCurve(typeof value === 'string' ? JSON.parse(value) : value) : String(value);
+  (own.values || (own.values = {}))[id] = isCurveId(id) ? cloneCurve(typeof value === 'string' ? JSON.parse(value) : value) : String(value);
 }
 /* RESET TO INHERITED (F6-scope): the picked scope's owned outline values are
    removed — its offsets stay — and the scope inherits its parent's outline
-   live again. The panel re-binds so the controls show what is inherited. */
-function resetScopeOutline() {
+   live again. The panel re-binds so the controls show what is inherited.
+   PER GROUP (F3-scope): "Outline: reset to inherited" removes the outline's
+   two values and "Spine: reset to inherited" the spine's, so a scope owning
+   both keeps the one it was not asked to give up (`SCOPE_VALUE_GROUPS`, the
+   geometry's own split). */
+function resetScopeValues(group) {
   const v = scopeView;
   if (!v || v.kind === 'tier') return false;
   const own = scopeOwnEntry(v, false);
   if (!own || !own.values) return false;
-  delete own.values;
+  const ids = SCOPE_VALUE_GROUPS[group].filter((id) => id in own.values);
+  if (!ids.length) return false;
+  for (const id of ids) delete own.values[id];
   pruneScopeEntry(own, v);
   bindScope(null); bindScope(v);
   relabelView();
   regenerate();
   return true;
 }
+const resetScopeOutline = () => resetScopeValues('outline');
+const resetScopeSpine = () => resetScopeValues('spine');
 function onScopedEdit(e) {
   if (!scopeView) return;
   const t = e.target;
@@ -1178,10 +1200,13 @@ function syncScopeBar(ui) {
   }
   scopePick.value = scopeValue(scopeView);
   scopeStatus.textContent = scopeStatusText(ui, mode || (tiers ? 'tier' : null));
-  /* the reset shows iff the picked layer or pair owns an outline value */
-  if (scopeOutlineReset) {
+  /* each reset shows iff the picked layer or pair owns a value of ITS group
+     (the outline's, the spine's) */
+  {
     const own = scopeView && scopeView.kind !== 'tier' ? scopeOwnEntry(scopeView, false) : null;
-    scopeOutlineReset.hidden = !(own && own.values && Object.keys(own.values).length);
+    const owns = (g) => !!(own && own.values && SCOPE_VALUE_GROUPS[g].some((id) => id in own.values));
+    if (scopeOutlineReset) scopeOutlineReset.hidden = !owns('outline');
+    if (scopeSpineReset) scopeSpineReset.hidden = !owns('spine');
   }
   return changed;
 }
@@ -1220,6 +1245,7 @@ function scopeStatusText(ui, mode) {
   return parts.filter(Boolean).join(' ');
 }
 if (scopeOutlineReset) scopeOutlineReset.addEventListener('click', () => { resetScopeOutline(); });
+if (scopeSpineReset) scopeSpineReset.addEventListener('click', () => { resetScopeSpine(); });
 scopePick.addEventListener('change', () => {
   const val = scopePick.value;
   if (!val) { selectScope(null); return; }
@@ -1250,14 +1276,19 @@ function refreshScopeNotes(ui) {
          mirrored. */
       cls = 'scoped';
       const from = term && term.valueFrom ? term.valueFrom[c.id] : null;
-      const what = c.id === 'petalOutlineCurve' ? 'outline curve' : 'outline mode';
+      const group = scopeValueGroup(c.id);
+      const what = { petalOutlineCurve: 'outline curve', petalOutlineMode: 'outline mode', petalSpineCurve: 'spine curve', petalCurlMode: 'curl mode' }[c.id] || c.id;
+      const reset = group === 'spine' ? 'Spine: reset to inherited' : 'Outline: reset to inherited';
       const mine = from === scopeView.kind;
       const n = lastFoot.slotCount;
       const pair = scopeView.kind === 'petal' && String(ui.placement) === 'FAN' && Array.from({ length: n }, (_, i) => i).filter((i) => scopeSlotKey(i, n, ui) === scopeView.slot).length === 2;
       text = mine
-        ? `${name}: its OWN ${what} — it replaces what it would inherit ("Outline: reset to inherited" in the bar returns it)`
+        ? `${name}: its OWN ${what} — it replaces what it would inherit ("${reset}" in the bar returns it)`
         : `${name}: INHERITED from ${from === 'layer' ? 'its layer' : 'the whole bloom'}, live — it follows that ${what}'s edits; editing it here makes it ${name}'s own`;
       if (pair && c.id === 'petalOutlineCurve') text += ' · the pair\'s other petal draws it MIRRORED (its left and right halves swapped)';
+      /* the spine is planar in the midrib plane, so a mirror pair's partner
+         draws it unchanged — said, because the outline beside it is mirrored */
+      if (pair && c.id === 'petalSpineCurve') text += ' · the pair\'s other petal draws the SAME spine (it lies in the midrib plane, so its mirror image is itself)';
     } else if (scopeView && ids.has(c.id)) {
       cls = 'scoped';
       const off = term && term.offsets && c.id in term.offsets ? term.offsets[c.id] : 0;
@@ -1287,6 +1318,12 @@ function refreshScopeNotes(ui) {
       if (owned.length) parts.push(`the whole bloom's curve — ${owned.join(', ')} draw${owned.length === 1 ? 's' : ''} ${owned.length === 1 ? 'its' : 'their'} own`);
       if (String(ui.placement) === 'FAN' && v && v.mode === 'two-sided') parts.push('on the fan each mirror pair\'s other petal draws it MIRRORED (left and right halves swapped)');
       if (parts.length) { cls = null; text = parts.join(' · '); }
+    } else if (c.id === 'petalSpineCurve' && String(ui.petalCurlMode) === 'CURVE') {
+      /* F3-SCOPE, NOTHING PICKED: which scopes bend their OWN spine curve */
+      const owned = [];
+      if (scopes && scopeLayersLive(ui)) for (const e of scopes.layers || []) if (e.values && e.values.petalSpineCurve) owned.push(`${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${e.layer + 1}`);
+      if (scopes && scopePetalsLive(ui)) for (const e of scopes.petals || []) if (e.values && e.values.petalSpineCurve) owned.push(`${lastFoot.layerCount > 1 ? `Layer ${e.layer + 1} · ` : ''}Petal ${e.slot + 1}`);
+      if (owned.length) { cls = null; text = `the whole bloom's spine — ${owned.join(', ')} bend${owned.length === 1 ? 's' : ''} ${owned.length === 1 ? 'its' : 'their'} own`; }
     }
     wrap.classList.toggle('bl-ctrl--scoped', cls === 'scoped');
     wrap.classList.toggle('bl-ctrl--global', cls === 'global');
@@ -2098,13 +2135,34 @@ function cupClampLine(petals, sepals) {
        + ` ${rows} row${rows === 1 ? '' : 's'} on ${cs.length} of ${parts.length} part${parts.length === 1 ? '' : 's'}\n`;
 }
 
-function spineLine(petals) {
+/* F3-SCOPE — A MIXED FLOWER (some rings on the drawn spine, some on the curl
+   sliders) is told per kind: the curve rings on the SPINE CURVE line, the
+   slider rings on the SPINE CURL line, then which scopes bend their own
+   (every built petal's `spineFrom`). A partner of a FAN pair draws the same
+   spine as its pair (planar in the midrib plane) — nothing to tell. */
+function spineLine(petals, all = null, layerWord = 'layer') {
   const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && (sp.curlRad !== 0 || sp.curveMode));
-  if (!sps.length) return '';
+  const curve = sps.filter((sp) => sp.curveMode), slider = sps.filter((sp) => !sp.curveMode);
+  return (curve.length ? spineCurveLine(curve) : '') + (slider.length ? spineCurlLine(slider) : '') + spineScopeLine(all || petals, layerWord);
+}
+function spineScopeLine(all, layerWord = 'layer') {
+  const ps = (all || []).filter((p) => p && p.spineFrom);
+  if (!ps.length) return '';
+  const groups = new Map();
+  for (const p of ps) {
+    const from = Object.values(p.spineFrom).includes('petal') ? 'petal' : 'layer';
+    const k = from === 'petal' ? `${layerWord} ${Math.round(p.whorl) + 1} pair ${p.scopeTerm && p.scopeTerm.key ? p.scopeTerm.key.slot + 1 : '?'}` : `${layerWord} ${Math.round(p.whorl) + 1}`;
+    if (!groups.has(k)) groups.set(k, { n: 0, mode: p.spine && p.spine.curveMode ? 'CURVE' : 'SLIDER', keys: Object.keys(p.spineFrom) });
+    groups.get(k).n++;
+  }
+  const said = [...groups.entries()].map(([k, g]) => `${k} owns its ${g.keys.map((x) => (x === 'petalSpineCurve' ? 'spine curve' : 'curl mode')).join(' and ')} (${g.mode === 'CURVE' ? 'the drawn spine' : 'the curl sliders'}, ${g.n} petal${g.n === 1 ? '' : 's'})`);
+  return `SPINE BY SCOPE: ${said.join(' · ')}; every other petal inherits the whole bloom's, live\n`;
+}
+function spineCurveLine(sps) {
   /* THE SPINE CURVE (F3-global): the law's own record on the whole-bloom petal
      and the worst ring's radius; a curve that a file loaded past the floor is
      CLAMPED and told exactly as the slider's modifiers are. */
-  if (sps[0].curveMode) {
+  {
     const sp0 = sps[0], cl = sp0.curveLaw;
     const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp0);
     const clamped = sps.filter((s) => s.clamped), contact = sps.filter((s) => s.clearance.selfContact);
@@ -2116,6 +2174,8 @@ function spineLine(petals) {
          + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp0.clearance.sheetT.toFixed(2)} mm sheet`
          + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
   }
+}
+function spineCurlLine(sps) {
   /* EVERY RING'S PETAL, because the floor binds and the flags fire on the
      SHRUNK inner whorls first: the line names the worst ring, not slot 0's. */
   const sp0 = sps[0];
@@ -3324,7 +3384,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
-       + spineLine(petals)
+       + spineLine(petals, built ? built.petalsAll : null, String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer')
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
        + outlineLine(petals, built ? built.petalsAll : null, String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer')
@@ -3891,6 +3951,17 @@ window.__bloomMetrics = () => ({
     pointsL: p.tipCap && p.tipCap.outline ? (p.tipCap.twoSided ? p.tipCap.outline.sides.left.points : p.tipCap.outline.points) : null,
     pointsR: p.tipCap && p.tipCap.outline && p.tipCap.twoSided ? p.tipCap.outline.sides.right.points : null,
     u: p.profileU, hL: p.profileBaseL || p.profileBase, hR: p.profileBaseR || p.profileBase,
+  } : null)) : null,
+  /* F3-scope — EVERY BUILT PETAL'S SPINE (C4): its layer, slot and azimuth, the
+     mode it was built in (the spine record's own `curveMode`), the curve the
+     law consumed, the law's record, the built turn and the EMITTED spine rows,
+     so a gate can restate each petal's spine from the controls and the row's
+     scopes and read a FAN pair's two spines off the drawn rows. Null on a bloom
+     with no petal in CURVE mode and no scope — nothing to assert. */
+  petalAllSpine: lastPetalsAll.some((p) => p && ((p.spine && p.spine.curveMode) || p.scopeTerm)) ? lastPetalsAll.map((p) => (p && p.spine ? {
+    whorl: p.whorl, slotIndex: p.slotIndex, azimuth: p.azimuth, curveMode: !!p.spine.curveMode, curve: p.spine.curve,
+    curveLaw: p.spine.curveLaw, turnBuiltDeg: p.spine.turnBuiltDeg, clamped: p.spine.clamped, askedLengthMm: p.spine.askedLengthMm,
+    from: p.spineFrom || null, rows: p.spine.rows,
   } : null)) : null,
   petalBladeLadder: lastPetal ? lastPetal.bladeLadder : null,
   petalNormal: lastPetal ? lastPetal.normal : null,

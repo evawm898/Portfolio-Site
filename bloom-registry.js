@@ -4885,8 +4885,15 @@ export const CONTROLS = [
    not a sepal's: a twin of a law control drops the petal's outline-mode refs
    (F6-sym-2 — found while extending them: under #417 the sepal's tapers and
    tip shape HID whenever the petal outline was CURVE, while the pinned-LAW
-   sepal still read every one of them — hidden and live). */
-const PETAL_OUTLINE_REFS = new Set(['outlineFromLaw', 'outlineLawShapes']);
+   sepal still read every one of them — hidden and live).
+   AND A SEPAL IS PINNED SLIDER for its curl (`sepalBladeState`), so the
+   PETAL's curl mode is not a sepal's either: the twins of spine curl, curl
+   bias and curl start drop `curlFromSlider` (F3-scope, Oct 19 — found while
+   scoping the spine: since F3-global the three sepal curl controls HID
+   whenever the petals' spine was CURVE, while the slider-pinned sepal still
+   read every one of them; block 62's own row "x 5 sepals at curl 60" set a
+   value the panel could not show). */
+const PETAL_OUTLINE_REFS = new Set(['outlineFromLaw', 'outlineLawShapes', 'curlFromSlider']);
 function twinPredicate(pred, map) {
   if (Array.isArray(pred)) return pred.map((p) => twinPredicate(p, map));
   if (pred && typeof pred === 'object' && PETAL_OUTLINE_REFS.has(pred.ref)) return { all: [] };

@@ -1028,6 +1028,38 @@ INHERITS LIVE, AND A FAN PAIR IS TWO MIRROR IMAGES** (F6-scope, Oct 18 — Eva's
 - Block 68 (15 rows, 1,374), smoke block 68 (6); `frozen/phase74` = the 1,359 rows at `f63235e`. Sheet:
   `node tools/shot-bloom-outline-scope.mjs <dir> --base <worktree>` → `docs/img/outline-scope.png`.
 
+**THE SPINE IS SCOPABLE THROUGH THE OUTLINE'S OWN CHAIN: ONE RESOLVER, TWO VALUE GROUPS, AND A FAN PAIR
+DRAWS ONE SPINE BECAUSE THE SPINE IS PLANAR** (F3-scope, Oct 19 — Eva's rulings; read
+`docs/bloom-spine-curve-scope-outcome.md` before touching `SCOPE_VALUE_GROUPS`, `resolvePetalValues`,
+`spineFrom`, bloom.js's `resetScopeValues` / `spineEditReaches` / `isCurveId`, `scopedValuesRestated` /
+`spineRestated`, C4 or panel route (aj)).
+- `petalCurlMode` and `petalSpineCurve` join `SCOPE_VALUE_IDS` (now derived from `SCOPE_VALUE_GROUPS`:
+  `outline`, `spine`). #421's `resolvePetalOutline` is EXTENDED and renamed `resolvePetalValues` — there is no
+  second chain (`the-spine-resolved-through-a-second-chain` is the standing mutant). Every spine reader already
+  read `ps` (`petalFormIsFlat`, `petalForm`'s curl read, `spineCurveLaw`, the refusal record), so a petal's
+  spine is its scope's with no new reader. The record splits `outlineFrom` / `spineFrom`.
+- **#421's placements carried over** (replace outright, inherit live, an edit equal to the inherited value is
+  pruned, a drag on an inherited curve makes it owned); **the resets are PER GROUP** — "Spine: reset to
+  inherited" keeps an outline the scope owns, and the reverse.
+- **THE MIRROR IS THE IDENTITY, MEASURED**: `spineAt` lays every point in the foot's (Rs, Up) plane; lateral
+  ≤ 3.6e-15 mm with twist, a dome, cup and an asymmetric outline on top; a FAN partner's in-plane rows equal
+  its pair's exactly. **C4** asserts planarity (1e-9 mm) on every petal and one spine per FAN pair;
+  `the-fan-partner-spine-is-flipped` must fire it.
+- The curl-gated controls follow the PICKED scope's curl mode with no new code (`viewUi`); the spine validator
+  asks the lengths the edit REACHES (`spineEditReaches`). **Found and fixed**: the sepal curl twins HID
+  whenever the petals were CURVE while the pinned-SLIDER sepal still read them — `twinPredicate` drops
+  `curlFromSlider` (#418's outline fix, for the spine).
+- Gates: C1 / J8 per ring and `formAssertions` against `spineRestated` (controls + the row's `@scopes`,
+  through `scopedValuesRestated`, the ONE restatement `outlineRestated` also reads); C4 per petal; five apex
+  mutants; panel route (aj) with five mutants (TWENTY-SEVEN routes); design-file F14. The byte tool hands the
+  BASE tree only the value ids it lists (`baseScopes` — what its page does with a newer file) and has
+  `--movers-predicate scope-spine`.
+- **Bytes: 14 movers / 1,382 holders, 0 floats on any holder** over the whole matrix in both modes. **One new
+  declared fold, NOT the scoping's**: `SCOPED SPINE: both curves per layer x cup 0.6` reads 248 / 0.1713, and main
+  folds the same S-spine × cup 0.6 composition UNSCOPED at 248 pairs on both trees.
+- Block 70 (16 rows, 1,396), smoke block 70 (6); `frozen/phase76` = the 1,380 rows at `971155c`. Sheet:
+  `node tools/shot-bloom-spine-scope.mjs <dir>` → `docs/img/spine-scope.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

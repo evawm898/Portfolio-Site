@@ -444,6 +444,26 @@
          each by its own sentence (both bloom.js): visibility reading the
          whole bloom's outline mode, and visibility ignoring the pick. Three
          edits: this entry, the block, the negative control's flags and banner.
+     (aj) THE SPINE UNDER SCOPING (F3-scope, Oct 19 — docs/bloom-spine-curve-
+         scope-outcome.md). Two RADIAL layers, Per-layer values ON, the whole
+         bloom on the curl SLIDERS: picking layer 2 writes NOTHING and its
+         curl-mode note says INHERITED; setting its curl mode to CURVE makes the
+         mode its OWN (the record carries the mode and no spine curve) and its
+         petals — read off the builder's per-petal spine census — bend on the
+         whole bloom's spine curve while layer 1 stays on the sliders; every
+         petal control whose predicate drives on `petalCurlMode` (spine curl,
+         bias, start — found by `predicateDrivers`) is shown or hidden on the
+         PICKED layer's mode, restated from the record through
+         `evalPredicate`, and the two picks must disagree; deselected, an edit
+         to the whole bloom's spine curve reaches layer 2 LIVE; picked again, a
+         curve edit makes it layer 2's own (the global unmoved); and "Spine:
+         reset to inherited" removes the spine's values and KEEPS the outline
+         value the layer also owns. Five mutants under --negative-control,
+         each by its own sentence (all bloom.js): a pick that writes the
+         spine, the spine reset leaving the owned curve, an inherited spine
+         curve frozen at copy time, the spine reset dropping the outline too,
+         and curl visibility reading the whole bloom's curl mode. Three edits:
+         this entry, the block, the negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4091,8 +4111,11 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
     const MUTANTS = [
       { name: 'a pick applies the scope outline', from: '  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  relabelView();', to: '  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView && scopeView.kind !== \'tier\') { const o = scopeOwnEntry(scopeView, true); o.values = { ...(o.values || {}), petalOutlineCurve: inputs.petalOutlineCurve.value }; }\n  relabelView();' },
-      { name: 'the reset leaves the owned curve', from: '  if (!own || !own.values) return false;\n  delete own.values;', to: '  if (!own || !own.values) return false;\n  delete own.values.petalOutlineMode;' },
-      { name: 'an inherited curve is frozen at copy time', from: "  (own.values || (own.values = {}))[id] = id === 'petalOutlineCurve'", to: "  if (id === 'petalOutlineMode' && !(own.values && 'petalOutlineCurve' in own.values)) (own.values || (own.values = {})).petalOutlineCurve = cloneCurve(inheritedOutlineValue(v, 'petalOutlineCurve', ui, own));\n  (own.values || (own.values = {}))[id] = id === 'petalOutlineCurve'" },
+      /* re-anchored by F3-scope: the reset is per value GROUP now
+         (`resetScopeValues`) and a curve is recognised by its registry kind
+         (`isCurveId`) — the defects these two plant are unchanged */
+      { name: 'the reset leaves the owned curve', from: '  for (const id of ids) delete own.values[id];', to: "  for (const id of ids) if (id !== 'petalOutlineCurve') delete own.values[id];" },
+      { name: 'an inherited curve is frozen at copy time', from: '  (own.values || (own.values = {}))[id] = isCurveId(id)', to: "  if (id === 'petalOutlineMode' && !(own.values && 'petalOutlineCurve' in own.values)) (own.values || (own.values = {})).petalOutlineCurve = cloneCurve(inheritedOutlineValue(v, 'petalOutlineCurve', ui, own));\n  (own.values || (own.values = {}))[id] = isCurveId(id)" },
     ];
     for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
     for (const m of MUTANTS) {
@@ -4169,6 +4192,132 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const MUTANTS = [
       { name: 'visibility reads the whole bloom\'s outline mode', from: '  const vui = scopeView ? viewUi(ui) : ui;', to: '  const vui = scopeView ? { ...viewUi(ui), petalOutlineMode: ui.petalOutlineMode } : ui;' },
       { name: 'visibility ignores the pick', from: "wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && idsFor(scopeView).has(c.id) ? vui : ui);", to: 'wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);' },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
+/* ---------------- (aj) THE SPINE UNDER SCOPING (F3-scope) -------------
+   See the header. Two RADIAL layers, Per-layer values ON, the whole bloom on
+   the curl SLIDERS at curl 45. The petals are read off the BUILDER's per-petal
+   census (`petalAllSpine`: each built petal's layer, its curl mode and the
+   curve its law consumed); the record off `__bloomDesign.scopes()`; the curl-
+   gated controls' visibility RESTATED through the registry's own
+   `evalPredicate` on the whole-bloom state with the curl mode taken from the
+   record (the scope's own value, else the whole bloom's). What each
+   assertion expects is the control value this route itself set. */
+{
+  const tag = '[spine scopes]';
+  const INCURVE = { mode: 'single', points: [[0, 0], [0.45, 0.06], [0.8, 0.3], [0.92, 0.55]] };
+  const REFLEX = { mode: 'single', points: [[0, 0], [0.5, -0.05], [0.9, -0.3]] };
+  const SPOON = { mode: 'symmetric', points: [[0, 0.03], [0.35, 0.05], [0.65, 0.2], [0.85, 0.22], [0.96, 0.12], [1, 0]] };
+  const GATED = CONTROLS.filter((c) => c.role === 'petal' && predicateDrivers(c.visibleWhen).has('petalCurlMode')).map((c) => c.id);
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const snap = (pg) => pg.evaluate((gated) => {
+    const m = window.__bloomMetrics();
+    const note = (id) => { const el = document.getElementById(id).closest('.bl-ctrl').querySelector('.bl-scope-note'); return el && !el.hidden ? el.textContent : ''; };
+    return {
+      rec: JSON.stringify(window.__bloomDesign.scopes()), ui: window.__bloomUIState(),
+      petals: (m.petalAllSpine || []).filter(Boolean).map((p) => ({ whorl: Math.round(p.whorl), curve: p.curveMode, pts: p.curve ? JSON.stringify((typeof p.curve === 'string' ? JSON.parse(p.curve) : p.curve).points) : null })),
+      outlines: (m.petalAllOutline || []).filter(Boolean).map((p) => ({ whorl: Math.round(p.whorl), mode: p.mode })),
+      modeNote: note('petalCurlMode'), curveNote: note('petalSpineCurve'),
+      spineReset: document.getElementById('scopeSpineReset').hidden, outlineReset: document.getElementById('scopeOutlineReset').hidden,
+      shown: Object.fromEntries(gated.map((i) => [i, !document.getElementById(i).closest('.bl-ctrl').hidden])),
+    };
+  }, GATED);
+  const setValue = async (pg, id, v) => { await pg.evaluate(([i, val]) => { const el = document.getElementById(i); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]); await settle(pg); };
+  const layerOf = (rec, k) => { const r = JSON.parse(rec || 'null'); return r && r.layers ? r.layers.find((e) => e.layer === k) : null; };
+  /* the curl-gated controls against the registry's predicate on the record's restated mode */
+  const visWrong = (sn, k) => {
+    const e = layerOf(sn.rec, k);
+    const mode = e && e.values && e.values.petalCurlMode ? e.values.petalCurlMode : sn.ui.petalCurlMode;
+    const st = { ...sn.ui, petalCurlMode: mode };
+    return GATED.filter((id) => sn.shown[id] !== evalPredicate(CONTROLS.find((c) => c.id === id).visibleWhen, st));
+  };
+  const run = async (pg, label) => {
+    const p = [];
+    if (GATED.length < 3) p.push(`only ${GATED.length} petal control(s) drive on petalCurlMode — the census that finds them is broken`);
+    const bad = await applyConfig(pg, [{ id: 'layerCount', value: '2' }, { id: 'scopeLayers', value: 'ON' }, { id: 'petalCurlMode', value: 'SLIDER' }, { id: 'petalSpineCurl', value: '45' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const base = await snap(pg);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 1, slot: 0 })); await settle(pg);
+    const picked = await snap(pg);
+    if (picked.rec !== base.rec) p.push(`a pick WROTE a spine to the record: ${base.rec} -> ${picked.rec}`);
+    if (!/INHERITED/.test(picked.modeNote)) p.push(`the picked layer's curl-mode note does not say INHERITED (${JSON.stringify(picked.modeNote)})`);
+    /* layer 2 owns the CURVE mode — and an outline, so the two resets can be told apart */
+    await setValue(pg, 'petalCurlMode', 'CURVE');
+    await setValue(pg, 'petalOutlineMode', 'CURVE');
+    const owned = await snap(pg);
+    const L1 = layerOf(owned.rec, 1);
+    if (!L1 || !L1.values || L1.values.petalCurlMode !== 'CURVE' || 'petalSpineCurve' in L1.values) p.push(`after setting layer 2's curl mode the record is ${owned.rec} — it must carry layer 2's own mode and NO spine curve (the curve inherited, live)`);
+    if (owned.ui.petalCurlMode !== 'SLIDER') p.push(`a curl-mode edit on layer 2 moved the WHOLE-BLOOM mode to ${owned.ui.petalCurlMode}`);
+    const g0 = JSON.stringify((typeof owned.ui.petalSpineCurve === 'string' ? JSON.parse(owned.ui.petalSpineCurve) : owned.ui.petalSpineCurve).points);
+    const strays = owned.petals.filter((q) => q.whorl === 0 && q.curve), missed = owned.petals.filter((q) => q.whorl === 1 && (!q.curve || q.pts !== g0));
+    if (strays.length || missed.length || !owned.petals.some((q) => q.whorl === 1)) p.push(`layer 2 owning CURVE: ${strays.length} layer-1 petal(s) left the sliders, ${missed.length} layer-2 petal(s) do not bend on the whole bloom's spine curve`);
+    if (!/OWN curl mode/.test(owned.modeNote)) p.push(`the curl-mode note does not say it is layer 2's OWN: ${JSON.stringify(owned.modeNote)}`);
+    if (owned.spineReset) p.push('the spine reset button is hidden while layer 2 owns its curl mode');
+    if (owned.outlineReset) p.push('the outline reset button is hidden while layer 2 owns its outline mode');
+    /* the curl sliders follow the PICKED layer's mode: hidden on layer 2 (CURVE), shown on layer 1 (SLIDER) */
+    const w2 = visWrong(owned, 1);
+    if (w2.length) p.push(`layer 2 picked (mode CURVE): ${w2.join(', ')} shown/hidden on a curl mode other than the picked layer's`);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 0, slot: 0 })); await settle(pg);
+    const other = await snap(pg);
+    const w1 = visWrong(other, 0);
+    if (w1.length) p.push(`layer 1 picked (mode SLIDER): ${w1.join(', ')} shown/hidden on a curl mode other than the picked layer's`);
+    if (JSON.stringify(other.shown) === JSON.stringify(owned.shown)) p.push('the two layers\' picks show the same curl controls — the visibility clause is vacuous here');
+    /* deselected, an edit to the whole bloom's spine curve reaches layer 2 live */
+    await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    const des = await snap(pg);
+    if (des.rec !== owned.rec) p.push(`deselecting changed the record: ${owned.rec} -> ${des.rec}`);
+    await setValue(pg, 'petalSpineCurve', INCURVE);
+    const live = await snap(pg);
+    if (live.rec !== owned.rec) p.push(`an edit to the whole bloom's spine curve changed the scope record: ${live.rec}`);
+    if (live.petals.filter((q) => q.whorl === 1).some((q) => q.pts !== JSON.stringify(INCURVE.points))) p.push('layer 2 did not follow the whole bloom\'s spine-curve edit — its inherited spine is not live');
+    if (live.petals.filter((q) => q.whorl === 0).some((q) => q.curve)) p.push('the whole bloom\'s spine-curve edit bent layer 1, which is on the sliders');
+    /* picked again, a curve edit makes the spine layer 2's own */
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 1, slot: 0 })); await settle(pg);
+    await setValue(pg, 'petalSpineCurve', REFLEX);
+    const own2 = await snap(pg);
+    const L2 = layerOf(own2.rec, 1);
+    if (!L2 || !L2.values || !L2.values.petalSpineCurve || JSON.stringify(L2.values.petalSpineCurve.points) !== JSON.stringify(REFLEX.points)) p.push(`after a spine-curve edit on layer 2 the record is ${own2.rec} — the spine curve must be layer 2's own`);
+    const gNow = own2.ui.petalSpineCurve;
+    if (JSON.stringify((typeof gNow === 'string' ? JSON.parse(gNow) : gNow).points) !== JSON.stringify(INCURVE.points)) p.push('a spine-curve edit on layer 2 moved the WHOLE-BLOOM spine curve');
+    if (own2.petals.filter((q) => q.whorl === 1).some((q) => q.pts !== JSON.stringify(REFLEX.points))) p.push('layer 2\'s petals do not bend on its own spine curve');
+    if (!/OWN spine curve/.test(own2.curveNote)) p.push(`the spine-curve note does not say it is layer 2's OWN: ${JSON.stringify(own2.curveNote)}`);
+    /* the SPINE reset removes the spine's values and keeps the outline's */
+    await pg.click('#scopeSpineReset'); await settle(pg);
+    const rs = await snap(pg);
+    const L3 = layerOf(rs.rec, 1);
+    if (L3 && L3.values && ('petalCurlMode' in L3.values || 'petalSpineCurve' in L3.values)) p.push(`the spine reset left layer 2 owning ${JSON.stringify(L3.values)}`);
+    if (!L3 || !L3.values || L3.values.petalOutlineMode !== 'CURVE') p.push(`the spine reset took layer 2's OUTLINE with it: ${rs.rec}`);
+    if (!rs.spineReset) p.push('the spine reset button is still shown after the reset');
+    if (rs.outlineReset) p.push('the outline reset button went with the spine\'s, while layer 2 still owns its outline');
+    if (rs.petals.filter((q) => q.whorl === 1).some((q) => q.curve)) p.push('after the spine reset layer 2 does not inherit the whole bloom\'s SLIDER mode');
+    if (rs.outlines.filter((q) => q.whorl === 1).some((q) => q.mode !== 'CURVE')) p.push('after the spine reset layer 2 no longer draws its own outline');
+    await pg.evaluate(() => { window.__bloomScopeView.deselect(); window.__bloomScopes(null); }); await settle(pg);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a pick writes nothing and says INHERITED; layer 2's curl mode set to CURVE is its own (no spine curve in the record), its petals bend on the whole bloom's spine and layer 1 stays on the sliders; the ${GATED.length} curl-gated controls follow each picked layer's mode; deselected, the whole bloom's spine edit reaches layer 2 live; picked, a spine edit is layer 2's own and the global is unmoved; the spine reset removes the spine values and keeps the outline's`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'per-layer spines');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'a pick applies the scope spine', from: '  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  relabelView();', to: "  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView && scopeView.kind !== 'tier') { const o = scopeOwnEntry(scopeView, true); o.values = { ...(o.values || {}), petalSpineCurve: inputs.petalSpineCurve.value }; }\n  relabelView();" },
+      { name: 'the spine reset leaves the owned spine curve', from: '  for (const id of ids) delete own.values[id];', to: "  for (const id of ids) if (id !== 'petalSpineCurve') delete own.values[id];" },
+      { name: 'an inherited spine curve is frozen at copy time', from: '  (own.values || (own.values = {}))[id] = isCurveId(id)', to: "  if (id === 'petalCurlMode' && !(own.values && 'petalSpineCurve' in own.values)) (own.values || (own.values = {})).petalSpineCurve = cloneCurve(inheritedOutlineValue(v, 'petalSpineCurve', ui, own));\n  (own.values || (own.values = {}))[id] = isCurveId(id)" },
+      { name: 'the spine reset drops the outline too', from: "  const ids = SCOPE_VALUE_GROUPS[group].filter((id) => id in own.values);", to: "  const ids = Object.keys(own.values);" },
+      { name: 'curl visibility reads the whole bloom\'s curl mode', from: '  const vui = scopeView ? viewUi(ui) : ui;', to: '  const vui = scopeView ? { ...viewUi(ui), petalCurlMode: ui.petalCurlMode } : ui;' },
     ];
     for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
     for (const m of MUTANTS) {
@@ -4295,14 +4444,20 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (ai), OUTLINE-GATED VISIBILITY FOLLOWS THE PICK — one flag per mutant */
     const sawVisMode = fail.some((f) => /^\[outline visibility\] MUTANT \(visibility reads the whole bloom's outline mode\).*on a mode other than the picked scope's/.test(f));
     const sawVisPick = fail.some((f) => /^\[outline visibility\] MUTANT \(visibility ignores the pick\).*on a mode other than the picked scope's/.test(f));
-    if (sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (aj), THE SPINE UNDER SCOPING — one flag per mutant */
+    const sawSpinePick = fail.some((f) => /^\[spine scopes\] MUTANT \(a pick applies the scope spine\).*a pick WROTE a spine/.test(f));
+    const sawSpineReset = fail.some((f) => /^\[spine scopes\] MUTANT \(the spine reset leaves the owned spine curve\).*the spine reset left layer 2 owning/.test(f));
+    const sawSpineFrozen = fail.some((f) => /^\[spine scopes\] MUTANT \(an inherited spine curve is frozen at copy time\).*(NO spine curve|not live)/.test(f));
+    const sawSpineGroup = fail.some((f) => /^\[spine scopes\] MUTANT \(the spine reset drops the outline too\).*took layer 2's OUTLINE with it/.test(f));
+    const sawSpineVis = fail.some((f) => /^\[spine scopes\] MUTANT \(curl visibility reads the whole bloom's curl mode\).*on a curl mode other than the picked layer's/.test(f));
+    if (sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SEVEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

@@ -678,6 +678,22 @@ function soPetals(M, { state, scopes }) {
 const soModes = (P) => P.map((p) => `${p.whorl}:${p.mode}`).join(' ');
 const SO_MUTANTS = /^(a-scoped-outline-is-ignored|a-scoped-outline-leaks-to-sibling-layers|a-scoped-outline-leaks-to-sibling-pairs|the-fan-partner-is-not-mirrored|the-radial-partner-is-mirrored)$/;
 const SO_ROWS = /^a scoped outline/;
+/* F3-scope — the spine under scoping: a layer owning a drawn spine over a
+   slider bloom, the same record with per-layer OFF (kept and inert), and a FAN
+   pair owning one. Each witness reads the MUTATED module's own per-petal spine
+   records (`spPetals`). */
+const SP_INCURVE = { mode: 'single', points: [[0, 0], [0.45, 0.06], [0.8, 0.3], [0.92, 0.55]] };
+const SP_LAYER = (on = 'ON') => ({ state: { ...REGISTRY_DEFAULTS, layerCount: 2, scopeLayers: on, petalSpineCurl: 45 }, scopes: SO_SCOPES([{ layer: 1, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }]) });
+const SP_FAN_PAIR = () => ({ state: { ...REGISTRY_DEFAULTS, placement: 'FAN', scopePetals: 'ON', petalSpineCurl: 30 }, scopes: SO_SCOPES([], [{ layer: 0, slot: 2, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }]) });
+function spPetals(M, { state, scopes }) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    return M.buildBloomInto(acc, state, scopes ? { scopes } : {}).petalsAll.filter(Boolean).map((p) => ({ whorl: Math.round(p.whorl), slot: p.slotIndex, curve: !!p.spine.curveMode, turn: p.spine.turnBuiltDeg }));
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const spModes = (P) => P.map((p) => `${p.whorl}.${p.slot}:${p.curve ? 'C' : 'S'}`).join(' ');
+const SPS_MUTANTS = /^(a-scoped-spine-is-ignored|a-scoped-spine-leaks-to-sibling-layers|a-scoped-spine-leaks-to-sibling-pairs|the-spine-resolved-through-a-second-chain|the-fan-partner-spine-is-flipped)$/;
+const SPS_ROWS = /^a scoped spine/;
 /* The tier rows run under the tier mutants alone (`rowsFor` below), and the
    tier mutants run over the rows that name them. */
 const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
@@ -2941,7 +2957,7 @@ const MUTANTS = [
      values, the reset leaving the owned curve, an inherited curve frozen at
      copy time) live in the panel gate's route (ah). */
   { id: 'a-scoped-outline-is-ignored', why: 'the scope\'s owned mode and curve never reach its petals — every petal draws the whole bloom\'s outline while the panel shows the layer\'s own',
-    find: '    ? resolvePetalOutline(ps, scopeTerm ? scopeTerm.values || null : null, !!slot.fanMirrored,', into: '    ? resolvePetalOutline(ps, null, !!slot.fanMirrored,', names: ['OC0', 'OC5'], rows: SO_ROWS,
+    find: '    ? resolvePetalValues(ps, scopeTerm ? scopeTerm.values || null : null, !!slot.fanMirrored,', into: '    ? resolvePetalValues(ps, null, !!slot.fanMirrored,', names: ['OC0', 'OC5'], rows: SO_ROWS,
     witness: (M, C) => { const m = soPetals(M, SO_MIXED()), c = soPetals(C, SO_MIXED());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.some((p) => p.mode === 'CURVE') && c.filter((p) => p.mode === 'CURVE').length === 16) ? null : `the mutant's modes ${soModes(m)} (the clean tree's ${soModes(c)})`; } },
@@ -2973,6 +2989,49 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const mir = (P) => P.filter((p) => p.mirrored).length;
       return (mir(m) > 0 && mir(c) === 0) ? null : `the mutant mirrors ${mir(m)} RADIAL petals (the clean tree ${mir(c)})`; } },
+  /* ===== THE SPINE UNDER SCOPING (F3-scope — docs/bloom-spine-curve-scope-
+     outcome.md). Five plausible wrong resolutions of a petal's spine, each
+     watertight and one piece at the same triangle count: a scope's owned spine
+     ignored, a layer's or a pair's owned spine leaking to its siblings, the
+     spine resolved through a SECOND chain beside the outline's (one that does
+     not carry the one chain's toggle gate), and a FAN partner's spine FLIPPED
+     as if the outline's mirror applied to it (the spine is planar in the midrib
+     plane, so its mirror image is itself — C4(d) is the identity this breaks).
+     C1 reads one petal per ring, C4 every petal; each witness reads the MUTATED
+     module's own per-petal spine records. The page's three (selection applying
+     values, the spine reset leaving the owned curve, an inherited spine frozen
+     at copy time) live in the panel gate's route (aj). */
+  { id: 'a-scoped-spine-is-ignored', why: 'the scope\'s owned curl mode and spine curve never reach its petals — every petal bends on the whole bloom\'s spine while the panel shows the layer\'s own',
+    find: '    for (const k of SCOPE_VALUE_IDS) if (k in values) (out || (out = {}))[k] = values[k];', into: '    for (const k of SCOPE_VALUE_GROUPS.outline) if (k in values) (out || (out = {}))[k] = values[k];', names: ['C1', 'C4'], rows: SPS_ROWS,
+    witness: (M, C) => { const m = spPetals(M, SP_LAYER()), c = spPetals(C, SP_LAYER());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.some((p) => p.curve) && c.filter((p) => p.curve).length === 8) ? null : `the mutant's modes ${spModes(m)} (the clean tree's ${spModes(c)})`; } },
+  { id: 'a-scoped-spine-leaks-to-sibling-layers', why: 'a layer\'s owned spine reaches EVERY layer — the outer whorl bends on the inner layer\'s drawn spine',
+    find: "  if (layersLive) {\n    for (const e of scopes.layers || []) {\n      if (e.layer !== layer) continue;",
+    into: "  if (layersLive) {\n    for (const e of scopes.layers || []) {\n      if (e.values) for (const k of SCOPE_VALUE_GROUPS.spine) if (k in e.values) { (values || (values = {}))[k] = e.values[k]; (valueFrom || (valueFrom = {}))[k] = 'layer'; any = true; }\n      if (e.layer !== layer) continue;", names: ['C1', 'C4'], rows: SPS_ROWS,
+    witness: (M, C) => { const m = spPetals(M, SP_LAYER()), c = spPetals(C, SP_LAYER());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.filter((p) => p.whorl === 0).every((p) => p.curve) && c.filter((p) => p.whorl === 0).every((p) => !p.curve)) ? null : `layer 1 reads ${spModes(m.filter((p) => p.whorl === 0))} on the mutant (the clean tree's ${spModes(c.filter((p) => p.whorl === 0))})`; } },
+  { id: 'a-scoped-spine-leaks-to-sibling-pairs', why: 'a pair\'s owned spine reaches every pair of its layer — the fan\'s other petals bend on it',
+    find: "  if (petalsLive) {\n    for (const e of scopes.petals || []) {\n      if (e.layer !== layer || e.slot !== key) continue;",
+    into: "  if (petalsLive) {\n    for (const e of scopes.petals || []) {\n      if (e.layer === layer && e.values) for (const k of SCOPE_VALUE_GROUPS.spine) if (k in e.values) { (values || (values = {}))[k] = e.values[k]; (valueFrom || (valueFrom = {}))[k] = 'petal'; any = true; }\n      if (e.layer !== layer || e.slot !== key) continue;", names: ['C4'], rows: SPS_ROWS,
+    witness: (M, C) => { const m = spPetals(M, SP_FAN_PAIR()), c = spPetals(C, SP_FAN_PAIR());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const n = (P) => P.filter((p) => p.curve).length;
+      return (n(m) === m.length && n(c) === 2) ? null : `${n(m)} of ${m.length} petals bend on a drawn spine on the mutant (the clean tree's ${n(c)})`; } },
+  { id: 'the-spine-resolved-through-a-second-chain', why: 'the spine read through its OWN chain beside the outline\'s — one that collects a layer\'s spine without the one chain\'s toggle gate, so a record kept inert under Per-layer values OFF bends its layer',
+    find: "  if (layersLive) {\n    for (const e of scopes.layers || []) {\n      if (e.layer !== layer) continue;",
+    into: "  for (const e of scopes.layers || []) if (e.layer === layer && e.values) for (const k of SCOPE_VALUE_GROUPS.spine) if (k in e.values) { (values || (values = {}))[k] = e.values[k]; (valueFrom || (valueFrom = {}))[k] = 'layer'; any = true; }\n  if (layersLive) {\n    for (const e of scopes.layers || []) {\n      if (e.layer !== layer) continue;", names: ['C1', 'C4'], rows: SPS_ROWS,
+    witness: (M, C) => { const m = spPetals(M, SP_LAYER('OFF')), c = spPetals(C, SP_LAYER('OFF'));
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.filter((p) => p.whorl === 1).every((p) => p.curve) && !c.some((p) => p.curve)) ? null : `with Per-layer values OFF the mutant reads ${spModes(m)} (the clean tree's ${spModes(c)})`; } },
+  { id: 'the-fan-partner-spine-is-flipped', why: 'the outline\'s mirror applied to the spine — the FAN partner bends its pair\'s drawn spine the other way, so a linked pair is two spines',
+    find: "    if (v && v.mode === 'two-sided') { (out || (out = {})).petalOutlineCurve = mirrorOutlineCurve(v); didMirror = true; }",
+    into: "    if (v && v.mode === 'two-sided') { (out || (out = {})).petalOutlineCurve = mirrorOutlineCurve(v); didMirror = true; }\n    { const sm = out && 'petalCurlMode' in out ? out.petalCurlMode : state.petalCurlMode, sc = out && 'petalSpineCurve' in out ? out.petalSpineCurve : state.petalSpineCurve; const sv = sm === 'CURVE' ? (typeof sc === 'string' ? JSON.parse(sc) : sc) : null; if (sv) (out || (out = {})).petalSpineCurve = { mode: sv.mode, points: sv.points.map(([x, y]) => [x, -y]) }; }", names: ['C4'], rows: SPS_ROWS,
+    witness: (M, C) => { const m = spPetals(M, SP_FAN_PAIR()), c = spPetals(C, SP_FAN_PAIR());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const t = (P, s) => (P.find((p) => p.slot === s) || {}).turn;
+      return (Math.abs(t(m, 5) + t(m, 2)) < 1e-9 && Math.abs(t(m, 2)) > 1 && t(c, 5) === t(c, 2)) ? null : `the partner turns ${t(m, 5)} against ${t(m, 2)} on the mutant (the clean tree ${t(c, 5)} / ${t(c, 2)})`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3571,6 +3630,19 @@ const ROWS = [
     set: [{ id: 'placement', value: 'FAN' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'a scoped outline — RADIAL x the lopsided curve (the pinwheel, none mirrored)', for: SO_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
+  /* F3-scope: a RADIAL layer owning the incurve over a slider bloom (curl 45),
+     the same record with Per-layer values OFF (kept and inert), and a FAN pair
+     owning the incurve on a slider fan. Scoped to the scoped-spine mutants (and
+     they to these). */
+  { label: 'a scoped spine — RADIAL x 2, layer 2 owns the incurve on a slider bloom', for: SPS_MUTANTS,
+    scopes: { layers: [{ layer: 1, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }], petals: [], tiers: [] },
+    set: [{ id: 'layerCount', value: '2' }, { id: 'scopeLayers', value: 'ON' }, { id: 'petalSpineCurl', value: '45' }] },
+  { label: 'a scoped spine — the same record with Per-layer values OFF (kept and inert)', for: SPS_MUTANTS,
+    scopes: { layers: [{ layer: 1, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }], petals: [], tiers: [] },
+    set: [{ id: 'layerCount', value: '2' }, { id: 'petalSpineCurl', value: '45' }] },
+  { label: 'a scoped spine — FAN pair 2 owns the incurve on a slider fan', for: SPS_MUTANTS,
+    scopes: { layers: [], petals: [{ layer: 0, slot: 2, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }], tiers: [] },
+    set: [{ id: 'placement', value: 'FAN' }, { id: 'scopePetals', value: 'ON' }, { id: 'petalSpineCurl', value: '30' }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,

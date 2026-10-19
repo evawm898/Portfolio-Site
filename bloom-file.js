@@ -106,6 +106,15 @@ import { readCurveValue, cloneCurve } from './bloom-curve.js';
 // did. A `tiers` entry carrying values is told and they are not applied (the
 // sepals' outline is a later session).
 //
+// F3-SCOPE (Oct 19) widens the same field, again with no version move: the
+// geometry's `SCOPE_VALUE_IDS` now also names the curl mode and the spine curve,
+//
+//   values: { …, petalCurlMode?: 'SLIDER' | 'CURVE', petalSpineCurve?: <a curve value> }
+//
+// read through the same field kinds (the choice's options, the spine curve's
+// own `single` shape rule), so a #411-#421 file — whose entries own an outline
+// or nothing — reads exactly as it did.
+//
 // An offset is a DELTA on the global value (Q3.2), verbatim — never clamped
 // here, because what it composes to is per petal and the geometry's one clamp
 // owns that (rule 2's spirit: this file holds no range). The reader VALIDATES
@@ -405,7 +414,7 @@ function readScopeEntry(k, e, i, notes) {
   /* F6-SCOPE — THE OWNED VALUES. Only the geometry's value ids, each through
      its control's own field kind; a tier carries none yet. */
   if (e.values !== undefined) {
-    if (k === 'tiers') notes.push(note('not-applied', `${where}.values: a sepal tier owns no outline yet (petals only, F6-scope) — not applied`));
+    if (k === 'tiers') notes.push(note('not-applied', `${where}.values: a sepal tier owns no outline or spine yet (petals only, F6-scope / F3-scope) — not applied`));
     else if (!e.values || typeof e.values !== 'object' || Array.isArray(e.values)) notes.push(note('invalid', `${where}.values is not an object — not applied`));
     else {
       const vals = {};

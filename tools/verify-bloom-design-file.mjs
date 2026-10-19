@@ -496,6 +496,61 @@ async function nodeClauses(F, rec) {
     }
     rec('F13', p, 'per-scope outlines: a layer and a pair owning a mode and curves round-trip verbatim, ownership and offsets intact, with no note; a #417-#420 file loads clean with no values invented; bad values (a bad choice, a non-value control, sheet thickness, a bad curve) are refused and told, a tier\'s told not applied');
   }
+  /* F14 — PER-SCOPE SPINES (F3-scope). A layer entry owning its curl mode, its
+     spine curve AND an outline, and a pair entry owning only a spine curve,
+     round-trip verbatim — every coordinate to the bit, the ownership (which
+     keys each entry carries, outline and spine side by side) intact, offsets
+     untouched — with no note; a #421-shaped file (entries owning an outline
+     only, the spine under `controls`) loads with no note and no spine value
+     invented; a curl mode the choice cannot hold, a spine curve outside its box
+     and a two-sided spine (the spine's spec is `single` only) are each refused
+     and told; a tier's spine is told not applied. */
+  {
+    const p = [];
+    const sameSide = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((q, i) => Object.is(q[0], b[i][0]) && Object.is(q[1], b[i][1]));
+    const hook = { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] };
+    const reflex = { mode: 'single', points: [[0, 0], [0.5, -0.05123], [0.9, -0.3]] };
+    const sym = { mode: 'symmetric', points: [[0, 0.03], [0.4, 0.22], [0.45, 0.25], [0.5, 0.22], [1, 0]] };
+    const scopes = {
+      layers: [{ layer: 1, offsets: { petalCup: 0.4 }, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: sym, petalCurlMode: 'CURVE', petalSpineCurve: hook } }],
+      petals: [{ layer: 0, slot: 2, offsets: {}, values: { petalSpineCurve: reflex } }],
+      tiers: [],
+    };
+    const r = F.readDoc(JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, petalCurlMode: 'SLIDER' }, { savedAt: 'x', scopes }))));
+    if (!r.ok) p.push(`a per-scope spine document did not read: ${JSON.stringify(r.notes)}`);
+    else {
+      if (r.notes.length) p.push(`a clean round trip of per-scope spines reported ${r.notes.map((n) => n.text).join(' | ')}`);
+      const L = r.doc.overrides.layers[0], P = r.doc.overrides.petals[0];
+      if (!L || L.layer !== 1 || L.offsets.petalCup !== 0.4 || !L.values || Object.keys(L.values).join() !== 'petalOutlineMode,petalOutlineCurve,petalCurlMode,petalSpineCurve' || L.values.petalCurlMode !== 'CURVE'
+        || !(L.values.petalSpineCurve && L.values.petalSpineCurve.mode === 'single' && sameSide(L.values.petalSpineCurve.points, hook.points))
+        || !(L.values.petalOutlineCurve && sameSide(L.values.petalOutlineCurve.points, sym.points))) p.push(`the layer's owned outline and spine read back as ${JSON.stringify(L)}`);
+      if (!P || P.layer !== 0 || P.slot !== 2 || !P.values || Object.keys(P.values).join() !== 'petalSpineCurve'
+        || !(P.values.petalSpineCurve && sameSide(P.values.petalSpineCurve.points, reflex.points))) p.push(`the pair's owned spine read back as ${JSON.stringify(P)}`);
+      if (r.doc.controls.petalCurlMode !== 'SLIDER') p.push(`the whole bloom's curl mode read back as ${r.doc.controls.petalCurlMode} — a scope's value leaked into the global`);
+    }
+    /* a #421 file: an outline owned per scope, the spine under controls only */
+    const old = JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: hook, scopeLayers: 'ON', layerCount: 2 }, { savedAt: 'x', scopes: { layers: [{ layer: 1, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: sym } }], petals: [], tiers: [] } })));
+    const r1 = F.readDoc(old);
+    if (!r1.ok || r1.notes.length) p.push(`a #421-shaped file did not load clean: ${JSON.stringify(r1.ok ? r1.notes : r1.error)}`);
+    else {
+      const v = r1.doc.overrides.layers[0] && r1.doc.overrides.layers[0].values;
+      if (!v || Object.keys(v).join() !== 'petalOutlineMode,petalOutlineCurve') p.push(`a #421-shaped file's entry came back owning ${JSON.stringify(v)} — a spine value was invented or the outline lost`);
+      if (r1.doc.controls.petalCurlMode !== 'CURVE' || !sameSide(r1.doc.controls.petalSpineCurve.points, hook.points)) p.push('a #421-shaped file\'s whole-bloom spine did not come back verbatim');
+    }
+    const bad = JSON.parse(F.toText(F.composeDoc(REG.DEFAULTS, { savedAt: 'x' })));
+    bad.overrides = { layers: [{ layer: 0, offsets: {}, values: { petalCurlMode: 'BOGUS', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 1.4], [1, 0.2]] } } }],
+      petals: [{ layer: 0, slot: 1, offsets: {}, values: { petalSpineCurve: { mode: 'two-sided', points: [[0, 0], [1, 0.2]], right: [[0, 0], [1, 0.1]] } } }],
+      tiers: [{ tier: 0, offsets: {}, values: { petalSpineCurve: hook } }] };
+    const r2 = F.readDoc(bad);
+    if (!r2.ok) p.push(`a document with bad spine values did not read: ${r2.error}`);
+    else {
+      if (r2.doc.overrides.layers[0] && r2.doc.overrides.layers[0].values) p.push(`bad spine values were applied: ${JSON.stringify(r2.doc.overrides.layers[0].values)}`);
+      if (r2.doc.overrides.petals[0] && r2.doc.overrides.petals[0].values) p.push(`a two-sided spine was applied: ${JSON.stringify(r2.doc.overrides.petals[0].values)}`);
+      for (const re of [/values\.petalCurlMode.*not one of/, /layers\[0\]\.values\.petalSpineCurve.*not a curve/, /petals\[0\]\.values\.petalSpineCurve.*not a curve/, /tiers\[0\]\.values.*not applied/])
+        if (!r2.notes.some((n) => re.test(n.text))) p.push(`not told: ${re} — ${r2.notes.map((n) => n.text).join(' | ')}`);
+    }
+    rec('F14', p, 'per-scope spines: a layer owning its curl mode, spine curve and outline and a pair owning a spine curve round-trip verbatim, ownership and offsets intact, with no note; a #421-shaped file loads clean with no spine value invented; a bad curl mode, an out-of-box spine and a two-sided spine are refused and told, a tier\'s told not applied');
+  }
 }
 
 /* ---------------- the browser clauses ---------------- */
@@ -663,7 +718,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13', 'F14'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
@@ -696,13 +751,14 @@ const MUTANTS = [
      F2 too: block 68's live rows carry owned values in their @scopes, so the
      1374-row round trip loses them (and F13's controls round trip loses
      petalCount under the dropped-field mutant above) — the first CI sweep said so. */
-  { id: 'scope-values-are-not-written', breaks: ['F13', 'F2'],
+  /* F3-scope: and F14, the per-scope spines' own round trip */
+  { id: 'scope-values-are-not-written', breaks: ['F13', 'F14', 'F2'],
     from: '    if (e.values && Object.keys(e.values).length) {\n      out.values = {};',
     to: '    if (false) {\n      out.values = {};' },
-  { id: 'scope-values-are-not-read', breaks: ['F13', 'F2'],
+  { id: 'scope-values-are-not-read', breaks: ['F13', 'F14', 'F2'],
     from: '      if (Object.keys(vals).length) out.values = vals;',
     to: '      if (false) out.values = vals;' },
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F14', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];
