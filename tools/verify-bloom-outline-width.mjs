@@ -74,7 +74,7 @@ const { server, port } = await serveRepo();
 const src = fs.readFileSync(path.join(ROOT, 'bloom.js'), 'utf8');
 const MUTANTS = [
   { id: 'the-width-listener-never-runs', find: "window.addEventListener('input', onWidthEdit, true);\nwindow.addEventListener('change', onWidthEdit, true);", into: '' },
-  { id: 'the-candidate-width-never-reaches-the-validator', find: "scale: outlineWidthScale({ petalWidth: o.widthMm + widthDelta })", into: 'scale: o.scale' },
+  { id: 'the-candidate-width-never-reaches-the-validator', find: "scale: outlineWidthScale({ petalWidth: widthTo !== null ? widthTo : o.widthMm + widthDelta })", into: 'scale: o.scale' },
 ];
 let failed = false;
 if (NEGATIVE) {

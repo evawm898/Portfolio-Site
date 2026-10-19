@@ -175,6 +175,14 @@ const E2_TURN_BAND_DEG = 5e-5;
    nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
    state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
+  /* F6-scope (Oct 18, docs/bloom-outline-curve-scope-outcome.md): NOT THE
+     SCOPING'S. The SPIRAL row's turn 1 owns the NEAR-RECTANGLE, and the same
+     two-turn SPIRAL with EVERY petal on the near-rectangle, unscoped, reads
+     45.000180 through this same gate (all on the diamond: 41.394) — the
+     near-rectangle's blunt nib under the bead (#419's class), 0.000168 deg over
+     the allowance, never widened. */
+  'SCOPED OUTLINE: SPIRAL x 2 turns on two different curves (turn 1 the rectangle, turn 2 the diamond)':
+    { excessDeg: 0.000168, note: 'adds 45.000168 deg at [-17.524, 8.525, 3.302]; face-to-face 45.00, outline 0.00 — the near-rectangle turn; unscoped all-rectangle twin 45.000180, all-diamond 41.394' },
   /* SEPAL OWN SIZE (docs/bloom-sepal-own-size-outcome.md): the two WING rows — a
      120 x 5 mm sepal blade, so every rim bead sits under #278's narrow-span clamp
      at the 1.00 mm wall (the class already declared for narrow leaves above);

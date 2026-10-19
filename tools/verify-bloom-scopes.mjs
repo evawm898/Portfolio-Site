@@ -942,8 +942,8 @@ const MUTANTS = [
     witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 4, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 1, n: 5, state: { ...FAN_PETALS_ON(), fanPerSide: 2 } }) !== null },
   /* Validation back on the kept entries only — the first cut's shape. */
   { id: 'unreached-entries-are-not-validated', breaks: ['SO5'],
-    from: '  for (const e of scopes.layers || []) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);\n  for (const e of scopes.petals || []) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);',
-    to: '  for (const e of scopes.layers || []) if (!layersLive) checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`);\n  for (const e of scopes.petals || []) if (!petalsLive) checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`);',
+    from: '  for (const e of scopes.layers || []) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`); }\n  for (const e of scopes.petals || []) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }',
+    to: '  for (const e of scopes.layers || []) if (!layersLive) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`); }\n  for (const e of scopes.petals || []) if (!petalsLive) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }',
     witness: (G) => { try { G.scopeOffsetsFor({ layers: [{ layer: 3, offsets: { sheetThickness: 0.5 } }] }, { layer: 0, slot: 0, n: 8, state: { ...REG.DEFAULTS, scopeLayers: 'ON' } }); return true; } catch (e) { return false; } } },
   { id: 'a-mirror-pair-is-split', breaks: ['SO3', 'SO4', 'SO7'],
     from: '  if (!SCOPE_PAIRED_PLACEMENTS.includes(state.placement)) return slot;\n  return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));',
@@ -972,8 +972,8 @@ const MUTANTS = [
      the role table, Q3.4: what they mutated no longer exists.) */
   /* ---- the role retirement (Q3.4 / Q3.5) ---- */
   { id: 'a-retired-id-is-still-read-by-the-builder', breaks: ['SO11'],
-    from: '  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;',
-    to: "  const ps0 = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;\n  const ps = state['labellumCup'] ? { ...ps0, petalCup: Number(ps0.petalCup) + Number(state['labellumCup']) } : ps0;",
+    from: '  let ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;',
+    to: "  const ps0 = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;\n  let ps = state['labellumCup'] ? { ...ps0, petalCup: Number(ps0.petalCup) + Number(state['labellumCup']) } : ps0;",
     witness: (G) => { const b = (st) => { const acc = new G.MeshBuilder({ exportMode: false }); G.buildBloomInto(acc, st, { below: null, capability: null, scopes: null }); return [...acc.positions]; };
       const a = b({ ...REG.DEFAULTS }), c = b({ ...REG.DEFAULTS, ['labellumCup']: 0.5 }); return !sameNumbers(a, c); } },
   { id: 'an-owned-tilt-keeps-the-ramp', breaks: ['SO6'],

@@ -1554,6 +1554,37 @@ export const SMOKE_BLOCKS = [
         path: "OC0's LAW arm with a two-sided curve stored (no cap is two-sided), the byte tool's partition (a holder)" },
     ],
   },
+  {
+    n: 68, title: 'the outline under scoping, and the FAN pairs as mirror images (Oct 18, F6-scope)',
+    anchor: 'SCOPED OUTLINE: a MIXED flower — RADIAL x 3 layers, layer 1 on the LAW, layer 2 owns the spoon, layer 3 the lopsided asymmetric curve',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       the scope's OWNED outline VALUES (mode and curve, replacing what the
+       petal inherits — resolvePetalOutline's values arm), the FAN MIRROR (the
+       non-canonical member's halves swapped — its mirrored arm), and every
+       per-ring and per-petal reader of the outline handed the petal's own
+       effective outline instead of the global control (OC0-OC4, AN, C1, A2,
+       FR2 restated per ring through outlineRestated, and OC5 per petal). The
+       anchor is the mixed flower, where all three layer states sit together;
+       the SPIRAL row carries the per-turn arm, the FAN pair row the mirror,
+       the orchid x infill row the mirror under the cell plan, and the GATED
+       row the inert-by-toggle branch. --conn is REQUIRED (a mirrored partner
+       is new geometry at every pair). */
+    conn: true,
+    rows: [
+      { label: 'SCOPED OUTLINE: a MIXED flower — RADIAL x 3 layers, layer 1 on the LAW, layer 2 owns the spoon, layer 3 the lopsided asymmetric curve',
+        path: "OC0-OC4 per ring against the outline restated from the row's own scopes (LAW, symmetric CURVE and two-sided CURVE in one flower), OC5's mode and sidedness per petal, AN per ring on its own curve" },
+      { label: 'SCOPED OUTLINE: the mixed flower x the Voronoi infill (each petal\'s cells on its own outline)',
+        path: "the infill family (I0-I12) on three outlines in one flower — each petal plans its cells on its own outline; X1 holds its one declared span-0 root-blend tangency" },
+      { label: 'SCOPED OUTLINE: SPIRAL x 2 turns on two different curves (turn 1 the rectangle, turn 2 the diamond)',
+        path: "the per-turn arm (a turn is a layer scope on SPIRAL), OC0/OC1 per turn on two different owned curves, OC5 per petal" },
+      { label: 'SCOPED OUTLINE: FAN — pair 2 owns the lopsided curve on a LAW fan (its partner mirrored)',
+        path: "OC5(c): the partner's emitted half-widths are the canonical member's with the halves swapped, exactly; OC4's handedness per member; a petal-scope owned value on a fan" },
+      { label: 'SCOPED OUTLINE: FAN orchid x 2 layers — mirrored asymmetric laterals x the Voronoi infill',
+        path: "the mirror under the cell plan (the partner plans on the swapped halves), coverage R1 with the re-emitted whorl handed each slot's mirror flag (fanSlotMirrored), I0-I12" },
+      { label: 'SCOPED OUTLINE: GATED — a layer owning a curve with per-layer values OFF (kept and inert; the whole bloom draws)',
+        path: "OC0/OC5 with an owned value kept and inert (scopeLayers OFF), the byte tool's partition (a holder)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

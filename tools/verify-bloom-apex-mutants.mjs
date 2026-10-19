@@ -659,6 +659,25 @@ function asymPetal(M, state) {
 }
 const ASYM_MUTANTS = /^(the-right-half-is-the-left-mirrored|the-halves-are-swapped|the-right-nib-reads-the-left-width|a-flat-section-reads-one-half-width)$/;
 const ASYM_ROWS = /^an asymmetric outline curve/;
+/* ===== THE OUTLINE UNDER SCOPING (F6-scope) =====
+   The mutated module's OWN per-petal records — each built petal's mode, its
+   mirror flag and its emitted half-widths per half — on the states the four
+   geometry mutants act on. Never OC5, which is what they name. */
+const SO_SPOON = { mode: 'symmetric', points: [[0, 0.03], [0.35, 0.05], [0.65, 0.2], [0.85, 0.22], [0.96, 0.12], [1, 0]] };
+const SO_SCOPES = (layers, petals = []) => ({ layers, petals, tiers: [], bounds: {} });
+const SO_MIXED = () => ({ state: { ...REGISTRY_DEFAULTS, layerCount: 3, scopeLayers: 'ON' }, scopes: SO_SCOPES([{ layer: 1, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: SO_SPOON } }, { layer: 2, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: ASYM_LOPSIDED } }]) });
+const SO_FAN_PAIR = () => ({ state: { ...REGISTRY_DEFAULTS, placement: 'FAN', scopePetals: 'ON' }, scopes: SO_SCOPES([], [{ layer: 0, slot: 2, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: ASYM_LOPSIDED } }]) });
+const SO_FAN = () => ({ state: { ...ASYM_SET(), placement: 'FAN' }, scopes: null });
+const SO_RADIAL = () => ({ state: ASYM_SET(), scopes: null });
+function soPetals(M, { state, scopes }) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    return M.buildBloomInto(acc, state, scopes ? { scopes } : {}).petalsAll.map((p) => ({ whorl: Math.round(p.whorl), slot: p.slotIndex, mode: p.outlineMode, mirrored: !!p.outlineMirrored, L: p.profileL ? [...p.profileL] : null, R: p.profileR ? [...p.profileR] : null }));
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const soModes = (P) => P.map((p) => `${p.whorl}:${p.mode}`).join(' ');
+const SO_MUTANTS = /^(a-scoped-outline-is-ignored|a-scoped-outline-leaks-to-sibling-layers|a-scoped-outline-leaks-to-sibling-pairs|the-fan-partner-is-not-mirrored|the-radial-partner-is-mirrored)$/;
+const SO_ROWS = /^a scoped outline/;
 /* The tier rows run under the tier mutants alone (`rowsFor` below), and the
    tier mutants run over the rows that name them. */
 const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
@@ -1250,8 +1269,8 @@ const MUTANTS = [
     /* re-anchored with the role retirement (Q3.4): the resolver takes no ring
        and the no-term arm IS the state; the mutation drops the FORM term only,
        so a scoped row keeps its scope and the mutant names one thing */
-    find: '  const ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;',
-    into: '  const ps = scopeTerm ? petalStateForSlot(state, null, formClamped, formScaled, scopeTerm) : state;', names: ['FV2'],
+    find: '  let ps = (slot.formTerm || scopeTerm) ? petalStateForSlot(state, slot.formTerm || null, formClamped, formScaled, scopeTerm) : state;',
+    into: '  let ps = scopeTerm ? petalStateForSlot(state, null, formClamped, formScaled, scopeTerm) : state;', names: ['FV2'],
     witness: (M, C) => {
       const [m, c] = formPair(M, C, { varianceForm: 1 });
       const t = bothBuilt(m, c); if (t) return t;
@@ -2912,6 +2931,48 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const off = (P) => Math.max(...P.margins.filter((r) => r.flat && r.hR > 1e-6).map((r) => Math.abs(Math.hypot(r.R[0] - r.C[0], r.R[1] - r.C[1], r.R[2] - r.C[2]) - r.hR)));
       return (off(m) > 0.5 && off(c) < 1e-9) ? null : `the mutant's right margin stands ${off(m)} mm off the right half (the clean tree's ${off(c)})`; } },
+  /* ===== THE OUTLINE UNDER SCOPING (F6-scope — docs/bloom-outline-curve-scope-
+     outcome.md). Five plausible wrong resolutions of a petal's outline, each
+     watertight and one piece at the same triangle count: a scope's owned curve
+     ignored (every petal on the whole bloom's), a layer's or a pair's owned
+     curve leaking to its siblings, the FAN partner not mirrored, and a RADIAL
+     partner mirrored. OC5 reads every petal; each witness reads the MUTATED
+     module's own per-petal records. The page's three (selection applying
+     values, the reset leaving the owned curve, an inherited curve frozen at
+     copy time) live in the panel gate's route (ah). */
+  { id: 'a-scoped-outline-is-ignored', why: 'the scope\'s owned mode and curve never reach its petals — every petal draws the whole bloom\'s outline while the panel shows the layer\'s own',
+    find: '    ? resolvePetalOutline(ps, scopeTerm ? scopeTerm.values || null : null, !!slot.fanMirrored,', into: '    ? resolvePetalOutline(ps, null, !!slot.fanMirrored,', names: ['OC0', 'OC5'], rows: SO_ROWS,
+    witness: (M, C) => { const m = soPetals(M, SO_MIXED()), c = soPetals(C, SO_MIXED());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.some((p) => p.mode === 'CURVE') && c.filter((p) => p.mode === 'CURVE').length === 16) ? null : `the mutant's modes ${soModes(m)} (the clean tree's ${soModes(c)})`; } },
+  { id: 'a-scoped-outline-leaks-to-sibling-layers', why: 'a layer\'s owned outline reaches EVERY layer — the outer whorl draws the inner layer\'s curve',
+    find: "      if (e.layer !== layer) continue;\n      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;\n      takeValues(e.values, 'layer');",
+    into: "      takeValues(e.values, 'layer'); if (e.values) any = true;\n      if (e.layer !== layer) continue;\n      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;", names: ['OC0', 'OC5'], rows: SO_ROWS,
+    witness: (M, C) => { const m = soPetals(M, SO_MIXED()), c = soPetals(C, SO_MIXED());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.filter((p) => p.whorl === 0).every((p) => p.mode === 'CURVE') && c.filter((p) => p.whorl === 0).every((p) => p.mode === 'LAW')) ? null : `layer 1 reads ${soModes(m.filter((p) => p.whorl === 0))} on the mutant (the clean tree's ${soModes(c.filter((p) => p.whorl === 0))})`; } },
+  { id: 'a-scoped-outline-leaks-to-sibling-pairs', why: 'a pair\'s owned outline reaches every pair of its layer — the fan\'s other petals draw it',
+    find: "      if (e.layer !== layer || e.slot !== key) continue;\n      addScopeOffsets(sum, e.offsets || {}, `petals[${e.layer},${e.slot}]`); any = true;\n      takeValues(e.values, 'petal');",
+    into: "      if (e.layer === layer && e.values) { takeValues(e.values, 'petal'); any = true; }\n      if (e.layer !== layer || e.slot !== key) continue;\n      addScopeOffsets(sum, e.offsets || {}, `petals[${e.layer},${e.slot}]`); any = true;", names: ['OC0', 'OC5'], rows: SO_ROWS,
+    witness: (M, C) => { const m = soPetals(M, SO_FAN_PAIR()), c = soPetals(C, SO_FAN_PAIR());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const n = (P) => P.filter((p) => p.mode === 'CURVE').length;
+      return (n(m) === m.length && n(c) === 2) ? null : `${n(m)} of ${m.length} petals draw a curve on the mutant (the clean tree's ${n(c)})`; } },
+  { id: 'the-fan-partner-is-not-mirrored', why: 'a FAN mirror pair keeps one hand — the partner draws its pair\'s asymmetric curve unswapped, so the pair is two copies rather than a mirror image',
+    find: "  return state.placement === 'FAN' && scopeSlotKey(slotIndex, slotCount, state) !== slotIndex;",
+    into: "  return false;", names: ['OC5'], rows: SO_ROWS,
+    witness: (M, C) => { const m = soPetals(M, SO_FAN()), c = soPetals(C, SO_FAN());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mir = (P) => P.filter((p) => p.mirrored).length;
+      const sameHand = (P) => P.every((p) => JSON.stringify(p.L) === JSON.stringify(P[0].L));
+      return (mir(m) === 0 && sameHand(m) && mir(c) === 3 && !sameHand(c)) ? null : `the mutant mirrors ${mir(m)} petals, same hand ${sameHand(m)} (the clean tree ${mir(c)}, ${sameHand(c)})`; } },
+  { id: 'the-radial-partner-is-mirrored', why: 'the mirror reaches RADIAL pairs too — the pinwheel the ruling keeps becomes mirror pairs',
+    find: "  return state.placement === 'FAN' && scopeSlotKey(slotIndex, slotCount, state) !== slotIndex;",
+    into: "  return (state.placement === 'FAN' || state.placement === 'RADIAL') && scopeSlotKey(slotIndex, slotCount, state) !== slotIndex;", names: ['OC5'], rows: SO_ROWS,
+    witness: (M, C) => { const m = soPetals(M, SO_RADIAL()), c = soPetals(C, SO_RADIAL());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mir = (P) => P.filter((p) => p.mirrored).length;
+      return (mir(m) > 0 && mir(c) === 0) ? null : `the mutant mirrors ${mir(m)} RADIAL petals (the clean tree ${mir(c)})`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -3496,6 +3557,20 @@ const ROWS = [
   /* F6-asym: the lopsided blade (the default curve on the left, a narrower
      right half) and the pinwheel at five petals. Scoped to the asymmetric
      mutants. */
+  /* F6-scope: the mixed flower (three layers: LAW / the spoon / the lopsided
+     curve), a FAN pair owning the lopsided curve, a FAN of the lopsided curve
+     (every partner mirrored) and a RADIAL one (the pinwheel — none mirrored).
+     Scoped to the scoped-outline mutants (and they to these). */
+  { label: 'a scoped outline — the MIXED flower (RADIAL x 3 layers, LAW / spoon / lopsided)', for: SO_MUTANTS,
+    scopes: { layers: [{ layer: 1, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: SO_SPOON } }, { layer: 2, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: ASYM_LOPSIDED } }], petals: [], tiers: [] },
+    set: [{ id: 'layerCount', value: '3' }, { id: 'scopeLayers', value: 'ON' }] },
+  { label: 'a scoped outline — FAN pair 2 owns the lopsided curve on a LAW fan', for: SO_MUTANTS,
+    scopes: { layers: [], petals: [{ layer: 0, slot: 2, offsets: {}, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: ASYM_LOPSIDED } }], tiers: [] },
+    set: [{ id: 'placement', value: 'FAN' }, { id: 'scopePetals', value: 'ON' }] },
+  { label: 'a scoped outline — FAN x the lopsided curve (every partner mirrored)', for: SO_MUTANTS,
+    set: [{ id: 'placement', value: 'FAN' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
+  { label: 'a scoped outline — RADIAL x the lopsided curve (the pinwheel, none mirrored)', for: SO_MUTANTS,
+    set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,

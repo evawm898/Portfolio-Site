@@ -80,7 +80,7 @@
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS } from './bloom-geometry.js';
+import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
@@ -91,6 +91,20 @@ import { readCurveValue, cloneCurve } from './bloom-curve.js';
 //   overrides.layers: [ { layer: <int >= 0>,               offsets: { <sliderId>: <number>, ... } } ]
 //   overrides.petals: [ { layer: <int >= 0>, slot: <int>, offsets: { ... } } ]
 //   overrides.tiers:  [ { tier:  <int >= 0>,               offsets: { ... } } ]   // read, kept, NOT applied — told
+//
+// F6-SCOPE (Oct 18) ADDS ONE OPTIONAL FIELD to a layer or petal entry, with no
+// version move (a container entry only ever gains fields):
+//
+//   values: { petalOutlineMode?: 'LAW' | 'CURVE', petalOutlineCurve?: <a curve value> }
+//
+// A value the scope OWNS OUTRIGHT — it replaces what the petal inherits, where
+// an offset adds to it (a curve is not a number and a choice has no delta). The
+// ids are the geometry's `SCOPE_VALUE_IDS`; each value is read through the
+// field kind of its control (a choice's options, a curve's shape rule), so a
+// value the control could not hold is refused and told exactly as it would be
+// under `controls`. A file written before this field has none, and reads as it
+// did. A `tiers` entry carrying values is told and they are not applied (the
+// sepals' outline is a later session).
 //
 // An offset is a DELTA on the global value (Q3.2), verbatim — never clamped
 // here, because what it composes to is per petal and the geometry's one clamp
@@ -205,7 +219,16 @@ export function composeDoc(state, { savedAt, scopes = null } = {}) {
      page kept, a 0 included), so a save after a load is the loaded file's own
      entries. Nothing is normalised on the way out (rule 2). */
   const overrides = {};
-  for (const k of SCOPE_CONTAINERS) overrides[k] = (scopes && Array.isArray(scopes[k])) ? scopes[k].map((e) => ({ ...e, offsets: { ...(e.offsets || {}) } })) : [];
+  for (const k of SCOPE_CONTAINERS) overrides[k] = (scopes && Array.isArray(scopes[k])) ? scopes[k].map((e) => {
+    const out = { ...e, offsets: { ...(e.offsets || {}) } };
+    /* F6-scope: owned values through each control's own field kind (a curve is
+       written as its value object, cloned) */
+    if (e.values && Object.keys(e.values).length) {
+      out.values = {};
+      for (const id of Object.keys(e.values)) { const c = controlOf.get(id); out.values[id] = c ? FIELD_KINDS[c.kind].write(e.values[id]) : e.values[id]; }
+    } else delete out.values;
+    return out;
+  }) : [];
   const curves = {};
   for (const k of CURVE_CONTAINERS) curves[k] = [];
   return { format: FORMAT, version: VERSION, app: APP, savedAt: savedAt || new Date().toISOString(), controls, overrides, curves };
@@ -351,7 +374,7 @@ export function scopeOffsetRefusal(id, container) {
    is, and saying so on every row would bury the four that need it). */
 export function scopeExclusionReason(id) {
   const c = controlOf.get(id);
-  if (!c || c.role !== 'petal' || scopeable.has(id)) return null;
+  if (!c || c.role !== 'petal' || scopeable.has(id) || SCOPE_VALUE_IDS.includes(id)) return null;
   return scopeOffsetRefusal(id, 'petals');
 }
 const scopeableTier = new Set(SCOPEABLE_TIER_IDS);
@@ -379,7 +402,24 @@ function readScopeEntry(k, e, i, notes) {
     if (typeof v !== 'number' || !Number.isFinite(v)) { notes.push(note('invalid', `${where}.offsets.${id} is ${JSON.stringify(v)}, not a number — not applied`)); continue; }
     out.offsets[id] = v;
   }
-  for (const f of Object.keys(e)) if (!need.includes(f) && f !== 'offsets') notes.push(note('unknown', `${where}.${f} is not a field this page knows`));
+  /* F6-SCOPE — THE OWNED VALUES. Only the geometry's value ids, each through
+     its control's own field kind; a tier carries none yet. */
+  if (e.values !== undefined) {
+    if (k === 'tiers') notes.push(note('not-applied', `${where}.values: a sepal tier owns no outline yet (petals only, F6-scope) — not applied`));
+    else if (!e.values || typeof e.values !== 'object' || Array.isArray(e.values)) notes.push(note('invalid', `${where}.values is not an object — not applied`));
+    else {
+      const vals = {};
+      for (const id of Object.keys(e.values)) {
+        if (SCOPE_UNSCOPED.includes(id)) { notes.push(note('invalid', `${where}.values.${id}: never scoped — it is the material (Q3.6) — not applied`)); continue; }
+        if (!SCOPE_VALUE_IDS.includes(id)) { notes.push(note(controlOf.has(id) ? 'invalid' : 'unknown', `${where}.values.${id}: only ${SCOPE_VALUE_IDS.join(' / ')} may be owned as a value — not applied`)); continue; }
+        const r = coerceField(controlOf.get(id), e.values[id]);
+        if (r.note) notes.push(note(r.kind || 'invalid', `${where}.values.${id}: ${r.note}`));
+        if (r.ok) vals[id] = r.value;
+      }
+      if (Object.keys(vals).length) out.values = vals;
+    }
+  }
+  for (const f of Object.keys(e)) if (!need.includes(f) && f !== 'offsets' && f !== 'values') notes.push(note('unknown', `${where}.${f} is not a field this page knows`));
   return out;
 }
 

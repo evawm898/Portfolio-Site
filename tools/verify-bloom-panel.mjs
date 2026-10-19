@@ -408,6 +408,22 @@
          each by its own sentence: per-layer values left RADIAL only, the foot
          keeping the ramp, the ring keeping the ramp, the ring held at the rim
          again (all bloom-geometry.js).
+     (ah) THE OUTLINE UNDER SCOPING (F6-scope, Oct 18 — docs/bloom-outline-
+         curve-scope-outcome.md). Two RADIAL layers, Per-layer values ON, the
+         whole bloom on the LAW: picking layer 2 writes NOTHING to the record
+         and its outline controls say INHERITED; setting its mode to CURVE
+         makes the mode its OWN (the record carries the mode and no curve) and
+         its petals — and only its petals, read off the builder's per-petal
+         census — draw the whole bloom's curve; deselected, an edit to the
+         whole bloom's curve reaches layer 2 LIVE; picked again, an edit to the
+         curve makes it layer 2's own (the whole bloom's curve unmoved), and
+         "Outline: reset to inherited" removes the layer's values (the bar's
+         button hides, the petals inherit the LAW again). Three mutants under
+         --negative-control, each by its own sentence (all bloom.js): a pick
+         that writes the scope's outline into its entry (selection applying
+         values), the reset leaving the owned curve, and an inherited curve
+         frozen at copy time. Three edits: this entry, the block, the negative
+         control's flags and banner.
          Three edits: this entry, the block, the negative control's flags and
          banner.
    =================================================================== */
@@ -3574,7 +3590,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const MUTANTS = [
       { name: 'a pick stamps the panel onto the picked scope', file: 'bloom.js', src: jsSrc, run: runLayers,
         from: '  const next = canonicalScope(sel, ui);\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  relabelView();',
-        to: '  const next = canonicalScope(sel, ui);\n  const shownBefore = Object.fromEntries([...SCOPE_IDS].map((id) => [id, Number(inputs[id].value)]));\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView) { for (const id of SCOPE_IDS) commitScopeOffset(id, shownBefore[id]); scheduleRegen(); }\n  relabelView();' },
+        to: '  const next = canonicalScope(sel, ui);\n  const shownBefore = Object.fromEntries([...SCOPE_IDS].filter((id) => !SCOPE_VALUE_SET.has(id)).map((id) => [id, Number(inputs[id].value)]));\n  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView) { for (const id of Object.keys(shownBefore)) commitScopeOffset(id, shownBefore[id]); scheduleRegen(); }\n  relabelView();' },
       { name: 'an edit lands on every scope', file: 'bloom.js', src: jsSrc, run: runLayers,
         from: '    own.offsets[id] = d;\n  }\n  if (scopesAreEmpty(scopes)) scopes = null;',
         to: '    own.offsets[id] = d;\n    for (const o of scopeOptions(ui)) { if (o.layer === v.layer && o.slot === v.slot) continue; let x = list.find((q) => q.layer === o.layer && (v.kind === \'layer\' || q.slot === o.slot)); if (!x) { x = v.kind === \'layer\' ? { layer: o.layer, offsets: {} } : { layer: o.layer, slot: o.slot, offsets: {} }; list.push(x); } x.offsets[id] = d; }\n  }\n  if (scopesAreEmpty(scopes)) scopes = null;' },
@@ -3981,6 +3997,97 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ah) THE OUTLINE UNDER SCOPING (F6-scope) ----------
+   See the header. The petals are read off the BUILDER's per-petal census
+   (`petalAllOutline`: each built petal's layer, its mode and the plan's own
+   points); the record off `__bloomDesign.scopes()`; what each assertion
+   expects is the control value this route itself set. */
+{
+  const tag = '[outline scopes]';
+  const SPOON = { mode: 'symmetric', points: [[0, 0.03], [0.35, 0.05], [0.65, 0.2], [0.85, 0.22], [0.96, 0.12], [1, 0]] };
+  const DIAMOND = { mode: 'symmetric', points: [[0, 0.03], [0.4, 0.22], [0.45, 0.25], [0.5, 0.22], [1, 0]] };
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const snap = (pg) => pg.evaluate(() => {
+    const m = window.__bloomMetrics();
+    const note = (id) => { const el = document.getElementById(id).closest('.bl-ctrl').querySelector('.bl-scope-note'); return el && !el.hidden ? el.textContent : ''; };
+    return {
+      rec: JSON.stringify(window.__bloomDesign.scopes()), ui: window.__bloomUIState(),
+      petals: (m.petalAllOutline || []).filter(Boolean).map((p) => ({ whorl: Math.round(p.whorl), mode: p.mode, pts: JSON.stringify(p.pointsL) })),
+      modeNote: note('petalOutlineMode'), curveNote: note('petalOutlineCurve'),
+      reset: document.getElementById('scopeOutlineReset').hidden,
+    };
+  });
+  const setValue = async (pg, id, v) => { await pg.evaluate(([i, val]) => { const el = document.getElementById(i); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]); await settle(pg); };
+  const run = async (pg, label) => {
+    const p = [];
+    const bad = await applyConfig(pg, [{ id: 'layerCount', value: '2' }, { id: 'scopeLayers', value: 'ON' }, { id: 'petalOutlineMode', value: 'LAW' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const base = await snap(pg);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 1, slot: 0 })); await settle(pg);
+    const picked = await snap(pg);
+    if (picked.rec !== base.rec) p.push(`a pick WROTE an outline to the record: ${base.rec} -> ${picked.rec}`);
+    if (!/INHERITED/.test(picked.modeNote) || !/INHERITED/.test(picked.curveNote + picked.modeNote)) p.push(`the picked layer's outline notes do not say INHERITED (${JSON.stringify(picked.modeNote)})`);
+    await setValue(pg, 'petalOutlineMode', 'CURVE');
+    const owned = await snap(pg);
+    const rec1 = JSON.parse(owned.rec || 'null');
+    const L1 = rec1 && rec1.layers && rec1.layers.find((e) => e.layer === 1);
+    if (!L1 || !L1.values || L1.values.petalOutlineMode !== 'CURVE' || 'petalOutlineCurve' in L1.values) p.push(`after setting layer 2's mode the record is ${owned.rec} — it must carry layer 2's own mode and NO curve (the curve inherited, live)`);
+    if (owned.ui.petalOutlineMode !== 'LAW') p.push(`a mode edit on layer 2 moved the WHOLE-BLOOM mode to ${owned.ui.petalOutlineMode}`);
+    const g0 = JSON.stringify(owned.ui.petalOutlineCurve.points);
+    const strays = owned.petals.filter((q) => q.whorl === 0 && q.mode !== 'LAW'), missed = owned.petals.filter((q) => q.whorl === 1 && (q.mode !== 'CURVE' || q.pts !== g0));
+    if (strays.length || missed.length || !owned.petals.some((q) => q.whorl === 1)) p.push(`layer 2 owning CURVE: ${strays.length} layer-1 petal(s) left the LAW, ${missed.length} layer-2 petal(s) do not draw the whole bloom's curve`);
+    if (!/OWN outline mode/.test(owned.modeNote)) p.push(`the mode note does not say it is layer 2's OWN: ${JSON.stringify(owned.modeNote)}`);
+    if (owned.reset) p.push('the reset button is hidden while layer 2 owns its mode');
+    /* deselected, an edit to the whole bloom's curve reaches layer 2 live */
+    await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    const des = await snap(pg);
+    if (des.rec !== owned.rec) p.push(`deselecting changed the record: ${owned.rec} -> ${des.rec}`);
+    await setValue(pg, 'petalOutlineCurve', SPOON);
+    const live = await snap(pg);
+    if (live.rec !== owned.rec) p.push(`an edit to the whole bloom's curve changed the scope record: ${live.rec}`);
+    if (live.petals.filter((q) => q.whorl === 1).some((q) => q.pts !== JSON.stringify(SPOON.points))) p.push('layer 2 did not follow the whole bloom\'s curve edit — its inherited curve is not live');
+    /* picked again, a curve edit makes it layer 2's own */
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 1, slot: 0 })); await settle(pg);
+    await setValue(pg, 'petalOutlineCurve', DIAMOND);
+    const own2 = await snap(pg);
+    const rec2 = JSON.parse(own2.rec || 'null');
+    const L2 = rec2 && rec2.layers && rec2.layers.find((e) => e.layer === 1);
+    if (!L2 || !L2.values || !L2.values.petalOutlineCurve || JSON.stringify(L2.values.petalOutlineCurve.points) !== JSON.stringify(DIAMOND.points)) p.push(`after a curve edit on layer 2 the record is ${own2.rec} — the curve must be layer 2's own`);
+    if (JSON.stringify(own2.ui.petalOutlineCurve.points) !== JSON.stringify(SPOON.points)) p.push('a curve edit on layer 2 moved the WHOLE-BLOOM curve');
+    if (own2.petals.filter((q) => q.whorl === 1).some((q) => q.pts !== JSON.stringify(DIAMOND.points))) p.push('layer 2\'s petals do not draw its own curve');
+    /* reset to inherited */
+    await pg.click('#scopeOutlineReset'); await settle(pg);
+    const rs = await snap(pg);
+    const rec3 = JSON.parse(rs.rec || 'null');
+    const L3 = rec3 && rec3.layers && rec3.layers.find((e) => e.layer === 1);
+    if (L3 && L3.values) p.push(`the reset left layer 2 owning ${JSON.stringify(L3.values)}`);
+    if (!rs.reset) p.push('the reset button is still shown after the reset');
+    if (rs.petals.filter((q) => q.whorl === 1).some((q) => q.mode !== 'LAW')) p.push('after the reset layer 2 does not inherit the whole bloom\'s LAW');
+    await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a pick writes nothing and says INHERITED; layer 2's mode set to CURVE is its own (no curve in the record), its 8 petals draw the whole bloom's curve and layer 1 stays LAW; deselected, the whole bloom's curve edit reaches layer 2 live; picked, a curve edit is layer 2's own and the global is unmoved; the reset removes the values and layer 2 inherits again`);
+  };
+  await openBloom(page, port);
+  await run(page, 'per-layer outlines');
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'a pick applies the scope outline', from: '  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  relabelView();', to: '  bindScope(next && scopeIsValid(next, ui) ? next : null);\n  if (scopeView && scopeView.kind !== \'tier\') { const o = scopeOwnEntry(scopeView, true); o.values = { ...(o.values || {}), petalOutlineCurve: inputs.petalOutlineCurve.value }; }\n  relabelView();' },
+      { name: 'the reset leaves the owned curve', from: '  if (!own || !own.values) return false;\n  delete own.values;', to: '  if (!own || !own.values) return false;\n  delete own.values.petalOutlineMode;' },
+      { name: 'an inherited curve is frozen at copy time', from: "  (own.values || (own.values = {}))[id] = id === 'petalOutlineCurve'", to: "  if (id === 'petalOutlineMode' && !(own.values && 'petalOutlineCurve' in own.values)) (own.values || (own.values = {})).petalOutlineCurve = cloneCurve(inheritedOutlineValue(v, 'petalOutlineCurve', ui, own));\n  (own.values || (own.values = {}))[id] = id === 'petalOutlineCurve'" },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4087,14 +4194,18 @@ if (NEGATIVE_CONTROL) {
     const sawSpiralFoot = fail.some((f) => /^\[spiral layers\] MUTANT \(the foot keeps the ramp\).*the foot did not follow its own width/.test(f));
     const sawSpiralRing = fail.some((f) => /^\[spiral layers\] MUTANT \(the ring keeps the ramp\).*the ring did not follow its own width/.test(f));
     const sawSpiralHold = fail.some((f) => /^\[spiral layers\] MUTANT \(the ring is held at the rim again\).*the hub did not grow to the widest owned ring/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (ah), THE OUTLINE UNDER SCOPING — one flag per mutant */
+    const sawOutlinePick = fail.some((f) => /^\[outline scopes\] MUTANT \(a pick applies the scope outline\).*a pick WROTE an outline/.test(f));
+    const sawOutlineReset = fail.some((f) => /^\[outline scopes\] MUTANT \(the reset leaves the owned curve\).*the reset left layer 2 owning/.test(f));
+    const sawOutlineFrozen = fail.some((f) => /^\[outline scopes\] MUTANT \(an inherited curve is frozen at copy time\).*(NO curve|not live)/.test(f));
+    if (sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FIVE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
