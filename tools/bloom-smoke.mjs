@@ -1585,6 +1585,26 @@ export const SMOKE_BLOCKS = [
         path: "OC0/OC5 with an owned value kept and inert (scopeLayers OFF), the byte tool's partition (a holder)" },
     ],
   },
+  {
+    n: 69, title: 'the infill on several whorls, and the length they stand for (Oct 19, infill-whorls)',
+    anchor: 'INFILL WHORLS: RADIAL x 3 whorls x the Voronoi infill on the LAW (#421\'s 736-pair flower)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block exercises is
+       the infill's SEAM on a short petal — the plan's `xB` as the seam's own
+       double, so `snapSeam`, the emitter's `onSeam` and the margin ramp agree
+       with the outline's seam columns. The anchor is the three-whorl flower
+       (#421's 736 pairs on main, every inner whorl a shorter petal); the
+       28 mm row is the same seam on ONE whorl (1,600 pairs on main), which is
+       what says the whorls were a proxy. X2 is the witness (0 pairs, no
+       declaration) and --conn is REQUIRED (the seam is where the basal panel
+       and the cells meet). */
+    conn: true,
+    rows: [
+      { label: 'INFILL WHORLS: RADIAL x 3 whorls x the Voronoi infill on the LAW (#421\'s 736-pair flower)',
+        path: "X2 on the seam of three whorls of infilled petals (0 pairs; 736 on main), I0-I12 per petal, coverage R1 over 24 infilled petals" },
+      { label: 'INFILL WHORLS: ONE whorl x petalLength 28 x the infill (the length the whorls stand for)',
+        path: "X2 on one short infilled petal's seam (0 pairs; 1,600 on main, where the quantisation residue had the other sign)" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

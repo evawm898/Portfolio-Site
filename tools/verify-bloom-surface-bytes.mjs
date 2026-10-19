@@ -376,6 +376,18 @@ const PREDICATE_MOVERS = {
     if (mine.outlineWidthScale(st) !== 1) return true;
     return mine.tubePlan(st, Math.round(Number(st.layerCount) || 1), Math.round(Number(st.petalCount))).active;
   },
+  /* THE INFILL'S SEAM IS ONE DOUBLE (the infill-whorls session). A row moves
+     iff the BASE tree builds a petal carrying an infill plan that cut cells
+     (not refused, not absent): `xB` is quantised onto the plan grid now, so
+     every such plan's seam, snap, ramp and seed field read a value up to half
+     a grid step from the raw station. PREDECLARED FROM THE BASE TREE'S OWN
+     RECORD, never from the label; every row with the guard off, and every
+     refused plan (a fringe, a lobed blade), must hold to the bit. */
+  'infill-seam': (st, row) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    return (b.petalsAll || []).some((p) => p && p.infill && !p.infill.refused && p.infill.cells > 0);
+  },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);

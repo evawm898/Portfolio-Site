@@ -138,6 +138,30 @@
          fillet), and below the record's own smallest onset nothing is rounded
          past its fillet.
 
+   I13 THE SEAM IS ONE BOUNDARY (the infill-whorls session, Oct 19 — docs/
+   bloom-infill-whorls-outcome.md). The basal panel is `emitPanel`'s and the
+   cells abut it along the seam row; every seam test (the planner's
+   `snapSeam`, the emitter's `onSeam` and the ramp's `!(x > plan.xB)`) compares
+   a plan point against `plan.xB` on a 1e-9 bar, so `xB` MUST BE THE SEAM'S
+   OWN DOUBLE — the quantised value the outline's seam columns carry. It was
+   the raw station, 2e-8 .. 4e-7 mm off, every seam test was false on every
+   row, and the census read the resulting T-junctions (and, on a buckled
+   blade, real crossings 0.0997 mm deep) as up to 1,600 within-shell pairs a
+   petal. Two clauses, each with a reference the seam code does not write:
+     (a) every outline point on the seam row has x === `plan.xB`, Object.is —
+         the outline's own `gq(rows[mSplit].u * L)` is the reference;
+     (b) on every seam state, the census (`tools/bloom-self-intersection.mjs`,
+         X2's own function) reads 0 within-shell pairs between the BASAL panel
+         and the CELL region (`emittedTriRange`) of one petal. The subject is
+         the seam's pairs and nothing else: a cell-against-cell fold elsewhere
+         (the buckle's three, the cup x curl corner's) is the petal's own and
+         declared in SELF_INTERSECTION_XFAIL. The states are the ones whose
+         seam residue had each sign (the shipped 35 mm reads clean on the raw
+         station by luck of the sign; 24/28/32/60 mm do not) plus the
+         declared #286 rows.
+   Its mutant restores the raw station in a copy of the module and both
+   clauses must go red.
+
    WHAT IT DOES NOT COVER, in its own header:
      - IT IS NODE-SIDE. It does not drive the page, so it inherits nothing
        about whether a row's values are REACHABLE through the UI; both STL
@@ -614,6 +638,8 @@ async function main() {
   for (const c of s4Clauses(G, null)) say(c);
   /* THE ROUNDNESS — I12. */
   { const cs = await i12Clauses(G, QUICK); for (const c of cs) say(c); console.log(`I12 the roundness: ${cs.filter((c) => c.ok).length} of ${cs.length} checks green (floor by branch, containment and roundness against today, count and bar at every step, the ruled default, the record).`); }
+  /* THE SEAM — I13. */
+  { const cs = i13Clauses(G, QUICK); for (const c of cs) say(c); console.log(`I13 the seam is one boundary: ${cs.filter((c) => c.ok).length} of ${cs.length} checks green (the seam columns at plan.xB, and 0 basal-vs-cell pairs on every seam state).`); }
 
   /* The two refusals, by name. */
   for (const [name, set, why] of REFUSERS) {
@@ -636,7 +662,7 @@ async function main() {
   const json = arg('--json', null);
   if (json) fs.writeFileSync(json, JSON.stringify(results, null, 1));
   console.log('');
-  console.log(fails === 0 ? `PASS — I0..I12 over ${states.length} states x 2 modes.` : `FAIL — ${fails} clause failure(s)`);
+  console.log(fails === 0 ? `PASS — I0..I13 over ${states.length} states x 2 modes.` : `FAIL — ${fails} clause failure(s)`);
   if (fails) process.exitCode = 1;
 }
 
@@ -688,6 +714,39 @@ import { pathToFileURL } from 'node:url';
 import { infillPlanFor, infillWallSurfaceMm } from './bloom-infill-wall.mjs';
 const S4_DEFAULT = {};
 import * as RL from './bloom-rim-roundness-lib.mjs';
+import { census as seamCensus } from './bloom-self-intersection.mjs';
+/* ---------------- I13: the seam is one boundary ---------------- */
+const I13_STATES = [
+  ['default (35 mm)', {}], ['petalLength 24', { petalLength: 24 }], ['petalLength 28', { petalLength: 28 }],
+  ['petalLength 32', { petalLength: 32 }], ['petalLength 60', { petalLength: 60 }],
+  ['petalWidth 30', { petalWidth: 30 }], ['footDelicacy 0.25', { footDelicacy: 0.25 }],
+  ['petalTipShape 3', { petalTipShape: 3 }], ['buckle 0.6 f3', { buckleAmp: 0.6, buckleFreq: 3 }],
+];
+function i13Clauses(M, quick = false) {
+  const out = [];
+  const add = (id, ok, msg) => out.push({ id, ok, msg });
+  for (const [name, set] of (quick ? I13_STATES.filter(([n]) => /28|default|buckle/.test(n)) : I13_STATES)) {
+    const { plan, petal, acc } = infillPlanFor(M, DEFAULTS, set, true);
+    if (!plan || plan.refused || !plan.outline) { add('I13', false, `${name}: the plan refused (${plan && plan.refused}) — the seam cannot be asked about`); continue; }
+    const seam = plan.outline.filter((q) => q.row === plan.mSplit);
+    const off = seam.filter((q) => !Object.is(q.x, plan.xB));
+    add('I13', seam.length >= 2 && off.length === 0, `${name}: ${off.length} of ${seam.length} seam column(s) are not at plan.xB (worst ${off.length ? Math.max(...off.map((q) => Math.abs(q.x - plan.xB))).toExponential(3) : 0} mm) — the seam has two doubles`);
+    const R = petal.infill && petal.infill.emittedTriRange;
+    if (!R) { add('I13', false, `${name}: no emitted cell range on the petal record`); continue; }
+    const c = seamCensus(new Float64Array(acc.positions), { collect: true });
+    const inC = (t) => t >= R[0] && t < R[1];
+    let seamPairs = 0, worst = 0;
+    for (const st of c.sites) if (inC(st.pair[0]) !== inC(st.pair[1])) { seamPairs++; worst = Math.max(worst, st.span); }
+    add('I13', seamPairs === 0, `${name}: ${seamPairs} within-shell pair(s) between the basal panel and the cell region (worst span ${worst.toFixed(4)} mm) — the seam is not one boundary`);
+    if (!quick) console.log(`I13 ${name.padEnd(22)} seam columns ${seam.length} at plan.xB: ${off.length === 0 ? 'yes' : 'NO'} · basal-vs-cell pairs ${seamPairs} · whole petal ${c.within} within-shell pair(s)`);
+  }
+  return out;
+}
+const I13_MUTANTS = [
+  { id: 'the-seam-is-the-raw-station', from: '  const xB = infillSnap(rows[mSplit].u * L, infillTieSlack(L));', to: '  const xB = rows[mSplit].u * L;',
+    witness: (M) => { const { plan } = infillPlanFor(M, DEFAULTS, { petalLength: 28 }, true); return plan && !Object.is(plan.xB, plan.outline.find((q) => q.row === plan.mSplit).x); },
+    breaks: ['I13'] },
+];
 let FLOOR_VARIANT = null;
 async function floorVariant() { if (!FLOOR_VARIANT) { FLOOR_VARIANT = await RL.loadVariant({ K: 4, law: true }); globalThis.__holeLaw = (Pl, fr, infillFillet) => infillFillet(Pl, fr); } return FLOOR_VARIANT; }
 function roundnessQ(h) { let per = 0; for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i + 1) % h.length]; per += Math.hypot(b.x - a.x, b.y - a.y); } return per > 0 ? (4 * Math.PI * polyArea(h)) / (per * per) : 0; }
@@ -991,7 +1050,24 @@ async function s4NegativeControl() {
     console.log(`${m.id.padEnd(40)} witness ${witness ? 'MOVED' : 'DID NOT MOVE'} · fired ${[...fired].sort().join(',') || '(nothing)'} — ${missed.length ? 'MISSED ' + missed.join(',') : 'every clause it names went red'}`);
   }
   console.log(f12 ? `I12 NEGATIVE CONTROL: FAIL — ${f12} mutant(s) did not behave` : 'I12 NEGATIVE CONTROL: every mutant witnessed and every named clause red.');
-  return fails + f12;
+  /* I13 — the seam's mutant, its anchor checked before it runs. */
+  console.log('');
+  console.log(`--- I13 NEGATIVE CONTROL: ${I13_MUTANTS.length} mutation(s) of a COPY of bloom-geometry.js, each with a witness on the mutated module ---`);
+  let f13 = 0;
+  for (const m of I13_MUTANTS) { const n = src.split(m.from).length - 1; if (n !== 1) { console.log(`${m.id.padEnd(40)} REFUSED — the anchor matches ${n} times, not once; the mutant is DISARMED`); f13++; } }
+  if (!f13) for (const m of I13_MUTANTS) {
+    const file = path.join(dir, `${m.id}.js`);
+    fs.writeFileSync(file, src.replace(m.from, m.to));
+    const M = await import(pathToFileURL(file).href);
+    let witness = false; try { witness = !!m.witness(M); } catch (e) { witness = false; }
+    const fired = new Set(); const why = [];
+    try { for (const c of i13Clauses(M, true)) if (!c.ok) { fired.add(c.id); if (why.length < 2) why.push(c.msg); } } catch (e) { fired.add('threw'); }
+    const missed = m.breaks.filter((b) => !fired.has(b));
+    if (!witness || missed.length) f13++;
+    console.log(`${m.id.padEnd(40)} witness ${witness ? 'MOVED' : 'DID NOT MOVE'} · fired ${[...fired].sort().join(',') || '(nothing)'} — ${missed.length ? 'MISSED ' + missed.join(',') : 'every clause it names went red'}${why.length ? '\n    e.g. ' + why.join('\n    e.g. ') : ''}`);
+  }
+  console.log(f13 ? `I13 NEGATIVE CONTROL: FAIL — ${f13} mutant(s) did not behave` : 'I13 NEGATIVE CONTROL: the mutant witnessed and I13 red.');
+  return fails + f12 + f13;
 }
 
 /* ---------------- --cap-sweep ---------------- */

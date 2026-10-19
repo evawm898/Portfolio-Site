@@ -424,8 +424,26 @@
          values), the reset leaving the owned curve, and an inherited curve
          frozen at copy time. Three edits: this entry, the block, the negative
          control's flags and banner.
-         Three edits: this entry, the block, the negative control's flags and
-         banner.
+     (ai) THE OUTLINE-GATED CONTROLS FOLLOW THE PICKED SCOPE'S MODE (the
+         infill-whorls session, Oct 19 — docs/bloom-infill-whorls-outcome.md
+         §5). Every control whose visibility predicate reads
+         `petalOutlineMode` (the tapers, the tip shape, the squared end, the
+         fringe and the lobes — found by `predicateDrivers`, never listed) is
+         shown or hidden on the PICKED scope's effective mode: its own value
+         where the scope owns one, the whole bloom's where it inherits. The
+         expectation is RESTATED here from the scope record the page reports
+         (`__bloomDesign.scopes()`) and the whole-bloom state, through the
+         registry's own `evalPredicate`, never read from the page's resolver.
+         Three arrangements (a RADIAL layer, a FAN pair, a SPIRAL turn), both
+         directions (whole bloom LAW / scope owns CURVE, whole bloom CURVE /
+         scope owns LAW), the owning scope and an inheriting one, and the
+         clause is non-vacuous by construction: the two picks must DISAGREE.
+         #421's "not done" list named this as following the global mode; on
+         `169fd5b` it already follows the scope, so this route is the claim's
+         first witness rather than a fix. Two mutants under --negative-control,
+         each by its own sentence (both bloom.js): visibility reading the
+         whole bloom's outline mode, and visibility ignoring the pick. Three
+         edits: this entry, the block, the negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4088,6 +4106,82 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ai) OUTLINE-GATED VISIBILITY FOLLOWS THE PICK -----------
+   See the header. The controls are the ones whose predicate DRIVES on
+   `petalOutlineMode`; the expectation is the registry's own predicate on the
+   whole-bloom state with the mode RESTATED from the scope record (the scope's
+   own value, else the whole bloom's), so the page's resolver is the thing
+   under test and never the reference. */
+{
+  const tag = '[outline visibility]';
+  const GATED = CONTROLS.filter((c) => predicateDrivers(c.visibleWhen).has('petalOutlineMode')).map((c) => c.id);
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const setValue = async (pg, id, v) => { await pg.evaluate(([i, val]) => { const el = document.getElementById(i); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]); await settle(pg); };
+  const shown = (pg) => pg.evaluate((ids) => Object.fromEntries(ids.map((i) => [i, !document.getElementById(i).closest('.bl-ctrl').hidden])), GATED);
+  /* the scope's mode, restated from the record the page reports: its own value, else the whole bloom's */
+  const restatedMode = (rec, ui, v) => {
+    const list = v.kind === 'pair' ? (rec && rec.petals) || [] : (rec && rec.layers) || [];
+    const e = list.find((x) => x.layer === v.layer && (v.kind !== 'pair' || x.slot === v.slot));
+    return e && e.values && e.values.petalOutlineMode ? e.values.petalOutlineMode : ui.petalOutlineMode;
+  };
+  const ARR = [
+    { label: 'a RADIAL layer', cfg: [{ id: 'layerCount', value: '2' }, { id: 'scopeLayers', value: 'ON' }], own: { kind: 'layer', layer: 1, slot: 0 }, inh: { kind: 'layer', layer: 0, slot: 0 } },
+    { label: 'a FAN pair', cfg: [{ id: 'placement', value: 'FAN' }, { id: 'scopePetals', value: 'ON' }], own: { kind: 'pair', layer: 0, slot: 2 }, inh: { kind: 'pair', layer: 0, slot: 1 } },
+    { label: 'a SPIRAL turn', cfg: [{ id: 'placement', value: 'SPIRAL' }, { id: 'layerCount', value: '2' }, { id: 'scopeLayers', value: 'ON' }], own: { kind: 'layer', layer: 1, slot: 0 }, inh: { kind: 'layer', layer: 0, slot: 0 } },
+  ];
+  const run = async (pg, label) => {
+    const p = [];
+    if (GATED.length < 10) p.push(`only ${GATED.length} control(s) drive on petalOutlineMode — the census that finds them is broken`);
+    let checked = 0;
+    for (const A of ARR) for (const [glob, owned] of [['LAW', 'CURVE'], ['CURVE', 'LAW']]) {
+      await pg.evaluate(() => { window.__bloomScopeView.deselect(); window.__bloomScopes(null); }); await settle(pg);
+      const bad = await applyConfig(pg, [...A.cfg, { id: 'petalOutlineMode', value: glob }]);
+      if (bad.length) { p.push(`${A.label}: config did not take: ${bad.join('; ')}`); continue; }
+      await pg.evaluate((v) => window.__bloomScopeView.select(v), A.own); await settle(pg);
+      await setValue(pg, 'petalOutlineMode', owned);
+      const picks = {};
+      for (const [which, v] of [['owning', A.own], ['inheriting', A.inh]]) {
+        await pg.evaluate((x) => window.__bloomScopeView.select(x), v); await settle(pg);
+        const snapV = await pg.evaluate(() => ({ rec: window.__bloomDesign.scopes(), ui: window.__bloomUIState() }));
+        const mode = restatedMode(snapV.rec, snapV.ui, v);
+        const want = which === 'owning' ? owned : glob;
+        if (mode !== want) p.push(`${A.label}, whole bloom ${glob}: the record says the ${which} scope's mode is ${mode}, expected ${want} — the route's own setup did not take`);
+        const st = { ...snapV.ui, petalOutlineMode: mode };
+        const got = await shown(pg);
+        const wrong = GATED.filter((id) => got[id] !== evalPredicate(CONTROLS.find((c) => c.id === id).visibleWhen, st));
+        if (wrong.length) p.push(`${A.label}, whole bloom ${glob}, the ${which} scope (mode ${mode}): ${wrong.join(', ')} ${wrong.length === 1 ? 'is' : 'are'} shown/hidden on a mode other than the picked scope's`);
+        picks[which] = JSON.stringify(got);
+        checked++;
+      }
+      if (picks.owning === picks.inheriting) p.push(`${A.label}, whole bloom ${glob}: the owning and inheriting picks show the same outline controls — the clause is vacuous here`);
+      await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    }
+    await pg.evaluate(() => window.__bloomScopes(null)); await settle(pg);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${GATED.length} outline-gated controls follow the PICKED scope's mode on ${checked} picks (a RADIAL layer, a FAN pair, a SPIRAL turn; whole bloom LAW and CURVE; owning and inheriting), restated from the record, and the two picks disagree every time`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'scoped outline visibility');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'visibility reads the whole bloom\'s outline mode', from: '  const vui = scopeView ? viewUi(ui) : ui;', to: '  const vui = scopeView ? { ...viewUi(ui), petalOutlineMode: ui.petalOutlineMode } : ui;' },
+      { name: 'visibility ignores the pick', from: "wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && idsFor(scopeView).has(c.id) ? vui : ui);", to: 'wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);' },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4198,14 +4292,17 @@ if (NEGATIVE_CONTROL) {
     const sawOutlinePick = fail.some((f) => /^\[outline scopes\] MUTANT \(a pick applies the scope outline\).*a pick WROTE an outline/.test(f));
     const sawOutlineReset = fail.some((f) => /^\[outline scopes\] MUTANT \(the reset leaves the owned curve\).*the reset left layer 2 owning/.test(f));
     const sawOutlineFrozen = fail.some((f) => /^\[outline scopes\] MUTANT \(an inherited curve is frozen at copy time\).*(NO curve|not live)/.test(f));
-    if (sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (ai), OUTLINE-GATED VISIBILITY FOLLOWS THE PICK — one flag per mutant */
+    const sawVisMode = fail.some((f) => /^\[outline visibility\] MUTANT \(visibility reads the whole bloom's outline mode\).*on a mode other than the picked scope's/.test(f));
+    const sawVisPick = fail.some((f) => /^\[outline visibility\] MUTANT \(visibility ignores the pick\).*on a mode other than the picked scope's/.test(f));
+    if (sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-FIVE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

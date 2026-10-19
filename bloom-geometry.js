@@ -11649,7 +11649,22 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      own top edge — degenerate geometry in code this feature does not own.
      Moving the REGION up instead leaves `emitPanel`'s argument untouched and
      still has the two meet at a LINE. */
-  const xB = rows[mSplit].u * L;
+  /* THE SEAM'S x IS THE SEAM'S OWN DOUBLE — ON THE PLAN GRID, THE VALUE THE
+     OUTLINE'S SEAM COLUMNS CARRY (`gq(rows[mSplit].u * L)` below) — AND NOT
+     THE RAW STATION. Every seam test downstream compares a plan point against
+     `xB` on a 1e-9 bar (`snapSeam` here, `onSeam` and the ramp's
+     `!(x > plan.xB)` in the emitter), and the quantiser moves the raw station
+     by up to half a grid step (measured 1.8e-8 .. 4.3e-7 mm over nine petal
+     lengths), so on the raw value every one of them was false on every row:
+     the snap that closes the seam's T-junctions never fired, the seam edges
+     were refined and beaded as if they were margin, and a cell vertex landed
+     INSIDE the basal panel's own seam edge. The census read each such
+     T-junction as within-shell contacts — 736 pairs at a 0.4240 mm "span"
+     (a collinear contact's LENGTH; no pair has a point inside both
+     triangles) on three RADIAL whorls, 1,600 on one 28 mm whorl — and WHICH
+     lengths read it was the SIGN of the quantisation residue. The seam session
+     (infill-whorls, Oct 19) has the table. One owner, one double. */
+  const xB = infillSnap(rows[mSplit].u * L, infillTieSlack(L));
   if (!(L - xB > 2 * wall)) return { ...base, refused: 'room' };
 
   /* THE METRIC, AND THE GUARD IS WHY THE SHIPPING DEFAULT COSTS NOTHING. */

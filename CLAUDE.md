@@ -1023,6 +1023,8 @@ INHERITS LIVE, AND A FAN PAIR IS TWO MIRROR IMAGES** (F6-scope, Oct 18 — Eva's
   apex mutants; panel route (ah) with three mutants (TWENTY-FIVE routes); design-file F13 with two.
 - **Found**: RADIAL x 3 whorls x infill folds at any outline (736 pairs on the LAW, unscoped, no matrix
   row); the scoped mix reads one span-0 tangency, declared. `bloom-census-attribute.mjs` now passes scopes.
+  **[Oct 19: FIXED, and neither the whorls nor the outline were the cause — the infill's seam had two doubles;
+  see the infill-whorls block below. Every one of those flowers reads 0, and the declaration is removed.]**
 - Block 68 (15 rows, 1,374), smoke block 68 (6); `frozen/phase74` = the 1,359 rows at `f63235e`. Sheet:
   `node tools/shot-bloom-outline-scope.mjs <dir> --base <worktree>` → `docs/img/outline-scope.png`.
 
@@ -2189,7 +2191,9 @@ holders**, positionally under `Object.is`, over the whole 920-row matrix in both
 **1,180,591,740 export floats over 131,176,860 triangles and 79,185,320 captured-grid values.**
 **The coupon plan gains a 0.40 mm tip.**
 **AND THE NIB COMPOSED WITH THE VORONOI INFILL FOLDS EIGHT ROWS NEITHER FEATURE FOLDS ALONE —
-IN THE ROOT BLEND, THIRTEEN MICRONS FROM THE NIB'S OWN REGION** (§12 of the outcome doc; the two
+IN THE ROOT BLEND, THIRTEEN MICRONS FROM THE NIB'S OWN REGION** (§12 of the outcome doc; the two **[Oct 19: the
+MECHANISM BELOW IS WRONG — every #286 row reads 0 since the infill-whorls session made the infill's seam one
+double; the pairs were the seam's T-junctions, not a facet crossing a rim wall. See that block.]**
 PRs were in flight against one base and #284 merged first). Measured three ways: main's geometry
 through THIS tree's census reads 0 on all eight, the same control sets with the infill guard OFF
 read 0, and only the two together fold — including `INFILL: the ruled defaults`, the feature's own
@@ -5990,6 +5994,29 @@ for hole within 0.0135 mm; **the budget FALLS — `INFILL: x 40 x 3` 1,226,912 (
 1,126,592 (75.1%)**, because every re-drawn ring drops its flat vertices. **I12** in
 `verify-bloom-infill.mjs` (six mutants), panel route **(aa)**, 31 movers / 926 holders,
 `frozen/phase44` = the 953 rows at `38a4893`. Stretch 1.65 untouched.
+
+**THE INFILL'S SEAM IS ONE DOUBLE, AND THAT CLEARED THE MULTI-WHORL FOLD AND #286 TOGETHER** (the
+infill-whorls session, Oct 19 — read `docs/bloom-infill-whorls-outcome.md` before touching
+`petalInfillPlan`'s `xB`, `snapSeam`, the emitter's `onSeam` / `gAt`, I13 or block 69).
+- **The whorls were a proxy.** #421's 736 pairs on three RADIAL whorls are all WITHIN ONE PETAL (its basal
+  panel against its own cells, at the seam), on the inner whorls only, which are shorter. One whorl at 28 mm
+  reads 1,600; the solid twin reads 0. Lengths 24/28/32/60 fold, 34–40 (the shipped 35) do not.
+- **The cause:** `xB` was the RAW station while the outline's seam columns are on the plan grid
+  (`infillSnap`), 2e-8 .. 4e-7 mm away. Every seam test on a 1e-9 bar (`snapSeam`, `onSeam`, the margin ramp's
+  `!(x > plan.xB)`) was false on every row, so S3's seam snap never fired and seam edges were split and beaded as
+  margin. WHICH lengths folded was the SIGN of the residue. The fix is one line: `xB` is quantised where defined.
+- **Most "folds" were not folds**: a classifier (a point inside BOTH triangles) reads 0 on the 3-whorl flower
+  and on every folding length (positive control: `petalRoll` 330, 7,129). The census was reading the seam's
+  T-junctions; a 0.4240 mm "span" is a collinear contact's LENGTH. The buckle row's 285 were REAL crossings
+  (0.0997 mm deep) and are gone too.
+- **Census:** every declaration first reproduced exactly on `169fd5b` (22 of 22). 17 entries REMOVED (every #286
+  row, the 120-petal cost corner, CONTINUOUS, the sphere stem, the scoped mixed flower …), 4 re-recorded,
+  0 undeclared — 231 → 214. The pattern moves where the snap now fires: a few basal cells gain a hole.
+- **Problem 2's premise was stale:** the outline-gated controls ALREADY follow the picked scope's mode
+  (layer, pair, turn; owned and inherited). Panel route **(ai)** now holds it, with two mutants (TWENTY-SIX
+  routes). I13 in the infill gate holds the seam (its mutant restores the raw station).
+- Block 69 (6 rows, 1,380), smoke block 69 (2); `frozen/phase75` = the 1,374 rows at `169fd5b`. Sheet:
+  `node tools/shot-bloom-infill-whorls.mjs <png> --base <worktree>` → `docs/img/infill-whorls.png`.
 
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
