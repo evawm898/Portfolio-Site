@@ -155,9 +155,15 @@ selection applying values, inherited curve frozen at copy time → panel route (
   Declared in `SELF_INTERSECTION_XFAIL` at 1 / 0.0000 with both controls in its note, confirmed in the
   browser (X1 "still failing at that magnitude"). A span-0 count is a knife edge. **No other block-68
   row reads a within-shell pair.**
-- **The byte partition**, predeclared from the base tree's own rows by `--movers-predicate
-  scope-outline` (a row moves iff some built petal's restated outline differs from the whole
-  bloom's): see §7 for the measured result.
+- **The byte partition: PASS** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of
+  f63235e> --movers-predicate scope-outline`, the whole 1,374-row matrix in both modes in twelve
+  `--range` chunks closed by `--merge`: **14 of 14 predeclared movers moved and 0 floats moved on the
+  1,360 holders**, positionally under `Object.is`, over **1,651,410,648 export floats / 183,490,072
+  triangles and 80,351,456 captured-grid values**; `--control` fires on a 1e-9 perturbation. The
+  predicate decides a mover from the harness's RESTATED outline against the whole bloom's (the base
+  tree has no owned values and no mirror, so it cannot itself say which rows engage them); the 14 are
+  the thirteen block-68 rows that build an owned or mirrored outline and block 67's FAN row, and both
+  GATED rows hold. **Every global-only row moves 0 floats**, the shipping default included.
 
 ## 6. Cost
 
@@ -168,7 +174,17 @@ each petal carries, as every infilled row has since F6-sym.
 
 ## 7. Measured
 
-(filled at close — see the session's PR)
+- Byte partition: 14 moved / 1,360 held, 0 floats on the holders (§5).
+- Export gate over block 68 and the FAN / asym rows: every row watertight; one declared span-0
+  tangency (§5); OC0-OC5 silent.
+- Apex table subset (five new mutants on the four scoped-outline rows): 5 of 5 fire their named
+  family, the clean tree silent.
+- Panel gate PASS with route (ah); scopes gate PASS (13 clauses, SO8 over 1,374 rows); design file
+  `--no-browser` PASS with F13; `bloom-smoke --check` OK (268 rows over 64 blocks, 187 families);
+  `--verify-frozen --phase74` PASS.
+- Triangles: the default 24,688 (unchanged); the sheet's cells 21,626 (the FAN orchid, both trees
+  alike — the mirror moves no row), 49,184 (RADIAL and SPIRAL, two layers), 184,816 (the mixed
+  flower x infill), 95,028 (the FAN orchid x 2 layers x infill).
 
 ## 8. Not done, and named
 
