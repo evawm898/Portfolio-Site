@@ -1092,6 +1092,29 @@ SLIDERS, AT EXACTLY HALF A SHEET** (spine-cup-fold, Oct 20 — Eva's rulings of 
   row's read 1.074 on the claw); coverage R3 bit-matches a buckled whorl at the limit; the cup refusal answers a
   trusted (hand) event only, so a gate's load is a loaded state.
 
+**A SWITCH TO CURVE SEEDS THE CURVE FROM THE SLIDER SHAPE, AND SEPALS TAKE BOTH CURVES, SCOPED PER TIER**
+(curves-sepals, Oct 20 — Eva's rulings; read `docs/bloom-curves-sepals-outcome.md` before touching
+`seedSpineCurve`, `seedOutlineCurve`, bloom.js's `onSeedSwitch` / `SEED_MODES`, the four value rows of
+`SEPAL_TWINS`, `sepalTwinValue`, `sepalOutlineWidthScale`, `SEPAL_SCOPE_VALUE_GROUPS`, `tierOffsetsFor`'s
+values, SP14, panel route (al) or block 72).
+- **The seed**: fewest points within `SEED_FIT_TOL_MM` (0.10 mm) through each curve's own sampler, the spine
+  error the larger of position and direction (1 mm per radian), reported from `spineLaw` itself. Written ONCE,
+  on a TRUSTED change to CURVE only — a file load, `applyConfig` and a matrix row never seed. Switching back
+  writes nothing. Told on the curve's read-out with its error; never claimed byte-identical. A seed never
+  exceeds the floor's refusal bar (a curl at the floor reads 2.01 mm off, NOT within, told).
+- **Sepal curves**: the value twins map onto the petal names verbatim (the SLIDER / LAW pins are gone), so the
+  fold limit, floor, nib and refusals reach a sepal through the petal builder. The registry rows are generated
+  kind-aware from the table. The sepal outline's width scale is `(W_s/L_s)/(16/petalLength)` (the petal's
+  16 mm reference; `petalWidth/16` by branch with no own size). No FAN pairing: a two-sided sepal outline is the
+  same hand on every sepal (the pinwheel).
+- **Tiers**: `scopes.tiers[{tier, offsets, values}]`, the four sepal value ids, through the ONE resolver
+  (`resolvePetalValues(…, groups)`). Replace / inherit live / per-group reset / prune, as a layer's.
+- **`sepalAngleLimit` reads the curved lamina** (incurve at 60: 0° against the straight sepal's 21°).
+- Gates: SP14 (modes, spine, C5, outline — restated from the controls and the row's `@scopes`); four apex
+  mutants (`SEPC_ROWS`); panel route (al) with two mutants (TWENTY-NINE routes); design-file F15. Block 72
+  (13 rows, 1,424), smoke block 72; `frozen/phase78` = the 1,411 rows at `31b89e7`. Sheet:
+  `node tools/shot-bloom-curves-sepals.mjs` → `docs/img/curves-sepals.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

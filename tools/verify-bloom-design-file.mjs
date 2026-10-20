@@ -456,8 +456,8 @@ async function nodeClauses(F, rec) {
      file written before the field (#417-#420: entries with offsets only, the
      outline under `controls`) loads with no note and no `values` invented; a
      value this control cannot hold, a value for a non-value control and one for
-     sheet thickness are each refused and told, and a tier's values are told
-     not applied. */
+     sheet thickness are each refused and told, and a PETAL value on a tier is
+     told not applied (a tier owns the sepal names — F15). */
   {
     const p = [];
     const sameSide = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((q, i) => Object.is(q[0], b[i][0]) && Object.is(q[1], b[i][1]));
@@ -550,7 +550,40 @@ async function nodeClauses(F, rec) {
         if (!r2.notes.some((n) => re.test(n.text))) p.push(`not told: ${re} — ${r2.notes.map((n) => n.text).join(' | ')}`);
     }
     rec('F14', p, 'per-scope spines: a layer owning its curl mode, spine curve and outline and a pair owning a spine curve round-trip verbatim, ownership and offsets intact, with no note; a #421-shaped file loads clean with no spine value invented; a bad curl mode, an out-of-box spine and a two-sided spine are refused and told, a tier\'s told not applied');
+  }  /* F15 — PER-TIER SEPAL CURVES (curves-sepals). A tier entry owning the
+     sepal's curl mode, spine curve, outline mode and a two-sided outline curve
+     round-trips verbatim with its offsets beside them and no note; a tier
+     entry naming a PETAL value is refused by name; and the whole bloom's
+     sepal modes read back unmoved (a tier's value never leaks into the
+     global). */
+  {
+    const p = [];
+    const reflex = { mode: 'single', points: [[0, 0], [0.5, -0.05], [0.9, -0.3]] };
+    const asym = { mode: 'two-sided', points: [[0, 0.06], [0.3, 0.18], [0.7, 0.16], [1, 0]], right: [[0, 0.06], [0.4, 0.1], [0.75, 0.08], [1, 0]] };
+    const scopes = { layers: [], petals: [], tiers: [{ tier: 1, offsets: { sepalLength: 10 }, values: { sepalCurlMode: 'CURVE', sepalSpineCurve: reflex, sepalOutlineMode: 'CURVE', sepalOutlineCurve: asym } }] };
+    const r = F.readDoc(JSON.parse(F.toText(F.composeDoc({ ...REG.DEFAULTS, sepalCount: 5, sepalTiers: 2 }, { savedAt: 'x', scopes }))));
+    if (!r.ok) p.push(`a per-tier sepal-curve document did not read: ${JSON.stringify(r.notes)}`);
+    else {
+      if (r.notes.length) p.push(`a clean round trip of per-tier sepal curves reported ${r.notes.map((n) => n.text).join(' | ')}`);
+      const T = r.doc.overrides.tiers[0];
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      if (!T || T.tier !== 1 || T.offsets.sepalLength !== 10 || !T.values || Object.keys(T.values).sort().join() !== 'sepalCurlMode,sepalOutlineCurve,sepalOutlineMode,sepalSpineCurve'
+        || T.values.sepalCurlMode !== 'CURVE' || T.values.sepalOutlineMode !== 'CURVE' || !same(T.values.sepalSpineCurve.points, reflex.points) || !same(T.values.sepalOutlineCurve.right, asym.right))
+        p.push(`the tier's owned sepal curves read back as ${JSON.stringify(T)}`);
+      if (r.doc.controls.sepalCurlMode !== 'SLIDER' || r.doc.controls.sepalOutlineMode !== 'LAW') p.push(`the whole bloom's sepal modes read back as ${r.doc.controls.sepalCurlMode} / ${r.doc.controls.sepalOutlineMode} — a tier's value leaked into the global`);
+    }
+    const bad = JSON.parse(F.toText(F.composeDoc(REG.DEFAULTS, { savedAt: 'x' })));
+    bad.overrides = { layers: [], petals: [], tiers: [{ tier: 0, offsets: {}, values: { petalCurlMode: 'CURVE', sepalCurlMode: 'CURVE' } }] };
+    const r2 = F.readDoc(bad);
+    if (!r2.ok) p.push(`a document with a petal value on a tier did not read: ${r2.error}`);
+    else {
+      const T = r2.doc.overrides.tiers[0];
+      if (!T || !T.values || 'petalCurlMode' in T.values || T.values.sepalCurlMode !== 'CURVE') p.push(`a tier naming a petal value kept ${JSON.stringify(T && T.values)} — the petal id must be refused and the sepal id kept`);
+      if (!r2.notes.some((n) => /tiers\[0\]\.values\.petalCurlMode.*by a sepal tier.*not applied/.test(n.text))) p.push(`a petal value on a tier was not told: ${r2.notes.map((n) => n.text).join(' | ')}`);
+    }
+    rec('F15', p, 'per-tier sepal curves: a tier owning the sepal curl mode, spine curve, outline mode and a two-sided outline round-trips verbatim with its offset and no note, the whole bloom\'s sepal modes unmoved; a petal value on a tier is refused by name while the tier\'s sepal value is kept');
   }
+
 }
 
 /* ---------------- the browser clauses ---------------- */
@@ -718,7 +751,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13', 'F14'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13', 'F14', 'F15'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
@@ -752,13 +785,13 @@ const MUTANTS = [
      1374-row round trip loses them (and F13's controls round trip loses
      petalCount under the dropped-field mutant above) — the first CI sweep said so. */
   /* F3-scope: and F14, the per-scope spines' own round trip */
-  { id: 'scope-values-are-not-written', breaks: ['F13', 'F14', 'F2'],
+  { id: 'scope-values-are-not-written', breaks: ['F13', 'F14', 'F15', 'F2'],
     from: '    if (e.values && Object.keys(e.values).length) {\n      out.values = {};',
     to: '    if (false) {\n      out.values = {};' },
-  { id: 'scope-values-are-not-read', breaks: ['F13', 'F14', 'F2'],
+  { id: 'scope-values-are-not-read', breaks: ['F13', 'F14', 'F15', 'F2'],
     from: '      if (Object.keys(vals).length) out.values = vals;',
     to: '      if (false) out.values = vals;' },
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F14', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F14', 'F15', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];

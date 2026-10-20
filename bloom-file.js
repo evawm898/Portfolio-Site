@@ -80,7 +80,7 @@
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS } from './bloom-geometry.js';
+import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
@@ -412,15 +412,16 @@ function readScopeEntry(k, e, i, notes) {
     out.offsets[id] = v;
   }
   /* F6-SCOPE — THE OWNED VALUES. Only the geometry's value ids, each through
-     its control's own field kind; a tier carries none yet. */
+     its control's own field kind — a layer's or pair's the petals' outline
+     and spine, a TIER's (curves-sepals, Oct 20) their sepal twins. */
   if (e.values !== undefined) {
-    if (k === 'tiers') notes.push(note('not-applied', `${where}.values: a sepal tier owns no outline or spine yet (petals only, F6-scope / F3-scope) — not applied`));
-    else if (!e.values || typeof e.values !== 'object' || Array.isArray(e.values)) notes.push(note('invalid', `${where}.values is not an object — not applied`));
+    const valueIds = k === 'tiers' ? SEPAL_SCOPE_VALUE_IDS : SCOPE_VALUE_IDS;
+    if (!e.values || typeof e.values !== 'object' || Array.isArray(e.values)) notes.push(note('invalid', `${where}.values is not an object — not applied`));
     else {
       const vals = {};
       for (const id of Object.keys(e.values)) {
         if (SCOPE_UNSCOPED.includes(id)) { notes.push(note('invalid', `${where}.values.${id}: never scoped — it is the material (Q3.6) — not applied`)); continue; }
-        if (!SCOPE_VALUE_IDS.includes(id)) { notes.push(note(controlOf.has(id) ? 'invalid' : 'unknown', `${where}.values.${id}: only ${SCOPE_VALUE_IDS.join(' / ')} may be owned as a value — not applied`)); continue; }
+        if (!valueIds.includes(id)) { notes.push(note(controlOf.has(id) ? 'invalid' : 'unknown', `${where}.values.${id}: only ${valueIds.join(' / ')} may be owned as a value${k === 'tiers' ? ' by a sepal tier' : ''} — not applied`)); continue; }
         const r = coerceField(controlOf.get(id), e.values[id]);
         if (r.note) notes.push(note(r.kind || 'invalid', `${where}.values.${id}: ${r.note}`));
         if (r.ok) vals[id] = r.value;

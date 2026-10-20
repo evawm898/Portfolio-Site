@@ -124,7 +124,7 @@ const MUTANTS = [
   { id: 'the-far-bound-is-taken', names: ['SL0', 'SL1'],
     from: 'return x < b.min ? b.min : x > b.max ? b.max : x;', to: 'return x < b.min ? b.max : x > b.max ? b.min : x;' },
   { id: 'the-blade-state-bypasses-the-clamp', names: ['SL1'],
-    from: 's[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);', to: 's[petalId] = Number(state[sepalId]);' },
+    from: 's[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);', to: 's[petalId] = sepalTwinIsValue(sepalId) ? sepalTwinValue(sepalId, state[sepalId]) : Number(state[sepalId]);' },
 ];
 
 async function control() {

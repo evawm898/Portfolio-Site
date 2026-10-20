@@ -1055,8 +1055,8 @@ const MUTANTS = [
      fired on it. */
   { id: 'sepal-roll-twin-dropped', names: ['V5'],
     why: 'sepalBladeState stops mapping sepalRoll onto the petal law, so a sepal at roll 180 builds flat — visible only on a row that reads the sepal (the all-max record moves past its band)',
-    find: 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);',
-    into: "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalRoll') s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);",
+    find: 'for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);',
+    into: "for (const [petalId, sepalId] of SEPAL_TWINS) if (petalId !== 'petalRoll') s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);",
     witness: (M, C) => {
       const st = { ...DEFAULTS_FOR_WITNESS, sepalRoll: 180 };
       const got = M.sepalBladeState(st, 0).petalRoll, clean = C.sepalBladeState(st, 0).petalRoll;
