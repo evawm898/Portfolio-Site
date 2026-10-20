@@ -106,10 +106,18 @@ const FLAT_XFAIL = Object.freeze({});
    each fold state's rims are re-traced and a different edge of the folding
    sheet is worst — two read better, two worse, all four still the PLAIN
    petal's own fold, identical in live and export. */
+/* RE-RECORDED by spine-cup-fold (previous figures 160.43 and 179.79): the
+   fold limit holds the curl-360 spine at its own cross-section's limit, so the
+   sheet under the holes is laid differently — ALL FORM MAX reads better and
+   `cup 1.2 x curl 360` 0.48 degrees WORSE, a different edge of the same
+   folding sheet. NOTE THE PREMISE MOVED for that row: its PLAIN petal no
+   longer folds (the whole plain bloom reads 0 pairs); the INFILLED sheet still
+   does (`INFILL: x cup 1.2 x spine curl 360`, 488 pairs, declared), and that
+   sheet is the one these rims are laid on. Recorded, not widened. */
 const H1_XFAIL = Object.freeze({
-  'cup 1.2 x curl 360': { worstDeg: 160.43 },
+  'cup 1.2 x curl 360': { worstDeg: 160.91 },
   'roll 330': { worstDeg: 134.23 },
-  'ALL FORM MAX': { worstDeg: 179.79 },
+  'ALL FORM MAX': { worstDeg: 175.34 },
   'buckle 0.60 f 3': { worstDeg: 110.97 },
 });
 

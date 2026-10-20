@@ -2856,7 +2856,7 @@ export const CONTROLS = [
       const floor = spineCurveFloorRadiusMm(ui);
       return `${v.points.length} points · drawn arc ${law.arcFrac.toFixed(2)} of the length, scaled to ${L.toFixed(1)} mm · start ${law.startDeg >= 0 ? '+' : ''}${law.startDeg.toFixed(1)}° laid along the blade · tightest radius ${isFinite(r) ? r.toFixed(2) + ' mm' : 'straight'} against a ${floor.toFixed(2)} mm floor${law.peakKmm > 1 / floor ? ' (UNDER THE FLOOR — a loaded curve; clamped and told)' : ''}`;
     },
-    validate: (cand, ui, ctx) => spineCurveRefusal(cand, ui, ctx && ctx.askedLengthsMm),
+    validate: (cand, ui, ctx) => spineCurveRefusal(cand, ui, ctx && ctx.askedLengthsMm, ctx && ctx.bends),
     visibleWhen: { ref: 'curlFromCurve' } },
 
   { id: 'petalSpineCurl', section: 'curl', kind: 'slider', min: -180, max: 360, step: 5, default: 0,

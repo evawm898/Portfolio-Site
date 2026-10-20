@@ -108,10 +108,15 @@ const QUICK_RE = /^default$|sheet 0\.60|ALL FORM MAX|petalTipShape 3/;
 /* RE-RECORDED by the roundness-control session (previous figures 89.18,
    113.14 and 31.26; roll 330 unmoved): the opened holes re-trace the cells
    beside the margin's bead on the same folding sheet. */
+/* RE-RECORDED by spine-cup-fold (previous figures 89.96 and 111.91, both
+   better now): the fold limit holds the curl-360 spine where its cupped
+   section would pass the bend's centre, so the margin's bead lies on a sheet
+   that turns less. The plain petal at cup 1.2 x curl 360 no longer folds; the
+   infilled sheet these beads sit on still does (declared in the census). */
 const MB1_XFAIL = Object.freeze({
-  'cup 1.2 x curl 360': { excessDeg: 89.96 },
+  'cup 1.2 x curl 360': { excessDeg: 87.38 },
   'roll 330': { excessDeg: 43.38 },
-  'ALL FORM MAX': { excessDeg: 111.91 },
+  'ALL FORM MAX': { excessDeg: 109.32 },
   'buckle 0.60 f 3': { excessDeg: 36.20 },
   'sheet 2.40': { excessDeg: 0.14 },
 });

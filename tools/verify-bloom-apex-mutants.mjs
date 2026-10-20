@@ -610,6 +610,20 @@ function curveSpine(M, state) {
 }
 const CURVE_HOOK = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.75, 0.45], [0.5, 0.6], [0.3, 0.45]] }, petalSpineCurl: 150, curlBias: 1, curlStart: 0.5 });
 const CURVE_UNDER = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] } });
+/* ===== THE FOLD LIMIT (spine-cup-fold) ===== */
+/* The mutated module's OWN spine record on the drawn S at cup 0.6 — whether the
+   fold limit bound, the worst station's limit and reach, the validator's answer.
+   Never C1 or C5, which is what these mutants name. */
+const S_SPINE = { mode: 'single', points: [[0, 0], [0.3, 0.12], [0.6, -0.1], [1, 0.15]] };
+const FOLD_S = () => ({ ...REGISTRY_DEFAULTS, petalCurlMode: 'CURVE', petalSpineCurve: S_SPINE, petalCup: 0.6 });
+function foldSpine(M, state) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, state);
+    const sp = b.petal.spine;
+    return { bendClamped: !!sp.bendClamped, bend: sp.bend || null, curveRefusal: sp.curveRefusal === undefined ? null : sp.curveRefusal, sheet: sp.clearance.sheetT };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
 /* ===== THE OUTLINE CURVE (F6-sym) ===== */
 /* The mutated module's OWN petal record on an outline-curve state — the
    half-widths it emitted, the length it drew against the length asked, the
@@ -641,6 +655,7 @@ const OUTLINE_TUBE = () => ({ ...REGISTRY_DEFAULTS, petalOutlineMode: 'CURVE', p
 const blandDiff = (m, c) => Math.max(...m.base.map((h, i) => (Number.isFinite(h) && Number.isFinite(c.base[i]) ? Math.abs(h - c.base[i]) : 0)));
 const OUTLINE2_MUTANTS = /^(the-outline-width-scale-is-ignored|the-width-scale-moves-the-positions|the-curve-starts-below-the-throat|the-throat-width-is-not-pinned|the-validator-and-the-build-disagree-on-the-scaled-floor)$/;
 const OUTLINE2_ROWS = /^a scaled outline curve|^a tubular outline curve/;
+const FOLD_ROWS = /S spine x cup 0\.6 \(the fold|on the sliders \(the fold/;
 const OUTLINE_ROWS = /^an outline curve|^a loaded outline curve/;
 /* ===== THE ASYMMETRIC OUTLINE (F6-asym) =====
    The mutated module's OWN two-sided petal record — each half's emitted
@@ -2817,8 +2832,10 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.turnBuiltDeg) < 1e-9 && Math.abs(c.turnBuiltDeg) > 10) ? null : `the mutant built a turn of ${m.turnBuiltDeg}° against the clean tree's ${c.turnBuiltDeg}°`; } },
   { id: 'a-refused-drag-clamps', why: 'the validator never refuses, so a drag past the printable floor is ACCEPTED and the build CLAMPS it — clamp-and-tell where Q4.4 ruled refusal; the point moves, the spine does not follow it, and every STL gate is green',
-    find: '  if (!worst) return null;',
-    into: '  return null;', names: ['C1'],
+    /* re-anchored by spine-cup-fold: the floor's refusal is its own `if
+       (worst) return` now, and the fold limit's answer follows it */
+    find: '  if (worst) return `the spine would bend to a ${(1 / worst.peakKmm).toFixed(2)}',
+    into: '  if (false) return `the spine would bend to a ${(1 / worst.peakKmm).toFixed(2)}', names: ['C1'],
     witness: (M, C) => { const m = curveSpine(M, CURVE_UNDER()), c = curveSpine(C, CURVE_UNDER());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (!c.clamped || c.curveRefusal === null) return `the clean tree does not clamp and refuse the under-floor curve (clamped ${c.clamped}, refusal ${JSON.stringify(c.curveRefusal)}) — the probe state is outside the mutant\'s subject`;
@@ -2842,6 +2859,31 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       if (c.curveRefusal === null) return 'the clean tree accepts the under-floor curve — the probe is outside the mutant\'s subject';
       return (m.curveRefusal === null && m.clamped) ? null : `the mutant still refuses (${JSON.stringify(m.curveRefusal)}) a curve at 0.69 mm against a 0.60 mm half-floor, or did not clamp (${m.clamped})`; } },
+  /* ===== THE FOLD LIMIT (spine-cup-fold — docs/bloom-spine-cup-fold-outcome.md).
+     Four plausible wrong limits, each witnessed on the MUTATED module's own spine
+     record on the drawn S at cup 0.6, never on the clause it names. Scoped to
+     the two fold rows (and they to these), the tier precedent. ===== */
+  { id: 'the-fold-limit-drops-the-cup', why: 'the reach reads only the section\'s width (its twist term), never its lift — the cup is out of the limit, so the cupped margin passes the bend\'s centre and the sheet folds through itself, watertight and one piece; the validator agrees with the build because both read the same wrong table',
+    find: '      const d = P[0] * st + P[1] * ct;', into: '      const d = P[0] * st;', names: ['C5'], rows: FOLD_ROWS,
+    witness: (M, C) => { const m = foldSpine(M, FOLD_S()), c = foldSpine(C, FOLD_S());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.bendClamped && !m.bendClamped) ? null : `the mutant\'s fold limit bound ${m.bendClamped} against the clean tree\'s ${c.bendClamped}`; } },
+  { id: 'the-validator-forgets-the-fold-limit', why: 'the curve\'s validator asks only the floor, so the editor ACCEPTS a drag the build then clamps at the fold limit — the point moves, the spine does not follow it; the validator and the build use different limits',
+    find: '  return spineBendRefusal(curve, bends);\n}', into: '  return null;\n}', names: ['C1'], rows: FOLD_ROWS,
+    witness: (M, C) => { const m = foldSpine(M, FOLD_S()), c = foldSpine(C, FOLD_S());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.curveRefusal !== null && m.curveRefusal === null && m.bendClamped) ? null : `the mutant\'s validator answers ${JSON.stringify(m.curveRefusal)} (clamped ${m.bendClamped}) against the clean tree\'s ${JSON.stringify(c.curveRefusal)}`; } },
+  { id: 'the-fold-limit-is-not-applied', why: 'the build never hands spineLaw the table (a loaded curve, or a slider, folding is built as asked) while the validator still refuses it — the load-time lift skipped: refused in the editor, folded in the file',
+    find: 'curve: curveLaw, bend: bend && bend.binds ? bend : null }) : null;', into: 'curve: curveLaw, bend: null }) : null;', names: ['C5'], rows: FOLD_ROWS,
+    witness: (M, C) => { const m = foldSpine(M, FOLD_S()), c = foldSpine(C, FOLD_S());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.bendClamped && !m.bendClamped && m.curveRefusal !== null) ? null : `the mutant clamped ${m.bendClamped} and refused ${JSON.stringify(m.curveRefusal)} against the clean tree\'s ${c.bendClamped}`; } },
+  { id: 'the-fold-margin-measured-from-the-mid-surface', why: 'the limit stops when the MID-SURFACE reaches the bend\'s centre, with the inner skin already half a sheet past it — Eva\'s ruling is the skin; the inner face inverts, under the 56-row mesh\'s resolution of the fold',
+    find: '  const marginMm = t / 2;', into: '  const marginMm = 0;', names: ['C5'], rows: FOLD_ROWS,
+    witness: (M, C) => { const m = foldSpine(M, FOLD_S()), c = foldSpine(C, FOLD_S());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (!m.bend || !c.bend) return `the fold limit did not bind (mutant ${!!m.bend}, clean ${!!c.bend}) — the probe is outside the mutant\'s subject`;
+      return (Math.abs(m.bend.limitRadiusMm - m.bend.reachMm) < 1e-9 && Math.abs(c.bend.limitRadiusMm - c.bend.reachMm - c.sheet / 2) < 1e-9) ? null : `the mutant\'s limit is reach + ${m.bend.limitRadiusMm - m.bend.reachMm} against the clean tree\'s reach + ${c.bend.limitRadiusMm - c.bend.reachMm}`; } },
   /* ===== THE OUTLINE CURVE (F6-sym — docs/bloom-outline-curve-outcome.md).
      Five plausible wrong outlines, each watertight and one piece at the same
      triangle count, each witnessed on the MUTATED module's own petal record.
@@ -3593,6 +3635,13 @@ const ROWS = [
           { id: 'petalSpineCurl', value: '150' }, { id: 'curlBias', value: '1' }, { id: 'curlStart', value: '0.5' }] },
   { label: 'a loaded spine curve UNDER the floor (0.69 mm radius against 1.20 — refused by the validator, clamped by the build)',
     set: [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify({ mode: 'single', points: [[0, 0], [0.55, 0.1], [0.66, 0.3], [0.56, 0.38], [0.5, 0.3]] }) }] },
+  /* THE FOLD LIMIT (spine-cup-fold): the drawn S at cup 0.6 (the limit binds on
+     a curve — refused by the validator, built at the limit) and curl 270 x cup
+     1.2 on the sliders (the limit opens the coil). Scoped to the fold mutants. */
+  { label: 'the drawn S spine x cup 0.6 (the fold limit binds: refused, built at the inner skin\'s limit)', for: /fold/,
+    set: [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify({ mode: 'single', points: [[0, 0], [0.3, 0.12], [0.6, -0.1], [1, 0.15]] }) }, { id: 'petalCup', value: '0.6' }] },
+  { label: 'curl 270 x cup 1.2 on the sliders (the fold limit opens the coil)', for: /fold/,
+    set: [{ id: 'petalSpineCurl', value: '270' }, { id: 'petalCup', value: '1.2' }] },
   /* THE OUTLINE CURVE (F6-sym): a spoon with the HIDDEN law family set (so a
      leak of the law, or of the lobes, is observable — at their defaults the
      law leak is still large, the lobe leak a no-op by construction), and a

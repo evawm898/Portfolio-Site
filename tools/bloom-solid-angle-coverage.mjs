@@ -497,7 +497,14 @@ export async function measure(page, { capability = null, wantMask = false, mutat
               const idx = fr.rings.indexOf(d);
               const ref = builtFull.petals[idx];
               if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) bad.push(`solid R3: layer ${L} slot 0's captured petal does not bit-match builtFull.petals[${idx}]`);
-            } else if (sizeField || formField || scopes) {
+            } else if (sizeField || formField || scopes || (Number(ui.buckleAmp) > 0 && (builtFull.petalsAll || []).some((q) => q && q.spine && q.spine.bendClamped))) {
+              /* (spine-cup-fold) THE FOLD LIMIT reads the slot's OWN section, and a
+                 buckle's phase is per slot (slotIndex x GOLDEN_ANGLE) — so on a
+                 buckled whorl whose spine meets the limit each slot's spine is its
+                 own (a slot the limit leaves alone differs from a held slot 0 too),
+                 and the rigid rotation below is not a consequence of the code
+                 any more: the bit-match against the builder's record is asked
+                 instead, the stronger claim. */
               /* under the size field a slot is its own size, not slot 0 rotated:
                  bit-match the builder's own record for it instead (plan-coverage's
                  arm, verbatim) */

@@ -14,9 +14,12 @@
    that tools/verify-bloom-rim-arc.mjs (session 38) reads the same twenty
    lines instead of carrying a copy that would drift.
    =================================================================== */
-import * as G from '../bloom-geometry.js';
+import * as GEOM from '../bloom-geometry.js';
 
-export function firstSlot(state, acc, layer = 0) {
+/* `G` is the geometry module to drive — this tree's by default; a two-tree
+   sheet hands the BASE tree's own module so its slot comes from its own
+   whorl primitive (spine-cup-fold). */
+export function firstSlot(state, acc, layer = 0, G = GEOM) {
   const fr = G.footRing(state, acc);
   let got = null;
   if (fr.continuousMode) {

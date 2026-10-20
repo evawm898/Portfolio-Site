@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -70,6 +70,14 @@ function spineEditReaches(p) {
   if (scopeView && scopeView.kind !== 'tier') return petalInScope(p, scopeView);
   return !(p.spineFrom && p.spineFrom.petalSpineCurve);
 }
+/* a key for "the same table": its length, its row count and its two reach
+   columns summed — the petals of one whorl share one, a field or a scope
+   makes another */
+const bendKeys = new WeakMap();
+function bendTableKey(askedLengthMm, T) {
+  if (!bendKeys.has(T)) { let a = 0, b = 0; for (let i = 0; i < T.N; i++) { a += T.reachPos[i]; b += T.reachNeg[i]; } bendKeys.set(T, `${T.length}|${T.N}|${T.floorRadius}|${a}|${b}`); }
+  return `${askedLengthMm}|${bendKeys.get(T)}`;
+}
 function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEditReaches, spineReaches = spineEditReaches } = {}) {
   const outlined = lastPetalsAll.filter((p) => p && p.tipCap && p.tipCap.outline && reaches(p)).map((p) => p.tipCap.outline);
   const seen = new Set(), outlinePetals = [];
@@ -78,7 +86,18 @@ function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEd
     const k = `${e.lengthMm}|${e.scale}|${e.pinnedFirst}`;
     if (!seen.has(k)) { seen.add(k); outlinePetals.push(e); }
   }
+  /* THE FOLD LIMIT'S TABLES (spine-cup-fold) of the petals the edit reaches,
+     off the build on screen: a candidate curve meets the SAME section (the
+     section does not depend on the spine), so the build's own table is the one
+     to ask. One entry per distinct table. */
+  const bends = [], seenT = new Set();
+  for (const p of lastPetalsAll) {
+    if (!p || !p.spine || !p.spine.bendTable || !spineReaches(p)) continue;
+    const k = bendTableKey(p.spine.askedLengthMm, p.spine.bendTable);
+    if (!seenT.has(k)) { seenT.add(k); bends.push({ askedLengthMm: p.spine.askedLengthMm, table: p.spine.bendTable }); }
+  }
   return {
+    bends: bends.length ? bends : null,
     askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine && spineReaches(p)).map((p) => p.spine.askedLengthMm))],
     outlinePetals: outlinePetals.length ? outlinePetals : null,
   };
@@ -1751,6 +1770,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfillAbsent = infillIsAbsent(uiForBuild);
     lastPetalsAll = built.petalsAll || [];
     builtPetalWidth = Number(uiForBuild.petalWidth);   // what a refused width drag goes back to (F6-sym-2)
+    builtCup = { petalCup: Number(uiForBuild.petalCup), petalCupGradient: Number(uiForBuild.petalCupGradient) };   // what a refused cup goes back to (spine-cup-fold)
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastGynoecium = built.gynoecium; lastStyles = built.styles;
     lastFilamentStyle = built.filamentStyle;
@@ -2165,28 +2185,40 @@ function spineCurveLine(sps) {
   {
     const sp0 = sps[0], cl = sp0.curveLaw;
     const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp0);
-    const clamped = sps.filter((s) => s.clamped), contact = sps.filter((s) => s.clearance.selfContact);
+    const clamped = sps.filter((s) => s.floorClamped), contact = sps.filter((s) => s.clearance.selfContact);
     const near = sps.reduce((a, s) => Math.min(a, s.clearance.minMm, s.clearance.minToFootMm), Infinity);
     const of = (arr) => `${arr.length} of ${sps.length} ring${sps.length === 1 ? '' : 's'}`;
     return `SPINE CURVE: ${sp0.curve.points.length} points, drawn arc ${cl.arcFrac.toFixed(3)} of the length scaled to ${sp0.askedLengthMm.toFixed(1)} mm · start ${cl.startDeg >= 0 ? '+' : ''}${cl.startDeg.toFixed(1)}° laid along the blade · ${sp0.turnBuiltDeg.toFixed(1)}° built · the slider family (spine curl, bias, start, the curl deltas, the variance curl term) is INERT`
          + ` · tightest spine radius ${tight.peakRadiusMm.toFixed(2)} mm`
          + (clamped.length ? ` (CLAMPED at one sheet thickness, ${tight.floorRadius.toFixed(2)} mm, on ${of(clamped)} — a loaded curve asks under the floor; the editor refuses such a drag)` : ` against a ${tight.floorRadius.toFixed(2)} mm floor`)
+         + foldLimitWords(sps, of, 'a loaded curve, or a later slider, asks the sheet to fold through itself; the editor refuses such a drag and the cup that would cause one')
          + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp0.clearance.sheetT.toFixed(2)} mm sheet`
          + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
   }
+}
+/* THE FOLD LIMIT (spine-cup-fold): where the spine was held at the radius its
+   own cross-section needs — the worst station, the section's reach toward the
+   bend's centre, the radius asked and the radius built — the nearest spine
+   that does not fold, told rather than silent. */
+function foldLimitWords(sps, of, why) {
+  const fc = sps.filter((s) => s.bendClamped && s.bend);
+  if (!fc.length) return '';
+  const w = fc.reduce((a, s) => (s.bend.ratio > a.bend.ratio ? s : a), fc[0]).bend;
+  return ` · FOLD LIMIT on ${of(fc)}: at u ${w.u.toFixed(2)} the petal's cross-section (its cup, roll or twist) reaches ${w.reachMm.toFixed(2)} mm toward the bend's centre, so the spine is built at ${w.limitRadiusMm.toFixed(2)} mm where ${w.askedRadiusMm.toFixed(2)} mm was asked (${why}; built as the nearest spine that does not)`;
 }
 function spineCurlLine(sps) {
   /* EVERY RING'S PETAL, because the floor binds and the flags fire on the
      SHRUNK inner whorls first: the line names the worst ring, not slot 0's. */
   const sp0 = sps[0];
   const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp0);
-  const clamped = sps.filter((s) => s.clamped), under = sps.filter((s) => s.underFloor), contact = sps.filter((s) => s.clearance.selfContact);
+  const clamped = sps.filter((s) => s.floorClamped), under = sps.filter((s) => s.underFloor), contact = sps.filter((s) => s.clearance.selfContact);
   const near = sps.reduce((a, s) => Math.min(a, s.clearance.minMm, s.clearance.minToFootMm), Infinity);
   const of = (arr) => `${arr.length} of ${sps.length} ring${sps.length === 1 ? '' : 's'}`;
   return `SPINE CURL ${sp0.turnAskedDeg}° · bias ${Number(sp0.bias).toFixed(2)} · start ${Number(sp0.start).toFixed(2)}${sp0.startFloored !== sp0.start ? ` (floored to the first blade row, ${sp0.startFloored.toFixed(3)})` : ''}`
        + ` · tightest spine radius ${tight.peakRadiusMm.toFixed(2)} mm`
        + (clamped.length ? ` (CLAMPED at one sheet thickness, ${tight.floorRadius.toFixed(2)} mm, on ${of(clamped)}: ${tight.turnAskedDeg}° asked, ${clamped.reduce((a, s) => Math.min(a, Math.abs(s.turnBuiltDeg)), Infinity).toFixed(1)}° built at the tightest — the sheet's inner face would invert under a tighter spine)` : '')
        + (under.length ? ` · UNDER ONE SHEET THICKNESS (${tight.floorRadius.toFixed(2)} mm) on ${of(under)} — the shipped uniform arc on a shrunk whorl, told, not clamped` : '')
+       + foldLimitWords(sps, of, 'the curl asks the sheet to fold through itself')
        + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp0.clearance.sheetT.toFixed(2)} mm sheet`
        + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
 }
@@ -3622,6 +3654,58 @@ function onWidthEdit(e) {
 }
 window.addEventListener('input', onWidthEdit, true);
 window.addEventListener('change', onWidthEdit, true);
+/* THE CUP IS REFUSED THROUGH THE SPINE'S FOLD LIMIT (spine-cup-fold): a cup —
+   or a cup gradient — that would make a DRAWN spine fold the sheet through
+   itself is refused the way a drag past the limit is (Q4.4: refuse, never
+   clamp), by the same function on the same kind of table: each curve petal
+   the edit reaches re-reads its own section at the candidate cup
+   (`spine.bendProbe`, petalSurface on the petal's own ring and slot) and asks
+   `spineBendRefusal`. The slider goes back to the cup the build on screen
+   drew and the spine editor's status names the station. A spine on the curl
+   SLIDERS is not refused — the slider family is clamped and told, and the
+   build's fold limit does that. With nothing picked a cup edit moves every
+   petal (an offset rides on the global); with a layer or pair picked, that
+   scope's petals, at the cup the slider now shows. */
+let builtCup = null;
+function onCupEdit(e) {
+  const id = e.target === inputs.petalCup ? 'petalCup' : e.target === inputs.petalCupGradient ? 'petalCupGradient' : null;
+  /* A HAND EDIT ONLY. A value written by code — a design file, a scope load,
+     a matrix row a gate applies — is a LOADED state, and a loaded state is
+     clamped and told by the build (the spine-curve rulings' own split: refuse
+     the drag, clamp the load). The browser marks a hand gesture `isTrusted`;
+     an event dispatched by script is not. */
+  if (!id || builtCup === null || !e.isTrusted) return;
+  const picked = scopeView && scopeView.kind !== 'tier' ? scopeView : null;
+  const ui = readUI();
+  const base = picked ? Number(scopeEffective(picked, ui).eff[id]) : Number(builtCup[id]);
+  const v = Number(e.target.value);
+  if (v === base) return;
+  const sc = inputs.petalSpineCurve;
+  let reason = null;
+  const asked = new Map();
+  for (const p of lastPetalsAll) {
+    /* a petal drawn on a curve, or one the controls now ask to draw on one
+       (a mode switch and a cup in one write, before the build has caught up);
+       the probe itself decides from the candidate's own surface */
+    if (!p || !p.spine || !p.spine.bendProbe || !(p.spine.curveMode || ui.petalCurlMode === 'CURVE') || (picked && !petalInScope(p, picked))) continue;
+    /* the candidate's GLOBAL: under a pick the slider shows the scope's
+       effective value and the scope's offset rides on the global, so the
+       global moves by the edit's delta; with none the global IS the slider */
+    const st = { ...ui, [id]: (picked ? Number(ui[id]) : Number(builtCup[id])) + (v - base) };
+    const k = `${p.whorl}|${p.slotIndex}|${JSON.stringify(p.spine.curve)}`;
+    if (asked.has(k)) continue;
+    const probe = p.spine.bendProbe(st);
+    const r = probe ? spineBendRefusal(probe.curve, [{ askedLengthMm: p.spine.askedLengthMm, table: probe.table }]) : null;
+    asked.set(k, r);
+    if (r) { reason = r; break; }
+  }
+  if (sc && sc.curveEditor) sc.curveEditor.showRefusal(reason ? `${id === 'petalCup' ? 'Petal cup' : 'Cup gradient'} ${v}: ${reason}` : null);
+  if (!reason) return;
+  e.target.value = base;
+  e.stopImmediatePropagation();
+}
+window.addEventListener('input', onCupEdit, true);
+window.addEventListener('change', onCupEdit, true);
 for (const c of CONTROLS) {
   inputs[c.id].addEventListener('input', () => { applyVisibility(); scheduleRegen(); });
   inputs[c.id].addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
@@ -3963,6 +4047,10 @@ window.__bloomMetrics = () => ({
     curveLaw: p.spine.curveLaw, turnBuiltDeg: p.spine.turnBuiltDeg, clamped: p.spine.clamped, askedLengthMm: p.spine.askedLengthMm,
     from: p.spineFrom || null, rows: p.spine.rows,
   } : null)) : null,
+  /* spine-cup-fold — EVERY BUILT PETAL'S FOLD LIMIT, so the panel gate's route
+     (ak) reads what the BUILDER held (clamped or not, the worst station's
+     record) beside what the read-out says. Null where no petal bends at all. */
+  spineFold: lastPetalsAll.some((p) => p && p.spine) ? lastPetalsAll.map((p) => (p && p.spine ? { bendClamped: !!p.spine.bendClamped, bend: p.spine.bend || null } : null)) : null,
   petalBladeLadder: lastPetal ? lastPetal.bladeLadder : null,
   petalNormal: lastPetal ? lastPetal.normal : null,
   /* The blade's WIDTH direction at the midpoint — a profile view looks down

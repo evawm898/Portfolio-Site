@@ -175,6 +175,27 @@ const E2_TURN_BAND_DEG = 5e-5;
    nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
    state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
+  /* SPINE-CUP-FOLD (Oct 20, docs/bloom-spine-cup-fold-outcome.md): five smoke
+     rows over the allowance, every one a strongly CUPPED blade on a strongly
+     CURLED spine — the cup's bead on a surface that bends hard along its
+     length, the twist/buckle out-of-plane class. NONE IS NEW GEOMETRY MADE
+     WORSE: two were declared census folds on the base tree (so E2 exempted
+     them) and now read 0 pairs, so E2 reads them for the FIRST time; one is the
+     just-valid side of the fold limit, where the limit does not bind and the
+     geometry is the base tree's to the bit (94.824898 on both); and the two
+     clamped rows read BETTER than the same state on the base tree (167.739178
+     -> 127.246563 and 156.680134 -> 51.659533, measured through --rows-file on
+     a worktree of 3dc8ee1). Declared at the measured magnitude, never widened. */
+  'ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)':
+    { excessDeg: 56.225279, note: 'adds 101.225279 deg; face-to-face 112.83, outline 11.61 — measured for the FIRST time by spine-cup-fold: on the base tree this row was a declared census fold (E2-exempt); the fold limit opens the inner layers\' coils and the census reads 0, so E2 now reads the cupped bead on the curled blade' },
+  'ALL PETALS: max x every base at max (curl 360+360, cup 1.2+1.2 — every clamp binds)':
+    { excessDeg: 78.771989, note: 'adds 123.771989 deg — measured for the FIRST time by spine-cup-fold: a declared census fold on the base tree (E2-exempt), 0 pairs under the fold limit; the cup-1.2 bead on the clamped curl' },
+  'SPINE FOLD: curl 195 x cup 1.2 (just valid at the widest cup)':
+    { excessDeg: 49.824898, note: 'NEW with block 71 (smoke): adds 94.824898 deg — the just-valid side of the fold limit, where the limit does not bind, so this is the base tree\'s geometry: the same state reads 94.824898 on a worktree of 3dc8ee1. The cup-1.2 bead on a 195-degree curl' },
+  'SPINE FOLD: curl 270 x cup 1.2 (clamped — the coil opens, told)':
+    { excessDeg: 82.246563, note: 'NEW with block 71 (smoke): adds 127.246563 deg; the same state reads 167.739178 on a worktree of 3dc8ee1 (BETTER under the limit, which opens the coil to 243.9 deg)' },
+  'SPINE FOLD: curl 360 x cup 0.9 x curl bias 0.5 (the general arm, clamped)':
+    { excessDeg: 6.659533, note: 'NEW with block 71 (smoke): adds 51.659533 deg; the same state reads 156.680134 on a worktree of 3dc8ee1 (BETTER under the limit)' },
   /* F6-scope (Oct 18, docs/bloom-outline-curve-scope-outcome.md): NOT THE
      SCOPING'S. The SPIRAL row's turn 1 owns the NEAR-RECTANGLE, and the same
      two-turn SPIRAL with EVERY petal on the near-rectangle, unscoped, reads
