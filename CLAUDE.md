@@ -1115,6 +1115,50 @@ values, SP14, panel route (al) or block 72).
   (13 rows, 1,424), smoke block 72; `frozen/phase78` = the 1,411 rows at `31b89e7`. Sheet:
   `node tools/shot-bloom-curves-sepals.mjs` → `docs/img/curves-sepals.png`.
 
+**LEAVES TAKE BOTH CURVES BY TWINS; A DRAWN LEAF SPINE THAT FALLS TURNS THE TIP DOWN, AS A POSITIVE ARCH
+DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR NAMES WHAT STOPPED IT**
+(curves-leaves, Oct 20 — Eva's rulings; read `docs/bloom-curves-leaves-outcome.md` before touching
+`LEAF_CURVE_TWINS`, `leafTwinValue`, `leafSpineCurveLaw`, `leafBendReachAt`, `leafCurveRiseMm`,
+`leafBladeRiseMm`, `spineArcReachMm`, `rachisSpine`, `leafOutlineWidthScale` / `leafletOutlineWidthScale`,
+`leafCurveTwinControls`, bloom.js's `leafSeedFor`, `seedSpineCurve`'s continuation, LF37 or block 73).
+- **Six twins from ONE table** (`LEAF_CURVE_TWINS`, the `SEPAL_TWINS` shape; the registry generates the
+  rows, the harness checks them at load): `leafCurlMode` / `leafSpineCurve` wherever `leafArch` reaches
+  (the simple blade, the LOBED blade, the compound RACHIS — placement); `leafOutlineMode` /
+  `leafOutlineCurve` on the SIMPLE blade; `leafletOutlineMode` / `leafletOutlineCurve`, ONE curve for every
+  leaflet, the terminal included, each at its own scale (placement). **LOBED keeps its own law** — pinned
+  in `lobedBladeState`, told; its outline record is its ENVELOPE's (`profE`), null by ruling.
+- **THE SIGN: `leafArch` positive turns the tip DOWN, opposite to petal curl; a drawn leaf spine is the
+  leaf seen from the side, root at the left, y up — a curve that FALLS toward the tip is the bend a
+  positive Arch makes**, and it reaches the law UNNEGATED (the arch is the odd one out, negated in
+  `leafBladeState`). The seed fits through that negation, so a switch from any arch does not jump. The
+  editor's read-out says so.
+- **Width scale: the leaf's own width default** — the simple blade `leafWidth / 17` (a branch at 17); a
+  leaflet `(W / L) / (17 / 26)` at its own size (terminal 30 × 19 → 0.969). The harness restates 17 / 26 /
+  17 and refuses to load if the defaults move.
+- **Serration stays ON in CURVE mode** (Eva, Oct 20): the lobes block runs on a petiole blade with an
+  outline curve; relief floor, count yield, tip neck and the nib's protection unchanged; per half on an
+  asymmetric blade (`serration.sides`, `tipClamp.sides`).
+- **Every reader reads the curved leaf** (§3 of the doc): the inset (`leafBladeRiseMm` — the arch law
+  verbatim on the slider, the EXPORT drawn spine's highest substep in CURVE mode), SN4's arc reach
+  (`spineArcReachMm`), the shared node's offset and cap (built through `buildLeafInto`), the rachis taper
+  (arc length along `rachisSpine`), `rodAxes` (emitted rings), the combination gate (emitted geometry);
+  `petioleClampMm` reads the angle only and is unaffected.
+- **The fold limit applies to a drawn blade spine, not to the Arch slider** (that is what keeps every
+  SLIDER leaf at 0 floats) and not to the rachis (a rod). A drawn rachis is built at the EXPORT floor in
+  both modes and subdivided like an arched one (+1,296 tris a compound leaf).
+- **THE SEED (from #425)**: #425's "curl 120 fits 0.112 at 10 points in print preview where 11 pass live"
+  was the SEARCH, not the mode (both modes read 0.112 in Node; #425's live 0.099 does not reproduce). Each
+  point count now also starts from the previous count's best (a CONTINUATION); the fit reaches the 0.10 mm
+  tolerance or names `seed.constraint` — the fold limit, the print floor, or the point cap — on the
+  read-out. Curl 120 → 9 points 0.0915, both modes; curl 270 / 360 and Arch 180 stopped by the print floor.
+- Gates: **LF37** (modes two ways, the spine record and its sign, the fold limit off the emitted rows, the
+  outline per blade at the restated scale); **LF4 / LF9 / LF11 / LF12 / LF13 / LF21 / LF32 / LF33 / LF35
+  re-derived for CURVE mode and per half**, never relaxed; eight apex mutants (`LEAFC_MUTANTS`, scoped to
+  `LEAFC_ROWS`); panel route **(am)** with two mutants (THIRTY routes). The LOBED reference blade (LF26's) is
+  pinned to the LAW outline.
+- Block 73 (13 rows, 1,437), smoke block 73 (5); `frozen/phase79` = the 1,424 rows at `fc96dc9`. Sheet:
+  `node tools/shot-bloom-curves-leaves.mjs` → `docs/img/curves-leaves.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

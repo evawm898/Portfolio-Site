@@ -925,8 +925,32 @@ for (const [prefix, expect] of Object.entries(TIP_EXPECTED)) {
     if (c.default !== d) bad.push(`${id} defaults to ${c.default} in the registry and ${d} in the geometry`);
   }
   /* (curves-leaves) the leaflets' outline twins sit in the drop-down too; they
-     are the twin table's, checked at load by `checkLeafCurveTwins` below */
+     are the twin table's, checked at load just below (THE LEAF CURVE TWINS) */
   const leafTwinIds = new Set(G.LEAF_CURVE_TWINS.map((r) => r.leaf));
+  /* THE LEAF CURVE TWINS (curves-leaves — "leaf twins generated from a table,
+     not hand-written"): every row of the geometry's `LEAF_CURVE_TWINS` is ONE
+     registry control of its petal twin's KIND, a choice carrying exactly the
+     petal twin's option values, a curve carrying the petal twin's curve spec
+     but for its OWNER (the leaf's own length — the leaflet's for the leaflet
+     outline), each defaulting to the value the twin table says a state that
+     predates it builds through (SLIDER, LAW, the default curves) — so a stored
+     set builds by branch. And no hand-written leaf curve control beside them. */
+  for (const row of G.LEAF_CURVE_TWINS) {
+    const p = CONTROLS.find((c) => c.id === row.petal), c = CONTROLS.find((x) => x.id === row.leaf);
+    if (!c) { bad.push(`the twin table names ${row.leaf} and the registry declares no such control`); continue; }
+    if (CONTROLS.filter((x) => x.id === row.leaf).length !== 1) bad.push(`${row.leaf} is declared more than once`);
+    if (c.kind !== p.kind) bad.push(`${row.leaf} is a ${c.kind} where its petal twin ${row.petal} is a ${p.kind}`);
+    if (p.kind === 'choice' && (c.options || []).map((o) => o.value).join('|') !== p.options.map((o) => o.value).join('|')) bad.push(`${row.leaf}'s options are not ${row.petal}'s`);
+    if (p.kind === 'curve') {
+      const { owner: oc, ...restC } = c.curve || {}, { owner: op, ...restP } = p.curve || {};
+      if (JSON.stringify(restC) !== JSON.stringify(restP)) bad.push(`${row.leaf}'s curve spec is not ${row.petal}'s (but for its owner)`);
+      const wantOwner = row.blade === 'leaflet' ? 'leafletLength' : 'leafLength';
+      if (oc !== wantOwner) bad.push(`${row.leaf}'s curve is owned by ${oc}, not ${wantOwner} — its fractions would be of the wrong length`);
+    }
+    if (JSON.stringify(c.default) !== JSON.stringify(row.rest) || JSON.stringify(DEFAULTS[row.leaf]) !== JSON.stringify(row.rest)) bad.push(`${row.leaf} defaults to ${JSON.stringify(c.default)} where the twin table's rest value is ${JSON.stringify(row.rest)}`);
+  }
+  const strayLeafCurves = CONTROLS.filter((c) => /^leaf(let)?(Curl|Spine|Outline)/.test(c.id) && !leafTwinIds.has(c.id));
+  if (strayLeafCurves.length) bad.push(`hand-written leaf curve control(s) beside the twin table: ${strayLeafCurves.map((c) => c.id).join(', ')}`);
   const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets' && !leafTwinIds.has(c.id));
   if (subs.length !== ranges.length) bad.push(`the Leaflets section holds ${subs.length} controls, the geometry's layout reads ${ranges.length}`);
   /* THE LEAFLETS' OWN TOOTH DEPTH (Eva's ruling on #380) lives in the shared
@@ -8779,9 +8803,9 @@ export async function leafAssertions(page, row) {
     for (let i0 = 0; i0 < bladesR.length && !broke35; i0++) {
       const ob = leafBladeOutlineRestated(ui, bladesR[i0], !!cpR, !!lobedR);
       const S0 = L.serrationBuilt[i0];
-      const halves35 = S0 && ob && ob.twoSided
-        ? [['left', S0.sides && S0.sides.left, L.rowHalfMm[i0], Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm[i0] : null, ob.sides.left.uPk],
-           ['right', S0.sides && S0.sides.right, Array.isArray(L.rowHalfRightMm) ? L.rowHalfRightMm[i0] : null, Array.isArray(L.rowHalfBaseRightMm) ? L.rowHalfBaseRightMm[i0] : null, ob.sides.right.uPk]]
+      const halves35 = ob && ob.twoSided
+        ? [['left', S0 && S0.sides && S0.sides.left, L.rowHalfMm[i0], Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm[i0] : null, ob.sides.left.uPk],
+           ['right', S0 && S0.sides && S0.sides.right, Array.isArray(L.rowHalfRightMm) ? L.rowHalfRightMm[i0] : null, Array.isArray(L.rowHalfBaseRightMm) ? L.rowHalfBaseRightMm[i0] : null, ob.sides.right.uPk]]
         : [[null, S0, L.rowHalfMm[i0], null, ob ? ob.sides.both.uPk : uPkLaw]];
     for (const [side35, Sv, hsH, hbH, uPkR] of halves35) {
       const i = side35 ? `${i0} (${side35} half)` : i0;
@@ -9077,7 +9101,7 @@ export async function leafAssertions(page, row) {
       const ob = leafBladeOutlineRestated(ui, bladesR[i0], !!cpR, !!lobedR);
       const S0 = L.serrationBuilt[i0];
       if (S0 && ob && ob.twoSided !== !!S0.twoSided) { bad.push(`LF13: blade ${i0}'s serration record is ${S0.twoSided ? 'two-sided' : 'one-sided'} on a ${ob.twoSided ? 'two-sided' : 'symmetric'} drawn outline`); break; }
-      const halves13 = S0 && ob && ob.twoSided ? [['left', S0.sides && S0.sides.left, ob.sides.left.peakHalfMm], ['right', S0.sides && S0.sides.right, ob.sides.right.peakHalfMm]] : [[null, S0, ob ? ob.sides.both.peakHalfMm : bladesR[i0].widthMm / 2]];
+      const halves13 = ob && ob.twoSided ? [['left', S0 && S0.sides && S0.sides.left, ob.sides.left.peakHalfMm], ['right', S0 && S0.sides && S0.sides.right, ob.sides.right.peakHalfMm]] : [[null, S0, ob ? ob.sides.both.peakHalfMm : bladesR[i0].widthMm / 2]];
     for (const [side13, S, halfW] of halves13) {
       const i = side13 ? `${i0} (${side13} half)` : i0;
       if (!(depth > 0)) { if (S) { bad.push(`LF13: blade ${i} carries a serration record at tooth depth 0 — the guard must be inert`); broke13 = true; break; } continue; }
