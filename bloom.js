@@ -18,7 +18,7 @@ import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
-import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
+import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, SEPAL_SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_GROUPS, seedSpineCurve, seedOutlineCurve, sepalBladeState, sepalOutlineWidthScale, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -41,6 +41,9 @@ const summaryEls = {}; // section id -> its <summary>, for the derived labels re
    the registry declares the reason once and references it from every section
    that hides for it, so identity is what makes the caption single. */
 const whyEls = new Map(); // reason object -> { el, parent, sections: [ids] }
+/* THE SEEDED CURVE'S SENTENCE (curves-sepals — see onSeedSwitch): curve id ->
+   the read-out's seed note, until that curve is next edited */
+const seedNotes = {};
 
 /* THE CURVE VALIDATORS' CONTEXT, from the build on screen: every drawn
    petal's asked length (the spine's), and every outline-curved petal's own
@@ -100,7 +103,44 @@ function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEd
     bends: bends.length ? bends : null,
     askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine && spineReaches(p)).map((p) => p.spine.askedLengthMm))],
     outlinePetals: outlinePetals.length ? outlinePetals : null,
+    sepal: sepalValidatorCtx(),
   };
+}
+/* curves-sepals — THE SAME CONTEXT FOR A SEPAL CURVE: the sepals the edit
+   reaches, off the build on screen — with a tier picked, that tier's; with
+   none, every built tier that owns no curve of its own for the group (a tier's
+   own value is not the whole bloom's to refuse). Each sepal's own asked length,
+   fold-limit table and outline record (its scale is the sepal's own, as built). */
+function sepalBlades() {
+  const out = [];
+  for (const T of (lastSepalsBuilt && lastSepalsBuilt.tiers) || []) if (T.present) for (const p of T.built) out.push({ p, T });
+  return out;
+}
+function sepalEditReaches({ T }, id) {
+  if (scopeView && scopeView.kind === 'tier') return T.tier === scopeView.layer;
+  return !(T.term && T.term.values && id in T.term.values);
+}
+function sepalValidatorCtx() {
+  const blades = sepalBlades();
+  if (!blades.length) return null;
+  const sp = blades.filter((b) => b.p.spine && sepalEditReaches(b, 'sepalSpineCurve'));
+  const bends = [], seenT = new Set();
+  for (const { p } of sp) {
+    if (!p.spine.bendTable) continue;
+    const k = bendTableKey(p.spine.askedLengthMm, p.spine.bendTable);
+    if (!seenT.has(k)) { seenT.add(k); bends.push({ askedLengthMm: p.spine.askedLengthMm, table: p.spine.bendTable }); }
+  }
+  const outlinePetals = [], seen = new Set();
+  for (const b of blades) {
+    const o = b.p.tipCap && b.p.tipCap.outline;
+    if (!o || !sepalEditReaches(b, 'sepalOutlineCurve')) continue;
+    const e = { lengthMm: o.lengthMm, scale: o.scale, pinnedFirst: false };
+    const k = `${e.lengthMm}|${e.scale}`;
+    if (!seen.has(k)) { seen.add(k); outlinePetals.push(e); }
+  }
+  /* a sepal not yet on a curve (a switch in flight) is asked at its asked length */
+  const lengths = [...new Set(sp.map((b) => b.p.spine.askedLengthMm))];
+  return { bends: bends.length ? bends : null, askedLengthsMm: lengths, outlinePetals: outlinePetals.length ? outlinePetals : null };
 }
 function makeInput(c) {
   if (c.kind === 'slider') {
@@ -712,7 +752,7 @@ function refreshLabels(ui, shown = null, scopedUi = null) {
   for (const c of CONTROLS) {
     if (valSpans[c.id].dataset.editing) continue;
     const u = scopedUi && SCOPE_IDS.has(c.id) ? scopedUi : ui;
-    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown);
+    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown) + (seedNotes[c.id] ? ` · ${seedNotes[c.id]}` : '');
   }
   /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3; its first
      user, the rosette's hood group, was retired with the roles). Same snapshot, same pass, same owner
@@ -873,11 +913,13 @@ document.getElementById('resetBtn').addEventListener('click', () => {
    too — as OWNED VALUES (`SCOPE_VALUE_IDS`, the geometry's list), which an
    edit REPLACES rather than offsets (commitScopeValue below). */
 const SCOPE_IDS = new Set([...SCOPEABLE_IDS, ...SCOPE_VALUE_IDS]);
-const SCOPE_VALUE_SET = new Set(SCOPE_VALUE_IDS);
+/* curves-sepals: a tier's owned values (the sepal twins of the outline's and
+   the spine's mode and curve) are values too — written whole, never offset */
+const SCOPE_VALUE_SET = new Set([...SCOPE_VALUE_IDS, ...SEPAL_SCOPE_VALUE_IDS]);
 /* A SEPAL TIER IS A SCOPE TOO (F1.1a, Q3.8): picking one binds the SEPAL
    controls — the tier-scopeable set the file reader owns — and the Sepals
    section edits that tier. `{ kind: 'tier', layer: k, slot: 0 }`, k 0-based. */
-const TIER_IDS = new Set(SCOPEABLE_TIER_IDS);
+const TIER_IDS = new Set([...SCOPEABLE_TIER_IDS, ...SEPAL_SCOPE_VALUE_IDS]);
 const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : SCOPE_IDS);
 let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier', layer, slot } — the picked scope; null = the whole bloom
 const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
@@ -968,6 +1010,9 @@ function scopeEffective(v, ui) {
     const sb = scopesForBuild(scopes);
     const r = sepalTierState(ui, sb, v.layer);
     for (const id of SCOPEABLE_TIER_IDS) eff[id] = r.state[id];
+    /* and the tier's curves — its own where it owns one, else the whole
+       bloom's sepal value, live (the resolver's chain, one level) */
+    for (const id of SEPAL_SCOPE_VALUE_IDS) eff[id] = r.state[id];
     return { eff, term: r.term };
   }
   const term = scopeTermFor(v, ui);
@@ -1129,6 +1174,8 @@ function outlineValuesSame(id, a, b) {
    never by a list of names */
 function isCurveId(id) { const c = CONTROLS.find((x) => x.id === id); return !!c && c.kind === 'curve'; }
 function inheritedOutlineValue(v, id, ui, own) {
+  /* a TIER inherits the whole bloom's sepal value — the chain is one level */
+  if (v.kind === 'tier') return ui[id];
   const listKey = v.kind === 'layer' ? 'layers' : 'petals';
   const without = scopes ? { ...scopes, [listKey]: (scopes[listKey] || []).map((e) => (e === own ? { ...e, values: undefined } : e)) } : null;
   const sb = without ? scopesForBuild(without) : null;
@@ -1136,17 +1183,18 @@ function inheritedOutlineValue(v, id, ui, own) {
   const res = resolvePetalValues(ui, term && term.values ? term.values : null, false);
   return res && id in res.state ? res.state[id] : ui[id];
 }
+const scopeListOf = (v) => (v.kind === 'layer' ? scopes.layers : v.kind === 'tier' ? (scopes.tiers || (scopes.tiers = [])) : scopes.petals);
 function scopeOwnEntry(v, create) {
   if (!scopes) { if (!create) return null; scopes = { layers: [], petals: [], tiers: [] }; }
-  const list = v.kind === 'layer' ? scopes.layers : scopes.petals;
-  let own = list.find((e) => e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot)) || null;
-  if (!own && create) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
+  const list = scopeListOf(v);
+  let own = list.find((e) => (v.kind === 'tier' ? e.tier === v.layer : e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot))) || null;
+  if (!own && create) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : v.kind === 'tier' ? { tier: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
   return own;
 }
 function pruneScopeEntry(own, v) {
   if (own.values && !Object.keys(own.values).length) delete own.values;
   if (!Object.keys(own.offsets || {}).length && !own.values) {
-    const list = v.kind === 'layer' ? scopes.layers : scopes.petals;
+    const list = scopeListOf(v);
     list.splice(list.indexOf(own), 1);
   }
   if (scopesAreEmpty(scopes)) scopes = null;
@@ -1172,10 +1220,11 @@ function commitScopeValue(id, value) {
    geometry's own split). */
 function resetScopeValues(group) {
   const v = scopeView;
-  if (!v || v.kind === 'tier') return false;
+  if (!v) return false;
   const own = scopeOwnEntry(v, false);
   if (!own || !own.values) return false;
-  const ids = SCOPE_VALUE_GROUPS[group].filter((id) => id in own.values);
+  /* a tier's groups are the sepal twins of the same two (curves-sepals) */
+  const ids = (v.kind === 'tier' ? SEPAL_SCOPE_VALUE_GROUPS : SCOPE_VALUE_GROUPS)[group].filter((id) => id in own.values);
   if (!ids.length) return false;
   for (const id of ids) delete own.values[id];
   pruneScopeEntry(own, v);
@@ -1222,8 +1271,9 @@ function syncScopeBar(ui) {
   /* each reset shows iff the picked layer or pair owns a value of ITS group
      (the outline's, the spine's) */
   {
-    const own = scopeView && scopeView.kind !== 'tier' ? scopeOwnEntry(scopeView, false) : null;
-    const owns = (g) => !!(own && own.values && SCOPE_VALUE_GROUPS[g].some((id) => id in own.values));
+    const own = scopeView ? scopeOwnEntry(scopeView, false) : null;
+    const groups = scopeView && scopeView.kind === 'tier' ? SEPAL_SCOPE_VALUE_GROUPS : SCOPE_VALUE_GROUPS;
+    const owns = (g) => !!(own && own.values && groups[g].some((id) => id in own.values));
     if (scopeOutlineReset) scopeOutlineReset.hidden = !owns('outline');
     if (scopeSpineReset) scopeSpineReset.hidden = !owns('spine');
   }
@@ -1296,7 +1346,7 @@ function refreshScopeNotes(ui) {
       cls = 'scoped';
       const from = term && term.valueFrom ? term.valueFrom[c.id] : null;
       const group = scopeValueGroup(c.id);
-      const what = { petalOutlineCurve: 'outline curve', petalOutlineMode: 'outline mode', petalSpineCurve: 'spine curve', petalCurlMode: 'curl mode' }[c.id] || c.id;
+      const what = { petalOutlineCurve: 'outline curve', petalOutlineMode: 'outline mode', petalSpineCurve: 'spine curve', petalCurlMode: 'curl mode', sepalOutlineCurve: 'sepal outline curve', sepalOutlineMode: 'sepal outline mode', sepalSpineCurve: 'sepal spine curve', sepalCurlMode: 'sepal curl mode' }[c.id] || c.id;
       const reset = group === 'spine' ? 'Spine: reset to inherited' : 'Outline: reset to inherited';
       const mine = from === scopeView.kind;
       const n = lastFoot.slotCount;
@@ -3706,6 +3756,77 @@ function onCupEdit(e) {
 }
 window.addEventListener('input', onCupEdit, true);
 window.addEventListener('change', onCupEdit, true);
+
+/* ===================================================================
+   THE SEEDED CURVE (curves-sepals, Oct 20 — Eva's ruling: "switching to CURVE
+   seeds the curve from the slider's CURRENT shape, so the petal does not
+   jump"). A HAND switch of a curl mode to CURVE fits the spine curve to the
+   slider spine the build on screen draws (`seedSpineCurve`), and a HAND switch
+   of an outline mode to CURVE fits the outline curve to the LAW outline
+   (`seedOutlineCurve`) — for the petals, for the sepals, and for whichever
+   layer, pair or tier is picked (the effective state of THAT scope). The seed
+   is WRITTEN ONCE, here: the sliders it was fitted to are hidden in CURVE mode
+   and nothing re-fits it when one moves. Switching back to SLIDER / LAW
+   touches no slider, so the slider shape returns exactly as it was. A design
+   file's saved curve, a scope load and a matrix row a gate applies are LOADED
+   states (no `isTrusted` event) and load the curve they carry — the cup
+   refusal's own split between a hand and a load.
+   The fit's error is told on the curve's own read-out until the curve is next
+   edited ("the first time"); it is a fit and never claimed byte-identical.
+   =================================================================== */
+const SEED_MODES = {
+  petalCurlMode: { curve: 'petalSpineCurve', kind: 'spine', sepal: false },
+  petalOutlineMode: { curve: 'petalOutlineCurve', kind: 'outline', sepal: false },
+  sepalCurlMode: { curve: 'sepalSpineCurve', kind: 'spine', sepal: true },
+  sepalOutlineMode: { curve: 'sepalOutlineCurve', kind: 'outline', sepal: true },
+};
+function seedFor(modeId) {
+  const M = SEED_MODES[modeId];
+  const ui = readUI();
+  const picked = scopeView && idsFor(scopeView).has(modeId) ? scopeView : null;
+  const eff = picked ? viewUi(ui) : ui;
+  if (M.sepal) {
+    /* the sepals the switch reaches — a picked tier's, else every built tier
+       that owns no curve of its own for the group */
+    const blades = sepalBlades().filter((b) => sepalEditReaches(b, M.curve));
+    const tierState = picked ? eff : ui;
+    const sub = sepalBladeState(tierState, 0);
+    const lens = blades.map((b) => b.p.askedLength).filter((x) => x > 0);
+    const L = lens.length ? Math.max(...lens) : (sub.bladeLengthMm > 0 ? sub.bladeLengthMm : Number(sub.petalLength) * Number(tierState.sepalScale));
+    if (M.kind === 'spine') return seedSpineCurve(sub, L, { lengthsMm: lens });
+    const W = sub.bladeWidthMm > 0 ? sub.bladeWidthMm : Number(sub.petalWidth) * Number(tierState.sepalScale);
+    const T = blades.length ? blades[0].T : null;
+    return seedOutlineCurve(sub, L, W, { scale: sepalOutlineWidthScale(tierState), lengthsMm: lens, footHalfMm: T && T.ring ? T.ring.width / 2 : 0 });
+  }
+  /* the petals the switch reaches — a picked layer's or pair's, else every
+     petal whose curve no scope owns — and the longest of them (the outer
+     whorl) is the one the shape is fitted on; the rest only bound the floor */
+  const reach = M.kind === 'spine' ? spineEditReaches : outlineEditReaches;
+  const petals = lastPetalsAll.filter((p) => p && p.spine && reach(p));
+  const lens = petals.map((p) => p.spine.askedLengthMm).filter((x) => x > 0);
+  const rep = petals.reduce((a, p) => (!a || p.spine.askedLengthMm > a.spine.askedLengthMm ? p : a), null);
+  const L = rep ? rep.spine.askedLengthMm : Number(eff.petalLength);
+  if (M.kind === 'spine') return seedSpineCurve(eff, L, { lengthsMm: lens });
+  const ring = rep ? (lastRings || []).find((r) => Math.round(r.lambda) === Math.round(rep.whorl)) || lastRings[0] : lastRings[0];
+  const W = Number(eff.petalWidth) * (L / Number(eff.petalLength));
+  return seedOutlineCurve(eff, L, W, { lengthsMm: lens, footHalfMm: ring ? ring.width / 2 : 0 });
+}
+function onSeedSwitch(e) {
+  const t = e.target;
+  const id = t && t.id;
+  if (!id || !SEED_MODES[id] || inputs[id] !== t || !e.isTrusted || t.value !== 'CURVE') return;
+  const M = SEED_MODES[id];
+  let seed;
+  try { seed = seedFor(id); } catch (err) { seedNotes[M.curve] = `not seeded — ${err.message}`; return; }
+  if (!seed || !seed.curve) return;
+  inputs[M.curve].value = seed.curve;
+  if (scopeView && idsFor(scopeView).has(M.curve)) commitScopeValue(M.curve, seed.curve);
+  const split = seed.split ? ` (position ${seed.split.posMm.toFixed(3)} mm, direction ${seed.split.dirDeg.toFixed(1)}° — a degree counted as a millimetre of blade per radian)` : '';
+  seedNotes[M.curve] = `SEEDED from ${seed.from} on the switch — ${seed.points} points, ${seed.met ? 'within' : 'NOT within'} the ${seed.tolMm.toFixed(2)} mm tolerance: it departs from it by ${seed.errorMm.toFixed(3)} mm${split}${seed.rotationDeg ? ` (drawn turned ${seed.rotationDeg.toFixed(0)}° so it stays in front of its root; the law lays it back along the blade)` : ''}${seed.clipped ? ' (wider than the box allows — clipped at half the length)' : ''}; a fit, not the slider build to the bit`;
+}
+window.addEventListener('change', onSeedSwitch, true);
+/* the seed's sentence is told until the curve is next edited */
+for (const M of Object.values(SEED_MODES)) inputs[M.curve].addEventListener('input', () => { delete seedNotes[M.curve]; });
 for (const c of CONTROLS) {
   inputs[c.id].addEventListener('input', () => { applyVisibility(); scheduleRegen(); });
   inputs[c.id].addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
@@ -4588,7 +4709,11 @@ window.__bloomMetrics = () => ({
       ring: T.ring ? { radius: T.ring.radius, width: T.ring.width, thickness: T.ring.thickness, overhang: T.ring.overhang, z: T.ring.z, domeLean: T.ring.domeLean, onDome: T.ring.dome !== null } : null,
       descriptor: T.present && lastFoot.sepalTiers ? (({ asked, count, ceiling, countClamped, scale, breadth, phaseFrac, phaseRad, pitchRad, startAzimuth, azimuths, footMm, footAskedMm, footClamped, footScale, own }) => ({ asked, count, ceiling, countClamped, scale, breadth, phaseFrac, phaseRad, pitchRad, startAzimuth, azimuths: azimuths.slice(), footMm, footAskedMm, footClamped, footScale, own: own ? { ...own } : null }))(lastFoot.sepalTiers[T.tier]) : null,
       limit: T.limit ? JSON.parse(JSON.stringify(T.limit)) : null,
-      petals: T.built.map((p) => ({ length: p.length, askedLength: p.askedLength, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris, footFrames: p.footFrames, rootRow: p.rootRow, tipCap: p.tipCap, form: p.form, builtFrom: p.builtFrom })),
+      /* curves-sepals: each blade's own SPINE record (the curl mode and curve
+         it was built from, its emitted rows, its fold limit) and its OUTLINE
+         (the base half-widths at the emitted stations) — SP14's measured side,
+         from the running module */
+      petals: T.built.map((p) => ({ length: p.length, askedLength: p.askedLength, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris, footFrames: p.footFrames, rootRow: p.rootRow, tipCap: p.tipCap, form: p.form, builtFrom: p.builtFrom, spine: p.spine, profileBase: p.profileBase, profileBaseL: p.profileBaseL, profileBaseR: p.profileBaseR, profileU: p.profileU })),
     })) : [],
     limit: lastSepalsBuilt ? JSON.parse(JSON.stringify(lastSepalsBuilt.limit)) : null,
     footTangentDeg: lastSepalsBuilt ? lastSepalsBuilt.footTangentDeg : undefined,
@@ -4605,6 +4730,8 @@ window.__bloomMetrics = () => ({
          reads (SP6 compares it against the page's own sepal* read-back, an
          owner the builder does not write) */
       builtFrom: p.builtFrom,
+      /* curves-sepals: the blade's own spine and outline records (SP14) */
+      spine: p.spine, profileBase: p.profileBase, profileBaseL: p.profileBaseL, profileBaseR: p.profileBaseR,
       /* a layer or petal SCOPE never reaches a sepal (SP6) — its tier is its own */
       scopeTerm: p.scopeTerm ?? null,
     })) : [],

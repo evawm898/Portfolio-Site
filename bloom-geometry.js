@@ -31,7 +31,7 @@ export const MIN_FEATURE_MM = 1.0;
 /* THE CURVE VALUE'S ONE SAMPLER (F3-global, the spine curve). bloom-curve.js is
    pure and owns the drawn curve; the spine curve law below derives curvature
    from its samples and never restates the law. */
-import { curveSamples, curveFunction } from './bloom-curve.js';
+import { curveSamples, curveFunction, quantise as curveQuantise, curveShapeRefusal } from './bloom-curve.js';
 
 /* THE DEFAULT sheet thickness, in mm. Until the thickness layer this was the
    thickness — one constant read at both call sites, so foot, blade and tip
@@ -1462,6 +1462,8 @@ export const SCOPE_VALUE_IDS = Object.freeze([...SCOPE_VALUE_GROUPS.outline, ...
    reset and the petal record's split of its sources */
 export function scopeValueGroup(id) {
   for (const g of Object.keys(SCOPE_VALUE_GROUPS)) if (SCOPE_VALUE_GROUPS[g].includes(id)) return g;
+  /* a sepal TIER's owned value (curves-sepals) — the sepal twins of the same two groups */
+  for (const g of Object.keys(SEPAL_SCOPE_VALUE_GROUPS)) if (SEPAL_SCOPE_VALUE_GROUPS[g].includes(id)) return g;
   return null;
 }
 export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
@@ -1575,12 +1577,12 @@ function addScopeOffsets(into, offsets, where) {
 function checkScopeOffsets(offsets, where) { addScopeOffsets({}, offsets, where); }
 /* A SCOPE'S OWN VALUES, validated the same way whether or not the entry reaches
    this petal: only the declared value ids, never sheet thickness. */
-function checkScopeValues(values, where) {
+function checkScopeValues(values, where, ids = SCOPE_VALUE_IDS) {
   if (values === undefined || values === null) return;
   if (typeof values !== 'object' || Array.isArray(values)) throw new Error(`scopes: ${where}.values is not an object`);
   for (const k of Object.keys(values)) {
     if (SCOPE_UNSCOPED.includes(k)) throw new Error(`scopes: ${where} carries a value for ${k}, which is never scoped (Q3.6)`);
-    if (!SCOPE_VALUE_IDS.includes(k)) throw new Error(`scopes: ${where}.values.${k} — only ${SCOPE_VALUE_IDS.join(' / ')} may be owned as values`);
+    if (!ids.includes(k)) throw new Error(`scopes: ${where}.values.${k} — only ${ids.join(' / ')} may be owned as values`);
   }
 }
 
@@ -1853,10 +1855,17 @@ export function fanSlotMirrored(slotIndex, slotCount, state) {
    spine has no mirror arm, and that is a measurement of the law rather than
    an omission: the spine curve is planar in the midrib plane (see
    SCOPE_VALUE_GROUPS), so its mirror image is itself. */
-export function resolvePetalValues(state, values, mirrored, valueFrom = null) {
+/* AND A SEPAL TIER'S (curves-sepals, Oct 20 — "one resolver, extend its chain
+   for tiers, do not add a second"): `groups` names the value ids the chain
+   reads — the petals' (`SCOPE_VALUE_GROUPS`, the default, every call that
+   existed) or the sepal twins of the same two groups (`SEPAL_SCOPE_VALUE_GROUPS`),
+   which `sepalTierState` hands it. A tier inherits the whole bloom's sepal
+   value LIVE where it owns none and an owned one REPLACES it — the layer's own
+   rule, one level up the chain (global -> tier). A sepal is never mirrored. */
+export function resolvePetalValues(state, values, mirrored, valueFrom = null, groups = SCOPE_VALUE_GROUPS) {
   let out = null;
   if (values) {
-    for (const k of SCOPE_VALUE_IDS) if (k in values) (out || (out = {}))[k] = values[k];
+    for (const g of Object.keys(groups)) for (const k of groups[g]) if (k in values) (out || (out = {}))[k] = values[k];
   }
   let didMirror = false;
   if (mirrored) {
@@ -7920,6 +7929,8 @@ export const OUTLINE_LIFT_MM = 2 ** -10;
    scales its own curve. */
 export const OUTLINE_WIDTH_REF_MM = 16;
 export function outlineWidthScale(state) {
+  /* a SEPAL's substate carries its own scale (`sepalOutlineWidthScale`) */
+  if (typeof state.outlineWidthScaleOwn === 'number') return state.outlineWidthScaleOwn;
   const w = Number(state.petalWidth);
   return w === OUTLINE_WIDTH_REF_MM ? 1 : w / OUTLINE_WIDTH_REF_MM;
 }
@@ -8009,6 +8020,239 @@ export function outlineCurveRefusal(curve, state, askedLengthsMm) {
   if (worst === null) return null;
   const sc = worst.scale === 1 ? '' : ` (the width scale ${worst.scale.toFixed(3)}x)`;
   return `${worst.side ? `the ${worst.side} half's ` : ''}point ${worst.point} would be ${(2 * worst.askedMm).toFixed(2)} mm across on a ${worst.L.toFixed(1)} mm petal${sc} — under the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor (only the run-out to the tip may go under it; the nib closes it)`;
+}
+
+/* ===================================================================
+   THE SEEDED CURVE (curves-sepals, Oct 20 — Eva's ruling: "switching to CURVE
+   seeds the curve from the slider's CURRENT shape, so the petal does not
+   jump"; it replaces the fixed 14.6-degree spine default and the today's-
+   outline outline default as what a SWITCH draws). The page calls these two
+   on an interactive switch and nowhere else — a design file's saved curve is
+   loaded as it is, and a seed is written ONCE, never re-fitted when a slider
+   moves afterwards (the sliders are hidden in CURVE mode).
+
+   FEWEST POINTS WITHIN A STATED TOLERANCE, THROUGH THE ONE SAMPLER EACH CURVE
+   ALREADY USES. The candidate point sets are read off the target at n = 2 ..
+   12 points (the spec's own count), two placements each — even in arc length
+   (or u) and even in arc length plus turning — quantised to the editor's own
+   grid (`CURVE_GRID`), refused where the spec cannot hold them; the first n
+   whose error is within `SEED_FIT_TOL_MM` wins, else the smallest error at
+   any n, which is REPORTED. The error is measured where the build would draw
+   the difference, in millimetres:
+     the spine — the curve run through `spineCurveLaw` + `spineLaw` (the
+       build's own path, the curve laid with its first chord along the blade)
+       against the slider law at the same arc positions, both at the asked
+       length on tilt 0, the largest distance between the two;
+     the outline — the curve run through `outlineCurvePlan` (the build's own
+       plan, PCHIP via `curveFunction`, the print floor's lift included)
+       against the LAW's core half-width, over the stretch where the law is
+       drawn above the print floor (below it the root blend and the foot are
+       the hub's in both modes, and the run-out to the tip is the nib's).
+   A ruling-free tolerance: 0.10 mm, under a third of the ~0.35 mm resolvable
+   detail this repo records for Nylon 12 and an eighth of the 0.80 mm floor. A
+   seed is NEVER claimed byte-identical to the slider build: it is a fit, and
+   its error is told on the read-out.
+   =================================================================== */
+export const SEED_FIT_TOL_MM = 0.1;
+const SEED_SAMPLES = 240;
+const SEED_TANGENT_MM = 1;   // a direction error of one radian counts as one millimetre of blade
+/* THE FIT ITSELF, one routine for both curves: a pattern search (coordinate
+   descent on the editor's grid, step halving from 1/64 to the grid) over the
+   free coordinates of an initial point set read off the target, minimising
+   the caller's own error in mm. Deterministic, no randomness; every candidate
+   that breaks the spec's shape rule is skipped, never repaired. */
+function seedPatternSearch(points, free, errOf, spec) {
+  let pts = points.map((p) => p.slice());
+  let e = errOf(pts);
+  for (let step = 1 / 64; step >= CURVE_GRID_STEP / 2; step /= 2) {
+    let moved = true, guard = 0;
+    while (moved && guard++ < 24) {
+      moved = false;
+      for (const [i, c] of free) for (const dir of [1, -1]) {
+        const q = pts.map((p) => p.slice());
+        q[i][c] = curveQuantise(q[i][c] + dir * step);
+        if (curveShapeRefusal({ mode: spec.modes[0], points: q }, spec)) continue;
+        const eq = errOf(q, e - 1e-12);
+        if (eq < e - 1e-12) { pts = q; e = eq; moved = true; }
+      }
+    }
+  }
+  return { points: pts, errorMm: e };
+}
+const CURVE_GRID_STEP = 1e-4;   // bloom-curve.js's CURVE_GRID — the editor's own grid, where the search stops
+/* THE SLIDER SPINE'S OWN SHAPE at the asked length, in the curl plane (dR along
+   the blade, dZ across it), as the slider family draws it: curl, bias, start,
+   the export floor (the stricter mode, the validator's own) — spineLaw's own
+   path at the base row count. */
+function seedSliderSpine(state, L) {
+  return spineLaw({ curlRad: Number(state.petalSpineCurl) * D2R, bias: Number(state.curlBias) || 0, start: Number(state.curlStart) || 0, length: L, tilt: 0, floorRadius: spineCurveFloorRadiusMm(state), startFloor: CURL_START_MIN, rows: NU_BASE });
+}
+/* `lengthsMm`: the asked lengths of every petal the switch reaches — no seed
+   the editor's own validator would refuse at any of them is ever written (a
+   tight kink near the root that the floor would clamp is not a fit). */
+export function seedSpineCurve(state, askedLengthMm, { tolMm = SEED_FIT_TOL_MM, lengthsMm = null } = {}) {
+  const L = Number(askedLengthMm);
+  const Ls = [L, ...((lengthsMm || []).filter((x) => x > 0))];
+  const floorRadius = spineCurveFloorRadiusMm(state);
+  const slider = seedSliderSpine(state, L);
+  const tgt = [], ss = [];
+  const tphi = [];
+  for (let i = 0; i <= SEED_SAMPLES; i++) { const sMm = (L * i) / SEED_SAMPLES; const q = slider.at(sMm); tgt.push([q.dR, q.dZ]); ss.push(sMm); tphi.push(q.phi); }
+  /* THE ERROR IS POSITION AND DIRECTION: a fit within a tenth of a millimetre
+     everywhere can still turn its tip several degrees short (measured: a
+     60-degree sepal curl seeded to 0.097 mm built 52 degrees), so the
+     direction's error counts too, weighted by one millimetre of blade
+     (`SEED_TANGENT_MM`) — the larger of the two is the error. */
+  /* THE BOX: the curve's x runs 0..1 from the root, so a spine that curls back
+     behind its own root (past about half a turn) cannot be drawn upright. The
+     law lays the drawn curve's first chord along the blade whatever its drawn
+     start angle (F3-global §2), so the shape may be drawn ROTATED: the
+     smallest rotation that keeps it in front of the root is taken, and the
+     shape is shrunk uniformly if it would leave the box (the law scales the
+     drawn arc to the petal's length, so size is free). */
+  let rot = null;
+  for (let d = 0; d <= 180 && rot === null; d++) for (const sg of d === 0 ? [1] : [1, -1]) {
+    const a = sg * d * D2R, c = Math.cos(a), sn = Math.sin(a);
+    if (tgt.every(([x, y]) => x * c - y * sn >= -1e-9 * L)) { rot = a; break; }
+  }
+  if (rot === null) rot = 0;
+  const c = Math.cos(rot), sn = Math.sin(rot);
+  const R = tgt.map(([x, y]) => [x * c - y * sn, x * sn + y * c]);
+  const ext = Math.max(...R.map((p) => p[0]), ...R.map((p) => Math.abs(p[1])), 1e-12);
+  const k = ext >= 0.98 * L ? (0.98 * L) / ext : 1;
+  const norm = R.map(([x, y]) => [Math.max(0, (x * k) / L), (y * k) / L]);
+  /* THE SEARCH'S ERROR: the curve's own sampled polyline as the law draws it —
+     scaled so its arc is the asked length, its first chord laid along the
+     blade — against the slider spine at the same arc positions (the build's
+     piecewise-constant node curvature integrates that polyline to well under
+     a micron); THE REPORTED ERROR is the build's own path, below. */
+  /* THE SEARCH'S ERROR is the BUILD's own curvature record (`spineCurveLaw`,
+     the per-node curvature the law integrates) integrated in exact circular
+     steps at the law's own substep density — the spine the law draws, short of
+     its floor clamp (a candidate the validator would refuse is not a fit and
+     reads Infinity) — against the slider spine at the same arc positions. A
+     cheaper reading of the drawn POLYLINE was tried first and is wrong: the
+     law's node intervals weight an end node by its interval, not its chord, so
+     a fit to the polyline built 55 degrees for a 60-degree arc; THE REPORTED
+     ERROR is `spineLaw` itself, below. */
+  const STEPS = SEED_SAMPLES * 4;
+  const Lmin = Math.min(...Ls), kFloor = 1 / floorRadius;
+  /* `bound`: the search only asks whether a candidate beats the error in hand,
+     so the walk stops the moment it cannot */
+  const polyErr = (pts, bound = Infinity) => {
+    const cl = spineCurveLaw({ mode: 'single', points: pts }, L);
+    /* the validator's own bar (spineCurveRefusal's: the peak at every asked
+       length, the shortest the tightest) — a candidate past it is no fit */
+    if (cl.peakKmm * (L / Lmin) > kFloor) return Infinity;
+    let phi = 0, x = 0, y = 0, e = 0;
+    const ds = L / STEPS;
+    for (let i = 0; i < STEPS; i++) {
+      const kk = cl.kappaAtMm((i + 0.5) * ds), dphi = kk * ds;
+      const chord = Math.abs(dphi) < 1e-9 ? ds : (2 * Math.sin(dphi / 2)) / kk;
+      x += chord * Math.cos(phi + dphi / 2); y += chord * Math.sin(phi + dphi / 2); phi += dphi;
+      if ((i + 1) % 4 === 0) { const k4 = (i + 1) / 4, t = tgt[k4]; e = Math.max(e, Math.hypot(x - t[0], y - t[1]), Math.abs(phi - tphi[k4]) * SEED_TANGENT_MM); if (e >= bound) return e; }
+    }
+    return e;
+  };
+  let lastSplit = null;
+  const lawErr = (curve) => {
+    const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: L, tilt: 0, floorRadius, startFloor: CURL_START_MIN, rows: NU_BASE, curve: spineCurveLaw(curve, L) });
+    let e = 0;
+    let ePos = 0, eDir = 0;
+    for (let i = 0; i <= SEED_SAMPLES; i++) { const q = law.at(ss[i]); ePos = Math.max(ePos, Math.hypot(q.dR - tgt[i][0], q.dZ - tgt[i][1])); eDir = Math.max(eDir, Math.abs(q.phi - tphi[i])); }
+    lastSplit = { posMm: ePos, dirDeg: eDir / D2R };
+    e = Math.max(ePos, eDir * SEED_TANGENT_MM);
+    return e;
+  };
+  const arcM = [0];
+  for (let i = 1; i <= SEED_SAMPLES; i++) arcM.push(arcM[i - 1] + Math.hypot(norm[i][0] - norm[i - 1][0], norm[i][1] - norm[i - 1][1]));
+  const at = (frac) => { const T = arcM[SEED_SAMPLES] * frac; let i = 0; while (i < SEED_SAMPLES && arcM[i + 1] < T) i++; return Math.min(SEED_SAMPLES, i + (arcM[i + 1] - T < T - arcM[i] ? 1 : 0)); };
+  let best = null;
+  for (let n = SPINE_CURVE_SPEC.points[0]; n <= SPINE_CURVE_SPEC.points[1]; n++) {
+    /* two starts: even in arc, and denser toward the two ends (Catmull-Rom's
+       mirrored end phantom starts the drawn curve along its first CHORD, which
+       the law lays along the blade, so the end spans carry the error) */
+    for (const spacing of [(f) => f, (f) => (1 - Math.cos(Math.PI * f)) / 2]) {
+      const idx = Array.from({ length: n }, (_, j) => (j === 0 ? 0 : j === n - 1 ? SEED_SAMPLES : at(spacing(j / (n - 1)))));
+      const start = idx.map((i) => (i === 0 ? [0, 0] : [curveQuantise(norm[i][0]), curveQuantise(norm[i][1])]));
+      if (curveShapeRefusal({ mode: 'single', points: start }, SPINE_CURVE_SPEC)) continue;
+      /* a straight spine needs no search */
+      const free = [];
+      if (polyErr(start) > tolMm / 4) for (let i = 1; i < n; i++) free.push([i, 0], [i, 1]);
+      const fit = seedPatternSearch(start, free, polyErr, SPINE_CURVE_SPEC);
+      const curve = { mode: 'single', points: fit.points };
+      const e = lawErr(curve);
+      if (!best || e < best.errorMm) best = { curve, errorMm: e, points: n, split: lastSplit };
+    }
+    if (best && best.errorMm <= tolMm) break;
+  }
+  return { ...best, tolMm, met: best.errorMm <= tolMm, rotationDeg: rot / D2R, shrunk: k < 1, from: Number(state.petalSpineCurl) === 0 ? 'a straight spine' : 'the slider spine' };
+}
+/* THE LAW OUTLINE'S CORE HALF-WIDTH (what CURVE mode replaces): the base taper
+   below the derived widest point, the tip law above it — widthProfile's own
+   CORE term, written once here for the seed (the build's term reads the same
+   three controls through the same expressions). */
+function seedLawCore(state, halfW) {
+  const a = Number(state.petalBaseTaper), b = Number(state.petalTipTaper), n = Number(state.petalTipShape);
+  const uPk = a / (a + b), gPk = Math.pow(uPk, a) * Math.pow(1 - uPk, b);
+  return { uPk, at: (u) => (u <= uPk ? halfW * (Math.pow(u, a) * Math.pow(1 - u, b)) / gPk : halfW * Math.pow(Math.max(0, 1 - Math.pow((u - uPk) / (1 - uPk), n)), 1 / n)) };
+}
+/* `lengthsMm`: every asked length the build on screen drew for the petals the
+   switch reaches (an inner whorl is shorter AND narrower; a fraction drawn at
+   the shortest is the tightest against the floor), so no seeded point is
+   lifted at any of them. `scale` the outline width scale (the petal's own, or
+   a sepal's `sepalOutlineWidthScale`). `footHalfMm` the foot's half-width —
+   the ROOT BLEND, the hub's, is max-ed under the core in BOTH modes, so the
+   stretch it covers is not the seed's to fit and the error is read on the
+   outline as drawn: `max(core, root blend)` against `max(curve, root blend)`. */
+export function seedOutlineCurve(state, askedLengthMm, askedWidthMm, { scale = outlineWidthScale(state), lengthsMm = null, footHalfMm = 0, tolMm = SEED_FIT_TOL_MM } = {}) {
+  const L = Number(askedLengthMm), halfW = Number(askedWidthMm) / 2;
+  const Lmin = Math.min(L, ...((lengthsMm || []).filter((x) => x > 0)));
+  const core = seedLawCore(state, halfW);
+  const blend = (u) => footHalfMm * Math.max(0, 1 - u / ROOT_BLEND_END);
+  const drawnLaw = (u) => Math.max(core.at(u), blend(u));
+  /* the curve's y at u: the law's half-width as a fraction of the length,
+     before the width scale the plan multiplies in */
+  const yOf = (u) => core.at(u) / (L * scale);
+  const yFloor = (TIP_HALF_MM * 1.001 + OUTLINE_LIFT_MM) / (scale * Lmin);
+  const yMax = OUTLINE_CURVE_SPEC.y[1];
+  const U = Array.from({ length: SEED_SAMPLES + 1 }, (_, i) => i / SEED_SAMPLES);
+  /* where the error is read: the law drawn ABOVE the print floor, short of the
+     nib (the run-out to the tip is the nib's in both modes) */
+  const above = U.filter((u) => u < 1 && core.at(u) > TIP_HALF_MM);
+  const errOf = (pts, bound = Infinity) => {
+    const pl = outlineCurvePlan({ mode: 'symmetric', points: pts }, L, { scale });
+    let e = 0;
+    for (const u of above) { e = Math.max(e, Math.abs(Math.max(pl.halfAtMm(u), blend(u)) - drawnLaw(u))); if (e >= bound) return e; }
+    return e;
+  };
+  const clearU = U.filter((u) => u > 0 && u < 1 && yOf(u) > yFloor);
+  if (clearU.length < 1) {
+    const pts = [[0, curveQuantise(Math.min(yMax, yFloor * 1.01))], [1, 0]];
+    return { curve: { mode: 'symmetric', points: pts }, errorMm: errOf(pts), points: 2, tolMm, met: false, clipped: false, from: 'the law outline (under the print floor at every station — the narrowest printable curve instead)' };
+  }
+  const ua = clearU[0], ub = clearU[clearU.length - 1];
+  let clipped = false;
+  const yAt = (u) => { let y = yOf(u); if (y > yMax) { y = yMax; clipped = true; } return curveQuantise(Math.max(y, yFloor)); };
+  let best = null;
+  /* no searched point may fall to the floor at the shortest length: the plan
+     would lift it there, which is a refusal the seed must not hand the editor */
+  const guarded = (pts, bound) => (pts.slice(0, -1).some((p) => p[1] * scale * Lmin <= TIP_HALF_MM + OUTLINE_LIFT_MM) ? Infinity : errOf(pts, bound));
+  for (let nInt = 1; nInt <= OUTLINE_CURVE_SPEC.points[1] - 2; nInt++) {
+    /* two starts over the clear stretch — even in u, and denser toward its two
+       ends, where the law turns fastest — the widest point always among them */
+    for (const spacing of [(f) => f, (f) => (1 - Math.cos(Math.PI * f)) / 2]) {
+      const us = [...new Set([...Array.from({ length: nInt }, (_, j) => ua + (ub - ua) * (nInt === 1 ? 0.5 : spacing(j / (nInt - 1)))), ...(nInt >= 3 ? [core.uPk] : [])].map((u) => curveQuantise(Math.min(ub, Math.max(ua, u)))))].sort((p, q) => p - q).filter((x) => x > 0 && x < 1).slice(0, OUTLINE_CURVE_SPEC.points[1] - 2);
+      const start = [[0, curveQuantise(Math.min(yMax, Math.max(yOf(0), yFloor)))], ...us.map((u) => [u, yAt(u)]), [1, 0]];
+      if (curveShapeRefusal({ mode: 'symmetric', points: start }, OUTLINE_CURVE_SPEC)) continue;
+      const free = [[0, 1]];
+      for (let i = 1; i < start.length - 1; i++) free.push([i, 0], [i, 1]);
+      const fit = seedPatternSearch(start, free, guarded, OUTLINE_CURVE_SPEC);
+      if (!best || fit.errorMm < best.errorMm) best = { curve: { mode: 'symmetric', points: fit.points }, errorMm: fit.errorMm, points: fit.points.length };
+    }
+    if (best && best.errorMm <= tolMm) break;
+  }
+  return { ...best, tolMm, met: best.errorMm <= tolMm, clipped, from: 'the law outline' };
 }
 
 /* ===================================================================
@@ -19332,10 +19576,17 @@ export function bladeAskedWidthMm(ps, slotScale) { return ps.bladeWidthMm > 0 ? 
    together), tilt (`sepalAngle` is its own control with its own derived
    limit) and thickness (the material, shared). */
 export const SEPAL_TWINS = Object.freeze([
+  /* THE CURVES (curves-sepals, Oct 20 — Eva's rulings: "sepals get both
+     curves; sepals scope per TIER"). The outline's mode and curve and the
+     curl's mode and curve are twins like every other shape and curl control,
+     so a sepal draws its OWN outline and spine and the petals' modes never
+     reach it. They are VALUES, not numbers (`SEPAL_TWIN_VALUE_DEFAULTS`). */
+  ['petalOutlineMode', 'sepalOutlineMode'], ['petalOutlineCurve', 'sepalOutlineCurve'],
   ['petalBaseTaper', 'sepalBaseTaper'], ['petalTipShape', 'sepalTipShape'], ['petalTipTaper', 'sepalTipTaper'],
   ['petalCup', 'sepalCup'], ['petalCupGradient', 'sepalCupGradient'],
   ['buckleAmp', 'sepalBuckleAmp'], ['buckleFreq', 'sepalBuckleFreq'], ['buckleEnv', 'sepalBuckleEnv'],
   ['petalApexSweep', 'sepalApexSweep'], ['petalRoll', 'sepalRoll'], ['petalRollTaper', 'sepalRollTaper'],
+  ['petalCurlMode', 'sepalCurlMode'], ['petalSpineCurve', 'sepalSpineCurve'],
   ['petalSpineCurl', 'sepalSpineCurl'], ['curlBias', 'sepalCurlBias'], ['curlStart', 'sepalCurlStart'], ['petalTwist', 'sepalTwist'],
 ]);
 /* THE SEPAL-ONLY BOUNDS (Eva's ruling §9.1, Oct 9 — docs/bloom-sepal-discovery.md
@@ -19366,7 +19617,24 @@ export const SEPAL_TWINS = Object.freeze([
 export const SEPAL_TWIN_BOUNDS = Object.freeze({
   sepalRoll: Object.freeze({ min: -180, max: 180 }),
 });
+/* THE VALUE TWINS (curves-sepals): a choice and a curve are never numbers, so
+   `sepalTwinValue` hands them through verbatim — and where a state predates
+   them (a stored matrix set, a Node tool's state) the value the sepal was
+   PINNED to before the twins existed (SLIDER, LAW, the two curves' own
+   defaults) — so every stored set builds through the expression it built
+   through, by branch. */
+export const SEPAL_TWIN_VALUE_DEFAULTS = Object.freeze({
+  sepalCurlMode: 'SLIDER', sepalSpineCurve: SPINE_CURVE_DEFAULT,
+  sepalOutlineMode: 'LAW', sepalOutlineCurve: OUTLINE_CURVE_DEFAULT,
+});
+/* THE TIER'S OWNED VALUES (curves-sepals): the sepal twins of the petals' two
+   value groups — derived from the ONE twin table, so a value a petal scope may
+   own is the value a tier may own, under its sepal name. */
+export const SEPAL_SCOPE_VALUE_GROUPS = Object.freeze(Object.fromEntries(Object.entries(SCOPE_VALUE_GROUPS).map(([g, ids]) => [g, Object.freeze(ids.map((id) => { const t = SEPAL_TWINS.find(([pid]) => pid === id); if (!t) throw new Error(`SEPAL_SCOPE_VALUE_GROUPS: ${id} has no sepal twin`); return t[1]; }))])));
+export const SEPAL_SCOPE_VALUE_IDS = Object.freeze([...SEPAL_SCOPE_VALUE_GROUPS.outline, ...SEPAL_SCOPE_VALUE_GROUPS.spine]);
+export function sepalTwinIsValue(sepalId) { return Object.prototype.hasOwnProperty.call(SEPAL_TWIN_VALUE_DEFAULTS, sepalId); }
 export function sepalTwinValue(sepalId, v) {
+  if (sepalTwinIsValue(sepalId)) return v === undefined || v === null ? SEPAL_TWIN_VALUE_DEFAULTS[sepalId] : v;
   const x = Number(v);
   const b = SEPAL_TWIN_BOUNDS[sepalId];
   if (!b) return x;
@@ -19439,11 +19707,23 @@ export function tierOffsetsFor(scopes, k) {
     const where = `tiers[${e.tier}]`;
     for (const id of Object.keys(e.offsets || {})) if (SCOPE_TIER_WHORL_LEVEL_IDS.includes(id)) throw new Error(`scopes: ${where} carries an offset on ${id}, a whorl-level sepal value with no per-tier meaning`);
     checkScopeOffsets(e.offsets || {}, where);
+    checkScopeValues(e.values, where, SEPAL_SCOPE_VALUE_IDS);
   }
   const sum = {};
   let any = false;
-  for (const e of list) { if (e.tier !== k) continue; addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true; }
-  return any ? { offsets: sum, bounds: scopes.bounds || {}, key: { tier: k } } : null;
+  /* THE TIER'S OWNED VALUES (curves-sepals) — its outline's and spine's mode
+     and curve, under their sepal names; a key added only where one is owned,
+     so every term with none is the object it always was */
+  let values = null, valueFrom = null;
+  for (const e of list) {
+    if (e.tier !== k) continue;
+    addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true;
+    if (e.values) for (const id of Object.keys(e.values)) { (values || (values = {}))[id] = e.values[id]; (valueFrom || (valueFrom = {}))[id] = 'tier'; }
+  }
+  if (!any) return null;
+  const term = { offsets: sum, bounds: scopes.bounds || {}, key: { tier: k } };
+  if (values) { term.values = values; term.valueFrom = valueFrom; }
+  return term;
 }
 /* A TIER'S OWN STATE: the global state with each offset control moved by the
    tier's summed offset and clamped into the registry's own range (the bounds
@@ -19463,6 +19743,11 @@ export function sepalTierState(state, scopes, k) {
     effective[id] = st[id];
     if (st[id] !== asked) clamped.push(id);
   }
+  /* the tier's owned curve values, through the ONE resolver of owned values */
+  if (term.values) {
+    const res = resolvePetalValues(st, term.values, false, term.valueFrom, SEPAL_SCOPE_VALUE_GROUPS);
+    if (res) Object.assign(st, res.state);
+  }
   return { state: st, term: { ...term, effective, clamped } };
 }
 export function sepalBladeState(state, angleDeg, unclamped = false) {
@@ -19473,15 +19758,45 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
      list the rim family already carries. The witness is
      `verify-bloom-sepal-decoupled.mjs`, which sweeps petal-side control values
      and asserts 0 sepal floats move. */
-  /* THE SPINE CURVE IS PINNED TO THE SLIDER FAMILY ON A SEPAL (F3-global): the
-     sepal's curl is its own twins' (sepalSpineCurl, bias, start) whatever the
-     petals' mode; a sepal curve is the sepal session's (Q4.3). */
-  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE', petalCurlMode: 'SLIDER', petalOutlineMode: 'LAW' };
-  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
+  /* THE CURVES ARE THE SEPAL'S OWN (curves-sepals, Oct 20). Until this session
+     a sepal was PINNED to SLIDER and LAW here whatever the petals' modes (F3 /
+     F6 left Q4.3 / Q6.7 to this session); the pins are gone and the four value
+     twins (`sepalCurlMode`, `sepalSpineCurve`, `sepalOutlineMode`,
+     `sepalOutlineCurve`) map onto the names the laws read like every other
+     twin — so the fold limit, the outline's print floor and lift, the nib that
+     closes it at exactly the asked length, and the refusals all reach a sepal
+     through the petal builder it already is. A sepal has no tube (its ring is
+     not a whorl's) and no FAN pairing (it is never mirrored), so a two-sided
+     sepal outline faces the same hand on every sepal of a tier — the petals'
+     RADIAL pinwheel. */
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
+  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
   const own = sepalOwnSize(state);
   s.bladeLengthMm = own.lengthMm; s.bladeWidthMm = own.widthMm;
+  /* THE OUTLINE'S WIDTH SCALE IS THE SEPAL'S OWN (only read in CURVE mode, so
+     only set there — a LAW sepal's substate is the object it was) */
+  if (outlineIsCurve(s)) s.outlineWidthScaleOwn = sepalOutlineWidthScale(state);
   return s;
+}
+/* THE SEPAL'S OUTLINE WIDTH SCALE (curves-sepals). A drawn outline's y are
+   fractions of the blade's own LENGTH, and the petal's ruled scale is its width
+   over the 16 mm reference (F6-sym-2) — which, the length being the petal's
+   own, is its ASPECT (width over length) against the reference aspect 16 mm :
+   Petal length. A sepal is scaled against THAT SAME REFERENCE: its own asked
+   width over its own asked length, against 16 mm over the petal's length —
+   `(W_s / L_s) / (16 / Petal length)`. So a sepal that is the petal scaled
+   (no own size set — width and length both Petal x Size) draws at the petal's
+   own scale, `Petal width / 16`, BY BRANCH (the petal's expression, never the
+   quotient); an own width widens it in proportion, an own length lengthens it
+   WITHOUT widening it. */
+export function sepalOutlineWidthScale(state) {
+  const own = sepalOwnSize(state);
+  if (own.lengthMm === null && own.widthMm === null) return outlineWidthScale({ petalWidth: state.petalWidth });
+  const k = Number(state.sepalScale);
+  const W = own.widthMm !== null ? own.widthMm : Number(state.petalWidth) * k;
+  const L = own.lengthMm !== null ? own.lengthMm : Number(state.petalLength) * k;
+  return (W / L) * (Number(state.petalLength) / OUTLINE_WIDTH_REF_MM);
 }
 
 /* ---- the lamina: a petal's mid-surface on the builder's own lattice ---- */
@@ -21347,7 +21662,9 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false, desc =
     const reps = [...configOf.values()];
     configs = Math.max(configs, reps.length);
     const trials = new Map();   // seam-step bucket -> trial lamina at its representative angle
-    const sepalRows = bladeRowsFor(sepalBladeState(state, lo, unclamped).petalTipShape);   // the sepal ring's own, never the head's NU
+    /* the sepal ring's own, never the head's NU — and in CURVE mode NU_BASE,
+       the expression petalSurface sets (the tip shape is inert there) */
+    const sepalRows = (() => { const bs0 = sepalBladeState(state, lo, unclamped); return outlineIsCurve(bs0) ? NU_BASE : bladeRowsFor(bs0.petalTipShape); })();
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
       /* the SUBSTATE's length (one owner — `state.petalLength * sepals.scale` here was a second producer of the sepal's length, found by the own-size session) */

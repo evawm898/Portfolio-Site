@@ -44,7 +44,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
-import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, sepalOutlineWidthScale, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, petalGroupCount, CURL_START_MIN,
@@ -856,6 +856,16 @@ export const PREDICATES = {
      checked against each other by the harness. */
   curlFromSlider: { id: 'petalCurlMode', oneOf: ['SLIDER'] },
   curlFromCurve: { id: 'petalCurlMode', oneOf: ['CURVE'] },
+  /* THE SEPAL'S OWN MODES (curves-sepals, Oct 20): the sepal twins of the curl
+     and outline modes, so a sepal's slider family and law shapes hide in ITS
+     CURVE mode, never in the petals' (`twinPredicate` re-points the petal refs
+     onto these). A sepal has no tube, so its law shapes are live exactly in LAW
+     mode. The geometry's statements are `curlIsCurve` / `outlineIsCurve` of the
+     sepal substate (`sepalBladeState`); SP14 compares. */
+  sepalCurlFromSlider: { id: 'sepalCurlMode', oneOf: ['SLIDER'] },
+  sepalCurlFromCurve: { id: 'sepalCurlMode', oneOf: ['CURVE'] },
+  sepalOutlineFromLaw: { id: 'sepalOutlineMode', oneOf: ['LAW'] },
+  sepalOutlineFromCurve: { id: 'sepalOutlineMode', oneOf: ['CURVE'] },
   /* THE OUTLINE CURVE (F6-sym) — the registry's statement of the geometry's
      `outlineIsCurve()`. In CURVE mode the whole boundary law (the two tapers,
      the tip shape, the squared end) and the rim family (lobes, fringe) are
@@ -4893,10 +4903,19 @@ export const CONTROLS = [
    whenever the petals' spine was CURVE, while the slider-pinned sepal still
    read every one of them; block 62's own row "x 5 sepals at curl 60" set a
    value the panel could not show). */
-const PETAL_OUTLINE_REFS = new Set(['outlineFromLaw', 'outlineLawShapes', 'curlFromSlider']);
+/* AND SINCE curves-sepals (Oct 20) A SEPAL HAS ITS OWN MODES, so the petal's
+   mode refs are no longer DROPPED from a twin's guard — they are RE-POINTED
+   onto the sepal's own (`sepalCurlFromSlider` ...): a sepal's tapers hide in
+   the SEPAL's CURVE outline mode and its curl sliders in the SEPAL's CURVE curl
+   mode, and the petals' modes reach no sepal control at all. `outlineLawShapes`
+   (LAW, or CURVE on a fused tube) maps to the sepal's LAW: a sepal has no tube. */
+const PETAL_MODE_REFS = new Map([
+  ['outlineFromLaw', 'sepalOutlineFromLaw'], ['outlineFromCurve', 'sepalOutlineFromCurve'], ['outlineLawShapes', 'sepalOutlineFromLaw'],
+  ['curlFromSlider', 'sepalCurlFromSlider'], ['curlFromCurve', 'sepalCurlFromCurve'],
+]);
 function twinPredicate(pred, map) {
   if (Array.isArray(pred)) return pred.map((p) => twinPredicate(p, map));
-  if (pred && typeof pred === 'object' && PETAL_OUTLINE_REFS.has(pred.ref)) return { all: [] };
+  if (pred && typeof pred === 'object' && PETAL_MODE_REFS.has(pred.ref)) return { ref: PETAL_MODE_REFS.get(pred.ref) };
   if (pred && typeof pred === 'object') {
     const out = {};
     for (const [k, val] of Object.entries(pred)) {
@@ -4910,11 +4929,20 @@ function twinPredicate(pred, map) {
 /* THE VIEW a twin's read-out sees: the petal's names carrying the sepal's
    values, the length and width scaled by the sepal's own size, and the
    SEPAL's own form record where the petal's fmt reads `shown.buckle`. */
+/* (curves-sepals) the sepal's OWN length and width where set — the substate's
+   own sizes — and its own outline width scale, so a curve twin's read-out and
+   validator ask about the sepal's blade rather than the petal's */
 function sepalView(ui) {
-  const v = { ...ui, petalLength: Number(ui.petalLength) * Number(ui.sepalScale), petalWidth: Number(ui.petalWidth) * Number(ui.sepalScale) };
+  const k = Number(ui.sepalScale);
+  const L = Number(ui.sepalLength) > 0 ? Math.max(SEPAL_LENGTH_RANGE[0], Number(ui.sepalLength)) : Number(ui.petalLength) * k;
+  const W = Number(ui.sepalWidth) > 0 ? Math.max(SEPAL_WIDTH_RANGE[0], Number(ui.sepalWidth)) : Number(ui.petalWidth) * k;
+  const v = { ...ui, petalLength: L, petalWidth: W, outlineWidthScaleOwn: sepalOutlineWidthScale(ui) };
   for (const [petalId, sepalId] of SEPAL_TWINS) v[petalId] = ui[sepalId];
   return v;
 }
+/* the validator's context for a SEPAL curve: the sepals' own built lengths,
+   tables and outline records (bloom.js hands them under `sepal`) */
+const sepalCtx = (ctx) => (ctx && ctx.sepal ? ctx.sepal : null);
 const sepalShown = (shown) => (shown ? { ...shown, buckle: shown.sepals && !shown.sepals.unavailable ? shown.sepals.buckle : null } : shown);
 export function sepalTwinControls(rows) {
   const map = new Map(SEPAL_TWINS);
@@ -4926,13 +4954,24 @@ export function sepalTwinControls(rows) {
     if (!sectionOf[p.section]) throw new Error(`SEPAL_TWINS names ${petalId} in section ${p.section}, which has no sepal twin section`);
     const own = twinPredicate(p.visibleWhen, map);
     const guarded = own && own.all && own.all.length === 0;
-    /* A sepal-only bound (SEPAL_TWIN_BOUNDS, Eva's §9.1) NARROWS the petal's
-       range on the twin alone; everything else is the petal's own spec. */
-    const bounds = SEPAL_TWIN_BOUNDS[sepalId] || {};
-    const min = bounds.min ?? p.min, max = bounds.max ?? p.max;
-    if (min < p.min || max > p.max || !(min <= p.default && p.default <= max)) throw new Error(`SEPAL_TWIN_BOUNDS widens ${sepalId} or puts its default outside it — a sepal bound may only narrow`);
+    /* THE KIND'S OWN SPEC (curves-sepals): a slider its range (a sepal-only
+       bound NARROWS it — SEPAL_TWIN_BOUNDS, Eva's §9.1), a choice its options,
+       a curve its spec and the petal's validator asked about the SEPAL (its
+       view, its built lengths) — everything else is the petal's own spec. */
+    const spec = {};
+    if (p.kind === 'slider') {
+      const bounds = SEPAL_TWIN_BOUNDS[sepalId] || {};
+      const min = bounds.min ?? p.min, max = bounds.max ?? p.max;
+      if (min < p.min || max > p.max || !(min <= p.default && p.default <= max)) throw new Error(`SEPAL_TWIN_BOUNDS widens ${sepalId} or puts its default outside it — a sepal bound may only narrow`);
+      Object.assign(spec, { min, max, step: p.step });
+    } else if (SEPAL_TWIN_BOUNDS[sepalId]) throw new Error(`SEPAL_TWIN_BOUNDS names ${sepalId}, a ${p.kind} — only a slider has a range to narrow`);
+    if (p.kind === 'choice') spec.options = p.options;
+    if (p.kind === 'curve') {
+      spec.curve = p.curve;
+      if (typeof p.validate === 'function') spec.validate = (cand, ui, ctx) => p.validate(cand, sepalView(ui), sepalCtx(ctx));
+    }
     return {
-      id: sepalId, section: sectionOf[p.section], kind: p.kind, min, max, step: p.step, default: p.default,
+      id: sepalId, section: sectionOf[p.section], kind: p.kind, ...spec, default: p.default,
       label: p.label.startsWith('Petal ') ? p.label.slice(6, 7).toUpperCase() + p.label.slice(7) : p.label,
       fmt: (v, ui, shown) => p.fmt(v, sepalView(ui), sepalShown(shown)),
       ...(typeof p.cap === 'function' ? { cap: (shown) => p.cap(sepalShown(shown)) } : {}),
