@@ -227,3 +227,24 @@ module that carries its own imports) has a spine substep whose curvature AS THE 
 base's `rowAt(u).sect(v)` over the same NV columns. Its 62 movers are exactly the 62 rows this tree's
 own `bendClamped` record names (§5) — two instruments sharing no code agree row for row. Zero
 triangles moved anywhere: the limit moves stations, never the lattice.
+
+## 9. Frozen tags — which bytes stop reproducing, and the phase owed
+
+**`frozen/phase77` is the 1,396 rows at `3dc8ee1`** (main's head before this change, block 71 takes the live
+matrix to 1,411), registered in BOTH maps and proved deep-equal by `--verify-frozen`; main's newest phase was
+re-read immediately before registering (phase76, at `971155c`).
+
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 3dc8ee1> --movers-predicate spine-fold
+--frozen-sweep` — the byte partition's own base-side predicate over every registered frozen matrix, memoised on
+the state (a consequence of the partition, never a substitute for it): **74 of 76 baselines carry a row whose
+bytes stop reproducing, 1,619 of 65,623 frozen rows.** `phase2` and `phase3` hold (no curled row before
+phase4); the count climbs 6 → 25 to phase70 and is **51 from phase71** (the ALL FORM MAX and ALL INNER MAX
+families plus the drawn-curve rows), **52 on phase77** — exactly the live partition's 52 binders among those
+rows. Every definition still deep-compares; no tag's DEFINITIONS move.
+
+**The first sweep reported 13 / 13 / 29 rows THROWN on phases 75–77, and it was the tool's, not the
+geometry's.** `--frozen-sweep` runs ahead of the full partition in the module, and it reaches `baseScopes`,
+which read `BASE_VALUE_IDS` — a `const` declared further down: a temporal dead zone on every row carrying a
+scoped outline or spine value. The live partition never saw it (it runs after the declaration). The sweep now
+names each throw (row and message) rather than counting it, the declaration sits above the sweep, and
+`--frozen-only <regex>` re-runs a subset; re-run, **0 throw** and the thirteen phase-75/76 rows are holders.

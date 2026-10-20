@@ -736,6 +736,7 @@ const PREDICATE_MOVERS = {
     return st.stamenCoil === 'INDEPENDENT' && Number(st.stamenCoilRadius) > 0;
   },
 };
+const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
 /* `--frozen-sweep` (spine-cup-fold): WHICH FROZEN BASELINES' BYTES STOP
    REPRODUCING under the declared predicate — every registered frozen matrix's
    rows run through the SAME predicate the byte partition proves exact on the
@@ -754,7 +755,8 @@ if (argv.includes('--frozen-sweep')) {
     }
     return st;
   };
-  const names = Object.keys(harness.FROZEN_MATRICES);
+  const fo = argv.indexOf('--frozen-only');
+  const names = Object.keys(harness.FROZEN_MATRICES).filter((n) => fo < 0 || new RegExp(argv[fo + 1]).test(n));
   const memo = new Map(), threwSeen = new Set();
   let tags = 0, total = 0, movers = 0, threwAll = 0;
   for (const name of names) {
@@ -827,7 +829,8 @@ function gridFloatsOf(petals) {
    the record with the unknown values dropped. Every row whose values the base
    already knows is handed the very same record, so a holder's two builds are
    the same call on the same input. */
-const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
+/* (`BASE_VALUE_IDS` is declared above `--frozen-sweep`, which reads it through
+   `baseScopes` and ran before it on every scoped row: a temporal dead zone.) */
 function baseScopes(sc) {
   if (!sc) return sc;
   const strip = (e) => {

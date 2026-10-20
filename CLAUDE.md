@@ -1085,6 +1085,12 @@ SLIDERS, AT EXACTLY HALF A SHEET** (spine-cup-fold, Oct 20 — Eva's rulings of 
   2 declared from birth (curl 360 × cup 0.62 / 0.63, the coil); 38 combination cells and the wall instrument's
   buckle composition IMPROVED. Every census mover is a row the limit binds on. Sheet:
   `node tools/shot-bloom-spine-cup-fold.mjs <png> --base <worktree>` → `docs/img/spine-cup-fold.png`.
+- **Byte partition: 62 movers / 1,349 holders, 0 floats on the holders**, predeclared from the BASE tree
+  (`verify-bloom-surface-bytes --movers-predicate spine-fold`); `--frozen-sweep`: 74 of 76 baselines carry a mover
+  (phase2/3 hold), 1,619 of 65,623 frozen rows. Five edge-profile E2 rows declared (cupped beads on curled
+  blades; two clamped ones read BETTER than the base). C5's reach is the SMALLEST over its three rows (the middle
+  row's read 1.074 on the claw); coverage R3 bit-matches a buckled whorl at the limit; the cup refusal answers a
+  trusted (hand) event only, so a gate's load is a loaded state.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
