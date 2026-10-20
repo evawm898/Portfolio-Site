@@ -7498,7 +7498,7 @@ const SPINE_WIRED = true;
 export const CURL_START_MIN = 1 / NU;
 export function curlIsUniform(state) { return state.curlBias === 0 && state.curlStart === 0; }
 export function curlStartFloored(start, startFloor = CURL_START_MIN) { return start === 0 ? 0 : Math.max(start, CURL_START_MIN, startFloor); }
-export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN, rows = NU, curve = null }) {
+export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN, rows = NU, curve = null, bend = null }) {
   const p = CURL_BIAS_POWER * bias;
   const s0 = curlStartFloored(start, startFloor);
   const remap = (u) => (s0 === 0 ? u : Math.max(0, (u - s0) / (1 - s0)));
@@ -7534,18 +7534,44 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
      bias and start are — and the refusal the editor's validator applies is
      `spineCurveRefusal`, which asks THIS clamp (the same `kMax`, the same
      per-node curvatures `kappaAtMm` serves here) rather than restating it. */
+  /* THE FOLD LIMIT (spine-cup-fold — docs/bloom-spine-cup-fold-outcome.md).
+     `bend` is a `spineBendTable()`: per substep and per SIDE of the bend, the
+     curvature at which the petal's own cross-section — cupped, rolled,
+     twisted, buckled, whatever the form drew — reaches the bend's centre of
+     curvature less the fold clamp's margin. Where it binds it is a SECOND
+     ceiling beside the floor, applied by the SAME comparison, so this function
+     stays the one owner of every clamp a spine takes; the editor's validator
+     asks THIS clamp (`spineCurveRefusal`) on the same table. It binds on the
+     uniform slider arc too, which the floor deliberately never does: the floor
+     is a thinness the arc is TOLD about (session 16's ruling, byte identity),
+     the fold limit is a self-intersection, and the invariant is that the
+     bloom never builds one. Null, or a table with no finite entry, is the
+     shipped law to the bit: `Math.min(kMax, Infinity)` is `kMax`. */
   const uniform = bias === 0 && s0 === 0 && curve === null;
   const kMax = uniform ? Infinity : 1 / floorRadius;
   const N = rows * SPINE_SUBSTEPS, ds = length / N;
+  if (bend !== null && bend.N !== N) throw new Error(`spineLaw: the fold-limit table holds ${bend.N} substeps for a law of ${N} — it was built for a different row count`);
+  let bendClamped = false, bendWorst = null, floorClamped = false;
   const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
   phi[0] = tilt;
   let peakK = 0, clamped = false;
   for (let i = 0; i < N; i++) {
     const u1 = (i + 1) / N;
     const kRaw = (Phi(u1) - Phi(i / N)) / ds + (curve === null ? 0 : curve.kappaAtMm((i + 0.5) * ds));
-    const over = Math.abs(kRaw) > kMax;
-    const k = over ? Math.sign(kRaw) * kMax : kRaw;
+    /* positive curvature turns the blade toward +N, so its centre is on +N */
+    const kLim = bend === null ? kMax : Math.min(kMax, (kRaw < 0 ? bend.kNeg : bend.kPos)[i]);
+    const over = Math.abs(kRaw) > kLim;
+    const k = over ? Math.sign(kRaw) * kLim : kRaw;
     if (over) clamped = true;
+    if (over && kLim === kMax) floorClamped = true;
+    if (over && kLim < kMax) {
+      bendClamped = true;
+      const ratio = Math.abs(kRaw) / kLim;
+      if (bendWorst === null || ratio > bendWorst.ratio) {
+        const side = kRaw < 0 ? -1 : 1;
+        bendWorst = { ratio, u: (i + 0.5) / N, side, askedRadiusMm: 1 / Math.abs(kRaw), limitRadiusMm: 1 / kLim, reachMm: (side < 0 ? bend.reachNeg : bend.reachPos)[i] };
+      }
+    }
     if (Math.abs(k) > peakK) peakK = Math.abs(k);
     const p0 = phi[i];
     /* Exact where nothing has clamped yet, accumulated once something has
@@ -7598,6 +7624,12 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
     startFloored: s0,
     startFloor,
     curve: curve === null ? null : { peakKmm: curve.peakKmm, arcFrac: curve.arcFrac, startDeg: curve.startDeg, nodes: curve.nodes },
+    /* where the fold limit bound, if it did — the worst substep (largest
+       asked curvature over its limit), its side, the section's reach there */
+    bendClamped,
+    bend: bendWorst,
+    /* the floor's own share of `clamped`, so a read-out can tell the two apart */
+    floorClamped,
   };
 }
 
@@ -7708,7 +7740,15 @@ export function spineCurveFloorRadiusMm(state) { return ROLL_MIN_RADIUS_FACTOR *
    else the reason, naming the tightest radius against the floor. It asks the
    spine law's own clamp: `peakKmm > 1 / floorRadius` is spineLaw's `|kRaw| >
    kMax` on the same per-node doubles, so accepted here means unclamped there. */
-export function spineCurveRefusal(curve, state, askedLengthsMm) {
+/* `bends` (spine-cup-fold): the fold-limit tables of the petals the edit
+   reaches, each `{ askedLengthMm, table }` as the build on screen recorded it
+   (`spine.bendTable`). For each one the refusal ASKS spineLaw's clamp — the
+   curve at that petal's asked length, the law at the table's own length and
+   row count, the table — and refuses where the fold limit binds, naming the
+   station and the two radii. The same comparison on the same doubles as the
+   build, so accepted here means unclamped there. Null or empty: the floor
+   alone, as before. */
+export function spineCurveRefusal(curve, state, askedLengthsMm, bends = null) {
   const floorR = spineCurveFloorRadiusMm(state);
   const Ls = (askedLengthsMm && askedLengthsMm.length ? askedLengthsMm : [Number(state.petalLength)]).filter((L) => L > 0);
   let worst = null;
@@ -7716,8 +7756,71 @@ export function spineCurveRefusal(curve, state, askedLengthsMm) {
     const law = spineCurveLaw(curve, L);
     if (law.peakKmm > 1 / floorR && (!worst || law.peakKmm > worst.peakKmm)) worst = { ...law, L };
   }
-  if (!worst) return null;
-  return `the spine would bend to a ${(1 / worst.peakKmm).toFixed(2)} mm radius on a ${worst.L.toFixed(1)} mm petal — under the printable floor of ${floorR.toFixed(2)} mm (one sheet thickness); the sheet's inner face would invert`;
+  if (worst) return `the spine would bend to a ${(1 / worst.peakKmm).toFixed(2)} mm radius on a ${worst.L.toFixed(1)} mm petal — under the printable floor of ${floorR.toFixed(2)} mm (one sheet thickness); the sheet's inner face would invert`;
+  return spineBendRefusal(curve, bends);
+}
+/* THE FOLD LIMIT, ASKED IN ADVANCE — the one decision, shared by the curve
+   validator and the cup's own refusal (bloom.js). */
+export function spineBendRefusal(curve, bends) {
+  let fold = null;
+  for (const b of bends || []) {
+    if (!b || !b.table || !b.table.binds) continue;
+    const T = b.table;
+    const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: T.length, tilt: 0, floorRadius: T.floorRadius, rows: T.rows, curve: spineCurveLaw(curve, b.askedLengthMm), bend: T });
+    if (law.bendClamped && (!fold || law.bend.ratio > fold.ratio)) fold = { ...law.bend, L: b.askedLengthMm };
+  }
+  if (!fold) return null;
+  return `the spine would bend to a ${fold.askedRadiusMm.toFixed(2)} mm radius at u ${fold.u.toFixed(2)} on a ${fold.L.toFixed(1)} mm petal, where the cupped section reaches ${fold.reachMm.toFixed(2)} mm toward the bend's centre — the sheet would fold through itself; it needs at least ${fold.limitRadiusMm.toFixed(2)} mm there`;
+}
+
+/* ===================================================================
+   THE FOLD LIMIT — the spine against its own cross-section (spine-cup-fold,
+   Oct 20; read docs/bloom-spine-cup-fold-outcome.md before touching it).
+
+   WHY IT EXISTS. A point the section puts a distance d toward the centre of
+   the spine's bend moves along the length at (1 - kappa d) times the spine's
+   own speed, so wherever kappa d passes 1 that part of the sheet runs
+   BACKWARDS through itself — the offset-surface theorem the fold clamp is
+   already built on, along the length instead of across it. A cup lifts the
+   margins by c h; an S-shaped spine bends both ways; on the bend whose
+   centre is on the cup's side the margins pass it. Measured on `main`: the
+   drawn S x cup 0.6 reads 248 / 344 within-shell CROSSINGS (spoon / LAW
+   outline), every one at the margin, at u 0.55-0.65 for a positive cup and
+   u 0.25 for a negative one — the other bend — and the curl SLIDERS reach the
+   same fold (cup 1.2 x curl 270: 2,904 pairs, every one at the margin). At
+   eight times the row count the census's first pair sits at kappa d = 0.98 to
+   1.00 over three S tightnesses, both outlines and both cup signs, so the
+   theorem is the mechanism and not a fit; the 56-row mesh resolves it only
+   from about 1.2.
+
+   THE LIMIT. The spine's radius at each substep must clear the section's
+   reach toward that side PLUS the fold clamp's own margin, FOLD_CLAMP_MARGIN
+   x t/2 — the same argument (Eva's ruling, the apex-nib session): the inner
+   skin keeps a fifth of the mid-surface's spacing. Where reach + margin is
+   not larger than the floor the floor rules and the entry is Infinity, so a
+   flat section changes nothing and the table is inert by construction.
+
+   THE REACH IS READ OFF THE SECTION, never restated from the cup's algebra:
+   `reachAt(u)` is the petal's own `sectAt` (see `bendReachAt`), so the roll's
+   wrap, the twist, the buckle and the nib are in it for free and a future
+   form term is too. ONE TABLE, read by spineLaw's clamp in the build and by
+   the editor's validator through `spineCurveRefusal` — the refusal IS the
+   clamp asked in advance, on the same doubles.
+   =================================================================== */
+export function spineBendTable({ length, rows, reachAt, floorRadius, t }) {
+  const N = rows * SPINE_SUBSTEPS;
+  const marginMm = (FOLD_CLAMP_MARGIN * t) / 2;
+  const reachPos = new Float64Array(N), reachNeg = new Float64Array(N), kPos = new Float64Array(N), kNeg = new Float64Array(N);
+  let binds = false;
+  for (let i = 0; i < N; i++) {
+    const r = reachAt((i + 0.5) / N);
+    reachPos[i] = r.pos; reachNeg[i] = r.neg;
+    const Rp = r.pos + marginMm, Rn = r.neg + marginMm;
+    kPos[i] = Rp > floorRadius ? 1 / Rp : Infinity;
+    kNeg[i] = Rn > floorRadius ? 1 / Rn : Infinity;
+    if (kPos[i] !== Infinity || kNeg[i] !== Infinity) binds = true;
+  }
+  return { N, rows, length, floorRadius, marginMm, reachPos, reachNeg, kPos, kNeg, binds };
 }
 
 /* ===================================================================
@@ -8158,7 +8261,11 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      sectAt, read by buildPetalInto, printed by the read-out. A clamp nobody
      is told about is a control that silently means something else. */
   const cupClamp = { u: null, askedRadiusMm: Infinity, drawnRadiusMm: Infinity, rows: 0 };
-  const sectAt = (C, T1, N1, h, u, hb = h, cupScale = 1, side = 1) => {
+  /* `quiet` (spine-cup-fold): a section evaluated ONLY to read how far it
+     reaches toward the spine's bend (`petalSurface`'s `bendReachAt`) must not
+     write the fold clamp's telemetry, which counts the EMITTED rows it bound
+     on. Everything else is the call the row loop makes. */
+  const sectAt = (C, T1, N1, h, u, hb = h, cupScale = 1, side = 1, quiet = false) => {
     const apex = apexOf(side);
     const r = ramp(u);
     const k = kAt(u, r);
@@ -8187,7 +8294,7 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
     const cRaw = cAt(u, r) * cupScale;
     const cCap = hb / (FOLD_CLAMP_MARGIN * t);
     const c = Math.abs(cRaw) <= cCap ? cRaw : (cRaw < 0 ? -cCap : cCap);
-    if (c !== cRaw) {
+    if (c !== cRaw && !quiet) {
       const askedR = hb / (2 * Math.abs(cRaw)), drawnR = hb / (2 * Math.abs(c));
       if (cupClamp.u === null || askedR < cupClamp.askedRadiusMm) {
         cupClamp.u = u; cupClamp.askedRadiusMm = askedR; cupClamp.drawnRadiusMm = drawnR;
@@ -8711,8 +8818,90 @@ export function petalSurface(state, ring, slot, cap, acc) {
      and start are zeroed here because `petalForm` never reads them. The curve is
      never uniform, so the general arm below builds it. */
   const curveLaw = form && form.spineCurve !== null ? spineCurveLaw(form.spineCurve, askedLength) : null;
-  const law = form && (kC !== 0 || curveLaw !== null) ? spineLaw({ curlRad: form.curlRad, bias: curveLaw ? 0 : ps.curlBias, start: curveLaw ? 0 : ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU, curve: curveLaw }) : null;
-  const generalSpine = SPINE_WIRED && law !== null && (curveLaw !== null || !form.curlUniform);
+  /* THE ROW'S SECTION PARAMETERS — the half-width(s), the base half-width(s)
+     and the nib's cup scale at u — ONE owner, read by `rowAt` / `twoRowAt`
+     below and by the fold limit's reach. Every expression is the row plan's
+     own, moved here unchanged so the reach reads the section the row loop
+     emits rather than a second statement of it. */
+  const planAt = (u) => {
+    const h = profile.halfWidthAt(u);
+    /* THE SURFACE'S OWN WIDTH SCALE (session 38): the base outline's, so a
+       lobe cuts the boundary without denting the sheet. Identical to `h` on
+       every plain petal, and `sectAt` takes the shipped branch there. */
+    const hb = profile.halfWidthBaseAt(u);
+    /* THE CUP'S SCALE ON THE NIB, DERIVED FROM TWO LENGTHS AND NOT TYPED.
+       `sectAt`'s cup term is `c * a^2 / hb`, so the mid-surface cross-section
+       leaves the midrib with curvature `2c/hb` and radius `hb/(2c)`. A sheet
+       is that mid-surface offset by +/- t/2, and an offset surface INVERTS
+       wherever the offset exceeds the radius — so the section folds wherever
+       `hb < |c| * t`. Off the nib that never binds: the blade's own floor is
+       TIP_HALF_MM and the widest reachable |c| is a fraction of a millimetre
+       of it. ON the nib it binds everywhere, because the outline is drawn to
+       APEX_END_HALF_MM: measured on `petalCup min (-0.8)` the radius runs
+       0.12544 mm at the nib's entry row down to 0.03125 at its end, against
+       a half-thickness of 0.6000 — five to nineteen times inside the fold.
+       Main never reached it because main's outline STOPPED at the floor.
+
+       The scale is `h / TIP_HALF_MM`, which is not a fade with a shape of its
+       own: the nib's entry is BY CONSTRUCTION the station where the law
+       crosses TIP_HALF_MM, so the factor is exactly 1 there and the blade
+       below the entry is untouched to the bit; and above it `2*(c*h/T)/h` is
+       `2c/T`, so the section's curvature is CONSTANT across the whole nib at
+       the value it already had at the entry. The nib inherits the tip
+       curvature main drew at its flat face and never goes past it. */
+    /* IT READS `hb`, THE BASE OUTLINE, AND NOT THE DRAWN `h` — the same
+       rule every other law in `sectAt` obeys, and measured rather than
+       assumed. The first cut scaled by `h`, which on a LOBED row
+       oscillates with the lobe period, so the cup's amplitude stepped at
+       every sinus and the true-normal offset turned each step into a
+       wedge — session 38's own buckle finding, arriving in the cup one
+       feature later: `LOBES: x cup 1.2` went 1,056 -> 1,688 pairs on it.
+       Against `hb` the curvature is `2c/TIP_HALF_MM` whatever the cut
+       removes, and the entry is still exactly 1 because the nib's entry
+       IS where the BASE law crosses TIP_HALF_MM. */
+    const cupScale = profile.onNib(u) ? hb / TIP_HALF_MM : 1;
+    return { h, hb, cupScale };
+  };
+  const twoPlanAt = (u) => {
+    const PL = profile.side(1), PR = profile.side(-1);
+    const hL = PL.halfWidthAt(u), hR = PR.halfWidthAt(u);
+    const hbL = PL.halfWidthBaseAt(u), hbR = PR.halfWidthBaseAt(u);
+    const cupL = PL.onNib(u) ? hbL / TIP_HALF_MM : 1, cupR = PR.onNib(u) ? hbR / TIP_HALF_MM : 1;
+    return { hL, hR, hbL, hbR, cupL, cupR };
+  };
+  /* THE FOLD LIMIT'S REACH (spine-cup-fold): how far the cross-section at u
+     reaches toward each side of the spine's bend — the curl plane's normal
+     N0, the frame's own `N` before the twist turns it — over the mesh's own
+     columns. Read off `sectAt` in a unit frame (quiet: no fold-clamp record),
+     so whatever the form put in the section — cup, cup gradient, roll, the
+     buckle, the apex sweep, the nib's scale — is in it, and the twist enters
+     through `frameAt`'s own angle `twistRad * u`. Null with no form: a flat
+     section reaches nowhere. */
+  const O3 = [0, 0, 0], X3 = [1, 0, 0], Y3 = [0, 1, 0];
+  const bendReachAt = form === null ? null : (u) => {
+    let sect;
+    if (profile.twoSided) {
+      const q = twoPlanAt(u);
+      const sL = form.sectAt(O3, X3, Y3, q.hL, u, q.hbL, q.cupL, 1, true), sR = form.sectAt(O3, X3, Y3, q.hR, u, q.hbR, q.cupR, -1, true);
+      sect = (v) => (v > 0 ? sL(v) : sR(v));
+    } else {
+      const q = planAt(u);
+      sect = form.sectAt(O3, X3, Y3, q.h, u, q.hb, q.cupScale, 1, true);
+    }
+    const tau = form.twistRad * u, ct = Math.cos(tau), st = Math.sin(tau);
+    let pos = 0, neg = 0;
+    for (let j = 0; j < NV; j++) {
+      const P = sect(-1 + (2 * j) / (NV - 1)).P;
+      const d = P[0] * st + P[1] * ct;
+      if (d > pos) pos = d;
+      if (-d > neg) neg = -d;
+    }
+    return { pos, neg };
+  };
+  const bend = form !== null && (kC !== 0 || curveLaw !== null) ? spineBendTable({ length, rows: NU, reachAt: bendReachAt, floorRadius, t }) : null;
+  const law = form && (kC !== 0 || curveLaw !== null) ? spineLaw({ curlRad: form.curlRad, bias: curveLaw ? 0 : ps.curlBias, start: curveLaw ? 0 : ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU, curve: curveLaw, bend: bend && bend.binds ? bend : null }) : null;
+  /* a uniform arc the fold limit clamped is no longer the closed-form arc */
+  const generalSpine = SPINE_WIRED && law !== null && (curveLaw !== null || !form.curlUniform || law.bendClamped);
   const spineAt = generalSpine
     ? (s) => {
       const q = law.at(s);
@@ -8755,12 +8944,9 @@ export function petalSurface(state, ring, slot, cap, acc) {
      half-width must ask for `hL` / `hR` by name. */
   const twoRowAt = (u) => {
     const s = u * length;
-    const PL = profile.side(1), PR = profile.side(-1);
-    const hL = PL.halfWidthAt(u), hR = PR.halfWidthAt(u);
-    const hbL = PL.halfWidthBaseAt(u), hbR = PR.halfWidthBaseAt(u);
+    const { hL, hR, hbL, hbR, cupL, cupR } = twoPlanAt(u);
     const { C, phi } = spineAt(s);
     const f = form ? form.frameAt(Rs, T, phi, u, dome === null ? null : Up) : null;
-    const cupL = PL.onNib(u) ? hbL / TIP_HALF_MM : 1, cupR = PR.onNib(u) ? hbR / TIP_HALF_MM : 1;
     const sL = f === null ? flatSect(C, nrm, hL) : form.sectAt(C, f.T, f.N, hL, u, hbL, cupL, 1);
     const sR = f === null ? flatSect(C, nrm, hR) : form.sectAt(C, f.T, f.N, hR, u, hbR, cupR, -1);
     const sect = (v) => (v > 0 ? sL(v) : sR(v));
@@ -8770,11 +8956,9 @@ export function petalSurface(state, ring, slot, cap, acc) {
   };
   const rowAt = profile.twoSided ? twoRowAt : (u) => {
     const s = u * length;
-    const h = profile.halfWidthAt(u);
-    /* THE SURFACE'S OWN WIDTH SCALE (session 38): the base outline's, so a
-       lobe cuts the boundary without denting the sheet. Identical to `h` on
-       every plain petal, and `sectAt` takes the shipped branch there. */
-    const hb = profile.halfWidthBaseAt(u);
+    /* the half-width, the base half-width and the nib's cup scale — `planAt`,
+       the one owner the fold limit's reach reads too */
+    const { h, hb, cupScale } = planAt(u);
     const { C, phi } = spineAt(s);
     /* The row's own frame, READ from petalForm's frameAt rather than
        recomputed here — the contact sheet's framing reads the same
@@ -8783,37 +8967,6 @@ export function petalSurface(state, ring, slot, cap, acc) {
        rotates about the CURRENT length direction; see the ordering
        argument in petalForm's header. */
     const f = form ? form.frameAt(Rs, T, phi, u, dome === null ? null : Up) : null;
-    /* THE CUP'S SCALE ON THE NIB, DERIVED FROM TWO LENGTHS AND NOT TYPED.
-       `sectAt`'s cup term is `c * a^2 / hb`, so the mid-surface cross-section
-       leaves the midrib with curvature `2c/hb` and radius `hb/(2c)`. A sheet
-       is that mid-surface offset by +/- t/2, and an offset surface INVERTS
-       wherever the offset exceeds the radius — so the section folds wherever
-       `hb < |c| * t`. Off the nib that never binds: the blade's own floor is
-       TIP_HALF_MM and the widest reachable |c| is a fraction of a millimetre
-       of it. ON the nib it binds everywhere, because the outline is drawn to
-       APEX_END_HALF_MM: measured on `petalCup min (-0.8)` the radius runs
-       0.12544 mm at the nib's entry row down to 0.03125 at its end, against
-       a half-thickness of 0.6000 — five to nineteen times inside the fold.
-       Main never reached it because main's outline STOPPED at the floor.
-
-       The scale is `h / TIP_HALF_MM`, which is not a fade with a shape of its
-       own: the nib's entry is BY CONSTRUCTION the station where the law
-       crosses TIP_HALF_MM, so the factor is exactly 1 there and the blade
-       below the entry is untouched to the bit; and above it `2*(c*h/T)/h` is
-       `2c/T`, so the section's curvature is CONSTANT across the whole nib at
-       the value it already had at the entry. The nib inherits the tip
-       curvature main drew at its flat face and never goes past it. */
-    /* IT READS `hb`, THE BASE OUTLINE, AND NOT THE DRAWN `h` — the same
-       rule every other law in `sectAt` obeys, and measured rather than
-       assumed. The first cut scaled by `h`, which on a LOBED row
-       oscillates with the lobe period, so the cup's amplitude stepped at
-       every sinus and the true-normal offset turned each step into a
-       wedge — session 38's own buckle finding, arriving in the cup one
-       feature later: `LOBES: x cup 1.2` went 1,056 -> 1,688 pairs on it.
-       Against `hb` the curvature is `2c/TIP_HALF_MM` whatever the cut
-       removes, and the entry is still exactly 1 because the nib's entry
-       IS where the BASE law crosses TIP_HALF_MM. */
-    const cupScale = profile.onNib(u) ? hb / TIP_HALF_MM : 1;
     /* `hb` RIDES ALONG (session 42). MODEL B's cut reaches the apex, so the
        apex clauses can no longer read `petalTipShape`'s own curve off the
        emitted half-widths — A6 used to fit ABOVE the lobe window and under
@@ -8853,7 +9006,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
        that derived them instead of re-deriving any of them. */
     t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
-    curveLaw, askedLength,
+    curveLaw, askedLength, bend,
     floorRadius, uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
     formClamped, formScaled,
@@ -9056,7 +9209,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
   const {
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
-    curveLaw, askedLength,
+    curveLaw, askedLength, bend,
     uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped, formScaled,
     outlineRes,
@@ -9408,8 +9561,27 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     curve: curveLaw !== null ? form.spineCurve : null,
     askedLengthMm: askedLength,
     curveLaw: law && law.curve ? law.curve : null,
-    curveRefusal: curveLaw !== null ? spineCurveRefusal(form.spineCurve, ps, [askedLength]) : null,
+    curveRefusal: curveLaw !== null ? spineCurveRefusal(form.spineCurve, ps, [askedLength], bend && bend.binds ? [{ askedLengthMm: askedLength, table: bend }] : null) : null,
+    /* THE FOLD LIMIT (spine-cup-fold): whether it bound, and the worst
+       substep — its station, the side of the bend, the section's reach there,
+       the radius the spine asked and the radius it was built at. A clamp
+       nobody is told about is a control that silently means something else. */
+    bendClamped: law ? law.bendClamped : false,
+    floorClamped: law ? law.floorClamped : false,
+    bend: law && law.bend ? { ...law.bend } : null,
+    bendBinds: !!(bend && bend.binds),
   };
+  /* THE TABLE ITSELF rides NON-ENUMERABLE — the editor's validator reads it
+     off the build on screen (a candidate curve meets the same section, which
+     does not depend on the spine), and a gate serialising the record through
+     `__bloomMetrics()` is not handed 3,584 doubles a petal. */
+  Object.defineProperty(spine, 'bendTable', { value: bend && bend.binds ? bend : null, enumerable: false });
+  /* AND HOW TO ASK IT AGAIN UNDER ANOTHER STATE — the cup's own refusal
+     (bloom.js) re-reads this petal's section at a candidate cup through
+     `petalSurface` on the SAME ring and slot (its scope, field and mirror
+     terms included), in the same mode, so the table it asks is the one the
+     build would make. Non-enumerable for the same reason as the table. */
+  Object.defineProperty(spine, 'bendProbe', { value: (st) => { const b = petalSurface(st, ring, slot, cap, new MeshBuilder({ exportMode: acc.exportMode })).bend; return b && b.binds ? b : null; }, enumerable: false });
 
   const midS = 0.5 * length;
   const midRow = spineAt(midS);
