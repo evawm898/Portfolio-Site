@@ -1156,7 +1156,7 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   re-derived for CURVE mode and per half**, never relaxed; eight apex mutants (`LEAFC_MUTANTS`, scoped to
   `LEAFC_ROWS`); panel route **(am)** with two mutants (THIRTY routes). The LOBED reference blade (LF26's) is
   pinned to the LAW outline.
-- Block 73 (13 rows, 1,437), smoke block 73 (5); `frozen/phase79` = the 1,424 rows at `fc96dc9`. Sheet:
+- Block 73 (13 rows, 1,437), smoke block 73 (7); `frozen/phase79` = the 1,424 rows at `fc96dc9`. Sheet:
   `node tools/shot-bloom-curves-leaves.mjs` → `docs/img/curves-leaves.png`.
 - **Bytes: 11 movers / 1,426 holders, 0 floats on any holder** (`--movers-predicate leaf-curve`, both modes;
   197 holders build a leaf on SLIDER / LAW). **`verify-bloom-surface-bytes`' `baseScopes` stripped a TIER's

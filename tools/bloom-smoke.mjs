@@ -1709,6 +1709,12 @@ export const SMOKE_BLOCKS = [
         path: "SN4 the emitted blade's reach along the drawn spine against the cap, LF37 the spine" },
       { label: 'LEAF CURVES: the STEEP 85 deg leaf on a drawn spine',
         path: "LF4 the inset against the drawn spine's rise restated from the control, LF37, ST9 on the curved blade" },
+      /* the two rows E2_TURN_XFAIL declares (the edge gate draws from this
+         subset, so a declaration on a row outside it is one nothing evaluates) */
+      { label: 'LEAF CURVES: the FOLD LIMIT — a tight UPWARD curl drawn on a cup 1.2 leaf (held at the inner skin\'s limit, told)',
+        path: "LF37(c) the fold limit off the EMITTED rows (curvature x reach + t/2 within the bar, clamped iff applied), E2 the cupped bead's declared turn" },
+      { label: 'LEAF CURVES: the LOBED blade on a drawn spine, an outline curve STORED (the lobed blade keeps its own law — the outline mode inert, told)',
+        path: "LF37(a) the outline mode inert on the lobed blade (its record null), LF21 the chevron's lean footed on the drawn spine, E2 the lobed bead's declared turn" },
     ],
   },
 ];

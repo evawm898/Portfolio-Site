@@ -184,8 +184,7 @@ read-out ("— stopped by …"). Re-measured in print preview (export) and live,
   fold limit on a cupped leaf; the compound rose on a drawn rachis with the shared
   leaflet curve, toothed; a raceme's shared-node leaf on a drawn spine; the steep 85°
   leaf on a drawn spine; the LOBED blade on a drawn spine with an outline curve stored;
-  two GATED rows. **Smoke block 73** (the anchor + four: the oak, the rose, the raceme,
-  the steep leaf).
+  two GATED rows. **Smoke block 73** (the anchor + six: the oak, the rose, the raceme, the steep leaf, and the two rows `E2_TURN_XFAIL` declares — the fold limit and the LOBED blade — because the edge gate draws from the smoke subset and a declaration on a row outside it is one nothing evaluates).
 - **Census: no new fold.** All 13 rows export watertight, live = export triangle counts,
   **0 within-shell self-intersection pairs on every row** (X2), orientation clean.
 - **Cost**: zero triangles on a simple or lobed leaf (the lattice is fixed); +1,296 a
