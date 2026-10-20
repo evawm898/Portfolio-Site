@@ -169,7 +169,15 @@ sepal seen from its upper face, base at the bottom).
 - **Census:** block 72 reads 0 within-shell pairs on all 13 rows; no entry added.
 - **Byte partition** (`verify-bloom-surface-bytes --movers-predicate sepal-curve`,
   predeclared from the BASE tree's own tier record plus the controls and the row's
-  scopes): BYTES_RESULT
+  scopes): **PASS — 10 predeclared movers / 1,414 holders over the whole 1,424-row
+  matrix in both modes, 0 floats moved on any holder** (positionally, under
+  `Object.is`, over 1,707,527,556 export floats / 189,725,284 triangles and
+  81,015,956 captured-grid values), all 10 movers moving. The movers are block 72
+  less its three holders: the petals on curves with the sepals on their sliders,
+  and the two GATED rows. Every petal-CURVE row from F3/F6 holds (its sepals were
+  pinned SLIDER / LAW, and the twins' defaults are exactly those).
+- Edge profile on block 72: E0–E7 clean, the worst added turn 44.64° against the
+  45° allowance.
 - Cost: a curved sepal costs what a slider sepal costs (39,998 export tris at 5
   sepals; 57,510 at two tiers); the seed costs nothing at build time.
 
