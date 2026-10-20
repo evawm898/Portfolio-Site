@@ -751,7 +751,7 @@ const MUTANTS = [
      is among the byte rows for that reason and no other. The `F5 *` claims
      are consequences on the page: a save without petalCount restores the
      reset value, a reader that never reads it leaves every load short. */
-  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13', 'F14'],
+  { id: 'a-dropped-field-on-write', breaks: ['F1', 'F2', 'F3', 'F5 save', 'F5 own save', 'F5 bytes', 'F8', 'F9', 'F11', 'F13', 'F14', 'F15'],
     /* re-anchored by the curve-editor session: the writer's loop moved into
        `composeControls` (one walker for the registry's table and a test
        table) — the same mutation, on the line that now does the writing */
