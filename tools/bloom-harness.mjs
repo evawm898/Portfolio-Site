@@ -924,7 +924,10 @@ for (const [prefix, expect] of Object.entries(TIP_EXPECTED)) {
     if (c.min !== r[0] || c.max !== r[1]) bad.push(`${id} is ${c.min}..${c.max} in the registry and ${r[0]}..${r[1]} in the geometry`);
     if (c.default !== d) bad.push(`${id} defaults to ${c.default} in the registry and ${d} in the geometry`);
   }
-  const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets');
+  /* (curves-leaves) the leaflets' outline twins sit in the drop-down too; they
+     are the twin table's, checked at load by `checkLeafCurveTwins` below */
+  const leafTwinIds = new Set(G.LEAF_CURVE_TWINS.map((r) => r.leaf));
+  const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets' && !leafTwinIds.has(c.id));
   if (subs.length !== ranges.length) bad.push(`the Leaflets section holds ${subs.length} controls, the geometry's layout reads ${ranges.length}`);
   /* THE LEAFLETS' OWN TOOTH DEPTH (Eva's ruling on #380) lives in the shared
      Serration section beside the simple leaf's, on the same range, default 0 */
