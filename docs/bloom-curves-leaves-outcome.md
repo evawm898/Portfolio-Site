@@ -190,8 +190,21 @@ read-out ("— stopped by …"). Re-measured in print preview (export) and live,
   **0 within-shell self-intersection pairs on every row** (X2), orientation clean.
 - **Cost**: zero triangles on a simple or lobed leaf (the lattice is fixed); +1,296 a
   compound leaf on a drawn rachis (placement 3).
+- **Edge profile (E2), three rows declared from birth, never widened**: the fold-limit
+  row adds 0.764° over the 45° allowance (the same cupped leaf flat reads 43.69°); the
+  compound rose adds 5.628° (its LAW leaflets read 43.69°); the LOBED row adds 44.061° —
+  and the same lobed blade on the Arch slider reads 94.20°, worse, so it is the lobed
+  bead class on a bent blade and not the curve's. Recorded in `E2_TURN_XFAIL` both ways.
 - **`frozen/phase79`** is the 1,424 rows at `fc96dc9` (main's head before this session),
   registered in both maps.
+- **The sheet** (`docs/img/curves-leaves.png`, print preview on, every leaf seen from
+  below): (1) a leaf at Arch +60 switched SLIDER → CURVE, before and after — the seeded
+  curve is 9 points within 0.085 mm and the built turn is −56.8° (the tip down); (2) the
+  oak-ish asymmetric toothed leaf on a drawn spine (width scale 1.294, six teeth a
+  margin); (3) the compound rose on a drawn rachis with the shared leaflet curve
+  (rachis turn −21.3°; laterals at 1.000, the terminal at 0.969 of the curve's own
+  proportion); (4) the arch-sign pair — Arch −60 beside its own seeded curve, rising,
+  ending at (0.833, 0.497), the same bend from two controls.
 
 BYTES: see §7.
 
