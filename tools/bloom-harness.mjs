@@ -3082,9 +3082,17 @@ function bendFromRecord(sp) {
          floor's clamp, not this one).
      (b) THE EMITTED SPINE AGAINST THE EMITTED SECTION: at every interior blade
          row the curvature read off the three EMITTED spine centres around it,
-         times the reach of the row's EMITTED section toward the side the bend's
-         centre is on (`rowReach`, the mesh's own `sect` — a second path to the
-         reach beside the table's) plus t/2, is at most 1 + C5_BAR. Where the
+         times the SMALLEST reach of the three rows' EMITTED sections toward the
+         side the bend's centre is on (`rowReach`, the mesh's own `sect` — a
+         second path to the reach beside the table's) plus t/2, is at most
+         1 + C5_BAR. THE SMALLEST, AND THAT IS THE SOUND BOUND, NOT A LOOSENING:
+         the three-point curvature is an AVERAGE over the substeps between the
+         outer rows, each held under 1/(ITS OWN reach + t/2), so the average is
+         under 1/(the smallest reach in the span + t/2) and no larger bound
+         follows. Pairing it with the middle row's reach read 1.074 on
+         `CAPABILITY: claw x form max`, where the reach climbs 2.14 -> 6.26 ->
+         5.90 mm across the form's onset (u 0.30) — the clause measuring its own
+         sampling against a fast reach, found in the browser before CI. Where the
          reach plus t/2 does not clear the floor the floor's C3 owns the row. A
          spine whose cup term was dropped from the limit, or whose clamp was
          skipped, folds here and fires; one measured from the mid-surface sits
@@ -3093,9 +3101,10 @@ function bendFromRecord(sp) {
          applied substep.
    C5_BAR IS THE THREE-POINT CURVATURE'S OWN READING ON A CLAMPED SPINE: where
    the limit binds the curvature IS the limit, a smooth function of u, and the
-   circle through three rows ~0.6 mm apart reads it to within 0.8% (measured
-   over every binding row of the matrix — the outcome doc has the figure); the
-   margin mutant reads 6% over at the widest reach the matrix holds.
+   circle through three rows ~0.6 mm apart reads it to within 0.08% (measured
+   over every binding row of the matrix in both modes: worst 1.0008, `CONT: 3
+   turns x ALL FORM MAX`); the margin mutant reads 6% over at the widest reach
+   the matrix holds.
    =================================================================== */
 const C5_BAR = 0.02;
 function c5Clauses(bad, sp, r, L) {
@@ -3122,13 +3131,14 @@ function c5Clauses(bad, sp, r, L) {
     if (!(sinish > 1e-12)) continue;
     const ang = 2 * Math.asin(Math.min(1, sinish / 2));
     const kap = ang / (0.5 * (la + lb));
-    const [pos, neg, nx, ny, nz] = RR[i];
-    const side = turn[0] * nx + turn[1] * ny + turn[2] * nz >= 0 ? pos : neg;
+    const [, , nx, ny, nz] = RR[i];
+    const si = turn[0] * nx + turn[1] * ny + turn[2] * nz >= 0 ? 0 : 1;
+    const side = Math.min(RR[i - 1][si], RR[i][si], RR[i + 1][si]);
     if (!(side + half > sp.floorRadius)) continue;
     const q = kap * (side + half);
     if (q > worst) { worst = q; at = i; atK = kap; atReach = side; }
   }
-  if (worst > 1 + C5_BAR) bad.push(`C5: ring ${L}: at blade row ${at + 1} (u ${sp.rowU[at].toFixed(4)}) the emitted spine bends to a ${(1 / atK).toFixed(3)} mm radius while its own emitted section reaches ${atReach.toFixed(3)} mm toward that side — curvature x (reach + t/2) reads ${worst.toFixed(4)} against 1 + ${C5_BAR}: the inner skin passes the bend's centre and the sheet folds through itself`);
+  if (worst > 1 + C5_BAR) bad.push(`C5: ring ${L}: at blade row ${at + 1} (u ${sp.rowU[at].toFixed(4)}) the emitted spine bends to a ${(1 / atK).toFixed(3)} mm radius while its own emitted section reaches ${atReach.toFixed(3)} mm toward that side over the span — curvature x (reach + t/2) reads ${worst.toFixed(4)} against 1 + ${C5_BAR}: the inner skin passes the bend's centre and the sheet folds through itself`);
 }
 
 /* THE SELF-CONTACT FLAG, exercised in both directions at MATRIX level — the

@@ -3669,7 +3669,12 @@ window.addEventListener('change', onWidthEdit, true);
 let builtCup = null;
 function onCupEdit(e) {
   const id = e.target === inputs.petalCup ? 'petalCup' : e.target === inputs.petalCupGradient ? 'petalCupGradient' : null;
-  if (!id || builtCup === null) return;
+  /* A HAND EDIT ONLY. A value written by code — a design file, a scope load,
+     a matrix row a gate applies — is a LOADED state, and a loaded state is
+     clamped and told by the build (the spine-curve rulings' own split: refuse
+     the drag, clamp the load). The browser marks a hand gesture `isTrusted`;
+     an event dispatched by script is not. */
+  if (!id || builtCup === null || !e.isTrusted) return;
   const picked = scopeView && scopeView.kind !== 'tier' ? scopeView : null;
   const ui = readUI();
   const base = picked ? Number(scopeEffective(picked, ui).eff[id]) : Number(builtCup[id]);

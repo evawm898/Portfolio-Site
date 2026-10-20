@@ -115,9 +115,22 @@ metric corner, #423's two rows). The one undeclared binder is `FORM VARIANCE: x 
 
 - **C5** (`c5Clauses`, both STL gates, slider and curve arms): (a) every applied substep's limit is
   `1 / (reach + t/2)` restated from the record and past the floor; (b) the EMITTED spine's three-point
-  curvature × (the emitted row's own reach on the bend side + t/2) stays at or under 1 + 0.02 —
-  the reach read off the emitted rows (`rowReach`, the row's own section projected on its untwisted
-  normal), never the table; (c) `bendClamped` ⇔ a limit was applied.
+  curvature × (the SMALLEST emitted reach on the bend side over the three rows it is read across +
+  t/2) stays at or under 1 + 0.02 — the reach read off the emitted rows (`rowReach`, the row's own
+  section projected on its untwisted normal), never the table. The smallest is the sound bound: the
+  three-point curvature averages substeps each held under `1/(its own reach + t/2)`. The first cut
+  paired it with the MIDDLE row's reach and read 1.074 in the browser on `CAPABILITY: claw x form max`,
+  where the reach climbs 2.14 → 6.26 → 5.90 mm across the form's onset — the clause measuring its own
+  sampling; with the span's smallest the worst over every binding row is **1.0008** in both modes;
+  (c) `bendClamped` ⇔ a limit was applied.
+- **Coverage R3** (both coverage instruments) assumed a whorl's slots are rigid rotations of slot 0
+  ("azimuth is the only thing that varies") — already not quite true (a buckle's phase is per slot)
+  and false once the fold limit reads each slot's own buckled section. A buckled whorl at the limit
+  takes R3's stronger arm (each slot bit-matched against the builder's record). Found by the browser
+  run on the two buckle rows and `FRINGE: x ALL FORM MAX`.
+- **The cup refusal answers a HAND edit only** (`isTrusted`): a value written by script — a design
+  file, a scope load, a matrix row a gate applies — is a loaded state, clamped and told by the build.
+  Found by the browser run, where `applyConfig` could not load the block-71 rows past the boundary.
 - **C1(d)** gained the fold refusal: refused for the fold ⇔ the build held the limit. **C1/C2's
   restatements** carry the applied limits (`bendFromRecord`). **C3**'s uniform clause reads
   `floorClamped` (the fold limit may clamp a uniform arc; the floor never does).
@@ -183,3 +196,9 @@ the buckle.
 width, 1.4749 mm) reads **1.5012 mm, over the 1.50 bar**, and is removed as the gate requires — not
 because the estimator was fixed (it is still the fix), but because the fold limit holds that state's
 curl-360 spine, so the curved plan is compressed less. The map stays, empty.
+
+**The hole-rim and margin-bead gates** (declared fold states, held both ways): H1 `ALL FORM MAX` 179.79 →
+175.34° and `cup 1.2 x curl 360` 160.43 → **160.91° (0.48° WORSE)** — a different edge of the same
+folding infilled sheet; MB1 `cup 1.2 x curl 360` 89.96 → 87.38° and `ALL FORM MAX` 111.91 → 109.32°.
+Re-recorded, not widened. The premise of the `cup 1.2 x curl 360` rows moved and is said in both
+files: the PLAIN petal there no longer folds; the INFILLED sheet these rims sit on still does.

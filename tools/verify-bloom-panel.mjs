@@ -465,11 +465,14 @@
          and curl visibility reading the whole bloom's curl mode. Three edits:
          this entry, the block, the negative control's flags and banner.
      (ak) THE FOLD LIMIT ON THE PAGE (spine-cup-fold, Oct 20 — docs/bloom-
-         spine-cup-fold-outcome.md). The petals on the drawn S spine at cup 0:
-         a cup edit to 0.6, which would fold the sheet through itself, is
-         REFUSED — the slider goes back to 0, the spine editor's status names
-         the fold, and the builder holds no petal at the limit; an edit to
-         0.31 (the largest cup the S accepts) is ACCEPTED and nothing is held.
+         spine-cup-fold-outcome.md). The petals on the drawn S spine at cup
+         0.29, the cup slider stepped by the REAL KEYBOARD (a hand edit — the
+         refusal answers trusted events only; a script-written value is a
+         loaded state, clamped and told): 0.30 and 0.31 are ACCEPTED with
+         nothing held, 0.32 — which would fold the sheet through itself — is
+         REFUSED (the slider stays at 0.31, the spine editor's status names
+         the fold, the builder holds no petal at the limit); and a cup of 0.6
+         written by script is NOT refused but built clamped and told.
          Then on the curl SLIDERS at 270 x cup 1.2, which the build CLAMPS
          and tells (the slider family is never refused): the read-out's SPINE
          CURL line carries FOLD LIMIT with the radius asked and the radius
@@ -4363,18 +4366,24 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   const held = (sn) => (sn.fold || []).filter((q) => q && q.bendClamped);
   const run = async (pg, label) => {
     const p = [];
-    const bad = await applyConfig(pg, [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify(S) }, { id: 'petalCup', value: '0' }]);
+    const bad = await applyConfig(pg, [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify(S) }, { id: 'petalCup', value: '0.29' }]);
     if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
-    await setValue(pg, 'petalCup', '0.6');
-    const r = await snap(pg);
-    if (r.cup !== 0) p.push(`the cup edit to 0.6 on the drawn S was accepted (the slider reads ${r.cup}) — it would fold the sheet through itself and must be refused`);
-    if (!/fold through itself/.test(r.status)) p.push(`the spine editor does not say why the cup was refused: ${JSON.stringify(r.status)}`);
-    if (held(r).length) p.push(`after the refused cup the builder holds ${held(r).length} petal(s) at the fold limit — the refused value reached the build`);
-    await setValue(pg, 'petalCup', '0.31');
-    const a = await snap(pg);
-    if (a.cup !== 0.31) p.push(`the cup edit to 0.31 (the largest the S accepts) was refused (the slider reads ${a.cup})`);
+    /* the hand: focus the range and step it with the keyboard, settling the build between presses */
+    await pg.evaluate(() => { for (let d = document.getElementById('petalCup').closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true; });
+    const press = async () => { await pg.focus('#petalCup'); await pg.keyboard.press('ArrowRight'); await settle(pg); return snap(pg); };
+    const a1 = await press(), a = await press();
+    if (a1.cup !== 0.3 || a.cup !== 0.31) p.push(`stepping the cup 0.29 -> 0.30 -> 0.31 on the drawn S read ${a1.cup} then ${a.cup} — the cups the S accepts were refused`);
     if (a.status) p.push(`an accepted cup left a refusal on the spine editor: ${JSON.stringify(a.status)}`);
     if (held(a).length) p.push(`at cup 0.31 the builder holds ${held(a).length} petal(s) at the fold limit — the boundary is not where the validator puts it`);
+    const r = await press();
+    if (r.cup !== 0.31) p.push(`the cup edit to 0.32 on the drawn S was accepted (the slider reads ${r.cup}) — it would fold the sheet through itself and must be refused`);
+    if (!/fold through itself/.test(r.status)) p.push(`the spine editor does not say why the cup was refused: ${JSON.stringify(r.status)}`);
+    if (held(r).length) p.push(`after the refused cup the builder holds ${held(r).length} petal(s) at the fold limit — the refused value reached the build`);
+    /* a LOADED cup (written by script) is the build's to clamp and tell, never refused */
+    await setValue(pg, 'petalCup', '0.6');
+    const l = await snap(pg);
+    if (l.cup !== 0.6) p.push(`a cup of 0.6 written by SCRIPT was refused (the slider reads ${l.cup}) — a loaded state is clamped and told, only a hand edit is refused`);
+    else if (!held(l).length) p.push('a loaded cup of 0.6 on the drawn S built no petal at the fold limit — it must be clamped and told');
     const bad2 = await applyConfig(pg, [{ id: 'petalCurlMode', value: 'SLIDER' }, { id: 'petalSpineCurl', value: '270' }, { id: 'petalCup', value: '1.2' }]);
     if (bad2.length) { note(`${tag} ${label}: slider config did not take: ${bad2.join('; ')}`); return; }
     const c = await snap(pg);
@@ -4388,7 +4397,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       else if (!c.line.includes(want)) p.push(`the SPINE CURL line's fold-limit numbers are not the builder's (${want}): ${JSON.stringify(c.line.slice(0, 400))}`);
     }
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: on the drawn S a cup of 0.6 is refused (the slider back at 0, the editor naming the fold, nothing held in the build) and 0.31 is accepted with nothing held; on the curl sliders 270 x cup 1.2 is clamped by the build and the SPINE CURL line tells the builder's own radius asked and built`);
+    else ok.push(`${tag} ${label}: on the drawn S the keyboard steps 0.30 and 0.31 (accepted, nothing held) and 0.32 is refused (the slider stays, the editor names the fold, nothing held); a script-written 0.6 is built clamped, not refused; on the curl sliders 270 x cup 1.2 is clamped by the build and the SPINE CURL line tells the builder's own radius asked and built`);
   };
   const { browser: b1, page: pg1 } = await launchPage();
   await openBloom(pg1, port);
@@ -4532,7 +4541,7 @@ if (NEGATIVE_CONTROL) {
     const sawSpineGroup = fail.some((f) => /^\[spine scopes\] MUTANT \(the spine reset drops the outline too\).*took layer 2's OUTLINE with it/.test(f));
     const sawSpineVis = fail.some((f) => /^\[spine scopes\] MUTANT \(curl visibility reads the whole bloom's curl mode\).*on a curl mode other than the picked layer's/.test(f));
     /* ROUTE (ak), THE FOLD LIMIT ON THE PAGE — one flag per mutant */
-    const sawFoldCup = fail.some((f) => /^\[fold limit\] MUTANT \(the cup is never refused\).*cup edit to 0\.6 on the drawn S was accepted/.test(f));
+    const sawFoldCup = fail.some((f) => /^\[fold limit\] MUTANT \(the cup is never refused\).*cup edit to 0\.32 on the drawn S was accepted/.test(f));
     const sawFoldWords = fail.some((f) => /^\[fold limit\] MUTANT \(the read-out does not tell the fold limit\).*does not tell the fold limit/.test(f));
     if (sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
