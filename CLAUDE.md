@@ -1059,6 +1059,32 @@ DRAWS ONE SPINE BECAUSE THE SPINE IS PLANAR** (F3-scope, Oct 19 — Eva's ruling
   folds the same S-spine × cup 0.6 composition UNSCOPED at 248 pairs on both trees.
 - Block 70 (16 rows, 1,396), smoke block 70 (6); `frozen/phase76` = the 1,380 rows at `971155c`. Sheet:
   `node tools/shot-bloom-spine-scope.mjs <dir>` → `docs/img/spine-scope.png`.
+  **[Oct 20: that fold is FIXED — the fold limit below; the entry is removed.]**
+
+**A SPINE MAY NOT BEND PAST ITS OWN CROSS-SECTION: THE FOLD LIMIT, ONE TABLE FOR THE DRAWN CURVE AND THE CURL
+SLIDERS, AT EXACTLY HALF A SHEET** (spine-cup-fold, Oct 20 — Eva's rulings of Oct 19; read
+`docs/bloom-spine-cup-fold-outcome.md` before touching `spineBendTable`, `spineLaw`'s `bend`, `spineBendRefusal`,
+`bendReachAt`, `spine.bendProbe`, bloom.js's `onCupEdit`, C5 or block 71).
+- **The mechanism**: a section point a distance `d` toward the bend's centre moves at `(1 − κd)` × the spine's
+  speed, so where a cup (roll, twist) reaches past the centre the sheet folds through itself along the length.
+  #423's S × cup 0.6 (2.87 mm asked against a 4.32 mm reach) and curl 360 × cup 1.2 (886 pairs a petal) are one fold.
+- **The limit** (`spineBendTable`, the ONE owner): per substep, radius ≥ reach + t/2 — the INNER SKIN reaching the
+  centre, **no margin** (ruling 2; 1.25 × half a sheet was ruled down). `spineLaw` clamps at `min(floor, 1/R)`; the
+  uniform arc is clamped too (and built through the general law). Reported: `bendClamped`, `floorClamped`, `bend`
+  (worst station), `bendApplied`, `rowReach`.
+- **Ruling 1, one function**: sliders and drawn curves alike; tightly curled cupped petals open (curl 360 × cup 1.2
+  builds 279.6°, × cup 0.9 321.9°, 270 × 1.2 243.9°; the S at cup 0.6 holds 4.92 mm at u 0.58).
+- **Refused on the page for a DRAWN spine** (the validator asks the build's own law; a cup edit is refused through
+  `bendProbe`), clamped and told for the sliders and for a loaded curve. Read-out: `FOLD LIMIT on …`.
+- **8× re-mesh: 0 crossings on every clamped state** except what the limit does not own — roll 200's own section
+  fold and the curl-360 tip-into-foot coil (both stay declared, ruling).
+- **Gates**: C5 (applied limit restated; emitted curvature × (emitted reach + t/2) ≤ 1.02; clamped ⇔ applied), C1(d)
+  fold refusal ⇔ clamp; four apex mutants; panel route (ak) (TWENTY-EIGHT routes); block 71 (15 rows, 1,411);
+  smoke block 71 (6); `frozen/phase77` = the 1,396 rows at `3dc8ee1`.
+- **Re-records**: 19 census entries removed (read 0), 31 re-recorded with their sites (main → here by band),
+  2 declared from birth (curl 360 × cup 0.62 / 0.63, the coil); 38 combination cells and the wall instrument's
+  buckle composition IMPROVED. Every census mover is a row the limit binds on. Sheet:
+  `node tools/shot-bloom-spine-cup-fold.mjs <png> --base <worktree>` → `docs/img/spine-cup-fold.png`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

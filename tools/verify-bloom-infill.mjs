@@ -414,9 +414,16 @@ function runState(name, set, opts = null, mode = 'export') {
    0.30 the same state reads 1.4034; with only the law put back to 1 on the new
    defaults it reads 1.5814. Measured on the ruled-defaults tree, both modes.
    The fix is the builder's bar estimator and is its own change. */
-const I1_XFAIL = Object.freeze({
-  'ALL FORM MAX': { worstMm: 1.4749, note: 'builder bar estimator vs on-object width under a density law of 0.30; the ruled-defaults session. RE-DECLARED by the roundness-control session (was 1.4799): the shipping roundness 0.60 opens this hole on the curved plan in the surface frame, and the bar clamp that holds an opening back reads the SAME builder estimator (`infillWidthMm` on the metric field), so it keeps the hole at >= 1.50 by that estimator while the on-object measure reads 1.4749 — measured in Node, both modes. Not widened: the estimator is still the fix.' },
-});
+/* REMOVED BY SPINE-CUP-FOLD (Oct 20): 'ALL FORM MAX' read 1.4749 here and
+   reads 1.5012 mm now, over the bar — NOT because the estimator was fixed
+   (it is still the fix the paragraph above names) but because the fold limit
+   holds that state's curl-360 spine at its own cross-section's limit, so the
+   curved plan is compressed less and the on-object hole widens past 1.50
+   (docs/bloom-spine-cup-fold-outcome.md). The disagreement between the two
+   estimators is unmoved in kind; it no longer puts a hole under the bar on
+   any row this gate builds. The map stays, empty, so a future entry has its
+   shape. */
+const I1_XFAIL = Object.freeze({});
 function clauses(r, plan) {
   const out = [];
   const add = (id, ok, msg) => out.push({ id, ok, msg });

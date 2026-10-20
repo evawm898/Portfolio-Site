@@ -464,6 +464,20 @@
          curve frozen at copy time, the spine reset dropping the outline too,
          and curl visibility reading the whole bloom's curl mode. Three edits:
          this entry, the block, the negative control's flags and banner.
+     (ak) THE FOLD LIMIT ON THE PAGE (spine-cup-fold, Oct 20 — docs/bloom-
+         spine-cup-fold-outcome.md). The petals on the drawn S spine at cup 0:
+         a cup edit to 0.6, which would fold the sheet through itself, is
+         REFUSED — the slider goes back to 0, the spine editor's status names
+         the fold, and the builder holds no petal at the limit; an edit to
+         0.31 (the largest cup the S accepts) is ACCEPTED and nothing is held.
+         Then on the curl SLIDERS at 270 x cup 1.2, which the build CLAMPS
+         and tells (the slider family is never refused): the read-out's SPINE
+         CURL line carries FOLD LIMIT with the radius asked and the radius
+         built that the BUILDER's own worst record holds. Two mutants under
+         --negative-control, each by its own sentence (both bloom.js): the cup
+         listener never refusing, and the read-out's fold-limit words gone.
+         Three edits: this entry, the block, the negative control's flags and
+         banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4331,6 +4345,73 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ak) THE FOLD LIMIT ON THE PAGE (spine-cup-fold) -----
+   See the header. What each assertion expects is the value this route set or
+   the BUILDER's own record (`__bloomMetrics().spineFold`), never the read-out
+   read back against itself. */
+{
+  const tag = '[fold limit]';
+  const S = { mode: 'single', points: [[0, 0], [0.3, 0.12], [0.6, -0.1], [1, 0.15]] };
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const snap = (pg) => pg.evaluate(() => {
+    const m = window.__bloomMetrics();
+    const st = document.getElementById('petalSpineCurve').closest('.bl-ctrl').querySelector('.bl-curve-status');
+    const line = document.getElementById('readout').textContent.split('\n').find((l) => /^SPINE CU(RL|RVE)/.test(l)) || '';
+    return { cup: Number(document.getElementById('petalCup').value), status: st && !st.hidden ? st.textContent : '', fold: m.spineFold, line };
+  });
+  const setValue = async (pg, id, v) => { await pg.evaluate(([i, val]) => { const el = document.getElementById(i); el.value = val; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, [id, v]); await settle(pg); };
+  const held = (sn) => (sn.fold || []).filter((q) => q && q.bendClamped);
+  const run = async (pg, label) => {
+    const p = [];
+    const bad = await applyConfig(pg, [{ id: 'petalCurlMode', value: 'CURVE' }, { id: 'petalSpineCurve', value: JSON.stringify(S) }, { id: 'petalCup', value: '0' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    await setValue(pg, 'petalCup', '0.6');
+    const r = await snap(pg);
+    if (r.cup !== 0) p.push(`the cup edit to 0.6 on the drawn S was accepted (the slider reads ${r.cup}) — it would fold the sheet through itself and must be refused`);
+    if (!/fold through itself/.test(r.status)) p.push(`the spine editor does not say why the cup was refused: ${JSON.stringify(r.status)}`);
+    if (held(r).length) p.push(`after the refused cup the builder holds ${held(r).length} petal(s) at the fold limit — the refused value reached the build`);
+    await setValue(pg, 'petalCup', '0.31');
+    const a = await snap(pg);
+    if (a.cup !== 0.31) p.push(`the cup edit to 0.31 (the largest the S accepts) was refused (the slider reads ${a.cup})`);
+    if (a.status) p.push(`an accepted cup left a refusal on the spine editor: ${JSON.stringify(a.status)}`);
+    if (held(a).length) p.push(`at cup 0.31 the builder holds ${held(a).length} petal(s) at the fold limit — the boundary is not where the validator puts it`);
+    const bad2 = await applyConfig(pg, [{ id: 'petalCurlMode', value: 'SLIDER' }, { id: 'petalSpineCurl', value: '270' }, { id: 'petalCup', value: '1.2' }]);
+    if (bad2.length) { note(`${tag} ${label}: slider config did not take: ${bad2.join('; ')}`); return; }
+    const c = await snap(pg);
+    if (c.cup !== 1.2) p.push(`a cup edit on the curl SLIDERS was refused (the slider reads ${c.cup}) — the slider family is clamped and told, never refused`);
+    const h = held(c);
+    if (!h.length) p.push('curl 270 x cup 1.2: the builder held no petal at the fold limit — the route has nothing to read');
+    else {
+      const w = h.reduce((x, q) => (q.bend.ratio > x.bend.ratio ? q : x), h[0]).bend;
+      const want = `built at ${w.limitRadiusMm.toFixed(2)} mm where ${w.askedRadiusMm.toFixed(2)} mm was asked`;
+      if (!/FOLD LIMIT/.test(c.line)) p.push(`the SPINE CURL line does not tell the fold limit the builder applied: ${JSON.stringify(c.line.slice(0, 200))}`);
+      else if (!c.line.includes(want)) p.push(`the SPINE CURL line's fold-limit numbers are not the builder's (${want}): ${JSON.stringify(c.line.slice(0, 400))}`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: on the drawn S a cup of 0.6 is refused (the slider back at 0, the editor naming the fold, nothing held in the build) and 0.31 is accepted with nothing held; on the curl sliders 270 x cup 1.2 is clamped by the build and the SPINE CURL line tells the builder's own radius asked and built`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'the S and the sliders');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the cup is never refused', from: "  if (!reason) return;\n  e.target.value = base;", to: "  if (true) return;\n  e.target.value = base;" },
+      { name: 'the read-out does not tell the fold limit', from: "  const fc = sps.filter((s) => s.bendClamped && s.bend);\n  if (!fc.length) return '';", to: "  const fc = sps.filter((s) => s.bendClamped && s.bend);\n  if (fc.length >= 0) return '';" },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4450,14 +4531,17 @@ if (NEGATIVE_CONTROL) {
     const sawSpineFrozen = fail.some((f) => /^\[spine scopes\] MUTANT \(an inherited spine curve is frozen at copy time\).*(NO spine curve|not live)/.test(f));
     const sawSpineGroup = fail.some((f) => /^\[spine scopes\] MUTANT \(the spine reset drops the outline too\).*took layer 2's OUTLINE with it/.test(f));
     const sawSpineVis = fail.some((f) => /^\[spine scopes\] MUTANT \(curl visibility reads the whole bloom's curl mode\).*on a curl mode other than the picked layer's/.test(f));
-    if (sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (ak), THE FOLD LIMIT ON THE PAGE — one flag per mutant */
+    const sawFoldCup = fail.some((f) => /^\[fold limit\] MUTANT \(the cup is never refused\).*cup edit to 0\.6 on the drawn S was accepted/.test(f));
+    const sawFoldWords = fail.some((f) => /^\[fold limit\] MUTANT \(the read-out does not tell the fold limit\).*does not tell the fold limit/.test(f));
+    if (sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-SEVEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-EIGHT ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

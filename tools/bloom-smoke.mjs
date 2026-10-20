@@ -1635,6 +1635,35 @@ export const SMOKE_BLOCKS = [
         path: "C1/C4 with an owned spine kept and inert (scopeLayers OFF), the byte tool's partition (a holder)" },
     ],
   },
+  {
+    n: 71, title: 'the fold limit (spine-cup-fold, Oct 20)',
+    anchor: 'SPINE FOLD: the S x cup 0.31 (just valid — the largest cup the drawn S accepts)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block adds is the
+       FOLD LIMIT in spineLaw (a substep's curvature held where the cupped,
+       rolled or twisted section's reach toward the bend's centre plus half a
+       sheet — the inner skin — would pass it), read by BOTH the build and the
+       spine-curve validator through one table. The anchor is the block's first row, the
+       S at cup 0.31 (the last valid cup); #423's own fold (the drawn S x cup
+       0.6, refused and built at the limit) is beside it; the cup 0.32 row
+       is the first REFUSED cup, 0.31 the last valid one; the slider rows carry
+       the uniform and the general (biased) arms; curl 195 x cup 1.2 is the
+       just-valid slider state. --conn is REQUIRED (the limit re-bends a blade). */
+    conn: true,
+    rows: [
+      { label: 'SPINE FOLD: the S x cup 0.6 (the fold #423 declared — held at the inner skin\'s limit, told)',
+        path: "C5 (the applied limit restated from the emitted rows' reach plus half a sheet; the emitted curvature x reach under 1), C1(d) the fold refusal <=> the clamp, X2 (0 pairs; 248 on main)" },
+      { label: 'SPINE FOLD: the S x cup 0.31 (just valid — the largest cup the drawn S accepts)',
+        path: "C1(d) accepted and unclamped one cup step under the refusal, C5(c) no limit applied" },
+      { label: 'SPINE FOLD: the S x cup 0.32 (the first cup refused — a loaded state, built at the limit and told)',
+        path: "C1(d) refused for the fold and built clamped, C5 at the first binding cup" },
+      { label: 'SPINE FOLD: curl 270 x cup 1.2 (clamped — the coil opens, told)',
+        path: "C3 on the uniform arc the limit reaches (the floor never does), C5 on the slider arm, X2 (0 pairs; 363 on main)" },
+      { label: 'SPINE FOLD: curl 360 x cup 0.9 x curl bias 0.5 (the general arm, clamped)',
+        path: "C1/C2 on the general law with the limit applied per substep, C5" },
+      { label: 'SPINE FOLD: curl 195 x cup 1.2 (just valid at the widest cup)',
+        path: "C5(c) the limit inert one curl step under it, C3 unclamped" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

@@ -121,11 +121,11 @@ rows.forEach((r, ri) => {
 /* the read-outs: the refused drag and the refused cup, through the shipped functions */
 const ya = rows.length * CH + 16;
 const s0 = petalOf(GA, RA, { petalCurlMode: 'CURVE', petalSpineCurve: J(S) });
-const tbl = s0.rec.spine.bendProbe({ ...s0.st, petalCup: 0.6 });
-const cupMsg = tbl ? GA.spineBendRefusal(S, [{ askedLengthMm: s0.rec.spine.askedLengthMm, table: tbl }]) : null;
+const pr = s0.rec.spine.bendProbe({ ...s0.st, petalCup: 0.6 });
+const cupMsg = pr ? GA.spineBendRefusal(pr.curve, [{ askedLengthMm: s0.rec.spine.askedLengthMm, table: pr.table }]) : null;
 const lines = [
   'RED X: THE BEND S CENTRE OF CURVATURE. WHITE: MID-SURFACE. BLUE: THE TWO SKINS.',
-  'THE FOLD IS THE CUPPED MARGIN PASSING THE CENTRE. THE LIMIT KEEPS THE SECTION CLEAR OF IT BY 1.25 X HALF A SHEET.',
+  'THE FOLD IS THE CUPPED MARGIN PASSING THE CENTRE. THE LIMIT STOPS THE INNER SKIN AT IT: HALF A SHEET, NO MARGIN.',
   'PAIRS: THE SINGLE PETAL S OWN WITHIN-SHELL CROSSINGS, EXPORT, THE BUILDER S DOUBLES.',
   `REFUSED CUP 0 TO 0.6 ON THE S: ${cupMsg ? 'YES' : 'NO'}`,
 ];

@@ -178,6 +178,52 @@ const rows = MATRIX.slice(RFROM, RTO).filter((r) => !ONLY || ONLY.test(r.label))
 /* THE PREDICATES. Each reads the row's own coerced state and, where the
    change moves a record the BASE tree owns, the BASE tree's own builder — so
    the prediction's owner is never the quantity under test. */
+/* the instrumented base copy the `spine-fold` predicate reads (see there) */
+let foldBase = null;
+async function foldBaseModule() {
+  if (foldBase) return foldBase;
+  const fs = await import('node:fs'), os = await import('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fold-base-'));
+  const src = fs.readFileSync(path.join(BASE, 'bloom-geometry.js'), 'utf8');
+  const find = '  const surface = petalSurface(state, ring, slot, cap, acc);\n';
+  if (src.split(find).length !== 2) throw new Error('spine-fold: the base buildPetalInto anchor does not match exactly once');
+  fs.writeFileSync(path.join(dir, 'bloom-geometry.js'), src.replace(find, find + '  if (globalThis.__foldSurfaces) globalThis.__foldSurfaces.push(surface);\n'));
+  for (const imp of [...src.matchAll(/from '\.\/([^']+)'/g)].map((m) => m[1])) fs.copyFileSync(path.join(BASE, imp), path.join(dir, imp));
+  fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
+  foldBase = await import(pathToFileURL(path.join(dir, 'bloom-geometry.js')).href);
+  return foldBase;
+}
+const FOLD_NV = 10;   // the geometry's NV, restated: the reach is read over the same columns
+function surfaceFolds(surf, B) {
+  if (!surf.form || !surf.law) return false;
+  const N = B.bladeRowsFor(surf.ps.petalTipShape) * B.SPINE_SUBSTEPS, L = surf.length, ds = L / N, half = surf.t / 2;
+  for (let i = 0; i < N; i++) {
+    const k = (surf.law.at((i + 1) * ds).phi - surf.law.at(i * ds).phi) / ds;
+    if (k === 0) continue;
+    const row = surf.rowAt((i + 0.5) / N), tau = surf.form.twistRad * row.u, ct = Math.cos(tau), sn = Math.sin(tau);
+    const N0 = [row.T[0] * sn + row.N[0] * ct, row.T[1] * sn + row.N[1] * ct, row.T[2] * sn + row.N[2] * ct];
+    let pos = 0, neg = 0;
+    for (let c = 0; c < FOLD_NV; c++) {
+      const P = row.sect(-1 + (2 * c) / (FOLD_NV - 1)).P;
+      const d = (P[0] - row.C[0]) * N0[0] + (P[1] - row.C[1]) * N0[1] + (P[2] - row.C[2]) * N0[2];
+      if (d > pos) pos = d;
+      if (-d > neg) neg = -d;
+    }
+    const R = (k > 0 ? pos : neg) + half;
+    if (R > surf.floorRadius && Math.abs(k) * R > 1) return true;
+  }
+  return false;
+}
+const foldB = MOVERS_PRED === 'spine-fold' ? await foldBaseModule() : null;
+function foldMoverOnBase(st, row) {
+  for (const exportMode of [true, false]) {
+    globalThis.__foldSurfaces = [];
+    foldB.buildBloomInto(new foldB.MeshBuilder({ exportMode }), { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    const surfs = globalThis.__foldSurfaces; globalThis.__foldSurfaces = null;
+    if (surfs.some((sf) => surfaceFolds(sf, foldB))) return true;
+  }
+  return false;
+}
 const PREDICATE_MOVERS = {
   /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
      it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
@@ -661,6 +707,21 @@ const PREDICATE_MOVERS = {
     for (let i = 0; i < fr.androecium.count; i++) { const b = Math.min(120, Math.max(5, L * (1 + amount * unit(i)))); if (b !== L) return true; }
     return false;
   },
+  /* THE FOLD LIMIT (spine-cup-fold — docs/bloom-spine-cup-fold-outcome.md). A
+     row moves iff SOME petal the BASE tree builds (a petal, a sepal, a floret's
+     petal — every `buildPetalInto` call) has a spine substep whose curvature,
+     as the BASE built it, exceeds the limit the change imposes: 1 / (the
+     section's reach toward that bend's centre + half a sheet), wherever that
+     radius is past the floor's. RESTATED HERE FROM THE BASE TREE'S OWN
+     SURFACE, never from this tree's `spineBendTable` or its `bendClamped`
+     flag: the curvature is the base law's own phi per substep, the reach is
+     read off the base's own `rowAt(u).sect(v)` at the substep's midpoint,
+     projected on the row's untwisted normal (T sin tau + N cos tau), over the
+     same NV columns. The base surfaces are reached through an INSTRUMENTED
+     COPY of the base module (one line appended after `buildPetalInto`'s
+     `petalSurface` call, refused unless it matches exactly once; the copy
+     carries the module's own imports). Both modes, OR'd. */
+  'spine-fold': (st, row) => foldMoverOnBase(st, row),
   /* THE INDEPENDENT COIL (F1.3a — docs/bloom-stamen-coil-outcome.md): a row
      moves iff the BASE tree's own footRing() builds an androecium on it (so
      SPHERE and count 0 are holders by the base's own record) AND the row asks
@@ -675,6 +736,43 @@ const PREDICATE_MOVERS = {
     return st.stamenCoil === 'INDEPENDENT' && Number(st.stamenCoilRadius) > 0;
   },
 };
+/* `--frozen-sweep` (spine-cup-fold): WHICH FROZEN BASELINES' BYTES STOP
+   REPRODUCING under the declared predicate — every registered frozen matrix's
+   rows run through the SAME predicate the byte partition proves exact on the
+   live matrix, memoised on the state. A consequence of that partition, never
+   a substitute for it (the seam tool's `--frozen-sweep`, for a base-side
+   predicate). A frozen row may name an id this tree retired; it rides into
+   the state raw and is read by nothing. */
+if (argv.includes('--frozen-sweep')) {
+  if (!MOVERS_PRED || !PREDICATE_MOVERS[MOVERS_PRED]) { console.error('--frozen-sweep needs --movers-predicate <name>'); process.exit(2); }
+  const lenient = (row) => {
+    const st = { ...harness.DEFAULTS };
+    for (const w of row.set || []) {
+      if (w.id === harness.SCOPES_SET_ID) continue;
+      const c = kindOf.get(w.id);
+      st[w.id] = !c ? w.value : c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value;
+    }
+    return st;
+  };
+  const names = Object.keys(harness.FROZEN_MATRICES);
+  const memo = new Map();
+  let tags = 0, total = 0, movers = 0, threwAll = 0;
+  for (const name of names) {
+    const fr = harness.FROZEN_MATRICES[name]();
+    let n = 0, threw = 0;
+    for (const row of fr) {
+      const st = lenient(row);
+      const key = JSON.stringify([st, row.capability || null, harness.rowScopesForBuild(row) || null]);
+      let v = memo.get(key);
+      if (v === undefined) { try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch { v = 'threw'; } memo.set(key, v); }
+      if (v === 'threw') threw++; else if (v) n++;
+    }
+    total += fr.length; movers += n; threwAll += threw; if (n) tags++;
+    console.log(`  frozen/${name.padEnd(8)} ${String(n).padStart(4)} of ${String(fr.length).padStart(4)} rows move${threw ? `   (${threw} threw, counted as neither)` : ''}`);
+  }
+  console.log(`\n  ${tags} of ${names.length} baselines carry a row whose bytes stop reproducing; ${movers} of ${total} frozen rows (${memo.size} distinct states).`);
+  process.exit(threwAll ? 1 : 0);
+}
 if (MOVERS_PRED && !PREDICATE_MOVERS[MOVERS_PRED]) { console.error(`--movers-predicate ${MOVERS_PRED}: no such predicate (${Object.keys(PREDICATE_MOVERS).join(', ')})`); process.exit(2); }
 if (MOVERS_PRED && MOVERS) { console.error('--movers and --movers-predicate are two declarations of one partition; give one'); process.exit(2); }
 console.log(`${rows.length} rows x 2 modes — this tree against ${BASE}`);

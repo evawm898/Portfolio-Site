@@ -3679,15 +3679,18 @@ function onCupEdit(e) {
   let reason = null;
   const asked = new Map();
   for (const p of lastPetalsAll) {
-    if (!p || !p.spine || !p.spine.curveMode || !p.spine.bendProbe || (picked && !petalInScope(p, picked))) continue;
+    /* a petal drawn on a curve, or one the controls now ask to draw on one
+       (a mode switch and a cup in one write, before the build has caught up);
+       the probe itself decides from the candidate's own surface */
+    if (!p || !p.spine || !p.spine.bendProbe || !(p.spine.curveMode || ui.petalCurlMode === 'CURVE') || (picked && !petalInScope(p, picked))) continue;
     /* the candidate's GLOBAL: under a pick the slider shows the scope's
        effective value and the scope's offset rides on the global, so the
        global moves by the edit's delta; with none the global IS the slider */
     const st = { ...ui, [id]: (picked ? Number(ui[id]) : Number(builtCup[id])) + (v - base) };
     const k = `${p.whorl}|${p.slotIndex}|${JSON.stringify(p.spine.curve)}`;
     if (asked.has(k)) continue;
-    const table = p.spine.bendProbe(st);
-    const r = table ? spineBendRefusal(p.spine.curve, [{ askedLengthMm: p.spine.askedLengthMm, table }]) : null;
+    const probe = p.spine.bendProbe(st);
+    const r = probe ? spineBendRefusal(probe.curve, [{ askedLengthMm: p.spine.askedLengthMm, table: probe.table }]) : null;
     asked.set(k, r);
     if (r) { reason = r; break; }
   }
@@ -4039,6 +4042,10 @@ window.__bloomMetrics = () => ({
     curveLaw: p.spine.curveLaw, turnBuiltDeg: p.spine.turnBuiltDeg, clamped: p.spine.clamped, askedLengthMm: p.spine.askedLengthMm,
     from: p.spineFrom || null, rows: p.spine.rows,
   } : null)) : null,
+  /* spine-cup-fold — EVERY BUILT PETAL'S FOLD LIMIT, so the panel gate's route
+     (ak) reads what the BUILDER held (clamped or not, the worst station's
+     record) beside what the read-out says. Null where no petal bends at all. */
+  spineFold: lastPetalsAll.some((p) => p && p.spine) ? lastPetalsAll.map((p) => (p && p.spine ? { bendClamped: !!p.spine.bendClamped, bend: p.spine.bend || null } : null)) : null,
   petalBladeLadder: lastPetal ? lastPetal.bladeLadder : null,
   petalNormal: lastPetal ? lastPetal.normal : null,
   /* The blade's WIDTH direction at the midpoint — a profile view looks down

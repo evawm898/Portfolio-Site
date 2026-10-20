@@ -7552,6 +7552,7 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
   const N = rows * SPINE_SUBSTEPS, ds = length / N;
   if (bend !== null && bend.N !== N) throw new Error(`spineLaw: the fold-limit table holds ${bend.N} substeps for a law of ${N} — it was built for a different row count`);
   let bendClamped = false, bendWorst = null, floorClamped = false;
+  const bendApplied = [];
   const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
   phi[0] = tilt;
   let peakK = 0, clamped = false;
@@ -7566,6 +7567,7 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
     if (over && kLim === kMax) floorClamped = true;
     if (over && kLim < kMax) {
       bendClamped = true;
+      bendApplied.push([i, kLim, (kRaw < 0 ? bend.reachNeg : bend.reachPos)[i]]);
       const ratio = Math.abs(kRaw) / kLim;
       if (bendWorst === null || ratio > bendWorst.ratio) {
         const side = kRaw < 0 ? -1 : 1;
@@ -7630,6 +7632,11 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
     bend: bendWorst,
     /* the floor's own share of `clamped`, so a read-out can tell the two apart */
     floorClamped,
+    /* EVERY substep the fold limit bound on, `[i, kLimit, reach]` — sparse, so
+       a gate can rebuild this law exactly (an entry that did not bind changed
+       no double) and restate each limit from the reach and the sheet */
+    bendApplied,
+    substeps: N,
   };
 }
 
@@ -7793,12 +7800,17 @@ export function spineBendRefusal(curve, bends) {
    theorem is the mechanism and not a fit; the 56-row mesh resolves it only
    from about 1.2.
 
-   THE LIMIT. The spine's radius at each substep must clear the section's
-   reach toward that side PLUS the fold clamp's own margin, FOLD_CLAMP_MARGIN
-   x t/2 — the same argument (Eva's ruling, the apex-nib session): the inner
-   skin keeps a fifth of the mid-surface's spacing. Where reach + margin is
-   not larger than the floor the floor rules and the entry is Infinity, so a
-   flat section changes nothing and the table is inert by construction.
+   THE LIMIT IS THE INNER SKIN REACHING THE CENTRE, AND NOTHING BEYOND IT
+   (Eva's ruling, Oct 19). The spine's radius at each substep must clear the
+   MID-SURFACE's reach toward that side plus exactly HALF A SHEET, t/2 — the
+   skin the section carries toward the centre — so the mid-surface can never
+   arrive with the skin already past it. No margin past that: the fold
+   clamp's 1.25 was built and REJECTED (it uncurled tightly cupped petals by
+   another 12-15 degrees for no fold the 8x re-mesh could find). The skin's
+   own offset toward the centre is (t/2)(n . N0) <= t/2, so the full half
+   sheet bounds it from the safe side. Where reach + t/2 is not larger than
+   the floor the floor rules and the entry is Infinity, so a flat section
+   changes nothing and the table is inert by construction.
 
    THE REACH IS READ OFF THE SECTION, never restated from the cup's algebra:
    `reachAt(u)` is the petal's own `sectAt` (see `bendReachAt`), so the roll's
@@ -7809,7 +7821,7 @@ export function spineBendRefusal(curve, bends) {
    =================================================================== */
 export function spineBendTable({ length, rows, reachAt, floorRadius, t }) {
   const N = rows * SPINE_SUBSTEPS;
-  const marginMm = (FOLD_CLAMP_MARGIN * t) / 2;
+  const marginMm = t / 2;   // the inner skin, measured from the mid-surface — Eva's ruling, no margin past it
   const reachPos = new Float64Array(N), reachNeg = new Float64Array(N), kPos = new Float64Array(N), kNeg = new Float64Array(N);
   let binds = false;
   for (let i = 0; i < N; i++) {
@@ -9480,6 +9492,18 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      A5/A6 fix is the precedent — the builder emits `profileU` and the gate
      reads it — and this is the same repair on the same class of defect. */
   const spineRowU = rows.slice(footS.length).map((r) => r.u);
+  const rowReach = form !== null && law !== null ? spineRows.map((_, j) => {
+    const row = rows[footS.length + j], tau = form.twistRad * row.u, ct = Math.cos(tau), st = Math.sin(tau);
+    const N0 = [row.T[0] * st + row.N[0] * ct, row.T[1] * st + row.N[1] * ct, row.T[2] * st + row.N[2] * ct];
+    let pos = 0, neg = 0;
+    for (let c = 0; c < NV; c++) {
+      const P = row.sect(-1 + (2 * c) / (NV - 1)).P;
+      const d = (P[0] - row.C[0]) * N0[0] + (P[1] - row.C[1]) * N0[1] + (P[2] - row.C[2]) * N0[2];
+      if (d > pos) pos = d;
+      if (-d > neg) neg = -d;
+    }
+    return [pos, neg, N0[0], N0[1], N0[2]];
+  }) : null;
   let integrationResidual = null;
   if (law !== null && form.curlUniform && isRep) {
     integrationResidual = 0;
@@ -9568,6 +9592,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        nobody is told about is a control that silently means something else. */
     bendClamped: law ? law.bendClamped : false,
     floorClamped: law ? law.floorClamped : false,
+    bendApplied: law ? law.bendApplied : [],
+    substeps: law ? law.substeps : null,
+    /* THE SECTION'S REACH ON THE EMITTED ROWS — every blade row's own `sect`
+       (the one the mesh was offset from), toward each side of the curl plane's
+       normal N0 = T sin(tau) + N cos(tau) undoing the row frame's twist, and
+       N0 itself, `[pos, neg, N0x, N0y, N0z]`, so a reader can tell which side a
+       bend's centre is on from the emitted centres alone. A
+       second path to the reach beside the table's quiet one, so C5 can hold
+       the EMITTED spine against the EMITTED section. Null with no form. */
+    rowReach: rowReach,
     bend: law && law.bend ? { ...law.bend } : null,
     bendBinds: !!(bend && bend.binds),
   };
@@ -9581,7 +9615,10 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      `petalSurface` on the SAME ring and slot (its scope, field and mirror
      terms included), in the same mode, so the table it asks is the one the
      build would make. Non-enumerable for the same reason as the table. */
-  Object.defineProperty(spine, 'bendProbe', { value: (st) => { const b = petalSurface(st, ring, slot, cap, new MeshBuilder({ exportMode: acc.exportMode })).bend; return b && b.binds ? b : null; }, enumerable: false });
+  /* the candidate's own surface: null unless it is a DRAWN spine (the slider
+     family is clamped and told, never refused) and its limit binds somewhere;
+     the curve handed back is the candidate's own, not this build's */
+  Object.defineProperty(spine, 'bendProbe', { value: (st) => { const sf = petalSurface(st, ring, slot, cap, new MeshBuilder({ exportMode: acc.exportMode })); return sf.curveLaw !== null && sf.bend && sf.bend.binds ? { table: sf.bend, curve: sf.form.spineCurve } : null; }, enumerable: false });
 
   const midS = 0.5 * length;
   const midRow = spineAt(midS);
