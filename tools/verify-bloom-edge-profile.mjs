@@ -175,6 +175,23 @@ const E2_TURN_BAND_DEG = 5e-5;
    nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
    state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
+  /* CURVES-LEAVES (Oct 20, docs/bloom-curves-leaves-outcome.md): three block-73
+     rows over the allowance, each measured against the SAME state on the arch
+     slider and the law outline (`--rows-file`, `--dump-e2`) — none is a new
+     class. The LOBED blade on a drawn spine reads 89.06 where the identical
+     state on the Arch slider reads 94.20 (the lobed bead class main declares
+     on its lobed rows; the drawn spine IMPROVES it); the tight upward curl on
+     a cup 1.2 leaf is the spine-cup-fold block's own class (the cupped bead on
+     a hard-bent spine) — 43.69 flat, 45.76 bent, the fold limit holding it;
+     the compound rose's 50.63 is the LEAFLET CURVE on the wide cupped leaflets
+     (43.69 with the leaflets on the law and the rachis drawn), the bead class
+     "on wide cupped blades" S4 named. Declared at their values, never widened. */
+  'LEAF CURVES: the FOLD LIMIT \u2014 a tight UPWARD curl drawn on a cup 1.2 leaf (held at the inner skin\'s limit, told)':
+    { excessDeg: 0.764243, note: 'adds 45.764243 deg — the cupped bead on a hard-bent drawn spine (the spine-cup-fold class); the same leaf flat adds 43.686' },
+  'LEAF CURVES: the COMPOUND rose on a drawn rachis, one leaflet curve shared by every leaflet (the terminal at its own size), toothed':
+    { excessDeg: 5.627818, note: 'adds 50.627818 deg — the leaflet curve on the wide cupped leaflets (the S4 bead class on wide cupped blades); the rachis drawn and the leaflets on the law read 43.686' },
+  'LEAF CURVES: the LOBED blade on a drawn spine, an outline curve STORED (the lobed blade keeps its own law \u2014 the outline mode inert, told)':
+    { excessDeg: 44.060970, note: 'adds 89.060970 deg — the lobed bead class main declares on its lobed rows; the identical state on the Arch slider reads 94.200 — the drawn spine improves it' },
   /* SPINE-CUP-FOLD (Oct 20, docs/bloom-spine-cup-fold-outcome.md): five smoke
      rows over the allowance, every one a strongly CUPPED blade on a strongly
      CURLED spine — the cup's bead on a surface that bends hard along its

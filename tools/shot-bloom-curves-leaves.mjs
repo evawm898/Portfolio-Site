@@ -73,7 +73,9 @@ const exportOnly = async (label) => { const S = await snap(); if (S.shownMode !=
    tangent) or face-on down the mid-row's own normal */
 const leafMid = (L, i = 0) => { const C = L.rowCentre[i]; return C[Math.floor(C.length / 2)]; };
 const sideOf = (L, r = 34, i = 0) => { const az = L.azimuths.flat()[i] || 0; return `window.__bloomFrame(${r}, 0, ${JSON.stringify(leafMid(L, i))}, ${JSON.stringify([-Math.sin(az), Math.cos(az), 0])}, [0,0,1])`; };
-const faceOf = (L, r = 34, i = 0) => { const C = L.rowCentre[i], N = L.rowNormal[i][Math.floor(C.length / 2)], a = C[0], b = C[C.length - 1]; return `window.__bloomFrame(${r}, 0, ${JSON.stringify(leafMid(L, i))}, ${JSON.stringify(N)}, ${JSON.stringify([b[0] - a[0], b[1] - a[1], b[2] - a[2]])})`; };
+/* face-on from BELOW (down the mid-row's normal, reversed): from above the
+   head's petals stand between the camera and the leaf */
+const faceOf = (L, r = 34, i = 0) => { const C = L.rowCentre[i], N = L.rowNormal[i][Math.floor(C.length / 2)], a = C[0], b = C[C.length - 1]; return `window.__bloomFrame(${r}, 0, ${JSON.stringify(leafMid(L, i))}, ${JSON.stringify(N.map((x) => -x))}, ${JSON.stringify([b[0] - a[0], b[1] - a[1], b[2] - a[2]])})`; };
 const f1 = (v) => (v === null || v === undefined ? '—' : Number(v).toFixed(1));
 const spineCap = (L) => { const sp = (L.spineBuilt || []).find(Boolean); return sp ? `drawn spine, turn ${f1(sp.turnBuiltDeg)}°${sp.bendClamped ? ' (FOLD LIMIT, told)' : ''}${sp.floorClamped ? ' (floor clamped)' : ''}` : `Arch ${L.archDeg}° on the slider`; };
 const outlineCap = (L) => { const o = (L.outlineBuilt || []).filter(Boolean); return o.length ? `drawn outline on ${o.length} blade(s), width scale ${o.map((x) => Number(x.scale).toFixed(3)).filter((v, k, A) => A.indexOf(v) === k).join(' / ')}${o[0].twoSided ? ' (asymmetric — two halves)' : ''}` : 'law outline'; };
@@ -95,6 +97,7 @@ await handPick('leafCurlMode', 'c');
 const mode = await valText('leafCurlMode'), seedTxt = await valText('leafSpineCurve');
 if (mode.value !== 'CURVE' || !/SEEDED/.test(seedTxt.text)) await die(`the hand switch did not seed (mode ${mode.value}, note ${JSON.stringify(seedTxt.text.slice(0, 160))})`);
 const seedNote = seedTxt.text.replace(/^.*?SEEDED/, 'SEEDED');
+const posPts = ((v) => (typeof v === 'string' ? JSON.parse(v) : v).points)(await page.evaluate(() => window.__bloomUIState().leafSpineCurve));
 S = await exportOnly('the seeded leaf');
 const after = await canvas(sideOf(S.leaf));
 const afterCap = spineCap(S.leaf);
@@ -103,7 +106,7 @@ const afterCap = spineCap(S.leaf);
 await openBloom(page, here.port, { asShipped: true });
 await edit({ ...BASE, leafAngle: 0, leafWidth: 22, leafToothDepth: 0.35, leafToothCount: 6, leafOutlineMode: 'CURVE', leafOutlineCurve: OUT_C.oak });
 S = await exportOnly('the oak');
-const oak = { b64: await canvas(faceOf(S.leaf, 34)), cap: `${outlineCap(S.leaf)} · ${teethCap(S.leaf)}` };
+const oak = { b64: await canvas(faceOf(S.leaf, 40)), cap: `${outlineCap(S.leaf)} · ${teethCap(S.leaf)}` };
 
 /* ---------------- 3. the compound rose on a drawn rachis ---------------- */
 await openBloom(page, here.port, { asShipped: true });
@@ -114,18 +117,23 @@ if (!roseMid) await die('the compound leaf reports no axis rod');
 const az0 = S.leaf.azimuths.flat()[0] || 0;
 const rose = {
   side: await canvas(`window.__bloomFrame(40, 0, ${JSON.stringify(roseMid)}, ${JSON.stringify([-Math.sin(az0), Math.cos(az0), 0])}, [0,0,1])`),
-  top: await canvas(`window.__bloomFrame(40, 0, ${JSON.stringify(roseMid)}, [0,0,1], ${JSON.stringify([Math.cos(az0), Math.sin(az0), 0])})`),
+  under: await canvas(`window.__bloomFrame(40, 0, ${JSON.stringify(roseMid)}, [0,0,-1], ${JSON.stringify([Math.cos(az0), Math.sin(az0), 0])})`),
   cap: `${spineCap(S.leaf)} (the RACHIS) · ${outlineCap(S.leaf)}`,
 };
 
-/* ---------------- 4. the arch-sign pair ---------------- */
+/* ---------------- 4. the arch-sign pair, the other way ---------------- */
 await openBloom(page, here.port, { asShipped: true });
-await edit({ ...BASE, leafArch: 60 });
-S = await exportOnly('Arch +60');
-const archPos = { b64: await canvas(sideOf(S.leaf)), cap: spineCap(S.leaf) };
-await edit({ leafCurlMode: 'CURVE', leafSpineCurve: SP.droop });
-S = await exportOnly('the drawn falling curve');
-const drawn = { b64: await canvas(sideOf(S.leaf)), cap: spineCap(S.leaf) };
+await edit({ ...BASE, leafArch: -60 });
+S = await exportOnly('Arch -60');
+const archNeg = { b64: await canvas(sideOf(S.leaf)), cap: spineCap(S.leaf) };
+await handPick('leafCurlMode', 'c');
+const negTxt = await valText('leafSpineCurve');
+if (!/SEEDED/.test(negTxt.text)) await die('the hand switch at Arch -60 did not seed');
+const uiPts = async (id) => { const v = await page.evaluate((i) => window.__bloomUIState()[i], id); return (typeof v === 'string' ? JSON.parse(v) : v).points; };
+const negPts = await uiPts('leafSpineCurve');
+S = await exportOnly('the seeded rising curve');
+const rising = { b64: await canvas(sideOf(S.leaf)), cap: `${spineCap(S.leaf)} — the seeded curve ends at (${negPts.at(-1).map((x) => x.toFixed(3)).join(', ')}): it RISES` };
+
 if (errors.length) await die(`page errors: ${errors.slice(0, 3).join(' | ')}`);
 
 /* ---------------- compose ---------------- */
@@ -141,12 +149,12 @@ figcaption{margin-top:6px;color:#9fb0aa;font-size:12px}</style>
 <h2>1 · the seed — the leaf on the Arch slider at +60°, then a hand switch to CURVE</h2>
 <p>The page's own sentence: ${esc(seedNote)}</p>
 <div class="row">${cell(before, `BEFORE — ${beforeCap}`)}${cell(after, `AFTER — ${afterCap} (the Arch kept, hidden)`)}</div>
-<h2>2 · a toothed drawn outline — an oak-ish asymmetric blade, the teeth cut into each half (face-on)</h2>
+<h2>2 · a toothed drawn outline — an oak-ish asymmetric blade, the teeth cut into each half (face-on, from below)</h2>
 <div class="row">${cell(oak.b64, oak.cap)}</div>
 <h2>3 · the compound rose on a drawn rachis — one leaflet curve on every leaflet, each at its own scale</h2>
-<div class="row">${cell(rose.side, `side — ${rose.cap}`)}${cell(rose.top, 'from above')}</div>
-<h2>4 · the arch-sign pair — Arch +60 on the slider, and a drawn curve that FALLS toward the tip: the same bend, tip down</h2>
-<div class="row">${cell(archPos.b64, archPos.cap)}${cell(drawn.b64, `${drawn.cap} — the curve drawn falling (y down toward the tip)`)}</div>`;
+<div class="row">${cell(rose.side, `side — ${rose.cap}`)}${cell(rose.under, 'from below')}</div>
+<h2>4 · the arch-sign pair — section 1 is Arch +60 (tip DOWN; the seeded curve FALLS, ending at (${posPts.at(-1).map((x) => x.toFixed(3)).join(', ')})); here Arch −60 (tip UP) and its seed, which RISES</h2>
+<div class="row">${cell(archNeg.b64, archNeg.cap)}${cell(rising.b64, rising.cap)}</div>`;
 await page.setViewportSize({ width: 1520, height: 1200 });
 await page.setContent(html);
 await page.waitForTimeout(400);
@@ -157,6 +165,6 @@ console.log(`SEED: ${seedNote}`);
 console.log(`BEFORE: ${beforeCap} · AFTER: ${afterCap}`);
 console.log(`OAK: ${oak.cap}`);
 console.log(`ROSE: ${rose.cap}`);
-console.log(`ARCH +60: ${archPos.cap} · DRAWN: ${drawn.cap}`);
+console.log(`ARCH -60: ${archNeg.cap} · SEEDED: ${rising.cap}`);
 await browser.close();
 here.server.close();
