@@ -785,13 +785,13 @@ const MUTANTS = [
      1374-row round trip loses them (and F13's controls round trip loses
      petalCount under the dropped-field mutant above) — the first CI sweep said so. */
   /* F3-scope: and F14, the per-scope spines' own round trip */
-  { id: 'scope-values-are-not-written', breaks: ['F13', 'F14', 'F2'],
+  { id: 'scope-values-are-not-written', breaks: ['F13', 'F14', 'F15', 'F2'],
     from: '    if (e.values && Object.keys(e.values).length) {\n      out.values = {};',
     to: '    if (false) {\n      out.values = {};' },
-  { id: 'scope-values-are-not-read', breaks: ['F13', 'F14', 'F2'],
+  { id: 'scope-values-are-not-read', breaks: ['F13', 'F14', 'F15', 'F2'],
     from: '      if (Object.keys(vals).length) out.values = vals;',
     to: '      if (false) out.values = vals;' },
-  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F14', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
+  { id: 'the-curve-kind-is-not-written', breaks: ['F7', 'F1', 'F2', 'F8', 'F9', 'F11', 'F13', 'F14', 'F15', 'F5 save', 'F5 own save', 'F5 changed', 'F5 missing', 'F5 bytes'],
     from: '    write: (v) => (v === undefined ? undefined : cloneCurve(v)),',
     to: '    write: () => undefined,' },
 ];
