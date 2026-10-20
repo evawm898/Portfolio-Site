@@ -34,7 +34,7 @@ slider moves (a later step of Petal length leaves a seeded outline alone; route
 (al) holds it and its mutant re-fits on every slider step).
 
 **The fit is a fit, and the read-out says so.** The sentence is
-`SEEDED from <the curl sliders | the law outline> on the switch — N points, within
+`SEEDED from <the slider spine | the law outline> on the switch — N points, within
 | NOT within the 0.10 mm tolerance: it departs from it by E mm (position P mm,
 direction D° — the direction weighed at one millimetre of blade per radian); a
 fit, not the slider build to the bit`. Nothing claims byte identity.
@@ -58,7 +58,11 @@ floor):
 | outline, base 2 / tip 1 / shape 3, width 30 | 11 | 0.1571 | no |
 | outline, base 0.4 / tip 2 / shape 0.6, width 8 | 9 | 0.0698 | yes |
 
-A seed costs 0.1–3.6 s on this box, once per switch.
+On the page the seed is fitted at the lengths the SHOWN build drew, so the same
+curl 120 reads **0.099 mm, 11 points** live (route (al)) and **0.112 mm, 10 points —
+NOT within** with print preview on (the sheet), where the export floor changes the
+slider spine it fits. Both are told as measured. A seed costs 0.1–3.6 s on this
+box, once per switch.
 
 **What the error is.** Spine: the larger of the position error between the curve's
 spine and the slider spine at the same arc positions, and the direction error
