@@ -17129,8 +17129,11 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       substeps: S.spine.law.substeps,
     } : null,
     /* THE DRAWN OUTLINE AS BUILT (curves-leaves) — the plan the profile drew
-       (each half's on an asymmetric blade), null on a LAW blade */
-    outline: leafOutlineRecord(prof),
+       (each half's on an asymmetric blade), null on a LAW blade. A LOBED
+       blade's is its ENVELOPE's (`profE`): the chevron profile cannot take a
+       curve at all, so the envelope is the one place a drawn outline could
+       reach a lobed blade — and the record says whether it did (null, ruled) */
+    outline: leafOutlineRecord(S.profE || prof),
     cup: { coefficient: S.bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
     serration,
     rim,
@@ -18732,7 +18735,9 @@ export function lobedBladeAreaMm2(outline, Lmm) {
   return sum;
 }
 export function simpleDefaultBladeAreaMm2(state, Lmm) {
-  const bs = leafBladeState({ ...state, leafType: 'SIMPLE', leafWidth: LEAF_WIDTH_DEFAULT, leafTipShape: LEAF_TIP_SHAPE, leafToothDepth: 0 });
+  /* (curves-leaves) the REFERENCE is the simple leaf's DEFAULTS — its LAW
+     outline, whatever outline curve a lobed leaf's state happens to store */
+  const bs = leafBladeState({ ...state, leafType: 'SIMPLE', leafWidth: LEAF_WIDTH_DEFAULT, leafTipShape: LEAF_TIP_SHAPE, leafToothDepth: 0, leafOutlineMode: 'LAW' });
   const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, LEAF_WIDTH_DEFAULT / 2, { petiole: true, rowCapacity: LEAF_BLADE_ROWS }, { exportMode: true }, Lmm);
   const N = LOBED_FOLD_SAMPLES;
   let sum = 0, prev = null;

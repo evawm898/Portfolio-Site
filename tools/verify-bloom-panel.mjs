@@ -495,6 +495,19 @@
          bloom.js): the seed never written, and the seed re-fitting on every
          later slider step. Three edits: this entry, the block, the negative
          control's flags and banner.
+     (am) THE LEAF'S CURVES SEEDED FROM THE LEAF'S OWN SHAPE (curves-leaves,
+         Oct 20 — docs/bloom-curves-leaves-outcome.md). A HAND switch of the
+         leaf's Curl from to CURVE at Arch 60 writes a curve that is not the
+         default, tells it was SEEDED from the Arch slider's spine, and BENDS
+         THE TIP DOWN as the positive Arch does (the drawn curve falls toward
+         the tip and the built spine turns the same way the arch did — the
+         sign the leaf's twin documents); back to SLIDER leaves the Arch
+         untouched; the simple blade's LAW -> CURVE seeds from the leaf's law
+         outline; a COMPOUND leaf's leaflet outline seeds too. Two mutants
+         under --negative-control (both bloom.js): the leaf's spine never
+         seeded, and the seed fitted to the arch's MIRROR (the sign flipped).
+         Three edits: this entry, the block, the negative control's flags and
+         banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4513,6 +4526,78 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (am) THE LEAF'S CURVES SEEDED (curves-leaves) ----------
+   See the header. "Not the default" is the registry's own default for each
+   curve control; the arch is the one this route set; the bend's direction is
+   read off the seeded points AND off the leaf the build then drew. */
+{
+  const tag = '[leaf seed]';
+  const defOf = (id) => JSON.stringify(typeof DEFAULTS[id] === 'string' ? JSON.parse(DEFAULTS[id]) : DEFAULTS[id]);
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const read = (pg, ids) => pg.evaluate((list) => Object.fromEntries(list.map((i) => { const el = document.getElementById(i); const w = el.closest('.bl-ctrl'); const v = w && w.querySelector('.bl-val'); return [i, { value: el.value, text: v ? v.textContent : '' }]; })), ids);
+  const canon = (v) => { try { return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v); } catch { return String(v); } };
+  const parse = (v) => { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } };
+  const pick = async (pg, id, key) => { await pg.evaluate((i) => { for (let d = document.getElementById(i).closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true; }, id); await pg.focus(`#${id}`); await pg.keyboard.press(key); await settle(pg); };
+  const run = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'stemLength', value: '70' }, { id: 'leafLength', value: '52' }, { id: 'leafArch', value: '60' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    await pick(pg, 'leafCurlMode', 'c');
+    let r = await read(pg, ['leafCurlMode', 'leafSpineCurve', 'leafArch']);
+    if (r.leafCurlMode.value !== 'CURVE') p.push(`the keyboard switch did not reach the leaf's CURVE (the select reads ${r.leafCurlMode.value})`);
+    else {
+      if (canon(r.leafSpineCurve.value) === defOf('leafSpineCurve')) p.push('the hand switch to CURVE at Arch 60 left the DEFAULT leaf spine curve — the leaf spine was not seeded from the arch');
+      if (!/SEEDED from the Arch slider's spine .* departs from it by [0-9.]+ mm/.test(r.leafSpineCurve.text)) p.push(`the leaf spine curve's read-out does not tell the seed and its fit error: ${JSON.stringify(r.leafSpineCurve.text.slice(0, 240))}`);
+      const pts = (parse(r.leafSpineCurve.value) || {}).points || [];
+      const last = pts[pts.length - 1];
+      if (!last || !(last[1] < 0)) p.push(`the seeded leaf spine ends at ${JSON.stringify(last)} — at a POSITIVE Arch the drawn curve must FALL toward the tip (the arch turns the tip DOWN); the seed bends the other way`);
+      const m = await pg.evaluate(() => window.__bloomMetrics());
+      const sp = m.leaf && Array.isArray(m.leaf.spineBuilt) ? m.leaf.spineBuilt.find(Boolean) : null;
+      if (!sp || !(sp.turnBuiltDeg < 0)) p.push(`the leaf the seeded curve builds turns ${sp ? sp.turnBuiltDeg : 'nothing'}° — the Arch 60 it replaced turned the tip down (a negative turn)`);
+    }
+    const seeded = r.leafSpineCurve.value;
+    await pick(pg, 'leafCurlMode', 's');
+    r = await read(pg, ['leafCurlMode', 'leafArch', 'leafSpineCurve']);
+    if (r.leafCurlMode.value !== 'SLIDER') p.push(`the keyboard switch back did not reach SLIDER (${r.leafCurlMode.value})`);
+    if (Number(r.leafArch.value) !== 60) p.push(`switching back to SLIDER moved the Arch (${r.leafArch.value}) — it must come back untouched`);
+    if (canon(r.leafSpineCurve.value) !== canon(seeded)) p.push('switching back to SLIDER rewrote the seeded leaf curve');
+    await pick(pg, 'leafOutlineMode', 'c');
+    r = await read(pg, ['leafOutlineMode', 'leafOutlineCurve']);
+    if (r.leafOutlineMode.value !== 'CURVE') p.push(`the keyboard switch did not reach the leaf outline CURVE (${r.leafOutlineMode.value})`);
+    else if (canon(r.leafOutlineCurve.value) === defOf('leafOutlineCurve') || !/SEEDED from the leaf's law outline/.test(r.leafOutlineCurve.text)) p.push(`the hand switch to the leaf outline CURVE was not seeded from the leaf's law outline: ${JSON.stringify(r.leafOutlineCurve.text.slice(0, 200))}`);
+    bad = await applyConfig(pg, [{ id: 'leafType', value: 'COMPOUND' }, { id: 'leafLength', value: '40' }]);
+    if (bad.length) p.push(`the compound config did not take: ${bad.join('; ')}`);
+    else {
+      await pick(pg, 'leafletOutlineMode', 'c');
+      r = await read(pg, ['leafletOutlineMode', 'leafletOutlineCurve']);
+      if (r.leafletOutlineMode.value !== 'CURVE') p.push(`the keyboard switch did not reach the leaflet outline CURVE (${r.leafletOutlineMode.value})`);
+      else if (canon(r.leafletOutlineCurve.value) === defOf('leafletOutlineCurve') || !/SEEDED from the leaf's law outline/.test(r.leafletOutlineCurve.text)) p.push(`the hand switch to the leaflet outline CURVE was not seeded: ${JSON.stringify(r.leafletOutlineCurve.text.slice(0, 200))}`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a hand switch to CURVE at Arch 60 writes a seeded leaf spine that FALLS toward the tip and builds a leaf turning down, and tells its fit error; back to SLIDER leaves the Arch untouched; the simple blade's and the leaflets' outlines seed from the leaf's law`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'leaf spine, outline, leaflets');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the leaf spine is never seeded', from: "  leafCurlMode: { curve: 'leafSpineCurve', kind: 'spine', leaf: 'leaf' },\n", to: '' },
+      { name: 'the leaf seed fits the mirrored arch', from: "    const sub = leafBladeState({ ...ui, leafLength: L });\n", to: "    const sub = leafBladeState({ ...ui, leafLength: L, leafArch: -Number(ui.leafArch) });\n" },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4638,14 +4723,17 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (al), CURVE SEEDED FROM THE SLIDER SHAPE — one flag per mutant */
     const sawSeedIgnored = fail.some((f) => /^\[seed\] MUTANT \(the seed is never written\).*was not seeded from the slider shape/.test(f));
     const sawSeedFollows = fail.some((f) => /^\[seed\] MUTANT \(the seed follows later slider moves\).*rewrote the seeded outline/.test(f));
-    if (sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (am), THE LEAF'S CURVES SEEDED — one flag per mutant */
+    const sawLeafSeedIgnored = fail.some((f) => /^\[leaf seed\] MUTANT \(the leaf spine is never seeded\).*was not seeded from the arch/.test(f));
+    const sawLeafSeedSign = fail.some((f) => /^\[leaf seed\] MUTANT \(the leaf seed fits the mirrored arch\).*the seed bends the other way/.test(f));
+    if (sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY-NINE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

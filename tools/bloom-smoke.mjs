@@ -1686,6 +1686,31 @@ export const SMOKE_BLOCKS = [
         path: "SP8 the harness's own contact test on the curved sepal at the built angle and one step above, SP14(b) the incurve on the emitted rows" },
     ],
   },
+  {
+    n: 73, title: 'the leaf\'s own curves (curves-leaves, Oct 20)',
+    anchor: 'LEAF CURVES: a drawn DROOPING spine (leaf Curl from CURVE — the bend a positive Arch makes; the Arch hidden and inert)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block adds is the
+       leaf's six curve twins reaching the petal laws through
+       `leafBladeState` / `leafletBladeState` (the pins to SLIDER / LAW
+       removed), the leaf's own spine arm in `leafSurface` / `lobedSurface` /
+       the rachis, and the readers of the curved leaf (the inset, the shared
+       node's offset and cap, SN4's arc reach). The anchor is the block's
+       first row; the brief's smoke rows are the asymmetric toothed blade, the
+       compound rose on a drawn rachis with the shared leaflet curve, the
+       raceme's shared-node leaf and the steep 85 deg leaf. --conn is REQUIRED
+       (a curve re-bends and re-draws every leaf blade). */
+    conn: true,
+    rows: [
+      { label: 'LEAF CURVES: an ASYMMETRIC TOOTHED oak-ish blade on a drawn spine (teeth cut into each drawn half)',
+        path: "LF37 the modes two ways, the spine restated from the control's points and the outline per half at the leaf's own width scale, LF13/LF33/LF35 per half on the drawn outline" },
+      { label: 'LEAF CURVES: the COMPOUND rose on a drawn rachis, one leaflet curve shared by every leaflet (the terminal at its own size), toothed',
+        path: "LF37 the rachis on the drawn curve and every leaflet's outline at its own scale (the terminal's 0.969), LF11 the rachis, LF17 the taper by the curved rachis's arc length" },
+      { label: 'LEAF CURVES: a raceme\'s shared-node leaf on a drawn spine (the offset and the cap read the CURVED blade)',
+        path: "SN4 the emitted blade's reach along the drawn spine against the cap, LF37 the spine" },
+      { label: 'LEAF CURVES: the STEEP 85 deg leaf on a drawn spine',
+        path: "LF4 the inset against the drawn spine's rise restated from the control, LF37, ST9 on the curved blade" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

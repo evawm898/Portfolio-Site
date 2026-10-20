@@ -379,6 +379,25 @@ const PREDICATE_MOVERS = {
      guard can only be read here). Every LAW row, the GATED row with a curve
      stored included, must hold to the bit in both modes. */
   'outline': (st) => mine.outlineIsCurve(st),
+  /* THE LEAF CURVES (curves-leaves). A row moves iff the BASE tree builds a
+     leaf on it (its own `leafPlan` record: a stem and a length, the shared
+     node's kept count on a raceme) AND the row asks for a curve the leaf
+     reaches — the leaf curl mode CURVE (the simple, lobed or compound leaf),
+     the simple blade's outline CURVE on a SIMPLE leaf, or the leaflets'
+     outline CURVE on a COMPOUND one. The base tree has no leaf curve control
+     and builds every row on the arch and the law, so the curve half is read
+     off the CONTROLS; a LOBED leaf with only an outline curve stored, and the
+     GATED rows (curves stored under SLIDER / LAW, or with no leaf), HOLD. */
+  'leaf-curve': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const plan = base.leafPlan(st, base.stemPlan(st, fr.hub, acc), acc);
+    if (!plan || !plan.present) return false;
+    const type = String(st.leafType || 'SIMPLE');
+    return String(st.leafCurlMode) === 'CURVE'
+      || (type === 'SIMPLE' && String(st.leafOutlineMode) === 'CURVE')
+      || (type === 'COMPOUND' && String(st.leafletOutlineMode) === 'CURVE');
+  },
   /* THE ASYMMETRIC OUTLINE (F6-asym). A row moves iff THIS tree builds it in
      CURVE mode with a TWO-SIDED curve whose right half differs from its left
      (the base tree reads only `points` — the left half — and draws it
