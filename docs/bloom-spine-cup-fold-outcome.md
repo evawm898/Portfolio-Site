@@ -147,7 +147,7 @@ metric corner, #423's two rows). The one undeclared binder is `FORM VARIANCE: x 
 
 ## 7. The census, re-measured — every mover is a row the limit binds on
 
-`node tools/bloom-xfail-magnitudes.mjs` over every declared row (Node, EXPORT, the builder's doubles):
+`node tools/bloom-xfail-magnitudes.mjs` over every declared row (Node, EXPORT, the builder's doubles) — after the re-records **197 of 197 declared rows reproduce at their recorded magnitude**:
 **50 of 215 declared entries moved, all 50 rows the fold limit binds on** (0 movers anywhere else), plus `ALL MAX` (export-refused, measured through `--include-refused`: 93,107 → 74,716 pairs, span unmoved at 13.6547 mm), and
 every one moved toward clean. Each re-record keeps the previous figure in its note and names its site
 — the pairs carried back to the builder's own mid-surface by `node tools/bloom-census-attribute.mjs`,
@@ -202,3 +202,28 @@ curl-360 spine, so the curved plan is compressed less. The map stays, empty.
 folding infilled sheet; MB1 `cup 1.2 x curl 360` 89.96 → 87.38° and `ALL FORM MAX` 111.91 → 109.32°.
 Re-recorded, not widened. The premise of the `cup 1.2 x curl 360` rows moved and is said in both
 files: the PLAIN petal there no longer folds; the INFILLED sheet these rims sit on still does.
+
+**The edge-profile gate** (E2, the treatment's added turn within 2 mm of a rim, 45° allowance): five
+smoke rows over it, every one a cupped bead on a strongly curled blade, declared in `E2_TURN_XFAIL` at
+the measured magnitude — none is new geometry made worse. `ZYGO: 3 layers x ALL INNER MAX` (101.23°)
+and `ALL PETALS: max x every base at max` (123.77°) were declared census folds on the base tree, which
+E2 exempts; they read 0 pairs now, so E2 reads them for the first time (S5's `LOBED YIELD` precedent).
+`SPINE FOLD: curl 195 x cup 1.2` (94.82°) is the just-valid side of the limit and the base tree's
+geometry to the bit (94.824898 on a worktree of `3dc8ee1`). The two clamped rows read BETTER than the
+same state on the base tree: `curl 270 x cup 1.2` 167.74 → **127.25°**, `curl 360 x cup 0.9 x curl bias
+0.5` 156.68 → **51.66°** (measured through `--rows-file --dump-e2` on both trees). Never widened.
+
+## 8. The byte partition — predeclared from the base tree
+
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 3dc8ee1> --movers-predicate spine-fold`
+(three `--range` chunks closed by `--merge`): **PASS — 62 predeclared movers moved, 0 floats moved on
+the 1,349 holders**, positionally under `Object.is`, over the whole 1,411-row matrix in both modes —
+1,692,923,256 export floats over 188,102,584 triangles and 80,900,776 captured-grid values.
+
+**The predicate never reads this tree.** A row moves iff some petal the BASE tree builds (petals,
+sepals, florets — every `buildPetalInto` call, reached through an instrumented copy of the base
+module that carries its own imports) has a spine substep whose curvature AS THE BASE BUILT IT exceeds
+`1/(the base surface's own reach toward that side + t/2)` past the floor — the reach read off the
+base's `rowAt(u).sect(v)` over the same NV columns. Its 62 movers are exactly the 62 rows this tree's
+own `bendClamped` record names (§5) — two instruments sharing no code agree row for row. Zero
+triangles moved anywhere: the limit moves stations, never the lattice.

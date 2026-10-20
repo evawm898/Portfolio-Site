@@ -755,7 +755,7 @@ if (argv.includes('--frozen-sweep')) {
     return st;
   };
   const names = Object.keys(harness.FROZEN_MATRICES);
-  const memo = new Map();
+  const memo = new Map(), threwSeen = new Set();
   let tags = 0, total = 0, movers = 0, threwAll = 0;
   for (const name of names) {
     const fr = harness.FROZEN_MATRICES[name]();
@@ -764,7 +764,7 @@ if (argv.includes('--frozen-sweep')) {
       const st = lenient(row);
       const key = JSON.stringify([st, row.capability || null, harness.rowScopesForBuild(row) || null]);
       let v = memo.get(key);
-      if (v === undefined) { try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch { v = 'threw'; } memo.set(key, v); }
+      if (v === undefined) { try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch (e) { v = 'threw'; if (threwSeen.size < 12 && !threwSeen.has(row.label)) { threwSeen.add(row.label); console.log(`    threw: ${name} ${row.label} — ${String(e && e.message || e).slice(0, 160)}`); } } memo.set(key, v); }
       if (v === 'threw') threw++; else if (v) n++;
     }
     total += fr.length; movers += n; threwAll += threw; if (n) tags++;
