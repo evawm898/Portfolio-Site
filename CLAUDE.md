@@ -1158,6 +1158,10 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   pinned to the LAW outline.
 - Block 73 (13 rows, 1,437), smoke block 73 (5); `frozen/phase79` = the 1,424 rows at `fc96dc9`. Sheet:
   `node tools/shot-bloom-curves-leaves.mjs` → `docs/img/curves-leaves.png`.
+- **Bytes: 11 movers / 1,426 holders, 0 floats on any holder** (`--movers-predicate leaf-curve`, both modes;
+  197 holders build a leaf on SLIDER / LAW). **`verify-bloom-surface-bytes`' `baseScopes` stripped a TIER's
+  values against the PETAL id list** and so built every sepal tier's own curve WITHOUT it on the base side —
+  two block-72 rows read as moved; a tier strips against `SEPAL_SCOPE_VALUE_IDS` now.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

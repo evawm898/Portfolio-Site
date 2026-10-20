@@ -206,8 +206,32 @@ read-out ("— stopped by …"). Re-measured in print preview (export) and live,
   proportion); (4) the arch-sign pair — Arch −60 beside its own seeded curve, rising,
   ending at (0.833, 0.497), the same bend from two controls.
 
-BYTES: see §7.
 
 ## 7. The byte partition
 
-(filled in at close)
+Predeclared from the BASE tree (`verify-bloom-surface-bytes --movers-predicate
+leaf-curve`: a row moves iff the base tree's own `leafPlan` builds a leaf AND the row
+asks a leaf curve mode the twins make effective — `leafCurlMode` CURVE, or `leafOutlineMode`
+CURVE on a SIMPLE leaf, or `leafletOutlineMode` CURVE on a COMPOUND one), measured over
+the whole 1,437-row live matrix in both modes against a worktree of `fc96dc9`, twelve
+`--range` chunks merged:
+
+**PASS — 11 movers / 1,426 holders, 0 floats moved on any holder**, positionally under
+`Object.is`, over **1,716,661,908 export floats** (190,740,212 triangles) and
+**81,131,136 captured-grid values**. The holders include **196 rows that build a leaf on
+SLIDER / LAW** (49 compound, 66 lobed) and block 73's GATED row with both curves stored
+and the modes left SLIDER / LAW. The 11 movers are block 73's non-GATED rows, every one
+moving: the drooping, upward and S spines; the lanceolate outline at 17 and 25 mm; the
+asymmetric toothed oak; the fold limit; the compound rose; the raceme's shared-node leaf;
+the steep 85° leaf; and the LOBED blade on a drawn spine (its spine moves, its outline
+does not — LF37 (a) holds the outline record null).
+
+**A DEFECT IN THE BYTE TOOL, FOUND BY THIS RUN AND FIXED, NOT THE GEOMETRY'S.** The first
+pass reported two block-72 rows (`SEPAL CURVES: two tiers on two outlines` / `…on two
+spines`) moved by ~0.002 mm. Built in one process with both modules they agree to the
+bit: the tool's `baseScopes` strips value ids the BASE tree does not list, and it read
+the PETAL list (`SCOPE_VALUE_IDS`) for a TIER — whose values are the SEPAL ids
+(`SEPAL_SCOPE_VALUE_IDS`, #425) — so the base build lost every sepal tier's own curve.
+A tier now strips against the base's sepal list; with it the two rows hold and the
+merged partition above reads PASS. (#425's own partition predates this — its tier rows
+were movers there, where a mover is not compared to the bit.)

@@ -777,6 +777,11 @@ const PREDICATE_MOVERS = {
   },
 };
 const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
+/* A TIER's values are the SEPAL ids (#425), which the petal list does not hold:
+   reading the petal list for a tier stripped every sepal tier's own curve from
+   the BASE build and reported a holder as moved (curves-leaves, measured on
+   block 72's two tier rows — in-process the two trees agree to the bit). */
+const BASE_TIER_VALUE_IDS = new Set(base.SEPAL_SCOPE_VALUE_IDS || []);
 /* `--frozen-sweep` (spine-cup-fold): WHICH FROZEN BASELINES' BYTES STOP
    REPRODUCING under the declared predicate — every registered frozen matrix's
    rows run through the SAME predicate the byte partition proves exact on the
@@ -873,13 +878,13 @@ function gridFloatsOf(petals) {
    `baseScopes` and ran before it on every scoped row: a temporal dead zone.) */
 function baseScopes(sc) {
   if (!sc) return sc;
-  const strip = (e) => {
+  const strip = (e, ids = BASE_VALUE_IDS) => {
     if (!e.values) return e;
-    const v = Object.fromEntries(Object.entries(e.values).filter(([k]) => BASE_VALUE_IDS.has(k)));
+    const v = Object.fromEntries(Object.entries(e.values).filter(([k]) => ids.has(k)));
     if (Object.keys(v).length === Object.keys(e.values).length) return e;
     const out = { ...e }; if (Object.keys(v).length) out.values = v; else delete out.values; return out;
   };
-  const layers = (sc.layers || []).map(strip), petals = (sc.petals || []).map(strip), tiers = (sc.tiers || []).map(strip);
+  const layers = (sc.layers || []).map((e) => strip(e)), petals = (sc.petals || []).map((e) => strip(e)), tiers = (sc.tiers || []).map((e) => strip(e, BASE_TIER_VALUE_IDS));
   if (layers.every((e, i) => e === sc.layers[i]) && petals.every((e, i) => e === sc.petals[i]) && tiers.every((e, i) => e === sc.tiers[i])) return sc;
   return { ...sc, layers, petals, tiers };
 }
