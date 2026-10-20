@@ -713,6 +713,10 @@ const SPS_ROWS = /^a scoped spine/;
    tier mutants run over the rows that name them. */
 const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
 const TIER_ROWS = /^SEPAL TIERS:/;
+/* THE SEPAL CURVES (curves-sepals): the four mutants and the rows they run over,
+   scoped to each other for the shard cap's sake (the tier rows' own reason). */
+const SEPC_MUTANTS = /^(a-sepal-curve-read-from-the-petals|a-tier-curve-leaks-to-every-tier|the-sepal-limit-drawn-on-the-slider-spine|the-fold-limit-skipped-for-sepals)$/;
+const SEPC_ROWS = /^SEPAL CURVES:/;
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -2435,7 +2439,7 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tilt === 60 && c.tilt < 60) ? null : `the mutant built its sepals at ${m.tilt} against the clean tree's ${c.tilt} (60 asked) — the clamp did not go`; } },
   { id: 'sepal-reads-the-petals-controls', why: "the sepal blade is built from the PETAL's shape, form and curl controls while the sepal's own twins are read by nothing — hidden-and-not-inert on twenty controls at once",
-    find: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);',
+    find: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);',
     into: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[petalId]);', names: ['SP6'],
     witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
@@ -2534,8 +2538,8 @@ const MUTANTS = [
       return (ct.limit < 60 && /tier 1/.test(ct.against || '') && !/tier 1/.test(mt.against || '') && mt.limit > ct.limit) ? null
         : `tier 2's limit reads ${mt.limit} against ${mt.against} on the mutant and ${ct.limit} against ${ct.against} clean — the tier above still clamps it`; } },
   { id: 'tier-offsets-leak', rows: TIER_ROWS, why: 'a tier scope\'s offsets reach EVERY tier — an entry for tier 2 alone lengthens tier 1 and tier 3 with it, the picker editing one tier and the build moving three',
-    find: "  for (const e of list) { if (e.tier !== k) continue; addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true; }",
-    into: "  for (const e of list) { addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true; }", names: ['SP12'],
+    find: "    if (e.tier !== k) continue;\n    addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true;\n    if (e.values)",
+    into: "    addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true;\n    if (e.tier !== k) continue;\n    if (e.values)", names: ['SP12'],
     witness: (M, C) => { const sc = { tiers: [{ tier: 1, offsets: { sepalLength: 30 } }] };
       const m = tierFacts(M, {}, sc), c = tierFacts(C, {}, sc);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
@@ -2555,6 +2559,33 @@ const MUTANTS = [
     witness: (M, C) => { const m = sepalFacts(M, { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 }), c = sepalFacts(C, { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.count === 8 && c.count === 0) ? null : `the mutant built ${m.count} sepals on a sphere against the clean tree's ${c.count} — the refusal still holds`; } },
+
+  /* THE SEPAL CURVES (curves-sepals). Each witnessed on the MUTATED module's own
+     sepal records — never the clause it names. */
+  { id: 'a-sepal-curve-read-from-the-petals', rows: SEPC_ROWS, why: "the four value twins are skipped in sepalBladeState, so a sepal reads the PETAL's curl mode and curves — a sepal drawn CURVE with the petals on the sliders is built straight",
+    find: "  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);",
+    into: "  for (const [petalId, sepalId] of SEPAL_TWINS) { if (sepalTwinIsValue(sepalId)) continue; s[petalId] = unclamped ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]); }", names: ['SP14'],
+    witness: (M, C) => { const m = sepcFacts(M, SEPC_REFLEX), c = sepcFacts(C, SEPC_REFLEX);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.tiers[0].curveMode === false && c.tiers[0].curveMode === true) ? null : `the sepal's curve mode reads ${m.tiers[0].curveMode} on the mutant against ${c.tiers[0].curveMode} clean`; } },
+  { id: 'a-tier-curve-leaks-to-every-tier', rows: SEPC_ROWS, why: "a tier's owned values are collected from every tier's entry, so tier 2's drawn reflex reaches tier 1 too — the picker editing one tier and the calyx bending two",
+    find: "    if (e.tier !== k) continue;\n    addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true;\n    if (e.values)",
+    into: "    if (e.values) for (const id of Object.keys(e.values)) { (values || (values = {}))[id] = e.values[id]; (valueFrom || (valueFrom = {}))[id] = 'tier'; any = true; }\n    if (e.tier !== k) continue;\n    addScopeOffsets(sum, e.offsets || {}, `tiers[${e.tier}]`); any = true;\n    if (e.values)", names: ['SP14'],
+    witness: (M, C) => { const m = sepcFacts(M, SEPC_TIERS.set, SEPC_TIERS.scopes), c = sepcFacts(C, SEPC_TIERS.set, SEPC_TIERS.scopes);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.tiers[0].curveMode === true && c.tiers[0].curveMode === false && c.tiers[1].curveMode === true) ? null : `tier 1's curve mode reads ${m.tiers[0].curveMode} on the mutant against ${c.tiers[0].curveMode} clean (tier 2 ${c.tiers[1] && c.tiers[1].curveMode})`; } },
+  { id: 'the-sepal-limit-drawn-on-the-slider-spine', rows: SEPC_ROWS, why: "the angle limit's trial sepal is built with the curl mode forced to SLIDER, so an incurved drawn sepal is cleared against the petals as if it were straight — and stands through them",
+    find: "  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, null, false);\n  return { lamina: laminaFromPanels(",
+    into: "  const p = buildPetalInto(acc, { ...sepalBladeState(state, angleDeg, unclamped), petalCurlMode: 'SLIDER' }, sepals.ring, slot, null, false);\n  return { lamina: laminaFromPanels(", names: ['SP8'],
+    witness: (M, C) => { const m = sepcFacts(M, SEPC_LIMIT), c = sepcFacts(C, SEPC_LIMIT);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.tiers[0].limit > c.tiers[0].limit + 5) ? null : `the limit reads ${m.tiers[0].limit} on the mutant against ${c.tiers[0].limit} clean — the trial still drew the curve`; } },
+  { id: 'the-fold-limit-skipped-for-sepals', rows: SEPC_ROWS, why: "the fold limit's table is not handed to a SEPAL's spine (the substate's own-size key marks it), so an S-spine sepal under a cup bends past its cross-section and folds while every petal is held",
+    find: "curve: curveLaw, bend: bend && bend.binds ? bend : null }) : null;",
+    into: "curve: curveLaw, bend: bend && bend.binds && !('bladeLengthMm' in ps) ? bend : null }) : null;", names: ['SP14'],
+    witness: (M, C) => { const m = sepcFacts(M, SEPC_FOLD), c = sepcFacts(C, SEPC_FOLD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.tiers[0].bendClamped === false && c.tiers[0].bendClamped === true) ? null : `the sepal's fold limit reads ${m.tiers[0].bendClamped} on the mutant against ${c.tiers[0].bendClamped} clean`; } },
 
   /* ===== THE APEX NIB (AN0-AN3, the apex-nib session) ===============
      Both STL gates are blind to every one of these: each leaves a
@@ -3044,7 +3075,7 @@ const MUTANTS = [
      values, the spine reset leaving the owned curve, an inherited spine frozen
      at copy time) live in the panel gate's route (aj). */
   { id: 'a-scoped-spine-is-ignored', why: 'the scope\'s owned curl mode and spine curve never reach its petals — every petal bends on the whole bloom\'s spine while the panel shows the layer\'s own',
-    find: '    for (const k of SCOPE_VALUE_IDS) if (k in values) (out || (out = {}))[k] = values[k];', into: '    for (const k of SCOPE_VALUE_GROUPS.outline) if (k in values) (out || (out = {}))[k] = values[k];', names: ['C1', 'C4'], rows: SPS_ROWS,
+    find: '    for (const g of Object.keys(groups)) for (const k of groups[g]) if (k in values) (out || (out = {}))[k] = values[k];', into: '    for (const k of groups.outline) if (k in values) (out || (out = {}))[k] = values[k];', names: ['C1', 'C4'], rows: SPS_ROWS,
     witness: (M, C) => { const m = spPetals(M, SP_LAYER()), c = spPetals(C, SP_LAYER());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.some((p) => p.curve) && c.filter((p) => p.curve).length === 8) ? null : `the mutant's modes ${spModes(m)} (the clean tree's ${spModes(c)})`; } },
@@ -3110,6 +3141,31 @@ function tierFacts(MOD, extra = {}, scopes = null) {
       limit: T.present && T.limit ? T.limit.limitDeg : null, against: T.present && T.limit ? T.limit.against : null, clamped: T.present && T.limit ? !!T.limit.clamped : null,
       length: T.present ? T.built[0].length : null, why: T.why || null, order: T.order ? { fracLaw: T.order.fracLaw, fracBuilt: T.order.fracBuilt, orderClamped: T.order.orderClamped } : null }));
     return { tiers, eligible: MOD.sepalTiersEligible(st), count: S ? S.count : 0 };
+  } catch (e) { return { threw: e.message }; }
+}
+
+/* THE SEPAL CURVE WITNESS (curves-sepals) — the module's own build of a sepal
+   whorl in EXPORT, read off every tier's first sepal: its spine's curve mode,
+   the fold limit's clamp and the drawn angle limit. */
+const SEPC_SC = {
+  reflex: { mode: 'single', points: [[0, 0], [0.5, -0.05], [0.9, -0.3]] },
+  s: { mode: 'single', points: [[0, 0], [0.3, 0.12], [0.6, -0.1], [1, 0.15]] },
+  incurve: { mode: 'single', points: [[0, 0], [0.45, 0.06], [0.8, 0.3], [0.92, 0.55]] },
+};
+const SEPC_REFLEX = { sepalCount: 5, sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.reflex };
+const SEPC_LIMIT = { sepalCount: 5, sepalAngle: 60, sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.incurve };
+const SEPC_FOLD = { sepalCount: 5, sepalCup: 0.6, sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.s };
+const SEPC_TIERS = { set: { sepalCount: 5, sepalTiers: 2, stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40 },
+  scopes: { layers: [], petals: [], tiers: [{ tier: 1, offsets: {}, values: { sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.reflex } }] } };
+function sepcFacts(MOD, extra = {}, scopes = null) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, ...extra };
+    const acc = new MOD.MeshBuilder({ exportMode: true });
+    const b = MOD.buildBloomInto(acc, st, scopes ? { scopes } : {});
+    const S = b.sepals;
+    const tiers = (S && S.tiers ? S.tiers : []).filter((T) => T.present).map((T) => { const sp = T.built[0].spine || {};
+      return { curveMode: !!sp.curveMode, bendClamped: !!sp.bendClamped, limit: T.limit ? T.limit.angleBuiltDeg : null }; });
+    return { tiers };
   } catch (e) { return { threw: e.message }; }
 }
 
@@ -3518,6 +3574,18 @@ const ROWS = [
     set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '3' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }] },
   { label: 'SEPAL TIERS: GATED — four tiers asked with NO stem (hidden and inert, told)', for: TIER_MUTANTS,
     set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '4' }] },
+  /* THE SEPAL CURVES (curves-sepals): a sepal on a drawn reflex with the
+     petals on the sliders, the incurve the angle limit is drawn on, the S under
+     a cup the fold limit binds on, and two tiers on two spines. */
+  { label: 'SEPAL CURVES: 5 sepals on a drawn reflex (the petals on the sliders)', for: SEPC_MUTANTS,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalCurlMode', value: 'CURVE' }, { id: 'sepalSpineCurve', value: JSON.stringify(SEPC_SC.reflex) }] },
+  { label: 'SEPAL CURVES: an incurved sepal asked up at 60 (the limit drawn on the curve)', for: SEPC_MUTANTS,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalAngle', value: '60' }, { id: 'sepalCurlMode', value: 'CURVE' }, { id: 'sepalSpineCurve', value: JSON.stringify(SEPC_SC.incurve) }] },
+  { label: 'SEPAL CURVES: the S x sepal cup 0.6 (the fold limit binds)', for: SEPC_MUTANTS,
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalCup', value: '0.6' }, { id: 'sepalCurlMode', value: 'CURVE' }, { id: 'sepalSpineCurve', value: JSON.stringify(SEPC_SC.s) }] },
+  { label: 'SEPAL CURVES: two tiers — tier 2 owns the reflex, tier 1 on the sliders', for: SEPC_MUTANTS,
+    scopes: { layers: [], petals: [], tiers: [{ tier: 1, offsets: {}, values: { sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.reflex } }] },
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '2' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }] },
   /* THE INFLORESCENCE ROWS (the raceme session). Three, and each exists for a
      statement the other two cannot make.
 

@@ -722,6 +722,27 @@ const PREDICATE_MOVERS = {
      `petalSurface` call, refused unless it matches exactly once; the copy
      carries the module's own imports). Both modes, OR'd. */
   'spine-fold': (st, row) => foldMoverOnBase(st, row),
+  /* THE SEPAL CURVES (curves-sepals — docs/bloom-curves-sepals-outcome.md). A
+     row moves iff some sepal tier the BASE tree builds (its own `sepals.tiers`
+     record — present, not refused) resolves its curl mode or its outline mode
+     to CURVE: the row's own tier entry's value where it owns one, the whole
+     bloom's sepal control otherwise — restated from the CONTROLS and the row's
+     own scopes, never from this tree's resolver. Every row whose sepals are on
+     SLIDER and LAW holds, and so does every row whose PETALS alone are on a
+     curve (the base pinned its sepals to SLIDER / LAW, and the twins' defaults
+     are exactly those). */
+  'sepal-curve': (st, row) => {
+    const b = base.buildBloomInto(new base.MeshBuilder({ exportMode: true }), { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    const S = b.sepals;
+    if (!S) return false;
+    const rs = harness.rowScopes(row);
+    const tiers = (S.tiers || [{ tier: 0, present: S.count > 0 }]).filter((T) => T.present);
+    return tiers.some((T) => {
+      const e = ((rs && rs.tiers) || []).find((x) => x.tier === T.tier && x.values) || null;
+      const val = (id) => (e && id in e.values ? e.values[id] : st[id]);
+      return String(val('sepalCurlMode')) === 'CURVE' || String(val('sepalOutlineMode')) === 'CURVE';
+    });
+  },
   /* THE INDEPENDENT COIL (F1.3a — docs/bloom-stamen-coil-outcome.md): a row
      moves iff the BASE tree's own footRing() builds an androecium on it (so
      SPHERE and count 0 are holders by the base's own record) AND the row asks
@@ -839,9 +860,9 @@ function baseScopes(sc) {
     if (Object.keys(v).length === Object.keys(e.values).length) return e;
     const out = { ...e }; if (Object.keys(v).length) out.values = v; else delete out.values; return out;
   };
-  const layers = (sc.layers || []).map(strip), petals = (sc.petals || []).map(strip);
-  if (layers.every((e, i) => e === sc.layers[i]) && petals.every((e, i) => e === sc.petals[i])) return sc;
-  return { ...sc, layers, petals };
+  const layers = (sc.layers || []).map(strip), petals = (sc.petals || []).map(strip), tiers = (sc.tiers || []).map(strip);
+  if (layers.every((e, i) => e === sc.layers[i]) && petals.every((e, i) => e === sc.petals[i]) && tiers.every((e, i) => e === sc.tiers[i])) return sc;
+  return { ...sc, layers, petals, tiers };
 }
 let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {

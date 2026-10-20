@@ -3821,7 +3821,7 @@ function onSeedSwitch(e) {
   if (!seed || !seed.curve) return;
   inputs[M.curve].value = seed.curve;
   if (scopeView && idsFor(scopeView).has(M.curve)) commitScopeValue(M.curve, seed.curve);
-  const split = seed.split ? ` (position ${seed.split.posMm.toFixed(3)} mm, direction ${seed.split.dirDeg.toFixed(1)}° — a degree counted as a millimetre of blade per radian)` : '';
+  const split = seed.split ? ` (position ${seed.split.posMm.toFixed(3)} mm, direction ${seed.split.dirDeg.toFixed(1)}° — the direction weighed at one millimetre of blade per radian)` : '';
   seedNotes[M.curve] = `SEEDED from ${seed.from} on the switch — ${seed.points} points, ${seed.met ? 'within' : 'NOT within'} the ${seed.tolMm.toFixed(2)} mm tolerance: it departs from it by ${seed.errorMm.toFixed(3)} mm${split}${seed.rotationDeg ? ` (drawn turned ${seed.rotationDeg.toFixed(0)}° so it stays in front of its root; the law lays it back along the blade)` : ''}${seed.clipped ? ' (wider than the box allows — clipped at half the length)' : ''}; a fit, not the slider build to the bit`;
 }
 window.addEventListener('change', onSeedSwitch, true);

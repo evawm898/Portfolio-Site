@@ -1664,6 +1664,28 @@ export const SMOKE_BLOCKS = [
         path: "C5(c) the limit inert one curl step under it, C3 unclamped" },
     ],
   },
+  {
+    n: 72, title: 'the sepal\'s own curves (curves-sepals, Oct 20)',
+    anchor: 'SEPAL CURVES: 5 sepals on a drawn REFLEXED spine (sepal Curl from CURVE — the sepal slider family hidden and inert)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block adds is the
+       sepal's four VALUE twins reaching the petal builder through
+       `sepalBladeState` (the pins to SLIDER / LAW removed), a tier owning them
+       through `tierOffsetsFor` / `sepalTierState` (the one resolver), and the
+       angle scan drawing its limit on the curved trial lamina. The anchor is
+       the block's first row (the reflexed spine); the asymmetric outline, the
+       two tiers on two curves, and the curved sepal at its angle limit are the
+       brief's four smoke rows. --conn is REQUIRED (a curve re-bends and
+       re-draws every sepal blade). */
+    conn: true,
+    rows: [
+      { label: 'SEPAL CURVES: 5 sepals on an ASYMMETRIC outline (two halves; every sepal the same hand — the pinwheel)',
+        path: "SP14(a)/(d) per half: the outline mode two ways and the emitted half-widths against the curve restated at the sepal's own width scale, SP6/SP12 skipping the value twins" },
+      { label: 'SEPAL CURVES: two tiers on two outlines — tier 1 the lanceolate, tier 2 the rounded on the reflexed spine (a 40 mm GOBLET hub)',
+        path: "SP14 per tier against the row's own tier values (a curve that leaks to another tier fires), SP10-SP13 on two tiers" },
+      { label: 'SEPAL CURVES: an INCURVED sepal asked up at 60 — the angle limit DRAWN ON THE CURVED LAMINA (clamped to 0; the straight sepal stops at 21)',
+        path: "SP8 the harness's own contact test on the curved sepal at the built angle and one step above, SP14(b) the incurve on the emitted rows" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
