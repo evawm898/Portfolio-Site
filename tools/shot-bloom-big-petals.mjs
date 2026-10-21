@@ -49,10 +49,10 @@ const sha = (buf) => crypto.createHash('sha1').update(buf).digest('hex').slice(0
    frame's) own fit radius; `root` is a macro on the petal at azimuth 0, seen
    along its width (-y), centred on its root. */
 const VIEWS = {
-  side: (f) => ({ r: f.fit * 1.05, at: [0, 0, f.fit * 0.2], dir: [0.15, -0.9, 0.4] }),
+  side: (f) => ({ r: Math.max(f.fit, f.across / 2) * 1.08, at: [0, 0, f.across * 0.1], dir: [0.15, -0.9, 0.4] }),
   below: (f) => ({ r: f.R * 2.2 + 6, at: [0, 0, 0], dir: [0.05, -0.12, -1] }),
-  root: (f) => ({ r: 9, at: [f.R + 4, 0, 1], dir: [0, -1, 0.06] }),
-  whole: (f) => ({ r: f.fit * 1.05, at: [0, 0, f.fit * 0.1], dir: [0.2, -0.6, 0.78] }),
+  root: (f) => ({ r: 11, at: [f.R + 6, 0, 2.5], dir: [0, -1, 0.06] }),
+  whole: (f) => ({ r: Math.max(f.fit, f.across / 2) * 1.08, at: [0, 0, f.across * 0.05], dir: [0.2, -0.6, 0.78] }),
 };
 
 async function setPreview(on) {
