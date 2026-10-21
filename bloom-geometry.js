@@ -5034,7 +5034,7 @@ export function outlineTwoSided(state) {
   return !!v && v.mode === 'two-sided';
 }
 function outlineTwoSidedFor(state, cap) {
-  return outlineTwoSided(state) && !(cap && (cap.petiole || cap.chevron || cap.stalk));
+  return outlineTwoSided(state) && !(cap && (cap.chevron || cap.stalk));
 }
 /* v > 0 is LEFT (see above). The one statement of the side convention. */
 export const sideOfV = (v) => (v > 0 ? 'left' : 'right');
@@ -5114,7 +5114,11 @@ function widthProfileOne(state, ring, halfW, cap, acc, length = null, outlineSid
      ladder reads this profile (a circle a declared station breaks). The LAW is
      written out here rather than read off the closures below, because in
      CURVE mode `uPkRaw` is the curve's peak and the LAW's own is a / (a + b). */
-  const curveOn = outlineIsCurve(state) && !(cap && (cap.petiole || cap.chevron || cap.stalk));
+  /* (curves-leaves) A LEAF BLADE takes the curve too — the simple blade and
+     every compound leaflet (`cap.petiole`); their states pin LAW unless the
+     leaf's own twin asks for CURVE, and the LOBED blade's state pins LAW
+     (`lobedBladeState`). The chevron and the claw's stalk keep their laws. */
+  const curveOn = outlineIsCurve(state) && !(cap && (cap.chevron || cap.stalk));
   const tubeLaw = curveOn && cap && cap.tubeLobe ? (() => {
     const uPkL = a / (a + b), gPkL = Math.pow(uPkL, a) * Math.pow(1 - uPkL, b), nL = state.petalTipShape;
     const at = (u) => {
@@ -5583,7 +5587,12 @@ function widthProfileOne(state, ring, halfW, cap, acc, length = null, outlineSid
     /* THE FRINGE WINS. Hidden in the registry, INERT here — and inert means
        the lobe record is never constructed at all, so nothing downstream can
        read a cut that the outline does not carry. */
-    if (!lobesEligible(state) || !lobesEngaged(state)) return null;
+    /* (curves-leaves) A LEAF'S TEETH STAY ON UNDER A DRAWN OUTLINE (Eva's
+       ruling, Oct 20 — "only petals turn teeth off"): on a petiole blade the
+       drawn outline does not stand the lobes down; they are cut into it by
+       every rule below unchanged. A LAW leaf reads the same predicate it
+       always did (`lobesEligible` is `!fringeEngaged` there), by branch. */
+    if (!(petiole && outline ? !fringeEngaged(state) : lobesEligible(state)) || !lobesEngaged(state)) return null;
     if (!(length > 0)) throw new Error('widthProfile: a lobed outline needs the blade LENGTH in mm to station its lobes on the lamina — pass it');
     const coverage = state.lobeCoverage === undefined ? LOBE_COVERAGE_DEFAULT : Number(state.lobeCoverage);
     const crestShape = state.lobeCrestShape === undefined ? LOBE_SHAPE_DEFAULT : Number(state.lobeCrestShape);
@@ -8090,7 +8099,12 @@ function seedSliderSpine(state, L) {
 /* `lengthsMm`: the asked lengths of every petal the switch reaches — no seed
    the editor's own validator would refuse at any of them is ever written (a
    tight kink near the root that the floor would clamp is not a fit). */
-export function seedSpineCurve(state, askedLengthMm, { tolMm = SEED_FIT_TOL_MM, lengthsMm = null } = {}) {
+/* `bends` (curves-leaves): the fold-limit tables of the blades the switch
+   reaches, `{ askedLengthMm, table }` as the editor's validator receives them —
+   a candidate the fold limit would clamp is no fit, exactly as one the floor
+   would clamp is not (the outcome doc's claim, which the first version made
+   and did not implement: it asked the floor alone). */
+export function seedSpineCurve(state, askedLengthMm, { tolMm = SEED_FIT_TOL_MM, lengthsMm = null, bends = null } = {}) {
   const L = Number(askedLengthMm);
   const Ls = [L, ...((lengthsMm || []).filter((x) => x > 0))];
   const floorRadius = spineCurveFloorRadiusMm(state);
@@ -8139,11 +8153,17 @@ export function seedSpineCurve(state, askedLengthMm, { tolMm = SEED_FIT_TOL_MM, 
   const Lmin = Math.min(...Ls), kFloor = 1 / floorRadius;
   /* `bound`: the search only asks whether a candidate beats the error in hand,
      so the walk stops the moment it cannot */
+  /* WHICH BAR STOPPED A CANDIDATE, counted (curves-leaves): the read-out names
+     the constraint when the tolerance is not reached, and a count is what lets
+     it say the floor or the fold limit rather than guess. */
+  const barred = { floor: 0, fold: 0 };
+  const foldBars = (bends || []).filter((b) => b && b.table && b.table.binds);
   const polyErr = (pts, bound = Infinity) => {
     const cl = spineCurveLaw({ mode: 'single', points: pts }, L);
     /* the validator's own bar (spineCurveRefusal's: the peak at every asked
        length, the shortest the tightest) — a candidate past it is no fit */
-    if (cl.peakKmm * (L / Lmin) > kFloor) return Infinity;
+    if (cl.peakKmm * (L / Lmin) > kFloor) { barred.floor++; return Infinity; }
+    if (foldBars.length && spineBendRefusal({ mode: 'single', points: pts }, foldBars) !== null) { barred.fold++; return Infinity; }
     let phi = 0, x = 0, y = 0, e = 0;
     const ds = L / STEPS;
     for (let i = 0; i < STEPS; i++) {
@@ -8167,26 +8187,62 @@ export function seedSpineCurve(state, askedLengthMm, { tolMm = SEED_FIT_TOL_MM, 
   const arcM = [0];
   for (let i = 1; i <= SEED_SAMPLES; i++) arcM.push(arcM[i - 1] + Math.hypot(norm[i][0] - norm[i - 1][0], norm[i][1] - norm[i - 1][1]));
   const at = (frac) => { const T = arcM[SEED_SAMPLES] * frac; let i = 0; while (i < SEED_SAMPLES && arcM[i + 1] < T) i++; return Math.min(SEED_SAMPLES, i + (arcM[i + 1] - T < T - arcM[i] ? 1 : 0)); };
-  let best = null;
+  let best = null, prevN = null;
   for (let n = SPINE_CURVE_SPEC.points[0]; n <= SPINE_CURVE_SPEC.points[1]; n++) {
     /* two starts: even in arc, and denser toward the two ends (Catmull-Rom's
        mirrored end phantom starts the drawn curve along its first CHORD, which
        the law lays along the blade, so the end spans carry the error) */
+    const starts = [];
     for (const spacing of [(f) => f, (f) => (1 - Math.cos(Math.PI * f)) / 2]) {
       const idx = Array.from({ length: n }, (_, j) => (j === 0 ? 0 : j === n - 1 ? SEED_SAMPLES : at(spacing(j / (n - 1)))));
-      const start = idx.map((i) => (i === 0 ? [0, 0] : [curveQuantise(norm[i][0]), curveQuantise(norm[i][1])]));
+      starts.push(idx.map((i) => (i === 0 ? [0, 0] : [curveQuantise(norm[i][0]), curveQuantise(norm[i][1])])));
+    }
+    /* AND A CONTINUATION (curves-leaves, the seed-fit fix): the previous count's
+       BEST fit with one point inserted at the midpoint of its LAST span, and of
+       its FIRST — the two end spans the mirrored phantoms leave too straight.
+       The two fresh starts are read off the target and searched from scratch at
+       every count, so a count that needs a point placed where neither spacing
+       puts one was never tried: measured on the default 35 mm petal at curl
+       120, the search sat at 0.112 mm (10 points) in BOTH modes — the mode was
+       never the cause — and 11 and 12 points fitted WORSE than 10. From the
+       continuation it reads 0.092 mm at 9. */
+    if (prevN && prevN.length === n - 1) {
+      for (const j of [prevN.length - 2, 0]) {
+        const q = prevN.map((p) => p.slice());
+        q.splice(j + 1, 0, [curveQuantise((prevN[j][0] + prevN[j + 1][0]) / 2), curveQuantise((prevN[j][1] + prevN[j + 1][1]) / 2)]);
+        starts.push(q);
+      }
+    }
+    let bestN = null;
+    for (const start of starts) {
       if (curveShapeRefusal({ mode: 'single', points: start }, SPINE_CURVE_SPEC)) continue;
       /* a straight spine needs no search */
       const free = [];
       if (polyErr(start) > tolMm / 4) for (let i = 1; i < n; i++) free.push([i, 0], [i, 1]);
       const fit = seedPatternSearch(start, free, polyErr, SPINE_CURVE_SPEC);
+      if (!Number.isFinite(fit.errorMm)) continue;
       const curve = { mode: 'single', points: fit.points };
       const e = lawErr(curve);
-      if (!best || e < best.errorMm) best = { curve, errorMm: e, points: n, split: lastSplit };
+      if (!bestN || e < bestN.errorMm) bestN = { curve, errorMm: e, points: n, split: lastSplit };
     }
+    if (bestN) { prevN = bestN.curve.points; if (!best || bestN.errorMm < best.errorMm) best = bestN; }
     if (best && best.errorMm <= tolMm) break;
   }
-  return { ...best, tolMm, met: best.errorMm <= tolMm, rotationDeg: rot / D2R, shrunk: k < 1, from: Number(state.petalSpineCurl) === 0 ? 'a straight spine' : 'the slider spine' };
+  if (!best) {
+    /* nothing the bars admit at any count — the straight spine, told */
+    const curve = { mode: 'single', points: [[0, 0], [1, 0]] };
+    best = { curve, errorMm: lawErr(curve), points: 2, split: lastSplit };
+  }
+  const met = best.errorMm <= tolMm;
+  /* THE CONSTRAINT THAT STOPPED IT, BY NAME (curves-leaves): the fold limit or
+     the print floor where either barred a candidate on the way (the curve the
+     sliders draw would be clamped as a curve, so the fit cannot follow it
+     there), else the point cap — every count the spec allows was tried. */
+  const constraint = met ? null
+    : barred.fold ? 'the fold limit'
+    : barred.floor ? 'the print floor'
+    : `the point cap (${SPINE_CURVE_SPEC.points[1]} points)`;
+  return { ...best, tolMm, met, constraint, barred: { ...barred }, rotationDeg: rot / D2R, shrunk: k < 1, from: Number(state.petalSpineCurl) === 0 ? 'a straight spine' : 'the slider spine' };
 }
 /* THE LAW OUTLINE'S CORE HALF-WIDTH (what CURVE mode replaces): the base taper
    below the derived widest point, the tip law above it — widthProfile's own
@@ -14239,7 +14295,10 @@ export function leafNodeLayout(state, stemLengthMm) {
      arc, the terminal on its stalk and every lateral leaflet's tip, each from
      its own station — `compoundLeafRiseMm`, the one owner, and a BRANCH, so a
      simple leaf takes the arch law verbatim. */
-  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));
+  /* (curves-leaves) A DRAWN SPINE reaches the inset too: `leafBladeRiseMm`
+     is the arch law VERBATIM in SLIDER mode and the drawn spine's own rise in
+     CURVE mode; the compound tree reads its drawn rachis. */
+  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg);
   const insetAskedMm = LEAF_NODE_TOP * stemLengthMm;
   const insetNeededMm = Math.max(0, rise);
   const insetMm = Math.max(insetAskedMm, insetNeededMm);
@@ -15699,6 +15758,194 @@ export function leafArchRiseMm(lengthMm, angleDeg, archDeg) {
   for (const c of [-Math.PI, 0, Math.PI]) if (c > lo && c < hi && z(c) > best) best = z(c);
   return best;
 }
+/* ===================================================================
+   THE LEAF CURVES (curves-leaves, Oct 20 — Eva's rulings; read
+   docs/bloom-curves-leaves-outcome.md before touching any of it).
+
+   A LEAF TAKES BOTH CURVES, through the PETAL's own laws, by TWINS: the
+   spine curve (`leafCurlMode` / `leafSpineCurve`) wherever `leafArch` reaches
+   today — the simple blade, the LOBED blade and the compound RACHIS — and the
+   outline curve on the SIMPLE blade (`leafOutlineMode` / `leafOutlineCurve`)
+   and on every compound LEAFLET (`leafletOutlineMode` / `leafletOutlineCurve`,
+   ONE curve shared by every leaflet, the terminal included, each scaled to its
+   own size — the sepal precedent; a placement made without a ruling). The
+   LOBED blade keeps its own law: its outline mode is hidden and inert, and
+   `lobedBladeState` pins LAW.
+
+   ONE TABLE, the `SEPAL_TWINS` shape: each row names the petal control the law
+   reads, the leaf twin that stands in for it, which blade it reaches, and the
+   value a state that predates the twin builds through (SLIDER, LAW, the
+   default curves) — so every stored set builds through the expression it
+   built through, BY BRANCH. The registry generates its rows from this table
+   (`leafCurveTwinControls`), never by hand.
+
+   THE SIGN, STATED ONCE: a drawn leaf spine is the leaf SEEN FROM THE SIDE,
+   its root at the left, x along the blade and y UP. A curve that FALLS toward
+   the tip draws a leaf whose tip falls — the same bend a POSITIVE `leafArch`
+   makes. That is the petal's own curve convention (positive y curls a petal's
+   tip up and in), and it is the ARCH SLIDER that is the odd one out: `leafArch`
+   positive turns the tip DOWN, so `leafBladeState` hands the spine law
+   `-leafArch` while the drawn curve goes through UNNEGATED. The seed fits the
+   curve to the spine the slider draws (through that negation), so a switch
+   from any arch value lands on the same bend. */
+export const LEAF_SPINE_CURVE_DEFAULT = Object.freeze({ mode: 'single', points: [[0, 0], [0.5, -0.04], [1, -0.17]] });
+/* the default outlines, each the twin's LAW shape drawn once at its own
+   reference blade: the simple leaf's lanceolate at a 40 mm length and the
+   17 mm reference width, the leaflet's ovate at the 26 x 17 mm reference
+   leaflet. A switch SEEDS from the law on screen instead; these are what a
+   state carrying no curve builds. */
+export const LEAF_OUTLINE_CURVE_DEFAULT = Object.freeze({ mode: 'symmetric', points: [[0, 0.05], [0.15, 0.15], [0.425, 0.2125], [0.7, 0.155], [0.9, 0.065], [1, 0]] });
+export const LEAFLET_OUTLINE_CURVE_DEFAULT = Object.freeze({ mode: 'symmetric', points: [[0, 0.08], [0.12, 0.25], [0.4, 0.327], [0.7, 0.25], [0.9, 0.11], [1, 0]] });
+export const LEAF_CURVE_TWINS = Object.freeze([
+  Object.freeze({ petal: 'petalCurlMode', leaf: 'leafCurlMode', blade: 'leaf', rest: 'SLIDER' }),
+  Object.freeze({ petal: 'petalSpineCurve', leaf: 'leafSpineCurve', blade: 'leaf', rest: LEAF_SPINE_CURVE_DEFAULT }),
+  Object.freeze({ petal: 'petalOutlineMode', leaf: 'leafOutlineMode', blade: 'leaf', rest: 'LAW' }),
+  Object.freeze({ petal: 'petalOutlineCurve', leaf: 'leafOutlineCurve', blade: 'leaf', rest: LEAF_OUTLINE_CURVE_DEFAULT }),
+  Object.freeze({ petal: 'petalOutlineMode', leaf: 'leafletOutlineMode', blade: 'leaflet', rest: 'LAW' }),
+  Object.freeze({ petal: 'petalOutlineCurve', leaf: 'leafletOutlineCurve', blade: 'leaflet', rest: LEAFLET_OUTLINE_CURVE_DEFAULT }),
+]);
+/* the twin's value, verbatim, or the value it stood at before the twin
+   existed — the one reader (`sepalTwinValue`'s value arm) */
+export function leafTwinValue(state, leafId) {
+  const row = LEAF_CURVE_TWINS.find((r) => r.leaf === leafId);
+  if (!row) throw new Error(`leafTwinValue: ${leafId} is not a leaf curve twin`);
+  const v = state[leafId];
+  return v === undefined || v === null ? row.rest : v;
+}
+/* THE GEOMETRY'S STATEMENTS of the three modes (the registry's are
+   `leafCurlFromCurve` / `leafOutlineFromCurve` / `leafletOutlineFromCurve`;
+   LF37 compares them per row). */
+export function leafCurlIsCurve(state) { return leafTwinValue(state, 'leafCurlMode') === 'CURVE'; }
+export function leafOutlineIsCurve(state) { return leafTwinValue(state, 'leafOutlineMode') === 'CURVE'; }
+export function leafletOutlineIsCurve(state) { return leafTwinValue(state, 'leafletOutlineMode') === 'CURVE'; }
+/* THE WIDTH SCALE (Eva's requirement: "the reference is the leaf's own width
+   default"). A drawn outline's y are FRACTIONS OF THE BLADE'S OWN LENGTH; the
+   petal's scale is `petalWidth / 16`, 16 mm its width default. The simple
+   leaf's is `leafWidth / LEAF_WIDTH_DEFAULT`, 17 mm — a BRANCH at 17, so the
+   curve is drawn as it stands at the default width. A leaflet's is the curve
+   read as drawn for the REFERENCE LEAFLET (`LEAFLET_LENGTH_DEFAULT` x
+   `LEAFLET_WIDTH_DEFAULT`, 26 x 17 mm) laid across the leaflet's own length
+   at its own width — `(W / L) / (17 / 26)`, the sepal's
+   `sepalOutlineWidthScale` one organ over — so the terminal (30 x 19) is drawn
+   at 0.969 of the laterals' aspect and every basal pair at the ratio its
+   ramp gives it. */
+export function leafOutlineWidthScale(state) {
+  const w = Number(state.leafWidth);
+  return w === LEAF_WIDTH_DEFAULT ? 1 : w / LEAF_WIDTH_DEFAULT;
+}
+export function leafletOutlineWidthScale(lengthMm, widthMm) {
+  const r = (Number(widthMm) / Number(lengthMm)) / (LEAFLET_WIDTH_DEFAULT / LEAFLET_LENGTH_DEFAULT);
+  return r === 1 ? 1 : r;
+}
+/* THE LEAF'S DRAWN SPINE — ONE OWNER for every blade a leaf spine curve
+   reaches (the simple blade, the LOBED blade): the petal's own curve arm of
+   `spineLaw`, handed curl 0 / bias 0 / start 0 so the spine IS the curve, on
+   the blade's ASKED length (the curve scaled so its arc length is the
+   slider's), laid with its first chord along the leaf's angle, at the mode's
+   floor (one sheet thickness of radius — the petal's `spineLaw` floor, clamped
+   and told), WITH THE FOLD LIMIT: `reachAt(u)` is how far the blade's own
+   cross-section reaches toward each side of the bend, read off the section
+   the rows emit (the petal's `bendReachAt`), so a drawn spine never bends a
+   cupped leaf through itself. Null where the leaf's spine is the slider's —
+   every arch that shipped is built by the expressions it was, by branch. */
+export function leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt = null }) {
+  if (!form || form.spineCurve === null || form.spineCurve === undefined) return null;
+  const curveLaw = spineCurveLaw(form.spineCurve, Lmm);
+  const floorRadius = ROLL_MIN_RADIUS_FACTOR * t;
+  const bend = reachAt ? spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t }) : null;
+  const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius, rows: nu, curve: curveLaw, bend: bend && bend.binds ? bend : null });
+  return { curveLaw, bend, law, floorRadius };
+}
+/* THE FOLD LIMIT'S REACH for a leaf blade — the cross-section at u in a unit
+   frame (quiet: no fold-clamp record), its extent along the row's normal on
+   each side over the mesh's own NV columns. A leaf carries no twist and no
+   roll, so the normal is the section's own N. One-sided and two-sided blades
+   alike: an asymmetric blade's two halves are each asked. */
+function leafBendReachAt(form, prof) {
+  const O3 = [0, 0, 0], X3 = [1, 0, 0], Y3 = [0, 1, 0];
+  const halves = prof.twoSided ? [[prof.side(1), 1], [prof.side(-1), -1]] : [[prof, 1]];
+  return (u) => {
+    let pos = 0, neg = 0;
+    for (const [P, sd] of halves) {
+      const h = leafHalfAt(P, u), hb = leafHalfBaseAt(P, u);
+      const sect = form.sectAt(O3, X3, Y3, h, u, hb, P.onNib(u) ? hb / TIP_HALF_MM : 1, sd, true);
+      for (let j = 0; j < NV; j++) {
+        const v = -1 + (2 * j) / (NV - 1);
+        if (prof.twoSided && (v > 0 ? 1 : -1) !== sd) continue;
+        const d = sect(v).P[1];
+        if (d > pos) pos = d;
+        if (-d > neg) neg = -d;
+      }
+    }
+    return { pos, neg };
+  };
+}
+/* HOW HIGH A LEAF WITH A DRAWN SPINE RISES OVER ITS OWN ROOT — the inset's
+   input in CURVE mode, read off the SPINE THE EXPORT BUILD DRAWS (the fold
+   limit and the print floor included), so the node depths stay mode-free by
+   declaration: the print is what the inset protects. The maximum height of the
+   spine's centreline over its substeps (the inset's pre-existing
+   approximation, unchanged: no petiole, no blade width). The arch slider's
+   law is `leafArchRiseMm`, called verbatim by the caller. */
+const LEAF_RISE_CACHE = new WeakMap();
+export function leafCurveRiseMm(state, lengthMm, angleDeg) {
+  let per = LEAF_RISE_CACHE.get(state);
+  const key = `${lengthMm}|${angleDeg}`;
+  if (per && per.has(key)) return per.get(key);
+  const acc = new MeshBuilder({ exportMode: true });
+  const th = (Number(angleDeg) * Math.PI) / 180;
+  let spine;
+  if (leafIsLobed(state)) {
+    const LL = lobedLaws(acc, { lengthMm }, state);
+    const reach = LL.form ? lobedBendReachAt(LL.form, LL.profE) : null;
+    spine = leafSpineCurveLaw({ form: LL.form, Lmm: lengthMm, th, t: LL.t, nu: LL.nu, reachAt: reach });
+  } else {
+    const bs = leafBladeState({ ...state, leafLength: lengthMm });
+    const { form, nu, prof, t } = leafBladeLaw(acc, bs, Number(state.leafWidth), lengthMm, state.sheetThickness);
+    spine = leafSpineCurveLaw({ form, Lmm: lengthMm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null });
+  }
+  let best = 0;
+  if (spine) for (let i = 0; i <= spine.law.substeps; i++) { const q = spine.law.at((lengthMm * i) / spine.law.substeps); if (q.dZ > best) best = q.dZ; }
+  else best = lengthMm * Math.sin(th);
+  if (!per) { per = new Map(); LEAF_RISE_CACHE.set(state, per); }
+  per.set(key, best);
+  return best;
+}
+/* the inset law's one entry for a simple or lobed leaf: the drawn spine's rise
+   in CURVE mode, the arch law VERBATIM otherwise (a branch) */
+export function leafBladeRiseMm(state, lengthMm, angleDeg) {
+  return leafCurlIsCurve(state) ? leafCurveRiseMm(state, lengthMm, angleDeg) : leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));
+}
+/* A SPINE'S ARC REACH — how far along the drawn spine an emitted point stands,
+   each point footed on the spine's own polyline (its substep stations) in the
+   leaf's (radial, up) plane: the arc analogue of the arch's circle-foot, for a
+   spine with no closed form. SN4's measured side on a curve. */
+function spineArcReachMm(P, from, bb, R, law, Lmm) {
+  const M = law.substeps;
+  const xs = new Float64Array(M + 1), zs = new Float64Array(M + 1), ss = new Float64Array(M + 1);
+  for (let i = 0; i <= M; i++) { const s = (Lmm * i) / M, q = law.at(s); xs[i] = q.dR; zs[i] = q.dZ; ss[i] = s; }
+  let best = -Infinity;
+  for (let k = from; k < P.length; k += 3) {
+    const dx = P[k] - bb[0], dy = P[k + 1] - bb[1], dz = P[k + 2] - bb[2];
+    const a = dx * R[0] + dy * R[1], z = dz;
+    let bd = Infinity, bi = 0;
+    for (let i = 0; i < M; i++) {
+      const ex = xs[i + 1] - xs[i], ez = zs[i + 1] - zs[i], L2 = ex * ex + ez * ez;
+      let f = L2 > 0 ? ((a - xs[i]) * ex + (z - zs[i]) * ez) / L2 : 0;
+      f = f < 0 ? 0 : f > 1 ? 1 : f;
+      const d = Math.hypot(a - (xs[i] + ex * f), z - (zs[i] + ez * f));
+      if (d < bd) { bd = d; bi = i; }
+    }
+    /* then ON THE LAW'S OWN ARC over the bracketing substeps — the polyline's
+       chord foots a point a few nanometres short of where the arc does */
+    const dist = (sv) => { const q = law.at(sv); return Math.hypot(a - q.dR, z - q.dZ); };
+    let lo = ss[Math.max(0, bi - 1)], hi = ss[Math.min(M, bi + 2)];
+    for (let it = 0; it < 80 && hi - lo > 1e-13; it++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (dist(m1) <= dist(m2)) hi = m2; else lo = m1; }
+    const bs = (lo + hi) / 2;
+    if (bs > best) best = bs;
+  }
+  return best;
+}
 /* The leaf's own outline: a LANCEOLATE blade, widest below the middle. Fixed
    rather than inherited — see leafBladeState's own note. */
 export const LEAF_BASE_TAPER = 0.85, LEAF_TIP_TAPER = 1.15;
@@ -16356,8 +16603,15 @@ export function leafBladeState(state) {
     petalCupGradient: 0, petalTwist: 0, petalRoll: 0, petalRollTaper: 0,
     petalSpineCurl: state.leafArch === undefined || Number(state.leafArch) === 0 ? 0 : -Number(state.leafArch),
     curlBias: 0, curlStart: 0, buckleAmp: 0,
-    petalCurlMode: 'SLIDER',   // the spine curve is the PETALS' (F3-global); leaves get curve mode in their own session (Q4.5)
-    petalOutlineMode: 'LAW',   // the outline curve is the PETALS' (F6-sym); leaves get outline curves in their own session (Q6.7)
+    /* THE LEAF'S OWN CURVES (curves-leaves): the modes and curves are the
+       LEAF's twins (`LEAF_CURVE_TWINS`), mapped onto the petal names the laws
+       read — the petal's own modes never reach a leaf. A state that predates
+       the twins builds SLIDER and LAW, the values the leaf was pinned to, by
+       branch. The drawn spine goes through UNNEGATED (see the twin table's
+       note on the sign); the drawn outline at the leaf's own width scale. */
+    petalCurlMode: leafTwinValue(state, 'leafCurlMode'), petalSpineCurve: leafTwinValue(state, 'leafSpineCurve'),
+    petalOutlineMode: leafTwinValue(state, 'leafOutlineMode'), petalOutlineCurve: leafTwinValue(state, 'leafOutlineCurve'),
+    ...(leafOutlineIsCurve(state) ? { outlineWidthScaleOwn: leafOutlineWidthScale(state) } : {}),
     petalTilt: 0, tipThinning: 0,
   };
 }
@@ -16427,6 +16681,18 @@ function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
 export function leafHalfAt(prof, u) { return prof.onNib(u) ? prof.halfWidthBaseAt(u) : Math.max(prof.halfWidthAt(u), TIP_HALF_MM); }
 export function leafHalfBaseAt(prof, u) { return prof.onNib(u) ? prof.halfWidthBaseAt(u) : Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM); }
 function leafRowSect(prof, form, C, T, N, u) {
+  /* AN ASYMMETRIC DRAWN OUTLINE (curves-leaves): each half from its own side
+     of the profile — v > 0 the LEFT half (`sideOfV`: seen from the upper face,
+     base at the bottom), v < 0 the right — about the unchanged midrib, the
+     petal's `twoRowAt` one organ over. `h` and `hb` are NULL on such a row: a
+     reader that assumes one half-width must ask for `hL` / `hR` by name. */
+  if (prof.twoSided) {
+    const PL = prof.side(1), PR = prof.side(-1);
+    const hL = leafHalfAt(PL, u), hR = leafHalfAt(PR, u), hbL = leafHalfBaseAt(PL, u), hbR = leafHalfBaseAt(PR, u);
+    const sL = form ? form.sectAt(C, T, N, hL, u, hbL, PL.onNib(u) ? hbL / TIP_HALF_MM : 1, 1) : (v) => ({ P: [C[0] + T[0] * hL * v, C[1] + T[1] * hL * v, C[2] + T[2] * hL * v], n: N });
+    const sR = form ? form.sectAt(C, T, N, hR, u, hbR, PR.onNib(u) ? hbR / TIP_HALF_MM : 1, -1) : (v) => ({ P: [C[0] + T[0] * hR * v, C[1] + T[1] * hR * v, C[2] + T[2] * hR * v], n: N });
+    return { h: null, hb: null, hL, hR, hbL, hbR, sect: (v) => (v > 0 ? sL(v) : sR(v)) };
+  }
   const h = leafHalfAt(prof, u);
   const hb = leafHalfBaseAt(prof, u);
   const sect = form
@@ -16475,10 +16741,20 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
      LEAF's own row count, never the module's `NU`, which the petals ramp:
      #303's coupling, refused a second time. */
   const kC = form ? form.curlRad / Lmm : 0;
-  const law = kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
+  /* THE DRAWN SPINE (curves-leaves): in CURVE mode `petalForm`'s curlRad is 0
+     by its one read, so `kC` is 0 and the spine is the curve's law
+     (`leafSpineCurveLaw`, the one owner, with the fold limit); a branch taken
+     FIRST, so every slider leaf runs the two arms below as they were. */
+  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null });
+  const law = spine ? spine.law : kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
   const rowAt = (u) => {
     let C, fr, phi = th;
-    if (kC === 0) {
+    if (spine) {
+      const q = spine.law.at(u * Lmm);
+      phi = q.phi;
+      C = [bb[0] + R[0] * q.dR, bb[1] + R[1] * q.dR, bb[2] + q.dZ];
+      fr = form.frameAt(R, T, phi, u);
+    } else if (kC === 0) {
       fr = form ? form.frameAt(R, T, th, u) : { D: D0, T, N: [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)] };
       C = [bb[0] + fr.D[0] * u * Lmm, bb[1] + fr.D[1] * u * Lmm, bb[2] + fr.D[2] * u * Lmm];
     } else {
@@ -16488,10 +16764,10 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
       C = [bb[0] + R[0] * dAlong, bb[1] + R[1] * dAlong, bb[2] + dAcross];
       fr = form.frameAt(R, T, phi, u);
     }
-    const { h, hb, sect } = leafRowSect(prof, form, C, fr.T, fr.N, u);
-    return { u, h, hb, C, D: fr.D, T: fr.T, N: fr.N, phi, sect };
+    const { h, hb, hL, hR, hbL, hbR, sect } = leafRowSect(prof, form, C, fr.T, fr.N, u);
+    return prof.twoSided ? { u, h, hb, hL, hR, hbL, hbR, C, D: fr.D, T: fr.T, N: fr.N, phi, sect } : { u, h, hb, C, D: fr.D, T: fr.T, N: fr.N, phi, sect };
   };
-  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, rowAt };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, spine, rowAt };
 }
 
 /* THE DIRECTED-EDGE CENSUS over the triangles emitted since `tris0`. */
@@ -16524,13 +16800,20 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
      emitPanel for the emitted skin lattice the fold clauses read. Null for
      every other blade, which then takes every line below as before.) */
   const rows = [], rowHalfBaseMm = [], rowHalfMm = [], rowCentre = [], rowNormal = [], rowMarginLiftMm = [], rowMarginAcrossMm = [];
+  /* AN ASYMMETRIC DRAWN OUTLINE (curves-leaves): the half-width lists carry
+     the LEFT half (`sideOfV`) and the right half rides beside them, so every
+     reader of one half-width reads a named half — never one half drawn on both
+     margins. Null on every symmetric blade. */
+  const two = !!prof.twoSided;
+  const rowHalfBaseRightMm = two ? [] : null, rowHalfRightMm = two ? [] : null;
   const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const stations = opts && opts.stations ? opts.stations : null;
   for (let i = 0; i <= nu; i++) {
     const row = rowAt(stations ? stations[i] : i / nu);
     rows.push(row);
-    rowHalfBaseMm.push(row.hb);
-    rowHalfMm.push(row.h);
+    rowHalfBaseMm.push(two ? row.hbL : row.hb);
+    rowHalfMm.push(two ? row.hL : row.h);
+    if (two) { rowHalfBaseRightMm.push(row.hbR); rowHalfRightMm.push(row.hR); }
     rowCentre.push(row.C);
     rowNormal.push(row.N);
     /* THE CUP AS THE SURFACE CARRIES IT — the lift of each margin's mid-surface
@@ -16574,7 +16857,7 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
      clears the floor) it is the stub's record term for term. A LENGTH derived
      from a length: the station times the leaf's own length. */
   const tipProf = (opts && opts.tipProf) || prof;
-  const tipClamp = (() => {
+  const tipClampOf = (tipProf) => {
     let lo = tipProf.uPk, hi = 1;
     if (!(tipProf.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
     else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (tipProf.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
@@ -16584,14 +16867,21 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
     return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * Lmm, terminalMm, ofWidth: terminalMm / widthMm,
       nib, startU: nib ? ap.uLaw : null, startHalfMm: nib ? ap.startHalfMm : null, regime: nib ? ap.regime : null, kinkDeg: nib ? ap.kinkDeg : null,
       arcU: nib ? ap.arcU : null, radiusMm: nib ? ap.radiusMm : null, slope: nib ? ap.slope : null };
-  })();
+  };
+  /* (an asymmetric blade: each half's own nib — the LEFT half's record stands
+     for the blade, both halves ride under `sides`) */
+  const tipClamp = two
+    ? { ...tipClampOf(prof.side(1)), twoSided: true, sides: { left: tipClampOf(prof.side(1)), right: tipClampOf(prof.side(-1)) } }
+    : tipClampOf(tipProf);
   /* THE SERRATION AS BUILT — the lobe record the outline was cut from, with
      the relief the OUTLINE carries at every margin sinus (base minus drawn
      half-width, at the sinus station the record declares). LF13's measured
      side: a floor applied to the record and not to the cut shows as these
      disagreeing with it. */
+  const serrationOf = (P, rowHalfBaseMm, rowHalfMm) => {
+  const prof = P;
   const L0 = prof.lobes;
-  const serration = !L0 ? null : {
+  return !L0 ? null : {
     noRoom: !!L0.noRoom, noRoomWhy: L0.noRoomWhy || null,
     countAsked: L0.countAsked, countBuilt: L0.countBuilt, clampedBy: L0.clampedBy || null,
     countRowsCap: L0.countRowsCap, countFloorCap: L0.countFloorCap, countReliefCap: L0.countReliefCap === undefined ? null : L0.countReliefCap,
@@ -16630,7 +16920,16 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
       return best;
     }),
   };
-  return { rows, rowU: rows.map((r) => r.u), rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
+  };
+  /* (an asymmetric blade: each half cuts its own teeth on its own outline —
+     the LEFT half's record stands for the blade, both ride under `sides`) */
+  const serration = two
+    ? (() => {
+      const l = serrationOf(prof.side(1), rowHalfBaseMm, rowHalfMm), r = serrationOf(prof.side(-1), rowHalfBaseRightMm, rowHalfRightMm);
+      return l || r ? { ...(l || r), twoSided: true, sides: { left: l, right: r } } : null;
+    })()
+    : serrationOf(prof, rowHalfBaseMm, rowHalfMm);
+  return { rows, rowU: rows.map((r) => r.u), rowHalfBaseMm, rowHalfMm, rowHalfBaseRightMm, rowHalfRightMm, twoSided: two, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
 }
 
 /* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
@@ -16756,7 +17055,11 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   let emittedReachMm = -Infinity;
   {
     const P = acc.positions;
-    if (S.kC === 0) {
+    /* (curves-leaves) ON A DRAWN SPINE the axis is the spine the law drew, and
+       each emitted vertex is footed on its own polyline — the arch's
+       circle-foot, for a spine with no closed form */
+    if (S.spine) emittedReachMm = pLen + spineArcReachMm(P, bladeTris0 * 9, S.bb, S.R, S.spine.law, Lmm);
+    else if (S.kC === 0) {
       for (let i = bladeTris0 * 9; i < P.length; i += 3) {
         const r = (P[i] - base[0]) * D0[0] + (P[i + 1] - base[1]) * D0[1] + (P[i + 2] - base[2]) * D0[2];
         if (r > emittedReachMm) emittedReachMm = r;
@@ -16807,7 +17110,30 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        each row was built on, and each margin's cup lift — LF11 (the arch) and
        LF12 (the cup) read these against laws restated from the controls. */
     rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm,
+    /* (curves-leaves) the RIGHT half's lists on an asymmetric blade, the two
+       above being the LEFT half's; null on a symmetric blade */
+    rowHalfBaseRightMm: B.rowHalfBaseRightMm, rowHalfRightMm: B.rowHalfRightMm, twoSided: B.twoSided,
     arch: { turnRad: form ? form.curlRad : 0, radiusMm: law ? law.peakRadius : Infinity, underFloor: law ? law.underFloor : false },
+    /* THE DRAWN SPINE AS BUILT (curves-leaves) — null on a slider leaf. The
+       curve the law was handed (the twin's value), the ASKED length it was
+       scaled to, the turn it built, the tightest radius, and both clamps with
+       their worst station: the floor (one sheet thickness) and the FOLD LIMIT
+       (the cupped section reaching the bend's centre, the table beside it so
+       the page's validator asks the same clamp). LF37's measured side. */
+    spine: S.spine ? {
+      curveMode: true, curve: S.form.spineCurve, askedLengthMm: Lmm,
+      turnBuiltDeg: S.spine.law.turnBuilt / D2R, peakRadiusMm: S.spine.law.peakRadius,
+      floorRadiusMm: S.spine.floorRadius, floorClamped: S.spine.law.floorClamped,
+      bendClamped: S.spine.law.bendClamped, bend: S.spine.law.bend, bendApplied: S.spine.law.bendApplied,
+      bendTable: S.spine.bend, startDeg: S.spine.curveLaw.startDeg, arcFrac: S.spine.curveLaw.arcFrac,
+      substeps: S.spine.law.substeps,
+    } : null,
+    /* THE DRAWN OUTLINE AS BUILT (curves-leaves) — the plan the profile drew
+       (each half's on an asymmetric blade), null on a LAW blade. A LOBED
+       blade's is its ENVELOPE's (`profE`): the chevron profile cannot take a
+       curve at all, so the envelope is the one place a drawn outline could
+       reach a lobed blade — and the record says whether it did (null, ruled) */
+    outline: leafOutlineRecord(S.profE || prof),
     cup: { coefficient: S.bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
     serration,
     rim,
@@ -16900,9 +17226,25 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        this file has already shipped a stem arm whose computed count was wrong
        by 48. */
     tris: acc.triangleCount - tris0,
-    rootBlendDown: prof.footHalf === 0 || widthProfileBlendIsDown(prof),
-    serrationBuilt: prof.lobes && !prof.lobes.noRoom ? prof.lobes.countBuilt : 0,
+    rootBlendDown: leafBlendIsDown(prof),
+    serrationBuilt: leafSerrationBuilt(prof),
   };
+}
+/* (curves-leaves) a blade's foot-blend and tooth count, asked of each half of
+   an asymmetric profile — which throws on a one-sided question */
+function leafBlendIsDown(prof) {
+  if (prof.twoSided) return leafBlendIsDown(prof.side(1)) && leafBlendIsDown(prof.side(-1));
+  return prof.footHalf === 0 || widthProfileBlendIsDown(prof);
+}
+function leafSerrationBuilt(prof) {
+  if (prof.twoSided) return Math.max(leafSerrationBuilt(prof.side(1)), leafSerrationBuilt(prof.side(-1)));
+  return prof.lobes && !prof.lobes.noRoom ? prof.lobes.countBuilt : 0;
+}
+/* the drawn outline's record, one owner for the simple blade and the leaflets */
+function leafOutlineRecord(prof) {
+  const one = (P) => (P.outline ? { points: P.outline.points, built: P.outline.built, lifted: P.outline.lifted, uPk: P.outline.uPk, peakHalfMm: P.outline.peakHalfMm, lengthMm: P.outline.lengthMm, scale: P.outline.scale, refusal: P.outline.refusal } : null);
+  if (prof.twoSided) { const l = one(prof.side(1)), r = one(prof.side(-1)); return l || r ? { twoSided: true, left: l, right: r, scale: (l || r).scale, lengthMm: (l || r).lengthMm } : null; }
+  return one(prof);
 }
 /* The profile's own answer to "is the foot-continuity floor standing down" —
    read off the EMITTED outline rather than from the flag that set it, so a
@@ -17020,11 +17362,20 @@ export const LEAFLET_BASE_TAPER = 0.6, LEAFLET_TIP_TAPER = 0.9;
    blade parameters are decided; the builder, the inset law and the harness's
    witnesses all read it. */
 export function leafletBladeState(state, lengthMm, widthMm) {
+  const { outlineWidthScaleOwn, ...simple } = leafBladeState({ ...state, leafLength: lengthMm, leafWidth: widthMm, leafArch: 0 });
+  const curve = leafletOutlineIsCurve(state);
   return {
-    ...leafBladeState({ ...state, leafLength: lengthMm, leafWidth: widthMm, leafArch: 0 }),
+    ...simple,
     lobeDepth: state.leafletToothDepth === undefined ? LEAFLET_TOOTH_DEPTH_DEFAULT : Number(state.leafletToothDepth),
     petalTipShape: state.leafletTipShape === undefined ? LEAFLET_TIP_SHAPE_DEFAULT : Number(state.leafletTipShape),
     petalBaseTaper: LEAFLET_BASE_TAPER, petalTipTaper: LEAFLET_TIP_TAPER,
+    /* THE LEAFLETS' OWN OUTLINE (curves-leaves): ONE curve for every leaflet,
+       the terminal included, at each leaflet's own scale; and NO per-leaflet
+       spine — a leaflet lies flat in the rachis's plane (S3's ruling), the
+       leaf's drawn spine being the RACHIS's. */
+    petalOutlineMode: leafTwinValue(state, 'leafletOutlineMode'), petalOutlineCurve: leafTwinValue(state, 'leafletOutlineCurve'),
+    ...(curve ? { outlineWidthScaleOwn: leafletOutlineWidthScale(lengthMm, widthMm) } : {}),
+    petalCurlMode: 'SLIDER',
   };
 }
 
@@ -17348,7 +17699,13 @@ export function lobedToothPerLobe(state) {
 export function lobedBladeState(state, lobes) {
   const n = lobes === undefined ? lobedChevronLaw(state).lobes : lobes;
   return {
-    ...leafBladeState({ ...state, leafWidth: state.lobedWidth === undefined ? LOBED_WIDTH_DEFAULT : Number(state.lobedWidth) }),
+    ...(({ outlineWidthScaleOwn, ...b }) => b)(leafBladeState({ ...state, leafWidth: state.lobedWidth === undefined ? LOBED_WIDTH_DEFAULT : Number(state.lobedWidth) })),
+    /* LOBED KEEPS ITS OWN LAW (curves-leaves, ruled): the leaf's outline mode
+       is hidden AND inert under LOBED — pinned here, the one place (the
+       chevron's profiles are cut with `petiole`, not `chevron`, so the cap's
+       exclusion alone would not hold them). The drawn SPINE reaches a lobed
+       blade as the arch does. */
+    petalOutlineMode: 'LAW',
     lobeDepth: state.lobedToothDepth === undefined ? LOBED_TOOTH_DEPTH_DEFAULT : Number(state.lobedToothDepth),
     /* the shared leafToothCount is HIDDEN AND INERT under LOBED: overridden here */
     lobeCount: lobedToothPerLobe(state) * (2 * n + 1),
@@ -18378,7 +18735,9 @@ export function lobedBladeAreaMm2(outline, Lmm) {
   return sum;
 }
 export function simpleDefaultBladeAreaMm2(state, Lmm) {
-  const bs = leafBladeState({ ...state, leafType: 'SIMPLE', leafWidth: LEAF_WIDTH_DEFAULT, leafTipShape: LEAF_TIP_SHAPE, leafToothDepth: 0 });
+  /* (curves-leaves) the REFERENCE is the simple leaf's DEFAULTS — its LAW
+     outline, whatever outline curve a lobed leaf's state happens to store */
+  const bs = leafBladeState({ ...state, leafType: 'SIMPLE', leafWidth: LEAF_WIDTH_DEFAULT, leafTipShape: LEAF_TIP_SHAPE, leafToothDepth: 0, leafOutlineMode: 'LAW' });
   const prof = widthProfile(bs, { width: 0, thickness: state.sheetThickness }, LEAF_WIDTH_DEFAULT / 2, { petiole: true, rowCapacity: LEAF_BLADE_ROWS }, { exportMode: true }, Lmm);
   const N = LOBED_FOLD_SAMPLES;
   let sum = 0, prev = null;
@@ -18425,11 +18784,19 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
   const pLen = plan.petioleLenMm;
   const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
   const kC = form ? form.curlRad / Lmm : 0;
-  const sLaw = kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
+  /* THE DRAWN SPINE (curves-leaves) reaches a LOBED blade as the arch does —
+     the one owner, the fold limit read off the ENVELOPE's own section (the
+     section every chevron point is lifted by) — taken first, a branch */
+  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? lobedBendReachAt(form, profE) : null });
+  const sLaw = spine ? spine.law : kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
   const flatN = [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)];
   /* THE ARC AT `s` mm along the midrib (the simple leaf's centreline law,
      verbatim per arm, evaluated at the chevron point's own station) */
   const at = (s) => {
+    if (spine) {
+      const q = spine.law.at(s);
+      return { C: [bb[0] + R[0] * q.dR, bb[1] + R[1] * q.dR, bb[2] + q.dZ], fr: form.frameAt(R, T, q.phi, s / Lmm), phi: q.phi };
+    }
     if (kC === 0) {
       const fr = form ? form.frameAt(R, T, th, s / Lmm) : { D: D0, T, N: flatN };
       return { C: [bb[0] + fr.D[0] * s, bb[1] + fr.D[1] * s, bb[2] + fr.D[2] * s], fr, phi: th };
@@ -18467,7 +18834,19 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
     };
     return { u, h, hb, hLobe, tau, C: A.C, D: A.fr.D, T: A.fr.T, N: A.fr.N, phi: A.phi, sect: (v) => { const p = point(v); return { P: p.P, n: p.n }; }, pointAt: point };
   };
-  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, rowAt, chevron: law, tilt, tauAt, round, lobeYield, roundness };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, spine, rowAt, chevron: law, tilt, tauAt, round, lobeYield, roundness };
+}
+/* the fold limit's reach on a LOBED blade: the cup section on the ENVELOPE at
+   u (the section `lobedSurface` lifts every chevron point of row u by) */
+function lobedBendReachAt(form, profE) {
+  const O3 = [0, 0, 0], X3 = [1, 0, 0], Y3 = [0, 1, 0];
+  return (u) => {
+    const hb = leafHalfBaseAt(profE, u);
+    const sect = form.sectAt(O3, X3, Y3, hb, u, hb, profE.onNib(u) ? hb / TIP_HALF_MM : 1, 1, true);
+    let pos = 0, neg = 0;
+    for (let j = 0; j < NV; j++) { const d = sect(-1 + (2 * j) / (NV - 1)).P[1]; if (d > pos) pos = d; if (-d > neg) neg = -d; }
+    return { pos, neg };
+  };
 }
 
 /* compoundLeafLayout — THE ONE OWNER of where every leaflet is and how big,
@@ -18540,6 +18919,30 @@ function rachisArc(angleDeg, archDeg, rachisMm) {
   };
 }
 
+/* THE RACHIS'S SPINE (curves-leaves) — the arch's uniform arc VERBATIM in
+   SLIDER mode (a branch, `rachisArc`), and in CURVE mode the leaf's DRAWN
+   spine on the rachis (Claude's placement, "the leaf spine curve applies
+   wherever leafArch applies today, including the compound rachis"): the
+   petal's own curve arm of `spineLaw`, the curve scaled so its arc length is
+   the rachis length, laid with its first chord along the leaf's angle. ARC
+   LENGTH IS THE PARAMETER, so the pair stations, the load taper and the
+   tip are measured ALONG THE DRAWN RACHIS exactly as along the arch. A RACHIS
+   IS A ROD, NOT A SHEET: it has no cupped section, so the fold limit does not
+   reach it; the floor does — one sheet thickness of radius at the EXPORT
+   sheet (`spineCurveFloorRadiusMm`, the validator's own), so the rachis is
+   the same curve in both modes and its stations are mode-free. */
+function rachisSpine(state, angleDeg, rachisMm) {
+  if (!leafCurlIsCurve(state)) return rachisArc(angleDeg, state.leafArch ?? 0, rachisMm);
+  const th = (angleDeg * Math.PI) / 180;
+  const curveLaw = spineCurveLaw(leafTwinValue(state, 'leafSpineCurve'), rachisMm);
+  const floorRadius = spineCurveFloorRadiusMm(state);
+  const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: rachisMm, tilt: th, floorRadius, rows: LEAF_BLADE_ROWS, curve: curveLaw });
+  return {
+    th, k: null, curve: true, law, curveLaw, floorRadius,
+    phiAt: (s) => law.at(s).phi,
+    at: (s) => { const q = law.at(s); return [q.dR, q.dZ]; },
+  };
+}
 /* HOW HIGH A COMPOUND LEAF RISES OVER ITS RACHIS BASE — the inset law's
    input. Every part is straight but the rachis, so the maximum is the rachis
    arc's own (`leafArchRiseMm`, the simple leaf's law on the rachis) or the far
@@ -18552,8 +18955,10 @@ function rachisArc(angleDeg, archDeg, rachisMm) {
 export function compoundLeafRiseMm(state) {
   const lay = compoundLeafLayout(state);
   const angleDeg = Number(state.leafAngle), archDeg = Number(state.leafArch ?? 0);
-  const arc = rachisArc(angleDeg, archDeg, lay.rachisMm);
-  let best = leafArchRiseMm(lay.rachisMm, angleDeg, archDeg);
+  const arc = rachisSpine(state, angleDeg, lay.rachisMm);
+  let best = 0;
+  if (arc.curve) { for (let i = 0; i <= arc.law.substeps; i++) { const z = arc.at((lay.rachisMm * i) / arc.law.substeps)[1]; if (z > best) best = z; } }
+  else best = leafArchRiseMm(lay.rachisMm, angleDeg, archDeg);
   const zEnd = arc.at(lay.rachisMm)[1];
   best = Math.max(best, zEnd + (lay.terminalStalkMm + lay.terminal.lengthMm) * Math.sin(arc.phiAt(lay.rachisMm)));
   const cA = Math.cos((lay.angleDeg * Math.PI) / 180);
@@ -18814,7 +19219,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const t = acc.floorThickness(state.sheetThickness);
   const D0 = [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   const bb = [base[0] + D0[0] * pLen, base[1] + D0[1] * pLen, base[2] + D0[2] * pLen];
-  const arc = rachisArc(plan.angleDeg, state.leafArch ?? 0, cp.rachisMm);
+  const arc = rachisSpine(state, plan.angleDeg, cp.rachisMm);
   const frameAt = (phi) => ({ D: [R[0] * Math.cos(phi), R[1] * Math.cos(phi), Math.sin(phi)], N: [-R[0] * Math.sin(phi), -R[1] * Math.sin(phi), Math.cos(phi)] });
   const rachisAt = (s) => { const [al, up] = arc.at(s); return [bb[0] + R[0] * al, bb[1] + R[1] * al, bb[2] + up]; };
   /* each leaflet's blade law, built ONCE per leaflet (the form's cup clamp is
@@ -18922,8 +19327,8 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
     const B0 = [F.root[0] + F.D[0] * F.stalkMm, F.root[1] + F.D[1] * F.stalkMm, F.root[2] + F.D[2] * F.stalkMm];
     const rowAt = (u) => {
       const C = [B0[0] + F.D[0] * u * sp.L, B0[1] + F.D[1] * u * sp.L, B0[2] + F.D[2] * u * sp.L];
-      const { h, hb, sect } = leafRowSect(prof, form, C, F.T, F.N, u);
-      return { u, h, hb, C, D: F.D, T: F.T, N: F.N, phi: 0, sect };
+      const { h, hb, hL, hR, hbL, hbR, sect } = leafRowSect(prof, form, C, F.T, F.N, u);
+      return prof.twoSided ? { u, h, hb, hL, hR, hbL, hbR, C, D: F.D, T: F.T, N: F.N, phi: 0, sect } : { u, h, hb, C, D: F.D, T: F.T, N: F.N, phi: 0, sect };
     };
     const tb = acc.triangleCount;
     const lSt = leafBladeStations(prof, nu);
@@ -18937,13 +19342,15 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
       rim: Bl.rim, tipClamp: Bl.tipClamp, serration: Bl.serration,
       cup: { coefficient: bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
       arch: { turnRad: form ? form.curlRad : 0, radiusMm: Infinity, underFloor: false },
-      serrationBuilt: prof.lobes && !prof.lobes.noRoom ? prof.lobes.countBuilt : 0,
-      rootBlendDown: prof.footHalf === 0 || widthProfileBlendIsDown(prof),
+      serrationBuilt: leafSerrationBuilt(prof),
+      rootBlendDown: leafBlendIsDown(prof),
+      outline: leafOutlineRecord(prof),
+      rowHalfBaseRightMm: Bl.rowHalfBaseRightMm, rowHalfRightMm: Bl.rowHalfRightMm, twoSided: Bl.twoSided,
       tris: acc.triangleCount - tb,
     };
   });
   const directedMismatch = leafDirectedMismatch(acc, tris0);
-  const law = arc.k !== 0 ? spineLaw({ curlRad: arc.k * cp.rachisMm, bias: 0, start: 0, length: cp.rachisMm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: LEAF_BLADE_ROWS }) : null;
+  const law = arc.curve ? arc.law : arc.k !== 0 ? spineLaw({ curlRad: arc.k * cp.rachisMm, bias: 0, start: 0, length: cp.rachisMm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: LEAF_BLADE_ROWS }) : null;
   const petioleAxis = { inner: ringMid(PA), outer: ringMid(PB), radiusMm: plan.petioleR };
   /* HOW FAR THE PETIOLE'S ROOTED END REACHES FROM THE STEM'S AXIS — the
      largest horizontal distance of any vertex of the EMITTED root ring from
@@ -18970,8 +19377,15 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
     axisRod: { centres: axisRings.map(ringMid), radii: axisRings.map(ringRadius), rings: axisRings.length },
     stalkRods: stalkRings.map((r) => ({ root: ringMid(r[0]), end: ringMid(r[1]), radiusMm: ringRadius(r[0]), endRadiusMm: ringRadius(r[1]) })),
     leaflets,
-    arch: { turnRad: arc.k * cp.rachisMm, radiusMm: law ? law.peakRadius : Infinity, underFloor: law ? law.underFloor : false },
+    arch: { turnRad: arc.curve ? 0 : arc.k * cp.rachisMm, radiusMm: law ? law.peakRadius : Infinity, underFloor: law ? law.underFloor : false },
     rachis: { baseC: bb, tipC, phiEnd, k: arc.k },
+    /* THE DRAWN RACHIS AS BUILT (curves-leaves) — null on the arch */
+    spine: arc.curve ? {
+      curveMode: true, rachis: true, curve: leafTwinValue(state, 'leafSpineCurve'), askedLengthMm: cp.rachisMm,
+      turnBuiltDeg: arc.law.turnBuilt / D2R, peakRadiusMm: arc.law.peakRadius, floorRadiusMm: arc.floorRadius,
+      floorClamped: arc.law.floorClamped, bendClamped: false, bend: null, bendTable: null,
+      startDeg: arc.curveLaw.startDeg, arcFrac: arc.curveLaw.arcFrac, substeps: arc.law.substeps,
+    } : null,
     tris: acc.triangleCount - tris0,
     rootBlendDown: leaflets.every((q) => q.rootBlendDown),
     serrationBuilt: leaflets.reduce((n, q) => Math.max(n, q.serrationBuilt), 0),

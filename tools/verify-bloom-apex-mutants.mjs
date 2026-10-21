@@ -717,6 +717,11 @@ const TIER_ROWS = /^SEPAL TIERS:/;
    scoped to each other for the shard cap's sake (the tier rows' own reason). */
 const SEPC_MUTANTS = /^(a-sepal-curve-read-from-the-petals|a-tier-curve-leaks-to-every-tier|the-sepal-limit-drawn-on-the-slider-spine|the-fold-limit-skipped-for-sepals)$/;
 const SEPC_ROWS = /^SEPAL CURVES:/;
+/* THE LEAF CURVES (curves-leaves): the eight geometry mutants and the rows they
+   run over, scoped to each other for the shard cap's sake (the seed's own
+   mutants are the panel gate's, route (am)). */
+const LEAFC_MUTANTS = /^(the-leaf-spine-sign-flipped|teeth-dropped-on-a-drawn-outline|a-tooth-cuts-the-nib-on-a-drawn-outline|leaflets-read-the-simple-leafs-curve|the-terminal-leaflet-not-at-its-own-scale|the-inset-reads-the-slider-arch|the-fold-limit-skipped-for-leaves|the-lobed-blade-takes-the-curve)$/;
+const LEAFC_ROWS = /^LEAF CURVES:/;
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -2587,6 +2592,61 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tiers[0].bendClamped === false && c.tiers[0].bendClamped === true) ? null : `the sepal's fold limit reads ${m.tiers[0].bendClamped} on the mutant against ${c.tiers[0].bendClamped} clean`; } },
 
+  /* THE LEAF CURVES (curves-leaves). Each witnessed on the MUTATED module's own
+     leaf records (`compoundFacts`, EXPORT) — never the clause it names. */
+  { id: 'the-leaf-spine-sign-flipped', rows: LEAFC_ROWS, why: "the drawn leaf spine is read with its y negated — the curve that FALLS toward the tip builds a leaf that curls UP, the opposite of the arch it documents",
+    find: '  const curveLaw = spineCurveLaw(form.spineCurve, Lmm);',
+    into: '  const curveLaw = spineCurveLaw({ ...form.spineCurve, points: form.spineCurve.points.map(([x, y]) => [x, -y]) }, Lmm);', names: ['LF11', 'LF37'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_DROOP), c = compoundFacts(C, LC_DROOP);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.spine.turnBuiltDeg > 0 && c.rep.spine.turnBuiltDeg < 0) ? null : `the leaf turns ${m.rep.spine.turnBuiltDeg}° on the mutant against ${c.rep.spine.turnBuiltDeg}° clean`; } },
+  { id: 'teeth-dropped-on-a-drawn-outline', rows: LEAFC_ROWS, why: "the leaf's serration is not cut where the outline is drawn — Eva's ruling keeps teeth ON in CURVE mode, and a toothed oak drawn as a curve comes out entire",
+    find: '    if (!(petiole && outline ? !fringeEngaged(state) : lobesEligible(state)) || !lobesEngaged(state)) return null;',
+    into: '    if (!(petiole && outline ? false : lobesEligible(state)) || !lobesEngaged(state)) return null;', names: ['LF13'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_TEETH), c = compoundFacts(C, LC_TEETH);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.rep.serration && c.rep.serration && c.rep.serration.countBuilt > 0) ? null : `the serration reads ${JSON.stringify(m.rep.serration && m.rep.serration.countBuilt)} on the mutant against ${JSON.stringify(c.rep.serration && c.rep.serration.countBuilt)} clean`; } },
+  { id: 'a-tooth-cuts-the-nib-on-a-drawn-outline', rows: LEAFC_ROWS, why: "on a DRAWN outline the nib's rows read the TOOTHED outline — a tooth whose period runs past the floor crossing digs the drawn tip toward its face (the S5 protection lost where the outline is a curve)",
+    find: 'export function leafHalfAt(prof, u) { return prof.onNib(u) ? prof.halfWidthBaseAt(u) : Math.max(prof.halfWidthAt(u), TIP_HALF_MM); }',
+    into: 'export function leafHalfAt(prof, u) { return prof.onNib(u) && !prof.outline ? prof.halfWidthBaseAt(u) : prof.onNib(u) ? prof.halfWidthAt(u) : Math.max(prof.halfWidthAt(u), TIP_HALF_MM); }', names: ['LF33'],
+    witness: (M, C) => {
+      const dig = (G) => { const f = compoundFacts(G, LC_NIB); if (f.threw) throw new Error(f.threw);
+        let d = 0; for (const B of f.rep.leaflets || []) for (let j = 0; j < B.rowHalfMm.length; j++) if (B.rowHalfBaseMm[j] < G.TIP_HALF_MM) d = Math.max(d, B.rowHalfBaseMm[j] - B.rowHalfMm[j]); return d; };
+      let dm, dc; try { dm = dig(M); dc = dig(C); } catch (e) { return `the witness threw: ${e.message}`; }
+      return (dm > 0.01 && dc === 0) ? null : `the mutant cuts ${dm} mm into its drawn leaflets' nibs against the clean ${dc} — the behaviour did not move`; } },
+  { id: 'leaflets-read-the-simple-leafs-curve', rows: LEAFC_ROWS, why: "the leaflets are drawn from the SIMPLE leaf's outline curve instead of the leaflet curve — one control reaching another blade type",
+    find: "petalOutlineCurve: leafTwinValue(state, 'leafletOutlineCurve'),",
+    into: "petalOutlineCurve: leafTwinValue(state, 'leafOutlineCurve'),", names: ['LF37'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_CPD), c = compoundFacts(C, LC_CPD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const pm = m.rep.leaflets[0].outline && m.rep.leaflets[0].outline.points, pc = c.rep.leaflets[0].outline && c.rep.leaflets[0].outline.points;
+      return (lcSame(pm, LC_OUT.lance.points) && lcSame(pc, LC_OUT.leaflet.points)) ? null : `the first leaflet is drawn from ${JSON.stringify(pm)} on the mutant against ${JSON.stringify(pc)} clean`; } },
+  { id: 'the-terminal-leaflet-not-at-its-own-scale', rows: LEAFC_ROWS, why: "every leaflet's outline is drawn at the REFERENCE leaflet's scale — the terminal (30 x 19) at the laterals' aspect instead of its own",
+    find: '    ...(curve ? { outlineWidthScaleOwn: leafletOutlineWidthScale(lengthMm, widthMm) } : {}),',
+    into: '    ...(curve ? { outlineWidthScaleOwn: leafletOutlineWidthScale(LEAFLET_LENGTH_DEFAULT, LEAFLET_WIDTH_DEFAULT) } : {}),', names: ['LF37'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_CPD), c = compoundFacts(C, LC_CPD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const tm = m.rep.leaflets.find((b) => b.role === 'terminal'), tc = c.rep.leaflets.find((b) => b.role === 'terminal');
+      return (tm.outline.scale === 1 && Math.abs(tc.outline.scale - 1) > 1e-3) ? null : `the terminal is drawn at scale ${tm.outline.scale} on the mutant against ${tc.outline.scale} clean`; } },
+  { id: 'the-inset-reads-the-slider-arch', rows: LEAFC_ROWS, why: "the node inset reads the ARCH slider's rise where the leaf is on a drawn spine — an upward curl rising above its chord puts the top leaf into the head",
+    find: '  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg);',
+    into: '  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));', names: ['LF4'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_UP), c = compoundFacts(C, LC_UP);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.plan.insetNeededMm < c.plan.insetNeededMm - 1) ? null : `the inset needs ${m.plan.insetNeededMm} mm on the mutant against ${c.plan.insetNeededMm} clean`; } },
+  { id: 'the-fold-limit-skipped-for-leaves', rows: LEAFC_ROWS, why: "the fold limit's table is not handed to a LEAF's drawn spine, so a tight curl on a cupped leaf bends past its own cross-section and folds while every petal is held",
+    find: '  const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius, rows: nu, curve: curveLaw, bend: bend && bend.binds ? bend : null });',
+    into: '  const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius, rows: nu, curve: curveLaw, bend: null });', names: ['LF37'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_FOLD), c = compoundFacts(C, LC_FOLD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.spine.bendClamped === false && c.rep.spine.bendClamped === true) ? null : `the leaf's fold limit reads ${m.rep.spine.bendClamped} on the mutant against ${c.rep.spine.bendClamped} clean`; } },
+  { id: 'the-lobed-blade-takes-the-curve', rows: LEAFC_ROWS, why: "the LOBED blade's pin to its own law is gone, so an outline curve stored on the leaf replaces the chevron envelope's outline — the ruling keeps LOBED on its own law",
+    find: "       blade as the arch does. */\n    petalOutlineMode: 'LAW',\n",
+    into: "       blade as the arch does. */\n", names: ['LF37'],
+    witness: (M, C) => { const m = compoundFacts(M, LC_LOBED), c = compoundFacts(C, LC_LOBED);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rep.outline && !c.rep.outline) ? null : `the lobed blade's outline record reads ${JSON.stringify(m.rep.outline && m.rep.outline.points)} on the mutant against ${JSON.stringify(c.rep.outline)} clean`; } },
+
   /* ===== THE APEX NIB (AN0-AN3, the apex-nib session) ===============
      Both STL gates are blind to every one of these: each leaves a
      single-valued, strictly falling outline on a fixed row-and-column
@@ -3157,6 +3217,27 @@ const SEPC_LIMIT = { sepalCount: 5, sepalAngle: 60, sepalCurlMode: 'CURVE', sepa
 const SEPC_FOLD = { sepalCount: 5, sepalCup: 0.6, sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.s };
 const SEPC_TIERS = { set: { sepalCount: 5, sepalTiers: 2, stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40 },
   scopes: { layers: [], petals: [], tiers: [{ tier: 1, offsets: {}, values: { sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.reflex } }] } };
+/* THE LEAF CURVE WITNESSES (curves-leaves) — the module's own build of one
+   leaf in EXPORT (`compoundFacts`), read off its plan and its emitted record. */
+const LC_SP = {
+  droop: { mode: 'single', points: [[0, 0], [0.5, -0.06], [0.95, -0.3]] },
+  curlUp: { mode: 'single', points: [[0, 0], [0.5, 0.08], [0.9, 0.35]] },
+  tight: { mode: 'single', points: [[0, 0], [0.5, 0.02], [0.62, 0.12], [0.6, 0.25]] },
+};
+const LC_OUT = {
+  lance: { mode: 'symmetric', points: [[0, 0.05], [0.2, 0.17], [0.45, 0.2], [0.75, 0.14], [1, 0]] },
+  oak: { mode: 'two-sided', points: [[0, 0.06], [0.3, 0.22], [0.65, 0.19], [1, 0]], right: [[0, 0.06], [0.25, 0.14], [0.6, 0.17], [1, 0]] },
+  leaflet: { mode: 'symmetric', points: [[0, 0.1], [0.3, 0.3], [0.65, 0.27], [1, 0]] },
+  blunt: { mode: 'symmetric', points: [[0, 0.12], [0.4, 0.3], [0.85, 0.28], [1, 0]] },
+};
+const LC_BASE = { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 1 };
+const LC_DROOP = { ...LC_BASE, leafCurlMode: 'CURVE', leafSpineCurve: LC_SP.droop };
+const LC_UP = { ...LC_BASE, leafNodes: 3, leafCurlMode: 'CURVE', leafSpineCurve: LC_SP.curlUp };
+const LC_FOLD = { ...LC_BASE, leafCup: 1.2, leafCurlMode: 'CURVE', leafSpineCurve: LC_SP.tight };
+const LC_TEETH = { ...LC_BASE, leafToothDepth: 0.35, leafToothCount: 6, leafOutlineMode: 'CURVE', leafOutlineCurve: LC_OUT.oak };
+const LC_CPD = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 1, leafType: 'COMPOUND', leafletToothDepth: 0.15, leafletOutlineMode: 'CURVE', leafletOutlineCurve: LC_OUT.leaflet, leafOutlineCurve: LC_OUT.lance };
+const LC_LOBED = { ...LC_BASE, leafType: 'LOBED', leafOutlineMode: 'CURVE', leafOutlineCurve: LC_OUT.lance };
+const lcSame = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function sepcFacts(MOD, extra = {}, scopes = null) {
   try {
     const st = { ...REGISTRY_DEFAULTS, ...extra };
@@ -3204,6 +3285,7 @@ const TAPER_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 
 const LOB_WIT = { stemLength: 70, stemDiameter: 6, leafLength: 46, leafNodes: 1, leafType: 'LOBED' };
 /* S5's witness states — the two rows above, as control sets */
 const NIB_TOOTH_WIT = { stemLength: 120, stemDiameter: 6, leafLength: 60, leafNodes: 1, leafType: 'COMPOUND', leafletTipShape: 0.8, leafletWidth: 40, leafletLength: 46, leafletToothDepth: 0.1, leafToothCount: 3 };
+const LC_NIB = { ...NIB_TOOTH_WIT, leafletOutlineMode: 'CURVE', leafletOutlineCurve: LC_OUT.blunt };
 const FILLET_WIT = { ...LOB_WIT, lobedShape: 2.5 };
 /* S4's own lobed form (S4b): the mum retune moved the four lobed defaults,
    and at its rounder, less tilted lobes the unclamped tilt folds no cell and
@@ -3586,6 +3668,14 @@ const ROWS = [
   { label: 'SEPAL CURVES: two tiers — tier 2 owns the reflex, tier 1 on the sliders', for: SEPC_MUTANTS,
     scopes: { layers: [], petals: [], tiers: [{ tier: 1, offsets: {}, values: { sepalCurlMode: 'CURVE', sepalSpineCurve: SEPC_SC.reflex } }] },
     set: [{ id: 'sepalCount', value: '5' }, { id: 'sepalTiers', value: '2' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }] },
+  /* THE LEAF CURVES (curves-leaves): a drooping drawn spine, an upward curl the
+     inset reads, the fold limit on a cupped leaf, an asymmetric toothed blade,
+     the compound rose with a leaflet curve, a blunt drawn leaflet whose teeth
+     reach the nib, and a lobed blade with an outline curve stored. */
+  ...[['LEAF CURVES: a drawn drooping spine', LC_DROOP], ['LEAF CURVES: an upward curl the inset reads (3 nodes)', LC_UP], ['LEAF CURVES: a tight upward curl on a cup 1.2 leaf (the fold limit binds)', LC_FOLD],
+    ['LEAF CURVES: an asymmetric toothed drawn outline', LC_TEETH], ['LEAF CURVES: the compound rose on a leaflet curve', LC_CPD], ['LEAF CURVES: a blunt drawn leaflet whose teeth reach the nib', LC_NIB],
+    ['LEAF CURVES: a lobed blade with an outline curve stored (its own law)', LC_LOBED]].map(([label, st]) => ({ label, for: LEAFC_MUTANTS,
+    set: Object.entries(st).map(([id, v]) => ({ id, value: typeof v === 'object' ? JSON.stringify(v) : String(v) })) })),
   /* THE INFLORESCENCE ROWS (the raceme session). Three, and each exists for a
      statement the other two cannot make.
 

@@ -18,6 +18,7 @@ import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
+import { leafBladeState, leafletBladeState, leafOutlineWidthScale, leafletOutlineWidthScale, compoundLeafLayout as compoundLeafLayoutForSeed } from './bloom-geometry.js';
 import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, SEPAL_SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_GROUPS, seedSpineCurve, seedOutlineCurve, sepalBladeState, sepalOutlineWidthScale, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
@@ -104,6 +105,39 @@ function curveValidatorCtx({ widthDelta = 0, widthTo = null, reaches = outlineEd
     askedLengthsMm: [...new Set(lastPetalsAll.filter((p) => p && p.spine && spineReaches(p)).map((p) => p.spine.askedLengthMm))],
     outlinePetals: outlinePetals.length ? outlinePetals : null,
     sepal: sepalValidatorCtx(),
+    ...leafValidatorCtx(),
+  };
+}
+/* curves-leaves — THE SAME CONTEXT FOR A LEAF CURVE, off the leaves the build
+   on screen drew: every blade's asked length and fold-limit table (the simple
+   or lobed blade's own, or the compound RACHIS's length, which carries no
+   section), and every blade's drawn-outline record (its length and its own
+   scale — each leaflet's). Null halves fall back to the controls' own. */
+function leafValidatorCtx() {
+  const built = lastLeavesBuilt || [];
+  if (!built.length) return { leaf: null, leaflet: null };
+  const sp = built.filter((r) => r.spine);
+  const lens = [...new Set(sp.map((r) => r.spine.askedLengthMm))];
+  const bends = [], seenT = new Set();
+  for (const r of sp) {
+    if (!r.spine.bendTable) continue;
+    const k = bendTableKey(r.spine.askedLengthMm, r.spine.bendTable);
+    if (!seenT.has(k)) { seenT.add(k); bends.push({ askedLengthMm: r.spine.askedLengthMm, table: r.spine.bendTable }); }
+  }
+  const blades = (kind) => {
+    const out = [], seen = new Set();
+    for (const r of built) for (const b of (r.compound ? r.leaflets : [r])) {
+      if (!b.outline || (kind === 'leaflet') !== !!r.compound) continue;
+      const e = { lengthMm: b.outline.lengthMm, scale: b.outline.scale, pinnedFirst: false };
+      const k = `${e.lengthMm}|${e.scale}`;
+      if (!seen.has(k)) { seen.add(k); out.push(e); }
+    }
+    return out.length ? out : null;
+  };
+  const leafB = blades('leaf'), leafletB = blades('leaflet');
+  return {
+    leaf: sp.length || leafB ? { askedLengthsMm: lens.length ? lens : null, bends: bends.length ? bends : null, outlineBlades: leafB } : null,
+    leaflet: leafletB ? { askedLengthsMm: null, bends: null, outlineBlades: leafletB } : null,
   };
 }
 /* curves-sepals — THE SAME CONTEXT FOR A SEPAL CURVE: the sepals the edit
@@ -3779,9 +3813,47 @@ const SEED_MODES = {
   petalOutlineMode: { curve: 'petalOutlineCurve', kind: 'outline', sepal: false },
   sepalCurlMode: { curve: 'sepalSpineCurve', kind: 'spine', sepal: true },
   sepalOutlineMode: { curve: 'sepalOutlineCurve', kind: 'outline', sepal: true },
+  /* curves-leaves: the leaf's spine (the arch it replaces, on the blade or the
+     compound RACHIS), the simple blade's outline and the leaflets' one */
+  leafCurlMode: { curve: 'leafSpineCurve', kind: 'spine', leaf: 'leaf' },
+  leafOutlineMode: { curve: 'leafOutlineCurve', kind: 'outline', leaf: 'leaf' },
+  leafletOutlineMode: { curve: 'leafletOutlineCurve', kind: 'outline', leaf: 'leaflet' },
 };
+/* THE LEAF'S SEED (curves-leaves). THE SPINE fits the spine the ARCH draws on
+   the blade the switch reaches — through `leafBladeState`, so the slider is
+   handed `-leafArch` there and the fitted curve goes back UNNEGATED: a switch
+   from any arch value lands on the same bend. On a compound leaf the blade is
+   the RACHIS (the arch's own uniform arc over the rachis length). THE OUTLINE
+   fits the LAW outline the build draws: the simple blade's lanceolate at its
+   own length and width scale; the leaflets' ovate on the NARROWEST leaflet —
+   every leaflet's law, divided by its own scale, is ONE curve (their shared
+   tapers and tip over each leaflet's aspect), so the fit is the same on any of
+   them and the narrowest is the one the floor binds. The fold limit's tables
+   are the blades' own (a seed the fold limit would clamp is no fit). */
+function leafSeedFor(M) {
+  const ui = readUI();
+  const built = lastLeavesBuilt || [];
+  if (M.kind === 'spine') {
+    const compound = built.some((r) => r.compound);
+    const lens = compound ? [Number(ui.leafLength)] : (lastLeaf && lastLeaf.nodeLengthsMm ? lastLeaf.nodeLengthsMm.filter((x) => x > 0) : [Number(ui.leafLength)]);
+    const L = Math.max(...lens, 0) || Number(ui.leafLength);
+    const sub = leafBladeState({ ...ui, leafLength: L });
+    const bends = built.filter((r) => r.spine && r.spine.bendTable && r.spine.bendTable.binds).map((r) => ({ askedLengthMm: r.spine.askedLengthMm, table: r.spine.bendTable }));
+    return seedSpineCurve(sub, L, { lengthsMm: lens, bends });
+  }
+  if (M.leaf === 'leaflet') {
+    const lay = compoundLeafLayoutForSeed(ui);
+    const sizes = [...lay.lateral.map((q) => [q.lengthMm, q.widthMm]), [lay.terminal.lengthMm, lay.terminal.widthMm]];
+    const [L, W] = sizes.reduce((a, b) => (b[1] < a[1] ? b : a), sizes[0]);
+    return seedOutlineCurve(leafletBladeState(ui, L, W), L, W, { scale: leafletOutlineWidthScale(L, W), lengthsMm: [L], footHalfMm: 0 });
+  }
+  const lens = lastLeaf && lastLeaf.nodeLengthsMm ? lastLeaf.nodeLengthsMm.filter((x) => x > 0) : [Number(ui.leafLength)];
+  const L = Math.max(...lens, 0) || Number(ui.leafLength);
+  return seedOutlineCurve(leafBladeState({ ...ui, leafLength: L }), L, Number(ui.leafWidth), { scale: leafOutlineWidthScale(ui), lengthsMm: lens, footHalfMm: 0 });
+}
 function seedFor(modeId) {
   const M = SEED_MODES[modeId];
+  if (M.leaf) return leafSeedFor(M);
   const ui = readUI();
   const picked = scopeView && idsFor(scopeView).has(modeId) ? scopeView : null;
   const eff = picked ? viewUi(ui) : ui;
@@ -3822,7 +3894,7 @@ function onSeedSwitch(e) {
   inputs[M.curve].value = seed.curve;
   if (scopeView && idsFor(scopeView).has(M.curve)) commitScopeValue(M.curve, seed.curve);
   const split = seed.split ? ` (position ${seed.split.posMm.toFixed(3)} mm, direction ${seed.split.dirDeg.toFixed(1)}° — the direction weighed at one millimetre of blade per radian)` : '';
-  seedNotes[M.curve] = `SEEDED from ${seed.from} on the switch — ${seed.points} points, ${seed.met ? 'within' : 'NOT within'} the ${seed.tolMm.toFixed(2)} mm tolerance: it departs from it by ${seed.errorMm.toFixed(3)} mm${split}${seed.rotationDeg ? ` (drawn turned ${seed.rotationDeg.toFixed(0)}° so it stays in front of its root; the law lays it back along the blade)` : ''}${seed.clipped ? ' (wider than the box allows — clipped at half the length)' : ''}; a fit, not the slider build to the bit`;
+  seedNotes[M.curve] = `SEEDED from ${M.leaf && M.kind === 'spine' ? 'the Arch slider\'s spine' : M.leaf ? 'the leaf\'s law outline' : seed.from} on the switch — ${seed.points} points, ${seed.met ? 'within' : 'NOT within'} the ${seed.tolMm.toFixed(2)} mm tolerance: it departs from it by ${seed.errorMm.toFixed(3)} mm${split}${!seed.met && seed.constraint ? ` — stopped by ${seed.constraint}` : ''}${seed.rotationDeg ? ` (drawn turned ${seed.rotationDeg.toFixed(0)}° so it stays in front of its root; the law lays it back along the blade)` : ''}${seed.clipped ? ' (wider than the box allows — clipped at half the length)' : ''}; a fit, not the slider build to the bit`;
 }
 window.addEventListener('change', onSeedSwitch, true);
 /* the seed's sentence is told until the curve is next edited */
@@ -4370,6 +4442,15 @@ window.__bloomMetrics = () => ({
        rows for its arc, so `i / nu` is no longer the answer) */
     rowU: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowU)),
     tipClamp: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.tipClamp)),
+    /* (curves-leaves) an ASYMMETRIC drawn outline's RIGHT half, per blade — the
+       two lists above carry its LEFT half (null on a symmetric blade) — and
+       each blade's drawn-outline record and each leaf's drawn-spine record
+       (the simple or lobed blade's, or a compound leaf's RACHIS's), the fold
+       table summarised. LF37's measured side. */
+    rowHalfBaseRightMm: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowHalfBaseRightMm || null)),
+    rowHalfRightMm: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => b.rowHalfRightMm || null)),
+    outlineBuilt: (lastLeavesBuilt || []).flatMap((r) => leafBlades(r).map((b) => (b.outline ? JSON.parse(JSON.stringify(b.outline)) : null))),
+    spineBuilt: (lastLeavesBuilt || []).map((r) => (r.spine ? { ...r.spine, bendTable: r.spine.bendTable ? { binds: r.spine.bendTable.binds, N: r.spine.bendTable.N } : null, peakRadiusMm: Number.isFinite(r.spine.peakRadiusMm) ? r.spine.peakRadiusMm : null } : null)),
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
     crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),

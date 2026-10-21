@@ -924,7 +924,34 @@ for (const [prefix, expect] of Object.entries(TIP_EXPECTED)) {
     if (c.min !== r[0] || c.max !== r[1]) bad.push(`${id} is ${c.min}..${c.max} in the registry and ${r[0]}..${r[1]} in the geometry`);
     if (c.default !== d) bad.push(`${id} defaults to ${c.default} in the registry and ${d} in the geometry`);
   }
-  const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets');
+  /* (curves-leaves) the leaflets' outline twins sit in the drop-down too; they
+     are the twin table's, checked at load just below (THE LEAF CURVE TWINS) */
+  const leafTwinIds = new Set(G.LEAF_CURVE_TWINS.map((r) => r.leaf));
+  /* THE LEAF CURVE TWINS (curves-leaves — "leaf twins generated from a table,
+     not hand-written"): every row of the geometry's `LEAF_CURVE_TWINS` is ONE
+     registry control of its petal twin's KIND, a choice carrying exactly the
+     petal twin's option values, a curve carrying the petal twin's curve spec
+     but for its OWNER (the leaf's own length — the leaflet's for the leaflet
+     outline), each defaulting to the value the twin table says a state that
+     predates it builds through (SLIDER, LAW, the default curves) — so a stored
+     set builds by branch. And no hand-written leaf curve control beside them. */
+  for (const row of G.LEAF_CURVE_TWINS) {
+    const p = CONTROLS.find((c) => c.id === row.petal), c = CONTROLS.find((x) => x.id === row.leaf);
+    if (!c) { bad.push(`the twin table names ${row.leaf} and the registry declares no such control`); continue; }
+    if (CONTROLS.filter((x) => x.id === row.leaf).length !== 1) bad.push(`${row.leaf} is declared more than once`);
+    if (c.kind !== p.kind) bad.push(`${row.leaf} is a ${c.kind} where its petal twin ${row.petal} is a ${p.kind}`);
+    if (p.kind === 'choice' && (c.options || []).map((o) => o.value).join('|') !== p.options.map((o) => o.value).join('|')) bad.push(`${row.leaf}'s options are not ${row.petal}'s`);
+    if (p.kind === 'curve') {
+      const { owner: oc, ...restC } = c.curve || {}, { owner: op, ...restP } = p.curve || {};
+      if (JSON.stringify(restC) !== JSON.stringify(restP)) bad.push(`${row.leaf}'s curve spec is not ${row.petal}'s (but for its owner)`);
+      const wantOwner = row.blade === 'leaflet' ? 'leafletLength' : 'leafLength';
+      if (oc !== wantOwner) bad.push(`${row.leaf}'s curve is owned by ${oc}, not ${wantOwner} — its fractions would be of the wrong length`);
+    }
+    if (JSON.stringify(c.default) !== JSON.stringify(row.rest) || JSON.stringify(DEFAULTS[row.leaf]) !== JSON.stringify(row.rest)) bad.push(`${row.leaf} defaults to ${JSON.stringify(c.default)} where the twin table's rest value is ${JSON.stringify(row.rest)}`);
+  }
+  const strayLeafCurves = CONTROLS.filter((c) => /^leaf(let)?(Curl|Spine|Outline)/.test(c.id) && !leafTwinIds.has(c.id));
+  if (strayLeafCurves.length) bad.push(`hand-written leaf curve control(s) beside the twin table: ${strayLeafCurves.map((c) => c.id).join(', ')}`);
+  const subs = CONTROLS.filter((c) => c.section === 'leafLeaflets' && !leafTwinIds.has(c.id));
   if (subs.length !== ranges.length) bad.push(`the Leaflets section holds ${subs.length} controls, the geometry's layout reads ${ranges.length}`);
   /* THE LEAFLETS' OWN TOOTH DEPTH (Eva's ruling on #380) lives in the shared
      Serration section beside the simple leaf's, on the same range, default 0 */
@@ -6774,6 +6801,64 @@ export function restatedCompound(ui) {
     stalkMm: cl('leafletStalk'), terminalStalkMm: cl('leafletTerminalStalk'),
   };
 }
+/* THE LEAF'S DRAWN SPINE, RESTATED FROM THE CONTROL (curves-leaves): the
+   leaf curl mode and curve as the CONTROLS hold them (a state that predates
+   the twins reads SLIDER and builds through the arch, by branch), and the law
+   the drawn curve gives over `lengthMm` — `restatedSpineCurve` (bloom-curve's
+   own sampler, C1's restatement, never `spineCurveLaw`), laid at the leaf's
+   angle, curl / bias / start 0 so the spine IS the curve, at one sheet
+   thickness of radius at the EXPORT floor for the RACHIS (a rod: no fold
+   limit — the geometry's `rachisSpine`) and at the BLADE's floor with the fold
+   table the blade's own record says bound (`rec`, `bendFromRecord`) for a
+   blade: whether each recorded limit is the RIGHT one is LF37's C5 clause,
+   never this one's. Null where the leaf is on the arch slider. */
+export function leafCurlCurveRestated(ui) {
+  if (String(ui.leafCurlMode ?? 'SLIDER') !== 'CURVE') return null;
+  const v = ui.leafSpineCurve;
+  return typeof v === 'string' ? JSON.parse(v) : v;
+}
+export function restatedLeafSpineLaw(ui, lengthMm, { rec = null, rachis = false, floorMm = null } = {}) {
+  const ctl = leafCurlCurveRestated(ui);
+  if (!ctl) return null;
+  const th = (Number(ui.leafAngle) * Math.PI) / 180;
+  const re = restatedSpineCurve(ctl, lengthMm);
+  const floorRadius = rachis || floorMm === null ? ROLL_MIN_RADIUS_FACTOR * Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM) : ROLL_MIN_RADIUS_FACTOR * floorMm;
+  const rows = rec && rec.substeps ? rec.substeps / SPINE_SUBSTEPS : GEOMETRY.LEAF_BLADE_ROWS;
+  return spineLaw({ curlRad: 0, bias: 0, start: 0, length: lengthMm, tilt: th, floorRadius, rows, curve: re, ...(rachis || !rec ? {} : bendFromRecord(rec)) });
+}
+const RACHIS_LAW_CACHE = new Map();
+function restatedRachisLaw(ui, Lr) {
+  const ctl = leafCurlCurveRestated(ui);
+  const key = `${JSON.stringify(ctl)}|${ui.leafAngle}|${ui.sheetThickness}|${Lr}`;
+  if (!RACHIS_LAW_CACHE.has(key)) { if (RACHIS_LAW_CACHE.size > 64) RACHIS_LAW_CACHE.clear(); RACHIS_LAW_CACHE.set(key, restatedLeafSpineLaw(ui, Lr, { rachis: true })); }
+  return RACHIS_LAW_CACHE.get(key);
+}
+/* HOW FAR ALONG A RESTATED SPINE A POINT STANDS — its foot on the law's own
+   substep polyline in the leaf's (radial, up) plane, then a ternary search on
+   the law between the bracketing substeps (a chord foots a point nanometres
+   short of the arc). A MEASUREMENT on the restated law, written here; the
+   geometry's SN4 reach is another owner's. */
+export function restatedSpineArcOf(law, Lmm, bb, az, p) {
+  const R = [Math.cos(az), Math.sin(az)];
+  const a = (p[0] - bb[0]) * R[0] + (p[1] - bb[1]) * R[1], z = p[2] - bb[2];
+  const M = law.substeps;
+  let bd = Infinity, bi = 0;
+  let prev = law.at(0);
+  for (let i = 0; i < M; i++) {
+    const nx = law.at((Lmm * (i + 1)) / M);
+    const ex = nx.dR - prev.dR, ez = nx.dZ - prev.dZ, L2 = ex * ex + ez * ez;
+    let f = L2 > 0 ? ((a - prev.dR) * ex + (z - prev.dZ) * ez) / L2 : 0;
+    f = f < 0 ? 0 : f > 1 ? 1 : f;
+    const d = Math.hypot(a - (prev.dR + ex * f), z - (prev.dZ + ez * f));
+    if (d < bd) { bd = d; bi = i; }
+    prev = nx;
+  }
+  const dist = (sv) => { const q = law.at(sv); return Math.hypot(a - q.dR, z - q.dZ); };
+  let lo = (Lmm * Math.max(0, bi - 1)) / M, hi = (Lmm * Math.min(M, bi + 2)) / M;
+  for (let it = 0; it < 90 && hi - lo > 1e-13; it++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (dist(m1) <= dist(m2)) hi = m2; else lo = m1; }
+  const s = (lo + hi) / 2;
+  return { s, off: Math.hypot(dist(s), (p[0] - bb[0]) * -R[1] + (p[1] - bb[1]) * R[0]) };
+}
 /* THE RACHIS'S CENTRELINE AND NORMAL from the controls, in the SUM-OF-SINES
    closed form (LF11's own), from the rachis base `bb` at azimuth `az`. */
 export function restatedRachisAt(ui, bb, az, s) {
@@ -6782,7 +6867,13 @@ export function restatedRachisAt(ui, bb, az, s) {
   const L = Number(ui.leafLength);
   const Rr = [Math.cos(az), Math.sin(az)];
   let C, phi = th;
-  if (arch === 0) {
+  /* a DRAWN rachis (curves-leaves): the curve's own law over the rachis */
+  const cpC = leafCurlCurveRestated(ui) ? restatedCompound(ui) : null;
+  if (cpC) {
+    const q = restatedRachisLaw(ui, cpC.rachisMm).at(s);
+    phi = q.phi;
+    C = [bb[0] + Rr[0] * q.dR, bb[1] + Rr[1] * q.dR, bb[2] + q.dZ];
+  } else if (arch === 0) {
     C = [bb[0] + Rr[0] * Math.cos(th) * s, bb[1] + Rr[1] * Math.cos(th) * s, bb[2] + Math.sin(th) * s];
   } else {
     const k = ((-arch * Math.PI) / 180) / L;
@@ -6799,6 +6890,8 @@ export function restatedRachisAt(ui, bb, az, s) {
    ill-conditioned and read the tip ring 2e-8 mm off on a ring that was
    exact (the cost-corner row, seen first). Straight: the distance. */
 export function restatedRachisArcOf(ui, bb, az, p) {
+  const cpC = leafCurlCurveRestated(ui) ? restatedCompound(ui) : null;
+  if (cpC) return restatedSpineArcOf(restatedRachisLaw(ui, cpC.rachisMm), cpC.rachisMm, bb, az, p).s;
   const th = (Number(ui.leafAngle) * Math.PI) / 180;
   const arch = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
   const w = [p[0] - bb[0], p[1] - bb[1], p[2] - bb[2]];
@@ -6811,7 +6904,7 @@ export function restatedRachisArcOf(ui, bb, az, p) {
   if (s < -1e-9) s += (2 * Math.PI) / Math.abs(k);
   return s;
 }
-export function restatedLeafRiseMm(ui) {
+export function restatedLeafRiseMm(ui, spineRec = null) {
   const L = Number(ui.leafLength), th = (Number(ui.leafAngle) * Math.PI) / 180;
   const arch = ui.leafArch === undefined ? 0 : Number(ui.leafArch);
   /* A COMPOUND LEAF (S3) rises by its whole tree: the rachis arc's own maximum
@@ -6820,12 +6913,25 @@ export function restatedLeafRiseMm(ui) {
      (whose rise is cos(angle) of the rachis's at its station). */
   const cp = restatedCompound(ui);
   if (cp) {
-    const arcMax = restatedLeafRiseMm({ ...ui, leafType: 'SIMPLE' });
+    /* (curves-leaves) a DRAWN rachis rises to its law's highest substep */
+    const law = leafCurlCurveRestated(ui) ? restatedRachisLaw(ui, cp.rachisMm) : null;
+    let arcMax;
+    if (law) { arcMax = 0; for (let i = 0; i <= law.substeps; i++) arcMax = Math.max(arcMax, law.at((cp.rachisMm * i) / law.substeps).dZ); }
+    else arcMax = restatedLeafRiseMm({ ...ui, leafType: 'SIMPLE' });
     const at = (s) => restatedRachisAt(ui, [0, 0, 0], 0, s);
     const end = at(cp.rachisMm);
     let best = Math.max(arcMax, end.C[2] + (cp.terminalStalkMm + cp.terminal.lengthMm) * Math.sin(end.phi));
     const cA = Math.cos((cp.angleDeg * Math.PI) / 180);
     for (const q of cp.lateral) { const a = at(q.stationMm); best = Math.max(best, a.C[2], a.C[2] + (cp.stalkMm + q.lengthMm) * cA * Math.sin(a.phi)); }
+    return best;
+  }
+  /* (curves-leaves) a DRAWN spine on a simple or lobed blade rises to its
+     law's highest substep — the EXPORT spine the inset reads (the export
+     floor), with the fold table the blade's own record says bound */
+  if (leafCurlCurveRestated(ui)) {
+    const law = restatedLeafSpineLaw(ui, L, { rec: spineRec, floorMm: Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM) });
+    let best = 0;
+    for (let i = 0; i <= law.substeps; i++) best = Math.max(best, law.at((L * i) / law.substeps).dZ);
     return best;
   }
   if (arch === 0) return L * Math.sin(th);
@@ -8008,6 +8114,38 @@ export const SELF_INTERSECTION_SCOPE =
 export const LEAF_SCOPE =
   'LF0-LF13 carry the leaf (LF11 the arch, LF12 the cup, LF13 the tooth floor — leaf/stem build S2). Blind by declaration: LF11-LF13 read the builder\'s own per-row record of what each blade was built from, so a builder that reported one row plan and emitted another would pass them (the edge-profile gate\'s E4 proves the bead apexes those rows place are in the emitted stream); nothing here reads the exported FILE (the petiole\'s weld is asserted from the builder\'s emitted rings against the plan\'s own bore and outer radii, not from the STL); nothing here asserts the blade\'s SURFACE is the one petalForm drew, which is the petal\'s own form coverage reached through a different frame; and nothing bounds the cantilever, which is UNMEASURED — no coupon has been printed.';
 
+/* ===================================================================
+   THE LEAF'S DRAWN OUTLINE, RESTATED FROM THE CONTROL (curves-leaves). A
+   blade is outlined by a curve iff it is a SIMPLE blade (not LOBED — the
+   lobed blade keeps its own law, ruled) with `leafOutlineMode` CURVE, or a
+   compound LEAFLET with `leafletOutlineMode` CURVE: ONE leaflet curve shared
+   by every leaflet, the terminal included. THE WIDTH SCALE IS RESTATED AS THE
+   RULING STATES IT — the leaf's own width default as the reference, written
+   here as the number (17 mm; the leaflets' 26 x 17 mm reference leaflet) and
+   asserted against the registry's defaults at load, never imported: the
+   simple blade `leafWidth / 17`, a leaflet `(W / L) / (17 / 26)` at its own
+   length and width. Each half of a two-sided curve is restated alone
+   (`outlineHalfOf`, OC's). Null on a LAW blade.
+   =================================================================== */
+export const LEAF_WIDTH_REF_RULED_MM = 17, LEAFLET_LENGTH_REF_RULED_MM = 26, LEAFLET_WIDTH_REF_RULED_MM = 17;
+if (Number(DEFAULTS.leafWidth) !== LEAF_WIDTH_REF_RULED_MM || Number(DEFAULTS.leafletLength) !== LEAFLET_LENGTH_REF_RULED_MM || Number(DEFAULTS.leafletWidth) !== LEAFLET_WIDTH_REF_RULED_MM) throw new Error(`bloom-harness: the leaf width default (${DEFAULTS.leafWidth}) or the leaflet's (${DEFAULTS.leafletLength} x ${DEFAULTS.leafletWidth}) is not the ${LEAF_WIDTH_REF_RULED_MM} / ${LEAFLET_LENGTH_REF_RULED_MM} x ${LEAFLET_WIDTH_REF_RULED_MM} mm the leaf CURVE width scales were ruled against — a default move reshapes every saved leaf curve (curves-leaves)`);
+export function leafBladeOutlineRestated(ui, blade, compound, lobed) {
+  const parse = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+  let curve, scale;
+  if (compound) {
+    if (String(ui.leafletOutlineMode ?? 'LAW') !== 'CURVE') return null;
+    curve = parse(ui.leafletOutlineCurve);
+    scale = (blade.widthMm / blade.lengthMm) / (LEAFLET_WIDTH_REF_RULED_MM / LEAFLET_LENGTH_REF_RULED_MM);
+  } else {
+    if (lobed || String(ui.leafOutlineMode ?? 'LAW') !== 'CURVE') return null;
+    curve = parse(ui.leafOutlineCurve);
+    scale = blade.widthMm / LEAF_WIDTH_REF_RULED_MM;
+  }
+  const twoSided = curve.mode === 'two-sided';
+  const half = (side) => restatedOutline(side ? outlineHalfOf(curve, side) : curve, blade.lengthMm, { scale });
+  return { curve, scale, twoSided, sides: twoSided ? { left: half('left'), right: half('right') } : { both: half(null) } };
+}
+
 export async function leafAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
   const ui = await page.evaluate(() => window.__bloomUIState());
@@ -8118,7 +8256,9 @@ export async function leafAssertions(page, row) {
   } else if (L.nodeDepthsMm.length) {
     /* THE RISE IS THE ARCHED BLADE'S (leaf/stem build S2), restated from the
        controls: at arch 0 it is `L sin(theta)` exactly, the clause as it was. */
-    const rise = restatedLeafRiseMm(ui);
+    /* (curves-leaves) a DRAWN spine's rise reads the fold table its own record
+       says bound — the limit's own values are LF37's C5 clause */
+    const rise = restatedLeafRiseMm(ui, Array.isArray(L.spineBuilt) ? (L.spineBuilt.find(Boolean) || null) : null);
     const needed = Math.max(0, rise);
     const top = L.nodeDepthsMm[0];
     /* A BICONDITIONAL, NOT A CLEARANCE. A leaf that rises further than the
@@ -8508,53 +8648,68 @@ export async function leafAssertions(page, row) {
          length and no station map is needed. The rows' stations are the
          BUILDER's (`rowU`): a nib spends LEAF_ARC_ROWS of them on its arc, so
          `j / NU` is not the answer. */
-      const ns = [];
+      /* (curves-leaves) A DRAWN OUTLINE (LF37 restates it): the tip shape is
+         HIDDEN AND INERT, so (b) has no exponent to read back; (c) holds per
+         half against each half's own clamp record, the widest point the
+         curve's own (restated from the control). */
+      const ob = leafBladeOutlineRestated(ui, bladesR[i], !!cpR, !!lobedR);
       const RU = Array.isArray(L.rowU) ? L.rowU[i] : null;
       if (!RU || RU.length !== rows.length) { bad.push(`LF9: blade ${i} reports ${RU ? RU.length : 'no'} row stations for its ${rows.length} rows — which u each half-width was built at cannot be read`); break; }
-      for (let j = 0; j <= NU_; j++) {
-        const u = RU[j];
-        if (cl && cl.nib && !(u < cl.fromU)) continue;
-        if (u <= uPk || !(rows[j] > TIP_HALF_MM * (1 + 1e-9))) continue;
-        const sPow = (u - uPk) / (1 - uPk), y = rows[j] / halfW;
-        if (!(y > 0 && y < 1 && sPow > 0 && sPow < 1)) continue;
-        let lo = 0.05, hi = 40;
-        for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (Math.pow(y, mid) + Math.pow(sPow, mid) > 1) lo = mid; else hi = mid; }
-        ns.push((lo + hi) / 2);
+      if (!ob) {
+        const ns = [];
+        for (let j = 0; j <= NU_; j++) {
+          const u = RU[j];
+          if (cl && cl.nib && !(u < cl.fromU)) continue;
+          if (u <= uPk || !(rows[j] > TIP_HALF_MM * (1 + 1e-9))) continue;
+          const sPow = (u - uPk) / (1 - uPk), y = rows[j] / halfW;
+          if (!(y > 0 && y < 1 && sPow > 0 && sPow < 1)) continue;
+          let lo = 0.05, hi = 40;
+          for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (Math.pow(y, mid) + Math.pow(sPow, mid) > 1) lo = mid; else hi = mid; }
+          ns.push((lo + hi) / 2);
+        }
+        if (ns.length < 3) { bad.push(`LF9: blade ${i} has only ${ns.length} row(s) above the widest point and above the floor — the exponent cannot be read back (the terminal has taken the whole tip)`); break; }
+        ns.sort((x, y) => x - y);
+        const nRead = ns[Math.floor(ns.length / 2)];
+        if (Math.abs(nRead - nWant) > 1e-6) { bad.push(`LF9: blade ${i}'s blade reads back a tip exponent of ${nRead.toFixed(6)} off the half-widths it was built from, where the LEAF's own control says ${nWant} (the plan says ${L.tipShape})`); break; }
       }
-      if (ns.length < 3) { bad.push(`LF9: blade ${i} has only ${ns.length} row(s) above the widest point and above the floor — the exponent cannot be read back (the terminal has taken the whole tip)`); break; }
-      ns.sort((x, y) => x - y);
-      const nRead = ns[Math.floor(ns.length / 2)];
-      if (Math.abs(nRead - nWant) > 1e-6) { bad.push(`LF9: blade ${i}'s blade reads back a tip exponent of ${nRead.toFixed(6)} off the half-widths it was built from, where the LEAF's own control says ${nWant} (the plan says ${L.tipShape})`); break; }
-      /* (c) the clamp, a biconditional against the same rows — OVER THE TIP
-         STRETCH [uPk, 1] the record is about. The first cut swept every row
-         and fired on the CLEAN tree at row 0: the leaf's base outline reaches
-         zero where it meets the petiole (the base taper's own u = 0), so that
-         row sits on the same floor for a reason that has nothing to do with
-         the tip, and the mutant table's control pass is what said so. */
-      const uPkD = uPk;
-      if (!cl || !(cl.fromU >= uPkD && cl.fromU <= 1)) { bad.push(`LF9: blade ${i}'s clamp record is missing or places the terminal at u = ${cl && cl.fromU}, outside [widest point, 1]`); break; }
-      /* (c) RE-DERIVED ONTO THE NIB (S5): below the station every row of the
-         tip stretch is above the floor (unchanged); at or past it, where the
-         stub's rows sat ON the floor, the nib's rows sit strictly UNDER it —
-         the authored exception, the petal's — and the last row is the nib's
-         own face, `APEX_END_HALF_MM` (the declaration, imported: AN's
-         precedent). A record saying "nib" over a blade built on the stub, or
-         the reverse, is the two disagreeing. */
-      let wrong = null;
-      for (let j = 0; j <= NU_; j++) {
-        const u = RU[j], atFloor = rows[j] === TIP_HALF_MM;
-        if (u < uPkD) continue;
-        if (u < cl.fromU && atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) sits ON the floor below the declared clamp station ${cl.fromU.toFixed(4)}`; break; }
-        if (u >= cl.fromU && cl.nib && !(rows[j] < TIP_HALF_MM)) { wrong = `row ${j} (u ${u.toFixed(4)}) is ${rows[j].toFixed(4)} mm, not UNDER the floor, at or past the nib's join ${cl.fromU.toFixed(4)}`; break; }
-        if (u >= cl.fromU && !cl.nib && !atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) is ${rows[j].toFixed(4)} mm ABOVE the floor at or past the declared clamp station ${cl.fromU.toFixed(4)}`; break; }
+      const halvesC = ob && ob.twoSided
+        ? [['left', rows, cl && cl.sides ? cl.sides.left : null, ob.sides.left.uPk], ['right', Array.isArray(L.rowHalfBaseRightMm) ? L.rowHalfBaseRightMm[i] : null, cl && cl.sides ? cl.sides.right : null, ob.sides.right.uPk]]
+        : [[null, rows, cl, ob ? ob.sides.both.uPk : uPk]];
+      let brokeC = false;
+      for (const [sideC, rowsC, clC, uPkC] of halvesC) {
+        if (!Array.isArray(rowsC) || rowsC.length !== rows.length) { bad.push(`LF9: blade ${i}'s ${sideC} half reports ${rowsC ? rowsC.length : 'no'} base half-widths — the asymmetric outline's ${sideC} half cannot be read`); brokeC = true; break; }
+        /* (c) the clamp, a biconditional against the same rows — OVER THE TIP
+           STRETCH [uPk, 1] the record is about. The first cut swept every row
+           and fired on the CLEAN tree at row 0: the leaf's base outline reaches
+           zero where it meets the petiole (the base taper's own u = 0), so that
+           row sits on the same floor for a reason that has nothing to do with
+           the tip, and the mutant table's control pass is what said so. */
+        const uPkD = uPkC;
+        if (!clC || !(clC.fromU >= uPkD && clC.fromU <= 1)) { bad.push(`LF9: blade ${i}${sideC ? ` (${sideC} half)` : ''}'s clamp record is missing or places the terminal at u = ${clC && clC.fromU}, outside [widest point, 1]`); brokeC = true; break; }
+        /* (c) RE-DERIVED ONTO THE NIB (S5): below the station every row of the
+           tip stretch is above the floor (unchanged); at or past it, where the
+           stub's rows sat ON the floor, the nib's rows sit strictly UNDER it —
+           the authored exception, the petal's — and the last row is the nib's
+           own face, `APEX_END_HALF_MM` (the declaration, imported: AN's
+           precedent). A record saying "nib" over a blade built on the stub, or
+           the reverse, is the two disagreeing. */
+        let wrong = null;
+        for (let j = 0; j <= NU_; j++) {
+          const u = RU[j], atFloor = rowsC[j] === TIP_HALF_MM;
+          if (u < uPkD) continue;
+          if (u < clC.fromU && atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) sits ON the floor below the declared clamp station ${clC.fromU.toFixed(4)}`; brokeC = true; break; }
+          if (u >= clC.fromU && clC.nib && !(rowsC[j] < TIP_HALF_MM)) { wrong = `row ${j} (u ${u.toFixed(4)}) is ${rowsC[j].toFixed(4)} mm, not UNDER the floor, at or past the nib's join ${clC.fromU.toFixed(4)}`; brokeC = true; break; }
+          if (u >= clC.fromU && !clC.nib && !atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) is ${rowsC[j].toFixed(4)} mm ABOVE the floor at or past the declared clamp station ${clC.fromU.toFixed(4)}`; brokeC = true; break; }
+        }
+        if (wrong) { bad.push(`LF9: the terminal clamp the read-out prints is not what the blade was built from — ${wrong}`); brokeC = true; break; }
+        const wantTerm = clC.nib ? 2 * APEX_END_HALF_MM : 2 * TIP_HALF_MM;
+        if (Math.abs(clC.terminalMm - wantTerm) > 1e-12) { bad.push(`LF9: blade ${i}${sideC ? ` (${sideC} half)` : ''} declares a ${clC.terminalMm} mm terminal where the leaf's ${clC.nib ? "nib's face" : 'floor'} is ${wantTerm} mm`); brokeC = true; break; }
+        if (clC.nib && Math.abs(rowsC[NU_] - APEX_END_HALF_MM) > 1e-12) { bad.push(`LF9: blade ${i}${sideC ? ` (${sideC} half)` : ''} declares a nib and its last row is ${rowsC[NU_]} mm, not the nib's ${APEX_END_HALF_MM} mm face`); brokeC = true; break; }
+        if (Math.abs(clC.fraction - (1 - clC.fromU)) > 1e-12 || Math.abs(clC.mm - (1 - clC.fromU) * lengthMm) > 1e-9 || Math.abs(clC.ofWidth - wantTerm / (2 * halfW)) > 1e-12) {
+          bad.push(`LF9: blade ${i}${sideC ? ` (${sideC} half)` : ''}'s clamp record (${clC.mm} mm, ${clC.fraction} of the length, ${clC.ofWidth} of the width) is not its own station ${clC.fromU} applied to the control's ${lengthMm} x ${2 * halfW} mm`); brokeC = true; break;
+        }
       }
-      if (wrong) { bad.push(`LF9: the terminal clamp the read-out prints is not what the blade was built from — ${wrong}`); break; }
-      const wantTerm = cl.nib ? 2 * APEX_END_HALF_MM : 2 * TIP_HALF_MM;
-      if (Math.abs(cl.terminalMm - wantTerm) > 1e-12) { bad.push(`LF9: blade ${i} declares a ${cl.terminalMm} mm terminal where the leaf's ${cl.nib ? "nib's face" : 'floor'} is ${wantTerm} mm`); break; }
-      if (cl.nib && Math.abs(rows[NU_] - APEX_END_HALF_MM) > 1e-12) { bad.push(`LF9: blade ${i} declares a nib and its last row is ${rows[NU_]} mm, not the nib's ${APEX_END_HALF_MM} mm face`); break; }
-      if (Math.abs(cl.fraction - (1 - cl.fromU)) > 1e-12 || Math.abs(cl.mm - (1 - cl.fromU) * lengthMm) > 1e-9 || Math.abs(cl.ofWidth - wantTerm / (2 * halfW)) > 1e-12) {
-        bad.push(`LF9: blade ${i}'s clamp record (${cl.mm} mm, ${cl.fraction} of the length, ${cl.ofWidth} of the width) is not its own station ${cl.fromU} applied to the control's ${lengthMm} x ${2 * halfW} mm`); break;
-      }
+      if (brokeC) break;
     }
   }
   /* LF32 — THE TIP CLOSES WITHOUT A NECK (S5, Eva's ruling of Oct 10: "the
@@ -8575,22 +8730,33 @@ export async function leafAssertions(page, row) {
      0.05 mm face. Reference: the emitted base rows and the floor constant;
      measured: the emitted drawn rows. */
   if (Array.isArray(L.rowHalfBaseMm) && Array.isArray(L.rowHalfMm) && Array.isArray(L.tipClamp) && L.rowHalfBaseMm.length === bladesR.length && L.rowHalfMm.length === bladesR.length) {
-    for (let i = 0; i < bladesR.length; i++) {
-      const hb = L.rowHalfBaseMm[i], hs = L.rowHalfMm[i], cl = L.tipClamp[i];
-      if (!Array.isArray(hb) || !Array.isArray(hs) || hb.length !== hs.length) { bad.push(`LF33: blade ${i} reports ${hb ? hb.length : 'no'} base and ${hs ? hs.length : 'no'} drawn half-widths — the fold zone cannot be read`); break; }
+    /* (curves-leaves) PER HALF on an asymmetric drawn outline — each half's
+       base and drawn rows (the right half's own arrays) and its own nib — and
+       the widest point the drawn curve's own, restated from the control */
+    let broke3 = false;
+    for (let i = 0; i < bladesR.length && !broke3; i++) {
+      const ob = leafBladeOutlineRestated(ui, bladesR[i], !!cpR, !!lobedR);
+      const halves3 = ob && ob.twoSided
+        ? [['left', L.rowHalfBaseMm[i], L.rowHalfMm[i], L.tipClamp[i] && L.tipClamp[i].sides ? L.tipClamp[i].sides.left : null, ob.sides.left.uPk],
+           ['right', Array.isArray(L.rowHalfBaseRightMm) ? L.rowHalfBaseRightMm[i] : null, Array.isArray(L.rowHalfRightMm) ? L.rowHalfRightMm[i] : null, L.tipClamp[i] && L.tipClamp[i].sides ? L.tipClamp[i].sides.right : null, ob.sides.right.uPk]]
+        : [[null, L.rowHalfBaseMm[i], L.rowHalfMm[i], L.tipClamp[i], ob ? ob.sides.both.uPk : null]];
+      for (const [side3, hb, hs, cl, uPkO] of halves3) {
+      const who = side3 ? `blade ${i} (${side3} half)` : `blade ${i}`;
+      if (!Array.isArray(hb) || !Array.isArray(hs) || hb.length !== hs.length) { bad.push(`LF33: ${who} reports ${hb ? hb.length : 'no'} base and ${hs ? hs.length : 'no'} drawn half-widths — the fold zone cannot be read`); broke3 = true; break; }
       let cutAt = null;
       for (let j = 0; j < hb.length; j++) if (hb[j] < TIP_HALF_MM && hs[j] !== hb[j]) { cutAt = j; break; }
-      if (cutAt !== null) { bad.push(`LF33: blade ${i}'s row ${cutAt} is cut to ${hs[cutAt].toFixed(5)} mm where its base outline is ${hb[cutAt].toFixed(5)} mm, under the ${TIP_HALF_MM} mm print floor — a tooth is cut into the converging tip, where it folds; the tip must give it up`); break; }
+      if (cutAt !== null) { bad.push(`LF33: ${who}'s row ${cutAt} is cut to ${hs[cutAt].toFixed(5)} mm where its base outline is ${hb[cutAt].toFixed(5)} mm, under the ${TIP_HALF_MM} mm print floor — a tooth is cut into the converging tip, where it folds; the tip must give it up`); broke3 = true; break; }
       if (!(cl && cl.nib)) continue;
       /* FROM THE RESTATED WIDEST POINT, never from the widest ROW: a bulb
          big enough is itself the widest row, and a clause starting there sees
          nothing past it — the mutant table's `the-leaf-nib-bulges` (a 293 mm
          swell) went silent here on exactly that. The widest point is rebuilt
-         from the blade type's two taper declarations (LF9's own restatement)
-         and the rows' stations are the builder's (`rowU`). */
+         from the blade type's two taper declarations (LF9's own restatement),
+         or on a drawn outline the curve's own argmax restated from the
+         control, and the rows' stations are the builder's (`rowU`). */
       const ta = cpR ? LEAFLET_BASE_TAPER : lobedR ? LOBED_BASE_TAPER : LEAF_BASE_TAPER, tb = cpR ? LEAFLET_TIP_TAPER : lobedR ? LOBED_TIP_TAPER : LEAF_TIP_TAPER;
-      const uPkR = ta / (ta + tb), RUi = Array.isArray(L.rowU) ? L.rowU[i] : null;
-      if (!RUi || RUi.length !== hb.length) { bad.push(`LF32: blade ${i} reports no row stations — where its widest point is cannot be read`); break; }
+      const uPkR = uPkO !== null ? uPkO : ta / (ta + tb), RUi = Array.isArray(L.rowU) ? L.rowU[i] : null;
+      if (!RUi || RUi.length !== hb.length) { bad.push(`LF32: ${who} reports no row stations — where its widest point is cannot be read`); broke3 = true; break; }
       let pk = 0;
       while (pk + 1 < hb.length && RUi[pk] < uPkR) pk++;
       /* a LOBED blade's base outline carries its lobes past the widest point
@@ -8602,7 +8768,8 @@ export async function leafAssertions(page, row) {
         if (hb[j] > hb[j - 1]) { neck = `row ${j} rises ${(hb[j] - hb[j - 1]).toExponential(3)} mm over row ${j - 1} (${hb[j - 1].toFixed(5)} -> ${hb[j].toFixed(5)} mm) past row ${pk} (the restated widest point${lobedR ? ', or for a lobed blade the first row under the floor' : ''})`; break; }
         if (hb[j - 1] < TIP_HALF_MM && !(hb[j] < hb[j - 1])) { neck = `row ${j} holds ${hb[j].toFixed(5)} mm under the print floor where the tip must keep closing`; break; }
       }
-      if (neck) { bad.push(`LF32: blade ${i}'s tip does not close as a point — ${neck} (a neck or a bulb)`); break; }
+      if (neck) { bad.push(`LF32: ${who}'s tip does not close as a point — ${neck} (a neck or a bulb)`); broke3 = true; break; }
+      }
     }
   }
   /* LF35 — THE CONVERGING TIP KEEPS NO NECK (S5b, Eva's ruling of Oct 11:
@@ -8629,18 +8796,28 @@ export async function leafAssertions(page, row) {
   if (Array.isArray(L.serrationBuilt) && L.serrationBuilt.length === bladesR.length && Array.isArray(L.rowHalfMm) && L.rowHalfMm.length === bladesR.length) {
     const NECK_HALF = 1 / 2, SLACK = 1e-5;
     const ta = cpR ? LEAFLET_BASE_TAPER : lobedR ? LOBED_BASE_TAPER : LEAF_BASE_TAPER, tb = cpR ? LEAFLET_TIP_TAPER : lobedR ? LOBED_TIP_TAPER : LEAF_TIP_TAPER;
-    const uPkR = ta / (ta + tb);
-    for (let i = 0; i < bladesR.length; i++) {
-      const Sv = L.serrationBuilt[i];
+    const uPkLaw = ta / (ta + tb);
+    /* (curves-leaves) PER HALF on an asymmetric drawn outline, the widest
+       point the drawn curve's own (restated from the control) */
+    let broke35 = false;
+    for (let i0 = 0; i0 < bladesR.length && !broke35; i0++) {
+      const ob = leafBladeOutlineRestated(ui, bladesR[i0], !!cpR, !!lobedR);
+      const S0 = L.serrationBuilt[i0];
+      const halves35 = ob && ob.twoSided
+        ? [['left', S0 && S0.sides && S0.sides.left, L.rowHalfMm[i0], Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm[i0] : null, ob.sides.left.uPk],
+           ['right', S0 && S0.sides && S0.sides.right, Array.isArray(L.rowHalfRightMm) ? L.rowHalfRightMm[i0] : null, Array.isArray(L.rowHalfBaseRightMm) ? L.rowHalfBaseRightMm[i0] : null, ob.sides.right.uPk]]
+        : [[null, S0, L.rowHalfMm[i0], null, ob ? ob.sides.both.uPk : uPkLaw]];
+    for (const [side35, Sv, hsH, hbH, uPkR] of halves35) {
+      const i = side35 ? `${i0} (${side35} half)` : i0;
       if (!Sv || Sv.noRoom) continue;
       const TN = Sv.tipNeck;
-      if (!TN) { bad.push(`LF35: blade ${i} cuts ${Sv.countBuilt} teeth and carries no tip-neck record — whether the converging tip is necked is then asserted by nothing`); break; }
+      if (!TN) { bad.push(`LF35: blade ${i} cuts ${Sv.countBuilt} teeth and carries no tip-neck record — whether the converging tip is necked is then asserted by nothing`); broke35 = true; break; }
       const tested = TN.tested || [];
       /* the bar: half, or the blade's own body teeth where those part it
          deeper (the record's measure of them; (a) below re-reads the body off
          the emitted rows) */
       const barR = Math.max(NECK_HALF, Number(TN.bodyFraction) || 0);
-      if (!(Math.abs(TN.bar - barR) <= 0)) { bad.push(`LF35: blade ${i}'s neck bar reads ${TN.bar} where max(1/2, its body's ${TN.bodyFraction}) is ${barR}`); break; }
+      if (!(Math.abs(TN.bar - barR) <= 0)) { bad.push(`LF35: blade ${i}'s neck bar reads ${TN.bar} where max(1/2, its body's ${TN.bodyFraction}) is ${barR}`); broke35 = true; break; }
       const stop = tested.findIndex((x) => !(x.fraction > barR));
       const giveN = stop < 0 ? tested.length : stop;
       if (TN.pairsGiven !== giveN || TN.sinusU.length !== giveN || tested.slice(0, giveN).some((x, k) => x.sinusU !== TN.sinusU[k])) {
@@ -8649,14 +8826,14 @@ export async function leafAssertions(page, row) {
       const sIdx = (u) => Sv.sinusU.indexOf(u);
       let relOk = true;
       for (const u of TN.sinusU) { const k = sIdx(u); if (k < 0 || Sv.reliefMm[k] !== 0 || Sv.reliefMm[Sv.periods - 1 - k] !== 0) relOk = false; }
-      if (!relOk) { bad.push(`LF35: blade ${i} says it gave the pair(s) at u ${TN.sinusU.map((u) => u.toFixed(4)).join(', ')} up and still cuts them on one margin or both`); break; }
+      if (!relOk) { bad.push(`LF35: blade ${i} says it gave the pair(s) at u ${TN.sinusU.map((u) => u.toFixed(4)).join(', ')} up and still cuts them on one margin or both`); broke35 = true; break; }
       let drawnN = 0;
       for (let k = 1; k < Sv.periods; k++) if (Sv.reliefMm[k - 1] > 0 || Sv.reliefMm[k] > 0) drawnN++;
-      if (drawnN !== TN.teethDrawn) { bad.push(`LF35: blade ${i} says ${TN.teethDrawn} teeth are drawn where ${drawnN} crests have a cut flank in its relief record`); break; }
-      const hs = L.rowHalfMm[i], RUi = Array.isArray(L.rowU) ? L.rowU[i] : null;
-      const LBi = lobedR && Array.isArray(L.lobedBuilt) ? L.lobedBuilt[i] : null;
-      const hT = LBi ? LBi.rowHalfLobeMm : (Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm[i] : null);
-      if (!Array.isArray(hs) || !Array.isArray(hT) || !RUi || hT.length !== hs.length || RUi.length !== hs.length) { bad.push(`LF35: blade ${i} reports no tooth-base and drawn rows with their stations — the tip cannot be read`); break; }
+      if (drawnN !== TN.teethDrawn) { bad.push(`LF35: blade ${i} says ${TN.teethDrawn} teeth are drawn where ${drawnN} crests have a cut flank in its relief record`); broke35 = true; break; }
+      const hs = hsH, RUi = Array.isArray(L.rowU) ? L.rowU[i0] : null;
+      const LBi = lobedR && Array.isArray(L.lobedBuilt) ? L.lobedBuilt[i0] : null;
+      const hT = LBi ? LBi.rowHalfLobeMm : hbH || (Array.isArray(L.rowHalfBaseMm) ? L.rowHalfBaseMm[i0] : null);
+      if (!Array.isArray(hs) || !Array.isArray(hT) || !RUi || hT.length !== hs.length || RUi.length !== hs.length) { bad.push(`LF35: blade ${i} reports no tooth-base and drawn rows with their stations — the tip cannot be read`); broke35 = true; break; }
       /* THE NOTCH THE TIP KEPT, bracketed by the tooth law's own LAYOUT
          (its crests and sinuses — the stations, never the give-up decision),
          measured on the rows: walking down from the apex, the first margin
@@ -8687,7 +8864,8 @@ export async function leafAssertions(page, row) {
         }
         break;
       }
-      if (worst) { bad.push(`LF35: blade ${i}'s tip-most notch NECKS the tip — row ${worst.j} (u ${RUi[worst.j].toFixed(4)}) is drawn ${hs[worst.j].toFixed(4)} mm where the tooth's base outline is ${hT[worst.j].toFixed(4)} mm: ${(100 * worst.f).toFixed(1)}% of the way to the midrib, past half and past the body's own deepest tooth on the rows (${(100 * bodyRows).toFixed(1)}%) — the tip must give that pair up`); break; }
+      if (worst) { bad.push(`LF35: blade ${i}'s tip-most notch NECKS the tip — row ${worst.j} (u ${RUi[worst.j].toFixed(4)}) is drawn ${hs[worst.j].toFixed(4)} mm where the tooth's base outline is ${hT[worst.j].toFixed(4)} mm: ${(100 * worst.f).toFixed(1)}% of the way to the midrib, past half and past the body's own deepest tooth on the rows (${(100 * bodyRows).toFixed(1)}%) — the tip must give that pair up`); broke35 = true; break; }
+    }
     }
   }
   /* LF10 — THE BLADE'S LATTICE IS THE LEAF'S OWN, WHATEVER THE PETALS DID.
@@ -8751,7 +8929,11 @@ export async function leafAssertions(page, row) {
     if (!Array.isArray(CB) || CB.length !== L.built || CB.some((c) => !c) || !Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built || builtNodes.length !== L.built) {
       bad.push(`LF11: a compound leaf reports no axis rod for ${L.built} leaves — the rachis's arch is then asserted by nothing`);
     } else {
-      const th = (Number(ui.leafAngle) * Math.PI) / 180, turn = (-archDeg * Math.PI) / 180, Lr = cpR.rachisMm;
+      const Lr = cpR.rachisMm;
+      /* (curves-leaves) IN CURVE MODE THE ARCH IS HIDDEN AND INERT: the rachis
+         follows the drawn curve (restated) and the built turn is 0 */
+      const curveR = leafCurlCurveRestated(ui) ? restatedRachisLaw(ui, Lr) : null;
+      const th = (Number(ui.leafAngle) * Math.PI) / 180, turn = curveR ? 0 : (-archDeg * Math.PI) / 180;
       let worst = 0, tipMiss = Infinity, at = null;
       for (let i = 0; i < L.built; i++) {
         const { az } = builtNodes[i], bb = L.petioleAxes[i].outer;
@@ -8773,24 +8955,36 @@ export async function leafAssertions(page, row) {
           const w = [cs[j][0] - bb[0], cs[j][1] - bb[1], cs[j][2] - bb[2]];
           const off = Math.abs(w[0] * T[0] + w[1] * T[1]), al = w[0] * R[0] + w[1] * R[1], up = w[2];
           let d;
-          if (turn === 0) { const s0 = al * Math.cos(th) + up * Math.sin(th); d = Math.hypot(al - s0 * Math.cos(th), up - s0 * Math.sin(th)); }
+          /* (curves-leaves) a DRAWN rachis: the ring's distance from the
+             curve's own law restated from the control's points */
+          if (curveR) d = restatedSpineArcOf(curveR, Lr, bb, az, cs[j]).off;
+          else if (turn === 0) { const s0 = al * Math.cos(th) + up * Math.sin(th); d = Math.hypot(al - s0 * Math.cos(th), up - s0 * Math.sin(th)); }
           else { const k = turn / Lr; d = Math.abs(Math.hypot(al + Math.sin(th) / k, up - Math.cos(th) / k) - 1 / Math.abs(k)); }
-          d = Math.hypot(d, off);
+          if (!curveR) d = Math.hypot(d, off);
           if (d > worst) { worst = d; at = `leaf ${i} ring ${j}`; }
         }
         const tb = L.leafArchBuilt && L.leafArchBuilt[i];
         if (!tb || Math.abs(tb.turnRad - turn) > 1e-12) { bad.push(`LF11: compound leaf ${i} reports a built turn of ${tb && tb.turnRad} rad over its rachis where the LEAF's arch of ${archDeg} deg asks ${turn}`); break; }
       }
-      if (Number.isFinite(tipMiss)) bad.push(`LF11: the axis rod never reaches the rachis tip the controls restate (arch ${archDeg} deg over ${Lr} mm), or has no ring at its base — ${at}`);
-      else if (worst > 1e-9) bad.push(`LF11: the rachis is ${worst.toExponential(3)} mm off the arc restated from the controls (arch ${archDeg} deg, angle ${ui.leafAngle} deg, ${Lr} mm) at ${at}`);
+      const what = curveR ? `the DRAWN curve restated from the leaf spine control (${Lr} mm)` : `the arc restated from the controls (arch ${archDeg} deg, angle ${ui.leafAngle} deg, ${Lr} mm)`;
+      if (Number.isFinite(tipMiss)) bad.push(`LF11: the axis rod never reaches the rachis tip ${what}, or has no ring at its base — ${at}`);
+      else if (worst > 1e-9) bad.push(`LF11: the rachis is ${worst.toExponential(3)} mm off ${what} at ${at}`);
     }
   } else if (!Array.isArray(L.rowCentre) || L.rowCentre.length !== L.built || !Array.isArray(L.rowNormal) || L.rowNormal.length !== L.built || !Array.isArray(L.petioleAxes) || L.petioleAxes.length !== L.built || builtNodes.length !== L.built) {
     bad.push(`LF11: the builder reports no per-row centre and frame for ${L.built} leaves — the arch is then asserted by nothing, and both STL gates are blind to it`);
   } else {
-    const th = (Number(ui.leafAngle) * Math.PI) / 180, turn = (-archDeg * Math.PI) / 180;
+    /* (curves-leaves) IN CURVE MODE THE ARCH IS HIDDEN AND INERT: every row
+       sits on the DRAWN curve's law restated from the leaf spine control at
+       the blade's own length and the mode's floor, with the fold table the
+       blade's own record says bound (whether each recorded limit is right is
+       LF37's C5 clause); the built arch turn is 0 */
+    const curveMode = !!leafCurlCurveRestated(ui);
+    const floorMm = m.shownMode === 'export' ? Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM) : Number(ui.sheetThickness);
+    const th = (Number(ui.leafAngle) * Math.PI) / 180, turn = curveMode ? 0 : (-archDeg * Math.PI) / 180;
     let worstC = 0, worstN = 0, at = null;
     for (let i = 0; i < L.built; i++) {
       const { az, len } = builtNodes[i];
+      const lawC = curveMode ? restatedLeafSpineLaw(ui, len, { rec: Array.isArray(L.spineBuilt) ? L.spineBuilt[i] : null, floorMm }) : null;
       /* (a LOBED leaf's petiole runs on into its blade, S4, so its blade base
          is the rod's ring AT the petiole's length — `bladeBase`, emitted) */
       const Rr = [Math.cos(az), Math.sin(az)], bb = L.petioleAxes[i].bladeBase || L.petioleAxes[i].outer;
@@ -8799,7 +8993,11 @@ export async function leafAssertions(page, row) {
       for (let j = 0; j <= NU_; j++) {
         const u = USc[j], sArc = u * len;
         let C, phi = th;
-        if (turn === 0) {
+        if (lawC) {
+          const q = lawC.at(sArc);
+          phi = q.phi;
+          C = [bb[0] + Rr[0] * q.dR, bb[1] + Rr[1] * q.dR, bb[2] + q.dZ];
+        } else if (turn === 0) {
           const D = [Rr[0] * Math.cos(th), Rr[1] * Math.cos(th), Math.sin(th)];
           C = [bb[0] + D[0] * sArc, bb[1] + D[1] * sArc, bb[2] + D[2] * sArc];
         } else {
@@ -8820,7 +9018,7 @@ export async function leafAssertions(page, row) {
     /* 1e-9 mm on the centre and 1e-9 on a unit normal: the two closed forms
        agree to ~1e-13 at the gentlest reachable arch (5 deg over 120 mm), and a
        wrong arch moves a 52 mm blade's tip by millimetres. */
-    if (worstC > 1e-9) bad.push(`LF11: the blade's centreline is ${worstC.toExponential(3)} mm off the arc restated from the controls (arch ${archDeg} deg, angle ${ui.leafAngle} deg) at ${at}`);
+    if (worstC > 1e-9) bad.push(`LF11: the blade's centreline is ${worstC.toExponential(3)} mm off ${curveMode ? 'the DRAWN curve restated from the leaf spine control' : 'the arc restated from the controls'} (arch ${archDeg} deg${curveMode ? ' — hidden and inert' : ''}, angle ${ui.leafAngle} deg) at ${at}`);
     if (worstN > 1e-9) bad.push(`LF11: a row's frame normal is ${worstN.toExponential(3)} off the arc's own normal — the centreline turned without the frame (a wedge, not a sheet)`);
   }
   /* LF12 — THE CUP IS THE LEAF'S OWN CONTROL, read back off the surface. On
@@ -8858,7 +9056,18 @@ export async function leafAssertions(page, row) {
            (`rowMarginAcrossMm`); the coefficient and the clamp are as above */
         const LB = lobedR && L.lobedBuilt && L.lobedBuilt[i];
         const ys = LB && LB.rowMarginAcrossMm ? LB.rowMarginAcrossMm[j] : [h, h];
-        lifts[j].forEach((got, side) => { const want = c * ys[side] * ys[side] / hb; const d = Math.abs(got - want); if (d > worst) { worst = d; at = `blade ${i} row ${j} (asked lift ${want.toFixed(4)} mm, read ${got.toFixed(4)})`; } });
+        /* (curves-leaves) an ASYMMETRIC drawn outline: margin 0 is v = -1, the
+           RIGHT half, cupped on its own half-widths; margin 1 the left */
+        const hR = Array.isArray(L.rowHalfRightMm) && L.rowHalfRightMm[i] ? L.rowHalfRightMm[i][j] : null;
+        const hbR = Array.isArray(L.rowHalfBaseRightMm) && L.rowHalfBaseRightMm[i] ? L.rowHalfBaseRightMm[i][j] : null;
+        lifts[j].forEach((got, side) => {
+          const two = hR !== null && hbR !== null && !LB;
+          const hS = two && side === 0 ? hR : side === 0 ? ys[0] : ys[1], hbS = two && side === 0 ? hbR : hb;
+          const capS = hbS / (FOLD_CLAMP_MARGIN * tSheet);
+          const cSS = hbS < TIP_HALF_MM ? cupCtl * (hbS / TIP_HALF_MM) : cupCtl;
+          const cS2 = two ? (Math.abs(cSS) <= capS ? cSS : (cSS < 0 ? -capS : capS)) : c;
+          const want = cS2 * hS * hS / hbS; const d = Math.abs(got - want); if (d > worst) { worst = d; at = `blade ${i} row ${j} margin ${side} (asked lift ${want.toFixed(4)} mm, read ${got.toFixed(4)})`; }
+        });
       }
     }
     if (worst > 1e-9) bad.push(`LF12: a margin's cup lift is ${worst.toExponential(3)} mm off the LEAF's own cup ${cupCtl} restated with the fold clamp, at ${at}`);
@@ -8882,41 +9091,166 @@ export async function leafAssertions(page, row) {
        note; seen red first: "blade 0 carries no serration record at tooth
        depth 0.26" on the compound defaults) */
     const depth = toothDepthCtl;
-    for (let i = 0; i < bladesR.length; i++) {
-      const S = L.serrationBuilt[i], halfW = bladesR[i].widthMm / 2;
-      if (!(depth > 0)) { if (S) { bad.push(`LF13: blade ${i} carries a serration record at tooth depth 0 — the guard must be inert`); break; } continue; }
-      if (!S) { bad.push(`LF13: blade ${i} carries no serration record at tooth depth ${depth}`); break; }
-      if (S.reliefFloorMm !== MIN_FEATURE_MM) { bad.push(`LF13: blade ${i}'s relief floor reads ${S.reliefFloorMm} where the ruling's floor is MIN_FEATURE_MM = ${MIN_FEATURE_MM} (both modes, the constant)`); break; }
-      if (Math.abs(S.peakHalfMm - halfW) > 1e-9) { bad.push(`LF13: blade ${i}'s declared widest half-width is ${S.peakHalfMm} where the control's width says ${halfW}`); break; }
+    /* (curves-leaves) SERRATION STAYS ON IN CURVE MODE (Eva, Oct 20): on a
+       drawn outline the widest half-width is the CURVE's own peak at the
+       blade's width scale, restated from the control (LF37's restatement),
+       and an asymmetric blade is held PER HALF against each half's own record
+       (`sides`) — the teeth cut into each drawn half, today's rules unchanged */
+    let broke13 = false;
+    for (let i0 = 0; i0 < bladesR.length && !broke13; i0++) {
+      const ob = leafBladeOutlineRestated(ui, bladesR[i0], !!cpR, !!lobedR);
+      const S0 = L.serrationBuilt[i0];
+      if (S0 && ob && ob.twoSided !== !!S0.twoSided) { bad.push(`LF13: blade ${i0}'s serration record is ${S0.twoSided ? 'two-sided' : 'one-sided'} on a ${ob.twoSided ? 'two-sided' : 'symmetric'} drawn outline`); break; }
+      const halves13 = ob && ob.twoSided ? [['left', S0 && S0.sides && S0.sides.left, ob.sides.left.peakHalfMm], ['right', S0 && S0.sides && S0.sides.right, ob.sides.right.peakHalfMm]] : [[null, S0, ob ? ob.sides.both.peakHalfMm : bladesR[i0].widthMm / 2]];
+    for (const [side13, S, halfW] of halves13) {
+      const i = side13 ? `${i0} (${side13} half)` : i0;
+      if (!(depth > 0)) { if (S) { bad.push(`LF13: blade ${i} carries a serration record at tooth depth 0 — the guard must be inert`); broke13 = true; break; } continue; }
+      if (!S) { bad.push(`LF13: blade ${i} carries no serration record at tooth depth ${depth}`); broke13 = true; break; }
+      if (S.reliefFloorMm !== MIN_FEATURE_MM) { bad.push(`LF13: blade ${i}'s relief floor reads ${S.reliefFloorMm} where the ruling's floor is MIN_FEATURE_MM = ${MIN_FEATURE_MM} (both modes, the constant)`); broke13 = true; break; }
+      if (Math.abs(S.peakHalfMm - halfW) > 1e-9) { bad.push(`LF13: blade ${i}'s declared widest half-width is ${S.peakHalfMm} where the control's width says ${halfW}`); broke13 = true; break; }
       const asked = depth * Math.max(0, halfW - TIP_HALF_MM);
-      if (!(halfW - TIP_HALF_MM >= MIN_FEATURE_MM) && !(S.noRoom && S.countBuilt === 0)) { bad.push(`LF13: blade ${i} cuts ${S.countBuilt} teeth on a blade whose widest half-width has only ${(halfW - TIP_HALF_MM).toFixed(3)} mm over the print floor — no notch can be ${MIN_FEATURE_MM} mm deep anywhere on it`); break; }
+      if (!(halfW - TIP_HALF_MM >= MIN_FEATURE_MM) && !(S.noRoom && S.countBuilt === 0)) { bad.push(`LF13: blade ${i} cuts ${S.countBuilt} teeth on a blade whose widest half-width has only ${(halfW - TIP_HALF_MM).toFixed(3)} mm over the print floor — no notch can be ${MIN_FEATURE_MM} mm deep anywhere on it`); broke13 = true; break; }
       if (S.noRoom) {
-        if (S.countBuilt !== 0) { bad.push(`LF13: blade ${i} declares NO ROOM and builds ${S.countBuilt} teeth`); break; }
+        if (S.countBuilt !== 0) { bad.push(`LF13: blade ${i} declares NO ROOM and builds ${S.countBuilt} teeth`); broke13 = true; break; }
         continue;
       }
-      if (Math.abs(S.reliefAskedMm - asked) > 1e-9) { bad.push(`LF13: blade ${i}'s asked relief reads ${S.reliefAskedMm} mm where depth ${depth} x (${halfW} - ${TIP_HALF_MM}) is ${asked}`); break; }
+      if (Math.abs(S.reliefAskedMm - asked) > 1e-9) { bad.push(`LF13: blade ${i}'s asked relief reads ${S.reliefAskedMm} mm where depth ${depth} x (${halfW} - ${TIP_HALF_MM}) is ${asked}`); broke13 = true; break; }
       /* (a LOBED chevron also caps it at the fold — LF23 holds that cap; here
          the floored ask is the most it may be, and exactly it where unclamped) */
       const built = lobedR && S.foldClamped ? S.foldCapMm : Math.max(asked, MIN_FEATURE_MM);
-      if (Math.abs(S.reliefBuiltMm - built) > 1e-9 || S.reliefFloored !== (asked < MIN_FEATURE_MM)) { bad.push(`LF13: blade ${i} cuts at a relief of ${S.reliefBuiltMm} mm (floored: ${S.reliefFloored}) where max(${asked.toFixed(4)}, ${MIN_FEATURE_MM}) is ${built}`); break; }
+      if (Math.abs(S.reliefBuiltMm - built) > 1e-9 || S.reliefFloored !== (asked < MIN_FEATURE_MM)) { bad.push(`LF13: blade ${i} cuts at a relief of ${S.reliefBuiltMm} mm (floored: ${S.reliefFloored}) where max(${asked.toFixed(4)}, ${MIN_FEATURE_MM}) is ${built}`); broke13 = true; break; }
       /* (S5b: a pair the converging tip gave up is cut at relief 0 BY THE
          RULE, not under the floor — LF35 holds the give-up itself) */
       const gaveK = new Set();
       for (const u of (S.tipNeck ? S.tipNeck.sinusU : [])) { const k = S.sinusU.indexOf(u); if (k >= 0) { gaveK.add(k); gaveK.add(S.periods - 1 - k); } }
       const margin = S.reliefMm.filter((r, k) => (S.apexIsCrest || k !== (S.periods - 1) / 2) && !gaveK.has(k));
       const under = margin.filter((r) => !(r >= MIN_FEATURE_MM));
-      if (under.length) { bad.push(`LF13: blade ${i} cuts ${under.length} margin notch(es) under the ${MIN_FEATURE_MM} mm floor (shallowest ${Math.min(...under).toFixed(4)} mm in the record)`); break; }
+      if (under.length) { bad.push(`LF13: blade ${i} cuts ${under.length} margin notch(es) under the ${MIN_FEATURE_MM} mm floor (shallowest ${Math.min(...under).toFixed(4)} mm in the record)`); broke13 = true; break; }
       const drawn = (S.sinusReliefMm || []).filter((r, k) => !(S.tipNeck && S.tipNeck.sinusU.includes(S.sinusU[k])) && !(r >= MIN_FEATURE_MM - 1e-6));
-      if (!S.sinusReliefMm || !S.sinusReliefMm.length || drawn.length) { bad.push(`LF13: blade ${i}'s OUTLINE carries ${drawn.length ? `a notch of ${Math.min(...drawn).toFixed(4)} mm at a margin sinus` : 'no margin sinus at all'} — the floor is in the record and not in the cut`); break; }
-      if (S.countBuilt > S.countAsked) { bad.push(`LF13: blade ${i} builds ${S.countBuilt} teeth of ${S.countAsked} asked`); break; }
-      if ((S.clampedBy === 'relief floor') !== (S.countReliefCap !== null && S.countReliefCap === S.countBuilt && S.countBuilt < Math.min(S.countAsked, S.countRowsCap, S.countFloorCap))) { bad.push(`LF13: blade ${i}'s count says CLAMPED BY ${S.clampedBy} with a relief-floor cap of ${S.countReliefCap} and ${S.countBuilt} built — the cause must be a biconditional`); break; }
+      if (!S.sinusReliefMm || !S.sinusReliefMm.length || drawn.length) { bad.push(`LF13: blade ${i}'s OUTLINE carries ${drawn.length ? `a notch of ${Math.min(...drawn).toFixed(4)} mm at a margin sinus` : 'no margin sinus at all'} — the floor is in the record and not in the cut`); broke13 = true; break; }
+      if (S.countBuilt > S.countAsked) { bad.push(`LF13: blade ${i} builds ${S.countBuilt} teeth of ${S.countAsked} asked`); broke13 = true; break; }
+      if ((S.clampedBy === 'relief floor') !== (S.countReliefCap !== null && S.countReliefCap === S.countBuilt && S.countBuilt < Math.min(S.countAsked, S.countRowsCap, S.countFloorCap))) { bad.push(`LF13: blade ${i}'s count says CLAMPED BY ${S.clampedBy} with a relief-floor cap of ${S.countReliefCap} and ${S.countBuilt} built — the cause must be a biconditional`); broke13 = true; break; }
+    }
     }
   } else if (toothDepthCtl > 0) {
     bad.push(`LF13: the builder reports no per-leaf serration record for ${L.built} leaves — the tooth floor is then asserted by nothing`);
   }
+  leafCurveClauses(ui, L, cpR, lobedR, builtNodes, bladesR, bad);
   bad.push(...compoundLeafClauses(ui, m, L, cpR, builtNodes, bladesR));
   bad.push(...lobedLeafClauses(ui, m, L, builtNodes, bladesR));
   return bad;
+}
+
+/* ===================================================================
+   LF37 — THE LEAF'S OWN CURVES (curves-leaves, Oct 20 — Eva's rulings;
+   docs/bloom-curves-leaves-outcome.md). BOTH STL GATES ARE BLIND TO ALL OF
+   IT: a leaf built on the petal's curve, a spine bent the wrong way, a
+   leaflet on the simple leaf's outline, a terminal at a lateral's scale and a
+   lobed blade on a drawn outline all export watertight and as one piece.
+   LF11 holds every emitted row on the drawn spine (restated) and LF9 / LF13 /
+   LF32 / LF33 / LF35 hold the tip, the teeth and the neck per half on a drawn
+   outline; LF37 holds the rest, each reference with an owner the quantity
+   under test does not write:
+     (a) THE MODES, TWO STATEMENTS: the registry's `leafCurlFromCurve` /
+         `leafOutlineFromCurve` / `leafletOutlineFromCurve` against what each
+         emitted leaf and blade REPORTS it was built from (a spine record, an
+         outline record). The LOBED blade keeps its own law — its outline
+         record is null whatever the outline mode (ruled), and a lobed blade
+         carrying one is the defect.
+     (b) THE SPINE IS THE CONTROL'S CURVE: the record's curve deep-equals the
+         leaf spine control, scaled on the blade's own length (a simple
+         blade's built length — on a raceme its flowering node's — or a
+         compound leaf's RACHIS); the built turn has the restated law's sign.
+     (c) THE FOLD LIMIT ON A LEAF, off the EMITTED rows (C5(b)'s shape): at
+         every interior row the three-point curvature of the emitted centres,
+         times the smallest reach of the three rows' EMITTED margins toward the
+         side the bend's centre is on (`rowMarginLiftMm` along each row's own
+         normal; the midrib is 0) plus half the LIVE sheet, is at most
+         1 + C5_BAR; and `bendClamped` iff the record holds an applied
+         substep, each applied limit `1 / (reach + t/2)` (C5(a)). A leaf whose
+         fold limit was skipped bends a cupped blade through itself here.
+     (d) THE OUTLINE IS THE CONTROL'S CURVE AT THE BLADE'S OWN SCALE: the
+         record's points the control's (the LEAFLET curve on every leaflet,
+         never the simple leaf's), its width scale the ruling's restated
+         (`leafBladeOutlineRestated`: the simple blade `leafWidth / 17`, each
+         leaflet `(W / L) / (17 / 26)` at its OWN length and width — the
+         terminal included), and the emitted base half-width against the
+         curve restated through bloom-curve's evaluator per half, below the
+         nib's start.
+   =================================================================== */
+function leafCurveClauses(ui, L, cpR, lobedR, builtNodes, bladesR, bad) {
+  const parse = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+  const curlCurve = evalPredicate({ ref: 'leafCurlFromCurve' }, ui);
+  const SB = L.spineBuilt;
+  if (!Array.isArray(SB) || SB.length !== L.built) { bad.push(`LF37: the builder reports ${Array.isArray(SB) ? SB.length : 'no'} spine records for ${L.built} leaves — which spine each leaf was built on cannot be read`); return; }
+  const ctlSpine = leafCurlCurveRestated(ui);
+  const tLive = Number(ui.sheetThickness);
+  for (let i = 0; i < L.built; i++) {
+    const sp = SB[i];
+    /* (a) */
+    if (!!sp !== curlCurve) { bad.push(`LF37: leaf ${i} ${sp ? 'reports a drawn spine' : 'reports no drawn spine'} while the registry's leafCurlFromCurve says ${curlCurve} — the leaf's curl mode has two statements that disagree`); return; }
+    if (!sp) continue;
+    /* (b) */
+    if (JSON.stringify(parse(sp.curve)) !== JSON.stringify(ctlSpine)) { bad.push(`LF37: leaf ${i}'s spine was built from ${JSON.stringify(sp.curve)} where the leaf spine control holds ${JSON.stringify(ctlSpine)}`); return; }
+    const lenWant = cpR ? cpR.rachisMm : builtNodes[i] ? builtNodes[i].len : Number(ui.leafLength);
+    if (Math.abs(sp.askedLengthMm - lenWant) > 1e-9) { bad.push(`LF37: leaf ${i}'s curve was scaled on ${sp.askedLengthMm} mm where the ${cpR ? 'rachis' : 'blade'} is ${lenWant} mm`); return; }
+    const law = cpR ? restatedLeafSpineLaw(ui, lenWant, { rachis: true }) : restatedLeafSpineLaw(ui, lenWant, { rec: sp, floorMm: tLive });
+    if (Math.abs(law.turnBuilt) > 1e-9 && Math.sign(sp.turnBuiltDeg) !== Math.sign(law.turnBuilt)) { bad.push(`LF37: leaf ${i}'s spine turns ${sp.turnBuiltDeg}° where the curve restated from the control turns ${((law.turnBuilt * 180) / Math.PI).toFixed(3)}° — the drawn spine is mirrored (a curve that FALLS must bend the tip DOWN)`); return; }
+    if (cpR) { if (sp.bendClamped || (sp.bendApplied && sp.bendApplied.length)) bad.push(`LF37: compound leaf ${i}'s rachis records a fold limit — a rod has no cross-section to fold`); continue; }
+    /* (c) */
+    const A = Array.isArray(sp.bendApplied) ? sp.bendApplied : [];
+    if (!!sp.bendClamped !== (A.length > 0)) { bad.push(`LF37: leaf ${i}'s bendClamped reads ${sp.bendClamped} while the record holds ${A.length} applied fold-limit substep(s)`); return; }
+    const half = tLive / 2;
+    for (const [k, kl, reach] of A) { const want = 1 / (reach + half); if (Math.abs(kl - want) > 1e-12 * Math.max(1, want)) { bad.push(`LF37: leaf ${i}'s substep ${k} was clamped at ${kl} /mm where the inner skin's limit 1/(reach ${reach} + half a sheet ${half}) is ${want}`); return; } }
+    const C = L.rowCentre && L.rowCentre[i], Nn = L.rowNormal && L.rowNormal[i], LM = Array.isArray(L.rowMarginLiftMm) ? L.rowMarginLiftMm[i] : null;
+    if (!Array.isArray(C) || !Array.isArray(Nn) || !Array.isArray(LM) || LM.length !== C.length) { bad.push(`LF37: leaf ${i} reports no emitted centres, normals and margin lifts — the fold limit cannot be read off the rows`); return; }
+    let worst = 0, at = -1;
+    for (let j = 1; j + 1 < C.length; j++) {
+      const a = [C[j][0] - C[j - 1][0], C[j][1] - C[j - 1][1], C[j][2] - C[j - 1][2]], b = [C[j + 1][0] - C[j][0], C[j + 1][1] - C[j][1], C[j + 1][2] - C[j][2]];
+      const la = Math.hypot(...a), lb = Math.hypot(...b);
+      if (!(la > 0 && lb > 0)) continue;
+      const turn = [b[0] / lb - a[0] / la, b[1] / lb - a[1] / la, b[2] / lb - a[2] / la];
+      const sinish = Math.hypot(...turn);
+      if (!(sinish > 1e-12)) continue;
+      const kap = (2 * Math.asin(Math.min(1, sinish / 2))) / (0.5 * (la + lb));
+      const toward = turn[0] * Nn[j][0] + turn[1] * Nn[j][1] + turn[2] * Nn[j][2] >= 0 ? 1 : -1;
+      const reachOf = (q) => Math.max(0, ...LM[q].map((x) => toward * x));
+      const side = Math.min(reachOf(j - 1), reachOf(j), reachOf(j + 1));
+      if (!(side + half > ROLL_MIN_RADIUS_FACTOR * tLive)) continue;
+      const qv = kap * (side + half);
+      if (qv > worst) { worst = qv; at = j; }
+    }
+    if (worst > 1 + C5_BAR) bad.push(`LF37: leaf ${i}'s emitted spine at row ${at} bends past its own cross-section — curvature x (the emitted margins' reach toward the bend + half a sheet) reads ${worst.toFixed(4)} against 1 + ${C5_BAR}: the inner skin passes the bend's centre (the fold limit skipped?)`);
+  }
+  /* (a) / (d) per blade */
+  const OB = L.outlineBuilt;
+  if (!Array.isArray(OB) || OB.length !== bladesR.length) { bad.push(`LF37: the builder reports ${Array.isArray(OB) ? OB.length : 'no'} outline records for ${bladesR.length} blades`); return; }
+  const outlined = cpR ? evalPredicate({ ref: 'leafletOutlineFromCurve' }, ui) : evalPredicate({ ref: 'leafOutlineFromCurve' }, ui);
+  for (let i = 0; i < bladesR.length; i++) {
+    const o = OB[i], ob = leafBladeOutlineRestated(ui, bladesR[i], !!cpR, !!lobedR);
+    if (!!o !== outlined || !!ob !== outlined) { bad.push(`LF37: blade ${i}${lobedR ? ' (LOBED — its own law, ruled)' : ''} ${o ? 'carries' : 'carries no'} drawn outline while the registry's ${cpR ? 'leafletOutlineFromCurve' : 'leafOutlineFromCurve'} says ${outlined}`); return; }
+    if (!o) continue;
+    if (Math.abs(o.scale - ob.scale) > 1e-12 * Math.max(1, ob.scale)) { bad.push(`LF37: blade ${i} (${bladesR[i].role}${bladesR[i].role !== 'blade' ? ` ${bladesR[i].lengthMm} x ${bladesR[i].widthMm} mm` : ''}) was drawn at width scale ${o.scale} where the ruling's — ${cpR ? `(W / L) / (${LEAFLET_WIDTH_REF_RULED_MM} / ${LEAFLET_LENGTH_REF_RULED_MM}) at its own size` : `leafWidth / ${LEAF_WIDTH_REF_RULED_MM}`} — is ${ob.scale}`); return; }
+    const halves = ob.twoSided ? [['left', o.left, ob.sides.left, L.rowHalfBaseMm[i], L.tipClamp[i] && L.tipClamp[i].sides ? L.tipClamp[i].sides.left : null], ['right', o.right, ob.sides.right, Array.isArray(L.rowHalfBaseRightMm) ? L.rowHalfBaseRightMm[i] : null, L.tipClamp[i] && L.tipClamp[i].sides ? L.tipClamp[i].sides.right : null]] : [[null, o, ob.sides.both, L.rowHalfBaseMm[i], L.tipClamp[i]]];
+    for (const [side, rec, re, rows, cl] of halves) {
+      const who = `blade ${i}${side ? ` (${side} half)` : ''}`;
+      const wantPts = side === 'right' ? ob.curve.right : ob.curve.points;
+      if (!rec || JSON.stringify(rec.points) !== JSON.stringify(wantPts)) { bad.push(`LF37: ${who} was drawn from ${JSON.stringify(rec && rec.points)} where the ${cpR ? 'LEAFLET' : 'leaf'} outline control holds ${JSON.stringify(wantPts)}`); return; }
+      const RU = Array.isArray(L.rowU) ? L.rowU[i] : null;
+      if (!Array.isArray(rows) || !Array.isArray(RU) || rows.length !== RU.length) { bad.push(`LF37: ${who} reports no base half-widths with their stations — the outline cannot be read`); return; }
+      const uEnd = cl && cl.nib ? cl.startU : 1;
+      let worst = 0, wu = null, n = 0;
+      for (let j = 0; j < rows.length; j++) {
+        const u = RU[j];
+        if (!(u > 0) || !(u < uEnd)) continue;
+        const want = Math.max(re.halfAtMm(u), TIP_HALF_MM);
+        const d = Math.abs(rows[j] - want); n++;
+        if (d > worst) { worst = d; wu = u; }
+      }
+      if (worst > 1e-9) { bad.push(`LF37: ${who}'s emitted outline departs from the ${cpR ? 'leaflet' : 'leaf'} outline curve restated at the blade's own width scale ${ob.scale.toFixed(4)} by ${worst.toExponential(3)} mm at u ${wu} — the blade is not its curve`); return; }
+      if (n < 3) { bad.push(`LF37: ${who} has only ${n} rows below the nib's start — the outline restatement asserted almost nothing`); return; }
+    }
+  }
 }
 
 /* ===================================================================
@@ -9023,7 +9357,11 @@ export function restatedLeafStations(nu, arcU = null) {
 /* the station a blade's row j was built at, restated for the blade's type
    from its own nib record */
 function restatedBladeStations(ui, lobed, nu, cl) {
-  const arcU = cl && cl.nib ? cl.arcU : null;
+  /* (curves-leaves) an ASYMMETRIC drawn outline closes each half on its own
+     nib; the arc window is the one covering both (the earlier arc), and a
+     nib only where both halves have one */
+  const two = cl && cl.twoSided && cl.sides;
+  const arcU = two ? (cl.sides.left.nib && cl.sides.right.nib ? Math.min(cl.sides.left.arcU, cl.sides.right.arcU) : null) : cl && cl.nib ? cl.arcU : null;
   return lobed ? restatedLobedStations(ui, arcU) : restatedLeafStations(nu, arcU);
 }
 /* THE SINUSES' OWN STATIONS AND HALF-PERIOD, restated from the controls (the
@@ -9212,10 +9550,15 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
     const sk = r.skin, pa = r.petioleAxis;
     if (!Array.isArray(sk) || sk.length < 3 || !pa || !pa.bladeBase) { bad.push(`LF21: leaf ${i} reports no emitted skin lattice or blade base — its lean and its folds are then asserted by nothing`); break; }
     const az = builtNodes[i].az, Rr = [Math.cos(az), Math.sin(az)], T = [-Math.sin(az), Math.cos(az)], bb = pa.bladeBase;
-    const k = ((-archDeg * Math.PI) / 180) / len;
+    /* (curves-leaves) on a DRAWN spine the arch is hidden and inert: a point's
+       station is its foot on the drawn curve's law restated from the control
+       (the mode's floor and the blade's own recorded fold table — LF11's) */
+    const curveL = leafCurlCurveRestated(ui) ? restatedLeafSpineLaw(ui, len, { rec: Array.isArray(L.spineBuilt) ? L.spineBuilt[i] : null, floorMm: m.shownMode === 'export' ? Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM) : Number(ui.sheetThickness) }) : null;
+    const k = curveL ? 0 : ((-archDeg * Math.PI) / 180) / len;
     const plan2 = (P) => {
       const dx = P[0] - bb[0], dy = P[1] - bb[1], dz = P[2] - bb[2];
       const al = dx * Rr[0] + dy * Rr[1], y = dx * T[0] + dy * T[1];
+      if (curveL) return [restatedSpineArcOf(curveL, len, bb, az, P).s, y];
       if (k === 0) return [al * Math.cos(th) + dz * Math.sin(th), y];
       const cx = -Math.sin(th) / k, cz = Math.cos(th) / k;
       const phi = Math.atan2(k * (al - cx), -k * (dz - cz));
@@ -17327,6 +17670,55 @@ export function buildMatrix() {
     ['SEPAL CURVES: the petals on both curves, the sepals on their sliders (nothing of the petals\' reaches a sepal)', sepRow({ sepalCount: 5, sepalSpineCurl: 30, petalCurlMode: 'CURVE', petalSpineCurve: CURVES.s, petalOutlineMode: 'CURVE', petalOutlineCurve: SO.spoon })],
     ['SEPAL CURVES: GATED — sepal curves stored with the modes SLIDER / LAW (inert; bit-identical to the plain sepals)', sepRow({ sepalCount: 5, sepalSpineCurve: SEP_SPINE.hook, sepalOutlineCurve: SEP_OUT.round })],
     ['SEPAL CURVES: GATED — a tier-2 entry owning both curves on a one-tier whorl (kept and inert)', sepRow({ sepalCount: 5 }, [{ tier: 1, offsets: {}, values: { sepalOutlineMode: 'CURVE', sepalOutlineCurve: SEP_OUT.round, sepalCurlMode: 'CURVE', sepalSpineCurve: SEP_SPINE.reflex } }])],
+  ]) rows.push({ label: name, set });
+
+  /* 73. THE LEAF'S OWN CURVES (curves-leaves, Oct 20 — Eva's rulings: leaves
+        get both curves; the outline curve on SIMPLE blades and COMPOUND
+        leaflets, the LOBED blade keeps its own law; serration STAYS ON in
+        CURVE mode; asymmetric outlines with LEFT as for petals; the spine
+        curve wherever `leafArch` reaches, the compound RACHIS included;
+        docs/bloom-curves-leaves-outcome.md). The six twins through
+        `LEAF_CURVE_TWINS`; LF37 reads every row. The rows: a drawn DROOPING
+        spine (the bend a positive Arch makes), an upward curl the inset reads
+        above its chord, the S; the lanceolate outline at the default width and
+        at 25 mm (the width scale `leafWidth / 17`); an ASYMMETRIC TOOTHED
+        oak-ish blade on a drawn spine (teeth cut into each drawn half); the
+        fold limit on a cupped leaf with a tight curve (told); the COMPOUND
+        rose on a drawn rachis with one leaflet curve shared by every leaflet,
+        the terminal included, toothed at the leaflets' own depth; a raceme's
+        shared-node leaf on a drawn spine (the offset clears the CURVED
+        blade); the steep 85 deg leaf on a drawn spine; the LOBED blade on a
+        drawn spine with an outline curve STORED (its outline mode inert,
+        told); and two GATED rows — curves stored with the modes SLIDER / LAW,
+        and the curves asked with no leaf. Appended as the FINAL block, after
+        72. */
+  const LEAF73 = { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 3 };
+  const LSP = {
+    droop: { mode: 'single', points: [[0, 0], [0.5, -0.06], [0.95, -0.3]] },
+    curlUp: { mode: 'single', points: [[0, 0], [0.5, 0.08], [0.9, 0.35]] },
+    s: { mode: 'single', points: [[0, 0], [0.3, 0.08], [0.6, 0.02], [0.95, -0.12]] },
+    tight: { mode: 'single', points: [[0, 0], [0.5, 0.02], [0.62, 0.12], [0.6, 0.25]] },
+  };
+  const LOUT = {
+    lance: { mode: 'symmetric', points: [[0, 0.05], [0.2, 0.17], [0.45, 0.2], [0.75, 0.14], [1, 0]] },
+    oak: { mode: 'two-sided', points: [[0, 0.06], [0.3, 0.22], [0.65, 0.19], [1, 0]], right: [[0, 0.06], [0.25, 0.14], [0.6, 0.17], [1, 0]] },
+    leaflet: { mode: 'symmetric', points: [[0, 0.1], [0.3, 0.3], [0.65, 0.27], [1, 0]] },
+  };
+  const lfRow = (sets) => Object.entries(sets).map(([id, value]) => ({ id, value: typeof value === 'object' ? JSON.stringify(value) : String(value) }));
+  for (const [name, set] of [
+    ['LEAF CURVES: a drawn DROOPING spine (leaf Curl from CURVE — the bend a positive Arch makes; the Arch hidden and inert)', lfRow({ ...LEAF73, leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop })],
+    ['LEAF CURVES: an UPWARD curl on a drawn spine (the inset reads the curve\'s rise above its chord)', lfRow({ ...LEAF73, leafCurlMode: 'CURVE', leafSpineCurve: LSP.curlUp })],
+    ['LEAF CURVES: the S spine', lfRow({ ...LEAF73, leafCurlMode: 'CURVE', leafSpineCurve: LSP.s })],
+    ['LEAF CURVES: a drawn LANCEOLATE outline (leaf Outline from CURVE — the tip shape hidden and inert; the teeth cut into it)', lfRow({ ...LEAF73, leafOutlineMode: 'CURVE', leafOutlineCurve: LOUT.lance })],
+    ['LEAF CURVES: the lanceolate outline at 25 mm (the width scale leafWidth / 17)', lfRow({ ...LEAF73, leafWidth: 25, leafOutlineMode: 'CURVE', leafOutlineCurve: LOUT.lance })],
+    ['LEAF CURVES: an ASYMMETRIC TOOTHED oak-ish blade on a drawn spine (teeth cut into each drawn half)', lfRow({ ...LEAF73, leafToothDepth: 0.35, leafToothCount: 6, leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop, leafOutlineMode: 'CURVE', leafOutlineCurve: LOUT.oak })],
+    ['LEAF CURVES: the FOLD LIMIT — a tight UPWARD curl drawn on a cup 1.2 leaf (held at the inner skin\'s limit, told)', lfRow({ ...LEAF73, leafCup: 1.2, leafCurlMode: 'CURVE', leafSpineCurve: LSP.tight })],
+    ['LEAF CURVES: the COMPOUND rose on a drawn rachis, one leaflet curve shared by every leaflet (the terminal at its own size), toothed', lfRow({ stemLength: 70, stemDiameter: 6, leafLength: 40, leafNodes: 3, leafType: 'COMPOUND', leafletToothDepth: 0.15, leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop, leafletOutlineMode: 'CURVE', leafletOutlineCurve: LOUT.leaflet })],
+    ['LEAF CURVES: a raceme\'s shared-node leaf on a drawn spine (the offset and the cap read the CURVED blade)', lfRow({ stemLength: 120, stemDiameter: 6, inflorescence: 'RACEME', leafLength: 40, leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop })],
+    ['LEAF CURVES: the STEEP 85 deg leaf on a drawn spine', lfRow({ ...LEAF73, leafAngle: 85, leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop })],
+    ['LEAF CURVES: the LOBED blade on a drawn spine, an outline curve STORED (the lobed blade keeps its own law — the outline mode inert, told)', lfRow({ ...LEAF73, leafType: 'LOBED', leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop, leafOutlineMode: 'CURVE', leafOutlineCurve: LOUT.lance })],
+    ['LEAF CURVES: GATED — leaf curves stored with the modes SLIDER / LAW (inert; bit-identical to the plain leaf)', lfRow({ ...LEAF73, leafSpineCurve: LSP.tight, leafOutlineCurve: LOUT.oak, leafletOutlineCurve: LOUT.leaflet })],
+    ['LEAF CURVES: GATED — both curves asked with no leaf (length 0)', lfRow({ stemLength: 70, stemDiameter: 6, leafLength: 0, leafCurlMode: 'CURVE', leafSpineCurve: LSP.droop, leafOutlineMode: 'CURVE', leafOutlineCurve: LOUT.oak })],
   ]) rows.push({ label: name, set });
 
   return rows.map(storedRow);
@@ -53852,6 +54244,1448 @@ export function phase78Matrix() {
   ];
 }
 
+/* ===================================================================
+   phase79Matrix() — THE 1424 ROWS AS THEY STOOD AT fc96dc9, frozen.
+
+   main's head before CURVES-LEAVES (the leaves take the spine and outline
+   curves as twins — the spine wherever the arch reaches, the compound rachis
+   included; the outline on simple blades and on every compound leaflet; the
+   lobed blade on its own law — and the seed's fit reaches its tolerance or
+   names what stopped it; Eva's rulings of Oct 20;
+   docs/bloom-curves-leaves-outcome.md). Owed because curves-leaves appends
+   block 73. Generated from that base commit's own buildMatrix() — the rows as
+   every gate is handed them, migrated (`storedRow`), `@scopes` entries and
+   all. Never edit a label here.
+   =================================================================== */
+export function phase79Matrix() {
+  return [
+    {"label":"DEFAULT (the shipping configuration)","set":[]},
+    {"label":"petalCount 3","set":[{"id":"petalCount","value":"3"}]},
+    {"label":"petalCount 4","set":[{"id":"petalCount","value":"4"}]},
+    {"label":"petalCount 5","set":[{"id":"petalCount","value":"5"}]},
+    {"label":"petalCount 6","set":[{"id":"petalCount","value":"6"}]},
+    {"label":"petalCount 7","set":[{"id":"petalCount","value":"7"}]},
+    {"label":"petalCount 8","set":[{"id":"petalCount","value":"8"}]},
+    {"label":"petalCount 9","set":[{"id":"petalCount","value":"9"}]},
+    {"label":"petalCount 10","set":[{"id":"petalCount","value":"10"}]},
+    {"label":"petalCount 11","set":[{"id":"petalCount","value":"11"}]},
+    {"label":"petalCount 12","set":[{"id":"petalCount","value":"12"}]},
+    {"label":"petalCount 13","set":[{"id":"petalCount","value":"13"}]},
+    {"label":"petalCount 14","set":[{"id":"petalCount","value":"14"}]},
+    {"label":"petalCount 15","set":[{"id":"petalCount","value":"15"}]},
+    {"label":"petalCount 16","set":[{"id":"petalCount","value":"16"}]},
+    {"label":"petalCount 17","set":[{"id":"petalCount","value":"17"}]},
+    {"label":"petalCount 18","set":[{"id":"petalCount","value":"18"}]},
+    {"label":"petalCount 19","set":[{"id":"petalCount","value":"19"}]},
+    {"label":"petalCount 20","set":[{"id":"petalCount","value":"20"}]},
+    {"label":"petalCount 21","set":[{"id":"petalCount","value":"21"}]},
+    {"label":"petalCount 22","set":[{"id":"petalCount","value":"22"}]},
+    {"label":"petalCount 23","set":[{"id":"petalCount","value":"23"}]},
+    {"label":"petalCount 24","set":[{"id":"petalCount","value":"24"}]},
+    {"label":"petalCount 25","set":[{"id":"petalCount","value":"25"}]},
+    {"label":"petalCount 26","set":[{"id":"petalCount","value":"26"}]},
+    {"label":"petalCount 27","set":[{"id":"petalCount","value":"27"}]},
+    {"label":"petalCount 28","set":[{"id":"petalCount","value":"28"}]},
+    {"label":"petalCount 29","set":[{"id":"petalCount","value":"29"}]},
+    {"label":"petalCount 30","set":[{"id":"petalCount","value":"30"}]},
+    {"label":"petalCount 31","set":[{"id":"petalCount","value":"31"}]},
+    {"label":"petalCount 32","set":[{"id":"petalCount","value":"32"}]},
+    {"label":"petalCount 33","set":[{"id":"petalCount","value":"33"}]},
+    {"label":"petalCount 34","set":[{"id":"petalCount","value":"34"}]},
+    {"label":"petalCount 35","set":[{"id":"petalCount","value":"35"}]},
+    {"label":"petalCount 36","set":[{"id":"petalCount","value":"36"}]},
+    {"label":"petalCount 37","set":[{"id":"petalCount","value":"37"}]},
+    {"label":"petalCount 38","set":[{"id":"petalCount","value":"38"}]},
+    {"label":"petalCount 39","set":[{"id":"petalCount","value":"39"}]},
+    {"label":"petalCount 40","set":[{"id":"petalCount","value":"40"}]},
+    {"label":"petalLength min (20)","set":[{"id":"petalLength","value":"20"}]},
+    {"label":"petalLength max (60)","set":[{"id":"petalLength","value":"60"}]},
+    {"label":"petalWidth min (8)","set":[{"id":"petalWidth","value":"8"}]},
+    {"label":"petalWidth max (30)","set":[{"id":"petalWidth","value":"30"}]},
+    {"label":"petalBaseTaper min (0.3)","set":[{"id":"petalBaseTaper","value":"0.3"}]},
+    {"label":"petalBaseTaper max (3)","set":[{"id":"petalBaseTaper","value":"3"}]},
+    {"label":"petalTipShape min (0.6)","set":[{"id":"petalTipShape","value":"0.6"}]},
+    {"label":"petalTipShape max (3)","set":[{"id":"petalTipShape","value":"3"}]},
+    {"label":"petalTipTaper min (0.6)","set":[{"id":"petalTipTaper","value":"0.6"}]},
+    {"label":"petalTipTaper max (4)","set":[{"id":"petalTipTaper","value":"4"}]},
+    {"label":"petalTipEnd min (0)","set":[{"id":"petalTipEnd","value":"0"}]},
+    {"label":"petalTipEnd max (1)","set":[{"id":"petalTipEnd","value":"1"}]},
+    {"label":"fringeCount min (0)","set":[{"id":"fringeCount","value":"0"}]},
+    {"label":"fringeCount max (10)","set":[{"id":"fringeCount","value":"10"}]},
+    {"label":"fringeDepth min (0.05)","set":[{"id":"fringeDepth","value":"0.05"}]},
+    {"label":"fringeDepth max (0.5)","set":[{"id":"fringeDepth","value":"0.5"}]},
+    {"label":"lobeDepth min (0)","set":[{"id":"lobeDepth","value":"0"}]},
+    {"label":"lobeDepth max (1)","set":[{"id":"lobeDepth","value":"1"}]},
+    {"label":"lobeCount min (1)","set":[{"id":"lobeCount","value":"1"}]},
+    {"label":"lobeCount max (10)","set":[{"id":"lobeCount","value":"10"}]},
+    {"label":"lobeCoverage min (0.1)","set":[{"id":"lobeCoverage","value":"0.1"}]},
+    {"label":"lobeCoverage max (1)","set":[{"id":"lobeCoverage","value":"1"}]},
+    {"label":"lobeCrestShape min (0.6)","set":[{"id":"lobeCrestShape","value":"0.6"}]},
+    {"label":"lobeCrestShape max (3)","set":[{"id":"lobeCrestShape","value":"3"}]},
+    {"label":"lobeNotchShape min (0.6)","set":[{"id":"lobeNotchShape","value":"0.6"}]},
+    {"label":"lobeNotchShape max (3)","set":[{"id":"lobeNotchShape","value":"3"}]},
+    {"label":"petalCup min (-0.8)","set":[{"id":"petalCup","value":"-0.8"}]},
+    {"label":"petalCup max (1.2)","set":[{"id":"petalCup","value":"1.2"}]},
+    {"label":"petalCupGradient min (-0.8)","set":[{"id":"petalCupGradient","value":"-0.8"}]},
+    {"label":"petalCupGradient max (1.2)","set":[{"id":"petalCupGradient","value":"1.2"}]},
+    {"label":"buckleAmp min (0)","set":[{"id":"buckleAmp","value":"0"}]},
+    {"label":"buckleAmp max (0.6)","set":[{"id":"buckleAmp","value":"0.6"}]},
+    {"label":"buckleFreq min (1)","set":[{"id":"buckleFreq","value":"1"}]},
+    {"label":"buckleFreq max (7)","set":[{"id":"buckleFreq","value":"7"}]},
+    {"label":"buckleEnv min (2)","set":[{"id":"buckleEnv","value":"2"}]},
+    {"label":"buckleEnv max (6)","set":[{"id":"buckleEnv","value":"6"}]},
+    {"label":"petalApexSweep min (0)","set":[{"id":"petalApexSweep","value":"0"}]},
+    {"label":"petalApexSweep max (1)","set":[{"id":"petalApexSweep","value":"1"}]},
+    {"label":"petalTilt min (0)","set":[{"id":"petalTilt","value":"0"}]},
+    {"label":"petalTilt max (120)","set":[{"id":"petalTilt","value":"120"}]},
+    {"label":"petalSpineCurl min (-180)","set":[{"id":"petalSpineCurl","value":"-180"}]},
+    {"label":"petalSpineCurl max (360)","set":[{"id":"petalSpineCurl","value":"360"}]},
+    {"label":"petalRoll min (-330)","set":[{"id":"petalRoll","value":"-330"}]},
+    {"label":"petalRoll max (330)","set":[{"id":"petalRoll","value":"330"}]},
+    {"label":"petalTwist min (-180)","set":[{"id":"petalTwist","value":"-180"}]},
+    {"label":"petalTwist max (180)","set":[{"id":"petalTwist","value":"180"}]},
+    {"label":"sheetThickness min (0.6)","set":[{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"sheetThickness max (2.4)","set":[{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"tipThinning min (0)","set":[{"id":"tipThinning","value":"0"}]},
+    {"label":"tipThinning max (0.8)","set":[{"id":"tipThinning","value":"0.8"}]},
+    {"label":"footDelicacy min (0.25)","set":[{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"footDelicacy max (1)","set":[{"id":"footDelicacy","value":"1"}]},
+    {"label":"spread min (0.6)","set":[{"id":"spread","value":"0.6"}]},
+    {"label":"spread max (6)","set":[{"id":"spread","value":"6"}]},
+    {"label":"headRise min (0)","set":[{"id":"headRise","value":"0"}]},
+    {"label":"headRise max (1)","set":[{"id":"headRise","value":"1"}]},
+    {"label":"layerCount min (1)","set":[{"id":"layerCount","value":"1"}]},
+    {"label":"layerCount max (6)","set":[{"id":"layerCount","value":"6"}]},
+    {"label":"varianceSize min (0)","set":[{"id":"varianceSize","value":"0"}]},
+    {"label":"varianceSize max (0.5)","set":[{"id":"varianceSize","value":"0.5"}]},
+    {"label":"varianceForm min (0)","set":[{"id":"varianceForm","value":"0"}]},
+    {"label":"varianceForm max (1)","set":[{"id":"varianceForm","value":"1"}]},
+    {"label":"varianceSpacing min (0)","set":[{"id":"varianceSpacing","value":"0"}]},
+    {"label":"varianceSpacing max (0.9)","set":[{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"stamenCount min (0)","set":[{"id":"stamenCount","value":"0"}]},
+    {"label":"stamenCount max (120)","set":[{"id":"stamenCount","value":"120"}]},
+    {"label":"sepalCount min (0)","set":[{"id":"sepalCount","value":"0"}]},
+    {"label":"sepalCount max (40)","set":[{"id":"sepalCount","value":"40"}]},
+    {"label":"stemLength min (0)","set":[{"id":"stemLength","value":"0"}]},
+    {"label":"stemLength max (120)","set":[{"id":"stemLength","value":"120"}]},
+    {"label":"ROSE-ish (obovate, broad tip)","set":[{"id":"petalBaseTaper","value":"2"},{"id":"petalTipTaper","value":"1.1"}]},
+    {"label":"POPPY-ish (orbicular, truncate)","set":[{"id":"petalBaseTaper","value":"0.6"},{"id":"petalTipTaper","value":"0.7"}]},
+    {"label":"ALL MIN","set":[{"id":"petalCount","value":"3"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"petalBaseTaper","value":"0.3"},{"id":"petalTipShape","value":"0.6"},{"id":"petalTipTaper","value":"0.6"},{"id":"petalTipEnd","value":"0"},{"id":"fringeCount","value":"0"},{"id":"fringeDepth","value":"0.05"},{"id":"lobeDepth","value":"0"},{"id":"lobeCount","value":"1"},{"id":"lobeCoverage","value":"0.1"},{"id":"lobeCrestShape","value":"0.6"},{"id":"lobeNotchShape","value":"0.6"},{"id":"petalCup","value":"-0.8"},{"id":"petalCupGradient","value":"-0.8"},{"id":"buckleAmp","value":"0"},{"id":"buckleFreq","value":"1"},{"id":"buckleEnv","value":"2"},{"id":"petalApexSweep","value":"0"},{"id":"petalTilt","value":"0"},{"id":"petalSpineCurl","value":"-180"},{"id":"curlBias","value":"0"},{"id":"curlStart","value":"0"},{"id":"petalRoll","value":"-330"},{"id":"petalRollTaper","value":"-1"},{"id":"petalTwist","value":"-180"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"headRise","value":"0"},{"id":"layerCount","value":"1"},{"id":"varianceSize","value":"0"},{"id":"varianceForm","value":"0"},{"id":"varianceSpacing","value":"0"},{"id":"stamenCount","value":"0"},{"id":"sepalCount","value":"0"},{"id":"stemLength","value":"0"}]},
+    {"label":"ALL MAX","set":[{"id":"petalCount","value":"40"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"30"},{"id":"petalBaseTaper","value":"3"},{"id":"petalTipShape","value":"3"},{"id":"petalTipTaper","value":"4"},{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"10"},{"id":"fringeDepth","value":"0.5"},{"id":"lobeDepth","value":"1"},{"id":"lobeCount","value":"10"},{"id":"lobeCoverage","value":"1"},{"id":"lobeCrestShape","value":"3"},{"id":"lobeNotchShape","value":"3"},{"id":"petalCup","value":"1.2"},{"id":"petalCupGradient","value":"1.2"},{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"7"},{"id":"buckleEnv","value":"6"},{"id":"petalApexSweep","value":"1"},{"id":"petalTilt","value":"120"},{"id":"petalSpineCurl","value":"360"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.95"},{"id":"petalRoll","value":"330"},{"id":"petalRollTaper","value":"1"},{"id":"petalTwist","value":"180"},{"id":"sheetThickness","value":"2.4"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"1"},{"id":"spread","value":"6"},{"id":"headRise","value":"1"},{"id":"layerCount","value":"6"},{"id":"varianceSize","value":"0.5"},{"id":"varianceForm","value":"1"},{"id":"varianceSpacing","value":"0.9"},{"id":"stamenCount","value":"120"},{"id":"sepalCount","value":"40"},{"id":"stemLength","value":"120"}]},
+    {"label":"FORM: QUILL (roll alone, toward a tube)","set":[{"id":"petalRoll","value":"330"}]},
+    {"label":"FORM: FIDDLEHEAD (spine curl alone)","set":[{"id":"petalSpineCurl","value":"360"}]},
+    {"label":"FORM: CONTORTED (twist alone)","set":[{"id":"petalTwist","value":"180"}]},
+    {"label":"FORM: REFLEXED (cup min x curl below the plane)","set":[{"id":"petalCup","value":"-0.8"},{"id":"petalSpineCurl","value":"-180"}]},
+    {"label":"FORM: ROLL CLAMP (roll max x narrowest petal)","set":[{"id":"petalRoll","value":"330"},{"id":"petalWidth","value":"8"}]},
+    {"label":"FORM: ALL MAX (all four curves together)","set":[{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"FORM: ALL MIN (all four curves together)","set":[{"id":"petalCup","value":"-0.8"},{"id":"petalSpineCurl","value":"-180"},{"id":"petalRoll","value":"-330"},{"id":"petalTwist","value":"-180"}]},
+    {"label":"THIN: ALL THIN","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"THIN: ALL THIN × spread min","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"THIN: ALL THIN × petalCount 40","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"petalCount","value":"40"}]},
+    {"label":"THIN: ALL THIN × form max","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"THIN: ALL THIN × ALL MIN","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"petalCount","value":"3"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"petalTilt","value":"0"}]},
+    {"label":"THIN: THICK GRADIENT (sheet max × thinning max)","set":[{"id":"sheetThickness","value":"2.4"},{"id":"tipThinning","value":"0.8"}]},
+    {"label":"APEX: fine end × roll max","set":[{"id":"petalRoll","value":"330"}]},
+    {"label":"APEX: fine end × twist max","set":[{"id":"petalTwist","value":"180"}]},
+    {"label":"APEX: fine end × taper max (the floor dominates)","set":[{"id":"petalTipTaper","value":"4"}]},
+    {"label":"APEX: the cap entry at the 0.80 clamp (taper 0.60 — the widest entry)","set":[{"id":"petalTipTaper","value":"0.6"}]},
+    {"label":"APEX: the cap entry from the crossing (taper 4 — the earliest entry)","set":[{"id":"petalTipTaper","value":"4"}]},
+    {"label":"APEX: the narrowest petal (the terminal is the whole tip)","set":[{"id":"petalWidth","value":"8"},{"id":"petalTipTaper","value":"4"}]},
+    {"label":"APEX: fine end × ALL THIN","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"CAPABILITY: claw (non-monotone width)","set":[],"capability":{"label":"CLAW","stalk":{"until":0.3,"halfWidth":1.4}}},
+    {"label":"CAPABILITY: cleft (two-span domain)","set":[],"capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}}},
+    {"label":"CAPABILITY: claw x form max","capability":{"label":"CLAW","stalk":{"until":0.3,"halfWidth":1.4}},"set":[{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"CAPABILITY: cleft x roll max","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"petalRoll","value":"330"}]},
+    {"label":"CAPABILITY: cleft x all thin","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"SPIRAL x petalCount 3 (below the legibility flag)","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"3"}]},
+    {"label":"SPIRAL x petalCount 5 (below the legibility flag)","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"5"}]},
+    {"label":"SPIRAL x petalCount 7 (below the legibility flag)","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"7"}]},
+    {"label":"SPIRAL x petalCount 8","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"8"}]},
+    {"label":"SPIRAL x petalCount 13","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"13"}]},
+    {"label":"SPIRAL x petalCount 21","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"21"}]},
+    {"label":"SPIRAL x petalCount 40","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCount","value":"40"}]},
+    {"label":"SPIRAL x defaults","set":[{"id":"placement","value":"SPIRAL"}]},
+    {"label":"6 layers x layerSize min (0.35)","set":[{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.35"}]},
+    {"label":"6 layers x layerSize max (0.9)","set":[{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.9"}]},
+    {"label":"6 layers x layerPhase min (0)","set":[{"id":"layerCount","value":"6"},{"id":"layerPhase","value":"0"}]},
+    {"label":"6 layers x layerPhase max (1)","set":[{"id":"layerCount","value":"6"},{"id":"layerPhase","value":"1"}]},
+    {"label":"6 layers x layerTilt min (0)","set":[{"id":"layerCount","value":"6"},{"id":"layerTilt","value":"0"}]},
+    {"label":"6 layers x layerTilt max (30)","set":[{"id":"layerCount","value":"6"},{"id":"layerTilt","value":"30"}]},
+    {"label":"6 layers x innerCurl min (-180)","set":[{"id":"layerCount","value":"6"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":-180}},{"layer":2,"offsets":{"petalSpineCurl":-180}},{"layer":3,"offsets":{"petalSpineCurl":-180}},{"layer":4,"offsets":{"petalSpineCurl":-180}},{"layer":5,"offsets":{"petalSpineCurl":-180}}],"petals":[],"tiers":[]}}]},
+    {"label":"6 layers x innerCurl max (360)","set":[{"id":"layerCount","value":"6"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":360}},{"layer":2,"offsets":{"petalSpineCurl":360}},{"layer":3,"offsets":{"petalSpineCurl":360}},{"layer":4,"offsets":{"petalSpineCurl":360}},{"layer":5,"offsets":{"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"6 layers x innerCup min (-0.8)","set":[{"id":"layerCount","value":"6"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":-0.8}},{"layer":2,"offsets":{"petalCup":-0.8}},{"layer":3,"offsets":{"petalCup":-0.8}},{"layer":4,"offsets":{"petalCup":-0.8}},{"layer":5,"offsets":{"petalCup":-0.8}}],"petals":[],"tiers":[]}}]},
+    {"label":"6 layers x innerCup max (1.2)","set":[{"id":"layerCount","value":"6"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2}},{"layer":2,"offsets":{"petalCup":1.2}},{"layer":3,"offsets":{"petalCup":1.2}},{"layer":4,"offsets":{"petalCup":1.2}},{"layer":5,"offsets":{"petalCup":1.2}}],"petals":[],"tiers":[]}}]},
+    {"label":"2 layers x RADIAL","set":[{"id":"layerCount","value":"2"},{"id":"placement","value":"RADIAL"}]},
+    {"label":"2 layers x SPIRAL","set":[{"id":"layerCount","value":"2"},{"id":"placement","value":"SPIRAL"}]},
+    {"label":"3 layers x RADIAL","set":[{"id":"layerCount","value":"3"},{"id":"placement","value":"RADIAL"}]},
+    {"label":"3 layers x SPIRAL","set":[{"id":"layerCount","value":"3"},{"id":"placement","value":"SPIRAL"}]},
+    {"label":"LAYERS: 3 x spread min","set":[{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"}]},
+    {"label":"LAYERS: 3 x ALL THIN","set":[{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"LAYERS: 3 x ALL THIN x spread min","set":[{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"LAYERS: 3 x ALL THIN x spread min x petalCount 40","set":[{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCount","value":"40"}]},
+    {"label":"LAYERS: 3 x ALL THIN x spread min x petalCount 3","set":[{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCount","value":"3"}]},
+    {"label":"LAYERS: 3 x layerSize min x ALL THIN (deepest foot floored)","set":[{"id":"layerCount","value":"3"},{"id":"layerSize","value":"0.35"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"LAYERS: 3 x ALL FORM MAX","set":[{"id":"layerCount","value":"3"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"LAYERS: 3 x SPIRAL x ALL THIN x spread min x petalCount 40","set":[{"id":"layerCount","value":"3"},{"id":"placement","value":"SPIRAL"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCount","value":"40"}]},
+    {"label":"LAYERS: 3 (the layered bloom at its defaults)","set":[{"id":"layerCount","value":"3"}]},
+    {"label":"LAYERS: 3 x layerTilt max (135° effective at petalTilt max)","set":[{"id":"layerCount","value":"3"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"75"}]},
+    {"label":"LAYERS: 2 x layerSize max x layerPhase 0 (the coincidence corner)","set":[{"id":"layerCount","value":"2"},{"id":"layerSize","value":"0.9"},{"id":"layerPhase","value":"0"},{"id":"layerTilt","value":"0"}]},
+    {"label":"LAYERS: 3 x ALL MIN elsewhere","set":[{"id":"layerCount","value":"3"},{"id":"petalCount","value":"3"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"petalTilt","value":"0"},{"id":"spread","value":"0.6"}]},
+    {"label":"CAPABILITY: cleft x 3 layers","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 3 x 3 turns (9 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"3"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 5 x 3 turns (15 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"5"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 7 x 3 turns (21 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"7"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 8 x 3 turns (24 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"8"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 13 x 3 turns (39 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"13"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 21 x 3 turns (63 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"21"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x petalCount 40 x 3 turns (120 in sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONTINUOUS x defaults (one turn)","set":[{"id":"placement","value":"CONTINUOUS"}]},
+    {"label":"CONTINUOUS x 2 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"2"}]},
+    {"label":"CONTINUOUS x 3 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"CONT: 3 turns x layerSize min x petalCount 40 (the deepest foot)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"layerSize","value":"0.35"},{"id":"petalCount","value":"40"}]},
+    {"label":"CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"layerSize","value":"0.9"},{"id":"petalCount","value":"40"}]},
+    {"label":"CONT: 3 turns x ALL THIN x spread min x petalCount 40 (the overlap box at 120 rings)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCount","value":"40"}]},
+    {"label":"CONT: 3 turns x ALL THIN x spread min x petalCount 3 (the sparsest continuum)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCount","value":"3"}]},
+    {"label":"CONT: 3 turns x layerSize min x ALL THIN x petalCount 40 (deepest foot, thinnest sheet)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"layerSize","value":"0.35"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"petalCount","value":"40"}]},
+    {"label":"CONT: 3 turns x footDelicacy min (floored from ring 1)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"CONT: 3 turns x spread max (the hub plate under a continuum)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"spread","value":"6"}]},
+    {"label":"CONT: 3 turns x layerTilt max x petalTilt max (161.25° effective — past the layered 135°)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"75"}]},
+    {"label":"CONT: 3 turns x ALL FORM MAX","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"CONT: 3 turns x ALL MIN elsewhere","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"petalCount","value":"3"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"petalTilt","value":"0"},{"id":"spread","value":"0.6"}]},
+    {"label":"CAPABILITY: cleft x CONTINUOUS x 3 turns","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"ZYGO: THE IRIS (falls curl down, standards rise)","set":[{"id":"layerCount","value":"2"},{"id":"petalSpineCurl","value":"-90"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"40"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":0.4,"petalSpineCurl":180}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 2 layers x ALL INNER MAX","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 3 layers x ALL INNER MAX x ALL THIN","set":[{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 3 layers x ALL INNER MAX x spread min (crowded feet)","set":[{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 3 layers x ALL INNER MAX x petalCount 3","set":[{"id":"layerCount","value":"3"},{"id":"petalCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 3 layers x ALL INNER MAX x petalCount 40","set":[{"id":"layerCount","value":"3"},{"id":"petalCount","value":"40"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)","set":[{"id":"layerCount","value":"3"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: curl clamp binds (base 360 + delta 360 -> 360)","set":[{"id":"layerCount","value":"2"},{"id":"petalSpineCurl","value":"360"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)","set":[{"id":"layerCount","value":"2"},{"id":"petalCup","value":"1.2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: curl clamp binds downward (base -180 + delta -180 -> -180)","set":[{"id":"layerCount","value":"2"},{"id":"petalSpineCurl","value":"-180"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":-180}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: the iris x SPIRAL (roles exist, azimuth differs)","set":[{"id":"layerCount","value":"2"},{"id":"petalSpineCurl","value":"-90"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"40"},{"id":"placement","value":"SPIRAL"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":0.4,"petalSpineCurl":180}}],"petals":[],"tiers":[]}}]},
+    {"label":"ZYGO: the foot UPPER clamp (petalWidth 30 — ring frozen at 11.06 mm)","set":[{"id":"layerCount","value":"2"},{"id":"petalWidth","value":"30"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"ORCHID x the IRIS (both role axes, one bloom)","set":[{"id":"layerCount","value":"2"},{"id":"layerPhase","value":"0"},{"id":"petalSpineCurl","value":"-90"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"40"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":0.4,"petalSpineCurl":180}}],"petals":[],"tiers":[]}}]},
+    {"label":"FAN: defaults (3/side, a mirror-line petal, 45deg)","set":[{"id":"placement","value":"FAN"}]},
+    {"label":"FAN: toggle ON (a petal on the mirror line) — pinned, and the shipping default since Sep 2","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"}]},
+    {"label":"FAN: toggle OFF (the line runs through the gap) — pinned","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"}]},
+    {"label":"FAN: fanSpacing min (15)","set":[{"id":"placement","value":"FAN"},{"id":"fanSpacing","value":"15"}]},
+    {"label":"FAN: fanSpacing max (60)","set":[{"id":"placement","value":"FAN"},{"id":"fanSpacing","value":"60"}]},
+    {"label":"FAN: fanPerSide min (1)","set":[{"id":"placement","value":"FAN"},{"id":"fanPerSide","value":"1"}]},
+    {"label":"FAN: fanPerSide max (8)","set":[{"id":"placement","value":"FAN"},{"id":"fanPerSide","value":"8"}]},
+    {"label":"FAN: fewest x widest — 1/side x 60deg, toggle OFF (two petals, no hood)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"60"}]},
+    {"label":"FAN: fewest x widest — 1/side x 60deg, toggle ON (three petals)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"60"}]},
+    {"label":"FAN: fewest x tightest — 1/side x 15deg, toggle OFF","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"15"}]},
+    {"label":"FAN: most x tightest — 8/side x 15deg, toggle ON","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"fanSpacing","value":"15"}]},
+    {"label":"FAN: fewest x new max — 1/side x 170deg, toggle ON (340deg arc, 20deg notch, now at the FEWEST petals)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"170"}]},
+    {"label":"FAN: fewest x new max — 1/side x 170deg, toggle OFF (170deg arc, 190deg notch — UNCAPPED, a shape the old ceiling never reached)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"170"}]},
+    {"label":"FAN: the arc limit binds — 8/side x 60deg, toggle ON (340deg arc, 20deg notch)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"fanSpacing","value":"60"}]},
+    {"label":"FAN: the arc limit binds — 8/side x 60deg, toggle OFF","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"fanPerSide","value":"8"},{"id":"fanSpacing","value":"60"}]},
+    {"label":"FAN: the arc limit now binds below 8/side — 2/side x 90deg, toggle ON (340deg arc, 20deg notch)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"fanSpacing","value":"90"}]},
+    {"label":"FAN: same nominal spacing, UNCAPPED under toggle OFF — 2/side x 90deg, toggle OFF (270deg arc, 90deg notch)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"fanPerSide","value":"2"},{"id":"fanSpacing","value":"90"}]},
+    {"label":"FAN: fewest x widest (the barest reachable fan)","set":[{"id":"placement","value":"FAN"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"60"}]},
+    {"label":"FAN: fewest x new max (the barest reachable fan, now wider)","set":[{"id":"placement","value":"FAN"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"170"}]},
+    {"label":"FAN: ALL THIN x spread min","set":[{"id":"placement","value":"FAN"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"FAN: ALL THIN x spread min x 1/side (feet cross the axis)","set":[{"id":"placement","value":"FAN"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"fanPerSide","value":"1"}]},
+    {"label":"FAN: spread max (the plate, at the fan's widest hub)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"spread","value":"6"}]},
+    {"label":"FAN: ALL FORM MAX","set":[{"id":"placement","value":"FAN"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"FAN: 3 layers (nested fans)","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"3"}]},
+    {"label":"FAN: 3 layers x ALL THIN x spread min","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"FAN: 3 layers x toggle ON x layerTilt max","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"layerCount","value":"3"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"75"}]},
+    {"label":"FAN x PER-PETAL: petal 1 extreme x toggle ON (the mirror-line petal, alone)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":21,"petalWidth":9.600000000000001,"petalTilt":-40,"petalCup":0.6,"petalSpineCurl":-60}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":21,"petalWidth":9.600000000000001,"petalTilt":-40,"petalCup":0.6,"petalSpineCurl":-60}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no controls)","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalLength":17.5,"petalWidth":8,"petalTilt":45,"petalCup":0.5,"petalSpineCurl":-60}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: the OUTERMOST group only (petal 4 at 3/side)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalLength":17.5,"petalWidth":8,"petalTilt":60,"petalSpineCurl":120}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: 1/side x 170deg x petal 1 MAX (largest petal, widest spacing, fewest petals)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"170"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: 1/side x 170deg x toggle OFF x petal 1 MAX (two petals, both are petal 1)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"fanPerSide","value":"1"},{"id":"fanSpacing","value":"170"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: ALL PER-PETAL MAX x 8/side x 60deg (nine groups on a capped arc)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"fanSpacing","value":"60"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":4,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":5,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":6,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":7,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":8,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: ALL PER-PETAL MAX x 1/side (one group is the whole bloom)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: petal 1 x 3 layers x inner* (position and depth composing)","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":21,"petalWidth":9.600000000000001,"petalTilt":-40,"petalCup":0.6,"petalSpineCurl":-60}},{"layer":1,"slot":0,"offsets":{"petalLength":21,"petalWidth":9.600000000000001,"petalTilt":-40,"petalCup":1,"petalSpineCurl":60}},{"layer":1,"slot":1,"offsets":{"petalCup":0.4,"petalSpineCurl":120}},{"layer":1,"slot":2,"offsets":{"petalCup":0.4,"petalSpineCurl":120}},{"layer":1,"slot":3,"offsets":{"petalCup":0.4,"petalSpineCurl":120}},{"layer":2,"slot":0,"offsets":{"petalLength":21,"petalWidth":9.600000000000001,"petalTilt":-40,"petalCup":1,"petalSpineCurl":60}},{"layer":2,"slot":1,"offsets":{"petalCup":0.4,"petalSpineCurl":120}},{"layer":2,"slot":2,"offsets":{"petalCup":0.4,"petalSpineCurl":120}},{"layer":2,"slot":3,"offsets":{"petalCup":0.4,"petalSpineCurl":120}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":1,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":1,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":1,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":1,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min","set":[{"id":"placement","value":"FAN"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN x PER-PETAL: ALL PER-PETAL MAX x ALL FORM MAX","set":[{"id":"placement","value":"FAN"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Size min (0.5) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Size max (2) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Size min (0.5) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Size max (2) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Size min (0.5) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Size max (2) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Size min (0.5) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Size max (2) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Size min (0.5) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Size max (2) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Size min (0.5) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Size max (2) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Size min (0.5) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Size max (2) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Size min (0.5) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Size max (2) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Size min (0.5) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalLength":-17.5,"petalWidth":-8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Size max (2) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalLength":35,"petalWidth":16}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Tilt min (-75) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Tilt max (75) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Tilt min (-75) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Tilt max (75) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Tilt min (-75) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Tilt max (75) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Tilt min (-75) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Tilt max (75) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Tilt min (-75) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Tilt max (75) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Tilt min (-75) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Tilt max (75) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Tilt min (-75) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Tilt max (75) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Tilt min (-75) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Tilt max (75) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Tilt min (-75) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalTilt":-75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Tilt max (75) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalTilt":75}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Cup min (-0.8) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Cup max (1.2) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Cup min (-0.8) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Cup max (1.2) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Cup min (-0.8) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Cup max (1.2) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Cup min (-0.8) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Cup max (1.2) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Cup min (-0.8) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Cup max (1.2) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Cup min (-0.8) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Cup max (1.2) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Cup min (-0.8) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Cup max (1.2) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Cup min (-0.8) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Cup max (1.2) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Cup min (-0.8) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalCup":-0.8}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Cup max (1.2) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalCup":1.2}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Curl min (-180) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal1Curl max (360) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Curl min (-180) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal2Curl max (360) at 1/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"1"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Curl min (-180) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal3Curl max (360) at 2/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Curl min (-180) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal4Curl max (360) at 3/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"3"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Curl min (-180) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal5Curl max (360) at 4/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"4"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":4,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Curl min (-180) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal6Curl max (360) at 5/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":5,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Curl min (-180) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal7Curl max (360) at 6/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"6"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":6,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Curl min (-180) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal8Curl max (360) at 7/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"7"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":7,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Curl min (-180) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalSpineCurl":-180}}],"tiers":[]}}]},
+    {"label":"PER-PETAL: petal9Curl max (360) at 8/side","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"fanPerSide","value":"8"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":8,"offsets":{"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"FAN: GATED — petalCount 8 (hidden under FAN, and must be inert)","set":[{"id":"placement","value":"FAN"},{"id":"petalCount","value":"8"}]},
+    {"label":"FAN: GATED — petalCount 40 (hidden under FAN, and must be inert)","set":[{"id":"placement","value":"FAN"},{"id":"petalCount","value":"40"}]},
+    {"label":"FAN: GATED — petalCount 3 (hidden under FAN, and must be inert)","set":[{"id":"placement","value":"FAN"},{"id":"petalCount","value":"3"}]},
+    {"label":"FAN: GATED — 3 layers x layerPhase max (hidden under FAN, and must be inert)","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"3"},{"id":"layerPhase","value":"1"}]},
+    {"label":"FAN: GATED — 3 layers x layerPhase 0 (the same bloom, stated)","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"3"},{"id":"layerPhase","value":"0"}]},
+    {"label":"CAPABILITY: cleft x FAN x toggle ON x ALL PER-PETAL MAX","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":1,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":2,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}},{"layer":0,"slot":3,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"ALL PETALS: max (curl +360, cup +1.20, tip +0.60)","set":[{"id":"petalCup","value":1.2},{"id":"petalSpineCurl","value":360}]},
+    {"label":"ALL PETALS: min (curl -180, cup -0.80)","set":[{"id":"petalCup","value":-0.8},{"id":"petalSpineCurl","value":-180}]},
+    {"label":"ALL PETALS: max x petalCount 3 x ALL THIN x spread min","set":[{"id":"petalCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCup","value":1.2},{"id":"petalSpineCurl","value":360}]},
+    {"label":"ALL PETALS: max x petalCount 40 x ALL THIN x spread min","set":[{"id":"petalCount","value":"40"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCup","value":1.2},{"id":"petalSpineCurl","value":360}]},
+    {"label":"ALL PETALS: min x petalCount 3 x ALL THIN x spread min (every petal folds under)","set":[{"id":"petalCount","value":"3"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"petalCup","value":-0.8},{"id":"petalSpineCurl","value":-180}]},
+    {"label":"ALL PETALS: max x every base at max (curl 360+360, cup 1.2+1.2 — every clamp binds)","set":[{"id":"petalSpineCurl","value":360},{"id":"petalCup","value":1.2}]},
+    {"label":"ALL PETALS: min x base curl and cup at min (-180 + -180 -> -180)","set":[{"id":"petalSpineCurl","value":-180},{"id":"petalCup","value":-0.8}]},
+    {"label":"ALL PETALS: max x FAN 3/side toggle ON x petal 1 max (the group, then the petal)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"petalCup","value":1.2},{"id":"petalSpineCurl","value":360},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"ALL PETALS: max x CONTINUOUS 1 turn (one sequence is one whorl)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCup","value":1.2},{"id":"petalSpineCurl","value":360}]},
+    {"label":"ALL PETALS: max x SPIRAL","set":[{"id":"placement","value":"SPIRAL"},{"id":"petalCup","value":1.2},{"id":"petalSpineCurl","value":360}]},
+    {"label":"ALL PETALS: GATED — max x Inner max x 2 layers (only the Inner pair applies)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"CROWDING: the mum run — 120 CONTINUOUS x spread min x feet floored (ruled BAD, Eva Sep 3)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"DEPTH: 4 layers x RADIAL x spread min (0.6)","set":[{"id":"layerCount","value":"4"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 4 turns x CONTINUOUS x spread min (0.6)","set":[{"id":"layerCount","value":"4"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 4 layers x RADIAL x spread default (2)","set":[{"id":"layerCount","value":"4"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"2"}]},
+    {"label":"DEPTH: 4 turns x CONTINUOUS x spread default (2)","set":[{"id":"layerCount","value":"4"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"2"}]},
+    {"label":"DEPTH: 4 layers x RADIAL x spread max (6)","set":[{"id":"layerCount","value":"4"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"6"}]},
+    {"label":"DEPTH: 4 turns x CONTINUOUS x spread max (6)","set":[{"id":"layerCount","value":"4"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"6"}]},
+    {"label":"DEPTH: 5 layers x RADIAL x spread min (0.6)","set":[{"id":"layerCount","value":"5"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 5 turns x CONTINUOUS x spread min (0.6)","set":[{"id":"layerCount","value":"5"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 5 layers x RADIAL x spread default (2)","set":[{"id":"layerCount","value":"5"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"2"}]},
+    {"label":"DEPTH: 5 turns x CONTINUOUS x spread default (2)","set":[{"id":"layerCount","value":"5"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"2"}]},
+    {"label":"DEPTH: 5 layers x RADIAL x spread max (6)","set":[{"id":"layerCount","value":"5"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"6"}]},
+    {"label":"DEPTH: 5 turns x CONTINUOUS x spread max (6)","set":[{"id":"layerCount","value":"5"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"6"}]},
+    {"label":"DEPTH: 6 layers x RADIAL x spread min (0.6)","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 6 turns x CONTINUOUS x spread min (0.6)","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 6 layers x RADIAL x spread default (2)","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"2"}]},
+    {"label":"DEPTH: 6 turns x CONTINUOUS x spread default (2)","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"2"}]},
+    {"label":"DEPTH: 6 layers x RADIAL x spread max (6)","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"6"}]},
+    {"label":"DEPTH: 6 turns x CONTINUOUS x spread max (6)","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"6"}]},
+    {"label":"DEPTH: the mum at 6 turns (D_max 19 measured, CROWDED)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"DEPTH: 6 layers x ALL THIN x spread min (feet across the axis on every ring)","set":[{"id":"layerCount","value":"6"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 6 layers x layerSize min (a 0.18 mm blade on a 1.60 mm foot; crowding R5 needs its fine pass)","set":[{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.35"}]},
+    {"label":"DEPTH: 6 turns x layerSize min x petalCount 40 (the deepest continuous foot)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.35"},{"id":"petalCount","value":"40"}]},
+    {"label":"DEPTH: 6 layers x layerSize max x layerPhase 0 x tilt 0 (the coincidence corner, six deep)","set":[{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.9"},{"id":"layerPhase","value":"0"},{"id":"layerTilt","value":"0"}]},
+    {"label":"DEPTH: 6 layers x petalCount 40 x spread min (D_max 15 measured)","set":[{"id":"layerCount","value":"6"},{"id":"petalCount","value":"40"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 6 turns x petalCount 40 x spread min (D_max 25 measured, CROWDED)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"6"},{"id":"petalCount","value":"40"},{"id":"spread","value":"0.6"}]},
+    {"label":"DEPTH: 6 layers x ALL FORM MAX","set":[{"id":"layerCount","value":"6"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"DEPTH: 6 layers x SPIRAL","set":[{"id":"layerCount","value":"6"},{"id":"placement","value":"SPIRAL"}]},
+    {"label":"DEPTH: 6 layers x layerTilt max x petalTilt max (225° effective on the sixth whorl)","set":[{"id":"layerCount","value":"6"},{"id":"layerTilt","value":"30"},{"id":"petalTilt","value":"75"}]},
+    {"label":"DEPTH: ZYGO 6 layers x ALL INNER MAX (one role over five whorls)","set":[{"id":"layerCount","value":"6"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":2,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":3,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":4,"offsets":{"petalCup":1.2,"petalSpineCurl":360}},{"layer":5,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"DEPTH: the depth cell taken to six (0.90 x tilt 12; D_max 4 measured)","set":[{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.9"}]},
+    {"label":"CAPABILITY: cleft x 6 layers","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"layerCount","value":"6"}]},
+    {"label":"DOME: rise 1 x RADIAL x spread min (0.6)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"0.6"}]},
+    {"label":"DOME: rise 1 x CONTINUOUS x spread min (0.6)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"0.6"}]},
+    {"label":"DOME: rise 1 x RADIAL x spread default (2)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"2"}]},
+    {"label":"DOME: rise 1 x CONTINUOUS x spread default (2)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"2"}]},
+    {"label":"DOME: rise 1 x RADIAL x spread max (6)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"RADIAL"},{"id":"spread","value":"6"}]},
+    {"label":"DOME: rise 1 x CONTINUOUS x spread max (6)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"CONTINUOUS"},{"id":"spread","value":"6"}]},
+    {"label":"DOME: rise 0.5 x petalCount 3","set":[{"id":"headRise","value":"0.5"},{"id":"petalCount","value":"3"}]},
+    {"label":"DOME: rise 0.5 x petalCount 8 (the default count)","set":[{"id":"headRise","value":"0.5"},{"id":"petalCount","value":"8"}]},
+    {"label":"DOME: rise 0.5 x petalCount 40","set":[{"id":"headRise","value":"0.5"},{"id":"petalCount","value":"40"}]},
+    {"label":"DOME: the mum x rise 0.5 (predicted D_max 10 before the run)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"}]},
+    {"label":"DOME: the mum x rise 1 — a hemisphere (predicted D_max 9: relieved, not halved)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"1"}]},
+    {"label":"DOME: the INCURVE TARGET, flat (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) · curl family pinned at identity, COVERAGE ASSERTED","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"curlBias","value":"0"},{"id":"curlStart","value":"0"},{"id":"petalRollTaper","value":"0"},{"id":"petalCupGradient","value":"0"}],"coverage":{"maxUncovered":0.0005,"maxBald":0.09}},
+    {"label":"DOME: the INCURVE TARGET x rise 0.5 (the sheet's headline; pre-registered D_max 5) · curl family pinned at identity, COVERAGE ASSERTED","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"},{"id":"curlBias","value":"0"},{"id":"curlStart","value":"0"},{"id":"petalRollTaper","value":"0"},{"id":"petalCupGradient","value":"0"}],"coverage":{"maxUncovered":0.0005,"maxBald":0.09}},
+    {"label":"DOME: rise 1 x 6 layers x spread min (the arc-based crossing flag)","set":[{"id":"headRise","value":"1"},{"id":"layerCount","value":"6"},{"id":"spread","value":"0.6"}]},
+    {"label":"DOME: rise 1 x 6 turns x spread min x petalCount 40 (the arc-based crossing flag, continuous)","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"6"},{"id":"spread","value":"0.6"},{"id":"petalCount","value":"40"}]},
+    {"label":"DOME: the APEX CORNER — ALL MIN x sheet 2.40 x spread min x rise 1 (the floor binds, CLAMPED to 0.25)","set":[{"id":"headRise","value":"1"},{"id":"petalCount","value":"3"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"2.4"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"DOME: rise 1 x ALL FORM MAX (the four curves on the rotated frame)","set":[{"id":"headRise","value":"1"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"DOME: rise 1 x petalTilt 0 (the blade lies in the tangent plane)","set":[{"id":"headRise","value":"1"},{"id":"petalTilt","value":"0"}]},
+    {"label":"DOME: rise 1 x petalTilt 75 x 3 layers x layerTilt 30 (135 deg effective on a hemisphere)","set":[{"id":"headRise","value":"1"},{"id":"petalTilt","value":"75"},{"id":"layerCount","value":"3"},{"id":"layerTilt","value":"30"}]},
+    {"label":"DOME: rise 1 x FAN 3/side toggle ON","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"}]},
+    {"label":"DOME: rise 1 x SPIRAL","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"SPIRAL"}]},
+    {"label":"DOME: rise 1 x FAN 3/side x petal 1 max","set":[{"id":"headRise","value":"1"},{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalLength":35,"petalWidth":16,"petalTilt":75,"petalCup":1.2,"petalSpineCurl":360}}],"tiers":[]}}]},
+    {"label":"DOME: rise 1 x ALL THIN x spread min x 3 layers (feet across the apex)","set":[{"id":"headRise","value":"1"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"layerCount","value":"3"}]},
+    {"label":"DOME: rise 1 x 6 layers x layerSize min (the 0.18 mm blade on a hemisphere)","set":[{"id":"headRise","value":"1"},{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.35"}]},
+    {"label":"DOME: GATED — rise 0 pinned (must be bit-identical to the default: the guard)","set":[{"id":"headRise","value":"0"}]},
+    {"label":"DOME LEAN: EVA_CONFIG flat (the headRise-independent baseline the lean must not touch)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"},{"id":"spread","value":"1.15"}]},
+    {"label":"DOME LEAN: EVA_CONFIG x rise 1 (GATED — bald-cap unmoved by domeLean; a shortfall the dome did not cause)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"},{"id":"spread","value":"1.15"},{"id":"headRise","value":"1"}]},
+    {"label":"DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18 (closes the gap via the EXISTING ramp, not domeLean)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"},{"id":"spread","value":"1.15"},{"id":"headRise","value":"1"},{"id":"layerTilt","value":"18"}]},
+    {"label":"CURL: bias max x incurve target x rise 0.5 (documented: re-opens 16.0% of the crown, tips 5-11 mm out)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"},{"id":"curlBias","value":"1"}]},
+    {"label":"CURL: bias 0.5 x incurve target x rise 0.5 (documented: re-opens 5.4%)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"},{"id":"curlBias","value":"0.5"}]},
+    {"label":"CURL: start max x incurve target x rise 0.5 (the spine floor binds: 150 asked, 96 built; re-opens 23.1%)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"},{"id":"curlStart","value":"0.95"}]},
+    {"label":"CURL: bias max x start max x incurve target x rise 0.5 (CLAMPED: 50 built)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.95"}]},
+    {"label":"CURL: start floored at one blade row (0.02 -> 0.036) x incurve target x rise 0.5","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"0.5"},{"id":"curlStart","value":"0.02"}]},
+    {"label":"CURL: bias max x incurve target, flat","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"curlBias","value":"1"}]},
+    {"label":"CURL: start max x incurve target, flat","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"curlStart","value":"0.95"}]},
+    {"label":"CURL: bias 0.5 x start 0.5 x incurve target x rise 1","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"headRise","value":"1"},{"id":"curlBias","value":"0.5"},{"id":"curlStart","value":"0.5"}]},
+    {"label":"CURL: FIDDLEHEAD x start 0.5 (SELF-CONTACT: the tip lands on its own mid-blade)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"curlStart","value":"0.5"}]},
+    {"label":"CURL: FIDDLEHEAD x bias max (a crozier winds inside itself: no self-contact)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"curlBias","value":"1"}]},
+    {"label":"CURL: crozier x rise 1 x 6 deep (curl max x bias max x start max)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.95"},{"id":"headRise","value":"1"},{"id":"layerCount","value":"6"}]},
+    {"label":"CURL: reflex x bias max x start max (curl min)","set":[{"id":"petalSpineCurl","value":"-180"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.95"}]},
+    {"label":"CURL: GATED — bias max at curl 0 (hidden and inert; bit-identical to the default)","set":[{"id":"curlBias","value":"1"}]},
+    {"label":"CURL: GATED — start max at curl 0 (hidden and inert; bit-identical to the default)","set":[{"id":"curlStart","value":"0.95"}]},
+    {"label":"CURL: GATED — the mum x bias max x start max (zero curl: inert, bit-identical to the mum)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.95"}]},
+    {"label":"CURL: FAN x petal 1 curl x start 0.5","set":[{"id":"placement","value":"FAN"},{"id":"petalSpineCurl","value":"30"},{"id":"curlStart","value":"0.5"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":0,"offsets":{"petalSpineCurl":120}}],"tiers":[]}}]},
+    {"label":"CURL: ALL FORM MAX x bias max x start 0.5","set":[{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.5"}]},
+    {"label":"CURL: all-petals curl delta x bias max (one whorl)","set":[{"id":"curlBias","value":"1"},{"id":"petalSpineCurl","value":150}]},
+    {"label":"TAPER: QUILL x taper max (roll clamp; opens toward the tip)","set":[{"id":"petalRoll","value":"330"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"0.6"},{"id":"petalRollTaper","value":"1"}]},
+    {"label":"TAPER: QUILL x taper min (roll clamp; opens toward the base)","set":[{"id":"petalRoll","value":"330"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"0.6"},{"id":"petalRollTaper","value":"-1"}]},
+    {"label":"TAPER: roll 90 x widest petal x taper max","set":[{"id":"petalRoll","value":"90"},{"id":"petalWidth","value":"30"},{"id":"petalRollTaper","value":"1"}]},
+    {"label":"TAPER: roll min (-330) x taper min","set":[{"id":"petalRoll","value":"-330"},{"id":"petalRollTaper","value":"-1"}]},
+    {"label":"TAPER: GATED — taper max at roll 0 (hidden and inert; bit-identical to the default)","set":[{"id":"petalRollTaper","value":"1"}]},
+    {"label":"GRADIENT: cup gradient max x cup max x widest petal (the metric reaches 2.6 at the tip)","set":[{"id":"petalCupGradient","value":"1.2"},{"id":"petalCup","value":"1.2"},{"id":"petalWidth","value":"30"}]},
+    {"label":"GRADIENT: cup gradient min x cup min (reflexed, more so at the tip)","set":[{"id":"petalCupGradient","value":"-0.8"},{"id":"petalCup","value":"-0.8"}]},
+    {"label":"GRADIENT: cup gradient max x ALL THIN x spread min","set":[{"id":"petalCupGradient","value":"1.2"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"GRADIENT: cup gradient max x QUILL (cup composes onto an isometric roll; no damping)","set":[{"id":"petalCupGradient","value":"1.2"},{"id":"petalRoll","value":"330"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"SPHERE: defaults (8 per turn x 1 turn — eight feet on a sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"}],"solidCoverage":{"maxReservedBaldDeg":0.3}},
+    {"label":"SPHERE: the INCURVE sliders (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) — the sheet's headline","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"hubShape","value":"SPHERE"}],"solidCoverage":{"maxUncovered":0.046,"maxFaceBaldDeg":0.3,"maxFaceRegionSr":0.001,"maxReservedBaldDeg":5,"maxReservedRegionSr":0.25}},
+    {"label":"SPHERE: petalCount 3 x 1 turn (three feet on a sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"3"}]},
+    {"label":"SPHERE: petalCount 40 x 1 turn","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"40"}]},
+    {"label":"SPHERE: 40 per turn x 6 turns (240 feet — the densest reachable pole)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"}],"solidCoverage":{"maxReservedBaldDeg":0.3}},
+    {"label":"SPHERE: spread min (0.6)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"spread","value":"0.6"}]},
+    {"label":"SPHERE: spread max (6)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"spread","value":"6"}]},
+    {"label":"SPHERE: the mum sliders (120 floored feet at spread 0.60)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"hubShape","value":"SPHERE"}],"solidCoverage":{"maxReservedBaldDeg":0.3}},
+    {"label":"SPHERE: the APEX CORNER — ALL MIN x sheet 2.40 x spread min (the sphere held at one sheet, CLAMPED)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"3"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"2.4"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"}]},
+    {"label":"SPHERE: ALL THIN x spread min x 3 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"layerCount","value":"3"}]},
+    {"label":"SPHERE: ALL FORM MAX (the four curves on the sphere's frame)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"SPHERE: petalTilt 0 (blades lie in the tangent plane, heading for the reserved pole)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalTilt","value":"0"}]},
+    {"label":"SPHERE: petalTilt 75 x layerTilt 30 x 3 turns (the tilt extreme, lean 0)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalTilt","value":"75"},{"id":"layerCount","value":"3"},{"id":"layerTilt","value":"30"}]},
+    {"label":"SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.35"}]},
+    {"label":"SPHERE: curl bias max x start 0.5 x the incurve sliders","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"hubShape","value":"SPHERE"},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.5"}]},
+    {"label":"SPHERE: FIDDLEHEAD (curl 360) x 3 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalSpineCurl","value":"360"},{"id":"layerCount","value":"3"}]},
+    {"label":"SPHERE: all-petals curl delta (one turn)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalSpineCurl","value":150}]},
+    {"label":"SPHERE: GATED — Head rise 1 under SPHERE (hidden and inert; bit-identical to the sphere at rise 0)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"headRise","value":"1"}]},
+    {"label":"SPHERE: GATED — Head rise 0.5 x the incurve sliders under SPHERE (bit-identical to the incurve sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"hubShape","value":"SPHERE"},{"id":"headRise","value":"0.5"}]},
+    {"label":"SPHERE: GATED — SPHERE stored under RADIAL (hidden and inert; bit-identical to the default)","set":[{"id":"hubShape","value":"SPHERE"}]},
+    {"label":"SPHERE: GATED — SPHERE stored under RADIAL x rise 0.5 (the cap is still the cap)","set":[{"id":"hubShape","value":"SPHERE"},{"id":"headRise","value":"0.5"}]},
+    {"label":"SPHERE: GATED — SPHERE stored under SPIRAL (hidden and inert)","set":[{"id":"hubShape","value":"SPHERE"},{"id":"placement","value":"SPIRAL"}]},
+    {"label":"SPHERE: GATED — SPHERE stored under FAN (hidden and inert)","set":[{"id":"hubShape","value":"SPHERE"},{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"ON"}]},
+    {"label":"SPHERE: GATED — CAP pinned under CONTINUOUS (bit-identical to CONTINUOUS x defaults)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"CAP"}]},
+    {"label":"STAMENS: 6 on a RING (the six-stamen candidate)","set":[{"id":"stamenCount","value":"6"}]},
+    {"label":"STAMENS: 6 on the DISC","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"STAMENS: 120 on the DISC (the cushion; the disc CLAMPED at the hub, 86 in the petal-root annulus)","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"STAMENS: 1 stamen (RING)","set":[{"id":"stamenCount","value":"1"}]},
+    {"label":"STAMENS: 1 stamen on the DISC","set":[{"id":"stamenCount","value":"1"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"STAMENS: 6 x spread min (0.6) — the roots fuse, flagged","set":[{"id":"stamenCount","value":"6"},{"id":"stamenSpread","value":"0.6"}]},
+    {"label":"STAMENS: 6 x spread max (6) — CLAMPED at the hub radius, told","set":[{"id":"stamenCount","value":"6"},{"id":"stamenSpread","value":"6"}]},
+    {"label":"STAMENS: 6 x length min (5)","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLength","value":"5"}]},
+    {"label":"STAMENS: 6 x length max (120) — L/d 100, UNMEASURED","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLength","value":"120"}]},
+    {"label":"STAMENS: 6 x length variance 0.5 (random per stamen, seeded from the index)","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLengthVariance","value":"0.5"}]},
+    {"label":"STAMENS: 120 DISC x length variance max (1) — the dense head","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"STAMENS: 6 x length max (120) x variance max (1) — the ceiling CLAMPS the long draws, told","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"STAMENS: 6 x length min (5) x variance max (1) — the floor CLAMPS the short draws, told","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLength","value":"5"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"STAMENS: 6 x length max (120) x curl max (180) — the long-rod corner","set":[{"id":"stamenCount","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"}]},
+    {"label":"STAMENS: 6 x curl min (-180) — reflexed outward","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCurl","value":"-180"}]},
+    {"label":"STAMENS: 6 x curl max (180) — bent in over the centre","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCurl","value":"180"}]},
+    {"label":"STAMENS: 6 x curl 90 x length max (120)","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCurl","value":"90"},{"id":"stamenLength","value":"120"}]},
+    {"label":"STAMENS: 120 DISC x Head rise 0.5 (the tips fan out with the normals)","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"headRise","value":"0.5"}]},
+    {"label":"STAMENS: 120 DISC x Head rise 1 (a hemisphere)","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"headRise","value":"1"}]},
+    {"label":"STAMENS: 120 DISC x the mum (the apex corner: 120 stamens clamped into a 4.69 mm printed hub)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"STAMENS: 6 x ALL THIN x spread min (the thinnest slab)","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"stamenCount","value":"6"}]},
+    {"label":"STAMENS: 6 x 3 layers (deeper petal roots)","set":[{"id":"stamenCount","value":"6"},{"id":"layerCount","value":"3"}]},
+    {"label":"STAMENS: 120 DISC x CONTINUOUS x 3 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"STAMENS: 6 x FAN (the fan's full-disc hub)","set":[{"id":"placement","value":"FAN"},{"id":"stamenCount","value":"6"}]},
+    {"label":"STAMENS: 120 DISC x sheet 2.40 (the fat filament)","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"STAMENS: 6 x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than a filament radius: the stamens stand ON THE AXIS, told)","set":[{"id":"petalCount","value":"3"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"2.4"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"stamenCount","value":"6"}]},
+    {"label":"STAMENS: 6 x COILED (independent, r 1.5 mm x 3 turns) — the lily-like coil","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"}]},
+    {"label":"STAMENS: 6 x COILED x radius 0 — the plain rod by branch","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilRadius","value":"0"}]},
+    {"label":"STAMENS: 6 x COILED x turns max (12) — the curvature floor CLAMPS the turns, told","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilTurns","value":"12"}]},
+    {"label":"STAMENS: 6 x COILED x radius max (10) x length min (5) — the floor CLAMPS the radius, told","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilRadius","value":"10"},{"id":"stamenLength","value":"5"}]},
+    {"label":"STAMENS: 6 x COILED x radius max (10) x turns max (12) x length max (120) — the long coiled corner","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilRadius","value":"10"},{"id":"stamenCoilTurns","value":"12"},{"id":"stamenLength","value":"120"}]},
+    {"label":"STAMENS: 120 DISC x COILED x turns max (12) x length max (120) x variance max — the cost corner","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilTurns","value":"12"},{"id":"stamenLength","value":"120"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"STAMENS: 6 x COILED x curl max (180) — the coil about a curled filament","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCurl","value":"180"}]},
+    {"label":"STAMENS: 6 x COILED x length variance 0.5 — the pitch follows each length","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenLengthVariance","value":"0.5"}]},
+    {"label":"STAMENS: 6 x COILED x radius 0.3 x turns max (12) — a fine tight coil","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilRadius","value":"0.3"},{"id":"stamenCoilTurns","value":"12"}]},
+    {"label":"STAMENS: 6 x COILED x turns max (12) x sheet 0.60 — the floor differs live / export, the stations do not","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilTurns","value":"12"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"STAMENS: 6 x COILED x anther 3 lobes x spread 30 — the tip on the coil's end frame","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"antherLumps","value":"3"},{"id":"antherSpread","value":"30"}]},
+    {"label":"STAMENS: 6 x COILED x STYLE — the coils beside the style","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"STAMENS: GATED — the coil NONE with its sub-controls at MAXIMUM (inert; bit-identical to six plain stamens)","set":[{"id":"stamenCount","value":"6"},{"id":"stamenCoil","value":"NONE"},{"id":"stamenCoilRadius","value":"10"},{"id":"stamenCoilTurns","value":"12"}]},
+    {"label":"STAMENS: GATED — the coil at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilRadius","value":"10"},{"id":"stamenCoilTurns","value":"12"}]},
+    {"label":"STAMENS: GATED — the coil at MAXIMUM with count 0 (hidden and inert; bit-identical to the default)","set":[{"id":"stamenCount","value":"0"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"},{"id":"stamenCoil","value":"INDEPENDENT"},{"id":"stamenCoilRadius","value":"10"},{"id":"stamenCoilTurns","value":"12"}]},
+    {"label":"STAMENS: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"STAMENS: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"hubShape","value":"SPHERE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"STAMENS: GATED — every sub-control at MAXIMUM with count 0 (hidden and inert; bit-identical to the default)","set":[{"id":"stamenCount","value":"0"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"}]},
+    {"label":"GYNOECIUM: a style on the bare apex (the four states — style only)","set":[{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"GYNOECIUM: style x 6 stamens on a RING (the four states — both present)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stamenCount","value":"6"}]},
+    {"label":"GYNOECIUM: style x 120 on the DISC (the trifid against the cushion)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"GYNOECIUM: style length min (5) x 6 stamens — the stigma below the anthers","set":[{"id":"gynoecium","value":"STYLE"},{"id":"styleLength","value":"5"},{"id":"stamenCount","value":"6"}]},
+    {"label":"GYNOECIUM: style length max (40) — L/d 33","set":[{"id":"gynoecium","value":"STYLE"},{"id":"styleLength","value":"40"}]},
+    {"label":"GYNOECIUM: style curl min (-180) x 6 stamens","set":[{"id":"gynoecium","value":"STYLE"},{"id":"styleCurl","value":"-180"},{"id":"stamenCount","value":"6"}]},
+    {"label":"GYNOECIUM: style curl max (180) — bent over the apex","set":[{"id":"gynoecium","value":"STYLE"},{"id":"styleCurl","value":"180"}]},
+    {"label":"GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stamenCount","value":"6"},{"id":"stamenCurl","value":"180"}]},
+    {"label":"GYNOECIUM: style x Head rise 1 (rooted at the cap's apex)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"headRise","value":"1"}]},
+    {"label":"GYNOECIUM: style x 120 DISC x Head rise 0.5","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"headRise","value":"0.5"}]},
+    {"label":"GYNOECIUM: style x the mum (the 4.69 mm printed hub)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"GYNOECIUM: style x sheet 2.40 (the fat style)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"GYNOECIUM: style x ALL THIN x spread min (the thinnest slab)","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tipThinning","value":"0.8"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"GYNOECIUM: style x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than the style: WIDER THAN THE HUB, told)","set":[{"id":"petalCount","value":"3"},{"id":"petalWidth","value":"8"},{"id":"sheetThickness","value":"2.4"},{"id":"footDelicacy","value":"0.25"},{"id":"spread","value":"0.6"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"GYNOECIUM: style x 3 layers (deeper petal roots)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"layerCount","value":"3"}]},
+    {"label":"GYNOECIUM: style x CONTINUOUS x 3 turns x 120 DISC","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"gynoecium","value":"STYLE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"GYNOECIUM: style x FAN (the fan's full-disc hub)","set":[{"id":"placement","value":"FAN"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"GYNOECIUM: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"gynoecium","value":"STYLE"},{"id":"styleLength","value":"40"},{"id":"styleCurl","value":"180"}]},
+    {"label":"GYNOECIUM: GATED — the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert; bit-identical to the bare sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"},{"id":"gynoecium","value":"STYLE"},{"id":"styleLength","value":"40"},{"id":"styleCurl","value":"180"}]},
+    {"label":"GYNOECIUM: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"1.6"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.9"},{"id":"petalTilt","value":"75"},{"id":"layerTilt","value":"5"},{"id":"petalSpineCurl","value":"150"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"hubShape","value":"SPHERE"},{"id":"gynoecium","value":"STYLE"},{"id":"styleLength","value":"40"},{"id":"styleCurl","value":"180"}]},
+    {"label":"GYNOECIUM: GATED — every sub-control at MAXIMUM with NONE (hidden and inert; bit-identical to the default)","set":[{"id":"gynoecium","value":"NONE"},{"id":"styleLength","value":"40"},{"id":"styleCurl","value":"180"}]},
+    {"label":"ANTHER: 6 stamens at the shipped pill (the tip block's own control row)","set":[{"id":"stamenCount","value":"6"}]},
+    {"label":"ANTHER: size min (0.6) — the whole tip under the 0.50 mm floor, told","set":[{"id":"stamenCount","value":"6"},{"id":"antherSize","value":"0.6"}]},
+    {"label":"ANTHER: size max (6.00) — a 7.20 mm anther on a 1.20 mm filament","set":[{"id":"stamenCount","value":"6"},{"id":"antherSize","value":"6"}]},
+    {"label":"ANTHER: elongation min (1.00) — A SPHERE, the band floored","set":[{"id":"stamenCount","value":"6"},{"id":"antherElongation","value":"1"}]},
+    {"label":"ANTHER: elongation max (6.00) — a rod-anther","set":[{"id":"stamenCount","value":"6"},{"id":"antherElongation","value":"6"}]},
+    {"label":"ANTHER: a TRIANGLE (3 points, pinch 1.00 — the polygon, roundedness 0)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"3"},{"id":"antherPinch","value":"1"}]},
+    {"label":"ANTHER: a ROUNDED STAR (6 points, pinch 1.00, roundedness 0.35)","set":[{"id":"stamenCount","value":"6"},{"id":"antherPoints","value":"6"},{"id":"antherPinch","value":"1"},{"id":"antherRoundedness","value":"0.35"}]},
+    {"label":"ANTHER: the WAIST FLOOR binding (pinch max 7.00 at roundedness 0 — CLAMPED, told)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPinch","value":"7"}]},
+    {"label":"ANTHER: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPinch","value":"0.05"}]},
+    {"label":"ANTHER: the lattice at n = 5 (ten sides, the only count that samples every extremum)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"5"},{"id":"antherPinch","value":"1.5"}]},
+    {"label":"ANTHER: the lattice at n = 12 (24 sides — the widest tip this family builds)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"12"},{"id":"antherPinch","value":"1.5"}]},
+    {"label":"ANTHER: 3 lobes at 40° — the trifid's own law on an anther","set":[{"id":"stamenCount","value":"6"},{"id":"antherLumps","value":"3"},{"id":"antherSpread","value":"40"}]},
+    {"label":"ANTHER: 6 lobes at 90° — the widest fan","set":[{"id":"stamenCount","value":"6"},{"id":"antherLumps","value":"6"},{"id":"antherSpread","value":"90"}]},
+    {"label":"ANTHER: COINCIDENT — 2 lobes at a spread of 0 (duplicate geometry, told, never refused)","set":[{"id":"stamenCount","value":"6"},{"id":"antherLumps","value":"2"}]},
+    {"label":"ANTHER: one lobe LEANING (spread 45 at a count of 1 — not a dead slider)","set":[{"id":"stamenCount","value":"6"},{"id":"antherSpread","value":"45"}]},
+    {"label":"ANTHER: 120 on the DISC x a 12-point star (the cost corner)","set":[{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"antherPoints","value":"12"},{"id":"antherPinch","value":"1.5"},{"id":"antherRoundedness","value":"0"}]},
+    {"label":"ANTHER: a shaped tip x the mum (the 4.69 mm printed hub)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"3"},{"id":"antherPinch","value":"1"}]},
+    {"label":"ANTHER: a shaped tip x sheet 2.40 (the fat anther)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"3"},{"id":"antherPinch","value":"1"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"ANTHER: a shaped tip x a style (the trifid beside a triangle, on one scale)","set":[{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"3"},{"id":"antherPinch","value":"1"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"ANTHER: INERT — the points and the pinch at their extremes with roundedness 1 (bit-identical to the shipped pill)","set":[{"id":"stamenCount","value":"6"},{"id":"antherPoints","value":"12"},{"id":"antherPinch","value":"7"}]},
+    {"label":"ANTHER: GATED — every tip control at MAXIMUM with count 0 (hidden and inert; bit-identical to the default)","set":[{"id":"antherSize","value":"6"},{"id":"antherElongation","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"12"},{"id":"antherPinch","value":"7"},{"id":"antherLumps","value":"6"},{"id":"antherSpread","value":"90"},{"id":"stamenCount","value":"0"}]},
+    {"label":"ANTHER: GATED — every tip control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"},{"id":"stamenSpread","value":"6"},{"id":"stamenLength","value":"120"},{"id":"stamenCurl","value":"180"},{"id":"stamenLengthVariance","value":"1"},{"id":"antherSize","value":"6"},{"id":"antherElongation","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"12"},{"id":"antherPinch","value":"7"},{"id":"antherLumps","value":"6"},{"id":"antherSpread","value":"90"}]},
+    {"label":"STIGMA: a style at the shipped trifid x 6 stamens (the tip block's own control row)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stamenCount","value":"6"}]},
+    {"label":"STIGMA: size min (0.6) — the whole lobe under the 0.50 mm floor, told","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaSize","value":"0.6"}]},
+    {"label":"STIGMA: size max (6.00) — 7.20 mm lobes on a 1.20 mm style","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaSize","value":"6"}]},
+    {"label":"STIGMA: elongation min (1.00) — SPHERES, the band floored","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaElongation","value":"1"}]},
+    {"label":"STIGMA: elongation max (6.00) — rod-lobes","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaElongation","value":"6"}]},
+    {"label":"STIGMA: a TRIANGLE (3 points, pinch 1.00 — the polygon, roundedness 0)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"3"},{"id":"stigmaPinch","value":"1"}]},
+    {"label":"STIGMA: a ROUNDED STAR (6 points, pinch 1.00, roundedness 0.35)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaPoints","value":"6"},{"id":"stigmaPinch","value":"1"},{"id":"stigmaRoundedness","value":"0.35"}]},
+    {"label":"STIGMA: the WAIST FLOOR binding (pinch max 7.00 at roundedness 0 — CLAMPED, told)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPinch","value":"7"}]},
+    {"label":"STIGMA: the lattice at n = 5 (ten sides)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"5"},{"id":"stigmaPinch","value":"1.5"}]},
+    {"label":"STIGMA: the lattice at n = 12 (24 sides)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"12"},{"id":"stigmaPinch","value":"1.5"}]},
+    {"label":"STIGMA: ONE lobe at 0° — a pill on the style (the anther's own default shape)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaLumps","value":"1"},{"id":"stigmaSpread","value":"0"}]},
+    {"label":"STIGMA: 6 lobes at 90° — the widest fan","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaLumps","value":"6"},{"id":"stigmaSpread","value":"90"}]},
+    {"label":"STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaSpread","value":"0"}]},
+    {"label":"STIGMA: one lobe LEANING (spread 45 at a count of 1 — not a dead slider)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaLumps","value":"1"},{"id":"stigmaSpread","value":"45"}]},
+    {"label":"STIGMA: a shaped stigma x 120 on the DISC (the cushion around a 12-point star)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"12"},{"id":"stigmaPinch","value":"1.5"},{"id":"stamenCount","value":"120"},{"id":"stamenLayout","value":"DISC"}]},
+    {"label":"STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"8"},{"id":"layerSize","value":"0.8"},{"id":"layerTilt","value":"11"},{"id":"sheetThickness","value":"0.6"},{"id":"footDelicacy","value":"0.25"},{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"3"},{"id":"stigmaPinch","value":"1"}]},
+    {"label":"STIGMA: a shaped stigma x sheet 2.40 (the fat style)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"3"},{"id":"stigmaPinch","value":"1"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"STIGMA: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice; the singular exponent sits one step below)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPinch","value":"0.05"}]},
+    {"label":"STIGMA: THE FAMILY — the same seven on both tips (3-point polygons at pinch 1, roundedness 0, on six anthers and the trifid)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"3"},{"id":"stigmaPinch","value":"1"},{"id":"stamenCount","value":"6"},{"id":"antherRoundedness","value":"0"},{"id":"antherPoints","value":"3"},{"id":"antherPinch","value":"1"}]},
+    {"label":"STIGMA: INERT — the points and the pinch at their extremes with roundedness 1 (bit-identical to the shipped trifid)","set":[{"id":"gynoecium","value":"STYLE"},{"id":"stigmaPoints","value":"12"},{"id":"stigmaPinch","value":"7"}]},
+    {"label":"STIGMA: GATED — every tip control at MAXIMUM with NONE (hidden and inert; bit-identical to the default)","set":[{"id":"stigmaSize","value":"6"},{"id":"stigmaElongation","value":"6"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"12"},{"id":"stigmaPinch","value":"7"},{"id":"stigmaLumps","value":"6"},{"id":"stigmaSpread","value":"90"},{"id":"gynoecium","value":"NONE"}]},
+    {"label":"STIGMA: GATED — every tip control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"gynoecium","value":"STYLE"},{"id":"styleLength","value":"40"},{"id":"styleCurl","value":"180"},{"id":"stigmaSize","value":"6"},{"id":"stigmaElongation","value":"6"},{"id":"stigmaRoundedness","value":"0"},{"id":"stigmaPoints","value":"12"},{"id":"stigmaPinch","value":"7"},{"id":"stigmaLumps","value":"6"},{"id":"stigmaSpread","value":"90"}]},
+    {"label":"BUCKLE: the first live step (0.01 x the half-width)","set":[{"id":"buckleAmp","value":"0.01"}]},
+    {"label":"BUCKLE: a gentle undulation (0.10 x, f 2)","set":[{"id":"buckleAmp","value":"0.1"},{"id":"buckleFreq","value":"2"}]},
+    {"label":"BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"buckleFreq","value":"3"}]},
+    {"label":"BUCKLE: f min (1) — one cycle along the blade, the whole range live","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"1"}]},
+    {"label":"BUCKLE: f max (7) — the ceiling, exactly 8 rows per cycle","set":[{"id":"buckleAmp","value":"0.2"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"BUCKLE: THE CLAMP BINDING (0.60 asked at f 7 — built at the cap, told)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"BUCKLE: the clamp NOT binding (0.60 asked at f 1 — the cap is 3.23x)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"1"}]},
+    {"label":"BUCKLE: reach min (p 2) — the wave over the outer 68% of the half-width","set":[{"id":"buckleAmp","value":"0.3"},{"id":"buckleEnv","value":"2"}]},
+    {"label":"BUCKLE: reach max (p 6) — confined to the outer 32%","set":[{"id":"buckleAmp","value":"0.3"},{"id":"buckleEnv","value":"6"}]},
+    {"label":"BUCKLE: THE IRIS look — high amplitude, low p (wide ruffle reaching in)","set":[{"id":"buckleAmp","value":"0.45"},{"id":"buckleFreq","value":"2"},{"id":"buckleEnv","value":"2"}]},
+    {"label":"BUCKLE: THE ROSE look — low amplitude, high p (a narrow band at the edge)","set":[{"id":"buckleAmp","value":"0.12"},{"id":"buckleFreq","value":"4"},{"id":"buckleEnv","value":"6"}]},
+    {"label":"BUCKLE: over a cupped blade (cup 1.2)","set":[{"id":"buckleAmp","value":"0.2"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"BUCKLE: over a curled blade (curl 180)","set":[{"id":"buckleAmp","value":"0.2"},{"id":"petalSpineCurl","value":"180"}]},
+    {"label":"BUCKLE: THE COMPOSITION (cup 1.2 x curl 180) — a tracked wall xfail that must still export clean","set":[{"id":"buckleAmp","value":"0.2"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"180"}]},
+    {"label":"BUCKLE: x ALL FORM MAX (every clamp binds at once)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"5"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"BUCKLE: x the thinnest sheet (0.60 — the floor is halved, the cap doubles)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"4"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"BUCKLE: x the thickest sheet (2.40 — the floor doubles, the cap halves)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"4"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"BUCKLE: x the shortest petal (20 mm — the cap falls with L^2)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"4"},{"id":"petalLength","value":"20"}]},
+    {"label":"BUCKLE: x the longest, widest petal (60 x 30)","set":[{"id":"buckleAmp","value":"0.4"},{"id":"buckleFreq","value":"4"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"30"}]},
+    {"label":"BUCKLE: x petalCount 3 (the per-slot phase over three petals)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"petalCount","value":"3"}]},
+    {"label":"BUCKLE: x petalCount 40 (forty phases at the golden angle)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"petalCount","value":"40"}]},
+    {"label":"BUCKLE: x 3 whorls (the phase runs over the slot index, not the whorl)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"layerCount","value":"3"}]},
+    {"label":"BUCKLE: x CONTINUOUS x 3 turns","set":[{"id":"buckleAmp","value":"0.3"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"BUCKLE: x SPHERE (a buckled margin on a full-sphere head)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"24"}]},
+    {"label":"BUCKLE: x the whole centre (stamens and a style under a buckled whorl)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"stamenCount","value":"60"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"BUCKLE: x ZYGO 2 whorls x ALL INNER MAX (the buckle is not role-differentiated)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"BUCKLE: GATED — frequency and reach at MAXIMUM with amplitude 0 (hidden and inert; bit-identical to the default)","set":[{"id":"buckleAmp","value":"0"},{"id":"buckleFreq","value":"7"},{"id":"buckleEnv","value":"6"}]},
+    {"label":"BUCKLE: GATED — frequency and reach at MINIMUM with amplitude 0 (hidden and inert; bit-identical to the default)","set":[{"id":"buckleAmp","value":"0"},{"id":"buckleFreq","value":"1"},{"id":"buckleEnv","value":"2"}]},
+    {"label":"TIP SHAPE: 0.60 — acute, the floor","set":[{"id":"petalTipShape","value":"0.6"}]},
+    {"label":"TIP SHAPE: 1.00 — a straight point","set":[{"id":"petalTipShape","value":"1"}]},
+    {"label":"TIP SHAPE: 1.20 — today's pointed petal, which must stay reachable","set":[{"id":"petalTipShape","value":"1.2"}]},
+    {"label":"TIP SHAPE: 2.00 — the true ellipse","set":[{"id":"petalTipShape","value":"2"}]},
+    {"label":"TIP SHAPE: 3.00 — the held-width round tip, the ceiling","set":[{"id":"petalTipShape","value":"3"}]},
+    {"label":"TIP SHAPE: Eva's reference settings at the default exponent","set":[{"id":"petalLength","value":"33"},{"id":"petalWidth","value":"14"},{"id":"petalBaseTaper","value":"0.7"},{"id":"petalTipTaper","value":"0.6"},{"id":"petalCount","value":"8"}]},
+    {"label":"TIP SHAPE: 3.00 x a far-out widest point (a 4b, where the OLD cap made it inert)","set":[{"id":"petalTipShape","value":"3"},{"id":"petalBaseTaper","value":"2.4"},{"id":"petalTipTaper","value":"0.6"}]},
+    {"label":"TIP SHAPE: 0.60 x a far-out widest point","set":[{"id":"petalTipShape","value":"0.6"},{"id":"petalBaseTaper","value":"2.4"},{"id":"petalTipTaper","value":"0.6"}]},
+    {"label":"TIP SHAPE: 3.00 x the widest point hard at the base (a min, b max)","set":[{"id":"petalTipShape","value":"3"},{"id":"petalBaseTaper","value":"0.3"},{"id":"petalTipTaper","value":"4"}]},
+    {"label":"TIP SHAPE: 0.60 x the thinnest sheet (0.60 — the print floor halves)","set":[{"id":"petalTipShape","value":"0.6"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)","set":[{"id":"petalTipShape","value":"0.6"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"TIP SHAPE: 0.60 x the shortest petal (20 mm — the floor is a larger share)","set":[{"id":"petalTipShape","value":"0.6"},{"id":"petalLength","value":"20"}]},
+    {"label":"TIP SHAPE: 3.00 x the longest, widest petal (60 x 30)","set":[{"id":"petalTipShape","value":"3"},{"id":"petalLength","value":"60"},{"id":"petalWidth","value":"30"}]},
+    {"label":"TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at once)","set":[{"id":"petalTipShape","value":"3"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"}]},
+    {"label":"TIP SHAPE: x CONTINUOUS x 3 turns","set":[{"id":"petalTipShape","value":"3"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"TIP SHAPE: x SPHERE","set":[{"id":"petalTipShape","value":"0.6"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"24"}]},
+    {"label":"TIP SHAPE: x the whole centre (stamens and a style under a round tip)","set":[{"id":"petalTipShape","value":"3"},{"id":"stamenCount","value":"60"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"TIP SHAPE: x ZYGO 2 whorls x ALL INNER MAX","set":[{"id":"petalTipShape","value":"0.6"},{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform","set":[{"id":"petalTipShape","value":"3"},{"id":"buckleAmp","value":"0.2"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"LADDER x BUCKLE: f 5 — the ladder is bounded but still redistributes","set":[{"id":"petalTipShape","value":"3"},{"id":"buckleAmp","value":"0.3"},{"id":"buckleFreq","value":"5"}]},
+    {"label":"LADDER x BUCKLE: f 1 — one cycle, the ladder is unbounded by the buckle","set":[{"id":"petalTipShape","value":"3"},{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"1"}]},
+    {"label":"LADDER x BUCKLE: the clamp binding under a round tip","set":[{"id":"petalTipShape","value":"2.5"},{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"TIP SHAPE: x petalCount 40 (forty apexes on one hub)","set":[{"id":"petalTipShape","value":"3"},{"id":"petalCount","value":"40"}]},
+    {"label":"TIP SHAPE: 3.00 x a cleft margin","capability":{"label":"CLEFT","cleft":{"from":0.55,"gap":0.35}},"set":[{"id":"petalTipShape","value":"3"}]},
+    {"label":"LOBES: the first live step (depth 0.01)","set":[{"id":"lobeDepth","value":"0.01"}]},
+    {"label":"LOBES: 2 teeth at the default coverage — an EVEN count, so the apex carries the NOTCH and it is FLAT (the terminal face is already at the print floor)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"}]},
+    {"label":"LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"3"}]},
+    {"label":"LOBES: 8 asked at the default coverage — CLAMPED to 6 by the rows the ladder has (capacity 33 at 9 stations a period)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"8"}]},
+    {"label":"LOBES: 10 asked at the default coverage — CLAMPED to 6, told","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"10"}]},
+    {"label":"LOBES: 10 asked at maximum coverage — CLAMPED to 7 (capacity 39 rows at 9 a period); TWO of the margin's teeth are relief-limited by the material at their own sinus","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"10"},{"id":"lobeCoverage","value":"1"}]},
+    {"label":"LOBES: TWELVE O'CLOCK ALONE — coverage min (0.10), 1.2 hours of the clock: the whole treated arc lies in the converging tip, so both teeth are relief-limited to what the material there allows","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"lobeCoverage","value":"0.1"}]},
+    {"label":"LOBES: ONE tooth AT twelve — count 1 at coverage min, the apex-only state Eva's clock names (periods 2, a crest on the terminal face)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"1"},{"id":"lobeCoverage","value":"0.1"}]},
+    {"label":"LOBES: DEPTH 1.00 — the relief target is the whole of the widest half-width above the print floor; the guard is PER PERIOD, so the depth is never clamped and only the teeth without room fall short","set":[{"id":"lobeDepth","value":"1"},{"id":"lobeCount","value":"2"}]},
+    {"label":"LOBES: DEPTH 1.00 at maximum coverage over 5 teeth — SIX of the six periods relief-limited, the residual fade measured at its worst","set":[{"id":"lobeDepth","value":"1"},{"id":"lobeCount","value":"5"},{"id":"lobeCoverage","value":"1"}]},
+    {"label":"LOBES: a POINT over a round U (crest 1.00, notch 2.00 — the old pointed lobe, drawn by the new law)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCrestShape","value":"1"},{"id":"lobeNotchShape","value":"2"}]},
+    {"label":"LOBES: a ROUND crest over a V (crest 2.00, notch 1.00 — CRENATE; unreachable on the shipped family at any exponent)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCrestShape","value":"2"},{"id":"lobeNotchShape","value":"1"}]},
+    {"label":"LOBES: the TRIANGLE wave (crest 1.00, notch 1.00 — both acute, the serrate margin; g(r) = r to the bit)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"8"},{"id":"lobeCrestShape","value":"1"},{"id":"lobeNotchShape","value":"1"}]},
+    {"label":"LOBES: SERRATION (8 asked at the triangle wave, low depth — the count the shape buys: demand 3 a period, not 9)","set":[{"id":"lobeDepth","value":"0.12"},{"id":"lobeCount","value":"8"},{"id":"lobeCrestShape","value":"1"},{"id":"lobeNotchShape","value":"1"}]},
+    {"label":"LOBES: SERRATION AROUND THE WHOLE RIM (10 at the triangle wave, coverage 1 — the range's own maximum, uncapped by either cap)","set":[{"id":"lobeDepth","value":"0.12"},{"id":"lobeCount","value":"10"},{"id":"lobeCoverage","value":"1"},{"id":"lobeCrestShape","value":"1"},{"id":"lobeNotchShape","value":"1"}]},
+    {"label":"LOBES: both CUSPED (crest 0.60, notch 0.60 — a needle over a slit, both local powers under 1)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"4"},{"id":"lobeCrestShape","value":"0.6"},{"id":"lobeNotchShape","value":"0.6"}]},
+    {"label":"LOBES: both FLAT (crest 3.00, notch 3.00 — a square wave drawn as bends; the flattest reachable pair)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCrestShape","value":"3"},{"id":"lobeNotchShape","value":"3"}]},
+    {"label":"LOBES: a CUSPED crest over a FLAT notch (crest 0.60, notch 3.00 — the most asymmetric pair the square holds)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCrestShape","value":"0.6"},{"id":"lobeNotchShape","value":"3"}]},
+    {"label":"LOBES: a FLAT crest over a CUSPED notch (crest 3.00, notch 0.60 — the other corner; DENTATE)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCrestShape","value":"3"},{"id":"lobeNotchShape","value":"0.6"}]},
+    {"label":"LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"petalCup","value":"0.4"}]},
+    {"label":"LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; MODEL B's stations no longer land on them — 0 pairs, and the xfail entry came off in the same commit)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"buckleAmp","value":"0.3"},{"id":"buckleFreq","value":"3"}]},
+    {"label":"LOBES: x buckle 0.60 f 7 (the ladder forced uniform by the buckle — its 22 window rows hold 2 lobes)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"LOBES: x roll 330 (over the quill, declared on main)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"petalRoll","value":"330"}]},
+    {"label":"LOBES: x curl 360 (over the fiddlehead, declared on main)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"petalSpineCurl","value":"360"}]},
+    {"label":"LOBES: x twist 180","set":[{"id":"lobeDepth","value":"0.3"},{"id":"petalTwist","value":"180"}]},
+    {"label":"LOBES: x the shortest petal (20 mm x 10 asked at coverage 1 — the rows cap binds at 8; the pitch floor would allow 28)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"10"},{"id":"lobeCoverage","value":"1"},{"id":"petalLength","value":"20"}]},
+    {"label":"LOBES: NO ROOM by the pitch floor (20 mm petal, sheet 2.40, coverage 0.10 — a 3.5 mm treated arc under a 2.40 mm pitch floor holds no period; nothing cut, told)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"lobeCoverage","value":"0.1"},{"id":"petalLength","value":"20"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"LOBES: NO ROOM by the rows (coverage 0.10 under the buckle's frequency ceiling — the ladder is uniform there and holds 3 stations in the arc against a demand of 7)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"lobeCoverage","value":"0.1"},{"id":"buckleAmp","value":"0.3"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"LOBES: NO ROOM by the RELIEF (20 mm petal at coverage 0.10 — the whole treated arc lies where the outline has already converged to the print floor; nothing to remove, told)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"lobeCoverage","value":"0.1"},{"id":"petalLength","value":"20"}]},
+    {"label":"LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 13.9 mm arc at a 2.40 mm floor; CLAMPED to 3 by rows)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"4"},{"id":"lobeCoverage","value":"0.4"},{"id":"petalLength","value":"20"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"LOBES: x the thickest sheet (2.40 — the pitch floor doubles; the rows cap still binds first)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"8"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"LOBES: x the thinnest sheet (0.60 — the floor is MIN_FEATURE_MM, not the sheet)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"LOBES: x petalTipShape 0.60 (an acute apex — the rim LENGTHENS to 55.6 mm and the teeth run over a point the cap used to own alone)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"petalTipShape","value":"0.6"}]},
+    {"label":"LOBES: x petalTipShape 3.00","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"petalTipShape","value":"3"}]},
+    {"label":"LOBES: x the far-out widest point (a 3, b 0.6 — the window sits below the peak)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"petalBaseTaper","value":"3"},{"id":"petalTipTaper","value":"0.6"}]},
+    {"label":"LOBES: x 3 whorls (the inner petals are short — the floor binds there first)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"layerCount","value":"3"}]},
+    {"label":"LOBES: x CONTINUOUS x 3 turns","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"LOBES: x SPHERE","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"24"}]},
+    {"label":"LOBES: x FAN","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"placement","value":"FAN"}]},
+    {"label":"LOBES: x the whole centre (stamens and a style under a lobed whorl)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"stamenCount","value":"60"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":1.2,"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"LOBES: x petalCount 40","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"petalCount","value":"40"}]},
+    {"label":"LOBES: x the domed hub (head rise 1.00)","set":[{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"2"},{"id":"headRise","value":"1"}]},
+    {"label":"LOBES: GATED — count, coverage and BOTH shapes at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)","set":[{"id":"lobeDepth","value":"0"},{"id":"lobeCount","value":"10"},{"id":"lobeCoverage","value":"1"},{"id":"lobeCrestShape","value":"3"},{"id":"lobeNotchShape","value":"3"}]},
+    {"label":"LOBES: GATED — count, coverage and BOTH shapes at MINIMUM with depth 0 (hidden and inert; bit-identical to the default)","set":[{"id":"lobeDepth","value":"0"},{"id":"lobeCount","value":"2"},{"id":"lobeCoverage","value":"0.1"},{"id":"lobeCrestShape","value":"0.6"},{"id":"lobeNotchShape","value":"0.6"}]},
+    {"label":"STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"STEM: SOLID at the floor (3 mm OD — the bore closes, Eva's rule)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"STEM: the widest (12 mm OD — the join reaches most of the hub)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"STEM: the shortest built stem (1 mm)","set":[{"id":"stemLength","value":"1"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"STEM: the longest (120 mm)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"STEM: x a domed head (rise 0.50 — part of the stem is inside the bowl)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"headRise","value":"0.5"}]},
+    {"label":"STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"headRise","value":"1"}]},
+    {"label":"STEM: x 3 whorls (a bigger hub under the same stem — the join blends out sooner in fraction)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"layerCount","value":"3"}]},
+    {"label":"STEM: x 40 petals (the widest hub reachable in one whorl)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"},{"id":"petalCount","value":"40"}]},
+    {"label":"STEM: x CONTINUOUS","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"placement","value":"CONTINUOUS"}]},
+    {"label":"STEM: x FAN","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"placement","value":"FAN"}]},
+    {"label":"STEM: x the whole centre (stamens and a style rooted through the same slab)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"stamenCount","value":"60"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"STEM: x a thick sheet (2.40 mm — the hub is thicker, so the join is inert further out)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"STEM: x the thinnest sheet (0.60 mm, floored to 1.00 in export)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"STEM: GATED — diameter at MAXIMUM with length 0 (hidden and inert; bit-identical to the default)","set":[{"id":"stemLength","value":"0"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"STEM: GATED — diameter at MINIMUM with length 0 (hidden and inert; bit-identical to the default)","set":[{"id":"stemLength","value":"0"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"FRINGE: the terminal alone at the shipped middle (0.35 of the peak — a 5.60 mm end, 35% of the width)","set":[{"id":"petalTipEnd","value":"0.35"}]},
+    {"label":"FRINGE: the terminal alone, narrowest clear of the dead travel (0.15)","set":[{"id":"petalTipEnd","value":"0.15"}]},
+    {"label":"FRINGE: the terminal alone at the CEILING (1.00 — the tip taper fully squared, the base taper untouched)","set":[{"id":"petalTipEnd","value":"1"}]},
+    {"label":"FRINGE: the terminal x the acute apex law (0.60 — the taper the terminal replaces)","set":[{"id":"petalTipEnd","value":"0.35"},{"id":"petalTipShape","value":"0.6"}]},
+    {"label":"FRINGE: the terminal x the round apex law (3.00 — a blunt shoulder meeting a flat end)","set":[{"id":"petalTipEnd","value":"0.35"},{"id":"petalTipShape","value":"3"}]},
+    {"label":"FRINGE: the terminal x the narrowest petal (8 mm — where the dead travel is 20% of the track)","set":[{"id":"petalTipEnd","value":"0.35"},{"id":"petalWidth","value":"8"}]},
+    {"label":"FRINGE: the terminal x the widest petal (30 mm)","set":[{"id":"petalTipEnd","value":"0.35"},{"id":"petalWidth","value":"30"}]},
+    {"label":"FRINGE: the terminal x the shortest petal (20 mm — the end is a larger share of the blade)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"petalLength","value":"20"}]},
+    {"label":"FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"}]},
+    {"label":"FRINGE: THE CENSUS ROW — the MAXIMUM count on the MAXIMUM terminal (the state nothing has measured)","set":[{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"10"},{"id":"fringeDepth","value":"0.2"}]},
+    {"label":"FRINGE: THE CENSUS ROW at the deepest split (10 teeth, depth 0.50 — the longest teeth reachable)","set":[{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"10"},{"id":"fringeDepth","value":"0.5"}]},
+    {"label":"FRINGE: the shallowest split (depth 0.05 — a toothed edge rather than a fringe)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.05"}]},
+    {"label":"FRINGE: ONE tooth (the terminal tapered to a single point — legal, and not a fringe)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"1"},{"id":"fringeDepth","value":"0.2"}]},
+    {"label":"FRINGE: TWO teeth (the cleft the shipped capability hook has always drawn, now reachable)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"2"},{"id":"fringeDepth","value":"0.2"}]},
+    {"label":"FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.30; told, never refused)","set":[{"id":"petalTipEnd","value":"0.3"},{"id":"fringeCount","value":"10"},{"id":"fringeDepth","value":"0.2"}]},
+    {"label":"FRINGE: CLAMPED — 10 teeth on the narrowest petal (8 mm, the tightest count ceiling reachable)","set":[{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"10"},{"id":"fringeDepth","value":"0.2"},{"id":"petalWidth","value":"8"}]},
+    {"label":"FRINGE: NO ROOM — a fringe asked with no terminal at all (no end to cut teeth into; told, and bit-identical to the default)","set":[{"id":"petalTipEnd","value":"0"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"}]},
+    {"label":"FRINGE: x the thickest sheet (2.40 mm — the print floor doubles under the same terminal)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"FRINGE: x the thinnest sheet (0.60 mm, floored to 1.00 in export)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"FRINGE: x cup 1.2 (the picture measured fingers reaching each other here)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"FRINGE: x the buckle at 0.30 f 3 (the other state that brought fingers together)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"buckleAmp","value":"0.3"},{"id":"buckleFreq","value":"3"}]},
+    {"label":"FRINGE: x roll 330 (a quilled tube with a fringed end)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"petalRoll","value":"330"}]},
+    {"label":"FRINGE: x spine curl 180 (the fringe carried round a fiddlehead)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"petalSpineCurl","value":"180"}]},
+    {"label":"FRINGE: x ALL FORM MAX (a fringed end under every deformation at once)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"petalCup","value":"1.2"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"40"},{"id":"petalSpineCurl","value":"180"},{"id":"buckleAmp","value":"0.6"}]},
+    {"label":"FRINGE: x 40 petals (forty fringed ends on one hub)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"petalCount","value":"40"}]},
+    {"label":"FRINGE: x CONTINUOUS x 3 turns (a fringe on every petal of a spiral)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"FRINGE: x 3 layers (the inner whorls fringed too)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"layerCount","value":"3"}]},
+    {"label":"FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)","set":[{"id":"petalTipEnd","value":"0"},{"id":"fringeCount","value":"10"},{"id":"fringeDepth","value":"0.5"}]},
+    {"label":"FRINGE: GATED — a MAXIMUM terminal with the count at 0 (the terminal alone; no panel is split)","set":[{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"0"},{"id":"fringeDepth","value":"0.5"}]},
+    {"label":"FRINGE: GATED — the count at 0 with the depth at MAXIMUM (hidden and inert; bit-identical to the default)","set":[{"id":"fringeCount","value":"0"},{"id":"fringeDepth","value":"0.5"}]},
+    {"label":"FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)","set":[{"id":"petalTipEnd","value":"0.5"},{"id":"fringeCount","value":"7"},{"id":"fringeDepth","value":"0.2"},{"id":"lobeDepth","value":"1"},{"id":"lobeCount","value":"10"},{"id":"lobeCoverage","value":"1"}]},
+    {"label":"SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"SPHERE STEM: the widest stem on the default sphere (12 mm — the join is INERT on a shell)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"SPHERE STEM: SOLID at the floor (3 mm OD — the bore closes, Eva's rule, on a shell)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"SPHERE STEM: x 40 petals in ONE turn","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"40"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"SPHERE STEM: x 40 petals x 6 turns (240 feet — the most the channel ever sorts)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"SPHERE STEM: the longest stem (120 mm)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"}]},
+    {"label":"SPHERE STEM: x the thinnest sheet (0.60 mm, floored to 1.00 in export — the two modes measure different geometry)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"SPHERE STEM: THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"layerSize","value":"0.35"},{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"SPHERE STEM: THE TWO CLOSURES MEET — a 1 mm stem on the bare corner (solid throughout, told)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"layerSize","value":"0.35"},{"id":"stemLength","value":"1"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"SPHERE STEM: the thinnest bore left (0.100 mm between the two closures, live)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"sheetThickness","value":"0.6"},{"id":"stemLength","value":"1"},{"id":"stemDiameter","value":"3.5"}]},
+    {"label":"SPHERE STEM: GATED — the widest stem at length 0 on a sphere (bit-identical to an untouched sphere)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"0"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"LEAVES: alternate x 3 nodes at the ruled 35 deg","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafAngle","value":"35"},{"id":"leafNodes","value":"3"},{"id":"leafPhyllotaxy","value":"alternate"}]},
+    {"label":"LEAVES: opposite x 5 nodes (decussate, 10 leaves)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafAngle","value":"35"},{"id":"leafNodes","value":"5"},{"id":"leafPhyllotaxy","value":"opposite"}]},
+    {"label":"LEAVES: whorled x 8 nodes (24 leaves — the most the controls reach)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"45"},{"id":"leafWidth","value":"15"},{"id":"leafAngle","value":"35"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"}]},
+    {"label":"LEAVES: on a HOLLOW stem at the widest bore (12 mm — the petiole crosses 1.5 mm of wall)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"12"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafAngle","value":"35"},{"id":"leafNodes","value":"3"}]},
+    {"label":"LEAVES: on the SOLID stem at the floor (3 mm — no bore at all)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"3"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafAngle","value":"35"},{"id":"leafNodes","value":"3"}]},
+    {"label":"LEAVES: the STEEP angle (85 deg — axis-rooted this DETACHES; wall-rooted it does not)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"12"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafAngle","value":"85"},{"id":"leafNodes","value":"3"}]},
+    {"label":"LEAVES: DROOPING (-60 deg, the other end of the angle)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafAngle","value":"-60"},{"id":"leafNodes","value":"3"}]},
+    {"label":"LEAVES: serration OFF (an entire margin — the guard, inert)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafToothDepth","value":"0"}]},
+    {"label":"LEAVES: serration at MAXIMUM (depth 1, 12 teeth, a cusped notch on a cusped crest)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafToothDepth","value":"1"},{"id":"leafToothCount","value":"12"},{"id":"leafCrestShape","value":"0.6"},{"id":"leafNotchShape","value":"3"}]},
+    {"label":"LEAVES: the LONGEST leaf on the SHORTEST stem (the head cannot be cleared; the node count gives)","set":[{"id":"stemLength","value":"20"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"120"},{"id":"leafWidth","value":"40"},{"id":"leafAngle","value":"35"},{"id":"leafNodes","value":"3"}]},
+    {"label":"LEAVES: x a SPHERE with a stem (the channel and the leaves on one head)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"45"},{"id":"leafWidth","value":"15"},{"id":"leafNodes","value":"3"}]},
+    {"label":"LEAVES: tip shape ACUTE (0.60 — the floor; the 1.6 mm terminal stub is at its longest)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafTipShape","value":"0.6"}]},
+    {"label":"LEAVES: tip shape the held-width ROUND tip (3.00 — the ceiling; the stub all but vanishes)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafTipShape","value":"3"}]},
+    {"label":"LEAVES: tip shape 0.60 x serration at maximum (the cut law over the acute tip)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafTipShape","value":"0.6"},{"id":"leafToothDepth","value":"1"},{"id":"leafToothCount","value":"12"}]},
+    {"label":"LEAVES: tip shape 3.00 on the NARROWEST leaf (3 mm across — the terminal is over half the width)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"3"},{"id":"leafNodes","value":"3"},{"id":"leafTipShape","value":"3"}]},
+    {"label":"LEAVES: GATED — length 0 with every other leaf control at maximum","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"0"},{"id":"leafWidth","value":"40"},{"id":"leafAngle","value":"90"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"},{"id":"leafToothDepth","value":"1"},{"id":"leafToothCount","value":"12"},{"id":"leafTipShape","value":"3"}]},
+    {"label":"HUB: GOBLET at amount 2 (the rounded flare, exaggerated)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: ANGLED at amount 1 (a straight cone frustum, hard shoulders)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"1"}]},
+    {"label":"HUB: ANGLED at amount 2","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: CURVED at amount 1 (smooth into the stem, no shoulder)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"1"}]},
+    {"label":"HUB: CURVED at amount 2","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: STRAIGHT — amount 0 (no flare; the three styles coincide)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubShapeAmount","value":"0"}]},
+    {"label":"HUB: an explicit length (GOBLET, 20 mm reach — hubLength overrides the derived depth)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubLength","value":"20"}]},
+    {"label":"HUB: GOBLET at MAX amount x MAX length (2x, 40 mm)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"HUB: ANGLED at MAX amount x MAX length","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"HUB: CURVED at MAX amount x MAX length","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"HUB: CURVED, widest stem (12 mm) x amount 2 (the join reaches most of the hub)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: #236 — a hub NARROWER than the stem (3 petals, spread 0.6, 8 mm petals, 12 mm stem), GOBLET","set":[{"id":"petalCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalWidth","value":"8"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: #236 — the same narrow hub, ANGLED","set":[{"id":"petalCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalWidth","value":"8"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: #236 — the same narrow hub, CURVED, longest stem (120 mm)","set":[{"id":"petalCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalWidth","value":"8"},{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"12"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: #236 — the narrow hub on a CAP head (rise 0.5), the shape #236 was filed on","set":[{"id":"petalCount","value":"3"},{"id":"spread","value":"0.6"},{"id":"petalWidth","value":"8"},{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"},{"id":"headRise","value":"0.5"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"}]},
+    {"label":"HUB: GATED — length 0 with style/amount/length at MAXIMUM (hidden and inert; bit-identical to the default)","set":[{"id":"stemLength","value":"0"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)","set":[{"id":"sepalCount","value":"5"}]},
+    {"label":"SEPALS: ONE sepal","set":[{"id":"sepalCount","value":"1"}]},
+    {"label":"SEPALS: ALIGNED at the shipped size (offset 0 — the foot columns coincide at 3/5 and the census reads a weld)","set":[{"id":"sepalCount","value":"8"},{"id":"sepalPhase","value":"0"}]},
+    {"label":"SEPALS: ALIGNED at size 1.00 (the sepal foot IS the petal foot — welded by construction)","set":[{"id":"sepalCount","value":"8"},{"id":"sepalPhase","value":"0"},{"id":"sepalScale","value":"1"}]},
+    {"label":"SEPALS: offset 0.25 (toward aligned)","set":[{"id":"sepalCount","value":"8"},{"id":"sepalPhase","value":"0.25"}]},
+    {"label":"SEPALS: offset 1.00 (past interleaved — aligned with the NEXT petal)","set":[{"id":"sepalCount","value":"8"},{"id":"sepalPhase","value":"1"}]},
+    {"label":"SEPALS: the count at the ceiling (8 on 8)","set":[{"id":"sepalCount","value":"8"}]},
+    {"label":"SEPALS: the count past the ceiling (40 asked on 5 petals — CLAMPED to 5, told)","set":[{"id":"petalCount","value":"5"},{"id":"sepalCount","value":"40"}]},
+    {"label":"SEPALS: MAX count on MAX petals (40 on 40, interleaved)","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"}]},
+    {"label":"SEPALS: size min (0.20)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalScale","value":"0.2"}]},
+    {"label":"SEPALS: size max (1.00 — as long as the petals)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalScale","value":"1"}]},
+    {"label":"SEPALS: foot breadth min (0.25 — the print floor binds, told)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalFootBreadth","value":"0.25"}]},
+    {"label":"SEPALS: foot breadth max (1.50)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalFootBreadth","value":"1.5"}]},
+    {"label":"SEPALS: angle min (-90 — reflexed straight down)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalAngle","value":"-90"}]},
+    {"label":"SEPALS: angle 90 asked — CLAMPED at the drawn limit (the last angle clear of the petals)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalAngle","value":"90"}]},
+    {"label":"SEPALS: angle 90 asked, ALIGNED (the limit is the petal tilt less a step)","set":[{"id":"sepalCount","value":"8"},{"id":"sepalPhase","value":"0"},{"id":"sepalAngle","value":"90"}]},
+    {"label":"SEPALS: angle 90 asked on a CUPPED corolla (cup 0.6 — an interleaved sepal tilts further than an aligned one)","set":[{"id":"sepalCount","value":"5"},{"id":"petalCup","value":"0.6"},{"id":"sepalAngle","value":"90"}]},
+    {"label":"SEPALS: on a FAN (5 sepals on 7 slots, interleaved)","set":[{"id":"placement","value":"FAN"},{"id":"sepalCount","value":"5"}]},
+    {"label":"SEPALS: on a FAN with no mirror-line petal (4 sepals, aligned)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"sepalCount","value":"4"},{"id":"sepalPhase","value":"0"}]},
+    {"label":"SEPALS: under CONTINUOUS x 3 turns (8 at the rim — a golden-angle spiral has no pitch to interleave with, told)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"sepalCount","value":"8"}]},
+    {"label":"SEPALS: on a DOME (rise 0.5)","set":[{"id":"sepalCount","value":"5"},{"id":"headRise","value":"0.5"}]},
+    {"label":"SEPALS: on the HEMISPHERE (rise 1)","set":[{"id":"sepalCount","value":"5"},{"id":"headRise","value":"1"}]},
+    {"label":"SEPALS: x 3 whorls (the ceiling is the OUTER whorl)","set":[{"id":"layerCount","value":"3"},{"id":"sepalCount","value":"8"}]},
+    {"label":"SEPALS: on the thickest sheet (2.40 — seventeen seam-step buckets)","set":[{"id":"sepalCount","value":"5"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"SEPALS: on the thinnest sheet (0.60 — the export floor moves t, the mode union binds)","set":[{"id":"sepalCount","value":"5"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"SEPALS: height 0.75 (the shipped default) on the default stem — 60 x 6, GOBLET auto (the foot 0.33 mm below the head)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"}]},
+    {"label":"SEPALS: height min (0 — at the stem end, where the flare meets the stem)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"sepalHeight","value":"0"}]},
+    {"label":"SEPALS: height max (1 — where the hub meets the head)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"sepalHeight","value":"1"}]},
+    {"label":"SEPALS: height 0.50 on GOBLET at MAX amount x MAX length (half-way down a 77.6 mm hub)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"},{"id":"sepalHeight","value":"0.5"}]},
+    {"label":"SEPALS: height on an INERT join (amount 0 — a straight join has no flare: at the rim, told)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubShapeAmount","value":"0"}]},
+    {"label":"SEPALS: height on a DOME with a stem (rise 0.5 — the bowl holds the stem end above the join's rim, the extent INVERTED: at the rim, told)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"headRise","value":"0.5"}]},
+    {"label":"SEPALS: height on a shallow DOME with a hanging hub (rise 0.1 x length 40 — the domed arm of the solve)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"headRise","value":"0.1"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: with a stem — GOBLET at MAX amount x MAX length (the blend reaches the rim)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: with a stem — ANGLED at MAX amount x MAX length (the foot on the cone's SIDE, a straight face — no shoulder under it)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: with a stem — CURVED at MAX amount x MAX length","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: with a stem and leaves (the whole plant)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"70"},{"id":"leafLength","value":"52"}]},
+    {"label":"SEPALS: THE CROWDED CORNER, no stem — 40 x 40 x size 1 x ALIGNED x 90 asked","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"},{"id":"sepalScale","value":"1"},{"id":"sepalPhase","value":"0"},{"id":"sepalAngle","value":"90"}]},
+    {"label":"SEPALS: THE CROWDED CORNER on GOBLET (stem 60 x 6, amount 2, length 40)","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"},{"id":"sepalScale","value":"1"},{"id":"sepalPhase","value":"0"},{"id":"sepalAngle","value":"90"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: THE CROWDED CORNER on ANGLED","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"},{"id":"sepalScale","value":"1"},{"id":"sepalPhase","value":"0"},{"id":"sepalAngle","value":"90"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: THE CROWDED CORNER on CURVED","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"},{"id":"sepalScale","value":"1"},{"id":"sepalPhase","value":"0"},{"id":"sepalAngle","value":"90"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"CURVED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"}]},
+    {"label":"SEPALS: sepalBaseTaper min (0.3)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBaseTaper","value":"0.3"}]},
+    {"label":"SEPALS: sepalBaseTaper max (3)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBaseTaper","value":"3"}]},
+    {"label":"SEPALS: sepalTipShape min (0.6)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTipShape","value":"0.6"}]},
+    {"label":"SEPALS: sepalTipShape max (3)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTipShape","value":"3"}]},
+    {"label":"SEPALS: sepalTipTaper min (0.6)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTipTaper","value":"0.6"}]},
+    {"label":"SEPALS: sepalTipTaper max (4)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTipTaper","value":"4"}]},
+    {"label":"SEPALS: sepalCup min (-0.8)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCup","value":"-0.8"}]},
+    {"label":"SEPALS: sepalCup max (1.2)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCup","value":"1.2"}]},
+    {"label":"SEPALS: sepalCupGradient min (-0.8)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCupGradient","value":"-0.8"}]},
+    {"label":"SEPALS: sepalCupGradient max (1.2)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCupGradient","value":"1.2"}]},
+    {"label":"SEPALS: sepalBuckleAmp min (0)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBuckleAmp","value":"0"}]},
+    {"label":"SEPALS: sepalBuckleAmp max (0.6)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBuckleAmp","value":"0.6"}]},
+    {"label":"SEPALS: sepalBuckleFreq min (1)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBuckleAmp","value":"0.3"},{"id":"sepalBuckleFreq","value":"1"}]},
+    {"label":"SEPALS: sepalBuckleFreq max (7)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBuckleAmp","value":"0.3"},{"id":"sepalBuckleFreq","value":"7"}]},
+    {"label":"SEPALS: sepalBuckleEnv min (2)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBuckleAmp","value":"0.3"},{"id":"sepalBuckleEnv","value":"2"}]},
+    {"label":"SEPALS: sepalBuckleEnv max (6)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalBuckleAmp","value":"0.3"},{"id":"sepalBuckleEnv","value":"6"}]},
+    {"label":"SEPALS: sepalApexSweep min (0)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalApexSweep","value":"0"}]},
+    {"label":"SEPALS: sepalApexSweep max (1)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalApexSweep","value":"1"}]},
+    {"label":"SEPALS: sepalRoll min (-180)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalRoll","value":"-180"}]},
+    {"label":"SEPALS: sepalRoll max (180)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalRoll","value":"180"}]},
+    {"label":"SEPALS: sepalRollTaper min (-1)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalRoll","value":"180"},{"id":"sepalRollTaper","value":"-1"}]},
+    {"label":"SEPALS: sepalRollTaper max (1)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalRoll","value":"180"},{"id":"sepalRollTaper","value":"1"}]},
+    {"label":"SEPALS: sepalSpineCurl min (-180)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"-180"}]},
+    {"label":"SEPALS: sepalSpineCurl max (360)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"360"}]},
+    {"label":"SEPALS: sepalCurlBias min (0)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlBias","value":"0"}]},
+    {"label":"SEPALS: sepalCurlBias max (1)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlBias","value":"1"}]},
+    {"label":"SEPALS: sepalCurlStart min (0)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlStart","value":"0"}]},
+    {"label":"SEPALS: sepalCurlStart max (0.95)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlStart","value":"0.95"}]},
+    {"label":"SEPALS: sepalTwist min (-180)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTwist","value":"-180"}]},
+    {"label":"SEPALS: sepalTwist max (180)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTwist","value":"180"}]},
+    {"label":"SEPALS: GATED — count 0 with every sepal control at MAXIMUM (hidden and inert; bit-identical to the default)","set":[{"id":"sepalCount","value":"0"},{"id":"sepalScale","value":"1"},{"id":"sepalHeight","value":"1"},{"id":"sepalPhase","value":"1"},{"id":"sepalFootBreadth","value":"1.5"},{"id":"sepalAngle","value":"90"},{"id":"sepalCup","value":"1.2"},{"id":"sepalSpineCurl","value":"360"},{"id":"sepalRoll","value":"180"},{"id":"sepalTwist","value":"180"},{"id":"sepalBuckleAmp","value":"0.6"},{"id":"sepalTipShape","value":"3"}]},
+    {"label":"SEPALS: GATED — asked under SPHERE (8 asked on a closed head: none built, UNAVAILABLE told)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"sepalCount","value":"8"}]},
+    {"label":"TILT: 76 (one step past the old ceiling, still under the right angle)","set":[{"id":"petalTilt","value":"76"}]},
+    {"label":"TILT: 90 (the right angle — where the clearance law saturates)","set":[{"id":"petalTilt","value":"90"}]},
+    {"label":"TILT: 105 (inside the seam window the ceiling is derived from)","set":[{"id":"petalTilt","value":"105"}]},
+    {"label":"TILT: 120 x sheet 2.40 (the thickest sheet — the clearance is t/2 there)","set":[{"id":"petalTilt","value":"120"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"TILT: 120 x 20 x 8 mm (the shortest blade — the coarsest lattice station)","set":[{"id":"petalTilt","value":"120"},{"id":"petalLength","value":"20"},{"id":"petalWidth","value":"8"}]},
+    {"label":"TILT: 120 x 3 whorls x layerTilt 0 (every whorl past the right angle, not only the innermost)","set":[{"id":"petalTilt","value":"120"},{"id":"layerCount","value":"3"},{"id":"layerTilt","value":"0"}]},
+    {"label":"TILT: 120 x CONTINUOUS x 3 turns (the other placement whose rings each carry their own turn)","set":[{"id":"petalTilt","value":"120"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"TILT: 120 x headRise 0.5 (domeLean on top of the ceiling — past the window's own edge)","set":[{"id":"petalTilt","value":"120"},{"id":"headRise","value":"0.5"}]},
+    {"label":"INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"}]},
+    {"label":"INFLO: ONE node (the count floor — a solitary lateral flower)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"1"}]},
+    {"label":"INFLO: 12 nodes (the count ceiling on a rachis long enough to hold them)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"}]},
+    {"label":"INFLO: OPPOSITE (two florets across each node, decussate)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretPhyllotaxy","value":"opposite"}]},
+    {"label":"INFLO: WHORLED (three at 120 deg a node)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretPhyllotaxy","value":"whorled"}]},
+    {"label":"INFLO: 3 petals a floret (the smallest floret the range reaches)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretPetals","value":"3"}]},
+    {"label":"INFLO: 12 petals a floret (the largest — above this it is a head, not a floret)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretPetals","value":"12"}]},
+    {"label":"INFLO: size 0.20x (CLAMPED at both petal sliders' own floors)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretScale","value":"0.2"}]},
+    {"label":"INFLO: size 1.00x (a floret IS the head — the biggest reachable unit)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretScale","value":"1"}]},
+    {"label":"INFLO: 5 mm pedicels (short — the old floor, florets against the rachis)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"5"}]},
+    {"label":"INFLO: 60 mm pedicels (build 1's ceiling — half the rachis; the ceiling is 250 since build 3)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"60"}]},
+    {"label":"INFLO: pedicels DESCENDING (-60 deg — the florets hang below their nodes)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelAngle","value":"-60"}]},
+    {"label":"INFLO: pedicels STRAIGHT UP (90 deg — the placement rotation is the identity there)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"INFLO: a 3 mm rachis (SOLID — the pedicel is as thick as the stem it hangs off)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"INFLO: a 12 mm rachis (the area rule ABOVE its floor — the derived pedicel)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"INFLO: 12 nodes on a 20 mm rachis (the pitch floor takes the count)","set":[{"id":"stemLength","value":"20"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"}]},
+    {"label":"INFLO: the florets cannot clear the head (60 mm straight up on a 20 mm rachis)","set":[{"id":"stemLength","value":"20"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"60"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"INFLO: x SEPALS (every floret inherits the head's whorl — ruling 10)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"sepalCount","value":"5"}]},
+    {"label":"INFLO: x a full CENTRE (every floret inherits the stamens and the style)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"stamenCount","value":"6"},{"id":"gynoecium","value":"STYLE"}]},
+    {"label":"INFLO: x a SPHERE head (the stem channel and the florets on one rachis)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"12"}]},
+    {"label":"INFLO: ALL MAX — every inflorescence control at its maximum (ONE node of 3 florets: a 250 mm pedicel reaches past the rachis)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretPetals","value":"12"},{"id":"floretScale","value":"1"},{"id":"pedicelLength","value":"250"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"INFLO: GATED — every control at MAXIMUM with the type NONE (hidden AND inert)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"NONE"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretPetals","value":"12"},{"id":"floretScale","value":"1"},{"id":"pedicelLength","value":"60"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"INFLO: GATED — every control at MAXIMUM with NO RACHIS (hidden AND inert)","set":[{"id":"stemLength","value":"0"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretPetals","value":"12"},{"id":"floretScale","value":"1"},{"id":"pedicelLength","value":"60"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"VARIANCE: size ±50% (1 cycle round the shipping whorl, phase 0)","set":[{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: size ±5% (the first step above the guard — 1 cycle on the shipping whorl)","set":[{"id":"varianceSize","value":"0.05"}]},
+    {"label":"VARIANCE: size ±50% x 3 petals (the smallest whorl — 1 cycle on 3 slots)","set":[{"id":"petalCount","value":"3"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: size ±50% x 40 petals (the largest whorl)","set":[{"id":"petalCount","value":"40"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: the RAMP (frequency 0 — one side of the flower to the other, its seam at the phase)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceFrequency","value":"0"}]},
+    {"label":"VARIANCE: 2 cycles (the two-lobed wave)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceFrequency","value":"2"}]},
+    {"label":"VARIANCE: 4 cycles on 8 slots (AT THE BAR — n/2, two slots a cycle, the last that draws)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceFrequency","value":"4"}]},
+    {"label":"VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceFrequency","value":"20"}]},
+    {"label":"VARIANCE: phase 180 (the wave turned half round the axis)","set":[{"id":"varianceSize","value":"0.5"},{"id":"variancePhase","value":"180"}]},
+    {"label":"VARIANCE: the ramp at phase 270 (the seam moved)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceFrequency","value":"0"},{"id":"variancePhase","value":"270"}]},
+    {"label":"VARIANCE: x SPIRAL (the golden-angle azimuth indexed, one whorl)","set":[{"id":"placement","value":"SPIRAL"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)","set":[{"id":"placement","value":"FAN"},{"id":"varianceSize","value":"0.5"},{"id":"variancePhase","value":"90"}]},
+    {"label":"VARIANCE: x FAN ramp (outward from the mirror line)","set":[{"id":"placement","value":"FAN"},{"id":"varianceSize","value":"0.5"},{"id":"varianceFrequency","value":"0"}]},
+    {"label":"VARIANCE: x CONTINUOUS x 3 turns (1 cycle over the whole 24-slot sequence)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x a SPHERE with a stem (the channel probes each slot at its OWN size)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x 3 whorls RADIAL (one field, every whorl indexed on its own azimuths)","set":[{"id":"layerCount","value":"3"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x the IRIS at 2 whorls (a role override composed with the slot field)","set":[{"id":"layerCount","value":"2"},{"id":"layerPhase","value":"0"},{"id":"varianceSize","value":"0.5"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":0.5}}],"petals":[],"tiers":[]}}]},
+    {"label":"VARIANCE: x SEPALS (the sepals do NOT take the field in this build)","set":[{"id":"sepalCount","value":"8"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x the RACEME (every floret carries the same field — ruling 10)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x cup 1.2 (the size field composed with the form maximum)","set":[{"id":"petalCup","value":"1.2"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x margin buckling 0.30 f 3 (the buckle phase is the slot index; the size is its azimuth)","set":[{"id":"buckleAmp","value":"0.3"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: x the FRINGE at 10 teeth (the tooth ceiling is per petal under the field)","set":[{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"10"},{"id":"varianceSize","value":"0.5"}]},
+    {"label":"VARIANCE: GATED — frequency and phase at MAXIMUM with the amount 0 (hidden AND inert)","set":[{"id":"varianceSize","value":"0"},{"id":"varianceFrequency","value":"20"},{"id":"variancePhase","value":"360"}]},
+    {"label":"VARIANCE: GATED — the ramp and phase 0 with the amount 0 (hidden AND inert)","set":[{"id":"varianceSize","value":"0"},{"id":"varianceFrequency","value":"0"},{"id":"variancePhase","value":"0"}]},
+    {"label":"INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)","set":[{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"INFILL: x density 8 (the range floor)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillDensity","value":"8"}]},
+    {"label":"INFILL: x density 40 (the range ceiling — the achieved count saturates and is told)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillDensity","value":"40"}]},
+    {"label":"INFILL: x cup 1.2 x spine curl 360 (S2's metric corner — the wall a flat plan quartered)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"}]},
+    {"label":"INFILL: x ALL FORM MAX","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalCup","value":"1.2"},{"id":"petalCupGradient","value":"1"},{"id":"petalRoll","value":"330"},{"id":"petalTwist","value":"180"},{"id":"petalSpineCurl","value":"360"}]},
+    {"label":"INFILL: x roll 330 (the petal's own declared fold, infilled)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalRoll","value":"330"}]},
+    {"label":"INFILL: x petalWidth 8 (the narrowest blade)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalWidth","value":"8"}]},
+    {"label":"INFILL: x petalWidth 30 (the widest — every cell keeps its hole)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalWidth","value":"30"}]},
+    {"label":"INFILL: x petalLength 20 (the shortest blade)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalLength","value":"20"}]},
+    {"label":"INFILL: x petalLength 60 x density 40","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalLength","value":"60"},{"id":"infillDensity","value":"40"}]},
+    {"label":"INFILL: x footDelicacy 0.25 (the foot under the print floor — the wall floor binds)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"footDelicacy","value":"0.25"}]},
+    {"label":"INFILL: x sheetThickness 2.40","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"INFILL: x tipThinning 0.80 (the range ceiling — the LIVE sheet is thinnest at the tip)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"tipThinning","value":"0.8"}]},
+    {"label":"INFILL: x buckle 0.60 f 3","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"3"}]},
+    {"label":"INFILL: x petalTipShape 3.00","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalTipShape","value":"3"}]},
+    {"label":"INFILL: x 40 petals x 3 whorls (the cost at scale)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalCount","value":"40"},{"id":"layerCount","value":"3"}]},
+    {"label":"INFILL: x CONTINUOUS x 3 turns","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"INFILL: x a SPHERE head with a stem","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"}]},
+    {"label":"INFILL: x sepals 8 (ruling 4 — the sepals are pinned off and stay solid)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"sepalCount","value":"8"}]},
+    {"label":"INFILL: REFUSED — a FRINGE owns the same region (several panels)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"4"}]},
+    {"label":"INFILL: REFUSED — a LOBED blade (a non-convex outline)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"lobeDepth","value":"0.6"},{"id":"lobeCount","value":"5"}]},
+    {"label":"INFILL: GATED — the density at its MAXIMUM with the guard OFF (hidden AND inert)","set":[{"id":"petalInfill","value":"NONE"},{"id":"infillDensity","value":"40"}]},
+    {"label":"INFILL: x relaxation 0 (the seeder's own cells, no Lloyd pass)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillRelax","value":"0"}]},
+    {"label":"INFILL: x relaxation 12 (the range ceiling)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillRelax","value":"12"}]},
+    {"label":"INFILL: x density law 0 (cells one size — the tip filled with holes)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillLaw","value":"0"}]},
+    {"label":"INFILL: x density law 2 (cells shrink faster than the blade — the tip packs solid)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillLaw","value":"2"}]},
+    {"label":"INFILL: x stretch 1 (round cells, no anisotropy)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillAniso","value":"1"}]},
+    {"label":"INFILL: x stretch 3 (the range ceiling)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillAniso","value":"3"}]},
+    {"label":"INFILL: x solid base 1 (the cells start at ROOT_BLEND_END)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillBase","value":"1"}]},
+    {"label":"INFILL: x the four at their far ends (relaxation 12 x law 0 x stretch 3 x base 1)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillRelax","value":"12"},{"id":"infillLaw","value":"0"},{"id":"infillAniso","value":"3"},{"id":"infillBase","value":"1"}]},
+    {"label":"INFILL: x sheetThickness 0.60 (the hole bead where the LIVE sheet is thinner than the bead is wide)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"INFILL: x petalTipShape 0.60 (the margin bead at the acutest tip, where the width arm binds)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"petalTipShape","value":"0.6"}]},
+    {"label":"INFILL: x roundness 0 (the floor — today's filleted holes)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillRound","value":"0"}]},
+    {"label":"INFILL: x roundness 1 (the inscribed circle, the range ceiling)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillRound","value":"1"}]},
+    {"label":"INFILL: x roundness 1 x cup 1.2 x curl 360 (the bar holds the opening back on a curved plan)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"infillRound","value":"1"},{"id":"petalCup","value":"1.2"},{"id":"petalSpineCurl","value":"360"}]},
+    {"label":"INFILL: GATED — the four at their far ends with the guard OFF (hidden AND inert)","set":[{"id":"petalInfill","value":"NONE"},{"id":"infillRelax","value":"12"},{"id":"infillLaw","value":"0"},{"id":"infillAniso","value":"3"},{"id":"infillBase","value":"1"}]},
+    {"label":"INFILL: GATED — roundness 1 with the guard OFF (hidden AND inert)","set":[{"id":"petalInfill","value":"NONE"},{"id":"infillRound","value":"1"}]},
+    {"label":"APEX NIB: tip shape 0.60 x 60 mm (the shallowest flank on the longest blade — 8.59 mm of law given up)","set":[{"id":"petalTipShape","value":"0.6"},{"id":"petalLength","value":"60"}]},
+    {"label":"APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest — a 0.003 mm arc)","set":[{"id":"petalTipShape","value":"3"},{"id":"petalLength","value":"20"}]},
+    {"label":"APEX NIB: tip shape 1.40 (the OVERSHOOT — the cap carries the blade past the slider)","set":[{"id":"petalTipShape","value":"1.4"}]},
+    {"label":"APEX NIB: INERT — a squared terminal holds the outline above the print floor","set":[{"id":"petalTipEnd","value":"0.3"}]},
+    {"label":"APEX NIB: MIXED — 6 layers x layerSize min (three rings nibbed, three whose blade never clears the floor)","set":[{"id":"layerCount","value":"6"},{"id":"layerSize","value":"0.35"}]},
+    {"label":"APEX NIB: x the buckle at its frequency ceiling (the arc asks the uniform ladder for its rows)","set":[{"id":"buckleAmp","value":"0.6"},{"id":"buckleFreq","value":"7"}]},
+    {"label":"APEX NIB: x LOBES 1.00 x 10 (the per-period relief against the nib’s own floor)","set":[{"id":"lobeDepth","value":"1"},{"id":"lobeCount","value":"10"}]},
+    {"label":"APEX NIB: x the FRINGE at 10 teeth on a squared end (the nib stands down, #229)","set":[{"id":"petalTipEnd","value":"1"},{"id":"fringeCount","value":"10"}]},
+    {"label":"APEX NIB: x SEPALS (the petal builder on a second ring cuts its own nib)","set":[{"id":"sepalCount","value":"8"}]},
+    {"label":"APEX NIB: x cup 1.2 x roll 330 (the nib under the form maximum)","set":[{"id":"petalCup","value":"1.2"},{"id":"petalRoll","value":"330"}]},
+    {"label":"APEX NIB: x CONTINUOUS x 3 turns x 40 petals (every ring its own crossing)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"petalCount","value":"40"}]},
+    {"label":"STEM NODES: the flower's 0.48 on 100 x 6 mm, three alternate leaves","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: 0.48 on Eva's approved 3 mm stem (SOLID — no bore)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"3"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: 0.01, the first step above the guard","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.01"},{"id":"stemNodeKink","value":"0.01"}]},
+    {"label":"STEM NODES: prominence MAXIMUM (1.00)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"STEM NODES: on the thinnest bore (4 mm — the perpendicular wall at its tightest)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"4"},{"id":"leafLength","value":"30"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"STEM NODES: on the widest bore (12 mm)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"12"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: opposite x 5 nodes (the kink turns a quarter a node)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"5"},{"id":"leafPhyllotaxy","value":"opposite"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: whorled x 8 nodes (the most the controls reach)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"30"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: x a SPHERE with a stem (the channel against a noded stem)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"45"},{"id":"leafWidth","value":"15"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: the longest leaf on the shortest stem (the node count clamps)","set":[{"id":"stemLength","value":"20"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"120"},{"id":"leafWidth","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: a thin sheet on a short stem (the mode-free pitch floor)","set":[{"id":"stemLength","value":"12"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"6"},{"id":"leafNodes","value":"8"},{"id":"sheetThickness","value":"0.6"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"STEM NODES: prominence 1 with no leaves (a BARE stem — GATED until ruling 6)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"STEM NODES: GATED — prominence 1 under a raceme (hidden AND inert)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"inflorescence","value":"RACEME"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"LEAVES: x petalTipShape 3.00 (the petals ramp their rows; the leaf keeps its own)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"petalTipShape","value":"3"}]},
+    {"label":"FORM VARIANCE: amount 1 (1 cycle round the shipping whorl, phase 0)","set":[{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: amount 0.40 (a middle amount — under the offset law the first petal of the default under the 1.0 mm bar is at 0.70)","set":[{"id":"varianceForm","value":"0.4"}]},
+    {"label":"FORM VARIANCE: amount 0.01 (the first step above the guard)","set":[{"id":"varianceForm","value":"0.01"}]},
+    {"label":"FORM VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)","set":[{"id":"varianceForm","value":"1"},{"id":"varianceFrequency","value":"20"}]},
+    {"label":"FORM VARIANCE: 20 cycles, phase 90 (aliased so that every slot reads cos 90 — zero delta)","set":[{"id":"varianceForm","value":"1"},{"id":"varianceFrequency","value":"20"},{"id":"variancePhase","value":"90"}]},
+    {"label":"FORM VARIANCE: the RAMP (frequency 0)","set":[{"id":"varianceForm","value":"1"},{"id":"varianceFrequency","value":"0"}]},
+    {"label":"FORM VARIANCE: phase 180","set":[{"id":"varianceForm","value":"1"},{"id":"variancePhase","value":"180"}]},
+    {"label":"FORM VARIANCE: x 3 petals","set":[{"id":"petalCount","value":"3"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: x 40 petals (not aliased at 20 cycles — the bar is n/2 = 20)","set":[{"id":"petalCount","value":"40"},{"id":"varianceForm","value":"1"},{"id":"varianceFrequency","value":"20"}]},
+    {"label":"FORM VARIANCE: x SPIRAL","set":[{"id":"placement","value":"SPIRAL"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)","set":[{"id":"placement","value":"FAN"},{"id":"varianceForm","value":"1"},{"id":"variancePhase","value":"90"}]},
+    {"label":"FORM VARIANCE: x CONTINUOUS x 3 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: x a SPHERE with a stem (the channel probes each slot at its OWN form)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: x 3 whorls with innerCurl 360 on curl 180 (the ONE clamp — past 360 before the slot term)","set":[{"id":"layerCount","value":"3"},{"id":"petalSpineCurl","value":"180"},{"id":"varianceForm","value":"1"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":360}},{"layer":2,"offsets":{"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"FORM VARIANCE: x size ±50% (one wave, two fields)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: x SEPALS (the sepals do NOT take the field)","set":[{"id":"sepalCount","value":"8"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: x LEAVES (a leaf takes no form field)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"varianceForm","value":"1"}]},
+    {"label":"FORM VARIANCE: GATED — frequency and phase at MAXIMUM with both amounts 0 (hidden AND inert)","set":[{"id":"varianceForm","value":"0"},{"id":"varianceSize","value":"0"},{"id":"varianceFrequency","value":"20"},{"id":"variancePhase","value":"360"}]},
+    {"label":"FORM VARIANCE: GATED — the ramp with both amounts 0 (hidden AND inert)","set":[{"id":"varianceForm","value":"0"},{"id":"varianceSize","value":"0"},{"id":"varianceFrequency","value":"0"},{"id":"variancePhase","value":"90"}]},
+    {"label":"COMPOSED: 3 whorls x curl 180 x innerCurl 360 (each inner petal coils its tip into its own foot — the census is the guard, `self` cannot see it)","set":[{"id":"layerCount","value":"3"},{"id":"petalSpineCurl","value":"180"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":360}},{"layer":2,"offsets":{"petalSpineCurl":360}}],"petals":[],"tiers":[]}}]},
+    {"label":"TUBE: 5 petals x k 0 (one closed ring)","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: 5 petals x k 1 (1 panel)","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"1"}]},
+    {"label":"TUBE: 6 petals x k 0 (one closed ring)","set":[{"id":"petalCount","value":"6"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: 6 petals x k 1 (1 panel)","set":[{"id":"petalCount","value":"6"},{"id":"tubeLayer1","value":"1"}]},
+    {"label":"TUBE: 6 petals x k 2 (2 panels)","set":[{"id":"petalCount","value":"6"},{"id":"tubeLayer1","value":"2"}]},
+    {"label":"TUBE: 6 petals x k 3 (3 panels)","set":[{"id":"petalCount","value":"6"},{"id":"tubeLayer1","value":"3"}]},
+    {"label":"TUBE: 8 petals x k 0 (one closed ring)","set":[{"id":"petalCount","value":"8"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: 8 petals x k 1 (1 panel)","set":[{"id":"petalCount","value":"8"},{"id":"tubeLayer1","value":"1"}]},
+    {"label":"TUBE: 8 petals x k 2 (2 panels)","set":[{"id":"petalCount","value":"8"},{"id":"tubeLayer1","value":"2"}]},
+    {"label":"TUBE: 8 petals x k 4 (4 panels)","set":[{"id":"petalCount","value":"8"},{"id":"tubeLayer1","value":"4"}]},
+    {"label":"TUBE: 12 petals x k 0 (one closed ring)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: 12 petals x k 1 (1 panel)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"1"}]},
+    {"label":"TUBE: 12 petals x k 2 (2 panels)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"2"}]},
+    {"label":"TUBE: 12 petals x k 3 (3 panels)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"3"}]},
+    {"label":"TUBE: 12 petals x k 4 (4 panels)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"4"}]},
+    {"label":"TUBE: 12 petals x k 6 (6 panels)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"6"}]},
+    {"label":"TUBE: k 0 x fusion height 0.1","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.1"}]},
+    {"label":"TUBE: k 0 x fusion height 0.4","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"}]},
+    {"label":"TUBE: k 0 x fusion height 0.58","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.58"}]},
+    {"label":"TUBE: k 0 x fusion height 0.1 x BLEND 0","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.1"},{"id":"tubeBlend","value":"0"}]},
+    {"label":"TUBE: k 0 x fusion height 0.25 x BLEND 0","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.25"},{"id":"tubeBlend","value":"0"}]},
+    {"label":"TUBE: k 0 x fusion height 0.4 x BLEND 0","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"},{"id":"tubeBlend","value":"0"}]},
+    {"label":"TUBE: k 0 x fusion height 0.58 x BLEND 0","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.58"},{"id":"tubeBlend","value":"0"}]},
+    {"label":"TUBE: k 2 x fusion height 0.1","set":[{"id":"tubeLayer1","value":"2"},{"id":"tubeHeight","value":"0.1"}]},
+    {"label":"TUBE: k 2 x fusion height 0.58","set":[{"id":"tubeLayer1","value":"2"},{"id":"tubeHeight","value":"0.58"}]},
+    {"label":"TUBE: k 2 x BLEND 0","set":[{"id":"tubeLayer1","value":"2"},{"id":"tubeBlend","value":"0"}]},
+    {"label":"TUBE: k 0 x BLEND 0.5","set":[{"id":"tubeLayer1","value":"0"},{"id":"tubeBlend","value":"0.5"}]},
+    {"label":"TUBE: 5 petals x k 0 x fusion height 0.4 (a notch is cut)","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"}]},
+    {"label":"TUBE: 3 whorls x k 0 / 2 / FREE","set":[{"id":"layerCount","value":"3"},{"id":"tubeLayer1","value":"0"},{"id":"tubeLayer2","value":"2"}]},
+    {"label":"TUBE: 3 whorls x k 4 / 0 / 1","set":[{"id":"layerCount","value":"3"},{"id":"tubeLayer1","value":"4"},{"id":"tubeLayer2","value":"0"},{"id":"tubeLayer3","value":"1"}]},
+    {"label":"TUBE: 6 whorls x every whorl k 0","set":[{"id":"layerCount","value":"6"},{"id":"tubeLayer1","value":"0"},{"id":"tubeLayer2","value":"0"},{"id":"tubeLayer3","value":"0"},{"id":"tubeLayer4","value":"0"},{"id":"tubeLayer5","value":"0"},{"id":"tubeLayer6","value":"0"}]},
+    {"label":"TUBE: SNAP: asked 3 at 8 petals (builds 2, the tie goes down)","set":[{"id":"tubeLayer1","value":"3"}]},
+    {"label":"TUBE: SNAP: asked 6 at 8 petals (builds 4, the tie goes down)","set":[{"id":"tubeLayer1","value":"6"}]},
+    {"label":"TUBE: SNAP: asked 7 at 8 petals (builds FREE)","set":[{"id":"tubeLayer1","value":"7"}]},
+    {"label":"TUBE: SNAP: asked 5 at 12 petals (builds 4)","set":[{"id":"petalCount","value":"12"},{"id":"tubeLayer1","value":"5"}]},
+    {"label":"TUBE: THIN SHEET 0.6 x 7 petals x k 0 x fusion height 0.4 (the modes split at the bead bar)","set":[{"id":"sheetThickness","value":"0.6"},{"id":"petalCount","value":"7"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"}]},
+    {"label":"TUBE: THIN SHEET 0.6 x k 2 x fusion height 0.4","set":[{"id":"sheetThickness","value":"0.6"},{"id":"tubeLayer1","value":"2"},{"id":"tubeHeight","value":"0.4"}]},
+    {"label":"TUBE: k 0 x cup 1.2","set":[{"id":"tubeLayer1","value":"0"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"TUBE: k 0 x roll 180","set":[{"id":"tubeLayer1","value":"0"},{"id":"petalRoll","value":"180"}]},
+    {"label":"TUBE: k 0 x twist 180","set":[{"id":"tubeLayer1","value":"0"},{"id":"petalTwist","value":"180"}]},
+    {"label":"TUBE: k 0 x tilt 60","set":[{"id":"tubeLayer1","value":"0"},{"id":"petalTilt","value":"60"}]},
+    {"label":"TUBE: k 0 x tilt 105 (the ring folds as the petal does past a right angle)","set":[{"id":"tubeLayer1","value":"0"},{"id":"petalTilt","value":"105"}]},
+    {"label":"TUBE: k 0 x head rise 1 (the ring folds on the hemisphere)","set":[{"id":"tubeLayer1","value":"0"},{"id":"headRise","value":"1"}]},
+    {"label":"TUBE: k 0 x curl 270 x fusion height 0.58 (strong curl in the blend)","set":[{"id":"tubeLayer1","value":"0"},{"id":"petalSpineCurl","value":"270"},{"id":"tubeHeight","value":"0.58"}]},
+    {"label":"TUBE: k 2 x lobes 0.3","set":[{"id":"tubeLayer1","value":"2"},{"id":"lobeDepth","value":"0.3"}]},
+    {"label":"TUBE: k 0 x sepals 5","set":[{"id":"tubeLayer1","value":"0"},{"id":"sepalCount","value":"5"}]},
+    {"label":"TUBE: k 0 x a 60 mm stem","set":[{"id":"tubeLayer1","value":"0"},{"id":"stemLength","value":"60"}]},
+    {"label":"TUBE: 40 petals x 6 whorls x every whorl k 0 (the densest)","set":[{"id":"petalCount","value":"40"},{"id":"layerCount","value":"6"},{"id":"tubeLayer1","value":"0"},{"id":"tubeLayer2","value":"0"},{"id":"tubeLayer3","value":"0"},{"id":"tubeLayer4","value":"0"},{"id":"tubeLayer5","value":"0"},{"id":"tubeLayer6","value":"0"}]},
+    {"label":"TUBE: GATED — FAN (unavailable, inert)","set":[{"id":"placement","value":"FAN"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: GATED — the buckle (unavailable, inert)","set":[{"id":"buckleAmp","value":"0.2"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: GATED — the fringe (unavailable, inert)","set":[{"id":"fringeCount","value":"4"},{"id":"petalTipEnd","value":"1"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: GATED — the infill (unavailable, inert)","set":[{"id":"petalInfill","value":"VORONOI"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: GATED — size variance (unavailable, inert)","set":[{"id":"varianceSize","value":"0.1"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"TUBE: GATED — an inflorescence (unavailable, inert)","set":[{"id":"stemLength","value":"60"},{"id":"inflorescence","value":"RACEME"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"NODE LAWS: gradient 0 (the floor — the lowest node SESSILE, a spike grading into a raceme)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelGradient","value":"0"}]},
+    {"label":"NODE LAWS: gradient 0.5 (the lower pedicels shorter)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelGradient","value":"0.5"}]},
+    {"label":"NODE LAWS: gradient 2 (the lower pedicels longer)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelGradient","value":"2"}]},
+    {"label":"NODE LAWS: gradient 3 (the ceiling — the lowest florets overtop the upper)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelGradient","value":"3"}]},
+    {"label":"NODE LAWS: gradient 3 x 12 nodes x 60 mm (was CLAMPED at the old 120 mm ceiling — the lowest pedicel 180 mm now, under the 250 cap)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelGradient","value":"3"},{"id":"floretNodes","value":"12"},{"id":"pedicelLength","value":"60"}]},
+    {"label":"NODE LAWS: CORYMB on a 40 mm rachis (level tops, solved exactly)","set":[{"id":"stemLength","value":"40"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"}]},
+    {"label":"NODE LAWS: CORYMB on a 40 mm rachis at 60 deg","set":[{"id":"stemLength","value":"40"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"},{"id":"pedicelAngle","value":"60"}]},
+    {"label":"NODE LAWS: CORYMB on the 120 mm rachis (solved exactly at the 250 mm ceiling — the lowest pedicel 134.3 mm, which the old 120 cap CLAMPED)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"}]},
+    {"label":"NODE LAWS: CORYMB at a level pedicel (INERT, told)","set":[{"id":"stemLength","value":"40"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"},{"id":"pedicelAngle","value":"0"}]},
+    {"label":"NODE LAWS: CORYMB x whorled","set":[{"id":"stemLength","value":"40"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"},{"id":"floretPhyllotaxy","value":"whorled"}]},
+    {"label":"NODE LAWS: GATED — gradient 3 under the CORYMB (hidden AND inert)","set":[{"id":"stemLength","value":"40"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"},{"id":"pedicelGradient","value":"3"}]},
+    {"label":"NODE LAWS: SESSILE — a true spike (the floret hub rooted one wall deep)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"}]},
+    {"label":"NODE LAWS: SESSILE at a level angle (the hub square into the wall)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"pedicelAngle","value":"0"}]},
+    {"label":"NODE LAWS: SESSILE x a 3 mm SOLID rachis (rooted to the axis)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"NODE LAWS: SESSILE x a 12 mm rachis","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"NODE LAWS: SESSILE x a domed floret head (rooted by the inner cap)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"headRise","value":"0.5"}]},
+    {"label":"NODE LAWS: SESSILE x a SPHERE floret head (rooted by the outer far pole)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"petalCount","value":"12"}]},
+    {"label":"NODE LAWS: SESSILE x whorled x 12 nodes (the densest spike)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"}]},
+    {"label":"NODE LAWS: SESSILE x descending (-60 deg)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"0"},{"id":"pedicelAngle","value":"-60"}]},
+    {"label":"NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"}]},
+    {"label":"NODE LAWS: SHARED NODE x opposite","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"floretPhyllotaxy","value":"opposite"}]},
+    {"label":"NODE LAWS: SHARED NODE x whorled","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"floretPhyllotaxy","value":"whorled"}]},
+    {"label":"NODE LAWS: SHARED NODE x a spike (NO blade clears a sessile floret — every node carries none, told)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"pedicelLength","value":"0"}]},
+    {"label":"NODE LAWS: SHARED NODE x gradient 2 (a length cap per pedicel length)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"pedicelGradient","value":"2"}]},
+    {"label":"NODE LAWS: SHARED NODE x a 5 mm pedicel (CAPPED to a 2.5 mm blade)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"pedicelLength","value":"5"}]},
+    {"label":"NODE LAWS: SHARED NODE x the corymb","set":[{"id":"stemLength","value":"60"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"30"},{"id":"pedicelCorymb","value":"ON"}]},
+    {"label":"NODE LAWS: SHARED NODE x a steeper leaf (60 deg against 35 — the conservative offset)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"leafAngle","value":"60"}]},
+    {"label":"NODE LAWS: SHARED NODE x a vertical pedicel (no offset exists — no leaf built, told)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"NODE LAWS: SHARED NODE x a 30 mm rachis (the lowest pedicel carries none, told)","set":[{"id":"stemLength","value":"30"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"30"}]},
+    {"label":"NODE LAWS: GATED — the leaf's own 8 nodes and whorled under a raceme (hidden AND inert)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"}]},
+    {"label":"NODE LAWS: GATED — gradient 3 and the corymb with NO inflorescence (hidden AND inert)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"NONE"},{"id":"pedicelGradient","value":"3"},{"id":"pedicelCorymb","value":"ON"}]},
+    {"label":"NODE LAWS: x 2 whorls (every floret inherits the head's second whorl)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"layerCount","value":"2"}]},
+    {"label":"NODE LAWS: ALL MAX at 35 deg x a leaf under every pedicel, on 40 mm pedicels (ONE node under the florets' own floor — 10.1% of budget, EXPORTS; was 101.1% REFUSED at twelve nodes before ruling 1)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretPetals","value":"12"},{"id":"floretScale","value":"1"},{"id":"pedicelLength","value":"40"},{"id":"pedicelAngle","value":"35"},{"id":"leafLength","value":"40"}]},
+    {"label":"BARE NODES: the flower's 0.48 on 100 x 6 mm, three nodes, golden angle","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: 0.48 on Eva's approved 3 mm stem (SOLID — no bore)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"3"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: on the widest bore (12 mm)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"12"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: one node (the flower's solo 0.55 L)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafNodes","value":"1"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: five nodes on 120 mm at prominence 1 (every pair apart)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafNodes","value":"5"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"BARE NODES: eight nodes on 60 mm (SWELLINGS MERGED — told, not clamped)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"leafNodes","value":"8"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: a thin sheet on a 12 mm stem (the pitch floor; MERGED)","set":[{"id":"stemLength","value":"12"},{"id":"stemDiameter","value":"6"},{"id":"leafNodes","value":"8"},{"id":"sheetThickness","value":"0.6"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: x a SPHERE with a stem (the channel against a bare noded stem)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"stemNodeSwelling","value":"0.48"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"BARE NODES: GATED — prominence 1 under a raceme (head inert; every PEDICEL pinned straight)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"inflorescence","value":"RACEME"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"STEM CUT: the thinnest HOLLOW stem (3.5 mm, a 0.5 mm bore) — the plug under the cut","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"3.5"}]},
+    {"label":"STEM CUT: the widest stem (12 mm) — the longest cut and the longest plug","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"STEM CUT: Eva's 3 mm SOLID stem — the cut costs no plug","set":[{"id":"stemLength","value":"40"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"STEM CUT: the 4 mm stem (the land's chord on a lattice column — the degenerate case refused)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"4"}]},
+    {"label":"STEM CUT: FLAT — the control OFF (the end as before the cut; a holder)","set":[{"id":"stemLength","value":"60"},{"id":"stemDiameter","value":"6"},{"id":"stemCut","value":"FLAT"}]},
+    {"label":"STEM CUT: GATED — a 1 mm stem on 3 mm, shorter than its own 1.89 mm cut (told; the end stays flat)","set":[{"id":"stemLength","value":"1"},{"id":"stemDiameter","value":"3"}]},
+    {"label":"STEM CUT: the crossover under a cut — 12 mm on 12 mm, the plug meets the head (SOLID THROUGHOUT)","set":[{"id":"stemLength","value":"12"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"STEM CUT: 13 mm on 12 mm — 0.38 mm of sealed bore survives above the plug","set":[{"id":"stemLength","value":"13"},{"id":"stemDiameter","value":"12"}]},
+    {"label":"STEM CUT: x bare NODES at prominence 1 on 12 mm (the tip leans; the face follows the kinked axis)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"12"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"STEM CUT: x a SPHERE with an 8 mm stem (ST9 locates the cut tip)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"8"}]},
+    {"label":"STEM CUT: x the RACEME on an 8 mm rachis (the rachis is cut; every PEDICEL pinned flat)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"8"},{"id":"inflorescence","value":"RACEME"}]},
+    {"label":"STEM CUT: FLAT x the RACEME (nothing cut anywhere — a holder)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"8"},{"id":"inflorescence","value":"RACEME"},{"id":"stemCut","value":"FLAT"}]},
+    {"label":"STEM CUT: x LEAVES (two nodes above the cut on an 80 mm stem)","set":[{"id":"stemLength","value":"80"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"30"},{"id":"leafNodes","value":"2"}]},
+    {"label":"REACH INSET: 250 mm pedicels at the shipped 35 deg (the new ceiling — the reach passes the rachis, ONE node, told)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"250"}]},
+    {"label":"REACH INSET: 250 mm straight up (90 deg) — the reach is the pedicel plus the floret, one node","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"250"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"REACH INSET: 100 mm pedicels (the inset at 80 mm of a 120 mm rachis — five nodes in the 23 mm left)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"100"}]},
+    {"label":"REACH INSET: LEVEL TOPS x 8 nodes on the full 120 mm rachis (solved exactly — the lowest pedicel 134.3 mm, past the old 120 cap)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelCorymb","value":"ON"},{"id":"floretNodes","value":"8"}]},
+    {"label":"REACH INSET: gradient 3 x 100 mm (the lowest pedicel CLAMPED at the 250 mm ceiling)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelLength","value":"100"},{"id":"pedicelGradient","value":"3"}]},
+    {"label":"REACH INSET: a 0.60 mm sheet (the LIVE and EXPORT reach differ — the union decides the node)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"REACH INSET: descending (-60 deg): the reach is under the node and the stem's own inset stands (not clamped)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelAngle","value":"-60"}]},
+    {"label":"REACH INSET: a hemisphere head (the floor is the RIM, 8.8 mm under the stem's root plane)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"headRise","value":"1"}]},
+    {"label":"REACH INSET: full-size florets (1.00x — the deepest reach a default head carries)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretScale","value":"1"}]},
+    {"label":"REACH INSET: THE BUDGET CORNER — 12 x whorled x 12 petals x 1.00 on 40 mm straight up (TWO nodes under the florets' own floor, 17.3% of budget; was 95.0% at twelve before ruling 1)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretNodes","value":"12"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretPetals","value":"12"},{"id":"floretScale","value":"1"},{"id":"pedicelLength","value":"40"},{"id":"pedicelAngle","value":"90"}]},
+    {"label":"NODE VARIANCE: amount 1 on the raceme (each floret's curl, cup and twist by its node's azimuth — two distinct builds)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"nodeVariance","value":"1"}]},
+    {"label":"NODE VARIANCE: 0.5 x the form field 0.5 (the head's slot field composing on the moved base; the phase DERIVED outward)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"nodeVariance","value":"0.5"},{"id":"varianceForm","value":"0.5"}]},
+    {"label":"NODE VARIANCE: x OPPOSITE (the two florets of a node take opposite signs — four distinct builds)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"nodeVariance","value":"1"},{"id":"floretPhyllotaxy","value":"opposite"}]},
+    {"label":"NODE VARIANCE: x WHORLED x 8 nodes (twenty-four azimuths — the cost corner, a build per distinct node)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"nodeVariance","value":"1"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretNodes","value":"8"}]},
+    {"label":"NODE VARIANCE: the DERIVED PHASE alone — the size field on DESCENDING pedicels (-60 deg: the outward point flips)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"varianceSize","value":"0.5"},{"id":"pedicelAngle","value":"-60"}]},
+    {"label":"NODE VARIANCE: the derived phase at a LEVEL pedicel (INERT, told — the outward direction is the floret's own axis)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"varianceSize","value":"0.5"},{"id":"pedicelAngle","value":"0"}]},
+    {"label":"NODE VARIANCE: x the form field at frequency 3 with the head's phase at 90 (the florets' phase is their own, never the head's)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"varianceForm","value":"0.5"},{"id":"varianceFrequency","value":"3"},{"id":"variancePhase","value":"90"}]},
+    {"label":"NODE VARIANCE: x gradient 2 (a delta per node AND a length per node — the memo keys on both)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"nodeVariance","value":"1"},{"id":"pedicelGradient","value":"2"}]},
+    {"label":"NODE VARIANCE: GATED — amount 1 with NO inflorescence (hidden AND inert)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"NONE"},{"id":"nodeVariance","value":"1"}]},
+    {"label":"NODE VARIANCE: INTERNODE FLOOR: full-size WHORLED florets (the florets' floor at its widest — the count the rachis holds at 1.00x)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"floretPhyllotaxy","value":"whorled"},{"id":"floretScale","value":"1"}]},
+    {"label":"NODE VARIANCE: GRADIENT CAP: gradient 3 x 100 mm straight up on 12 nodes (the cap binds hardest — asked 3.00, the ramp stops where the lowest floret would overtop the head)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"pedicelGradient","value":"3"},{"id":"pedicelLength","value":"100"},{"id":"pedicelAngle","value":"90"},{"id":"floretNodes","value":"12"}]},
+    {"label":"SPACING VARIANCE: 0.9, the ruled maximum (1 cycle, phase 0)","set":[{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 at phase 90","set":[{"id":"varianceSpacing","value":"0.9"},{"id":"variancePhase","value":"90"}]},
+    {"label":"SPACING VARIANCE: 0.45 (half the maximum)","set":[{"id":"varianceSpacing","value":"0.45"}]},
+    {"label":"SPACING VARIANCE: 0.01 (the first step above the guard)","set":[{"id":"varianceSpacing","value":"0.01"}]},
+    {"label":"SPACING VARIANCE: 0.9 at 5 cycles on 8 slots (ALIASED past n/2 — scatter, told and not capped)","set":[{"id":"varianceSpacing","value":"0.9"},{"id":"varianceFrequency","value":"5"}]},
+    {"label":"SPACING VARIANCE: 0.9 at 5 cycles, phase 90 (aliased)","set":[{"id":"varianceSpacing","value":"0.9"},{"id":"varianceFrequency","value":"5"},{"id":"variancePhase","value":"90"}]},
+    {"label":"SPACING VARIANCE: 0.9, the RAMP (frequency 0 — the seam at the phase)","set":[{"id":"varianceSpacing","value":"0.9"},{"id":"varianceFrequency","value":"0"}]},
+    {"label":"SPACING VARIANCE: 0.9 x 3 petals","set":[{"id":"petalCount","value":"3"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x 40 petals (the crowding corner)","set":[{"id":"petalCount","value":"40"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x SPIRAL","set":[{"id":"placement","value":"SPIRAL"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x FAN, phase 90 (even about the mirror line, the phase INERT, the span held by renormalising)","set":[{"id":"placement","value":"FAN"},{"id":"varianceSpacing","value":"0.9"},{"id":"variancePhase","value":"90"}]},
+    {"label":"SPACING VARIANCE: 0.9 x FAN, the RAMP (outward from the mirror line)","set":[{"id":"placement","value":"FAN"},{"id":"varianceSpacing","value":"0.9"},{"id":"varianceFrequency","value":"0"}]},
+    {"label":"SPACING VARIANCE: 0.9 x CONTINUOUS x 3 turns","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x a SPHERE with a stem (the channel probes each slot at its MAPPED azimuth)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"},{"id":"stemLength","value":"60"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x 3 whorls at layer offset 0.5 (one circle map — the whorls keep their mutual order)","set":[{"id":"layerCount","value":"3"},{"id":"layerPhase","value":"0.5"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: x size 0.5 x form 1 (three amounts, one wave)","set":[{"id":"varianceSize","value":"0.5"},{"id":"varianceForm","value":"1"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x SEPALS (the sepals STAY at their nominal azimuths)","set":[{"id":"sepalCount","value":"8"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: 0.9 x a RACEME (each floret's spacing phase derived outward)","set":[{"id":"stemLength","value":"120"},{"id":"inflorescence","value":"RACEME"},{"id":"varianceSpacing","value":"0.9"}]},
+    {"label":"SPACING VARIANCE: GATED — frequency and phase at MAXIMUM with every amount 0 (hidden AND inert)","set":[{"id":"varianceSpacing","value":"0"},{"id":"varianceForm","value":"0"},{"id":"varianceSize","value":"0"},{"id":"varianceFrequency","value":"20"},{"id":"variancePhase","value":"360"}]},
+    {"label":"NODE SPLIT: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, no kink","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"4"},{"id":"leafPhyllotaxy","value":"opposite"},{"id":"stemNodeSwelling","value":"1"},{"id":"stemNodeKink","value":"0"}]},
+    {"label":"NODE SPLIT: the ROSE — alternate at 137.5 x 4 nodes, kink 0.8 (~6 deg), no swelling","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"4"},{"id":"leafDivergence","value":"137.5"},{"id":"stemNodeSwelling","value":"0"},{"id":"stemNodeKink","value":"0.8"}]},
+    {"label":"NODE SPLIT: the halves APART — swelling 0.3 x kink 1 on three alternate leaves","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"0.3"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"NODE SPLIT: swelling ONLY on a BARE stem (1, no kink)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"stemNodeSwelling","value":"1"}]},
+    {"label":"NODE SPLIT: kink ONLY on a BARE stem (1, golden angle, no swelling)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"NODE SPLIT: swelling ONLY on the thinnest bore (4 mm, 1)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"4"},{"id":"leafLength","value":"30"},{"id":"leafNodes","value":"3"},{"id":"stemNodeSwelling","value":"1"}]},
+    {"label":"DIVERGENCE: 137.5, the golden spiral (five nodes, no node shape)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"5"},{"id":"leafDivergence","value":"137.5"}]},
+    {"label":"DIVERGENCE: 90, the range floor (four ranks)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"5"},{"id":"leafDivergence","value":"90"}]},
+    {"label":"DIVERGENCE: 120 x kink 0.48 (the bends follow the three-ranked spiral)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"5"},{"id":"leafDivergence","value":"120"},{"id":"stemNodeKink","value":"0.48"}]},
+    {"label":"DIVERGENCE: 137.5 x 8 nodes x kink 1 (the spiral zig-zag at the most nodes)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"30"},{"id":"leafNodes","value":"8"},{"id":"leafDivergence","value":"137.5"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"DIVERGENCE: GATED — 90 under OPPOSITE (hidden AND inert)","set":[{"id":"stemLength","value":"100"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"4"},{"id":"leafPhyllotaxy","value":"opposite"},{"id":"leafDivergence","value":"90"}]},
+    {"label":"DIVERGENCE: GATED — 90 under a raceme's shared node (the pedicels' arrangement; hidden AND inert)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"30"},{"id":"leafNodes","value":"3"},{"id":"inflorescence","value":"RACEME"},{"id":"leafDivergence","value":"90"}]},
+    {"label":"LEAF POSE: the CARNATION — opposite (decussate) x 4 nodes, swelling 1, arched linear leaves (60 x 6 mm, arch 90, cup 0.6, entire)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"60"},{"id":"leafWidth","value":"6"},{"id":"leafNodes","value":"4"},{"id":"leafPhyllotaxy","value":"opposite"},{"id":"stemNodeSwelling","value":"1"},{"id":"leafArch","value":"90"},{"id":"leafCup","value":"0.6"},{"id":"leafToothDepth","value":"0"}]},
+    {"label":"LEAF POSE: arch MAXIMUM (180 — the tip arches over and hangs back)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafArch","value":"180"}]},
+    {"label":"LEAF POSE: arch MINIMUM (-90 — the tip curls up; the inset reads the rise above the chord)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafArch","value":"-90"}]},
+    {"label":"LEAF POSE: arch -30 (an upward arch rising HIGHER than its chord — LF4 restates the arc)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafArch","value":"-30"}]},
+    {"label":"LEAF POSE: arch 90 (the carnation's fall) on the ruled 35 deg leaf","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafArch","value":"90"}]},
+    {"label":"LEAF POSE: arch 180 x a DROOPING leaf (-60 deg — the tip hangs back toward the stem)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafAngle","value":"-60"},{"id":"leafArch","value":"180"}]},
+    {"label":"LEAF POSE: cup MAXIMUM (1.2 — the fold clamp binds where the blade narrows)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"LEAF POSE: cup MINIMUM (-0.8 — the margins turned down)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafCup","value":"-0.8"}]},
+    {"label":"LEAF POSE: cup 0 (a FLAT section — the form law is not built at all)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafCup","value":"0"}]},
+    {"label":"LEAF POSE: arch 180 x cup 1.2 (both at their maxima)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafArch","value":"180"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"LEAF POSE: arch 90 x cup 0 (the arch alone builds the form — a curl with no cup)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafArch","value":"90"},{"id":"leafCup","value":"0"}]},
+    {"label":"LEAF POSE: whorled x 8 nodes at arch 180 x cup 1.2 (24 leaves — the worst triangle corner)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"45"},{"id":"leafWidth","value":"15"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"},{"id":"leafArch","value":"180"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"TOOTH FLOOR: depth 0.05 (0.39 mm asked, FLOORED to 1.00 mm)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"17"},{"id":"leafNodes","value":"3"},{"id":"leafToothDepth","value":"0.05"}]},
+    {"label":"TOOTH FLOOR: a 5 mm blade (the count GIVES — 9 asked, fewer fit a 1 mm notch)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"5"},{"id":"leafNodes","value":"3"}]},
+    {"label":"TOOTH FLOOR: a 3.5 mm blade (NO ROOM — the widest point has 0.95 mm over the print floor)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"52"},{"id":"leafWidth","value":"3.5"},{"id":"leafNodes","value":"3"}]},
+    {"label":"TOOTH FLOOR: the ROSE leaflet (23 x 12 mm, 12 fine teeth at depth 0.1 — the serration coarsens)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"23"},{"id":"leafWidth","value":"12"},{"id":"leafNodes","value":"3"},{"id":"leafToothCount","value":"12"},{"id":"leafToothDepth","value":"0.1"}]},
+    {"label":"LEAF POSE: arch 90 under a raceme's shared node (the offset clears the ARCHED blade)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"leafArch","value":"90"}]},
+    {"label":"LEAF POSE: GATED — arch and cup at their maxima with length 0 (hidden AND inert)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"0"},{"id":"leafArch","value":"180"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"COMPOUND: the ROSE — alternate 137.5 x 4 nodes, kink 0.8, swelling 0.25, the retuned defaults (2 pairs + a larger terminal, ovate, entire), arch 10, cup 0.28","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"4.5"},{"id":"leafLength","value":"40"},{"id":"leafType","value":"COMPOUND"},{"id":"leafNodes","value":"4"},{"id":"leafPhyllotaxy","value":"alternate"},{"id":"leafDivergence","value":"137.5"},{"id":"stemNodeKink","value":"0.8"},{"id":"stemNodeSwelling","value":"0.25"},{"id":"leafArch","value":"10"},{"id":"leafCup","value":"0.28"}]},
+    {"label":"COMPOUND: the shipped compound defaults (2 pairs + terminal on a 40 mm rachis, 3 alternate nodes)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"}]},
+    {"label":"COMPOUND: leafletPairs min (1 — first and last coincide, basal ratio inert)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"1"}]},
+    {"label":"COMPOUND: leafletPairs max (4 — nine leaflets)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"}]},
+    {"label":"COMPOUND: leafletFirst min (0.05)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletFirst","value":"0.05"}]},
+    {"label":"COMPOUND: leafletFirst max (0.45)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletFirst","value":"0.45"}]},
+    {"label":"COMPOUND: leafletLast min (0.5)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletLast","value":"0.5"}]},
+    {"label":"COMPOUND: leafletLast max (1 — the top pair beside the terminal)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletLast","value":"1"}]},
+    {"label":"COMPOUND: leafletAngle min (20)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletAngle","value":"20"}]},
+    {"label":"COMPOUND: leafletAngle max (90 — square to the rachis)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletAngle","value":"90"}]},
+    {"label":"COMPOUND: leafletLength min (4)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletLength","value":"4"}]},
+    {"label":"COMPOUND: leafletLength max (60)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletLength","value":"60"}]},
+    {"label":"COMPOUND: leafletWidth min (3)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletWidth","value":"3"}]},
+    {"label":"COMPOUND: leafletWidth max (40)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletWidth","value":"40"}]},
+    {"label":"COMPOUND: leafletBasalRatio min (0.4 — the basal pair at 40%)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletBasalRatio","value":"0.4"}]},
+    {"label":"COMPOUND: leafletBasalRatio max (1.4 — the basal pair LARGER than the top)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletBasalRatio","value":"1.4"}]},
+    {"label":"COMPOUND: leafletTerminalLength min (4)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTerminalLength","value":"4"}]},
+    {"label":"COMPOUND: leafletTerminalLength max (60 — the leaf's rise takes nodes off the stem)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTerminalLength","value":"60"}]},
+    {"label":"COMPOUND: leafletTerminalWidth min (3)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTerminalWidth","value":"3"}]},
+    {"label":"COMPOUND: leafletTerminalWidth max (40)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTerminalWidth","value":"40"}]},
+    {"label":"COMPOUND: leafletStalk min (0 — sessile laterals on the rachis)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletStalk","value":"0"}]},
+    {"label":"COMPOUND: leafletStalk max (20)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletStalk","value":"20"}]},
+    {"label":"COMPOUND: leafletTerminalStalk min (0 — the terminal on the rachis tip)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTerminalStalk","value":"0"}]},
+    {"label":"COMPOUND: leafletTerminalStalk max (30)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTerminalStalk","value":"30"}]},
+    {"label":"COMPOUND: arch 180 (the RACHIS arcs over; the leaflets ride it, unarched)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafArch","value":"180"}]},
+    {"label":"COMPOUND: arch -90 (the rachis curls up)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafArch","value":"-90"}]},
+    {"label":"COMPOUND: cup 1.2 (every leaflet cupped; the fold clamp at each stub)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"COMPOUND: sheetThickness 2.4 (the wire 2.40 mm; the petiole asks 5.37 and the stem holds 4.48 — CLAMPED)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"COMPOUND: sheetThickness 0.6 (the export floor raises the rods with the sheet)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"COMPOUND: leafAngle 85 (steep — the rachis leaves near the stem; the petiole CLAMPED to the 1.64 mm the stem holds)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafAngle","value":"85"}]},
+    {"label":"COMPOUND: leafAngle -60 (drooping)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafAngle","value":"-60"}]},
+    {"label":"COMPOUND: a SPHERE head with a stem (ST9 excuses the thicker petiole, the rachis and stalks by name)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"}]},
+    {"label":"COMPOUND: whorled x 8 nodes x leafletPairs 4 x arch 180 (24 leaves of nine leaflets, the rachis subdivided — the cost corner)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"45"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"},{"id":"leafArch","value":"180"}]},
+    {"label":"COMPOUND: under a raceme's shared node (PINNED to SIMPLE, and told)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"leafType","value":"COMPOUND"}]},
+    {"label":"COMPOUND: GATED — SIMPLE with every leaflet control at an extreme (hidden AND inert)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"SIMPLE"},{"id":"leafletPairs","value":"4"},{"id":"leafletAngle","value":"90"},{"id":"leafletLength","value":"60"},{"id":"leafletStalk","value":"20"},{"id":"leafletTerminalStalk","value":"30"},{"id":"leafletBasalRatio","value":"1.4"}]},
+    {"label":"COMPOUND: GATED — the type and every leaflet control at an extreme with length 0 (hidden AND inert)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"0"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"},{"id":"leafletAngle","value":"90"},{"id":"leafletStalk","value":"20"},{"id":"leafletTerminalStalk","value":"30"},{"id":"leafletBasalRatio","value":"1.4"}]},
+    {"label":"COMPOUND RETUNE: leaflet serration ON (leafletToothDepth 0.12, 12 fine teeth, tip and notch 1.6 — the 1 mm floor applies)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletToothDepth","value":"0.12"},{"id":"leafToothCount","value":"12"},{"id":"leafCrestShape","value":"1.6"},{"id":"leafNotchShape","value":"1.6"}]},
+    {"label":"COMPOUND RETUNE: leafletToothDepth max (1)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletToothDepth","value":"1"}]},
+    {"label":"COMPOUND RETUNE: leafletTipShape min (0.6 — acute)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTipShape","value":"0.6"}]},
+    {"label":"COMPOUND RETUNE: leafletTipShape max (3 — the held-width round tip)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTipShape","value":"3"}]},
+    {"label":"COMPOUND RETUNE: the petiole CLAMPED on the 3 mm solid stem (4 pairs ask 3.60 mm; the stem holds 2.98)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"3"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"}]},
+    {"label":"COMPOUND RETUNE: the petiole on a 4 mm stem (asks 2.68 mm under a 3.69 mm cap)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"4"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"}]},
+    {"label":"COMPOUND RETUNE: the petiole on a 12 mm hollow stem x 4 pairs (asks 3.60 under a 4.76 cap — a thin wall far from the axis)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"12"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"}]},
+    {"label":"COMPOUND RETUNE: leafAngle 90 x 4 pairs on the 3 mm stem (the cap is the wall, 1.50 mm)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"3"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"},{"id":"leafAngle","value":"90"}]},
+    {"label":"COMPOUND RETUNE: the clamp under a LEANING node (kink 1 x 4 pairs x 50 deg on a 3.5 mm stem — the cap reads the stem straight, declared)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"3.5"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletPairs","value":"4"},{"id":"leafAngle","value":"50"},{"id":"stemNodeKink","value":"1"}]},
+    {"label":"COMPOUND RETUNE: sheet 2.4 x leafAngle 85 (the 1.64 mm cap is UNDER the 2.40 mm wire — the petiole stays the wire, no cone)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"sheetThickness","value":"2.4"},{"id":"leafAngle","value":"85"}]},
+    {"label":"COMPOUND RETUNE: GATED — COMPOUND with the simple leaf's tooth depth 1 and tip 3 (hidden AND inert under COMPOUND)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"leafToothDepth","value":"1"},{"id":"leafTipShape","value":"3"}]},
+    {"label":"COMPOUND RETUNE: GATED — SIMPLE with the leaflets' tooth depth 1 and tip 0.6 (hidden AND inert under SIMPLE)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"SIMPLE"},{"id":"leafletToothDepth","value":"1"},{"id":"leafletTipShape","value":"0.6"}]},
+    {"label":"LOBED: the MUM — alternate 137.5 x 4 nodes at the lobed defaults, arch 25","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafType","value":"LOBED"},{"id":"leafNodes","value":"4"},{"id":"leafPhyllotaxy","value":"alternate"},{"id":"leafDivergence","value":"137.5"},{"id":"leafArch","value":"25"}]},
+    {"label":"LOBED: the shipped lobed defaults (a 46 mm blade, 34 mm envelope, 3 alternate nodes)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"}]},
+    {"label":"LOBED: lobedLobes min (1 a side)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"1"}]},
+    {"label":"LOBED: lobedLobes max (6 a side)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"6"}]},
+    {"label":"LOBED: lobedFrom min (0.02)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedFrom","value":"0.02"}]},
+    {"label":"LOBED: lobedFrom max (0.4)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedFrom","value":"0.4"}]},
+    {"label":"LOBED: lobedTo min (0.5)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedTo","value":"0.5"}]},
+    {"label":"LOBED: lobedTo max (0.95)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedTo","value":"0.95"}]},
+    {"label":"LOBED: lobedSinus min (0 — the envelope, no sinus)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0"}]},
+    {"label":"LOBED: lobedSinus max (0.9 — the narrowest sinus gaps)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0.9"}]},
+    {"label":"LOBED: lobedShape min (0.5 — sharp crests)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedShape","value":"0.5"}]},
+    {"label":"LOBED: lobedShape max (2.5 — rounded crests)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedShape","value":"2.5"}]},
+    {"label":"LOBED: lobedAngle min (0 — the rows square to the midrib, no chevron)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedAngle","value":"0"}]},
+    {"label":"LOBED: lobedAngle max (60 — the TILT CAP binds, built under asked)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedAngle","value":"60"}]},
+    {"label":"LOBED: lobedEase min (0.5)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedEase","value":"0.5"}]},
+    {"label":"LOBED: lobedEase max (0.95)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedEase","value":"0.95"}]},
+    {"label":"LOBED: lobedWidth min (3)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedWidth","value":"3"}]},
+    {"label":"LOBED: lobedWidth max (40)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedWidth","value":"40"}]},
+    {"label":"LOBED: lobedToothDepth 0 (the lobes entire)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedToothDepth","value":"0"}]},
+    {"label":"LOBED: lobedToothDepth max (1 — the FOLD CLAMP binds: asked against built)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedToothDepth","value":"1"}]},
+    {"label":"LOBED: NONE FIT — 6 lobes x sinus 0.9 x depth 0.3, 3 teeth a lobe (39 asked: the fold cap 0.08 mm, under the 1 mm floor; no teeth, told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0.9"},{"id":"lobedShape","value":"0.7"},{"id":"lobedAngle","value":"38"},{"id":"lobedToothDepth","value":"0.3"},{"id":"lobedLobes","value":"6"},{"id":"lobedToothCount","value":"3"}]},
+    {"label":"LOBED: 6 lobes x tooth depth 0.3, 1 tooth a lobe (the fold clamp binds — 4.86 mm asked, built at the 1.71 mm cap)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0.62"},{"id":"lobedShape","value":"0.7"},{"id":"lobedAngle","value":"38"},{"id":"lobedToothDepth","value":"0.3"},{"id":"lobedLobes","value":"6"},{"id":"lobedToothCount","value":"1"}]},
+    {"label":"LOBED: a 10 mm envelope (the tooth count GIVES at the 1 mm floor)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedWidth","value":"10"}]},
+    {"label":"LOBED: leafTipShape min (0.6 — the tip law is shared with SIMPLE)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafTipShape","value":"0.6"}]},
+    {"label":"LOBED: leafTipShape max (3)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafTipShape","value":"3"}]},
+    {"label":"LOBED: arch 180","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafArch","value":"180"}]},
+    {"label":"LOBED: arch -90","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafArch","value":"-90"}]},
+    {"label":"LOBED: cup 1.2","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"LOBED: cup -0.8","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafCup","value":"-0.8"}]},
+    {"label":"LOBED: sheetThickness 2.4","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"sheetThickness","value":"2.4"}]},
+    {"label":"LOBED: sheetThickness 0.6 (the export floor)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"LOBED: leafAngle 85 (steep)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafAngle","value":"85"}]},
+    {"label":"LOBED: leafAngle -60 (drooping)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafAngle","value":"-60"}]},
+    {"label":"LOBED: a SPHERE head with a stem (ST9 excuses the petiole by name)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"}]},
+    {"label":"LOBED: whorled x 8 nodes x arch 180 x cup 1.2 (24 lobed leaves — the cost corner)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"8"},{"id":"leafPhyllotaxy","value":"whorled"},{"id":"leafType","value":"LOBED"},{"id":"leafArch","value":"180"},{"id":"leafCup","value":"1.2"}]},
+    {"label":"LOBED: under a raceme's shared node (PINNED to SIMPLE, and told)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"inflorescence","value":"RACEME"},{"id":"leafLength","value":"40"},{"id":"leafType","value":"LOBED"}]},
+    {"label":"LOBED: S4's form (sinus 0.62, shape 0.70, angle 38, teeth 0.08 — two V's under 1 mm, both ROUNDED, told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0.62"},{"id":"lobedShape","value":"0.7"},{"id":"lobedAngle","value":"38"},{"id":"lobedToothDepth","value":"0.08"}]},
+    {"label":"LOBED: THE LOBE COUNT YIELDS — 5 lobes asked on a 36 mm blade at 30 deg, 3 built (no round bottom fits even at the print minimum at 5 or 4; told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"36"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"5"},{"id":"lobedFrom","value":"0.21"},{"id":"lobedTo","value":"0.55"},{"id":"lobedSinus","value":"0.84"},{"id":"lobedShape","value":"0.9"},{"id":"lobedAngle","value":"30"},{"id":"lobedEase","value":"0.79"},{"id":"lobedWidth","value":"26"},{"id":"leafTipShape","value":"1.05"}]},
+    {"label":"LOBED: a 40 mm envelope with no sinus (the largest blade asks the thickest petiole)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedWidth","value":"40"},{"id":"lobedSinus","value":"0"}]},
+    {"label":"LOBED: the petiole CLAMPED — no sinus on a 3 mm stem at 90 deg (asks 0.82 mm, the rooted end holds 0.75)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"3"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafAngle","value":"90"},{"id":"lobedSinus","value":"0"}]},
+    {"label":"LOBED: GATED — SIMPLE with every lobed control at an extreme (hidden AND inert)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"SIMPLE"},{"id":"lobedLobes","value":"6"},{"id":"lobedSinus","value":"0.9"},{"id":"lobedAngle","value":"60"},{"id":"lobedShape","value":"0.5"},{"id":"lobedWidth","value":"40"},{"id":"lobedToothDepth","value":"1"}]},
+    {"label":"LOBED: GATED — COMPOUND with every lobed control at an extreme (hidden AND inert)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"lobedLobes","value":"6"},{"id":"lobedSinus","value":"0.9"},{"id":"lobedAngle","value":"60"},{"id":"lobedShape","value":"0.5"},{"id":"lobedWidth","value":"40"},{"id":"lobedToothDepth","value":"1"}]},
+    {"label":"LOBED: GATED — LOBED and every lobed control at an extreme with length 0 (hidden AND inert)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"0"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"6"},{"id":"lobedSinus","value":"0.9"},{"id":"lobedAngle","value":"60"},{"id":"lobedShape","value":"0.5"},{"id":"lobedToothDepth","value":"1"}]},
+    {"label":"LOBED ROUNDNESS: 0 (S4b's print minimum only — the law by branch)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedRound","value":"0"}]},
+    {"label":"LOBED ROUNDNESS: 0.05 (just above the minimum)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedRound","value":"0.05"}]},
+    {"label":"LOBED ROUNDNESS: 0.25","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedRound","value":"0.25"}]},
+    {"label":"LOBED ROUNDNESS: max (0.5 — SATURATED from 0.18: every sinus at its largest smooth radius, told and hatched)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedRound","value":"0.5"}]},
+    {"label":"LOBED ROUNDNESS: 0.3 x S4's form (the radius shrinks at all three sinuses)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0.62"},{"id":"lobedShape","value":"0.7"},{"id":"lobedAngle","value":"38"},{"id":"lobedToothDepth","value":"0.08"},{"id":"lobedRound","value":"0.3"}]},
+    {"label":"LOBED ROUNDNESS: 0.25 x 6 lobes (the narrow sinuses take the shrink)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"6"},{"id":"lobedRound","value":"0.25"}]},
+    {"label":"LOBED ROUNDNESS: 0.5 x one lobe a side","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"1"},{"id":"lobedRound","value":"0.5"}]},
+    {"label":"LOBED ROUNDNESS: x sinus 0.9 x shape 0.5 (the deepest, sharpest sinuses)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedSinus","value":"0.9"},{"id":"lobedShape","value":"0.5"}]},
+    {"label":"LOBED YIELD: 6 lobes asked on a 12 mm blade (the count gives 6 -> 2, where the print minimum fits; told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"12"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"6"},{"id":"lobedSinus","value":"0.7"},{"id":"lobedAngle","value":"30"}]},
+    {"label":"LOBED YIELD: the RESIDUAL — 3 lobes on a 24 mm blade over a 5.5 mm window at 58 deg (no count fits; the V kept, told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"24"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"3"},{"id":"lobedFrom","value":"0.37"},{"id":"lobedTo","value":"0.6"},{"id":"lobedSinus","value":"0.67"},{"id":"lobedShape","value":"0.75"},{"id":"lobedAngle","value":"58"},{"id":"lobedEase","value":"0.53"},{"id":"lobedWidth","value":"15.5"},{"id":"leafTipShape","value":"2.3"}]},
+    {"label":"LOBED TEETH: 1 a lobe (7 over the rim)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedToothCount","value":"1"}]},
+    {"label":"LOBED TEETH: 2 a lobe (14 — an even count: the apex notch on the terminal face)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedToothCount","value":"2"}]},
+    {"label":"LOBED TEETH: max (6 a lobe — 42 asked, the ROWS cap builds 28 at 130 rows, told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedToothCount","value":"6"}]},
+    {"label":"LOBED TEETH: the ruled 4 a lobe x 6 lobes (52 asked over 13 lobes — the rows cap builds 28, told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"6"}]},
+    {"label":"LOBED TEETH: the SHARED count at its maximum under LOBED (12 — hidden AND inert)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"leafToothCount","value":"12"}]},
+    {"label":"LOBED TEETH: GATED — SIMPLE with the roundness and the lobed tooth count at their maxima (hidden AND inert)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"SIMPLE"},{"id":"lobedRound","value":"0.5"},{"id":"lobedToothCount","value":"6"}]},
+    {"label":"LOBED TEETH: GATED — COMPOUND with the roundness and the lobed tooth count at their maxima (hidden AND inert)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"COMPOUND"},{"id":"lobedRound","value":"0.5"},{"id":"lobedToothCount","value":"6"}]},
+    {"label":"LOBED RULINGS: 3 a lobe (S4c's proposal, ruled against — 21 over the rim, 2 / 3 / 3 / 5)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedToothCount","value":"3"}]},
+    {"label":"LOBED RULINGS: roundness 0.17 (the last LIVE step on the ruled leaf — it saturates at 0.1750)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedRound","value":"0.17"}]},
+    {"label":"LOBED RULINGS: roundness 0.18 (the first DEAD step — SATURATED, the same leaf as 0.5; told and hatched)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedRound","value":"0.18"}]},
+    {"label":"LOBED RULINGS: a told shoulder CORNER — the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"58"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"5"},{"id":"lobedFrom","value":"0.27"},{"id":"lobedTo","value":"0.57"},{"id":"lobedSinus","value":"0.63"},{"id":"lobedShape","value":"1.5"},{"id":"lobedAngle","value":"39"},{"id":"lobedEase","value":"0.77"},{"id":"lobedWidth","value":"17"},{"id":"lobedToothDepth","value":"0.27"},{"id":"leafTipShape","value":"0.7"}]},
+    {"label":"LEAF TIP: SIMPLE at tip shape 0.60 — the nib's FLOOR regime (the flank shallower than the outline, a told corner)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafTipShape","value":"0.6"}]},
+    {"label":"LEAF TIP: SIMPLE at tip shape 3.00 — the nib's STEEP regime (the law's own round end)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafTipShape","value":"3"}]},
+    {"label":"LEAF TIP: COMPOUND, a leaflet tooth reaching the converging tip (leaflet tip 0.80, width 40, depth 0.1 — no notch inside the nib)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"60"},{"id":"leafNodes","value":"1"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletTipShape","value":"0.8"},{"id":"leafletWidth","value":"40"},{"id":"leafletLength","value":"46"},{"id":"leafletToothDepth","value":"0.1"},{"id":"leafToothCount","value":"3"}]},
+    {"label":"LEAF TIP: the tip gives its tooth up (SIMPLE, width 10, 12 teeth at depth 1, tip 0.60 — the first given up at the tip, told)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafWidth","value":"10"},{"id":"leafToothCount","value":"12"},{"id":"leafToothDepth","value":"1"},{"id":"leafTipShape","value":"0.6"}]},
+    {"label":"LEAF TIP: LOBED at lobedTo 0.95 (the tip stretch at its shortest, the arc rows from the uniform stretch)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedTo","value":"0.95"}]},
+    {"label":"BROAD SINUS: filleted at roundness 0.12 (lobe shape 2.5 — every sinus broad)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedShape","value":"2.5"}]},
+    {"label":"BROAD SINUS: roundness 0 (no fillet — S4b by branch, the V kept)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedShape","value":"2.5"},{"id":"lobedRound","value":"0"}]},
+    {"label":"BROAD SINUS: roundness 0.5 (the range top fits — no dead travel)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"3"},{"id":"leafType","value":"LOBED"},{"id":"lobedShape","value":"2.5"},{"id":"lobedRound","value":"0.5"}]},
+    {"label":"BROAD SINUS: roundness 0.49 (the last LIVE step on a fillet that saturates at 0.4928)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafNodes","value":"1"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"2"},{"id":"lobedFrom","value":"0.26"},{"id":"lobedTo","value":"0.6"},{"id":"lobedSinus","value":"0.2"},{"id":"lobedShape","value":"2.35"},{"id":"lobedAngle","value":"18"},{"id":"lobedEase","value":"0.54"},{"id":"lobedWidth","value":"17"},{"id":"leafLength","value":"44"},{"id":"lobedToothDepth","value":"0.95"},{"id":"leafToothCount","value":"6"},{"id":"leafTipShape","value":"2.85"},{"id":"lobedRound","value":"0.49"}]},
+    {"label":"BROAD SINUS: roundness 0.50 (the first DEAD step — SATURATED, told and hatched)","set":[{"id":"stemLength","value":"120"},{"id":"stemDiameter","value":"6"},{"id":"leafNodes","value":"1"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"2"},{"id":"lobedFrom","value":"0.26"},{"id":"lobedTo","value":"0.6"},{"id":"lobedSinus","value":"0.2"},{"id":"lobedShape","value":"2.35"},{"id":"lobedAngle","value":"18"},{"id":"lobedEase","value":"0.54"},{"id":"lobedWidth","value":"17"},{"id":"leafLength","value":"44"},{"id":"lobedToothDepth","value":"0.95"},{"id":"leafToothCount","value":"6"},{"id":"leafTipShape","value":"2.85"},{"id":"lobedRound","value":"0.5"}]},
+    {"label":"TIP NECK: SIMPLE, the default leaf alone (its terminal notch cuts 77% of the way to the midrib — the pair given up, told)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"1"}]},
+    {"label":"TIP NECK: two pairs given up (SIMPLE depth 0.5 x 9 teeth — 77% and 68%; the third pair, 48%, stops the walk)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"1"},{"id":"leafToothDepth","value":"0.5"},{"id":"leafToothCount","value":"9"}]},
+    {"label":"TIP NECK: the bar is the BODY's (SIMPLE depth 0.5 x 12 — its body tooth parts 52%: 82% and 59% given, 46% kept)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"1"},{"id":"leafToothDepth","value":"0.5"},{"id":"leafToothCount","value":"12"}]},
+    {"label":"TIP NECK: the body parts the blade as deeply (SIMPLE depth 0.8 x 9 — the body 80%, the tip 77%: no neck, nothing given)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"46"},{"id":"leafNodes","value":"1"},{"id":"leafToothDepth","value":"0.8"},{"id":"leafToothCount","value":"9"}]},
+    {"label":"TIP NECK: the ROSE, its leaflets toothed at 0.26 (each leaflet gives its terminal pair up)","set":[{"id":"stemLength","value":"90"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"40"},{"id":"leafNodes","value":"1"},{"id":"leafType","value":"COMPOUND"},{"id":"leafletToothDepth","value":"0.26"}]},
+    {"label":"ALREADY ROUND: every broad sinus rounder than the largest fillet its arms take (5 lobes, shape 2.1, sinus 0.17 — the roundness slider dead along its whole travel, told plainly)","set":[{"id":"stemLength","value":"70"},{"id":"stemDiameter","value":"6"},{"id":"leafLength","value":"108"},{"id":"leafNodes","value":"1"},{"id":"leafType","value":"LOBED"},{"id":"lobedLobes","value":"5"},{"id":"lobedFrom","value":"0.35"},{"id":"lobedTo","value":"0.91"},{"id":"lobedSinus","value":"0.17"},{"id":"lobedShape","value":"2.1"},{"id":"lobedAngle","value":"42"},{"id":"lobedEase","value":"0.64"},{"id":"lobedWidth","value":"16"},{"id":"lobedToothDepth","value":"0"},{"id":"leafTipShape","value":"1.4"}]},
+    {"label":"SEPAL SIZE: the WING — 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60 (the sepals three times the 35 mm petals' length)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalAngle","value":"-10"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlBias","value":"0.9"},{"id":"sepalCurlStart","value":"0.6"},{"id":"sepalBaseTaper","value":"3"},{"id":"sepalTipTaper","value":"4"},{"id":"sepalTipShape","value":"0.6"},{"id":"sepalFootBreadth","value":"0.5"},{"id":"sepalLength","value":"120"},{"id":"sepalWidth","value":"5"}]},
+    {"label":"SEPAL SIZE: length min (5 mm, the width following the petal x size)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalLength","value":"5"}]},
+    {"label":"SEPAL SIZE: length max (120 mm — longer than any petal; the width following)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalLength","value":"120"}]},
+    {"label":"SEPAL SIZE: width min (3 mm — the leaf's own floor; the length following)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalWidth","value":"3"}]},
+    {"label":"SEPAL SIZE: width max (30 mm — wider than the petal; the foot follows the width ratio and clamps at its ceiling, told)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalWidth","value":"30"}]},
+    {"label":"SEPAL SIZE: both set at size 0.20 — the multiplier INERT and hidden (60 x 16 built whatever it says)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalScale","value":"0.2"},{"id":"sepalLength","value":"60"},{"id":"sepalWidth","value":"16"}]},
+    {"label":"SEPAL SIZE: under the floors (2 mm long, 1 mm wide asked — FLOORED at 5 x 3, told)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalLength","value":"2"},{"id":"sepalWidth","value":"1"}]},
+    {"label":"SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal's length read +24 here)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalAngle","value":"40"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlBias","value":"0.9"},{"id":"sepalCurlStart","value":"0.6"},{"id":"sepalBaseTaper","value":"3"},{"id":"sepalTipTaper","value":"4"},{"id":"sepalTipShape","value":"0.6"},{"id":"sepalFootBreadth","value":"0.5"},{"id":"sepalLength","value":"120"},{"id":"sepalWidth","value":"5"}],"sepalLimitMaxDeg":22},
+    {"label":"SEPAL SIZE: GATED — count 0 with both set (hidden and inert; bit-identical to the default)","set":[{"id":"sepalCount","value":"0"},{"id":"sepalLength","value":"120"},{"id":"sepalWidth","value":"30"}]},
+    {"label":"SPINE CURVE: the default curve (CURVE mode on the shipping petal — the slider family hidden and inert)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.5,0.08],[1,0.3]]}"}]},
+    {"label":"SPINE CURVE: an S-curve (the spine bends one way, then the other)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"}]},
+    {"label":"SPINE CURVE: a HOOKED tip (the spine doubles back — not a function of x)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}"}]},
+    {"label":"SPINE CURVE: at the printable LIMIT (tightest radius a hair over one sheet thickness — accepted, not clamped)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.72,0.42],[0.55,0.55],[0.42,0.45]]}"}]},
+    {"label":"SPINE CURVE: a LOADED curve UNDER the floor (a file can hold one — CLAMPED and told; the editor refuses such a drag)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.66,0.3],[0.56,0.38],[0.5,0.3]]}"}]},
+    {"label":"SPINE CURVE: the hidden slider family set (curl 150, bias 1, start 0.5, all-curl 90 — INERT; bit-identical to the default-curve row)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.5,0.08],[1,0.3]]}"},{"id":"petalSpineCurl","value":240},{"id":"curlBias","value":"1"},{"id":"curlStart","value":"0.5"}]},
+    {"label":"SPINE CURVE: x 3 whorls (the same shape scaled to each whorl's own asked length)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.5,0.08],[1,0.3]]}"},{"id":"layerCount","value":"3"}]},
+    {"label":"SPINE CURVE: the limit curve x 3 whorls (CLAMPED on the inner whorls — the same shape is under the floor at their length, and the validator says so)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.72,0.42],[0.55,0.55],[0.42,0.45]]}"},{"id":"layerCount","value":"3"}]},
+    {"label":"SPINE CURVE: x the form field 0.5 (the curl term INERT, cup and twist still varied)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"varianceForm","value":"0.5"}]},
+    {"label":"SPINE CURVE: x 5 sepals at curl 60 (a sepal keeps its own slider curl — pinned SLIDER)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"60"}]},
+    {"label":"SPINE CURVE: the limit curve on the THIN sheet (0.60 — the validator asks the EXPORT floor, 1.00 mm, so live and export agree)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.72,0.42],[0.55,0.55],[0.42,0.45]]}"},{"id":"sheetThickness","value":"0.6"}]},
+    {"label":"SPINE CURVE: GATED — SLIDER mode with a hooked curve stored (hidden and inert; bit-identical to the default)","set":[{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}"}]},
+    {"label":"SEPAL TIERS: three tiers on a 40 mm GOBLET hub — the LANTERN frame (5 sepals a tier, at 0.75 / 0.50 / 0.25 of the join)","set":[{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"3"}]},
+    {"label":"SEPAL TIERS: two tiers on the DEFAULT join (1.32 mm) — tier 2 has NO ROOM under the one-sheet gap, not built and told","set":[{"id":"stemLength","value":"60"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"2"}]},
+    {"label":"SEPAL TIERS: three tiers asked UP at 60 on a 10 mm hub — tiers 2 and 3 CLAMPED against the tier above (the contact clamp)","set":[{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"10"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"3"},{"id":"sepalAngle","value":"60"}]},
+    {"label":"SEPAL TIERS: four tiers on a 4 mm hub — ORDER-CLAMPED one sheet apart (the height law would stack them closer)","set":[{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"4"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"4"}]},
+    {"label":"SEPAL TIERS: four tiers on a 6 mm hub at the THICK sheet (2.40 mm) — the gap a LENGTH: tiers 2 and 3 order-clamped 2.40 mm apart, tier 4 NO ROOM","set":[{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"6"},{"id":"sheetThickness","value":"2.4"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"4"}]},
+    {"label":"SEPAL TIERS: three tiers on a DOME (rise 0.5) with a 60 mm stem — the extent INVERTED, tiers past the first inert and told","set":[{"id":"headRise","value":"0.5"},{"id":"stemLength","value":"60"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"3"}]},
+    {"label":"SEPAL TIERS: two tiers on a FAN (5 sepals on 7 slots) down a 20 mm hub","set":[{"id":"placement","value":"FAN"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"20"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"2"}]},
+    {"label":"SEPAL TIERS: two tiers x CONTINUOUS x 3 turns down a 20 mm hub","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"20"},{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"2"}]},
+    {"label":"SEPAL TIERS: four tiers (the ceiling) x 40 sepals x 40 petals asked UP at 60 on a 20 mm ANGLED cone — the crowded corner, every tier clamped","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"ANGLED"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"20"},{"id":"sepalTiers","value":"4"},{"id":"sepalAngle","value":"60"}]},
+    {"label":"SEPAL TIERS: the WING on four tiers x 40 sepals x 40 petals on a 120 mm stem (the budget corner at tip 0.60; the tip-3.00 corner reads 72 % in Node)","set":[{"id":"petalCount","value":"40"},{"id":"sepalCount","value":"40"},{"id":"stemLength","value":"120"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"},{"id":"sepalTiers","value":"4"},{"id":"sepalAngle","value":"-10"},{"id":"sepalSpineCurl","value":"120"},{"id":"sepalCurlBias","value":"0.9"},{"id":"sepalCurlStart","value":"0.6"},{"id":"sepalBaseTaper","value":"3"},{"id":"sepalTipTaper","value":"4"},{"id":"sepalTipShape","value":"0.6"},{"id":"sepalFootBreadth","value":"0.5"},{"id":"sepalLength","value":"120"},{"id":"sepalWidth","value":"5"}]},
+    {"label":"SEPAL TIERS: GATED — four tiers asked with NO stem (hidden and inert; bit-identical to the one-tier whorl)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalTiers","value":"4"}]},
+    {"label":"PER-LAYER: SPIRAL x 3 turns — a cup offset on turn 3 (a spiral's turn is its layer scope)","set":[{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":2,"offsets":{"petalCup":0.4}}],"petals":[],"tiers":[]}}]},
+    {"label":"PER-LAYER: RADIAL x 3 layers — layer 2 owns a 12 mm width, layer 1 a 14 mm one (the foot and the ring follow; layer 1's ring stays the rim)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":0,"offsets":{"petalWidth":-2}},{"layer":1,"offsets":{"petalWidth":-4}}],"petals":[],"tiers":[]}}]},
+    {"label":"PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt (no foot, no ring)","set":[{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalWidth":-4}},{"layer":2,"offsets":{"petalLength":5,"petalTilt":8}}],"petals":[],"tiers":[]}}]},
+    {"label":"PER-LAYER: RADIAL x 4 layers — layer 4 asks a width past the outer whorl's (the HUB GROWS to its ring, told)","set":[{"id":"layerCount","value":"4"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":3,"offsets":{"petalWidth":3}}],"petals":[],"tiers":[]}}]},
+    {"label":"PER-LAYER: SPIRAL x 3 turns x rise 0.25 — turn 3 owns a 20 mm width (the HUB GROWS to its ring and the dome follows the grown rim)","set":[{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"headRise","value":"0.25"},{"id":"@scopes","value":{"layers":[{"layer":2,"offsets":{"petalWidth":4}}],"petals":[],"tiers":[]}}]},
+    {"label":"PER-LAYER: SPIRAL x 3 turns x rise 0.5 — turn 3 owns a 20 mm width (its ring on the grown rim at an effective tilt of 102: the past-90 class, declared)","set":[{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"headRise","value":"0.5"},{"id":"@scopes","value":{"layers":[{"layer":2,"offsets":{"petalWidth":4}}],"petals":[],"tiers":[]}}]},
+    {"label":"PER-LAYER: GATED — CONTINUOUS x 3 turns with per-layer ON and a layer record (kept and inert)","set":[{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalCup":0.4,"petalWidth":-4}}],"petals":[],"tiers":[]}}]},
+    {"label":"OUTLINE CURVE: the default curve (CURVE mode on the shipping petal — the law family hidden and inert)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE: an orchid-sepal-like LONG TAIL (wide at the base, a 2 mm tail to the tip)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.15,0.14],[0.3,0.12],[0.5,0.05],[0.85,0.03],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE: a SPOON on a claw (spatulate — narrow, then wide near the tip: a waisted, non-convex blade)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE: a NEAR-RECTANGLE (held width, a short rounded shoulder into the nib)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.15],[0.1,0.16],[0.9,0.16],[0.97,0.12],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE: a SHARP DIAMOND (a tight crest at mid-length)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE: the hidden law family set (tip shape 3, tapers 3 / 4, squared end 1, lobes 0.3, fringe 4 — INERT; bit-identical to the default-curve row)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalTipShape","value":"3"},{"id":"petalBaseTaper","value":"3"},{"id":"petalTipTaper","value":"4"},{"id":"petalTipEnd","value":"1"},{"id":"lobeDepth","value":"0.3"},{"id":"fringeCount","value":"4"}]},
+    {"label":"OUTLINE CURVE: a LOADED curve with a point UNDER the print floor (a file can hold one — LIFTED and told; the editor refuses such a drag)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.2,0.015],[0.4,0.2],[0.8,0.12],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE: the long tail x 3 whorls (the same fractions narrower on the inner whorls — LIFTED there only)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.15,0.14],[0.3,0.12],[0.5,0.05],[0.85,0.03],[1,0]]}"},{"id":"layerCount","value":"3"}]},
+    {"label":"OUTLINE CURVE: the default curve at petalLength 20 (the shortest petal; the curve scales with the length)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalLength","value":"20"}]},
+    {"label":"OUTLINE CURVE: the default curve at petalLength 60 (the longest petal)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalLength","value":"60"}]},
+    {"label":"OUTLINE CURVE: x the Voronoi infill (the cells planned on the drawn outline)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"OUTLINE CURVE: the spoon x the Voronoi infill (cells on a waisted, non-convex blade)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"OUTLINE CURVE: the spoon x cup 0.6 (the form laws read the drawn half-width)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"OUTLINE CURVE: the diamond x CONTINUOUS x 3 turns","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"OUTLINE CURVE: the tail x 5 sepals (a sepal keeps its own law — pinned LAW)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.15,0.14],[0.3,0.12],[0.5,0.05],[0.85,0.03],[1,0]]}"},{"id":"sepalCount","value":"5"}]},
+    {"label":"OUTLINE CURVE: GATED — LAW mode with a spoon stored (hidden and inert; bit-identical to the default)","set":[{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE 2: the default curve x petalWidth 24 (the widths x1.5, the positions unmoved)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalWidth","value":"24"}]},
+    {"label":"OUTLINE CURVE 2: the default curve x petalWidth 8 (the widths x0.5)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalWidth","value":"8"}]},
+    {"label":"OUTLINE CURVE 2: the default curve x petalWidth 30 (the widest)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"petalWidth","value":"30"}]},
+    {"label":"OUTLINE CURVE 2: the spoon x petalWidth 30","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"},{"id":"petalWidth","value":"30"}]},
+    {"label":"OUTLINE CURVE 2: petalWidth 10 set in LAW, then the long tail (its narrow run under the floor at 0.625x — LIFTED and told, never a refused drag)","set":[{"id":"petalWidth","value":"10"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.15,0.14],[0.3,0.12],[0.5,0.05],[0.85,0.03],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — the default curve on the default tube (k 0, fusion height 0.25)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x fusion height 0.1 (the shortest tube)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.1"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x fusion height 0.7 (the longest tube)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.7"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x fusion height 0.4 x BLEND 0 (no flare)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"},{"id":"tubeBlend","value":"0"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x 6 petals x k 2 (slit — the edge petals keep their outer halves from the foot)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"petalCount","value":"6"},{"id":"tubeLayer1","value":"2"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — the spoon as a waisted lobe x 5 petals","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"},{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x petalWidth 22 (the scale and the throat together)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"tubeLayer1","value":"0"},{"id":"petalWidth","value":"22"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x base taper 2 (the law below the throat is live and shown)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"tubeLayer1","value":"0"},{"id":"petalBaseTaper","value":"2"}]},
+    {"label":"OUTLINE CURVE 2: TUBE — a lobe curve x 3 whorls, only the first fused (k 0 / FREE / FREE)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"layerCount","value":"3"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"OUTLINE CURVE 2: the BELL in LAW (5 petals, tilt 75, cup 0.6, k 0 at 0.40 — the twin)","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"},{"id":"petalTilt","value":"75"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"OUTLINE CURVE 2: the BELL with a drawn lobe","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.4"},{"id":"petalTilt","value":"75"},{"id":"petalCup","value":"0.6"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE 2: the TRUMPET in LAW (5 petals, tilt 85, length 50, curl -45, k 0 at 0.58 — the twin)","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.58"},{"id":"petalTilt","value":"85"},{"id":"petalLength","value":"50"},{"id":"petalSpineCurl","value":"-45"}]},
+    {"label":"OUTLINE CURVE 2: the TRUMPET with a drawn lobe","set":[{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"},{"id":"tubeHeight","value":"0.58"},{"id":"petalTilt","value":"85"},{"id":"petalLength","value":"50"},{"id":"petalSpineCurl","value":"-45"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"}]},
+    {"label":"OUTLINE CURVE 2: TUBE x the Voronoi infill (the tube refuses the infill and says so — a free CURVE blade)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.1],[0.35,0.22],[0.75,0.16],[1,0]]}"},{"id":"tubeLayer1","value":"0"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"ASYM OUTLINE: EQUAL halves (two-sided, left = right — bit-identical to the symmetric default-curve row)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]]}"}]},
+    {"label":"ASYM OUTLINE: a LOPSIDED blade (the right half narrower)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"}]},
+    {"label":"ASYM OUTLINE: an orchid LATERAL — one-sided (a wide left half, a 3 mm right half)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"}]},
+    {"label":"ASYM OUTLINE: NEAR-SYMMETRIC (the right half a hair off the left)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.15,0.15],[0.36,0.22],[0.7,0.18],[0.9,0.1],[1,0]]}"}]},
+    {"label":"ASYM OUTLINE: a periwinkle-like PINWHEEL x 5 petals (every petal the same hand)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.3,0.15],[0.6,0.26],[0.85,0.24],[1,0]],\"right\":[[0,0.05],[0.3,0.08],[0.6,0.12],[0.85,0.1],[1,0]]}"},{"id":"petalCount","value":"5"}]},
+    {"label":"ASYM OUTLINE: lopsided x cup 0.6 (each half cups on its own width)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"ASYM OUTLINE: the lateral x cup 1.2 (the fold clamp on each half)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"ASYM OUTLINE: lopsided x buckle 0.3 (the ruffle on each half's own width)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"buckleAmp","value":"0.3"}]},
+    {"label":"ASYM OUTLINE: lopsided x roll 200","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalRoll","value":"200"}]},
+    {"label":"ASYM OUTLINE: lopsided x curl 180 x twist 60","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalSpineCurl","value":"180"},{"id":"petalTwist","value":"60"}]},
+    {"label":"ASYM OUTLINE: lopsided x apex sweep 0.8 x cup 0.6 (each half's own inscribed radius)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalApexSweep","value":"0.8"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"ASYM OUTLINE: lopsided x the Voronoi infill (cells on the asymmetric outline)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"ASYM OUTLINE: the lateral x the Voronoi infill (cells on a one-sided blade)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"ASYM OUTLINE: the lateral x infill x cup 0.6 (the metric plan on two halves)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"petalInfill","value":"VORONOI"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"ASYM OUTLINE: lopsided x petalWidth 24 (both halves scaled)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalWidth","value":"24"}]},
+    {"label":"ASYM OUTLINE: lopsided x petalLength 60","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"petalLength","value":"60"}]},
+    {"label":"ASYM OUTLINE: the pinwheel x 3 whorls","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.3,0.15],[0.6,0.26],[0.85,0.24],[1,0]],\"right\":[[0,0.05],[0.3,0.08],[0.6,0.12],[0.85,0.1],[1,0]]}"},{"id":"petalCount","value":"5"},{"id":"layerCount","value":"3"}]},
+    {"label":"ASYM OUTLINE: the pinwheel x SPIRAL","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.3,0.15],[0.6,0.26],[0.85,0.24],[1,0]],\"right\":[[0,0.05],[0.3,0.08],[0.6,0.12],[0.85,0.1],[1,0]]}"},{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"2"}]},
+    {"label":"ASYM OUTLINE: the pinwheel x CONTINUOUS x 3 turns","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.3,0.15],[0.6,0.26],[0.85,0.24],[1,0]],\"right\":[[0,0.05],[0.3,0.08],[0.6,0.12],[0.85,0.1],[1,0]]}"},{"id":"placement","value":"CONTINUOUS"},{"id":"layerCount","value":"3"}]},
+    {"label":"ASYM OUTLINE: the lateral x FAN (a mirror pair is a mirror image — the partner draws the halves swapped)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"placement","value":"FAN"}]},
+    {"label":"ASYM OUTLINE: the pinwheel x a SPHERE head","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.3,0.15],[0.6,0.26],[0.85,0.24],[1,0]],\"right\":[[0,0.05],[0.3,0.08],[0.6,0.12],[0.85,0.1],[1,0]]}"},{"id":"placement","value":"CONTINUOUS"},{"id":"hubShape","value":"SPHERE"}]},
+    {"label":"ASYM OUTLINE: the pinwheel x TUBE (each half pinned to the throat)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.3,0.15],[0.6,0.26],[0.85,0.24],[1,0]],\"right\":[[0,0.05],[0.3,0.08],[0.6,0.12],[0.85,0.1],[1,0]]}"},{"id":"petalCount","value":"5"},{"id":"tubeLayer1","value":"0"}]},
+    {"label":"ASYM OUTLINE: a LOADED curve with its RIGHT half under the print floor (lifted and told)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.25,0.015],[0.5,0.1],[0.8,0.08],[1,0]]}"}]},
+    {"label":"ASYM OUTLINE: lopsided x 5 sepals (a sepal keeps its own law — pinned LAW)","set":[{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"sepalCount","value":"5"}]},
+    {"label":"ASYM OUTLINE: GATED — LAW mode with an asymmetric curve stored (hidden and inert; bit-identical to the default)","set":[{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"}]},
+    {"label":"SCOPED OUTLINE: a MIXED flower — RADIAL x 3 layers, layer 1 on the LAW, layer 2 owns the spoon, layer 3 the lopsided asymmetric curve","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}}},{"layer":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: the mixed flower x the Voronoi infill (each petal's cells on its own outline)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalInfill","value":"VORONOI"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}}},{"layer":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: the mixed flower x cup 0.6 (the bead, nib and cup per petal)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalCup","value":"0.6"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}}},{"layer":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: RADIAL x 2 layers — the inner layer DRAWN (the diamond), the outer on the LAW","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: SPIRAL x 2 turns on two different curves (turn 1 the rectangle, turn 2 the diamond)","set":[{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"@scopes","value":{"layers":[{"layer":0,"offsets":{},"values":{"petalOutlineCurve":{"mode":"symmetric","points":[[0,0.15],[0.1,0.16],[0.9,0.16],[0.97,0.12],[1,0]]}}},{"layer":1,"offsets":{},"values":{"petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: a layer owns only its MODE (CURVE) and inherits the whole bloom's stored spoon, live","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE"}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: a layer owns the diamond AND a -4 mm width offset (its own width scales its own curve)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalWidth":-4},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: a LAW layer with lobes beside a CURVE layer (the lobes cut on the LAW petals only)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"lobeDepth","value":"0.3"},{"id":"lobeCount","value":"3"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: FAN — pair 2 owns the lopsided curve on a LAW fan (its partner mirrored)","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}}}],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: FAN — the whole bloom the asymmetric lateral, pair 1 owns a symmetric diamond","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{},"values":{"petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}}}],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: FAN — a CURVE fan with pair 3 owning the LAW","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{},"values":{"petalOutlineMode":"LAW"}}],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: FAN orchid x 2 layers — mirrored asymmetric laterals x the Voronoi infill","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"2"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"SCOPED OUTLINE: FAN through the GAP (no mirror-line petal) x the lopsided curve — every pair mirrored","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"}]},
+    {"label":"SCOPED OUTLINE: GATED — a layer owning a curve with per-layer values OFF (kept and inert; the whole bloom draws)","set":[{"id":"layerCount","value":"2"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED OUTLINE: GATED — a layer owning only a CURVE while every mode is LAW (inert; bit-identical to the plain two layers)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"INFILL WHORLS: RADIAL x 2 whorls x the Voronoi infill on the LAW (the inner whorl is the shorter petal)","set":[{"id":"layerCount","value":"2"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"INFILL WHORLS: RADIAL x 3 whorls x the Voronoi infill on the LAW (#421's 736-pair flower)","set":[{"id":"layerCount","value":"3"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"INFILL WHORLS: RADIAL x 3 whorls x the infill on a DRAWN curve (the lopsided two-sided)","set":[{"id":"layerCount","value":"3"},{"id":"petalInfill","value":"VORONOI"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],\"right\":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]}"}]},
+    {"label":"INFILL WHORLS: RADIAL x 2 whorls x the infill on a DRAWN curve (the diamond)","set":[{"id":"layerCount","value":"2"},{"id":"petalInfill","value":"VORONOI"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.4,0.22],[0.45,0.25],[0.5,0.22],[1,0]]}"}]},
+    {"label":"INFILL WHORLS: ONE whorl x petalLength 28 x the infill (the length the whorls stand for)","set":[{"id":"petalLength","value":"28"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"INFILL WHORLS: ONE whorl x petalLength 24 x the infill","set":[{"id":"petalLength","value":"24"},{"id":"petalInfill","value":"VORONOI"}]},
+    {"label":"SCOPED SPINE: BOTH CURVES per layer — layer 1 LAW on the sliders, layer 2 the spoon on the S, layer 3 the lopsided on the incurve","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalSpineCurl","value":"30"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]},"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}}},{"layer":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]},"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: both curves per layer x the Voronoi infill (each petal's cells on its own outline and spine)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalSpineCurl","value":"30"},{"id":"petalInfill","value":"VORONOI"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]},"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}}},{"layer":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]},"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: both curves per layer x cup 0.6 (the bead, nib and cup per petal)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalSpineCurl","value":"30"},{"id":"petalCup","value":"0.6"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"symmetric","points":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]},"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}}},{"layer":2,"offsets":{},"values":{"petalOutlineMode":"CURVE","petalOutlineCurve":{"mode":"two-sided","points":[[0,0.05],[0.15,0.16],[0.36,0.2286],[0.7,0.178],[0.9,0.1],[1,0]],"right":[[0,0.05],[0.2,0.09],[0.5,0.12],[0.8,0.08],[1,0]]},"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: RADIAL x 2 — the inner layer bent by a drawn spine (the incurve), the outer on the curl sliders (curl 45)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"petalSpineCurl","value":"45"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: RADIAL x 3 — layer 1 on the curl sliders, layer 2 the S, layer 3 the incurve","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalSpineCurl","value":"30"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}}},{"layer":2,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: SPIRAL x 2 turns on two different spines (turn 1 the reflex, turn 2 the incurve)","set":[{"id":"placement","value":"SPIRAL"},{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"petalCurlMode","value":"CURVE"},{"id":"@scopes","value":{"layers":[{"layer":0,"offsets":{},"values":{"petalSpineCurve":{"mode":"single","points":[[0,0],[0.5,-0.05],[0.9,-0.3]]}}},{"layer":1,"offsets":{},"values":{"petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: a layer owns only its curl MODE (CURVE) and inherits the whole bloom's stored hook, live","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}"},{"id":"@scopes","value":{"layers":[{"layer":0,"offsets":{},"values":{"petalCurlMode":"CURVE"}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: a CURVE bloom whose layer 2 owns the SLIDER mode and a +90 curl offset (the offset reaches it)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{"petalSpineCurl":90},"values":{"petalCurlMode":"SLIDER"}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: the hook owned by the inner layer of three (CLAMPED there and told; the outer layers on the default curve)","set":[{"id":"layerCount","value":"3"},{"id":"scopeLayers","value":"ON"},{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.5,0.08],[1,0.3]]}"},{"id":"@scopes","value":{"layers":[{"layer":2,"offsets":{},"values":{"petalSpineCurve":{"mode":"single","points":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: FAN — pair 2 owns the incurve on a slider fan (its partner the SAME spine, unflipped)","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"petalSpineCurl","value":"30"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":2,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: FAN orchid — the asymmetric laterals mirrored, pair 1 owns the hook (its partner the same hook)","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.05],[0.2,0.2],[0.5,0.3],[0.8,0.2],[1,0]],\"right\":[[0,0.04],[0.3,0.06],[0.7,0.05],[1,0]]}"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}}}],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: FAN — a CURVE fan (the S) with pair 3 owning the SLIDER mode (curl 90)","set":[{"id":"placement","value":"FAN"},{"id":"scopePetals","value":"ON"},{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalSpineCurl","value":"90"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":3,"offsets":{},"values":{"petalCurlMode":"SLIDER"}}],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: FAN x 2 layers x the Voronoi infill — layer 2 pair 2 owns the reflex","set":[{"id":"placement","value":"FAN"},{"id":"layerCount","value":"2"},{"id":"scopePetals","value":"ON"},{"id":"petalInfill","value":"VORONOI"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":1,"slot":2,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.5,-0.05],[0.9,-0.3]]}}}],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: FAN through the GAP — pair 1 owns the incurve (both members, unflipped)","set":[{"id":"placement","value":"FAN"},{"id":"fanCenterPetal","value":"OFF"},{"id":"scopePetals","value":"ON"},{"id":"@scopes","value":{"layers":[],"petals":[{"layer":0,"slot":1,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: GATED — a layer owning a drawn spine with per-layer values OFF (kept and inert; the whole bloom on the sliders)","set":[{"id":"layerCount","value":"2"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalCurlMode":"CURVE","petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SCOPED SPINE: GATED — a layer owning only a spine CURVE while every mode is SLIDER (inert; bit-identical to the plain two layers)","set":[{"id":"layerCount","value":"2"},{"id":"scopeLayers","value":"ON"},{"id":"@scopes","value":{"layers":[{"layer":1,"offsets":{},"values":{"petalSpineCurve":{"mode":"single","points":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}}}],"petals":[],"tiers":[]}}]},
+    {"label":"SPINE FOLD: the S x cup 0.31 (just valid — the largest cup the drawn S accepts)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"0.31"}]},
+    {"label":"SPINE FOLD: the S x cup 0.32 (the first cup refused — a loaded state, built at the limit and told)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"0.32"}]},
+    {"label":"SPINE FOLD: the S x cup -0.30 (just valid on the S's other bend)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"-0.3"}]},
+    {"label":"SPINE FOLD: the S x cup -0.31 (refused on the other bend)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"-0.31"}]},
+    {"label":"SPINE FOLD: the S x cup 0.6 (the fold #423 declared — held at the inner skin's limit, told)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"SPINE FOLD: the S on the spoon x cup 0.6 (#423's own composition, unscoped)","set":[{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"0.6"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"}]},
+    {"label":"SPINE FOLD: curl 360 x cup 0.62 (just valid on the sliders)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"petalCup","value":"0.62"}]},
+    {"label":"SPINE FOLD: curl 360 x cup 0.63 (the first cup the curl is clamped at)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"petalCup","value":"0.63"}]},
+    {"label":"SPINE FOLD: curl 195 x cup 1.2 (just valid at the widest cup)","set":[{"id":"petalSpineCurl","value":"195"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"SPINE FOLD: curl 200 x cup 1.2 (the first curl clamped at the widest cup)","set":[{"id":"petalSpineCurl","value":"200"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"SPINE FOLD: curl 270 x cup 1.2 (clamped — the coil opens, told)","set":[{"id":"petalSpineCurl","value":"270"},{"id":"petalCup","value":"1.2"}]},
+    {"label":"SPINE FOLD: curl 360 x cup 0.9 x curl bias 0.5 (the general arm, clamped)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"petalCup","value":"0.9"},{"id":"curlBias","value":"0.5"}]},
+    {"label":"SPINE FOLD: curl 360 x twist 180 (the twist's reach toward the bend — flat section, clamped)","set":[{"id":"petalSpineCurl","value":"360"},{"id":"petalTwist","value":"180"}]},
+    {"label":"SPINE FOLD: curl 270 x cup 1.2 x 3 whorls (each whorl its own table)","set":[{"id":"petalSpineCurl","value":"270"},{"id":"petalCup","value":"1.2"},{"id":"layerCount","value":"3"}]},
+    {"label":"SPINE FOLD: GATED — the S stored in SLIDER mode x cup 0.6 (no spine law; inert)","set":[{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalCup","value":"0.6"}]},
+    {"label":"SEPAL CURVES: 5 sepals on a drawn REFLEXED spine (sepal Curl from CURVE — the sepal slider family hidden and inert)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCurlMode","value":"CURVE"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.5,-0.05],[0.9,-0.3]]}"}]},
+    {"label":"SEPAL CURVES: 5 sepals on the S spine","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCurlMode","value":"CURVE"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"}]},
+    {"label":"SEPAL CURVES: 5 sepals on the HOOK (a 21 mm sepal clamps it at the floor — a loaded curve, told)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCurlMode","value":"CURVE"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}"}]},
+    {"label":"SEPAL CURVES: 5 sepals on a drawn LANCEOLATE outline (sepal Outline from CURVE)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalOutlineMode","value":"CURVE"},{"id":"sepalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.25,0.14],[0.5,0.15],[0.8,0.09],[1,0]]}"}]},
+    {"label":"SEPAL CURVES: 5 sepals on an ASYMMETRIC outline (two halves; every sepal the same hand — the pinwheel)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalOutlineMode","value":"CURVE"},{"id":"sepalOutlineCurve","value":"{\"mode\":\"two-sided\",\"points\":[[0,0.06],[0.3,0.18],[0.7,0.16],[1,0]],\"right\":[[0,0.06],[0.4,0.1],[0.75,0.08],[1,0]]}"}]},
+    {"label":"SEPAL CURVES: both curves at the sepal's OWN 30 x 12 mm (the width scale read off the sepal's own aspect)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalLength","value":"30"},{"id":"sepalWidth","value":"12"},{"id":"sepalCurlMode","value":"CURVE"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.5,-0.05],[0.9,-0.3]]}"},{"id":"sepalOutlineMode","value":"CURVE"},{"id":"sepalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.3,0.22],[0.6,0.24],[0.9,0.14],[1,0]]}"}]},
+    {"label":"SEPAL CURVES: an INCURVED sepal asked up at 60 — the angle limit DRAWN ON THE CURVED LAMINA (clamped to 0; the straight sepal stops at 21)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalAngle","value":"60"},{"id":"sepalCurlMode","value":"CURVE"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.45,0.06],[0.8,0.3],[0.92,0.55]]}"}]},
+    {"label":"SEPAL CURVES: the S x sepal cup 0.6 — the FOLD LIMIT on a sepal (held at the inner skin's limit, told)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalCup","value":"0.6"},{"id":"sepalCurlMode","value":"CURVE"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"}]},
+    {"label":"SEPAL CURVES: two tiers on two outlines — tier 1 the lanceolate, tier 2 the rounded on the reflexed spine (a 40 mm GOBLET hub)","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"},{"id":"sepalTiers","value":"2"},{"id":"@scopes","value":{"layers":[],"petals":[],"tiers":[{"tier":0,"offsets":{},"values":{"sepalOutlineMode":"CURVE","sepalOutlineCurve":{"mode":"symmetric","points":[[0,0.06],[0.25,0.14],[0.5,0.15],[0.8,0.09],[1,0]]}}},{"tier":1,"offsets":{},"values":{"sepalOutlineMode":"CURVE","sepalOutlineCurve":{"mode":"symmetric","points":[[0,0.06],[0.3,0.22],[0.6,0.24],[0.9,0.14],[1,0]]},"sepalCurlMode":"CURVE","sepalSpineCurve":{"mode":"single","points":[[0,0],[0.5,-0.05],[0.9,-0.3]]}}}]}}]},
+    {"label":"SEPAL CURVES: two tiers on two spines — tier 1 on the sepal curl sliders (curl 40), tier 2 owning the reflex","set":[{"id":"sepalCount","value":"5"},{"id":"stemLength","value":"60"},{"id":"hubStyle","value":"GOBLET"},{"id":"hubShapeAmount","value":"2"},{"id":"hubLength","value":"40"},{"id":"sepalTiers","value":"2"},{"id":"sepalSpineCurl","value":"40"},{"id":"@scopes","value":{"layers":[],"petals":[],"tiers":[{"tier":1,"offsets":{},"values":{"sepalCurlMode":"CURVE","sepalSpineCurve":{"mode":"single","points":[[0,0],[0.5,-0.05],[0.9,-0.3]]}}}]}}]},
+    {"label":"SEPAL CURVES: the petals on both curves, the sepals on their sliders (nothing of the petals' reaches a sepal)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurl","value":"30"},{"id":"petalCurlMode","value":"CURVE"},{"id":"petalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.3,0.12],[0.6,-0.1],[1,0.15]]}"},{"id":"petalOutlineMode","value":"CURVE"},{"id":"petalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.03],[0.35,0.05],[0.65,0.2],[0.85,0.22],[0.96,0.12],[1,0]]}"}]},
+    {"label":"SEPAL CURVES: GATED — sepal curves stored with the modes SLIDER / LAW (inert; bit-identical to the plain sepals)","set":[{"id":"sepalCount","value":"5"},{"id":"sepalSpineCurve","value":"{\"mode\":\"single\",\"points\":[[0,0],[0.55,0.1],[0.75,0.45],[0.5,0.6],[0.3,0.45]]}"},{"id":"sepalOutlineCurve","value":"{\"mode\":\"symmetric\",\"points\":[[0,0.06],[0.3,0.22],[0.6,0.24],[0.9,0.14],[1,0]]}"}]},
+    {"label":"SEPAL CURVES: GATED — a tier-2 entry owning both curves on a one-tier whorl (kept and inert)","set":[{"id":"sepalCount","value":"5"},{"id":"@scopes","value":{"layers":[],"petals":[],"tiers":[{"tier":1,"offsets":{},"values":{"sepalOutlineMode":"CURVE","sepalOutlineCurve":{"mode":"symmetric","points":[[0,0.06],[0.3,0.22],[0.6,0.24],[0.9,0.14],[1,0]]},"sepalCurlMode":"CURVE","sepalSpineCurve":{"mode":"single","points":[[0,0],[0.5,-0.05],[0.9,-0.3]]}}}]}}]},
+  ];
+}
+
 export const FROZEN_BASE_COMMITS = {
   phase2: '21d4602',   // the A/B centre rig, spread exposed — before the silhouette model
   phase3: '6626961',   // the silhouette model — before the four form curves
@@ -53923,6 +55757,7 @@ export const FROZEN_BASE_COMMITS = {
   phase74: 'f63235e',   // main's head before F6-scope, the OUTLINE UNDER SCOPING (per-layer / per-petal outline mode and curves, and the FAN's mirror pairs drawn as mirror images — Eva's rulings of Oct 18); #420's 1359 rows. Owed because F6-scope appends block 68.
   phase76: '971155c',   // main's head before F3-scope, the SPINE CURVE UNDER SCOPING (the curl mode and the spine curve owned per layer / per pair through the one value resolver — Eva's rulings of Oct 19); #422's 1380 rows. Owed because F3-scope appends block 70.
   phase78: '31b89e7',   // main's head before CURVES-SEPALS (the sepal spine and outline curves as twins scoped per tier, and CURVE seeded from the slider shape — Eva's rulings of Oct 20); #424's 1411 rows. Owed because curves-sepals appends block 72.
+  phase79: 'fc96dc9',   // main's head before CURVES-LEAVES (the leaf spine and outline curves as twins, the seed's fit to its tolerance — Eva's rulings of Oct 20); #425's 1424 rows. Owed because curves-leaves appends block 73.
   phase77: '3dc8ee1',   // main's head before SPINE-CUP-FOLD, the FOLD LIMIT (the spine clears its own cross-section — the inner skin may not reach the bend's centre — on drawn curves and the curl sliders alike, Eva's rulings of Oct 19); #423's 1396 rows. Owed because spine-cup-fold appends block 71.
   phase75: '169fd5b',   // main's head before the infill-whorls session (the infill's seam one double — xB on the plan grid; the multi-whorl infill fold and the #286 seam class cleared); #421's 1374 rows. Owed because the session appends block 69.
   phase73: 'f663973',   // main's head before F6-asym, the ASYMMETRIC OUTLINE (two half-curves about the midrib — Eva's rulings of Oct 18); #419's 1334 rows. Owed because F6-asym appends block 67.
@@ -85695,6 +87530,7 @@ export const FROZEN_MATRICES = {
   phase76: phase76Matrix,
   phase77: phase77Matrix,
   phase78: phase78Matrix,
+  phase79: phase79Matrix,
 };
 
 {

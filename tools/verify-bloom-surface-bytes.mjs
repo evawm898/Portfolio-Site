@@ -379,6 +379,25 @@ const PREDICATE_MOVERS = {
      guard can only be read here). Every LAW row, the GATED row with a curve
      stored included, must hold to the bit in both modes. */
   'outline': (st) => mine.outlineIsCurve(st),
+  /* THE LEAF CURVES (curves-leaves). A row moves iff the BASE tree builds a
+     leaf on it (its own `leafPlan` record: a stem and a length, the shared
+     node's kept count on a raceme) AND the row asks for a curve the leaf
+     reaches — the leaf curl mode CURVE (the simple, lobed or compound leaf),
+     the simple blade's outline CURVE on a SIMPLE leaf, or the leaflets'
+     outline CURVE on a COMPOUND one. The base tree has no leaf curve control
+     and builds every row on the arch and the law, so the curve half is read
+     off the CONTROLS; a LOBED leaf with only an outline curve stored, and the
+     GATED rows (curves stored under SLIDER / LAW, or with no leaf), HOLD. */
+  'leaf-curve': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const fr = base.footRing(st, acc);
+    const plan = base.leafPlan(st, base.stemPlan(st, fr.hub, acc), acc);
+    if (!plan || !plan.present) return false;
+    const type = String(st.leafType || 'SIMPLE');
+    return String(st.leafCurlMode) === 'CURVE'
+      || (type === 'SIMPLE' && String(st.leafOutlineMode) === 'CURVE')
+      || (type === 'COMPOUND' && String(st.leafletOutlineMode) === 'CURVE');
+  },
   /* THE ASYMMETRIC OUTLINE (F6-asym). A row moves iff THIS tree builds it in
      CURVE mode with a TWO-SIDED curve whose right half differs from its left
      (the base tree reads only `points` — the left half — and draws it
@@ -758,6 +777,11 @@ const PREDICATE_MOVERS = {
   },
 };
 const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
+/* A TIER's values are the SEPAL ids (#425), which the petal list does not hold:
+   reading the petal list for a tier stripped every sepal tier's own curve from
+   the BASE build and reported a holder as moved (curves-leaves, measured on
+   block 72's two tier rows — in-process the two trees agree to the bit). */
+const BASE_TIER_VALUE_IDS = new Set(base.SEPAL_SCOPE_VALUE_IDS || []);
 /* `--frozen-sweep` (spine-cup-fold): WHICH FROZEN BASELINES' BYTES STOP
    REPRODUCING under the declared predicate — every registered frozen matrix's
    rows run through the SAME predicate the byte partition proves exact on the
@@ -854,13 +878,13 @@ function gridFloatsOf(petals) {
    `baseScopes` and ran before it on every scoped row: a temporal dead zone.) */
 function baseScopes(sc) {
   if (!sc) return sc;
-  const strip = (e) => {
+  const strip = (e, ids = BASE_VALUE_IDS) => {
     if (!e.values) return e;
-    const v = Object.fromEntries(Object.entries(e.values).filter(([k]) => BASE_VALUE_IDS.has(k)));
+    const v = Object.fromEntries(Object.entries(e.values).filter(([k]) => ids.has(k)));
     if (Object.keys(v).length === Object.keys(e.values).length) return e;
     const out = { ...e }; if (Object.keys(v).length) out.values = v; else delete out.values; return out;
   };
-  const layers = (sc.layers || []).map(strip), petals = (sc.petals || []).map(strip), tiers = (sc.tiers || []).map(strip);
+  const layers = (sc.layers || []).map((e) => strip(e)), petals = (sc.petals || []).map((e) => strip(e)), tiers = (sc.tiers || []).map((e) => strip(e, BASE_TIER_VALUE_IDS));
   if (layers.every((e, i) => e === sc.layers[i]) && petals.every((e, i) => e === sc.petals[i]) && tiers.every((e, i) => e === sc.tiers[i])) return sc;
   return { ...sc, layers, petals, tiers };
 }

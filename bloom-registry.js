@@ -76,6 +76,7 @@ import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_F
          LOBED_EASE_RANGE, LOBED_EASE_DEFAULT, LOBED_WIDTH_DEFAULT, LOBED_TOOTH_DEPTH_DEFAULT,
          LOBED_ROUND_RANGE, LOBED_ROUND_DEFAULT, LOBED_TOOTH_PER_LOBE_RANGE, LOBED_TOOTH_PER_LOBE_DEFAULT } from './bloom-geometry.js';
 import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
+import { LEAF_CURVE_TWINS, leafOutlineWidthScale, leafletOutlineWidthScale } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 import { SCOPE_TOGGLE_VALUES, SCOPE_LAYER_PLACEMENTS, mirrorFor } from './bloom-geometry.js';
@@ -987,6 +988,22 @@ export const PREDICATES = {
      COMPOUND and is hidden AND inert under LOBED, where `lobedToothCount`
      (teeth PER LOBE) is the count; `lobedBladeState` is the geometry's half. */
   leafToothedShared: { all: [{ ref: 'leafToothed' }, { not: { ref: 'leafLobed' } }] },
+  /* THE LEAF CURVES (curves-leaves, Oct 20). The registry's statements of the
+     geometry's `leafCurlIsCurve` / the blade's outline record: the spine's mode
+     reaches every leaf the arch reaches (simple, lobed, the compound rachis;
+     a raceme's shared-node leaf too); the simple blade's outline mode its
+     SIMPLE blade only (hidden AND inert under LOBED, which keeps its own law —
+     `lobedBladeState` pins LAW — and under COMPOUND, whose leaflets carry
+     their own); the leaflets' outline mode the compound leaf only. LF37
+     compares each pair per row. */
+  leafCurlFromSlider: { all: [{ ref: 'leafPresent' }, { id: 'leafCurlMode', oneOf: ['SLIDER'] }] },
+  leafCurlFromCurve: { all: [{ ref: 'leafPresent' }, { id: 'leafCurlMode', oneOf: ['CURVE'] }] },
+  leafOutlineFromCurve: { all: [{ ref: 'leafSimpleBlade' }, { id: 'leafOutlineMode', oneOf: ['CURVE'] }] },
+  leafletOutlineFromCurve: { all: [{ ref: 'leafCompound' }, { id: 'leafletOutlineMode', oneOf: ['CURVE'] }] },
+  /* the simple tip shape is the LAW's: live on the lobed blade (its law) and on
+     a simple blade drawn from the law; the leaflets' the same one level down */
+  leafTipFromLaw: { any: [{ ref: 'leafLobed' }, { all: [{ ref: 'leafSimpleBlade' }, { id: 'leafOutlineMode', oneOf: ['LAW'] }] }] },
+  leafletTipFromLaw: { all: [{ ref: 'leafCompound' }, { id: 'leafletOutlineMode', oneOf: ['LAW'] }] },
   leafLobedToothed: { all: [{ ref: 'leafToothed' }, { ref: 'leafLobed' }] },
 
   /* ===================================================================
@@ -4225,7 +4242,7 @@ export const CONTROLS = [
     label: 'Leaf type',
     fmt: (v, ui) => (String(v) === 'COMPOUND'
       ? `compound · ${2 * Math.round(Number(ui.leafletPairs)) + 1} leaflets — ${Math.round(Number(ui.leafletPairs))} pair${Math.round(Number(ui.leafletPairs)) === 1 ? '' : 's'} and a terminal`
-      : String(v) === 'LOBED' ? `lobed · ${Math.round(Number(ui.lobedLobes))} lobe${Math.round(Number(ui.lobedLobes)) === 1 ? '' : 's'} a side pointing forward, and the terminal — one blade on its petiole`
+      : String(v) === 'LOBED' ? `lobed · ${Math.round(Number(ui.lobedLobes))} lobe${Math.round(Number(ui.lobedLobes)) === 1 ? '' : 's'} a side pointing forward, and the terminal — one blade on its petiole; its outline is the lobes' own law (a drawn outline is the simple blade's and the leaflets', never a lobed blade's)`
       : 'simple · one blade on its petiole'),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodesOwn' } },
   { id: 'leafWidth', section: 'leaves', kind: 'slider',
@@ -4272,7 +4289,8 @@ export const CONTROLS = [
       const b = shown && shown.leaf && shown.leaf.archBuilt && shown.leaf.archBuilt[0];
       return `${a}° — the tip ${a > 0 ? 'falls away (arching down)' : 'curls up'}${r ? ` · a ${r.toFixed(1)} mm radius over the blade` : ''}${b && b.underFloor ? ' — UNDER ONE SHEET THICKNESS (told, never clamped)' : ''}`;
     },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+    /* (curves-leaves) hidden AND inert in the leaf's CURVE spine mode */
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCurlFromSlider' } },
   { id: 'leafCup', section: 'leaves', kind: 'slider',
     min: LEAF_CUP_RANGE[0], max: LEAF_CUP_RANGE[1], step: 0.01, default: LEAF_CUP,
     label: 'Cup',
@@ -4338,8 +4356,10 @@ export const CONTROLS = [
     },
     /* A SIMPLE BLADE'S OWN (Eva's ruling on #380): under COMPOUND every
        leaflet reads `leafletTipShape`, so this one is hidden AND inert there.
-       A LOBED blade reads it too (S4 — the terminal lobe's tip). */
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafOneBlade' } },
+       A LOBED blade reads it too (S4 — the terminal lobe's tip). (curves-
+       leaves) Hidden AND inert under a DRAWN simple outline, which replaces
+       the law it shapes. */
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafTipFromLaw' } },
 
   /* THE LEAFLETS (leaf/stem build S3) — the compound leaf's own tree, every
      value the leaf-lab's ROSE (its §6b PINNATE_COMPOUND tree, on the
@@ -4406,7 +4426,7 @@ export const CONTROLS = [
     min: LEAF_TIP_SHAPE_RANGE[0], max: LEAF_TIP_SHAPE_RANGE[1], step: 0.05, default: LEAFLET_TIP_SHAPE_DEFAULT,
     label: 'Leaflet tip',
     fmt: (v) => { const n = Number(v); return `${n.toFixed(2)} · ${leafTipName(n, 'pointed')}${n >= 1.45 && n < 1.9 ? ' (rounded to acute)' : ''} — every leaflet, the simple leaf's law`; },
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafCompound' } },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafletTipFromLaw' } },
   { id: 'leafletStalk', section: 'leafLeaflets', kind: 'slider',
     min: LEAFLET_STALK_RANGE[0], max: LEAFLET_STALK_RANGE[1], step: 0.5, default: LEAFLET_STALK_DEFAULT,
     label: 'Lateral stalk',
@@ -4984,6 +5004,125 @@ export function sepalTwinControls(rows) {
   const at = CONTROLS.findIndex((c) => c.section === 'stem');
   if (at < 0) throw new Error('the stem rows are not where the sepal twins expect them');
   CONTROLS.splice(at, 0, ...sepalTwinControls(CONTROLS));
+}
+
+/* ===================================================================
+   THE LEAF CURVE TWINS (curves-leaves, Oct 20) — GENERATED from the
+   geometry's `LEAF_CURVE_TWINS` (the same table `leafBladeState` and
+   `leafletBladeState` map the values back through, so the two cannot name
+   different sets): each row takes its petal twin's KIND and its options or
+   curve spec, the twin's own REST value as its default, a leaf section and a
+   leaf guard; the words are the leaf's (a leaf spine is drawn SEEN FROM THE
+   SIDE and its sign is the opposite of the Arch slider's — said on the
+   editor's read-out). Spliced in at the leaf rows' own places (the spine
+   beside Arch, the outline beside Tip shape, the leaflets' beside Leaflet
+   tip), because an array literal cannot read itself.
+   =================================================================== */
+/* the view a leaf validator or read-out asks the petal laws through: the
+   leaf's own length, width, sheet and width scale under the petal names */
+function leafCurveView(ui, blade) {
+  if (blade === 'leaflet') {
+    const lay = compoundLeafLayout(ui);
+    const L = lay.lateral.length ? lay.lateral[lay.lateral.length - 1].lengthMm : lay.terminal.lengthMm;
+    const W = lay.lateral.length ? lay.lateral[lay.lateral.length - 1].widthMm : lay.terminal.widthMm;
+    return { ...ui, petalLength: L, petalWidth: W, outlineWidthScaleOwn: leafletOutlineWidthScale(L, W) };
+  }
+  return { ...ui, petalLength: Number(ui.leafLength), petalWidth: Number(ui.leafWidth), outlineWidthScaleOwn: leafOutlineWidthScale(ui) };
+}
+/* the validator's context for a leaf curve: the blades the build on screen
+   drew (bloom.js hands them under `leaf` / `leaflet`), else the controls' own
+   (the simple blade at its length; every leaflet of the layout at its size) */
+function leafCurveCtx(ui, ctx, blade) {
+  const c = ctx && ctx[blade];
+  if (c) return c;
+  if (blade === 'leaflet') {
+    const lay = compoundLeafLayout(ui);
+    const bl = [...lay.lateral.map((q) => [q.lengthMm, q.widthMm]), [lay.terminal.lengthMm, lay.terminal.widthMm]];
+    return { askedLengthsMm: null, bends: null, outlineBlades: bl.map(([L, W]) => ({ lengthMm: L, scale: leafletOutlineWidthScale(L, W), pinnedFirst: false })) };
+  }
+  return { askedLengthsMm: [Number(ui.leafLength)], bends: null, outlineBlades: [{ lengthMm: Number(ui.leafLength), scale: leafOutlineWidthScale(ui), pinnedFirst: false }] };
+}
+const LEAF_TWIN_WORDS = {
+  leafCurlMode: { section: 'leaves', before: 'leafArch', label: 'Arch from',
+    options: [{ value: 'SLIDER', label: 'Slider — the Arch control' }, { value: 'CURVE', label: 'Curve — draw the spine' }],
+    fmt: (v) => (v === 'CURVE' ? 'the drawn spine below (Arch is hidden and inert) — on a compound leaf it is the RACHIS' : 'the Arch slider'),
+    visibleWhen: { ref: 'leafPresent' } },
+  leafSpineCurve: { section: 'leaves', before: 'leafArch', label: 'Spine curve',
+    fmt: (v, ui) => {
+      const L = Number(ui.leafLength);
+      if (!(L > 0)) return `${v.points.length} points`;
+      const view = leafCurveView(ui, 'leaf');
+      const law = spineCurveLaw(v, L);
+      const r = law.peakKmm > 0 ? 1 / law.peakKmm : Infinity;
+      const floor = spineCurveFloorRadiusMm(view);
+      const endY = v.points[v.points.length - 1][1];
+      return `${v.points.length} points · drawn SEEN FROM THE SIDE, root at the left: a curve that FALLS toward the tip arches the tip DOWN — the bend a POSITIVE Arch makes (this curve ends ${endY < 0 ? 'below' : endY > 0 ? 'above' : 'level with'} its root) · scaled to ${L.toFixed(1)} mm${String(ui.leafType) === 'COMPOUND' && String(ui.inflorescence) !== 'RACEME' ? ' of RACHIS' : ''} · start ${law.startDeg >= 0 ? '+' : ''}${law.startDeg.toFixed(1)}° laid along the leaf's angle · tightest radius ${isFinite(r) ? r.toFixed(2) + ' mm' : 'straight'} against a ${floor.toFixed(2)} mm floor${law.peakKmm > 1 / floor ? ' (UNDER THE FLOOR — a loaded curve; clamped and told)' : ''}`;
+    },
+    validate: (cand, ui, ctx) => { const c = leafCurveCtx(ui, ctx, 'leaf'); return spineCurveRefusal(cand, leafCurveView(ui, 'leaf'), c.askedLengthsMm, c.bends); },
+    owner: 'leafLength', visibleWhen: { ref: 'leafCurlFromCurve' } },
+  leafOutlineMode: { section: 'leaves', before: 'leafTipShape', label: 'Outline from',
+    options: [{ value: 'LAW', label: 'Law — the lanceolate blade and its tip shape' }, { value: 'CURVE', label: 'Curve — draw the outline' }],
+    fmt: (v) => (v === 'CURVE' ? 'the drawn outline below (Tip shape is hidden and inert; the teeth are cut into the drawn outline)' : 'the lanceolate law and the tip shape'),
+    visibleWhen: { ref: 'leafSimpleBlade' } },
+  leafOutlineCurve: { section: 'leaves', before: 'leafTipShape', label: 'Outline curve', owner: 'leafLength', blade: 'leaf',
+    visibleWhen: { ref: 'leafOutlineFromCurve' } },
+  leafletOutlineMode: { section: 'leafLeaflets', before: 'leafletTipShape', label: 'Leaflet outline from',
+    options: [{ value: 'LAW', label: 'Law — the ovate leaflet and its tip shape' }, { value: 'CURVE', label: 'Curve — draw one outline for every leaflet' }],
+    fmt: (v) => (v === 'CURVE' ? 'the drawn outline below, ONE curve for every leaflet (the terminal too), each at its own length and width (Leaflet tip is hidden and inert)' : 'the ovate law and the leaflet tip'),
+    visibleWhen: { ref: 'leafCompound' } },
+  leafletOutlineCurve: { section: 'leafLeaflets', before: 'leafletTipShape', label: 'Leaflet outline curve', owner: 'leafletLength', blade: 'leaflet',
+    visibleWhen: { ref: 'leafletOutlineFromCurve' } },
+};
+/* the outline curve's read-out, on the leaf's own plan — widest and narrowest
+   point and the scale, each half on an asymmetric curve */
+const leafOutlineFmt = (blade) => (v, ui) => {
+  const view = leafCurveView(ui, blade);
+  const L = Number(view.petalLength);
+  if (!(L > 0)) return `${v.points.length} points`;
+  const scale = view.outlineWidthScaleOwn;
+  const per = blade === 'leaflet' ? ` (the apical pair's ${L.toFixed(1)} mm; every leaflet, the terminal too, at its own length and width)` : '';
+  if (v.mode === 'two-sided') {
+    const half = (side, pts) => { const pl = outlineCurvePlan(v, L, { scale, side }); return `${side} ${pts.length} points, widest ${pl.peakHalfMm.toFixed(1)} mm out at ${(pl.uPk * 100).toFixed(0)}%${pl.lifted.length ? `, ${pl.lifted.length} LIFTED` : ''}`; };
+    return `ASYMMETRIC at ${scale.toFixed(3)}x width — ${half('left', v.points)} · ${half('right', v.right)} · of ${L.toFixed(0)} mm${per} (LEFT = the upper curve: the half on the viewer's left with the leaf seen from its upper face, base at the bottom) · the teeth are cut into each half`;
+  }
+  const pl = outlineCurvePlan(v, L, { scale });
+  return `${v.points.length} points at ${scale.toFixed(3)}x width · widest ${(2 * pl.peakHalfMm).toFixed(1)} mm at ${(pl.uPk * 100).toFixed(0)}% of ${L.toFixed(0)} mm${per}${pl.lifted.length ? ` (${pl.lifted.length} point${pl.lifted.length === 1 ? '' : 's'} LIFTED to the 1.60 mm floor — a loaded curve; the editor refuses such a drag)` : ''} · the teeth are cut into the drawn outline`;
+};
+export function leafCurveTwinControls(rows) {
+  return LEAF_CURVE_TWINS.map((row) => {
+    const p = rows.find((c) => c.id === row.petal);
+    if (!p) throw new Error(`LEAF_CURVE_TWINS names ${row.petal}, which is not a control`);
+    const w = LEAF_TWIN_WORDS[row.leaf];
+    if (!w) throw new Error(`LEAF_CURVE_TWINS names ${row.leaf}, which has no words in the registry`);
+    const spec = {};
+    if (p.kind === 'choice') {
+      if (w.options.map((o) => o.value).join('|') !== p.options.map((o) => o.value).join('|')) throw new Error(`${row.leaf}'s options must be its petal twin's values`);
+      spec.options = w.options;
+    }
+    if (p.kind === 'curve') {
+      spec.curve = Object.freeze({ ...p.curve, owner: w.owner });
+      if (p.curve === OUTLINE_CURVE_SPEC) {
+        spec.validate = (cand, ui, ctx) => outlineCurveRefusal(cand, leafCurveView(ui, w.blade), leafCurveCtx(ui, ctx, w.blade).outlineBlades);
+        spec.fmt = leafOutlineFmt(w.blade);
+      }
+    }
+    if (p.kind === 'choice' && row.rest !== p.default) throw new Error(`${row.leaf}'s rest value must be its petal twin's default`);
+    return {
+      id: row.leaf, section: w.section, kind: p.kind, ...spec, default: row.rest,
+      label: w.label, fmt: spec.fmt || w.fmt, ...(w.validate ? { validate: w.validate } : {}),
+      tier: p.tier, role: 'stem', visibleWhen: w.visibleWhen,
+      /* where the row goes: just before the control it stands beside */
+      _before: w.before,
+    };
+  });
+}
+{
+  for (const r of leafCurveTwinControls(CONTROLS)) {
+    const { _before, ...row } = r;
+    const at = CONTROLS.findIndex((c) => c.id === _before);
+    if (at < 0) throw new Error(`the leaf curve twin ${row.id} expects ${_before} to stand beside`);
+    CONTROLS.splice(at, 0, row);
+  }
 }
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
