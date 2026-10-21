@@ -116,8 +116,10 @@ if (flag('--run')) {
   out.endOrder = order();
   const testRows = sim.step ? sim.steps.map(s => ({ ext: s.ext, load: s.load, top: s.top, phase: s.phase, strain: s.strain, frames: s.frames, converged: s.converged, step: true })) : rows;
   out.pull = { rows: testRows, stepped: !!sim.step, frames, unconverged: sim.unconverged || 0, loadEnd: sim.loadEnd, peak: sim.peak, restHeight: sim.restHeight, wallMs: performance.now() - t0, deep, certFail: sim.stats.certFail, certSteps: sim.stats.certSteps, worstMargin: sim.stats.worstMargin, closest: sim.stats.minDist, strainStopped: sim.strainStopped, side: sim.sideGrip || null };
-  process.stdout.write(JSON.stringify(out));
-  process.exit(0);
+  // exit only once the pipe has taken it all: process.exit() straight after a large write to a pipe
+  // cuts it off (a continuous run's rows are ~100 KB; the parent read a truncated JSON and died)
+  process.stdout.write(JSON.stringify(out), () => process.exit(0));
+  await new Promise(() => {});
 }
 
 // ---- the size-vs-speed table (--scale), in the parent -----------------------------------------

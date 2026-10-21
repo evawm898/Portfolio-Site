@@ -799,8 +799,12 @@ export class KnitSim {
     if (st.moving) {
       // A move never carries the load past the limit: at the wall (the jam closing, then the yarn's own
       // length) the load can triple in a tenth of a percent, faster than the last steps' growth predicts,
-      // so a loading move stops the frame the load cell reaches LOAD_LIMIT and that step ends the loading.
-      if (this.phase === 'pulling' && this.testLoad() >= P.LOAD_LIMIT) { st.target = this.drive; st.capped = true; }
+      // so a loading move stops the frame EITHER jaw reads LOAD_LIMIT and that step ends the loading.
+      // Either, not the load cell alone: during a short move the stationary jaw lags (a contact
+      // correction travels a few segments a substep), so the load it reads arrives in the hold, after
+      // the move — the moving jaw feels the wall at once.
+      const moving = this.dir === 'course' ? this.stats.loadRight : this.stats.loadTop;
+      if (this.phase === 'pulling' && Math.max(this.testLoad(), moving) >= P.LOAD_LIMIT) { st.target = this.drive; st.capped = true; }
       if (Math.abs(this.drive - st.target) < 1e-12) { st.moving = false; st.hold = 0; st.win = []; st.top = []; }
       return;
     }
