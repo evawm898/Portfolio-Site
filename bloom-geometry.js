@@ -489,52 +489,55 @@ export function androeciumEligible(state) { return !sphereMode(state); }
    16 stations a turn). Read docs/bloom-stamen-braid-outcome.md first.
 
    A BRAID IS A WAY OF LAYING THE STRANDS' OFFSETS, NOT A SECOND ROD. Every
-   strand is still its own rod: rooted on its own foot through the slab (JS1–
-   JS3 hold unchanged), drawn by rodInto's coiled arm, its centreline its own
-   spineLaw centreline B plus an offset. The offset lays it into ONE bundle:
+   strand is still its own rod: rooted on its own foot through the slab (JS1-
+   JS3 hold unchanged), drawn by rodInto's coiled arm through `coilLaw`'s third
+   arm (`braidLaw`), its centreline an offset laid in the BUNDLE's frame:
 
-     C(s) = B(s) + g(s) (A(s) + H(s) - B(s)),   H = R (cos th N1_A + sin th T_A)
+     C(s) = A(s) + E(s) w(s)
 
-   A is the BUNDLE'S AXIS — spineLaw at the hub's apex (the axis every cap's
-   normal is exactly +z on), in the azimuth-0 plane exactly as the style's
-   rod is, curled at the bundle's ONE curvature `stamenCurl / stamenLength`
-   (the control's length, so a strand's own length offset never bends the
-   others' axis). H is the strand's place in the bundle at radius R (the coil
-   radius), and g gathers the strand onto it. Two regions, in order, so each
-   curvature has an exact arithmetic form and the floor is not a bound:
-     * THE GATHER, s in [0, G]: g = lambda * smootherstep(s / G) and th is
-       held at the strand's own place (th0 = pi - azimuth: the bundle slot
-       on the SAME radial line as its foot, so no strand crosses the axis
-       while gathering). On a straight flat axis the strand moves laterally by
-       Delta (the distance from its outer root to its bundle slot) and its
-       curvature is Delta f''/G^2 / (1 + (Delta f'/G)^2)^1.5 <= Delta F2 / G^2;
-       G is the longer of sqrt(F2 Delta t) (the floor) and 15/8 Delta (the
-       lateral slope never past 45 degrees — a choice made without a ruling),
-       capped at half the strand. Where the cap binds the strand cannot reach
-       the bundle in under one sheet thickness of curvature, so it gathers a
-       FRACTION lambda = (L/2)^2 / (F2 Delta t) of the way — the coil's own
-       radius clamp, told, continuous (lambda = 1 exactly at the boundary).
-     * THE TWIST, s in [G, L]: th = th0 + Omega(s), the twist RATE ramped in
-       by smootherstep over `rampMm` (one asked pitch, or what is left of the
-       strand) so the strand leaves the gather with continuous tangent AND
-       curvature. On a straight axis C' = (1, 0, R th') and C'' = (0, -R th'^2,
-       R th'') in (D, e, e_perp), which is the coil's exact form with rho' = 0
-       — arithmetic only (th' and th'' are polynomials), so the turns clamp is
-       a bisection on a quantity bit-identical in every engine.
-   THE TWIST IS THE BUNDLE'S: every strand winds at `2 pi n / stamenLength`
-   about the shared axis, the SAME handedness as an INDEPENDENT coil (one
-   expression, `cos th N1 + sin th T` with th increasing — the coil-§7
-   ruling's one handedness), so at equal radius and turns the strands are
-   parallel helices — a plied bundle, rope-laid. A strand's OWN radius or
-   turns (its scope, select-and-edit) puts it inside or outside the others, or
-   winding faster, and that is where strands cross.
+   A is the BUNDLE'S AXIS: spineLaw at the hub's apex (where every cap's normal
+   is exactly +z), in the azimuth-0 plane exactly as the style's rod is, curled
+   at the bundle's ONE curvature `stamenCurl / stamenLength` (the CONTROL's
+   length, so a strand's own length offset never bends the others' axis). E is
+   that planar arc's rotation-minimising frame, and w is the strand's offset in
+   it. Two regions, in order:
+     * THE GATHER, s in [0, G]: w goes from the strand's own outer root (w0) to
+       its SLOT H = R (cos th0 N1_A + sin th0 T_A), th0 = pi - azimuth — the
+       slot on the same radial line as its foot, so no strand crosses the axis
+       while gathering. It leaves its root ALONG ITS OWN NORMAL and arrives in
+       the slot with the twist's own velocity (`braidGatherGeometry`'s header
+       has the polynomials). Its curvature is EXACT and arithmetic only — the
+       curl and a domed hub's leaning roots included — so G is the least
+       length the floor admits, BISECTED (52 steps, over a 128-sample lattice
+       with ternary refinement), never shorter than 15/8 of the gather
+       distance (a lateral slope at or under 45 degrees, a choice made without
+       a ruling), and it may take the WHOLE strand. Where even the whole strand
+       cannot gather under the floor, it gathers the largest FRACTION lambda the
+       floor admits (bisected; lambda = 1 exactly at the boundary) and does not
+       twist — the coil's own radius clamp, told, continuous.
+     * THE TWIST, s in [G, L]: th = th0 + Omega(s), the twist RATE 2 pi n / Lr
+       (Lr the control's length — the length is the AXIS) ramped in by
+       smootherstep over one asked pitch, or what is left of the strand, so
+       the strand leaves the gather with continuous tangent AND curvature. On a
+       straight axis its curvature has the coil's exact form with rho' = 0
+       (`braidTwistKappa`), so the turns clamp is a bisection on a quantity
+       bit-identical in every engine.
+   THE TWIST IS THE BUNDLE'S: every strand winds about the shared axis with
+   the SAME handedness as an INDEPENDENT coil (one handedness — the coil-§7
+   ruling; MEASURED left-handed, clockwise from above as it rises, which is the
+   shipped coil's own hand — docs/bloom-stamen-braid-outcome.md §6), so at equal
+   radius and turns the strands are parallel helices: a rope-laid bundle. A
+   strand's OWN radius or turns (its scope, select-and-edit) puts it inside or
+   outside the others, or winding faster, and that is where strands cross.
 
-   THE FLOOR — the composite curvature floor (Q2.3) and the fold limit apply
-   to EVERY strand, and for a round section they are one statement: the fold
-   limit's radius >= reach + t/2 with a rod's reach t/2 IS one sheet thickness
-   of radius, the floor. Bounded on the straight flat axis, as the coil's is;
-   the filament curl and a domed hub's tilted roots are MEASURED on every
-   strand (`peakRadiusMm`, `underFloor`) and told, the coil's precedent.
+   THE FLOORS — the composite curvature floor (Q2.3) and the fold limit apply
+   to EVERY strand. The floor bounds the gather and the twist as above. THE FOLD
+   LIMIT (spine-cup-fold's ruling: a spine may not bend past its own cross-
+   section) is the BUNDLE's: a strand laid at R about an axis bending at 1/k
+   has its inner skin at 1/k - R - t/2 from the bend's centre, so the LAY
+   RADIUS is clamped to 1/|k| - t per strand and told (`foldClamped`). The
+   filament curl's composite with the twist is MEASURED on every strand
+   (`peakRadiusMm`, `underFloor`) and told, the coil's precedent.
 
    THE STATION COUNT is the coil's — stamenCoilRows(the strand's asked turns)
    — a function of controls, so live and export agree and a 120-strand braid

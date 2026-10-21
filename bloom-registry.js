@@ -3826,7 +3826,12 @@ export const CONTROLS = [
       if (r === 0) return '0 — no coil: the plain filament, byte for byte';
       const C = shown && shown.androecium && shown.androecium.coil;
       const head = ui.stamenCoil === 'BRAIDED' ? `${r.toFixed(1)} mm from the bundle's axis to each strand` : `${r.toFixed(1)} mm from the filament's axis to the wire`;
-      if (ui.stamenCoil === 'BRAIDED') return C && C.gathersClampedCount ? `${head} — ${C.gathersClampedCount} of ${shown.androecium.count} strands too short to gather all the way in under one sheet thickness of curvature: they lean toward the bundle and do not wind (${shown.mode}), told` : head;
+      if (ui.stamenCoil === 'BRAIDED') {
+        const told = [];
+        if (C && C.gathersClampedCount) told.push(`${C.gathersClampedCount} of ${shown.androecium.count} strands too short to gather all the way in under one sheet thickness of curvature: they lean toward the bundle and do not wind`);
+        if (C && C.foldClampedCount) told.push(`${C.foldClampedCount} of ${shown.androecium.count} laid closer than asked by the FOLD LIMIT (the curled bundle's radius less one sheet thickness)`);
+        return told.length ? `${head} — ${told.join('; ')} (${shown.mode}), told` : head;
+      }
       if (!C || !C.radiusClampedCount) return head;
       return `${head} — ${C.radiusClampedCount} of ${shown.androecium.count} CLAMPED to ${C.radiusMinMm.toFixed(2)} mm at the narrowest (${shown.mode}): too short a filament to ramp a coil that wide in under one sheet thickness of curvature, told`;
     },
