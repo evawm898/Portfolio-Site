@@ -24,9 +24,14 @@ const canvas = document.getElementById('klCanvas'), ctx = canvas.getContext('2d'
 const chart = document.getElementById('klChart'), cctx = chart.getContext('2d');
 const $ = id => document.getElementById(id);
 
-let swatch = HASH.get('SWATCH') === 'eyelet' ? 'eyelet' : 'plain';
+const SWATCH_KEYS = ['plain', 'eyelet', 'eyelet-ssk', 'rib'];
+let swatch = SWATCH_KEYS.includes(HASH.get('SWATCH')) ? HASH.get('SWATCH') : 'plain';
+let direction = HASH.get('DIRECTION') === 'course' ? 'course' : 'wale';
+const NAMES = { plain: 'stockinette', eyelet: 'eyelet (k2tog)', 'eyelet-ssk': 'eyelet (ssk)', rib: '1×1 rib' };
 let init = null, st = null, view = null, drawMs = 0, paused = false, log = [], drag = null, dirty = false;
-const results = {};              // per swatch: the last completed test { rows, jam, cycle, restHeight }
+const results = {};              // per swatch/direction: the last completed test { rows, jam, cycle, restHeight }
+let lastKey = null;              // the key of the test before the current one (drawn grey)
+const key = (sw = swatch, d = (st && st.dir) || direction) => `${sw}/${d}`;
 const raf = { last: 0, maxGapSettling: 0, maxGapTesting: 0, frames: 0 };
 
 // ---- the engine ------------------------------------------------------------------------------
@@ -51,13 +56,17 @@ function receive(m) {
   st = m; dirty = true;
   if (m.rows.length) log.push(...m.rows);
   if (m.phase === 'done' && !wasDone && log.length) {
-    results[swatch] = { rows: log.slice(), jam: findJam(log), cycle: cycleStats(log, m.restHeight), restHeight: m.restHeight, peak: m.peak, loadEnd: m.loadEnd };
+    const k = key(swatch, m.dir);
+    results[k] = { rows: log.slice(), jam: findJam(log), cycle: cycleStats(log, m.restHeight), restHeight: m.restHeight, peak: m.peak, loadEnd: m.loadEnd, dir: m.dir, swatch };
+    if (results.latest && results.latest !== k) lastKey = results.latest;
+    results.latest = k;
   }
 }
 
 function start(sw = swatch) {
   swatch = sw; init = null; st = null; view = null; log = []; drag = null;
   document.querySelectorAll('[data-swatch]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.swatch === swatch)));
+  document.querySelectorAll('[data-dir]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dir === direction)));
   $('klTest').disabled = true; $('klCsv').disabled = true;
   send({ type: 'start', swatch, params: OVERRIDE, wales: WALES, courses: COURSES });
 }
@@ -69,7 +78,14 @@ function bounds(x, n) {
   return { x0, x1, y0, y1 };
 }
 function fitTarget(b) {
-  let y1 = b.y1;
+  let y1 = b.y1, x1 = b.x1;
+  if (st.dir === 'course') {            // a course pull runs to the right: room for +70% of the width
+    const w = st.restHeight || (b.x1 - b.x0);
+    x1 = Math.max(b.x1, b.x0 + w * 1.7 + (b.x1 - b.x0 - w));
+    const W = canvas.clientWidth, H = canvas.clientHeight, pad = 28;
+    const s = Math.min((W - 2 * pad) / (x1 - b.x0), (H - 2 * pad) / (b.y1 - b.y0));
+    return { s, cx: (b.x0 + x1) / 2, cy: (b.y0 + b.y1) / 2 };
+  }
   if (st.restHeight || st.phase === 'settled') {
     const h = st.restHeight || (b.y1 - b.y0);
     y1 = Math.max(b.y1, b.y0 + h * 1.55 + (b.y1 - b.y0 - h));
@@ -80,7 +96,7 @@ function fitTarget(b) {
 }
 function updateView(b) {
   const t = fitTarget(b);
-  if (!view || st.phase === 'settling') view = view ? { s: lerp(view.s, t.s), cx: lerp(view.cx, t.cx), cy: lerp(view.cy, t.cy) } : t;
+  if (!view || st.phase === 'settling' || st.phase === 'freeing') view = view ? { s: lerp(view.s, t.s), cx: lerp(view.cx, t.cx), cy: lerp(view.cy, t.cy) } : t;
   else if (!view.frozen) view = { ...t, frozen: st.phase !== 'settled' };
 }
 const lerp = (a, b) => a + (b - a) * 0.15;
@@ -102,11 +118,12 @@ function draw(b) {
   ctx.setTransform(dpr, 0, 0, dpr, canvas.clientWidth / 2 * dpr, canvas.clientHeight / 2 * dpr);
   const x = st.x, n = init.n, s = view.s, cx = view.cx, cy = view.cy;
   const sx = i => (x[3 * i] - cx) * s, sy = i => -(x[3 * i + 1] - cy) * s;
-  {   // bottom jaw
-    let y0 = Infinity, y1 = -Infinity;
-    for (let i = 0; i < n; i++) if (init.grip[i] === 1) { const y = x[3 * i + 1]; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const grip = st.grip || init.grip;
+  {   // the jaws: the bottom jaw (wale test), or the two side jaws (course test)
+    const box = gs => { let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (let i = 0; i < n; i++) if (gs.includes(grip[i])) { const a = x[3 * i], y = x[3 * i + 1]; if (a < x0) x0 = a; if (a > x1) x1 = a; if (y < y0) y0 = y; if (y > y1) y1 = y; } return { x0, x1, y0, y1 }; };
     ctx.fillStyle = 'rgba(47,163,163,0.08)';
-    ctx.fillRect((b.x0 - cx) * s - 10, -(y1 - cy) * s - 4, (b.x1 - b.x0) * s + 20, (y1 - y0) * s + 8);
+    if (st.dir === 'course' && st.grip) for (const g of [3, 4]) { const j = box([g]); if (Number.isFinite(j.x0)) ctx.fillRect((j.x0 - cx) * s - 4, -(j.y1 - cy) * s - 4, (j.x1 - j.x0) * s + 8, (j.y1 - j.y0) * s + 8); }
+    else { const j = box([1, 5]); ctx.fillRect((b.x0 - cx) * s - 10, -(j.y1 - cy) * s - 4, (b.x1 - b.x0) * s + 20, (j.y1 - j.y0) * s + 8); }
   }
   const nChunks = Math.ceil((n - 1) / CHUNK);
   if (!order || order.length !== nChunks) { order = new Int32Array(nChunks); keys = new Float64Array(nChunks); }
@@ -143,7 +160,7 @@ function draw(b) {
 function drawPins(s, cx, cy) {   // the comb, seen end on: the pins run straight into the screen
   const r = P.PIN_RADIUS * s;
   ctx.fillStyle = '#34393a'; ctx.strokeStyle = PETROL; ctx.lineWidth = 1;
-  for (const p of init.pins) { ctx.beginPath(); ctx.arc((p.x - cx) * s, -(p.y + st.pullOffset - cy) * s, r, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); }
+  init.pins.forEach((p, k) => { const px = st.pinX ? st.pinX[k] : p.x; ctx.beginPath(); ctx.arc((px - cx) * s, -(p.y + st.pullOffset - cy) * s, r, 0, 2 * Math.PI); ctx.fill(); ctx.stroke(); });
 }
 const rgb = (c, k) => `rgb(${Math.round(c[0] * k)},${Math.round(c[1] * k)},${Math.round(c[2] * k)})`;
 
@@ -155,7 +172,7 @@ function drawChart() {
   cctx.setTransform(1, 0, 0, 1, 0, 0); cctx.fillStyle = BLACK; cctx.fillRect(0, 0, W, H);
   cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const w = chart.clientWidth, h = chart.clientHeight, L = 34, B = 20, T = 8, R = 8;
-  const other = results[swatch === 'plain' ? 'eyelet' : 'plain'];
+  const other = lastKey && lastKey !== key() ? results[lastKey] : null;
   const all = [...log, ...(other ? other.rows : [])];
   const xmax = Math.max(0.2, ...all.map(p => p.ext)) * 1.05;
   const lo = 1e3, ymax = Math.max(P.LOAD_LIMIT, ...all.map(p => p.load)) * 1.3, span = Math.log10(ymax / lo);
@@ -176,15 +193,17 @@ function drawChart() {
   if (other) { path(other.rows.filter(r => r.phase === 'pulling'), '#3d4646', 1.2, [3, 3]); path(other.rows.filter(r => r.phase !== 'pulling'), '#3d4646', 1.2, [1, 2]); jamTick(other.jam, '#3d4646'); }
   path(log.filter(r => r.phase === 'pulling'), PETROL, 1.6);
   path(log.filter(r => r.phase !== 'pulling'), INK, 1.3);
-  if (results[swatch] && st && st.phase === 'done') jamTick(results[swatch].jam, PETROL);
+  if (log.length && log[0].step) for (const p of log) { cctx.fillStyle = p.phase === 'pulling' ? PETROL : INK; cctx.fillRect(X(p.ext) - 1.5, Y(p.load) - 1.5, 3, 3); }
+  if (results[key()] && st && st.phase === 'done') jamTick(results[key()].jam, PETROL);
 }
 
 // ---- readouts --------------------------------------------------------------------------------
 function readouts() {
-  const r = results[swatch], o = results[swatch === 'plain' ? 'eyelet' : 'plain'];
+  const r = results[key()], o = lastKey && lastKey !== key() ? results[lastKey] : null;
   const pct = v => Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—';
   const rows = [
     ['swatch', init.label],
+    ['test', `${st.dir === 'course' ? 'along the courses (side jaws)' : 'along the wales (comb)'} · ${P.PROTOCOL === 'stepped' ? `stepped, ${(P.STEP_EXT * 100).toFixed(1)}% a step, held to ${(P.STEP_TOL * 100).toFixed(2)}%` : `continuous at ${P.PULL_SPEED} d/s`}`],
     ['phase', st.phase + (st.loadEnd && st.phase !== 'pulling' ? ` (loading ended on ${st.loadEnd})` : '')],
     ['simulation thread', USE_WORKER ? 'Web Worker' : 'this page (#WORKER=0)'],
     ['points / contact pairs', `${init.n} / ${st.nPairs}`],
@@ -194,25 +213,30 @@ function readouts() {
     ['ms to draw a frame', drawMs.toFixed(1)],
     ['settle', st.settledAt ? `${st.settledAt.frames} frames · ${(st.settleWallMs / 1000).toFixed(1)} s wall` : `${st.settleFrames} frames…`],
     ['jaw gap', `${st.jawGap.toFixed(1)} d`],
+    ['width (wale-centre span, mid courses)', `${st.waleSpan.toFixed(1)} d${st.freeAt ? ` · free: ${st.freeAt.span.toFixed(1)} d` : ''}`],
     ['closest yarn approach', `${st.closest.toFixed(3)} d`],
     ['overlaps > ½ d now / worst', `${st.overlaps} / ${st.worstDeep}`, st.worstDeep > 0],
     ['largest yarn strain', `${(st.maxStrain * 100).toFixed(3)}%`, st.maxStrain > 0.01],
     ['extension', st.restHeight ? pct(st.extension) : '—'],
-    ['load: bottom jaw / comb', `${st.stats.loadBottom.toFixed(0)} / ${st.stats.loadTop.toFixed(0)}`],
+    [st.dir === 'course' ? 'load: left jaw (load cell) / comb' : 'load: bottom jaw / comb', `${st.testLoad.toFixed(0)} / ${st.stats.loadTop.toFixed(0)}`],
+    ['steps recorded', st.step ? `${st.step.n}${st.step.moving ? ' · moving' : ` · holding ${st.step.hold} frames`}` : '—'],
     ['jam (stiffness ×10 the soft region)', r ? `${pct(r.jam.ext)} at load ${Math.round(r.jam.load)}` : '—'],
     ['hysteresis (loading work lost)', r ? pct(r.cycle.lossFraction) : '—'],
     ['permanent set', r ? pct(r.cycle.set) : '—'],
   ];
-  if (o) rows.push([`last ${o === results.plain ? 'plain' : 'eyelet'} test (grey)`, `jam ${pct(o.jam.ext)} · lost ${pct(o.cycle.lossFraction)} · set ${pct(o.cycle.set)}`]);
+  if (o) rows.push([`last test: ${NAMES[o.swatch]}, ${o.dir} (grey)`, `jam ${pct(o.jam.ext)} · lost ${pct(o.cycle.lossFraction)} · set ${pct(o.cycle.set)}`]);
   $('klRo').innerHTML = rows.map(([k, v, bad]) => `<dt>${k}</dt><dd${bad ? ' class="is-bad"' : ''}>${v}</dd>`).join('');
   $('klProgress').style.width = `${(st.settleProgress * 100).toFixed(1)}%`;
   $('klStatus').textContent = st.phase === 'settling' ? `settling — ${Math.round(st.settleProgress * 100)}%`
+    : st.phase === 'freeing' ? 'releasing the width: the cast-on on a rail, the comb\'s pins sliding, the swatch settling at its own width…'
+    : st.phase === 'free' ? 'settled at its own width.'
+    : st.step && (st.phase === 'pulling' || st.phase === 'unloading') ? `${st.phase === 'pulling' ? 'loading' : 'unloading'} in steps: ${st.step.n} recorded, ${st.step.moving ? 'moving the jaw' : `holding (${st.step.hold} frames)`}…`
     : st.phase === 'settled' ? 'settled. Run the test, or drag above the top course.'
     : st.phase === 'pulling' ? (st.pullAuto ? `loading at constant speed, until the bottom jaw reads ${P.LOAD_LIMIT.toExponential(1)}…` : 'pulling by hand')
     : st.phase === 'unloading' ? 'unloading: the comb going back to where it started…'
     : st.phase === 'returned' ? 'back at the start, holding…'
     : st.phase === 'done' ? `test done: ${r ? `jam at ${pct(r.jam.ext)}, ${pct(r.cycle.lossFraction)} of the loading work lost, set ${pct(r.cycle.set)}` : ''}` : st.phase;
-  $('klTest').disabled = st.phase === 'settling' || (st.phase === 'pulling' && st.pullAuto) || st.phase === 'unloading' || st.phase === 'returned';
+  $('klTest').disabled = st.phase === 'settling' || st.phase === 'freeing' || (st.phase === 'pulling' && st.pullAuto) || st.phase === 'unloading' || st.phase === 'returned' || st.phase === 'done' || (st.dir === 'course' && direction === 'wale');
   $('klCsv').disabled = !log.length;
 }
 
@@ -237,23 +261,28 @@ function frame(t) {
 
 // ---- controls --------------------------------------------------------------------------------
 document.querySelectorAll('[data-swatch]').forEach(b => b.addEventListener('click', () => start(b.dataset.swatch)));
-$('klTest').addEventListener('click', () => { log = []; send({ type: 'test' }); });
+$('klTest').addEventListener('click', () => { log = []; send({ type: 'test', direction }); });
+document.querySelectorAll('[data-dir]').forEach(b => b.addEventListener('click', () => {
+  direction = b.dataset.dir;
+  document.querySelectorAll('[data-dir]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.dir === direction)));
+  if (st && (st.phase === 'done' || (st.dir === 'course' && direction === 'wale'))) start();   // a fresh swatch per test
+}));
 $('klPause').addEventListener('click', e => { paused = !paused; e.target.textContent = paused ? 'Resume' : 'Pause'; send({ type: 'pause', value: paused }); });
 $('klRestart').addEventListener('click', () => start());
 $('klCsv').addEventListener('click', () => {
   const csv = 'extension,load_bottom,load_top,max_strain,phase\n' + log.map(p => `${p.ext.toFixed(5)},${p.load.toFixed(3)},${p.top.toFixed(3)},${p.strain.toFixed(6)},${p.phase}`).join('\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `knit-lab-${swatch}-load-unload.csv`; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `knit-lab-${swatch}-${(st && st.dir) || direction}-load-unload.csv`; a.click();
 });
 const worldY = e => { const r = canvas.getBoundingClientRect(); return view.cy - (e.clientY - r.top - r.height / 2) / view.s; };
 const topY = () => bounds(st.x, init.n).y1;
 canvas.addEventListener('pointermove', e => {
   if (!st || !view) return;
-  const pullable = st.phase !== 'settling' && worldY(e) > topY() - 3 * P.YARN_DIAMETER;
+  const pullable = st.phase !== 'settling' && st.dir !== 'course' && worldY(e) > topY() - 3 * P.YARN_DIAMETER;
   canvas.classList.toggle('is-pullable', pullable || !!drag);
   if (drag) send({ type: 'drag', target: drag.off0 + worldY(e) - drag.y0 });
 });
 canvas.addEventListener('pointerdown', e => {
-  if (!st || !view || st.phase === 'settling' || worldY(e) < topY() - 3 * P.YARN_DIAMETER) return;
+  if (!st || !view || st.phase === 'settling' || st.dir === 'course' || worldY(e) < topY() - 3 * P.YARN_DIAMETER) return;
   if (st.phase === 'settled' || st.pullAuto || st.phase === 'done') log = [];
   drag = { y0: worldY(e), off0: st.pullOffset };
   send({ type: 'grab' });
@@ -263,5 +292,5 @@ const endDrag = () => { drag = null; };
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
 window.addEventListener('resize', resize);
 
-window.__knitLab = { PARAMS: P, USE_WORKER, raf, results, start, send, get swatch() { return swatch; }, get state() { return st; }, get init() { return init; }, get log() { return log; }, get drawMs() { return drawMs; } };
+window.__knitLab = { PARAMS: P, USE_WORKER, raf, results, start, send, get swatch() { return swatch; }, get direction() { return direction; }, setDirection(d) { direction = d; }, get state() { return st; }, get init() { return init; }, get log() { return log; }, get drawMs() { return drawMs; } };
 resize(); start(); requestAnimationFrame(frame);
