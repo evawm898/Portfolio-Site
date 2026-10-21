@@ -480,7 +480,7 @@ const wovenScene = {
 };
 
 // ---------- 6. NONWOVEN: the flurry settles into a web, is pressed, and is bonded ----------
-const WEB = { y: 112, half: 76, squeeze: 0.62, extra: 40 };
+const WEB = { y: 112, half: 76, squeeze: 0.58, extra: 40 };
 let WEBF = null;
 function buildWeb() {
   const r = rng(SEED + 500);
@@ -493,8 +493,12 @@ function buildWeb() {
   }
   fib.forEach((o, i) => {
     o.wx = o.entering ? lerp(o.start.x, 12 + r() * 296, 0.7) : lerp(o.start.x, 12 + r() * 296, 0.35);
-    o.wy = WEB.y + (r() * 2 - 1) * WEB.half * 0.88;
-    o.wang = o.start.ang + (r() - 0.5) * 0.9;
+    o.wy = WEB.y + (r() * 2 - 1) * WEB.half * 0.74;
+    // a web lies flat: seen a little from the side, its fibres run mostly across the card.
+    // Turn each to the nearer of its two horizontal headings, plus a spread, so none spins.
+    const a0 = Math.atan2(Math.sin(o.start.ang), Math.cos(o.start.ang));
+    const flat = Math.abs(a0) > Math.PI / 2 ? Math.sign(a0) * Math.PI : 0;
+    o.wang = flat + (r() - 0.5) * 1.5;
     o.delay = (o.entering ? 0.06 : 0) + r() * 0.14;
     o.z = o.f.accent ? 2 : r();
   });
@@ -520,7 +524,7 @@ const nonwovenScene = {
     // the press: two plates close on the web, then lift away
     const show = seg(t, 0.4, 0.46) * (1 - seg(t, 0.7, 0.78));
     if (show > 0) {
-      const gap = WEB.half * sq + 7, op = f1(show * 100) / 100;
+      const gap = (WEB.half * 0.74 + 16) * sq + 3, op = f1(show * 100) / 100;
       s += `<g stroke="${INK}" stroke-width="1.6" stroke-opacity="${op}" fill="none"><path d="M6,${f1(WEB.y - gap)}H314"/><path d="M6,${f1(WEB.y + gap)}H314"/></g>`;
     }
     for (const b of W.bonds) {
@@ -528,7 +532,7 @@ const nonwovenScene = {
       if (k <= 0) continue;
       // a bond point: the fibres under it melted into one spot (an oval, pressed flat like the web)
       const rx = 5.2 * k, ry = 3.6 * k;
-      s += `<ellipse cx="${f1(b.x)}" cy="${f1(b.y)}" rx="${f1(rx + 1.3)}" ry="${f1(ry + 1.3)}" fill="${BG}"/><ellipse cx="${f1(b.x)}" cy="${f1(b.y)}" rx="${f1(rx)}" ry="${f1(ry)}" fill="${INK}" fill-opacity="0.82"/>`;
+      s += `<ellipse cx="${f1(b.x)}" cy="${f1(b.y)}" rx="${f1(rx + 1.3)}" ry="${f1(ry + 1.3)}" fill="${BG}"/><ellipse cx="${f1(b.x)}" cy="${f1(b.y)}" rx="${f1(rx)}" ry="${f1(ry)}" fill="${INK}" fill-opacity="0.7"/>`;
     }
     return s;
   },

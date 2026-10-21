@@ -53,7 +53,7 @@ for (let k = 0; k < names.length; k++) {
   }
   const mp4 = path.join(out, `${name}.mp4`), gif = path.join(out, `${name}.gif`);
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', path.join(dir, 'f%04d.png'), '-vf', 'scale=640:-2', '-pix_fmt', 'yuv420p', mp4]);
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', path.join(dir, 'f%04d.png'), '-vf', 'fps=20,scale=480:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse', gif]);
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', path.join(dir, 'f%04d.png'), '-vf', 'fps=15,scale=400:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse', gif]);
   console.log(`${name}: ${frames} frames, ${(ms / frames).toFixed(1)} ms/frame draw (seek), mp4 ${fs.statSync(mp4).size >> 10} KB, gif ${fs.statSync(gif).size >> 10} KB`);
   fs.rmSync(dir, { recursive: true, force: true });
 }
