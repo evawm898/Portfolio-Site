@@ -967,9 +967,34 @@ before the nib spans half-width ~2.4 → 0.2 mm in one step and the cup's lift f
 (89.84°) and the LAW spatulate on main's law (81.33°; 140.47° at tip shape 3.0) read worse at the same cup; pointed
 ends stay under 44°. 0 within-shell pairs, 0 inward shells, the rim at the site is the nib's own clamp (0.36 mm at
 cup 0 too). Both spoon rows are smoke rows now, declared at 71.986507 / 49.198688. The remedy, if wanted, is a
-nib resolution demand in the ladder for LAW and CURVE alike — its own byte partition. `node
+nib resolution demand in the ladder for LAW and CURVE alike — its own byte partition. **[Oct 21: TRIED AND
+REFUTED — the block below. A station in the last gap does not take the turn away.]** `node
 tools/bloom-spoon-rim-turn.mjs` reproduces every figure (via the gate's new `--rows-file`); sheet `node
 tools/shot-bloom-spoon-nib.mjs <dir>` → `docs/img/spoon-rim-turn.png`.
+
+**THE BLUNT-NIB LADDER DEMAND WAS BUILT, MEASURED AND NOT SHIPPED — THE COARSE LAST GAP IS THE RAMP, NOT A MISSING
+STATION** (Oct 21, Eva's ruling of Oct 20 tried as written — read `docs/bloom-blunt-nib-ladder-outcome.md` before
+re-proposing any nib or fall demand in `bladeStations`).
+- **What was built.** A fall demand through `ladderDemand`, merged with the arc's and the lobes', held by branch,
+  placed by the one ladder. The candidate is `docs/bloom-blunt-nib-ladder-trial.patch`; it applies to `96b96e1`.
+- **The criterion.** No gap on the descent into the nib falls more than N mm of half-width, on the law or on the
+  drawn outline, at 0.8 / 1.0 / 1.6 mm.
+- **The result.** Measured through E2's own clause over 17 states:
+  - main has 8 over the allowance and the best candidate 13 (10 worse, 3 better);
+  - every criterion pushes the cup-0 blunt ends past 45 (the near-rectangle 45.00 → 53.74);
+  - the round LAW ends worsen 20–30° under a cup;
+  - a criterion under 0.924 mm binds and moves the SHIPPING petal (LAW default × cup 0.6 43.50 → 69.67).
+- **Why.** The last gap is the ramp the bead's room arm (0.50 → 0.18 mm) and the cup's lift fall down, and a
+  station makes the ramp steeper.
+- **No fold, no triangle moved, mode-free** (after the trial's own non-monotone-station defect was fixed; it read
+  ~1,900 pairs first, and "the demand folds" was a wrong first reading).
+- **Sizing on main's record:** 164 of 1,455 rows bind at 1.0 mm, 1,327 at 0.8.
+- **No geometry, no byte, no phase.** `bloom-geometry.js` is main's.
+- **The levers left are not the ladder's**, and the choice is Eva's: the cup's nib scale (`hb / TIP_HALF_MM`,
+  fade over a length), or the bead laid on the outline's in-plane normal.
+- `node tools/bloom-blunt-nib-ladder.mjs` reproduces the table (2 min, no browser). The sheet is
+  `node tools/shot-bloom-blunt-nib-trial.mjs <dir> --png <file>` → `docs/img/blunt-nib-ladder-trial.png`. It shows
+  the cupped spoon visibly ROUNDER under the trial, which is real and which the table outweighs.
 
 **THE PETAL OUTLINE CAN BE ASYMMETRIC: TWO HALF-CURVES ABOUT THE MIDRIB, AND "LEFT" IS DEFINED HERE,
 ONCE** (F6-asym, Oct 18 — Eva's rulings; read `docs/bloom-outline-curve-asym-outcome.md` before touching

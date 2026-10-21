@@ -1,0 +1,498 @@
+diff --git a/bloom-geometry.js b/bloom-geometry.js
+index dbff2a0..229ebff 100644
+--- a/bloom-geometry.js
++++ b/bloom-geometry.js
+@@ -5020,7 +5020,55 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
+       rows.push(sampleU(hi));
+     }
+   };
+-  const cumAt = (u) => { const i = Math.min(LADDER_SAMPLES, Math.max(0, Math.round((u - u0) / (1 - u0) * LADDER_SAMPLES))); return cum[i]; };
++  const sampleAt = (u) => Math.min(LADDER_SAMPLES, Math.max(0, Math.round((u - u0) / (1 - u0) * LADDER_SAMPLES)));
++  const cumAt = (u) => { const i = sampleAt(u); return cum[i]; };
++  /* THE NIB'S FALL BUDGET (the blunt-nib session) — the one measure the fall
++     sub-region is placed by, on the ladder's OWN samples, so a station is
++     still `sampleU` of an integer. Each sample is charged the LARGER of its
++     two budgets: the base outline's half-width change over NIB_FALL_MM (the
++     criterion) and its width in `u` over the gap bound (less two samples, the
++     snapping's own slack). Equal increments of it therefore give every gap
++     at most one of each — the fall criterion AND the gap bound met by the
++     placement itself — with the fewest stations that can. Built only when a
++     fall demand binds; absent on every other row. */
++  let fallCum = null;
++  const fallBudget = (fall) => {
++    if (fallCum && fallCum.fall === fall) return fallCum.c;
++    const capU = Math.max(1e-9, ladderGapFactor(buckle && buckle.A ? buckle.f : 0) / NU - 2 * (1 - u0) / LADDER_SAMPLES);
++    const du = (1 - u0) / LADDER_SAMPLES;
++    const c = [0];
++    let prev = fall.sides.map((h) => h(u0));
++    for (let i = 1; i <= LADDER_SAMPLES; i++) {
++      const u = sampleU(i), cur = fall.sides.map((h) => h(u));
++      let dh = 0;
++      for (let k = 0; k < cur.length; k++) dh = Math.max(dh, Math.abs(cur[k] - prev[k]));
++      c.push(c[i - 1] + Math.max(dh / NIB_FALL_MM, du / capU));
++      prev = cur;
++    }
++    fallCum = { fall, c };
++    return c;
++  };
++  const fallEnd = (uA, uB) => Math.max(sampleAt(uA), Math.floor((uB - u0) / (1 - u0) * LADDER_SAMPLES));
++  const fallCount = (fall, uA, uB) => {
++    const c = fallBudget(fall), iA = sampleAt(uA), iB = fallEnd(uA, uB);
++    /* never more stations than the window has samples for them */
++    return Math.min(iB - iA, Math.max(1, Math.ceil(c[iB] - c[iA])));
++  };
++  const placeFall = (rows, fall, uA, uB, count) => {
++    /* the window's last station may never round PAST the arc's start: on a
++       round end the arc is narrower than one ladder sample (tip shape 3.00:
++       2e-5 of u against a sample of 8.75e-5), and a station rounded up onto
++       u = 1 would stand above the arc's own rows */
++    const c = fallBudget(fall), iA = sampleAt(uA), iB = fallEnd(uA, uB);
++    const cA = c[iA], cB = c[iB], ftol = LADDER_SAMPLES * Number.EPSILON * Math.max(1, cB);
++    for (let j = 1; j <= count; j++) {
++      if (j === count) { rows.push(sampleU(iB)); continue; }
++      const target = cA + (cB - cA) * j / count;
++      let lo = iA, hi = iB;
++      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (c[m] < target - ftol) lo = m; else hi = m; }
++      rows.push(sampleU(hi));
++    }
++  };
+   /* THE WIDEST GAP AND THE BOUND IT IS JUDGED AGAINST, hoisted above the
+      placement because the arc's yield below has to ask this question before
+      the ladder is final. The tail's own early return reads the same two
+@@ -5175,7 +5223,28 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
+       for (let i = 0; i < winCounts.length; i++) bands.push([winEdges[i], winEdges[i + 1]]);
+       bands.push([dem.u1, 1]);
+       const counts = [rg.S, ...winCounts, rg.T];
+-      for (let b = 0; b < bands.length; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
++      /* THE NIB'S FALL BAND KEEPS ITS PLACEMENT (the blunt-nib session) — the
++         one band whose target is not uniform in `u`. Its rows were placed at
++         equal increments of the ladder's own measure across a steep fall,
++         where uniform `u` is exactly the spacing the fall demand exists to
++         undo (it hands the steepest stretch the fewest millimetres of
++         half-width per row). Kept only where that placement is itself inside
++         the gap bound, so the target stays admissible; otherwise uniform, as
++         every other band. Absent on every row the demand does not bind. */
++      const fb = dem.fallSub != null && sub && placed ? 1 + dem.fallSub : -1;
++      let fallRows = null;
++      if (fb > 0) {
++        let at = held + rg.S;
++        for (let i = 0; i < dem.fallSub; i++) at += sub[i];
++        const r = placed.slice(at, at + counts[fb]);
++        let w = 0, prev = bands[fb][0];
++        for (const u of r) { w = Math.max(w, u - prev); prev = u; }
++        if (r.length === counts[fb] && w <= cap && !(r[r.length - 1] > bands[fb][1])) fallRows = r;
++      }
++      for (let b = 0; b < bands.length; b++) {
++        if (b === fb && fallRows) { for (const u of fallRows) ref.push(u); continue; }
++        for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
++      }
+       ref[NU - 1] = 1;
+       return ref;
+     })();
+@@ -5211,89 +5280,278 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
+      placement inside the bound therefore has a target inside it too. The
+      loop cannot fire on a row that was going to pass. Measured over the live
+      matrix: 4 of 2,484 rings move, and they are the four that were red. */
+-  let regions = regionsFor(demand);
+-  while (demand !== null && demand.yieldAt != null && demand.counts[demand.yieldAt] > 1
+-         && widest(targetFor(demand, regions, null)) > cap) {
+-    const counts = demand.counts.slice();
+-    counts[demand.yieldAt] -= 1;
+-    demand = { ...demand, stations: demand.stations - 1, counts };
+-    regions = regionsFor(demand);
+-  }
++  /* THE PLACEMENT, AS A FUNCTION OF THE DEMAND (the blunt-nib session). Every
++     line inside is the placement this function always made, verbatim and in
++     its order; it is wrapped so the nib's FALL demand below can ask what a
++     merged demand would place before deciding to keep it. What it reports is
++     returned rather than written, so a trial placement never leaks into the
++     builder's record. */
++  const ladderFor = (demand0) => {
++    let demand = demand0;
++    const rep = { blend: 1, regions: null, placedSub: null };
++    let regions = regionsFor(demand);
++    while (demand !== null && demand.yieldAt != null && demand.counts[demand.yieldAt] > 1
++           && widest(targetFor(demand, regions, null)) > cap) {
++      const counts = demand.counts.slice();
++      counts[demand.yieldAt] -= 1;
++      demand = { ...demand, stations: demand.stations - 1, counts };
++      regions = regionsFor(demand);
++    }
+ 
+-  const out = heldRows.slice();
+-  if (demand === null) {
+-    placeInto(out, 0, total, want);
+-  } else {
+-    placeInto(out, 0, regions.cS, regions.S);
+-    if (regions.sub) {
+-      for (let i = 0; i < regions.sub.length; i++) placeInto(out, regions.edges[i], regions.edges[i + 1], regions.sub[i]);
+-      /* WHAT WAS PLACED, PER SUB-REGION, BEFORE THE GAP-BOUND BLEND. The
+-         blend that follows pulls every station toward uniform and can carry
+-         one across a period boundary, so "the demand was served" and "the
+-         emitted stations are still distributed that way" are two different
+-         claims about two different moments. L6 asserts the first as an
+-         identity and reports the second. */
+-      if (report) report.placedSub = regions.sub.slice();
++    const out = heldRows.slice();
++    if (demand === null) {
++      placeInto(out, 0, total, want);
+     } else {
+-      placeInto(out, regions.cS, regions.cW, regions.W);
+-      if (report) report.placedSub = [regions.W];
++      placeInto(out, 0, regions.cS, regions.S);
++      if (regions.sub) {
++        for (let i = 0; i < regions.sub.length; i++) {
++          if (i === demand.fallSub) placeFall(out, demand.fall, demand.u0, demand.splits[0], regions.sub[i]);
++          else placeInto(out, regions.edges[i], regions.edges[i + 1], regions.sub[i]);
++        }
++        /* WHAT WAS PLACED, PER SUB-REGION, BEFORE THE GAP-BOUND BLEND. The
++           blend that follows pulls every station toward uniform and can carry
++           one across a period boundary, so "the demand was served" and "the
++           emitted stations are still distributed that way" are two different
++           claims about two different moments. L6 asserts the first as an
++           identity and reports the second. */
++        rep.placedSub = regions.sub.slice();
++      } else {
++        placeInto(out, regions.cS, regions.cW, regions.W);
++        rep.placedSub = [regions.W];
++      }
++      placeInto(out, regions.cW, total, regions.T);
++    }
++    /* THE REGIONS ARE DECIDED BEFORE THE BLEND AND DO NOT MOVE WITH IT, so
++       they are reported HERE rather than at the end — the gap bound has an
++       early return (the ladder already inside the cap) that the tail never
++       reaches, and a report written only at the tail is absent on exactly the
++       rows where no blending was needed. The reported shape is the region
++       COUNTS alone: the cumulative edges `regionsFor` carries for the placer
++       are this function's own working, not a claim about the geometry. */
++    rep.regions = regions === null ? null
++      : (regions.sub ? { S: regions.S, W: regions.W, T: regions.T, sub: regions.sub }
++                     : { S: regions.S, W: regions.W, T: regions.T });
++    out[NU - 1] = 1;
++    /* Strictly increasing, always: two rows at one station is a zero-length
++       panel, and the assertion families read `profileU` expecting an order. */
++    for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);
++
++    /* Bound the widest gap by blending back toward uniform in u. Monotone in
++       the blend, so a bisection finds the largest admissible ladder.
++
++       THE MEASURE AND THE BOUND ARE DEFINED ABOVE THE PLACEMENT — see the
++       paragraph there for why the leading gap is A7's and not this one's. */
++    if (widest(out) <= cap) return { st: out, rep };
++    /* The blend touches ONLY the redistributed rows. Running it over the held
++       ones too would move them by an ulp (`l*u + (1-l)*u` is not `u` in
++       floating point) and the base's identity claim is a BIT identity, not a
++       four-decimal agreement — measured: 23 of the held stations moved.
++
++       UNDER A DEMAND THE BLEND TARGET KEEPS THE DEMAND. Blending toward the
++       global uniform ladder would pull rows out of the window and quietly
++       break the count the demand was solved for; so the target is uniform
++       WITHIN EACH REGION — the stretch below the window, the window, the tip
++       above it — with the region counts `out` already has, so row i lies in
++       the same region in both lists and the mix cannot leave it. The window's
++       count is at most the capacity, which is what makes the target's outside
++       gaps admissible. With no demand the target is the uniform ladder, as
++       before. */
++    const target = targetFor(demand, regions, out);
++    const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * target[i]));
++    let lo = 0, hi = 1;
++    for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (widest(mix(m)) <= cap) lo = m; else hi = m; }
++    /* UNDER A DEMAND THE BLEND IS THE NORMAL CASE (the window's rows are
++       raised past what the base measure gave, so the gaps outside it widen to
++       the bound on most lobed petals), and a bisection run to 2^-60 hands back
++       the largest admissible blend TO THE LAST BIT — a value whose low bits
++       are a function of the low bits of every measure sample, which differ
++       between engines by an ulp through the transcendental functions (the page
++       and the Node rebuild of one state disagreed at one station by exactly one
++       ulp, and X0 refused the export). The blend is therefore taken DOWN to a
++       grid of 1/4096: still admissible (the widest gap is monotone in the
++       blend), and unmoved by an ulp unless the exact boundary sits within an
++       ulp of a grid line. Only under a demand: with none, every row keeps the
++       placement main ships, to the bit. */
++    if (demand !== null) lo = Math.floor(lo * LADDER_BLEND_GRID) / LADDER_BLEND_GRID;
++    rep.blend = lo;
++    return { st: mix(lo), rep };
++  };
++  const placed = ladderFor(demand);
++  const ceilingFall = demand === null && ladderGapFactor(buckle && buckle.A ? buckle.f : 0) === 1 && profile.ladderDemand
++    ? ((profile.ladderDemand() || {}).fall || null) : null;
++  const fallOut = nibFallLadder(placed, demand, ladderFor, { held, heldRows, u0, want, buckle, ceilingFall, fallCount });
++  const chosen = fallOut ? fallOut.chosen : placed;
++  if (report) {
++    report.blend = chosen.rep.blend;
++    report.regions = chosen.rep.regions;
++    if (chosen.rep.placedSub) report.placedSub = chosen.rep.placedSub;
++    report.nibFall = fallOut ? fallOut.record : null;
++  }
++  return chosen.st;
++}
++/* ===================================================================
++   THE NIB'S FALL DEMAND — a blunt end's last ladder gap (the blunt-nib
++   session; Eva's ruling of Oct 20, docs/bloom-blunt-nib-ladder-outcome.md).
++
++   THE DEFECT, measured by F6-spoon (docs/bloom-spoon-rim-turn-outcome.md):
++   on a BLUNT end the outline holds its width almost to the end and then
++   falls, so the last ladder station before the nib's arc stands at a
++   half-width of 2.4-3.0 mm and the next is already ON the 0.05 mm arc — one
++   row gap carries the whole fall, the cup's lift `c * h` falls with it, and
++   the bead strip across that gap meets the arc's strip at ~90 deg (E2 71.99
++   on the spoon, 89.84 on the near-rectangle, 81.33 / 140.47 on the LAW
++   spatulate). The ladder's turning measure cannot see it: the fall is
++   nearly STRAIGHT (no turning) and short in `u`, and `ladderHalfAt` floors
++   on TIP_HALF_MM so the flank below is flat to it by construction.
++
++   THE CRITERION, A LENGTH AGAINST A LENGTH: no ladder gap on the descent
++   from the blade's widest point drops the BASE outline's half-width by more
++   than NIB_FALL_MM = TIP_HALF_MM — the half-width at which the nib takes the
++   outline over, i.e. the blade is sampled on its way into the nib at least
++   as finely as the nib's own entry scale. Equivalently the last station
++   before the nib's crossing stands no wider than the stub the nib replaced
++   (2 x TIP_HALF_MM across). It is read on the ladder's own MODE-FREE view
++   of the base outline (the law, the root blend, TIP_HALF_MM — the lobe cut
++   excluded, because a lobe's notch is the lobes' own demand and not a fall
++   into the nib), so it is the same answer in live and in export: row
++   positions are topology. No row count appears in it: a gap is judged by
++   the millimetres of half-width it spans, never by how many rows it is.
++
++   POINTED ENDS HOLD BY BRANCH. The demand is placed only where the shipped
++   placement violates the criterion; where it does not, the shipped ladder is
++   returned — the same array, from the same call. Measured on the shipping
++   default petal the worst fall is 0.466 mm (LAW) and 0.740 mm on the default
++   outline curve, against 0.800.
++
++   IT IS A SUB-REGION OF THE ONE DEMAND, NEVER A SECOND PLACER. The fall
++   window [uA, arc start] becomes the demand's first sub-region in front of
++   the arc's (and of the lobes', see below), with the station count the
++   criterion asks of it; the ladder places it at equal increments of its own
++   measure, the gap bound's blend runs over it, and the result is checked
++   against the criterion on the EMITTED stations — if a gap still falls too
++   far the window is widened or given one more station and placed again.
++
++   THE ARC YIELDS FIRST, THEN THE FALL STOPS AND IS TOLD. The window's
++   capacity is the ladder's (`ladderOutsideMinima`); the fall asks at most
++   that capacity less the arc's rows, and where it needs more the record says
++   `short` with the worst fall left. The arc keeps its `yieldAt` role against
++   the gap bound, exactly as with the lobes.
++
++   AT THE BUCKLE'S FREQUENCY CEILING NOTHING IS PLACED: `ladderGapFactor(7)`
++   is exactly 1 and the ladder is uniform by the buckle's own rule, so no
++   demand reaches the placer (bladeStations' `demand` is null there) and a
++   blunt end under a buckle at f 7 keeps its coarse last gap — session 32's
++   ruled trade, carried rather than re-opened. The record says so
++   (`ceiling: true`).
++
++   WITH LOBES THE FALL IS MERGED INTO THE LOBES' PERIODS, NEVER CHOSEN
++   BETWEEN: the lobes' window (MODEL B, to u = 1) already spans the fall, so
++   no split is added — the period sub-regions the fall crosses each carry at
++   least the stations the criterion asks of their share of it, on top of the
++   lobes' own floor, and the lobes' floor is never lowered to pay for it. */
++export const NIB_FALL_MM = (globalThis.process && process.env.NIBD) ? Number(process.env.NIBD) : TIP_HALF_MM;
++const NIB_FALL_ITER = 24;
++function nibFallLadder(placed, demand, ladderFor, ctx) {
++  /* AT THE CEILING the demand is null by the buckle's rule; the fall is still
++     MEASURED on the uniform ladder and the record says it was not placed. */
++  const atCeiling = demand === null && ctx.ceilingFall;
++  const fall = atCeiling ? ctx.ceilingFall : (demand && demand.fall ? demand.fall : null);
++  if (!fall) return null;
++  const D = NIB_FALL_MM;
++  const gapsOf = (st) => {
++    const g = [];
++    for (let i = 1; i < st.length; i++) {
++      const a = st[i - 1], b = st[i];
++      if (a < fall.uPk || a >= fall.uArc) continue;
++      let f = -Infinity;
++      for (const h of fall.sides) f = Math.max(f, h(a) - h(b));
++      g.push({ a, b, f });
+     }
+-    placeInto(out, regions.cW, total, regions.T);
++    return g;
++  };
++  const worstOf = (g) => g.reduce((m, x) => Math.max(m, x.f), 0);
++  const g0 = gapsOf(placed.st);
++  const worstBase = worstOf(g0);
++  const record = { binds: false, criterionMm: D, worstBaseMm: worstBase, worstMm: worstBase, uA: null, stations: 0, short: false, iterations: 0, ceiling: !!atCeiling };
++  if (atCeiling || !(worstBase > D)) return { chosen: placed, record };
++  record.binds = true;
++  /* THE WINDOW GROWS FROM THE NIB UPWARD. The defect is the gap that meets
++     the arc, so the window opens on the LOWEST violating gap and climbs to
++     the next one above only while the ladder has room — where capacity runs
++     out it is the gaps furthest from the nib that keep the shipped spacing,
++     and the record says `short`. */
++  const uLow = ctx.heldRows.length ? ctx.heldRows[ctx.heldRows.length - 1] : 0;
++  const need = (g, uA) => ctx.fallCount(fall, uA, fall.uArc);
++  const bf = ctx.buckle && ctx.buckle.A ? ctx.buckle.f : 0;
++  let uA = Math.max(uLow, Math.max(...g0.filter((x) => x.f > D).map((x) => x.a)));
++  let N = need(g0, uA);
++  let chosen = placed, worst = worstBase, best = null;
++  for (let it = 0; it < NIB_FALL_ITER; it++) {
++    const { minStretch, minTip } = ladderOutsideMinima(uA, 1, bf);
++    const capRows = Math.max(0, ctx.want - minStretch - minTip);
++    const merged = N >= 1 ? mergeNibFall(demand, uA, fall.uArc, N, capRows) : null;
++    if (!merged) { record.short = true; break; }
++    const r = ladderFor(merged.demand);
++    const g = gapsOf(r.st);
++    const w = worstOf(g);
++    record.iterations = it + 1;
++    best = { r, w, uA, n: merged.fallRows };
++    if (!(w > D)) break;
++    const inside = g.filter((x) => x.f > D && x.a >= uA);
++    const above = g.filter((x) => x.f > D && x.a < uA);
++    if (inside.length) {
++      if (merged.atCapacity) { record.short = true; break; }
++      N = Math.max(merged.fallRows + 1, need(g, uA));
++    } else {
++      const next = Math.max(uLow, Math.max(...above.map((x) => x.a)));
++      if (!(next < uA)) { record.short = true; break; }
++      uA = next;
++      N = need(g, uA);
++    }
++  }
++  if (best) { chosen = best.r; worst = best.w; uA = best.uA; N = best.n; }
++  record.worstMm = worst;
++  record.uA = uA;
++  record.stations = N;
++  return { chosen, record };
++}
++/* THE MERGE — the fall's window joined to the demand it was handed. ON THE
++   ARC ALONE (`u0` at the arc's start) the fall is a new first sub-region,
++   [uA, arc start], and the arc keeps its rows and its `yieldAt` role. UNDER
++   LOBES (`u0` below the fall) the window already covers it and only the
++   COUNTS move: every period sub-region the fall overlaps is raised to its own
++   floor plus the fall's share of it, the share by the overlap's fraction of
++   the fall's u-extent — the lobes' floor is never touched. Returns null where
++   the window cannot take one more station (the arc at one row, the lobes at
++   their floor, the capacity spent). */
++function mergeNibFall(dem, uA, uArc, N, capRows) {
++  const counts0 = dem.counts && dem.counts.length ? dem.counts.slice() : [dem.stations];
++  const splits0 = dem.splits ? dem.splits.slice() : [];
++  if (dem.u0 >= uA) {
++    const arcRows = counts0.reduce((a, b) => a + b, 0);
++    const room = capRows - arcRows;
++    if (room < 1) return null;
++    const n = Math.min(N, room);
++    return { fallRows: n, atCapacity: n === room,
++      demand: { ...dem, u0: uA, stations: n + arcRows, exact: dem.exact,
++        splits: [dem.u0, ...splits0], counts: [n, ...counts0],
++        fallSub: 0,
++        yieldAt: dem.yieldAt != null ? dem.yieldAt + 1 : counts0.length } };
++  }
++  const edges = [dem.u0, ...splits0, dem.u1];
++  const span = Math.max(1e-12, uArc - uA);
++  const counts = counts0.slice();
++  let added = 0;
++  for (let k = 0; k < counts.length; k++) {
++    const lo = Math.max(edges[k], uA), hi = Math.min(edges[k + 1], uArc);
++    if (!(hi > lo)) continue;
++    const share = Math.ceil(N * (hi - lo) / span);
++    counts[k] += share; added += share;
+   }
+-  /* THE REGIONS ARE DECIDED BEFORE THE BLEND AND DO NOT MOVE WITH IT, so
+-     they are reported HERE rather than at the end — the gap bound has an
+-     early return (the ladder already inside the cap) that the tail never
+-     reaches, and a report written only at the tail is absent on exactly the
+-     rows where no blending was needed. The reported shape is the region
+-     COUNTS alone: the cumulative edges `regionsFor` carries for the placer
+-     are this function's own working, not a claim about the geometry. */
+-  if (report) report.regions = regions === null ? null
+-    : (regions.sub ? { S: regions.S, W: regions.W, T: regions.T, sub: regions.sub }
+-                   : { S: regions.S, W: regions.W, T: regions.T });
+-  out[NU - 1] = 1;
+-  /* Strictly increasing, always: two rows at one station is a zero-length
+-     panel, and the assertion families read `profileU` expecting an order. */
+-  for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);
+-
+-  /* Bound the widest gap by blending back toward uniform in u. Monotone in
+-     the blend, so a bisection finds the largest admissible ladder.
+-
+-     THE MEASURE AND THE BOUND ARE DEFINED ABOVE THE PLACEMENT — see the
+-     paragraph there for why the leading gap is A7's and not this one's. */
+-  if (widest(out) <= cap) return out;
+-  /* The blend touches ONLY the redistributed rows. Running it over the held
+-     ones too would move them by an ulp (`l*u + (1-l)*u` is not `u` in
+-     floating point) and the base's identity claim is a BIT identity, not a
+-     four-decimal agreement — measured: 23 of the held stations moved.
+-
+-     UNDER A DEMAND THE BLEND TARGET KEEPS THE DEMAND. Blending toward the
+-     global uniform ladder would pull rows out of the window and quietly
+-     break the count the demand was solved for; so the target is uniform
+-     WITHIN EACH REGION — the stretch below the window, the window, the tip
+-     above it — with the region counts `out` already has, so row i lies in
+-     the same region in both lists and the mix cannot leave it. The window's
+-     count is at most the capacity, which is what makes the target's outside
+-     gaps admissible. With no demand the target is the uniform ladder, as
+-     before. */
+-  const target = targetFor(demand, regions, out);
+-  const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * target[i]));
+-  let lo = 0, hi = 1;
+-  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (widest(mix(m)) <= cap) lo = m; else hi = m; }
+-  /* UNDER A DEMAND THE BLEND IS THE NORMAL CASE (the window's rows are
+-     raised past what the base measure gave, so the gaps outside it widen to
+-     the bound on most lobed petals), and a bisection run to 2^-60 hands back
+-     the largest admissible blend TO THE LAST BIT — a value whose low bits
+-     are a function of the low bits of every measure sample, which differ
+-     between engines by an ulp through the transcendental functions (the page
+-     and the Node rebuild of one state disagreed at one station by exactly one
+-     ulp, and X0 refused the export). The blend is therefore taken DOWN to a
+-     grid of 1/4096: still admissible (the widest gap is monotone in the
+-     blend), and unmoved by an ulp unless the exact boundary sits within an
+-     ulp of a grid line. Only under a demand: with none, every row keeps the
+-     placement main ships, to the bit. */
+-  if (demand !== null) lo = Math.floor(lo * LADDER_BLEND_GRID) / LADDER_BLEND_GRID;
+-  if (report) report.blend = lo;
+-  return mix(lo);
++  const total = counts.reduce((a, b) => a + b, 0);
++  if (added === 0 || total > capRows) return null;
++  return { fallRows: N, atCapacity: total === capRows,
++    demand: { ...dem, stations: total, counts } };
+ }
+ const NV = 10;   // columns across one span
+ /* ONE FROZEN ROW OF `true`, shared by every plain captured row — the mask is
+@@ -5478,7 +5736,11 @@ function twoSidedProfile(L, R) {
+     ladderDemand() {
+       const a = L.ladderDemand(), b = R.ladderDemand();
+       if (a === null || b === null) return a === null ? b : a;
+-      return a.u0 <= b.u0 ? a : b;
++      const d = a.u0 <= b.u0 ? a : b;
++      /* the nib's fall is judged on BOTH halves, from the lower widest point
++         to the lower arc start — each margin's own descent */
++      if (!a.fall || !b.fall) return d;
++      return { ...d, fall: { uPk: Math.min(a.fall.uPk, b.fall.uPk), uArc: Math.min(a.fall.uArc, b.fall.uArc), sides: [...a.fall.sides, ...b.fall.sides] } };
+     },
+     slopeBreaks: (grid = 4096) => unionBreaks(L.slopeBreaks(grid), R.slopeBreaks(grid)),
+     laminaSlopeBreaks: (grid = 4096) => unionBreaks(L.laminaSlopeBreaks(grid), R.laminaSlopeBreaks(grid)),
+@@ -6748,11 +7010,20 @@ function widthProfileOne(state, ring, halfW, cap, acc, length = null, outlineSid
+        row rather than an argument. AN3 REPORTS the count and does not
+        assert it, for that reason. */
+     ladderDemand() {
++      /* THE NIB'S FALL, carried on whichever demand the nib is part of (the
++         blunt-nib session): where the descent starts (the widest point), where
++         the arc starts, and the ladder's own MODE-FREE view of the BASE
++         outline — `nibFallLadder` in bladeStations decides whether it binds. */
++      const NX = (globalThis.process && process.env.NIBX) || 'law';
++      const lawH = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
++      const drawnH = (u) => { const n = apex.halfAt(u); return n !== null ? n : lawH(u); };
++      const fall = apex.active ? { uPk, uArc: NX === 'drawn1' ? 1 : apex.arcU, sides: [NX === 'law' ? lawH : drawnH] } : null;
+       const arcOnly = apex.active
+-        ? { u0: apex.arcU, u1: 1, stations: APEX_ARC_ROWS, exact: true, splits: [], counts: [APEX_ARC_ROWS] }
++        ? { u0: apex.arcU, u1: 1, stations: APEX_ARC_ROWS, exact: true, splits: [], counts: [APEX_ARC_ROWS], fall }
+         : null;
+       if (lobes === null || lobes.noRoom) return arcOnly;
+-      const d = lobes.demand;
++      const d0 = lobes.demand;
++      const d = d0 && fall ? { ...d0, fall } : d0;
+       if (!d || !apex.active) return d;
+       /* The split must lie strictly inside the window and above every split
+          already there. A lobe period shorter than the arc is not reachable
+@@ -10637,6 +10908,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
+       /* WHAT THE LADDER PLACED PER PERIOD, before the gap-bound blend moved
+          anything (session 42). Null when the demand named no splits. */
+       placedSub: ladderReport.placedSub || null,
++      /* THE NIB'S FALL DEMAND (the blunt-nib session): whether the shipped
++         placement fell further than NIB_FALL_MM in one gap on the way into
++         the nib (`binds`), the worst fall before and after, the window and
++         the stations it asked, and `short` / `ceiling` where it could not be
++         met or was not placed. Null where the petal has no nib. */
++      nibFall: ladderReport.nibFall || null,
+     },
+     slotIndex: slot.index,
+     /* THE BLADE'S OWN LENGTH IN MILLIMETRES, as built — the control times the
