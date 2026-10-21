@@ -1216,12 +1216,21 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   no taper) — no workflow edit.
 - Block 75 (28 rows, 1,485), smoke block 75 (7); combination `cup-x-length` gains 80/100, `length-x-tilt` new
   (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too.
-- **`petalWidth` (8–30) cannot hold the shipping 35:16 proportion past 66 mm** — recommended max 46, NOT changed.
-- **A 100 mm petal's ROOT RIM turns ~53.5° against E2's 45° (open for Eva, declared on the three smoke rows):** the rim
+- **`petalWidth` is 8–46 (RULED Oct 21, default 16 unmoved)** — the shipping 35:16 proportion at 100 mm.
+  `petalWidth max (46)` is redefined; `verify-bloom-surface-bytes`' `root-taper` predicate carries the width
+  (a COMPOSED width past the base's 30 moves; a bare global does not — the base clamps compositions only) and a
+  ROW-DEF guard against the base's own matrix (3 declared, 28 added). `ALL MAX` refusal 3,334,106 tris (all of
+  the width's +641,932 is the FRINGE, measured with it off), census 78,222 / 34.0787. Nine FAN census rows
+  re-recorded (petal 1's +16 now builds 32). `cup-x-width` and its triple reach 46: seven cells under the bar,
+  declared (worst 0.189 mm). The foot's 10 mm clamp now binds over 56% of the slider — reported, unchanged.
+- **Sepals pinned OFF and leaves never wired stay on the 1.2 mm sheet at any length** (a 120 mm one is 11.8x the
+  reference stress) — measured and stated in §3b, open for Eva. SO13's original condition was planted on the new
+  geometry and reddens the restated clause; `an-owned-length-moves-the-foot` is its standing mutant.
+- **A 100 mm petal's ROOT RIM turns ~53.5° against E2's 45° — RULED Oct 21: accepted, a chamfer (declared on the three smoke rows):** the rim
   taper eases a 3.88 mm root to the 1 mm bead in 3 mm. A bead scaled by the root factor moved it to 80 mm (61.9°); a
   lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carries one
   E7 edge declared by value (`E7_INSET_XFAIL`).
-- Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png`.
+- Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png` (2b: the root rim side-on).
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

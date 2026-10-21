@@ -76,6 +76,37 @@ have their own surface law (`leafSurface`) and their own petiole rule. **Florets
 is a bloom, and its petals are `floretScale x` the head's, so a raceme of 100 mm heads carries
 tapered florets when the scale passes 0.35.
 
+### 3b. Three followers, measured (Eva's ruling 4) — what each one's root actually is
+
+Measured in EXPORT on this tree, `petalLength` 35 and 100, the default sheet (1.20 mm), each read
+off the builder's own thickness record and confirmed on the file by the T family:
+
+| part | 35 mm petal | 100 mm petal | takes the root law? |
+|---|---|---|---|
+| petal root | 1.200 mm | **3.883 mm** | yes |
+| hub plate | 1.200 mm | **3.883 mm** | yes — `sheet x tau(L_hub)` |
+| sepal root (`sepalLength` set to the petal's) | 1.200 mm | **1.200 mm** | **no — deliberately pinned** |
+| leaf blade root (`leafLength` 100) | 1.200 mm | **1.200 mm** | **no — never wired** |
+| leaf petiole radius | 0.600 mm | 0.600 mm | no (`t/2`, its own rule) |
+| hub-to-stem join, 6 mm stem | 2.516 mm | **3.883 mm** (the floor binds: the join reads the thickened hub) | via the hub |
+| hub-to-stem join, 12 mm stem | — | **4.296 mm** (the join's own bending law is past the hub) | via the hub |
+
+- **Sepals: pinned OFF ON PURPOSE**, not by accident. A sepal is the petal builder on a second
+  ring, so it WOULD inherit the law; `sepalBladeState` sets `rootTaper: 'OFF'` and
+  `petalRootTaperFor` is the one reader of that pin. Its root stands on the join's flare rather
+  than on the plate. **The consequence is real and is said rather than papered over**: a sepal
+  can be 120 mm long (`sepalLength`'s own range), and a 120 mm sepal on a 1.2 mm root is
+  stressed `(120/35)^2 = 11.8x` the reference. T4 asserts the pin; whether sepals should take
+  the law is open (§7).
+- **Leaves: untouched, and that is the honest word for it.** The leaf blade is built by
+  `leafSurface` / `leafBladeLaw`, which reads the floored sheet directly and was never handed the
+  root law. That was a scope choice in this session (the ruling named the petal and the hub),
+  not a measurement that leaves are safe: a 120 mm leaf (`leafLength`'s maximum) on a 1.2 mm
+  blade is the same 11.8x. Nothing asserts it either way. Open (§7).
+- **The join floor reads the thickened hub**: `stemJoinThickness` is floored at
+  `hub.thickness`, and on a 6 mm stem under a 100 mm petal the floor is what binds (3.883 mm
+  against the join law's own 2.516). Asserted by ST4/ST5 on block 75's stem row.
+
 ## 4. Measured before building
 
 On `4d0758d`, `petalLength` forced past the 60 mm slider in Node:
@@ -110,6 +141,26 @@ On `4d0758d`, `petalLength` forced past the 60 mm slider in Node:
   hub not following (T3), the thickness read from a row count (T2), the law made first-order
   (T1). **4 of 4 fire.** It rides in CI by being SPAWNED by `verify-bloom-defaults-bar.mjs` (both
   arms), which also asserts DB3 — the shipped default builds no taper. No workflow was edited.
+- **SO13 (the scopes gate) is RESTATED, and the original condition was planted on the new
+  geometry to prove the restatement still bites** (Eva's ruling 3). SO13's law is that a layer
+  that OWNS its length or tilt moves no foot and no ring; under the root taper an owned length
+  past 35 mm legitimately moves the foot's THICKNESS, so the clause now restates the thickness
+  from the law and holds position, frame and half-width EXACTLY — at an owned length under the
+  reference (25 mm) and over it (40 mm). The plant: on a scratch tree, an owned LENGTH was made
+  to scale the foot's width as an owned width does (the original defect, on this geometry). The
+  restated clause, verbatim:
+  ```
+  SO13: RADIAL layer 3 (owned length 25 mm): an owned length/tilt moved an emitted foot row (position, frame or half-width)
+  SO13: RADIAL layer 3 (owned length 25 mm): an owned length/tilt moved the ring's radius 7.8758630541514885 -> 11.864301199950255
+  SO13: RADIAL layer 3 (owned length 25 mm): an owned length/tilt moved the ring's width 3.1359999999999997 -> 4.571428571428572
+  SO13: RADIAL layer 3 (owned length 40 mm): an owned length/tilt moved an emitted foot row (position, frame or half-width)
+  SO13: RADIAL layer 3 (owned length 40 mm): an owned length/tilt moved the ring's radius 7.8758630541514885 -> 20.103212417368027
+  SO13: RADIAL layer 3 (owned length 40 mm): an owned length/tilt moved the ring's width 3.1359999999999997 -> 7.314285714285714
+  ```
+  (the SPIRAL turns read the same). No committed mutant did this, so one was added:
+  `an-owned-length-moves-the-foot` in `verify-bloom-scopes.mjs`'s negative control, witnessed on
+  the MUTATED module (layer 2's `footRing` width moves with an owned length) before its clauses
+  are consulted — it reddens SO13 and SO12. Clean: SCOPES GATE PASS, 13 clauses.
 - **Matrix block 75** (28 rows, 1,457 -> 1,485): 60/80/100 mm x cup, curl, layers, tilt, a
   hemisphere, CONTINUOUS, a SPHERE head, a stem, sepals, infill, tip thinning, sheet extremes,
   and a GATED 35 mm row. **Smoke block 75** (7 rows, `--conn`).
@@ -129,8 +180,8 @@ set**, so none is the taper's:
 | 100 mm x tilt 90 | 32 / 0.0000 | 32 / 0.0000 | span-0 tangency (`TILT: 90`'s kind) |
 | 100 mm on a hemisphere | 520 / 0.4619 | 632 / 0.3547 | the head's hemisphere fold |
 
-**THE ROOT RIM OF A 100 mm PETAL TURNS 53.5° — 8.5° PAST E2'S ALLOWANCE — AND THAT IS AN OPEN
-QUESTION FOR EVA, DECLARED, NOT CLAMPED.** The rim taper eases the body down to the 1 mm bead
+**THE ROOT RIM OF A 100 mm PETAL TURNS 53.5° — 8.5° PAST E2'S ALLOWANCE. RULED Oct 21: accepted.
+A thick root closing on the 1 mm bead is a chamfer.** Declared, not clamped. The rim taper eases the body down to the 1 mm bead
 over `RIM_TAPER_MM` (3 mm) of surface; at a 3.88 mm root that is a much steeper ease than at the
 1.2 mm sheet it was ruled on, and the edge gate's E2 reads it at the root (radius ~11.6 mm) on
 every 100 mm row: 53.53° plain, at tilt 0 and with a stem, 53.49° with tip thinning, 53.43° cupped
@@ -153,6 +204,59 @@ bracket. That bracket is the half's ARC over 4096 while the bisection halves the
 which this section does not stretch evenly — a bound that assumed an even stretch, met for the first
 time. `E7_INSET_XFAIL` holds it both ways; the row is export-refused.
 
+## 6b. `petalWidth` to 46 mm (Eva's ruling 2, the same PR)
+
+**RULED Oct 21: `petalWidth`'s maximum 30 -> 46 mm; the default (16) does not move.** 46 is the
+shipping petal's proportion (35 x 16) carried to the new 100 mm length. `OVERRIDE_BOUNDS` and the
+registry row both say 46 (one range, two statements, checked at harness load).
+
+Every reader the range reaches, and what it does at 46:
+
+| reader | at 46 mm | moved? |
+|---|---|---|
+| the blade's half-width | 23 mm | yes — the point of the ruling |
+| the foot (`0.4 x width x footDelicacy`, clamped at `FOOT_MAX_WIDTH_MM` 10) | 10 mm — the clamp already binds from 25 up, so it now binds on **22 of the slider's 39 values** (56%); a 46 mm blade stands on the same foot and ring as a 25 mm one (blade +84%, ring +0%) | no — reported in the constant's own header, not changed (widening it moves every ring) |
+| the ring / `R0` area rule | reads the clamped foot | no |
+| the outline curve's width scale (`petalWidth / 16`) | 2.875x | yes, by its own law; a scaled-UP point cannot fall under the floor, so the drag refusal is unaffected |
+| sepal twins | a sepal's derived width is `petalWidth x sepalScale` (to 46 at size 1.0); its OWN `sepalWidth` row stays 3–30 | the derived width follows; the own range is not this ruling's — reported |
+| florets | `clamp(petalWidth x floretScale, 8, 46)` — the clamp reads the range and can never bind (scale <= 1) | no |
+| infill density | the cells are planned on the drawn outline; a wider blade carries more | by its own law |
+| crowding | reads the feet, which are clamped | no |
+| fringe count | the geometry's ceiling grows with the terminal's width (about 23 teeth at 46), but `FRINGE_COUNT_RANGE` already binds at 10 from 16 mm up | no |
+| scope offsets | a composed width (global + offset) is clamped at the range; FAN petal 1's +16 on the default now builds 32 where it clamped at 30 | yes — 9 census rows (below) |
+
+**The blanket sweep's `petalWidth max` row is REDEFINED (30 -> 46)**, as `petalLength max` was
+(60 -> 100) and `ALL MAX` (both). The byte tool now carries a row-definition guard for the
+`root-taper` predicate — the tilt-range precedent's `ROW_DEF_MOVED_BY_CHANGE`, ported into
+`verify-bloom-surface-bytes.mjs` — which loads the BASE tree's own matrix and refuses an
+undeclared redefinition and a declared one that did not happen: **3 declared, 3 confirmed, 28
+rows added (block 75)**. `petalWidth max (46)` itself is a byte HOLDER: the base geometry clamps
+a COMPOSED width, never the global, so the base builds the same 46 mm blade from the same row.
+
+**`ALL MAX` moved again and was re-measured**: the export refusal **2,692,174 -> 3,334,106**
+triangles (2,716,406 at main's 60 x 30). **All of the +641,932 is the FRINGE, measured**: with
+`fringeCount` 0 the same control set builds 928,586 at width 30 and at width 46, to the integer —
+the fringe's tooth ceiling is a rule about the terminal's width. The census **68,518 / 26.2094 ->
+78,222 / 34.0787** (main's 74,716 / 13.6547). Both in their entries with the two steps named.
+
+**Nine census declarations re-recorded by the width alone** — every one a FAN row carrying petal
+1's +16 width offset, which composes to 32: `FAN x PER-PETAL: 1/side x 170deg x petal 1 MAX`
+57 / 0.5147 -> 57 / 0.5100, `… toggle OFF …` 114 / 0.3802 -> 118 / 0.3815, `ALL PER-PETAL MAX x
+8/side x 60deg` 901 / 0.5557 -> 935 / 0.5498, `… x 1/side` 171 / 0.5147 -> 171 / 0.5100, `… x 3
+layers` 1295 / 0.5530 -> 1337 / 0.5498, `… x ALL FORM MAX` 5047 / 2.5964 -> 5124 / 2.6812,
+`CAPABILITY: cleft x FAN x toggle ON x ALL PER-PETAL MAX` 385 / 0.5147 -> 385 / 0.5100, `ALL
+PETALS: max x FAN 3/side toggle ON x petal 1 max` 55 / 0.5147 -> 55 / 0.5100, `DOME: rise 1 x FAN
+3/side x petal 1 max` 331 / 0.6555 -> 335 / 0.6470. Four worse in pairs, the rest the same count
+with the span moving both ways — re-recorded by value, never a widened band.
+
+**The combination gate reaches the new maximum and finds the cup on a 46 mm blade**: width 46
+ALONE clears (1.236 mm), and the cup closes further across it. `cup-x-width` gains a 46 mm
+column — **0.902 / 0.788 / 0.712 mm at cup 0.6 / 0.9 / 1.2**, all under the 1.00 mm bar, all
+declared by value (the 23 mm cell reproduces at 0.981, unmoved). The triple
+`cup-x-tipshape-x-width` gains 46 too — **0.759 / 0.194 / 0.712 / 0.189** at its four new
+under-the-bar cells, the triple's own worst cell going 0.390 -> **0.189 mm** (cup 1.2 x tip 3.00 x
+width 46). Seven new declarations; never clamped.
+
 PARTITION_AND_CENSUS_PLACEHOLDER
 
 ## 7. Open decisions for Eva — shipped as declared defaults
@@ -163,18 +267,14 @@ PARTITION_AND_CENSUS_PLACEHOLDER
 2. **The taper's extent** — `L - 35` mm from the root, derived (the fully stressed solution).
    A shorter taper would be a different law, not a tuning.
 3. **Sepals pinned off, leaves untouched, florets tapered** (§3).
-4. **`petalWidth` — reported, NOT changed.** The range is 8–30 mm (default 16). The shipping
-   petal is 35 x 16, a length-to-width of 2.19. **At 100 mm the widest petal is 30 mm, 3.33 —
-   the shipping proportion is unreachable**; it needs 45.7 mm. At the 20 mm minimum length the
-   widest is 1.5x WIDER than long. **Recommendation: raise `petalWidth`'s maximum to 46 mm**
-   (100 x 16 / 35), keep the minimum and the default. What it would move: the foot
-   (`0.4 x width x footDelicacy`), the ring radius through the area rule, the outline curve's
-   width scale (`petalWidth / 16`), and `ALL MAX` (a redefinition, like this session's).
-   Not done — it is its own ruling.
-
-5. **The root rim at 100 mm** (§6) — 53.5° against E2's 45° allowance, declared. Remedies tried
-   and measured are in §6; the choice between accepting it, a bead that grows with the root, or a
-   different taper law at the root is Eva's.
+4. **`petalWidth` — RULED Oct 21: maximum 46 mm, default unmoved, shipped in this PR (§6b).**
+   Left open by it: the foot's 10 mm clamp (now binding over 56% of the slider), and the sepal's
+   own `sepalWidth` range (3–30) against a derived sepal width that now reaches 46.
+5. **The root rim at 100 mm** (§6) — 53.5° against E2's 45° allowance. **RULED Oct 21: accepted. A
+   thick root closing on the 1 mm bead is a chamfer.** The three smoke-row declarations stand with
+   their numbers; both failed fixes are kept in §6 with theirs.
+6. **Sepals and leaves on the root law** (§3b): both stay on the uniform sheet — sepals pinned
+   on purpose, leaves never wired. A 120 mm sepal or leaf is 11.8x the reference stress.
 
 ## 8. What this does not do
 

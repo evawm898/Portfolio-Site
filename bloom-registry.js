@@ -2004,7 +2004,7 @@ export const CONTROLS = [
      width drag that would put a scaled point under the print floor is REFUSED
      by the outline's own validator (bloom.js) and the editor's status says
      which point. It still sets the foot, as in LAW mode. */
-  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 30, step: 1, default: OUTLINE_WIDTH_REF_MM,
+  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 46, step: 1, default: OUTLINE_WIDTH_REF_MM,
     label: 'Petal width', fmt: (v, ui) => (ui && ui.petalOutlineMode === 'CURVE' ? `${v} mm — scales the drawn outline's widths ${outlineWidthScale({ petalWidth: v }).toFixed(3)}x (against ${OUTLINE_WIDTH_REF_MM} mm), and sets the foot` : `${v} mm`), tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 

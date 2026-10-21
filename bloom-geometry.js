@@ -77,6 +77,13 @@ export const FOOT_MIN_WIDTH_MM = 1.6;
        petalWidth 25 -> foot 10.00 mm, ring 11.0558 mm
        petalWidth 30 -> foot 10.00 mm, ring 11.0558 mm   (blade +20%, ring +0%)
 
+   [Oct 21, big petals: `petalWidth`'s max went 30 -> 46 (Eva's ruling 2, the
+   shipping 35 x 16 proportion at 100 mm). The clamp did not move, so it now
+   binds over 22 of the slider's 39 reachable values (25..46, 56%): a 46 mm
+   blade stands on the same 10 mm foot and the same ring as a 25 mm one —
+   blade +84%, ring +0%. Reported, not changed (docs/bloom-big-petals-outcome.md
+   §6b); widening the foot would move every ring through the area rule.]
+
    This predates the zygomorphy work by four sessions; a per-role size
    multiplier is simply the fastest route to it, which is why it surfaced
    here. NO GEOMETRY MOVES: the constant is the same double the literal was,
@@ -1693,7 +1700,7 @@ export const OVERRIDE_BOUNDS = new Map([
   ['petalSpineCurl', { min: -180, max: 360 }],
   ['petalCup', { min: -0.8, max: 1.2 }],
   ['petalLength', { min: 20, max: 100 }],
-  ['petalWidth', { min: 8, max: 30 }],
+  ['petalWidth', { min: 8, max: 46 }],
   ['petalTilt', { min: 0, max: 120 }],
 ]);
 

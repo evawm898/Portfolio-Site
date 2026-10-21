@@ -52,6 +52,14 @@ const VIEWS = {
   side: (f) => ({ r: Math.max(f.fit, f.across / 2) * 1.3, at: [0, 0, f.across * 0.1], dir: [0.15, -0.9, 0.4] }),
   below: (f) => ({ r: f.R * 2.2 + 6, at: [0, 0, 0], dir: [0.05, -0.12, -1] }),
   root: (f) => ({ r: 13, at: [f.R + 8, 0, 3.5], dir: [0, -1, 0.06] }),
+  /* THE ROOT RIM, SIDE-ON (Eva's ruling 5): a macro on the -y margin of the
+     petal at azimuth 0, ~2.8 mm out from the hub's rim — where the edge gate
+     reads the declared 53.5 deg turn — seen from beside and a little outward
+     and above, so the top skin's facets read as the chamfer easing a 3.88 mm
+     root down to the 1 mm bead. The position is the 3-petal 100 mm bloom's
+     own rim apex (rows 3-4, half-width 2.8-3.0 mm), measured off the
+     builder's rim record. */
+  rim: (f) => ({ r: 5, at: [f.R + 2.8, -2.6, 1.3], dir: [0.25, -1, 0.35] }),
   whole: (f) => ({ r: Math.max(f.fit, f.across / 2) * 1.2, at: [0, 0, f.across * 0.05], dir: [0.2, -0.6, 0.78] }),
 };
 
@@ -132,6 +140,8 @@ for (const L of LENGTHS) row1.push(await cell({ label: `${L} mm`, set: set({ pet
 /* (2) the root edge-on, three petals */
 const roots = [];
 for (const L of [35, 100]) roots.push(await cell({ label: `${L} mm root, edge-on (3 petals)`, set: set({ petalLength: L, petalCount: 3 }), views: ['root'], ruling: 'one petal\'s root seen along its width' }));
+/* (2b) the 100 mm root rim, side-on — the declared chamfer */
+const rim = await cell({ label: '100 mm root rim, side-on (3 petals)', set: set({ petalLength: 100, petalCount: 3 }), views: ['rim'], ruling: 'the declared chamfer: a 3.88 mm root closing on the 1 mm bead over the 3 mm rim taper — E2 reads 53.5 deg here; RULED Oct 21: accepted' });
 /* (3) the hub from below */
 const hubs = [];
 for (const L of [35, 100]) hubs.push(await cell({ label: `${L} mm — the hub from below`, set: set({ petalLength: L }), views: ['below'], ruling: 'the plate the roots stand on' }));
@@ -175,6 +185,9 @@ figcaption{margin-top:8px}small{color:#7f948a}</style>
 <main class="two">${roots.map((c) => fig(c, 'root', 'macro on one root, along its width')).join('')}</main>
 <p class="note">The thickness along each petal's centre line, READ OFF THE FILE (dots, the T family's own reader: the nearest skin either side along the build's normal) against the law restated from the controls (dashed). Rows within 3 mm of the rim taper or the tip are not read, as T2 does not read them.</p>
 ${profileSvg(row1)}
+<h2>2b. The 100 mm root rim, side-on — the declared chamfer</h2>
+<main class="two">${fig(rim, 'rim', 'macro on the root\'s margin, from beside')}</main>
+<p class="note">A thick root closing on the 1 mm bead is a CHAMFER: the rim taper eases the body from the root's thickness to the bead over 3 mm of surface, and at 3.88 mm that ease turns the edge 53.5 deg against the edge gate's 45 deg allowance. RULED Oct 21: accepted, declared in E2_TURN_XFAIL by value on the three 100 mm smoke rows.</p>
 <h2>3. The hub from below</h2>
 <main class="two">${hubs.map((c) => fig(c, 'below', 'the plate the roots stand on')).join('')}</main>
 <h2>4. A 15 cm bloom</h2>
