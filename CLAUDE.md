@@ -11210,6 +11210,30 @@ don't wait to be asked, and don't surface them only after the fact.
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
 
+## `/knit-lab` — yarn-level knit simulator spike (pointer only)
+
+Hidden page (`knit-lab.html`, `knit-lab.css`, `knit-lab.js`, `knit-lab-engine.js`, `knit-lab-worker.js`,
+`knit-lab-sim.js`, `knit-lab-topology.js`, `knit-lab-analysis.js`; `noindex`, unlinked). A FEASIBILITY
+SPIKE (Oct 21), phase 2 the same day — read `docs/knit-lab-spike.md` before continuing it. 10 × 10
+stockinette (or with an eyelet row), one yarn as a point chain relaxed with XPBD, settled, then LOADED
+to a load limit and UNLOADED.
+- **The yarn's length is ONE tridiagonal solve along the chain** (`solveStretchDirect`), not a
+  Gauss-Seidel sweep: strain 0.00% at rest and ≤ 0.08% at the load limit (the sweep gave ~1% at rest
+  and ran to the 5% stop past the jam). `STRETCH_SOLVER: 'gs'` keeps the old one for comparison.
+- **Friction μ 0.25 is the default.** The phase-1 "μ 0.1 locks the loops" was the free tail and the
+  stretch solve, not friction; the cap is the normal multiplier of THIS substep (both multipliers
+  reset every substep). A cap read from an accumulated multiplier is the gate's must-fail.
+- **The test ends on `LOAD_LIMIT`**, then unloads to the start; the strain stop is a safety the gate
+  asserts never fires. `PULL_DAMPING` is 1 (15 made a frictionless swatch lag the jaw: fake hysteresis).
+- **The topology is `through` per loop**; `placeCourse` has a case for 0 (yo), 1 and 2 (k2tog: the
+  right parent's head drawn over the left's) parents. The start is drawn `INITIAL_DEPTH` (2.5×) deep and
+  the plates close / the yarn reels to length over the first frames — a decrease needs the room.
+  Linking numbers (`legLinks`) certify the drawn start; the pass-through certificate carries it after.
+- `tools/verify-knit-lab.mjs` (Node + `--browser`, ~5 min): gates T/F/I/C/E/S/W, each with a must-fail.
+  `tools/shot-knit-lab.mjs <dir>` takes the screenshots. **No CI covers it.**
+- `textile-knit-loops.js` is imported for the starting curve and must not be forked; the stretch
+  simulator is untouched.
+
 ## `/weave` — the Weave Draft and construction tool (pointer only)
 
 Hidden generative page (`weave.html`, `weave.css`, `weave.js`, `weave-draft.js`,
