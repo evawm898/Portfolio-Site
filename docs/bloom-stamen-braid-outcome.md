@@ -73,11 +73,15 @@ the slab on its own foot (JS1–JS3 unchanged).
 ## §3 The floors, on every strand
 
 - **The composite curvature floor** (Q2.3, one sheet thickness of radius) bounds the gather and the
-  twist exactly, as above. Swept over 3,780 states (3/6/30/120 stamens, RING/DISC, curl −180..180,
+  twist exactly, as above. Swept in Node, export mode, over 3,780 states (3/6/30/120 stamens, RING/DISC, curl −180..180,
   rise 0/0.5/1, R 0.3–10 mm, turns 0.5–12, length 5–120):
   - **0 uncurled states under the floor.**
   - With the filament curl, the composite in the twist is MEASURED and told, the coil's precedent:
-    BRAIDED §7a-n states, the tightest §7a-w mm; INDEPENDENT §7b-n states, the tightest §7b-w mm.
+    BRAIDED 1,390 states, the tightest 0.107 mm (120 on the disc, curl 180, rise 0.5, R 10 mm);
+    INDEPENDENT 1,200 states, the tightest 0.756 mm. The braid's worst is tighter: a 10 mm lay radius
+    about a curled bundle turns its strands harder than a 10 mm coil about its own filament. Told,
+    never clamped, as the coil's is. The tightest uncurled strand reads 1.2001 mm against the 1.20 mm
+    floor (120 on the disc, R 0.3, 5 mm, every strand's turns clamped).
 - **The fold limit** (spine-cup-fold: a spine may not bend past its own cross-section) is the
   BUNDLE's. A strand laid at R about an axis bending at 1/k has its inner skin `1/k − R − t/2` from
   the bend's centre. So the lay radius is clamped to `1/|k| − t`, per strand, and told. The bundle's
@@ -119,7 +123,16 @@ design file naming it keeps the control's own default. So the base build of such
 `stamenCoil` at the BASE's default. The byte tool now hands the base tree only the choice values its
 own registry lists (`baseState`, the choice twin of `baseScopes`).
 
-§8 has the measured result.
+**MEASURED, PASS:** 16 of 16 predeclared movers MOVED, and 0 floats moved on the 1,441 holders,
+positionally under `Object.is`, over the whole 1,457-row matrix in both modes. That is 1,720,165,356
+export floats over 191,129,484 triangles, and 81,370,356 captured-grid values. It ran in eleven
+`--range` chunks against a worktree of `0a48f17` and was closed by `--merge`.
+
+- The movers are block 74's sixteen BRAIDED rows at radius above 0.
+- The holders are every row on `main`, plus block 74's four GATED rows: a strand record on an
+  INDEPENDENT coil, radius 0, the braid under SPHERE, and count 0.
+- `--control` fires both clauses (the export stream and the captured grid) on a 1e-9 perturbation of
+  a holder.
 
 ## §6 THE HANDEDNESS — a measurement against a ruling, left to Eva
 
@@ -148,7 +161,52 @@ row.
 
 ## §8 Verification
 
-§8 is completed below with the measured results.
+- **Export gate, block 74** (`--only '^BRAID'`): PASS, 20 of 20 reach the results and export
+  watertight, live = export.
+  - The first run DROPPED two rows on X2: the hemisphere and the STYLE row.
+  - Both read their base class's own record exactly (§4) and are declared with that cause. The
+    re-run reads both at their recorded magnitudes.
+  - The 552,688-triangle cost corner exports in the browser.
+- **Connectedness, block 74:** see the PR's CI. The local run is noted in the PR body.
+- **The byte partition:** §5, PASS.
+- **JS9's braid arm** (`restatedBraid` in the harness) restates every strand from the controls, the
+  index and the row's `@scopes`. The restatement is the same law, written apart from the geometry's
+  `stamenBraidFor` / `braidLaw`, with the fold clamp. It is checked against the EMITTED rings:
+  positions to ≤ 4.5e-12 mm, directions to ≤ 6e-15, clamp counts equal both ways, SLENDERNESS
+  to 1e-6. JS4 counts each strand's own stations, and JS8 reads each strand's own length.
+- **The mutant table:** `node tools/verify-bloom-apex-mutants.mjs --only=<the seven> --rows=braided`.
+  - 7 of 7 fire JS9, and the clean tree is silent on every braid row.
+  - 225 anchors, 225 matching exactly once.
+  - Each mutant is witnessed on the MUTATED module's own builder records first:
+    - `the-braid-is-ignored` (each strand coils about its own root);
+    - `every-strand-braids-at-the-same-phase` (one lay angle; also JS4);
+    - `the-anther-stands-upright-on-the-braid` (also JS6);
+    - `the-braid-gather-is-unfloored`;
+    - `the-braid-turns-are-unfloored`;
+    - `the-braid-fold-limit-is-removed`;
+    - `a-strand-scope-is-ignored` (also JS8).
+  - The four braid rows carry `for: /braid|strand/` and the mutants `rows: BRAID_ROWS`, so no apex
+    shard pays for them on every row. The run is a SUBSET; the full table runs in CI.
+- **Panel route (an)** (`tools/verify-bloom-panel.mjs`): the strand picker at 6 stamens. Run as its
+  own block it passes, and both its mutants fire on their own sentences: the picker listing no
+  strands, and every pick binding strand 1. THIRTY-ONE routes; three edits.
+- **Design file and scopes:** `verify-bloom-design-file.mjs --no-browser` PASS (12 clauses, F6
+  spawning the scopes gate, PASS 13). The census gains `strands`. SO8's fixture carries a strand entry
+  and round-trips on every live row. SO0 restates the three strand ids and their bounds.
+- **Smoke census:** `bloom-smoke --check` reads 296 rows over 70 blocks of 1,457 (main: 291 over
+  69 of 1,437). Block 74 is in it, and 191 families are asserted and claimed both ways.
+- **`--verify-frozen --phase80`:** PASS, deep-equal to `0a48f17`'s own `buildMatrix()`.
+- **The sheet:** `node tools/shot-bloom-stamen-braid.mjs <dir> --png <file>` →
+  `docs/img/stamen-braid.png` (downscaled 2x and paletted).
+  - The braid at 3, 6 and 30 beside INDEPENDENT controls, from the side and from above, one camera per
+    count.
+  - The anthers on the end tangent (macro).
+  - The byte claim: BRAIDED at radius 0 exports six plain stamens' own sha, `74610491c3f6` — the coil
+    sheet's six-plain sha — REQUIRED equal.
+  - The picker panel with strand 3 given +10 mm, beside the braid it built. The builder's lengths
+    read `[20,20,30,20,20,20]`.
+  - Print preview on, JS0–JS9 asserted before every shutter, no pixel delta quoted. The shas
+    reproduce across two runs.
 
 ## §9 Frozen phase
 

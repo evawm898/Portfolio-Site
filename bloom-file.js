@@ -368,12 +368,12 @@ const scopeable = new Set(SCOPEABLE_IDS);
    and the reader keep its own wording, and the comment claimed they could not
    disagree while four of the reasons already did — the review's finding.) null
    when the control may carry one there. `container` is 'layers' / 'petals' /
-   'tiers'. */
+   'tiers' / 'strands'. */
 export function scopeOffsetRefusal(id, container) {
   const c = controlOf.get(id);
   if (!c) return 'not a control this page knows';
   if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
-  if (container === 'strands') return SCOPE_STRAND_IDS.includes(id) ? null : `only ${SCOPE_STRAND_IDS.join(' / ')} belong to one strand of a braid — every other value is the bundle's`;
+  if (container === 'strands') return SCOPE_STRAND_IDS.includes(id) ? null : `only a strand's length, coil radius and turns are its own (${SCOPE_STRAND_IDS.join(' / ')}) — every other value is the bundle's`;
   if (container === 'tiers' ? scopeableTier.has(id) : scopeable.has(id)) return null;
   if (c.kind !== 'slider') return `a ${c.kind} has no offset`;
   if (id === 'footDelicacy') return 'a whorl-level value — the foot is the whorl\'s (Q3.3)';
