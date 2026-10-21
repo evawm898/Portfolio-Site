@@ -512,12 +512,25 @@ async function nodeClauses(G, F, R, rec) {
       const sc2 = build(G, F, st, withBounds(F, { layers: rec0.layers.filter((e) => e.layer !== 2) }), { lamina: false });
       for (const k of ['radius', 'width', 'overhang']) if (!Object.is(sc.built.foot.rings[2][k], sc2.built.foot.rings[2][k])) p.push(`${placement} layer 3: an owned length/tilt moved the ring's ${k} ${sc2.built.foot.rings[2][k]} -> ${sc.built.foot.rings[2][k]}`);
       const fa = sc.petals.filter((q) => Math.round(q.whorl) === 2), fb = sc2.petals.filter((q) => Math.round(q.whorl) === 2);
-      const flat = (qs) => qs.flatMap((q) => q.footFrames.flatMap((f) => [...f.C, ...f.N, ...f.T, f.h, f.t]));
+      /* EXCEPT ITS THICKNESS, BY THE ROOT TAPER (big petals, Oct 21): a layer
+         owning a length past the 35 mm reference stands its foot on a root
+         `rootFactor` sheets thick — the law's own root, restated from the
+         owned asked length through the harness's other integrator, never
+         read from the build. At or under the reference: the same bits as
+         before. Position, frame and half-width move nothing either way. */
+      const flat = (qs) => qs.flatMap((q) => q.footFrames.flatMap((f) => [...f.C, ...f.N, ...f.T, f.h]));
       if (!sameNumbers(flat(fa), flat(fb))) p.push(`${placement} layer 3: an owned length/tilt moved an emitted foot row`);
+      for (const [qa, qb] of fa.map((q, i) => [q, fb[i]])) {
+        const f = H.rootFactorRestated(qa.askedLength);
+        for (const [i, fra] of qa.footFrames.entries()) {
+          const t0 = qb.footFrames[i].t, want = f === null ? t0 : t0 * f;
+          if (f === null ? !Object.is(fra.t, t0) : !(Math.abs(fra.t - want) <= 1e-9 * want)) p.push(`${placement} layer 3 slot ${qa.slot.index}: the foot row is ${fra.t} mm thick, restated ${want} (the ${qa.askedLength} mm owned length's root${f === null ? ' — the identity' : ` x ${f.toFixed(6)}`})`);
+        }
+      }
       if (sameNumbers(fa.map((q) => q.askedLength), fb.map((q) => q.askedLength))) p.push(`${placement} layer 3: the owned length did not reach the blade — the length/tilt half would be vacuous`);
       said.push(`${placement}: rings ${rings.map((r) => r.radius.toFixed(3)).join(' / ')} mm on R0 ${R0.toFixed(3)}, feet ${rings.map((r) => r.width.toFixed(3)).join(' / ')} mm`);
     }
-    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring is the rim unless an over-wide layer grows the hub to its own ring (told); an owned length / tilt moves no foot row and no ring`);
+    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring is the rim unless an over-wide layer grows the hub to its own ring (told); an owned length / tilt moves no foot row and no ring (but the root taper's thickness, restated)`);
   }
   /* SO7 — THE MIGRATION LANDS ON THE OLD COMPOSITION. A written-down state
      carrying retired role ids is migrated by the registry's `migrateRoles`
