@@ -1740,6 +1740,35 @@ export const SMOKE_BLOCKS = [
       { label: 'BRAID STRANDS: strand 4 laid wider (+1.5 mm) and strand 6 with 2 more turns',
         path: "JS9 per strand from the row's own @scopes (the strand's radius and turns restated, clamped to the registry's bounds), JS4 the strand's own station count" },
     ],
+  },  {
+    n: 75, title: 'big petals (Oct 21)',
+    anchor: 'BIG PETALS: 60 mm (root x1.750 the sheet, 2.10 mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block adds is the
+       ROOT TAPER — `petalRootTaper`'s factor in `thicknessProfile` (the law's
+       second factor beside the tip thinning), read by the seam, the fold
+       clamp, the roll floor and the fold limit, and the HUB following the
+       longest blade. The anchor is the block's 60 mm row; the subset adds the
+       100 mm petal, the cupped and curled blades, the stem (the join's floor
+       is the thickened hub), the sepals (pinned off) and the size field (the
+       hub's bound). --conn is REQUIRED (a thicker root and a thicker hub are a
+       new junction overlap). */
+    conn: true,
+    rows: [
+      { label: 'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)',
+        path: "T0 the record restated through the other integrator (the factor and the taper's end), T1 the ROOT read off the file, T2 the untapered blade rows at their own stations, T3 the hub against the thickest root, J4 the hub restated, A7 the seam on half the root" },
+      { label: 'BIG PETALS: 100 mm x cup 1.2 (the fold clamp reads each row\'s own thickness)',
+        path: "T1/T2 on a cupped blade (the locators on the cupped mid-surface), the roll and cup floors against the root, X1/X2 the census" },
+      { label: 'BIG PETALS: 100 mm x curl 360 (the fold limit at each substep\'s own thickness)',
+        path: "C5 the fold limit's half sheet at each substep's own station under the taper, restated; C1 the spine on the drawn length" },
+      { label: 'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)',
+        path: "ST4/ST5 the stem rooted through the THICKENED hub and the join floored at it, T3 the hub, J4 the hub restated" },
+      { label: 'BIG PETALS: 100 mm x 8 sepals (pinned off — a sepal\'s root is the sheet)',
+        path: "T4 every sepal's root read off the file at the sheet (the declared pin), SP-family attachment on the thicker plate" },
+      { label: 'BIG PETALS: 60 mm x size variance 0.5 (the hub reads the largest factor)',
+        path: "T0 per ring on the size field's own factor, J4 the hub at the restated bound (petalLength x (1 + amount)), T3 the hub at least as thick as every root in the file" },
+      { label: 'BIG PETALS: GATED — 35 mm x sheet 2.40 x tip thinning 0.5 (at the reference the law is the identity)',
+        path: "T0 the branch identity (no ring declares a taper at the reference), J4 the hub the sheet to the bit" },
+    ],
   },
 ];
 

@@ -511,6 +511,24 @@ const PREDICATE_MOVERS = {
     return (b.petalsAll || []).some((p) => p && p.infill && !p.infill.refused && p.infill.cells > 0
       && p.infill.mSplit >= 0 && p.profileU && (() => { const x = p.profileU[p.infill.mSplit] * p.length; return Number.isFinite(x) && !Object.is(snap(x, p.length), x); })());
   },
+  /* BIG PETALS (Oct 21, docs/bloom-big-petals-outcome.md) — THE ROOT TAPER.
+     PREDECLARED FROM THE BASE TREE'S OWN RECORD: a row moves iff the BASE
+     builds a petal whose ASKED length (its own `askedLength`, the length the
+     law reads) passes the 35 mm reference, or a raceme whose floret asks for
+     one (head length x floretScale), or the HUB's bound passes it — the
+     longest petal the bloom can build, scopes and the size field included,
+     which this tree's `hubRootTaperLengthMm` states (the hub law is new, so
+     its bound has no base owner; it reads the coerced state, never the
+     build). Every row whose petals are all at or under 35 mm holds to the
+     bit — the law is the identity there BY BRANCH. */
+  'root-taper': (st, row) => {
+    const REF = 35;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    if ((b.petalsAll || []).some((p) => p && Number(p.askedLength) > REF)) return true;
+    if (st.inflorescence && st.inflorescence !== 'NONE' && Number(st.petalLength) * Number(st.floretScale) > REF) return true;
+    return mine.hubRootTaperLengthMm(st, harness.rowScopesForBuild(row)) > REF;
+  },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);

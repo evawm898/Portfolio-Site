@@ -200,9 +200,31 @@ export function verify(tree, table, matrix, { quiet = false } = {}) {
   return bad;
 }
 
+/* THE ROOT TAPER RIDES HERE (big petals, Oct 21). Its must-fail,
+   tools/verify-bloom-root-taper.mjs, is Node-only and imports the harness, so
+   it belongs exactly where this gate already sits in the export preflight —
+   and a workflow edit would cost the frozen tag owed by the same session.
+   So this gate SPAWNS it, the clean arm beside the gate and the mutant arm
+   beside --control, and fails if it does. And the ruling's own claim about
+   the shipped default — the law is the identity there, so not one float of
+   the default moves — is asserted here as a statement about DEFAULTS. */
+async function rootTaperArm(tree) {
+  const { spawnSync } = await import('node:child_process');
+  const bad = [];
+  const L = Number(tree.R.DEFAULTS.petalLength);
+  if (tree.G.petalRootTaper(L) !== null) bad.push(`DB3: the shipped default's petal (${L} mm) builds a root taper — the law must be the identity at the default`);
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/verify-bloom-root-taper.mjs'), ...(CONTROL ? ['--control'] : [])], { encoding: 'utf8' });
+  const tail = (r.stdout || '').trim().split('\n').slice(-1)[0];
+  console.log(`  root taper ${CONTROL ? 'must-fail' : 'clean'} arm: ${tail}`);
+  if (r.status !== 0) bad.push(`DB3: tools/verify-bloom-root-taper.mjs${CONTROL ? ' --control' : ''} exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-3).join(' | ')}`);
+  return bad;
+}
+
 async function main() {
   const tree = await loadTree(ROOT);
   const matrix = buildMatrix();
+  const rootBad = await rootTaperArm(tree);
+  if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
   if (!CONTROL) {
     const bad = verify(tree, SHIPPED_STATES, matrix);
     if (bad.length) { console.log(`defaults bar: FAILED — ${bad.length} finding(s)`); for (const b of bad) console.log('  - ' + b); process.exitCode = 1; return; }

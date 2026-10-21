@@ -693,7 +693,7 @@ export const PAIRS = [
     label: 'petalCup x petalLength — the cup on a short blade',
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
-    b: { id: 'petalLength', values: [35, 20, 60] },
+    b: { id: 'petalLength', values: [35, 20, 60, 80, 100] },   /* 80 and 100 joined with the range (big petals, Oct 21): the ruled reach of the control, and the law's own thick root under every cup */
     /* VERDICT RE-DECLARED BY THE APEX NIB: was CLEARS, and #263's own citation for it predicted this in words: 'measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom'. The twelve microns are spent and one interior cell is now under the bar, with neither single reaching it. CG4 partitions the three arms so no declaration is unfalsifiable, and it fired on this pair rather than letting the change pass as a magnitude move. */
     /* PRODUCT-ONLY -> CLEARS, BY THE FOLD CLAMP (this PR): its one declared cell (cup 1.2 x a 20 mm blade) clears at 1.053.
        It was 0.994 — the cell the apex nib itself added, and #263 predicted before that ("twelve microns of headroom"). The clamp gives them back.
@@ -704,6 +704,17 @@ export const PAIRS = [
     verdict: 'clears',
     cite: 'docs/bloom-combination-gate.md §4 — a guess, measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom',
     why: 'a guess: that a short blade cups into a tighter tube. It does, and it stops just above the bar — which is why a measured clear is worth gating rather than dropping',
+  },
+  {
+    id: 'length-x-tilt',
+    tier: 2,
+    label: 'petalLength x petalTilt — a long, thickened root turned at the seam',
+    measure: 'self',
+    a: { id: 'petalLength', values: [35, 60, 80, 100] },
+    b: { id: 'petalTilt', values: [25, 0, 60, 90] },
+    verdict: 'clears',
+    cite: 'docs/bloom-big-petals-outcome.md — the seam clearance (t/2) sin(theta) is multiplied by the root factor, so a long petal clears a thicker kink at every tilt; the pair is bought by the ruling (Oct 21) that took petalLength to 100 mm',
+    why: 'a shared mechanism argued from bloom-geometry.js: the root taper thickens exactly the stretch the seam must clear and the fold limit must protect, and the tilt sets how sharp that kink is — two controls acting on one quantity',
   },
   {
     id: 'lobedepth-x-curl',

@@ -1192,6 +1192,33 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   values against the PETAL id list** and so built every sepal tier's own curve WITHOUT it on the base side —
   two block-72 rows read as moved; a tier strips against `SEPAL_SCOPE_VALUE_IDS` now.
 
+**A PETAL REACHES 100 mm, AND A LONG PETAL THICKENS AT ITS ROOT BY ITS OWN LENGTH; THE HUB FOLLOWS**
+(big petals, Oct 21 — Eva's rulings; read `docs/bloom-big-petals-outcome.md` before touching `petalRootTaper`,
+`rootTaperFactor`, `thicknessProfile`'s `rootTaper`, `hubRootTaperLengthMm`, `seamClearanceMm`'s `rootFactor`,
+`spineBendTable`'s `tauAt`, the T family or block 75).
+- `petalLength` is 20–100 mm (default 35, unchanged); `OVERRIDE_BOUNDS` follows. The blanket row is
+  `petalLength max (100)` and `ALL MAX` carries 100 (both redefined).
+- **The law is the self-weight cantilever against the SHIPPING petal (35 mm on 1.2 mm), UNVALIDATED** — nothing
+  has been printed; it keeps every longer root's stress at that one's, no more. Width cancels. The taper starts
+  35 mm from the tip (a length the petal owns) and is fully stressed inward: `dtau/dzeta = sqrt((8/3)tau^3 + 4/3) /
+  (2 tau)`, RK4 (arithmetic + sqrt, cross-engine identical). Root 1.200 / 2.100 / 2.931 / **3.883 mm** at
+  35 / 60 / 80 / 100. Reads the ASKED length (mode-free). **At or under 35 mm it is `null` — the identity by
+  branch.** One law with tip thinning, one owner (`thicknessProfile`).
+- Followers: seam clearance and `seamHalfMm` x the root factor (A7 restated); the fold limit's margin per
+  substep (C5 restated); the cup fold clamp per row; the roll floor against the root; the rim bead (feet
+  untapered, so root skins are `+/- t_root/2`); the hub plate = sheet x the factor of the LONGEST petal the bloom
+  can build (scopes and the size field — an upper bound; J4a restated, exact at or under 35); the join floor reads
+  the thickened hub. Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule).
+- **T0–T4** in both STL gates read the thickness off the EXPORTED skins (root, untapered rows, hub, sepal roots)
+  against the law RESTATED through the other integral (Simpson + bisection, 1e-9). J1/J4a/A7/C5/roll floor
+  restated, never relaxed. Must-fail `node tools/verify-bloom-root-taper.mjs [--control]` (four mutants, each
+  witnessed on the mutated module), SPAWNED by `verify-bloom-defaults-bar.mjs` both arms (DB3: the default builds
+  no taper) — no workflow edit.
+- Block 75 (28 rows, 1,485), smoke block 75 (7); combination `cup-x-length` gains 80/100, `length-x-tilt` new
+  (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too.
+- **`petalWidth` (8–30) cannot hold the shipping 35:16 proportion past 66 mm** — recommended max 46, NOT changed.
+- Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

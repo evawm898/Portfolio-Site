@@ -1692,7 +1692,7 @@ let APPLIED_BASES = null;
 export const OVERRIDE_BOUNDS = new Map([
   ['petalSpineCurl', { min: -180, max: 360 }],
   ['petalCup', { min: -0.8, max: 1.2 }],
-  ['petalLength', { min: 20, max: 60 }],
+  ['petalLength', { min: 20, max: 100 }],
   ['petalWidth', { min: 8, max: 30 }],
   ['petalTilt', { min: 0, max: 120 }],
 ]);
@@ -2803,7 +2803,19 @@ export function footRing(state, acc, opts = {}) {
   /* ON THE SPHERE THE HUB'S RADIUS IS THE SPHERE'S — the equator, which
      every ring's plan radius is under by construction (Rd sin phi <= Rd).
      Cap and flat: R0, verbatim. */
-  const hub = { radius: sphere ? dome.Rd : Rhub, thickness, derivedRadius, dome, growth: hubGrowth };
+  /* THE HUB FOLLOWS THE THICKEST ROOT (big petals, Oct 21 — Eva's ruling 2:
+     "the hub thickens to match, so the root never sits on a plate thinner than
+     itself"). The plate is the sheet times the root factor of the LONGEST
+     petal this state can build (`hubRootTaperLengthMm`), never less than any
+     root, so every hub reader — the builder's slab, cap and sphere, the
+     hub-to-stem join's floor (`stemPlan`'s `hubT`), the sepal attachment, the
+     head's own bowl — follows it from this one field. A BRANCH: null at or
+     under the reference length, where `thickness` is the double it was. The
+     rings and the reproductive parts keep the SHEET (`thickness`): a foot's
+     own thickness is the petal's law at u = 0, and a filament is one sheet. */
+  const hubRootTaper = petalRootTaper(hubRootTaperLengthMm(state, tierScopes));
+  const hubThickness = hubRootTaper === null ? thickness : thickness * hubRootTaper.rootFactor;
+  const hub = { radius: sphere ? dome.Rd : Rhub, thickness: hubThickness, derivedRadius, dome, growth: hubGrowth, rootTaper: hubRootTaper, sheetThickness: thickness };
 
   /* THE REPRODUCTIVE PARTS' OWN RADIUS — ONE OWNER (session 24). A filament
      and a style are each ONE SHEET THICK (Part thickness owns the material
@@ -4797,7 +4809,17 @@ export function ladderGapFactor(buckleFreq) {
    `seamHalfMm` call this rather than restating it, so the live gate's A7
    clause and the clearance itself cannot drift apart. */
 export function seamHalfThicknessMm(sheetMm) { return Math.max(sheetMm, MIN_FEATURE_MM) / 2; }
-export function seamClearanceMm(turnRad, sheetMm) {
+export function seamClearanceMm(turnRad, sheetMm, rootFactor = 1) {
+  /* THE ROOT TAPER'S FACTOR (big petals, Oct 21): a long petal's root is
+     `rootFactor` sheets thick, so the offset the kink folds is that much
+     larger. A BRANCH at 1, which is every caller that passes none — the
+     expression it always was. */
+  const c = seamClearanceOnTheSheetMm(turnRad, sheetMm);
+  return rootFactor === 1 ? c : c * rootFactor;
+}
+/* the clearance on the bare sheet — ONE expression, so the mutant table's
+   anchor (`seam-floor-removed`) reaches every arm of seamClearanceMm */
+function seamClearanceOnTheSheetMm(turnRad, sheetMm) {
   return seamHalfThicknessMm(sheetMm) * Math.sin(Math.max(0, Math.min(turnRad, Math.PI / 2)));
 }
 /* THE ONE OWNER of which lattice station the blade starts at — the first
@@ -7041,16 +7063,170 @@ export function thicknessIsUniform(state) {
   return state.tipThinning === 0;
 }
 
-export function thicknessProfile(ring, state) {
+export function thicknessProfile(ring, state, rootTaper = null) {
   const base = ring.thickness;          // footRing() is the owner; this reads it
   const thin = state.tipThinning;
+  /* THE ROOT TAPER IS THE SECOND FACTOR OF THE SAME LAW (big petals, Oct 21 —
+     Eva's ruling: "if the tip-thinning control already varies thickness along
+     the petal, compose the root taper with it as ONE thickness law with one
+     owner"). t(u) = base * tau(u) * (1 - thin * u): the cantilever's root
+     factor `tau` (petalRootTaper below) times the tip thinning, both in the
+     blade's own length coordinate. A BRANCH on `rootTaper === null`, which is
+     every petal at or under the reference length and every sepal, so those
+     take `base * (1 - thin * u)` operation for operation. */
+  if (rootTaper === null) {
+    return {
+      base, thin, rootTaper: null,
+      /* Unfloored — the AUTHORED law. The caller applies the accumulator's
+         floor, so the floor is applied in exactly one place and the telemetry
+         can report both the authored and the emitted number. */
+      at(u) { return base * (1 - thin * u); },
+    };
+  }
   return {
-    base, thin,
-    /* Unfloored — the AUTHORED law. The caller applies the accumulator's
-       floor, so the floor is applied in exactly one place and the telemetry
-       can report both the authored and the emitted number. */
-    at(u) { return base * (1 - thin * u); },
+    base, thin, rootTaper,
+    at(u) { return base * rootTaper.at(u) * (1 - thin * u); },
   };
+}
+
+/* ===================================================================
+   THE ROOT TAPER — a long petal thickens at the ROOT and tapers out to the
+   sheet toward the tip, sized by its length (big petals, Oct 21 — Eva's
+   ruling 2; read docs/bloom-big-petals-outcome.md before touching it).
+
+   THE REFERENCE IS UNVALIDATED AND THAT IS SAID FIRST. Nothing in this
+   project has ever been printed. The reference is the SHIPPING petal — 35 mm
+   on the 1.2 mm sheet — and the claim is only that a longer petal's root is
+   stressed no more than that one's, under the same self-weight. Whether the
+   shipping petal's root is itself strong enough is not known; this law makes
+   every longer petal exactly as strong as it, and no stronger.
+
+   THE DERIVATION — the cantilever under its own weight. Treat the blade as a
+   strip of width w (uniform along its length — the idealisation, stated) and
+   thickness t(z), z the distance in mm from the TIP. The bending moment at
+   section z is the weight beyond it times its lever,
+       M(z) = rho g w INT_0^z t(z') (z - z') dz',   so   M''(z) = rho g w t(z),
+   and the root's bending stress is the moment over the section modulus,
+       sigma(z) = 6 M(z) / (w t(z)^2).
+   THE WIDTH CANCELS: the moment carries w and the modulus carries w, so a
+   petal of any width compares against the reference at its own width, and
+   the foot is a fixed fraction of that width (`0.4 x footDelicacy`), so the
+   same holds at the root section. What remains is a law in LENGTH alone,
+   which is what the ruling asked for ("sized by petal length").
+
+   THE REFERENCE: a uniform sheet t0 over the reference length l carries, at
+   its root, M_ref = rho g w t0 l^2 / 2 and sigma_ref = 3 rho g l^2 / t0.
+
+   THE OUTER STRETCH NEEDS NOTHING: within l of the tip a uniform t0 is
+   stressed 3 rho g z^2 / t0 <= sigma_ref. It reaches exactly sigma_ref at
+   z = l — the section that carries the reference root's own moment — and
+   past it a uniform sheet would be over-stressed. So the taper begins at
+       z = l    (u = 1 - l / L, a distance l from the tip),
+   which is a LENGTH THE PETAL OWNS (its length less the reference), derived
+   from the relation and never a fraction typed for convenience. The taper
+   runs over the inner L - l of the blade.
+
+   THE INNER STRETCH IS FULLY STRESSED — the least material that keeps every
+   section at sigma_ref. With tau = t / t0, mu = M / M_ref and zeta = z / l:
+       tau^2 = mu          (sigma = sigma_ref)
+       mu''  = 2 tau       (M'' = rho g w t, in zeta)
+   matched to the outer stretch at zeta = 1, where mu = 1 and mu' = 2. The
+   ADDED MATERIAL'S OWN WEIGHT IS IN IT — the moment integrates the thickened
+   sheet, not the reference one — which is why this is not the first-order
+   `tau = zeta` (that would leave a 100 mm root 12% under-thick, 3.43 mm
+   against 3.88). Multiplying mu'' = 2 sqrt(mu) by mu' and integrating once:
+       mu'^2 = (8/3) mu^(3/2) + 4/3
+   and with mu = tau^2, mu' = 2 tau tau':
+       d tau / d zeta = sqrt( (8/3) tau^3 + 4/3 ) / (2 tau),   tau(1) = 1.
+   That is the law. Its slope at the junction is exactly 1 (the outer
+   stretch's is 0 — a crease in the SKIN of t0 / l, 0.034 mm/mm on the
+   reference sheet, under two degrees); far from it tau grows as zeta^2 / 6,
+   the fully stressed self-weight cantilever's own quadratic.
+   The integral `zeta(tau) = 1 + sqrt(3) INT_1^tau x / sqrt(2 x^3 + 1) dx` is
+   elliptic, so tau(zeta) is computed by fourth-order Runge-Kutta from the
+   junction at fixed steps of at most 1 / ROOT_TAPER_STEPS_PER_UNIT —
+   arithmetic and `Math.sqrt` alone, both correctly rounded, so every engine
+   computes the same double (no transcendental is involved, which is what the
+   page/Node X0 comparison needs). The harness restates it through the OTHER
+   form (the integral, by Simpson, inverted by bisection): two integrators,
+   two owners.
+
+   WHAT THE LAW READS. The ASKED length (`bladeAskedLengthMm`, mode-free —
+   the control the ruling is stated in, and the length the branch is decided
+   on) and the blade's own station u: zeta = (1 - u) L / l. At u = 0 (the
+   ring row and the three foot rows, which all carry u = 0) the factor is the
+   ROOT's, tau_r = tau(L / l).
+
+   THE BRANCH. At or under the reference length the factor is identically 1
+   and this returns NULL; every consumer branches on that null and takes its
+   pre-taper expression verbatim. So the shipping default and every row at or
+   under 35 mm hold 0 floats by construction, never by the arithmetic `x * 1`.
+
+   ROOT FACTORS (sheet 1.20 mm): 35 mm -> 1.000 (1.200 mm), 60 mm -> 1.750
+   (2.100 mm), 100 mm -> 3.236 (3.883 mm).
+   =================================================================== */
+export const ROOT_TAPER_REF_MM = 35;
+export const ROOT_TAPER_STEPS_PER_UNIT = 64;
+/* tau(zeta) — 1 for zeta <= 1; the fully stressed law beyond it. */
+export function rootTaperFactor(zeta) {
+  if (!(zeta > 1)) return 1;
+  const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));
+  const h = (zeta - 1) / n;
+  const f = (tau) => Math.sqrt((8 / 3) * tau * tau * tau + 4 / 3) / (2 * tau);
+  let tau = 1;
+  for (let i = 0; i < n; i++) {
+    const k1 = f(tau), k2 = f(tau + 0.5 * h * k1), k3 = f(tau + 0.5 * h * k2), k4 = f(tau + h * k3);
+    tau += (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+  }
+  return tau;
+}
+/* THE LAW FOR ONE BLADE — null BY BRANCH at or under the reference length.
+   `at(u)` is the factor at the blade's own station; `rootFactor` is it at
+   u = 0 (the ring row, the foot rows), and `extentMm` the inner stretch the
+   taper runs over, `L - l`. */
+export function petalRootTaper(askedLengthMm) {
+  const L = Number(askedLengthMm);
+  if (!(L > ROOT_TAPER_REF_MM)) return null;
+  const k = L / ROOT_TAPER_REF_MM;
+  const rootFactor = rootTaperFactor(k);
+  return {
+    lengthMm: L, refMm: ROOT_TAPER_REF_MM, extentMm: L - ROOT_TAPER_REF_MM,
+    uEnd: 1 - ROOT_TAPER_REF_MM / L, rootFactor,
+    at(u) { return u <= 0 ? rootFactor : rootTaperFactor((1 - u) * k); },
+  };
+}
+/* A SEPAL DOES NOT TAKE THE LAW (a declared default — the outcome doc's open
+   decision): its substate carries `rootTaper: 'OFF'` (sepalBladeState), so a
+   sepal of any length is built on the uniform sheet exactly as before. The one
+   reader of that pin; every petal-side consumer asks through here. */
+export function petalRootTaperFor(ps, askedLengthMm) {
+  return ps.rootTaper === 'OFF' ? null : petalRootTaper(askedLengthMm);
+}
+/* THE LONGEST BLADE THE HUB MUST CARRY — the petal length any petal of this
+   state can be asked at, so the hub's factor is never under a root's:
+     - the whole bloom's `petalLength` (the outer whorl's scale is exactly 1;
+       every deeper whorl's is under 1 — `layerSize` <= 0.90, a continuous
+       ring's `layerSize^lambda` — so they ask for less);
+     - a live LAYER or PETAL scope entry's petalLength offset on top of it,
+       clamped into the slider's own range as the resolver clamps it (a layer
+       that OWNS its length takes no ramp, scale 1, which this already is);
+     - the SIZE field's largest factor, `1 + varianceSize` (its law is
+       `1 + A g`, |g| <= 1).
+   An UPPER bound where a field or a scope makes the petals differ, and the
+   EXACT longest petal everywhere else (the outer whorl's); the harness
+   restates the same three terms from the controls and the row's scopes, and
+   asserts the hub at least as thick as every EMITTED root (T4). Sepals are not
+   in it: they do not take the law. */
+export function hubRootTaperLengthMm(state, scopes = null) {
+  const LB = OVERRIDE_BOUNDS.get('petalLength');
+  let L = Number(state.petalLength);
+  if (scopes) {
+    let off = 0;
+    if (scopeLayersLive(state)) for (const e of scopes.layers || []) { const o = e.offsets && e.offsets.petalLength; if (typeof o === 'number' && o > off) off = o; }
+    if (scopePetalsLive(state)) for (const e of scopes.petals || []) { const o = e.offsets && e.offsets.petalLength; if (typeof o === 'number' && o > off) off = o; }
+    if (off > 0) L = Math.min(LB.max, Math.max(LB.min, L + off));
+  }
+  return varianceIsAbsent(state) ? L : L * (1 + Number(state.varianceSize));
 }
 
 /* ===================================================================
@@ -8232,7 +8408,7 @@ export function spineBendRefusal(curve, bends) {
    the editor's validator through `spineCurveRefusal` — the refusal IS the
    clamp asked in advance, on the same doubles.
    =================================================================== */
-export function spineBendTable({ length, rows, reachAt, floorRadius, t }) {
+export function spineBendTable({ length, rows, reachAt, floorRadius, t, tauAt = null }) {
   const N = rows * SPINE_SUBSTEPS;
   const marginMm = t / 2;   // the inner skin, measured from the mid-surface — Eva's ruling, no margin past it
   const reachPos = new Float64Array(N), reachNeg = new Float64Array(N), kPos = new Float64Array(N), kNeg = new Float64Array(N);
@@ -8240,7 +8416,15 @@ export function spineBendTable({ length, rows, reachAt, floorRadius, t }) {
   for (let i = 0; i < N; i++) {
     const r = reachAt((i + 0.5) / N);
     reachPos[i] = r.pos; reachNeg[i] = r.neg;
-    const Rp = r.pos + marginMm, Rn = r.neg + marginMm;
+    /* THE ROOT TAPER (big petals, Oct 21): a long petal's skin stands half ITS
+       OWN thickness off the mid-surface, which near the root is the root
+       factor's times the sheet's — so the margin is read at the substep's own
+       station. A BRANCH: with no taper it is the one scalar it always was.
+       Where the root is thicker than two sheets this binds on a FLAT section
+       too (reach 0 + half the root past the floor's one sheet), which is the
+       floor's own protection carried to the thick root. */
+    const m = tauAt === null ? marginMm : (t * tauAt((i + 0.5) / N)) / 2;
+    const Rp = r.pos + m, Rn = r.neg + m;
     kPos[i] = Rp > floorRadius ? 1 / Rp : Infinity;
     kNeg[i] = Rn > floorRadius ? 1 / Rn : Infinity;
     if (kPos[i] !== Infinity || kNeg[i] !== Infinity) binds = true;
@@ -8869,7 +9053,13 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      wrap angle per row, radius proportional to that row's half-width) puts
      a 0.127 mm radius at the 0.8 mm tip row and inverts on every petal. */
   const kReq = (state.petalRoll * D2R) / halfW;
-  const kMax = 1 / (ROLL_MIN_RADIUS_FACTOR * t);
+  /* THE ROOT TAPER (big petals, Oct 21): one curvature for the whole petal,
+     so it is floored against the THICKEST section — the doctrine this floor
+     was always written in ("the THICKEST row, since thinning only ever removes
+     material"), which a thickened root now names. Null on every petal at or
+     under the reference length: the expression it was. */
+  const rootTaper = buckleCtx && buckleCtx.rootTaper ? buckleCtx.rootTaper : null;
+  const kMax = rootTaper === null ? 1 / (ROLL_MIN_RADIUS_FACTOR * t) : 1 / (ROLL_MIN_RADIUS_FACTOR * t * rootTaper.rootFactor);
   const kappa = Math.sign(kReq) * Math.min(Math.abs(kReq), kMax);
   const clamped = Math.abs(kReq) > kMax;
 
@@ -8999,7 +9189,9 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
        is exactly `2/(margin*t)` whatever `hb` is — the radius is pinned at
        `margin * t/2` and the clamp is TOLD, never silent. */
     const cRaw = cAt(u, r) * cupScale;
-    const cCap = hb / (FOLD_CLAMP_MARGIN * t);
+    /* the row's OWN thickness under the root taper (a thick root folds at a
+       larger cup radius than the sheet beyond it); a branch otherwise */
+    const cCap = rootTaper === null ? hb / (FOLD_CLAMP_MARGIN * t) : hb / (FOLD_CLAMP_MARGIN * t * rootTaper.at(u));
     const c = Math.abs(cRaw) <= cCap ? cRaw : (cRaw < 0 ? -cCap : cCap);
     if (c !== cRaw && !quiet) {
       const askedR = hb / (2 * Math.abs(cRaw)), drawnR = hb / (2 * Math.abs(c));
@@ -9169,7 +9361,7 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
            sheet legitimately permits a 0.60 mm radius and would have read as
            a FAIL, and a 2.40 mm sheet clamps at 2.40 so a genuinely inverting
            radius would have read as a PASS. One owner, and it is here. */
-        rollMinRadiusMm: ROLL_MIN_RADIUS_FACTOR * t,
+        rollMinRadiusMm: rootTaper === null ? ROLL_MIN_RADIUS_FACTOR * t : ROLL_MIN_RADIUS_FACTOR * t * rootTaper.rootFactor,
         sheetThicknessMm: t,
         /* The ratio |dP/dv| / |dP/dv|_flat. The flat sheet already has
            |dP/dv| = h(u) (v is normalised, not arc length), so the raw
@@ -9300,6 +9492,15 @@ export function petalSurface(state, ring, slot, cap, acc) {
      The profile is built once at the asked length — the nib's plan is
      computed inside it, from the law, and the drawn length comes back out. */
   const askedLength = bladeAskedLengthMm(ps, lengthScale);   // the substate's own mm where a sepal set one, else the petal's x the slot's scale
+  /* THE ROOT TAPER (big petals, Oct 21) — null BY BRANCH at or under
+     ROOT_TAPER_REF_MM and on every sepal (its substate's pin), so every
+     consumer below takes its pre-taper expression there. Read on the ASKED
+     length, which is mode-free: how thick a section is never depends on the
+     export floor's verdict about the tip. `tRoot` is the thickest section of
+     this blade (the root's), the number every law that guards the WHOLE blade
+     against its thickest row reads in place of `t`. */
+  const rootTaper = petalRootTaperFor(ps, askedLength);
+  const tRoot = rootTaper === null ? t : t * rootTaper.rootFactor;
   /* THE AFFINE ANGLE, PLUS THE DOME'S OWN LEAN (Sep 4) — three terms, read
      from three owners: `ps.petalTilt` the base control, `slot.tiltExtra` the
      layered ramp footRing() computed per this descriptor, `ring.domeLean`
@@ -9344,8 +9545,13 @@ export function petalSurface(state, ring, slot, cap, acc) {
      accumulator's mode-dependent `t`. Row positions are topology and the
      export floor may not move them — `ladderHalfAt`'s own rule, and session
      32's mode-dependence defect refusing to ship a third time. */
-  const seamHalfMm = seamHalfThicknessMm(ps.sheetThickness);
-  const seamClearMm = seamClearanceMm(seamTurnRad, ps.sheetThickness);
+  /* AND THE ROOT TAPER MOVES IT (big petals): the fold the clearance clears
+     is the offset of the sheet AT THE KINK, which is the root's own half
+     thickness — the reference sheet's times the root factor. Mode-free still:
+     the factor reads the asked length. A branch: no taper, no factor. */
+  const seamRootFactor = rootTaper === null ? 1 : rootTaper.rootFactor;
+  const seamHalfMm = seamRootFactor === 1 ? seamHalfThicknessMm(ps.sheetThickness) : seamHalfThicknessMm(ps.sheetThickness) * seamRootFactor;
+  const seamClearMm = seamClearanceMm(seamTurnRad, ps.sheetThickness, seamRootFactor);
   const seamStep = seamLatticeStep(seamClearMm, length);
   const seamBaseU = seamStep / NU;
 
@@ -9361,6 +9567,9 @@ export function petalSurface(state, ring, slot, cap, acc) {
      byte-identical. */
   const form = petalFormIsFlat(ps) ? null : petalForm(ps, halfW, t, {
     slotIndex: slot.index, halfW, length, floorRadius: ROLL_MIN_RADIUS_FACTOR * t,
+    /* the root taper, so the fold clamp reads each row's OWN thickness and the
+       roll's one curvature is floored against the thickest (null: neither moves) */
+    rootTaper,
     /* The profile, so apexScale() derives R and u0 from widthProfile()`s own
        answer rather than from a second statement of the outline. */
     profile,
@@ -9380,8 +9589,8 @@ export function petalSurface(state, ring, slot, cap, acc) {
      The roll curvature floor is expressed against `t` — the THICKEST row,
      since thinning only ever removes material — so the floor keeps
      protecting the whole blade rather than only its tip. */
-  const uniformThickness = thicknessIsUniform(ps);
-  const profileT = thicknessProfile(ring, ps);
+  const uniformThickness = thicknessIsUniform(ps) && rootTaper === null;
+  const profileT = thicknessProfile(ring, ps, rootTaper);
   const tAt = uniformThickness ? () => t : (u) => acc.floorThickness(profileT.at(u));
 
   /* THE FLAT CROSS-SECTION, and the reason it is a closure.
@@ -9605,7 +9814,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     }
     return { pos, neg };
   };
-  const bend = form !== null && (kC !== 0 || curveLaw !== null) ? spineBendTable({ length, rows: NU, reachAt: bendReachAt, floorRadius, t }) : null;
+  const bend = form !== null && (kC !== 0 || curveLaw !== null) ? spineBendTable({ length, rows: NU, reachAt: bendReachAt, floorRadius, t, tauAt: rootTaper === null ? null : rootTaper.at }) : null;
   const law = form && (kC !== 0 || curveLaw !== null) ? spineLaw({ curlRad: form.curlRad, bias: curveLaw ? 0 : ps.curlBias, start: curveLaw ? 0 : ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU, curve: curveLaw, bend: bend && bend.binds ? bend : null }) : null;
   /* a uniform arc the fold limit clamped is no longer the closed-form arc */
   const generalSpine = SPINE_WIRED && law !== null && (curveLaw !== null || !form.curlUniform || law.bendClamped);
@@ -9714,7 +9923,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
     curveLaw, askedLength, bend,
-    floorRadius, uniformThickness, profileT, tAt,
+    floorRadius, uniformThickness, profileT, tAt, rootTaper, tRoot,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
     formClamped, formScaled,
     outlineRes,
@@ -9917,7 +10126,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
     curveLaw, askedLength, bend,
-    uniformThickness, profileT, tAt,
+    uniformThickness, profileT, tAt, rootTaper,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped, formScaled,
     outlineRes,
   } = surface;
@@ -10288,6 +10497,9 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     bendClamped: law ? law.bendClamped : false,
     floorClamped: law ? law.floorClamped : false,
     bendApplied: law ? law.bendApplied : [],
+    /* the substep count the applied indices count in (big petals: C5 reads each
+       substep's own station under the root taper) */
+    bendN: bend ? bend.N : null,
     substeps: law ? law.substeps : null,
     /* THE SECTION'S REACH ON THE EMITTED ROWS — every blade row's own `sect`
        (the one the mesh was offset from), toward each side of the curl plane's
@@ -10849,6 +11061,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       floorBinds: profileT.at(1) < MIN_FEATURE_MM,
       exportMode: acc.exportMode,
       uniform: uniformThickness,
+      /* THE ROOT TAPER (big petals, Oct 21) — null at or under the reference
+         length and on a sepal, by branch; otherwise the law's own declaration
+         (the asked length it was read on, the root factor, the station the
+         taper ends at) and the ROOT the builder emitted. T0 restates the law
+         from the controls and pins this both ways; T1/T2 read the thickness
+         off the exported file, never off this. */
+      rootTaper: rootTaper === null ? null : {
+        askedLengthMm: rootTaper.lengthMm, refMm: rootTaper.refMm, rootFactor: rootTaper.rootFactor,
+        extentMm: rootTaper.extentMm, uEnd: rootTaper.uEnd, rootMm: rows[0].tUsed,
+      },
     },
     thicknessGuardResidual,
     /* THE EDGE PROFILE, as the builder measured it rather than as the
@@ -11515,6 +11737,16 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       }
     }
     top.push(ht); bot.push(hb); skinV.push(vs); skinP.push(Ps); skinN.push(Ns); skinB.push(Bs); rimClamped.push(Cl); roomSide.push(twoR ? { lo: roomLo, hi: roomHi } : null);
+    /* THE CENTRE LOCATOR (big petals, Oct 21): the two columns either side of
+       the midrib — their mid-surface point and normal, the line each skin was
+       offset ALONG — so the T family can find the two emitted skin vertices
+       in an exported file and read the thickness off the file. A locator,
+       never a thickness: nothing here says how far apart the skins are.
+       References to arrays already built; no number moves. */
+    if (rim && !per) {
+      const c1 = NVp >> 1, c0 = c1 - 1;
+      (rim.centre || (rim.centre = [])).push({ panel: panel.label, row: i, u: row.u, halfWidth: row.h === null ? Math.min(row.hL, row.hR) : row.h, P: [Ps[c0], Ps[c1]], n: [Ns[c0], Ns[c1]], arc: [arc[c0], arc[NVp - 1] - arc[c1]], dTip: dTipRow, dBase: dBaseRow });
+    }
   }
   /* THE EMITTED SKIN LATTICE, on request (leaf/stem build S4): the mid-surface
      points the two skins are offset from, row by row — what the LOBED fold
@@ -20584,7 +20816,13 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
      not a whorl's) and no FAN pairing (it is never mirrored), so a two-sided
      sepal outline faces the same hand on every sepal of a tier — the petals'
      RADIAL pinwheel. */
-  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
+  /* THE ROOT TAPER IS PINNED OFF on a sepal (big petals, Oct 21 — a declared
+     default, open for Eva's ruling in docs/bloom-big-petals-outcome.md): a
+     sepal's foot lands on the hub-to-stem join's flare, not on the plate the
+     taper's hub follows, so "the root never sits on a plate thinner than
+     itself" has no owner there yet. One value in the pin list, read by
+     `petalRootTaperFor` alone. */
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE', rootTaper: 'OFF' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
   const own = sepalOwnSize(state);

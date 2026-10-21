@@ -129,7 +129,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { parseShard, shardOf, matrixHash, writeCensus, slimConn, summarizeConn } from './bloom-connectedness-shards.mjs';
-import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions, rootTaperAssertions } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 /* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
@@ -501,6 +501,12 @@ for (const [rowIndex, row] of rows.entries()) {
     await page.evaluate(() => window.__bloomMetrics()),
     await page.evaluate(() => window.__bloomUIState()));
   if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
+  /* T1/T2/T4/T5 — THE ROOT TAPER, read from THIS row's STL bytes (big petals,
+     Oct 21): the thickness at every root and on the untapered blade rows, the
+     hub against the thickest root, and the sepals left on the sheet. Both STL
+     gates are blind to a thickness by construction. See rootTaperAssertions(). */
+  const taper = rootTaperAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics()), await page.evaluate(() => window.__bloomUIState()));
+  if (taper.length) { validity.push(`${row.label}: ${taper.join('; ')}`); continue; }
   /* ID10 (d) — THE FLORETS AGAINST EACH OTHER, read from THIS row's STL bytes
      (build 3, ruling 1): the internode floor is derived to clear it, and the
      file is the only thing that can say whether it did. */
