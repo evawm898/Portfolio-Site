@@ -843,7 +843,7 @@ async function browserClauses(port, rec) {
   try {
     await H.openBloom(page, port);
     const p = [];
-    const rec0 = { layers: [{ layer: 0, offsets: { petalCup: 0.3 } }], petals: [{ layer: 0, slot: 1, offsets: { petalTipShape: 0.5 } }], tiers: [] };
+    const rec0 = { layers: [{ layer: 0, offsets: { petalCup: 0.3 } }], petals: [{ layer: 0, slot: 1, offsets: { petalTipShape: 0.5 } }], tiers: [], strands: [] };
     const before = await page.evaluate(() => window.__bloomMetrics().scopes);
     if (before !== null) p.push(`the page opened with scopes ${JSON.stringify(before)}`);
     /* per-layer values ON first (Scoping-b): a layer entry reaches a petal only
@@ -884,7 +884,7 @@ async function browserClauses(port, rec) {
     const status = await page.evaluate(() => document.getElementById('designStatus').textContent);
     if (!/1 layer \/ 1 petal offset entries/.test(status)) p.push(`the status line reads "${status}"`);
     /* a plain save (no overrides) clears the record */
-    const plain = JSON.parse(await page.evaluate(() => window.__bloomDesign.save())); plain.overrides = { layers: [], petals: [], tiers: [] };
+    const plain = JSON.parse(await page.evaluate(() => window.__bloomDesign.save())); plain.overrides = { layers: [], petals: [], tiers: [], strands: [] };
     await page.evaluate((t) => window.__bloomDesign.load(t, 'plain.json'), JSON.stringify(plain));
     if ((await page.evaluate(() => window.__bloomDesign.scopes())) !== null) p.push('a plain file did not clear the scopes');
     const stl3 = await H.exportStl(page, tmp);
