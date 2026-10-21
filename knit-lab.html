@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <title>Knit Lab — Field Notes — Eva Maskalenko</title>
-<meta name="description" content="Field Notes lab: a feasibility spike for a yarn-level knit simulator in the browser. Ten wales by ten courses of stockinette, each yarn a chain of points relaxed with XPBD, then pulled.">
+<meta name="description" content="Field Notes lab: a feasibility spike for a yarn-level knit simulator in the browser. Ten wales by ten courses of stockinette, plain or with an eyelet row, the yarn a chain of points relaxed with XPBD, then loaded and unloaded.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -35,7 +35,7 @@
       <span>Lab &middot; feasibility spike</span>
     </div>
     <h1 class="project__title">Knit Lab</h1>
-    <p class="project__lede">Ten wales by ten courses of stockinette, knitted flat from one yarn. The yarn is a chain of points; it may not stretch, it resists bending, and it may not pass through itself. Nothing else tells it how to be a knit. It starts as a rough guess, settles, and is then pulled from the top.</p>
+    <p class="project__lede">Ten wales by ten courses of stockinette, knitted flat from one yarn, plain or with a row of eyelets across the middle. The yarn is a chain of points; it may not stretch, it resists bending, it may not pass through itself, and where it touches itself it grips with friction. Nothing else tells it how to be a knit. It starts as a rough guess, settles, and is then loaded from the top and let back down.</p>
   </div>
 
   <section class="kl" aria-label="Yarn-level knit simulation">
@@ -49,22 +49,28 @@
       </div>
 
       <aside class="kl__panel">
+        <p class="kl__eyebrow">Swatch</p>
+        <div class="kl__buttons">
+          <button type="button" class="kl__btn" data-swatch="plain" aria-pressed="true">Stockinette</button>
+          <button type="button" class="kl__btn" data-swatch="eyelet" aria-pressed="false">Eyelet row</button>
+        </div>
+
         <p class="kl__eyebrow">Run</p>
         <div class="kl__buttons">
-          <button type="button" class="kl__btn" id="klPull" disabled>Pull to +70%</button>
+          <button type="button" class="kl__btn" id="klTest" disabled>Load, then unload</button>
           <button type="button" class="kl__btn" id="klPause">Pause</button>
           <button type="button" class="kl__btn" id="klRestart">Restart</button>
           <button type="button" class="kl__btn" id="klCsv" disabled>Force log CSV</button>
         </div>
         <label class="kl__check"><input type="checkbox" id="klStripes" checked> stripe alternate courses</label>
-        <p class="kl__hint">After it settles: drag anywhere above the top course to pull by hand, or press Pull for a slow constant-speed pull that logs force against extension. It stops early if the yarn itself starts to stretch.</p>
+        <p class="kl__hint">After it settles: drag anywhere above the top course to pull by hand, or run the test: the comb rises at constant speed until the bottom jaw reads its load limit (well past the jam), then goes back down to where it started, logging force against extension both ways. Run both swatches to see them on one plot.</p>
 
         <p class="kl__eyebrow">Readouts</p>
         <dl class="kl__ro" id="klRo"></dl>
 
         <p class="kl__eyebrow">Load &ndash; extension</p>
-        <canvas class="kl__chart" id="klChart" aria-label="Force on the bottom jaw against extension of the swatch"></canvas>
-        <p class="kl__caption">Reaction on the bottom jaw (model units) against jaw-to-jaw extension.</p>
+        <canvas class="kl__chart" id="klChart" aria-label="Force on the bottom jaw against extension of the swatch, loading and unloading"></canvas>
+        <p class="kl__caption">Reaction on the bottom jaw (model units, log scale) against jaw-to-jaw extension: <span class="kl__key kl__key--load">loading</span>, <span class="kl__key kl__key--unload">unloading</span>; the other swatch&rsquo;s last test in grey; a tick marks each jam. The work lost between the two curves (the hysteresis) and the permanent set are in the readouts.</p>
       </aside>
     </div>
   </section>
@@ -73,7 +79,8 @@
     <section class="project__section">
       <h2 class="project__section-title"><span>01</span>What is being simulated</h2>
       <div class="project__section-body">
-        <p>One yarn, about 3,500 points half a yarn diameter apart. Every substep it obeys three rules, solved with extended position-based dynamics (XPBD): consecutive points keep their spacing (the yarn is near-inextensible), each point stays near the midpoint of its neighbours (bending stiffness), and no two non-neighbouring stretches of yarn come closer than one yarn diameter (contact, found through a spatial hash). There is no friction and no gravity.</p>
+        <p>One yarn, about 3,500 points half a yarn diameter apart. Every substep it obeys three rules, solved with extended position-based dynamics (XPBD): consecutive points keep their spacing, each point stays near the midpoint of its neighbours (bending stiffness), and no two non-neighbouring stretches of yarn come closer than one yarn diameter (contact, found through a spatial hash). Where yarn touches yarn it grips with Coulomb friction, μ = 0.25, a dry yarn-on-yarn value. There is no gravity.</p>
+        <p>The yarn&rsquo;s length is solved as one linear system along the whole chain each substep (it is tridiagonal, so that costs no more than a sweep), so tension reaches from jaw to jaw at once: the yarn stays within a few hundredths of a percent of its length right up to the load limit. The simulation runs in a Web Worker, so the page keeps drawing while it settles.</p>
         <p>The knit structure is not a constraint. It lives only in the starting geometry: a rough guess where every new loop&rsquo;s legs pass in front of the head of the loop it was pulled through, and its feet pass behind that loop&rsquo;s legs. If the contact rule holds, the yarn can never undo that interlocking, so whatever it settles into is still a knit. A certificate checks that on every substep: no stretch of yarn moves far enough to have crossed another.</p>
       </div>
     </section>
@@ -81,19 +88,19 @@
       <h2 class="project__section-title"><span>02</span>How it is held</h2>
       <div class="project__section-body">
         <p>The cast-on course is clamped in a jaw. The live stitches of the last course hang on a comb, one pin through each loop where the next course&rsquo;s legs would be, and the yarn&rsquo;s end is tied to it: a frictionless knit with a free end and live stitches has no resting state at all, it unravels. The swatch lies between two frictionless plates a few yarn diameters apart, or its free side edges roll up without end, the way stockinette curls.</p>
-        <p>While settling, the comb follows the load down until the swatch carries a small tension, the preload a tensile tester uses to define the gauge length. Pulling drives the comb up at constant speed and logs the force on the bottom jaw.</p>
+        <p>While settling, the comb follows the load down until the swatch carries a small tension, the preload a tensile tester uses to define the gauge length. The test then drives the comb up at constant speed until the bottom jaw reads a set load, several times what it carries at the jam, and brings it back down to where it started. The work lost between the two curves is the hysteresis; how much further out the way back runs at the same small load is the permanent set.</p>
       </div>
     </section>
     <section class="project__section">
       <h2 class="project__section-title"><span>03</span>The topology record</h2>
       <div class="project__section-body">
-        <p>Each loop records the loops of the previous course it passes through: one for a plain knit stitch, none for a yarn over or the cast-on, two for a k2tog or ssk, in the order they lie. The solver never reads it; only the starting-geometry builder does, so a yarn over or a decrease is a change to that record and one case in the builder, not to the simulation.</p>
+        <p>Each loop records the loops of the previous course it passes through: one for a plain knit stitch, none for a yarn over or the cast-on, two for a k2tog or ssk, in the order they lie. The solver never reads it; only the starting-geometry builder does, so the eyelet row (yarn over, k2tog, repeated) is that record plus one case each in the builder. For a k2tog the right-hand parent&rsquo;s head is drawn over the left one&rsquo;s, so the new loop&rsquo;s legs pass through both; a yarn over passes through nothing and stands in the gap the decrease left. The drawn start is checked by linking numbers: each leg of each loop must pass once through exactly the loops it was charted through.</p>
       </div>
     </section>
     <section class="project__section project__section--disclaimer">
       <h2 class="project__section-title"><span>04</span>What this is, and isn&rsquo;t</h2>
       <div class="project__section-body">
-        <p>A feasibility spike, not a finished field note. Forces are in model units, not newtons; the yarn has no friction, no twist, no compressible cross-section and no material data. Past the point where the loops jam, the pull is carried by the yarn itself, and one solver sweep per substep cannot keep it inextensible under that load, so the automatic pull stops when any piece of yarn is strained 5%. What it is for is to find out whether a browser can relax and pull a yarn-level knit at interactive speed, and whether the result behaves like a knit.</p>
+        <p>A feasibility spike, not a finished field note. Forces are in model units, not newtons; the yarn has no twist, no compressible cross-section and no material data, and its friction coefficient is a plausible number, not a measured one. Contacts in a position-based solver are inelastic, and the test runs at a finite speed, so even the frictionless swatch loses a few percent of its loading work on the way back. What it is for is to find out whether a browser can relax, load and unload a yarn-level knit at interactive speed, and whether the result behaves like a knit.</p>
       </div>
     </section>
   </div>

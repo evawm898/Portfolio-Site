@@ -108,3 +108,10 @@
   .kl__canvas { height: 70vh; }
   .kl__panel { margin-right: 0; border-left: 0; border-top: 1px solid var(--line); }
 }
+
+.kl__btn[aria-pressed="true"] { border-color: var(--petrol-bright); color: var(--petrol-bright); }
+.kl__buttons + .kl__eyebrow { margin-top: 1.5rem; }
+.kl__key { white-space: nowrap; }
+.kl__key::before { content: ''; display: inline-block; width: 1.1em; height: 2px; margin: 0 0.35em 0.2em 0; vertical-align: middle; }
+.kl__key--load::before { background: var(--petrol-bright); }
+.kl__key--unload::before { background: var(--ink); }

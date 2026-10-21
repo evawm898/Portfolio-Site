@@ -1,169 +1,255 @@
 // tools/verify-knit-lab.mjs — the knit-lab spike's numbers, measured in Node on the shipped modules.
 //
-//   node tools/verify-knit-lab.mjs [--out <dir>] [--quick] [--no-scale] [--rates]
+//   node tools/verify-knit-lab.mjs [--out <dir>] [--jobs N] [--browser] [--rates] [--scale]
+//   node tools/verify-knit-lab.mjs --run '<spec json>'      one simulation, JSON on stdout (internal)
 //
-// 1. TOPOLOGY   the stockinette record validates; three broken records are refused by name; the
-//               geometry builder refuses a yarn over and a k2tog by name rather than guessing.
-// 2. SETTLE     from the rough start to settled, with the pass-through CERTIFICATE on at every
-//               substep (KnitSim.auditBefore/After): frames, simulated seconds, wall time, ms per
-//               substep, closest approach, overlaps deeper than half a diameter, largest strain.
-// 3. PULL       the comb driven up at PULL_SPEED to PULL_MAX_EXTENSION, certificate still on,
-//               logging the bottom jaw's reaction against extension; the curve's shape is reported
-//               as tangent stiffness by 5% band (soft initial region, then stiffening?), the peak
-//               and what follows it. --rates repeats the pull from the same settled swatch at
-//               4 / 1.5 / 0.5 d/s. (Early runs suggested the jam load depended on speed; it was
-//               the swatch unravelling from its free end, since tied to the comb.)
-// 4. SCALING    ms per substep against swatch size, no certificate, so the interactive ceiling can
-//               be read off.
+// Every simulation is its own child process (--jobs at a time, default 4). Each settles a 10 x 10
+// swatch and runs the automatic load-unload test (KnitSim.startPull(true, true): load to
+// LOAD_LIMIT, unload to the start, hold). The pass-through certificate is on for the two
+// reference runs.
 //
-// Writes summary.json and force-extension.csv into --out (default: a temp dir). It asserts only
-// what must hold for the numbers to mean anything (topology refusals, no deep overlaps, no failed
-// certificate) and REPORTS the rest; the spike's questions are answered by the numbers.
+// THE GATES. Every check is a pure function of measured runs, and every one is also handed an
+// input it must REJECT (a "must-fail"); a check that cannot fail is not a check.
+//   T  topology   the drawn start is the charted knit: each leg of each loop passes once through
+//                 exactly the loops it was pulled through (linking numbers, knit-lab-analysis.js).
+//                 Must-fail: the k2tog drawn without its right parent's head moved over.
+//   F  friction   at μ 0.25 the curve keeps a soft region before the jam: the jam (stiffness 10x
+//                 the 0-10% region) is at >= 12% and the soft region is at most twice as stiff as
+//                 the frictionless swatch's. Must-fail: friction capped by a normal multiplier
+//                 accumulated across substeps (the bug the brief asked about).
+//   I  inextensible  strain < 1% before the jam; the load never falls below 90% of its running
+//                 peak past the jam; the loading ends on the LOAD LIMIT, not on the 5% strain stop.
+//                 Must-fails: a yarn 2,000x more compliant (strain > 1%); the old one-sweep stretch
+//                 solve (it ends on the strain stop — its strain before its own jam is 0.97%, a knife
+//                 edge, so it is not used for the 1% check); the yarn's end left untied (the load
+//                 collapses past the jam).
+//   C  cycle      μ 0.25: at least 15% of the loading work lost and at least 2% permanent set;
+//                 μ 0: under a third of that loss and under half that set. Must-fails: each
+//                 condition handed the other swatch's numbers.
+//   E  eyelet     at least 4 openings of inscribed radius >= 1 d in the eyelet course, settled and
+//                 at +20%; the eyelet swatch jams at least 5 points of extension away from plain.
+//                 Must-fails: the plain swatch's openings; plain against itself.
+//   S  safety     no yarn pair closer than ½ d and the certificate unbroken on the audited runs.
+//   W  worker     (--browser) the page keeps drawing while it settles: gaps between animation
+//                 frames p95 < 60 ms, none > 100 ms, with the simulation in a Web Worker. Must-fail:
+//                 the same page with #WORKER=0 (the simulation on the page's thread).
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { makeStockinette, validateTopology } from '../knit-lab-topology.js';
-import { KnitSim, PARAMS } from '../knit-lab-sim.js';
+import { spawn } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const flag = f => args.includes(f);
-const OUT = args.includes('--out') ? path.resolve(args[args.indexOf('--out') + 1]) : fs.mkdtempSync(path.join(os.tmpdir(), 'knit-lab-'));
+const opt = (f, d) => (args.includes(f) ? args[args.indexOf(f) + 1] : d);
+
+// ---- mutants: one text substitution each in a copy of a module --------------------------------
+const MUTANTS = {
+  'friction-cap-accumulates': { file: 'knit-lab-sim.js', from: 'this.lamC.fill(0, 0, this.nPairs); this.lamT.fill(0, 0, this.nPairs);', to: 'this.lamT.fill(0, 0, this.nPairs);' },
+  'k2tog-head-not-moved': { file: 'knit-lab-sim.js', from: '+ headShift.get(id) * ramp(u, K.s0, K.s1)', to: '+ 0' },
+};
+async function loadSim(mutant) {
+  if (!mutant) return import(pathToFileURL(path.join(ROOT, 'knit-lab-sim.js')).href);
+  const m = MUTANTS[mutant]; let src = fs.readFileSync(path.join(ROOT, m.file), 'utf8');
+  if (src.split(m.from).length !== 2) throw new Error(`mutant ${mutant}: anchor not found exactly once`);
+  src = src.replace(m.from, m.to).replace(/from '\.\//g, `from '${pathToFileURL(ROOT).href}/`);
+  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'knit-mut-')), 'sim.mjs');
+  fs.writeFileSync(f, src);
+  return import(pathToFileURL(f).href);
+}
+const T = await import(pathToFileURL(path.join(ROOT, 'knit-lab-topology.js')).href);
+const A = await import(pathToFileURL(path.join(ROOT, 'knit-lab-analysis.js')).href);
+const makeSwatch = s => (s === 'eyelet' ? T.makeEyelet(10, 10) : T.makeStockinette(10, 10));
+const HOLE_R = 1.0, MID = 0.2;
+
+// ---- one simulation (child process) ----------------------------------------------------------
+if (flag('--run')) {
+  const spec = JSON.parse(opt('--run'));
+  const { KnitSim, PARAMS } = await loadSim(spec.mutant);
+  const P = { ...PARAMS, ...(spec.params || {}) };
+  const topo = makeSwatch(spec.swatch), band = topo.eyelet ?? 5;
+  const sim = new KnitSim(topo, P); sim.audit = !!spec.audit;
+  const L = A.legLinks(topo, sim.x, sim.loopOf, sim.uOf);
+  const out = { name: spec.name, spec, n: sim.n, loopLength: sim.loopLength, start: { bad: L.bad, undetermined: L.undetermined, loops: L.pairs, closest: sim.countOverlaps(0.5).min } };
+  const holeReport = () => { const h = A.holes(sim.x, sim.n), b = A.holesInCourse(h, sim.x, sim.course, sim.n, band); return { band: b.slice(0, 8).map(o => +o.r.toFixed(3)), open: b.filter(o => o.r >= HOLE_R).length }; };
+  let deep = 0, t0 = performance.now();
+  while (sim.phase === 'settling') { sim.stepFrame(); if (sim.frame % 20 === 0) deep = Math.max(deep, sim.countOverlaps(0.5).pairs); }
+  const st = sim.settledAt;
+  out.settle = { frames: st.frames, hitCap: st.hitCap, gap: sim.jawGap(), wallMs: performance.now() - t0, msPerSubstep: st.ms / st.steps, deep, certFail: sim.stats.certFail, certSteps: sim.stats.certSteps, worstMargin: sim.stats.worstMargin, closest: sim.stats.minDist, strain: sim.maxStrain() };
+  out.holesSettled = holeReport();
+  sim.stats.certFail = 0; sim.stats.certSteps = 0; sim.stats.worstMargin = Infinity; sim.stats.minDist = Infinity;
+  sim.startPull(true, true); deep = 0; t0 = performance.now();
+  const rows = []; let mid = null;
+  while (sim.phase !== 'done') {
+    sim.stepFrame();
+    rows.push([+sim.extension().toFixed(6), +sim.stats.loadBottom.toFixed(2), sim.phase, +sim.stats.maxStrain.toFixed(7)]);
+    if (!mid && sim.phase === 'pulling' && sim.extension() >= MID) mid = { ext: sim.extension(), ...holeReport() };
+    if (spec.audit && sim.frame % 10 === 0) deep = Math.max(deep, sim.countOverlaps(0.5).pairs);
+    if (rows.length > 20000) break;
+  }
+  out.holesMid = mid;
+  out.pull = { rows, loadEnd: sim.loadEnd, peak: sim.peak, restHeight: sim.restHeight, wallMs: performance.now() - t0, deep, certFail: sim.stats.certFail, certSteps: sim.stats.certSteps, worstMargin: sim.stats.worstMargin, closest: sim.stats.minDist, strainStopped: sim.strainStopped };
+  process.stdout.write(JSON.stringify(out));
+  process.exit(0);
+}
+
+// ---- the parent: run everything, then judge -------------------------------------------------
+const OUT = path.resolve(opt('--out', fs.mkdtempSync(path.join(os.tmpdir(), 'knit-lab-'))));
 fs.mkdirSync(OUT, { recursive: true });
-const QUICK = flag('--quick');
+const JOBS = +opt('--jobs', Math.min(4, os.cpus().length));
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${msg}`); if (!ok) failed++; };
-const fmt = (v, k = 2) => Number.isFinite(v) ? v.toFixed(k) : String(v);
-const summary = { params: PARAMS, machine: { cpus: os.cpus().length, model: os.cpus()[0]?.model, node: process.version } };
+const mustFail = (verdict, msg) => { const ok = !verdict.ok; console.log(`${ok ? 'PASS' : 'FAIL'}  must-fail: ${msg} -> ${verdict.ok ? 'ACCEPTED (the check cannot fail)' : 'rejected: ' + verdict.why}`); if (!ok) failed++; };
+const pct = (v, k = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(k)}%` : String(v));
+const fmt = (v, k = 0) => (Number.isFinite(v) ? v.toFixed(k) : String(v));
 
-// ---- 1. topology ------------------------------------------------------------------------------
-console.log('\n== 1. topology');
+const SPECS = [
+  { name: 'plain', swatch: 'plain', audit: true },
+  { name: 'plain-mu0', swatch: 'plain', params: { FRICTION: 0 } },
+  { name: 'eyelet', swatch: 'eyelet', audit: true },
+  { name: 'mf-friction-accumulates', swatch: 'plain', mutant: 'friction-cap-accumulates' },
+  { name: 'mf-gauss-seidel-stretch', swatch: 'plain', params: { STRETCH_SOLVER: 'gs' } },
+  { name: 'mf-compliant-yarn', swatch: 'plain', params: { STRETCH_COMPLIANCE: 2e-6 } },
+  { name: 'mf-tail-untied', swatch: 'plain', params: { TAIL_TIED: 0 } },
+];
+if (flag('--rates')) SPECS.push({ name: 'plain-slow', swatch: 'plain', params: { PULL_SPEED: 0.5 } }, { name: 'plain-mu0-slow', swatch: 'plain', params: { FRICTION: 0, PULL_SPEED: 0.5 } });
+
+function runChild(spec) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(process.execPath, [fileURLToPath(import.meta.url), '--run', JSON.stringify(spec)], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, NODE_NO_WARNINGS: '1' } });
+    let o = '', e = ''; p.stdout.on('data', d => (o += d)); p.stderr.on('data', d => (e += d));
+    p.on('close', code => (code === 0 ? resolve(JSON.parse(o)) : reject(new Error(`${spec.name}: exit ${code}\n${e}`))));
+  });
+}
+console.log(`running ${SPECS.length} simulations, ${JOBS} at a time…`);
+const t0 = Date.now(), runs = {}, queue = SPECS.slice();
+await Promise.all(Array.from({ length: JOBS }, async () => { while (queue.length) { const s = queue.shift(); const r = await runChild(s); runs[s.name] = r; console.log(`  ${s.name}: settled ${r.settle.frames} frames, test ${r.pull.rows.length} frames (${fmt((r.settle.wallMs + r.pull.wallMs) / 1000, 0)} s)`); } }));
+console.log(`(${fmt((Date.now() - t0) / 1000, 0)} s)`);
+
+// rows -> analysis rows; per-run readings
+const rowsOf = r => r.pull.rows.map(([ext, load, phase, strain]) => ({ ext, load, phase: phase === 'held' ? 'pulling' : phase, strain }));
+const read = r => { const rows = rowsOf(r), jam = A.findJam(rows), cyc = A.cycleStats(rows, r.pull.restHeight); return { rows, jam, cyc, soft: jam.soft / r.pull.restHeight }; };
+const R = Object.fromEntries(Object.entries(runs).map(([k, r]) => [k, read(r)]));
+
+// ---- the checks (pure) ------------------------------------------------------------------------
+const V = (ok, why) => ({ ok, why });
+function topologyOK(start) { return V(start.bad.length === 0 && start.undetermined === 0, start.bad.length ? `${start.bad.length} loop(s) wrong, e.g. ${start.bad[0]}` : start.undetermined ? `${start.undetermined} pairs undetermined` : 'every leg passes through its parents'); }
+function softRegion(mu, zero) {
+  const ratio = mu.soft / zero.soft;
+  return V(mu.jam.ext >= 0.12 && ratio <= 2, `jam at ${pct(mu.jam.ext, 0)}, soft region ${fmt(mu.soft)} per d = ${fmt(ratio, 2)}x the frictionless ${fmt(zero.soft)}`);
+}
+function strainBeforeJam(m) {   // up to the jam; if no jam came first, over the whole loading
+  const jam = Number.isFinite(m.jam.ext), lim = jam ? m.jam.ext : Infinity;
+  const s = Math.max(0, ...m.rows.filter(r => r.phase === 'pulling' && r.ext < lim).map(r => Math.abs(r.strain)));
+  return V(s < 0.01, `largest |strain| ${jam ? `before the jam (${pct(m.jam.ext, 0)})` : 'over the whole loading (no jam reached)'}: ${pct(s, 3)}`);
+}
+function noCollapse(m) {
+  const b = A.bin(m.rows.filter(r => r.phase === 'pulling'), 0.01).filter(p => p.ext >= m.jam.ext);
+  let run = -Infinity, worst = Infinity, at = NaN;
+  for (const p of b) { run = Math.max(run, p.load); const f = p.load / run; if (f < worst) { worst = f; at = p.ext; } }
+  return V(b.length > 0 && worst >= 0.9, b.length ? `past the jam the load never fell below ${pct(worst, 0)} of its running peak${worst < 1 ? ` (at ${pct(at, 0)})` : ''}` : 'no jam found');
+}
+function endedOnLoad(r) { return V(r.pull.loadEnd === 'load' && !r.pull.strainStopped, `loading ended on: ${r.pull.loadEnd}${r.pull.strainStopped ? ' (the 5% strain stop)' : ''}`); }
+function frictionLoop(c) { return V(c.cyc.lossFraction >= 0.15 && c.cyc.set >= 0.02, `${pct(c.cyc.lossFraction)} of the loading work lost, set ${pct(c.cyc.set)}`); }
+function frictionlessVanishes(c, ref) { return V(c.cyc.lossFraction <= ref.cyc.lossFraction / 3 && c.cyc.set <= ref.cyc.set / 2, `${pct(c.cyc.lossFraction)} lost and set ${pct(c.cyc.set)}, against ${pct(ref.cyc.lossFraction)} / ${pct(ref.cyc.set)} with friction`); }
+function eyeletsOpen(r) { const a = r.holesSettled, b = r.holesMid; return V(a.open >= 4 && b && b.open >= 4, `openings >= ${HOLE_R} d in the eyelet course: ${a.open} settled (r ${a.band.slice(0, 5).join(', ')}), ${b ? b.open : '—'} at +${pct(MID, 0)} (r ${b ? b.band.slice(0, 5).join(', ') : '—'})`); }
+function jamDiffers(e, p) { const d = e.jam.ext - p.jam.ext; return V(Math.abs(d) >= 0.05, `jam ${pct(e.jam.ext, 0)} against ${pct(p.jam.ext, 0)} (${d >= 0 ? '+' : ''}${fmt(d * 100, 0)} points)`); }
+function safe(r) { return V(r.settle.deep === 0 && r.pull.deep === 0 && r.settle.certFail === 0 && r.pull.certFail === 0, `deep overlaps ${r.settle.deep}/${r.pull.deep}; certificate ${r.settle.certSteps - r.settle.certFail}/${r.settle.certSteps} settling, ${r.pull.certSteps - r.pull.certFail}/${r.pull.certSteps} testing; closest ${fmt(Math.min(r.settle.closest, r.pull.closest), 3)} d`); }
+const gate = (v, msg) => check(v.ok, `${msg}: ${v.why}`);
+
+// ---- T: topology -----------------------------------------------------------------------------
+console.log('\n== T. topology: the drawn start is the charted knit');
 {
-  const t = makeStockinette(10, 10);
-  check(validateTopology(t).length === 0, `10 x 10 stockinette validates (${t.loops.length} loops)`);
-  const broken = (mut, why) => { const t2 = makeStockinette(4, 4); mut(t2); const bad = validateTopology(t2); check(bad.length > 0, `refused: ${why} -> "${bad[0]}"`); };
-  broken(t => { t.loops[t.rows[3][1]].through = [t.rows[1][1]]; }, 'a loop pulled through a loop two courses down');
-  broken(t => { t.loops[t.rows[2][0]].through = [t.rows[1][1]]; }, 'a loop that nothing holds (it would ladder)');
-  broken(t => { t.loops[t.rows[2][1]].through = [t.rows[1][0], t.rows[1][1], t.rows[1][2]]; }, 'three parents');
-  const yo = makeStockinette(4, 4); yo.loops[yo.rows[2][1]].through = []; yo.loops[yo.rows[2][1]].kind = 'yo'; yo.loops[yo.rows[2][2]].through = [yo.rows[1][1], yo.rows[1][2]];
-  check(validateTopology(yo).length === 0, 'a yarn over beside a k2tog is a valid RECORD (data change only)');
-  let msg = ''; try { new KnitSim(yo); } catch (e) { msg = e.message; }
-  check(/only draws plain knit/.test(msg), `...and the geometry builder refuses it by name: "${msg.slice(0, 90)}..."`);
+  const bad3 = T.makeStockinette(4, 4); bad3.loops[bad3.rows[2][1]].through = [bad3.rows[1][0], bad3.rows[1][1], bad3.rows[1][2]];
+  check(T.validateTopology(bad3).some(m => /3 parents/.test(m)), 'a loop pulled through three loops is refused by the record check');
+  const e = makeSwatch('eyelet'); const row = e.rows[e.eyelet].map(id => e.loops[id].kind);
+  check(T.validateTopology(e).length === 0, `the eyelet chart validates; course ${e.eyelet}: ${row.join(' ')}`);
+  gate(topologyOK(runs.plain.start), 'plain stockinette, drawn start');
+  gate(topologyOK(runs.eyelet.start), 'eyelet row, drawn start (yo through nothing, k2tog through both parents)');
+  const { buildYarn } = await loadSim('k2tog-head-not-moved');
+  const y = buildYarn(e); mustFail(topologyOK(A.legLinks(e, y.pos, y.loopOf, y.uOf)), 'the k2tog drawn without its right parent\'s head moved over');
+  console.log(`  start: closest approach ${fmt(runs.plain.start.closest, 3)} d plain, ${fmt(runs.eyelet.start.closest, 3)} d eyelet (drawn ${2.5}x deep, the plates closing)`);
 }
 
-// ---- 2. settle --------------------------------------------------------------------------------
-console.log('\n== 2. settle (10 x 10, pass-through certificate on every substep)');
-const sim = new KnitSim(makeStockinette(10, 10));
-sim.audit = true;
-const init = { points: sim.n, segments: sim.nSeg, loopLength: sim.loopLength, yarnLength: sim.yarnLength, initialMin: sim.countOverlaps(0.5).min };
-console.log(`points ${sim.n}, segment ${fmt(sim.seg, 3)} d, yarn ${fmt(sim.yarnLength, 0)} d = ${fmt(sim.loopLength, 2)} d per loop; start: closest approach ${fmt(init.initialMin, 3)} d`);
-let deepWorst = 0, strainWorst = 0, t0 = performance.now();
-const settleTrace = [];
-while (sim.phase === 'settling') {
-  sim.stepFrame();
-  if (sim.frame % 20 === 0) {
-    const o = sim.countOverlaps(0.5); deepWorst = Math.max(deepWorst, o.pairs); strainWorst = Math.max(strainWorst, Math.abs(sim.maxStrain()));
-    if (sim.frame % 200 === 0) { settleTrace.push({ frame: sim.frame, rms: sim.stats.rmsSpeed, height: sim.jawGap(), combLoad: sim.combLoad }); console.log(`  frame ${sim.frame}: rms ${fmt(sim.stats.rmsSpeed, 3)} d/s, jaw gap ${fmt(sim.jawGap(), 2)} d, comb load ${fmt(sim.combLoad, 0)}`); }
-  }
+// ---- F: friction ---------------------------------------------------------------------------
+console.log('\n== F. friction: μ 0.25 still rearranges before the jam');
+console.log(`  soft region (0-10%), load per d of jaw travel: μ 0 ${fmt(R['plain-mu0'].soft)}, μ 0.25 ${fmt(R.plain.soft)}; jam ${pct(R['plain-mu0'].jam.ext, 0)} / ${pct(R.plain.jam.ext, 0)}`);
+gate(softRegion(R.plain, R['plain-mu0']), 'μ 0.25 has a soft region before the jam');
+mustFail(softRegion(R['mf-friction-accumulates'], R['plain-mu0']), `friction capped by a normal multiplier accumulated across substeps (largest strain ${pct(Math.max(...R['mf-friction-accumulates'].rows.map(r => r.strain)), 0)})`);
+
+// ---- I: inextensible --------------------------------------------------------------------------
+console.log('\n== I. the yarn stays inextensible up to the jam, and the load does not collapse past it');
+for (const k of ['plain', 'eyelet']) {
+  gate(strainBeforeJam(R[k]), `${k}: strain < 1% before the jam`);
+  gate(noCollapse(R[k]), `${k}: no collapse past the jam`);
+  gate(endedOnLoad(runs[k]), `${k}: the test, not the strain safety, ends the loading (peak ${fmt(runs[k].pull.peak.load)} at ${pct(runs[k].pull.peak.ext)}; largest strain anywhere ${pct(Math.max(...R[k].rows.map(r => r.strain)), 3)})`);
 }
-const auditWall = performance.now() - t0;
-const st = sim.settledAt;
-summary.settle = { ...init, frames: st.frames, simSeconds: st.simSeconds, substeps: st.steps, msPerSubstepAudited: st.ms / st.steps, wallMsAudited: auditWall, hitCap: st.hitCap,
-  closestApproach: sim.stats.minDist, deepOverlapsWorst: deepWorst, maxStrainWorst: strainWorst, certSubsteps: sim.stats.certSteps, certFailed: sim.stats.certFail, worstMargin: sim.stats.worstMargin,
-  restHeight: sim.jawGap(), width: sim.bounds().x1 - sim.bounds().x0, trace: settleTrace };
-console.log(`settled after ${st.frames} frames = ${fmt(st.simSeconds, 1)} s simulated, ${st.steps} substeps${st.hitCap ? ' (HIT THE FRAME CAP — not converged by the criterion)' : ''}`);
-console.log(`audited wall ${fmt(auditWall / 1000, 1)} s; ms/substep with the certificate ${fmt(st.ms / st.steps, 3)}`);
-check(deepWorst === 0, `no yarn pair closer than 0.5 d while settling (worst sample: ${deepWorst} pairs; closest approach ${fmt(sim.stats.minDist, 3)} d)`);
-check(sim.stats.certFail === 0, `pass-through certificate held on ${sim.stats.certSteps - sim.stats.certFail} of ${sim.stats.certSteps} substeps (worst margin ${fmt(sim.stats.worstMargin, 4)} d)`);
-console.log(`largest yarn strain while settling: ${fmt(strainWorst * 100, 2)}%; settled jaw gap ${fmt(summary.settle.restHeight, 2)} d (${fmt(summary.settle.restHeight / 9, 2)} d per course), width ${fmt(summary.settle.width, 1)} d`);
+mustFail(strainBeforeJam(R['mf-compliant-yarn']), 'a yarn 2,000x more compliant (STRETCH_COMPLIANCE 2e-6)');
+mustFail(endedOnLoad(runs['mf-gauss-seidel-stretch']), `the one-sweep Gauss-Seidel stretch solve, the first version (${strainBeforeJam(R['mf-gauss-seidel-stretch']).why})`);
+mustFail(noCollapse(R['mf-tail-untied']), 'the yarn\'s end left free (it unravels from the tail under load)');
 
-// ---- 3. pull ----------------------------------------------------------------------------------
-const MAXE = PARAMS.PULL_MAX_EXTENSION;
-console.log(`\n== 3. pull to +${Math.round(MAXE * 100)}% at ${PARAMS.PULL_SPEED} d/s (certificate on)`);
-const settledState = sim.snapshot();
-sim.stats.certFail = 0; sim.stats.certSteps = 0; sim.stats.worstMargin = Infinity; sim.stats.minDist = Infinity;
-const pull = runPull(sim, PARAMS.PULL_SPEED, MAXE, true);
-const log = pull.log;
-fs.writeFileSync(path.join(OUT, 'force-extension.csv'), 'extension,load_bottom,load_top,max_strain,mid_width\n' + log.map(r => [r.ext, r.bottom, r.top, r.strain, r.width].map(v => v.toFixed(5)).join(',')).join('\n') + '\n');
-check(pull.deep === 0, `no yarn pair closer than 0.5 d while pulling (closest approach ${fmt(sim.stats.minDist, 3)} d)`);
-check(sim.stats.certFail === 0, `pass-through certificate held on ${sim.stats.certSteps - sim.stats.certFail} of ${sim.stats.certSteps} pull substeps (worst margin ${fmt(sim.stats.worstMargin, 4)} d)`);
-const shape = curveShape(log, summary.settle.restHeight, MAXE);
-console.log('extension  load(bottom jaw)  tangent stiffness to next band (load per d of jaw travel)');
-shape.bands.forEach((e, i) => console.log(`  ${String(Math.round(e * 100)).padStart(3)}%  ${fmt(shape.loads[i], 0).padStart(10)}  ${i < shape.k.length ? fmt(shape.k[i], 0).padStart(10) : ''}`));
-console.log(`soft region (0-10%): ${fmt(shape.kSoft, 0)} per d; steepest before the peak: ${fmt(shape.kMax, 0)} per d at ${Math.round(shape.kMaxAt * 100)}% — ${fmt(shape.kMax / shape.kSoft, 1)}x`);
-console.log(shape.endOverPeak >= 0.999 ? `load rises through every band measured (last band ${Math.round(shape.bands.at(-1) * 100)}%: ${fmt(shape.peak, 0)})`
-  : `load peaks at ${Math.round(shape.peakAt * 100)}% (${fmt(shape.peak, 0)}) and falls to ${fmt(100 * shape.endOverPeak, 0)}% of it by ${Math.round(shape.bands.at(-1) * 100)}%`);
-const w0 = log[0].width, w1 = log.filter(r => !r.hold).at(-1).width;
-summary.pull = { speed: PARAMS.PULL_SPEED, maxExtension: MAXE, frames: log.length, wallMs: pull.wallMs, ...shape, maxStrain: pull.strain, certSubsteps: sim.stats.certSteps, certFailed: sim.stats.certFail,
-  worstMargin: sim.stats.worstMargin, closestApproach: sim.stats.minDist, widthStart: w0, widthEnd: w1, holdLoadBottom: pull.holdBottom, holdLoadTop: pull.holdTop };
-console.log(pull.strainStopped ? `the pull STOPPED at +${fmt(pull.stoppedAt * 100, 1)}%: a segment reached the ${PARAMS.STRAIN_STOP * 100}% strain stop (the knit had jammed)` : 'the pull reached its target without the strain stop');
-summary.pull.strainStopped = pull.strainStopped; summary.pull.stoppedAt = pull.stoppedAt;
-console.log(`largest yarn strain while pulling: ${fmt(pull.strain * 100, 2)}%; mid-height width ${fmt(w0, 1)} -> ${fmt(w1, 1)} d`);
-console.log(`held at the end for 60 frames: bottom jaw ${fmt(pull.holdBottom, 0)}, comb ${fmt(pull.holdTop, 0)} (static equilibrium: these should agree)`);
+// ---- C: cycle ---------------------------------------------------------------------------------
+console.log('\n== C. load-unload: hysteresis and permanent set');
+for (const k of ['plain', 'plain-mu0', 'eyelet', ...(flag('--rates') ? ['plain-slow', 'plain-mu0-slow'] : [])]) {
+  const c = R[k].cyc; console.log(`  ${k.padEnd(15)} loading work ${fmt(c.workLoad)}, given back ${fmt(c.workUnload)}: ${pct(c.lossFraction)} lost; set ${pct(c.set)} (at load ${fmt(c.setLoad)}: ${pct(c.setAtLoading, 0)} up, ${pct(c.setAtUnloading, 0)} down)`);
+}
+gate(frictionLoop(R.plain), 'μ 0.25: a visible loop and a nonzero set');
+gate(frictionlessVanishes(R['plain-mu0'], R.plain), 'μ 0: loop and set nearly vanish');
+mustFail(frictionLoop(R['plain-mu0']), 'the μ 0.25 condition handed the frictionless swatch');
+mustFail(frictionlessVanishes(R.plain, R.plain), 'the μ 0 condition handed the swatch with friction');
 
-// rate sensitivity: the same settled swatch pulled at three speeds (no certificate), to +40%
-if (flag('--rates')) {
-  console.log('\n== 3b. rate sensitivity (same settled swatch, to +40%)');
-  sim.audit = false; summary.rates = [];
-  for (const v of [4, 1.5, 0.5]) {
-    sim.restore(settledState);
-    const r = runPull(sim, v, 0.4, false), sh = curveShape(r.log, summary.settle.restHeight, 0.4);
-    summary.rates.push({ speed: v, loads: sh.loads, bands: sh.bands, maxStrain: r.strain });
-    console.log(`  ${v} d/s: ` + sh.bands.map((e, i) => `${Math.round(e * 100)}%:${fmt(sh.loads[i] / 1000, 1)}k`).join(' ') + ` · max strain ${fmt(r.strain * 100, 1)}%`);
-  }
+// ---- E: eyelet --------------------------------------------------------------------------------
+console.log('\n== E. eyelets');
+gate(eyeletsOpen(runs.eyelet), 'the eyelet row opens into holes');
+mustFail(eyeletsOpen(runs.plain), 'the plain swatch, same course');
+gate(jamDiffers(R.eyelet, R.plain), 'the eyelet swatch jams at a different extension');
+mustFail(jamDiffers(R.plain, R.plain), 'plain against itself');
+console.log(`  soft region per d: eyelet ${fmt(R.eyelet.soft)}, plain ${fmt(R.plain.soft)}; load at the jam ${fmt(R.eyelet.jam.load)} / ${fmt(R.plain.jam.load)}`);
+
+// ---- S: safety -------------------------------------------------------------------------------
+console.log('\n== S. no pass-through');
+gate(safe(runs.plain), 'plain (audited)');
+gate(safe(runs.eyelet), 'eyelet (audited)');
+console.log(`  settle: plain ${runs.plain.settle.frames} frames, eyelet ${runs.eyelet.settle.frames}${runs.plain.settle.hitCap || runs.eyelet.settle.hitCap ? ' (HIT THE CAP)' : ''}; ms per substep (audited) ${fmt(runs.plain.settle.msPerSubstep, 2)} / ${fmt(runs.eyelet.settle.msPerSubstep, 2)}`);
+
+// ---- W: worker -------------------------------------------------------------------------------
+if (flag('--browser')) {
+  console.log('\n== W. the page keeps drawing while it settles');
+  const w = await browserGaps();
+  for (const [k, g] of Object.entries(w)) console.log(`  ${k}: ${g.frames} animation frames in ${fmt(g.ms / 1000, 1)} s of settling; gap p50 ${fmt(g.p50, 1)} ms, p95 ${fmt(g.p95, 1)} ms, longest ${fmt(g.max, 1)} ms${g.errors.length ? '; errors: ' + g.errors.join(' | ') : ''}`);
+  // headless Chromium paints at ~30 fps here (p50 33 ms with nothing to do), so the bar is p95 under
+  // 60 ms and no frame later than 100 ms; the first version held the thread 80 ms at a time
+  const workerOK = g => V(g.p95 < 60 && g.max < 100 && g.errors.length === 0, `p95 ${fmt(g.p95, 1)} ms, longest gap ${fmt(g.max, 1)} ms`);
+  gate(workerOK(w.worker), 'simulation in a Web Worker');
+  mustFail(workerOK(w.main), 'the same page with #WORKER=0 (the simulation on the page\'s thread)');
 }
 
-function runPull(s, speed, maxE, sampleDeep) {
-  s.P = { ...s.P, PULL_SPEED: speed, PULL_MAX_EXTENSION: maxE };
-  s.startPull(true);
-  const out = []; let deep = 0, strain = 0; const t = performance.now();
-  const row = hold => ({ ext: s.extension(), bottom: s.stats.loadBottom, top: s.stats.loadTop, strain: s.maxStrain(), width: midWidth(s), hold });
-  while (s.pullOffset < s.pullTarget - 1e-9 && !s.strainStopped) {
-    s.stepFrame(); out.push(row(false)); strain = Math.max(strain, Math.abs(out.at(-1).strain));
-    if (sampleDeep && s.frame % 10 === 0) deep = Math.max(deep, s.countOverlaps(0.5).pairs);
-  }
-  for (let k = 0; k < 60; k++) { s.stepFrame(); out.push(row(true)); }
-  const held = out.filter(r => r.hold);
-  s.P = PARAMS;
-  return { log: out, deep, strain, strainStopped: s.strainStopped, stoppedAt: s.strainStopped ? out.filter(r => !r.hold).at(-1).ext : null, wallMs: performance.now() - t, holdBottom: held.reduce((a, r) => a + r.bottom, 0) / held.length, holdTop: held.reduce((a, r) => a + r.top, 0) / held.length };
-}
-function curveShape(lg, h0, maxE) {
-  const reached = Math.max(...lg.filter(r => !r.hold).map(r => r.ext));
-  const bands = []; for (let e = 0; e <= Math.min(maxE, reached - 0.0125) + 1e-9; e += 0.05) bands.push(Math.round(e * 100) / 100);
-  const loadAt = e => { const near = lg.filter(r => !r.hold && Math.abs(r.ext - e) < 0.0125); return near.length ? near.reduce((a, r) => a + r.bottom, 0) / near.length : NaN; };
-  const loads = bands.map(loadAt);
-  const k = bands.slice(1).map((e, i) => (loads[i + 1] - loads[i]) / (0.05 * h0));
-  let pk = 0; loads.forEach((L, i) => { if (L > loads[pk]) pk = i; });
-  const pre = k.slice(0, Math.max(1, pk));
-  const kMax = Math.max(...pre), kMaxAt = bands[pre.indexOf(kMax)];
-  const kSoft = (k[0] + k[1]) / 2;
-  return { bands, loads, k, kSoft, kMax, kMaxAt, peak: loads[pk], peakAt: bands[pk], endOverPeak: loads.at(-1) / loads[pk] };
-}
-
-// ---- 4. scaling ------------------------------------------------------------------------------
-if (!flag('--no-scale')) {
-  console.log('\n== 4. ms per substep against swatch size (no certificate; 20 warm-up frames, then 10 timed)');
-  summary.scaling = [];
-  for (const n of QUICK ? [10, 20] : [10, 20, 30, 40]) {
-    const s = new KnitSim(makeStockinette(n, n));
-    for (let f = 0; f < 20; f++) s.stepFrame();
-    const steps0 = s.timing.steps, ms0 = s.timing.totalMs;
-    for (let f = 0; f < 10; f++) s.stepFrame();
-    const ms = (s.timing.totalMs - ms0) / (s.timing.steps - steps0);
-    const row = { wales: n, courses: n, points: s.n, pairs: s.nPairs, msPerSubstep: ms, usPerPoint: 1000 * ms / s.n, msPerFrame: ms * PARAMS.SUBSTEPS_PER_FRAME };
-    summary.scaling.push(row);
-    console.log(`  ${n} x ${n}: ${s.n} points, ${s.nPairs} contact pairs, ${fmt(ms, 3)} ms/substep (${fmt(row.usPerPoint, 3)} us/point), ${fmt(row.msPerFrame, 1)} ms per ${PARAMS.SUBSTEPS_PER_FRAME}-substep frame`);
-  }
-}
-
-function midWidth(s) {   // x extent of the points within one course pitch of the jaws' mid-height
-  const yMid = s.bottomY + s.jawGap() / 2, h = s.pitch.course;
-  let x0 = Infinity, x1 = -Infinity;
-  for (let i = 0; i < s.n; i++) { const y = s.x[3 * i + 1]; if (Math.abs(y - yMid) < h) { const x = s.x[3 * i]; if (x < x0) x0 = x; if (x > x1) x1 = x; } }
-  return x1 - x0;
-}
-
-fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summary, null, 1));
-console.log(`\nwrote ${path.join(OUT, 'summary.json')} and force-extension.csv`);
+fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify({ params: (await loadSim()).PARAMS, runs: Object.fromEntries(Object.entries(runs).map(([k, r]) => [k, { ...r, pull: { ...r.pull, rows: undefined }, jam: R[k].jam.ext, soft: R[k].soft, cycle: R[k].cyc }])) }, null, 1));
+fs.writeFileSync(path.join(OUT, 'load-unload.csv'), 'run,extension,load_bottom,phase,max_strain\n' + Object.entries(runs).flatMap(([k, r]) => r.pull.rows.map(x => [k, ...x].join(','))).join('\n') + '\n');
+console.log(`\nwrote ${path.join(OUT, 'summary.json')} and load-unload.csv`);
 console.log(failed ? `\n${failed} check(s) FAILED` : '\nall checks passed');
 process.exit(failed ? 1 : 0);
+
+// ---- the browser half ---------------------------------------------------------------------------
+async function browserGaps() {
+  const { createRequire } = await import('node:module'); const require = createRequire(import.meta.url);
+  let pw; try { pw = require('playwright'); } catch { pw = require('/opt/node22/lib/node_modules/playwright'); }
+  const http = await import('node:http');
+  const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon' };
+  const server = http.createServer((q, r) => { const f = path.join(ROOT, decodeURIComponent(q.url.split('?')[0])); if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(r); }).listen(0);
+  const browser = await pw.chromium.launch(), out = {};
+  for (const [k, hash] of [['worker', ''], ['main', '#WORKER=0']]) {
+    const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+    await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+    const errors = []; page.on('pageerror', e => errors.push(String(e)));
+    await page.goto(`http://localhost:${server.address().port}/knit-lab.html${hash}`);
+    await page.waitForFunction(() => window.__knitLab && window.__knitLab.state && window.__knitLab.state.phase === 'settling' && window.__knitLab.state.frame > 5, null, { timeout: 60000 });
+    // 6 s of animation frames, inside the settle
+    out[k] = { ...(await page.evaluate(() => new Promise(res => { const g = []; let last = 0; const t0 = performance.now(); const f = t => { if (last) g.push(t - last); last = t; if (t - t0 < 6000) requestAnimationFrame(f); else { g.sort((a, b) => a - b); res({ frames: g.length, ms: t - t0, p50: g[g.length >> 1], p95: g[Math.floor(g.length * 0.95)], max: g[g.length - 1], stillSettling: window.__knitLab.state.phase === 'settling' }); } }; requestAnimationFrame(f); }))), errors };
+    await page.close();
+  }
+  await browser.close(); server.close();
+  return out;
+}

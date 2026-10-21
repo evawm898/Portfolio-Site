@@ -1,5 +1,6 @@
-// tools/shot-knit-lab.mjs — screenshots of /knit-lab.html: start, settled, mid-pull, end of pull,
-// with the page's own timings. Usage: node tools/shot-knit-lab.mjs <out-dir> [#HASH=overrides]
+// tools/shot-knit-lab.mjs — screenshots of /knit-lab.html: plain and eyelet swatches settled, both
+// mid-pull (at +20%) and after the load-unload test, and the load-unload plot with both, with the
+// page's own timings. Usage: node tools/shot-knit-lab.mjs <out-dir> [#HASH=overrides]
 // Serves the repo itself; Google Fonts are aborted (the page falls back to its font stack).
 import http from 'node:http';
 import fs from 'node:fs';
@@ -23,27 +24,34 @@ const port = server.address().port;
 const browser = await pw.chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 1000 }, deviceScaleFactor: 1 });
 await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
-const errors = []; page.on('pageerror', e => errors.push(String(e)));
+const errors = []; page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto(`http://localhost:${port}/knit-lab.html${HASH}`);
 const stage = page.locator('.kl__grid');
-await page.waitForFunction(() => window.__knitLab && window.__knitLab.sim);
+await page.waitForFunction(() => window.__knitLab && window.__knitLab.state);
 await page.evaluate(() => document.querySelector('.kl').scrollIntoView());
-await page.waitForTimeout(150);
-await stage.screenshot({ path: path.join(OUT, '1-start.png') });
-const t0 = Date.now();
-await page.waitForFunction(() => window.__knitLab.sim.phase !== 'settling', null, { timeout: 600000, polling: 500 });
-const settle = await page.evaluate(() => { const s = window.__knitLab.sim; return { ...s.settledAt, wallMs: window.__knitLab.settleWallMs, msPerStep: s.timing.totalMs / s.timing.steps, n: s.n, worstDeep: window.__knitLab.worstDeep }; });
-await page.waitForTimeout(400);
-await stage.screenshot({ path: path.join(OUT, '2-settled.png') });
-await page.click('#klPull');
-await page.waitForFunction(() => window.__knitLab.sim.extension() > 0.2, null, { timeout: 600000, polling: 200 });
-await stage.screenshot({ path: path.join(OUT, '3-mid-pull.png') });
-await page.waitForFunction(() => { const s = window.__knitLab.sim; return s.strainStopped || s.pullOffset >= s.pullTarget; }, null, { timeout: 600000, polling: 500 });
-await page.waitForTimeout(500);
-await stage.screenshot({ path: path.join(OUT, '4-end-of-pull.png') });
-const end = await page.evaluate(() => { const s = window.__knitLab.sim; return { msPerStep: s.timing.totalMs / s.timing.steps, frameMs: s.timing.frameMs, drawMs: window.__knitLab.drawMs, worstDeep: window.__knitLab.worstDeep, logLen: window.__knitLab.log.length, extension: s.extension(), strainStopped: s.strainStopped }; });
-// frame rate while pulling: animation frames per second of wall time, measured over 3 s after a restart of the pull is not possible, so measure idle-held frames
-const fps = await page.evaluate(() => new Promise(r => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 3000) requestAnimationFrame(f); else r(n / ((performance.now() - t0) / 1000)); }; requestAnimationFrame(f); }));
-end.fpsHeld = fps;
-console.log(JSON.stringify({ settle, end, wallTotal: Date.now() - t0, errors }, null, 1));
+const out = { errors };
+const MID = 0.2;
+for (const sw of ['plain', 'eyelet']) {
+  if (sw !== 'plain') { await page.click(`[data-swatch="${sw}"]`); await page.waitForFunction(s => window.__knitLab.init && window.__knitLab.init.swatch === s && window.__knitLab.state, sw); }
+  const t0 = Date.now();
+  await page.waitForFunction(() => window.__knitLab.state.phase !== 'settling', null, { timeout: 900000, polling: 500 });
+  await page.waitForTimeout(600);
+  await stage.screenshot({ path: path.join(OUT, `${sw}-1-settled.png`) });
+  const settle = await page.evaluate(() => { const k = window.__knitLab, s = k.state; return { frames: s.settledAt.frames, wallMs: s.settleWallMs, msPerSubstep: s.timing.msPerSubstep, n: k.init.n, worstDeep: s.worstDeep }; });
+  await page.click('#klTest');
+  await page.waitForFunction(m => window.__knitLab.state.phase === 'pulling' && window.__knitLab.state.extension > m, MID, { timeout: 900000, polling: 100 });
+  await page.evaluate(() => window.__knitLab.send({ type: 'pause', value: true }));
+  await page.waitForTimeout(500);
+  const mid = await page.evaluate(() => window.__knitLab.state.extension);
+  await stage.screenshot({ path: path.join(OUT, `${sw}-2-mid-pull.png`) });
+  await page.evaluate(() => window.__knitLab.send({ type: 'pause', value: false }));
+  await page.waitForFunction(() => window.__knitLab.state.phase === 'done', null, { timeout: 900000, polling: 500 });
+  await page.waitForTimeout(600);
+  await stage.screenshot({ path: path.join(OUT, `${sw}-3-done.png`) });
+  const res = await page.evaluate(s => { const r = window.__knitLab.results[s]; return { jam: r.jam.ext, lossFraction: r.cycle.lossFraction, set: r.cycle.set, loadEnd: r.loadEnd, peak: r.peak, rows: r.rows.length }; }, sw);
+  out[sw] = { settle, midPullExtension: mid, result: res, wallMs: Date.now() - t0 };
+}
+await page.locator('#klChart').screenshot({ path: path.join(OUT, 'load-unload-plot.png') });
+await page.locator('.kl__panel').screenshot({ path: path.join(OUT, 'panel.png') });
+console.log(JSON.stringify(out, null, 1));
 await browser.close(); server.close();

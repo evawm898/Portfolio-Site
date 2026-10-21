@@ -4,7 +4,7 @@
 // order, left to right as the technical face is seen. Every loop records exactly one thing about
 // how it is held: `through`, the ids of the loops of the PREVIOUS course it was pulled through.
 //
-//   plain knit        through: [a]        one parent  — the only case this spike builds
+//   plain knit        through: [a]        one parent
 //   yarn over         through: []         no parent   — a new loop that holds nothing up
 //   k2tog / ssk       through: [a, b]     two parents — the list order is which one lies on
 //                                                       top (k2tog: [right, left], the
@@ -17,8 +17,8 @@
 // whatever was knitted. Only the INITIAL-GEOMETRY builder (knit-lab-sim.js, placeCourse)
 // reads `through` — to put each new loop's legs where they pierce its parent(s). So a yarn
 // over or a decrease is a change to the topology DATA plus one case in that builder, never a
-// change to the solver. The builder throws, by name, on any `through` length it does not draw
-// yet, rather than drawing something plausible and wrong.
+// change to the solver — and that is how the yarn over and the k2tog were added (one case each in
+// placeCourse; the solver did not change). The builder throws, by name, on more than two parents.
 //
 // The yarn's travel direction per course is part of the topology too: a flat swatch is knitted
 // back and forth, so the one yarn runs left->right on even courses and right->left on odd ones
@@ -36,6 +36,26 @@ export function makeStockinette(wales, courses) {
     rows.push(row);
   }
   return { loops, rows, flat: true };
+}
+
+// Stockinette with ONE EYELET ROW at course `at` (default: mid-height): a plain edge stitch each
+// side and "yo, k2tog" repeated between them, in knitting order (k1, [yo, k2tog] x n, k1 — on 10
+// wales, four eyelets). Each pair consumes two loops of the course below (the k2tog, right parent
+// on top) and makes two (the k2tog and the yarn over), so every course keeps `wales` loops and the
+// course above knits into them plainly. On a right-to-left course "yo, then k2tog" puts the yarn
+// over to the RIGHT of its decrease.
+export function makeEyelet(wales, courses, at = Math.floor(courses / 2)) {
+  const t = makeStockinette(wales, courses);
+  if (at < 1 || at >= courses - 1) throw new Error('makeEyelet: the eyelet row needs a course below and above it');
+  const below = t.rows[at - 1], row = t.rows[at], dir = courseDirection(t, at);
+  for (let k = 1; k + 2 < wales; k += 2) {
+    const [yoSlot, decSlot] = dir > 0 ? [k, k + 1] : [k + 1, k];
+    const yo = t.loops[row[yoSlot]], dec = t.loops[row[decSlot]];
+    yo.kind = 'yo'; yo.through = [];
+    dec.kind = 'k2tog'; dec.through = [below[k + 1], below[k]];      // [right, left]: the right one on top
+  }
+  t.eyelet = at;
+  return t;
 }
 
 // +1: the yarn runs left -> right along this course; -1: right -> left.
