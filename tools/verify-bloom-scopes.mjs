@@ -1009,7 +1009,12 @@ const MUTANTS = [
     from: '  const tiltExtra = owns && owns.petalTilt ? 0 : slot.tiltExtra;',
     to: '  const tiltExtra = slot.tiltExtra;',
     witness: (G) => Q35_PROBE(G).tiltDeg !== 35 },
-  { id: 'an-owned-length-keeps-the-ramp', breaks: ['SO6'],
+  /* SO13 too since big petals (Oct 21): SO13's planted state has layer 3 OWN a
+     40 mm length, which must take the root law (the over-reference arm). Keep
+     the ramp on an owned length and that layer builds under 35 mm and does not
+     taper — the arm the clause requires is not exercised, which is true of
+     this mutation, not collateral. Measured: reddens SO6 and SO13. */
+  { id: 'an-owned-length-keeps-the-ramp', breaks: ['SO6', 'SO13'],
     from: '  const lengthScale = owns && owns.petalLength ? (slot.sizeFactor ?? 1) : slot.scale;',
     to: '  const lengthScale = slot.scale;',
     witness: (G) => Q35_PROBE(G).asked !== 35 },
