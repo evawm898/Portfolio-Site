@@ -147,7 +147,7 @@ const timing = await page.evaluate(async () => {
     const ts = [];
     for (let i = 0; i < 40; i++) {
       const t0 = performance.now();
-      S.drawJersey(g, { nx: P.nx, ny: P.ny, W, C, H: L.H, map: (x, y) => [425 + x * 13, 340 - y * 13], widthPx: P.d * 13, bg: '#101414', samples: st.knitDraw.samples, colorOf: () => ({ body: [28, 107, 107], hi: [47, 163, 163] }) });
+      S.drawJersey(g, { nx: P.nx, ny: P.ny, W, C, H: L.H, map: (x, y) => [425 + x * 13, 340 - y * 13], widthPx: S.knitStyle.fullness * P.W0 * 13, bg: '#101414', samples: st.knitDraw.samples, colorOf: () => ({ mid: [47, 163, 163] }) });
       g.getImageData(0, 0, 1, 1); // flush
       ts.push(performance.now() - t0);
     }
