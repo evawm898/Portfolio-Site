@@ -166,7 +166,7 @@ const E2_TURN_BAND_DEG = 5e-5;
    directions: the count exactly, the worst within E7_INSET_BAND_MM. */
 const E7_INSET_BAND_MM = 5e-5;
 const E7_INSET_XFAIL = {
-  'ALL MAX': { profiles: 2, worstMm: 0.00971, note: 'the 150 mm root-tapered petal at its root-blend end; the inset bracket assumes an even section stretch (see above)' },
+  /* REMOVED BY THE WIDTH RANGE (Oct 21, petalWidth max 30 -> 46, the same PR): 'ALL MAX' was declared at 2 profiles / 0.00971 mm (the 150 mm root-tapered petal at its root-blend end) and reads 0 once its width is 46 — a wider section stretch at the root blend puts the inset bracket back on the bead. Re-declare by value if a later change brings it back. */
 };
 /* RE-RECORDED ON a4dc836 BY THE GATE-COVERAGE SESSION, ELEVEN MERGES LATE. This
    gate ran in no workflow (D14), so the apex nib (#283, 6ebf784) moved seven of

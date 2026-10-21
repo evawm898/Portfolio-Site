@@ -202,7 +202,10 @@ maximum x its size field's 1.5) on a 6.56 mm root body under every form control;
 at the root-blend end stop 0.00971 mm off the drawn bead radius against the builder's own 0.00958 mm
 bracket. That bracket is the half's ARC over 4096 while the bisection halves the section PARAMETER,
 which this section does not stretch evenly — a bound that assumed an even stretch, met for the first
-time. `E7_INSET_XFAIL` holds it both ways; the row is export-refused.
+time. `E7_INSET_XFAIL` held it both ways while the width range was 8–30; the row is export-refused.
+**AND THE WIDTH RANGE TOOK IT AWAY:** once `ALL MAX` asks a 46 mm width the same gate reads **0** off-bracket
+profiles in both modes, so the entry was REMOVED (X1's own both-directions rule — a record that stops
+reproducing is stale), with a comment in its place saying to re-declare it by value if it comes back.
 
 ## 6b. `petalWidth` to 46 mm (Eva's ruling 2, the same PR)
 
@@ -257,7 +260,48 @@ declared by value (the 23 mm cell reproduces at 0.981, unmoved). The triple
 under-the-bar cells, the triple's own worst cell going 0.390 -> **0.189 mm** (cup 1.2 x tip 3.00 x
 width 46). Seven new declarations; never clamped.
 
-PARTITION_AND_CENSUS_PLACEHOLDER
+## 6c. The byte partition and the census
+
+**The byte partition, one table** — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 4d0758d>
+--movers-predicate root-taper`, in seven `--range` chunks and closed with `--merge`, both modes, positionally
+under `Object.is`, every chunk run on the final predicate (the length clause and the width clause together),
+the movers PREDECLARED from the BASE tree's own build record:
+
+| class | rows | how it is decided |
+|---|---|---|
+| root-taper movers | **100** | the base builds a petal (or a raceme's floret head, or the hub's bound) asking more than 35 mm |
+| width movers | **19** — every one ALSO a root-taper mover | the base builds a petal whose COMPOSED width (global + scope offset) passes the base's own 30 mm bound; all 19 are FAN rows whose per-petal size offset doubles the petal, so they ask 70 mm as well |
+| width-only movers | **0** | measured, not assumed: a top-level `petalWidth` past 30 is not clamped on the base (the clamp acts on a composition), so `petalWidth max (46)` HOLDS to the bit |
+| holders | **1,385**, 0 floats moved | every row whose petals are all at or under 35 mm and whose widths compose inside 30 |
+
+**PASS — 100 of 100 predeclared movers moved and 0 floats moved on the 1,385 holders**, over
+1,709,607,456 export floats (189,956,384 triangles) and 81,492,282 captured-grid values in 9,425 panels The row-definition guard confirms the three declared redefinitions against the base matrix
+(`petalLength max (100)`, `petalWidth max (46)`, `ALL MAX`) and the 28 rows block 75 adds, and refuses an
+undeclared one; `phase81` (the 1,457 rows at `4d0758d`) still deep-compares equal to the base's own
+`buildMatrix()`.
+
+**The census, every move named** (`SELF_INTERSECTION_XFAIL`, X1's both-directions rule):
+
+- **Re-recorded by the root law** (11 entries, each note keeping the previous figure): the mum on a hemisphere
+  (228 / 0.2435 -> 219 / 0.3176), `ALL MAX`, and the nine FAN per-petal rows whose size offset asks 70 mm.
+- **Re-recorded again by the width** (the same nine FAN rows, §6b): petal 1's width offset now composes to 32,
+  so each carries two dated notes, the root law's and the width's.
+- **Removed** (2): `GYNOECIUM: style x the mum` and `STIGMA: a shaped stigma x the mum` read 0 — the mum's
+  60 mm petals thicken the hub to 1.75 sheets, so the style's root no longer overlaps itself inside the plate.
+- **Declared from birth** (5): the four block-75 folds (100 mm x curl 360 608 / 0.3738, 60 mm x curl 360
+  768 / 0.7060, 100 mm x tilt 90 a span-0 tangency 32 / 0.0000, 100 mm on a hemisphere 520 / 0.4619 — each
+  folding with the law OFF too) and **`FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min`, 294 / 0.3223**.
+  That last one reads 0 on `4d0758d`; every pair is in the ROOT BLEND (u < 0.30, worst u 0.018 beside the
+  foot-to-blade seam) of a 70 mm petal on a 0.6 mm sheet tilted to 75 on a FAN — a thick root turned hard over a
+  narrow foot. It reads 294 / 0.3187 with the root law alone and 294 / 0.3223 once the width reached 46. **It
+  was found by the browser export gate (X2), not by the Node census sweep, which this row had escaped** — said
+  plainly, because the sweep was the instrument this session leaned on.
+- **`ALL MAX`**: census 74,716 / 13.6547 -> **78,222 / 34.0787**, refusal **3,334,106** triangles (§6b).
+
+**Browser confirmation.** The eleven width-affected rows went through `node tools/verify-bloom-export.mjs
+--only`: ten reached the results, watertight, every X1 line "still failing at that magnitude" on the
+re-recorded figures — Chromium agrees with Node on all nine width re-records — and the eleventh was the ALL THIN
+row above, dropped on X2 until it was declared.
 
 ## 7. Open decisions for Eva — shipped as declared defaults
 

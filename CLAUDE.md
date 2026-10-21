@@ -1215,7 +1215,11 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   witnessed on the mutated module), SPAWNED by `verify-bloom-defaults-bar.mjs` both arms (DB3: the default builds
   no taper) — no workflow edit.
 - Block 75 (28 rows, 1,485), smoke block 75 (7); combination `cup-x-length` gains 80/100, `length-x-tilt` new
-  (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too.
+  (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too, plus
+  `FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min` (294 / 0.3223, 0 on main, all in the root blend of
+  a 70 mm petal on a 0.6 sheet — found by the browser X2, missed by the Node census sweep).
+- **Byte partition: 100 movers (19 of them width movers too, 0 width-only) / 1,385 holders at 0 floats**, both
+  modes (`--movers-predicate root-taper`, predeclared from the base tree).
 - **`petalWidth` is 8–46 (RULED Oct 21, default 16 unmoved)** — the shipping 35:16 proportion at 100 mm.
   `petalWidth max (46)` is redefined; `verify-bloom-surface-bytes`' `root-taper` predicate carries the width
   (a COMPOSED width past the base's 30 moves; a bare global does not — the base clamps compositions only) and a
@@ -1228,8 +1232,8 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   geometry and reddens the restated clause; `an-owned-length-moves-the-foot` is its standing mutant.
 - **A 100 mm petal's ROOT RIM turns ~53.5° against E2's 45° — RULED Oct 21: accepted, a chamfer (declared on the three smoke rows):** the rim
   taper eases a 3.88 mm root to the 1 mm bead in 3 mm. A bead scaled by the root factor moved it to 80 mm (61.9°); a
-  lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carries one
-  E7 edge declared by value (`E7_INSET_XFAIL`).
+  lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carried one
+  E7 edge (`E7_INSET_XFAIL`) until the width reached 46, where it reads 0 and the entry came off.
 - Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png` (2b: the root rim side-on).
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
