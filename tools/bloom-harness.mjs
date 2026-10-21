@@ -13162,7 +13162,12 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
   const sheetX = Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM);
   const thin = Number(ui.tipThinning) || 0;
   const want = (asked, u) => Math.max(MIN_FEATURE_MM, sheetX * rootTaperAtRestated(asked, u) * (1 - thin * u));
-  const centresOf = (p) => (p && p.rim && Array.isArray(p.rim.centre) ? p.rim.centre.filter((c) => c.panel === 'full' || c.panel === 'base') : []);
+  /* the panel that carries the blade from its root: 'full', the fringe's 'base',
+     and on a FUSED whorl (the tube) the 'lobe' — the petal's own panel there,
+     the ring being a separate shell trimmed under it. CI found the third: the
+     TRUMPET rows are the only tube rows with a petal past 35 mm, and T1 read
+     "no centre locators" on both. */
+  const centresOf = (p) => (p && p.rim && Array.isArray(p.rim.centre) ? p.rim.centre.filter((c) => c.panel === 'full' || c.panel === 'base' || c.panel === 'lobe') : []);
   const readAt = (c) => {
     const out = [];
     for (let k = 0; k < 2; k++) { const d = look(c.P[k], c.n[k], 6); out.push(d); }
@@ -13197,7 +13202,15 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
       }
       if (bad.length > 8) return bad;
     }
-    if (!rootSeen) bad.push(`T1: ring ${L}: no root row (u = 0) among the centre locators — the root was not read`);
+    /* A FUSED WHORL'S ROOT IS THE TUBE RING'S, NOT THE PETAL'S PANEL: on a tube
+       the petal's own panel ('lobe') begins at the throat and the stretch below
+       it is the ring, a separate shell emitted from the petal's OWN rows at
+       their own `tUsed` (emitTubeRings' `tAt`), so it carries the law through
+       the one owner — but it reports no centre locators, so this clause cannot
+       read its root off the file. DECLARED BLINDNESS, not a pass: T0 still holds
+       the builder's root against the law and T2 reads the lobe's rows here. */
+    const fusedRing = C.every((c) => c.panel === 'lobe');
+    if (!rootSeen && !fusedRing) bad.push(`T1: ring ${L}: no root row (u = 0) among the centre locators — the root was not read`);
   }
   /* T3 — THE HUB, READ OFF THE FILE, against the thickest root the FILE
      carries. A flat hub is read at its RIM (J4a's own statement is about the

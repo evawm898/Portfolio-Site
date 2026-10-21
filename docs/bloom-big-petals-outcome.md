@@ -342,6 +342,16 @@ the mum go 0 -> **272 / 0.0664** (main's figure, restored, above); the other thr
 before; **`ALL MAX` is unmoved at 78,222 / 34.0787 on 3,334,106 tris** (re-measured with `--include-refused`).
 Triangle counts move nowhere — a root span is not a lattice change.
 
+**The same run found T1 blind to a tube, and that is declared rather than worked around.** The two
+`OUTLINE CURVE 2: the TRUMPET` rows are the only TUBE rows with a petal past 35 mm (50 mm), and T1 read "no centre
+locators" on both: on a fused whorl the petal's own panel is named `lobe` and begins at the THROAT (u 0.49 there),
+and the stretch below it is the tube RING — a separate periodic shell emitted from the petal's own rows at their own
+`tUsed` (emitTubeRings' `tAt`), so the ring carries the root law through the one owner, but it reports no centre
+locators and T1 cannot read its root off the file. T1 now takes the `lobe` panel and does not require a root row on
+a fused whorl; T2 reads the lobe's rows (34 readings on the LAW trumpet, every one at the sheet the law asks above
+u 0.30) and T0 still holds the builder's root against the law. **Blindness, stated: nothing reads a tube ring's
+root thickness off the exported file.** Reading it would need the ring to report its own centre locators.
+
 ## 7. Open decisions for Eva — shipped as declared defaults
 
 1. **The reference length** — 35 mm, the shipping petal. Any other reference is one constant
