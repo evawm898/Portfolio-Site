@@ -1,0 +1,110 @@
+/* ---------------------------------------------------
+   Knit Lab — Field Notes lab page (feasibility spike)
+   Loads after styles.css and only adds the simulation band; the page
+   chrome (nav, header, hero, sections, footer) is the shared Field
+   Notes layout from styles.css.
+--------------------------------------------------- */
+
+.kl { border-bottom: 1px solid var(--line); }
+
+.kl__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+}
+
+.kl__stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: 6vw;
+  border-left: 1px solid var(--line);
+}
+
+.kl__canvas {
+  display: block;
+  width: 100%;
+  height: min(78vh, 760px);
+  background: var(--black);
+  cursor: default;
+  touch-action: none;
+}
+.kl__canvas.is-pullable { cursor: ns-resize; }
+
+.kl__stagebar {
+  border-top: 1px solid var(--line);
+  padding: 0.9rem 1.25rem 1.1rem;
+}
+
+.kl__progress {
+  height: 3px;
+  background: var(--line);
+  margin-bottom: 0.6rem;
+}
+.kl__progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--petrol-bright);
+  transition: width 0.15s linear;
+}
+
+.kl__status { font-size: 12px; color: var(--ink-dim); }
+
+.kl__panel {
+  border-left: 1px solid var(--line);
+  margin-right: 6vw;
+  padding: 1.75rem 1.5rem 2rem;
+}
+
+.kl__eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--petrol-bright);
+  margin: 2rem 0 1rem;
+}
+.kl__eyebrow:first-child { margin-top: 0; }
+
+.kl__buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+.kl__btn {
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+  text-align: left;
+}
+.kl__btn:hover:not(:disabled) { border-color: var(--petrol-bright); }
+.kl__btn:disabled { color: var(--ink-faint); cursor: default; }
+.kl__btn:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
+
+.kl__check { display: block; margin-top: 0.9rem; font-size: 12px; color: var(--ink-dim); }
+.kl__check input { accent-color: var(--petrol-bright); margin-right: 0.4rem; }
+
+.kl__hint, .kl__caption { font-size: 11px; color: var(--ink-faint); margin-top: 0.75rem; line-height: 1.5; }
+
+.kl__ro {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 0.9rem;
+  font-size: 12px;
+}
+.kl__ro dt { color: var(--ink-dim); }
+.kl__ro dd { text-align: right; font-variant-numeric: tabular-nums; }
+.kl__ro dd.is-bad { color: #e8b06e; }
+
+.kl__chart {
+  display: block;
+  width: 100%;
+  height: 180px;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .kl__grid { grid-template-columns: 1fr; }
+  .kl__stage { margin-left: 0; border-left: 0; }
+  .kl__canvas { height: 70vh; }
+  .kl__panel { margin-right: 0; border-left: 0; border-top: 1px solid var(--line); }
+}

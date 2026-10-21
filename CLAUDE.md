@@ -11210,6 +11210,25 @@ don't wait to be asked, and don't surface them only after the fact.
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
 
+## `/knit-lab` — yarn-level knit simulator spike (pointer only)
+
+Hidden page (`knit-lab.html`, `knit-lab.css`, `knit-lab.js`, `knit-lab-sim.js`, `knit-lab-topology.js`;
+`noindex`, unlinked). A FEASIBILITY SPIKE (Oct 21), not shipped work — read `docs/knit-lab-spike.md`
+before continuing it. 10 × 10 stockinette, one yarn as a point chain relaxed with XPBD (stretch,
+midpoint bending, capsule contact via a spatial hash / Verlet list), settled, then pulled.
+- **The topology is `through` per loop** (ids of the previous course's loops it passes through: 1 knit,
+  0 yo, 2 k2tog/ssk). Only the initial-geometry builder reads it, and it REFUSES anything but one parent
+  — yo/decreases are one case in `placeCourse`, not a solver change.
+- **Four boundary devices, each added because the run failed without it**: a comb of pins through the
+  live stitches (else the frictionless knit unravels), the yarn's end tied to the comb (else it
+  unravels from the tail under load — which faked a 4× rate dependence), two frictionless plates (else
+  the free sides roll forever), and a small tensile PRELOAD while settling (zero overshoots, buckles,
+  and the crumple locks). Damping is relative to the jaws' uniform stretch, never world-frame.
+- `tools/verify-knit-lab.mjs` (Node, ~3 min, `--rates`) measures everything incl. a per-substep
+  pass-through certificate; `tools/shot-knit-lab.mjs <dir>` takes the screenshots. **No CI covers it.**
+- `textile-knit-loops.js` is imported for the starting curve and must not be forked; the stretch
+  simulator is untouched.
+
 ## `/weave` — the Weave Draft and construction tool (pointer only)
 
 Hidden generative page (`weave.html`, `weave.css`, `weave.js`, `weave-draft.js`,
