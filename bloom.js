@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -954,8 +954,15 @@ const SCOPE_VALUE_SET = new Set([...SCOPE_VALUE_IDS, ...SEPAL_SCOPE_VALUE_IDS]);
    controls — the tier-scopeable set the file reader owns — and the Sepals
    section edits that tier. `{ kind: 'tier', layer: k, slot: 0 }`, k 0-based. */
 const TIER_IDS = new Set([...SCOPEABLE_TIER_IDS, ...SEPAL_SCOPE_VALUE_IDS]);
-const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : SCOPE_IDS);
-let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier', layer, slot } — the picked scope; null = the whole bloom
+/* A BRAID'S STRAND IS A SCOPE TOO (F1.3b — Eva's ruling 3: "pick a strand or
+   the bundle and edit what is picked", this picker reused): picking one binds
+   the three controls a strand owns (`SCOPE_STRAND_IDS`, the geometry's list) and
+   the Androecium section edits that strand; "the bundle" is the whole-bloom
+   option, where every androecium control edits the bundle.
+   `{ kind: 'strand', layer: i, slot: 0 }`, i the stamen's 0-based index. */
+const STRAND_IDS = new Set(SCOPE_STRAND_IDS);
+const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : v && v.kind === 'strand' ? STRAND_IDS : SCOPE_IDS);
+let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier' | 'strand', layer, slot } — the picked scope; null = the whole bloom
 const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
 let lastShown = null;              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
 const scopeBar = document.getElementById('scopeBar');
@@ -968,6 +975,8 @@ const scopeSpineReset = document.getElementById('scopeSpineReset');
 function scopeMode(ui) { return scopeLayersLive(ui) ? 'layer' : scopePetalsLive(ui) ? 'petal' : null; }
 /* THE TIERS NEED NO TOGGLE: a tier count above one IS the ask (F1.1a). */
 function tiersMode(ui) { return sepalTiersEligible(ui) && sepalTierCount(ui) > 1; }
+/* THE STRANDS NEED NO TOGGLE EITHER: a built braid IS the ask (F1.3b). */
+function strandsMode(ui) { return stamenBraidBuilt(ui); }
 const scopeValue = (v) => (v ? `${v.kind}:${v.layer}:${v.slot}` : '');
 /* THE SCOPES THIS ARRANGEMENT HAS, from footRing()'s own answers on the build
    on screen (`lastFoot`): its layer count, its slot count and its plane — so
@@ -1011,6 +1020,14 @@ function scopeOptions(ui) {
       out.push({ kind: 'tier', layer: T.tier, slot: 0, label: `Sepal tier ${T.tier + 1}${where}${own ? ' · own values' : ''}` });
     }
   }
+  /* THE STRANDS (F1.3b) — one per BUILT stamen of the braid on screen, from
+     the owner's own record; numbered from 1 as the read-out counts them. */
+  if (strandsMode(ui) && lastFoot.androecium) {
+    for (let i = 0; i < lastFoot.androecium.count; i++) {
+      const own = sc && sc.scopedStrands && sc.scopedStrands.includes(i);
+      out.push({ kind: 'strand', layer: i, slot: 0, label: `Strand ${i + 1} of ${lastFoot.androecium.count}${own ? ' · own values' : ''}` });
+    }
+  }
   return out;
 }
 /* A PICK, CANONICALISED: a petal pick names either member of a pair and binds
@@ -1018,6 +1035,7 @@ function scopeOptions(ui) {
 function canonicalScope(sel, ui) {
   if (!sel) return null;
   if (sel.kind === 'tier') return tiersMode(ui) ? { kind: 'tier', layer: Math.round(Number(sel.layer) || 0), slot: 0 } : null;
+  if (sel.kind === 'strand') return strandsMode(ui) ? { kind: 'strand', layer: Math.round(Number(sel.layer) || 0), slot: 0 } : null;
   const mode = scopeMode(ui);
   if (!mode) return null;
   const layer = Math.round(Number(sel.layer) || 0);
@@ -1033,10 +1051,18 @@ function scopeTermFor(v, ui) {
   const sb = scopesForBuild(scopes);
   if (!sb) return null;
   if (v.kind === 'tier') return sepalTierState(ui, sb, v.layer).term;
+  if (v.kind === 'strand') return strandOffsetsFor(sb, v.layer);
   return scopeOffsetsFor(sb, { layer: v.layer, slot: v.slot, n: lastFoot.slotCount, state: ui });
 }
 function scopeEffective(v, ui) {
   const eff = {};
+  if (v.kind === 'strand') {
+    /* through the geometry's own owners: the summed entries reaching the
+       strand and its clamp into the registry's bound */
+    const term = strandOffsetsFor(scopesForBuild(scopes), v.layer);
+    for (const id of SCOPE_STRAND_IDS) eff[id] = strandValue(ui, term, id);
+    return { eff, term };
+  }
   if (v.kind === 'tier') {
     /* through the geometry's own owner of a tier's state (`sepalTierState`):
        the global sepal value plus the tier's offset, clamped into the
@@ -1085,6 +1111,7 @@ function viewUi(ui) { return scopeView ? { ...ui, ...scopeEffective(scopeView, u
 let scopeLastInfill = null;   // { key, infill } — the picked scope's own plan off its last full build
 function scopeShown(shown) {
   if (!scopeView || !shown) return shown;
+  if (scopeView.kind === 'strand') return shown;
   if (scopeView.kind === 'tier') {
     /* THE PICKED TIER'S OWN RECORD under `sepals`, so every sepal read-out
        (the count's ceiling, the angle's limit, the foot, the size) quotes the
@@ -1151,13 +1178,13 @@ function relabelView() {
 function commitScopeOffset(id, desired) {
   const ui = readUI();
   const v = scopeView;
-  if (!scopes) scopes = { layers: [], petals: [], tiers: [] };
-  const list = v.kind === 'layer' ? scopes.layers : v.kind === 'tier' ? scopes.tiers : scopes.petals;
+  if (!scopes) scopes = { layers: [], petals: [], tiers: [], strands: [] };
+  const list = scopeListOf(v);
   /* THE ENTRIES THAT REACH THIS SCOPE, by the geometry's own rule
      (`scopeOffsetsFor`, `tierOffsetsFor`): a layer by its index, a tier by its
      index, a pair by its CANONICAL slot, matched exactly — never re-keyed at
      today's count (see the geometry's `scopeEntryNamesPair`). */
-  const reaches = (e) => (v.kind === 'tier' ? e.tier === v.layer : e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot));
+  const reaches = (e) => (v.kind === 'tier' ? e.tier === v.layer : v.kind === 'strand' ? e.strand === v.layer : e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot));
   let own = list.find(reaches) || null;
   let others = 0;
   for (const e of list) if (e !== own && reaches(e)) others += Number((e.offsets || {})[id]) || 0;
@@ -1187,7 +1214,7 @@ function commitScopeOffset(id, desired) {
       if (!Object.keys(own.offsets).length && !(own.values && Object.keys(own.values).length)) list.splice(list.indexOf(own), 1);
     }
   } else {
-    if (!own) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : v.kind === 'tier' ? { tier: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
+    if (!own) { own = newScopeEntry(v); list.push(own); }
     own.offsets[id] = d;
   }
   if (scopesAreEmpty(scopes)) scopes = null;
@@ -1217,12 +1244,13 @@ function inheritedOutlineValue(v, id, ui, own) {
   const res = resolvePetalValues(ui, term && term.values ? term.values : null, false);
   return res && id in res.state ? res.state[id] : ui[id];
 }
-const scopeListOf = (v) => (v.kind === 'layer' ? scopes.layers : v.kind === 'tier' ? (scopes.tiers || (scopes.tiers = [])) : scopes.petals);
+const scopeListOf = (v) => (v.kind === 'layer' ? scopes.layers : v.kind === 'tier' ? (scopes.tiers || (scopes.tiers = [])) : v.kind === 'strand' ? (scopes.strands || (scopes.strands = [])) : scopes.petals);
+function newScopeEntry(v) { return v.kind === 'layer' ? { layer: v.layer, offsets: {} } : v.kind === 'tier' ? { tier: v.layer, offsets: {} } : v.kind === 'strand' ? { strand: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; }
 function scopeOwnEntry(v, create) {
-  if (!scopes) { if (!create) return null; scopes = { layers: [], petals: [], tiers: [] }; }
+  if (!scopes) { if (!create) return null; scopes = { layers: [], petals: [], tiers: [], strands: [] }; }
   const list = scopeListOf(v);
-  let own = list.find((e) => (v.kind === 'tier' ? e.tier === v.layer : e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot))) || null;
-  if (!own && create) { own = v.kind === 'layer' ? { layer: v.layer, offsets: {} } : v.kind === 'tier' ? { tier: v.layer, offsets: {} } : { layer: v.layer, slot: v.slot, offsets: {} }; list.push(own); }
+  let own = list.find((e) => (v.kind === 'tier' ? e.tier === v.layer : v.kind === 'strand' ? e.strand === v.layer : e.layer === v.layer && (v.kind === 'layer' || e.slot === v.slot))) || null;
+  if (!own && create) { own = newScopeEntry(v); list.push(own); }
   return own;
 }
 function pruneScopeEntry(own, v) {
@@ -1290,18 +1318,20 @@ panelRoot.addEventListener('change', onScopedEdit, true);
 function syncScopeBar(ui) {
   const mode = scopeMode(ui);
   const tiers = tiersMode(ui);
-  scopeBar.hidden = !mode && !tiers;
+  const strands = strandsMode(ui);
+  scopeBar.hidden = !mode && !tiers && !strands;
   let changed = false;
   if (scopeView && !scopeIsValid(scopeView, ui)) { bindScope(null); changed = true; }
   const opts = scopeOptions(ui);
-  const want = [{ value: '', label: mode === 'petal' ? `Whole bloom (every petal${tiers ? ' and tier' : ''})` : mode === 'layer' ? `Whole bloom (every layer${tiers ? ' and tier' : ''})` : 'Whole bloom (every sepal tier)' },
+  const also = (tiers && mode ? ' and tier' : '') + (strands && (mode || tiers) ? ', and the whole bundle' : '');
+  const want = [{ value: '', label: mode === 'petal' ? `Whole bloom (every petal${also})` : mode === 'layer' ? `Whole bloom (every layer${also})` : tiers ? `Whole bloom (every sepal tier${strands ? ', and the whole bundle' : ''})` : 'The bundle (every strand)' },
     ...opts.map((o) => ({ value: scopeValue(o), label: o.label }))];
   const have = Array.from(scopePick.options).map((o) => `${o.value}|${o.textContent}`).join('\n');
   if (have !== want.map((o) => `${o.value}|${o.label}`).join('\n')) {
     scopePick.replaceChildren(...want.map((o) => { const el = document.createElement('option'); el.value = o.value; el.textContent = o.label; return el; }));
   }
   scopePick.value = scopeValue(scopeView);
-  scopeStatus.textContent = scopeStatusText(ui, mode || (tiers ? 'tier' : null));
+  scopeStatus.textContent = scopeStatusText(ui, mode || (tiers ? 'tier' : strands ? 'strand' : null));
   /* each reset shows iff the picked layer or pair owns a value of ITS group
      (the outline's, the spine's) */
   {
@@ -1319,7 +1349,15 @@ function syncScopeBar(ui) {
 function controlLabel(id) { const c = CONTROLS.find((x) => x.id === id); return c ? `"${c.label}"` : id; }
 function scopeStatusText(ui, mode) {
   if (!mode) return '';
-  const tiersToo = mode !== 'tier' && tiersMode(ui) ? ' Pick a sepal tier and the Sepals section edits just that tier.' : '';
+  const tiersToo = (mode !== 'tier' && mode !== 'strand' && tiersMode(ui) ? ' Pick a sepal tier and the Sepals section edits just that tier.' : '')
+    + (mode !== 'strand' && strandsMode(ui) ? ' Pick a strand of the braid and the Androecium section edits just that strand.' : '');
+  if (!scopeView && mode === 'strand') return 'Pick a strand of the braid and the Androecium section edits just that strand: its length, its radius in the bundle and its own turns, kept as offsets on the bundle\'s values. The bundle (the first option) is every strand: every androecium control edits it.';
+  if (scopeView && scopeView.kind === 'strand') {
+    const opt = scopeOptions(ui).find((o) => o.kind === 'strand' && o.layer === scopeView.layer);
+    const name = opt ? opt.label.replace(/ · own values$/, '') : '';
+    return [`Editing ${name}.`, 'Its length, its radius in the bundle and its own turns set its own values; every other androecium control still edits the whole bundle.',
+      'A strand wound at another radius or rate crosses the others — that is how a braid is varied.', 'The bundle ends the pick; nothing is lost.'].join(' ');
+  }
   if (!scopeView) {
     return (mode === 'layer'
       ? (String(ui.placement) === 'SPIRAL'
@@ -1367,7 +1405,7 @@ const stepDecimals = (c) => { const s = String(c.step); return s.includes('.') ?
 function refreshScopeNotes(ui) {
   const term = scopeView ? scopeTermFor(scopeView, ui) : null;
   const eff = scopeView ? scopeEffective(scopeView, ui).eff : null;
-  const name = scopeView ? (scopeView.kind === 'layer' ? `${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
+  const name = scopeView ? (scopeView.kind === 'layer' ? `${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${scopeView.layer + 1}` : scopeView.kind === 'tier' ? `Sepal tier ${scopeView.layer + 1}` : scopeView.kind === 'strand' ? `Strand ${scopeView.layer + 1}` : `Petal ${scopeView.slot + 1}`) : '';
   const ids = idsFor(scopeView);
   for (const c of CONTROLS) {
     const wrap = wrappers[c.id];
@@ -1399,8 +1437,13 @@ function refreshScopeNotes(ui) {
         const dp = stepDecimals(c);
         const g = Number(ui[c.id]);
         const asked = g + off;
-        text = `${name}: whole bloom ${g.toFixed(dp)} ${off >= 0 ? '+' : '−'} ${Math.abs(off).toFixed(dp)} offset = ${Number(eff[c.id]).toFixed(dp)}${eff[c.id] !== asked ? ` (clamped from ${asked.toFixed(dp)})` : ''}`;
+        text = `${name}: ${scopeView.kind === 'strand' ? 'the bundle' : 'whole bloom'} ${g.toFixed(dp)} ${off >= 0 ? '+' : '−'} ${Math.abs(off).toFixed(dp)} offset = ${Number(eff[c.id]).toFixed(dp)}${eff[c.id] !== asked ? ` (clamped from ${asked.toFixed(dp)})` : ''}`;
       }
+    } else if (scopeView && scopeView.kind === 'strand') {
+      /* under a picked strand every other ANDROECIUM control is the bundle's,
+         said with the file reader's own reason */
+      const why = wrap && c.section === 'androecium' ? scopeOffsetRefusal(c.id, 'strands') : null;
+      if (why) { cls = 'global'; text = `the bundle — ${why}`; }
     } else if (scopeView && scopeView.kind === 'tier') {
       /* under a picked tier the whole-bloom SEPAL values (the count, the tier
          count) say so with the file reader's own reason */
@@ -2806,7 +2849,7 @@ function stamenLine(fr, stamens, near, mode, fs = null) {
            ? ` · NO ROOM FOR THE INNER LIMIT: the disc, ${A.radius.toFixed(2)} mm, is inside the ${A.innerLimit.toFixed(2)} mm limit, so every stamen stands on the rim (told, never refused)`
            : ` · the disc runs from ${A.innerUsed.toFixed(2)} mm out — a filament radius plus a style radius, where a filament's tube clears a style's — in equal-area annuli`)
          : '')
-       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.lengthVariance > 0 ? ` ±${Math.round(A.lengthVariance * 100)}% random per stamen (seeded from its index) → ${A.lengthMinMm.toFixed(1)}–${A.lengthMaxMm.toFixed(1)} mm built${A.lengthsClamped ? `, ${A.lengthsClamped} of ${A.count} CLAMPED to the ${A.lengthRange[0]}–${A.lengthRange[1]} mm range (told, never silent)` : ''}` : ''}${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'}${A.coil ? ` · COILED (independent) r ${A.coil.radiusMm} mm × ${A.coil.turnsAsked} turns asked, each at its own phase (seeded from its index), ${A.coil.rows} stations a rod${A.coil.turnsClampedCount ? `, ${A.coil.turnsClampedCount} of ${A.count} CLAMPED to ${A.coil.turnsMin.toFixed(2)}–${A.coil.turnsMax.toFixed(2)} turns by the curvature floor (one sheet thickness of radius)` : ''}${A.coil.radiusClampedCount ? `, ${A.coil.radiusClampedCount} with the radius CLAMPED to ${A.coil.radiusMinMm.toFixed(2)} mm (too short to ramp it in)` : ''} — tightest radius of curvature ${A.coil.peakRadiusMm.toFixed(3)} mm${A.coil.underFloorCount ? `, ${A.coil.underFloorCount} UNDER ONE SHEET THICKNESS with the filament curl (told, never clamped)` : ''}` : ''} · anther ${A.anther.lumps === 1 ? 'PILL' : `${A.anther.lumps} LOBES`} ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
+       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.lengthVariance > 0 ? ` ±${Math.round(A.lengthVariance * 100)}% random per stamen (seeded from its index) → ${A.lengthMinMm.toFixed(1)}–${A.lengthMaxMm.toFixed(1)} mm built${A.lengthsClamped ? `, ${A.lengthsClamped} of ${A.count} CLAMPED to the ${A.lengthRange[0]}–${A.lengthRange[1]} mm range (told, never silent)` : ''}` : ''}${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'}${A.coil && A.coil.mode === 'BRAIDED' ? ` · BRAIDED — ONE bundle: every strand gathers from its own root onto the bundle's axis (the centre, the style's) in at most ${A.coil.gatherMaxMm.toFixed(1)} mm, then winds round it at r ${A.coil.radiusMm} mm × ${A.coil.turnsAsked} turns asked (${A.coil.revolutionsMin.toFixed(2)}–${A.coil.revolutionsMax.toFixed(2)} laid), ${A.coil.rows} stations a strand${A.coil.strandsScoped ? `, ${A.coil.strandsScoped} strand${A.coil.strandsScoped === 1 ? '' : 's'} with values of ${A.coil.strandsScoped === 1 ? 'its' : 'their'} own` : ''}${A.coil.gathersClampedCount ? `, ${A.coil.gathersClampedCount} of ${A.count} too short to gather all the way (they lean toward the bundle and do not wind, told)` : ''}${A.coil.turnsClampedCount ? `, ${A.coil.turnsClampedCount} of ${A.count} with the turns CLAMPED to ${A.coil.turnsMin.toFixed(2)}–${A.coil.turnsMax.toFixed(2)} by the curvature floor (one sheet thickness of radius)` : ''} — tightest radius of curvature ${A.coil.peakRadiusMm.toFixed(3)} mm${A.coil.underFloorCount ? `, ${A.coil.underFloorCount} UNDER ONE SHEET THICKNESS with the filament curl (told, never clamped)` : ''}; the strands touch and cross one another by design (separate closed solids, overlapping — the export contract's own case)` : ''}${A.coil && A.coil.mode !== 'BRAIDED' ? ` · COILED (independent) r ${A.coil.radiusMm} mm × ${A.coil.turnsAsked} turns asked, each at its own phase (seeded from its index), ${A.coil.rows} stations a rod${A.coil.turnsClampedCount ? `, ${A.coil.turnsClampedCount} of ${A.count} CLAMPED to ${A.coil.turnsMin.toFixed(2)}–${A.coil.turnsMax.toFixed(2)} turns by the curvature floor (one sheet thickness of radius)` : ''}${A.coil.radiusClampedCount ? `, ${A.coil.radiusClampedCount} with the radius CLAMPED to ${A.coil.radiusMinMm.toFixed(2)} mm (too short to ramp it in)` : ''} — tightest radius of curvature ${A.coil.peakRadiusMm.toFixed(3)} mm${A.coil.underFloorCount ? `, ${A.coil.underFloorCount} UNDER ONE SHEET THICKNESS with the filament curl (told, never clamped)` : ''}` : ''} · anther ${A.anther.lumps === 1 ? 'PILL' : `${A.anther.lumps} LOBES`} ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
        + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
        + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}${A.anther.lumps > 1 ? ', on each anther\'s first lobe' : ''}` : '')
        + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
@@ -5189,7 +5232,7 @@ function writeDesignStatus() {
   designStatus.hidden = false;
   if (d.action === 'saved') { designStatus.textContent = `saved ${d.name} — ${d.count} controls, version ${d.version}`; return; }
   if (d.action === 'refused') { designStatus.innerHTML = `<span class="bl-err">could not load ${esc(d.name)}: ${esc(d.error)}</span>`; return; }
-  const sc = d.scopes ? ` and ${d.scopes.layers} layer / ${d.scopes.petals} petal offset entr${d.scopes.layers + d.scopes.petals === 1 ? 'y' : 'ies'}${d.scopes.tiers ? ` and ${d.scopes.tiers} sepal tier entr${d.scopes.tiers === 1 ? 'y' : 'ies'}` : ''}` : '';
+  const sc = d.scopes ? ` and ${d.scopes.layers} layer / ${d.scopes.petals} petal offset entr${d.scopes.layers + d.scopes.petals === 1 ? 'y' : 'ies'}${d.scopes.tiers ? ` and ${d.scopes.tiers} sepal tier entr${d.scopes.tiers === 1 ? 'y' : 'ies'}` : ''}${d.scopes.strands ? ` and ${d.scopes.strands} strand entr${d.scopes.strands === 1 ? 'y' : 'ies'}` : ''}` : '';
   const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set${sc}`;
   if (!d.notes.length) { designStatus.textContent = `${head}; every field read clean, nothing to report`; return; }
   designStatus.innerHTML = `${esc(head)}; ${d.notes.length} note${d.notes.length === 1 ? '' : 's'}:\n`
@@ -5241,7 +5284,7 @@ function applyDesign(text, name = '(inline)') {
   const had = scopes;
   const missing = r.doc.overrides.missing || [];
   const next = {};
-  for (const k of ['layers', 'petals', 'tiers']) next[k] = missing.includes(k) ? ((had && had[k]) || []).map((e) => ({ ...e, offsets: { ...e.offsets } })) : r.doc.overrides[k];
+  for (const k of ['layers', 'petals', 'tiers', 'strands']) next[k] = missing.includes(k) ? ((had && had[k]) || []).map((e) => ({ ...e, offsets: { ...e.offsets } })) : r.doc.overrides[k];
   scopes = scopesAreEmpty(next) ? null : next;
   if (had !== null || scopes !== null) regenerate();   // a plain file onto a plain page rebuilt through the input events already
   const notes = r.notes.slice();
@@ -5250,7 +5293,7 @@ function applyDesign(text, name = '(inline)') {
      either carried into a scope offset or a global, or DROPPED, and each one
      arrives here as a `migrated` / `retired` note — printed below like every
      other note, never silent. */
-  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes, scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length } : null };
+  lastDesign = { action: 'loaded', name, applied, fields: CONTROLS.length, version: r.doc.version, notes, scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length, strands: (scopes.strands || []).length } : null };
   writeDesignStatus();
   return lastDesign;
 }

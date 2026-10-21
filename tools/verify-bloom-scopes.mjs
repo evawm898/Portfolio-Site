@@ -211,7 +211,11 @@ async function nodeClauses(G, F, R, rec) {
     if (JSON.stringify([...F.SCOPEABLE_TIER_IDS]) !== JSON.stringify(wantTier)) p.push(`SCOPEABLE_TIER_IDS differ from the restated census (sepal-role sliders less sepalCount and sepalTiers)`);
     const b = F.scopeBounds();
     for (const id of [...F.SCOPEABLE_IDS, ...F.SCOPEABLE_TIER_IDS]) { const c = kindOf.get(id); if (!b[id] || b[id].min !== c.min || b[id].max !== c.max) p.push(`scopeBounds.${id} is ${JSON.stringify(b[id])}, the registry says ${c.min}..${c.max}`); }
-    if (Object.keys(b).length !== F.SCOPEABLE_IDS.length + F.SCOPEABLE_TIER_IDS.length) p.push(`scopeBounds has ${Object.keys(b).length} entries for ${F.SCOPEABLE_IDS.length} + ${F.SCOPEABLE_TIER_IDS.length} scopeable ids`);
+    /* the braid's three strand ids (restated here, never imported): one strand's
+       length, coil radius and coil turns, with the registry's bounds */
+    const STRAND_RESTATED = ['stamenLength', 'stamenCoilRadius', 'stamenCoilTurns'];
+    for (const id of STRAND_RESTATED) { const c = kindOf.get(id); if (!b[id] || b[id].min !== c.min || b[id].max !== c.max) p.push(`scopeBounds.${id} is ${JSON.stringify(b[id])}, the registry says ${c.min}..${c.max}`); }
+    if (Object.keys(b).length !== F.SCOPEABLE_IDS.length + F.SCOPEABLE_TIER_IDS.length + STRAND_RESTATED.length) p.push(`scopeBounds has ${Object.keys(b).length} entries for ${F.SCOPEABLE_IDS.length} + ${F.SCOPEABLE_TIER_IDS.length} + ${STRAND_RESTATED.length} scopeable ids`);
     rec('SO0', p, `sheet thickness is the one unscoped control; ${F.SCOPEABLE_IDS.length} petal sliders are scopeable (layers / petals) and ${F.SCOPEABLE_TIER_IDS.length} sepal sliders (tiers), with the registry's own bounds; the 47 role ids are retired, migrate through migrateRoles, and no role table is exported`);
   }
   /* SO1 — the identity by branch */
@@ -634,6 +638,9 @@ async function nodeClauses(G, F, R, rec) {
       layers: [{ layer: 1, offsets: { petalCup: 0.25, petalSpineCurl: -30 } }],
       petals: [{ layer: 0, slot: 2, offsets: { petalTipShape: 0.4, petalLength: -5 } }, { layer: 0, slot: 0, offsets: { petalTwist: 0 } }],
       tiers: [{ tier: 0, offsets: { sepalCup: 0.1 } }],
+      /* the braid's strand container (the braid session): one strand's own
+         length and radius, carried and read back like any other entry */
+      strands: [{ strand: 1, offsets: { stamenLength: 4, stamenCoilRadius: -0.5 } }],
     };
     let rows = 0;
     for (const row of MATRIX) {
@@ -668,7 +675,7 @@ async function nodeClauses(G, F, R, rec) {
     { const r = F.readDoc(base()); if (r.notes.length) p.push(`a plain compose(DEFAULTS) reports ${texts(r)}`); if (!F.scopesAreEmpty(r.doc.overrides) || F.scopesForBuild(r.doc.overrides) !== null) p.push('empty containers do not read as no scopes'); }
     { const sc = F.scopesForBuild(fixture); if (!sc || sc.layers.length !== 1 || sc.petals.length !== 2 || sc.tiers.length !== 1 || !sc.bounds.petalCup || !sc.bounds.sepalCup) p.push('scopesForBuild did not carry the three lists and the bounds (the tier ids included)'); }
     { const sc = F.scopesForBuild({ layers: [], petals: [], tiers: [{ tier: 0, offsets: { sepalCup: 0.1 } }] }); if (!sc || sc.tiers.length !== 1) p.push('a tiers-only record builds nothing — scopesForBuild returned null (F1.1a: a tier entry builds a tier)'); }
-    rec('SO8', p, `${rows} live rows round-trip a two-layer / two-petal / one-tier record with no note; every written-down refusal fires by name; a tiers-only record reaches the build`);
+    rec('SO8', p, `${rows} live rows round-trip a two-layer / two-petal / one-tier / one-strand record with no note; every written-down refusal fires by name; a tiers-only record reaches the build`);
   }
   /* SO10 — THE TOGGLE GATE: an entry reaches a petal only while its toggle is
      LIVE (Scoping-b, "each is a toggle; off = today's panel exactly"). Every

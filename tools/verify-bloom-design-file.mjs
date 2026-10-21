@@ -119,7 +119,7 @@ const ONLY = (argv.find((a) => a.startsWith('--mutant=')) || '').slice(9).split(
    module under test. */
 const CENSUS = {
   top: ['format', 'version', 'app', 'savedAt', 'controls', 'overrides', 'curves'],
-  scopes: ['layers', 'petals', 'tiers'],
+  scopes: ['layers', 'petals', 'tiers', 'strands'],
   curves: ['spine', 'outline'],
   format: 'bloom-design',
   version: 1,

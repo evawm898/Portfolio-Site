@@ -277,7 +277,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, lobeSamplesPerLobe, ladderWindowCapacity, ladderGapFactor, LADDER_BLEND_GRID,
          petalGroupCount, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
          MAX_STAMENS, STAMEN_SIDES, STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_ROWS, tippedRodTris,
-         STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT, COIL_ROWS_PER_TURN, stamenCoilBuilt, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
+         STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT, COIL_ROWS_PER_TURN, stamenCoilBuilt, stamenBraidBuilt, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
          STEM_MIN_WALL_MM, STEM_DIAMETER_RANGE, STEM_LENGTH_RANGE,
          /* THE NOZZLE (ruling 7's land). A DECLARED print number, like
@@ -818,9 +818,9 @@ for (const [prefix, expect] of Object.entries(TIP_EXPECTED)) {
   const lenCtl = CONTROLS.find((c) => c.id === 'stamenLength'), varCtl = CONTROLS.find((c) => c.id === 'stamenLengthVariance');
   if (!lenCtl || lenCtl.min !== STAMEN_LENGTH_RANGE[0] || lenCtl.max !== STAMEN_LENGTH_RANGE[1]) throw new Error(`registry stamenLength ${lenCtl && `${lenCtl.min}..${lenCtl.max}`} is not the geometry's STAMEN_LENGTH_RANGE ${STAMEN_LENGTH_RANGE.join('..')} (Eva's fixed 120 mm ceiling, Oct 12)`);
   if (!varCtl || varCtl.min !== STAMEN_LENGTH_VARIANCE_RANGE[0] || varCtl.max !== STAMEN_LENGTH_VARIANCE_RANGE[1] || varCtl.default !== 0) throw new Error(`registry stamenLengthVariance ${varCtl && `${varCtl.min}..${varCtl.max} default ${varCtl.default}`} is not the geometry's STAMEN_LENGTH_VARIANCE_RANGE ${STAMEN_LENGTH_VARIANCE_RANGE.join('..')} with a default of 0 (the byte-identical guard)`);
-  /* F1.3a: the coil's two ranges are the GEOMETRY's declarations too, the mode is NONE / INDEPENDENT (BRAIDED is its own session and must not be reachable here), and NONE is the default (the byte-identical guard). */
+  /* F1.3a: the coil's two ranges are the GEOMETRY's declarations too, the mode is NONE / INDEPENDENT / BRAIDED (F1.3b added the braid, in that order, so a stored value keeps its meaning), and NONE is the default (the byte-identical guard). */
   const coilCtl = CONTROLS.find((c) => c.id === 'stamenCoil'), coilR = CONTROLS.find((c) => c.id === 'stamenCoilRadius'), coilN = CONTROLS.find((c) => c.id === 'stamenCoilTurns');
-  if (!coilCtl || coilCtl.default !== 'NONE' || JSON.stringify(coilCtl.options.map((o) => o.value)) !== JSON.stringify(['NONE', 'INDEPENDENT'])) throw new Error(`registry stamenCoil ${coilCtl && JSON.stringify(coilCtl.options.map((o) => o.value))} default ${coilCtl && coilCtl.default} — the coil is a choice NONE / INDEPENDENT defaulting to NONE (F1.3a; BRAIDED is a later session)`);
+  if (!coilCtl || coilCtl.default !== 'NONE' || JSON.stringify(coilCtl.options.map((o) => o.value)) !== JSON.stringify(['NONE', 'INDEPENDENT', 'BRAIDED'])) throw new Error(`registry stamenCoil ${coilCtl && JSON.stringify(coilCtl.options.map((o) => o.value))} default ${coilCtl && coilCtl.default} — the coil is a choice NONE / INDEPENDENT / BRAIDED defaulting to NONE (F1.3a, F1.3b)`);
   if (!coilR || coilR.min !== STAMEN_COIL_RADIUS_RANGE[0] || coilR.max !== STAMEN_COIL_RADIUS_RANGE[1] || coilR.default !== STAMEN_COIL_RADIUS_DEFAULT || coilR.min !== 0) throw new Error(`registry stamenCoilRadius ${coilR && `${coilR.min}..${coilR.max}`} is not the geometry's STAMEN_COIL_RADIUS_RANGE ${STAMEN_COIL_RADIUS_RANGE.join('..')} from 0`);
   if (!coilN || coilN.min !== STAMEN_COIL_TURNS_RANGE[0] || coilN.max !== STAMEN_COIL_TURNS_RANGE[1] || coilN.default !== STAMEN_COIL_TURNS_DEFAULT) throw new Error(`registry stamenCoilTurns ${coilN && `${coilN.min}..${coilN.max}`} is not the geometry's STAMEN_COIL_TURNS_RANGE ${STAMEN_COIL_TURNS_RANGE.join('..')}`);
   for (const placement of ['RADIAL', 'SPIRAL', 'CONTINUOUS', 'FAN']) {
@@ -840,12 +840,15 @@ for (const [prefix, expect] of Object.entries(TIP_EXPECTED)) {
            MODE is chosen on a present androecium; the turns iff the GEOMETRY
            builds a coil (`stamenCoilBuilt` — a radius of exactly 0 is the
            plain rod by branch, so its turns would be a dead slider). */
-        for (const stamenCoil of ['NONE', 'INDEPENDENT']) for (const stamenCoilRadius of [0, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_RADIUS_RANGE[1]]) {
+        for (const stamenCoil of ['NONE', 'INDEPENDENT', 'BRAIDED']) for (const stamenCoilRadius of [0, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_RADIUS_RANGE[1]]) {
           const sc = { ...st, stamenCoil, stamenCoilRadius };
           const present = geo && stamenCount >= 1, rShown = evalPredicate(coilR.visibleWhen, sc), nShown = evalPredicate(coilN.visibleWhen, sc), built = stamenCoilBuilt(sc);
-          if (rShown !== (present && stamenCoil === 'INDEPENDENT')) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens x coil ${stamenCoil} r ${stamenCoilRadius}: stamenCoilRadius is ${rShown ? 'shown' : 'hidden'}`);
+          /* F1.3b: the braid's two statements beside the coil's */
+          const braid = stamenBraidBuilt(sc), braidReg = evalPredicate({ ref: 'stamenBraidBuilt' }, sc);
+          if (braid !== braidReg || braid !== (built && stamenCoil === 'BRAIDED')) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens x coil ${stamenCoil} r ${stamenCoilRadius}: stamenBraidBuilt reads ${braid} (geometry) / ${braidReg} (registry)`);
+          if (rShown !== (present && stamenCoil !== 'NONE')) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens x coil ${stamenCoil} r ${stamenCoilRadius}: stamenCoilRadius is ${rShown ? 'shown' : 'hidden'}`);
           if (nShown !== built) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens x coil ${stamenCoil} r ${stamenCoilRadius}: stamenCoilTurns is ${nShown ? 'shown' : 'hidden'} while the geometry ${built ? 'builds' : 'builds no'} coil`);
-          if (built !== (present && stamenCoil === 'INDEPENDENT' && stamenCoilRadius > 0)) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens x coil ${stamenCoil} r ${stamenCoilRadius}: the geometry's stamenCoilBuilt reads ${built}`);
+          if (built !== (present && stamenCoil !== 'NONE' && stamenCoilRadius > 0)) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens x coil ${stamenCoil} r ${stamenCoilRadius}: the geometry's stamenCoilBuilt reads ${built}`);
         }
       }
     }
@@ -6060,6 +6063,98 @@ export function restatedCoil(i, L, R, n, t, curlRad) {
   return { phase, ramp, radius: Rb, radiusClamped, turns, turnsClamped, rows: STAMEN_ROWS + Math.ceil(n * COIL_ROWS_PER_TURN), at, kStraight, arc };
 }
 
+/* ===================================================================
+   THE BRAID, RESTATED (F1.3b — JS9's reference under BRAIDED). A braided
+   strand's centreline written a SECOND time from the controls, the row's own
+   strand scopes, the stamen's emitted root (its outer point, its normal and its
+   slot azimuth — JS1/JS2's verified quantities) and the hub's apex (the dome
+   the gate already holds the roots to): importing stamenBraidFor / braidLaw
+   would mutate with them and check nothing. The bundle's axis and the strand's
+   own centreline are the uniform arc in CLOSED FORM (sin / cos of k s), never
+   spineLaw's table; the gather's bound and its two bisections and the twist's
+   exact curvature on the coil's lattice are restated line for line —
+   arithmetic only, so the two engines agree to the bit on every decision.
+   Only COIL_ROWS_PER_TURN and STAMEN_ROWS are imported (declarations).
+   =================================================================== */
+export function restatedBraid({ L, Lr, R: Rasked, n, t, curlRad, outer, Up, azimuth, apexZ }) {
+  const F = (x) => x * x * x * (x * (6 * x - 15) + 10), F1 = (x) => 30 * x * x * (x - 1) * (x - 1), F2 = (x) => 60 * x * (x - 1) * (2 * x - 1);
+  const I = (x) => x * x * x * x * (x * (x - 3) + 2.5);
+  const Hh = (x) => x * (1 + x * x * (-6 + x * (8 - 3 * x))), Hh1 = (x) => 1 + x * x * (-18 + x * (32 - 15 * x)), Hh2 = (x) => x * (-36 + x * (96 - 60 * x));
+  const kb = curlRad / Lr, k = Math.abs(kb);
+  const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  /* the fold limit: a strand's lay radius at most 1/|k| - t */
+  const foldR = kb === 0 ? Infinity : Math.max(0, 1 / k - t), foldClamped = Rasked > foldR, R = foldClamped ? foldR : Rasked;
+  /* the bundle's frame at the apex: azimuth 0, slope 0 (every cap's normal is +z there) */
+  const z = [0, 0, 1], RsA = [1, 0, 0], nA = [-1, 0, 0], tA = [0, 1, 0], OA = [0, 0, apexZ + t / 2];
+  const zn = cr(z, nA), Om = [kb * zn[0], kb * zn[1], kb * zn[2]];
+  const th0 = Math.PI - azimuth;
+  const H = [0, 1, 2].map((j) => R * (Math.cos(th0) * nA[j] + Math.sin(th0) * tA[j]));
+  const w0 = [outer[0] - OA[0], outer[1] - OA[1], outer[2] - OA[2]];
+  const ow0 = cr(Om, w0), v0 = [0, 1, 2].map((j) => Up[j] - z[j] - ow0[j]);
+  const d = [0, 1, 2].map((j) => H[j] - w0[j]), D = Math.hypot(...d);
+  const W = (G, lam, x) => {
+    const f = lam * F(x), f1 = (lam * F1(x)) / G, f2 = (lam * F2(x)) / (G * G);
+    const h = lam * G * Hh(x) + (1 - lam) * G * x, h1 = lam * Hh1(x) + (1 - lam), h2 = (lam * Hh2(x)) / G;
+    return { w: [0, 1, 2].map((j) => w0[j] + f * d[j] + h * v0[j]), w1: [0, 1, 2].map((j) => f1 * d[j] + h1 * v0[j]), w2: [0, 1, 2].map((j) => f2 * d[j] + h2 * v0[j]) };
+  };
+  const kapG = (G, lam, x) => { const { w, w1, w2 } = W(G, lam, x); const c1 = [0, 1, 2].map((j) => z[j] + cr(Om, w)[j] + w1[j]); const c2 = [0, 1, 2].map((j) => cr(Om, c1)[j] + cr(Om, w1)[j] + w2[j]); const n1 = Math.hypot(...c1); return n1 === 0 ? Infinity : Math.hypot(...cr(c1, c2)) / (n1 * n1 * n1); };
+  const latticeMax = (fn, N) => { const kk = []; for (let j = 0; j <= N; j++) kk.push(fn(j / N)); let m = 0;
+    for (let j = 0; j <= N; j++) { if (kk[j] > m) m = kk[j]; if ((j > 0 && kk[j] < kk[j - 1]) || (j < N && kk[j] < kk[j + 1])) continue;
+      let lo = j > 0 ? (j - 1) / N : 0, hi = j < N ? (j + 1) / N : 1;
+      for (let it = 0; it < 64; it++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (fn(m1) < fn(m2)) lo = m1; else hi = m2; }
+      const kq = fn((lo + hi) / 2); if (kq > m) m = kq; }
+    return m; };
+  const gathers = (G, lam) => (G > 0 ? latticeMax((x) => kapG(G, lam, x), 128) * t <= 1 : D === 0 && Math.hypot(...v0) === 0);
+  let need, lam = 1;
+  const gClamped = !gathers(L, 1);
+  if (!gClamped) { let lo = 0, hi = L; if (gathers(0, 1)) hi = 0; else for (let it = 0; it < 52; it++) { const mid = (lo + hi) / 2; if (gathers(mid, 1)) hi = mid; else lo = mid; } need = hi; }
+  else { need = Infinity; let lo = 0, hi = 1; for (let it = 0; it < 52; it++) { const mid = (lo + hi) / 2; if (gathers(L, mid)) lo = mid; else hi = mid; } lam = lo; }
+  const G = Math.min(L, Math.max(need, (15 / 8) * D));
+  const Rb = gClamped ? lam * R : R, run = L - G;
+  const kapT = (w, T, x) => { const t1 = w * F(x), t2 = (w * F1(x)) / T, b = Rb * t1, c = -Rb * t1 * t1, dd = Rb * t2, q = 1 + b * b, e = -b * c; return Math.sqrt(e * e + c * c + dd * dd) / (q * Math.sqrt(q)); };
+  const rampOf = (nn) => Math.min(Lr / nn, run);
+  const ok = (nn) => run > 0 && latticeMax((x) => kapT((2 * Math.PI * nn) / Lr, rampOf(nn), x), 512) * t <= 1;
+  let turns = gClamped ? 0 : n; const turnsClamped = gClamped || !ok(n);
+  if (turnsClamped && !gClamped) { let lo = 0, hi = n; if (run > 0) for (let it = 0; it < 52; it++) { const mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; } turns = lo; }
+  const T = turns > 0 ? rampOf(turns) : run, w = (2 * Math.PI * turns) / Lr;
+  /* the bundle's axis in CLOSED FORM: the uniform arc of curvature kb in the azimuth-0 plane */
+  const at = (sArc) => {
+    const phi = kb * sArc, cp = Math.cos(phi), sp = Math.sin(phi);
+    const dR = kb === 0 ? sArc : Math.sin(phi) / kb, dZ = kb === 0 ? 0 : (1 - Math.cos(phi)) / kb;
+    const DA = [0, 1, 2].map((j) => z[j] * cp - RsA[j] * sp), N1 = [0, 1, 2].map((j) => -z[j] * sp - RsA[j] * cp);
+    const Aw = [0, 1, 2].map((j) => OA[j] + z[j] * dR - RsA[j] * dZ);
+    let wv, w1;
+    if (G > 0 && (sArc < G || lam < 1)) { const r = W(G, lam, Math.min(1, sArc / G)); wv = r.w; w1 = r.w1; }
+    else {
+      let om = 0, om1 = 0; const sg = sArc - G;
+      if (sg > 0) { if (sg < T) { const x = sg / T; om = w * T * I(x); om1 = w * F(x); } else { om = w * T / 2 + w * (sg - T); om1 = w; } }
+      const th = th0 + om, ct = Math.cos(th), st = Math.sin(th);
+      wv = [0, 1, 2].map((j) => R * (ct * nA[j] + st * tA[j])); w1 = [0, 1, 2].map((j) => R * om1 * (-st * nA[j] + ct * tA[j]));
+    }
+    const c1 = [0, 1, 2].map((j) => z[j] + cr(Om, wv)[j] + w1[j]);
+    const E = (u) => { const uz = dot(u, z), un = dot(u, nA), ut = dot(u, tA); return [0, 1, 2].map((j) => uz * DA[j] + un * N1[j] + ut * tA[j]); };
+    const Ew = E(wv), C1 = E(c1), sp1 = Math.hypot(...C1);
+    return { p: [0, 1, 2].map((j) => Aw[j] + Ew[j]), t: C1.map((v) => v / sp1), speed: sp1 };
+  };
+  const kStraight = turns > 0 ? (() => { let m = 0; for (let j = 0; j <= 4096; j++) m = Math.max(m, kapT(w, T, j / 4096)); return m; })() : 0;
+  let arc = 0; { const N = 2 * Math.ceil(((turns + 1) * 128) / 2), hh = L / N; for (let j = 0; j < N; j += 2) arc += (hh / 3) * (at(j * hh).speed + 4 * at((j + 1) * hh).speed + at((j + 2) * hh).speed); }
+  return { gather: G, lambda: lam, gatherClamped: gClamped, foldClamped, radius: Rb, turns, turnsClamped, rows: STAMEN_ROWS + Math.ceil(n * COIL_ROWS_PER_TURN), at, kStraight, arc, delta: D };
+}
+/* A STRAND'S OWN VALUE, restated from the row's own strand scopes and the
+   REGISTRY's bound — the geometry's `strandValue` written a second time. Live
+   only under a built braid; anywhere else every strand is the control's. */
+export function strandValueRestated(ui, row, i, id) {
+  if (!stamenBraidBuilt(ui)) return Number(ui[id]);
+  const sc = rowScopes(row);
+  const list = (sc && sc.strands) || [];
+  let off = 0, any = false;
+  for (const e of list) if (e.strand === i && e.offsets && id in e.offsets) { off += e.offsets[id]; any = true; }
+  if (!any) return Number(ui[id]);
+  const c = CONTROLS.find((x) => x.id === id);
+  return Math.min(c.max, Math.max(c.min, Number(ui[id]) + off));
+}
+
 export async function stamenAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
   const ui = await page.evaluate(() => window.__bloomUIState());
@@ -6085,7 +6180,12 @@ export async function stamenAssertions(page, row) {
      builds), on the real state, and the owner's record agreeing. */
   const coilWant = evalPredicate({ ref: 'stamenCoilBuilt' }, ui);
   if (coilWant !== stamenCoilBuilt(ui)) bad.push(`JS9: the registry's stamenCoilBuilt says ${coilWant} and the geometry's says ${stamenCoilBuilt(ui)} on this state`);
-  if ((A.coil !== null && A.coil !== undefined) !== coilWant) bad.push(`JS9: the owner ${A.coil ? 'declares a coil' : 'declares no coil'} while the state ${coilWant ? `asks for an independent coil of radius ${ui.stamenCoilRadius}` : 'asks for none (NONE, or a radius of exactly 0 — the plain rod by branch)'}`);
+  if ((A.coil !== null && A.coil !== undefined) !== coilWant) bad.push(`JS9: the owner ${A.coil ? 'declares a coil' : 'declares no coil'} while the state ${coilWant ? `asks for a ${String(ui.stamenCoil).toLowerCase()} coil of radius ${ui.stamenCoilRadius}` : 'asks for none (NONE, or a radius of exactly 0 — the plain rod by branch)'}`);
+  /* F1.3b: THE TWO STATEMENTS of "a braid is built", and the owner's record
+     naming the mode it built. */
+  const braidWant = evalPredicate({ ref: 'stamenBraidBuilt' }, ui);
+  if (braidWant !== stamenBraidBuilt(ui)) bad.push(`JS9: the registry's stamenBraidBuilt says ${braidWant} and the geometry's says ${stamenBraidBuilt(ui)} on this state`);
+  if (A.coil && (A.coil.mode === 'BRAIDED') !== braidWant) bad.push(`JS9: the owner's coil is ${A.coil.mode} while the state ${braidWant ? 'asks for the braid' : 'asks for an independent coil'}`);
   if (A.count !== count) bad.push(`JS0: the owner declares ${A.count} stamens, the control says ${count}`);
   if (A.thickness !== t || A.diameter !== t || A.rFil !== t / 2) bad.push(`JS3: the filament is ${A.diameter} across on a ${t} mm slab — it is meant to be one sheet thick, floored with it`);
   if (A.hubRadius !== m.hubRadius) bad.push(`JS2: the owner's androecium reads a hub radius of ${A.hubRadius}, the hub is ${m.hubRadius}`);
@@ -6121,7 +6221,7 @@ export async function stamenAssertions(page, row) {
     /* F1.3a: a coiled rod carries STAMEN_ROWS + ceil(turns asked x
        COIL_ROWS_PER_TURN) free stations — the rows restated from the CONTROL,
        never from the builder's record (JS9 holds the record to it). */
-    const rowsWant = coilWant ? STAMEN_ROWS + Math.ceil(Number(ui.stamenCoilTurns) * COIL_ROWS_PER_TURN) : STAMEN_ROWS;
+    const rowsWant = coilWant ? STAMEN_ROWS + Math.ceil(strandValueRestated(ui, row, i, 'stamenCoilTurns') * COIL_ROWS_PER_TURN) : STAMEN_ROWS;
     if (s.tris !== tippedRodTris(A.anther.lumps, A.anther.sides, rowsWant)) bad.push(`JS4: stamen ${i} emitted ${s.tris} triangles, a rod of ${rowsWant} free stations tipped with the ${A.anther.lumps} lump(s) this owner declares on a ${A.anther.sides}-side lattice is ${tippedRodTris(A.anther.lumps, A.anther.sides, rowsWant)} — a tip dropped, a tube doubled, or a lattice that is not the outline's`);
     if (!Array.isArray(s.lumps) || s.lumps.length !== A.anther.lumps) bad.push(`JS4: stamen ${i} emitted ${s.lumps && s.lumps.length} tips, the owner declares ${A.anther.lumps}`);
     /* JS6 — THE TIP AS EMITTED (session 26): its axis is the rod direction
@@ -6248,7 +6348,9 @@ export async function stamenAssertions(page, row) {
     let clampedWant = 0, minWant = Infinity, maxWant = -Infinity, reported = 0;
     for (let i = 0; i < count; i++) {
       const s = S[i];
-      const asked = amount === 0 ? Lctl : Lctl * (1 + amount * unitOf(i));
+      /* F1.3b: a braid's strand may carry its own length (its strand scope) */
+      const Li = strandValueRestated(ui, row, i, 'stamenLength');
+      const asked = amount === 0 ? Li : Li * (1 + amount * unitOf(i));
       const built = Math.min(hi, Math.max(lo, asked)), clamped = built !== asked;
       if (clamped) clampedWant++;
       minWant = Math.min(minWant, built); maxWant = Math.max(maxWant, built);
@@ -6283,7 +6385,50 @@ export async function stamenAssertions(page, row) {
      JS4's count and JS6's frame are blind to all of it — a coil drawn at the
      wrong phase, the wrong pitch or with no floor exports watertight, as one
      piece, at the same triangle count. */
-  if (coilWant && A.coil && S.length === count && count >= 1) {
+  /* JS9 UNDER THE BRAID (F1.3b) — every strand restated by `restatedBraid()`
+     from the controls, its strand scope and its EMITTED root, read against its
+     EMITTED ring centres; the end tangent the anther follows (ruling 2); the end
+     ring read off the artefact; both clamps counted both ways; SLENDERNESS the
+     longest restated wire; the restated twist held to the floor on a straight
+     axis. The builder's braid record is a reference for nothing here. */
+  if (coilWant && braidWant && A.coil && S.length === count && count >= 1) {
+    const C = A.coil, cRad = (Number(ui.stamenCurl) * Math.PI) / 180, Lr = Number(ui.stamenLength);
+    const amount = Number(ui.stamenLengthVariance), [lo, hi] = STAMEN_LENGTH_RANGE;
+    const unitOf = (i) => { let h = Math.imul((i | 0) + 1, 0x9E3779B1) >>> 0; h = (h ^ (h >>> 15)) >>> 0; h = Math.imul(h, 0x85EBCA6B) >>> 0; h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xC2B2AE35) >>> 0; h = (h ^ (h >>> 16)) >>> 0; return (h / 0xFFFFFFFF) * 2 - 1; };
+    const apexZ = dome ? dome.centreZ + dome.Rd : 0;
+    let turnsClampedWant = 0, gatherClampedWant = 0, foldClampedWant = 0, arcMax = -Infinity, reported = 0;
+    for (let i = 0; i < count; i++) {
+      const s = S[i];
+      const Li = strandValueRestated(ui, row, i, 'stamenLength'), R = strandValueRestated(ui, row, i, 'stamenCoilRadius'), n = strandValueRestated(ui, row, i, 'stamenCoilTurns');
+      const asked = amount === 0 ? Li : Li * (1 + amount * unitOf(i)), L = Math.min(hi, Math.max(lo, asked));
+      const rowsWant = STAMEN_ROWS + Math.ceil(n * COIL_ROWS_PER_TURN);
+      const rb = restatedBraid({ L, Lr, R, n, t, curlRad: cRad, outer: s.outer, Up: s.N, azimuth: s.azimuth, apexZ });
+      if (rb.turnsClamped) turnsClampedWant++;
+      if (rb.gatherClamped) gatherClampedWant++;
+      if (rb.foldClamped) foldClampedWant++;
+      arcMax = Math.max(arcMax, rb.arc);
+      if (rb.kStraight * t > 1 + 1e-9) bad.push(`JS9: the RESTATED braid's twist on strand ${i} reads a radius of curvature of ${1 / rb.kStraight} mm on a straight axis, under the ${t} mm floor — the restatement itself is wrong`);
+      if (!Array.isArray(s.stations) || s.stations.length !== 2 + rowsWant) { bad.push(`JS9: strand ${i} was revolved through ${s.stations && s.stations.length} ring centres; ${n} asked turns is 2 root rings + ${rowsWant} free stations`); continue; }
+      const tol = 1e-8 * Math.max(1, L + R + Math.hypot(...s.outer));
+      for (let k = 1; k <= rowsWant; k++) {
+        const want = rb.at((k / rowsWant) * L).p, got = s.stations[1 + k];
+        const dd = Math.hypot(got[0] - want[0], got[1] - want[1], got[2] - want[2]);
+        if (dd > tol) { if (reported++ < 4) bad.push(`JS9: strand ${i}'s free station ${k} of ${rowsWant} is emitted ${dd} mm off the braid restated from the controls and its root (radius ${R}, gather ${rb.gather.toFixed(3)} mm${rb.gatherClamped ? ` CLAMPED at lambda ${rb.lambda}` : ''}, ${rb.turns} turns${rb.turnsClamped ? ' CLAMPED' : ''}, length ${L} mm, curl ${ui.stamenCurl} deg)`); break; }
+      }
+      const D = rb.at(L).t;
+      for (let c = 0; c < 3; c++) if (Math.abs(s.dir[c] - D[c]) > 1e-9) { bad.push(`JS9: strand ${i}'s rod ends along ${JSON.stringify(s.dir)}; the braid's restated END TANGENT is ${JSON.stringify(D)} — the anther must follow it (ruling 2)`); break; }
+      if (A.anther.spreadRad === 0 && s.lumps && s.lumps[0]) for (let c = 0; c < 3; c++) if (Math.abs(s.lumps[0].axis[c] - D[c]) > 1e-9) { bad.push(`JS9: strand ${i}'s anther points along ${JSON.stringify(s.lumps[0].axis)}, not the braid's restated end tangent ${JSON.stringify(D)}`); break; }
+      if (!s.coil || !Array.isArray(s.coil.endRing) || !s.coil.endRing[0]) { bad.push(`JS9: strand ${i} reports no emitted end ring — the tip's frame cannot be read off the artefact`); continue; }
+      const last = s.stations[s.stations.length - 1], P0 = s.coil.endRing[0];
+      const e1 = [(P0[0] - last[0]) / A.rFil, (P0[1] - last[1]) / A.rFil, (P0[2] - last[2]) / A.rFil];
+      if (Math.abs(Math.hypot(...e1) - 1) > 1e-9 || Math.abs(e1[0] * D[0] + e1[1] * D[1] + e1[2] * D[2]) > 1e-9) bad.push(`JS9: strand ${i}'s emitted end ring is not a ring about the restated end tangent (|e1| ${Math.hypot(...e1)}, e1.D ${e1[0] * D[0] + e1[1] * D[1] + e1[2] * D[2]})`);
+      const eT = s.coil.endT;
+      if (!eT || Math.abs(eT[0] * e1[0] + eT[1] * e1[1] + eT[2] * e1[2] - 1) > 1e-9) bad.push(`JS9: strand ${i}'s reported tip frame ${JSON.stringify(eT)} is not the ring vector read off its emitted end ring ${JSON.stringify(e1)}`);
+    }
+    if (C.turnsClampedCount !== turnsClampedWant || C.gathersClampedCount !== gatherClampedWant || C.foldClampedCount !== foldClampedWant) bad.push(`JS9: the owner says ${C.turnsClampedCount} turn count(s) CLAMPED, ${C.gathersClampedCount} gather(s) short and ${C.foldClampedCount} lay radi(i) held to the FOLD LIMIT; the restated braid clamps ${turnsClampedWant}, ${gatherClampedWant} and ${foldClampedWant}`);
+    if (Math.abs(A.slenderness - arcMax / t) > 1e-6 * (arcMax / t)) bad.push(`JS9: SLENDERNESS reads ${A.slenderness}; the longest restated braided strand ${arcMax} mm over the ${t} mm diameter is ${arcMax / t} — under a braid it is the WIRE's length`);
+  }
+  if (coilWant && !braidWant && A.coil && S.length === count && count >= 1) {
     const C = A.coil, R = Number(ui.stamenCoilRadius), n = Number(ui.stamenCoilTurns), cRad = (Number(ui.stamenCurl) * Math.PI) / 180;
     const Lctl = Number(ui.stamenLength), amount = Number(ui.stamenLengthVariance), [lo, hi] = STAMEN_LENGTH_RANGE;
     const unitOf = (i) => { let h = Math.imul((i | 0) + 1, 0x9E3779B1) >>> 0; h = (h ^ (h >>> 15)) >>> 0; h = Math.imul(h, 0x85EBCA6B) >>> 0; h = (h ^ (h >>> 13)) >>> 0; h = Math.imul(h, 0xC2B2AE35) >>> 0; h = (h ^ (h >>> 16)) >>> 0; return (h / 0xFFFFFFFF) * 2 - 1; };
