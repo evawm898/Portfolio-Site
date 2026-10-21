@@ -13,17 +13,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { weftCourse, tricotYarn, toPath, crossings, slice, JERSEY_REST } from '../../textile-knit-loops.js';
+import { tricotYarn, toPath, crossings, notchPath, WEFT_PANEL, weftPanelCourses } from '../../textile-knit-loops.js';
 
-const PANEL = { w: 460, h: 300 };
-const SW = 7, HALO = 2;                    // yarn width; background gap each side of a front strand
+const PANEL = { w: WEFT_PANEL.w, h: WEFT_PANEL.h };
+const { SW, HALO } = WEFT_PANEL;           // yarn width; background gap each side of a front strand
 const INK = 'var(--ink)', DIM = 'var(--ink-dim)', ACCENT = 'var(--petrol-bright)';
-
-function notch(pts, s, halfLen) {
-  const i = Math.max(0, Math.min(pts.length - 2, Math.floor(s)));
-  const seg = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y) || 1;
-  return toPath(slice(pts, s - halfLen / seg, s + halfLen / seg));
-}
 
 // strands -> { defs, paths } with per-strand occlusion masks
 function masked(strands, id, color) {
@@ -32,7 +26,7 @@ function masked(strands, id, color) {
   strands.forEach((pts, i) => {
     const bites = X.filter(x => (x.a === i && x.front === 'b') || (x.b === i && x.front === 'a')).map(x => {
       const F = x.front === 'a' ? x.a : x.b, s = x.front === 'a' ? x.ia + x.ta : x.ib + x.tb;
-      return `<path d="${notch(strands[F], s, SW / 2 + HALO)}" stroke-width="${SW + 2 * HALO}"/>`;
+      return `<path d="${notchPath(strands[F], s, SW / 2 + HALO)}" stroke-width="${SW + 2 * HALO}"/>`;
     }).join('');
     defs += `<mask id="${id}-m${i}" maskUnits="userSpaceOnUse" x="0" y="0" width="${PANEL.w}" height="${PANEL.h}"><rect width="${PANEL.w}" height="${PANEL.h}" fill="#fff"/><g fill="none" stroke="#000" stroke-linecap="round">${bites}</g></mask>`;
     const delay = i ? ` delay${Math.min(i, 4)}` : '';
@@ -41,12 +35,8 @@ function masked(strands, id, color) {
   return { defs, paths, crossings: X.length };
 }
 
-// ---- weft: four courses, six wales, accent on the third course ------------------------
-const WEFT = { x0: 76, W: 62, H: 52, n: 6, courses: 4, top: 60 };
-WEFT.L = JERSEY_REST.loopPerCourse * WEFT.H;
-const weft = masked(
-  Array.from({ length: WEFT.courses }, (_, c) => weftCourse({ x0: WEFT.x0, cy: WEFT.top + c * WEFT.H + 36, W: WEFT.W, L: WEFT.L, n: WEFT.n })),
-  'kw', i => i === 2 ? ACCENT : (i === 0 ? INK : DIM));
+// ---- weft: four courses, six wales, accent on the third course (geometry: WEFT_PANEL) ----
+const weft = masked(weftPanelCourses(), 'kw', i => i === 2 ? ACCENT : (i === 0 ? INK : DIM));
 
 // ---- warp: open-lap tricot over four wales; the two edge yarns fade out at the sides ----
 const WARP = { x0: 100, W: 70, H: 48, y0: 232, courses: 4, wales: 4 };

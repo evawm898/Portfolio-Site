@@ -62,39 +62,42 @@
     </div>
 
     <div class="tx-chain">
-      <div class="tx-chain-node">
-        <svg class="icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M8 36C8 20 20 8 36 8" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>
-          <path d="M8 36C8 26 14 14 26 10" stroke="var(--petrol-bright)" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-        </svg>
+      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="fiber">
+        <div class="tx-anim"><svg role="img" aria-label="Short, crimped staple fibers drifting loose; one is teal"></svg></div>
         <div class="label">Fiber</div>
         <div class="sub">the base ingredient</div>
       </div>
       <div class="tx-chain-arrow">&rarr;</div>
-      <div class="tx-chain-node">
-        <svg class="icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M6 22C10 16 14 28 18 22C22 16 26 28 30 22C34 16 38 28 38 22" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/>
-          <path d="M6 22C10 16 14 28 18 22C22 16 26 28 30 22C34 16 38 28 38 22" stroke="var(--petrol-bright)" stroke-width="2" stroke-linecap="round" opacity="0.5" transform="translate(0,6)"/>
-        </svg>
+      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="yarn">
+        <div class="tx-anim"><svg role="img" aria-label="The same fibers gather, line up, and twist into a yarn; the teal fiber spirals through it"></svg></div>
         <div class="label">Yarn</div>
         <div class="sub">fibers, twisted together</div>
       </div>
       <div class="tx-chain-arrow">&rarr;</div>
-      <div class="tx-chain-node">
-        <svg class="icon" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M6 6H38V38H6V6Z" stroke="var(--ink)" stroke-width="2"/>
-          <path d="M6 16H38M6 26H38M16 6V38M26 6V38" stroke="var(--petrol-bright)" stroke-width="1.2" opacity="0.6"/>
-        </svg>
+      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="fabric">
+        <div class="tx-anim"><svg role="img" aria-label="That yarn is woven over and under a row of warp yarns, pick after pick"></svg></div>
         <div class="label">Fabric</div>
         <div class="sub">woven, knit, or nonwoven</div>
       </div>
     </div>
 
-    <ul class="project__list" style="margin-top: 2.5rem;">
-      <li>Wovens interlace two sets of yarns at right angles &mdash; strong, stable, structured.</li>
-      <li>Knits interloop a single system of yarns &mdash; stretchy, soft, flexible.</li>
-      <li>Nonwovens bond fibers directly, without weaving or knitting &mdash; light, cheap, less durable.</li>
-    </ul>
+    <div class="tx-types">
+      <div class="tx-types__label">Types of fabric</div>
+      <div class="tx-types__grid">
+        <figure class="tx-type" data-tx-anim="knit">
+          <div class="tx-anim"><svg role="img" aria-label="Loops of yarn forming course by course into jersey knit"></svg></div>
+          <figcaption><span class="label">Knit</span><span class="sub">Knits interloop a single system of yarns &mdash; stretchy, soft, flexible.</span></figcaption>
+        </figure>
+        <figure class="tx-type" data-tx-anim="woven">
+          <div class="tx-anim"><svg role="img" aria-label="Close-up of finished plain weave: yarns crossing over and under at right angles"></svg></div>
+          <figcaption><span class="label">Woven</span><span class="sub">Wovens interlace two sets of yarns at right angles &mdash; strong, stable, structured.</span></figcaption>
+        </figure>
+        <figure class="tx-type" data-tx-anim="nonwoven">
+          <div class="tx-anim"><svg role="img" aria-label="Loose fibers settle into a web, are pressed flat, and are fused at bond points"></svg></div>
+          <figcaption><span class="label">Nonwoven</span><span class="sub">Nonwovens bond fibers directly, without weaving or knitting &mdash; light, cheap, less durable.</span></figcaption>
+        </figure>
+      </div>
+    </div>
   </section>
 
   <!-- ================= FIBERS ================= -->
@@ -526,6 +529,12 @@
 </footer>
 
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<!-- #what-is-a-textile: the Fiber / Yarn / Fabric and Knit / Woven / Nonwoven animations -->
+<script type="module">
+  import { mountTextileBasics } from './textile-basics.js';
+  mountTextileBasics();
+</script>
 
 </body>
 </html>

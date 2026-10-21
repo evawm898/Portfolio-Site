@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Textile basics — animation prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="../../textile-101.css">
+</head>
+<body>
+<main>
+  <section class="tx-topic" id="what-is-a-textile">
+    <div class="tx-topic-head">
+      <h2>What Is a Textile?</h2>
+      <div class="tx-topic-copy">
+        <p>Every textile &mdash; no matter how technical &mdash; comes from the same three-step chain. A fiber gets twisted or spun into a yarn, and that yarn becomes a fabric: woven, knit, or bonded into a nonwoven.</p>
+        <p class="muted">Everything downstream &mdash; strength, stretch, moisture management, durability &mdash; traces back to choices made at each of these three steps.</p>
+      </div>
+    </div>
+
+    <div class="tx-chain">
+      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="fiber">
+        <div class="tx-anim"><svg role="img" aria-label="Short, crimped staple fibers drifting loose; one is teal"></svg></div>
+        <div class="label">Fiber</div>
+        <div class="sub">the base ingredient</div>
+      </div>
+      <div class="tx-chain-arrow">&rarr;</div>
+      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="yarn">
+        <div class="tx-anim"><svg role="img" aria-label="The same fibers gather, line up, and twist into a yarn; the teal fiber spirals through it"></svg></div>
+        <div class="label">Yarn</div>
+        <div class="sub">fibers, twisted together</div>
+      </div>
+      <div class="tx-chain-arrow">&rarr;</div>
+      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="fabric">
+        <div class="tx-anim"><svg role="img" aria-label="That yarn is woven over and under a row of warp yarns, pick after pick"></svg></div>
+        <div class="label">Fabric</div>
+        <div class="sub">woven, knit, or nonwoven</div>
+      </div>
+    </div>
+
+    <div class="tx-types">
+      <div class="tx-types__label">Types of fabric</div>
+      <div class="tx-types__grid">
+        <figure class="tx-type" data-tx-anim="knit">
+          <div class="tx-anim"><svg role="img" aria-label="Loops of yarn forming course by course into jersey knit"></svg></div>
+          <figcaption><span class="label">Knit</span><span class="sub">Knits interloop a single system of yarns &mdash; stretchy, soft, flexible.</span></figcaption>
+        </figure>
+        <figure class="tx-type" data-tx-anim="woven">
+          <div class="tx-anim"><svg role="img" aria-label="Close-up of finished plain weave: yarns crossing over and under at right angles"></svg></div>
+          <figcaption><span class="label">Woven</span><span class="sub">Wovens interlace two sets of yarns at right angles &mdash; strong, stable, structured.</span></figcaption>
+        </figure>
+        <figure class="tx-type" data-tx-anim="nonwoven">
+          <div class="tx-anim"><svg role="img" aria-label="Loose fibers settle into a web, are pressed flat, and are fused at bond points"></svg></div>
+          <figcaption><span class="label">Nonwoven</span><span class="sub">Nonwovens bond fibers directly, without weaving or knitting &mdash; light, cheap, less durable.</span></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+</main>
+<script type="module">
+  import { mountTextileBasics } from '../../textile-basics.js';
+  const q = new URLSearchParams(location.search);
+  window.__tb = mountTextileBasics(document, { ...(q.has('reduce') ? { reducedMotion: true } : {}), ...(q.has('still') ? { autoplay: false } : {}) });
+</script>
+</body>
+</html>
