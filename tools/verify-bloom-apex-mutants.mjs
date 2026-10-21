@@ -2943,6 +2943,25 @@ const MUTANTS = [
      from the controls, the index and the row's @scopes against the EMITTED
      rings. Scoped to the braid rows (`rows: BRAID_ROWS`, and the rows carry
      `for: /braid|strand/`), so no shard pays for them on every row. */
+  /* BIG PETALS (Oct 21): THE PARTS' ROOT SPAN FOLLOWS THE HUB. A petal past
+     35 mm thickens the hub plate, and a stamen or the style is rooted THROUGH
+     that slab (footRing()'s `rootSpan`); a root one sheet long sits wholly
+     inside the plate and the part loses (hub - sheet)/2 of visible length.
+     JS1 / JG1 read the emitted root's span against the hub. Found in CI on
+     ALL MAX; witnessed on the mutated module's own stamen and style records.
+     It NAMES JS1 ONLY: this table runs stamenAssertions and never the
+     gynoecium family, so JG1 cannot fire here (measured: SILENT) — the same
+     `rootSpan` reaches the style, and JG1 is held by both STL gates on the
+     mum's style and stigma rows, where the root's span is what moves. */
+  { id: 'the-part-root-spans-the-sheet', why: 'a stamen and the style are rooted one SHEET deep on a thickened hub: their roots sit inside the plate and both stand shorter than asked',
+    find: '  const rootSpan = hubThickness;',
+    into: '  const rootSpan = thickness;', names: ['JS1'], rows: /the roots span the thickened hub/,
+    witness: (M, C) => {
+      const st = { ...REGISTRY_DEFAULTS, petalLength: 100, stamenCount: 6, gynoecium: 'STYLE' };
+      const span = (G) => { const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {}); const s0 = b.stamens[0], y0 = b.styles[0]; return [s0.outer[2] - s0.inner[2], y0.outer[2] - y0.inner[2], b.hub.thickness]; };
+      try { const [ms, my, mh] = span(M), [cs, cy] = span(C);
+        return (Math.abs(cs - mh) < 1e-9 && Math.abs(cy - mh) < 1e-9 && ms < mh - 1 && my < mh - 1) ? null : `the mutant's stamen root spans ${ms} and its style root ${my} on a ${mh} mm hub (clean ${cs} / ${cy})`;
+      } catch (e) { return `the witness threw: ${String(e && e.message || e)}`; } } },
   { id: 'the-braid-is-ignored', why: 'coilLaw never takes its braided arm: every strand coils about its OWN root as an independent coil does, on a panel that says ONE BUNDLE',
     find: "  if (coil.mode === 'BRAIDED') return braidLaw({ length, coil, frame });",
     into: "  if (false) return braidLaw({ length, coil, frame });", names: ['JS9'], rows: BRAID_ROWS,
@@ -3869,6 +3888,8 @@ const ROWS = [
      limit binds per strand) and with two strands owning their own values
      (through `__bloomScopes`). Scoped to the braid mutants: the clean control
      still runs them. */
+  { label: 'six stamens and a style on 100 mm petals (the roots span the thickened hub)', for: /the-part-root-spans-the-sheet/,
+    set: [{ id: 'petalLength', value: '100' }, { id: 'stamenCount', value: '6' }, { id: 'gynoecium', value: 'STYLE' }] },
   { label: 'six stamens braided (one bundle, r 1.5 mm x 3 turns)', for: /braid|strand/,
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'BRAIDED' }] },
   { label: 'six stamens braided at twelve turns (the floor clamps the twist)', for: /braid|strand/,

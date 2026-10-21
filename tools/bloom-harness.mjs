@@ -1244,6 +1244,21 @@ export async function settleBuild(page, timeoutMs = 30000) {
   }, null, { timeout: timeoutMs });
 }
 
+/* THE ROWS DECLARED IN EXPORT_REFUSED_XFAIL GET THE EXPORT CLICK'S OWN BUDGET
+   FOR THEIR SETTLE TOO (big petals, Oct 21). Such a row is refused BECAUSE it is
+   the largest build the matrix asks for, so its live build is the slowest settle
+   as well, and `exportStl` already waits REFUSED_ROW_BUILD_MS for its export
+   build. `ALL MAX` went 2,716,406 -> 3,334,106 tris with petalLength 100 and
+   petalWidth 46 (30.0 -> 39.9 s live in Node on one dev box, both trees), and on
+   the CI runner its settle crossed 30 s and THREW out of the shard: the row XR1
+   exists to assert was never reached. Every other row keeps the 30 s bound — it
+   is not loosened; only a row the list declares as the over-budget corner gets
+   the budget its export already has. One owner for the number. */
+export const REFUSED_ROW_BUILD_MS = 120000;
+export function settleMsForRow(label) {
+  return Object.prototype.hasOwnProperty.call(EXPORT_REFUSED_XFAIL, label) ? REFUSED_ROW_BUILD_MS : 30000;
+}
+
 /* READ-BACK: set each value through the real input, fire the real events,
    and compare what the element now holds, THEN wait for the rebuild the
    events queued. Returns failure strings; the caller must treat any as fatal
@@ -1389,8 +1404,8 @@ export async function exportStl(page, tmpDir) {
      120 s of building to produce nothing. A gate that crashes where it should
      assert is the failure mode this pair of numbers now rules out. */
   const [dl] = await Promise.all([
-    page.waitForEvent('download', { timeout: 120000 }).catch(() => null),
-    page.click('#exportStl', { timeout: 120000 }),
+    page.waitForEvent('download', { timeout: REFUSED_ROW_BUILD_MS }).catch(() => null),
+    page.click('#exportStl', { timeout: REFUSED_ROW_BUILD_MS }),
   ]);
   if (!dl) return null;
   const fp = path.join(tmpDir, 'bloom.stl');
@@ -6251,7 +6266,7 @@ export function restatedCoil(i, L, R, n, t, curlRad) {
    arithmetic only, so the two engines agree to the bit on every decision.
    Only COIL_ROWS_PER_TURN and STAMEN_ROWS are imported (declarations).
    =================================================================== */
-export function restatedBraid({ L, Lr, R: Rasked, n, t, curlRad, outer, Up, azimuth, apexZ }) {
+export function restatedBraid({ L, Lr, R: Rasked, n, t, tRoot = t, curlRad, outer, Up, azimuth, apexZ }) {
   const F = (x) => x * x * x * (x * (6 * x - 15) + 10), F1 = (x) => 30 * x * x * (x - 1) * (x - 1), F2 = (x) => 60 * x * (x - 1) * (2 * x - 1);
   const I = (x) => x * x * x * x * (x * (x - 3) + 2.5);
   const Hh = (x) => x * (1 + x * x * (-6 + x * (8 - 3 * x))), Hh1 = (x) => 1 + x * x * (-18 + x * (32 - 15 * x)), Hh2 = (x) => x * (-36 + x * (96 - 60 * x));
@@ -6261,7 +6276,7 @@ export function restatedBraid({ L, Lr, R: Rasked, n, t, curlRad, outer, Up, azim
   /* the fold limit: a strand's lay radius at most 1/|k| - t */
   const foldR = kb === 0 ? Infinity : Math.max(0, 1 / k - t), foldClamped = Rasked > foldR, R = foldClamped ? foldR : Rasked;
   /* the bundle's frame at the apex: azimuth 0, slope 0 (every cap's normal is +z there) */
-  const z = [0, 0, 1], RsA = [1, 0, 0], nA = [-1, 0, 0], tA = [0, 1, 0], OA = [0, 0, apexZ + t / 2];
+  const z = [0, 0, 1], RsA = [1, 0, 0], nA = [-1, 0, 0], tA = [0, 1, 0], OA = [0, 0, apexZ + tRoot / 2];
   const zn = cr(z, nA), Om = [kb * zn[0], kb * zn[1], kb * zn[2]];
   const th0 = Math.PI - azimuth;
   const H = [0, 1, 2].map((j) => R * (Math.cos(th0) * nA[j] + Math.sin(th0) * tA[j]));
@@ -6349,7 +6364,15 @@ export async function stamenAssertions(page, row) {
   }
   if (!A) return bad;
   const dome = m.hubDome || null;
-  const t = m.hubThickness;
+  /* TWO THICKNESSES, TWO OWNERS (big petals, Oct 21): the FILAMENT is one
+     SHEET thick (footRing()'s ring.thickness, floored), and its ROOT runs
+     through the SLAB, which is the hub's own thickness — the sheet times the
+     root factor once a petal passes 35 mm. Until then the two are one double
+     and every clause below reads as it did. Reading the hub for both made the
+     filament's diameter the hub's on ALL MAX (13.64 mm) — CI's first sight of
+     the row with a thickened hub. */
+  const t = m.ringThickness;
+  const tSlab = m.hubThickness;
   /* JS9 (F1.3a) — THE TWO STATEMENTS of "a coil is built": the registry's
      `stamenCoilBuilt` (which HIDES the turns) and the geometry's (which
      builds), on the real state, and the owner's record agreeing. */
@@ -6362,7 +6385,8 @@ export async function stamenAssertions(page, row) {
   if (braidWant !== stamenBraidBuilt(ui)) bad.push(`JS9: the registry's stamenBraidBuilt says ${braidWant} and the geometry's says ${stamenBraidBuilt(ui)} on this state`);
   if (A.coil && (A.coil.mode === 'BRAIDED') !== braidWant) bad.push(`JS9: the owner's coil is ${A.coil.mode} while the state ${braidWant ? 'asks for the braid' : 'asks for an independent coil'}`);
   if (A.count !== count) bad.push(`JS0: the owner declares ${A.count} stamens, the control says ${count}`);
-  if (A.thickness !== t || A.diameter !== t || A.rFil !== t / 2) bad.push(`JS3: the filament is ${A.diameter} across on a ${t} mm slab — it is meant to be one sheet thick, floored with it`);
+  if (A.thickness !== t || A.diameter !== t || A.rFil !== t / 2) bad.push(`JS3: the filament is ${A.diameter} across on a ${t} mm sheet — it is meant to be one sheet thick, floored with it`);
+  if (A.rootSpan !== tSlab) bad.push(`JS1: the owner's root span is ${A.rootSpan} mm on a ${tSlab} mm slab — a stamen is rooted THROUGH the slab, underside to top`);
   if (A.hubRadius !== m.hubRadius) bad.push(`JS2: the owner's androecium reads a hub radius of ${A.hubRadius}, the hub is ${m.hubRadius}`);
   if (Math.abs(A.derivedRadius - (t / 2) * Math.sqrt(count)) > 1e-12) bad.push(`JS2: the reference radius ${A.derivedRadius} is not the area rule's (d/2) sqrt(N) = ${(t / 2) * Math.sqrt(count)}`);
   if (A.limit !== Math.max(0, A.hubRadius - A.rFil)) bad.push(`JS2: the range's limit ${A.limit} is not the hub radius ${A.hubRadius} less a filament radius ${A.rFil}`);
@@ -6442,8 +6466,8 @@ export async function stamenAssertions(page, row) {
     /* JS1 — THE ROOT AXIS ON THE OWNER'S NORMAL THROUGH THE FULL SLAB: inner
        to outer is exactly one slab thickness along the cap's normal at the
        surface point, and the surface point is the owner's. */
-    if (Math.abs(len - t) > 1e-9) bad.push(`JS1: stamen ${i}'s root runs ${len} mm through a ${t} mm slab`);
-    for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / t - N[k]) > 1e-9) bad.push(`JS1: stamen ${i}'s root axis is not along its normal ${JSON.stringify(N)}`);
+    if (Math.abs(len - tSlab) > 1e-9) bad.push(`JS1: stamen ${i}'s root runs ${len} mm through a ${tSlab} mm slab`);
+    for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / tSlab - N[k]) > 1e-9) bad.push(`JS1: stamen ${i}'s root axis is not along its normal ${JSON.stringify(N)}`);
     for (let k = 0; k < 3; k++) if (Math.abs((s.inner[k] + s.outer[k]) / 2 - s.root[k]) > 1e-9) bad.push(`JS1: stamen ${i}'s root axis is not centred on its surface point`);
     const plan = Math.hypot(s.root[0], s.root[1]);
     if (Math.abs(plan - d.radius) > 1e-9) bad.push(`JS1: stamen ${i} stands at plan radius ${plan}, the owner says ${d.radius}`);
@@ -6577,7 +6601,7 @@ export async function stamenAssertions(page, row) {
       const Li = strandValueRestated(ui, row, i, 'stamenLength'), R = strandValueRestated(ui, row, i, 'stamenCoilRadius'), n = strandValueRestated(ui, row, i, 'stamenCoilTurns');
       const asked = amount === 0 ? Li : Li * (1 + amount * unitOf(i)), L = Math.min(hi, Math.max(lo, asked));
       const rowsWant = STAMEN_ROWS + Math.ceil(n * COIL_ROWS_PER_TURN);
-      const rb = restatedBraid({ L, Lr, R, n, t, curlRad: cRad, outer: s.outer, Up: s.N, azimuth: s.azimuth, apexZ });
+      const rb = restatedBraid({ L, Lr, R, n, t, tRoot: tSlab, curlRad: cRad, outer: s.outer, Up: s.N, azimuth: s.azimuth, apexZ });
       if (rb.turnsClamped) turnsClampedWant++;
       if (rb.gatherClamped) gatherClampedWant++;
       if (rb.foldClamped) foldClampedWant++;
@@ -6662,7 +6686,7 @@ export async function stamenAssertions(page, row) {
     /* The limit from the SLAB: one filament radius plus one style radius,
        both being one sheet thick. Not read from A.innerLimit. */
     const wantLimit = t / 2 + t / 2;
-    if (A.innerLimit !== wantLimit) bad.push(`JS5: the owner's inner limit, ${A.innerLimit}, is not a filament's radius plus a style's on a ${t} mm slab = ${wantLimit}`);
+    if (A.innerLimit !== wantLimit) bad.push(`JS5: the owner's inner limit, ${A.innerLimit}, is not a filament's radius plus a style's on a ${t} mm sheet = ${wantLimit}`);
     const Gy = m.gynoecium;
     if (Gy && A.innerLimit !== A.rFil + Gy.rSty) bad.push(`JS5: the inner limit ${A.innerLimit} is not the filament's radius ${A.rFil} plus the style's ${Gy.rSty} — the disc's law and the flag's must be ONE quantity`);
     if (m.filamentStyle && m.filamentStyle.threshold !== A.innerLimit) bad.push(`JS5: the filament-against-style flag reports a threshold of ${m.filamentStyle.threshold} while the owner's inner limit is ${A.innerLimit} — the flag must READ the limit, never re-derive it`);
@@ -6861,10 +6885,14 @@ export async function gynoeciumAssertions(page, row) {
   }
   if (!G) return bad;
   const dome = m.hubDome || null;
-  const t = m.hubThickness;
+  /* the style is one SHEET thick and its root runs through the SLAB — the
+     stamens' two owners (JS above), one of each */
+  const t = m.ringThickness;
+  const tSlab = m.hubThickness;
   if (G.count !== 1) bad.push(`JG2: the owner declares ${G.count} styles; the gynoecium is one style on the axis`);
   if (G.radius !== 0) bad.push(`JG2: the owner puts the style at radius ${G.radius}, not 0 — it is not on the axis`);
-  if (G.thickness !== t || G.diameter !== t || G.rSty !== t / 2) bad.push(`JG3: the style is ${G.diameter} across on a ${t} mm slab — it is meant to be one sheet thick, floored with it`);
+  if (G.thickness !== t || G.diameter !== t || G.rSty !== t / 2) bad.push(`JG3: the style is ${G.diameter} across on a ${t} mm sheet — it is meant to be one sheet thick, floored with it`);
+  if (G.rootSpan !== tSlab) bad.push(`JG1: the owner's root span is ${G.rootSpan} mm on a ${tSlab} mm slab — the style is rooted THROUGH the slab, underside to top`);
   if (G.hubRadius !== m.hubRadius) bad.push(`JG2: the owner's gynoecium reads a hub radius of ${G.hubRadius}, the hub is ${m.hubRadius}`);
   if (G.widerThanHub !== (G.rSty > G.hubRadius)) bad.push(`JG2: widerThanHub reads ${G.widerThanHub} while the style radius ${G.rSty} against the hub ${G.hubRadius} says ${G.rSty > G.hubRadius}`);
   /* THE STIGMA'S SEVEN (session 30) — JG6, the anther's JS7 statement on the
@@ -6885,8 +6913,8 @@ export async function gynoeciumAssertions(page, row) {
   if (s.tris !== tippedRodTris(G.lobe.lumps, G.lobe.sides)) bad.push(`JG4: the style emitted ${s.tris} triangles, a rod tipped with the ${G.lobe.lumps} lump(s) this owner declares on a ${G.lobe.sides}-side lattice is ${tippedRodTris(G.lobe.lumps, G.lobe.sides)} — a lobe dropped, a tube doubled, or a lattice that is not the outline's`);
   /* JG1 */
   const len = Math.hypot(s.outer[0] - s.inner[0], s.outer[1] - s.inner[1], s.outer[2] - s.inner[2]);
-  if (Math.abs(len - t) > 1e-9) bad.push(`JG1: the style's root runs ${len} mm through a ${t} mm slab`);
-  for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / t - N[k]) > 1e-9) bad.push(`JG1: the style's root axis is not along its normal ${JSON.stringify(N)}`);
+  if (Math.abs(len - tSlab) > 1e-9) bad.push(`JG1: the style's root runs ${len} mm through a ${tSlab} mm slab`);
+  for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / tSlab - N[k]) > 1e-9) bad.push(`JG1: the style's root axis is not along its normal ${JSON.stringify(N)}`);
   for (let k = 0; k < 3; k++) if (Math.abs((s.inner[k] + s.outer[k]) / 2 - s.root[k]) > 1e-9) bad.push('JG1: the style\'s root axis is not centred on its surface point');
   if (!(s.root[0] === 0 && s.root[1] === 0)) bad.push(`JG1: the style stands at plan (${s.root[0]}, ${s.root[1]}), not exactly on the axis`);
   if (!(N[0] === 0 && N[1] === 0 && N[2] === 1)) bad.push(`JG1: the style's normal ${JSON.stringify(N)} is not exactly the apex's [0,0,1]`);
@@ -14121,7 +14149,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'GYNOECIUM: style curl max (180) — bent over the apex': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x Head rise 1 (rooted at the cap\'s apex)': { pairs: 318, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it) — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 286 -> 318 pairs, 0.4176 -> 0.4262 mm' },
-  /* REMOVED BY BIG PETALS (Oct 21): 'GYNOECIUM: style x the mum (the 4.69 mm printed hub)' was declared at 272 pairs / 0.0664 mm (the STYLE's own by-design rod overlap) and reads 0 — the mum's petals are 60 mm, so its hub is 1.75 sheets thick and the style's root no longer overlaps itself inside the plate. */
+  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': { pairs: 272, worstMm: 0.0664, note: 'BIG PETALS (Oct 21): taken off this list for an hour and restored at the same 272 / 0.0664 — the 0 it read was a DEFECT, not a fix: the mum\'s 60 mm petals thicken its hub to 1.75 mm and the style\'s root still spanned one 1.20 mm sheet, so the root sat wholly inside the plate and its own by-design rod overlap was buried with it. With the root spanning the hub again (footRing()\'s `rootSpan`, JS1/JG1 in CI on ALL MAX) the row reads main\'s figure to the pair.' },
   'GYNOECIUM: style x sheet 2.40 (the fat style)': { pairs: 272, worstMm: 0.1593 },
   'GYNOECIUM: style x ALL THIN x spread min (the thinnest slab)': { pairs: 272, worstMm: 0.0664 },
   'GYNOECIUM: style x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than the style: WIDER THAN THE HUB, told)': { pairs: 300, worstMm: 1.6149 },
@@ -14146,7 +14174,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: one lobe LEANING (spread 45 at a count of 1 — not a dead slider)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: a shaped stigma x 120 on the DISC (the cushion around a 12-point star)': { pairs: 272, worstMm: 0.0796 },
-  /* REMOVED BY BIG PETALS (Oct 21): 'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)' was declared at 272 pairs / 0.0664 mm (the STYLE's own by-design rod overlap) and reads 0 — the mum's petals are 60 mm, so its hub is 1.75 sheets thick and the style's root no longer overlaps itself inside the plate. */
+  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': { pairs: 272, worstMm: 0.0664, note: 'BIG PETALS (Oct 21): taken off this list for an hour and restored at the same 272 / 0.0664 — the 0 it read was a DEFECT, not a fix: the mum\'s 60 mm petals thicken its hub to 1.75 mm and the style\'s root still spanned one 1.20 mm sheet, so the root sat wholly inside the plate and its own by-design rod overlap was buried with it. With the root spanning the hub again (footRing()\'s `rootSpan`, JS1/JG1 in CI on ALL MAX) the row reads main\'s figure to the pair.' },
   'STIGMA: a shaped stigma x sheet 2.40 (the fat style)': { pairs: 272, worstMm: 0.1593 },
   'STIGMA: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice; the singular exponent sits one step below)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: THE FAMILY — the same seven on both tips (3-point polygons at pinch 1, roundedness 0, on six anthers and the trifid)': { pairs: 272, worstMm: 0.0796 },

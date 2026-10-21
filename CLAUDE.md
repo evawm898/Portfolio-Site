@@ -1208,7 +1208,11 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   substep (C5 restated); the cup fold clamp per row; the roll floor against the root; the rim bead (feet
   untapered, so root skins are `+/- t_root/2`); the hub plate = sheet x the factor of the LONGEST petal the bloom
   can build (scopes and the size field — an upper bound; J4a restated, exact at or under 35); the join floor reads
-  the thickened hub. Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule).
+  the thickened hub; a stamen's and the style's ROOT spans the thickened hub (`rootSpan`; the parts stay one sheet
+  thick) — MISSED in the first push and found by CI's JS1 on `ALL MAX` (§6d; apex mutant
+  `the-part-root-spans-the-sheet`), and the two style rows on the mum it had "fixed" read 272 / 0.0664 again.
+  `ALL MAX`'s settle has the export click's 120 s (`settleMsForRow`, declared refusals only; every other row 30 s).
+  Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule).
 - **T0–T4** in both STL gates read the thickness off the EXPORTED skins (root, untapered rows, hub, sepal roots)
   against the law RESTATED through the other integral (Simpson + bisection, 1e-9). J1/J4a/A7/C5/roll floor
   restated, never relaxed. Must-fail `node tools/verify-bloom-root-taper.mjs [--control]` (four mutants, each

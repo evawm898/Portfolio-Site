@@ -67,6 +67,7 @@ verbatim — the identity BY BRANCH, never by `x * 1`.**
 | infill wall inset | unchanged — the inset is in the plane of the sheet, a length the thickness does not enter | the infill gates (unchanged figures) |
 | hub plate | `hub.thickness = sheet x tau(L_hub)`, `L_hub` the longest petal the bloom can build (scopes and the size field included, `hubRootTaperLengthMm`); the area rule and the rings keep the sheet | J4a restated (exact at or under the reference), T3 reads the hub off the file |
 | hub-to-stem join floor | `max(join, hub thickness)` — the floor IS the thickened hub | block 75's stem row, ST4/ST5 |
+| stamen and style roots | `rootSpan = hubThickness` — a part is rooted THROUGH the slab (underside to top), so its root spans the thickened hub; the part itself stays one sheet thick. **Missed in the first push and found by CI** (§6d) | JS1 / JG1 (the root's emitted span against the hub, the owner's `rootSpan`), apex mutant `the-part-root-spans-the-sheet` |
 
 **DECISIONS STATED (declared defaults, Eva's to rule — §7):** sepals are **pinned OFF**
 (`sepalBladeState` sets `rootTaper: 'OFF'`) — a sepal's root stands on the join's flare, not on
@@ -286,8 +287,11 @@ undeclared one; `phase81` (the 1,457 rows at `4d0758d`) still deep-compares equa
   (228 / 0.2435 -> 219 / 0.3176), `ALL MAX`, and the nine FAN per-petal rows whose size offset asks 70 mm.
 - **Re-recorded again by the width** (the same nine FAN rows, §6b): petal 1's width offset now composes to 32,
   so each carries two dated notes, the root law's and the width's.
-- **Removed** (2): `GYNOECIUM: style x the mum` and `STIGMA: a shaped stigma x the mum` read 0 — the mum's
-  60 mm petals thicken the hub to 1.75 sheets, so the style's root no longer overlaps itself inside the plate.
+- ~~**Removed** (2): `GYNOECIUM: style x the mum` and `STIGMA: a shaped stigma x the mum` read 0 — the mum's
+  60 mm petals thicken the hub to 1.75 sheets, so the style's root no longer overlaps itself inside the plate.~~
+  **WITHDRAWN (§6d): that 0 was the missed root-span follower, not a fix.** The style's root spanned one sheet
+  inside a 1.75 mm plate and its by-design rod overlap was buried with it. With the root spanning the hub, both
+  rows read main's own **272 / 0.0664** to the pair and both entries are back, each with a note saying so.
 - **Declared from birth** (5): the four block-75 folds (100 mm x curl 360 608 / 0.3738, 60 mm x curl 360
   768 / 0.7060, 100 mm x tilt 90 a span-0 tangency 32 / 0.0000, 100 mm on a hemisphere 520 / 0.4619 — each
   folding with the law OFF too) and **`FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min`, 294 / 0.3223**.
@@ -302,6 +306,41 @@ undeclared one; `phase81` (the 1,457 rows at `4d0758d`) still deep-compares equa
 --only`: ten reached the results, watertight, every X1 line "still failing at that magnitude" on the
 re-recorded figures — Chromium agrees with Node on all nine width re-records — and the eleventh was the ALL THIN
 row above, dropped on X2 until it was declared.
+
+## 6d. CI's first full run: a settle timeout, then a follower this session missed
+
+**What CI said.** The export gate's shard 0 threw a `settleBuild` timeout on `ALL MAX` (3,334,106 tris; its live
+build reads 30.0 s on the base tree and 39.9 s here in Node on one dev box, so on the runner it crossed the 30 s
+settle). The row XR1 exists to assert was never reached. `settleMsForRow()` (one owner, `REFUSED_ROW_BUILD_MS`
+= 120 s) now gives the rows declared in `EXPORT_REFUSED_XFAIL` — `ALL MAX` alone — the budget their export click
+already had; every other row keeps the 30 s bound, unloosened.
+
+**What the longer settle then showed — a real defect, mine.** JS1/JS2/JS3/JS5/JS7/JS8 fired on `ALL MAX`: the
+stamen clauses read `m.hubThickness` as "the sheet", and the GEOMETRY rooted every stamen and the style one
+SHEET deep (`rodFrame(..., thickness)`) while the hub plate is `sheet x tau` and straddles the mid-surface. So on
+any bloom with a petal past 35 mm the parts' roots sat wholly INSIDE the plate and each part stood
+`(hub - sheet)/2` shorter than asked — 5.6 mm on `ALL MAX`, 0.27 mm on the mum. Watertight and one piece
+throughout, which is why only JS1 saw it, and only on `ALL MAX`, the one row nobody can build locally inside
+the old settle.
+
+**Fixed in the geometry, both gates re-derived onto two owners:**
+- `footRing()`'s `rootSpan = hubThickness`, read by both rod calls and both braid frames; the descriptors carry
+  it. At or under 35 mm `hubThickness` IS `thickness` (the same double), so those rows build from the doubles
+  they did.
+- JS3/JG3 and the part's own sizes read the SHEET (`m.ringThickness`); JS1/JG1 read the SLAB (`m.hubThickness`)
+  for the root's emitted span and its axis, and assert the owner's `rootSpan` is the slab. `restatedBraid` takes
+  the slab for the bundle's root (`tRoot`).
+- Apex mutant **`the-part-root-spans-the-sheet`** (`rootSpan = thickness`), scoped to one new table row (six
+  stamens and a style on 100 mm petals): witnessed on the mutated module's own records (clean 3.883 / 3.883 mm
+  on a 3.883 mm hub; mutant 1.2 / 1.2) and firing JS1. It names JS1 only — the table never runs the gynoecium
+  family, measured SILENT on JG1; JG1 is held by both STL gates on the mum's style and stigma rows.
+
+**What moved:** five matrix rows carry a part AND a hub past the sheet — `ALL MAX` and the mum's 120-stamen disc,
+style, shaped-anther and shaped-stigma rows — every one ALREADY a root-taper mover, so the byte partition's
+classes are unchanged (holders build `rootSpan === thickness` by branch). Census: the style and stigma rows on
+the mum go 0 -> **272 / 0.0664** (main's figure, restored, above); the other three read 0 within-shell pairs as
+before; **`ALL MAX` is unmoved at 78,222 / 34.0787 on 3,334,106 tris** (re-measured with `--include-refused`).
+Triangle counts move nowhere — a root span is not a lattice change.
 
 ## 7. Open decisions for Eva — shipped as declared defaults
 

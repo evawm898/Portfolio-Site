@@ -53,7 +53,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
          fringeAssertions,
          thicknessAssertions, THICKNESS_SCOPE, apexNibAssertions, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
@@ -124,7 +124,7 @@ for (const [rowIndex, row] of rows.entries()) {
   attempted.push(row.label);
   attemptedIdx.push({ index: rowIndex, label: row.label });
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
-  const bad = await applyConfig(page, row.set);
+  const bad = await applyConfig(page, row.set, null, { settleMs: settleMsForRow(row.label) });
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }

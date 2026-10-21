@@ -2840,6 +2840,18 @@ export function footRing(state, acc, opts = {}) {
      exactly the coupling session 22 ruled against when it made each part
      independently present or absent. */
   const partRadius = thickness / 2;
+  /* THE PARTS' ROOT SPAN IS THE HUB'S THICKNESS, NOT THE SHEET'S (big petals,
+     Oct 21). A stamen and the style are rooted THROUGH the slab, inner face on
+     the hub's underside and outer face on its top, so the overlap the slicer
+     unions is a solid and the filament's length is measured from the top face.
+     The hub plate is `thickness x the root factor` once a petal passes 35 mm
+     and straddles the mid-surface (+/- hubThickness/2), so a root one SHEET
+     long sat wholly INSIDE the plate and every stamen lost (hub - sheet)/2 of
+     its visible length (5.6 mm on ALL MAX) — found by JS1 in CI. The PART
+     stays one sheet thick (`partRadius`); only the root's span follows the
+     hub. At or under 35 mm the hub IS the sheet (the same double), so every
+     such row is built from the doubles it was. */
+  const rootSpan = hubThickness;
 
   /* ===================================================================
      THE ANDROECIUM DESCRIPTOR (session 21) — this owner's second kind. Null
@@ -2967,7 +2979,7 @@ export function footRing(state, acc, opts = {}) {
       buildWhorlInto({ count, radius: () => 0, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
         placement: disc ? 'SPIRAL' : 'RADIAL', blade: (slot) => { braidAzimuths[slot.index] = slot.azimuth; } });
       const s0 = surfaceAt(0, null);
-      bundleFrame = rodFrame({ radius: 0, slope: s0.slope, z: s0.z }, 0, thickness);
+      bundleFrame = rodFrame({ radius: 0, slope: s0.slope, z: s0.z }, 0, rootSpan);
     }
     let strandsScoped = 0, gathersClamped = 0, foldsClamped = 0, gatherMaxMm = -Infinity, revolutionsMin = Infinity, revolutionsMax = -Infinity;
     const stamens = [];
@@ -2991,7 +3003,7 @@ export function footRing(state, acc, opts = {}) {
            the BUNDLE's one curvature (the control's length). */
         const az = braidAzimuths[i];
         const Ri = strandValue(state, strandTerm, 'stamenCoilRadius'), ni = strandValue(state, strandTerm, 'stamenCoilTurns');
-        const Fi = rodFrame({ radius: r, slope: s.slope, z: s.z }, az, thickness);
+        const Fi = rodFrame({ radius: r, slope: s.slope, z: s.z }, az, rootSpan);
         const refL = Number(state.stamenLength), curl = state.stamenCurl * D2R;
         const w0 = [Fi.outer[0] - bundleFrame.outer[0], Fi.outer[1] - bundleFrame.outer[1], Fi.outer[2] - bundleFrame.outer[2]];
         coil = stamenBraidFor(i, { lengthMm: L.builtMm, refLengthMm: refL, radiusMm: Ri, turnsAsked: ni, floorRadius: diameter, w0, up: Fi.Up, bundle: bundleFrame, azimuth: az, curlRad: curl });
@@ -3031,7 +3043,7 @@ export function footRing(state, acc, opts = {}) {
     }
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
-      derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, dome,
+      derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, rootSpan, dome,
       /* THE INNER LIMIT (session 24) — see the block above. `innerLimit` is a
          property of the PARTS and is a number on both layouts; `innerUsed`
          and `noRoom` describe the DISC and are null under RING. */
@@ -3103,7 +3115,7 @@ export function footRing(state, acc, opts = {}) {
       hubRadius: hub.radius, widerThanHub: rSty > hub.radius,
       inPetalRootAnnulus: rings.some((rg) => rSty > rg.radius - rg.overhang),
       clearRadius: Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang))),
-      lobe, thickness, dome,
+      lobe, thickness, rootSpan, dome,
       /* SLENDERNESS — free length over the FLOORED diameter, telemetry only
          (Q7), on the same read-out line as the filament's: UNMEASURED — no
          coupon has been printed. */
@@ -20386,10 +20398,10 @@ export function buildStamenInto(acc, andro, s, slot) {
      curl 60 where the straight strand reads the bundle's own.) An
      INDEPENDENT coil's call is the one it was. */
   const rod = s.coil && s.coil.mode === 'BRAIDED'
-    ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: 0, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
+    ? rodInto(acc, { t: andro.rootSpan, r: andro.rFil, curlRad: 0, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
     : s.coil
-    ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
-    : rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
+    ? rodInto(acc, { t: andro.rootSpan, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
+    : rodInto(acc, { t: andro.rootSpan, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
   /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
      direction at azimuths a whole turn apart — the TRIFID's own law, one
      statement for both owners (session 29). At the shipping default the count
@@ -20449,7 +20461,7 @@ export function buildStamenInto(acc, andro, s, slot) {
    the lobe's own ring vector. Positive curl bends the style toward -Rs, the
    filament's own sign (at azimuth 0 that is -x). */
 export function buildStyleInto(acc, G) {
-  const rod = rodInto(acc, { t: G.thickness, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
+  const rod = rodInto(acc, { t: G.rootSpan, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
   const tip = rod.stations[rod.stations.length - 1], a = G.lobe.diameter / 2, Lc = G.lobe.length - 2 * a;
   const D = rod.at(G.length).D;
   /* THE TRIFID: `lobe.lumps` tips sharing the rod's tip (a control since session 30), each `spreadRad` off
