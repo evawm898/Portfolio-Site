@@ -796,7 +796,14 @@ export class KnitSim {
   // safety; unloading steps back to where the jaws were clamped, and the last step is that hold.
   advanceStep() {
     const P = this.P, st = this.step, W = P.STEP_WINDOW;
-    if (st.moving) { if (Math.abs(this.drive - st.target) < 1e-12) { st.moving = false; st.hold = 0; st.win = []; st.top = []; } return; }
+    if (st.moving) {
+      // A move never carries the load past the limit: at the wall (the jam closing, then the yarn's own
+      // length) the load can triple in a tenth of a percent, faster than the last steps' growth predicts,
+      // so a loading move stops the frame the load cell reaches LOAD_LIMIT and that step ends the loading.
+      if (this.phase === 'pulling' && this.testLoad() >= P.LOAD_LIMIT) { st.target = this.drive; st.capped = true; }
+      if (Math.abs(this.drive - st.target) < 1e-12) { st.moving = false; st.hold = 0; st.win = []; st.top = []; }
+      return;
+    }
     st.hold++; st.win.push(this.testLoad()); st.top.push(this.dir === 'course' ? this.stats.loadRight : this.stats.loadTop);
     if (st.hold < Math.max(P.STEP_HOLD_MIN, 2 * W)) return;
     const mean = (a, i0, i1) => { let s = 0; for (let i = i0; i < i1; i++) s += a[i]; return s / (i1 - i0); };
@@ -811,7 +818,7 @@ export class KnitSim {
     const size = P.STEP_EXT * this.restHeight;
     if (loading) {
       if (Math.abs(rec.strain) > P.STRAIN_STOP) this.strainStopped = true;
-      const why = this.strainStopped ? 'strain' : a >= P.LOAD_LIMIT * (1 - P.LOAD_LIMIT_TOL) ? 'load' : this.drive >= this.pullTarget - 1e-9 ? 'extension' : null;
+      const why = this.strainStopped ? 'strain' : st.capped || a >= P.LOAD_LIMIT * (1 - P.LOAD_LIMIT_TOL) ? 'load' : this.drive >= this.pullTarget - 1e-9 ? 'extension' : null;
       if (why) { this.loadEnd = why; this.peak = { ext: rec.ext, load: a }; if (!this.cycle) { this.phase = 'held'; return; } this.phase = 'unloading'; st.target = Math.max(this.restOffset, this.drive - size); }
       else st.target = Math.min(this.pullTarget, this.drive + this.approachStep(size));
     } else {
