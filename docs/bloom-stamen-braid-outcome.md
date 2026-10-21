@@ -167,7 +167,8 @@ row.
   - Both read their base class's own record exactly (§4) and are declared with that cause. The
     re-run reads both at their recorded magnitudes.
   - The 552,688-triangle cost corner exports in the browser.
-- **Connectedness, block 74:** see the PR's CI. The local run is noted in the PR body.
+- **Connectedness, block 74** (`--only '^BRAID'`): PASS, 20 of 20 rows export as a single connected body,
+  the 552,688-triangle corner and the 30-strand disc included.
 - **The byte partition:** §5, PASS.
 - **JS9's braid arm** (`restatedBraid` in the harness) restates every strand from the controls, the
   index and the row's `@scopes`. The restatement is the same law, written apart from the geometry's
