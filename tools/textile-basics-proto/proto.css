@@ -14,5 +14,6 @@
 @media (max-width: 700px) {
   .tx-chain { align-items: stretch; }
   .tx-chain-node { flex: none; }
+  .tx-chain-arrow { align-self: center; padding: 0.6rem 0; }
   .tx-types__grid { grid-template-columns: 1fr; }
 }
