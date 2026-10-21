@@ -145,7 +145,7 @@
       <h2 class="project__section-title"><span>02</span>Why knits stretch</h2>
       <div class="project__section-body">
         <p>A weft-knit loop is an inextensible curve that changes shape. Pull along the courses and each loop flattens: the head widens, the legs rotate toward horizontal, and yarn migrates from the legs into the width of the loop. Pull along the wales and the opposite happens: the loop grows tall and narrow, and the fabric narrows with it. In both cases the yarn length per loop is constant &mdash; the &ldquo;one loop&rdquo; panel reports it &mdash; which is why a cotton jersey extends 50&ndash;100% at a load that would barely register on a woven.</p>
-        <p>The soft regime ends when the loops jam: legs of neighbouring wales touch, or the head of one loop hooks the feet of the loop above. From there the only way to extend is to stretch the yarn, and the curve turns stiff. Stitch density moves that limit. A tighter knit has less room inside each loop, so it jams sooner and resists more from the start.</p>
+        <p>The soft regime ends when the loops jam: legs of neighbouring wales touch, or the head of one loop is about to slip out of the loop above. From there the loops stop rearranging &mdash; the swatch stops narrowing and the loop keeps its height &mdash; the only way to extend is to stretch the yarn, and the curve turns stiff. Stitch density moves that limit. A tighter knit has less room inside each loop, so it jams sooner and resists more from the start.</p>
       </div>
     </section>
 
@@ -168,7 +168,7 @@
     <section class="project__section project__section--disclaimer">
       <h2 class="project__section-title"><span>05</span>What the model is, and isn&rsquo;t</h2>
       <div class="project__section-body">
-        <p>This is a geometric, quasi-static, homogeneous model built for teaching, not a finite-element simulation. The knit loop is a two-dimensional yarn-length-conserving curve with an interlock floor; the woven is a crimp-interchange curve on grain and a trellis with a locking angle off grain; the two are combined through the pull direction. Stiffness constants, crimp percentages, recovery fractions and break elongations are calibrated to be plausible for the fabrics named in the presets, not measured from them. Loads are per 50&nbsp;mm strip. Loading hysteresis, friction during loading, out-of-plane loop curvature and time-dependent yarn behaviour are not modelled.</p>
+        <p>This is a geometric, quasi-static, homogeneous model built for teaching, not a finite-element simulation. The knit loop is the same jersey loop <a href="textile-101.html#weft-warp-knit">Textile 101</a> draws, with the same over/under: a two-dimensional yarn-length-conserving curve with an interlock floor (the legs of the loop above must still cross each head, a yarn diameter deep); the woven is a crimp-interchange curve on grain and a trellis with a locking angle off grain; the two are combined through the pull direction. Stiffness constants, crimp percentages, recovery fractions and break elongations are calibrated to be plausible for the fabrics named in the presets, not measured from them. Loads are per 50&nbsp;mm strip. Loading hysteresis, friction during loading, out-of-plane loop curvature and time-dependent yarn behaviour are not modelled.</p>
       </div>
     </section>
 
@@ -200,6 +200,6 @@
 
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
 
-<script src="textile-stretch-simulator.js"></script>
+<script type="module" src="textile-stretch-simulator.js"></script>
 </body>
 </html>

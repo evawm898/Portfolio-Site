@@ -5,7 +5,7 @@
 //   node tools/knit-diagram/gen-knit-diagram.mjs --print  # prints it instead
 //
 // The page carries no runtime JS for this: the generator runs once, here, and the output is
-// committed. Both panels are built from knit-loops.js — one continuous strand per yarn with a
+// committed. Both panels are built from /textile-knit-loops.js — one continuous strand per yarn with a
 // depth per point — and rendered as continuous <path>s each wearing a <mask> that cuts a
 // halo-wide notch wherever a strand with higher depth crosses it (the ruling: option C).
 // Every strand carries pathLength="900" so the page's existing .yarn-path dash animation and
@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { weftCourse, tricotYarn, toPath, crossings, slice } from './knit-loops.js';
+import { weftCourse, tricotYarn, toPath, crossings, slice, JERSEY_REST } from '../../textile-knit-loops.js';
 
 const PANEL = { w: 460, h: 300 };
 const SW = 7, HALO = 2;                    // yarn width; background gap each side of a front strand
@@ -43,7 +43,7 @@ function masked(strands, id, color) {
 
 // ---- weft: four courses, six wales, accent on the third course ------------------------
 const WEFT = { x0: 76, W: 62, H: 52, n: 6, courses: 4, top: 60 };
-WEFT.L = 1.75 * WEFT.H;
+WEFT.L = JERSEY_REST.loopPerCourse * WEFT.H;
 const weft = masked(
   Array.from({ length: WEFT.courses }, (_, c) => weftCourse({ x0: WEFT.x0, cy: WEFT.top + c * WEFT.H + 36, W: WEFT.W, L: WEFT.L, n: WEFT.n })),
   'kw', i => i === 2 ? ACCENT : (i === 0 ? INK : DIM));
