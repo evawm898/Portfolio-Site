@@ -80,7 +80,7 @@
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS } from './bloom-geometry.js';
+import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
@@ -90,7 +90,8 @@ import { readCurveValue, cloneCurve } from './bloom-curve.js';
 //
 //   overrides.layers: [ { layer: <int >= 0>,               offsets: { <sliderId>: <number>, ... } } ]
 //   overrides.petals: [ { layer: <int >= 0>, slot: <int>, offsets: { ... } } ]
-//   overrides.tiers:  [ { tier:  <int >= 0>,               offsets: { ... } } ]   // read, kept, NOT applied — told
+//   overrides.tiers:  [ { tier:  <int >= 0>,               offsets: { ... } } ]   // applied since F1.1a
+//   overrides.strands:[ { strand: <int >= 0>,              offsets: { stamenLength | stamenCoilRadius | stamenCoilTurns } } ]   // F1.3b
 //
 // F6-SCOPE (Oct 18) ADDS ONE OPTIONAL FIELD to a layer or petal entry, with no
 // version move (a container entry only ever gains fields):
@@ -167,7 +168,11 @@ export const CONTROL_FIELDS = Object.freeze(CONTROLS.map((c) => Object.freeze({ 
 export const CONTROL_EXCEPTIONS = Object.freeze([]);
 
 /* The two containers and their scopes — the forward shape above. */
-export const SCOPE_CONTAINERS = Object.freeze(['layers', 'petals', 'tiers']);
+/* `strands` (F1.3b, the braid): a braided androecium's strands, picked one at
+   a time — an entry names a strand by its 0-based index and carries offsets on
+   the geometry's SCOPE_STRAND_IDS only. Added, never migrated: a file written
+   before it reports the list missing and the page keeps what it holds (rule 3). */
+export const SCOPE_CONTAINERS = Object.freeze(['layers', 'petals', 'tiers', 'strands']);
 export const CURVE_CONTAINERS = Object.freeze(['spine', 'outline']);
 export const TOP_LEVEL_KEYS = Object.freeze(['format', 'version', 'app', 'savedAt', 'controls', 'overrides', 'curves']);
 
@@ -363,11 +368,12 @@ const scopeable = new Set(SCOPEABLE_IDS);
    and the reader keep its own wording, and the comment claimed they could not
    disagree while four of the reasons already did — the review's finding.) null
    when the control may carry one there. `container` is 'layers' / 'petals' /
-   'tiers'. */
+   'tiers' / 'strands'. */
 export function scopeOffsetRefusal(id, container) {
   const c = controlOf.get(id);
   if (!c) return 'not a control this page knows';
   if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
+  if (container === 'strands') return SCOPE_STRAND_IDS.includes(id) ? null : `only a strand's length, coil radius and turns are its own (${SCOPE_STRAND_IDS.join(' / ')}) — every other value is the bundle's`;
   if (container === 'tiers' ? scopeableTier.has(id) : scopeable.has(id)) return null;
   if (c.kind !== 'slider') return `a ${c.kind} has no offset`;
   if (id === 'footDelicacy') return 'a whorl-level value — the foot is the whorl\'s (Q3.3)';
@@ -395,7 +401,7 @@ function readScopeEntry(k, e, i, notes) {
   const where = `overrides.${k}[${i}]`;
   if (!e || typeof e !== 'object' || Array.isArray(e)) { notes.push(note('invalid', `${where} is not an entry — dropped`)); return null; }
   const out = {};
-  const need = k === 'tiers' ? ['tier'] : k === 'petals' ? ['layer', 'slot'] : ['layer'];
+  const need = k === 'strands' ? ['strand'] : k === 'tiers' ? ['tier'] : k === 'petals' ? ['layer', 'slot'] : ['layer'];
   for (const f of need) {
     if (!isIndex(e[f])) { notes.push(note('invalid', `${where}.${f} is ${JSON.stringify(e[f] ?? null)}, not a whole number — the entry is dropped`)); return null; }
     out[f] = e[f];
@@ -414,7 +420,8 @@ function readScopeEntry(k, e, i, notes) {
   /* F6-SCOPE — THE OWNED VALUES. Only the geometry's value ids, each through
      its control's own field kind — a layer's or pair's the petals' outline
      and spine, a TIER's (curves-sepals, Oct 20) their sepal twins. */
-  if (e.values !== undefined) {
+  if (e.values !== undefined && k === 'strands') notes.push(note('invalid', `${where}.values: a strand owns no values — not applied`));
+  else if (e.values !== undefined) {
     const valueIds = k === 'tiers' ? SEPAL_SCOPE_VALUE_IDS : SCOPE_VALUE_IDS;
     if (!e.values || typeof e.values !== 'object' || Array.isArray(e.values)) notes.push(note('invalid', `${where}.values is not an object — not applied`));
     else {
@@ -524,7 +531,7 @@ function migrateRetiredRoles(doc, notes) {
    branch on it is the shipped path. */
 export function scopeBounds() {
   const out = {};
-  for (const id of [...SCOPEABLE_IDS, ...SCOPEABLE_TIER_IDS]) { const c = controlOf.get(id); out[id] = { min: c.min, max: c.max }; }
+  for (const id of [...SCOPEABLE_IDS, ...SCOPEABLE_TIER_IDS, ...SCOPE_STRAND_IDS]) { const c = controlOf.get(id); out[id] = { min: c.min, max: c.max }; }
   return out;
 }
 /* Null when every list is empty — a tier entry builds a tier (F1.1a), so
@@ -534,8 +541,9 @@ export function scopesForBuild(overrides) {
   const layers = Array.isArray(overrides.layers) ? overrides.layers : [];
   const petals = Array.isArray(overrides.petals) ? overrides.petals : [];
   const tiers = Array.isArray(overrides.tiers) ? overrides.tiers : [];
-  if (!layers.length && !petals.length && !tiers.length) return null;
-  return { layers, petals, tiers, bounds: scopeBounds() };
+  const strands = Array.isArray(overrides.strands) ? overrides.strands : [];
+  if (!layers.length && !petals.length && !tiers.length && !strands.length) return null;
+  return { layers, petals, tiers, strands, bounds: scopeBounds() };
 }
 export const scopesAreEmpty = (o) => !o || SCOPE_CONTAINERS.every((k) => !Array.isArray(o[k]) || o[k].length === 0);
 

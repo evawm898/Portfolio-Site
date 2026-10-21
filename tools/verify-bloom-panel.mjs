@@ -508,6 +508,18 @@
          seeded, and the seed fitted to the arch's MIRROR (the sign flipped).
          Three edits: this entry, the block, the negative control's flags and
          banner.
+     (an) THE BRAID'S STRANDS UNDER THE PICKER (the braid session — docs/
+         bloom-stamen-braid-outcome.md; Eva's ruling 3, select-and-edit, the
+         scope picker reused). At 6 stamens: no bar on an INDEPENDENT coil;
+         BRAIDED lists "the bundle" and 6 strands; a pick of strand 4 is a pure
+         load; a length edit under it lands on strand 4 ALONE, read off the
+         BUILDER's per-stamen lengths, and is told "the bundle + offset"; a
+         bundle value (the curl) under the pick is told as the bundle's and
+         writes no offset; strand 2 loads its own value; deselect writes
+         nothing; INDEPENDENT keeps the record and builds the unscoped coil.
+         Two mutants under --negative-control (both bloom.js): the picker
+         listing no strands, and every pick binding strand 1. Three edits: this
+         entry, the block, the negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3699,8 +3711,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
         from: "  for (const n of m.notes) notes.push(note(kindOf[n.kind] || 'retired', n.id ? `controls.${n.id}: ${n.text}` : `controls: ${n.text}`));",
         to: "  void kindOf;" },
       { name: 'a missing overrides list drops the page offsets', file: 'bloom.js', src: jsSrc, run: runLifecycle,
-        from: "  for (const k of ['layers', 'petals', 'tiers']) next[k] = missing.includes(k) ?",
-        to: "  for (const k of ['layers', 'petals', 'tiers']) next[k] = false ?" },
+        from: "  for (const k of ['layers', 'petals', 'tiers', 'strands']) next[k] = missing.includes(k) ?",
+        to: "  for (const k of ['layers', 'petals', 'tiers', 'strands']) next[k] = false ?" },
       { name: 'a member index is re-keyed', file: 'bloom-geometry.js', src: geoSrc, run: runFold,
         from: '      if (e.layer !== layer || e.slot !== key) continue;',
         to: '      if (e.layer !== layer || scopeSlotKey(e.slot, n, state) !== key) continue;' },
@@ -4598,6 +4610,110 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (an) THE BRAID'S STRANDS UNDER THE PICKER (the braid session) -----
+   See the header. Every claim is read off the BUILDER's own per-stamen record
+   (`__bloomMetrics().androecium.stamens[i].lengthMm`), the raw record
+   (`__bloomDesign.scopes()`) and the mesh digest — never the inputs this
+   route set. The edited strand is NOT the first (index 0 is where a picker
+   binding every pick to strand 1 would land) and not the middle of an odd
+   count. */
+{
+  const tag = '[strand picker]';
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const snap = (pg) => pg.evaluate(() => {
+    const m = window.__bloomMetrics();
+    const A = m.androecium;
+    const w = document.getElementById('stamenLength').closest('.bl-ctrl'); const n = w.querySelector('.bl-scope-note');
+    const wc = document.getElementById('stamenCurl').closest('.bl-ctrl'); const nc = wc.querySelector('.bl-scope-note');
+    return {
+      count: window.__bloomBuildState().count, digest: JSON.stringify(window.__bloomShownDigest()), rec: JSON.stringify(window.__bloomDesign.scopes()),
+      ui: window.__bloomUIState(), bound: window.__bloomScopeView.bound(), bar: window.__bloomScopeView.bar(),
+      lengths: A ? A.stamens.map((s) => s.lengthMm) : [], mode: A && A.coil ? A.coil.mode : null,
+      shown: document.getElementById('stamenLength').value,
+      lenNote: n && !n.hidden ? n.textContent : '', curlNote: nc && !nc.hidden ? nc.textContent : '', curlGlobal: wc.classList.contains('bl-ctrl--global'),
+    };
+  });
+  const pick = async (pg, sel) => { const r = await pg.evaluate((s) => window.__bloomScopeView.select(s), sel); await settle(pg); return r; };
+  const unpick = async (pg) => { await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg); };
+  const sameView = (a, b) => a.count === b.count && a.digest === b.digest && a.rec === b.rec && JSON.stringify(a.ui) === JSON.stringify(b.ui);
+  const run = async (pg, label) => {
+    const p = [];
+    const L0 = Number(DEFAULTS.stamenLength), N = 6, S = 3;
+    let bad = await applyConfig(pg, [{ id: 'stamenCount', value: String(N) }, { id: 'stamenCoil', value: 'INDEPENDENT' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const ind = await snap(pg);
+    if (!ind.bar.hidden) p.push('the scope bar shows on an INDEPENDENT coil — a strand exists only in a braid');
+    bad = await applyConfig(pg, [{ id: 'stamenCoil', value: 'BRAIDED' }]);
+    if (bad.length) { note(`${tag} ${label}: the braid did not take: ${bad.join('; ')}`); return; }
+    const on = await snap(pg);
+    if (on.mode !== 'BRAIDED') p.push(`the builder reports coil mode ${on.mode} on a braid`);
+    if (on.bar.hidden) p.push('the scope bar is hidden on a braid');
+    const strandOpts = on.bar.options.filter((o) => /^strand:/.test(o.value));
+    if (strandOpts.length !== N || !/bundle/i.test(on.bar.options[0].label)) p.push(`the picker lists ${strandOpts.length} strand(s) at ${N} stamens and a first option "${on.bar.options[0] && on.bar.options[0].label}" — expected the bundle and ${N} strands`);
+    /* 1. a pick LOADS */
+    const got = await pick(pg, { kind: 'strand', layer: S, slot: 0 });
+    const a1 = await snap(pg);
+    if (!got || got.kind !== 'strand' || got.layer !== S) p.push(`picking strand ${S + 1} bound ${JSON.stringify(got)}`);
+    if (!sameView(on, a1)) p.push(`picking strand ${S + 1} was not a pure load`);
+    /* 2. a length edit lands on the picked strand only — the BUILDER's lengths */
+    bad = await applyConfig(pg, [{ id: 'stamenLength', value: String(L0 + 4) }]);
+    if (bad.length) p.push(`the length edit did not take: ${bad.join('; ')}`);
+    const e = await snap(pg);
+    const recE = JSON.parse(e.rec);
+    const ents = recE && recE.strands ? recE.strands : [];
+    if (ents.length !== 1 || ents[0].strand !== S || ents[0].offsets.stamenLength !== 4) p.push(`after the edit the record holds ${e.rec} — expected one strand entry, strand ${S + 1}'s length offset 4`);
+    if (e.ui.stamenLength !== L0) p.push(`the strand edit moved the BUNDLE's length to ${e.ui.stamenLength}`);
+    const wrong = e.lengths.map((l, i) => (i === S ? (l !== L0 + 4 ? i : -1) : (l !== L0 ? i : -1))).filter((i) => i >= 0);
+    if (wrong.length) p.push(`the builder's lengths read ${JSON.stringify(e.lengths)} — strand ${S + 1} should be ${L0 + 4} and every other ${L0} (wrong at ${wrong.map((i) => i + 1).join(', ')})`);
+    if (!new RegExp(`the bundle ${L0} \\+ 4 offset = ${L0 + 4}`).test(e.lenNote)) p.push(`the length control does not tell the bundle and the offset: "${e.lenNote}"`);
+    if (!e.curlGlobal || !/the bundle/.test(e.curlNote)) p.push(`the curl (a bundle value) is not told as the bundle's under a picked strand: "${e.curlNote}"`);
+    /* 3. another strand loads ITS value; a bundle value edited under the pick writes no offset */
+    await pick(pg, { kind: 'strand', layer: 1, slot: 0 });
+    const a3 = await snap(pg);
+    if (a3.rec !== e.rec || a3.digest !== e.digest) p.push('a pick of another strand WROTE to the record or moved the braid');
+    if (Number(a3.shown) !== L0) p.push(`strand 2's length slider shows ${a3.shown}, not its own ${L0}`);
+    bad = await applyConfig(pg, [{ id: 'stamenCurl', value: '30' }]);
+    const c3 = await snap(pg);
+    if (bad.length || c3.ui.stamenCurl !== 30 || c3.rec !== e.rec) p.push(`a curl edit under a picked strand did not move the bundle's curl alone (curl ${c3.ui.stamenCurl}, record ${c3.rec})`);
+    await applyConfig(pg, [{ id: 'stamenCurl', value: String(DEFAULTS.stamenCurl) }]);
+    /* 4. deselect writes nothing */
+    const b4 = await snap(pg);
+    await unpick(pg);
+    const a4 = await snap(pg);
+    if (a4.bound !== null) p.push('deselecting left a strand bound');
+    if (!sameView(b4, a4)) p.push('deselecting changed the record or moved the braid');
+    if (Number(a4.shown) !== L0) p.push(`after deselecting the length slider shows ${a4.shown}, not the bundle's ${L0}`);
+    /* 5. INDEPENDENT keeps the record and builds the unscoped coil */
+    await applyConfig(pg, [{ id: 'stamenCoil', value: 'INDEPENDENT' }]);
+    const z = await snap(pg);
+    if (z.rec !== a4.rec) p.push(`switching to INDEPENDENT changed the record to ${z.rec}`);
+    if (z.digest !== ind.digest) p.push('INDEPENDENT with a kept strand record is not the unscoped coil — the record reached the build');
+    if (!z.bar.hidden) p.push('the scope bar still shows on INDEPENDENT');
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${N} stamens — no bar on INDEPENDENT; BRAIDED lists the bundle and ${N} strands; a pick is a pure load; a length edit on strand ${S + 1} lands on that strand alone (the builder's own lengths) and is told "the bundle + offset"; the curl stays the bundle's; strand 2 loads its own value; deselect writes nothing; INDEPENDENT keeps the record and builds the unscoped coil`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'braid strands');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the picker lists no strands', from: '  if (strandsMode(ui) && lastFoot.androecium) {\n', to: '  if (false && strandsMode(ui) && lastFoot.androecium) {\n' },
+      { name: 'every pick binds strand 1', from: "  if (sel.kind === 'strand') return strandsMode(ui) ? { kind: 'strand', layer: Math.round(Number(sel.layer) || 0), slot: 0 } : null;\n", to: "  if (sel.kind === 'strand') return strandsMode(ui) ? { kind: 'strand', layer: 0, slot: 0 } : null;\n" },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4726,14 +4842,17 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (am), THE LEAF'S CURVES SEEDED — one flag per mutant */
     const sawLeafSeedIgnored = fail.some((f) => /^\[leaf seed\] MUTANT \(the leaf spine is never seeded\).*was not seeded from the arch/.test(f));
     const sawLeafSeedSign = fail.some((f) => /^\[leaf seed\] MUTANT \(the leaf seed fits the mirrored arch\).*the seed bends the other way/.test(f));
-    if (sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (an), THE BRAID'S STRANDS UNDER THE PICKER — one flag per mutant */
+    const sawStrandList = fail.some((f) => /^\[strand picker\] MUTANT \(the picker lists no strands\).*the picker lists 0 strand/.test(f));
+    const sawStrandBind = fail.some((f) => /^\[strand picker\] MUTANT \(every pick binds strand 1\).*picking strand 4 bound/.test(f));
+    if (sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-ONE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

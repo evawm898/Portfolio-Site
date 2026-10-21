@@ -145,9 +145,23 @@ if (!BASE || !existsSync(path.join(BASE, 'bloom-geometry.js'))) {
 }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const load = (dir, f) => import(pathToFileURL(path.join(dir, f)).href);
-const [mine, base, harness] = await Promise.all([
-  load(ROOT, 'bloom-geometry.js'), load(BASE, 'bloom-geometry.js'), load(ROOT, 'tools/bloom-harness.mjs'),
+const [mine, base, harness, baseReg] = await Promise.all([
+  load(ROOT, 'bloom-geometry.js'), load(BASE, 'bloom-geometry.js'), load(ROOT, 'tools/bloom-harness.mjs'), load(BASE, 'bloom-registry.js'),
 ]);
+/* THE BASE TREE IS HANDED THE CHOICE VALUES IT KNOWS (the braid session). A
+   choice value the base registry does not list (BRAIDED, on a tree whose coil
+   is NONE / INDEPENDENT) is one the base page cannot hold — its select has no
+   such option and a design file naming it is refused and keeps the control's
+   own default — so the base build of that row is the row with that control at
+   the BASE's default. Every row whose choices the base already knows is
+   handed the very same state, so a holder's two builds are the same call on
+   the same input (the `baseScopes` rule below, for choices). */
+const BASE_CHOICES = new Map((baseReg.CONTROLS || []).filter((c) => Array.isArray(c.options)).map((c) => [c.id, { values: new Set(c.options.map((o) => o.value)), def: c.default }]));
+function baseState(st) {
+  let out = st;
+  for (const [id, c] of BASE_CHOICES) if (id in st && !c.values.has(st[id])) { if (out === st) out = { ...st }; out[id] = c.def; }
+  return out;
+}
 
 /* The row -> state map, read from the harness's own CONTROLS so a row's value
    is coerced by the control's declared kind rather than by a guess here. */
@@ -373,6 +387,19 @@ const PREDICATE_MOVERS = {
      stored included, must hold to the bit in both modes: that is the
      "byte-identical by branch" claim, measured. */
   'curve': (st) => mine.curlIsCurve(st),
+  /* THE BRAID (the braid session). A row moves iff the BASE tree builds an
+     androecium on it (its own `footRing` record — a count, and not refused
+     under SPHERE) AND the row asks for a BRAIDED coil of a radius above 0. The
+     base tree has no BRAIDED value and builds such a row's stamens plain, so
+     the braid half is read off the CONTROLS; every NONE and every INDEPENDENT
+     row — a strand record on an INDEPENDENT coil among them — and the GATED
+     rows (radius 0, the braid under SPHERE, count 0) must hold to the bit in
+     both modes: that is "NONE and INDEPENDENT byte-identical", measured. */
+  'stamen-braid': (st) => {
+    if (String(st.stamenCoil) !== 'BRAIDED' || !(Number(st.stamenCoilRadius) > 0)) return false;
+    const fr = base.footRing(baseState(st), new base.MeshBuilder({ exportMode: true }));
+    return !!(fr.androecium && fr.androecium.count >= 1);
+  },
   /* THE OUTLINE CURVE (F6-sym). A row moves iff THIS tree builds it in CURVE
      mode — the geometry's own `outlineIsCurve` on the row's coerced state (the
      base tree has no `petalOutlineMode` and builds every row on the law, so the
@@ -902,7 +929,7 @@ for (const row of rows) {
 
     /* 1. THE EXPORT STREAM, positionally. */
     const A = new mine.MeshBuilder({ exportMode }), B = new base.MeshBuilder({ exportMode });
-    mine.buildBloomInto(A, { ...st }, opts); base.buildBloomInto(B, { ...st }, optsBase);
+    mine.buildBloomInto(A, { ...st }, opts); base.buildBloomInto(B, { ...baseState(st) }, optsBase);
     const pa = A.positions, pb = B.positions;
     if (CONTROL && rowsDone === 0 && !exportMode) { pa[0] += 1e-9; controlFired++; }
     if (pa.length !== pb.length) {
@@ -926,7 +953,7 @@ for (const row of rows) {
       const k = ga.findIndex((x) => typeof x === 'number');
       if (k >= 0) { ga[k] += 1e-9; controlFired++; }
     }
-    const gb = gridFloatsOf(base.buildBloomInto(GB, { ...st }, optsBase).petals);
+    const gb = gridFloatsOf(base.buildBloomInto(GB, { ...baseState(st) }, optsBase).petals);
     if (ga.length !== gb.length) {
       fails.push(`${tag}: grid shape moved — ${ga.length} captured values against ${gb.length}`);
     } else {

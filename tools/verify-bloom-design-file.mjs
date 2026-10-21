@@ -119,7 +119,7 @@ const ONLY = (argv.find((a) => a.startsWith('--mutant=')) || '').slice(9).split(
    module under test. */
 const CENSUS = {
   top: ['format', 'version', 'app', 'savedAt', 'controls', 'overrides', 'curves'],
-  scopes: ['layers', 'petals', 'tiers'],
+  scopes: ['layers', 'petals', 'tiers', 'strands'],
   curves: ['spine', 'outline'],
   format: 'bloom-design',
   version: 1,
@@ -199,7 +199,7 @@ async function nodeClauses(F, rec) {
       if (!r.ok) { p.push(`${row.label}: refused — ${r.error}`); continue; }
       const bad = [];
       if (r.notes.length) bad.push(`${r.notes.length} note(s): ${r.notes.slice(0, 2).map((n) => n.text).join(' | ')}`);
-      if (rec0 && JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: rec0.layers || [], petals: rec0.petals || [], tiers: rec0.tiers || [] })) bad.push(`the overrides did not round-trip: ${JSON.stringify(r.doc.overrides)}`);
+      if (rec0 && JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: rec0.layers || [], petals: rec0.petals || [], tiers: rec0.tiers || [], strands: rec0.strands || [] })) bad.push(`the overrides did not round-trip: ${JSON.stringify(r.doc.overrides)}`);
       for (const c of REG.CONTROLS) if (!(c.id in r.doc.controls) || !same(c, r.doc.controls[c.id], st[c.id])) { bad.push(`${c.id} ${JSON.stringify(st[c.id])} -> ${JSON.stringify(r.doc.controls[c.id])}`); break; }
       if (bad.length) p.push(`${row.label}: ${bad.join('; ')}`); else clean++;
     }
@@ -298,7 +298,7 @@ async function nodeClauses(F, rec) {
         || r.notes.some((n) => /overrides\.tiers/.test(n.text))
         || !r.notes.some((n) => n.kind === 'invalid' && /overrides\.petals\[0\]\.slot/.test(n.text))
         || r.notes.some((n) => /overrides\.layers/.test(n.text))
-        || JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: [{ layer: 1, offsets: { petalLength: 3 } }], petals: [], tiers: [{ tier: 0, offsets: { sepalCup: 0.2 } }] })) p.push(`container entries: ${r.ok ? texts(r) + ' | ' + JSON.stringify(r.doc.overrides) : r.error}`); }
+        || JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: [{ layer: 1, offsets: { petalLength: 3 } }], petals: [], tiers: [{ tier: 0, offsets: { sepalCup: 0.2 } }], strands: [] })) p.push(`container entries: ${r.ok ? texts(r) + ' | ' + JSON.stringify(r.doc.overrides) : r.error}`); }
     // a missing container, a missing scope, a scope that is not a list, an unknown scope
     { const o = base(); delete o.curves; delete o.overrides.tiers; o.overrides.petals = 5; o.overrides.flowers = []; const r = F.readDoc(o);
       const want = [['missing', /^curves is missing/], ['missing', /overrides\.tiers is missing/], ['invalid', /overrides\.petals is not a list/], ['unknown', /overrides\.flowers/]];

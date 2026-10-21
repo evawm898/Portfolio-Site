@@ -119,6 +119,12 @@ NONE / INDEPENDENT, radius and turns, a per-stamen phase from the index, the ant
 (Q2.5), the curvature floored on the composite (Q2.3, confirmed by measurement); JS9 the witness.
 BRAIDED (Q2.4) remains.
 
+**F1.3b SHIPPED (Oct 21) — `docs/bloom-stamen-braid-outcome.md`.** BRAIDED is the third value of
+`stamenCoil`: every filament of the androecium gathers onto ONE bundle's axis (the style's) and winds
+round it, the anther on the braid's end tangent, a strand or the bundle picked and edited through the
+scope picker (`scopes.strands`). The coil's §7 decisions are RULED (Eva, Oct 20). The last build on
+this map.
+
 **What exists**
 - `stamenCount` 0–120, `stamenLayout` RING/DISC, `stamenSpread` 0.6–max, **`stamenLength` 5–40 mm
   (default 20)** and `stamenCurl` −180..180 (R:3517–3571), all in the `androecium` section under
@@ -587,7 +593,7 @@ The spine of the order:
 | 10 | F2 per-petal (FAN) + mirror links (pairs stay linked — §11 Q3.7; no unlink) | parallel | 3, 8 |
 | 11 | F3 per-scope curves | parallel | 5, 9/10 |
 | 12 | F6 symmetric outline curve (new CORE arm in `widthProfile`) | **wait**: same function as the leaf series | 4, leaf merged |
-| 13 | F1.3 braided mode | parallel | 6, Q2.4 |
+| ~~13~~ | ~~F1.3 braided mode~~ — **DONE (the braid session, Oct 21); `docs/bloom-stamen-braid-outcome.md`** | — | — |
 | 14 | F6 asymmetric (two-margin cross-section, bead, ladder, infill) | **wait** | 12, leaf merged |
 | 15 | F6 per-scope + mirror-linked outlines | wait | 10, 14 |
 | ~~16~~ | ~~F7 pin + hide, then light drag path~~ — **DONE, merged as `b4ad9ba` (#400); §11** | — | — |

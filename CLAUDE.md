@@ -1404,8 +1404,8 @@ roots — fifteen cells declared by value, both length axes in `COMBINATION_INER
 CURVATURE FLOORED ON THE COMPOSITE** (Eva's rulings Q2.3 / Q2.5, Oct 14 — F1.3a; read
 `docs/bloom-stamen-coil-outcome.md` before touching `coilLaw`, `stamenCoilFor`, `coilCurvatureMax`,
 `rodInto`'s coiled arm, `restatedCoil` or JS9).
-- `stamenCoil` NONE / INDEPENDENT (default NONE, the plain rod by branch; radius 0 is too). BRAIDED is
-  NOT an option until its session — an option in a choice is reachable.
+- `stamenCoil` NONE / INDEPENDENT (default NONE, the plain rod by branch; radius 0 is too). **[Oct 21:
+  BRAIDED is the third value — the braid block below.]**
 - `coilLaw` is an OFFSET about spineLaw's centreline, never a second spineLaw; `rodInto` stays the one
   emitter (plain arm verbatim, coiled arm on a double-reflection rotation-minimising frame).
 - The station count is the ASKED turns' (`STAMEN_ROWS + ceil(turns x 16)`), so live = export.
@@ -1417,6 +1417,55 @@ CURVATURE FLOORED ON THE COMPOSITE** (Eva's rulings Q2.3 / Q2.5, Oct 14 — F1.3
   the style do — 29 combination cells declared by value, nothing clamped.
 - Worst corner 120 x 12 turns x 120 mm: 552,688 export tris (36.8%). `frozen/phase67` is the 1316 rows
   at `037a4a8`; block 23 is 1331 rows. Sheet: `node tools/shot-bloom-stamen-coil.mjs <dir>`.
+- **§7 IS RULED (Eva, Oct 20) — do not re-open any of it:** the default r 1.5 mm x 3 turns stays;
+  interpenetration at 3+ stamens is a declared look, never clamped; right-handed only; the length is
+  the AXIS, not the arc; the coil ramps in over its first pitch; 16 stations per turn.
+  - **MEASURED AGAINST "right-handed": the shipped coil is LEFT-handed** — clockwise seen from above as
+    it rises, −11.49 rad over the upper 60% of a three-turn coil on the emitted stations. The braid
+    follows the shipped hand. Making both right-handed is a sign on the turn and moves every INDEPENDENT
+    row's bytes, which the braid's brief held identical — so it is recorded and left to Eva, not flipped
+    quietly (`docs/bloom-stamen-braid-outcome.md` §6).
+
+**THE BRAID IS ONE BUNDLE: EVERY FILAMENT GATHERS ONTO THE STYLE'S AXIS AND WINDS ROUND IT, THE ANTHER ON
+THE BRAID'S END TANGENT, AND A STRAND OR THE BUNDLE IS PICKED AND EDITED** (the braid session, Oct 21 —
+Eva's rulings; read `docs/bloom-stamen-braid-outcome.md` before touching `braidLaw`, `stamenBraidFor`,
+`braidGatherGeometry`, `braidTwistKappa`, `rodFrame`, `strandOffsetsFor` / `strandValue`, footRing's
+braid branch, `restatedBraid` / `strandValueRestated`, JS9's braid arm, panel route (an) or block 74).
+- **`stamenCoil` BRAIDED** is the third value. It is `coilLaw`'s third arm (`braidLaw`), an offset laid
+  in the BUNDLE's frame (`C = A + E w`, A the bundle axis's own spineLaw at the apex), through the one
+  emitter `rodInto`. **NONE and INDEPENDENT are byte-identical** (the partition below).
+- **Per strand:** the gather is the least length the floor admits on the EXACT curvature (bisected,
+  at least 15/8 of the gather distance, up to the whole strand). Where even that fails, the strand
+  gathers a fraction and does not twist (told). The twist rate is `2 pi n / stamenLength` (the
+  control's — the length is the axis), ramped in over one pitch; its turns are clamped by the floor.
+  The fold limit clamps the lay radius to `1/|k| - t` (told). The curl composite is measured and told.
+- **Strand scopes — select-and-edit reuses the SCOPE PICKER, not a second one:**
+  - The record is `scopes.strands [{strand, offsets}]`, on the three ids in `SCOPE_STRAND_IDS`
+    (length, coil radius, turns). It is the design file's fourth container, added with no migration.
+  - Offsets are clamped to the registry's bounds, and live only under a built braid. A record on
+    INDEPENDENT is kept and inert (a GATED byte holder).
+  - The bar lists "The bundle (every strand)" and "Strand i of N". A pick loads and writes nothing.
+    Other androecium controls are told "the bundle — …".
+- **Strands touch and cross by design and that is CROSS-shell** (each strand is its own closed rod).
+  Within-shell pairs read 0 on every braid row. Two declared block-74 rows are not the braid's:
+  - the hemisphere, 248 / 0.4262, is `headRise max (1)`'s own fold;
+  - the STYLE row, 272 / 0.0796, is the style's own overlap.
+  - Cross-shell pairs, NONE / INDEPENDENT / BRAIDED: 4,706 / 4,864 / 4,694 at 3 stamens; 5,096 /
+    6,148 / 8,228 at 6; 10,325 / 23,345 / 139,235 at 30 on the disc.
+- **Gates:**
+  - **JS9's braid arm** restates every strand from the controls, the index and the row's `@scopes`
+    against the EMITTED rings (≤ 4.5e-12 mm), the anther on the end tangent, and the clamp counts
+    both ways.
+  - **Seven witnessed mutants**, scoped to the braid rows (`BRAID_ROWS`, rows `for: /braid|strand/`).
+  - Panel route **(an)** with two mutants (THIRTY-ONE routes). The design-file and scopes gates
+    carry `strands`.
+- **Cost:** the worst corner (120 on the disc x 12 turns x 120 mm, BRAIDED) is 552,688 export tris
+  (36.8%), reported before building and identical to the INDEPENDENT corner.
+- **Bookkeeping:**
+  - Block 74 is 20 rows (1,457); smoke block 74 is 5. `frozen/phase80` is the 1,437 rows at `0a48f17`.
+  - The byte tool hands the BASE tree only the choice values it knows (`baseState`) and has
+    `--movers-predicate stamen-braid`.
+  - Sheet: `node tools/shot-bloom-stamen-braid.mjs <dir> --png <file>` → `docs/img/stamen-braid.png`.
 
 **THE GYNOECIUM IS BUILT AND SHIPS ABSENT; THE CENTRE IS COMPLETE** (Eva's rulings,
 session 22, phase 2 B3). `gynoecium` (GYNOECIUM section, a CHOICE: NONE / STYLE, default NONE

@@ -2,7 +2,7 @@
 
 Session outcome, Oct 14. Eva's rulings of Oct 12 (`docs/reference-flower-feature-map.md` §11,
 Q2.3 / Q2.5) govern; nothing here re-litigates them. Base: `main` at `037a4a8`. Braided (Q2.4)
-is a later session.
+is a later session. **[Oct 21: built — `docs/bloom-stamen-braid-outcome.md`; BRAIDED is the third value of `stamenCoil`.]**
 
 ## §1 What shipped
 
@@ -122,17 +122,28 @@ the export contract's own case and both STL gates are blind to it; 29 cells decl
 
 Live equals export on every row. The worst corner exports a 27 MB STL.
 
-## §7 Decisions made without a ruling (Eva's to confirm or move)
+## §7 RULED (Eva, Oct 20) — the confirmations
 
-1. **The length is the AXIS the coil winds round**, not the wire's arc — so `stamenLength`, its
-   variance and the 120 mm ceiling keep their meaning, and SLENDERNESS reports the wire.
-2. **The coil ramps in over its first pitch** (smootherstep) so the filament leaves its root on the
-   normal; without it the root would kink by up to the helix angle.
-3. **Right-handed only.** A handedness would be one more control or a sign on the turns.
-4. **Defaults r 1.5 mm × 3 turns** read as a coil on the six-stamen head and interpenetrate
-   neighbours at three or more on the shipping hub (§5). A radius under ~0.4 mm clears six but
-   barely reads as a coil.
-5. **16 stations a turn** — the 2D chord sagitta is 1.9% of the coil radius (0.19 mm at 10 mm).
+These were decisions made without a ruling when the coil shipped. Eva confirmed them on Oct 20, with
+the braid's brief, and they are RULED now. Do not re-open them.
+
+1. **RULED: length is the AXIS, not the arc.** The coil winds round the length, so `stamenLength`,
+   its variance and the 120 mm ceiling keep their meaning, and SLENDERNESS reports the wire.
+2. **RULED: the coil ramps in over its first pitch** (smootherstep), so the filament leaves its root
+   on the normal. Without the ramp, the root would kink by up to the helix angle.
+3. **RULED: right-handed only.** No handedness control. **A measured finding sits against this
+   ruling** (the braid session, `docs/bloom-stamen-braid-outcome.md` §6):
+   - The coil as shipped turns CLOCKWISE seen from above as it rises, so it is LEFT-handed. Measured
+     on the emitted stations: −11.49 rad over the upper 60% of a three-turn coil.
+   - The braid follows the shipped coil's hand.
+   - Making both right-handed is a sign on the turn. It moves every INDEPENDENT row's bytes, and the
+     braid's brief holds those byte-identical.
+   - So the hand is LEFT, recorded, and the flip is Eva's question rather than something done quietly.
+4. **RULED: default r 1.5 mm × 3 turns stays.** **Interpenetration at 3+ stamens is a declared look,
+   never clamped** (§5): neighbours overlap as separate closed solids. A radius under ~0.4 mm clears
+   six stamens but barely reads as a coil.
+5. **RULED: 16 stations per turn.** The 2D chord sagitta is 1.9% of the coil radius (0.19 mm at
+   10 mm).
 
 ## §8 Verification
 
