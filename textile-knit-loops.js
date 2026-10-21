@@ -29,6 +29,24 @@ export const SHAPE = { neck: 0.21, squeeze: 0.05 };
 // loop height / course pitch = 1.75. The generator reads loopPerCourse from here; the simulator
 // reads both, so a resting swatch has the diagram's own proportions.
 export const JERSEY_REST = { coursePerWale: 52 / 62, loopPerCourse: 1.75 };
+// The textile 101 weft-knit panel (#weft-warp-knit) in its own viewBox: four courses of six
+// wales, course 0 at the TOP (the newest — wale runs up), drawn SW wide with a HALO-wide gap
+// each side of a front strand where it crosses a strand behind it. The generator bakes it, and
+// the Knit tile in #what-is-a-textile (/textile-basics.js) animates the very same strands, so
+// the two drawings cannot drift.
+export const WEFT_PANEL = { w: 460, h: 300, x0: 76, W: 62, H: 52, n: 6, courses: 4, top: 60, SW: 7, HALO: 2 };
+export function weftPanelCourses(P = WEFT_PANEL) {
+  const L = JERSEY_REST.loopPerCourse * P.H;
+  return Array.from({ length: P.courses }, (_, c) => weftCourse({ x0: P.x0, cy: P.top + c * P.H + 36, W: P.W, L, n: P.n }));
+}
+// The notch cut out of a back strand where front strand pts crosses it at fractional index s:
+// a stretch of the FRONT strand halfLen long each way, stroked SW + 2·HALO wide in a mask.
+export function notchPath(pts, s, halfLen) {
+  const i = Math.max(0, Math.min(pts.length - 2, Math.floor(s)));
+  const seg = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y) || 1;
+  return toPath(slice(pts, s - halfLen / seg, s + halfLen / seg));
+}
+
 export function loopPoint(u, cx, cy, W, L, shape = SHAPE) {
   const x = cx + W * (u - 0.5) + shape.neck * W * Math.sin(4 * Math.PI * u) + shape.squeeze * W * Math.sin(2 * Math.PI * u);
   const y = cy + (L / 2) * Math.cos(2 * Math.PI * u);              // SVG y down: u=0 bottom, .5 top
