@@ -35,7 +35,7 @@
    Units: mm for geometry; strain as a fraction; load in N per 50 mm strip.
    The constants are calibrated to be plausible, not measured — see the
    page's "What the model is" section. */
-import { weftCourse, latticeCrossings, interlockLimit, catmullRom, slice, loopLength as curveLength, JERSEY_REST } from './textile-knit-loops.js';
+import { weftCourse, latticeCrossings, interlockLimit, catmullRom, loopLength as curveLength, JERSEY_REST } from './textile-knit-loops.js';
 
 (() => {
 'use strict';
@@ -48,7 +48,21 @@ const SWATCH_MM = 20;         // rest swatch is 20 mm square
 // cost goes with the segment count). The inset and any loop big enough draw 30.
 const KNIT_SAMPLES = 30, KNIT_SAMPLES_MIN = 20, KNIT_PX_PER_SAMPLE = 4;
 const LEN_SAMPLES = 120;      // samples per loop for the conserved yarn length
-const HALO_FRAC = 2 / 7;      // textile 101's notch: HALO 2 each side of a 7-wide yarn
+// Drawing the knit as shaded yarn (rendering only — none of this reaches the mechanics):
+//   KNIT_DRAW_FULLNESS — the DRAWN yarn diameter is this fraction of the RESTING wale
+//     pitch, so at rest neighbouring legs nearly touch and a course pull opens gaps.
+//     The model's yarn diameter (YARN_D / P.d) is untouched: it still sets the
+//     interlock floor, the loop length and every force. This is a draw scale only.
+//   KNIT_DEPTH_BANDS — every segment is binned by its depth (z, 0 at heads and
+//     sinkers, 1 mid-leg) and the bands are painted back to front. Measured over
+//     every density, stretch and sampling the swatch reaches: at a crossing the
+//     front segment's mean z is >= 0.665 and the back one's <= 0.497, so any band
+//     count from 2 to 6 puts the front strand in a higher band at all 15,360
+//     crossings sampled. Nothing is erased; the front yarn simply covers the back.
+//   KNIT_BACK_SHADE — brightness of the deepest band (heads and sinkers duck under).
+const KNIT_DRAW_FULLNESS = 0.40, KNIT_DEPTH_BANDS = 4, KNIT_BACK_SHADE = 0.75;
+const PETROL_BRIGHT = [47, 163, 163];   // --petrol-bright, the yarn's mid-tone
+const RUST_MID = [214, 132, 52];
 // max C/H that still interloops, at EVERY sampling the swatch may draw with (≈ 0.872),
 // so a loop the model calls interlocked always has its crossings on screen
 let INTERLOCK = 1;
@@ -415,7 +429,10 @@ function yarnColor(yarnStrain, P) {
   const t = P.yarnMax > 0 ? yarnStrain / P.yarnMax : 0;
   const flip = clamp(yarnStrain / 0.01, 0, 1);              // teal -> rust over the first 1 % of yarn strain
   const glow = clamp(t, 0, 1);                              // then brighten toward the break
-  return { body: mix(mix(TEAL, RUST, flip), [214, 132, 52], glow * 0.7), hi: mix(TEAL_BRIGHT, [242, 200, 140], flip) };
+  return {
+    body: mix(mix(TEAL, RUST, flip), [214, 132, 52], glow * 0.7), hi: mix(TEAL_BRIGHT, [242, 200, 140], flip),
+    mid: mix(mix(PETROL_BRIGHT, RUST_MID, flip), [236, 160, 80], glow * 0.5),   // the knit's shaded tube
+  };
 }
 
 function strokePath(ctx, build, widthPx, col, bg) {
@@ -426,60 +443,82 @@ function strokePath(ctx, build, widthPx, col, bg) {
   ctx.lineWidth = Math.max(0.6, widthPx * 0.32); ctx.strokeStyle = rgb(col.hi, 0.75); ctx.stroke();
 }
 
-// A jersey lattice drawn the way textile 101 draws it: each course one
-// continuous strand of the shared loop, smoothed by the same Catmull-Rom; at
-// every crossing the front strand's slice (±(yarn/2 + halo) along it) is laid
-// over the back one inside a halo of background, which is the SVG's mask
-// notch done in paint. The crossings are found on one cell
-// (latticeCrossings) and repeated — the lattice is regular, and a linear map
-// keeps every crossing where it was on the polylines.
+// A jersey lattice drawn as yarn. Each course is one continuous strand of the
+// shared loop (textile-knit-loops.js), smoothed by the same Catmull-Rom as
+// textile 101. Every Bézier segment is binned by its depth into
+// KNIT_DEPTH_BANDS bands and the bands are painted back to front, so heads and
+// sinkers go down first and the legs of the neighbouring courses cover them —
+// over/under by painter's order, with no cut and no halo. Within a band each
+// run is a shaded tube: a wide dark edge, the mid-tone body, and a thin light
+// core nudged toward an upper-left light. Deeper bands are darker
+// (KNIT_BACK_SHADE at the back), so a head visibly ducks under. Runs share
+// their boundary sample and the spline's tangent, so the butt ends meet flush.
+// A band is stroked course by course (bottom up — the upper course's legs sit
+// in front) and, within a course, even wales then odd ones, so two tubes that
+// lie side by side each keep their dark rim instead of merging into one band.
 //   g: { nx, ny, W, C, H, map(x, yUp) -> [sx, sy], widthPx, bg, samples?,
-//        colorOf(course) -> { body, hi } }  (model mm, y up, lattice centred)
-const crossCache = { key: '', cell: null };
+//        colorOf(course) -> { mid } }  (model mm, y up, lattice centred)
+// Cost (headless Chromium, CPU raster, a moving drag, full frame): 27-28 ms at DPR 1
+// and 36-37 at DPR 2, against 35-36 / 44-47 for the notch-and-halo renderer it
+// replaced — dropping 600-odd round-capped notch slices more than pays for the tube.
+const crossCache = { key: '', count: 0 };
+function crossingCount(nx, ny, W, C, H, n) {
+  const key = [nx, ny, W, C, H, n].join(',');
+  if (crossCache.key !== key) {
+    let k = 0;
+    for (const x of latticeCrossings(W, C, H, undefined, n)) for (let i = 0; i + x.dc < ny; i++) for (let j = 0; j < nx; j++) if (j + x.dw >= 0 && j + x.dw < nx) k++;
+    crossCache.key = key; crossCache.count = k;
+  }
+  return crossCache.count;
+}
+const shade = (c, f) => c.map(v => Math.round(v * f));
+const tint = (c, f) => c.map(v => Math.round(v + (255 - v) * f));
 function drawJersey(ctx, g) {
-  const { nx, ny, W, C, H, map, widthPx, bg } = g;
-  const n = g.samples || KNIT_SAMPLES;
-  const key = W + ',' + C + ',' + H + ',' + n;
-  if (crossCache.key !== key) { crossCache.key = key; crossCache.cell = latticeCrossings(W, C, H, undefined, n); }
-  const cell = crossCache.cell;
+  const { nx, ny, W, C, H, map, widthPx } = g;
+  const n = g.samples || KNIT_SAMPLES, K = KNIT_DEPTH_BANDS;
   const width = nx * W, height = (ny - 1) * C + H;
-  // course i (0 at the bottom) centred at yUp = -height/2 + H/2 + i·C; weftCourse
-  // draws in the SVG frame (y down), so its cy is −yUp and its y is negated back
-  const strands = [];
+  // per band, per (course, wale parity): the Bézier segments of every run in it,
+  // as flat arrays [x0, y0, c1x, c1y, c2x, c2y, x1, y1, startsRun]
+  const bands = Array.from({ length: K }, () => []);
   for (let i = 0; i < ny; i++) {
+    // course i (0 at the bottom) centred at yUp = -height/2 + H/2 + i·C; weftCourse
+    // draws in the SVG frame (y down), so its cy is −yUp and its y is negated back
     const yc = -height / 2 + H / 2 + i * C;
-    const pts = weftCourse({ x0: -width / 2 + W / 2, cy: -yc, W, L: H, n: nx, samples: n });
-    strands.push(pts.map(p => { const q = map(p.x, -p.y); return { x: q[0], y: q[1] }; }));
+    const pts = weftCourse({ x0: -width / 2 + W / 2, cy: -yc, W, L: H, n: nx, samples: n })
+      .map(p => { const q = map(p.x, -p.y); return { x: q[0], y: q[1], z: p.z }; });
+    const col = g.colorOf(i);
+    const groups = Array.from({ length: K }, () => [{ col, seg: [] }, { col, seg: [] }]);
+    for (let b = 0; b < K; b++) bands[b].push(groups[b][0], groups[b][1]);
+    let prev = -1, prevPar = -1, k = 0;
+    catmullRom(pts, (c1x, c1y, c2x, c2y, x, y) => {
+      const a = pts[k], b = pts[k + 1], par = Math.floor(k / n) & 1; k++;
+      const band = Math.min(K - 1, Math.floor((a.z + b.z) / 2 * K));
+      groups[band][par].seg.push(a.x, a.y, c1x, c1y, c2x, c2y, x, y, band !== prev || par !== prevPar ? 1 : 0);
+      prev = band; prevPar = par;
+    });
   }
-  const halo = Math.max(1, HALO_FRAC * widthPx), halfLen = widthPx / 2 + halo;
-  // group by colour so the swatch costs a handful of strokes, not one per course
-  const groups = new Map();
-  const groupOf = i => { const col = g.colorOf(i); const k = col.body.join() + '|' + col.hi.join(); if (!groups.has(k)) groups.set(k, { col, strands: [], notches: [] }); return groups.get(k); };
-  strands.forEach((pts, i) => groupOf(i).strands.push(pts));
-  const notches = [];
-  for (let i = 0; i < ny; i++) for (let j = 0; j < nx; j++) for (const x of cell) {
-    const i2 = i + x.dc, j2 = j + x.dw;
-    if (i2 >= ny || j2 < 0 || j2 >= nx) continue;
-    const course = x.front === 'a' ? i : i2;
-    const s = x.front === 'a' ? j * n + x.sa : j2 * n + x.sb;
-    const pts = strands[course];
-    const k = Math.max(0, Math.min(pts.length - 2, Math.floor(s)));
-    const seg = Math.hypot(pts[k + 1].x - pts[k].x, pts[k + 1].y - pts[k].y) || 1;
-    const sl = slice(pts, s - halfLen / seg, s + halfLen / seg);
-    notches.push(sl); groupOf(course).notches.push(sl);
-  }
-  const trace = list => { for (const pts of list) { ctx.moveTo(pts[0].x, pts[0].y); catmullRom(pts, (a, b, c, d, e, f) => ctx.bezierCurveTo(a, b, c, d, e, f)); } };
-  const body = (list, col) => {
-    ctx.beginPath(); trace(list);
-    ctx.lineWidth = widthPx; ctx.strokeStyle = rgb(col.body); ctx.stroke();
-    ctx.lineWidth = Math.max(0.6, widthPx * 0.32); ctx.strokeStyle = rgb(col.hi, 0.75); ctx.stroke();
+  const trace = (seg, dx, dy) => {
+    ctx.beginPath();
+    for (let i = 0; i < seg.length; i += 9) {
+      if (seg[i + 8] || i === 0 || seg[i] !== seg[i - 3] || seg[i + 1] !== seg[i - 2]) ctx.moveTo(seg[i] + dx, seg[i + 1] + dy);
+      ctx.bezierCurveTo(seg[i + 2] + dx, seg[i + 3] + dy, seg[i + 4] + dx, seg[i + 5] + dy, seg[i + 6] + dx, seg[i + 7] + dy);
+    }
   };
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const gr of groups.values()) body(gr.strands, gr.col);
-  ctx.beginPath(); trace(notches);
-  ctx.lineWidth = widthPx + 2 * halo; ctx.strokeStyle = bg; ctx.stroke();
-  for (const gr of groups.values()) if (gr.notches.length) body(gr.notches, gr.col);
-  return { width, height, crossings: notches.length };
+  const lx = -0.12 * widthPx, ly = -0.14 * widthPx;   // the core sits toward an upper-left light
+  ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+  for (let b = 0; b < K; b++) {
+    const f = KNIT_BACK_SHADE + (1 - KNIT_BACK_SHADE) * b / (K - 1);
+    for (const { col, seg } of bands[b]) {
+      if (!seg.length) continue;
+      const mid = shade(col.mid, f);
+      trace(seg, 0, 0);
+      ctx.lineWidth = widthPx; ctx.strokeStyle = rgb(shade(mid, 0.32)); ctx.stroke();
+      ctx.lineWidth = widthPx * 0.72; ctx.strokeStyle = rgb(mid); ctx.stroke();
+      trace(seg, lx, ly);
+      ctx.lineWidth = widthPx * 0.22; ctx.strokeStyle = rgb(tint(mid, 0.42), 0.85); ctx.stroke();
+    }
+  }
+  return { width, height, crossings: crossingCount(nx, ny, W, C, H, n) };
 }
 
 const knitTile = { canvas: document.createElement('canvas'), key: '', ready: false, draw: null, hits: 0, live: 0 };
@@ -490,7 +529,9 @@ function drawKnit(ctx, P, M, E, bg) {
   state.loop = L;
   // draw in the rectangular (W', C') frame, then map its axes onto M's
   const Md = [M[0] / Math.hypot(M[0], M[2]), M[1] / Math.hypot(M[1], M[3]), M[2] / Math.hypot(M[0], M[2]), M[3] / Math.hypot(M[1], M[3])];
-  const dpx = P.d / Math.sqrt(1 + L.yarnStrain) * view.scale;
+  // drawn yarn: KNIT_DRAW_FULLNESS of the resting wale pitch (a draw scale, not P.d),
+  // thinned by yarn strain the way the model's yarn is
+  const dpx = KNIT_DRAW_FULLNESS * P.W0 / Math.sqrt(1 + L.yarnStrain) * view.scale;
   const col = yarnColor(L.yarnStrain, P);
   const samples = clamp(Math.round(L.len * view.scale / KNIT_PX_PER_SAMPLE), KNIT_SAMPLES_MIN, KNIT_SAMPLES);
   const job = { nx: P.nx, ny: P.ny, W, C, H: L.H, map: (x, y) => toScreen(Md, x, y), widthPx: dpx, bg, samples, colorOf: () => col };
@@ -514,7 +555,7 @@ function drawKnit(ctx, P, M, E, bg) {
     t.key = key; t.ready = false;
     d = drawJersey(ctx, job); t.live++;
   }
-  state.knitDraw = { crossings: d.crossings, W, C, H: L.H, dpx, samples, tiled: t.ready };
+  state.knitDraw = { crossings: d.crossings, W, C, H: L.H, dpx, samples, tiled: t.ready, nx: P.nx, ny: P.ny, Md, off: state.off.slice() };
   return { M: Md, width: d.width, height: d.height, yarnStrain: L.yarnStrain };
 }
 
@@ -637,9 +678,9 @@ function drawInset(P, E, draw) {
     const sc = Math.min((w - 46) / width, (h - 30) / height);
     const cx = w / 2 - 8, cy = h / 2 - 6;
     const col = yarnColor(L.yarnStrain, P);
-    const dim = { body: mix(col.body, [16, 20, 20], 0.62), hi: mix(col.hi, [16, 20, 20], 0.62) };
+    const dim = { mid: mix(col.mid, [16, 20, 20], 0.62) };
     drawJersey(ctx, { nx: NX, ny: NY, W: L.W, C: L.C, H: L.H, map: (x, y) => [cx + x * sc, cy - y * sc],
-      widthPx: P.d / Math.sqrt(1 + L.yarnStrain) * sc, bg, colorOf: i => (i === 1 ? col : dim) });
+      widthPx: KNIT_DRAW_FULLNESS * P.W0 / Math.sqrt(1 + L.yarnStrain) * sc, bg, colorOf: i => (i === 1 ? col : dim) });
     // dimension lines: wale pitch under the middle loop, loop height beside the lattice
     ctx.strokeStyle = css('--ink-faint'); ctx.fillStyle = css('--ink-dim'); ctx.lineWidth = 1; ctx.font = '10px ' + mono;
     const yb = cy + height / 2 * sc + 8;
@@ -1000,6 +1041,9 @@ function init() {
     get state() { return state; },
     solveLoop, loopLength, elasticStrains, drawJersey, knitTile,
     // rest-material mm -> CSS px in the swatch canvas, through the current map
+    // the knit swatch's own lattice frame (deformed mm, y up, centred) -> CSS px, as last drawn
+    knitScreen(x, y) { const k = state.knitDraw, m = apply(k.Md, x, y); return [view.cx + (m[0] + k.off[0]) * view.scale, view.cy - (m[1] + k.off[1]) * view.scale]; },
+    get knitStyle() { return { fullness: KNIT_DRAW_FULLNESS, bands: KNIT_DEPTH_BANDS, backShade: KNIT_BACK_SHADE }; },
     screenOf(x, y) { const m = apply(state.M || [1, 0, 0, 1], x, y); return [view.cx + (m[0] + state.off[0]) * view.scale, view.cy - (m[1] + state.off[1]) * view.scale, view.scale]; }, strainAlong, loadCap, deriveParams,
     pull(thetaDeg, px) {
       const G = { x: view.cx, y: view.cy };

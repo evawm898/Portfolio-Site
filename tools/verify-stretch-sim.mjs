@@ -17,7 +17,8 @@
 // diagram still regenerates byte-identical from the shared module, the page
 // imports that module rather than carrying a second loop, and the one-cell
 // crossing lattice the swatch repeats is exactly what textile 101's own
-// crossings() finds on a whole swatch.
+// crossings() finds on a whole swatch. The swatch is drawn as shaded yarn by depth
+// band (no cut): section 1b checks over/under, cuts ("pills") and the sinkers.
 //
 //   node tools/verify-stretch-sim.mjs [--url http://127.0.0.1:8899/textile-stretch-simulator.html]
 //                                     [--shots <dir>]
@@ -108,6 +109,23 @@ section('Shared loop geometry (Node)');
   }
   const I = K.interlockLimit();
   const crossAt = c => K.latticeCrossings(1, c, 1).filter(x => x.front === 'b').length;
+  // sinkers sit behind the legs: at the resting proportions and the DRAWN yarn width,
+  // most of each sinker's centreline lies under the body of some leg (a segment with
+  // mean depth >= 0.5). The drawn fullness is read from the simulator's own source.
+  {
+    const full = Number((src.match(/KNIT_DRAW_FULLNESS = ([0-9.]+)/) || [])[1]);
+    const W = 1, C = K.JERSEY_REST.coursePerWale, L = K.JERSEY_REST.loopPerCourse * C, n = 30, nx = 6, ny = 5, r = 0.36 * full * W;
+    const strands = Array.from({ length: ny }, (_, i) => K.weftCourse({ x0: 0, cy: -i * C, W, L, n: nx, samples: n }));
+    const dseg = (p, a, b) => { const vx = b.x - a.x, vy = b.y - a.y, t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / (vx * vx + vy * vy))); return Math.hypot(p.x - a.x - t * vx, p.y - a.y - t * vy); };
+    let tot = 0, cov = 0;
+    for (let i = 1; i < ny - 1; i++) strands[i].forEach((q, k) => {
+      const u = (k % n) / n; if (!((u < 0.08 || u > 0.92) && k > n && k < strands[i].length - n)) return;
+      tot++;
+      if (strands.some(S => S.some((a, m) => m < S.length - 1 && (a.z + S[m + 1].z) / 2 >= 0.5 && dseg(q, a, S[m + 1]) < r))) cov++;
+    });
+    check('sinkers sit behind the legs: most of each sinker is under a leg at rest', full >= 0.38 && full <= 0.42 && cov / tot > 0.6,
+      `drawn fullness ${full} of the wale pitch · ${cov}/${tot} sinker samples under a leg body (${(100 * cov / tot).toFixed(0)}%)`);
+  }
   check('interlockLimit is where the loop above stops crossing the head', I > 0.8 && I < 0.95 && crossAt(I * 0.99) >= 2 && crossAt(I * 1.02) < 2, 'c_max ' + I.toFixed(4));
 }
 
@@ -150,53 +168,85 @@ check('canvas present and sized', await page.evaluate(() => { const c = document
 check('index reads No. 05 / NN', /^No\. 05 \/ \d\d$/.test((await page.textContent('.project-header__index')).trim()));
 await shot('01-knit-rest');
 
-// 1b. over/under is painted, not just counted ----------------------------------
+// 1b. over/under is painted, and no yarn is cut --------------------------------
 // Two courses in two colours drawn by the page's drawJersey on an offscreen canvas.
-// The reference is NOT the renderer: the same two strands are rebuilt here from the
-// shared module and textile 101's own crossings() says which is in front. At every
-// crossing the pixel must be the front course's colour, and a little way along the
-// back strand — past the front yarn, inside its halo — background. A back strand
-// drawn straight through (no halo) or the wrong strand on top fails.
+// The reference is NOT the renderer: the same strands are rebuilt here from the shared
+// module and textile 101's own crossings() says which is in front.
+//   * at every crossing the pixel is the FRONT course's lit colour (painter's order by
+//     depth band must put the front yarn on top — nothing is erased any more);
+//   * no "pills": every sample of every strand's centreline is lit yarn, never the
+//     background — the notch-and-halo renderer cut each leg off at both ends;
+// "Background" is the ground or the grid: dark AND neutral. Every part of a yarn tube,
+// its darkest rim included, is chromatic (teal, rust, or the test colours here).
+// (That sinkers sit behind is a geometric check in section 0; the crossing check here
+// is what proves they are painted first.)
 {
   const o = await page.evaluate(async () => {
     const K = await import('./textile-knit-loops.js');
-    const S = window.__stretchSim, c = document.createElement('canvas'); c.width = 520; c.height = 420;
-    const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 520, 420);
-    const nx = 4, ny = 2, W = 100, C = 84, H = 147, w = 14, halo = w * 2 / 7, cols = [[255, 0, 0], [0, 0, 255]];
-    S.drawJersey(g, { nx, ny, W, C, H, map: (x, y) => [260 + x, 210 - y], widthPx: w, bg: '#000', colorOf: i => ({ body: cols[i], hi: cols[i] }) });
-    const height = (ny - 1) * C + H;
-    const strands = [0, 1].map(i => K.weftCourse({ x0: -nx * W / 2 + W / 2, cy: -(-height / 2 + H / 2 + i * C), W, L: H, n: nx }));
-    const px = (x, y) => Array.from(g.getImageData(Math.round(260 + x), Math.round(210 + y), 1, 1).data.slice(0, 3));
-    let n = 0, onFront = 0, gapBg = 0; const fronts = new Set();
+    const S = window.__stretchSim, P = S.state.P, st = S.knitStyle;
+    const c = document.createElement('canvas'); c.width = 560; c.height = 460;
+    const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 560, 460);
+    // the resting lattice of the current preset, scaled up: 4 wales x 3 courses
+    const sc = 100 / P.W0, nx = 4, ny = 3, W = P.W0 * sc, C = P.C0 * sc, H = P.H0 * sc, w = st.fullness * W;
+    const cols = [[255, 0, 0], [0, 0, 255], [0, 255, 0]];
+    S.drawJersey(g, { nx, ny, W, C, H, map: (x, y) => [280 + x, 230 - y], widthPx: w, bg: '#000', colorOf: i => ({ mid: cols[i] }) });
+    const height = (ny - 1) * C + H, n = 30;
+    const strands = [0, 1, 2].map(i => K.weftCourse({ x0: -nx * W / 2 + W / 2, cy: -(-height / 2 + H / 2 + i * C), W, L: H, n: nx, samples: n }));
+    const px = (x, y) => Array.from(g.getImageData(Math.round(280 + x), Math.round(230 + y), 1, 1).data.slice(0, 3));
+    const hue = p => p.indexOf(Math.max(...p));
+    let nX = 0, onFront = 0; const fronts = new Set();
     for (const x of K.crossings(strands)) {
-      n++;
-      const front = x.front === 'a' ? x.a : x.b, back = front === x.a ? x.b : x.a;
-      fronts.add(front);
-      const p = px(x.x, x.y), want = cols[front];
-      if (Math.abs(p[0] - want[0]) < 40 && Math.abs(p[2] - want[2]) < 40) onFront++;
-      const seg = (P, i) => [P[i + 1].x - P[i].x, P[i + 1].y - P[i].y];
-      const bd = seg(strands[back], back === x.a ? x.ia : x.ib), fd = seg(strands[front], front === x.a ? x.ia : x.ib);
-      const bl = Math.hypot(...bd), fl = Math.hypot(...fd);
-      const sin = Math.abs(bd[0] * fd[1] - bd[1] * fd[0]) / (bl * fl) || 1;
-      const t = (w / 2 + 0.6 * halo) / sin;
-      const q = px(x.x + bd[0] / bl * t, x.y + bd[1] / bl * t), q2 = px(x.x - bd[0] / bl * t, x.y - bd[1] / bl * t);
-      if (q[0] + q[2] < 60 || q2[0] + q2[2] < 60) gapBg++;
+      nX++; const front = x.front === 'a' ? x.a : x.b; fronts.add(front);
+      const p = px(x.x, x.y); if (Math.max(...p) >= 70 && hue(p) === hue(cols[front])) onFront++;
     }
-    return { n, onFront, gapBg, fronts: fronts.size };
+    const isBg = p => Math.max(...p) < 70 && Math.max(...p) - Math.min(...p) < 12;
+    let pts = 0, dark = 0; const darkAt = [];
+    strands.forEach((S1, i) => S1.forEach((q, k) => {
+      if (k === 0 || k === S1.length - 1) return;   // a strand's two ends are the swatch's cut edge
+      const p = px(q.x, q.y); pts++;
+      if (isBg(p)) { dark++; if (darkAt.length < 4) darkAt.push(`course ${i} sample ${k} [${p}]`); }
+    }));
+    return { nX, onFront, fronts: fronts.size, pts, dark, darkAt };
   });
-  check('over/under is painted: front yarn on top, back yarn notched by its halo', o.n > 0 && o.onFront === o.n && o.gapBg === o.n && o.fronts === 2,
-    `${o.n} crossings (textile 101's crossings()) · front on top at ${o.onFront} · back notched at ${o.gapBg} · both courses take a turn in front: ${o.fronts === 2}`);
+  check('over/under by draw order: the front yarn is on top at every crossing', o.nX > 0 && o.onFront === o.nX && o.fronts >= 2,
+    `${o.nX} crossings (textile 101's crossings()) · front colour on top at ${o.onFront}`);
+  check('no pills: no strand centreline sample shows the background', o.dark === 0, `${o.pts - o.dark}/${o.pts} on yarn` + (o.dark ? ' · background at ' + o.darkAt.join(', ') : ''));
 }
 
 // 2. knit: course-wise pull — loops flatten, yarn length conserved ----------
 section('Knit, course-wise');
 await preset('cotton-jersey');
 const rest = await read();
+{
+  const f = await page.evaluate(() => { const S = window.__stretchSim, k = S.state.knitDraw; return k.dpx / (S.state.P.W0 * S.screenOf(0, 0)[2]); });
+  check('the drawn yarn nearly fills the cell at rest (0.38-0.42 of the wale pitch)', f >= 0.38 && f <= 0.42, 'drawn width / wale pitch ' + f.toFixed(3));
+}
 check('the rest swatch is interlooped (crossings drawn)', rest.cross > 0 && !rest.loop.jammed, rest.cross + ' crossings');
 const kx = await pull(0, 110);
 // (pull() grabs the swatch centre and pins the far edge)
 check('load is positive under pull', kx.sigma > 0.5, kx.load);
 check('extends along the course direction, short of the jam', kx.ext > 0.25 && kx.elasticExt < kx.epsJ1, 'ext ' + (kx.ext * 100).toFixed(0) + '%, jams at ' + (kx.epsJ1 * 100).toFixed(0) + '%');
+await frames(4);
+const swatchPill = await page.evaluate(async () => {
+  const K = await import('./textile-knit-loops.js');
+  // read the swatch's own tile (yarn over transparency — no grid, no pull overlay); the
+  // pull is held still, so the tile is what is on screen
+  const S = window.__stretchSim, k = S.state.knitDraw, t = S.knitTile, c = document.getElementById('swatchCanvas'), dpr = c.width / c.getBoundingClientRect().width;
+  if (!k.tiled) return { pts: 0, dark: -1 };
+  const g = t.canvas.getContext('2d');
+  const height = (k.ny - 1) * k.C + k.H;
+  let pts = 0, dark = 0;
+  for (let i = 0; i < k.ny; i++) {
+    const S1 = K.weftCourse({ x0: -k.nx * k.W / 2 + k.W / 2, cy: -(-height / 2 + k.H / 2 + i * k.C), W: k.W, L: k.H, n: k.nx, samples: k.samples });
+    S1.forEach((q, j) => {
+      if (j === 0 || j === S1.length - 1) return;
+      const [sx, sy] = S.knitScreen(q.x, -q.y), p = g.getImageData(Math.round(sx * dpr), Math.round(sy * dpr), 1, 1).data;
+      pts++; if (p[3] < 128) dark++;
+    });
+  }
+  return { pts, dark };
+});
+check('no pills on the live swatch under a course pull: no centreline sample shows the background', swatchPill.pts > 0 && swatchPill.dark === 0, swatchPill.dark < 0 ? 'swatch not on its tile' : `${swatchPill.pts - swatchPill.dark}/${swatchPill.pts} on yarn`);
 check('wales spread and courses close up (legs splay, heads flatten)', kx.loop.W > rest.loop.W * 1.15 && kx.loop.C < rest.loop.C, `pitch W ${rest.loop.W.toFixed(2)}→${kx.loop.W.toFixed(2)}  C ${rest.loop.C.toFixed(2)}→${kx.loop.C.toFixed(2)}`);
 check('loop widens and flattens', kx.loop.W > rest.loop.W * 1.15 && kx.loop.H < rest.loop.H * 0.9, `W ${rest.loop.W.toFixed(2)}→${kx.loop.W.toFixed(2)}  H ${rest.loop.H.toFixed(2)}→${kx.loop.H.toFixed(2)}`);
 check('yarn length conserved in the structural regime', !kx.loop.jammed && Math.abs(kx.loop.len - kx.len0) < 1e-6, `ℓ ${kx.loop.len.toFixed(4)} vs ℓ₀ ${kx.len0.toFixed(4)}`);
