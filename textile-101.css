@@ -222,12 +222,6 @@
   border: 1px solid var(--line);
 }
 
-.tx-chain-node .icon {
-  margin: 0 auto 1.1rem;
-  width: 44px;
-  height: 44px;
-}
-
 .tx-chain-node .label {
   font-family: var(--serif);
   font-weight: 500;
@@ -257,6 +251,27 @@
   .tx-chain-arrow {
     transform: rotate(90deg);
   }
+}
+
+/* animated chain + "Types of fabric" row: drawn by /textile-basics.js, played once on scroll-in,
+   replayed on hover / tap; reduced motion shows the end frame */
+.tx-chain-node--anim { padding: 1rem 1rem 1.6rem; cursor: pointer; }
+.tx-anim { width: 100%; aspect-ratio: 320 / 220; margin: 0 0 1.1rem; }
+.tx-anim svg { display: block; width: 100%; height: 100%; }
+.tx-types { margin-top: 3rem; }
+.tx-types__label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-dim); margin-bottom: 1.1rem;
+}
+.tx-types__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
+.tx-type { margin: 0; border: 1px solid var(--line); padding: 1rem 1rem 1.4rem; cursor: pointer; }
+.tx-type .label { display: block; font-family: var(--serif); font-weight: 500; font-size: 1.25rem; color: var(--ink); }
+.tx-type .sub { display: block; margin-top: 0.5rem; font-size: 12px; line-height: 1.55; color: var(--ink-dim); }
+@media (max-width: 700px) {
+  .tx-chain { align-items: stretch; }
+  .tx-chain-node { flex: none; }
+  .tx-chain-arrow { align-self: center; padding: 0.6rem 0; }
+  .tx-types__grid { grid-template-columns: 1fr; }
 }
 
 /* ---------- Icon grids (fiber families, cross-sections, yarn types) ---------- */

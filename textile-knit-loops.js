@@ -1,9 +1,11 @@
-// textile-knit-loops.js — the ONE jersey loop geometry, shared by two pages.
+// textile-knit-loops.js — the ONE jersey loop geometry, shared by two pages and three drawings.
 //
 //   * /textile-101.html — tools/knit-diagram/gen-knit-diagram.mjs imports this in Node and
 //     bakes the #weft-warp-knit SVG once; the page itself carries no JS for it.
 //   * /textile-stretch-simulator.html — imports this in the browser and draws the knit
 //     swatch from it every frame, at whatever (W, L) the load has driven the loop to.
+//   * /textile-basics.js (the Knit tile in /textile-101.html#what-is-a-textile) — animates the
+//     very strands the #weft-warp-knit panel bakes, through WEFT_PANEL / weftPanelCourses.
 //
 // Do not fork a copy into either page. A change here re-shapes BOTH: regenerate textile 101
 // (node tools/knit-diagram/gen-knit-diagram.mjs) and commit the diff it produces, and run
