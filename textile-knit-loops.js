@@ -1,4 +1,14 @@
-// knit-loops.js — scratch prototype, NOT linked from the site.
+// textile-knit-loops.js — the ONE jersey loop geometry, shared by two pages.
+//
+//   * /textile-101.html — tools/knit-diagram/gen-knit-diagram.mjs imports this in Node and
+//     bakes the #weft-warp-knit SVG once; the page itself carries no JS for it.
+//   * /textile-stretch-simulator.html — imports this in the browser and draws the knit
+//     swatch from it every frame, at whatever (W, L) the load has driven the loop to.
+//
+// Do not fork a copy into either page. A change here re-shapes BOTH: regenerate textile 101
+// (node tools/knit-diagram/gen-knit-diagram.mjs) and commit the diff it produces, and run
+// node tools/verify-stretch-sim.mjs, which checks that the diagram regenerates byte-identical.
+//
 // Parametric jersey loop with a depth (z) per point; z decides draw order at crossings.
 //
 // Loop anatomy per stitch (u in [0,1]): u=0 sinker (bottom, between wales) -> left leg ->
@@ -14,6 +24,11 @@ export const PALETTE = { bg: '#0A0A0C', ink: '#EDEDE8', accent: '#5FA0A0' };
 // shoulders (sin 4πu); squeeze narrows the whole loop against its pitch (sin 2πu) so the sinker
 // loop between wales comes out as wide as the head. Tuned numerically: see tune.mjs in the report.
 export const SHAPE = { neck: 0.21, squeeze: 0.05 };
+
+// The resting jersey the textile 101 weft panel draws: course pitch / wale pitch = 52 / 62, and
+// loop height / course pitch = 1.75. The generator reads loopPerCourse from here; the simulator
+// reads both, so a resting swatch has the diagram's own proportions.
+export const JERSEY_REST = { coursePerWale: 52 / 62, loopPerCourse: 1.75 };
 export function loopPoint(u, cx, cy, W, L, shape = SHAPE) {
   const x = cx + W * (u - 0.5) + shape.neck * W * Math.sin(4 * Math.PI * u) + shape.squeeze * W * Math.sin(2 * Math.PI * u);
   const y = cy + (L / 2) * Math.cos(2 * Math.PI * u);              // SVG y down: u=0 bottom, .5 top
@@ -54,15 +69,68 @@ export function tricotYarn({ x0, y0, W, H, L, courses, w0, span = 0.62, shape = 
   return pts;
 }
 
+// The smoothing both pages draw a strand with: a Catmull-Rom spline through the sampled points,
+// as cubic Béziers. emit(c1x, c1y, c2x, c2y, x, y) is called once per segment, from pts[0].
+// A linear map commutes with it (every control point is an affine combination of samples), so
+// mapping the points first and the controls after give the same curve.
+export function catmullRom(pts, emit) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    emit(p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6, p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6, p2.x, p2.y);
+  }
+}
+
 const f = v => Math.round(v * 10) / 10;   // a tenth of a viewBox unit is well under a device pixel at any shipped size
 export function toPath(pts) {
   if (pts.length < 2) return '';
   let d = `M${f(pts[0].x)},${f(pts[0].y)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
-    d += ` C${f(p1.x + (p2.x - p0.x) / 6)},${f(p1.y + (p2.y - p0.y) / 6)} ${f(p2.x - (p3.x - p1.x) / 6)},${f(p2.y - (p3.y - p1.y) / 6)} ${f(p2.x)},${f(p2.y)}`;
-  }
+  catmullRom(pts, (c1x, c1y, c2x, c2y, x, y) => { d += ` C${f(c1x)},${f(c1y)} ${f(c2x)},${f(c2y)} ${f(x)},${f(y)}`; });
   return d;
+}
+
+// Yarn length of one loop (one wale, sinker to sinker) of the shared curve at (W, L), by a fine
+// polyline. The simulator conserves this number in the structural regime.
+export function loopLength(W, L, shape = SHAPE, samples = 240) {
+  let len = 0, p = loopPoint(0, 0, 0, W, L, shape);
+  for (let i = 1; i <= samples; i++) { const q = loopPoint(i / samples, 0, 0, W, L, shape); len += Math.hypot(q.x - p.x, q.y - p.y); p = q; }
+  return len;
+}
+
+// The largest course pitch / loop height (C / L) at which the loops still interloop: the legs
+// of the loop above cross the head of the loop below on both sides. Past it the head has
+// slid out of the loop above and the fabric has come apart. It depends on nothing but the
+// loop's shape (stretching x leaves crossing heights alone, and everything scales with L),
+// and it is found at the sampling the strands are drawn with, so "interlocked" and "a
+// crossing is drawn" are the same statement. 0.8804 for SHAPE at 30 samples.
+export function interlockLimit(shape = SHAPE, samples = 30) {
+  const a = weftCourse({ x0: 0, cy: 0, W: 1, L: 1, n: 1, shape, samples });
+  const holds = c => crossings([a, weftCourse({ x0: -2, cy: -c, W: 1, L: 1, n: 5, shape, samples })])
+    .filter(x => x.front === 'b').length >= 2;
+  let lo = 0.5, hi = 1;
+  for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (holds(m)) lo = m; else hi = m; }
+  return lo;
+}
+
+// Crossings of a REGULAR jersey lattice (wale pitch W, course pitch C, loop height L), found on
+// one cell and meant to be repeated: the loop of course 0 at wale 0 against the loops of the
+// courses above it (dc = 1..) at wales dw = -2..2, every course sampled as weftCourse samples
+// it. Each entry: { dc, dw, sa, sb, front } — sa / sb are fractional sample indices inside the
+// course-0 loop and inside the neighbour's loop (0..samples), front 'a' or 'b' by the same z
+// rule crossings() applies. Replicating it over a lattice gives exactly what crossings() finds
+// on the whole swatch (verify-stretch-sim checks that), at the cost of one cell.
+export function latticeCrossings(W, C, L, shape = SHAPE, samples = 30) {
+  const out = [];
+  const a = weftCourse({ x0: 0, cy: 0, W, L, n: 1, shape, samples });
+  const reach = Math.ceil(L / C) + 1;
+  for (let dc = 1; dc <= reach; dc++) {
+    // SVG y-down, as weftCourse draws it: course dc sits dc pitches ABOVE course 0
+    const b = weftCourse({ x0: -2 * W, cy: -dc * C, W, L, n: 5, shape, samples });
+    for (const x of crossings([a, b])) {
+      const k = Math.floor(x.ib / samples);
+      out.push({ dc, dw: k - 2, sa: x.ia + x.ta, sb: x.ib - k * samples + x.tb, front: x.front });
+    }
+  }
+  return out;
 }
 
 function segInt(a, b, c, d) {

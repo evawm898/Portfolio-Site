@@ -9,16 +9,23 @@
    cursor; a poplin pulled on grain barely moves; the same poplin pulled on the
    bias trellises open.
 
-   Knit (weft-knit jersey, technical face). The loop is drawn from four
-   dimensions — head half-width a, sinker half-width s, shoulder height yh, and
-   the head/sinker arc heights — all tied to one free number, the loop height
-   H. Yarn length per wale ℓ is a function of (W', H). In the structural
-   regime the yarn is inextensible: for the stretched cell width W' the loop
-   height is whatever conserves ℓ₀, so a course-wise pull flattens the loop
-   and a wale-wise pull (which narrows the cell through lateral contraction)
-   makes it tall. Interlock demands H ≥ C' + d; when conserving ℓ₀ would put H
-   below that floor the loop is jammed and the excess is yarn strain — the
-   second, stiff regime.
+   Knit (weft-knit jersey, technical face). The loop is textile 101's loop —
+   imported from /textile-knit-loops.js, never copied — drawn at wale pitch W'
+   and loop height H, with the same over/under: every course is one strand,
+   a depth per point (legs in front, heads and sinkers behind) decides each
+   crossing, and the back strand is notched by the front one's halo. Yarn
+   length per wale ℓ is that same curve's length at (W', H). In the
+   structural regime the yarn is inextensible: for the stretched cell width
+   W' the loop height is whatever conserves ℓ₀, so a course-wise pull widens
+   and flattens the loop and a wale-wise pull (which narrows the cell through
+   lateral contraction) makes it tall. Interlock demands that the legs of the
+   loop above still cross the head, with a yarn diameter to spare:
+   H·c_max ≥ C' + d, c_max the shape's own limit (interlockLimit, ≈ 0.87).
+   When conserving ℓ₀ would put H below that floor the loop is jammed and the
+   excess is yarn strain — the second, stiff regime. Once jammed the loops
+   are packed against each other, so the cell stops contracting across the
+   pull (P.epsJ1 / P.epsJ2): the loop's dimension across the pull freezes and
+   only the stretch along it — the yarn elongating — continues.
 
    Woven (plain weave). On grain: crimp interchange — the pulled yarn
    straightens (soft, up to the crimp percentage) and then extends (stiff).
@@ -28,18 +35,28 @@
    Units: mm for geometry; strain as a fraction; load in N per 50 mm strip.
    The constants are calibrated to be plausible, not measured — see the
    page's "What the model is" section. */
+import { weftCourse, latticeCrossings, interlockLimit, catmullRom, slice, loopLength as curveLength, JERSEY_REST } from './textile-knit-loops.js';
+
 (() => {
 'use strict';
 
 const YARN_D = 0.30;          // mm — one yarn for every configuration
 const SWATCH_MM = 20;         // rest swatch is 20 mm square
-const KAPPA = 0.35;           // fraction of loop height in the two arcs
-const HEAD_FRAC = 0.26, SINK_FRAC = 0.09; // head / sinker half-widths as a fraction of W
+// Samples per loop on screen: textile 101's generator draws with 30. The swatch
+// samples the same curve to screen resolution — about one sample per 4 px of
+// yarn, never under 20 — which is what keeps a live drag affordable (stroke
+// cost goes with the segment count). The inset and any loop big enough draw 30.
+const KNIT_SAMPLES = 30, KNIT_SAMPLES_MIN = 20, KNIT_PX_PER_SAMPLE = 4;
+const LEN_SAMPLES = 120;      // samples per loop for the conserved yarn length
+const HALO_FRAC = 2 / 7;      // textile 101's notch: HALO 2 each side of a 7-wide yarn
+// max C/H that still interloops, at EVERY sampling the swatch may draw with (≈ 0.872),
+// so a loop the model calls interlocked always has its crossings on screen
+let INTERLOCK = 1;
+for (let n = KNIT_SAMPLES_MIN; n <= KNIT_SAMPLES; n++) INTERLOCK = Math.min(INTERLOCK, interlockLimit(undefined, n));
 const K_HAND = 0.22;          // N per px of hand–fabric gap
 const SIGMA_MAX = 60;         // N — the grip's limit
 const EPS_TABLE_MAX = 2.0;    // axial tables sampled 0..200 % extension
 const EPS_TABLE_N = 201;
-const BEZ_K = 0.5523;         // quarter-ellipse Bézier constant
 const RUST = [165, 107, 46];
 const TEAL = [28, 107, 107];
 const TEAL_BRIGHT = [47, 163, 163];
@@ -83,73 +100,51 @@ const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const mix = (c0, c1, t) => c0.map((v, i) => Math.round(lerp(v, c1[i], clamp(t, 0, 1))));
 
 // ---------------------------------------------------------------- knit loop geometry
-// One wale of one course, wale centre at x = 0, feet on y = 0, y up.
-function loopDims(W, H) {
-  const a = HEAD_FRAC * W, s = SINK_FRAC * W;
-  const hsum = KAPPA * H;
-  const ha = hsum * a / (a + s), hs = hsum * s / (a + s);
-  const yh = (1 - KAPPA) * H;
-  return { a, s, b: W / 2 - s, ha, hs, yh, H, W };
-}
-
-// Cubic Bézier segments for one wale, starting at the left sinker bottom.
-function loopSegments(L, x0) {
-  const { a, s, b, ha, hs, yh, W } = L;
-  const k = BEZ_K;
-  const P = (x, y) => [x0 + x, y];
-  return [
-    // left sinker: bottom -> left foot (quarter ellipse centred at (-W/2, 0))
-    [P(-W / 2, -hs), P(-W / 2 + k * s, -hs), P(-b, -k * hs), P(-b, 0)],
-    // left leg
-    [P(-b, 0), P(-b + (a - b) / 3, yh / 3), P(-b + 2 * (a - b) / 3, 2 * yh / 3), P(-a, yh)],
-    // head, left half
-    [P(-a, yh), P(-a, yh + k * ha), P(-k * a, yh + ha), P(0, yh + ha)],
-    // head, right half
-    [P(0, yh + ha), P(k * a, yh + ha), P(a, yh + k * ha), P(a, yh)],
-    // right leg
-    [P(a, yh), P(a + (b - a) / 3, 2 * yh / 3), P(a + 2 * (b - a) / 3, yh / 3), P(b, 0)],
-    // right sinker: right foot -> bottom at (W/2, -hs)
-    [P(b, 0), P(b, -k * hs), P(W / 2 - k * s, -hs), P(W / 2, -hs)],
-  ];
-}
-
-function bezLength(seg, n = 14) {
-  let len = 0, px = seg[0][0], py = seg[0][1];
-  for (let i = 1; i <= n; i++) {
-    const t = i / n, u = 1 - t;
-    const x = u * u * u * seg[0][0] + 3 * u * u * t * seg[1][0] + 3 * u * t * t * seg[2][0] + t * t * t * seg[3][0];
-    const y = u * u * u * seg[0][1] + 3 * u * u * t * seg[1][1] + 3 * u * t * t * seg[2][1] + t * t * t * seg[3][1];
-    len += Math.hypot(x - px, y - py); px = x; py = y;
-  }
-  return len;
-}
-
-function loopLength(W, H) {
-  const segs = loopSegments(loopDims(W, H), 0);
-  let len = 0;
-  for (const s of segs) len += bezLength(s);
-  return len;
-}
+// The loop is the shared one (textile-knit-loops.js): wale pitch W, loop height H.
+function loopLength(W, H) { return curveLength(W, H, undefined, LEN_SAMPLES); }
 
 // Given the deformed cell (W', C'), the relaxed yarn length ℓ₀ and yarn
-// diameter d: the loop height that conserves ℓ₀, floored by interlock.
+// diameter d: the loop height that conserves ℓ₀, floored by interlock — the
+// loop above must still pass through the head, a yarn diameter deep.
 function solveLoop(W, C, len0, d) {
-  const Hmin = C + d;
+  const Hmin = (C + d) / INTERLOCK;
   const lenAtMin = loopLength(W, Hmin);
+  const out = H => ({ W, C, H });
   if (lenAtMin >= len0) {
-    return { ...loopDims(W, Hmin), jammed: true, yarnStrain: lenAtMin / len0 - 1, len: lenAtMin };
+    return { ...out(Hmin), jammed: true, yarnStrain: lenAtMin / len0 - 1, len: lenAtMin };
   }
   let lo = Hmin, hi = Math.max(Hmin * 1.01, 8 * C);
-  if (loopLength(W, hi) < len0) return { ...loopDims(W, hi), jammed: false, yarnStrain: 0, len: len0 };
+  if (loopLength(W, hi) < len0) return { ...out(hi), jammed: false, yarnStrain: 0, len: len0 };
   for (let i = 0; i < 40; i++) {
     const mid = 0.5 * (lo + hi);
     if (loopLength(W, mid) < len0) lo = mid; else hi = mid;
   }
-  const H = 0.5 * (lo + hi);
-  return { ...loopDims(W, H), jammed: false, yarnStrain: 0, len: len0 };
+  return { ...out(0.5 * (lo + hi)), jammed: false, yarnStrain: 0, len: len0 };
+}
+
+// The knit cell for a pure pull of ε along axis 1 (course) or 2 (wale), with
+// lateral contraction capped at the strain `cap` (where the loops jam).
+function knitCell(P, axis, eps, cap) {
+  const lat = Math.min(eps, cap);
+  if (axis === 1) return { W: P.W0 * (1 + eps), C: Math.max(P.C0 * (1 - P.nu * lat), P.Cmin) };
+  return { C: P.C0 * (1 + eps), W: Math.max(P.W0 * (1 - P.nu * lat), P.Wmin) };
+}
+// the strain along `axis` at which the conserved-length loop first hits the interlock floor
+function jamStrain(P, axis) {
+  const jammed = e => { const c = knitCell(P, axis, e, Infinity); return solveLoop(c.W, c.C, P.len0, P.d).jammed; };
+  if (!jammed(EPS_TABLE_MAX)) return Infinity;
+  let lo = 0, hi = EPS_TABLE_MAX;
+  for (let i = 0; i < 30; i++) { const m = 0.5 * (lo + hi); if (jammed(m)) hi = m; else lo = m; }
+  return hi;
+}
+// the part of the axial strain that still drives lateral contraction
+function contractingAxial(P, E, theta) {
+  const c = Math.cos(theta), s = Math.sin(theta);
+  return Math.min(E.e1, P.epsJ1) * c * c + Math.min(E.e2, P.epsJ2) * s * s;
 }
 
 // ---------------------------------------------------------------- parameters
+let paramsUid = 0;
 function deriveParams() {
   const sp = state.spandex / 100, e = state.elasticity, d = YARN_D;
   // The yarn: a hard fibre (cotton .. textured nylon) with, when spandex is
@@ -159,11 +154,12 @@ function deriveParams() {
   const Ksoft = 15;                           // elastane-dominated modulus
   const epsSp = Math.min(0.8, 12 * sp);       // yarn strain the spandex core allows before lock
   const yarnMax = epsSp + 0.05 + 0.30 * e;    // yarn strain at break
-  const P = { fabric: state.fabric, d, sp, e, yarnMax, Khard, Ksoft, epsSp };
+  const P = { fabric: state.fabric, d, sp, e, yarnMax, Khard, Ksoft, epsSp, uid: ++paramsUid };
   if (state.fabric === 'knit') {
+    // a resting swatch has textile 101's own proportions (JERSEY_REST)
     P.W0 = 10 / state.density;
-    P.C0 = P.W0 / 1.3;
-    P.H0 = 1.3 * P.C0 + d;                 // relaxed loop height: ~30 % wale slack
+    P.C0 = P.W0 * JERSEY_REST.coursePerWale;
+    P.H0 = JERSEY_REST.loopPerCourse * P.C0;
     P.len0 = loopLength(P.W0, P.H0);
     P.tight = clamp((d / P.W0 - 0.105) / (0.24 - 0.105), 0, 1);
     P.Ks = 3 * (1 + 2 * P.tight) * (1 - 0.4 * e) * (1 + 3 * sp);
@@ -171,6 +167,7 @@ function deriveParams() {
     P.nu = 0.7;
     P.Ksh = 8; P.gLock = 0.9; P.KLock = 60;
     P.Wmin = 4 * d; P.Cmin = 2.5 * d;
+    P.epsJ1 = jamStrain(P, 1); P.epsJ2 = jamStrain(P, 2);
     P.nx = Math.max(3, Math.round(SWATCH_MM / P.W0));
     P.ny = Math.max(3, Math.round(SWATCH_MM / P.C0));
     P.resBaseAx = 0.45; P.resBaseSh = 0.5;
@@ -185,6 +182,7 @@ function deriveParams() {
     P.gLock = Math.min(Math.PI / 3, Math.acos(Math.min(0.99, P.cover)));
     P.KLock = 600;
     P.n = Math.max(6, Math.round(SWATCH_MM / P.p));
+    P.epsJ1 = P.epsJ2 = Infinity;          // no loop jam: the weave contracts throughout
     P.resBaseAx = 0.25; P.resBaseSh = 0.5;
   }
   // residual (set) fractions right after the elastic snap-back, and the
@@ -213,10 +211,8 @@ function axialTable(P, axis) {
     const eps = EPS_TABLE_MAX * i / (EPS_TABLE_N - 1);
     let f, ys;
     if (P.fabric === 'knit') {
-      let W, C;
-      if (axis === 1) { W = P.W0 * (1 + eps); C = Math.max(P.C0 * (1 - P.nu * eps), P.Cmin); }
-      else { C = P.C0 * (1 + eps); W = Math.max(P.W0 * (1 - P.nu * eps), P.Wmin); }
-      const L = solveLoop(W, C, P.len0, P.d);
+      const cell = knitCell(P, axis, eps, axis === 1 ? P.epsJ1 : P.epsJ2);
+      const L = solveLoop(cell.W, cell.C, P.len0, P.d);
       ys = L.yarnStrain;
       f = P.Ks * eps + yarnForce(P, ys);
     } else {
@@ -320,8 +316,7 @@ function buildMap(P, E, theta) {
   const ch = Math.cos(E.g / 2), sh = Math.sin(E.g / 2);
   const a = (1 + E.e1) * ch, cc = (1 + E.e1) * sh, b = (1 + E.e2) * sh, dd = (1 + E.e2) * ch;
   // lateral contraction from the axial part, applied perpendicular to the pull
-  const axial = E.e1 * c * c + E.e2 * s * s;
-  const eperp = -P.nu * axial;
+  const eperp = -P.nu * contractingAxial(P, E, theta);
   const px = -s, py = c;  // ⊥ unit
   // S = I + eperp (⊥⊗⊥)
   const S = [1 + eperp * px * px, eperp * px * py, eperp * px * py, 1 + eperp * py * py];
@@ -431,33 +426,96 @@ function strokePath(ctx, build, widthPx, col, bg) {
   ctx.lineWidth = Math.max(0.6, widthPx * 0.32); ctx.strokeStyle = rgb(col.hi, 0.75); ctx.stroke();
 }
 
+// A jersey lattice drawn the way textile 101 draws it: each course one
+// continuous strand of the shared loop, smoothed by the same Catmull-Rom; at
+// every crossing the front strand's slice (±(yarn/2 + halo) along it) is laid
+// over the back one inside a halo of background, which is the SVG's mask
+// notch done in paint. The crossings are found on one cell
+// (latticeCrossings) and repeated — the lattice is regular, and a linear map
+// keeps every crossing where it was on the polylines.
+//   g: { nx, ny, W, C, H, map(x, yUp) -> [sx, sy], widthPx, bg, samples?,
+//        colorOf(course) -> { body, hi } }  (model mm, y up, lattice centred)
+const crossCache = { key: '', cell: null };
+function drawJersey(ctx, g) {
+  const { nx, ny, W, C, H, map, widthPx, bg } = g;
+  const n = g.samples || KNIT_SAMPLES;
+  const key = W + ',' + C + ',' + H + ',' + n;
+  if (crossCache.key !== key) { crossCache.key = key; crossCache.cell = latticeCrossings(W, C, H, undefined, n); }
+  const cell = crossCache.cell;
+  const width = nx * W, height = (ny - 1) * C + H;
+  // course i (0 at the bottom) centred at yUp = -height/2 + H/2 + i·C; weftCourse
+  // draws in the SVG frame (y down), so its cy is −yUp and its y is negated back
+  const strands = [];
+  for (let i = 0; i < ny; i++) {
+    const yc = -height / 2 + H / 2 + i * C;
+    const pts = weftCourse({ x0: -width / 2 + W / 2, cy: -yc, W, L: H, n: nx, samples: n });
+    strands.push(pts.map(p => { const q = map(p.x, -p.y); return { x: q[0], y: q[1] }; }));
+  }
+  const halo = Math.max(1, HALO_FRAC * widthPx), halfLen = widthPx / 2 + halo;
+  // group by colour so the swatch costs a handful of strokes, not one per course
+  const groups = new Map();
+  const groupOf = i => { const col = g.colorOf(i); const k = col.body.join() + '|' + col.hi.join(); if (!groups.has(k)) groups.set(k, { col, strands: [], notches: [] }); return groups.get(k); };
+  strands.forEach((pts, i) => groupOf(i).strands.push(pts));
+  const notches = [];
+  for (let i = 0; i < ny; i++) for (let j = 0; j < nx; j++) for (const x of cell) {
+    const i2 = i + x.dc, j2 = j + x.dw;
+    if (i2 >= ny || j2 < 0 || j2 >= nx) continue;
+    const course = x.front === 'a' ? i : i2;
+    const s = x.front === 'a' ? j * n + x.sa : j2 * n + x.sb;
+    const pts = strands[course];
+    const k = Math.max(0, Math.min(pts.length - 2, Math.floor(s)));
+    const seg = Math.hypot(pts[k + 1].x - pts[k].x, pts[k + 1].y - pts[k].y) || 1;
+    const sl = slice(pts, s - halfLen / seg, s + halfLen / seg);
+    notches.push(sl); groupOf(course).notches.push(sl);
+  }
+  const trace = list => { for (const pts of list) { ctx.moveTo(pts[0].x, pts[0].y); catmullRom(pts, (a, b, c, d, e, f) => ctx.bezierCurveTo(a, b, c, d, e, f)); } };
+  const body = (list, col) => {
+    ctx.beginPath(); trace(list);
+    ctx.lineWidth = widthPx; ctx.strokeStyle = rgb(col.body); ctx.stroke();
+    ctx.lineWidth = Math.max(0.6, widthPx * 0.32); ctx.strokeStyle = rgb(col.hi, 0.75); ctx.stroke();
+  };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const gr of groups.values()) body(gr.strands, gr.col);
+  ctx.beginPath(); trace(notches);
+  ctx.lineWidth = widthPx + 2 * halo; ctx.strokeStyle = bg; ctx.stroke();
+  for (const gr of groups.values()) if (gr.notches.length) body(gr.notches, gr.col);
+  return { width, height, crossings: notches.length };
+}
+
+const knitTile = { canvas: document.createElement('canvas'), key: '', ready: false, draw: null, hits: 0, live: 0 };
 function drawKnit(ctx, P, M, E, bg) {
-  const W = P.W0 * Math.hypot(M[0], M[2]);
-  const C = P.C0 * Math.hypot(M[1], M[3]);
-  const L = solveLoop(Math.max(W, P.Wmin), Math.max(C, P.Cmin), P.len0, P.d);
+  const W = Math.max(P.Wmin, P.W0 * Math.hypot(M[0], M[2]));
+  const C = Math.max(P.Cmin, P.C0 * Math.hypot(M[1], M[3]));
+  const L = solveLoop(W, C, P.len0, P.d);
   state.loop = L;
   // draw in the rectangular (W', C') frame, then map its axes onto M's
   const Md = [M[0] / Math.hypot(M[0], M[2]), M[1] / Math.hypot(M[1], M[3]), M[2] / Math.hypot(M[0], M[2]), M[3] / Math.hypot(M[1], M[3])];
-  const width = P.nx * W, height = (P.ny - 1) * C + L.H;
-  const ox = -width / 2, oy = -height / 2 + L.hs;
   const dpx = P.d / Math.sqrt(1 + L.yarnStrain) * view.scale;
   const col = yarnColor(L.yarnStrain, P);
-  const pt = (x, y) => toScreen(Md, x, y);
-  for (let i = 0; i < P.ny; i++) {
-    const y0 = oy + i * C;
-    strokePath(ctx, () => {
-      let first = true;
-      for (let j = 0; j < P.nx; j++) {
-        const segs = loopSegments(L, ox + (j + 0.5) * W);
-        for (const s of segs) {
-          if (first) { const p = pt(s[0][0], s[0][1] + y0); ctx.moveTo(p[0], p[1]); first = false; }
-          const p1 = pt(s[1][0], s[1][1] + y0), p2 = pt(s[2][0], s[2][1] + y0), p3 = pt(s[3][0], s[3][1] + y0);
-          ctx.bezierCurveTo(p1[0], p1[1], p2[0], p2[1], p3[0], p3[1]);
-        }
-      }
-    }, dpx, col, bg);
+  const samples = clamp(Math.round(L.len * view.scale / KNIT_PX_PER_SAMPLE), KNIT_SAMPLES_MIN, KNIT_SAMPLES);
+  const job = { nx: P.nx, ny: P.ny, W, C, H: L.H, map: (x, y) => toScreen(Md, x, y), widthPx: dpx, bg, samples, colorOf: () => col };
+  // Every frame in which the loops move is drawn live. Only a picture that has
+  // not changed for two frames (at rest, or a pull held still) is put on a
+  // tile and blitted until something moves again.
+  const key = [P.uid, view.w, view.h, view.dpr, view.scale, ...Md, ...state.off, W, C, L.H, dpx, samples, bg].join(',');
+  const t = knitTile;
+  let d;
+  if (t.key === key && t.ready) {
+    ctx.drawImage(t.canvas, 0, 0, view.w, view.h);
+    d = t.draw; t.hits++;
+  } else if (t.key === key) {
+    if (t.canvas.width !== view.canvas.width || t.canvas.height !== view.canvas.height) { t.canvas.width = view.canvas.width; t.canvas.height = view.canvas.height; }
+    const tc = t.canvas.getContext('2d');
+    tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(0, 0, t.canvas.width, t.canvas.height);
+    tc.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    d = t.draw = drawJersey(tc, job); t.ready = true;
+    ctx.drawImage(t.canvas, 0, 0, view.w, view.h);
+  } else {
+    t.key = key; t.ready = false;
+    d = drawJersey(ctx, job); t.live++;
   }
-  return { M: Md, width, height, yarnStrain: L.yarnStrain };
+  state.knitDraw = { crossings: d.crossings, W, C, H: L.H, dpx, samples, tiled: t.ready };
+  return { M: Md, width: d.width, height: d.height, yarnStrain: L.yarnStrain };
 }
 
 function drawWoven(ctx, P, M, E, bg) {
@@ -573,26 +631,23 @@ function drawInset(P, E, draw) {
   ctx.font = '10px ' + mono; ctx.fillStyle = css('--ink-dim'); ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   if (P.fabric === 'knit') {
     const L = state.loop; if (!L) return;
-    if (L.C_draw === undefined) L.C_draw = P.C0;
     ro.insetTitle.textContent = 'One loop · yarn length ' + L.len.toFixed(2) + ' mm' + (L.jammed ? ' (+' + fmtPct(L.yarnStrain, 1) + ' yarn strain)' : ' (conserved)');
-    const sc = Math.min((w - 70) / (L.W * 1.1), (h - 34) / (L.H * 1.02));
-    const cx = w / 2 - 10, cy = h / 2 - 9 + (L.H / 2 - L.hs) * sc;
+    // three wales by three courses of the swatch's own lattice, the middle course in full
+    const NX = 3, NY = 3, width = NX * L.W, height = (NY - 1) * L.C + L.H;
+    const sc = Math.min((w - 46) / width, (h - 30) / height);
+    const cx = w / 2 - 8, cy = h / 2 - 6;
     const col = yarnColor(L.yarnStrain, P);
-    const segs = loopSegments(L, 0);
-    const pt = (x, y) => [cx + x * sc, cy - y * sc];
-    // faint neighbours: course above (legs through the head) and the sinker of the course below
-    ctx.globalAlpha = 0.28;
-    strokePath(ctx, () => { let f = true; for (const s of loopSegments(L, 0)) { const p0 = pt(s[0][0], s[0][1] + L.C_draw); if (f) { ctx.moveTo(p0[0], p0[1]); f = false; } const a = pt(s[1][0], s[1][1] + L.C_draw), b = pt(s[2][0], s[2][1] + L.C_draw), c = pt(s[3][0], s[3][1] + L.C_draw); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]); } }, P.d * sc, col, bg);
-    ctx.globalAlpha = 1;
-    strokePath(ctx, () => { let f = true; for (const s of segs) { const p0 = pt(s[0][0], s[0][1]); if (f) { ctx.moveTo(p0[0], p0[1]); f = false; } const a = pt(s[1][0], s[1][1]), b = pt(s[2][0], s[2][1]), c = pt(s[3][0], s[3][1]); ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]); } }, P.d * sc, col, bg);
-    // dimension lines
+    const dim = { body: mix(col.body, [16, 20, 20], 0.62), hi: mix(col.hi, [16, 20, 20], 0.62) };
+    drawJersey(ctx, { nx: NX, ny: NY, W: L.W, C: L.C, H: L.H, map: (x, y) => [cx + x * sc, cy - y * sc],
+      widthPx: P.d / Math.sqrt(1 + L.yarnStrain) * sc, bg, colorOf: i => (i === 1 ? col : dim) });
+    // dimension lines: wale pitch under the middle loop, loop height beside the lattice
     ctx.strokeStyle = css('--ink-faint'); ctx.fillStyle = css('--ink-dim'); ctx.lineWidth = 1; ctx.font = '10px ' + mono;
-    const yb = cy + L.hs * sc + 12;
+    const yb = cy + height / 2 * sc + 8;
     ctx.beginPath(); ctx.moveTo(cx - L.W / 2 * sc, yb); ctx.lineTo(cx + L.W / 2 * sc, yb); ctx.stroke();
     ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('W ' + L.W.toFixed(2) + ' mm', cx, yb + 3);
-    const xr = cx + L.W / 2 * sc + 10;
-    ctx.beginPath(); ctx.moveTo(xr, cy + L.hs * sc); ctx.lineTo(xr, cy - (L.H - L.hs) * sc); ctx.stroke();
-    ctx.save(); ctx.translate(xr + 4, cy - (L.H / 2 - L.hs) * sc); ctx.rotate(-Math.PI / 2); ctx.textBaseline = 'bottom'; ctx.fillText('H ' + L.H.toFixed(2), 0, 0); ctx.restore();
+    const yc = -height / 2 + L.H / 2 + L.C, xr = cx + width / 2 * sc + 8, yTop = cy - (yc + L.H / 2) * sc, yBot = cy - (yc - L.H / 2) * sc;
+    ctx.beginPath(); ctx.moveTo(xr, yTop); ctx.lineTo(xr, yBot); ctx.stroke();
+    ctx.save(); ctx.translate(xr + 4, (yTop + yBot) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = 'bottom'; ctx.fillText('H ' + L.H.toFixed(2), 0, 0); ctx.restore();
   } else {
     const wv = state.woven || { ys1: 0, ys2: 0, shear: 0 };
     const offGrain = Math.abs(Math.sin(2 * state.theta));
@@ -707,7 +762,7 @@ function updateReadouts(P, E, draw) {
   const theta = state.theta;
   const eN = strainAlong(totalStrains(), theta);
   const axial = E.e1 * Math.cos(theta) ** 2 + E.e2 * Math.sin(theta) ** 2;
-  const lat = -P.nu * axial - (Math.abs(E.g) > 0 ? Math.abs(E.g) * Math.abs(Math.sin(theta) * Math.cos(theta)) : 0);
+  const lat = -P.nu * contractingAxial(P, E, theta) - (Math.abs(E.g) > 0 ? Math.abs(E.g) * Math.abs(Math.sin(theta) * Math.cos(theta)) : 0);
   const deg = Math.abs(((theta * 180 / Math.PI) % 180 + 180) % 180);
   const off = deg > 90 ? 180 - deg : deg;
   const axisName = P.fabric === 'knit' ? ['course', 'wale'] : ['weft', 'warp'];
@@ -788,7 +843,6 @@ function frame(now) {
   drawGrid(ctx, view.w, view.h);
   const bg = css('--black-raised');
   const draw = P.fabric === 'knit' ? drawKnit(ctx, P, M, E, bg) : drawWoven(ctx, P, M, E, bg);
-  if (state.loop) state.loop.C_draw = P.C0 * Math.hypot(M[1], M[3]);
   drawOutlines(ctx, P, M, draw);
   drawPull(ctx, P, draw, M);
   drawInset(P, E, draw);
@@ -944,7 +998,9 @@ function init() {
   // test hook — read-only view of the model for tools/verify-stretch-sim.mjs
   window.__stretchSim = {
     get state() { return state; },
-    solveLoop, loopLength, elasticStrains, strainAlong, loadCap, deriveParams,
+    solveLoop, loopLength, elasticStrains, drawJersey, knitTile,
+    // rest-material mm -> CSS px in the swatch canvas, through the current map
+    screenOf(x, y) { const m = apply(state.M || [1, 0, 0, 1], x, y); return [view.cx + (m[0] + state.off[0]) * view.scale, view.cy - (m[1] + state.off[1]) * view.scale, view.scale]; }, strainAlong, loadCap, deriveParams,
     pull(thetaDeg, px) {
       const G = { x: view.cx, y: view.cy };
       state.theta = thetaDeg * Math.PI / 180;
