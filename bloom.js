@@ -2271,6 +2271,22 @@ function seamLine(petals) {
    line that cannot fire reads as absent, never as a passing zero. Reads EVERY
    built petal AND every built sepal, because a sepal is the petal builder on
    a second ring and meets the floor sooner for being scaled down. */
+/* THE ROOT TAPER (big petals, Oct 21) — told wherever a petal is longer than
+   the reference and thickens at its root, with the hub the root sits on.
+   Absent at or under the reference (a line that cannot fire reads as
+   absent). Reads every ring's representative petal's own record and the
+   hub's; computes nothing. Sepals do not take the law (a declared default),
+   and the line says so when there are sepals to say it about. */
+function rootTaperLine(petals, fr, mode) {
+  const ts = (petals || []).map((p) => p && p.thickness && p.thickness.rootTaper).filter(Boolean);
+  if (!ts.length) return '';
+  const worst = ts.reduce((a, t) => (t.rootFactor > a.rootFactor ? t : a), ts[0]);
+  const hub = fr && fr.hub ? fr.hub : null;
+  return `ROOT TAPER: a ${worst.askedLengthMm.toFixed(1)} mm petal is ${worst.rootMm.toFixed(2)} mm thick at its root (×${worst.rootFactor.toFixed(3)} the sheet), tapering to the sheet ${worst.refMm} mm from its tip`
+       + ` — the cantilever law against the shipping ${worst.refMm} mm petal's root stress (UNVALIDATED — no coupon has been printed)`
+       + (ts.length > 1 ? ` · ${ts.length} rings taper` : '')
+       + (hub ? ` · the hub is ${hub.thickness.toFixed(2)} mm thick to carry it (${mode})` : '') + `\n`;
+}
 function cupClampLine(petals, sepals) {
   const parts = [...(petals || []), ...(sepals || [])].filter(Boolean);
   const cs = parts.map((p) => p && p.form && p.form.cupClamp).filter(Boolean);
@@ -3543,6 +3559,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
+       + rootTaperLine(petals, built && built.hub ? { hub: built.hub } : fr, mode)
        + spineLine(petals, built ? built.petalsAll : null, String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer')
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
@@ -4348,6 +4365,10 @@ window.__bloomMetrics = () => ({
   /* THE HUB'S GROWTH FOR AN OWNED RING (Oct 16) — footRing()'s record, or null. */
   hubGrowth: lastHub.growth ? { ...lastHub.growth } : null,
   hubThickness: lastHub.thickness,
+  /* THE HUB'S OWN ROOT FACTOR (big petals): the law read on the longest blade
+     the hub must carry, or null — and the sheet it multiplies. */
+  hubRootTaper: lastHub.rootTaper ? { askedLengthMm: lastHub.rootTaper.lengthMm, rootFactor: lastHub.rootTaper.rootFactor } : null,
+  hubSheetThickness: lastHub.sheetThickness ?? null,
   /* THE STEM AND THE HUB-TO-STEM JOIN (session 43) — ST0-ST6's measured side.
      `stem` is NULL and not absent when there is no stem: ST1 distinguishes "the
      builder says there is none" from "the builder says nothing", and a missing
@@ -4991,6 +5012,10 @@ window.__bloomMetrics = () => ({
      below is the LAST petal's and stays — A2, A4, A5 and A6 read it — but a
      clause that is about a RING may not read it. */
   petalRingTipCap: lastPetals.map((p) => (p ? p.tipCap : null)),
+  /* THE ROOT TAPER PER RING (big petals, Oct 21) — the builder's declaration
+     (null at or under the reference), which T0 restates from the controls and
+     pins both ways; the thickness itself is read off the exported file. */
+  petalRingRootTaper: lastPetals.map((p) => (p && p.thickness ? p.thickness.rootTaper : null)),
   petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
   /* EVERY RING'S BASE OUTLINE (F6-sym): OC1 restates the outline curve on
      every ring's own emitted rows, not the last petal's alone. */

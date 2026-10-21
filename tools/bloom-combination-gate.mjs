@@ -669,7 +669,7 @@ export const PAIRS = [
     label: 'petalCup x petalWidth — the cup on a broad blade',
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
-    b: { id: 'petalWidth', values: [16, 23, 30] },
+    b: { id: 'petalWidth', values: [16, 23, 30, 46] },
     verdict: 'product-only',
     cite: 'docs/bloom-combination-gate.md §4 — a guess that measured as a product-only failure',
     why: "a guess: that a cup of the same amplitude closes further across a wider blade, since the amplitude is a fraction of the half-width and the half-width is what the two margins have to cross",
@@ -693,7 +693,7 @@ export const PAIRS = [
     label: 'petalCup x petalLength — the cup on a short blade',
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
-    b: { id: 'petalLength', values: [35, 20, 60] },
+    b: { id: 'petalLength', values: [35, 20, 60, 80, 100] },   /* 80 and 100 joined with the range (big petals, Oct 21): the ruled reach of the control, and the law's own thick root under every cup */
     /* VERDICT RE-DECLARED BY THE APEX NIB: was CLEARS, and #263's own citation for it predicted this in words: 'measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom'. The twelve microns are spent and one interior cell is now under the bar, with neither single reaching it. CG4 partitions the three arms so no declaration is unfalsifiable, and it fired on this pair rather than letting the change pass as a magnitude move. */
     /* PRODUCT-ONLY -> CLEARS, BY THE FOLD CLAMP (this PR): its one declared cell (cup 1.2 x a 20 mm blade) clears at 1.053.
        It was 0.994 — the cell the apex nib itself added, and #263 predicted before that ("twelve microns of headroom"). The clamp gives them back.
@@ -704,6 +704,17 @@ export const PAIRS = [
     verdict: 'clears',
     cite: 'docs/bloom-combination-gate.md §4 — a guess, measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom',
     why: 'a guess: that a short blade cups into a tighter tube. It does, and it stops just above the bar — which is why a measured clear is worth gating rather than dropping',
+  },
+  {
+    id: 'length-x-tilt',
+    tier: 2,
+    label: 'petalLength x petalTilt — a long, thickened root turned at the seam',
+    measure: 'self',
+    a: { id: 'petalLength', values: [35, 60, 80, 100] },
+    b: { id: 'petalTilt', values: [25, 0, 60, 90] },
+    verdict: 'clears',
+    cite: 'docs/bloom-big-petals-outcome.md — the seam clearance (t/2) sin(theta) is multiplied by the root factor, so a long petal clears a thicker kink at every tilt; the pair is bought by the ruling (Oct 21) that took petalLength to 100 mm',
+    why: 'a shared mechanism argued from bloom-geometry.js: the root taper thickens exactly the stretch the seam must clear and the fold limit must protect, and the tilt sets how sharp that kink is — two controls acting on one quantity',
   },
   {
     id: 'lobedepth-x-curl',
@@ -1064,7 +1075,7 @@ export const TRIPLES = [
          worse than their maximum somewhere, but never under the bar there. */
       { id: 'petalCup', values: [0, 1, 1.2] },
       { id: 'petalTipShape', values: [1.7, 3] },
-      { id: 'petalWidth', values: [16, 30] },
+      { id: 'petalWidth', values: [16, 30, 46] },
     ],
     verdict: 'pair-reaches',
     /* WIDTH, NOT TIP THINNING — both are declared PRODUCT-ONLY with cup, and
@@ -1377,6 +1388,10 @@ export const COMBINATION_XFAIL = Object.freeze({
   'cup-x-width @ petalCup=1.2 x petalWidth=23': { mm: 0.981, note: "NEW WITH THE FOLD CLAMP, and it is the twelve-microns story a second time: 1.0002 mm on a worktree of 84e641d (the commit before the clamp), 0.9814 here — two tenths of a micron of headroom spent. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
   'cup-x-width @ petalCup=1.2 x petalWidth=30': { mm: 0.884, note: "measured 2026-09-19 on c29a8b5 — the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.932 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOLD CLAMP: was 0.916 mm. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
 
+  'cup-x-width @ petalCup=0.6 x petalWidth=46': { mm: 0.902, note: "NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  'cup-x-width @ petalCup=0.9 x petalWidth=46': { mm: 0.788, note: "NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  'cup-x-width @ petalCup=1.2 x petalWidth=46': { mm: 0.712, note: "NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22. The worst cell of this pair now (0.884 at width 30)." },
+
   /* THE CUP ON A THINNED TIP — a guess that paid, and the second control
      SATURATES AGAINST THE PRINT FLOOR: 0.4 and 0.8 read the same number
      at every cup, because in EXPORT mode `tipThinning` 0.4 has already
@@ -1451,6 +1466,10 @@ export const COMBINATION_XFAIL = Object.freeze({
   "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=330": { mm: 0.19, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.520 mm against its nearest face (petalSpineCurl=360 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721) — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.527 mm, now 0.19 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.983, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
 
   /* ===== cup-x-tipshape-x-width (the headroom PR, §21) */
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=46": { mm: 0.759, note: "a FACE of the triple at the new width maximum. NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=46": { mm: 0.194, note: "THE TRIPLE'S OWN CELL at the new width maximum (0.457 at width 30). NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=1.7 x petalWidth=46": { mm: 0.712, note: "a FACE of the triple, the same state as cup-x-width @ petalCup=1.2 x petalWidth=46 read on the triple's face. NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=3 x petalWidth=46": { mm: 0.189, note: "the triple's worst cell at the new width maximum (0.390 at width 30). NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=30": { mm: 0.92, note: "a FACE of the triple (petalCup x petalWidth moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=16": { mm: 0.788, note: "a FACE of the triple (petalCup x petalTipShape moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=30": { mm: 0.457, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.331 mm against its nearest face (petalCup=1 x petalTipShape=3 x petalWidth=16) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },

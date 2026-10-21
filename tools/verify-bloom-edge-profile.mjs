@@ -156,6 +156,18 @@ const DIH_BAR = 180 / G0.RIM_BEAD_SEGMENTS;
    above the float floor of an angle taken from two unit normals, and well
    inside the smallest excess declared here (1.68e-4). */
 const E2_TURN_BAND_DEG = 5e-5;
+/* E7 DECLARED BY VALUE (big petals, Oct 21). `ALL MAX` asks a 150 mm petal
+   (the 100 mm maximum x its size field's 1.5) on a 6.56 mm root body under
+   every form control at once, and two side profiles at its root-blend end
+   (base row 16, u 0.2857) stop 0.0097 mm off the drawn radius against the
+   builder's 0.0096 mm bracket: the bracket is the half's ARC over 4096, and
+   the bisection's twelve halvings are in the section parameter, which this
+   section does not stretch evenly. The root taper OFF reads clean. Both
+   directions: the count exactly, the worst within E7_INSET_BAND_MM. */
+const E7_INSET_BAND_MM = 5e-5;
+const E7_INSET_XFAIL = {
+  /* REMOVED BY THE WIDTH RANGE (Oct 21, petalWidth max 30 -> 46, the same PR): 'ALL MAX' was declared at 2 profiles / 0.00971 mm (the 150 mm root-tapered petal at its root-blend end) and reads 0 once its width is 46 — a wider section stretch at the root blend puts the inset bracket back on the bead. Re-declare by value if a later change brings it back. */
+};
 /* RE-RECORDED ON a4dc836 BY THE GATE-COVERAGE SESSION, ELEVEN MERGES LATE. This
    gate ran in no workflow (D14), so the apex nib (#283, 6ebf784) moved seven of
    these rows and the row ramp (#289, 4f3d31b) two more, and nothing said so
@@ -175,6 +187,9 @@ const E2_TURN_BAND_DEG = 5e-5;
    nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
    state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
+  'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)': { excessDeg: 8.532510, note: 'the ROOT RIM of a tapered 100 mm petal (big petals, Oct 21): the rim taper eases the thickened body (3.88 mm at the root) to the 1 mm bead within RIM_TAPER_MM, so the rim turns past the allowance at the root (radius ~11.6 mm); the same state with the root taper OFF passes E2, and the two remedies tried (the bead scaled by the root factor; the buried-end ramp lengthened by it) each moved the excess to another length (80 mm read 61.9 / 77.5). RULED Oct 21: accepted — a thick root closing on the 1 mm bead is a chamfer (docs/bloom-big-petals-outcome.md §6)' },
+  'BIG PETALS: 100 mm x cup 1.2 (the fold clamp reads each row\'s own thickness)': { excessDeg: 13.141118, note: 'the CUPPED TIP, not the taper\'s: the same state with the root taper OFF reads the identical turn at the identical site (the cupped-nib bead class main declares)' },
+  'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)': { excessDeg: 8.532510, note: 'the ROOT RIM of a tapered 100 mm petal (big petals, Oct 21): the rim taper eases the thickened body (3.88 mm at the root) to the 1 mm bead within RIM_TAPER_MM, so the rim turns past the allowance at the root (radius ~11.6 mm); the same state with the root taper OFF passes E2, and the two remedies tried (the bead scaled by the root factor; the buried-end ramp lengthened by it) each moved the excess to another length (80 mm read 61.9 / 77.5). RULED Oct 21: accepted — a thick root closing on the 1 mm bead is a chamfer (docs/bloom-big-petals-outcome.md §6)' },
   /* CURVES-LEAVES (Oct 20, docs/bloom-curves-leaves-outcome.md): three block-73
      rows over the allowance, each measured against the SAME state on the arch
      slider and the law outline (`--rows-file`, `--dump-e2`) — none is a new
@@ -853,7 +868,10 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
         if (d > r.inset.tolMm + 1e-9) { insetBad++; if (!insetWorst || d > insetWorst.d) insetWorst = { d, r }; }
       }
       insetChecked += insetN;
-      check('E7', insetBad === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${insetBad} of ${insetN} side profiles stop ${insetWorst && insetWorst.d.toFixed(4)} mm off their own drawn radius ${insetWorst && insetWorst.r.inset.mm.toFixed(4)} mm (panel ${insetWorst && insetWorst.r.panel} row ${insetWorst && insetWorst.r.row} col ${insetWorst && insetWorst.r.col}) — the bead's inset was not solved on this side's own section`);
+      const e7d = E7_INSET_XFAIL[row.label];
+      if (e7d) {
+        check('E7', insetBad === e7d.profiles && insetWorst && Math.abs(insetWorst.d - e7d.worstMm) <= E7_INSET_BAND_MM, `${row.label} [${exportMode ? 'export' : 'live'}]: declared ${e7d.profiles} profile(s) off by ${e7d.worstMm} mm and reads ${insetBad}${insetWorst ? ` off by ${insetWorst.d.toFixed(5)}` : ''} — the declaration is stale (re-record or remove it)`);
+      } else check('E7', insetBad === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${insetBad} of ${insetN} side profiles stop ${insetWorst && insetWorst.d.toFixed(4)} mm off their own drawn radius ${insetWorst && insetWorst.r.inset.mm.toFixed(4)} mm (panel ${insetWorst && insetWorst.r.panel} row ${insetWorst && insetWorst.r.row} col ${insetWorst && insetWorst.r.col}) — the bead's inset was not solved on this side's own section`);
 
       /* ---- E1: the rim floor, with the clamp as a BICONDITIONAL ----
          THE BAR IS `min(RIM_FLOOR_MM, the body's own thickness)`, and that is

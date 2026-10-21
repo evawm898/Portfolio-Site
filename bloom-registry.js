@@ -78,6 +78,7 @@ import { LOBED_PER_SIDE_RANGE, LOBED_PER_SIDE_DEFAULT, LOBED_FROM_RANGE, LOBED_F
 import { LEAF_WIDTH_DEFAULT, LEAF_TOOTH_DEPTH_DEFAULT, LEAF_TOOTH_COUNT_DEFAULT } from './bloom-geometry.js';
 import { LEAF_CURVE_TWINS, leafOutlineWidthScale, leafletOutlineWidthScale } from './bloom-geometry.js';
 import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE, VARIANCE_FORM_RANGE, VARIANCE_SPACING_RANGE, NODE_VARIANCE_RANGE } from './bloom-geometry.js';
+import { petalRootTaper, ROOT_TAPER_REF_MM } from './bloom-geometry.js';
 import { TUBE_HEIGHT_RANGE, TUBE_HEIGHT_DEFAULT, TUBE_BLEND_RANGE, TUBE_BLEND_DEFAULT, TUBE_K_MAX, tubeSnap, MAX_LAYERS as TUBE_MAX_LAYERS } from './bloom-geometry.js';
 import { SCOPE_TOGGLE_VALUES, SCOPE_LAYER_PLACEMENTS, mirrorFor } from './bloom-geometry.js';
 /* THE CURVE KIND (the curve-editor session, Oct 14) — its value shape, its
@@ -1981,8 +1982,20 @@ export const CONTROLS = [
        is hidden AND inert: FAN at petalCount 40 must be bit-identical to FAN
        at petalCount 8. */
     visibleWhen: { not: { id: 'placement', oneOf: ['FAN'] } } },
-  { id: 'petalLength', section: 'shape', kind: 'slider', min: 20, max: 60, step: 1, default: 35,
-    label: 'Petal length', fmt: (v) => `${v} mm`, tier: 'standard', role: 'petal',
+  /* BIG PETALS (Oct 21 — Eva's ruling 1): the maximum is 100 mm, the default
+     does not move. A petal past the reference length (the default, 35 mm,
+     `ROOT_TAPER_REF_MM`) thickens at its root by the cantilever law
+     (`petalRootTaper`, ruling 2), and the read-out says how thick — the
+     derived quantity printed beside the asked one, one expression in the
+     geometry and none here. */
+  { id: 'petalLength', section: 'shape', kind: 'slider', min: 20, max: 100, step: 1, default: 35,
+    label: 'Petal length', tier: 'standard', role: 'petal',
+    fmt: (v, ui) => {
+      const rt = petalRootTaper(Number(v));
+      if (rt === null) return `${v} mm`;
+      const sheet = ui ? Number(ui.sheetThickness) : 1.2;
+      return `${v} mm · root ${(Math.max(sheet, 1) * rt.rootFactor).toFixed(2)} mm thick (×${rt.rootFactor.toFixed(2)} the sheet, tapering to it ${ROOT_TAPER_REF_MM} mm from the tip)`;
+    },
     visibleWhen: { all: [] } },
   /* THE WIDTH IN CURVE MODE SCALES THE DRAWN CURVE (F6-sym-2, Eva's ruling):
      every point's width times `petalWidth / 16` (the default, which is the
@@ -1991,7 +2004,7 @@ export const CONTROLS = [
      width drag that would put a scaled point under the print floor is REFUSED
      by the outline's own validator (bloom.js) and the editor's status says
      which point. It still sets the foot, as in LAW mode. */
-  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 30, step: 1, default: OUTLINE_WIDTH_REF_MM,
+  { id: 'petalWidth', section: 'shape', kind: 'slider', min: 8, max: 46, step: 1, default: OUTLINE_WIDTH_REF_MM,
     label: 'Petal width', fmt: (v, ui) => (ui && ui.petalOutlineMode === 'CURVE' ? `${v} mm — scales the drawn outline's widths ${outlineWidthScale({ petalWidth: v }).toFixed(3)}x (against ${OUTLINE_WIDTH_REF_MM} mm), and sets the foot` : `${v} mm`), tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 

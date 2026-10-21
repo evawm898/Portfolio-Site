@@ -53,7 +53,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
          fringeAssertions,
          thicknessAssertions, THICKNESS_SCOPE, apexNibAssertions, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
@@ -61,7 +61,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          stemAssertions, STEM_SCOPE,
          leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions, rootTaperAssertions } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -124,7 +124,7 @@ for (const [rowIndex, row] of rows.entries()) {
   attempted.push(row.label);
   attemptedIdx.push({ index: rowIndex, label: row.label });
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
-  const bad = await applyConfig(page, row.set);
+  const bad = await applyConfig(page, row.set, null, { settleMs: settleMsForRow(row.label) });
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
@@ -343,6 +343,12 @@ for (const [rowIndex, row] of rows.entries()) {
     await page.evaluate(() => window.__bloomMetrics()),
     await page.evaluate(() => window.__bloomUIState()));
   if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
+  /* T1/T2/T4/T5 — THE ROOT TAPER, read from THIS row's STL bytes (big petals,
+     Oct 21): the thickness at every root and on the untapered blade rows, the
+     hub against the thickest root, and the sepals left on the sheet. Both STL
+     gates are blind to a thickness by construction. See rootTaperAssertions(). */
+  const taper = rootTaperAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics()), await page.evaluate(() => window.__bloomUIState()));
+  if (taper.length) { validity.push(`${row.label}: ${taper.join('; ')}`); continue; }
   /* ID10 (d) — THE FLORETS AGAINST EACH OTHER, read from THIS row's STL bytes
      (build 3, ruling 1): the internode floor is derived to clear it, and the
      file is the only thing that can say whether it did. */

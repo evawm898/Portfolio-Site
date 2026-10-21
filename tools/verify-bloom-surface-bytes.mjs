@@ -182,6 +182,41 @@ function stateOf(row) {
 
 const ONLY = argOf('--only') ? new RegExp(argOf('--only')) : null;
 const MATRIX = harness.buildMatrix();
+/* THE ROW-DEFINITION GUARD (big petals, Oct 21 — `verify-bloom-seam-bytes`'s
+   ROW_DEF_MOVED_BY_CHANGE, ported). This tool builds BOTH trees from THIS
+   tree's rows, so a row whose definition moved between the trees is compared
+   on one state and the redefinition itself is invisible to the partition.
+   For a predicate that declares redefinitions, the BASE tree's own matrix is
+   loaded and compared row by row (label, set, capability): an undeclared
+   difference REFUSES, a declared one that did not happen REFUSES, and rows
+   past the base's length are the declared ADDED count. Keyed on THIS tree's
+   label. */
+const ROW_DEF_MOVED_BY_PRED = {
+  'root-taper': {
+    added: 28,
+    rows: {
+      'petalLength max (100)': "block 1 sweeps every SWEEPABLE slider to its own max; the base calls it `petalLength max (60)`",
+      'petalWidth max (46)': "the same row for the width range (Eva's ruling 2); the base calls it `petalWidth max (30)`",
+      'ALL MAX': 'one label, two states — it carries every slider max, so both ranges move it',
+    },
+  },
+};
+if (MOVERS_PRED && ROW_DEF_MOVED_BY_PRED[MOVERS_PRED] && !MERGE) {
+  const decl = ROW_DEF_MOVED_BY_PRED[MOVERS_PRED];
+  const baseHarness = await load(BASE, 'tools/bloom-harness.mjs');
+  const rowsB = baseHarness.buildMatrix();
+  const sigOf = (r) => JSON.stringify([r.label, (r.set || []).map((w) => [w.id, String(w.value)]), r.capability || null]);
+  const why = [], seen = new Set();
+  if (MATRIX.length - rowsB.length !== decl.added) why.push(`the matrix grew by ${MATRIX.length - rowsB.length} rows, declared ${decl.added}`);
+  for (let i = 0; i < Math.min(rowsB.length, MATRIX.length); i++) {
+    if (sigOf(MATRIX[i]) === sigOf(rowsB[i])) continue;
+    if (MATRIX[i].label in decl.rows) seen.add(MATRIX[i].label);
+    else why.push(`UNDECLARED ROW REDEFINITION at row ${i}: "${rowsB[i].label}" on the base is "${MATRIX[i].label}" here (or carries a different set)`);
+  }
+  for (const l of Object.keys(decl.rows)) if (!seen.has(l)) why.push(`DECLARED REDEFINITION THAT DID NOT HAPPEN: "${l}" is identical on both trees or absent`);
+  if (why.length) { console.error(`REFUSED (row definitions): ${why.join('; ')}`); process.exit(1); }
+  console.log(`row defs      : ${seen.size} declared redefinitions confirmed against the base matrix (${[...seen].join(' · ')}); ${decl.added} rows added`);
+}
 const [RFROM, RTO] = RANGE ? RANGE.split(':').map(Number) : [0, MATRIX.length];
 /* `--from K` starts at the K-th selected row (0-based), so a full-matrix run
    can be closed out in foreground chunks of `--from K --rows N` without a
@@ -510,6 +545,38 @@ const PREDICATE_MOVERS = {
     const snap = (v, L) => { const slack = (8 * Math.abs(L) * Number.EPSILON) / G; const t = v / G, n = Math.floor(t); return (t - n >= 0.5 - slack ? n + 1 : n) * G; };
     return (b.petalsAll || []).some((p) => p && p.infill && !p.infill.refused && p.infill.cells > 0
       && p.infill.mSplit >= 0 && p.profileU && (() => { const x = p.profileU[p.infill.mSplit] * p.length; return Number.isFinite(x) && !Object.is(snap(x, p.length), x); })());
+  },
+  /* BIG PETALS (Oct 21, docs/bloom-big-petals-outcome.md) — THE ROOT TAPER.
+     PREDECLARED FROM THE BASE TREE'S OWN RECORD: a row moves iff the BASE
+     builds a petal whose ASKED length (its own `askedLength`, the length the
+     law reads) passes the 35 mm reference, or a raceme whose floret asks for
+     one (head length x floretScale), or the HUB's bound passes it — the
+     longest petal the bloom can build, scopes and the size field included,
+     which this tree's `hubRootTaperLengthMm` states (the hub law is new, so
+     its bound has no base owner; it reads the coerced state, never the
+     build). Every row whose petals are all at or under 35 mm holds to the
+     bit — the law is the identity there BY BRANCH. */
+  'root-taper': (st, row) => {
+    const REF = 35;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    if ((b.petalsAll || []).some((p) => p && Number(p.askedLength) > REF)) return true;
+    if (st.inflorescence && st.inflorescence !== 'NONE' && Number(st.petalLength) * Number(st.floretScale) > REF) return true;
+    if (mine.hubRootTaperLengthMm(st, harness.rowScopesForBuild(row)) > REF) return true;
+    /* AND THE WIDTH RANGE (Eva's ruling 2, the same PR): `petalWidth`'s max
+       went 30 -> 46. The base geometry clamps a petal's COMPOSED width (the
+       global plus its scope offset, `OVERRIDE_BOUNDS`) at the BASE's own
+       bound, so a row moves on the width alone iff the base builds a petal
+       whose composed ask passes that bound, or a raceme whose floret head asks
+       past it. The bound is read off the BASE module, never restated. A
+       top-level `petalWidth` past 30 with no offset is not clamped on the
+       base (the clamp acts on a composition, and the global alone is the
+       control's own value) — measured, `petalWidth max (46)` holds to the bit
+       — so the clause reads a petal that carries a width OFFSET. */
+    const WMAX = base.OVERRIDE_BOUNDS.get('petalWidth').max;
+    const offW = (p) => Number((p.scopeTerm && p.scopeTerm.offsets && p.scopeTerm.offsets.petalWidth) || 0);
+    if ((b.petalsAll || []).some((p) => p && offW(p) !== 0 && Number(st.petalWidth) + offW(p) > WMAX)) return true;
+    return !!(st.inflorescence && st.inflorescence !== 'NONE' && Number(st.petalWidth) * Number(st.floretScale) > WMAX);
   },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });

@@ -1192,6 +1192,54 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   values against the PETAL id list** and so built every sepal tier's own curve WITHOUT it on the base side —
   two block-72 rows read as moved; a tier strips against `SEPAL_SCOPE_VALUE_IDS` now.
 
+**A PETAL REACHES 100 mm, AND A LONG PETAL THICKENS AT ITS ROOT BY ITS OWN LENGTH; THE HUB FOLLOWS**
+(big petals, Oct 21 — Eva's rulings; read `docs/bloom-big-petals-outcome.md` before touching `petalRootTaper`,
+`rootTaperFactor`, `thicknessProfile`'s `rootTaper`, `hubRootTaperLengthMm`, `seamClearanceMm`'s `rootFactor`,
+`spineBendTable`'s `tauAt`, the T family or block 75).
+- `petalLength` is 20–100 mm (default 35, unchanged); `OVERRIDE_BOUNDS` follows. The blanket row is
+  `petalLength max (100)` and `ALL MAX` carries 100 (both redefined).
+- **The law is the self-weight cantilever against the SHIPPING petal (35 mm on 1.2 mm), UNVALIDATED** — nothing
+  has been printed; it keeps every longer root's stress at that one's, no more. Width cancels. The taper starts
+  35 mm from the tip (a length the petal owns) and is fully stressed inward: `dtau/dzeta = sqrt((8/3)tau^3 + 4/3) /
+  (2 tau)`, RK4 (arithmetic + sqrt, cross-engine identical). Root 1.200 / 2.100 / 2.931 / **3.883 mm** at
+  35 / 60 / 80 / 100. Reads the ASKED length (mode-free). **At or under 35 mm it is `null` — the identity by
+  branch.** One law with tip thinning, one owner (`thicknessProfile`).
+- Followers: seam clearance and `seamHalfMm` x the root factor (A7 restated); the fold limit's margin per
+  substep (C5 restated); the cup fold clamp per row; the roll floor against the root; the rim bead (feet
+  untapered, so root skins are `+/- t_root/2`); the hub plate = sheet x the factor of the LONGEST petal the bloom
+  can build (scopes and the size field — an upper bound; J4a restated, exact at or under 35); the join floor reads
+  the thickened hub; a stamen's and the style's ROOT spans the thickened hub (`rootSpan`; the parts stay one sheet
+  thick) — MISSED in the first push and found by CI's JS1 on `ALL MAX` (§6d; apex mutant
+  `the-part-root-spans-the-sheet`), and the two style rows on the mum it had "fixed" read 272 / 0.0664 again.
+  `ALL MAX`'s settle has the export click's 120 s (`settleMsForRow`, declared refusals only; every other row 30 s).
+  Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule).
+- **T0–T4** in both STL gates read the thickness off the EXPORTED skins (root, untapered rows, hub, sepal roots)
+  against the law RESTATED through the other integral (Simpson + bisection, 1e-9). J1/J4a/A7/C5/roll floor
+  restated, never relaxed. Must-fail `node tools/verify-bloom-root-taper.mjs [--control]` (four mutants, each
+  witnessed on the mutated module), SPAWNED by `verify-bloom-defaults-bar.mjs` both arms (DB3: the default builds
+  no taper) — no workflow edit.
+- Block 75 (28 rows, 1,485), smoke block 75 (7); combination `cup-x-length` gains 80/100, `length-x-tilt` new
+  (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too, plus
+  `FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min` (294 / 0.3223, 0 on main, all in the root blend of
+  a 70 mm petal on a 0.6 sheet — found by the browser X2, missed by the Node census sweep).
+- **Byte partition: 100 movers (19 of them width movers too, 0 width-only) / 1,385 holders at 0 floats**, both
+  modes (`--movers-predicate root-taper`, predeclared from the base tree).
+- **`petalWidth` is 8–46 (RULED Oct 21, default 16 unmoved)** — the shipping 35:16 proportion at 100 mm.
+  `petalWidth max (46)` is redefined; `verify-bloom-surface-bytes`' `root-taper` predicate carries the width
+  (a COMPOSED width past the base's 30 moves; a bare global does not — the base clamps compositions only) and a
+  ROW-DEF guard against the base's own matrix (3 declared, 28 added). `ALL MAX` refusal 3,334,106 tris (all of
+  the width's +641,932 is the FRINGE, measured with it off), census 78,222 / 34.0787. Nine FAN census rows
+  re-recorded (petal 1's +16 now builds 32). `cup-x-width` and its triple reach 46: seven cells under the bar,
+  declared (worst 0.189 mm). The foot's 10 mm clamp now binds over 56% of the slider — reported, unchanged.
+- **Sepals pinned OFF and leaves never wired stay on the 1.2 mm sheet at any length** (a 120 mm one is 11.8x the
+  reference stress) — measured and stated in §3b, open for Eva. SO13's original condition was planted on the new
+  geometry and reddens the restated clause; `an-owned-length-moves-the-foot` is its standing mutant.
+- **A 100 mm petal's ROOT RIM turns ~53.5° against E2's 45° — RULED Oct 21: accepted, a chamfer (declared on the three smoke rows):** the rim
+  taper eases a 3.88 mm root to the 1 mm bead in 3 mm. A bead scaled by the root factor moved it to 80 mm (61.9°); a
+  lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carried one
+  E7 edge (`E7_INSET_XFAIL`) until the width reached 46, where it reads 0 and the entry came off.
+- Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png` (2b: the root rim side-on).
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
