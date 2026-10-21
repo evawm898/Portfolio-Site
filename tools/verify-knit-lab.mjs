@@ -147,16 +147,21 @@ const fmt = (v, k = 0) => (Number.isFinite(v) ? v.toFixed(k) : String(v));
 
 // The phase-2 test, as it was: a continuous pull, the phase-2 friction, settled with friction on.
 const PHASE2 = { PROTOCOL: 'continuous', FRICTION_MODE: 'substep', SETTLE_FRICTION: null, PULL_DAMPING: 1 };
-const SPECS = [
+const SPECS = [   // the longest first, so four at a time finishes soonest
+  { name: 'rib-course', swatch: 'rib', dir: 'course', audit: true },
+  { name: 'plain-course', swatch: 'plain', dir: 'course' },
+  { name: 'mf-tail-untied', swatch: 'plain', params: { TAIL_TIED: 0 } },
   { name: 'plain', swatch: 'plain', audit: true, peakHold: 600 },
+  // replicas: the plain test again, the preload moved by one part in 1e9 — not gated; they measure the
+  // run-to-run scatter of the stepped test at FIXED settings, which the step / tolerance spread is read against
+  { name: 'plain-rep1', swatch: 'plain', params: { PRELOAD: 1500 * (1 + 1e-9) } },
+  { name: 'plain-rep2', swatch: 'plain', params: { PRELOAD: 1500 * (1 + 2e-9) } },
   { name: 'plain-step0.5', swatch: 'plain', params: { STEP_EXT: 0.005 } },
   { name: 'plain-tol0.05', swatch: 'plain', params: { STEP_TOL: 0.0005 } },
   { name: 'plain-step0.5-tol0.05', swatch: 'plain', params: { STEP_EXT: 0.005, STEP_TOL: 0.0005 } },
   { name: 'plain-mu0', swatch: 'plain', params: { FRICTION: 0 } },
   { name: 'eyelet', swatch: 'eyelet', audit: true },
   { name: 'eyelet-ssk', swatch: 'eyelet-ssk' },
-  { name: 'plain-course', swatch: 'plain', dir: 'course' },
-  { name: 'rib-course', swatch: 'rib', dir: 'course', audit: true },
   { name: 'mf-phase2-fast', swatch: 'plain', params: { ...PHASE2 } },
   { name: 'mf-phase2-slow', swatch: 'plain', params: { ...PHASE2, PULL_SPEED: 0.5 } },
   { name: 'mf-phase2-mu0', swatch: 'plain', params: { ...PHASE2, FRICTION: 0 } },
@@ -164,7 +169,6 @@ const SPECS = [
   { name: 'mf-friction-accumulates', swatch: 'plain', mutant: 'friction-cap-accumulates' },
   { name: 'mf-gauss-seidel-stretch', swatch: 'plain', params: { STRETCH_SOLVER: 'gs' } },
   { name: 'mf-compliant-yarn', swatch: 'plain', params: { STRETCH_COMPLIANCE: 2e-6 } },
-  { name: 'mf-tail-untied', swatch: 'plain', params: { TAIL_TIED: 0 } },
 ];
 const ONLY = opt('--only', null);
 const RUN = ONLY ? SPECS.filter(s => ONLY.split(',').includes(s.name)) : SPECS;
@@ -228,6 +232,8 @@ if (has('plain', 'plain-step0.5', 'plain-tol0.05', 'plain-step0.5-tol0.05', 'pla
   for (const k of ['plain', 'plain-step0.5', 'plain-tol0.05', 'plain-step0.5-tol0.05', 'plain-mu0', 'mf-phase2-fast', 'mf-phase2-slow', 'mf-phase2-mu0']) {
     const c = R[k].cyc, r = runs[k]; console.log(`  ${k.padEnd(24)} ${r.pull.stepped ? `${r.pull.rows.length} steps, ${r.pull.unconverged} unconverged, ${fmt(mean(r.pull.rows.map(q => q.frames)), 0)} frames a hold` : 'continuous'}: ${pct(c.lossFraction)} lost, set ${pct(c.set, 2)}, jam ${pct(R[k].jam.ext, 0)}, peak ${fmt(r.pull.peak.load)} at ${pct(r.pull.peak.ext, 0)}`);
   }
+  const reps = ['plain', 'plain-rep1', 'plain-rep2'].filter(k => runs[k]);
+  if (reps.length > 1) { const L = reps.map(k => R[k].cyc.lossFraction), S = reps.map(k => R[k].cyc.set); console.log(`  replicas at FIXED settings (preload +0 / 1e-9 / 2e-9): loss ${L.map(v => pct(v)).join(' / ')} (spread ${pct(spread(L))}), set ${S.map(v => pct(v, 2)).join(' / ')} (spread ${pct(spread(S))}) — not gated`); }
   gate(quasiStatic(['plain', 'plain-step0.5', 'plain-tol0.05', 'plain-step0.5-tol0.05'].map(k => R[k])), 'μ 0.25: loss and set agree across step 1% / 0.5% x tolerance 0.2% / 0.05%');
   mustFail(quasiStatic([R['mf-phase2-fast'], R['mf-phase2-slow']]), 'the phase-2 test at 1.5 and 0.5 d/s');
   gate(frictionlessNoLoss(R['plain-mu0']), 'μ 0: the stepped cycle loses under 2%');
