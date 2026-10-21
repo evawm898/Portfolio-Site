@@ -134,7 +134,10 @@ export floats over 191,129,484 triangles, and 81,370,356 captured-grid values. I
 - `--control` fires both clauses (the export stream and the captured grid) on a 1e-9 perturbation of
   a holder.
 
-## §6 THE HANDEDNESS — a measurement against a ruling, left to Eva
+## §6 THE HANDEDNESS — left-handed only (RULED Oct 21)
+
+**RULED (Eva, Oct 21): left-handed only.** The shipped hand stays for the coil and the braid; the flip
+below is not taken, so no byte moves. The measurement that led to the ruling is kept as it was.
 
 The coil-§7 ruling says "right-handed only". **The coil as shipped is LEFT-handed.** It turns CLOCKWISE
 seen from above as it rises. Measured on the emitted stations, it turns −11.49 rad about +z over the
