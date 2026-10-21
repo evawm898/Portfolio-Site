@@ -347,7 +347,10 @@ export const STAMEN_ROWS = 16;
    not) and the same for every stamen whatever the clamp or the variance
    did. COIL_ROWS_PER_TURN stations a turn ON TOP OF the plain rod's
    STAMEN_ROWS. */
-export const STAMEN_COIL_MODES = Object.freeze(['NONE', 'INDEPENDENT']);
+/* BRAIDED (F1.3b) joined the modes in the braid session — see THE BRAIDED
+   BUNDLE below. NONE and INDEPENDENT are untouched by its arrival: every
+   expression they reach is the one they reached before it. */
+export const STAMEN_COIL_MODES = Object.freeze(['NONE', 'INDEPENDENT', 'BRAIDED']);
 export const STAMEN_COIL_RADIUS_RANGE = Object.freeze([0, 10]);
 export const STAMEN_COIL_TURNS_RANGE = Object.freeze([0.5, 12]);
 export const STAMEN_COIL_RADIUS_DEFAULT = 1.5;
@@ -361,7 +364,7 @@ export const COIL_PROBE_PER_TURN = 64;
    `stamenCoilBuilt` is the twin that HIDES the turns; the harness holds the
    two equal per row (JS9). */
 export function stamenCoilBuilt(state) {
-  return androeciumEligible(state) && Math.round(Number(state.stamenCount)) >= 1 && state.stamenCoil === 'INDEPENDENT' && Number(state.stamenCoilRadius) > 0;
+  return androeciumEligible(state) && Math.round(Number(state.stamenCount)) >= 1 && (state.stamenCoil === 'INDEPENDENT' || state.stamenCoil === 'BRAIDED') && Number(state.stamenCoilRadius) > 0;
 }
 export function stamenCoilRows(turnsAsked) { return STAMEN_ROWS + Math.ceil(Number(turnsAsked) * COIL_ROWS_PER_TURN); }
 export function stamenCoilPhaseUnit(i) {
@@ -437,7 +440,12 @@ export function stamenCoilFor(i, lengthMm, radiusMm, turnsAsked, floorRadius) {
    curvature (uniform on every rod — bias 0, start 0, never clamped), and the
    coil record above. Returns local (Up, -Rs, T) coordinates of the coiled
    centreline and its UNIT tangent at base arc length s. */
-export function coilLaw({ base, length, k, coil }) {
+export function coilLaw({ base, length, k, coil, frame = null }) {
+  /* THE BRAID (F1.3b) is an arm of this law, not a second one: the strand is
+     still its own spineLaw centreline plus an offset — the offset that lays it
+     into the bundle (braidLaw, below). The INDEPENDENT arm is the code that
+     follows, untouched. */
+  if (coil.mode === 'BRAIDED') return braidLaw({ length, coil, frame });
   const R = coil.radiusMm, w = (TAU * coil.turns) / length, ph = coil.phaseRad, sr = coil.rampMm;
   const at = (s) => {
     const q = base.at(s), cp = Math.cos(q.phi), sp = Math.sin(q.phi);
@@ -471,6 +479,341 @@ export function coilTelemetry(law, length, turns, floorRadius) {
   return { arcMm: arc, peakRadiusMm: peakK === 0 ? Infinity : 1 / peakK, underFloor: peakK * floorRadius > 1 };
 }
 export function androeciumEligible(state) { return !sphereMode(state); }
+
+/* ===================================================================
+   THE BRAIDED BUNDLE — F1.3b (Eva's rulings: Q2.4 "braided = ONE bundle —
+   every stamen winds around a shared axis", Oct 12; the braid session's
+   three of Oct 20 — one bundle of ALL the androecium's filaments, the anther
+   on the braid's end tangent, select-and-edit by strand; and the coil-§7
+   confirmations: the length is the AXIS, the coil ramps in, ONE handedness,
+   16 stations a turn). Read docs/bloom-stamen-braid-outcome.md first.
+
+   A BRAID IS A WAY OF LAYING THE STRANDS' OFFSETS, NOT A SECOND ROD. Every
+   strand is still its own rod: rooted on its own foot through the slab (JS1-
+   JS3 hold unchanged), drawn by rodInto's coiled arm through `coilLaw`'s third
+   arm (`braidLaw`), its centreline an offset laid in the BUNDLE's frame:
+
+     C(s) = A(s) + E(s) w(s)
+
+   A is the BUNDLE'S AXIS: spineLaw at the hub's apex (where every cap's normal
+   is exactly +z), in the azimuth-0 plane exactly as the style's rod is, curled
+   at the bundle's ONE curvature `stamenCurl / stamenLength` (the CONTROL's
+   length, so a strand's own length offset never bends the others' axis). E is
+   that planar arc's rotation-minimising frame, and w is the strand's offset in
+   it. Two regions, in order:
+     * THE GATHER, s in [0, G]: w goes from the strand's own outer root (w0) to
+       its SLOT H = R (cos th0 N1_A + sin th0 T_A), th0 = pi - azimuth — the
+       slot on the same radial line as its foot, so no strand crosses the axis
+       while gathering. It leaves its root ALONG ITS OWN NORMAL and arrives in
+       the slot with the twist's own velocity (`braidGatherGeometry`'s header
+       has the polynomials). Its curvature is EXACT and arithmetic only — the
+       curl and a domed hub's leaning roots included — so G is the least
+       length the floor admits, BISECTED (52 steps, over a 128-sample lattice
+       with ternary refinement), never shorter than 15/8 of the gather
+       distance (a lateral slope at or under 45 degrees, a choice made without
+       a ruling), and it may take the WHOLE strand. Where even the whole strand
+       cannot gather under the floor, it gathers the largest FRACTION lambda the
+       floor admits (bisected; lambda = 1 exactly at the boundary) and does not
+       twist — the coil's own radius clamp, told, continuous.
+     * THE TWIST, s in [G, L]: th = th0 + Omega(s), the twist RATE 2 pi n / Lr
+       (Lr the control's length — the length is the AXIS) ramped in by
+       smootherstep over one asked pitch, or what is left of the strand, so
+       the strand leaves the gather with continuous tangent AND curvature. On a
+       straight axis its curvature has the coil's exact form with rho' = 0
+       (`braidTwistKappa`), so the turns clamp is a bisection on a quantity
+       bit-identical in every engine.
+   THE TWIST IS THE BUNDLE'S: every strand winds about the shared axis with
+   the SAME handedness as an INDEPENDENT coil (one handedness — the coil-§7
+   ruling; MEASURED left-handed, clockwise from above as it rises, which is the
+   shipped coil's own hand — docs/bloom-stamen-braid-outcome.md §6), so at equal
+   radius and turns the strands are parallel helices: a rope-laid bundle. A
+   strand's OWN radius or turns (its scope, select-and-edit) puts it inside or
+   outside the others, or winding faster, and that is where strands cross.
+
+   THE FLOORS — the composite curvature floor (Q2.3) and the fold limit apply
+   to EVERY strand. The floor bounds the gather and the twist as above. THE FOLD
+   LIMIT (spine-cup-fold's ruling: a spine may not bend past its own cross-
+   section) is the BUNDLE's: a strand laid at R about an axis bending at 1/k
+   has its inner skin at 1/k - R - t/2 from the bend's centre, so the LAY
+   RADIUS is clamped to 1/|k| - t per strand and told (`foldClamped`). The
+   filament curl's composite with the twist is MEASURED on every strand
+   (`peakRadiusMm`, `underFloor`) and told, the coil's precedent.
+
+   THE STATION COUNT is the coil's — stamenCoilRows(the strand's asked turns)
+   — a function of controls, so live and export agree and a 120-strand braid
+   at 12 turns costs exactly what 120 independent coils do (552,688 export
+   triangles at 120 mm, measured before this was built).
+   =================================================================== */
+/* The ids a STRAND scope may offset (select-and-edit, ruling 3): a strand's
+   own length, its radius in the bundle and its own turns. Whole-androecium
+   values (the count, the layout, the spread, the curl, the variance) are the
+   BUNDLE's and are edited by picking the bundle. */
+export const SCOPE_STRAND_IDS = Object.freeze(['stamenLength', 'stamenCoilRadius', 'stamenCoilTurns']);
+/* the gather's run per millimetre of gather distance: max |smootherstep'| is
+   15/8, so this keeps the strand's lateral slope at or under 1 (45 degrees) */
+export const BRAID_GATHER_RUN = 15 / 8;
+/* THE GEOMETRY'S STATEMENT of "a braid is built" — the registry's
+   `stamenBraidBuilt` is its twin; the harness holds the two equal per row. */
+export function stamenBraidBuilt(state) { return stamenCoilBuilt(state) && state.stamenCoil === 'BRAIDED'; }
+/* the integral of smootherstep, I(1) = 1/2 — the twist ANGLE while its rate ramps in */
+const braidRampI = (x) => x * x * x * x * (x * (x - 3) + 2.5);
+function braidTwistKappa(R, w, T, x) {
+  const t1 = w * coilRampF(x), t2 = (w * coilRampF1(x)) / T;
+  const b = R * t1, c = -R * t1 * t1, d = R * t2;
+  const q = 1 + b * b, e = -b * c;
+  return Math.sqrt(e * e + c * c + d * d) / (q * Math.sqrt(q));
+}
+/* The twist's peak curvature over the ramp and the plateau — the coil's own
+   lattice-and-refine, on the twist's kappa (arithmetic only). */
+export function braidTwistCurvatureMax(R, w, T) {
+  const N = COIL_BOUND_SAMPLES, k = new Float64Array(N + 1);
+  for (let j = 0; j <= N; j++) k[j] = braidTwistKappa(R, w, T, j / N);
+  let m = 0;
+  for (let j = 0; j <= N; j++) {
+    if (k[j] > m) m = k[j];
+    if ((j > 0 && k[j] < k[j - 1]) || (j < N && k[j] < k[j + 1])) continue;
+    let lo = j > 0 ? (j - 1) / N : 0, hi = j < N ? (j + 1) / N : 1;
+    for (let it = 0; it < COIL_REFINE_STEPS; it++) {
+      const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      if (braidTwistKappa(R, w, T, m1) < braidTwistKappa(R, w, T, m2)) lo = m1; else hi = m2;
+    }
+    const kk = braidTwistKappa(R, w, T, (lo + hi) / 2);
+    if (kk > m) m = kk;
+  }
+  return m;
+}
+/* THE ONE OWNER OF A STRAND'S PLACE IN THE BRAID: its index, its BUILT
+   length, the bundle's reference length (the control's), its radius and asked
+   turns (the controls plus its strand scope, clamped), the floor, its gather
+   distance and its foot's azimuth. */
+export function stamenBraidFor(i, { lengthMm, refLengthMm, radiusMm, turnsAsked, floorRadius, w0, up, bundle, azimuth, curlRad }) {
+  const L = Number(lengthMm), Lr = Number(refLengthMm), Rasked = Number(radiusMm), n = Number(turnsAsked), t = floorRadius;
+  const k = Number(curlRad) / Lr;
+  /* THE FOLD LIMIT (spine-cup-fold's ruling, Oct 19: a spine may not bend past
+     its own cross-section — radius >= reach + t/2, no margin). The bundle is
+     the spine and a strand's LAY RADIUS is its reach: a strand laid at R about
+     an axis bending at 1/k has its inner skin at 1/k - R - t/2 from the bend's
+     centre, so R <= 1/|k| - t. CLAMPED PER STRAND and told (never the bundle's
+     curl, which every strand shares — one strand's own radius must not bend
+     the others). Inert on an uncurled bundle (1/0 is Infinity). */
+  const foldR = k === 0 ? Infinity : Math.max(0, 1 / Math.abs(k) - t);
+  const foldClamped = Rasked > foldR;
+  const R = foldClamped ? foldR : Rasked;
+  const g = braidGatherGeometry({ R, phaseRad: Math.PI - azimuth, w0, up, bundle, k });
+  /* THE GATHER: the least length over which the EXACT curvature of the
+     gather (braidGatherMax) stays within one sheet thickness of radius,
+     bisected — arithmetic only, bit-identical in every engine; never shorter
+     than BRAID_GATHER_RUN x its distance (the lateral slope never past 45
+     degrees, a choice made without a ruling); and it may take the WHOLE
+     strand. (A cut that capped the gather at half the strand, as the coil caps
+     its ramp, twisted a strand that had not reached the bundle about the line
+     between its root and the axis — on a domed hub that line leans off the
+     axis, the helix lay oblique to it and a 5 mm strand read 0.18 mm of
+     radius.) Where even the whole strand cannot gather it under the floor it
+     gathers the largest FRACTION lambda the floor admits (the coil's own
+     radius clamp, told, continuous: lambda = 1 exactly at the boundary) and a
+     strand left no twist run does not twist — the allowed turns fall to 0
+     continuously as the run does. */
+  const gathers = (G, lam) => (G > 0 ? braidGatherMax(g, G, lam) * t <= 1 : g.deltaMm === 0 && g.v0n === 0);
+  let gatherNeedMm, lambda = 1;
+  const gatherClamped = !gathers(L, 1);
+  if (!gatherClamped) {
+    let lo = 0, hi = L;
+    if (gathers(0, 1)) hi = 0;
+    else for (let it = 0; it < COIL_BISECT_STEPS; it++) { const mid = (lo + hi) / 2; if (gathers(mid, 1)) hi = mid; else lo = mid; }
+    gatherNeedMm = hi;
+  } else {
+    gatherNeedMm = Infinity;
+    let lo = 0, hi = 1;
+    for (let it = 0; it < COIL_BISECT_STEPS; it++) { const mid = (lo + hi) / 2; if (gathers(L, mid)) lo = mid; else hi = mid; }
+    lambda = lo;
+  }
+  const gatherMm = Math.min(L, Math.max(gatherNeedMm, BRAID_GATHER_RUN * g.deltaMm));
+  const Rb = gatherClamped ? lambda * R : R;
+  const twistRun = L - gatherMm;
+  const rampFor = (nn) => Math.min(Lr / nn, twistRun);
+  const fits = (nn) => twistRun > 0 && braidTwistCurvatureMax(Rb, (TAU * nn) / Lr, rampFor(nn)) * t <= 1;
+  let turns = gatherClamped ? 0 : n;
+  const twistClamped = gatherClamped || !fits(n);
+  if (twistClamped && !gatherClamped) {
+    let lo = 0, hi = n;
+    if (twistRun > 0) for (let it = 0; it < COIL_BISECT_STEPS; it++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+    turns = lo;
+  }
+  const rampMm = turns > 0 ? rampFor(turns) : twistRun;
+  /* the revolutions actually laid over the strand's own twist run */
+  const w = (TAU * turns) / Lr;
+  const omegaEnd = turns === 0 ? 0 : twistRun < rampMm ? w * rampMm * braidRampI(twistRun / rampMm) : w * rampMm / 2 + w * (twistRun - rampMm);
+  return { mode: 'BRAIDED', index: i, radiusAskedMm: Rasked, radiusLaidMm: R, foldClamped, foldRadiusMm: foldR, radiusMm: Rb, radiusClamped: gatherClamped, lambda, gatherMm, gatherNeedMm, gatherDeltaMm: g.deltaMm,
+           turnsAsked: n, turns, turnsClamped: twistClamped, clamped: gatherClamped || twistClamped, refLengthMm: Lr, kRad: k,
+           azimuth, phaseRad: Math.PI - azimuth, rampMm, revolutions: omegaEnd / TAU, rows: stamenCoilRows(n), w0, up };
+}
+/* THE GATHER IN THE BUNDLE'S OWN FRAME. The bundle's axis A carries a frame
+   E(s) that turns about T_A at the curl (a planar arc's rotation-minimising
+   frame), and a strand is C(s) = A(s) + E(s) w(s), w written in the frame's
+   coordinates at s = 0 (world-aligned there, E(0) = I). Over the gather
+     w = w0 + f(x) (H - w0) + G h(x) v0,   x = s / G
+   (and, where the strand cannot gather all the way, w = w0 + lambda f (H - w0)
+   + [lambda G h(x) + (1 - lambda) s] v0 — at lambda 0 the strand's own rod
+   straight along its normal, exactly, on an uncurled hub)
+   with w0 the strand's outer root less the axis's, H its bundle slot, f the
+   smootherstep and h = x - 6x^3 + 8x^4 - 3x^5 (h(0) = 0, h'(0) = 1, h''(0) = 0,
+   h = h' = h'' = 0 at 1), and v0 = Up_i - z - Om x w0 — the start velocity
+   that makes the strand LEAVE ITS ROOT ALONG ITS OWN NORMAL (the root
+   cylinder's direction: c' = Up_i at x = 0) and arrive in its slot with no
+   velocity of its own (c' = z + Om x H at x = 1, the twist's start). In the
+   frame, with Om = k (z x N1_A) the frame's turning,
+     c'  = z + Om x w + w'          (C' = E c')
+     c'' = Om x c' + Om x w' + w''  (C'' = E c'')
+   — POLYNOMIALS IN x BETWEEN FIXED VECTORS, so the gather's curvature
+   |c' x c''| / |c'|^3 is EXACT and arithmetic only, the curl and a domed
+   hub's leaning roots included. (Two bounds went first and were too
+   pessimistic to use: one on |C''| alone let the gather's push cancel the
+   strand's speed into a CUSP at curl -180 on a hemisphere, 0.0036 mm of
+   radius; one adding a speed bound clamped the gather on up to 82% of the
+   strands of a flat hub at curl 180, because its terms cancel in the curve
+   and not in the bound. The exact form has nothing to cancel.) */
+export function braidGatherGeometry({ R, phaseRad, w0, up, bundle, k }) {
+  const z = bundle.Up, nA = [-bundle.Rs[0], -bundle.Rs[1], -bundle.Rs[2]], tA = bundle.T;
+  const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const zn = cr(z, nA), Om = [k * zn[0], k * zn[1], k * zn[2]];
+  const ct = Math.cos(phaseRad), st = Math.sin(phaseRad);
+  const H = [0, 1, 2].map((j) => R * (ct * nA[j] + st * tA[j]));
+  const ow = cr(Om, w0), v0 = [0, 1, 2].map((j) => up[j] - z[j] - ow[j]);
+  const d = [0, 1, 2].map((j) => H[j] - w0[j]);
+  return { z, nA, tA, Om, H, w0, v0, d, deltaMm: Math.hypot(d[0], d[1], d[2]), v0n: Math.hypot(v0[0], v0[1], v0[2]) };
+}
+const braidH = (x) => x * (1 + x * x * (-6 + x * (8 - 3 * x)));
+const braidH1 = (x) => 1 + x * x * (-18 + x * (32 - 15 * x));
+const braidH2 = (x) => x * (-36 + x * (96 - 60 * x));
+/* w, w', w'' at x over a gather of length G whose move is scaled by lam. */
+function braidGatherW(g, G, lam, x) {
+  const f = lam * coilRampF(x), f1 = (lam * coilRampF1(x)) / G, f2 = (lam * coilRampF2(x)) / (G * G);
+  const h = lam * G * braidH(x) + (1 - lam) * G * x, h1 = lam * braidH1(x) + (1 - lam), h2 = (lam * braidH2(x)) / G;
+  const w = [0, 1, 2].map((j) => g.w0[j] + f * g.d[j] + h * g.v0[j]);
+  const w1 = [0, 1, 2].map((j) => f1 * g.d[j] + h1 * g.v0[j]);
+  const w2 = [0, 1, 2].map((j) => f2 * g.d[j] + h2 * g.v0[j]);
+  return { w, w1, w2 };
+}
+function braidGatherKappa(g, G, lam, x) {
+  /* braidGatherW and the two cross products, in scalars (this runs ~10^4
+     times a strand inside the bisection; the vector form allocated its way to
+     a second a build at 120 strands) — the same arithmetic in the same order. */
+  const f = lam * coilRampF(x), f1 = (lam * coilRampF1(x)) / G, f2 = (lam * coilRampF2(x)) / (G * G);
+  const h = lam * G * braidH(x) + (1 - lam) * G * x, h1 = lam * braidH1(x) + (1 - lam), h2 = (lam * braidH2(x)) / G;
+  const W0 = g.w0, D = g.d, V = g.v0, O = g.Om, Z = g.z;
+  const wx = W0[0] + f * D[0] + h * V[0], wy = W0[1] + f * D[1] + h * V[1], wz = W0[2] + f * D[2] + h * V[2];
+  const ax = f1 * D[0] + h1 * V[0], ay = f1 * D[1] + h1 * V[1], az = f1 * D[2] + h1 * V[2];
+  const bx = f2 * D[0] + h2 * V[0], by = f2 * D[1] + h2 * V[1], bz = f2 * D[2] + h2 * V[2];
+  const c1x = Z[0] + (O[1] * wz - O[2] * wy) + ax, c1y = Z[1] + (O[2] * wx - O[0] * wz) + ay, c1z = Z[2] + (O[0] * wy - O[1] * wx) + az;
+  const c2x = (O[1] * c1z - O[2] * c1y) + (O[1] * az - O[2] * ay) + bx;
+  const c2y = (O[2] * c1x - O[0] * c1z) + (O[2] * ax - O[0] * az) + by;
+  const c2z = (O[0] * c1y - O[1] * c1x) + (O[0] * ay - O[1] * ax) + bz;
+  const xx = c1y * c2z - c1z * c2y, xy = c1z * c2x - c1x * c2z, xz = c1x * c2y - c1y * c2x;
+  const n1 = Math.sqrt(c1x * c1x + c1y * c1y + c1z * c1z);
+  if (n1 === 0) return Infinity;
+  return Math.sqrt(xx * xx + xy * xy + xz * xz) / (n1 * n1 * n1);
+}
+/* The gather's peak curvature — the coil's own lattice-and-refine. */
+export function braidGatherMax(g, G, lam) {
+  const N = BRAID_GATHER_SAMPLES, k = new Float64Array(N + 1);
+  for (let j = 0; j <= N; j++) k[j] = braidGatherKappa(g, G, lam, j / N);
+  let m = 0;
+  for (let j = 0; j <= N; j++) {
+    if (k[j] > m) m = k[j];
+    if ((j > 0 && k[j] < k[j - 1]) || (j < N && k[j] < k[j + 1])) continue;
+    let lo = j > 0 ? (j - 1) / N : 0, hi = j < N ? (j + 1) / N : 1;
+    for (let it = 0; it < COIL_REFINE_STEPS; it++) {
+      const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      if (braidGatherKappa(g, G, lam, m1) < braidGatherKappa(g, G, lam, m2)) lo = m1; else hi = m2;
+    }
+    const kk = braidGatherKappa(g, G, lam, (lo + hi) / 2);
+    if (kk > m) m = kk;
+  }
+  return m;
+}
+/* the gather's lattice — coarser than the coil's: the gather is one smooth
+   S-move, refined at every local maximum, and it is bisected 52 times per
+   strand */
+export const BRAID_GATHER_SAMPLES = 128;
+/* THE ROD'S FRAME AT AN OWNER'S SURFACE POINT — buildPetalInto's (Rs, Up)
+   on the cap, the azimuthal T, the surface point and the two root faces.
+   rodInto's own expressions, so the braid reads the frame the rod is drawn in
+   (the strand's) and the frame the bundle axis is drawn in (the apex's, at
+   azimuth 0, exactly as the style's). */
+export function rodFrame(s, azimuth, t) {
+  const cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
+  const R = [cosA, sinA, 0], T = [-sinA, cosA, 0];
+  const Rs = [R[0] * Math.cos(s.slope), R[1] * Math.cos(s.slope), -Math.sin(s.slope)];
+  const Up = [R[0] * Math.sin(s.slope), R[1] * Math.sin(s.slope), Math.cos(s.slope)];
+  const P = [R[0] * s.radius, R[1] * s.radius, s.z];
+  const off = (h) => [P[0] + Up[0] * h, P[1] + Up[1] * h, P[2] + Up[2] * h];
+  return { R, T, Rs, Up, P, inner: off(-t / 2), outer: off(t / 2) };
+}
+/* THE BRAID'S LAW, returned in the STRAND'S local (Up, -Rs, T) coordinates
+   about its outer root — coilLaw's own interface, so rodInto's coiled arm
+   draws a braided strand exactly as it draws a coil. C(s) = A(s) + E(s) w(s)
+   (braidGatherGeometry's header): over the gather w is the polynomial move
+   from the root to the slot; past it w is the slot turning, H(th) =
+   R (cos th N1_A + sin th T_A), th = th0 + Omega(s) with the twist RATE ramped
+   in. A is spineLaw's own arc at the apex (the style's frame), curled at the
+   bundle's one curvature; E(s) carries a vector u written at s = 0 to
+   (u.z) D_A(s) + (u.N1) N1_A(s) + (u.T) T_A. `frame` is the strand's. */
+function braidLaw({ length, coil, frame }) {
+  const F = frame, Af = coil.bundle;
+  const A = spineLaw({ curlRad: coil.kRad * length, bias: 0, start: 0, length, tilt: 0, floorRadius: coil.floorRadius, rows: ROD_SPINE_ROWS });
+  const g = braidGatherGeometry({ R: coil.radiusLaidMm, phaseRad: coil.phaseRad, w0: coil.w0, up: coil.up, bundle: Af, k: coil.kRad });
+  const lam = coil.lambda, G = coil.gatherMm, T = coil.rampMm, R = coil.radiusLaidMm, th0 = coil.phaseRad;
+  const w = (TAU * coil.turns) / coil.refLengthMm;
+  const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const at = (s) => {
+    const qA = A.at(s), cA = Math.cos(qA.phi), sA = Math.sin(qA.phi);
+    const DA = [0, 1, 2].map((j) => Af.Up[j] * cA - Af.Rs[j] * sA), N1 = [0, 1, 2].map((j) => -Af.Up[j] * sA - Af.Rs[j] * cA);
+    const Aw = [0, 1, 2].map((j) => Af.outer[j] + Af.Up[j] * qA.dR - Af.Rs[j] * qA.dZ);
+    let wv, w1;
+    if (G > 0 && (s < G || lam < 1)) { const r = braidGatherW(g, G, lam, Math.min(1, s / G)); wv = r.w; w1 = r.w1; }
+    else {
+      let om = 0, om1 = 0;
+      const sg = s - G;
+      if (sg > 0) { if (sg < T) { const x = sg / T; om = w * T * braidRampI(x); om1 = w * coilRampF(x); } else { om = w * T / 2 + w * (sg - T); om1 = w; } }
+      const th = th0 + om, ct = Math.cos(th), st = Math.sin(th);
+      wv = [0, 1, 2].map((j) => R * (ct * g.nA[j] + st * g.tA[j]));
+      w1 = [0, 1, 2].map((j) => R * om1 * (-st * g.nA[j] + ct * g.tA[j]));
+    }
+    const ow = cr(g.Om, wv), c1 = [0, 1, 2].map((j) => g.z[j] + ow[j] + w1[j]);
+    /* E(s): the frame's coordinates at 0 carried to s */
+    const E = (u) => { const uz = dot(u, g.z), un = dot(u, g.nA), ut = dot(u, g.tA); return [0, 1, 2].map((j) => uz * DA[j] + un * N1[j] + ut * g.tA[j]); };
+    const C = [0, 1, 2].map((j) => Aw[j] + E(wv)[j]), C1 = E(c1);
+    const rel = [C[0] - F.outer[0], C[1] - F.outer[1], C[2] - F.outer[2]];
+    const ta = dot(C1, F.Up), tb = -dot(C1, F.Rs), tc = dot(C1, F.T), tn = Math.hypot(ta, tb, tc);
+    return { a: dot(rel, F.Up), b: -dot(rel, F.Rs), c: dot(rel, F.T), ta: ta / tn, tb: tb / tn, tc: tc / tn, speed: tn };
+  };
+  return { at };
+}
+/* THE ENTRIES THAT REACH STRAND i, summed into one `{ id: delta }` term — the
+   `tierOffsetsFor` shape for the strands container. Every entry is validated
+   whether or not it reaches this strand; null when nothing reaches it, so the
+   caller's branch is the whole guard. */
+export function strandOffsetsFor(scopes, i) {
+  if (!scopes) return null;
+  const list = scopes.strands || [];
+  for (const e of list) {
+    for (const id of Object.keys(e.offsets || {})) if (!SCOPE_STRAND_IDS.includes(id)) throw new Error(`scopes: strands[${e.strand}] carries an offset on ${id}, which is not a strand's (only ${SCOPE_STRAND_IDS.join(' / ')})`);
+    checkScopeOffsets(e.offsets || {}, `strands[${e.strand}]`);
+  }
+  const sum = {};
+  let any = false;
+  for (const e of list) { if (e.strand !== i) continue; addScopeOffsets(sum, e.offsets || {}, `strands[${e.strand}]`); any = true; }
+  return any ? { offsets: sum, bounds: scopes.bounds || {}, key: { strand: i } } : null;
+}
+/* A STRAND'S OWN VALUES — the control plus its summed offset, clamped into
+   the registry's bound; the control's own value where nothing reaches it. */
+export function strandValue(state, term, id) {
+  if (!term || !(id in term.offsets)) return Number(state[id]);
+  const asked = Number(state[id]) + term.offsets[id], b = term.bounds[id];
+  return b ? clamp(asked, b.min, b.max) : asked;
+}
 
 /* ===================================================================
    THE GYNOECIUM (session 22, phase 2 B3 — Eva's rulings, carried, not
@@ -2589,6 +2932,25 @@ export function footRing(state, acc, opts = {}) {
     const coilTurns = coilMode === 'NONE' ? null : Number(state.stamenCoilTurns);
     const coilOn = stamenCoilBuilt(state);
     if (coilOn && !(coilRadius <= STAMEN_COIL_RADIUS_RANGE[1] && coilTurns >= STAMEN_COIL_TURNS_RANGE[0] && coilTurns <= STAMEN_COIL_TURNS_RANGE[1])) throw new Error(`stamen coil radius ${coilRadius} / turns ${coilTurns} outside the geometry's ranges — the registry and the builder have diverged`);
+    /* THE BRAID (F1.3b) — see THE BRAIDED BUNDLE's header. Its strands are
+       placed by the SAME arrangement primitive the builder places them with
+       (a pre-pass that records each slot's azimuth and emits nothing — never
+       a second copy of the placement law), because a strand's bundle slot is
+       on its own foot's radial line. The bundle's axis is the apex's rod
+       frame at azimuth 0, the style's. A STRAND'S OWN VALUES come through its
+       strand scope (`strandOffsetsFor`), live only while the braid is built;
+       an entry for a strand the bundle does not have is kept and inert. */
+    const braidOn = stamenBraidBuilt(state);
+    const strandScopes = braidOn ? tierScopes : null;
+    let braidAzimuths = null, bundleFrame = null;
+    if (braidOn) {
+      braidAzimuths = new Array(count);
+      buildWhorlInto({ count, radius: () => 0, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
+        placement: disc ? 'SPIRAL' : 'RADIAL', blade: (slot) => { braidAzimuths[slot.index] = slot.azimuth; } });
+      const s0 = surfaceAt(0, null);
+      bundleFrame = rodFrame({ radius: 0, slope: s0.slope, z: s0.z }, 0, thickness);
+    }
+    let strandsScoped = 0, gathersClamped = 0, foldsClamped = 0, gatherMaxMm = -Infinity, revolutionsMin = Infinity, revolutionsMax = -Infinity;
     const stamens = [];
     let lengthsClamped = 0, lengthMinMm = Infinity, lengthMaxMm = -Infinity;
     let coilsClamped = 0, coilsRadiusClamped = 0, coilsTurnsClamped = 0, coilRadiusMinMm = Infinity, coilTurnsMin = Infinity, coilTurnsMax = -Infinity, coilArcMaxMm = -Infinity, coilPeakRadiusMm = Infinity, coilsUnderFloor = 0;
@@ -2596,12 +2958,39 @@ export function footRing(state, acc, opts = {}) {
       const r = disc ? Math.sqrt(innerUsed * innerUsed + ((i + 0.5) * (radius * radius - innerUsed * innerUsed)) / count) : radius;
       const s = surfaceAt(r, null);
       const inPetalRootAnnulus = rings.some((rg) => r + rFil > rg.radius - rg.overhang && r - rFil < rg.radius);
-      const L = stamenLengthFor(i, state.stamenLength, lengthVariance);
+      const strandTerm = braidOn ? strandOffsetsFor(strandScopes, i) : null;
+      if (strandTerm) strandsScoped++;
+      const L = strandTerm ? stamenLengthFor(i, strandValue(state, strandTerm, 'stamenLength'), lengthVariance) : stamenLengthFor(i, state.stamenLength, lengthVariance);
       if (L.clamped) lengthsClamped++;
       if (L.builtMm < lengthMinMm) lengthMinMm = L.builtMm;
       if (L.builtMm > lengthMaxMm) lengthMaxMm = L.builtMm;
       let coil = null;
-      if (coilOn) {
+      if (braidOn) {
+        /* THE STRAND'S PLACE IN THE BUNDLE (F1.3b): its radius and turns are
+           the controls plus its strand scope; its gather distance is from its
+           outer root to its bundle slot, both read off rodFrame; the curl is
+           the BUNDLE's one curvature (the control's length). */
+        const az = braidAzimuths[i];
+        const Ri = strandValue(state, strandTerm, 'stamenCoilRadius'), ni = strandValue(state, strandTerm, 'stamenCoilTurns');
+        const Fi = rodFrame({ radius: r, slope: s.slope, z: s.z }, az, thickness);
+        const refL = Number(state.stamenLength), curl = state.stamenCurl * D2R;
+        const w0 = [Fi.outer[0] - bundleFrame.outer[0], Fi.outer[1] - bundleFrame.outer[1], Fi.outer[2] - bundleFrame.outer[2]];
+        coil = stamenBraidFor(i, { lengthMm: L.builtMm, refLengthMm: refL, radiusMm: Ri, turnsAsked: ni, floorRadius: diameter, w0, up: Fi.Up, bundle: bundleFrame, azimuth: az, curlRad: curl });
+        coil = { ...coil, floorRadius: diameter, bundle: bundleFrame };
+        const base = spineLaw({ curlRad: 0, bias: 0, start: 0, length: L.builtMm, tilt: 0, floorRadius: diameter, rows: ROD_SPINE_ROWS });
+        const tel = coilTelemetry(coilLaw({ base, length: L.builtMm, k: 0, coil, frame: Fi }), L.builtMm, coil.turns, diameter);
+        coil = { ...coil, arcMm: tel.arcMm, peakRadiusMm: tel.peakRadiusMm, underFloor: tel.underFloor };
+        if (coil.clamped) coilsClamped++;
+        if (coil.radiusClamped) { coilsRadiusClamped++; gathersClamped++; }
+        if (coil.foldClamped) foldsClamped++;
+        if (coil.turnsClamped) coilsTurnsClamped++;
+        coilRadiusMinMm = Math.min(coilRadiusMinMm, coil.radiusMm);
+        if (coil.underFloor) coilsUnderFloor++;
+        coilTurnsMin = Math.min(coilTurnsMin, coil.turns); coilTurnsMax = Math.max(coilTurnsMax, coil.turns);
+        coilArcMaxMm = Math.max(coilArcMaxMm, coil.arcMm); coilPeakRadiusMm = Math.min(coilPeakRadiusMm, coil.peakRadiusMm);
+        gatherMaxMm = Math.max(gatherMaxMm, coil.gatherMm);
+        revolutionsMin = Math.min(revolutionsMin, coil.revolutions); revolutionsMax = Math.max(revolutionsMax, coil.revolutions);
+      } else if (coilOn) {
         coil = stamenCoilFor(i, L.builtMm, coilRadius, coilTurns, diameter);
         /* The telemetry runs the SAME two laws the builder will (spineLaw
            and coilLaw on this stamen's own numbers) on a probe lattice — it
@@ -2618,7 +3007,8 @@ export function footRing(state, acc, opts = {}) {
         coilArcMaxMm = Math.max(coilArcMaxMm, coil.arcMm); coilPeakRadiusMm = Math.min(coilPeakRadiusMm, coil.peakRadiusMm);
       }
       stamens.push({ index: i, radius: r, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief, inPetalRootAnnulus,
-                     lengthMm: L.builtMm, lengthAskedMm: L.askedMm, lengthClamped: L.clamped, lengthUnit: L.unit, coil });
+                     lengthMm: L.builtMm, lengthAskedMm: L.askedMm, lengthClamped: L.clamped, lengthUnit: L.unit, coil,
+                     ...(strandTerm ? { strandTerm } : {}) });
     }
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
@@ -2656,7 +3046,12 @@ export function footRing(state, acc, opts = {}) {
          axis) and the tightest measured radius of curvature with how many
          stamens sit under the floor on the composite (told, never clamped). */
       coil: coilOn ? { mode: coilMode, radiusMm: coilRadius, turnsAsked: coilTurns, rows: stamenCoilRows(coilTurns), clampedCount: coilsClamped, radiusClampedCount: coilsRadiusClamped, turnsClampedCount: coilsTurnsClamped, radiusMinMm: coilRadiusMinMm, turnsMin: coilTurnsMin, turnsMax: coilTurnsMax,
-                       arcMaxMm: coilArcMaxMm, peakRadiusMm: coilPeakRadiusMm, underFloorCount: coilsUnderFloor, floorRadius: diameter } : null,
+                       arcMaxMm: coilArcMaxMm, peakRadiusMm: coilPeakRadiusMm, underFloorCount: coilsUnderFloor, floorRadius: diameter,
+                       /* THE BRAID'S OWN RECORD (F1.3b): the bundle's axis frame,
+                          the curvature it curls at, the strands a scope reaches,
+                          how many could not gather all the way (told) and the
+                          longest gather, and the revolutions actually laid */
+                       ...(braidOn ? { bundle: bundleFrame, refLengthMm: Number(state.stamenLength), kRad: (state.stamenCurl * D2R) / Number(state.stamenLength), strandsScoped, gathersClampedCount: gathersClamped, foldClampedCount: foldsClamped, gatherMaxMm, revolutionsMin, revolutionsMax } : {}) } : null,
       coilMode,
     };
   })();
@@ -19622,14 +20017,11 @@ function revolveInto(acc, rings, south, north, outline = null) {
    both trees is what MEASURES that, not this sentence. `s` is the owner's
    surface record (radius, slope, z); `r` the rod's radius; `t` the slab. */
 function rodInto(acc, { t, r, curlRad, length, floorRadius, coil = null }, s, azimuth) {
-  const cosA = Math.cos(azimuth), sinA = Math.sin(azimuth);
-  const R = [cosA, sinA, 0], T = [-sinA, cosA, 0];
-  /* The foot's own frame on the cap — buildPetalInto's (Rs, Up), verbatim. */
-  const Rs = [R[0] * Math.cos(s.slope), R[1] * Math.cos(s.slope), -Math.sin(s.slope)];
-  const Up = [R[0] * Math.sin(s.slope), R[1] * Math.sin(s.slope), Math.cos(s.slope)];
-  const P = [R[0] * s.radius, R[1] * s.radius, s.z];                       // the owner's surface point
-  const off = (h) => [P[0] + Up[0] * h, P[1] + Up[1] * h, P[2] + Up[2] * h];
-  const inner = off(-t / 2), outer = off(t / 2);
+  /* The foot's own frame on the cap — buildPetalInto's (Rs, Up), verbatim —
+     the owner's surface point and the two root faces: rodFrame, the ONE
+     statement of it (the braid reads it for the strand and for the bundle's
+     axis; F1.3b moved the expressions there unchanged). */
+  const { T, Rs, Up, P, inner, outer } = rodFrame(s, azimuth, t);
   const law = spineLaw({ curlRad, bias: 0, start: 0, length, tilt: 0, floorRadius, rows: ROD_SPINE_ROWS });
   const at = (sArc) => {
     const q = law.at(sArc), c = Math.cos(q.phi), sn = Math.sin(q.phi);
@@ -19649,7 +20041,7 @@ function rodInto(acc, { t, r, curlRad, length, floorRadius, coil = null }, s, az
      double reflection (Wang et al. 2008: arithmetic only, no trigonometry, no
      normalisation of a zero vector), started from the plain rod's own `T` at
      the outer root so the two root rings are the plain rod's, term for term. */
-  const cl = coilLaw({ base: law, length, k: curlRad / length, coil });
+  const cl = coilLaw({ base: law, length, k: curlRad / length, coil, frame: { Up, Rs, T, outer } });
   const world = (q) => [outer[0] + Up[0] * q.a - Rs[0] * q.b + T[0] * q.c, outer[1] + Up[1] * q.a - Rs[1] * q.b + T[1] * q.c, outer[2] + Up[2] * q.a - Rs[2] * q.b + T[2] * q.c];
   const worldDir = (q) => [Up[0] * q.ta - Rs[0] * q.tb + T[0] * q.tc, Up[1] * q.ta - Rs[1] * q.tb + T[1] * q.tc, Up[2] * q.ta - Rs[2] * q.tb + T[2] * q.tc];
   let x0 = outer, t0 = Up, r0 = T;
@@ -19747,7 +20139,16 @@ export function buildStamenInto(acc, andro, s, slot) {
   const lengthMm = s.lengthMm;
   /* THE COIL IS THE STAMEN'S OWN RECORD TOO (F1.3a) — `s.coil`, stamped by
      footRing() through stamenCoilFor(); null is the plain rod by branch. */
-  const rod = s.coil
+  /* A BRAIDED strand (F1.3b): its OWN centreline is the straight rod (curl
+     0) and the curl is the BUNDLE's — the axis it gathers onto bends at the
+     bundle's one curvature. (A strand curled in its own radial plane against
+     an axis curled in the azimuth-0 plane pulled the two apart during the
+     gather — measured: a strand opposite the curl read 0.96 mm of radius at
+     curl 60 where the straight strand reads the bundle's own.) An
+     INDEPENDENT coil's call is the one it was. */
+  const rod = s.coil && s.coil.mode === 'BRAIDED'
+    ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: 0, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
+    : s.coil
     ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
     : rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
   /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
@@ -19796,7 +20197,7 @@ export function buildStamenInto(acc, andro, s, slot) {
            /* THE COIL AS EMITTED (F1.3a), for JS9: the rod frame the tip was
               carried on, the free station count and the LAST ring's points
               (its ring vector is readable off them). Null on a plain rod. */
-           coil: rod.coil ? { rows: s.coil.rows, endT: rod.end.T, endRing: rod.tubePts[rod.tubePts.length - 1] } : null,
+           coil: rod.coil ? { rows: s.coil.rows, endT: rod.end.T, endRing: rod.tubePts[rod.tubePts.length - 1], mode: s.coil.mode || 'INDEPENDENT' } : null,
            law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };
 }
 
@@ -23311,7 +23712,12 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     scopedLayers: uniqLayers(layerEntries.filter((e) => scopeEntryNamesLayer(e, layerCountBuilt))),
     keptLayers: uniqLayers(layerEntries.filter((e) => !scopeEntryNamesLayer(e, layerCountBuilt))),
     scopedPetals: uniqPairs(petalEntries.filter(namesPair)),
-    keptPetals: uniqPairs(petalEntries.filter((e) => !namesPair(e))) } : null;
+    keptPetals: uniqPairs(petalEntries.filter((e) => !namesPair(e))),
+    /* THE STRANDS (F1.3b): an entry reaches a strand of a BUILT braid by its
+       index; one past the count, or with no braid built, is kept and inert. */
+    strands: (scopes.strands || []).length, strandsLive: stamenBraidBuilt(state),
+    scopedStrands: [...new Set(((scopes.strands || []).filter(offsetCount)).filter((e) => stamenBraidBuilt(state) && fr.androecium && e.strand < fr.androecium.count).map((e) => e.strand))].sort((a, b) => a - b),
+    keptStrands: [...new Set(((scopes.strands || []).filter(offsetCount)).filter((e) => !(stamenBraidBuilt(state) && fr.androecium && e.strand < fr.androecium.count)).map((e) => e.strand))].sort((a, b) => a - b) } : null;
   return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is

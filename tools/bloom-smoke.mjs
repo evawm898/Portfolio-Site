@@ -1716,6 +1716,30 @@ export const SMOKE_BLOCKS = [
       { label: 'LEAF CURVES: the LOBED blade on a drawn spine, an outline curve STORED (the lobed blade keeps its own law — the outline mode inert, told)',
         path: "LF37(a) the outline mode inert on the lobed blade (its record null), LF21 the chevron's lean footed on the drawn spine, E2 the lobed bead's declared turn" },
     ],
+  },  {
+    n: 74, title: 'the braid (the braid session, Oct 21)',
+    anchor: 'BRAID: 6 on a ring — one bundle',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block adds is
+       `coilLaw`'s BRAIDED arm (the gather onto the bundle's axis and the
+       twist about it, an offset about the bundle's own spineLaw centreline
+       through the one emitter `rodInto`), the per-strand clamps (the gather,
+       the turns, the fold limit) and the strand scopes. The anchor is the
+       block's six-stamen row; the subset adds the clamps, the bundle curled,
+       the hemisphere and a strand scope. --conn is REQUIRED (a braid's
+       strands meet the hub at their own roots and cross one another). */
+    conn: true,
+    rows: [
+      { label: 'BRAID: 6 x turns max (12) — the curvature floor CLAMPS the turns, told',
+        path: "JS9's braid arm — the turns the floor admits on the twist's exact curvature, restated in the gate and counted both ways — and JS4 at the strand's station count" },
+      { label: 'BRAID: 6 x radius max (10) x length min (5) — too short to gather, the strands lean and do not wind (told)',
+        path: "JS9 the gather CLAMPED (the largest fraction the floor admits, the turns 0) restated from the controls, JS8 the per-strand chord" },
+      { label: 'BRAID: 6 x radius max (10) x curl 180 — the FOLD LIMIT clamps the lay radius (told)',
+        path: "JS9 the lay radius at 1/k - t restated, every free station on the restated braid about the CURLED bundle axis, the anther on the end tangent" },
+      { label: 'BRAID: 6 on a hemisphere (rise 1)',
+        path: "JS9 the gather from roots on the dome onto the axis at the apex, JS1/JS3 the roots through the slab on the cap's normal" },
+      { label: 'BRAID STRANDS: strand 4 laid wider (+1.5 mm) and strand 6 with 2 more turns',
+        path: "JS9 per strand from the row's own @scopes (the strand's radius and turns restated, clamped to the registry's bounds), JS4 the strand's own station count" },
+    ],
   },
 ];
 

@@ -771,8 +771,11 @@ export const PREDICATES = {
      once the radius is above 0 — at radius 0 the rod is the plain rod by
      BRANCH in the geometry (`stamenCoilBuilt`, the twin the harness holds
      this to), so the turns would be a dead slider there. */
-  stamenCoilOn: { all: [{ ref: 'androeciumPresent' }, { id: 'stamenCoil', oneOf: ['INDEPENDENT'] }] },
+  stamenCoilOn: { all: [{ ref: 'androeciumPresent' }, { id: 'stamenCoil', oneOf: ['INDEPENDENT', 'BRAIDED'] }] },
   stamenCoilBuilt: { all: [{ ref: 'stamenCoilOn' }, { not: { id: 'stamenCoilRadius', oneOf: ['0'] } }] },
+  /* THE BRAID (F1.3b): the twin of the geometry's `stamenBraidBuilt` — a coil
+     is built and it is the bundle. The strand picker appears on this. */
+  stamenBraidBuilt: { all: [{ ref: 'stamenCoilBuilt' }, { id: 'stamenCoil', oneOf: ['BRAIDED'] }] },
 
   /* ===================================================================
      WHERE THE GYNOECIUM APPLIES (session 22, phase 2 B3) — the androecium's
@@ -3786,16 +3789,24 @@ export const CONTROLS = [
      every stored design builds the bytes it did); INDEPENDENT coils each
      filament along its own length about the curled centreline above, at its
      own phase DERIVED from the stamen's index (never a control — the length
-     variance's seed precedent). BRAIDED (Q2.4, one bundle about a shared
-     axis) is its own session and is deliberately NOT an option here: an
-     option in a choice is reachable, and it is not built. */
+     variance's seed precedent). BRAIDED (F1.3b, Q2.4 — ONE bundle of every
+     filament about a shared axis) lays each strand from its own root onto the
+     bundle and winds it there; the radius and the turns are the bundle's, and
+     a picked STRAND (the scope bar) carries its own. */
   { id: 'stamenCoil', section: 'androecium', kind: 'choice', default: 'NONE',
     options: [
       { value: 'NONE', label: 'None (a plain filament)' },
       { value: 'INDEPENDENT', label: 'Independent coil' },
+      { value: 'BRAIDED', label: 'Braided (one bundle)' },
     ],
     label: 'Coil',
     fmt: (v, ui, shown) => {
+      if (v === 'BRAIDED') {
+        const C = shown && shown.androecium && shown.androecium.coil;
+        if (Number(ui.stamenCoilRadius) === 0) return 'one braided bundle — at a radius of 0 every filament is the plain filament';
+        if (!C) return 'every filament gathers from its own root onto one bundle about the centre and winds round it';
+        return `every filament gathers from its own root onto one bundle about the centre and winds round it — ${C.arcMaxMm.toFixed(1)} mm of wire at the longest (${shown.mode})${C.strandsScoped ? `, ${C.strandsScoped} strand${C.strandsScoped === 1 ? '' : 's'} with values of ${C.strandsScoped === 1 ? 'its' : 'their'} own` : ''}`;
+      }
       if (v !== 'INDEPENDENT') return 'a plain filament along its curl';
       const C = shown && shown.androecium && shown.androecium.coil;
       if (Number(ui.stamenCoilRadius) === 0) return 'each filament its own coil — at a radius of 0 it is the plain filament';
@@ -3814,7 +3825,13 @@ export const CONTROLS = [
       const r = Number(v);
       if (r === 0) return '0 — no coil: the plain filament, byte for byte';
       const C = shown && shown.androecium && shown.androecium.coil;
-      const head = `${r.toFixed(1)} mm from the filament's axis to the wire`;
+      const head = ui.stamenCoil === 'BRAIDED' ? `${r.toFixed(1)} mm from the bundle's axis to each strand` : `${r.toFixed(1)} mm from the filament's axis to the wire`;
+      if (ui.stamenCoil === 'BRAIDED') {
+        const told = [];
+        if (C && C.gathersClampedCount) told.push(`${C.gathersClampedCount} of ${shown.androecium.count} strands too short to gather all the way in under one sheet thickness of curvature: they lean toward the bundle and do not wind`);
+        if (C && C.foldClampedCount) told.push(`${C.foldClampedCount} of ${shown.androecium.count} laid closer than asked by the FOLD LIMIT (the curled bundle's radius less one sheet thickness)`);
+        return told.length ? `${head} — ${told.join('; ')} (${shown.mode}), told` : head;
+      }
       if (!C || !C.radiusClampedCount) return head;
       return `${head} — ${C.radiusClampedCount} of ${shown.androecium.count} CLAMPED to ${C.radiusMinMm.toFixed(2)} mm at the narrowest (${shown.mode}): too short a filament to ramp a coil that wide in under one sheet thickness of curvature, told`;
     },
@@ -3824,7 +3841,9 @@ export const CONTROLS = [
     fmt: (v, ui, shown) => {
       const n = Number(v);
       const C = shown && shown.androecium && shown.androecium.coil;
-      const head = `${n} turn${n === 1 ? '' : 's'} over each filament's length (right-handed)`;
+      const head = ui.stamenCoil === 'BRAIDED'
+        ? `${n} turn${n === 1 ? '' : 's'} of the bundle over the filament length, every strand the same hand as a coil (clockwise seen from above as it rises)${C && C.revolutionsMax !== undefined ? ` — ${C.revolutionsMin.toFixed(2)}–${C.revolutionsMax.toFixed(2)} laid after each strand gathers` : ''}`
+        : `${n} turn${n === 1 ? '' : 's'} over each filament's length (clockwise seen from above as it rises)`;
       if (!C || !C.turnsClampedCount) return head;
       return `${head} — ${C.turnsClampedCount} of ${shown.androecium.count} CLAMPED by the curvature floor (one sheet thickness of radius) to ${C.turnsMin.toFixed(2)}–${C.turnsMax.toFixed(2)} turns built (${shown.mode}), told`;
     },
