@@ -596,6 +596,28 @@ function coiledStamens(M, state) {
 }
 const COILED_SIX = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenCoilRadius: 1.5, stamenCoilTurns: 3 });
 const COILED_TIGHT = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'INDEPENDENT', stamenCoilRadius: 1.5, stamenCoilTurns: 12 });
+/* ===== THE BRAID (the braid session) ===== */
+/* The mutated module's OWN builder records on a braided state — the emitted
+   stamens (station centres, end direction) and the owner's per-strand braid
+   records — never JS9, which is what these mutants name. The scopes carry the
+   registry's bounds for the three strand ids. */
+const BRAID_BOUNDS = { stamenLength: { min: 5, max: 120 }, stamenCoilRadius: { min: 0, max: 10 }, stamenCoilTurns: { min: 0.5, max: 12 } };
+function braidStamens(M, state, strands = null) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, state, strands ? { scopes: { layers: [], petals: [], tiers: [], strands, bounds: BRAID_BOUNDS } } : {});
+    return { stamens: b.stamens || [], A: b.androecium };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const BRAID_SIX = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'BRAIDED' });
+const BRAID_TIGHT = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'BRAIDED', stamenCoilTurns: 12 });
+const BRAID_FOLD = () => ({ ...REGISTRY_DEFAULTS, stamenCount: 6, stamenCoil: 'BRAIDED', stamenCoilRadius: 10, stamenCurl: 180 });
+const BRAID_STRANDS = [{ strand: 1, offsets: { stamenLength: 10 } }, { strand: 3, offsets: { stamenCoilRadius: 1.5 } }];
+/* the radius of each strand's LAST station about the bundle's axis (the
+   z axis on an uncurled bundle) — every strand of a braid ends on the
+   bundle at its lay radius */
+const endRadii = (r) => r.stamens.map((s) => { const e = s.stations[s.stations.length - 1]; return Math.hypot(e[0], e[1]); });
+const endAngles = (r) => r.stamens.map((s) => { const e = s.stations[s.stations.length - 1]; return Math.atan2(e[1], e[0]); });
 /* ===== THE SPINE CURVE (F3-global) ===== */
 /* The mutated module's OWN spine record on a curve-mode state — the mode it
    says it built, the curl it was handed, the turn it built, the clamp and the
@@ -709,6 +731,7 @@ function spPetals(M, { state, scopes }) {
 const spModes = (P) => P.map((p) => `${p.whorl}.${p.slot}:${p.curve ? 'C' : 'S'}`).join(' ');
 const SPS_MUTANTS = /^(a-scoped-spine-is-ignored|a-scoped-spine-leaks-to-sibling-layers|a-scoped-spine-leaks-to-sibling-pairs|the-spine-resolved-through-a-second-chain|the-fan-partner-spine-is-flipped)$/;
 const SPS_ROWS = /^a scoped spine/;
+const BRAID_ROWS = /braided/;
 /* The tier rows run under the tier mutants alone (`rowsFor` below), and the
    tier mutants run over the rows that name them. */
 const TIER_MUTANTS = /^(every-tier-at-the-same-height|tiers-cross|tier-contact-unclamped|tier-offsets-leak|tiers-built-with-no-stem)$/;
@@ -2912,6 +2935,64 @@ const MUTANTS = [
     witness: (M, C) => { const m = coiledStamens(M, COILED_TIGHT()), c = coiledStamens(C, COILED_TIGHT());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (c.A.coil.turnsMax < 12 && m.A.coil.turnsMax === 12) ? null : `the mutant builds ${m.A.coil.turnsMax} turns against the clean tree's ${c.A.coil.turnsMax}`; } },
+  /* ===================================================================
+     THE BRAID (the braid session — docs/bloom-stamen-braid-outcome.md).
+     Seven mutants, each witnessed on the MUTATED module's own builder
+     records (station centres, end direction, the owner's per-strand braid
+     record) before JS9 is consulted. JS9's braid arm restates every strand
+     from the controls, the index and the row's @scopes against the EMITTED
+     rings. Scoped to the braid rows (`rows: BRAID_ROWS`, and the rows carry
+     `for: /braid|strand/`), so no shard pays for them on every row. */
+  { id: 'the-braid-is-ignored', why: 'coilLaw never takes its braided arm: every strand coils about its OWN root as an independent coil does, on a panel that says ONE BUNDLE',
+    find: "  if (coil.mode === 'BRAIDED') return braidLaw({ length, coil, frame });",
+    into: "  if (false) return braidLaw({ length, coil, frame });", names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_SIX()), c = braidStamens(C, BRAID_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const spread = (r) => { const e = endRadii(r); return Math.max(...e) - Math.min(...e); };
+      const far = (r) => Math.max(...endRadii(r));
+      return (far(c) < 2.2 && far(m) > 2.6) ? null : `the mutant's strands end up to ${far(m).toFixed(3)} mm off the axis against the clean tree's ${far(c).toFixed(3)} (spread ${spread(m).toFixed(3)} / ${spread(c).toFixed(3)})`; } },
+  { id: 'every-strand-braids-at-the-same-phase', why: 'every strand is laid at ONE angle in the bundle: the strands wind on top of one another instead of round it',
+    find: '           azimuth, phaseRad: Math.PI - azimuth, rampMm,',
+    into: '           azimuth, phaseRad: Math.PI, rampMm,', names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_SIX()), c = braidStamens(C, BRAID_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const dist = (r) => new Set(endAngles(r).map((a) => a.toFixed(3))).size;
+      return (dist(c) === 6 && dist(m) === 1) ? null : `the mutant's strands end at ${dist(m)} distinct angles against the clean tree's ${dist(c)}`; } },
+  { id: 'the-anther-stands-upright-on-the-braid', why: 'a braided strand\'s anther is aimed along the plain filament\'s end direction instead of the braid\'s end tangent (ruling 2): it sits askew on the strand',
+    find: '  const D = rod.coil ? rod.end.D : rod.at(lengthMm).D;\n  const rodT = rod.coil ? rod.end.T : rod.T;',
+    into: "  const D = rod.coil && s.coil.mode !== 'BRAIDED' ? rod.end.D : rod.at(lengthMm).D;\n  const rodT = rod.coil && s.coil.mode !== 'BRAIDED' ? rod.end.T : rod.T;", names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_SIX()), c = braidStamens(C, BRAID_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const off = (r) => Math.max(...r.stamens.map((s) => { const a = s.stations[s.stations.length - 2], b = s.stations[s.stations.length - 1], v = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], n = Math.hypot(...v); return Math.acos(Math.min(1, (v[0] * s.dir[0] + v[1] * s.dir[1] + v[2] * s.dir[2]) / n)) * 180 / Math.PI; }));
+      return (off(c) < 15 && off(m) > 30) ? null : `the mutant's anther leaves its strand at ${off(m).toFixed(1)} deg against the clean tree's ${off(c).toFixed(1)} deg`; } },
+  { id: 'the-braid-gather-is-unfloored', why: 'the gather is laid at its 45-degree run whatever the floor asks: a strand turns onto the bundle tighter than one sheet thickness of radius',
+    find: '  const gatherMm = Math.min(L, Math.max(gatherNeedMm, BRAID_GATHER_RUN * g.deltaMm));',
+    into: '  const gatherMm = Math.min(L, BRAID_GATHER_RUN * g.deltaMm);', names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_SIX()), c = braidStamens(C, BRAID_SIX());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const gs = (r) => r.A.stamens.map((s) => s.coil.gatherMm);
+      const moved = gs(m).filter((g, i) => g !== gs(c)[i]).length;
+      return moved ? null : `the mutant's gathers ${JSON.stringify(gs(m))} equal the clean tree's — the floor never bound`; } },
+  { id: 'the-braid-turns-are-unfloored', why: 'the braid\'s turns are never clamped: twelve turns on 20 mm wind a strand tighter than one sheet thickness of radius, told as unclamped',
+    find: '  const twistClamped = gatherClamped || !fits(n);',
+    into: '  const twistClamped = gatherClamped;', names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_TIGHT()), c = braidStamens(C, BRAID_TIGHT());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (c.A.coil.turnsMax < 12 && m.A.coil.turnsMax === 12) ? null : `the mutant builds ${m.A.coil.turnsMax} turns against the clean tree's ${c.A.coil.turnsMax}`; } },
+  { id: 'the-braid-fold-limit-is-removed', why: 'a strand is laid at its asked radius about a curled bundle tighter than that radius: its inner skin passes the bend\'s centre (the spine-cup-fold ruling, per strand)',
+    find: '  const foldClamped = Rasked > foldR;',
+    into: '  const foldClamped = false;', names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_FOLD()), c = braidStamens(C, BRAID_FOLD());
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const laid = (r) => Math.max(...r.A.stamens.map((s) => s.coil.radiusLaidMm));
+      return (laid(c) < 10 && laid(m) === 10) ? null : `the mutant lays its strands at ${laid(m)} mm against the clean tree's ${laid(c)}`; } },
+  { id: 'a-strand-scope-is-ignored', why: 'a strand\'s own values never reach it: the picker edits a record the build does not read, and every strand is the bundle\'s',
+    find: '      const strandTerm = braidOn ? strandOffsetsFor(strandScopes, i) : null;',
+    into: '      const strandTerm = null;', names: ['JS9'], rows: BRAID_ROWS,
+    witness: (M, C) => { const m = braidStamens(M, BRAID_SIX(), BRAID_STRANDS), c = braidStamens(C, BRAID_SIX(), BRAID_STRANDS);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const len = (r) => r.A.stamens.map((s) => s.lengthMm);
+      return (len(c)[1] === 30 && len(m)[1] === 20) ? null : `the mutant builds strand 2 at ${len(m)[1]} mm against the clean tree's ${len(c)[1]}`; } },
   /* ===== THE SPINE CURVE (F3-global — docs/bloom-spine-curve-outcome.md).
      Five mutants, each witnessed on the MUTATED module's own spine record or
      refusal on a curve-mode state, never on C1 (the clause they all name).
@@ -3783,6 +3864,20 @@ const ROWS = [
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'INDEPENDENT' }] },
   { label: 'six stamens coiled at twelve turns (the curvature floor clamps the turns)',
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'INDEPENDENT' }, { id: 'stamenCoilTurns', value: '12' }] },
+  /* THE BRAID (the braid session): six braided at the defaults, at twelve
+     turns (the floor binds on the twist), radius 10 x curl 180 (the fold
+     limit binds per strand) and with two strands owning their own values
+     (through `__bloomScopes`). Scoped to the braid mutants: the clean control
+     still runs them. */
+  { label: 'six stamens braided (one bundle, r 1.5 mm x 3 turns)', for: /braid|strand/,
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'BRAIDED' }] },
+  { label: 'six stamens braided at twelve turns (the floor clamps the twist)', for: /braid|strand/,
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'BRAIDED' }, { id: 'stamenCoilTurns', value: '12' }] },
+  { label: 'six stamens braided at radius 10 x curl 180 (the fold limit clamps each strand)', for: /braid|strand/,
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'BRAIDED' }, { id: 'stamenCoilRadius', value: '10' }, { id: 'stamenCurl', value: '180' }] },
+  { label: 'six stamens braided, strand 2 +10 mm and strand 4 laid +1.5 mm wider (strand scopes)', for: /braid|strand/,
+    set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'BRAIDED' }],
+    scopes: { layers: [], petals: [], tiers: [], strands: [{ strand: 1, offsets: { stamenLength: 10 } }, { strand: 3, offsets: { stamenCoilRadius: 1.5 } }] } },
   /* THE SPINE CURVE (F3-global): a hooked curve in CURVE mode with the HIDDEN
      slider family set (so a leak of the slider is observable — on a slider at
      0 the leak mutant is a no-op by construction), and a LOADED curve under
