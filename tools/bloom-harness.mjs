@@ -13755,6 +13755,13 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'STAMENS: 6 x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than a filament radius: the stamens stand ON THE AXIS, told)': { pairs: 45506, worstMm: 5.7600, note: 'RE-RECORDED: was 45539 pairs, 33 removed by the census adjacency rule (see the block at the head of this list)' },
   'STAMENS: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': { pairs: 84, worstMm: 0.0225, note: 'RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 67 -> 151 pairs, 0.2109 -> 0.2109 mm'  + ' — RE-RECORDED BY THE APEX NIB (the tip law is truncated at the print floor and closed on a rounded nib, so the outline moves on every row whose blade clears that floor): was 151 pairs / 0.2109 mm' },
   'STAMENS: 6 x COILED x STYLE — the coils beside the style': { pairs: 272, worstMm: 0.0796, note: 'F1.3a — the STYLE\'s own by-design rod overlap (every STYLE row reads exactly 272 / 0.0796, worst site on the style\'s own inner root ring at (0.00, 0.60, -0.60)); the coils add nothing to it' },
+  /* THE BRAID (block 74): two rows, neither fold the braid's — each reads its
+     base class's own record to the pair and to the fourth decimal, and every
+     other braid row reads 0 within-shell pairs (the strands are separate
+     closed shells; their contacts are CROSS-shell, the export contract's own
+     case). */
+  'BRAID: 6 on a hemisphere (rise 1)': { pairs: 248, worstMm: 0.4262, note: 'the braid session — the HEAD\'s (EFFECTIVE TILT PAST 90) fold, not the braid\'s: "headRise max (1)" reads the same 248 / 0.4262 at the same site (-5.77, -7.37, 0.85), 9.4 mm off the axis among the petals; the braided strands add nothing to it' },
+  'BRAID: 6 x STYLE — the bundle wound round the style': { pairs: 272, worstMm: 0.0796, note: 'the braid session — the STYLE\'s own by-design rod overlap (every STYLE row reads exactly 272 / 0.0796, worst site on the style\'s own inner root ring at (0.00, 0.60, -0.60)); the bundle wound round it adds nothing' },
   'GYNOECIUM: a style on the bare apex (the four states — style only)': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x 6 stamens on a RING (the four states — both present)': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x 120 on the DISC (the trifid against the cushion)': { pairs: 272, worstMm: 0.0796 },
