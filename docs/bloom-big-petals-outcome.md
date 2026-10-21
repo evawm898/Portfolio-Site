@@ -129,6 +129,30 @@ set**, so none is the taper's:
 | 100 mm x tilt 90 | 32 / 0.0000 | 32 / 0.0000 | span-0 tangency (`TILT: 90`'s kind) |
 | 100 mm on a hemisphere | 520 / 0.4619 | 632 / 0.3547 | the head's hemisphere fold |
 
+**THE ROOT RIM OF A 100 mm PETAL TURNS 53.5° — 8.5° PAST E2'S ALLOWANCE — AND THAT IS AN OPEN
+QUESTION FOR EVA, DECLARED, NOT CLAMPED.** The rim taper eases the body down to the 1 mm bead
+over `RIM_TAPER_MM` (3 mm) of surface; at a 3.88 mm root that is a much steeper ease than at the
+1.2 mm sheet it was ruled on, and the edge gate's E2 reads it at the root (radius ~11.6 mm) on
+every 100 mm row: 53.53° plain, at tilt 0 and with a stem, 53.49° with tip thinning, 53.43° cupped
+0.6, 53.28° rolled 200, 50.16° curled 180. **60 and 80 mm plain pass.** The same states with the
+root taper OFF pass. Two remedies were built and measured, and neither ships:
+- the bead's radius scaled by the row's root factor — the 100 mm root passes, and the 80 mm root
+  then reads **61.9°** in the buried-end ramp, where a larger bead fades in over the same 3 mm;
+- that ramp lengthened by the root factor as well — **77.5° / 88.7°**, because the edge gate
+  excludes the ramp's own stretch and a longer ramp puts wall-like profiles inside its window.
+Lengthening the across-the-rim taper would reach the centre line and thin the root the law
+derives, so it was not tried. The three 100 mm smoke rows are declared in `E2_TURN_XFAIL` with
+this note; the other readings are recorded here. **Two rows fail at the TIP and are not the
+taper's** (the same state with the law off reads the identical turn at the identical site): cup
+1.2 (58.14°) and 80 mm x cup 0.9 x curl 270 (50.79°) — the cupped-nib bead class.
+
+**AND ONE E7 EDGE ON `ALL MAX`, DECLARED BY VALUE.** `ALL MAX` asks a **150 mm** petal (the 100 mm
+maximum x its size field's 1.5) on a 6.56 mm root body under every form control; two side profiles
+at the root-blend end stop 0.00971 mm off the drawn bead radius against the builder's own 0.00958 mm
+bracket. That bracket is the half's ARC over 4096 while the bisection halves the section PARAMETER,
+which this section does not stretch evenly — a bound that assumed an even stretch, met for the first
+time. `E7_INSET_XFAIL` holds it both ways; the row is export-refused.
+
 PARTITION_AND_CENSUS_PLACEHOLDER
 
 ## 7. Open decisions for Eva — shipped as declared defaults
@@ -147,6 +171,10 @@ PARTITION_AND_CENSUS_PLACEHOLDER
    (`0.4 x width x footDelicacy`), the ring radius through the area rule, the outline curve's
    width scale (`petalWidth / 16`), and `ALL MAX` (a redefinition, like this session's).
    Not done — it is its own ruling.
+
+5. **The root rim at 100 mm** (§6) — 53.5° against E2's 45° allowance, declared. Remedies tried
+   and measured are in §6; the choice between accepting it, a bead that grows with the root, or a
+   different taper law at the root is Eva's.
 
 ## 8. What this does not do
 

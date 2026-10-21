@@ -1217,6 +1217,10 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
 - Block 75 (28 rows, 1,485), smoke block 75 (7); combination `cup-x-length` gains 80/100, `length-x-tilt` new
   (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too.
 - **`petalWidth` (8–30) cannot hold the shipping 35:16 proportion past 66 mm** — recommended max 46, NOT changed.
+- **A 100 mm petal's ROOT RIM turns ~53.5° against E2's 45° (open for Eva, declared on the three smoke rows):** the rim
+  taper eases a 3.88 mm root to the 1 mm bead in 3 mm. A bead scaled by the root factor moved it to 80 mm (61.9°); a
+  lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carries one
+  E7 edge declared by value (`E7_INSET_XFAIL`).
 - Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
