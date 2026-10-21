@@ -96,10 +96,11 @@ near-rectangle and the LAW spatulate, and absent from the spoon at cup 0.
 ## 5. What was done
 
 - **No geometry change.** Fixing it "inside CURVE mode only" would put a station into the CURVE ladder that the LAW
-  ladder does not get, for a class LAW has worse — two answers to one boundary (the registration rule). The
-  remedy, if Eva wants one, is the ladder's: a station inside a blunt end's last gap (a resolution demand from the
-  nib, the way `ladderDemand` already asks for `APEX_ARC_ROWS`), applied to LAW and CURVE alike, with its own byte
-  partition. Recorded as §6, not taken.
+  ladder does not get, for a class LAW has worse — two answers to one boundary (the registration rule). This doc
+  named the ladder as the remedy: a station inside a blunt end's last gap (a resolution demand from the nib, the
+  way `ladderDemand` already asks for `APEX_ARC_ROWS`), for LAW and CURVE alike. **[Oct 21: REFUTED — the ladder
+  was tried as ruled and made 10 of 17 measured states worse (`docs/bloom-blunt-nib-ladder-outcome.md`). The class
+  is DECLARED BY RULING (Eva, Oct 21): closed, no further session.]**
 - **Both spoon rows are smoke rows** (blocks 65 and 66; `--check` reads 254 rows over 62 blocks, 185 families), so
   E2 holds them in CI.
 - **Declared in `E2_TURN_XFAIL`**: `the spoon x cup 0.6` at excess 26.986507, `the spoon x petalWidth 30` at
@@ -114,5 +115,6 @@ near-rectangle and the LAW spatulate, and absent from the spoon at cup 0.
 ## 6. Not done, and named
 
 - **The blunt-nib ladder gap** (§5): every blunt end under a cup reads 50–140° at the nib's first arc row, the LAW
-  spatulate worst (140.47° at tip shape 3.0, cup 0.4). It is #283's declared nib × cup class, now measured as one
-  missing station. Eva's ruling on whether a nibbed bead may turn past the allowance (open since #283) covers it.
+  spatulate worst (140.47° at tip shape 3.0, cup 0.4). It is #283's declared nib × cup class. **[Oct 21: "measured
+  as one missing station" is REFUTED — the ladder demand was built and made 10 of 17 states worse
+  (`docs/bloom-blunt-nib-ladder-outcome.md`). Eva's ruling, Oct 21: the class stays DECLARED, closed.]**

@@ -1,5 +1,8 @@
 # The blunt-nib ladder fix — tried, measured, NOT shipped
 
+> **RULED Oct 21: declared, closed.** The blunt-tip rim turn stays DECLARED in `E2_TURN_XFAIL` (Eva's ruling (c)):
+> no cup fade, no bead re-orientation, and no further session on it. The two levers in §7 are NOT scheduled.
+
 *Session of Oct 21. Eva's ruling of Oct 20 scheduled it after the braid: "a nib resolution demand in the ladder, for
 LAW and CURVE alike", the remedy F6-spoon named in §5–§6 of `docs/bloom-spoon-rim-turn-outcome.md`. Read that doc
 first; this one answers its §6.*
@@ -22,8 +25,9 @@ re-record is owed, and no frozen phase is owed. The candidate is committed as a 
 reproduced and the code is not lost: `docs/bloom-blunt-nib-ladder-trial.patch`.
 
 **The premise F6-spoon §6 recorded — "it is #283's declared nib × cup class, now measured as one missing station" —
-is REFUTED.** The sites in §4 say why. The coarse last gap is not a missing station. It is the ramp the bead's
-narrow-span clamp and the cup's lift fall down. Shorten it and the ramp gets steeper.
+is REFUTED** by the table in §3: adding stations there made 10 of 17 states worse. WHY is a HYPOTHESIS (§4): the
+coarse last gap may be the ramp the bead's narrow-span clamp and the cup's lift fall down, so shortening it would
+steepen the ramp. That mechanism was never isolated.
 
 ## 2. What was built (the trial patch)
 
@@ -111,7 +115,12 @@ How to read the table:
   - The coarsest (1.6) leaves the cupped rows where they were or worse.
   - Every criterion worsens the round ends under a cup.
 
-## 4. Where the turn goes, and why a station cannot take it away
+## 4. Where the turn goes — and a HYPOTHESIS for why a station cannot take it away
+
+**THE MECHANISM BELOW IS A HYPOTHESIS, NOT A MEASUREMENT.** It was never isolated: no run turned the bead or the
+cup off at the site (a flat-wall rim, or cup 0 held only across the last gap) to show that either is what turns.
+What IS measured is the table in §3 and the sites in the table just below; the "ramp" reading is an account that
+fits them.
 
 Read the sites with `tools/bloom-spoon-rim-turn.mjs` under the trial's knobs (`NIBX=drawn NIBD=1.0`).
 **At cup 0 every blunt end turns at the NEW last gap before the nib, whose upper station now sits at h ≈ 1.04 mm**:
@@ -130,13 +139,13 @@ What changes across that one gap does not get smaller with it. The bead's room a
 collapses from a full 0.50 mm bead to the nib's clamped one (0.18 mm at the arc's start). The cup's lift (`c x h`,
 scaled down onto the nib) falls with it.
 
-**So the gap is the RAMP those two fall down, and a shorter gap is a steeper ramp.** A pointed end reads under 44°
+**The hypothesis: the gap is the RAMP those two fall down, and a shorter gap is a steeper ramp.** A pointed end reads under 44°
 with the same collapse because its last gap is about 1.2 mm of plan. Main's blunt end reads ≤ 45° at cup 0 because
 its last gap is LONG. Under a cup the long gap's out-of-plane drop is what turns, and the trial trades it for a
 steeper in-plane collapse. That trade is the table.
 
-This is a measured pattern over these states, not a law fitted to them. It says the lever is not the ladder's: what
-turns is the bead's clamp and the cup's lift approaching the nib. **The ruling's other named criterion — "the gap
+This is a pattern over these states, not a law fitted to them, and the attribution to the bead's clamp and the cup's
+lift is the untested part. What the table settles on its own is that the lever is not the ladder's. **The ruling's other named criterion — "the gap
 in mm against the nib's own scale" — cannot discriminate either.** On main the last gap's along-length is
 0.55–0.66 mm on the blunt ends and 0.55–0.79 mm on the pointed ones (F6-spoon §2's table). A criterion on it binds
 both or neither.
@@ -205,11 +214,15 @@ without moving the default (§3).
   <file>`): F6-spoon's own sheet run on main and on the patched copy, each from its own server, with the E2 of the
   tree that drew it on every caption. It is deliberately NOT `spoon-rim-turn-fixed.png`, because nothing was
   fixed. `docs/img/spoon-rim-turn.png` stays where it is.
-- **The two levers the measurement points at are not built and need a ruling:**
+- **MAIN'S NEAR-RECTANGLE AT CUP 0 SITS AT EXACTLY 45.00°** — 45.000168 through the gate (§3's table rounds it),
+  0.000168 over the allowance, which is the very excess `SCOPED OUTLINE: SPIRAL x 2 turns …` is declared at in
+  `E2_TURN_XFAIL`. It sits ON the allowance, so ANY future ladder change will flip that row one way or the other —
+  a red, or a declaration gone stale, after a ladder change is that change's to measure and re-record, not this
+  class re-opening.
+- **The two levers the hypothesis points at were offered and NOT taken — RULED Oct 21 (c): declared, closed:**
   - **(a) The cup's nib scale.** `cupScale = hb / TIP_HALF_MM` ties the lift to the half-width, so on a blunt end
     the lift falls with the cliff. It could be faded over a LENGTH approaching the nib instead.
   - **(b) The bead's profile on a steep outline.** The profile is laid across the ROW, which is ALONG the outline
     where the outline is near-vertical, and its room arm collapses with the nib's width. It could be laid on the
     outline's own in-plane normal.
-  - Either is its own session with its own byte partition. Which one, or neither — the class stays declared, as
-    #283 and F6-spoon left it — is Eva's.
+  - Neither is scheduled. The class stays declared, as #283 and F6-spoon left it.

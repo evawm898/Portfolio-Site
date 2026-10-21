@@ -131,14 +131,13 @@ the braid's brief, and they are RULED now. Do not re-open them.
    its variance and the 120 mm ceiling keep their meaning, and SLENDERNESS reports the wire.
 2. **RULED: the coil ramps in over its first pitch** (smootherstep), so the filament leaves its root
    on the normal. Without the ramp, the root would kink by up to the helix angle.
-3. **RULED: right-handed only.** No handedness control. **A measured finding sits against this
-   ruling** (the braid session, `docs/bloom-stamen-braid-outcome.md` §6):
-   - The coil as shipped turns CLOCKWISE seen from above as it rises, so it is LEFT-handed. Measured
-     on the emitted stations: −11.49 rad over the upper 60% of a three-turn coil.
-   - The braid follows the shipped coil's hand.
-   - Making both right-handed is a sign on the turn. It moves every INDEPENDENT row's bytes, and the
-     braid's brief holds those byte-identical.
-   - So the hand is LEFT, recorded, and the flip is Eva's question rather than something done quietly.
+3. **RULED: left-handed only (RULED Oct 21).** No handedness control. The Oct 20 confirmation said
+   "right-handed only"; the braid session measured the shipped coil and it is LEFT-handed
+   (`docs/bloom-stamen-braid-outcome.md` §6), and Eva ruled on Oct 21 that the shipped hand stays:
+   - The coil turns CLOCKWISE seen from above as it rises. Measured on the emitted stations: −11.49
+     rad over the upper 60% of a three-turn coil.
+   - The braid follows the same hand (−11.48 rad on the same measure).
+   - Nothing is flipped, so no INDEPENDENT or BRAIDED row moves a byte. Do not re-open it.
 4. **RULED: default r 1.5 mm × 3 turns stays.** **Interpenetration at 3+ stamens is a declared look,
    never clamped** (§5): neighbours overlap as separate closed solids. A radius under ~0.4 mm clears
    six stamens but barely reads as a coil.
