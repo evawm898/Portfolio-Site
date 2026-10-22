@@ -258,6 +258,11 @@ class RoiMeasurementOut(BaseModel):
     # module comment above _wale_count_candidate for why wale specifically.
     wale_source: str = "periodicity"
     wale_count_confidence: float = 0.0
+    # Why a trustworthy-looking count was NOT used for this region: it
+    # disagreed with the region's own periodicity reading across a
+    # harmonic (see _wale_count_harmonic_note). None when the count was
+    # used, or when there was no trustworthy count to begin with.
+    wale_count_note: Optional[str] = None
 
 
 class MultiRoiDebugOut(BaseModel):

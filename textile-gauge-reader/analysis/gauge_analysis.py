@@ -4639,6 +4639,60 @@ def _wale_count_candidate(lattice: Optional["LoopLatticeResult"]) -> Tuple[Optio
     return lattice.wale_spacing_px, confidence
 
 
+# A region's COUNTED spacing may CORROBORATE and refine its own periodicity
+# reading; it may not REPLACE it across a harmonic. Measured on the app-path
+# scorecard (tests/app_path_scorecard.py, every fixture, the exact scale and
+# +-0.5/1/2% jitter -- 70 runs, ~200 regions): wherever the two disagreed,
+# the count was the wrong one, every time -- usually the stitch-LEG lattice
+# at half the true period (every clean fabric: synth_jersey, synth_garter,
+# jersey, knit_09, teal all read the leg spacing on most regions) and
+# sometimes a 2x/3x of it where columns were missed. Not once was the
+# periodicity reading a harmonic of the truth while the count was right.
+# The reason is structural: analyze_loop_lattice_experiment picks its scale
+# among the periodicity's own 0.5x/1x/2x family by lattice REGULARITY
+# alone, and on regular fabric the leg lattice is exactly as regular as the
+# loop lattice (on the synthetic fabrics both read 1.000 and the tie goes
+# to the finer candidate), whereas the periodicity scorer decided among the
+# same three candidates with the 2D template walk, phase consistency, fold
+# consistency and the leg-lattice climb. So a count that lands on a
+# different member of that family than the scorer did is the count
+# repeating the harmonic error the scorer already rejected, with less
+# evidence. The tolerance is the consensus's own "agrees" tolerance
+# (CONSENSUS_INLIER_LOG_TOLERANCE), so "the count agrees with the region's
+# own reading" means the same thing here as "two regions agree" does there.
+# A region with no periodicity reading at all keeps the count unchanged:
+# there is nothing to corroborate against, and a count is still a
+# measurement.
+WALE_COUNT_AGREEMENT_LOG_TOLERANCE = CONSENSUS_INLIER_LOG_TOLERANCE
+
+
+def _wale_count_harmonic_note(count_px: Optional[float], periodicity_px: Optional[float]) -> Optional[str]:
+    """
+    None when a region's counted spacing agrees with its own periodicity
+    reading (within WALE_COUNT_AGREEMENT_LOG_TOLERANCE in log-ratio), or
+    when there is no periodicity reading to compare against -- the count
+    may then feed the consensus. Otherwise a human-readable reason naming
+    the disagreement (and the harmonic it is consistent with, when it is
+    one), and the count is NOT used: the region contributes its own
+    periodicity reading instead. See the comment above.
+    """
+    if count_px is None or periodicity_px is None or count_px <= 0 or periodicity_px <= 0:
+        return None
+    ratio = count_px / periodicity_px
+    if abs(math.log(ratio)) <= WALE_COUNT_AGREEMENT_LOG_TOLERANCE:
+        return None
+    if abs(math.log(ratio * 2.0)) <= CONSENSUS_HARMONIC_LOG_TOLERANCE:
+        harmonic = " -- consistent with the stitch-leg half-period, not a loop count"
+    elif abs(math.log(ratio / 2.0)) <= CONSENSUS_HARMONIC_LOG_TOLERANCE:
+        harmonic = " -- consistent with a doubled repeat (missed columns), not a loop count"
+    else:
+        harmonic = ""
+    return (
+        f"Counted spacing {count_px:.1f}px disagrees with this region's own periodicity reading "
+        f"{periodicity_px:.1f}px ({ratio:.2f}x){harmonic}; the periodicity reading was used instead."
+    )
+
+
 @dataclass
 class OutlierInfo:
     """
@@ -4719,6 +4773,11 @@ class RoiMeasurement:
     # _wale_count_candidate.
     wale_source: str = "periodicity"
     wale_count_confidence: float = 0.0
+    # Set when this region's loop-lattice count was trustworthy on its own
+    # terms but DISAGREED with the region's own periodicity reading across
+    # a harmonic, so it was not used (wale_source is then "periodicity" and
+    # wale_count_confidence 0.0) -- see _wale_count_harmonic_note.
+    wale_count_note: Optional[str] = None
 
 
 @dataclass
@@ -5011,6 +5070,12 @@ def analyze_multi_roi(
             loop_lattice = None
 
         count_spacing, count_confidence = _wale_count_candidate(loop_lattice)
+        # The count may corroborate the region's own periodicity reading,
+        # never replace it across a harmonic -- see the comment above
+        # _wale_count_harmonic_note for the measurement behind this.
+        count_note = _wale_count_harmonic_note(count_spacing, result.wale.spacing_px)
+        if count_note is not None:
+            count_spacing, count_confidence = None, 0.0
         wale_source = "loop_count" if count_spacing is not None else "periodicity"
 
         per_roi.append(RoiMeasurement(
@@ -5022,6 +5087,7 @@ def analyze_multi_roi(
             loop_centers_px=result.loop_centers_px,
             rotation_deg=result.rotation_deg, loop_lattice=loop_lattice,
             wale_source=wale_source, wale_count_confidence=count_confidence,
+            wale_count_note=count_note,
         ))
 
     # --- Per-region plausibility gates, applied BEFORE cross-region
