@@ -293,7 +293,7 @@ async function run(override = null) {
       const svgs = names.filter((n) => /-sheet-\d+-of-\d+\.svg$/.test(n)),   // the CUT sheets by name; the zip also carries backing sheets, the test grid and the coupon (P15's)
        readme = names.find((n) => /README/.test(n)), json = names.find((n) => /\.json$/.test(n));
       const sheet1 = svgs.length ? await z.file(svgs[0]).async('string') : '';
-      const png = await download(page, () => page.click('#exportPng'), 120000);
+      const png = await download(page, () => page.click('#exportPng', { timeout: 120000 }), 120000);   // the click resolves only when the synchronous render has (the bloom gate's own XR1 lesson): 30 s timed out at 4 min on the runner (run 39766275888)
       const pngHead = fs.readFileSync(png.path).subarray(0, 8).toString('hex');
       await T(() => window.__lantern.set('bed', 'k40'));
       const small = await T(() => ({ plan: window.__lantern.plan(), badge: document.getElementById('flagCount').textContent, bed: window.__lantern.flags().find((f) => f.id === 'bed') }));
