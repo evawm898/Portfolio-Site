@@ -7,6 +7,8 @@
 
 import * as G from './lantern-geometry.js';
 import * as PAT from './lantern-pattern.js';
+import * as MAT from './lantern-material.js';
+import * as EXP from './lantern-export.js';
 import { curveFunction, proposeEdit, nearestOnCurve, quantise, curveEquals, cloneCurve } from './bloom-curve.js';
 import { createFoldedView } from './lantern-view.js';
 
@@ -16,7 +18,9 @@ const $ = (id) => document.getElementById(id);
 const inch = (mm) => (mm / G.MM_PER_IN).toFixed(1) + '″';
 
 /* ---------------- state and history ---------------- */
-let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+let rules = MAT.rulesFor(MAT.stockOf(state), MAT.machineOf(state));   // the material model's derived rules, re-read on every rebuild
+let plan = null;        // the export plan: pieces, sheets, notes (see rebuildNow)
 let pattern = null;      // the pattern laid onto the model's facets, judged (see rebuildNow)
 let flatFocus = null;    // a cut finding the Flat view is zoomed on: { x, y, r } in flat mm
 let model = null;
@@ -54,6 +58,11 @@ const CONTROLS = [
   { id: 'patRim', sec: 'patternCtrls', kind: 'select', label: 'Rim band', options: [['none', 'none'], ['beads', 'beads'], ['picot', 'picot'], ['scallop', 'scallop arcs'], ['dashes', 'dashes']], when: (s) => s.patMode !== 'none', tip: 'A row of small cuts inside the rim margin, along each edge.' },
   { id: 'patSolidAlt', sec: 'patternCtrls', kind: 'check', label: 'Alternate points solid', when: (s) => s.patMode !== 'none', tip: 'Every other point left uncut — the lantern reads as pattern / plain / pattern.' },
   { id: 'patAutoBridge', sec: 'patternCtrls', kind: 'check', label: 'Auto-bridge islands', when: (s) => s.patMode !== 'none', tip: 'A piece of paper enclosed by a cut would fall out; on, the generator splits the cut to leave a bridge. Off, the island is reported instead.' },
+  { id: 'material', sec: 'materialCtrls', kind: 'select', label: 'Stock', options: MAT.MATERIALS.map((m) => [m.id, m.name]), tip: 'The paper. Every cutting rule below is derived from its caliper; a custom stock takes your own gsm and thickness.' },
+  { id: 'gsm', sec: 'materialCtrls', kind: 'range', label: 'Weight', min: MAT.GSM_RANGE[0], max: MAT.GSM_RANGE[1], step: 5, fmt: (v) => `${v} gsm`, when: (s) => s.material === 'custom', tip: 'Grams per square metre — on the ream\'s label.' },
+  { id: 'caliper', sec: 'materialCtrls', kind: 'range', label: 'Thickness', min: MAT.CALIPER_RANGE[0], max: MAT.CALIPER_RANGE[1], step: 0.01, fmt: (v) => `${v.toFixed(2)} mm`, when: (s) => s.material === 'custom', tip: 'The caliper, measured with a micrometer or taken from the mill\'s sheet. It drives every rule.' },
+  { id: 'machine', sec: 'materialCtrls', kind: 'select', label: 'Machine', options: MAT.MACHINES.map((m) => [m.id, m.name]), tip: 'A laser scores the mountains and perforates the valleys; a blade cutter scores both and leaves the PERF layer empty.' },
+  { id: 'bed', sec: 'materialCtrls', kind: 'select', label: 'Bed', options: MAT.BEDS.map((b) => [b.id, b.name]), tip: 'The cutting area. A half that does not fit is split into one module per point, joined on the valley folds.' },
   { id: 'profile', sec: 'profileCtrls', kind: 'select', label: 'Side profile', options: [['straight', 'straight — classic triangle'], ['faceted', 'faceted curve (phase 6, not yet)']], disabledOptions: ['faceted'], tip: 'Straight: the ridge runs straight from centre to tip. Faceted: extra creases round the body (not built yet).' },
 ];
 const SECS = {};
@@ -98,6 +107,7 @@ function setValue(id, value, { commit = true } = {}) {
   if (!commit && !gestureStart) gestureStart = snap(state);
   if (id === 'edge') state.edge = cloneCurve(value); else state[id] = value;
   if (id === 'points' && state.points % 2 && state.alternate) state.alternate = false;
+  if (id === 'material' && value !== 'custom') { const m = MAT.MATERIALS.find((x) => x.id === value); state.gsm = m.gsm; state.caliper = m.t; }   // a preset stock pins its numbers; custom starts from the last ones
   if (['scallops', 'scallopDepth'].includes(id) && state.edgeMode === 'scalloped') state.edge = G.edgeCurveFor('scalloped', state);
   if (commit) { pushHistory(prev); gestureStart = null; }
   rebuild({ commit });
@@ -132,16 +142,20 @@ function applyPatternPreset(p) {
   pushHistory(prev); $('patternNote').textContent = p.name; rebuild({ commit: true });
 }
 /* a random pattern is kept only if the judge passes it with no island and no thin paper: up to eight draws, the best of them otherwise, told */
+let lastRandom = null;                 // every draw's own counts and which one was kept — read by the gate, written by nothing else
 function randomPattern() {
   const prev = { ...state, edge: cloneCurve(state.edge) };
   let best = null;
+  const draws = [];
   for (let k = 0; k < 8; k++) {
     const cand = PAT.randomPattern((Math.random() * 2 ** 31) >>> 0);
-    const pat = PAT.patternForModel(model, { ...state, ...cand }, PAT.RULES_DEFAULT, { validate: true });
+    const pat = PAT.patternForModel(model, { ...state, ...cand }, rules, { validate: true });
     const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;
-    if (!best || score < best.score) best = { cand, score };
+    draws.push({ counts: { island: pat.counts.island, thin: pat.counts.thin, narrow: pat.counts.narrow, keepout: pat.counts.keepout } });
+    if (!best || score < best.score) best = { cand, score, k };
     if (score === 0) break;
   }
+  lastRandom = { draws, picked: best.k };
   state = { ...state, ...best.cand };
   pushHistory(prev);
   $('patternNote').textContent = best.score === 0 ? `random — passes every check` : `random — the best of eight draws, see Checks`;
@@ -157,11 +171,14 @@ function rebuild({ commit = true } = {}) {
 function rebuildNow({ commit = true } = {}) {
   const t0 = performance.now();
   if (!G.SHAPE_PRESETS.some((p) => presetMatches(p.id))) $('presetNote').textContent = $('presetNote').textContent.startsWith('random') ? $('presetNote').textContent : '';
-  model = G.solveLantern(state);
+  rules = MAT.rulesFor(MAT.stockOf(state), MAT.machineOf(state));
+  model = G.solveLantern({ ...state, tabWidth: rules.tabWidth });
   stats.solves++; stats.solveMs = performance.now() - t0;
   const t1 = performance.now();
-  pattern = PAT.patternForModel(model, state, PAT.RULES_DEFAULT, { validate: commit });   // mid-gesture the raster judge is skipped; the commit runs it
+  pattern = PAT.patternForModel(model, state, rules, { validate: commit || !pattern });   // mid-gesture the raster judge is skipped; the commit runs it, and so does the first paint
   stats.patternMs = performance.now() - t1; stats.patterns++;
+  plan = EXP.exportPlan(model, pattern, state, rules);
+  drawRules(); drawPlan();
   syncControls();
   drawDims();
   drawFlags();
@@ -193,6 +210,21 @@ function pushMesh() {
 let meshFitted = false, lastFitRadius = 0;
 
 /* ---------------- read-outs ---------------- */
+function drawRules() {
+  const r = rules, m = MAT.machineOf(state);
+  $('rulesOut').innerHTML = `<b>stock</b>  ${r.gsm} gsm · ${r.t.toFixed(2)} mm\n<b>rules</b>  bridge ${r.bridge} · hole ≥ ${r.minHole} · stroke ≥ ${r.minCut} · fold keep-out ${r.foldKeepout} · rim margin ${r.rimMargin} · spine ${r.spine} · tab ${r.tabWidth} mm\n<b>machine</b>  ${m.note} · kerf ${r.kerf} mm, not compensated`;
+}
+function drawPlan() {
+  const p = plan;
+  const sheets = p.sheets.length, util = p.sheets.reduce((s, sh) => s + sh.utilisation, 0) / Math.max(1, sheets);
+  const area = paperAreaMm2(), cutFrac = cutFraction();
+  const w = MAT.weightEstimate(area, cutFrac, rules.gsm);
+  $('planOut').innerHTML = `<b>${p.bed.name}</b>  ${p.split ? `${model.N} point modules a half, seams on the valley folds` : 'each half whole'} · ${p.pieces.length} pieces on <b>${sheets} sheet${sheets > 1 ? 's' : ''}</b> · ${(util * 100).toFixed(0)}% of the bed used\n<b>paper</b>  ${(area / 1e4).toFixed(1)} dm² before cutting, ${(cutFrac * 100).toFixed(0)}% cut away · about <b>${w.toFixed(0)} g</b> of paper${p.fitsBed ? '' : '\n<b>does not fit</b> — see Checks'}`;
+}
+/* both halves' paper (the facets, the tabs) and the share the pattern cuts away */
+function paperAreaMm2() { const h = G.halfOutline(model, 'front'); return 2 * polyAreaAbs(h.outline) + h.tabs.filter(Boolean).reduce((s, t) => s + polyAreaAbs(t.poly), 0); }
+function cutFraction() { if (!pattern || state.patMode === 'none') return 0; const h = G.halfOutline(model, 'front'); const cut = PAT.placeCuts(model, pattern, state).reduce((s, c) => s + polyAreaAbs(c.poly), 0); return Math.min(0.95, cut / polyAreaAbs(h.outline)); }
+const polyAreaAbs = (p) => { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]); return Math.abs(a / 2); };
 function drawDims() {
   const d = G.dimensions(model);
   const alt = model.alternate ? `\nshort tip radius <b>${(model.facets[1].rtip).toFixed(1)} mm</b> · facet angles <b>${(model.facets[0].a * 180 / Math.PI).toFixed(2)}° / ${(model.facets[1].a * 180 / Math.PI).toFixed(2)}°</b>` : '';
@@ -211,9 +243,11 @@ function drawFlags() {
   const pc = pattern ? pattern.counts : { island: 0, thin: 0, narrow: 0, keepout: 0 };
   const cutFindings = [];
   if (pc.island) cutFindings.push({ kind: 'bad', id: 'islands', text: `${pc.island} island${pc.island > 1 ? 's' : ''} per facet — paper enclosed by a cut falls out when weeded${state.patAutoBridge ? ' (the auto-bridge could not reach it)' : ' (auto-bridge is off)'}`, issue: 'island' });
-  if (pc.thin) cutFindings.push({ kind: 'warn', id: 'thin', text: `${pc.thin} spot${pc.thin > 1 ? 's' : ''} per facet of paper thinner than the ${PAT.RULES_DEFAULT.bridge} mm bridge — it will cut, and may tear in weeding`, issue: 'thin' });
-  if (pc.narrow) cutFindings.push({ kind: 'warn', id: 'narrow', text: `${pc.narrow} cut${pc.narrow > 1 ? 's' : ''} per facet narrower than the stock's minimum (${PAT.RULES_DEFAULT.minCut} mm stroke, ${PAT.RULES_DEFAULT.minHole} mm hole)`, issue: 'narrow' });
+  if (pc.thin) cutFindings.push({ kind: 'warn', id: 'thin', text: `${pc.thin} spot${pc.thin > 1 ? 's' : ''} per facet of paper thinner than the ${rules.bridge} mm bridge — it will cut, and may tear in weeding`, issue: 'thin' });
+  if (pc.narrow) cutFindings.push({ kind: 'warn', id: 'narrow', text: `${pc.narrow} cut${pc.narrow > 1 ? 's' : ''} per facet narrower than the stock's minimum (${rules.minCut} mm stroke, ${rules.minHole} mm hole)`, issue: 'narrow' });
   if (pc.keepout) cutFindings.push({ kind: 'warn', id: 'keepout', text: `${pc.keepout} cut${pc.keepout > 1 ? 's' : ''} per facet inside a keep-out (spine, fold or rim margin)`, issue: 'keepout' });
+  for (const n of plan ? plan.notes : []) cutFindings.push(n);
+  if (model.Ro > MAT.sagLimitMm(rules.t)) cutFindings.push({ kind: 'warn', id: 'sag', text: `a ${model.Ro.toFixed(0)} mm point on ${rules.gsm} gsm will sag — the stock holds about ${MAT.sagLimitMm(rules.t).toFixed(0)} mm (a starting rule of thumb, scaled by the cube root of the caliper); heavier stock or a smaller star` });
   if (pattern && pattern.bridged) cutFindings.push({ kind: 'info', id: 'bridged', text: `${pattern.bridged} island${pattern.bridged > 1 ? 's' : ''} per facet bridged automatically` });
   for (const n of cutFindings) {
     const li = document.createElement('li'); li.className = n.kind + (n.issue ? ' cut' : ''); li.dataset.flag = n.id; li.textContent = n.text;
@@ -385,10 +419,10 @@ let thumbsReady = false;
 function patternThumb(p) {
   const m = G.solveLantern({ ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...p.state, points: 6, slender: 0.5, depthFrac: 0.4 });
   const t = m.facets[0]; const st = { ...PAT.PATTERN_STATE_DEFAULTS, ...p.state };
-  const lay = st.patMode === 'none' ? { placed: [] } : PAT.layoutFacet(t, PAT.patternOf(st));
+  const lay = st.patMode === 'none' ? { placed: [] } : PAT.layoutFacet(t, PAT.patternOf(st), rules);
   const cuts = PAT.taggedCuts(lay.placed);
   // a square crop of the facet's middle, both halves, scaled to fill the box — a whole facet at 56 px is a sliver nobody can read
-  const F = PAT.facetField(t, PAT.RULES_DEFAULT), x0 = F.xMin + (F.xMax - F.xMin) * 0.3, half = Math.max(F.yHi(x0), 6);
+  const F = PAT.facetField(t, rules), x0 = F.xMin + (F.xMax - F.xMin) * 0.3, half = Math.max(F.yHi(x0), 6);
   const s = 56 / (2 * half), x1 = x0 + 2 * half;
   const PT = (q, side) => `${(s * (q[0] - x0)).toFixed(1)},${(28 - s * side * q[1]).toFixed(1)}`;
   return `<svg viewBox="0 0 56 56"><rect width="56" height="56" style="fill:rgba(237,237,232,.14)"/>${[1, -1].map((side) => cuts.filter((c) => c.poly.some((q) => q[0] > x0 - 5 && q[0] < x1 + 5)).map((c) => `<path d="M${c.poly.map((q) => PT(q, side)).join('L')}Z" style="fill:var(--ink);stroke:none"/>`).join('')).join('')}</svg>`;
@@ -442,10 +476,35 @@ $('openDesign').addEventListener('change', async (ev) => {
   $('designMsg').textContent = r.notes.length ? `opened with notes: ${r.notes.join('; ')}` : 'opened — a clean read, nothing reported.';
   ev.target.value = '';
 });
+/* the cut files: every sheet as an SVG, the README and the design JSON, zipped; JSZip is loaded on the first click (cards.html's pin) */
+let jszipLoading = null;
+function loadJsZip() { if (window.JSZip) return Promise.resolve(window.JSZip); if (!jszipLoading) jszipLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = () => res(window.JSZip); sc.onerror = () => { jszipLoading = null; rej(new Error('JSZip did not load')); }; document.head.append(sc); }); return jszipLoading; }
+function sheetSvgs() { return plan.sheets.map((sh, k) => { sh.machine = plan.machine; return { name: `${stamp()}-sheet-${k + 1}-of-${plan.sheets.length}.svg`, text: EXP.sheetSvg(sh, k, plan.sheets.length, { stamp: stamp() }) }; }); }
+async function exportZip() {
+  const btn = $('exportZip'); btn.disabled = true;
+  try {
+    const JSZip = await loadJsZip();
+    const zip = new JSZip();
+    for (const f of sheetSvgs()) zip.file(f.name, f.text);
+    zip.file('README.txt', EXP.readme(model, plan, state, rules));
+    zip.file(`${stamp()}.json`, G.serializeDesign(state));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${stamp()}-cut-files.zip`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+    $('exportMsg').textContent = exportNote(`${plan.sheets.length} sheet${plan.sheets.length > 1 ? 's' : ''} for the ${plan.bed.name.split(' — ')[0]} bed, a README and the design, zipped.${plan.fitsBed ? '' : ' A piece does not fit the bed — see Checks.'}`);
+  } catch (e) { $('exportMsg').textContent = `the zip could not be written: ${e.message}`; }
+  btn.disabled = false;
+}
+function exportPng() {
+  if (view !== 'folded') setView('folded');
+  fold.renderOnce();
+  $('foldCanvas').toBlob((blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${stamp()}.png`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); $('exportMsg').textContent = 'the folded view written as a PNG, at the canvas\'s own size.'; });
+}
+$('exportZip').addEventListener('click', exportZip);
+$('exportPng').addEventListener('click', exportPng);
 $('randomPattern').addEventListener('click', randomPattern);
 $('patReseed').addEventListener('click', reseedPattern);
 $('undo').addEventListener('click', undo); $('redo').addEventListener('click', redo);
-$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
+$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
 $('randomShape').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; const seed = (Math.random() * 2 ** 31) >>> 0; const st = G.randomShape(seed); state = { ...state, ...st, width: state.width }; pushHistory(prev); $('presetNote').textContent = `random #${seed.toString(36)}`; rebuild({ commit: true }); });
 document.addEventListener('keydown', (ev) => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); }
@@ -477,10 +536,14 @@ window.__lantern = {
   fold: { frames: () => fold.frames, triangles: () => fold.triangles, camera: fold.camera, lookAt: fold.lookAt, pixel: fold.pixel, running: fold.isRunning, renderOnce: fold.renderOnce, materials: fold.materials },
   flags: () => [...document.querySelectorAll('#flags li')].map((li) => ({ kind: li.className, id: li.dataset.flag || 'ok', text: li.textContent })),
   dimsText: () => $('dims').textContent,
+  random: () => lastRandom && { draws: lastRandom.draws.map((d) => ({ counts: { ...d.counts } })), picked: lastRandom.picked },
   pattern: () => pattern && { counts: { ...pattern.counts }, bridged: pattern.bridged, validated: pattern.validated, cuts: pattern.types.map((t) => t.cuts.length), issues: pattern.issues.length },
   placedCuts: () => PAT.placeCuts(model, pattern, state).length,
   focusIssue, flatFocus: () => flatFocus,
   patternPreset: (id) => applyPatternPreset(PAT.PATTERN_PRESETS.find((p) => p.id === id)), patternPresetIds: () => PAT.PATTERN_PRESETS.map((p) => p.id), patThumbsReady: () => patThumbsReady,
   randomPattern, reseedPattern,
   textures: () => [...textureCache.values()].map((c) => ({ w: c.width, h: c.height })),
+  rules: () => ({ ...rules }), plan: () => plan && { split: plan.split, sheets: plan.sheets.length, pieces: plan.pieces.length, fitsBed: plan.fitsBed, bed: plan.bed.id, notes: plan.notes.map((n) => n.id) },
+  sheetSvgs: () => sheetSvgs().map((f) => ({ name: f.name, paths: (f.text.match(/<path/g) || []).length })), readme: () => EXP.readme(model, plan, state, rules),
+  rulesText: () => $('rulesOut').textContent, planText: () => $('planOut').textContent,
 };

@@ -291,7 +291,7 @@ export function solveLantern(rawState) {
     state: s, N, H, depth: 2 * H, width: 2 * rt, rt, rv, bow: sol.bow, ratio: sol.ratio, ok: sol.ok, clampedDepth,
     alternate: s.alternate, facets: types, flatTip, tip3d, infeasible, notes,
     flatSpan: 2 * Math.max(...types.map((t) => t.Ro)), Ro: types[0].Ro, Ri: types[0].Ri,
-    tipRadius, tab: { width: TAB_WIDTH_MM, taper: TAB_TAPER_MM },
+    tipRadius, tab: { width: Number.isFinite(+s.tabWidth) && +s.tabWidth > 0 ? +s.tabWidth : TAB_WIDTH_MM, taper: TAB_TAPER_MM },   // the material model hands the tab width in on the state (phase 3); the constant is the phase-1 default
     opening: s.opening, ringWidth: s.ringWidth, hangHole: s.hangHole,
     closure: types.map((t) => t.dev.end - a0),   // the residual, for the gate
   };

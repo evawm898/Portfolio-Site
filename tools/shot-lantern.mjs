@@ -6,13 +6,24 @@
    for looking at. Writes <dir>/*.png and <dir>/index.html. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { openLantern } from './lantern-page-harness.mjs';
+import { openLantern, REPO } from './lantern-page-harness.mjs';
 
 const OUT = path.resolve(process.argv[2] || 'lantern-sheet');
 fs.mkdirSync(OUT, { recursive: true });
 const cells = [];
 const SHOT = { timeout: 120000 };   // a WebGL canvas on the runner's software GL can take past Playwright's 30 s default (the sheet step timed out at 30 s on its fourth cell)
-const shotOf = async (sel) => { const b = await page.locator(sel).boundingBox(); return page.screenshot({ clip: b, ...SHOT }); };   // a clip, never locator.screenshot(): the turning canvas is never 'stable'
+// a clip, never locator.screenshot(): the turning canvas is never 'stable'. The element is scrolled to the TOP of its
+// scroller and the clip is CLAMPED to the viewport first: a clip reaching past the viewport makes Playwright resize the
+// viewport for the shot, which re-renders the turning WebGL canvas on the runner's software GL and hung the export cell
+// for 120 s there (the runner's fonts make the panel taller than this box's, so #secExport ended below the fold).
+const shotOf = async (sel) => {
+  const loc = page.locator(sel);
+  await loc.evaluate((el) => el.scrollIntoView({ block: 'start' })); await page.waitForTimeout(100);
+  const b = await loc.boundingBox(); const v = page.viewportSize();
+  const x = Math.max(0, b.x), y = Math.max(0, b.y);
+  const clip = { x, y, width: Math.min(b.x + b.width, v.width) - x, height: Math.min(b.y + b.height, v.height) - y };
+  return page.screenshot({ clip, ...SHOT });
+};
 const save = (name, buf, caption) => { fs.writeFileSync(path.join(OUT, name), buf); cells.push({ name, caption }); console.log(`${name.padEnd(22)} ${caption}`); };
 
 const s = await openLantern({ storage: '', viewport: { width: 1440, height: 900 }, dsf: 2 });
@@ -46,7 +57,25 @@ await page.locator('#secPattern').scrollIntoViewIfNeeded(); await page.waitForTi
 save('pattern-panel.png', await shotOf('#secPattern'), 'the Pattern section: presets with facet thumbnails, the randomizer, reseed, generator, density, intricacy, rim band, alternate-solid, auto-bridge');
 await page.locator('#secChecks').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('pattern-checks.png', await shotOf('#secChecks'), 'Checks with auto-bridge off: the island as a problem, the thin-paper notes, each clickable into the Flat view');
-await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true })); await T(() => window.__lantern.view('folded'));
+// The panel cells below show no preview, so they are shot in the FLAT view: the turning WebGL canvas on the runner's
+// software GL made every folded cell cost 12-25 s there and the export cell hang past Playwright's 120 s twice over.
+await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true })); await T(() => window.__lantern.view('flat')); await T(() => window.__lantern.flush()); await page.waitForTimeout(200);
+await page.locator('#secMaterial').evaluate((d) => { d.open = true; }); await page.locator('#secMaterial').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('material.png', await shotOf('#secMaterial'), 'Material & Machine: the stock, the machine, the bed, and every rule derived from the caliper (starting values)');
+await page.locator('#secExport').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('export.png', await shotOf('#secExport'), 'Export: the plan on the default Glowforge bed — the halves split into point modules, pieces and sheets, the paper and its weight; the ZIP, the PNG, the quick half SVGs');
+{
+  const sheets = await T(() => window.__lantern.sheetSvgs().length);
+  const zip = await (async () => { const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click('#exportZip')]); return d.path(); })();
+  const JSZip = (await import('node:module')).createRequire(import.meta.url)(path.join(REPO, 'node_modules/jszip'));
+  const z = await JSZip.loadAsync(fs.readFileSync(zip));
+  const first = Object.keys(z.files).find((n) => /sheet-1-of/.test(n));
+  const svg = (await z.file(first).async('string')).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1320" height="744" style="background:#f4f2ec"');
+  const sheetPage = await s.browser.newPage({ viewport: { width: 1340, height: 764 }, deviceScaleFactor: 2 });
+  await sheetPage.setContent(`<body style="margin:10px;background:#333">${svg}</body>`); await sheetPage.waitForTimeout(100);
+  save('sheet-1.png', await sheetPage.screenshot(), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
+  await sheetPage.close();
+}
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
 save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');

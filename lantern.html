@@ -76,10 +76,21 @@
     <div class="ln-sec-body"><ul class="ln-flags" id="flags"></ul><p class="ln-note" id="flagHint" hidden>click a cut finding to see it in the Flat view</p></div>
   </details>
 
-  <details class="ln-sec" open id="secExport">
-    <summary>Machine &amp; Export</summary>
+  <details class="ln-sec" id="secMaterial">
+    <summary>Material &amp; Machine</summary>
     <div class="ln-sec-body">
-      <div class="ln-row"><button class="ln-btn ln-btn--solid" id="svgFront">Front half SVG</button><button class="ln-btn ln-btn--solid" id="svgBack">Back half SVG</button></div>
+      <div id="materialCtrls"></div>
+      <div class="ln-derived" id="rulesOut"></div>
+      <p class="ln-note">starting values — confirm with test cuts (the coupon, phase 4)</p>
+    </div>
+  </details>
+
+  <details class="ln-sec" open id="secExport">
+    <summary>Export</summary>
+    <div class="ln-sec-body">
+      <div class="ln-derived" id="planOut"></div>
+      <div class="ln-row"><button class="ln-btn ln-btn--solid" id="exportZip">Cut files (.zip)</button><button class="ln-btn" id="exportPng">Render (.png)</button></div>
+      <div class="ln-row"><button class="ln-btn ln-btn--sm" id="svgFront">Front half SVG</button><button class="ln-btn ln-btn--sm" id="svgBack">Back half SVG</button></div>
       <p class="ln-msg" id="exportMsg"></p>
       <div class="ln-row"><button class="ln-btn" id="saveDesign">Save design (.json)</button><label class="ln-btn ln-file">Open design<input type="file" id="openDesign" accept=".json,application/json"></label></div>
       <p class="ln-msg" id="designMsg"></p>

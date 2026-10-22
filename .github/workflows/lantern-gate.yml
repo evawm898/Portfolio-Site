@@ -62,10 +62,14 @@ jobs:
         run: node tools/verify-lantern-pattern.mjs
       - name: Pattern negative control
         run: node tools/verify-lantern-pattern.mjs --negative-control
+      - name: Export gate (the material rules, the modules, the seams, the nest, the sheets)
+        run: node tools/verify-lantern-export.mjs
+      - name: Export negative control
+        run: node tools/verify-lantern-export.mjs --negative-control
 
   page:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60   # the gate plus its 15-mutant negative control is ~30 min on the runner and the contact sheet ~9: 40 cancelled a green job two seconds after its artifact uploaded
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
