@@ -35,11 +35,18 @@ Calibration modes:
   * "truth"  -- the correct scale from ground truth: two points exactly
                 px_per_inch apart and a known distance of 1 inch. The ideal
                 user who calibrated perfectly.
-  * "ruler"  -- /detect-ruler's pre-filled points AND pre-filled distance
-                and unit, accepted as-is: what a user who just clicks
-                Confirm gets. A photo where the detector finds no ruler
-                records "no ruler" and is not run further (the app then
-                needs a manual calibration, which is the "truth" mode).
+  * "ruler"  -- /detect-ruler's pre-fill, if one is offered: its points AND its
+                distance and unit, accepted as-is (what a user who just clicks
+                Confirm gets). The endpoint only offers a pre-fill it can justify
+                from the ruler's own tick pattern (analysis.gauge_analysis.
+                justify_ruler_calibration). When NONE is offered the user has
+                nothing to accept and calibrates by hand, here as a perfect manual
+                calibration -- the "truth" run, scored as the "truth" mode is. So
+                this mode measures what calibration ADDS to the app path: a row
+                that is confident-and-wrong here but not under "truth" was put
+                there by the pre-fill. (Until the calibration guardrail the mode
+                was "accept the pre-fill as-is, always": 13 confident-and-wrong
+                axes against 1 on "truth".)
   * jitter   -- the "truth" scale multiplied by (1 + j) for each j in
                 JITTERS, to find results that sit on a knife edge of scale.
 
@@ -200,7 +207,8 @@ def detect_ruler(client, name: str) -> dict:
     res = client.post("/detect-ruler", files=_files(name))
     assert res.status_code == 200, f"{name}: /detect-ruler HTTP {res.status_code}"
     body = res.json()
-    out = {"success": bool(body.get("success")), "message": body.get("message", "")}
+    out = {"success": bool(body.get("success")), "message": body.get("message", ""),
+           "declined_reason": body.get("declined_reason", ""), "assumption": body.get("assumption", "")}
     if not out["success"]:
         return out
     (x1, y1), (x2, y2) = body["point1_px"], body["point2_px"]
@@ -280,8 +288,9 @@ def score_axis(fx: Fixture, axis: str, run: dict, mode: str) -> Optional[dict]:
     row["area_status"] = a["area_status"]
     row["spacing_px"] = a["spacing_px"]
     pred = a["per_inch"]
-    if mode == "truth" and a["spacing_px"]:
-        # Score each axis against ITS OWN ruler scale (matters only for knit_06).
+    if (mode == "truth" or run.get("source") == "manual") and a["spacing_px"]:
+        # A perfect manual calibration. Score each axis against ITS OWN ruler scale
+        # (matters only for knit_06).
         axis_ppi = fx.px_per_inch_wale if axis == "wale" else fx.px_per_inch_course
         pred = axis_ppi / a["spacing_px"]
     row["predicted"] = pred
@@ -295,11 +304,15 @@ def score_axis(fx: Fixture, axis: str, run: dict, mode: str) -> Optional[dict]:
 
 
 def ruler_verdict(fx: Fixture, r: dict) -> str:
-    """"no ruler" (none detected), "ok", "OFF" (points imprecise, 5-20%),
-    "WRONG" (beyond 20%: a wrong distance label or unit), or
-    "SPURIOUS" (a ruler pre-filled on a photo that has none)."""
+    """What the pre-fill offered for this photo turned out to be.
+
+    Offered: "ok" (within 5%), "OFF" (5-20%, the points misplaced), "WRONG"
+    (beyond 20%: a wrong distance label or unit), or "SPURIOUS" (a ruler offered
+    on a photo that has none). Not offered: "withheld" when the photo does have a
+    ruler (the user calibrates by hand: safe, but a miss), "none (correct)" when
+    it does not."""
     if not r["success"]:
-        return "no ruler"
+        return "withheld" if fx.has_ruler else "none (correct)"
     if not fx.has_ruler:
         return "SPURIOUS"
     e = abs(r["scale_error_pct"])
@@ -338,7 +351,11 @@ def build_scorecard(client=None) -> dict:
         runs[("truth", fx.name)] = run_app_path(client, fx.name, calibration_for_scale(fx.request_ppi))
         rulers[fx.name] = detect_ruler(client, fx.name)
         if rulers[fx.name]["success"]:
-            runs[("ruler", fx.name)] = run_app_path(client, fx.name, rulers[fx.name]["calibration"])
+            runs[("ruler", fx.name)] = dict(
+                run_app_path(client, fx.name, rulers[fx.name]["calibration"]), source="prefill")
+        else:
+            # Nothing offered: the user calibrates by hand, correctly.
+            runs[("ruler", fx.name)] = dict(runs[("truth", fx.name)], source="manual")
         for j in JITTERS:
             runs[(f"jitter{j:+.3f}", fx.name)] = run_app_path(
                 client, fx.name, calibration_for_scale(fx.request_ppi * (1.0 + j)))
@@ -408,11 +425,11 @@ def format_mode_table(card: dict, mode: str) -> str:
         "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for fx in FIXTURES:
-        run = card["runs"].get((mode, fx.name))
-        if run is None:
-            lines.append(f"| {fx.name} | no ruler | | | | | | | | | | |")
-            continue
-        cells = [fx.name, str(run["areas"]) if run["areas"] else "0 (no proposals)"]
+        run = card["runs"][(mode, fx.name)]
+        areas = str(run["areas"]) if run["areas"] else "0 (no proposals)"
+        if run.get("source") == "manual":
+            areas += " (manual)"
+        cells = [fx.name, areas]
         for axis in AXES:
             true = fx.true_wpi if axis == "wale" else fx.true_cpi
             row = card["rows"].get((mode, fx.name, axis))
@@ -434,12 +451,12 @@ def format_mode_table(card: dict, mode: str) -> str:
 
 
 def format_ruler_table(card: dict) -> str:
-    lines = ["| fixture | pre-filled distance | implied px/in | true px/in | scale error | verdict |",
+    lines = ["| fixture | pre-fill offered | implied px/in | true px/in | scale error | verdict |",
              "|---|---|---|---|---|---|"]
     for fx in FIXTURES:
         r = card["rulers"][fx.name]
         if not r["success"]:
-            lines.append(f"| {fx.name} | no ruler | — | — | — | no ruler |")
+            lines.append(f"| {fx.name} | none | — | — | — | {ruler_verdict(fx, r)} |")
             continue
         lines.append(
             f"| {fx.name} | {r['suggested_distance']:g} {r['suggested_unit']} | {r['implied_ppi']:.2f} | "
@@ -482,9 +499,11 @@ def format_all(card: dict) -> str:
     return "\n\n".join([
         "**Confident-and-wrong** (status `confident`, |error| > 10%):\n\n" + format_headline(card),
         "**(a) Correct scale from ground truth**\n\n" + format_mode_table(card, "truth"),
-        "**(b) Ruler detector's pre-fill accepted as-is** (verdict: ok within 5%; OFF 5-20%, the points "
-        "misplaced; WRONG beyond 20%, a wrong distance label or unit; SPURIOUS, a ruler found in a photo "
-        "drawn without one)\n\n" + format_ruler_table(card)
+        "**(b) The ruler pre-fill accepted if one is offered; otherwise the user calibrates by hand, "
+        "correctly** (the pre-fill is ok within 5%; OFF 5-20%, the points misplaced; WRONG beyond 20%, "
+        "a wrong distance label or unit; SPURIOUS, offered in a photo drawn without a ruler; withheld, a "
+        "photo that has a ruler and was offered none; none (correct), no ruler and none offered)\n\n"
+        + format_ruler_table(card)
         + "\n\n" + format_mode_table(card, "ruler"),
         "**Scale jitter around the correct scale** (per-inch result as the user sees it; "
         f"change vs the unjittered run; flagged beyond ±{JITTER_JUMP_PCT:g}% or on a status flip)\n\n"

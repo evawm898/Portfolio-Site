@@ -351,7 +351,10 @@ class RulerCalibrationOut(BaseModel):
     analysis.gauge_analysis.detect_ruler_calibration / POST /detect-ruler).
     A SUGGESTED two-point calibration the frontend pre-fills into the
     Calibrate Scale step for the user to review, confirm, or override --
-    never applied silently. suggested_unit is a structural HINT (inferred
+    never applied silently, and offered at all only when the span between the
+    two points can be justified from the ruler's own tick pattern
+    (justify_ruler_calibration): otherwise success is false and the user
+    calibrates by hand. suggested_unit is a structural HINT (inferred
     from minor-tick-per-major-tick counts, not read from any printed
     numeral) so it needs the same confirm-or-override treatment as the
     points themselves.
@@ -366,6 +369,13 @@ class RulerCalibrationOut(BaseModel):
     minor_tick_spacing_px: Optional[float] = None
     major_tick_count: int = 0
     confidence: float = 0.0
+    # What the detector assumed, in plain words, shown beside a pre-filled
+    # calibration; empty whenever success is false.
+    assumption: str = ""
+    # When a ruler-like pattern WAS found but its span could not be justified
+    # (analysis.gauge_analysis.justify_ruler_calibration), why nothing was
+    # pre-filled -- technical wording, for logs and tests, not for display.
+    declined_reason: str = ""
 
 
 class ErrorResponse(BaseModel):

@@ -5404,6 +5404,16 @@ RULER_MAJOR_TICK_LENGTH_RATIO = 2.0  # a tick reaching at least this many times 
 RULER_MIN_MAJOR_TICKS = 2           # need at least 2 major ticks to suggest a major-tick-spaced calibration
 RULER_MAX_MAJOR_FRACTION = 0.35     # majors must stay a sparse minority of all ticks (real rulers number every 4th-16th tick, never anywhere close to half) -- if more than this fraction of ticks look "long", the length signal is unreliable (e.g. picked up fabric texture, not a real ruler), so treat it as no major/minor split found at all rather than trust it
 RULER_REACH_EXTENSION_MULTIPLIER = 3.0  # how many multiples of the tight tick-band's own height to extend into, when measuring how far ticks reach (see _build_reach_strip)
+# Minor ticks per major tick that read as imperial (fractions of an inch) or
+# metric (millimetres in a centimetre) -- ONE owner, read by the detector's unit
+# hint and by justify_ruler_calibration below, so the two cannot drift apart.
+RULER_IMPERIAL_SUBDIVISIONS = (4, 8, 16)
+RULER_METRIC_SUBDIVISIONS = (5, 10)
+# Tick positions are whole pixels, so two of them are only known to +-0.5 px each.
+RULER_POSITION_QUANT_PX = 1.0
+# How close to the span's half-way point a tick must sit to count as "half-way",
+# in minor-tick pitches (on top of the pixel quantisation above).
+RULER_HALF_WAY_PITCHES = 0.25
 
 
 @dataclass
@@ -5424,6 +5434,30 @@ class RulerCalibrationResult:
     minor_tick_spacing_px: Optional[float] = None
     major_tick_count: int = 0
     confidence: float = 0.0
+    # The tick evidence the suggestion was read from, kept so the suggestion can be
+    # CHECKED (justify_ruler_calibration) instead of trusted. Recorded, never used to
+    # decide anything inside detect_ruler_calibration.
+    evidence: Optional["RulerTickEvidence"] = field(default=None, repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class RulerTickEvidence:
+    """
+    The ticks behind a RulerCalibrationResult, along the ruler's own length.
+
+    `axis` is which image coordinate runs along the ruler (0 = x, a horizontal
+    ruler; 1 = y, a vertical one). `ticks` is every tick found as
+    (position along that axis in px, reach 0..1), ascending by position -- reach
+    being how far the tick's dark mark extends, normalised to the longest tick
+    (see _measure_tick_reach). `major_positions` are the ticks the detector's own
+    length test called major. `minor_spacing_px` is the median gap between
+    adjacent ticks.
+    """
+
+    axis: int
+    ticks: Tuple[Tuple[float, float], ...]
+    major_positions: Tuple[float, ...]
+    minor_spacing_px: float
 
 
 def _ruler_band_score(band_gray: np.ndarray) -> Tuple[float, float, float]:
@@ -5742,8 +5776,8 @@ def detect_ruler_calibration(image_bgr: np.ndarray) -> RulerCalibrationResult:
     # the unit.
     suggested_unit: Literal["mm", "cm", "in"] = "cm"
     if minor_count_per_major is not None:
-        imperial_candidates = (4, 8, 16)
-        metric_candidates = (5, 10)
+        imperial_candidates = RULER_IMPERIAL_SUBDIVISIONS
+        metric_candidates = RULER_METRIC_SUBDIVISIONS
         nearest_imperial = min(imperial_candidates, key=lambda n: abs(n - minor_count_per_major))
         nearest_metric = min(metric_candidates, key=lambda n: abs(n - minor_count_per_major))
         if abs(nearest_imperial - minor_count_per_major) < abs(nearest_metric - minor_count_per_major):
@@ -5769,4 +5803,152 @@ def detect_ruler_calibration(image_bgr: np.ndarray) -> RulerCalibrationResult:
         minor_tick_spacing_px=round(minor_spacing, 3),
         major_tick_count=len(majors),
         confidence=round(confidence, 4),
+        evidence=RulerTickEvidence(
+            axis=0 if horizontal else 1,
+            ticks=tuple(sorted((float(p), float(r)) for p, r in ticks)),
+            major_positions=tuple(float(m) for m in majors),
+            minor_spacing_px=float(minor_spacing),
+        ),
+    )
+
+
+# --- Checking a ruler suggestion before it is offered ---------------------
+#
+# detect_ruler_calibration answers "where do the marks of a ruler-like pattern
+# sit?". It does not answer "is the distance between the two marks I picked
+# really one centimetre / one inch?", and every number it reports with it
+# (confidence included) is about the first question. Measured on the app-path
+# scorecard, the answer to the second was no on 6 of 8 photos with a ruler, on
+# all three drawn without one, and on 151 of 184 images with no ruler at all --
+# while the confidence of the wrong ones (0.61-0.98) overlapped the right ones
+# (0.73, 0.85), so no confidence cut separates them. A user confirms whatever is
+# pre-filled, so a wrong pre-fill is a confident wrong scale.
+#
+# What does separate them is structure. A real ruler is a COMB: a unit mark
+# repeats at one pitch, the same number of smaller ticks sits between any two
+# neighbouring unit marks, and a unit mark is longer than anything between two
+# unit marks. justify_ruler_calibration checks that the span being offered is ONE
+# PERIOD of that comb, using only the ticks the detector already found:
+#
+#   1. a tick hierarchy was found (the detector's fallback -- a run of five
+#      minor ticks labelled "1 unit" -- never knows how long its span is);
+#   2. the span holds a whole, standard number of minor ticks (4/5/8/10/16, the
+#      detector's own unit vocabulary) to within pixel quantisation: the tick
+#      intervals agree with the claimed spacing;
+#   3. that number gives the same unit the detector suggested;
+#   4. the two marks are the SAME tick class, and strictly longer than every tick
+#      between them -- two neighbouring half-inch marks, or a half-inch and an
+#      inch mark, are not a unit;
+#   5. no tick as long as the end marks sits half-way along the span -- if one
+#      does, the real unit is half the span (two inches read as one).
+#
+# Each check was added because removing it let a wrong span through on real tick
+# evidence (docs: README "Calibration guardrail"). A refusal costs the user the
+# manual two-click calibration they could always do; a wrong pre-fill costs them a
+# silently wrong gauge, so every doubt resolves to refusing.
+
+
+@dataclass(frozen=True)
+class RulerJustification:
+    """
+    Whether a ruler suggestion may be pre-filled. `reason` is the technical
+    finding (for logs and tests); `assumption` is the plain-words statement the
+    user sees beside the pre-filled points, empty when refused.
+    """
+
+    ok: bool
+    reason: str = ""
+    assumption: str = ""
+    minors_per_unit: Optional[int] = None
+
+
+_RULER_UNIT_WORDS = {"cm": "cm", "in": "inch", "mm": "mm"}
+
+
+def justify_ruler_calibration(result: RulerCalibrationResult) -> RulerJustification:
+    """
+    Decide whether `result`'s two points may be offered as a pre-filled
+    calibration of "1 <suggested_unit>" -- see the section comment above for the
+    five checks. Pure: reads only `result`.
+    """
+    if not result.success or result.point1_px is None or result.point2_px is None:
+        return RulerJustification(False, "the detector found no ruler")
+    ev = result.evidence
+    if ev is None or len(ev.ticks) < 2 or ev.minor_spacing_px <= 0:
+        return RulerJustification(False, "no tick evidence to check the span against")
+
+    # 1. A hierarchy: the span between two MAJOR ticks, never the minor-tick fallback.
+    if result.major_tick_count < RULER_MIN_MAJOR_TICKS:
+        return RulerJustification(
+            False, "no major/minor tick hierarchy was found, so nothing says how long the span is"
+        )
+
+    a, b = sorted((result.point1_px[ev.axis], result.point2_px[ev.axis]))
+    span = b - a
+    if span <= 0:
+        return RulerJustification(False, "the two points coincide along the ruler")
+    pitch = ev.minor_spacing_px
+
+    # 2. A whole, standard number of minor ticks fits in the span.
+    per_unit = int(round(span / pitch))
+    standard = {n: "in" for n in RULER_IMPERIAL_SUBDIVISIONS}
+    standard.update({n: "cm" for n in RULER_METRIC_SUBDIVISIONS})
+    if per_unit not in standard:
+        return RulerJustification(
+            False,
+            f"the span holds {span / pitch:.2f} minor ticks, not a standard {sorted(standard)} per unit",
+        )
+    tolerance_px = RULER_POSITION_QUANT_PX + 0.5 * per_unit  # two ends, and the pitch is a median of integers
+    if abs(span - per_unit * pitch) > tolerance_px:
+        return RulerJustification(
+            False,
+            f"the span ({span:.1f} px) is not {per_unit} minor ticks of {pitch:.1f} px "
+            f"(off by {abs(span - per_unit * pitch):.1f} px, quantisation allows {tolerance_px:.1f})",
+        )
+
+    # 3. That subdivision names the unit the detector suggested.
+    if standard[per_unit] != result.suggested_unit:
+        return RulerJustification(
+            False,
+            f"{per_unit} minor ticks per span reads as {standard[per_unit]}, "
+            f"but the detector suggested {result.suggested_unit}",
+        )
+
+    # 4. The end marks are one tick class, longer than everything between them.
+    positions = [p for p, _ in ev.ticks]
+    reach = [r for _, r in ev.ticks]
+    i1 = min(range(len(positions)), key=lambda i: abs(positions[i] - a))
+    i2 = min(range(len(positions)), key=lambda i: abs(positions[i] - b))
+    r_lo, r_hi = sorted((reach[i1], reach[i2]))
+    interior = [reach[i] for i in range(min(i1, i2) + 1, max(i1, i2))]
+    interior_max = max(interior, default=0.0)
+    if not (r_hi - r_lo < r_lo - interior_max):
+        return RulerJustification(
+            False,
+            f"the end marks (reach {reach[i1]:.2f} and {reach[i2]:.2f}) are not one tick class clearly longer "
+            f"than the ticks between them (up to {interior_max:.2f})",
+        )
+
+    # 5. Nothing as long as the end marks sits half-way along the span.
+    half_tolerance_px = RULER_POSITION_QUANT_PX + RULER_HALF_WAY_PITCHES * pitch
+    for pos, rch in zip(positions, reach):
+        phase = ((pos - a) / span) % 1.0
+        if abs(phase - 0.5) * span <= half_tolerance_px and rch >= r_lo:
+            return RulerJustification(
+                False,
+                f"a tick as long as the end marks (reach {rch:.2f}) sits half-way along the span, "
+                f"so the span is probably two units",
+            )
+
+    unit_word = _RULER_UNIT_WORDS[result.suggested_unit]
+    return RulerJustification(
+        True,
+        f"{per_unit} minor ticks between two {r_lo:.2f}+ reach marks, the same class, nothing as long half-way",
+        (
+            f"Read as 1 {unit_word} between these two marks. The detector counted {per_unit} small ticks "
+            f"between them, which is how 1 {unit_word} looks on "
+            f"{'a metric' if standard[per_unit] == 'cm' else 'an imperial'} ruler. It cannot read the ruler's "
+            f"numbers, so check that both points sit on marks exactly 1 {unit_word} apart."
+        ),
+        per_unit,
     )
