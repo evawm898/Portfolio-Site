@@ -176,7 +176,7 @@ async function cell({ label, tree, sets, views, frame = null, organ = null, ruli
   for (const view of views) {
     /* the sepal's root is seen along its width from a little below (its
        underside is where the thickened root stands proud of the hub's rim) */
-    const dirR = organ === 'sepal' ? (() => { const d = [O.dir[0], O.dir[1], O.dir[2] - 0.45], l = Math.hypot(...d); return d.map((v) => v / l); })() : O.dir;
+    const dirR = view !== 'root' ? null : organ === 'sepal' ? (() => { const d = [O.dir[0], O.dir[1], O.dir[2] - 0.45], l = Math.hypot(...d); return d.map((v) => v / l); })() : O.dir;
     const fr = view === 'root' ? { macro: organ === 'sepal' ? 22 : 11, at: O.at, dir: dirR } : (frame || own);
     shots[view] = await shoot(path.join(outDir, `${slug(tree + '-' + label)}-${view}.png`), view, fr);
   }
