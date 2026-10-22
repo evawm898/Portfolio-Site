@@ -259,6 +259,23 @@ export function archSkeleton(p) {
     });
   }
   for (const s of spines) if (s.bandWidth === undefined) s.bandWidth = w;
+  // EMBED declarations (phase 2, charter §4): where a band's END touches a
+  // neighbour face to face — a jamb standing ON the sill's top edge, the head
+  // starting AT the jamb's top, a mullion ending AT its light's springing —
+  // the relief extends that end INTO the neighbour named here, so the two
+  // closed shells overlap rather than graze. The sub-arches need none: half
+  // their band is already buried in the jamb or mullion they end on (ruling
+  // 4 / ruling 3). A stepped sill's band touches the step along y = 0, so the
+  // sill declares an OUTER lip into it. Only frame-relief.js reads these; the
+  // SVG and every 2-D consumer never do (the gate measures that: the default's
+  // SVG is byte-identical with the field present).
+  const hasSill = p.sill !== 'none';
+  for (const s of spines) {
+    if (/^jamb/.test(s.id)) s.embed = { start: hasSill ? 'sill' : null, end: 'head' };
+    else if (/^mullion/.test(s.id)) s.embed = { start: hasSill ? 'sill' : null, end: `light${s.id.slice(7) - 1}` };
+    else if (s.id === 'head') s.embed = { start: 'jambR', end: 'jambL' };
+    else if (s.id === 'sill') s.embed = { outer: p.sill === 'stepped' ? 'sillStep' : null };
+  }
   return { spines, info };
 }
 

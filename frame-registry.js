@@ -8,6 +8,7 @@ export const SECTIONS = [
   { id: 'skeleton', label: 'Skeleton', open: true },
   { id: 'molding', label: 'Molding', open: true },
   { id: 'shading', label: 'Shading', open: true },
+  { id: 'print', label: 'Print (relief STL)', open: true },
 ];
 
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen = null, tier = 'standard') =>
@@ -53,7 +54,26 @@ export const PARAM_SPEC = [
   // this — a deep cove, a shadowed step. ADVANCED tier (ruling 6): hidden
   // until the panel's Advanced toggle is on, and never a Standard control.
   R('crossHatchThreshold', 'shading', 'Cross-hatch above', 0, 1, 0.01, 0.7, '', null, 'advanced'),
+
+  // --- 4. print — the relief STL, the PRIMARY output (phase 2, ruling 1).
+  //     These reach the STL and the 3D view and never the SVG; the 2-D gate's
+  //     pixel sweep skips this section and asserts the STL moves instead.
+  //     printHeight is the overall size: the drawing's height is scaled to
+  //     it (x, y alike); plate and relief depth are print millimetres.
+  R('printHeight', 'print', 'Overall height', 40, 600, 1, 180, 'mm'),
+  R('plateThickness', 'print', 'Back plate', 0.5, 6, 0.1, 2, 'mm'),
+  R('reliefScale', 'print', 'Relief depth (× profile)', 0.2, 3, 0.05, 1),
+  { id: 'lights', section: 'print', label: 'Lights', kind: 'choice', default: 'pierced',
+    options: [['pierced', 'Pierced — open'], ['backed', 'Backed — a plate behind']] },
 ];
+
+/* The minimum printable feature, in millimetres. AN ASSUMPTION: the print
+   process is undecided (ruling 3) and nothing here has been printed; it is
+   the one number the floors below read, so a coupon moves one constant. It
+   caps the OUTPUT (a plate thinner than it is built at it and told; a band or
+   mullion narrower than it is told) and never narrows a control's range. It
+   is also the length by which a band's relief embeds into its neighbour. */
+export const MIN_FEATURE_MM = 1.0;
 
 /* The two tiers a control may declare. Standard is what the panel opens on;
    Advanced is reached by one toggle and hides nothing from Standard. */
