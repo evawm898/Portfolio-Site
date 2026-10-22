@@ -4312,7 +4312,72 @@ def _local_anomaly_fraction(
     return float(np.mean(anomaly))
 
 
+# The proposer runs at ONE working resolution, whatever the photo's own.
+# Every gate and score below carries fixed-PIXEL constants that were
+# tuned on ~170-350 px/in photos: _fabric_mask's and the anomaly
+# baseline's 16 px blocks with an absolute std-dev floor, the Laplacian
+# sharpness ceiling, MIN_PLAUSIBLE_SPACING_PX, the quadrant split's 20 px
+# minimum. On a phone-resolution photo (knit_sample_02 is 1187 px/in) a
+# 16 px block sits INSIDE a single smooth yarn strand, so its local
+# std-dev falls under the floor and real fabric reads as "background":
+# knit_02's windows scored 31-53% fabric against the 97% gate and every
+# candidate at every size was rejected before it was scored (likewise
+# knit_05 at 320 px/in, 17-95%; and any photo upscaled 2x). So a photo
+# finer than this is downsampled (INTER_AREA) for proposal only, the
+# windows are chosen there, and their coordinates are mapped back to the
+# full-resolution image -- which is what analysis then reads, untouched.
+# Never upsampled: a coarser photo has nothing finer to recover.
+# 180 px/in: the synthetic fixtures' own scale, the coarsest at which
+# every ground-truth fixture is proposed at 0.5x / 1x / 2x of its own
+# resolution, and above it the 2x-upscaled synthetic garter loses its
+# proposals again (README, "Measurement-area proposal at one working
+# resolution").
+ROI_PROPOSAL_WORKING_PX_PER_INCH = 180.0
+
+
 def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
+    """
+    Resolution-normalised front door onto _propose_measurement_rois_at_scale
+    (see ROI_PROPOSAL_WORKING_PX_PER_INCH for why): proposes on a copy
+    downsampled to the working resolution when the photo is finer, and
+    returns the areas in the ORIGINAL image's pixel coordinates.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return RoiProposalResult(success=False, message="No image data to propose areas from.")
+    if pixels_per_mm is None or pixels_per_mm <= 0:
+        return RoiProposalResult(success=False, message="Invalid calibration scale.")
+
+    working_ppm = ROI_PROPOSAL_WORKING_PX_PER_INCH / 25.4
+    if pixels_per_mm <= working_ppm:
+        return _propose_measurement_rois_at_scale(image_bgr, pixels_per_mm)
+
+    img_h, img_w = image_bgr.shape[:2]
+    factor = working_ppm / pixels_per_mm
+    small_w = max(1, int(round(img_w * factor)))
+    small_h = max(1, int(round(img_h * factor)))
+    small = cv2.resize(image_bgr, (small_w, small_h), interpolation=cv2.INTER_AREA)
+    # The scale actually applied per axis (rounding moves it off `factor`
+    # by under a pixel's worth); the proposer is told the small image's
+    # own px/mm so its inch-sized windows stay the requested inches.
+    sx, sy = small_w / img_w, small_h / img_h
+    result = _propose_measurement_rois_at_scale(small, pixels_per_mm * (sx + sy) / 2.0)
+    if not result.rois:
+        return result
+
+    def _back(v: float, s: float) -> int:
+        return int(round(v / s))
+
+    rois = []
+    for r in result.rois:
+        side = min(_back(r.width, (sx + sy) / 2.0), img_w, img_h)
+        x = min(max(0, _back(r.x, sx)), img_w - side)
+        y = min(max(0, _back(r.y, sy)), img_h - side)
+        rois.append(replace(r, x=x, y=y, width=side, height=side))
+    window = min(_back(result.window_size_px, (sx + sy) / 2.0), img_w, img_h) if result.window_size_px else None
+    return RoiProposalResult(success=result.success, message=result.message, rois=rois, window_size_px=window)
+
+
+def _propose_measurement_rois_at_scale(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
     """
     Propose a FEW (ROI_PROPOSAL_MIN_REGIONS..ROI_PROPOSAL_MAX_REGIONS)
     candidate measurement areas for the user to review/edit/approve

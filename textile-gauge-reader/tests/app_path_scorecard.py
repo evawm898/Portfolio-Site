@@ -82,6 +82,7 @@ from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 import cv2
+import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -100,6 +101,9 @@ JITTERS = (-0.02, -0.01, -0.005, 0.005, 0.01, 0.02)
 JITTER_JUMP_PCT = 25.0       # a per-inch result moving more than this under jitter is unstable
 RULER_SCALE_TOL_PCT = 5.0    # a pre-filled ruler calibration further off than this is wrong
 RULER_LABEL_PCT = 20.0       # ...and further off than this is a wrong LABEL / unit, not imprecise points
+
+RESOLUTION_SCALES = (0.5, 1.0, 2.0)  # the photo resampled by this factor (scale adjusted to match)
+RESOLUTION_AGREE_PCT = 10.0  # readings at two resolutions further apart than this must be flagged uncertain
 
 ORIENTATION = "vertical"     # the frontend's default
 STRUCTURE = "unknown"        # the frontend's default
@@ -189,8 +193,28 @@ def upload_for(name: str) -> Tuple[str, bytes, str]:
         return (fx.source, fh.read(), "image/jpeg")
 
 
-def _files(name: str) -> dict:
-    return {"file": upload_for(name)}
+@lru_cache(maxsize=None)
+def upload_at(name: str, scale: float) -> Tuple[str, bytes, str]:
+    """The fixture resampled by `scale` -- INTER_AREA down, INTER_CUBIC up -- and
+    re-encoded the way it arrived (JPEG at quality 95 for a photo, PNG for a
+    synthetic), so a 2x row is the "upscaled phone photo" of the audit and a 0.5x
+    row a small one. scale 1.0 is the fixture's own bytes, untouched."""
+    if scale == 1.0:
+        return upload_for(name)
+    fn, data, ctype = upload_for(name)
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    interp = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_CUBIC
+    img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=interp)
+    if ctype == "image/png":
+        ok, buf = cv2.imencode(".png", img)
+    else:
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    assert ok, f"could not encode {name} at {scale}x"
+    return (f"{scale:g}x-{fn}", buf.tobytes(), ctype)
+
+
+def _files(name: str, scale: float = 1.0) -> dict:
+    return {"file": upload_at(name, scale)}
 
 
 # --- One app-path run ---------------------------------------------------
@@ -232,9 +256,9 @@ def detect_ruler(client, name: str) -> dict:
     return out
 
 
-def run_app_path(client, name: str, calibration: dict) -> dict:
+def run_app_path(client, name: str, calibration: dict, scale: float = 1.0) -> dict:
     """propose-rois -> accept every proposal -> analyze-multi, through the API."""
-    pr = client.post("/propose-rois", files=_files(name), data=calibration)
+    pr = client.post("/propose-rois", files=_files(name, scale), data=calibration)
     assert pr.status_code == 200, f"{name}: /propose-rois HTTP {pr.status_code}: {pr.text[:200]}"
     pbody = pr.json()
     rois = [
@@ -245,7 +269,7 @@ def run_app_path(client, name: str, calibration: dict) -> dict:
     if not rois:
         return out
     data = dict(calibration, rois_json=json.dumps(rois), orientation=ORIENTATION, structure=STRUCTURE)
-    am = client.post("/analyze-multi", files=_files(name), data=data)
+    am = client.post("/analyze-multi", files=_files(name, scale), data=data)
     assert am.status_code == 200, f"{name}: /analyze-multi HTTP {am.status_code}: {am.text[:200]}"
     body = am.json()
     out["analyzed"] = bool(body.get("success"))
@@ -402,7 +426,64 @@ def build_scorecard(client=None) -> dict:
 
     cw = {mode: sorted([(n, a) for (m, n, a), r in rows.items() if m == mode and confident_and_wrong(r)])
           for mode in ("truth", "ruler")}
-    return {"rulers": rulers, "runs": runs, "rows": rows, "jitter": jitter, "cw": cw}
+    return {"rulers": rulers, "runs": runs, "rows": rows, "jitter": jitter, "cw": cw,
+            "resolution": build_resolution(client, runs)}
+
+
+def build_resolution(client, runs: Optional[dict] = None) -> dict:
+    """Each fixture at RESOLUTION_SCALES of its own resolution, calibrated correctly
+    for that resolution (the "truth" scale times the factor), every proposal accepted.
+
+    Returns {
+      "rows":  {(fixture, scale, axis): scored row (score_axis, "truth" mode) or None},
+      "areas": {(fixture, scale): proposed-area count},
+      "agree": {(fixture, axis): {"spread_pct": .., "flagged": bool, "ok": bool}},
+      "cw":    [(fixture, scale, axis), ...]   confident-and-wrong at any resolution,
+    }
+    "agree" compares every resolution's per-inch reading with every other's: the
+    largest pairwise disagreement (max/min - 1, in %) must be within
+    RESOLUTION_AGREE_PCT, or every resolution's status must say so (at least one
+    reading flagged uncertain) -- a confident reading that moves with the photo's
+    pixel count is the failure this exists to catch.
+    """
+    rows, areas, raw = {}, {}, {}
+    for fx in FIXTURES:
+        for sc in RESOLUTION_SCALES:
+            if sc == 1.0 and runs is not None:
+                run = runs[("truth", fx.name)]
+            else:
+                run = run_app_path(client, fx.name, calibration_for_scale(fx.request_ppi * sc), scale=sc)
+            if sc != 1.0 and run.get("analyzed"):
+                # Score against the resampled photo's own scale: spacing_px is in its pixels.
+                run = dict(run)
+                for axis in AXES:
+                    a = dict(run[axis])
+                    if a.get("spacing_px"):
+                        a["spacing_px"] = a["spacing_px"] / sc
+                    run[axis] = a
+            raw[(fx.name, sc)] = run
+            areas[(fx.name, sc)] = run["areas"]
+            for axis in AXES:
+                rows[(fx.name, sc, axis)] = score_axis(fx, axis, run, "truth")
+
+    agree = {}
+    for fx in FIXTURES:
+        for axis in AXES:
+            vals, statuses = [], []
+            for sc in RESOLUTION_SCALES:
+                run = raw[(fx.name, sc)]
+                if run.get("analyzed") and run[axis].get("spacing_px"):
+                    vals.append(run[axis]["spacing_px"])
+                    statuses.append(run[axis]["status"])
+            if len(vals) < len(RESOLUTION_SCALES):
+                agree[(fx.name, axis)] = {"spread_pct": None, "flagged": False, "ok": False}
+                continue
+            spread = (max(vals) / min(vals) - 1.0) * 100.0
+            flagged = any(st != "confident" for st in statuses)
+            agree[(fx.name, axis)] = {"spread_pct": spread, "flagged": flagged,
+                                      "ok": spread <= RESOLUTION_AGREE_PCT or flagged}
+    cw = sorted(k for k, r in rows.items() if confident_and_wrong(r))
+    return {"rows": rows, "areas": areas, "agree": agree, "cw": cw}
 
 
 # --- Tables -------------------------------------------------------------
@@ -485,6 +566,40 @@ def format_jitter_table(card: dict) -> str:
     return "\n".join(lines)
 
 
+def format_resolution_table(card: dict) -> str:
+    res = card["resolution"]
+    head = ["fixture", "axis"] + [f"{sc:g}×" for sc in RESOLUTION_SCALES] + ["spread", "verdict"]
+    lines = ["| " + " | ".join(head) + " |", "|" + "---|" * len(head)]
+    for fx in FIXTURES:
+        for axis in AXES:
+            cells = [fx.name, axis]
+            for sc in RESOLUTION_SCALES:
+                n = res["areas"][(fx.name, sc)]
+                row = res["rows"][(fx.name, sc, axis)]
+                if not n:
+                    cells.append("0 areas")
+                    continue
+                if row is None:
+                    cells.append(f"{n} areas, no truth")
+                    continue
+                if row["error"] is None:
+                    cells.append(f"{n} areas, no measurement")
+                    continue
+                err = _fmt_err(row["error"]) + (" (alt)" if row.get("matched") == "alternate" else "")
+                if confident_and_wrong(row):
+                    err = f"**{err}**"
+                st = "C" if row["status"] == "confident" else "u"
+                cells.append(f"{n} · {row['predicted']:.2f} {err} {st}")
+            a = res["agree"][(fx.name, axis)]
+            if a["spread_pct"] is None:
+                cells += ["—", "MISSING"]
+            else:
+                verdict = "agree" if a["spread_pct"] <= RESOLUTION_AGREE_PCT else ("flagged" if a["flagged"] else "**DISAGREE**")
+                cells += [f"{a['spread_pct']:.1f}%", verdict]
+            lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 def format_headline(card: dict) -> str:
     out = []
     for mode in ("truth", "ruler"):
@@ -508,6 +623,11 @@ def format_all(card: dict) -> str:
         "**Scale jitter around the correct scale** (per-inch result as the user sees it; "
         f"change vs the unjittered run; flagged beyond ±{JITTER_JUMP_PCT:g}% or on a status flip)\n\n"
         + format_jitter_table(card),
+        "**Resolution invariance** (each photo resampled to 0.5×, 1× and 2× of its own resolution -- "
+        "INTER_AREA down, INTER_CUBIC up -- and calibrated correctly for that resolution; each cell is areas "
+        "· per-inch · error · status; spread is the largest disagreement between two resolutions' readings, "
+        f"which must be within {RESOLUTION_AGREE_PCT:g}% or carry an `uncertain` status)\n\n"
+        + format_resolution_table(card),
     ])
 
 
