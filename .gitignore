@@ -50,3 +50,4 @@ tools/bug-wing-sources/
 # committed by accident (Scoping-b did exactly that once, caught before a push).
 bloom-geometry.__mutant_*.js
 bloom-file.__mutant_*.js
+_frame-*-mutant-*.js

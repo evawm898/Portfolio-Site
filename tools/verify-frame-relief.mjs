@@ -43,6 +43,14 @@
         spine's embed field deleted is the same string.
      D  the print rows are in the registry's print section with defaults in
         range.
+     SC the scroll primitive (phase 3a step 1; SC7 the fitted tightness range:
+        no dead travel at 30/60/120 mm).
+     OR the ornament attached (step 2), over 13 rows on all three skeletons:
+        closed and one region; the least wire and the least gap off the
+        EMITTED walls (a junction must be a true overlap of the embed, never
+        a graze); every half-group rooted in the band by the embed (the
+        gate's own footprints); the mirror to the bit; filigree off is the
+        frame itself.
 
    --base <worktree>   also compares exportSvg strings against that tree over
                        the rows (the byte-identity claim; `8db018c` is the
@@ -371,6 +379,115 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     rec('SC7 the tightness slider has no dead travel: every 0.01 step builds more turns, at 30/60/120 mm on 1.0/1.6/2.4 mm wire, and its top is exactly the most that prints', sc7.length === 0, `${rows} scrolls × 101 steps${sc7.length ? ' — ' + sc7.slice(0, 3).join('; ') : ''}`);
   }
 
+  // OR — the ORNAMENT attached (phase 3a, step 2), on every skeleton at the
+  // default and at density 5 with every group on, plus a crowded frame where
+  // groups must give way. Every quantity is read off the EMITTED mesh (each
+  // wire part's first and last column = its two walls), against the gate's
+  // OWN band footprints (outerEdge / innerEdge, the boundaries' owner — never
+  // frame-filigree's bandRegion), MIN_FEATURE_MM and EMBED_MM.
+  if (FL && (label === 'shipped' || MUTANTS.find((m) => m.id === label)?.file === 'filigree')) {
+    const F = R.MIN_FEATURE_MM, E = RL.EMBED_MM;
+    const ON = { filigree: 'scrolls' };
+    const DENSE = { filigree: 'scrolls', ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on' };
+    const OROWS = [
+      ['arch default', ON], ['arch dense', DENSE], ['arch sill none dense', { ...DENSE, sill: 'none' }],
+      ['rect default', { skeleton: 'rect', ...ON }], ['rect dense', { skeleton: 'rect', ...DENSE }],
+      ...['rounded', 'notched', 'eared'].map((t) => [`rect ${t} dense`, { skeleton: 'rect', cornerTreatment: t, ...DENSE }]),
+      ['oval default', { skeleton: 'oval', ...ON }], ['oval dense', { skeleton: 'oval', ...DENSE }], ['circle dense', { skeleton: 'oval', aspect: 1, ...DENSE }],
+      ['rect crowded (groups must give way)', { skeleton: 'rect', width: 70, height: 120, ...DENSE, ornScale: 6 }],
+      ['dense, round wire, tight, thick', { ...DENSE, ornShape: 'round', ornTightness: 1, ornWire: 3.2 }],
+    ];
+    // the gate's own band footprints, in print mm: an open band is one
+    // polygon, a closed loop two (outer, inner) — never bridged
+    const pip = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
+    const feet = (model, s) => model.spines.map((sp) => { const o = G.outerEdge(sp, sp.bandWidth).map(([x, y]) => [x * s, y * s]), i = G.innerEdge(sp, sp.bandWidth).map(([x, y]) => [x * s, y * s]); return sp.closed ? { loops: [o, i], inside: (q) => pip(q, o) && !pip(q, i) } : { loops: [[...o, ...i.slice().reverse(), o[0]]], inside: (q) => pip(q, [...o, ...i.slice().reverse()]) }; });
+    const depthIn = (fs_, q) => { const ins = fs_.some((f) => f.inside(q)); let d = Infinity; for (const f of fs_) for (const l of f.loops) d = Math.min(d, G.distToPoly(q, l)); return ins ? d : -d; };
+    const dseg = (q, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy; let t = l2 ? ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); };
+    const minD = (A, B) => { let m = Infinity; for (const q of A) for (let k = 0; k < B.length - 1; k++) m = Math.min(m, dseg(q, B[k], B[k + 1])); return m; };
+    const or1 = [], or2 = [], or3 = [], or4 = [], or5 = [], or6 = [];
+    let leastWire = Infinity, leastGap = Infinity, leastEmbed = Infinity, deepest = 0, built = 0, notBuilt = 0;
+    for (const [name, q] of OROWS) {
+      const model = FL.withOrnament(G.buildFrame(q));
+      const rel = RL.buildRelief(model);
+      const a = RL.analyzeStl(RL.exportStl(rel)), cc = RL.connected(rel);
+      if (a.boundary !== 0 || cc.comps !== 1) or1.push(`${name}: boundary ${a.boundary}, ${cc.comps} regions`);
+      const orn = model.ornament, P = rel.positions;
+      // the emitted wires: per part, the two wall columns of the top grid
+      const parts = rel.parts.filter((x) => /^orn/.test(x.id));
+      if (parts.length !== orn.curves.length || !parts.length) { or1.push(`${name}: ${parts.length} wire solids for ${orn.curves.length} wires`); continue; }
+      const W = parts.map((pt) => {
+        const c = [], t = [];
+        for (let v = 0; v < pt.V; v++) { const i0 = 3 * pt.T(v, 0), i1 = 3 * pt.T(v, pt.C - 1); const A = [P[i0], P[i0 + 1]], B = [P[i1], P[i1 + 1]]; c.push([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]); t.push(Math.hypot(A[0] - B[0], A[1] - B[1])); }
+        return { c, t, wire: Math.min(...t), part: pt };
+      });
+      for (const w of W) { leastWire = Math.min(leastWire, w.wire); if (w.wire < F - 1e-9) or2.push(`${name}: a wire ${w.wire.toFixed(4)} mm wide`); }
+      // which wire is in which group, and which side: groups.flatMap(curves, mirrored)
+      const owner = []; let k = 0;
+      orn.groups.forEach((g, gi) => { for (const side of ['R', 'L']) for (let i = 0; i < g.curves.length; i++) owner[k++] = { gi, side, i }; });
+      built += orn.groups.length; notBuilt += orn.told.filter((m) => /not built/.test(m)).length;
+      // OR3 gaps. Within one half-group: every approach under a feature is a
+      // TRUE junction (it reaches an overlap of the embed), never a graze;
+      // between half-groups (the other side, another group): a feature clear.
+      for (let x = 0; x < W.length; x++) {
+        // the wire's own coils: stations the emitted centreline turns ≥ π
+        // between, centreline distance less the wire
+        const C = W[x].c, n = C.length; let cum = [0];
+        for (let i = 1; i < n - 1; i++) { const ax = C[i][0] - C[i - 1][0], ay = C[i][1] - C[i - 1][1], bx = C[i + 1][0] - C[i][0], by = C[i + 1][1] - C[i][1]; cum.push(cum[i - 1] + Math.atan2(ax * by - ay * bx, ax * bx + ay * by)); }
+        cum.push(cum[n - 2]);
+        for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) if (Math.abs(cum[j] - cum[i]) >= Math.PI) { const g = Math.hypot(C[j][0] - C[i][0], C[j][1] - C[i][1]) - W[x].wire; leastGap = Math.min(leastGap, g); if (g < F - 2e-3) { or3.push(`${name}: wire ${x} comes ${g.toFixed(3)} mm from its own coil`); i = n; break; } }
+        for (let y = x + 1; y < W.length; y++) {
+          const same = owner[x].gi === owner[y].gi && owner[x].side === owner[y].side;
+          const half = (W[x].wire + W[y].wire) / 2;
+          if (!same) { const d = minD(W[x].c, W[y].c) - half; leastGap = Math.min(leastGap, d); if (d < F - 1e-6) or3.push(`${name}: wires ${x} and ${y} (different groups or sides) ${d.toFixed(3)} mm apart`); continue; }
+          // runs of either wire's stations within a feature of the other; each
+          // must reach an overlap ≥ E (read from both wires)
+          const runs = [];
+          for (const [A, B] of [[W[x].c, W[y].c], [W[y].c, W[x].c]]) {
+            let run = null;
+            A.forEach((qq) => { const d = minD([qq], B) - half; if (d < F) { if (!run) run = { min: d }; run.min = Math.min(run.min, d); } else if (run) { runs.push(run); run = null; } });
+            if (run) runs.push(run);
+          }
+          for (const r of runs) { if (r.min > -E + 1e-6) { or3.push(`${name}: wires ${x} and ${y} graze at ${r.min.toFixed(3)} mm (neither a feature apart nor joined)`); break; } }
+          const outside = runs.length ? null : minD(W[x].c, W[y].c) - half; if (outside != null) leastGap = Math.min(leastGap, outside);
+        }
+      }
+      // OR4 every half-group is ROOTED: each of its contacts with the band is
+      // a true embed (≥ EMBED_MM into the band footprint), and it has one
+      const fs_ = feet(model, rel.scale);
+      const halves = new Map();
+      W.forEach((w, x) => { const key = `${owner[x].gi}${owner[x].side}`; if (!halves.has(key)) halves.set(key, []); halves.get(key).push(w); });
+      for (const [key, ws] of halves) {
+        let rooted = false;
+        for (const w of ws) {
+          let run = null; const runs = [];
+          w.c.forEach((qq, i) => { const cl = -depthIn(fs_, qq) - w.t[i] / 2; if (cl < F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { runs.push(run); run = null; } });
+          if (run) runs.push(run);
+          for (const r of runs) { if (r.min <= -E + 1e-6) { rooted = true; leastEmbed = Math.min(leastEmbed, -r.min); deepest = Math.max(deepest, -r.min); } else or4.push(`${name} group ${key}: a wire grazes the band at ${r.min.toFixed(3)} mm`); }
+        }
+        if (!rooted) or4.push(`${name} group ${key}: not rooted in the band (no contact reaches the ${E} mm embed)`);
+      }
+      // OR5 the mirror, to the bit, on the emitted vertices
+      orn.groups.forEach((g, gi) => {
+        const base = owner.findIndex((o) => o.gi === gi && o.side === 'R');
+        for (let i = 0; i < g.curves.length; i++) {
+          const A = parts[base + i], B = parts[base + g.curves.length + i];
+          let bad = A.V !== B.V || A.C !== B.C;
+          for (let v = 0; v < A.V && !bad; v++) for (let c = 0; c < A.C && !bad; c++) { const ia = 3 * A.T(v, c), ib = 3 * B.T(v, c); if (!Object.is(P[ib], -P[ia]) || !Object.is(P[ib + 1], P[ia + 1]) || !Object.is(P[ib + 2], P[ia + 2])) bad = true; }
+          if (bad) or5.push(`${name}: ${g.group} wire ${i}'s mirror is not its source with x negated`);
+        }
+      });
+      // OR6 filigree off is the frame itself
+      const off = FL.withOrnament(G.buildFrame({ ...q, filigree: 'none' }));
+      if (off.ornament || G.exportSvg(off).svg !== G.exportSvg(G.buildFrame({ ...q, filigree: 'none' })).svg) or6.push(`${name}: off is not the frame`);
+    }
+    rec('OR1 with the filigree on, every ornament row is watertight (boundary 0) and ONE voxel region, at the default and at density 5 with every group on, on all three skeletons', or1.length === 0, `${OROWS.length} rows${or1.length ? ' — ' + or1.slice(0, 3).join('; ') : ''}`);
+    rec('OR2 no wire is narrower than the feature (read off the emitted walls)', or2.length === 0, `least wire ${leastWire.toFixed(4)} mm${or2.length ? ' — ' + or2.slice(0, 2).join('; ') : ''}`);
+    rec('OR3 every gap is a feature or a junction: a wire\'s own coils, wires of one half-group (a contact must be a true overlap of the embed, never a graze), and wires of different groups or sides at least a feature apart', or3.length === 0, `least gap ${leastGap.toFixed(4)} mm${or3.length ? ' — ' + or3.slice(0, 3).join('; ') : ''}`);
+    rec('OR4 every scroll group is rooted: each half has a contact with the band (the gate\'s own footprints) at least EMBED_MM deep, and no contact is a graze', or4.length === 0, `${built} groups built, ${notBuilt} given way (told); embeds ${leastEmbed.toFixed(3)}–${deepest.toFixed(3)} mm${or4.length ? ' — ' + or4.slice(0, 3).join('; ') : ''}`);
+    rec('OR5 the ornament is mirror-symmetric to the bit: every left wire\'s emitted vertices are the right\'s with x negated', or5.length === 0, or5.slice(0, 2).join('; '));
+    rec('OR6 the filigree off is the frame itself (no ornament field, the same SVG string)', or6.length === 0, or6.slice(0, 2).join('; '));
+  }
+
   // base-tree byte identity, when a worktree is given
   if (label === 'shipped') {
     if (BASE) {
@@ -406,6 +523,14 @@ const MUTANTS = [
   { id: 'the-tightness-range-not-fitted', file: 'filigree', from: 'fitMemo.set(key, fitUncached({ ...spec, wire: t }, t))', to: 'fitMemo.set(key, { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] })', breaks: ['SC7'] },
   { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2', 'SC3'] },   // the eye itself is then a gap of 0.2 mm
   { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wire + tw) / 2 - EMBED_MM;', to: 'const off = (wire + tw) / 2 + 0.5;', breaks: ['SC6'] },
+  // phase 3a, step 2 — the ornament: a scroll left off its molding, the
+  // graze rule removed (a gap under the floor between wire and band), the
+  // group-clearance check removed (groups crowd under the floor), the mirror
+  // rebuilt off the axis by 0.02 mm
+  { id: 'a-scroll-detached', file: 'filigree', from: 'return { curves: cs, push: d };', to: 'return { curves: at(d - 3), push: d };', breaks: ['OR1', 'OR4'] },
+  { id: 'the-graze-rule-removed', file: 'filigree', from: '    if (!g.length) break;', to: '    break;', breaks: ['OR4'] },
+  { id: 'the-group-clearance-removed', file: 'filigree', from: 'if (worst < MIN_FEATURE_MM) { told.push(', to: 'if (false) { told.push(', breaks: ['OR3'] },
+  { id: 'the-mirror-is-broken', file: 'filigree', from: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y])', to: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [0.02 - x, y])', breaks: ['OR5'] },
   { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
 ];
 

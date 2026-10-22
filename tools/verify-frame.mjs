@@ -638,7 +638,11 @@ async function partTwo(G, R) {
   const vrows = [];
   // a control that belongs to one skeleton type is probed IN that type,
   // against that type's own baseline (phase 2b) — never against the arch
-  const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' } };
+  const ORN = { filigree: 'scrolls' };
+  const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' },
+    // the ornament's rows are probed with the filigree on (they are hidden
+    // and inert while it is off)
+    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
@@ -662,13 +666,16 @@ async function partTwo(G, R) {
   const stl0 = await page.evaluate(() => window.__frame.stl());
   const svg0 = await page.evaluate(() => window.__frame.svg());
   const prows = [];
+  const pbase = {};
   for (const s of R.PARAM_SPEC.filter((q) => q.section === 'print')) {
+    const ctx = CONTEXT[s.id] || {}, key = JSON.stringify(ctx);
+    if (!pbase[key]) { await page.evaluate((q) => window.__frame.setParams(q), ctx); pbase[key] = { stl: await page.evaluate(() => window.__frame.stl()), svg: await page.evaluate(() => window.__frame.svg()) }; }
     const states = s.kind === 'range' ? [s.default === s.max ? s.min : s.max] : s.options.map(([v]) => v).filter((v) => v !== s.default);
     for (const v of states) {
-      await page.evaluate((q) => window.__frame.setParams(q), { [s.id]: v });
+      await page.evaluate((q) => window.__frame.setParams(q), { ...ctx, [s.id]: v });
       const stl = await page.evaluate(() => window.__frame.stl());
       const svg = await page.evaluate(() => window.__frame.svg());
-      prows.push({ id: s.id, v, moved: stl.hash !== stl0.hash, paper: svg === svg0, tris: stl.triangles });
+      prows.push({ id: s.id, v, moved: stl.hash !== pbase[key].stl.hash, paper: svg === pbase[key].svg, tris: stl.triangles });
     }
   }
   await page.evaluate(() => window.__frame.setParams({}));

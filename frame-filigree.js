@@ -45,7 +45,7 @@
    MIN_FEATURE_MM (registry) is an ASSUMPTION — nothing here has been printed.
    The wire thickness is floored at it and told. */
 
-import { offsetCurve } from './frame-geometry.js';
+import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.js';
 import { bandSolid, Mesh, EMBED_MM } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
 
@@ -277,7 +277,10 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
   // junction, by a feature: where the asked tightness would cross one (a
   // tighter, longer volute reaching back over the lead), the CHILD's
   // tightness is lowered by bisection until it clears — told.
-  const clears = (x) => out.every((y) => pairGap(x.curve, y.curve).gap >= MIN_FEATURE_MM);
+  // A child JOINS its parent (the lead): every approach under a feature must
+  // be a true overlap of the embed, never a graze; it shares no junction with
+  // a sibling, so a sibling must stand a full feature clear.
+  const clears = (x) => out.every((y, k) => (k === 0 ? joinsCleanly(x.curve, y.curve) : wireClear(x.curve, y.curve) >= MIN_FEATURE_MM));
   stations.forEach((frac, i) => {
     let x = placeChild(frac, i, tightness);
     if (clears(x)) { out.push(x); return; }
@@ -337,6 +340,23 @@ export function scrollRelief(curves, opts = {}) {
   return { positions: Float64Array.from(mesh.pos), indices: Uint32Array.from(mesh.idx), parts: mesh.parts, scale: opts.scale ?? 1 };
 }
 
+/* Two wires that JOIN: every run of a's stations within a feature of b
+   (centreline distance less the half wires under F) reaches an overlap of
+   at least EMBED_MM — the joint is a true overlap, and nowhere do the two
+   come within a feature without joining (a graze prints as a web). */
+export function joinsCleanly(a, b) { return joinsFrom(a, b) && joinsFrom(b, a); }   // read from both wires
+function joinsFrom(a, b) {
+  const half = (a.info.wire + b.info.wire) / 2;
+  let run = null;
+  for (const q of a.pts) {
+    let d = Infinity; for (let k = 0; k < b.pts.length - 1; k++) d = Math.min(d, segDist(q, b.pts[k], b.pts[k + 1]));
+    d -= half;
+    if (d < MIN_FEATURE_MM) run = Math.min(run ?? Infinity, d);
+    else if (run !== null) { if (run > -EMBED_MM + 1e-9) return false; run = null; }
+  }
+  return run === null || run <= -EMBED_MM + 1e-9;
+}
+
 /* The least gap between two DIFFERENT wires outside their junction: the
    centreline distance less the half wires, over station pairs; pairs inside
    the JUNCTION — the contiguous stretch around the contact where the wires
@@ -366,3 +386,239 @@ function pairGapFrom(a, b) {
 }
 
 export { offsetCurve, EMBED_MM };
+
+/* ================================================================== */
+/* ORNAMENT — the scroll groups attached to a frame (phase 3a, step 2) */
+/* ================================================================== */
+
+/* Read §10 of docs/frame-charter.md first. The ornament is BUILT IN PRINT
+   MILLIMETRES — the wire, its gaps and its embed are print features and the
+   floors are print floors — from a frame model whose scale is its own: the
+   FRAME's box sets the print scale (printHeight is the frame's height; the
+   ornament may project past it, told), so turning the ornament on moves the
+   frame by nothing.
+
+   Placement (charter §10.4). Each anchor GROUP names the anchors on the RIGHT
+   of the mirror line (x ≥ 0); the left is that geometry with x negated, to the
+   double — the mirror is exact because it is never rebuilt. An anchor ON the
+   axis (the crest, the bottom) takes a right half shifted along the edge until
+   its nearest wire stands half a feature off the axis, so the pair stands a
+   feature apart there and each half roots in the molding.
+
+   Attachment. A group is laid with its lead C's MOUTH OUTWARD (its back, and
+   the children budding from the back, toward the band), then pushed along the
+   inward normal until its deepest wire edge is EMBED_MM inside the band's
+   footprint. Every approach of a wire to the band is then either at least a
+   feature clear or a TRUE embed (at least EMBED_MM deep): a graze — a wire
+   under a feature from the band but not into it — would print as a web, so
+   the group is pushed deeper until it becomes an embed, and the depth is
+   reported. A group that would come within a feature of an already placed
+   one (crest before bottom before corners before sides) is not built, told. */
+
+
+/* The anchor groups per skeleton type: the RIGHT-hand anchors only. */
+export const ORNAMENT_GROUPS = {
+  arch: { crest: ['apex'], bottom: ['bottomCentre'], corners: ['springR'], sides: ['sideR'] },
+  rect: { crest: ['topCentre'], bottom: ['bottomCentre'], corners: ['cornerTR', 'cornerBR'], sides: ['sideR'] },
+  oval: { crest: ['topCentre'], bottom: ['bottomCentre'], sides: ['sideR'] },
+};
+export const ORNAMENT_ORDER = ['crest', 'bottom', 'corners', 'sides'];
+export const GROUP_CONTROL = { crest: 'ornCrest', bottom: 'ornBottom', corners: 'ornCorners', sides: 'ornSides' };
+
+const pip = (pt, poly) => {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+const segDist = (p, a, b) => {
+  const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+};
+
+/* The frame's band footprints in PRINT mm, read off outerEdge / innerEdge
+   (the owners of those boundaries): depth(pt) is the distance to the nearest
+   footprint boundary, positive INSIDE a band and negative outside. */
+export function bandRegion(model, scale) {
+  const sc = (q) => [q[0] * scale, q[1] * scale];
+  const regs = [], edges = [];
+  for (const s of model.spines) {
+    const o = outerEdge(s, s.bandWidth).map(sc), i = innerEdge(s, s.bandWidth).map(sc);
+    if (s.closed) { regs.push({ o, i }); edges.push(o, i); }
+    else { const poly = [...o, ...i.slice().reverse(), o[0]]; regs.push({ poly }); edges.push(poly); }
+  }
+  const inside = (pt) => regs.some((r) => (r.poly ? pip(pt, r.poly) : pip(pt, r.o) && !pip(pt, r.i)));
+  const make = (segs) => {
+    const dist2 = (pt) => { let m = Infinity; for (const [a, b] of segs) m = Math.min(m, segDist(pt, a, b)); return m; };
+    return { depth: (pt) => (inside(pt) ? 1 : -1) * dist2(pt), inside };
+  };
+  const all = []; for (const e of edges) for (let k = 0; k < e.length - 1; k++) all.push([e[k], e[k + 1]]);
+  const R = make(all);
+  // the same region with only the boundary segments within r of a centre:
+  // exact for every point whose nearest boundary is within that reach
+  R.near = (c, r) => make(all.filter(([a, b]) => segDist(c, a, b) <= r));
+  R.edges = edges;
+  return R;
+}
+
+/* A rigid motion of a curve: an optional reflection of LOCAL x, a rotation
+   by `angle`, a translation by `at`. Normals and tangents follow. */
+function rigid(c, { at = [0, 0], angle = 0, mirrorX = false }) {
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const R = ([x, y]) => { if (mirrorX) x = -x; return [ca * x - sa * y, sa * x + ca * y]; };
+  return { ...c, pts: c.pts.map((p) => { const q = R(p); return [q[0] + at[0], q[1] + at[1]]; }), nrm: c.nrm.map(R), tan: c.tan.map((f) => angle + (mirrorX ? Math.PI - f : f)) };
+}
+const shift = (c, d) => ({ ...c, pts: c.pts.map(([x, y]) => [x + d[0], y + d[1]]) });
+/* THE mirror: x negated, the doubles never recomputed. */
+export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y]), nrm: c.nrm.map(([x, y]) => [-x, y]), tan: c.tan.map((f) => Math.PI - f) });
+
+/* The least clearance between two wires of DIFFERENT groups: centreline
+   distance less the half wires, with no junction excused. */
+export function wireClear(a, b) {
+  let m = Infinity;
+  for (const p of a.pts) for (let k = 0; k < b.pts.length - 1; k++) m = Math.min(m, segDist(p, b.pts[k], b.pts[k + 1]));
+  return m - (a.info.wire + b.info.wire) / 2;
+}
+
+/* A group's contacts with the band: per curve, the runs of stations whose
+   wire edge comes within a feature of the band (clearance c < F, where c is
+   the distance outside the footprint less the half wire); each run's deepest
+   point must be a true embed (c ≤ −EMBED_MM) or it is a graze. */
+export function bandContacts(curves, region) {
+  const runs = [];
+  curves.forEach((c, ci) => {
+    const t = c.info.wire;
+    const cl = c.pts.map((p) => -region.depth(p) - t / 2);
+    let run = null;
+    cl.forEach((v, i) => {
+      if (v < MIN_FEATURE_MM) { if (!run) run = { curve: ci, from: i, to: i, min: v }; run.to = i; run.min = Math.min(run.min, v); }
+      else if (run) { runs.push(run); run = null; }
+    });
+    if (run) runs.push(run);
+  });
+  return runs;
+}
+
+/* Push a group along `inward` until its deepest wire edge is EMBED_MM inside
+   the band, then on until no contact run is a graze. Returns the moved curves
+   and the push (mm). */
+function seat(curves, inward, region, bracket) {
+  const deepest = (cs) => Math.min(...cs.map((c) => Math.min(...c.pts.map((p) => -region.depth(p) - c.info.wire / 2))));
+  const at = (d) => curves.map((c) => shift(c, [inward[0] * d, inward[1] * d]));
+  // the push at which the deepest wire edge is exactly EMBED_MM in. The
+  // clearance is NOT monotone in the push (pushed through the band a wire
+  // comes out over the opening), so the crossing NEAREST the anchor is
+  // found by walking from 0 in quarter-millimetre steps, then bisected
+  const deep = (d) => deepest(at(d)) <= -EMBED_MM;
+  const STEP = 0.25, dirn = deep(0) ? -1 : 1;
+  let a = 0, b = null;
+  for (let k = 1; k * STEP <= bracket; k++) { const x = dirn * k * STEP; if (deep(x) !== deep(a)) { b = x; break; } a = x; }
+  if (b === null) return { curves, push: NaN };
+  let lo = Math.min(a, b), hi = Math.max(a, b);          // deep(hi) is true
+  for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (deep(m)) hi = m; else lo = m; }
+  let d = hi, cs = at(d);
+  for (let k = 0; k < 40; k++) {
+    const g = bandContacts(cs, region).filter((r) => r.min > -EMBED_MM);
+    if (!g.length) break;
+    d += Math.max(...g.map((r) => r.min)) + EMBED_MM + 1e-6;
+    cs = at(d);
+  }
+  return { curves: cs, push: d };
+}
+
+/* The outer-edge point and outward normal of a frame at an anchor, print mm. */
+function anchorFrame(model, anchor, scale) {
+  const s = model.spines.find((q) => q.id === anchor.spine), w = s.bandWidth;
+  const nl = Math.hypot(anchor.nrm[0], anchor.nrm[1]), out = [-anchor.nrm[0] / nl, -anchor.nrm[1] / nl];
+  let Po;
+  if (anchor.index == null) Po = [anchor.pt[0] - anchor.nrm[0] * w / 2, anchor.pt[1] - anchor.nrm[1] * w / 2];
+  else Po = offsetCurve(s, -w / 2)[anchor.index];
+  return { Po: [Po[0] * scale, Po[1] * scale], out };
+}
+
+/* The ornament of a frame model: groups at the asked anchors, built in print
+   mm, mirrored, seated and checked. p carries the ornament controls. */
+export function ornamentFor(model) {
+  const p = model.params;
+  const kind = model.info.kind;
+  const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
+  const region = bandRegion(model, scale);
+  const told = [];
+  const length = p.ornScale * p.moldingWidth * scale;
+  const groups = [];                         // { group, anchor, curves (right), mirrored (left) }
+  const accepted = [];
+  const yMid = (model.box.y0 + model.box.y1) / 2 * scale;
+  for (const g of ORNAMENT_ORDER) {
+    const ids = (ORNAMENT_GROUPS[kind] || {})[g];
+    if (!ids || p[GROUP_CONTROL[g]] !== 'on') continue;
+    for (const id of ids) {
+      const anchor = model.info.anchors[id];
+      if (!anchor) { told.push(`no ${id} on this frame — its ${g} group is not built`); continue; }
+      const { Po, out } = anchorFrame(model, anchor, scale);
+      const onAxis = Math.abs(Po[0]) < 1e-9;
+      const theta = Math.atan2(-out[0], out[1]);
+      // the long half's direction: along +x local under theta; on the axis it
+      // points away from the axis (right); elsewhere away from the frame's
+      // middle — up in the upper half, down in the lower, up at the sides
+      const dir = [Math.cos(theta), Math.sin(theta)];
+      let mirrorX = false;
+      if (onAxis) mirrorX = dir[0] < 0;
+      else { const upper = Po[1] >= yMid - 1e-9; mirrorX = upper ? dir[1] < 0 : dir[1] > 0; }
+      const local = buildGroup({ n: p.ornDensity, length, tightness: p.ornTightness, wire: p.ornWire, balance: 0.6 });
+      let curves = local.map((x) => rigid(x.curve, { at: Po, angle: theta, mirrorX }));
+      const childTold = local.flatMap((x) => x.curve.info.told.filter((m) => /^child/.test(m)));
+      if (onAxis) {
+        // slide along the edge's tangent (here: x) until the nearest wire
+        // edge stands F/2 off the axis — the mirrored pair a feature apart
+        const minX = Math.min(...curves.map((c) => Math.min(...c.pts.map(([x]) => x - c.info.wire / 2))));
+        curves = curves.map((c) => shift(c, [MIN_FEATURE_MM / 2 - minX, 0]));
+      }
+      const reach = 3 * length + 20;
+      const seated = seat(curves, [-out[0], -out[1]], region.near(Po, 2 * reach), reach);
+      if (!Number.isFinite(seated.push)) { told.push(`the ${g} group at ${id} is not built — it does not reach the band within ${reach.toFixed(0)} mm`); continue; }
+      curves = seated.curves;
+      const mirrored = curves.map(mirrorCurve);
+      // clear of every group already placed, both sides
+      const mine = onAxis ? [...curves, ...mirrored] : [...curves, ...mirrored];
+      let worst = Infinity, against = null;
+      for (const a of mine) for (const b of accepted) { const d = wireClear(a, b.curve); if (d < worst) { worst = d; against = b.group; } }
+      if (worst < MIN_FEATURE_MM) { told.push(`the ${g} group at ${id} is not built — it would come ${worst.toFixed(2)} mm from the ${against} group (under the ${MIN_FEATURE_MM.toFixed(1)} mm feature)`); continue; }
+      for (const c of mine) accepted.push({ curve: c, group: g });
+      groups.push({ group: g, anchor: id, onAxis, curves, mirrored, push: seated.push, told: childTold });
+      for (const m of childTold) { const prev = told.find((q) => q.endsWith(`: ${m}`) && q.startsWith('groups ')); if (prev) told[told.indexOf(prev)] = prev.replace(/^groups ([^:]*):/, `groups $1, ${id}:`); else told.push(`groups ${id}: ${m}`); }
+    }
+  }
+  const all = groups.flatMap((g) => [...g.curves, ...g.mirrored]);
+  const wire = Math.max(MIN_FEATURE_MM, p.ornWire);
+  if (p.ornWire < MIN_FEATURE_MM) told.push(`wire ${p.ornWire.toFixed(2)} mm built at the ${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum feature`);
+  const fit = all.length ? groups[0].curves[0].info : null;
+  if (fit) for (const m of fit.told.filter((q) => /^tightness/.test(q))) told.push(`lead scroll: ${m}`);
+  return { scale, length, wire, groups, curves: all, region, told };
+}
+
+/* The model with its ornament: the frame's bands unchanged and first, the
+   wire bands after them (the SVG draws them with the frame's own hatching, a
+   half-round wire's true section), the box widened to hold them and the
+   frame's own box kept as frameBox (the print scale's owner). Off, the model
+   comes back as itself. */
+export function withOrnament(model) {
+  const p = model.params;
+  if (p.filigree !== 'scrolls') return model;
+  const orn = ornamentFor(model);
+  const s = orn.scale;
+  const shape = p.ornShape === 'round' ? 'round' : 'half-round';
+  const spines = orn.curves.map((c, i) => ({ id: `orn${i}`, pts: c.pts.map(([x, y]) => [x / s, y / s]), nrm: c.nrm, bandWidth: c.info.wire / s }));
+  const drawProf = wireProfile('half-round');
+  const bands = spines.map((sp, i) => sweepSpine(sp, drawProf, { ...p, moldingWidth: orn.curves[i].info.wire / s, moldingDepth: orn.curves[i].info.wire / 2 / s }));
+  let { x0, y0, x1, y1 } = model.box, strokes = model.strokes;
+  for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch.map((h) => h.pts), ...b.cross.map((h) => h.pts)]) {
+    strokes++;
+    for (const [x, y] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  const prof = wireProfile(shape);
+  const solids = orn.curves.map((c, i) => ({ spine: { id: `orn${i}`, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire }, prof, depth: wireHeight(c.info.wire, shape) * p.ornProjection }));
+  return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
+}
