@@ -2146,7 +2146,7 @@ function footFloorLine(rings) {
   const worst = capped.length ? capped.reduce((a, r) => (r.width / r.widthAskedMm < a.width / a.widthAskedMm ? r : a), capped[0]) : null;
   const under = clampedRingsPhrase(rings, (r) => r.footArcUnderFloor && r.widthAskedMm > r.footArcMm);
   return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
-       + (hi ? `FOOT WIDTH CAPPED by the ring's own room on ${hi} — ${worst.widthAskedMm.toFixed(2)} mm asked, ${worst.width.toFixed(2)} mm built: the arc each foot owns at its ring (${worst.radius.toFixed(2)} mm x ${((worst.footSpanRad * 180) / Math.PI).toFixed(1)}°); a crowded ring caps lower, a sparse one higher\n` : '')
+       + (hi ? `FOOT WIDTH CAPPED by the ring's own room on ${hi} — ${worst.widthAskedMm.toFixed(2)} mm asked, ${worst.width.toFixed(2)} mm built: the arc each foot owns at its ring (${(worst.footCapRadiusMm ?? worst.radius).toFixed(2)} mm x ${((worst.footSpanRad * 180) / Math.PI).toFixed(1)}°); a crowded ring caps lower, a sparse one higher\n` : '')
        + (under ? `FOOT ROOM UNDER THE FLOOR on ${under} — the arc each foot owns is under the ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm floor, the floor wins and the feet on that ring still overlap their neighbours\n` : '');
 }
 
@@ -5021,7 +5021,7 @@ window.__bloomMetrics = () => ({
        still, and nothing reported it. [Oct 21: the ceiling is the ring's own
        room now — the foot cap's record rides beside it.] */
     widthClampedHigh: r.widthClampedHigh,
-    widthAskedMm: r.widthAskedMm, footArcMm: r.footArcMm, footSpanRad: r.footSpanRad, footCapped: r.footCapped, footArcUnderFloor: r.footArcUnderFloor,
+    widthAskedMm: r.widthAskedMm, footArcMm: r.footArcMm, footCapRadiusMm: r.footCapRadiusMm, footSpanRad: r.footSpanRad, footCapped: r.footCapped, footArcUnderFloor: r.footArcUnderFloor,
     /* THE DEPTH TELEMETRY (Sep 3) — footRing()'s own two flags behind the
        read-out's RINGS NARROWER THAN A FOOT line, exposed so the panel gate
        asserts that line against the owner in both directions. */

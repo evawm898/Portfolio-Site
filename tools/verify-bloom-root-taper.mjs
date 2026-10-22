@@ -209,7 +209,7 @@ function fire(G, label) {
   const bad = H.rootTaperAssertions(positions, row, metricsOf(rec), ui);
   /* FC1 — the foot cap, the same pure clause junctionAssertions carries, on
      this module's ring records and emitted foot frames */
-  rec.rings.forEach((r, L) => { for (const msg of H.footCapClauses(r, L, ui, rec.petals[L] ? rec.petals[L].footFrames : null)) bad.push(msg); });
+  rec.rings.forEach((r, L) => { for (const msg of H.footCapClauses(r, L, ui, rec.petals[L] ? rec.petals[L].footFrames : null, { exportMode: true })) bad.push(msg); });
   const tapered = (p) => !!(p && p.thickness && p.thickness.rootTaper);
   const live = FC_PROBES.has(label)
     ? rec.rings.some((r) => r.widthClampedHigh)

@@ -2527,6 +2527,27 @@ export function footRing(state, acc, opts = {}) {
   const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
   const R0 = derivedRadius * state.spread;         // the ONLY use of spread
+  /* THE RING THE FOOT CAP IS MEASURED ON IS THE EXPORT FLOOR'S, IN BOTH MODES
+     (root support, found by CI: `INFILL: x sheetThickness 0.60` built 91,360
+     triangles live and 108,928 in export). The area rule places the ring from
+     `sqrt(width x sheet)`, and the sheet is floored at export, so a sheet under
+     MIN_FEATURE_MM puts the LIVE ring nearer the axis than the EXPORT one; a cap
+     read off the live ring then bound where the export's did not, the feet
+     differed, and the infill — planned against the outline the feet set —
+     differed in TOPOLOGY. Which feet a print gets is the export's question, and
+     a topology may not depend on the mode (session 32's rule, a seventh time),
+     so the cap's radius is the area rule at `max(sheet, MIN_FEATURE_MM)` — the
+     export's own expression on the export's own thickness, the same doubles in
+     both modes. WHERE THE SHEET IS AT OR ABOVE THE FLOOR it IS this ring's R0
+     (a branch, no product formed), so every export build and every live build
+     on a printable sheet reads the radius it always read. */
+  const capThickness = Math.max(Number(state.sheetThickness), MIN_FEATURE_MM);
+  const capR0 = capThickness === thickness ? R0 : (() => {
+    let s2 = 0;
+    for (const p of raw) { const rf = Math.sqrt((p.width * capThickness) / Math.PI); s2 += p.footCount * rf * rf; }
+    const d = guarded ? Math.sqrt((raw[0].width * capThickness) / Math.PI) * Math.sqrt(slotCount) : Math.sqrt(s2);
+    return d * state.spread;
+  })();
   /* THE HUB GROWS TO THE WIDEST OWNED RING (Eva's ruling, Oct 16, replacing the
      rim hold). A layer that owns a width wider than Petal width asks for a ring
      at `R0 x own / petalWidth`, past layer 1's; the hub's rim moves out to the
@@ -2661,7 +2682,13 @@ export function footRing(state, acc, opts = {}) {
        so the shipping default (6.40 mm against a 6.95 mm arc) is the expression
        it was. */
     const footSpanRad = fanMode ? fan.step : TAU / n;
-    const footArcMm = radius * footSpanRad;
+    /* the cap's ring (above): this ring's radius where the sheet is printable,
+       else the same law on the export floor's R0 (the sphere's Rd floor at the
+       export thickness too) */
+    const capRadiusMm = capR0 === R0 ? radius : sphere
+      ? Math.max(capR0, HEAD_RISE_MIN_RADIUS_FACTOR * capThickness) * Math.sin(polar)
+      : capR0 * p.ringFactor;
+    const footArcMm = capRadiusMm * footSpanRad;
     const footCapped = p.width > footArcMm;
     const width = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footArcMm) : p.width;
     return {
@@ -2791,7 +2818,7 @@ export function footRing(state, acc, opts = {}) {
          this foot owns at its ring, the angle that arc is of, whether the cap
          bound, and whether the arc is under the floor (the floor then wins and
          the feet on this ring still overrun their room — told). */
-      widthAskedMm: p.width, footArcMm, footSpanRad, footCapped, footArcUnderFloor: footArcMm < FOOT_MIN_WIDTH_MM,
+      widthAskedMm: p.width, footArcMm, footCapRadiusMm: capRadiusMm, footSpanRad, footCapped, footArcUnderFloor: footArcMm < FOOT_MIN_WIDTH_MM,
       /* A statement about the EXPORT, true in either mode — the read-out has
          to warn about a floor it is not currently applying. */
       thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,

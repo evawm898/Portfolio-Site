@@ -297,6 +297,21 @@ export function footSpanRestated(ui) {
   }
   return (2 * Math.PI) / Math.round(Number(ui.petalCount));
 }
+/* THE RING THE CAP IS MEASURED ON, RESTATED (root support, CI's mode finding):
+   the export floor's ring in BOTH modes — this ring's radius where the live
+   sheet is at or above MIN_FEATURE_MM (or the build IS the export), else the
+   area rule's own scaling to the floor's thickness: every ring radius goes as
+   sqrt(sheet) (rFoot = sqrt(width x sheet / pi)), and on the sphere the radius
+   is Rd sin(polar) with Rd = max(R0, the apex floor x sheet), so the export
+   floor's Rd is restated from the live R0 and the floor. From the controls and
+   the ring's own radius, never the builder's `footCapRadiusMm`. */
+export function footCapRadiusRestated(r, ui, { exportMode = false, dome = null, R0 = null } = {}) {
+  const tl = Number(ui.sheetThickness), tc = Math.max(tl, MIN_FEATURE_MM);
+  if (exportMode || tc === tl) return r.radius;
+  const k = Math.sqrt(tc / tl);
+  if (dome && dome.closed && R0 !== null) return (r.radius * Math.max(R0 * k, GEOMETRY.HEAD_RISE_MIN_RADIUS_FACTOR * tc)) / dome.Rd;
+  return r.radius * k;
+}
 export function footCapRestated(askedMm, radiusMm, spanRad) {
   const arcMm = radiusMm * spanRad;
   const capped = askedMm > arcMm;
@@ -4685,14 +4700,15 @@ const GUARD_ULPS = 4;
    `verify-bloom-root-taper.mjs` runs the very same clause in Node on a MUTATED
    module's build (the foot cap typed back to a constant), ST9's remedy for a
    clause the apex table cannot reach. */
-export function footCapClauses(r, L, ui0, frames) {
+export function footCapClauses(r, L, ui0, frames, capOpts = {}) {
   const bad = [];
   const span = footSpanRestated(ui0);
   const delF = Number(ui0.footDelicacy), WF = Number(ui0.petalWidth);
   const askedF = Math.max(FOOT_MIN_WIDTH_MM, (r.ownWidth === null || r.ownWidth === undefined ? WF * r.scale : r.ownWidth) * 0.4 * delF);
-  const C = footCapRestated(askedF, r.radius, span);
-  const tol = 8 * Number.EPSILON * Math.max(1, WF, r.radius);
-  if (!(Math.abs(r.width - C.width) <= tol)) bad.push(`FC1: ring ${L}'s foot is ${r.width} mm across where the asked ${askedF.toFixed(6)} mm ${C.capped ? `does not fit the ${C.arcMm.toFixed(6)} mm the ring's own room gives each foot (radius ${r.radius.toFixed(6)} x ${(span * 180 / Math.PI).toFixed(4)} deg), floored at ${FOOT_MIN_WIDTH_MM}, restating ${C.width.toFixed(6)}` : `fits its ${C.arcMm.toFixed(6)} mm arc and must stand`} — the foot cap is not the ring's own room`);
+  const capR = footCapRadiusRestated(r, ui0, capOpts);
+  const C = footCapRestated(askedF, capR, span);
+  const tol = 8 * Number.EPSILON * Math.max(1, WF, capR);
+  if (!(Math.abs(r.width - C.width) <= tol)) bad.push(`FC1: ring ${L}'s foot is ${r.width} mm across where the asked ${askedF.toFixed(6)} mm ${C.capped ? `does not fit the ${C.arcMm.toFixed(6)} mm the ring's own room gives each foot (radius ${capR.toFixed(6)} at the export floor x ${(span * 180 / Math.PI).toFixed(4)} deg), floored at ${FOOT_MIN_WIDTH_MM}, restating ${C.width.toFixed(6)}` : `fits its ${C.arcMm.toFixed(6)} mm arc and must stand`} — the foot cap is not the ring's own room`);
   const told = !!r.widthClampedHigh, wantTold = C.width < askedF;
   if (told !== wantTold) bad.push(`FC1: ring ${L} says the cap ${told ? 'bound' : 'did not bind'} (widthClampedHigh ${told}) where the asked ${askedF.toFixed(4)} against the ${C.arcMm.toFixed(4)} mm arc says it ${wantTold ? 'did' : 'did not'} — the read-out would be untrue`);
   if (typeof r.footArcMm === 'number' && !(Math.abs(r.footArcMm - C.arcMm) <= tol)) bad.push(`FC1: ring ${L} records an arc of ${r.footArcMm} mm where its radius x the restated angle is ${C.arcMm}`);
@@ -4886,7 +4902,7 @@ export async function junctionAssertions(page, row) {
        does not — and the told flag must say which. Both STL gates are blind to
        a foot at the wrong width (it overlaps the hub either way). The EMITTED
        foot rows carry it too (their half-widths against the record). */
-    for (const msg of footCapClauses(r, L, ui0, frames && frames[L])) bad.push(msg);
+    for (const msg of footCapClauses(r, L, ui0, frames && frames[L], { dome, R0: m.derivedRadius * Number(ui0.spread) })) bad.push(msg);
 
     /* J1 — THE FEET ARE IN THE HUB PLANE, per layer. Moved here from
        formAssertions, where it only ever saw layer 0. Slot 0 of every layer
@@ -6160,7 +6176,7 @@ export async function zygoAssertions(page, row) {
       /* (root support: the asked foot, floored, then capped at the arc it owns
          on its ring — `footCapRestated`, the FC clause's own law) */
       const askedW = Math.max(FOOT_MIN_WIDTH_MM, ownW === null ? W * scale * 0.4 * del : ownW * 0.4 * del);
-      const wantW = footCapRestated(askedW, r.radius, footSpanRestated(ui)).width;
+      const wantW = footCapRestated(askedW, footCapRadiusRestated(r, ui), footSpanRestated(ui)).width;
       if (!near(r.width, wantW, ownW ?? W)) bad.push(`Z3: ring ${L}'s foot is ${r.width} mm across, restated ${wantW} from ${ownW === null ? `the ramp (Petal width ${W} x ${scale})` : `the layer's own width ${ownW}`} x 0.4 x Foot delicacy ${del}, capped at the ring's own room — the foot did not follow ${ownW === null ? 'the ramp' : 'its own width'}`);
       if ((r.ownWidth ?? null) !== ownW) bad.push(`Z3: ring ${L} reports its own width ${JSON.stringify(r.ownWidth ?? null)}, the row's entries say ${JSON.stringify(ownW)}`);
       if (L === 0) return;
@@ -13461,8 +13477,21 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
     const leafCentres = (rimRec, label) => (rimRec && Array.isArray(rimRec.centre) ? rimRec.centre.filter((c) => c.panel === label) : []);
     const untaperedLeaf = (c) => c.arc[0] >= GEOMETRY.RIM_TAPER_MM + 1e-6 && c.arc[1] >= GEOMETRY.RIM_TAPER_MM + 1e-6 && c.dTip >= GEOMETRY.RIM_TAPER_MM + 1e-6 && c.dBase >= GEOMETRY.RIM_TAPER_MM + 1e-6;
     const readBlade = (rimRec, label, lenB, tag) => {
-      const C = leafCentres(rimRec, label).filter(untaperedLeaf);
-      if (!C.length) { if (rootFactorRestated(lenB) !== null) bad.push(`T5: ${tag}: no row of the ${lenB.toFixed(2)} mm blade stands clear of its rim taper — the file cannot be read`); return 0; }
+      const all = leafCentres(rimRec, label), C = all.filter(untaperedLeaf);
+      /* A BLADE THE RIM TAPER COVERS WHOLE HAS NO ROW TO READ, AND THAT IS A
+         DECLARED BLINDNESS, NOT A FAILURE (found by CI on the 3.5 and 5 mm
+         tooth-floor blades, `lobedWidth` min and a 12-tooth depth-1 blade):
+         where even the widest row sits under RIM_TAPER_MM of either margin, the
+         rim law sets every row's thickness and the root law never shows bare in
+         the file. Decided from the rim record's own distances (the same ones
+         `untaperedLeaf` reads); a blade wide enough to read that still yields no
+         row — the tip or base distance excluding it all — stays a failure. */
+      if (!C.length) {
+        const widest = all.reduce((m, c) => Math.max(m, Math.min(c.arc[0], c.arc[1])), 0);
+        if (rootFactorRestated(lenB) !== null && !(widest < GEOMETRY.RIM_TAPER_MM + 1e-6)) bad.push(`T5: ${tag}: no row of the ${lenB.toFixed(2)} mm blade stands clear of its rim taper though its widest row is ${widest.toFixed(3)} mm from each margin — the file cannot be read`);
+        if (out) (out.unreadable = out.unreadable || []).push({ tag, widestMm: widest });
+        return 0;
+      }
       let first = 0;
       for (const c of C) {
         const w = Math.max(MIN_FEATURE_MM, sheetX * rootTaperAtRestated(lenB, c.u));
@@ -14125,6 +14154,19 @@ export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnPro
      phase that pins it (frozen/phase70) and in
      docs/bloom-role-retirement-outcome.md. */
 export const SELF_INTERSECTION_XFAIL = Object.freeze({
+  /* ROOT SUPPORT (Oct 21, docs/bloom-root-support-outcome.md §6b) — THE ALIGNED WELD, A TUBE'S. At 12 petals the
+     foot cap binds (6.40 asked, the 5.672 mm arc each foot owns at its 10.832 mm ring), and the slit tube's
+     panel columns then land TO THE BIT on the capped feet's margin vertices, so the census's exact-position weld
+     reads petal and tube panel as one shell and their by-design overlap as a within-shell fold. Measured: with the
+     cap one part in a million under the arc the row reads 19 shells and 0 pairs; the base tree reads 0. A property
+     of the vertex-welded shell definition (the sepal ALIGNED WELD and STYLE-at-272 class), not of the geometry. */
+  'TUBE: 12 petals x k 1 (1 panel)': { pairs: 263, worstMm: 1.2916, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
+  'TUBE: 12 petals x k 2 (2 panels)': { pairs: 768, worstMm: 1.2916, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
+  'TUBE: 12 petals x k 3 (3 panels)': { pairs: 986, worstMm: 1.2916, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
+  'TUBE: 12 petals x k 4 (4 panels)': { pairs: 1457, worstMm: 1.2916, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
+  'TUBE: SNAP: asked 5 at 12 petals (builds 4)': { pairs: 1457, worstMm: 1.2916, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
+  'TUBE: THIN SHEET 0.6 x k 2 x fusion height 0.4': { pairs: 530, worstMm: 1.6907, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
+  'TUBE: 12 petals x k 6 (6 panels)': { pairs: 2236, worstMm: 1.2768, note: 'ROOT SUPPORT: the foot capped exactly at its arc meets the slit tube\'s panel columns to the bit and the weld merges petal and panel (the aligned weld) — 0 pairs on the base tree and 0 with the cap a part in a million under the arc' },
   /* ===================================================================
      REMOVED BY SPINE-CUP-FOLD (Oct 20), NINETEEN ENTRIES, ALL ONE MECHANISM:
      the spine bent tighter than its own cupped (rolled, twisted) cross-section
