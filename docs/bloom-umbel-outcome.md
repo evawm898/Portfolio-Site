@@ -141,12 +141,52 @@ reads `shown.inflorescence.gradientMax`. Panel route (ao) found it (its
 adding `inflorescence` / `inflorescenceBuilt` to `shown`; read-out only, no
 byte moves.
 
+## 6c. What was measured (local, this tree)
+
+* **Export gate, block 77**: PASS, 27 of 27 rows watertight, 0 degenerate,
+  live and export counts equal.
+* **Connectedness, block 77**: PASS, 27 of 27 one connected body — every
+  pedicel reaches the knot at 2 / 5 / 6 / 7 / 12 florets and at -60 / 35 / 90
+  deg (UM2 asserts the root disc inside the knot on every row).
+* **Apex mutants**: the four umbel mutants each fire what they name (with the
+  ID collateral their mutation genuinely causes), the clean tree silent; the
+  raceme's `the-pedicel-roots-on-the-axis` was RE-ANCHORED (its line gained the
+  umbel arm — the anchor scan said so before anything ran) and still fires ID2.
+* **Panel gate**: PASS; `--negative-control` — all THIRTY-TWO routes observed
+  their failure, route (ao)'s two mutants among them.
+* **Byte partition** (`verify-bloom-surface-bytes --base <56f91f4> --movers-predicate
+  umbel`, both modes, three ranges merged): **25 movers / 1,508 holders, 0
+  floats moved on any holder** over 1,803,869,496 export floats and 82,156,516
+  captured-grid values; every predeclared mover moved (block 77 less its two
+  GATED rows); `--control` fires both clauses. Every existing row holds by
+  branch.
+* **Combination gate**: three umbel pairs; `umbel-florets-x-angle` and
+  `umbel-length-x-angle` SINGLE-REACHES (12 cells declared by value),
+  `umbel-head-length-x-angle` CLEARS (nearest 1.087 mm, a 5 mm pedicel at 35).
+* **`frozen/phase83`** = the 1,506 rows at `e4ce6eb`, `--verify-frozen` PASS.
+
+The sheet's measured approaches (EXPORT, emitted vertices against triangles):
+
+| cell | tris (export) | knot radius | floret-floret | floret-stem | floret-head |
+|---|---|---|---|---|---|
+| the spider lily, 6, head OFF | 136,026 | 6.000 | 0.000 | 23.365 | — |
+| 2 florets, head OFF | 37,998 | 5.243 | 15.000 (cap) | 21.261 | — |
+| 5 florets, head OFF | 89,868 | 5.403 | 0.000 | 21.777 | — |
+| 12 florets, head OFF | 211,794 | 9.727 | 0.000 | 25.331 | — |
+| 6 florets, head ON | 133,606 | 7.500 | 0.000 | 12.268 | 4.920 |
+| 6 florets at -60 deg | 107,286 | 6.000 | 0.000 | **0.000** | — |
+| 6 florets at 90 deg | 107,286 | 6.000 | 0.000 | 22.517 | — |
+
 ## 7. Declared, never clamped
 
 * **The florets of one umbel overlap** — every row but the two-floret ones
   reads 0.0000 mm floret-to-floret (ID10 (d), `INFLO_APPROACH_XFAIL`, and the
   combination gate's `umbel-florets-x-angle`). There is no internode to move
-  them apart; a real umbel's florets interleave. Declared by value.
+  them apart; a real umbel's florets interleave. Declared by value. The one
+  exception is five SPHERE florets, 0.9127 mm apart, declared at that value.
+* **At -60 deg a 5 or 20 mm pedicel stands its floret against the stem below
+  the knot** (floret-stem 0.000; 60 mm and longer clear) — declared in the
+  combination gate.
 
 ## 8. Open for Eva
 
