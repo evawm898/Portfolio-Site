@@ -62,6 +62,53 @@ export const SHEET_THICKNESS_MM = 1.2;
    A printed coupon replaces this guess with a measurement. */
 export const FOOT_MIN_WIDTH_MM = 1.6;
 
+/* THE FOOT CAP'S CLEARANCE (the foot-clearance session, Oct 22 — Eva's ruling
+   on #435: "the foot cap must not land exactly on the arc"). Read
+   docs/bloom-foot-clearance-outcome.md before touching it.
+
+   WHAT WENT WRONG. A foot capped EXACTLY at the arc it owns (`r x span`) has
+   its margins at exactly the half-step azimuth, where its neighbour's margins
+   are too: the two feet ABUT with a gap of zero. Wherever the across-direction
+   is laid on a circle about the axis — a slit tube's ring curve (the lobe hook
+   blends a foot's open half onto it), the equator of a hemispherical head —
+   both neighbours then evaluate the same circle at the same angle and emit the
+   SAME DOUBLE, and the uncut tube sinus (zero gap, so no notch) puts its knot at
+   the sinus centre, which IS the margin. The census's exact-position weld reads
+   two closed shells sharing one vertex as one shell, so their by-design overlap
+   is counted as a fold: 263 .. 2,236 pairs on the seven tube rows, and 1,048 /
+   932 of the two hemisphere-at-spread-0.6 rows' 1,424 / 1,268
+   (`tools/bloom-weld-attribute.mjs` names every pair). The leaf petiole's
+   remedy, a third time: REMOVE the shared vertex, never declare its pairs.
+
+   THE CLEARANCE IS AN ANGLE, 2^-19 RAD, AND IT IS WHAT THE WELD NEEDS — NOT A
+   TYPED EPSILON. The weld is EXACT EQUALITY of positions, and the positions a
+   print gets are the STL's FLOAT32s, so two vertices are distinct for every
+   reader (the census on the builder's doubles, a slicer on the file) only if
+   they differ by whole float32 steps of the coordinate they are differenced
+   from. A float32 step at magnitude r is at most r x 2^-23. Capping each foot at
+   `r x (span - 2^-19)` opens a gap of r x 2^-19 between neighbouring margins,
+   so each margin stands r x 2^-20 = EIGHT float32 steps of the ring's own
+   radius from the half-step azimuth — and the tube's knot, which sits at the
+   gap's centre, eight steps from each margin. Eight is the count X0 already
+   derived for a cancellation residue (`X0_TOL_ULPS`), and the clearance is an
+   ANGLE so the separation scales with the radius at every foot row: a row
+   nearer the axis is nearer by the same factor its float32 step is smaller.
+   What it is NOT: a fraction of the lattice (half a foot column is ~0.3 mm,
+   a visible notch Eva did not ask for), nor a printable gap (a slit under
+   MIN_FEATURE_MM fuses in print — this one is 2.07e-5 mm at the 12-petal ring,
+   two orders under the float32 grain a printer resolves, and exists for the
+   census and the file, not for the object).
+
+   MODE-FREE BY CONSTRUCTION: which shells a solid has is topology, and the
+   clearance reads only the cap's ring (`footCapRadiusMm`, the export floor's
+   in both modes) and the span. A foot inside its cap is the asked double by
+   BRANCH; a foot the floor wins keeps 1.6 mm (it overruns its arc either way,
+   so its corners pass their neighbour's rather than meeting it). */
+export const FOOT_CAP_CLEARANCE_RAD = 2 ** -19;
+/* the one owner of the capped width: the arc a foot owns at its ring, less the
+   clearance — read by every petal ring and every sepal tier */
+export function footCapMm(radiusMm, spanRad) { return radiusMm * (spanRad - FOOT_CAP_CLEARANCE_RAD); }
+
 /* THE FOOT'S UPPER CLAMP — a number that has always been here as a bare `10`
    inside footRing()'s clamp, given a name (Eva's ruling, Sep 1, option b)
    because it BINDS and nothing said so.
@@ -2695,8 +2742,12 @@ export function footRing(state, acc, opts = {}) {
       ? Math.max(capR0, HEAD_RISE_MIN_RADIUS_FACTOR * capThickness) * Math.sin(polar)
       : capR0 * p.ringFactor;
     const footArcMm = capRadiusMm * footSpanRad;
-    const footCapped = p.width > footArcMm;
-    const width = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footArcMm) : p.width;
+    /* THE CLEARANCE (Oct 22, `FOOT_CAP_CLEARANCE_RAD` above): the cap stands a
+       hair inside the arc so a capped foot never shares a vertex with its
+       neighbour or a tube column; the arc stays in the record beside it */
+    const footCapWidthMm = footCapMm(capRadiusMm, footSpanRad);
+    const footCapped = p.width > footCapWidthMm;
+    const width = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footCapWidthMm) : p.width;
     return {
       index: L,
       radius, derivedRadius, width, thickness,
@@ -2824,7 +2875,7 @@ export function footRing(state, acc, opts = {}) {
          this foot owns at its ring, the angle that arc is of, whether the cap
          bound, and whether the arc is under the floor (the floor then wins and
          the feet on this ring still overrun their room — told). */
-      widthAskedMm: p.width, footArcMm, footCapRadiusMm: capRadiusMm, footSpanRad, footCapped, footArcUnderFloor: footArcMm < FOOT_MIN_WIDTH_MM,
+      widthAskedMm: p.width, footArcMm, footCapMm: footCapWidthMm, footCapRadiusMm: capRadiusMm, footSpanRad, footCapped, footArcUnderFloor: footCapWidthMm < FOOT_MIN_WIDTH_MM,
       /* A statement about the EXPORT, true in either mode — the read-out has
          to warn about a floor it is not currently applying. */
       thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
@@ -3363,8 +3414,9 @@ export function footRing(state, acc, opts = {}) {
     const overhang = Math.max(1.5, radius * 0.4);
     const footSpanRad = fanMode ? fan.step : TAU / count;
     const footArcMm = radius * footSpanRad;
-    const footCapped = footFlooredMm > footArcMm;
-    const footMm = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footArcMm) : footFlooredMm;
+    const footCapWidthMm = footCapMm(radius, footSpanRad);
+    const footCapped = footFlooredMm > footCapWidthMm;
+    const footMm = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footCapWidthMm) : footFlooredMm;
     let azimuths, placement, startAzimuth = outer.phase + phaseRad, mirrorSymmetric = null;
     if (fanMode) {
       placement = 'LIST';
@@ -3387,7 +3439,7 @@ export function footRing(state, acc, opts = {}) {
       scale, breadth, phaseFrac, pitchRad, pitchDeg: (pitchRad * 180) / Math.PI, phaseRad, phaseDeg: (phaseRad * 180) / Math.PI,
       phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
       startAzimuth, azimuths, placement, mirrorSymmetric,
-      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: footArcMm, footArcMm, footSpanRad, footCapped: footCapped && footMm < footFlooredMm, footArcUnderFloor: footArcMm < FOOT_MIN_WIDTH_MM, footScale,
+      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: footCapWidthMm, footArcMm, footCapMm: footCapWidthMm, footSpanRad, footCapped: footCapped && footMm < footFlooredMm, footArcUnderFloor: footCapWidthMm < FOOT_MIN_WIDTH_MM, footScale,
       own: { lengthMm: own.lengthMm, widthMm: own.widthMm, lengthFloored: own.lengthFloored, widthFloored: own.widthFloored, scaleInert: sepalScaleInert(st) },
       /* THE ATTACHMENT — the whorl's height (the `height` the whorl primitive
          is handed; 0 at the rim, where the flat arm reads `slot.z` as the
@@ -11183,7 +11235,13 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     /* THE BUILDER'S OWN TALLY of what this call emitted (the leaf builder's
        precedent) — SP1 sums the sepals' own against the whorl's. */
     tris: acc.triangleCount - tris0,
-    triStart: tris0,   // where this blade's triangles begin in the accumulator (the texture gate's TX4 reads the range)
+    /* AND WHERE IN THE ACCUMULATOR'S STREAM THEY SIT — [first, end) triangle
+       index (the foot-clearance session): an instrument reading the EMITTED mesh
+       tags each triangle with the petal that emitted it from this range rather
+       than from the nearest lamina point, which mislabels a foot corner beside
+       its neighbour's. Telemetry; nothing here moves a byte. */
+    triRange: [tris0, acc.triangleCount],
+    triStart: tris0,   // where this blade's triangles begin in the accumulator (the texture gate's TX4 reads it with `tris`; leaves and leaflets carry it too, which `triRange` does not)
     /* THE RING ROW'S POINT, THE SEAM STEP AND THE SLOT THIS PETAL WAS BUILT AT —
        read by the sepal angle scan (a trial sepal is rotated about its ring
        tangent through `base`, one builder call per seam-step bucket) and by

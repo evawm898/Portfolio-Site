@@ -1268,6 +1268,10 @@ RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-suppor
   petal and a tube panel and the by-design overlap reads as within-shell pairs — seven TUBE rows declared by value,
   never nudged. Two hemisphere-at-spread-0.6 census rows got much WORSE (272 → 1,424, 264 → 1,268): the cap on a
   2.65 mm ring, attributed and reported, not tuned. T5 declares a blade the rim taper covers whole.
+  **[Oct 22: SUPERSEDED by the foot clearance (the block below) — the cap stands 2^-19 rad inside the arc, the
+  seven tube declarations are REMOVED (all weld, all 0 now), and 1,048 / 932 of the two hemisphere rows' pairs were
+  WELDS between neighbouring petals that this paragraph's nearest-lamina attribution could not see; their genuine
+  folds are 376 / 336, root blend and foot only.]**
 - **Gates**: T4 restated (sepals at their own length, off the file), T5 (every leaf blade off the file), T6 (the
   petiole's rooted ring off the FILE — its first cut read the harness's own rebuild and could not fire), FC1
   (`footCapClauses`, pure; `FC` without a digit was invisible to the smoke census). Z3 / SP3 / SP11 / LF18 / LF26 /
@@ -1281,6 +1285,38 @@ RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-suppor
   from the BASE record; three predicate corrections first — the shared-node petiole's ASKED length, lower sepal
   tiers on their own rings, a closed tube's feet are a record). **Frozen sweep: all 81 baselines carry a mover**
   (19,294 of 72,837 rows); the sweep's `--memo <file>` lets it close in `--frozen-only` batches.
+
+**THE FOOT CAP STANDS 2^-19 RAD INSIDE THE ARC, SO A CAPPED FOOT NEVER SHARES A VERTEX WITH ITS NEIGHBOUR OR A
+TUBE COLUMN** (the foot clearance, Oct 22 — Eva's ruling on #435; read `docs/bloom-foot-clearance-outcome.md` before
+touching `footCapMm`, `FOOT_CAP_CLEARANCE_RAD`, `footCapRestated`, `footVertexClauses` / FC2 or the petal record's
+`triRange`).
+- **The mechanism**: a foot capped EXACTLY on `r x span` puts its margins at the half-step azimuth where its
+  neighbour's are, and wherever the across-row lies on a circle about the axis — the slit tube's ring curve (an edge
+  petal's blended half; an uncut sinus's knot, which sits at the sinus centre = the margin at zero gap), the
+  hemisphere's equator — two parts emit ONE double, the census welds them into one shell and counts their
+  by-design overlap as a fold. Removed, never declared (the leaf petiole's half-step precedent).
+- **The clearance is what the weld needs, derived**: the weld is exact equality on the STL's float32s; a float32 step
+  at r is at most r x 2^-23, so a gap of r x 2^-19 puts each margin (and the tube's knot at the gap's centre) EIGHT
+  float32 steps of the ring's radius from the half-step (X0's own 8). An ANGLE, so it scales with every foot row's
+  radius. Mode-free (reads only the export-floor cap ring and the span); a foot inside its cap is the asked double BY
+  BRANCH; a floored foot holds. The move: 0 at 8 petals, −23.9 nm at 16, −37.7 nm at 40 on the default width;
+  triangle counts identical. NOT half a foot column (a ~0.3 mm notch) and NOT a printable gap (a slit fuses in print).
+- **Diagnose by EMITTER, never by nearest lamina or by edge-connected primitive**: `node
+  tools/bloom-weld-attribute.mjs --only <re> [--root <tree>]` tags each triangle by the stream range of the part that
+  emitted it (the petal and sepal records' `triRange`, telemetry; the tube rings' `triFrom`/`triTo`). Neighbours
+  coincide along whole EDGES on the k 6 tube (one primitive), and a nearest-lamina label hands a foot corner to the
+  neighbour — both read welds as folds. #435's hemisphere attribution was that.
+- **Census**: the seven tube entries REMOVED (263 .. 2,236 pairs, all weld, all 0 now at their base shell counts);
+  `DOME: rise 1 x RADIAL x spread min (0.6)` 1,424 → **376**, `x 6 layers` 1,268 → **336** — genuine folds (root
+  blend + foot, 0 blade), the narrower capped foot, declared with that cause; two FAN per-petal spans and the aligned
+  sepal FAN row (petal x sepal, the ALIGNED WELD class, not this ruling's subject) re-recorded. Browser-confirmed.
+- **FC2** (export gate, beside X0): no position of the exported FILE carried by two parts (petal x petal, petal x
+  tube, sepal x sepal; a sepal on its petal is the declared aligned weld). 0 rows on this tree; on `main` exactly the
+  nine rows. Mutant `the-foot-cap-lands-on-the-arc` in `verify-bloom-root-taper --control` (fires FC1 + FC2). FC1
+  restates the clearance; the harness refuses to load if the constant moves.
+- **Bytes: 247 movers / 1,259 holders, 0 floats on any holder**, both modes (`--movers-predicate foot-clearance`, from
+  the BASE record); frozen sweep 14,930 of 72,837 rows over all 81 baselines; no row added, no phase owed.
+  `--frozen-sweep --memo` now checkpoints inside a baseline.
 
 **SURFACE TEXTURE IS RULED AND PLANNED, NOT BUILT: B, OUTWARD ONLY, HEIGHT A CONTROL WITH A FLOOR**
 (Eva's rulings on #436, Oct 22 — read `docs/bloom-surface-texture-discovery.md` §0, §8 and §10 before any
@@ -11539,10 +11575,19 @@ top the jambs stand on, the jamb and head inner edges the lights read); shading 
 from the profile's own normal against the registry's one fixed `LIGHT`, never painted. Phase 1
 is the arch only; phase 1b carried Eva's rulings on it (intensity 1.00, line weight follows
 darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier
-threshold). Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
-quoting a pass from a changed harness; `--no-browser` for iteration) — **it runs in CI**
-(`frame.yml`, gate plus negative control). Sheet: `node tools/shot-frame-sheet.mjs <dir>`,
-by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
+threshold). **Phase 2 (Oct 22, Eva's ruling 1): the RELIEF STL is the primary output and the
+SVG the secondary** — `frame-relief.js` lifts every band's profile over a flat back as one
+closed shell per band, each EMBEDDED one `MIN_FEATURE_MM` into the neighbour it abuts (a
+declared `spine.embed`, because bands touch face to face and the voxel gate cannot tell a
+graze from an overlap), pierced or backed lights, `Get STL`, and a three.js Relief view
+(`frame-view3d.js`, one light, no auto-rotate). `MIN_FEATURE_MM` 1.0 is an ASSUMPTION (print
+process undecided, ruling 3) that caps output and is told. Gates: `node tools/verify-frame.mjs`
+(2-D + the page) and `node tools/verify-frame-relief.mjs` (W watertight, C voxel-connected,
+R registered on `offsetCurve`, L clear widths, B embeds land, F the floor; `--base <worktree>`
+for the SVG byte identity), each with `--negative-control` required before quoting a pass
+from a changed harness — **both run in CI** (`frame.yml`). Sheets: `node
+tools/shot-frame-sheet.mjs <dir>` (the engraving) and `node tools/shot-frame-relief.mjs <dir>`
+(the relief), by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
 they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
 runs them — the "adding a tool runs the flower gates" corollary recorded in several
 sections above is history as of Oct 1.

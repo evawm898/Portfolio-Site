@@ -689,6 +689,46 @@ const PREDICATE_MOVERS = {
     if (ip && ip.present) return core(base.floretState(st, ip), null) === true;
     return false;
   },
+  /* THE FOOT CLEARANCE (Oct 22, docs/bloom-foot-clearance-outcome.md) — the
+     foot cap stands FOOT_CAP_CLEARANCE_RAD inside the arc. PREDECLARED FROM THE
+     BASE TREE'S OWN RECORD: each ring's asked foot (`widthAskedMm`), its cap
+     ring (`footCapRadiusMm`), its span (`footSpanRad`) and the width it BUILT,
+     with the clearance RESTATED (the harness's derivation, never this tree's
+     builder). A ring moves iff the width the new law restates from those
+     records differs from the base's built width — i.e. the cap binds above the
+     floor (a foot inside its cap is the asked double by branch; a foot the
+     1.6 mm floor wins holds on both trees). The same law for every BUILT sepal
+     tier on its own ring and step, and for a raceme's floret state. Skipped,
+     as `root-support` measured them: a ring with no BUILT petal (the sphere
+     stem's channel took them all) and a whorl a closed tube (k 0) draws — its
+     feet are a record and emit no row. */
+  'foot-clearance': (st, row) => {
+    const F = base.FOOT_MIN_WIDTH_MM, CL = harness.FOOT_CAP_CLEARANCE_RAD_RULED;
+    const newW = (asked, capR, span) => { const cap = capR * (span - CL); return asked > cap ? Math.max(F, cap) : asked; };
+    const core = (s, sc) => {
+      const acc = new base.MeshBuilder({ exportMode: true });
+      const b = base.buildBloomInto(acc, s, { below: null, capability: row.capability ?? null, scopes: sc });
+      for (const [i, r] of (b.rings || []).entries()) {
+        if (!(b.petals || [])[i]) continue;
+        const TL = b.tube && b.tube.active && b.tube.layers ? b.tube.layers[i] : null;
+        if (TL && TL.k === 0) continue;
+        if (newW(r.widthAskedMm, r.footCapRadiusMm, r.footSpanRad) !== r.width) return true;
+      }
+      const tierRecs = (b.foot && b.foot.sepalTiers) || [];
+      const tierBuilt = (b.sepals && b.sepals.tiers) || [];
+      for (const [k, T] of tierRecs.entries()) {
+        const TB = tierBuilt[k];
+        if (!T || !T.ring || !(TB && TB.present && (TB.built || []).some(Boolean))) continue;
+        if (newW(Math.max(F, T.footAskedMm), T.ring.radius, T.footSpanRad) !== T.footMm) return true;
+      }
+      return b;
+    };
+    const b = core(st, harness.rowScopesForBuild(row));
+    if (b === true) return true;
+    const ip = b.inflorescence;
+    if (ip && ip.present) return core(base.floretState(st, ip), null) === true;
+    return false;
+  },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const fr = base.footRing(st, acc);
@@ -1025,7 +1065,7 @@ if (argv.includes('--frozen-sweep')) {
   const memoFile = argOf('--memo');
   const fsM = memoFile ? await import('node:fs') : null;
   if (memoFile && fsM.existsSync(memoFile)) for (const [k, v] of JSON.parse(fsM.readFileSync(memoFile, 'utf8'))) memo.set(k, v);
-  let tags = 0, total = 0, movers = 0, threwAll = 0;
+  let tags = 0, total = 0, movers = 0, threwAll = 0, memoSavedAt = Date.now();
   for (const name of names) {
     const fr = harness.FROZEN_MATRICES[name]();
     let n = 0, threw = 0;
@@ -1033,7 +1073,16 @@ if (argv.includes('--frozen-sweep')) {
       const st = lenient(row);
       const key = JSON.stringify([st, row.capability || null, harness.rowScopesForBuild(row) || null]);
       let v = memo.get(key);
-      if (v === undefined) { try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch (e) { v = 'threw'; if (threwSeen.size < 12 && !threwSeen.has(row.label)) { threwSeen.add(row.label); console.log(`    threw: ${name} ${row.label} — ${String(e && e.message || e).slice(0, 160)}`); } } memo.set(key, v); }
+      if (v === undefined) {
+        try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch (e) { v = 'threw'; if (threwSeen.size < 12 && !threwSeen.has(row.label)) { threwSeen.add(row.label); console.log(`    threw: ${name} ${row.label} — ${String(e && e.message || e).slice(0, 160)}`); } }
+        memo.set(key, v);
+        /* AND A CHECKPOINT INSIDE A BASELINE (the foot-clearance session): a
+           baseline of ~950 rows outlasts one foreground call, and a memo
+           written only after each baseline then never advances — measured,
+           two of four workers closed 0 phases in 570 s. Keyed on the state, so
+           a resumed run skips exactly what was answered. */
+        if (memoFile && Date.now() - memoSavedAt > 30000) { fsM.writeFileSync(memoFile, JSON.stringify([...memo])); memoSavedAt = Date.now(); }
+      }
       if (v === 'threw') threw++; else if (v) n++;
     }
     total += fr.length; movers += n; threwAll += threw; if (n) tags++;

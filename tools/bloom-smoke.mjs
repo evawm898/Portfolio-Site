@@ -1021,6 +1021,8 @@ export const SMOKE_BLOCKS = [
         path: "MUST FIX 2's row — the live sinus 0.144 mm and the export one 0.908 against the 0.50 mm bead bar; the notch decision reads both modes, so tris(live) === tris(export) here, which both STL gates assert" },
       { label: 'TUBE: k 0 x tilt 105 (the ring folds as the petal does past a right angle)',
         path: "a DECLARED fold — X1 holds it to 318 pairs / 0.3800 mm in both directions" },
+      { label: 'TUBE: 12 petals x k 6 (6 panels)',
+        path: "FC2 on a CAPPED foot: at 12 petals the cap binds (6.40 asked, 5.67 mm of arc) and every petal is a slit's edge petal whose open half is blended onto the ring curve, so a cap ON the arc puts two neighbours' margins and the tube's column on one double — the clause reads the exported file's own float32s and requires no two parts to carry one position (the foot-clearance ruling, Oct 22); X2 holds the row at 0 pairs" },
       { label: 'TUBE: GATED — the buckle (unavailable, inert)',
         path: "TU0's other arm — a ring asked where the ruling makes it unavailable: the geometry reports unavailable, no ring is built" },
     ],
