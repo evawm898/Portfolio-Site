@@ -9,6 +9,7 @@ import * as G from './lantern-geometry.js';
 import * as PAT from './lantern-pattern.js';
 import * as MAT from './lantern-material.js';
 import * as EXP from './lantern-export.js';
+import * as BLD from './lantern-build.js';
 import { curveFunction, proposeEdit, nearestOnCurve, quantise, curveEquals, cloneCurve } from './bloom-curve.js';
 import { createFoldedView } from './lantern-view.js';
 
@@ -18,7 +19,7 @@ const $ = (id) => document.getElementById(id);
 const inch = (mm) => (mm / G.MM_PER_IN).toFixed(1) + '″';
 
 /* ---------------- state and history ---------------- */
-let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, ...BLD.BACKING_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
 let rules = MAT.rulesFor(MAT.stockOf(state), MAT.machineOf(state));   // the material model's derived rules, re-read on every rebuild
 let plan = null;        // the export plan: pieces, sheets, notes (see rebuildNow)
 let pattern = null;      // the pattern laid onto the model's facets, judged (see rebuildNow)
@@ -63,6 +64,9 @@ const CONTROLS = [
   { id: 'caliper', sec: 'materialCtrls', kind: 'range', label: 'Thickness', min: MAT.CALIPER_RANGE[0], max: MAT.CALIPER_RANGE[1], step: 0.01, fmt: (v) => `${v.toFixed(2)} mm`, when: (s) => s.material === 'custom', tip: 'The caliper, measured with a micrometer or taken from the mill\'s sheet. It drives every rule.' },
   { id: 'machine', sec: 'materialCtrls', kind: 'select', label: 'Machine', options: MAT.MACHINES.map((m) => [m.id, m.name]), tip: 'A laser scores the mountains and perforates the valleys; a blade cutter scores both and leaves the PERF layer empty.' },
   { id: 'bed', sec: 'materialCtrls', kind: 'select', label: 'Bed', options: MAT.BEDS.map((b) => [b.id, b.name]), tip: 'The cutting area. A half that does not fit is split into one module per point, joined on the valley folds.' },
+  { id: 'backing', sec: 'backingCtrls', kind: 'check', label: 'Tissue backing', tip: 'Translucent tissue glued behind each point\'s cuts, so the light comes through colour.' },
+  { id: 'backingColours', sec: 'backingCtrls', kind: 'range', label: 'Colours', min: 1, max: 3, step: 1, fmt: (v) => `${v}`, when: (s) => s.backing, tip: 'One colour, two alternating around the star, or a triad.' },
+  { id: 'palette', sec: 'backingCtrls', kind: 'select', label: 'Palette', options: BLD.PALETTES.map((p) => [p.id, p.name]), when: (s) => s.backing, tip: 'Curated tissue colours; the pieces are labelled by point.' },
   { id: 'profile', sec: 'profileCtrls', kind: 'select', label: 'Side profile', options: [['straight', 'straight — classic triangle'], ['faceted', 'faceted curve (phase 6, not yet)']], disabledOptions: ['faceted'], tip: 'Straight: the ridge runs straight from centre to tip. Faceted: extra creases round the body (not built yet).' },
 ];
 const SECS = {};
@@ -178,7 +182,12 @@ function rebuildNow({ commit = true } = {}) {
   pattern = PAT.patternForModel(model, state, rules, { validate: commit || !pattern });   // mid-gesture the raster judge is skipped; the commit runs it, and so does the first paint
   stats.patternMs = performance.now() - t1; stats.patterns++;
   plan = EXP.exportPlan(model, pattern, state, rules);
-  drawRules(); drawPlan();
+  plan.backing = state.backing && state.patMode !== 'none' ? [...BLD.backingPieces(model, state, rules, 'front'), ...BLD.backingPieces(model, state, rules, 'back')] : [];
+  plan.backingSheets = plan.backing.length ? EXP.nest(plan.backing, plan.bed) : [];
+  plan.weightG = MAT.weightEstimate(paperAreaMm2(), cutFraction(), rules.gsm);
+  plan.steps = BLD.buildSteps(model, plan, state, rules, { backing: plan.backing.length });
+  drawRules(); drawPlan(); drawSwatch();
+  if (view === 'build') drawBuild();
   syncControls();
   drawDims();
   drawFlags();
@@ -202,9 +211,11 @@ function textureFor(rec, solid) {
 }
 function pushMesh() {
   const solidAlt = !!state.patSolidAlt && state.patMode !== 'none';
-  const front = G.foldedMesh(model, 1, { solidAlternate: solidAlt }), back = G.foldedMesh(model, -1, { opening: true, solidAlternate: solidAlt });
+  const backing = !!state.backing && state.patMode !== 'none';
+  const front = G.foldedMesh(model, 1, { solidAlternate: solidAlt, perPoint: backing }), back = G.foldedMesh(model, -1, { opening: true, solidAlternate: solidAlt, perPoint: backing });
   const texOf = (part) => (state.patMode === 'none' ? null : textureFor(pattern.types[model.alternate ? (part.type === 'short' ? 1 : 0) : 0], part.solid));
-  fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt, textureOf: texOf });
+  const colourOf = backing ? (part) => (part.solid ? null : BLD.colourOfPoint(state, part.j)) : null;
+  fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt, textureOf: texOf, colourOf });
   meshFitted = true; lastFitRadius = model.flatSpan;
 }
 let meshFitted = false, lastFitRadius = 0;
@@ -219,7 +230,17 @@ function drawPlan() {
   const sheets = p.sheets.length, util = p.sheets.reduce((s, sh) => s + sh.utilisation, 0) / Math.max(1, sheets);
   const area = paperAreaMm2(), cutFrac = cutFraction();
   const w = MAT.weightEstimate(area, cutFrac, rules.gsm);
-  $('planOut').innerHTML = `<b>${p.bed.name}</b>  ${p.split ? `${model.N} point modules a half, seams on the valley folds` : 'each half whole'} · ${p.pieces.length} pieces on <b>${sheets} sheet${sheets > 1 ? 's' : ''}</b> · ${(util * 100).toFixed(0)}% of the bed used\n<b>paper</b>  ${(area / 1e4).toFixed(1)} dm² before cutting, ${(cutFrac * 100).toFixed(0)}% cut away · about <b>${w.toFixed(0)} g</b> of paper${p.fitsBed ? '' : '\n<b>does not fit</b> — see Checks'}`;
+  const bk = p.backing.length ? ` · ${p.backing.length} tissue pieces on ${p.backingSheets.length} more sheet${p.backingSheets.length > 1 ? 's' : ''}` : '';
+  $('planOut').innerHTML = `<b>${p.bed.name}</b>  ${p.split ? `${model.N} point modules a half, seams on the valley folds` : 'each half whole'} · ${p.pieces.length} pieces on <b>${sheets} sheet${sheets > 1 ? 's' : ''}</b> · ${(util * 100).toFixed(0)}% of the bed used${bk}\n<b>paper</b>  ${(area / 1e4).toFixed(1)} dm² before cutting, ${(cutFrac * 100).toFixed(0)}% cut away · about <b>${w.toFixed(0)} g</b> of paper${p.fitsBed ? '' : '\n<b>does not fit</b> — see Checks'}`;
+}
+function drawSwatch() { const host = $('paletteSwatch'); host.replaceChildren(); if (!state.backing) return; const cols = BLD.paletteOf(state).colours.slice(0, state.backingColours); for (const c of cols) { const sw = document.createElement('span'); sw.className = 'ln-swatch'; sw.style.background = c; sw.title = c; host.append(sw); } const n = document.createElement('span'); n.className = 'ln-note'; n.textContent = `point 1 ${cols[0]}${cols.length > 1 ? `, point 2 ${cols[1]}` : ''}${cols.length > 2 ? `, point 3 ${cols[2]}` : ''}, and round`; host.append(n); }
+/* the Build view: the steps, the counts, the machine settings — one list, drawn here and into the PDF */
+function drawBuild() {
+  const steps = plan.steps, settings = BLD.settingsTable(plan.machine, rules);
+  $('buildView').innerHTML = `<h2>Build — ${model.N}-point star, ${model.width.toFixed(0)} mm</h2><p class="ln-build-sub">${plan.pieces.length} pieces on ${plan.sheets.length} sheet${plan.sheets.length > 1 ? 's' : ''}${plan.backing.length ? `, ${plan.backing.length} tissue pieces` : ''} · ${plan.machine.name} · ${state.material} · about ${Math.round(plan.weightG)} g</p>` +
+    `<ol>${steps.map((st) => `<li><b>${st.title}</b>${st.text}</li>`).join('')}</ol>` +
+    `<table><tr><th>layer</th><th>starting setting</th><th>what it does</th></tr>${settings.map((r) => `<tr><td>${r.layer}</td><td>${r.setting}</td><td>${r.note}</td></tr>`).join('')}</table>` +
+    `<p class="ln-note">settings are starting values for a power test on this stock — every machine is its own. <span class="ln-warn">LED light only.</span></p>`;
 }
 /* both halves' paper (the facets, the tabs) and the share the pattern cuts away */
 function paperAreaMm2() { const h = G.halfOutline(model, 'front'); return 2 * polyAreaAbs(h.outline) + h.tabs.filter(Boolean).reduce((s, t) => s + polyAreaAbs(t.poly), 0); }
@@ -447,9 +468,10 @@ function setView(name) {
   for (const b of $('views').children) b.classList.toggle('is-on', b.dataset.view === name);
   $('flatSvg').toggleAttribute('hidden', name !== 'flat');
   $('foldCanvas').toggleAttribute('hidden', name !== 'folded');
-  $('previewLabel').textContent = name === 'flat' ? 'Flat — the cut file' : 'Folded';
-  $('previewHint').textContent = name === 'flat' ? 'one half, as it is cut: creases as the file carries them' : 'drag to turn · scroll to zoom · it turns on its own when left alone';
-  if (name === 'folded') { fold.start(); pushMesh(); } else { fold.stop(); drawFlat(); }
+  $('buildView').toggleAttribute('hidden', name !== 'build');
+  $('previewLabel').textContent = name === 'flat' ? 'Flat — the cut file' : name === 'build' ? 'Build — the instructions' : 'Folded';
+  $('previewHint').textContent = name === 'flat' ? 'one half, as it is cut: creases as the file carries them' : name === 'build' ? 'the same steps go into the PDF, with the counts of this star' : 'drag to turn · scroll to zoom · it turns on its own when left alone';
+  if (name === 'folded') { fold.start(); pushMesh(); } else if (name === 'flat') { fold.stop(); drawFlat(); } else { fold.stop(); drawBuild(); }
 }
 for (const b of $('views').children) b.addEventListener('click', () => setView(b.dataset.view));
 flatSvg.addEventListener('click', () => { if (flatFocus) { flatFocus = null; drawFlat(); } });
@@ -486,6 +508,10 @@ async function exportZip() {
     const JSZip = await loadJsZip();
     const zip = new JSZip();
     for (const f of sheetSvgs()) zip.file(f.name, f.text);
+    plan.backingSheets.forEach((sh, k) => { sh.machine = plan.machine; zip.file(`${stamp()}-backing-${k + 1}-of-${plan.backingSheets.length}.svg`, EXP.sheetSvg(sh, k, plan.backingSheets.length, { stamp: `${stamp()} tissue backing (cut from the tissue, colour per label: ${BLD.paletteOf(state).colours.slice(0, state.backingColours).join(' / ')})` })); });
+    zip.file(`${stamp()}-test-grid.svg`, BLD.testGridSvg(rules, { stamp: stamp() }));
+    zip.file(`${stamp()}-coupon.svg`, couponSvg());
+    zip.file('INSTRUCTIONS.txt', BLD.instructionsText(plan.steps, model));
     zip.file('README.txt', EXP.readme(model, plan, state, rules));
     zip.file(`${stamp()}.json`, G.serializeDesign(state));
     const blob = await zip.generateAsync({ type: 'blob' });
@@ -499,12 +525,47 @@ function exportPng() {
   fold.renderOnce();
   $('foldCanvas').toBlob((blob) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${stamp()}.png`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); $('exportMsg').textContent = 'the folded view written as a PNG, at the canvas\'s own size.'; });
 }
+/* the coupon: one front point module, alone on the bed */
+function couponSvg() {
+  const mods = EXP.modulePieces(model, pattern, state, 'front', rules);
+  const sh = EXP.nest(BLD.couponPieces(mods), plan.bed)[0]; sh.machine = plan.machine;
+  return EXP.sheetSvg(sh, 0, 1, { stamp: `${stamp()} coupon — one point` });
+}
+let jspdfLoading = null;
+function loadJsPdf() { if (window.jspdf) return Promise.resolve(window.jspdf); if (!jspdfLoading) jspdfLoading = new Promise((res, rej) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'; sc.onload = () => res(window.jspdf); sc.onerror = () => { jspdfLoading = null; rej(new Error('jsPDF did not load')); }; document.head.append(sc); }); return jspdfLoading; }
+async function exportPdf() {
+  try {
+    const { jsPDF } = await loadJsPdf();
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const W = 210, M = 18; let y = 22;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.text(`${model.N}-point paper star lantern — assembly`, M, y); y += 8;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(90);
+    doc.text(`${model.width.toFixed(0)} mm wide, ${model.depth.toFixed(0)} mm deep · ${state.material} · ${plan.machine.name} · ${plan.pieces.length} pieces on ${plan.sheets.length} sheet${plan.sheets.length > 1 ? 's' : ''}${plan.backing.length ? ` · ${plan.backing.length} tissue pieces` : ''}`, M, y); y += 10;
+    doc.setTextColor(20);
+    plan.steps.forEach((st, i) => {
+      const lines = doc.splitTextToSize(st.text, W - 2 * M - 10);
+      if (y + 6 + lines.length * 5 > 282) { doc.addPage(); y = 22; }
+      doc.setFont('helvetica', 'bold'); doc.text(`${i + 1}. ${st.title}`, M, y); y += 5.5;
+      doc.setFont('helvetica', 'normal'); doc.text(lines, M + 6, y); y += lines.length * 5 + 3;
+    });
+    if (y + 40 > 282) { doc.addPage(); y = 22; }
+    doc.setFont('helvetica', 'bold'); doc.text('Machine settings — starting values for a power test', M, y); y += 6;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    for (const r of BLD.settingsTable(plan.machine, rules)) { doc.text(`${r.layer}: ${r.setting} — ${r.note}`, M, y); y += 5; }
+    y += 4; doc.setFont('helvetica', 'bold'); doc.setTextColor(170, 60, 40); doc.text('LED light only. Never an incandescent or halogen bulb in a paper lantern.', M, y);
+    doc.save(`${stamp()}-instructions.pdf`);
+    $('exportMsg').textContent = `instructions written: ${plan.steps.length} steps and the settings, A4.`;
+  } catch (e) { $('exportMsg').textContent = `the PDF could not be written: ${e.message}`; }
+}
+$('testGrid').addEventListener('click', () => { download(`${stamp()}-test-grid.svg`, BLD.testGridSvg(rules, { stamp: stamp() })); $('exportMsg').textContent = 'the test grid written — cut it on your stock first, weed it, and keep the narrowest that survived.'; });
+$('coupon').addEventListener('click', () => { download(`${stamp()}-coupon.svg`, couponSvg()); $('exportMsg').textContent = 'the coupon written: one point of this star, as it will cut.'; });
+$('instructionsPdf').addEventListener('click', exportPdf);
 $('exportZip').addEventListener('click', exportZip);
 $('exportPng').addEventListener('click', exportPng);
 $('randomPattern').addEventListener('click', randomPattern);
 $('patReseed').addEventListener('click', reseedPattern);
 $('undo').addEventListener('click', undo); $('redo').addEventListener('click', redo);
-$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
+$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, ...BLD.BACKING_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
 $('randomShape').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; const seed = (Math.random() * 2 ** 31) >>> 0; const st = G.randomShape(seed); state = { ...state, ...st, width: state.width }; pushHistory(prev); $('presetNote').textContent = `random #${seed.toString(36)}`; rebuild({ commit: true }); });
 document.addEventListener('keydown', (ev) => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); }
@@ -546,4 +607,6 @@ window.__lantern = {
   rules: () => ({ ...rules }), plan: () => plan && { split: plan.split, sheets: plan.sheets.length, pieces: plan.pieces.length, fitsBed: plan.fitsBed, bed: plan.bed.id, notes: plan.notes.map((n) => n.id) },
   sheetSvgs: () => sheetSvgs().map((f) => ({ name: f.name, paths: (f.text.match(/<path/g) || []).length })), readme: () => EXP.readme(model, plan, state, rules),
   rulesText: () => $('rulesOut').textContent, planText: () => $('planOut').textContent,
+  steps: () => plan.steps.map((st) => st.title), backingPieces: () => plan.backing.length, backingSheets: () => plan.backingSheets.length, buildText: () => $('buildView').textContent,
+  testGridSvg: () => BLD.testGridSvg(rules, { stamp: stamp() }), couponSvg,
 };

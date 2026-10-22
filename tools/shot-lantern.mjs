@@ -76,6 +76,22 @@ save('export.png', await shotOf('#secExport'), 'Export: the plan on the default 
   save('sheet-1.png', await sheetPage.screenshot(), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
   await sheetPage.close();
 }
+await T(() => window.__lantern.set('backing', true)); await page.waitForTimeout(500);
+save('backing.png', await shotOf('.ln-preview'), 'tissue backing on, two colours of the warm palette alternating by point, seen through the cuts');
+await T(() => window.__lantern.set('backingColours', 3)); await T(() => window.__lantern.set('palette', 'dusk')); await page.waitForTimeout(500);
+save('backing-dusk.png', await shotOf('.ln-preview'), 'three colours, the dusk palette');
+await page.locator('#secBacking').evaluate((d) => { d.open = true; }); await page.locator('#secBacking').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('backing-panel.png', await shotOf('#secBacking'), 'the Backing section: on / off, colours, the palette and its swatches');
+await T(() => window.__lantern.view('build')); await page.waitForTimeout(200);
+save('build.png', await shotOf('.ln-preview'), 'the Build view: the eleven steps with this star\'s own counts, and the machine settings table (starting values)');
+{
+  const grid = await T(() => window.__lantern.testGridSvg());
+  const gp = await s.browser.newPage({ viewport: { width: 1220, height: 740 }, deviceScaleFactor: 2 });
+  await gp.setContent(`<body style="margin:10px;background:#333">${grid.replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1200" height="720" style="background:#f4f2ec"')}</body>`); await gp.waitForTimeout(100);
+  save('test-grid.png', await gp.screenshot(), 'the test grid for the stock: bridges, holes, strokes and a score beside a cut, the derived value marked ◀ — cut this before the star');
+  await gp.close();
+}
+await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.view('folded'));
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
 save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');

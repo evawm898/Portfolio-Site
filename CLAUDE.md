@@ -11630,8 +11630,8 @@ outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
 with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
 path-scoped to the lantern's files plus `bloom-curve.js`): `node
 tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
-mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P14 in
-Chromium, `--negative-control` fifteen mutants of the page). Sheet: `node
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P15 in
+Chromium, `--negative-control` eighteen mutants of the page). Sheet: `node
 tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
 built. **Phase 2 is built too (doc §4): `lantern-pattern.js` lays out a scroll
 skeleton (a stem, stem-rooted volutes, fillers, a rim band) or a lattice per
@@ -11648,6 +11648,10 @@ derives every cutting rule from the stock's caliper with floors (starting values
 point on the VALLEY folds with a seam tab and a label pair per seam, nests the
 pieces on shelves, and writes one SVG per sheet (CUT / SCORE / PERF / ENGRAVE)
 zipped with a README and the design.** `node tools/verify-lantern-export.mjs`
-(X0–X8, eleven mutants) is the third Node gate; the page gate is P0–P14 with
-fifteen mutants. Backing, instructions, the coupon and the lit view are phases
-4–6.
+(X0–X10, fifteen mutants) is the third Node gate; the page gate is P0–P15 with
+eighteen mutants. **Phase 4 is built (doc §7, §9): `lantern-build.js` lays one
+tissue BACKING piece per point per half behind the cut field, held off every
+fold, colours cycling by point from a palette (drawn in the folded view as a
+translucent skin); the Build view and the jsPDF instructions draw ONE step list
+with this star's counts (LED only); the test grid marks the stock's derived
+values and the coupon is one point alone.** The lit view is phase 5.
