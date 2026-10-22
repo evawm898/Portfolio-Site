@@ -90,8 +90,8 @@ export function voluteStart(Lv, re, turns, rMax) {
    volute (a log spiral) — continuous everywhere, tightening all the way out.
    sign: +1 curls left of the direction of march, −1 right. ramp: the
    S-scroll's smoothstep length. */
-function halfCurve(h, rMid, rv, re, sign, ramp, phi0) {
-  const sv = h * (1 - VOLUTE_SHARE), Lv = h - sv;
+function halfCurve(h, rMid, rv, re, sign, ramp, phi0, share) {
+  const sv = h * (1 - share), Lv = h - sv;
   const rho = (s) => (s <= sv ? rMid + (rv - rMid) * s / sv : rv + (re - rv) * (s - sv) / Lv);
   const kap = (s) => sign * (ramp > 0 ? smooth(s / ramp) : 1) / rho(s);
   const pts = [[0, 0]], phi = [phi0], kk = [kap(0)], u = [0];
@@ -127,14 +127,15 @@ export function scrollCurve(spec) {
   const ramp = kind === 'S' ? 0.2 * Math.min(h1, h2) : 0;
   const rMid = SCROLL_BODY[kind] * L;
   const re = (t + MIN_FEATURE_MM) / 2;
-  const rv = [h1, h2].map((h) => voluteStart(h * VOLUTE_SHARE, re, turns, rMid));
-  const B = halfCurve(h2, rMid, rv[1], re, +1, ramp, 0);
-  const A = halfCurve(h1, rMid, rv[0], re, kind === 'C' ? -1 : +1, ramp, Math.PI);
+  const share = spec.share ?? VOLUTE_SHARE;
+  const rv = [h1, h2].map((h) => voluteStart(h * share, re, turns, rMid));
+  const B = halfCurve(h2, rMid, rv[1], re, +1, ramp, 0, share);
+  const A = halfCurve(h1, rMid, rv[0], re, kind === 'C' ? -1 : +1, ramp, Math.PI, share);
   const pts = [], tan = [], u = [], kap = [];
   for (let i = A.pts.length - 1; i >= 1; i--) { pts.push(A.pts[i]); tan.push(A.phi[i] - Math.PI); u.push(-A.u[i]); kap.push(-A.kap[i]); }
   for (let i = 0; i < B.pts.length; i++) { pts.push(B.pts[i]); tan.push(B.phi[i]); u.push(B.u[i]); kap.push(B.kap[i]); }
   const nrm = tan.map((f) => [-Math.sin(f), Math.cos(f)]);
-  const built = [h1, h2].map((h, i) => linTurn(h * VOLUTE_SHARE, rv[i], re) / (2 * Math.PI));
+  const built = [h1, h2].map((h, i) => linTurn(h * share, rv[i], re) / (2 * Math.PI));
   return { kind, pts, nrm, tan, u, kap, root: A.pts.length - 1, info: { L, t, rMid, rv, eye: re, h1, h2, turnsAsked: turns, turnsBuilt: built } };
 }
 
@@ -153,26 +154,81 @@ export function selfGap(curve, t) {
   return { gap: best, at };
 }
 
-/* The scroll as built: the wire floored at F (told); the volutes' turns
-   lowered by bisection until the self-gap is at least F — a coil or a mouth
-   that would close is opened rather than printed as a web — and the turns
-   built reported beside the turns asked. */
+/* The most volute turns (≤ `asked`) a scroll admits with every coil gap at
+   least F: bisection, the gap rising as the turns fall (0 turns is the bare
+   body). Returns the turns and whether the clamp bound. */
+function printableTurns(base, t, asked) {
+  if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return { turns: asked, bound: false };
+  let lo = 0, hi = asked;
+  for (let i = 0; i < 40 && hi - lo > 1e-4; i++) { const m = (lo + hi) / 2; if (selfGap(scrollCurve({ ...base, turns: m }), t).gap >= MIN_FEATURE_MM) lo = m; else hi = m; }
+  return { turns: lo, bound: true };
+}
+
+/* THE TIGHTNESS RANGE IS FITTED TO THE SCROLL (Eva's ruling 2 on step 1:
+   no dead travel). A coil needs its own wire plus a feature of room, so a
+   short scroll cannot hold the 1¾ turns a long one can, and a fixed range
+   left most of the slider held at one shape (measured at 60 mm on a 1.6 mm
+   wire: everything above tightness 0.27 built 0.84 turns). Two moves, in
+   this order:
+     1. the volute's SHARE of each half rises from VOLUTE_SHARE toward
+        VOLUTE_SHARE_MAX until the top of the range fits — a longer spiral
+        spaces its coils further apart, so a small scroll gives its body to
+        its volute (bisection on the share, the printable turns rising with
+        it);
+     2. where even the largest share cannot hold 1¾ turns, the range's TOP is
+        the most that prints, and tightness spans [½ turn, that] — so every
+        step of the slider changes the scroll, and tightness 1 means "as
+        tight as this wire and length print" (told, with the number).
+   Below half a turn nothing is left to span: the slider is inert, told. */
+export const VOLUTE_SHARE_MAX = 0.8;
+const fitMemo = new Map();
+export function tightnessFit(spec) {
+  const t = Math.max(spec.wire, MIN_FEATURE_MM);
+  const key = [spec.kind, spec.length, t, spec.balance, spec.share].join('|');
+  if (!fitMemo.has(key)) fitMemo.set(key, fitUncached({ ...spec, wire: t }, t));   // pure: tightness does not enter it
+  return fitMemo.get(key);
+}
+function fitUncached(base, t) {
+  const spec = base;
+  const top = VOLUTE_TURNS[1];
+  const at = (share) => printableTurns({ ...base, share }, t, top).turns;
+  if (spec.share != null) return { share: spec.share, turnsMax: at(spec.share) };
+  if (at(VOLUTE_SHARE) >= top) return { share: VOLUTE_SHARE, turnsMax: top };
+  const capT = at(VOLUTE_SHARE_MAX);
+  if (capT < top) return { share: VOLUTE_SHARE_MAX, turnsMax: capT };
+  let lo = VOLUTE_SHARE, hi = VOLUTE_SHARE_MAX;
+  for (let i = 0; i < 30 && hi - lo > 1e-4; i++) { const m = (lo + hi) / 2; if (at(m) >= top) hi = m; else lo = m; }
+  return { share: hi, turnsMax: top };
+}
+
+/* The scroll as built: the wire floored at F (told); the tightness mapped
+   onto the scroll's own fitted range; and, as a safety, the volutes' turns
+   lowered by bisection should the gap still fall under F — a coil or a mouth
+   that would close is opened rather than printed as a web — with the turns
+   built reported beside the turns asked. An explicit spec.turns (the gap
+   clamp's own probe) bypasses the fit. */
 export function buildScroll(spec) {
   const told = [];
   let t = spec.wire;
   if (t < MIN_FEATURE_MM) { told.push(`wire ${t.toFixed(2)} mm built at the ${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum feature`); t = MIN_FEATURE_MM; }
-  const base = { ...spec, wire: t };
-  const asked = spec.turns ?? tightnessTurns(spec.tightness ?? 0.5);
-  let c = scrollCurve({ ...base, turns: asked });
-  let g = selfGap(c, t);
-  let turns = asked;
-  if (g.gap < MIN_FEATURE_MM) {
-    let lo = 0, hi = asked;                              // the gap rises as the turns fall; 0 turns is the bare body
-    for (let i = 0; i < 40 && hi - lo > 1e-4; i++) { const m = (lo + hi) / 2; if (selfGap(scrollCurve({ ...base, turns: m }), t).gap >= MIN_FEATURE_MM) lo = m; else hi = m; }
-    turns = lo; c = scrollCurve({ ...base, turns }); g = selfGap(c, t);
-    told.push(`volutes held at ${turns.toFixed(2)} of ${asked.toFixed(2)} turns — a closer coil leaves a gap under the ${MIN_FEATURE_MM.toFixed(1)} mm feature`);
+  let base = { ...spec, wire: t }, asked, fit = null;
+  if (spec.turns != null) asked = spec.turns;
+  else {
+    fit = tightnessFit(base);
+    base = { ...base, share: fit.share };
+    const tau = Math.min(1, Math.max(0, spec.tightness ?? 0.5));
+    const lo = Math.min(VOLUTE_TURNS[0], fit.turnsMax);
+    asked = lo + (fit.turnsMax - lo) * tau;
+    if (fit.turnsMax < VOLUTE_TURNS[1]) told.push(fit.turnsMax <= VOLUTE_TURNS[0]
+      ? `tightness inert — a ${(spec.length).toFixed(0)} mm scroll on a ${t.toFixed(1)} mm wire prints at most ${fit.turnsMax.toFixed(2)} turns`
+      : `tightness spans ${lo.toFixed(2)}–${fit.turnsMax.toFixed(2)} turns — the most a ${(spec.length).toFixed(0)} mm scroll on a ${t.toFixed(1)} mm wire prints (volute ${(fit.share * 100).toFixed(0)}% of each half)`);
   }
-  c.info = { ...c.info, wire: t, turnsAsked: asked, turnsHeld: turns, selfGap: g.gap, gapAt: g.at, told };
+  const held = printableTurns(base, t, asked);
+  const turns = held.turns;
+  const c = scrollCurve({ ...base, turns });
+  const g = selfGap(c, t);
+  if (held.bound) told.push(`volutes held at ${turns.toFixed(2)} of ${asked.toFixed(2)} turns — a closer coil leaves a gap under the ${MIN_FEATURE_MM.toFixed(1)} mm feature`);
+  c.info = { ...c.info, wire: t, share: base.share ?? VOLUTE_SHARE, fit, turnsAsked: asked, turnsHeld: turns, selfGap: g.gap, gapAt: g.at, told };
   return c;
 }
 
@@ -203,10 +259,10 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
   const out = [{ curve: lead, role: 'lead', parent: null, station: null }];
   const stations = [];
   for (let i = 1; i < n; i++) stations.push((i % 2 ? -1 : 1) * (0.18 + 0.14 * Math.floor((i - 1) / 2)));
-  stations.forEach((frac, i) => {
+  const placeChild = (frac, i, tau) => {
     const order = Math.floor(i / 2) + 1;
     const len = length * ratio ** order, tw = Math.max(MIN_FEATURE_MM, wire * Math.sqrt(ratio) ** order);
-    const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness, wire: tw, balance });
+    const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness: tau, wire: tw, balance });
     // the lead's station at arc length frac · L from its root, on its BACK
     // (the side opposite its normal)
     const target = frac * lead.info.L;
@@ -215,8 +271,31 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
     const at = [lead.pts[j][0] - off * lead.nrm[j][0], lead.pts[j][1] - off * lead.nrm[j][1]];
     // the child's back faces the lead: its own normal points AWAY from the
     // lead, so it is laid along the lead's tangent and flipped
-    const placed = placeCurve(child, { at, angle: lead.tan[j], flip: true });
-    out.push({ curve: placed, role: 'child', parent: 0, station: j, contact: at });
+    return { curve: placeCurve(child, { at, angle: lead.tan[j], flip: true }), role: 'child', parent: 0, station: j, contact: at };
+  };
+  // A child's volutes must clear every wire already laid, outside its own
+  // junction, by a feature: where the asked tightness would cross one (a
+  // tighter, longer volute reaching back over the lead), the CHILD's
+  // tightness is lowered by bisection until it clears — told.
+  const clears = (x) => out.every((y) => pairGap(x.curve, y.curve).gap >= MIN_FEATURE_MM);
+  stations.forEach((frac, i) => {
+    let x = placeChild(frac, i, tightness);
+    if (clears(x)) { out.push(x); return; }
+    // first the child's tightness; where even a half-turn volute crosses (the
+    // lead's own volute has coiled back over the station), the station slides
+    // toward the root a tenth at a time; a child that clears nowhere is not
+    // built — every step told
+    for (let k = 10; k >= 3; k--) {
+      const f = frac * k / 10;
+      if (!clears(placeChild(f, i, 0))) continue;
+      let lo = 0, hi = tightness, best = placeChild(f, i, 0);
+      for (let q = 0; q < 20 && hi - lo > 1e-3; q++) { const m = (lo + hi) / 2, y = placeChild(f, i, m); if (clears(y)) { lo = m; best = y; } else hi = m; }
+      if (k < 10) best.curve.info.told.push(`child ${i} moved from ${(100 * Math.abs(frac)).toFixed(0)}% to ${(100 * Math.abs(f)).toFixed(0)}% of the lead's length from its root — at its station the lead's volute crosses it`);
+      if (lo < tightness - 1e-3) best.curve.info.told.push(`child ${i} held at tightness ${lo.toFixed(2)} of ${tightness.toFixed(2)} — a tighter volute crosses another wire of the group`);
+      best.heldTightness = lo; out.push(best); return;
+    }
+    out.dropped = (out.dropped || 0) + 1;
+    (out[0].curve.info.told).push(`child ${i} not built — it crosses another wire of the group at every station and tightness`);
   });
   return out;
 }
@@ -229,7 +308,7 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
    half-round is a true semicircle of radius t/2 standing on the base;
    round raises it on a wall of t/2, so the visible top is the upper half of
    a round wire of diameter t. */
-export function wireProfile(shape = 'round') {
+export function wireProfile(shape = 'half-round') {
   const x = new Float64Array(WIRE_SAMPLES + 1), z = new Float64Array(WIRE_SAMPLES + 1);
   for (let i = 0; i <= WIRE_SAMPLES; i++) {
     x[i] = i / WIRE_SAMPLES;
@@ -246,7 +325,7 @@ export const scrollSpine = (c, id) => ({ id, pts: c.pts, nrm: c.nrm, bandWidth: 
 /* Lay a list of placed curves into a mesh as closed wire solids standing on
    a base of `baseZ` (print mm; the vocabulary sheet stands them on a plate of
    that thickness). scale maps the curve's mm to print mm (1 on the sheet). */
-export function scrollsIntoMesh(mesh, curves, { scale = 1, baseZ = 1, shape = 'round' } = {}) {
+export function scrollsIntoMesh(mesh, curves, { scale = 1, baseZ = 1, shape = 'half-round' } = {}) {
   const prof = wireProfile(shape);
   curves.forEach((c, i) => bandSolid(mesh, scrollSpine(c, `scroll${i}`), prof, { scale, plateT: baseZ, reliefDepth: wireHeight(c.info.wire, shape) * scale }));
   return mesh;
@@ -265,6 +344,12 @@ export function scrollRelief(curves, opts = {}) {
    excluded and their length reported, so a junction cannot hide a second
    near-contact elsewhere. */
 export function pairGap(a, b) {
+  // read from BOTH wires: the junction is found along the first argument, so
+  // one order alone can mistake a crossing for the junction and miss it
+  const x = pairGapFrom(a, b), y = pairGapFrom(b, a);
+  return x.gap <= y.gap ? x : y;
+}
+function pairGapFrom(a, b) {
   const ta = a.info.wire, tb = b.info.wire, need = (ta + tb) / 2 + MIN_FEATURE_MM;
   const near = (i) => { let m = Infinity, jm = -1; for (let j = 0; j < b.pts.length; j++) { const d = Math.hypot(a.pts[i][0] - b.pts[j][0], a.pts[i][1] - b.pts[j][1]); if (d < m) { m = d; jm = j; } } return [m, jm]; };
   const d = a.pts.map((_, i) => near(i));

@@ -41,7 +41,7 @@ const cells = [];
 for (const kind of ['C', 'S']) for (const tau of [0, 0.25, 0.5, 0.75, 1]) cells.push({ row: `${kind}-scroll × tightness (length ${L0} mm, wire ${T0} mm, balance 0.6)`, label: `tightness ${tau.toFixed(2)}`, curves: one({ kind, tightness: tau }) });
 for (const L of [30, 60, 90, 120]) cells.push({ row: 'C-scroll × length (tightness 0.5)', label: `length ${L} mm`, curves: one({ length: L }) });
 for (const L of [30, 60, 90, 120]) cells.push({ row: 'S-scroll × length (tightness 0.5)', label: `length ${L} mm`, curves: one({ kind: 'S', length: L }) });
-for (const t of [1.0, 1.6, 2.4, 3.2]) cells.push({ row: 'wire thickness (C, length 60, round)', label: `wire ${t.toFixed(1)} mm`, curves: one({ wire: t }) });
+for (const t of [1.0, 1.6, 2.4, 3.2]) cells.push({ row: 'wire thickness (C, length 60, half-round)', label: `wire ${t.toFixed(1)} mm`, curves: one({ wire: t }) });
 for (const [shape, t] of [['round', 1.6], ['half-round', 1.6], ['round', 2.4], ['half-round', 2.4]]) cells.push({ row: 'wire profile', label: `${shape}, ${t} mm`, curves: one({ wire: t }), shape, cam: 'low' });
 for (const b of [1, 0.75, 0.6, 0.4]) cells.push({ row: 'balance (second volute against the first)', label: `balance ${b}`, curves: one({ balance: b }) });
 for (const n of [2, 3, 4, 5]) cells.push({ row: 'groups of 2–5 (a lead C, children budding from its back, × 0.6 per order)', label: `${n} scrolls`, curves: group({ n }) });
@@ -50,7 +50,7 @@ for (const n of [1, 2, 3]) cells.push({ row: 'mirrored about a vertical axis (th
 
 // measure every cell in Node: the mesh and the gaps
 for (const c of cells) {
-  const relief = S.scrollRelief(c.curves, { baseZ: 1, shape: c.shape || 'round' });
+  const relief = S.scrollRelief(c.curves, { baseZ: 1, shape: c.shape || 'half-round' });
   const a = RL.analyzeStl(RL.exportStl(relief));
   const conn = RL.connected(relief);
   let self = Infinity, pair = Infinity, web = 0, touch = 0;

@@ -290,14 +290,14 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       // (ρ_mid − eye) / (VOLUTE_SHARE · half), ρ_mid = SCROLL_BODY · length —
       // restated from the module's constants and the spec, never the builder
       const betaE = Math.min(1, Math.max(0.3, q.balance)), hS = q.length - q.length / (1 + betaE);
-      const slope = (FL.SCROLL_BODY[q.kind] * q.length - eyeWant) / (FL.VOLUTE_SHARE * hS);
+      const slope = (FL.SCROLL_BODY[q.kind] * q.length - eyeWant) / (c.info.share * hS);
       const ends = [[endR([P[0], P[1], P[2], P[3]]), L2(P[0], P[1]) + L2(P[1], P[2])], [endR([P[n - 1], P[n - 2], P[n - 3], P[n - 4]]), L2(P[n - 1], P[n - 2]) + L2(P[n - 2], P[n - 3])]];   // the last step may be a short remainder, so two steps
       for (const [r, ds] of ends) { const e = Math.abs(r - eyeWant) / eyeWant; worstEye = Math.max(worstEye, e); if (Math.abs(r - eyeWant) > slope * ds) sc2.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}: eye ${r.toFixed(4)} vs ${eyeWant}`); }
       // the turns drawn: sum the emitted turning over each half's volute (its
       // last VOLUTE_SHARE of arc length, from the restated half lengths)
       const beta = Math.min(1, Math.max(0.3, q.balance)), h2 = q.length / (1 + beta), h1 = q.length - h2;
       const arc = [0]; for (let i = 1; i < n; i++) arc.push(arc[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
-      const halves = [[0, h1 * FL.VOLUTE_SHARE], [q.length - h2 * FL.VOLUTE_SHARE, q.length]];
+      const halves = [[0, h1 * c.info.share], [q.length - h2 * c.info.share, q.length]];
       halves.forEach(([s0, s1], k) => {
         let tt = 0; for (let i = 1; i < n - 1; i++) if (arc[i] > s0 + 1e-9 && arc[i] < s1 - 1e-9) tt += turnAt(P, i);
         const got = Math.abs(tt) / (2 * Math.PI), want = c.info.turnsBuilt[k];
@@ -307,7 +307,7 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
         worstTurn = Math.max(worstTurn, Math.abs(got - want));
         if (d > 0) sc2.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire} half ${k}: ${got.toFixed(3)} turns drawn vs ${want.toFixed(3)} reported`);
       });
-      if (c.info.turnsHeld > FL.tightnessTurns(q.tightness) + 1e-12) sc2.push(`${q.kind}: held ${c.info.turnsHeld} above asked`);
+      if (c.info.turnsHeld > FL.tightnessTurns(q.tightness) + 1e-12 || c.info.turnsHeld > c.info.turnsAsked + 1e-12) sc2.push(`${q.kind}: held ${c.info.turnsHeld} above asked`);
       // the self-gap, RESTATED: every pair of vertices the EMITTED chords turn
       // at least π between, centreline distance less the wire
       let cum = [0]; for (let i = 1; i < n - 1; i++) cum.push(cum[i - 1] + turnAt(P, i)); cum.push(cum[n - 2]);
@@ -345,6 +345,32 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     rec('SC6 a group is one closed region; each child overlaps its parent by the embed; outside each junction no two wires come within a feature', sc6.length === 0, `least pair gap ${leastPair.toFixed(4)} mm, longest junction web ${longestWeb.toFixed(1)} mm${sc6.length ? ' — ' + sc6.slice(0, 3).join('; ') : ''}`);
   }
 
+  // (it costs ~1,800 builds, so a mutant of another file does not pay it)
+  if (FL && (label === 'shipped' || MUTANTS.find((m) => m.id === label)?.file === 'filigree')) {
+    const F = R.MIN_FEATURE_MM;
+    // SC7 no dead travel (Eva's ruling 2 on step 1): over the tightness slider
+    // at its own 0.01 step, every step builds MORE turns than the last, at
+    // 30 / 60 / 120 mm on three wires — and the top of the range is the most
+    // that PRINTS, probed independently of the fit: the top turns keep the
+    // gap ≥ F and a hundredth of a turn more closes it (unless the top is the
+    // 1¾ ceiling), and a share raised above the base was needed (the base
+    // share could not hold 1¾ turns).
+    const sc7 = []; let rows = 0;
+    for (const kind of ['C', 'S']) for (const length of [30, 60, 120]) for (const wire of [1.0, 1.6, 2.4]) {
+      rows++;
+      let prev = -Infinity, dead = 0, last = null;
+      for (let i = 0; i <= 100; i++) { const c = FL.buildScroll({ kind, length, tightness: i / 100, wire, balance: 0.6 }); if (!(c.info.turnsHeld > prev + 1e-6)) dead++; prev = c.info.turnsHeld; last = c; }
+      if (dead) sc7.push(`${kind} L${length} t${wire}: ${dead} dead steps`);
+      const sh = last.info.share, top = last.info.turnsHeld, spec = { kind, length, wire, balance: 0.6, share: sh };
+      const gapAt = (turns, share = sh) => FL.selfGap(FL.scrollCurve({ ...spec, share, turns }), wire).gap;
+      if (gapAt(top) < F) sc7.push(`${kind} L${length} t${wire}: the top ${top.toFixed(3)} turns does not print`);
+      if (top < FL.VOLUTE_TURNS[1] - 1e-9 && gapAt(top + 0.01) >= F) sc7.push(`${kind} L${length} t${wire}: ${(top + 0.01).toFixed(3)} turns still prints — the range stops short`);
+      if (sh < FL.VOLUTE_SHARE || sh > FL.VOLUTE_SHARE_MAX) sc7.push(`${kind} L${length} t${wire}: share ${sh} outside the declared range`);
+      if (sh > FL.VOLUTE_SHARE + 1e-9 && gapAt(FL.VOLUTE_TURNS[1], FL.VOLUTE_SHARE) >= F) sc7.push(`${kind} L${length} t${wire}: the share was raised though the base share holds 1¾ turns`);
+    }
+    rec('SC7 the tightness slider has no dead travel: every 0.01 step builds more turns, at 30/60/120 mm on 1.0/1.6/2.4 mm wire, and its top is exactly the most that prints', sc7.length === 0, `${rows} scrolls × 101 steps${sc7.length ? ' — ' + sc7.slice(0, 3).join('; ') : ''}`);
+  }
+
   // base-tree byte identity, when a worktree is given
   if (label === 'shipped') {
     if (BASE) {
@@ -376,7 +402,8 @@ const MUTANTS = [
   { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
   // phase 3a, the scroll: the gap clamp removed, the eye under the floor, a
   // child laid off its parent's back
-  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (g.gap < MIN_FEATURE_MM) {', to: 'if (false) {', breaks: ['SC3', 'SC6'] },
+  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return', to: 'if (true) return', breaks: ['SC3', 'SC6', 'SC7'] },
+  { id: 'the-tightness-range-not-fitted', file: 'filigree', from: 'fitMemo.set(key, fitUncached({ ...spec, wire: t }, t))', to: 'fitMemo.set(key, { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] })', breaks: ['SC7'] },
   { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2', 'SC3'] },   // the eye itself is then a gap of 0.2 mm
   { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wire + tw) / 2 - EMBED_MM;', to: 'const off = (wire + tw) / 2 + 0.5;', breaks: ['SC6'] },
   { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
