@@ -2532,8 +2532,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.limit > c.limit) ? null : `the mutant's limit is ${m.limit} against the clean tree's ${c.limit} on the 120 x 5 wing at 40 asked — the exclusion is not reading as a fraction`; } },
   { id: 'sepal-foot-floor-removed', why: 'the sepal foot is whatever breadth asks with no print floor — 0.96 mm across at breadth 0.25, under the 1.60 mm foot floor every petal ring is held to',
-    find: '    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);',
-    into: '    const footMm = footAskedMm;', names: ['SP3'],
+    find: '    const footFlooredMm = Math.max(FOOT_MIN_WIDTH_MM, footAskedMm);',
+    into: '    const footFlooredMm = footAskedMm;', names: ['SP3'],
     witness: (M, C) => { const m = sepalFacts(M, { sepalFootBreadth: 0.25 }), c = sepalFacts(C, { sepalFootBreadth: 0.25 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.footH < 0.6 && c.footH >= 0.79) ? null : `the mutant's foot half-width is ${m.footH} against the clean tree's ${c.footH} at breadth 0.25 — the floor still binds`; } },

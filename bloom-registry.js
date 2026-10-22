@@ -4052,7 +4052,7 @@ export const CONTROLS = [
       const k = Number(v).toFixed(2);
       const S = shown && shown.sepals;
       if (!S || S.unavailable) return `${k}x the sepal's share of the petal foot`;
-      return `${k}x — ${S.footMm.toFixed(2)} mm across where it meets the hub` + (S.footClamped ? ` (CLAMPED from ${S.footAskedMm.toFixed(2)}: the print floor is ${S.footFloorMm.toFixed(2)} mm, the ceiling ${S.footCeilingMm.toFixed(2)})` : ` (asked ${S.footAskedMm.toFixed(2)}, inside the ${S.footFloorMm.toFixed(2)}–${S.footCeilingMm.toFixed(2)} mm floors)`);
+      return `${k}x — ${S.footMm.toFixed(2)} mm across where it meets the hub` + (S.footClamped ? ` (CLAMPED from ${S.footAskedMm.toFixed(2)}: the print floor is ${S.footFloorMm.toFixed(2)} mm, the arc each sepal owns at its ring ${S.footCeilingMm.toFixed(2)})` : ` (asked ${S.footAskedMm.toFixed(2)}, between the ${S.footFloorMm.toFixed(2)} mm floor and the ring's ${S.footCeilingMm.toFixed(2)} mm arc)`);
     },
     tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
   { id: 'sepalAngle', section: 'sepalCurl', kind: 'slider',

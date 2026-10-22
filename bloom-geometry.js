@@ -90,8 +90,14 @@ export const FOOT_MIN_WIDTH_MM = 1.6;
    and the fix is the (CLAMPED) discipline this project already applies
    everywhere else arriving where it was always missing — `widthClampedHigh`
    beside `widthClamped`, and a ceiling twin of the read-out's floor line.
-   A slider that has stopped moving must say so. */
-export const FOOT_MAX_WIDTH_MM = 10;
+   A slider that has stopped moving must say so.
+
+   [Oct 21, root support — RETIRED (Eva's ruling 2): "the foot's fixed 10 mm
+   clamp is replaced by a cap derived from the hub — the ring's own room, the
+   arc each foot owns at its ring, so a crowded ring caps lower and a sparse
+   one higher." The constant is gone; `footArcMm` in footRing() is the cap. See
+   the FOOT CAP block there for the law, the fixed point that was measured and
+   refused, and docs/bloom-root-support-outcome.md for the numbers.] */
 
 /* HOW MANY WHORLS THE ARRANGEMENT MAY STACK. SIX (Eva, Sep 3, raised from
    three), and the number is argued from a measurement rather than from a
@@ -2420,7 +2426,12 @@ export function footRing(state, acc, opts = {}) {
       const lambda = lambdaAt(k);
       const scale = Math.pow(state.layerSize, lambda);
       const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
-      const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+      /* THE ASKED FOOT — floored, never capped here: the cap is the ring's own
+         room, which the ring's radius decides, and the radius is the area rule
+         over these asked feet (see THE FOOT CAP after the ring map). Where the
+         asked foot is inside [floor, old 10 mm ceiling] this is the double the
+         clamp returned (`Math.min(10, Math.max(lo, a))` is `Math.max(lo, a)`). */
+      const width = Math.max(FOOT_MIN_WIDTH_MM, authoredWidth);
       const rFoot = Math.sqrt((width * thickness) / Math.PI);
       /* A CONTINUOUS RING CARRIES EXACTLY ONE PETAL. `1 * x * x` is `x * x`
          exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
@@ -2463,7 +2474,7 @@ export function footRing(state, acc, opts = {}) {
     const own = layerOwnedValues(tierScopes, L, slotCount, state);
     const ownWidth = own && 'petalWidth' in own ? own.petalWidth : null;
     const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;
-    const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+    const width = Math.max(FOOT_MIN_WIDTH_MM, authoredWidth);   // the ASKED foot (floored; the cap follows the ring map)
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
     const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;
     /* The group is the whole whorl and `footCount` is `state.petalCount` (or
@@ -2619,9 +2630,43 @@ export function footRing(state, acc, opts = {}) {
        same expression on the same double as the field it has always been —
        so the axis-crossing flag below reads it rather than restating it. */
     const overhang = Math.max(1.5, radius * 0.4);
+    /* ===================================================================
+       THE FOOT CAP (root support, Oct 21 — Eva's ruling 2, replacing the fixed
+       10 mm clamp): a foot may be no wider than THE ARC IT OWNS AT ITS RING —
+       the ring's own circumference shared among the feet on it, `r x 2 pi / n`
+       (n the petals of one whorl, or of one TURN under CONTINUOUS and on the
+       sphere, where the golden-angle sequence lays n a turn), and on a FAN one
+       step of the fan's own lattice, `r x step`. A LENGTH FROM LENGTHS: the
+       ring's radius (this ring's, as the area rule placed it) and the angle
+       each foot owns; nothing typed. A crowded ring caps lower, a sparse one
+       higher, and the floor is unchanged and WINS (`Math.max(floor, arc)`), so
+       a ring too crowded to give even a floored foot its arc keeps the floored
+       foot and says so (`footArcUnderFloor`).
+
+       WHICH RING — the one the area rule places from the ASKED feet, and THAT
+       IS A DECISION, measured before it was made. The other reading closes the
+       loop: cap the feet, re-place the ring from the capped feet, cap again, to
+       the fixed point. It was solved in closed form for one ring — wherever the
+       cap binds the fixed point is w = 4 pi s^2 t / n and the ring radius
+       R0 = 2 s^2 t, INDEPENDENT OF THE PETAL COUNT AND THE PETAL WIDTH — so
+       every capped head would carry one hub, 9.60 mm at the defaults, and a
+       40-petal head's hub would halve (19.78 -> 9.89 mm) while even its floored
+       1.6 mm foot overran the 1.55 mm arc it was capped to. A hub that stops
+       depending on what feeds it is the opposite of the area rule's intent, so
+       the ring stays where the asked feet put it ("a cap derived from the hub",
+       the ruling's words) and the feet are capped to their room ON it.
+       docs/bloom-root-support-outcome.md §4 has both tables.
+
+       THE BRANCH: a foot inside its arc is the asked double, no product formed,
+       so the shipping default (6.40 mm against a 6.95 mm arc) is the expression
+       it was. */
+    const footSpanRad = fanMode ? fan.step : TAU / n;
+    const footArcMm = radius * footSpanRad;
+    const footCapped = p.width > footArcMm;
+    const width = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footArcMm) : p.width;
     return {
       index: L,
-      radius, derivedRadius, width: p.width, thickness,
+      radius, derivedRadius, width, thickness,
       overhang,
       /* THE LAYER'S PLACEMENT, owned here so no consumer computes it. All
          three are EXACTLY the pre-layer constants at L = 0: Math.pow(x, 0) is
@@ -2740,8 +2785,13 @@ export function footRing(state, acc, opts = {}) {
       /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the
          thickness layer and the ceiling never was, so a quarter of the
          petalWidth slider moved the blade and not the ring in silence. See
-         FOOT_MAX_WIDTH_MM's note for the measurement. Telemetry only. */
-      widthClampedHigh: p.authoredWidth > FOOT_MAX_WIDTH_MM,
+         the FOOT CAP above for the law (the 10 mm constant is retired). Telemetry only. */
+      widthClampedHigh: footCapped && width < p.width,
+      /* THE FOOT CAP'S RECORD (root support): the asked foot (floored), the arc
+         this foot owns at its ring, the angle that arc is of, whether the cap
+         bound, and whether the arc is under the floor (the floor then wins and
+         the feet on this ring still overrun their room — told). */
+      widthAskedMm: p.width, footArcMm, footSpanRad, footCapped, footArcUnderFloor: footArcMm < FOOT_MIN_WIDTH_MM,
       /* A statement about the EXPORT, true in either mode — the read-out has
          to warn about a floor it is not currently applying. */
       thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
@@ -3250,7 +3300,11 @@ export function footRing(state, acc, opts = {}) {
     const own = sepalOwnSize(st);
     const footScale = own.widthMm !== null ? own.widthMm / Number(st.petalWidth) : scale;
     const footAskedMm = outer.width * footScale * breadth;
-    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+    /* THE FOOT CAP (root support — the petal ring's own law, one whorl over):
+       no wider than the arc each sepal owns at ITS ring, computed below once the
+       ring's radius is known. The sepal ring is placed by the attachment, never
+       by its feet, so there is no loop to close here. */
+    const footFlooredMm = Math.max(FOOT_MIN_WIDTH_MM, footAskedMm);
     /* WHERE THE WHORL SITS (the attachment-height ruling — `sepalAttachment`
        below the sepal block owns the solve): partway down the hub's flare at
        `sepalHeight` of its axial extent when there is a hub below the head,
@@ -3265,9 +3319,19 @@ export function footRing(state, acc, opts = {}) {
     const radius = onHub ? attachment.rAttach : hub.radius;
     const surf = surfaceAt(radius, null);
     const slope = onHub ? 0 : surf.slope, arc = surf.arc, relief = surf.relief;
-    const height = onHub ? attachment.zAttach + thickness / 2 : 0;
+    /* THE FOOT'S BOTTOM SKIN PASSES THROUGH THE ATTACHMENT POINT, so the ring
+       row stands HALF THE ROOT above it (root support: a sepal past the
+       reference length roots at `sheet x tau(L)`, the foot rows carrying the
+       law's u = 0 factor). A BRANCH: at or under the reference the root is the
+       sheet and this is the expression it was. */
+    const sepalRootTaper = petalRootTaper(sepalAskedLengthMm(st));
+    const height = onHub ? attachment.zAttach + (sepalRootTaper === null ? thickness / 2 : (thickness * sepalRootTaper.rootFactor) / 2) : 0;
     const z = onHub ? height : surf.z;
     const overhang = Math.max(1.5, radius * 0.4);
+    const footSpanRad = fanMode ? fan.step : TAU / count;
+    const footArcMm = radius * footSpanRad;
+    const footCapped = footFlooredMm > footArcMm;
+    const footMm = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footArcMm) : footFlooredMm;
     let azimuths, placement, startAzimuth = outer.phase + phaseRad, mirrorSymmetric = null;
     if (fanMode) {
       placement = 'LIST';
@@ -3290,7 +3354,7 @@ export function footRing(state, acc, opts = {}) {
       scale, breadth, phaseFrac, pitchRad, pitchDeg: (pitchRad * 180) / Math.PI, phaseRad, phaseDeg: (phaseRad * 180) / Math.PI,
       phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
       startAzimuth, azimuths, placement, mirrorSymmetric,
-      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM, footScale,
+      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: footArcMm, footArcMm, footSpanRad, footCapped: footCapped && footMm < footFlooredMm, footArcUnderFloor: footArcMm < FOOT_MIN_WIDTH_MM, footScale,
       own: { lengthMm: own.lengthMm, widthMm: own.widthMm, lengthFloored: own.lengthFloored, widthFloored: own.widthFloored, scaleInert: sepalScaleInert(st) },
       /* THE ATTACHMENT — the whorl's height (the `height` the whorl primitive
          is handed; 0 at the rim, where the flat arm reads `slot.z` as the
@@ -7187,8 +7251,25 @@ export function thicknessProfile(ring, state, rootTaper = null) {
 export const ROOT_TAPER_REF_MM = 35;
 export const ROOT_TAPER_STEPS_PER_UNIT = 64;
 /* tau(zeta) — 1 for zeta <= 1; the fully stressed law beyond it. */
+/* MEMOISED ON THE EXACT DOUBLE (root support): the law is a pure function of
+   zeta, so a cached answer IS the computed one, bit for bit, and the cache can
+   move no float. It is owed because sepals now take the law: the angle limit's
+   trial builds and the fold clamp ask the same stations of the same lengths
+   thousands of times, and the integration from the junction each call took the
+   four-tier x 40-sepal corner from 16 s to 24 s a build. Bounded: cleared when
+   it grows past ROOT_TAPER_MEMO_MAX, which only costs recomputation. */
+const ROOT_TAPER_MEMO = new Map();
+const ROOT_TAPER_MEMO_MAX = 200000;
 export function rootTaperFactor(zeta) {
   if (!(zeta > 1)) return 1;
+  const hit = ROOT_TAPER_MEMO.get(zeta);
+  if (hit !== undefined) return hit;
+  const tau = rootTaperIntegrate(zeta);
+  if (ROOT_TAPER_MEMO.size >= ROOT_TAPER_MEMO_MAX) ROOT_TAPER_MEMO.clear();
+  ROOT_TAPER_MEMO.set(zeta, tau);
+  return tau;
+}
+function rootTaperIntegrate(zeta) {
   const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));
   const h = (zeta - 1) / n;
   const f = (tau) => Math.sqrt((8 / 3) * tau * tau * tau + 4 / 3) / (2 * tau);
@@ -7214,10 +7295,13 @@ export function petalRootTaper(askedLengthMm) {
     at(u) { return u <= 0 ? rootFactor : rootTaperFactor((1 - u) * k); },
   };
 }
-/* A SEPAL DOES NOT TAKE THE LAW (a declared default — the outcome doc's open
-   decision): its substate carries `rootTaper: 'OFF'` (sepalBladeState), so a
-   sepal of any length is built on the uniform sheet exactly as before. The one
-   reader of that pin; every petal-side consumer asks through here. */
+/* THE LAW FOR A BLADE OF THE PETAL BUILDER — petals and, since root support
+   (Oct 21, Eva's ruling 1), SEPALS: the big-petals pin (`rootTaper: 'OFF'` on
+   the sepal substate) is lifted, so nothing sets it any more. The pin's READ is
+   kept as the one place an organ could be held off the law (a state carrying
+   it is refused by nothing and built untapered), and every petal-side consumer
+   still asks through here. Leaves have their own surface law and ask
+   `petalRootTaper` directly at THEIR OWN length (leafBladeLaw). */
 export function petalRootTaperFor(ps, askedLengthMm) {
   return ps.rootTaper === 'OFF' ? null : petalRootTaper(askedLengthMm);
 }
@@ -7234,9 +7318,33 @@ export function petalRootTaperFor(ps, askedLengthMm) {
    An UPPER bound where a field or a scope makes the petals differ, and the
    EXACT longest petal everywhere else (the outer whorl's); the harness
    restates the same three terms from the controls and the row's scopes, and
-   asserts the hub at least as thick as every EMITTED root (T4). Sepals are not
-   in it: they do not take the law. */
+   asserts the hub at least as thick as every EMITTED root (T4).
+   AND THE SEPALS (root support, Oct 21): a sepal takes the law at its own
+   length now, and its foot stands either ON the plate (the rim fallback, at
+   the plate's mid-plane, so its root fits inside the plate iff the plate is at
+   least the root) or partway down the hub-to-stem join's flare, where the
+   material above the attachment point is the join's depth at that radius —
+   never less than the plate, since the join only ever adds material BELOW the
+   plate's underside. So "the hub thickens to match" means, for a sepal, the
+   same thing it means for a petal: THE PLATE IS AT LEAST THE THICKEST ROOT
+   THAT STANDS ON THE HUB, and the join's floor (`max(join, hub thickness)`)
+   carries it down the flare. The longest sepal of every tier is therefore in
+   the bound. A BRANCH: with no sepals the petal-side expression is returned
+   verbatim, and where no sepal is longer than the petal bound `Math.max`
+   returns that bound's own double. (A sepal on the flare could in principle
+   stand on less — the depth there is the join's — and holding the plate to it
+   is an UPPER bound, stated, as the bound already is under scopes and the size
+   field; docs/bloom-root-support-outcome.md §2 measures the spare.) */
 export function hubRootTaperLengthMm(state, scopes = null) {
+  const L = petalHubLengthMm(state, scopes);
+  if (sepalsAbsent(state)) return L;
+  let Ls = 0;
+  for (let k = 0; k < sepalTierCount(state); k++) { const l = sepalAskedLengthMm(sepalTierState(state, scopes, k).state); if (l > Ls) Ls = l; }
+  return Math.max(L, Ls);
+}
+/* the petal half of the bound — the expression `hubRootTaperLengthMm` was
+   before sepals took the law, character for character */
+function petalHubLengthMm(state, scopes) {
   const LB = OVERRIDE_BOUNDS.get('petalLength');
   let L = Number(state.petalLength);
   if (scopes) {
@@ -16494,11 +16602,13 @@ export function leafletOutlineWidthScale(lengthMm, widthMm) {
    the rows emit (the petal's `bendReachAt`), so a drawn spine never bends a
    cupped leaf through itself. Null where the leaf's spine is the slider's —
    every arch that shipped is built by the expressions it was, by branch. */
-export function leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt = null }) {
+export function leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt = null, tauAt = null }) {
   if (!form || form.spineCurve === null || form.spineCurve === undefined) return null;
   const curveLaw = spineCurveLaw(form.spineCurve, Lmm);
   const floorRadius = ROLL_MIN_RADIUS_FACTOR * t;
-  const bend = reachAt ? spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t }) : null;
+  /* (root support: the fold limit's margin is half the thickness AT EACH
+     SUBSTEP on a tapered blade — the petal's `tauAt`, null BY BRANCH) */
+  const bend = reachAt ? (tauAt === null ? spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t }) : spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t, tauAt })) : null;
   const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius, rows: nu, curve: curveLaw, bend: bend && bend.binds ? bend : null });
   return { curveLaw, bend, law, floorRadius };
 }
@@ -16544,11 +16654,11 @@ export function leafCurveRiseMm(state, lengthMm, angleDeg) {
   if (leafIsLobed(state)) {
     const LL = lobedLaws(acc, { lengthMm }, state);
     const reach = LL.form ? lobedBendReachAt(LL.form, LL.profE) : null;
-    spine = leafSpineCurveLaw({ form: LL.form, Lmm: lengthMm, th, t: LL.t, nu: LL.nu, reachAt: reach });
+    spine = leafSpineCurveLaw({ form: LL.form, Lmm: lengthMm, th, t: LL.t, nu: LL.nu, reachAt: reach, tauAt: LL.rootTauAt });
   } else {
     const bs = leafBladeState({ ...state, leafLength: lengthMm });
-    const { form, nu, prof, t } = leafBladeLaw(acc, bs, Number(state.leafWidth), lengthMm, state.sheetThickness);
-    spine = leafSpineCurveLaw({ form, Lmm: lengthMm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null });
+    const { form, nu, prof, t, rootTauAt } = leafBladeLaw(acc, bs, Number(state.leafWidth), lengthMm, state.sheetThickness, lengthMm);
+    spine = leafSpineCurveLaw({ form, Lmm: lengthMm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null, tauAt: rootTauAt });
   }
   let best = 0;
   if (spine) for (let i = 0; i <= spine.law.substeps; i++) { const q = spine.law.at((lengthMm * i) / spine.law.substeps); if (q.dZ > best) best = q.dZ; }
@@ -17003,7 +17113,11 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
   const shared = !!(inflo && inflo.present);
   let sharedRec = null;
   if (shared) {
-    const petioleRFree = leafNodePitchFloorMm(state.sheetThickness) / 2;
+    /* (root support: the mode-free rod the offset reads carries the blade's
+       root too — the same floor and the same clamp as the built petiole) */
+    const wireFreeR = leafNodePitchFloorMm(state.sheetThickness) / 2;
+    const freeFloor = petioleRootFloorMm(wireFreeR, lengthMm);
+    const petioleRFree = freeFloor === null ? wireFreeR : petioleClampMm(wireFreeR, freeFloor, stem, angleDeg, state.sheetThickness).radiusMm;
     const bladeP = leafBladeLocalTris(state, widthMm, lengthMm);
     const bladeReach = bladeReachMm(bladeP, inflo.pedicelR + MIN_FEATURE_MM);
     const offsetRodMm = sharedNodeOffsetMm(inflo.pedicelR, petioleRFree, inflo.angleDeg, angleDeg);
@@ -17048,7 +17162,15 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      Oct 8), capped by the stem exactly as the compound one is —
      `lobedPetiolePlan` is its one owner. Simple leaves keep the wire. */
   const lobedPetiole = lobed && !compoundRec ? lobedPetiolePlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
-  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : petioleR0;
+  /* A SIMPLE LEAF'S PETIOLE CARRIES ITS BLADE'S ROOT (root support): past the
+     reference length the wire gives way to half the root, through the one
+     petiole clamp (`petioleRootFloorMm` above). The wire, verbatim, by branch. */
+  const simpleRootFloorMm = compoundRec || lobedPetiole ? null : petioleRootFloorMm(petioleR0, lengthMm);
+  const simplePetiole = simpleRootFloorMm === null ? null : (() => {
+    const c = petioleClampMm(petioleR0, simpleRootFloorMm, stem, angleDeg, state.sheetThickness);
+    return { askedMm: simpleRootFloorMm, capMm: c.capMm, radiusMm: c.radiusMm, clamped: c.thickens && simpleRootFloorMm > c.capMm, thickens: c.thickens, wireR: petioleR0 };
+  })();
+  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;
   /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null with both node amounts
      0). Two things move with them and nothing else does: every petiole roots
      on the DISPLACED axis at its own depth (`nodeOffsets`), and the clearance
@@ -17187,6 +17309,8 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     })() : null,
     /* the LOBED petiole's area law (S4b) — null otherwise */
     lobedPetiole,
+    /* the simple blade's root-carrying petiole (root support), null at or under the reference */
+    simplePetiole,
     compound: compoundRec, wireR: petioleR0,
   };
 }
@@ -17291,8 +17415,24 @@ export function leafBladeState(state) {
    with the petiole cap and the tooth floor, `LEAF_BLADE_ROWS`. One blade law,
    never a second; a leaflet differs from a simple blade only in the length
    and width it is handed and the frame it is laid on. */
-function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
-  const form = petalFormIsFlat(bs) ? null : petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness));
+/* THE ROOT LAW REACHES EVERY LEAF BLADE (root support, Oct 21 — Eva's ruling
+   1): the ONE law (`petalRootTaper`) at THIS BLADE'S OWN LENGTH — the simple
+   leaf's, a lobed leaf's (lobedLaws calls the same law), and each COMPOUND
+   LEAFLET's own (never the rachis's: the rachis is a rod, carried by the load
+   taper). It reaches the blade through the three readers a petal has: the
+   thickness emitPanel lays (`tAt`), the form's cup fold clamp and roll floor
+   (handed `{ rootTaper }`, the petal's own buckleCtx field), and a drawn
+   spine's fold limit (`tauAt`, leafSpineCurveLaw). A BRANCH: at or under the
+   reference the law is null and every one of the three is the expression it
+   was — `() => t`, no ctx, no tauAt. */
+/* `rootLengthMm` is the length the ROOT LAW reads, named at every call (root
+   support, Oct 21): the blade's own — the simple leaf's at its node, each
+   compound LEAFLET's own, never the rachis's and never the petal's. It equals
+   `Lmm` at every call; it is a separate argument so the organ whose length it
+   is stands at the call site, where a wrong one can be seen (and mutated). */
+function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness, rootLengthMm) {
+  const rootTaper = petalRootTaper(rootLengthMm);
+  const form = petalFormIsFlat(bs) ? null : rootTaper === null ? petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness)) : petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness), { rootTaper });
   const nu = LEAF_BLADE_ROWS;
   const cap = { petiole: true, rowCapacity: nu };
   /* THE TOOTH RELIEF IS FLOORED AT THE MINIMUM FEATURE (Eva's ruling, Oct 6:
@@ -17305,7 +17445,8 @@ function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
   cap.toothReliefFloorMm = MIN_FEATURE_MM;
   const prof = widthProfile(bs, { width: 0, thickness: sheetThickness }, widthMm / 2, cap, acc, Lmm);
   const t = acc.floorThickness(sheetThickness);
-  return { form, nu, cap, prof, t };
+  const tAt = rootTaper === null ? () => t : (u) => t * rootTaper.at(u);
+  return { form, nu, cap, prof, t, rootTaper, tAt, rootTauAt: rootTaper === null ? null : rootTaper.at };
 }
 /* ONE ROW's half-widths and cross-section on a given frame — the leaf row's
    own expressions, extracted verbatim for the same reason. */
@@ -17371,7 +17512,7 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
      takes the flat arm below rather than the zero-form law argued exact. Before
      the cup was a control no reachable leaf was flat, so this moves nothing
      that shipped. */
-  const { form, nu, cap, prof, t } = leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness);
+  const { form, nu, cap, prof, t, rootTaper, tAt, rootTauAt } = leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness, Lmm);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   /* ON THE DISPLACED AXIS where the stem has nodes, and the pre-node
      expression verbatim where it has none (a branch, never `+ 0`). */
@@ -17391,7 +17532,7 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
      by its one read, so `kC` is 0 and the spine is the curve's law
      (`leafSpineCurveLaw`, the one owner, with the fold limit); a branch taken
      FIRST, so every slider leaf runs the two arms below as they were. */
-  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null });
+  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null, tauAt: rootTauAt });
   const law = spine ? spine.law : kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
   const rowAt = (u) => {
     let C, fr, phi = th;
@@ -17413,7 +17554,7 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
     const { h, hb, hL, hR, hbL, hbR, sect } = leafRowSect(prof, form, C, fr.T, fr.N, u);
     return prof.twoSided ? { u, h, hb, hL, hR, hbL, hbR, C, D: fr.D, T: fr.T, N: fr.N, phi, sect } : { u, h, hb, C, D: fr.D, T: fr.T, N: fr.N, phi, sect };
   };
-  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, spine, rowAt };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, spine, rowAt, rootTaper, tAt };
 }
 
 /* THE DIRECTED-EDGE CENSUS over the triangles emitted since `tris0`. */
@@ -17488,7 +17629,10 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
   const panel = free
     ? { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1], baseExposed: true }
     : { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] };
-  emitPanel(acc, rows, panel, () => t, rim);
+  /* (root support: a tapered blade's thickness at each row's own station —
+     `opts.tAt`, the blade law's; the constant sheet otherwise, BY BRANCH) */
+  const tAtRow = opts && opts.tAt ? opts.tAt : () => t;
+  emitPanel(acc, rows, panel, tAtRow, rim);
   /* THE TIP, TOLD (the leaf tip-shape session; S5). Before S5 the half-width
      was `max(profile, TIP_HALF_MM)` to the end, so the blade ended on a
      2 x TIP_HALF_MM stub and this said how much of the leaf it was. Since S5
@@ -17575,7 +17719,7 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
       return l || r ? { ...(l || r), twoSided: true, sides: { left: l, right: r } } : null;
     })()
     : serrationOf(prof, rowHalfBaseMm, rowHalfMm);
-  return { rows, rowU: rows.map((r) => r.u), rowHalfBaseMm, rowHalfMm, rowHalfBaseRightMm, rowHalfRightMm, twoSided: two, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
+  return { rows, rowU: rows.map((r) => r.u), rowThicknessMm: rows.map((r) => tAtRow(r.u)), rowHalfBaseMm, rowHalfMm, rowHalfBaseRightMm, rowHalfRightMm, twoSided: two, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
 }
 
 /* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
@@ -17679,7 +17823,8 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bladeTris0 = acc.triangleCount;
   const leafSt = lobedRow0 ? null : leafBladeStations(prof, nu);
-  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt } : leafSt ? { stations: leafSt } : null);
+  const rootT = S.rootTaper === null ? null : { tAt: S.tAt };
+  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt, ...rootT } : leafSt ? { stations: leafSt, ...rootT } : rootT);
   const { rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim } = B;
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
      — read off the triangles this builder EMITTED (the bead included), never
@@ -17739,7 +17884,10 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
       return [x / ring.length, y / ring.length, z / ring.length];
     };
-    return PM ? { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, bladeBase: mid(PM) } : { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
+    /* (root support) the rooted ring's radius AS EMITTED — T6's measured side:
+       the petiole carries the blade's root, read off the ring, never the plan */
+    const radiusEmittedMm = ringRadius(PA);
+    return PM ? { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, radiusEmittedMm, bladeBase: mid(PM) } : { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, radiusEmittedMm };
   })();
   return {
     directedMismatch, emittedReachMm,
@@ -17752,6 +17900,11 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        spends LEAF_ARC_ROWS of them on its arc, so `i / nu` is no longer the
        answer and nothing may assume it) */
     rowU: B.rowU,
+    /* THE THICKNESS EACH ROW WAS LAID AT, and the root law's record (root
+       support): T5 reads the root off the EXPORTED skins against the law
+       restated from the controls; this is what the builder says it built. */
+    rowThicknessMm: B.rowThicknessMm,
+    rootTaper: S.rootTaper === null ? null : { askedLengthMm: S.rootTaper.lengthMm, refMm: S.rootTaper.refMm, rootFactor: S.rootTaper.rootFactor, extentMm: S.rootTaper.extentMm, uEnd: S.rootTaper.uEnd, rootMm: B.rowThicknessMm[0] },
     /* and the DRAWN half-width (after the cut), the centre and frame normal
        each row was built on, and each margin's cup lift — LF11 (the arch) and
        LF12 (the cup) read these against laws restated from the controls. */
@@ -19243,8 +19396,11 @@ function lobedLaws(acc, plan, state) {
   const Lmm = plan.lengthMm;
   const O = lobedOutline(state, Lmm, !!acc.exportMode);
   const t = acc.floorThickness(state.sheetThickness);
-  const form = petalFormIsFlat(O.bs) ? null : petalForm(O.bs, O.halfW, t);
-  const out = { ...O, state, exportMode: !!acc.exportMode, Lmm, t, form };
+  /* (root support: the one root law at the lobed blade's own length — the
+     simple blade's three readers, one organ over; null BY BRANCH) */
+  const rootTaper = petalRootTaper(Lmm);
+  const form = petalFormIsFlat(O.bs) ? null : rootTaper === null ? petalForm(O.bs, O.halfW, t) : petalForm(O.bs, O.halfW, t, { rootTaper });
+  const out = { ...O, state, exportMode: !!acc.exportMode, Lmm, t, form, rootTaper, tAt: rootTaper === null ? () => t : (u) => t * rootTaper.at(u), rootTauAt: rootTaper === null ? null : rootTaper.at };
   LOBED_LAWS.set(plan, out);
   return out;
 }
@@ -19410,20 +19566,39 @@ export function petioleClampMm(wireR, askedMm, wall, angleDeg, sheetThickness) {
   const radiusMm = thickens ? Math.max(wireR, Math.min(askedMm, capMm)) : wireR;
   return { capMm, thickens, radiusMm };
 }
+/* THE PETIOLE CARRIES THE BLADE'S ROOT (root support, Oct 21 — Eva's ruling 1,
+   the leaf half: "decide whether the petiole radius must be at least half the
+   blade root"). DECIDED: YES — a rod whose DIAMETER is under the thickness of
+   the blade root it holds is the leaf's version of a root standing on a plate
+   thinner than itself, which is exactly what "the hub thickens to match" ruled
+   out for petals. So a blade past the reference length asks a petiole radius of
+   at least `wire x tau_root` (`wire` is t/2, so that is half the root), on the
+   blade's ASKED length (an upper bound wherever a raceme's shared node caps a
+   node's blade shorter — a capped blade's root is thinner, never thicker).
+   The geometric criterion, not a load one — the hub follower's own kind — and
+   it is CAPPED by the one petiole clamp (`petioleClampMm`: the rooted end must
+   still fit the stem), clamped and TOLD where the stem cannot hold it. A
+   BRANCH: null law, the asked radius untouched. */
+export function petioleRootFloorMm(wireR, bladeLengthMm) {
+  const rt = petalRootTaper(bladeLengthMm);
+  return rt === null ? null : wireR * rt.rootFactor;
+}
 export function lobedPetiolePlan(state, Lmm, wireR, wall, angleDeg) {
   const areaMm2 = lobedBladeAreaMm2(lobedOutline(state, Lmm, true), Lmm);
   const refAreaMm2 = simpleDefaultBladeAreaMm2(state, Lmm);
   const ratio = areaMm2 / refAreaMm2;
-  const askedMm = lobedPetioleRadiusMm(wireR, ratio);
+  const areaAskedMm = lobedPetioleRadiusMm(wireR, ratio);
+  const rootFloorMm = petioleRootFloorMm(wireR, Lmm);
+  const askedMm = rootFloorMm === null ? areaAskedMm : Math.max(areaAskedMm, rootFloorMm);
   const { capMm, thickens, radiusMm } = petioleClampMm(wireR, askedMm, wall, angleDeg, state.sheetThickness);
-  return { areaMm2, refAreaMm2, ratio, askedMm, capMm, radiusMm, clamped: thickens && askedMm > capMm, thickens, floored: askedMm < wireR, wireR };
+  return { areaMm2, refAreaMm2, ratio, askedMm, areaAskedMm, rootFloorMm, capMm, radiusMm, clamped: thickens && askedMm > capMm, thickens, floored: askedMm < wireR, wireR };
 }
 function lobedSurface(acc, plan, state, nodeIndex, az) {
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
   const perNode = false;
-  const { Lmm, bs, t, form, nu, law, profE, profL, tilt, tauAt, cap, prof, round, lobeYield, roundness } = lobedLaws(acc, plan, state);
+  const { Lmm, bs, t, form, nu, law, profE, profL, tilt, tauAt, cap, prof, round, lobeYield, roundness, rootTaper, tAt, rootTauAt } = lobedLaws(acc, plan, state);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
   const base = leafRootBase(plan, o, R, z);
@@ -19433,7 +19608,7 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
   /* THE DRAWN SPINE (curves-leaves) reaches a LOBED blade as the arch does —
      the one owner, the fold limit read off the ENVELOPE's own section (the
      section every chevron point is lifted by) — taken first, a branch */
-  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? lobedBendReachAt(form, profE) : null });
+  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? lobedBendReachAt(form, profE) : null, tauAt: rootTauAt });
   const sLaw = spine ? spine.law : kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
   const flatN = [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)];
   /* THE ARC AT `s` mm along the midrib (the simple leaf's centreline law,
@@ -19480,7 +19655,7 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
     };
     return { u, h, hb, hLobe, tau, C: A.C, D: A.fr.D, T: A.fr.T, N: A.fr.N, phi: A.phi, sect: (v) => { const p = point(v); return { P: p.P, n: p.n }; }, pointAt: point };
   };
-  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, spine, rowAt, chevron: law, tilt, tauAt, round, lobeYield, roundness };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, spine, rowAt, chevron: law, tilt, tauAt, round, lobeYield, roundness, rootTaper, tAt };
 }
 /* the fold limit's reach on a LOBED blade: the cup section on the ENVELOPE at
    u (the section `lobedSurface` lifts every chevron point of row u by) */
@@ -19799,6 +19974,14 @@ export function compoundLeafPlan(state, rachisMm, wireR, wall, angleDeg) {
     intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, fromR: compoundRachisRadiusMm(taper, keys[j]), toR: compoundRachisRadiusMm(taper, keys[j + 1]) });
   }
   const stalkR = compoundRodRadiusMm(wireR);
+  /* THE STALKS STAY THE WIRE (root support, Oct 21 — a decision stated, not a
+     ruling taken): a leaflet past the reference length (leaflets reach 60 mm)
+     now ROOTS at `sheet x tau(L)`, thicker than the wire stalk that holds it
+     (2.10 against 1.20 mm at 60 mm). The S3 retune ruled the stalks the wire,
+     and thickening one past the rachis section it is rooted in would hand the
+     rachis's own load taper a second rule; so the stalk keeps its ruling and
+     the read-out TELLS the leaflet root that stands on a thinner stalk
+     (docs/bloom-root-support-outcome.md §3, open for Eva). */
   const stretches = compoundRachisStretches(taper, lay.terminalStalkMm, lay.lateral.map((q) => q.stationMm));
   const worst = stretches.reduce((a, b) => (b.ld > a.ld ? b : a), stretches[0]);
   return {
@@ -19969,7 +20152,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const leaflets = specs.map((sp, i) => {
     const F = leafletFrames[i];
     const bs = leafletBladeState(state, sp.L, sp.W);
-    const { form, nu, prof } = leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness);
+    const { form, nu, prof, rootTaper: lfTaper, tAt: lfTAt } = leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness, sp.L);
     const B0 = [F.root[0] + F.D[0] * F.stalkMm, F.root[1] + F.D[1] * F.stalkMm, F.root[2] + F.D[2] * F.stalkMm];
     const rowAt = (u) => {
       const C = [B0[0] + F.D[0] * u * sp.L, B0[1] + F.D[1] * u * sp.L, B0[2] + F.D[2] * u * sp.L];
@@ -19978,13 +20161,15 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
     };
     const tb = acc.triangleCount;
     const lSt = leafBladeStations(prof, nu);
-    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, lSt ? { stations: lSt } : null);
+    const lfT = lfTaper === null ? null : { tAt: lfTAt };
+    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, lSt ? { stations: lSt, ...lfT } : lfT);
     return {
       role: sp.role, k: sp.k, side: sp.side, lengthMm: sp.L, widthMm: sp.W, embedMm: sp.embedMm,
       root: F.root, base: B0, D: F.D, T: F.T, N: F.N,
       /* which rod holds it: the axis rod for the terminal, its own stalk else */
       holder: sp.role === 'terminal' ? 'axis' : `stalk ${i}`,
-      rowU: Bl.rowU, rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
+      rowU: Bl.rowU, rowThicknessMm: Bl.rowThicknessMm, rootTaper: lfTaper === null ? null : { askedLengthMm: lfTaper.lengthMm, refMm: lfTaper.refMm, rootFactor: lfTaper.rootFactor, extentMm: lfTaper.extentMm, uEnd: lfTaper.uEnd, rootMm: Bl.rowThicknessMm[0] }, stalkRMm: cp.stalkR,
+      rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
       rim: Bl.rim, tipClamp: Bl.tipClamp, serration: Bl.serration,
       cup: { coefficient: bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
       arch: { turnRad: form ? form.curlRad : 0, radiusMm: Infinity, underFloor: false },
@@ -20630,6 +20815,15 @@ export function sepalOwnSize(state) {
   const L = own(state.sepalLength, SEPAL_LENGTH_RANGE), W = own(state.sepalWidth, SEPAL_WIDTH_RANGE);
   return { lengthMm: L.mm, widthMm: W.mm, lengthFloored: L.floored, widthFloored: W.floored };
 }
+/* A SEPAL'S ASKED LENGTH — the length its root law reads (root support, Oct
+   21): its own `sepalLength` where set, the petal's x `sepalScale` otherwise.
+   The same double `bladeAskedLengthMm(sepalBladeState(st), st.sepalScale)` is
+   inside the builder (the slot's scale IS `sepalScale`), stated here so the
+   hub bound and the descriptor's foot height can read it before a blade exists. */
+export function sepalAskedLengthMm(st) {
+  const own = sepalOwnSize(st);
+  return own.lengthMm !== null ? own.lengthMm : st.petalLength * Number(st.sepalScale);
+}
 export function sepalScaleInert(state) { const o = sepalOwnSize(state); return o.lengthMm !== null && o.widthMm !== null; }
 export function bladeAskedLengthMm(ps, slotScale) { return ps.bladeLengthMm > 0 ? ps.bladeLengthMm : ps.petalLength * slotScale; }
 export function bladeAskedWidthMm(ps, slotScale) { return ps.bladeWidthMm > 0 ? ps.bladeWidthMm : ps.petalWidth * slotScale; }
@@ -20835,13 +21029,14 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
      not a whorl's) and no FAN pairing (it is never mirrored), so a two-sided
      sepal outline faces the same hand on every sepal of a tier — the petals'
      RADIAL pinwheel. */
-  /* THE ROOT TAPER IS PINNED OFF on a sepal (big petals, Oct 21 — a declared
-     default, open for Eva's ruling in docs/bloom-big-petals-outcome.md): a
-     sepal's foot lands on the hub-to-stem join's flare, not on the plate the
-     taper's hub follows, so "the root never sits on a plate thinner than
-     itself" has no owner there yet. One value in the pin list, read by
-     `petalRootTaperFor` alone. */
-  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE', rootTaper: 'OFF' };
+  /* THE ROOT TAPER REACHES A SEPAL (root support, Oct 21 — Eva's ruling 1,
+     lifting the big-petals pin): a sepal is the petal builder on a second ring,
+     so `petalRootTaperFor` hands it the ONE law at ITS OWN asked length (its
+     `sepalLength`, or the petal's x `sepalScale`), each tier at its own. Where
+     the foot stands and what holds it is footRing's (the descriptor's foot
+     height, and the hub bound, which counts the longest sepal — see
+     `hubRootTaperLengthMm`). */
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
   const own = sepalOwnSize(state);
@@ -22740,7 +22935,11 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false, desc =
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
       /* the SUBSTATE's length (one owner — `state.petalLength * sepals.scale` here was a second producer of the sepal's length, found by the own-size session) */
-      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), bladeAskedLengthMm(sepalBladeState(state, deg, unclamped), sepals.scale), sepalRows);
+      /* (root support: the sepal's own root factor, as the builder's seam reads
+         it — a bucket keyed on the bare sheet would hand a long sepal a trial
+         lamina built at another seam step) */
+      const sepalLen = bladeAskedLengthMm(sepalBladeState(state, deg, unclamped), sepals.scale), sepalRT = petalRootTaper(sepalLen);
+      const seamStep = seamLatticeStep(sepalRT === null ? seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness) : seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness, sepalRT.rootFactor), sepalLen, sepalRows);
       let trial = trials.get(seamStep);
       if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode, unclamped); trials.set(seamStep, trial); }
       scanned++;
@@ -23812,7 +24011,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
       /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
       if (leafPlanned.nodeLengthsMm && !(leafPlanned.nodeLengthsMm[i] > 0)) continue;
-      for (const az of leafPlanned.azimuths[i]) leavesBuilt.push(buildLeafInto(acc, leafPlanned, state, i, az));
+      for (const az of leafPlanned.azimuths[i]) { const lb = buildLeafInto(acc, leafPlanned, state, i, az); lb.nodeIndex = i; leavesBuilt.push(lb); }
     }
   }
   const leafTriRange = [leafTris0, acc.triangleCount];

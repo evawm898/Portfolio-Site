@@ -16,7 +16,7 @@
    rebuild supplies the LOCATORS — so the file and the reference have
    different owners, which is the whole point.
 
-   THE MUTANTS — Eva's three, and a fourth:
+   THE MUTANTS — Eva's three, a fourth, and root support's four (Oct 21):
      the-taper-is-ignored            the law's root factor dropped from the
                                      ONE thickness law (thicknessProfile)
      the-hub-does-not-follow         footRing's hub left at the sheet
@@ -27,6 +27,22 @@
                                      turning ladder is not
      the-law-is-first-order          tau = zeta: the added material's own
                                      weight left out (a 100 mm root 12% thin)
+     the-sepal-pin-is-restored       the big-petals pin back on the sepal
+                                     substate: a 120 mm sepal on the sheet (T4)
+     the-leaf-reads-the-petals-length
+                                     the simple leaf's law at the PETAL's
+                                     length, not its own (T5)
+     the-leaflet-reads-the-rachis-length
+                                     every compound leaflet at the RACHIS's
+                                     length (T5, on the default 26 / 30 mm
+                                     leaflets of a 120 mm rachis)
+     the-petiole-stays-the-wire      a 120 mm simple leaf's petiole left at
+                                     the wire under its thickened root (T6)
+     the-foot-cap-is-typed-back-to-10-mm
+                                     the derived foot cap replaced by the
+                                     retired constant (FC1 — the same pure
+                                     clause junctionAssertions carries, run
+                                     here on the mutated module's rings)
    Each declares the T clause it must fire and a WITNESS asked of the MUTATED
    module's own build — the behaviour moved — before the clause is consulted,
    and never the clause it names (asking the gate whether the gate fired is
@@ -50,6 +66,9 @@ import * as H from './bloom-harness.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
 const CONTROL = process.argv.includes('--control');
+/* `--only=<id>[,...]` runs a subset of the mutants (every anchor is still
+   checked); the run says it is a subset and never reports it as the sweep */
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 
 export const MUTANTS = [
   { id: 'the-taper-is-ignored', names: ['T1', 'T2'],
@@ -65,10 +84,36 @@ export const MUTANTS = [
     to: '    const t = tAt(row.u === 0 ? 0 : Math.max(0, (i - baseEnd) / NU));\n    row.tUsed = t; acc.noteSheet(t);',
     witness: (M, C) => { const m = root(M, 'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)'), c = root(C, 'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)'); const d = m.rowT.reduce((a, t, i) => Math.max(a, Math.abs(t - c.rowT[i])), 0); return d > 1e-6 ? null : `no row's thickness moved (worst ${d})`; } },
   { id: 'the-law-is-first-order', names: ['T1'],
-    from: '  if (!(zeta > 1)) return 1;\n  const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));',
-    to: '  if (!(zeta > 1)) return 1;\n  return zeta;\n  const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));',
+    from: 'function rootTaperIntegrate(zeta) {\n  const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));',
+    to: 'function rootTaperIntegrate(zeta) {\n  return zeta;\n  const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));',
     witness: (M, C) => { const a = M.rootTaperFactor(100 / 35), b = C.rootTaperFactor(100 / 35); return a !== b ? null : `tau(100 / 35) still reads ${a}`; } },
+  /* ROOT SUPPORT (Oct 21) — Eva's four: the organs that now take the law, and
+     the derived foot cap. */
+  { id: 'the-sepal-pin-is-restored', names: ['T4'],
+    from: "petalInfill: 'NONE' };\n  for (const [petalId, sepalId] of SEPAL_TWINS)",
+    to: "petalInfill: 'NONE', rootTaper: 'OFF' };\n  for (const [petalId, sepalId] of SEPAL_TWINS)",
+    witness: (M, C) => { const m = sepalRoot(M, SEPAL_120), c = sepalRoot(C, SEPAL_120); return m !== c ? null : `the sepal's root still reads ${m} mm`; } },
+  { id: 'the-leaf-reads-the-petals-length', names: ['T5'],
+    from: 'leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness, Lmm);',
+    to: 'leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness, Number(state.petalLength));',
+    witness: (M, C) => { const m = leafRoot(M, LEAF_120), c = leafRoot(C, LEAF_120); return m !== c ? null : `the leaf's root factor still reads ${m}`; } },
+  { id: 'the-leaflet-reads-the-rachis-length', names: ['T5'],
+    from: 'leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness, sp.L);',
+    to: 'leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness, Number(state.leafLength));',
+    witness: (M, C) => { const m = leafRoot(M, LEAFLETS_DEFAULT), c = leafRoot(C, LEAFLETS_DEFAULT); return m !== c ? null : `the first leaflet's root factor still reads ${m}`; } },
+  { id: 'the-petiole-stays-the-wire', names: ['T6'],
+    from: 'lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;',
+    to: 'lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
+    witness: (M, C) => { const m = petioleR(M, LEAF_120), c = petioleR(C, LEAF_120); return m !== c ? null : `the petiole still reads ${m} mm`; } },
+  { id: 'the-foot-cap-is-typed-back-to-10-mm', names: ['FC1'],
+    from: '    const footArcMm = radius * footSpanRad;\n    const footCapped = p.width > footArcMm;',
+    to: '    const footArcMm = 10;\n    const footCapped = p.width > footArcMm;',
+    witness: (M, C) => { const m = ringWidths(M, WIDE_40), c = ringWidths(C, WIDE_40); return m.join() !== c.join() ? null : `every ring's foot still reads ${m.join(', ')} mm`; } },
 ];
+const SEPAL_120 = 'ROOT SUPPORT: 8 sepals x 120 mm (the hub held to the sepal root)';
+const LEAF_120 = 'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)';
+const LEAFLETS_DEFAULT = 'ROOT SUPPORT: COMPOUND 120 mm rachis x the default leaflets (the rachis is not the leaflet)';
+const WIDE_40 = 'ROOT SUPPORT: width 46 x 40 petals';
 /* THE PROBE ROWS — matrix rows by label (one owner of the states), each with
    the taper LIVE on it (asserted). */
 export const PROBES = [
@@ -78,8 +123,20 @@ export const PROBES = [
   'BIG PETALS: 100 mm x tip thinning 0.5 (the law\'s second factor)',
   'BIG PETALS: 100 mm on a hemisphere (rise 1 — the shell thickens)',
   'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)',
-  'BIG PETALS: 100 mm x 8 sepals (pinned off — a sepal\'s root is the sheet)',
+  'BIG PETALS: 100 mm x 8 sepals (each sepal its own 60 mm root — root support lifted the pin)',
+  'ROOT SUPPORT: 8 sepals x 120 mm (the hub held to the sepal root)',
+  'ROOT SUPPORT: 2 sepal tiers x 60 mm x stem 120 x 12 (each tier its own length)',
+  'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)',
+  'ROOT SUPPORT: simple leaf 120 mm x stem 60 x 3 mm (the stem caps the petiole — told)',
+  'ROOT SUPPORT: LOBED leaf 120 mm x stem 60',
+  'ROOT SUPPORT: COMPOUND 120 mm rachis x 60 mm leaflets (each leaflet its own length)',
+  'ROOT SUPPORT: COMPOUND 120 mm rachis x the default leaflets (the rachis is not the leaflet)',
+  'ROOT SUPPORT: width 46 x 40 petals',
+  'ROOT SUPPORT: width 46 on the FAN (the fan step is the foot\'s span)',
 ];
+/* probes whose subject is the FOOT CAP (FC) and not the taper — no taper is
+   asked of them, the cap is asked to BIND (asserted) */
+const FC_PROBES = new Set(['ROOT SUPPORT: width 46 x 40 petals', 'ROOT SUPPORT: width 46 on the FAN (the fan step is the foot\'s span)']);
 const MATRIX = H.buildMatrix();
 const KIND = new Map(H.CONTROLS.map((c) => [c.id, c]));
 function rowOf(label) {
@@ -106,6 +163,25 @@ function root(G, label) {
   const { rec } = buildOn(G, rowOf(label));
   return { rootMm: rec.petal.thickness.base, hubMm: rec.hub.thickness };
 }
+function sepalRoot(G, label) {
+  const { rec } = buildOn(G, rowOf(label));
+  const p = rec.sepals.tiers[0].built.find(Boolean);
+  return p.thickness.base;
+}
+function leafRoot(G, label) {
+  const { rec } = buildOn(G, rowOf(label));
+  const B = rec.leavesBuilt.find(Boolean);
+  const r = B.compound ? B.leaflets[0].rootTaper : B.rootTaper;
+  return r ? r.rootFactor : 1;
+}
+function petioleR(G, label) {
+  const { rec } = buildOn(G, rowOf(label));
+  return rec.leavesBuilt.find(Boolean).petioleAxis.radiusEmittedMm;
+}
+function ringWidths(G, label) {
+  const { rec } = buildOn(G, rowOf(label));
+  return rec.rings.map((r) => r.width);
+}
 function rootGrid(G, label) {
   const row = rowOf(label), ui = stateOf(row);
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
@@ -130,9 +206,19 @@ function fire(G, label) {
   const { ui, acc, rec } = buildOn(G, row);
   const positions = new Float64Array(acc.positions.length);
   for (let i = 0; i < positions.length; i++) positions[i] = Math.fround(acc.positions[i]);
-  return { bad: H.rootTaperAssertions(positions, row, metricsOf(rec), ui), live: (rec.petals || []).some((p) => p && p.thickness && p.thickness.rootTaper) };
+  const bad = H.rootTaperAssertions(positions, row, metricsOf(rec), ui);
+  /* FC1 — the foot cap, the same pure clause junctionAssertions carries, on
+     this module's ring records and emitted foot frames */
+  rec.rings.forEach((r, L) => { for (const msg of H.footCapClauses(r, L, ui, rec.petals[L] ? rec.petals[L].footFrames : null)) bad.push(msg); });
+  const tapered = (p) => !!(p && p.thickness && p.thickness.rootTaper);
+  const live = FC_PROBES.has(label)
+    ? rec.rings.some((r) => r.widthClampedHigh)
+    : (rec.petals || []).some(tapered)
+      || (rec.sepals && rec.sepals.tiers || []).some((T) => (T.built || []).some(tapered))
+      || (rec.leavesBuilt || []).some((B) => B && (B.compound ? (Number(ui.leafLength) > H.ROOT_TAPER_REF_RULED_MM) : B.rootTaper));
+  return { bad, live };
 }
-const fams = (bad) => new Set(bad.map((b) => (b.match(/^(T\d+):/) || [])[1]).filter(Boolean));
+const fams = (bad) => new Set(bad.map((b) => (b.match(/^(T\d+|FC\d+):/) || [])[1]).filter(Boolean));
 
 const failures = [];
 for (const mu of MUTANTS) {
@@ -145,13 +231,14 @@ const CLEAN = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).h
 if (!CONTROL) {
   for (const label of PROBES) {
     const { bad, live } = fire(CLEAN, label);
-    if (!live) failures.push(`${label}: the probe builds no tapered petal — it is not in the family's subject`);
+    if (!live) failures.push(`${label}: the probe builds ${FC_PROBES.has(label) ? 'no capped foot' : 'no tapered blade (petal, sepal or leaf)'} — it is not in the family's subject`);
     if (bad.length) failures.push(`${label}: the CLEAN tree fires ${bad.slice(0, 3).join(' | ')}`);
     console.log(`${bad.length || !live ? 'FAIL' : 'ok  '}  clean  ${label}`);
   }
 } else {
   const WDIR = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-root-taper-'));
   for (const mu of MUTANTS) {
+    if (ONLY.length && !ONLY.includes(mu.id)) continue;
     const d = path.join(WDIR, mu.id); fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(path.join(d, 'bloom-geometry.js'), SRC.replace(mu.from, mu.to));
     fs.copyFileSync(path.join(ROOT, 'bloom-curve.js'), path.join(d, 'bloom-curve.js'));
@@ -170,4 +257,4 @@ if (!CONTROL) {
   }
 }
 if (failures.length) { console.error('\nverify-bloom-root-taper: FAILED'); for (const f of failures) console.error(`  - ${f}`); process.exit(1); }
-console.log(`\nverify-bloom-root-taper: PASS — ${CONTROL ? `${MUTANTS.length} of ${MUTANTS.length} mutants fired the clause they name, each witnessed on its mutated module` : `${PROBES.length} probe rows, every clause silent on the clean tree and the taper live on each`}`);
+console.log(`\nverify-bloom-root-taper: PASS — ${CONTROL && ONLY.length ? `a SUBSET: ${ONLY.length} of ${MUTANTS.length} mutants (${ONLY.join(', ')}) fired the clause they name` : CONTROL ? `${MUTANTS.length} of ${MUTANTS.length} mutants fired the clause they name, each witnessed on its mutated module` : `${PROBES.length} probe rows, every clause silent on the clean tree and the taper live on each`}`);

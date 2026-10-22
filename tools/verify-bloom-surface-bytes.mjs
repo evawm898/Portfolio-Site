@@ -192,6 +192,12 @@ const MATRIX = harness.buildMatrix();
    past the base's length are the declared ADDED count. Keyed on THIS tree's
    label. */
 const ROW_DEF_MOVED_BY_PRED = {
+  'root-support': {
+    added: 21,
+    rows: {
+      "BIG PETALS: 100 mm x 8 sepals (each sepal its own 60 mm root — root support lifted the pin)": "relabelled, the same set: the base row's label said the sepals were pinned off, which root support lifts",
+    },
+  },
   'root-taper': {
     added: 28,
     rows: {
@@ -577,6 +583,62 @@ const PREDICATE_MOVERS = {
     const offW = (p) => Number((p.scopeTerm && p.scopeTerm.offsets && p.scopeTerm.offsets.petalWidth) || 0);
     if ((b.petalsAll || []).some((p) => p && offW(p) !== 0 && Number(st.petalWidth) + offW(p) > WMAX)) return true;
     return !!(st.inflorescence && st.inflorescence !== 'NONE' && Number(st.petalWidth) * Number(st.floretScale) > WMAX);
+  },
+  /* ROOT SUPPORT (Oct 21, docs/bloom-root-support-outcome.md) — sepals and
+     leaves take the root law at their own length, and the foot clamp is the
+     ring's own arc. PREDECLARED FROM THE BASE TREE'S OWN RECORD, the new laws'
+     thresholds RESTATED from the controls (the harness's restatements, never
+     this tree's builder). A row moves iff, on the base build:
+       (a) a petal ring's asked foot, floored, passes the base's 10 mm cap (the
+           ring placed by the area rule moves: it reads the uncapped asked
+           foot now) or does not fit the arc it owns at its base radius
+           (radius x the restated span) — the new cap binds;
+       (b) a built sepal tier asks a length past 35 mm, or the sepal's asked
+           foot passes the base's 10 mm cap or its own arc (the sepal foot's
+           cap is the arc too), or the sepals raise the hub's bound past both
+           35 mm and the base's own bound (the plate held to a sepal root);
+       (c) a built leaf blade — the simple or lobed leaf at its node's length,
+           any compound leaflet at its own — is past 35 mm;
+       (d) a raceme whose FLORET state satisfies (a)-(c) (the floret is the
+           same builder on its own state). */
+  'root-support': (st, row) => {
+    const REF = 35, FOOT_MAX_BASE = 10;
+    const scopes = harness.rowScopesForBuild(row);
+    const core = (s, sc) => {
+      const acc = new base.MeshBuilder({ exportMode: true });
+      const b = base.buildBloomInto(acc, s, { below: null, capability: row.capability ?? null, scopes: sc });
+      const span = harness.footSpanRestated(s);
+      for (const r of b.rings || []) {
+        const asked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(r.authoredWidth));
+        if (asked > FOOT_MAX_BASE || asked > r.radius * span) return true;
+      }
+      const S = b.foot && b.foot.sepals;
+      if (S && S.count > 0) {
+        const tiers = harness.sepalTiersRestated(s);
+        let Ls = 0;
+        for (let k = 0; k < tiers; k++) Ls = Math.max(Ls, harness.sepalLengthRestated(s, sc, k));
+        const built = (b.sepals && b.sepals.tiers ? b.sepals.tiers : []).some((T) => T && T.present && (T.built || []).some(Boolean));
+        if (built && Ls > REF) return true;
+        const footAsked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(S.footAskedMm));
+        if (built && (footAsked > FOOT_MAX_BASE || footAsked > S.ring.radius * span)) return true;
+        if (Ls > REF && Ls > base.hubRootTaperLengthMm(s, sc)) return true;
+      }
+      const lp = b.leaf;
+      if (lp && lp.present && lp.built > 0) {
+        for (const B of b.leavesBuilt || []) {
+          if (!B) continue;
+          if (B.compound) { if (B.leaflets.some((lf) => Number(lf.lengthMm) > REF)) return true; continue; }
+          const L = lp.nodeLengthsMm ? Math.max(...lp.nodeLengthsMm) : Number(lp.lengthMm);
+          if (L > REF) return true;
+        }
+      }
+      return b;
+    };
+    const b = core(st, scopes);
+    if (b === true) return true;
+    const ip = b.inflorescence;
+    if (ip && ip.present) return core(base.floretState(st, ip), null) === true;
+    return false;
   },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });

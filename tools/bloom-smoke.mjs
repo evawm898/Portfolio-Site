@@ -1381,7 +1381,7 @@ export const SMOKE_BLOCKS = [
       { label: "SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal's length read +24 here)",
         path: "SP8's pin: the drawn limit on a long sepal at or under 22 degrees, and the harness's own contact test — its trial sepal keeping every blade row from the restated mm exclusion outward — finding the built angle clear and the step above clipping" },
       { label: "SEPAL SIZE: width max (30 mm — wider than the petal; the foot follows the width ratio and clamps at its ceiling, told)",
-        path: "SP3's width-ratio arm with the foot ceiling binding (clamped, told), SP5b's flat-blade EXACT width (a sepal wider than its petal, the length still the petal's x size)" },
+        path: "SP3's width-ratio arm with the foot cap binding (the arc each sepal foot owns at its ring — clamped, told), SP5b's flat-blade EXACT width (a sepal wider than its petal, the length still the petal's x size)" },
       { label: "SEPAL SIZE: under the floors (2 mm long, 1 mm wide asked — FLOORED at 5 x 3, told)",
         path: "SP5's floored arm (both flags, the floored sizes in the record and on the emitted blade)" },
       { label: "SEPAL SIZE: GATED — count 0 with both set (hidden and inert; bit-identical to the default)",
@@ -1762,12 +1762,43 @@ export const SMOKE_BLOCKS = [
         path: "C5 the fold limit's half sheet at each substep's own station under the taper, restated; C1 the spine on the drawn length" },
       { label: 'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)',
         path: "ST4/ST5 the stem rooted through the THICKENED hub and the join floored at it, T3 the hub, J4 the hub restated" },
-      { label: 'BIG PETALS: 100 mm x 8 sepals (pinned off — a sepal\'s root is the sheet)',
-        path: "T4 every sepal's root read off the file at the sheet (the declared pin), SP-family attachment on the thicker plate" },
+      { label: 'BIG PETALS: 100 mm x 8 sepals (each sepal its own 60 mm root — root support lifted the pin)',
+        path: "T4 every sepal's root read off the file at the law of its own 60 mm length (root support lifted the pin), SP-family attachment on the thicker plate" },
       { label: 'BIG PETALS: 60 mm x size variance 0.5 (the hub reads the largest factor)',
         path: "T0 per ring on the size field's own factor, J4 the hub at the restated bound (petalLength x (1 + amount)), T3 the hub at least as thick as every root in the file" },
       { label: 'BIG PETALS: GATED — 35 mm x sheet 2.40 x tip thinning 0.5 (at the reference the law is the identity)',
         path: "T0 the branch identity (no ring declares a taper at the reference), J4 the hub the sheet to the bit" },
+    ],
+  },  {
+    n: 76, title: 'root support (Oct 21)',
+    anchor: 'ROOT SUPPORT: 8 sepals x 60 mm (root x1.750 at the sepal\'s own length)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       root law on the SEPAL (the pin lifted; the hub held to the longest sepal
+       root, the descriptor's foot height on the thickened root), on the LEAF
+       blade (simple, lobed, every compound leaflet at its own length) with the
+       petiole carrying the root, and the DERIVED FOOT CAP (the arc each foot
+       owns at its ring). The subset adds the 120 mm sepal on a stem (the join
+       goes inert — the rim fallback), two tiers at their own length, the
+       simple leaf on a 6 and a 3 mm stem (the petiole capped), the compound
+       leaf with long and default leaflets, and the cap binding at 40 petals.
+       --conn is REQUIRED (a thicker sepal root, a thicker petiole and a capped
+       foot are each a junction overlap of their own). */
+    conn: true,
+    rows: [
+      { label: 'ROOT SUPPORT: 8 sepals x 120 mm x stem 60 (the join goes inert — the sepals stand on the rim)',
+        path: "T4 the sepal's root off the file at the law of its own 120 mm length, T3 the hub carrying the sepal root, SP3 the attachment's rim fallback with the thicker foot, ST5 the join inert against the thickened plate" },
+      { label: 'ROOT SUPPORT: 2 sepal tiers x 60 mm x stem 120 x 12 (each tier its own length)',
+        path: "T4 per tier at the tier's own restated length, SP10-SP13 the tiers down the join, SP3 each tier's foot at its own root" },
+      { label: 'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)',
+        path: "T5 the blade's untapered rows off the file at its own 120 mm length, T6 the petiole's ring off the file (CLAMPED at the stem, told), LF18 the root-floored petiole restated, ST9 the rod named at its real radius" },
+      { label: 'ROOT SUPPORT: simple leaf 120 mm x stem 60 x 3 mm (the stem caps the petiole — told)',
+        path: "T6 the petiole at the stem's own cap, LF18 the clamp told, LF4 the inset on the arch-free blade" },
+      { label: 'ROOT SUPPORT: COMPOUND 120 mm rachis x 60 mm leaflets (each leaflet its own length)',
+        path: "T5 every leaflet at its OWN length (never the rachis's), LF17 the rachis taper unchanged, LF18 the stalks the wire" },
+      { label: 'ROOT SUPPORT: COMPOUND 120 mm rachis x the default leaflets (the rachis is not the leaflet)',
+        path: "T5 entered on the rachis past the reference, every leaflet read at the sheet (the identity)" },
+      { label: 'ROOT SUPPORT: width 46 x 40 petals',
+        path: "FC1 the foot cap restated from the ring's radius x 2 pi / n and the asked foot, the told flag both ways, the emitted foot rows at the capped width; Z3 the ring's foot restated through the cap; J4 the floors" },
     ],
   },
 ];

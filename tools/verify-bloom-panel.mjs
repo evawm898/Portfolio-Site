@@ -526,7 +526,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
-         SPIRAL_LEGIBLE_COUNT, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM } from './bloom-harness.mjs';
+         SPIRAL_LEGIBLE_COUNT, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, footCapRestated, footSpanRestated } from './bloom-harness.mjs';
 import { sectionLabel } from '../bloom-registry.js';
 import { mirrorPartner } from '../bloom-geometry.js';
 
@@ -4035,8 +4035,10 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     bad = await applyConfig(pg, [{ id: 'petalWidth', value: '12' }]);
     if (bad.length) p.push(`the width edit did not take: ${bad.join('; ')}`);
     const w = await snap(pg);
-    const wantFoot = Math.min(FOOT_MAX_WIDTH_MM, Math.max(FOOT_MIN_WIDTH_MM, 12 * 0.4 * Number(DEFAULTS.footDelicacy)));
     const r0 = w.rings[0], r1 = w.rings[1], r2 = w.rings[2];
+    /* (root support: the asked foot floored, capped at the arc it owns on its
+       own ring — the harness's restatement, never the record's arc) */
+    const wantFoot = r1 ? footCapRestated(Math.max(FOOT_MIN_WIDTH_MM, 12 * 0.4 * Number(DEFAULTS.footDelicacy)), r1.radius, footSpanRestated(w.ui)).width : NaN;
     if (!r1 || r1.ownWidth !== 12) p.push(`turn 2's ring reports its own width as ${r1 && r1.ownWidth}, not the 12 set`);
     if (!r1 || !Object.is(r1.width, wantFoot)) p.push(`the owned turn's foot is ${r1 && r1.width} mm across, restated ${wantFoot} — the foot did not follow its own width`);
     if (!r1 || Math.abs(r1.radius / r0.radius - 12 / Number(DEFAULTS.petalWidth)) > 1e-12) p.push(`the owned turn's ring sits at ${r1 && (r1.radius / r0.radius).toFixed(6)} of the rim, restated ${(12 / Number(DEFAULTS.petalWidth)).toFixed(6)} — the ring did not follow its own width`);
