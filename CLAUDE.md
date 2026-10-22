@@ -11557,6 +11557,13 @@ tools/shot-frame-sheet.mjs <dir>` (the engraving) and `node tools/shot-frame-rel
 they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
 runs them — the "adding a tool runs the flower gates" corollary recorded in several
 sections above is history as of Oct 1.
+**Phase 2b (Oct 22): the RECTANGLE (mitre / rounded / notched / eared corners) and the OVAL
+(aspect; the circle is 1:1) are CLOSED LOOPS** — one spine, `closed: true`, no duplicated
+vertex, the seam at the bottom centre — through the same sweep, relief and SVG; `offsetCurve`
+trims between neighbouring joins and wraps through the seam; named ANCHORS are declared in the
+registry; the interior is open / backed / recessed. Every arch row's SVG and STL is
+byte-identical to `e759041` (CI's `--base`). Read §7b of the charter before touching a closed
+skeleton. Sheet: `node tools/shot-frame-skeletons.mjs <dir>`.
 
 ## `/marble` — the paper-marbling simulator (pointer only)
 

@@ -20,9 +20,9 @@
    Model coordinates are millimetres, x right, y UP (the SVG writer flips y).
    The arch's opening is centred on x = 0 with the sill's underside at y = 0. */
 
-import { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, PARAM_SPEC, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS } from './frame-registry.js';
+import { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, PARAM_SPEC, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS, MIN_FEATURE_MM, ANCHORS } from './frame-registry.js';
 
-export { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS };
+export { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS, ANCHORS };
 
 const spec = (id) => PARAM_SPEC.find((s) => s.id === id);
 
@@ -104,11 +104,13 @@ function arcSpine(id, c, r, t0, t1, stepDeg = 1.5) {
    where the two offset curves meet; with one arc's normal the two inner
    edges cross past the apex in a bow-tie. (Measured at the default: 0.74 mm
    of crossing at the apex before this, 0 after.) */
-function joinSpines(id, a, b, extra = {}) {
-  const n1 = a.nrm[a.nrm.length - 1], n2 = b.nrm[0];
+export function mitreNormal(n1, n2) {
   const sx = n1[0] + n2[0], sy = n1[1] + n2[1], l = Math.hypot(sx, sy);
   const cosHalf = l / 2;                       // |n1 + n2| / 2 = cos(turn / 2)
-  const mitre = cosHalf > 1e-9 ? [sx / l / cosHalf, sy / l / cosHalf] : n1;
+  return cosHalf > 1e-9 ? [sx / l / cosHalf, sy / l / cosHalf] : n1;
+}
+function joinSpines(id, a, b, extra = {}) {
+  const mitre = mitreNormal(a.nrm[a.nrm.length - 1], b.nrm[0]);
   return { id, pts: [...a.pts, ...b.pts.slice(1)], nrm: [...a.nrm.slice(0, -1), mitre, ...b.nrm.slice(1)], joins: [a.pts.length - 1], ...extra };
 }
 
@@ -120,17 +122,31 @@ function joinSpines(id, a, b, extra = {}) {
    null-free form every drawn edge uses; the hatch keeps the indices. */
 export function offsetCurve(spine, d) {
   const out = spine.pts.map((p, i) => [p[0] + d * spine.nrm[i][0], p[1] + d * spine.nrm[i][1]]);
-  for (const j of spine.joins || []) {
-    const P = out[j], b = spine.nrm[j];
-    for (let i = 0; i < out.length; i++) {
-      if (i === j || !out[i]) continue;
+  const joins = spine.joins || [], n = out.length;
+  for (let k = 0; k < joins.length; k++) {
+    const j = joins[k], P = out[j], b = spine.nrm[j];
+    // the stretch a join can trim runs to its NEIGHBOURING joins (an open
+    // spine with one join: the whole spine, the phase-1 rule unchanged); on
+    // a CLOSED loop the stretch wraps through the seam.
+    const prev = spine.closed ? joins[(k + joins.length - 1) % joins.length] : (k ? joins[k - 1] : -1);
+    const next = spine.closed ? joins[(k + 1) % joins.length] : (k < joins.length - 1 ? joins[k + 1] : n);
+    const test = (i, before) => {
+      if (!out[i]) return;
       const side = b[0] * (out[i][1] - P[1]) - b[1] * (out[i][0] - P[0]);   // cross(b, q - P)
-      if ((i < j && side < 0) || (i > j && side > 0)) out[i] = null;
+      if ((before && side < 0) || (!before && side > 0)) out[i] = null;
+    };
+    if (!spine.closed) {
+      for (let i = 0; i < n; i++) if (i !== j && i > prev && i < next) test(i, i < j);
+    } else if (joins.length > 1) {
+      for (let i = (j + n - 1) % n; i !== prev; i = (i + n - 1) % n) test(i, true);
+      for (let i = (j + 1) % n; i !== next; i = (i + 1) % n) test(i, false);
     }
   }
   return out;
 }
-export const offsetPoly = (spine, d) => offsetCurve(spine, d).filter(Boolean);
+/* null-free; a CLOSED spine's polyline repeats its first point at the end so
+   a drawn edge closes (the spine itself never duplicates a vertex). */
+export const offsetPoly = (spine, d) => { const o = offsetCurve(spine, d).filter(Boolean); return spine.closed ? [...o, o[0]] : o; };
 
 /* The band's two edges are offsets at ±half its width. Consumers name the
    edge they read rather than restating the arithmetic. */
@@ -276,7 +292,197 @@ export function archSkeleton(p) {
     else if (s.id === 'head') s.embed = { start: 'jambR', end: 'jambL' };
     else if (s.id === 'sill') s.embed = { outer: p.sill === 'stepped' ? 'sillStep' : null };
   }
+  // named anchors (registry ANCHORS.arch): every one ON a spine
+  const sp = (id) => spines.find((s) => s.id === id);
+  const head = sp('head'), jL = sp('jambL'), jR = sp('jambR');
+  const anchors = {
+    apex: anchorAt(head, head.joins[0]),
+    springR: anchorAt(head, 0),
+    springL: anchorAt(head, head.pts.length - 1),
+    sideL: anchorAt(jL, 1), sideR: anchorAt(jR, 1),
+  };
+  if (hasSill) {
+    const sill = sp('sill');
+    anchors.sillL = anchorAt(sill, 0); anchors.sillR = anchorAt(sill, sill.pts.length - 1);
+    anchors.bottomCentre = { spine: 'sill', index: null, pt: [0, sill.pts[0][1]], nrm: sill.nrm[0] };   // ON the sill's one segment (its ends are mirror images)
+  }
+  info.anchors = anchors;
+  info.kind = 'arch';
   return { spines, info };
+}
+
+const anchorAt = (spine, i) => ({ spine: spine.id, index: i, pt: spine.pts[i], nrm: spine.nrm[i] });
+
+/* ------------------------------------------------------------------ */
+/* The closed skeletons: rectangle and oval (phase 2b)                 */
+/* ------------------------------------------------------------------ */
+
+/* A closed loop is ONE spine with `closed: true`: its last vertex joins its
+   first, no vertex is duplicated, and no consumer caps its ends. It is
+   traversed COUNTER-CLOCKWISE with the inward normal on the left of travel
+   (the arch head's own sense), and it STARTS at the bottom centre — a point
+   on a straight side (rectangle) or the oval's bottom vertex — so the seam
+   sits where the shape is mirror-symmetric and its antipode (the top centre,
+   vertex V/2) is the seam's twin, which is what the gate compares it with.
+   Every corner that turns is a join carrying the MITRE normal (mitreNormal,
+   the arch apex's own law), so offsetCurve meets itself exactly there. */
+
+/* cos/sin of 90·j/m degrees for j = 0..m, MIRROR-EXACT: the upper half of
+   the table is the lower half with cos and sin SWAPPED, so the angle t and
+   its complement 90 − t are built from the same two doubles and a point and
+   its mirror image (about either axis or a corner's bisector) agree to the
+   bit. quarterPoint(m, i) is the unit vector at −90 + 90·i/m degrees (i in
+   0..4m), rotated by whole quarter turns, which negate and swap exactly. */
+export function quarterTable(m) {
+  const T = new Array(m + 1);
+  for (let j = 0; 2 * j <= m; j++) { const t = (90 * j / m) * Math.PI / 180; T[j] = [Math.cos(t), Math.sin(t)]; }
+  for (let j = 0; 2 * j < m; j++) T[m - j] = [T[j][1], T[j][0]];
+  if (m % 2 === 0) T[m / 2] = [Math.SQRT1_2, Math.SQRT1_2];   // 45°: cos and sin are ONE double (Math.cos and Math.sin differ there by an ulp)
+  return T;
+}
+function quarterPoint(T, m, i) {
+  const qd = Math.floor(i / m) % 4, j = i - Math.floor(i / m) * m;
+  let c = T[j][1], s = -T[j][0];             // −90° + 90·j/m: (sin t, −cos t)
+  for (let k = 0; k < qd; k++) [c, s] = [-s, c];
+  return [c, s];
+}
+
+/* The rectangle's centreline: half-width a (between the side bands'
+   centrelines, the arch's convention), the outer box from y = 0 to the
+   height. The corner treatments replace each corner symmetrically about its
+   own bisector, so the corner anchor is the vertex ON that bisector. */
+export function rectSkeleton(p) {
+  const w = p.moldingWidth, F = MIN_FEATURE_MM;
+  const info = { clamped: [], kind: 'rect' };
+  const a = p.width / 2;
+  let b = (p.height - w) / 2;
+  const bMin = (w + F) / 2;                    // the opening at least one feature tall (inner edges a feature apart)
+  if (b < bMin) { info.clamped.push(`a ${p.height} mm height leaves no opening under a ${w} mm band — the centreline held ${(2 * bMin).toFixed(1)} mm tall`); b = bMin; }
+  const cy = w / 2 + b;                        // the centreline's centre; bottom side at y = w/2
+  const treat = p.cornerTreatment;
+  // the corner size, clamped to what the band and the sides admit, TOLD
+  let sz = p.cornerSize;
+  if (treat === 'rounded') {
+    const lo = (w + F) / 2, hi = Math.min(a, b) - F / 2;   // inner arc radius ≥ F/2; a straight side ≥ F
+    if (sz < lo) { info.clamped.push(`corner radius ${sz} mm is inside the ${w} mm band — held at ${lo.toFixed(2)} mm (inner radius ${(F / 2).toFixed(1)} mm)`); sz = lo; }
+    if (sz > hi) { info.clamped.push(`corner radius ${sz} mm leaves no straight side — held at ${hi.toFixed(2)} mm`); sz = hi; }
+  } else if (treat === 'notched' || treat === 'eared') {
+    const lo = w + F, hi = Math.min(a, b) - (w + F) / 2;   // the step's own inner face ≥ F; the side between two steps ≥ F
+    if (sz < lo) { info.clamped.push(`a ${sz} mm ${treat} step folds the ${w} mm band — held at ${lo.toFixed(2)} mm`); sz = lo; }
+    if (sz > hi) { info.clamped.push(`a ${sz} mm ${treat} step meets the next corner — held at ${hi.toFixed(2)} mm`); sz = Math.max(lo, hi); }
+  }
+  info.cornerSize = treat === 'mitre' ? 0 : sz;
+  info.a = a; info.b = b; info.cy = cy;
+  // one quadrant of the loop, the BOTTOM-RIGHT corner, built in coordinates
+  // relative to the corner c = (a, yb) travelling +x then +y; the other
+  // three are its exact mirror images, so the loop is mirror-exact.
+  // Each entry: [dx, dy, nx, ny, join]
+  const Q = [];
+  if (treat === 'mitre') Q.push([0, 0, ...mitreNormal([0, 1], [-1, 0]), true]);
+  else if (treat === 'rounded') {
+    const n = 2 * Math.ceil(45 / 1.5), r = sz, T = quarterTable(n);   // the arc's own 1.5° step (arcSpine's law); even, so the 45° point is a vertex
+    for (let k = 0; k <= n; k++) {
+      const [c, si] = quarterPoint(T, n, k);                 // from straight down to straight right about the arc centre
+      Q.push([-r + r * c, r + r * si, -c, -si, false]);
+    }
+  } else if (treat === 'notched') {
+    Q.push([-sz, 0, ...mitreNormal([0, 1], [-1, 0]), true]);   // turn up (left)
+    Q.push([-sz, sz, ...mitreNormal([-1, 0], [0, 1]), true]);  // turn right (+x)
+    Q.push([0, sz, ...mitreNormal([0, 1], [-1, 0]), true]);    // turn up
+  } else {   // eared
+    Q.push([-sz, 0, ...mitreNormal([0, 1], [1, 0]), true]);    // turn down (right turn)
+    Q.push([-sz, -sz, ...mitreNormal([1, 0], [0, 1]), true]);  // turn +x
+    Q.push([sz, -sz, ...mitreNormal([0, 1], [-1, 0]), true]);  // turn +y
+    Q.push([sz, sz, ...mitreNormal([-1, 0], [0, -1]), true]);  // turn -x
+    Q.push([0, sz, ...mitreNormal([0, -1], [-1, 0]), true]);   // turn +y (right turn)
+  }
+  const cornerMid = treat === 'mitre' ? 0 : treat === 'rounded' ? (Q.length - 1) / 2 : treat === 'notched' ? 1 : 2;
+  // assemble: bottom mid, BR, right mid, TR, top mid, TL, left mid, BL.
+  // A corner's quadrant list is mapped by the corner's two signs: (sx, sy)
+  // for BR (+,+ in the corner's local frame), TR reflects y (travel +y then
+  // -x is BR's travel turned a quarter: its entries are BR's with (dx,dy) ->
+  // (-dy, dx) about the TR corner) — built by rotating the BR quadrant, which
+  // a rectangle's symmetry makes the same set of points.
+  const yb = w / 2;
+  const pts = [], nrm = [], joins = [], anchorIdx = {};
+  const push = (x, y, nx, ny, j) => { if (j) joins.push(pts.length); pts.push([x, y]); nrm.push([nx, ny]); };
+  const corner = (cx0, cy0, rot) => {   // rot: quarter turns applied to the BR template
+    const rk = (x, y) => { let X = x, Y = y; for (let k = 0; k < rot; k++) [X, Y] = [-Y, X]; return [X, Y]; };
+    // the BR template is in a frame whose axes are swapped for odd rotations
+    // of a NON-square rectangle only by position, never by shape, so the
+    // corner shape is congruent at all four corners.
+    Q.forEach(([dx, dy, nx, ny, j], i) => {
+      const [X, Y] = rk(dx, dy), [NX, NY] = rk(nx, ny);
+      if (i === cornerMid) anchorIdx[rot] = pts.length;
+      push(cx0 + X, cy0 + Y, NX, NY, j);
+    });
+  };
+  push(0, yb, 0, 1, false); anchorIdx.bottom = 0;
+  corner(a, yb, 0);
+  anchorIdx.right = pts.length; push(a, cy, -1, 0, false);
+  corner(a, cy + b, 1);
+  anchorIdx.top = pts.length; push(0, cy + b, 0, -1, false);
+  corner(-a, cy + b, 2);
+  anchorIdx.left = pts.length; push(-a, cy, 1, 0, false);
+  corner(-a, yb, 3);
+  const loop = { id: 'frame', pts, nrm, joins, closed: true, bandWidth: w };
+  info.anchors = {
+    bottomCentre: anchorAt(loop, anchorIdx.bottom), topCentre: anchorAt(loop, anchorIdx.top),
+    sideR: anchorAt(loop, anchorIdx.right), sideL: anchorAt(loop, anchorIdx.left),
+    cornerBR: anchorAt(loop, anchorIdx[0]), cornerTR: anchorAt(loop, anchorIdx[1]),
+    cornerTL: anchorAt(loop, anchorIdx[2]), cornerBL: anchorAt(loop, anchorIdx[3]),
+  };
+  info.seam = { index: 0, antipode: anchorIdx.top };
+  return { spines: [loop], info };
+}
+
+/* The oval: an ellipse centreline with semi-axes A = aspect · B (across) and
+   B = (height − w)/2 (up), centred so the outer bottom is y = 0. Sampled
+   UNIFORMLY IN THE NORMAL'S ANGLE — the arc's own 1.5° of turning per step,
+   generalised — so the point for normal angle φ is (A² cos φ, B² sin φ) /
+   √(A² cos² φ + B² sin² φ): the inward normal is exactly −(cos φ, sin φ), and
+   a circle (aspect 1) is the arc law itself. The inner edge stays a curve
+   (no swallowtail) iff the band's half-width is under the ellipse's least
+   radius of curvature min(A,B)²/max(A,B); the aspect is clamped so the inner
+   edge keeps a radius of at least half a feature, and TOLD. */
+export const OVAL_STEP_DEG = 1.5;
+export function ovalSkeleton(p) {
+  const w = p.moldingWidth, F = MIN_FEATURE_MM;
+  const info = { clamped: [], kind: 'oval' };
+  const q = (w + F) / 2;                       // least centreline radius of curvature admitted
+  let B = (p.height - w) / 2;
+  if (B < q) { info.clamped.push(`a ${p.height} mm height leaves no opening under a ${w} mm band — the centreline held ${(2 * q).toFixed(1)} mm tall`); B = q; }
+  let k = p.aspect;
+  const kLo = Math.sqrt(q / B), kHi = B / q;
+  if (k < kLo) { info.clamped.push(`aspect ${k.toFixed(2)} folds the inner edge at the sides — held at ${kLo.toFixed(3)}`); k = kLo; }
+  if (k > kHi) { info.clamped.push(`aspect ${k.toFixed(2)} folds the inner edge at the top — held at ${kHi.toFixed(3)}`); k = kHi; }
+  const A = k * B, cy = w / 2 + B;
+  info.A = A; info.B = B; info.cy = cy; info.aspect = k;
+  info.minRadius = Math.min(A, B) ** 2 / Math.max(A, B);
+  const m = 2 * Math.ceil(45 / OVAL_STEP_DEG), n = 4 * m;   // a multiple of 8: both axes' ends and the diagonals are vertices
+  const T = quarterTable(m);
+  const pts = [], nrm = [];
+  for (let i = 0; i < n; i++) {
+    const [c, s] = quarterPoint(T, m, i);
+    const den = Math.sqrt(A * A * c * c + B * B * s * s);
+    pts.push([A * A * c / den, cy + B * B * s / den]);
+    nrm.push([-c, -s]);
+  }
+  const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };
+  info.anchors = {
+    bottomCentre: anchorAt(loop, 0), sideR: anchorAt(loop, n / 4),
+    topCentre: anchorAt(loop, n / 2), sideL: anchorAt(loop, 3 * n / 4),
+  };
+  info.seam = { index: 0, antipode: n / 2 };
+  return { spines: [loop], info };
+}
+
+/* The one dispatch: every skeleton type returns { spines, info } and feeds
+   the same sweep, relief and SVG. */
+export function skeletonFor(p) {
+  if (p.skeleton === 'rect') return rectSkeleton(p);
+  if (p.skeleton === 'oval') return ovalSkeleton(p);
+  return archSkeleton(p);
 }
 
 /* ------------------------------------------------------------------ */
@@ -342,6 +548,23 @@ export function hatchWeight(dark, lineWeight) {
    stroke was drawn at and weight its stroke width in mm. */
 const stroke = (pts, dark, p) => ({ pts, dark, weight: hatchWeight(dark, p.lineWeight) });
 
+/* The vertex order a hatch line is walked in on a CLOSED loop: from the
+   first vertex where a run breaks (off, or a weight-level change) once round
+   back to it; with no break anywhere, the whole ring plus its first vertex
+   again, so the stroke closes. */
+function closedOrder(run, levelOf) {
+  const nv = run.length;
+  let s0 = run.indexOf(false);
+  if (s0 < 0) {
+    for (let v = 0; v < nv && s0 < 0; v++) if (levelOf(v) !== levelOf((v + nv - 1) % nv)) s0 = v;
+    if (s0 < 0) s0 = 0;
+  }
+  const order = [];
+  for (let k = 0; k < nv; k++) order.push((s0 + k) % nv);
+  if (run[s0]) order.push(s0);                 // every vertex on: end where it began
+  return order;
+}
+
 export function sweepSpine(spine, prof, p) {
   const w = spine.bandWidth;
   const edges = [outerEdge(spine, w), innerEdge(spine, w)];
@@ -374,10 +597,15 @@ export function sweepSpine(spine, prof, p) {
       const off = offsetCurve(spine, d);
       // a run is split where its WEIGHT LEVEL changes (the boundary vertex is
       // shared), so the line swells and thins along the spine; a run of one
-      // vertex is no line.
+      // vertex is no line. On a CLOSED loop the walk starts where a run
+      // already breaks (an off vertex, else a level change) and goes once
+      // round, so no run is cut at the seam; a line on at every vertex at one
+      // level closes on its own first point.
+      const order = spine.closed ? closedOrder(run, (v) => weightLevel(darknessAt(prof, i, p, spine.nrm[v]))) : null;
       let seg = null, segLevel = -1, segSum = 0;
       const close = () => { if (seg && seg.length >= 2) hatch.push(stroke(seg, segSum / seg.length, p)); seg = null; };
-      for (let v = 0; v < nv; v++) {
+      for (let t = 0, len = order ? order.length : nv; t < len; t++) {
+        const v = order ? order[t] : t;
         const dk = darknessAt(prof, i, p, spine.nrm[v]);
         if (run[v] && off[v]) {
           const lv = weightLevel(dk);
@@ -409,8 +637,11 @@ export function crossHatch(spine, prof, p) {
   const offAt = (i) => offs[i] || (offs[i] = offsetCurve(spine, (prof.x[i] - 0.5) * w));
   const lerp = (A, B, t) => [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t];
   let carry = 0;                                   // distance to the next station, in mm
-  for (let v = 0; v < nv - 1; v++) {
-    const [ax, ay] = spine.pts[v], [bx, by] = spine.pts[v + 1];
+  // an open spine walks its nv - 1 segments; a closed loop walks nv, the
+  // last being the closing segment through the seam
+  for (let v = 0, segs = spine.closed ? nv : nv - 1; v < segs; v++) {
+    const vn = (v + 1) % nv;
+    const [ax, ay] = spine.pts[v], [bx, by] = spine.pts[vn];
     const len = Math.hypot(bx - ax, by - ay);
     if (len === 0) continue;
     // the dark stretches across the band at this vertex's normal
@@ -424,7 +655,7 @@ export function crossHatch(spine, prof, p) {
       const t = s / len;
       for (const [i0, i1] of runs) {
         if (i1 === i0) continue;                    // one sample is no length
-        const A0 = offAt(i0)[v], A1 = offAt(i0)[v + 1], B0 = offAt(i1)[v], B1 = offAt(i1)[v + 1];
+        const A0 = offAt(i0)[v], A1 = offAt(i0)[vn], B0 = offAt(i1)[v], B1 = offAt(i1)[vn];
         if (!A0 || !A1 || !B0 || !B1) continue;     // past a join's bisector
         let sum = 0; for (let i = i0; i <= i1; i++) sum += dark[i];
         out.push(stroke([lerp(A0, A1, t), lerp(B0, B1, t)], sum / (i1 - i0 + 1), p));
@@ -449,7 +680,7 @@ export function buildFrame(params, customProfile = null) {
   for (const s of PARAM_SPEC) if (s.kind === 'range') p[s.id] = Math.min(s.max, Math.max(s.min, +p[s.id]));
   const points = profileFor(p, customProfile);
   const prof = profileSamples(points);
-  const { spines, info } = archSkeleton(p);
+  const { spines, info } = skeletonFor(p);
   const bands = spines.map((s) => sweepSpine(s, prof, p));
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, strokes = 0;
   for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch.map((h) => h.pts), ...b.cross.map((h) => h.pts)]) {

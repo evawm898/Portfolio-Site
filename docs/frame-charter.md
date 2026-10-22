@@ -43,7 +43,7 @@ before it, and ornament tuned against a skeleton that later moves is work done t
 
 | # | layer | what it owns | phase |
 |---|---|---|---|
-| 1 | **Skeleton** | the path: arch (one continuous pointedness; ogee and Tudor later as separate constructions), rectangle, oval; width, height, proportion; mullion count, sill | 1 (arch), 2 (rect/oval) |
+| 1 | **Skeleton** | the path: arch (one continuous pointedness; ogee and Tudor later as separate constructions), rectangle (mitre / rounded / notched / eared corners), oval (aspect; the circle is 1:1); width, height, proportion; mullion count, sill; the NAMED ANCHORS ornament grows from | 1 (arch), 2b (rect/oval, anchors) |
 | 2 | **Molding** | one 1-D cross-section profile swept along every spine; the draggable profile editor; presets as starting points; width and depth. Grooves are a property of the profile, never an overlay. **In 3D the same profile is the relief** (2): each band's `z(x)` lifted over a flat back | 1, 2 |
 | 3 | **Shading** | SVG only: hatching derived from the swept surface's normal against one fixed light; intensity, pitch, line weight — the weight FOLLOWS the darkness (1b), and cross-hatching lands only above a threshold (1b). In 3D the molding shades itself under the same `LIGHT` | 1, 1b |
 | 4 | **Filigree / ornament** | RELIEF GEOMETRY grown from named skeleton anchors (apex, springings, sill ends), mirrored, ATTACHED to the molding or the back plate — never floating, never a separate shell with no overlap; a crest/cartouche slot; tracery heads (cusps, trefoil, quatrefoil); density and scale. The SVG draws its projection | 3 |
@@ -122,7 +122,12 @@ All in `frame-geometry.js`.
 | a cross line | `crossHatch` — a CHORD between two of `offsetCurve`'s polylines at the profile samples bracketing the dark stretch, interpolated along the spine; stations every `hatchPitch` mm | `sweepSpine` |
 | a band's relief surface (phase 2) | `bandSolid` in `frame-relief.js` — its grid's xy are `offsetCurve(spine, (x_i − 0.5)·w)` at every spine vertex (a `null` past a join's bisector is the join's own mitre point), its z is `plateT + z_i · reliefDepth` | `buildRelief`, the STL, the 3D view; the gate's R reads it back against `offsetCurve` to the double |
 | the end EMBED | `spine.embed` — DECLARED by `archSkeleton` (which knows what abuts what) and realised by `embedSpine` in `frame-relief.js`, which extends a COPY of the spine by `MIN_FEATURE_MM` along its end tangent; the sill's outer lip under a stepped sill likewise | `bandSolid` only. `exportSvg` and every 2-D reader never see it (the SVG is byte-identical with the field present) |
-| the back plate (backed lights) | `plateOutline` — the frame's outer silhouette read off `outerEdge` of the jambs, the head and the sill (or the step) | `buildRelief` |
+| the back plate (backed lights) | `plateOutline` — the frame's outer silhouette read off `outerEdge` of the jambs, the head and the sill (or the step); a closed frame's is its loop's own `outerEdge` | `buildRelief` (backed at the plate thickness, recessed at the floor) |
+| a turn's mitre normal (2b) | `mitreNormal(n1, n2)` — extracted VERBATIM from `joinSpines` (the arch's bytes are unmoved) | `joinSpines` (the arch apex, every light), `rectSkeleton` (every corner that turns: mitre, notched, eared) |
+| a closed loop (2b) | `spine.closed` — ONE spine whose last vertex joins its first: no duplicated vertex, no end cap. `offsetCurve` trims within the stretch between NEIGHBOURING joins, wrapping through the seam (an open spine's one join: the whole spine, the phase-1 rule unchanged); `offsetPoly` repeats the first point so a drawn edge closes | `sweepSpine` (a hatch run walks once round from where it already breaks — `closedOrder` — so none is cut at the seam), `crossHatch` (the closing segment), `bandSolid` (the CLOSING STRIP, no end caps) |
+| mirror-exact angles (2b) | `quarterTable(m)` — cos/sin of 90·j/m with the upper half the lower half SWAPPED and the 45° entry one double, so a point and its mirror image are built from the same doubles | the rounded corner's arc, the oval |
+| the skeleton type | `skeletonFor(p)` — arch / `rectSkeleton` / `ovalSkeleton`, each returning `{ spines, info }` with `info.kind`, `info.anchors`, and (closed) `info.seam` | `buildFrame` — the one sweep, the one relief, the one SVG |
+| a named anchor (2b) | `ANCHORS` in the registry DECLARES the names per type (`when` for the sill's); the skeleton builders PLACE each one ON a spine (a vertex, or the sill's one segment) | phase 3's ornament; the read-out lists them; the sheet's close cameras aim at them |
 
 The gate's O1–O4 measure this table rather than recite it: jambs and mullions start on
 `innerEdge(sill)` to the double; the clear widths are equal measured from the jambs'
@@ -198,15 +203,57 @@ rather than a pitch of its own: both are decisions without a ruling (§9).
 | **1** | registry, page, arch skeleton (pointedness, width, height, mullions, sill), profile editor + presets, normal-derived hatching, basic SVG download | `verify-frame.mjs` 27/27 + 6/6 mutants; contact sheet ruled by Eva on: shipped intensity, default preset, mullion width, sill proportions, the half-buried sub-arch springing |
 | **1b** (this) | Eva's rulings on 1: intensity 1.00, weight follows darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier threshold; the `frame` CI workflow; the flower gates' `tools/**` filters narrowed | `verify-frame.mjs` 32/32 + 11/11 mutants, in CI; the sheet's weight and threshold rows |
 | **2** (this) | **relief STL as the primary output** (ruling 1): `frame-relief.js` lifts every band's profile over a flat back, pierced or backed lights, print size / plate / depth controls, `MIN_FEATURE_MM`; `Get STL`; the 3D view (three.js, one fixed light, no auto-rotate, a 2D/3D toggle, the profile editor driving both). Arch only | `verify-frame-relief.mjs` W/C/R/L/B/F green with its mutants, in CI; the default's SVG byte-identical to `8db018c`; the 3D sheet with the cove and apex close-ups |
-| 2b | rectangle and oval skeletons through the same sweep and the same relief; Gothic rectangle corners (mitred joins already exist); ogee and Tudor arch constructions | O-family extended to corners; byte partition: every arch row unmoved in SVG AND STL |
+| **2b** (this) | rectangle (mitre / rounded / notched / eared corners) and oval (aspect; circle = 1:1) skeletons as CLOSED LOOPS through the same sweep, relief, STL and SVG; the interior open / backed / recessed; the named anchors. Ogee and Tudor arch constructions stay queued | `verify-frame.mjs` 44/44 + 20/20 mutants (K, Q1, AN, W3, U4, X2 new); `verify-frame-relief.mjs` 16/16 over 78 rows + 7/7 mutants (Q, L2, S2 new); every arch row's SVG AND STL byte-identical to `e759041`; the sheet `shot-frame-skeletons.mjs` |
 | 3 | ornament as RELIEF: scroll grammar from named anchors (apex, springings, sill ends), mirrored, each scroll a closed shell overlapping the molding or the plate it grows from; crest slot; tracery heads | an ownership row per anchor; loudness budget scored per preset; every scroll's root is ON an anchor to the double and overlaps it (B's clause); W and C stay green |
 | 4 | texture as surface DISPLACEMENT on the relief, amplitude floored at `MIN_FEATURE_MM` | inert at 0 (bit-identical STL), told where the floor binds |
 | 5 | overgrowth (ivy, drips) as attached relief | generated by the skeleton's edges, never clipped; the frame rows unmoved; W and C green |
 | 6 | interior | — |
 
-**Rectangle and oval skeletons stay queued behind the relief** (ruling 1's order): a
-second skeleton type is worth building once the thing every skeleton feeds — the relief
-and its gates — exists.
+## 7b. The closed skeletons, as built (phase 2b)
+
+**One spine, closed.** The rectangle and the oval are each ONE spine with `closed: true`,
+traversed counter-clockwise with the inward normal on the left (the arch head's sense),
+starting at the BOTTOM CENTRE — a point on a straight side, or the oval's bottom vertex —
+so the seam sits where the shape is mirror-symmetric and its ANTIPODE (vertex V/2, the top
+centre) is its twin. No vertex is duplicated; the relief joins row V−1 to row 0 by a
+closing strip of the same quads every other pair of rows gets, and caps nothing.
+
+**Rectangle.** `width` is between the side bands' centrelines (the arch's convention),
+`height` the outer box from y = 0. One corner — the bottom-right, travelling +x then +y —
+is built and rotated by whole quarter turns onto the other three, so the four are
+congruent and every corner's anchor is the vertex on its own bisector: the mitre, the
+arc's 45° point, the notch's or the ear's diagonal step. `cornerSize` is the rounded
+corner's CENTRELINE radius, or the notch's / ear's step. Clamped and told: a radius whose
+inner edge would be under half a feature, or would leave no straight side; a step whose
+own inner face would be under a feature (`≥ w + F`), or would meet the next corner.
+
+**Oval.** Semi-axes `B = (height − w)/2` up and `A = aspect · B` across (the width control
+is hidden: the aspect is the oval's own proportion, and 1.00 is the circle). Sampled
+uniformly in the NORMAL'S ANGLE — the arc's own 1.5° of turning per vertex, generalised —
+so the point for normal angle φ is `(A² cos φ, B² sin φ) / √(A² cos² φ + B² sin² φ)` and the
+inward normal is exactly `−(cos φ, sin φ)`. The inner edge stays a curve iff the half band
+is under the least radius of curvature `min(A,B)²/max(A,B)`; the aspect is clamped so the
+inner edge keeps half a feature of radius, and TOLD. 240 vertices.
+
+**Measured.** Every vertex on the skeleton RESTATED from the controls to ≤ 2.2e-13 mm
+(K2). The seam: gap 0 and normal discontinuity 0 at the loop start in the plane (Q1); in
+the mesh, |turn across the seam − turn across its antipode| ≤ 1.2e-13 rad on every column
+of 63 closed rows (Q, `atan2` — an `acos` read 3e-8 of rounding as a step). A seam moved
+0.1 mm, on the oval and on the rectangle, is caught by both gates; a closing strip dropped
+is caught by W and Q. The opening across the sides in the STL equals `2a − w` / `2A − w`
+to 2.8e-14 mm (L2). Triangles at the defaults: rectangle mitre 1,568, rounded 48,608,
+notched 3,136, eared 4,704; oval 47,040 (the arch 68,076, unmoved).
+
+**Found, not fixed, recorded:** (a) the ARCH is not mirror-exact at the double — its left
+springing is `R·sin π` (~3e-14 mm) above its right and its apex x is ~1e-14; AN holds the
+arch to 1e-9 mm and prints the residue, because rebuilding it on `quarterTable` would move
+its frozen bytes. (b) Darkness at a MITRE vertex reads the mitre normal, whose length is
+`1/cos(turn/2)` (√2 at a rectangle corner, ~1.15 at the arch apex), so the shading's
+normal is over-tilted at that one vertex per corner — pre-existing at the apex; normalising
+it would move the arch's SVG. (c) The voxel sampler (C) was replaced by rows parallel to
+each triangle's longest edge: the n × n grid spent 5–7 s on a rectangle's long thin quads;
+the row sampler reads 2% fewer voxels (grazes at cell corners), which can only SPLIT a
+region, never merge two — stricter, never blinder (header of `voxelComponents`).
 
 ## 8. Verification plan
 
@@ -245,6 +292,17 @@ every profile preset, 0 and 4 mullions, each sill, pierced and backed.
 from `offsetCurve`, an embed removed). It rides in `frame.yml` beside the 2-D gate. The
 3D sheet is `node tools/shot-frame-relief.mjs <dir>`: a fixed camera, chrome hidden, and
 close-ups of the cove and the apex mitre.
+
+## 8b. Rulings on phase 2 (Eva, Oct 22, the phase-2b brief)
+
+1. `MIN_FEATURE_MM` stays 1.0 mm as a labelled assumption; the print process is undecided.
+2. `printHeight` 180 mm and `plateThickness` 2.0 mm stay as defaults until a printer is chosen.
+3. The floor keeps TELLING, not refusing.
+4. The arch's lights default pierced. A frame's interior default is NOT ruled — open /
+   backed / recessed are exposed and asked from the sheet.
+5. `reliefScale`'s default: left blank in the brief ("0.5× / 1× / 2× — fill in from the
+   preview"); unchanged at 1.0 and asked again, the sheet's last row.
+6. The Relief view stays unhatched; hatching is SVG-only.
 
 ## 9. Decisions made without a ruling (phase 1)
 
@@ -294,6 +352,16 @@ Phase 2 added, each without a ruling (ruling 2 parks items 3, 8–11 as SVG-only
 16. **The 3D view carries no hatching**: the relief under one light IS the shading there,
     and a hatched texture on a surface already shaded by its own normal would be the same
     information twice. *Undo:* a second material.
+18. **Phase 2b, each without a ruling:** the corner treatments are FOUR options (the brief's
+    "notched/eared" read as two opposite steps, in and out), one `cornerSize` serving all
+    three sized ones, default `mitre` at 24 mm; the oval takes an `aspect` control (0.40–2.50,
+    default 0.75) and hides `width`; a closed frame's seam is the bottom centre; `recessed`
+    is the backed plate at the `MIN_FEATURE_MM` floor (with the default 2 mm plate the
+    opening reads 1 mm deeper than backed — told when the plate is already at the floor);
+    the one `lights` control now reads "Interior" and serves all three types, default
+    `pierced` (ruled for the arch; NOT ruled for the frames — the sheet's interior row asks).
+    *Undo:* registry rows; `rectSkeleton`'s quadrant; one line in `buildRelief`.
+
 17. **Relief depth is `moldingDepth × scale × reliefScale`** — the profile's own depth
     control, scaled with the print, times one multiplier; not a separate millimetre
     control, so the 2-D shading and the 3-D relief describe one profile. *Undo:* `reliefDepthMm`.

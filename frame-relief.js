@@ -116,31 +116,46 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
   const S = ext.spine;
   const { ds, zs, lip } = bandColumns(spine, prof, embedMm);
   const V = S.pts.length, C = ds.length;
+  const closed = !!S.closed;
   const j = S.joins && S.joins.length ? S.joins[0] : -1;
   // xy of every grid vertex: offsetCurve per column, nulls → the mitre point
+  // (the join whose stretch the vertex is in; an open spine has one)
   const xy = ds.map((d) => {
     const off = offsetCurve(S, d);
-    return off.map((q) => q || off[j]);
+    return closed ? off.map((q, i) => q || off[nearestJoin(S, i)]) : off.map((q) => q || off[j]);
   });
   const base = mesh.pos.length / 3;
   const t0 = mesh.idx.length / 3;
   for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth);
   for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, 0);
   const T = (v, c) => base + v * C + c, B = (v, c) => base + V * C + v * C + c;
-  for (let v = 0; v < V - 1; v++) for (let c = 0; c < C - 1; c++) {
-    mesh.quad(T(v, c), T(v + 1, c), T(v + 1, c + 1), T(v, c + 1));
-    mesh.quad(B(v, c), B(v, c + 1), B(v + 1, c + 1), B(v + 1, c));
+  // a CLOSED loop: row V−1 joins row 0 by the same quads every other pair of
+  // rows gets (the CLOSING STRIP) and there are no end caps — no vertex is
+  // duplicated and nothing is drawn at the seam that is not drawn elsewhere.
+  const strips = closed ? V : V - 1, nx = (v) => (v + 1) % V;
+  for (let v = 0; v < strips; v++) for (let c = 0; c < C - 1; c++) {
+    mesh.quad(T(v, c), T(nx(v), c), T(nx(v), c + 1), T(v, c + 1));
+    mesh.quad(B(v, c), B(v, c + 1), B(nx(v), c + 1), B(nx(v), c));
   }
-  for (let v = 0; v < V - 1; v++) {
-    mesh.quad(T(v, 0), B(v, 0), B(v + 1, 0), T(v + 1, 0));               // outer wall
-    mesh.quad(T(v, C - 1), T(v + 1, C - 1), B(v + 1, C - 1), B(v, C - 1)); // inner wall
+  for (let v = 0; v < strips; v++) {
+    mesh.quad(T(v, 0), B(v, 0), B(nx(v), 0), T(nx(v), 0));               // outer wall
+    mesh.quad(T(v, C - 1), T(nx(v), C - 1), B(nx(v), C - 1), B(v, C - 1)); // inner wall
   }
-  for (let c = 0; c < C - 1; c++) {
+  if (!closed) for (let c = 0; c < C - 1; c++) {
     mesh.quad(T(0, c), T(0, c + 1), B(0, c + 1), B(0, c));               // start end
     mesh.quad(T(V - 1, c), B(V - 1, c), B(V - 1, c + 1), T(V - 1, c + 1)); // far end
   }
   orientOutward(mesh, t0);
-  mesh.parts.push({ id: spine.id, kind: 'band', base, V, C, t0, t1: mesh.idx.length / 3, rowOffset: ext.start ? 1 : 0, colOffset: lip ? 1 : 0, embedStart: ext.start, embedEnd: ext.end, lip, T: (v, c) => base + v * C + c });
+  mesh.parts.push({ id: spine.id, kind: 'band', closed, base, V, C, t0, t1: mesh.idx.length / 3, rowOffset: ext.start ? 1 : 0, colOffset: lip ? 1 : 0, embedStart: ext.start, embedEnd: ext.end, lip, T: (v, c) => base + v * C + c });
+}
+
+/* The join whose trimming stretch vertex i lies in on a closed loop: the
+   nearest join by index around the loop. */
+function nearestJoin(S, i) {
+  const n = S.pts.length;
+  let best = S.joins[0], bd = Infinity;
+  for (const j of S.joins) { const d = Math.min((i - j + n) % n, (j - i + n) % n); if (d < bd) { bd = d; best = j; } }
+  return best;
 }
 
 /* ------------------------------------------------------------------ */
@@ -152,6 +167,9 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
    of those boundaries — never restated. */
 export function plateOutline(model) {
   const w = model.params.moldingWidth;
+  // a closed frame's silhouette IS its loop's outer edge (closed, so the
+  // repeated first point is dropped for the ear clipper)
+  if (model.spines.length === 1 && model.spines[0].closed) return outerEdge(model.spines[0], w).slice(0, -1);
   const sp = (id) => model.spines.find((s) => s.id === id);
   const headOut = outerEdge(sp('head'), w);                // right springing → apex → left
   const xo = outerEdge(sp('jambR'), w)[0][0];
@@ -219,18 +237,25 @@ export function buildRelief(model) {
   const underFloor = [];
   const bandW = p.moldingWidth * scale, mullW = bandW * p.mullionWidth;
   if (bandW < MIN_FEATURE_MM) underFloor.push(`molding band ${bandW.toFixed(2)} mm wide`);
-  if (p.mullions > 0 && mullW < MIN_FEATURE_MM) underFloor.push(`mullion ${mullW.toFixed(2)} mm wide`);
-  if (p.sill === 'stepped' && 0.7 * bandW < MIN_FEATURE_MM) underFloor.push(`sill step ${(0.7 * bandW).toFixed(2)} mm wide`);
+  const arch = model.info.kind === 'arch';
+  if (arch && p.mullions > 0 && mullW < MIN_FEATURE_MM) underFloor.push(`mullion ${mullW.toFixed(2)} mm wide`);
+  if (arch && p.sill === 'stepped' && 0.7 * bandW < MIN_FEATURE_MM) underFloor.push(`sill step ${(0.7 * bandW).toFixed(2)} mm wide`);
   if (reliefDepth < MIN_FEATURE_MM) underFloor.push(`relief ${reliefDepth.toFixed(2)} mm deep`);
   const prof = model.prof;
   const mesh = new Mesh();
   for (const s of model.spines) bandSolid(mesh, s, prof, { scale, plateT, reliefDepth });
-  let plate = null;
-  if (p.lights === 'backed') { plate = plateOutline(model); plateSolid(mesh, plate, { scale, plateT }); }
+  // the interior: open, a plate behind at the plate thickness (backed), or
+  // the same plate at the floor so the opening reads deeper (recessed)
+  let plate = null, panelT = null;
+  if (p.lights === 'backed' || p.lights === 'recessed') {
+    panelT = p.lights === 'backed' ? plateT : MIN_FEATURE_MM;
+    if (p.lights === 'recessed' && plateT <= MIN_FEATURE_MM) told.push(`recessed reads as backed: the plate is already at the ${FLOOR_NOTE} floor`);
+    plate = plateOutline(model); plateSolid(mesh, plate, { scale, plateT: panelT });
+  }
   const positions = Float64Array.from(mesh.pos), indices = Uint32Array.from(mesh.idx);
   let z1 = 0; for (let i = 2; i < positions.length; i += 3) if (positions[i] > z1) z1 = positions[i];
   return {
-    positions, indices, parts: mesh.parts, scale, plateT, reliefDepth, plate,
+    positions, indices, parts: mesh.parts, scale, plateT, reliefDepth, plate, panelT,
     info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, depthMm: z1, floorNote: FLOOR_NOTE },
   };
 }
@@ -298,6 +323,15 @@ export function analyzeStl(bytes) {
    merely graze within one cell read as ONE region: that is why the embed is
    asserted geometrically (B) and not here. */
 export const VOXEL_SAMPLE_STEP = 0.25;
+/* The row sampler runs at half the nominal step. Measured on the default
+   arch at 0.4 mm: the old n × n grid marked 134,679 voxels, the row sampler
+   131,903 at this step (132,961 at a quarter, 134,049 at a tenth — the missing
+   ~2% are grazes at voxel corners that the square grid over-sampled across a
+   thin triangle's short direction). FEWER marked voxels can only SPLIT a
+   region, never merge two, so this can make C stricter and can never hide a
+   detachment; a split is re-read at 0.2 mm as before. Cost: ~0.3 s a row
+   against 5–7 s for a rectangle on the square grid. */
+const ROW_STEP = 0.5;
 export function voxelComponents(relief, cell) {
   const P = relief.positions, I = relief.indices;
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
@@ -308,13 +342,29 @@ export function voxelComponents(relief, cell) {
   const vox = new Uint8Array(nx * ny * nz);
   const mark = (x, y, z) => { vox[(Math.floor((z - z0) / cell) + 1) * nx * ny + (Math.floor((y - y0) / cell) + 1) * nx + Math.floor((x - x0) / cell) + 1] = 1; };
   const step = cell * VOXEL_SAMPLE_STEP;
+  const d3 = (i, j) => Math.hypot(P[j] - P[i], P[j + 1] - P[i + 1], P[j + 2] - P[i + 2]);
   for (let t = 0; t < I.length; t += 3) {
-    const a = 3 * I[t], b = 3 * I[t + 1], c = 3 * I[t + 2];
-    const L = Math.max(Math.hypot(P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]), Math.hypot(P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]), Math.hypot(P[c] - P[b], P[c + 1] - P[b + 1], P[c + 2] - P[b + 2]));
-    const n = Math.max(1, Math.ceil(L / step));
-    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++) {
-      const u = i / n, v = j / n, w = 1 - u - v;
-      mark(w * P[a] + u * P[b] + v * P[c], w * P[a + 1] + u * P[b + 1] + v * P[c + 1], w * P[a + 2] + u * P[b + 2] + v * P[c + 2]);
+    // ROWS PARALLEL TO THE LONGEST EDGE (phase 2b): rows at most `step`
+    // apart across the triangle's height, samples at most `step` apart along
+    // each row — the same spacing bound as an n × n barycentric grid sized by
+    // the longest edge, at a cost proportional to the AREA. A closed frame's
+    // long straight sides are long thin quads, where the square grid spent
+    // millions of samples per triangle (measured: 5–7 s a rectangle row).
+    let a = 3 * I[t], b = 3 * I[t + 1], c = 3 * I[t + 2];
+    const lab = d3(a, b), lbc = d3(b, c), lca = d3(c, a);
+    if (lbc >= lab && lbc >= lca) [a, b, c] = [b, c, a]; else if (lca >= lab && lca >= lbc) [a, b, c] = [c, a, b];
+    const L = Math.max(lab, lbc, lca);          // now |ab| is the longest edge, c the apex
+    const ex = P[b] - P[a], ey = P[b + 1] - P[a + 1], ez = P[b + 2] - P[a + 2], fx = P[c] - P[a], fy = P[c + 1] - P[a + 1], fz = P[c + 2] - P[a + 2];
+    const H = L > 0 ? Math.hypot(ey * fz - ez * fy, ez * fx - ex * fz, ex * fy - ey * fx) / L : 0;
+    const nh = Math.max(1, Math.ceil(H / (step * ROW_STEP)));
+    for (let k = 0; k <= nh; k++) {
+      const tt = k / nh;                         // the row from a + tt(c − a) to b + tt(c − b), length (1 − tt) L
+      const m = Math.max(1, Math.ceil((1 - tt) * L / (step * ROW_STEP)));
+      for (let i = 0; i <= m; i++) {
+        const u = (1 - tt) * i / m;              // weight of b
+        const v = tt, w = 1 - u - v;             // weight of c, of a
+        mark(w * P[a] + u * P[b] + v * P[c], w * P[a + 1] + u * P[b + 1] + v * P[c + 1], w * P[a + 2] + u * P[b + 2] + v * P[c + 2]);
+      }
     }
   }
   const lab = new Int32Array(vox.length); const q = new Int32Array(vox.length);
