@@ -219,7 +219,41 @@ the cap off its arc would be a typed constant standing for nothing.
 
 ### 6a. Bytes
 
-*(filled from the byte partition run below)*
+**413 MOVERS / 1,093 HOLDERS over the 1,506-row live matrix in both modes, PASS — 0 floats
+moved on any holder, positionally under `Object.is`, and all 413 predeclared movers moved**
+(`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 8403b47> --movers-predicate
+root-support`, 116 chunks closed by `--merge`): **1,779,379,920 export floats over
+197,708,880 triangles and 82,005,892 captured-grid values.** The 21 block-76 rows and the one
+declared redefinition (block 75's eight-sepal row) are confirmed against the base matrix.
+
+The movers are predeclared from the **BASE tree's own builder record** (`root-support` in
+`PREDICATE_MOVERS`): a row moves iff some ring's asked foot exceeds the derived cap on the
+base's own ring (the petal rings, every built sepal tier on its own ring), or a built sepal
+or leaf blade (simple, LOBED, each leaflet) is longer than the 35 mm reference, or a
+shared-node leaf asks past it.
+
+**The predicate needed three corrections and the run is what said so — 17 rows flipped,
+none of them in a chunk that had already passed:**
+
+- **The shared-node petiole** (a raceme's leaf under every pedicel) reads the ASKED leaf
+  length, not the built (capped) blade (§3). The first predicate read the built length and
+  missed all twelve raceme-with-leaves movers.
+- **Lower sepal tiers** sit on smaller rings than tier 1, so the cap binds on them where it
+  does not on the rim tier — the first predicate checked tier 1 only (2 rows).
+- **A closed tube (k 0) emits no foot rows**, so its feet are a record and move no float.
+  The first predicate called its rings movers (3 rows declared to move that held).
+
+`--list-movers <file>` was added to print the predicted set, so a predicate correction can be
+diffed row by row against the previous one rather than re-run blind.
+
+**The frozen sweep** (`--frozen-sweep`, the same predicate applied to every registered
+baseline, a consequence of the partition above and never a substitute for it): **all 81
+baselines carry a mover — 19,294 of 72,837 frozen rows**, from `frozen/phase2` (44 of 76) to
+`frozen/phase82` (394 of 1,485). Every tag's DEFINITIONS still deep-compare; their bytes
+stop reproducing on those rows, which is what a change to the foot at the shipping width is
+expected to do. No baseline threw. The sweep gained `--memo <file>` (the predicate's answer per
+distinct state, carried across runs) so it closes in `--frozen-only` batches inside one
+foreground call each.
 
 ### 6b. Census
 

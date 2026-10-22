@@ -1009,6 +1009,12 @@ if (argv.includes('--frozen-sweep')) {
   const fo = argv.indexOf('--frozen-only');
   const names = Object.keys(harness.FROZEN_MATRICES).filter((n) => fo < 0 || new RegExp(argv[fo + 1]).test(n));
   const memo = new Map(), threwSeen = new Set();
+  /* `--memo <file>`: the predicate's answer per distinct state, carried across
+     runs so a sweep longer than one foreground call closes in batches
+     (`--frozen-only` picks each batch). Rewritten after every baseline. */
+  const memoFile = argOf('--memo');
+  const fsM = memoFile ? await import('node:fs') : null;
+  if (memoFile && fsM.existsSync(memoFile)) for (const [k, v] of JSON.parse(fsM.readFileSync(memoFile, 'utf8'))) memo.set(k, v);
   let tags = 0, total = 0, movers = 0, threwAll = 0;
   for (const name of names) {
     const fr = harness.FROZEN_MATRICES[name]();
@@ -1022,6 +1028,7 @@ if (argv.includes('--frozen-sweep')) {
     }
     total += fr.length; movers += n; threwAll += threw; if (n) tags++;
     console.log(`  frozen/${name.padEnd(8)} ${String(n).padStart(4)} of ${String(fr.length).padStart(4)} rows move${threw ? `   (${threw} threw, counted as neither)` : ''}`);
+    if (memoFile) fsM.writeFileSync(memoFile, JSON.stringify([...memo]));
   }
   console.log(`\n  ${tags} of ${names.length} baselines carry a row whose bytes stop reproducing; ${movers} of ${total} frozen rows (${memo.size} distinct states).`);
   process.exit(threwAll ? 1 : 0);

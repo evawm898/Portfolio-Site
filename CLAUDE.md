@@ -1277,6 +1277,10 @@ RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-suppor
 - Block 76 (21 rows, 1,506), smoke block 76 (7, `--conn`); block 75's eight-sepal row relabelled;
   `frozen/phase82` = the 1,485 rows at `8403b47`. Sheet: `node tools/shot-bloom-root-support.mjs <dir> --base <wt>`
   → `docs/img/root-support.png`.
+- **Bytes: 413 movers / 1,093 holders, 0 floats on any holder**, both modes (`--movers-predicate root-support`,
+  from the BASE record; three predicate corrections first — the shared-node petiole's ASKED length, lower sepal
+  tiers on their own rings, a closed tube's feet are a record). **Frozen sweep: all 81 baselines carry a mover**
+  (19,294 of 72,837 rows); the sweep's `--memo <file>` lets it close in `--frozen-only` batches.
 
 **SURFACE TEXTURE IS RULED AND PLANNED, NOT BUILT: B, OUTWARD ONLY, HEIGHT A CONTROL WITH A FLOOR**
 (Eva's rulings on #436, Oct 22 — read `docs/bloom-surface-texture-discovery.md` §0, §8 and §10 before any
