@@ -73,7 +73,7 @@ save('export.png', await shotOf('#secExport'), 'Export: the plan on the default 
   const svg = (await z.file(first).async('string')).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1320" height="744" style="background:#f4f2ec"');
   const sheetPage = await s.browser.newPage({ viewport: { width: 1340, height: 764 }, deviceScaleFactor: 2 });
   await sheetPage.setContent(`<body style="margin:10px;background:#333">${svg}</body>`); await sheetPage.waitForTimeout(100);
-  save('sheet-1.png', await sheetPage.screenshot(), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
+  save('sheet-1.png', await sheetPage.screenshot(SHOT), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
   await sheetPage.close();
 }
 await T(() => window.__lantern.set('backing', true)); await page.waitForTimeout(500);
@@ -82,13 +82,22 @@ await T(() => window.__lantern.set('backingColours', 3)); await T(() => window._
 save('backing-dusk.png', await shotOf('.ln-preview'), 'three colours, the dusk palette');
 await page.locator('#secBacking').evaluate((d) => { d.open = true; }); await page.locator('#secBacking').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('backing-panel.png', await shotOf('#secBacking'), 'the Backing section: on / off, colours, the palette and its swatches');
+await T(() => window.__lantern.view('lit')); await T(() => window.__lantern.fold.fit()); await page.waitForTimeout(800);
+save('lit.png', await shotOf('.ln-preview'), 'the Lit view, the page\'s opening view: a warm LED inside the star, the paper glowing, the cuts bright, the pattern thrown onto the wall and floor behind (the backing\'s tissue tinting the glow)');
+await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.set('litRoom', 0.3)); await page.waitForTimeout(600);
+save('lit-day.png', await shotOf('.ln-preview'), 'room darkness 30 %: the lamp against daylight, the thrown pattern fading into a lit room');
+await T(() => window.__lantern.set('litRoom', 1)); await T(() => window.__lantern.set('litWarmth', 2000)); await T(() => window.__lantern.set('litWall', 1.2)); await page.waitForTimeout(600);
+save('lit-candle.png', await shotOf('.ln-preview'), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
+await page.locator('#secLit').evaluate((d) => { d.open = true; }); await page.locator('#secLit').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('lit-panel.png', await shotOf('#secLit'), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
+await T(() => window.__lantern.set('litRoom', 0.85)); await T(() => window.__lantern.set('litWarmth', 2700)); await T(() => window.__lantern.set('litWall', 1.4)); await T(() => window.__lantern.set('backing', true));
 await T(() => window.__lantern.view('build')); await page.waitForTimeout(200);
 save('build.png', await shotOf('.ln-preview'), 'the Build view: the eleven steps with this star\'s own counts, and the machine settings table (starting values)');
 {
   const grid = await T(() => window.__lantern.testGridSvg());
   const gp = await s.browser.newPage({ viewport: { width: 1220, height: 740 }, deviceScaleFactor: 2 });
   await gp.setContent(`<body style="margin:10px;background:#333">${grid.replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1200" height="720" style="background:#f4f2ec"')}</body>`); await gp.waitForTimeout(100);
-  save('test-grid.png', await gp.screenshot(), 'the test grid for the stock: bridges, holes, strokes and a score beside a cut, the derived value marked ◀ — cut this before the star');
+  save('test-grid.png', await gp.screenshot(SHOT), 'the test grid for the stock: bridges, holes, strokes and a score beside a cut, the derived value marked ◀ — cut this before the star');
   await gp.close();
 }
 await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.view('folded'));

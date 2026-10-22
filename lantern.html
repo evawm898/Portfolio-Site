@@ -75,6 +75,14 @@
     </div>
   </details>
 
+  <details class="ln-sec" id="secLit">
+    <summary>Light</summary>
+    <div class="ln-sec-body">
+      <div id="litCtrls"></div>
+      <p class="ln-note">the Lit view: an LED inside the star, the paper glowing, the cuts throwing their pattern on the wall behind — view settings, saved with the design, no effect on the files</p>
+    </div>
+  </details>
+
   <details class="ln-sec" id="secProfile">
     <summary>Profile</summary>
     <div class="ln-sec-body" id="profileCtrls"></div>
@@ -111,11 +119,12 @@
 <main class="ln-main">
   <section class="ln-card ln-preview" aria-label="Preview">
     <div class="ln-card-head">
-      <span class="ln-label" id="previewLabel">Folded</span>
+      <span class="ln-label" id="previewLabel">Lit</span>
       <span class="ln-hint" id="previewHint">drag to turn · scroll to zoom · it turns on its own when left alone</span>
       <span class="ln-views" id="views">
+        <button class="ln-btn ln-btn--sm is-on" data-view="lit">Lit</button>
+        <button class="ln-btn ln-btn--sm" data-view="folded">Folded</button>
         <button class="ln-btn ln-btn--sm" data-view="flat">Flat</button>
-        <button class="ln-btn ln-btn--sm is-on" data-view="folded">Folded</button>
         <button class="ln-btn ln-btn--sm" data-view="build">Build</button>
       </span>
     </div>

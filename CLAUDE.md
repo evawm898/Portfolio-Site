@@ -11614,7 +11614,8 @@ declared rule of thumb.
 ## `/lantern` — the paper star lantern (pointer only)
 
 Hidden generative page (`lantern.html`, `lantern.css`, `lantern.js`,
-`lantern-geometry.js`, `lantern-view.js`; `noindex`, unlinked). Its governing
+`lantern-geometry.js`, `lantern-view.js`, `lantern-pattern.js`, `lantern-validate.js`,
+`lantern-material.js`, `lantern-export.js`, `lantern-build.js`; `noindex`, unlinked). Its governing
 document is **`lantern-design-doc.md`** — read §2 before touching the solver.
 The law: `solveLantern(state)` in `lantern-geometry.js` is the ONE owner of the
 geometry — the FINISHED star is what the user specifies and the FLAT pattern is
@@ -11630,8 +11631,8 @@ outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
 with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
 path-scoped to the lantern's files plus `bloom-curve.js`): `node
 tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
-mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P15 in
-Chromium, `--negative-control` eighteen mutants of the page). Sheet: `node
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P16 in
+Chromium, `--negative-control` twenty-two mutants of the page). Sheet: `node
 tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
 built. **Phase 2 is built too (doc §4): `lantern-pattern.js` lays out a scroll
 skeleton (a stem, stem-rooted volutes, fillers, a rim band) or a lattice per
@@ -11654,4 +11655,15 @@ tissue BACKING piece per point per half behind the cut field, held off every
 fold, colours cycling by point from a palette (drawn in the folded view as a
 translucent skin); the Build view and the jsPDF instructions draw ONE step list
 with this star's counts (LED only); the test grid marks the stock's derived
-values and the coupon is one point alone.** The lit view is phase 5.
+values and the coupon is one point alone.** **Phase 5 is built (doc §10): the
+page OPENS LIT (ruling 7) — a point light inside the star, the paper EMISSIVE
+through a glow map built from the cut canvas (a hole white, the paper a 0.42
+share), the cuts still holes, and the lamp casting shadows THROUGH them onto a
+wall and floor by a `MeshDistanceMaterial` carrying the same alpha map. Two
+things that cost a cycle: three's shadow pass copies the OBJECT material's
+`alphaTest` onto the distance material, so a material with `alphaTest 0` throws
+a SOLID shadow (measured, 43 of 2,115 wall samples lit against 1,583
+unshadowed; 131 once the holes stayed holes) — keep `alphaTest 0.5` on the cut
+material in lit mode; and the lamp is sized from the WALL distance (`I ∝ d²`)
+so the wall reads at any star size. Four Light sliders are view state saved
+in the design file; Folded restores every phase-1 value (`setLit(null)`).**
