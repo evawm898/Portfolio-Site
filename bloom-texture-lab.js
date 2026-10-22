@@ -31,7 +31,7 @@ const meshes = { A: null, B: null };
 
 const ui = () => ({
   state: $('state').value, type: $('type').value, heightMm: Number($('height').value), lambda: Number($('lambda').value),
-  mode: $('mode').value, edgeMm: Number($('edge').value),
+  mode: $('mode').value, edgeMm: Number($('edge').value), split: $('split').value,
   maskBeads: $('maskBeads').checked, maskHoleRims: $('maskHoleRims').checked, maskFeet: $('maskFeet').checked, maskCreases: $('maskCreases').checked,
   flat: $('flat').checked,
 });
@@ -53,10 +53,10 @@ async function rebuild() {
     status('building the shipped bloom (bloom-geometry.js, export mode)…'); await tick();
     soup = C.buildTagged({ ...DEFAULTS, ...C.DEMO_STATES[o.state] }); soupKey = o.state; prepKey = null;
   }
-  const pk = `${o.state}|${o.edgeMm}`;
+  const pk = `${o.state}|${o.edgeMm}|${o.split}`;
   if (prepKey !== pk) {
-    status(`subdividing to ${o.edgeMm} mm edges…`); await tick();
-    prep = C.prepare(soup, o.edgeMm); prepKey = pk;
+    status(`subdividing to ${o.edgeMm} mm edges (${o.split})…`); await tick();
+    prep = C.prepare(soup, o.edgeMm, { split: o.split }); prepKey = pk;
   }
   status('displacing…'); await tick();
   const info = { shippedTris: soup.triCount, tris: prep.tri.length / 3 };
@@ -76,7 +76,7 @@ async function rebuild() {
   lastInfo = info;
   $('readout').textContent =
     `shipped ${info.shippedTris.toLocaleString()} tris (export)\n` +
-    `subdivided ${info.tris.toLocaleString()} tris at ${o.edgeMm} mm\n` +
+    `subdivided ${info.tris.toLocaleString()} tris at ${o.edgeMm} mm (${o.split} split)\n` +
     `= ${(info.tris / 1.5e6 * 100).toFixed(1)}% of the 1,500,000 export budget\n` +
     `relief ${o.type} · ${o.heightMm} mm · ${o.lambda} mm · ${o.mode}\n` +
     (o.lambda < 4 * o.edgeMm ? `! feature size under 4 edges: the relief is under-sampled\n` : '');
@@ -161,7 +161,7 @@ async function measure() {
   status('measured');
 }
 
-for (const id of ['state', 'type', 'height', 'lambda', 'mode', 'edge', 'maskBeads', 'maskHoleRims', 'maskFeet', 'maskCreases', 'flat']) {
+for (const id of ['state', 'type', 'height', 'lambda', 'mode', 'split', 'edge', 'maskBeads', 'maskHoleRims', 'maskFeet', 'maskCreases', 'flat']) {
   $(id).addEventListener(id === 'height' || id === 'lambda' || id === 'edge' ? 'change' : 'input', () => { building = rebuild(); });
   if (id === 'height' || id === 'lambda' || id === 'edge') $(id).addEventListener('input', paintValues);
 }

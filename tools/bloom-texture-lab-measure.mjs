@@ -3,8 +3,10 @@
    bloom-texture-lab-measure.mjs — PRINT REALITY FOR THE SURFACE-TEXTURE
    PROTOTYPE (discovery, NOT a gate; nothing runs it in CI).
 
-   For each demo state x arm (A post-pass / B emitter field) x mode, the
-   relief is applied by bloom-texture-lab-core.js and two lengths are read off
+   For each demo state x arm (A post-pass / B emitter field), OUTWARD relief
+   (the one ruled mode — discovery doc §0 ruling 2; the discovery's inward /
+   centred / emboss rows are its record, docs/data/bloom-surface-texture-
+   measure.json, and this tool no longer makes them) is applied by bloom-texture-lab-core.js and two lengths are read off
    the DISPLACED mesh at every `--every`-th vertex, against the SAME vertex on
    the undisplaced subdivided mesh (same topology, so the comparison is per
    vertex rather than per population):
@@ -20,13 +22,20 @@
    under 1.0 along their normal by geometry; overlapping shells read a gap of
    0 by design) is NOT counted, and its baseline is reported instead.
 
-   SAMPLING, NAMED (CLAUDE.md, durable rule 1): EXPORT mode, edge target
+   SAMPLING, NAMED (CLAUDE.md, durable rule 1): EXPORT mode, the split
+   --split (default 'rows', T1's; 'redgreen' is the discovery's), edge target
    --edge (default 0.4 mm), every --every-th vertex (default 5), rays capped at
    2.5 mm. A per-vertex ray measure, not a medial-axis thickness: at a vertex
    whose normal is oblique to the sheet it reads LONGER than the sheet.
 
+   THE CONFIGS. Each state at 0.4 mm and a 2.0 mm feature; the whole bloom
+   ALSO at 0.6 mm and 2.5 mm (`whole@0.6`), the discovery's own setting for it,
+   so its rows compare like for like with §4's (at 0.4 mm the red-green split
+   made it 1.92 M triangles; the rows split makes it 420 k).
+
    Usage: node tools/bloom-texture-lab-measure.mjs [--out <json>] [--every N]
-          [--edge MM] [--only default,whole,infill,tube] [--quick]
+          [--edge MM] [--split rows|redgreen] [--no-pairs] [--only default,whole,whole@0.6,infill,tube]
+          [--quick] [--resume]
    =================================================================== */
 import fs from 'node:fs';
 import * as C from '../bloom-texture-lab-core.js';
@@ -38,7 +47,11 @@ const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const EVERY = Number(arg('--every', 5));
 const EDGE = Number(arg('--edge', 0.4));
 const OUT = arg('--out', null);
-const ONLY = (arg('--only', 'default,whole,infill,tube')).split(',');
+const SPLIT = arg('--split', 'rows');
+/* --no-pairs: the rows split with every triangle cut alone (no quad pairs) — T1's intermediate */
+const PAIRS = !args.includes('--no-pairs');
+const ALL = ['default', 'whole', 'whole@0.6', 'infill', 'tube'];
+const ONLY = (arg('--only', ALL.join(','))).split(',');
 const QUICK = args.includes('--quick');
 /* --resume: the out file is rewritten after EVERY run with complete:false, and
    a resumed run skips every (state, type, H, arm, mode) already in it. A
@@ -46,11 +59,9 @@ const QUICK = args.includes('--quick');
    work does not survive the end of a turn here; run in timeout-bounded
    foreground chunks). */
 const RESUME = args.includes('--resume');
-/* THE WHOLE BLOOM IS MEASURED AT 0.6 mm / a 2.5 mm feature — at 0.4 mm it is
-   1.92 M triangles, over the export budget it would have to ship under, and a
-   run does not fit a foreground chunk. Recorded per state in the output. */
-const STATE_EDGE = { whole: 0.6 };
-const STATE_LAMBDA = { whole: 2.5 };
+/* `whole@0.6` is the whole bloom at the discovery's own setting for it */
+const STATE_EDGE = { 'whole@0.6': 0.6 };
+const STATE_LAMBDA = { 'whole@0.6': 2.5 };
 const HOLE_BAR_MM = 1.5;
 const TMAX = 2.5;
 
@@ -65,15 +76,16 @@ function classOf(prep, v) {
 }
 
 const RUNS = [];
-const ARMS = [['A', 'outward'], ['A', 'inward'], ['A', 'centred'], ['B', 'outward'], ['B', 'inward'], ['B', 'centred'], ['B', 'emboss']];
+const ARMS = [['A', 'outward'], ['B', 'outward']];
 const B_MASKS = { maskBeads: true, maskHoleRims: true, maskFeet: true, maskCreases: true, fadeMm: 0.6 };
 
-const report = (RESUME && OUT && fs.existsSync(OUT)) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : { edgeMm: EDGE, every: EVERY, tMax: TMAX, floorMm: MIN_FEATURE_MM, holeBarMm: HOLE_BAR_MM, states: {} };
+const report = (RESUME && OUT && fs.existsSync(OUT)) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : { split: SPLIT, pairs: PAIRS, edgeMm: EDGE, every: EVERY, tMax: TMAX, floorMm: MIN_FEATURE_MM, holeBarMm: HOLE_BAR_MM, states: {} };
+if (report.split !== SPLIT) throw new Error(`--resume: ${OUT} was measured on the ${report.split} split, not ${SPLIT}`);
 report.complete = false;
 const save = () => { if (OUT) fs.writeFileSync(OUT, JSON.stringify(report, null, 1)); };
 const runKey = (r) => `${r.type}|${r.heightMm}|${r.arm}|${r.mode}`;
 for (const name of ONLY) {
-  const state = { ...DEFAULTS, ...C.DEMO_STATES[name] };
+  const state = { ...DEFAULTS, ...C.DEMO_STATES[name.split('@')[0]] };
   const typesFor = (name === 'default' && !QUICK) ? C.RELIEF_TYPES : ['pebble'];
   const heightsFor = (name === 'default' && !QUICK) ? [0.1, 0.2, 0.3, 0.5] : [0.3];
   const wanted = [];
@@ -83,16 +95,16 @@ for (const name of ONLY) {
   const t0 = Date.now();
   const soup = C.buildTagged(state);
   const edge = STATE_EDGE[name] ?? EDGE, lambda = STATE_LAMBDA[name] ?? 2.0;
-  const prep = C.prepare(soup, edge);
+  const prep = C.prepare(soup, edge, { split: SPLIT, pairs: PAIRS });
   const base = C.wallAndGap(prep, prep.P, { every: EVERY, tMax: TMAX });
   const cls = base.idx.map((v) => classOf(prep, v));
-  const st = report.states[name] = { shippedTris: soup.triCount, subdividedTris: prep.tri.length / 3, edgeMm: edge, lambdaMm: lambda, baseline: {}, runs: (report.states[name] || {}).runs || [] };
+  const st = report.states[name] = { shippedTris: soup.triCount, subdividedTris: prep.tri.length / 3, edgeMm: edge, lambdaMm: lambda, split: SPLIT, baselineCensus: C.edgeCensus(prep.P, prep.tri), baseline: {}, runs: (report.states[name] || {}).runs || [] };
   for (const c of CLASSES) {
     const w = [], g = [];
     base.idx.forEach((v, i) => { if (cls[i] === c) { w.push(base.wall[i]); g.push(base.gap[i]); } });
     if (w.length) st.baseline[c] = { n: w.length, minWall: Math.min(...w), underWall: w.filter((x) => x < MIN_FEATURE_MM).length, minGap: Math.min(...g) };
   }
-  console.log(`== ${name}: shipped ${soup.triCount} tris -> ${prep.tri.length / 3} at ${edge} mm (${Date.now() - t0} ms)`);
+  console.log(`== ${name}: shipped ${soup.triCount} tris -> ${prep.tri.length / 3} at ${edge} mm, ${SPLIT} split (${Date.now() - t0} ms)`);
   for (const type of typesFor) for (const H of heightsFor) for (const [arm, mode] of ARMS) {
     if (type !== 'pebble' && H !== 0.3) continue;
     if (have.has(`${type}|${H}|${arm}|${mode}`)) continue;
@@ -132,6 +144,6 @@ for (const name of ONLY) {
     console.log(`  ${type.padEnd(8)} H ${H} ${arm} ${mode.padEnd(7)} bnd ${census.boundary} nm ${census.nonManifold}${CLASSES.map(brief).join('')} (${Date.now() - t1} ms)`);
   }
 }
-report.complete = ONLY.length === 4 && ['default', 'whole', 'infill', 'tube'].every((n) => report.states[n]);
+report.complete = ALL.every((n) => report.states[n] && report.states[n].runs.length === (n === 'default' && !QUICK ? 12 : 2));
 save();
 console.log(report.complete ? 'done (complete)' : 'done (partial — run again with --resume)');

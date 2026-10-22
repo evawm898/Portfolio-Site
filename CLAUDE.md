@@ -1255,9 +1255,16 @@ texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-co
 - **Texture sessions run long measurements in the FOREGROUND, chunked and checkpointed (`--resume`), with
   no background waiter and no scheduled check-in** — the discovery lost a 40-minute run to a container
   restart.
-- **The prototype's red-green split is DEFECTIVE on long slivers** (the stem's 570 triangles → 429,378 at
-  0.6 mm against an ideal 9,621), so every stem figure it prints measures the split. T1 of the plan fixes
-  it before anything is re-measured.
+- **T1 IS DONE (Oct 22, §11 of the doc): the prototype's red-green split is replaced by the 'rows' split**
+  (each edge into ⌈L/e⌉ equal segments, coplanar strip quads cut as one unit, rows from the corner opposite
+  the least-cut edge). Stem 429,378 → 20,244 triangles at 0.6 mm, its outward bore folds 4,058 → 0 in both
+  arms; the whole bloom 23.7 % of the budget at 0.4 mm (was 128 %); the corners are BUILT now (infill × 40 ×
+  3: 239 %). `node tools/bloom-texture-lab-quality.mjs` (TQ0–TQ3, `--control` 10 legs — red-green must FAIL
+  it on the stem) is the check. The edge-count split ALONE left 119 bore folds; only the quad pairing
+  cleared them, and the check restates the quads itself so it catches that intermediate.
+- **T1's open questions for T2/T5 are §11.7 (Q14–Q16)**: T2's bar against 2A/e² is not reachable by a
+  refinement of the shipped lattice; whether B refines the bore at all; the split's counts differ between
+  Chromium and Node on the whole bloom, so a T2 sub-lattice count must come from engine-agreed quantities.
 - Plan: T1 split fix (prototype) → T2 own-coordinate lattice through `petalSurface` → T3 field, guard and
   outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
   Gate family **TX**.

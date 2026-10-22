@@ -1,6 +1,9 @@
 # Bloom surface texture — discovery and standalone prototype
 
-**Status: DISCOVERY, RULED (§0). Merged as reference — the prototype page, this doc and the sheet. Nothing shipped.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
+**Status: DISCOVERY, RULED (§0). Merged as reference — the prototype page, this doc and the sheet. Nothing shipped.**
+**T1 DONE (Oct 22, §11): the prototype's split is fixed and the prototype re-measured, outward only. Every
+stem figure in §4, §5 and §7 before §11 was the red-green split's and is replaced there; prototype files only,
+still nothing shipped.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
 `bloom.html`, `bloom.css` and every gate are untouched (predeclared before a line was written,
 checked by `git diff --stat origin/main` at close — §9). The prototype is new files only, none of
 which any workflow names, so no CI run is triggered by this PR:
@@ -13,6 +16,9 @@ which any workflow names, so no CI run is triggered by this PR:
 | `tools/bloom-texture-lab-budget.mjs` | the triangle cost, built for the demo states and projected for the cost corners |
 | `tools/shot-bloom-texture-lab.mjs` | the ruling sheet → `docs/img/bloom-surface-texture.png` |
 | `docs/data/bloom-surface-texture-*.json` | every number in §4 and §5, as measured |
+| `tools/bloom-texture-lab-quality.mjs` | **T1:** triangle quality per organ and the TQ check, with its must-fail (§11.1) |
+| `docs/data/bloom-surface-texture-*-t1.json` | **T1:** the quality, the outward re-measure and the budget on the fixed split (§11) |
+| `docs/img/bloom-surface-texture-t1-stem.png` | **T1:** the stem before / after the split fix, one camera |
 
 ## 0. Eva's rulings (Oct 22, on #436)
 
@@ -161,7 +167,8 @@ grooved boundaries), `ribbing` (radial spokes about the bloom axis — spacing =
 **Height H is peak-to-valley** (§8 Q2). **Modes:** `outward` (s ∈ [0, H], only ever rises out of
 the solid), `inward` (s ∈ [−H, 0]), `centred` (s ∈ [−H/2, H/2]), and B-only `emboss` (both skins of
 a sheet move along the SHEET normal by H·(f − ½), the field sampled on the mid-surface so the two
-skins read one value; non-sheet surfaces fall back to centred).
+skins read one value; non-sheet surfaces fall back to centred). **[T1: ruling 2 left `outward` only;
+the page, the core and the tools no longer offer the other three. Their rows below are the record.]**
 
 **How B is emulated, stated plainly.** B is not inside the emitters. It is the same refined mesh as
 A with three things A cannot have: (i) on a sheet skin the direction is the captured mid-surface
@@ -174,7 +181,9 @@ normal (neither has a captured mid-surface here, so B treats them as A does).
 ## 4. Print reality — SLS PA12
 
 `node tools/bloom-texture-lab-measure.mjs --resume --out docs/data/bloom-surface-texture-measure.json`
-(Node only; every figure below is in that JSON). **Mode and sampling, named:** EXPORT geometry,
+(Node only; every figure below is in that JSON). **[T1: every table in this section was measured on the
+discovery's RED-GREEN split. Its stem column is invalid — §7.6 — and is struck below; the outward rows
+are re-measured on the fixed split in §11.3, beside these.]** **Mode and sampling, named:** EXPORT geometry,
 subdivided to a 0.4 mm edge (the whole bloom at 0.6 mm and a 2.5 mm feature: at 0.4 mm it is 1.92 M triangles and a run does
 not fit a measurement chunk; **its stem column is invalid, §7.6**), feature size
 2.0 mm, every 5th vertex sampled, rays capped at 2.5 mm; B with all four masks on, fade 0.6 mm.
@@ -247,15 +256,19 @@ Baseline (no relief): skin min wall 0.696 (34/30835 under 1.0) · bead min wall 
 
 Baseline (no relief): skin min wall 0.572 (67/18463 under 1.0) · bead min wall 0.767 (8/4548 under 1.0) · rod min wall 1.141 (0/5177 under 1.0) · hub min wall 1.200 (0/1049 under 1.0) · stem min wall 0.326 (12/42938 under 1.0) · other min wall 1.159 (0/214 under 1.0)
 
+**The stem column is struck: it measured the red-green split, not the relief (§7.6).** Re-measured on the
+fixed split (§11.3): outward relief newly thins **0** stem samples and folds **0**, in both arms, at 0.6 mm
+and at 0.4 mm. The gap column's total includes the struck stem's and the rods' red-green figures (§11.3).
+
 | relief | H | arm | mode | skin: newly < 1.0 · thin p99 · folds | bead: newly < 1.0 · thin p99 · folds | rod: newly < 1.0 · thin p99 · folds | hub: newly < 1.0 · thin p99 · folds | stem: newly < 1.0 · thin p99 · folds | gap newly < 1.0 (all) | hole bar newly < 1.5 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| pebble | 0.3 | A | outward | 4 (0.0%) · -0.052 · 16 | 13 (0.4%) · -0.047 · 13 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.014 · 0 | 4058 (9.6%) · 1.499 · 4058 | 1168 | — |
-| pebble | 0.3 | A | inward | 15827 (85.7%) · 0.589 · 146 | 2206 (68.3%) · 2.169 · 109 | 3443 (67.6%) · 1.138 · 58 | 291 (36.3%) · 0.617 · 1 | 3378 (8.0%) · 1.508 · 2628 | 163 | — |
-| pebble | 0.3 | A | centred | 1738 (9.4%) · 0.249 · 25 | 538 (16.7%) · 0.421 · 13 | 357 (7.0%) · 0.233 · 0 | 2 (0.2%) · 0.243 · 0 | 1231 (2.9%) · 1.500 · 1231 | 331 | — |
-| pebble | 0.3 | B | outward | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.014 · 0 | 4052 (9.6%) · 1.499 · 4052 | 1101 | — |
-| pebble | 0.3 | B | inward | 14860 (80.5%) · 0.538 · 0 | 1157 (35.8%) · 0.783 · 0 | 3390 (66.6%) · 1.138 · 58 | 267 (33.3%) · 0.839 · 0 | 3376 (8.0%) · 1.508 · 2628 | 155 | — |
-| pebble | 0.3 | B | centred | 1528 (8.3%) · 0.239 · 0 | 121 (3.7%) · 0.298 · 0 | 336 (6.6%) · 0.231 · 0 | 2 (0.2%) · 0.243 · 0 | 1231 (2.9%) · 1.500 · 1231 | 304 | — |
-| pebble | 0.3 | B | emboss | 165 (0.9%) · 0.103 · 0 | 140 (4.3%) · 0.293 · 0 | 336 (6.6%) · 0.231 · 0 | 2 (0.2%) · 0.243 · 0 | 1231 (2.9%) · 1.500 · 1231 | 308 | — |
+| pebble | 0.3 | A | outward | 4 (0.0%) · -0.052 · 16 | 13 (0.4%) · -0.047 · 13 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.014 · 0 | ~~4058 (9.6%) · 1.499 · 4058~~ invalid (§7.6; §11.3) | 1168 | — |
+| pebble | 0.3 | A | inward | 15827 (85.7%) · 0.589 · 146 | 2206 (68.3%) · 2.169 · 109 | 3443 (67.6%) · 1.138 · 58 | 291 (36.3%) · 0.617 · 1 | ~~3378 (8.0%) · 1.508 · 2628~~ invalid (§7.6; mode ruled out, not re-measured) | 163 | — |
+| pebble | 0.3 | A | centred | 1738 (9.4%) · 0.249 · 25 | 538 (16.7%) · 0.421 · 13 | 357 (7.0%) · 0.233 · 0 | 2 (0.2%) · 0.243 · 0 | ~~1231 (2.9%) · 1.500 · 1231~~ invalid (§7.6; mode ruled out, not re-measured) | 331 | — |
+| pebble | 0.3 | B | outward | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.014 · 0 | ~~4052 (9.6%) · 1.499 · 4052~~ invalid (§7.6; §11.3) | 1101 | — |
+| pebble | 0.3 | B | inward | 14860 (80.5%) · 0.538 · 0 | 1157 (35.8%) · 0.783 · 0 | 3390 (66.6%) · 1.138 · 58 | 267 (33.3%) · 0.839 · 0 | ~~3376 (8.0%) · 1.508 · 2628~~ invalid (§7.6; mode ruled out, not re-measured) | 155 | — |
+| pebble | 0.3 | B | centred | 1528 (8.3%) · 0.239 · 0 | 121 (3.7%) · 0.298 · 0 | 336 (6.6%) · 0.231 · 0 | 2 (0.2%) · 0.243 · 0 | ~~1231 (2.9%) · 1.500 · 1231~~ invalid (§7.6; mode ruled out, not re-measured) | 304 | — |
+| pebble | 0.3 | B | emboss | 165 (0.9%) · 0.103 · 0 | 140 (4.3%) · 0.293 · 0 | 336 (6.6%) · 0.231 · 0 | 2 (0.2%) · 0.243 · 0 | ~~1231 (2.9%) · 1.500 · 1231~~ invalid (§7.6; mode ruled out, not re-measured) | 308 | — |
 
 #### infill — shipped 108,928 tris, 557,248 after the split
 
@@ -288,6 +301,10 @@ Baseline (no relief): skin min wall 0.696 (33/26631 under 1.0) · bead min wall 
 
 ## 5. Triangle budget
 
+**[T1: this table is the RED-GREEN split's and is the record. Every figure on it moved with the split
+fix, and the two corners are BUILT now rather than projected — §11.4. The stem rows and the
+"whole bloom without the stem's blow-up" row are superseded there.]**
+
 `node tools/bloom-texture-lab-budget.mjs` (EXPORT mode; data in
 `docs/data/bloom-surface-texture-budget.json`). **Built** = the prototype's red-green split, run.
 **Ideal** = 2·area/e², the count of a regular lattice of edge e over the same area — what an
@@ -301,8 +318,8 @@ stem's 56 mm slivers, §7.6), and it is labelled as a projection, never a build.
 | default (8 petals + hub) | 24,688 | 7,919 | 162,592 (10.8 %) | **403,616 (26.9 %)** | 639,200 (42.6 %) | 836,672 (55.8 %) |
 | — ideal 2A/e² | | | 44,000 | 99,000 | 176,000 | 253,000 |
 | whole bloom | 59,012 | 14,921 | 723,690 (48.2 %) | **1,921,732 (128.1 %)** | 2,660,164 (177.3 %) | — |
-| — of which the STEM (the split's sliver defect, §7.6) | 570 | 1,732 | 429,378 | 1,274,322 | — | — |
-| — whole bloom WITHOUT the stem's blow-up | | | 294,312 (19.6 %) | 647,410 (43.2 %) | — | — |
+| — of which the STEM (the split's sliver defect, §7.6) — **T1: 20,244 and 30,580, §11.4** | 570 | 1,732 | ~~429,378~~ | ~~1,274,322~~ | — | — |
+| — whole bloom WITHOUT the stem's blow-up — **T1 builds the whole bloom: 204,440 (13.6 %) and 355,766 (23.7 %), §11.4** | | | ~~294,312 (19.6 %)~~ | ~~647,410 (43.2 %)~~ | — | — |
 | — ideal | | | 82,900 | 186,500 | 331,600 | 477,500 |
 | Voronoi infill | 108,928 | 6,712 | 264,452 (17.6 %) | 557,248 (37.1 %) | 892,522 (59.5 %) | — |
 | tube | 24,672 | 8,695 | 183,130 (12.2 %) | 440,256 (29.4 %) | 718,776 (47.9 %) | — |
@@ -311,7 +328,8 @@ stem's 56 mm slivers, §7.6), and it is labelled as a projection, never a build.
 | whole bloom × 40 × 3 — PROJECTED | 401,956 | 89,191 | 1,831,142 (122 %) | 4,545,601 (303 %) | 7,198,793 (480 %) | 9,422,761 (628 %) |
 | — ideal | | | 495,500 | 1,114,900 (74 %) | 1,982,000 (132 %) | |
 
-**The whole bloom's breach is the prototype's, not the relief's.** At 0.4 mm the stem alone is
+**The whole bloom's breach is the prototype's, not the relief's** — **confirmed by T1: the fixed split
+builds it at 355,766 triangles at 0.4 mm, 23.7 % of the budget (§11.4).** At 0.4 mm the stem alone was
 1,274,322 of its 1,921,732 triangles against an ideal of 21,648 — the sliver defect of §7.6.
 Per organ at 0.4 mm, built (ideal): petals 359,072 (92,034) · sepals 80,130 (21,835) · leaves
 100,632 (25,332) · stamens 60,960 (16,333) · style 11,480 (2,297) · hub 35,136 (7,040).
@@ -353,7 +371,9 @@ sections:
    costs instead is GAPS and SILHOUETTE: it adds material, so it closes gaps between organs (7–12
    samples on the default at 0.1–0.5 mm; 1,101 on the whole bloom, of which 904 are rods — the 12
    stamens and the style standing within a millimetre of each other — and 94 skins, not located further) and, on any surface it is not masked from, moves the silhouette out
-   by up to H. *(The stem rows read otherwise and are INVALID — item 6.)*
+   by up to H. *(The stem rows read otherwise and were INVALID — item 6. **T1: the stem re-measures at 0
+newly thinned and 0 folds in both arms, and the whole bloom's newly-closed gaps are 328 (B, 0.6 mm), of
+which 220 are rods, not 1,101 / 904 — those counts were the red-green split's too. §11.3.**)*
 2. **Inward breaks the 1.0 mm floor on most of every sheet at any height worth seeing.** With a
    1.20 mm sheet the budget is 0.20 mm: at H = 0.1 mm inward, 12.8–14.8 % of skin samples go under
    the floor; at 0.2 mm 57–61 %; at 0.3 mm 79–86 %. The hub plate and every 1.2 mm rod go the same
@@ -380,7 +400,10 @@ sections:
    shipped, 2,624 after the split; A leaves 896–914, B leaves all 2,624 — the coincidence is
    preserved only by an arm that gives coincident points one displacement). B outward reads 0 / 0 /
    0 there. **On the infill, A is not an option at any height this session measured.**
-6. **THE STEM ROWS ARE INVALID AS PRINT EVIDENCE — THEY MEASURE THE PROTOTYPE'S SPLIT.** Outward-only
+6. **THE STEM ROWS WERE INVALID AS PRINT EVIDENCE — THEY MEASURED THE PROTOTYPE'S SPLIT. [T1: FIXED and
+   re-measured — §11. The edge-count split alone took the bore's folds from 4,058 to 119, and the rest
+   were the same defect one level down (each wall quad cut as two slivers); cut as quads, 0. The paragraph
+   below is the discovery's diagnosis, kept as written.]** Outward-only
    relief "folds" 9.6 % of stem samples in BOTH arms (4,058 A, 4,052 B), every one located on the
    BORE wall (r = 1.500 mm on the 6 mm stem). Outward relief cannot thin a wall, and the two arms
    agree, which is the tell: the cause is shared. It is the split. A straight tube is exact at two
@@ -406,7 +429,7 @@ sections:
    into another, so neither fades the relief at an organ boundary — that would need the union (A′).
 9. **The lattice is the cost, not the field.** Displacing the default's 202 k vertices is
    85 ms (A) and 361 ms (B, with its mask distances) in Node; the split is 3.6 s and multiplies the triangle count 16× on the default at
-   0.4 mm (§5). The emulated B paid the same split as A; a real B would refine its own lattice in
+   0.4 mm (§5). **[T1: the fixed split takes ~0.15 s and multiplies it 7.4× (183,168), §11.4.]** The emulated B paid the same split as A; a real B would refine its own lattice in
    (u, v) at ~1/4 of the count and put the new points on the surface rather than the chords.
 10. **The relief is visible at 0.3 mm with a 2 mm feature under raking light and close to invisible
     at a whole-bloom distance** (sheet §4). Whether it RESOLVES in PA12 at that scale is not
@@ -462,8 +485,9 @@ ruled ones keep their text so the ruling can be read against what it answered.
    split (T2's lattice lowers that, §5).
 9. **OPEN — the triangle budget.** The shipped infill cost corner (74.7 % of the budget plain)
    projects to 258 % at a 0.4 mm edge through a post-pass split and ~63 % through an ideal lattice;
-   the whole-bloom demo state reads 128 % at 0.4 mm in the prototype, but 1.27 M of that is the
-   prototype's own stem defect (§7.6) — without it, 43 %. B's own-coordinate lattice (T2) is the
+   the whole-bloom demo state read 128 % at 0.4 mm in the prototype, but 1.27 M of that was the
+   prototype's own stem defect (§7.6). **[T1: on the fixed split the whole bloom is 23.7 % at 0.4 mm, and
+   the infill corner, BUILT, is 239 % — §11.4.]** B's own-coordinate lattice (T2) is the
    ruled route toward the ideal; what stays open is what happens at the corners even then: a
    feature-size floor (λ sets the edge, so the refinement is bounded by the floor), a higher budget,
    or relief refused above the budget the way the export already refuses (XR1). **Blocks T2's
@@ -476,7 +500,8 @@ ruled ones keep their text so the ruling can be read against what it answered.
     the mirror relief underneath, wanted?
 12. **OPEN — stamens and the style are 1.2 mm rods** (one sheet, floored with it). Under outward-only
     nothing thins them, but relief thickens a filament the slenderness line already reports and closes
-    the gaps between them (904 of the whole bloom's 1,101 newly-closed gaps are rods, §7.1). Texture the
+    the gaps between them (904 of the whole bloom's 1,101 newly-closed gaps were rods on the red-green
+    split, §7.1; **T1: 220 of 328 at 0.6 mm and 244 of 428 at 0.4 mm, B, §11.3**). Texture the
     rods, or exempt them? **Blocks T5's rod half.**
 13. **OPEN, NEW (from ruling 3) — the height control's FLOOR: what value, and in what units?** Ruling 3
     says the height ships with a floor and never a default that assumes it prints, and names no number.
@@ -490,20 +515,37 @@ ruled ones keep their text so the ruling can be read against what it answered.
 
 ```
 npm i --no-save three@0.161.0            # the page and the sheet serve three from node_modules
-# ~60 min, Node only: run in the FOREGROUND in timeout-bounded chunks; each run checkpoints the JSON
-# and --resume skips what is already in it (a container restart killed one unchunked run, §10)
-timeout 560 node tools/bloom-texture-lab-measure.mjs --resume --out docs/data/bloom-surface-texture-measure.json   # repeat until "done (complete)"
-node tools/bloom-texture-lab-budget.mjs  --out docs/data/bloom-surface-texture-budget.json    # ~3 min
-node tools/shot-bloom-texture-lab.mjs <dir> --png docs/img/bloom-surface-texture.png         # ~2 min, Chromium
+# T1 (§11), Node only, each in the FOREGROUND:
+node tools/bloom-texture-lab-quality.mjs --out docs/data/bloom-surface-texture-quality-t1.json   # ~1 min; exits 1 on a TQ failure
+node tools/bloom-texture-lab-quality.mjs --control                                              # ~1 min; the must-fail, 9 legs
+timeout 560 node tools/bloom-texture-lab-measure.mjs --resume --out docs/data/bloom-surface-texture-measure-t1.json  # ~3 min; repeat until "done (complete)"
+node --max-old-space-size=12000 tools/bloom-texture-lab-budget.mjs --out docs/data/bloom-surface-texture-budget-t1.json  # ~3 min, the corners built
+node tools/shot-bloom-texture-lab.mjs <dir> --png <file>                                        # ~2 min, Chromium
 ```
+
+**The discovery's own JSONs (`-measure.json`, `-budget.json`) are its record and are not re-run**: they
+were measured on the red-green split and in four modes, and the tools no longer make either (the
+measure tool takes `--split redgreen` for the split; the modes are gone). Nor is
+`docs/img/bloom-surface-texture.png` re-rendered: it is the sheet Eva ruled on, red-green split, all
+four modes, and its §3 section can no longer be reproduced by design.
+
+**WHY THE LONG RUNS ARE CHUNKED — THE ACCOUNT, HELD HERE AND ONLY HERE.** The discovery session ran the
+§4 sweep (about 60 minutes on the red-green split) once as a single unchunked process; a container
+restart killed it about 40 minutes in and every row it had measured was lost with it. The measure tool's
+`--resume` (the JSON is rewritten after every run with `complete: false`, and a resumed run skips what is
+already in it) and the foreground `timeout 560` chunks are the answer, and Eva made that discipline a rule
+for every texture session (§10, (iii)). On the fixed split the whole T1 re-measure is about three minutes
+and fits one chunk; the discipline stands regardless.
 
 The page itself: serve the repo root and open `/bloom-texture-lab.html` (it is reachable on the
 deploy preview and on production, unlinked and `noindex`).
 
-**Predeclared untouched, and verified by `git diff --stat origin/main...HEAD`:** `bloom-geometry.js`,
+**Predeclared untouched, and verified by `git diff --stat origin/main...HEAD` — on the discovery PR
+(#436) and again on T1's:** `bloom-geometry.js`,
 `bloom-registry.js`, `bloom.js`, `bloom.html`, `bloom.css`, `bloom-file.js`, `bloom-curve.js`,
-`bloom-grid-gltf.js`, every `tools/verify-*`, `tools/bloom-harness.mjs`, every workflow. The PR adds
-files only. **No workflow's path filter names any of them**, so the PR starts no Actions run —
+`bloom-grid-gltf.js`, every `tools/verify-*`, `tools/bloom-harness.mjs`, every workflow. The
+discovery PR added files only; T1 edits only the prototype's own files and adds one tool, its data and
+one image. **No workflow's path filter names any of them**, so the PR starts no Actions run —
 Netlify's checks are the only ones it gets, and no gate certifies anything here.
 
 **No matrix row, no frozen phase, no byte moved** — the generator was not changed.
@@ -524,12 +566,16 @@ session **(i)** touches no shipped file it does not name, **(ii)** proves the gu
 (relief NONE moves 0 floats over the whole matrix in both modes — `verify-bloom-surface-bytes`'
 partition, movers predeclared from the BASE tree's record), and **(iii) runs every long measurement
 in the FOREGROUND, chunked and checkpointed (`--resume`), with no background waiter and no scheduled
-check-in** (Eva, Oct 22 — this session lost one 40-minute run to a container restart, §9). The new
+check-in** (Eva, Oct 22; the run it answers — killed by a container restart — is accounted for in §9). The new
 gate family is **TX** (free; checked against every assertion prefix in `tools/`), written and seen red
 before the geometry it guards, each clause with a must-fail.
 
-**T1 · THE SPLIT, FIXED; THE PROTOTYPE RE-MEASURED.** *Prototype only. No gate dependency. No open
-question blocks it.* **FIRST**, for the infill S1's reason: every number below it — the stem rows, the
+**T1 · THE SPLIT, FIXED; THE PROTOTYPE RE-MEASURED.** **[DONE Oct 22 — §11. The bore reads 0 outward
+folds; the 1.5×-at-0.6 mm count bar is unreachable by any split of the shipped stem (§11.6) and is met at
+0.4 mm; the must-fail is the quality check's `--control` (red-green FAILS it on the stem) and the
+measure tool's `--split redgreen`, which brings the 4,058 folds back. It also needed a second step the plan
+did not name — coplanar strip quads cut as one unit (§11.1). Four questions it raises for T2/T5 are §11.7.]**
+*Prototype only. No gate dependency. No open question blocks it.* **FIRST**, for the infill S1's reason: every number below it — the stem rows, the
 rods, the budget — is a property of the split and moves when the split is fixed. Builds: the
 **edge-count-aware split** for the stem-sliver defect (§7.6) — each edge into ⌈L/e⌉ equal segments, the
 count a pure function of the unordered edge so two triangles sharing it agree, and the triangle filled
@@ -623,3 +669,266 @@ states (X2 reads the census, and a relieved fold may read deeper — re-records,
 the cross-shell gaps outward relief closes (§7.1: 904 rod pairs on the whole bloom), which are
 over-connection and not a print failure under the crowding ruling, but are the combination gate's
 subject the day a pair names them.
+
+## 11. T1 — the split fixed, the prototype re-measured (Oct 22)
+
+**Prototype files only.** `bloom-texture-lab-core.js`, the page (`bloom-texture-lab.html` / `.js`), the
+three tools and one new one (`tools/bloom-texture-lab-quality.mjs`), their data
+(`docs/data/bloom-surface-texture-*-t1.json`) and one image. No shipped file, no gate, no workflow; the
+PR starts no Actions run. T2 is not started. **Mode and sampling, named, for every figure below:** EXPORT
+geometry; the split named per figure; the wall/gap rays as §4 (every 5th vertex of the subdivided mesh, so
+the populations differ between splits and SHARES compare where raw counts do not); outward relief only.
+
+### 11.1 The split, and the check that holds it
+
+**The 'rows' split** (`subdivide`'s header has the law): every edge into ⌈L/e⌉ equal segments, the points
+cached on the welded edge so neighbours share them by construction; a **coplanar strip quad** — two
+triangles sharing their mutual longest edge, coplanar to 1e-9 mm, convex, both rails at least as long in
+segments as either end — cut as ONE unit, rows across it between its long sides, its diagonal never cut;
+any other triangle filled by rows from the corner opposite its least-cut edge, consecutive rows zipped on
+the shorter diagonal. ~0.15 s on the default at 0.4 mm, where red-green took 3.6 s.
+
+**It took two steps, and the first was not enough — measured.** The edge-count split alone (every
+triangle cut on its own; `--no-pairs` reproduces it) took the stem's outward bore "folds" at 0.6 mm from
+**4,058 / 4,052 (A / B) to 119 / 119**, and 205 / 204 at 0.4 mm — 3.3 % of the stem's samples, every one
+on the bore at r = 1.500 mm, normal pointing at the axis. Located: each 55.89 × 0.20 mm bore quad cut as two
+slivers leaves, near each sliver's apex, a diagonal point and an axial-edge point **0.014 mm apart** whose
+area-weighted normals differ by **3.75°** (one lies inside a facet column, the other on its edge), and a
+0.16 mm outward push along those normals crosses one over the other. That is still the split. Cut as
+quads, the bore reads **0**.
+
+**The check is `node tools/bloom-texture-lab-quality.mjs`** (prototype instrument, not a gate; no CI).
+Two references, neither read off the split under test: the IDEAL 2A/e² and the conforming FLOOR
+Σ max(n_ab + n_bc + n_ca − 2, 2A/e²) over the shipped triangles (the least a split that keeps every
+shipped edge can emit; a paired quad drops its diagonal, which is why 'rows' can read under 1× of it).
+
+| clause | asserts, on the 'rows' split, every state, 0.6 and 0.4 mm |
+|---|---|
+| **TQ0** | 0 boundary edges in INDEX space, and every non-manifold edge on shipped triangles already non-manifold (the infill's 224 coincident-sheet edges propagate into their rows by construction: 607 at 0.6, 835 at 0.4, 0 new) |
+| **TQ1** | every organ within **2.0×** its floor — 'rows' reads 0.52–1.37×, red-green 11.06× / 21.94× on the stem; the bar sits between the two distributions |
+| **TQ2** | no fans: per shipped region, the sub-1° pieces at most what its OWN corners force (2·⌈1°/α⌉ per corner); a cap (altitude under e·tan 1°) may be thin throughout, up to 2× its polygon floor; a coplanar strip quad is ONE region and its four corners are judged, so a stem wall quad forces none. The quads are RESTATED in the tool, not read from the split — a split that stopped pairing would otherwise hand over the grouping that excuses it |
+| **TQ3** | each shipped triangle's (or paired quad's) pieces sum to its area to 1e-9 and face its way |
+
+**`--control` — 10 of 10 behave:** 'rows' passes at both edges; **red-green FAILS TQ1 and TQ2 on the stem**
+at both edges (11.06× / 21.94× its floor, 96 fanning quads, 40.8 % / 32.8 % of the stem under 1°); four
+mutants of 'rows', each built in a copy of the core with its anchor checked to match exactly once, fail
+what they name — `the-base-row-is-recut` → TQ0 (102,774 boundary edges), `quads-are-cut-as-two-triangles`
+→ TQ2 on the stem (T1's intermediate), `the-quad-rows-fan-from-one-corner` → TQ2 on the stem,
+`apex-at-the-long-edge` → TQ2. **A first mutant that only dropped the edge cache was INERT and was
+replaced**: the points are computed from the lower vertex id either way, so the copies were bit-identical
+and welded into one — dropping the cache is harmless, and the mutant named a defect it did not make.
+**And the fold half of the plan's must-fail holds too**: `--split redgreen --only whole@0.6` reproduces
+the discovery's 4,058 / 4,052 stem folds to the integer through the T1 tool.
+
+### 11.2 Triangle quality per organ, red-green → rows
+
+Smallest angle and aspect (Lmax²/2A; 1.155 equilateral) per organ. **Read the counts beside the
+percentiles**: on petals and sepals the p1 angle FALLS (12.52° → 7.63° on the default petal at 0.4 mm) while
+the count of triangles under 5° falls too (1,024 → 928) — 'rows' emits half as many triangles, so the
+shipped mesh's own thin facets (bead strips, edges already under e, which no split touches) weigh twice as
+much in a percentile. The stem is the defect and reads **0 under 1° on 'rows' at both edges** (175,104 and
+417,792 on red-green). Data: `docs/data/bloom-surface-texture-quality-t1.json`.
+
+**default** (shipped 24,688)
+
+| organ | edge | tris red-green → rows | × ideal | min angle p1 / p5 / p50 (°) | aspect p99 | under 1° | under 5° |
+|---|---|---|---|---|---|---|---|
+| petal | 0.6 | 150,688 → **98,800** | 3.68 → 2.42 | 7.35 / 20.93 / 31.5 → 5.95 / 19.93 / 37.78 | 8.3 → 10.6 | 432 → 400 | 928 → 896 |
+| hub | 0.6 | 11,904 → **4,608** | 3.85 → 1.49 | 7.37 / 7.37 / 14.87 → 7.37 / 14.39 / 36.68 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+| petal | 0.4 | 359,072 → **173,568** | 3.9 → 1.89 | 12.52 / 21.8 / 33.59 → 7.63 / 22.02 / 41.84 | 5.1 → 7.7 | 528 → 432 | 1,024 → 928 |
+| hub | 0.4 | 44,544 → **9,600** | 6.4 → 1.38 | 7.37 / 7.37 / 14.87 → 7.5 / 21.89 / 39.54 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+
+**whole** (shipped 59,012)
+
+| organ | edge | tris red-green → rows | × ideal | min angle p1 / p5 / p50 (°) | aspect p99 | under 1° | under 5° |
+|---|---|---|---|---|---|---|---|
+| petal | 0.6 | 150,688 → **98,800** | 3.68 → 2.42 | 7.35 / 20.93 / 31.5 → 5.95 / 19.93 / 37.78 | 8.3 → 10.6 | 432 → 400 | 928 → 896 |
+| hub | 0.6 | 10,464 → **4,992** | 3.34 → 1.6 | 7.37 / 7.37 / 29.27 → 7.37 / 14.39 / 38.88 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+| stem | 0.6 | 429,378 → **20,244** | 44.63 → 2.1 | 0.2 / 0.4 / 1.61 → 5.84 / 18.26 / 31.14 | 284.9 → 10.5 | 175,104 → 0 | 375,060 → 163 |
+| leaf | 0.6 | 48,766 → **33,894** | 4.33 → 3.01 | 4.08 / 8.43 / 29.93 → 4.28 / 13.56 / 34.39 | 14.1 → 13.6 | 180 → 168 | 1,035 → 444 |
+| stamen | 0.6 | 46,224 → **15,680** | 6.37 → 2.16 | 11.64 / 16.52 / 25.14 → 26.67 / 29.66 / 41.67 | 6.5 → 2.9 | 0 → 0 | 0 → 0 |
+| style | 0.6 | 5,440 → **1,860** | 5.33 → 1.82 | 11.64 / 11.64 / 23.28 → 26.67 / 27.4 / 35.45 | 5.1 → 2.9 | 0 → 0 | 0 → 0 |
+| sepal | 0.6 | 32,730 → **28,970** | 3.37 → 2.99 | 1.95 / 9.89 / 34.8 → 1.89 / 8.94 / 35.74 | 29.7 → 30.6 | 270 → 250 | 590 → 570 |
+| petal | 0.4 | 359,072 → **173,568** | 3.9 → 1.89 | 12.52 / 21.8 / 33.59 → 7.63 / 22.02 / 41.84 | 5.1 → 7.7 | 528 → 432 | 1,024 → 928 |
+| hub | 0.4 | 35,136 → **12,000** | 4.99 → 1.7 | 7.37 / 7.37 / 24.81 → 7.5 / 23.9 / 38.93 | 7.9 → 7.7 | 0 → 0 | 0 → 0 |
+| stem | 0.4 | 1,274,322 → **30,580** | 58.87 → 1.41 | 0.2 / 0.4 / 1.63 → 7.99 / 26.17 / 37.81 | 284.9 → 7.8 | 417,792 → 0 | 1,043,135 → 174 |
+| leaf | 0.4 | 100,632 → **59,748** | 3.97 → 2.36 | 4.08 / 11.66 / 30 → 6.11 / 15.62 / 37.71 | 14.1 → 10 | 195 → 174 | 1,629 → 447 |
+| stamen | 0.4 | 60,960 → **24,000** | 3.73 → 1.47 | 11.64 / 11.64 / 32.91 → 26.67 / 38.9 / 40.12 | 5.1 → 3 | 0 → 0 | 0 → 0 |
+| style | 0.4 | 11,480 → **3,200** | 5 → 1.39 | 11.64 / 11.64 / 26.7 → 26.67 / 38.9 / 43.51 | 8.4 → 2.9 | 0 → 0 | 0 → 0 |
+| sepal | 0.4 | 80,130 → **52,670** | 3.67 → 2.41 | 6.47 / 19.78 / 34.93 → 3.91 / 18.1 / 39.41 | 9.5 → 14.7 | 270 → 250 | 590 → 570 |
+
+**infill** (shipped 108,928)
+
+| organ | edge | tris red-green → rows | × ideal | min angle p1 / p5 / p50 (°) | aspect p99 | under 1° | under 5° |
+|---|---|---|---|---|---|---|---|
+| petal | 0.6 | 252,548 → **197,680** | 7.39 → 5.78 | 0.22 / 1.12 / 15.65 → 0.22 / 1.38 / 17.85 | 284.7 → 281.8 | 11,296 → 6,736 | 64,728 → 38,424 |
+| hub | 0.6 | 11,904 → **4,608** | 3.85 → 1.49 | 7.37 / 7.37 / 14.87 → 7.37 / 14.39 / 36.68 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+| petal | 0.4 | 512,704 → **348,496** | 6.66 → 4.53 | 0.2 / 1.2 / 17.79 → 0.23 / 1.51 / 19.18 | 299.8 → 259.1 | 21,616 → 11,016 | 121,912 → 59,816 |
+| hub | 0.4 | 44,544 → **9,600** | 6.4 → 1.38 | 7.37 / 7.37 / 14.87 → 7.5 / 21.89 / 39.54 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+
+**tube** (shipped 24,672)
+
+| organ | edge | tris red-green → rows | × ideal | min angle p1 / p5 / p50 (°) | aspect p99 | under 1° | under 5° |
+|---|---|---|---|---|---|---|---|
+| petal | 0.6 | 129,626 → **84,586** | 3.67 → 2.4 | 6.67 / 21.13 / 31.42 → 4.22 / 17.95 / 39.33 | 9.1 → 14.4 | 432 → 400 | 928 → 896 |
+| hub | 0.6 | 11,904 → **4,608** | 3.85 → 1.49 | 7.37 / 7.37 / 14.87 → 7.37 / 14.39 / 36.68 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+| tube | 0.6 | 41,600 → **22,016** | 4.19 → 2.22 | 2.16 / 8.62 / 28.71 → 2.17 / 21.75 / 34.93 | 26.5 → 26.4 | 0 → 0 | 1,920 → 576 |
+| petal | 0.4 | 314,176 → **152,644** | 3.96 → 1.92 | 11.25 / 21.94 / 33.3 → 7.35 / 21.73 / 41.33 | 5.5 → 8.3 | 528 → 432 | 1,024 → 928 |
+| hub | 0.4 | 44,544 → **9,600** | 6.4 → 1.38 | 7.37 / 7.37 / 14.87 → 7.5 / 21.89 / 39.54 | 7.9 → 7.9 | 0 → 0 | 0 → 0 |
+| tube | 0.4 | 81,536 → **36,256** | 3.65 → 1.62 | 2.16 / 4.32 / 31.11 → 4.32 / 10.81 / 42.67 | 26.5 → 13.3 | 0 → 0 | 4,736 → 576 |
+
+### 11.3 Print reality, outward only — re-measured beside §4
+
+`node tools/bloom-texture-lab-measure.mjs` (data `docs/data/bloom-surface-texture-measure-t1.json`), the
+§4 columns (newly < 1.0 mm with its share of the class's finite-baseline samples · thinning p99 ·
+folds). The red-green rows are §4's, unchanged; **rows** is T1. The whole bloom is measured at §4's own
+0.6 mm / 2.5 mm so it compares like for like, and **also at 0.4 mm / 2.0 mm for the first time** (below the
+tables). Every displaced mesh: 0 boundary edges.
+
+#### default — shipped 24,688 · red-green 403,616 → rows 183,168 at 0.4 mm, feature 2 mm
+
+| relief | H | arm | split | skin: newly < 1.0 · thin p99 · folds | bead: newly < 1.0 · thin p99 · folds | hub: newly < 1.0 · thin p99 · folds | gap newly < 1.0 (all) | hole bar newly < 1.5 |
+|---|---|---|---|---|---|---|---|---|
+| pebble | 0.1 | A | red-green | 0 (0.0%) · -0.0227 · 1 | 0 (0.0%) · -0.0269 · 0 | 0 (0.0%) · -0.0141 · 0 | 13 | — |
+| pebble | 0.1 | A | **rows** | 0 (0.0%) · -0.0237 · 0 | 0 (0.0%) · -0.0232 · 0 | 0 (0.0%) · -0.0076 · 0 | 2 | — |
+| pebble | 0.1 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0109 · 0 | 7 | — |
+| pebble | 0.1 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0065 · 0 | 0 | — |
+| pebble | 0.2 | A | red-green | 0 (0.0%) · -0.0453 · 3 | 0 (0.0%) · -0.0475 · 0 | 0 (0.0%) · -0.0281 · 0 | 19 | — |
+| pebble | 0.2 | A | **rows** | 0 (0.0%) · -0.0474 · 0 | 0 (0.0%) · -0.0462 · 0 | 0 (0.0%) · -0.0152 · 0 | 5 | — |
+| pebble | 0.2 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0217 · 0 | 7 | — |
+| pebble | 0.2 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0131 · 0 | 1 | — |
+| pebble | 0.3 | A | red-green | 1 (0.0%) · -0.0678 · 4 | 0 (0.0%) · -0.051 · 0 | 0 (0.0%) · -0.0422 · 0 | 26 | — |
+| pebble | 0.3 | A | **rows** | 2 (0.0%) · -0.0711 · 2 | 0 (0.0%) · -0.0614 · 0 | 0 (0.0%) · -0.0227 · 0 | 8 | — |
+| pebble | 0.3 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0326 · 0 | 7 | — |
+| pebble | 0.3 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0196 · 0 | 4 | — |
+| pebble | 0.5 | A | red-green | 7 (0.0%) · -0.1107 · 11 | 1 (0.0%) · -0.054 · 0 | 0 (0.0%) · -0.0703 · 0 | 40 | — |
+| pebble | 0.5 | A | **rows** | 7 (0.1%) · -0.1171 · 7 | 1 (0.0%) · -0.0711 · 0 | 0 (0.0%) · -0.0379 · 0 | 18 | — |
+| pebble | 0.5 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0543 · 0 | 12 | — |
+| pebble | 0.5 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0326 · 0 | 6 | — |
+| cellular | 0.3 | A | red-green | 9 (0.0%) · -0.0086 · 12 | 0 (0.0%) · -0.0198 · 0 | 0 (0.0%) · -0.0059 · 0 | 35 | — |
+| cellular | 0.3 | A | **rows** | 6 (0.0%) · -0.0093 · 6 | 0 (0.0%) · -0.013 · 0 | 0 (0.0%) · -0.0069 · 0 | 19 | — |
+| cellular | 0.3 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.005 · 0 | 12 | — |
+| cellular | 0.3 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0067 · 0 | 9 | — |
+| ribbing | 0.3 | A | red-green | 3 (0.0%) · -0.0011 · 7 | 0 (0.0%) · -0.018 · 0 | 0 (0.0%) · 0 · 0 | 27 | — |
+| ribbing | 0.3 | A | **rows** | 1 (0.0%) · -0.0011 · 1 | 0 (0.0%) · -0.0132 · 0 | 0 (0.0%) · 0 · 0 | 12 | — |
+| ribbing | 0.3 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 7 | — |
+| ribbing | 0.3 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 4 | — |
+
+#### whole@0.6 — shipped 59,012 · red-green 723,690 → rows 204,440 at 0.6 mm, feature 2.5 mm
+
+| relief | H | arm | split | skin: newly < 1.0 · thin p99 · folds | bead: newly < 1.0 · thin p99 · folds | rod: newly < 1.0 · thin p99 · folds | hub: newly < 1.0 · thin p99 · folds | stem: newly < 1.0 · thin p99 · folds | gap newly < 1.0 (all) | hole bar newly < 1.5 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pebble | 0.3 | A | red-green | 4 (0.0%) · -0.0524 · 16 | 13 (0.4%) · -0.0466 · 13 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.0143 · 0 | 4058 (9.6%) · 1.4994 · 4058 | 1168 | — |
+| pebble | 0.3 | A | **rows** | 3 (0.0%) · -0.0506 · 12 | 13 (0.4%) · -0.0486 · 13 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.0132 · 0 | 0 (0.0%) · -0.0811 · 0 | 370 | — |
+| pebble | 0.3 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.0143 · 0 | 4052 (9.6%) · 1.4994 · 4052 | 1101 | — |
+| pebble | 0.3 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.037 · 0 | 0 (0.0%) · -0.0132 · 0 | 0 (0.0%) · -0.076 · 0 | 328 | — |
+
+#### infill — shipped 108,928 · red-green 557,248 → rows 358,096 at 0.4 mm, feature 2 mm
+
+| relief | H | arm | split | skin: newly < 1.0 · thin p99 · folds | bead: newly < 1.0 · thin p99 · folds | holeRim: newly < 1.0 · thin p99 · folds | hub: newly < 1.0 · thin p99 · folds | gap newly < 1.0 (all) | hole bar newly < 1.5 |
+|---|---|---|---|---|---|---|---|---|---|
+| pebble | 0.3 | A | red-green | 344 (1.6%) · 1.1934 · 303 | 115 (2.1%) · 1.1549 · 48 | 625 (2.8%) · 1.4244 · 667 | 0 (0.0%) · -0.0422 · 0 | 173 | 286 |
+| pebble | 0.3 | A | **rows** | 36 (0.3%) · -0.0653 · 15 | 100 (2.7%) · 1.2636 · 46 | 600 (3.2%) · 1.4787 · 651 | 0 (0.0%) · -0.0613 · 0 | 141 | 263 |
+| pebble | 0.3 | B | red-green | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0298 · 0 | 8 | 0 |
+| pebble | 0.3 | B | **rows** | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · 0 · 0 | 0 (0.0%) · -0.0489 · 0 | 6 | 0 |
+
+#### tube — shipped 24,672 · red-green 440,256 → rows 198,500 at 0.4 mm, feature 2 mm
+
+| relief | H | arm | split | skin: newly < 1.0 · thin p99 · folds | bead: newly < 1.0 · thin p99 · folds | hub: newly < 1.0 · thin p99 · folds | tubeRing: newly < 1.0 · thin p99 · folds | gap newly < 1.0 (all) | hole bar newly < 1.5 |
+|---|---|---|---|---|---|---|---|---|---|
+| pebble | 0.3 | A | red-green | 1 (0.0%) · -0.0713 · 6 | 0 (0.0%) · -0.054 · 0 | 0 (0.0%) · -0.0457 · 0 | 0 (0.0%) · -0.0429 · 0 | 22 | — |
+| pebble | 0.3 | A | **rows** | 1 (0.0%) · -0.0723 · 1 | 0 (0.0%) · -0.0707 · 0 | 0 (0.0%) · -0.0227 · 0 | 0 (0.0%) · -0.0478 · 0 | 9 | — |
+| pebble | 0.3 | B | red-green | 0 (0.0%) · -0.052 · 0 | 0 (0.0%) · -0.0051 · 0 | 0 (0.0%) · -0.0323 · 0 | 0 (0.0%) · 0 · 0 | 3 | — |
+| pebble | 0.3 | B | **rows** | 0 (0.0%) · -0.0541 · 0 | 0 (0.0%) · -0.0055 · 0 | 0 (0.0%) · -0.0196 · 0 | 0 (0.0%) · 0 · 0 | 1 | — |
+
+**The whole bloom at 0.4 mm, 2.0 mm feature, pebble 0.3 mm outward (new; 355,766 triangles):**
+A — skin 3 newly / 12 folds, bead 10 / 10, rod / hub / **stem 0 / 0**; B — **0 newly and 0 folds on every
+class**; newly-closed gaps 484 (A) and 428 (B), of which rods 253 and 244. Baseline walls under 1.0 before
+any relief, as §4 reports them: stem 11 of 3,058 samples (min 0.055 mm — the florist's cut point and
+land, thin by design).
+
+### 11.4 Budget at 0.4 mm — the whole bloom and the corners, built
+
+`node --max-old-space-size=12000 tools/bloom-texture-lab-budget.mjs` (data
+`docs/data/bloom-surface-texture-budget-t1.json`), 'rows' split, against the 1,500,000 export budget.
+**The two cost corners are BUILT now** (§5 projected them from the default's density).
+
+| state | shipped | e = 0.6 | **e = 0.4** | e = 0.3 | e = 0.25 | ideal at 0.4 |
+|---|---|---|---|---|---|---|
+| default (8 petals + hub) | 24,688 | 103,408 (6.9 %) | **183,168 (12.2 %)** | 290,416 (19.4 %) | 399,808 (26.7 %) | 98,993 |
+| whole bloom | 59,012 | 204,440 (13.6 %) | **355,766 (23.7 %)** | 590,390 (39.4 %) | 791,992 (52.8 %) | 186,519 |
+| — of which the stem | 570 | 20,244 | **30,580** | 60,512 | 73,138 | 21,648 |
+| Voronoi infill | 108,928 | 202,288 (13.5 %) | **358,096 (23.9 %)** | 535,088 (35.7 %) | 638,432 (42.6 %) | 83,903 |
+| tube | 24,672 | 111,210 (7.4 %) | **198,500 (13.2 %)** | 316,912 (21.1 %) | 431,056 (28.7 %) | 108,691 |
+| `INFILL: x 40 petals x 3 whorls` (74.7 % plain) — BUILT | 1,121,152 | 2,039,050 (135.9 %) | **3,587,358 (239.2 %)** | 5,448,028 (363.2 %) | 6,576,650 (438.4 %) | 949,864 (63.3 %) |
+| whole bloom × 40 × 3 — BUILT | 401,956 | 1,234,000 (82.3 %) | **2,167,718 (144.5 %)** | 3,509,494 (234.0 %) | 4,770,984 (318.1 %) | 1,114,883 (74.3 %) |
+
+Per organ, the whole bloom at 0.4 mm: petals 173,568 · sepals 52,670 · leaves 59,748 · stamens 24,000 ·
+style 3,200 · hub 12,000 · **stem 30,580** (red-green: 359,072 · 80,130 · 100,632 · 60,960 · 11,480 ·
+35,136 · 1,274,322).
+
+**What it says, restated.** At 0.4 mm the default and the whole bloom fit with room through a split of
+the soup; the infill and the whole bloom at the 40 × 3 corner do not, even built rather than projected —
+the infill corner at 0.6 mm is already 136 %. The projection over-stated the whole-bloom corner by 2.1×
+(4.55 M projected, 2.17 M built) and the infill corner by 8 % (3.87 M / 3.59 M) — the projection was
+the red-green split's density, which the stem's fans had inflated. Q9 stands, at these numbers.
+
+### 11.5 What changed and what held
+
+| earlier figure (discovery, red-green) | T1 (rows) | |
+|---|---|---|
+| §4/§7.6 whole bloom, stem: outward folds 4,058 (A) / 4,052 (B), 9.6 % | **0 / 0** at 0.6 mm; 0 / 0 at 0.4 mm | **REPLACED** — the invalid figure |
+| §5 stem triangles 429,378 (0.6) / 1,274,322 (0.4) | 20,244 / 30,580 | **CHANGED** |
+| §5 whole bloom 723,690 (48.2 %) / 1,921,732 (128.1 %) | 204,440 (13.6 %) / **355,766 (23.7 %)** | **CHANGED** |
+| §5 "whole bloom without the stem's blow-up" 294,312 / 647,410 | superseded by the build above | **CHANGED** |
+| §5 default 403,616 (26.9 %) at 0.4 | 183,168 (12.2 %) | **CHANGED** |
+| §5 infill 557,248 (37.1 %) / tube 440,256 (29.4 %) at 0.4 | 358,096 (23.9 %) / 198,500 (13.2 %) | **CHANGED** |
+| §5 corners PROJECTED 3,872,783 (258 %) / 4,545,601 (303 %) at 0.4 | BUILT 3,587,358 (239.2 %) / 2,167,718 (144.5 %) | **CHANGED** (and now builds) |
+| §5 "the prototype's split is 3.7–10.3× the ideal lattice" | 1.38–5.78× per organ (the top is the infill petal: its shipped mesh alone is 108,736 triangles, 3.18× the 0.6 mm ideal before any split) | **CHANGED** |
+| §7.1 B outward: 0 newly < 1.0 and 0 folds on every class | 0 and 0 on every class, every state, the stem included | **HELD** (now true of the stem too) |
+| §7.1 whole bloom newly-closed gaps 1,101 (B), 904 of them rods | 328, 220 rods (0.6 mm); 428, 244 rods (0.4 mm) | **CHANGED** — the red-green split's rods are slivers too |
+| §7.1 default gaps B 7 / 7 / 7 / 12 at H 0.1–0.5 | 0 / 1 / 4 / 6 | **CHANGED** (smaller) |
+| §7.5 A on the infill outward: hole rims 625 newly (2.8 %), 667 folds, 286 under the hole bar | 600 (3.2 %), 651 folds, 263 under the hole bar | **HELD** — A breaks the infill's hole rims, the arm's not the split's |
+| §7.5 A on the infill outward: cell skins 344 newly (1.6 %), 303 folds, thinning p99 1.19 mm | **36 (0.3 %), 15 folds, p99 −0.065** | **CHANGED** — most of the cell-skin damage was the split |
+| §7.7 A outward skin folds on the default, 1 / 3 / 4 / 11 at H 0.1–0.5 | 0 / 0 / 2 / 7 | **HELD in kind**, smaller |
+| §4 tube outward, every class | B 0 / 0; A 1 newly, 1 fold (was 6) | **HELD** |
+| §4 inward / centred / emboss rows; the rods' 58 inward folds (§7.6) | not re-measured — the modes are ruled out | **WITHDRAWN** as options, kept as the record |
+| §6 the ruling sheet `docs/img/bloom-surface-texture.png` | not re-rendered (it is what was ruled on); `docs/img/bloom-surface-texture-t1-stem.png` is the stem before / after on one camera | **HELD** as the record |
+
+### 11.6 Acceptance, as §10 wrote it
+
+- **0 outward folds on the bore: MET** — 0 in both arms at 0.6 and 0.4 mm.
+- **The stem at a 0.6 mm edge within 1.5× of its ideal 9,621: NOT MET, AND NOT REACHABLE BY ANY SPLIT OF
+  THE SHIPPED STEM.** 'rows' reads 20,244 (2.10×). The stem's circumference is 48 sectors — 0.39 mm on the
+  outer wall, 0.20 mm on the bore — already finer than 0.6 mm, and a split can only add vertices: the two
+  walls alone need 2 × 48 × 2 × 94 = 18,048 triangles (1.88×) at 94 rows. At 0.4 mm the same law reads
+  30,580, **1.41× the ideal 21,648 — within the bar.** Recorded as found, not tuned to.
+
+### 11.7 Open questions T1 raises for T2–T6 (written down, not acted on)
+
+14. **OPEN — T2's acceptance bar is stated against 2A/e², which a refinement of the shipped lattice does
+    not reach.** T2 hopes for "the default near 99,000 at 0.4 mm"; 'rows' — conforming, no fans, the
+    quads paired — reads 183,168 (1.85×). The ⌈L/e⌉ rounding is the cause and a T2 sub-lattice has it too:
+    a 1.6 mm column goes to 4 × 0.4 and a 0.6 mm row to 2 × 0.3, so a cell is 0.4 × 0.3 mm against the
+    ideal's 0.4 × 0.4. Should T2's bar be a ratio of the ideal (which ratio?), or the conforming floor TQ1
+    already uses? **Joins Q9; blocks T2's acceptance.**
+15. **OPEN — does B refine the stem's BORE at all, and in whose coordinates does T5 refine the stem?**
+    §10 T5 says the bore is never relieved. Then B need not refine it, which would roughly halve the
+    stem's cost (bore and outer wall each 48 × 94 × 2 at 0.6 mm), and the same holds for every buried face
+    Q7 decides to leave plain. Separately: the quad pairing that fixed the bore here applies only to
+    COPLANAR quads; a noded stem's wall quads are not coplanar, so a split of its emitted triangles would
+    bring the 0.014 mm sliver-apex crossing back. T5 refining the stem in its own (s, θ) — the way T2 refines
+    a panel in its own (u, v) — would not have it. **Shapes T5's stem half and the budget (Q9).**
+16. **OPEN — the split's discrete decisions are not cross-engine.** The page (Chromium) and Node build the
+    same whole-bloom soup (59,012 triangles both) and subdivide it to **204,432 vs 204,440** ('rows', 0.6
+    mm) and **723,686 vs 723,690** (red-green); the default agrees exactly (183,168). Not diagnosed further:
+    ⌈L/e⌉ on an edge length, the float32 weld and the pairing's 1e-9 coplanarity are all decisions on last
+    bits. Inside an emitter (T2) the triangle count must agree between Chromium and Node exactly (X0
+    rebuilds the page's STL in Node), so a sub-lattice count has to come from quantities both engines agree
+    on — integers, or values quantised onto a grid the way `infillSnap` does. **A T2 design constraint.**
+17. **NOTED, not a question — the float32 census reads non-manifold edges the index census does not.**
+    Overlapping closed shells (the feet in the hub, the tube ring on the hub) can have split points of two
+    DIFFERENT shells land on one float32 position, which the STL gates' census reads as a shared edge with
+    four triangles: 60 on the default at 0.6 mm, 0 at 0.4, every shell index-clean. It is the export
+    contract's overlap, not an open shell, and it moves with the edge target. Any TX gate that counts
+    non-manifold edges on a relieved mesh needs to know which census it is reading.

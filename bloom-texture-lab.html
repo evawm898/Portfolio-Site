@@ -70,10 +70,12 @@
     <div class="row"><input id="lambda" type="range" min="1" max="6" step="0.25" value="2"><span class="v" id="lambdaV"></span></div>
     <label for="mode">Displacement</label>
     <select id="mode">
-      <option value="outward">outward only (never cuts in)</option>
-      <option value="centred">centred (half in, half out)</option>
-      <option value="inward">inward only (never rises)</option>
-      <option value="emboss">emboss — B only (both skins move; A shows centred)</option>
+      <option value="outward">outward only (never cuts in — the one ruled mode)</option>
+    </select>
+    <label for="split">Split</label>
+    <select id="split">
+      <option value="rows">rows — each edge into ceil(L/e) equal segments (T1)</option>
+      <option value="redgreen">red-green — the discovery's split (fans long slivers)</option>
     </select>
     <label for="edge">Subdivision edge</label>
     <div class="row"><input id="edge" type="range" min="0.25" max="1" step="0.05" value="0.4"><span class="v" id="edgeV"></span></div>
