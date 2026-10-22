@@ -318,6 +318,13 @@ async function partTwo(G, R) {
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   await page.route('**fonts.googleapis.com/**', (r) => r.abort());
   await page.route('**fonts.gstatic.com/**', (r) => r.abort());
+  // three.js is served from node_modules at the exact jsDelivr URLs frame.html
+  // pins (the bloom harness's route), so the Relief view needs no CDN egress
+  await page.route('**cdn.jsdelivr.net/**', (route) => {
+    const rel = new URL(route.request().url()).pathname.replace('/npm/three@0.161.0/', '');
+    try { route.fulfill({ status: 200, contentType: 'text/javascript', body: fs.readFileSync(path.join(ROOT, 'node_modules/three', rel)) }); }
+    catch { route.abort(); }
+  });
   await page.goto(`${base}/frame.html`);
   await page.waitForFunction(() => !!window.__frame);
 
@@ -372,6 +379,7 @@ async function partTwo(G, R) {
   check('V0 the fixed camera is repeatable (same state twice)', diff(baseImg, baseAgain) === 0, `${diff(baseImg, baseAgain)} px differ, ${baseImg.w}×${baseImg.h}`);
   const vrows = [];
   for (const s of R.PARAM_SPEC) {
+    if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
     const states = s.kind === 'range' ? [[s.default === s.max ? s.min : s.max]] : s.options.map(([v]) => [v]).filter(([v]) => v !== s.default);
     for (const [v] of states) {
       const p = { [s.id]: v };
@@ -384,7 +392,44 @@ async function partTwo(G, R) {
   }
   await page.evaluate(() => window.__frame.setParams({}));
   const dead = vrows.filter((r) => r.n < 200);
-  check('V1 every control moves pixels at a fixed camera (≥ 200 px)', dead.length === 0, dead.length ? 'DEAD: ' + dead.map((r) => `${r.id}=${r.v} (${r.n})`).join(', ') : vrows.map((r) => `${r.id}=${r.v}:${r.n}`).join(' '));
+  check('V1 every drawing control moves pixels at a fixed camera (≥ 200 px)', dead.length === 0, dead.length ? 'DEAD: ' + dead.map((r) => `${r.id}=${r.v} (${r.n})`).join(', ') : vrows.map((r) => `${r.id}=${r.v}:${r.n}`).join(' '));
+  // V2 the print rows move the STL and leave the paper alone (phase 2)
+  const stl0 = await page.evaluate(() => window.__frame.stl());
+  const svg0 = await page.evaluate(() => window.__frame.svg());
+  const prows = [];
+  for (const s of R.PARAM_SPEC.filter((q) => q.section === 'print')) {
+    const states = s.kind === 'range' ? [s.default === s.max ? s.min : s.max] : s.options.map(([v]) => v).filter((v) => v !== s.default);
+    for (const v of states) {
+      await page.evaluate((q) => window.__frame.setParams(q), { [s.id]: v });
+      const stl = await page.evaluate(() => window.__frame.stl());
+      const svg = await page.evaluate(() => window.__frame.svg());
+      prows.push({ id: s.id, v, moved: stl.hash !== stl0.hash, paper: svg === svg0, tris: stl.triangles });
+    }
+  }
+  await page.evaluate(() => window.__frame.setParams({}));
+  check('V2 every print control moves the STL and none moves the SVG', prows.length > 0 && prows.every((r) => r.moved && r.paper), prows.map((r) => `${r.id}=${r.v}:${r.moved ? 'stl moved' : 'STL UNMOVED'}${r.paper ? '' : ' PAPER MOVED'}`).join(' '));
+
+  // P3 the STL button writes the relief: a real download, watertight
+  const RL = await import(pathToFileURL(path.join(ROOT, 'frame-relief.js')).href);
+  // the panel is hidden at this point in the sweep, so the click is dispatched on the element itself
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.evaluate(() => document.getElementById('exportStl').click())]);
+  const dlPath = await dl.path();
+  const dlBytes = new Uint8Array(fs.readFileSync(dlPath));
+  const census = RL.analyzeStl(dlBytes);
+  const inPage = await page.evaluate(() => window.__frame.stl());
+  check('P3 Get STL downloads the relief: a binary STL, boundary edges 0, the bytes the page holds', dlBytes.length === inPage.bytes && census.boundary === 0 && census.triangles === inPage.triangles && /\.stl$/.test(dl.suggestedFilename()), `${dl.suggestedFilename()}: ${census.triangles} tris, ${(dlBytes.length / 1024).toFixed(0)} KiB, boundary ${census.boundary}`);
+
+  // P4 the Relief view draws the relief and leaves the SVG alone; the Drawing view comes back
+  const svgBefore = await page.evaluate(() => window.__frame.svg());
+  await page.evaluate(() => window.__frame.setView('3d'));
+  await page.waitForFunction(() => window.__frame.view() === '3d' && window.__frame.view3dInk() !== null, null, { timeout: 60000 });
+  await page.waitForTimeout(300);
+  const ink3d = await page.evaluate(() => window.__frame.view3dInk());
+  const vis3d = await page.evaluate(() => ({ canvas: !document.getElementById('stage3d').hidden, paper: document.getElementById('paper').hidden }));
+  const svgAfter = await page.evaluate(() => window.__frame.svg());
+  await page.evaluate(() => window.__frame.setView('svg'));
+  const back = await page.evaluate(() => ({ canvas: !document.getElementById('stage3d').hidden, paper: document.getElementById('paper').hidden, view: window.__frame.view() }));
+  check('P4 the Relief view draws (ink on the canvas), hides the paper, leaves the SVG string unchanged, and the Drawing view returns', ink3d > 0.02 && vis3d.canvas && vis3d.paper && svgAfter === svgBefore && !back.canvas && !back.paper && back.view === 'svg', `relief ink ${(100 * ink3d).toFixed(1)}% of the canvas`);
 
   // E editor drag
   await page.addStyleTag({ content: '.fr-panel{display:block!important}' });

@@ -4,14 +4,19 @@
    download. There is no second geometry path: the drawing on screen IS
    exportSvg(model), the same string the button saves. */
 
-import { PARAM_SPEC, SECTIONS, DEFAULTS, PROFILE_PRESETS, HATCH_WEIGHT_RANGE } from './frame-registry.js';
+import { PARAM_SPEC, SECTIONS, DEFAULTS, PROFILE_PRESETS, HATCH_WEIGHT_RANGE, MIN_FEATURE_MM } from './frame-registry.js';
 import { buildFrame, exportSvg, toneAcross, profileFor } from './frame-geometry.js';
+import { buildRelief, exportStl } from './frame-relief.js';
 import { ProfileEditor } from './frame-profile-editor.js';
 
 /* ---------------- state ---------------- */
 let params = { ...DEFAULTS };
 let profile = PROFILE_PRESETS[DEFAULTS.profilePreset].map((p) => [...p]);  // the editor's points
 let model = null;
+let relief = null;       // buildRelief(model): what Get STL writes and the Relief view draws
+let view = 'svg';        // 'svg' (the engraving) | '3d' (the relief); view chrome, never saved
+let viewer = null;       // frame-view3d.js, loaded on the first switch to '3d'
+let viewerLoading = null;
 let fixedView = null;    // test chrome: a pinned viewBox, so a pixel diff has one camera
 let advanced = false;    // the panel's tier: Advanced controls (registry `tier`) show only when this is on
 
@@ -98,9 +103,39 @@ function buildNow() {
   const t = performance.now();
   model = buildFrame(params, profile);
   stats.buildMs = performance.now() - t;
+  const t2 = performance.now();
+  relief = buildRelief(model);
+  stats.reliefMs = performance.now() - t2;
   document.getElementById('paper').innerHTML = exportSvg(model, fixedView ? { view: fixedView } : {}).svg;
+  if (viewer) { viewer.setMesh(relief); if (!pinnedCamera) viewer.frame(); viewer.render(); }
   writeReadout();
 }
+
+/* ---------------- the relief view ---------------- */
+let pinnedCamera = false;   // test chrome: a camera the sheet pinned stays put across rebuilds
+let raf3d = 0;
+function loop3d() { raf3d = 0; if (view !== '3d' || !viewer) return; viewer.render(); raf3d = requestAnimationFrame(loop3d); }
+async function ensureViewer() {
+  if (viewer) return viewer;
+  if (!viewerLoading) viewerLoading = import('./frame-view3d.js').then((m) => {
+    viewer = m.createViewer(document.getElementById('stage3d'));
+    window.addEventListener('resize', () => { viewer.resize(); viewer.render(); });
+    return viewer;
+  });
+  return viewerLoading;
+}
+async function setView(name) {
+  view = name === '3d' ? '3d' : 'svg';
+  document.querySelectorAll('#viewToggle button').forEach((b) => b.classList.toggle('is-on', b.dataset.view === view));
+  const paper = document.getElementById('paper'), canvas = document.getElementById('stage3d');
+  paper.hidden = view === '3d'; canvas.hidden = view !== '3d';
+  if (view === '3d') {
+    await ensureViewer();
+    viewer.resize(); viewer.setMesh(relief); if (!pinnedCamera) viewer.frame(); viewer.render();
+    if (!raf3d) raf3d = requestAnimationFrame(loop3d);
+  }
+}
+document.querySelectorAll('#viewToggle button').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
 
 function writeReadout() {
   const { info, box, params: p } = model;
@@ -119,13 +154,23 @@ function writeReadout() {
   const crossLine = nCross
     ? `cross-hatch <b>${nCross}</b> lines on ${crossBands} of ${model.bands.length} bands where darkness exceeds <b>${p.crossHatchThreshold.toFixed(2)}</b>`
     : `no cross-hatch — no band's darkness exceeds <b>${p.crossHatchThreshold.toFixed(2)}</b>`;
+  const r = relief.info;
+  const floorWarn = [
+    ...r.told.map((t) => `<span class="warn">FLOOR — ${t}</span>`),
+    ...(r.underFloor.length ? [`<span class="warn">UNDER THE ${MIN_FEATURE_MM.toFixed(1)} mm ASSUMED FLOOR — ${r.underFloor.join('; ')} (print process undecided; the STL is written as asked)</span>`] : []),
+  ].join('\n');
+  const reliefLine =
+    `relief <b>${r.widthMm.toFixed(1)} × ${r.heightMm.toFixed(1)} × ${r.depthMm.toFixed(1)} mm</b> (scale ${r.scale.toFixed(3)}), <b>${r.triangles}</b> triangles · `
+    + `band <b>${r.bandW.toFixed(2)} mm</b>${p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · lights <b>${p.lights}</b>\n`
+    + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   document.getElementById('readout').innerHTML =
-    `drawing <b>${(box.x1 - box.x0).toFixed(1)} × ${(box.y1 - box.y0).toFixed(1)} mm</b>, <b>${model.strokes}</b> strokes\n`
+    `${reliefLine}\n`
+    + `drawing <b>${(box.x1 - box.x0).toFixed(1)} × ${(box.y1 - box.y0).toFixed(1)} mm</b>, <b>${model.strokes}</b> strokes\n`
     + `spring line <b>${info.springY.toFixed(1)} mm</b>, apex <b>${info.apexY.toFixed(1)} mm</b>, arc radius <b>${info.R.toFixed(1)} mm</b>\n`
     + `${lights}\n`
     + `shade across the band <b>${tmin.toFixed(2)}–${tmax.toFixed(2)}</b> darkness (${tmax - tmin < 1e-9 ? 'uniform — a flat face' : 'graded — the profile turns'})\n`
     + `${weightLine}\n${crossLine}\n`
-    + `profile <b>${p.profilePreset}</b>, ${model.profile.length} points · build <b>${stats.buildMs.toFixed(1)} ms</b>`
+    + `profile <b>${p.profilePreset}</b>, ${model.profile.length} points · build <b>${stats.buildMs.toFixed(1)} ms</b> + relief <b>${stats.reliefMs.toFixed(1)} ms</b>`
     + (warn ? '\n' + warn : '');
 }
 
@@ -136,14 +181,23 @@ function download(name, data, type) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 document.getElementById('exportSvg').addEventListener('click', () => download(`frame-arch-${params.profilePreset}.svg`, exportSvg(model).svg, 'image/svg+xml'));
+document.getElementById('exportStl').addEventListener('click', () => download(`frame-arch-${params.profilePreset}.stl`, exportStl(relief), 'model/stl'));
 
-/* ---------------- test chrome (read by tools/verify-frame.mjs, tools/shot-frame-sheet.mjs) ---------------- */
+/* ---------------- test chrome (read by tools/verify-frame.mjs, tools/verify-frame-relief.mjs, the sheets) ---------------- */
 window.__frame = {
   setParams: (p, prof = null) => loadParams(p, prof),
   getParams: () => ({ ...params }),
   getProfile: () => profile.map((q) => [...q]),
   setFixedView: (v) => { fixedView = v; if (model) buildNow(); },
   svg: () => exportSvg(model).svg,
+  // the STL as the button writes it, plus a digest the gate compares across
+  // control writes (the print controls move this and never the paper)
+  stl: () => { const b = exportStl(relief); let h = 0; for (let i = 0; i < b.length; i++) h = (h * 31 + b[i]) >>> 0; return { bytes: b.length, triangles: relief.indices.length / 3, hash: h, info: relief.info }; },
+  stlBytes: () => Array.from(exportStl(relief)),
+  view: () => view,
+  setView: (name) => setView(name),
+  view3dInk: () => (viewer ? viewer.ink() : null),
+  pinCamera: (v) => { pinnedCamera = !!v; if (viewer && v) { viewer.frame(v); viewer.render(); } },
   model: () => ({ info: model.info, box: model.box, strokes: model.strokes, bands: model.bands.map((b) => ({ id: b.id, hatch: b.hatch.length, cross: b.cross.length, creases: b.creases.length, tone: b.tone, weights: b.hatch.map((h) => h.weight) })) }),
   setAdvanced: (on) => setAdvanced(on),
   readout: () => document.getElementById('readout').textContent,

@@ -11505,10 +11505,19 @@ top the jambs stand on, the jamb and head inner edges the lights read); shading 
 from the profile's own normal against the registry's one fixed `LIGHT`, never painted. Phase 1
 is the arch only; phase 1b carried Eva's rulings on it (intensity 1.00, line weight follows
 darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier
-threshold). Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
-quoting a pass from a changed harness; `--no-browser` for iteration) — **it runs in CI**
-(`frame.yml`, gate plus negative control). Sheet: `node tools/shot-frame-sheet.mjs <dir>`,
-by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
+threshold). **Phase 2 (Oct 22, Eva's ruling 1): the RELIEF STL is the primary output and the
+SVG the secondary** — `frame-relief.js` lifts every band's profile over a flat back as one
+closed shell per band, each EMBEDDED one `MIN_FEATURE_MM` into the neighbour it abuts (a
+declared `spine.embed`, because bands touch face to face and the voxel gate cannot tell a
+graze from an overlap), pierced or backed lights, `Get STL`, and a three.js Relief view
+(`frame-view3d.js`, one light, no auto-rotate). `MIN_FEATURE_MM` 1.0 is an ASSUMPTION (print
+process undecided, ruling 3) that caps output and is told. Gates: `node tools/verify-frame.mjs`
+(2-D + the page) and `node tools/verify-frame-relief.mjs` (W watertight, C voxel-connected,
+R registered on `offsetCurve`, L clear widths, B embeds land, F the floor; `--base <worktree>`
+for the SVG byte identity), each with `--negative-control` required before quoting a pass
+from a changed harness — **both run in CI** (`frame.yml`). Sheets: `node
+tools/shot-frame-sheet.mjs <dir>` (the engraving) and `node tools/shot-frame-relief.mjs <dir>`
+(the relief), by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
 they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
 runs them — the "adding a tool runs the flower gates" corollary recorded in several
 sections above is history as of Oct 1.
