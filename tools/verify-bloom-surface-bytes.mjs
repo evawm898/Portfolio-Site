@@ -616,6 +616,13 @@ const PREDICATE_MOVERS = {
         /* a ring none of whose petals is BUILT (the sphere stem's channel took
            them all) moves nothing: its feet exist only as a record */
         if (!(b.petals || [])[i]) continue;
+        /* a whorl the TUBE closes completely (k 0) emits no foot rows — the
+           tube draws its own base — so a capped foot there is a record only
+           (measured: `OUTLINE CURVE 2: TUBE — a lobe curve x petalWidth 22`
+           held to the bit with its foot 8.80 -> 8.15 mm); a slit tube's
+           feet beside the slits ARE emitted, and move */
+        const TL = b.tube && b.tube.active && b.tube.layers ? b.tube.layers[i] : null;
+        if (TL && TL.k === 0) continue;
         const asked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(r.authoredWidth));
         /* the built foot differs iff the base clamp bound (asked past 10 mm,
            which also moves the ring) or the new cap binds ABOVE the floor —
@@ -635,6 +642,18 @@ const PREDICATE_MOVERS = {
            movers and both held to the bit */
         const sepalSpan = s.placement === 'FAN' ? span : (2 * Math.PI) / S.count;
         if (built && (footAsked > FOOT_MAX_BASE || footAsked > Math.max(base.FOOT_MIN_WIDTH_MM, S.ring.radius * sepalSpan))) return true;
+        /* EVERY TIER's foot against ITS OWN ring's arc (F1.1a): a lower tier
+           sits on a smaller ring, so the cap binds there first — the tier-1
+           check alone called `SEPAL TIERS: four tiers on a 4 mm hub` a holder
+           while tier 4's foot went 3.84 -> 3.81 mm */
+        const tierRecs = (b.foot && b.foot.sepalTiers) || [];
+        const tierBuilt = (b.sepals && b.sepals.tiers) || [];
+        for (const [k, T] of tierRecs.entries()) {
+          const TB = tierBuilt[k];
+          if (!T || !T.ring || !(TB && TB.present && (TB.built || []).some(Boolean))) continue;
+          const fa = Math.max(base.FOOT_MIN_WIDTH_MM, Number(T.footAskedMm));
+          if (fa > FOOT_MAX_BASE || fa > Math.max(base.FOOT_MIN_WIDTH_MM, T.ring.radius * sepalSpan)) return true;
+        }
         if (Ls > REF && Ls > base.hubRootTaperLengthMm(s, sc)) return true;
       }
       const lp = b.leaf;
@@ -644,6 +663,12 @@ const PREDICATE_MOVERS = {
           if (B.compound) { if (B.leaflets.some((lf) => Number(lf.lengthMm) > REF)) return true; continue; }
           const L = lp.nodeLengthsMm ? Math.max(...lp.nodeLengthsMm) : Number(lp.lengthMm);
           if (L > REF) return true;
+          /* the PETIOLE's root floor reads the ASKED length (a shared node's
+             offset needs the rod before the floret cap exists, so the rod and
+             the built petiole carry the asked blade's root — a conservative
+             upper bound): a shared-node leaf capped under 35 mm still moves
+             when its asked length is past it */
+          if (Number(lp.lengthMm) > REF) return true;
         }
       }
       return b;
@@ -952,6 +977,17 @@ const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
    the BASE build and reported a holder as moved (curves-leaves, measured on
    block 72's two tier rows — in-process the two trees agree to the bit). */
 const BASE_TIER_VALUE_IDS = new Set(base.SEPAL_SCOPE_VALUE_IDS || []);
+/* `--list-movers <file>`: every live matrix row's prediction under the
+   declared predicate, written as JSON and nothing else built — so a predicate
+   corrected mid-partition can be compared against the one the finished chunks
+   ran, and only the rows whose prediction flipped need re-measuring. */
+if (argv.includes('--list-movers')) {
+  if (!MOVERS_PRED || !PREDICATE_MOVERS[MOVERS_PRED]) { console.error('--list-movers needs --movers-predicate <name>'); process.exit(2); }
+  const out = MATRIX.map((row) => { let v; try { v = !!PREDICATE_MOVERS[MOVERS_PRED](stateOf(row), row); } catch (e) { v = 'threw'; } return [row.label, v]; });
+  (await import('node:fs')).writeFileSync(argOf('--list-movers'), JSON.stringify(out));
+  console.log(`--list-movers: ${out.filter((x) => x[1] === true).length} movers of ${out.length} rows`);
+  process.exit(0);
+}
 /* `--frozen-sweep` (spine-cup-fold): WHICH FROZEN BASELINES' BYTES STOP
    REPRODUCING under the declared predicate — every registered frozen matrix's
    rows run through the SAME predicate the byte partition proves exact on the
