@@ -57,7 +57,9 @@ await page.locator('#secPattern').scrollIntoViewIfNeeded(); await page.waitForTi
 save('pattern-panel.png', await shotOf('#secPattern'), 'the Pattern section: presets with facet thumbnails, the randomizer, reseed, generator, density, intricacy, rim band, alternate-solid, auto-bridge');
 await page.locator('#secChecks').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('pattern-checks.png', await shotOf('#secChecks'), 'Checks with auto-bridge off: the island as a problem, the thin-paper notes, each clickable into the Flat view');
-await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true })); await T(() => window.__lantern.view('folded'));
+// The panel cells below show no preview, so they are shot in the FLAT view: the turning WebGL canvas on the runner's
+// software GL made every folded cell cost 12-25 s there and the export cell hang past Playwright's 120 s twice over.
+await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true })); await T(() => window.__lantern.view('flat')); await T(() => window.__lantern.flush()); await page.waitForTimeout(200);
 await page.locator('#secMaterial').evaluate((d) => { d.open = true; }); await page.locator('#secMaterial').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('material.png', await shotOf('#secMaterial'), 'Material & Machine: the stock, the machine, the bed, and every rule derived from the caliper (starting values)');
 await page.locator('#secExport').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
