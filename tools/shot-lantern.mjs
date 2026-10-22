@@ -12,7 +12,18 @@ const OUT = path.resolve(process.argv[2] || 'lantern-sheet');
 fs.mkdirSync(OUT, { recursive: true });
 const cells = [];
 const SHOT = { timeout: 120000 };   // a WebGL canvas on the runner's software GL can take past Playwright's 30 s default (the sheet step timed out at 30 s on its fourth cell)
-const shotOf = async (sel) => { const b = await page.locator(sel).boundingBox(); return page.screenshot({ clip: b, ...SHOT }); };   // a clip, never locator.screenshot(): the turning canvas is never 'stable'
+// a clip, never locator.screenshot(): the turning canvas is never 'stable'. The element is scrolled to the TOP of its
+// scroller and the clip is CLAMPED to the viewport first: a clip reaching past the viewport makes Playwright resize the
+// viewport for the shot, which re-renders the turning WebGL canvas on the runner's software GL and hung the export cell
+// for 120 s there (the runner's fonts make the panel taller than this box's, so #secExport ended below the fold).
+const shotOf = async (sel) => {
+  const loc = page.locator(sel);
+  await loc.evaluate((el) => el.scrollIntoView({ block: 'start' })); await page.waitForTimeout(100);
+  const b = await loc.boundingBox(); const v = page.viewportSize();
+  const x = Math.max(0, b.x), y = Math.max(0, b.y);
+  const clip = { x, y, width: Math.min(b.x + b.width, v.width) - x, height: Math.min(b.y + b.height, v.height) - y };
+  return page.screenshot({ clip, ...SHOT });
+};
 const save = (name, buf, caption) => { fs.writeFileSync(path.join(OUT, name), buf); cells.push({ name, caption }); console.log(`${name.padEnd(22)} ${caption}`); };
 
 const s = await openLantern({ storage: '', viewport: { width: 1440, height: 900 }, dsf: 2 });
