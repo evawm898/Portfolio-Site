@@ -592,7 +592,10 @@ const PREDICATE_MOVERS = {
        (a) a petal ring's asked foot, floored, passes the base's 10 mm cap (the
            ring placed by the area rule moves: it reads the uncapped asked
            foot now) or does not fit the arc it owns at its base radius
-           (radius x the restated span) — the new cap binds;
+           (radius x the restated span) where that arc is above the 1.6 mm
+           floor — the new cap binds (an arc under the floor builds the floor
+           on both trees: the first cut of this clause called 17 such rows
+           movers and every one held to the bit);
        (b) a built sepal tier asks a length past 35 mm, or the sepal's asked
            foot passes the base's 10 mm cap or its own arc (the sepal foot's
            cap is the arc too), or the sepals raise the hub's bound past both
@@ -610,7 +613,10 @@ const PREDICATE_MOVERS = {
       const span = harness.footSpanRestated(s);
       for (const r of b.rings || []) {
         const asked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(r.authoredWidth));
-        if (asked > FOOT_MAX_BASE || asked > r.radius * span) return true;
+        /* the built foot differs iff the base clamp bound (asked past 10 mm,
+           which also moves the ring) or the new cap binds ABOVE the floor —
+           an arc under the 1.6 mm floor builds the floor on both trees */
+        if (asked > FOOT_MAX_BASE || asked > Math.max(base.FOOT_MIN_WIDTH_MM, r.radius * span)) return true;
       }
       const S = b.foot && b.foot.sepals;
       if (S && S.count > 0) {
@@ -620,7 +626,7 @@ const PREDICATE_MOVERS = {
         const built = (b.sepals && b.sepals.tiers ? b.sepals.tiers : []).some((T) => T && T.present && (T.built || []).some(Boolean));
         if (built && Ls > REF) return true;
         const footAsked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(S.footAskedMm));
-        if (built && (footAsked > FOOT_MAX_BASE || footAsked > S.ring.radius * span)) return true;
+        if (built && (footAsked > FOOT_MAX_BASE || footAsked > Math.max(base.FOOT_MIN_WIDTH_MM, S.ring.radius * span))) return true;
         if (Ls > REF && Ls > base.hubRootTaperLengthMm(s, sc)) return true;
       }
       const lp = b.leaf;

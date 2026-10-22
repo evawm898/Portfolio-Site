@@ -119,6 +119,13 @@ instead of stacking). **The cap binds at the shipping width from ten petals up**
 (6.40 mm against a 6.21 mm arc at ten) — every `petalCount` 10..40 row of block 1
 moves, which is why the byte partition below is large.
 
+**What the cap looks like from below** (the sheet's §3): at the cap each foot is
+exactly its arc, so neighbouring feet ABUT at the ring radius instead of overlapping —
+and because a foot is a straight chord across a curved arc, a small open notch is
+left between neighbours just outside the hub disc (visible at 8 petals × 46 mm). The
+solid is still one piece (the feet overlap the hub and each other inside it); the
+notch is the honest picture of feet that no longer stack.
+
 The read-out says it (`FOOT WIDTH CAPPED by the ring's own room …`, the asked and built
 widths and the arc), and `FOOT ROOM UNDER THE FLOOR` where the arc is under 1.6 mm and
 the floor wins (40 petals × 6 whorls, inner rings).
