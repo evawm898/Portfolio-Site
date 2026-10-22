@@ -992,9 +992,12 @@ const MUTANTS = [
     to: '    { const so = scopeTerm !== null && base in scopeTerm.offsets ? scopeTerm.offsets[base] : 0; out[base] = clamp(composed - so, b.min, b.max) + so; }\n    /* WHICH BASES THE CLAMP ACTUALLY BIT',
     witness: (G) => G.resolvePetalTerms({ ...REG.DEFAULTS }, null, null, null, { offsets: { petalCup: 5 }, bounds: {} }).petalCup > 1.2 },
   { id: 'thickness-is-scoped', breaks: ['SO0', 'SO5'],
-    from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);",
-    to: 'export const SCOPE_UNSCOPED = Object.freeze([]);',
-    witness: (G) => G.SCOPE_UNSCOPED.length === 0 },
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the list carries the texture's two
+       sliders beside the sheet now, so the mutation drops the SHEET alone —
+       the thing Q3.6 is about — and the witness reads its absence. */
+    from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',",
+    to: "export const SCOPE_UNSCOPED = Object.freeze([",
+    witness: (G) => !G.SCOPE_UNSCOPED.includes('sheetThickness') },
   /* ---- Scoping-b: the toggles ---- */
   /* (SO7 came off this claim with the retirement: it carried the RADIAL
      petal entry that must stay inert, and the migration clause that replaced
