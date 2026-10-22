@@ -142,16 +142,20 @@ function applyPatternPreset(p) {
   pushHistory(prev); $('patternNote').textContent = p.name; rebuild({ commit: true });
 }
 /* a random pattern is kept only if the judge passes it with no island and no thin paper: up to eight draws, the best of them otherwise, told */
+let lastRandom = null;                 // every draw's own counts and which one was kept — read by the gate, written by nothing else
 function randomPattern() {
   const prev = { ...state, edge: cloneCurve(state.edge) };
   let best = null;
+  const draws = [];
   for (let k = 0; k < 8; k++) {
     const cand = PAT.randomPattern((Math.random() * 2 ** 31) >>> 0);
     const pat = PAT.patternForModel(model, { ...state, ...cand }, rules, { validate: true });
     const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;
-    if (!best || score < best.score) best = { cand, score };
+    draws.push({ counts: { island: pat.counts.island, thin: pat.counts.thin, narrow: pat.counts.narrow, keepout: pat.counts.keepout } });
+    if (!best || score < best.score) best = { cand, score, k };
     if (score === 0) break;
   }
+  lastRandom = { draws, picked: best.k };
   state = { ...state, ...best.cand };
   pushHistory(prev);
   $('patternNote').textContent = best.score === 0 ? `random — passes every check` : `random — the best of eight draws, see Checks`;
@@ -532,6 +536,7 @@ window.__lantern = {
   fold: { frames: () => fold.frames, triangles: () => fold.triangles, camera: fold.camera, lookAt: fold.lookAt, pixel: fold.pixel, running: fold.isRunning, renderOnce: fold.renderOnce, materials: fold.materials },
   flags: () => [...document.querySelectorAll('#flags li')].map((li) => ({ kind: li.className, id: li.dataset.flag || 'ok', text: li.textContent })),
   dimsText: () => $('dims').textContent,
+  random: () => lastRandom && { draws: lastRandom.draws.map((d) => ({ counts: { ...d.counts } })), picked: lastRandom.picked },
   pattern: () => pattern && { counts: { ...pattern.counts }, bridged: pattern.bridged, validated: pattern.validated, cuts: pattern.types.map((t) => t.cuts.length), issues: pattern.issues.length },
   placedCuts: () => PAT.placeCuts(model, pattern, state).length,
   focusIssue, flatFocus: () => flatFocus,

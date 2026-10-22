@@ -39,7 +39,7 @@
          Checks list shows an island as a problem (badge "problem"), clicking
          it switches to the Flat view zoomed on the finding with a focus ring,
          and a click on the drawing restores the whole sheet.
-     P13 the random pattern button yields a pattern with no island and the
+     P13 the random pattern button keeps the lowest-scoring of its draws (restated from each draw's own counts, auto-bridge off, three presses) and the
          note says so; the pattern survives a reload.
      P14 MATERIAL AND EXPORT: the defaults open judged (thin notes listed on
          the first paint); a heavier stock raises every rule and re-lays the
@@ -242,12 +242,26 @@ async function run(override = null) {
       await T(() => window.__lantern.view('folded'));
     }
     // P13 the random pattern, and it survives a reload
+    // The score is RESTATED here from each draw's own counts (the page records the counts, never its score): the kept draw
+    // must be the lowest, the search must stop only on a clean draw or after eight, and the note must match the kept
+    // score. With auto-bridge ON every island is bridged and nearly every draw scores 0, which made a mutant that scores
+    // everything 0 a coin flip (it MISSED in CI once) — so the draws are made with auto-bridge OFF, three presses in a row.
     {
-      await page.click('#randomPattern'); await T(() => window.__lantern.flush());
-      const pat = await T(() => window.__lantern.pattern()), note = await T(() => document.getElementById('patternNote').textContent), st = await T(() => window.__lantern.state());
+      await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: false }));
+      const restate = (c) => c.island * 100 + c.thin + c.narrow + c.keepout;
+      const presses = [];
+      for (let i = 0; i < 3; i++) {
+        await page.click('#randomPattern'); await T(() => window.__lantern.flush());
+        const r = await T(() => window.__lantern.random()), note = await T(() => document.getElementById('patternNote').textContent), pat = await T(() => window.__lantern.pattern());
+        const scores = r ? r.draws.map((d) => restate(d.counts)) : [], kept = r ? scores[r.picked] : NaN, last = scores[scores.length - 1];
+        presses.push({ n: scores.length, kept, min: Math.min(...scores), stopped: scores.length === 8 || last === 0, noteOk: /random/.test(note) && (kept === 0 ? /passes every check/.test(note) : /best of eight/.test(note)), onPage: pat.counts.island === r.draws[r.picked].counts.island });
+      }
+      const st = await T(() => window.__lantern.state());
       await page.reload(); await page.waitForTimeout(600);
       const st2 = await T(() => window.__lantern.state());
-      ok(pat.counts.island === 0 && /random/.test(note) && st2.patMode === st.patMode && st2.patSeed === st.patSeed, `P13: random pattern — ${st.patMode} #${st.patSeed}, ${pat.counts.island} islands, note "${note}"; after a reload ${st2.patMode} #${st2.patSeed}`);
+      await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true }));
+      ok(presses.every((p) => p.kept === p.min && p.stopped && p.noteOk && p.onPage) && st2.patMode === st.patMode && st2.patSeed === st.patSeed,
+        `P13: random pattern, auto-bridge off, three presses — ${presses.map((p) => `${p.n} draws, kept ${p.kept} (min ${p.min}${p.stopped ? '' : ', stopped early'}${p.noteOk ? '' : ', note wrong'})`).join('; ')}; ${st.patMode} #${st.patSeed} after a reload ${st2.patMode} #${st2.patSeed}`);
     }
     // P14 material and export
     {
