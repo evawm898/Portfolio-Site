@@ -513,7 +513,7 @@ const MUTANTS = [
   // floats at BOTH ends: a mullion lifted off the sill alone still hangs from its light's springing, one region
   { id: 'a-detached-mullion', file: 'geometry', from: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY], [info.mullionX[i - 1], subSpring], [1, 0], 2);', to: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY + 2], [info.mullionX[i - 1], subSpring - 3], [1, 0], 2);', breaks: ['C', 'B'] },
   { id: 'the-mesh-offsets-by-itself', file: 'relief', from: 'const off = offsetCurve(S, d);', to: 'const off = S.pts.map((q, i) => [q[0] + d * S.nrm[i][0], q[1] + d * S.nrm[i][1]]);', breaks: ['R'] },
-  { id: 'the-embed-removed', file: 'relief', from: 'export const EMBED_MM = MIN_FEATURE_MM;', to: 'export const EMBED_MM = 0;', breaks: ['B', 'F0'] },
+  { id: 'the-embed-removed', file: 'relief', from: 'export const EMBED_MM = MIN_FEATURE_MM;', to: 'export const EMBED_MM = 0;', breaks: ['B', 'F0', 'SC6'] },   // a child scroll then only TOUCHES its parent
   // phase 2b: a closed loop left OPEN at its seam, and the seam moved 0.1 mm
   { id: 'the-closing-strip-dropped', file: 'relief', from: 'const strips = closed ? V : V - 1, nx = (v) => (v + 1) % V;', to: 'const strips = V - 1, nx = (v) => (v + 1) % V;', breaks: ['W', 'Q'] },
   { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
