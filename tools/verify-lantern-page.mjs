@@ -347,7 +347,7 @@ const MUTANTS = [
   { id: 'the-backing-is-not-drawn', file: 'lantern.js', from: "const colourOf = backing ? (part) => (part.solid ? null : BLD.colourOfPoint(state, part.j)) : null;", to: "const colourOf = null;", breaks: ['P15'] },
   { id: 'the-zip-drops-the-backing-sheets', file: 'lantern.js', from: "plan.backingSheets.forEach((sh, k) => { sh.machine = plan.machine; zip.file(", to: "[].forEach((sh, k) => { sh.machine = plan.machine; zip.file(", breaks: ['P15'] },
   { id: 'the-build-view-stays-hidden', file: 'lantern.js', from: "$('buildView').toggleAttribute('hidden', name !== 'build');", to: "$('buildView').toggleAttribute('hidden', true);", breaks: ['P15'] },
-  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13'] },
+  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13', 'P15'] },
 ];
 
 function print(res, label) { let f = 0; for (const [p, m] of res) { console.log(`${p ? 'ok  ' : 'FAIL'} ${m}`); if (!p) f++; } console.log(`\n${label}: ${res.length - f} of ${res.length} passed`); return f; }
