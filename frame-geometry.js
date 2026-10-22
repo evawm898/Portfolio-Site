@@ -367,8 +367,15 @@ export function rectSkeleton(p) {
     if (sz < lo) { info.clamped.push(`corner radius ${sz} mm is inside the ${w} mm band — held at ${lo.toFixed(2)} mm (inner radius ${(F / 2).toFixed(1)} mm)`); sz = lo; }
     if (sz > hi) { info.clamped.push(`corner radius ${sz} mm leaves no straight side — held at ${hi.toFixed(2)} mm`); sz = hi; }
   } else if (treat === 'notched' || treat === 'eared') {
-    const lo = w + F, hi = Math.min(a, b) - (w + F) / 2;   // the step's own inner face ≥ F; the side between two steps ≥ F
-    if (sz < lo) { info.clamped.push(`a ${sz} mm ${treat} step folds the ${w} mm band — held at ${lo.toFixed(2)} mm`); sz = lo; }
+    // the floors are MEASURED (ruling 5, phase 3a — tools/frame-fold-boundary.mjs
+    // finds the fold on the emitted edges of a clamp-free copy): an EAR's
+    // inner edge loops back through its own step for every sz < w, so it is
+    // held a feature clear of that, w + F; a NOTCH never folds at any size
+    // (each offset step keeps length sz: one end convex, one concave), so its
+    // floor is the feature itself, F. Phase 2b's w + F for the notch was not
+    // a fold and is withdrawn.
+    const lo = treat === 'eared' ? w + F : F, hi = Math.min(a, b) - (w + F) / 2;   // the side between two steps ≥ F
+    if (sz < lo) { info.clamped.push(treat === 'eared' ? `a ${sz} mm ear folds the ${w} mm band — held at ${lo.toFixed(2)} mm` : `a ${sz} mm notch is under the ${F.toFixed(1)} mm feature — held at it`); sz = lo; }
     if (sz > hi) { info.clamped.push(`a ${sz} mm ${treat} step meets the next corner — held at ${hi.toFixed(2)} mm`); sz = Math.max(lo, hi); }
   }
   info.cornerSize = treat === 'mitre' ? 0 : sz;

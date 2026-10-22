@@ -11564,6 +11564,17 @@ trims between neighbouring joins and wraps through the seam; named ANCHORS are d
 registry; the interior is open / backed / recessed. Every arch row's SVG and STL is
 byte-identical to `e759041` (CI's `--base`). Read §7b of the charter before touching a closed
 skeleton. Sheet: `node tools/shot-frame-skeletons.mjs <dir>`.
+**Phase 3a (Oct 22): the SCROLL primitive (`frame-filigree.js`) — C and S scrolls by a
+curvature law, log-spiral volutes, groups of 2–5, swept by `bandSolid` — with the tightness range
+FITTED to each scroll (Eva's ruling: no dead travel; the volute's share rises to 0.8, then the
+range's top is the most that prints, told) and a half-round wire by default; ruling 5's clamps
+MEASURED (`tools/frame-fold-boundary.mjs`). Step 2 ATTACHES it: `withOrnament(model)` builds the
+groups in PRINT mm at the skeleton's right-hand anchors (crest, bottom, corners/springings,
+sides), seats each in the molding by the embed (no graze), mirrors to the bit, and adds wire
+bands to the SVG and wire solids to the STL; filigree off returns the model itself (77 of 77
+rows byte-identical to `e4ce6eb`). The FRAME's box sets the print scale (`frameBox`). Read §10 of
+the charter. Sheets: `node tools/shot-frame-scrolls.mjs <dir>`, `node
+tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 
 ## `/marble` — the paper-marbling simulator (pointer only)
 

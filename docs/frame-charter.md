@@ -128,6 +128,10 @@ All in `frame-geometry.js`.
 | mirror-exact angles (2b) | `quarterTable(m)` — cos/sin of 90·j/m with the upper half the lower half SWAPPED and the 45° entry one double, so a point and its mirror image are built from the same doubles | the rounded corner's arc, the oval |
 | the skeleton type | `skeletonFor(p)` — arch / `rectSkeleton` / `ovalSkeleton`, each returning `{ spines, info }` with `info.kind`, `info.anchors`, and (closed) `info.seam` | `buildFrame` — the one sweep, the one relief, the one SVG |
 | a named anchor (2b) | `ANCHORS` in the registry DECLARES the names per type (`when` for the sill's); the skeleton builders PLACE each one ON a spine (a vertex, or the sill's one segment) | phase 3's ornament; the read-out lists them; the sheet's close cameras aim at them |
+| a scroll's centreline (3a) | `scrollCurve(spec)` in `frame-filigree.js` — the curvature law ρ(s), integrated exactly per step; `buildScroll` is the one place the gap clamp lowers the turns and the wire is floored | `buildGroup`, `scrollRelief`, the vocabulary sheet, SC1–SC6 |
+| a wire's solid (3a) | frame-relief's own `bandSolid`, handed `scrollSpine(curve)` and `wireProfile(shape)` — so every wire edge is `offsetCurve` of its centreline (the O4 rule holds: the filigree adds no `d · n`) | `scrollRelief`, `scrollsIntoMesh` |
+| a junction between two wires (3a) | `buildGroup` DECLARES the overlap (a child's root `(t_p + t_c)/2 − EMBED_MM` off its parent's centreline); `pairGap` measures the gap outside it and the web inside it | SC6, the sheet's captions |
+| a clamp's floor on a closed skeleton (3a, ruling 5) | `rectSkeleton` / `ovalSkeleton` — each floor MEASURED by `tools/frame-fold-boundary.mjs` on a clamp-free copy (§10.1) | K4, K5 |
 
 The gate's O1–O4 measure this table rather than recite it: jambs and mullions start on
 `innerEdge(sill)` to the double; the clear widths are equal measured from the jambs'
@@ -204,7 +208,8 @@ rather than a pitch of its own: both are decisions without a ruling (§9).
 | **1b** (this) | Eva's rulings on 1: intensity 1.00, weight follows darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier threshold; the `frame` CI workflow; the flower gates' `tools/**` filters narrowed | `verify-frame.mjs` 32/32 + 11/11 mutants, in CI; the sheet's weight and threshold rows |
 | **2** (this) | **relief STL as the primary output** (ruling 1): `frame-relief.js` lifts every band's profile over a flat back, pierced or backed lights, print size / plate / depth controls, `MIN_FEATURE_MM`; `Get STL`; the 3D view (three.js, one fixed light, no auto-rotate, a 2D/3D toggle, the profile editor driving both). Arch only | `verify-frame-relief.mjs` W/C/R/L/B/F green with its mutants, in CI; the default's SVG byte-identical to `8db018c`; the 3D sheet with the cove and apex close-ups |
 | **2b** (this) | rectangle (mitre / rounded / notched / eared corners) and oval (aspect; circle = 1:1) skeletons as CLOSED LOOPS through the same sweep, relief, STL and SVG; the interior open / backed / recessed; the named anchors. Ogee and Tudor arch constructions stay queued | `verify-frame.mjs` 44/44 + 20/20 mutants (K, Q1, AN, W3, U4, X2 new); `verify-frame-relief.mjs` 16/16 over 78 rows + 7/7 mutants (Q, L2, S2 new); every arch row's SVG AND STL byte-identical to `e759041`; the sheet `shot-frame-skeletons.mjs` |
-| 3 | ornament as RELIEF: scroll grammar from named anchors (apex, springings, sill ends), mirrored, each scroll a closed shell overlapping the molding or the plate it grows from; crest slot; tracery heads | an ownership row per anchor; loudness budget scored per preset; every scroll's root is ON an anchor to the double and overlaps it (B's clause); W and C stay green |
+| **3a step 1** | the SCROLL PRIMITIVE alone (`frame-filigree.js`): C and S scrolls by curvature law, log-spiral volutes, the gap clamp, groups of 2–5 budding from a lead; the vocabulary sheet `shot-frame-scrolls.mjs`; ruling 5's measured clamps (`frame-fold-boundary.mjs`, K5) | `verify-frame-relief.mjs` SC1–SC6 + 3 scroll mutants; `verify-frame.mjs` K5 + 4 clamp mutants; nothing attached to a skeleton; every frame row's SVG and STL byte-identical to `e4ce6eb` except the notched-corner floor (§10) — **then STOP for Eva's ruling on the scroll look** |
+| **3a step 2** (this) | Eva's rulings on step 1 (the tightness range fitted — no dead travel; half-round default); the ornament attached to all three skeletons' anchors (crest, bottom, corners / springings, sides), mirrored to the bit, seated in the molding by the embed; density, scale, tightness, wire, per-group on/off, and (print) wire profile and relief; STL and SVG — §10.4–10.6 | `verify-frame-relief.mjs` SC7 + OR1–OR6 over 13 ornament rows, 4 ornament mutants; `verify-frame.mjs` V1/V2 over the ornament rows; filigree off: 77 of 77 frame rows byte-identical (SVG and STL) to `e4ce6eb`; the sheet `shot-frame-filigree.mjs` |
 | 4 | texture as surface DISPLACEMENT on the relief, amplitude floored at `MIN_FEATURE_MM` | inert at 0 (bit-identical STL), told where the floor binds |
 | 5 | overgrowth (ivy, drips) as attached relief | generated by the skeleton's edges, never clipped; the frame rows unmoved; W and C green |
 | 6 | interior | — |
@@ -365,3 +370,198 @@ Phase 2 added, each without a ruling (ruling 2 parks items 3, 8–11 as SVG-only
 17. **Relief depth is `moldingDepth × scale × reliefScale`** — the profile's own depth
     control, scaled with the print, times one multiplier; not a separate millimetre
     control, so the 2-D shading and the 3-D relief describe one profile. *Undo:* `reliefDepthMm`.
+
+## 10. Phase 3a — filigree (step 1: the scroll primitive and ruling 5; step 2: attachment)
+
+### 10.0 Rulings on phase 2b (Eva, Oct 22, the phase-3a brief)
+
+1. Interior default for the frames: **NOT RULED** — the brief carried the two options in
+   brackets ("backed for rectangle + oval / open everywhere") with neither chosen. Unchanged
+   at `pierced`; asked again.
+2. `reliefScale` default **1×** (RULED; it already was).
+3. Corner styles: **NOT RULED** — the brief carried "[keep all four / changes]". All four kept;
+   asked again.
+4. The oval exposes aspect only and the overall size sets scale (RULED, kept).
+5. The aspect cap and the corner floors are COMPUTED, clamped and told, with gate rows at the
+   fold boundary and just past it and a mutant that removes each clamp — §10.1.
+
+### 10.1 Ruling 5: where the inner edge folds, measured
+
+`node tools/frame-fold-boundary.mjs` builds a COPY of `frame-geometry.js` with every clamp
+removed, and BISECTS the onset of a fold on the emitted edges — a fold is an edge segment that
+runs against its own centreline segment, or an edge that crosses itself — over four band widths
+(6 / 18 / 30 / 40 mm). Results, every row:
+
+| corner | fold measured | law | shipped floor | margin |
+|---|---|---|---|---|
+| rounded | radius = w/2 (to 1e-5) | inner arc radius 0 | (w + F)/2 | F/2 of inner radius |
+| oval, narrow | aspect = √((w/2)/B) (to 1e-4) | least radius A²/B = w/2 | √(((w + F)/2)/B) | F/2 of inner radius |
+| oval, wide | aspect = B/(w/2) (to 1e-3) | least radius B²/A = w/2 | B/((w + F)/2) | F/2 of inner radius |
+| eared | step = w | the inner edge loops back through the ear's own step | w + F | F |
+| notched | **never** (swept 0.05 … 2w) | each offset step keeps length sz | **F** (was w + F) | the feature itself |
+
+So phase 2b's rounded, oval and eared floors were right — computed, and now measured. **The
+notched floor was not a fold**: a notch's offset steps keep their length at every size (one end
+convex, one concave), so `w + F` was a guess. It is the feature, F, now (the slider's own 2 mm
+minimum is above it, so the floor never binds inside the range). The eared case is the one the
+first measurement got WRONG: segment REVERSAL alone put its fold at w/2, and the gate's K4 found
+the inner edge still crossing itself at that floor — the ear's last offset face runs back past its
+first for every sz < w. The tool counts crossings as well as reversals since.
+
+**K5** in `verify-frame.mjs` holds it: at each floor (rounded, eared, notched, oval narrow and
+wide, two band widths) nothing is told, nothing folds, and the inner edge's least feature — a
+triple's circumradius on a curve, a segment or a clearance on a step — is the promised one
+(0.5000 mm of inner radius; √2·F across the ear's opened loop; the notch's 2 mm); just past the
+floor the corner is told and built AT it (the same SVG string). Mutants: each clamp removed
+(`the-rounded-clamp-removed`, `the-oval-clamp-removed`), the notch floor back at phase 2b's guess,
+the ear held only to its reversal.
+
+**Bytes:** the only geometry change is the notched floor, which binds below 19 mm at the default
+band; every gate row keeps the 24 mm default, so every SVG and STL row is unmoved against
+`e4ce6eb` (measured — the session report).
+
+### 10.2 The scroll primitive (`frame-filigree.js`)
+
+**One law, by curvature.** From the scroll's MIDDLE (its root: the back of a C, the inflection of
+an S) outward, each half's radius of curvature runs LINEARLY in arc length from the body's
+`ρ_mid = SCROLL_BODY · length` (C 0.42, S 0.60) down to the volute's start `ρ_v` over the half's
+first half, then linearly from `ρ_v` to the EYE over its last `VOLUTE_SHARE` (0.5) — a log
+spiral, the curve whose radius of curvature is linear in arc length. Continuous everywhere,
+tightening all the way out. The S's curvature passes through zero over a smoothstep of the first
+fifth of its shorter half. `balance` shortens the first half (0.6 = the rib-order ratio).
+
+**Tightness is the volute's TURNS** (0.50 → 1.75), and `ρ_v` is SOLVED per half so the volute
+turns that much down to the eye. The first law tried — one log spiral over the whole half,
+tightness as its constant k — tied the body's radius to the volutes': a tight scroll closed into
+a ring. Measured, not argued: the sheet's first render.
+
+**The eye is the floor, and the turns are what the gap allows.** The eye radius is `(t + F)/2`
+— the corners' own law: the wire's inner edge keeps half a feature of radius. The turns are
+then LOWERED by bisection until the least SELF-GAP — centreline distance, less the wire, between
+two stations the curve turns at least π between (across the eye, across adjacent coils, across
+a closing mouth) — is at least F: a closed gap prints as a solid web. Held turns are told. At
+the vocabulary's 60 mm / 1.6 mm, tightness above about 0.3 WAS held at 0.84 turns — dead travel
+on the slider. **Fixed by Eva's ruling 2 on step 1 — §10.4.**
+
+**Sampling** is the arc law at 3° of turning (half the band's resolution: a wire is a few mm
+across), capped at 1 mm along a straight stretch, each step an exact circular arc at the step's
+mid curvature. **The wire** is `bandSolid` on the curve as a spine: ROUND (a semicircle crown of
+radius t/2 on a wall of t/2 — the upper half of a round wire) or HALF-ROUND (the semicircle
+alone), standing on a base (1.0 mm on the sheet; step 2 sets it to the host). Wire floored at F,
+told. Cost: **5,500–12,100 triangles a scroll** at 8 profile samples (30–120 mm), so a frame with
+40 scrolls is ~0.3–0.5 M — estimated now, for step 2's density ceiling.
+
+**Groups (2–5).** A LEAD C and n − 1 children budding from its BACK at stations ±0.18, ±0.32 of
+its length from its root, each child the other kind (S, C, …) at 0.6 × the length per order and
+√0.6 × the wire, laid along the lead's tangent and flipped so its own back kisses the lead's, its
+root `(t_lead + t_child)/2 − EMBED_MM` off the lead's centreline: the two closed shells OVERLAP by
+the embed (never a graze). Each junction prints as a WEB over the stretch where the two wires are
+closer than t + F — 7.9 to 16.7 mm on the sheet — and `pairGap` requires no second near-contact
+outside it. Mirror is exact (x negated, to the bit).
+
+**SC1–SC6** (`verify-frame-relief.mjs`, over 54 scrolls and 8 groups): closed and one region;
+the eye and the drawn turns against the law (the eye extrapolated from the end triples within two
+steps of the spiral's own slope, restated from the module constants and the spec); the self-gap
+restated off the emitted chords (least 1.0000 mm); the wire floor told; mirror to the bit; every
+child overlapping its parent by the embed and no other near-contact. Mutants: the gap clamp
+removed (SC3), the eye under the floor (SC2), a child laid off its parent (SC6).
+
+### 10.3 Decisions made without a ruling (step 1)
+
+19. **Curvature law, `SCROLL_BODY` 0.42 / 0.60, `VOLUTE_SHARE` 0.5, turns 0.5–1.75.** From the
+    sheet; every one a constant. *Undo:* the constants.
+20. **A C has two volutes facing; an S two opposed.** The single-volute "J" is not offered.
+21. **Children alternate kind and bud from the lead's back.** Other grammars (nested Cs, a fan
+    from one root) were not built. *Undo:* `buildGroup`.
+22. **The wire's two profiles** as above; ~~"round" is the default~~ **half-round is the default (Eva, ruling 3 on step 1)**; round stays an option. *Undo:* `wireProfile`.
+23. **Held turns lower BOTH volutes together** (one bisection), so the longer half could carry
+    more than it gets. *Undo:* a per-half bisection.
+
+### 10.4 Rulings on step 1 (Eva, Oct 22)
+
+1. Scroll look and character: **NOT RULED** — the message carried the options in brackets
+   ("approve as drawn / changes"; "constant wire / taper / offer both") with none chosen. Since
+   no taper was asked for, nothing needed another look, and step 2 proceeded on the CONSTANT
+   wire as drawn. Asked again.
+2. **Tightness dead travel: fixed.** Measured first: the volute's share alone cannot do it — at
+   30 mm on a 1.6 mm wire even a 0.95 share prints 0.81 turns of the slider's 1.75, at 60 mm
+   1.21, at 120 mm 1.70. So two moves, in order (`tightnessFit`): the volute's SHARE of each half
+   rises from 0.5 toward `VOLUTE_SHARE_MAX` 0.8 until the top of the range fits (bisected; a
+   longer spiral spaces its coils further apart); where even 0.8 cannot hold 1.75 turns, the
+   range's TOP is the most that prints and tightness spans ½ turn → that, told on the read-out
+   with the number. **Measured dead travel at 30 / 60 / 120 mm × 1.0 / 1.6 / 2.4 mm wire, C and S:
+   0 of 100 slider steps everywhere** (SC7, which also probes the top independently: it prints,
+   and a hundredth of a turn more does not). The cost, said plainly: below about 120 mm on a
+   1.6 mm wire the share sits at its 0.8 cap, so the body is a fifth of each half (the scrolls
+   read more spiral than step 1's), and "tightness 1" means "as tight as this wire and length
+   print" rather than a fixed 1¾ turns. Groups needed one more measured rule: a child budding
+   from a tighter lead can land on the lead's volute, so its station slides toward the root a
+   tenth at a time until it clears (told), and a child must JOIN its parent cleanly (every
+   approach under a feature a true overlap of the embed) and stand a full feature from its
+   siblings (which share no junction) — the first rule read the siblings' nearest approach as a
+   "junction" and passed a 0.83 mm graze, which OR3 found.
+3. **Default wire: half-round** (flat back, flush on the plate); round stays an option.
+4. Interior default for the rectangle and the oval, and corner styles: **NOT RULED** (brackets
+   again). Unchanged — `pierced`, all four corners — and asked again.
+
+### 10.5 The ornament attached (`frame-filigree.js`, `ornamentFor` / `withOrnament`)
+
+**Built in print millimetres.** The wire, its gaps and its embeds are print features, so every
+scroll is built at the print scale; the SVG draws the same curves divided by it. The FRAME's box
+sets the scale (`model.frameBox`; Overall height is the frame's) and the ornament may stand past
+it — told on the read-out. Consequence, declared: with the filigree on, Overall height reaches
+the SVG's wire width (the wire is a fixed print width); the 2-D gate's V2 ("print rows never move
+the paper") is stated with the filigree off.
+
+**Anchors and groups** (`ORNAMENT_GROUPS`, right-hand anchors only): crest (apex / top centre),
+bottom (sill centre / bottom centre), corners (the arch's springings, the rectangle's four
+corners; none on the oval), sides (jamb / side midpoints — on the oval these are its quarter
+points). Defaults: crest and corners ON, sides and bottom OFF — the loudness budget. Each group
+is `buildGroup(density, length = scale × molding width × print scale, tightness, wire)`.
+
+**Placement.** The lead C is laid MOUTH OUTWARD (its back and the children budding from it toward
+the band), its longer half pointing away from the axis on the axis, else away from the frame's
+middle (up in the upper half, down in the lower). An anchor ON the axis takes a right half slid
+along the edge until its nearest wire edge is F/2 off the axis — the mirrored pair a feature
+apart, each half rooting in the molding on its own. Then the group is SEATED: pushed along the
+inward normal until its deepest wire edge is EMBED_MM inside the band footprint (the push found
+by walking from 0 in quarter-millimetre steps and bisecting — the clearance is NOT monotone: a
+group pushed through the band comes out over the opening, and the first bisection over the whole
+bracket seated the rectangle's corners 91 mm inside the frame), then on until no contact with the
+band is a graze (a wire within a feature of the band that does not reach the embed prints as a
+web). The left is the right with x negated, to the double (`mirrorCurve`, never rebuilt). A group
+that would come within a feature of one already placed (crest, bottom, corners, sides, in that
+order) is not built, told.
+
+**The relief** is `bandSolid` on each wire at scale 1 (already print mm), standing on the plate
+thickness, its crown `wire/2 × projection` (half-round) or `wire × projection` (round). A crown
+under the floor is told with the other under-floor numbers (the default half-round 1.6 mm wire's
+crown is 0.80 mm — told). **The SVG** sweeps each wire with the frame's own `sweepSpine` and a
+half-round's true section, so the drawing never reads the print-only wire profile or projection.
+
+**Measured (OR1–OR6, 13 rows: every skeleton at the default and at density 5 with every group on,
+the rounded / notched / eared corners, the sill-less arch, a circle, a crowded frame where groups
+give way, and a thick, tight, round-wire row):** boundary 0 and one voxel region on every row;
+least wire **1.0000 mm**; least gap **1.0000 mm** (self-coils, siblings, different groups and
+sides, all read off the EMITTED walls); every half-group ROOTED, embeds **1.000–5.655 mm**, no
+graze; the mirror exact to the bit on the emitted vertices; filigree off the frame itself.
+Triangles: the default arch 68,076 → **110,812** with the default ornament, **259,724** dense;
+rectangle 1,568 → 66,320 / 245,088; oval 47,040 → 68,624 / 193,152. Mutants: a scroll left 3 mm
+off its molding (OR1, OR4), the graze rule removed (OR4), the group clearance removed (OR3), the
+mirror moved 0.02 mm (OR5).
+
+### 10.6 Decisions made without a ruling (step 2)
+
+24. **Mouth outward, children toward the band.** The other reading (back outward, mouth on the
+    band) leaves the lead's root — its back — the point FARTHEST from the molding. *Undo:* the
+    rotation in `ornamentFor`.
+25. **Scale is relative (× molding width); the wire is absolute (print mm).** A scroll keeps its
+    proportion to the frame at any print size; the wire is the floor-bound feature. *Undo:* two
+    registry rows.
+26. **"Projection" is the ornament's RELIEF height (× its wire), a print control** — the brief's
+    word read in relief terms; how far a group stands past the outer edge follows from scale and
+    seating, not a slider. *Undo:* `ornProjection`.
+27. **The oval's quarter points are its existing side anchors**, so the oval has no "corners"
+    group. *Undo:* `ORNAMENT_GROUPS.oval`.
+28. **Groups that would crowd give way whole, in a fixed priority**, rather than shrinking. *Undo:*
+    the clearance block in `ornamentFor`.
