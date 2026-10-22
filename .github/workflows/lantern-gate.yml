@@ -69,7 +69,7 @@ jobs:
 
   page:
     runs-on: ubuntu-latest
-    timeout-minutes: 60   # the gate plus its 15-mutant negative control is ~30 min on the runner and the contact sheet ~9: 40 cancelled a green job two seconds after its artifact uploaded
+    timeout-minutes: 40   # the gate (~5 min on the runner) and the contact sheet (~9); the negative control is page-control's, sharded
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -84,11 +84,35 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Page gate (real pointer events, downloads)
         run: node tools/verify-lantern-page.mjs
-      - name: Negative control (broken copies of lantern.js, each caught by its check)
-        run: node tools/verify-lantern-page.mjs --negative-control
       - name: Contact sheet
         run: node tools/shot-lantern.mjs lantern-sheet
       - uses: actions/upload-artifact@v4
         with:
           name: lantern-contact-sheet
           path: lantern-sheet
+
+  # The page negative control, sharded: ~3.7 min a mutant on the runner's software
+  # GL, so 22 mutants in one job passed the 60-minute timeout (run 39767517254).
+  # Each shard re-runs the clean pass and checks EVERY mutant's anchor and claimed
+  # names; only the mutant runs are split. Adding a shard is two edits here.
+  page-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps
+        run: npm i --no-save playwright@1.62.1 three@0.161.0 jszip@3.10.1 jspdf@2.5.1
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: |
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Negative control, shard ${{ matrix.shard }} of 4 (broken copies of lantern.js, each caught by its check)
+        run: node tools/verify-lantern-page.mjs --negative-control --shard=${{ matrix.shard }}/4

@@ -63,7 +63,13 @@
 
    --negative-control re-serves deliberately broken copies of lantern.js and
    requires each to fail the check that names it. Every anchor is checked
-   first. */
+   first. --shard k/n runs the mutants whose index is k mod n (every anchor
+   and every claimed name still checked for ALL of them), so CI spreads the
+   sweep over n parallel jobs: at ~3.7 min a mutant on the runner's software
+   GL the whole sweep passed the 60-minute job timeout (run 39767517254).
+   --only=<ids> runs a named subset and REFUSES an id it does not know (a
+   mis-typed id used to be silently nothing). A shard or a subset reports
+   itself as one, never as the sweep. */
 
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -74,6 +80,7 @@ import * as G from '../lantern-geometry.js';
 const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
 const ONLY = (args.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
+const SHARD = (() => { const a = args.find((x) => x.startsWith('--shard=')); if (!a) return null; const [k, n] = a.slice(8).split('/').map(Number); if (!(n >= 1 && k >= 0 && k < n)) { console.log(`bad --shard ${a.slice(8)}: want k/n with 0 <= k < n`); process.exit(1); } return { k, n }; })();
 
 async function download(page, trigger, timeout = 20000) {   // a download that RENDERS (the PNG reads the WebGL canvas) gets the sheet's 120 s: 20 s timed out on the runner's software GL (run 39762462046)
   const [d] = await Promise.all([page.waitForEvent('download', { timeout }), trigger()]);
@@ -392,9 +399,10 @@ if (!NEG) {
   const clean = await run();
   const names = clean.map(([, msg]) => msg.split(':')[0]);
   for (const m of MUTANTS) for (const b of m.breaks) if (!names.includes(b)) { console.log(`STALE NAME ${m.id} claims ${b}`); bad++; }
-  if (clean.some(([p]) => !p) || bad) { print(clean, 'clean'); console.log('the clean tree does not pass; the control cannot run'); process.exit(1); }
-  for (const m of MUTANTS) {
-    if (ONLY.length && !ONLY.includes(m.id)) continue;
+  for (const id of ONLY) if (!MUTANTS.some((m) => m.id === id)) { console.log(`UNKNOWN MUTANT ${id}`); bad++; }
+  if (clean.some(([p]) => !p) || bad) { print(clean, 'clean'); console.log(bad ? 'a stale anchor, a stale name or an unknown id; the control cannot run' : 'the clean tree does not pass; the control cannot run'); process.exit(1); }
+  const picked = MUTANTS.filter((m, i) => (!ONLY.length || ONLY.includes(m.id)) && (!SHARD || i % SHARD.n === SHARD.k));
+  for (const m of picked) {
     const res = await run({ [`/${m.file}`]: srcs[m.file].replace(m.from, m.to) });
     const red = res.filter(([p]) => !p).map(([, msg]) => msg.split(':')[0]);
     const missed = m.breaks.filter((b) => !red.includes(b)), unclaimed = red.filter((r) => !m.breaks.includes(r));
@@ -402,6 +410,7 @@ if (!NEG) {
     console.log(`${good ? 'ok  ' : 'BAD '} ${m.id}: reddened ${red.join(', ') || 'nothing'}${missed.length ? ` — MISSED ${missed.join(', ')}` : ''}${unclaimed.length ? ` — UNCLAIMED ${unclaimed.join(', ')}` : ''}`);
     if (!good) bad++;
   }
-  console.log(`\nnegative control: ${MUTANTS.length - bad} of ${MUTANTS.length} mutants behave`);
+  const scope = SHARD ? `shard ${SHARD.k}/${SHARD.n}` : ONLY.length ? 'subset' : 'sweep';
+  console.log(`\nnegative control (${scope}): ${picked.length - bad} of ${picked.length} mutants behave${picked.length < MUTANTS.length ? ` — ${MUTANTS.length - picked.length} of ${MUTANTS.length} not run here` : ''}`);
   process.exit(bad ? 1 : 0);
 }
