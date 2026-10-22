@@ -43,6 +43,9 @@
                                      retired constant (FC1 — the same pure
                                      clause junctionAssertions carries, run
                                      here on the mutated module's rings)
+     the-foot-cap-lands-on-the-arc   the clearance removed, #435's cap ON the
+                                     arc (FC2 — two parts on one vertex, read
+                                     off the float32s; FC1 beside it)
    Each declares the T clause it must fire and a WITNESS asked of the MUTATED
    module's own build — the behaviour moved — before the clause is consulted,
    and never the clause it names (asking the gate whether the gate fired is
@@ -106,10 +109,20 @@ export const MUTANTS = [
     to: 'lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
     witness: (M, C) => { const m = petioleR(M, LEAF_120), c = petioleR(C, LEAF_120); return m !== c ? null : `the petiole still reads ${m} mm`; } },
   { id: 'the-foot-cap-is-typed-back-to-10-mm', names: ['FC1'],
-    from: '    const footArcMm = capRadiusMm * footSpanRad;\n    const footCapped = p.width > footArcMm;',
-    to: '    const footArcMm = 10;\n    const footCapped = p.width > footArcMm;',
+    from: '    const footCapWidthMm = footCapMm(capRadiusMm, footSpanRad);\n    const footCapped = p.width > footCapWidthMm;',
+    to: '    const footCapWidthMm = 10;\n    const footCapped = p.width > footCapWidthMm;',
     witness: (M, C) => { const m = ringWidths(M, WIDE_40), c = ringWidths(C, WIDE_40); return m.join() !== c.join() ? null : `every ring's foot still reads ${m.join(', ')} mm`; } },
+  /* THE FOOT-CLEARANCE RULING (Oct 22): the cap put back ON the arc — #435's
+     own law, where a capped foot's margins meet their neighbour's (and the
+     tube's uncut sinus knot) on one double. FC2 reads the coincidence off the
+     exported floats; FC1 restates the clearance and fires beside it. Witnessed
+     on the mutated module: the k 6 tube's capped foot reads its whole arc. */
+  { id: 'the-foot-cap-lands-on-the-arc', names: ['FC1', 'FC2'],
+    from: 'export function footCapMm(radiusMm, spanRad) { return radiusMm * (spanRad - FOOT_CAP_CLEARANCE_RAD); }',
+    to: 'export function footCapMm(radiusMm, spanRad) { return radiusMm * spanRad; }',
+    witness: (M, C) => { const m = buildOn(M, rowOf(TUBE_K6)).rec.rings[0], c = buildOn(C, rowOf(TUBE_K6)).rec.rings[0]; return m.width === m.footArcMm && c.width < c.footArcMm ? null : `the capped foot reads ${m.width} against its ${m.footArcMm} mm arc (clean ${c.width})`; } },
 ];
+const TUBE_K6 = 'TUBE: 12 petals x k 6 (6 panels)';
 const SEPAL_120 = 'ROOT SUPPORT: 8 sepals x 120 mm (the hub held to the sepal root)';
 const LEAF_120 = 'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)';
 const LEAFLETS_DEFAULT = 'ROOT SUPPORT: COMPOUND 120 mm rachis x the default leaflets (the rachis is not the leaflet)';
@@ -133,10 +146,15 @@ export const PROBES = [
   'ROOT SUPPORT: COMPOUND 120 mm rachis x the default leaflets (the rachis is not the leaflet)',
   'ROOT SUPPORT: width 46 x 40 petals',
   'ROOT SUPPORT: width 46 on the FAN (the fan step is the foot\'s span)',
+  /* the foot-clearance ruling's subject: capped feet whose margins are laid on
+     a circle about the axis — the slit tube's ring curve, the hemisphere's
+     equator — where a cap ON the arc lands two parts on one double */
+  'TUBE: 12 petals x k 6 (6 panels)',
+  'DOME: rise 1 x RADIAL x spread min (0.6)',
 ];
 /* probes whose subject is the FOOT CAP (FC) and not the taper — no taper is
    asked of them, the cap is asked to BIND (asserted) */
-const FC_PROBES = new Set(['ROOT SUPPORT: width 46 x 40 petals', 'ROOT SUPPORT: width 46 on the FAN (the fan step is the foot\'s span)']);
+const FC_PROBES = new Set(['ROOT SUPPORT: width 46 x 40 petals', 'ROOT SUPPORT: width 46 on the FAN (the fan step is the foot\'s span)', 'TUBE: 12 petals x k 6 (6 panels)', 'DOME: rise 1 x RADIAL x spread min (0.6)']);
 const MATRIX = H.buildMatrix();
 const KIND = new Map(H.CONTROLS.map((c) => [c.id, c]));
 function rowOf(label) {
@@ -210,6 +228,9 @@ function fire(G, label) {
   /* FC1 — the foot cap, the same pure clause junctionAssertions carries, on
      this module's ring records and emitted foot frames */
   rec.rings.forEach((r, L) => { for (const msg of H.footCapClauses(r, L, ui, rec.petals[L] ? rec.petals[L].footFrames : null, { exportMode: true })) bad.push(msg); });
+  /* FC2 — no two parts carry one vertex, on the float32s a file would store
+     and this module's own stream ranges (the clause the export gate runs) */
+  bad.push(...H.footVertexClauses(positions, rec));
   const tapered = (p) => !!(p && p.thickness && p.thickness.rootTaper);
   const live = FC_PROBES.has(label)
     ? rec.rings.some((r) => r.widthClampedHigh)
