@@ -586,7 +586,8 @@ const PREDICATE_MOVERS = {
   },
   /* ROOT SUPPORT (Oct 21, docs/bloom-root-support-outcome.md) — sepals and
      leaves take the root law at their own length, and the foot clamp is the
-     ring's own arc. PREDECLARED FROM THE BASE TREE'S OWN RECORD, the new laws'
+     ring's own arc. PREDECLARED FROM THE BASE TREE'S OWN RECORD (a ring with
+     no BUILT petal is skipped), the new laws'
      thresholds RESTATED from the controls (the harness's restatements, never
      this tree's builder). A row moves iff, on the base build:
        (a) a petal ring's asked foot, floored, passes the base's 10 mm cap (the
@@ -598,7 +599,7 @@ const PREDICATE_MOVERS = {
            movers and every one held to the bit);
        (b) a built sepal tier asks a length past 35 mm, or the sepal's asked
            foot passes the base's 10 mm cap or its own arc (the sepal foot's
-           cap is the arc too), or the sepals raise the hub's bound past both
+           cap is the arc too, at the SEPAL whorl's own step), or the sepals raise the hub's bound past both
            35 mm and the base's own bound (the plate held to a sepal root);
        (c) a built leaf blade — the simple or lobed leaf at its node's length,
            any compound leaflet at its own — is past 35 mm;
@@ -611,7 +612,10 @@ const PREDICATE_MOVERS = {
       const acc = new base.MeshBuilder({ exportMode: true });
       const b = base.buildBloomInto(acc, s, { below: null, capability: row.capability ?? null, scopes: sc });
       const span = harness.footSpanRestated(s);
-      for (const r of b.rings || []) {
+      for (const [i, r] of (b.rings || []).entries()) {
+        /* a ring none of whose petals is BUILT (the sphere stem's channel took
+           them all) moves nothing: its feet exist only as a record */
+        if (!(b.petals || [])[i]) continue;
         const asked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(r.authoredWidth));
         /* the built foot differs iff the base clamp bound (asked past 10 mm,
            which also moves the ring) or the new cap binds ABOVE the floor —
@@ -626,7 +630,11 @@ const PREDICATE_MOVERS = {
         const built = (b.sepals && b.sepals.tiers ? b.sepals.tiers : []).some((T) => T && T.present && (T.built || []).some(Boolean));
         if (built && Ls > REF) return true;
         const footAsked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(S.footAskedMm));
-        if (built && (footAsked > FOOT_MAX_BASE || footAsked > Math.max(base.FOOT_MIN_WIDTH_MM, S.ring.radius * span))) return true;
+        /* the sepal foot owns ITS OWN whorl's step (2 pi / the sepal count, the
+           fan's step on a FAN) — the petal span here called two sepal rows
+           movers and both held to the bit */
+        const sepalSpan = s.placement === 'FAN' ? span : (2 * Math.PI) / S.count;
+        if (built && (footAsked > FOOT_MAX_BASE || footAsked > Math.max(base.FOOT_MIN_WIDTH_MM, S.ring.radius * sepalSpan))) return true;
         if (Ls > REF && Ls > base.hubRootTaperLengthMm(s, sc)) return true;
       }
       const lp = b.leaf;
