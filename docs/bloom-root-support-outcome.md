@@ -72,6 +72,15 @@ state.
   leaf on the default 6 mm stem at 35° asks 2.481 mm of radius and is clamped at **2.239
   mm** (the cap); on a 3 mm stem at **1.491 mm**; a 60 mm leaf gets its 1.050 mm.
   The lobed petiole is `max(area law, root floor)`.
+- **On a raceme's shared node the petiole carries the ASKED blade's root, not the
+  capped one — a declared upper bound, forced by the order.** The node offset needs the
+  rod's radius before the floret cap exists (the cap is measured from the node depths
+  the offset sets), so the mode-free rod the offset reads and the built petiole are both
+  floored from `leafLength`, while the blade itself is built at its capped node length
+  (17.43 mm of 40 asked at the defaults, where the law is the identity). The petiole is
+  therefore never thinner than the blade it holds, and on these rows 0.686 mm against the
+  wire's 0.600: every shared-node row asking more than 35 mm moves by the rod and the
+  offset that reads it (the byte partition's first predicate missed all twelve, §6a).
 - **Compound stalks STAY THE WIRE** (S3's ruling, untouched): a tapered leaflet's root
   is thicker than the rod that holds it, said on the read-out. Thickening the stalk to the
   root would push it past the rachis's own section at the stalk's root (LF17's root disc),
