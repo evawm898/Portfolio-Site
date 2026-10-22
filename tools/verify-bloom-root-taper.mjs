@@ -106,7 +106,7 @@ export const MUTANTS = [
     to: 'lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
     witness: (M, C) => { const m = petioleR(M, LEAF_120), c = petioleR(C, LEAF_120); return m !== c ? null : `the petiole still reads ${m} mm`; } },
   { id: 'the-foot-cap-is-typed-back-to-10-mm', names: ['FC1'],
-    from: '    const footArcMm = radius * footSpanRad;\n    const footCapped = p.width > footArcMm;',
+    from: '    const footArcMm = capRadiusMm * footSpanRad;\n    const footCapped = p.width > footArcMm;',
     to: '    const footArcMm = 10;\n    const footCapped = p.width > footArcMm;',
     witness: (M, C) => { const m = ringWidths(M, WIDE_40), c = ringWidths(C, WIDE_40); return m.join() !== c.join() ? null : `every ring's foot still reads ${m.join(', ')} mm`; } },
 ];
