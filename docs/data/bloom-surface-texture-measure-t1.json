@@ -1,0 +1,1378 @@
+{
+ "split": "rows",
+ "edgeMm": 0.4,
+ "every": 5,
+ "tMax": 2.5,
+ "floorMm": 1,
+ "holeBarMm": 1.5,
+ "states": {
+  "default": {
+   "shippedTris": 24688,
+   "subdividedTris": 183168,
+   "edgeMm": 0.4,
+   "lambdaMm": 2,
+   "split": "rows",
+   "baselineCensus": {
+    "boundary": 0,
+    "nonManifold": 0
+   },
+   "baseline": {
+    "skin": {
+     "n": 13881,
+     "minWall": 0.6943922853446464,
+     "underWall": 29,
+     "minGap": 2.5
+    },
+    "bead": {
+     "n": 3479,
+     "minWall": 0.9832769445158788,
+     "underWall": 94,
+     "minGap": 0.00010446642996039509
+    },
+    "hub": {
+     "n": 961,
+     "minWall": 1.1999999999999993,
+     "underWall": 0,
+     "minGap": 0.32209246698448935
+    }
+   },
+   "runs": [
+    {
+     "type": "pebble",
+     "heightMm": 0.1,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0983,
+       "wallMin": 0.7734,
+       "thinP99": -0.0237,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0608,
+       "wallMin": 1.0188,
+       "thinP99": -0.0232,
+       "thinMax": 0,
+       "newlyGap": 2,
+       "gapP01": 0.0113
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2076,
+       "wallMin": 1.2,
+       "thinP99": -0.0076,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.025
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.1,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.062,
+       "wallMin": 0.7289,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0065,
+       "wallMin": 0.9965,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0024
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2076,
+       "wallMin": 1.2,
+       "thinP99": -0.0065,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.316
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.2,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.147,
+       "wallMin": 0.8476,
+       "thinP99": -0.0474,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0915,
+       "wallMin": 1.0429,
+       "thinP99": -0.0462,
+       "thinMax": 0,
+       "newlyGap": 5,
+       "gapP01": 0.0125
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2152,
+       "wallMin": 1.2,
+       "thinP99": -0.0152,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.5191
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.2,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0908,
+       "wallMin": 0.7705,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0176,
+       "wallMin": 0.9987,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0024
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2152,
+       "wallMin": 1.2,
+       "thinP99": -0.0131,
+       "thinMax": 0,
+       "newlyGap": 1,
+       "gapP01": 0.3106
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 2,
+       "folds": 2,
+       "wallP01": 1.1848,
+       "wallMin": 0.0002,
+       "thinP99": -0.0711,
+       "thinMax": 1.0419,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.1308,
+       "wallMin": 1.0526,
+       "thinP99": -0.0614,
+       "thinMax": 0,
+       "newlyGap": 8,
+       "gapP01": 0.0174
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2227,
+       "wallMin": 1.2,
+       "thinP99": -0.0227,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.487
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.1183,
+       "wallMin": 0.8176,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0244,
+       "wallMin": 1.0008,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0024
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2227,
+       "wallMin": 1.2,
+       "thinP99": -0.0196,
+       "thinMax": 0,
+       "newlyGap": 4,
+       "gapP01": 0.3057
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.5,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 7,
+       "folds": 7,
+       "wallP01": 1.2514,
+       "wallMin": 0,
+       "thinP99": -0.1171,
+       "thinMax": 1.0459,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 1,
+       "folds": 0,
+       "wallP01": 1.1803,
+       "wallMin": 0.1433,
+       "thinP99": -0.0711,
+       "thinMax": 2.263,
+       "newlyGap": 18,
+       "gapP01": 0.0156
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2379,
+       "wallMin": 1.2,
+       "thinP99": -0.0379,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.4121
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.5,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.1485,
+       "wallMin": 0.9158,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0372,
+       "wallMin": 1.0052,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0024
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2379,
+       "wallMin": 1.2,
+       "thinP99": -0.0326,
+       "thinMax": 0,
+       "newlyGap": 6,
+       "gapP01": 0.1988
+      }
+     }
+    },
+    {
+     "type": "cellular",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 6,
+       "folds": 6,
+       "wallP01": 1.1086,
+       "wallMin": 0.0001,
+       "thinP99": -0.0093,
+       "thinMax": 1.0418,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.077,
+       "wallMin": 1.0113,
+       "thinP99": -0.013,
+       "thinMax": -0.0009,
+       "newlyGap": 11,
+       "gapP01": 0.0123
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.208,
+       "wallMin": 1.2002,
+       "thinP99": -0.0069,
+       "thinMax": -0.0002,
+       "newlyGap": 8,
+       "gapP01": 0.0243
+      }
+     }
+    },
+    {
+     "type": "cellular",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.08,
+       "wallMin": 0.7252,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0103,
+       "wallMin": 0.9943,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0024
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.208,
+       "wallMin": 1.2002,
+       "thinP99": -0.0067,
+       "thinMax": -0.0002,
+       "newlyGap": 9,
+       "gapP01": 0.2991
+      }
+     }
+    },
+    {
+     "type": "ribbing",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 1,
+       "folds": 1,
+       "wallP01": 1.0758,
+       "wallMin": 0.0003,
+       "thinP99": -0.0011,
+       "thinMax": 1.0415,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0518,
+       "wallMin": 0.9925,
+       "thinP99": -0.0132,
+       "thinMax": -0.006,
+       "newlyGap": 12,
+       "gapP01": 0.0129
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2,
+       "wallMin": 1.2,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.543
+      }
+     }
+    },
+    {
+     "type": "ribbing",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 13881,
+       "finiteWall": 13881,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0608,
+       "wallMin": 0.7072,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 3479,
+       "finiteWall": 2646,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0054,
+       "wallMin": 0.9921,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0024
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2,
+       "wallMin": 1.2,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 4,
+       "gapP01": 0.2578
+      }
+     }
+    }
+   ]
+  },
+  "whole": {
+   "shippedTris": 59012,
+   "subdividedTris": 355766,
+   "edgeMm": 0.4,
+   "lambdaMm": 2,
+   "split": "rows",
+   "baselineCensus": {
+    "boundary": 0,
+    "nonManifold": 0
+   },
+   "baseline": {
+    "skin": {
+     "n": 22280,
+     "minWall": 0.5716762205898817,
+     "underWall": 69,
+     "minGap": 0.0017760670375571153
+    },
+    "bead": {
+     "n": 6221,
+     "minWall": 0.7744513191896563,
+     "underWall": 107,
+     "minGap": 0.00010446642996039509
+    },
+    "rod": {
+     "n": 2731,
+     "minWall": 1.1949419687146818,
+     "underWall": 0,
+     "minGap": 0.0004741458561910402
+    },
+    "hub": {
+     "n": 1201,
+     "minWall": 1.1999999999999995,
+     "underWall": 0,
+     "minGap": 0.0715208825495266
+    },
+    "stem": {
+     "n": 3058,
+     "minWall": 0.05459279830318411,
+     "underWall": 11,
+     "minGap": 0.01816426095541151
+    },
+    "other": {
+     "n": 106,
+     "minWall": 1.1766178236735074,
+     "underWall": 0,
+     "minGap": 0.007194852751995693
+    }
+   },
+   "runs": [
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 22280,
+       "finiteWall": 22280,
+       "newlyWall": 3,
+       "folds": 12,
+       "wallP01": 1.1659,
+       "wallMin": 0.0002,
+       "thinP99": -0.0639,
+       "thinMax": 1.0334,
+       "newlyGap": 137,
+       "gapP01": 0.0023
+      },
+      "bead": {
+       "n": 6221,
+       "finiteWall": 4632,
+       "newlyWall": 10,
+       "folds": 10,
+       "wallP01": 1.1128,
+       "wallMin": 0.0001,
+       "thinP99": -0.0427,
+       "thinMax": 2.4596,
+       "newlyGap": 74,
+       "gapP01": 0.0109
+      },
+      "rod": {
+       "n": 2731,
+       "finiteWall": 2608,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.296,
+       "wallMin": 1.2205,
+       "thinP99": -0.0027,
+       "thinMax": -0.0027,
+       "newlyGap": 253,
+       "gapP01": 0.0067
+      },
+      "hub": {
+       "n": 1201,
+       "finiteWall": 930,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2697,
+       "wallMin": 1.2,
+       "thinP99": -0.0123,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0003
+      },
+      "stem": {
+       "n": 3058,
+       "finiteWall": 2766,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.5669,
+       "wallMin": 0.6192,
+       "thinP99": -0.0778,
+       "thinMax": -0.0073,
+       "newlyGap": 15,
+       "gapP01": 0.0124
+      },
+      "other": {
+       "n": 106,
+       "finiteWall": 86,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.3574,
+       "wallMin": 1.3574,
+       "thinP99": -0.1574,
+       "thinMax": -0.1574,
+       "newlyGap": 5,
+       "gapP01": 0.0162
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 22280,
+       "finiteWall": 22280,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0937,
+       "wallMin": 0.6175,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 126,
+       "gapP01": 0.0398
+      },
+      "bead": {
+       "n": 6221,
+       "finiteWall": 4632,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0259,
+       "wallMin": 0.9931,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 30,
+       "gapP01": 0.0032
+      },
+      "rod": {
+       "n": 2731,
+       "finiteWall": 2608,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.296,
+       "wallMin": 1.2205,
+       "thinP99": -0.0027,
+       "thinMax": -0.0001,
+       "newlyGap": 244,
+       "gapP01": 0.0067
+      },
+      "hub": {
+       "n": 1201,
+       "finiteWall": 930,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2503,
+       "wallMin": 1.2,
+       "thinP99": -0.0123,
+       "thinMax": 0,
+       "newlyGap": 7,
+       "gapP01": 0.0243
+      },
+      "stem": {
+       "n": 3058,
+       "finiteWall": 2766,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.5558,
+       "wallMin": 0.4172,
+       "thinP99": -0.0731,
+       "thinMax": -0.0068,
+       "newlyGap": 16,
+       "gapP01": 0.0124
+      },
+      "other": {
+       "n": 106,
+       "finiteWall": 86,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2062,
+       "wallMin": 1.2062,
+       "thinP99": -0.019,
+       "thinMax": -0.019,
+       "newlyGap": 5,
+       "gapP01": 0.0162
+      }
+     }
+    }
+   ]
+  },
+  "whole@0.6": {
+   "shippedTris": 59012,
+   "subdividedTris": 204440,
+   "edgeMm": 0.6,
+   "lambdaMm": 2.5,
+   "split": "rows",
+   "baselineCensus": {
+    "boundary": 0,
+    "nonManifold": 30
+   },
+   "baseline": {
+    "skin": {
+     "n": 11785,
+     "minWall": 0.5716762205898817,
+     "underWall": 65,
+     "minGap": 0.0017811801673765927
+    },
+    "bead": {
+     "n": 4315,
+     "minWall": 0.7674837373636126,
+     "underWall": 9,
+     "minGap": 0.00010224893014102955
+    },
+    "rod": {
+     "n": 1765,
+     "minWall": 1.1926603358998713,
+     "underWall": 0,
+     "minGap": 0.0006470506012486763
+    },
+    "hub": {
+     "n": 499,
+     "minWall": 1.1999999999999995,
+     "underWall": 0,
+     "minGap": 0.12313573305161743
+    },
+    "stem": {
+     "n": 2025,
+     "minWall": 0.06519187626107945,
+     "underWall": 9,
+     "minGap": 0.07284208580176255
+    },
+    "other": {
+     "n": 75,
+     "minWall": 1.176617823673508,
+     "underWall": 0,
+     "minGap": 0.0224132924299015
+    }
+   },
+   "runs": [
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 20
+     },
+     "per": {
+      "skin": {
+       "n": 11785,
+       "finiteWall": 11785,
+       "newlyWall": 3,
+       "folds": 12,
+       "wallP01": 1.1502,
+       "wallMin": 0,
+       "thinP99": -0.0506,
+       "thinMax": 1.0459,
+       "newlyGap": 74,
+       "gapP01": 0.0044
+      },
+      "bead": {
+       "n": 4315,
+       "finiteWall": 3208,
+       "newlyWall": 13,
+       "folds": 13,
+       "wallP01": 1.1069,
+       "wallMin": 0.0001,
+       "thinP99": -0.0486,
+       "thinMax": 2.4388,
+       "newlyGap": 55,
+       "gapP01": 0.0084
+      },
+      "rod": {
+       "n": 1765,
+       "finiteWall": 1686,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2683,
+       "wallMin": 1.2435,
+       "thinP99": -0.037,
+       "thinMax": -0.037,
+       "newlyGap": 224,
+       "gapP01": 0.0176
+      },
+      "hub": {
+       "n": 499,
+       "finiteWall": 383,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.3158,
+       "wallMin": 1.2886,
+       "thinP99": -0.0132,
+       "thinMax": -0.0131,
+       "newlyGap": 0,
+       "gapP01": 0.0023
+      },
+      "stem": {
+       "n": 2025,
+       "finiteWall": 1858,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.5676,
+       "wallMin": 0.6947,
+       "thinP99": -0.0811,
+       "thinMax": 0,
+       "newlyGap": 14,
+       "gapP01": 0.0201
+      },
+      "other": {
+       "n": 75,
+       "finiteWall": 64,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2371,
+       "wallMin": 1.2371,
+       "thinP99": -0.0371,
+       "thinMax": -0.0371,
+       "newlyGap": 3,
+       "gapP01": 0.0159
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 11785,
+       "finiteWall": 11785,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0964,
+       "wallMin": 0.6273,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 66,
+       "gapP01": 0.0429
+      },
+      "bead": {
+       "n": 4315,
+       "finiteWall": 3208,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0389,
+       "wallMin": 1.0058,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 25,
+       "gapP01": 0.0032
+      },
+      "rod": {
+       "n": 1765,
+       "finiteWall": 1686,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2679,
+       "wallMin": 1.2435,
+       "thinP99": -0.037,
+       "thinMax": -0.033,
+       "newlyGap": 220,
+       "gapP01": 0.0283
+      },
+      "hub": {
+       "n": 499,
+       "finiteWall": 383,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.3119,
+       "wallMin": 1.2886,
+       "thinP99": -0.0132,
+       "thinMax": -0.0131,
+       "newlyGap": 0,
+       "gapP01": 0.0353
+      },
+      "stem": {
+       "n": 2025,
+       "finiteWall": 1858,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.563,
+       "wallMin": 0.4646,
+       "thinP99": -0.076,
+       "thinMax": 0,
+       "newlyGap": 14,
+       "gapP01": 0.0235
+      },
+      "other": {
+       "n": 75,
+       "finiteWall": 64,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2371,
+       "wallMin": 1.2371,
+       "thinP99": -0.0364,
+       "thinMax": -0.0364,
+       "newlyGap": 3,
+       "gapP01": 0.0231
+      }
+     }
+    }
+   ]
+  },
+  "infill": {
+   "shippedTris": 108928,
+   "subdividedTris": 358096,
+   "edgeMm": 0.4,
+   "lambdaMm": 2,
+   "split": "rows",
+   "baselineCensus": {
+    "boundary": 0,
+    "nonManifold": 2456
+   },
+   "baseline": {
+    "skin": {
+     "n": 11292,
+     "minWall": 1.085633392133079,
+     "underWall": 0,
+     "minGap": 2.5
+    },
+    "bead": {
+     "n": 4248,
+     "minWall": 0.208780055235735,
+     "underWall": 940,
+     "minGap": 0.0032829999990513998
+    },
+    "holeRim": {
+     "n": 19114,
+     "minWall": 0.8847181228494548,
+     "underWall": 4528,
+     "minGap": 0.9576088027270602
+    },
+    "hub": {
+     "n": 961,
+     "minWall": 1.1999999999999995,
+     "underWall": 0,
+     "minGap": 0.42085999933228485
+    }
+   },
+   "runs": [
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 852
+     },
+     "per": {
+      "skin": {
+       "n": 11292,
+       "finiteWall": 11292,
+       "newlyWall": 36,
+       "folds": 15,
+       "wallP01": 1.262,
+       "wallMin": 0.0002,
+       "thinP99": -0.0653,
+       "thinMax": 1.1998,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 4248,
+       "finiteWall": 3766,
+       "newlyWall": 100,
+       "folds": 46,
+       "wallP01": 0.0104,
+       "wallMin": 0,
+       "thinP99": 1.2636,
+       "thinMax": 1.5293,
+       "newlyGap": 31,
+       "gapP01": 0.0287
+      },
+      "holeRim": {
+       "n": 19114,
+       "finiteWall": 18576,
+       "newlyWall": 600,
+       "folds": 651,
+       "wallP01": 0.001,
+       "wallMin": 0,
+       "thinP99": 1.4787,
+       "thinMax": 2.3298,
+       "newlyGap": 110,
+       "gapP01": 0.0009,
+       "newlyUnderHoleBar": 263
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 904,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2613,
+       "wallMin": 1.212,
+       "thinP99": -0.0613,
+       "thinMax": -0.012,
+       "newlyGap": 0,
+       "gapP01": 0.4035
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 2456
+     },
+     "per": {
+      "skin": {
+       "n": 11292,
+       "finiteWall": 11292,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.1995,
+       "wallMin": 1.1162,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": null
+      },
+      "bead": {
+       "n": 4248,
+       "finiteWall": 3766,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 0.489,
+       "wallMin": 0.2088,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0093
+      },
+      "holeRim": {
+       "n": 19114,
+       "finiteWall": 18576,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 0.9241,
+       "wallMin": 0.8847,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.9948,
+       "newlyUnderHoleBar": 0
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 904,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2563,
+       "wallMin": 1.212,
+       "thinP99": -0.0489,
+       "thinMax": -0.0007,
+       "newlyGap": 6,
+       "gapP01": 0.3884
+      }
+     }
+    }
+   ]
+  },
+  "tube": {
+   "shippedTris": 24672,
+   "subdividedTris": 198500,
+   "edgeMm": 0.4,
+   "lambdaMm": 2,
+   "split": "rows",
+   "baselineCensus": {
+    "boundary": 0,
+    "nonManifold": 0
+   },
+   "baseline": {
+    "skin": {
+     "n": 12205,
+     "minWall": 0.6943922853446464,
+     "underWall": 31,
+     "minGap": 0.00004116745512561405
+    },
+    "bead": {
+     "n": 3063,
+     "minWall": 0.9832769445158788,
+     "underWall": 113,
+     "minGap": 0.00033410767288601366
+    },
+    "hub": {
+     "n": 961,
+     "minWall": 1.1999999999999993,
+     "underWall": 0,
+     "minGap": 0.06167545212790851
+    },
+    "tubeRing": {
+     "n": 3625,
+     "minWall": 0.11753513442723712,
+     "underWall": 1188,
+     "minGap": 0.00037278594609569077
+    }
+   },
+   "runs": [
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "A",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 12205,
+       "finiteWall": 12205,
+       "newlyWall": 1,
+       "folds": 1,
+       "wallP01": 1.1928,
+       "wallMin": 0,
+       "thinP99": -0.0723,
+       "thinMax": 1.034,
+       "newlyGap": 0,
+       "gapP01": 0.0001
+      },
+      "bead": {
+       "n": 3063,
+       "finiteWall": 2280,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.1125,
+       "wallMin": 1.0383,
+       "thinP99": -0.0707,
+       "thinMax": -0.0074,
+       "newlyGap": 9,
+       "gapP01": 0.0045
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2227,
+       "wallMin": 1.2,
+       "thinP99": -0.0227,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.1204
+      },
+      "tubeRing": {
+       "n": 3625,
+       "finiteWall": 3542,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 0.3239,
+       "wallMin": 0.1199,
+       "thinP99": -0.0478,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0012
+      }
+     }
+    },
+    {
+     "type": "pebble",
+     "heightMm": 0.3,
+     "arm": "B",
+     "mode": "outward",
+     "census": {
+      "boundary": 0,
+      "nonManifold": 0
+     },
+     "per": {
+      "skin": {
+       "n": 12205,
+       "finiteWall": 12205,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.1228,
+       "wallMin": 0.8176,
+       "thinP99": -0.0541,
+       "thinMax": -0.0001,
+       "newlyGap": 0,
+       "gapP01": 0.0014
+      },
+      "bead": {
+       "n": 3063,
+       "finiteWall": 2280,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.0189,
+       "wallMin": 0.9875,
+       "thinP99": -0.0055,
+       "thinMax": 0,
+       "newlyGap": 1,
+       "gapP01": 0.001
+      },
+      "hub": {
+       "n": 961,
+       "finiteWall": 902,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 1.2227,
+       "wallMin": 1.2,
+       "thinP99": -0.0196,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.1531
+      },
+      "tubeRing": {
+       "n": 3625,
+       "finiteWall": 3542,
+       "newlyWall": 0,
+       "folds": 0,
+       "wallP01": 0.1215,
+       "wallMin": 0.1175,
+       "thinP99": 0,
+       "thinMax": 0,
+       "newlyGap": 0,
+       "gapP01": 0.0015
+      }
+     }
+    }
+   ]
+  }
+ },
+ "complete": true
+}

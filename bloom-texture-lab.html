@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Bloom Texture Lab</title>
+<!-- DISCOVERY PROTOTYPE, NOT SHIPPED. Unlinked, noindex. Renders the shipped
+     bloom (bloom-geometry.js, unchanged) with a surface relief applied two ways:
+     A, a post-pass on the finished triangle soup, and B, a shared world-space
+     field applied with each emitter's own knowledge (emulated — see
+     bloom-texture-lab-core.js). docs/bloom-surface-texture-discovery.md. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root { --ink: #e8e6e1; --dim: #8b8a86; --bg: #0b0b0d; --panel: #141417; --line: #2a2a30; --accent: #6fb7ae; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #wrap { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+  #side { background: var(--panel); border-right: 1px solid var(--line); padding: 12px 14px; overflow: auto; }
+  #side h1 { font-size: 14px; margin: 0 0 4px; }
+  #side p.note { color: var(--dim); margin: 0 0 12px; font-size: 11px; }
+  label { display: block; margin: 8px 0 2px; color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+  select, input[type=range] { width: 100%; }
+  select { background: #1d1d22; color: var(--ink); border: 1px solid var(--line); padding: 4px; }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .row span.v { min-width: 56px; text-align: right; color: var(--ink); }
+  .chk { display: flex; gap: 6px; align-items: center; margin: 3px 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 12px; }
+  button { background: #1d1d22; color: var(--ink); border: 1px solid var(--line); padding: 5px 8px; cursor: pointer; margin: 2px 2px 2px 0; }
+  button:hover { border-color: var(--accent); }
+  fieldset { border: 1px solid var(--line); margin: 10px 0; padding: 6px 8px; }
+  legend { color: var(--accent); font-size: 11px; }
+  #view { position: relative; }
+  #view canvas { display: block; width: 100%; height: 100%; }
+  .tag { position: absolute; top: 8px; padding: 3px 8px; background: rgba(0,0,0,.55); border: 1px solid var(--line); font-size: 12px; pointer-events: none; }
+  #tagA { left: 8px; } #tagB { left: calc(50% + 8px); }
+  #status { position: absolute; bottom: 8px; left: 8px; right: 8px; color: var(--dim); font-size: 11px; pointer-events: none; white-space: pre-wrap; }
+  #readout { white-space: pre-wrap; font-size: 11px; color: var(--ink); margin-top: 8px; }
+  #divider { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--line); pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="side">
+    <h1>Bloom texture lab</h1>
+    <p class="note">Discovery prototype — not shipped. Left: A, a post-pass on the finished solid. Right: B, the same world-space field applied by each emitter (emulated).</p>
+    <label for="state">Bloom</label>
+    <select id="state">
+      <option value="default">shipped default (8 petals + hub)</option>
+      <option value="whole">whole bloom (stem, leaves, sepals, stamens, style)</option>
+      <option value="infill">Voronoi infill (ruled defaults)</option>
+      <option value="tube">tube (layer 1 fused)</option>
+    </select>
+    <label for="type">Relief</label>
+    <select id="type">
+      <option value="pebble">pebble — fine noise</option>
+      <option value="cellular">cellular — raised cells</option>
+      <option value="ribbing">ribbing — radial spokes</option>
+      <option value="none">none</option>
+    </select>
+    <label for="height">Relief height</label>
+    <div class="row"><input id="height" type="range" min="0" max="1" step="0.05" value="0.3"><span class="v" id="heightV"></span></div>
+    <label for="lambda">Feature size</label>
+    <div class="row"><input id="lambda" type="range" min="1" max="6" step="0.25" value="2"><span class="v" id="lambdaV"></span></div>
+    <label for="mode">Displacement</label>
+    <select id="mode">
+      <option value="outward">outward only (never cuts in — the one ruled mode)</option>
+    </select>
+    <label for="split">Split</label>
+    <select id="split">
+      <option value="rows">rows — each edge into ceil(L/e) equal segments (T1)</option>
+      <option value="redgreen">red-green — the discovery's split (fans long slivers)</option>
+    </select>
+    <label for="edge">Subdivision edge</label>
+    <div class="row"><input id="edge" type="range" min="0.25" max="1" step="0.05" value="0.4"><span class="v" id="edgeV"></span></div>
+    <fieldset>
+      <legend>B only — what an emitter knows</legend>
+      <label class="chk"><input type="checkbox" id="maskBeads" checked> no relief on rim beads</label>
+      <label class="chk"><input type="checkbox" id="maskHoleRims" checked> no relief on hole rims</label>
+      <label class="chk"><input type="checkbox" id="maskFeet" checked> no relief on buried feet</label>
+      <label class="chk"><input type="checkbox" id="maskCreases" checked> fade at hard edges (&gt; 50°)</label>
+    </fieldset>
+    <label>View</label>
+    <div>
+      <button data-view="whole">whole</button><button data-view="hub">hub seam</button><button data-view="tip">petal tip bead</button><button data-view="hole">hole rim</button><button data-view="stem">stem / sepals</button><button data-view="ring">tube ring</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="flat"> flat shading</label>
+    <button id="measure">measure walls and gaps</button>
+    <div id="readout"></div>
+  </div>
+  <div id="view">
+    <canvas id="c"></canvas>
+    <div id="divider"></div>
+    <div class="tag" id="tagA">A · post-pass</div>
+    <div class="tag" id="tagB">B · emitter field</div>
+    <div id="status"></div>
+  </div>
+</div>
+<script type="module" src="bloom-texture-lab.js"></script>
+</body>
+</html>

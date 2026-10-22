@@ -1261,6 +1261,13 @@ RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-suppor
   default is its old double. The fixed point (ring over capped feet) was measured and refused: the foot becomes
   `4π s² t / n` whatever is asked. Binds on 28 / 37 / 39 of 39 widths at 8 / 16 / 40 petals (the old clamp: 21);
   at the shipping width from TEN petals up; D_max falls to 2 everywhere. `node tools/bloom-foot-cap.mjs --base <wt>`.
+- **The cap's ring is the EXPORT floor's in BOTH modes** (`footCapRadiusMm`, the area rule at `max(sheet,
+  MIN_FEATURE_MM)` — the ring's own radius by branch at or above 1 mm): CI found the first cut mode-dependent
+  (`INFILL: x sheetThickness 0.60`, 91,360 live vs 108,928 export). Gates restate it (`footCapRadiusRestated`).
+- **A foot capped exactly at its arc meets a slit tube's columns to the bit** (12 petals): the vertex weld merges a
+  petal and a tube panel and the by-design overlap reads as within-shell pairs — seven TUBE rows declared by value,
+  never nudged. Two hemisphere-at-spread-0.6 census rows got much WORSE (272 → 1,424, 264 → 1,268): the cap on a
+  2.65 mm ring, attributed and reported, not tuned. T5 declares a blade the rim taper covers whole.
 - **Gates**: T4 restated (sepals at their own length, off the file), T5 (every leaf blade off the file), T6 (the
   petiole's rooted ring off the FILE — its first cut read the harness's own rebuild and could not fire), FC1
   (`footCapClauses`, pure; `FC` without a digit was invisible to the smoke census). Z3 / SP3 / SP11 / LF18 / LF26 /
@@ -1270,6 +1277,35 @@ RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-suppor
 - Block 76 (21 rows, 1,506), smoke block 76 (7, `--conn`); block 75's eight-sepal row relabelled;
   `frozen/phase82` = the 1,485 rows at `8403b47`. Sheet: `node tools/shot-bloom-root-support.mjs <dir> --base <wt>`
   → `docs/img/root-support.png`.
+
+**SURFACE TEXTURE IS RULED AND PLANNED, NOT BUILT: B, OUTWARD ONLY, HEIGHT A CONTROL WITH A FLOOR**
+(Eva's rulings on #436, Oct 22 — read `docs/bloom-surface-texture-discovery.md` §0, §8 and §10 before any
+texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-core.js` (unlinked,
+`noindex`, imports the shipped geometry read-only; nothing shipped imports it).
+- **Attachment B**: one world-space field sampled INSIDE the emitters. A (post-pass) and A′ (union
+  re-mesh) are not built; A′ is parked with its costing.
+- **Outward only — relief never thins a sheet.** Centred, inward and emboss are dropped.
+- **No coupon first; height is ruled from renders and ships as a control with a FLOOR**, never a default
+  that assumes it prints (the floor's value is open, Q13).
+- **Visibility**: a light preview while dragging, the full relief on release and in the export (the
+  print preview's F7 pattern); never rebuilt live on every drag.
+- **/plot gets no say in bloom decisions** (a downstream consumer).
+- **Texture sessions run long measurements in the FOREGROUND, chunked and checkpointed (`--resume`), with
+  no background waiter and no scheduled check-in** — the discovery lost a 40-minute run to a container
+  restart.
+- **T1 IS DONE (Oct 22, §11 of the doc): the prototype's red-green split is replaced by the 'rows' split**
+  (each edge into ⌈L/e⌉ equal segments, coplanar strip quads cut as one unit, rows from the corner opposite
+  the least-cut edge). Stem 429,378 → 20,244 triangles at 0.6 mm, its outward bore folds 4,058 → 0 in both
+  arms; the whole bloom 23.7 % of the budget at 0.4 mm (was 128 %); the corners are BUILT now (infill × 40 ×
+  3: 239 %). `node tools/bloom-texture-lab-quality.mjs` (TQ0–TQ3, `--control` 10 legs — red-green must FAIL
+  it on the stem) is the check. The edge-count split ALONE left 119 bore folds; only the quad pairing
+  cleared them, and the check restates the quads itself so it catches that intermediate.
+- **T1's open questions for T2/T5 are §11.7 (Q14–Q16)**: T2's bar against 2A/e² is not reachable by a
+  refinement of the shipped lattice; whether B refines the bore at all; the split's counts differ between
+  Chromium and Node on the whole bloom, so a T2 sub-lattice count must come from engine-agreed quantities.
+- Plan: T1 split fix (prototype) → T2 own-coordinate lattice through `petalSurface` → T3 field, guard and
+  outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
+  Gate family **TX**.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
@@ -11570,3 +11606,28 @@ numbered steps and ±1 mm figure, P23 a fresh profile opens on 4 × 3). Sheet:
 pin, B in use at 90° and 60°). Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.
+
+## `/lantern` — the paper star lantern (pointer only)
+
+Hidden generative page (`lantern.html`, `lantern.css`, `lantern.js`,
+`lantern-geometry.js`, `lantern-view.js`; `noindex`, unlinked). Its governing
+document is **`lantern-design-doc.md`** — read §2 before touching the solver.
+The law: `solveLantern(state)` in `lantern-geometry.js` is the ONE owner of the
+geometry — the FINISHED star is what the user specifies and the FLAT pattern is
+derived (the inverse problem); every view, export and gate reads the same model.
+**Two mirrored halves glued at a planar rim cannot be made of rigid flat
+triangles (the rim edge would have to shrink), so a facet is a PLEATED CONE
+from the raised centre, and the one freedom that closes it is a convex bow on
+the flat edge, solved by bisection** (doc §2.2–2.3, with the measured closure
+table: a slender straight-edged pentagram closes at depth ≈ 0.41 × width — the
+commercial proportion — and slender-and-shallow has no planar rim at all; the
+solver clamps the depth to the nearest closing one and tells). The point
+outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
+with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
+path-scoped to the lantern's files plus `bloom-curve.js`): `node
+tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P9 in
+Chromium, `--negative-control` six mutants of the page). Sheet: `node
+tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
+built; the pattern system, the material model, export, backing, instructions
+and the lit view are the doc's phases 2–6.
