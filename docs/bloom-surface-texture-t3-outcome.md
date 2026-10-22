@@ -174,10 +174,20 @@ ABOVE the ring — the feet and the root blend overlap by design, the accepted l
 
 ## 6. The byte partition and the frozen sweep
 
-Predeclared from the base tree's own state (textured and not infilled): **19 movers (block 77's textured
-rows less BOTH ON and GATED) / 1,506 holders**, both modes. Chunk 0 (rows 0–254): PASS, 0 floats moved on
-255 holders over 313,745,112 export floats. The remaining chunks and the merge are read back below.
-<!-- PARTITION-CLOSE -->
+Predeclared from the base tree's own state (textured and not infilled): **17 movers (block 77's 19 rows less BOTH
+ON, whose texture is refused, and GATED, whose guard is NONE) / 1,508 holders**, both modes, six chunks of 255 rows
+against a worktree of `d60e734`, merged:
+
+```
+MERGED 6 chunks over 1525 rows x 2 modes, predicate texture, base /tmp/base
+partition     : 17 of 17 predeclared movers MOVED (every one must), 1508 holders compared to the bit
+export stream : 1,804,052,448 floats over 200,450,272 triangles
+captured grid : 82,174,232 values over 9,470 panels (live)
+PASS — 0 floats moved on the 1508 holders, positionally, under Object.is; all 17 predeclared movers moved.
+```
+
+So every one of `main`'s 1,506 rows — `ALL MAX`, the infilled rows and the shipping default among them — is
+byte-identical in both modes, and the two texture rows that build no relief hold too.
 
 **Frozen sweep: 0 of 74,343 frozen rows across 82 baselines name a texture id**, so every tag's bytes
 reproduce by construction (the guard is a choice, a stored row without the id builds at NONE, and NONE is
