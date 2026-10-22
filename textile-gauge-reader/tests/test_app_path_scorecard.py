@@ -131,29 +131,54 @@ KNOWN_BEYOND_BAR = {
     ("ruler", "knit_08", "wale"): _NO_PROPOSALS + " at the pre-filled (+486.5%) scale",
     ("ruler", "knit_08", "course"): _NO_PROPOSALS + " at the pre-filled (+486.5%) scale",
     ("ruler", "synth_jersey", "wale"): (
-        _ruler_reason("synth_jersey", "is spurious (+154.0%)") + "; the wale consensus is the areas' own "
-        "36 px reading (right in pixels) at a 2.54x wrong scale -- before the leg gate every area's "
-        "leg-lattice count was excluded as implausibly dense at that scale and the axis returned no number"
+        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: " + _ruler_reason("synth_jersey", "is spurious (+154.0%)")
+        + "; the wale consensus is the areas' own 36 px reading (right in pixels) at a 2.54x wrong scale -- "
+        "before the leg gate every area's leg-lattice count was excluded as implausibly dense at that scale and "
+        "the axis returned no number (see KNOWN_CONFIDENT_AND_WRONG)"
     ),
     ("ruler", "synth_jersey", "course"): _ruler_reason("synth_jersey", "is spurious (+154.0%)"),
     ("ruler", "synth_garter", "wale"): (
-        _ruler_reason("synth_garter", "is spurious (+154.0%)") + "; the wale consensus is the areas' own "
-        "36 px reading (right in pixels) at a 2.54x wrong scale -- before the leg gate every area's "
-        "leg-lattice count was excluded as implausibly dense at that scale and the axis returned no number"
+        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: " + _ruler_reason("synth_garter", "is spurious (+154.0%)")
+        + "; the wale consensus is the areas' own 36 px reading (right in pixels) at a 2.54x wrong scale -- "
+        "before the leg gate every area's leg-lattice count was excluded as implausibly dense at that scale and "
+        "the axis returned no number (see KNOWN_CONFIDENT_AND_WRONG)"
     ),
     ("ruler", "synth_garter", "course"): _ruler_reason("synth_garter", "is spurious (+154.0%)"),
     ("ruler", "synth_rib", "wale"): _ruler_reason("synth_rib", "is spurious (+306.4%)"),
     ("ruler", "synth_rib", "course"): _ruler_reason("synth_rib", "is spurious (+306.4%)"),
 }
 
-# Rows pinned as KNOWN CONFIDENT-AND-WRONG by ruling: inside the 20% bar
-# (so test_app_path_row guards them against regression like any other
-# row) and still "confident" with |error| > CONFIDENT_WRONG_PCT. Each is a
+# Rows pinned as KNOWN CONFIDENT-AND-WRONG by ruling: still "confident"
+# with |error| > CONFIDENT_WRONG_PCT (those inside the 20% bar are also
+# guarded against regression by test_app_path_row like any other row;
+# those beyond it are strict xfails there too, with their diagnosis in
+# KNOWN_BEYOND_BAR). Each is a
 # strict xfail on test_known_confident_and_wrong_row_is_fixed: the day a
 # change takes the row inside 10% or flags it uncertain, it XPASSes and
 # the entry has to come off on purpose, together with its line in
 # CONFIDENT_AND_WRONG below.
 KNOWN_CONFIDENT_AND_WRONG = {
+    # The three calibration-(b) rows the loop-count gate made VISIBLE (Eva's
+    # ruling, 2026-10-22: they do not count against the gate's "no new row"
+    # condition -- each is a ruler-detector error now reported on a correct
+    # wale reading, not an error the fix created).
+    ("ruler", "knit_05", "wale"): (
+        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: the pre-fill is -56.6% ('1 in' across ~0.43 in), "
+        "so the proposer builds one 122 px window (1.8 true wales) whose 35 px reading is a sub-feature of a "
+        "68 px wale; -15.5% confident. The old +7.6% was that scale error cancelling against a 27.5 px count."
+    ),
+    ("ruler", "synth_jersey", "wale"): (
+        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: a spurious '1 cm' ruler (+154.0%) on an image drawn "
+        "with no ruler; the wale consensus is the areas' correct 36 px reading at that wrong scale, +154.0% "
+        "confident (its course twin reads the same). Before the gate the axis returned no number while claiming "
+        "confident."
+    ),
+    ("ruler", "synth_garter", "wale"): (
+        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: a spurious '1 cm' ruler (+154.0%) on an image drawn "
+        "with no ruler; the wale consensus is the areas' correct 36 px reading at that wrong scale, +154.0% "
+        "confident (its course twin reads the same). Before the gate the axis returned no number while claiming "
+        "confident."
+    ),
     ("truth", "teal", "wale"): (
         "-11.0% CONFIDENT -- KNOWN CONFIDENT-AND-WRONG, ACCEPTED BY EVA'S RULING on the loop-count gate "
         "(variant B) and the target of the next PR: teal's own wale periodicity reads 75-80 px against a "

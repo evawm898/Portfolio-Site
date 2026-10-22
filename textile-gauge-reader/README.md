@@ -3039,9 +3039,15 @@ ruler is WRONG by -56.6%, so the proposer builds one 122 px window (1.8
 true wales) whose 35 px reading is a sub-feature of a 68 px wale -- the
 old +7.6% was that scale error cancelling against a 27.5 px count, two
 errors and no right answer. The ruler detector is outside this PR by its
-brief. **The merge is held on that condition for Eva's word; the branch
-carries variant B, re-pinned, with these three rows explained in
-`KNOWN_BEYOND_BAR` where they are beyond the bar.** **A tolerance between the two readings was
+brief. **Eva ruled (2026-10-22) that these three rows do NOT count against the
+"no new row" condition**: all three are ruler-detector errors made visible
+by a now-correct wale reading -- the synthetics previously returned no
+number while claiming `confident`, and knit_05's +7.6% was two errors
+cancelling -- and the condition was meant to catch the fix CREATING errors,
+not upstream errors becoming visible. The three are pinned as strict xfails
+labelled "ruler-detector error, target of the calibration PR"
+(`KNOWN_CONFIDENT_AND_WRONG` in `tests/test_app_path_scorecard.py`), so
+that PR has to clear them explicitly. **A tolerance between the two readings was
 NOT written**: ~10% separates jersey's 39.5-against-35.2 count from
 knit_08's 77-against-85, a two-percent-wide knife edge typed to three
 photos.
