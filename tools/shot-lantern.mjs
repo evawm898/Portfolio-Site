@@ -11,6 +11,7 @@ import { openLantern } from './lantern-page-harness.mjs';
 const OUT = path.resolve(process.argv[2] || 'lantern-sheet');
 fs.mkdirSync(OUT, { recursive: true });
 const cells = [];
+const shotOf = async (sel) => { const b = await page.locator(sel).boundingBox(); return page.screenshot({ clip: b }); };   // a clip, never locator.screenshot(): the turning canvas is never 'stable'
 const save = (name, buf, caption) => { fs.writeFileSync(path.join(OUT, name), buf); cells.push({ name, caption }); console.log(`${name.padEnd(22)} ${caption}`); };
 
 const s = await openLantern({ storage: '', viewport: { width: 1440, height: 900 }, dsf: 2 });
@@ -19,17 +20,17 @@ const T = (f, ...a) => page.evaluate(f, ...a);
 await page.waitForTimeout(600);
 save('page.png', await page.screenshot(), 'the page as it opens: the default 5-point star, 20″ wide, folded and turning');
 await T(() => window.__lantern.view('flat')); await page.waitForTimeout(200);
-save('flat.png', await page.locator('.ln-preview').screenshot(), 'the Flat view — one half as it is cut: outline and tabs in red, mountain scores blue, valley perforations green dashed, the back\'s opening and ring beside it');
+save('flat.png', await shotOf('.ln-preview'), 'the Flat view — one half as it is cut: outline and tabs in red, mountain scores blue, valley perforations green dashed, the back\'s opening and ring beside it');
 await T(() => window.__lantern.edgeMode('convex')); await T(() => window.__lantern.flush()); await page.waitForTimeout(100);
-save('editor.png', await page.locator('#secShape').screenshot(), 'the Shape section with a convex point outline: the drawn curve (teal) and the derived bow the solver adds to close the fold (amber dashes)');
+save('editor.png', await shotOf('#secShape'), 'the Shape section with a convex point outline: the drawn curve (teal) and the derived bow the solver adds to close the fold (amber dashes)');
 await T(() => window.__lantern.view('folded'));
 for (const id of ['alt8', 'sunburst12', 'flower', 'puffy6']) {
   await T((i) => window.__lantern.preset(i), id); await T(() => window.__lantern.flush()); await page.waitForTimeout(500);
-  save(`preset-${id}.png`, await page.locator('.ln-preview').screenshot(), `preset ${id}, folded`);
+  save(`preset-${id}.png`, await shotOf('.ln-preview'), `preset ${id}, folded`);
 }
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
-save('clamp.png', await page.locator('.ln-panel').screenshot(), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');
+save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');
 await s.close();
 const m = await openLantern({ storage: '', viewport: { width: 390, height: 844 }, dsf: 2 });
 await m.page.waitForTimeout(600);
