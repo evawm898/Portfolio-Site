@@ -190,6 +190,22 @@ const E2_TURN_XFAIL = {
   'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)': { excessDeg: 8.532510, note: 'the ROOT RIM of a tapered 100 mm petal (big petals, Oct 21): the rim taper eases the thickened body (3.88 mm at the root) to the 1 mm bead within RIM_TAPER_MM, so the rim turns past the allowance at the root (radius ~11.6 mm); the same state with the root taper OFF passes E2, and the two remedies tried (the bead scaled by the root factor; the buried-end ramp lengthened by it) each moved the excess to another length (80 mm read 61.9 / 77.5). RULED Oct 21: accepted — a thick root closing on the 1 mm bead is a chamfer (docs/bloom-big-petals-outcome.md §6)' },
   'BIG PETALS: 100 mm x cup 1.2 (the fold clamp reads each row\'s own thickness)': { excessDeg: 13.141118, note: 'the CUPPED TIP, not the taper\'s: the same state with the root taper OFF reads the identical turn at the identical site (the cupped-nib bead class main declares)' },
   'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)': { excessDeg: 8.532510, note: 'the ROOT RIM of a tapered 100 mm petal (big petals, Oct 21): the rim taper eases the thickened body (3.88 mm at the root) to the 1 mm bead within RIM_TAPER_MM, so the rim turns past the allowance at the root (radius ~11.6 mm); the same state with the root taper OFF passes E2, and the two remedies tried (the bead scaled by the root factor; the buried-end ramp lengthened by it) each moved the excess to another length (80 mm read 61.9 / 77.5). RULED Oct 21: accepted — a thick root closing on the 1 mm bead is a chamfer (docs/bloom-big-petals-outcome.md §6)' },
+  /* ROOT SUPPORT (Oct 21, docs/bloom-root-support-outcome.md §6b): three smoke
+     rows of block 76 over the allowance. The two 120 mm leaves are NOT the
+     root law's: the site is the TIP (x 109 of 120 mm), and a worktree of
+     8403b47 reads 48.100062 deg at the identical point on the identical state —
+     the narrow tip flank's bead (the narrow-span clamp class), reached because
+     no matrix row carried a 120 mm leaf before. The width-46 x 40 row IS this
+     change's: the derived cap narrows the foot 10.000 -> 5.267 mm, the root
+     blend from a 46 mm blade into it steepens, and the bead there turns 45.78
+     deg at z 0.18 where the base reads 43.48 elsewhere on the petal. Declared at
+     the measured magnitude, never widened. */
+  'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)':
+    { excessDeg: 3.100062, note: 'adds 48.100062 deg at [109.016, 1.052, 21.681]; face-to-face 50.66, outline 2.56 — the 120 mm leaf\'s TIP; identical on a worktree of 8403b47' },
+  'ROOT SUPPORT: simple leaf 120 mm x stem 60 x 3 mm (the stem caps the petiole \u2014 told)':
+    { excessDeg: 3.100062, note: 'adds 48.100062 deg at [107.516, 1.052, 22.898] — the same tip, identical on 8403b47' },
+  'ROOT SUPPORT: width 46 x 40 petals':
+    { excessDeg: 0.779637, note: 'adds 45.779637 deg at [21.333, 28.252, 0.176]; face-to-face 46.95, outline 1.17 — the root blend into the CAPPED foot (5.267 mm, the arc it owns at r 33.53; the base built 10.000 at r 24.72 and reads 43.483 at [25.517, 12.756, 1.638])' },
   /* CURVES-LEAVES (Oct 20, docs/bloom-curves-leaves-outcome.md): three block-73
      rows over the allowance, each measured against the SAME state on the arch
      slider and the law outline (`--rows-file`, `--dump-e2`) — none is a new
@@ -206,7 +222,7 @@ const E2_TURN_XFAIL = {
   'LEAF CURVES: the COMPOUND rose on a drawn rachis, one leaflet curve shared by every leaflet (the terminal at its own size), toothed':
     { excessDeg: 5.627818, note: 'adds 50.627818 deg — the leaflet curve on the wide cupped leaflets (the S4 bead class on wide cupped blades); the rachis drawn and the leaflets on the law read 43.686' },
   'LEAF CURVES: the LOBED blade on a drawn spine, an outline curve STORED (the lobed blade keeps its own law \u2014 the outline mode inert, told)':
-    { excessDeg: 44.060970, note: 'adds 89.060970 deg — the lobed bead class main declares on its lobed rows; the identical state on the Arch slider reads 94.200 — the drawn spine improves it' },
+    { excessDeg: 35.159030, note: 'RE-RECORDED 44.060970 -> 35.159030 by ROOT SUPPORT (Oct 21): the lobed leaf takes the root law at its own length (better, measured by CI on b6759be). Earlier: adds 89.060970 deg — the lobed bead class main declares on its lobed rows; the identical state on the Arch slider reads 94.200 — the drawn spine improves it' },
   /* SPINE-CUP-FOLD (Oct 20, docs/bloom-spine-cup-fold-outcome.md): five smoke
      rows over the allowance, every one a strongly CUPPED blade on a strongly
      CURLED spine — the cup's bead on a surface that bends hard along its
@@ -241,9 +257,9 @@ const E2_TURN_XFAIL = {
      at the 1.00 mm wall (the class already declared for narrow leaves above);
      0.000151 deg over the allowance on both, at the blade's margin, never widened. */
   'SEPAL SIZE: the WING — 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60 (the sepals three times the 35 mm petals\' length)':
-    { excessDeg: 0.000151, note: 'adds 45.000151 deg at [16.423, 5.990, -1.520] — the narrow-span bead clamp on a 5 mm blade, found by CI on 8255893' },
+    { excessDeg: 0.020093, note: 'RE-RECORDED 0.000151 -> 0.020093 by ROOT SUPPORT (Oct 21): the 120 mm sepal takes the root law at its own length (x4.134, a 4.96 mm root), so the narrow-span clamp closes a thicker body on the 5 mm blade (measured by CI on b6759be). Earlier: adds 45.000151 deg at [16.423, 5.990, -1.520] — the narrow-span bead clamp on a 5 mm blade, found by CI on 8255893' },
   'SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal\'s length read +24 here)':
-    { excessDeg: 0.000151, note: 'adds 45.000151 deg at [-2.550, 22.830, 5.418] — the same 5 mm blade at the other angle, the same clamp' },
+    { excessDeg: 0.020091, note: 'RE-RECORDED 0.000151 -> 0.020091 by ROOT SUPPORT (Oct 21), the same root on the same 5 mm blade. Earlier: adds 45.000151 deg at [-2.550, 22.830, 5.418] — the same 5 mm blade at the other angle, the same clamp' },
   /* LEAF/STEM BUILD S5 (the leaf nib, the tip yield, the broad-sinus fillet —
      docs/bloom-leaf-tip-broad-sinus-outcome.md): nine smoke rows newly over
      the allowance, each declared at its measured magnitude with its reason;
@@ -446,7 +462,7 @@ const E2_TURN_XFAIL = {
   "LOBED RULINGS: roundness 0.18 (the first DEAD step \u2014 SATURATED, the same leaf as 0.5; told and hatched)":
     { excessDeg: 37.320181, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 37.432361; earlier: NEW with the S4c follow-up: the first dead step, the same leaf (and the same figure) as roundness 0.5; RE-RECORDED at S5 from 37.320181 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 43.466762 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
   "LOBED RULINGS: a told shoulder CORNER \u2014 the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)":
-    { excessDeg: 28.347335, note: 'NEW with the S4c follow-up: a told shoulder corner on a broad-sinus blade; RE-RECORDED at S5 from 28.346182 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 20.886846 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
+    { excessDeg: 4.573785, note: 'RE-RECORDED 28.347335 -> 4.573785 by ROOT SUPPORT (Oct 21): the 58 mm lobed leaf takes the root law at its own length, and the thickened body re-faces the bead at the shoulder (better, measured by CI on b6759be). Earlier: NEW with the S4c follow-up: a told shoulder corner on a broad-sinus blade; RE-RECORDED at S5 from 28.346182 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 20.886846 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE
@@ -1082,9 +1098,10 @@ const MUTATIONS = [
   { id: 'the-leaf-rim-is-not-recorded', breaks: ['E0'],
     /* RE-ANCHORED (leaf/stem build S3): the blade's emitPanel call moved into
        `emitLeafBladeInto`, the one emitter a simple leaf and every leaflet go
-       through, so the mutation reaches both. */
-    from: "  emitPanel(acc, rows, panel, () => t, rim);",
-    to:   "  emitPanel(acc, rows, panel, () => t, null);" },
+       through, so the mutation reaches both. RE-ANCHORED AGAIN (root support):
+       the thickness is the leaf's root law per row now (`tAtRow`). */
+    from: "  emitPanel(acc, rows, panel, tAtRow, rim);",
+    to:   "  emitPanel(acc, rows, panel, tAtRow, null);" },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },

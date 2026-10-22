@@ -2196,8 +2196,8 @@ const MUTANTS = [
       const same = m.rep.lobed.rowHalfLobeMm.every((h, j) => h === c.rep.lobed.rowHalfLobeMm[j]);
       return (same && m.rep.lobed.roundBottoms.sinuses.every((r) => !r.built) && c.rep.lobed.roundBottoms.sinuses.some((r) => r.built)) ? null : `the mutant's outline is ${same ? 'the clean one' : 'MOVED'} with ${m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built).length} bottoms told — the behaviour did not move`; } },
   { id: 'the-lobed-petiole-is-the-wire', why: 'the area law is computed and recorded and the rod is built at the wire anyway — the read-out says asked -> built on a petiole that was never thickened',
-    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
-    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : petioleR0;', names: ['LF26'],
+    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;',
+    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;', names: ['LF26'],
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.petioleR === m.plan.lobedPetiole.wireR && c.plan.petioleR > c.plan.lobedPetiole.wireR) ? null : `the mutant builds the petiole at ${m.plan.petioleR} mm against the clean ${c.plan.petioleR} — the behaviour did not move`; } },
@@ -2532,8 +2532,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.limit > c.limit) ? null : `the mutant's limit is ${m.limit} against the clean tree's ${c.limit} on the 120 x 5 wing at 40 asked — the exclusion is not reading as a fraction`; } },
   { id: 'sepal-foot-floor-removed', why: 'the sepal foot is whatever breadth asks with no print floor — 0.96 mm across at breadth 0.25, under the 1.60 mm foot floor every petal ring is held to',
-    find: '    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);',
-    into: '    const footMm = footAskedMm;', names: ['SP3'],
+    find: '    const footFlooredMm = Math.max(FOOT_MIN_WIDTH_MM, footAskedMm);',
+    into: '    const footFlooredMm = footAskedMm;', names: ['SP3'],
     witness: (M, C) => { const m = sepalFacts(M, { sepalFootBreadth: 0.25 }), c = sepalFacts(C, { sepalFootBreadth: 0.25 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.footH < 0.6 && c.footH >= 0.79) ? null : `the mutant's foot half-width is ${m.footH} against the clean tree's ${c.footH} at breadth 0.25 — the floor still binds`; } },

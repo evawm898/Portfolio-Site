@@ -459,7 +459,10 @@ async function nodeClauses(G, F, R, rec) {
   {
     const p = [];
     const said = [];
-    const clampW = (w) => Math.min(G.FOOT_MAX_WIDTH_MM, Math.max(G.FOOT_MIN_WIDTH_MM, w));
+    /* (root support, Oct 21: the asked foot is FLOORED here and the area rule
+       sums the asked feet; the CAP — the arc each foot owns at its ring — is
+       applied once the ring is placed, below) */
+    const clampW = (w) => Math.max(G.FOOT_MIN_WIDTH_MM, w);
     for (const placement of ['RADIAL', 'SPIRAL']) {
       /* layer 1 owns a narrower width (its foot only — its ring IS the rim),
          layer 2 owns a width (foot AND ring), layer 3 owns length and tilt
@@ -488,6 +491,7 @@ async function nodeClauses(G, F, R, rec) {
         want.push({ width, factor: w === null ? scale : L === 0 ? 1 : w / Number(st.petalWidth), owned: w !== null });
       }
       const R0 = Math.sqrt(sumSq) * Number(st.spread);
+      for (let L = 0; L < 4; L++) want[L].width = H.footCapRestated(want[L].width, R0 * want[L].factor, (2 * Math.PI) / Math.round(Number(st.petalCount))).width;
       for (let L = 0; L < 4; L++) {
         const r = rings[L], w = want[L];
         if (!Object.is(r.width, w.width)) p.push(`${placement} layer ${L + 1}: foot width ${r.width}, restated ${w.width}`);

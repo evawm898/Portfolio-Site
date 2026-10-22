@@ -811,8 +811,16 @@ async function run(geomUrl, gltfUrl, registryUrl) {
         /* The v-line at u = 0 must carry the FOOT's half-width, which is the
            whole content of "keep the s = 0 row": a file that kept a blade row
            instead would be uniform in u and wrong about the junction. */
-        check('3', Math.abs(fp.halfWidthMm[0] - built.petalsAll[0].profile[built.petalsAll[0].footRows - 1]) < 1e-6,
-          `${row.label}: the u = 0 row's half-width is not the foot's`);
+        /* COMPARED AT THE FILE'S OWN DECLARED PRECISION (root support): the
+           exporter writes half-widths to five decimals (`round(x, 5)`), and a
+           1e-6 bar against the double held only while every foot was a round
+           number (3.2, 5.0). A foot capped at its ring's arc is an arc length,
+           so the file's rounding (up to 5e-6) showed as a mismatch. The
+           expected value is rounded exactly as the file rounds it, and the
+           comparison is then exact. */
+        const footHalfDeclared = +built.petalsAll[0].profile[built.petalsAll[0].footRows - 1].toFixed(5);
+        check('3', fp.halfWidthMm[0] === footHalfDeclared,
+          `${row.label}: the u = 0 row's half-width ${fp.halfWidthMm[0]} is not the foot's ${footHalfDeclared} (to the file's five decimals)`);
       }
 
       /* One LINE_STRIP per column plus one per row, and a POINTS for the

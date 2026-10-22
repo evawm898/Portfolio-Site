@@ -1212,7 +1212,8 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   thick) — MISSED in the first push and found by CI's JS1 on `ALL MAX` (§6d; apex mutant
   `the-part-root-spans-the-sheet`), and the two style rows on the mum it had "fixed" read 272 / 0.0664 again.
   `ALL MAX`'s settle has the export click's 120 s (`settleMsForRow`, declared refusals only; every other row 30 s).
-  Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule).
+  Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule). **[Oct 21: SUPERSEDED — sepals and leaves take
+  the law at their own length; the root-support block below.]**
 - **T0–T4** in both STL gates read the thickness off the EXPORTED skins (root, untapered rows, hub, sepal roots)
   against the law RESTATED through the other integral (Simpson + bisection, 1e-9). J1/J4a/A7/C5/roll floor
   restated, never relaxed. Must-fail `node tools/verify-bloom-root-taper.mjs [--control]` (four mutants, each
@@ -1230,7 +1231,8 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   ROW-DEF guard against the base's own matrix (3 declared, 28 added). `ALL MAX` refusal 3,334,106 tris (all of
   the width's +641,932 is the FRINGE, measured with it off), census 78,222 / 34.0787. Nine FAN census rows
   re-recorded (petal 1's +16 now builds 32). `cup-x-width` and its triple reach 46: seven cells under the bar,
-  declared (worst 0.189 mm). The foot's 10 mm clamp now binds over 56% of the slider — reported, unchanged.
+  declared (worst 0.189 mm). The foot's 10 mm clamp now binds over 56% of the slider — reported, unchanged. **[Oct 21: RETIRED —
+  the foot cap is the ring's own arc; the root-support block below.]**
 - **Sepals pinned OFF and leaves never wired stay on the 1.2 mm sheet at any length** (a 120 mm one is 11.8x the
   reference stress) — measured and stated in §3b, open for Eva. SO13's original condition was planted on the new
   geometry and reddens the restated clause; `an-owned-length-moves-the-foot` is its standing mutant.
@@ -1239,6 +1241,46 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carried one
   E7 edge (`E7_INSET_XFAIL`) until the width reached 46, where it reads 0 and the entry came off.
 - Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png` (2b: the root rim side-on).
+
+**SEPALS AND LEAVES TAKE THE ROOT LAW AT THEIR OWN LENGTH, AND THE FOOT IS CAPPED BY THE ARC IT OWNS AT ITS
+RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-support-outcome.md` before touching
+`sepalAskedLengthMm`, `hubRootTaperLengthMm`, `leafBladeLaw`'s `rootLengthMm`, `petioleRootFloorMm`, the foot cap in
+`footRing` (petal rings and the sepal descriptor), `footCapClauses`, T4–T6, FC1 or block 76).
+- **Sepals**: the big-petals pin is lifted; each tier at its own asked length; the foot height is half the ROOT
+  above the attachment; the plate is held to the longest blade it carries, sepals included (a 120 mm sepal: a
+  4.961 mm plate). Measured: with the plate at the sheet, 23 of 30 states had less flare above the attachment than
+  the sepal's root. **Consequence**: a plate past the join makes the join inert and the sepals stand on the RIM
+  (from 80 mm on a 6 mm stem, 120 mm on 12 mm) — told, Eva's to judge.
+- **Leaves**: `leafBladeLaw(…, rootLengthMm)` names the root's owner at every call (the simple leaf's node length,
+  each leaflet's own `sp.L`, never the rachis or the petal); `tAt` reaches emitPanel, the form, the fold limit and the
+  curve rise. **The petiole's diameter is at least the blade's root** (`petioleRootFloorMm`), CLAMPED at the stem's
+  cap through `petioleClampMm` and told (120 mm leaf on 6 mm: 2.239 of 2.481 mm radius). **Compound stalks stay the
+  wire** (S3's ruling), said on the read-out.
+- **The foot cap**: the ring is placed by the area rule over the ASKED (floored, uncapped) feet; each foot is then
+  `asked > radius × span ? max(floor, radius × span) : asked` (span = the fan step or 2π/n) — a branch, so the
+  default is its old double. The fixed point (ring over capped feet) was measured and refused: the foot becomes
+  `4π s² t / n` whatever is asked. Binds on 28 / 37 / 39 of 39 widths at 8 / 16 / 40 petals (the old clamp: 21);
+  at the shipping width from TEN petals up; D_max falls to 2 everywhere. `node tools/bloom-foot-cap.mjs --base <wt>`.
+- **The cap's ring is the EXPORT floor's in BOTH modes** (`footCapRadiusMm`, the area rule at `max(sheet,
+  MIN_FEATURE_MM)` — the ring's own radius by branch at or above 1 mm): CI found the first cut mode-dependent
+  (`INFILL: x sheetThickness 0.60`, 91,360 live vs 108,928 export). Gates restate it (`footCapRadiusRestated`).
+- **A foot capped exactly at its arc meets a slit tube's columns to the bit** (12 petals): the vertex weld merges a
+  petal and a tube panel and the by-design overlap reads as within-shell pairs — seven TUBE rows declared by value,
+  never nudged. Two hemisphere-at-spread-0.6 census rows got much WORSE (272 → 1,424, 264 → 1,268): the cap on a
+  2.65 mm ring, attributed and reported, not tuned. T5 declares a blade the rim taper covers whole.
+- **Gates**: T4 restated (sepals at their own length, off the file), T5 (every leaf blade off the file), T6 (the
+  petiole's rooted ring off the FILE — its first cut read the harness's own rebuild and could not fire), FC1
+  (`footCapClauses`, pure; `FC` without a digit was invisible to the smoke census). Z3 / SP3 / SP11 / LF18 / LF26 /
+  SO13 / panel route (j) re-derived. `verify-bloom-root-taper --control` (`--only=`) runs 9 witnessed mutants,
+  five new. `rootTaperFactor` is memoised on the exact double (pure; the four-tier corner went 16 → 24 s without).
+- **Declared, not done**: the sepal angle limit's contact test reads one sheet, not each root.
+- Block 76 (21 rows, 1,506), smoke block 76 (7, `--conn`); block 75's eight-sepal row relabelled;
+  `frozen/phase82` = the 1,485 rows at `8403b47`. Sheet: `node tools/shot-bloom-root-support.mjs <dir> --base <wt>`
+  → `docs/img/root-support.png`.
+- **Bytes: 413 movers / 1,093 holders, 0 floats on any holder**, both modes (`--movers-predicate root-support`,
+  from the BASE record; three predicate corrections first — the shared-node petiole's ASKED length, lower sepal
+  tiers on their own rings, a closed tube's feet are a record). **Frozen sweep: all 81 baselines carry a mover**
+  (19,294 of 72,837 rows); the sweep's `--memo <file>` lets it close in `--frozen-only` batches.
 
 **SURFACE TEXTURE IS RULED AND PLANNED, NOT BUILT: B, OUTWARD ONLY, HEIGHT A CONTROL WITH A FLOOR**
 (Eva's rulings on #436, Oct 22 — read `docs/bloom-surface-texture-discovery.md` §0, §8 and §10 before any

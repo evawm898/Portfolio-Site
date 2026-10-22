@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -2135,11 +2135,19 @@ function clampedRingsPhrase(rings, hit) {
    floor and the foot floor already carry, arriving where it was always
    missing (Eva, Sep 1 — found by discovery, not by a visitor wondering why
    the ring stopped growing). No geometry moves; this is telemetry. */
+/* [Oct 21, root support — Eva's ruling 2: the ceiling is no longer a fixed
+   10 mm but each ring's OWN ROOM, the arc each foot owns at its ring
+   (footRing's `footArcMm`). The cap line names the ring, what was asked and
+   what the arc allowed, and says when even the floor overruns the arc.] */
 function footFloorLine(rings) {
   const lo = clampedRingsPhrase(rings, (r) => r.widthClamped);
   const hi = clampedRingsPhrase(rings, (r) => r.widthClampedHigh);
+  const capped = (rings || []).filter((r) => r.widthClampedHigh);
+  const worst = capped.length ? capped.reduce((a, r) => (r.width / r.widthAskedMm < a.width / a.widthAskedMm ? r : a), capped[0]) : null;
+  const under = clampedRingsPhrase(rings, (r) => r.footArcUnderFloor && r.widthAskedMm > r.footArcMm);
   return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
-       + (hi ? `FOOT WIDTH CAPPED at ${FOOT_MAX_WIDTH_MM.toFixed(2)} mm on ${hi} — the blade keeps widening, the ring does not\n` : '');
+       + (hi ? `FOOT WIDTH CAPPED by the ring's own room on ${hi} — ${worst.widthAskedMm.toFixed(2)} mm asked, ${worst.width.toFixed(2)} mm built: the arc each foot owns at its ring (${(worst.footCapRadiusMm ?? worst.radius).toFixed(2)} mm x ${((worst.footSpanRad * 180) / Math.PI).toFixed(1)}°); a crowded ring caps lower, a sparse one higher\n` : '')
+       + (under ? `FOOT ROOM UNDER THE FLOOR on ${under} — the arc each foot owns is under the ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm floor, the floor wins and the feet on that ring still overlap their neighbours\n` : '');
 }
 
 /* THE INNER-RING LINE (Eva, Sep 3) — the read-out that stands where a derived
@@ -2275,8 +2283,37 @@ function seamLine(petals) {
    the reference and thickens at its root, with the hub the root sits on.
    Absent at or under the reference (a line that cannot fire reads as
    absent). Reads every ring's representative petal's own record and the
-   hub's; computes nothing. Sepals do not take the law (a declared default),
-   and the line says so when there are sepals to say it about. */
+   hub's; computes nothing. Sepals and leaves take the law too (root support) and have their own lines below,
+   so this line is the petals' alone. */
+/* [Oct 21, root support: SEPALS and LEAVES take the law at their own length
+   (Eva's ruling 1). Each organ that tapers gets its own line, read off its own
+   built record: a sepal's root and the hub that carries it, a leaf's root and
+   the petiole that carries it (clamped and told where the stem cannot hold the
+   asked radius), and a compound leaf's worst leaflet with its stalk.] */
+function organRootTaperLines(sepalsBuilt, leavesBuilt, leafPlan, hub, mode) {
+  let out = '';
+  const ss = (sepalsBuilt || []).map((p) => p && p.thickness && p.thickness.rootTaper).filter(Boolean);
+  if (ss.length) {
+    const w = ss.reduce((a, t) => (t.rootFactor > a.rootFactor ? t : a), ss[0]);
+    out += `ROOT TAPER (sepal): a ${w.askedLengthMm.toFixed(1)} mm sepal is ${w.rootMm.toFixed(2)} mm thick at its root (×${w.rootFactor.toFixed(3)} the sheet), the same law as a petal at its own length (UNVALIDATED — no coupon has been printed)`
+         + (hub ? ` · the hub is ${hub.thickness.toFixed(2)} mm thick to carry it (${mode})` : '') + `\n`;
+  }
+  const L = (leavesBuilt || [])[0];
+  if (L && L.compound) {
+    const lf = L.leaflets.filter((q) => q.rootTaper);
+    if (lf.length) {
+      const w = lf.reduce((a, q) => (q.rootTaper.rootFactor > a.rootTaper.rootFactor ? q : a), lf[0]);
+      out += `ROOT TAPER (leaflet): a ${w.lengthMm.toFixed(1)} mm leaflet is ${w.rootTaper.rootMm.toFixed(2)} mm thick at its root (×${w.rootTaper.rootFactor.toFixed(3)}) on a ${(2 * w.stalkRMm).toFixed(2)} mm stalk — the stalks stay the wire (the compound ruling), so a tapered leaflet's root is thicker than the rod that holds it · ${lf.length} of ${L.leaflets.length} leaflets taper (UNVALIDATED — no coupon has been printed)\n`;
+    }
+  } else if (L && L.rootTaper) {
+    const pp = leafPlan ? (leafPlan.simplePetiole || leafPlan.lobedPetiole) : null;
+    out += `ROOT TAPER (leaf): a ${L.rootTaper.askedLengthMm.toFixed(1)} mm leaf blade is ${L.rootTaper.rootMm.toFixed(2)} mm thick at its root (×${L.rootTaper.rootFactor.toFixed(3)})`
+         + (leafPlan ? ` on a ${(2 * leafPlan.petioleR).toFixed(2)} mm petiole` : '')
+         + (pp && pp.clamped ? ` — the petiole is CLAMPED at the stem (${(2 * pp.radiusMm).toFixed(2)} of ${(2 * (pp.rootFloorMm ?? pp.askedMm)).toFixed(2)} mm asked: the rooted end must still fit the stem)` : '')
+         + ` (UNVALIDATED — no coupon has been printed)\n`;
+  }
+  return out;
+}
 function rootTaperLine(petals, fr, mode) {
   const ts = (petals || []).map((p) => p && p.thickness && p.thickness.rootTaper).filter(Boolean);
   if (!ts.length) return '';
@@ -3313,7 +3350,7 @@ function sepalTierLine(S, B, first, mode, tag = '') {
       : ` · size ${S.scale.toFixed(2)}x`)
     + (S.own && (S.own.lengthFloored || S.own.widthFloored) ? ' — FLOORED at the ruled minimum (told)' : '')
     + (first ? (Math.abs(first.length - first.askedLength) > 0.05 ? ` (${first.askedLength.toFixed(1)} mm asked, DRAWN ${first.length.toFixed(1)} mm — ${first.length < first.askedLength ? 'the tip floor shortens a narrow blade' : 'the apex nib runs past the asked length'})` : ` (${first.length.toFixed(1)} mm)`) : '')
-    + `\n     SEPAL FOOT ${tag}${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
+    + `\n     SEPAL FOOT ${tag}${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm — the arc each sepal owns at its ring)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
     + ` · ${footSurface}`
     + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
 }
@@ -3560,6 +3597,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
        + rootTaperLine(petals, built && built.hub ? { hub: built.hub } : fr, mode)
+       + (built ? organRootTaperLines(built.sepals ? built.sepals.tiers.flatMap((T) => T.built || []) : null, built.leavesBuilt, built.leaf, built.hub, mode) : '')
        + spineLine(petals, built ? built.petalsAll : null, String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer')
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
@@ -4491,6 +4529,9 @@ window.__bloomMetrics = () => ({
     lobed: lastLeaf.lobed ? JSON.parse(JSON.stringify(lastLeaf.lobed)) : null,
     /* the LOBED petiole's area law (S4b) — LF26's subject; null otherwise */
     lobedPetiole: lastLeaf.lobedPetiole ? { ...lastLeaf.lobedPetiole } : null,
+    /* (root support) the SIMPLE leaf's root-carrying petiole — LF18 / T6's
+       record of whether the stem clamped it; null where no root floor binds */
+    simplePetiole: lastLeaf.simplePetiole ? { ...lastLeaf.simplePetiole } : null,
     compound: lastLeaf.compound ? JSON.parse(JSON.stringify(lastLeaf.compound)) : null,
     /* PER BLADE, NOT PER LEAF (S3): every array below that describes a BLADE
        has one entry per emitted blade — a simple leaf's one, a compound
@@ -4977,8 +5018,10 @@ window.__bloomMetrics = () => ({
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing
-       still, and nothing reported it. See FOOT_MAX_WIDTH_MM. */
+       still, and nothing reported it. [Oct 21: the ceiling is the ring's own
+       room now — the foot cap's record rides beside it.] */
     widthClampedHigh: r.widthClampedHigh,
+    widthAskedMm: r.widthAskedMm, footArcMm: r.footArcMm, footCapRadiusMm: r.footCapRadiusMm, footSpanRad: r.footSpanRad, footCapped: r.footCapped, footArcUnderFloor: r.footArcUnderFloor,
     /* THE DEPTH TELEMETRY (Sep 3) — footRing()'s own two flags behind the
        read-out's RINGS NARROWER THAN A FOOT line, exposed so the panel gate
        asserts that line against the owner in both directions. */
