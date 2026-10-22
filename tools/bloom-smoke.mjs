@@ -1829,6 +1829,12 @@ export const SMOKE_BLOCKS = [
         path: 'TX6 refused with the word infill, nothing displaced, the read-out NOT BUILT; I0-I13 the infill built as before' },
       { label: 'TEXTURE: GATED — the two sliders at their maxima under NONE (the choice guard holds the bytes)',
         path: 'TX0 the two statements under the guard, no record; the byte partition holds the row' },
+      /* THE LOBED LEAF IS A SMOKE ROW BECAUSE THE EDGE GATE DRAWS FROM THIS LIST:
+         its E2_TURN_XFAIL entry (the untextured lobed leaf's own turn) is a
+         declaration nothing evaluates unless the row is here — the plain
+         gate said so, in the local preflight, before CI could. */
+      { label: 'TEXTURE: PEBBLE x a LOBED leaf (the blade declared OUT — refused, told)',
+        path: 'TX0 the leaf refused by name (lobed) and told, the petals relieved beside it; E2 the untextured lobed leaf\'s own declared turn, LF19-LF24 the chevron lattice unmoved' },
     ],
   },
 ];
