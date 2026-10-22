@@ -39,6 +39,7 @@
    =================================================================== */
 import fs from 'node:fs';
 import * as C from '../bloom-texture-lab-core.js';
+import * as L from '../bloom-texture-lab-lattice.js';
 import { DEFAULTS } from '../bloom-registry.js';
 import { MIN_FEATURE_MM } from '../bloom-geometry.js';
 
@@ -53,6 +54,11 @@ const PAIRS = !args.includes('--no-pairs');
 const ALL = ['default', 'whole', 'whole@0.6', 'infill', 'tube'];
 const ONLY = (arg('--only', ALL.join(','))).split(',');
 const QUICK = args.includes('--quick');
+/* --lattice (T2): the mesh is B's own lattice (bloom-texture-lab-lattice.js)
+   for every petal, sepal and leaf panel, T1's snapped split for the rest, and
+   B's direction on a lattice skin vertex is the EXACT sheet normal the lattice
+   evaluated it from — not the nearest ladder sample. --split is then ignored. */
+const LATTICE = args.includes('--lattice');
 /* --resume: the out file is rewritten after EVERY run with complete:false, and
    a resumed run skips every (state, type, H, arm, mode) already in it. A
    container restart then costs one run, not the sweep (CLAUDE.md: background
@@ -79,8 +85,8 @@ const RUNS = [];
 const ARMS = [['A', 'outward'], ['B', 'outward']];
 const B_MASKS = { maskBeads: true, maskHoleRims: true, maskFeet: true, maskCreases: true, fadeMm: 0.6 };
 
-const report = (RESUME && OUT && fs.existsSync(OUT)) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : { split: SPLIT, pairs: PAIRS, edgeMm: EDGE, every: EVERY, tMax: TMAX, floorMm: MIN_FEATURE_MM, holeBarMm: HOLE_BAR_MM, states: {} };
-if (report.split !== SPLIT) throw new Error(`--resume: ${OUT} was measured on the ${report.split} split, not ${SPLIT}`);
+const report = (RESUME && OUT && fs.existsSync(OUT)) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : { split: LATTICE ? 'lattice' : SPLIT, pairs: PAIRS, edgeMm: EDGE, every: EVERY, tMax: TMAX, floorMm: MIN_FEATURE_MM, holeBarMm: HOLE_BAR_MM, states: {} };
+if (report.split !== (LATTICE ? 'lattice' : SPLIT)) throw new Error(`--resume: ${OUT} was measured on the ${report.split} split, not ${SPLIT}`);
 report.complete = false;
 const save = () => { if (OUT) fs.writeFileSync(OUT, JSON.stringify(report, null, 1)); };
 const runKey = (r) => `${r.type}|${r.heightMm}|${r.arm}|${r.mode}`;
@@ -93,18 +99,19 @@ for (const name of ONLY) {
   const have = new Set(((report.states[name] || {}).runs || []).map(runKey));
   if (wanted.every((k) => have.has(k))) { console.log(`== ${name}: complete in ${OUT}, skipped`); continue; }
   const t0 = Date.now();
-  const soup = C.buildTagged(state);
   const edge = STATE_EDGE[name] ?? EDGE, lambda = STATE_LAMBDA[name] ?? 2.0;
-  const prep = C.prepare(soup, edge, { split: SPLIT, pairs: PAIRS });
+  let soup, prep;
+  if (LATTICE) { const B = await L.buildLattice(state, edge, { record: true }); soup = B.soup; prep = C.prepare(soup, edge, { lattice: B.ctx }); }
+  else { soup = C.buildTagged(state); prep = C.prepare(soup, edge, { split: SPLIT, pairs: PAIRS }); }
   const base = C.wallAndGap(prep, prep.P, { every: EVERY, tMax: TMAX });
   const cls = base.idx.map((v) => classOf(prep, v));
-  const st = report.states[name] = { shippedTris: soup.triCount, subdividedTris: prep.tri.length / 3, edgeMm: edge, lambdaMm: lambda, split: SPLIT, baselineCensus: C.edgeCensus(prep.P, prep.tri), baseline: {}, runs: (report.states[name] || {}).runs || [] };
+  const st = report.states[name] = { shippedTris: LATTICE ? C.buildTagged(state).triCount : soup.triCount, subdividedTris: prep.tri.length / 3, edgeMm: edge, lambdaMm: lambda, split: LATTICE ? 'lattice' : SPLIT, exactMidVertices: prep.exactMid, baselineCensus: C.edgeCensus(prep.P, prep.tri), baseline: {}, runs: (report.states[name] || {}).runs || [] };
   for (const c of CLASSES) {
     const w = [], g = [];
     base.idx.forEach((v, i) => { if (cls[i] === c) { w.push(base.wall[i]); g.push(base.gap[i]); } });
     if (w.length) st.baseline[c] = { n: w.length, minWall: Math.min(...w), underWall: w.filter((x) => x < MIN_FEATURE_MM).length, minGap: Math.min(...g) };
   }
-  console.log(`== ${name}: shipped ${soup.triCount} tris -> ${prep.tri.length / 3} at ${edge} mm, ${SPLIT} split (${Date.now() - t0} ms)`);
+  console.log(`== ${name}: shipped ${st.shippedTris} tris -> ${prep.tri.length / 3} at ${edge} mm, ${st.split}${LATTICE ? ` (${prep.exactMid} vertices on the exact sheet normal)` : ' split'} (${Date.now() - t0} ms)`);
   for (const type of typesFor) for (const H of heightsFor) for (const [arm, mode] of ARMS) {
     if (type !== 'pebble' && H !== 0.3) continue;
     if (have.has(`${type}|${H}|${arm}|${mode}`)) continue;

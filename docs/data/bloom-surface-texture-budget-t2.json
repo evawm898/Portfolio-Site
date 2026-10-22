@@ -1,0 +1,204 @@
+{
+ "budget": 1500000,
+ "edges": [
+  0.6,
+  0.4
+ ],
+ "rows": {
+  "default|0.6": {
+   "label": "default",
+   "edgeMm": 0.6,
+   "shippedTris": 24688,
+   "total": 91984,
+   "pctBudget": 6.1,
+   "native": {
+    "petal": 87376
+   },
+   "rest": {
+    "hub": 4608
+   },
+   "ms": 6752
+  },
+  "default|0.4": {
+   "label": "default",
+   "edgeMm": 0.4,
+   "shippedTris": 24688,
+   "total": 162064,
+   "pctBudget": 10.8,
+   "native": {
+    "petal": 152464
+   },
+   "rest": {
+    "hub": 9600
+   },
+   "ms": 8969
+  },
+  "whole|0.6": {
+   "label": "whole",
+   "edgeMm": 0.6,
+   "shippedTris": 59012,
+   "total": 185028,
+   "pctBudget": 12.3,
+   "native": {
+    "petal": 87376,
+    "leaf": 32004,
+    "sepal": 21690
+   },
+   "rest": {
+    "hub": 4992,
+    "stem": 20242,
+    "leaf": 744,
+    "stamen": 16080,
+    "style": 1900
+   },
+   "ms": 12088
+  },
+  "whole|0.4": {
+   "label": "whole",
+   "edgeMm": 0.4,
+   "shippedTris": 59012,
+   "total": 326014,
+   "pctBudget": 21.7,
+   "native": {
+    "petal": 152464,
+    "leaf": 55476,
+    "sepal": 47250
+   },
+   "rest": {
+    "hub": 12000,
+    "stem": 30580,
+    "leaf": 1044,
+    "stamen": 24000,
+    "style": 3200
+   },
+   "ms": 18441
+  },
+  "infill|0.6": {
+   "label": "infill",
+   "edgeMm": 0.6,
+   "shippedTris": 108928,
+   "total": 217712,
+   "pctBudget": 14.5,
+   "native": {
+    "petal": 213104
+   },
+   "rest": {
+    "hub": 4608
+   },
+   "ms": 21503
+  },
+  "infill|0.4": {
+   "label": "infill",
+   "edgeMm": 0.4,
+   "shippedTris": 108928,
+   "total": 320400,
+   "pctBudget": 21.4,
+   "native": {
+    "petal": 310800
+   },
+   "rest": {
+    "hub": 9600
+   },
+   "ms": 26694
+  },
+  "tube|0.6": {
+   "label": "tube",
+   "edgeMm": 0.6,
+   "shippedTris": 24672,
+   "total": 85088,
+   "pctBudget": 5.7,
+   "native": {
+    "petal": 58464
+   },
+   "rest": {
+    "hub": 4608,
+    "tube": 22016
+   },
+   "ms": 5502
+  },
+  "tube|0.4": {
+   "label": "tube",
+   "edgeMm": 0.4,
+   "shippedTris": 24672,
+   "total": 146528,
+   "pctBudget": 9.8,
+   "native": {
+    "petal": 100672
+   },
+   "rest": {
+    "hub": 9600,
+    "tube": 36256
+   },
+   "ms": 7874
+  },
+  "INFILL: x 40 petals x 3 whorls|0.6": {
+   "label": "INFILL: x 40 petals x 3 whorls",
+   "edgeMm": 0.6,
+   "shippedTris": 1035632,
+   "total": 1880512,
+   "pctBudget": 125.4,
+   "native": {
+    "petal": 1843360
+   },
+   "rest": {
+    "hub": 37152
+   },
+   "ms": 198723
+  },
+  "INFILL: x 40 petals x 3 whorls|0.4": {
+   "label": "INFILL: x 40 petals x 3 whorls",
+   "edgeMm": 0.4,
+   "shippedTris": 1035632,
+   "total": 2940832,
+   "pctBudget": 196.1,
+   "native": {
+    "petal": 2861920
+   },
+   "rest": {
+    "hub": 78912
+   },
+   "ms": 266227
+  },
+  "whole bloom x 40 petals x 3 whorls|0.6": {
+   "label": "whole bloom x 40 petals x 3 whorls",
+   "edgeMm": 0.6,
+   "shippedTris": 401956,
+   "total": 1001892,
+   "pctBudget": 66.8,
+   "native": {
+    "petal": 870160,
+    "leaf": 32004,
+    "sepal": 21690
+   },
+   "rest": {
+    "hub": 39072,
+    "stem": 20242,
+    "leaf": 744,
+    "stamen": 16080,
+    "style": 1900
+   },
+   "ms": 67351
+  },
+  "whole bloom x 40 petals x 3 whorls|0.4": {
+   "label": "whole bloom x 40 petals x 3 whorls",
+   "edgeMm": 0.4,
+   "shippedTris": 401956,
+   "total": 1795890,
+   "pctBudget": 119.7,
+   "native": {
+    "petal": 1546960,
+    "leaf": 55476,
+    "sepal": 46790
+   },
+   "rest": {
+    "hub": 87840,
+    "stem": 30580,
+    "leaf": 1044,
+    "stamen": 24000,
+    "style": 3200
+   },
+   "ms": 100942
+  }
+ },
+ "complete": true
+}

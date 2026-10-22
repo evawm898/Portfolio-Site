@@ -1307,6 +1307,22 @@ texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-co
 - **T1's open questions for T2/T5 are §11.7 (Q14–Q16)**: T2's bar against 2A/e² is not reachable by a
   refinement of the shipped lattice; whether B refines the bore at all; the split's counts differ between
   Chromium and Node on the whole bloom, so a T2 sub-lattice count must come from engine-agreed quantities.
+  **Q14 RULED (Oct 22): T2's bar is the CONFORMING FLOOR (TQ1's), never a typed ratio of 2A/e²** — §10's
+  "near 99,000" is struck.
+- **T2 IS DONE AS A PROTOTYPE (Oct 22, §12 of the doc) — read §12.1 before porting it.**
+  `bloom-texture-lab-lattice.js` is a runtime-patched COPY of `bloom-geometry.js` (anchored edits, each
+  exactly once): `emitPanel` dispatches to the shipped text verbatim (OFF) or to `emitPanelLattice`, which
+  inserts sub-rows through the organ's own `rowAt(u)` (petal/sepal `petalSurface`, leaf `leafSurface`) and
+  sub-columns through `row.sect(v)`, every per-row decision taken on the SHIPPED rows so the ladder's skin
+  vertices are bit-identical. Not refined in u: the petal foot and seam gap, buckled petals, tube-lobe rows;
+  the tube ring, hub, stem and rods stay on T1's split. `node tools/bloom-texture-lab-lattice.mjs` is TX0–TX4
+  (`--control` 9 legs, among them a moved shipped row and sub-points on flat chords; `--browser` engine
+  agreement; `--budget`). Measured: the default 162,064 at 0.4 mm (T1 183,168), the corners 196 % / 120 %
+  (Q9 open); Node and Chromium agree on all 12 rows (Q16 diagnosed: stamen edges exactly 0.6 mm — counts are
+  decided on lengths snapped to 2⁻²⁰ mm); B thins nothing on the lattice. Open: items 18–22 of §12.8 (strict
+  vs 2.0× floor; the infill cell region is WORSE than T1 on slivers; the tube ring has no row law).
+  **The measure's weld is per organ instance now** (`weld(soup, { groups })`): a global float32 weld merged
+  the lattice's 9 shells into 1 and read buried feet as the hub's material.
 - Plan: T1 split fix (prototype) → T2 own-coordinate lattice through `petalSurface` → T3 field, guard and
   outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
   Gate family **TX**.
