@@ -11588,8 +11588,8 @@ outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
 with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
 path-scoped to the lantern's files plus `bloom-curve.js`): `node
 tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
-mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P13 in
-Chromium, `--negative-control` twelve mutants of the page). Sheet: `node
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P14 in
+Chromium, `--negative-control` fifteen mutants of the page). Sheet: `node
 tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
 built. **Phase 2 is built too (doc §4): `lantern-pattern.js` lays out a scroll
 skeleton (a stem, stem-rooted volutes, fillers, a rim band) or a lattice per
@@ -11599,5 +11599,13 @@ splitting a stroke, never by re-tracing a raster), thin paper, narrow cuts and
 keep-outs — with every finding clickable into the Flat view; the folded view
 carries the cuts as per-type alpha maps on UVs the geometry emits in the facet
 frame.** `node tools/verify-lantern-pattern.mjs` (PA0–PA10, ten mutants) rides
-beside the other two, and the page gate is P0–P13 with twelve mutants. The
-material model, export, backing, instructions and the lit view are phases 3–6.
+beside the other two. **Phase 3 is built (doc §5, §6, §8): `lantern-material.js`
+derives every cutting rule from the stock's caliper with floors (starting values
+— the default stock reproduces phase 2's numbers exactly, so nothing moved), and
+`lantern-export.js` splits a half that does not fit the bed into one module per
+point on the VALLEY folds with a seam tab and a label pair per seam, nests the
+pieces on shelves, and writes one SVG per sheet (CUT / SCORE / PERF / ENGRAVE)
+zipped with a README and the design.** `node tools/verify-lantern-export.mjs`
+(X0–X8, eleven mutants) is the third Node gate; the page gate is P0–P14 with
+fifteen mutants. Backing, instructions, the coupon and the lit view are phases
+4–6.

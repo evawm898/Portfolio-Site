@@ -41,12 +41,19 @@
          and a click on the drawing restores the whole sheet.
      P13 the random pattern button yields a pattern with no island and the
          note says so; the pattern survives a reload.
+     P14 MATERIAL AND EXPORT: the defaults open judged (thin notes listed on
+         the first paint); a heavier stock raises every rule and re-lays the
+         pattern on them (the bridge in the read-out moves); the default bed
+         splits the halves into modules and a 900 × 600 bed does not; the ZIP
+         download holds one SVG per sheet, a README and the design; the PNG
+         download is a PNG; a bed too small reports a problem.
 
    --negative-control re-serves deliberately broken copies of lantern.js and
    requires each to fail the check that names it. Every anchor is checked
    first. */
 
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { openLantern, REPO } from './lantern-page-harness.mjs';
 import * as G from '../lantern-geometry.js';
@@ -58,7 +65,7 @@ const ONLY = (args.find((a) => a.startsWith('--only=')) || '').slice(7).split(',
 async function download(page, trigger) {
   const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), trigger()]);
   const p = await d.path();
-  return { name: d.suggestedFilename(), text: fs.readFileSync(p, 'utf8') };
+  return { name: d.suggestedFilename(), path: p, text: /\.(svg|json|txt)$/.test(d.suggestedFilename()) ? fs.readFileSync(p, 'utf8') : '' };
 }
 
 async function run(override = null) {
@@ -242,6 +249,30 @@ async function run(override = null) {
       const st2 = await T(() => window.__lantern.state());
       ok(pat.counts.island === 0 && /random/.test(note) && st2.patMode === st.patMode && st2.patSeed === st.patSeed, `P13: random pattern — ${st.patMode} #${st.patSeed}, ${pat.counts.island} islands, note "${note}"; after a reload ${st2.patMode} #${st2.patSeed}`);
     }
+    // P14 material and export
+    {
+      await page.click('#resetAll'); await T(() => window.__lantern.flush());
+      const first = await T(() => ({ validated: window.__lantern.pattern().validated, flags: window.__lantern.flags().map((f) => f.id) }));
+      const r0 = await T(() => window.__lantern.rules()), pat0 = await T(() => window.__lantern.pattern());
+      await T(() => window.__lantern.set('material', 'cover300'));
+      const r1 = await T(() => window.__lantern.rules()), txt = await T(() => window.__lantern.rulesText()), pat1 = await T(() => window.__lantern.pattern());
+      const planG = await T(() => window.__lantern.plan());
+      await T(() => window.__lantern.set('bed', 'laser900'));
+      const planL = await T(() => window.__lantern.plan());
+      const zip = await download(page, () => page.click('#exportZip'));
+      const JSZip = createRequire(import.meta.url)(path.join(REPO, 'node_modules/jszip'));   // the UMD build, through require
+      const z = await JSZip.loadAsync(fs.readFileSync(zip.path));
+      const names = Object.keys(z.files);
+      const svgs = names.filter((n) => /\.svg$/.test(n)), readme = names.find((n) => /README/.test(n)), json = names.find((n) => /\.json$/.test(n));
+      const sheet1 = svgs.length ? await z.file(svgs[0]).async('string') : '';
+      const png = await download(page, () => page.click('#exportPng'));
+      const pngHead = fs.readFileSync(png.path).subarray(0, 8).toString('hex');
+      await T(() => window.__lantern.set('bed', 'k40'));
+      const small = await T(() => ({ plan: window.__lantern.plan(), badge: document.getElementById('flagCount').textContent, bed: window.__lantern.flags().find((f) => f.id === 'bed') }));
+      await T(() => window.__lantern.set('bed', 'glowforge')); await T(() => window.__lantern.set('material', 'card200'));
+      ok(first.validated && first.flags.includes('thin') && r1.bridge > r0.bridge && r1.rimMargin > r0.rimMargin && new RegExp(`bridge ${r1.bridge}`).test(txt) && pat1.validated && pat1.cuts[0] !== pat0.cuts[0] && planG.split && planG.sheets > 2 && !planL.split && planL.sheets === 2 && svgs.length === planL.sheets && readme && json && /id="CUT"/.test(sheet1) && /id="PERF"/.test(sheet1) && pngHead === '89504e470d0a1a0a' && !small.plan.fitsBed && small.bed && /bad/.test(small.bed.kind) && /problem/.test(small.badge),
+        `P14: first paint judged (${first.flags.join(', ')}); cover300 → bridge ${r0.bridge} → ${r1.bridge}, rim margin ${r0.rimMargin} → ${r1.rimMargin}, read-out "${txt.slice(0, 40)}…", pattern re-laid on the new rules (${pat0.cuts[0]} → ${pat1.cuts[0]} cuts); Glowforge split=${planG.split} ${planG.sheets} sheets, 900×600 split=${planL.split} ${planL.sheets} sheets; zip holds ${svgs.length} svg + ${readme ? 'README' : 'no README'} + ${json ? 'design' : 'no design'}; png header ${pngHead}; K40: fits=${small.plan.fitsBed}, "${small.bed && small.bed.text.slice(0, 50)}…", badge "${small.badge}"`);
+    }
   } finally { await s.close(); }
   // P7b fresh profile and P8 phone
   {
@@ -270,6 +301,9 @@ const MUTANTS = [
   { id: 'an-island-is-not-a-problem', file: 'lantern.js', from: "if (pc.island) cutFindings.push({ kind: 'bad',", to: "if (pc.island) cutFindings.push({ kind: 'info',", breaks: ['P12'] },
   { id: 'a-finding-click-does-not-zoom', file: 'lantern.js', from: "if (n.issue) { li.title = 'show in the Flat view'; li.addEventListener('click', () => focusIssue(n.issue)); }", to: "if (n.issue) { li.title = 'show in the Flat view'; }", breaks: ['P12'] },
   { id: 'the-random-pattern-keeps-islands', file: 'lantern.js', from: "const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;", to: "const score = 0;", breaks: ['P13'] },
+  { id: 'a-preset-stock-keeps-the-old-caliper', file: 'lantern.js', from: "if (id === 'material' && value !== 'custom') { const m = MAT.MATERIALS.find((x) => x.id === value); state.gsm = m.gsm; state.caliper = m.t; }", to: "0;", breaks: ['P14'] },
+  { id: 'the-pattern-ignores-the-rules', file: 'lantern.js', from: "pattern = PAT.patternForModel(model, state, rules, { validate: commit || !pattern });", to: "pattern = PAT.patternForModel(model, state, PAT.RULES_DEFAULT, { validate: commit || !pattern });", breaks: ['P14'] },
+  { id: 'the-zip-drops-the-readme', file: 'lantern.js', from: "zip.file('README.txt', EXP.readme(model, plan, state, rules));", to: '0;', breaks: ['P14'] },
   { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13'] },
 ];
 

@@ -350,18 +350,66 @@ export is allowed with the warning in the message.
   commit (a slider's release), never mid-gesture, and the result is memoised
   on the facet and the pattern state.
 
-## 5. Material model (phase 3 — plan)
+## 5. Material model (phase 3 — built)
 
-One constants module labelled "starting values — confirm with test cuts".
-Presets by gsm / caliper; derived minimum bridge, minimum hole, fold keep-out,
-rim margin, spine width, tab width, kerf; a weight estimate and a sag warning.
-Formulas will be documented here when the module lands.
+`lantern-material.js` — **starting values, confirm with test cuts**; nothing
+here has been cut. Five stocks by gsm and caliper (kraft 120 / 0.16, card
+160 / 0.20, **card 200 / 0.25 the default**, bristol 250 / 0.32, cover 300 /
+0.38) and a custom stock taking its own numbers. Every rule is derived from
+the caliper `t` with a floor the cutters we know can hold, rounded to 0.05 mm:
 
-## 6. Modularization (phase 3 — plan)
+| rule | law | floor · ceiling | at the default |
+|---|---|---|---|
+| bridge (paper between cuts) | 4.8 t | 1.0 · 2.2 | 1.2 |
+| smallest hole | 6 t | 1.5 · 2.6 | 1.5 |
+| narrowest stroke | 4 t | 1.0 · 1.8 | 1.0 |
+| fold keep-out | 16 t | 3.5 · 6 | 4 |
+| rim margin | 20 t | 4.5 · 7 | 5 |
+| spine | 40 t | 9 · 14 | 10 |
+| glue tab | 32 t | 7 · 11 | 8 |
+| pattern stroke | 6.4 t | 1.5 · 2.4 | 1.6 |
 
-Any piece larger than the chosen bed is split per point (or per facet pair) on
-VALLEY folds, each seam with a glue tab and matching labels; gate: every module
-fits the bed with margin, every seam has a tab and a label pair.
+The default stock reproduces phase 2's `RULES_DEFAULT` number for number
+(gate X0), so the default pattern did not move. The geometry reads the tab
+width off the state; the pattern module reads the rules; the judge holds the
+pattern to them. Kerf is the machine's (laser 0.15, blade 0), **reported and
+not compensated** (ruling 15). Weight: paper area × gsm × (1 − cut share),
+about 49 g for the default star. Sag: a declared rule of thumb — a 200 gsm
+point holds 300 mm from centre to tip, scaled by the cube root of the caliper
+(stiffness goes as t³); the Checks list warns past it.
+
+## 6. Modularization (phase 3 — built)
+
+`lantern-export.js`. A half larger than the bed (less a 6 mm margin, either
+orientation) is split into **one module per point on the VALLEY folds**: the
+wedge from the apex out — the left edge, the tip, the right edge — with the
+apex as a point (front) or the sector of the opening (back). Each seam is the
+valley between modules j and j + 1 and carries a glue tab on module j's right
+valley side (tab width from the stock, tapered both ends, clear of the apex
+and of the rim tabs) and a label pair S_j engraved on both modules; the
+module's own name (F1 … / B1 …) sits on its ridge. The front's rim tabs stay
+on the module whose edge they belong to; the pattern's cuts come with their
+point. A piece too large for the bed even as a module (the K40's 288 × 188
+mm against a 20″ star's 273 × 194 mm module) is a PROBLEM in Checks and is
+still placed on a sheet of its own, never dropped.
+
+Nesting is shelves of rotated bounding boxes: each piece is tried at the four
+quarter turns and, for a module, with its ridge laid flat, the orientation
+with the lowest box going first-fit-decreasing onto the lowest shelf it fits.
+The utilisation is reported (about 55 % on the Glowforge for the default: 11
+pieces over 6 sheets; two sheets whole on 900 × 600).
+
+## 8. Export (phase 3 — built; the test grid and coupon are phase 4)
+
+Machine profiles: **laser** (mountains scored on SCORE, valleys perforated 1
+mm cut / 1 mm gap on PERF, the dashes centred so both ends are paper) and
+**blade** (both fold families on SCORE, PERF empty). Beds: K40, Glowforge
+(default), 600 × 400, 900 × 600, Cricut 12 × 12 and 12 × 24, A3, letter. One
+SVG per sheet in mm with LightBurn-style layers CUT red / SCORE blue / PERF
+green / ENGRAVE black (the labels), zipped with a README (the layer key, the
+seam order, the rules used, LED only) and the design JSON; the folded view as
+a PNG from the canvas itself. The single-half SVGs stay as the quick path.
+JSZip is loaded on the first click from the pin `cards.html` uses.
 
 ## 7. Backing (phase 4 — plan)
 
@@ -411,7 +459,7 @@ Phone width stacks the preview over the panel.
 
 1. Geometry core, page shell, Flat + Folded, curve editor, presets, gates.
 2. Pattern system + validity — built (§4).
-3. Material model + modularization + export.
+3. Material model + modularization + export — built (§5, §6, §8).
 4. Backing + settings + test grid + coupon + instructions + ring.
 5. Lit simulation.
 6. Stretch: faceted-curve profile, SVG import, wall band, collapsible lock.
@@ -480,6 +528,21 @@ to the lantern's own files (and `bloom-curve.js`, which it imports).
     on an odd count the pattern / plain rhythm breaks once at the last point.
 13. The folded view shows the cuts as holes with the far half visible through
     them (no light yet — phase 5).
+14. **The material laws (§5) are linear in the caliper with floors**, chosen
+    so the default stock reproduces phase 2's numbers; the coupon (phase 4)
+    is what should move them. The sag rule (300 mm at 0.25 mm, cube-root
+    scaling) is a guess.
+15. **Kerf is reported, not compensated.** Offsetting every cut by half a
+    kerf is one line in the sheet writer but changes every bridge by the
+    same amount; the judge would then hold the pattern to the post-kerf
+    width. Left for the coupon to decide.
+16. Modules split per POINT on the valleys (one seam tab per valley, on the
+    right side, labels S1–SN). The alternative — per facet pair, on the
+    ridges — was not built: a ridge seam would cut the pattern's spine.
+17. The default bed is the Glowforge (495 × 279), which splits a 20″ star
+    into modules; on a 20″ star the K40 cannot cut even a module.
+18. Nesting is shelf packing by bounding box, about 55 % utilisation; a
+    polygon nest would save sheets and is phase 6 territory.
 
 ## 15. Out of scope, named
 

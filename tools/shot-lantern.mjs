@@ -6,7 +6,7 @@
    for looking at. Writes <dir>/*.png and <dir>/index.html. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { openLantern } from './lantern-page-harness.mjs';
+import { openLantern, REPO } from './lantern-page-harness.mjs';
 
 const OUT = path.resolve(process.argv[2] || 'lantern-sheet');
 fs.mkdirSync(OUT, { recursive: true });
@@ -47,6 +47,22 @@ save('pattern-panel.png', await shotOf('#secPattern'), 'the Pattern section: pre
 await page.locator('#secChecks').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('pattern-checks.png', await shotOf('#secChecks'), 'Checks with auto-bridge off: the island as a problem, the thin-paper notes, each clickable into the Flat view');
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true })); await T(() => window.__lantern.view('folded'));
+await page.locator('#secMaterial').evaluate((d) => { d.open = true; }); await page.locator('#secMaterial').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('material.png', await shotOf('#secMaterial'), 'Material & Machine: the stock, the machine, the bed, and every rule derived from the caliper (starting values)');
+await page.locator('#secExport').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('export.png', await shotOf('#secExport'), 'Export: the plan on the default Glowforge bed — the halves split into point modules, pieces and sheets, the paper and its weight; the ZIP, the PNG, the quick half SVGs');
+{
+  const sheets = await T(() => window.__lantern.sheetSvgs().length);
+  const zip = await (async () => { const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click('#exportZip')]); return d.path(); })();
+  const JSZip = (await import('node:module')).createRequire(import.meta.url)(path.join(REPO, 'node_modules/jszip'));
+  const z = await JSZip.loadAsync(fs.readFileSync(zip));
+  const first = Object.keys(z.files).find((n) => /sheet-1-of/.test(n));
+  const svg = (await z.file(first).async('string')).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1320" height="744" style="background:#f4f2ec"');
+  const sheetPage = await s.browser.newPage({ viewport: { width: 1340, height: 764 }, deviceScaleFactor: 2 });
+  await sheetPage.setContent(`<body style="margin:10px;background:#333">${svg}</body>`); await sheetPage.waitForTimeout(100);
+  save('sheet-1.png', await sheetPage.screenshot(), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
+  await sheetPage.close();
+}
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
 save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');
