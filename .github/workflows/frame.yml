@@ -21,6 +21,7 @@ on:
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
+      - tools/shot-frame-skeletons.mjs
       - docs/frame-charter.md
       - .github/workflows/frame.yml
   push:
@@ -38,6 +39,7 @@ on:
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
+      - tools/shot-frame-skeletons.mjs
       - docs/frame-charter.md
   workflow_dispatch: {}
 
@@ -69,10 +71,12 @@ jobs:
       # Phase 2: the relief STL gate (Node only), with the SVG byte-identity
       # clause against the commit the relief was built on. fetch-depth 0 so
       # the base commit is reachable for the worktree.
-      - name: Relief gate (watertight, connected, registered, embedded, floored) + SVG bytes vs 8db018c
+      # Phase 2b: every arch row's SVG AND STL bytes against e759041 (phase 2's
+      # merge), the base the closed skeletons were built on.
+      - name: Relief gate (watertight, connected, registered, embedded, floored, seam) + arch SVG and STL bytes vs e759041
         run: |
-          git fetch --depth=1 origin 8db018ccf70efae42d58a3026702ef69ae2aee83
-          git worktree add /tmp/frame-base 8db018ccf70efae42d58a3026702ef69ae2aee83
+          git fetch --depth=1 origin e7590411d20754b84aef66845358d0b76f18d9d8
+          git worktree add /tmp/frame-base e7590411d20754b84aef66845358d0b76f18d9d8
           node tools/verify-frame-relief.mjs --base /tmp/frame-base
       - name: Relief negative control
         run: node tools/verify-frame-relief.mjs --negative-control

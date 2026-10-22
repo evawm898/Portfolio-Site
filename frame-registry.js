@@ -14,23 +14,43 @@ export const SECTIONS = [
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen = null, tier = 'standard') =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen, tier });
 
-const hasMullions = (p) => p.mullions > 0;
+const isArch = (p) => p.skeleton === 'arch';
+const isRect = (p) => p.skeleton === 'rect';
+const isOval = (p) => p.skeleton === 'oval';
+const hasMullions = (p) => isArch(p) && p.mullions > 0;
+const sizedCorner = (p) => isRect(p) && p.cornerTreatment !== 'mitre';
 
 export const PARAM_SPEC = [
-  // --- 1. skeleton — phase 1 is the arch only; rectangle and oval are later
-  //     skeleton types that feed the same sweep (charter §2). The choice is
-  //     declared now so the id and the section do not move when they land.
+  // --- 1. skeleton — three types feeding ONE sweep, ONE relief, ONE SVG
+  //     (charter §2): the arch (open-bottomed / silled), and the rectangle
+  //     and the oval, which are CLOSED LOOPS — one spine with no start cap,
+  //     no duplicated vertex and no seam (phase 2b). Each control below that
+  //     belongs to one type is hidden AND inert under the others.
   { id: 'skeleton', section: 'skeleton', label: 'Type', kind: 'choice', default: 'arch',
-    options: [['arch', 'Arch — Gothic window']] },
-  R('width', 'skeleton', 'Width', 60, 400, 1, 180, 'mm'),
+    options: [['arch', 'Arch — Gothic window'], ['rect', 'Rectangle — frame'], ['oval', 'Oval / circle — frame']] },
+  // arch and rectangle: between the CENTRELINES of the two side bands. The
+  // oval takes its width from its aspect instead, so it hides this.
+  R('width', 'skeleton', 'Width', 60, 400, 1, 180, 'mm', (p) => !isOval(p)),
+  // the OVERALL height: the drawing's outer bottom (y = 0) to the arch's
+  // centreline apex, or to the frame's outer top.
   R('height', 'skeleton', 'Height', 80, 600, 1, 340, 'mm'),
   // 0 = semicircular (centres at the midpoint), 0.5 = equilateral (each centre
   // at the opposite springing), 1 = lancet (centres a full span past it).
-  R('pointedness', 'skeleton', 'Pointedness', 0, 1, 0.01, 0.5),
-  R('mullions', 'skeleton', 'Mullions', 0, 4, 1, 2),
+  R('pointedness', 'skeleton', 'Pointedness', 0, 1, 0.01, 0.5, '', isArch),
+  R('mullions', 'skeleton', 'Mullions', 0, 4, 1, 2, '', isArch),
   R('mullionWidth', 'skeleton', 'Mullion width (× molding)', 0.3, 1, 0.01, 0.6, '', hasMullions),
-  { id: 'sill', section: 'skeleton', label: 'Sill', kind: 'choice', default: 'plain',
+  { id: 'sill', section: 'skeleton', label: 'Sill', kind: 'choice', default: 'plain', visibleWhen: isArch,
     options: [['none', 'None — open bottom'], ['plain', 'Plain'], ['stepped', 'Stepped']] },
+  // the rectangle's corners — where Gothic and baroque frames differ most.
+  // mitre: a square mitred corner; rounded: a quarter circle of cornerSize
+  // (centreline radius); notched: the corner stepped INWARD by cornerSize (a
+  // square cut); eared: the corner stepped OUTWARD by cornerSize (a crossette).
+  { id: 'cornerTreatment', section: 'skeleton', label: 'Corners', kind: 'choice', default: 'mitre', visibleWhen: isRect,
+    options: [['mitre', 'Square — mitred'], ['rounded', 'Rounded'], ['notched', 'Notched — stepped in'], ['eared', 'Eared — stepped out']] },
+  R('cornerSize', 'skeleton', 'Corner size', 2, 80, 0.5, 24, 'mm', sizedCorner),
+  // the oval's centreline width ÷ height. 1.00 is the circle — the 1:1 case
+  // of the one oval, never a separate type.
+  R('aspect', 'skeleton', 'Aspect (width ÷ height)', 0.4, 2.5, 0.01, 0.75, '', isOval),
 
   // --- 2. molding — the cross-section profile swept along every spine. The
   //     profile's SHAPE is the editor's state (frame.js `profile`), not a
@@ -63,8 +83,13 @@ export const PARAM_SPEC = [
   R('printHeight', 'print', 'Overall height', 40, 600, 1, 180, 'mm'),
   R('plateThickness', 'print', 'Back plate', 0.5, 6, 0.1, 2, 'mm'),
   R('reliefScale', 'print', 'Relief depth (× profile)', 0.2, 3, 0.05, 1),
-  { id: 'lights', section: 'print', label: 'Lights', kind: 'choice', default: 'pierced',
-    options: [['pierced', 'Pierced — open'], ['backed', 'Backed — a plate behind']] },
+  // the interior: the arch's lights (ruled pierced, phase 2 ruling 4) or a
+  // frame's opening (its default NOT ruled — phase 2b asks from the sheet).
+  // pierced = open; backed = a plate behind, its face at the plate thickness;
+  // recessed = the same plate at the MIN_FEATURE_MM floor, so the opening
+  // reads deeper by the difference (told when there is none).
+  { id: 'lights', section: 'print', label: 'Interior', kind: 'choice', default: 'pierced',
+    options: [['pierced', 'Open — pierced'], ['backed', 'Backed — a plate behind'], ['recessed', 'Recessed — a thin plate, set deep']] },
 ];
 
 /* The minimum printable feature, in millimetres. AN ASSUMPTION: the print
@@ -114,3 +139,41 @@ export const HATCH_WEIGHT_STEPS = 6;
 /* Depth of the profile's own sampling across the band. One owner: the sweep,
    the shading, the crease finder and the editor's drawn curve all read this. */
 export const PROFILE_SAMPLES = 48;
+
+/* NAMED SKELETON ANCHORS (phase 2b) — the points ornament will grow from in
+   phase 3. Declared here, per skeleton type, so a consumer names an anchor
+   rather than restating where it is; frame-geometry's skeleton builders put
+   every one ON a spine (a vertex, or the sill's own segment) and the gate
+   holds the list to this declaration both ways and the mirrored pairs to
+   x -> -x to the double. Conditional anchors (the sill's) carry `when`. */
+export const ANCHORS = {
+  arch: [
+    { id: 'apex', what: 'the head\'s apex — the mitred join of its two arcs' },
+    { id: 'springL', what: 'the left springing — the jamb\'s top, where the head starts' },
+    { id: 'springR', what: 'the right springing' },
+    { id: 'sideL', what: 'the left jamb\'s midpoint' },
+    { id: 'sideR', what: 'the right jamb\'s midpoint' },
+    { id: 'bottomCentre', what: 'the sill\'s centre', when: (p) => p.sill !== 'none' },
+    { id: 'sillL', what: 'the sill\'s left end', when: (p) => p.sill !== 'none' },
+    { id: 'sillR', what: 'the sill\'s right end', when: (p) => p.sill !== 'none' },
+  ],
+  rect: [
+    { id: 'topCentre', what: 'the top side\'s midpoint' },
+    { id: 'bottomCentre', what: 'the bottom side\'s midpoint — the loop\'s own start' },
+    { id: 'sideL', what: 'the left side\'s midpoint' },
+    { id: 'sideR', what: 'the right side\'s midpoint' },
+    { id: 'cornerTL', what: 'the top-left corner — the vertex on its bisector (the mitre, the arc\'s middle, the notch\'s or the ear\'s diagonal step)' },
+    { id: 'cornerTR', what: 'the top-right corner' },
+    { id: 'cornerBL', what: 'the bottom-left corner' },
+    { id: 'cornerBR', what: 'the bottom-right corner' },
+  ],
+  oval: [
+    { id: 'topCentre', what: 'the top of the oval' },
+    { id: 'bottomCentre', what: 'the bottom of the oval — the loop\'s own start' },
+    { id: 'sideL', what: 'the left end of the oval' },
+    { id: 'sideR', what: 'the right end of the oval' },
+  ],
+};
+/* Mirror pairs: an anchor and its image under x -> -x (the y axis is every
+   skeleton's mirror line). */
+export const ANCHOR_MIRRORS = [['springL', 'springR'], ['sideL', 'sideR'], ['sillL', 'sillR'], ['cornerTL', 'cornerTR'], ['cornerBL', 'cornerBR']];

@@ -141,7 +141,18 @@ function writeReadout() {
   const { info, box, params: p } = model;
   const tone = toneAcross(model.prof, p);
   let tmin = Infinity, tmax = -Infinity; for (const v of tone) { tmin = Math.min(tmin, v); tmax = Math.max(tmax, v); }
-  const lights = info.lights.length ? `${info.lights.length} lights, sub-arches spring at <b>${info.subSpringY.toFixed(1)} mm</b>` : 'one light, no mullions';
+  // the skeleton's own lines: the arch's spring line and lights, or a
+  // closed frame's centreline, corners and seam
+  let skelLines;
+  if (info.kind === 'arch') {
+    const lights = info.lights.length ? `${info.lights.length} lights, sub-arches spring at <b>${info.subSpringY.toFixed(1)} mm</b>` : 'one light, no mullions';
+    skelLines = `spring line <b>${info.springY.toFixed(1)} mm</b>, apex <b>${info.apexY.toFixed(1)} mm</b>, arc radius <b>${info.R.toFixed(1)} mm</b>\n${lights}`;
+  } else if (info.kind === 'rect') {
+    skelLines = `rectangle, centreline <b>${(2 * info.a).toFixed(1)} × ${(2 * info.b).toFixed(1)} mm</b>, corners <b>${p.cornerTreatment}</b>${p.cornerTreatment !== 'mitre' ? ` <b>${info.cornerSize.toFixed(1)} mm</b>` : ''}\nclosed loop, <b>${model.spines[0].pts.length}</b> vertices, seam at the bottom centre`;
+  } else {
+    skelLines = `${Math.abs(info.aspect - 1) < 1e-12 ? 'circle' : 'oval'}, centreline <b>${(2 * info.A).toFixed(1)} × ${(2 * info.B).toFixed(1)} mm</b> (aspect <b>${info.aspect.toFixed(2)}</b>), least centreline radius <b>${info.minRadius.toFixed(1)} mm</b>\nclosed loop, <b>${model.spines[0].pts.length}</b> vertices at ${1.5}° of turning, seam at the bottom centre`;
+  }
+  skelLines += `\nanchors: ${Object.keys(info.anchors).join(', ')}`;
   const warn = info.clamped.map((c) => `<span class="warn">CLAMPED — ${c}</span>`).join('\n');
   let wmin = Infinity, wmax = -Infinity, nHatch = 0, nCross = 0, crossBands = 0;
   for (const b of model.bands) {
@@ -161,13 +172,12 @@ function writeReadout() {
   ].join('\n');
   const reliefLine =
     `relief <b>${r.widthMm.toFixed(1)} × ${r.heightMm.toFixed(1)} × ${r.depthMm.toFixed(1)} mm</b> (scale ${r.scale.toFixed(3)}), <b>${r.triangles}</b> triangles · `
-    + `band <b>${r.bandW.toFixed(2)} mm</b>${p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · lights <b>${p.lights}</b>\n`
+    + `band <b>${r.bandW.toFixed(2)} mm</b>${info.kind === 'arch' && p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · interior <b>${p.lights}</b>${r.panelT != null ? ` (${r.panelT.toFixed(2)} mm plate)` : ''}\n`
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   document.getElementById('readout').innerHTML =
     `${reliefLine}\n`
     + `drawing <b>${(box.x1 - box.x0).toFixed(1)} × ${(box.y1 - box.y0).toFixed(1)} mm</b>, <b>${model.strokes}</b> strokes\n`
-    + `spring line <b>${info.springY.toFixed(1)} mm</b>, apex <b>${info.apexY.toFixed(1)} mm</b>, arc radius <b>${info.R.toFixed(1)} mm</b>\n`
-    + `${lights}\n`
+    + `${skelLines}\n`
     + `shade across the band <b>${tmin.toFixed(2)}–${tmax.toFixed(2)}</b> darkness (${tmax - tmin < 1e-9 ? 'uniform — a flat face' : 'graded — the profile turns'})\n`
     + `${weightLine}\n${crossLine}\n`
     + `profile <b>${p.profilePreset}</b>, ${model.profile.length} points · build <b>${stats.buildMs.toFixed(1)} ms</b> + relief <b>${stats.reliefMs.toFixed(1)} ms</b>`
@@ -180,8 +190,8 @@ function download(name, data, type) {
   const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-document.getElementById('exportSvg').addEventListener('click', () => download(`frame-arch-${params.profilePreset}.svg`, exportSvg(model).svg, 'image/svg+xml'));
-document.getElementById('exportStl').addEventListener('click', () => download(`frame-arch-${params.profilePreset}.stl`, exportStl(relief), 'model/stl'));
+document.getElementById('exportSvg').addEventListener('click', () => download(`frame-${params.skeleton}-${params.profilePreset}.svg`, exportSvg(model).svg, 'image/svg+xml'));
+document.getElementById('exportStl').addEventListener('click', () => download(`frame-${params.skeleton}-${params.profilePreset}.stl`, exportStl(relief), 'model/stl'));
 
 /* ---------------- test chrome (read by tools/verify-frame.mjs, tools/verify-frame-relief.mjs, the sheets) ---------------- */
 window.__frame = {
@@ -198,7 +208,7 @@ window.__frame = {
   setView: (name) => setView(name),
   view3dInk: () => (viewer ? viewer.ink() : null),
   pinCamera: (v) => { pinnedCamera = !!v; if (viewer && v) { viewer.frame(v); viewer.render(); } },
-  model: () => ({ info: model.info, box: model.box, strokes: model.strokes, bands: model.bands.map((b) => ({ id: b.id, hatch: b.hatch.length, cross: b.cross.length, creases: b.creases.length, tone: b.tone, weights: b.hatch.map((h) => h.weight) })) }),
+  model: () => ({ info: { ...model.info, anchors: Object.fromEntries(Object.entries(model.info.anchors).map(([k, a]) => [k, { spine: a.spine, index: a.index, pt: a.pt }])) }, box: model.box, strokes: model.strokes, bands: model.bands.map((b) => ({ id: b.id, hatch: b.hatch.length, cross: b.cross.length, creases: b.creases.length, tone: b.tone, weights: b.hatch.map((h) => h.weight) })) }),
   setAdvanced: (on) => setAdvanced(on),
   readout: () => document.getElementById('readout').textContent,
   controls: () => Object.fromEntries(PARAM_SPEC.map((s) => [s.id, !ctrlEl[s.id].hidden])),

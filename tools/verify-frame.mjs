@@ -59,7 +59,12 @@
         preset; flat within 0.06 of uniform, cove darker at the outer bin. Printed beside part one's
         geometric figures, which are the same claim from the other side.
 
-   --negative-control  eleven mutations of frame-geometry.js, each served to
+   --negative-control  twenty mutations of frame-geometry.js (phase 2b adds
+                       nine: the seam offset 0.1 mm on the oval and on the
+                       rectangle, a hatch line cut at the seam, a corner not
+                       mitred, the oval sampled by parameter, the aspect
+                       unread, an arch control leaking into the rectangle, an
+                       anchor off its spine, a corner clamp not told), each served to
                        part one through a copy in the repo root (it imports
                        ./frame-registry.js) and required to redden exactly the
                        clauses it names. Part two is NOT mutated: say so
@@ -248,23 +253,212 @@ async function partOne(G, R, label = 'shipped') {
   rec('H1 cross-hatch IFF the band\'s own darkness exceeds the threshold: none at 1, all at 0, every line above the threshold', noCross && allCross && iffBad === 0 && belowBad === 0, hDetail.slice(0, 3).join('; ') || `${nCross} cross lines on ${crossBands} of ${allBands} bands at ${R.DEFAULTS.crossHatchThreshold}; none at 1: ${noCross}, all at 0: ${allCross}`);
   rec('H2 every cross line is a chord of offsetCurve (both ends on an offset polyline of the band)', hBad === 0 && nCross > 0, `${hBad} endpoints off, over ${nCross} lines`);
 
+  // ---------------- phase 2b: the closed skeletons ----------------
+  const CLOSED = [
+    ['rect mitre', { skeleton: 'rect', cornerTreatment: 'mitre' }],
+    ['rect rounded', { skeleton: 'rect', cornerTreatment: 'rounded' }],
+    ['rect notched', { skeleton: 'rect', cornerTreatment: 'notched' }],
+    ['rect eared', { skeleton: 'rect', cornerTreatment: 'eared' }],
+    ['circle', { skeleton: 'oval', aspect: 1 }],
+    ['oval tall', { skeleton: 'oval', aspect: 0.5 }],
+    ['oval wide', { skeleton: 'oval', aspect: 2 }],
+  ];
+  // segment-segment proper intersection, for "the edge is a simple polygon"
+  const segX = (a, b, c, d) => {
+    const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+    const d1 = o(c, d, a), d2 = o(c, d, b), d3 = o(a, b, c), d4 = o(a, b, d);
+    return ((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9)) && ((d3 > 1e-9 && d4 < -1e-9) || (d3 < -1e-9 && d4 > 1e-9));
+  };
+  const selfCrossings = (poly) => { let n = 0; for (let i = 0; i < poly.length - 1; i++) for (let j = i + 2; j < poly.length - 1; j++) { if (i === 0 && j === poly.length - 2) continue; if (segX(poly[i], poly[i + 1], poly[j], poly[j + 1])) n++; } return n; };
+  // K1 the loop: one spine, closed, no duplicated vertex, its edges close on
+  // themselves and are simple polygons
+  let k1Bad = []; const k1Detail = [];
+  for (const [name, q] of CLOSED) {
+    const m = G.buildFrame(q);
+    const sp = m.spines[0];
+    const n = sp.pts.length;
+    let minGap = Infinity; for (let i = 0; i < n; i++) { const a = sp.pts[i], b = sp.pts[(i + 1) % n]; minGap = Math.min(minGap, Math.hypot(b[0] - a[0], b[1] - a[1])); }
+    const outer = G.outerEdge(sp, sp.bandWidth), inner = G.innerEdge(sp, sp.bandWidth);
+    const closesO = outer[0] === outer[outer.length - 1] || (outer[0][0] === outer[outer.length - 1][0] && outer[0][1] === outer[outer.length - 1][1]);
+    const closesI = inner[0][0] === inner[inner.length - 1][0] && inner[0][1] === inner[inner.length - 1][1];
+    const xO = selfCrossings(outer), xI = selfCrossings(inner);
+    const ok = m.spines.length === 1 && sp.closed === true && minGap > 1e-6 && closesO && closesI && xO === 0 && xI === 0 && outer.length === n + 1;
+    if (!ok) k1Bad.push(name);
+    k1Detail.push(`${name}: ${n} v, min edge ${minGap.toFixed(3)} mm, crossings ${xO}/${xI}`);
+  }
+  rec('K1 a closed skeleton is ONE closed spine, no duplicated vertex, its edges close exactly and never cross themselves', k1Bad.length === 0, k1Bad.length ? 'BAD: ' + k1Bad.join(', ') + ' — ' + k1Detail.join(' · ') : k1Detail.join(' · '));
+
+  // K2 the skeleton RESTATED from the controls (never read from the builder)
+  const k2 = [];
+  for (const [name, q] of CLOSED) {
+    const m = G.buildFrame(q); const pp = m.params, sp = m.spines[0], w = pp.moldingWidth;
+    let worst = 0, nWorst = 0;
+    if (pp.skeleton === 'rect') {
+      const a = pp.width / 2, b = (pp.height - w) / 2, yb = w / 2, yt = pp.height - w / 2, s0 = pp.cornerSize;
+      // every centreline vertex lies on the restated rectangle (mitre), on a
+      // quarter circle of radius s0 inside each corner (rounded), or on the
+      // restated step polygon (notched / eared) — the corners as four lists
+      // each corner with the inverse of the quarter turns that carry the
+      // bottom-right corner's frame (travel +x then +y) onto it
+      const corners = [[a, yb, (X, Y) => [X, Y]], [a, yt, (X, Y) => [Y, -X]], [-a, yt, (X, Y) => [-X, -Y]], [-a, yb, (X, Y) => [-Y, X]]];
+      for (const [x, y] of sp.pts) {
+        let d = Infinity;
+        // the straight sides between corner regions
+        const onSide = (Math.abs(Math.abs(x) - a) < 1e-9 && Math.abs(y - (yb + yt) / 2) <= b) || (Math.abs(y - yb) < 1e-9 || Math.abs(y - yt) < 1e-9) && Math.abs(x) <= a;
+        if (onSide) d = 0;
+        for (const [cx, cy, inv] of corners) {
+          const [lx, ly] = inv(x - cx, y - cy);              // the bottom-right frame: lx ≤ 0 along the side arrived on, ly ≥ 0 along the side left by
+          if (pp.cornerTreatment === 'rounded') { const ccx = -s0, ccy = s0; if (lx >= -s0 - 1e-9 && ly <= s0 + 1e-9) d = Math.min(d, Math.abs(Math.hypot(lx - ccx, ly - ccy) - s0)); }
+          if (pp.cornerTreatment === 'notched') for (const [px, py] of [[-s0, 0], [-s0, s0], [0, s0]]) d = Math.min(d, Math.hypot(lx - px, ly - py));
+          if (pp.cornerTreatment === 'eared') for (const [px, py] of [[-s0, 0], [-s0, -s0], [s0, -s0], [s0, s0], [0, s0]]) d = Math.min(d, Math.hypot(lx - px, ly - py));
+        }
+        if (d > worst) worst = d; if (d > 1e-9) nWorst++;
+      }
+      // the mitre corners: the inner edge's corner is the restated inner rectangle's corner
+      if (pp.cornerTreatment === 'mitre') { const inner = G.innerEdge(sp, w); const want = [a - w / 2, yb + w / 2]; const got = inner.reduce((m0, q0) => (q0[0] - q0[1] > m0[0] - m0[1] ? q0 : m0)); worst = Math.max(worst, Math.hypot(got[0] - want[0], got[1] - want[1])); }
+    } else {
+      const B = (pp.height - w) / 2, A = pp.aspect * B, cy = w / 2 + B;
+      for (let i = 0; i < sp.pts.length; i++) {
+        const [x, y] = sp.pts[i];
+        const e = Math.abs(Math.sqrt((x / A) ** 2 + ((y - cy) / B) ** 2) - 1) * Math.min(A, B);   // ≈ mm off the ellipse
+        const gx = x / (A * A), gy = (y - cy) / (B * B), gl = Math.hypot(gx, gy);
+        const nn = sp.nrm[i], ang = Math.abs(Math.atan2(-gx / gl * nn[1] + gy / gl * nn[0], -(gx / gl) * nn[0] - (gy / gl) * nn[1]));
+        const d = Math.max(e, ang * 1e3);   // a radian of normal error weighs as a metre
+        if (d > worst) worst = d; if (d > 1e-9) nWorst++;
+      }
+    }
+    k2.push({ name, worst, nWorst });
+  }
+  rec('K2 every centreline vertex lies on the skeleton RESTATED from the controls (rectangle corners / the ellipse and its normal), 1e-9', k2.every((r) => r.worst <= 1e-9), k2.map((r) => `${r.name}: worst ${r.worst.toExponential(1)}${r.nWorst ? ` (${r.nWorst} off)` : ''}`).join(' · '));
+
+  // K3 hidden AND inert, both ways: a control that belongs to another type
+  // moves nothing; a type's own controls do move it
+  const svgOf = (q) => G.exportSvg(G.buildFrame(q)).svg;
+  const inertRows = [
+    ['rect', { skeleton: 'rect' }, [{ pointedness: 1 }, { mullions: 4 }, { sill: 'none' }, { mullionWidth: 1 }, { aspect: 2 }]],
+    ['oval', { skeleton: 'oval' }, [{ pointedness: 1 }, { mullions: 0 }, { sill: 'stepped' }, { cornerTreatment: 'eared' }, { cornerSize: 60 }, { width: 400 }]],
+    ['arch', {}, [{ cornerTreatment: 'rounded' }, { cornerSize: 60 }, { aspect: 2 }]],
+    ['rect mitre', { skeleton: 'rect', cornerTreatment: 'mitre' }, [{ cornerSize: 60 }]],
+  ];
+  const leaks = [], live = [];
+  for (const [nm, base, probes] of inertRows) { const b0 = svgOf(base); for (const pr of probes) if (svgOf({ ...base, ...pr }) !== b0) leaks.push(`${nm} ← ${JSON.stringify(pr)}`); }
+  for (const [nm, q] of [['rect cornerSize', { skeleton: 'rect', cornerTreatment: 'rounded', cornerSize: 40 }], ['rect corners', { skeleton: 'rect', cornerTreatment: 'eared' }], ['oval aspect', { skeleton: 'oval', aspect: 1.5 }], ['rect width', { skeleton: 'rect', width: 300 }]]) {
+    const base = { skeleton: q.skeleton, ...(q.cornerTreatment === 'rounded' ? { cornerTreatment: 'rounded' } : {}) };
+    if (svgOf(q) === svgOf(base)) live.push(nm);
+  }
+  rec('K3 another type\'s controls are inert on a skeleton (SVG byte-identical) and a type\'s own controls move it', leaks.length === 0 && live.length === 0, leaks.length || live.length ? `LEAKS: ${leaks.join('; ')} DEAD: ${live.join('; ')}` : `${inertRows.reduce((n, r) => n + r[2].length, 0)} cross-type probes inert, 4 own controls live`);
+
+  // K4 clamped AND told
+  const k4 = [
+    ['rounded radius under the band', { skeleton: 'rect', cornerTreatment: 'rounded', cornerSize: 2 }],
+    ['notch past the next corner', { skeleton: 'rect', cornerTreatment: 'notched', cornerSize: 80, width: 100, height: 120 }],
+    ['ear folding the band', { skeleton: 'rect', cornerTreatment: 'eared', cornerSize: 4 }],
+    ['oval aspect folding the inner edge', { skeleton: 'oval', aspect: 0.4, height: 80, moldingWidth: 30 }],
+  ].map(([nm, q]) => { const m = G.buildFrame(q); const sp = m.spines[0]; return { nm, told: m.info.clamped.length, x: selfCrossings(G.innerEdge(sp, sp.bandWidth)) + selfCrossings(G.outerEdge(sp, sp.bandWidth)), msg: m.info.clamped[0] || '' }; });
+  rec('K4 a corner or aspect the band cannot carry is clamped AND told, and the clamped edges do not cross', k4.every((r) => r.told >= 1 && r.x === 0), k4.map((r) => `${r.nm}: ${r.told ? '"' + r.msg + '"' : 'NOT TOLD'}${r.x ? ` ${r.x} CROSSINGS` : ''}`).join(' · '));
+
+  // Q the seam, in the plane: the loop's first vertex IS the restated bottom
+  // centre (0, w/2) with the normal (0, 1) — the gap and the normal
+  // discontinuity at the loop start, measured; the turn across the seam
+  // equals the turn across its antipode; and no hatch run is cut there.
+  const qRows = [];
+  for (const [name, q] of CLOSED) {
+    const m = G.buildFrame(q); const sp = m.spines[0], n = sp.pts.length, w = m.params.moldingWidth;
+    const gap = Math.hypot(sp.pts[0][0] - 0, sp.pts[0][1] - w / 2);
+    const nAng = Math.abs(Math.atan2(sp.nrm[0][0], sp.nrm[0][1]));
+    const turn = (i) => { const a = sp.nrm[(i + n - 1) % n], b = sp.nrm[i], c = sp.nrm[(i + 1) % n]; const t1 = Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]); const t2 = Math.atan2(b[0] * c[1] - b[1] * c[0], b[0] * c[0] + b[1] * c[1]); return [t1, t2]; };
+    const [s1, s2] = turn(0), ap = m.info.seam.antipode, [a1, a2] = turn(ap);
+    const turnStep = Math.max(Math.abs(s1 - a1), Math.abs(s2 - a2), Math.abs(s1 - s2) > 1e-12 && Math.abs(Math.abs(s1 - s2) - Math.abs(a1 - a2)) > 1e-12 ? 1 : 0);
+    // a hatch stroke with an endpoint on the seam vertex's own offset point is
+    // a closed ring, or its line genuinely breaks there (off, or a weight-level
+    // change across the seam)
+    const band = m.bands[0];
+    let cut = 0;
+    const nLines = Math.max(1, Math.floor(w / m.params.hatchPitch));
+    for (let k = 0; k < nLines; k++) {
+      const x = (k + 0.5) / nLines, i = Math.round(x * (m.prof.x.length - 1)), d = (x - 0.5) * w;
+      const P0 = G.offsetCurve(sp, d)[0];
+      if (!P0) { cut++; continue; }                 // the seam vertex trimmed away: the line cannot reach it
+      const dk = (v) => G.darknessAt(m.prof, i, m.params, sp.nrm[v]), thr = G.vdc(k);
+      const broken = !(dk(n - 1) > thr && dk(0) > thr) || G.weightLevel(dk(n - 1)) !== G.weightLevel(dk(0));
+      if (broken) continue;
+      for (const h of band.hatch) {
+        const f = h.pts[0], l = h.pts[h.pts.length - 1];
+        const atS = (q0) => q0[0] === P0[0] && q0[1] === P0[1];
+        const ring = f[0] === l[0] && f[1] === l[1];
+        if ((atS(f) || atS(l)) && !ring) cut++;
+      }
+    }
+    qRows.push({ name, gap, nAng, turnStep, cut });
+  }
+  rec('Q1 the seam: the loop starts ON the restated bottom centre with the restated normal (gap 0, normal 0), turns across the seam as across its antipode, and cuts no hatch line', qRows.every((r) => r.gap === 0 && r.nAng === 0 && r.turnStep <= 1e-12 && r.cut === 0), qRows.map((r) => `${r.name}: gap ${r.gap.toExponential(1)} mm, normal ${r.nAng.toExponential(1)} rad, turn step ${r.turnStep.toExponential(1)}, cut ${r.cut}`).join(' · '));
+
+  // AN the named anchors: exactly the registry's list for the type (its
+  // `when` evaluated), each ON its spine, mirrored pairs x -> -x to the bit
+  const anRows = [];
+  for (const [name, q] of [['arch', {}], ['arch no sill', { sill: 'none' }], ...CLOSED]) {
+    const m = G.buildFrame(q);
+    const want = R.ANCHORS[m.params.skeleton].filter((a) => !a.when || a.when(m.params)).map((a) => a.id).sort();
+    const got = Object.keys(m.info.anchors).sort();
+    let off = 0, mir = 0;
+    for (const [id, a] of Object.entries(m.info.anchors)) {
+      const sp = m.spines.find((x) => x.id === a.spine);
+      const on = !sp ? false : a.index != null ? (sp.pts[a.index][0] === a.pt[0] && sp.pts[a.index][1] === a.pt[1]) : G.distToPoly(a.pt, sp.pts) === 0;
+      if (!on) off++;
+    }
+    // to the BIT on the closed skeletons (built from mirrored doubles); the
+    // arch is NOT bit-mirrored and never was — its left springing is R·sin π
+    // (~4e-14 mm) above its right and its apex x is ~1e-14 — so the arch is
+    // held to 1e-9 mm and its residue printed (its bytes are frozen, phase 2)
+    const tol = m.params.skeleton === 'arch' ? 1e-9 : 0;
+    let res = 0;
+    for (const [l, r] of R.ANCHOR_MIRRORS) { const A = m.info.anchors[l], B = m.info.anchors[r]; if (!A !== !B) { mir++; continue; } if (!A) continue; const e = Math.max(Math.abs(A.pt[0] + B.pt[0]), Math.abs(A.pt[1] - B.pt[1])); res = Math.max(res, e); if (e > tol) mir++; }
+    for (const id of ['apex', 'topCentre', 'bottomCentre']) { const A = m.info.anchors[id]; if (!A) continue; res = Math.max(res, Math.abs(A.pt[0])); if (Math.abs(A.pt[0]) > tol) mir++; }
+    anRows.push({ name, ok: JSON.stringify(want) === JSON.stringify(got) && off === 0 && mir === 0, detail: `${name}: ${got.length} (${off} off, ${mir} unmirrored, mirror residue ${res.toExponential(1)} mm)${JSON.stringify(want) !== JSON.stringify(got) ? ' WANT ' + want.join(',') + ' GOT ' + got.join(',') : ''}` });
+  }
+  rec('AN every skeleton names exactly its registry anchors, each ON its spine, mirrored pairs exact under x -> -x', anRows.every((r) => r.ok), anRows.map((r) => r.detail).join(' · '));
+  if (label === 'shipped') for (const [k, list] of Object.entries(R.ANCHORS)) console.log(`     anchors ${k.padEnd(5)} ${list.map((a) => a.id + (a.when ? '*' : '')).join(', ')}`);
+
+  // W and H on the closed skeletons too (the law is the same law)
+  let lawBad2 = 0, iffBad2 = 0, hBad2 = 0, nCross2 = 0;
+  for (const [, q] of CLOSED) for (const name of ['ogee', 'cove', 'stepped']) {
+    const m = G.buildFrame({ ...q, profilePreset: name });
+    const sp = m.spines[0], b = m.bands[0], thr = m.params.crossHatchThreshold;
+    for (const h of b.hatch) if (!near(h.weight, lawWeight(h.dark, m.params.lineWeight), 1e-12)) lawBad2++;
+    let dmax = -Infinity; for (const nrm of sp.nrm) for (const d of G.toneAcross(m.prof, m.params, nrm)) dmax = Math.max(dmax, d);
+    if ((b.cross.length > 0) !== (dmax > thr)) iffBad2++;
+    for (const c of b.cross) { nCross2++; for (const e of c.pts) { let best = Infinity; for (let i = 0; i < m.prof.x.length; i++) best = Math.min(best, G.distToPoly(e, G.offsetPoly(sp, (m.prof.x[i] - 0.5) * sp.bandWidth))); if (best > 1e-6) hBad2++; } }
+  }
+  rec('W3 on the closed skeletons every hatch run is at the law of its darkness; cross-hatch IFF the band exceeds the threshold, every line a chord of offsetCurve', lawBad2 === 0 && iffBad2 === 0 && hBad2 === 0 && nCross2 > 0, `${lawBad2} off the law, ${iffBad2} iff failures, ${hBad2} endpoints off over ${nCross2} cross lines (7 skeletons × ogee/cove/stepped)`);
+
   return out;
 }
 
 /* ================= NEGATIVE CONTROL ================= */
 const MUTANTS = [
-  { id: 'no-mitre', from: 'const mitre = cosHalf > 1e-9 ? [sx / l / cosHalf, sy / l / cosHalf] : n1;', to: 'const mitre = n1;', breaks: ['M1'] },
-  { id: 'shading-ignores-the-profile', from: 'return p.shadeIntensity * (1 - lambert(normalAt(dzds, nrm)));', to: 'return p.shadeIntensity * 0.3;', breaks: ['T2', 'T3', 'W1', 'H2'] },   // one darkness everywhere: one weight, and no band reaches the cross-hatch threshold (H2's vacuity guard)
+  { id: 'no-mitre', from: 'return cosHalf > 1e-9 ? [sx / l / cosHalf, sy / l / cosHalf] : n1;', to: 'return n1;', breaks: ['M1', 'K1', 'K2', 'Q1', 'W3'] },   // mitreNormal has two owners since 2b: the arch apex AND every rectangle corner, so the corners fold (K1/K2) and the seam vertex is trimmed (Q1)
+  { id: 'shading-ignores-the-profile', from: 'return p.shadeIntensity * (1 - lambert(normalAt(dzds, nrm)));', to: 'return p.shadeIntensity * 0.3;', breaks: ['T2', 'T3', 'W1', 'H2', 'W3'] },   // one darkness everywhere: one weight, and no band reaches the cross-hatch threshold (H2's vacuity guard)
   { id: 'sill-top-restated-as-a-constant', from: 'floorY = innerEdge(sill, w)[0][1];', to: 'floorY = w * 0.9;', breaks: ['O1'] },
   { id: 'lights-measured-from-the-centreline', from: "const xInL = innerEdge(spines.find((s) => s.id === 'jambL'), w)[0][0];", to: 'const xInL = -a;', breaks: ['O2', 'O3'] },   // the outer light springs on that same xInL since ruling 4, so O3 reads it too
   { id: 'creases-never-found', from: 'export const CREASE_DEG = 22;', to: 'export const CREASE_DEG = 999;', breaks: ['S2'] },
   { id: 'a-second-offset-expression', from: 'const sillHalf = halfSpan + w / 2;', to: 'const sillHalf = halfSpan + w / 2; void ((spine, d) => spine.pts.map((q, i) => [q[0] + d * spine.nrm[i][0], q[1] + d * spine.nrm[i][1]]));', breaks: ['O4'] },
   // phase 1b
   { id: 'outer-light-springs-on-the-centreline', from: 'const bounds = [xInL];', to: 'const bounds = [-a];', breaks: ['O3'] },
-  { id: 'weight-ignores-darkness', from: 'return lineWeight * (HATCH_WEIGHT_RANGE[0] + (HATCH_WEIGHT_RANGE[1] - HATCH_WEIGHT_RANGE[0]) * q);', to: 'return lineWeight * (0 * q + 1);', breaks: ['W1', 'W2'] },
+  { id: 'weight-ignores-darkness', from: 'return lineWeight * (HATCH_WEIGHT_RANGE[0] + (HATCH_WEIGHT_RANGE[1] - HATCH_WEIGHT_RANGE[0]) * q);', to: 'return lineWeight * (0 * q + 1);', breaks: ['W1', 'W2', 'W3'] },
   { id: 'svg-ignores-the-weight', from: 'for (const h of list) { const k = f(h.weight);', to: 'for (const h of list) { const k = f(lw);', breaks: ['W2'] },
   { id: 'cross-hatch-ignores-the-threshold', from: 'const thr = p.crossHatchThreshold;', to: 'const thr = 0;', breaks: ['H1'] },
-  { id: 'cross-hatch-never-drawn', from: 'const cross = crossHatch(spine, prof, p);', to: 'const cross = [];', breaks: ['H1', 'H2'] },
+  { id: 'cross-hatch-never-drawn', from: 'const cross = crossHatch(spine, prof, p);', to: 'const cross = [];', breaks: ['H1', 'H2', 'W3'] },
+  // phase 2b: the closed skeletons
+  { id: 'the-oval-seam-offset-0.1mm', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['K2', 'Q1', 'AN'] },
+  // a 0.1 mm shift ALONG the bottom side stays on the restated rectangle, so K2 is right to stay silent; the seam clause and the anchor's mirror see it
+  { id: 'the-rect-seam-offset-0.1mm', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q1', 'AN'] },
+  { id: 'a-hatch-line-cut-at-the-seam', from: 'const order = spine.closed ? closedOrder(run, (v) => weightLevel(darknessAt(prof, i, p, spine.nrm[v]))) : null;', to: 'const order = spine.closed ? run.map((_, v) => v) : null;', breaks: ['Q1'] },
+  { id: 'a-rect-corner-not-mitred', from: "if (treat === 'mitre') Q.push([0, 0, ...mitreNormal([0, 1], [-1, 0]), true]);", to: "if (treat === 'mitre') Q.push([0, 0, 0, 1, true]);", breaks: ['K2', 'Q1', 'W3'] },   // the wrong corner normal also trims the seam vertex away (the bottom-left corner's stretch reaches it)
+  { id: 'the-oval-sampled-by-parameter', from: 'pts.push([A * A * c / den, cy + B * B * s / den]);', to: 'pts.push([A * c, cy + B * s]);', breaks: ['K2'] },
+  { id: 'the-aspect-not-read', from: 'let k = p.aspect;', to: 'let k = 1;', breaks: ['K2', 'K3', 'K4'] },   // an unread aspect cannot be clamped, so K4's folding-aspect row is never told
+  { id: 'an-arch-control-leaks-into-the-rect', from: 'const a = p.width / 2;\n  let b = (p.height - w) / 2;', to: 'const a = p.width / 2 + (p.mullions - 2);\n  let b = (p.height - w) / 2;', breaks: ['K3'] },
+  { id: 'an-anchor-off-its-spine', from: 'topCentre: anchorAt(loop, anchorIdx.top),', to: 'topCentre: { ...anchorAt(loop, anchorIdx.top), pt: [0, 1] },', breaks: ['AN'] },
+  { id: 'a-corner-clamp-not-told', from: 'if (sz < lo) { info.clamped.push(`corner radius', to: 'if (sz < lo) { void (`corner radius', breaks: ['K4'] },
 ];
 
 async function negativeControl() {
@@ -342,7 +536,23 @@ async function partTwo(G, R) {
   const vOff = await vis(false), vOn = await vis(true); await vis(false);
   check('U3 Advanced-tier controls hide with the toggle off and show with it on; Standard controls move neither way', advIds.length > 0 && advIds.every((id) => vOff[id] === false && vOn[id] === true) && stdIds.every((id) => vOff[id] === true && vOn[id] === true), `advanced: ${advIds.join(',')}; ${stdIds.length} standard controls unmoved`);
 
-  // X one geometry path
+  // U4 each skeleton type shows its own controls and hides the others' (both directions)
+  const own = { arch: ['pointedness', 'mullions', 'mullionWidth', 'sill', 'width'], rect: ['cornerTreatment', 'cornerSize', 'width'], oval: ['aspect'] };
+  const vis4 = {};
+  for (const sk of ['arch', 'rect', 'oval']) { await page.evaluate((q) => window.__frame.setParams(q), { skeleton: sk, cornerTreatment: 'rounded', mullions: 2 }); vis4[sk] = await page.evaluate(() => window.__frame.controls()); }
+  const u4bad = [];
+  for (const sk of Object.keys(own)) for (const id of new Set(Object.values(own).flat())) { const want = own[sk].includes(id); if (vis4[sk][id] !== want) u4bad.push(`${sk}/${id}: ${vis4[sk][id]}`); }
+  await page.evaluate(() => window.__frame.setParams({ skeleton: 'rect', cornerTreatment: 'mitre' }));
+  const mitreSize = await page.evaluate(() => window.__frame.controls().cornerSize);
+  check('U4 each skeleton shows exactly its own controls (arch: pointedness, mullions, sill; rect: corners, size; oval: aspect, no width) and a mitred corner hides its size', u4bad.length === 0 && mitreSize === false, u4bad.join('; ') || 'arch / rect / oval both ways');
+
+  // X one geometry path — on every skeleton type
+  const sameAll = [];
+  for (const q of [{ skeleton: 'rect', cornerTreatment: 'eared' }, { skeleton: 'oval' }]) {
+    await page.evaluate((v) => window.__frame.setParams(v), q);
+    sameAll.push(await page.evaluate(() => { const ds = (root) => Array.from(root.querySelectorAll('path')).map((e) => e.getAttribute('d')); const a = ds(document.getElementById('paper')), b = ds(new DOMParser().parseFromString(window.__frame.svg(), 'image/svg+xml')); return a.length > 0 && a.length === b.length && a.every((d, i) => d === b[i]); }));
+  }
+  check('X2 on the rectangle and the oval too, the drawing on screen IS the export string', sameAll.every(Boolean), sameAll.join(','));
   await page.evaluate(() => window.__frame.setParams({}));
   const same = await page.evaluate(() => {
     const ds = (root) => Array.from(root.querySelectorAll('path')).map((e) => e.getAttribute('d'));
@@ -378,15 +588,22 @@ async function partTwo(G, R) {
   const baseAgain = await decode(await shot());
   check('V0 the fixed camera is repeatable (same state twice)', diff(baseImg, baseAgain) === 0, `${diff(baseImg, baseAgain)} px differ, ${baseImg.w}×${baseImg.h}`);
   const vrows = [];
+  // a control that belongs to one skeleton type is probed IN that type,
+  // against that type's own baseline (phase 2b) — never against the arch
+  const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' } };
+  const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
-    const states = s.kind === 'range' ? [[s.default === s.max ? s.min : s.max]] : s.options.map(([v]) => [v]).filter(([v]) => v !== s.default);
+    const ctx = CONTEXT[s.id] || {};
+    const key = JSON.stringify(ctx);
+    if (!baseOf[key]) { await page.evaluate((q) => window.__frame.setParams(q), ctx); baseOf[key] = await decode(await shot()); }
+    const states = s.kind === 'range' ? [[s.default === s.max ? s.min : s.max]] : s.options.map(([v]) => [v]).filter(([v]) => v !== (ctx[s.id] ?? s.default));
     for (const [v] of states) {
-      const p = { [s.id]: v };
+      const p = { ...ctx, [s.id]: v };
       if (s.id === 'mullionWidth') p.mullions = 3;
       if (s.id === 'profilePreset' && v === 'custom') continue;      // reached by the editor (E1), not by the select
       await page.evaluate((q) => window.__frame.setParams(q), p);
-      const n = diff(baseImg, await decode(await shot()));
+      const n = diff(baseOf[key], await decode(await shot()));
       vrows.push({ id: s.id, v, n });
     }
   }

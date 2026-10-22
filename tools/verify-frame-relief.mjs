@@ -48,8 +48,10 @@
                        the rows (the byte-identity claim; `8db018c` is the
                        base this phase was built on). Skipped, and said so,
                        without it.
-   --negative-control  four mutants (an open edge, a detached mullion, a
-                       mesh that offsets by itself, the embed removed), each
+   --negative-control  seven mutants (an open edge, a detached mullion, a
+                       mesh that offsets by itself, the embed removed; phase
+                       2b: a closed loop's closing strip dropped, and its seam
+                       moved 0.1 mm on the oval and on the rectangle), each
                        served through copies in the repo root and required to
                        redden exactly what it names; every anchor checked
                        before any mutant runs.
@@ -74,7 +76,21 @@ function check(name, ok, detail = '') {
   console.log(`${ok ? ' ok ' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
 }
 
-const ROWS = [
+const PRESETS = ['flat', 'bead', 'cove', 'ogee', 'reeded', 'fluted', 'stepped'];
+/* the closed skeletons (phase 2b): every rectangle corner treatment, the
+   circle, a tall and a wide oval — each under every profile preset */
+const CLOSED = [
+  ['rect mitre', { skeleton: 'rect', cornerTreatment: 'mitre' }],
+  ['rect rounded', { skeleton: 'rect', cornerTreatment: 'rounded' }],
+  ['rect notched', { skeleton: 'rect', cornerTreatment: 'notched' }],
+  ['rect eared', { skeleton: 'rect', cornerTreatment: 'eared' }],
+  ['circle', { skeleton: 'oval', aspect: 1 }],
+  ['oval tall', { skeleton: 'oval', aspect: 0.5 }],
+  ['oval wide', { skeleton: 'oval', aspect: 2 }],
+];
+/* ARCH rows: the phase-2 rows, every one compared byte for byte (SVG AND
+   STL) against the base tree under --base. */
+const ARCH_ROWS = [
   ['default', {}],
   ...['flat', 'bead', 'cove', 'ogee', 'reeded', 'fluted', 'stepped'].map((k) => [`preset ${k}`, { profilePreset: k }]),
   ['0 mullions', { mullions: 0 }],
@@ -83,6 +99,12 @@ const ROWS = [
   ['sill stepped', { sill: 'stepped' }],
   ['backed', { lights: 'backed' }],
   ['backed x 4 mullions', { lights: 'backed', mullions: 4 }],
+];
+const ROWS = [
+  ...ARCH_ROWS,
+  ['arch recessed', { lights: 'recessed' }],
+  ...CLOSED.flatMap(([n, q]) => PRESETS.map((k) => [`${n} · ${k}`, { ...q, profilePreset: k }])),
+  ...CLOSED.flatMap(([n, q]) => [['backed', { lights: 'backed' }], ['recessed', { lights: 'recessed' }]].map(([i, iq]) => [`${n} · ${i}`, { ...q, ...iq }])),
 ];
 
 function pointInPoly(pt, poly) {
@@ -107,7 +129,7 @@ async function run(G, R, RL, label = 'shipped') {
   rec('F0 MIN_FEATURE_MM is 1.0, the embed is that same length, and the module calls it an assumption', R.MIN_FEATURE_MM === 1 && RL.EMBED_MM === R.MIN_FEATURE_MM && /assumed/.test(RL.FLOOR_NOTE), `${R.MIN_FEATURE_MM} mm — "${RL.FLOOR_NOTE}"`);
 
   // per row: W, C, R, B (+ L on pierced rows with mullions)
-  const wRows = [], cRows = [], rRows = [], bRows = [], lRows = [];
+  const wRows = [], cRows = [], rRows = [], bRows = [], lRows = [], qRows = [], l2Rows = [];
   let worstB = Infinity;
   for (const [name, p] of ROWS) {
     const model = G.buildFrame(p);
@@ -165,7 +187,7 @@ async function run(G, R, RL, label = 'shipped') {
       }
     }
     // L clear widths, pierced rows with mullions
-    if (p.lights !== 'backed' && (p.mullions ?? R.DEFAULTS.mullions) > 0) {
+    if (model.info.kind === 'arch' && p.lights !== 'backed' && p.lights !== 'recessed' && (p.mullions ?? R.DEFAULTS.mullions) > 0) {
       const w = model.params.moldingWidth, wm = w * model.params.mullionWidth, n = model.params.mullions;
       const xInL = G.innerEdge(model.spines.find((q) => q.id === 'jambL'), w)[0][0];
       const xInR = G.innerEdge(model.spines.find((q) => q.id === 'jambR'), w)[0][0];
@@ -175,11 +197,49 @@ async function run(G, R, RL, label = 'shipped') {
       const clear3d = (xm - xj) / s;
       lRows.push({ name, clear2d, clear3d, d: Math.abs(clear3d - clear2d) });
     }
+    // Q the seam of a CLOSED band, in the mesh: the closing strip exists (row
+    // V−1 is joined to row 0 by triangles, no vertex duplicated there), and
+    // the top surface turns across the seam row exactly as across its
+    // antipode — the gap and the normal discontinuity at the loop start
+    const loop = relief.parts.find((q) => q.kind === 'band' && q.closed);
+    if (loop) {
+      const { V, C } = loop, I = relief.indices;
+      const rowOf = (vi) => { const r = vi - loop.base; return r < V * C ? Math.floor(r / C) : Math.floor((r - V * C) / C); };
+      let closing = 0;
+      for (let t = loop.t0; t < loop.t1; t++) { const rs = [rowOf(I[3 * t]), rowOf(I[3 * t + 1]), rowOf(I[3 * t + 2])]; if (rs.includes(V - 1) && rs.includes(0)) closing++; }
+      let dup = Infinity;
+      for (let c = 0; c < C; c++) { const a0 = 3 * loop.T(0, c), b0 = 3 * loop.T(V - 1, c); dup = Math.min(dup, Math.hypot(P[a0] - P[b0], P[a0 + 1] - P[b0 + 1], P[a0 + 2] - P[b0 + 2])); }
+      // top-face normal of the strip between rows v and v+1 at column c
+      const fN = (v, c) => { const A = 3 * loop.T(v, c), B = 3 * loop.T((v + 1) % V, c), D = 3 * loop.T(v, c + 1); const ux = P[B] - P[A], uy = P[B + 1] - P[A + 1], uz = P[B + 2] - P[A + 2], wx = P[D] - P[A], wy = P[D + 1] - P[A + 1], wz = P[D + 2] - P[A + 2]; const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx, l = Math.hypot(nx, ny, nz); return [nx / l, ny / l, nz / l]; };
+      // atan2(|a×b|, a·b), never acos: acos(1 − ε) turns 1e-16 of rounding into 1e-8 rad
+      const dih = (v, c) => { const a = fN((v + V - 1) % V, c), b = fN(v, c); const x = a[1] * b[2] - a[2] * b[1], y = a[2] * b[0] - a[0] * b[2], z = a[0] * b[1] - a[1] * b[0]; return Math.atan2(Math.hypot(x, y, z), a[0] * b[0] + a[1] * b[1] + a[2] * b[2]); };
+      const ap = model.info.seam.antipode;
+      let step = 0, seamDih = 0;
+      for (let c = 0; c < C - 1; c++) { step = Math.max(step, Math.abs(dih(0, c) - dih(ap, c))); seamDih = Math.max(seamDih, dih(0, c)); }
+      // the xy gap: the seam row sits ON the restated bottom centre column line x = 0 (scaled)
+      let gap = 0; for (let c = 0; c < C; c++) gap = Math.max(gap, Math.abs(P[3 * loop.T(0, c)]) / s);
+      qRows.push({ name, closing, dup, step, seamDih, gap, wantClosing: 4 * (C - 1) + 4 });
+      // L2 the opening: the inner wall's width across the sides, in the STL,
+      // equals the restated opening (2a − w for the rectangle, 2A − w for the
+      // oval) — read off the positions the STL writes
+      if (p.lights !== 'backed' && p.lights !== 'recessed') {
+        const iR = model.info.anchors.sideR.index, iL = model.info.anchors.sideL.index, w = model.params.moldingWidth;
+        const got = (P[3 * loop.T(iR, C - 1)] - P[3 * loop.T(iL, C - 1)]) / s;
+        const want = model.info.kind === 'rect' ? model.params.width - w : 2 * model.params.aspect * (model.params.height - w) / 2 - w;
+        l2Rows.push({ name, got, want, d: Math.abs(got - want) });
+      }
+    }
   }
-  rec('W boundary edges = 0 on every row (welded float32 STL bytes)', wRows.every((r) => r.boundary === 0), wRows.map((r) => `${r.name}: ${r.triangles} tris, boundary ${r.boundary}, nonManifold(unrated) ${r.nonManifold}`).join(' · '));
-  rec('C one connected region on every row (0.4 mm voxels; a miss re-read at 0.2)', cRows.every((r) => r.comps === 1), cRows.map((r) => `${r.name}: ${r.comps}@${r.cell}${r.first ? ` (first ${r.first}, sizes ${r.sizes})` : ''}`).join(' · '));
+  rec('W boundary edges = 0 on every row (welded float32 STL bytes)', wRows.every((r) => r.boundary === 0), `${wRows.length} rows, ${wRows.filter((r) => r.boundary).length} open${wRows.filter((r) => r.boundary).slice(0, 4).map((r) => `; ${r.name}: boundary ${r.boundary}`).join('')}`);
+  rec('C one connected region on every row (0.4 mm voxels; a miss re-read at 0.2)', cRows.every((r) => r.comps === 1), `${cRows.length} rows, ${cRows.filter((r) => r.comps !== 1).length} split${cRows.filter((r) => r.comps !== 1).slice(0, 4).map((r) => `; ${r.name}: ${r.comps}@${r.cell} (first ${r.first}, sizes ${r.sizes})`).join('')}`);
+  if (label === 'shipped') {
+    console.log('     per row (tris · boundary · nonManifold(unrated) · regions@cell):');
+    for (let i = 0; i < wRows.length; i++) console.log(`       ${wRows[i].name.padEnd(30)} ${String(wRows[i].triangles).padStart(6)} · ${wRows[i].boundary} · ${String(wRows[i].nonManifold).padStart(4)} · ${cRows[i].comps}@${cRows[i].cell}${cRows[i].first ? ` (first ${cRows[i].first})` : ''}`);
+  }
   rec('R every grid vertex is offsetCurve × scale and plateT + z·depth, exactly; a null offset is the mitre point', rRows.every((r) => r.bad === 0) && rRows.some((r) => r.nulls > 0), `${rRows.reduce((a, r) => a + r.n, 0)} vertices, ${rRows.reduce((a, r) => a + r.bad, 0)} off, ${rRows.reduce((a, r) => a + r.nulls, 0)} at a mitre`);
   rec('L a pierced light\'s clear width in the STL equals the 2-D clear width (1e-6 mm)', lRows.length > 0 && lRows.every((r) => r.d <= 1e-6), lRows.map((r) => `${r.name}: ${r.clear3d.toFixed(6)} vs ${r.clear2d.toFixed(6)}`).join(' · '));
+  rec('Q the seam of every closed band: the closing strip is there (row V−1 joined to row 0, no duplicated vertex), the seam row is ON x = 0, and the surface turns across the seam exactly as across its antipode', qRows.length > 0 && qRows.every((r) => r.closing === r.wantClosing && r.dup > 1e-6 && r.step <= 1e-9 && r.gap === 0), `${qRows.length} closed rows; worst |seam turn − antipode turn| ${Math.max(...qRows.map((r) => r.step)).toExponential(1)} rad, seam xy gap ${Math.max(...qRows.map((r) => r.gap)).toExponential(1)} mm, closing strip ${qRows[0] ? qRows[0].closing : '—'} triangles${qRows.filter((r) => !(r.closing === r.wantClosing && r.dup > 1e-6 && r.step <= 1e-9 && r.gap === 0)).slice(0, 3).map((r) => `; ${r.name}: closing ${r.closing}/${r.wantClosing}, dup ${r.dup.toFixed(4)}, step ${r.step.toExponential(1)}, gap ${r.gap.toExponential(1)}`).join('')}`);
+  rec('L2 a closed frame\'s opening across its sides in the STL equals the restated opening (2a − w, 2A − w), 1e-6 mm', l2Rows.length > 0 && l2Rows.every((r) => r.d <= 1e-6), `${l2Rows.length} open rows, worst ${Math.max(...l2Rows.map((r) => r.d)).toExponential(1)} mm${l2Rows.filter((r) => r.d > 1e-6).slice(0, 2).map((r) => `; ${r.name} ${r.got.toFixed(4)} vs ${r.want.toFixed(4)}`).join('')}`);
   rec('B every declared embed lands strictly inside the band it names', bRows.length > 0 && bRows.every((r) => r.ok), `${bRows.length} embeds, nearest to a boundary ${worstB === Infinity ? '—' : worstB.toFixed(4)} mm${bRows.filter((r) => !r.ok).map((r) => `; ${r.name} ${r.id} ${r.detail}`).join('')}`);
   if (label === 'shipped') { const d = bRows.filter((r) => r.name === 'sill stepped'); console.log(`     embeds on 'sill stepped': ${d.map((r) => `${r.id} ${r.detail}`).join(' | ')}`); }
 
@@ -204,10 +264,17 @@ async function run(G, R, RL, label = 'shipped') {
   if (label === 'shipped') {
     if (BASE) {
       const GB = await import(pathToFileURL(path.join(BASE, 'frame-geometry.js')).href);
-      let moved = 0;
-      for (const [, p] of ROWS) if (G.exportSvg(G.buildFrame(p)).svg !== GB.exportSvg(GB.buildFrame(p)).svg) moved++;
-      check(`S the SVG strings are byte-identical to ${path.basename(BASE)} on every row`, moved === 0, `${moved} of ${ROWS.length} moved`);
-    } else console.log('     S (SVG byte identity against a base worktree): SKIPPED — pass --base <worktree of 8db018c>');
+      const RB = fs.existsSync(path.join(BASE, 'frame-relief.js')) ? await import(pathToFileURL(path.join(BASE, 'frame-relief.js')).href) : null;
+      let moved = 0, stlMoved = 0, stlN = 0;
+      for (const [, p] of ARCH_ROWS) {
+        const m = G.buildFrame(p), mb = GB.buildFrame(p);
+        if (G.exportSvg(m).svg !== GB.exportSvg(mb).svg) moved++;
+        if (RB) { stlN++; const a = RL.exportStl(RL.buildRelief(m)), b = RB.exportStl(RB.buildRelief(mb)); if (a.length !== b.length || a.some((v, i) => v !== b[i])) stlMoved++; }
+      }
+      check(`S the SVG strings are byte-identical to ${path.basename(BASE)} on every arch row`, moved === 0, `${moved} of ${ARCH_ROWS.length} moved`);
+      if (RB) check(`S2 the STL bytes are byte-identical to ${path.basename(BASE)} on every arch row`, stlMoved === 0, `${stlMoved} of ${stlN} moved`);
+      else console.log(`     S2 (STL byte identity): SKIPPED — ${path.basename(BASE)} has no frame-relief.js`);
+    } else console.log('     S/S2 (SVG and STL byte identity against a base worktree): SKIPPED — pass --base <worktree of e759041>');
   }
   return out;
 }
@@ -219,6 +286,10 @@ const MUTANTS = [
   { id: 'a-detached-mullion', file: 'geometry', from: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY], [info.mullionX[i - 1], subSpring], [1, 0], 2);', to: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY + 2], [info.mullionX[i - 1], subSpring - 3], [1, 0], 2);', breaks: ['C', 'B'] },
   { id: 'the-mesh-offsets-by-itself', file: 'relief', from: 'const off = offsetCurve(S, d);', to: 'const off = S.pts.map((q, i) => [q[0] + d * S.nrm[i][0], q[1] + d * S.nrm[i][1]]);', breaks: ['R'] },
   { id: 'the-embed-removed', file: 'relief', from: 'export const EMBED_MM = MIN_FEATURE_MM;', to: 'export const EMBED_MM = 0;', breaks: ['B', 'F0'] },
+  // phase 2b: a closed loop left OPEN at its seam, and the seam moved 0.1 mm
+  { id: 'the-closing-strip-dropped', file: 'relief', from: 'const strips = closed ? V : V - 1, nx = (v) => (v + 1) % V;', to: 'const strips = V - 1, nx = (v) => (v + 1) % V;', breaks: ['W', 'Q'] },
+  { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
+  { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
 ];
 
 async function negativeControl() {
