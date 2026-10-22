@@ -250,12 +250,15 @@ class RoiMeasurementOut(BaseModel):
     periodicity_consistency: Optional[float] = None
     rotation_deg: float = 0.0
     loop_lattice_debug: Optional[LoopLatticeDebugOut] = None
-    # Which evidence this region's WALE consensus candidate actually came
-    # from -- "loop_count" when the loop-lattice detector found enough
+    # Which evidence backs this region's WALE consensus candidate --
+    # "loop_count" when the loop-lattice detector found enough
     # well-supported columns to COUNT a spacing directly (median interval
-    # between real, position-verified stitch columns), "periodicity" when
-    # it fell back to wale.spacing_px above. See analysis.gauge_analysis's
-    # module comment above _wale_count_candidate for why wale specifically.
+    # between real, position-verified stitch columns) and that count agrees
+    # with wale.spacing_px above, which it then corroborates (supplying the
+    # candidate's confidence); "periodicity" otherwise. The candidate's
+    # VALUE is wale.spacing_px on both paths. See analysis.gauge_analysis's
+    # module comments above _wale_count_candidate and
+    # _wale_count_harmonic_note.
     wale_source: str = "periodicity"
     wale_count_confidence: float = 0.0
     # Why a trustworthy-looking count was NOT used for this region: it

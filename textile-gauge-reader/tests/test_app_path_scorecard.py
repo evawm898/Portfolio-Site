@@ -32,16 +32,18 @@ calibration (a) it reproduced the read-only audit's app-path numbers:
 jersey W +90.0, teal W +70.5, knit_09 W +103.7, knit_01 W +3.4,
 knit_08 W -0.1; knit_02 / knit_05 get no proposed areas.
 
-RE-PINNED 2026-10-22 for the consensus loop-count gate (README: "Consensus
-loop-count override: the count may corroborate, never override by a
-harmonic"). On (a) every former confident-and-wrong wale row lands within
-10%: jersey -5.5, teal -6.6, knit_09 -0.9, synth_jersey +0.2, synth_garter
-+0.0, and knit_06 -4.3. That change is a CANDIDATE pinned pending Eva's
-ruling -- it misses two of the PR's own criteria (jersey W is outside 10%
-at three of the seven jitter scales, and calibration (b) gains four
-confident-and-wrong rows, each explained in KNOWN_BEYOND_BAR) -- so these
-pins describe the measured state of the candidate, not an accepted
-baseline.
+RE-PINNED 2026-10-22 for the consensus loop-count gate as RULED (README:
+"Consensus loop-count override: the count may corroborate, never override
+by a harmonic" -- variant B, a corroborating count supplies confidence
+only and the area's own periodicity reading is always the value voted).
+On (a): jersey W -5.5, knit_09 W -0.9, synth_jersey W +0.2, synth_garter W
++0.0, knit_06 W -4.3, and teal W -11.0 confident -- the one confident-and-
+wrong row left, ACCEPTED BY EVA'S RULING for this PR (teal's own periodicity
+is -12% on every area at every scale) and kept here as a strict xfail
+labelled known confident-and-wrong, the target of the next PR (the count's
+precision on small windows). Three calibration-(b) wale rows that used to
+return no number or a coincidentally right one now carry the ruler's own
+error, confident; each is explained in KNOWN_BEYOND_BAR.
 """
 from __future__ import annotations
 
@@ -60,7 +62,7 @@ BASELINE = {
     # (a) correct scale from ground truth
     ("truth", "jersey", "wale"): -5.5,
     ("truth", "jersey", "course"): -6.4,
-    ("truth", "teal", "wale"): -6.6,
+    ("truth", "teal", "wale"): -11.0,
     ("truth", "teal", "course"): 0.5,
     ("truth", "knit_01", "wale"): 3.4,
     ("truth", "knit_01", "course"): 4.3,
@@ -69,7 +71,7 @@ BASELINE = {
     ("truth", "knit_05", "course"): None,
     ("truth", "knit_06", "wale"): -4.3,
     ("truth", "knit_06", "course"): 0.4,
-    ("truth", "knit_08", "wale"): -0.1,
+    ("truth", "knit_08", "wale"): -1.4,
     ("truth", "knit_08", "course"): 2.3,
     ("truth", "knit_09", "wale"): -0.9,
     ("truth", "knit_09", "course"): -0.0,
@@ -80,7 +82,7 @@ BASELINE = {
     ("truth", "synth_rib", "wale"): 0.0,
     ("truth", "synth_rib", "course"): 0.1,
     # (b) the ruler detector's pre-fill accepted as-is
-    ("ruler", "jersey", "wale"): -16.5,
+    ("ruler", "jersey", "wale"): -6.2,
     ("ruler", "jersey", "course"): -6.7,
     ("ruler", "teal", "wale"): 69.6,
     ("ruler", "teal", "course"): 99.1,
@@ -89,11 +91,11 @@ BASELINE = {
     ("ruler", "knit_02", "wale"): None,
     ("ruler", "knit_05", "wale"): -15.5,
     ("ruler", "knit_05", "course"): -1.2,
-    ("ruler", "knit_06", "wale"): 84.5,
+    ("ruler", "knit_06", "wale"): 72.4,
     ("ruler", "knit_06", "course"): 93.1,
     ("ruler", "knit_08", "wale"): None,
     ("ruler", "knit_08", "course"): None,
-    ("ruler", "knit_09", "wale"): 19.3,
+    ("ruler", "knit_09", "wale"): 15.2,
     ("ruler", "knit_09", "course"): 17.1,
     ("ruler", "synth_jersey", "wale"): 154.0,
     ("ruler", "synth_jersey", "course"): 153.9,
@@ -144,6 +146,23 @@ KNOWN_BEYOND_BAR = {
     ("ruler", "synth_rib", "course"): _ruler_reason("synth_rib", "is spurious (+306.4%)"),
 }
 
+# Rows pinned as KNOWN CONFIDENT-AND-WRONG by ruling: inside the 20% bar
+# (so test_app_path_row guards them against regression like any other
+# row) and still "confident" with |error| > CONFIDENT_WRONG_PCT. Each is a
+# strict xfail on test_known_confident_and_wrong_row_is_fixed: the day a
+# change takes the row inside 10% or flags it uncertain, it XPASSes and
+# the entry has to come off on purpose, together with its line in
+# CONFIDENT_AND_WRONG below.
+KNOWN_CONFIDENT_AND_WRONG = {
+    ("truth", "teal", "wale"): (
+        "-11.0% CONFIDENT -- KNOWN CONFIDENT-AND-WRONG, ACCEPTED BY EVA'S RULING on the loop-count gate "
+        "(variant B) and the target of the next PR: teal's own wale periodicity reads 75-80 px against a "
+        "68.2 px truth on every proposed area at every scale (the pinned-crop scorecard reads -12.4%), and "
+        "only a count's VALUE ever put it inside 10%; under the ruling a corroborating count supplies "
+        "confidence, never the value. Within 15% at all seven scales (ruling condition 2)."
+    ),
+}
+
 # Fixtures that get no proposed areas on calibration (a).
 NO_PROPOSALS = {"knit_02": _NO_PROPOSALS, "knit_05": _NO_PROPOSALS}
 
@@ -164,24 +183,15 @@ WRONG_RULER = {
 # (fixture, axis) whose app-path result jumps > 25% or flips status under
 # +-0.5/1/2% scale jitter around the correct scale.
 JITTER_UNSTABLE = {
-    ("jersey", "wale"): (
-        "4.72/in at the exact scale; -2% reads 3.85 and flips to uncertain (no jump beyond 25%, but "
-        "-0.5% / +0.5% / +2% read 4.19 / 4.34 / 3.85 against a true 5.00 -- an accepted count of 4-6 "
-        "columns on a 250 px window outweighing the area's own periodicity reading)"
-    ),
     ("knit_01", "course"): "-2%, -1% and +0.5% read ~3.9-4.0/in against 5.95; -1% and +0.5% flip to uncertain",
     ("knit_08", "course"): "stable value, but three of six jitters flip uncertain -> confident",
-    ("knit_08", "wale"): "stable value (4.24-5.40/in against 4.49), but four of six jitters flip confident -> uncertain",
-    ("teal", "wale"): "stable value (3.19-4.14/in against 3.74), but -2% and -0.5% flip confident -> uncertain",
+    ("knit_08", "wale"): "stable value (4.24-4.85/in against 4.44), but +0.5% and +2% flip confident -> uncertain",
 }
 
 # The headline: confident-and-wrong rows per calibration mode.
 CONFIDENT_AND_WRONG = {
-    "truth": [],
-    "ruler": [("jersey", "wale"), ("knit_05", "wale"), ("knit_06", "course"), ("knit_06", "wale"),
-              ("knit_09", "course"), ("knit_09", "wale"), ("synth_garter", "course"), ("synth_garter", "wale"),
-              ("synth_jersey", "course"), ("synth_jersey", "wale"), ("synth_rib", "course"),
-              ("synth_rib", "wale"), ("teal", "course"), ("teal", "wale")],
+    "truth": [("teal", "wale")],
+    "ruler": [("knit_05", "wale"), ("knit_06", "course"), ("knit_06", "wale"), ("knit_09", "course"), ("knit_09", "wale"), ("synth_garter", "course"), ("synth_garter", "wale"), ("synth_jersey", "course"), ("synth_jersey", "wale"), ("synth_rib", "course"), ("synth_rib", "wale"), ("teal", "course"), ("teal", "wale")],
 }
 
 @pytest.fixture(scope="module")
@@ -217,6 +227,21 @@ def test_app_path_row(card, key):
         f"{key}: {err:+.1f}% (status {row['status']}) vs pinned {base:+.1f}% -- |error| worsened by more "
         f"than {REGRESSION_PP:g} points"
     )
+
+
+@pytest.mark.parametrize("key", [
+    pytest.param(key, id="-".join(key), marks=_strict(reason)) for key, reason in KNOWN_CONFIDENT_AND_WRONG.items()
+])
+def test_known_confident_and_wrong_row_is_fixed(card, key):
+    row = card["rows"][key]
+    assert not ap.confident_and_wrong(row), (
+        f"{key}: {row['error']:+.1f}% (status {row['status']}) -- still confident-and-wrong"
+    )
+
+
+def test_known_confident_and_wrong_rows_are_in_the_headline_list():
+    for (mode, name, axis) in KNOWN_CONFIDENT_AND_WRONG:
+        assert (name, axis) in CONFIDENT_AND_WRONG[mode], f"{(mode, name, axis)} is pinned as known but missing from CONFIDENT_AND_WRONG"
 
 
 def test_baseline_covers_every_scored_row(card):

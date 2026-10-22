@@ -4639,8 +4639,11 @@ def _wale_count_candidate(lattice: Optional["LoopLatticeResult"]) -> Tuple[Optio
     return lattice.wale_spacing_px, confidence
 
 
-# A region's COUNTED spacing may CORROBORATE and refine its own periodicity
-# reading; it may not REPLACE it across a harmonic. Measured on the app-path
+# A region's COUNTED spacing may CORROBORATE its own periodicity reading --
+# raising the confidence the region votes with -- and never REPLACES it,
+# neither across a harmonic nor within the agreement tolerance (the value
+# fed to the consensus is always the region's own reading; see
+# wale_candidates in analyze_multi_roi). Measured on the app-path
 # scorecard (tests/app_path_scorecard.py, every fixture, the exact scale and
 # +-0.5/1/2% jitter -- 70 runs, ~200 regions): wherever the two disagreed,
 # the count was the wrong one, every time -- usually the stitch-LEG lattice
@@ -4660,9 +4663,21 @@ def _wale_count_candidate(lattice: Optional["LoopLatticeResult"]) -> Tuple[Optio
 # evidence. The tolerance is the consensus's own "agrees" tolerance
 # (CONSENSUS_INLIER_LOG_TOLERANCE), so "the count agrees with the region's
 # own reading" means the same thing here as "two regions agree" does there.
-# A region with no periodicity reading at all keeps the count unchanged:
-# there is nothing to corroborate against, and a count is still a
-# measurement.
+# A region with no periodicity reading at all has nothing to corroborate
+# and nothing to vote with.
+#
+# Why the count supplies confidence and not the value, even when it agrees
+# (Eva's ruling on the same scorecard): a count of 4-6 columns on a 250 px
+# window (the real jersey) agrees with the reading to within 1.25x while
+# sitting 12-22% high (a missed column leaves the median interval long),
+# and its confidence -- regularity and row support, which a missed column
+# barely dents -- outweighed the region's own, so the result swung with the
+# calibration scale (4.19 / 4.34 / 3.85 against a true 5.00 at three of
+# seven jitter scales). Fed the reading instead, jersey holds 4.66-4.83 at
+# every scale. The cost, accepted by ruling: teal, whose own periodicity is
+# 12% low on every area at every scale, reads -11.0% instead of the -6.6% a
+# corroborating count's value gave it (pinned as a known confident-and-
+# wrong row; the next mechanism is the count's precision on small windows).
 WALE_COUNT_AGREEMENT_LOG_TOLERANCE = CONSENSUS_INLIER_LOG_TOLERANCE
 
 
@@ -4671,10 +4686,12 @@ def _wale_count_harmonic_note(count_px: Optional[float], periodicity_px: Optiona
     None when a region's counted spacing agrees with its own periodicity
     reading (within WALE_COUNT_AGREEMENT_LOG_TOLERANCE in log-ratio), or
     when there is no periodicity reading to compare against -- the count
-    may then feed the consensus. Otherwise a human-readable reason naming
-    the disagreement (and the harmonic it is consistent with, when it is
-    one), and the count is NOT used: the region contributes its own
-    periodicity reading instead. See the comment above.
+    may then corroborate the reading (supplying the candidate's
+    confidence). Otherwise a human-readable reason naming the disagreement
+    (and the harmonic it is consistent with, when it is one), and the
+    count is NOT used: the region votes with its own periodicity
+    confidence. The VALUE the region contributes is its own periodicity
+    reading either way. See the comment above.
     """
     if count_px is None or periodicity_px is None or count_px <= 0 or periodicity_px <= 0:
         return None
@@ -4763,14 +4780,17 @@ class RoiMeasurement:
     loop_centers_px: List[Tuple[float, float]] = field(default_factory=list)
     rotation_deg: float = 0.0
     loop_lattice: Optional["LoopLatticeResult"] = None
-    # Which evidence the WALE consensus candidate below actually came
-    # from: "loop_count" when this region's own loop-lattice detector
-    # found enough well-supported columns to COUNT a spacing directly
-    # (median interval between real, position-verified stitch columns);
-    # "periodicity" when it fell back to the autocorrelation-based
-    # estimate (analyze_gauge's own wale.spacing_px) because loop-lattice
-    # didn't produce a trustworthy result for this region. See
-    # _wale_count_candidate.
+    # Which evidence backs this region's WALE consensus candidate:
+    # "loop_count" when this region's own loop-lattice detector found
+    # enough well-supported columns to COUNT a spacing directly (median
+    # interval between real, position-verified stitch columns) AND that
+    # count agrees with the region's own periodicity reading -- the count
+    # then CORROBORATES the reading and supplies the candidate's
+    # confidence; "periodicity" when there was no trustworthy count, or
+    # the count disagreed across a harmonic (see wale_count_note). The
+    # candidate's VALUE is the region's own wale.spacing_px on both paths
+    # (see wale_candidates in analyze_multi_roi and the comment above
+    # _wale_count_harmonic_note).
     wale_source: str = "periodicity"
     wale_count_confidence: float = 0.0
     # Set when this region's loop-lattice count was trustworthy on its own
@@ -5134,7 +5154,12 @@ def analyze_multi_roi(
     ratio_excluded_labels = set()
     density_excluded_labels = set()
     for idx, m in enumerate(per_roi):
-        wale_px = m.loop_lattice.wale_spacing_px if (m.wale_source == "loop_count" and m.loop_lattice) else m.wale.spacing_px
+        # The value that enters the vote is the region's own periodicity
+        # reading on every path now (see wale_candidates below); a
+        # corroborating count agrees with it within
+        # WALE_COUNT_AGREEMENT_LOG_TOLERANCE, so its implied density is
+        # the same density to within that tolerance.
+        wale_px = m.wale.spacing_px
         course_px = m.course.spacing_px
         reasons = []
 
@@ -5179,14 +5204,16 @@ def analyze_multi_roi(
     course_no_measurement_labels: List[str] = []
 
     def wale_candidates() -> List[dict]:
-        # Prefer each region's COUNTED spacing (median interval between
-        # real, position-verified loop columns) over its periodicity
-        # estimate whenever the count is trustworthy enough -- see the
-        # module comment above _wale_count_candidate for why wale
-        # specifically. Falls back to periodicity when loop-lattice
-        # didn't produce a trustworthy result for that region, so a
-        # region is never dropped just because the experimental detector
-        # came up empty on it.
+        # Each region votes with its own periodicity reading; a trustworthy
+        # COUNT (median interval between real, position-verified loop
+        # columns) that agrees with that reading corroborates it and
+        # supplies the vote's confidence -- see the module comment above
+        # _wale_count_candidate for why wale specifically, and the one
+        # above _wale_count_harmonic_note for why the count never supplies
+        # the value. A region with no trustworthy count, or a count that
+        # disagrees across a harmonic, votes with its periodicity
+        # confidence, so a region is never dropped just because the
+        # experimental detector came up empty on it.
         #
         # With exactly ONE approved region, cross-region consensus isn't
         # possible at all -- confidence instead comes from whether this
@@ -5197,12 +5224,17 @@ def analyze_multi_roi(
         for idx, m in enumerate(per_roi):
             if m.label in ratio_excluded_labels or m.label in density_excluded_labels:
                 continue
-            if m.wale_source == "loop_count":
-                spacing_px = m.loop_lattice.wale_spacing_px
-                base_confidence = m.wale_count_confidence
-            else:
-                spacing_px = m.wale.spacing_px
-                base_confidence = m.wale.confidence
+            # The VALUE is always the region's own periodicity reading. A
+            # trustworthy count that AGREES with it (wale_source
+            # "loop_count") corroborates it and supplies the confidence;
+            # it never supplies the value -- see the comment above
+            # _wale_count_harmonic_note (Eva's ruling on the app-path
+            # scorecard: a 4-6 column count on a small window is 12-22%
+            # off on the real jersey while still "agreeing", and letting
+            # it stand in for the reading made the result swing with the
+            # calibration scale).
+            spacing_px = m.wale.spacing_px
+            base_confidence = m.wale_count_confidence if m.wale_source == "loop_count" else m.wale.confidence
             if spacing_px is None:
                 wale_no_measurement_labels.append(m.label)
                 if m.wale.status != "uncertain":

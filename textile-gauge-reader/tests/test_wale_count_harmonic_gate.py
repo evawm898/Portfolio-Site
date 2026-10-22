@@ -147,9 +147,13 @@ def test_leg_lattice_count_no_longer_overrides_every_region(monkeypatch):
     assert result.wale_consensus.included_labels == ["A", "B", "C"]
 
 
-def test_an_agreeing_count_still_corroborates_and_refines(monkeypatch):
-    # The mechanism's documented purpose is intact: a count that agrees
-    # with the region's own reading is preferred, and the record says so.
+def test_an_agreeing_count_corroborates_the_reading_and_never_supplies_the_value(monkeypatch):
+    # Eva's ruling (variant B): a count that agrees with the region's own
+    # reading is recorded as corroborating it (wale_source "loop_count",
+    # the count's confidence on the vote), but the VALUE that enters the
+    # consensus is the region's own periodicity reading, never the count.
+    # knit_08's own numbers: readings 82.5 / 72.75 / 78.0, counts 79.0 /
+    # 77.5 / 75.0 -- all agreeing within 1.25x.
     result = _run(
         monkeypatch,
         periodicity_by_x={0: 82.5, 100: 72.75, 200: 78.0},
@@ -160,7 +164,23 @@ def test_an_agreeing_count_still_corroborates_and_refines(monkeypatch):
         assert by_label[label].wale_source == "loop_count"
         assert by_label[label].wale_count_confidence > 0
         assert by_label[label].wale_count_note is None
-    assert result.wale_consensus.spacing_px in (75.0, 77.5, 79.0)
+    assert result.wale_consensus.spacing_px in (72.75, 78.0, 82.5)
+    assert result.wale_consensus.spacing_px not in (75.0, 77.5, 79.0)
+    assert result.wale_consensus.included_labels == ["A", "B", "C"]
+
+
+def test_a_corroborated_count_cannot_swing_the_result_with_the_scale(monkeypatch):
+    # The jersey mechanism in miniature: two regions reading 35.3 / 35.2
+    # px; one count of six columns reads 39.5 (12% high, within the
+    # agreement tolerance) with a confidence far above the region's own.
+    # Before the ruling that count's VALUE won the weighted median
+    # (39.5 px); now the consensus is a reading.
+    result = _run(
+        monkeypatch,
+        periodicity_by_x={0: 35.333, 100: 35.2, 200: 35.5},
+        lattice_by_x={0: FakeLattice(17.5), 100: FakeLattice(39.5, column_count=6), 200: FakeLattice(36.0)},
+    )
+    assert 35.0 <= result.wale_consensus.spacing_px <= 35.6
 
 
 def test_the_gate_is_per_region(monkeypatch):
