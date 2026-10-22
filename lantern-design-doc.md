@@ -411,37 +411,44 @@ seam order, the rules used, LED only) and the design JSON; the folded view as
 a PNG from the canvas itself. The single-half SVGs stay as the quick path.
 JSZip is loaded on the first click from the pin `cards.html` uses.
 
-## 7. Backing (phase 4 — plan)
+## 7. Backing (phase 4 — built)
 
-Translucent pieces behind cut regions, per facet / region, outline = cut region
-+ glue margin, trimmed off the folds; 1–3 colours by region with curated
-palettes; "no backing" stays available.
+`lantern-build.js`. One translucent piece per point per half, behind that
+point's cut field: the field region (between the spine band and the two fold
+keep-outs, from where the field opens to the rim margin) grown by a 3 mm glue
+margin that is held off every fold (a quarter of the keep-out from the
+valleys, the inner half of the spine) and off the rim — so the tissue never
+crosses a crease, which is what would stop a crease folding. The two halves
+of a point join into one piece across the ridge. Colours are assigned per
+POINT from a curated palette (warm, ice, forest, dusk, paper), cycling, so
+"two colours" alternates around the star and "three" runs a triad; each
+piece is labelled by point. The pieces nest on their own sheets in the ZIP
+(cut from the tissue; the labels name the colour). The folded view draws a
+translucent tissue skin inside every point in its colour, so the cuts show
+colour before the lit view exists.
 
-## 8. Export (phase 3/4 — plan)
+## 9. Instructions (phase 4 — built)
 
-Machine profiles, score strategy (laser: mountains scored, valleys perforated
-1 mm / 1 mm; blade: score layer), LightBurn-style layers (CUT red, SCORE blue,
-PERF green, ENGRAVE black), bed presets and nesting, settings panel, test
-grid, single-point coupon, SVG per sheet, ZIP, PNG, design JSON.
+`buildSteps(model, plan, state, rules)` is ONE list the Build view (a third
+tab beside Flat and Folded) and the PDF (jsPDF, loaded on the first click)
+both draw: cut, weed, fold, join the modules (when split), back the cuts
+(when backing), the ring, raise the halves, join the halves, light (LED only,
+5 W or less, never incandescent or halogen), hang, check — eleven steps on a
+split, backed star, nine whole and plain, every one carrying this star's own
+counts. Beside them a machine-settings table — starting values for a power
+test on the stock, per layer, scaled by the caliper — and the TEST GRID (a
+coupon of the rules themselves: bridges 0.6–2.2, holes 0.8–3.0, strokes
+0.6–2.0, a score beside a cut at 2–6 mm, the derived value marked ◀) and the
+single-point COUPON (front module F1 alone on the bed). All of it rides in
+the ZIP beside the sheets, as SVGs and `INSTRUCTIONS.txt`.
 
-Phase 1 ships: the flat half as one SVG (outline, creases on their layers,
-tabs, the opening and ring) and the design JSON save / load.
+Phase 1 opened on the FOLDED view with a slow turntable; phase 5 moves the
+default to LIT.
 
-## 9. Instructions (phase 4 — plan), 10. Lit view (phase 5 — plan)
+## 10. Lit view (phase 5 — plan)
 
-As briefed. Phase 1 opens on the FOLDED view with a slow turntable; phase 5
-moves the default to LIT.
-
-Why three.js for the 3D views: the folded view needs orbit controls, a
-double-sided lit material and, in phase 5, a point light inside a translucent
-shell with emissive cut regions and a projected shadow on a backdrop — all of
-which three gives for one pinned CDN import (`three@0.161.0`, the version
-every other generator here pins, so the headless tools serve one local copy).
-Hand-rolled WebGL would be a week of shader and camera code for no gain and
-no gate coverage. It is confined to `lantern-view.js`; nothing else imports
-it, and the geometry module hands it plain Float32 triangle data.
-
----
+A point light inside the star, the paper emissive, the cuts throwing their
+pattern onto a wall behind; the page opens Lit (ruling 7).
 
 ## 11. UI
 
@@ -460,7 +467,7 @@ Phone width stacks the preview over the panel.
 1. Geometry core, page shell, Flat + Folded, curve editor, presets, gates.
 2. Pattern system + validity — built (§4).
 3. Material model + modularization + export — built (§5, §6, §8).
-4. Backing + settings + test grid + coupon + instructions + ring.
+4. Backing + settings + test grid + coupon + instructions + ring — built (§7, §9).
 5. Lit simulation.
 6. Stretch: faceted-curve profile, SVG import, wall band, collapsible lock.
 
@@ -543,6 +550,15 @@ to the lantern's own files (and `bloom-curve.js`, which it imports).
     into modules; on a 20″ star the K40 cannot cut even a module.
 18. Nesting is shelf packing by bounding box, about 55 % utilisation; a
     polygon nest would save sheets and is phase 6 territory.
+19. **Backing is per POINT, one piece per half, colours cycling by point**
+    (§7); the alternatives — per facet half, or per cut region — make more
+    pieces for the same light. The 3 mm glue margin and the five palettes
+    are placements. The backing ships OFF.
+20. The machine settings table (§9) is scaled from a 200 gsm laser baseline
+    (CUT 55 % / 18 mm/s, SCORE 14 % / 40 mm/s) by the caliper; every
+    machine is its own and the numbers are a place to start a power test.
+21. The instructions say LED only, 5 W or less — the one safety line, kept
+    on the page, in the PDF and in the ZIP's text.
 
 ## 15. Out of scope, named
 

@@ -410,7 +410,7 @@ function rim3dOf(facet) {
    crease lines, `sign` +1 for the front (centre at +H) and −1 for the back.
    Fans from the centre to each facet's rim; with an opening, a strip from the
    opening ring (on each generator at ρ = r_h) to the rim. */
-export function foldedMesh(model, sign = 1, { opening = false, solidAlternate = false } = {}) {
+export function foldedMesh(model, sign = 1, { opening = false, solidAlternate = false, perPoint = false } = {}) {
   const { N, facets, H, tip3d } = model;
   const typeOf = (j) => (model.alternate ? facets[j % 2] : facets[0]);
   const tris = [];
@@ -419,8 +419,11 @@ export function foldedMesh(model, sign = 1, { opening = false, solidAlternate = 
   const rh = opening ? model.opening / 2 : 0;
   // per facet TYPE: its own position and uv streams, so a pattern texture per type maps onto exactly its facets
   // with "alternate points solid" the odd points carry no pattern: they get their own parts, flagged, so the view can give them an uncut material
-  const parts = facets.flatMap((t) => (solidAlternate ? [{ type: t.type, solid: false, pos: [], uv: [], box: uvBox(t) }, { type: t.type, solid: true, pos: [], uv: [], box: uvBox(t) }] : [{ type: t.type, solid: false, pos: [], uv: [], box: uvBox(t) }]));
-  const partOf = (facet, j) => parts[facets.indexOf(facet) * (solidAlternate ? 2 : 1) + (solidAlternate && j % 2 === 1 ? 1 : 0)];
+  // `perPoint` gives every point its own part (the backing colours are per point); otherwise one part per type (and per parity under solid-alternate)
+  const parts = perPoint
+    ? Array.from({ length: N }, (_, j) => ({ type: typeOf(j).type, j, solid: solidAlternate && j % 2 === 1, pos: [], uv: [], box: uvBox(typeOf(j)) }))
+    : facets.flatMap((t) => (solidAlternate ? [{ type: t.type, solid: false, pos: [], uv: [], box: uvBox(t) }, { type: t.type, solid: true, pos: [], uv: [], box: uvBox(t) }] : [{ type: t.type, solid: false, pos: [], uv: [], box: uvBox(t) }]));
+  const partOf = (facet, j) => (perPoint ? parts[j] : parts[facets.indexOf(facet) * (solidAlternate ? 2 : 1) + (solidAlternate && j % 2 === 1 ? 1 : 0)]);
   let cur = null, curFlat = null;
   const push = (p, flat) => { tris.push(p[0], p[1], p[2]); cur.pos.push(p[0], p[1], p[2]); cur.uv.push(flat[0] / cur.box.Ro, (flat[1] + cur.box.yMax) / (2 * cur.box.yMax)); };
   const onGen = (Q, rho, frac) => [C[0] + (Q[0] - C[0]) * frac, C[1] + (Q[1] - C[1]) * frac, C[2] + (Q[2] - C[2]) * frac];
@@ -451,7 +454,7 @@ export function foldedMesh(model, sign = 1, { opening = false, solidAlternate = 
     creases.push({ kind: 'mountain', from: C, to: tipP });
     creases.push({ kind: 'valley', from: C, to: valP });
   }
-  return { positions: new Float32Array(tris), creases, triangles: tris.length / 9, parts: parts.filter((p) => p.pos.length).map((p) => ({ type: p.type, solid: p.solid, positions: new Float32Array(p.pos), uvs: new Float32Array(p.uv), box: p.box })) };
+  return { positions: new Float32Array(tris), creases, triangles: tris.length / 9, parts: parts.filter((p) => p.pos.length).map((p) => ({ type: p.type, j: p.j, solid: p.solid, positions: new Float32Array(p.pos), uvs: new Float32Array(p.uv), box: p.box })) };
 }
 /* The flat box a facet type's pattern texture covers: x in [0, Ro] along the
    ridge, y in [−yMax, yMax] across both halves. One owner, read by the mesh's

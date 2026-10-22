@@ -35,7 +35,18 @@
      X8  the sag warning fires above the limit and not under it; the weight
          estimate is paper area × gsm less the cut fraction.
 
-   --negative-control re-imports COPIES of lantern-material.js / lantern-export.js
+     X9  BACKING (phase 4): one tissue piece per point per half, each inside
+         its own point's outline, every vertex at least a quarter of the fold
+         keep-out from the two valleys and off the spine's inner half, the
+         colours cycling by point for 1, 2 and 3 colours; none with alternate
+         points solid on the odd points; none when the pattern is none.
+     X10 the TEST GRID marks the stock's own four values (◀) and carries the
+         four series; the COUPON is one front module alone, placed on the bed;
+         the INSTRUCTIONS are eleven steps on a split plan with backing (nine
+         whole with neither), at least nine of them naming a count of this
+         star (fold and hang carry none).
+
+   --negative-control re-imports COPIES of lantern-material.js / lantern-export.js / lantern-build.js
    with one deliberate defect at a time and requires each to redden exactly the
    clauses it names (every anchor checked before any runs). */
 
@@ -51,10 +62,10 @@ const NEG = args.includes('--negative-control');
 const polyArea = (p) => { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]); return Math.abs(a / 2); };
 const rot = ([x, y], g) => [x * Math.cos(g) - y * Math.sin(g), x * Math.sin(g) + y * Math.cos(g)];
 
-async function run(G, P, M, X) {
+async function run(G, P, M, X, B) {
   const res = [];
   const ok = (c, m) => res.push([!!c, m]);
-  const base = { ...G.DEFAULTS, ...P.PATTERN_STATE_DEFAULTS, ...M.EXPORT_STATE_DEFAULTS };
+  const base = { ...G.DEFAULTS, ...P.PATTERN_STATE_DEFAULTS, ...M.EXPORT_STATE_DEFAULTS, ...B.BACKING_STATE_DEFAULTS };
   const model = G.solveLantern(base);
   const rules = M.rulesFor(M.stockOf(base), M.machineOf(base));
   const pattern = P.patternForModel(model, base, rules, { validate: false });
@@ -167,12 +178,44 @@ async function run(G, P, M, X) {
     const w = M.weightEstimate(1e6, 0.25, 200);
     ok(Math.abs(lim - 300) < 1e-9 && limThin < lim && Math.abs(w - 150) < 1e-9, `X8: the sag limit is ${lim.toFixed(0)} mm at 0.25 mm and ${limThin.toFixed(0)} at 0.16; a square metre of 200 gsm a quarter cut away weighs ${w} g`);
   }
+  // X9 backing
+  {
+    const inside = (poly, p) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) if ((poly[i][1] > p[1]) !== (poly[j][1] > p[1]) && p[0] < poly[i][0] + ((p[1] - poly[i][1]) * (poly[j][0] - poly[i][0])) / (poly[j][1] - poly[i][1])) c = !c; return c; };
+    const mods = X.modulePieces(model, pattern, base, 'front', rules);
+    const st = { ...base, backing: true, backingColours: 2 };
+    const bk = B.backingPieces(model, st, rules, 'front');
+    let out = 0, nearFold = 0, onSpine = 0;
+    const t = model.facets[0], tanA = Math.tan(t.a);
+    for (const p of bk) { const mod = mods[p.j]; for (const q of p.outline) { if (!inside(mod.outline, q)) out++; } const reg = B.backingRegion(t, rules); for (const [x, y] of reg) { if ((x * tanA - y) * Math.cos(t.a) < rules.foldKeepout * 0.25 - 1e-9) nearFold++; if (y < rules.spine * 0.25 - 1e-9) onSpine++; } }
+    const cols = (n) => B.backingPieces(model, { ...st, backingColours: n }, rules, 'front').map((p) => p.colour);
+    const pal = B.paletteOf(st).colours;
+    const cyc = [1, 2, 3].every((n) => cols(n).every((c, j) => c === pal[j % n]));
+    const alt = B.backingPieces(model, { ...st, patSolidAlt: true }, rules, 'front');
+    const none = B.backingPieces(model, { ...st, patMode: 'none' }, rules, 'front');
+    ok(bk.length === N && out === 0 && nearFold === 0 && onSpine === 0 && cyc && alt.length === Math.ceil(N / 2) && alt.every((p) => p.j % 2 === 0) && none.length === N, `X9: ${bk.length} tissue pieces, ${out} vertices outside their point, ${nearFold} inside the fold keep-out, ${onSpine} on the spine; colours cycle for 1 / 2 / 3; ${alt.length} with alternate solid (the even points); ${none.length} pieces are laid out for a plain star (the page gates them)`);
+  }
+  // X10 grid, coupon, steps
+  {
+    const grid = B.testGridSvg(rules, { stamp: 'gate' });
+    const marks = ((grid.split('<g id="ENGRAVE"')[1] || '').split('</g>')[0].match(/◀/g) || []).length, rects = (grid.match(/<rect/g) || []).length, circles = (grid.match(/<circle/g) || []).length;
+    const mods = X.modulePieces(model, pattern, base, 'front', rules);
+    const coupon = B.couponPieces(mods), sheet = X.nest(coupon, M.bedOf(base))[0];
+    const plan = X.exportPlan(model, pattern, base, rules);
+    const stepsSplit = B.buildSteps(model, plan, base, rules, { backing: 10 }), stepsWhole = B.buildSteps(model, X.exportPlan(model, pattern, { ...base, bed: 'laser900' }, rules), base, rules, { backing: 0 });
+    const counted = stepsSplit.filter((st) => /\d/.test(st.text)).length;
+    ok(marks === 4 && rects >= 26 && circles === 7 && coupon.length === 1 && coupon[0].which === 'front' && coupon[0].j === 0 && sheet.items.length === 1 && stepsSplit.length === 11 && stepsWhole.length === 9 && counted >= 9 && stepsSplit.some((st) => /LED only/.test(st.text)),
+      `X10: the test grid marks ${marks} derived values over ${rects} rects and ${circles} holes; the coupon is ${coupon.length} piece (${coupon[0] && coupon[0].label}) on a sheet of ${sheet.items.length}; ${stepsSplit.length} steps split with backing, ${stepsWhole.length} whole without, ${counted} carrying a number, LED-only present`);
+  }
   return res;
 }
 
 const MUTANTS = [
+  { id: 'the-backing-crosses-the-fold', file: 'lantern-build.js', from: "Math.max(yLo, Math.min(F.yHi(x) + g, F.rimY(x) - rules.rimMargin * 0.6, x * Math.tan(t.a) - rules.foldKeepout * 0.5 / Math.cos(t.a)))", to: "Math.max(yLo, F.yHi(x) + g + 6)", breaks: ['X9'] },
+  { id: 'the-backing-colours-do-not-cycle', file: 'lantern-build.js', from: "export const colourOfPoint = (state, j) => paletteOf(state).colours[j % state.backingColours];", to: "export const colourOfPoint = (state, j) => paletteOf(state).colours[0];", breaks: ['X9'] },
+  { id: 'the-grid-marks-nothing', file: 'lantern-build.js', from: "engrave.push(txt(x, y + 13, `${b}${Math.abs(b - rules.bridge) < 1e-9 ? ' ◀' : ''}`)); });", to: "engrave.push(txt(x, y + 13, `${b}`)); });", breaks: ['X10'] },
+  { id: 'the-steps-skip-the-modules', file: 'lantern-build.js', from: "...(modules ? [{ title: 'Join the modules',", to: "...(false ? [{ title: 'Join the modules',", breaks: ['X10'] },
   { id: 'the-rules-ignore-the-caliper', file: 'lantern-material.js', from: 'bridge: clamp(4.8 * t, 1.0, 2.2),', to: 'bridge: 1.2,', breaks: ['X0'] },
-  { id: 'a-module-drops-its-left-edge', file: 'lantern-export.js', from: 'const outline = [...apex, ...left, ...right.slice(1)];', to: 'const outline = [...apex, ...right];', breaks: ['X1'] },   // the seams, the nest and the sheet do not read the left edge: X1's area is the witness
+  { id: 'a-module-drops-its-left-edge', file: 'lantern-export.js', from: 'const outline = [...apex, ...left, ...right.slice(1)];', to: 'const outline = [...apex, ...right];', breaks: ['X1', 'X9'] },   // the seams, the nest and the sheet do not read the left edge: X1's area is the witness, and the backing then falls outside its point
   { id: 'the-seam-tab-is-on-the-module', file: 'lantern-export.js', from: 'const n2 = [nR[0] * sgn, nR[1] * sgn];', to: 'const n2 = [-nR[0] * sgn, -nR[1] * sgn];', breaks: ['X2'] },
   { id: 'the-seam-labels-do-not-pair', file: 'lantern-export.js', from: "{ text: `S${((j + N - 1) % N) + 1}`,", to: "{ text: `S${j + 1}`,", breaks: ['X2'] },
   { id: 'the-nest-ignores-the-margin', file: 'lantern-export.js', from: 'const W = bed.w - 2 * BED_MARGIN_MM, H = bed.h - 2 * BED_MARGIN_MM, gap = 4;', to: 'const W = bed.w, H = bed.h, gap = 4;', breaks: ['X3'] },
@@ -190,13 +233,13 @@ const G = await import('../lantern-geometry.js');
 const P = await import('../lantern-pattern.js');
 if (!NEG) {
   const M = await import('../lantern-material.js'), X = await import('../lantern-export.js');
-  process.exit(print(await run(G, P, M, X), 'verify-lantern-export') ? 1 : 0);
+  process.exit(print(await run(G, P, M, X, await import('../lantern-build.js')), 'verify-lantern-export') ? 1 : 0);
 } else {
-  const srcs = { 'lantern-material.js': fs.readFileSync(path.join(REPO, 'lantern-material.js'), 'utf8'), 'lantern-export.js': fs.readFileSync(path.join(REPO, 'lantern-export.js'), 'utf8') };
+  const srcs = { 'lantern-material.js': fs.readFileSync(path.join(REPO, 'lantern-material.js'), 'utf8'), 'lantern-export.js': fs.readFileSync(path.join(REPO, 'lantern-export.js'), 'utf8'), 'lantern-build.js': fs.readFileSync(path.join(REPO, 'lantern-build.js'), 'utf8') };
   let bad = 0;
   for (const m of MUTANTS) { const n = srcs[m.file].split(m.from).length - 1; if (n !== 1) { console.log(`ANCHOR ${m.id}: matches ${n} times`); bad++; } }
   if (bad) process.exit(1);
-  const clean = await run(G, P, await import('../lantern-material.js'), await import('../lantern-export.js'));
+  const clean = await run(G, P, await import('../lantern-material.js'), await import('../lantern-export.js'), await import('../lantern-build.js'));
   const names = clean.map(([, msg]) => msg.split(':')[0]);
   for (const m of MUTANTS) for (const b of m.breaks) if (!names.includes(b)) { console.log(`STALE NAME ${m.id} claims ${b}, which the gate does not run`); bad++; }
   if (clean.some(([p]) => !p)) { console.log('the clean tree does not pass; the control cannot run'); process.exit(1); }
@@ -206,7 +249,7 @@ if (!NEG) {
     const abs = (f) => pathToFileURL(path.join(REPO, f)).href;
     for (const f of Object.keys(srcs)) { let s = srcs[f]; if (f === m.file) s = s.replace(m.from, m.to); s = s.replace("from './lantern-geometry.js'", `from '${abs('lantern-geometry.js')}'`).replace("from './lantern-pattern.js'", `from '${abs('lantern-pattern.js')}'`); fs.writeFileSync(path.join(dir, f), s); }
     let res;
-    try { res = await run(G, P, await import(pathToFileURL(path.join(dir, 'lantern-material.js')).href), await import(pathToFileURL(path.join(dir, 'lantern-export.js')).href)); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+    try { res = await run(G, P, await import(pathToFileURL(path.join(dir, 'lantern-material.js')).href), await import(pathToFileURL(path.join(dir, 'lantern-export.js')).href), await import(pathToFileURL(path.join(dir, 'lantern-build.js')).href)); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
     const red = res.filter(([p]) => !p).map(([, msg]) => msg.split(':')[0]);
     const missed = m.breaks.filter((b) => !red.includes(b)), unclaimed = red.filter((r) => !m.breaks.includes(r));
     const good = !missed.length && !unclaimed.length;

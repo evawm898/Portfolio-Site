@@ -47,6 +47,12 @@
          splits the halves into modules and a 900 × 600 bed does not; the ZIP
          download holds one SVG per sheet, a README and the design; the PNG
          download is a PNG; a bed too small reports a problem.
+     P15 BACKING AND BUILD (phase 4): backing on draws a tissue material behind
+         every cut part and lays out 2N pieces; the Build view lists the steps
+         with the counts and the settings table; the PDF download is a PDF; the
+         test grid and coupon downloads are SVGs; the ZIP then holds the backing
+         sheets, the grid, the coupon and INSTRUCTIONS.txt; backing survives a
+         reload.
 
    --negative-control re-serves deliberately broken copies of lantern.js and
    requires each to fail the check that names it. Every anchor is checked
@@ -277,7 +283,8 @@ async function run(override = null) {
       const JSZip = createRequire(import.meta.url)(path.join(REPO, 'node_modules/jszip'));   // the UMD build, through require
       const z = await JSZip.loadAsync(fs.readFileSync(zip.path));
       const names = Object.keys(z.files);
-      const svgs = names.filter((n) => /\.svg$/.test(n)), readme = names.find((n) => /README/.test(n)), json = names.find((n) => /\.json$/.test(n));
+      const svgs = names.filter((n) => /-sheet-\d+-of-\d+\.svg$/.test(n)),   // the CUT sheets by name; the zip also carries backing sheets, the test grid and the coupon (P15's)
+       readme = names.find((n) => /README/.test(n)), json = names.find((n) => /\.json$/.test(n));
       const sheet1 = svgs.length ? await z.file(svgs[0]).async('string') : '';
       const png = await download(page, () => page.click('#exportPng'));
       const pngHead = fs.readFileSync(png.path).subarray(0, 8).toString('hex');
@@ -286,6 +293,25 @@ async function run(override = null) {
       await T(() => window.__lantern.set('bed', 'glowforge')); await T(() => window.__lantern.set('material', 'card200'));
       ok(first.validated && first.flags.includes('thin') && r1.bridge > r0.bridge && r1.rimMargin > r0.rimMargin && new RegExp(`bridge ${r1.bridge}`).test(txt) && pat1.validated && pat1.cuts[0] !== pat0.cuts[0] && planG.split && planG.sheets > 2 && !planL.split && planL.sheets === 2 && svgs.length === planL.sheets && readme && json && /id="CUT"/.test(sheet1) && /id="PERF"/.test(sheet1) && pngHead === '89504e470d0a1a0a' && !small.plan.fitsBed && small.bed && /bad/.test(small.bed.kind) && /problem/.test(small.badge),
         `P14: first paint judged (${first.flags.join(', ')}); cover300 → bridge ${r0.bridge} → ${r1.bridge}, rim margin ${r0.rimMargin} → ${r1.rimMargin}, read-out "${txt.slice(0, 40)}…", pattern re-laid on the new rules (${pat0.cuts[0]} → ${pat1.cuts[0]} cuts); Glowforge split=${planG.split} ${planG.sheets} sheets, 900×600 split=${planL.split} ${planL.sheets} sheets; zip holds ${svgs.length} svg + ${readme ? 'README' : 'no README'} + ${json ? 'design' : 'no design'}; png header ${pngHead}; K40: fits=${small.plan.fitsBed}, "${small.bed && small.bed.text.slice(0, 50)}…", badge "${small.badge}"`);
+    }
+    // P15 backing and build
+    {
+      await T(() => window.__lantern.set('backing', true)); await page.waitForTimeout(200);
+      const mats = await T(() => window.__lantern.fold.materials()), bk = await T(() => ({ pieces: window.__lantern.backingPieces(), sheets: window.__lantern.backingSheets(), N: window.__lantern.model().N }));
+      await T(() => window.__lantern.view('build')); await page.waitForTimeout(150);
+      const build = await T(() => ({ steps: window.__lantern.steps(), text: window.__lantern.buildText(), vis: !document.getElementById('buildView').hidden && document.getElementById('foldCanvas').hidden }));
+      const pdf = await download(page, () => page.click('#instructionsPdf'));
+      const pdfHead = fs.readFileSync(pdf.path).subarray(0, 5).toString();
+      const grid = await download(page, () => page.click('#testGrid')), coupon = await download(page, () => page.click('#coupon'));
+      const zip = await download(page, () => page.click('#exportZip'));
+      const JSZip = createRequire(import.meta.url)(path.join(REPO, 'node_modules/jszip'));
+      const names = Object.keys((await JSZip.loadAsync(fs.readFileSync(zip.path))).files);
+      const has = (re) => names.filter((n) => re.test(n)).length;
+      await page.reload(); await page.waitForTimeout(600);
+      const kept = await T(() => window.__lantern.state().backing);
+      await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.view('folded'));
+      ok(mats.includes('tissue') && mats.filter((m) => m === 'tissue').length === 2 * bk.N && bk.pieces === 2 * bk.N && bk.sheets >= 1 && build.vis && build.steps.length === 11 && /Join the modules/.test(build.text) && /LED only/.test(build.text) && /starting setting/.test(build.text) && pdfHead === '%PDF-' && /test-grid\.svg$/.test(grid.name) && /◀/.test(grid.text) && /coupon\.svg$/.test(coupon.name) && /id="CUT"/.test(coupon.text) && has(/backing-\d+-of/) === bk.sheets && has(/test-grid/) === 1 && has(/coupon/) === 1 && has(/INSTRUCTIONS/) === 1 && kept === true,
+        `P15: backing → ${mats.filter((m) => m === 'tissue').length} tissue materials for ${bk.N} points, ${bk.pieces} pieces on ${bk.sheets} sheets; Build view ${build.vis ? 'shown' : 'hidden'} with ${build.steps.length} steps; PDF "${pdfHead}"; ${grid.name}, ${coupon.name}; zip: ${has(/backing/)} backing sheets, ${has(/test-grid/)} grid, ${has(/coupon/)} coupon, ${has(/INSTRUCTIONS/)} instructions; backing after a reload: ${kept}`);
     }
   } finally { await s.close(); }
   // P7b fresh profile and P8 phone
@@ -311,14 +337,17 @@ const MUTANTS = [
   { id: 'the-clamp-is-not-shown', file: 'lantern.js', from: "li.className = n.kind === 'clamp' ? 'warn' : n.kind;", to: "li.className = 'info';", breaks: ['P5'] },
   { id: 'the-cuts-are-not-drawn-flat', file: 'lantern.js', from: "flatSvg.append(el('path', { class: 'cutpat', d: path(c.poly, true) }));", to: '0;', breaks: ['P10'] },
   { id: 'the-svg-has-no-cuts', file: 'lantern.js', from: "const exportSvg = (which) => G.flatSvg(model, which, { cuts: state.patMode === 'none' ? [] : PAT.placeCuts(model, pattern, state).map((c) => c.poly) });", to: "const exportSvg = (which) => G.flatSvg(model, which);", breaks: ['P10'] },
-  { id: 'the-folded-view-has-no-cuts', file: 'lantern.js', from: "fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt, textureOf: texOf });", to: "fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt });", breaks: ['P10'] },
+  { id: 'the-folded-view-has-no-cuts', file: 'lantern.js', from: "bounds: model.rt, textureOf: texOf, colourOf });", to: "bounds: model.rt, colourOf });", breaks: ['P10', 'P15'] },
   { id: 'an-island-is-not-a-problem', file: 'lantern.js', from: "if (pc.island) cutFindings.push({ kind: 'bad',", to: "if (pc.island) cutFindings.push({ kind: 'info',", breaks: ['P12'] },
   { id: 'a-finding-click-does-not-zoom', file: 'lantern.js', from: "if (n.issue) { li.title = 'show in the Flat view'; li.addEventListener('click', () => focusIssue(n.issue)); }", to: "if (n.issue) { li.title = 'show in the Flat view'; }", breaks: ['P12'] },
   { id: 'the-random-pattern-keeps-islands', file: 'lantern.js', from: "const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;", to: "const score = 0;", breaks: ['P13'] },
   { id: 'a-preset-stock-keeps-the-old-caliper', file: 'lantern.js', from: "if (id === 'material' && value !== 'custom') { const m = MAT.MATERIALS.find((x) => x.id === value); state.gsm = m.gsm; state.caliper = m.t; }", to: "0;", breaks: ['P14'] },
   { id: 'the-pattern-ignores-the-rules', file: 'lantern.js', from: "pattern = PAT.patternForModel(model, state, rules, { validate: commit || !pattern });", to: "pattern = PAT.patternForModel(model, state, PAT.RULES_DEFAULT, { validate: commit || !pattern });", breaks: ['P14'] },
   { id: 'the-zip-drops-the-readme', file: 'lantern.js', from: "zip.file('README.txt', EXP.readme(model, plan, state, rules));", to: '0;', breaks: ['P14'] },
-  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13'] },
+  { id: 'the-backing-is-not-drawn', file: 'lantern.js', from: "const colourOf = backing ? (part) => (part.solid ? null : BLD.colourOfPoint(state, part.j)) : null;", to: "const colourOf = null;", breaks: ['P15'] },
+  { id: 'the-zip-drops-the-backing-sheets', file: 'lantern.js', from: "plan.backingSheets.forEach((sh, k) => { sh.machine = plan.machine; zip.file(", to: "[].forEach((sh, k) => { sh.machine = plan.machine; zip.file(", breaks: ['P15'] },
+  { id: 'the-build-view-stays-hidden', file: 'lantern.js', from: "$('buildView').toggleAttribute('hidden', name !== 'build');", to: "$('buildView').toggleAttribute('hidden', true);", breaks: ['P15'] },
+  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13', 'P15'] },
 ];
 
 function print(res, label) { let f = 0; for (const [p, m] of res) { console.log(`${p ? 'ok  ' : 'FAIL'} ${m}`); if (!p) f++; } console.log(`\n${label}: ${res.length - f} of ${res.length} passed`); return f; }

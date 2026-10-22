@@ -53,7 +53,9 @@ export function createFoldedView(canvas) {
   }
   /* `halves` is [{ positions, creases, parts? }, …]; with `textureOf(part)` returning a canvas (or null) the
      parts are drawn each with its own alpha-mapped material, so the cuts show as holes in the folded paper. */
-  function setModel(halves, { fit = true, bounds = null, textureOf = null } = {}) {
+  const tintMats = new Map();   // colour hex -> a translucent tissue material, drawn as a second skin just inside the paper
+  function tintFor(hex) { let m = tintMats.get(hex); if (!m) { m = new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.95, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.82, depthWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }); tintMats.set(hex, m); } return m; }
+  function setModel(halves, { fit = true, bounds = null, textureOf = null, colourOf = null } = {}) {
     clear();
     let maxR = 1;
     for (const h of halves) {
@@ -65,6 +67,8 @@ export function createFoldedView(canvas) {
           g.computeVertexNormals();
           const mesh = new THREE.Mesh(g, matFor(textureOf(part)));
           group.add(mesh); meshes.push(mesh);
+          const tint = colourOf && colourOf(part);
+          if (tint) { const back = new THREE.Mesh(g, tintFor(tint)); back.renderOrder = -1; group.add(back); meshes.push(back); }
         }
       } else {
         const g = new THREE.BufferGeometry();
@@ -122,7 +126,7 @@ export function createFoldedView(canvas) {
     lookAt: (target, dir, dist) => { controls.target.set(...target); camera.position.set(target[0] + dir[0] * dist, target[1] + dir[1] * dist, target[2] + dir[2] * dist); lastUser = performance.now(); controls.update(); dirty = true; renderOnce(); },
     pixel: (x, y) => { const gl = renderer.getContext(); const px = new Uint8Array(4); const r = renderer.getPixelRatio(); gl.readPixels(Math.round(x * r), Math.round((canvas.height / r - y) * r), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [...px]; },
     isRunning: () => running,
-    materials: () => meshes.filter((m) => m.isMesh).map((m) => (m.material.alphaMap ? 'cut' : 'paper')),
+    materials: () => meshes.filter((m) => m.isMesh).map((m) => (m.material.alphaMap ? 'cut' : m.material.transparent ? 'tissue' : 'paper')),
     THREE, scene, group, renderer, controlsRef: controls,
   };
 }

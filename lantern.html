@@ -66,6 +66,15 @@
     </div>
   </details>
 
+  <details class="ln-sec" id="secBacking">
+    <summary>Backing</summary>
+    <div class="ln-sec-body">
+      <div id="backingCtrls"></div>
+      <div class="ln-row" id="paletteSwatch"></div>
+      <p class="ln-note">translucent tissue behind each point's cuts, one piece per point per half, trimmed off every fold; its sheets ride in the ZIP</p>
+    </div>
+  </details>
+
   <details class="ln-sec" id="secProfile">
     <summary>Profile</summary>
     <div class="ln-sec-body" id="profileCtrls"></div>
@@ -91,6 +100,7 @@
       <div class="ln-derived" id="planOut"></div>
       <div class="ln-row"><button class="ln-btn ln-btn--solid" id="exportZip">Cut files (.zip)</button><button class="ln-btn" id="exportPng">Render (.png)</button></div>
       <div class="ln-row"><button class="ln-btn ln-btn--sm" id="svgFront">Front half SVG</button><button class="ln-btn ln-btn--sm" id="svgBack">Back half SVG</button></div>
+      <div class="ln-row"><button class="ln-btn ln-btn--sm" id="testGrid" title="Cut this first on your stock: bridges, holes, strokes and keep-outs, the derived value marked">Test grid SVG</button><button class="ln-btn ln-btn--sm" id="coupon" title="One point of this star, alone: cut it before the whole">Coupon SVG</button><button class="ln-btn ln-btn--sm" id="instructionsPdf">Instructions PDF</button></div>
       <p class="ln-msg" id="exportMsg"></p>
       <div class="ln-row"><button class="ln-btn" id="saveDesign">Save design (.json)</button><label class="ln-btn ln-file">Open design<input type="file" id="openDesign" accept=".json,application/json"></label></div>
       <p class="ln-msg" id="designMsg"></p>
@@ -106,11 +116,13 @@
       <span class="ln-views" id="views">
         <button class="ln-btn ln-btn--sm" data-view="flat">Flat</button>
         <button class="ln-btn ln-btn--sm is-on" data-view="folded">Folded</button>
+        <button class="ln-btn ln-btn--sm" data-view="build">Build</button>
       </span>
     </div>
     <div class="ln-stage">
       <svg id="flatSvg" class="ln-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The flat cut pattern of one half" hidden></svg>
       <canvas id="foldCanvas"></canvas>
+      <div id="buildView" class="ln-build" hidden></div>
       <p class="ln-building" id="building" hidden>solving…</p>
     </div>
   </section>
