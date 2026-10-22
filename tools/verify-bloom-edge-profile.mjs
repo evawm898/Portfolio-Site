@@ -1098,9 +1098,10 @@ const MUTATIONS = [
   { id: 'the-leaf-rim-is-not-recorded', breaks: ['E0'],
     /* RE-ANCHORED (leaf/stem build S3): the blade's emitPanel call moved into
        `emitLeafBladeInto`, the one emitter a simple leaf and every leaflet go
-       through, so the mutation reaches both. */
-    from: "  emitPanel(acc, rows, panel, () => t, rim);",
-    to:   "  emitPanel(acc, rows, panel, () => t, null);" },
+       through, so the mutation reaches both. RE-ANCHORED AGAIN (root support):
+       the thickness is the leaf's root law per row now (`tAtRow`). */
+    from: "  emitPanel(acc, rows, panel, tAtRow, rim);",
+    to:   "  emitPanel(acc, rows, panel, tAtRow, null);" },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
