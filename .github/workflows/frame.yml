@@ -17,11 +17,14 @@ on:
       - frame-profile-editor.js
       - frame-relief.js
       - frame-view3d.js
+      - frame-filigree.js
       - tools/verify-frame.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
       - tools/shot-frame-skeletons.mjs
+      - tools/shot-frame-scrolls.mjs
+      - tools/frame-fold-boundary.mjs
       - docs/frame-charter.md
       - .github/workflows/frame.yml
   push:
@@ -35,11 +38,14 @@ on:
       - frame-profile-editor.js
       - frame-relief.js
       - frame-view3d.js
+      - frame-filigree.js
       - tools/verify-frame.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
       - tools/shot-frame-skeletons.mjs
+      - tools/shot-frame-scrolls.mjs
+      - tools/frame-fold-boundary.mjs
       - docs/frame-charter.md
   workflow_dispatch: {}
 
@@ -78,6 +84,8 @@ jobs:
           git fetch --depth=1 origin e7590411d20754b84aef66845358d0b76f18d9d8
           git worktree add /tmp/frame-base e7590411d20754b84aef66845358d0b76f18d9d8
           node tools/verify-frame-relief.mjs --base /tmp/frame-base
+      - name: Ruling 5 — the clamps sit on the measured fold
+        run: node tools/frame-fold-boundary.mjs
       - name: Relief negative control
         run: node tools/verify-frame-relief.mjs --negative-control
       - name: Frame gate (part one Node, part two Chromium)

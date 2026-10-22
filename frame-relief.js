@@ -68,7 +68,7 @@ export function embedSpine(spine, e = EMBED_MM) {
 /* Mesh accumulator                                                    */
 /* ------------------------------------------------------------------ */
 
-class Mesh {
+export class Mesh {
   constructor() { this.pos = []; this.idx = []; this.parts = []; }
   vertex(x, y, z) { this.pos.push(x, y, z); return this.pos.length / 3 - 1; }
   tri(a, b, c) {

@@ -119,7 +119,7 @@ function pointInPoly(pt, poly) {
 // distance reads the closing edge too — the band's end at the far springing)
 const footprint = (G, spine) => { const p = [...G.outerEdge(spine, spine.bandWidth), ...G.innerEdge(spine, spine.bandWidth).slice().reverse()]; return [...p, p[0]]; };
 
-async function run(G, R, RL, label = 'shipped') {
+async function run(G, R, RL, label = 'shipped', FL = null) {
   const out = [];
   const rec = (name, ok, detail = '') => { out.push({ name, ok: !!ok, detail }); if (label === 'shipped') check(name, ok, detail); };
 
@@ -260,6 +260,91 @@ async function run(G, R, RL, label = 'shipped') {
   const m2 = { ...m, bands: m.spines.map((sp) => G.sweepSpine(sp, m.prof, m.params)) };
   rec('X2 the SVG is the same string with every embed declaration deleted', G.exportSvg(m2).svg === withEmbed, `${withEmbed.length} chars`);
 
+  // SC — the SCROLL primitive (phase 3a, step 1: frame-filigree.js), on the
+  // vocabulary grid. Every quantity is read off the EMITTED polyline and the
+  // mesh, against restatements of the law from the spec and MIN_FEATURE_MM.
+  if (FL) {
+    const F = R.MIN_FEATURE_MM;
+    const grid = [];
+    for (const kind of ['C', 'S']) for (const tightness of [0, 0.5, 1]) for (const length of [30, 60, 120]) for (const wire of [1, 1.6, 3.2]) grid.push({ kind, tightness, length, wire, balance: kind === 'C' ? 0.6 : 1 });
+    const scs = grid.map((q) => ({ q, c: FL.buildScroll(q) }));
+    // turning between consecutive chords (atan2: never acos)
+    const turnAt = (P, i) => { const ax = P[i][0] - P[i - 1][0], ay = P[i][1] - P[i - 1][1], bx = P[i + 1][0] - P[i][0], by = P[i + 1][1] - P[i][1]; return Math.atan2(ax * by - ay * bx, ax * bx + ay * by); };
+    const circR = (a, b, c) => { const A = Math.hypot(b[0] - c[0], b[1] - c[1]), B = Math.hypot(a[0] - c[0], a[1] - c[1]), C = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2; return ar > 1e-15 ? A * B * C / (4 * ar) : Infinity; };
+    let sc1 = [], sc2 = [], sc3 = [], worstEye = 0, worstTurn = 0, worstGap = Infinity;
+    for (const { q, c } of scs) {
+      const rel = FL.scrollRelief([c], { baseZ: 1 });
+      const a = RL.analyzeStl(RL.exportStl(rel)), cc = RL.connected(rel);
+      if (a.boundary !== 0 || cc.comps !== 1) sc1.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}: boundary ${a.boundary}, ${cc.comps} regions`);
+      const P = c.pts, n = P.length, t = Math.max(F, q.wire);
+      // the eye: the radius at each END, read off the last three vertices, is
+      // the restated floor (t + F)/2 — the wire's inner edge keeps F/2 of radius
+      const eyeWant = (t + F) / 2;
+      // the radius of curvature is LINEAR in arc length through the volute (a
+      // log spiral), so it is extrapolated to the end vertex from the two last
+      // triples' circumradii (each the radius at its middle vertex)
+      const L2 = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const endR = (Q) => { const r1 = circR(Q[1], Q[2], Q[3]), r0 = circR(Q[0], Q[1], Q[2]); return r0 + (r0 - r1) * L2(Q[0], Q[1]) / L2(Q[1], Q[2]); };
+      // the drawn arcs carry the curvature of each step's MIDPOINT, so the end
+      // is within one step's change of ρ: the volute's slope is at most
+      // (ρ_mid − eye) / (VOLUTE_SHARE · half), ρ_mid = SCROLL_BODY · length —
+      // restated from the module's constants and the spec, never the builder
+      const betaE = Math.min(1, Math.max(0.3, q.balance)), hS = q.length - q.length / (1 + betaE);
+      const slope = (FL.SCROLL_BODY[q.kind] * q.length - eyeWant) / (FL.VOLUTE_SHARE * hS);
+      const ends = [[endR([P[0], P[1], P[2], P[3]]), L2(P[0], P[1]) + L2(P[1], P[2])], [endR([P[n - 1], P[n - 2], P[n - 3], P[n - 4]]), L2(P[n - 1], P[n - 2]) + L2(P[n - 2], P[n - 3])]];   // the last step may be a short remainder, so two steps
+      for (const [r, ds] of ends) { const e = Math.abs(r - eyeWant) / eyeWant; worstEye = Math.max(worstEye, e); if (Math.abs(r - eyeWant) > slope * ds) sc2.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}: eye ${r.toFixed(4)} vs ${eyeWant}`); }
+      // the turns drawn: sum the emitted turning over each half's volute (its
+      // last VOLUTE_SHARE of arc length, from the restated half lengths)
+      const beta = Math.min(1, Math.max(0.3, q.balance)), h2 = q.length / (1 + beta), h1 = q.length - h2;
+      const arc = [0]; for (let i = 1; i < n; i++) arc.push(arc[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+      const halves = [[0, h1 * FL.VOLUTE_SHARE], [q.length - h2 * FL.VOLUTE_SHARE, q.length]];
+      halves.forEach(([s0, s1], k) => {
+        let tt = 0; for (let i = 1; i < n - 1; i++) if (arc[i] > s0 + 1e-9 && arc[i] < s1 - 1e-9) tt += turnAt(P, i);
+        const got = Math.abs(tt) / (2 * Math.PI), want = c.info.turnsBuilt[k];
+        // the summed chord turning covers the volute less the step straddling
+        // each end: at most two steps of SCROLL_STEP_DEG
+        const d = Math.abs(got - want) - 2 * FL.SCROLL_STEP_DEG / 360;
+        worstTurn = Math.max(worstTurn, Math.abs(got - want));
+        if (d > 0) sc2.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire} half ${k}: ${got.toFixed(3)} turns drawn vs ${want.toFixed(3)} reported`);
+      });
+      if (c.info.turnsHeld > FL.tightnessTurns(q.tightness) + 1e-12) sc2.push(`${q.kind}: held ${c.info.turnsHeld} above asked`);
+      // the self-gap, RESTATED: every pair of vertices the EMITTED chords turn
+      // at least π between, centreline distance less the wire
+      let cum = [0]; for (let i = 1; i < n - 1; i++) cum.push(cum[i - 1] + turnAt(P, i)); cum.push(cum[n - 2]);
+      let g = Infinity;
+      for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (Math.abs(cum[j] - cum[i]) >= Math.PI) g = Math.min(g, Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - t);
+      worstGap = Math.min(worstGap, g);
+      // within the chord's own turning step of the curve's π
+      if (g < F - 1e-6) sc3.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}: self-gap ${g.toFixed(4)} mm`);
+    }
+    rec('SC1 every scroll on the vocabulary grid is a closed solid: boundary 0 and one voxel region', sc1.length === 0, `${scs.length} scrolls${sc1.length ? ': ' + sc1.slice(0, 3).join('; ') : ''}`);
+    rec('SC2 the drawn scroll is the law: each eye (the end vertices\' radius, extrapolated) is the restated floor (t + F)/2 within two steps of the spiral\'s own slope, each volute\'s drawn turns are the reported ones, never above the asked', sc2.length === 0, `worst eye ${(100 * worstEye).toFixed(3)}%, worst turns ${worstTurn.toFixed(4)}${sc2.length ? ' — ' + sc2.slice(0, 3).join('; ') : ''}`);
+    rec('SC3 no wire comes within a feature of its own coil, eye or mouth (restated off the emitted chords)', sc3.length === 0, `least self-gap ${worstGap.toFixed(4)} mm against ${F}${sc3.length ? ' — ' + sc3.slice(0, 3).join('; ') : ''}`);
+    const thin = FL.buildScroll({ kind: 'C', length: 60, tightness: 0.5, wire: 0.6 });
+    rec('SC4 a wire under the floor is built AT it and told', thin.info.wire === F && thin.info.told.some((x) => /wire 0\.60/.test(x)), thin.info.told.join('; '));
+    // SC5 mirror: x -> -x to the bit, and the group's junctions
+    const c0 = scs[4].c, m0 = FL.placeCurve(c0, { mirror: true });
+    const mirOk = m0.pts.every((p, i) => Object.is(p[0], -c0.pts[i][0]) && Object.is(p[1], c0.pts[i][1]));
+    rec('SC5 a mirrored scroll is its source with x negated, to the bit', mirOk, `${m0.pts.length} vertices`);
+    const sc6 = [];
+    let leastPair = Infinity, longestWeb = 0;
+    for (const n of [2, 3, 4, 5]) for (const tightness of [0, 1]) {
+      const g = FL.buildGroup({ n, length: 60, tightness, wire: 1.6 });
+      const cs = g.map((x) => x.curve);
+      const rel = FL.scrollRelief(cs, { baseZ: 1 });
+      if (RL.analyzeStl(RL.exportStl(rel)).boundary !== 0 || RL.connected(rel).comps !== 1) sc6.push(`group ${n}: not one closed region`);
+      // each child OVERLAPS its parent by at least the embed at the contact:
+      // least centreline distance ≤ (t_p + t_c)/2 − EMBED, restated
+      for (const x of g.filter((y) => y.role === 'child')) {
+        const p = cs[x.parent], tp = p.info.wire, tc = x.curve.info.wire;
+        let d = Infinity; for (const a of x.curve.pts) for (const b of p.pts) d = Math.min(d, Math.hypot(a[0] - b[0], a[1] - b[1]));
+        if (d > (tp + tc) / 2 - RL.EMBED_MM + 1e-6) sc6.push(`group ${n}: a child stands ${(d - (tp + tc) / 2).toFixed(3)} mm off its parent (wants an overlap of ${RL.EMBED_MM})`);
+      }
+      for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) { const pg = FL.pairGap(cs[i], cs[j]); leastPair = Math.min(leastPair, pg.gap); longestWeb = Math.max(longestWeb, pg.web); if (pg.gap < F - 1e-9) sc6.push(`group ${n} τ${tightness}: wires ${i}-${j} ${pg.gap.toFixed(3)} mm apart outside their junction`); }
+    }
+    rec('SC6 a group is one closed region; each child overlaps its parent by the embed; outside each junction no two wires come within a feature', sc6.length === 0, `least pair gap ${leastPair.toFixed(4)} mm, longest junction web ${longestWeb.toFixed(1)} mm${sc6.length ? ' — ' + sc6.slice(0, 3).join('; ') : ''}`);
+  }
+
   // base-tree byte identity, when a worktree is given
   if (label === 'shipped') {
     if (BASE) {
@@ -289,15 +374,21 @@ const MUTANTS = [
   // phase 2b: a closed loop left OPEN at its seam, and the seam moved 0.1 mm
   { id: 'the-closing-strip-dropped', file: 'relief', from: 'const strips = closed ? V : V - 1, nx = (v) => (v + 1) % V;', to: 'const strips = V - 1, nx = (v) => (v + 1) % V;', breaks: ['W', 'Q'] },
   { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
+  // phase 3a, the scroll: the gap clamp removed, the eye under the floor, a
+  // child laid off its parent's back
+  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (g.gap < MIN_FEATURE_MM) {', to: 'if (false) {', breaks: ['SC3'] },
+  { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2'] },
+  { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wire + tw) / 2 - EMBED_MM;', to: 'const off = (wire + tw) / 2 + 0.5;', breaks: ['SC6'] },
   { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
 ];
 
 async function negativeControl() {
   const srcG = fs.readFileSync(path.join(ROOT, 'frame-geometry.js'), 'utf8');
   const srcR = fs.readFileSync(path.join(ROOT, 'frame-relief.js'), 'utf8');
+  const srcF = fs.readFileSync(path.join(ROOT, 'frame-filigree.js'), 'utf8');
   const R = await import(pathToFileURL(path.join(ROOT, 'frame-registry.js')).href);
   for (const m of MUTANTS) {
-    const n = (m.file === 'relief' ? srcR : srcG).split(m.from).length - 1;
+    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : srcG).split(m.from).length - 1;
     if (n !== 1) { console.log(`FAIL anchor ${m.id}: matches ${n} times`); process.exit(1); }
   }
   let bad = 0;
@@ -305,10 +396,13 @@ async function negativeControl() {
     const gPath = path.join(ROOT, `_frame-geometry-mutant-${m.id}.js`), rPath = path.join(ROOT, `_frame-relief-mutant-${m.id}.js`);
     fs.writeFileSync(gPath, m.file === 'geometry' ? srcG.replace(m.from, m.to) : srcG);
     fs.writeFileSync(rPath, (m.file === 'relief' ? srcR.replace(m.from, m.to) : srcR).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`));
+    const fPath = path.join(ROOT, `_frame-filigree-mutant-${m.id}.js`);
+    fs.writeFileSync(fPath, (m.file === 'filigree' ? srcF.replace(m.from, m.to) : srcF).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`).replace("from './frame-relief.js'", `from './${path.basename(rPath)}'`));
     const G = await import(pathToFileURL(gPath).href + `?${Date.now()}`);
     const RL = await import(pathToFileURL(rPath).href + `?${Date.now()}`);
-    const out = await run(G, R, RL, m.id);
-    fs.unlinkSync(gPath); fs.unlinkSync(rPath);
+    const FL = await import(pathToFileURL(fPath).href + `?${Date.now()}`);
+    const out = await run(G, R, RL, m.id, FL);
+    fs.unlinkSync(gPath); fs.unlinkSync(rPath); fs.unlinkSync(fPath);
     const red = out.filter((r) => !r.ok).map((r) => r.name.split(' ')[0]);
     const missed = m.breaks.filter((c) => !red.includes(c)), unclaimed = red.filter((c) => !m.breaks.includes(c));
     const ok = missed.length === 0 && unclaimed.length === 0;
@@ -324,7 +418,8 @@ else {
   const G = await import(pathToFileURL(path.join(ROOT, 'frame-geometry.js')).href);
   const R = await import(pathToFileURL(path.join(ROOT, 'frame-registry.js')).href);
   const RL = await import(pathToFileURL(path.join(ROOT, 'frame-relief.js')).href);
-  await run(G, R, RL);
+  const FL = await import(pathToFileURL(path.join(ROOT, 'frame-filigree.js')).href);
+  await run(G, R, RL, 'shipped', FL);
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length} of ${results.length} checks passed${failed.length ? ' — FAILED: ' + failed.map((f) => f.name).join('; ') : ''}`);
   process.exit(failed.length ? 1 : 0);

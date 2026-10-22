@@ -11564,6 +11564,11 @@ trims between neighbouring joins and wraps through the seam; named ANCHORS are d
 registry; the interior is open / backed / recessed. Every arch row's SVG and STL is
 byte-identical to `e759041` (CI's `--base`). Read §7b of the charter before touching a closed
 skeleton. Sheet: `node tools/shot-frame-skeletons.mjs <dir>`.
+**Phase 3a step 1 (Oct 22): the SCROLL primitive (`frame-filigree.js`) — C and S scrolls by a
+curvature law, log-spiral volutes whose turns the 1 mm self-gap clamps (told), groups of 2–5,
+swept by `bandSolid` — and ruling 5's clamps MEASURED (`tools/frame-fold-boundary.mjs`; the
+notch floor was a guess and is F now). Not attached to any skeleton yet. Read §10 of the
+charter. Sheet: `node tools/shot-frame-scrolls.mjs <dir>`; gates SC1–SC6 and K5.
 
 ## `/marble` — the paper-marbling simulator (pointer only)
 
