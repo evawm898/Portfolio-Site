@@ -10,7 +10,7 @@ import { findJam, cycleStats } from './knit-lab-analysis.js';
 // the simulation on the page's own thread, as the first version did (for comparison).
 const HASH = new URLSearchParams(location.hash.slice(1));
 const OVERRIDE = {};
-for (const [k, v] of HASH) if (k in PARAMS) OVERRIDE[k] = typeof PARAMS[k] === 'number' ? +v : v;
+for (const [k, v] of HASH) if (k in PARAMS) OVERRIDE[k] = typeof PARAMS[k] === 'number' ? +v : typeof PARAMS[k] === 'boolean' ? (v === 'true' || v === '1') : v;
 const WALES = Math.max(2, +HASH.get('WALES') || 10), COURSES = Math.max(3, +HASH.get('COURSES') || 10);
 const USE_WORKER = HASH.get('WORKER') !== '0' && typeof Worker !== 'undefined';
 const P = { ...PARAMS, ...OVERRIDE };
@@ -141,7 +141,7 @@ function draw(b) {
   let pinsDrawn = false;
   for (let o = 0; o < nChunks; o++) {
     const k = order[o], a = k * CHUNK, e = Math.min(n - 1, a + CHUNK);
-    if (!pinsDrawn && keys[k] > 0) { drawPins(s, cx, cy); pinsDrawn = true; }
+    if (!pinsDrawn && keys[k] > 0) { if (pinsShown()) drawPins(s, cx, cy); pinsDrawn = true; }
     const shade = 0.45 + 0.55 * (keys[k] - z0) / zr;
     const c = init.course[a];
     const base = stripes && Math.floor(c) % 2 === 1 ? [47, 163, 163] : [233, 236, 236];
@@ -155,8 +155,9 @@ function draw(b) {
       ctx.restore();
     }
   }
-  if (!pinsDrawn) drawPins(s, cx, cy);
+  if (!pinsDrawn && pinsShown()) drawPins(s, cx, cy);
 }
+const pinsShown = () => P.FIXTURE !== 'clamp' || st.dir === 'course';
 function drawPins(s, cx, cy) {   // the comb, seen end on: the pins run straight into the screen
   const r = P.PIN_RADIUS * s;
   ctx.fillStyle = '#34393a'; ctx.strokeStyle = PETROL; ctx.lineWidth = 1;
@@ -203,7 +204,7 @@ function readouts() {
   const pct = v => Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—';
   const rows = [
     ['swatch', init.label],
-    ['test', `${st.dir === 'course' ? 'along the courses (side jaws)' : 'along the wales (comb)'} · ${P.PROTOCOL === 'stepped' ? `stepped, ${(P.STEP_EXT * 100).toFixed(1)}% a step, held to ${(P.STEP_TOL * 100).toFixed(2)}%` : `continuous at ${P.PULL_SPEED} d/s`}`],
+    ['test', `${st.dir === 'course' ? 'along the courses (side jaws; does not settle on this model)' : 'along the wales (top jaw)'} · ${P.PROTOCOL === 'stepped' ? `stepped, ${(P.STEP_EXT * 100).toFixed(1)}% a step, held to ${(P.STEP_TOL * 100).toFixed(2)}%` : `continuous at ${P.PULL_SPEED} d/s`}`],
     ['phase', st.phase + (st.loadEnd && st.phase !== 'pulling' ? ` (loading ended on ${st.loadEnd})` : '')],
     ['simulation thread', USE_WORKER ? 'Web Worker' : 'this page (#WORKER=0)'],
     ['points / contact pairs', `${init.n} / ${st.nPairs}`],
@@ -218,7 +219,7 @@ function readouts() {
     ['overlaps > ½ d now / worst', `${st.overlaps} / ${st.worstDeep}`, st.worstDeep > 0],
     ['largest yarn strain', `${(st.maxStrain * 100).toFixed(3)}%`, st.maxStrain > 0.01],
     ['extension', st.restHeight ? pct(st.extension) : '—'],
-    [st.dir === 'course' ? 'load: left jaw (load cell) / comb' : 'load: bottom jaw / comb', `${st.testLoad.toFixed(0)} / ${st.stats.loadTop.toFixed(0)}`],
+    [st.dir === 'course' ? 'load: left jaw (load cell) / needle' : 'load: bottom jaw / top jaw', `${st.testLoad.toFixed(0)} / ${st.stats.loadTop.toFixed(0)}`],
     ['steps recorded', st.step ? `${st.step.n}${st.step.moving ? ' · moving' : ` · holding ${st.step.hold} frames`}` : '—'],
     ['jam (stiffness ×10 the soft region)', r ? `${pct(r.jam.ext)} at load ${Math.round(r.jam.load)}` : '—'],
     ['hysteresis (loading work lost)', r ? pct(r.cycle.lossFraction) : '—'],
@@ -228,12 +229,12 @@ function readouts() {
   $('klRo').innerHTML = rows.map(([k, v, bad]) => `<dt>${k}</dt><dd${bad ? ' class="is-bad"' : ''}>${v}</dd>`).join('');
   $('klProgress').style.width = `${(st.settleProgress * 100).toFixed(1)}%`;
   $('klStatus').textContent = st.phase === 'settling' ? `settling — ${Math.round(st.settleProgress * 100)}%`
-    : st.phase === 'freeing' ? 'releasing the width: the cast-on on a rail, the comb\'s pins sliding, the swatch settling at its own width…'
+    : st.phase === 'freeing' ? 'releasing the width: the cast-on on a rail, the live stitches on a needle, the swatch settling at its own width…'
     : st.phase === 'free' ? 'settled at its own width.'
     : st.step && (st.phase === 'pulling' || st.phase === 'unloading') ? `${st.phase === 'pulling' ? 'loading' : 'unloading'} in steps: ${st.step.n} recorded, ${st.step.moving ? 'moving the jaw' : `holding (${st.step.hold} frames)`}…`
     : st.phase === 'settled' ? 'settled. Run the test, or drag above the top course.'
     : st.phase === 'pulling' ? (st.pullAuto ? `loading at constant speed, until the bottom jaw reads ${P.LOAD_LIMIT.toExponential(1)}…` : 'pulling by hand')
-    : st.phase === 'unloading' ? 'unloading: the comb going back to where it started…'
+    : st.phase === 'unloading' ? 'unloading: the driven jaw going back to where it started…'
     : st.phase === 'returned' ? 'back at the start, holding…'
     : st.phase === 'done' ? `test done: ${r ? `jam at ${pct(r.jam.ext)}, ${pct(r.cycle.lossFraction)} of the loading work lost, set ${pct(r.cycle.set)}` : ''}` : st.phase;
   $('klTest').disabled = st.phase === 'settling' || st.phase === 'freeing' || (st.phase === 'pulling' && st.pullAuto) || st.phase === 'unloading' || st.phase === 'returned' || st.phase === 'done' || (st.dir === 'course' && direction === 'wale');

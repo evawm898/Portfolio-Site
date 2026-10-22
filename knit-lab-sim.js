@@ -75,10 +75,17 @@ export const PARAMS = {
                                // course test). 0: the rough start relaxes frictionless, the way a knit is
                                // wet-relaxed, so μ 0 and μ 0.25 tests start from the SAME swatch and
                                // friction stores no stress from the drawn guess. null = FRICTION.
+  CONTACT_SMOOTH: false,       // contact between the yarns' smooth (B-spline) curves, not their chords —
+                               // contactSmooth(). OFF: it takes the polyline's corrugation out (a frictionless
+                               // ±2% excursion comes back to 0.4% instead of 4%) but the swatch never comes to
+                               // rest under it (~0.1 d/s held still, every variant tried), so no hold converges.
+  CONTACT_VELOCITY: true,      // the contacts' restitution-0 velocity pass (contactVelocity()). Without it a
+                               // swatch held still keeps moving at 0.05-0.35 d/s whatever the damping.
   CONTACT_SKIP_ARC: 2.0,       // in d: segments nearer than this along the yarn never collide.
   CONTACT_MARGIN: 0.15,        // in d: the pair list is built this much wider than contact and
                                // reused until some point has moved half of it (a Verlet list).
-  SUBSTEPS_PER_FRAME: 32,      // XPBD substeps per rendered frame...
+  SUBSTEPS_PER_FRAME: 64,      // XPBD substeps per rendered frame (with the velocity pass, a held swatch comes
+                               // to rest exactly at 64; at 32 it does not)...
   ITERATIONS_PER_SUBSTEP: 1,   // ...each this many Gauss-Seidel sweeps ("small steps": 1).
   STRETCH_SOLVER: 'direct',    // 'direct': all stretch constraints in one tridiagonal solve along
                                // the yarn; 'gs': one Gauss-Seidel sweep (the first version).
@@ -102,7 +109,7 @@ export const PARAMS = {
                                // stops at a set force, then UNLOADS the comb back to where it started.
                                // Past the jam an inextensible yarn cannot extend, so an extension
                                // target there is a request for broken yarn.
-  PULL_MAX_EXTENSION: 0.6,     // ...or at +60%, whichever first.
+  PULL_MAX_EXTENSION: 3.0,     // ...or at +300%, whichever first (the course direction jams far out).
   STRAIN_STOP: 0.05,           // SAFETY: stop loading if any segment is strained 5%. With the direct
                                // stretch solve it never fires (the gate asserts so); in the first
                                // version it was what ended every pull.
@@ -131,13 +138,17 @@ export const PARAMS = {
                                // no squeeze the loops shorten while still deep and the swatch crumples). It
                                // touches nothing once the swatch starts to settle.
   START_RELEASE_FRAMES: 60,    // ...and opens linearly to nothing over this many frames after closing.
-  OUT_OF_PLANE_K: 0,           // a weak spring holding the fabric's MID-SURFACE near z = 0 (no plates): each
+  OUT_OF_PLANE_K: 300,          // a weak spring holding the fabric's MID-SURFACE near z = 0 (no plates): each
                                // INTERIOR loop (not in an edge wale or an edge course) feels -K x the z of
                                // its own centroid, in model load units per d, spread evenly over its points —
                                // so a loop keeps its own depth and the edges are free to curl. Along z only:
-                               // it never reaches a jaw's load (read along x or y).
-  COURSE_EDGE_LOAD: 0,         // in a course test the live loops ride a NEEDLE (the pins, each free along x)
-                               // that is force-controlled to this load: 0 = the top edge is free.
+                               // it never reaches a jaw's load (read along x or y). 300: at 100 or below the
+                               // swatch crumples while it settles (jaw gap 33 -> 21 d), from 150 up it holds.
+  COURSE_BOTTOM: 'rail',       // in a course test the cast-on rides a RAIL (its y and z kept, free along x) and
+  COURSE_EDGE_LOAD: 1500,      // the live loops a NEEDLE (the pins, each free along x) force-controlled to this
+                               // load: a small pretension across the pull, the wale test's own preload. 'free' /
+                               // 0: both edges free and unloaded — frictionless, the swatch then collapses
+                               // (height 29 -> 21 d, the edges curling 7 d out of plane) and never comes to rest.
   PIN_RADIUS: 0.5,             // comb pin radius, in d.
   TAIL_TIED: 1.5,              // this much of the yarn's end, in d, is tied to the comb.
   COMB_FOLLOW: 1e-3,           // while settling the comb is FORCE-controlled: it moves at this
@@ -336,7 +347,8 @@ export class KnitSim {
     this.loopOf = y.loopOf; this.uOf = y.uOf;
     { const nl = topo.loops.length, last = topo.rows.length - 1, cnt = new Float64Array(nl);
       this.interior = new Uint8Array(nl);
-      for (let c = 1; c < last; c++) { const row = topo.rows[c]; for (let k = 1; k < row.length - 1; k++) this.interior[row[k]] = 1; }
+      const e = P.OUT_OF_PLANE_EDGES ? 0 : 1;
+      for (let c = e; c <= last - e; c++) { const row = topo.rows[c]; for (let k = e; k < row.length - e; k++) this.interior[row[k]] = 1; }
       for (let i = 0; i < y.n; i++) if (y.loopOf[i] >= 0) cnt[y.loopOf[i]]++;
       this.loopCount = cnt; this.loopZ = new Float64Array(nl); }
     this.prev = new Float64Array(n * 3);
@@ -368,8 +380,8 @@ export class KnitSim {
     this.pairCap = this.nSeg * 16;
     this.pairA = new Int32Array(this.pairCap); this.pairB = new Int32Array(this.pairCap); this.lamC = new Float64Array(this.pairCap); this.lamT = new Float64Array(this.pairCap);
     this.cS = new Float64Array(this.pairCap); this.cT = new Float64Array(this.pairCap);
-    this.acc = new Float64Array(this.pairCap * 3); this.capped = new Uint8Array(this.pairCap);
-    this.nPairs = 0;
+    this.acc = new Float64Array(this.pairCap * 3); this.capped = new Uint8Array(this.pairCap); this.cIdx = new Int32Array(8); this.cCo = new Float64Array(8); this.cST = new Float64Array(2); this.cN = new Float64Array(3); for (const k of ['sw0', 'sw1', 'sw2', 'sv0', 'sv1', 'sv2']) this[k] = new Float64Array(4);
+    this.nPairs = 0; this.pinHits = 0;
     this.skip = Math.ceil(P.CONTACT_SKIP_ARC * P.YARN_DIAMETER / this.seg);
     this.cs = [0, 0];
     // state
@@ -535,10 +547,12 @@ export class KnitSim {
     const x = this.x, w = this.w, g = this.grip, D = this.P.YARN_DIAMETER, D2 = D * D, cs = this.cs, lam = this.lamC, lamT = this.lamT, mu = this.relaxing() ? (this.P.SETTLE_FRICTION ?? this.P.FRICTION) : this.P.FRICTION;
     let minD2 = Infinity;
     const pA = this.pairA, pB = this.pairB, memory = this.P.FRICTION_MODE === 'memory';
+    const smooth = this.P.CONTACT_SMOOTH, SM2 = (D + 0.2 * D) * (D + 0.2 * D);
     for (let p = 0; p < this.nPairs; p++) {
       const a0 = pA[p], a1 = a0 + 1, b0 = pB[p], b1 = b0 + 1;
       const d2 = closest(x, a0, a1, b0, b1, cs);
       if (first && d2 < minD2) minD2 = d2;
+      if (smooth) { if (d2 >= SM2) continue; if (this.contactSmooth(p, a0, b0, cs[0], cs[1], at, mu, memory)) continue; continue; }
       if (d2 >= D2) continue;
       const s = cs[0], t = cs[1];
       const pax = x[3 * a0] + (x[3 * a1] - x[3 * a0]) * s, pay = x[3 * a0 + 1] + (x[3 * a1 + 1] - x[3 * a0 + 1]) * s, paz = x[3 * a0 + 2] + (x[3 * a1 + 2] - x[3 * a0 + 2]) * s;
@@ -548,6 +562,7 @@ export class KnitSim {
       if (dd < 1e-9) continue;                       // exact touch: no direction to push in
       nx /= dd; ny /= dd; nz /= dd;
       const ca0 = 1 - s, ca1 = s, cb0 = 1 - t, cb1 = t;
+      this.cS[p] = s; this.cT[p] = t;
       const W = ca0 * ca0 * w[a0] + ca1 * ca1 * w[a1] + cb0 * cb0 * w[b0] + cb1 * cb1 * w[b1];
       if (W === 0) continue;
       const C = dd - D;
@@ -569,7 +584,7 @@ export class KnitSim {
         let rx = (x[3 * a0] - pr[3 * a0]) * ca0 + (x[3 * a1] - pr[3 * a1]) * ca1 - (x[3 * b0] - pr[3 * b0]) * cb0 - (x[3 * b1] - pr[3 * b1]) * cb1;
         let ry = (x[3 * a0 + 1] - pr[3 * a0 + 1]) * ca0 + (x[3 * a1 + 1] - pr[3 * a1 + 1]) * ca1 - (x[3 * b0 + 1] - pr[3 * b0 + 1]) * cb0 - (x[3 * b1 + 1] - pr[3 * b1 + 1]) * cb1;
         let rz = (x[3 * a0 + 2] - pr[3 * a0 + 2]) * ca0 + (x[3 * a1 + 2] - pr[3 * a1 + 2]) * ca1 - (x[3 * b0 + 2] - pr[3 * b0 + 2]) * cb0 - (x[3 * b1 + 2] - pr[3 * b1 + 2]) * cb1;
-        if (memory) { const A3 = this.acc; rx += A3[3 * p]; ry += A3[3 * p + 1]; rz += A3[3 * p + 2]; this.cS[p] = s; this.cT[p] = t; this.capped[p] = 0; }
+        if (memory) { const A3 = this.acc; rx += A3[3 * p]; ry += A3[3 * p + 1]; rz += A3[3 * p + 2]; this.capped[p] = 0; }
         const rn = rx * nx + ry * ny + rz * nz; rx -= rn * nx; ry -= rn * ny; rz -= rn * nz;
         const slip = Math.sqrt(rx * rx + ry * ry + rz * rz);
         if (slip > 1e-12) {
@@ -594,6 +609,153 @@ export class KnitSim {
     return minD2;
   }
 
+  // ---- the smooth contact (CONTACT_SMOOTH). A polyline yarn's tube is CORRUGATED: between two
+  // vertices the chord runs inside the curve the points sample by the sagitta, seg² κ / 8, so a yarn
+  // sliding over a bent one rides over a bump at every vertex. Those bumps pin a frictionless contact
+  // like friction does — an effective coefficient ~ π seg κ / 4, about 0.25 on a knit's ~1.5 d bends at
+  // 0.5 d segments — and that was what lost ~10% of the work in a FRICTIONLESS cycle (measured: the loss
+  // grows with the segment length; the static states it rests in differ by ~0.1-0.3 d all over the
+  // swatch). So the contact is taken between the two smooth CURVES the points define (below), at their
+  // own closest points, not between the chords. The constraint then reads EIGHT points (each segment
+  // and its two neighbours); its weights sum to 1 on each side, so it still pushes the two yarns apart
+  // with equal and opposite impulses.
+  // The yarn's smooth curve is the uniform quadratic B-SPLINE of its points: C1 everywhere (no kink at
+  // a vertex, so a contact sliding along it meets no bump), through every segment's midpoint and inside
+  // every vertex by (x0 - 2 x1 + x2) / 8. On segment (a0, a0+1), at s < ½ it is the piece centred on
+  // a0, at s >= ½ the piece centred on a0+1; splineW() writes the four weights on a0-1 .. a0+2 (value,
+  // first or second derivative in s). At the yarn's two ends it falls back to the chord.
+  splineW(a0, s, order, out) {
+    const n = this.n;
+    if (s < 0.5) {
+      if (a0 < 1) { out[0] = 0; out[1] = order === 0 ? 1 - s : order === 1 ? -1 : 0; out[2] = order === 0 ? s : order === 1 ? 1 : 0; out[3] = 0; return; }
+      if (order === 0) { out[0] = (0.5 - s) * (0.5 - s) / 2; out[1] = 0.75 - s * s; out[2] = (s + 0.5) * (s + 0.5) / 2; }
+      else if (order === 1) { out[0] = -(0.5 - s); out[1] = -2 * s; out[2] = s + 0.5; }
+      else { out[0] = 1; out[1] = -2; out[2] = 1; }
+      out[3] = 0;
+    } else {
+      if (a0 + 2 >= n) { out[0] = 0; out[1] = order === 0 ? 1 - s : order === 1 ? -1 : 0; out[2] = order === 0 ? s : order === 1 ? 1 : 0; out[3] = 0; return; }
+      out[0] = 0;
+      if (order === 0) { out[1] = (1.5 - s) * (1.5 - s) / 2; out[2] = -s * s + 2 * s - 0.25; out[3] = (s - 0.5) * (s - 0.5) / 2; }
+      else if (order === 1) { out[1] = -(1.5 - s); out[2] = 2 - 2 * s; out[3] = s - 0.5; }
+      else { out[1] = 1; out[2] = -2; out[3] = 1; }
+    }
+  }
+  // The closest points of the two smooth segments: Newton on |A(s) - B(t)|² from the chords' answer.
+  // At an interior answer the separation is normal to BOTH curves, so the push is the gradient of the
+  // distance and the contact force is conservative.
+  closestSmooth(a0, b0, s, t) {
+    const x = this.x, o = this.cST, w0 = this.sw0, w1 = this.sw1, w2 = this.sw2, v0 = this.sv0, v1 = this.sv1, v2 = this.sv2;
+    const pt = (j, W, k) => { let r = 0; for (let m = 0; m < 4; m++) if (W[m]) r += W[m] * x[3 * (j - 1 + m) + k]; return r; };
+    for (let it = 0; it < 4; it++) {
+      this.splineW(a0, s, 0, w0); this.splineW(a0, s, 1, w1); this.splineW(a0, s, 2, w2);
+      this.splineW(b0, t, 0, v0); this.splineW(b0, t, 1, v1); this.splineW(b0, t, 2, v2);
+      let raA = 0, rbB = 0, aa = 0, bb = 0, ab = 0, rA2 = 0, rB2 = 0;
+      for (let k = 0; k < 3; k++) {
+        const r = pt(a0, w0, k) - pt(b0, v0, k), Ad = pt(a0, w1, k), Bd = pt(b0, v1, k);
+        raA += r * Ad; rbB += r * Bd; aa += Ad * Ad; bb += Bd * Bd; ab += Ad * Bd; rA2 += r * pt(a0, w2, k); rB2 += r * pt(b0, v2, k);
+      }
+      const gs = raA, gt = -rbB, Hss = aa + rA2, Htt = bb - rB2, Hst = -ab, det = Hss * Htt - Hst * Hst;
+      if (!(Hss > 0 && Htt > 0 && det > 1e-12 * Hss * Htt)) break;
+      let ns = s - (Htt * gs - Hst * gt) / det, nt = t - (Hss * gt - Hst * gs) / det;
+      if (ns < 0 || ns > 1) { ns = ns < 0 ? 0 : 1; nt = t - (gt + Hst * (ns - s)) / Htt; }
+      if (nt < 0 || nt > 1) { nt = nt < 0 ? 0 : 1; ns = s - (gs + Hst * (nt - t)) / Hss; ns = ns < 0 ? 0 : ns > 1 ? 1 : ns; }
+      const done = Math.abs(ns - s) + Math.abs(nt - t) < 1e-10; s = ns; t = nt; if (done) break;
+    }
+    o[0] = s; o[1] = t; return o;
+  }
+  // The eight weights of the contact separation A(s) - B(t) on a0-1 .. a0+2 and b0-1 .. b0+2 (they sum
+  // to +1 on A's side and -1 on B's). A zero weight keeps a valid index.
+  contactCoefs(p, a0, b0, s, t) {
+    const I = this.cIdx, Q = this.cCo, w0 = this.sw0, v0 = this.sv0;
+    this.splineW(a0, s, 0, w0); this.splineW(b0, t, 0, v0);
+    for (let m = 0; m < 4; m++) {
+      I[m] = w0[m] ? a0 - 1 + m : a0; Q[m] = w0[m];
+      I[4 + m] = v0[m] ? b0 - 1 + m : b0; Q[4 + m] = -v0[m];
+    }
+  }
+  contactSmooth(p, a0, b0, s, t, at, mu, memory) {
+    const x = this.x, w = this.w, g = this.grip, D = this.P.YARN_DIAMETER, lam = this.lamC, lamT = this.lamT;
+    const st = this.closestSmooth(a0, b0, s, t); s = st[0]; t = st[1];
+    this.contactCoefs(p, a0, b0, s, t);
+    const I = this.cIdx, Q = this.cCo;
+    let nx = 0, ny = 0, nz = 0, W = 0;
+    for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; nx += q * x[3 * i]; ny += q * x[3 * i + 1]; nz += q * x[3 * i + 2]; W += q * q * w[i]; }
+    const dd = Math.hypot(nx, ny, nz);
+    if (dd >= D || dd < 1e-9 || W === 0) return false;
+    nx /= dd; ny /= dd; nz /= dd;
+    this.cS[p] = s; this.cT[p] = t;
+    let dl = (-(dd - D) - at * lam[p]) / (W + at);
+    if (lam[p] + dl < 0) dl = -lam[p];
+    lam[p] += dl;
+    for (let k = 0; k < 8; k++) {
+      const i = I[k], q = Q[k]; if (!q) continue;
+      if (w[i] === 0) { this.react[g[i]] += q * dl * ny; this.reactX[g[i]] += q * dl * nx; continue; }
+      const kk = w[i] * q * dl; x[3 * i] += nx * kk; x[3 * i + 1] += ny * kk; x[3 * i + 2] += nz * kk;
+    }
+    if (mu > 0) {
+      // friction on the smooth contact: the relative slip of the two (bulged) contact points since the
+      // start of the substep, plus the memory, tangential part, cancelled up to mu x this substep's normal
+      const pr = this.prev; let rx = 0, ry = 0, rz = 0;
+      for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; rx += q * (x[3 * i] - pr[3 * i]); ry += q * (x[3 * i + 1] - pr[3 * i + 1]); rz += q * (x[3 * i + 2] - pr[3 * i + 2]); }
+      if (memory) { const A3 = this.acc; rx += A3[3 * p]; ry += A3[3 * p + 1]; rz += A3[3 * p + 2]; this.capped[p] = 0; }
+      const rn = rx * nx + ry * ny + rz * nz; rx -= rn * nx; ry -= rn * ny; rz -= rn * nz;
+      const slip = Math.sqrt(rx * rx + ry * ry + rz * rz);
+      if (slip > 1e-12) {
+        const budget = mu * lam[p] - lamT[p]; if (budget <= 0) { if (memory) this.capped[p] = 1; return true; }
+        const f = Math.min(1 / W, budget / slip);
+        if (memory && f < 1 / W) this.capped[p] = 1;
+        lamT[p] += f * slip;
+        const tx = rx * f, ty = ry * f, tz = rz * f;
+        for (let k = 0; k < 8; k++) {
+          const i = I[k], q = Q[k]; if (!q) continue;
+          if (w[i] === 0) { this.react[g[i]] -= q * ty; this.reactX[g[i]] -= q * tx; continue; }
+          const kk = w[i] * q; x[3 * i] -= tx * kk; x[3 * i + 1] -= ty * kk; x[3 * i + 2] -= tz * kk;
+        }
+      }
+    }
+    return true;
+  }
+
+  // ---- the contacts' velocity pass (restitution 0). A position-based contact pushes the two yarns
+  // apart by however far the prediction and the other constraints (the stretch solve, last) left them
+  // overlapping, and deriving velocity from positions turns that push into a SEPARATING velocity the
+  // next substep carries: a contact held against a curved yarn bounces every substep, feeding the
+  // swatch energy that only damping takes out. (Measured, frictionless, held still at +12%: RMS speed
+  // 0.14 d/s at 32 substeps a frame, 0.014 at 128 — a time-step artifact.) So after the velocity update
+  // every contact active this substep has its relative NORMAL velocity removed, the restitution-0 step
+  // of XPBD's velocity solve (Müller et al. 2020): perfectly inelastic along the normal, tangential
+  // velocity untouched (friction stays the position pass's). Positions, and so the jaws' loads, are not
+  // moved by it.
+  contactVelocity() {
+    const x = this.x, v = this.v, w = this.w, lam = this.lamC, pA = this.pairA, pB = this.pairB;
+    for (let p = 0; p < this.nPairs; p++) {
+      if (!(lam[p] > 0)) continue;
+      const a0 = pA[p], a1 = a0 + 1, b0 = pB[p], b1 = b0 + 1, s = this.cS[p], t = this.cT[p], ca0 = 1 - s, ca1 = s, cb0 = 1 - t, cb1 = t;
+      let nx = 0, ny = 0, nz = 0, vn = 0;
+      if (this.P.CONTACT_SMOOTH) {
+        this.contactCoefs(p, a0, b0, s, t); const I = this.cIdx, Q = this.cCo; let W = 0, vx = 0, vy = 0, vz = 0;
+        for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; nx += q * x[3 * i]; ny += q * x[3 * i + 1]; nz += q * x[3 * i + 2]; vx += q * v[3 * i]; vy += q * v[3 * i + 1]; vz += q * v[3 * i + 2]; W += q * q * w[i]; }
+        const dd = Math.hypot(nx, ny, nz); if (dd < 1e-9 || W === 0) continue; nx /= dd; ny /= dd; nz /= dd;
+        const j = -(vx * nx + vy * ny + vz * nz) / W;
+        for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k] * j * w[i]; if (!q) continue; v[3 * i] += nx * q; v[3 * i + 1] += ny * q; v[3 * i + 2] += nz * q; }
+        continue;
+      }
+      const pa = [0, 0, 0], pb = [0, 0, 0];
+      for (let k = 0; k < 3; k++) { pa[k] = x[3 * a0 + k] * ca0 + x[3 * a1 + k] * ca1; pb[k] = x[3 * b0 + k] * cb0 + x[3 * b1 + k] * cb1; }
+      nx = pa[0] - pb[0]; ny = pa[1] - pb[1]; nz = pa[2] - pb[2];
+      const dd = Math.hypot(nx, ny, nz); if (dd < 1e-9) continue; nx /= dd; ny /= dd; nz /= dd;
+      const W = ca0 * ca0 * w[a0] + ca1 * ca1 * w[a1] + cb0 * cb0 * w[b0] + cb1 * cb1 * w[b1]; if (W === 0) continue;
+      const rel = k => v[3 * a0 + k] * ca0 + v[3 * a1 + k] * ca1 - v[3 * b0 + k] * cb0 - v[3 * b1 + k] * cb1;
+      vn = rel(0) * nx + rel(1) * ny + rel(2) * nz;
+      const j = -vn / W;
+      const q0 = w[a0] * ca0 * j, q1 = w[a1] * ca1 * j, q2 = w[b0] * cb0 * j, q3 = w[b1] * cb1 * j;
+      v[3 * a0] += nx * q0; v[3 * a0 + 1] += ny * q0; v[3 * a0 + 2] += nz * q0;
+      v[3 * a1] += nx * q1; v[3 * a1 + 1] += ny * q1; v[3 * a1 + 2] += nz * q1;
+      v[3 * b0] -= nx * q2; v[3 * b0 + 1] -= ny * q2; v[3 * b0 + 2] -= nz * q2;
+      v[3 * b1] -= nx * q3; v[3 * b1 + 1] -= ny * q3; v[3 * b1 + 2] -= nz * q3;
+    }
+  }
+
   // The slip a contact did not stop this substep — measured at the END of it, after the stretch
   // solve has slid the yarn along the contact to keep its length — is carried into the next
   // substep's friction, which cancels it together with that substep's own slip. Measured at the
@@ -605,7 +767,10 @@ export class KnitSim {
       if (!(lam[p] > 0) || this.capped[p]) { A3[3 * p] = A3[3 * p + 1] = A3[3 * p + 2] = 0; continue; }
       const a0 = pA[p], a1 = a0 + 1, b0 = pB[p], b1 = b0 + 1, s = this.cS[p], t = this.cT[p], ca0 = 1 - s, ca1 = s, cb0 = 1 - t, cb1 = t;
       let nx = 0, ny = 0, nz = 0, rx = 0, ry = 0, rz = 0;
-      for (let k = 0; k < 3; k++) {
+      if (this.P.CONTACT_SMOOTH) {
+        this.contactCoefs(p, a0, b0, s, t); const I = this.cIdx, Q = this.cCo;
+        for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; nx += q * x[3 * i]; ny += q * x[3 * i + 1]; nz += q * x[3 * i + 2]; rx += q * (x[3 * i] - pr[3 * i]); ry += q * (x[3 * i + 1] - pr[3 * i + 1]); rz += q * (x[3 * i + 2] - pr[3 * i + 2]); }
+      } else for (let k = 0; k < 3; k++) {
         const pa = x[3 * a0 + k] * ca0 + x[3 * a1 + k] * ca1, pb = x[3 * b0 + k] * cb0 + x[3 * b1 + k] * cb1;
         const r = pa - (pr[3 * a0 + k] * ca0 + pr[3 * a1 + k] * ca1) - pb + (pr[3 * b0 + k] * cb0 + pr[3 * b1 + k] * cb1);
         if (k === 0) { nx = pa - pb; rx = r; } else if (k === 1) { ny = pa - pb; ry = r; } else { nz = pa - pb; rz = r; }
@@ -620,6 +785,7 @@ export class KnitSim {
   // to a pin's axis than PIN_RADIUS + d/2 is pushed straight out; the pin is kinematic, so all of
   // the correction goes to the yarn and its y component is the comb's reaction.
   solvePins() {
+    if (!this.pinHitI) { this.pinHitI = new Int32Array(4096); this.pinHitN = new Float64Array(8192); }
     const x = this.x, w = this.w, pins = this.pins, R = this.P.PIN_RADIUS + 0.5 * this.P.YARN_DIAMETER, R2 = R * R;
     const zl = this.P.PIN_HALF_LENGTH * this.P.YARN_DIAMETER, off = this.pullOffset;
     const yTop = pins[0].y + off + R, yBot = pins[0].y + off - R;
@@ -632,6 +798,7 @@ export class KnitSim {
         const d2 = dx * dx + dy * dy; if (d2 >= R2) continue;
         const dd = Math.sqrt(d2); if (dd < 1e-9) continue;
         const push = R - dd, nx = dx / dd, ny = dy / dd;
+        if (this.pinHits < this.pinHitI.length) { this.pinHitI[this.pinHits] = i; this.pinHitN[2 * this.pinHits] = nx; this.pinHitN[2 * this.pinHits + 1] = ny; this.pinHits++; }
         if (!this.pinsFree) {
           x[3 * i] += nx * push; x[3 * i + 1] += ny * push;
           this.reactPin += push * ny;                 // λ·∂C/∂y on the yarn; the pin feels the opposite
@@ -699,6 +866,7 @@ export class KnitSim {
     }
     if (this.pairsStale()) this.findPairs();
     this.lamS.fill(0); this.lamB.fill(0); this.lamC.fill(0, 0, this.nPairs); this.lamT.fill(0, 0, this.nPairs);
+    this.pinHits = 0;
     const dt2 = dt * dt;
     const r0 = this.react[1], r2 = this.react[2], rp = this.reactPin, r3 = this.reactX[3], r4 = this.reactX[4];
     for (let it = 0; it < P.ITERATIONS_PER_SUBSTEP; it++) {
@@ -726,6 +894,11 @@ export class KnitSim {
       const d2 = dx * dx + dy * dy + dz * dz; if (d2 > maxD2) maxD2 = d2; sum2 += d2;
       if (w[i] === 0) continue;
       v[3 * i] = dx / dt; v[3 * i + 1] = dy / dt; v[3 * i + 2] = dz / dt;
+    }
+    if (P.CONTACT_VELOCITY) {
+      this.contactVelocity();
+      // the pins too: a yarn point a pin pushed out keeps no velocity along the push (restitution 0)
+      for (let h = 0; h < this.pinHits; h++) { const i = this.pinHitI[h], nx = this.pinHitN[2 * h], ny = this.pinHitN[2 * h + 1]; const vn = v[3 * i] * nx + v[3 * i + 1] * ny; v[3 * i] -= vn * nx; v[3 * i + 1] -= vn * ny; }
     }
     this.subRms = Math.sqrt(sum2 / n);
     return Math.sqrt(maxD2);
@@ -918,10 +1091,13 @@ export class KnitSim {
   releaseWidth() {
     this.dir = 'course'; this.pinsFree = true;
     if (this.clampTop) {
-      for (let i = 0; i < this.n; i++) if (this.grip[i] === 1 || (this.grip[i] === 2 && i < this.tailFrom)) { this.grip[i] = 0; this.w[i] = 1; }
-      this.v.fill(0); this.builtAt = null;
-      this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
-      return;
+      for (let i = 0; i < this.n; i++) if (this.grip[i] === 2 && i < this.tailFrom) { this.grip[i] = 0; this.w[i] = 1; }
+      if (this.P.COURSE_BOTTOM === 'free') {
+        for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 0; this.w[i] = 1; }
+        this.v.fill(0); this.builtAt = null;
+        this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
+        return;
+      }
     }
     this.railY = new Float64Array(this.n); this.railZ = new Float64Array(this.n);
     for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 5; this.w[i] = 1; this.railY[i] = this.x[3 * i + 1]; this.railZ[i] = this.x[3 * i + 2]; }
@@ -948,6 +1124,7 @@ export class KnitSim {
       if (side === 3) { sl += this.x[3 * i]; nl++; } else { sr += this.x[3 * i]; nr++; }
     }
     this.jawL = sl / nl; this.jawR0 = sr / nr; this.sideOffset = 0; this.sideGrip = { left: nl, right: nr };
+    if (this.clampTop) this.combFixed = true;      // the needle found its height at the pretension while the width was free; from here it is held (a biaxial grip), so nothing moves but the driven jaw
     this.restHeight = this.jawGap(); this.restOffset = 0;
   }
   // Per loop: the centroid of its points (x, y, z) and how many.
