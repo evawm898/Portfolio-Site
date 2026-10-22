@@ -167,6 +167,9 @@ arc every one reads clean and its base shell count** (14 / 15 / 19 shells at k 1
 sepal ALIGNED WELD and STYLE-at-272 class, not a fold. Declared by value in
 `SELF_INTERSECTION_XFAIL` (which also excuses O2 on those rows), never nudged: pulling
 the cap off its arc would be a typed constant standing for nothing.
+**[Oct 22: SUPERSEDED — Eva ruled the cap must not land on the arc. It stands 2^-19 rad inside it
+(derived from the float32 grain the weld keys on, not typed), the seven declarations are removed
+and every one reads 0; see [`bloom-foot-clearance-outcome.md`](bloom-foot-clearance-outcome.md).]**
 
 ## 5. Gates
 
@@ -272,7 +275,11 @@ Every mover is a row the foot cap binds on:
   collapses five times faster and the blade now folds at u 0.3–0.5 too (`node
   tools/bloom-census-attribute.mjs`: base 177 root blend + 95 foot; here 858 root blend +
   212 foot + 354 blade). The ruled cap acting on the tightest ring the arrangement reaches;
-  both rows were already declared (EFFECTIVE TILT PAST 90). The same family's CONTINUOUS and
+  both rows were already declared (EFFECTIVE TILT PAST 90). **[Oct 22: the attribution above is a
+  nearest-lamina carry-back and could not tell neighbouring petals apart. Tagged by the part that
+  EMITTED each triangle, 1,048 and 932 of the pairs were WELDS between neighbours' capped feet on
+  the equator; the genuine folds are 376 and 336, root blend and foot only, 0 blade — the foot
+  clearance removed the weld half, `bloom-foot-clearance-outcome.md` §2.]** The same family's CONTINUOUS and
   40-petal rows moved a few pairs with shallower spans.
 - **The dome-lean pair, the fiddlehead, two aligned-sepal rows and `ALL MAX`** (78,222 →
   77,896, span unmoved; its refusal count 3,334,106 unmoved — XR1 green in CI).
