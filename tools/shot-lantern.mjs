@@ -90,8 +90,9 @@ await T(() => window.__lantern.set('litRoom', 1)); await T(() => window.__lanter
 save('lit-candle.png', await shotOf('.ln-preview'), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
 await page.locator('#secLit').evaluate((d) => { d.open = true; }); await page.locator('#secLit').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('lit-panel.png', await shotOf('#secLit'), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
-await T(() => window.__lantern.set('litRoom', 0.85)); await T(() => window.__lantern.set('litWarmth', 2700)); await T(() => window.__lantern.set('litWall', 1.4)); await T(() => window.__lantern.set('backing', true));
-await T(() => window.__lantern.view('build')); await page.waitForTimeout(200);
+await T(() => window.__lantern.view('build'));   // switch FIRST: the canvas is stopped and hidden in Build, so putting the lit values back costs no lit render
+await T(() => window.__lantern.set('litRoom', 0.85)); await T(() => window.__lantern.set('litWarmth', 2700)); await T(() => window.__lantern.set('litWall', 1.4)); await T(() => window.__lantern.set('backing', true));   // four lit rebuilds with the shadow pass on the runner's software GL hung the next screenshot for 120 s (run 39777729024)
+await page.waitForTimeout(400);
 save('build.png', await shotOf('.ln-preview'), 'the Build view: the eleven steps with this star\'s own counts, and the machine settings table (starting values)');
 {
   const grid = await T(() => window.__lantern.testGridSvg());
