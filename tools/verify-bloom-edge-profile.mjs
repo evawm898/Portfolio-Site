@@ -1126,8 +1126,10 @@ const MUTATIONS = [
        `emitLeafBladeInto`, the one emitter a simple leaf and every leaflet go
        through, so the mutation reaches both. RE-ANCHORED AGAIN (root support):
        the thickness is the leaf's root law per row now (`tAtRow`). */
-    from: "  emitPanel(acc, rows, panel, tAtRow, rim);",
-    to:   "  emitPanel(acc, rows, panel, tAtRow, null);" },
+    /* RE-ANCHORED a THIRD time (SURFACE TEXTURE T3): the call carries the
+       leaf's texture context now. */
+    from: "  emitPanel(acc, rows, panel, tAtRow, rim, texL);",
+    to:   "  emitPanel(acc, rows, panel, tAtRow, null, texL);" },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
@@ -1190,8 +1192,10 @@ const MUTATIONS = [
     from: '    const inLo = side ? rimInsetV(row.sect, vLo, vMid, aLo) : vLo;\n    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;',
     to:   '    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;\n    const inLo = side ? (vLo === -vHi ? -inHi : rimInsetV(row.sect, vLo, vMid, aLo)) : vLo;' },
   { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5', 'E6', 'E2'],
-    from: '  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
-    to:   '  const skinTo = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the skin's end is a SHIPPED-row index
+       (`skinToS`) now, mapped onto the lattice's expanded rows by `kOf`. */
+    from: '  const skinToS = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
+    to:   '  const skinToS = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
 ];
 /* The floor mutation needs a second edit: the constant is exported and read
    by the gate as the BAR, so lowering the export alone would move the bar
@@ -1210,8 +1214,10 @@ const EXTRA = {
     ['  pts[APEX] = apex;', '  pts[APEX] = C;'],
   ],
   'the-rim-floor-is-lowered-to-0.4': [
-    ['    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);',
-     '    const r = Math.min(RIM_FLOOR_APPLIED / 2, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);'],
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the room is read off the lattice's
+       per-row record (`base.w`) and the radius is formed on `room`. */
+    ['    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * room);',
+     '    const r = Math.min(RIM_FLOOR_APPLIED / 2, tBody / 2, RIM_ROOM_FRACTION * room);'],
   ],
 };
 
