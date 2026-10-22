@@ -44,21 +44,25 @@ export function createFoldedView(canvas) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   let lit = null;   // { warmth (K), brightness, room, wallDistance }
   const kelvin = (K) => { const t = Math.min(4000, Math.max(1800, K)) / 100; const r = 255, g = Math.min(255, Math.max(0, 99.47 * Math.log(t) - 161.12)), b = t <= 19 ? 0 : Math.min(255, Math.max(0, 138.52 * Math.log(t - 10) - 305.04)); return new THREE.Color(r / 255, g / 255, b / 255); };
+  let litWas = null;   // whether the last applyLit was lit: a shader recompile is owed only when that FLIPS (an emissive map comes or goes)
   function applyLit() {
     const on = !!lit;
+    const flipped = litWas !== on; litWas = on;
     litGroup.visible = on;
     hemi.intensity = on ? 0.05 + 1.4 * (1 - lit.room) : 0.9; key.intensity = on ? 0.9 * (1 - lit.room) : 1.15; fill.intensity = on ? 0.3 * (1 - lit.room) : 0.45;
     const room = on ? new THREE.Color(0x05050a).lerp(new THREE.Color(0x4a4640), 1 - lit.room) : new THREE.Color(INK);
     renderer.setClearColor(room, 1);
     scene.fog = on ? new THREE.Fog(room, radius * (lit.wallDistance + 3.2), radius * (lit.wallDistance + 10)) : null;   // from the camera's own fit distance (~3.3 R) the wall sits at ~3.3 R + d, so the fog starts just past the thrown pattern   // the planes fade into the room instead of ending at an edge
-    for (const m of [paperMat, wallMat, ...cutMats.values(), ...tintMats.values()]) m.needsUpdate = true;
+    // needsUpdate only on a FLIP: every rebuild in one view used to recompile every program, which on the runner's software GL
+    // is seconds a material and took the PNG export past the page gate's download wait (run 39762462046, #445).
+    if (flipped) for (const m of [paperMat, wallMat, ...cutMats.values(), ...tintMats.values()]) m.needsUpdate = true;
     const glow = on ? kelvin(lit.warmth) : null;
     /* lit: the paper is lit from INSIDE, so its daylight shading goes (colour near black, the glow is the emissive). The cuts stay
        HOLES (alphaTest 0.5 on the material — the shadow pass copies the object material's alphaTest onto the distance material,
        so a material with alphaTest 0 throws a SOLID shadow; measured, 43 of 2,115 wall samples lit against 1,583 unshadowed),
        and through them the lamp lights the wall with the pattern. Folded: every value back to phase 1's. */
-    paperMat.emissive = on ? glow.clone() : new THREE.Color(0); paperMat.emissiveIntensity = on ? GLOW_PAPER * lit.brightness : 0; paperMat.color.setHex(on ? 0x2a2622 : PAPER); paperMat.needsUpdate = true;
-    for (const [cv, m] of cutMats) { m.emissive = on ? glow.clone() : new THREE.Color(0); m.emissiveIntensity = on ? 1.0 * lit.brightness : 0; m.emissiveMap = on ? glowFor(cv) : null; m.color.setHex(on ? 0x2a2622 : PAPER); m.needsUpdate = true; }
+    paperMat.emissive = on ? glow.clone() : new THREE.Color(0); paperMat.emissiveIntensity = on ? GLOW_PAPER * lit.brightness : 0; paperMat.color.setHex(on ? 0x2a2622 : PAPER); if (flipped) paperMat.needsUpdate = true;
+    for (const [cv, m] of cutMats) { m.emissive = on ? glow.clone() : new THREE.Color(0); m.emissiveIntensity = on ? 1.0 * lit.brightness : 0; m.emissiveMap = on ? glowFor(cv) : null; m.color.setHex(on ? 0x2a2622 : PAPER); if (flipped) m.needsUpdate = true; }
     for (const m of tintMats.values()) { m.emissive = on ? m.color.clone().multiply(glow) : new THREE.Color(0); m.emissiveIntensity = on ? 1.1 * lit.brightness : 0; m.opacity = on ? 0.55 : 0.82; }
     if (on) {
       wallMat.color.setHex(0x3a3632).lerp(new THREE.Color(0x8a8278), (1 - lit.room) * 0.8);

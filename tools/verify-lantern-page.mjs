@@ -75,8 +75,8 @@ const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
 const ONLY = (args.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 
-async function download(page, trigger) {
-  const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), trigger()]);
+async function download(page, trigger, timeout = 20000) {   // a download that RENDERS (the PNG reads the WebGL canvas) gets the sheet's 120 s: 20 s timed out on the runner's software GL (run 39762462046)
+  const [d] = await Promise.all([page.waitForEvent('download', { timeout }), trigger()]);
   const p = await d.path();
   return { name: d.suggestedFilename(), path: p, text: /\.(svg|json|txt)$/.test(d.suggestedFilename()) ? fs.readFileSync(p, 'utf8') : '' };
 }
@@ -293,7 +293,7 @@ async function run(override = null) {
       const svgs = names.filter((n) => /-sheet-\d+-of-\d+\.svg$/.test(n)),   // the CUT sheets by name; the zip also carries backing sheets, the test grid and the coupon (P15's)
        readme = names.find((n) => /README/.test(n)), json = names.find((n) => /\.json$/.test(n));
       const sheet1 = svgs.length ? await z.file(svgs[0]).async('string') : '';
-      const png = await download(page, () => page.click('#exportPng'));
+      const png = await download(page, () => page.click('#exportPng'), 120000);
       const pngHead = fs.readFileSync(png.path).subarray(0, 8).toString('hex');
       await T(() => window.__lantern.set('bed', 'k40'));
       const small = await T(() => ({ plan: window.__lantern.plan(), badge: document.getElementById('flagCount').textContent, bed: window.__lantern.flags().find((f) => f.id === 'bed') }));
@@ -376,7 +376,7 @@ const MUTANTS = [
   { id: 'the-lit-settings-are-not-stored', file: 'lantern.js', from: "const LIT_FIELDS = ['litWarmth', 'litBrightness', 'litRoom', 'litWall'];", to: "const LIT_FIELDS = ['litBrightness', 'litRoom', 'litWall'];", breaks: ['P16'] },
   { id: 'the-lamp-ignores-the-wall-distance', file: 'lantern-view.js', from: "wall.position.set(0, 0, -d); wall.scale", to: "wall.position.set(0, 0, -radius * 1.4); wall.scale", breaks: ['P16'] },
   { id: 'the-build-view-stays-hidden', file: 'lantern.js', from: "$('buildView').toggleAttribute('hidden', name !== 'build');", to: "$('buildView').toggleAttribute('hidden', true);", breaks: ['P15'] },
-  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13', 'P15'] },
+  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13', 'P15', 'P16'] },
 ];
 
 function print(res, label) { let f = 0; for (const [p, m] of res) { console.log(`${p ? 'ok  ' : 'FAIL'} ${m}`); if (!p) f++; } console.log(`\n${label}: ${res.length - f} of ${res.length} passed`); return f; }
