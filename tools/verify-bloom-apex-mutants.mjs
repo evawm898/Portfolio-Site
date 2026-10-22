@@ -2196,8 +2196,8 @@ const MUTANTS = [
       const same = m.rep.lobed.rowHalfLobeMm.every((h, j) => h === c.rep.lobed.rowHalfLobeMm[j]);
       return (same && m.rep.lobed.roundBottoms.sinuses.every((r) => !r.built) && c.rep.lobed.roundBottoms.sinuses.some((r) => r.built)) ? null : `the mutant's outline is ${same ? 'the clean one' : 'MOVED'} with ${m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built).length} bottoms told — the behaviour did not move`; } },
   { id: 'the-lobed-petiole-is-the-wire', why: 'the area law is computed and recorded and the rod is built at the wire anyway — the read-out says asked -> built on a petiole that was never thickened',
-    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
-    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : petioleR0;', names: ['LF26'],
+    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;',
+    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;', names: ['LF26'],
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.petioleR === m.plan.lobedPetiole.wireR && c.plan.petioleR > c.plan.lobedPetiole.wireR) ? null : `the mutant builds the petiole at ${m.plan.petioleR} mm against the clean ${c.plan.petioleR} — the behaviour did not move`; } },
