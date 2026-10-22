@@ -51,3 +51,4 @@ tools/bug-wing-sources/
 bloom-geometry.__mutant_*.js
 bloom-file.__mutant_*.js
 _frame-*-mutant-*.js
+_frame-mutant-*.js
