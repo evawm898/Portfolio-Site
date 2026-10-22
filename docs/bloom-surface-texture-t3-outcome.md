@@ -4,7 +4,7 @@
 worst-corner cap's mechanism (§7, none picked). Three findings the brief said to stop on are reported with
 renders in §5, not masked.**
 
-Base `main` at `d60e734`. Discovery and its rulings: `docs/bloom-surface-texture-discovery.md` §0, §8,
+Base `main` at `d60e734`, merged with `56f91f4` (#447 foot clearance, #448 frame phase 2, #441) before CI. Discovery and its rulings: `docs/bloom-surface-texture-discovery.md` §0, §8,
 §10–§12. Sheet: `docs/img/bloom-texture-t3.png` (`node tools/shot-bloom-texture-t3.mjs <dir> --png …
 --bead <json> --corner <json>`).
 
@@ -186,13 +186,21 @@ captured grid : 82,174,232 values over 9,470 panels (live)
 PASS — 0 floats moved on the 1508 holders, positionally, under Object.is; all 17 predeclared movers moved.
 ```
 
-So every one of `main`'s 1,506 rows — `ALL MAX`, the infilled rows and the shipping default among them — is
+**Measured before the merge with #447**, which moves foot widths by nanometres at 16 and 40 petals on both trees
+alike and no triangle count; the block-77 chunk (rows 1,275–1,524, every texture row) was re-run against a
+worktree of `56f91f4` after the merge — its verdict is appended below. So every one of `main`'s 1,506 rows — `ALL MAX`, the infilled rows and the shipping default among them — is
 byte-identical in both modes, and the two texture rows that build no relief hold too.
+
+**After the merge, rows 1,275–1,524 against a worktree of `56f91f4`** (`--range 1275:1525`): PASS — all 17
+predeclared movers moved, 0 floats moved on the 233 holders, positionally, under `Object.is` (3,848,880
+captured-grid values). The other five chunks were not re-run against the merged base: #447 moves no triangle
+count and only foot widths at 16 and 40 petals, identically on both trees.
 
 **Frozen sweep: 0 of 74,343 frozen rows across 82 baselines name a texture id**, so every tag's bytes
 reproduce by construction (the guard is a choice, a stored row without the id builds at NONE, and NONE is
-main's path verbatim). `frozen/phase83` is the 1,506 rows at `d60e734` (the matrix grew), registered in
-both maps and proved deep-equal against a worktree of the base.
+main's path verbatim). `frozen/phase83` is the 1,506 rows at `56f91f4` — main's head at merge, after #447 (the foot clearance), whose
+matrix is row-for-row `d60e734`'s, where this branch started — registered in both maps and proved deep-equal
+against worktrees of both commits.
 
 ## 7. THE WORST CORNER — the cap's options, measured; NONE PICKED (Eva's question)
 

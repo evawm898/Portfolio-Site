@@ -1393,7 +1393,7 @@ lattice or relief, `textureContext`, `TEXTURE_*`, `TEXTURE_BAR_XFAIL`, TX0–TX8
   40 fit at 3 whorls; coarsen the edge — 0.5 mm is the finest that fits). WAITING ON EVA.
 - Gates: TX0–TX8 in both STL gates, five witnessed apex mutants, panel route (ao) (THIRTY-TWO routes) with
   the section's geometry witness, block 77 (19 rows, 1,525), smoke block 77, E carves relieved parts out BY
-  NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `d60e734`; 0 frozen
+  NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `56f91f4` (row-for-row `d60e734`'s); 0 frozen
   rows name a texture id. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
   `tools/bloom-texture-bead.mjs` and `tools/bloom-texture-corner.mjs` are the measurements.
 

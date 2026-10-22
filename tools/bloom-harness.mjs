@@ -61523,7 +61523,7 @@ export function phase82Matrix() {
 }
 
 /* ===================================================================
-   phase83Matrix() — THE 1506 ROWS AS THEY STOOD AT d60e734, frozen.
+   phase83Matrix() — THE 1506 ROWS AS THEY STOOD AT 56f91f4 (and at d60e734 — #447 between them added none), frozen.
 
    main's head before SURFACE TEXTURE T3 (the field, the control and the
    outward relief on the sheets, built into the shipped generator — Eva's
@@ -63118,7 +63118,7 @@ export const FROZEN_BASE_COMMITS = {
   phase80: '0a48f17',   // main's head before THE BRAID (the BRAIDED stamen coil as one bundle, the anther on its end tangent, strands picked and edited — Eva's rulings, and the coil's §7 confirmations of Oct 20); #426's 1437 rows (the two stretch-simulator commits after it move no bloom row). Owed because the braid appends block 74.
   phase81: '4d0758d',   // main's head before BIG PETALS (petalLength to 100 mm; the root taper by length and the hub following it — Eva's rulings of Oct 21); #432's 1457 rows. Owed because big petals appends block 75 and redefines `petalLength max` and ALL MAX.
   phase82: '8403b47',   // main's head before ROOT SUPPORT (sepals and leaves take the root law at their own length; the foot clamp is the arc each foot owns at its ring — Eva's rulings of Oct 21); #434's 1485 rows. Owed because root support appends block 76 and relabels the 100 mm petal's eight-sepal row.
-  phase83: 'd60e734',   // main's head before SURFACE TEXTURE T3 (the relief field, the lattice and the texture controls; block 77 appended) — docs/bloom-surface-texture-t3-outcome.md
+  phase83: '56f91f4',   // main's head before SURFACE TEXTURE T3 (its matrix is row-for-row d60e734's, where the rows were first frozen; #447 added none) (the relief field, the lattice and the texture controls; block 77 appended) — docs/bloom-surface-texture-t3-outcome.md
   phase77: '3dc8ee1',   // main's head before SPINE-CUP-FOLD, the FOLD LIMIT (the spine clears its own cross-section — the inner skin may not reach the bend's centre — on drawn curves and the curl sliders alike, Eva's rulings of Oct 19); #423's 1396 rows. Owed because spine-cup-fold appends block 71.
   phase75: '169fd5b',   // main's head before the infill-whorls session (the infill's seam one double — xB on the plan grid; the multi-whorl infill fold and the #286 seam class cleared); #421's 1374 rows. Owed because the session appends block 69.
   phase73: 'f663973',   // main's head before F6-asym, the ASYMMETRIC OUTLINE (two half-curves about the midrib — Eva's rulings of Oct 18); #419's 1334 rows. Owed because F6-asym appends block 67.
