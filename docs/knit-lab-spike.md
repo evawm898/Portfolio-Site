@@ -1,4 +1,4 @@
-# Knit Lab — yarn-level knit feasibility spike (Oct 21, phase 2 the same day)
+# Knit Lab — yarn-level knit feasibility spike (Oct 21; phase 2 the same day, phase 3 Oct 21–22)
 
 `/knit-lab.html` (noindex, unlinked). Ten wales × ten courses of stockinette knitted flat from one
 yarn — plain, or with one eyelet row across the middle — the yarn a chain of points relaxed with XPBD,
@@ -6,7 +6,293 @@ settled, then **loaded to a load limit and unloaded**. Phase 1 asked whether the
 at interactive speed and whether the result behaves like a knit (yes, on the CPU, for 10 × 10).
 Phase 2 made the physics trustworthy before adding stitches: friction that behaves like yarn, a yarn
 that stays inextensible under load, a load–unload cycle, yarn overs and k2tog, and the simulation in a
-Web Worker. Phase 1's record is kept below the phase-2 section; where phase 2 overturned it, it says so.
+Web Worker. Phase 3 replaced the continuous pull with a stepped, quasi-static test, found why phase 2's
+friction was rate-dependent, added a pull across the courses, and purl, 1×1 rib and ssk. Each phase's
+record is kept below the next; where a later phase overturned an earlier one, it says so.
+
+## Phase 3 — quasi-static test, the course direction, purl / rib / ssk (Oct 21–22)
+
+**Outcome: not merged.** Gate Q's frictionless half fails (9.1% of the work lost against a 2% bar), the
+course-direction test blows up in the jam (gate I), and the step-size half of Q passes on this draw but
+replicas at fixed settings scatter more than the bar allows. ⟨RIB⟩ Every number below:
+`node tools/verify-knit-lab.mjs --browser --scale` on this container (Intel Xeon @ 2.10 GHz, 4 cores,
+Node 22), unless a section says otherwise. Model units throughout. Phase 2's record is below; where
+phase 3 overturned it, it says so there too.
+
+### 1. The stepped, quasi-static test
+
+`PROTOCOL: 'stepped'` (the default; `'continuous'` is phase 2's test, kept for comparison). The driven
+jaw moves one step — `STEP_EXT`, 1% of the gauge — at `STEP_SPEED` 0.5 d/s and stops. The swatch is
+then HELD, the stationary jaw's load averaged over windows of `STEP_WINDOW` (10) frames, and the step is
+recorded once, over the last window, **the two jaws read the same load and it is the load of the window
+before**, both within `STEP_TOL` (0.2%) of max(|load|, 1,500), or after 900 frames, counted
+unconverged. The first criterion is static equilibrium itself: nothing but the two jaws pulls along the
+test axis (the plates push only in z, the cast-on rail only in y and z, the comb's pins slide freely in
+x in a course test), so a swatch whose jaws disagree is still moving. Loading ends on a settled load
+within 3% of `LOAD_LIMIT`; unloading steps back to where the jaws were clamped. One point per settled
+step is logged and plotted.
+
+Four things had to be fixed before the protocol measured anything:
+
+- **The comb read low.** The tied tail's reaction was added to the pins' with the opposite sign
+  convention, so the comb under-read by twice the tail's share: held at +30% the bottom jaw read 346,543
+  and the comb 327,490. Fixed, they read 404,099 / 404,099. The bottom jaw — phase 2's load cell — was
+  never affected; the comb's preload control was, so the settled swatch differs slightly from phase 2's.
+- **The peak depended on the step.** Past the jam the load grows about exponentially (doubling every
+  1–2%), so the first step past the limit landed anywhere from 1.0 to 2.1 M, and the peak sets how much
+  work a cycle can lose. The last steps are shortened to the extension the last two steps' own growth
+  says reaches the limit (`approachStep`), and a loading move stops the frame either jaw reads the limit
+  (that step then ends the loading). Every wale run now peaks at 0.97–1.10 M.
+- **The move itself was too fast.** At 1.5 d/s a step's move still carried dynamics: 22.1% / 19.4% of
+  the work lost at 1% / 0.5% steps, against 25.0% / 23.6% at 0.5 d/s (μ 0.25, everything else equal).
+- **The gate's child processes cut their own output.** A run wrote ~100 KB of JSON and called
+  `process.exit()`; through a pipe that truncates it, and the parent died on the parse after two hours.
+  The child exits in the write's callback now.
+
+### 2. Why phase 2's friction was rate-dependent: no contact ever stayed stuck
+
+The brief: phase 2 lost 29.5% of the work at 1.5 d/s and 9.1% at 0.5 d/s; find the cause. Found by
+holding the swatch still: **at a fixed +25% with μ 0.25 the load climbed 319k → 467k in 1,500 frames and
+→ 3.8 M in 3,000 (RMS point speed 0.4 → 4.2 d/s); at +10% it held.** The jaws were not moving.
+
+The mechanism. Friction (`FRICTION_MODE 'substep'`, phase 2) cancels a contact's slip since the start
+of the substep, up to μ × its normal multiplier — inside the contact pass. The stretch solve runs LAST
+(it is the one met exactly) and slides the yarn along every contact to keep its length. So the slip
+friction sees in a substep is only the prediction, and the slide it should have stopped happens after
+it, every substep, unresisted. A stuck contact therefore creeps by one stretch-slide a substep, at a rate
+set by the TIME STEP, not by μ: the resistance a test sees depends on how fast it pulls against that
+creep (phase 2's rate dependence), and held in the jam the creep ratchets the knit tighter without end.
+Ruled out on that hold: more substeps (48 still climbed; 64 held at μ 0.25 and blew up at μ 0.5), more
+iterations (2 climbed, 3–4 crept), the closest-point solve on nearly parallel segments (no change),
+friction moved after the stretch solve (the swatch froze, then broke its own length), and under-relaxed
+friction (stable, but weaker than Coulomb and itself rate-dependent).
+
+The fix (`FRICTION_MODE 'memory'`, the default): each contact carries the slip it let through — measured
+at the END of the substep, after the stretch solve, at its own material points (s, t), so a contact that
+rolls accumulates nothing — and the next substep's friction cancels that together with its own slip, up
+to the same Coulomb cap. A contact that hits the cap is slipping and forgets it. **Held 600 frames at the
+wale test's peak (1.05 M), the load moves 0.006% (gate H); phase 2's friction, held the same way, climbs
+from 1.16 M to 2.82 M.**
+
+Friction makes the knit stiffer early, as it should: with static friction that really sticks, a swatch
+settled WITH friction carried stress frozen in from the drawn guess (soft region 18,300 per d, 32% of
+the work lost). So the swatch now settles frictionless (`SETTLE_FRICTION 0`, a wet relaxation) and
+friction comes on for the test; μ 0 and μ 0.25 start from the same swatch.
+
+### 3. Gate Q: rate-independent now, but not repeatable to 10%
+
+| run (μ 0.25 unless noted) | steps | lost | set | jam | peak |
+|---|---|---|---|---|---|
+| 1% steps, tol 0.2% (`plain`) | 61 | 24.7% | 7.64% | 23% | 1.05 M |
+| 0.5% steps | 117 | 23.6% | 8.14% | 23% | 1.01 M |
+| tol 0.05% | 59 | 22.7% | 7.68% | 22% | 0.98 M |
+| 0.5% steps, tol 0.05% | 119 | 24.6% | 7.49% | 22% | 1.10 M |
+| replica: preload × (1 + 1e-9) | 61 | 27.9% | 8.05% | 22% | 0.97 M |
+| replica: preload × (1 + 2e-9) | 61 | 24.1% | 7.65% | 22% | 0.98 M |
+| μ 0, 1% steps | 65 | **9.1%** | 3.22% | 23% | 0.97 M |
+| phase 2's test, 1.5 / 0.5 d/s | — | 31.3% / 6.2% | 7.0 / 3.0% | 21% | 1.0 M |
+| phase 2's test, μ 0 | — | 1.0% | 2.0% | 25% | 1.0 M |
+
+- **Step size and tolerance: spread 8.8% in loss and 8.7% in set — under the 10% bar.** The phase-2
+  test's 31.3% / 6.2% across speeds is the must-fail, and is rejected.
+- **But the same test, its preload moved by one part in a billion, scatters 16% in loss** (24.1–27.9%).
+  A first, uncapped set of three replicas read 21.6 / 25.0 / 26.6% (23%). The step / tolerance spread is
+  inside that scatter, so the pass is a draw, not a margin: with friction the knit's path through the
+  jam is chaotic and the work it loses varies run to run by more than the bar. Set is steadier (5–7%).
+- **Frictionless, the cycle loses 9.1%, not under 2%: gate Q FAILS here.** Next section.
+
+### 4. Frictionless: the knit has two shapes at the same extension
+
+Phase 2 read the frictionless remainder (4.5%) as solver dissipation, and the phase-2 test itself now
+reads 1.0% (it moves continuously at 1.5 d/s and never stops to settle). The stepped test does not
+remove it — it exposes it: **frictionless, it loses 9–16% of the work** (9.1% at 1% steps, 15.5% at 0.5%
+steps). It is not the hold: held 3,000 frames at +20%, the frictionless swatch rests at **62,309 on the
+way up and 55,439–55,711 on the way down**, both still (and 27,728 / 15,472 at 64 substeps, 29,808 /
+24,949 with the plates at ±2.5). Two equilibria at one extension. The two states differ by 1–5 d all
+over the swatch and the loop heads sit at different depths — many pressed against a plate in one state
+and not in the other: the stockinette between the plates curls and buckles out of plane, and that has
+more than one stable shape. Closer plates (±1.2) take the frictionless loss to 6.0%, not to zero. A
+frictionless knit with unilateral contacts can be multistable; this one is, and a quasi-static cycle
+that passes from one state to the other loses work without friction. **Not fixed, because nothing about
+it is wrong as mechanics**; the gate's premise (a frictionless cycle closes) does not hold for this
+boundary condition. What would test it: a swatch with no plates and some other way to stop the curl
+(gravity, a backing), or a frictionless cycle small enough to stay on one branch.
+
+### 5. Pulling across the courses
+
+`startTest('course')` (the page's "Pull across the courses"). Two stages, both in the sim:
+
+1. **The width is released** (`releaseWidth`, phase `freeing`). After the ordinary settle the cast-on
+   is on its jaw at the width it was DRAWN, which says nothing about the knit's own width. So the
+   cast-on moves onto a RAIL (each point keeps its y and z, free along x), the comb's pins slide freely
+   along x (a pin's push is shared between the pin and the yarn, the pin carrying mass 1), the comb
+   keeps holding the preload, and the swatch settles again — frictionless, like the first settle —
+   until the wale-centre span stops drifting. That span is the swatch's width at rest: **jersey 36.8 d
+   after 198 frames** (drawn at 37.0).
+2. **Side jaws grip the edge wales** (`clampSides`): every point of the first and last loop of every
+   course and every selvedge turn, plus the tied tail on its own side — 367 + 376 points on jersey. The
+   left jaw is fixed and is the load cell (its reaction along x); the right one is driven out along x by
+   the same stepped protocol. Top and bottom stay where the release left them (the comb at the preload,
+   the cast-on on its rail). The gauge is the distance between the two jaws: 37.6 d.
+
+The two side jaws agree at every converged step (the convergence criterion requires it): nothing else
+carries load along x. Early holds come fully to rest (RMS speed 0.000 d/s from +2%).
+
+**Jersey, wale against course (gate D passes):**
+
+| extension | 5% | 10% | 20% | 30% | 40% | 50% | 55% |
+|---|---|---|---|---|---|---|---|
+| along the wales | 20k | 33k | 123k | 1.05 M (limit) | | | |
+| across the courses | 9k | 17k | 34k | 54k | 89k | 171k | 570k |
+
+The jam (`findJam`: past 10%, where the tangent stiffness first reaches 10× the soft region's, 0.5–10%) comes at **23% along
+the wales and 50% across the courses**; the soft region, per unit strain and per d of fabric across the
+pull (so the two directions compare), is **6,972 along and 5,487 across (0.79×)**. Softer and jamming
+later across the courses: the loops' heads and sinkers straighten before anything binds.
+
+**Past the jam across the courses, friction ratchets and the run blows up (gate I fails).** The last
+settled step, 55.97%, read 912k; the next (0.19%) never settled: held with both jaws still, the load
+wandered at 0.76–0.98 M for ~140 frames, climbed to 1.17 M, then the yarn's strain jumped 0.65% → 8% in
+20 frames and the run reached 2.95 M and 54% strain (the 5% strain stop ends the loading only when a step
+is recorded). The unloading
+curve then lies ABOVE the loading one, which is the −825% "loss" the gate prints. Forked from that
+55.97% state and held 600 frames, jaws still:
+
+| held at 55.97% | load after 600 frames | strain | RMS speed |
+|---|---|---|---|
+| as shipped (memory friction, μ 0.25) | 0.91 → 2.03 M | 23% | 14 d/s |
+| 64 substeps a frame | → 10.9 M | 52% | 35 d/s |
+| 2 iterations a substep | → 3.84 M (then stuck) | 2.1% | 0 |
+| frictionless | → **0.267 M, steady** | 0.06% | 0.02 d/s |
+
+So it is friction, and more substeps make it WORSE — not a time-step artefact that refining would cure.
+Along the wales the same friction holds the jam still (gate H: 600 frames at 1.05 M, −0.006%). The
+difference is the load path: across the courses the yarn is pulled ALONG its own length round every
+loop, a capstan. The hypothesis, not isolated: friction stops the yarn sliding round the loop, the
+tension rises, the contact's normal multiplier rises with it, and that raises friction's own cap — a
+loop that position-based Coulomb friction, solved before the stretch, does not bound the way the real
+capstan law (T₂/T₁ ≤ e^{μθ}) does. **Not fixed**: a fix is a change to the friction model (a capstan-
+aware cap, or friction and stretch solved together), and it would re-open every friction number above.
+The frictionless state at the same extension holds 267k, so roughly two thirds of the 912k was being
+carried by friction.
+
+### 6. Purl, 1×1 rib and ssk — topology, nothing tuned
+
+- **Purl** is a loop pulled through its parent from the FRONT. In the record it is `kind: 'purl'` with
+  one parent; in the geometry it is the knit loop with its depth sign flipped (`sgn(id)` in
+  `buildYarn`): its legs go back through the parent and its head sits in front. The selvedge turn and
+  the cast-on take the sign of the loop they belong to. The solver never reads the record and did not
+  change.
+- **The linking check knows the sign** (`LINK_SIGN`): a knit half links its parent −1, a purl half +1.
+  Gate T: every leg of the rib's drawn start passes through its parent the right way; must-fail
+  `purl-drawn-knitwise` (the purl drawn with the knit sign) makes 45 loops wrong.
+- **1×1 rib** (`makeRib`): stockinette with every odd wale purl — k1, p1 across every course. Same
+  yarn, same 10 × 10 stitches, same drawn gauge as jersey; 3,648 points against 3,476 (18.24 d of yarn a
+  loop against 17.37: a purl next to a knit has to cross the fabric).
+- **ssk** is k2tog mirrored: the LEFT parent's head is drawn over the right one's, the new loop stands
+  on the RIGHT parent's wale, and the yarn over goes on the other side — `makeEyelet(…, 'ssk')`, course
+  5 = `k1, (yo, ssk) × 4, k1`. Gate O checks the decreases' order (the top parent's head in front; k2tog
+  leaning right, ssk left) on the drawn start, the settled swatch and after the test; must-fail
+  `decrease-head-not-moved`.
+
+### 7. What the new stitches do
+
+**1×1 rib against jersey, across the courses (gate R: the two halves, read separately):**
+
+- **At rest, rib draws in: 31.0 d wide against jersey's 36.8 (0.843×)**, both released from the same
+  drawn width (37 d) by the same frictionless width settle (rib in 502 frames, jersey 198). The bar was
+  ≤ 0.95×.
+- **Rib does not jam within the test's 60% range; jersey jams at 50%.** Rib reaches 60% at 119k — where
+  jersey is at 171k by 50% and 570k by 55% — with no jam by `findJam`'s definition, so the gate's ratio
+  is NaN and the check FAILS as written (the bar, ≥ 1.25× jersey's jam, is 62.5%, outside the range).
+  ⟨RIB150⟩
+- Rib's soft region per unit strain per d of height is 5,008 against jersey's 5,487 (0.91×).
+- The rib's cycle (to 60%, 119k) loses 73% of its small loading work with a 23% set — read nothing
+  into it: it never loaded the knit.
+
+Nothing was tuned for either result: rib is jersey's chart with every other wale's sign flipped.
+
+**ssk eyelets against k2tog eyelets (along the wales):**
+
+| | jam | soft region per d | lost | set | openings ≥ 1 d, settled / at +20% | loading ended on |
+|---|---|---|---|---|---|---|
+| plain | 23% | 8,417 | 24.7% | 7.6% | 0 / 0 | load (1.05 M) |
+| yo, k2tog | 47% | 5,499 | 60.4% | 34.5% | 4 / 5 | **extension** (60%, 818k) |
+| ssk, yo | 42% | 3,914 | 48.4% | 24.7% | **2** / 4 | load (0.93 M) |
+
+- Both decreases keep their recorded order through the test, and ssk leans left — except **one ssk,
+  settled, whose two parent heads sit level (−0.04 d), so which is on top is not decided there (gate O
+  FAILS on it)**; by the end of the test it is back on top (+0.03 d), and the other three are clearly
+  ordered throughout.
+- **The ssk row opens only 2 holes of radius ≥ 1 d at rest (gate E FAILS on it; 4 at +20%)**; k2tog's
+  opens 4. The ssk swatch is also the softer of the two and jams earlier. Whether that is the ssk itself
+  or the drawn start (the ssk's depth choreography is k2tog's mirrored, not re-swept) is not isolated.
+- **The k2tog eyelet swatch reaches the 60% extension cap at 818k, before the load limit (gate I
+  FAILS)**; its loss and set are therefore from a cycle that stopped short.
+
+### 8. Gate results
+
+`node tools/verify-knit-lab.mjs --browser --scale` (19 simulations, 4 at a time, 6,699 s), then
+re-judged with `--reuse` after the frictionless must-fail was corrected. **8 checks fail.** Every check
+has a must-fail, and every must-fail rejects.
+
+| gate | what | result |
+|---|---|---|
+| Q | μ 0.25: loss and set across step 1% / 0.5% × tolerance 0.2% / 0.05% | PASS — 8.9% / 8.6% spread (but replicas scatter 16%, §3) |
+| Q | μ 0: the stepped cycle loses under 2% | **FAIL — 9.1%** (§4) |
+| H | held 600 frames at the peak, the load stays put | PASS — −0.006% (phase 2's friction: +141%) |
+| T | each drawn start is its chart (plain, k2tog, ssk, rib) | PASS — 4 / 4; must-fails 8, 8, 45 loops wrong |
+| O | decreases keep their order (k2tog right, ssk left), drawn / settled / after | 5 / 6 — **FAIL: one ssk settled level (−0.04 d)** |
+| F | μ 0.25 still has a soft region before the jam | PASS — 1.94× the frictionless |
+| I | strain < 1% before the jam, every run | PASS — ≤ 0.08% |
+| I | no collapse past the jam | PASS — except **rib: no jam reached** |
+| I | the load limit, not a safety, ends the loading | **FAIL ×3** — k2tog eyelet: 60% extension; jersey course: strain stop (§5); rib course: 60% extension |
+| C | friction adds to the loop (μ 0.25 vs 0) | PASS — 24.7% vs 9.1%, set 7.64% vs 3.22% |
+| E | eyelet rows open (≥ 4 openings ≥ 1 d, settled and at +20%) | k2tog PASS (4 / 5); **ssk FAIL (2 / 4)** |
+| E | the eyelet swatches jam at a different extension | PASS — 47% and 42% against 23% |
+| D | jersey is softer and jams later across the courses | PASS — jam 50% vs 23%; 0.79× as stiff |
+| R | rib jams ≥ 1.25× later across the courses, and draws in ≤ 0.95× at rest | **FAIL as written** — no jam within 60% (§7); width 0.843× |
+| S | no pass-through (plain, eyelet, rib course; audited) | PASS — 0 deep overlaps; certificate 2.65 M / 2.65 M substeps |
+| W | the page keeps drawing while it settles (worker) | PASS — p95 33.4 ms, longest 66.7 (main thread: 166.7 / 199.9) |
+
+### 9. Size against speed (this solver, settling frames; not gated)
+
+`--scale`, stockinette N × N, settling, on this container (with the gate's four simulations running
+beside it, so read the ratios more than the absolutes):
+
+| swatch | points | contact pairs | ms a substep | ms a 32-substep frame | µs a point |
+|---|---|---|---|---|---|
+| 10 × 10 | 3,476 | 13,702 | 1.47 | 47 | 0.42 |
+| 20 × 20 | 13,781 | 56,241 | 6.73 | 215 | 0.49 |
+| 30 × 30 | 30,909 | 117,084 | 17.74 | 568 | 0.57 |
+| 40 × 40 | 54,861 | 188,108 | 33.21 | 1,063 | 0.61 |
+
+About linear in points, a little worse per point as the swatch grows (the contact list). The stepped
+test costs far more WALL time than the continuous one at the same solver speed: a 10 × 10 wale cycle is
+~61 steps of ~80 held frames (≈ 7,000 frames, 8–20 min in Node depending on load), a course cycle
+~26,000 frames (≈ 45 min), the audited rib course ≈ 110 min. 10 × 10 is still the only size that is
+interactive (~20 sim frames a second on one core); 20 × 20 is ~5.
+
+### 10. Screenshots
+
+`docs/img/knit-lab/`: `jersey-rib-settled.png` (stockinette and 1×1 rib settled, side by side, cast-on
+still pinned at the drawn width), `rib-mid-course-pull.png` (rib held at +30% across the courses),
+`course-plot.png` (rib and jersey along the courses, log load), `panel.png`. Phase 2's and phase 1's
+are kept.
+
+### 11. What is untested / not done (phase 3)
+
+- **The course direction past the jam** (§5): friction ratchets there; jersey's course cycle and its loss
+  are not meaningful past its last settled step (0.91 M at 56%).
+- **Repeatability**: one replica pair per settings is measured; a real error bar wants tens.
+- **Frictionless multistability** is diagnosed (two rest states at one extension) but not removed.
+- **Rib and ssk are checked against their charts on the drawn start only** (linking numbers); after the
+  start the pass-through certificate carries topology, as before.
+- **Purl-only fabric (reverse stockinette), seed, other ribs** are one-line charts and untested.
+- **The page's course test** runs the same code; it was driven once by the screenshot tool; the page's
+  numbers differ from the gate's in the last bits, as in phase 2.
+- **No CI** covers any knit-lab file; run the gate by hand (≈ 2 h on 4 cores, the audited rib course
+  pull being the longest run; `--reuse` re-judges a finished run's output in seconds).
 
 ## Phase 2 — what changed and what it measured
 
@@ -127,7 +413,7 @@ p95 < 60 and nothing over 100 ms; the worker's longest gap is closer to it than 
 performance work: a sim frame is still ~40–45 ms (1.3 ms a substep), so the swatch moves at ~22 frames
 a second of simulation while the page draws at its own rate.
 
-### Rate
+### Rate (superseded by phase 3 §2–§3)
 
 `--rates` (0.5 d/s instead of 1.5): plain μ 0.25 loses 9.1% with 4% set (29.5% / 8% at 1.5),
 frictionless 2.4% with 2% set (4.5% / 3%).
@@ -150,12 +436,12 @@ phase-1 `1-start.png` … `4-end-of-pull.png`.
 
 ### What is untested / not done (phase 2)
 
-- **Rate dependence of friction's loss** (above) — measured, not explained.
+- ~~**Rate dependence of friction's loss** (above) — measured, not explained.~~ Explained and fixed in phase 3 §2.
 - **Permanent set read off the curves, not off a released swatch**: releasing the comb to the preload
   after unloading was tried and the comb reading is unreliable in compression (the comb moved down
   while the bottom jaw read near zero), so it was dropped.
-- **Only the eyelet chart** exercises yo / k2tog; ssk is the same case with the list reversed and is
-  untested; increases (two children in one parent) are allowed by the record and never built.
+- ~~**Only the eyelet chart** exercises yo / k2tog; ssk is the same case with the list reversed and is
+  untested;~~ ssk built and gated in phase 3; increases (two children in one parent) are allowed by the record and never built.
 - **The decrease geometry is one sweep's optimum** at this gauge and yarn; another wale pitch may need
   the sweep re-run (the gate's linking check will say so).
 - **The page's drag-to-pull** goes through the worker and has no committed check.
@@ -166,14 +452,14 @@ phase-1 `1-start.png` … `4-end-of-pull.png`.
 | file | what |
 |---|---|
 | `knit-lab.html`, `knit-lab.css` | the page (site tokens, Field Notes chrome, `noindex`) |
-| `knit-lab.js` | the page: draws what the engine reports (2D canvas, depth-sorted shaded tubes), swatch choice, drag-to-pull, the load–unload plot + CSV |
+| `knit-lab.js` | the page: draws what the engine reports (2D canvas, depth-sorted shaded tubes), swatch choice (stockinette, k2tog / ssk eyelets, 1×1 rib), pull direction (along the wales / across the courses, side jaws drawn), drag-to-pull (wales only), the load–unload plot (settled steps) + CSV |
 | `knit-lab-engine.js`, `knit-lab-worker.js` | runs a `KnitSim` and reports by message; the worker hosts it (`#WORKER=0`: on the page's thread) |
-| `knit-lab-sim.js` | the simulator, pure (no DOM): initial geometry, XPBD constraints, jaws, the test protocol, certificate. `PARAMS` and `DECREASE_SHAPE` at the top hold every constant |
-| `knit-lab-topology.js` | the knit record (see below), `makeStockinette`, `makeEyelet` and the validator |
-| `knit-lab-analysis.js` | linking numbers, the jam, hysteresis and set, holes — read by the page and the gate |
-| `tools/verify-knit-lab.mjs` | every phase-2 number in this doc and its must-fails (`--browser` the worker gate, `--rates` the slow runs) |
-| `tools/shot-knit-lab.mjs` | the screenshots, through the real page in headless Chromium |
-| `docs/img/knit-lab/` | phase 2: both swatches settled and at +20%, the load–unload plot; phase 1: `1-start.png` … `4-end-of-pull.png` |
+| `knit-lab-sim.js` | the simulator, pure (no DOM): initial geometry (knit and purl), XPBD constraints, friction with slip memory, jaws (comb, cast-on, rail, side jaws), the stepped test, certificate. `PARAMS` and `DECREASE_SHAPE` at the top hold every constant |
+| `knit-lab-topology.js` | the knit record (see below), `makeStockinette` (any knit / purl per wale), `makeRib`, `makeEyelet` (k2tog or ssk) and the validator |
+| `knit-lab-analysis.js` | linking numbers (signed: knit −1, purl +1), the decreases' order, the jam, hysteresis and set (per settled step), holes — read by the page and the gate |
+| `tools/verify-knit-lab.mjs` | every phase-3 number in this doc and its must-fails (`--browser` the worker gate, `--scale` the size table, `--reuse <dir>` re-judges saved runs; ≈ 2 h on 4 cores) |
+| `tools/shot-knit-lab.mjs` | the screenshots, through the real page in headless Chromium (`--runs <gate out>` draws the course plot from the gate's runs; `--phase2` the phase-2 set) |
+| `docs/img/knit-lab/` | phase 3: `jersey-rib-settled.png`, `rib-mid-course-pull.png`, `course-plot.png`, `panel.png`; phase 2: both swatches settled and at +20%, the load–unload plot; phase 1: `1-start.png` … `4-end-of-pull.png` |
 
 `textile-knit-loops.js` is imported (its `loopPoint` jersey curve gives the starting x/y) and not
 modified. `textile-stretch-simulator.*` is untouched. Nothing from Asunder Knit or any commercial
@@ -186,8 +472,9 @@ order — and `loops`, each `{ id, course, slot, kind, through }`. **`through` i
 the ids of the loops of the previous course this loop was pulled through.
 
 - plain knit: `through: [a]`
+- purl (phase 3): `kind: 'purl'`, `through: [a]` — pulled through from the front
 - yarn over: `through: []`
-- k2tog / ssk: `through: [a, b]`, order = which parent lies on top
+- k2tog / ssk: `through: [a, b]`, order = which parent lies on top (k2tog: the right one; ssk: the left)
 - cast-on: course 0, `through: []`
 
 `validateTopology()` refuses a parent outside the previous course, a loop nothing holds (it would
