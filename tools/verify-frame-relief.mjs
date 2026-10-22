@@ -519,7 +519,7 @@ const MUTANTS = [
   { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
   // phase 3a, the scroll: the gap clamp removed, the eye under the floor, a
   // child laid off its parent's back
-  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return', to: 'if (true) return', breaks: ['SC3', 'SC6', 'SC7'] },
+  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return', to: 'if (true) return', breaks: ['SC3', 'SC6', 'SC7', 'OR3'] },
   { id: 'the-tightness-range-not-fitted', file: 'filigree', from: 'fitMemo.set(key, fitUncached({ ...spec, wire: t }, t))', to: 'fitMemo.set(key, { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] })', breaks: ['SC7'] },
   { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2', 'SC3'] },   // the eye itself is then a gap of 0.2 mm
   { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wire + tw) / 2 - EMBED_MM;', to: 'const off = (wire + tw) / 2 + 0.5;', breaks: ['SC6'] },
