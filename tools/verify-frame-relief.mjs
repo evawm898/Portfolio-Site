@@ -366,7 +366,7 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
 
 /* ================= NEGATIVE CONTROL ================= */
 const MUTANTS = [
-  { id: 'an-open-edge', file: 'relief', from: 'mesh.quad(T(V - 1, c), B(V - 1, c), B(V - 1, c + 1), T(V - 1, c + 1)); // far end', to: '', breaks: ['W'] },
+  { id: 'an-open-edge', file: 'relief', from: 'mesh.quad(T(V - 1, c), B(V - 1, c), B(V - 1, c + 1), T(V - 1, c + 1)); // far end', to: '', breaks: ['W', 'SC1', 'SC6'] },   // the scroll wires close on the same far-end cap
   // floats at BOTH ends: a mullion lifted off the sill alone still hangs from its light's springing, one region
   { id: 'a-detached-mullion', file: 'geometry', from: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY], [info.mullionX[i - 1], subSpring], [1, 0], 2);', to: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY + 2], [info.mullionX[i - 1], subSpring - 3], [1, 0], 2);', breaks: ['C', 'B'] },
   { id: 'the-mesh-offsets-by-itself', file: 'relief', from: 'const off = offsetCurve(S, d);', to: 'const off = S.pts.map((q, i) => [q[0] + d * S.nrm[i][0], q[1] + d * S.nrm[i][1]]);', breaks: ['R'] },
@@ -376,8 +376,8 @@ const MUTANTS = [
   { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
   // phase 3a, the scroll: the gap clamp removed, the eye under the floor, a
   // child laid off its parent's back
-  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (g.gap < MIN_FEATURE_MM) {', to: 'if (false) {', breaks: ['SC3'] },
-  { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2'] },
+  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (g.gap < MIN_FEATURE_MM) {', to: 'if (false) {', breaks: ['SC3', 'SC6'] },
+  { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2', 'SC3'] },   // the eye itself is then a gap of 0.2 mm
   { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wire + tw) / 2 - EMBED_MM;', to: 'const off = (wire + tw) / 2 + 0.5;', breaks: ['SC6'] },
   { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
 ];
