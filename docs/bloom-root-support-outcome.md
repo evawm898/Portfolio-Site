@@ -130,6 +130,35 @@ The read-out says it (`FOOT WIDTH CAPPED by the ring's own room …`, the asked 
 widths and the arc), and `FOOT ROOM UNDER THE FLOOR` where the arc is under 1.6 mm and
 the floor wins (40 petals × 6 whorls, inner rings).
 
+**THE CAP'S RING IS THE EXPORT FLOOR'S, IN BOTH MODES — CI FOUND THE FIRST CUT
+MODE-DEPENDENT.** `INFILL: x sheetThickness 0.60` built 91,360 triangles live and
+108,928 in export. The area rule places a ring from `sqrt(width × sheet)`, and the sheet
+is floored to 1.00 mm at export, so on a 0.60 mm sheet the LIVE ring sits nearer the axis
+(×0.775): the cap bound live where it did not in export, the feet differed, and the
+infill — planned against the outline the feet set — differed in TOPOLOGY. Which feet a
+print gets is the export's question and a topology may not depend on the mode (session
+32's rule, a seventh time), so the arc is measured on the area rule at `max(sheet,
+MIN_FEATURE_MM)` in both modes (`footCapRadiusMm` on the ring, the sphere's Rd floor at
+the export thickness too). **Where the sheet is at or above the floor that IS the ring's
+own radius, by branch** — every export build and every live build on a printable sheet
+reads the radius it read, and only a live build on a sub-millimetre sheet whose cap binds
+moves. The gates restate it from the controls (`footCapRadiusRestated`: the ring's radius
+× `sqrt(floor / sheet)`, never the builder's record): FC1 and Z3 read it.
+
+**AND A FOOT CAPPED EXACTLY AT ITS ARC MEETS A SLIT TUBE'S COLUMNS TO THE BIT — the
+aligned weld, declared.** At 12 petals the cap binds (6.40 asked, 5.672 mm of arc on a
+10.832 mm ring) and the slit tube's panel columns land on the capped feet's margin
+vertices exactly, so the census's exact-position weld reads a petal and a tube panel as
+ONE shell: 14 → 12 shells at k 1, the ray-parity half of O2 reads the merged shell
+"inward" (its ray crosses the welded neighbour once), and the by-design overlap counts
+as within-shell pairs — 263 / 768 / 986 / 1,457 at k 1 / 2 / 3 / 4, 2,236 at k 6, 1,457
+on the SNAP row, 530 on the thin sheet. **With the cap one part in a million under the
+arc every one reads clean and its base shell count** (14 / 15 / 19 shells at k 1 / 2 / 6,
+0 disagreements), and the base tree reads 0 — the vertex-welded shell definition, the
+sepal ALIGNED WELD and STYLE-at-272 class, not a fold. Declared by value in
+`SELF_INTERSECTION_XFAIL` (which also excuses O2 on those rows), never nudged: pulling
+the cap off its arc would be a typed constant standing for nothing.
+
 ## 5. Gates
 
 - **T4 restated** (it asserted the pin): every built sepal's root and untapered rows,
@@ -138,7 +167,12 @@ the floor wins (40 petals × 6 whorls, inner rings).
 - **T5** (new): every leaf blade — simple, lobed, each compound leaflet at its own
   length — read off the file on every row clear of its rim taper (row 0 is held by the
   petiole). A compound leaf whose rachis passes 35 mm is entered even where no leaflet
-  does (the state on which a leaflet reading the rachis would taper).
+  does (the state on which a leaflet reading the rachis would taper). **A blade the rim taper covers whole is a DECLARED BLINDNESS** (found by CI on the 3.5
+  and 5 mm tooth-floor blades, the narrowest 3 mm leaf, the carnation's 6 mm linear leaves,
+  `lobedWidth` min and a 12-tooth depth-1 blade): where even the widest row sits under
+  `RIM_TAPER_MM` of either margin the rim law sets every row's thickness and the root law
+  never shows bare in the file. Decided from the rim record's own distances; a blade wide
+  enough to read that still yields no row stays a failure.
 - **T6** (new): the petiole's rooted ring, **read off the file** (the cluster of
   `LEAF_PETIOLE_SIDES` vertices one distance from the axis in that plane), is at least
   half the restated root, or exactly at the stem's restated cap. **Its first cut read
@@ -180,7 +214,36 @@ the floor wins (40 petals × 6 whorls, inner rings).
 
 ### 6b. Census
 
-*(filled from CI's X1 / X2 and the edge-profile gate)*
+**26 declared magnitudes moved, every one re-recorded by value** (`node
+tools/bloom-xfail-magnitudes.mjs --include-refused`, then all 25 exportable rows re-run
+through the real export gate in Chromium: PASS, 25 of 25, every X1 at its new record).
+Every mover is a row the foot cap binds on:
+
+- **The FAN per-petal rows** (the foot's span is the fan's step): `ALL PER-PETAL MAX x 8/side x
+  60deg` 935 → 901, and nine `petalNTilt` / seven `petalNCurl` max rows by a few pairs and a
+  shallower span (e.g. `petal9Tilt` 0.5158 → 0.3858 mm, `petal8Curl` 390 → 370).
+- **Two hemisphere-at-spread-0.6 rows got much WORSE — reported, not tuned around**:
+  `DOME: rise 1 x RADIAL x spread min (0.6)` **272 → 1,424 pairs, 0.4983 → 0.6709 mm**, and
+  `x 6 layers` **264 → 1,268, 0.4123 → 1.0124**. At spread 0.6 the ring is 2.65 mm, so the
+  cap takes the foot 6.40 → 2.08 mm while the blade stays 16 mm wide: the root blend
+  collapses five times faster and the blade now folds at u 0.3–0.5 too (`node
+  tools/bloom-census-attribute.mjs`: base 177 root blend + 95 foot; here 858 root blend +
+  212 foot + 354 blade). The ruled cap acting on the tightest ring the arrangement reaches;
+  both rows were already declared (EFFECTIVE TILT PAST 90). The same family's CONTINUOUS and
+  40-petal rows moved a few pairs with shallower spans.
+- **The dome-lean pair, the fiddlehead, two aligned-sepal rows and `ALL MAX`** (78,222 →
+  77,896, span unmoved; its refusal count 3,334,106 unmoved — XR1 green in CI).
+- **Seven tube rows declared new** — the aligned weld above (§4).
+
+**E2 (the edge-profile gate, smoke subset): four declared rim turns re-recorded** (the
+LOBED rulings shoulder 28.347 → 4.574°, the LOBED drawn spine → 35.159°, the two
+120 mm-sepal WING rows → 0.0201°) **and the three new block-76 smoke rows declared**: the
+120 mm simple leaf on a 60 mm stem, with and without the 3 mm stem's cap, at 3.100062°
+over the allowance — identical on a worktree of `8403b47`, the leaf's own tip, not the
+root — and `width 46 x 40 petals` at 0.779637°, the root blend into the capped 5.267 mm
+foot (base 10.000 mm, 43.483°). The three non-smoke rows over the allowance (120 mm leaf
+× arch 90 at 46.93°, the 120 mm LOBED leaf at 46.45°, width 46 × 40 × 6 at 46.89°) are not
+reached by CI's subset and their base readings were not taken; recorded, not declared.
 
 ### 6c. Combination gate
 
