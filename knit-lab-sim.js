@@ -704,7 +704,7 @@ export class KnitSim {
       const offBefore = this.pullOffset, sideBefore = this.sideOffset;
       // force-controlled comb while settling, and through a course test (it holds the preload while the
       // width changes); speed-limited so a contact spike cannot fling it off the loops
-      if (this.phase === 'settling' || (course && this.phase !== 'held')) {
+      if (this.phase === 'settling' || (course && this.phase !== 'held' && !this.combFixed)) {
         const v = Math.max(-P.COMB_MAX_SPEED, Math.min(P.COMB_MAX_SPEED, -P.COMB_FOLLOW * (this.combLoad - P.PRELOAD)));
         this.pullOffset += v * dt;
       }
