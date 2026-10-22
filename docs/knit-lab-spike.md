@@ -14,7 +14,9 @@ record is kept below the next; where a later phase overturned an earlier one, it
 
 **Outcome: not merged.** Gate Q's frictionless half fails (9.1% of the work lost against a 2% bar), the
 course-direction test blows up in the jam (gate I), and the step-size half of Q passes on this draw but
-replicas at fixed settings scatter more than the bar allows. ⟨RIB⟩ Every number below:
+replicas at fixed settings scatter more than the bar allows. **The rib question has an answer:** across
+the courses 1×1 rib draws in at rest (0.84× jersey's width) and jams later (71% against 50%, measured on a
+run past the gate's 60% range), both from the topology alone (§7). Every number below:
 `node tools/verify-knit-lab.mjs --browser --scale` on this container (Intel Xeon @ 2.10 GHz, 4 cores,
 Node 22), unless a section says otherwise. Model units throughout. Phase 2's record is below; where
 phase 3 overturned it, it says so there too.
@@ -205,7 +207,14 @@ carried by friction.
 - **Rib does not jam within the test's 60% range; jersey jams at 50%.** Rib reaches 60% at 119k — where
   jersey is at 171k by 50% and 570k by 55% — with no jam by `findJam`'s definition, so the gate's ratio
   is NaN and the check FAILS as written (the bar, ≥ 1.25× jersey's jam, is 62.5%, outside the range).
-  ⟨RIB150⟩
+  **Run on to 150% (`PULL_MAX_EXTENSION` 1.5, one run, not audited, not part of the gate): rib jams at
+  71%, at 152k — 1.42× jersey's 50%, past the gate's 1.25× bar.** Its curve: 50k at 30%, 82k at 50%,
+  113k at 60%, 134k at 70%, 299k at 80%; past its own jam the same friction ratchet as jersey's (§5) ends
+  it on the strain stop at 89% (519k, 10.6% strain). Its released width that run was 30.7 d (31.0 in the
+  gate run, 30.5 in the page): the width settle scatters by about 1%.
+  So both halves of the rib result come out of the topology, untuned: **it draws in (0.83–0.84×) and it
+  jams later (1.42×)**. The gate fails only because its test range (60%) stops short of the rib's jam;
+  widening the range for course runs is one constant and an hour of gate time, not done here.
 - Rib's soft region per unit strain per d of height is 5,008 against jersey's 5,487 (0.91×).
 - The rib's cycle (to 60%, 119k) loses 73% of its small loading work with a 23% set — read nothing
   into it: it never loaded the knit.
@@ -251,7 +260,7 @@ has a must-fail, and every must-fail rejects.
 | E | eyelet rows open (≥ 4 openings ≥ 1 d, settled and at +20%) | k2tog PASS (4 / 5); **ssk FAIL (2 / 4)** |
 | E | the eyelet swatches jam at a different extension | PASS — 47% and 42% against 23% |
 | D | jersey is softer and jams later across the courses | PASS — jam 50% vs 23%; 0.79× as stiff |
-| R | rib jams ≥ 1.25× later across the courses, and draws in ≤ 0.95× at rest | **FAIL as written** — no jam within 60% (§7); width 0.843× |
+| R | rib jams ≥ 1.25× later across the courses, and draws in ≤ 0.95× at rest | **FAIL as written** — no jam within 60%; width 0.843×. Run to 150%: jam at 71% = 1.42× (§7) |
 | S | no pass-through (plain, eyelet, rib course; audited) | PASS — 0 deep overlaps; certificate 2.65 M / 2.65 M substeps |
 | W | the page keeps drawing while it settles (worker) | PASS — p95 33.4 ms, longest 66.7 (main thread: 166.7 / 199.9) |
 
