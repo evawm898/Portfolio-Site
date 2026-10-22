@@ -1,6 +1,6 @@
 // tools/verify-knit-lab.mjs — the knit-lab spike's numbers, measured in Node on the shipped modules.
 //
-//   node tools/verify-knit-lab.mjs [--out <dir>] [--jobs N] [--browser] [--scale] [--only a,b]
+//   node tools/verify-knit-lab.mjs [--out <dir>] [--jobs N] [--browser] [--scale] [--only a,b] [--reuse <dir>]
 //   node tools/verify-knit-lab.mjs --run '<spec json>'      one simulation, JSON on stdout (internal)
 //
 // Every simulation is its own child process (--jobs at a time, default 4). Each settles a 10 x 10
@@ -8,7 +8,7 @@
 // quasi-static (move the driven jaw one step, hold until the swatch is in equilibrium, record, repeat)
 // to LOAD_LIMIT and back, along the wales (the comb) or the courses (the side jaws). The pass-through
 // certificate is on for the audited runs. --only runs a subset of the checks' specs (iteration only:
-// the gate is the full run). --scale adds the size-vs-speed table (reported, not gated).
+// the gate is the full run). --scale adds the size-vs-speed table (reported, not gated). --reuse <dir> judges an earlier --out directory's runs whose spec is unchanged (re-running the rest).
 //
 // THE GATES. Every check is a pure function of measured runs, and every one is also handed an
 // input it must REJECT (a "must-fail"); a check that cannot fail is not a check.
@@ -184,7 +184,9 @@ function runChild(spec) {
 }
 console.log(`running ${RUN.length} simulations, ${JOBS} at a time…`);
 const t0 = Date.now(), runs = {}, queue = RUN.slice();
-await Promise.all(Array.from({ length: JOBS }, async () => { while (queue.length) { const s = queue.shift(); const r = await runChild(s); runs[s.name] = r; fs.writeFileSync(path.join(OUT, `${s.name}.json`), JSON.stringify(r)); console.log(`  ${s.name}: settled ${r.settle.frames} frames, test ${r.pull.frames} frames, ${r.pull.stepped ? `${r.pull.rows.length} steps (${r.pull.unconverged} unconverged)` : 'continuous'} (${fmt((r.settle.wallMs + r.pull.wallMs) / 1000, 0)} s)`); } }));
+const REUSE = opt('--reuse', null);   // a directory of earlier runs' JSON: judge those instead of re-running
+const fetchRun = async s => { const f = REUSE && path.join(path.resolve(REUSE), `${s.name}.json`); if (f && fs.existsSync(f)) { const r = JSON.parse(fs.readFileSync(f, 'utf8')); if (JSON.stringify(r.spec) === JSON.stringify(s)) return r; } return runChild(s); };
+await Promise.all(Array.from({ length: JOBS }, async () => { while (queue.length) { const s = queue.shift(); const r = await fetchRun(s); runs[s.name] = r; fs.writeFileSync(path.join(OUT, `${s.name}.json`), JSON.stringify(r)); console.log(`  ${s.name}: settled ${r.settle.frames} frames, test ${r.pull.frames} frames, ${r.pull.stepped ? `${r.pull.rows.length} steps (${r.pull.unconverged} unconverged)` : 'continuous'} (${fmt((r.settle.wallMs + r.pull.wallMs) / 1000, 0)} s)`); } }));
 console.log(`(${fmt((Date.now() - t0) / 1000, 0)} s)`);
 
 // per-run readings. soft: load per unit strain of the soft region; softW: the same per d of fabric
@@ -239,7 +241,10 @@ if (has('plain', 'plain-step0.5', 'plain-tol0.05', 'plain-step0.5-tol0.05', 'pla
   gate(quasiStatic(['plain', 'plain-step0.5', 'plain-tol0.05', 'plain-step0.5-tol0.05'].map(k => R[k])), 'μ 0.25: loss and set agree across step 1% / 0.5% x tolerance 0.2% / 0.05%');
   mustFail(quasiStatic([R['mf-phase2-fast'], R['mf-phase2-slow']]), 'the phase-2 test at 1.5 and 0.5 d/s');
   gate(frictionlessNoLoss(R['plain-mu0']), 'μ 0: the stepped cycle loses under 2%');
-  mustFail(frictionlessNoLoss(R['mf-phase2-mu0']), 'the phase-2 test, frictionless');
+  // (the phase-2 continuous test, frictionless, reads ~1% here — it never stops to settle, so it never
+  // crosses between the knit's two rest shapes — and so cannot be this check's must-fail.)
+  mustFail(frictionlessNoLoss(R.plain), 'the same test with friction (μ 0.25)');
+  console.log(`  (the phase-2 continuous test, frictionless: ${pct(R['mf-phase2-mu0'].cyc.lossFraction)} lost)`);
 }
 
 // ---- H: hold ----------------------------------------------------------------------------------
