@@ -16,14 +16,15 @@ const SHOT = { timeout: 120000 };   // a WebGL canvas on the runner's software G
 // scroller and the clip is CLAMPED to the viewport first: a clip reaching past the viewport makes Playwright resize the
 // viewport for the shot, which re-renders the turning WebGL canvas on the runner's software GL and hung the export cell
 // for 120 s there (the runner's fonts make the panel taller than this box's, so #secExport ended below the fold).
-const shotOf = async (sel) => {
+const shotOf = async (sel, timeout) => {   // a Lit cell gets LIT_SHOT_MS: a lit frame on the runner's software GL takes 55-120 s, and at 120 s which cell tripped was luck (runs 39777729024, 39780364382, 39785255238)
   const loc = page.locator(sel);
   await loc.evaluate((el) => el.scrollIntoView({ block: 'start' })); await page.waitForTimeout(100);
   const b = await loc.boundingBox(); const v = page.viewportSize();
   const x = Math.max(0, b.x), y = Math.max(0, b.y);
   const clip = { x, y, width: Math.min(b.x + b.width, v.width) - x, height: Math.min(b.y + b.height, v.height) - y };
-  return page.screenshot({ clip, ...SHOT });
+  return page.screenshot({ clip, ...SHOT, ...(timeout ? { timeout } : {}) });
 };
+const LIT_SHOT_MS = 300000;
 const save = (name, buf, caption) => { fs.writeFileSync(path.join(OUT, name), buf); cells.push({ name, caption }); console.log(`${name.padEnd(22)} ${caption}`); };
 
 const s = await openLantern({ storage: '', viewport: { width: 1440, height: 900 }, dsf: 2 });
@@ -83,13 +84,13 @@ save('backing-dusk.png', await shotOf('.ln-preview'), 'three colours, the dusk p
 await page.locator('#secBacking').evaluate((d) => { d.open = true; }); await page.locator('#secBacking').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('backing-panel.png', await shotOf('#secBacking'), 'the Backing section: on / off, colours, the palette and its swatches');
 await T(() => window.__lantern.view('lit')); await T(() => window.__lantern.fold.fit()); await page.waitForTimeout(800);
-save('lit.png', await shotOf('.ln-preview'), 'the Lit view, the page\'s opening view: a warm LED inside the star, the paper glowing, the cuts bright, the pattern thrown onto the wall and floor behind (the backing\'s tissue tinting the glow)');
+save('lit.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'the Lit view, the page\'s opening view: a warm LED inside the star, the paper glowing, the cuts bright, the pattern thrown onto the wall and floor behind (the backing\'s tissue tinting the glow)');
 await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.set('litRoom', 0.3)); await page.waitForTimeout(600);
-save('lit-day.png', await shotOf('.ln-preview'), 'room darkness 30 %: the lamp against daylight, the thrown pattern fading into a lit room');
+save('lit-day.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'room darkness 30 %: the lamp against daylight, the thrown pattern fading into a lit room');
 await T(() => window.__lantern.set('litRoom', 1)); await T(() => window.__lantern.set('litWarmth', 2000)); await T(() => window.__lantern.set('litWall', 1.2)); await page.waitForTimeout(600);
-save('lit-candle.png', await shotOf('.ln-preview'), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
+save('lit-candle.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
 await page.locator('#secLit').evaluate((d) => { d.open = true; }); await page.locator('#secLit').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
-save('lit-panel.png', await shotOf('#secLit'), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
+save('lit-panel.png', await shotOf('#secLit', LIT_SHOT_MS), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
 // Leave the Lit view through Folded and wait for TWO cheap frames to complete before hiding the canvas: a lit frame on
 // the runner's software GL takes most of a minute (every lit cell above took ~60 s against its sub-second wait), and
 // hiding the canvas while one is in flight left the next screenshot waiting on it past 120 s (runs 39777729024, 39780364382).
